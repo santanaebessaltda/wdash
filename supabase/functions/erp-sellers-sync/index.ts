@@ -1,7 +1,7 @@
 /**
- * erp-sellers-sync — JWT OWNER/MANAGER sincroniza os funcionários de 1 loja (botão Atualizar
- * em Configurações > Lojas > detalhe). Síncrono: não passa pela fila do worker.
- * Reusa o token salvo em erp_credential; 401 → login com a senha cifrada e persiste o token novo.
+ * erp-sellers-sync  -  JWT OWNER/MANAGER sincroniza os funcionarios de 1 loja (botao Atualizar
+ * em Configuracoes > Lojas > detalhe). Sincrono: nao passa pela fila do worker.
+ * Reusa o token salvo em erp_credential; 401  ->  login com a senha cifrada e persiste o token novo.
  */
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeaders } from "../_shared/cors.ts";
@@ -12,6 +12,7 @@ import {
   MillenniumHttpError,
   type ErpSeller,
 } from "../_shared/millenniumSellers.ts";
+import { canAccessStore, loadStaffCaller } from "../_shared/staffAuth.ts";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -117,23 +118,12 @@ Deno.serve(async (req) => {
 
   const admin = createClient(supabaseUrl, serviceKey);
 
-  const { data: identity } = await admin
-    .from("identity")
-    .select("id")
-    .eq("auth_user_id", userData.user.id)
-    .maybeSingle();
-  if (!identity) return json({ error: "identity_not_found" }, 403);
-
-  const { data: membership } = await admin
-    .from("membership")
-    .select("tenant_id")
-    .eq("identity_id", identity.id)
-    .eq("status", "ACTIVE")
-    .in("role", ["OWNER", "MANAGER"])
-    .limit(1)
-    .maybeSingle();
+  const membership = await loadStaffCaller(admin, userData.user.id);
   if (!membership) return json({ error: "forbidden" }, 403);
-  const tenantId = membership.tenant_id as string;
+  if (!canAccessStore(membership.role, membership.memberStoreIds, storeId)) {
+    return json({ error: "forbidden" }, 403);
+  }
+  const tenantId = membership.tenantId;
 
   const { data: store } = await admin
     .from("store")

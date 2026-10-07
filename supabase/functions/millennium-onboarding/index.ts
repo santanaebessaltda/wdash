@@ -21,6 +21,7 @@ import {
   type LoginReason,
   type ReportCheck,
 } from "../_shared/millennium.ts";
+import { loadStaffCaller } from "../_shared/staffAuth.ts";
 
 type OkResponse = { ok: true; session: string; stores: MillenniumStore[]; reclaimed?: boolean };
 type ErrResponse = { ok: false; reason: LoginReason; reports?: ReportCheck[] };
@@ -51,24 +52,6 @@ async function authedClients(req: Request) {
 
   const admin = createClient(supabaseUrl, serviceKey);
   return { userId: userData.user.id, admin };
-}
-
-async function tenantIdForAuthUser(admin: SupabaseClient, authUserId: string): Promise<string | null> {
-  const { data: identity } = await admin
-    .from("identity")
-    .select("id")
-    .eq("auth_user_id", authUserId)
-    .maybeSingle();
-  if (!identity?.id) return null;
-  const { data: memb } = await admin
-    .from("membership")
-    .select("tenant_id")
-    .eq("identity_id", identity.id)
-    .eq("status", "ACTIVE")
-    .order("is_owner", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  return (memb?.tenant_id as string | undefined) ?? null;
 }
 
 async function loadCredential(
@@ -167,7 +150,11 @@ Deno.serve(async (req) => {
   }
 
   const action = String(body.action ?? "").trim().toLowerCase();
-  const tenantId = await tenantIdForAuthUser(admin, userId);
+
+  // Controle ERP / sessao Millennium: so Gestor ou Gerente ACTIVE (nao vendedor).
+  const staff = await loadStaffCaller(admin, userId);
+  if (!staff) return json({ error: "forbidden" }, 403);
+  const tenantId = staff.tenantId;
 
   if (action === "logout") {
     const session = String(body.session ?? "").trim();

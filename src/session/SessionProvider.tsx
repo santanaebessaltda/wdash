@@ -73,7 +73,7 @@ function gravar(s: Session | null) {
     else window.localStorage.removeItem(CHAVE);
     window.localStorage.removeItem(CHAVE_LEGACY);
   } catch {
-    /* armazenamento indisponível */
+    /* armazenamento indisponivel */
   }
 }
 
@@ -102,7 +102,8 @@ function mergeWithCache(fromAuth: Session, cached: Session | null): Session {
         : fromAuth.onboardingStep === null
           ? null
           : Math.max(cached.onboardingStep, fromAuth.onboardingStep),
-    temporaryPassword: cached.temporaryPassword ? fromAuth.temporaryPassword : false,
+    // Flag de senha provisoria sempre do Auth/DB — cache nunca engole um reset admin.
+    temporaryPassword: fromAuth.temporaryPassword,
     companyName:
       cached.companyName && cached.onboardingStep === null ? cached.companyName : fromAuth.companyName,
     appInstalled: cached.appInstalled || fromAuth.appInstalled,
@@ -110,12 +111,12 @@ function mergeWithCache(fromAuth: Session, cached: Session | null): Session {
 }
 
 /**
- * O supabase-js emite SIGNED_IN de novo toda vez que a aba volta a ficar visível. Sessão igual
- * mantém o mesmo objeto (e o mesmo array de lojas) — senão as telas recarregam com skeleton.
+ * O supabase-js emite SIGNED_IN de novo toda vez que a aba volta a ficar visivel. Sessao igual
+ * mantem o mesmo objeto (e o mesmo array de lojas)  -  senao as telas recarregam com skeleton.
  */
 function keepIfSame(atual: Session | null, nova: Session): Session {
   if (!atual) return nova;
-  // Lojas vêm do banco sem ordem garantida: mesma lista em outra ordem = mesmas lojas.
+  // Lojas vem do banco sem ordem garantida: mesma lista em outra ordem = mesmas lojas.
   const mesmasLojas = storesKey(atual.stores) === storesKey(nova.stores);
   const candidata = mesmasLojas ? { ...nova, stores: atual.stores } : nova;
   return JSON.stringify(atual) === JSON.stringify(candidata) ? atual : candidata;
@@ -123,7 +124,7 @@ function keepIfSame(atual: Session | null, nova: Session): Session {
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
-  // PWA: restaurar cache na 1ª paint — senão / e RequireSession bounce pro login.
+  // PWA: restaurar cache na 1 paint  -  senao / e RequireSession bounce pro login.
   const [session, setSession] = useState<Session | null>(() =>
     typeof window !== "undefined" ? ler() : null,
   );
@@ -154,7 +155,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (cached) setSession(cached);
 
       // Fonte de verdade no boot = onAuthStateChange (INITIAL_SESSION).
-      // NÃO chamar getSession antes do listener: no PWA costuma vir null e
+      // NAO chamar getSession antes do listener: no PWA costuma vir null e
       // apagar wedash-session / mandar pro login.
       const { data } = sb.auth.onAuthStateChange(async (event, authSession) => {
         if (cancel) return;
@@ -177,7 +178,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         }
 
         if (event === "TOKEN_REFRESHED") {
-          // Só JWT — não reidrata (preserva onboarding local).
+          // So JWT  -  nao reidrata (preserva onboarding local).
           return;
         }
 
@@ -195,7 +196,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
           if (!authSession?.user) {
             // INITIAL_SESSION null: race comum no PWA / tab resume.
-            // Se ainda há token ou cache, NÃO desloga.
+            // Se ainda ha token ou cache, NAO desloga.
             if (event === "INITIAL_SESSION") {
               if (hasStoredAuthToken() || cached) {
                 const retry = await sb.auth.getSession();
@@ -235,7 +236,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
               return merged;
             });
           } else {
-            // JWT ok, hydrate falhou (rede) — manter cache.
+            // JWT ok, hydrate falhou (rede)  -  manter cache.
             setSession((atual) => atual ?? cached ?? ler());
           }
           finishBoot();
@@ -243,7 +244,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       });
       unsub = () => data.subscription.unsubscribe();
 
-      // Safety: se INITIAL_SESSION nunca vier, não trava a UI.
+      // Safety: se INITIAL_SESSION nunca vier, nao trava a UI.
       window.setTimeout(() => {
         if (!cancel) finishBoot();
       }, 2500);
@@ -268,7 +269,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(() => {
-    // Não desconecta Millennium — só Configurações > Integração ERP.
+    // Nao desconecta Millennium  -  so Configuracoes > Integracao ERP.
     clearSavedPeriod();
     setSession(null);
     gravar(null);

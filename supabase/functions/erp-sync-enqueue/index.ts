@@ -1,10 +1,11 @@
 /**
- * erp-sync-enqueue — JWT OWNER/MANAGER enfileira SEED | LIGHT | FORCE | RANGE | REGISTRY.
- * REGISTRY (Atualizar cadastros, Integrações) = só Gestor (OWNER).
+ * erp-sync-enqueue  -  JWT OWNER/MANAGER enfileira SEED | LIGHT | FORCE | RANGE | REGISTRY.
+ * REGISTRY (Atualizar cadastros, Integracoes) = so Gestor (OWNER).
  * Rate limit FORCE: ver FORCE_COOLDOWN_MS (0 = off p/ teste).
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeaders } from "../_shared/cors.ts";
+import { loadStaffCaller, managerAllowedStores } from "../_shared/staffAuth.ts";
 
 type JobKind = "SEED" | "LIGHT" | "FORCE" | "FORCE_LIGHT" | "RANGE" | "BACKFILL" | "REGISTRY";
 
@@ -73,7 +74,7 @@ Deno.serve(async (req) => {
 
   const payload: { from?: string; to?: string; storeIds?: string[] } = {};
   if (kind === "FORCE" || kind === "FORCE_LIGHT") {
-    // Só hoje — client pode mandar from=to=hoje (audit); worker usa fuso da loja.
+    // So hoje  -  client pode mandar from=to=hoje (audit); worker usa fuso da loja.
     if (isIsoDay(body.from) && isIsoDay(body.to) && body.from === body.to) {
       payload.from = body.from;
       payload.to = body.to;
@@ -95,27 +96,16 @@ Deno.serve(async (req) => {
 
   const admin = createClient(supabaseUrl, serviceKey);
 
-  const { data: identity, error: idErr } = await admin
-    .from("identity")
-    .select("id")
-    .eq("auth_user_id", userData.user.id)
-    .maybeSingle();
-  if (idErr || !identity) return json({ error: "identity_not_found" }, 403);
+  const membership = await loadStaffCaller(admin, userData.user.id);
+  if (!membership) return json({ error: "forbidden" }, 403);
+  if (kind === "REGISTRY" && membership.role !== "OWNER" && membership.role !== "ADMIN_GLOBAL") {
+    return json({ error: "forbidden" }, 403);
+  }
 
-  const { data: membership, error: memErr } = await admin
-    .from("membership")
-    .select("id, tenant_id, role, status")
-    .eq("identity_id", identity.id)
-    .eq("status", "ACTIVE")
-    .in("role", ["OWNER", "MANAGER"])
-    .limit(1)
-    .maybeSingle();
-  if (memErr || !membership) return json({ error: "forbidden" }, 403);
-  if (kind === "REGISTRY" && membership.role !== "OWNER") return json({ error: "forbidden" }, 403);
+  const tenantId = membership.tenantId;
+  const managerScope = managerAllowedStores(membership.role, membership.memberStoreIds);
 
-  const tenantId = membership.tenant_id as string;
-
-  // FORCE/RANGE: opcionalmente só as lojas do StorePicker (não "Todas").
+  // FORCE/RANGE: opcionalmente so as lojas do StorePicker (nao "Todas").
   if (
     (kind === "FORCE" || kind === "FORCE_LIGHT" || kind === "RANGE") &&
     Array.isArray(body.storeIds) &&
@@ -129,6 +119,9 @@ Deno.serve(async (req) => {
     if (ids.length === 0) {
       return json({ error: "invalid_store" }, 400);
     }
+    if (managerScope && ids.some((id) => !managerScope.includes(id))) {
+      return json({ error: "forbidden" }, 403);
+    }
     const { data: stores, error: storeErr } = await admin
       .from("store")
       .select("id")
@@ -141,6 +134,11 @@ Deno.serve(async (req) => {
     payload.storeIds = ids;
   }
 
+  // Gerente com lojas vinculadas: nunca enfileira sync da rede inteira.
+  if (managerScope && !payload.storeIds) {
+    payload.storeIds = managerScope;
+  }
+
   const { data: credential, error: credErr } = await admin
     .from("erp_credential")
     .select("id, status, sync_paused")
@@ -150,13 +148,13 @@ Deno.serve(async (req) => {
   if (credential.status === "INVALID" || credential.status === "NOT_CONFIGURED") {
     return json({ error: "credential_invalid" }, 400);
   }
-  // Desconectado: o worker não pega jobs de integração pausada — job ficaria QUEUED para sempre.
+  // Desconectado: o worker nao pega jobs de integracao pausada  -  job ficaria QUEUED para sempre.
   if (credential.sync_paused) return json({ error: "integration_paused" }, 409);
 
   if ((kind === "FORCE" || kind === "FORCE_LIGHT") && FORCE_COOLDOWN_MS > 0) {
     const windowMs = FORCE_COOLDOWN_MS;
     const since = new Date(Date.now() - windowMs).toISOString();
-    // Abertos: pela criação. Concluídos: pelo finished_at (5 min contam a partir do fim do job).
+    // Abertos: pela criacao. Concluidos: pelo finished_at (5 min contam a partir do fim do job).
     const [openRes, doneRes] = await Promise.all([
       admin
         .from("sync_job")
@@ -205,7 +203,7 @@ Deno.serve(async (req) => {
       const recentIds = jobStoreIds((row as { payload?: unknown }).payload);
       let hits = false;
       if (requestedIds == null) {
-        hits = true; // Opção A: qualquer FORCE recente
+        hits = true; // Opcao A: qualquer FORCE recente
       } else if (recentIds == null) {
         hits = true; // "Todas" recente bloqueia cada loja
       } else if (requestedIds.some((id) => recentIds.includes(id))) {
@@ -225,9 +223,9 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Atualizar repetido (outra pessoa do tenant clicou antes): acompanha o job aberto que já cobre
-  // as lojas pedidas em vez de chamar o ERP de novo. "Todas" cobre qualquer loja; loja não cobre
-  // "Todas". Rodada automática fica de fora (sessão caída nela falha sem relogin).
+  // Atualizar repetido (outra pessoa do tenant clicou antes): acompanha o job aberto que ja cobre
+  // as lojas pedidas em vez de chamar o ERP de novo. "Todas" cobre qualquer loja; loja nao cobre
+  // "Todas". Rodada automatica fica de fora (sessao caida nela falha sem relogin).
   if (kind === "FORCE") {
     const { data: open, error: openErr } = await admin
       .from("sync_job")

@@ -18,6 +18,14 @@ Pedir para subir grava o `main` no GitHub. O resto acompanha esse push:
 - **Sincronizador:** Fly `wdash-millennium-sync`, região `gru`, uma máquina. A Action publica quando mudam o worker, `src/data/wedash` ou `src/lib`.
 - Commit sem `Co-authored-by`.
 
+### Segurança multi-tenant (DECIDIDO — 2026-10-07)
+Remediação do security audit (standard):
+- **ERP / Millennium:** Edges de controle (`millennium-onboarding`, enqueue, sellers-sync) exigem membership ACTIVE `OWNER|MANAGER|ADMIN_GLOBAL`. Persistência de credencial e wipe = só Gestor (`OWNER|ADMIN_GLOBAL`).
+- **Gerente + lojas:** `membership_store` vazio = todas; com vínculos, enqueue/sellers-sync não cruzam loja fora do escopo. Escrita de `membership_store` só `service_role` (Edge).
+- **Segredos ERP:** `password_ciphertext` e `millennium_session*` fora do SELECT do `authenticated` (migration `20261007140000_security_harden`).
+- **Convite:** `redirectTo` = só `APP_ORIGIN` (nunca origin do body).
+- **Senha provisória:** `mergeWithCache` sempre usa a flag do Auth/DB; cliente limpa só via RPC `clear_own_temporary_password` (não pode setar `true`).
+
 ### Sem white label (DECIDIDO — 2026-09-27; substitui "URL do tenant" de 2026-09-21)
 - A plataforma aparece **sempre como WDash** (sidebar, login, onboarding, telas de acesso) — `PRODUCT_NAME` + `WedashBrand` (`src/components/wedash/WedashBrand.tsx`). Sem nome, logo ou cor personalizados por empresa.
 - **Acesso sempre pelo endereço padrão da WDash.** Sem slug, sem `wdash.app/{slug}`, sem `{empresa}.wdash.app`.

@@ -256,15 +256,8 @@ export async function updatePassword(novaSenha: string): Promise<{ ok: boolean; 
   if (error) return { ok: false, error: mensagemErroSenhaAuth(error) };
 
   // Recovery define senha definitiva  -  limpa a flag de provisoria antes do signOut.
-  const { data: userData } = await sb.auth.getUser();
-  const uid = userData.user?.id;
-  if (uid) {
-    const { error: flagErr } = await sb
-      .from("identity")
-      .update({ temporary_password: false })
-      .eq("auth_user_id", uid);
-    if (flagErr) console.warn("updatePassword temporary_password:", flagErr.message);
-  }
+  const { error: flagErr } = await sb.rpc("clear_own_temporary_password");
+  if (flagErr) console.warn("updatePassword temporary_password:", flagErr.message);
 
   limparRecovery();
   await sb.auth.signOut();
@@ -429,7 +422,8 @@ export async function createAccess(
   const { error } = await sb.auth.updateUser({ password: input.password });
   if (error) return { ok: false, error: mensagemErroSenhaAuth(error) };
 
-  await sb.from("identity").update({ temporary_password: false }).eq("auth_user_id", uid);
+  const { error: flagErr } = await sb.rpc("clear_own_temporary_password");
+  if (flagErr) console.warn("createAccess temporary_password:", flagErr.message);
   return { ok: true, name, avatarUrl };
 }
 

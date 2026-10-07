@@ -38,15 +38,11 @@ function emailOk(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-function inviteRedirect(origin: unknown): string | undefined {
-  if (typeof origin !== "string") return undefined;
-  try {
-    const u = new URL(origin);
-    if (u.protocol !== "https:" && u.protocol !== "http:") return undefined;
-    return `${u.origin}/invite/link`;
-  } catch {
-    return undefined;
-  }
+/** Origem fixa do app — nunca aceitar origin do body (open redirect no e-mail). */
+const APP_ORIGIN = (Deno.env.get("APP_ORIGIN") ?? "https://wdash.app").replace(/\/$/, "");
+
+function inviteRedirect(): string {
+  return `${APP_ORIGIN}/invite/link`;
 }
 
 const ROLE_LABEL: Record<Role, string> = { OWNER: "Gestor", MANAGER: "Gerente" };
@@ -69,11 +65,10 @@ async function inviteSellerAccount(
   admin: SupabaseClient,
   tenantId: string,
   email: string,
-  origin: unknown,
 ): Promise<{ userId: string } | { error: string }> {
   const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
     data: { company: await companyName(admin, tenantId), role: "Equipe de vendas" },
-    redirectTo: inviteRedirect(origin),
+    redirectTo: inviteRedirect(),
   });
   if (error || !data.user) return { error: authErrorCode(error) };
   return { userId: data.user.id };
@@ -84,11 +79,10 @@ async function resendSellerInvite(
   admin: SupabaseClient,
   tenantId: string,
   email: string,
-  origin: unknown,
 ): Promise<string | null> {
   const { error } = await admin.auth.admin.inviteUserByEmail(email, {
     data: { company: await companyName(admin, tenantId), role: "Equipe de vendas" },
-    redirectTo: inviteRedirect(origin),
+    redirectTo: inviteRedirect(),
   });
   return error ? authErrorCode(error) : null;
 }
@@ -243,8 +237,8 @@ Deno.serve(async (req) => {
     if (!who) return json({ error: "forbidden" }, 403);
     const storeSellerId = typeof body.storeSellerId === "string" ? body.storeSellerId : "";
     const storeId = typeof body.storeId === "string" ? body.storeId : "";
-    const invite = (email: string) => inviteSellerAccount(admin, tenantId, email, body.origin);
-    const resend = (email: string) => resendSellerInvite(admin, tenantId, email, body.origin);
+    const invite = (email: string) => inviteSellerAccount(admin, tenantId, email);
+    const resend = (email: string) => resendSellerInvite(admin, tenantId, email);
     const result =
       action === "seller_list" ? await sellerList(admin, who, tenantId, storeId)
       : action === "seller_invite" ? await sellerInvite(admin, who, { tenantId, storeSellerId, email: String(body.email ?? ""), origin: body.origin, invite })
@@ -327,7 +321,7 @@ Deno.serve(async (req) => {
 
     const { data: invited, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
       data: await inviteData(admin, tenantId, role),
-      redirectTo: inviteRedirect(body.origin),
+      redirectTo: inviteRedirect(),
     });
     if (invErr || !invited.user) return fail(authErrorCode(invErr));
 
@@ -385,7 +379,7 @@ Deno.serve(async (req) => {
     if (target.status !== "PENDING") return fail("not_pending");
     const { error } = await admin.auth.admin.inviteUserByEmail(targetIdentity.email, {
       data: await inviteData(admin, tenantId, target.role as Role),
-      redirectTo: inviteRedirect(body.origin),
+      redirectTo: inviteRedirect(),
     });
     if (error) return fail(authErrorCode(error));
     return json({ ok: true });

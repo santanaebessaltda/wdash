@@ -1,10 +1,11 @@
 /**
- * erp-credential-persist  -  OWNER onboarding: encrypt ERP password, upsert
- * erp_credential (+ optional stores). Username change wipes tenant sync data.
+ * erp-credential-persist  -  Gestor (OWNER/ADMIN_GLOBAL): encrypt ERP password,
+ * upsert erp_credential (+ optional stores). Username change wipes tenant sync data.
  */
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeaders } from "../_shared/cors.ts";
 import { logoutMillennium } from "../_shared/millennium.ts";
+import { GESTOR_ROLES } from "../_shared/staffAuth.ts";
 
 type StoreIn = {
   storeId: number;
@@ -138,7 +139,8 @@ Deno.serve(async (req) => {
     .eq("tenant_id", tenantId)
     .eq("status", "ACTIVE")
     .maybeSingle();
-  if (!membership || !["OWNER", "MANAGER"].includes(membership.role as string)) {
+  // Integracoes / onboarding ERP = so Gestor (wipe de dados nao e papel do Gerente).
+  if (!membership || !(GESTOR_ROLES as readonly string[]).includes(membership.role as string)) {
     return json({ error: "forbidden" }, 403);
   }
 
