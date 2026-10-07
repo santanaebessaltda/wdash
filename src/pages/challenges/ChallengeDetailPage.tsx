@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Alert, Badge, Breadcrumbs, Button, Card, CardTitle } from "@/components/ui";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { DuplicateChoiceModal } from "@/components/wedash/DuplicateChoiceModal";
 import { ChallengeDetailSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { WedashBrand } from "@/components/wedash/WedashBrand";
 import { usesMinSales } from "@/data/wedash/challengeForm";
@@ -37,6 +38,7 @@ import {
 } from "@/pages/challenges/shared";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
+import { useReturnWhenStoreChanges } from "@/pages/dashboard/useScope";
 import { FlameIcon } from "@/pages/dashboards/icons";
 import { Icon, icons } from "@/pages/users/Icons";
 import { paths } from "@/router/paths";
@@ -62,14 +64,14 @@ const GERENCIA_RESULTADO: Record<ChallengeRecord["metric"], string> = {
 
 const ORDINAL = ["1º", "2º", "3º"];
 
-/** " · meta de 2,00" · Índice: " · índice da equipe de 105,0". */
+/** "  |  meta de 2,00"  |  Indice: "  |  indice da equipe de 105,0". */
 function managerGoalText(c: ChallengeRecord): string {
   if (c.managerTarget == null) return "";
   const valor = metricValueLabel(c.metric, c.managerTarget);
   return isIndexMetric(c.metric) ? ` · índice da equipe de ${valor}` : ` · meta de ${valor}`;
 }
 
-/** Gestão > Desafios > detalhe — resumo e participantes; encerrado = fechamento com quem ganhou o quê. */
+/** Gestao > Desafios > detalhe  -  resumo e participantes; encerrado = fechamento com quem ganhou o que. */
 export default function ChallengeDetailPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
@@ -77,6 +79,9 @@ export default function ChallengeDetailPage() {
   const today = calendarTodayIso();
   const [data, setData] = useState<Loaded | null>(null);
   const [reload, setReload] = useState(0);
+  const [duplicarAberto, setDuplicarAberto] = useState(false);
+  const hasOtherStores = storesForSession(session.stores).length > 1;
+  useReturnWhenStoreChanges(data?.challenge?.storeId, paths.management.challenges);
 
   useEffect(() => {
     const onSync = () => setReload((n) => n + 1);
@@ -122,7 +127,7 @@ export default function ChallengeDetailPage() {
         />
         {challenge && !showSkeleton && (
           <div className="ml-auto flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => navigate(paths.management.challengeCopy(challenge.id))}>
+            <Button variant="outline" size="sm" onClick={() => setDuplicarAberto(true)}>
               Duplicar desafio
             </Button>
             <Button size="sm" onClick={() => navigate(paths.management.challengeEdit(challenge.id))}>
@@ -131,6 +136,23 @@ export default function ChallengeDetailPage() {
           </div>
         )}
       </div>
+
+      <DuplicateChoiceModal
+        open={duplicarAberto}
+        onClose={() => setDuplicarAberto(false)}
+        kind="desafio"
+        name={challenge?.name ?? null}
+        hasOtherStores={hasOtherStores}
+        onChoose={(choice) => {
+          if (!challenge) return;
+          setDuplicarAberto(false);
+          navigate(
+            choice === "store"
+              ? paths.management.challengeCopyStore(challenge.id)
+              : paths.management.challengeCopy(challenge.id),
+          );
+        }}
+      />
 
       {showSkeleton ? (
         <ChallengeDetailSkeleton />
@@ -185,7 +207,7 @@ function prizesText(c: ChallengeRecord): string {
   return c.prizes.map((p, i) => `${ORDINAL[i]}: ${prizeLabel(p)}`).join(" · ") || "—";
 }
 
-/** "Body Splash VF Golden · Desod Col Obsessed · +2" — itens do desafio em uma linha. */
+/** "Body Splash VF Golden  |  Desod Col Obsessed  |  +2"  -  itens do desafio em uma linha. */
 function itemsText(c: ChallengeRecord): string | null {
   if (!usesScope(c.metric)) return null;
   if (c.scope === "ALL") return CHALLENGE_SCOPE_LABEL.ALL;
@@ -378,7 +400,7 @@ function PayoutReportHeader({ challenge: c, lojaNome }: { challenge: ChallengeRe
   );
 }
 
-/** Desafio encerrado: quem ganhou o quê. Outro prêmio (texto livre) aparece pelo nome e não entra no total em R$. */
+/** Desafio encerrado: quem ganhou o que. Outro premio (texto livre) aparece pelo nome e nao entra no total em R$. */
 function ChallengePayoutCard({ challenge: c, view, onExport }: { challenge: ChallengeRecord; view: ChallengeView; onExport: () => void }) {
   const payout = challengePayout(view);
   const fimMais1 = deIso(c.endsOn);
@@ -476,7 +498,7 @@ function ChallengePayoutCard({ challenge: c, view, onExport }: { challenge: Chal
   );
 }
 
-/** ["Combo KFC", "Combo KFC", "Vale"] → ["2× Combo KFC", "Vale"]. */
+/** ["Combo KFC", "Combo KFC", "Vale"]  ->  ["2x Combo KFC", "Vale"]. */
 function contarEspecie(itens: string[]): string[] {
   const contagem = new Map<string, number>();
   for (const i of itens) contagem.set(i, (contagem.get(i) ?? 0) + 1);

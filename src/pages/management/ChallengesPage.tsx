@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Badge, Button, Card, DateRangePicker, Modal, useToast } from "@/components/ui";
 import { Tooltip } from "@/components/ui/Tooltip";
 import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePicker";
+import { DuplicateChoiceModal } from "@/components/wedash/DuplicateChoiceModal";
 import { ChallengeCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import {
   deleteChallenge,
@@ -21,7 +22,7 @@ import {
 } from "@/data/wedash/challengeView";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { resolvePeriod } from "@/data/wedash/dashboard";
-import type { Store } from "@/data/wedash/stores";
+import { storesForSession, type Store } from "@/data/wedash/stores";
 import { dataCompleta, deIso, fimDoMes, paraIso } from "@/lib/format";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import {
@@ -43,13 +44,13 @@ import { paths } from "@/router/paths";
 
 type Loaded = { challenges: ChallengeRecord[]; aggs: ChallengeAggInput };
 
-/** Desafios podem ser cadastrados para frente: o calendário vai até o fim do mês daqui a 12 meses. */
+/** Desafios podem ser cadastrados para frente: o calendario vai ate o fim do mes daqui a 12 meses. */
 function maxPickerDate(today: string): Date {
   const d = deIso(today);
   return deIso(fimDoMes(paraIso(new Date(d.getFullYear(), d.getMonth() + 12, 1))));
 }
 
-/** Gestão > Desafios — 1 card por desafio (lojas do StorePicker × período do filtro). */
+/** Gestao > Desafios  -  1 card por desafio (lojas do StorePicker x periodo do filtro). */
 export function ChallengesPage() {
   const navigate = useNavigate();
   const { show } = useToast();
@@ -65,6 +66,8 @@ export function ChallengesPage() {
   const [reload, setReload] = useState(0);
   const [confirmar, setConfirmar] = useState<ChallengeRecord | null>(null);
   const [excluindo, setExcluindo] = useState(false);
+  const [duplicar, setDuplicar] = useState<ChallengeRecord | null>(null);
+  const hasOtherStores = storesForSession(session.stores).length > 1;
 
   useEffect(() => {
     const onSync = () => setReload((n) => n + 1);
@@ -79,7 +82,7 @@ export function ChallengesPage() {
     if (lojasLoading) return;
     let cancelled = false;
     (async () => {
-      // Venda nova (SALES_SYNCED_EVENT) recarrega sem skeleton; só filtro novo mostra o skeleton.
+      // Venda nova (SALES_SYNCED_EVENT) recarrega sem skeleton; so filtro novo mostra o skeleton.
       if (loadedKey.current !== filtroKey) setLoading(true);
       const challenges = await fetchChallenges({ tenantId: session.tenantId, storeIds, from: periodo.inicio, to: periodo.fim });
       const aggs =
@@ -182,13 +185,27 @@ export function ChallengesPage() {
                 loja={loja}
                 mostraLoja={lojas.length > 1}
                 onDetail={() => navigate(paths.management.challengeDetail(challenge.id))}
-                onCopy={() => navigate(paths.management.challengeCopy(challenge.id))}
+                onCopy={() => setDuplicar(challenge)}
                 onDelete={() => setConfirmar(challenge)}
               />
             ))}
           </div>
         )}
       </div>
+
+      <DuplicateChoiceModal
+        open={duplicar !== null}
+        onClose={() => setDuplicar(null)}
+        kind="desafio"
+        name={duplicar?.name ?? null}
+        hasOtherStores={hasOtherStores}
+        onChoose={(choice) => {
+          if (!duplicar) return;
+          const id = duplicar.id;
+          setDuplicar(null);
+          navigate(choice === "store" ? paths.management.challengeCopyStore(id) : paths.management.challengeCopy(id));
+        }}
+      />
 
       <Modal
         open={confirmar !== null}

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Badge, Breadcrumbs, Button, Card, CardTitle, progressTextClass } from "@/components/ui";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { DuplicateChoiceModal } from "@/components/wedash/DuplicateChoiceModal";
 import { GoalDetailSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import {
@@ -24,8 +25,9 @@ import { exportPdf } from "@/lib/printMode";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
+import { useReturnWhenStoreChanges } from "@/pages/dashboard/useScope";
 import { TargetIcon } from "@/pages/dashboards/icons";
-import { CardVendedoras, FaixaMetaGlobal, metaLiberouProjecao } from "@/pages/team/blocos";
+import { SellersCard, GoalProgressBar, goalShowsProjection } from "@/pages/team/blocks";
 import { Icon, icons } from "@/pages/users/Icons";
 import { paths } from "@/router/paths";
 import { useActiveSession } from "@/session/SessionProvider";
@@ -47,7 +49,7 @@ const AJUDA_MODO: Record<GoalRecord["tierMode"], string> = {
     "O grupo sobe de nível pela soma das vendas. A premiação é dividida igualmente entre as pessoas do grupo, e o bônus de cada nível vale para cada pessoa. Os bônus dos níveis alcançados são acumulados.",
 };
 
-/** Gestão > Metas > detalhe — resumo, níveis com o progresso e equipe; meta encerrada = fechamento da premiação. */
+/** Gestao > Metas > detalhe  -  resumo, niveis com o progresso e equipe; meta encerrada = fechamento da premiacao. */
 export default function GoalDetailPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
@@ -55,6 +57,9 @@ export default function GoalDetailPage() {
   const today = calendarTodayIso();
   const [data, setData] = useState<Loaded | null>(null);
   const [reload, setReload] = useState(0);
+  const [duplicarAberto, setDuplicarAberto] = useState(false);
+  const hasOtherStores = storesForSession(session.stores).length > 1;
+  useReturnWhenStoreChanges(data?.goal?.storeId, paths.goals);
 
   useEffect(() => {
     const onSync = () => setReload((n) => n + 1);
@@ -114,7 +119,7 @@ export default function GoalDetailPage() {
         <Breadcrumbs items={[{ label: "Gestão" }, { label: "Metas", to: paths.goals }, { label: goal?.name ?? "Detalhe" }]} />
         {goal && !showSkeleton && (
           <div className="ml-auto flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => navigate(paths.goalCopy(goal.id))}>
+            <Button variant="outline" size="sm" onClick={() => setDuplicarAberto(true)}>
               Duplicar meta
             </Button>
             <Button size="sm" onClick={() => navigate(paths.goalEdit(goal.id))}>
@@ -123,6 +128,19 @@ export default function GoalDetailPage() {
           </div>
         )}
       </div>
+
+      <DuplicateChoiceModal
+        open={duplicarAberto}
+        onClose={() => setDuplicarAberto(false)}
+        kind="meta"
+        name={goal?.name ?? null}
+        hasOtherStores={hasOtherStores}
+        onChoose={(choice) => {
+          if (!goal) return;
+          setDuplicarAberto(false);
+          navigate(choice === "store" ? paths.goalCopyStore(goal.id) : paths.goalCopy(goal.id));
+        }}
+      />
 
       {showSkeleton ? (
         <GoalDetailSkeleton />
@@ -157,7 +175,7 @@ export default function GoalDetailPage() {
           ) : (
             <div className="flex flex-col gap-5">
               <GoalTiersCard goal={goal} card={card} status={status} gerencia={gerencia} today={today} />
-              <CardVendedoras
+              <SellersCard
                 estado={card.vendedoras.length > 0 ? "disponivel" : "sem_dados"}
                 lista={card.vendedoras}
                 metaAtiva
@@ -199,7 +217,7 @@ function GoalHero({
   const premiacao =
     card.vendedoras.reduce((s, v) => s + v.premiacaoAcumulada + v.bonusAlcancado, 0) + (gerencia ? gerencia.premiacao + gerencia.bonus : 0);
   const faltam = Math.max(0, goal.target - realizado);
-  const liberou = status === "active" && metaLiberouProjecao(goal.startsOn, goal.endsOn, today);
+  const liberou = status === "active" && goalShowsProjection(goal.startsOn, goal.endsOn, today);
   const stats: { label: string; value: string; cls: string; sub?: string; subCls?: string; help?: string }[] = [
     { label: "Meta da loja", value: brlCent(goal.target), cls: "text-acc" },
     {
@@ -271,7 +289,7 @@ function GoalHero({
   );
 }
 
-/** Barra de progresso com os níveis + grupos + lista de níveis (formato Milestones) + nível atual da gerência. */
+/** Barra de progresso com os niveis + grupos + lista de niveis (formato Milestones) + nivel atual da gerencia. */
 function GoalTiersCard({
   goal,
   card,
@@ -293,7 +311,7 @@ function GoalTiersCard({
       <div className="mb-4 flex items-center gap-1.5">
         <CardTitle>Níveis e premiação</CardTitle>
       </div>
-      <FaixaMetaGlobal meta={card.faixa} degraus={card.degraus} hojeIso={today} embedded soBarra />
+      <GoalProgressBar meta={card.faixa} degraus={card.degraus} hojeIso={today} embedded soBarra />
       {goal.groups.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[12px]">
           <span className="mr-1 text-t2">Grupos:</span>
@@ -324,7 +342,7 @@ function GoalTiersCard({
             if (t.gerenciaPct != null) {
               const bonusGer = t.gerenciaBonus ?? 0;
               bonusGerAcum += bonusGer;
-              const ger = [`Gerência: ${num(t.gerenciaPct, 1)}%`];
+              const ger = [`Gerência: ${num(t.gerenciaPct, 1)}% da venda da loja`];
               if (bonusGer > 0) ger.push(`bônus de ${brlCent(bonusGer)}`);
               if (bonusGerAcum > bonusGer) ger.push(`total de ${brlCent(bonusGerAcum)}`);
               linhaGerencia = ger.join(" · ");
@@ -385,7 +403,7 @@ function GoalTiersCard({
   );
 }
 
-/** Cabeçalho que só aparece no PDF do fechamento: marca, loja, meta e período. */
+/** Cabecalho que so aparece no PDF do fechamento: marca, loja, meta e periodo. */
 function PayoutReportHeader({ goal, lojaNome }: { goal: GoalRecord; lojaNome?: string }) {
   const agora = new Date();
   const geradoEm = `${agora.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })} às ${agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}`;
@@ -429,7 +447,7 @@ type PayoutRow = {
   total: number;
 };
 
-/** Meta encerrada: quanto cada pessoa e a gerência ganharam (premiação do nível + bônus somados). */
+/** Meta encerrada: quanto cada pessoa e a gerencia ganharam (premiacao do nivel + bonus somados). */
 function GoalPayoutCard({
   goal,
   card,

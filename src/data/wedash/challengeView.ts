@@ -31,19 +31,19 @@ export const CHALLENGE_METRIC_LABEL: Record<ChallengeMetric, string> = {
   INDEX: "Índice de desempenho",
 };
 
-/** Pesos do Índice de desempenho (somam 1). */
+/** Pesos do Indice de desempenho (somam 1). */
 export const INDEX_WEIGHTS = { faturamento: 0.5, ticket: 0.25, pa: 0.25 } as const;
 
 export interface IndexTeamBase {
-  /** Faturamento médio por pessoa (só quem vendeu). */
+  /** Faturamento medio por pessoa (so quem vendeu). */
   faturamentoMedio: number;
-  /** Média dos tickets individuais (não o ticket consolidado: quem vende mais não pesa mais). */
+  /** Media dos tickets individuais (nao o ticket consolidado: quem vende mais nao pesa mais). */
   ticket: number;
-  /** Média dos P.A.s individuais. */
+  /** Media dos P.A.s individuais. */
   pa: number;
 }
 
-/** Médias simples entre quem vendeu → a média dos índices dessas pessoas é exatamente 100. */
+/** Medias simples entre quem vendeu  ->  a media dos indices dessas pessoas e exatamente 100. */
 export function indexTeamBase(pessoas: { faturamento: number; vendas: number; itens: number }[]): IndexTeamBase | null {
   const comVenda = pessoas.filter((p) => p.vendas > 0);
   if (comVenda.length === 0) return null;
@@ -55,7 +55,7 @@ export function indexTeamBase(pessoas: { faturamento: number; vendas: number; it
   };
 }
 
-/** Faturamento em R$ ou centavos — só precisa ser a mesma unidade da base. */
+/** Faturamento em R$ ou centavos  -  so precisa ser a mesma unidade da base. */
 export function performanceIndex(p: { faturamento: number; vendas: number; itens: number }, base: IndexTeamBase): number {
   if (p.vendas <= 0) return 0;
   const parte = (v: number, ref: number) => (ref > 0 ? v / ref : 0);
@@ -76,8 +76,8 @@ export interface IndexPersonTotals {
 }
 
 /**
- * Índice da equipe (gerência): mesma fórmula, com as médias da equipe agora × as do período anterior.
- * 100 = igual ao período anterior. Sem venda em algum lado ou com dia sem itens = null (nada estimado).
+ * Indice da equipe (gerencia): mesma formula, com as medias da equipe agora x as do periodo anterior.
+ * 100 = igual ao periodo anterior. Sem venda em algum lado ou com dia sem itens = null (nada estimado).
  */
 export function teamIndex(atual: IndexPersonTotals[], anterior: IndexPersonTotals[]): number | null {
   if ([...atual, ...anterior].some((p) => p.vendas > 0 && p.semItens)) return null;
@@ -109,23 +109,23 @@ export interface ChallengeParticipant {
   key: string;
   nome: string;
   grupo: string | null;
-  /** null = a começar ou P.A. sem itens gravados ("—"). */
+  /** null = a comecar ou P.A. sem itens gravados (" - "). */
   resultado: number | null;
   vendas: number;
-  /** Disputa: posição entre quem concorre (empate compartilha). */
+  /** Disputa: posicao entre quem concorre (empate compartilha). */
   posicao: number | null;
-  /** Disputa: venceu · Mínimo: atingiu. */
+  /** Disputa: venceu  |  Minimo: atingiu. */
   vencedor: boolean;
   premio: ChallengePrize | null;
-  /** Só em andamento. */
+  /** So em andamento. */
   falta: string | null;
 }
 
 export interface ChallengeManagerResult {
-  /** Média da equipe (Índice: índice da equipe × período anterior). */
+  /** Media da equipe (Indice: indice da equipe x periodo anterior). */
   resultado: number | null;
   alvo: number;
-  /** Só no Índice: período anterior inteiro usado na comparação. */
+  /** So no Indice: periodo anterior inteiro usado na comparacao. */
   periodoAnterior: { from: string; to: string } | null;
   atingiu: boolean;
   premio: ChallengePrize;
@@ -135,10 +135,10 @@ export interface ChallengeView {
   mode: ChallengeMode;
   status: ChallengeStatus;
   prazo: string;
-  /** Encerrado ontem: o último dia fecha na madrugada e ainda pode mudar. */
+  /** Encerrado ontem: o ultimo dia fecha na madrugada e ainda pode mudar. */
   emFechamento: boolean;
   participantes: ChallengeParticipant[];
-  /** Mínimo: quantas pessoas atingiram. */
+  /** Minimo: quantas pessoas atingiram. */
   atingiram: number;
   gerencia: ChallengeManagerResult | null;
   /** Dias com venda da loja e sem itens por pessoa (produtos/categorias escolhidos). */
@@ -152,7 +152,7 @@ function diasEntre(inicio: string, fim: string): number {
   return Math.round((deIso(fim).getTime() - deIso(inicio).getTime()) / 86_400_000) + 1;
 }
 
-/** 12 itens · 1 item · 7,5 itens · 1,85 · R$ 92,30 · 112,4 (índice) */
+/** 12 itens  |  1 item  |  7,5 itens  |  1,85  |  R$ 92,30  |  112,4 (indice) */
 export function metricValueLabel(metric: ChallengeMetric, value: number): string {
   if (metric === "PA") return num(value, 2);
   if (metric === "INDEX") return num(value, 1);
@@ -441,7 +441,7 @@ export function buildChallengeView(args: {
 export interface ChallengeWinner {
   nome: string;
   grupo: string | null;
-  /** "1º lugar" · "Atingiu" */
+  /** "1 lugar"  |  "Atingiu" */
   colocacao: string;
   premio: ChallengePrize;
 }
@@ -449,9 +449,9 @@ export interface ChallengeWinner {
 export interface ChallengePayout {
   vencedores: ChallengeWinner[];
   gerencia: ChallengePrize | null;
-  /** Σ prêmios em R$ (pessoas + gerência). */
+  /**  premios em R$ (pessoas + gerencia). */
   totalReais: number;
-  /** Outros prêmios (texto livre), um por vencedor (+ gerência). */
+  /** Outros premios (texto livre), um por vencedor (+ gerencia). */
   especie: string[];
 }
 
@@ -479,14 +479,14 @@ function juntarNomes(nomes: string[]): string {
   return `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}`;
 }
 
-/** Resumo do card da listagem: líder(es) na Disputa · quantas atingiram no Mínimo. */
+/** Resumo do card da listagem: lider(es) na Disputa  |  quantas atingiram no Minimo. */
 export function challengeCardSummary(view: ChallengeView): { lider: string | null; atingiram: number | null } {
   if (view.mode === "MINIMUM") return { lider: null, atingiram: view.status === "upcoming" ? null : view.atingiram };
   const lideres = view.participantes.filter((p) => p.posicao === 1).map((p) => p.nome);
   return { lider: lideres.length > 0 ? juntarNomes(lideres) : null, atingiram: null };
 }
 
-/** Cópia para "Duplicar desafio": começa no dia seguinte ao fim, com a mesma duração. */
+/** Copia para "Duplicar desafio": comeca no dia seguinte ao fim, com a mesma duracao. */
 export function copyChallenge(c: ChallengeRecord): ChallengeInput {
   const { id: _id, ...rest } = c;
   const duracao = diasEntre(c.startsOn, c.endsOn);
@@ -496,6 +496,18 @@ export function copyChallenge(c: ChallengeRecord): ChallengeInput {
     name: `${c.name} (cópia)`,
     startsOn,
     endsOn: somarDias(startsOn, duracao - 1),
+    products: c.products.map((p) => ({ ...p })),
+    categories: c.categories.map((t) => ({ ...t })),
+    prizes: c.prizes.map((p) => ({ ...p })),
+    managerPrize: c.managerPrize ? { ...c.managerPrize } : null,
+  };
+}
+
+/** Copia para "Duplicar para outra loja": mesmas datas e nome; a loja e escolhida no editor. */
+export function copyChallengeToStore(c: ChallengeRecord): ChallengeInput {
+  const { id: _id, ...rest } = c;
+  return {
+    ...rest,
     products: c.products.map((p) => ({ ...p })),
     categories: c.categories.map((t) => ({ ...t })),
     prizes: c.prizes.map((p) => ({ ...p })),

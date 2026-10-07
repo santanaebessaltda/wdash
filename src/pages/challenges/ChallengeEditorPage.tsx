@@ -39,13 +39,18 @@ import {
   type ChallengeMode,
   type ChallengeScope,
 } from "@/data/wedash/challengesRepo";
-import { CHALLENGE_METRIC_LABEL, CHALLENGE_MODE_LABEL, copyChallenge } from "@/data/wedash/challengeView";
+import {
+  CHALLENGE_METRIC_LABEL,
+  CHALLENGE_MODE_LABEL,
+  copyChallenge,
+  copyChallengeToStore,
+} from "@/data/wedash/challengeView";
 import { storesForSession } from "@/data/wedash/stores";
 import { cn } from "@/lib/cn";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { CHALLENGE_MODE_HELP } from "@/pages/challenges/shared";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
-import { useScope } from "@/pages/dashboard/useScope";
+import { useReturnWhenStoreChanges, useScope } from "@/pages/dashboard/useScope";
 import { NumberInput, SAVE_ERROR_MSG } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
 import { paths } from "@/router/paths";
@@ -90,11 +95,12 @@ const semAcento = (s: string) =>
     .replace(/[\u0300-\u036f]/g, "")
     .toLocaleUpperCase("pt-BR");
 
-/** Gestão > Desafios — criar, editar e duplicar (`?copy=`). */
+/** Gestao > Desafios  -  criar, editar e duplicar (`?copy=`). */
 export default function ChallengeEditorPage() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const copyId = id ? null : searchParams.get("copy");
+  const copyForStore = Boolean(copyId) && searchParams.get("for") === "store";
   const navigate = useNavigate();
   const session = useActiveSession();
   const toast = useToast();
@@ -105,24 +111,35 @@ export default function ChallengeEditorPage() {
   const lojas = useMemo(() => storesForSession(session.stores), [session.stores]);
   const lojaFiltro = escopo.filialIds[0];
   const [form, setForm] = useState<ChallengeForm>(() =>
-    emptyChallengeForm(lojaFiltro ?? (lojas.length === 1 ? lojas[0]!.id : "")),
+    emptyChallengeForm(copyForStore ? "" : lojaFiltro ?? (lojas.length === 1 ? lojas[0]!.id : "")),
   );
   const set = (patch: Partial<ChallengeForm>) => setForm((f) => ({ ...f, ...patch }));
   useEffect(() => {
-    if (!id && lojaFiltro) setForm((f) => ({ ...f, storeId: lojaFiltro }));
-  }, [id, lojaFiltro]);
-  /** Loja já definida (StorePicker numa loja, usuário de 1 loja ou edição): combo aparece bloqueado. */
-  const lojaFixa = Boolean(id) || Boolean(lojaFiltro) || lojas.length === 1;
-  const lojaHint = id
-    ? "A loja não pode ser alterada depois que o desafio é criado."
-    : lojaFiltro && lojas.length > 1
-      ? "Para escolher outra loja, selecione Todas as lojas no filtro do topo."
-      : undefined;
+    if (!id && !copyForStore && lojaFiltro) setForm((f) => ({ ...f, storeId: lojaFiltro }));
+  }, [id, lojaFiltro, copyForStore]);
+  useReturnWhenStoreChanges(id ? form.storeId || undefined : undefined, paths.management.challenges);
 
   const sourceId = id ?? copyId;
   const [loadingSource, setLoadingSource] = useState(Boolean(sourceId));
   const [notFound, setNotFound] = useState(false);
   const [copiedFrom, setCopiedFrom] = useState<string | null>(null);
+  const [copiedForStore, setCopiedForStore] = useState(false);
+  const [sourceStoreId, setSourceStoreId] = useState<string | null>(null);
+  const lojasDestino = useMemo(
+    () => (copyForStore && sourceStoreId ? lojas.filter((l) => l.id !== sourceStoreId) : lojas),
+    [copyForStore, sourceStoreId, lojas],
+  );
+  /** Loja ja definida (StorePicker numa loja, usuario de 1 loja ou edicao): combo aparece bloqueado. Copia para outra loja deixa livre. */
+  const lojaFixa = copyForStore
+    ? lojasDestino.length === 1
+    : Boolean(id) || Boolean(lojaFiltro) || lojas.length === 1;
+  const lojaHint = id
+    ? "A loja não pode ser alterada depois que o desafio é criado."
+    : copyForStore
+      ? "Escolha a filial de destino."
+      : lojaFiltro && lojas.length > 1
+        ? "Para escolher outra loja, selecione Todas as lojas no filtro do topo."
+        : undefined;
   useEffect(() => {
     if (!sourceId) return;
     let cancelled = false;
@@ -131,16 +148,28 @@ export default function ChallengeEditorPage() {
       if (cancelled) return;
       if (!c) setNotFound(true);
       else if (copyId) {
-        setForm({ ...challengeToForm(copyChallenge(c)), storeId: lojaFiltro ?? c.storeId });
-        setCopiedFrom(c.name);
+        if (copyForStore) {
+          setSourceStoreId(c.storeId);
+          const outras = lojas.filter((l) => l.id !== c.storeId);
+          const destino =
+            lojaFiltro && lojaFiltro !== c.storeId ? lojaFiltro : outras.length === 1 ? outras[0]!.id : "";
+          setForm({ ...challengeToForm(copyChallengeToStore(c)), storeId: destino });
+          setCopiedFrom(c.name);
+          setCopiedForStore(true);
+        } else {
+          setSourceStoreId(null);
+          setForm({ ...challengeToForm(copyChallenge(c)), storeId: lojaFiltro ?? c.storeId });
+          setCopiedFrom(c.name);
+          setCopiedForStore(false);
+        }
       } else setForm(challengeToForm(c));
       setLoadingSource(false);
     });
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- a loja do filtro só vale no momento em que a cópia abre
-  }, [sourceId, copyId, session.tenantId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a loja do filtro so vale no momento em que a copia abre
+  }, [sourceId, copyId, copyForStore, session.tenantId]);
   const showSkeleton = useMinSkeleton(loadingSource);
 
   const [catalog, setCatalog] = useState<ChallengeCatalog | null>(null);
@@ -154,7 +183,7 @@ export default function ChallengeEditorPage() {
     };
   }, []);
 
-  /** Erros só aparecem depois da 1ª tentativa de salvar; daí somem conforme o campo é corrigido. */
+  /** Erros so aparecem depois da 1 tentativa de salvar; dai somem conforme o campo e corrigido. */
   const [tried, setTried] = useState(false);
   const [saving, setSaving] = useState(false);
   const errors: ChallengeFormErrors = tried ? validateChallengeForm(form) : {};
@@ -198,6 +227,7 @@ export default function ChallengeEditorPage() {
         {copiedFrom && (
           <p className="mt-1 text-[13px] text-t2">
             Cópia de <span className="font-semibold text-t1">{copiedFrom}</span>
+            {copiedForStore ? " · mesma configuração para outra loja" : ""}
           </p>
         )}
       </div>
@@ -288,7 +318,7 @@ export default function ChallengeEditorPage() {
               )}
             >
               {!form.storeId && <option value="">Selecione a loja</option>}
-              {lojas.map((l) => (
+              {lojasDestino.map((l) => (
                 <option key={l.id} value={l.id}>
                   {l.fantasia} · Filial {l.codFilial}
                 </option>
@@ -497,7 +527,7 @@ export default function ChallengeEditorPage() {
 
 const Divider = () => <div className="border-t border-line" />;
 
-/** Mínimo na unidade do tipo: itens (inteiro), P.A. (2 casas) ou R$. */
+/** Minimo na unidade do tipo: itens (inteiro), P.A. (2 casas) ou R$. */
 function TargetInput({
   metric,
   value,
@@ -538,7 +568,7 @@ function TargetInput({
   );
 }
 
-/** Prêmio: valor em R$ ou descrição livre ("Combo KFC"). */
+/** Premio: valor em R$ ou descricao livre ("Combo KFC"). */
 function PrizeField({ prize, onChange, invalid }: { prize: PrizeForm; onChange: (p: PrizeForm) => void; invalid: boolean }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-2">
@@ -576,7 +606,7 @@ function PickerShell({ label, error, children }: { label: string; error?: string
 
 const TAGS_VISIVEIS = 12;
 
-/** Parte do nome que bate com a busca, na cor primária. */
+/** Parte do nome que bate com a busca, na cor primaria. */
 function destacar(nome: string, q: string): ReactNode {
   const i = q ? semAcento(nome).indexOf(q) : -1;
   if (i < 0) return nome;
@@ -590,9 +620,9 @@ function destacar(nome: string, q: string): ReactNode {
 }
 
 /**
- * Multi-select no padrão Searchable select do Vela: campo fechado; ao clicar abre o painel com busca,
- * filtro Todos/Escolhidos, Selecionar todos e checkboxes — fica aberto enquanto marca (fecha no clique fora,
- * Esc ou Concluir). Teclado: ↑/↓ navega, Enter marca. Escolhidos viram tags abaixo do campo.
+ * Multi-select no padrao Searchable select do Vela: campo fechado; ao clicar abre o painel com busca,
+ * filtro Todos/Escolhidos, Selecionar todos e checkboxes  -  fica aberto enquanto marca (fecha no clique fora,
+ * Esc ou Concluir). Teclado: / navega, Enter marca. Escolhidos viram tags abaixo do campo.
  */
 function ProductPicker({
   catalog,
@@ -857,7 +887,7 @@ function ProductPicker({
   );
 }
 
-/** Categorias do catálogo como botões liga/desliga. */
+/** Categorias do catalogo como botoes liga/desliga. */
 function CategoryPicker({
   catalog,
   selected,

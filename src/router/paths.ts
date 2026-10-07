@@ -1,6 +1,6 @@
 /**
  * ========================================================
- * Template Name: Vela — React Admin Dashboard Template
+ * Template Name: Vela  -  React Admin Dashboard Template
  * Author: elsayedB
  * License: You must have a valid license purchased only from ThemeForest
  * ========================================================
@@ -16,24 +16,24 @@
 export const paths = {
   home: "/",
 
-  /* ---------- WeDash (produto) ---------- */
+  /* ---------- WDash (produto) ---------- */
   access: {
     login: "/login",
     forgot: "/forgot",
-    /** Formulário OTP + nova senha (recovery). */
+    /** Formulario OTP + nova senha (recovery). */
     reset: "/reset",
     invite: (token: string = ":token") => `/invite/${token}`,
     install: "/install",
-    /** Primeiro acesso com senha temporária = "Crie seu acesso" (nome, sobrenome e senha). */
+    /** Primeiro acesso com senha temporaria = "Crie seu acesso" (nome, sobrenome e senha). */
     createAccess: "/create-access",
   },
   onboarding: "/onboarding",
-  /** Pós-onboarding — aguarda SEED antes do Dashboard. */
+  /** Pos-onboarding  -  aguarda SEED antes do Dashboard. */
   syncing: "/sincronizando",
-  /** Entrada canônica do Dashboard = overview. `/dashboard` redireciona. */
+  /** Entrada canonica do Dashboard = overview. `/dashboard` redireciona. */
   dashboard: "/dashboard",
   overview: "/dashboard/overview",
-  /** WeDash finance screen (template Vela uses `paths.finance.*`). */
+  /** WDash finance screen (template Vela uses `paths.finance.*`). */
   financial: "/dashboard/finance",
   products: "/dashboard/products",
   groups: "/dashboard/groups",
@@ -43,8 +43,10 @@ export const paths = {
   goalNew: "/goals/new",
   goalDetail: (id: string) => `/goals/${id}`,
   goalEdit: (id: string) => `/goals/${id}/edit`,
-  /** Nova meta preenchida com a configuração de outra. */
+  /** Nova meta preenchida com a configuracao de outra (periodo seguinte). */
   goalCopy: (id: string) => `/goals/new?copy=${encodeURIComponent(id)}`,
+  /** Nova meta com a mesma configuracao e datas, para escolher outra loja. */
+  goalCopyStore: (id: string) => `/goals/new?copy=${encodeURIComponent(id)}&for=store`,
   /** Estoque: saldo por local + pedido de compra. `saleTables` e `products` = URLs antigas (redirecionam). */
   stock: {
     inventory: "/stock/inventory",
@@ -52,18 +54,20 @@ export const paths = {
     saleTables: "/stock/sale-tables",
     products: "/stock/products",
   },
-  /** Gestão: operação e equipe (Metas fica em `goals`). */
+  /** Gestao: operacao e equipe (Metas fica em `goals`). */
   management: {
     challenges: "/management/challenges",
     challengeNew: "/management/challenges/new",
     challengeDetail: (id: string) => `/management/challenges/${id}`,
     challengeEdit: (id: string) => `/management/challenges/${id}/edit`,
-    /** Novo desafio preenchido com a configuração de outro. */
+    /** Novo desafio preenchido com a configuracao de outro (periodo seguinte). */
     challengeCopy: (id: string) => `/management/challenges/new?copy=${encodeURIComponent(id)}`,
+    /** Novo desafio com a mesma configuracao e datas, para escolher outra loja. */
+    challengeCopyStore: (id: string) => `/management/challenges/new?copy=${encodeURIComponent(id)}&for=store`,
     shifts: "/management/shifts",
     staff: "/management/staff",
   },
-  /** Configurações: parâmetros de custo por loja usados no Financeiro. */
+  /** Configuracoes: parametros de custo por loja usados no Financeiro. */
   operation: {
     costs: "/operation/costs",
     store: "/operation/store",
@@ -71,7 +75,7 @@ export const paths = {
     rent: "/operation/rent",
     productsTaxes: "/operation/products-and-taxes",
   },
-  /** Live — painel operacional do mês + pulso do dia. */
+  /** Live  -  painel operacional do mes + pulso do dia. */
   live: {
     root: "/live",
     share: "/live/share",
@@ -86,7 +90,7 @@ export const paths = {
   },
   profile: "/profile",
 
-  /** URLs antigas em PT — só para redirects. */
+  /** URLs antigas em PT  -  so para redirects. */
   legacy: {
     auth: {
       entrar: "/entrar",
@@ -133,7 +137,7 @@ export const paths = {
     },
     profile: "/perfil",
   },
-  /* ---------- Template Vela (referência) ---------- */
+  /* ---------- Template Vela (referencia) ---------- */
 
   dashboards: {
     analytics: "/dashboards/analytics",
@@ -319,7 +323,7 @@ export const paths = {
   settings: {
     root: "/settings",
     tab: (tab: string) => `/settings/${tab}`,
-    /** WeDash app settings */
+    /** WDash app settings */
     challenges: "/settings/challenges",
     staff: "/settings/staff",
     groups: "/settings/groups-and-tasks",

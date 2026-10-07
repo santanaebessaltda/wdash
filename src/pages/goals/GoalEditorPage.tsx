@@ -29,7 +29,7 @@ import { fetchStoreShifts, storesForSession } from "@/data/wedash/stores";
 import { brlCent, deIso, paraIso } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
-import { useScope } from "@/pages/dashboard/useScope";
+import { useReturnWhenStoreChanges, useScope } from "@/pages/dashboard/useScope";
 import {
   NumberInput,
   numText,
@@ -40,26 +40,26 @@ import { Icon, icons } from "@/pages/users/Icons";
 import { paths } from "@/router/paths";
 import { useActiveSession } from "@/session/SessionProvider";
 
-/** Grupo da loja (Gestão > Grupos): na meta só muda o % da meta global. */
+/** Grupo da loja (Gestao > Grupos): na meta so muda o % da meta global. */
 type GroupRow = {
   key: string;
   name: string;
   pct: string;
-  /** Ordem da última edição manual; 0 = % ajustado automaticamente. */
+  /** Ordem da ultima edicao manual; 0 = % ajustado automaticamente. */
   editedAt: number;
 };
-/** Nível da premiação progressiva: meta = % da meta a atingir; premiação = % sobre as vendas; bônus = R$ fixo por atingir. */
+/** Nivel da premiacao progressiva: meta = % da meta a atingir; premiacao = % sobre as vendas; bonus = R$ fixo por atingir. */
 type TierRow = {
   key: number;
   name: string;
   meta: string;
   commission: string;
   bonus: string;
-  /** Premiação da gerência (% sobre o faturamento total da loja). */
+  /** Premiacao da gerencia (% sobre o faturamento total da loja). */
   mgrCommission: string;
   mgrBonus: string;
 };
-/** Individual = cada pessoa sobre a própria meta (meta do grupo ÷ pessoas); Grupo = o grupo todo sobre a meta do grupo. */
+/** Individual = cada pessoa sobre a propria meta (meta do grupo  pessoas); Grupo = o grupo todo sobre a meta do grupo. */
 type PrizeMode = "INDIVIDUAL" | "GROUP";
 
 type TierErrors = { meta?: string; commission?: string; mgrCommission?: string };
@@ -76,7 +76,7 @@ type FormErrors = {
 
 const REQUIRED = "Campo obrigatório.";
 
-/** Erros do formulário; objeto vazio = pode salvar. */
+/** Erros do formulario; objeto vazio = pode salvar. */
 function validateGoal(f: {
   name: string;
   startsOn: Date | null;
@@ -134,7 +134,7 @@ function positive(txt: string): number | null {
   return v != null && !Number.isNaN(v) && v > 0 ? v : null;
 }
 
-/** "Atingir", premiação (% sobre o total vendido) e bônus de cada nível sobre uma base (meta global ou meta do grupo). */
+/** "Atingir", premiacao (% sobre o total vendido) e bonus de cada nivel sobre uma base (meta global ou meta do grupo). */
 function tierResults(
   tiers: TierRow[],
   base: number | null,
@@ -142,7 +142,7 @@ function tierResults(
   atingir: number | null;
   comissao: number | null;
   bonus: number | null;
-  /** Bônus somados até este nível (bateu o 2º = bônus do 1º + do 2º). */
+  /** Bonus somados ate este nivel (bateu o 2 = bonus do 1 + do 2). */
   bonusTotal: number;
 }[] {
   let acumulado = 0;
@@ -157,7 +157,7 @@ function tierResults(
   });
 }
 
-/** Premiação da gerência no nível `i`: % sobre o valor que a loja precisa atingir + bônus somados até o nível. */
+/** Premiacao da gerencia no nivel `i`: % da venda da loja quando a loja atinge o nivel, + bonus somados. */
 function managerResult(
   tiers: TierRow[],
   i: number,
@@ -174,21 +174,21 @@ function managerResult(
   };
 }
 
-/** "bônus de R$ X" + "total de R$ Y" (bônus dos níveis anteriores somados) como itens do `InfoLine`. */
-function bonusItems(bonus: number | null, total: number, porPessoa = false): ReactNode[] {
+/** "bonus de R$ X". A soma dos niveis ("total de R$ Y") so entra na simulacao. */
+function bonusItems(bonus: number | null, total: number, porPessoa = false, soma = false): ReactNode[] {
   if (total <= 0) return [];
   const sufixo = porPessoa ? " por pessoa" : "";
   const valor = (v: number) => <span className="font-mono font-semibold text-ok">{brlCent(v)}</span>;
   const items: ReactNode[] = [];
   if (bonus != null) items.push(<>bônus de {valor(bonus)}{sufixo}</>);
-  if (total > (bonus ?? 0)) items.push(<>total de {valor(total)}{sufixo}</>);
+  if (soma && total > (bonus ?? 0)) items.push(<>total de {valor(total)}{sufixo}</>);
   return items;
 }
 
 let groupEditSeq = 1;
 /**
- * Grava o % digitado num grupo e distribui o que falta para 100% entre os grupos automáticos
- * (sem edição manual). Sem grupo automático, quem se ajusta é o editado há mais tempo.
+ * Grava o % digitado num grupo e distribui o que falta para 100% entre os grupos automaticos
+ * (sem edicao manual). Sem grupo automatico, quem se ajusta e o editado ha mais tempo.
  */
 function distributeGroups(
   gs: GroupRow[],
@@ -226,7 +226,7 @@ function groupPct(g: GroupRow): number | null {
   const v = parseNum(g.pct);
   return v != null && !Number.isNaN(v) && v > 0 ? v : null;
 }
-/** Meta do grupo (R$) = % × meta global. */
+/** Meta do grupo (R$) = % x meta global. */
 function groupTarget(g: GroupRow, target: number | null): number | null {
   const v = groupPct(g);
   return v != null && target ? (target * v) / 100 : null;
@@ -250,12 +250,13 @@ const DEFAULT_TIERS = () => [
   newTier(3, "180", "3"),
 ];
 
-/** Gestão > Metas > criar / editar — informações gerais à esquerda; grupos, premiação progressiva e simulação em 3 cards. */
+/** Gestao > Metas > criar / editar  -  informacoes gerais a esquerda; grupos, premiacao progressiva e simulacao em 3 cards. */
 export default function GoalEditorPage() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
-  /** Duplicar: nova meta com a configuração desta (loja, modo, níveis, gerência e grupos); datas e nome do período seguinte, meta da loja em branco. */
+  /** Duplicar: nova meta com a configuracao desta. `for=store` = mesmas datas, outra loja; senao periodo seguinte. */
   const copyId = id ? null : searchParams.get("copy");
+  const copyForStore = Boolean(copyId) && searchParams.get("for") === "store";
   const navigate = useNavigate();
   const session = useActiveSession();
   const toast = useToast();
@@ -268,19 +269,13 @@ export default function GoalEditorPage() {
     [session.stores],
   );
   const [storeId, setStoreId] = useState(
-    () => escopo.filialIds[0] ?? (lojas.length === 1 ? lojas[0]!.id : ""),
+    () => (copyForStore ? "" : escopo.filialIds[0] ?? (lojas.length === 1 ? lojas[0]!.id : "")),
   );
   const lojaFiltro = escopo.filialIds[0];
+  useReturnWhenStoreChanges(id ? storeId || undefined : undefined, paths.goals);
   useEffect(() => {
-    if (!id && lojaFiltro) setStoreId(lojaFiltro);
-  }, [id, lojaFiltro]);
-  /** Loja já definida (StorePicker numa loja, usuário de 1 loja ou edição): combo aparece bloqueado. */
-  const lojaFixa = Boolean(id) || Boolean(lojaFiltro) || lojas.length === 1;
-  const lojaHint = id
-    ? "A loja não pode ser alterada depois que a meta é criada."
-    : lojaFiltro && lojas.length > 1
-      ? "Para escolher outra loja, selecione Todas as lojas no topo."
-      : undefined;
+    if (!id && !copyForStore && lojaFiltro) setStoreId(lojaFiltro);
+  }, [id, lojaFiltro, copyForStore]);
   const [name, setName] = useState("");
   const [startsOn, setStartsOn] = useState<Date | null>(null);
   const [endsOn, setEndsOn] = useState<Date | null>(null);
@@ -291,7 +286,7 @@ export default function GoalEditorPage() {
   const [tiers, setTiers] = useState<TierRow[]>(DEFAULT_TIERS);
   const [managerOn, setManagerOn] = useState(false);
   const [prizeMode, setPrizeMode] = useState<PrizeMode>("INDIVIDUAL");
-  /** % gravado de cada grupo (edição); aplicado quando os grupos da loja carregam. */
+  /** % gravado de cada grupo (edicao); aplicado quando os grupos da loja carregam. */
   const savedGroups = useRef<GoalGroup[]>([]);
   const applySavedGroups = (rows: GroupRow[]): GroupRow[] =>
     rows.map((r) => {
@@ -301,21 +296,51 @@ export default function GoalEditorPage() {
         savedGroups.current.find((x) => x.name.trim().toLocaleUpperCase("pt-BR") === nome);
       return s ? { ...r, pct: numText(s.pct), editedAt: groupEditSeq++ } : r;
     });
-  const [copiedFrom, setCopiedFrom] = useState<{ name: string; target: number } | null>(null);
+  const [copiedFrom, setCopiedFrom] = useState<{ name: string; target: number; forStore?: boolean } | null>(null);
+  const [sourceStoreId, setSourceStoreId] = useState<string | null>(null);
   const sourceId = id ?? copyId;
+  const lojasDestino = useMemo(
+    () => (copyForStore && sourceStoreId ? lojas.filter((l) => l.id !== sourceStoreId) : lojas),
+    [copyForStore, sourceStoreId, lojas],
+  );
+  /** Loja ja definida (StorePicker numa loja, usuario de 1 loja ou edicao): combo aparece bloqueado. Copia para outra loja deixa livre. */
+  const lojaFixa = copyForStore
+    ? lojasDestino.length === 1
+    : Boolean(id) || Boolean(lojaFiltro) || lojas.length === 1;
+  const lojaHint = id
+    ? "A loja não pode ser alterada depois que a meta é criada."
+    : copyForStore
+      ? "Escolha a filial de destino."
+      : lojaFiltro && lojas.length > 1
+        ? "Para escolher outra loja, selecione Todas as lojas no topo."
+        : undefined;
   useEffect(() => {
     if (!sourceId) return;
     let cancelled = false;
     void fetchGoal(session.tenantId, sourceId).then((g) => {
       if (cancelled || !g) return;
       if (copyId) {
-        const periodo = nextGoalPeriod(g.startsOn, g.endsOn);
-        setStoreId(lojaFiltro ?? g.storeId);
-        setName(copyGoalName(g.name, periodo.startsOn));
-        setStartsOn(deIso(periodo.startsOn));
-        setEndsOn(deIso(periodo.endsOn));
-        setTarget("");
-        setCopiedFrom({ name: g.name, target: g.target });
+        if (copyForStore) {
+          setSourceStoreId(g.storeId);
+          const outras = lojas.filter((l) => l.id !== g.storeId);
+          const destino =
+            lojaFiltro && lojaFiltro !== g.storeId ? lojaFiltro : outras.length === 1 ? outras[0]!.id : "";
+          setStoreId(destino);
+          setName(g.name);
+          setStartsOn(deIso(g.startsOn));
+          setEndsOn(deIso(g.endsOn));
+          setTarget(numText(g.target, "R$"));
+          setCopiedFrom({ name: g.name, target: g.target, forStore: true });
+        } else {
+          setSourceStoreId(null);
+          const periodo = nextGoalPeriod(g.startsOn, g.endsOn);
+          setStoreId(lojaFiltro ?? g.storeId);
+          setName(copyGoalName(g.name, periodo.startsOn));
+          setStartsOn(deIso(periodo.startsOn));
+          setEndsOn(deIso(periodo.endsOn));
+          setTarget("");
+          setCopiedFrom({ name: g.name, target: g.target });
+        }
       } else {
         setStoreId(g.storeId);
         setName(g.name);
@@ -346,8 +371,8 @@ export default function GoalEditorPage() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- a loja do filtro só vale no momento em que a cópia abre
-  }, [sourceId, copyId, session.tenantId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a loja do filtro so vale no momento em que a copia abre
+  }, [sourceId, copyId, copyForStore, session.tenantId]);
 
   const [team, setTeam] = useState<GoalTeamMember[] | null>(null);
   useEffect(() => {
@@ -382,7 +407,7 @@ export default function GoalEditorPage() {
     parsedTarget != null && !Number.isNaN(parsedTarget) && parsedTarget > 0
       ? parsedTarget
       : null;
-  /** Erros só aparecem depois da 1ª tentativa de salvar; daí somem conforme o campo é corrigido. */
+  /** Erros so aparecem depois da 1 tentativa de salvar; dai somem conforme o campo e corrigido. */
   const [tried, setTried] = useState(false);
   const [saving, setSaving] = useState(false);
   const [overlap, setOverlap] = useState(false);
@@ -475,6 +500,7 @@ export default function GoalEditorPage() {
         {copiedFrom && (
           <p className="mt-1 text-[13px] text-t2">
             Cópia de <span className="font-semibold text-t1">{copiedFrom.name}</span>
+            {copiedFrom.forStore ? " · mesma configuração para outra loja" : ""}
           </p>
         )}
       </div>
@@ -535,7 +561,7 @@ export default function GoalEditorPage() {
                 )}
               >
                 {!storeId && <option value="">Selecione a loja</option>}
-                {lojas.map((l) => (
+                {lojasDestino.map((l) => (
                   <option key={l.id} value={l.id}>
                     {l.fantasia} · Filial {l.codFilial}
                   </option>
@@ -555,7 +581,7 @@ export default function GoalEditorPage() {
                 autoFocus={Boolean(copyId)}
                 aria-label="Meta da loja"
               />
-              {copiedFrom && (
+              {copiedFrom && !copiedFrom.forStore && (
                 <p className="mt-1.5 text-[12px] text-t2">
                   Meta anterior: <span className="font-mono font-semibold text-t1">{brlCent(copiedFrom.target)}</span>
                 </p>
@@ -649,6 +675,7 @@ export default function GoalEditorPage() {
             target={targetValue}
             mode={prizeMode}
             equipeToda={!groupsOn && prizeMode === "GROUP"}
+            managerOn={managerOn}
           />
         </SideCard>
       </div>
@@ -666,8 +693,8 @@ export default function GoalEditorPage() {
 }
 
 /**
- * Meta global ÷ equipe de vendas ativa da loja. Só no modo Individual sem grupos de distribuição —
- * com grupos a meta de cada um vem do % do grupo; no modo Grupo a meta não é dividida por pessoa.
+ * Meta global  equipe de vendas ativa da loja. So no modo Individual sem grupos de distribuicao  - 
+ * com grupos a meta de cada um vem do % do grupo; no modo Grupo a meta nao e dividida por pessoa.
  */
 function GlobalSplit({
   target,
@@ -706,12 +733,12 @@ function SideCard({
 }: {
   title: string;
   active: boolean;
-  /** Liga/desliga o recurso pela chave no cabeçalho. */
+  /** Liga/desliga o recurso pela chave no cabecalho. */
   onToggle?: (v: boolean) => void;
   emptyIcon: string;
   emptyTitle?: string;
   emptyText: string;
-  /** Botão no canto do cabeçalho (só com o recurso ativo). */
+  /** Botao no canto do cabecalho (so com o recurso ativo). */
   action?: ReactNode;
   children: ReactNode;
 }) {
@@ -759,7 +786,7 @@ function RemoveButton({
   );
 }
 
-/** Grupos da loja (Gestão > Grupos): nome e lista fixos; muda só o valor e o tipo (% ou R$). Soma ≤ 100% da meta global. */
+/** Grupos da loja (Gestao > Grupos): nome e lista fixos; muda so o valor e o tipo (% ou R$). Soma  100% da meta global. */
 function GroupsEditor({
   storeId,
   groups,
@@ -878,7 +905,7 @@ function GroupsEditor({
   );
 }
 
-/** Meta de cada grupo e as pessoas dele (o grupo de cada pessoa é definido em Gestão > Vendedores). */
+/** Meta de cada grupo e as pessoas dele (o grupo de cada pessoa e definido em Gestao > Vendedores). */
 function GroupsSimulation({
   groups,
   team,
@@ -972,7 +999,7 @@ function GroupsSimulation({
   );
 }
 
-/** Informações do nível: uma por linha quando o card é estreito (celular e colunas lado a lado no desktop); em linha com "·" no meio. */
+/** Informacoes do nivel: uma por linha quando o card e estreito (celular e colunas lado a lado no desktop); em linha com " | " no meio. */
 function InfoLine({
   items,
   className,
@@ -998,7 +1025,7 @@ function InfoLine({
   );
 }
 
-/** Linha "rótulo + valor" do nível. */
+/** Linha "rotulo + valor" do nivel. */
 function TierField({
   label,
   value,
@@ -1086,7 +1113,7 @@ function TiersEditor({
         <div className="min-w-0">
           <p className="text-[12.5px] font-bold text-t0">Premiação da gerência</p>
           <p className="mt-0.5 text-[11.5px] text-t2">
-            A gerência também sobe de nível pelo faturamento total da loja e recebe a premiação correspondente.
+            Mesmos níveis da equipe. A gerência ganha o percentual sobre a venda da loja.
           </p>
         </div>
         <Switch checked={managerOn} onChange={setManagerOn} />
@@ -1177,15 +1204,19 @@ function TiersEditor({
                   onChange={(mgrBonus) => update(t.key, { mgrBonus })}
                   optional
                 />
-                {mgr && (positive(t.mgrCommission) != null || mgr.bonusTotal > 0) && (
+                {mgr && (r.atingir != null || mgr.bonusTotal > 0) && (
                   <InfoLine
                     items={[
+                      r.atingir != null && (
+                        <>
+                          A partir de{" "}
+                          <span className="font-mono text-t1">{brlCent(r.atingir)}</span> na meta da loja
+                        </>
+                      ),
                       positive(t.mgrCommission) != null && (
                         <>
                           premiação de{" "}
-                          <span className="font-semibold text-ok">
-                            {numText(positive(t.mgrCommission)!)}%
-                          </span>
+                          <span className="font-semibold text-ok">{numText(positive(t.mgrCommission)!)}%</span>
                         </>
                       ),
                       ...bonusItems(mgr.bonus, mgr.bonusTotal),
@@ -1227,9 +1258,9 @@ function TiersEditor({
           )}
           {managerOn && (
             <>
-              {" "}A <span className="font-semibold">gerência</span> usa os
-              mesmos percentuais sobre a meta da loja e considera o
-              faturamento total da loja, incluindo vendas sem vendedor
+              {" "}A <span className="font-semibold">gerência</span> sobe pelos
+              mesmos níveis, medidos na meta da loja, e ganha o percentual de
+              cada nível sobre a venda da loja, incluindo vendas sem vendedor
               identificado ou realizadas pela gerência.
             </>
           )}
@@ -1247,6 +1278,7 @@ function Simulation({
   target,
   mode,
   equipeToda,
+  managerOn,
 }: {
   storeId: string;
   /** null = grupos da loja ainda carregando. */
@@ -1255,8 +1287,9 @@ function Simulation({
   tiers: TierRow[];
   target: number | null;
   mode: PrizeMode;
-  /** Modo Grupo sem grupos de distribuição: a equipe toda é um grupo só, com a meta global. */
+  /** Modo Grupo sem grupos de distribuicao: a equipe toda e um grupo so, com a meta global. */
   equipeToda: boolean;
+  managerOn: boolean;
 }) {
   const individual = mode === "INDIVIDUAL";
   const grupos = equipeToda
@@ -1424,7 +1457,7 @@ function Simulation({
                               por pessoa
                             </>
                           ),
-                          ...bonusItems(r.bonus, r.bonusTotal, true),
+                          ...bonusItems(r.bonus, r.bonusTotal, true, true),
                         ]}
                       />
                     </div>
@@ -1435,6 +1468,55 @@ function Simulation({
           </div>
         );
       })}
+      {managerOn && <ManagerSimulation tiers={tiers} target={target} />}
+    </div>
+  );
+}
+
+/** Mesmo formato da equipe, sobre a venda da loja. A soma dos bonus aparece aqui. */
+function ManagerSimulation({ tiers, target }: { tiers: TierRow[]; target: number }) {
+  const resultados = tierResults(tiers, target);
+  return (
+    <div className="rounded-[var(--radius-vela-md)] bg-bg-1 p-3">
+      <p className="truncate text-[13.5px] font-bold text-acc">Gerência</p>
+      <p className="mb-2.5 mt-0.5 text-[11.5px] text-t2">
+        Meta da loja: <span className="font-mono text-t1">{brlCent(target)}</span>
+        {" · "}premiação sobre a venda da loja
+      </p>
+      <div className="flex flex-col gap-1">
+        {tiers.map((t, i) => {
+          const r = resultados[i]!;
+          const mgr = managerResult(tiers, i, r.atingir);
+          if (r.atingir == null) return null;
+          const pct = positive(t.meta);
+          const taxa = positive(t.mgrCommission);
+          return (
+            <div key={t.key} className="rounded-lg bg-bg-2 px-2.5 py-1.5 text-[12px]">
+              <p className="truncate">
+                <span className="font-semibold text-t0">{t.name.trim() || `Nível ${i + 1}`}</span>
+                {pct != null && <span className="text-t2"> · {numText(pct)}%</span>}
+              </p>
+              <InfoLine
+                className="mt-0.5"
+                items={[
+                  <>
+                    A partir de <span className="font-mono text-t1">{brlCent(r.atingir)}</span>
+                  </>,
+                  taxa != null && (
+                    <>
+                      premiação de <span className="font-semibold text-ok">{numText(taxa)}%</span> da venda da loja
+                    </>
+                  ),
+                  taxa != null && mgr.comissao != null && (
+                    <span className="font-mono font-semibold text-ok">{brlCent(mgr.comissao)}</span>
+                  ),
+                  ...bonusItems(mgr.bonus, mgr.bonusTotal, false, true),
+                ]}
+              />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

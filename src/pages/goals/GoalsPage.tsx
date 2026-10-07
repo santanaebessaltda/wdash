@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AvatarGroup, Badge, Button, Card, DateRangePicker, Modal, ProgressBar, progressTextClass, useToast } from "@/components/ui";
 import { Tooltip } from "@/components/ui/Tooltip";
 import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePicker";
+import { DuplicateChoiceModal } from "@/components/wedash/DuplicateChoiceModal";
 import { GoalCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { resolvePeriod } from "@/data/wedash/dashboard";
@@ -10,7 +11,7 @@ import { buildGoalSummary, GOAL_STATUS_LABEL, goalTeamNames, prazoRestante, type
 import { deleteGoal, fetchGoalTeam, fetchGoals, type GoalRecord, type GoalTeamMember } from "@/data/wedash/goalsRepo";
 import { fetchSalesDayAggs } from "@/data/wedash/salesRepo";
 import type { SalesDayAgg } from "@/data/wedash/salesTypes";
-import type { Store } from "@/data/wedash/stores";
+import { storesForSession, type Store } from "@/data/wedash/stores";
 import { brlCent, dataCompleta, fimDoMes, num, paraIso, deIso } from "@/lib/format";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
@@ -28,13 +29,13 @@ const STATUS_VARIANT: Record<GoalStatus, "success" | "info" | "neutral"> = { act
 
 type Loaded = { goals: GoalRecord[]; dayAggs: SalesDayAgg[]; team: GoalTeamMember[] };
 
-/** Metas podem ser cadastradas para frente: o calendário vai até o fim do mês daqui a 12 meses. */
+/** Metas podem ser cadastradas para frente: o calendario vai ate o fim do mes daqui a 12 meses. */
 function maxPickerDate(today: string): Date {
   const d = deIso(today);
   return deIso(fimDoMes(paraIso(new Date(d.getFullYear(), d.getMonth() + 12, 1))));
 }
 
-/** Gestão > Metas — 1 card por meta (loja do StorePicker × período do filtro). */
+/** Gestao > Metas  -  1 card por meta (loja do StorePicker x periodo do filtro). */
 export default function GoalsPage() {
   const navigate = useNavigate();
   const { show } = useToast();
@@ -50,6 +51,8 @@ export default function GoalsPage() {
   const [reload, setReload] = useState(0);
   const [confirmar, setConfirmar] = useState<GoalRecord | null>(null);
   const [excluindo, setExcluindo] = useState(false);
+  const [duplicar, setDuplicar] = useState<GoalRecord | null>(null);
+  const hasOtherStores = storesForSession(session.stores).length > 1;
 
   useEffect(() => {
     const onSync = () => setReload((n) => n + 1);
@@ -64,7 +67,7 @@ export default function GoalsPage() {
     if (lojasLoading) return;
     let cancelled = false;
     (async () => {
-      // Venda nova (SALES_SYNCED_EVENT) recarrega sem skeleton; só filtro novo mostra o skeleton.
+      // Venda nova (SALES_SYNCED_EVENT) recarrega sem skeleton; so filtro novo mostra o skeleton.
       if (loadedKey.current !== filtroKey) setLoading(true);
       const goals = await fetchGoals({ tenantId: session.tenantId, storeIds, from: periodo.inicio, to: periodo.fim });
       let dayAggs: SalesDayAgg[] = [];
@@ -178,13 +181,27 @@ export default function GoalsPage() {
                 mostraLoja={lojas.length > 1}
                 equipe={equipe}
                 onDetail={() => navigate(paths.goalDetail(summary.goal.id))}
-                onCopy={() => navigate(paths.goalCopy(summary.goal.id))}
+                onCopy={() => setDuplicar(summary.goal)}
                 onDelete={() => setConfirmar(summary.goal)}
               />
             ))}
           </div>
         )}
       </div>
+
+      <DuplicateChoiceModal
+        open={duplicar !== null}
+        onClose={() => setDuplicar(null)}
+        kind="meta"
+        name={duplicar?.name ?? null}
+        hasOtherStores={hasOtherStores}
+        onChoose={(choice) => {
+          if (!duplicar) return;
+          const id = duplicar.id;
+          setDuplicar(null);
+          navigate(choice === "store" ? paths.goalCopyStore(id) : paths.goalCopy(id));
+        }}
+      />
 
       <Modal
         open={confirmar !== null}

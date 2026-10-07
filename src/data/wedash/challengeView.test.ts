@@ -4,6 +4,7 @@ import {
   challengeCardSummary,
   challengePayout,
   copyChallenge,
+  copyChallengeToStore,
   metricValueLabel,
   performanceIndex,
   prizeLabel,
@@ -205,7 +206,7 @@ describe("buildChallengeView — participantes e resultado", () => {
       sellerDays: [
         sellerDay(1, 10, 20, 100_000),
         sellerDay(2, 20, 30, 120_000),
-        // hoje (parcial) não entra
+        // hoje (parcial) nao entra
         sellerDay(1, 50, 50, 900_000, { day: "2026-10-08" }),
         sellerDay(1, 10, 15, 80_000, { day: "2026-09-29" }),
         sellerDay(2, 10, 20, 120_000, { day: "2026-09-29" }),
@@ -215,7 +216,7 @@ describe("buildChallengeView — participantes e resultado", () => {
     });
     const c = (managerTarget: number) =>
       challenge({ metric: "INDEX", scope: "ALL", products: [], minSales: 1, managerPrize: { kind: "MONEY", amount: 80 }, managerTarget });
-    // 100 × (0,5 × 110.000/100.000 + 0,25 × 8.000/10.000 + 0,25 × 1,75/1,75) = 100
+    // 100 x (0,5 x 110.000/100.000 + 0,25 x 8.000/10.000 + 0,25 x 1,75/1,75) = 100
     expect(build(c(100), aggs).gerencia).toMatchObject({
       resultado: 100,
       alvo: 100,
@@ -532,6 +533,18 @@ describe("fechamento, card e duplicar", () => {
     const c = challenge({ target: 10, managerPrize: { kind: "ITEM", label: "Spa" }, managerTarget: 15 });
     const { id: _id, ...rest } = c;
     expect(copyChallenge(c)).toEqual({ ...rest, name: "Body Splash — quem vender mais (cópia)", startsOn: "2026-10-12", endsOn: "2026-10-18" });
+  });
+
+  it("duplicar para outra loja: mesmas datas e nome", () => {
+    const c = challenge({ target: 10, managerPrize: { kind: "ITEM", label: "Spa" }, managerTarget: 15 });
+    const { id: _id, ...rest } = c;
+    expect(copyChallengeToStore(c)).toEqual({
+      ...rest,
+      products: c.products.map((p) => ({ ...p })),
+      categories: c.categories.map((t) => ({ ...t })),
+      prizes: c.prizes.map((p) => ({ ...p })),
+      managerPrize: { kind: "ITEM", label: "Spa" },
+    });
   });
 
   it("rótulos de valor por métrica", () => {
