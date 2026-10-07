@@ -7,8 +7,8 @@ export function deepHistoryTouches(fill: DeepHistoryFill | null, inicio: string,
 }
 
 /**
- * Alerta com anel de progresso enquanto a recuperacao de vendas antigas (madrugada) ainda nao
- * chegou na inauguracao / teto. Escondido durante a carga do mes (MonthFill) — ela tem prioridade.
+ * Alerta com anel de progresso da recuperacao de vendas antigas (ate inauguracao / teto).
+ * Pode aparecer em 0% de dia — a carga so anda de madrugada. Escondido durante MonthFill.
  */
 export function DeepHistoryNotice({
   fill,

@@ -1055,7 +1055,9 @@ export function monthFillProgress(fill: MonthFill, todayIso: string): { done: nu
 
 /**
  * Progresso da recuperacao de vendas antigas (DEEP_HISTORY).
- * So aparece depois que o worker enfileirou pelo menos 1 job `deep` (se DEEP_HISTORY=off, nunca mostra).
+ * Aparece assim que ha cobertura e ainda falta horizonte (pode ser 0%) — a carga so anda de
+ * madrugada; a barra fica de dia para acompanhar. Some com `deepDone` ou progresso completo.
+ * A tela esconde enquanto a carga do mes (MonthFill) roda.
  */
 export async function fetchDeepHistoryFill(
   tenantId: string,
@@ -1079,20 +1081,6 @@ export async function fetchDeepHistoryFill(
     return null;
   }
   if (doneMarker) return null;
-
-  const { data: deepJob, error: deepErr } = await c
-    .from("sync_job")
-    .select("id")
-    .eq("tenant_id", tenantId)
-    .eq("kind", "CLOSE")
-    .eq("payload->>deep", "true")
-    .limit(1)
-    .maybeSingle();
-  if (deepErr) {
-    console.warn("fetchDeepHistoryFill deep job:", deepErr.message ?? deepErr);
-    return null;
-  }
-  if (!deepJob) return null;
 
   const { data: storeRows, error: storeErr } = await c
     .from("store")

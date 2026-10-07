@@ -86,7 +86,7 @@ function subscribe(listener: () => void) {
 
 /**
  * Recuperacao de vendas antigas (DEEP_HISTORY). Um poll so para o app;
- * some quando completa ou se a carga ainda nao comecou / esta desligada.
+ * mostra desde 0% (antes da 1a madrugada) e some ao completar.
  */
 export function useDeepHistoryFill(): DeepHistoryFill | null {
   const { tenantId } = useActiveSession();
