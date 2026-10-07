@@ -7,23 +7,25 @@ import type { SellerHomeStore } from "@/data/wedash/engine/sellerHome";
 
 type Goal = NonNullable<SellerHomeStore["goal"]>;
 
-/** Premiação do vendedor numa loja: até agora, nível, barra, falta, ao chegar e projeção. */
-export function PrizeCard({ store }: { store: SellerHomeStore }) {
+/** Premiacao do vendedor numa loja: ate agora, nivel, barra, falta, ao chegar e projecao. */
+export function PrizeCard({ store, embedded = false }: { store: SellerHomeStore; embedded?: boolean }) {
   const goal = store.goal;
-  return (
-    <Card className="flex flex-col">
-      <h2 className="text-[15px] font-bold text-t0">{store.storeName}</h2>
+  const body = (
+    <>
+      {!embedded && <h2 className="text-[15px] font-bold text-t0">{store.storeName}</h2>}
       {!goal ? (
-        <EmptyBlock icon="🎯" title="Meta não configurada" description="Quando a meta da loja for cadastrada, ela aparece aqui." />
+        <EmptyBlock icon="🎯" title="Meta não configurada" description="Quando a meta da loja for cadastrada, ela aparecerá aqui." />
       ) : !goal.me ? (
         <p className="py-6 text-center text-[13.5px] text-t1">
-          Você ainda não está em nenhum grupo desta meta. Fale com a gerência da loja.
+          Você ainda não está em um grupo desta meta. Fale com a gerência da loja.
         </p>
       ) : (
         <PrizeBody goal={goal} me={goal.me} />
       )}
-    </Card>
+    </>
   );
+  if (embedded) return body;
+  return <Card className="flex flex-col">{body}</Card>;
 }
 
 function PrizeBody({ goal, me }: { goal: Goal; me: NonNullable<Goal["me"]> }) {
@@ -44,15 +46,16 @@ function PrizeBody({ goal, me }: { goal: Goal; me: NonNullable<Goal["me"]> }) {
       {proximo ? (
         <div className="flex flex-col gap-1 text-[13px] text-t1">
           <p>Faltam {brlCent(me.proximo!.falta)} para {proximo}</p>
-          {goal.nextLevelGain != null && <p>Ao chegar: +{brlCent(goal.nextLevelGain)} de premiação</p>}
+          {goal.nextLevelGain != null && <p>Ao chegar: +{brlCent(goal.nextLevelGain)} em premiação</p>}
         </div>
       ) : (
         <p className="text-[13px] font-semibold text-ok">Você chegou ao último nível da meta.</p>
       )}
       {goal.projectedPrize != null && (
-        <p className="text-[12.5px] text-t2">
-          Se mantiver o ritmo: {brlCent(goal.projectedPrize)} até {dataCurta(goal.endsOn)} (estimativa)
-        </p>
+        <div>
+          <p className="text-[13px] font-semibold text-t1">Projeção: {brlCent(goal.projectedPrize)} até {dataCurta(goal.endsOn)}</p>
+          <p className="text-[12.5px] text-t2">Se mantiver o ritmo atual.</p>
+        </div>
       )}
     </div>
   );
