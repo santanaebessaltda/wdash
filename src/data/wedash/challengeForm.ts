@@ -17,7 +17,7 @@ export const CHALLENGE_NAME_MAX = 80;
 export const DEFAULT_MIN_SALES = "10";
 export const MAX_PODIUM = 3;
 
-/** Prêmio no formulário: R$ (máscara "1.234,50") ou descrição. */
+/** Premio no formulario: R$ (mascara "1.234,50") ou descricao. */
 export interface PrizeForm {
   kind: ChallengePrize["kind"];
   amount: string;
@@ -35,14 +35,14 @@ export interface ChallengeForm {
   mode: ChallengeMode;
   products: ChallengeProduct[];
   categories: ChallengeCategory[];
-  /** Mínimo na unidade do tipo: obrigatório em "Quem chegar ao mínimo", opcional em "Quem fizer mais". */
+  /** Minimo na unidade do tipo: obrigatorio em "Quem chegar ao minimo", opcional em "Quem fizer mais". */
   target: string;
   minSales: string;
-  /** Disputa: 1º, 2º, 3º · Mínimo: só o 1º (por pessoa que atingir). */
+  /** Disputa: 1, 2, 3  |  Minimo: so o 1 (por pessoa que atingir). */
   prizes: PrizeForm[];
   managerOn: boolean;
   managerPrize: PrizeForm;
-  /** Média da equipe que a gerência precisa alcançar, na unidade da métrica (Índice: índice da equipe × período anterior). */
+  /** Media da equipe que a gerencia precisa alcancar, na unidade da metrica (Indice: indice da equipe x periodo anterior). */
   managerTarget: string;
 }
 
@@ -55,7 +55,7 @@ export interface ChallengeFormErrors {
   categories?: string;
   target?: string;
   minSales?: string;
-  /** Por posição do prêmio (0 = 1º). */
+  /** Por posicao do premio (0 = 1). */
   prizes?: Record<number, string>;
   managerPrize?: string;
   managerTarget?: string;
@@ -85,7 +85,7 @@ export function emptyChallengeForm(storeId: string): ChallengeForm {
   };
 }
 
-/** "1.234,50" · "1,9" · "15" → número; vazio = null; inválido = NaN. */
+/** "1.234,50"  |  "1,9"  |  "15"  ->  numero; vazio = null; invalido = NaN. */
 function parseNumber(txt: string): number | null {
   const raw = txt.trim();
   if (!raw) return null;
@@ -95,11 +95,11 @@ function parseNumber(txt: string): number | null {
 }
 
 export const usesMinSales = (m: ChallengeMetric) => m === "PA" || m === "TICKET" || m === "INDEX";
-/** Índice de desempenho é sempre "Quem fizer mais". */
+/** Indice de desempenho e sempre "Quem fizer mais". */
 const modeOf = (f: { metric: ChallengeMetric; mode: ChallengeMode }): ChallengeMode => (isIndexMetric(f.metric) ? "CONTEST" : f.mode);
 const round2 = (v: number) => Math.round(v * 100) / 100;
 
-/** Erro do mínimo; undefined = válido (ou vazio quando opcional). */
+/** Erro do minimo; undefined = valido (ou vazio quando opcional). */
 function targetError(metric: ChallengeMetric, txt: string, required: boolean): string | undefined {
   const v = parseNumber(txt);
   if (v == null) return required ? REQUIRED : undefined;
@@ -133,7 +133,7 @@ function prizeValue(p: PrizeForm): ChallengePrize {
 
 const activePrizes = (f: ChallengeForm) => (modeOf(f) === "MINIMUM" ? f.prizes.slice(0, 1) : f.prizes.slice(0, MAX_PODIUM));
 
-/** Erros do formulário; objeto vazio = pode salvar. */
+/** Erros do formulario; objeto vazio = pode salvar. */
 export function validateChallengeForm(f: ChallengeForm): ChallengeFormErrors {
   const e: ChallengeFormErrors = {};
   const name = f.name.trim();
@@ -147,10 +147,9 @@ export function validateChallengeForm(f: ChallengeForm): ChallengeFormErrors {
   const scope = scopeOf(f);
   if (scope === "PRODUCTS" && f.products.length === 0) e.products = "Escolha pelo menos 1 produto.";
   if (scope === "CATEGORIES" && f.categories.length === 0) e.categories = "Escolha pelo menos 1 categoria.";
-  if (usesMinSales(f.metric)) {
+  if (usesMinSales(f.metric) && f.minSales.trim()) {
     const v = parseNumber(f.minSales);
-    if (v == null) e.minSales = REQUIRED;
-    else if (!Number.isInteger(v) || v < 1) e.minSales = "Informe um número inteiro a partir de 1.";
+    if (v == null || !Number.isInteger(v) || v < 1) e.minSales = "Informe um número inteiro a partir de 1.";
   }
 
   const target = targetError(f.metric, f.target, modeOf(f) === "MINIMUM");
@@ -172,7 +171,7 @@ export function validateChallengeForm(f: ChallengeForm): ChallengeFormErrors {
   return e;
 }
 
-/** Formulário válido → dados para gravar. */
+/** Formulario valido  ->  dados para gravar. */
 export function challengeFormToInput(f: ChallengeForm): ChallengeInput {
   const scope = scopeOf(f);
   return {
@@ -186,7 +185,12 @@ export function challengeFormToInput(f: ChallengeForm): ChallengeInput {
     products: scope === "PRODUCTS" ? f.products : [],
     categories: scope === "CATEGORIES" ? f.categories : [],
     target: targetValue(f.metric, f.target),
-    minSales: usesMinSales(f.metric) ? Math.round(parseNumber(f.minSales) ?? 1) : null,
+    minSales: usesMinSales(f.metric)
+      ? (() => {
+          const v = parseNumber(f.minSales);
+          return v != null && Number.isInteger(v) && v >= 1 ? Math.round(v) : null;
+        })()
+      : null,
     prizes: activePrizes(f).map(prizeValue),
     managerPrize: f.managerOn ? prizeValue(f.managerPrize) : null,
     managerTarget: f.managerOn ? targetValue(f.metric, f.managerTarget) : null,
@@ -205,7 +209,7 @@ function targetToText(metric: ChallengeMetric, v: number | null): string {
   return String(v).replace(".", ",");
 }
 
-/** Registro (ou cópia) → formulário. */
+/** Registro (ou copia)  ->  formulario. */
 export function challengeToForm(c: ChallengeRecord | ChallengeInput): ChallengeForm {
   return {
     name: c.name,
@@ -218,7 +222,7 @@ export function challengeToForm(c: ChallengeRecord | ChallengeInput): ChallengeF
     products: c.products.map((p) => ({ ...p })),
     categories: c.categories.map((t) => ({ ...t })),
     target: targetToText(c.metric, c.target),
-    minSales: c.minSales != null ? String(c.minSales) : DEFAULT_MIN_SALES,
+    minSales: c.minSales != null ? String(c.minSales) : usesMinSales(c.metric) ? "" : DEFAULT_MIN_SALES,
     prizes: c.prizes.length > 0 ? c.prizes.map(prizeToForm) : [emptyPrize()],
     managerOn: c.managerPrize != null,
     managerPrize: c.managerPrize ? prizeToForm(c.managerPrize) : emptyPrize(),

@@ -66,8 +66,9 @@ describe("validateChallengeForm", () => {
     expect(challengeFormToInput(valid({ metric: "VALUE", mode: "MINIMUM", target: "1.500,50" })).target).toBe(1500.5);
   });
 
-  it("P.A. e ticket exigem mínimo de vendas inteiro ≥ 1", () => {
-    expect(validateChallengeForm(valid({ metric: "PA", products: [], minSales: "" })).minSales).toBe("Campo obrigatório.");
+  it("P.A. e ticket: vendas mínimas são opcionais; se preenchidas, inteiro ≥ 1", () => {
+    expect(validateChallengeForm(valid({ metric: "PA", products: [], minSales: "" })).minSales).toBeUndefined();
+    expect(challengeFormToInput(valid({ metric: "PA", products: [], minSales: "" })).minSales).toBeNull();
     expect(validateChallengeForm(valid({ metric: "TICKET", products: [], minSales: "0" })).minSales).toBe(
       "Informe um número inteiro a partir de 1.",
     );

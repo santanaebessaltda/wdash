@@ -416,9 +416,8 @@ export default function ChallengeEditorPage() {
             {usaVendas && (
               <FormField
                 label="Vendas mínimas para participar"
-                required
                 error={errors.minSales}
-                hint="Define o número mínimo de vendas necessário para concorrer ao prêmio."
+                hint="Opcional. Se preenchido, só concorre quem tiver pelo menos esse número de vendas."
               >
                 <Input
                   inputMode="numeric"

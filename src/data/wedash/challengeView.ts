@@ -283,7 +283,7 @@ export function buildChallengeView(args: {
     return round2(a.faturamentoCents / 100 / a.vendas);
   };
 
-  const minVendas = usesMinSales(c.metric) ? Math.max(1, c.minSales ?? 1) : 0;
+  const minVendas = usesMinSales(c.metric) && c.minSales != null ? Math.max(1, c.minSales) : 0;
   const base = [...accs.values()].map((a) => ({ a, resultado: resultadoDe(a) }));
   const concorre = (x: { a: Acc; resultado: number | null }) =>
     x.resultado != null && x.resultado > 0 && x.a.vendas >= minVendas;
