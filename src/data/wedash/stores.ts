@@ -284,6 +284,24 @@ export function productStores(): Store[] {
   return extras.length > 0 ? extras : stores;
 }
 
+/**
+ * Ids que o usuario enxerga no seletor. Vinculo vazio (exceto vendedor) = todas as lojas ativas.
+ * Loja desativada fica de fora mesmo se ainda estiver no vinculo.
+ */
+export function sessionStoreIds(input: {
+  linkedIds: string[];
+  tenantStores: { id: string; active: boolean }[];
+  role: string;
+}): string[] {
+  const operational = input.tenantStores.filter((s) => s.active);
+  if (input.linkedIds.length === 0) {
+    if (input.role === "SELLER") return [];
+    return operational.map((s) => s.id);
+  }
+  const allowed = new Set(input.linkedIds);
+  return operational.filter((s) => allowed.has(s.id)).map((s) => s.id);
+}
+
 /** Lojas da sessão: só ids que o membership enxerga (UUIDs reais pós-ERP). */
 export function storesForSession(sessionStoreIds: string[]): Store[] {
   if (sessionStoreIds.length === 0) return [];
