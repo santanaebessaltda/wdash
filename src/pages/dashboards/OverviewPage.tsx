@@ -37,7 +37,9 @@ import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePi
 import { useActiveSession } from "@/session/SessionProvider";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useMonthFill } from "@/pages/dashboard/useMonthFill";
+import { useDeepHistoryFill } from "@/pages/dashboard/useDeepHistoryFill";
 import { MonthFillNotice, pickerMinDate } from "@/pages/dashboard/MonthFillNotice";
+import { DeepHistoryNotice } from "@/pages/dashboard/DeepHistoryNotice";
 import { InitialSyncNotice } from "@/pages/dashboard/InitialSyncNotice";
 import { StoreHoursNotice } from "@/pages/dashboard/StoreHoursNotice";
 import { ErpStatusNotice } from "@/pages/dashboard/ErpStatusNotice";
@@ -62,7 +64,7 @@ import {
 } from "@/pages/dashboard/periodPicker";
 type TopProdSort = "nome" | "itens" | "faturamento" | "lucro" | "variacao";
 
-/** Ouro / prata / bronze — mesmo padrão do Sales leaderboard (Vela). */
+/** Ouro / prata / bronze  -  mesmo padrao do Sales leaderboard (Vela). */
 const RANK_MEDAL = ["#f7b84e", "#c7cdd6", "#d99a5c"];
 
 const IconFat = () => (
@@ -96,7 +98,7 @@ const KPI_ICONS = [IconFat, IconCmv, IconVendas, IconTicket];
 
 /** Cores fixas para as lojas no donut e barras do Ranking de Lojas. */
 const CORES_LOJAS = ["var(--acc)", "var(--info)", "var(--ok)", "var(--warn)", "var(--bad)"];
-/** Fatia neutra "Demais lojas" (1 loja no StorePicker) — não compete com a cor da loja. */
+/** Fatia neutra "Demais lojas" (1 loja no StorePicker)  -  nao compete com a cor da loja. */
 const COR_DEMAIS_LOJAS = "color-mix(in srgb, var(--t2) 40%, transparent)";
 
 /** Cores distintas para cada KPI card (hero). */
@@ -108,9 +110,9 @@ const KPI_COLORS = [
 ];
 
 /**
- * Badge de delta — só % no chip; base do comparativo no tooltip (igual StatCard).
- * `metrica` nomeia o que o badge compara quando o título do card fala de outra coisa
- * ("Faturamento total em relação ao mês passado: R$ …").
+ * Badge de delta  -  so % no chip; base do comparativo no tooltip (igual StatCard).
+ * `metrica` nomeia o que o badge compara quando o titulo do card fala de outra coisa
+ * ("Faturamento total em relacao ao mes passado: R$ ...").
  */
 function BadgeVsAnterior({
   delta,
@@ -130,7 +132,7 @@ function BadgeVsAnterior({
   return tip ? <Tooltip label={tip}>{badge}</Tooltip> : badge;
 }
 
-/** Título da tela inicial pós-login: saudação com o primeiro nome. */
+/** Titulo da tela inicial pos-login: saudacao com o primeiro nome. */
 function welcomeTitle(name: string): string {
   const first = titleName(name).split(" ")[0];
   return first ? `Bem-vindo(a) de volta, ${first} 👋` : "Bem-vindo(a) de volta 👋";
@@ -161,7 +163,7 @@ export default function OverviewPage() {
   const [goalDayAggs, setGoalDayAggs] = useState<SalesDayAgg[]>([]);
   const [goalSellerDayAggs, setGoalSellerDayAggs] = useState<SalesSellerDayAgg[]>([]);
   const [goalTeam, setGoalTeam] = useState<GoalTeamMember[]>([]);
-  // Catálogo de lojas (horário/fuso) hidratado depois do 1º render → recalcula eixos.
+  // Catalogo de lojas (horario/fuso) hidratado depois do 1 render  ->  recalcula eixos.
   const [storesTick, setStoresTick] = useState(0);
   useEffect(() => {
     const onStores = () => setStoresTick((n) => n + 1);
@@ -170,7 +172,7 @@ export default function OverviewPage() {
   }, []);
   const [topProdSort, setTopProdSort] = useState<TopProdSort>("faturamento");
   const [topProdDir, setTopProdDir] = useState<SortDir>("desc");
-  /** Só a leitura mais recente aplica setState (evita corrida stale sobrescrever pós-FORCE). */
+  /** So a leitura mais recente aplica setState (evita corrida stale sobrescrever pos-FORCE). */
   const reloadGen = useRef(0);
 
   const reloadAggs = useCallback(async () => {
@@ -183,8 +185,8 @@ export default function OverviewPage() {
     const goalStoreIds =
       escopo.filialIds.length > 0 ? escopo.filialIds : storesForSession(session.stores).map((s) => s.id);
     const goalsP = fetchGoals({ tenantId: session.tenantId, storeIds: goalStoreIds, from: periodo.inicio, to: periodo.fim });
-    // Atingimento da meta = do início de cada meta até hoje (pode sair do período da tela).
-    // Nível de meta no Destaques da equipe = mesma janela, por pessoa.
+    // Atingimento da meta = do inicio de cada meta ate hoje (pode sair do periodo da tela).
+    // Nivel de meta no Destaques da equipe = mesma janela, por pessoa.
     const vazio = { days: [] as SalesDayAgg[], sellers: [] as SalesSellerDayAgg[], team: [] as GoalTeamMember[] };
     const goalDataP = goalsP.then(async (gs) => {
       if (gs.length === 0) return vazio;
@@ -204,7 +206,7 @@ export default function OverviewPage() {
       const [days, hours, cats, catalog, payments, sellers, products, productCosts, wm, cov, goalHistDays, goalHistHours, prevDays, prevHours, shifts, goalsLoaded, goalAggs] = await Promise.all([
         fetchSalesDayAggs({
           tenantId: session.tenantId,
-          // Sempre a rede: Ranking precisa do total/participação mesmo com 1 loja no StorePicker.
+          // Sempre a rede: Ranking precisa do total/participacao mesmo com 1 loja no StorePicker.
           storeIds: [],
           from: periodo.inicio,
           to: periodo.fim,
@@ -322,8 +324,8 @@ export default function OverviewPage() {
     return () => window.removeEventListener(SALES_SYNCED_EVENT, onSynced);
   }, [reloadAggs]);
 
-  // Só a 1ª carga usa `loading` (desabilita o botão). Re-fetch de escopo/aba
-  // atualiza os dados em silêncio — senão o Atualizar “pisca” (disabled:opacity-50).
+  // So a 1 carga usa `loading` (desabilita o botao). Re-fetch de escopo/aba
+  // atualiza os dados em silencio  -  senao o Atualizar "pisca" (disabled:opacity-50).
   const hasLoadedOnce = useRef(false);
   useEffect(() => {
     let cancelled = false;
@@ -340,7 +342,7 @@ export default function OverviewPage() {
     };
   }, [reloadAggs]);
 
-  // Enquanto o primeiro sync não grava watermark, repolha (SEED pode demorar).
+  // Enquanto o primeiro sync nao grava watermark, repolha (SEED pode demorar).
   useEffect(() => {
     if (watermark != null) return;
     const id = window.setInterval(() => {
@@ -349,7 +351,7 @@ export default function OverviewPage() {
     return () => window.clearInterval(id);
   }, [watermark, reloadAggs]);
 
-  // Enquanto o histórico ainda cresce (HISTORY), repolha cobertura do picker.
+  // Enquanto o historico ainda cresce (HISTORY), repolha cobertura do picker.
   useEffect(() => {
     const id = window.setInterval(() => {
       void fetchSalesCoverage(session.tenantId, escopo.filialIds).then((cov) => {
@@ -384,7 +386,7 @@ export default function OverviewPage() {
     [escopo, dayAggs, hourAggs, categoryDayAggs, categoryCatalog, paymentDayAggs, sellerDayAggs, sellerShifts, productDayAggs, productCostDayAggs, goalHistoryDayAggs, goalHistoryHourAggs, prevDayAggs, prevHourAggs, goals, goalDayAggs, goalSellerDayAggs, goalTeam, storesTick],
   );
 
-  // A métrica escolhe QUAIS 5 entram (sempre os maiores); a direção só reordena os 5.
+  // A metrica escolhe QUAIS 5 entram (sempre os maiores); a direcao so reordena os 5.
   // "Produto" (nome) reordena o Top 5 por faturamento.
   const topProdutosOrdenados = useMemo(() => {
     type P = (typeof view.topProdutos)[number];
@@ -415,10 +417,11 @@ export default function OverviewPage() {
     }
   }
 
-  // Resolve o DateRange a partir do escopo — sempre mostra algo selecionado.
+  // Resolve o DateRange a partir do escopo  -  sempre mostra algo selecionado.
   const dateRange = useMemo(() => dateRangeFromPeriod(escopo.periodo), [escopo.periodo]);
   const periodoAtual = resolvePeriod(escopo.periodo, calendarTodayIso());
   const monthFill = useMonthFill();
+  const deepHistoryFill = useDeepHistoryFill();
   const printing = usePrintMode();
   const exportar = useExportPdf("Visão geral");
   const firstSteps = useFirstSteps(escopo.filialIds);
@@ -460,7 +463,13 @@ export default function OverviewPage() {
       <ErpStatusNotice />
       <InitialSyncNotice />
       <MonthFillNotice fill={monthFill} inicio={periodoAtual.inicio} fim={periodoAtual.fim} />
-      {/* O horário de funcionamento já é um dos primeiros passos. */}
+      <DeepHistoryNotice
+        fill={deepHistoryFill}
+        monthFill={monthFill}
+        inicio={periodoAtual.inicio}
+        fim={periodoAtual.fim}
+      />
+      {/* O horario de funcionamento ja e um dos primeiros passos. */}
       {firstSteps.status === "hidden" && <StoreHoursNotice />}
       {firstSteps.status === "visible" && (
         <FirstStepsCard steps={firstSteps.steps} doneCount={firstSteps.doneCount} tenantId={firstSteps.tenantId} />
@@ -471,7 +480,7 @@ export default function OverviewPage() {
       ) : (
       <>
 
-      {/* KPI row — 4 cards */}
+      {/* KPI row  -  4 cards */}
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {view.kpis.map((kpi, i) => (
           <KpiCard key={kpi.label} kpi={kpi} Icon={KPI_ICONS[i]} colorIdx={i} />
@@ -600,7 +609,7 @@ export default function OverviewPage() {
                 />
               );
             }
-            // evolucao vem acumulada; o gráfico mostra o valor de cada hora/dia/mês.
+            // evolucao vem acumulada; o grafico mostra o valor de cada hora/dia/mes.
             const serie = view.evolucao
               .map((e, i) => {
                 const prev = view.evolucao[i - 1];
@@ -630,7 +639,7 @@ export default function OverviewPage() {
         </Card>
       </div>
 
-      {/* Linha: Categoria vs Meta + Dia da Semana vs Meta (Dia some em período de 1 dia) */}
+      {/* Linha: Categoria vs Meta + Dia da Semana vs Meta (Dia some em periodo de 1 dia) */}
       <div className={`mt-4 grid grid-cols-1 gap-4 ${view.diaVsMeta.length > 0 ? "lg:grid-cols-2" : ""}`}>
         <Card padding="lg" className="flex flex-col">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -741,7 +750,7 @@ export default function OverviewPage() {
               const umaLoja = escopo.filialIds.length === 1;
               const valorLoja = view.rankingLojas[0]?.valor ?? 0;
               const valorDemais = umaLoja ? Math.max(0, totalRede - valorLoja) : 0;
-              // 1 loja: fatia da loja × "Demais lojas" (resto da rede) — mostra o peso real na rede.
+              // 1 loja: fatia da loja x "Demais lojas" (resto da rede)  -  mostra o peso real na rede.
               const demais: (typeof view.rankingLojas)[number] | null =
                 umaLoja && valorDemais > 0
                   ? {
@@ -816,7 +825,7 @@ export default function OverviewPage() {
               const total = view.formasPagamento.reduce((s, f) => s + f.valor, 0) || 1;
               return (
                 <div className="flex flex-1 flex-col justify-center px-4 pb-4">
-                  {/* Padrão Expense breakdown — igual Financeiro */}
+                  {/* Padrao Expense breakdown  -  igual Financeiro */}
                   <div className="mx-auto my-2">
                     <DonutChart
                       segments={view.formasPagamento.map((f) => ({

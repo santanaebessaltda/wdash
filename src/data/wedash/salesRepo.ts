@@ -12,6 +12,14 @@ import {
   buildTableCostFill,
   type TableCostFill,
 } from "./costTableFill";
+import {
+  DEEP_EMPTY_MONTHS,
+  addMonths,
+  deepHistoryCap,
+  deepHistoryFloor,
+  deepHistoryProgress,
+  monthStart,
+} from "./deepHistory";
 import type {
   SalesBrand,
   SalesCategoryDayAgg,
@@ -188,7 +196,7 @@ function clientOrNull(override?: SalesQueryClient): SalesQueryClient | null {
   return getSupabase() as unknown as SalesQueryClient | null;
 }
 
-/** Fetch daily aggregates for scope. Empty array when none — never mock R$. */
+/** Fetch daily aggregates for scope. Empty array when none  -  never mock R$. */
 export async function fetchSalesDayAggs(
   query: SalesDayQuery,
   clientOverride?: SalesQueryClient,
@@ -214,7 +222,7 @@ export async function fetchSalesDayAggs(
 
 /**
  * Custo da tabela da loja para os produtos que vieram com custo 0 na margem.
- * `rows` já carregadas (produto) ou null = busca só as linhas zeradas do período. Falha → sem ajuste.
+ * `rows` ja carregadas (produto) ou null = busca so as linhas zeradas do periodo. Falha  ->  sem ajuste.
  */
 async function loadTableCostFill(
   client: SalesQueryClient,
@@ -282,9 +290,9 @@ async function loadTableCostFill(
 const PAGE_SIZE = 1000;
 
 /**
- * PostgREST corta em 1000 linhas por request (`.limit` maior não adianta): pagina
+ * PostgREST corta em 1000 linhas por request (`.limit` maior nao adianta): pagina
  * com `range` quando o client suporta (Supabase). A query precisa de ordem total
- * (inclua a chave da linha no `order`) para as páginas não repetirem/pularem linhas.
+ * (inclua a chave da linha no `order`) para as paginas nao repetirem/pularem linhas.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function fetchAllPages<Row>(ordered: any, label: string): Promise<Row[]> {
@@ -335,10 +343,10 @@ export async function fetchSalesHourAggs(
   return (await fetchAllPages<HourRow>(ordered, "fetchSalesHourAggs")).map(mapHour);
 }
 
-/** Itens vendidos (top produtos) × catálogo de produtos da rede → receita por tipo de produto. */
+/** Itens vendidos (top produtos) x catalogo de produtos da rede  ->  receita por tipo de produto. */
 const CATEGORY_SOURCE = "sales_category_day_view";
 
-/** Receita diária por categoria (PRODUTO_TIPO do catálogo). */
+/** Receita diaria por categoria (PRODUTO_TIPO do catalogo). */
 export async function fetchSalesCategoryDayAggs(
   query: SalesCategoryDayQuery,
   clientOverride?: SalesQueryClient,
@@ -367,8 +375,8 @@ export async function fetchSalesCategoryDayAggs(
 }
 
 /**
- * Catálogo de categorias já vistas no sync da loja/rede (sem filtro de período).
- * Serve para exibir barras zeradas no gráfico de mix.
+ * Catalogo de categorias ja vistas no sync da loja/rede (sem filtro de periodo).
+ * Serve para exibir barras zeradas no grafico de mix.
  */
 export async function fetchSalesCategoryCatalog(
   query: { tenantId: string; storeIds: string[]; brand?: SalesBrand | null },
@@ -403,7 +411,7 @@ export async function fetchSalesCategoryCatalog(
   return [...byId.values()].sort((a, b) => a.categoryName.localeCompare(b.categoryName, "pt-BR"));
 }
 
-/** Receita diária por forma de pagamento (CONDICAO / VENDAS.Lista). */
+/** Receita diaria por forma de pagamento (CONDICAO / VENDAS.Lista). */
 export async function fetchSalesPaymentDayAggs(
   query: SalesPaymentDayQuery,
   clientOverride?: SalesQueryClient,
@@ -458,7 +466,7 @@ export async function fetchNonSalesPeople(client: SalesQueryClient, tenantId: st
   return out;
 }
 
-/** Funcionárias com turno definido em Configurações > Lojas (vazio se a migration de turnos não existir). */
+/** Funcionarias com turno definido em Configuracoes > Lojas (vazio se a migration de turnos nao existir). */
 export async function fetchSellerShifts(
   tenantId: string,
   clientOverride?: SalesQueryClient,
@@ -496,7 +504,7 @@ export async function fetchSellerShifts(
   return out;
 }
 
-/** Receita diária por vendedora (VENDEDOR_MILLENNIUM / VENDAS.Lista), sem gerência / conta de freelancer. */
+/** Receita diaria por vendedora (VENDEDOR_MILLENNIUM / VENDAS.Lista), sem gerencia / conta de freelancer. */
 export async function fetchSalesSellerDayAggs(
   query: SalesSellerDayQuery,
   clientOverride?: SalesQueryClient,
@@ -527,7 +535,7 @@ export async function fetchSalesSellerDayAggs(
   return excludeNonSalesPeople(rows.map(sellerDayFromRow), nonSales);
 }
 
-/** Receita diária por SKU ({E7A5C5C7} VENDAS DE PRODUTOS POR FILIAL). */
+/** Receita diaria por SKU ({E7A5C5C7} VENDAS DE PRODUTOS POR FILIAL). */
 export async function fetchSalesProductDayAggs(
   query: SalesProductDayQuery,
   clientOverride?: SalesQueryClient,
@@ -556,7 +564,7 @@ export async function fetchSalesProductDayAggs(
 
 let catalogDescriptions: Promise<string[]> | null = null;
 
-/** Descrições do catálogo de produtos (global, ~600 linhas) — base das linhas de produto. 1× por sessão. */
+/** Descricoes do catalogo de produtos (global, ~600 linhas)  -  base das linhas de produto. 1x por sessao. */
 export function fetchProductCatalogDescriptions(clientOverride?: SalesQueryClient): Promise<string[]> {
   if (catalogDescriptions && !clientOverride) return catalogDescriptions;
   const client = clientOrNull(clientOverride);
@@ -569,7 +577,7 @@ export function fetchProductCatalogDescriptions(clientOverride?: SalesQueryClien
   })();
   if (!clientOverride) {
     catalogDescriptions = run;
-    // Falha de leitura volta vazia → tenta de novo no próximo carregamento.
+    // Falha de leitura volta vazia  ->  tenta de novo no proximo carregamento.
     void run.then((rows) => {
       if (rows.length === 0) catalogDescriptions = null;
     });
@@ -580,8 +588,8 @@ export function fetchProductCatalogDescriptions(clientOverride?: SalesQueryClien
 let catalogTypes: Promise<Record<number, number>> | null = null;
 
 /**
- * id do produto no ERP → tipo (categoria), mesmo join da `sales_category_day_view`.
- * Global (~600 linhas), 1× por sessão. Falha → {} (detalhe da Curva ABC fica sem produtos).
+ * id do produto no ERP  ->  tipo (categoria), mesmo join da `sales_category_day_view`.
+ * Global (~600 linhas), 1x por sessao. Falha  ->  {} (detalhe da Curva ABC fica sem produtos).
  */
 export function fetchProductCatalogTypes(clientOverride?: SalesQueryClient): Promise<Record<number, number>> {
   if (catalogTypes && !clientOverride) return catalogTypes;
@@ -609,7 +617,7 @@ export function fetchProductCatalogTypes(clientOverride?: SalesQueryClient): Pro
   return run;
 }
 
-/** COD_PRODUTO → descrição do catálogo. Falha de leitura → {} (aviso mostra só o código). */
+/** COD_PRODUTO  ->  descricao do catalogo. Falha de leitura  ->  {} (aviso mostra so o codigo). */
 export async function fetchProductNames(
   codes: string[],
   clientOverride?: SalesQueryClient,
@@ -644,7 +652,7 @@ type ProductCostDayRow = {
   cmv_cents: number;
 };
 
-/** CMV diário por COD_PRODUTO (RELATORIOMARGEM). Falha de leitura → [] (colunas de custo ficam "—"). */
+/** CMV diario por COD_PRODUTO (RELATORIOMARGEM). Falha de leitura  ->  [] (colunas de custo ficam " - "). */
 export async function fetchSalesProductCostDayAggs(
   query: SalesProductDayQuery,
   clientOverride?: SalesQueryClient,
@@ -728,7 +736,7 @@ export async function requestForceRefresh(opts: {
     },
   });
 
-  // Em non-2xx o invoke preenche `error` e às vezes deixa `data` vazio —
+  // Em non-2xx o invoke preenche `error` e as vezes deixa `data` vazio  - 
   // o JSON real (rate_limited etc.) vem em error.context.
   let body = data as {
     ok?: boolean;
@@ -781,7 +789,7 @@ export type SyncJobWaitResult =
   | { status: "TIMEOUT" }
   | { status: "CANCELLED" };
 
-/** Uma leitura do status — usado ao voltar da aba (não piscar "Atualizando…" se já terminou). */
+/** Uma leitura do status  -  usado ao voltar da aba (nao piscar "Atualizando..." se ja terminou). */
 export async function peekSyncJob(jobId: string): Promise<SyncJobWaitResult | null> {
   const sb = getSupabase();
   if (!sb) return { status: "FAILED", error: "supabase_unavailable" };
@@ -801,14 +809,14 @@ export async function peekSyncJob(jobId: string): Promise<SyncJobWaitResult | nu
   if (st === "FAILED" || st === "CANCELLED") {
     return { status: "FAILED", error: row.error ?? null };
   }
-  // QUEUED / RUNNING / desconhecido — ainda em andamento
+  // QUEUED / RUNNING / desconhecido  -  ainda em andamento
   return null;
 }
 
 /**
  * Espera o sync_job chegar em SUCCEEDED/FAILED (poll).
  * FORCE pode demorar (Lista + DetMov); default 12 min.
- * `onStatus` recebe QUEUED/RUNNING a cada poll (UI: Na fila… / Atualizando…).
+ * `onStatus` recebe QUEUED/RUNNING a cada poll (UI: Na fila... / Atualizando...).
  */
 export async function waitForSyncJob(
   jobId: string,
@@ -852,7 +860,7 @@ export async function waitForSyncJob(
   return { status: "TIMEOUT" };
 }
 
-/** Fallback quando o enqueue não devolveu jobId — pega o FORCE mais recente do tenant. */
+/** Fallback quando o enqueue nao devolveu jobId  -  pega o FORCE mais recente do tenant. */
 export async function waitForLatestForceJob(
   tenantId: string,
   opts?: { sinceIso?: string; timeoutMs?: number; pollMs?: number; signal?: AbortSignal },
@@ -896,7 +904,7 @@ export async function waitForLatestForceJob(
   return { status: "TIMEOUT" };
 }
 
-/** Status do job SEED mais recente (para tela de sincronização). */
+/** Status do job SEED mais recente (para tela de sincronizacao). */
 export async function fetchLatestSeedJob(
   tenantId: string,
   clientOverride?: SalesQueryClient,
@@ -931,13 +939,13 @@ export async function fetchLatestSeedJob(
 }
 
 /**
- * Libera pós-onboarding só quando:
- * 1) SEED mais recente está SUCCEEDED
- * 2) A cobertura em sales_day_agg cobre a janela SEED (mês ant. → hoje)
+ * Libera pos-onboarding so quando:
+ * 1) SEED mais recente esta SUCCEEDED
+ * 2) A cobertura em sales_day_agg cobre a janela SEED (mes ant.  ->  hoje)
  *
- * O flag `since` só evita liberar com SEED antigo **sem** cobertura.
- * Se os dias já estão no banco, libera mesmo se o relógio do retry/F5
- * tiver sido bumpado depois do SUCCEEDED (senão a UI fica em “Buscando” pra sempre).
+ * O flag `since` so evita liberar com SEED antigo **sem** cobertura.
+ * Se os dias ja estao no banco, libera mesmo se o relogio do retry/F5
+ * tiver sido bumpado depois do SUCCEEDED (senao a UI fica em "Buscando" pra sempre).
  */
 export async function fetchSyncReady(
   tenantId: string,
@@ -970,7 +978,7 @@ export async function fetchSyncReady(
   return true;
 }
 
-/** Janela do SEED = só hoje (o resto do mês carrega por trás — ver `fetchMonthFill`). */
+/** Janela do SEED = so hoje (o resto do mes carrega por tras  -  ver `fetchMonthFill`). */
 export function seedCoverageWindow(todayIso: string): {
   from: string;
   to: string;
@@ -979,15 +987,28 @@ export function seedCoverageWindow(todayIso: string): {
   return { from: todayIso, to: todayIso, expectedDays: 1 };
 }
 
-/** Carga do mês pós-onboarding (jobs CLOSE com `fillUntil`), do dia mais recente para o dia 1. */
+/** Carga do mes pos-onboarding (jobs CLOSE com `fillUntil`), do dia mais recente para o dia 1. */
 export type MonthFill = {
-  /** Dia sendo carregado agora (ou o próximo da fila). Dias ≤ este ainda faltam. */
+  /** Dia sendo carregado agora (ou o proximo da fila). Dias  este ainda faltam. */
   currentDay: string;
-  /** Dia 1 do mês (fim da carga). */
+  /** Dia 1 do mes (fim da carga). */
   fillUntil: string;
 };
 
-/** Carga do mês em andamento, ou null quando não há nada na fila. */
+/**
+ * Progresso da carga funda (madrugada): meses cobertos / horizonte.
+ * Null = nada a mostrar (desligada, ainda nao comecou, ou ja completa).
+ */
+export type DeepHistoryFill = {
+  done: number;
+  total: number;
+  /** Proximo mes a carregar (YYYY-MM-01). */
+  nextMonth: string;
+  /** Dia mais antigo ja gravado na rede. */
+  oldestLoaded: string;
+};
+
+/** Carga do mes em andamento, ou null quando nao ha nada na fila. */
 export async function fetchMonthFill(
   tenantId: string,
   clientOverride?: SalesQueryClient,
@@ -1012,7 +1033,7 @@ export async function fetchMonthFill(
   const payload = (data as { payload?: { to?: unknown; fillUntil?: unknown; progressDay?: unknown } } | null)
     ?.payload;
   if (typeof payload?.to !== "string" || typeof payload.fillUntil !== "string") return null;
-  // Job em período (mês inteiro): o worker grava o último dia concluído; falta o dia anterior a ele.
+  // Job em periodo (mes inteiro): o worker grava o ultimo dia concluido; falta o dia anterior a ele.
   const currentDay =
     typeof payload.progressDay === "string" ? previousIsoDay(payload.progressDay.slice(0, 10)) : payload.to.slice(0, 10);
   return { currentDay, fillUntil: payload.fillUntil.slice(0, 10) };
@@ -1023,7 +1044,7 @@ function previousIsoDay(iso: string): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Dias já carregados / total do mês (hoje conta como carregado). */
+/** Dias ja carregados / total do mes (hoje conta como carregado). */
 export function monthFillProgress(fill: MonthFill, todayIso: string): { done: number; total: number } {
   const toMs = (iso: string) => Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10));
   const DAY = 86_400_000;
@@ -1032,7 +1053,121 @@ export function monthFillProgress(fill: MonthFill, todayIso: string): { done: nu
   return { done: Math.max(0, Math.min(total, done)), total: Math.max(1, total) };
 }
 
-/** Dias distintos com venda no período (UI de progresso). */
+/**
+ * Progresso da recuperacao de vendas antigas (DEEP_HISTORY).
+ * So aparece depois que o worker enfileirou pelo menos 1 job `deep` (se DEEP_HISTORY=off, nunca mostra).
+ */
+export async function fetchDeepHistoryFill(
+  tenantId: string,
+  todayIso: string,
+  clientOverride?: SalesQueryClient,
+): Promise<DeepHistoryFill | null> {
+  const client = clientOrNull(clientOverride);
+  if (!client) return null;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const c = client as any;
+  const { data: doneMarker, error: doneErr } = await c
+    .from("sync_job")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("payload->>deepDone", "true")
+    .limit(1)
+    .maybeSingle();
+  if (doneErr) {
+    console.warn("fetchDeepHistoryFill deepDone:", doneErr.message ?? doneErr);
+    return null;
+  }
+  if (doneMarker) return null;
+
+  const { data: deepJob, error: deepErr } = await c
+    .from("sync_job")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("kind", "CLOSE")
+    .eq("payload->>deep", "true")
+    .limit(1)
+    .maybeSingle();
+  if (deepErr) {
+    console.warn("fetchDeepHistoryFill deep job:", deepErr.message ?? deepErr);
+    return null;
+  }
+  if (!deepJob) return null;
+
+  const { data: storeRows, error: storeErr } = await c
+    .from("store")
+    .select("id, opened_at")
+    .eq("tenant_id", tenantId)
+    .eq("active", true);
+  if (storeErr) {
+    console.warn("fetchDeepHistoryFill stores:", storeErr.message ?? storeErr);
+    return null;
+  }
+  const stores = (storeRows ?? []) as Array<{ id: string; opened_at?: string | null }>;
+  if (stores.length === 0) return null;
+
+  const cap = deepHistoryCap(todayIso);
+  const deepStores: Array<{
+    id: string;
+    oldestDay: string | null;
+    floor: string;
+    emptyTail: boolean;
+  }> = [];
+
+  for (const s of stores) {
+    const { data: oldestRow, error: oldErr } = await c
+      .from("sales_day_agg")
+      .select("day")
+      .eq("store_id", s.id)
+      .eq("brand", "ALL")
+      .order("day", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (oldErr) {
+      console.warn("fetchDeepHistoryFill oldest:", oldErr.message ?? oldErr);
+      return null;
+    }
+    const oldestDay = oldestRow?.day ? String(oldestRow.day).slice(0, 10) : null;
+    const openedAt = s.opened_at ? String(s.opened_at).slice(0, 10) : null;
+    let emptyTail = false;
+    if (!openedAt && oldestDay && oldestDay === monthStart(oldestDay)) {
+      const { data: tail, error: tailErr } = await c
+        .from("sales_day_agg")
+        .select("revenue_cents")
+        .eq("store_id", s.id)
+        .eq("brand", "ALL")
+        .gte("day", oldestDay)
+        .lt("day", addMonths(oldestDay, DEEP_EMPTY_MONTHS));
+      if (tailErr) {
+        console.warn("fetchDeepHistoryFill emptyTail:", tailErr.message ?? tailErr);
+        return null;
+      }
+      emptyTail = ((tail ?? []) as Array<{ revenue_cents?: number | null }>).every(
+        (r) => Number(r.revenue_cents ?? 0) === 0,
+      );
+    }
+    deepStores.push({
+      id: s.id,
+      oldestDay,
+      floor: deepHistoryFloor(openedAt, cap),
+      emptyTail,
+    });
+  }
+
+  const progress = deepHistoryProgress(deepStores, todayIso);
+  if (!progress || progress.nextMonth == null || progress.done >= progress.total) return null;
+  const loaded = deepStores.map((s) => s.oldestDay).filter((d): d is string => d != null);
+  if (loaded.length === 0) return null;
+  const oldestLoaded = loaded.reduce((a, b) => (b < a ? b : a));
+  return {
+    done: progress.done,
+    total: progress.total,
+    nextMonth: progress.nextMonth,
+    oldestLoaded,
+  };
+}
+
+/** Dias distintos com venda no periodo (UI de progresso). */
 export async function countSalesDays(
   tenantId: string,
   from: string,
@@ -1059,7 +1194,7 @@ export async function countSalesDays(
   return days.size;
 }
 
-/** Cobertura sincronizada (min/max day) — DateRangePicker bloqueia fora disso. */
+/** Cobertura sincronizada (min/max day)  -  DateRangePicker bloqueia fora disso. */
 export async function fetchSalesCoverage(
   tenantId: string,
   storeIds: string[] = [],
@@ -1099,7 +1234,7 @@ export async function fetchSalesCoverage(
   return { from, to };
 }
 
-/** Dias de calendário inclusivos entre from e to (YYYY-MM-DD). */
+/** Dias de calendario inclusivos entre from e to (YYYY-MM-DD). */
 export function calendarDaysInclusive(from: string, to: string): number {
   const [fy, fm, fd] = from.split("-").map(Number);
   const [ty, tm, td] = to.split("-").map(Number);
@@ -1163,8 +1298,8 @@ export async function fetchTenantStores(
 }
 
 /**
- * Cobertura por loja na janela SEED: storeId → set de dias YYYY-MM-DD.
- * Uma query só (poll da SyncingPage).
+ * Cobertura por loja na janela SEED: storeId  ->  set de dias YYYY-MM-DD.
+ * Uma query so (poll da SyncingPage).
  */
 export async function fetchSeedDaysByStore(
   tenantId: string,
@@ -1198,7 +1333,7 @@ export async function fetchSeedDaysByStore(
   return out;
 }
 
-/** Quantos dias da janela [from,to] já existem no set. */
+/** Quantos dias da janela [from,to] ja existem no set. */
 export function countDaysInWindow(days: Set<string> | undefined, from: string, to: string): number {
   if (!days || days.size === 0) return 0;
   let n = 0;

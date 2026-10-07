@@ -21,7 +21,7 @@ import { GoalLevelSummary } from "@/components/wedash/GoalLevelsBar";
 import { AvatarIniciais } from "@/components/wedash/InitialsAvatar";
 import type { SalesDayAgg, SalesSellerDayAgg } from "@/data/wedash/salesTypes";
 import { storesForSession } from "@/data/wedash/stores";
-import { CardMeta } from "./blocos";
+import { GoalCard } from "./blocks";
 import {
   emptyChallengeAggInput,
   fetchChallengeInput,
@@ -31,12 +31,15 @@ import {
 } from "@/data/wedash/challengesRepo";
 import { buildChallengeView } from "@/data/wedash/challengeView";
 import { ChallengeMiniCard } from "@/pages/challenges/ChallengeMiniCard";
+import { CHALLENGE_STATUS_ORDER } from "@/pages/challenges/shared";
 import { fetchTeamAggInput, useTeamMemberDetail } from "@/pages/dashboard/TeamMemberDetail";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { useActiveSession } from "@/session/SessionProvider";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useMonthFill } from "@/pages/dashboard/useMonthFill";
+import { useDeepHistoryFill } from "@/pages/dashboard/useDeepHistoryFill";
 import { MonthFillNotice, pickerMinDate } from "@/pages/dashboard/MonthFillNotice";
+import { DeepHistoryNotice } from "@/pages/dashboard/DeepHistoryNotice";
 import { InitialSyncNotice } from "@/pages/dashboard/InitialSyncNotice";
 import { StoreHoursNotice } from "@/pages/dashboard/StoreHoursNotice";
 import { ErpStatusNotice } from "@/pages/dashboard/ErpStatusNotice";
@@ -46,7 +49,7 @@ import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { TeamSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { FlameIcon, TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
-import { BlocoRanking } from "@/pages/live/blocos";
+import { RankingBlock } from "@/pages/live/blocks";
 import type { RankingRow } from "@/data/wedash/live";
 import { TABLE_PAGE_SIZE } from "@/lib/usePagedRows";
 import { brlCent, deIso, labelUpper, num, tipRelacao } from "@/lib/format";
@@ -62,7 +65,7 @@ import {
 type GoalsData = { goals: GoalRecord[]; dayAggs: SalesDayAgg[]; sellerAggs: SalesSellerDayAgg[]; team: GoalTeamMember[] };
 const GOALS_VAZIO: GoalsData = { goals: [], dayAggs: [], sellerAggs: [], team: [] };
 
-/** Metas das lojas do filtro que cruzam o período; vendas do início de cada meta até hoje (igual ao detalhe da meta). */
+/** Metas das lojas do filtro que cruzam o periodo; vendas do inicio de cada meta ate hoje (igual ao detalhe da meta). */
 async function fetchGoalsData(tenantId: string, escopo: Scope, sessionStores: string[]): Promise<GoalsData> {
   const hoje = calendarTodayIso();
   const periodo = resolvePeriod(escopo.periodo, hoje);
@@ -85,11 +88,12 @@ async function fetchGoalsData(tenantId: string, escopo: Scope, sessionStores: st
 type ChallengesData = { challenges: ChallengeRecord[]; aggs: ChallengeAggInput };
 const CHALLENGES_VAZIO: ChallengesData = { challenges: [], aggs: emptyChallengeAggInput() };
 
-/** Desafios em andamento hoje nas lojas do filtro (não seguem o período da tela). */
-async function fetchActiveChallenges(tenantId: string, escopo: Scope, sessionStores: string[]): Promise<ChallengesData> {
+/** Desafios das lojas do filtro cujo periodo cruza o filtro da tela (em andamento, a comecar e encerrados). */
+async function fetchPeriodChallenges(tenantId: string, escopo: Scope, sessionStores: string[]): Promise<ChallengesData> {
   const hoje = calendarTodayIso();
+  const periodo = resolvePeriod(escopo.periodo, hoje);
   const storeIds = escopo.filialIds.length > 0 ? escopo.filialIds : storesForSession(sessionStores).map((s) => s.id);
-  const challenges = await fetchChallenges({ tenantId, storeIds, from: hoje, to: hoje });
+  const challenges = await fetchChallenges({ tenantId, storeIds, from: periodo.inicio, to: periodo.fim });
   if (challenges.length === 0) return CHALLENGES_VAZIO;
   return { challenges, aggs: await fetchChallengeInput({ tenantId, challenges, today: hoje }) };
 }
@@ -129,7 +133,7 @@ const KPI_COLORS = [
 ];
 
 const CORES_TURNO = ["var(--acc)", "var(--info)", "var(--ok)", "var(--warn)", "var(--bad)"];
-/** Fatia neutra (sem turno / fora da equipe) — não compete com as demais. */
+/** Fatia neutra (sem turno / fora da equipe)  -  nao compete com as demais. */
 const COR_NEUTRA = "color-mix(in srgb, var(--t2) 40%, transparent)";
 const PODE_CONFIGURAR_LOJA = new Set(["OWNER", "MANAGER", "ADMIN_GLOBAL"]);
 
@@ -160,22 +164,22 @@ function Variacao({ v }: { v: number | null }) {
   );
 }
 
-/** "Manhã · 09:00–15:00" → nome + horário. */
+/** "Manha  |  09:00 - 15:00"  ->  nome + horario. */
 function partesTurno(turno?: string): { nome: string; horario?: string } {
   if (!turno) return { nome: TEAM_SEM_TURNO };
   const [nome, horario] = turno.split(" · ");
   return { nome: nome ?? turno, horario };
 }
 
-/** Loja principal (+N) — só com mais de 1 loja no escopo. */
+/** Loja principal (+N)  -  so com mais de 1 loja no escopo. */
 function rotuloLojas(lojas: string[]): string | null {
   if (lojas.length === 0) return null;
   return lojas.length > 1 ? `${lojas[0]} · +${lojas.length - 1}` : lojas[0]!;
 }
 
 /**
- * Dashboard > Equipe: desempenho individual da equipe de vendas no período.
- * Aba Metas = metas reais (Gestão > Metas) das lojas do filtro; aba Desafios = desafios em andamento hoje.
+ * Dashboard > Equipe: desempenho individual da equipe de vendas no periodo.
+ * Aba Metas e aba Desafios = o que cruza o periodo do filtro (encerrado continua quando o mes passado esta selecionado).
  */
 export function TeamPage() {
   const session = useActiveSession();
@@ -200,7 +204,7 @@ export function TeamPage() {
     return () => window.removeEventListener("wedash:stores", onStores);
   }, []);
 
-  /** Só a leitura mais recente aplica setState. */
+  /** So a leitura mais recente aplica setState. */
   const reloadGen = useRef(0);
   const reload = useCallback(async () => {
     const gen = ++reloadGen.current;
@@ -209,7 +213,7 @@ export function TeamPage() {
         fetchTeamAggInput(session.tenantId, escopo),
         fetchSalesCoverage(session.tenantId, escopo.filialIds),
         fetchGoalsData(session.tenantId, escopo, session.stores),
-        fetchActiveChallenges(session.tenantId, escopo, session.stores).catch((e: unknown) => {
+        fetchPeriodChallenges(session.tenantId, escopo, session.stores).catch((e: unknown) => {
           console.error("Team challenges:", e);
           return CHALLENGES_VAZIO;
         }),
@@ -268,8 +272,14 @@ export function TeamPage() {
         view: buildChallengeView({ challenge, aggs: challengesData.aggs, today: hojeIso }),
         lojaNome: nomeLoja.get(challenge.storeId),
       }))
-      .filter((c) => c.view.status === "active")
-      .sort((a, b) => a.challenge.endsOn.localeCompare(b.challenge.endsOn) || a.challenge.name.localeCompare(b.challenge.name, "pt-BR"));
+      .sort(
+        (a, b) =>
+          CHALLENGE_STATUS_ORDER[a.view.status] - CHALLENGE_STATUS_ORDER[b.view.status] ||
+          (a.view.status === "ended"
+            ? b.challenge.endsOn.localeCompare(a.challenge.endsOn)
+            : a.challenge.endsOn.localeCompare(b.challenge.endsOn)) ||
+          a.challenge.name.localeCompare(b.challenge.name, "pt-BR"),
+      );
   }, [challengesData, session.stores, hojeIso]);
   const mostraLojaDesafio = escopo.filialIds.length === 0 && storesForSession(session.stores).length > 1;
 
@@ -289,6 +299,7 @@ export function TeamPage() {
   const dateRange = useMemo(() => dateRangeFromPeriod(escopo.periodo), [escopo.periodo]);
   const periodoAtual = resolvePeriod(escopo.periodo, calendarTodayIso());
   const monthFill = useMonthFill();
+  const deepHistoryFill = useDeepHistoryFill();
   function onDateChange(r: DateRange, meta?: DateRangeChangeMeta) {
     mudar(applyPeriodDateChange(escopo, r, meta));
   }
@@ -302,7 +313,7 @@ export function TeamPage() {
       if (sortKey === "nome") return a.nome.localeCompare(b.nome, "pt-BR") * dir;
       const va = a[sortKey];
       const vb = b[sortKey];
-      // Sem dado ("—") sempre no fim, nas duas direções.
+      // Sem dado (" - ") sempre no fim, nas duas direcoes.
       if (va == null && vb == null) return b.faturamento - a.faturamento;
       if (va == null) return 1;
       if (vb == null) return -1;
@@ -402,6 +413,12 @@ export function TeamPage() {
       <ErpStatusNotice />
       <InitialSyncNotice />
       <MonthFillNotice fill={monthFill} inicio={periodoAtual.inicio} fim={periodoAtual.fim} />
+      <DeepHistoryNotice
+        fill={deepHistoryFill}
+        monthFill={monthFill}
+        inicio={periodoAtual.inicio}
+        fim={periodoAtual.fim}
+      />
       <StoreHoursNotice />
 
       {showSkeleton ? (
@@ -491,7 +508,7 @@ export function TeamPage() {
               )}
             </Card>
 
-            {/* Composição do faturamento */}
+            {/* Composicao do faturamento */}
             <Card className="flex flex-col">
               <CardHeader>
                 <div className="flex items-center gap-1.5">
@@ -544,7 +561,7 @@ export function TeamPage() {
             </Card>
           </div>
 
-          {/* Desempenho da equipe — abas Ranking · Desafios · Metas (mesmo card do Ao vivo) */}
+          {/* Desempenho da equipe  -  abas Ranking  |  Desafios  |  Metas (mesmo card do Ao vivo) */}
           <Card className="mt-4 min-w-0 overflow-hidden" padding="lg">
             <div className="mb-4 flex items-center gap-1.5">
               <CardTitle>Desempenho da equipe</CardTitle>
@@ -601,7 +618,7 @@ export function TeamPage() {
                     metaCards.length > 0 ? (
                       <div className="flex flex-col gap-4">
                         {metaCards.map((card) => (
-                          <CardMeta key={card.id} card={card} metaAtiva hojeIso={hojeIso} />
+                          <GoalCard key={card.id} card={card} metaAtiva hojeIso={hojeIso} />
                         ))}
                       </div>
                     ) : (
@@ -631,7 +648,7 @@ export function TeamPage() {
   function abaRanking() {
     return (
       <div className="flex flex-col">
-        <BlocoRanking ranking={podio} formatValor={brlCent} onSelect={(r) => abrirPessoa(r.colaboradorId, r.nome)} />
+        <RankingBlock ranking={podio} formatValor={brlCent} onSelect={(r) => abrirPessoa(r.colaboradorId, r.nome)} />
 
         <div className="mt-6 mb-4 flex flex-wrap items-center gap-2 sm:justify-end print:hidden">
           <input
@@ -757,7 +774,7 @@ export function TeamPage() {
   }
 }
 
-/** Barra da meta da pessoa com os níveis (N1 · nome (premiação %)); sem meta = "—". */
+/** Barra da meta da pessoa com os niveis (N1  |  nome (premiacao %)); sem meta = " - ". */
 function CelulaNivelMeta({ nivel, completo }: { nivel?: SellerGoalLevel; completo: boolean }) {
   if (!nivel) return <td className="py-3 pl-5 pr-1 text-[13px] text-t2">—</td>;
   return (

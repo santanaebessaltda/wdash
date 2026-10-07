@@ -27,7 +27,9 @@ import { calendarTodayIso } from "@/data/wedash/clock";
 import { useActiveSession } from "@/session/SessionProvider";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useMonthFill } from "@/pages/dashboard/useMonthFill";
+import { useDeepHistoryFill } from "@/pages/dashboard/useDeepHistoryFill";
 import { MonthFillNotice, pickerMinDate } from "@/pages/dashboard/MonthFillNotice";
+import { DeepHistoryNotice } from "@/pages/dashboard/DeepHistoryNotice";
 import { InitialSyncNotice } from "@/pages/dashboard/InitialSyncNotice";
 import { StoreHoursNotice } from "@/pages/dashboard/StoreHoursNotice";
 import { ErpStatusNotice } from "@/pages/dashboard/ErpStatusNotice";
@@ -47,7 +49,7 @@ import {
   periodDisplayLabel,
 } from "@/pages/dashboard/periodPicker";
 
-/** Ícones dos KPIs — Fat/Lucro/Margem iguais ao Financeiro; Itens próprio da tela. */
+/** Icones dos KPIs  -  Fat/Lucro/Margem iguais ao Financeiro; Itens proprio da tela. */
 const IconFat = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
@@ -75,7 +77,7 @@ const IconItens = () => (
 );
 const KPI_ICONS = [IconFat, IconLucro, IconMargem, IconItens];
 
-/** Heroes por métrica: Fat/Lucro/Margem iguais ao Financeiro; Itens = warn. */
+/** Heroes por metrica: Fat/Lucro/Margem iguais ao Financeiro; Itens = warn. */
 const KPI_COLORS = [
   { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" },
   { iconColor: "var(--ok)", iconBg: "var(--ok-soft)" },
@@ -125,7 +127,7 @@ export default function ProductsPage() {
   const [page, setPage] = useState(1);
   const printing = usePrintMode();
   const exportar = useExportPdf("Produtos");
-  // Catálogo de lojas (custos/impostos) hidratado depois do 1º render → recalcula.
+  // Catalogo de lojas (custos/impostos) hidratado depois do 1 render  ->  recalcula.
   const [storesTick, setStoresTick] = useState(0);
   useEffect(() => {
     const onStores = () => setStoresTick((n) => n + 1);
@@ -133,7 +135,7 @@ export default function ProductsPage() {
     return () => window.removeEventListener("wedash:stores", onStores);
   }, []);
 
-  /** Só a leitura mais recente aplica setState. */
+  /** So a leitura mais recente aplica setState. */
   const reloadGen = useRef(0);
   const reload = useCallback(async () => {
     const gen = ++reloadGen.current;
@@ -170,11 +172,12 @@ export default function ProductsPage() {
   const dateRange = useMemo(() => dateRangeFromPeriod(escopo.periodo), [escopo.periodo]);
   const periodoAtual = resolvePeriod(escopo.periodo, calendarTodayIso());
   const monthFill = useMonthFill();
+  const deepHistoryFill = useDeepHistoryFill();
   function onDateChange(r: DateRange, meta?: DateRangeChangeMeta) {
     mudar(applyPeriodDateChange(escopo, r, meta));
   }
 
-  // A métrica escolhe QUAIS 5 entram (sempre os maiores); a direção só reordena os 5.
+  // A metrica escolhe QUAIS 5 entram (sempre os maiores); a direcao so reordena os 5.
   // "Produto" (nome) reordena o Top 5 por faturamento.
   const topProdutos = useMemo(() => {
     const metrica = (p: ProductItemRow) =>
@@ -202,7 +205,7 @@ export default function ProductsPage() {
     }
   }
 
-  // Mesma regra do Top produtos: a métrica escolhe as 5 linhas; a direção só reordena.
+  // Mesma regra do Top produtos: a metrica escolhe as 5 linhas; a direcao so reordena.
   const topLinhas = useMemo(() => {
     const metrica = (l: ProductLineRow) =>
       topLinhaSort === "itens"
@@ -238,7 +241,7 @@ export default function ProductsPage() {
       if (sortKey === "nome") return a.nome.localeCompare(b.nome, "pt-BR") * dir;
       const va = a[sortKey];
       const vb = b[sortKey];
-      // Sem dado ("—") sempre no fim, nas duas direções.
+      // Sem dado (" - ") sempre no fim, nas duas direcoes.
       if (va == null && vb == null) return b.faturamento - a.faturamento;
       if (va == null) return 1;
       if (vb == null) return -1;
@@ -320,6 +323,12 @@ export default function ProductsPage() {
       <ErpStatusNotice />
       <InitialSyncNotice />
       <MonthFillNotice fill={monthFill} inicio={periodoAtual.inicio} fim={periodoAtual.fim} />
+      <DeepHistoryNotice
+        fill={deepHistoryFill}
+        monthFill={monthFill}
+        inicio={periodoAtual.inicio}
+        fim={periodoAtual.fim}
+      />
       <StoreHoursNotice />
       {!loading && (
         <ProductsWithoutCostNotice
@@ -545,7 +554,7 @@ export default function ProductsPage() {
         </Card>
       </div>
 
-      {/* Desempenho por produto — mesma lista do Top produtos; clique abre o detalhe */}
+      {/* Desempenho por produto  -  mesma lista do Top produtos; clique abre o detalhe */}
       <Card className="mt-4 flex flex-col">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div className="flex items-center gap-1.5">

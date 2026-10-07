@@ -29,7 +29,9 @@ import { calendarTodayIso } from "@/data/wedash/clock";
 import { useActiveSession } from "@/session/SessionProvider";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useMonthFill } from "@/pages/dashboard/useMonthFill";
+import { useDeepHistoryFill } from "@/pages/dashboard/useDeepHistoryFill";
 import { MonthFillNotice, pickerMinDate } from "@/pages/dashboard/MonthFillNotice";
+import { DeepHistoryNotice } from "@/pages/dashboard/DeepHistoryNotice";
 import { InitialSyncNotice } from "@/pages/dashboard/InitialSyncNotice";
 import { StoreHoursNotice } from "@/pages/dashboard/StoreHoursNotice";
 import { ErpStatusNotice } from "@/pages/dashboard/ErpStatusNotice";
@@ -48,7 +50,7 @@ import {
   periodDisplayLabel,
 } from "@/pages/dashboard/periodPicker";
 
-/** Ícones dos KPIs — Faturamento/CMV iguais à Visão Geral; Lucro/Margem próprios. */
+/** Icones dos KPIs  -  Faturamento/CMV iguais a Visao Geral; Lucro/Margem proprios. */
 const IconFat = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
@@ -83,7 +85,7 @@ const TipHelp = ({ label }: { label: string }) => (
   </Tooltip>
 );
 
-/** Badge de delta — só % no chip; base do comparativo no tooltip (igual StatCard). */
+/** Badge de delta  -  so % no chip; base do comparativo no tooltip (igual StatCard). */
 function BadgeVsAnterior({ delta }: { delta?: { value: string; positive: boolean; vs?: string; diff?: string; anterior?: string } }) {
   if (!delta) return null;
   const badge = (
@@ -98,7 +100,7 @@ function BadgeVsAnterior({ delta }: { delta?: { value: string; positive: boolean
 
 const KPI_ICONS = [IconFat, IconCmv, IconLucro, IconMargem];
 
-/** Mesma paleta da Visão Geral: Faturamento, CMV, Lucro, Margem. */
+/** Mesma paleta da Visao Geral: Faturamento, CMV, Lucro, Margem. */
 const KPI_COLORS = [
   { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" },
   { iconColor: "var(--warn)", iconBg: "rgba(245,158,11,0.12)" },
@@ -159,7 +161,7 @@ const evolucaoColumns: DataTableColumn<MonthlyEvolutionRow>[] = [
   },
 ];
 
-/** Hierarquia visual no padrão Income statement (ProfitLoss). */
+/** Hierarquia visual no padrao Income statement (ProfitLoss). */
 function estiloLinhaCusto(linha: FixedCostRow): { bold: boolean; indent: boolean; color?: string; valor: string } {
   if (linha.ehResultado) {
     return {
@@ -186,7 +188,7 @@ export default function FinancePage() {
   const [coverageFrom, setCoverageFrom] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
   const showSkeleton = useMinSkeleton(loading);
-  // Catálogo de lojas (horário/custos) hidratado depois do 1º render → recalcula.
+  // Catalogo de lojas (horario/custos) hidratado depois do 1 render  ->  recalcula.
   const [storesTick, setStoresTick] = useState(0);
   useEffect(() => {
     const onStores = () => setStoresTick((n) => n + 1);
@@ -194,7 +196,7 @@ export default function FinancePage() {
     return () => window.removeEventListener("wedash:stores", onStores);
   }, []);
 
-  /** Só a leitura mais recente aplica setState. */
+  /** So a leitura mais recente aplica setState. */
   const reloadGen = useRef(0);
   const reload = useCallback(async () => {
     const gen = ++reloadGen.current;
@@ -245,10 +247,11 @@ export default function FinancePage() {
     [escopo, aggs, storesTick],
   );
 
-  // Resolve o DateRange a partir do escopo — sempre mostra algo selecionado.
+  // Resolve o DateRange a partir do escopo  -  sempre mostra algo selecionado.
   const dateRange = useMemo(() => dateRangeFromPeriod(escopo.periodo), [escopo.periodo]);
   const periodoAtual = resolvePeriod(escopo.periodo, calendarTodayIso());
   const monthFill = useMonthFill();
+  const deepHistoryFill = useDeepHistoryFill();
   const exportar = useExportPdf("Financeiro");
   function onDateChange(r: DateRange, meta?: DateRangeChangeMeta) {
     mudar(applyPeriodDateChange(escopo, r, meta));
@@ -282,6 +285,12 @@ export default function FinancePage() {
       <ErpStatusNotice />
       <InitialSyncNotice />
       <MonthFillNotice fill={monthFill} inicio={periodoAtual.inicio} fim={periodoAtual.fim} />
+      <DeepHistoryNotice
+        fill={deepHistoryFill}
+        monthFill={monthFill}
+        inicio={periodoAtual.inicio}
+        fim={periodoAtual.fim}
+      />
       <StoreHoursNotice />
       {!loading && (
         <ProductsWithoutCostNotice
@@ -297,14 +306,14 @@ export default function FinancePage() {
       ) : (
       <>
 
-      {/* KPI row — 4 cards */}
+      {/* KPI row  -  4 cards */}
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {view.kpis.map((kpi, i) => (
           <KpiCard key={kpi.label} kpi={kpi} Icon={KPI_ICONS[i]} colorIdx={i} />
         ))}
       </div>
 
-      {/* Quick stats WPINK — só quando a loja (ou rede) tem a marca */}
+      {/* Quick stats WPINK  -  so quando a loja (ou rede) tem a marca */}
       {view.kpisWpink.length > 0 && (
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {view.kpisWpink.map((kpi, i) => {
@@ -472,8 +481,8 @@ export default function FinancePage() {
         })()}
       </div>
 
-      {/* Custos antes de Formas (leitura natural após Resultado / margem op.).
-          Com WPINK no escopo: 3 colunas (Custos | Formas | Marcas); senão 2. */}
+      {/* Custos antes de Formas (leitura natural apos Resultado / margem op.).
+          Com WPINK no escopo: 3 colunas (Custos | Formas | Marcas); senao 2. */}
       <div
         className={cn(
           "mt-4 grid grid-cols-1 gap-4",
@@ -612,7 +621,7 @@ export default function FinancePage() {
         )}
       </div>
 
-      {/* Evolução Mensal — só com período por mês (>31 dias); DataTable (desktop) + cards (mobile) */}
+      {/* Evolucao Mensal  -  so com periodo por mes (>31 dias); DataTable (desktop) + cards (mobile) */}
       {view.mostrarEvolucaoMensal && (
       <Card className="mt-4" padding="none">
         <div className="flex items-center gap-1.5 px-5 py-4">
@@ -628,12 +637,12 @@ export default function FinancePage() {
           <EmptyBlock />
         ) : (
         <>
-        {/* Desktop / tablet — DataTable Vela */}
+        {/* Desktop / tablet  -  DataTable Vela */}
         <div className="hidden p-4 md:block">
           <DataTable columns={evolucaoColumns} data={view.evolucaoMensal} rowKey={(r) => r.mes} paginate="meses" />
         </div>
 
-        {/* Mobile — stack em cards (padrão Responsive Tables) */}
+        {/* Mobile  -  stack em cards (padrao Responsive Tables) */}
         <div className="flex flex-col gap-2.5 p-3.5 md:hidden">
           {view.evolucaoMensal.map((linha) => (
               <div key={linha.mes} className="rounded-xl border border-line bg-bg-inset p-3.5">
@@ -675,7 +684,7 @@ export default function FinancePage() {
   );
 }
 
-/** StatCard wrapper com tooltip ? e sparkline de tendência. */
+/** StatCard wrapper com tooltip ? e sparkline de tendencia. */
 function KpiCard({ kpi, Icon, colorIdx = 0 }: { kpi: FinanceKpi; Icon: () => React.JSX.Element; colorIdx?: number }) {
   const c = KPI_COLORS[colorIdx % KPI_COLORS.length];
   return (

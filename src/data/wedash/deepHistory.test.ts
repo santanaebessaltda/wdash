@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { addMonths, deepHistoryFloor, isDeepHistoryWindow, planDeepHistory, type DeepStore } from "./deepHistory";
+import {
+  addMonths,
+  deepHistoryCap,
+  deepHistoryFloor,
+  deepHistoryProgress,
+  isDeepHistoryWindow,
+  monthsInclusive,
+  planDeepHistory,
+  type DeepStore,
+} from "./deepHistory";
 
 const TZ = "America/Sao_Paulo";
 const at = (hhmm: string) => new Date(`2026-09-25T${hhmm}:00-03:00`);
@@ -16,7 +25,7 @@ describe("isDeepHistoryWindow", () => {
   });
 
   it("todas as lojas precisam estar na madrugada", () => {
-    const cuiaba = { timezone: "America/Cuiaba" }; // 1h a menos que São Paulo
+    const cuiaba = { timezone: "America/Cuiaba" }; // 1h a menos que Sao Paulo
     expect(isDeepHistoryWindow([store, cuiaba], at("00:30"))).toBe(false);
     expect(isDeepHistoryWindow([store, cuiaba], at("01:30"))).toBe(true);
     expect(isDeepHistoryWindow([], at("03:00"))).toBe(false);
@@ -62,5 +71,43 @@ describe("planDeepHistory", () => {
     expect(planDeepHistory([s({ oldestDay: "2026-07-10", floor: "2026-07-10" })])).toBeNull();
     expect(planDeepHistory([s({ emptyTail: true })])).toBeNull();
     expect(planDeepHistory([s({ oldestDay: null })])).toBeNull();
+  });
+});
+
+describe("deepHistoryProgress (barra da tela)", () => {
+  const s = (over: Partial<DeepStore>): DeepStore => ({
+    id: "s1",
+    oldestDay: "2026-08-01",
+    floor: "2024-10-01",
+    emptyTail: false,
+    ...over,
+  });
+
+  it("meses inclusivos e teto UI (24m contando o atual)", () => {
+    expect(monthsInclusive("2024-10-01", "2026-09-01")).toBe(24);
+    expect(deepHistoryCap("2026-10-07", 24)).toBe("2024-11-01");
+  });
+
+  it("% pelos meses já cobertos até o horizonte (mês passado)", () => {
+    // Horizonte = set/2026; floor out/2024 → 24 meses. oldest = ago/2026 → falta jul…out = 22; done = 2.
+    expect(deepHistoryProgress([s({})], "2026-10-07")).toEqual({
+      done: 2,
+      total: 24,
+      nextMonth: "2026-07-01",
+    });
+  });
+
+  it("completo (chegou no floor) ou ainda no onboarding = null / 100%", () => {
+    expect(deepHistoryProgress([s({ oldestDay: null })], "2026-10-07")).toBeNull();
+    expect(deepHistoryProgress([s({ oldestDay: "2024-10-01", floor: "2024-10-01" })], "2026-10-07")).toEqual({
+      done: 24,
+      total: 24,
+      nextMonth: null,
+    });
+    expect(deepHistoryProgress([s({ emptyTail: true })], "2026-10-07")).toEqual({
+      done: 24,
+      total: 24,
+      nextMonth: null,
+    });
   });
 });
