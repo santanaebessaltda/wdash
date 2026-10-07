@@ -18,7 +18,7 @@ const ETAPA_ERP = 2;
 
 const bullets = ["Conexão testada antes de continuar", "Lojas adicionadas automaticamente", "Dados de acesso protegidos"];
 
-/** Onboarding — shell RegisterSplit: form à esquerda, hero à direita. Única etapa = Integração ERP. */
+/** Onboarding  -  shell RegisterSplit: form a esquerda, hero a direita. Unica etapa = Integracao ERP. */
 export function Onboarding() {
   const session = useActiveSession();
   const { update, signOut } = useSession();
@@ -33,7 +33,7 @@ export function Onboarding() {
     gravarRascunho(membershipId, draft);
   }, [draft, membershipId]);
 
-  // Legado (1 = antiga Empresa, 3 = antiga Lojas) → ERP.
+  // Legado (1 = antiga Empresa, 3 = antiga Lojas)  ->  ERP.
   useEffect(() => {
     if (session.onboardingStep === null || session.onboardingStep === ETAPA_ERP) return;
     update({ onboardingStep: ETAPA_ERP });
@@ -41,13 +41,13 @@ export function Onboarding() {
   }, [session.onboardingStep, update, membershipId]);
 
   /**
-   * Grava credencial + todas as lojas do usuário (token do teste — worker reusa sem novo login),
-   * pede as vendas de hoje e abre o board sem esperar: os números chegam sozinhos em segundos.
+   * Grava credencial + todas as lojas do usuario (token do teste  -  worker reusa sem novo login),
+   * pede as vendas de hoje e abre o board sem esperar: os numeros chegam sozinhos em segundos.
    */
   async function conectar(stores: StoreErp[], millenniumSession: string | undefined) {
     const password = lerSenhaErp(membershipId);
     if (!draft.erp.usuario.trim() || !password) {
-      show("Digite novamente o usuário e a senha do Millennium.", "danger");
+      show("Informe novamente o usuário e a senha do Millennium.", "danger");
       return;
     }
     setConectando(true);
@@ -128,7 +128,7 @@ export function Onboarding() {
           <h2 className="mb-6 text-[26px] font-extrabold leading-[1.3] tracking-tight text-white">
             Seus dados do Millennium
             <br />
-            na WeDash.
+            na WDash.
           </h2>
           <p className="mb-6 max-w-[380px] text-[15px] leading-relaxed text-white/70">
             A conexão mantém vendas, custos e cadastros atualizados automaticamente.

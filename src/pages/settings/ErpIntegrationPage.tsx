@@ -51,16 +51,16 @@ const ESTADO_UI: Record<Estado, { label: string; cls: string; dot: string }> = {
 const ERRO_CREDENCIAL: Record<Extract<ErpCredentialChangeResult, { ok: false }>["reason"], string> = {
   password: "Usuário ou senha incorretos. Confira os dados e tente novamente.",
   busy: "Este usuário do Millennium está conectado em outro local. Encerre a outra sessão e tente novamente.",
-  stores: "A conexão foi realizada, mas não conseguimos identificar as lojas deste usuário. Tente novamente.",
+  stores: "Conseguimos acessar o Millennium, mas não foi possível identificar as lojas deste usuário. Tente novamente.",
   no_stores: "Este usuário não possui lojas vinculadas no Millennium. Verifique os vínculos no Millennium e tente novamente.",
   other: "Não foi possível conectar ao Millennium. Tente novamente em alguns minutos.",
   persist: "A conexão foi testada, mas não foi possível salvá-la. Tente novamente.",
-  reports: "Este usuário não possui acesso a todos os relatórios necessários para a WeDash.",
+  reports: "Este usuário não tem acesso a todos os relatórios necessários para a WDash.",
 };
 
 /**
- * Configurações > Integrações — card Millennium (padrão Integrations do Vela).
- * Desconectar libera o Millennium; logout WeDash NÃO faz isso.
+ * Configuracoes > Integracoes  -  card Millennium (padrao Integrations do Vela).
+ * Desconectar libera o Millennium; logout WDash NAO faz isso.
  */
 export function ErpIntegrationPage() {
   const session = useActiveSession();
@@ -155,9 +155,9 @@ export function ErpIntegrationPage() {
 }
 
 /**
- * Conectado → credenciais só leitura + Desconectar (danger).
- * Não conectado / desconectado / senha inválida → formulário + Conectar
- * (mesmos checks do onboarding). Trocar senha/usuário = desconectar e conectar de novo.
+ * Conectado  ->  credenciais so leitura + Desconectar (danger).
+ * Nao conectado / desconectado / senha invalida  ->  formulario + Conectar
+ * (mesmos checks do onboarding). Trocar senha/usuario = desconectar e conectar de novo.
  */
 function MillenniumModal({
   open,
@@ -188,7 +188,7 @@ function MillenniumModal({
   const [autorizo, setAutorizo] = useState(false);
   const [aceiteTroca, setAceiteTroca] = useState(false);
   const [relatorios, setRelatorios] = useState<ErpReportCheck[] | null>(null);
-  /** Login ok, mas a troca remove lojas — aguardando confirmação. */
+  /** Login ok, mas a troca remove lojas  -  aguardando confirmacao. */
   const [pendente, setPendente] = useState<PreparedErpChange | null>(null);
   useEffect(() => {
     if (!open) return;
@@ -315,7 +315,7 @@ function MillenniumModal({
       <div className="flex flex-col gap-3.5">
         {conectado ? (
           <p className="text-[13.5px] leading-relaxed text-t1">
-            A WeDash está conectada ao Millennium com o usuário{" "}
+            A WDash está conectada ao Millennium com o usuário{" "}
             <strong className="font-semibold text-t0">{usuarioAnterior}</strong>. As sincronizações acontecem
             automaticamente enquanto a conexão estiver ativa.
           </p>
@@ -325,7 +325,7 @@ function MillenniumModal({
           </Alert>
         ) : (
           <p className="text-[13.5px] leading-relaxed text-t1">
-            Informe o usuário e a senha do Millennium que a WeDash usará para sincronizar os dados. Antes de conectar,
+            Informe o usuário e a senha do Millennium que a WDash usará para sincronizar os dados. Antes de conectar,
             verificamos o acesso às lojas e aos relatórios necessários.
           </p>
         )}
@@ -390,7 +390,7 @@ function MillenniumModal({
             <div>
               <p className="font-semibold text-t0">Desconexão</p>
               <p className="mt-0.5 text-t2">
-                Ao desconectar, a WeDash para de sincronizar os dados e encerra a sessão deste usuário no Millennium.
+                Ao desconectar, a WDash para de sincronizar os dados e encerra a sessão deste usuário no Millennium.
               </p>
             </div>
           </div>
@@ -400,10 +400,10 @@ function MillenniumModal({
               className="items-start"
               label={
                 <span>
-                  Este usuário será usado somente pela WeDash
+                  Este usuário será usado somente pela WDash
                   <span className="mt-0.5 block text-xs text-t2">
                     O Millennium permite apenas uma sessão por usuário. Use um usuário exclusivo para evitar interrupções
-                    e permitir que a WeDash se reconecte automaticamente se a sessão cair.
+                    e permitir que a WDash se reconecte automaticamente se a sessão cair.
                   </span>
                 </span>
               }
@@ -412,7 +412,7 @@ function MillenniumModal({
               disabled={travado}
             />
             <Checkbox
-              label="Autorizo a WeDash a usar este acesso para realizar a sincronização."
+              label="Autorizo a WDash a usar este acesso para realizar a sincronização."
               checked={autorizo}
               onChange={(e) => setAutorizo(e.target.checked)}
               disabled={travado}
@@ -451,11 +451,11 @@ function MillenniumModal({
             }
           >
             {pendente.plan.kind === "partial" ? (
-              "As lojas abaixo deixarão de ser sincronizadas e serão removidas da WeDash. As demais continuam normalmente."
+              "As lojas abaixo deixarão de ser sincronizadas e serão removidas da WDash. As demais continuam normalmente."
             ) : (
               <>
                 <span className="block">
-                  A troca substituirá as lojas e os dados sincronizados atualmente na WeDash. As lojas disponíveis para o
+                  A troca substituirá as lojas e os dados sincronizados atualmente na WDash. As lojas disponíveis para o
                   novo usuário serão cadastradas novamente e uma nova carga inicial será realizada.
                 </span>
                 <span className="mt-1.5 block">Configurações como fuso e horário das lojas voltarão ao padrão.</span>

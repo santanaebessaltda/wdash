@@ -2,7 +2,7 @@
 
 export const SENHA_MIN = 8;
 
-/** Qualquer caractere que não seja letra ou dígito. */
+/** Qualquer caractere que nao seja letra ou digito. */
 const ESPECIAL = /[^A-Za-z0-9]/;
 
 export type SenhaCheck = { ok: true } | { ok: false; erro: string };
@@ -16,7 +16,7 @@ export function validarSenha(senha: string): SenhaCheck {
     return { ok: false, erro: `Use pelo menos ${SENHA_MIN} caracteres.` };
   }
   if (!senhaTemEspecial(senha)) {
-    return { ok: false, erro: "Inclua pelo menos 1 caractere especial." };
+    return { ok: false, erro: "Inclua 1 caractere especial, como !, @, # ou $." };
   }
   return { ok: true };
 }

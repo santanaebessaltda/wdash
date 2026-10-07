@@ -2,7 +2,7 @@ import { getSupabase } from "@/lib/supabase";
 import { validarSenha, SENHA_REGRA_TEXTO } from "@/lib/password";
 import { prepararAvatar } from "@/lib/avatar";
 import { companyNameCase, titleName } from "@/lib/format";
-import { stores } from "@/data/wedash/stores";
+import { sessionStoreIds, stores } from "@/data/wedash/stores";
 import { userByEmail, type User } from "@/data/wedash/team";
 import { sessionFromUser, type Session } from "@/session/session";
 import { paths } from "@/router/paths";
@@ -14,16 +14,16 @@ export const MENSAGEM_OTP_GENERICA = "Não foi possível verificar o código. Te
 export const MENSAGEM_SESSAO_EXPIRADA = "Sua sessão expirou. Entre novamente.";
 const MENSAGEM_FOTO_ENVIO_SEM_PONTO = "Não foi possível enviar a foto. Tente novamente";
 const MENSAGEM_FOTO_ENVIO = `${MENSAGEM_FOTO_ENVIO_SEM_PONTO}.`;
-/** Tamanho do OTP de recovery — alinhar com Auth → Providers → Email → OTP length. */
+/** Tamanho do OTP de recovery  -  alinhar com Auth  ->  Providers  ->  Email  ->  OTP length. */
 export const RECOVERY_OTP_LENGTH = 6;
-/** Aceita letra+número (A–Z / 0–9). Se o Dashboard só gerar dígitos, continua válido. */
-export const RECOVERY_OTP_PATTERN = new RegExp(`^[A-Z0-9]{${RECOVERY_OTP_LENGTH}}$`);
+/** Aceita letra+numero (A - Z / 0 - 9). Se o Dashboard so gerar digitos, continua valido. */
+export const RECOVERY_OTP_PATTERN = new RegExp(`^[A-Z0-9]{${RECOVERY_OTP_LENGTH}$`);
 
 export function normalizeRecoveryOtp(raw: string): string {
   return raw.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, RECOVERY_OTP_LENGTH);
 }
 
-/** Traduz erros do Supabase Auth (inglês) para copy PT da tela Nova senha. */
+/** Traduz erros do Supabase Auth (ingles) para copy PT da tela Nova senha. */
 export function mensagemErroSenhaAuth(error: { code?: string; message?: string } | null): string {
   if (!error) return MENSAGEM_SENHA_GENERICA;
   const code = (error.code ?? "").toLowerCase();
@@ -41,7 +41,7 @@ export function mensagemErroSenhaAuth(error: { code?: string; message?: string }
   if (msg.includes("rate limit") || code.includes("over_request")) {
     return MENSAGEM_SENHA_GENERICA;
   }
-  // Nunca exibir inglês cru na UI.
+  // Nunca exibir ingles cru na UI.
   return MENSAGEM_SENHA_GENERICA;
 }
 
@@ -65,7 +65,7 @@ export function mensagemErroOtpAuth(error: { code?: string; message?: string } |
   return MENSAGEM_OTP_GENERICA;
 }
 
-/** sessionStorage: fluxo de recuperação ativo (não hidratar app Session). */
+/** sessionStorage: fluxo de recuperacao ativo (nao hidratar app Session). */
 export const CHAVE_RECOVERY = "wedash-password-recovery";
 /** E-mail para o qual o OTP de recovery foi pedido. */
 export const CHAVE_RECOVERY_EMAIL = "wedash-recovery-email";
@@ -119,12 +119,12 @@ export function readRecoveryEmail(): string | null {
   }
 }
 
-/** @deprecated callback de link — OTP não depende disso; mantido por compat. */
+/** @deprecated callback de link  -  OTP nao depende disso; mantido por compat. */
 export function urlRedefinirSenha(): string {
   return `${window.location.origin}${paths.access.reset}`;
 }
 
-/** Login: Supabase Auth se configurado; senão mock por e-mail (demo). */
+/** Login: Supabase Auth se configurado; senao mock por e-mail (demo). */
 export async function loginWithEmail(email: string, senha: string): Promise<AuthResult> {
   const e = email.trim().toLowerCase();
   if (!emailOk(e) || !senha) return { ok: false, error: MENSAGEM_LOGIN };
@@ -146,7 +146,7 @@ export async function loginWithEmail(email: string, senha: string): Promise<Auth
     await sb.auth.signOut();
     return {
       ok: false,
-      error: session === SELLER_SUSPENDED ? "Seu acesso está suspenso. Fale com a gerência da loja." : MENSAGEM_LOGIN,
+      error: session === SELLER_SUSPENDED ? "Seu acesso está suspenso. Fale com o responsável pelos acessos da WDash." : MENSAGEM_LOGIN,
     };
   }
   return { ok: true, session };
@@ -159,9 +159,9 @@ export async function logoutAuth(): Promise<void> {
 }
 
 /**
- * Pedido de recuperação por OTP (código no e-mail).
+ * Pedido de recuperacao por OTP (codigo no e-mail).
  * Sempre resolve OK na UI (anti-enumeration).
- * Demo sem Supabase: grava e-mail + flag para aceitar qualquer código de 6 dígitos.
+ * Demo sem Supabase: grava e-mail + flag para aceitar qualquer codigo de 6 digitos.
  */
 export async function requestPasswordReset(email: string): Promise<void> {
   const e = email.trim().toLowerCase();
@@ -185,7 +185,7 @@ export async function requestPasswordReset(email: string): Promise<void> {
 }
 
 /**
- * Valida o OTP de recovery (abre sessão Auth; app Session continua bloqueada por emRecovery).
+ * Valida o OTP de recovery (abre sessao Auth; app Session continua bloqueada por emRecovery).
  */
 export async function verifyRecoveryOtp(
   email: string,
@@ -216,7 +216,7 @@ export async function verifyRecoveryOtp(
 
 /**
  * @deprecated preferir verifyRecoveryOtp + updatePassword (telas separadas).
- * Mantido por compat — valida OTP e define senha numa chamada.
+ * Mantido por compat  -  valida OTP e define senha numa chamada.
  */
 export async function resetPasswordWithOtp(
   email: string,
@@ -231,8 +231,8 @@ export async function resetPasswordWithOtp(
 }
 
 /**
- * Há sessão Auth válida para redefinir senha sem OTP?
- * (compat: link antigo do e-mail ainda pode abrir sessão de recovery)
+ * Ha sessao Auth valida para redefinir senha sem OTP?
+ * (compat: link antigo do e-mail ainda pode abrir sessao de recovery)
  */
 export async function canResetPassword(): Promise<boolean> {
   const sb = getSupabase();
@@ -242,7 +242,7 @@ export async function canResetPassword(): Promise<boolean> {
   return emRecovery();
 }
 
-/** Redefine senha quando já existe sessão de recovery (OTP ou link legado). */
+/** Redefine senha quando ja existe sessao de recovery (OTP ou link legado). */
 export async function updatePassword(novaSenha: string): Promise<{ ok: boolean; error?: string }> {
   const check = validarSenha(novaSenha);
   if (!check.ok) return { ok: false, error: check.erro };
@@ -255,7 +255,7 @@ export async function updatePassword(novaSenha: string): Promise<{ ok: boolean; 
   const { error } = await sb.auth.updateUser({ password: novaSenha });
   if (error) return { ok: false, error: mensagemErroSenhaAuth(error) };
 
-  // Recovery define senha definitiva — limpa a flag de provisória antes do signOut.
+  // Recovery define senha definitiva  -  limpa a flag de provisoria antes do signOut.
   const { data: userData } = await sb.auth.getUser();
   const uid = userData.user?.id;
   if (uid) {
@@ -287,7 +287,7 @@ export async function sessionFromPersistedAuth(): Promise<Session | null> {
   return session;
 }
 
-/** Acesso suspenso: a sessão do Auth é encerrada e o login mostra o aviso. */
+/** Acesso suspenso: a sessao do Auth e encerrada e o login mostra o aviso. */
 export const SELLER_SUSPENDED = "seller_suspended";
 
 async function hydrateSessionFromAuth(authUserId: string, email: string): Promise<Session | typeof SELLER_SUSPENDED | null> {
@@ -330,17 +330,12 @@ async function hydrateSessionFromAuth(authUserId: string, email: string): Promis
     .maybeSingle();
 
   const { data: storeRows } = await sb.from("membership_store").select("store_id").eq("membership_id", memb.id);
-  let storeIds = (storeRows ?? []).map((r) => r.store_id as string);
-  // Sem lojas vinculadas = todas as lojas da empresa (Gestor/Gerente convidado com "Todas as lojas").
-  if (storeIds.length === 0 && memb.role !== "SELLER") {
-    const { data: tenantStores } = await sb
-      .from("store")
-      .select("id")
-      .eq("tenant_id", memb.tenant_id)
-      .eq("active", true);
-    storeIds = (tenantStores ?? []).map((r) => r.id as string);
-    if (storeIds.length === 0) storeIds = stores.map((f) => f.id);
-  }
+  const linkedIds = (storeRows ?? []).map((r) => r.store_id as string);
+  const { data: tenantStores } = await sb.from("store").select("id, active").eq("tenant_id", memb.tenant_id);
+  const catalog = (tenantStores ?? []).map((r) => ({ id: r.id as string, active: r.active !== false }));
+  // Sem lojas vinculadas = todas as ativas. Desativada fica fora mesmo com vinculo.
+  let storeIds = sessionStoreIds({ linkedIds, tenantStores: catalog, role: memb.role });
+  if (storeIds.length === 0 && catalog.length === 0 && memb.role !== "SELLER") storeIds = stores.map((f) => f.id);
 
   return {
     membershipId: memb.id,
@@ -361,8 +356,8 @@ async function hydrateSessionFromAuth(authUserId: string, email: string): Promis
 }
 
 /**
- * Sobe a foto de perfil (já reduzida) para `avatars/{auth.uid}/…` e devolve a URL pública.
- * Nome único por envio: evita cache antigo do navegador/CDN ao trocar de foto.
+ * Sobe a foto de perfil (ja reduzida) para `avatars/{auth.uid}/...` e devolve a URL publica.
+ * Nome unico por envio: evita cache antigo do navegador/CDN ao trocar de foto.
  */
 export async function uploadAvatar(photo: File): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
   const sb = getSupabase();
@@ -389,7 +384,7 @@ export type CreateAccessInput = { firstName: string; lastName: string; password:
 
 /**
  * "Crie seu acesso" (primeiro acesso): sobe a foto (opcional), grava nome, sobrenome e foto na
- * identity, troca a senha temporária no Auth e desliga a flag. Sessão permanece (diferente do
+ * identity, troca a senha temporaria no Auth e desliga a flag. Sessao permanece (diferente do
  * recovery, que faz signOut).
  */
 export async function createAccess(
@@ -421,7 +416,7 @@ export async function createAccess(
     avatarUrl = up.url;
   }
 
-  // Nome e foto antes da senha: se a troca falhar, tentar de novo não esbarra em "senha igual à anterior".
+  // Nome e foto antes da senha: se a troca falhar, tentar de novo nao esbarra em "senha igual a anterior".
   const { error: idErr } = await sb
     .from("identity")
     .update({ first_name: firstName, last_name: lastName, name, ...(avatarUrl ? { avatar_url: avatarUrl } : {}) })
@@ -495,7 +490,7 @@ export async function saveMyProfile(
   return { ok: true, name, avatarUrl };
 }
 
-/** Meu perfil: confere a senha atual (novo login) e troca a senha sem encerrar a sessão. */
+/** Meu perfil: confere a senha atual (novo login) e troca a senha sem encerrar a sessao. */
 export async function changeMyPassword(email: string, atual: string, nova: string): Promise<{ ok: boolean; error?: string }> {
   const check = validarSenha(nova);
   if (!check.ok) return { ok: false, error: check.erro };
@@ -516,11 +511,11 @@ export async function changeMyPassword(email: string, atual: string, nova: strin
   return { ok: true };
 }
 
-/** Destino após login / troca de senha / raiz. */
+/** Destino apos login / troca de senha / raiz. */
 export function destinationAfterAuth(s: Session, de?: string | null): string {
   if (s.temporaryPassword) return paths.access.createAccess;
   if (s.onboardingStep !== null) return paths.onboarding;
-  // Pós-onboarding: não manda pro Dash enquanto a carga inicial não terminou.
+  // Pos-onboarding: nao manda pro Dash enquanto a carga inicial nao terminou.
   try {
     if (typeof sessionStorage !== "undefined" && sessionStorage.getItem("wedash.awaitingInitialSync") === "1") {
       return paths.syncing;
@@ -533,7 +528,7 @@ export function destinationAfterAuth(s: Session, de?: string | null): string {
   return paths.overview;
 }
 
-/** Persiste progresso/conclusão do onboarding no membership (null = concluído). */
+/** Persiste progresso/conclusao do onboarding no membership (null = concluido). */
 export async function saveOnboardingStep(membershipId: string, step: number | null): Promise<void> {
   const sb = getSupabase();
   if (!sb) return;
@@ -541,7 +536,7 @@ export async function saveOnboardingStep(membershipId: string, step: number | nu
   if (error) console.warn("saveOnboardingStep:", error.message);
 }
 
-/** Substitui o escopo de lojas do membership (ids do catálogo local, ex.: f1 / erp-8). */
+/** Substitui o escopo de lojas do membership (ids do catalogo local, ex.: f1 / erp-8). */
 export async function saveMembershipStores(membershipId: string, storeIds: string[]): Promise<void> {
   const sb = getSupabase();
   if (!sb) return;
@@ -562,11 +557,11 @@ export type PersistErpInput = {
   username: string;
   password: string;
   dedicated: boolean;
-  /** Sessão Millennium já aberta no Step2 — grava p/ o worker reusar. */
+  /** Sessao Millennium ja aberta no Step2  -  grava p/ o worker reusar. */
   millenniumSession?: string;
-  /** Troca de usuário mantendo dados: remove só as lojas que o usuário novo não enxerga. */
+  /** Troca de usuario mantendo dados: remove so as lojas que o usuario novo nao enxerga. */
   userChange?: { mode: "keep"; removeMillenniumStoreIds: number[] };
-  /** Vazio no Step2 (só credencial); preenchido ao concluir lojas. */
+  /** Vazio no Step2 (so credencial); preenchido ao concluir lojas. */
   stores?: Array<{
     storeId: number;
     code?: string;
@@ -584,7 +579,7 @@ export type PersistErpResult =
 
 /**
  * Persiste erp_credential (senha cifrada no Edge) + store rows e remapeia membership_store.
- * light_interval_min = 5 (mesmo ritmo do botão Atualizar / FORCE).
+ * light_interval_min = 5 (mesmo ritmo do botao Atualizar / FORCE).
  */
 export async function persistErpCredentialAndStores(
   input: PersistErpInput,
@@ -637,7 +632,7 @@ export async function persistErpCredentialAndStores(
   };
 }
 
-/** Marca o usuário logado como ativo (coluna Último acesso em Configurações > Usuários). */
+/** Marca o usuario logado como ativo (coluna Ultimo acesso em Configuracoes > Usuarios). */
 export async function touchLastSeen(): Promise<void> {
   const sb = getSupabase();
   if (!sb) return;
@@ -647,7 +642,7 @@ export async function touchLastSeen(): Promise<void> {
 
 export type ThemeChoice = "light" | "dark" | "system";
 
-/** Aparência salva na conta (Meu perfil). `null` = nunca escolheu, sem banco ou falha. */
+/** Aparencia salva na conta (Meu perfil). `null` = nunca escolheu, sem banco ou falha. */
 export async function fetchThemePreference(): Promise<ThemeChoice | null> {
   const sb = getSupabase();
   if (!sb) return null;

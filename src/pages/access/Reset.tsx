@@ -1,4 +1,4 @@
-import { useToast } from "@/components/ui";
+import { Spinner, useToast } from "@/components/ui";
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ClipboardEvent } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { paths } from "@/router/paths";
@@ -232,7 +232,7 @@ export function Reset() {
     navigate(paths.access.login, {
       replace: true,
       state: {
-        aviso: "Senha alterada com sucesso. Entre com a nova senha.",
+        aviso: "Senha alterada. Entre com a nova senha.",
         avisoId: `senha-${Date.now()}`,
       },
     });
@@ -267,7 +267,7 @@ export function Reset() {
     return (
       <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-bg-0 p-10">
         <AuthGlow />
-        <p className="relative text-sm text-t2">Carregando…</p>
+        <Spinner size={28} />
       </div>
     );
   }
@@ -280,10 +280,10 @@ export function Reset() {
         <div className="relative w-full max-w-[420px]">
           <div className="rounded-[22px] border border-line bg-bg-2 p-9 text-center" style={{ boxShadow: "0 20px 60px -20px rgba(0,0,0,.6)" }}>
             <h2 className={acessoTitulo}>Informe seu e-mail</h2>
-            <p className={acessoSubtitulo}>Comece pela recuperação de senha para receber seu código.</p>
+            <p className={acessoSubtitulo}>Comece pela recuperação de senha para receber um código de verificação.</p>
             <Link to={paths.access.forgot} className="mb-4 block">
               <button type="button" className={acessoBotao}>
-                Ir para recuperação
+                Recuperar senha
               </button>
             </Link>
           </div>
@@ -344,7 +344,7 @@ export function Reset() {
           ) : (
             <>
               <h2 className={acessoTitulo}>Crie uma nova senha</h2>
-              <p className={acessoSubtitulo}>Escolha a nova senha que você usará para acessar a WDash.</p>
+              <p className={acessoSubtitulo}>Escolha a senha que você usará para acessar a WDash.</p>
 
               <form onSubmit={salvarSenha} className="flex flex-col gap-3.5 text-left" noValidate>
                 {/* Escondido: gerenciador de senhas associa a senha nova a este login. */}
@@ -358,7 +358,7 @@ export function Reset() {
                   autoFocus
                 />
                 <CampoSenha
-                  label="Confirme sua senha"
+                  label="Confirme a nova senha"
                   value={confirma}
                   onChange={setConfirma}
                   placeholder="Digite novamente"

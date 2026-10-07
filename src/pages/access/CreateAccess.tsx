@@ -12,13 +12,13 @@ import { destinationAfterAuth, createAccess } from "@/session/authApi";
 import { useSession, useActiveSession } from "@/session/SessionProvider";
 
 const bullets = [
-  "Seu nome identifica você na WeDash",
-  "Uma senha pessoal substitui a senha temporária",
+  "Seu nome identifica você na WDash",
+  "Sua senha pessoal substitui a senha temporária",
   "Depois, conecte o Millennium para adicionar suas lojas",
 ];
 
 /**
- * Primeiro acesso com senha temporária = "Crie seu acesso" (etapa 1 do onboarding):
+ * Primeiro acesso com senha temporaria = "Crie seu acesso" (etapa 1 do onboarding):
  * nome, sobrenome (sempre em branco) e a nova senha.
  */
 export function CreateAccess() {
@@ -80,7 +80,7 @@ export function CreateAccess() {
           {comOnboarding && <WizardSteps steps={ONBOARDING_STEPS} current={1} />}
 
           <h1 className="mb-2 text-2xl font-extrabold tracking-tight text-t0">Crie seu acesso</h1>
-          <p className="mb-7 text-sm text-t2">Informe seu nome e crie a senha que você usará para acessar a WeDash.</p>
+          <p className="mb-7 text-sm text-t2">Informe seu nome e crie a senha que você usará para acessar a WDash.</p>
 
           <form onSubmit={salvar} className="flex flex-col gap-3.5" noValidate>
             <CampoFoto nome={nome} foto={foto} onChange={setFoto} />
@@ -95,7 +95,7 @@ export function CreateAccess() {
               autoComplete="new-password"
             />
             <CampoSenha
-              label="Confirme sua senha"
+              label="Confirme a nova senha"
               value={confirma}
               onChange={setConfirma}
               placeholder="Digite novamente"
@@ -120,12 +120,12 @@ export function CreateAccess() {
         />
         <div className="relative">
           <h2 className="mb-6 text-[26px] font-extrabold leading-[1.3] tracking-tight text-white">
-            Seu acesso à WeDash
+            Seu acesso à WDash
             <br />
             começa aqui.
           </h2>
           <p className="mb-6 max-w-[380px] text-[15px] leading-relaxed text-white/70">
-            Crie seus dados pessoais de acesso para substituir a senha temporária.
+            Informe seus dados e crie uma senha pessoal para substituir a senha temporária.
           </p>
           <div className="flex flex-col gap-4">
             {bullets.map((b) => (

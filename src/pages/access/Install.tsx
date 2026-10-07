@@ -17,8 +17,17 @@ function detectarPlataforma(): Plataforma {
 }
 
 const passos: Record<Exclude<Plataforma, "desktop">, string[]> = {
-  ios: ["Toque no botão Compartilhar, o quadrado com a seta para cima, na barra do Safari.", "Role a lista e toque em \"Adicionar à Tela de Início\".", "Confirme em \"Adicionar\". O ícone aparece junto dos outros apps.", "Abra pelo ícone e aceite as notificações quando pedir."],
-  android: ["Toque no aviso \"Instalar app\" que aparece embaixo, ou nos três pontos do Chrome.", "Escolha \"Instalar aplicativo\" e confirme.", "Abra pelo ícone e aceite as notificações quando pedir."],
+  ios: [
+    "Toque em Compartilhar, o ícone de um quadrado com uma seta para cima, na barra do Safari.",
+    "Role a lista e toque em \"Adicionar à Tela de Início\".",
+    "Confirme em \"Adicionar\". O ícone da WDash aparecerá junto aos outros apps.",
+    "Abra a WDash pelo ícone e permita as notificações quando solicitado.",
+  ],
+  android: [
+    "Toque em \"Instalar app\" quando o aviso aparecer ou abra o menu de três pontos do Chrome.",
+    "Escolha \"Instalar aplicativo\" e confirme.",
+    "Abra a WDash pelo ícone e permita as notificações quando solicitado.",
+  ],
 };
 
 export function Install() {
@@ -44,7 +53,11 @@ export function Install() {
         </svg>
       </IconeCard>
       <h1 className={acessoTitulo}>Instale o app no celular</h1>
-      <p className="mb-5 text-sm leading-relaxed text-t1">Com o app instalado você recebe o aviso na hora em que cruzar um degrau da meta. Sem ele, o aviso não chega.</p>
+      <p className="mb-5 text-sm leading-relaxed text-t1">
+        {session?.role === "SELLER"
+          ? "Instale o app para receber avisos quando avançar para um novo nível de premiação."
+          : "Instale o app para receber no celular os avisos da WDash."}
+      </p>
 
       <div className="mb-5 flex gap-1 rounded-[var(--radius-vela-md)] bg-bg-3 p-1">
         {(["ios", "android", "desktop"] as Plataforma[]).map((p) => (
@@ -57,9 +70,9 @@ export function Install() {
       {plataforma === "desktop" ? (
         <div className="flex flex-col gap-3">
           <AvisoCard tom="info" titulo="Melhor no celular">
-            O app funciona melhor no celular. Mande o link para o seu e-mail e instale por lá.
+            O app funciona melhor no celular. Envie o link para seu e-mail e instale por lá.
           </AvisoCard>
-          <Button size="lg" fullWidth className="!h-[46px] font-bold" onClick={() => show("Link enviado para o seu e-mail.", "success")}>Enviar link pro meu e-mail</Button>
+          <Button size="lg" fullWidth className="!h-[46px] font-bold" onClick={() => show("Link enviado para seu e-mail.", "success")}>Enviar link para meu e-mail</Button>
           <Button size="lg" fullWidth variant="outline" className="!h-[46px] font-bold" onClick={() => concluir(false)}>Continuar no computador</Button>
         </div>
       ) : (
@@ -74,12 +87,12 @@ export function Install() {
           </ol>
           {plataforma === "ios" && (
             <AvisoCard tom="warn" titulo="Notificações no iPhone">
-              No iPhone, as notificações só funcionam com o app instalado pela tela de início.
+              No iPhone, as notificações só funcionam com a WDash instalada pela Tela de Início.
             </AvisoCard>
           )}
           <Button size="lg" fullWidth className="!h-[46px] font-bold" onClick={() => concluir(true)}>Já instalei</Button>
-          <Button size="lg" fullWidth variant="outline" className="!h-[46px] font-bold" onClick={() => concluir(false)}>Pular por agora</Button>
-          <p className="text-center text-xs text-t2">Este guia fica sempre disponível no seu perfil.</p>
+          <Button size="lg" fullWidth variant="outline" className="!h-[46px] font-bold" onClick={() => concluir(false)}>Agora não</Button>
+          <p className="text-center text-xs text-t2">Você pode abrir este guia novamente pelo menu.</p>
         </div>
       )}
     </AcessoPagina>

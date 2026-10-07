@@ -93,12 +93,12 @@ export function Login() {
         </div>
         <div className="relative">
           <h2 className="mb-3.5 text-[30px] font-extrabold leading-[1.25] tracking-tight text-white">
-            Todas as suas lojas.
+            Sua operação.
             <br />
-            Uma gestão mais clara.
+            Mais clara em um só lugar.
           </h2>
           <p className="max-w-[400px] text-[15px] leading-relaxed text-white/70">
-            Acompanhe faturamento, metas, premiações e margens de todas as unidades em um só lugar.
+            Acompanhe resultados, metas e desempenho na WDash.
           </p>
         </div>
         <div className="relative flex gap-2">
@@ -116,7 +116,7 @@ export function Login() {
         </div>
 
         <div className="w-full max-w-[380px]">
-          <h1 className="mb-2 text-[26px] font-extrabold tracking-tight text-t0">Acesse sua conta</h1>
+          <h1 className="mb-2 text-[26px] font-extrabold tracking-tight text-t0">Acesse a WDash</h1>
           <p className="mb-7 text-sm text-t1">Entre com seu e-mail e senha.</p>
 
           <form ref={formRef} onSubmit={enviar} className="flex flex-col gap-3.5" noValidate>

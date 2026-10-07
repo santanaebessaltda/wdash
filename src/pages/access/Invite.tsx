@@ -28,12 +28,12 @@ type State =
   | { kind: "active" }
   | { kind: "form"; info: InviteInfo };
 
-/** O link do e-mail só vale 1 vez: StrictMode / remount não podem verificar de novo. */
+/** O link do e-mail so vale 1 vez: StrictMode / remount nao podem verificar de novo. */
 const opened = new Map<string, Promise<boolean>>();
 
 /**
- * Abre a sessão do convite. `/invite/{token_hash}` (template com TokenHash) → verifyOtp;
- * `/invite/link#access_token=…` (link padrão do Supabase) → setSession.
+ * Abre a sessao do convite. `/invite/{token_hash}` (template com TokenHash)  ->  verifyOtp;
+ * `/invite/link#access_token=...` (link padrao do Supabase)  ->  setSession.
  */
 function openInviteSession(token: string): Promise<boolean> {
   const cached = opened.get(token);
@@ -50,7 +50,7 @@ function openInviteSession(token: string): Promise<boolean> {
         const { error } = await sb.auth.setSession({ access_token, refresh_token });
         return !error;
       }
-      // Sem token no link: pode ser a mesma aba voltando depois de já ter aberto.
+      // Sem token no link: pode ser a mesma aba voltando depois de ja ter aberto.
       const { data } = await sb.auth.getSession();
       return Boolean(data.session);
     }
@@ -117,7 +117,7 @@ export function Invite() {
         <p className={acessoSubtitulo}>
           {active
             ? "Entre com seu e-mail e a senha que você criou."
-            : "O link expirou ou já foi usado. Peça um novo convite a quem enviou este."}
+            : "O link expirou ou já foi usado. Peça um novo convite ao responsável pelo seu acesso."}
         </p>
         <Link to={paths.access.login} className={cn("block text-center", acessoLink)}>
           Ir para o login
@@ -166,7 +166,7 @@ export function Invite() {
       <p className={acessoSubtitulo}>
         {info.role === "SELLER" ? (
           <>
-            Informe seu nome e crie uma senha para acessar a WeDash como parte da equipe de vendas
+            Informe seu nome e crie uma senha para acessar a WDash como parte da equipe de vendas
             {info.storeName ? (
               <>
                 {" "}
@@ -176,7 +176,7 @@ export function Invite() {
           </>
         ) : (
           <>
-            Informe seu nome e crie uma senha para acessar a WeDash como {roleLabel[info.role].toLowerCase()}
+            Informe seu nome e crie uma senha para acessar a WDash como {roleLabel[info.role].toLowerCase()}
             {info.companyName ? (
               <>
                 {" "}
@@ -199,7 +199,7 @@ export function Invite() {
           autoComplete="new-password"
         />
         <CampoSenha
-          label="Confirme sua senha"
+          label="Confirme a nova senha"
           value={confirma}
           onChange={setConfirma}
           placeholder="Digite novamente"

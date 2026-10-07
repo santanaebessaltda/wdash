@@ -7,10 +7,10 @@ import { noAutofill, secretStyle } from "@/lib/noAutofill";
 
 const toastErro: Record<Exclude<ErpLoginResult, { ok: true }>["reason"], string> = {
   password: "Usuário ou senha incorretos. Confira os dados e tente novamente.",
-  busy: "Este usuário já está conectado ao Millennium em outro local. Encerre a outra sessão e tente novamente.",
-  stores: "A conexão foi realizada, mas não conseguimos identificar as lojas deste usuário. Tente novamente.",
+  busy: "Este usuário do Millennium está conectado em outro local. Encerre a outra sessão e tente novamente.",
+  stores: "Conseguimos acessar o Millennium, mas não foi possível identificar as lojas deste usuário. Tente novamente.",
   other: "Não foi possível conectar ao Millennium. Tente novamente em alguns minutos.",
-  reports: "Este usuário não possui acesso a todos os relatórios necessários para a WeDash.",
+  reports: "Este usuário não tem acesso a todos os relatórios necessários para a WDash.",
 };
 
 const btnPrimario =
@@ -23,8 +23,8 @@ export type ErpRascunho = {
 };
 
 /**
- * Etapa 2 (última) — um clique testa o Millennium (login, lojas, relatórios) e, se passou, conecta
- * com todas as lojas do usuário. As vendas de hoje chegam depois, já no board.
+ * Etapa 2 (ultima)  -  um clique testa o Millennium (login, lojas, relatorios) e, se passou, conecta
+ * com todas as lojas do usuario. As vendas de hoje chegam depois, ja no board.
  */
 export function Step2Credentials({
   membershipId,
@@ -70,7 +70,7 @@ export function Step2Credentials({
       await logoutErp(r.session);
       setTestando(false);
       setFalhou(true);
-      show("Este usuário não possui lojas vinculadas no Millennium. Verifique os vínculos no ERP e tente novamente.", "danger");
+      show("Este usuário não possui lojas vinculadas no Millennium. Verifique os vínculos no Millennium e tente novamente.", "danger");
       return;
     }
     setTestando(false);
@@ -87,13 +87,13 @@ export function Step2Credentials({
     <div>
       <h1 className="mb-2 text-2xl font-extrabold tracking-tight text-t0">Conecte o Millennium</h1>
       <p className="mb-7 text-sm text-t2">
-        Conecte seu ERP para trazer vendas, custos e cadastros para a WeDash. As lojas vinculadas a este usuário serão
-        adicionadas automaticamente.
+        Conecte o Millennium para trazer vendas, custos, lojas e vendedores para a WDash. As lojas disponíveis para este
+        usuário serão adicionadas automaticamente.
       </p>
 
       <div className="flex flex-col gap-3.5">
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-          <FormField label="Usuário" required>
+          <FormField label="Usuário do Millennium" required>
             <Input
               value={usuario}
               onChange={(e) => {
@@ -107,7 +107,7 @@ export function Step2Credentials({
               className="uppercase"
             />
           </FormField>
-          <FormField label="Senha" required>
+          <FormField label="Senha do Millennium" required>
             <div className="relative">
               <Input
                 type="text"
@@ -154,10 +154,10 @@ export function Step2Credentials({
             style={{ accentColor: "var(--acc)" }}
           />
           <span>
-            Este usuário será exclusivo da WeDash
+            Este usuário será usado somente pela WDash
             <span className="mt-0.5 block text-t2">
-              O Millennium permite apenas uma sessão por usuário. Para evitar interrupções na sincronização, use um
-              usuário criado exclusivamente para a WeDash.
+              O Millennium permite apenas uma sessão por usuário. Use um usuário exclusivo para evitar interrupções na
+              sincronização e permitir que a WDash se reconecte automaticamente se a sessão cair.
             </span>
           </span>
         </label>
@@ -173,7 +173,7 @@ export function Step2Credentials({
             className="mt-0.5"
             style={{ accentColor: "var(--acc)" }}
           />
-          Autorizo a WeDash a usar estes dados para realizar a sincronização.
+          Autorizo a WDash a usar este acesso para realizar a sincronização.
         </label>
 
         {relatorios && <ErpReportChecks reports={relatorios} username={usuario.trim()} />}

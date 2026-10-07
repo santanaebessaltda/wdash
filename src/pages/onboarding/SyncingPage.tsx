@@ -24,7 +24,7 @@ import { BrandMark } from "@/pages/auth/authKit";
 import { PRODUCT_NAME } from "@/data/wedash/tenant";
 import { padTopoEBase } from "@/lib/safeArea";
 
-/** Job na fila sem worker pegar → erro (não espera infinito). */
+/** Job na fila sem worker pegar  ->  erro (nao espera infinito). */
 const STUCK_QUEUED_MS = 90_000;
 /** RUNNING sem nenhuma loja pronta por muito tempo (hoje leva segundos). */
 const STUCK_RUNNING_MS = 5 * 60_000;
@@ -63,8 +63,8 @@ function isInternalJobCancel(msg: string | null | undefined): boolean {
 }
 
 /**
- * Pós-onboarding: espera só o Atualizar de **hoje** (segundos) e abre o dashboard.
- * Os dias anteriores do mês chegam por trás (indicador no Topbar — `useMonthFill`).
+ * Pos-onboarding: espera so o Atualizar de **hoje** (segundos) e abre o dashboard.
+ * Os dias anteriores do mes chegam por tras (indicador no Topbar  -  `useMonthFill`).
  * Progresso = lojas com hoje gravado / total (sem fake %).
  */
 export function SyncingPage() {
@@ -171,12 +171,12 @@ export function SyncingPage() {
         setStatus("failed");
         if (erpBusy) {
           setErrorMsg(
-            "Este usuário já está logado no Millennium em outro lugar. Saia do ERP nessa outra sessão e toque em Tentar novamente.",
+            "Este usuário do Millennium está conectado em outro local. Encerre a outra sessão e tente novamente.",
           );
           if (!toastBusyShown.current) {
             toastBusyShown.current = true;
             show(
-              "Usuário ocupado no Millennium. Saia do ERP no outro lugar e tente de novo.",
+              "Este usuário do Millennium está conectado em outro local. Encerre a outra sessão e tente novamente.",
               "warning",
             );
           }
@@ -196,7 +196,7 @@ export function SyncingPage() {
       if (waitedMs >= STUCK_QUEUED_MS) {
         setStatus("failed");
         setErrorMsg(
-          "A sincronização demorou para começar. Tente novamente. Se o problema continuar, fale com o suporte.",
+          "A sincronização está demorando mais que o normal para começar. Tente novamente. Se o problema continuar, fale com o suporte.",
         );
         if (!toastStuckShown.current) {
           toastStuckShown.current = true;
@@ -222,10 +222,10 @@ export function SyncingPage() {
       }
       if (Date.now() - runningSinceRef.current >= STUCK_RUNNING_MS) {
         setStatus("failed");
-        setErrorMsg("A sincronização não avançou como esperado. Tente novamente.");
+        setErrorMsg("A sincronização não está avançando. Tente novamente.");
         if (!toastStuckShown.current) {
           toastStuckShown.current = true;
-          show("A sincronização não avançou. Tente novamente.", "danger");
+          show("A sincronização não está avançando. Tente novamente.", "danger");
         }
         return;
       }
@@ -249,7 +249,7 @@ export function SyncingPage() {
         return;
       }
       if (totalDays <= 0 || !coverageReseedDone.current) {
-        // SEED “ok” mas cobertura incompleta → um reseed.
+        // SEED "ok" mas cobertura incompleta  ->  um reseed.
         if (!coverageReseedDone.current) {
           coverageReseedDone.current = true;
           await enqueueSeed();
@@ -320,10 +320,10 @@ export function SyncingPage() {
       : status === "failed"
         ? errorMsg
         : busy
-          ? "Aguardando liberar a sessão no Millennium…"
+          ? "Aguardando a sessão do Millennium ficar disponível…"
           : preparing
             ? "Quase lá — abrindo o dashboard."
-            : `Buscando as vendas de hoje ${lojasTxt} no Millennium. Leva alguns segundos.`;
+            : `Buscando as vendas de hoje ${lojasTxt} no Millennium. Isso pode levar alguns instantes.`;
 
   return (
     <div
@@ -366,7 +366,7 @@ export function SyncingPage() {
             </div>
             {status === "running" && elapsedMs > 0 && (
               <div className="text-right text-[12px] text-t2">
-                Decorrido <span className="font-semibold text-t1 tabular-nums">{fmtDuration(elapsedMs)}</span>
+                Tempo decorrido: <span className="font-semibold text-t1 tabular-nums">{fmtDuration(elapsedMs)}</span>
               </div>
             )}
           </div>
@@ -389,7 +389,7 @@ export function SyncingPage() {
                     <Avatar name={s.name} size="sm" />
                     <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold text-t0">{s.name}</span>
                     {done ? (
-                      <Badge variant="success">Pronta</Badge>
+                      <Badge variant="success">Concluído</Badge>
                     ) : status === "running" ? (
                       <Spinner size={16} />
                     ) : (
@@ -408,7 +408,7 @@ export function SyncingPage() {
           </div>
         ) : (
           <p className="mt-4 text-center text-[12px] text-t3">
-            Depois de entrar, os dias anteriores do mês continuam carregando por trás — você acompanha no topo da tela.
+            Depois de entrar, o histórico do mês continuará sendo carregado. Você poderá acompanhar o progresso no topo da tela.
           </p>
         )}
       </div>
