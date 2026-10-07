@@ -97,14 +97,13 @@ export function Step2Credentials({
             <Input
               value={usuario}
               onChange={(e) => {
-                const v = e.target.value.toUpperCase();
+                const v = e.target.value;
                 setUsuario(v);
                 syncErp({ usuario: v });
               }}
               placeholder="Ex.: ESSENCIA.INTEGRACAO"
               {...noAutofill}
               autoFocus
-              className="uppercase"
             />
           </FormField>
           <FormField label="Senha do Millennium" required>

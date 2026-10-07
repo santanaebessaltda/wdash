@@ -203,8 +203,8 @@ function MillenniumModal({
   }, [open, info]);
 
   const conectado = estado === "conectado";
-  const usuarioAnterior = (info?.username ?? "").trim().toUpperCase();
-  const usuarioNovo = usuario.trim().toUpperCase();
+  const usuarioAnterior = (info?.username ?? "").trim();
+  const usuarioNovo = usuario.trim();
   const podeConectar = canEdit && usuarioNovo.length > 0 && senha.length > 0 && autorizo && !busy;
 
   function descartarPendente() {
@@ -334,12 +334,11 @@ function MillenniumModal({
             <Input
               value={usuario}
               onChange={(e) => {
-                setUsuario(e.target.value.toUpperCase());
+                setUsuario(e.target.value);
                 descartarPendente();
               }}
               placeholder="Ex.: ESSENCIA.INTEGRACAO"
               {...noAutofill}
-              className="uppercase"
               disabled={travado}
             />
           </FormField>

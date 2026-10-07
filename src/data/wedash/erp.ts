@@ -26,7 +26,7 @@ export interface StoreErp {
   openedAt: string;
 }
 
-/** Resultado do teste de cada relatório personalizado do Millennium que o sync usa. */
+/** Resultado do teste de cada relatorio personalizado do Millennium que o sync usa. */
 export type ErpReportCheck = { key: string; name: string; ok: boolean; error?: string };
 
 export type ErpLoginFailReason = "password" | "busy" | "other" | "stores" | "reports";
@@ -64,10 +64,10 @@ function storesMock(): StoreErp[] {
 }
 
 /**
- * Login + FILIAIS.Lista + acesso aos relatórios personalizados no ERP.
- * Antes de logar, a Edge libera sessão WeDash salva (reclaim) — busy do nosso sync some sem o usuário ver.
- * Sem acesso a algum relatório → `reason: "reports"` + lista (Edge já deslogou).
- * Demo (sem Edge): senha "errada" | "ocupado" | "falha" | "relatorio"; qualquer outra → ok + mock.
+ * Login + FILIAIS.Lista + acesso aos relatorios personalizados no ERP.
+ * Antes de logar, a Edge libera sessao WDash salva (reclaim)  -  busy do nosso sync some sem o usuario ver.
+ * Sem acesso a algum relatorio  ->  `reason: "reports"` + lista (Edge ja deslogou).
+ * Demo (sem Edge): senha "errada" | "ocupado" | "falha" | "relatorio"; qualquer outra  ->  ok + mock.
  */
 export async function testErpLogin(usuario: string, senha: string): Promise<ErpLoginResult> {
   const u = usuario.trim();
@@ -75,7 +75,7 @@ export async function testErpLogin(usuario: string, senha: string): Promise<ErpL
 
   const sb = getSupabase();
   if (sb) {
-    // Libera sessão do tenant antes (idempotente).
+    // Libera sessao do tenant antes (idempotente).
     try {
       await sb.functions.invoke("millennium-onboarding", { body: { action: "release" } });
     } catch {
@@ -90,7 +90,7 @@ export async function testErpLogin(usuario: string, senha: string): Promise<ErpL
 
     let { data, error } = await attempt();
     if (data && typeof data === "object" && "ok" in data && data.ok === false && data.reason === "busy") {
-      // Ainda busy (ERP desktop ou órfão sem token) — release de novo + 1 retry curto.
+      // Ainda busy (ERP desktop ou orfao sem token)  -  release de novo + 1 retry curto.
       try {
         await sb.functions.invoke("millennium-onboarding", { body: { action: "release" } });
       } catch {
@@ -124,8 +124,8 @@ export async function testErpLogin(usuario: string, senha: string): Promise<ErpL
   return { ok: true, session: "mock-session", stores: storesMock() };
 }
 
-/** Encerra a sessão no ERP (voltar no wizard / desconectar). Best-effort.
- * Não chamar ao confirmar lojas — o token fica no tenant p/ o worker. */
+/** Encerra a sessao no ERP (voltar no wizard / desconectar). Best-effort.
+ * Nao chamar ao confirmar lojas  -  o token fica no tenant p/ o worker. */
 export async function logoutErp(session: string | undefined): Promise<void> {
   const sb = getSupabase();
   if (!sb) return;
@@ -138,7 +138,7 @@ export async function logoutErp(session: string | undefined): Promise<void> {
   }
 }
 
-/** Libera sessão WeDash no Millennium + (opcional) pausa o sync do worker. */
+/** Libera sessao WDash no Millennium + (opcional) pausa o sync do worker. */
 export async function releaseErpSession(opts?: { pauseSync?: boolean }): Promise<void> {
   const sb = getSupabase();
   if (!sb) return;
@@ -173,7 +173,7 @@ export type ErpIntegrationStatus = {
   autoRefreshEnabled: boolean;
 };
 
-/** Lê estado da integração (sem senha) para Configurações > Integração ERP. */
+/** Le estado da integracao (sem senha) para Configuracoes > Integracao ERP. */
 export async function fetchErpIntegrationStatus(
   tenantId: string,
 ): Promise<ErpIntegrationStatus | null> {
@@ -216,8 +216,8 @@ export async function fetchErpIntegrationStatus(
 }
 
 /**
- * Atualizar do card Millennium: lojas do tenant + opções de tabela de custo do ERP (nada de venda).
- * Síncrono (Edge `erp-products-sync`, `scope: "registry"`), sem passar pela fila do worker.
+ * Atualizar do card Millennium: lojas do tenant + opcoes de tabela de custo do ERP (nada de venda).
+ * Sincrono (Edge `erp-products-sync`, `scope: "registry"`), sem passar pela fila do worker.
  */
 export async function refreshErpRegistry(): Promise<{ ok: true } | { ok: false; message: string }> {
   if (!getSupabase()) {
@@ -228,7 +228,7 @@ export async function refreshErpRegistry(): Promise<{ ok: true } | { ok: false; 
   return r.ok ? { ok: true } : r;
 }
 
-/** Quando foi enfileirada a última rodada automática (base da próxima). */
+/** Quando foi enfileirada a ultima rodada automatica (base da proxima). */
 export async function fetchLastAutoRefreshAt(tenantId: string): Promise<Date | null> {
   const sb = getSupabase();
   if (!sb) return null;
@@ -253,7 +253,7 @@ export type ErpCredentialChangeResult =
   | { ok: true; wiped: boolean; storeIds: string[] }
   | { ok: false; reason: ErpLoginFailReason | "no_stores" | "persist"; reports?: ErpReportCheck[] };
 
-/** Lojas ativas do tenant (id Millennium + nome) — base da comparação ao trocar usuário. */
+/** Lojas ativas do tenant (id Millennium + nome)  -  base da comparacao ao trocar usuario. */
 async function tenantErpStores(tenantId: string): Promise<{ storeId: number; name: string }[]> {
   const sb = getSupabase();
   if (!sb) return [];
@@ -269,11 +269,11 @@ async function tenantErpStores(tenantId: string): Promise<{ storeId: number; nam
 
 /**
  * Impacto de trocar a credencial:
- * - `credential`: mesmo usuário (troca de senha) — só grava.
- * - `keep`: outro usuário que enxerga todas as lojas atuais — só grava, dados ficam.
- * - `partial`: outro usuário sem algumas lojas — remove só essas (pede confirmação).
- * - `full`: nenhuma loja em comum / tenant sem lojas — recria lojas + carga inicial
- *   (pede confirmação se já havia lojas).
+ * - `credential`: mesmo usuario (troca de senha)  -  so grava.
+ * - `keep`: outro usuario que enxerga todas as lojas atuais  -  so grava, dados ficam.
+ * - `partial`: outro usuario sem algumas lojas  -  remove so essas (pede confirmacao).
+ * - `full`: nenhuma loja em comum / tenant sem lojas  -  recria lojas + carga inicial
+ *   (pede confirmacao se ja havia lojas).
  */
 export type ErpChangePlan =
   | { kind: "credential" }
@@ -297,7 +297,7 @@ export function erpChangeNeedsConfirm(plan: ErpChangePlan): boolean {
 }
 
 /**
- * Passo 1 — testa login + relatórios e calcula o impacto (nada gravado ainda).
+ * Passo 1  -  testa login + relatorios e calcula o impacto (nada gravado ainda).
  * Se o chamador desistir, chamar `cancelErpCredentialChange`.
  */
 export async function prepareErpCredentialChange(input: {
@@ -308,7 +308,7 @@ export async function prepareErpCredentialChange(input: {
   password: string;
   dedicated: boolean;
 }): Promise<{ ok: true; change: PreparedErpChange } | Extract<ErpCredentialChangeResult, { ok: false }>> {
-  const username = input.username.trim().toUpperCase();
+  const username = input.username.trim();
   const login = await testErpLogin(username, input.password);
   if (!login.ok) return { ok: false, reason: login.reason, reports: login.reports };
 
@@ -321,7 +321,7 @@ export async function prepareErpCredentialChange(input: {
     session: login.session,
     loginStores: login.stores,
   };
-  if ((input.currentUsername ?? "").trim().toUpperCase() === username) {
+  if ((input.currentUsername ?? "").trim() === username) {
     return { ok: true, change: { ...base, plan: { kind: "credential" } } };
   }
 
@@ -340,12 +340,12 @@ export async function prepareErpCredentialChange(input: {
   return { ok: true, change: { ...base, plan } };
 }
 
-/** Desistiu da troca após o teste — encerra a sessão aberta no teste. */
+/** Desistiu da troca apos o teste  -  encerra a sessao aberta no teste. */
 export async function cancelErpCredentialChange(change: PreparedErpChange): Promise<void> {
   await logoutErp(change.session);
 }
 
-/** Passo 2 — grava a credencial conforme o plano. `wiped` = recriou lojas + SEED. */
+/** Passo 2  -  grava a credencial conforme o plano. `wiped` = recriou lojas + SEED. */
 export async function applyErpCredentialChange(change: PreparedErpChange): Promise<ErpCredentialChangeResult> {
   const { plan } = change;
   const persisted = await persistErpCredentialAndStores({
@@ -378,23 +378,23 @@ export async function applyErpCredentialChange(change: PreparedErpChange): Promi
   return { ok: true, wiped: plan.kind === "full", storeIds: persisted.storeIds };
 }
 
-/** Marca presença WeDash (heartbeat). Worker só synca com presença recente. */
+/** Marca presenca WDash (heartbeat). Worker so synca com presenca recente. */
 export async function touchErpPresence(): Promise<void> {
   const sb = getSupabase();
   if (!sb) return;
   try {
     await sb.functions.invoke("millennium-onboarding", { body: { action: "presence" } });
   } catch {
-    /* best-effort — sem credencial ainda (pré-onboarding) */
+    /* best-effort  -  sem credencial ainda (pre-onboarding) */
   }
 }
 
-/** Pausar sync + logout no Millennium (sair da WeDash). Precisa do JWT ainda válido. */
+/** Pausar sync + logout no Millennium (sair da WDash). Precisa do JWT ainda valido. */
 export async function pauseErpForLogout(): Promise<void> {
   await releaseErpSession({ pauseSync: true });
 }
 
-/** Preferir lojas já trazidas no login; fallback mock só sem sessão. */
+/** Preferir lojas ja trazidas no login; fallback mock so sem sessao. */
 export async function listErpStores(precarregadas?: StoreErp[]): Promise<StoreErp[]> {
   if (precarregadas) return precarregadas;
   await esperar(900);

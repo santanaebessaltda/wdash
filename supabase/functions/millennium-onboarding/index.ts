@@ -1,14 +1,14 @@
 /**
- * millennium-onboarding — sessão Millennium do TENANT (não do worker).
+ * millennium-onboarding  -  sessao Millennium do TENANT (nao do worker).
  *
  * Body:
- *   { username, password }     → liberar sessão salva + login + FILIAIS
- *     + checkReports: true     → smoke dos relatórios personalizados; sem acesso = reason "reports"
- *   { action: "logout", session } → logout token explícito + limpa credencial
- *   { action: "release" }      → encerra sessão salva do tenant (app/worker)
- *   { action: "pause" }        → release + sync_paused + limpa presença
- *   { action: "resume" }       → sync_paused=false + presença
- *   { action: "presence"|"heartbeat" } → marca app online (worker pode syncar)
+ *   { username, password }      ->  liberar sessao salva + login + FILIAIS
+ *     + checkReports: true      ->  smoke dos relatorios personalizados; sem acesso = reason "reports"
+ *   { action: "logout", session }  ->  logout token explicito + limpa credencial
+ *   { action: "release" }       ->  encerra sessao salva do tenant (app/worker)
+ *   { action: "pause" }         ->  release + sync_paused + limpa presenca
+ *   { action: "resume" }        ->  sync_paused=false + presenca
+ *   { action: "presence"|"heartbeat" }  ->  marca app online (worker pode syncar)
  */
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeaders } from "../_shared/cors.ts";
@@ -87,7 +87,7 @@ async function loadCredential(
     const { data } = await admin
       .from("erp_credential")
       .select("id, millennium_session")
-      .eq("username", opts.username.toUpperCase())
+      .eq("username", opts.username)
       .limit(1)
       .maybeSingle();
     if (data) return data as { id: string; millennium_session: string | null };
@@ -122,7 +122,7 @@ async function saveSessionRow(
     .eq("id", credentialId);
 }
 
-/** Encerra sessão salva na credencial (best-effort). */
+/** Encerra sessao salva na credencial (best-effort). */
 async function releaseStored(
   admin: SupabaseClient,
   opts: { tenantId?: string | null; username?: string },
@@ -210,7 +210,7 @@ Deno.serve(async (req) => {
     return json(r);
   }
 
-  // Heartbeat: app logado → worker pode syncar. Sem presença recente = idle.
+  // Heartbeat: app logado  ->  worker pode syncar. Sem presenca recente = idle.
   if (action === "presence" || action === "heartbeat") {
     if (!tenantId) return json({ error: "no_tenant" }, 400);
     await admin
@@ -224,7 +224,7 @@ Deno.serve(async (req) => {
     return json(r);
   }
 
-  const username = String(body.username ?? body.usuario ?? "").trim().toUpperCase();
+  const username = String(body.username ?? body.usuario ?? "").trim();
   const password = String(body.password ?? body.senha ?? "");
   const includeStores = (body.includeStores ?? body.incluirFiliais) !== false;
   const keepSession = (body.keepSession ?? body.manterSessao) !== false;
@@ -235,7 +235,7 @@ Deno.serve(async (req) => {
     return json(r);
   }
 
-  // Sempre tenta liberar sessão WeDash salva antes de logar (evita busy do nosso sync).
+  // Sempre tenta liberar sessao WeDash salva antes de logar (evita busy do nosso sync).
   let reclaimed = await releaseStored(admin, { tenantId, username });
 
   let session: string | null = null;

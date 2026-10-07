@@ -1,5 +1,5 @@
 /**
- * erp-credential-persist — OWNER onboarding: encrypt ERP password, upsert
+ * erp-credential-persist  -  OWNER onboarding: encrypt ERP password, upsert
  * erp_credential (+ optional stores). Username change wipes tenant sync data.
  */
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
@@ -39,7 +39,7 @@ async function encryptPassword(plain: string, secret: string): Promise<string> {
   return `${b64(iv)}.${b64(cipher)}`;
 }
 
-/** Apaga dados de sync do tenant (troca de usuário Millennium). */
+/** Apaga dados de sync do tenant (troca de usuario Millennium). */
 async function wipeTenantErpSync(
   admin: SupabaseClient,
   tenantId: string,
@@ -96,9 +96,9 @@ Deno.serve(async (req) => {
     millenniumSession?: string;
     stores?: StoreIn[];
     /**
-     * Troca de usuário ERP com lojas em comum (Configurações > Integrações):
-     * mantém dados/lojas e remove só as lojas que o usuário novo não enxerga.
-     * Ausente = comportamento antigo (troca de usuário apaga tudo).
+     * Troca de usuario ERP com lojas em comum (Configuracoes > Integracoes):
+     * mantem dados/lojas e remove so as lojas que o usuario novo nao enxerga.
+     * Ausente = comportamento antigo (troca de usuario apaga tudo).
      */
     userChange?: { mode?: string; removeMillenniumStoreIds?: number[] };
   };
@@ -110,13 +110,13 @@ Deno.serve(async (req) => {
 
   const tenantId = String(body.tenantId ?? "").trim();
   const membershipId = String(body.membershipId ?? "").trim();
-  const username = String(body.username ?? "").trim().toUpperCase();
+  const username = String(body.username ?? "").trim();
   const password = String(body.password ?? "");
   const dedicated = Boolean(body.dedicated);
   const millenniumSession = String(body.millenniumSession ?? "").trim();
   const stores = Array.isArray(body.stores) ? body.stores : [];
 
-  // stores vazias = só credencial (Step2); com lojas = concluir onboarding.
+  // stores vazias = so credencial (Step2); com lojas = concluir onboarding.
   if (!tenantId || !membershipId || !username || !password) {
     return json({ error: "invalid_body" }, 400);
   }
@@ -148,12 +148,10 @@ Deno.serve(async (req) => {
     .eq("tenant_id", tenantId)
     .maybeSingle();
 
-  const prevUser = String((existing as { username?: string } | null)?.username ?? "")
-    .trim()
-    .toUpperCase();
+  const prevUser = String((existing as { username?: string } | null)?.username ?? "").trim();
   const usernameChanged = Boolean(prevUser && prevUser !== username);
   const keepOnChange = usernameChanged && body.userChange?.mode === "keep";
-  // O teste de login já gravou o token NOVO na credencial — não deslogar ele.
+  // O teste de login ja gravou o token NOVO na credencial  -  nao deslogar ele.
   const oldSessionRaw = (existing as { millennium_session?: string | null })?.millennium_session ?? null;
   const oldSession = oldSessionRaw && oldSessionRaw !== millenniumSession ? oldSessionRaw : null;
   if (keepOnChange) {
@@ -183,7 +181,7 @@ Deno.serve(async (req) => {
   }
 
   const ciphertext = await encryptPassword(password, erpSecret);
-  const lightInterval = 5; // alinhado ao cooldown do botão Atualizar (FORCE)
+  const lightInterval = 5; // alinhado ao cooldown do botao Atualizar (FORCE)
 
   const credRow: Record<string, unknown> = {
     tenant_id: tenantId,
@@ -226,7 +224,6 @@ Deno.serve(async (req) => {
           trade_name: s.tradeName ?? s.name ?? String(milleniumId),
           tax_id: s.taxId?.trim() || null,
           timezone: "America/Campo_Grande",
-          active: true,
           has_wpink: Boolean(s.hasWpink),
           ...(s.openedAt && /^\d{4}-\d{2}-\d{2}/.test(s.openedAt)
             ? { opened_at: s.openedAt.slice(0, 10) }
