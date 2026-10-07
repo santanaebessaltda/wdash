@@ -26,7 +26,7 @@ const valid = (over: Partial<ChallengeForm> = {}): ChallengeForm => ({
 describe("emptyChallengeForm", () => {
   it("novo desafio começa em Quantidade de produtos escolhidos · Quem fizer mais, 10 vendas e 1 prêmio em R$ vazio", () => {
     const f = emptyChallengeForm("s1");
-    expect(f).toMatchObject({ storeId: "s1", metric: "QUANTITY", scope: "PRODUCTS", mode: "CONTEST", minSales: "10", managerOn: false });
+    expect(f).toMatchObject({ storeId: "s1", metric: "QUANTITY", scope: "PRODUCTS", mode: "CONTEST", minSales: "", managerOn: false });
     expect(f.prizes).toEqual([{ kind: "MONEY", amount: "", label: "" }]);
   });
 });
@@ -66,14 +66,13 @@ describe("validateChallengeForm", () => {
     expect(challengeFormToInput(valid({ metric: "VALUE", mode: "MINIMUM", target: "1.500,50" })).target).toBe(1500.5);
   });
 
-  it("P.A. e ticket: vendas mínimas são opcionais; se preenchidas, inteiro ≥ 1", () => {
+  it("P.A. e ticket: vendas mínimas são opcionais; 0/vazio = sem piso; se ≥ 1, inteiro", () => {
     expect(validateChallengeForm(valid({ metric: "PA", products: [], minSales: "" })).minSales).toBeUndefined();
     expect(challengeFormToInput(valid({ metric: "PA", products: [], minSales: "" })).minSales).toBeNull();
-    expect(validateChallengeForm(valid({ metric: "TICKET", products: [], minSales: "0" })).minSales).toBe(
-      "Informe um número inteiro a partir de 1.",
-    );
+    expect(validateChallengeForm(valid({ metric: "TICKET", products: [], minSales: "0" })).minSales).toBeUndefined();
+    expect(challengeFormToInput(valid({ metric: "TICKET", products: [], minSales: "0" })).minSales).toBeNull();
     expect(validateChallengeForm(valid({ metric: "PA", products: [], minSales: "2,5" })).minSales).toBe(
-      "Informe um número inteiro a partir de 1.",
+      "Informe um número inteiro a partir de 1 (ou deixe em branco / 0).",
     );
     expect(validateChallengeForm(valid({ metric: "PA", products: [], minSales: "10" })).minSales).toBeUndefined();
   });

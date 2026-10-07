@@ -77,7 +77,7 @@ export function emptyChallengeForm(storeId: string): ChallengeForm {
     products: [],
     categories: [],
     target: "",
-    minSales: DEFAULT_MIN_SALES,
+    minSales: "",
     prizes: [emptyPrize()],
     managerOn: false,
     managerPrize: emptyPrize(),
@@ -149,7 +149,10 @@ export function validateChallengeForm(f: ChallengeForm): ChallengeFormErrors {
   if (scope === "CATEGORIES" && f.categories.length === 0) e.categories = "Escolha pelo menos 1 categoria.";
   if (usesMinSales(f.metric) && f.minSales.trim()) {
     const v = parseNumber(f.minSales);
-    if (v == null || !Number.isInteger(v) || v < 1) e.minSales = "Informe um número inteiro a partir de 1.";
+    // 0 / vazio = sem piso. Se preencheu outro valor, so aceita inteiro >= 1.
+    if (v !== 0 && (v == null || !Number.isInteger(v) || v < 1)) {
+      e.minSales = "Informe um número inteiro a partir de 1 (ou deixe em branco / 0).";
+    }
   }
 
   const target = targetError(f.metric, f.target, modeOf(f) === "MINIMUM");

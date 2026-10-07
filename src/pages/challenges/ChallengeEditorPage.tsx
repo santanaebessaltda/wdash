@@ -208,7 +208,7 @@ export default function ChallengeEditorPage() {
     setForm((f) =>
       f.metric === metric
         ? f
-        : { ...f, metric, target: "", managerTarget: "", minSales: usesMinSales(metric) && !f.minSales.trim() ? "10" : f.minSales },
+        : { ...f, metric, target: "", managerTarget: "", minSales: usesMinSales(metric) ? f.minSales : "" },
     );
   const setPrize = (i: number, p: PrizeForm) => setForm((f) => ({ ...f, prizes: f.prizes.map((x, j) => (j === i ? p : x)) }));
 
@@ -416,11 +416,13 @@ export default function ChallengeEditorPage() {
             {usaVendas && (
               <FormField
                 label="Vendas mínimas para participar"
+                optional
                 error={errors.minSales}
-                hint="Opcional. Se preenchido, só concorre quem tiver pelo menos esse número de vendas."
+                hint="Opcional. Em branco ou 0 = sem piso. Se preencher (≥ 1), só concorre quem tiver pelo menos esse número de vendas."
               >
                 <Input
                   inputMode="numeric"
+                  placeholder="0"
                   value={form.minSales}
                   onChange={(e) => set({ minSales: e.target.value.replace(/\D/g, "").slice(0, 5) })}
                   className={errors.minSales ? "border-bad!" : undefined}
