@@ -1,14 +1,14 @@
 /**
- * Camada de visões da Visão geral. Faz o papel do backend: recebe o escopo
- * (filial, período, divisão) e devolve os blocos com números prontos.
+ * Camada de visoes da Visao geral. Faz o papel do backend: recebe o escopo
+ * (filial, periodo, divisao) e devolve os blocos com numeros prontos.
  *
- * AD-047 — adaptar, não esconder: o gráfico principal é por hora (1 dia) ou
- * por dia (período > 1 dia), inclusive na rede. A régua sempre aparece:
- * % da meta, % da marca na rede, ou participação da marca na loja única.
- * AD-048 — KPIs com subtítulo só do próprio indicador; gráfico compara
- * períodos no mesmo eixo (padrão Finance / Revenue vs expenses).
+ * AD-047  -  adaptar, nao esconder: o grafico principal e por hora (1 dia) ou
+ * por dia (periodo > 1 dia), inclusive na rede. A regua sempre aparece:
+ * % da meta, % da marca na rede, ou participacao da marca na loja unica.
+ * AD-048  -  KPIs com subtitulo so do proprio indicador; grafico compara
+ * periodos no mesmo eixo (padrao Finance / Revenue vs expenses).
  */
-import { categorias, stores, productStores, tarefas, grupos, storeOperatingCostsConfigured, type Division, type Store, type Grupo } from "./stores";
+import { categorias, stores, productStores, tarefas, grupos, storeOperatingCostsConfigured, type Division, type Store } from "./stores";
 import { goalOfStore } from "./goals";
 import { productsOfCategory } from "./products";
 import { buildProductLineIndex } from "./productLines";
@@ -20,6 +20,7 @@ import { dayAggregate, salesDay, salesDays, storeOpen, dayWeight, sumAggregates,
 import { brl, brlCent, dataCompleta, dataCurta, deIso, delta as fmtDelta, diaSemanaCurto, faixaHora, fimDoMes, horaCurta, inicioDoMes, intervaloDias, labelUpper, mesAno, mesCurto, pct, somarDias } from "@/lib/format";
 import type { TintKey } from "@/pages/dashboards/icons";
 import { buildStoreInsight } from "./insight";
+import { brandFromProductCode } from "./costTableFill";
 
 export type PeriodType =
   | "hoje"
@@ -29,12 +30,12 @@ export type PeriodType =
   | "esteTrimestre"
   | "esteSemestre"
   | "esteAno"
-  /** Legados (URL antiga / testes) — ainda resolvem. */
+  /** Legados (URL antiga / testes)  -  ainda resolvem. */
   | "7dias"
   | "mesPassado"
   | "personalizado";
 
-/** Uma cor por loja, fixa pela posição no cadastro: a loja não muda de cor conforme o desempenho, como não muda o "Desktop"/"Mobile" da demo. */
+/** Uma cor por loja, fixa pela posicao no cadastro: a loja nao muda de cor conforme o desempenho, como nao muda o "Desktop"/"Mobile" da demo. */
 const PALETA_LOJAS: TintKey[] = ["acc", "ok", "info", "warn", "bad"];
 
 export interface Period {
@@ -52,7 +53,7 @@ export interface ResolvedPeriod {
   granularidade: Granularity;
   atravessaMeses: boolean;
   ehHoje: boolean;
-  /** Último dia do período = hoje (dia ainda em andamento). */
+  /** Ultimo dia do periodo = hoje (dia ainda em andamento). */
   terminaHoje: boolean;
   mesAberto: boolean;
   rotulo: string;
@@ -61,7 +62,7 @@ export interface ResolvedPeriod {
 export interface Scope {
   /**
    * Lojas selecionadas (multi-select). Array vazio = "Todas as lojas"
-   * (consolida a rede). Um id = visão detalhada daquela loja. Vários =
+   * (consolida a rede). Um id = visao detalhada daquela loja. Varios =
    * soma daquelas lojas. Substitui o antigo `filialId: string | "todas"`.
    */
   filialIds: string[];
@@ -111,13 +112,13 @@ export type TrackStatus = "no_trilho" | "atencao" | "abaixo" | "meta_batida" | "
 
 export interface TrackView {
   status: TrackStatus;
-  /** Percentual do trilho (realizado ÷ meta × fração acumulada da curva), null em competência encerrada. */
+  /** Percentual do trilho (realizado  meta x fracao acumulada da curva), null em competencia encerrada. */
   pctTrilho: number | null;
   competencia: string;
 }
 
 export interface RequiredSalesView {
-  /** (faltaRestante × pesoHoje ÷ Σ pesosRestantes) − realizadoHoje */
+  /** (faltaRestante x pesoHoje   pesosRestantes)  realizadoHoje */
   valor: number | null;
   realizadoHoje: number;
   faltaRestante: number;
@@ -142,7 +143,7 @@ export interface MixView {
   periodo: string;
 }
 
-/** Linha da visão de grupo (LOJA-05): status do trilho por loja + se tem meta. */
+/** Linha da visao de grupo (LOJA-05): status do trilho por loja + se tem meta. */
 export interface StoreSummaryView {
   filialId: string;
   nome: string;
@@ -170,10 +171,10 @@ const DIA_SEMANA_PASSADO = [
   "o sábado passado",
 ];
 
-/** Segunda-feira da semana ISO (PT-BR) que contém `hojeIso`. */
+/** Segunda-feira da semana ISO (PT-BR) que contem `hojeIso`. */
 function inicioDaSemana(hojeIso: string): string {
   const d = deIso(hojeIso);
-  const dow = d.getDay(); // 0=dom … 6=sáb
+  const dow = d.getDay(); // 0=dom ... 6=sab
   const diff = dow === 0 ? -6 : 1 - dow;
   return somarDias(hojeIso, diff);
 }
@@ -272,15 +273,15 @@ export interface SystemAlert {
 /** Um indicador do topo, no formato do KpiTile do template. */
 export interface KpiValor {
   valor: string;
-  delta?: { value: string; positive: boolean; /** Rótulo curto da base, ex.: "ago" / "Segunda passada" */ vs?: string };
-  /** Série curta para o traço de tendência. Só o Faturamento usa. */
+  delta?: { value: string; positive: boolean; /** Rotulo curto da base, ex.: "ago" / "Segunda passada" */ vs?: string };
+  /** Serie curta para o traco de tendencia. So o Faturamento usa. */
   serie?: number[];
-  /** Só o Faturamento sobrescreve rótulo e subtítulo — os outros usam o texto fixo do componente. */
+  /** So o Faturamento sobrescreve rotulo e subtitulo  -  os outros usam o texto fixo do componente. */
   rotulo?: string;
   sub?: string;
 }
 
-/** Segundo tile da fileira: Meta do mês (dia), Projeção (mês) ou Participação da marca (recorte por marca). Mesmo lugar, papel diferente conforme o contexto. */
+/** Segundo tile da fileira: Meta do mes (dia), Projecao (mes) ou Participacao da marca (recorte por marca). Mesmo lugar, papel diferente conforme o contexto. */
 export interface GoalProjectionTile {
   tipo: "meta" | "projecao" | "participacao" | "indisponivel";
   rotulo: string;
@@ -289,12 +290,12 @@ export interface GoalProjectionTile {
   detalhe: string;
 }
 
-/** Card lateral da rede: só enquanto a meta está em jogo (não fechada, não batida antes da hora). */
+/** Card lateral da rede: so enquanto a meta esta em jogo (nao fechada, nao batida antes da hora). */
 export interface RitmoCard {
   realizadoDia: string;
   necessarioDia: string;
   projecaoLinha: string;
-  /** Projeção sobre meta, 0-100, pra desenhar a barra. */
+  /** Projecao sobre meta, 0-100, pra desenhar a barra. */
   barraPct: number;
 }
 
@@ -304,16 +305,16 @@ export interface RulerRow {
   faturamento: string;
   faturamentoValor: number;
   atingimentoPct: number;
-  /** Já inclui o sufixo pronto: "42% da meta" ou "23% da marca". */
+  /** Ja inclui o sufixo pronto: "42% da meta" ou "23% da marca". */
   atingimentoTexto: string;
   barraPct: number;
-  /** Cor de identidade da loja, estável independente da ordenação por desempenho. */
+  /** Cor de identidade da loja, estavel independente da ordenacao por desempenho. */
   tint: TintKey;
   variacaoDia: { value: string; positive: boolean } | null;
   variacaoDiaValor: number | null;
 }
 
-/** Loja fora do ritmo da própria meta: quem precisa de atenção, não quem vendeu mais. */
+/** Loja fora do ritmo da propria meta: quem precisa de atencao, nao quem vendeu mais. */
 export interface AttentionPoint {
   filialId: string;
   nome: string;
@@ -326,13 +327,13 @@ export interface AttentionPoint {
 export interface HourChart {
   horas: number[];
   valores: number[];
-  /** Mesmo dia da semana anterior (semana passada), alinhado por hora — AD-048. */
+  /** Mesmo dia da semana anterior (semana passada), alinhado por hora  -  AD-048. */
   anterior: number[] | null;
   rotuloAnterior: string;
   horaAtual: number | null;
 }
 
-/** Por hora, empilhado por loja — só na rede, período de um dia. Acima de 5 lojas, colapsa: uma cor só, soma simples. */
+/** Por hora, empilhado por loja  -  so na rede, periodo de um dia. Acima de 5 lojas, colapsa: uma cor so, soma simples. */
 export interface NetworkHourChart {
   horas: number[];
   series: { filialId: string; nome: string; tint: TintKey; valores: number[] }[];
@@ -359,7 +360,7 @@ export interface CategoryRow {
   receita: string;
   margem: string;
   margemPct: string;
-  /** Relativa à maior margem em R$ do grupo — pra desenhar a barra da lista. */
+  /** Relativa a maior margem em R$ do grupo  -  pra desenhar a barra da lista. */
   barraPct: number;
 }
 
@@ -373,7 +374,7 @@ export interface GroupRow {
   tarefas: { titulo: string; feita: boolean }[];
 }
 
-/** Checklist do dia: um grupo por linha, cada um com o próprio estado e lista de tarefas. */
+/** Checklist do dia: um grupo por linha, cada um com o proprio estado e lista de tarefas. */
 export interface DayChecklist {
   dataTexto: string;
   grupos: GroupRow[];
@@ -383,13 +384,13 @@ export interface ProjectionView {
   valor: number | null;
   disponivel: boolean;
   encerrada: boolean;
-  /** Índice de desempenho da competência (realizado ÷ meta acumulada), usado para escalar a curva restante. */
+  /** Indice de desempenho da competencia (realizado  meta acumulada), usado para escalar a curva restante. */
   indice: number | null;
-  /** Meta mensal em R$ — para a UI desenhar a barra sem duplicar o pct (AD-029). */
+  /** Meta mensal em R$  -  para a UI desenhar a barra sem duplicar o pct (AD-029). */
   metaValor: number;
 }
 
-/** Período com agregados consolidados para a comparação única (LOJA-06 AC 1-3). */
+/** Periodo com agregados consolidados para a comparacao unica (LOJA-06 AC 1-3). */
 export interface PeriodAggregateComparison {
   inicio: string;
   fim: string;
@@ -430,7 +431,7 @@ export interface StoreView {
   ritmo: RitmoCard | null;
   ritmoAviso: string | null;
   regua: RulerRow[] | null;
-  /** Título da régua: "Desempenho das lojas" (rede) ou "Desempenho da loja" (uma loja). */
+  /** Titulo da regua: "Desempenho das lojas" (rede) ou "Desempenho da loja" (uma loja). */
   reguaTitulo: string;
   pontosAtencao: AttentionPoint[] | null;
   graficoHora: HourChart | null;
@@ -444,14 +445,14 @@ export interface StoreView {
 /* ---------- Helpers ---------- */
 
 function storesInScope(escopo: Scope): Store[] {
-  // Array vazio = "Todas as lojas" → consolida a rede (ERP hidratado, sem misturar mock).
+  // Array vazio = "Todas as lojas"  ->  consolida a rede (ERP hidratado, sem misturar mock).
   const catalog = productStores();
   return escopo.filialIds.length === 0
     ? catalog
     : catalog.filter((f) => escopo.filialIds.includes(f.id));
 }
 
-/** `horaMax` recorta só o último dia (`fim`) — dia equivalente ao "hoje" em andamento. */
+/** `horaMax` recorta so o ultimo dia (`fim`)  -  dia equivalente ao "hoje" em andamento. */
 function agregadoPeriodo(f: Store, inicio: string, fim: string, divisao: Division | null, horaMax?: number): Aggregate {
   return sumAggregates(salesDays(f.id, inicio, fim).map((d) => dayAggregate(d, divisao, d.data === fim ? horaMax : undefined)));
 }
@@ -465,8 +466,8 @@ function pctDelta(atual: number, anterior: number): number {
   return ((atual - anterior) / anterior) * 100;
 }
 
-/** Delta pronto para o KpiTile do template: sem sinal no texto, a seta já indica. */
-/** Unidade do valor comparado no tooltip do badge: R$ (padrão) ou quantidade com unidade (nunca o número solto). */
+/** Delta pronto para o KpiTile do template: sem sinal no texto, a seta ja indica. */
+/** Unidade do valor comparado no tooltip do badge: R$ (padrao) ou quantidade com unidade (nunca o numero solto). */
 export type DeltaUnit = "brl" | "itens" | "vendas" | "pa";
 
 function anteriorComUnidade(v: number, unidade: Exclude<DeltaUnit, "brl">): string {
@@ -488,12 +489,12 @@ export function kpiDelta(atual: number, anterior: number, vs?: string, unidade: 
     positive: v >= 0,
     ...(vs ? { vs } : {}),
     ...(monetario && diferenca > 0 ? { diff: brl(diferenca) } : {}),
-    // Valor do período comparado (tooltip do badge).
+    // Valor do periodo comparado (tooltip do badge).
     anterior: unidade === "brl" ? brlCent(anterior) : anteriorComUnidade(anterior, unidade),
   };
 }
 
-/** Delta em pontos percentuais (margem etc.). Omite ~0 p.p. — mesmo critério do kpiDelta. */
+/** Delta em pontos percentuais (margem etc.). Omite ~0 p.p.  -  mesmo criterio do kpiDelta. */
 export function kpiDeltaPp(atual: number, anterior: number, vs?: string): { value: string; positive: boolean; vs?: string; anterior?: string } | undefined {
   const diff = Math.abs(atual - anterior);
   if (num(diff, 1) === num(0, 1)) return undefined;
@@ -505,16 +506,16 @@ export function kpiDeltaPp(atual: number, anterior: number, vs?: string): { valu
   };
 }
 
-/** Dias com loja aberta que ainda restam no mês corrente. */
+/** Dias com loja aberta que ainda restam no mes corrente. */
 function diasRestantesMes(fs: Store[]): number {
   return intervaloDias(somarDias(TODAY_ISO, 1), fimDoMes(TODAY_ISO)).filter((iso) => fs.some((f) => storeOpen(f, iso))).length;
 }
 
 /**
- * Série curta de faturamento para o traço de tendência do KPI: por hora
- * quando o período é um dia só (truncada na hora atual, sem horas futuras
- * zeradas que pareceriam queda), por dia nos demais períodos. Serve rede,
- * loja e mês com a mesma função, porque soma sobre `fs`.
+ * Serie curta de faturamento para o traco de tendencia do KPI: por hora
+ * quando o periodo e um dia so (truncada na hora atual, sem horas futuras
+ * zeradas que pareceriam queda), por dia nos demais periodos. Serve rede,
+ * loja e mes com a mesma funcao, porque soma sobre `fs`.
  */
 function serieTendenciaAgregada(fs: Store[], periodo: ResolvedPeriod, divisao: Division | null): Aggregate[] {
   if (periodo.granularidade === "dia") {
@@ -545,7 +546,7 @@ function serieTendenciaAgregada(fs: Store[], periodo: ResolvedPeriod, divisao: D
   return dias.map((iso) => sumAggregates(fs.map((f) => dayAggregate(salesDay(f.id, iso)!, divisao))));
 }
 
-/** Uma série por métrica, derivada dos mesmos pontos (por hora no dia, por dia nos demais períodos). */
+/** Uma serie por metrica, derivada dos mesmos pontos (por hora no dia, por dia nos demais periodos). */
 function seriesTendencia(fs: Store[], periodo: ResolvedPeriod, divisao: Division | null): { faturamento?: number[]; ticket?: number[]; pa?: number[]; atendimentos?: number[] } {
   const pontos = serieTendenciaAgregada(fs, periodo, divisao);
   if (pontos.length < 2) return {};
@@ -557,7 +558,7 @@ function seriesTendencia(fs: Store[], periodo: ResolvedPeriod, divisao: Division
   };
 }
 
-/** Expectativa para um dia: média do mesmo dia da semana nas 4 semanas anteriores. */
+/** Expectativa para um dia: media do mesmo dia da semana nas 4 semanas anteriores. */
 function esperadoDia(f: Store, iso: string, divisao: Division | null): number {
   if (!storeOpen(f, iso)) return 0;
   let soma = 0;
@@ -573,8 +574,8 @@ function esperadoDia(f: Store, iso: string, divisao: Division | null): number {
   return n ? soma / n : 0;
 }
 
-/** R$ 85,3k — valor curto, pra não quebrar componente. R$ 1,2M a partir de 1 milhão. Abaixo de R$ 10.000, valor cheio — R$ 3.022, não R$ 3k, que esconderia precisão que cabe na tela. Sem ",0" à toa: só mostra casa decimal quando ela diz algo (283k, não 283,0k). */
-/** Formata número inteiro com separador de milhar (ex.: 5778 → "5.778"). */
+/** R$ 85,3k  -  valor curto, pra nao quebrar componente. R$ 1,2M a partir de 1 milhao. Abaixo de R$ 10.000, valor cheio  -  R$ 3.022, nao R$ 3k, que esconderia precisao que cabe na tela. Sem ",0" a toa: so mostra casa decimal quando ela diz algo (283k, nao 283,0k). */
+/** Formata numero inteiro com separador de milhar (ex.: 5778  ->  "5.778"). */
 export function num(v: number, casas?: number): string {
   if (casas !== undefined) return v.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas });
   return Math.round(v).toLocaleString("pt-BR");
@@ -604,7 +605,7 @@ interface MetaCalculada {
   fechada: boolean;
 }
 
-/** Meta do mês. Sempre mensal, mesmo quando o período exibido é diferente. */
+/** Meta do mes. Sempre mensal, mesmo quando o periodo exibido e diferente. */
 function calcularMeta(fs: Store[], competencia: string): MetaCalculada | null {
   const metasFs = fs.map((f) => goalOfStore(f.id, competencia)).filter((m): m is NonNullable<typeof m> => Boolean(m));
   if (metasFs.length === 0) return null;
@@ -620,7 +621,7 @@ function calcularMeta(fs: Store[], competencia: string): MetaCalculada | null {
   const necessarioDia = fechada || diasRestantes === 0 || realizado >= valor ? null : (valor - realizado) / diasRestantes;
   const atingimentoPct = divSeguro(realizado, valor) * 100;
 
-  // Projeção só a partir do dia 7: cinco dias não projetam trinta.
+  // Projecao so a partir do dia 7: cinco dias nao projetam trinta.
   const diaDoMes = deIso(fechada ? ultimoDia : TODAY_ISO).getDate();
   let projecao: number | null = null;
   let pessimista: number | null = null;
@@ -639,7 +640,7 @@ function calcularMeta(fs: Store[], competencia: string): MetaCalculada | null {
       const feito = dayAggregate(salesDay(f.id, TODAY_ISO)!, null).faturamento;
       restoHoje += Math.max(0, esperadoDia(f, TODAY_ISO, null) - feito);
     }
-    // A faixa se estreita conforme o mês avança: menos dias por vir, menos incerteza.
+    // A faixa se estreita conforme o mes avanca: menos dias por vir, menos incerteza.
     const fracaoRestante = divSeguro(futuro + restoHoje, realizado + futuro + restoHoje);
     const amplitude = 0.06 + 0.22 * fracaoRestante;
     projecao = realizado + futuro + restoHoje;
@@ -651,7 +652,7 @@ function calcularMeta(fs: Store[], competencia: string): MetaCalculada | null {
   return { valor, realizado, atingimentoPct, necessarioDia, diasRestantes, diaDoMes, diasNoMes: deIso(ultimoDia).getDate(), projecao, pessimista, otimista, veredito, fechada };
 }
 
-/** "abaixo do ritmo" / "no ritmo" / "acima do ritmo": realizado por dia contra o necessário por dia, a mesma conta em todo lugar que fala de ritmo. */
+/** "abaixo do ritmo" / "no ritmo" / "acima do ritmo": realizado por dia contra o necessario por dia, a mesma conta em todo lugar que fala de ritmo. */
 function statusRitmo(m: MetaCalculada): string {
   const emJogo = m.necessarioDia !== null;
   const ritmoDiario = m.diaDoMes > 0 ? m.realizado / m.diaDoMes : 0;
@@ -662,10 +663,10 @@ function statusRitmo(m: MetaCalculada): string {
   return "abaixo do ritmo";
 }
 
-/** Período anterior comparável, com o rótulo que a tela exibe. */
+/** Periodo anterior comparavel, com o rotulo que a tela exibe. */
 /**
- * Período anterior equivalente. Se o período atual termina hoje, `horaMax` vale só para o último
- * dia (`fim`) do anterior — o dia equivalente entra até a hora atual, os demais inteiros.
+ * Periodo anterior equivalente. Se o periodo atual termina hoje, `horaMax` vale so para o ultimo
+ * dia (`fim`) do anterior  -  o dia equivalente entra ate a hora atual, os demais inteiros.
  */
 export function previousPeriod(
   periodo: ResolvedPeriod,
@@ -691,7 +692,7 @@ export function previousPeriod(
   return { inicio: somarDias(fim, -(n - 1)), fim, rotulo: `os ${n} dias anteriores`, horaMax };
 }
 
-/** "15/09/2026" para um único dia, "01/09/2026 – 07/09/2026" para um intervalo. */
+/** "15/09/2026" para um unico dia, "01/09/2026  -  07/09/2026" para um intervalo. */
 function formatarIntervalo(inicio: string, fim: string): string {
   return inicio === fim ? dataCompleta(inicio) : `${dataCompleta(inicio)} – ${dataCompleta(fim)}`;
 }
@@ -734,7 +735,7 @@ function montarAlertas(fs: Store[]): SystemAlert[] {
 
 /* ---------- Motor de trilho ---------- */
 
-/** Curva de pesos normalizados: `peso(iso)` soma 1 nos dias abertos; `pesoBruto` é o valor pré-normalização. */
+/** Curva de pesos normalizados: `peso(iso)` soma 1 nos dias abertos; `pesoBruto` e o valor pre-normalizacao. */
 export interface RevenueCurve {
   peso: (iso: string) => number;
   pesoBruto: (iso: string) => number;
@@ -742,9 +743,9 @@ export interface RevenueCurve {
 }
 
 /**
- * curvaReceita (AD-034): pesos diários normalizados (soma = 1 nos dias abertos)
- * derivados do histórico real de faturamento — média simples das quatro
- * ocorrências equivalentes anteriores do mesmo dia da semana; menos ocorrências
+ * curvaReceita (AD-034): pesos diarios normalizados (soma = 1 nos dias abertos)
+ * derivados do historico real de faturamento  -  media simples das quatro
+ * ocorrencias equivalentes anteriores do mesmo dia da semana; menos ocorrencias
  * usa o que houver; nenhuma usa `pesoDia` como base.
  */
 export function revenueCurve(fs: Store[], competencia: string): RevenueCurve {
@@ -772,25 +773,25 @@ export function revenueCurve(fs: Store[], competencia: string): RevenueCurve {
   };
 }
 
-/** As últimas `n` ocorrências anteriores do mesmo dia da semana, com loja aberta (AD-034). */
+/** As ultimas `n` ocorrencias anteriores do mesmo dia da semana, com loja aberta (AD-034). */
 function ocorrenciasAnteriores(f: Store, iso: string, n: number): DiaVendasVendas[] {
   const out: DiaVendasVendas[] = [];
   for (let i = 7; out.length < n && i <= 28; i += 7) {
     const ref = somarDias(iso, -i);
     const d = salesDay(f.id, ref);
-    // Só contam ocorrências com loja aberta e registro no histórico (undefined antes do início).
+    // So contam ocorrencias com loja aberta e registro no historico (undefined antes do inicio).
     if (d && storeOpen(f, ref)) out.push(d);
   }
   return out;
 }
 
-/** Tipo mínimo de DiaVendas usado pelas curvas. */
+/** Tipo minimo de DiaVendas usado pelas curvas. */
 interface DiaVendasVendas {
   data: string;
   total: { faturamento: number; atendimentos: number };
 }
 
-/** Meta acumulada esperada até hoje: meta mensal × fração acumulada da curvaReceita (LOJA-01 AC 2-7). */
+/** Meta acumulada esperada ate hoje: meta mensal x fracao acumulada da curvaReceita (LOJA-01 AC 2-7). */
 function metaAcumuladaAteHoje(fs: Store[], competencia: string, metaValor: number, hojeIso: string): number {
   const curva = revenueCurve(fs, competencia);
   const primeiroDia = `${competencia}-01`;
@@ -799,7 +800,7 @@ function metaAcumuladaAteHoje(fs: Store[], competencia: string, metaValor: numbe
   return metaValor * fração;
 }
 
-/** Status do trilho do mês (LOJA-01). */
+/** Status do trilho do mes (LOJA-01). */
 function calcularTrilho(fs: Store[], competencia: string): TrackView | null {
   const metasFs = fs.map((f) => goalOfStore(f.id, competencia)).filter((m): m is NonNullable<typeof m> => Boolean(m));
   if (metasFs.length === 0) return null;
@@ -826,7 +827,7 @@ function calcularTrilho(fs: Store[], competencia: string): TrackView | null {
   return { status, pctTrilho, competencia };
 }
 
-/** Venda necessária hoje (LOJA-02): (falta × pesoHoje ÷ Σ pesos restantes) − realizadoHoje. */
+/** Venda necessaria hoje (LOJA-02): (falta x pesoHoje   pesos restantes)  realizadoHoje. */
 function vendaNecessariaHoje(fs: Store[], competencia: string): RequiredSalesView | null {
   const metasFs = fs.map((f) => goalOfStore(f.id, competencia)).filter((m): m is NonNullable<typeof m> => Boolean(m));
   if (metasFs.length === 0) return { valor: null, realizadoHoje: 0, faltaRestante: 0, diasRestantes: 0, diaReferencia: TODAY_ISO, cumpridaHoje: false, metaMesAtingida: false, semMeta: true };
@@ -845,11 +846,11 @@ function vendaNecessariaHoje(fs: Store[], competencia: string): RequiredSalesVie
   const abertosRestantes = intervaloDias(TODAY_ISO, ultimoDia).filter((iso) => fs.some((f) => storeOpen(f, iso)));
   if (abertosRestantes.length === 0) return null;
 
-  // Dia de referência: hoje se aberto, senão o próximo dia aberto (LOJA-02 AC 5).
+  // Dia de referencia: hoje se aberto, senao o proximo dia aberto (LOJA-02 AC 5).
   const diaRef = fs.some((f) => storeOpen(f, TODAY_ISO)) ? TODAY_ISO : abertosRestantes[0];
   const pesoHoje = curva.peso(diaRef);
   const somaPesosRest = abertosRestantes.reduce((s, iso) => s + curva.peso(iso), 0);
-  const faltaRestanteRef = valor - realizado; // gap absoluto no mês (sem descontar a projeção futura)
+  const faltaRestanteRef = valor - realizado; // gap absoluto no mes (sem descontar a projecao futura)
   const necessarioBruto = somaPesosRest > 0 ? (faltaRestanteRef * pesoHoje) / somaPesosRest : 0;
   const valorHoje = Math.max(0, necessarioBruto - (diaRef === TODAY_ISO ? realizadoHoje : 0));
 
@@ -865,7 +866,7 @@ function vendaNecessariaHoje(fs: Store[], competencia: string): RequiredSalesVie
   };
 }
 
-/** Projeção de fechamento (LOJA-03): índice da competência × curva restante, com gate do dia 7. */
+/** Projecao de fechamento (LOJA-03): indice da competencia x curva restante, com gate do dia 7. */
 function calcularProjecao(fs: Store[], competencia: string): ProjectionView {
   const metasFs = fs.map((f) => goalOfStore(f.id, competencia)).filter((m): m is NonNullable<typeof m> => Boolean(m));
   const valor = metasFs.reduce((s, m) => s + m.valorLoja, 0);
@@ -889,7 +890,7 @@ function calcularProjecao(fs: Store[], competencia: string): ProjectionView {
   return { valor: projecao, disponivel: true, encerrada: false, indice, metaValor: valor };
 }
 
-/** curvaAtendimentos (AD-034): pesos diários normalizados a partir do histórico de atendimentos. */
+/** curvaAtendimentos (AD-034): pesos diarios normalizados a partir do historico de atendimentos. */
 function curvaAtendimentos(fs: Store[], competencia: string): RevenueCurve {
   const primeiroDia = `${competencia}-01`;
   const ultimoDia = fimDoMes(primeiroDia);
@@ -915,7 +916,7 @@ function curvaAtendimentos(fs: Store[], competencia: string): RevenueCurve {
   };
 }
 
-/** Diagnóstica a lacuna de receita entre fluxo e ticket (LOJA-04 AC 1-9). */
+/** Diagnostica a lacuna de receita entre fluxo e ticket (LOJA-04 AC 1-9). */
 function calcularLacuna(fs: Store[], competencia: string, pctTrilho: number | null): GapView {
   const metasFs = fs.map((f) => goalOfStore(f.id, competencia)).filter((m): m is NonNullable<typeof m> => Boolean(m));
   if (metasFs.length === 0) return { exibir: false, efeitoFluxo: 0, efeitoTicket: 0, gapTotal: 0, alavancaDominante: null, semMeta: true };
@@ -926,31 +927,31 @@ function calcularLacuna(fs: Store[], competencia: string, pctTrilho: number | nu
   const fechada = ultimoDia < TODAY_ISO;
   const fimReal = fechada ? ultimoDia : TODAY_ISO;
 
-  // Atendimentos esperados no mês: soma da curvaAtendimentos (peso normalizado × faturamento? Não—
-  // é o total esperado de atendimentos do mês). O total esperado = (média diária × dias abertos).
+  // Atendimentos esperados no mes: soma da curvaAtendimentos (peso normalizado x faturamento? Nao - 
+  // e o total esperado de atendimentos do mes). O total esperado = (media diaria x dias abertos).
   const cA = curvaAtendimentos(fs, competencia);
   const cR = revenueCurve(fs, competencia);
-  // Total esperado do mês = soma dos pesos brutos de atendimentos (cada dia = média de 4 semanas).
-  const totalEsperadoMes = cA.soma; // soma dos pesos brutos = média diária × nº dias — já é n atendimentos esperados.
+  // Total esperado do mes = soma dos pesos brutos de atendimentos (cada dia = media de 4 semanas).
+  const totalEsperadoMes = cA.soma; // soma dos pesos brutos = media diaria x n dias  -  ja e n atendimentos esperados.
   const ticketMeta = totalEsperadoMes > 0 ? meta / totalEsperadoMes : 0;
 
-  // Atendimentos esperados até hoje = total mensal × fração acumulada da curvaReceita.
+  // Atendimentos esperados ate hoje = total mensal x fracao acumulada da curvaReceita.
   const fracaoAcumReceita = intervaloDias(primeiroDia, fimReal).reduce((s, iso) => s + cR.peso(iso), 0);
   const atendimentosEsperadosAteHoje = totalEsperadoMes * fracaoAcumReceita;
 
-  // Atendimentos realizados até hoje.
+  // Atendimentos realizados ate hoje.
   const atendimentosRealizadosAteHoje = fs.reduce((s, f) => s + agregadoPeriodo(f, primeiroDia, fimReal, null).atendimentos, 0);
 
-  // Ticket realizado até hoje.
+  // Ticket realizado ate hoje.
   const realizadoReceita = fs.reduce((s, f) => s + agregadoPeriodo(f, primeiroDia, fimReal, null).faturamento, 0);
   const ticketRealAteHoje = atendimentosRealizadosAteHoje > 0 ? realizadoReceita / atendimentosRealizadosAteHoje : 0;
 
-  // Efeitos (LOJA-04 AC 5-6); interação já contida no efeito fluxo.
+  // Efeitos (LOJA-04 AC 5-6); interacao ja contida no efeito fluxo.
   const efeitoFluxo = (atendimentosEsperadosAteHoje - atendimentosRealizadosAteHoje) * ticketMeta;
   const efeitoTicket = (ticketMeta - ticketRealAteHoje) * atendimentosRealizadosAteHoje;
   const gapTotal = meta * fracaoAcumReceita - realizadoReceita;
 
-  // Alavanca dominante (AC 8-9): apenas efeitos positivos; maior ≥ 60% da soma dos positivos.
+  // Alavanca dominante (AC 8-9): apenas efeitos positivos; maior  60% da soma dos positivos.
   const positivos = [efeitoFluxo, efeitoTicket].filter((e) => e > 0);
   const somaPositivos = positivos.reduce((s, e) => s + e, 0);
   let alavancaDominante: GapView["alavancaDominante"] = null;
@@ -970,7 +971,7 @@ function calcularLacuna(fs: Store[], competencia: string, pctTrilho: number | nu
   };
 }
 
-/** Mix do período/marca selecionados: participação por categoria com margem (LOJA-04 AC 10). */
+/** Mix do periodo/marca selecionados: participacao por categoria com margem (LOJA-04 AC 10). */
 function montarMix(fs: Store[], inicio: string, fim: string, divisao: Division | null, rotuloPeriodo: string): MixView {
   const catResumo = new Map<number, { receita: number; cmv: number }>();
   for (const f of fs) {
@@ -999,7 +1000,7 @@ function montarMix(fs: Store[], inicio: string, fim: string, divisao: Division |
   return { itens, periodo: rotuloPeriodo };
 }
 
-/** Visão de grupo (LOJA-05): status do trilho por loja na competência. */
+/** Visao de grupo (LOJA-05): status do trilho por loja na competencia. */
 function montarLojasGrupo(fs: Store[], competencia: string): StoreSummaryView[] {
   return fs.map((f) => {
     const trilho = calcularTrilho([f], competencia);
@@ -1036,13 +1037,13 @@ export function buildStoreView(escopo: Scope): StoreView {
   const kpiTicket: KpiValor = { valor: brl(ticket), delta: temComparacao ? kpiDelta(ticket, ticketAnt, vsRotulo) : undefined, serie: series.ticket };
   const kpiPA: KpiValor = { valor: num(pa, 2), delta: temComparacao ? kpiDelta(pa, paAnt, vsRotulo, "pa") : undefined, serie: series.pa };
 
-  // Meta é sempre mensal. Divisão ou período cruzando meses desligam.
+  // Meta e sempre mensal. Divisao ou periodo cruzando meses desligam.
   const competencia = periodo.granularidade === "mes" ? periodo.inicio.slice(0, 7) : TODAY_ISO.slice(0, 7);
   const semMetaPeriodo = periodo.atravessaMeses && periodo.granularidade !== "mes";
   const metaCalc = divisao || semMetaPeriodo ? null : calcularMeta(fs, competencia);
 
-  // Subtítulos: cada KPI fala só do próprio indicador (AD-048).
-  // Faturamento NÃO repete atendimentos nem “precisa R$/dia” (régua/meta cobrem ritmo).
+  // Subtitulos: cada KPI fala so do proprio indicador (AD-048).
+  // Faturamento NAO repete atendimentos nem "precisa R$/dia" (regua/meta cobrem ritmo).
   const nDiasPeriodo = intervaloDias(periodo.inicio, periodo.fim).length;
   let subFaturamento: string | undefined;
   if (!divisao && metaCalc) {
@@ -1064,13 +1065,13 @@ export function buildStoreView(escopo: Scope): StoreView {
     valor: brlK(atual.faturamento),
     delta: temComparacao ? kpiDelta(atual.faturamento, anterior.faturamento, vsRotulo) : undefined,
     serie: series.faturamento,
-    // O período já está no filtro logo acima do card; sem sufixo "· HOJE".
-    // A marca selecionada continua no rótulo porque muda o dado.
+    // O periodo ja esta no filtro logo acima do card; sem sufixo " |  HOJE".
+    // A marca selecionada continua no rotulo porque muda o dado.
     rotulo: `FATURAMENTO${divisao ? ` ${divisao}` : ""}`,
     sub: subFaturamento,
   };
 
-  // Segundo tile: Participação da marca quando filtrado, Meta/Projeção quando não.
+  // Segundo tile: Participacao da marca quando filtrado, Meta/Projecao quando nao.
   let tileMeta: GoalProjectionTile | null = null;
   if (divisao) {
     const totalTudo = sumAggregates(fs.map((f) => agregadoPeriodo(f, periodo.inicio, periodo.fim, null))).faturamento;
@@ -1110,10 +1111,10 @@ export function buildStoreView(escopo: Scope): StoreView {
     }
   }
 
-  // Ritmo da meta: aparece em qualquer visão (rede ou loja) sempre que houver
-  // uma meta mensal aplicável — some só com marca filtrada ou período cruzando
-  // meses (metaCalc já vem null nesses dois casos). Sem meta cadastrada, uma
-  // linha de aviso no lugar do card. Mês fechado: "Projeção" vira "Fechou em".
+  // Ritmo da meta: aparece em qualquer visao (rede ou loja) sempre que houver
+  // uma meta mensal aplicavel  -  some so com marca filtrada ou periodo cruzando
+  // meses (metaCalc ja vem null nesses dois casos). Sem meta cadastrada, uma
+  // linha de aviso no lugar do card. Mes fechado: "Projecao" vira "Fechou em".
   let ritmo: RitmoCard | null = null;
   let ritmoAviso: string | null = null;
   if (!divisao && !semMetaPeriodo) {
@@ -1140,12 +1141,12 @@ export function buildStoreView(escopo: Scope): StoreView {
   if (semMetaPeriodo) avisos.push("Meta e lucro bruto são mensais e não aparecem neste período.");
   if (divisao) avisos.push(`Marca ${divisao} selecionada. Meta e projeção são da loja inteira e não aparecem no recorte por marca.`);
 
-  /* --- Régua de lojas e pontos de atenção --- */
+  /* --- Regua de lojas e pontos de atencao --- */
   let regua: RulerRow[] | null = null;
   let pontosAtencao: AttentionPoint[] | null = null;
   let reguaTitulo: string = "Desempenho das lojas";
-  // Sempre adaptamos ao filtro (AD-047): rede = uma linha por loja; loja única =
-  // painel de meta (ou de participação da marca, se houver marca). Nunca some.
+  // Sempre adaptamos ao filtro (AD-047): rede = uma linha por loja; loja unica =
+  // painel de meta (ou de participacao da marca, se houver marca). Nunca some.
   if (visao === "rede" || unica) {
     const variacaoBadge = (v: number | null): { value: string; positive: boolean } | null => {
       if (v === null) return null;
@@ -1161,7 +1162,7 @@ export function buildStoreView(escopo: Scope): StoreView {
     };
 
     if (unica && divisao) {
-      // Loja + marca: painel da participação da marca no faturamento da loja.
+      // Loja + marca: painel da participacao da marca no faturamento da loja.
       const fatMarca = agregadoPeriodo(unica, periodo.inicio, periodo.fim, divisao).faturamento;
       const fatLoja = agregadoPeriodo(unica, periodo.inicio, periodo.fim, null).faturamento;
       const participacao = fatLoja > 0 ? (fatMarca / fatLoja) * 100 : 0;
@@ -1183,7 +1184,7 @@ export function buildStoreView(escopo: Scope): StoreView {
       ];
       pontosAtencao = null;
     } else if (divisao) {
-      // Rede + marca: a barra vira participação daquela loja no total da marca.
+      // Rede + marca: a barra vira participacao daquela loja no total da marca.
       const receitas = fs.map((f) => ({ f, receita: agregadoPeriodo(f, periodo.inicio, periodo.fim, divisao).faturamento }));
       const totalMarca = receitas.reduce((s, r) => s + r.receita, 0);
       regua = receitas
@@ -1207,8 +1208,8 @@ export function buildStoreView(escopo: Scope): StoreView {
         }));
       pontosAtencao = null;
     } else {
-      // Título no singular quando o escopo tem uma loja só (painel de meta dela);
-      // plural na rede. Não há variação de hoje nem ordenação na loja única.
+      // Titulo no singular quando o escopo tem uma loja so (painel de meta dela);
+      // plural na rede. Nao ha variacao de hoje nem ordenacao na loja unica.
       reguaTitulo = fs.length > 1 ? "Desempenho das lojas" : "Desempenho da loja";
       const base = fs.map((f) => {
         const m = calcularMeta([f], competencia);
@@ -1232,8 +1233,8 @@ export function buildStoreView(escopo: Scope): StoreView {
           variacaoDiaValor: b.variacaoDiaValor,
         }));
 
-      // Ordenada por desempenho (régua), não por faturamento: quem está pior no
-      // ritmo da própria meta aparece primeiro, seja loja grande ou pequena.
+      // Ordenada por desempenho (regua), nao por faturamento: quem esta pior no
+      // ritmo da propria meta aparece primeiro, seja loja grande ou pequena.
       pontosAtencao = base
         .filter((b) => b.m?.veredito === "nao_atinge" || b.m?.veredito === "incerto")
         .sort((a, b) => a.atingimento - b.atingimento)
@@ -1248,7 +1249,7 @@ export function buildStoreView(escopo: Scope): StoreView {
     }
   }
 
-  /* --- Por hora: loja única OU rede (soma) — mesmo gráfico AreaLine com comparação (AD-048) --- */
+  /* --- Por hora: loja unica OU rede (soma)  -  mesmo grafico AreaLine com comparacao (AD-048) --- */
   let graficoHora: HourChart | null = null;
   if (periodo.granularidade === "dia" && fs.length > 0) {
     const refIso = somarDias(periodo.inicio, -7);
@@ -1283,10 +1284,10 @@ export function buildStoreView(escopo: Scope): StoreView {
     };
   }
 
-  /* Rede por loja empilhada: não usada na Visão geral — o gráfico principal unificou em AreaLine (AD-048). */
+  /* Rede por loja empilhada: nao usada na Visao geral  -  o grafico principal unificou em AreaLine (AD-048). */
   const graficoHoraRede: NetworkHourChart | null = null;
 
-  /* --- Evolução diária: período > 1 dia (loja única OU rede) — AD-047 --- */
+  /* --- Evolucao diaria: periodo > 1 dia (loja unica OU rede)  -  AD-047 --- */
   let evolucao: EvolutionChart | null = null;
   if (periodo.granularidade !== "dia") {
     const dias = intervaloDias(periodo.inicio, periodo.fim);
@@ -1306,8 +1307,8 @@ export function buildStoreView(escopo: Scope): StoreView {
   if (unica && (periodo.tipo === "hoje" || periodo.tipo === "ontem")) {
     const gruposDaLoja = grupos.filter((x) => x.filialId === unica.id).sort((a, b) => a.horaInicio - b.horaInicio);
     if (gruposDaLoja.length > 0) {
-      // Mock de conclusão: grupo encerrado sai como tudo feito, grupo em
-      // andamento usa uma marcação fixa por grupo, grupo futuro nada feito.
+      // Mock de conclusao: grupo encerrado sai como tudo feito, grupo em
+      // andamento usa uma marcacao fixa por grupo, grupo futuro nada feito.
       const feitasEmAndamento: Record<string, string[]> = { "t-f1-manha": ["tf1", "tf2", "tf3", "tf5"], "t-f2-tarde": ["tf14"] };
       const linhas: GroupRow[] = gruposDaLoja.map((t) => {
         const estado: GroupRow["estado"] = periodo.tipo === "ontem" ? "encerrado" : CURRENT_HOUR >= t.horaFim ? "encerrado" : CURRENT_HOUR >= t.horaInicio ? "andamento" : "naoComecou";
@@ -1328,7 +1329,7 @@ export function buildStoreView(escopo: Scope): StoreView {
     }
   }
 
-  /* --- Lucro bruto e categorias: período de mês, dentro de uma loja. Continuam filtrados por marca. --- */
+  /* --- Lucro bruto e categorias: periodo de mes, dentro de uma loja. Continuam filtrados por marca. --- */
   let lucroBruto: StoreView["lucroBruto"] = null;
   let cats: CategoryRow[] | null = null;
   if (visao === "periodo" && periodo.granularidade === "mes") {
@@ -1372,7 +1373,7 @@ export function buildStoreView(escopo: Scope): StoreView {
     }));
   }
 
-  // Motor de trilho: sempre da competência do período (AD-023).
+  // Motor de trilho: sempre da competencia do periodo (AD-023).
   const competenciaTrilho = periodo.granularidade === "mes" ? periodo.inicio.slice(0, 7) : TODAY_ISO.slice(0, 7);
   const trilho = calcularTrilho(fs, competenciaTrilho);
   const vendaNecessaria = trilho ? vendaNecessariaHoje(fs, competenciaTrilho) : null;
@@ -1431,7 +1432,7 @@ export function buildStoreView(escopo: Scope): StoreView {
 }
 
 /* ================================================================
- * TELA FINANCEIRO — camada de dados (montarFinanceiroView)
+ * TELA FINANCEIRO  -  camada de dados (montarFinanceiroView)
  * ================================================================ */
 
 export interface FinanceKpi {
@@ -1449,8 +1450,8 @@ export interface CostProfitMonth {
   lucro: number;
   margemPct: number;
   faturamento: number;
-  futuro?: boolean; // Hora de hoje que ainda não chegou
-  faixa?: string; // Eixo hora: "21h às 22h" (tooltip)
+  futuro?: boolean; // Hora de hoje que ainda nao chegou
+  faixa?: string; // Eixo hora: "21h as 22h" (tooltip)
 }
 
 export interface OpResultMonth {
@@ -1459,8 +1460,8 @@ export interface OpResultMonth {
   resultado: number;
   margemOpPct: number;
   faturamento: number;
-  futuro?: boolean; // Hora de hoje que ainda não chegou
-  faixa?: string; // Eixo hora: "21h às 22h" (tooltip)
+  futuro?: boolean; // Hora de hoje que ainda nao chegou
+  faixa?: string; // Eixo hora: "21h as 22h" (tooltip)
 }
 
 export interface PaymentMethodRevenue {
@@ -1497,9 +1498,9 @@ export interface FinanceView {
   escopo: Scope;
   periodo: ResolvedPeriod;
   kpis: FinanceKpi[];
-  /** Eixo dos cards de tendência (CMV/Lucro e Resultado). */
+  /** Eixo dos cards de tendencia (CMV/Lucro e Resultado). */
   eixoSerie: SeriesAxis;
-  /** Ex.: "Hoje · por hora". */
+  /** Ex.: "Hoje  |  por hora". */
   rotuloSerie: string;
   /** True quando custos fixos foram rateados no eixo (hora/dia). */
   resultadoRateado: boolean;
@@ -1507,22 +1508,22 @@ export interface FinanceView {
   resultadoOperacional: OpResultMonth[];
   deltaResultado?: { value: string; positive: boolean; vs?: string; diff?: string };
   formasPagamento: PaymentMethodRevenue[];
-  /** Só quando filtro = todas as marcas; null se WEPINK ou WPINK isolada. */
+  /** So quando filtro = todas as marcas; null se WEPINK ou WPINK isolada. */
   faturamentoPorMarca: RevenueByBrand[] | null;
   custosFixosFranquia: FixedCostRow[];
-  /** Alguma loja do escopo tem custo da operação preenchido (senão o card mostra "Custos não configurados"). */
+  /** Alguma loja do escopo tem custo da operacao preenchido (senao o card mostra "Custos nao configurados"). */
   custosConfigurados: boolean;
   evolucaoMensal: MonthlyEvolutionRow[];
-  /** Card só em período mensal (ver `monthlyEvolutionMonths`). */
+  /** Card so em periodo mensal (ver `monthlyEvolutionMonths`). */
   mostrarEvolucaoMensal: boolean;
   rotuloEvolucaoMensal: string;
-  /** Faixa WPINK (Faturamento · CMV · Lucro · Margem) — só se alguma loja do escopo tem a marca. */
+  /** Faixa WPINK (Faturamento  |  CMV  |  Lucro  |  Margem)  -  so se alguma loja do escopo tem a marca. */
   kpisWpink: OverviewKpiWpink[];
-  /** Itens vendidos (mesma regra de comparativo dos KPIs) — usado pela tela Produtos. */
+  /** Itens vendidos (mesma regra de comparativo dos KPIs)  -  usado pela tela Produtos. */
   kpiItens?: FinanceKpi;
-  /** Faturamento do período (R$) — aviso "sem vendas" independente do eixo. */
+  /** Faturamento do periodo (R$)  -  aviso "sem vendas" independente do eixo. */
   faturamentoAtual?: number;
-  /** Produtos vendidos no período com custo R$ 0 no Millennium (maior faturamento primeiro). */
+  /** Produtos vendidos no periodo com custo R$ 0 no Millennium (maior faturamento primeiro). */
   produtosSemCusto?: ProductWithoutCost[];
 }
 
@@ -1533,7 +1534,7 @@ const CORES_FORMAS: Record<string, string> = {
   Dinheiro: "var(--warn)",
 };
 
-/** Percentuais mockados de custos variáveis sobre faturamento (parametrização futura). */
+/** Percentuais mockados de custos variaveis sobre faturamento (parametrizacao futura). */
 const PCT_CUSTOS_FIXOS = {
   aluguelShopping: 5,
   royaltiesWepink: 5,
@@ -1542,13 +1543,13 @@ const PCT_CUSTOS_FIXOS = {
   taxaMktWpink: 2,
 } as const;
 
-/** Aluguel fixo mockado por filial (mensal). Variáveis (% sobre fat) são calculadas no view. */
+/** Aluguel fixo mockado por filial (mensal). Variaveis (% sobre fat) sao calculadas no view. */
 function aluguelFixoMock(f: Store): number {
   const base = f.id === "f1" ? 6100 : 3450;
   return Math.round(18000 * (base / 5000));
 }
 
-/** Custos da loja (Configurações > Lojas); campo vazio cai no padrão mockado. */
+/** Custos da loja (Configuracoes > Lojas); campo vazio cai no padrao mockado. */
 function custosDaFilial(f: Store) {
   const c = f.custos;
   return {
@@ -1572,9 +1573,9 @@ const PRESETS_MENSAIS = new Set<PeriodType>(["esteMes", "mesPassado", "esteTrime
 const MESES_ANTERIORES_EVOLUCAO = 5;
 
 /**
- * Meses da Evolução mensal. Período mensal pelo calendário (preset de mês/trimestre/semestre/ano
- * ou personalizado do dia 1 ao fim do mês / hoje) — nunca por contagem de dias (fevereiro tem 28).
- * 1 mês só → ele + 5 anteriores (comparação); vários meses ou eixo por mês → meses do período.
+ * Meses da Evolucao mensal. Periodo mensal pelo calendario (preset de mes/trimestre/semestre/ano
+ * ou personalizado do dia 1 ao fim do mes / hoje)  -  nunca por contagem de dias (fevereiro tem 28).
+ * 1 mes so  ->  ele + 5 anteriores (comparacao); varios meses ou eixo por mes  ->  meses do periodo.
  */
 export function monthlyEvolutionMonths(
   periodo: ResolvedPeriod,
@@ -1600,7 +1601,7 @@ export function monthlyEvolutionMonths(
   return { meses: [], comAnteriores: false };
 }
 
-/** Nome do mês na Evolução mensal; ano só se a lista atravessa anos; recorte "(01 a 26)" em mês parcial. */
+/** Nome do mes na Evolucao mensal; ano so se a lista atravessa anos; recorte "(01 a 26)" em mes parcial. */
 function rotuloMesEvolucao(mes: string, meses: string[], ini?: string, fim?: string): string {
   const nome = mesAno(`${mes}-01`);
   const base = meses[0]!.slice(0, 4) === meses[meses.length - 1]!.slice(0, 4) ? nome.split(" de ")[0]! : nome;
@@ -1612,7 +1613,7 @@ function rotuloEvolucao(periodo: ResolvedPeriod, comAnteriores: boolean): string
   return comAnteriores ? `${mesAno(periodo.inicio)} e meses anteriores` : periodo.rotulo;
 }
 
-/** Eixo dos cards de tendência: 1 dia → hora; 2–31 dias → dia; >31 dias → mês. */
+/** Eixo dos cards de tendencia: 1 dia  ->  hora; 2 - 31 dias  ->  dia; >31 dias  ->  mes. */
 export type SeriesAxis = "hora" | "dia" | "mes";
 
 export function seriesAxisForPeriod(periodo: ResolvedPeriod): SeriesAxis {
@@ -1622,7 +1623,7 @@ export function seriesAxisForPeriod(periodo: ResolvedPeriod): SeriesAxis {
   return "mes";
 }
 
-/** Subtítulo dos cards de série (ex.: "Hoje · por hora"). */
+/** Subtitulo dos cards de serie (ex.: "Hoje  |  por hora"). */
 export function seriesAxisLabel(periodo: ResolvedPeriod, eixo: SeriesAxis): string {
   if (eixo === "hora") return `${periodo.rotulo} · por hora`;
   if (eixo === "dia") return `${periodo.rotulo} · por dia`;
@@ -1656,7 +1657,7 @@ function agregadoMes(fs: Store[], mes: string, divisao: Division | null): Aggreg
   const fim = fimDoMes(inicio);
   const agg = sumAggregates(fs.map((f) => agregadoPeriodo(f, inicio, fim, divisao)));
   const custo = custoPeriodo(fs, inicio, fim, divisao).cmv;
-  // Soma das formas de pagamento no mês.
+  // Soma das formas de pagamento no mes.
   const dias = intervaloDias(inicio, fim);
   const porMeio: Record<string, number> = {};
   for (const f of fs) {
@@ -1692,7 +1693,7 @@ export function buildFinanceView(escopo: Scope, aggs?: FinanceAggInput | null): 
   const temComp = anterior.atendimentos > 0;
   const vsRotulo = temComp ? ant.rotulo : undefined;
 
-  // Séries de tendência (últimos 7 pontos do período, ou 7 dias se período curto).
+  // Series de tendencia (ultimos 7 pontos do periodo, ou 7 dias se periodo curto).
   const serieFaturamento = (seriesTendencia(fs, periodo, divisao).faturamento ?? []).slice(-7);
   const serieCmv = serieFaturamento.map((_, i) => {
     const frac = custoAtual / (atual.faturamento || 1);
@@ -1732,17 +1733,17 @@ export function buildFinanceView(escopo: Scope, aggs?: FinanceAggInput | null): 
     },
   ];
 
-  // Série de tendência: eixo hora / dia / mês conforme o período filtrado.
+  // Serie de tendencia: eixo hora / dia / mes conforme o periodo filtrado.
   const eixoSerie = seriesAxisForPeriod(periodo);
   const rotuloSerie = seriesAxisLabel(periodo, eixoSerie);
   const resultadoRateado = eixoSerie !== "mes";
 
-  // Faturamento por marca (sempre calculado; donut só quando filtro = todas).
+  // Faturamento por marca (sempre calculado; donut so quando filtro = todas).
   const fatWepink = sumAggregates(fs.map((f) => agregadoPeriodo(f, periodo.inicio, periodo.fim, "WEPINK"))).faturamento;
   const fatWpink = sumAggregates(fs.map((f) => agregadoPeriodo(f, periodo.inicio, periodo.fim, "WPINK"))).faturamento;
   const fatTodasMarcas = fatWepink + fatWpink;
 
-  // Custos por loja (Configurações > Lojas): aluguel fixo compartilhado; % só sobre a(s) marca(s) do filtro.
+  // Custos por loja (Configuracoes > Lojas): aluguel fixo compartilhado; % so sobre a(s) marca(s) do filtro.
   const incluiWepink = !divisao || divisao === "WEPINK";
   const incluiWpink = !divisao || divisao === "WPINK";
   const custosLojas = fs.map((f) => ({
@@ -1870,7 +1871,7 @@ export function buildFinanceView(escopo: Scope, aggs?: FinanceAggInput | null): 
   const resultadoAnterior = lucroAnterior - totalCustosFixos;
   const deltaResultado = temComp ? kpiDelta(resultadoAtual, resultadoAnterior, vsRotulo) : undefined;
 
-  // Formas de pagamento no período.
+  // Formas de pagamento no periodo.
   const diasPeriodo = intervaloDias(periodo.inicio, periodo.fim);
   const totaisForma: Record<string, number> = {};
   for (const f of fs) {
@@ -1892,7 +1893,7 @@ export function buildFinanceView(escopo: Scope, aggs?: FinanceAggInput | null): 
       cor: CORES_FORMAS[forma] ?? "var(--t2)",
     }));
 
-  // Mini-DRE → Resultado Operacional. Linhas de marca só aparecem no filtro correspondente.
+  // Mini-DRE  ->  Resultado Operacional. Linhas de marca so aparecem no filtro correspondente.
   const linhasMarca: FixedCostRow[] = [];
   if (incluiWepink) {
     linhasMarca.push(
@@ -1961,17 +1962,17 @@ export function buildFinanceView(escopo: Scope, aggs?: FinanceAggInput | null): 
 /* ---------- Financeiro com agregados reais (sales_day_agg / hour / payment) ---------- */
 
 export type FinanceAggInput = {
-  /** Período + período anterior + últimos 6 meses, todas as marcas (ALL/WEPINK/WPINK). */
+  /** Periodo + periodo anterior + ultimos 6 meses, todas as marcas (ALL/WEPINK/WPINK). */
   dayAggs: import("./salesTypes").SalesDayAgg[];
-  /** Horas do dia filtrado (período de 1 dia). */
+  /** Horas do dia filtrado (periodo de 1 dia). */
   hourAggs?: import("./salesTypes").SalesHourAgg[];
-  /** Horas do dia de comparação — hoje compara com a mesma hora da semana passada. */
+  /** Horas do dia de comparacao  -  hoje compara com a mesma hora da semana passada. */
   prevHourAggs?: import("./salesTypes").SalesHourAgg[];
-  /** Formas de pagamento (CONDICAO) — só brand=ALL. */
+  /** Formas de pagamento (CONDICAO)  -  so brand=ALL. */
   paymentDayAggs?: import("./salesTypes").SalesPaymentDayAgg[];
-  /** CMV por produto (RELATORIOMARGEM) do período — produtos sem custo no ERP e dias com margem gravada. */
+  /** CMV por produto (RELATORIOMARGEM) do periodo  -  produtos sem custo no ERP e dias com margem gravada. */
   productCostDayAggs?: import("./salesTypes").SalesProductCostDayAgg[];
-  /** COD_PRODUTO → descrição (catálogo), para o aviso de produtos sem custo. */
+  /** COD_PRODUTO  ->  descricao (catalogo), para o aviso de produtos sem custo. */
   productNames?: Record<string, string>;
 };
 
@@ -1991,19 +1992,19 @@ type FinCosts = {
   royWpink: number;
   mktWepink: number;
   mktWpink: number;
-  /** Custos variáveis da loja (% do faturamento) — hoje sempre 0; volta com a tela de DRE. */
+  /** Custos variaveis da loja (% do faturamento)  -  hoje sempre 0; volta com a tela de DRE. */
   variaveis: number;
 };
 /**
- * Custos mensais rateados por dia (não seguem o faturamento). `fixos`/`outras` hoje sempre 0 por loja
+ * Custos mensais rateados por dia (nao seguem o faturamento). `fixos`/`outras` hoje sempre 0 por loja
  * (voltam com a tela de DRE); no eixo por hora `fixos` carrega o rateio dos custos mensais.
  */
 type FinMonthly = {
   fixos: number;
   outras: number;
-  /** Aluguel mínimo rateado no período. */
+  /** Aluguel minimo rateado no periodo. */
   aluguelMinBase: number;
-  /** Quanto falta para o % chegar no mínimo: max(0, mínimo − aluguel %), por loja no período. */
+  /** Quanto falta para o % chegar no minimo: max(0, minimo  aluguel %), por loja no periodo. */
   aluguelMin: number;
 };
 type FinLine = FinMoney & FinCosts & FinMonthly & { icms: number; icmsSt: number };
@@ -2025,7 +2026,7 @@ const FIN_LINE_ZERO: FinLine = {
   icmsSt: 0,
 };
 
-/** Lucro bruto = Faturamento − CMV − impostos (ICMS sobre o faturamento, ICMS ST sobre o CMV). */
+/** Lucro bruto = Faturamento  CMV  impostos (ICMS sobre o faturamento, ICMS ST sobre o CMV). */
 function finLucro(l: FinLine): number {
   return l.rev - l.cmv - l.icms - l.icmsSt;
 }
@@ -2042,17 +2043,17 @@ function finScale<T extends Record<string, number>>(a: T, f: number): T {
   return out;
 }
 
-/** Custos da operação da linha: aluguel (% + complemento do mínimo) + franquia + custos da loja. */
+/** Custos da operacao da linha: aluguel (% + complemento do minimo) + franquia + custos da loja. */
 function finOperatingCosts(l: FinCosts & FinMonthly): number {
   return l.aluguelPct + l.aluguelMin + l.royWepink + l.royWpink + l.mktWepink + l.mktWpink + l.variaveis + l.fixos + l.outras;
 }
 
-/** Custos mensais (fixos, outras despesas, complemento do aluguel mínimo) — rateados nas horas abertas. */
+/** Custos mensais (fixos, outras despesas, complemento do aluguel minimo)  -  rateados nas horas abertas. */
 function finMonthlyCosts(l: FinMonthly): number {
   return l.fixos + l.outras + l.aluguelMin;
 }
 
-/** Custos da loja para dados reais: campo sem configuração = 0 (não inventa R$). */
+/** Custos da loja para dados reais: campo sem configuracao = 0 (nao inventa R$). */
 function custosDaFilialReal(f: Store) {
   const c = f.custos;
   const rua = f.pointType === "RUA";
@@ -2064,9 +2065,21 @@ function custosDaFilialReal(f: Store) {
     royaltiesWpinkPct: c?.royaltiesWpinkPct ?? 0,
     mktWepinkPct: c?.marketingWepinkPct ?? 0,
     mktWpinkPct: c?.marketingWpinkPct ?? 0,
-    icmsPct: f.custos?.icmsPct ?? 0,
-    icmsStPct: f.custos?.icmsStPct ?? 0,
+    icmsWepinkPct: f.custos?.icmsWepinkPct ?? 0,
+    icmsWpinkPct: f.custos?.icmsWpinkPct ?? 0,
+    icmsStWepinkPct: f.custos?.icmsStWepinkPct ?? 0,
+    icmsStWpinkPct: f.custos?.icmsStWpinkPct ?? 0,
   };
+}
+
+function impostosDoProduto(
+  taxa: { icmsWepinkPct: number; icmsWpinkPct: number; icmsStWepinkPct: number; icmsStWpinkPct: number },
+  code: string,
+  receita: number,
+  cmv: number,
+): number {
+  const wpink = brandFromProductCode(code) === "WPINK";
+  return (receita * (wpink ? taxa.icmsWpinkPct : taxa.icmsWepinkPct) + cmv * (wpink ? taxa.icmsStWpinkPct : taxa.icmsStWepinkPct)) / 100;
 }
 
 /** Financeiro a partir dos agregados do sync (sem fixture). Custos % por marca; aluguel fixo rateado por dia/hora. */
@@ -2094,16 +2107,16 @@ export function buildFinanceViewFromAggs(escopo: Scope, input: FinanceAggInput):
     cells.set(key, cell);
   }
 
-  /** Linha loja×dia no filtro de marca: receita/CMV/contagens + custos % (marca) + aluguel fixo do dia. */
+  /** Linha lojaxdia no filtro de marca: receita/CMV/contagens + custos % (marca) + aluguel fixo do dia. */
   function storeDay(f: Store, iso: string): FinLine {
     const cell = cells.get(`${f.id}|${iso}`) ?? {};
     const hasSplit = Boolean(cell.WEPINK || cell.WPINK);
     const all = cell.ALL ?? (hasSplit ? finAdd(cell.WEPINK ?? FIN_ZERO, cell.WPINK ?? FIN_ZERO) : FIN_ZERO);
-    // Loja sem split de marca (sem WPINK ou split ainda não rodou) → tudo WEPINK.
+    // Loja sem split de marca (sem WPINK ou split ainda nao rodou)  ->  tudo WEPINK.
     const wepink = cell.WEPINK ?? (hasSplit ? FIN_ZERO : all);
     const wpink = cell.WPINK ?? FIN_ZERO;
     let m = !divisao ? all : divisao === "WEPINK" ? wepink : wpink;
-    // Relatório de marca pode vir sem contagens: rateia do ALL pela receita.
+    // Relatorio de marca pode vir sem contagens: rateia do ALL pela receita.
     if (divisao && m.sales === 0 && m.rev > 0 && all.rev > 0) {
       const share = m.rev / all.rev;
       m = { ...m, sales: Math.round(all.sales * share), items: Math.round(all.items * share) };
@@ -2111,6 +2124,8 @@ export function buildFinanceViewFromAggs(escopo: Scope, input: FinanceAggInput):
     const c = custosDaFilialReal(f);
     const w = incluiWepink ? wepink.rev : 0;
     const p = incluiWpink ? wpink.rev : 0;
+    const cmvW = incluiWepink ? wepink.cmv : 0;
+    const cmvP = incluiWpink ? wpink.cmv : 0;
     const diasMes = diasNoMes(iso.slice(0, 7));
     const aluguelPct = (w * c.aluguelWepinkPct + p * c.aluguelWpinkPct) / 100;
     const aluguelMinBase = c.aluguelMin / diasMes;
@@ -2126,12 +2141,12 @@ export function buildFinanceViewFromAggs(escopo: Scope, input: FinanceAggInput):
       outras: 0,
       aluguelMinBase,
       aluguelMin: Math.max(0, aluguelMinBase - aluguelPct),
-      icms: (m.rev * c.icmsPct) / 100,
-      icmsSt: (m.cmv * c.icmsStPct) / 100,
+      icms: (w * c.icmsWepinkPct + p * c.icmsWpinkPct) / 100,
+      icmsSt: (cmvW * c.icmsStWepinkPct + cmvP * c.icmsStWpinkPct) / 100,
     };
   }
 
-  /** Soma loja × mês: o aluguel do mês é o maior entre o mínimo (rateado nos dias do recorte) e o %, não dia a dia. */
+  /** Soma loja x mes: o aluguel do mes e o maior entre o minimo (rateado nos dias do recorte) e o %, nao dia a dia. */
   function sumDays(dias: string[]): FinLine {
     const porMes = new Map<string, string[]>();
     for (const iso of dias) {
@@ -2149,7 +2164,7 @@ export function buildFinanceViewFromAggs(escopo: Scope, input: FinanceAggInput):
     return acc;
   }
 
-  /** Horas de uma loja no filtro de marca; sem hora×marca, usa ALL × participação da marca no dia. */
+  /** Horas de uma loja no filtro de marca; sem horaxmarca, usa ALL x participacao da marca no dia. */
   function storeHours(rows: import("./salesTypes").SalesHourAgg[], f: Store, day: FinLine, iso: string): Map<number, FinMoney> {
     const own = rows.filter((h) => h.storeId === f.id && h.day === iso);
     const pick = (brand: string) => own.filter((h) => h.brand === brand);
@@ -2181,7 +2196,7 @@ export function buildFinanceViewFromAggs(escopo: Scope, input: FinanceAggInput):
   const diasPeriodo = intervaloDias(periodo.inicio, periodo.fim);
   const atual = sumDays(diasPeriodo);
 
-  // Período anterior equivalente. Terminando hoje, o último dia do anterior entra até a hora atual (precisa das horas).
+  // Periodo anterior equivalente. Terminando hoje, o ultimo dia do anterior entra ate a hora atual (precisa das horas).
   const ant = previousPeriod(periodo, calendarCurrentHour());
   const diasAnt = intervaloDias(ant.inicio, ant.fim);
   let anterior: FinLine | null = sumDays(diasAnt);
@@ -2217,7 +2232,7 @@ export function buildFinanceViewFromAggs(escopo: Scope, input: FinanceAggInput):
     anterior = faltaHora ? null : parcial;
   }
 
-  // Sem venda no período atual não é queda de 100% — é falta de dado (sem badge).
+  // Sem venda no periodo atual nao e queda de 100%  -  e falta de dado (sem badge).
   const temComp = anterior != null && anterior.rev > 0 && atual.rev > 0;
   const vsRotulo = temComp ? ant.rotulo : undefined;
   const antLine = anterior ?? FIN_LINE_ZERO;
@@ -2226,7 +2241,7 @@ export function buildFinanceViewFromAggs(escopo: Scope, input: FinanceAggInput):
   const impostosAtual = atual.icms + atual.icmsSt;
   const margemAtual = divSeguro(lucroAtual, atual.rev) * 100;
   const temCmv = atual.cmv > 0;
-  // CMV não existe por hora: terminando hoje, CMV/lucro/margem/resultado comparam sem o dia de hoje nos dois lados.
+  // CMV nao existe por hora: terminando hoje, CMV/lucro/margem/resultado comparam sem o dia de hoje nos dois lados.
   const cortaHoje = ant.horaMax != null;
   const atualCmp = cortaHoje ? sumDays(diasPeriodo.slice(0, -1)) : atual;
   const antCmp = cortaHoje ? sumDays(diasAnt.slice(0, -1)) : antLine;
@@ -2306,7 +2321,7 @@ export function buildFinanceViewFromAggs(escopo: Scope, input: FinanceAggInput):
       }
     }
     const comVenda = [...porHora.entries()].filter(([, l]) => l.rev > 0).map(([h]) => h);
-    // Mesmo eixo do Faturamento x meta; hoje, as horas que ainda não chegaram ficam sem linha.
+    // Mesmo eixo do Faturamento x meta; hoje, as horas que ainda nao chegaram ficam sem linha.
     const { first, last, win } = hourAxisRange(fs.map((f) => f.horas), dow, comVenda);
     const horasAbertas = Math.max(1, win.fechamento - win.abertura);
     const mensalHora = finMonthlyCosts(atual) / horasAbertas;
@@ -2323,7 +2338,7 @@ export function buildFinanceViewFromAggs(escopo: Scope, input: FinanceAggInput):
       );
     }
   } else if (eixoSerie === "dia") {
-    // Complemento do aluguel mínimo é do mês: dividido igualmente pelos dias do mês no período.
+    // Complemento do aluguel minimo e do mes: dividido igualmente pelos dias do mes no periodo.
     const complementoDia = new Map<string, number>();
     for (const mes of new Set(diasPeriodo.map((iso) => iso.slice(0, 7)))) {
       const diasDoMes = diasPeriodo.filter((iso) => iso.startsWith(mes));
@@ -2348,7 +2363,7 @@ export function buildFinanceViewFromAggs(escopo: Scope, input: FinanceAggInput):
   const resultadoAnteriorCmp = lucroAnteriorCmp - finOperatingCosts(antCmp);
   const deltaResultado = cmvComparavel ? kpiDelta(resultadoAtualCmp, resultadoAnteriorCmp, vsCmv) : undefined;
 
-  // Formas de pagamento: sempre total (a Lista não traz marca).
+  // Formas de pagamento: sempre total (a Lista nao traz marca).
   const scopedIds = new Set(fs.map((f) => f.id));
   const totaisForma: Record<string, number> = {};
   for (const row of input.paymentDayAggs ?? []) {
@@ -2368,7 +2383,7 @@ export function buildFinanceViewFromAggs(escopo: Scope, input: FinanceAggInput):
       cor: CORES_FORMAS[forma] ?? FORMAS_FALLBACK[i % FORMAS_FALLBACK.length]!,
     }));
 
-  // Mini-DRE. Linhas WPINK só se alguma loja do escopo tem a marca.
+  // Mini-DRE. Linhas WPINK so se alguma loja do escopo tem a marca.
   const custos = fs.map((f) => custosDaFilialReal(f));
   const temWpink = fs.some((f) => f.temWpink);
   const linhasMarca: FixedCostRow[] = [];
@@ -2385,7 +2400,7 @@ export function buildFinanceViewFromAggs(escopo: Scope, input: FinanceAggInput):
       { rotulo: `Taxa de marketing WPINK${rotuloPct(cw.map((c) => c.mktWpinkPct))}`, valor: atual.mktWpink },
     );
   }
-  // Aluguel do mês = maior entre o fixo e o %: mostra o fixo e, se o % passar dele, só o excedente.
+  // Aluguel do mes = maior entre o fixo e o %: mostra o fixo e, se o % passar dele, so o excedente.
   const aluguelFixo = atual.aluguelMinBase;
   const aluguelExcedente = Math.max(0, atual.aluguelPct + atual.aluguelMin - aluguelFixo);
   const rotuloAluguelPct = `${aluguelFixo > 0 ? "Aluguel percentual excedente" : "Aluguel percentual"}${rotuloPct(custos.map((c) => c.aluguelWepinkPct))}`;
@@ -2418,7 +2433,7 @@ export function buildFinanceViewFromAggs(escopo: Scope, input: FinanceAggInput):
       : null;
   }
 
-  // Evolução mensal: período mensal (calendário) — meses do filtro, recortados nas pontas; 1 mês só = + 5 anteriores inteiros.
+  // Evolucao mensal: periodo mensal (calendario)  -  meses do filtro, recortados nas pontas; 1 mes so = + 5 anteriores inteiros.
   const evo = monthlyEvolutionMonths(periodo, eixoSerie);
   const evolucaoMensal: MonthlyEvolutionRow[] = evo.meses
     .map((mes) => {
@@ -2495,7 +2510,7 @@ export function buildFinanceViewFromAggs(escopo: Scope, input: FinanceAggInput):
   };
 }
 
-/** Início da janela de dias que o Financeiro precisa (período anterior e 6 meses de evolução). */
+/** Inicio da janela de dias que o Financeiro precisa (periodo anterior e 6 meses de evolucao). */
 export function financeFetchRange(escopo: Scope): { from: string; to: string; prevHourDay: string | null } {
   const today = calendarTodayIso();
   const periodo = resolvePeriod(escopo.periodo, today);
@@ -2508,7 +2523,7 @@ export function financeFetchRange(escopo: Scope): { from: string; to: string; pr
 }
 
 /* ================================================================
- * TELA PRODUTOS — camada de dados (agregados reais do sync)
+ * TELA PRODUTOS  -  camada de dados (agregados reais do sync)
  * ================================================================ */
 
 export type ProductsKpi = FinanceKpi;
@@ -2520,24 +2535,24 @@ export interface CategoryRevenue {
   itens: number;
 }
 
-/** Linha da tabela de produtos (relatório {E7A5C5C7} + CMV do RELATORIOMARGEM por COD_PRODUTO). */
+/** Linha da tabela de produtos (relatorio {E7A5C5C7} + CMV do RELATORIOMARGEM por COD_PRODUTO). */
 export interface ProductItemRow {
-  /** `COD_PRODUTO` ou `#productId` (sem código) — abre o detalhe. */
+  /** `COD_PRODUTO` ou `#productId` (sem codigo)  -  abre o detalhe. */
   chave: string;
   codigo: string;
   nome: string;
   faturamento: number;
   itens: number;
   precoMedio: number;
-  /** Participação no faturamento dos produtos do período (0–100). */
+  /** Participacao no faturamento dos produtos do periodo (0 - 100). */
   participacaoPct: number;
   /** null = algum dia com venda do produto sem custo gravado (nada estimado). */
   cmv: number | null;
   lucro: number | null;
   margemPct: number | null;
-  /** Faturamento vs período anterior (%); null sem base de comparação. */
+  /** Faturamento vs periodo anterior (%); null sem base de comparacao. */
   variacaoPct: number | null;
-  /** Faturamento nos dois lados do comparativo (mesmo recorte da Variação) — variação do total. */
+  /** Faturamento nos dois lados do comparativo (mesmo recorte da Variacao)  -  variacao do total. */
   faturamentoCmp: number;
   faturamentoAnt: number;
 }
@@ -2557,7 +2572,7 @@ export interface AbcCategory {
 export interface AbcCurveSummary {
   classe: AbcClass;
   qtdCategorias: number;
-  /** Participação da classe no faturamento total (0–100). */
+  /** Participacao da classe no faturamento total (0 - 100). */
   pctReceita: number;
   /** Soma do faturamento das categorias da classe. */
   faturamento: number;
@@ -2571,24 +2586,24 @@ export interface AbcCurveCategories {
 export interface ProductsView {
   escopo: Scope;
   periodo: ResolvedPeriod;
-  /** Faturamento · Lucro bruto · Margem · Itens vendidos (mesmas regras do Financeiro). */
+  /** Faturamento  |  Lucro bruto  |  Margem  |  Itens vendidos (mesmas regras do Financeiro). */
   kpis: ProductsKpi[];
   kpisWpink: OverviewKpiWpink[];
   temVendas: boolean;
   categorias: CategoryRevenue[];
   deltaCategorias?: { value: string; positive: boolean; vs?: string; anterior?: string };
-  /** Curva ABC (Pareto) das categorias — cortes 80% / 95%. */
+  /** Curva ABC (Pareto) das categorias  -  cortes 80% / 95%. */
   curvaAbcCategorias: AbcCurveCategories;
   produtos: ProductItemRow[];
-  /** Linhas de produto (fragrância), ranking completo por faturamento. */
+  /** Linhas de produto (fragrancia), ranking completo por faturamento. */
   linhas: ProductLineRow[];
   /** Faturamento de produtos sem linha (skincare, cabelo, maquiagem, suplementos, kits). */
   semLinhaFaturamento: number;
-  /** Algum produto do período tem CMV gravado. */
+  /** Algum produto do periodo tem CMV gravado. */
   temCustoProduto: boolean;
-  /** Base da coluna Variação (tooltip). */
+  /** Base da coluna Variacao (tooltip). */
   vsVariacao: string;
-  /** Produtos vendidos no período com custo R$ 0 no Millennium. */
+  /** Produtos vendidos no periodo com custo R$ 0 no Millennium. */
   produtosSemCusto: ProductWithoutCost[];
 }
 
@@ -2596,9 +2611,9 @@ export type ProductsAggInput = FinanceAggInput & {
   categoryDayAggs?: import("./salesTypes").SalesCategoryDayAgg[];
   productDayAggs?: import("./salesTypes").SalesProductDayAgg[];
   productCostDayAggs?: import("./salesTypes").SalesProductCostDayAgg[];
-  /** Descrições do catálogo — nome estável das linhas de produto. */
+  /** Descricoes do catalogo  -  nome estavel das linhas de produto. */
   catalogDescriptions?: string[];
-  /** id do produto no ERP → tipo (categoria) — detalhe da Curva ABC. */
+  /** id do produto no ERP  ->  tipo (categoria)  -  detalhe da Curva ABC. */
   catalogTypes?: Record<number, number>;
 };
 
@@ -2606,9 +2621,9 @@ export interface ProductLineRow {
   nome: string;
   faturamento: number;
   itens: number;
-  /** Produtos da linha vendidos no período. */
+  /** Produtos da linha vendidos no periodo. */
   produtos: number;
-  /** Tipos vendidos (desodorante colônia, body splash…), do maior faturamento para o menor. */
+  /** Tipos vendidos (desodorante colonia, body splash...), do maior faturamento para o menor. */
   tipos: string[];
   participacaoPct: number;
   /** null = algum produto da linha sem custo gravado. */
@@ -2616,11 +2631,11 @@ export interface ProductLineRow {
   /** null = algum produto da linha sem custo gravado. */
   margemPct: number | null;
   variacaoPct: number | null;
-  /** Chaves (`ProductItemRow.chave`) de todos os produtos da linha — abre o detalhe. */
+  /** Chaves (`ProductItemRow.chave`) de todos os produtos da linha  -  abre o detalhe. */
   chaves: string[];
 }
 
-/** Classifica categorias em A/B/C (80%/95% acumulado), já ordenadas por fat. desc. */
+/** Classifica categorias em A/B/C (80%/95% acumulado), ja ordenadas por fat. desc. */
 export function classifyAbcCurve(cats: Array<{ categoriaId: number; nome: string; faturamento: number }>): AbcCurveCategories {
   const total = cats.reduce((s, c) => s + c.faturamento, 0) || 1;
   let acum = 0;
@@ -2652,7 +2667,7 @@ export function classifyAbcCurve(cats: Array<{ categoriaId: number; nome: string
   return { itens, resumo };
 }
 
-/** Janela de leitura de categorias/produtos: período anterior + período atual. */
+/** Janela de leitura de categorias/produtos: periodo anterior + periodo atual. */
 export function productsFetchRange(escopo: Scope): { from: string; to: string } {
   const periodo = resolvePeriod(escopo.periodo, calendarTodayIso());
   const ant = previousPeriod(periodo);
@@ -2662,7 +2677,7 @@ export function productsFetchRange(escopo: Scope): { from: string; to: string } 
 /**
  * Produtos a partir dos agregados do sync. Sem filtro de marca (tudo ALL).
  * KPIs e faixa WPINK = Financeiro. Categorias e produtos sem hora: terminando hoje,
- * os comparativos usam "até ontem" nos dois lados.
+ * os comparativos usam "ate ontem" nos dois lados.
  */
 export function buildProductsView(escopo: Scope, input: ProductsAggInput = { dayAggs: [] }): ProductsView {
   const esc: Scope = { ...escopo, divisao: null };
@@ -2684,7 +2699,7 @@ export function buildProductsView(escopo: Scope, input: ProductsAggInput = { day
     (k): k is ProductsKpi => Boolean(k),
   );
 
-  // Categorias (itens vendidos × catálogo) — chave = PRODUTO_TIPO; nome = o do dia mais recente.
+  // Categorias (itens vendidos x catalogo)  -  chave = PRODUTO_TIPO; nome = o do dia mais recente.
   const catAcc = new Map<number, { nome: string; nomeDia: string; fat: number; itens: number; fatCmp: number; fatAnt: number }>();
   for (const r of input.categoryDayAggs ?? []) {
     if (!storeById.has(r.storeId)) continue;
@@ -2710,7 +2725,7 @@ export function buildProductsView(escopo: Scope, input: ProductsAggInput = { day
   const catAnt = [...catAcc.values()].reduce((s, c) => s + c.fatAnt, 0);
   const deltaCategorias = catCmp > 0 && catAnt > 0 ? kpiDelta(catCmp, catAnt, vsCmp) : undefined;
 
-  // CMV por produto (RELATORIOMARGEM) — loja × dia × COD_PRODUTO.
+  // CMV por produto (RELATORIOMARGEM)  -  loja x dia x COD_PRODUTO.
   const custoKey = (storeId: string, day: string, code: string) => `${storeId}|${day}|${code}`;
   const custos = new Map<string, number>();
   for (const r of input.productCostDayAggs ?? []) {
@@ -2765,7 +2780,7 @@ export function buildProductsView(escopo: Scope, input: ProductsAggInput = { day
       acc.fat += v;
       acc.itens += r.itemCount;
       const taxa = custoDaLoja(r.storeId);
-      acc.impostos += (v * taxa.icmsPct) / 100;
+      acc.impostos += impostosDoProduto(taxa, code, v, 0);
       if (v > 0) {
         const k = custoKey(r.storeId, r.day, code);
         const cmv = code ? custos.get(k) : undefined;
@@ -2773,7 +2788,7 @@ export function buildProductsView(escopo: Scope, input: ProductsAggInput = { day
         else if (!custosUsados.has(k)) {
           custosUsados.add(k);
           acc.cmv += cmv;
-          acc.impostos += (cmv * taxa.icmsStPct) / 100;
+          acc.impostos += impostosDoProduto(taxa, code, 0, cmv);
         }
       }
     }
@@ -2806,7 +2821,7 @@ export function buildProductsView(escopo: Scope, input: ProductsAggInput = { day
     })
     .sort((a, b) => b.faturamento - a.faturamento || a.nome.localeCompare(b.nome, "pt-BR"));
 
-  // Linhas de produto: fragrância da descrição (catálogo = nome estável da linha).
+  // Linhas de produto: fragrancia da descricao (catalogo = nome estavel da linha).
   const lineIndex = buildProductLineIndex([
     ...(input.catalogDescriptions ?? []),
     ...[...prodAcc.values()].map((p) => p.nome).filter(Boolean),
@@ -2896,7 +2911,7 @@ export interface ProductDetailStore {
   nome: string;
   faturamento: number;
   itens: number;
-  /** Fatia do faturamento do produto no escopo (0–100). */
+  /** Fatia do faturamento do produto no escopo (0 - 100). */
   pct: number;
 }
 
@@ -2906,7 +2921,7 @@ export interface ProductDetailItem {
   nome: string;
   faturamento: number;
   itens: number;
-  /** Fatia do faturamento da linha (0–100). */
+  /** Fatia do faturamento da linha (0 - 100). */
   pct: number;
   /** null = algum dia com venda do produto sem custo (nada estimado). */
   lucro: number | null;
@@ -2920,7 +2935,7 @@ export interface ProductDetailCategory {
   faturamento: number;
   lucro: number | null;
   margemPct: number | null;
-  /** Participação no faturamento de todas as categorias (0–100). */
+  /** Participacao no faturamento de todas as categorias (0 - 100). */
   pct: number;
   pctAcumulado: number;
 }
@@ -2938,21 +2953,21 @@ export interface ProductDetail {
   cmv: number | null;
   lucro: number | null;
   margemPct: number | null;
-  /** Faturamento/itens por dia (2–31 dias) ou por mês (> 31); null em 1 dia (sem dado por hora). */
+  /** Faturamento/itens por dia (2 - 31 dias) ou por mes (> 31); null em 1 dia (sem dado por hora). */
   serie: { label: string; faturamento: number; itens: number }[] | null;
   serieGranularidade: "dia" | "mes";
-  /** Só com mais de 1 loja no escopo. */
+  /** So com mais de 1 loja no escopo. */
   lojas: ProductDetailStore[];
-  /** Mesmo recorte da coluna Variação (período terminando hoje = até ontem nos dois lados). */
+  /** Mesmo recorte da coluna Variacao (periodo terminando hoje = ate ontem nos dois lados). */
   comparativo: {
     vs: string;
     faturamento?: ReturnType<typeof kpiDelta>;
     itens?: ReturnType<typeof kpiDelta>;
     margem?: ReturnType<typeof kpiDeltaPp>;
   } | null;
-  /** Linha: produtos vendidos no período (maior faturamento primeiro). Produto: vazio. */
+  /** Linha: produtos vendidos no periodo (maior faturamento primeiro). Produto: vazio. */
   produtos: ProductDetailItem[];
-  /** Linha: tipos vendidos (desodorante colônia, body splash…). */
+  /** Linha: tipos vendidos (desodorante colonia, body splash...). */
   tipos: string[];
   /** Classe da Curva ABC: categorias da classe. */
   categorias: ProductDetailCategory[];
@@ -2965,7 +2980,7 @@ type ItemsDetail = Omit<ProductDetail, "tipo" | "chave" | "codigo" | "nome" | "p
 /** Mesma chave do `buildProductsView`: `COD_PRODUTO` ou `#productId`. */
 const productRowKey = (r: { productCode: string; productId: number }) => r.productCode.trim() || `#${r.productId}`;
 
-/** Detalhe de um conjunto de produtos — mesmas regras de custo/impostos do `buildProductsView`. */
+/** Detalhe de um conjunto de produtos  -  mesmas regras de custo/impostos do `buildProductsView`. */
 function buildItemsDetail(
   escopo: Scope,
   input: ProductsAggInput,
@@ -3019,16 +3034,16 @@ function buildItemsDetail(
       fat += v;
       itens += r.itemCount;
       const taxa = taxaDaLoja(r.storeId);
-      impostos += (v * taxa.icmsPct) / 100;
+      const code = r.productCode.trim();
+      impostos += impostosDoProduto(taxa, code, v, 0);
       if (v > 0) {
-        const code = r.productCode.trim();
         const k = custoKey(r.storeId, r.day, code);
         const c = code ? custos.get(k) : undefined;
         if (c == null) semCusto = true;
         else if (!usados.has(k)) {
           usados.add(k);
           cmv += c;
-          impostos += (c * taxa.icmsStPct) / 100;
+          impostos += impostosDoProduto(taxa, code, 0, c);
         }
       }
     }
@@ -3172,7 +3187,7 @@ export function buildProductDetail(
   };
 }
 
-/** Detalhe de uma linha de produto (fragrância) — soma dos produtos dela + lista dos produtos. */
+/** Detalhe de uma linha de produto (fragrancia)  -  soma dos produtos dela + lista dos produtos. */
 export function buildProductLineDetail(
   escopo: Scope,
   input: ProductsAggInput,
@@ -3191,7 +3206,7 @@ export function buildProductLineDetail(
   };
 }
 
-/** Mesmo join da `sales_category_day_view`: produto fora do catálogo = INDEFINIDO. */
+/** Mesmo join da `sales_category_day_view`: produto fora do catalogo = INDEFINIDO. */
 const CATEGORIA_INDEFINIDA = -2000000000;
 
 function productKeysByCategory(input: ProductsAggInput): Map<number, Set<string>> {
@@ -3209,7 +3224,7 @@ function productKeysByCategory(input: ProductsAggInput): Map<number, Set<string>
   return out;
 }
 
-/** Detalhe de uma categoria (tipo de produto) — soma dos produtos dela + lista dos produtos. */
+/** Detalhe de uma categoria (tipo de produto)  -  soma dos produtos dela + lista dos produtos. */
 export function buildCategoryDetail(
   escopo: Scope,
   input: ProductsAggInput,
@@ -3230,7 +3245,7 @@ export function buildCategoryDetail(
   };
 }
 
-/** Detalhe de uma classe da Curva ABC — soma das categorias dela + lista das categorias. */
+/** Detalhe de uma classe da Curva ABC  -  soma das categorias dela + lista das categorias. */
 export function buildAbcClassDetail(
   escopo: Scope,
   input: ProductsAggInput,
@@ -3269,8 +3284,8 @@ export function buildAbcClassDetail(
 }
 
 /**
- * Turno da pessoa (Configurações > Lojas): liga pelo código da funcionária → gerador → nome,
- * na ordem das lojas recebida (maior venda primeiro). Rótulo "Manhã · 09:00–15:00".
+ * Turno da pessoa (Configuracoes > Lojas): liga pelo codigo da funcionaria  ->  gerador  ->  nome,
+ * na ordem das lojas recebida (maior venda primeiro). Rotulo "Manha  |  09:00 - 15:00".
  */
 function sellerShiftResolver(shifts: import("./salesTypes").SellerShiftRef[] = []) {
   const porFunc = new Map<string, string>();
@@ -3299,7 +3314,7 @@ function sellerShiftResolver(shifts: import("./salesTypes").SellerShiftRef[] = [
 }
 
 /* ================================================================
- * TELA EQUIPE — camada de dados (agregados reais do sync)
+ * TELA EQUIPE  -  camada de dados (agregados reais do sync)
  * ================================================================ */
 
 export interface TeamKpi {
@@ -3313,20 +3328,20 @@ export interface TeamKpi {
 export interface TeamMemberRow {
   key: string;
   nome: string;
-  /** Lojas onde vendeu no período, da que mais faturou para a que menos. */
+  /** Lojas onde vendeu no periodo, da que mais faturou para a que menos. */
   lojas: string[];
-  /** "Manhã · 09:00–15:00"; ausente = sem turno definido. */
+  /** "Manha  |  09:00 - 15:00"; ausente = sem turno definido. */
   turno?: string;
   faturamento: number;
   vendas: number;
   itens: number;
   ticketMedio: number;
-  /** Itens por venda; null se algum dia com venda não tem itens gravados (nada estimado). */
+  /** Itens por venda; null se algum dia com venda nao tem itens gravados (nada estimado). */
   pa: number | null;
   participacaoPct: number;
-  /** Faturamento vs período anterior (sem hora: terminando hoje, até ontem nos dois lados). */
+  /** Faturamento vs periodo anterior (sem hora: terminando hoje, ate ontem nos dois lados). */
   variacaoPct: number | null;
-  /** Lados da variação — o Total da tabela soma e compara ponderado. */
+  /** Lados da variacao  -  o Total da tabela soma e compara ponderado. */
   faturamentoCmp: number;
   faturamentoAnt: number;
 }
@@ -3340,21 +3355,21 @@ export interface TeamShiftSlice {
 export interface TeamDashboardView {
   escopo: Scope;
   periodo: ResolvedPeriod;
-  /** KPIs e tabela já filtrados pelo turno escolhido. */
+  /** KPIs e tabela ja filtrados pelo turno escolhido. */
   kpis: TeamKpi[];
   pessoas: TeamMemberRow[];
-  /** Toda a equipe (sem filtro de turno). Maior faturamento primeiro; "Sem turno definido" sempre por último. */
+  /** Toda a equipe (sem filtro de turno). Maior faturamento primeiro; "Sem turno definido" sempre por ultimo. */
   turnos: TeamShiftSlice[];
   /** Alguma pessoa das lojas do escopo tem turno cadastrado. */
   turnosConfigurados: boolean;
-  /** Opções do filtro de turno (nome do turno; "Sem turno definido" se alguém vendeu sem turno). */
+  /** Opcoes do filtro de turno (nome do turno; "Sem turno definido" se alguem vendeu sem turno). */
   turnosDisponiveis: string[];
-  /** Turno aplicado (null = todos; valor fora das opções vira null). */
+  /** Turno aplicado (null = todos; valor fora das opcoes vira null). */
   turnoFiltro: string | null;
-  /** Faturamento das lojas = equipe + vendas sem vendedor identificado ou realizadas pela gerência; `turno` = parte da equipe no turno filtrado. */
+  /** Faturamento das lojas = equipe + vendas sem vendedor identificado ou realizadas pela gerencia; `turno` = parte da equipe no turno filtrado. */
   composicao: { equipe: number; fora: number; total: number; turno?: number };
   vsVariacao: string;
-  /** Mais de 1 loja no escopo → mostra a loja de cada pessoa. */
+  /** Mais de 1 loja no escopo  ->  mostra a loja de cada pessoa. */
   multiLoja: boolean;
 }
 
@@ -3366,15 +3381,15 @@ export type TeamAggInput = {
 
 export const TEAM_SEM_TURNO = "Sem grupo definido";
 
-/** Nome do turno a partir do rótulo "Manhã · 09:00–15:00" (sem turno = TEAM_SEM_TURNO). */
+/** Nome do turno a partir do rotulo "Manha  |  09:00 - 15:00" (sem turno = TEAM_SEM_TURNO). */
 export function teamShiftName(turno?: string): string {
   return turno ? (turno.split(" · ")[0] ?? turno) : TEAM_SEM_TURNO;
 }
 
 /**
- * Equipe a partir dos agregados do sync (sales_seller_day_agg, sem gerência / conta de freelancer).
- * Sem dado por hora: período terminando hoje compara até ontem nos dois lados; em "Hoje" fica sem badge.
- * `opts.turno` filtra KPIs e tabela pelo nome do turno (turno atual da pessoa vale também para o período anterior).
+ * Equipe a partir dos agregados do sync (sales_seller_day_agg, sem gerencia / conta de freelancer).
+ * Sem dado por hora: periodo terminando hoje compara ate ontem nos dois lados; em "Hoje" fica sem badge.
+ * `opts.turno` filtra KPIs e tabela pelo nome do turno (turno atual da pessoa vale tambem para o periodo anterior).
  */
 export function buildTeamDashboardView(
   escopo: Scope,
@@ -3460,14 +3475,14 @@ export function buildTeamDashboardView(
       employeeId: a.employeeId,
       geradorId: a.geradorId,
       sellerKeys: a.sellerKeys,
-      // Sem venda no período (só no anterior): liga pelo código/nome em qualquer loja do escopo.
+      // Sem venda no periodo (so no anterior): liga pelo codigo/nome em qualquer loja do escopo.
       lojas: lojasIds.length > 0 ? lojasIds : [...storeIds],
     });
     return { key, a, lojasIds, turno };
   });
   const comVenda = todas.filter(({ a }) => a.atual.fat > 0 || a.atual.vendas > 0);
 
-  // Opções do filtro: turnos cadastrados nas lojas do escopo (ordem de início) + "Sem turno definido".
+  // Opcoes do filtro: turnos cadastrados nas lojas do escopo (ordem de inicio) + "Sem turno definido".
   const inicioPorNome = new Map<string, string>();
   for (const s of input.sellerShifts ?? []) {
     if (!storeIds.has(s.storeId)) continue;
@@ -3510,7 +3525,7 @@ export function buildTeamDashboardView(
     }))
     .sort((x, y) => y.faturamento - x.faturamento || x.nome.localeCompare(y.nome, "pt-BR"));
 
-  // Turnos (toda a equipe): soma por rótulo; sem turno por último.
+  // Turnos (toda a equipe): soma por rotulo; sem turno por ultimo.
   const porTurno = new Map<string, TeamShiftSlice>();
   let equipeTotal = 0;
   for (const { a, turno } of comVenda) {
@@ -3535,7 +3550,7 @@ export function buildTeamDashboardView(
     .reduce((s, r) => s + r.revenueCents / 100, 0);
   const fora = Math.max(0, totalLojas - equipeTotal);
 
-  // Comparativos: só com venda no período atual (nunca −100%) e dado nos dois lados.
+  // Comparativos: so com venda no periodo atual (nunca 100%) e dado nos dois lados.
   const comparavel = totAtual.fat > 0 && totCmp.vendas > 0 && totAnt.vendas > 0;
   const ticketCmp = divSeguro(totCmp.fat, totCmp.vendas);
   const ticketAnt = divSeguro(totAnt.fat, totAnt.vendas);
@@ -3605,8 +3620,8 @@ export interface TeamMemberDetail extends TeamMemberRow {
 }
 
 /**
- * Detalhe de uma pessoa da equipe — mesma linha da tabela Desempenho da equipe (mesmo filtro de turno)
- * + faturamento dia a dia e comparativo sem hora (terminando hoje, até ontem nos dois lados).
+ * Detalhe de uma pessoa da equipe  -  mesma linha da tabela Desempenho da equipe (mesmo filtro de turno)
+ * + faturamento dia a dia e comparativo sem hora (terminando hoje, ate ontem nos dois lados).
  */
 export function buildTeamMemberDetail(
   escopo: Scope,
@@ -3686,289 +3701,7 @@ export function buildTeamMemberDetail(
 }
 
 /* ================================================================
- * TELA GRUPOS — camada de dados (montarGruposView)
- * ================================================================ */
-
-export interface GroupKpi {
-  nome: string;
-  faturamento: number;
-  vendas: number;
-  ticketMedio: number;
-}
-
-export interface GroupDayRevenue {
-  dia: string;
-  porGrupo: Record<string, number>;
-}
-
-export interface HourIndicator {
-  hora: number;
-  faturamento: number;
-  atendimentos: number;
-  ticketMedio: number;
-  pctFatDia: number;
-  fatAcumulado: number;
-  pctFatAcumulado: number;
-  deltaVsAnterior: { value: string; positive: boolean } | null;
-}
-
-export interface HeatmapCell {
-  dia: string;
-  hora: number;
-  valor: number;
-}
-
-export interface SellerByHour {
-  hora: number;
-  reais: number;
-  metaMinima: number;
-}
-
-export interface GroupsView {
-  escopo: Scope;
-  periodo: ResolvedPeriod;
-  /** Nome do grupo ativo (`Grupo 1` / `Grupo 2`), ou null = todos. */
-  grupoFiltro: string | null;
-  /** Grupos únicos no escopo (por nome), para o select do header. */
-  gruposDisponiveis: { id: string; nome: string }[];
-  kpisPorGrupo: GroupKpi[];
-  faturamentoPorDiaGrupo: GroupDayRevenue[];
-  heatmap: HeatmapCell[];
-  indicadoresPorHora: HourIndicator[] | null;
-  vendedorasPorHora: SellerByHour[];
-}
-
-/** Horas de um grupo cadastrado. Sem grupo → 0–23. */
-function horasDoGrupo(grupo: Grupo | null): number[] {
-  if (!grupo) return Array.from({ length: 24 }, (_, i) => i);
-  const horas: number[] = [];
-  for (let h = grupo.horaInicio; h < grupo.horaFim; h++) horas.push(h);
-  return horas;
-}
-
-/** União das faixas horárias de vários grupos (mesmo nome em lojas diferentes). */
-function horasDosGrupos(lista: Grupo[]): number[] {
-  if (lista.length === 0) return Array.from({ length: 24 }, (_, i) => i);
-  const set = new Set<number>();
-  for (const t of lista) {
-    for (let h = t.horaInicio; h < t.horaFim; h++) set.add(h);
-  }
-  return [...set].sort((a, b) => a - b);
-}
-
-function grupoDaFilial(filialId: string, nomeGrupo: string) {
-  return grupos.find((t) => t.filialId === filialId && t.nome === nomeGrupo);
-}
-
-/**
- * @param grupoFiltro Nome do grupo (`Grupo 1` / `Grupo 2`), não o id do cadastro.
- *   Null = todos os grupos.
- */
-export function buildGroupsView(escopo: Scope, grupoFiltro: string | null = null): GroupsView {
-  const periodo = resolvePeriod(escopo.periodo);
-  const fs = storesInScope(escopo);
-  const divisao = escopo.divisao;
-
-  // Grupos das filiais do escopo; nomes únicos para o select.
-  const gruposEscopo = grupos.filter((t) => fs.some((f) => f.id === t.filialId));
-  const nomesUnicos = [...new Set(gruposEscopo.map((t) => t.nome))];
-  const gruposDisponiveis = nomesUnicos.map((nome) => ({ id: nome, nome }));
-
-  // Filtro por nome: une as faixas horárias desse grupo em todas as lojas do escopo.
-  const gruposDoFiltro = grupoFiltro ? gruposEscopo.filter((t) => t.nome === grupoFiltro) : [];
-  const horasAtivas = grupoFiltro ? horasDosGrupos(gruposDoFiltro) : horasDoGrupo(null);
-
-  // KPIs por grupo — cada loja usa a faixa horária do seu próprio cadastro.
-  const kpisPorGrupo: GroupKpi[] = nomesUnicos.map((nome) => {
-    let faturamento = 0;
-    let vendas = 0;
-    for (const f of fs) {
-      const grupo = grupoDaFilial(f.id, nome);
-      if (!grupo) continue;
-      for (const iso of intervaloDias(periodo.inicio, periodo.fim)) {
-        const dv = salesDay(f.id, iso);
-        if (!dv) continue;
-        for (const h of horasDoGrupo(grupo)) {
-          const ag = dv.porHora[h];
-          if (!ag) continue;
-          if (divisao) {
-            const divAg = dv.porDivisao[divisao];
-            const fr = divAg && dv.total.faturamento > 0 ? divAg.faturamento / dv.total.faturamento : 1;
-            faturamento += Math.round(ag.faturamento * fr);
-            vendas += Math.round(ag.atendimentos * fr);
-          } else {
-            faturamento += ag.faturamento;
-            vendas += ag.atendimentos;
-          }
-        }
-      }
-    }
-    return {
-      nome,
-      faturamento,
-      vendas,
-      ticketMedio: divSeguro(faturamento, vendas),
-    };
-  });
-
-  // Faturamento por dia × grupo
-  const dias = intervaloDias(periodo.inicio, periodo.fim);
-  const faturamentoPorDiaGrupo: GroupDayRevenue[] = dias.map((iso) => {
-    const porGrupo: Record<string, number> = {};
-    for (const nome of nomesUnicos) {
-      let fat = 0;
-      for (const f of fs) {
-        const grupo = grupoDaFilial(f.id, nome);
-        if (!grupo) continue;
-        const dv = salesDay(f.id, iso);
-        if (!dv) continue;
-        for (const h of horasDoGrupo(grupo)) {
-          const ag = dv.porHora[h];
-          if (!ag) continue;
-          if (divisao) {
-            const divAg = dv.porDivisao[divisao];
-            const fr = divAg && dv.total.faturamento > 0 ? divAg.faturamento / dv.total.faturamento : 1;
-            fat += Math.round(ag.faturamento * fr);
-          } else {
-            fat += ag.faturamento;
-          }
-        }
-      }
-      porGrupo[nome] = fat;
-    }
-    return { dia: iso, porGrupo };
-  });
-
-  // Heatmap (dia × hora) — valores de faturamento
-  const heatmap: HeatmapCell[] = [];
-  for (const iso of dias) {
-    for (const h of horasAtivas) {
-      let valor = 0;
-      for (const f of fs) {
-        const dv = salesDay(f.id, iso);
-        if (!dv) continue;
-        const ag = dv.porHora[h];
-        if (!ag) continue;
-        if (divisao) {
-          const divAg = dv.porDivisao[divisao];
-          const fr = divAg && dv.total.faturamento > 0 ? divAg.faturamento / dv.total.faturamento : 1;
-          valor += Math.round(ag.faturamento * fr);
-        } else {
-          valor += ag.faturamento;
-        }
-      }
-      heatmap.push({ dia: iso, hora: h, valor });
-    }
-  }
-
-  // Indicadores por hora (só quando período = 1 dia)
-  const ehUmDia = periodo.inicio === periodo.fim;
-  let indicadoresPorHora: HourIndicator[] | null = null;
-  if (ehUmDia) {
-    const diaIso = periodo.inicio;
-    const ant = previousPeriod(periodo);
-    let fatTotalDia = 0;
-    for (const f of fs) {
-      const dv = salesDay(f.id, diaIso);
-      if (!dv) continue;
-      for (const h of horasAtivas) {
-        const ag = dv.porHora[h];
-        if (!ag) continue;
-        if (divisao) {
-          const divAg = dv.porDivisao[divisao];
-          const fr = divAg && dv.total.faturamento > 0 ? divAg.faturamento / dv.total.faturamento : 1;
-          fatTotalDia += Math.round(ag.faturamento * fr);
-        } else {
-          fatTotalDia += ag.faturamento;
-        }
-      }
-    }
-    let acumulado = 0;
-    indicadoresPorHora = horasAtivas.map((h) => {
-      let fat = 0;
-      let atd = 0;
-      for (const f of fs) {
-        const dv = salesDay(f.id, diaIso);
-        if (!dv) continue;
-        const ag = dv.porHora[h];
-        if (!ag) continue;
-        if (divisao) {
-          const divAg = dv.porDivisao[divisao];
-          const fr = divAg && dv.total.faturamento > 0 ? divAg.faturamento / dv.total.faturamento : 1;
-          fat += Math.round(ag.faturamento * fr);
-          atd += Math.round(ag.atendimentos * fr);
-        } else {
-          fat += ag.faturamento;
-          atd += ag.atendimentos;
-        }
-      }
-      acumulado += fat;
-      // Comparativo com mesmo horário do dia anterior
-      let fatAnt = 0;
-      for (const f of fs) {
-        const dvAnt = salesDay(f.id, ant.inicio);
-        if (!dvAnt) continue;
-        const agAnt = dvAnt.porHora[h];
-        if (!agAnt) continue;
-        if (divisao) {
-          const divAg = dvAnt.porDivisao[divisao];
-          const fr = divAg && dvAnt.total.faturamento > 0 ? divAg.faturamento / dvAnt.total.faturamento : 1;
-          fatAnt += Math.round(agAnt.faturamento * fr);
-        } else {
-          fatAnt += agAnt.faturamento;
-        }
-      }
-      const delta = fatAnt > 0 ? ((fat - fatAnt) / fatAnt) * 100 : null;
-      return {
-        hora: h,
-        faturamento: fat,
-        atendimentos: atd,
-        ticketMedio: divSeguro(fat, atd),
-        pctFatDia: divSeguro(fat, fatTotalDia) * 100,
-        fatAcumulado: acumulado,
-        pctFatAcumulado: divSeguro(acumulado, fatTotalDia) * 100,
-        deltaVsAnterior: delta !== null ? { value: `${Math.abs(delta).toFixed(0)}%`, positive: delta >= 0 } : null,
-      };
-    });
-  }
-
-  // Vendedoras por hora (staff real vs meta mínima) — agrega todos os dias do período
-  const diasDoPeriodo = intervaloDias(periodo.inicio, periodo.fim);
-  const numDias = diasDoPeriodo.length || 1;
-  const vendedorasPorHora: SellerByHour[] = horasAtivas.map((h) => {
-    let somaReais = 0;
-    for (const dia of diasDoPeriodo) {
-      for (const f of fs) {
-        const dv = salesDay(f.id, dia);
-        if (!dv) continue;
-        const ag = dv.porHora[h];
-        if (ag && ag.atendimentos > 0) {
-          const vendedoresCount = Object.keys(dv.porVendedora).length || 1;
-          somaReais += vendedoresCount;
-        }
-      }
-    }
-    const reais = Math.round(somaReais / numDias);
-    const metaMinima = 2;
-    return { hora: h, reais, metaMinima };
-  });
-
-  return {
-    escopo,
-    periodo,
-    grupoFiltro,
-    gruposDisponiveis,
-    kpisPorGrupo,
-    faturamentoPorDiaGrupo,
-    heatmap,
-    indicadoresPorHora,
-    vendedorasPorHora,
-  };
-}
-
-
-/* ================================================================
- * TELA VISÃO GERAL — camada de dados (montarVisaoGeralView)
+ * TELA VISAO GERAL  -  camada de dados (montarVisaoGeralView)
  * ================================================================ */
 
 import { collaboratorsOfStore } from "./team";
@@ -3977,7 +3710,7 @@ export interface OverviewKpi {
   label: string;
   valor: string;
   sub?: string;
-  /** @deprecated Prefer `kpisWpink` strip — kept optional for compat. */
+  /** @deprecated Prefer `kpisWpink` strip  -  kept optional for compat. */
   subWpink?: string;
   delta?: { value: string; positive: boolean; vs?: string };
   serie?: number[];
@@ -3985,7 +3718,7 @@ export interface OverviewKpi {
   drillTo?: string;
 }
 
-/** Quick stats WPINK (estilo Sales overview / Ao vivo) — só quando a loja tem WPINK. */
+/** Quick stats WPINK (estilo Sales overview / Ao vivo)  -  so quando a loja tem WPINK. */
 export interface OverviewKpiWpink {
   label: string;
   valor: string;
@@ -4020,11 +3753,11 @@ export interface EvolutionPoint {
   realizado: number;
   meta: number;
   projecao: number | null;
-  /** Ponto-âncora R$ 0 na abertura (eixo hora "acumulado até") — fora do modo por período. */
+  /** Ponto-ancora R$ 0 na abertura (eixo hora "acumulado ate")  -  fora do modo por periodo. */
   ancora?: boolean;
-  /** Hora de hoje que ainda não chegou: só a meta (o realizado para em "Agora"). */
+  /** Hora de hoje que ainda nao chegou: so a meta (o realizado para em "Agora"). */
   futuro?: boolean;
-  /** Eixo hora: faixa completa para o tooltip ("21h às 22h"). */
+  /** Eixo hora: faixa completa para o tooltip ("21h as 22h"). */
   faixa?: string;
 }
 
@@ -4034,18 +3767,18 @@ export interface TopItem {
 }
 
 export interface TopSeller extends TopItem {
-  /** Mesma chave do `TeamMemberRow.key` — abre o detalhe da pessoa. */
+  /** Mesma chave do `TeamMemberRow.key`  -  abre o detalhe da pessoa. */
   key?: string;
   sub?: string;
   ticketMedio?: number;
   pctMeta?: number;
-  /** Itens por venda; ausente se algum dia com venda não tem itens gravados (nada estimado). */
+  /** Itens por venda; ausente se algum dia com venda nao tem itens gravados (nada estimado). */
   pa?: number;
-  /** Lojas onde vendeu no período, da que mais faturou para a que menos. */
+  /** Lojas onde vendeu no periodo, da que mais faturou para a que menos. */
   lojas: string[];
-  /** Turno cadastrado em Configurações > Lojas ("Manhã · 09:00–15:00"); ausente = sem turno. */
+  /** Turno cadastrado em Configuracoes > Lojas ("Manha  |  09:00 - 15:00"); ausente = sem turno. */
   turno?: string;
-  /** Nível na meta (Gestão > Metas) do início dela até hoje; ausente = pessoa sem meta. */
+  /** Nivel na meta (Gestao > Metas) do inicio dela ate hoje; ausente = pessoa sem meta. */
   meta?: import("./goalView").SellerGoalLevel;
 }
 
@@ -4062,24 +3795,24 @@ export interface OverviewView {
   projecaoFechamento: string | null;
   /** Qual meta o card Atingimento mostra (nome + datas, ou soma de N lojas). */
   metaDescricao?: string | null;
-  /** Delta do faturamento vs período anterior (badge dos cards de gráfico). */
+  /** Delta do faturamento vs periodo anterior (badge dos cards de grafico). */
   deltaFaturamento?: { value: string; positive: boolean; vs?: string };
   eixoSerie: SeriesAxis;
   rotuloSerie: string;
   categoriaVsMeta: CategoryVsGoal[];
-  /** Vazio quando período = 1 dia (card oculto na UI). */
+  /** Vazio quando periodo = 1 dia (card oculto na UI). */
   diaVsMeta: DayVsGoal[];
   evolucao: EvolutionPoint[];
   formasPagamento: PaymentMethodRevenue[];
   topVendedoras: TopSeller[];
-  /** Ranking completo (maior faturamento primeiro) — a tela escolhe a métrica e corta o Top N.
+  /** Ranking completo (maior faturamento primeiro)  -  a tela escolhe a metrica e corta o Top N.
    *  `chave` = mesma do `ProductItemRow` (abre o detalhe do produto). */
   /** `lucro`: null = algum dia com venda sem custo gravado; ausente = fixture. */
   topProdutos: (TopItem & { chave?: string; sub?: string; itens?: number; categoria?: string; trend?: number; lucro?: number | null })[];
   rankingLojas: (TopItem & { id?: string; pctMeta?: number; pctRede?: number; trend?: number })[];
-  /** Faturamento da rede no período (badge do Ranking — independente do StorePicker). */
+  /** Faturamento da rede no periodo (badge do Ranking  -  independente do StorePicker). */
   rankingRedeTotal?: number;
-  /** Com 1 loja no StorePicker: quantas outras lojas venderam no período (fatia "Demais lojas"). */
+  /** Com 1 loja no StorePicker: quantas outras lojas venderam no periodo (fatia "Demais lojas"). */
   rankingDemaisLojas?: number;
   /** True when KPIs come from sales_*_agg (possibly empty). */
   fromAggregates?: boolean;
@@ -4089,31 +3822,31 @@ export type OverviewAggInput = {
   dayAggs: import("./salesTypes").SalesDayAgg[];
   hourAggs?: import("./salesTypes").SalesHourAgg[];
   categoryDayAggs?: import("./salesTypes").SalesCategoryDayAgg[];
-  /** Tipos já vistos no sync (histórico) — barras com R$ 0 no período. */
+  /** Tipos ja vistos no sync (historico)  -  barras com R$ 0 no periodo. */
   categoryCatalog?: import("./salesTypes").SalesCategoryRef[];
-  /** Formas de pagamento (CONDICAO) — brand=ALL. */
+  /** Formas de pagamento (CONDICAO)  -  brand=ALL. */
   paymentDayAggs?: import("./salesTypes").SalesPaymentDayAgg[];
-  /** Ranking vendedoras (VENDEDOR_MILLENNIUM) — brand=ALL. */
+  /** Ranking vendedoras (VENDEDOR_MILLENNIUM)  -  brand=ALL. */
   sellerDayAggs?: import("./salesTypes").SalesSellerDayAgg[];
-  /** Turno de cada funcionária (store_seller.shift_id) — popover do Destaques da equipe. */
+  /** Turno de cada funcionaria (store_seller.shift_id)  -  popover do Destaques da equipe. */
   sellerShifts?: import("./salesTypes").SellerShiftRef[];
-  /** Top produtos ({E7A5C5C7}) — brand=ALL. Pode incluir dias do período anterior p/ variação. */
+  /** Top produtos ({E7A5C5C7})  -  brand=ALL. Pode incluir dias do periodo anterior p/ variacao. */
   productDayAggs?: import("./salesTypes").SalesProductDayAgg[];
-  /** CMV por produto do período (RELATORIOMARGEM) — lucro bruto do Top produtos. */
+  /** CMV por produto do periodo (RELATORIOMARGEM)  -  lucro bruto do Top produtos. */
   productCostDayAggs?: import("./salesTypes").SalesProductCostDayAgg[];
-  /** Histórico antes do período (curva da meta por dia da semana) — `goalHistoryDayRange`. */
+  /** Historico antes do periodo (curva da meta por dia da semana)  -  `goalHistoryDayRange`. */
   goalHistoryDayAggs?: import("./salesTypes").SalesDayAgg[];
-  /** Mesmo dia da semana nas semanas anteriores (curva da meta por hora) — `goalHistorySameWeekdays`. */
+  /** Mesmo dia da semana nas semanas anteriores (curva da meta por hora)  -  `goalHistorySameWeekdays`. */
   goalHistoryHourAggs?: import("./salesTypes").SalesHourAgg[];
-  /** Período anterior (`previousPeriod`) — badges de comparativo dos KPIs e cards. */
+  /** Periodo anterior (`previousPeriod`)  -  badges de comparativo dos KPIs e cards. */
   prevDayAggs?: import("./salesTypes").SalesDayAgg[];
-  /** Período = hoje: horas do mesmo dia da semana passada (comparativo até a hora atual). */
+  /** Periodo = hoje: horas do mesmo dia da semana passada (comparativo ate a hora atual). */
   prevHourAggs?: import("./salesTypes").SalesHourAgg[];
-  /** Metas (Gestão > Metas) das lojas que cruzam o período. */
+  /** Metas (Gestao > Metas) das lojas que cruzam o periodo. */
   goals?: import("./goalsRepo").GoalRecord[];
-  /** Faturamento do início das metas até hoje (card Atingimento da meta, que ignora o filtro de período). */
+  /** Faturamento do inicio das metas ate hoje (card Atingimento da meta, que ignora o filtro de periodo). */
   goalDayAggs?: import("./salesTypes").SalesDayAgg[];
-  /** Vendas por pessoa do início das metas até hoje (nível de meta no Destaques da equipe). */
+  /** Vendas por pessoa do inicio das metas ate hoje (nivel de meta no Destaques da equipe). */
   goalSellerDayAggs?: import("./salesTypes").SalesSellerDayAgg[];
   /** Equipe das lojas com meta (grupo de cada pessoa na meta). */
   goalTeam?: import("./goalsRepo").GoalTeamMember[];
@@ -4121,12 +3854,12 @@ export type OverviewAggInput = {
 
 /** Prefere linhas brand=ALL; sem ALL, soma WEPINK+WPINK. */
 /**
- * Linhas WPINK do período. Dia só com receita (relatório de marca sem DetMov) deixa
- * CMV / nº de vendas incompletos — nada é estimado; a UI mostra "—" e sem badge.
+ * Linhas WPINK do periodo. Dia so com receita (relatorio de marca sem DetMov) deixa
+ * CMV / n de vendas incompletos  -  nada e estimado; a UI mostra " - " e sem badge.
  */
 function wpinkRows<R extends import("./salesTypes").SalesDayAgg>(
   rows: R[],
-  /** `loja|dia` com o relatório de margem gravado — CMV 0 ali é custo R$ 0 no ERP, não falta de dado. */
+  /** `loja|dia` com o relatorio de margem gravado  -  CMV 0 ali e custo R$ 0 no ERP, nao falta de dado. */
   costDays?: ReadonlySet<string>,
 ): { rows: R[]; cmvIncompleto: boolean; vendasIncompletas: boolean } {
   const out = rows.filter((r) => r.brand === "WPINK");
@@ -4138,8 +3871,8 @@ function wpinkRows<R extends import("./salesTypes").SalesDayAgg>(
   };
 }
 
-/** Totais WPINK; `null` = dado incompleto em algum dia com venda WPINK (nada é estimado). */
-/** `impostos` = ICMS (faturamento) + ICMS ST (CMV) das lojas; 0 sem configuração. */
+/** Totais WPINK; `null` = dado incompleto em algum dia com venda WPINK (nada e estimado). */
+/** `impostos` = ICMS (faturamento) + ICMS ST (CMV) das lojas; 0 sem configuracao. */
 type WpinkTotals = { fat: number; cmv: number | null; vendas: number | null; itens: number | null; impostos: number };
 
 type WpinkScope = { has(storeId: string): boolean; get?(storeId: string): Store | undefined };
@@ -4161,7 +3894,7 @@ function wpinkTotals(
         cmv: acc.cmv + cmv,
         sales: acc.sales + d.salesCount,
         items: acc.items + d.itemCount,
-        tax: acc.tax + (d.revenueCents * (c?.icmsPct ?? 0) + cmv * (c?.icmsStPct ?? 0)) / 100,
+        tax: acc.tax + (d.revenueCents * (c?.icmsWpinkPct ?? 0) + cmv * (c?.icmsStWpinkPct ?? 0)) / 100,
       };
     },
     { rev: 0, cmv: 0, sales: 0, items: 0, tax: 0 },
@@ -4176,9 +3909,9 @@ function wpinkTotals(
 }
 
 /**
- * WPINK do período anterior. Com `horaMax`, o último dia (`fim`) entra pelas horas WPINK até a hora
- * atual e os demais inteiros (sem CMV por hora → CMV null). Loja com venda WPINK nesse dia sem
- * horas gravadas → null (sem comparativo).
+ * WPINK do periodo anterior. Com `horaMax`, o ultimo dia (`fim`) entra pelas horas WPINK ate a hora
+ * atual e os demais inteiros (sem CMV por hora  ->  CMV null). Loja com venda WPINK nesse dia sem
+ * horas gravadas  ->  null (sem comparativo).
  */
 function wpinkPrevTotals(
   dayRows: import("./salesTypes").SalesDayAgg[],
@@ -4207,7 +3940,7 @@ function wpinkPrevTotals(
   };
 }
 
-/** Faixa WPINK do Financeiro: Faturamento · CMV · Lucro bruto · Margem (+ badge vs período anterior). */
+/** Faixa WPINK do Financeiro: Faturamento  |  CMV  |  Lucro bruto  |  Margem (+ badge vs periodo anterior). */
 function buildFinanceWpinkKpis(p: {
   mostrar: boolean;
   atual: WpinkTotals;
@@ -4271,7 +4004,7 @@ function preferAllBrand<T extends { brand: string }>(rows: T[]): T[] {
   return all.length > 0 ? all : rows.filter((r) => r.brand !== "ALL");
 }
 
-/** Overview from real sales aggregates — CMV/top produtos stay empty until heavy sync. */
+/** Overview from real sales aggregates  -  CMV/top produtos stay empty until heavy sync. */
 export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput): OverviewView {
   const periodo = resolvePeriod(escopo.periodo, calendarTodayIso());
   const eixoSerie = seriesAxisForPeriod(periodo);
@@ -4287,9 +4020,9 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
     return all.length > 0 ? all : rows.filter((d) => d.brand === "WEPINK" || d.brand === "WPINK");
   }
 
-  // Rede (todas as lojas do fetch) — ranking / badge / % participação.
+  // Rede (todas as lojas do fetch)  -  ranking / badge / % participacao.
   const daysRede = byBrand(input.dayAggs);
-  // Escopo do StorePicker — KPIs / gráficos.
+  // Escopo do StorePicker  -  KPIs / graficos.
   let days =
     escopo.filialIds.length > 0
       ? daysRede.filter((d) => scopedStoreIds.has(d.storeId))
@@ -4317,8 +4050,8 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
   const atualAgg = sumDays(days);
 
   /**
-   * Sem hora×marca (FORCE sem DetMov ainda): rateia horas ALL pelo share
-   * marca/ALL de cada loja — mantém o gráfico Faturamento x meta no filtro WPINK/WEPINK.
+   * Sem horaxmarca (FORCE sem DetMov ainda): rateia horas ALL pelo share
+   * marca/ALL de cada loja  -  mantem o grafico Faturamento x meta no filtro WPINK/WEPINK.
    */
   let hours = hoursRaw;
   if (brand && hours.length === 0 && atualAgg.revenueCents > 0) {
@@ -4359,7 +4092,7 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
   let atendimentos = atualAgg.salesCount;
   let itens = atualAgg.itemCount;
 
-  // Relatório de marca grava só receita (counts=0). Até o próximo FORCE/SEED
+  // Relatorio de marca grava so receita (counts=0). Ate o proximo FORCE/SEED
   // com counts preenchidos, deriva de horas ou rateia do ALL.
   if (brand && atendimentos === 0 && atualAgg.revenueCents > 0) {
     const fromHours = hours.reduce(
@@ -4401,7 +4134,7 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
 
   const ticket = atendimentos > 0 ? faturamento / atendimentos : 0;
 
-  // Quick stats WPINK — só se alguma loja do escopo tem a marca.
+  // Quick stats WPINK  -  so se alguma loja do escopo tem a marca.
   const showWpinkStrip = fs.some((f) => f.temWpink);
   const wpink = wpinkRows(
     input.dayAggs.filter((d) => {
@@ -4420,7 +4153,7 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
     { revenueCents: 0, cmvCents: 0, salesCount: 0, itemCount: 0 },
   );
   const wpinkFat = wpinkSum.revenueCents / 100;
-  // CMV WPINK só quando todos os dias com venda WPINK têm CMV (senão soma parcial engana).
+  // CMV WPINK so quando todos os dias com venda WPINK tem CMV (senao soma parcial engana).
   const wpinkCmv = wpink.cmvIncompleto ? 0 : wpinkSum.cmvCents / 100;
   const wpinkVendas = wpink.vendasIncompletas ? 0 : wpinkSum.salesCount;
   const wpinkItens = wpink.vendasIncompletas ? 0 : wpinkSum.itemCount;
@@ -4464,7 +4197,7 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
       ]
     : [];
 
-  // Metas (Gestão > Metas): meta de cada loja num dia = a meta que cobre o dia, distribuída pelos dias dela.
+  // Metas (Gestao > Metas): meta de cada loja num dia = a meta que cobre o dia, distribuida pelos dias dela.
   const hojeIso = calendarTodayIso();
   const goals = (input.goals ?? []).filter((g) => scopedStoreIds.has(g.storeId));
   const goalOn = (storeId: string, iso: string) =>
@@ -4493,7 +4226,7 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
     .map(([, v]) => v)
     .slice(-7);
 
-  // Comparativo: período anterior equivalente. Terminando hoje, o último dia do anterior entra até a hora atual.
+  // Comparativo: periodo anterior equivalente. Terminando hoje, o ultimo dia do anterior entra ate a hora atual.
   const antBase = previousPeriod(periodo, calendarCurrentHour());
   const antHoraMax = antBase.horaMax;
   const inScope = (storeId: string) => escopo.filialIds.length === 0 || scopedStoreIds.has(storeId);
@@ -4518,7 +4251,7 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
       (input.prevHourAggs ?? []).filter((h) => inScope(h.storeId) && h.day === antBase.fim),
     );
     const lojasComHora = new Set(prevHours.map((h) => h.storeId));
-    // Loja que vendeu no dia equivalente sem horas gravadas → sem comparativo (nunca dia cheio × parcial).
+    // Loja que vendeu no dia equivalente sem horas gravadas  ->  sem comparativo (nunca dia cheio x parcial).
     const faltaHora = prevDays.some((d) => d.day === antBase.fim && d.revenueCents > 0 && !lojasComHora.has(d.storeId));
     if (!faltaHora) {
       anterior = somaPrev(prevDays.filter((d) => d.day < antBase.fim));
@@ -4530,7 +4263,7 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
       }
     }
   }
-  // Sem venda no período atual (ex.: hoje antes do Atualizar) não é queda de 100% — é falta de dado.
+  // Sem venda no periodo atual (ex.: hoje antes do Atualizar) nao e queda de 100%  -  e falta de dado.
   const temComp = anterior != null && anterior.fatCents > 0 && faturamento > 0;
   const vsRotulo = temComp ? antBase.rotulo : undefined;
   const antFat = (anterior?.fatCents ?? 0) / 100;
@@ -4538,14 +4271,14 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
   const antTicket = antVendas > 0 ? antFat / antVendas : 0;
   const deltaFaturamento = temComp ? kpiDelta(faturamento, antFat, vsRotulo) : undefined;
 
-  // CMV não existe por hora: terminando hoje, compara sem o dia de hoje nos dois lados.
+  // CMV nao existe por hora: terminando hoje, compara sem o dia de hoje nos dois lados.
   const cortaHoje = antHoraMax != null;
   const vsCmv = cortaHoje ? `${antBase.rotulo}, até o mesmo dia` : antBase.rotulo;
   const cmvAtualCmp = (cortaHoje ? days.filter((d) => d.day < periodo.fim) : days).reduce((s, d) => s + (d.cmvCents ?? 0), 0) / 100;
   const cmvAntCmp = somaPrev(cortaHoje ? prevDays.filter((d) => d.day < antBase.fim) : prevDays).cmvCents / 100;
   const deltaCmv = cmvTotalCents > 0 && cmvAtualCmp > 0 && cmvAntCmp > 0 ? kpiDelta(cmvAtualCmp, cmvAntCmp, vsCmv) : undefined;
 
-  // Faixa WPINK: mesmo período anterior (último dia = horas WPINK até a hora atual; sem horas → sem badge).
+  // Faixa WPINK: mesmo periodo anterior (ultimo dia = horas WPINK ate a hora atual; sem horas  ->  sem badge).
   const antW = kpisWpink.length > 0
     ? wpinkPrevTotals(input.prevDayAggs ?? [], input.prevHourAggs ?? [], { has: inScope }, antBase)
     : null;
@@ -4605,7 +4338,7 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
     },
   ];
 
-  // Curva da meta: meta de cada loja → dia (peso do dia da semana nas datas da meta) → hora (peso da hora).
+  // Curva da meta: meta de cada loja  ->  dia (peso do dia da semana nas datas da meta)  ->  hora (peso da hora).
   const histDayByStore = new Map<string, Map<string, number>>();
   for (const r of preferAllBrand(input.goalHistoryDayAggs ?? [])) {
     const m = histDayByStore.get(r.storeId) ?? new Map<string, number>();
@@ -4620,8 +4353,8 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
     return g ? periodDailyGoal(g.target, g.startsOn, g.endsOn, iso, weekdayWeightsByStore.get(f.id) ?? []) : 0;
   };
 
-  // Card Atingimento = metas inteiras que cruzam o filtro (ex.: 01/09 a 30/09), com o vendido do início de cada
-  // meta até hoje — independente do filtro. O dia contra a meta do dia fica no Faturamento x meta.
+  // Card Atingimento = metas inteiras que cruzam o filtro (ex.: 01/09 a 30/09), com o vendido do inicio de cada
+  // meta ate hoje  -  independente do filtro. O dia contra a meta do dia fica no Faturamento x meta.
   const vendidoPorLojaDia = new Map<string, number>();
   for (const d of preferAllBrand(input.goalDayAggs ?? [])) {
     const k = `${d.storeId}|${d.day}`;
@@ -4648,7 +4381,7 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
     }
     realizadoMeta += realizado;
     if (g.endsOn < hojeIso) projetado += realizado;
-    // Projeção = ritmo dos dias fechados × meta; só depois de metade da meta esperada ter passado.
+    // Projecao = ritmo dos dias fechados x meta; so depois de metade da meta esperada ter passado.
     else if (esperadoAteOntem >= g.target / 2) projetado += (realizadoAteOntem / esperadoAteOntem) * g.target;
     else projecaoCompleta = false;
   }
@@ -4677,7 +4410,7 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
     for (const f of fs) {
       const metaDia = metaLojaDia(f, periodo.inicio);
       if (metaDia <= 0) continue;
-      // Sem horário: curva pelas horas que venderam no histórico; sem histórico, 10h–22h (só a meta).
+      // Sem horario: curva pelas horas que venderam no historico; sem historico, 10h - 22h (so a meta).
       const hist = histHourByStore.get(f.id) ?? new Map<number, number>();
       let shares = hourShares(hist, f.horas, dowMeta);
       if (shares.size === 0) shares = hourShares(hist, effectiveWeekHours(f.horas), dowMeta);
@@ -4685,8 +4418,8 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
         metaByHour.set(h, (metaByHour.get(h) ?? 0) + metaDia * share);
       }
     }
-    // Eixo = expediente das lojas no dia (`hourAxisRange`); só lojas com venda no dia entram
-    // (evita loja sem venda alargar o eixo). Dia inteiro: hoje, as horas que ainda não chegaram mostram só a meta.
+    // Eixo = expediente das lojas no dia (`hourAxisRange`); so lojas com venda no dia entram
+    // (evita loja sem venda alargar o eixo). Dia inteiro: hoje, as horas que ainda nao chegaram mostram so a meta.
     const storesWithSales = new Set(
       [...days, ...hours].filter((r) => r.revenueCents > 0).map((r) => r.storeId),
     );
@@ -4711,7 +4444,7 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
       }
       return v;
     };
-    // Rótulo = início da faixa ("10h" = 10:00–10:59, hora local da loja); a âncora R$ 0 fica fora do gráfico.
+    // Rotulo = inicio da faixa ("10h" = 10:00 - 10:59, hora local da loja); a ancora R$ 0 fica fora do grafico.
     evolucao.push({ label: horaCurta(first), realizado: 0, meta: 0, projecao: null, ancora: true });
     let acum = 0;
     let acumM = 0;
@@ -4748,8 +4481,8 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
 
   const faltamParaMeta = faltam > 0 ? `Faltam ${brlCent(faltam)} para atingir a meta` : metaTotal > 0 ? "Meta atingida" : null;
 
-  // Faturamento por categoria — mix do período + catálogo histórico (zeros).
-  // Meta por categoria fica p/ CRUD de Metas; não inventar Goal aqui.
+  // Faturamento por categoria  -  mix do periodo + catalogo historico (zeros).
+  // Meta por categoria fica p/ CRUD de Metas; nao inventar Goal aqui.
   const catAcc = new Map<string, { realizado: number }>();
   for (const ref of input.categoryCatalog ?? []) {
     if (brand && ref.brand !== brand && ref.brand !== "ALL") continue;
@@ -4773,7 +4506,7 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
     }))
     .sort((a, b) => b.realizado - a.realizado || a.categoria.localeCompare(b.categoria, "pt-BR"));
 
-  // Ranking de lojas — totais da rede; lista pode filtrar 1 loja, mas %/badge = rede.
+  // Ranking de lojas  -  totais da rede; lista pode filtrar 1 loja, mas %/badge = rede.
   const byStore = new Map<string, number>();
   for (const d of daysRede) {
     byStore.set(d.storeId, (byStore.get(d.storeId) ?? 0) + d.revenueCents / 100);
@@ -4805,7 +4538,7 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
       ? [...byStore.entries()].filter(([id, v]) => v > 0 && id !== escopo.filialIds[0]).length
       : undefined;
 
-  // Formas: sempre brand=ALL (Lista não traz marca). Filtra só por loja/período.
+  // Formas: sempre brand=ALL (Lista nao traz marca). Filtra so por loja/periodo.
   const totaisForma: Record<string, number> = {};
   for (const row of input.paymentDayAggs ?? []) {
     if (escopo.filialIds.length > 0 && !scopedStoreIds.has(row.storeId)) continue;
@@ -4825,8 +4558,8 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
       cor: CORES_FORMAS[forma] ?? FORMAS_FALLBACK[i % FORMAS_FALLBACK.length]!,
     }));
 
-  // Top vendedoras — VENDEDOR_MILLENNIUM (sem % meta até CRUD de Metas).
-  // Com código do ERP agrupa pela funcionária (nome trocado no ERP não divide a pessoa); nome = o do dia mais recente.
+  // Top vendedoras  -  VENDEDOR_MILLENNIUM (sem % meta ate CRUD de Metas).
+  // Com codigo do ERP agrupa pela funcionaria (nome trocado no ERP nao divide a pessoa); nome = o do dia mais recente.
   type VendAcc = {
     nome: string;
     nomeDia: string;
@@ -4910,8 +4643,8 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
       };
     });
 
-  // Top produtos — agrupado por `COD_PRODUTO` (igual à tela Produtos); variação vs período anterior.
-  // Lucro bruto = faturamento − CMV (RELATORIOMARGEM) − ICMS − ICMS ST da loja; sem custo num dia = null.
+  // Top produtos  -  agrupado por `COD_PRODUTO` (igual a tela Produtos); variacao vs periodo anterior.
+  // Lucro bruto = faturamento  CMV (RELATORIOMARGEM)  ICMS  ICMS ST da loja; sem custo num dia = null.
   const antPeriod = previousPeriod(periodo);
   const storeById = new Map(fs.map((f) => [f.id, f]));
   const custoKey = (storeId: string, day: string, code: string) => `${storeId}|${day}|${code}`;
@@ -4952,7 +4685,7 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
       const taxa = taxaDaLoja(row.storeId);
       if (!taxa) acc.semCusto = true;
       else {
-        acc.impostos += (v * taxa.icmsPct) / 100;
+        acc.impostos += impostosDoProduto(taxa, code, v, 0);
         if (v > 0) {
           const k = custoKey(row.storeId, row.day, code);
           const cmv = code ? custos.get(k) : undefined;
@@ -4960,7 +4693,7 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
           else if (!custosUsados.has(k)) {
             custosUsados.add(k);
             acc.cmv += cmv;
-            acc.impostos += (cmv * taxa.icmsStPct) / 100;
+            acc.impostos += impostosDoProduto(taxa, code, 0, cmv);
           }
         }
       }
@@ -5015,15 +4748,15 @@ export function buildOverviewView(escopo: Scope, aggs?: OverviewAggInput | null)
 
   const periodo = resolvePeriod(escopo.periodo);
   const fs = storesInScope(escopo);
-  // Overview fixture: mesmo contrato — total da operação (sem filtro de marca).
+  // Overview fixture: mesmo contrato  -  total da operacao (sem filtro de marca).
   const divisao = null as Division | null;
 
-  // Agregados do período
+  // Agregados do periodo
   const atual = sumAggregates(fs.map((f) => agregadoPeriodo(f, periodo.inicio, periodo.fim, divisao)));
   const custoAtual = custoPeriodo(fs, periodo.inicio, periodo.fim, divisao).cmv;
   const lucroAtual = atual.faturamento - custoAtual;
   void lucroAtual; // reservado para KPIs futuros de margem/lucro
-  // Período anterior para deltas
+  // Periodo anterior para deltas
   const ant = previousPeriod(periodo);
   const anterior = sumAggregates(fs.map((f) => agregadoPeriodo(f, ant.inicio, ant.fim, divisao)));
   const custoAnterior = custoPeriodo(fs, ant.inicio, ant.fim, divisao).cmv;
@@ -5078,7 +4811,7 @@ export function buildOverviewView(escopo: Scope, aggs?: OverviewAggInput | null)
       ]
     : [];
 
-  // Meta da competência (mês corrente)
+  // Meta da competencia (mes corrente)
   const competencia = periodo.inicio.slice(0, 7);
   let metaTotal = 0;
   for (const f of fs) {
@@ -5088,14 +4821,14 @@ export function buildOverviewView(escopo: Scope, aggs?: OverviewAggInput | null)
   const atingMeta = metaTotal > 0 ? (atual.faturamento / metaTotal) * 100 : 0;
   const faltam = metaTotal > 0 ? Math.max(0, metaTotal - atual.faturamento) : 0;
 
-  // Projeção de fechamento (curva de receita)
+  // Projecao de fechamento (curva de receita)
   const curva = revenueCurve(fs, competencia);
   let fracaoAcum = 0;
   for (const iso of intervaloDias(`${competencia}-01`, TODAY_ISO)) fracaoAcum += curva.peso(iso);
   const projetado = fracaoAcum > 0 ? atual.faturamento / fracaoAcum : 0;
   const projPct = metaTotal > 0 ? (projetado / metaTotal) * 100 : 0;
 
-  // Série de tendência (7 pontos)
+  // Serie de tendencia (7 pontos)
   const serieFat = seriesTendencia(fs, periodo, divisao).faturamento?.slice(-7) ?? [];
 
   // KPIs com drill-down
@@ -5137,7 +4870,7 @@ export function buildOverviewView(escopo: Scope, aggs?: OverviewAggInput | null)
     alvo: Math.round(metaTotal * d.atingimentoMinPct / 100),
     realizado: atual.faturamento,
   }));
-  // Fallback se não houver degraus mas houver meta
+  // Fallback se nao houver degraus mas houver meta
   if (gauges.length === 0 && metaTotal > 0) {
     gauges.push({ nome: "Meta", pct: Math.min(100, atingMeta), alvo: metaTotal, realizado: atual.faturamento });
   }
@@ -5169,7 +4902,7 @@ export function buildOverviewView(escopo: Scope, aggs?: OverviewAggInput | null)
     })
     .sort((a, b) => b.realizado - a.realizado || a.categoria.localeCompare(b.categoria, "pt-BR"));
 
-  // Faturamento por Dia da Semana vs Meta — oculto em período de 1 dia.
+  // Faturamento por Dia da Semana vs Meta  -  oculto em periodo de 1 dia.
   const eixoSerie = seriesAxisForPeriod(periodo);
   const rotuloSerie = seriesAxisLabel(periodo, eixoSerie);
   const diasSemanaNomes = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
@@ -5200,7 +4933,7 @@ export function buildOverviewView(escopo: Scope, aggs?: OverviewAggInput | null)
     }));
   }
 
-  // Evolução Fat vs Meta — eixo hora / dia / mês conforme o período.
+  // Evolucao Fat vs Meta  -  eixo hora / dia / mes conforme o periodo.
   const diasPeriodo = intervaloDias(periodo.inicio, periodo.fim);
   const evolucao: EvolutionPoint[] = [];
   if (eixoSerie === "hora") {
@@ -5265,7 +4998,7 @@ export function buildOverviewView(escopo: Scope, aggs?: OverviewAggInput | null)
       evolucao.push({ label, realizado: acumRealizado, meta: acumMeta, projecao: null });
     }
   }
-  // Formas de pagamento (reusa lógica do Financeiro)
+  // Formas de pagamento (reusa logica do Financeiro)
   const totaisForma: Record<string, number> = {};
   for (const f of fs) {
     for (const iso of diasPeriodo) {
@@ -5310,7 +5043,7 @@ export function buildOverviewView(escopo: Scope, aggs?: OverviewAggInput | null)
       }
     }
   }
-  // Meta individual = meta total da loja / nº de vendedoras ativas
+  // Meta individual = meta total da loja / n de vendedoras ativas
   const competenciaMeta = periodo.inicio.slice(0, 7); // YYYY-MM
   const metasFs = fs.map((f) => goalOfStore(f.id, competenciaMeta)).filter((m): m is NonNullable<typeof m> => Boolean(m));
   const metaTotalLoja = metasFs.reduce((s, m) => s + m.valorLoja, 0);
@@ -5342,7 +5075,7 @@ export function buildOverviewView(escopo: Scope, aggs?: OverviewAggInput | null)
       prodMap.set(p.codProduto, acc);
     }
   }
-  // Calcular trend comparando com período anterior
+  // Calcular trend comparando com periodo anterior
   const prodMapAnt = new Map<string, number>();
   for (const [catId, c] of catMap.entries()) {
     const prodsAnt = productsOfCategory(catId, `${ant.inicio}|${divisao ?? ""}`, c.faturamento * 0.85, 0, 0);
@@ -5365,12 +5098,12 @@ export function buildOverviewView(escopo: Scope, aggs?: OverviewAggInput | null)
     })
     .sort((a, b) => b.valor - a.valor);
 
-  // Ranking de lojas (faturamento + % da meta + trend) — fantasia = mesmo rótulo do StorePicker
+  // Ranking de lojas (faturamento + % da meta + trend)  -  fantasia = mesmo rotulo do StorePicker
   const rankingLojas: (TopItem & { pctMeta?: number; trend?: number })[] = fs.map((f) => {
     const fatPeriodo = agregadoPeriodo(f, periodo.inicio, periodo.fim, divisao).faturamento;
     const metaFilial = goalOfStore(f.id, periodo.inicio.slice(0, 7));
     const pctMeta = metaFilial ? (fatPeriodo / metaFilial.valorLoja) * 100 : null;
-    // Trend real: faturamento do período vs período anterior
+    // Trend real: faturamento do periodo vs periodo anterior
     const fatAnterior = agregadoPeriodo(f, ant.inicio, ant.fim, divisao).faturamento;
     const trend = fatAnterior > 0 ? Math.round(((fatPeriodo - fatAnterior) / fatAnterior) * 100) : undefined;
     return {

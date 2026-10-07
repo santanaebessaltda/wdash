@@ -23,8 +23,10 @@ const store = (over: Partial<Store> & Pick<Store, "id">): Store =>
     costTableId: 104,
     custos: {
       ...EMPTY_STORE_COSTS,
-      icmsPct: 10,
-      icmsStPct: 20,
+      icmsWepinkPct: 10,
+      icmsWpinkPct: 10,
+      icmsStWepinkPct: 20,
+      icmsStWpinkPct: 20,
       royaltiesWepinkPct: 5,
       royaltiesWpinkPct: 3,
       marketingWepinkPct: 2,
@@ -54,6 +56,23 @@ describe("composePrice", () => {
     expect(c.pctTotal).toBe(13);
     expect(productBrand("WP014")).toBe("WPINK");
     expect(productBrand("BSPPAR-ATH-001")).toBe("WEPINK");
+  });
+
+  it("produto WP usa o ICMS e o ICMS ST da WPINK", () => {
+    const base = store({ id: "a" });
+    const c = composePrice(
+      store({
+        id: "a",
+        custos: { ...base.custos!, icmsWepinkPct: 10, icmsWpinkPct: 4, icmsStWepinkPct: 20, icmsStWpinkPct: 8 },
+      }),
+      "WP014",
+      10000,
+      3000,
+    );
+    expect(c.despesas.find((d) => d.label === "ICMS")?.pct).toBe(4);
+    expect(c.icmsStPct).toBe(8);
+    const wepink = composePrice(store({ id: "a", custos: { ...base.custos!, icmsWepinkPct: 10, icmsWpinkPct: 4 } }), "BSP-001", 10000, 3000);
+    expect(wepink.despesas.find((d) => d.label === "ICMS")?.pct).toBe(10);
   });
 
   it("sem custo = sem lucro; sem preço = sem custo total", () => {

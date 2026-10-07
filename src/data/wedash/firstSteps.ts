@@ -1,7 +1,7 @@
 import { weekHoursConfigured } from "./storeHours";
 import { fetchStoreSellers, isActiveSalesPerson, type Store, type StoreSeller } from "./stores";
 
-/** Primeiros passos (Visão geral, só Gestor): configurações que deixam custos, margens, metas e premiação corretos. */
+/** Primeiros passos (Visao geral, so Gestor): configuracoes que deixam custos, margens, metas e premiacao corretos. */
 export type FirstStepId = "erp" | "sellers" | "hours" | "groups" | "franchise" | "rent" | "taxes" | "goal" | "challenge";
 
 export interface FirstStep {
@@ -11,7 +11,7 @@ export interface FirstStep {
   done: boolean;
   /** O que falta, quando ajuda a agir ("Falta em 2 de 4 lojas", "3 vendedores sem grupo"). */
   detail?: string;
-  /** Grupos: loja com equipe e sem nenhum grupo → criar grupos; senão → vincular vendedores. */
+  /** Grupos: loja com equipe e sem nenhum grupo  ->  criar grupos; senao  ->  vincular vendedores. */
   needsGroups?: boolean;
 }
 
@@ -26,8 +26,8 @@ export interface FirstStepsInput {
 }
 
 /**
- * "Todas as lojas" avalia a rede. Uma loja no StorePicker mostra só o que falta nela
- * (o card só some de vez quando todas as lojas da sessão estão prontas).
+ * "Todas as lojas" avalia a rede. Uma loja no StorePicker mostra so o que falta nela
+ * (o card so some de vez quando todas as lojas da sessao estao prontas).
  */
 export function storesForFirstStepsView<T extends { id: string }>(stores: T[], filialIds: string[]): T[] {
   if (filialIds.length !== 1) return stores;
@@ -46,7 +46,7 @@ function franchiseOk(s: FirstStepsStore): boolean {
   return !s.temWpink || (c.royaltiesWpinkPct != null && c.marketingWpinkPct != null);
 }
 
-/** Loja de rua só tem aluguel mensal; shopping pode ter só o percentual. */
+/** Loja de rua so tem aluguel mensal; shopping pode ter so o percentual. */
 function rentOk(s: FirstStepsStore): boolean {
   const c = s.custos;
   if (!c) return false;
@@ -55,7 +55,9 @@ function rentOk(s: FirstStepsStore): boolean {
 }
 
 function taxesOk(s: FirstStepsStore): boolean {
-  return s.custos?.icmsPct != null && s.custos?.icmsStPct != null;
+  const c = s.custos;
+  if (!c || c.icmsWepinkPct == null || c.icmsStWepinkPct == null) return false;
+  return !s.temWpink || (c.icmsWpinkPct != null && c.icmsStWpinkPct != null);
 }
 
 export function buildFirstSteps(input: FirstStepsInput): FirstStep[] {
@@ -66,7 +68,7 @@ export function buildFirstSteps(input: FirstStepsInput): FirstStep[] {
     return { done: faltam === 0, detail: lojasFaltando(faltam, total) };
   };
 
-  // Grupos, meta e desafio só nas lojas com equipe de vendas (loja parada não precisa).
+  // Grupos, meta e desafio so nas lojas com equipe de vendas (loja parada nao precisa).
   const equipe = (id: string) => (input.sellersByStore.get(id) ?? []).filter(isActiveSalesPerson);
   const comEquipe = stores.filter((s) => equipe(s.id).length > 0);
   const lojasPessoas = comEquipe.length > 0 ? comEquipe : stores;
@@ -88,7 +90,7 @@ export function buildFirstSteps(input: FirstStepsInput): FirstStep[] {
     {
       id: "erp",
       title: "Conectar o Millennium",
-      description: "Sincroniza vendas, custos, lojas e vendedores com a WeDash.",
+      description: "Sincroniza vendas, custos, lojas e vendedores com a WDash.",
       done: true,
     },
     {
@@ -126,7 +128,7 @@ export function buildFirstSteps(input: FirstStepsInput): FirstStep[] {
     {
       id: "taxes",
       title: "Informar os impostos",
-      description: "ICMS e ICMS ST entram no cálculo do lucro bruto e da margem.",
+      description: "ICMS e ICMS ST de cada marca entram no cálculo do lucro bruto e da margem.",
       ...porLoja(taxesOk),
     },
     {
@@ -153,7 +155,7 @@ async function client() {
 
 const doneKey = (tenantId: string) => `wedash.firstSteps.done:${tenantId}`;
 
-/** Grupos, metas e desafios das lojas (só o necessário para marcar os passos). */
+/** Grupos, metas e desafios das lojas (so o necessario para marcar os passos). */
 export async function fetchFirstStepsData(tenantId: string, storeIds: string[]): Promise<FirstStepsData> {
   const out: FirstStepsData = {
     sellersByStore: new Map(),
@@ -182,7 +184,7 @@ export async function fetchFirstStepsData(tenantId: string, storeIds: string[]):
   return out;
 }
 
-/** A empresa já concluiu os primeiros passos (fica salvo: o card não volta). */
+/** A empresa ja concluiu os primeiros passos (fica salvo: o card nao volta). */
 export async function fetchFirstStepsDone(tenantId: string): Promise<boolean> {
   const sb = await client();
   if (!sb) return localStorage.getItem(doneKey(tenantId)) === "1";

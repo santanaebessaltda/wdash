@@ -9,8 +9,8 @@ const CUSTOS_OK: StoreCosts = {
   royaltiesWepinkPct: 5,
   marketingWepinkPct: 2,
   rentMin: 8000,
-  icmsPct: 0,
-  icmsStPct: 0,
+  icmsWepinkPct: 0,
+  icmsStWepinkPct: 0,
 };
 
 const loja = (id: string, over: Partial<FirstStepsStore> = {}): FirstStepsStore => ({
@@ -72,7 +72,10 @@ describe("buildFirstSteps", () => {
 
   it("impostos: 0 preenchido conta; vazio não", () => {
     expect(passo(input(), "taxes").done).toBe(true);
-    expect(passo(input({ stores: [loja("a", { custos: { ...CUSTOS_OK, icmsStPct: null } })] }), "taxes").done).toBe(false);
+    expect(passo(input({ stores: [loja("a", { custos: { ...CUSTOS_OK, icmsStWepinkPct: null } })] }), "taxes").done).toBe(false);
+    expect(passo(input({ stores: [loja("a", { temWpink: true })] }), "taxes").done).toBe(false);
+    const wpink = { ...CUSTOS_OK, icmsWpinkPct: 0, icmsStWpinkPct: 0 };
+    expect(passo(input({ stores: [loja("a", { temWpink: true, custos: wpink })] }), "taxes").done).toBe(true);
   });
 
   it("grupos: conta vendedores ativos sem grupo; gerência e desligados não contam", () => {

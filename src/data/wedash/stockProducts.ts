@@ -1,9 +1,9 @@
 /**
- * Estoque (saldo por local, transferência, em falta) e Tabelas de venda (custo, despesas sobre a venda e lucro por peça), por loja.
- * Custo de aquisição = custo da tabela de custo da loja + ICMS ST (% do custo).
+ * Estoque (saldo por local, transferencia, em falta) e Tabelas de venda (custo, despesas sobre a venda e lucro por peca), por loja.
+ * Custo de aquisicao = custo da tabela de custo da loja + ICMS ST (% do custo).
  * Despesas sobre a venda = ICMS + royalties + taxa de marketing (da marca do produto) + aluguel percentual
- * (só Shopping) — todas em % do preço. Lucro por peça = preço − despesas − custo de aquisição.
- * Preço mínimo = custo de aquisição ÷ (1 − Σ%): o menor preço que não dá prejuízo.
+ * (so Shopping)  -  todas em % do preco. Lucro por peca = preco  despesas  custo de aquisicao.
+ * Preco minimo = custo de aquisicao  (1  %): o menor preco que nao da prejuizo.
  */
 import type { Store } from "./stores";
 
@@ -12,14 +12,14 @@ export type StockCatalogItem = { code: string; name: string; category: string };
 export type StockInput = {
   stores: Store[];
   catalog: Map<string, StockCatalogItem>;
-  /** qty = soma dos locais; locations = saldo por local de estoque (ESTOQUE, QUIOSQUE, SHOP010…). */
+  /** qty = soma dos locais; locations = saldo por local de estoque (ESTOQUE, QUIOSQUE, SHOP010...). */
   stock: Array<{ storeId: string; code: string; qty: number; locations?: Record<string, number> }>;
-  /** tabela de custo → COD_PRODUTO → custo unitário (centavos). */
+  /** tabela de custo  ->  COD_PRODUTO  ->  custo unitario (centavos). */
   costPrices: Map<number, Map<string, number>>;
-  /** tabela de venda → COD_PRODUTO → preço (centavos). */
+  /** tabela de venda  ->  COD_PRODUTO  ->  preco (centavos). */
   salePrices: Map<number, Map<string, number>>;
   saleTableId: number | null;
-  /** Vendas dos últimos 30 dias por loja × produto (preço médio praticado). */
+  /** Vendas dos ultimos 30 dias por loja x produto (preco medio praticado). */
   charged: Array<{ storeId: string; code: string; revenueCents: number; items: number }>;
 };
 
@@ -31,7 +31,7 @@ export type PriceComposition = {
   icmsStPct: number;
   icmsSt: number | null;
   custoAquisicao: number | null;
-  /** Despesas sobre a venda (só as > 0%); valor = % × preço. */
+  /** Despesas sobre a venda (so as > 0%); valor = % x preco. */
   despesas: CostLine[];
   pctTotal: number;
   impostos: number | null;
@@ -47,13 +47,13 @@ export function productBrand(code: string): "WEPINK" | "WPINK" {
   return /^WP[\dA-Z]/.test(t) || t === "WP" || t.startsWith("WP ") ? "WPINK" : "WEPINK";
 }
 
-/** % sobre o preço de venda que a loja paga em cada peça do produto. */
+/** % sobre o preco de venda que a loja paga em cada peca do produto. */
 export function saleCostPcts(store: Store, code: string): CostLine[] {
   const c = store.custos;
   const wpink = productBrand(code) === "WPINK";
   const rent = store.pointType === "SHOPPING" ? (c?.rentWepinkPct ?? c?.rentWpinkPct ?? 0) : 0;
   const lines: CostLine[] = [
-    { label: "ICMS", pct: c?.icmsPct ?? 0, valor: 0 },
+    { label: "ICMS", pct: (wpink ? c?.icmsWpinkPct : c?.icmsWepinkPct) ?? 0, valor: 0 },
     { label: "Royalties", pct: (wpink ? c?.royaltiesWpinkPct : c?.royaltiesWepinkPct) ?? 0, valor: 0 },
     { label: "Taxa de marketing", pct: (wpink ? c?.marketingWpinkPct : c?.marketingWepinkPct) ?? 0, valor: 0 },
     { label: "Aluguel percentual", pct: rent, valor: 0 },
@@ -64,7 +64,8 @@ export function saleCostPcts(store: Store, code: string): CostLine[] {
 export function composePrice(store: Store, code: string, priceCents: number | null, costCents: number | null): PriceComposition {
   const preco = priceCents == null ? null : priceCents / 100;
   const custo = costCents == null ? null : costCents / 100;
-  const icmsStPct = store.custos?.icmsStPct ?? 0;
+  const wpink = productBrand(code) === "WPINK";
+  const icmsStPct = (wpink ? store.custos?.icmsStWpinkPct : store.custos?.icmsStWepinkPct) ?? 0;
   const icmsSt = custo == null ? null : (custo * icmsStPct) / 100;
   const custoAquisicao = custo == null ? null : custo + (icmsSt ?? 0);
   const pcts = saleCostPcts(store, code);
@@ -94,7 +95,7 @@ export function composePrice(store: Store, code: string, priceCents: number | nu
 
 export type StockLocation = { nome: string; qtd: number };
 
-/** `qtd` peças do local `de` para o local `para`, na mesma loja. */
+/** `qtd` pecas do local `de` para o local `para`, na mesma loja. */
 export type StockTransfer = { de: string; para: string; qtd: number };
 
 type LocalNivel = "estoque" | "intermediario" | "loja";
@@ -110,9 +111,9 @@ function localNivel(nome: string): LocalNivel {
 }
 
 /**
- * Transferências pendentes entre locais de uma loja, pela hierarquia: Estoque é pai de todos; os demais
- * (Shop010…) são filhos do Estoque; a Loja (QUIOSQUE, de onde sai a venda) é filha de todos. Cobre primeiro os
- * locais intermediários negativos (só pelo Estoque) e depois a Loja (pelo que sobrar, do local com mais saldo).
+ * Transferencias pendentes entre locais de uma loja, pela hierarquia: Estoque e pai de todos; os demais
+ * (Shop010...) sao filhos do Estoque; a Loja (QUIOSQUE, de onde sai a venda) e filha de todos. Cobre primeiro os
+ * locais intermediarios negativos (so pelo Estoque) e depois a Loja (pelo que sobrar, do local com mais saldo).
  */
 export function stockTransfers(locais: StockLocation[]): StockTransfer[] {
   const saldo = new Map(locais.map((l) => [l.nome, l.qtd]));
@@ -137,12 +138,12 @@ export function stockTransfers(locais: StockLocation[]): StockTransfer[] {
 export type StockStoreDetail = {
   store: Store;
   estoque: number;
-  /** Saldo por local (só locais com saldo ≠ 0), maior primeiro. */
+  /** Saldo por local (so locais com saldo = 0), maior primeiro. */
   locais: StockLocation[];
   transferencias: StockTransfer[];
   composicao: PriceComposition;
   praticado: { preco: number; itens: number; lucro: number | null; margemPct: number | null } | null;
-  /** Peças vendidas nos últimos 30 dias na loja. */
+  /** Pecas vendidas nos ultimos 30 dias na loja. */
   vendidos30d: number;
 };
 
@@ -151,7 +152,7 @@ export type StockProductRow = {
   nome: string;
   categoria: string;
   estoque: number;
-  /** Peças a transferir entre locais de estoque, somando as lojas do filtro. */
+  /** Pecas a transferir entre locais de estoque, somando as lojas do filtro. */
   transferir: number;
   custo: number | null;
   impostos: number | null;
@@ -164,7 +165,7 @@ export type StockProductRow = {
   precoPraticado: number | null;
   margemPraticadaPct: number | null;
   itensVendidos30d: number;
-  /** Custo / lucro diferentes entre as lojas do filtro: valores = média das lojas. */
+  /** Custo / lucro diferentes entre as lojas do filtro: valores = media das lojas. */
   variaPorLoja: boolean;
   lojas: StockStoreDetail[];
 };
@@ -189,10 +190,10 @@ export function costCentsFor(costPrices: StockInput["costPrices"], store: Store,
 }
 
 /**
- * Situação do produto na aba Estoque, a mais grave primeiro (por loja do filtro):
+ * Situacao do produto na aba Estoque, a mais grave primeiro (por loja do filtro):
  * negativo = total da loja abaixo de zero; aguardando = algum local negativo com saldo positivo num local "pai".
- * Hierarquia: Estoque é pai de todos; os demais (Shop010…) são filhos do Estoque; a Loja (QUIOSQUE, de onde sai
- * a venda) é filha de todos.
+ * Hierarquia: Estoque e pai de todos; os demais (Shop010...) sao filhos do Estoque; a Loja (QUIOSQUE, de onde sai
+ * a venda) e filha de todos.
  */
 export type StockStatus = "negativo" | "aguardando" | "ok";
 
@@ -298,7 +299,7 @@ export function buildStockProductsView(input: StockInput): StockProductsView {
   };
 }
 
-/** Tabela mais usada (em peças) no período, somando as lojas; `usadas` = tabelas com venda no período, mais usada primeiro. */
+/** Tabela mais usada (em pecas) no periodo, somando as lojas; `usadas` = tabelas com venda no periodo, mais usada primeiro. */
 export function suggestSaleTable(usage: Array<{ day: string; tableId: number; items: number }>): {
   sugerida: number | null;
   usadas: number[];

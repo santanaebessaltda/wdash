@@ -3,18 +3,40 @@ import { Card, FormField, Select, useToast } from "@/components/ui";
 import { StoreCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { fetchCostTables, updateStoreCosts, updateStoreCostTable, type CostTable, type Store } from "@/data/wedash/stores";
 import { syncProductsNow } from "@/data/wedash/productCatalog";
-import { INVALID_COSTS_MSG, pctField, useCostFields, type CostField } from "./costFields";
+import { INVALID_COSTS_MSG, pctField, useCostFields, type CostField, type CostFieldSection } from "./costFields";
 import { FormActions, NumberField, SAVE_ERROR_MSG, StoreCardHeader, StoreCardsPage, useScopedStores } from "./shared";
 
-const TAX_FIELDS: CostField[] = [
-  pctField("icmsPct", "ICMS", "Percentual sobre o faturamento."),
-  pctField("icmsStPct", "ICMS ST", "Percentual sobre o CMV."),
-];
+function taxFields(loja: Store): CostField[] {
+  return [
+    pctField("icmsWepinkPct", "ICMS"),
+    pctField("icmsStWepinkPct", "ICMS ST"),
+    ...(loja.temWpink ? [pctField("icmsWpinkPct", "ICMS"), pctField("icmsStWpinkPct", "ICMS ST")] : []),
+  ];
+}
+
+function taxSections(loja: Store): CostFieldSection[] {
+  return [
+    {
+      title: "WEPINK",
+      hint: "ICMS é calculado sobre o faturamento WEPINK. ICMS ST é calculado sobre o CMV WEPINK.",
+      keys: ["icmsWepinkPct", "icmsStWepinkPct"],
+    },
+    ...(loja.temWpink
+      ? [
+          {
+            title: "WPINK",
+            hint: "ICMS é calculado sobre o faturamento WPINK. ICMS ST é calculado sobre o CMV WPINK.",
+            keys: ["icmsWpinkPct", "icmsStWpinkPct"],
+          },
+        ]
+      : []),
+  ];
+}
 
 const INTRO =
-  "A tabela de custo ajuda a completar produtos vendidos sem custo no Millennium. ICMS e ICMS ST são considerados no cálculo do lucro bruto e da margem. Campos vazios são considerados 0.";
+  "A tabela de custo ajuda a completar produtos vendidos sem custo no Millennium. ICMS e ICMS ST entram no lucro bruto e na margem, cada um sobre a sua marca. Campos vazios são considerados 0.";
 
-/** Configurações > Produtos e impostos — tabela de custo do Millennium, ICMS e ICMS ST. */
+/** Configuracoes > Produtos e impostos  -  tabela de custo do Millennium, ICMS e ICMS ST. */
 export function ProductsTaxesPage() {
   const { lojas, loading, refresh } = useScopedStores();
   const [tables, setTables] = useState<CostTable[]>([]);
@@ -38,7 +60,7 @@ export function ProductsTaxesPage() {
       title="Produtos e impostos"
       subtitle="Configure a tabela de custo dos produtos e os impostos de cada loja."
       loading={loading}
-      skeleton={(n) => <StoreCardsSkeleton count={n} intro fields={3} />}
+      skeleton={(n) => <StoreCardsSkeleton count={n} intro fields={1} sections={1} />}
       lojas={lojas}
     >
       {(loja) => <ProductsTaxesCard loja={loja} tables={tables} tablesLoading={tablesLoading} onSaved={refresh} />}
@@ -58,13 +80,14 @@ function ProductsTaxesCard({
   onSaved: () => void;
 }) {
   const { show } = useToast();
-  const form = useCostFields(loja, TAX_FIELDS);
+  const fields = taxFields(loja);
+  const form = useCostFields(loja, fields);
   const [savedTable, setSavedTable] = useState<number | null>(loja.costTableId ?? null);
   const [table, setTable] = useState<number | null>(savedTable);
   const [saving, setSaving] = useState(false);
   const tableDirty = table !== savedTable;
 
-  /** Tabela nova busca os preços no Millennium antes; falhou = nada é gravado. */
+  /** Tabela nova busca os precos no Millennium antes; falhou = nada e gravado. */
   async function save() {
     const custos = form.merged();
     if (!custos) return show(INVALID_COSTS_MSG, "danger");
@@ -110,7 +133,7 @@ function ProductsTaxesCard({
         <p className="text-[12.5px] text-t2">{INTRO}</p>
         <FormField
           label="Tabela de custo dos produtos"
-          hint="Usada quando um produto vendido chega do Millennium sem custo. Enquanto nenhuma tabela for escolhida manualmente, a WeDash seleciona automaticamente a que mais se aproxima dos custos da loja."
+          hint="Usada quando um produto vendido chega do Millennium sem custo. Enquanto nenhuma tabela for escolhida manualmente, a WDash seleciona automaticamente a que mais se aproxima dos custos da loja."
         >
           <Select
             value={tablesLoading || table == null ? "" : String(table)}
@@ -128,18 +151,28 @@ function ProductsTaxesCard({
             ))}
           </Select>
         </FormField>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {TAX_FIELDS.map((f) => (
-            <NumberField
-              key={f.key}
-              label={f.label}
-              hint={f.hint}
-              unit={f.unit}
-              value={form.txt[f.key] ?? ""}
-              onChange={(v) => form.setField(f.key, v)}
-            />
-          ))}
-        </div>
+        {taxSections(loja).map((section, i) => (
+          <div key={section.title} className={i > 0 ? "flex flex-col gap-3 border-t border-line pt-4" : "flex flex-col gap-3"}>
+            <div>
+              <p className="text-[14px] font-bold text-t0">{section.title}</p>
+              {section.hint && <p className="mt-0.5 text-[12.5px] text-t2">{section.hint}</p>}
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {fields
+                .filter((f) => section.keys.includes(f.key))
+                .map((f) => (
+                  <NumberField
+                    key={f.key}
+                    label={f.label}
+                    hint={f.hint}
+                    unit={f.unit}
+                    value={form.txt[f.key] ?? ""}
+                    onChange={(v) => form.setField(f.key, v)}
+                  />
+                ))}
+            </div>
+          </div>
+        ))}
         <FormActions
           dirty={form.dirty || tableDirty}
           saving={saving}

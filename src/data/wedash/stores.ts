@@ -19,18 +19,20 @@ export interface Store {
   pointType: PointType;
   temWpink: boolean;
   fuso: string;
-  /** Horário por dia (0=dom..6=sáb), como configurado. Cálculos usam `effectiveWeekHours(horas)`. */
+  /** Horario por dia (0=dom..6=sab), como configurado. Calculos usam `effectiveWeekHours(horas)`. */
   horas: StoreWeekHours;
-  /** Derivado do horário de hoje / primeira janela aberta — compat charts legados. */
+  /** Derivado do horario de hoje / primeira janela aberta  -  compat charts legados. */
   abertura: number;
   fechamento: number;
   /** Dias da semana fechados (0 = domingo). */
   diasFechados: number[];
   dataInauguracao: string;
-  /** Custos da operação (Configurações > Lojas). Ausente/null = não configurado. */
+  /** Custos da operacao (Configuracoes > Lojas). Ausente/null = nao configurado. */
   custos?: StoreCosts;
   /** Tabela de custo do Millennium: completa o custo de produto que vem zerado na margem. */
   costTableId?: number | null;
+  /** false = desativada: some do seletor e da operacao. Ausente = em operacao. */
+  active?: boolean;
 }
 
 /** Tabela de custo do Millennium (product_cost_table). */
@@ -40,7 +42,7 @@ export interface CostTable {
   description: string;
 }
 
-/** % sobre o faturamento da marca; aluguel mínimo em R$/mês. null = não configurado. */
+/** % sobre o faturamento da marca; aluguel minimo em R$/mes. null = nao configurado. */
 export interface StoreCosts {
   royaltiesWepinkPct: number | null;
   royaltiesWpinkPct: number | null;
@@ -48,12 +50,14 @@ export interface StoreCosts {
   marketingWpinkPct: number | null;
   rentWepinkPct: number | null;
   rentWpinkPct: number | null;
-  /** Aluguel R$/mês: o % do faturamento só soma o que passar dele (aluguel do mês = maior entre os dois). */
+  /** Aluguel R$/mes: o % do faturamento so soma o que passar dele (aluguel do mes = maior entre os dois). */
   rentMin: number | null;
-  /** ICMS % sobre o faturamento da loja (as duas marcas). */
-  icmsPct: number | null;
-  /** ICMS ST % sobre o custo dos produtos vendidos (CMV). */
-  icmsStPct: number | null;
+  /** ICMS % sobre o faturamento da marca. */
+  icmsWepinkPct: number | null;
+  icmsWpinkPct: number | null;
+  /** ICMS ST % sobre o CMV da marca. */
+  icmsStWepinkPct: number | null;
+  icmsStWpinkPct: number | null;
 }
 
 export const EMPTY_STORE_COSTS: StoreCosts = {
@@ -64,12 +68,14 @@ export const EMPTY_STORE_COSTS: StoreCosts = {
   rentWepinkPct: null,
   rentWpinkPct: null,
   rentMin: null,
-  icmsPct: null,
-  icmsStPct: null,
+  icmsWepinkPct: null,
+  icmsWpinkPct: null,
+  icmsStWepinkPct: null,
+  icmsStWpinkPct: null,
 };
 
-/** Campos obrigatórios da loja (WPINK só se a loja vende WPINK). */
-/** Algum custo da operação (royalties, marketing, aluguel) preenchido em Configurações > Lojas. */
+/** Campos obrigatorios da loja (WPINK so se a loja vende WPINK). */
+/** Algum custo da operacao (royalties, marketing, aluguel) preenchido em Configuracoes > Lojas. */
 export function storeOperatingCostsConfigured(s: Store): boolean {
   const c = s.custos;
   if (!c) return false;
@@ -194,7 +200,7 @@ export function storeById(id: string): Store {
   return f;
 }
 
-/** Casa lojas do Millennium com o catálogo local (millenniumFilial → id). */
+/** Casa lojas do Millennium com o catalogo local (millenniumFilial  ->  id). */
 export function storeIdsFromErp(
   lista: {
     storeId: number;
@@ -268,7 +274,7 @@ function registerExtraStore(f: Store, opts?: { silent?: boolean }) {
   }
 }
 
-/** Catálogo completo: fixtures + extras vindas do ERP (localStorage). */
+/** Catalogo completo: fixtures + extras vindas do ERP (localStorage). */
 export function allStores(): Store[] {
   const map = new Map(stores.map((f) => [f.id, f]));
   for (const e of lerExtras()) map.set(e.id, e);
@@ -277,11 +283,16 @@ export function allStores(): Store[] {
 
 /**
  * Lojas do produto para filtros/ranking.
- * Se já hidratou ERP (UUIDs), ignora fixtures mock — senão "Todas" misturava f1/f2.
+ * Se ja hidratou ERP (UUIDs), ignora fixtures mock  -  senao "Todas" misturava f1/f2.
  */
 export function productStores(): Store[] {
   const extras = lerExtras();
   return extras.length > 0 ? extras : stores;
+}
+
+/** Loja desativada nao entra na operacao. Ausente = em operacao (fixtures e dados antigos). */
+export function isOperationalStore(s: { active?: boolean }): boolean {
+  return s.active !== false;
 }
 
 /**
@@ -302,13 +313,13 @@ export function sessionStoreIds(input: {
   return operational.filter((s) => allowed.has(s.id)).map((s) => s.id);
 }
 
-/** Lojas da sessão: só ids que o membership enxerga (UUIDs reais pós-ERP). */
+/** Lojas da sessao: so ids que o membership enxerga (UUIDs reais pos-ERP). */
 export function storesForSession(sessionStoreIds: string[]): Store[] {
   if (sessionStoreIds.length === 0) return [];
   const catalog = allStores();
   const hit = catalog.filter((f) => sessionStoreIds.includes(f.id));
   if (hit.length > 0) return hit;
-  // Demo: sessão ainda aponta para fixtures f1/f2.
+  // Demo: sessao ainda aponta para fixtures f1/f2.
   return stores.filter((f) => sessionStoreIds.includes(f.id));
 }
 
@@ -333,7 +344,12 @@ function rowToStore(r: {
   point_type?: string | null;
   icms_pct?: number | string | null;
   icms_st_pct?: number | string | null;
+  icms_wepink_pct?: number | string | null;
+  icms_wpink_pct?: number | string | null;
+  icms_st_wepink_pct?: number | string | null;
+  icms_st_wpink_pct?: number | string | null;
   cost_table_id?: number | string | null;
+  active?: boolean | null;
 }): Store {
   const horas = parseWeekHours(r.hours);
   const num = (v: number | string | null | undefined) => (v == null || v === "" ? null : Number(v));
@@ -361,21 +377,26 @@ function rowToStore(r: {
       rentWepinkPct: num(r.rent_wepink_pct),
       rentWpinkPct: num(r.rent_wpink_pct),
       rentMin: rentCents == null ? null : rentCents / 100,
-      icmsPct: num(r.icms_pct),
-      icmsStPct: num(r.icms_st_pct),
+      icmsWepinkPct: r.icms_wepink_pct !== undefined ? num(r.icms_wepink_pct) : num(r.icms_pct),
+      icmsWpinkPct: r.icms_wpink_pct !== undefined ? num(r.icms_wpink_pct) : num(r.icms_pct),
+      icmsStWepinkPct: r.icms_st_wepink_pct !== undefined ? num(r.icms_st_wepink_pct) : num(r.icms_st_pct),
+      icmsStWpinkPct: r.icms_st_wpink_pct !== undefined ? num(r.icms_st_wpink_pct) : num(r.icms_st_pct),
     },
     costTableId: num(r.cost_table_id),
+    active: r.active !== false,
   });
 }
 
 const STORE_COST_COLUMNS =
   "royalties_wepink_pct, royalties_wpink_pct, marketing_wepink_pct, marketing_wpink_pct, rent_wepink_pct, rent_wpink_pct, rent_min_cents";
-const STORE_TAX_COLUMNS = "icms_pct, icms_st_pct";
+const STORE_TAX_COLUMNS =
+  "icms_wepink_pct, icms_wpink_pct, icms_st_wepink_pct, icms_st_wpink_pct, icms_pct, icms_st_pct";
+const STORE_TAX_LEGACY_COLUMNS = "icms_pct, icms_st_pct";
 const STORE_COST_TABLE_COLUMN = "cost_table_id";
 const STORE_POINT_TYPE_COLUMN = "point_type";
 
 /**
- * Filtro de marca só faz sentido se alguma loja do escopo tem WPINK.
+ * Filtro de marca so faz sentido se alguma loja do escopo tem WPINK.
  * `filialIds` vazio = rede (usa sessionStoreIds).
  */
 export function scopeShowsBrandPicker(filialIds: string[], sessionStoreIds: string[]): boolean {
@@ -385,7 +406,7 @@ export function scopeShowsBrandPicker(filialIds: string[], sessionStoreIds: stri
   return ids.some((id) => byId.get(id)?.temWpink === true);
 }
 
-/** Formata CNPJ 14 dígitos; se já vier mascarado, devolve como está. */
+/** Formata CNPJ 14 digitos; se ja vier mascarado, devolve como esta. */
 export function formatCnpjDisplay(raw: string): string {
   const digits = raw.replace(/\D/g, "");
   if (digits.length !== 14) return raw.trim();
@@ -393,8 +414,8 @@ export function formatCnpjDisplay(raw: string): string {
 }
 
 /**
- * Carrega lojas do Postgres (UUIDs da membership) e registra no catálogo local.
- * Sem isso o StorePicker cai no mock f1/f2 e o useScope rejeita a seleção.
+ * Carrega lojas do Postgres (UUIDs da membership) e registra no catalogo local.
+ * Sem isso o StorePicker cai no mock f1/f2 e o useScope rejeita a selecao.
  */
 export async function hydrateSessionStores(tenantId: string, sessionStoreIds: string[]): Promise<Store[]> {
   if (sessionStoreIds.length === 0) return [];
@@ -422,6 +443,10 @@ export async function hydrateSessionStores(tenantId: string, sessionStoreIds: st
     if (error?.code === "42703")
       ({ data, error } = await query(`${baseCols}, ${STORE_COST_COLUMNS}, ${STORE_TAX_COLUMNS}, ${STORE_COST_TABLE_COLUMN}`));
     if (error?.code === "42703") ({ data, error } = await query(`${baseCols}, ${STORE_COST_COLUMNS}, ${STORE_TAX_COLUMNS}`));
+    if (error?.code === "42703")
+      ({ data, error } = await query(
+        `${baseCols}, ${STORE_COST_COLUMNS}, ${STORE_TAX_LEGACY_COLUMNS}, ${STORE_COST_TABLE_COLUMN}, ${STORE_POINT_TYPE_COLUMN}`,
+      ));
     if (error?.code === "42703") ({ data, error } = await query(`${baseCols}, ${STORE_COST_COLUMNS}`));
     if (error?.code === "42703") ({ data, error } = await query(baseCols));
     if (error || !data?.length) {
@@ -430,8 +455,8 @@ export async function hydrateSessionStores(tenantId: string, sessionStoreIds: st
     }
 
     const out: Store[] = (data as unknown as Parameters<typeof rowToStore>[0][]).map(rowToStore);
-    // Substitui o catálogo local: lojas de resets/reseeds antigos (com horário
-    // padrão 9–21) não podem continuar entrando em "Todas" e nos eixos de hora.
+    // Substitui o catalogo local: lojas de resets/reseeds antigos (com horario
+    // padrao 9 - 21) nao podem continuar entrando em "Todas" e nos eixos de hora.
     try {
       window.localStorage.setItem(CHAVE_EXTRAS, JSON.stringify(out));
     } catch {
@@ -445,7 +470,108 @@ export async function hydrateSessionStores(tenantId: string, sessionStoreIds: st
   }
 }
 
-/** Persiste fuso + horário semanal (Configurações > Lojas). */
+const STORE_BASE_COLUMNS =
+  "id, millennium_store_id, code, name, trade_name, tax_id, timezone, opened_at, has_wpink, hours, active";
+
+async function selectStoreRows(
+  tenantId: string,
+  opts: { ids?: string[]; activeOnly?: boolean },
+): Promise<Parameters<typeof rowToStore>[0][] | null> {
+  const { getSupabase } = await import("@/lib/supabase");
+  const sb = getSupabase();
+  if (!sb) return null;
+  const run = (cols: string) => {
+    let q = sb.from("store").select(cols).eq("tenant_id", tenantId).order("code");
+    if (opts.activeOnly) q = q.eq("active", true);
+    if (opts.ids) q = q.in("id", opts.ids);
+    return q;
+  };
+  const full =
+    STORE_BASE_COLUMNS +
+    ", " +
+    STORE_COST_COLUMNS +
+    ", " +
+    STORE_TAX_COLUMNS +
+    ", " +
+    STORE_COST_TABLE_COLUMN +
+    ", " +
+    STORE_POINT_TYPE_COLUMN;
+  const withTable = STORE_BASE_COLUMNS + ", " + STORE_COST_COLUMNS + ", " + STORE_TAX_COLUMNS + ", " + STORE_COST_TABLE_COLUMN;
+  const withTax = STORE_BASE_COLUMNS + ", " + STORE_COST_COLUMNS + ", " + STORE_TAX_COLUMNS;
+  const withLegacyTax =
+    STORE_BASE_COLUMNS +
+    ", " +
+    STORE_COST_COLUMNS +
+    ", " +
+    STORE_TAX_LEGACY_COLUMNS +
+    ", " +
+    STORE_COST_TABLE_COLUMN +
+    ", " +
+    STORE_POINT_TYPE_COLUMN;
+  const withCost = STORE_BASE_COLUMNS + ", " + STORE_COST_COLUMNS;
+  let { data, error } = await run(full);
+  if (error?.code === "42703") ({ data, error } = await run(withTable));
+  if (error?.code === "42703") ({ data, error } = await run(withTax));
+  if (error?.code === "42703") ({ data, error } = await run(withLegacyTax));
+  if (error?.code === "42703") ({ data, error } = await run(withCost));
+  if (error?.code === "42703") ({ data, error } = await run(STORE_BASE_COLUMNS));
+  if (error) {
+    console.warn("selectStoreRows:", error.message);
+    return null;
+  }
+  return (data ?? []) as unknown as Parameters<typeof rowToStore>[0][];
+}
+
+/**
+ * Lojas da lista de Administracao, inclusive as desativadas.
+ * Vinculo vazio = todas as lojas da empresa. Vinculo preenchido = so essas.
+ */
+export async function fetchManagedStores(tenantId: string, membershipId: string): Promise<Store[]> {
+  try {
+    const { getSupabase } = await import("@/lib/supabase");
+    const sb = getSupabase();
+    if (!sb) return stores;
+    const { data: links, error } = await sb.from("membership_store").select("store_id").eq("membership_id", membershipId);
+    if (error) {
+      console.warn("fetchManagedStores:", error.message);
+      return [];
+    }
+    const ids = (links ?? []).map((r) => r.store_id as string);
+    const rows = await selectStoreRows(tenantId, ids.length > 0 ? { ids } : {});
+    if (!rows) return [];
+    return rows.map(rowToStore);
+  } catch (e) {
+    console.warn("fetchManagedStores:", e);
+    return [];
+  }
+}
+
+const SAVE_FAIL = "Não foi possível salvar as alterações. Tente novamente.";
+
+/** Liga ou desliga a loja na operacao. Desativada, ela sai do catalogo local. */
+export async function setStoreActive(storeId: string, active: boolean): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const { getSupabase } = await import("@/lib/supabase");
+    const sb = getSupabase();
+    if (!sb) return { ok: false, error: SAVE_FAIL };
+    const { error } = await sb.from("store").update({ active }).eq("id", storeId);
+    if (error) return { ok: false, error: SAVE_FAIL };
+    if (!active) {
+      try {
+        const atuais = lerExtras().filter((x) => x.id !== storeId);
+        window.localStorage.setItem(CHAVE_EXTRAS, JSON.stringify(atuais));
+        window.dispatchEvent(new Event("wedash:stores"));
+      } catch {
+        /* ignore */
+      }
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, error: SAVE_FAIL };
+  }
+}
+
+/** Persiste fuso + horario semanal (Configuracoes > Lojas). */
 export async function updateStoreSchedule(args: {
   storeId: string;
   timezone: string;
@@ -484,7 +610,7 @@ export async function updateStoreSchedule(args: {
   }
 }
 
-/** Tabelas de custo do Millennium (sincronizadas pelo worker). Falha → []. */
+/** Tabelas de custo do Millennium (sincronizadas pelo worker). Falha  ->  []. */
 export async function fetchCostTables(): Promise<CostTable[]> {
   try {
     const { getSupabase } = await import("@/lib/supabase");
@@ -503,7 +629,7 @@ export async function fetchCostTables(): Promise<CostTable[]> {
   }
 }
 
-/** Tabela de custo da loja (Configurações > Lojas > Custo dos produtos). Gravar fixa a escolha (a detecção automática não mexe mais). */
+/** Tabela de custo da loja (Configuracoes > Lojas > Custo dos produtos). Gravar fixa a escolha (a deteccao automatica nao mexe mais). */
 export async function updateStoreCostTable(
   storeId: string,
   costTableId: number | null,
@@ -527,7 +653,7 @@ export async function updateStoreCostTable(
   }
 }
 
-/** Persiste custos da operação da loja (Configurações > Lojas > Custos). */
+/** Persiste custos da operacao da loja (Configuracoes > Lojas > Custos). */
 export async function updateStoreCosts(
   storeId: string,
   custos: StoreCosts,
@@ -548,8 +674,10 @@ export async function updateStoreCosts(
         rent_wepink_pct: custos.rentWepinkPct,
         rent_wpink_pct: custos.rentWpinkPct,
         rent_min_cents: custos.rentMin == null ? null : Math.round(custos.rentMin * 100),
-        icms_pct: custos.icmsPct,
-        icms_st_pct: custos.icmsStPct,
+        icms_wepink_pct: custos.icmsWepinkPct,
+        icms_wpink_pct: custos.icmsWpinkPct,
+        icms_st_wepink_pct: custos.icmsStWepinkPct,
+        icms_st_wpink_pct: custos.icmsStWpinkPct,
         ...(pointType ? { point_type: pointType === "RUA" ? "STREET" : "MALL" } : {}),
       })
       .eq("id", storeId);
@@ -572,25 +700,25 @@ export interface StoreSeller {
   code: string | null;
   /** false = desativada / afastada / oculta no caixa no ERP. */
   active: boolean;
-  /** CARGO no Millennium (upper); "" = sem cargo no ERP; null = ainda não sincronizado com cargo. */
+  /** CARGO no Millennium (upper); "" = sem cargo no ERP; null = ainda nao sincronizado com cargo. */
   role: string | null;
   syncedAt: string;
   /** Turno (store_shift.id) definido na WeDash; null = sem turno. */
   shiftId: string | null;
-  /** E-mail do cadastro do Millennium (pré-preenche o convite de acesso). */
+  /** E-mail do cadastro do Millennium (pre-preenche o convite de acesso). */
   email: string | null;
 }
 
 export { SELLER_ROLE };
 
-/** Na equipe de vendas agora: ativo com cargo VENDEDOR (gerência / conta de freelancer fica fora). */
+/** Na equipe de vendas agora: ativo com cargo VENDEDOR (gerencia / conta de freelancer fica fora). */
 export function isActiveSalesPerson(s: Pick<StoreSeller, "active" | "role">): boolean {
   return s.active && (s.role == null || s.role === SELLER_ROLE);
 }
 
 /**
- * Funcionários por loja sincronizados do Millennium (`store_seller`); equipe de vendas = `isActiveSalesPerson`.
- * Só quem ainda está na lista do ERP; ativas primeiro, depois por nome.
+ * Funcionarios por loja sincronizados do Millennium (`store_seller`); equipe de vendas = `isActiveSalesPerson`.
+ * So quem ainda esta na lista do ERP; ativas primeiro, depois por nome.
  */
 export async function fetchStoreSellers(tenantId: string, storeIds: string[]): Promise<Map<string, StoreSeller[]>> {
   const out = new Map<string, StoreSeller[]>();
@@ -611,7 +739,7 @@ export async function fetchStoreSellers(tenantId: string, storeIds: string[]): P
       .limit(2000);
   const base = "id, store_id, name, code, active, erp_role, synced_at, email";
   let { data, error } = await query(`${base}, shift_id`);
-  // Migration de turnos ainda não aplicada → lista sem turno.
+  // Migration de turnos ainda nao aplicada  ->  lista sem turno.
   if (error?.code === "42703") ({ data, error } = await query(base));
   if (error) {
     console.warn("fetchStoreSellers:", error.message);
@@ -645,7 +773,7 @@ export async function fetchStoreSellers(tenantId: string, storeIds: string[]): P
   return out;
 }
 
-/** Turno da loja (Configurações > Lojas > Turnos). Horas em HH:MM local da loja. */
+/** Turno da loja (Configuracoes > Lojas > Turnos). Horas em HH:MM local da loja. */
 export interface StoreShift {
   id: string;
   name: string;
@@ -796,7 +924,7 @@ export interface Categoria {
   id: number;
   nome: string;
   divisao: Division;
-  /** CMV como fração do preço de venda (custo de fábrica com imposto). */
+  /** CMV como fracao do preco de venda (custo de fabrica com imposto). */
   cmvPct: number;
 }
 
