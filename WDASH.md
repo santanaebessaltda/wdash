@@ -1567,6 +1567,11 @@ Regra geral: **KPIs em 4 colunas no desktop**, widget central em largura total, 
 
 ---
 
+## PWA / deploy (2026-10-07)
+
+- Sintoma: URL muda e a tela fica branca até F5. Causa típica: shell antigo (aba aberta ou SW) pede chunk com hash velho → 404; `React.lazy` rejeita e a rota não renderiza.
+- Mitigação: `lazyPage` recarrega 1× em falha de import; SW (`public/sw.js` v9+) só grava respostas OK (não cacheia 404 de chunk); navegação continua network-first.
+
 ## Premissas de IMPLEMENTAÇÃO (ler antes de codar — decidido com o gestor)
 
 > Estas regras valem para o início da fase de código. Não são mock — são decisões que evitam retrabalho.
