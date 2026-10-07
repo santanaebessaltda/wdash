@@ -156,7 +156,7 @@ export function buildCatalogDeps(sb: SupabaseClient): CatalogDeps {
     async upsertProducts(products) {
       if (products.length === 0) return;
       const now = new Date().toISOString();
-      // Código que trocou de id no ERP: libera o id antigo antes (erp_product_id é único).
+      // Codigo que trocou de id no ERP: libera o id antigo antes (erp_product_id e unico).
       for (const part of chunk(products, 300)) {
         const { data: clash, error: clashErr } = await sb
           .from("product_catalog")
@@ -301,25 +301,31 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
     catalog: buildCatalogDeps(sb),
     costTable: buildCostTableDetectDeps(sb),
     listaMemo,
-    async hasRunningForCredential(credentialId) {
-      const { data, error } = await sb
+    async hasRunningForCredential(credentialId, excludeJobId) {
+      let q = sb
         .from("sync_job")
         .select("id")
         .eq("credential_id", credentialId)
         .eq("status", "RUNNING")
-        .limit(1)
-        .maybeSingle();
+        .limit(1);
+      if (excludeJobId) q = q.neq("id", excludeJobId);
+      const { data, error } = await q.maybeSingle();
       if (error) throw error;
       return Boolean(data);
     },
 
     async markJobRunning(jobId) {
-      const { error } = await sb
+      // Idempotente: claimNextJob ja promove QUEUED→RUNNING; se ainda QUEUED (testes), promove.
+      // Zero linhas = outro worker levou o job (ou ja terminou) — fail closed.
+      const { data, error } = await sb
         .from("sync_job")
         .update({ status: "RUNNING", locked_at: new Date().toISOString() })
         .eq("id", jobId)
-        .eq("status", "QUEUED");
+        .in("status", ["QUEUED", "RUNNING"])
+        .select("id")
+        .maybeSingle();
       if (error) throw error;
+      if (!data) throw new Error("job_claim_lost");
     },
 
     async markJobFinished({ jobId, status, error: errMsg, noSalesChange }) {
@@ -528,7 +534,7 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
         const d = String((r as { day: string }).day).slice(0, 10);
         if (d) days.add(d);
       }
-      // Dia sem venda: nada a particionar por CONDICAO — considera completo.
+      // Dia sem venda: nada a particionar por CONDICAO  -  considera completo.
       const { data: zeroRows, error: zeroErr } = await sb
         .from("sales_day_agg")
         .select("day")
@@ -704,7 +710,7 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
         in_erp: true,
         synced_at: now,
       });
-      // Consultadas: status + gerador. Não consultadas (gerador salvo, mesmo cargo): só Lista, status fica o do banco.
+      // Consultadas: status + gerador. Nao consultadas (gerador salvo, mesmo cargo): so Lista, status fica o do banco.
       const consulted = args.sellers
         .filter((s) => s.active != null)
         .map((s) => ({
@@ -855,8 +861,8 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
           sales_count: r.salesCount,
           item_count: r.itemCount,
         };
-        // Inclui CMV quando a margem já classificou (WEPINK/WPINK); omitir em
-        // upserts só-Lista (ALL) para não zerar CMV já patchado.
+        // Inclui CMV quando a margem ja classificou (WEPINK/WPINK); omitir em
+        // upserts so-Lista (ALL) para nao zerar CMV ja patchado.
         if (r.cmvCents != null) {
           return { ...base, cmv_cents: r.cmvCents };
         }
@@ -879,7 +885,7 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
           .eq("day", r.day)
           .eq("brand", "ALL");
         if (error) throw error;
-        // Se ainda não existe linha ALL (dia sem Lista), cria stub com CMV.
+        // Se ainda nao existe linha ALL (dia sem Lista), cria stub com CMV.
         const { data: existing } = await sb
           .from("sales_day_agg")
           .select("day")
@@ -1242,9 +1248,9 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
 }
 
 /**
- * Fechamento de ontem (CLOSE), 1× por integração por dia, só na janela da madrugada
- * (CLOSE_HOUR … +CLOSE_WINDOW_HOURS, fuso da 1ª loja). Cobre anteontem também se a noite anterior
- * não fechou. Não enfileira com onboarding aberto nem com SEED pendente (a carga já cobre ontem).
+ * Fechamento de ontem (CLOSE), 1x por integracao por dia, so na janela da madrugada
+ * (CLOSE_HOUR ... +CLOSE_WINDOW_HOURS, fuso da 1 loja). Cobre anteontem tambem se a noite anterior
+ * nao fechou. Nao enfileira com onboarding aberto nem com SEED pendente (a carga ja cobre ontem).
  */
 export async function enqueueDueCloseJobs(sb: SupabaseClient, now = new Date()): Promise<number> {
   if (!dailyCloseEnabled()) return 0;
@@ -1302,7 +1308,7 @@ export async function enqueueDueCloseJobs(sb: SupabaseClient, now = new Date()):
       .maybeSingle();
     if (seed) continue;
 
-    // Só lojas com dia pendente (a rodada automática depois do fechamento já fecha o dia).
+    // So lojas com dia pendente (a rodada automatica depois do fechamento ja fecha o dia).
     const { data: storeRows, error: storeErr } = await sb
       .from("store")
       .select("id, last_closed_day")
@@ -1335,7 +1341,7 @@ export async function enqueueDueCloseJobs(sb: SupabaseClient, now = new Date()):
       );
 
     // Loja sem base = ontem (+ anteontem se a noite anterior falhou); com base = desde o dia seguinte
-    // ao último fechado, até o dia 1 do mês anterior.
+    // ao ultimo fechado, ate o dia 1 do mes anterior.
     const legacyFrom = closeWindow(today, previousClosed).from;
     const floor = recoveryFloor(today);
     const from = pendingStores
@@ -1356,12 +1362,12 @@ export async function enqueueDueCloseJobs(sb: SupabaseClient, now = new Date()):
 }
 
 /**
- * Atualização automática: enfileira o Atualizar de hoje (FORCE com `auto: true`) das lojas no expediente
- * 30 min depois da última rodada automática + a última rodada do dia (fechamento + 30 min); loja sem
- * horário configurado não entra (rodada perdida = roda assim que reconectar). O dia fecha na madrugada.
- * Não enfileira com onboarding aberto, SEED pendente, integração pausada/senha inválida ou
- * outro Atualizar já na fila. Rodada anterior pulada por sessão caída → esta faz login 1×;
- * usuário exclusivo da WeDash (`dedicated`) faz login na hora.
+ * Atualizacao automatica: enfileira o Atualizar de hoje (FORCE com `auto: true`) das lojas no expediente
+ * 30 min depois da ultima rodada automatica + a ultima rodada do dia (fechamento + 30 min); loja sem
+ * horario configurado nao entra (rodada perdida = roda assim que reconectar). O dia fecha na madrugada.
+ * Nao enfileira com onboarding aberto, SEED pendente, integracao pausada/senha invalida ou
+ * outro Atualizar ja na fila. Rodada anterior pulada por sessao caida  ->  esta faz login 1x;
+ * usuario exclusivo da WeDash (`dedicated`) faz login na hora.
  */
 export async function enqueueDueAutoRefreshJobs(sb: SupabaseClient, now = new Date()): Promise<number> {
   if (!autoRefreshEnabled()) return 0;
@@ -1427,7 +1433,7 @@ export async function enqueueDueAutoRefreshJobs(sb: SupabaseClient, now = new Da
     });
     if (!plan) continue;
 
-    // Usuário exclusivo da WeDash: ninguém para derrubar → login na hora se a sessão caiu.
+    // Usuario exclusivo da WeDash: ninguem para derrubar  ->  login na hora se a sessao caiu.
     const relogin =
       Boolean(c.dedicated) ||
       (lastAuto?.status === "FAILED" && String(lastAuto.error ?? "").startsWith(AUTO_SESSION_MARK));
@@ -1449,11 +1455,11 @@ export async function enqueueDueAutoRefreshJobs(sb: SupabaseClient, now = new Da
 }
 
 /**
- * Carga funda do histórico na madrugada (0h–6h no fuso de todas as lojas): 1 mês por vez, a cada 15 min,
- * do mais recente que falta até a inauguração da loja (teto = `.env DEEP_HISTORY`, ex.: 24m; off =
- * desligado). Não enfileira com outro job na fila da credencial, onboarding aberto ou integração
- * pausada. Mês que falhou só volta na próxima madrugada. Terminou → grava 1 aviso "histórico
- * completo" (sino de Notificações).
+ * Carga funda do historico na madrugada (0h - 6h no fuso de todas as lojas): 1 mes por vez, a cada 15 min,
+ * do mais recente que falta ate a inauguracao da loja (teto = `.env DEEP_HISTORY`, ex.: 24m; off =
+ * desligado). Nao enfileira com outro job na fila da credencial, onboarding aberto ou integracao
+ * pausada. Mes que falhou so volta na proxima madrugada. Terminou  ->  grava 1 aviso "historico
+ * completo" (sino de Notificacoes).
  */
 export async function enqueueDueDeepHistoryJobs(sb: SupabaseClient, now = new Date()): Promise<number> {
   const span = deepHistorySpan();
@@ -1542,7 +1548,7 @@ export async function enqueueDueDeepHistoryJobs(sb: SupabaseClient, now = new Da
 
     const plan = planDeepHistory(deepStores);
     if (!plan) {
-      // Histórico completo: 1 aviso no sino (só se a carga funda rodou alguma vez).
+      // Historico completo: 1 aviso no sino (so se a carga funda rodou alguma vez).
       if (lastDeep?.status !== "SUCCEEDED") continue;
       const { data: marker } = await sb
         .from("sync_job")
@@ -1566,7 +1572,7 @@ export async function enqueueDueDeepHistoryJobs(sb: SupabaseClient, now = new Da
         finished_at: at,
       });
       if (markErr) throw markErr;
-      console.log(`Histórico antigo completo (desde ${since}) · tenant ${tenantId.slice(0, 8)}`);
+      console.log(`Histórico antigo completo (desde ${since}) | empresa ${tenantId.slice(0, 8)}`);
       continue;
     }
 
@@ -1583,7 +1589,7 @@ export async function enqueueDueDeepHistoryJobs(sb: SupabaseClient, now = new Da
   return n;
 }
 
-/** Ordem na fila: Atualizar/SEED primeiro; HISTORY por último (roda quando não há nada do gestor). */
+/** Ordem na fila: Atualizar/SEED primeiro; HISTORY por ultimo (roda quando nao ha nada do gestor). */
 const JOB_PRIORITY: Record<string, number> = {
   REGISTRY: 0,
   FORCE: 0,
@@ -1596,7 +1602,10 @@ const JOB_PRIORITY: Record<string, number> = {
   HISTORY: 3,
 };
 
-/** Peek oldest QUEUED job whose credential is connected and has no RUNNING job. */
+/**
+ * Proximo job elegivel: peek por prioridade + UPDATE atomico QUEUED→RUNNING.
+ * Se outro worker pegar a linha no meio, tenta o candidato seguinte.
+ */
 export async function claimNextJob(sb: SupabaseClient): Promise<SyncJob | null> {
   const { data: rows, error } = await sb
     .from("sync_job")
@@ -1606,7 +1615,7 @@ export async function claimNextJob(sb: SupabaseClient): Promise<SyncJob | null> 
     .limit(20);
   if (error) throw error;
   if (!rows?.length) return null;
-  // sort é estável: mesma prioridade mantém a ordem de chegada.
+  // sort e estavel: mesma prioridade mantem a ordem de chegada.
   rows.sort((a, b) => (JOB_PRIORITY[a.kind as string] ?? 2) - (JOB_PRIORITY[b.kind as string] ?? 2));
 
   for (const row of rows) {
@@ -1628,7 +1637,18 @@ export async function claimNextJob(sb: SupabaseClient): Promise<SyncJob | null> 
       .maybeSingle();
     if (!isIntegrationActive(cred as { sync_paused?: boolean } | null)) continue;
 
-    const payload = (row.payload ?? {}) as {
+    const lockedAt = new Date().toISOString();
+    const { data: claimed, error: claimErr } = await sb
+      .from("sync_job")
+      .update({ status: "RUNNING", locked_at: lockedAt })
+      .eq("id", row.id)
+      .eq("status", "QUEUED")
+      .select("id, tenant_id, credential_id, kind, status, payload")
+      .maybeSingle();
+    if (claimErr) throw claimErr;
+    if (!claimed) continue;
+
+    const payload = (claimed.payload ?? {}) as {
       from?: string;
       to?: string;
       storeIds?: unknown;
@@ -1643,11 +1663,11 @@ export async function claimNextJob(sb: SupabaseClient): Promise<SyncJob | null> 
     const storeIds = idList(payload.storeIds);
     const closeStoreIds = idList(payload.closeStoreIds);
     return {
-      id: row.id as string,
-      tenantId: row.tenant_id as string,
-      credentialId,
-      kind: row.kind as SyncJobKind,
-      status: "QUEUED",
+      id: claimed.id as string,
+      tenantId: claimed.tenant_id as string,
+      credentialId: claimed.credential_id as string,
+      kind: claimed.kind as SyncJobKind,
+      status: "RUNNING",
       payload: {
         from: typeof payload.from === "string" ? payload.from : undefined,
         to: typeof payload.to === "string" ? payload.to : undefined,
@@ -1664,8 +1684,8 @@ export async function claimNextJob(sb: SupabaseClient): Promise<SyncJob | null> 
 }
 
 /**
- * Integração ERP ativa = não pausada.
- * Presença WeDash NÃO é exigida (HISTORY pode rodar com app fechado).
+ * Integracao ERP ativa = nao pausada.
+ * Presenca WeDash NAO e exigida (HISTORY pode rodar com app fechado).
  */
 export function isIntegrationActive(
   cred: { sync_paused?: boolean | null } | null | undefined,
@@ -1674,8 +1694,8 @@ export function isIntegrationActive(
 }
 
 /**
- * No boot: limpa RUNNING órfãos e cancela fila de tenants ainda no onboarding.
- * Evita worker brigar com a sessão do wizard (busy / onboarding preso).
+ * No boot: limpa RUNNING orfaos e cancela fila de tenants ainda no onboarding.
+ * Evita worker brigar com a sessao do wizard (busy / onboarding preso).
  */
 export async function disconnectTenantSessions(
   sb: SupabaseClient,
@@ -1712,9 +1732,9 @@ export async function disconnectTenantSessions(
 }
 
 /**
- * No boot: RUNNING órfãos voltam pra fila (QUEUED), não falham.
- * Assim um Ctrl+C / crash no meio do SEED não deixa a UI presa em “Buscando”.
- * Também cancela fila de tenants ainda no onboarding.
+ * No boot: RUNNING orfaos voltam pra fila (QUEUED), nao falham.
+ * Assim um Ctrl+C / crash no meio do SEED nao deixa a UI presa em "Buscando".
+ * Tambem cancela fila de tenants ainda no onboarding.
  */
 export async function recoverOnStartup(sb: SupabaseClient): Promise<void> {
   const nowIso = new Date().toISOString();
@@ -1735,7 +1755,7 @@ export async function recoverOnStartup(sb: SupabaseClient): Promise<void> {
       })
       .eq("status", "RUNNING");
     if (error) throw error;
-    console.log(`Recuperação: ${running.length} job(s) RUNNING órfão(s) → QUEUED`);
+    console.log(`Recuperação: ${running.length} sincronização(ões) em andamento voltaram para a fila`);
   }
 
   const { data: boarding, error: boardErr } = await sb
@@ -1758,11 +1778,11 @@ export async function recoverOnStartup(sb: SupabaseClient): Promise<void> {
     .select("id");
   if (cancelErr) throw cancelErr;
   if (cancelled && cancelled.length > 0) {
-    console.log(`Recuperação: ${cancelled.length} job(s) cancelados (onboarding aberto)`);
+    console.log(`Recuperação: ${cancelled.length} sincronização(ões) canceladas (onboarding aberto)`);
   }
 }
 
-/** Retenção de Configurações > Logs. */
+/** Retencao de Configuracoes > Logs. */
 export const SYNC_LOG_RETENTION_DAYS = 120;
 
 export async function purgeOldSyncLogs(sb: SupabaseClient, now = new Date()): Promise<number> {
@@ -1773,8 +1793,8 @@ export async function purgeOldSyncLogs(sb: SupabaseClient, now = new Date()): Pr
 }
 
 /**
- * Durante o poll: RUNNING parado demais (worker morreu no meio) → refila.
- * Sem isso a UI fica em “Buscando” e o log do worker fica mudo.
+ * Durante o poll: RUNNING parado demais (worker morreu no meio)  ->  refila.
+ * Sem isso a UI fica em "Buscando" e o log do worker fica mudo.
  */
 export async function recoverStaleRunningJobs(
   sb: SupabaseClient,
@@ -1805,7 +1825,7 @@ export async function recoverStaleRunningJobs(
     if (!upErr) {
       n += 1;
       console.log(
-        `Recuperação: job ${(row as { id: string }).id.slice(0, 8)}… RUNNING parado → QUEUED`,
+        `Recuperação: sincronização ${(row as { id: string }).id.slice(0, 8)} parada voltou para a fila`,
       );
     }
   }
@@ -1814,7 +1834,7 @@ export async function recoverStaleRunningJobs(
 
 /**
  * Enqueue LIGHT for credentials due (interval elapsed, no open job).
- * Default OFF — só Atualizar (FORCE). Ligar com LIGHT_AUTO=1 no .env.
+ * Default OFF  -  so Atualizar (FORCE). Ligar com LIGHT_AUTO=1 no .env.
  */
 export async function enqueueDueLightJobs(sb: SupabaseClient): Promise<number> {
   if (process.env.LIGHT_AUTO !== "1") return 0;
@@ -1834,7 +1854,7 @@ export async function enqueueDueLightJobs(sb: SupabaseClient): Promise<number> {
   for (const c of creds ?? []) {
     if (!isIntegrationActive(c as { sync_paused?: boolean })) continue;
 
-    // Não dispara LIGHT enquanto algum membership do tenant ainda está no onboarding.
+    // Nao dispara LIGHT enquanto algum membership do tenant ainda esta no onboarding.
     const { data: onboarding } = await sb
       .from("membership")
       .select("id")
@@ -1849,7 +1869,7 @@ export async function enqueueDueLightJobs(sb: SupabaseClient): Promise<number> {
     const due = !last || now - last >= intervalMin * 60_000;
     if (!due) continue;
 
-    // Millennium session limit / 401 — don't spam LIGHT every poll while broken.
+    // Millennium session limit / 401  -  don't spam LIGHT every poll while broken.
     const errAt = c.last_error_at ? new Date(c.last_error_at as string).getTime() : 0;
     const errText = String(c.last_error ?? "").toLowerCase();
     const busyRecently =
@@ -1892,7 +1912,7 @@ export async function processOneJob(sb: SupabaseClient, erpSecret: string): Prom
   const job = await claimNextJob(sb);
   if (!job) return false;
 
-  // LIGHT automático desligado — descarta se ainda houver na fila.
+  // LIGHT automatico desligado  -  descarta se ainda houver na fila.
   if (job.kind === "LIGHT" && process.env.LIGHT_AUTO !== "1") {
     await sb
       .from("sync_job")
@@ -1903,12 +1923,12 @@ export async function processOneJob(sb: SupabaseClient, erpSecret: string): Prom
       })
       .eq("id", job.id)
       .in("status", ["QUEUED", "RUNNING"]);
-    console.log(`Job ${job.id.slice(0, 8)}… LIGHT ignorado (LIGHT_AUTO off)`);
+    console.log(`Sincronização ${job.id.slice(0, 8)} ignorada: atualização rápida desligada`);
     return true;
   }
 
-  // Só Atualizar (FORCE) + SEED do onboarding + fechamento/carga do histórico (CLOSE).
-  // RANGE/BACKFILL/HISTORY não rodam sozinhos.
+  // So Atualizar (FORCE) + SEED do onboarding + fechamento/carga do historico (CLOSE).
+  // RANGE/BACKFILL/HISTORY nao rodam sozinhos.
   if (
     process.env.SYNC_MANUAL_ONLY !== "0" &&
     job.kind !== "FORCE" &&
@@ -1926,11 +1946,11 @@ export async function processOneJob(sb: SupabaseClient, erpSecret: string): Prom
       })
       .eq("id", job.id)
       .in("status", ["QUEUED", "RUNNING"]);
-    console.log(`Job ${job.id.slice(0, 8)}… ${job.kind} ignorado (SYNC_MANUAL_ONLY)`);
+    console.log(`Sincronização ${job.id.slice(0, 8)} (${job.kind}) ignorada: somente atualização manual`);
     return true;
   }
 
-  // Nunca compete com o wizard: onboarding usa a mesma sessão Millennium.
+  // Nunca compete com o wizard: onboarding usa a mesma sessao Millennium.
   const { data: onboarding } = await sb
     .from("membership")
     .select("id")
@@ -1939,7 +1959,7 @@ export async function processOneJob(sb: SupabaseClient, erpSecret: string): Prom
     .limit(1)
     .maybeSingle();
   if (onboarding) {
-    // claimNextJob já deixou RUNNING — não filtrar por QUEUED.
+    // claimNextJob ja deixou RUNNING  -  nao filtrar por QUEUED.
     await sb
       .from("sync_job")
       .update({
@@ -1949,29 +1969,49 @@ export async function processOneJob(sb: SupabaseClient, erpSecret: string): Prom
       })
       .eq("id", job.id)
       .in("status", ["QUEUED", "RUNNING"]);
-    console.log(`Job ${job.id.slice(0, 8)}… ignorado (onboarding em andamento)`);
+    console.log(`Sincronização ${job.id.slice(0, 8)} ignorada: onboarding em andamento`);
     return true;
   }
 
-  // Usuário pausou sync (liberou ERP) — não compete com sessão desktop.
+  // Usuario pausou sync (liberou ERP)  -  nao compete com sessao desktop.
   const { data: credPause } = await sb
     .from("erp_credential")
     .select("sync_paused")
     .eq("id", job.credentialId)
     .maybeSingle();
   if ((credPause as { sync_paused?: boolean } | null)?.sync_paused) {
-    console.log(`Job ${job.id.slice(0, 8)}… ignorado (sync pausado pelo usuário)`);
-    return true; // deixa QUEUED; volta quando resume
+    // claimNextJob ja promoveu a RUNNING — devolve a fila ate o resume.
+    await sb
+      .from("sync_job")
+      .update({ status: "QUEUED", locked_at: null, error: null, finished_at: null })
+      .eq("id", job.id)
+      .eq("status", "RUNNING");
+    console.log(`Sincronização ${job.id.slice(0, 8)} ignorada: sincronização pausada`);
+    return true;
   }
 
   const deps = buildDeps(sb, erpSecret);
-  const result = await runSyncJob(job, deps);
-  if (!result.ok) {
-    if (result.reason === "locked") {
-      // Outro job da mesma credencial ainda RUNNING — deixa QUEUED, sem FAILED/spam.
+  let result: Awaited<ReturnType<typeof runSyncJob>>;
+  try {
+    result = await runSyncJob(job, deps);
+  } catch (e) {
+    if (e instanceof Error && e.message === "job_claim_lost") {
+      // Outro worker levou o lease depois do peek — nada a fazer.
       return false;
     }
-    console.log(`Job ${job.id.slice(0, 8)}… falhou (${result.reason})`);
+    throw e;
+  }
+  if (!result.ok) {
+    if (result.reason === "locked") {
+      // claimNextJob ja tinha promovido a RUNNING — devolve a fila.
+      await sb
+        .from("sync_job")
+        .update({ status: "QUEUED", locked_at: null, error: null, finished_at: null })
+        .eq("id", job.id)
+        .eq("status", "RUNNING");
+      return false;
+    }
+    console.log(`Sincronização ${job.id.slice(0, 8)} falhou (${result.reason})`);
   }
   return true;
 }

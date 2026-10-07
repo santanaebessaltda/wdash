@@ -94,7 +94,7 @@ type ListaWindowArgs = {
   to: string;
   rows: SaleRow[];
   now: Date;
-  /** Resolve gerador/nome → código da vendedora (sincroniza a loja se aparecer vendedora nova). */
+  /** Resolve gerador/nome  ->  codigo da vendedora (sincroniza a loja se aparecer vendedora nova). */
   linkSellers?: (rows: SalesSellerDayAgg[]) => Promise<SalesSellerDayAgg[]>;
 };
 
@@ -120,7 +120,7 @@ async function persistListaDerivedDayAggs(
   if (!args.skipSellers) await persistSellerDayAggs(deps, args);
 }
 
-/** Cupom que veio no relatório de cupom → vendedora pelo gerador, com o nome atual do ERP. */
+/** Cupom que veio no relatorio de cupom  ->  vendedora pelo gerador, com o nome atual do ERP. */
 export function withCouponSeller(row: SaleRow, sellers: Map<string, CouponSeller>): SaleRow {
   const x = row as Partial<SaleRowWithFilial>;
   if (x.millenniumOpCode == null || !x.nf) return row;
@@ -153,13 +153,9 @@ async function persistSellerDayAggs(
     rows: sellers,
   });
 }
-import {
-  forgetMillenniumSession,
-  logoutRememberedSessions,
-  rememberMillenniumSession,
-} from "./sessionStore.ts";
+import { forgetMillenniumSession, rememberMillenniumSession } from "./sessionStore.ts";
 
-/** Etapas do resumo de tempo por loja (ordem = ordem de execução). */
+/** Etapas do resumo de tempo por loja (ordem = ordem de execucao). */
 const STEP = {
   gerador: "Mapa filial → gerador",
   mapaProdutos: "Mapa produto → marca",
@@ -176,7 +172,7 @@ function timed<T>(timings: StepTimings | undefined, step: string, fn: () => Prom
   return timings ? timings.time(step, fn) : fn();
 }
 
-/** Quantas ConsultaDetMov em paralelo (1 sessão). Default 5. */
+/** Quantas ConsultaDetMov em paralelo (1 sessao). Default 5. */
 export function detMovConcurrency(pending: number): number {
   const raw = Number(process.env.DET_MOV_CONCURRENCY ?? "5");
   if (!Number.isFinite(raw) || raw <= 0) return 1;
@@ -185,12 +181,12 @@ export function detMovConcurrency(pending: number): number {
 
 /**
  * Grava WEPINK/WPINK:
- * - Receita/dia = RELATORIOMARGEM · COD WP* → WPINK (TOTALVENDA; bate com TOTAL VENDA POR DIA).
- * - CMV do mesmo fetch (evita 2ª ida à margem nos dias da janela).
- * - Contagens (vendas/itens) e horas por marca, quando há WPINK = relatório de cupom {52DE7BBC}
- *   (hora da Lista); cupom fora do relatório (venda sem vendedora) = ConsultaDetMov com cache.
- *   Loja só WEPINK copia as contagens do ALL.
- * Soft-fail — ALL da Lista já está gravado.
+ * - Receita/dia = RELATORIOMARGEM  |  COD WP*  ->  WPINK (TOTALVENDA; bate com TOTAL VENDA POR DIA).
+ * - CMV do mesmo fetch (evita 2 ida a margem nos dias da janela).
+ * - Contagens (vendas/itens) e horas por marca, quando ha WPINK = relatorio de cupom {52DE7BBC}
+ *   (hora da Lista); cupom fora do relatorio (venda sem vendedora) = ConsultaDetMov com cache.
+ *   Loja so WEPINK copia as contagens do ALL.
+ * Soft-fail  -  ALL da Lista ja esta gravado.
  */
 async function upsertBrandSplit(
   deps: SyncJobDeps,
@@ -204,11 +200,11 @@ async function upsertBrandSplit(
     productMap: ProductBrandMap;
     geradorMap: Map<string, number>;
     geradorIdsWithWpink: Set<number>;
-    /** DetMov só para vendas a partir deste dia (1 chamada por cupom). */
+    /** DetMov so para vendas a partir deste dia (1 chamada por cupom). */
     detMovFrom?: string;
     /** DetMov em paralelo (default DET_MOV_CONCURRENCY; carga inicial = 1). */
     detMovConcurrency?: number;
-    /** Itens do relatório de cupom {52DE7BBC} (esperado só depois da margem); null = tudo pelo DetMov. */
+    /** Itens do relatorio de cupom {52DE7BBC} (esperado so depois da margem); null = tudo pelo DetMov. */
     couponLines?: CouponReportLine[] | null | Promise<CouponReportLine[] | null>;
     /** Recebe os itens de cada DetMov feito (top produtos reaproveita sem nova chamada). */
     detMovLines?: Map<string, DetMovLine[]>;
@@ -273,7 +269,7 @@ async function upsertBrandSplit(
       margemFail += 1;
       const msg = e instanceof Error ? e.message : String(e);
       if (isSessionDeadError(msg)) throw e;
-      console.warn(`  ⚠ [${args.store.code}] marca/CMV ${day}: ${msg}`);
+      console.warn(`  AVISO [${args.store.code}] marca/CMV ${day}: ${msg}`);
       syncLog("WARN", "margem", `Marca/CMV (RELATORIOMARGEM) falhou: ${msg}`, { store: args.store, day });
     }
   }
@@ -293,7 +289,7 @@ async function upsertBrandSplit(
   const hasWpink =
     (geradorId != null && args.geradorIdsWithWpink.has(geradorId)) || margemHasWpink;
 
-  // 2a) Loja sem WPINK: counts do ALL (Lista) → WEPINK
+  // 2a) Loja sem WPINK: counts do ALL (Lista)  ->  WEPINK
   if (!hasWpink && dayAggs.length > 0 && storeRows.length > 0) {
     const listaAgg = aggregateSales(
       storeRows.map((r) => ({ ...r, brand: "ALL" as const })),
@@ -309,7 +305,7 @@ async function upsertBrandSplit(
   }
 
   // 2b) Loja com WPINK: horas + counts por marca (receita continua a da margem).
-  // Cupom com vendedora → relatório de cupom; sem vendedora (ou relatório falhou) → DetMov com cache.
+  // Cupom com vendedora  ->  relatorio de cupom; sem vendedora (ou relatorio falhou)  ->  DetMov com cache.
   if (hasWpink) {
     const detMovFrom = args.detMovFrom;
     const headers = uniqueBrandSplitHeaders(
@@ -352,7 +348,7 @@ async function upsertBrandSplit(
           }
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
-          console.warn(`  ⚠ [${args.store.code}] cache de cupons indisponível (busca todos): ${msg}`);
+          console.warn(`  AVISO [${args.store.code}] cache de cupons indisponível (busca todos): ${msg}`);
         }
       }
       const missing = headers.filter((h) => !cached.has(couponKey(h)));
@@ -376,7 +372,7 @@ async function upsertBrandSplit(
                 tipoOperacao: header.tipoOperacao,
               }),
             );
-            // Detalhe vazio pode ser falha momentânea do ERP — não congela no cache.
+            // Detalhe vazio pode ser falha momentanea do ERP  -  nao congela no cache.
             if (lines.length > 0) {
               args.detMovLines?.set(couponKey(header), lines);
               const coupon = couponBrandFromLines(
@@ -394,7 +390,7 @@ async function upsertBrandSplit(
             const msg = e instanceof Error ? e.message : String(e);
             if (isSessionDeadError(msg)) throw e;
             console.warn(
-              `  ⚠ [${args.store.code}] DetMov ${header.millenniumOpCode}/${header.nf}: ${msg}`,
+              `  AVISO [${args.store.code}] DetMov ${header.millenniumOpCode}/${header.nf}: ${msg}`,
             );
             syncLog("WARN", "detalhe_movimento", `Detalhe do movimento de uma venda falhou: ${msg}`, {
               store: args.store,
@@ -411,10 +407,10 @@ async function upsertBrandSplit(
             });
           } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
-            console.warn(`  ⚠ [${args.store.code}] cache de cupons não gravou: ${msg}`);
+            console.warn(`  AVISO [${args.store.code}] cache de cupons não gravou: ${msg}`);
           }
         }
-        // Só cupons que estão na Lista agora (cancelado some da soma).
+        // So cupons que estao na Lista agora (cancelado some da soma).
         const brandRows: SaleRow[] = [];
         for (const header of headers) {
           const coupon = cached.get(couponKey(header));
@@ -441,7 +437,7 @@ async function upsertBrandSplit(
           if (dayAggs.length > 0) {
             dayAggs = applyBrandDayCounts(dayAggs, brandedDays);
           } else {
-            // Margem caiu — usa receita+counts do DetMov como fallback
+            // Margem caiu  -  usa receita+counts do DetMov como fallback
             dayAggs = brandedDays;
           }
           if (brandedHours.length > 0) await deps.upsertHourAggs(brandedHours);
@@ -452,7 +448,7 @@ async function upsertBrandSplit(
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         if (isSessionDeadError(msg)) throw e;
-        console.warn(`  ⚠ [${args.store.code}] DetMov falhou (margem ok): ${msg}`);
+        console.warn(`  AVISO [${args.store.code}] DetMov falhou (margem ok): ${msg}`);
         syncLog("WARN", "detalhe_movimento", `Detalhe do movimento falhou (horas/contagens por marca): ${msg}`, {
           store: args.store,
         });
@@ -497,9 +493,9 @@ function eachIsoDay(from: string, to: string): string[] {
 }
 
 /**
- * CMV por produto (mesmo fetch da margem). Soft-fail: o CMV do dia já foi gravado.
- * Depois: produto vendido com custo 0 sem preço na tabela da loja → recarga de produtos;
- * loja ainda sem tabela → escolha automática (só banco).
+ * CMV por produto (mesmo fetch da margem). Soft-fail: o CMV do dia ja foi gravado.
+ * Depois: produto vendido com custo 0 sem preco na tabela da loja  ->  recarga de produtos;
+ * loja ainda sem tabela  ->  escolha automatica (so banco).
  */
 async function saveProductCosts(
   deps: SyncJobDeps,
@@ -515,7 +511,7 @@ async function saveProductCosts(
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : (e as { message?: string })?.message ?? String(e);
-    console.warn(`  ⚠ [${args.store.code}] CMV por produto não gravou: ${msg}`);
+    console.warn(`  AVISO [${args.store.code}] CMV por produto não gravou: ${msg}`);
     syncLog("WARN", "custo_produto", `CMV por produto não gravou: ${msg}`, { store: args.store });
     return;
   }
@@ -537,11 +533,11 @@ async function saveProductCosts(
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.warn(`  ⚠ [${args.store.code}] tabela de custo: ${msg}`);
+    console.warn(`  AVISO [${args.store.code}] tabela de custo: ${msg}`);
   }
 }
 
-/** CMV via RELATORIOMARGEM — 1 chamada por dia (imposto% = 0). Soft-fail. */
+/** CMV via RELATORIOMARGEM  -  1 chamada por dia (imposto% = 0). Soft-fail. */
 async function syncCmvForRange(
   deps: SyncJobDeps,
   args: {
@@ -550,7 +546,7 @@ async function syncCmvForRange(
     store: SyncStore;
     from: string;
     to: string;
-    /** Se passado, só estes dias (pula intermediários). */
+    /** Se passado, so estes dias (pula intermediarios). */
     days?: string[];
     timings?: StepTimings;
   },
@@ -592,7 +588,7 @@ async function syncCmvForRange(
       fail += 1;
       const msg = e instanceof Error ? e.message : String(e);
       if (isSessionDeadError(msg)) throw e;
-      console.warn(`  ⚠ [${args.store.code}] CMV ${day} (${formatElapsed(tDay)}): ${msg}`);
+      console.warn(`  AVISO [${args.store.code}] CMV ${day} (${formatElapsed(tDay)}): ${msg}`);
       syncLog("WARN", "cmv", `CMV (RELATORIOMARGEM) falhou: ${msg}`, { store: args.store, day });
     }
   }
@@ -612,7 +608,7 @@ async function syncCmvForRange(
 type CouponFetch = { lines: CouponReportLine[]; okWindows: Array<{ from: string; to: string }> };
 
 /**
- * Relatório de cupom {52DE7BBC} — 1 chamada por janela (Atualizar = 1 por loja).
+ * Relatorio de cupom {52DE7BBC}  -  1 chamada por janela (Atualizar = 1 por loja).
  * Soft-fail: janela que falha fica de fora (marca cai no DetMov, equipe no nome da Lista); todas falharam = null.
  */
 async function fetchCouponLinesForWindows(
@@ -649,7 +645,7 @@ async function fetchCouponLinesForWindows(
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (isSessionDeadError(msg)) throw e;
-      console.warn(`  ⚠ [${args.store.code}] cupom ${w.from}→${w.to}: ${msg}`);
+      console.warn(`  AVISO [${args.store.code}] cupom ${w.from}→${w.to}: ${msg}`);
       syncLog("WARN", "cupom", `Produtos por cupom {52DE7BBC} falhou: ${msg}`, {
         store: args.store,
         day: w.from === w.to ? w.from : null,
@@ -659,7 +655,7 @@ async function fetchCouponLinesForWindows(
   return out.okWindows.length > 0 ? out : null;
 }
 
-/** Produtos: produto desconhecido → catálogo; custo 0 sem preço → tabela de custo da loja (soft-fail; 401 derruba o job). */
+/** Produtos: produto desconhecido  ->  catalogo; custo 0 sem preco  ->  tabela de custo da loja (soft-fail; 401 derruba o job). */
 async function ensureCatalogFor(
   deps: SyncJobDeps,
   args: {
@@ -686,7 +682,7 @@ async function ensureCatalogFor(
       args.timings?.add(STEP.catalogo, nowMs() - t, r.calls);
       if (r.registryError) {
         if (isSessionDeadError(r.registryError)) throw new Error(r.registryError);
-        console.warn(`  ⚠ [${args.store.code}] cadastro dos produtos (Saldo Atual e Futuro): ${r.registryError}`);
+        console.warn(`  AVISO [${args.store.code}] cadastro dos produtos (Saldo Atual e Futuro): ${r.registryError}`);
         syncLog("WARN", "catalogo", `Cadastro dos produtos (Saldo Atual e Futuro) falhou: ${r.registryError}`, { store: args.store });
       }
       const parts = [
@@ -705,7 +701,7 @@ async function ensureCatalogFor(
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (isSessionDeadError(msg)) throw e;
-    console.warn(`  ⚠ [${args.store.code}] catálogo de produtos: ${msg}`);
+    console.warn(`  AVISO [${args.store.code}] catálogo de produtos: ${msg}`);
     syncLog("WARN", "catalogo", `Catálogo de produtos (tipo/categoria) falhou: ${msg}`, { store: args.store });
   }
 }
@@ -713,8 +709,8 @@ async function ensureCatalogFor(
 const MAX_TOP_PRODUCT_DETMOV = 10;
 
 /**
- * Itens dos cupons da Lista que não vieram no relatório de cupom (venda sem vendedora):
- * reaproveita o DetMov já feito na marca; senão 1 ConsultaDetMov por cupom.
+ * Itens dos cupons da Lista que nao vieram no relatorio de cupom (venda sem vendedora):
+ * reaproveita o DetMov ja feito na marca; senao 1 ConsultaDetMov por cupom.
  */
 async function detMovItemsForMissingCoupons(
   deps: SyncJobDeps,
@@ -752,13 +748,13 @@ async function detMovItemsForMissingCoupons(
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.warn(`  ⚠ [${args.store.code}] cache de cupons indisponível (top produtos): ${msg}`);
+      console.warn(`  AVISO [${args.store.code}] cache de cupons indisponível (top produtos): ${msg}`);
     }
   }
   const toFetch = pending;
-  // Normal = 0–2 vendas sem vendedora por dia. Muitas = relatório incompleto: não troca por N chamadas.
+  // Normal = 0 - 2 vendas sem vendedora por dia. Muitas = relatorio incompleto: nao troca por N chamadas.
   if (toFetch.length > MAX_TOP_PRODUCT_DETMOV) {
-    console.warn(`  ⚠ [${args.store.code}] top produtos: ${toFetch.length} cupons fora do relatório de cupom (pula o detalhe)`);
+    console.warn(`  AVISO [${args.store.code}] top produtos: ${toFetch.length} cupons fora do relatório de cupom (pula o detalhe)`);
     syncLog("WARN", "cupom", `Top produtos: ${toFetch.length} vendas da Lista não vieram no relatório de cupom`, {
       store: args.store,
     });
@@ -782,7 +778,7 @@ async function detMovItemsForMissingCoupons(
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (isSessionDeadError(msg)) throw e;
-      console.warn(`  ⚠ [${args.store.code}] DetMov (top produtos) ${header.millenniumOpCode}/${header.nf}: ${msg}`);
+      console.warn(`  AVISO [${args.store.code}] DetMov (top produtos) ${header.millenniumOpCode}/${header.nf}: ${msg}`);
       syncLog("WARN", "detalhe_movimento", `Detalhe do movimento de uma venda falhou: ${msg}`, {
         store: args.store,
         detail: { nf: header.nf },
@@ -792,7 +788,7 @@ async function detMovItemsForMissingCoupons(
   if (fetched.length > 0) {
     await deps.upsertCouponBrands({ tenantId: args.tenantId, storeId: args.store.id, rows: fetched }).catch((e) => {
       const msg = e instanceof Error ? e.message : String(e);
-      console.warn(`  ⚠ [${args.store.code}] cache de cupons não gravou (top produtos): ${msg}`);
+      console.warn(`  AVISO [${args.store.code}] cache de cupons não gravou (top produtos): ${msg}`);
     });
   }
   return out;
@@ -802,18 +798,18 @@ export type ClosedMonthSource = {
   from: string;
   to: string;
   covers: (day: string) => boolean;
-  /** Relatório de cupom do período inteiro (1 chamada por loja). null = falhou → segue dia a dia. */
+  /** Relatorio de cupom do periodo inteiro (1 chamada por loja). null = falhou  ->  segue dia a dia. */
   couponLines: (args: {
     session: string;
     store: SyncStore;
     geradorId: number;
     timings?: StepTimings;
   }) => Promise<CouponReportLine[] | null>;
-  /** Custo unitário do período (margem 1× por loja). null = falhou → margem dia a dia. */
+  /** Custo unitario do periodo (margem 1x por loja). null = falhou  ->  margem dia a dia. */
   unitCosts: (args: { session: string; store: SyncStore; timings?: StepTimings }) => Promise<Map<string, number> | null>;
-  /** COD_PRODUTO de um produto visto no relatório de cupom do período (qualquer loja / dia). */
+  /** COD_PRODUTO de um produto visto no relatorio de cupom do periodo (qualquer loja / dia). */
   codeOf: (productId: number) => string | undefined;
-  /** VENDAS.Lista do período inteiro (1 chamada por loja). null = falhou → Lista dia a dia. */
+  /** VENDAS.Lista do periodo inteiro (1 chamada por loja). null = falhou  ->  Lista dia a dia. */
   listaRows: (args: {
     session: string;
     store: SyncStore;
@@ -863,7 +859,7 @@ function createClosedMonthSource(deps: SyncJobDeps, from: string, to: string): C
           return lines;
         },
         (msg) => {
-          console.warn(`  ⚠ [${store.code}] cupom do mês ${from}→${to}: ${msg} — segue dia a dia`);
+          console.warn(`  AVISO [${store.code}] cupom do mês ${from}→${to}: ${msg} — segue dia a dia`);
           syncLog("WARN", "cupom", `Produtos por cupom do mês falhou (segue dia a dia): ${msg}`, { store });
         },
       ),
@@ -878,7 +874,7 @@ function createClosedMonthSource(deps: SyncJobDeps, from: string, to: string): C
             ),
           ),
         (msg) => {
-          console.warn(`  ⚠ [${store.code}] margem do mês ${from}→${to}: ${msg} — segue dia a dia`);
+          console.warn(`  AVISO [${store.code}] margem do mês ${from}→${to}: ${msg} — segue dia a dia`);
           syncLog("WARN", "margem", `Marca/CMV do mês falhou (segue dia a dia): ${msg}`, { store });
         },
       ),
@@ -899,7 +895,7 @@ function createClosedMonthSource(deps: SyncJobDeps, from: string, to: string): C
             }),
           ),
         (msg) => {
-          console.warn(`  ⚠ [${store.code}] Lista do mês ${from}→${to}: ${msg} — segue dia a dia`);
+          console.warn(`  AVISO [${store.code}] Lista do mês ${from}→${to}: ${msg} — segue dia a dia`);
           syncLog("WARN", "vendas", `Vendas do mês falhou (segue dia a dia): ${msg}`, { store });
         },
       ),
@@ -907,8 +903,8 @@ function createClosedMonthSource(deps: SyncJobDeps, from: string, to: string): C
 }
 
 /**
- * Margem de 1 dia da carga em período sem chamar o ERP: itens do relatório de cupom do dia + itens das
- * vendas sem vendedora (DetMov / cache) × custo unitário do período. null = usa a margem do dia.
+ * Margem de 1 dia da carga em periodo sem chamar o ERP: itens do relatorio de cupom do dia + itens das
+ * vendas sem vendedora (DetMov / cache) x custo unitario do periodo. null = usa a margem do dia.
  */
 async function closedMonthMargem(
   deps: SyncJobDeps,
@@ -970,7 +966,7 @@ async function closedMonthMargem(
   return lines;
 }
 
-/** Top produtos das janelas que o relatório de cupom trouxe (só cupons da Lista; sem vendedora = DetMov). */
+/** Top produtos das janelas que o relatorio de cupom trouxe (so cupons da Lista; sem vendedora = DetMov). */
 async function saveCouponProducts(
   deps: SyncJobDeps,
   args: {
@@ -1050,7 +1046,7 @@ async function saveCouponProducts(
   );
 }
 
-/** Top produtos sem Lista (só buracos de dias já sincronizados): relatório de cupom dia a dia. */
+/** Top produtos sem Lista (so buracos de dias ja sincronizados): relatorio de cupom dia a dia. */
 async function syncCouponProductsForDays(
   deps: SyncJobDeps,
   args: {
@@ -1112,7 +1108,7 @@ async function syncCouponProductsForDays(
   }
 }
 
-/** Soft-fail: a tabela de preço das vendas só sugere a tabela padrão de Estoque > Produtos. */
+/** Soft-fail: a tabela de preco das vendas so sugere a tabela padrao de Estoque > Produtos. */
 async function savePriceTableDayAggs(
   deps: SyncJobDeps,
   args: { tenantId: string; store: SyncStore; from: string; to: string; rows: PriceTableDayAgg[] },
@@ -1125,7 +1121,7 @@ async function savePriceTableDayAggs(
   }
 }
 
-/** Itens por pessoa × produto (desafios). Soft-fail: o top produtos do dia já foi gravado. */
+/** Itens por pessoa x produto (desafios). Soft-fail: o top produtos do dia ja foi gravado. */
 async function saveSellerProductDayAggs(
   deps: SyncJobDeps,
   args: { tenantId: string; store: SyncStore; from: string; to: string; rows: SalesSellerProductDayAgg[] },
@@ -1141,14 +1137,14 @@ async function saveSellerProductDayAggs(
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : (e as { message?: string })?.message ?? String(e);
-    console.warn(`  ⚠ [${args.store.code}] itens por pessoa não gravaram: ${msg}`);
+    console.warn(`  AVISO [${args.store.code}] itens por pessoa não gravaram: ${msg}`);
     syncLog("WARN", "itens_pessoa", `Itens por pessoa não gravaram: ${msg}`, { store: args.store });
   }
 }
 
 /**
- * SEED = hoje (onboarding) + carga do histórico por trás (SYNC_ONBOARDING). HISTORY/RANGE = só manual. FORCE = Atualizar.
- * CLOSE = fechamento noturno: mesmo fluxo do FORCE para os dias `payload.from → to` (ontem; + anteontem se a noite anterior falhou).
+ * SEED = hoje (onboarding) + carga do historico por tras (SYNC_ONBOARDING). HISTORY/RANGE = so manual. FORCE = Atualizar.
+ * CLOSE = fechamento noturno: mesmo fluxo do FORCE para os dias `payload.from  ->  to` (ontem; + anteontem se a noite anterior falhou).
  */
 export type SyncJobKind =
   | "BACKFILL"
@@ -1159,19 +1155,19 @@ export type SyncJobKind =
   | "RANGE"
   | "HISTORY"
   | "CLOSE"
-  /** Atualizar cadastros (Integrações): lojas, gerador, colaboradores, produtos e tabelas de custo — nada de venda. */
+  /** Atualizar cadastros (Integracoes): lojas, gerador, colaboradores, produtos e tabelas de custo  -  nada de venda. */
   | "REGISTRY";
 
-/** Hora local (fuso da 1ª loja) a partir da qual o fechamento de ontem é enfileirado (`.env CLOSE_HOUR`). */
+/** Hora local (fuso da 1 loja) a partir da qual o fechamento de ontem e enfileirado (`.env CLOSE_HOUR`). */
 export function closeHour(env: Record<string, string | undefined> = process.env): number {
   const n = Number(env.CLOSE_HOUR ?? "3");
   return Number.isInteger(n) && n >= 0 && n <= 23 ? n : 3;
 }
 
-/** Horas a partir de CLOSE_HOUR em que o fechamento pode entrar na fila (fora disso espera a próxima noite). */
+/** Horas a partir de CLOSE_HOUR em que o fechamento pode entrar na fila (fora disso espera a proxima noite). */
 export const CLOSE_WINDOW_HOURS = 6;
 
-/** Hora local dentro da janela do fechamento (ex.: 3h → 3:00–8:59). */
+/** Hora local dentro da janela do fechamento (ex.: 3h  ->  3:00 - 8:59). */
 export function isCloseWindow(localHour: number, startHour: number): boolean {
   return (localHour - startHour + 24) % 24 < CLOSE_WINDOW_HOURS;
 }
@@ -1181,13 +1177,13 @@ export function dailyCloseEnabled(env: Record<string, string | undefined> = proc
   return env.CLOSE_HOUR?.trim().toLowerCase() !== "off";
 }
 
-/** Hora local (0–23) de `date` no fuso. */
+/** Hora local (0 - 23) de `date` no fuso. */
 export function hourInTz(date: Date, timeZone: string): number {
   const h = new Intl.DateTimeFormat("en-US", { timeZone, hour: "2-digit", hourCycle: "h23" }).format(date);
   return Number(h) % 24;
 }
 
-/** Instante que corresponde a `isoDay` 23:59:30 no fuso (relógio do fechamento). */
+/** Instante que corresponde a `isoDay` 23:59:30 no fuso (relogio do fechamento). */
 export function endOfDayInTz(isoDay: string, timeZone: string): Date {
   const guess = Date.parse(`${isoDay}T23:59:30.000Z`);
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -1206,8 +1202,8 @@ export function endOfDayInTz(isoDay: string, timeZone: string): Date {
 }
 
 /**
- * Dias que o fechamento cobre: sempre ontem; anteontem também quando a noite anterior
- * não fechou (worker parado / falha). Nunca mais que 2 dias. Primeira noite da integração = só ontem.
+ * Dias que o fechamento cobre: sempre ontem; anteontem tambem quando a noite anterior
+ * nao fechou (worker parado / falha). Nunca mais que 2 dias. Primeira noite da integracao = so ontem.
  */
 export function closeWindow(todayIso: string, previousClosed: boolean): { from: string; to: string } {
   const to = addDaysIso(todayIso, -1);
@@ -1224,21 +1220,21 @@ export type SyncJobPayload = {
   /** When set and non-empty, only these store UUIDs are synced. */
   storeIds?: string[];
   /**
-   * CLOSE da carga do mês (pós-onboarding): 1 dia por job; ao terminar enfileira o dia anterior
-   * até chegar neste dia (dia 1 do mês).
+   * CLOSE da carga do mes (pos-onboarding): 1 dia por job; ao terminar enfileira o dia anterior
+   * ate chegar neste dia (dia 1 do mes).
    */
   fillUntil?: string;
-  /** Rodada da atualização automática (Configurações > Integrações). */
+  /** Rodada da atualizacao automatica (Configuracoes > Integracoes). */
   auto?: boolean;
-  /** Rodada automática anterior pulou por sessão caída → esta pode fazer login com a senha salva. */
+  /** Rodada automatica anterior pulou por sessao caida  ->  esta pode fazer login com a senha salva. */
   relogin?: boolean;
   /** Lojas no fechamento + 30 min: rodada ok fecha o dia delas. */
   closeStoreIds?: string[];
-  /** Lojas que fecham o dia nesta rodada: sempre completas (não pula relatórios com Lista igual). */
+  /** Lojas que fecham o dia nesta rodada: sempre completas (nao pula relatorios com Lista igual). */
   fullStoreIds?: string[];
   /**
-   * Carga funda do histórico (madrugada, até a inauguração / 24 meses): 1 mês por job, sem encadear
-   * (o agendador enfileira o próximo mês) e sem barra de progresso na tela.
+   * Carga funda do historico (madrugada, ate a inauguracao / 24 meses): 1 mes por job, sem encadear
+   * (o agendador enfileira o proximo mes) e sem barra de progresso na tela.
    */
   deep?: boolean;
 };
@@ -1252,11 +1248,11 @@ export type SyncJob = {
   payload: SyncJobPayload;
   /** Tipo gravado nos Logs quando difere de `kind` (dias do CLOSE rodam como FORCE). */
   logKind?: SyncJobKind;
-  /** Título no log do terminal (ex.: "Carga do mês"); padrão = pelo tipo. */
+  /** Titulo no log do terminal (ex.: "Carga do mes"); padrao = pelo tipo. */
   logTitle?: string;
-  /** Rodada automática: sessão caída / ERP fora do ar não vira erro em Logs nem `last_error`. */
+  /** Rodada automatica: sessao caida / ERP fora do ar nao vira erro em Logs nem `last_error`. */
   quietFailures?: boolean;
-  /** Dia da carga em período: sem blocos no terminal (quem chama imprime 1 linha); erro continua aparecendo. */
+  /** Dia da carga em periodo: sem blocos no terminal (quem chama imprime 1 linha); erro continua aparecendo. */
   compactLog?: boolean;
 };
 
@@ -1271,18 +1267,18 @@ export type SyncCredential = {
 export type SyncStore = {
   id: string;
   millenniumStoreId: number;
-  /** COD_FILIAL display e.g. "00010" — used to resolve S-{n} EVENTO. */
+  /** COD_FILIAL display e.g. "00010"  -  used to resolve S-{n} EVENTO. */
   code: string;
   timezone: string;
-  /** DATA_INAUGURACAO — chão do backfill (null = só teto 24m). */
+  /** DATA_INAUGURACAO  -  chao do backfill (null = so teto 24m). */
   openedAt?: string | null;
-  /** true = loja já teve WPINK no sync; false = só cosmético; undefined = ainda não sabemos. */
+  /** true = loja ja teve WPINK no sync; false = so cosmetico; undefined = ainda nao sabemos. */
   hasWpink?: boolean | null;
-  /** Nome fantasia (só log). */
+  /** Nome fantasia (so log). */
   name?: string | null;
-  /** Gerador da filial salvo no banco (filtro dos relatórios); null = ainda não buscado. */
+  /** Gerador da filial salvo no banco (filtro dos relatorios); null = ainda nao buscado. */
   geradorId?: number | null;
-  /** Último dia fechado (`store.last_closed_day`); null = ainda sem base. */
+  /** Ultimo dia fechado (`store.last_closed_day`); null = ainda sem base. */
   lastClosedDay?: string | null;
 };
 
@@ -1291,17 +1287,18 @@ export type LoginResult =
   | { ok: false; reason: "busy" | "password" | "other"; raw: string };
 
 export type SyncJobDeps = {
-  hasRunningForCredential: (credentialId: string) => Promise<boolean>;
+  /** excludeJobId: ignora o job ja claimado (QUEUED→RUNNING) nesta rodada. */
+  hasRunningForCredential: (credentialId: string, excludeJobId?: string) => Promise<boolean>;
   markJobRunning: (jobId: string) => Promise<void>;
   markJobFinished: (args: {
     jobId: string;
     status: "SUCCEEDED" | "FAILED";
     error?: string;
-    /** Rodada automática sem venda nova (`payload.noSalesChange`): o sino de Notificações ignora. */
+    /** Rodada automatica sem venda nova (`payload.noSalesChange`): o sino de Notificacoes ignora. */
     noSalesChange?: boolean;
   }) => Promise<void>;
   loadCredential: (credentialId: string) => Promise<SyncCredential>;
-  /** Erros/avisos do job → `sync_log` (Configurações > Logs). Best-effort. */
+  /** Erros/avisos do job  ->  `sync_log` (Configuracoes > Logs). Best-effort. */
   insertSyncLogs?: (rows: SyncLogRow[]) => Promise<void>;
   listStores: (tenantId: string) => Promise<SyncStore[]>;
   /** Days already in sales_day_agg for this store (any brand). */
@@ -1318,7 +1315,7 @@ export type SyncJobDeps = {
     from: string;
     to: string;
   }) => Promise<string[]>;
-  /** Dias que já têm sales_product_day_agg. */
+  /** Dias que ja tem sales_product_day_agg. */
   listDaysWithProduct: (args: {
     tenantId: string;
     storeId: string;
@@ -1326,7 +1323,7 @@ export type SyncJobDeps = {
     to: string;
   }) => Promise<string[]>;
   /**
-   * Dias com forma de pagamento “completa”:
+   * Dias com forma de pagamento "completa":
    * tem linha em sales_payment_day_agg OU day_agg ALL com revenue 0.
    */
   listDaysPaymentComplete: (args: {
@@ -1346,9 +1343,9 @@ export type SyncJobDeps = {
     codFilial: string,
   ) => Promise<number[]>;
   fetchSalesLista: (params: FetchSalesListaParams) => Promise<SaleRowWithFilial[] | SaleRow[]>;
-  /** Lookup COD_FILIAL → FILIAL_GERADOR_GERADOR (wtsreports). */
+  /** Lookup COD_FILIAL  ->  FILIAL_GERADOR_GERADOR (wtsreports). */
   fetchFilialGeradorMap: (session: string) => Promise<Map<string, number>>;
-  /** Mapa PRODUTO → WEPINK|WPINK (report + LISTAR; 1× por job, união das lojas). */
+  /** Mapa PRODUTO  ->  WEPINK|WPINK (report + LISTAR; 1x por job, uniao das lojas). */
   fetchProductBrandMap: (params: {
     session: string;
     geradorIds: number[];
@@ -1358,7 +1355,7 @@ export type SyncJobDeps = {
     /** Uma chamada por vez (carga inicial). */
     sequential?: boolean;
   }) => Promise<ProductBrandCatalog>;
-  /** Relatório oficial faturamento por marca (dia) — CATALOG 70F9DE61. */
+  /** Relatorio oficial faturamento por marca (dia)  -  CATALOG 70F9DE61. */
   fetchBrandRevenueReport: (params: {
     session: string;
     geradorIds: number[];
@@ -1372,7 +1369,7 @@ export type SyncJobDeps = {
     nf: string;
     tipoOperacao?: string;
   }) => Promise<DetMovLine[]>;
-  /** Cupons já detalhados (cache do ConsultaDetMov) no intervalo de dias. */
+  /** Cupons ja detalhados (cache do ConsultaDetMov) no intervalo de dias. */
   listCouponBrands: (args: {
     tenantId: string;
     storeId: string;
@@ -1384,17 +1381,17 @@ export type SyncJobDeps = {
     storeId: string;
     rows: CouponBrand[];
   }) => Promise<void>;
-  /** RELATORIOMARGEM — CMV do período (chamar por dia). */
+  /** RELATORIOMARGEM  -  CMV do periodo (chamar por dia). */
   fetchRelatorioMargem: (params: {
     session: string;
     millenniumStoreId: number;
     from: string;
     to: string;
   }) => Promise<import("./millenniumMargem.ts").MargemLine[]>;
-  /** Catálogo de produtos da rede (tipo = categoria). Sem ele, produto novo fica INDEFINIDO. */
+  /** Catalogo de produtos da rede (tipo = categoria). Sem ele, produto novo fica INDEFINIDO. */
   catalog?: CatalogDeps;
   costTable?: CostTableDetectDeps;
-  /** {52DE7BBC} Produtos por cupom e vendedor — linhas cupom × produto (sem cancelados). */
+  /** {52DE7BBC} Produtos por cupom e vendedor  -  linhas cupom x produto (sem cancelados). */
   fetchCouponReport: (params: {
     session: string;
     geradorId: number;
@@ -1402,13 +1399,13 @@ export type SyncJobDeps = {
     to: string;
   }) => Promise<CouponReportLine[]>;
   upsertDayAggs: (rows: SalesDayAgg[]) => Promise<void>;
-  /** Patch só cmv_cents em brand=ALL (não zera receita no upsert). */
+  /** Patch so cmv_cents em brand=ALL (nao zera receita no upsert). */
   patchDayCmv: (
     rows: Array<{ tenantId: string; storeId: string; day: string; cmvCents: number }>,
   ) => Promise<void>;
   /**
    * Substitui Top produtos no intervalo [from,to] da loja
-   * (relatório de cupom {52DE7BBC} — delete + upsert).
+   * (relatorio de cupom {52DE7BBC}  -  delete + upsert).
    */
   replaceProductDayAggs: (args: {
     tenantId: string;
@@ -1417,7 +1414,7 @@ export type SyncJobDeps = {
     to: string;
     rows: SalesProductDayAgg[];
   }) => Promise<void>;
-  /** Substitui a tabela de preço usada nas vendas no intervalo [from,to] da loja (relatório de cupom). */
+  /** Substitui a tabela de preco usada nas vendas no intervalo [from,to] da loja (relatorio de cupom). */
   replacePriceTableDayAggs?: (args: {
     tenantId: string;
     storeId: string;
@@ -1425,7 +1422,7 @@ export type SyncJobDeps = {
     to: string;
     rows: PriceTableDayAgg[];
   }) => Promise<void>;
-  /** Substitui os itens por pessoa × produto no intervalo [from,to] da loja (relatório de cupom; desafios). */
+  /** Substitui os itens por pessoa x produto no intervalo [from,to] da loja (relatorio de cupom; desafios). */
   replaceSellerProductDayAggs?: (args: {
     tenantId: string;
     storeId: string;
@@ -1442,7 +1439,7 @@ export type SyncJobDeps = {
   }) => Promise<void>;
   /**
    * Substitui formas de pagamento no intervalo [from,to] da loja
-   * (delete + upsert — evita CONDICAO órfã após FORCE).
+   * (delete + upsert  -  evita CONDICAO orfa apos FORCE).
    */
   replacePaymentDayAggs: (args: {
     tenantId: string;
@@ -1453,7 +1450,7 @@ export type SyncJobDeps = {
   }) => Promise<void>;
   /**
    * Substitui ranking de vendedoras no intervalo [from,to] da loja
-   * (VENDEDOR_MILLENNIUM da Lista — delete + upsert).
+   * (VENDEDOR_MILLENNIUM da Lista  -  delete + upsert).
    */
   replaceSellerDayAggs: (args: {
     tenantId: string;
@@ -1463,25 +1460,25 @@ export type SyncJobDeps = {
     rows: SalesSellerDayAgg[];
   }) => Promise<void>;
   upsertHourAggs: (rows: SalesHourAgg[]) => Promise<void>;
-  /** Vendedoras já conhecidas do tenant (nome → código). Sem ela, agregados ficam só pelo nome. */
+  /** Vendedoras ja conhecidas do tenant (nome  ->  codigo). Sem ela, agregados ficam so pelo nome. */
   loadSellerDirectory?: SellerLinkerDeps["loadSellerDirectory"];
-  /** Vendedoras da loja (FUNCIONARIOS.Lista CARGO=1 + Consulta). Opcional: sem ela o passo é pulado. */
+  /** Vendedoras da loja (FUNCIONARIOS.Lista CARGO=1 + Consulta). Opcional: sem ela o passo e pulado. */
   fetchStoreSellers?: SellerLinkerDeps["fetchStoreSellers"];
-  /** Upsert das vendedoras da loja (quem não veio vira in_erp=false) + liga dias antigos pelo nome. */
+  /** Upsert das vendedoras da loja (quem nao veio vira in_erp=false) + liga dias antigos pelo nome. */
   syncStoreSellers?: SellerLinkerDeps["syncStoreSellers"];
   /** Persiste flag WPINK por loja (mapa produto / FILIAIS). */
   setStoresHasWpink: (rows: Array<{ storeId: string; hasWpink: boolean }>) => Promise<void>;
-  /** Guarda o gerador da filial (lookup só roda quando falta). */
+  /** Guarda o gerador da filial (lookup so roda quando falta). */
   setStoresGerador?: (rows: Array<{ storeId: string; geradorId: number }>) => Promise<void>;
-  /** FILIAIS.Lista do usuário ERP (Atualizar cadastros). */
+  /** FILIAIS.Lista do usuario ERP (Atualizar cadastros). */
   fetchErpStores?: (session: string) => Promise<ErpStore[]>;
-  /** Nome, fantasia, CNPJ e inauguração das lojas já cadastradas; `missing` = lojas do ERP que não estão na WeDash. */
+  /** Nome, fantasia, CNPJ e inauguracao das lojas ja cadastradas; `missing` = lojas do ERP que nao estao na WDash. */
   updateStoresFromErp?: (tenantId: string, stores: ErpStore[]) => Promise<{ updated: number; missing: number }>;
-  /** Avança `store.last_closed_day` (nunca volta). */
+  /** Avanca `store.last_closed_day` (nunca volta). */
   markStoresClosed?: (rows: Array<{ storeId: string; day: string }>) => Promise<void>;
-  /** `store.last_sync_at` = último Atualizar de hoje ok. */
+  /** `store.last_sync_at` = ultimo Atualizar de hoje ok. */
   markStoresSynced?: (storeIds: string[], at: Date) => Promise<void>;
-  /** Lista de hoje da última rodada completa por loja (Atualizar sem venda nova pula cupom e margem). */
+  /** Lista de hoje da ultima rodada completa por loja (Atualizar sem venda nova pula cupom e margem). */
   listaMemo?: ListaMemo;
   insertSyncRun: (args: {
     tenantId: string;
@@ -1501,28 +1498,28 @@ export type SyncJobDeps = {
     lastSuccessAt?: Date;
     lastLightSyncAt?: Date;
   }) => Promise<void>;
-  /** Sessão Millennium persistida no tenant (compartilhada com o app). */
+  /** Sessao Millennium persistida no tenant (compartilhada com o app). */
   getStoredSession: (credentialId: string) => Promise<string | null>;
   setStoredSession: (credentialId: string, session: string | null) => Promise<void>;
-  /** Mês fechado da carga do histórico: relatório de cupom e margem 1× por loja no período. */
+  /** Mes fechado da carga do historico: relatorio de cupom e margem 1x por loja no periodo. */
   closedMonth?: ClosedMonthSource;
-  /** Atualizar / carga inicial na fila da credencial (a carga de mês fechado cede a vez entre dias). */
+  /** Atualizar / carga inicial na fila da credencial (a carga de mes fechado cede a vez entre dias). */
   hasPriorityJobQueued?: (credentialId: string) => Promise<boolean>;
-  /** Carga do histórico em período: grava no job o dia mais antigo já gravado (`payload.progressDay`, barra da tela). */
+  /** Carga do historico em periodo: grava no job o dia mais antigo ja gravado (`payload.progressDay`, barra da tela). */
   markJobProgress?: (args: { jobId: string; day: string }) => Promise<void>;
-  /** Carga do histórico: enfileira o CLOSE de `day` (não duplica se já houver na fila/rodando). */
+  /** Carga do historico: enfileira o CLOSE de `day` (nao duplica se ja houver na fila/rodando). */
   enqueueMonthFillDay: (args: {
     tenantId: string;
     credentialId: string;
     day: string;
     fillUntil: string;
-    /** Recarga de dias (ex.: custos corrigidos no ERP): só essas lojas; vazio = todas. */
+    /** Recarga de dias (ex.: custos corrigidos no ERP): so essas lojas; vazio = todas. */
     storeIds?: string[];
   }) => Promise<boolean>;
   now: () => Date;
 };
 
-/** Números do job para o log compacto (carga em período). */
+/** Numeros do job para o log compacto (carga em periodo). */
 export type RunSyncSummary = { sales: number; revenueCents: number; timings: StepTimings };
 
 export type RunSyncResult =
@@ -1554,13 +1551,13 @@ function maxIso(a: string, b: string): string {
   return a >= b ? a : b;
 }
 
-/** 401 / sessão morta — não adianta continuar dia a dia. */
+/** 401 / sessao morta  -  nao adianta continuar dia a dia. */
 function isSessionDeadError(msg: string): boolean {
   const t = msg.toLowerCase();
   return /\b401\b/.test(t) || t.includes("unauthorized");
 }
 
-/** Contenção Millennium (sessão única / limite) — vale baixar concorrência e retry. */
+/** Contencao Millennium (sessao unica / limite)  -  vale baixar concorrencia e retry. */
 export function isContentionError(msg: string): boolean {
   const t = msg.toLowerCase();
   return (
@@ -1580,7 +1577,7 @@ export function isContentionError(msg: string): boolean {
   );
 }
 
-/** Sessão caída ou ERP fora do ar / lento — na rodada automática pula em silêncio. */
+/** Sessao caida ou ERP fora do ar / lento  -  na rodada automatica pula em silencio. */
 export function isErpUnavailableError(msg: string): boolean {
   const t = msg.toLowerCase();
   return (
@@ -1618,8 +1615,8 @@ export async function mapPool<T, R>(
 }
 
 /**
- * Processa itens em paralelo; se der contenção Millennium, desce N → ⌊N/2⌋ → 1 e retenta só os que falharam.
- * Índices originais preservados nos resultados.
+ * Processa itens em paralelo; se der contencao Millennium, desce N  ->  N/2  ->  1 e retenta so os que falharam.
+ * Indices originais preservados nos resultados.
  */
 export async function mapPoolAdaptive<T, R>(
   items: T[],
@@ -1674,8 +1671,8 @@ export async function mapPoolAdaptive<T, R>(
 }
 
 /**
- * Quantas lojas em paralelo (1 sessão Millennium).
- * Default = todas as lojas do job. `STORE_CONCURRENCY` opcional só como teto.
+ * Quantas lojas em paralelo (1 sessao Millennium).
+ * Default = todas as lojas do job. `STORE_CONCURRENCY` opcional so como teto.
  */
 export function storeFetchConcurrency(storeCount: number): number {
   const n = Math.max(1, storeCount);
@@ -1687,8 +1684,8 @@ export function storeFetchConcurrency(storeCount: number): number {
 }
 
 /**
- * LIGHT / FORCE / SEED: marca vem da margem (COD WP*) e o DetMov classifica pela descrição.
- * No SEED o mapa custava ~55s (LISTARVENDASSALDO do mês inteiro) sem mudar receita/CMV.
+ * LIGHT / FORCE / SEED: marca vem da margem (COD WP*) e o DetMov classifica pela descricao.
+ * No SEED o mapa custava ~55s (LISTARVENDASSALDO do mes inteiro) sem mudar receita/CMV.
  */
 export function shouldBuildProductBrandMap(
   kind: SyncJobKind,
@@ -1697,7 +1694,7 @@ export function shouldBuildProductBrandMap(
 ): boolean {
   if (lightToday) return false;
   if (kind === "FORCE" || kind === "FORCE_LIGHT" || kind === "SEED") return false;
-  // Nenhuma loja marcada com WPINK → DetMov não roda; brand report basta.
+  // Nenhuma loja marcada com WPINK  ->  DetMov nao roda; brand report basta.
   if (stores.length > 0 && stores.every((s) => s.hasWpink === false)) return false;
   if (kind === "HISTORY" || kind === "BACKFILL" || kind === "RANGE") {
     return true;
@@ -1705,7 +1702,7 @@ export function shouldBuildProductBrandMap(
   return false;
 }
 
-/** Janela do LISTAR enrich: SEED/HISTORY amplo; FORCE/RANGE só o dia (SKU do dia). */
+/** Janela do LISTAR enrich: SEED/HISTORY amplo; FORCE/RANGE so o dia (SKU do dia). */
 function productCatalogWindow(
   kind: SyncJobKind,
   todayIso: string,
@@ -1716,7 +1713,7 @@ function productCatalogWindow(
   return { from: todayIso, to: todayIso };
 }
 
-/** Chunk inclusive range into ≤ maxDays windows. */
+/** Chunk inclusive range into  maxDays windows. */
 export function chunkInclusiveRange(
   start: string,
   end: string,
@@ -1746,8 +1743,8 @@ export function inclusiveDayCount(from: string, to: string): number {
 }
 
 /**
- * Escada após timeout/vazio: mês → 15d → 7d → 1d.
- * `null` = já é 1 dia (não dá pra fatiar mais).
+ * Escada apos timeout/vazio: mes  ->  15d  ->  7d  ->  1d.
+ * `null` = ja e 1 dia (nao da pra fatiar mais).
  */
 export function nextFallbackMaxDays(from: string, to: string): number | null {
   const days = inclusiveDayCount(from, to);
@@ -1757,7 +1754,7 @@ export function nextFallbackMaxDays(from: string, to: string): number | null {
   return 1;
 }
 
-/** Fatia a janela que falhou no próximo degrau da escada. */
+/** Fatia a janela que falhou no proximo degrau da escada. */
 export function splitFailedWindow(
   from: string,
   to: string,
@@ -1767,7 +1764,7 @@ export function splitFailedWindow(
   return chunkInclusiveRange(from, to, max);
 }
 
-/** Particiona em meses de calendário (ex.: ago/01–31, set/01–hoje). */
+/** Particiona em meses de calendario (ex.: ago/01 - 31, set/01 - hoje). */
 export function chunkByCalendarMonths(
   start: string,
   end: string,
@@ -1786,7 +1783,7 @@ export function chunkByCalendarMonths(
   return out;
 }
 
-/** Carga do onboarding: dia 1 do mês atual (fuso da loja) → hoje. Passado = planilha (futuro). */
+/** Carga do onboarding: dia 1 do mes atual (fuso da loja)  ->  hoje. Passado = planilha (futuro). */
 export function seedWindow(todayIso: string): { from: string; to: string } {
   return { from: `${todayIso.slice(0, 7)}-01`, to: todayIso };
 }
@@ -1799,8 +1796,8 @@ export function monthsBeforeIso(todayIso: string, months: number): string {
 }
 
 /**
- * Chão do histórico: o mais recente entre inauguração e o dia 1º do mês `months` meses
- * antes do mês atual (ex.: set/26 com 2 → 01/07/26). Sempre mês inteiro.
+ * Chao do historico: o mais recente entre inauguracao e o dia 1 do mes `months` meses
+ * antes do mes atual (ex.: set/26 com 2  ->  01/07/26). Sempre mes inteiro.
  */
 export function historyFloor(
   todayIso: string,
@@ -1825,8 +1822,8 @@ export function previousCalendarMonth(dayIso: string): { from: string; to: strin
 }
 
 /**
- * Próximo mês a buscar no HISTORY (um mês atrás do que já temos).
- * `earliestExisting` null → começa logo antes do SEED (`seedFrom`).
+ * Proximo mes a buscar no HISTORY (um mes atras do que ja temos).
+ * `earliestExisting` null  ->  comeca logo antes do SEED (`seedFrom`).
  */
 export function nextHistoryWindow(opts: {
   today: string;
@@ -1884,7 +1881,7 @@ export function missingDays(
     cursor = addDaysIso(cursor, 1);
   }
   if (opts.alwaysToday) {
-    // Sempre rebusca hoje (venda muda o dia inteiro), mesmo fora do período ou já no banco.
+    // Sempre rebusca hoje (venda muda o dia inteiro), mesmo fora do periodo ou ja no banco.
     const set = new Set(need);
     set.add(opts.today);
     return [...set].sort();
@@ -1894,8 +1891,8 @@ export function missingDays(
 
 /**
  * CMV / produtos: SEED/HISTORY = janela inteira;
- * FORCE = buracos + hoje (1 report/dia — barato o bastante p/ refrescar).
- * RANGE = só buracos.
+ * FORCE = buracos + hoje (1 report/dia  -  barato o bastante p/ refrescar).
+ * RANGE = so buracos.
  */
 export async function daysNeedingHeavySync(
   deps: Pick<SyncJobDeps, "listDaysWithCmv" | "listDaysWithProduct">,
@@ -1924,7 +1921,7 @@ export async function daysNeedingHeavySync(
   return missingDays(from, to, have, { today, alwaysToday });
 }
 
-/** Título do job no log do terminal. */
+/** Titulo do job no log do terminal. */
 function jobTitle(kind: SyncJobKind): string {
   switch (kind) {
     case "SEED":
@@ -1946,7 +1943,7 @@ function jobTitle(kind: SyncJobKind): string {
   }
 }
 
-/** Janela de CMV: FORCE = só hoje; RANGE = período do payload. */
+/** Janela de CMV: FORCE = so hoje; RANGE = periodo do payload. */
 function cmvWindowForJob(
   job: SyncJob,
   today: string,
@@ -1957,7 +1954,7 @@ function cmvWindowForJob(
     return { from: today, to: today };
   }
   if (kind === "SEED" || kind === "BACKFILL") return seedWindow(today);
-  if (kind === "HISTORY") return null; // usa as janelas já buscadas
+  if (kind === "HISTORY") return null; // usa as janelas ja buscadas
   const from = job.payload.from ?? today;
   const to = job.payload.to ?? today;
   return { from: minIso(from, to), to: maxIso(from, to) };
@@ -1973,7 +1970,7 @@ function shouldSyncCmv(kind: SyncJobKind): boolean {
   );
 }
 
-/** Top produtos (relatório de cupom) sem Lista: SEED/HISTORY/FORCE/RANGE (não LIGHT). */
+/** Top produtos (relatorio de cupom) sem Lista: SEED/HISTORY/FORCE/RANGE (nao LIGHT). */
 function shouldSyncProducts(kind: SyncJobKind): boolean {
   return (
     kind === "SEED" ||
@@ -1994,13 +1991,13 @@ async function windowsForStore(
   const kind = job.kind;
 
   if (kind === "LIGHT" || kind === "FORCE" || kind === "FORCE_LIGHT") {
-    // Atualizar = só hoje (fuso da loja). Passado = job noturno / SEED.
+    // Atualizar = so hoje (fuso da loja). Passado = job noturno / SEED.
     return [{ from: today, to: today }];
   }
 
   if (kind === "SEED" || kind === "BACKFILL") {
     const { from, to } = seedWindow(today);
-    // Lista de mês inteiro trava o Millennium (minutos + "Requisição cancelada"); 1 dia ≈ 0,6s.
+    // Lista de mes inteiro trava o Millennium (minutos + "Requisicao cancelada"); 1 dia  0,6s.
     return chunkInclusiveRange(from, to, 1);
   }
 
@@ -2020,7 +2017,7 @@ async function windowsForStore(
     return chunkByCalendarMonths(win.from, win.to);
   }
 
-  // RANGE (e kinds com payload de período): buracos no intervalo.
+  // RANGE (e kinds com payload de periodo): buracos no intervalo.
   const from = job.payload.from ?? today;
   const to = job.payload.to ?? today;
   const rangeFrom = minIso(from, to);
@@ -2049,7 +2046,7 @@ async function windowsForStore(
   return collapseDaysToWindows(days).flatMap((w) => chunkByCalendarMonths(w.from, w.to));
 }
 
-/** Sessão Millennium aberta neste processo — liberada no finally e no SIGINT. */
+/** Sessao Millennium aberta neste processo  -  liberada no finally e no SIGINT. */
 let activeMillenniumSession: string | null = null;
 
 export function getActiveMillenniumSession(): string | null {
@@ -2062,15 +2059,15 @@ export async function releaseActiveMillenniumSession(
   const s = activeMillenniumSession;
   if (!s) return;
   activeMillenniumSession = null;
-  // Não faz logout no ERP — sessão pertence ao tenant até o usuário desconectar.
-  // Só tira da memória do processo.
+  // Nao faz logout no ERP  -  sessao pertence ao tenant ate o usuario desconectar.
+  // So tira da memoria do processo.
   void logout;
   console.log("Sessão Millennium mantida no tenant (shutdown só libera memória do worker)");
 }
 
-/** Smoke leve: sessão morta → 401 (não usa cache de EVENTOs). */
+/** Smoke leve: sessao morta  ->  401 (nao usa cache de EVENTOs). */
 async function sessionStillAlive(session: string): Promise<boolean> {
-  // Testes unitários não batem no Millennium.
+  // Testes unitarios nao batem no Millennium.
   if (process.env.VITEST || process.env.NODE_ENV === "test") return true;
   try {
     const res = await fetch(`${millenniumBaseUrl()}/Millennium.EVENTOS.ListaTodos`, {
@@ -2091,7 +2088,7 @@ async function sessionStillAlive(session: string): Promise<boolean> {
 }
 
 /**
- * Reusa token do tenant; se não houver / 401, faz login e grava.
+ * Reusa token do tenant; se nao houver / 401, faz login e grava.
  * Renova (novo login) quando forceRenew ou smoke falha.
  */
 async function ensureMillenniumSession(
@@ -2142,21 +2139,21 @@ async function ensureMillenniumSession(
 }
 
 /**
- * Carga inicial com SYNC_ONBOARDING=off: nada de vendas, mas o cadastro do Millennium entra —
- * gerador de cada loja, equipe de cada loja e produtos (catálogo + tabelas de custo, só se vazios).
- * Cada parte é soft-fail (aviso no terminal); sessão caída interrompe o resto.
+ * Carga inicial com SYNC_ONBOARDING=off: nada de vendas, mas o cadastro do Millennium entra  - 
+ * gerador de cada loja, equipe de cada loja e produtos (catalogo + tabelas de custo, so se vazios).
+ * Cada parte e soft-fail (aviso no terminal); sessao caida interrompe o resto.
  * Devolve quantas lojas tiveram a equipe sincronizada.
  */
 async function syncOnboardingRegistry(job: SyncJob, deps: SyncJobDeps): Promise<number> {
   const warn = (what: string, e: unknown) =>
-    console.warn(`  ⚠ ${what} não sincronizou: ${e instanceof Error ? e.message : String(e)}`);
+    console.warn(`  AVISO ${what} não sincronizou: ${e instanceof Error ? e.message : String(e)}`);
   let session: string;
   let stores: SyncStore[];
   try {
     const cred = await deps.loadCredential(job.credentialId);
     const ensured = await ensureMillenniumSession(cred, deps);
     if (!ensured.ok) {
-      console.warn(`  ⚠ cadastro não sincronizou: login no Millennium falhou (${ensured.reason})`);
+      console.warn(`  AVISO cadastro não sincronizou: login no Millennium falhou (${ensured.reason})`);
       return 0;
     }
     session = ensured.session;
@@ -2195,7 +2192,7 @@ async function syncOnboardingRegistry(job: SyncJob, deps: SyncJobDeps): Promise<
         tenantId: job.tenantId,
         getSession: () => session,
         now: () => deps.now(),
-        log: (_level, message, store) => console.warn(`  ⚠ [${store.code}] ${message}`),
+        log: (_level, message, store) => console.warn(`  AVISO [${store.code}] ${message}`),
         isSessionDead: isSessionDeadError,
       });
       for (const store of stores) {
@@ -2220,14 +2217,14 @@ async function syncOnboardingRegistry(job: SyncJob, deps: SyncJobDeps): Promise<
 }
 
 /**
- * Atualizar cadastros (Configurações > Integrações): lojas (nome, fantasia, CNPJ, inauguração),
- * gerador de cada loja e a lista de tabelas de custo do ERP (opções do Select, sem preços).
- * Produtos, preços e colaboradores ficam nos gatilhos automáticos (produto/vendedor desconhecido,
- * troca de tabela) e no Atualizar de Gestão > Vendedores.
- * Cada parte segue se outra falhar; alguma falhou → job FAILED com a lista. Sessão caída interrompe.
+ * Atualizar cadastros (Configuracoes > Integracoes): lojas (nome, fantasia, CNPJ, inauguracao),
+ * gerador de cada loja e a lista de tabelas de custo do ERP (opcoes do Select, sem precos).
+ * Produtos, precos e colaboradores ficam nos gatilhos automaticos (produto/vendedor desconhecido,
+ * troca de tabela) e no Atualizar de Gestao > Vendedores.
+ * Cada parte segue se outra falhar; alguma falhou  ->  job FAILED com a lista. Sessao caida interrompe.
  */
 async function runRegistryJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyncResult> {
-  if (await deps.hasRunningForCredential(job.credentialId)) return { ok: false, reason: "locked" };
+  if (await deps.hasRunningForCredential(job.credentialId, job.id)) return { ok: false, reason: "locked" };
   await deps.markJobRunning(job.id);
   const t0 = nowMs();
   const failed: string[] = [];
@@ -2260,7 +2257,7 @@ async function runRegistryJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyncR
     return finish(e instanceof Error ? e.message : String(e));
   }
 
-  /** Roda uma parte; 401 derruba o job, o resto só marca a parte como falha. */
+  /** Roda uma parte; 401 derruba o job, o resto so marca a parte como falha. */
   const step = async (label: string, run: () => Promise<void>): Promise<boolean> => {
     try {
       await run();
@@ -2281,7 +2278,7 @@ async function runRegistryJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyncR
         const erp = await fetchErpStores(session);
         const r = await updateStoresFromErp(job.tenantId, erp);
         stores = await deps.listStores(job.tenantId);
-        console.log(`  Lojas · ${r.updated} atualizada(s)${r.missing > 0 ? ` · ${r.missing} do ERP fora da WeDash` : ""}`);
+        console.log(`  Lojas · ${r.updated} atualizada(s)${r.missing > 0 ? ` · ${r.missing} do ERP fora da WDash` : ""}`);
       });
     }
 
@@ -2319,19 +2316,19 @@ async function runRegistryJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyncR
  * sequential stores, always logout after login, busy/password classification.
  */
 /**
- * FORCE dia a dia — mesmo fluxo do Atualizar para cada dia de `from → to` e cada fuso das lojas,
- * com o relógio em 23:59 daquele dia (hoje = relógio real). Horas, marca/DetMov, CMV, categorias,
+ * FORCE dia a dia  -  mesmo fluxo do Atualizar para cada dia de `from  ->  to` e cada fuso das lojas,
+ * com o relogio em 23:59 daquele dia (hoje = relogio real). Horas, marca/DetMov, CMV, categorias,
  * produtos, formas, equipe.
- * - CLOSE (fechamento noturno): payload.from/to; dia que falha derruba o job; não mexe em
- *   "Atualizado às…".
- * - SEED (onboarding): só **hoje** (o usuário entra no dashboard em segundos); grava "Atualizado às…"
- *   e enfileira a carga do histórico (CLOSE com `fillUntil`), de ontem até o início de `SYNC_ONBOARDING`
- *   (off = sem vendas; só o cadastro: gerador, equipe e produtos).
- * - Carga do histórico (CLOSE com `fillUntil`): 1 dia por job; terminou (ou falhou sem ser senha) →
+ * - CLOSE (fechamento noturno): payload.from/to; dia que falha derruba o job; nao mexe em
+ *   "Atualizado as...".
+ * - SEED (onboarding): so **hoje** (o usuario entra no dashboard em segundos); grava "Atualizado as..."
+ *   e enfileira a carga do historico (CLOSE com `fillUntil`), de ontem ate o inicio de `SYNC_ONBOARDING`
+ *   (off = sem vendas; so o cadastro: gerador, equipe e produtos).
+ * - Carga do historico (CLOSE com `fillUntil`): 1 dia por job; terminou (ou falhou sem ser senha)  -> 
  *   enfileira o dia anterior. Entre um dia e outro o Atualizar (prioridade na fila) passa na frente.
  */
 async function runDailyForceJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyncResult> {
-  if (await deps.hasRunningForCredential(job.credentialId)) return { ok: false, reason: "locked" };
+  if (await deps.hasRunningForCredential(job.credentialId, job.id)) return { ok: false, reason: "locked" };
   await deps.markJobRunning(job.id);
   const startedAt = deps.now();
   const tJob = nowMs();
@@ -2347,7 +2344,7 @@ async function runDailyForceJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyn
   const deep = Boolean(fillUntil && job.payload.deep);
   const label = isSeed ? "Carga inicial" : deep ? "Histórico antigo" : fillUntil ? "Carga do histórico" : "Fechamento";
 
-  /** Próximo dia da carga do histórico (o anterior a `day`), se ainda não chegou no fim (`until`). */
+  /** Proximo dia da carga do historico (o anterior a `day`), se ainda nao chegou no fim (`until`). */
   const chainMonthFill = async (day: string, until: string) => {
     if (deep) return;
     const prev = addDaysIso(day, -1);
@@ -2407,8 +2404,8 @@ async function runDailyForceJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyn
   }
   if (!from || !to) return fail("other", "fechamento sem dias no payload", 0);
 
-  // Carga do histórico: os dias já fechados do mês (até `fillUntil`) num job só —
-  // Lista, relatório de cupom e margem 1× por loja; os dias são gravados um a um.
+  // Carga do historico: os dias ja fechados do mes (ate `fillUntil`) num job so  - 
+  // Lista, relatorio de cupom e margem 1x por loja; os dias sao gravados um a um.
   let closedMonth: ClosedMonthSource | undefined;
   if (fillUntil && from === to && isHistoryRangeDay(from, seedToday)) {
     const range = closedMonthRange(from, fillUntil);
@@ -2444,7 +2441,7 @@ async function runDailyForceJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyn
     for (const [tz, tzStoreIds] of byTz) {
       const todayTz = ymdInTz(realNow, tz);
       if (day > todayTz) continue;
-      // Fechamento da madrugada: pula loja que já fechou o dia (rodada automática depois do fechamento).
+      // Fechamento da madrugada: pula loja que ja fechou o dia (rodada automatica depois do fechamento).
       const storeIds =
         isSeed || fillUntil
           ? tzStoreIds
@@ -2560,7 +2557,7 @@ async function runDailyForceJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyn
       ...(yieldedAt ? { note: `Pausou em ${brDay(yieldedAt)} para o Atualizar; continua depois` } : {}),
     });
   } else if (days.length > 1) {
-    console.log(`✓ ${runLabel} · ${daysOk} dias · ${storesDone} loja(s) · ${formatElapsed(tJob)} no total`);
+    console.log(`OK ${runLabel} · ${daysOk} dias · ${storesDone} loja(s) · ${formatElapsed(tJob)} no total`);
   }
   if (isSeed) {
     const until = onboardingHistoryUntil(seedToday);
@@ -2582,8 +2579,8 @@ async function priorityJobQueued(deps: SyncJobDeps, credentialId: string): Promi
 }
 
 /**
- * Onboarding sem carga do histórico (SYNC_ONBOARDING=off / 1d): ontem vira o último dia fechado das
- * lojas sem base — nada antes do onboarding é buscado, mas dia perdido depois disso é recuperado.
+ * Onboarding sem carga do historico (SYNC_ONBOARDING=off / 1d): ontem vira o ultimo dia fechado das
+ * lojas sem base  -  nada antes do onboarding e buscado, mas dia perdido depois disso e recuperado.
  */
 async function setRecoveryBase(job: SyncJob, deps: SyncJobDeps): Promise<void> {
   try {
@@ -2596,7 +2593,7 @@ async function setRecoveryBase(job: SyncJob, deps: SyncJobDeps): Promise<void> {
         .map((s) => ({ storeId: s.id, day: addDaysIso(ymdInTz(now, s.timezone), -1) })),
     );
   } catch (e) {
-    console.warn(`  ⚠ base da recuperação de dias não foi salva: ${e instanceof Error ? e.message : String(e)}`);
+    console.warn(`  AVISO base da recuperação de dias não foi salva: ${e instanceof Error ? e.message : String(e)}`);
   }
 }
 
@@ -2605,11 +2602,11 @@ async function markStoresClosed(deps: SyncJobDeps, rows: Array<{ storeId: string
   try {
     await deps.markStoresClosed(rows);
   } catch (e) {
-    console.warn(`  ⚠ último dia fechado não foi salvo: ${e instanceof Error ? e.message : String(e)}`);
+    console.warn(`  AVISO último dia fechado não foi salvo: ${e instanceof Error ? e.message : String(e)}`);
   }
 }
 
-/** Deps de um dia passado: relógio no fim do dia e sem mexer em "Atualizado às…". */
+/** Deps de um dia passado: relogio no fim do dia e sem mexer em "Atualizado as...". */
 function pastDayDeps(deps: SyncJobDeps, dayNow: Date): SyncJobDeps {
   return {
     ...deps,
@@ -2622,13 +2619,13 @@ function pastDayDeps(deps: SyncJobDeps, dayNow: Date): SyncJobDeps {
 }
 
 /**
- * Atualizar (FORCE de hoje) — botão do Topbar ou rodada automática (Configurações > Integrações).
- * 1. Automático sem `relogin`: sessão salva caída → pula em silêncio (a próxima rodada faz login 1×).
- * 2. Fecha antes os dias pendentes das lojas (até 3 por rodada, do mais antigo ao mais novo).
- * 3. Atualiza hoje; loja que já passou do fechamento + 30 min fecha o dia.
+ * Atualizar (FORCE de hoje)  -  botao do Topbar ou rodada automatica (Configuracoes > Integracoes).
+ * 1. Automatico sem `relogin`: sessao salva caida  ->  pula em silencio (a proxima rodada faz login 1x).
+ * 2. Fecha antes os dias pendentes das lojas (ate 3 por rodada, do mais antigo ao mais novo).
+ * 3. Atualiza hoje; loja que ja passou do fechamento + 30 min fecha o dia.
  */
 async function runRefreshJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyncResult> {
-  if (await deps.hasRunningForCredential(job.credentialId)) return { ok: false, reason: "locked" };
+  if (await deps.hasRunningForCredential(job.credentialId, job.id)) return { ok: false, reason: "locked" };
   await deps.markJobRunning(job.id);
   const startedAt = deps.now();
   const auto = job.payload.auto === true;
@@ -2690,7 +2687,7 @@ async function runRefreshJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyncRe
     payload,
   });
 
-  // Dias pendentes: dia → fuso → lojas.
+  // Dias pendentes: dia  ->  fuso  ->  lojas.
   const realNow = deps.now();
   const pending = new Map<string, Map<string, string[]>>();
   for (const s of stores) {
@@ -2716,8 +2713,8 @@ async function runRefreshJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyncRe
     }
   }
 
-  // Hoje só fecha com pedido explícito (job antigo na fila); o normal é a madrugada (CLOSE) fechar ontem —
-  // se ela não rodou, a 1ª rodada do dia fecha ontem como dia pendente, acima.
+  // Hoje so fecha com pedido explicito (job antigo na fila); o normal e a madrugada (CLOSE) fechar ontem  - 
+  // se ela nao rodou, a 1 rodada do dia fecha ontem como dia pendente, acima.
   const closeRequested = new Set(job.payload.closeStoreIds ?? []);
   const fullStoreIds = stores.filter((s) => closeRequested.has(s.id)).map((s) => s.id);
   const res = await runSyncJob(
@@ -2735,7 +2732,7 @@ async function runRefreshJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyncRe
   const at = deps.now();
   if (deps.markStoresSynced && stores.length > 0) {
     await deps.markStoresSynced(stores.map((s) => s.id), at).catch((e: unknown) => {
-      console.warn(`  ⚠ horário da última atualização da loja não foi salvo: ${e instanceof Error ? e.message : String(e)}`);
+      console.warn(`  AVISO horário da última atualização da loja não foi salvo: ${e instanceof Error ? e.message : String(e)}`);
     });
   }
   const full = new Set(fullStoreIds);
@@ -2750,8 +2747,8 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
   if (job.kind === "REGISTRY") return runRegistryJob(job, deps);
   if (job.kind === "CLOSE" || job.kind === "SEED") return runDailyForceJob(job, deps);
   if (job.kind === "FORCE" && !job.logKind) return runRefreshJob(job, deps);
-  if (await deps.hasRunningForCredential(job.credentialId)) {
-    // Silencioso — claimNextJob já evita isso; se chegar aqui, deixa QUEUED.
+  if (await deps.hasRunningForCredential(job.credentialId, job.id)) {
+    // Outro job da mesma credencial — devolve a fila se ainda estivermos QUEUED.
     return { ok: false, reason: "locked" };
   }
 
@@ -2759,12 +2756,12 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
   beginSyncLog({ tenantId: job.tenantId, jobId: job.id, jobKind: job.logKind ?? job.kind });
   const startedAt = deps.now();
   const tJob = nowMs();
-  // Relógio real (no fechamento, deps.now() é 23:59 do dia fechado).
+  // Relogio real (no fechamento, deps.now() e 23:59 do dia fechado).
   const wallStart = new Date();
   const title = job.logTitle ?? jobTitle(job.logKind ?? job.kind);
   let session: string | null = null;
   let storesDone = 0;
-  /** Rodada automática que caiu por sessão / ERP fora do ar: nada vai para Logs. */
+  /** Rodada automatica que caiu por sessao / ERP fora do ar: nada vai para Logs. */
   let quietFailure = false;
   let erpUser: string | null = null;
   let logTz = "America/Sao_Paulo";
@@ -2776,7 +2773,7 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
   const compact = Boolean(job.compactLog);
   let totalSales = 0;
   let totalRevenueCents = 0;
-  /** Alguma loja trouxe Lista diferente da última vista (sino só notifica rodada automática com venda nova). */
+  /** Alguma loja trouxe Lista diferente da ultima vista (sino so notifica rodada automatica com venda nova). */
   let salesChanged = false;
   const totalTimings = () => {
     const all = new StepTimings();
@@ -2789,7 +2786,7 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
   detail(`[sync] start kind=${job.kind} tenant=${job.tenantId.slice(0, 8)} job=${job.id.slice(0, 8)}`);
 
   try {
-    // HISTORY sem janelas: não gasta sessão. RANGE sem buracos ainda precisa CMV.
+    // HISTORY sem janelas: nao gasta sessao. RANGE sem buracos ainda precisa CMV.
     if (job.kind === "HISTORY") {
       let previewStores = await deps.listStores(job.tenantId);
       if (job.payload.storeIds && job.payload.storeIds.length > 0) {
@@ -2826,8 +2823,8 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
     erpUser = cred.username;
     setSyncLogErpUser(cred.username);
 
-    // Sessão ligada ao tenant: reusa token salvo; só loga se não houver / inválido.
-    // Logout explícito fica com o usuário (Configurações / pause), não com o fim do job.
+    // Sessao ligada ao tenant: reusa token salvo; so loga se nao houver / invalido.
+    // Logout explicito fica com o usuario (Configuracoes / pause), nao com o fim do job.
     const ensured = await ensureMillenniumSession(cred, deps);
     if (!ensured.ok) {
       const reason = ensured.reason;
@@ -2900,9 +2897,9 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
         return { ok: true, storesDone: 0 };
       }
     }
-    // Atualizar (e a carga inicial, que é o Atualizar dia a dia): uma loja por vez.
+    // Atualizar (e a carga inicial, que e o Atualizar dia a dia): uma loja por vez.
     const sequential = job.kind === "BACKFILL" || job.kind === "FORCE" || job.kind === "FORCE_LIGHT";
-    // Dentro da loja, relatórios independentes em paralelo (cada um dia a dia); a loja seguinte só começa depois.
+    // Dentro da loja, relatorios independentes em paralelo (cada um dia a dia); a loja seguinte so comeca depois.
     const parallelReports = sequential;
     storeTimings = new Map(storeList.map((s) => [s.id, new StepTimings()]));
     storeCount = storeList.length;
@@ -2946,7 +2943,7 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
       sellerLinker ? (rows: SalesSellerDayAgg[]) => sellerLinker(store, rows) : undefined;
 
     const now = deps.now();
-    // Gerador da filial fica salvo na loja; o lookup só roda quando alguma ainda não tem.
+    // Gerador da filial fica salvo na loja; o lookup so roda quando alguma ainda nao tem.
     const geradorMap = new Map<string, number>();
     for (const s of storeList) if (s.geradorId != null) geradorMap.set(s.code, s.geradorId);
     const missingGerador = storeList.filter((s) => s.geradorId == null);
@@ -2964,12 +2961,12 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
         detail(`Gerador · ${toSave.length}/${missingGerador.length} loja(s) sem gerador salvo resolvidas · ${formatElapsed(tGer)}`);
         if (toSave.length > 0 && deps.setStoresGerador) {
           await deps.setStoresGerador(toSave).catch((e: unknown) => {
-            console.warn(`  ⚠ gerador da loja não foi salvo: ${e instanceof Error ? e.message : String(e)}`);
+            console.warn(`  AVISO gerador da loja não foi salvo: ${e instanceof Error ? e.message : String(e)}`);
           });
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        console.warn(`  ⚠ lookup filial → gerador falhou: ${msg}`);
+        console.warn(`  AVISO lookup filial → gerador falhou: ${msg}`);
         syncLog("WARN", "gerador", `Lookup filial → gerador falhou (marca, categorias e top produtos pulados): ${msg}`);
       }
     }
@@ -2981,7 +2978,7 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
     const lightToday =
       job.kind === "LIGHT" ||
       (job.kind === "FORCE_LIGHT" && !job.payload.from && !job.payload.to);
-    // Pré-marca lojas já conhecidas com WPINK (evita DetMov sem mapa no FORCE).
+    // Pre-marca lojas ja conhecidas com WPINK (evita DetMov sem mapa no FORCE).
     for (const s of storeList) {
       if (s.hasWpink === true) {
         const g = geradorMap.get(s.code);
@@ -3017,7 +3014,7 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
         detail(
           `Product→marca map · ${productMap.size} SKU(s) · WPINK em ${geradorIdsWithWpink.size}/${geradorIds.length} loja(s) · ${formatElapsed(tProd)}`,
         );
-        // Só liga o flag (nunca desliga) — loja pode ter WPINK no relatório
+        // So liga o flag (nunca desliga)  -  loja pode ter WPINK no relatorio
         // mesmo sem SKU WPINK no mapa de estoque do gerador.
         const fromCatalog = storeList
           .filter((s) => {
@@ -3028,11 +3025,11 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
         if (fromCatalog.length > 0) await deps.setStoresHasWpink(fromCatalog);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        console.warn(`  ⚠ mapa produto → marca falhou: ${msg}`);
+        console.warn(`  AVISO mapa produto → marca falhou: ${msg}`);
         syncLog("WARN", "mapa_produtos", `Mapa produto → marca falhou (split WEPINK/WPINK por descrição): ${msg}`);
       }
     } else if (geradorIds.length === 0) {
-      console.warn("  ⚠ nenhuma loja com gerador — marca, categorias e cupom pulados");
+      console.warn("  AVISO nenhuma loja com gerador — marca, categorias e cupom pulados");
       syncLog("WARN", "gerador", "Nenhuma filial com gerador no Millennium — marca, categorias e top produtos pulados");
     } else {
       detail(
@@ -3045,7 +3042,7 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
     }
 
     if (lightToday) {
-      // LIGHT: 1× VENDAS.Lista sem FILIAL (hoje) → particiona por FILIAL da linha.
+      // LIGHT: 1x VENDAS.Lista sem FILIAL (hoje)  ->  particiona por FILIAL da linha.
       const tz = storeList[0]?.timezone ?? "America/Sao_Paulo";
       const today = ymdInTz(now, tz);
       const eventoSet = new Set<number>();
@@ -3201,7 +3198,7 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
           if (shouldSyncProducts(job.kind) && cmvWin) {
             const geradorId = geradorMap.get(store.code);
             if (geradorId == null) {
-              console.warn(`  ⚠ [${store.code}] top produtos: sem gerador (pula)`);
+              console.warn(`  AVISO [${store.code}] top produtos: sem gerador (pula)`);
               syncLog("WARN", "gerador", "Loja sem gerador no Millennium — top produtos e categorias pulados", {
                 store,
               });
@@ -3236,12 +3233,12 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
           return 1;
         }
         detail(`  [${store.code}] ${windows.length} janela(s) · EVENTOs ${eventoIds.join(",")}`);
-        // Carga inicial: equipe completa antes das vendas (cadastro + código de gerador).
+        // Carga inicial: equipe completa antes das vendas (cadastro + codigo de gerador).
         if (job.logKind === "SEED" && sellerLinker) await sellerLinker.syncStore(store);
-        // Relatório de cupom não depende da Lista; marca/CMV sim (usa as vendas).
+        // Relatorio de cupom nao depende da Lista; marca/CMV sim (usa as vendas).
         const geradorId = geradorMap.get(store.code) ?? null;
         if (geradorId == null) {
-          console.warn(`  ⚠ [${store.code}] sem gerador — relatório de cupom pulado`);
+          console.warn(`  AVISO [${store.code}] sem gerador — relatório de cupom pulado`);
           syncLog("WARN", "gerador", "Loja sem gerador no Millennium — top produtos e categorias pulados", {
             store,
           });
@@ -3251,8 +3248,8 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
             ? Promise.resolve(null)
             : fetchCouponLinesForWindows(deps, { session: session!, store, geradorId, windows, timings });
         const asError = (e: unknown) => (e instanceof Error ? e : new Error(String(e)));
-        // Atualizar de hoje (relógio real — dias pendentes rodam com o relógio no fim do dia) fora do
-        // fechamento: se a Lista vier igual à da última rodada completa, pula cupom e margem.
+        // Atualizar de hoje (relogio real  -  dias pendentes rodam com o relogio no fim do dia) fora do
+        // fechamento: se a Lista vier igual a da ultima rodada completa, pula cupom e margem.
         const realToday = ymdInTz(wallStart, store.timezone);
         const memo =
           deps.listaMemo &&
@@ -3267,8 +3264,8 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
         const prevFingerprint = memo?.get(store.id);
         const mayReuse = prevFingerprint?.startsWith(`${realToday}:`) ?? false;
         const issuesBefore = syncLogIssueCount(store.id);
-        // Atualizar: relatório de cupom ‖ (Lista → marca/CMV) ao mesmo tempo — salvo quando pode
-        // pular: aí o cupom espera a Lista (pode nem ser chamado).
+        // Atualizar: relatorio de cupom  (Lista  ->  marca/CMV) ao mesmo tempo  -  salvo quando pode
+        // pular: ai o cupom espera a Lista (pode nem ser chamado).
         const couponTask: Promise<CouponFetch | null | Error> | null =
           parallelReports && !mayReuse ? runCoupon().catch(asError) : null;
         const sellerWindows: ListaWindowArgs[] = [];
@@ -3321,16 +3318,16 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
               (job.kind === "SEED" || job.kind === "BACKFILL" || job.kind === "HISTORY") &&
               from !== to
             ) {
-              // Janela de vários dias: não repete a mesma consulta pesada — fatia na hora.
+              // Janela de varios dias: nao repete a mesma consulta pesada  -  fatia na hora.
               const parts = splitFailedWindow(from, to);
               console.warn(
-                `  ⚠ [${store.code}] Falha em ${from}→${to}: ${msg} — caindo para ${nextFallbackMaxDays(from, to)}d (${parts.length} janela(s))`,
+                `  AVISO [${store.code}] Falha em ${from}→${to}: ${msg} — caindo para ${nextFallbackMaxDays(from, to)}d (${parts.length} janela(s))`,
               );
               queue.unshift(...parts);
               continue;
             }
             if (job.kind === "SEED" || job.kind === "BACKFILL" || job.kind === "HISTORY") {
-              console.warn(`  ⚠ [${store.code}] Falha em ${from}→${to}: ${msg} — nova tentativa`);
+              console.warn(`  AVISO [${store.code}] Falha em ${from}→${to}: ${msg} — nova tentativa`);
               try {
                 rows = await timed(timings, STEP.lista, () =>
                   deps.fetchSalesLista({
@@ -3348,7 +3345,7 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
                   throw new Error(`Sessão Millennium inválida (401) em ${from}→${to}`);
                 }
                 dayErrors += 1;
-                console.warn(`  ⚠ [${store.code}] Desistindo de ${from}→${to}: ${retryMsg}`);
+                console.warn(`  AVISO [${store.code}] Desistindo de ${from}→${to}: ${retryMsg}`);
                 syncLog("ERROR", "vendas", `Vendas (VENDAS.Lista) falhou duas vezes em ${from}→${to}: ${retryMsg}`, {
                   store,
                   day: from === to ? from : null,
@@ -3370,7 +3367,7 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
                   const parts = splitFailedWindow(from, to);
                   const step = nextFallbackMaxDays(from, to);
                   console.warn(
-                    `  ⚠ [${store.code}] Range falhou — caindo para ${step}d (${from}→${to} → ${parts.length} janela(s))`,
+                    `  AVISO [${store.code}] Range falhou — caindo para ${step}d (${from}→${to} → ${parts.length} janela(s))`,
                   );
                   queue.unshift(...parts);
                 }
@@ -3385,7 +3382,7 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
             const parts = splitFailedWindow(from, to);
             const step = nextFallbackMaxDays(from, to);
             console.warn(
-              `  ⚠ [${store.code}] Range ${from}→${to} vazio — caindo para ${step}d (${parts.length} janela(s))`,
+              `  AVISO [${store.code}] Range ${from}→${to} vazio — caindo para ${step}d (${parts.length} janela(s))`,
             );
             queue.unshift(...parts);
             continue;
@@ -3411,7 +3408,7 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
             dayTo: to,
           });
 
-          // Dia sem venda grava R$ 0 — a carga inicial (FORCE dia a dia) conta o dia como coberto.
+          // Dia sem venda grava R$ 0  -  a carga inicial (FORCE dia a dia) conta o dia como coberto.
           if (
             agg.days.length === 0 &&
             from === to &&
@@ -3555,8 +3552,8 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
             timings,
           });
         }
-        // CMV / categorias: FORCE = buracos + hoje; SEED/HISTORY = janela; RANGE = só buracos.
-        // Dias já cobertos pela margem no brand split não re-buscam CMV.
+        // CMV / categorias: FORCE = buracos + hoje; SEED/HISTORY = janela; RANGE = so buracos.
+        // Dias ja cobertos pela margem no brand split nao re-buscam CMV.
         const cmvDone = new Set(cmvDaysDone);
         if (shouldSyncCmv(job.kind) && cmvWin) {
           const cmvDays = (
@@ -3583,7 +3580,7 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
           detail(`  [${store.code}] → CMV · skip (sem janela)`);
         }
         if (memo) {
-          // Só rodada sem nenhum aviso (cupom, margem, CMV, catálogo…) vale como base para pular.
+          // So rodada sem nenhum aviso (cupom, margem, CMV, catalogo...) vale como base para pular.
           if (fingerprint && syncLogIssueCount(store.id) === issuesBefore) memo.set(store.id, fingerprint);
           else memo.forget(store.id);
         }
@@ -3698,8 +3695,8 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
     });
     return { ok: false, reason: "other", error: msg };
   } finally {
-    // Sessão permanece no tenant (DB) até o usuário desconectar em Integrações / pause.
-    // Só limpa o ponteiro em memória deste processo.
+    // Sessao permanece no tenant (DB) ate o usuario desconectar em Integracoes / pause.
+    // So limpa o ponteiro em memoria deste processo.
     if (session) {
       activeMillenniumSession = null;
     }

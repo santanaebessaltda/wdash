@@ -1,4 +1,5 @@
-# Worker do Millennium. Uma máquina só, em São Paulo: duas brigam pela mesma sessão do ERP.
+# Worker do Millennium. Uma máquina só (fly scale count 1), região gru:
+# duas máquinas brigam pela mesma sessão Millennium / pelo mesmo sync_job.
 app = "wdash-millennium-sync"
 primary_region = "gru"
 

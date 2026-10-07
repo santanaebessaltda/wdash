@@ -1,5 +1,27 @@
-# Edge Functions — WeDash
+# Edge Functions — WDash
 # https://supabase.com/docs/guides/functions
+# verify_jwt=true em todas as funcoes com JWT de usuario (gateway + getUser no handler).
 
 [functions.millennium-onboarding]
+verify_jwt = true
+
+[functions.erp-credential-persist]
+verify_jwt = true
+
+[functions.erp-sync-enqueue]
+verify_jwt = true
+
+[functions.erp-sellers-sync]
+verify_jwt = true
+
+[functions.erp-products-sync]
+verify_jwt = true
+
+[functions.erp-stock-sync]
+verify_jwt = true
+
+[functions.team-members]
+verify_jwt = true
+
+[functions.seller-home]
 verify_jwt = true

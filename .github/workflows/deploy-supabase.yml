@@ -14,6 +14,9 @@ concurrency:
   group: supabase-prod
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -23,12 +26,12 @@ jobs:
       SUPABASE_PROJECT_ID: gjdslociicdkmjxxznyf
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
         with:
-          version: latest
+          version: 2.120.0
 
       - name: Link project
         run: supabase link --project-ref "$SUPABASE_PROJECT_ID"

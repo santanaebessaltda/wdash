@@ -1,47 +1,39 @@
 /**
- * Persiste o token WTS-Session no disco do worker.
- * Se o processo morrer sem logout, o próximo boot ainda consegue encerrar a sessão órfã.
- * Em Vitest: só memória (não lê/grava o arquivo real).
+ * Sessao Millennium em memoria do processo.
+ * Token tambem vive em erp_credential.millennium_session (service_role) —
+ * crash/reboot usa a coluna no banco (disconnectTenantSessions), nao disco.
+ * Em Vitest: mesma memoria de processo (isolada por arquivo de teste).
  */
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, unlinkSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const STORE_PATH = resolve(__dirname, "../.millennium-sessions.json");
-const useMemory = process.env.VITEST === "true" || process.env.NODE_ENV === "test";
+/** Caminho legado — apagado na 1ª escrita para nao deixar WTS-Session em plaintext. */
+const LEGACY_STORE_PATH = resolve(__dirname, "../.millennium-sessions.json");
 
 type Store = Record<string, string>;
 let memoryStore: Store = {};
+let scrubbedLegacy = false;
 
-function readStore(): Store {
-  if (useMemory) return { ...memoryStore };
+function scrubLegacyDisk(): void {
+  if (scrubbedLegacy) return;
+  scrubbedLegacy = true;
   try {
-    if (!existsSync(STORE_PATH)) return {};
-    const raw = readFileSync(STORE_PATH, "utf8");
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object") return {};
-    const out: Store = {};
-    for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
-      if (typeof v === "string" && v.length > 0) out[k] = v;
-    }
-    return out;
+    if (existsSync(LEGACY_STORE_PATH)) unlinkSync(LEGACY_STORE_PATH);
   } catch {
-    return {};
+    /* best-effort */
   }
 }
 
+function readStore(): Store {
+  scrubLegacyDisk();
+  return { ...memoryStore };
+}
+
 function writeStore(store: Store): void {
-  if (useMemory) {
-    memoryStore = { ...store };
-    return;
-  }
-  try {
-    mkdirSync(dirname(STORE_PATH), { recursive: true });
-    writeFileSync(STORE_PATH, JSON.stringify(store, null, 2), "utf8");
-  } catch (e) {
-    console.warn("Não foi possível gravar sessão Millennium local:", e instanceof Error ? e.message : e);
-  }
+  scrubLegacyDisk();
+  memoryStore = { ...store };
 }
 
 export function rememberMillenniumSession(credentialId: string, session: string): void {
@@ -61,7 +53,7 @@ export function listRememberedSessions(): Array<{ credentialId: string; session:
   return Object.entries(readStore()).map(([credentialId, session]) => ({ credentialId, session }));
 }
 
-/** Encerra todas as sessões lembradas (boot / liberar busy). */
+/** Encerra todas as sessoes lembradas (script erp-session / liberar busy). */
 export async function logoutRememberedSessions(
   logout: (session: string) => Promise<void>,
 ): Promise<number> {
