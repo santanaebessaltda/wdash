@@ -1,8 +1,11 @@
-/** Horário de funcionamento e fusos — Configurações > Lojas. */
+/** Horario de funcionamento e fusos  -  Configuracoes > Lojas. */
 
 import type { DayHours, Dow, StoreWeekHours } from "./engine/goalWeights.ts";
 
 export type { DayHours, Dow, StoreWeekHours } from "./engine/goalWeights.ts";
+
+/** Mesmo conceito de `Store.pointType` (evita import ciclico com stores.ts). */
+export type HoursPointType = "SHOPPING" | "RUA";
 
 export const DOW_LABELS: Record<Dow, string> = {
   0: "Domingo",
@@ -24,7 +27,7 @@ export const DOW_SHORT: Record<Dow, string> = {
   6: "S",
 };
 
-/** Fusos oficiais do Brasil (sem horário de verão desde 2019), ordenados pelo offset. */
+/** Fusos oficiais do Brasil (sem horario de verao desde 2019), ordenados pelo offset. */
 export const STORE_TIMEZONES: Array<{ value: string; label: string; states: string }> = [
   { value: "America/Noronha", label: "(UTC−02:00) Fernando de Noronha", states: "Fernando de Noronha" },
   {
@@ -36,7 +39,7 @@ export const STORE_TIMEZONES: Array<{ value: string; label: string; states: stri
   { value: "America/Rio_Branco", label: "(UTC−05:00) Horário do Acre", states: "AC e sudoeste do AM" },
 ];
 
-/** IANA equivalentes (mesmo offset, sem DST) → fuso oficial da lista. */
+/** IANA equivalentes (mesmo offset, sem DST)  ->  fuso oficial da lista. */
 const TZ_ALIAS: Record<string, string> = {
   "America/Campo_Grande": "America/Manaus",
   "America/Cuiaba": "America/Manaus",
@@ -56,19 +59,55 @@ export function canonicalStoreTimezone(tz: string): string {
   return TZ_ALIAS[tz] ?? tz;
 }
 
-/** Default = todos os dias desligados (não configurado; o gestor preenche em Configurações > Lojas). */
+/** Default no banco = todos os dias desligados (ainda nao configurado). */
 export function defaultWeekHours(): StoreWeekHours {
   return { 0: null, 1: null, 2: null, 3: null, 4: null, 5: null, 6: null };
 }
 
-/** Nenhum dia aberto = horário ainda não configurado. */
+/**
+ * Preenchimento sugerido no formulario (Configuracoes > Loja), conforme o tipo do ponto.
+ * Shopping/quiosque: seg–sab 10–22, dom 12–22. Loja de rua: seg–sex 08–18, sab 08–17, dom fechado.
+ */
+export function presetWeekHours(pointType: HoursPointType): StoreWeekHours {
+  if (pointType === "RUA") {
+    const util: DayHours = { open: "08:00", close: "18:00" };
+    const sab: DayHours = { open: "08:00", close: "17:00" };
+    return {
+      0: null,
+      1: { ...util },
+      2: { ...util },
+      3: { ...util },
+      4: { ...util },
+      5: { ...util },
+      6: { ...sab },
+    };
+  }
+  const semana: DayHours = { open: "10:00", close: "22:00" };
+  const domingo: DayHours = { open: "12:00", close: "22:00" };
+  return {
+    0: { ...domingo },
+    1: { ...semana },
+    2: { ...semana },
+    3: { ...semana },
+    4: { ...semana },
+    5: { ...semana },
+    6: { ...semana },
+  };
+}
+
+export const PRESET_HOURS_HINT: Record<HoursPointType, string> = {
+  SHOPPING: "Padrão de quiosque (shopping): seg–sáb 10h–22h · domingo 12h–22h. Ajuste se for diferente.",
+  RUA: "Padrão de loja de rua: seg–sex 8h–18h · sábado 8h–17h · domingo fechado. Ajuste se for diferente.",
+};
+
+/** Nenhum dia aberto = horario ainda nao configurado. */
 export function weekHoursConfigured(h: StoreWeekHours): boolean {
   return ([0, 1, 2, 3, 4, 5, 6] as Dow[]).some((d) => h[d] != null);
 }
 
 /**
- * Horário usado nos gráficos (eixo por hora, curva da meta): sem configuração = 10:00–22:00
- * todos os dias, só para o cálculo não zerar. O sync não usa horário (atualiza o dia inteiro).
+ * Horario usado nos graficos (eixo por hora, curva da meta): sem configuracao = 10:00 - 22:00
+ * todos os dias, so para o calculo nao zerar. O sync nao usa horario (atualiza o dia inteiro).
  */
 export function effectiveWeekHours(h: StoreWeekHours): StoreWeekHours {
   if (weekHoursConfigured(h)) return h;
@@ -97,7 +136,7 @@ export function parseWeekHours(raw: unknown): StoreWeekHours {
   return base;
 }
 
-/** "09:00" → 9; "09:30" → 9.5 */
+/** "09:00"  ->  9; "09:30"  ->  9.5 */
 export function hhmmToHour(hhmm: string): number {
   const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
   if (!m) return 0;
@@ -113,7 +152,7 @@ export function openHourFloor(day: DayHours): number | null {
   return Math.floor(hhmmToHour(day.open));
 }
 
-/** Última hora cheia exclusiva do expediente (ex.: fecha 21:00 → eixo até 20). */
+/** Ultima hora cheia exclusiva do expediente (ex.: fecha 21:00  ->  eixo ate 20). */
 export function closeHourCeil(day: DayHours): number | null {
   if (!day) return null;
   const c = hhmmToHour(day.close);
@@ -121,7 +160,7 @@ export function closeHourCeil(day: DayHours): number | null {
   return c > floor ? floor + 1 : Math.max(floor, openHourFloor(day)! + 1);
 }
 
-/** Opções de select a cada 30 min (00:00–23:30). */
+/** Opcoes de select a cada 30 min (00:00 - 23:30). */
 export function halfHourOptions(): string[] {
   const out: string[] = [];
   for (let h = 0; h < 24; h++) {
@@ -132,10 +171,10 @@ export function halfHourOptions(): string[] {
 }
 
 /**
- * Janela união das lojas no dia da semana (gráficos).
- * Se todas fechadas, cai no default 9–21.
+ * Janela uniao das lojas no dia da semana (graficos).
+ * Se todas fechadas, cai no default 9 - 21.
  */
-/** União do expediente só das lojas com horário configurado; null = nenhuma → o eixo sai das vendas. */
+/** Uniao do expediente so das lojas com horario configurado; null = nenhuma  ->  o eixo sai das vendas. */
 export function unionConfiguredWindow(
   hoursList: StoreWeekHours[],
   dow: Dow,
@@ -147,9 +186,9 @@ export function unionConfiguredWindow(
 }
 
 /**
- * Eixo dos gráficos por hora (1 dia), igual em todas as telas: expediente configurado das lojas no dia
- * (Configurações > Loja); venda fora do expediente estende o eixo. Nenhuma loja com horário → horas com
- * venda ∪ `fallbackHours` (ex.: horas com meta); sem nada, 10h–22h. `first`/`last` inclusivos.
+ * Eixo dos graficos por hora (1 dia), igual em todas as telas: expediente configurado das lojas no dia
+ * (Configuracoes > Loja); venda fora do expediente estende o eixo. Nenhuma loja com horario  ->  horas com
+ * venda  `fallbackHours` (ex.: horas com meta); sem nada, 10h - 22h. `first`/`last` inclusivos.
  */
 export function hourAxisRange(
   hoursList: StoreWeekHours[],

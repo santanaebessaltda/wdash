@@ -3,9 +3,12 @@ import { FormField, Select, Switch, useToast } from "@/components/ui";
 import { updateStoreSchedule, type Store } from "@/data/wedash/stores";
 import {
   DOW_LABELS,
+  PRESET_HOURS_HINT,
   STORE_TIMEZONES,
   canonicalStoreTimezone,
   parseWeekHours,
+  presetWeekHours,
+  weekHoursConfigured,
   type Dow,
   type StoreWeekHours,
 } from "@/data/wedash/storeHours";
@@ -14,7 +17,12 @@ import { FormActions, SAVE_ERROR_MSG, TimeSelect } from "./shared";
 
 const DOWS: Dow[] = [0, 1, 2, 3, 4, 5, 6];
 
-/** Funcionamento da loja: fuso horário + horário por dia (Resetar / Salvar alterações). */
+function initialHours(store: Store): StoreWeekHours {
+  const saved = parseWeekHours(store.horas);
+  return weekHoursConfigured(saved) ? saved : presetWeekHours(store.pointType);
+}
+
+/** Funcionamento da loja: fuso horario + horario por dia (Resetar / Salvar alteracoes). */
 export function StoreScheduleForm({ store, canEdit, onSaved }: { store: Store; canEdit: boolean; onSaved: () => void }) {
   const { show } = useToast();
   const [saved, setSaved] = useState(() => ({
@@ -22,9 +30,11 @@ export function StoreScheduleForm({ store, canEdit, onSaved }: { store: Store; c
     hours: parseWeekHours(store.horas),
   }));
   const [timezone, setTimezone] = useState(saved.timezone);
-  const [hours, setHours] = useState<StoreWeekHours>(saved.hours);
+  const [hours, setHours] = useState<StoreWeekHours>(() => initialHours(store));
   const [saving, setSaving] = useState(false);
   const dirty = timezone !== saved.timezone || JSON.stringify(hours) !== JSON.stringify(saved.hours);
+  const showingPreset = !weekHoursConfigured(saved.hours);
+  const preset = presetWeekHours(store.pointType);
 
   async function save() {
     const invalid = DOWS.find((d) => {
@@ -49,7 +59,7 @@ export function StoreScheduleForm({ store, canEdit, onSaved }: { store: Store; c
 
   function reset() {
     setTimezone(saved.timezone);
-    setHours(saved.hours);
+    setHours(weekHoursConfigured(saved.hours) ? saved.hours : presetWeekHours(store.pointType));
   }
 
   function toggleDow(d: Dow) {
@@ -57,7 +67,8 @@ export function StoreScheduleForm({ store, canEdit, onSaved }: { store: Store; c
     if (next[d]) {
       next[d] = null;
     } else {
-      const template = DOWS.map((x) => hours[x]).find((x) => x != null) ?? { open: "09:00", close: "21:00" };
+      const fromPreset = preset[d];
+      const template = fromPreset ?? DOWS.map((x) => hours[x]).find((x) => x != null) ?? { open: "09:00", close: "21:00" };
       next[d] = { ...template };
     }
     setHours(next);
@@ -75,6 +86,10 @@ export function StoreScheduleForm({ store, canEdit, onSaved }: { store: Store; c
     const next = { ...hours };
     for (const d of DOWS) if (next[d]) next[d] = { ...src };
     setHours(next);
+  }
+
+  function applyPreset() {
+    setHours(presetWeekHours(store.pointType));
   }
 
   const copySource = DOWS.find((d) => hours[d] != null);
@@ -104,7 +119,7 @@ export function StoreScheduleForm({ store, canEdit, onSaved }: { store: Store; c
         </Select>
       </FormField>
 
-      <FormField label="Dias e horários">
+      <FormField label="Dias e horários" hint={showingPreset ? PRESET_HOURS_HINT[store.pointType] : undefined}>
         <div>
           {DOWS.map((d) => {
             const day = hours[d];
@@ -153,6 +168,15 @@ export function StoreScheduleForm({ store, canEdit, onSaved }: { store: Store; c
             );
           })}
         </div>
+        {canEdit && (
+          <button
+            type="button"
+            onClick={applyPreset}
+            className="mt-2 text-left text-[12.5px] font-semibold text-acc hover:underline"
+          >
+            {store.pointType === "RUA" ? "Preencher com o padrão de loja de rua" : "Preencher com o padrão de quiosque"}
+          </button>
+        )}
       </FormField>
       {canEdit && <FormActions dirty={dirty} saving={saving} onReset={reset} />}
     </form>

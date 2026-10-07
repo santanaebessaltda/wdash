@@ -7,6 +7,7 @@ import {
   openHourFloor,
   closeHourCeil,
   parseWeekHours,
+  presetWeekHours,
   unionConfiguredWindow,
   unionOpenWindow,
   weekHoursConfigured,
@@ -22,7 +23,7 @@ describe("storeHours", () => {
     expect(h[2]).toBeNull();
   });
 
-  it("padrão = tudo desligado; cálculos usam 10h–22h enquanto não configurado", () => {
+  it("padrão no banco = tudo desligado; cálculos usam 10h–22h enquanto não configurado", () => {
     const vazio = defaultWeekHours();
     expect(Object.values(vazio).every((d) => d === null)).toBe(true);
     expect(weekHoursConfigured(vazio)).toBe(false);
@@ -30,6 +31,20 @@ describe("storeHours", () => {
     const umDia = parseWeekHours({ 1: { open: "09:00", close: "18:00" } });
     expect(weekHoursConfigured(umDia)).toBe(true);
     expect(effectiveWeekHours(umDia)).toBe(umDia);
+  });
+
+  it("preset quiosque (shopping) e loja de rua", () => {
+    const kiosk = presetWeekHours("SHOPPING");
+    expect(kiosk[1]).toEqual({ open: "10:00", close: "22:00" });
+    expect(kiosk[6]).toEqual({ open: "10:00", close: "22:00" });
+    expect(kiosk[0]).toEqual({ open: "12:00", close: "22:00" });
+    expect(weekHoursConfigured(kiosk)).toBe(true);
+
+    const street = presetWeekHours("RUA");
+    expect(street[1]).toEqual({ open: "08:00", close: "18:00" });
+    expect(street[5]).toEqual({ open: "08:00", close: "18:00" });
+    expect(street[6]).toEqual({ open: "08:00", close: "17:00" });
+    expect(street[0]).toBeNull();
   });
 
   it("hhmm / open-close floors", () => {
@@ -53,7 +68,7 @@ describe("storeHours", () => {
     const b = defaultWeekHours();
     b[1] = { open: "08:00", close: "18:00" };
     expect(unionOpenWindow([a, b], 1)).toEqual({ abertura: 8, fechamento: 22 });
-    expect(unionOpenWindow([a], 0).abertura).toBe(9); // domingo null → default
+    expect(unionOpenWindow([a], 0).abertura).toBe(9); // domingo null  ->  default
   });
 
   it("hourAxisRange: expediente configurado manda; venda fora estende; meta não", () => {
