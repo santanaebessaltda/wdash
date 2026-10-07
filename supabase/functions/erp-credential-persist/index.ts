@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
 
   const tenantId = String(body.tenantId ?? "").trim();
   const membershipId = String(body.membershipId ?? "").trim();
-  const username = String(body.username ?? "").trim();
+  const username = String(body.username ?? "").trim().toUpperCase();
   const password = String(body.password ?? "");
   const dedicated = Boolean(body.dedicated);
   const millenniumSession = String(body.millenniumSession ?? "").trim();
@@ -148,7 +148,9 @@ Deno.serve(async (req) => {
     .eq("tenant_id", tenantId)
     .maybeSingle();
 
-  const prevUser = String((existing as { username?: string } | null)?.username ?? "").trim();
+  const prevUser = String((existing as { username?: string } | null)?.username ?? "")
+    .trim()
+    .toUpperCase();
   const usernameChanged = Boolean(prevUser && prevUser !== username);
   const keepOnChange = usernameChanged && body.userChange?.mode === "keep";
   // O teste de login ja gravou o token NOVO na credencial  -  nao deslogar ele.

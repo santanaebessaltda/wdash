@@ -87,7 +87,7 @@ async function loadCredential(
     const { data } = await admin
       .from("erp_credential")
       .select("id, millennium_session")
-      .eq("username", opts.username)
+      .eq("username", opts.username.toUpperCase())
       .limit(1)
       .maybeSingle();
     if (data) return data as { id: string; millennium_session: string | null };
@@ -224,7 +224,7 @@ Deno.serve(async (req) => {
     return json(r);
   }
 
-  const username = String(body.username ?? body.usuario ?? "").trim();
+  const username = String(body.username ?? body.usuario ?? "").trim().toUpperCase();
   const password = String(body.password ?? body.senha ?? "");
   const includeStores = (body.includeStores ?? body.incluirFiliais) !== false;
   const keepSession = (body.keepSession ?? body.manterSessao) !== false;

@@ -308,7 +308,7 @@ export async function prepareErpCredentialChange(input: {
   password: string;
   dedicated: boolean;
 }): Promise<{ ok: true; change: PreparedErpChange } | Extract<ErpCredentialChangeResult, { ok: false }>> {
-  const username = input.username.trim();
+  const username = input.username.trim().toUpperCase();
   const login = await testErpLogin(username, input.password);
   if (!login.ok) return { ok: false, reason: login.reason, reports: login.reports };
 
@@ -321,7 +321,7 @@ export async function prepareErpCredentialChange(input: {
     session: login.session,
     loginStores: login.stores,
   };
-  if ((input.currentUsername ?? "").trim() === username) {
+  if ((input.currentUsername ?? "").trim().toUpperCase() === username) {
     return { ok: true, change: { ...base, plan: { kind: "credential" } } };
   }
 
