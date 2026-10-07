@@ -1,25 +1,25 @@
 /**
- * Gestão > Desafios — tabela `challenge` (1 loja por desafio; vários desafios da loja podem cruzar o período).
- * Prêmio no banco em centavos (`{kind:"MONEY",cents}`); no app em reais (`{kind:"MONEY",amount}`).
+ * Gestao > Desafios  -  tabela `challenge` (1 loja por desafio; varios desafios da loja podem cruzar o periodo).
+ * Premio no banco em centavos (`{kind:"MONEY",cents}`); no app em reais (`{kind:"MONEY",amount}`).
  */
 import { intervaloDias, somarDias } from "@/lib/format";
 import type { GoalTeamMember } from "./goalsRepo";
 import type { NonSalesPeople } from "./salesRepo";
 import type { SalesSellerDayAgg, SalesSellerProductDayAgg } from "./salesTypes";
 
-/** Tipo do desafio: Itens vendidos · Faturamento · P.A. · Ticket médio · Índice de desempenho. */
+/** Tipo do desafio: Itens vendidos  |  Faturamento  |  P.A.  |  Ticket medio  |  Indice de desempenho. */
 export type ChallengeMetric = "QUANTITY" | "VALUE" | "PA" | "TICKET" | "INDEX";
-/** O que conta em Quantidade/Valor: produtos escolhidos · categorias escolhidas · tudo o que a pessoa vender. */
+/** O que conta em Quantidade/Valor: produtos escolhidos  |  categorias escolhidas  |  tudo o que a pessoa vender. */
 export type ChallengeScope = "PRODUCTS" | "CATEGORIES" | "ALL";
-/** CONTEST = Quem fizer mais (pódio) · MINIMUM = Quem chegar ao mínimo (todos que chegarem). */
+/** CONTEST = Quem fizer mais (podio)  |  MINIMUM = Quem chegar ao minimo (todos que chegarem). */
 export type ChallengeMode = "CONTEST" | "MINIMUM";
 
-/** Prêmio: valor em R$ (> 0) ou descrição livre (1–60 caracteres). */
+/** Premio: valor em R$ (> 0) ou descricao livre (1 - 60 caracteres). */
 export type ChallengePrize = { kind: "MONEY"; amount: number } | { kind: "ITEM"; label: string };
 
 export interface ChallengeProduct {
   code: string;
-  /** Nome salvo (produto que sair do catálogo continua com nome). */
+  /** Nome salvo (produto que sair do catalogo continua com nome). */
   name: string;
 }
 
@@ -41,14 +41,14 @@ export interface ChallengeRecord {
   mode: ChallengeMode;
   products: ChallengeProduct[];
   categories: ChallengeCategory[];
-  /** Mínimo (obrigatório em "Quem chegar ao mínimo", opcional em "Quem fizer mais"). Itens = inteiro; P.A. = 2 casas; valor/ticket = R$. */
+  /** Minimo (obrigatorio em "Quem chegar ao minimo", opcional em "Quem fizer mais"). Itens = inteiro; P.A. = 2 casas; valor/ticket = R$. */
   target: number | null;
-  /** P.A./ticket: vendas mínimas para concorrer. */
+  /** P.A./ticket: vendas minimas para concorrer. */
   minSales: number | null;
-  /** Disputa: 1º, 2º, 3º (1 a 3) · Mínimo: 1 (por pessoa que atingir). */
+  /** Disputa: 1, 2, 3 (1 a 3)  |  Minimo: 1 (por pessoa que atingir). */
   prizes: ChallengePrize[];
   managerPrize: ChallengePrize | null;
-  /** Meta da gerência = média da equipe, na unidade da métrica (Índice: índice da equipe × período anterior). Só com `managerPrize`. */
+  /** Meta da gerencia = media da equipe, na unidade da metrica (Indice: indice da equipe x periodo anterior). So com `managerPrize`. */
   managerTarget: number | null;
 }
 
@@ -61,7 +61,7 @@ const SCOPES: readonly ChallengeScope[] = ["PRODUCTS", "CATEGORIES", "ALL"];
 const MODES: readonly ChallengeMode[] = ["CONTEST", "MINIMUM"];
 
 export const usesScope = (m: ChallengeMetric) => m === "QUANTITY" || m === "VALUE";
-/** Índice de desempenho: só "Quem fizer mais"; gerência ganha pelo índice da equipe × o mesmo nº de dias antes do desafio. */
+/** Indice de desempenho: gerencia ganha pelo indice da equipe x o mesmo n de dias antes do desafio. */
 export const isIndexMetric = (m: ChallengeMetric) => m === "INDEX";
 
 /** Tipo + escopo da linha; aceita o formato antigo (metric PRODUCTS/CATEGORIES = Quantidade). */
@@ -88,7 +88,7 @@ function parsePrize(raw: unknown): ChallengePrize | null {
   return null;
 }
 
-/** Pódio em ordem: um prêmio inválido corta dali para frente (o 3º nunca vira 2º). */
+/** Podio em ordem: um premio invalido corta dali para frente (o 3 nunca vira 2). */
 function parsePrizes(raw: unknown): ChallengePrize[] {
   if (!Array.isArray(raw)) return [];
   const out: ChallengePrize[] = [];
@@ -138,7 +138,7 @@ export type ChallengeRow = {
   manager_prize: unknown;
 };
 
-/** Meta guardada junto do prêmio da gerência; desafio antigo sem ela usa o alvo/piso. */
+/** Meta guardada junto do premio da gerencia; desafio antigo sem ela usa o alvo/piso. */
 function parseManagerTarget(raw: unknown, fallback: number | null): number | null {
   const t = raw && typeof raw === "object" && !Array.isArray(raw) ? numOrNull((raw as { target?: unknown }).target) : null;
   return t != null && t > 0 ? t : fallback;
@@ -147,7 +147,7 @@ function parseManagerTarget(raw: unknown, fallback: number | null): number | nul
 export function challengeFromRow(r: ChallengeRow): ChallengeRecord {
   const metricScope = parseMetricScope(r.metric, r.scope);
   const indice = isIndexMetric(metricScope.metric);
-  // Índice: o piso das vendedoras não serve de meta da gerência (outra escala) → sem meta, sem prêmio.
+  // Indice: o piso das vendedoras nao serve de meta da gerencia (outra escala)  ->  sem meta, sem premio.
   const managerTargetRaw = parseManagerTarget(r.manager_prize, indice ? null : numOrNull(r.target));
   const managerPrize = indice && managerTargetRaw == null ? null : parsePrize(r.manager_prize);
   return {
@@ -157,7 +157,7 @@ export function challengeFromRow(r: ChallengeRow): ChallengeRecord {
     startsOn: r.starts_on,
     endsOn: r.ends_on,
     ...metricScope,
-    mode: indice ? "CONTEST" : MODES.includes(r.mode as ChallengeMode) ? (r.mode as ChallengeMode) : "CONTEST",
+    mode: MODES.includes(r.mode as ChallengeMode) ? (r.mode as ChallengeMode) : "CONTEST",
     products: parseProducts(r.products),
     categories: parseCategories(r.categories),
     target: numOrNull(r.target),
@@ -176,7 +176,6 @@ function prizeToJson(p: ChallengePrize): { kind: "MONEY"; cents: number } | { ki
 
 /** Linha para insert/update (sem tenant e sem id). */
 export function challengeToRow(c: ChallengeInput): Omit<ChallengeRow, "id"> {
-  const indice = isIndexMetric(c.metric);
   return {
     store_id: c.storeId,
     name: c.name.trim(),
@@ -184,7 +183,7 @@ export function challengeToRow(c: ChallengeInput): Omit<ChallengeRow, "id"> {
     ends_on: c.endsOn,
     metric: c.metric,
     scope: usesScope(c.metric) ? c.scope : "ALL",
-    mode: indice ? "CONTEST" : c.mode,
+    mode: c.mode,
     products: c.products.map((p) => ({ code: p.code, name: p.name })),
     categories: c.categories.map((x) => ({ typeId: x.typeId, name: x.name })),
     target: c.target == null ? null : Math.round(c.target * 100) / 100,
@@ -204,7 +203,7 @@ async function client() {
   return getSupabase();
 }
 
-/** Desafios das lojas com período que cruza [from, to]; mais recentes primeiro. */
+/** Desafios das lojas com periodo que cruza [from, to]; mais recentes primeiro. */
 export async function fetchChallenges(q: {
   tenantId: string;
   storeIds: string[];
@@ -281,7 +280,7 @@ export async function deleteChallenge(tenantId: string, id: string): Promise<{ o
   return { ok: true };
 }
 
-/** Produto do catálogo no seletor do desafio. */
+/** Produto do catalogo no seletor do desafio. */
 export interface CatalogProduct {
   code: string;
   name: string;
@@ -298,13 +297,13 @@ export interface CatalogCategory {
 export interface ChallengeCatalog {
   products: CatalogProduct[];
   categories: CatalogCategory[];
-  /** COD_PRODUTO → tipo (categoria). */
+  /** COD_PRODUTO  ->  tipo (categoria). */
   typeByCode: Map<string, number>;
 }
 
 let catalogPromise: Promise<ChallengeCatalog> | null = null;
 
-/** Catálogo global (produtos + categorias, caixa alta, sem INDEFINIDO). 1× por sessão. */
+/** Catalogo global (produtos + categorias, caixa alta, sem INDEFINIDO). 1x por sessao. */
 export function fetchChallengeCatalog(): Promise<ChallengeCatalog> {
   if (catalogPromise) return catalogPromise;
   const run = (async (): Promise<ChallengeCatalog> => {
@@ -354,9 +353,9 @@ export interface DayRange {
 }
 
 /**
- * Janelas do índice da equipe (gerência no Índice de desempenho): o desafio × o mesmo nº de dias logo antes dele.
- * `anterior` = período anterior inteiro (texto da tela). Em andamento conta até ontem nos dois lados (sem dia parcial);
- * `comparado` = null enquanto não há dia fechado.
+ * Janelas do indice da equipe (gerencia no Indice de desempenho): o desafio x o mesmo n de dias logo antes dele.
+ * `anterior` = periodo anterior inteiro (texto da tela). Em andamento conta ate ontem nos dois lados (sem dia parcial);
+ * `comparado` = null enquanto nao ha dia fechado.
  */
 export function managerIndexWindows(
   c: Pick<ChallengeRecord, "startsOn" | "endsOn">,
@@ -370,16 +369,16 @@ export function managerIndexWindows(
   return { anterior, atual: { from: c.startsOn, to: fim }, comparado: { from: anterior.from, to: somarDias(anterior.from, dias - 1) } };
 }
 
-/** Dados que a conta do desafio precisa (lidos 1× para todos os desafios da tela). */
+/** Dados que a conta do desafio precisa (lidos 1x para todos os desafios da tela). */
 export interface ChallengeAggInput {
-  /** Itens por pessoa × produto (Produtos/Categorias), sem gerência / freelancer. */
+  /** Itens por pessoa x produto (Produtos/Categorias), sem gerencia / freelancer. */
   sellerProducts: SalesSellerProductDayAgg[];
-  /** Vendas, itens e faturamento por pessoa × dia (P.A., ticket e quem vendeu), sem gerência. */
+  /** Vendas, itens e faturamento por pessoa x dia (P.A., ticket e quem vendeu), sem gerencia. */
   sellerDays: SalesSellerDayAgg[];
-  /** `storeId|day` com venda da loja (sales_day_agg ALL) — base do alerta de resultado incompleto. */
+  /** `storeId|day` com venda da loja (sales_day_agg ALL)  -  base do alerta de resultado incompleto. */
   storeSaleDays: Set<string>;
   team: GoalTeamMember[];
-  /** COD_PRODUTO → tipo (categoria). */
+  /** COD_PRODUTO  ->  tipo (categoria). */
   typeByCode: Map<string, number>;
 }
 
@@ -387,7 +386,7 @@ export function emptyChallengeAggInput(): ChallengeAggInput {
   return { sellerProducts: [], sellerDays: [], storeSaleDays: new Set(), team: [], typeByCode: new Map() };
 }
 
-/** Tira as linhas de gerência / conta de freelancer (ativos com cargo ≠ VENDEDOR), por gerador e por nome. */
+/** Tira as linhas de gerencia / conta de freelancer (ativos com cargo = VENDEDOR), por gerador e por nome. */
 export function excludeNonSalesSellerProducts(
   rows: SalesSellerProductDayAgg[],
   people: NonSalesPeople,
@@ -412,8 +411,8 @@ type SellerProductRow = {
 };
 
 /**
- * Busca, para a união das lojas/períodos dos desafios (até hoje), tudo o que a conta precisa.
- * Itens por pessoa só quando há desafio de Produtos/Categorias. Falha de leitura = vazio.
+ * Busca, para a uniao das lojas/periodos dos desafios (ate hoje), tudo o que a conta precisa.
+ * Itens por pessoa so quando ha desafio de Produtos/Categorias. Falha de leitura = vazio.
  */
 export async function fetchChallengeInput(q: {
   tenantId: string;
@@ -427,7 +426,7 @@ export async function fetchChallengeInput(q: {
   const { fetchAllPages, fetchNonSalesPeople, fetchSalesDayAggs, fetchSalesSellerDayAggs } = await import("./salesRepo");
   const { fetchGoalTeam } = await import("./goalsRepo");
   const storeIds = [...new Set(q.challenges.map((c) => c.storeId))];
-  // Índice com prêmio da gerência compara a equipe com o mesmo nº de dias antes do desafio.
+  // Indice com premio da gerencia compara a equipe com o mesmo n de dias antes do desafio.
   const inicio = (c: ChallengeRecord) =>
     isIndexMetric(c.metric) && c.managerPrize ? managerIndexWindows(c, q.today).anterior.from : c.startsOn;
   const from = q.challenges.reduce((m, c) => (inicio(c) < m ? inicio(c) : m), inicio(q.challenges[0]));

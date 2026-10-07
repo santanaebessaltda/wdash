@@ -1,6 +1,5 @@
 import { paraIso, deIso } from "@/lib/format";
 import {
-  isIndexMetric,
   PRIZE_LABEL_MAX,
   usesScope,
   type ChallengeCategory,
@@ -95,8 +94,6 @@ function parseNumber(txt: string): number | null {
 }
 
 export const usesMinSales = (m: ChallengeMetric) => m === "PA" || m === "TICKET" || m === "INDEX";
-/** Indice de desempenho e sempre "Quem fizer mais". */
-const modeOf = (f: { metric: ChallengeMetric; mode: ChallengeMode }): ChallengeMode => (isIndexMetric(f.metric) ? "CONTEST" : f.mode);
 const round2 = (v: number) => Math.round(v * 100) / 100;
 
 /** Erro do minimo; undefined = valido (ou vazio quando opcional). */
@@ -131,7 +128,7 @@ function prizeValue(p: PrizeForm): ChallengePrize {
   return p.kind === "MONEY" ? { kind: "MONEY", amount: round2(parseNumber(p.amount) ?? 0) } : { kind: "ITEM", label: p.label.trim() };
 }
 
-const activePrizes = (f: ChallengeForm) => (modeOf(f) === "MINIMUM" ? f.prizes.slice(0, 1) : f.prizes.slice(0, MAX_PODIUM));
+const activePrizes = (f: ChallengeForm) => (f.mode === "MINIMUM" ? f.prizes.slice(0, 1) : f.prizes.slice(0, MAX_PODIUM));
 
 /** Erros do formulario; objeto vazio = pode salvar. */
 export function validateChallengeForm(f: ChallengeForm): ChallengeFormErrors {
@@ -155,7 +152,7 @@ export function validateChallengeForm(f: ChallengeForm): ChallengeFormErrors {
     }
   }
 
-  const target = targetError(f.metric, f.target, modeOf(f) === "MINIMUM");
+  const target = targetError(f.metric, f.target, f.mode === "MINIMUM");
   if (target) e.target = target;
 
   const prizes: Record<number, string> = {};
@@ -184,7 +181,7 @@ export function challengeFormToInput(f: ChallengeForm): ChallengeInput {
     endsOn: paraIso(f.endsOn!),
     metric: f.metric,
     scope,
-    mode: modeOf(f),
+    mode: f.mode,
     products: scope === "PRODUCTS" ? f.products : [],
     categories: scope === "CATEGORIES" ? f.categories : [],
     target: targetValue(f.metric, f.target),

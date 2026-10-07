@@ -160,14 +160,15 @@ describe("challengeToRow", () => {
     expect(r).toMatchObject({ scope: "PRODUCTS", target: 15, manager_prize: null, products: [{ code: "WP002", name: "WP ULTRA" }] });
   });
 
-  it("Índice de desempenho: sempre Quem fizer mais e escopo ALL; gerência sem índice próprio = sem prêmio", () => {
+  it("Índice de desempenho: escopo ALL; modo mínimo preservado; gerência sem índice próprio = sem prêmio", () => {
     expect(
       challengeFromRow(row({ metric: "INDEX", scope: "PRODUCTS", mode: "MINIMUM", target: "90", manager_prize: { kind: "MONEY", cents: 5_000 } })),
-    ).toMatchObject({ metric: "INDEX", scope: "ALL", mode: "CONTEST", managerPrize: null, managerTarget: null });
+    ).toMatchObject({ metric: "INDEX", scope: "ALL", mode: "MINIMUM", managerPrize: null, managerTarget: null });
     const r = challengeToRow({ ...input, metric: "INDEX", mode: "MINIMUM", target: 110.55, managerPrize: { kind: "MONEY", amount: 50 }, managerTarget: 105 });
-    expect([r.metric, r.scope, r.mode, r.target]).toEqual(["INDEX", "ALL", "CONTEST", 110.55]);
+    expect([r.metric, r.scope, r.mode, r.target]).toEqual(["INDEX", "ALL", "MINIMUM", 110.55]);
     expect(r.manager_prize).toEqual({ kind: "MONEY", cents: 5_000, target: 105 });
     expect(challengeFromRow({ ...r, id: "c1" } as ChallengeRow)).toMatchObject({
+      mode: "MINIMUM",
       managerPrize: { kind: "MONEY", amount: 50 },
       managerTarget: 105,
     });

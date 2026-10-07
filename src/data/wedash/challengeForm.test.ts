@@ -197,7 +197,7 @@ describe("challengeFormToInput / challengeToForm", () => {
     expect([desligada.managerPrize, desligada.managerTarget]).toEqual([null, null]);
   });
 
-  it("Índice de desempenho é sempre Quem fizer mais; gerência exige o índice mínimo da gerência", () => {
+  it("Índice de desempenho aceita Quem atingir o mínimo; gerência exige o índice mínimo da gerência", () => {
     const f = valid({
       metric: "INDEX",
       mode: "MINIMUM",
@@ -208,13 +208,17 @@ describe("challengeFormToInput / challengeToForm", () => {
       managerPrize: { kind: "MONEY", amount: "", label: "" },
       managerTarget: "",
     });
-    expect(validateChallengeForm(f)).toEqual({ managerPrize: "Campo obrigatório.", managerTarget: "Campo obrigatório." });
+    expect(validateChallengeForm(f)).toEqual({
+      target: "Campo obrigatório.",
+      managerPrize: "Campo obrigatório.",
+      managerTarget: "Campo obrigatório.",
+    });
     const ok = { ...f, target: "110,5", managerPrize: { kind: "MONEY" as const, amount: "80", label: "" }, managerTarget: "105" };
     expect(validateChallengeForm(ok)).toEqual({});
     expect(challengeFormToInput(ok)).toMatchObject({
       metric: "INDEX",
       scope: "ALL",
-      mode: "CONTEST",
+      mode: "MINIMUM",
       target: 110.5,
       minSales: 10,
       managerPrize: { kind: "MONEY", amount: 80 },

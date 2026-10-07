@@ -266,7 +266,7 @@ export default function ChallengeEditorPage() {
   const usaVendas = usesMinSales(form.metric);
   const usaEscopo = usesScope(form.metric);
   const indice = isIndexMetric(form.metric);
-  const modo: ChallengeMode = indice ? "CONTEST" : form.mode;
+  const modo = form.mode;
   const podio = modo === "CONTEST" ? form.prizes.slice(0, MAX_PODIUM) : form.prizes.slice(0, 1);
 
   return (
@@ -388,16 +388,12 @@ export default function ChallengeEditorPage() {
             <Segmented<ChallengeMode>
               options={[
                 { value: "CONTEST", label: CHALLENGE_MODE_LABEL.CONTEST },
-                ...(indice ? [] : [{ value: "MINIMUM" as const, label: CHALLENGE_MODE_LABEL.MINIMUM }]),
+                { value: "MINIMUM", label: CHALLENGE_MODE_LABEL.MINIMUM },
               ]}
               value={modo}
               onChange={(v) => v && set({ mode: v })}
             />
-            <p className="mt-1.5 text-[11.5px] text-t2">
-              {indice
-                ? "Ganha quem tiver o maior índice. Em caso de empate, as pessoas empatadas recebem o prêmio da posição e a posição seguinte é pulada."
-                : CHALLENGE_MODE_HELP[modo]}
-            </p>
+            <p className="mt-1.5 text-[11.5px] text-t2">{CHALLENGE_MODE_HELP[modo]}</p>
           </FormField>
           <div className="flex flex-col gap-4">
             <FormField
