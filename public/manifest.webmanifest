@@ -1,7 +1,7 @@
 {
-  "name": "WeDash",
-  "short_name": "WeDash",
-  "description": "Painel WeDash: vendas, metas, equipe e comissão das suas lojas.",
+  "name": "WDash",
+  "short_name": "WDash",
+  "description": "Painel WDash: vendas, metas, equipe e comissão das suas lojas.",
   "lang": "pt-BR",
   "start_url": "./",
   "scope": "./",
