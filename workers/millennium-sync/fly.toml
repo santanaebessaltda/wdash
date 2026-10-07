@@ -1,0 +1,23 @@
+# Worker do Millennium. Uma máquina só, em São Paulo: duas brigam pela mesma sessão do ERP.
+app = "wdash-millennium-sync"
+primary_region = "gru"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  MILLENNIUM_API_BASE = "http://177.85.160.35:6017/api"
+  SYNC_ONBOARDING = "2m"
+  AUTO_REFRESH = "on"
+  CLOSE_HOUR = "2"
+  DEEP_HISTORY = "24m"
+
+[processes]
+  worker = "./node_modules/.bin/tsx src/index.ts"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+  processes = ["worker"]
+
+kill_timeout = 30

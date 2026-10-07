@@ -1,0 +1,12 @@
+.git
+**/.env
+**/.env.*
+!**/.env.example
+**/node_modules
+dist
+.specs
+docs
+workers/millennium-sync/scripts
+workers/millennium-sync/.millennium-sessions.json
+workers/millennium-sync/.millennium-pause
+workers/millennium-sync/.millennium-worker.lock
