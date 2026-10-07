@@ -3,7 +3,6 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui";
 import { paths } from "@/router/paths";
 import { AuthGlow } from "@/pages/auth/authKit";
-import { isSupabaseConfigured } from "@/lib/supabase";
 import { requestPasswordReset } from "@/session/authApi";
 import {
   CampoEmail,
@@ -14,7 +13,6 @@ import {
   acessoTitulo,
   useFocoNoEnvioAposAutofill,
 } from "./AccessKit";
-import { cn } from "@/lib/cn";
 
 function emailValido(v: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
@@ -26,7 +24,7 @@ const mailIcon = (
   </svg>
 );
 
-/** Recuperação de senha por OTP — tipografia unificada com o Login. */
+/** Recuperacao de senha por OTP  -  tipografia unificada com o Login. */
 export function Forgot() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -74,9 +72,6 @@ export function Forgot() {
               </button>
             </div>
           </form>
-          {!isSupabaseConfigured() && (
-            <p className={cn(acessoRodape, "mb-3")}>Demo sem Supabase — use qualquer código de 6 dígitos em seguida.</p>
-          )}
           <p className={acessoRodape}>
             <Link to={paths.access.login} className={acessoLink}>
               Voltar ao login

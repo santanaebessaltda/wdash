@@ -26,7 +26,7 @@ import {
 import { SENHA_REGRA_TEXTO, senhaValida } from "@/lib/password";
 import { cn } from "@/lib/cn";
 
-/** Caixinhas 1 caractere cada — quantidade = length do OTP. */
+/** Caixinhas 1 caractere cada  -  quantidade = length do OTP. */
 function OtpBoxes({
   length,
   value,
@@ -92,8 +92,8 @@ function OtpBoxes({
           autoCapitalize="off"
           autoCorrect="off"
           spellCheck={false}
-          // iOS/Android sugerem o código do e-mail/SMS no 1º campo (QuickType).
-          // maxLength no 1º precisa caber o OTP inteiro — senão o autofill corta em 1 dígito.
+          // iOS/Android sugerem o codigo do e-mail/SMS no 1 campo (QuickType).
+          // maxLength no 1 precisa caber o OTP inteiro  -  senao o autofill corta em 1 digito.
           autoComplete={i === 0 ? "one-time-code" : "off"}
           name={i === 0 ? "one-time-code" : undefined}
           autoFocus={i === 0}
@@ -130,10 +130,10 @@ function OtpBoxes({
 
 type Step = "otp" | "password";
 
-/** Alinha com o intervalo mínimo do SMTP/Auth no Supabase (60s). */
+/** Alinha com o intervalo minimo do SMTP/Auth no Supabase (60s). */
 const RESEND_COOLDOWN_SEC = 60;
 
-/** Recovery: etapa OTP → etapa nova senha. */
+/** Recovery: etapa OTP  ->  etapa nova senha. */
 export function Reset() {
   const { token = "" } = useParams();
   const navigate = useNavigate();
@@ -155,7 +155,7 @@ export function Reset() {
   const [confirma, setConfirma] = useState("");
   const [carregando, setCarregando] = useState(false);
   const [reenviando, setReenviando] = useState(false);
-  /** Segundos restantes até poder reenviar (já chega com código do /forgot). */
+  /** Segundos restantes ate poder reenviar (ja chega com codigo do /forgot). */
   const [resendIn, setResendIn] = useState(RESEND_COOLDOWN_SEC);
   const [pronto, setPronto] = useState(tokenDemoInvalido);
 
@@ -169,7 +169,7 @@ export function Reset() {
     let ativo = true;
     (async () => {
       const ok = await canResetPassword();
-      // Link legado: já tem sessão Auth e não veio do fluxo OTP → pula pro passo senha.
+      // Link legado: ja tem sessao Auth e nao veio do fluxo OTP  ->  pula pro passo senha.
       if (ativo && ok && isSupabaseConfigured()) {
         const hasEmail = Boolean(emailFromState || readRecoveryEmail());
         if (!hasEmail) setStep("password");
@@ -272,7 +272,7 @@ export function Reset() {
     );
   }
 
-  // Sem e-mail no fluxo OTP → manda pedir de novo
+  // Sem e-mail no fluxo OTP  ->  manda pedir de novo
   if (step === "otp" && !emailOk) {
     return (
       <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-bg-0 p-10">
@@ -340,16 +340,11 @@ export function Reset() {
                       : "Reenviar código"}
                 </button>
               </p>
-              {!isSupabaseConfigured() && (
-                <p className="mt-4 text-xs text-t2">
-                  Demo — qualquer código de {RECOVERY_OTP_LENGTH} dígitos é válido.
-                </p>
-              )}
             </>
           ) : (
             <>
               <h2 className={acessoTitulo}>Crie uma nova senha</h2>
-              <p className={acessoSubtitulo}>Escolha a nova senha que você usará para acessar a WeDash.</p>
+              <p className={acessoSubtitulo}>Escolha a nova senha que você usará para acessar a WDash.</p>
 
               <form onSubmit={salvarSenha} className="flex flex-col gap-3.5 text-left" noValidate>
                 {/* Escondido: gerenciador de senhas associa a senha nova a este login. */}

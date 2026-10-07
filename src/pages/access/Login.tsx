@@ -7,7 +7,7 @@ import { PRODUCT_NAME } from "@/data/wedash/tenant";
 import { users } from "@/data/wedash/team";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { loginWithEmail, MENSAGEM_LOGIN, destinationAfterAuth } from "@/session/authApi";
-import { roleLabel, useSession } from "@/session/SessionProvider";
+import { useSession } from "@/session/SessionProvider";
 import { acessoBotao, CampoEmail, CampoSenha, Checkbox, useFocoNoEnvioAposAutofill } from "./AccessKit";
 
 function emailValido(v: string) {
@@ -27,24 +27,22 @@ export function Login() {
   const [senha, setSenha] = useState("");
   const [lembrar, setLembrar] = useState(true);
   const [carregando, setCarregando] = useState(false);
-  const [mostrarDemo, setMostrarDemo] = useState(false);
   const formRef = useFocoNoEnvioAposAutofill();
 
   const podeEnviar = email.trim().length > 0 && senha.length > 0 && !carregando;
 
-  // Se a sessão voltou depois (race PWA) ou já estava logado, não fica na tela.
+  // Se a sessao voltou depois (race PWA) ou ja estava logado, nao fica na tela.
   useEffect(() => {
     if (!ready || !session) return;
-    const destino = (location.state as { de?: string } | null)?.de;
-    navigate(destinationAfterAuth(session, destino), { replace: true });
-  }, [ready, session, location.state, navigate]);
+    navigate(destinationAfterAuth(session), { replace: true });
+  }, [ready, session, navigate]);
 
   useEffect(() => {
     const state = location.state as { aviso?: string; avisoId?: string; de?: string } | null;
     if (!state?.aviso) return;
     const id = state.avisoId ?? state.aviso;
     const de = state.de;
-    // Limpa o state antes de qualquer coisa — o 2º run do StrictMode não reprocessa.
+    // Limpa o state antes de qualquer coisa  -  o 2 run do StrictMode nao reprocessa.
     navigate(location.pathname, { replace: true, state: de ? { de } : {} });
     if (avisosJaExibidos.has(id)) return;
     avisosJaExibidos.add(id);
@@ -75,13 +73,12 @@ export function Login() {
       return;
     }
     applySession(r.session);
-    const destino = (location.state as { de?: string } | null)?.de;
-    navigate(destinationAfterAuth(r.session, destino), { replace: true });
+    navigate(destinationAfterAuth(r.session), { replace: true });
   }
 
   return (
     <div className="grid min-h-screen w-full bg-bg-0 lg:grid-cols-2">
-      {/* Hero — layout LoginSplit */}
+      {/* Hero  -  layout LoginSplit */}
       <div
         className="relative hidden flex-col justify-between overflow-hidden p-12 lg:flex"
         style={{ background: "linear-gradient(150deg,#14103a,#1b1650 45%,#0f2d54)" }}
@@ -111,7 +108,7 @@ export function Login() {
         </div>
       </div>
 
-      {/* Form — layout LoginSplit */}
+      {/* Form  -  layout LoginSplit */}
       <div className="flex flex-col items-center justify-center px-6 py-12 sm:px-14">
         <div className="mb-8 flex items-center gap-2.5 lg:hidden">
           <BrandMark size={34} />
@@ -142,37 +139,6 @@ export function Login() {
               {carregando ? "Entrando…" : "Entrar"}
             </button>
           </form>
-
-          {!isSupabaseConfigured() && (
-            <div className="mt-6 rounded-[16px] border border-dashed border-line bg-bg-2/60 p-4">
-              <button type="button" onClick={() => setMostrarDemo((m) => !m)} className="flex w-full items-center justify-between text-left">
-                <span className="text-[12px] font-bold uppercase tracking-wide text-t2">Demo (sem Supabase)</span>
-                <span className="text-[11px] text-t2">{mostrarDemo ? "ocultar" : "mostrar"}</span>
-              </button>
-              {mostrarDemo && (
-                <div className="mt-3 flex flex-col gap-1.5">
-                  {users
-                    .filter((u) => u.onboardingStep === null)
-                    .map((u) => (
-                      <button
-                        key={u.membershipId}
-                        type="button"
-                        onClick={() => {
-                          setEmail(u.email);
-                          setSenha("demonstracao");
-                        }}
-                        className="flex items-center justify-between gap-2 rounded-[10px] border border-line bg-bg-2 px-3 py-2 text-left hover:bg-bg-3"
-                      >
-                        <span className="min-w-0 truncate text-[12.5px] font-bold text-t0">
-                          {u.name}
-                          <span className="ml-1 font-normal text-t2">· {roleLabel[u.role]}</span>
-                        </span>
-                      </button>
-                    ))}
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
     </div>
