@@ -35,7 +35,7 @@ export function DuplicateChoiceModal({
         <button
           type="button"
           onClick={() => onChoose("period")}
-          className="rounded-[var(--radius-vela)] border border-line px-4 py-3 text-left transition-colors hover:border-acc hover:bg-acc-soft/40"
+          className="rounded-[var(--radius-vela-lg)] border border-line px-4 py-3 text-left transition-colors hover:border-acc hover:bg-acc-soft/40"
         >
           <p className="text-[13.5px] font-bold text-t0">Próximo período</p>
           <p className="mt-0.5 text-[12.5px] leading-snug text-t2">Cria uma cópia no período seguinte nesta loja.</p>
@@ -44,7 +44,7 @@ export function DuplicateChoiceModal({
           <button
             type="button"
             onClick={() => onChoose("store")}
-            className="rounded-[var(--radius-vela)] border border-line px-4 py-3 text-left transition-colors hover:border-acc hover:bg-acc-soft/40"
+            className="rounded-[var(--radius-vela-lg)] border border-line px-4 py-3 text-left transition-colors hover:border-acc hover:bg-acc-soft/40"
           >
             <p className="text-[13.5px] font-bold text-t0">Outra loja</p>
             <p className="mt-0.5 text-[12.5px] leading-snug text-t2">
