@@ -6,7 +6,6 @@ import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePi
 import { DuplicateChoiceModal } from "@/components/wedash/DuplicateChoiceModal";
 import { GoalCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { calendarTodayIso } from "@/data/wedash/clock";
-import { resolvePeriod } from "@/data/wedash/dashboard";
 import { buildGoalSummary, GOAL_STATUS_LABEL, goalTeamNames, prazoRestante, type GoalStatus, type GoalSummary } from "@/data/wedash/goalView";
 import { deleteGoal, fetchGoalTeam, fetchGoals, type GoalRecord, type GoalTeamMember } from "@/data/wedash/goalsRepo";
 import { fetchSalesDayAggs } from "@/data/wedash/salesRepo";
@@ -15,7 +14,13 @@ import { storesForSession, type Store } from "@/data/wedash/stores";
 import { brlCent, dataCompleta, fimDoMes, num, paraIso, deIso } from "@/lib/format";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
-import { applyPeriodDateChange, dateRangeFromPeriod, periodActivePresetId, periodDisplayLabel } from "@/pages/dashboard/periodPicker";
+import {
+  applyPeriodDateChange,
+  dateRangeFromManagementPeriod,
+  managementScheduleWindow,
+  periodActivePresetId,
+  periodDisplayLabel,
+} from "@/pages/dashboard/periodPicker";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useScope } from "@/pages/dashboard/useScope";
 import { TargetIcon } from "@/pages/dashboards/icons";
@@ -42,7 +47,7 @@ export default function GoalsPage() {
   const { session, lojas, loading: lojasLoading } = useScopedStores();
   const { escopo, mudar } = useScope();
   const today = calendarTodayIso();
-  const periodo = resolvePeriod(escopo.periodo, today);
+  const janela = useMemo(() => managementScheduleWindow(escopo.periodo, today), [escopo.periodo, today]);
   const storeIds = useMemo(() => lojas.map((l) => l.id), [lojas]);
   const storeKey = storeIds.join(",");
 
@@ -60,7 +65,7 @@ export default function GoalsPage() {
     return () => window.removeEventListener(SALES_SYNCED_EVENT, onSync);
   }, []);
 
-  const filtroKey = `${session.tenantId}|${storeKey}|${periodo.inicio}|${periodo.fim}`;
+  const filtroKey = `${session.tenantId}|${storeKey}|${janela.from}|${janela.to}`;
   const loadedKey = useRef<string | null>(null);
 
   useEffect(() => {
@@ -69,7 +74,7 @@ export default function GoalsPage() {
     (async () => {
       // Venda nova (SALES_SYNCED_EVENT) recarrega sem skeleton; so filtro novo mostra o skeleton.
       if (loadedKey.current !== filtroKey) setLoading(true);
-      const goals = await fetchGoals({ tenantId: session.tenantId, storeIds, from: periodo.inicio, to: periodo.fim });
+      const goals = await fetchGoals({ tenantId: session.tenantId, storeIds, from: janela.from, to: janela.to });
       let dayAggs: SalesDayAgg[] = [];
       let team: GoalTeamMember[] = [];
       if (goals.length > 0) {
@@ -93,7 +98,7 @@ export default function GoalsPage() {
     return () => {
       cancelled = true;
     };
-  }, [session.tenantId, storeKey, periodo.inicio, periodo.fim, lojasLoading, reload]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session.tenantId, storeKey, janela.from, janela.to, lojasLoading, reload]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const showSkeleton = useMinSkeleton(loading || lojasLoading);
 
@@ -114,7 +119,7 @@ export default function GoalsPage() {
       );
   }, [data, lojas, today]);
 
-  const dateRange = useMemo(() => dateRangeFromPeriod(escopo.periodo), [escopo.periodo]);
+  const dateRange = useMemo(() => dateRangeFromManagementPeriod(escopo.periodo), [escopo.periodo]);
   function onDateChange(r: DateRange, meta?: DateRangeChangeMeta) {
     mudar(applyPeriodDateChange(escopo, r, meta));
   }

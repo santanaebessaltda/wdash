@@ -21,7 +21,6 @@ import {
   type ChallengeView,
 } from "@/data/wedash/challengeView";
 import { calendarTodayIso } from "@/data/wedash/clock";
-import { resolvePeriod } from "@/data/wedash/dashboard";
 import { storesForSession, type Store } from "@/data/wedash/stores";
 import { dataCompleta, deIso, fimDoMes, paraIso } from "@/lib/format";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
@@ -33,7 +32,13 @@ import {
   mainPrizeLabel,
 } from "@/pages/challenges/shared";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
-import { applyPeriodDateChange, dateRangeFromPeriod, periodActivePresetId, periodDisplayLabel } from "@/pages/dashboard/periodPicker";
+import {
+  applyPeriodDateChange,
+  dateRangeFromManagementPeriod,
+  managementScheduleWindow,
+  periodActivePresetId,
+  periodDisplayLabel,
+} from "@/pages/dashboard/periodPicker";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useScope } from "@/pages/dashboard/useScope";
 import { FlameIcon, TrophyIcon } from "@/pages/dashboards/icons";
@@ -57,7 +62,7 @@ export function ChallengesPage() {
   const { session, lojas, loading: lojasLoading } = useScopedStores();
   const { escopo, mudar } = useScope();
   const today = calendarTodayIso();
-  const periodo = resolvePeriod(escopo.periodo, today);
+  const janela = useMemo(() => managementScheduleWindow(escopo.periodo, today), [escopo.periodo, today]);
   const storeIds = useMemo(() => lojas.map((l) => l.id), [lojas]);
   const storeKey = storeIds.join(",");
 
@@ -75,7 +80,7 @@ export function ChallengesPage() {
     return () => window.removeEventListener(SALES_SYNCED_EVENT, onSync);
   }, []);
 
-  const filtroKey = `${session.tenantId}|${storeKey}|${periodo.inicio}|${periodo.fim}`;
+  const filtroKey = `${session.tenantId}|${storeKey}|${janela.from}|${janela.to}`;
   const loadedKey = useRef<string | null>(null);
 
   useEffect(() => {
@@ -84,7 +89,7 @@ export function ChallengesPage() {
     (async () => {
       // Venda nova (SALES_SYNCED_EVENT) recarrega sem skeleton; so filtro novo mostra o skeleton.
       if (loadedKey.current !== filtroKey) setLoading(true);
-      const challenges = await fetchChallenges({ tenantId: session.tenantId, storeIds, from: periodo.inicio, to: periodo.fim });
+      const challenges = await fetchChallenges({ tenantId: session.tenantId, storeIds, from: janela.from, to: janela.to });
       const aggs =
         challenges.length > 0
           ? await fetchChallengeInput({ tenantId: session.tenantId, challenges, today })
@@ -98,7 +103,7 @@ export function ChallengesPage() {
     return () => {
       cancelled = true;
     };
-  }, [session.tenantId, storeKey, periodo.inicio, periodo.fim, lojasLoading, reload]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session.tenantId, storeKey, janela.from, janela.to, lojasLoading, reload]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const showSkeleton = useMinSkeleton(loading || lojasLoading);
 
@@ -118,7 +123,7 @@ export function ChallengesPage() {
       );
   }, [data, lojas, today]);
 
-  const dateRange = useMemo(() => dateRangeFromPeriod(escopo.periodo), [escopo.periodo]);
+  const dateRange = useMemo(() => dateRangeFromManagementPeriod(escopo.periodo), [escopo.periodo]);
   function onDateChange(r: DateRange, meta?: DateRangeChangeMeta) {
     mudar(applyPeriodDateChange(escopo, r, meta));
   }
