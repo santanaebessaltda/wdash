@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { scopeShowsBrandPicker, type Division } from "@/data/wedash/stores";
 import type { Scope, PeriodType } from "@/data/wedash/dashboard";
 import { useActiveSession } from "@/session/SessionProvider";
@@ -18,7 +18,7 @@ const PERIODOS: PeriodType[] = [
   "personalizado",
 ];
 
-/** Store filter — survives navigation even when Link omits `?filial=`. */
+/** Store filter  -  survives navigation even when Link omits `?filial=`. */
 const STORE_STORAGE_KEY = "wedash.store";
 const STORE_STORAGE_KEY_LEGACY = "gestao.filial";
 
@@ -35,7 +35,7 @@ function salvarFilial(id: string) {
     sessionStorage.setItem(STORE_STORAGE_KEY, id);
     sessionStorage.removeItem(STORE_STORAGE_KEY_LEGACY);
   } catch {
-    /* private mode / quota — URL ainda works on the same screen */
+    /* private mode / quota  -  URL ainda works on the same screen */
   }
 }
 
@@ -70,14 +70,14 @@ function periodoDaUrl(params: URLSearchParams): PeriodoSalvo | null {
 }
 
 /**
- * Escopo (lojas, período, divisão) mora na URL, não no estado de uma página.
- * **Loja** e **período** também ficam em sessionStorage: são filtros globais de todas as telas
- * e os NavLinks do menu não carregam a query string. Período padrão = Hoje.
+ * Escopo (lojas, periodo, divisao) mora na URL, nao no estado de uma pagina.
+ * **Loja** e **periodo** tambem ficam em sessionStorage: sao filtros globais de todas as telas
+ * e os NavLinks do menu nao carregam a query string. Periodo padrao = Hoje.
  *
- * Single-select de loja: `filial` na URL é um id (ex.: "filial=f1").
+ * Single-select de loja: `filial` na URL e um id (ex.: "filial=f1").
  * Ausente / vazio = "Todas as lojas" (consolida a rede), salvo se houver
- * preferência salva (aí reidrata a loja escolhida).
- * Se a URL ainda tiver lista antiga ("f1,f2"), usa só o primeiro id.
+ * preferencia salva (ai reidrata a loja escolhida).
+ * Se a URL ainda tiver lista antiga ("f1,f2"), usa so o primeiro id.
  */
 export function useScope() {
   const session = useActiveSession();
@@ -95,22 +95,22 @@ export function useScope() {
     const filialRaw = params.get("filial");
     let idsRaw = filialRaw ? filialRaw.split(",").map((s) => s.trim()).filter(Boolean) : [];
 
-    // Sem `?filial=` na URL (navegação pelo menu): recupera a última loja.
+    // Sem `?filial=` na URL (navegacao pelo menu): recupera a ultima loja.
     if (!temParamFilial) {
       const salva = lerFilialSalva();
       if (salva) idsRaw = [salva];
     }
 
-    // Só aceita ids que a sessão realmente pode ver; single-select → no máx. 1.
+    // So aceita ids que a sessao realmente pode ver; single-select  ->  no max. 1.
     const validos = idsRaw.filter((id) => session.stores.includes(id));
     const filialIds =
       validos.length === 0
-        ? session.stores.length > 1
-          ? []
-          : [session.stores[0]]
+        ? session.stores.length === 1
+          ? [session.stores[0]]
+          : []
         : [validos[0]];
 
-    // Sem `?periodo=` (navegação pelo menu): último período da sessão; senão Hoje.
+    // Sem `?periodo=` (navegacao pelo menu): ultimo periodo da sessao; senao Hoje.
     const per = periodoDaUrl(params) ?? lerPeriodoSalvo() ?? { tipo: PERIODO_PADRAO };
     const divisaoParam = params.get("divisao");
     const divisao: Division | null = divisaoParam === "WEPINK" || divisaoParam === "WPINK" ? divisaoParam : null;
@@ -127,14 +127,14 @@ export function useScope() {
     [escopo.filialIds, session.stores, catalogTick],
   );
 
-  // Mantém storage alinhado com a URL (bookmark / share / abas do Dashboard).
+  // Mantem storage alinhado com a URL (bookmark / share / abas do Dashboard).
   useEffect(() => {
     if (params.has("filial")) salvarFilial(params.get("filial")?.split(",")[0]?.trim() || "");
     const per = periodoDaUrl(params);
     if (per) salvarPeriodo(per);
   }, [params]);
 
-  // Reidrata `?filial=` na URL quando a preferência veio só do storage.
+  // Reidrata `?filial=` na URL quando a preferencia veio so do storage.
   useEffect(() => {
     if (params.has("filial")) return;
     const id = escopo.filialIds[0];
@@ -144,7 +144,7 @@ export function useScope() {
     setParams(p, { replace: true });
   }, [params, escopo.filialIds, setParams]);
 
-  // Sem WPINK no escopo → some o filtro e limpa `divisao` da URL.
+  // Sem WPINK no escopo  ->  some o filtro e limpa `divisao` da URL.
   useEffect(() => {
     if (showBrandPicker) return;
     if (!params.get("divisao")) return;
@@ -155,8 +155,8 @@ export function useScope() {
 
   function mudar(e: Scope) {
     const p = new URLSearchParams();
-    // Array vazio = "Todas as lojas" → não grava id (URL limpa) + storage "".
-    // Single-select: grava no máx. o primeiro id.
+    // Array vazio = "Todas as lojas"  ->  nao grava id (URL limpa) + storage "".
+    // Single-select: grava no max. o primeiro id.
     if (e.filialIds.length > 0) {
       p.set("filial", e.filialIds[0]);
       salvarFilial(e.filialIds[0]);
@@ -175,4 +175,18 @@ export function useScope() {
   }
 
   return { escopo, mudar, showBrandPicker };
+}
+
+/**
+ * Detalhe ou edicao de um registro de uma loja. Ao escolher outra loja no topo,
+ * volta para a lista. "Todas as lojas" permanece na tela.
+ */
+export function useReturnWhenStoreChanges(storeId: string | undefined, to: string) {
+  const navigate = useNavigate();
+  const { escopo } = useScope();
+  const loja = escopo.filialIds[0];
+  useEffect(() => {
+    if (!storeId || !loja || storeId === loja) return;
+    navigate(to, { replace: true });
+  }, [storeId, loja, to, navigate]);
 }

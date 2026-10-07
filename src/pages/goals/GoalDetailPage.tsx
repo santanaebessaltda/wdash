@@ -27,7 +27,7 @@ import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useReturnWhenStoreChanges } from "@/pages/dashboard/useScope";
 import { TargetIcon } from "@/pages/dashboards/icons";
-import { SellersCard, GoalProgressBar, goalShowsProjection } from "@/pages/team/blocks";
+import { CardVendedoras, FaixaMetaGlobal, metaLiberouProjecao } from "@/pages/team/blocos";
 import { Icon, icons } from "@/pages/users/Icons";
 import { paths } from "@/router/paths";
 import { useActiveSession } from "@/session/SessionProvider";
@@ -175,7 +175,7 @@ export default function GoalDetailPage() {
           ) : (
             <div className="flex flex-col gap-5">
               <GoalTiersCard goal={goal} card={card} status={status} gerencia={gerencia} today={today} />
-              <SellersCard
+              <CardVendedoras
                 estado={card.vendedoras.length > 0 ? "disponivel" : "sem_dados"}
                 lista={card.vendedoras}
                 metaAtiva
@@ -217,7 +217,7 @@ function GoalHero({
   const premiacao =
     card.vendedoras.reduce((s, v) => s + v.premiacaoAcumulada + v.bonusAlcancado, 0) + (gerencia ? gerencia.premiacao + gerencia.bonus : 0);
   const faltam = Math.max(0, goal.target - realizado);
-  const liberou = status === "active" && goalShowsProjection(goal.startsOn, goal.endsOn, today);
+  const liberou = status === "active" && metaLiberouProjecao(goal.startsOn, goal.endsOn, today);
   const stats: { label: string; value: string; cls: string; sub?: string; subCls?: string; help?: string }[] = [
     { label: "Meta da loja", value: brlCent(goal.target), cls: "text-acc" },
     {
@@ -311,7 +311,7 @@ function GoalTiersCard({
       <div className="mb-4 flex items-center gap-1.5">
         <CardTitle>Níveis e premiação</CardTitle>
       </div>
-      <GoalProgressBar meta={card.faixa} degraus={card.degraus} hojeIso={today} embedded soBarra />
+      <FaixaMetaGlobal meta={card.faixa} degraus={card.degraus} hojeIso={today} embedded soBarra />
       {goal.groups.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[12px]">
           <span className="mr-1 text-t2">Grupos:</span>
