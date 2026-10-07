@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { GoalRecord, GoalTeamMember, SalesSellerDayAgg } from "./goalTypes.ts";
 import { sellerGoalLevels } from "./goalView.ts";
 import type { StoreWeekHours } from "./goalWeights.ts";
+import { brlCent } from "./format.ts";
 import { buildSellerHome, type SellerHomeInput } from "./sellerHome.ts";
 
 const OPEN = { open: "10:00", close: "22:00" };
@@ -108,10 +109,40 @@ describe("buildSellerHome", () => {
     expect(g.ranking.some((e) => e.me)).toBe(false);
   });
 
-  it("no active goal: goal = null (none, or only upcoming)", () => {
-    expect(buildSellerHome(input({ goals: [] })).stores[0]!.goal).toBeNull();
+  it("no active goal: goal = null, and the month podium still lists who sold", () => {
+    const store = buildSellerHome(input({ goals: [] })).stores[0]!;
+    expect(store.goal).toBeNull();
+    expect(store.groupName).toBe("M");
+    expect(store.monthRanking.map((e) => [e.position, e.name, e.revenue, e.sales, e.me])).toEqual([
+      [1, "ANA", 3600, 4, true],
+      [2, "BIA", 3000, 2, false],
+    ]);
+    const withQuiet = buildSellerHome(input({ goals: [], team: [...team, member(5, "EVA", "m")] })).stores[0]!;
+    expect(withQuiet.monthRanking.map((e) => [e.name, e.sales])).toEqual([
+      ["ANA", 4],
+      ["BIA", 2],
+      ["EVA", 0],
+    ]);
     const upcoming = { ...goal, startsOn: "2026-10-01", endsOn: "2026-10-31" };
     expect(buildSellerHome(input({ goals: [upcoming] })).stores[0]!.goal).toBeNull();
+  });
+
+  it("challenges overlapping the month keep ended ones and label the prize", () => {
+    const store = buildSellerHome(
+      input({
+        challenges: [
+          { id: "c1", storeId: "s1", name: "Semana 1", startsOn: "2026-09-01", endsOn: "2026-09-07", mode: "CONTEST", prize: { kind: "MONEY", amount: 50 } },
+          { id: "c2", storeId: "s1", name: "Semana 3", startsOn: "2026-09-15", endsOn: "2026-09-21", mode: "MINIMUM", prize: { kind: "ITEM", label: "Combo" } },
+          { id: "c3", storeId: "s2", name: "Outra loja", startsOn: "2026-09-01", endsOn: "2026-09-30", mode: "CONTEST", prize: null },
+        ],
+      }),
+    ).stores[0]!;
+    expect(store.challenges.map((c) => [c.name, c.status, c.prize])).toEqual([
+      ["Semana 3", "active", "Combo por pessoa"],
+      ["Semana 1", "ended", `1º lugar: ${brlCent(50)}`],
+    ]);
+    expect(store.challenges[0]!.rules[0]).toMatch(/atingirem o mínimo/i);
+    expect(store.challenges[1]!.rules.some((r) => r.startsWith("Prêmios:"))).toBe(true);
   });
 
   it("goal ended yesterday: goal = null", () => {

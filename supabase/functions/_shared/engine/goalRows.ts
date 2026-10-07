@@ -1,4 +1,4 @@
-/** Linhas do banco → tipos da meta (sem dependências fora do motor). */
+/** Linhas do banco  ->  tipos da meta (sem dependencias fora do motor). */
 import { collaboratorName, shiftName } from "./format.ts";
 import type { GoalGroup, GoalRecord, GoalTeamMember, SalesBrand, SalesSellerDayAgg, Tier } from "./goalTypes.ts";
 
@@ -118,15 +118,15 @@ export function sellerDayFromRow(r: SellerDayRow): SalesSellerDayAgg {
   };
 }
 
-/** Funcionários ativos com cargo ≠ VENDEDOR (gerência, conta de freelancer) — fora do ranking. */
+/** Funcionarios ativos com cargo = VENDEDOR (gerencia, conta de freelancer)  -  fora do ranking. */
 export type NonSalesPeople = {
   employeeIds: Set<number>;
   geradorIds: Set<number>;
-  /** `storeId|nome normalizado` — linhas sem código ligadas só pelo nome. */
+  /** `storeId|nome normalizado`  -  linhas sem codigo ligadas so pelo nome. */
   storeNameKeys: Set<string>;
 };
 
-/** Tira do ranking as vendas de quem não é da equipe de vendas (a venda continua no total da loja, que vem de outra tabela). */
+/** Tira do ranking as vendas de quem nao e da equipe de vendas (a venda continua no total da loja, que vem de outra tabela). */
 export function excludeNonSalesPeople(rows: SalesSellerDayAgg[], people: NonSalesPeople): SalesSellerDayAgg[] {
   if (people.employeeIds.size === 0 && people.geradorIds.size === 0 && people.storeNameKeys.size === 0) return rows;
   return rows.filter((r) => {

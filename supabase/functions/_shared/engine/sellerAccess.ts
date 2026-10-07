@@ -20,7 +20,7 @@ export function validEmail(email: string): boolean {
   return email.length <= EMAIL_MAX_LENGTH && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-/** Gestor em qualquer loja da empresa; Gerente só nas lojas dele (nenhuma vinculada = todas); outro papel nunca. */
+/** Gestor em qualquer loja da empresa; Gerente so nas lojas dele (nenhuma vinculada = todas); outro papel nunca. */
 export function canManageStore(role: string, memberStoreIds: string[], storeId: string): boolean {
   if (role === "OWNER" || role === "ADMIN_GLOBAL") return true;
   if (role === "MANAGER") return memberStoreIds.length === 0 || memberStoreIds.includes(storeId);
@@ -36,15 +36,20 @@ export function accessState(membership: { status: string } | null): AccessState 
 const TRANSITIONS: Record<AccessState, AccessState[]> = {
   NONE: ["PENDING"],
   PENDING: ["ACTIVE", "NONE"],
-  ACTIVE: ["SUSPENDED"],
-  SUSPENDED: ["ACTIVE"],
+  ACTIVE: ["SUSPENDED", "NONE"],
+  SUSPENDED: ["ACTIVE", "NONE"],
 };
 
 export function canTransition(from: AccessState, to: AccessState): boolean {
   return TRANSITIONS[from].includes(to);
 }
 
-/** Só quem está na equipe de vendas agora: ativo, ainda na lista do Millennium e com cargo VENDEDOR. */
+/** So quem esta na equipe de vendas agora: ativo, ainda na lista do Millennium e com cargo VENDEDOR. */
 export function invitable(seller: { active: boolean; inErp: boolean; erpRole: string | null }): boolean {
   return seller.active && seller.inErp && (seller.erpRole == null || seller.erpRole === SELLER_ROLE);
+}
+
+/** Convite so com grupo vinculado. Sem grupo, o ranking e a meta da tela Inicio ficam sem base. */
+export function hasSalesGroup(shiftId: string | null | undefined): boolean {
+  return typeof shiftId === "string" && shiftId.length > 0;
 }

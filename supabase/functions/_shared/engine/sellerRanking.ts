@@ -1,24 +1,24 @@
-/** Ranking da loja na meta para a tela do vendedor: só nome, % e nível (sem R$ de ninguém). */
+/** Ranking da loja na meta para a tela do vendedor: so nome, % e nivel (sem R$ de ninguem). */
 import type { GoalCardView, SellerRow } from "./goalTypes.ts";
 
 export interface SellerRankingEntry {
   position: number;
   name: string;
-  /** % da meta individual (modo Grupo: vendido ÷ (meta do grupo ÷ pessoas do grupo)). */
+  /** % da meta individual (modo Grupo: vendido  (meta do grupo  pessoas do grupo)). */
   pct: number;
-  /** "N2 · Super"; null = abaixo do 1º nível. No modo Grupo é o nível do grupo. */
+  /** "N2  |  Super"; null = abaixo do 1 nivel. No modo Grupo e o nivel do grupo. */
   level: string | null;
   me: boolean;
 }
 
 export interface SellerRanking {
   entries: SellerRankingEntry[];
-  /** p.p. da meta até a pessoa logo acima; null = 1º lugar, sozinho ou fora do ranking. */
+  /** p.p. da meta ate a pessoa logo acima; null = 1 lugar, sozinho ou fora do ranking. */
   gapPp: number | null;
   abovePosition: number | null;
 }
 
-/** Mesmo grupo = mesmo nome, mesma meta e mesmo atingimento (no modo Grupo todos do grupo têm o mesmo %). */
+/** Mesmo grupo = mesmo nome, mesma meta e mesmo atingimento (no modo Grupo todos do grupo tem o mesmo %). */
 function groupKey(view: GoalCardView, r: SellerRow): string {
   return view.qtdGrupos === 0 ? "*" : `${r.grupo}|${r.metaIndividualValor}|${r.atingimentoPct}`;
 }

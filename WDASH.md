@@ -1576,6 +1576,10 @@ Regra geral: **KPIs em 4 colunas no desktop**, widget central em largura total, 
 
 - No Dashboard, **Este mês** = mês até hoje (MTD, vendas). Na listagem de Metas/Desafios, **Este mês** usa o mês calendário inteiro (`managementScheduleWindow`), senão desafio/meta com início futuro some. Personalizado nessas telas também pode ir além de hoje.
 
+## Desafios — regras na tela da vendedora (2026-10-07)
+
+- Card Início > Desafios mostra bloco **Como funciona** (`sellerChallengeRules`): como ganha (disputa vs mínimo), o que conta (métrica + escopo), vendas mínimas / piso e prêmios do pódio. Linguagem direta para a pessoa na loja.
+
 ## Premissas de IMPLEMENTAÇÃO (ler antes de codar — decidido com o gestor)
 
 > Estas regras valem para o início da fase de código. Não são mock — são decisões que evitam retrabalho.

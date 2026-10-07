@@ -42,6 +42,8 @@ export interface SellerChallengeStanding {
   progressPct: number | null;
 }
 
+type ChallengePrizeShape = { kind: string; amount?: number; label?: string };
+
 interface ChallengeShape {
   storeId: string;
   startsOn: string;
@@ -53,8 +55,95 @@ interface ChallengeShape {
   categoryIds?: number[];
   target?: number | null;
   minSales?: number | null;
-  prizes?: { kind: string }[];
-  prize?: { kind: string } | null;
+  prizes?: ChallengePrizeShape[];
+  prize?: ChallengePrizeShape | null;
+}
+
+const ORDINAL = ["1º", "2º", "3º"] as const;
+
+const METRIC_HOW: Record<SellerChallengeMetric, string> = {
+  QUANTITY: "O resultado é a quantidade de itens que você vender no período.",
+  VALUE: "O resultado é o faturamento das suas vendas no período.",
+  PA: "O resultado é o seu P.A. (itens por venda) no período.",
+  TICKET: "O resultado é o seu ticket médio (valor médio por venda) no período.",
+  INDEX:
+    "O índice compara seu faturamento médio por pessoa, ticket e P.A. com a média da loja no período (100 = na média).",
+};
+
+function prizeText(p: ChallengePrizeShape): string {
+  if (p.kind === "MONEY") return brlCent(p.amount ?? 0);
+  const label = (p.label ?? "").trim();
+  return label || "Prêmio";
+}
+
+function metricFloorLabel(metric: SellerChallengeMetric, value: number): string {
+  if (metric === "PA") return num(value, 2);
+  if (metric === "INDEX") return num(value, 1);
+  if (metric === "TICKET" || metric === "VALUE") return brlCent(value);
+  const inteiro = Number.isInteger(value);
+  return `${num(value, inteiro ? 0 : 1)} ${value === 1 ? "item" : "itens"}`;
+}
+
+/**
+ * Regras do desafio em linguagem da vendedora (card Início).
+ * Ordem: como ganha → o que conta → piso / vendas mínimas → prêmios.
+ */
+export function sellerChallengeRules(challenge: ChallengeShape): string[] {
+  const metric = challenge.metric ?? "QUANTITY";
+  const scope = challenge.scope ?? "ALL";
+  const target = challenge.target ?? null;
+  const prizes = challenge.prizes?.length ? challenge.prizes : challenge.prize ? [challenge.prize] : [];
+  const rules: string[] = [];
+
+  if (challenge.mode === "MINIMUM") {
+    rules.push("Todas as pessoas que atingirem o mínimo ganham o prêmio.");
+  } else {
+    rules.push(
+      "Ganha quem tiver o melhor resultado. Em empate, as empatadas recebem o prêmio da posição e a seguinte é pulada.",
+    );
+  }
+
+  rules.push(METRIC_HOW[metric]);
+
+  if (usesScope(metric)) {
+    if (scope === "PRODUCTS") {
+      const n = challenge.productCodes?.length ?? 0;
+      rules.push(n > 0 ? `Contam só os ${n} ${n === 1 ? "produto escolhido" : "produtos escolhidos"} pelo gestor.` : "Contam só os produtos escolhidos pelo gestor.");
+    } else if (scope === "CATEGORIES") {
+      const n = challenge.categoryIds?.length ?? 0;
+      rules.push(n > 0 ? `Contam só as ${n} ${n === 1 ? "categoria escolhida" : "categorias escolhidas"} pelo gestor.` : "Contam só as categorias escolhidas pelo gestor.");
+    } else {
+      rules.push("Conta tudo o que você vender na loja.");
+    }
+  }
+
+  if (usesMinSales(metric) && challenge.minSales != null && challenge.minSales >= 1) {
+    const n = Math.round(challenge.minSales);
+    rules.push(n === 1 ? "Precisa de pelo menos 1 venda para participar." : `Precisa de pelo menos ${num(n)} vendas para participar.`);
+  }
+
+  if (target != null && target > 0) {
+    const piso = metricFloorLabel(metric, target);
+    rules.push(
+      challenge.mode === "MINIMUM"
+        ? `Mínimo para ganhar: ${piso}.`
+        : `Para receber prêmio na disputa, precisa de pelo menos ${piso}.`,
+    );
+  }
+
+  if (prizes.length > 0) {
+    if (challenge.mode === "MINIMUM") {
+      rules.push(`Prêmio: ${prizeText(prizes[0]!)} por pessoa.`);
+    } else {
+      const lista = prizes
+        .slice(0, ORDINAL.length)
+        .map((p, i) => `${ORDINAL[i]} ${prizeText(p)}`)
+        .join(" · ");
+      rules.push(`Prêmios: ${lista}.`);
+    }
+  }
+
+  return rules;
 }
 
 interface Acc {

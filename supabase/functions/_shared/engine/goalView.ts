@@ -27,7 +27,7 @@ function diasEntre(inicio: string, fim: string): number {
   return Math.round((deIso(fim).getTime() - deIso(inicio).getTime()) / 86_400_000) + 1;
 }
 
-/** Fração do período já decorrida (hoje conta inteiro); 0 antes de começar, 1 depois de acabar. */
+/** Fracao do periodo ja decorrida (hoje conta inteiro); 0 antes de comecar, 1 depois de acabar. */
 function fracaoDecorrida(g: GoalRecord, today: string): number {
   const status = goalStatus(g, today);
   if (status === "upcoming") return 0;
@@ -40,15 +40,15 @@ function diasRestantes(g: GoalRecord, today: string): number {
   return goalStatus(g, today) === "active" ? diasEntre(today, g.endsOn) : 0;
 }
 
-/** Prazo da meta em andamento ("12 dias restantes"); `dias` inclui hoje, então 1 = "Último dia". */
+/** Prazo da meta em andamento ("12 dias restantes"); `dias` inclui hoje, entao 1 = "Ultimo dia". */
 export function prazoRestante(dias: number): string {
   if (dias <= 1) return "Último dia";
   return `${dias} dias restantes`;
 }
 
 /**
- * Período da cópia de uma meta: meta de meses fechados (dia 1 ao último dia) = os meses seguintes,
- * com a mesma quantidade de meses; senão começa no dia seguinte ao fim, com a mesma duração.
+ * Periodo da copia de uma meta: meta de meses fechados (dia 1 ao ultimo dia) = os meses seguintes,
+ * com a mesma quantidade de meses; senao comeca no dia seguinte ao fim, com a mesma duracao.
  */
 export function nextGoalPeriod(startsOn: string, endsOn: string): { startsOn: string; endsOn: string } {
   const ini = deIso(startsOn);
@@ -65,7 +65,7 @@ export function nextGoalPeriod(startsOn: string, endsOn: string): { startsOn: st
 const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
 const MES_NO_NOME = /(janeiro|fevereiro|mar[çc]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)(\s+(?:de\s+)?|\s*\/\s*)?(\d{4})?/giu;
 
-/** Nome da cópia: o mês do nome (um só) vira o mês do novo período, mantendo maiúsculas; senão "{nome} (cópia)". */
+/** Nome da copia: o mes do nome (um so) vira o mes do novo periodo, mantendo maiusculas; senao "{nome} (copia)". */
 export function copyGoalName(name: string, newStartsOn: string): string {
   const achados = [...name.matchAll(MES_NO_NOME)];
   if (achados.length !== 1) return `${name} (cópia)`;
@@ -78,7 +78,7 @@ export function copyGoalName(name: string, newStartsOn: string): string {
   });
 }
 
-/** Faturamento da loja (brand ALL) dentro do período da meta. */
+/** Faturamento da loja (brand ALL) dentro do periodo da meta. */
 export function goalRealized(g: GoalRecord, dayAggs: SalesDayAgg[]): number {
   let cents = 0;
   for (const a of dayAggs) {
@@ -89,7 +89,7 @@ export function goalRealized(g: GoalRecord, dayAggs: SalesDayAgg[]): number {
   return cents / 100;
 }
 
-/** Projeção linear pelo ritmo do período (só em andamento); encerrada = o realizado. */
+/** Projecao linear pelo ritmo do periodo (so em andamento); encerrada = o realizado. */
 function projetadoPct(pct: number, g: GoalRecord, today: string): number {
   const f = fracaoDecorrida(g, today);
   if (f <= 0) return 0;
@@ -101,12 +101,12 @@ export interface GoalSummary {
   status: GoalStatus;
   realizado: number;
   pct: number;
-  /** Projeção de fechamento (% da meta) — só em andamento e depois de 50% do período (igual ao detalhe). */
+  /** Projecao de fechamento (% da meta)  -  so em andamento e depois de 50% do periodo (igual ao detalhe). */
   projetadoPct: number | null;
   diasRestantes: number;
-  /** Nível da loja na escada pelo realizado (null = nenhum ainda). */
+  /** Nivel da loja na escada pelo realizado (null = nenhum ainda). */
   nivelAtual: string | null;
-  /** Número do nível (1 = N1); null = nenhum ainda. */
+  /** Numero do nivel (1 = N1); null = nenhum ainda. */
   nivelNumero: number | null;
 }
 
@@ -134,11 +134,11 @@ export function buildGoalSummary(g: GoalRecord, dayAggs: SalesDayAgg[], today: s
 }
 
 export interface SellerGoalLevel {
-  /** Nome do nível alcançado; null = abaixo do 1º nível. */
+  /** Nome do nivel alcancado; null = abaixo do 1 nivel. */
   nivel: string | null;
   nivelNumero: number | null;
   atingimentoPct: number;
-  /** Níveis da meta (cortes da barra). */
+  /** Niveis da meta (cortes da barra). */
   marcos: { nome: string; pct: number; comissaoPct: number }[];
   metaNome: string;
   inicio: string;
@@ -147,23 +147,23 @@ export interface SellerGoalLevel {
   /** Dias que faltam (incluindo hoje) com a meta em andamento; 0 encerrada. */
   diasRestantes: number;
   modo: "individual" | "grupo";
-  /** Grupo de distribuição da pessoa (null = meta sem grupos). */
+  /** Grupo de distribuicao da pessoa (null = meta sem grupos). */
   grupo: string | null;
   /** Meta da pessoa (individual) ou do grupo (modo Grupo). */
   metaValor: number;
-  /** O que conta para a meta: vendas da pessoa (individual) ou do grupo (modo Grupo), do início da meta até hoje. */
+  /** O que conta para a meta: vendas da pessoa (individual) ou do grupo (modo Grupo), do inicio da meta ate hoje. */
   realizado: number;
   proximo: { nome: string; numero: number; falta: number; comissaoPct: number; bonus: number } | null;
-  /** Premiação do nível alcançado (no modo Grupo, a parte da pessoa). */
+  /** Premiacao do nivel alcancado (no modo Grupo, a parte da pessoa). */
   premiacao: number;
-  /** Bônus somados dos níveis alcançados. */
+  /** Bonus somados dos niveis alcancados. */
   bonus: number;
 }
 
 /**
- * Nível de meta de cada pessoa, com a mesma conta do detalhe da meta (do início da meta até hoje).
- * Chave = `e:{código}` / `n:{nome normalizado}` (a mesma do Destaques da equipe). Só metas que já começaram;
- * pessoa em mais de uma meta = a que começou por último (mesmo início = a loja onde mais vendeu). Sem meta = fora do mapa.
+ * Nivel de meta de cada pessoa, com a mesma conta do detalhe da meta (do inicio da meta ate hoje).
+ * Chave = `e:{codigo}` / `n:{nome normalizado}` (a mesma do Destaques da equipe). So metas que ja comecaram;
+ * pessoa em mais de uma meta = a que comecou por ultimo (mesmo inicio = a loja onde mais vendeu). Sem meta = fora do mapa.
  */
 export function sellerGoalLevels(input: {
   goals: GoalRecord[];
@@ -214,7 +214,7 @@ export function sellerGoalLevels(input: {
     }
   }
   const out = new Map([...melhor].map(([k, v]) => [k, v.level]));
-  // Venda gravada só pelo nome: a meta liga pelo cadastro (`e:`), o Destaques agrupa pelo nome (`n:`).
+  // Venda gravada so pelo nome: a meta liga pelo cadastro (`e:`), o Destaques agrupa pelo nome (`n:`).
   for (const m of input.team) {
     const level = out.get(`e:${m.employeeId}`);
     if (!level) continue;
@@ -224,21 +224,21 @@ export function sellerGoalLevels(input: {
 }
 
 export interface GoalManagerPrize {
-  /** Nível alcançado pela loja (null = abaixo do 1º). */
+  /** Nivel alcancado pela loja (null = abaixo do 1). */
   nivel: string | null;
   nivelNumero: number | null;
-  /** % da premiação da gerência no nível alcançado. */
+  /** % da premiacao da gerencia no nivel alcancado. */
   pct: number;
-  /** Premiação sobre o faturamento total da loja, do início da meta até hoje. */
+  /** Premiacao sobre o faturamento total da loja, do inicio da meta ate hoje. */
   premiacao: number;
-  /** Bônus somados dos níveis alcançados. */
+  /** Bonus somados dos niveis alcancados. */
   bonus: number;
   proximo: { nome: string; numero: number; falta: number; pct: number; bonus: number } | null;
 }
 
 /**
- * Premiação da gerência: sobe de nível pelo faturamento total da loja (inclui vendas sem vendedor identificado e da
- * própria gerência) contra a meta da loja, e ganha o % do nível sobre tudo o que a loja vendeu. null = meta sem gerência.
+ * Premiacao da gerencia: sobe de nivel pelo faturamento total da loja (inclui vendas sem vendedor identificado e da
+ * propria gerencia) contra a meta da loja, e ganha o % do nivel sobre tudo o que a loja vendeu. null = meta sem gerencia.
  */
 export function goalManagerPrize(g: GoalRecord, realizado: number): GoalManagerPrize | null {
   if (!g.tiers.some((t) => t.gerenciaPct != null)) return null;
@@ -288,10 +288,10 @@ type Acc = {
 
 /**
  * Detalhe da meta no formato do card de meta da Equipe (faixa + escada por pessoa).
- * Pessoas = equipe de vendas ativa da loja ∪ quem vendeu no período (ex-vendedoras incluídas).
- * Meta do grupo = meta × % do grupo (sem grupos = a meta inteira para a equipe toda). Pessoa fora dos grupos da meta = sem meta.
- * INDIVIDUAL: meta do grupo ÷ pessoas, premiação sobre as próprias vendas. GROUP: o grupo sobe pela soma das vendas e a
- * premiação é dividida igualmente. Bônus soma os níveis alcançados (bateu o 2º = bônus do 1º + do 2º), para cada pessoa.
+ * Pessoas = equipe de vendas ativa da loja  quem vendeu no periodo (ex-vendedoras incluidas).
+ * Meta do grupo = meta x % do grupo (sem grupos = a meta inteira para a equipe toda). Pessoa fora dos grupos da meta = sem meta.
+ * INDIVIDUAL: meta do grupo  pessoas, premiacao sobre as proprias vendas. GROUP: o grupo sobe pela soma das vendas e a
+ * premiacao e dividida igualmente. Bonus soma os niveis alcancados (bateu o 2 = bonus do 1 + do 2), para cada pessoa.
  */
 export function buildGoalCardView(input: {
   goal: GoalRecord;
@@ -345,7 +345,7 @@ export function buildGoalCardView(input: {
   const diasPeriodo = intervaloDias(g.startsOn, g.endsOn).length;
   const equipeTotal = pessoas.reduce((s, p) => s + p.faturamento, 0);
 
-  // Sem grupos de distribuição = um grupo só, com a equipe toda e a meta inteira.
+  // Sem grupos de distribuicao = um grupo so, com a equipe toda e a meta inteira.
   const TODOS = "*";
   const metaGrupo = new Map<string, number>(
     g.groups.length > 0 ? g.groups.map((x) => [x.shiftId, (g.target * x.pct) / 100]) : [[TODOS, g.target]],
@@ -365,8 +365,8 @@ export function buildGoalCardView(input: {
   }
 
   const vendedoras: SellerRow[] = pessoas.map((p) => {
-    // Individual: meta do grupo ÷ pessoas, sobre as próprias vendas.
-    // Grupo: o grupo sobe junto pela soma das vendas; premiação dividida igualmente entre as pessoas.
+    // Individual: meta do grupo  pessoas, sobre as proprias vendas.
+    // Grupo: o grupo sobe junto pela soma das vendas; premiacao dividida igualmente entre as pessoas.
     const k = grupoDe(p);
     const membros = k ? (membrosGrupo.get(k) ?? 0) : 0;
     const metaG = k ? (metaGrupo.get(k) ?? 0) : 0;
