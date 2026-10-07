@@ -1,0 +1,5 @@
+#!/bin/sh
+# Tira o trailer que o Cursor coloca depois da mensagem.
+MSG="$1"
+tmp="${MSG}.strip"
+grep -vi -e '^Co-authored-by:.*[Cc]ursor' -e '^Made-with:.*[Cc]ursor' "$MSG" > "$tmp" && mv "$tmp" "$MSG"

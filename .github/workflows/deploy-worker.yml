@@ -1,0 +1,32 @@
+name: Deploy Fly worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - workers/millennium-sync/**
+      - src/data/wedash/**
+      - src/lib/**
+      - .dockerignore
+      - .github/workflows/deploy-worker.yml
+  workflow_dispatch:
+
+concurrency:
+  group: fly-worker
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy
+        working-directory: .
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl deploy . --config workers/millennium-sync/fly.toml --dockerfile workers/millennium-sync/Dockerfile --remote-only

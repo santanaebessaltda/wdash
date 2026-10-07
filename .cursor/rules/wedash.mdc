@@ -1,15 +1,15 @@
 ---
-description: WeDash (Wepink/Wpink) — seguir CLAUDE.md e regras de implementação
+description: WDash (Wepink/Wpink) — seguir WDASH.md e regras de implementação
 alwaysApply: true
 ---
 
-# WeDash — regras Cursor
+# WDash — regras Cursor
 
 ## Fonte de verdade
-- Ler e seguir **`CLAUDE.md`** (arquitetura, filtros, mocks, decisões, glossário, ordem de build).
+- Ler e seguir **`WDASH.md`** (arquitetura, filtros, mocks, decisões, glossário, ordem de build). É a fonte de verdade do produto.
 - Código/pastas/rotas do produto em **inglês**; UI (copy) em português; comentários podem ser PT.
 - Dados do produto: `src/data/wedash/`. Componentes de produto: `src/components/wedash/`.
-- Registrar decisões de produto relevantes em `CLAUDE.md` para não perder contexto entre sessões.
+- Registrar decisões de produto relevantes em `WDASH.md` para não perder contexto entre sessões.
 - Referências visuais: `docs/referencias/`.
 
 ## Produto
@@ -27,5 +27,6 @@ alwaysApply: true
 - Componentes novos só os já decididos: `DateRangePicker`, `Segmented`, `CommissionLadder` (+ opcional `WaterfallChart`); `showValues` nos charts existentes.
 - Ordem de construção (premissa): Financeiro → Produtos → Equipe → Turnos → Visão Geral por último.
 - Preferir composição Vela (`Card`, `StatCard`, `DataTable`, etc.) a wrappers novos.
-- Em **commit + push**: sempre rodar `npm run build` antes; não incluir `Co-authored-by` na mensagem.
+- Em **commit + push**: sempre rodar `npm run build` antes. A mensagem não leva `Co-authored-by`, `Made-with` nem outro trailer do Cursor. O gancho `scripts/git-hooks/commit-msg` tira esse trailer se ele entrar depois.
+- Quando o dono pedir para **subir**: build, commit, push do `main`. O push publica o resto. Cloudflare (Worker `wdash`) reconstrói o site. A Action do Fly publica o sincronizador se mudou `workers/millennium-sync`, `src/data/wedash` ou `src/lib`. A Action do Supabase aplica migrations e Edge Functions se mudou `supabase/migrations`, `supabase/functions` ou `supabase/config.toml`.
 - Após **correções/refinos** de UI já pedidos (ex.: cards, charts, badges): fazer **build → commit → push** direto, sem esperar novo pedido.
