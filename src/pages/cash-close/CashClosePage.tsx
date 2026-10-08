@@ -15,6 +15,7 @@ import { closeBreaks, type CloseBreak } from "@/data/wedash/closeBreak";
 import {
   fetchCashCloseMonthMarks,
   fetchCashCloseReviews,
+  fetchCashCloseSaleDays,
   fetchCashCloseSales,
   fetchCashCloseSnapshot,
   fetchCloseShifts,
@@ -440,6 +441,7 @@ export function CashClosePage() {
   const [marks, setMarks] = useState<CashCloseDayMark[]>([]);
   const [marksKey, setMarksKey] = useState("");
   const [reviews, setReviews] = useState<CashCloseReview[]>([]);
+  const [diasComVenda, setDiasComVenda] = useState<Set<string>>(new Set());
   const [diaAberto, setDiaAberto] = useState<string | null>(null);
   const [dias, setDias] = useState<Record<string, CashCloseSnapshot>>({});
   const [quebra, setQuebra] = useState<{ sales: CloseSaleRow[]; shifts: CloseShiftRow[] } | "erro" | null>(null);
@@ -486,11 +488,13 @@ export function CashClosePage() {
     void Promise.all([
       fetchCashCloseMonthMarks(session.tenantId, ids, from, to),
       fetchCashCloseReviews(session.tenantId, ids, from, to),
+      fetchCashCloseSaleDays(session.tenantId, ids, from, to),
     ])
-      .then(([rows, ajustes]) => {
+      .then(([rows, ajustes, vendas]) => {
         if (cancelled) return;
         setMarks(rows);
         setReviews(ajustes);
+        setDiasComVenda(vendas);
         setMarksKey(faixaKey);
       })
       .catch(() => {
@@ -560,6 +564,7 @@ export function CashClosePage() {
   function faceDoDia(day: string): { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; diffCents: number } {
     const info = analise?.porDia.get(day);
     if (day === hoje) return { kind: "hoje", diffCents: info ? Math.max(info.systemCents, info.typedCents) : 0 };
+    if (!diasComVenda.has(day)) return { kind: "zero", diffCents: 0 };
     if (!info || (info.systemCents === 0 && info.typedCents === 0)) return { kind: "zero", diffCents: 0 };
     if (!info.hasMillennium && !info.hasLines) return { kind: "vazio", diffCents: 0 };
     if (!info.hasMillennium) return { kind: "pendente", diffCents: 0 };
