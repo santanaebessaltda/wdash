@@ -27,10 +27,18 @@ function cell(header: string[], row: string[], name: string): string {
   return i < 0 ? "" : (row[i] ?? "").trim();
 }
 
+/**
+ * Inteiro sem separador já é centavo: 1000 = R$ 10,00, como no CSV da Stone.
+ * Com vírgula ou casa decimal, o número está em reais.
+ * Arquivos gravados antes disto saíram 100 vezes maiores. O fechamento pede de novo.
+ */
+export const PIX_INTEGER_CENTS_AFTER = "2026-10-08T20:00:00.000Z";
+
 function moneyToCents(raw: string): number {
   let s = raw.trim();
   if (!s) return 0;
   s = s.replace(/\s/g, "");
+  if (/^-?\d+$/.test(s)) return Math.round(Number(s));
   if (s.includes(",") && s.includes(".")) {
     s = s.lastIndexOf(",") > s.lastIndexOf(".") ? s.replaceAll(".", "").replace(",", ".") : s.replaceAll(",", "");
   } else if (s.includes(",")) {

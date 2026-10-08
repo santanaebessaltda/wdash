@@ -5,7 +5,7 @@ import { decryptPassword } from "./decrypt.ts";
 import { fetchStoneConciliation } from "./stoneConciliation.ts";
 import { replaceCaptures } from "./stoneCloseScan.ts";
 import { markStoneFile } from "./stoneIngest.ts";
-import { STONE_PIX_RETRY_MS, registerStoneWebhook, requestStonePixFile } from "./stonePix.ts";
+import { PIX_INTEGER_CENTS_AFTER, STONE_PIX_RETRY_MS, registerStoneWebhook, requestStonePixFile } from "./stonePix.ts";
 import {
   addDaysIso,
   ensureMillenniumSession,
@@ -33,7 +33,7 @@ async function filledDays(sb: SupabaseClient, tenantId: string, storeId: string,
   return new Set((data ?? []).map((r) => String(r.day).slice(0, 10)));
 }
 
-type PixState = { status: "requested" | "received"; requestedAt: string | null };
+type PixState = { status: "requested" | "received"; requestedAt: string | null; receivedAt: string | null };
 
 async function stoneState(
   sb: SupabaseClient,
@@ -43,7 +43,7 @@ async function stoneState(
 ): Promise<Map<string, { card: boolean; pix: PixState | null }>> {
   const { data, error } = await sb
     .from("stone_day_file")
-    .select("day, kind, status, requested_at")
+    .select("day, kind, status, requested_at, received_at")
     .eq("store_id", storeId)
     .gte("day", from)
     .lte("day", to);
@@ -57,6 +57,7 @@ async function stoneState(
       cur.pix = {
         status: row.status === "received" ? "received" : "requested",
         requestedAt: (row.requested_at as string | null) ?? null,
+        receivedAt: (row.received_at as string | null) ?? null,
       };
     }
     map.set(day, cur);
@@ -66,7 +67,10 @@ async function stoneState(
 
 function pixDue(pix: PixState | null, now: Date): boolean {
   if (!pix) return true;
-  if (pix.status === "received") return false;
+  if (pix.status === "received") {
+    const t = pix.receivedAt ? Date.parse(pix.receivedAt) : NaN;
+    return Number.isNaN(t) || t < Date.parse(PIX_INTEGER_CENTS_AFTER);
+  }
   const t = pix.requestedAt ? Date.parse(pix.requestedAt) : NaN;
   if (Number.isNaN(t)) return true;
   return now.getTime() - t >= STONE_PIX_RETRY_MS;

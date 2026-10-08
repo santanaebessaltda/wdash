@@ -7,12 +7,13 @@ const csv = [
   "e1;paid;2026-10-07T15:20:28Z;E2E1;10.50;0;0.10;ABC123",
   "e2;canceled;2026-10-07 18:00:00;E2E2;20,00;20,00;0;",
   "e3;paid;2026-10-07T19:00:00Z;E2E3;1.234,56;0;0;T9",
+  "e4;paid;2026-10-07T20:00:00Z;E2E4;1000;0;5;T1",
 ].join("\n");
 
 describe("parseStonePixCsv", () => {
   it("lê o CSV com ponto e vírgula e trata cancelado à parte", () => {
     const rows = parseStonePixCsv(csv);
-    expect(rows.map((r) => r.eventId)).toEqual(["e1", "e2", "e3"]);
+    expect(rows.map((r) => r.eventId)).toEqual(["e1", "e2", "e3", "e4"]);
     expect(rows[0]).toMatchObject({
       e2eId: "E2E1",
       status: "paid",
@@ -25,6 +26,8 @@ describe("parseStonePixCsv", () => {
     expect(rows[1]?.paidCents).toBe(2000);
     expect(stonePixPaidCents(rows[1]!)).toBe(0);
     expect(rows[2]?.paidCents).toBe(123456);
+    expect(rows[3]?.paidCents).toBe(1000);
+    expect(rows[3]?.feeCents).toBe(5);
   });
 
   it("cabeçalho sozinho é um dia sem PIX", () => {
