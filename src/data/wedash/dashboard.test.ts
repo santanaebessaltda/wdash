@@ -1662,6 +1662,15 @@ describe("buildProductsView com agregados reais", () => {
     }
   });
 
+  it("usa a venda da margem quando o cupom veio abaixo do CMV", () => {
+    const v = buildProductsView(esc, {
+      dayAggs: [dia("2026-08-10", 600, 200)],
+      productDayAggs: [prod("2026-08-10", 1, "A1", 0, 4)],
+      productCostDayAggs: [{ ...custo("2026-08-10", "A1", 80), revenueCents: 600 * 100, itemCount: 4 }],
+    });
+    expect(v.produtos[0]).toMatchObject({ codigo: "A1", faturamento: 600, itens: 4, cmv: 80, lucro: 520 });
+  });
+
   describe("período terminando hoje", () => {
     beforeEach(() => {
       vi.useFakeTimers();

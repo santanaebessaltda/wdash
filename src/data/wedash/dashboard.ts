@@ -2667,6 +2667,43 @@ export function classifyAbcCurve(cats: Array<{ categoriaId: number; nome: string
   return { itens, resumo };
 }
 
+const productDayKey = (storeId: string, day: string, code: string) => `${storeId}|${day}|${code}`;
+
+/**
+ * Venda do produto no dia (RELATORIOMARGEM TOTALVENDA). O cupom, ou o DetMov quando a
+ * venda nao veio no relatorio de cupom, as vezes grava preco R$ 0. Com a venda da margem
+ * gravada, ela prevalece — e o mesmo numero da Lista. Sem ela, fica o valor do cupom.
+ */
+function productDaySaleMap(
+  rows: Array<{ storeId: string; day: string; productCode: string; revenueCents: number }> | undefined,
+): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const r of rows ?? []) {
+    const code = r.productCode.trim();
+    if (!code || r.revenueCents <= 0) continue;
+    const k = productDayKey(r.storeId, r.day, code);
+    out.set(k, (out.get(k) ?? 0) + r.revenueCents / 100);
+  }
+  return out;
+}
+
+/** null = este dia x produto ja entrou pela margem (nao soma de novo). */
+function productDaySaleReais(
+  row: { storeId: string; day: string; productCode: string; revenueCents: number },
+  marginSales: Map<string, number>,
+  used: Set<string>,
+): number | null {
+  const code = row.productCode.trim();
+  const k = productDayKey(row.storeId, row.day, code);
+  const margem = code ? marginSales.get(k) : undefined;
+  if (margem != null && margem > 0) {
+    if (used.has(k)) return null;
+    used.add(k);
+    return margem;
+  }
+  return row.revenueCents / 100;
+}
+
 /** Janela de leitura de categorias/produtos: periodo anterior + periodo atual. */
 export function productsFetchRange(escopo: Scope): { from: string; to: string } {
   const periodo = resolvePeriod(escopo.periodo, calendarTodayIso());
@@ -2733,6 +2770,8 @@ export function buildProductsView(escopo: Scope, input: ProductsAggInput = { day
     const k = custoKey(r.storeId, r.day, r.productCode.trim());
     custos.set(k, (custos.get(k) ?? 0) + r.cmvCents / 100);
   }
+  const vendasMargem = productDaySaleMap((input.productCostDayAggs ?? []).filter((r) => storeById.has(r.storeId)));
+  const vendasUsadas = new Set<string>();
   const custosLoja = new Map<string, ReturnType<typeof custosDaFilialReal>>();
   const custoDaLoja = (storeId: string) => {
     let c = custosLoja.get(storeId);
@@ -2775,7 +2814,11 @@ export function buildProductsView(escopo: Scope, input: ProductsAggInput = { day
       acc.nome = r.productName;
       acc.nomeDia = r.day;
     }
-    const v = r.revenueCents / 100;
+    const v = productDaySaleReais(r, vendasMargem, vendasUsadas);
+    if (v == null) {
+      prodAcc.set(key, acc);
+      continue;
+    }
     if (noAtual(r.day)) {
       acc.fat += v;
       acc.itens += r.itemCount;
@@ -3011,6 +3054,9 @@ function buildItemsDetail(
     const k = custoKey(r.storeId, r.day, code);
     custos.set(k, (custos.get(k) ?? 0) + r.cmvCents / 100);
   }
+  const vendasMargem = productDaySaleMap(
+    (input.productCostDayAggs ?? []).filter((r) => storeById.has(r.storeId) && chaves.has(r.productCode.trim())),
+  );
   const taxas = new Map<string, ReturnType<typeof custosDaFilialReal>>();
   const taxaDaLoja = (storeId: string) => {
     let t = taxas.get(storeId);
@@ -3028,9 +3074,11 @@ function buildItemsDetail(
     let impostos = 0;
     let semCusto = false;
     const usados = new Set<string>();
+    const vendasUsadas = new Set<string>();
     for (const r of linhas) {
       if (!no(r.day) || (chave != null && productRowKey(r) !== chave)) continue;
-      const v = r.revenueCents / 100;
+      const v = productDaySaleReais(r, vendasMargem, vendasUsadas);
+      if (v == null) continue;
       fat += v;
       itens += r.itemCount;
       const taxa = taxaDaLoja(r.storeId);
@@ -3064,11 +3112,14 @@ function buildItemsDetail(
   const serieGranularidade: ProductDetail["serieGranularidade"] = dias.length > 31 ? "mes" : "dia";
   if (dias.length > 1) {
     const porDia = new Map<string, { faturamento: number; itens: number }>();
+    const vendasUsadas = new Set<string>();
     for (const r of linhas) {
       if (!noAtual(r.day)) continue;
+      const v = productDaySaleReais(r, vendasMargem, vendasUsadas);
+      if (v == null) continue;
       const k = serieGranularidade === "mes" ? r.day.slice(0, 7) : r.day;
       const acc = porDia.get(k) ?? { faturamento: 0, itens: 0 };
-      acc.faturamento += r.revenueCents / 100;
+      acc.faturamento += v;
       acc.itens += r.itemCount;
       porDia.set(k, acc);
     }
@@ -3087,10 +3138,13 @@ function buildItemsDetail(
   let lojas: ProductDetailStore[] = [];
   if (storeById.size > 1) {
     const porLoja = new Map<string, { faturamento: number; itens: number }>();
+    const vendasUsadas = new Set<string>();
     for (const r of linhas) {
       if (!noAtual(r.day)) continue;
+      const v = productDaySaleReais(r, vendasMargem, vendasUsadas);
+      if (v == null) continue;
       const acc = porLoja.get(r.storeId) ?? { faturamento: 0, itens: 0 };
-      acc.faturamento += r.revenueCents / 100;
+      acc.faturamento += v;
       acc.itens += r.itemCount;
       porLoja.set(r.storeId, acc);
     }
@@ -3107,6 +3161,7 @@ function buildItemsDetail(
   }
 
   const porProduto = new Map<string, { nome: string; nomeDia: string; faturamento: number; itens: number }>();
+  const vendasUsadas = new Set<string>();
   for (const r of linhas) {
     const key = productRowKey(r);
     const acc = porProduto.get(key) ?? { nome: "", nomeDia: "", faturamento: 0, itens: 0 };
@@ -3115,7 +3170,12 @@ function buildItemsDetail(
       acc.nomeDia = r.day;
     }
     if (noAtual(r.day)) {
-      acc.faturamento += r.revenueCents / 100;
+      const v = productDaySaleReais(r, vendasMargem, vendasUsadas);
+      if (v == null) {
+        porProduto.set(key, acc);
+        continue;
+      }
+      acc.faturamento += v;
       acc.itens += r.itemCount;
     }
     porProduto.set(key, acc);
@@ -4666,6 +4726,8 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
     return t;
   };
   const custosUsados = new Set<string>();
+  const vendasMargem = productDaySaleMap(input.productCostDayAggs);
+  const vendasUsadas = new Set<string>();
   const prodMap = new Map<
     string,
     { nome: string; codigo: string; fat: number; itens: number; cmv: number; impostos: number; semCusto: boolean }
@@ -4674,7 +4736,8 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
   for (const row of input.productDayAggs ?? []) {
     if (escopo.filialIds.length > 0 && !scopedStoreIds.has(row.storeId)) continue;
     const key = productRowKey(row);
-    const v = row.revenueCents / 100;
+    const v = productDaySaleReais(row, vendasMargem, vendasUsadas);
+    if (v == null) continue;
     if (row.day >= periodo.inicio && row.day <= periodo.fim) {
       const acc = prodMap.get(key) ?? { nome: row.productName, codigo: "", fat: 0, itens: 0, cmv: 0, impostos: 0, semCusto: false };
       acc.fat += v;
