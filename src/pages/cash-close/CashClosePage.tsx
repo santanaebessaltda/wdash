@@ -752,7 +752,7 @@ function Mes({
                   Pendente
                 </Badge>
               )}
-              {(face?.kind === "zero" || face?.kind === "hoje" || face?.kind === "total") && (
+              {(face?.kind === "hoje" || face?.kind === "total") && (
                 <div className="mt-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-t2">Total</p>
                   <p
