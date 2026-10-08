@@ -30,7 +30,7 @@ import {
   type CloseShiftRow,
 } from "@/data/wedash/cashCloseRepo";
 import { calendarTodayIso } from "@/data/wedash/clock";
-import { fetchSyncWatermark } from "@/data/wedash/salesRepo";
+import { fetchSalesDayAggs, fetchSyncWatermark } from "@/data/wedash/salesRepo";
 import type { Store } from "@/data/wedash/stores";
 import { isGestor } from "@/layout/nav-wedash";
 import { cn } from "@/lib/cn";
@@ -475,6 +475,7 @@ export function CashClosePage() {
   const [erro, setErro] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [watermark, setWatermark] = useState<Date | null>(null);
+  const [soldToday, setSoldToday] = useState<{ cents: number; byStore: Record<string, number> } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   const storeKey = lojas.map((l) => l.id).join(",");
@@ -567,6 +568,39 @@ export function CashClosePage() {
   }, [lojasLoading, session.tenantId, lojas, from, to, faixaKey]);
 
   useEffect(() => {
+    if (lojasLoading || lojas.length === 0 || to < hoje) {
+      setSoldToday(null);
+      return;
+    }
+    let stop = false;
+    void fetchSalesDayAggs({
+      tenantId: session.tenantId,
+      storeIds: lojas.map((loja) => loja.id),
+      from: hoje,
+      to: hoje,
+      brand: null,
+    })
+      .then((rows) => {
+        if (stop) return;
+        const all = rows.filter((row) => row.brand === "ALL");
+        const used = all.length > 0 ? all : rows.filter((row) => row.brand !== "ALL");
+        const byStore: Record<string, number> = {};
+        let cents = 0;
+        for (const row of used) {
+          byStore[row.storeId] = (byStore[row.storeId] ?? 0) + row.revenueCents;
+          cents += row.revenueCents;
+        }
+        setSoldToday({ cents, byStore });
+      })
+      .catch(() => {
+        if (!stop) setSoldToday({ cents: 0, byStore: {} });
+      });
+    return () => {
+      stop = true;
+    };
+  }, [lojasLoading, lojas, session.tenantId, hoje, to, reloadKey]);
+
+  useEffect(() => {
     if (lojasLoading || !diaAberto || lojas.length === 0 || diaAberto > hoje) return;
     let cancelled = false;
     setErro(false);
@@ -623,9 +657,9 @@ export function CashClosePage() {
     return { resumo: monthCloseSummary(rows), porDia };
   }, [marks, reviews, marksKey, faixaKey, hoje]);
 
-  function faceDoDia(day: string): { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number } {
+  function faceDoDia(day: string): { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number; aguardando?: boolean } {
     const info = analise?.porDia.get(day);
-    if (day === hoje) return { kind: "hoje", totalCents: info ? Math.max(info.systemCents, info.realCents) : 0, diffCents: 0 };
+    if (day === hoje) return { kind: "hoje", totalCents: soldToday?.cents ?? 0, diffCents: 0, aguardando: soldToday == null };
     if (info?.pending) return { kind: "pendente", totalCents: info.systemCents, diffCents: 0 };
     if (!info || (info.systemCents === 0 && info.realCents === 0)) return { kind: "zero", totalCents: 0, diffCents: 0 };
     if (!info.hasMillennium && !info.hasLines) return { kind: "vazio", totalCents: 0, diffCents: 0 };
@@ -680,7 +714,7 @@ export function CashClosePage() {
             </div>
             <UpdatedLine
               text={atualizadoTexto}
-              tip="O Atualizar busca as vendas de hoje e o fechamento do mês que está na tela. O valor de cada dia é a soma do fechamento de caixa no Millennium. A Visão geral mostra o faturamento das vendas."
+              tip="O Atualizar busca as vendas de hoje e o fechamento do mês que está na tela. O dia de hoje mostra o mesmo faturamento da Visão geral. Do dia anterior para trás, o valor vem do fechamento de caixa."
             />
           </div>
         </div>
@@ -712,6 +746,7 @@ export function CashClosePage() {
         gestor={isGestor(session.role)}
         fechado={diaAberto != null && diaAberto < hoje}
         tenantId={session.tenantId}
+        soldByStore={soldToday?.byStore ?? null}
         onClose={() => setDiaAberto(null)}
         onSaved={(next) => {
           setReviews((atual) => {
@@ -788,7 +823,7 @@ function Mes({
 }: {
   hoje: string;
   cells: Array<string | null>;
-  faceDoDia: (day: string) => { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number };
+  faceDoDia: (day: string) => { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number; aguardando?: boolean };
   onOpen: (iso: string) => void;
 }) {
   return (
@@ -828,7 +863,7 @@ function Mes({
                   Pendente
                 </Badge>
               )}
-              {(face?.kind === "hoje" || face?.kind === "pendente" || face?.kind === "total") && (
+              {(face?.kind === "pendente" || face?.kind === "total" || (face?.kind === "hoje" && !face.aguardando)) && (
                 <div className="mt-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-t2">Total</p>
                   <p className="truncate font-mono text-[12px] font-extrabold text-t1 sm:text-[13px]">
@@ -866,6 +901,7 @@ function DiaModal({
   gestor,
   fechado,
   tenantId,
+  soldByStore,
   onClose,
   onSaved,
 }: {
@@ -878,6 +914,7 @@ function DiaModal({
   gestor: boolean;
   fechado: boolean;
   tenantId: string;
+  soldByStore: Record<string, number> | null;
   onClose: () => void;
   onSaved: (review: CashCloseReview) => void;
 }) {
@@ -1024,7 +1061,10 @@ function DiaModal({
                 ) : fechado ? (
                   <p className="mb-4 text-[13px] text-t2">Falta o total real de alguma forma. A diferença aparece quando ele for informado.</p>
                 ) : (
-                  <p className="mb-4 text-[13px] text-t2">Este dia ainda não fechou. A sobra ou a quebra aparecerá a partir de amanhã.</p>
+                  <p className="mb-4 text-[13px] text-t2">
+                    {soldByStore ? `Vendido hoje: ${brlCent((soldByStore[loja.id] ?? 0) / 100)}. ` : ""}
+                    Este dia ainda não fechou. Amanhã o valor passa a ser o do fechamento de caixa.
+                  </p>
                 )}
                 {cash?.openingCents != null && (
                   <p className="mb-3 text-[12px] text-t2">
