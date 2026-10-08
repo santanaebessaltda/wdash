@@ -239,25 +239,12 @@ export function InventoryPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table
-                className="w-full table-fixed border-collapse text-sm"
-                style={{ minWidth: 44 + 220 + (locais.length + (mostraTotal ? 1 : 0)) * 112 + 168 + 152 + 220 }}
-              >
-                <colgroup>
-                  <col style={{ width: 44 }} />
-                  <col />
-                  {locais.map((nome) => (
-                    <col key={nome} style={{ width: 112 }} />
-                  ))}
-                  {mostraTotal && <col style={{ width: 112 }} />}
-                  <col style={{ width: 168 }} />
-                  <col style={{ width: 152 }} />
-                  <col style={{ width: 220 }} />
-                </colgroup>
+              <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
-                    <th className="w-11 px-1 pb-3 text-center font-bold">#</th>
-                    <ThSort label="Produto" active={sortKey === "nome"} dir={sortDir} onClick={() => toggleSort("nome")} align="left" className="px-1 pb-3" />
+                    <th className="w-11 whitespace-nowrap px-1 pb-3 text-center font-bold">#</th>
+                    <ThSort label="Status" active={sortKey === "status"} dir={sortDir} onClick={() => toggleSort("status")} align="left" className="w-0 whitespace-nowrap pb-3 pl-1 pr-4" />
+                    <ThSort label="Produto" active={sortKey === "nome"} dir={sortDir} onClick={() => toggleSort("nome")} align="left" className="w-full px-1 pb-3" />
                     {locais.map((nome) => (
                       <ThSort
                         key={nome}
@@ -265,15 +252,14 @@ export function InventoryPage() {
                         active={sortKey === `local:${nome}`}
                         dir={sortDir}
                         onClick={() => toggleSort(`local:${nome}`)}
-                        className="px-1 pb-3"
+                        className="w-0 whitespace-nowrap px-3 pb-3"
                       />
                     ))}
                     {mostraTotal && (
-                      <ThSort label="Total" active={sortKey === "estoque"} dir={sortDir} onClick={() => toggleSort("estoque")} className="px-1 pb-3" />
+                      <ThSort label="Total" active={sortKey === "estoque"} dir={sortDir} onClick={() => toggleSort("estoque")} className="w-0 whitespace-nowrap px-3 pb-3" />
                     )}
-                    <ThSort label="Preço de custo" active={sortKey === "custo"} dir={sortDir} onClick={() => toggleSort("custo")} className="px-1 pb-3" />
-                    <ThSort label="Valor" active={sortKey === "valor"} dir={sortDir} onClick={() => toggleSort("valor")} className="px-1 pb-3" />
-                    <ThSort label="Status" active={sortKey === "status"} dir={sortDir} onClick={() => toggleSort("status")} align="left" className="pb-3 pl-4 pr-1" />
+                    <ThSort label="Preço de custo" active={sortKey === "custo"} dir={sortDir} onClick={() => toggleSort("custo")} className="w-0 whitespace-nowrap px-3 pb-3" />
+                    <ThSort label="Valor" active={sortKey === "valor"} dir={sortDir} onClick={() => toggleSort("valor")} className="w-0 whitespace-nowrap px-3 pb-3" />
                   </tr>
                 </thead>
                 <tbody>
@@ -282,32 +268,33 @@ export function InventoryPage() {
                     return (
                       <tr key={r.codigo} className="border-b border-line">
                         <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
+                        <td className="whitespace-nowrap py-3 pl-1 pr-4">
+                          <StatusCell r={r} status={s} variasLojas={variasLojas} />
+                        </td>
                         <td className="px-1 py-3">
                           <ProductNameCell nome={r.nome} idx={idx} sub={[r.codigo, r.categoria].filter(Boolean).join(" · ")} />
                         </td>
                         {locais.map((nome) => (
-                          <td key={nome} className="px-1 py-3 text-right">
+                          <td key={nome} className="whitespace-nowrap px-3 py-3 text-right">
                             <Qty v={localQty(r, nome)} />
                           </td>
                         ))}
                         {mostraTotal && (
-                          <td className="px-1 py-3 text-right">
+                          <td className="whitespace-nowrap px-3 py-3 text-right">
                             <Qty v={r.estoque} />
                           </td>
                         )}
-                        <td className="px-1 py-3 text-right">
+                        <td className="whitespace-nowrap px-3 py-3 text-right">
                           <UnitCost r={r} />
                         </td>
-                        <td className="px-1 py-3 text-right">
+                        <td className="whitespace-nowrap px-3 py-3 text-right">
                           <Money v={stockCostAmount(r).amount} />
-                        </td>
-                        <td className="py-3 pl-4 pr-1">
-                          <StatusCell r={r} status={s} variasLojas={variasLojas} />
                         </td>
                       </tr>
                     );
                   })}
                   <tr className="bg-bg-inset">
+                    <td />
                     <td />
                     <td className="px-1 py-3 text-[13px] font-extrabold text-t0">
                       <span className="inline-flex items-center gap-1">
@@ -319,20 +306,19 @@ export function InventoryPage() {
                       </span>
                     </td>
                     {totais.locais.map((v, i) => (
-                      <td key={locais[i]} className="px-1 py-3 text-right">
+                      <td key={locais[i]} className="whitespace-nowrap px-3 py-3 text-right">
                         <Qty v={v} total />
                       </td>
                     ))}
                     {mostraTotal && (
-                      <td className="px-1 py-3 text-right">
+                      <td className="whitespace-nowrap px-3 py-3 text-right">
                         <Qty v={totais.estoque} total />
                       </td>
                     )}
                     <td />
-                    <td className="px-1 py-3 text-right">
+                    <td className="whitespace-nowrap px-3 py-3 text-right">
                       <Money v={totais.temValor ? totais.valor : null} total />
                     </td>
-                    <td />
                   </tr>
                 </tbody>
               </table>
