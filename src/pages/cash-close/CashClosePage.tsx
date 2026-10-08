@@ -30,6 +30,7 @@ import {
   type CloseShiftRow,
 } from "@/data/wedash/cashCloseRepo";
 import { calendarTodayIso } from "@/data/wedash/clock";
+import { fetchSyncWatermark } from "@/data/wedash/salesRepo";
 import type { Store } from "@/data/wedash/stores";
 import { isGestor } from "@/layout/nav-wedash";
 import { cn } from "@/lib/cn";
@@ -38,6 +39,7 @@ import { FORCE_REFRESH_CLICK_EVENT, SALES_SYNCED_EVENT } from "@/pages/dashboard
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { parseNum, SectionHeader, useScopedStores } from "@/pages/operation/shared";
+import { UpdatedLine } from "@/pages/stock/shared";
 
 const DIAS = [
   { longo: "Domingo", curto: "D" },
@@ -50,6 +52,12 @@ const DIAS = [
 ];
 
 const money = (cents: number | null) => (cents == null ? "—" : brlCent(cents / 100));
+
+function horaAtualizacao(date: Date): string {
+  const h = date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  if (date.toDateString() === new Date().toDateString()) return `às ${h}`;
+  return `em ${date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} às ${h}`;
+}
 
 function diffClass(cents: number | null): string {
   if (cents == null || cents === 0) return "text-t2";
@@ -466,6 +474,7 @@ export function CashClosePage() {
   const [diaKey, setDiaKey] = useState("");
   const [erro, setErro] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [watermark, setWatermark] = useState<Date | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   const storeKey = lojas.map((l) => l.id).join(",");
@@ -501,6 +510,16 @@ export function CashClosePage() {
       window.clearInterval(id);
     };
   }, [syncing, session.tenantId, show]);
+
+  useEffect(() => {
+    let stop = false;
+    void fetchSyncWatermark(session.tenantId).then((wm) => {
+      if (!stop) setWatermark(wm);
+    });
+    return () => {
+      stop = true;
+    };
+  }, [session.tenantId, reloadKey]);
 
   const pedirFechamento = useCallback(async () => {
     const ids = lojasRef.current.map((loja) => loja.id);
@@ -628,6 +647,13 @@ export function CashClosePage() {
     irParaMes(somarMes(anchor, dir));
   }
 
+  const atualizadoTexto =
+    syncing
+      ? "Buscando fechamento…"
+      : watermark
+        ? `Fechamento atualizado ${horaAtualizacao(watermark)}`
+        : "Fechamento ainda não atualizado";
+
   const diaPronto = diaAberto != null && diaKey === `${storeKey}|${diaAberto}|${reloadKey}`;
   const navBtn =
     "flex h-10 w-10 items-center justify-center rounded-[11px] border border-line bg-bg-2 text-t1 hover:border-line-2 hover:text-t0 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-line disabled:hover:text-t1";
@@ -640,16 +666,22 @@ export function CashClosePage() {
         subtitle="Confira o fechamento diário comparando o Millennium com o total real."
       />
       <div className="mt-6 pb-6">
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
           <h2 className="text-xl font-extrabold text-t0 sm:text-[26px]">{rotuloMesAno(anchor)}</h2>
-          <div className="flex flex-wrap items-center gap-2">
-            <SeletorMesAno iso={anchor} hoje={hoje} onChange={irParaMes} />
-            <button type="button" aria-label="Mês anterior" className={navBtn} onClick={() => mover(-1)}>
-              <Seta dir="anterior" />
-            </button>
-            <button type="button" aria-label="Próximo mês" className={navBtn} disabled={!podeAvancar} onClick={() => mover(1)}>
-              <Seta dir="proximo" />
-            </button>
+          <div className="flex flex-col items-start gap-2 sm:items-end">
+            <div className="flex flex-wrap items-center gap-2">
+              <SeletorMesAno iso={anchor} hoje={hoje} onChange={irParaMes} />
+              <button type="button" aria-label="Mês anterior" className={navBtn} onClick={() => mover(-1)}>
+                <Seta dir="anterior" />
+              </button>
+              <button type="button" aria-label="Próximo mês" className={navBtn} disabled={!podeAvancar} onClick={() => mover(1)}>
+                <Seta dir="proximo" />
+              </button>
+            </div>
+            <UpdatedLine
+              text={atualizadoTexto}
+              tip="O Atualizar busca as vendas de hoje e o fechamento do mês que está na tela. O valor de cada dia é a soma do fechamento de caixa no Millennium. A Visão geral mostra o faturamento das vendas."
+            />
           </div>
         </div>
         {erro ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar o fechamento. Tente novamente." /> : null}
