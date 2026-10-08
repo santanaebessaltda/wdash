@@ -21,6 +21,10 @@ export type StockInput = {
   saleTableId: number | null;
   /** Vendas dos ultimos 30 dias por loja x produto (preco medio praticado). */
   charged: Array<{ storeId: string; code: string; revenueCents: number; items: number }>;
+  /** Pedidos em aberto (Saldo Atual e Futuro), chave `loja|codigo`. */
+  incoming?: Map<string, number>;
+  /** Lojas cujo saldo futuro ja foi buscado. Sem todas, A receber fica vazio. */
+  incomingKnown?: Set<string>;
 };
 
 export type CostLine = { label: string; pct: number; valor: number };
@@ -167,6 +171,10 @@ export type StockProductRow = {
   itensVendidos30d: number;
   /** Custo / lucro diferentes entre as lojas do filtro: valores = media das lojas. */
   variaPorLoja: boolean;
+  /** Pecas pedidas e ainda nao recebidas, somando as lojas do filtro. Null = saldo futuro ainda nao buscado. */
+  aReceber: number | null;
+  /** Saldo em estoque + a receber. */
+  totalGeral: number | null;
   lojas: StockStoreDetail[];
 };
 
@@ -245,10 +253,21 @@ export function buildStockProductsView(input: StockInput): StockProductsView {
     acc.items += c.items;
     chargedBy.set(k, acc);
   }
+  const incoming = input.incoming ?? new Map<string, number>();
+  const incomingKnown = input.incomingKnown ?? new Set<string>();
+  const allIncomingKnown = input.stores.length > 0 && input.stores.every((s) => incomingKnown.has(s.id));
   const storeIds = new Set(input.stores.map((s) => s.id));
   const codes = new Set<string>(prices.keys());
   for (const s of input.stock) {
     if (storeIds.has(s.storeId) && (s.qty !== 0 || Object.values(s.locations ?? {}).some((q) => q !== 0))) codes.add(s.code);
+  }
+  if (allIncomingKnown) {
+    for (const [key, q] of incoming) {
+      if (q === 0) continue;
+      const cut = key.indexOf("|");
+      if (cut < 0 || !storeIds.has(key.slice(0, cut))) continue;
+      codes.add(key.slice(cut + 1));
+    }
   }
   const rows: StockProductRow[] = [];
   const negativos: NegativeStock[] = [];
@@ -284,6 +303,8 @@ export function buildStockProductsView(input: StockInput): StockProductsView {
       const vals = comp.map(f);
       return same(vals) ? vals[0]! : mean(vals);
     };
+    const estoque = lojas.reduce((s, l) => s + l.estoque, 0);
+    const aReceber = allIncomingKnown ? input.stores.reduce((s, store) => s + (incoming.get(`${store.id}|${code}`) ?? 0), 0) : null;
     const varia = comp.length > 1 && !same(comp.map((c) => c.lucro ?? c.custoAquisicao));
     const ch = lojas.filter((l) => l.praticado);
     const itensPraticados = ch.reduce((s, l) => s + l.praticado!.itens, 0);
@@ -296,7 +317,9 @@ export function buildStockProductsView(input: StockInput): StockProductsView {
       codigo: code,
       nome,
       categoria: cat?.category || "Sem categoria",
-      estoque: lojas.reduce((s, l) => s + l.estoque, 0),
+      estoque,
+      aReceber,
+      totalGeral: aReceber == null ? null : estoque + aReceber,
       transferir: lojas.reduce((s, l) => s + l.transferencias.reduce((t, x) => t + x.qtd, 0), 0),
       custo: pick((c) => c.custo),
       impostos: pick((c) => c.impostos),

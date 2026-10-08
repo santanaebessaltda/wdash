@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/ui";
 import { buildStockProductsView, type StockCatalogItem, type StockInput } from "@/data/wedash/stockProducts";
+import { fetchIncomingQty } from "@/data/wedash/purchaseRepo";
 import { fetchCostPrices, fetchStockCatalog, fetchStoreStock, syncStockNow } from "@/data/wedash/stockRepo";
 import type { Store } from "@/data/wedash/stores";
 import { FORCE_REFRESH_CLICK_EVENT } from "@/pages/dashboard/useForceRefresh";
@@ -14,6 +15,8 @@ type StockLoaded = {
   stock: StockInput["stock"];
   costPrices: StockInput["costPrices"];
   syncedAt: Map<string, string | null>;
+  incoming: Map<string, number>;
+  incomingSyncedAt: Map<string, string | null>;
 };
 
 function hora(iso: string): string {
@@ -25,15 +28,14 @@ function hora(iso: string): string {
 
 async function loadAll(tenantId: string, lojas: Store[]): Promise<StockLoaded> {
   const tableIds = [...new Set(lojas.map((s) => s.costTableId).filter((id): id is number => id != null))];
-  const [catalog, stock, costPrices] = await Promise.all([
+  const storeIds = lojas.map((s) => s.id);
+  const [catalog, stock, costPrices, incoming] = await Promise.all([
     fetchStockCatalog(),
-    fetchStoreStock(
-      tenantId,
-      lojas.map((s) => s.id),
-    ),
+    fetchStoreStock(tenantId, storeIds),
     fetchCostPrices(tableIds),
+    fetchIncomingQty(tenantId, storeIds),
   ]);
-  return { catalog, stock: stock.rows, costPrices, syncedAt: stock.syncedAt };
+  return { catalog, stock: stock.rows, costPrices, syncedAt: stock.syncedAt, incoming: incoming.qty, incomingSyncedAt: incoming.syncedAt };
 }
 
 /** Estoque das lojas do escopo. Ao abrir, busca no Millennium o estoque com mais de 30 min. */
@@ -58,13 +60,10 @@ export function useStockData() {
     async (d: StockLoaded, opts: { force?: boolean } = {}) => {
       if (syncRef.current) return;
       const now = Date.now();
-      const stockIds = lojasRef.current
-        .map((s) => s.id)
-        .filter((id) => {
-          const at = d.syncedAt.get(id);
-          return opts.force || !at || now - Date.parse(at) > STOCK_MAX_AGE_MS;
-        });
-      if (stockIds.length === 0) return;
+      const stale = (at: string | null | undefined) => opts.force || !at || now - Date.parse(at) > STOCK_MAX_AGE_MS;
+      const stockIds = lojasRef.current.map((s) => s.id).filter((id) => stale(d.syncedAt.get(id)));
+      const purchaseIds = lojasRef.current.map((s) => s.id).filter((id) => stale(d.incomingSyncedAt.get(id)));
+      if (stockIds.length === 0 && purchaseIds.length === 0) return;
 
       syncRef.current = true;
       try {
@@ -72,12 +71,13 @@ export function useStockData() {
         const conexao = await fetchErpConnection(session.tenantId);
         if (conexao === "disconnected" || conexao === "password") return;
         setSyncing(true);
-        const r = await syncStockNow({ stockStoreIds: stockIds });
+        const r = await syncStockNow({ stockStoreIds: stockIds, purchaseStoreIds: purchaseIds });
         if (!r.ok) {
           show(r.message, "danger");
           return;
         }
         if (r.failed.length > 0) show("Não foi possível buscar todo o estoque. Alguns valores podem estar desatualizados.", "warning");
+        if (r.purchaseFailedStores.length > 0) show("Não foi possível buscar o que está a receber. Essa coluna pode estar desatualizada.", "warning");
         await reload();
       } finally {
         syncRef.current = false;
@@ -123,6 +123,8 @@ export function useStockData() {
             catalog: data.catalog,
             stock: data.stock,
             costPrices: data.costPrices,
+            incoming: data.incoming,
+            incomingKnown: new Set([...data.incomingSyncedAt].filter(([, at]) => at != null).map(([id]) => id)),
             salePrices: new Map(),
             saleTableId: null,
             charged: [],

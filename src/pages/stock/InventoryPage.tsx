@@ -30,7 +30,7 @@ import { useStockData } from "./useStockData";
 
 type StatusFiltro = "todos" | StockStatus;
 type BrandFiltro = "" | "WEPINK" | "WPINK";
-type SortKey = "nome" | "estoque" | "custo" | "valor" | "status" | `local:${string}`;
+type SortKey = "nome" | "estoque" | "receber" | "totalGeral" | "custo" | "valor" | "status" | `local:${string}`;
 
 const STATUS_BADGE: Record<StockStatus, { label: string; variant: StatusVariant }> = {
   negativo: { label: "Negativo", variant: "danger" },
@@ -99,6 +99,15 @@ export function InventoryPage() {
       sortKey === "status" ? STATUS_PESO[s] : sortKey.startsWith("local:") ? localQty(r, sortKey.slice(6)) : r.estoque;
     out.sort((a, b) => {
       if (sortKey === "nome") return a.r.nome.localeCompare(b.r.nome, "pt-BR") * dir;
+      if (sortKey === "receber" || sortKey === "totalGeral") {
+        const pick = (r: StockProductRow) => (sortKey === "receber" ? r.aReceber : r.totalGeral);
+        const av = pick(a.r);
+        const bv = pick(b.r);
+        if (av == null && bv == null) return a.r.nome.localeCompare(b.r.nome, "pt-BR");
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        return (av - bv) * dir || a.r.nome.localeCompare(b.r.nome, "pt-BR");
+      }
       if (sortKey === "custo" || sortKey === "valor") {
         const pick = (r: StockProductRow) => (sortKey === "custo" ? stockCostAmount(r).unit : stockCostAmount(r).amount);
         const av = pick(a.r);
@@ -131,6 +140,8 @@ export function InventoryPage() {
     () => ({
       locais: locais.map((nome) => linhas.reduce((s, { r }) => s + localQty(r, nome), 0)),
       estoque: linhas.reduce((s, { r }) => s + r.estoque, 0),
+      receber: linhas.every(({ r }) => r.aReceber == null) ? null : linhas.reduce((s, { r }) => s + (r.aReceber ?? 0), 0),
+      totalGeral: linhas.every(({ r }) => r.totalGeral == null) ? null : linhas.reduce((s, { r }) => s + (r.totalGeral ?? 0), 0),
       valor: linhas.reduce((s, { r }) => s + (stockCostAmount(r).amount ?? 0), 0),
       temValor: linhas.some((x) => stockCostAmount(x.r).amount != null),
     }),
@@ -153,7 +164,7 @@ export function InventoryPage() {
       <SectionHeader
         section="Estoque"
         title="Estoque"
-        subtitle="Acompanhe o saldo de cada produto por local de estoque."
+        subtitle="Acompanhe o saldo de cada produto, o que está a receber e o total dos dois."
         actions={
           <HeaderFilters
             updated={<UpdatedLine text={atualizadoTexto} tip="O estoque é buscado no Millennium ao abrir esta tela, quando a última busca tem mais de 30 minutos, e quando você usa Atualizar." />}
@@ -257,6 +268,8 @@ export function InventoryPage() {
                     {mostraTotal && (
                       <ThSort label="Total" active={sortKey === "estoque"} dir={sortDir} onClick={() => toggleSort("estoque")} className="w-0 whitespace-nowrap px-4 pb-3" />
                     )}
+                    <ThSort label="A receber" active={sortKey === "receber"} dir={sortDir} onClick={() => toggleSort("receber")} className="w-0 whitespace-nowrap px-4 pb-3" />
+                    <ThSort label="Total geral" active={sortKey === "totalGeral"} dir={sortDir} onClick={() => toggleSort("totalGeral")} className="w-0 whitespace-nowrap px-4 pb-3" />
                     <ThSort label="Preço de custo" active={sortKey === "custo"} dir={sortDir} onClick={() => toggleSort("custo")} className="w-0 whitespace-nowrap px-4 pb-3" />
                     <ThSort label="Valor" active={sortKey === "valor"} dir={sortDir} onClick={() => toggleSort("valor")} className="w-0 whitespace-nowrap pb-3 pl-4 pr-8" />
                     <ThSort label="Status" active={sortKey === "status"} dir={sortDir} onClick={() => toggleSort("status")} align="left" className="w-0 whitespace-nowrap pb-3 pl-8 pr-1" />
@@ -281,6 +294,12 @@ export function InventoryPage() {
                             <Qty v={r.estoque} />
                           </td>
                         )}
+                        <td className="whitespace-nowrap px-4 py-3 text-right">
+                          <Qty v={r.aReceber} />
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right">
+                          <Qty v={r.totalGeral} />
+                        </td>
                         <td className="whitespace-nowrap px-4 py-3 text-right">
                           <UnitCost r={r} />
                         </td>
@@ -314,6 +333,12 @@ export function InventoryPage() {
                         <Qty v={totais.estoque} total />
                       </td>
                     )}
+                    <td className="whitespace-nowrap px-4 py-3 text-right">
+                      <Qty v={totais.receber} total />
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right">
+                      <Qty v={totais.totalGeral} total />
+                    </td>
                     <td />
                     <td className="whitespace-nowrap py-3 pl-4 pr-8 text-right">
                       <Money v={totais.temValor ? totais.valor : null} total />
@@ -334,7 +359,8 @@ export function InventoryPage() {
 export default InventoryPage;
 
 /** Saldo em mono negrito (como os numeros do Desempenho por produto): negativo em vermelho, zero em cinza. */
-function Qty({ v, total = false }: { v: number; total?: boolean }) {
+function Qty({ v, total = false }: { v: number | null; total?: boolean }) {
+  if (v == null) return <span className={cn("font-mono text-[13px] text-t2", total ? "font-extrabold" : "font-bold")}>—</span>;
   return (
     <span className={cn("whitespace-nowrap font-mono text-[13px] tabular-nums", total ? "font-extrabold" : "font-bold", v < 0 ? "text-bad" : v === 0 ? "text-t2" : "text-t0")}>
       {qty(v)}

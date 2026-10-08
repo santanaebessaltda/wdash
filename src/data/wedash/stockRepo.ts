@@ -169,11 +169,12 @@ export async function syncStockNow(req: {
   saleTables?: boolean;
   salePriceTableIds?: number[];
   stockStoreIds?: string[];
-}): Promise<{ ok: true; failed: string[] } | { ok: false; message: string }> {
+  purchaseStoreIds?: string[];
+}): Promise<{ ok: true; failed: string[]; purchaseFailedStores: string[] } | { ok: false; message: string }> {
   const sb = getSupabase();
   if (!sb) return { ok: false, message: "Não foi possível conectar à WeDash. Verifique sua conexão e tente novamente." };
   const { data, error } = await sb.functions.invoke("erp-stock-sync", { body: req });
-  let body = data as { ok?: boolean; error?: string; failed?: string[] } | null;
+  let body = data as { ok?: boolean; error?: string; failed?: string[]; purchaseFailedStores?: string[] } | null;
   if ((!body || typeof body !== "object") && error && typeof error === "object") {
     const ctx = (error as { context?: Response }).context;
     if (ctx && typeof ctx.json === "function") {
@@ -184,7 +185,7 @@ export async function syncStockNow(req: {
       }
     }
   }
-  if (body?.ok === true) return { ok: true, failed: body.failed ?? [] };
+  if (body?.ok === true) return { ok: true, failed: body.failed ?? [], purchaseFailedStores: body.purchaseFailedStores ?? [] };
   return {
     ok: false,
     message: STOCK_SYNC_ERRORS[body?.error ?? ""] ?? "Não foi possível buscar o estoque no Millennium. Tente novamente.",

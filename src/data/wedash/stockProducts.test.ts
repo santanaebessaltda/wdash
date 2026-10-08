@@ -111,6 +111,33 @@ describe("buildStockProductsView", () => {
     expect(view.negativos).toEqual([{ codigo: "P2", nome: "P2", quantidade: -2, lojas: ["B"] }]);
     expect(stockCostAmount(p1)).toEqual({ amount: 5 * 30 + 3 * 40, unit: null });
     expect(stockCostAmount(view.rows.find((r) => r.codigo === "P2")!)).toEqual({ amount: null, unit: null });
+    expect(p1.aReceber).toBeNull();
+    expect(p1.totalGeral).toBeNull();
+  });
+
+  it("soma o que está a receber com o saldo e inclui produto que só tem pedido", () => {
+    const view = buildStockProductsView({
+      stores: [store({ id: "a" }), store({ id: "b" })],
+      catalog: new Map([["P3", { code: "P3", name: "SO PEDIDO", category: "PERFUMARIA" }]]),
+      stock: [{ storeId: "a", code: "P1", qty: 5 }],
+      costPrices: new Map(),
+      salePrices: new Map(),
+      saleTableId: null,
+      charged: [],
+      incoming: new Map([
+        ["a|P1", 2],
+        ["b|P1", 3],
+        ["a|P3", 12],
+      ]),
+      incomingKnown: new Set(["a", "b"]),
+    });
+    const p1 = view.rows.find((r) => r.codigo === "P1")!;
+    expect(p1.aReceber).toBe(5);
+    expect(p1.totalGeral).toBe(10);
+    const p3 = view.rows.find((r) => r.codigo === "P3")!;
+    expect(p3.estoque).toBe(0);
+    expect(p3.aReceber).toBe(12);
+    expect(p3.totalGeral).toBe(12);
   });
 
   it("local negativo com outro local positivo = transferência; total = soma dos locais", () => {
