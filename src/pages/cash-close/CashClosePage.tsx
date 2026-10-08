@@ -210,8 +210,12 @@ function QuebraDoDia({ breaks, indisponivel }: { breaks: CloseBreak[]; indisponi
             <p className="text-[13px] font-bold text-t0">{labelUpper(item.label)}</p>
             <p className={cn("font-mono text-[13px] font-bold", diffClass(item.diffCents))}>{totalDia(item.diffCents)}</p>
           </div>
-          <p className="mt-1 text-[12.5px] text-t1">{item.groups.length === 0 ? "Sem grupo" : item.groups.join(" · ")}</p>
-          <p className="mt-0.5 text-[12.5px] text-t2">{item.reason}</p>
+          {item.diffCents < 0 && (
+            <>
+              <p className="mt-1 text-[12.5px] text-t1">{item.groups.length === 0 ? "Sem grupo" : item.groups.join(" · ")}</p>
+              <p className="mt-0.5 text-[12.5px] text-t2">{item.reason}</p>
+            </>
+          )}
         </div>
       ))}
     </div>
@@ -549,10 +553,11 @@ export function CashClosePage() {
     return { resumo: monthCloseSummary(rows), porDia };
   }, [marks, reviews, marksKey, faixaKey]);
 
-  function faceDoDia(day: string): { kind: "vazio" | "pendente" | "hoje" | "total"; diffCents: number } {
+  function faceDoDia(day: string): { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; diffCents: number } {
     const info = analise?.porDia.get(day);
+    const semMovimento = !info || (info.systemCents === 0 && info.typedCents === 0);
+    if (day < hoje && semMovimento) return { kind: "zero", diffCents: 0 };
     if (!info || (!info.hasMillennium && !info.hasLines)) return { kind: "vazio", diffCents: 0 };
-    if (info.systemCents === 0 && info.typedCents === 0) return { kind: "vazio", diffCents: 0 };
     const diffCents = info.typedCents - info.systemCents;
     if (day === hoje) return { kind: "hoje", diffCents };
     if (!info.hasMillennium) return { kind: "pendente", diffCents: 0 };
@@ -703,7 +708,7 @@ function Mes({
 }: {
   hoje: string;
   cells: Array<string | null>;
-  faceDoDia: (day: string) => { kind: "vazio" | "pendente" | "hoje" | "total"; diffCents: number };
+  faceDoDia: (day: string) => { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; diffCents: number };
   onOpen: (iso: string) => void;
 }) {
   return (
@@ -743,16 +748,15 @@ function Mes({
                   Pendente
                 </Badge>
               )}
-              {face?.kind === "hoje" && (
+              {(face?.kind === "zero" || face?.kind === "hoje" || face?.kind === "total") && (
                 <div className="mt-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-t2">Total</p>
-                  <p className="truncate font-mono text-[12px] font-extrabold text-t1 sm:text-[13px]">{totalDia(face.diffCents)}</p>
-                </div>
-              )}
-              {face?.kind === "total" && (
-                <div className="mt-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-t2">Total</p>
-                  <p className={cn("truncate font-mono text-[12px] font-extrabold sm:text-[13px]", diffClass(face.diffCents))}>
+                  <p
+                    className={cn(
+                      "truncate font-mono text-[12px] font-extrabold sm:text-[13px]",
+                      face.kind === "total" ? diffClass(face.diffCents) : "text-t1",
+                    )}
+                  >
                     {totalDia(face.diffCents)}
                   </p>
                 </div>
