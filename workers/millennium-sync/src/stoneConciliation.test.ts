@@ -30,6 +30,6 @@ describe("parseStoneConciliation", () => {
     expect(stonePaymentMethod(2)).toBe("Cartão de crédito");
     expect(stonePaymentMethod(1)).toBe("Cartão de débito");
     expect(stonePaymentMethod(3)).toBe("Cartão de débito");
-    expect(stonePaymentMethod(4)).toBe("Outros");
+    expect(stonePaymentMethod(4)).toBe("Cartão de crédito");
   });
 });

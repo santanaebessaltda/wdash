@@ -41,6 +41,13 @@ export function cashCloseBucket(method: string): CashCloseBucket {
   return "other";
 }
 
+/** Stone: 2 e 4 são crédito (4 = pré-pago). 1 e 3 são débito (3 = pré-pago). */
+export function captureBucket(accountType: number | null | undefined, paymentMethod: string): CashCloseBucket {
+  if (accountType === 2 || accountType === 4) return "credit";
+  if (accountType === 1 || accountType === 3) return "debit";
+  return cashCloseBucket(paymentMethod);
+}
+
 export type CloseChip = {
   key: string;
   label: string;

@@ -3,6 +3,7 @@ import {
   applyCashReview,
   applyCloseReview,
   buildCashCloseView,
+  captureBucket,
   cashCloseChips,
   chipsHaveGap,
   closeDayFace,
@@ -13,6 +14,16 @@ import {
   monthCloseSummary,
   chipsAfterReview,
 } from "./cashCloseView";
+
+describe("captureBucket", () => {
+  it("soma crédito pré-pago no crédito e débito pré-pago no débito", () => {
+    expect(captureBucket(4, "Outros")).toBe("credit");
+    expect(captureBucket(2, "Cartão de crédito")).toBe("credit");
+    expect(captureBucket(1, "Cartão de débito")).toBe("debit");
+    expect(captureBucket(3, "Cartão de débito")).toBe("debit");
+    expect(captureBucket(null, "PIX")).toBe("pix");
+  });
+});
 
 describe("buildCashCloseView", () => {
   it("soma TEF no cartão e deixa a Stone em branco enquanto o arquivo não chegou", () => {

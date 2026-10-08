@@ -1,7 +1,7 @@
 import { calendarTodayIso } from "./clock";
 import { shiftName } from "./engine/format";
 import { monthCloseSpanFor } from "./cashCloseMonth";
-import { cashCloseBucket, type CashCloseBucket, type CashCloseMillLine, type CloseAmountMap } from "./cashCloseView";
+import { captureBucket, type CashCloseBucket, type CashCloseMillLine, type CloseAmountMap } from "./cashCloseView";
 
 export type CashCloseSnapshot = {
   millennium: CashCloseMillLine[];
@@ -25,7 +25,7 @@ export async function fetchCashCloseSnapshot(tenantId: string, storeId: string, 
       .eq("tenant_id", tenantId)
       .eq("store_id", storeId)
       .eq("day", day),
-    sb.from("stone_capture").select("payment_method, captured_cents").eq("tenant_id", tenantId).eq("store_id", storeId).eq("day", day),
+    sb.from("stone_capture").select("account_type, payment_method, captured_cents").eq("tenant_id", tenantId).eq("store_id", storeId).eq("day", day),
     sb.from("stone_pix").select("status, paid_cents").eq("tenant_id", tenantId).eq("store_id", storeId).eq("day", day),
     sb.from("stone_day_file").select("kind, status").eq("tenant_id", tenantId).eq("store_id", storeId).eq("day", day),
   ]);
@@ -42,7 +42,7 @@ export async function fetchCashCloseSnapshot(tenantId: string, storeId: string, 
   let otherCents = 0;
   for (const row of captures.data ?? []) {
     const cents = Number(row.captured_cents) || 0;
-    const bucket = cashCloseBucket(String(row.payment_method ?? ""));
+    const bucket = captureBucket(row.account_type == null ? null : Number(row.account_type), String(row.payment_method ?? ""));
     if (bucket === "credit") creditCents += cents;
     else if (bucket === "debit") debitCents += cents;
     else otherCents += cents;
@@ -154,7 +154,7 @@ export async function fetchCashCloseMonthMarks(
       .limit(5000),
     sb
       .from("stone_capture")
-      .select("store_id, day, payment_method, captured_cents")
+      .select("store_id, day, account_type, payment_method, captured_cents")
       .eq("tenant_id", tenantId)
       .in("store_id", storeIds)
       .gte("day", from)
@@ -191,7 +191,7 @@ export async function fetchCashCloseMonthMarks(
     const key = `${row.store_id}|${String(row.day).slice(0, 10)}`;
     const card = cards.get(key) ?? { creditCents: 0, debitCents: 0, otherCents: 0 };
     const cents = Number(row.captured_cents) || 0;
-    const bucket = cashCloseBucket(String(row.payment_method ?? ""));
+    const bucket = captureBucket(row.account_type == null ? null : Number(row.account_type), String(row.payment_method ?? ""));
     if (bucket === "credit") card.creditCents += cents;
     else if (bucket === "debit") card.debitCents += cents;
     else if (bucket !== "pix") card.otherCents += cents;

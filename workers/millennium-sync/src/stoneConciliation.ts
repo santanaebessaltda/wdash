@@ -46,9 +46,9 @@ export function stoneReferenceDay(raw: string): string {
   return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
 }
 
-/** 2 crédito; 1 e 3 débito. O resto fica Outros até a Stone nomear. */
+/** 2 e 4 crédito (4 = pré-pago). 1 e 3 débito (3 = pré-pago). O resto fica Outros. */
 export function stonePaymentMethod(accountType: number): string {
-  if (accountType === 2) return "Cartão de crédito";
+  if (accountType === 2 || accountType === 4) return "Cartão de crédito";
   if (accountType === 1 || accountType === 3) return "Cartão de débito";
   return "Outros";
 }
