@@ -26,6 +26,7 @@ export type SyncLogSource =
   | "gerador"
   | "eventos"
   | "vendedoras"
+  | "fechamento_caixa"
   | "millennium_ocupado";
 
 export type SyncLogRow = {

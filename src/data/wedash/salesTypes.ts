@@ -63,6 +63,24 @@ export type CashCloseSale = {
   sellerGeradorId: number | null;
 };
 
+/**
+ * Fechamento detalhado do Millennium (fundo, sangria, fechamento, valor digitado).
+ * Uma linha por loja × dia × forma. Não entra no faturamento.
+ */
+export type CashCloseDay = {
+  tenantId: string;
+  storeId: string;
+  day: string;
+  /** Forma como o Millennium mandou (DINHEIRO, CARTÃO CRÉDITO, TEF CARTÃO DÉBITO, PIX…). */
+  paymentMethod: string;
+  /** CONTA do caixa (Lista_Caixas), não o id da filial. */
+  accountId: number;
+  openingCents: number;
+  sangriaCents: number | null;
+  closingCents: number;
+  typedCents: number;
+};
+
 /** Daily revenue by payment method (CONDICAO) — sales_payment_day_agg. */
 export type SalesPaymentDayAgg = {
   tenantId: string;

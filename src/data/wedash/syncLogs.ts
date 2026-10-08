@@ -40,6 +40,7 @@ export const SYNC_LOG_SOURCE_LABEL: Record<string, string> = {
   gerador: "Gerador da loja",
   eventos: "Eventos de venda",
   vendedoras: "Equipe de vendas",
+  fechamento_caixa: "Fechamento de caixa",
   millennium_ocupado: "Millennium ocupado",
 };
 
@@ -129,6 +130,11 @@ const SYNC_LOG_TEXT: Record<string, SyncLogText> = {
     summary: "Eventos de venda não carregados",
     explanation:
       "Não foi possível carregar todos os eventos de venda deste período. Algumas informações detalhadas podem ficar incompletas.",
+  },
+  fechamento_caixa: {
+    summary: "Valor digitado não gravado",
+    explanation:
+      "Não foi possível gravar o fundo, a sangria, o fechamento ou o valor digitado deste dia. O faturamento não foi alterado.",
   },
   vendedoras: {
     summary: "Equipe de vendas não sincronizada",

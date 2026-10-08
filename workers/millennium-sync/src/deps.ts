@@ -17,6 +17,7 @@ import { fetchStoreSellers, type ErpSeller } from "./millenniumSellers.ts";
 import { fetchErpStores } from "./millenniumStores.ts";
 import { mergeNameKeys, type KnownSeller } from "./sellerLinker.ts";
 import { fetchRelatorioMargem } from "./millenniumMargem.ts";
+import { fetchCashAccounts, fetchCashCloseReport } from "./millenniumCashClose.ts";
 import { fetchCouponReport } from "./millenniumCouponReport.ts";
 import { fetchProductBrandMap } from "./millenniumProductDivision.ts";
 import { fetchProductRegistry, fetchProductTypes, fetchProductsOfType } from "./millenniumCatalog.ts";
@@ -55,6 +56,7 @@ import type {
   SalesDayAgg,
   SalesHourAgg,
   CashCloseSale,
+  CashCloseDay,
   SalesPaymentDayAgg,
   SalesProductDayAgg,
   SalesProductCostDayAgg,
@@ -633,6 +635,14 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
       });
     },
 
+    async fetchCashAccounts(session) {
+      return fetchCashAccounts({ session, baseUrl: millenniumBaseUrl() });
+    },
+
+    async fetchCashCloseReport(args) {
+      return fetchCashCloseReport({ ...args, baseUrl: millenniumBaseUrl() });
+    },
+
     async fetchFilialGeradorMap(session) {
       return fetchFilialGeradorMap({
         session,
@@ -1088,6 +1098,40 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
       for (let i = 0; i < payload.length; i += 400) {
         const { error } = await sb.from("cash_close_sale").upsert(payload.slice(i, i + 400), {
           onConflict: "tenant_id,store_id,operation_code,payment_method",
+        });
+        if (error) throw error;
+      }
+    },
+
+    async replaceCashCloseDays(args: {
+      tenantId: string;
+      storeId: string;
+      from: string;
+      to: string;
+      rows: CashCloseDay[];
+    }) {
+      const { error: delErr } = await sb
+        .from("cash_close_day")
+        .delete()
+        .eq("tenant_id", args.tenantId)
+        .eq("store_id", args.storeId)
+        .gte("day", args.from)
+        .lte("day", args.to);
+      if (delErr) throw delErr;
+      const payload = args.rows.map((r) => ({
+        tenant_id: r.tenantId,
+        store_id: r.storeId,
+        day: r.day,
+        payment_method: r.paymentMethod,
+        account_id: r.accountId,
+        opening_cents: r.openingCents,
+        sangria_cents: r.sangriaCents,
+        closing_cents: r.closingCents,
+        typed_cents: r.typedCents,
+      }));
+      for (let i = 0; i < payload.length; i += 400) {
+        const { error } = await sb.from("cash_close_day").upsert(payload.slice(i, i + 400), {
+          onConflict: "tenant_id,store_id,day,payment_method",
         });
         if (error) throw error;
       }

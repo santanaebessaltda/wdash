@@ -1,5 +1,5 @@
 import { aggregatePaymentDay, aggregateSales, aggregateSellerDay, cashCloseSalesFromRows } from "../../../src/data/wedash/salesAggregate.ts";
-import type { CashCloseSale, SalesDayAgg, SalesHourAgg } from "../../../src/data/wedash/salesTypes.ts";
+import type { CashCloseDay, CashCloseSale, SalesDayAgg, SalesHourAgg } from "../../../src/data/wedash/salesTypes.ts";
 import type { SaleRow } from "../../../src/data/wedash/salesTypes.ts";
 import {
   couponBrandFromLines,
@@ -28,6 +28,12 @@ import {
   productCostDayAggsFromMargemLines,
   type MargemLine,
 } from "./millenniumMargem.ts";
+import {
+  cashAccountForStore,
+  reaisToCents,
+  type CashAccount,
+  type CashCloseReportLine,
+} from "./millenniumCashClose.ts";
 import {
   closedMonthRange,
   isHistoryRangeDay,
@@ -128,6 +134,64 @@ async function persistListaDerivedDayAggs(
     });
   }
   if (!args.skipSellers) await persistSellerDayAggs(deps, args);
+}
+
+/** Fundo, sangria, fechamento e valor digitado da janela. Um dia = uma chamada. Falha não derruba a venda. */
+async function syncStoreCashClose(
+  deps: Pick<SyncJobDeps, "fetchCashCloseReport" | "replaceCashCloseDays">,
+  args: {
+    session: string;
+    tenantId: string;
+    store: Pick<SyncStore, "id" | "code">;
+    from: string;
+    to: string;
+    accounts: CashAccount[];
+    accountsOk: boolean;
+  },
+): Promise<void> {
+  if (!args.accountsOk || !deps.fetchCashCloseReport || !deps.replaceCashCloseDays) return;
+  const account = cashAccountForStore(args.accounts, args.store.code);
+  if (!account) {
+    console.warn(`  AVISO [${args.store.code}] sem caixa no Millennium — valor digitado pulado`);
+    return;
+  }
+  try {
+    const rows: CashCloseDay[] = [];
+    for (let day = args.from; day <= args.to; day = addDaysIso(day, 1)) {
+      const lines = await deps.fetchCashCloseReport({ session: args.session, conta: account.conta, day });
+      const byMethod = new Map<string, CashCloseDay>();
+      for (const line of lines) {
+        const method = line.paymentMethod.trim();
+        if (!method) continue;
+        byMethod.set(method, {
+          tenantId: args.tenantId,
+          storeId: args.store.id,
+          day,
+          paymentMethod: method,
+          accountId: account.conta,
+          openingCents: reaisToCents(line.openingReais),
+          sangriaCents: line.sangriaReais == null ? null : reaisToCents(line.sangriaReais),
+          closingCents: reaisToCents(line.closingReais),
+          typedCents: reaisToCents(line.typedReais),
+        });
+      }
+      rows.push(...byMethod.values());
+    }
+    await deps.replaceCashCloseDays({
+      tenantId: args.tenantId,
+      storeId: args.store.id,
+      from: args.from,
+      to: args.to,
+      rows,
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn(`  AVISO [${args.store.code}] fechamento de caixa ${args.from}→${args.to}: ${msg}`);
+    syncLog("WARN", "fechamento_caixa", `Valor digitado não gravou (${args.from}→${args.to}): ${msg}`, {
+      store: args.store,
+      day: args.from,
+    });
+  }
 }
 
 /** Cupom que veio no relatorio de cupom  ->  vendedora pelo gerador, com o nome atual do ERP. */
@@ -1468,6 +1532,21 @@ export type SyncJobDeps = {
     from: string;
     to: string;
     rows: CashCloseSale[];
+  }) => Promise<void>;
+  /** Contas de caixa do usuário ERP. Opcional: sem ela o valor digitado não é buscado. */
+  fetchCashAccounts?: (session: string) => Promise<CashAccount[]>;
+  /** Fechamento detalhado de um dia, na CONTA do caixa. */
+  fetchCashCloseReport?: (args: { session: string; conta: number; day: string }) => Promise<CashCloseReportLine[]>;
+  /**
+   * Substitui fundo, sangria, fechamento e valor digitado no intervalo [from,to].
+   * Não altera o faturamento.
+   */
+  replaceCashCloseDays?: (args: {
+    tenantId: string;
+    storeId: string;
+    from: string;
+    to: string;
+    rows: CashCloseDay[];
   }) => Promise<void>;
   /**
    * Substitui ranking de vendedoras no intervalo [from,to] da loja
@@ -2999,6 +3078,18 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
     const lightToday =
       job.kind === "LIGHT" ||
       (job.kind === "FORCE_LIGHT" && !job.payload.from && !job.payload.to);
+    let cashAccounts: CashAccount[] = [];
+    let cashAccountsOk = false;
+    if (deps.fetchCashAccounts && deps.fetchCashCloseReport && deps.replaceCashCloseDays) {
+      try {
+        cashAccounts = await deps.fetchCashAccounts(session!);
+        cashAccountsOk = true;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.warn(`  AVISO contas de caixa falhou: ${msg}`);
+        syncLog("WARN", "fechamento_caixa", `Contas de caixa não carregaram (valor digitado pulado): ${msg}`);
+      }
+    }
     // Pre-marca lojas ja conhecidas com WPINK (evita DetMov sem mapa no FORCE).
     for (const s of storeList) {
       if (s.hasWpink === true) {
@@ -3151,6 +3242,15 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
             linkSellers: linkSellersFor(store),
           });
         }
+        await syncStoreCashClose(deps, {
+          session: session!,
+          tenantId: job.tenantId,
+          store,
+          from: today,
+          to: today,
+          accounts: cashAccounts,
+          accountsOk: cashAccountsOk,
+        });
         storesDone += 1;
         console.log(
           `Loja ${store.code} · ${rows.length} venda(s) · ${agg.days.length || 1} dia(s)`,
@@ -3196,6 +3296,17 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
 
         if (windows.length === 0) {
           detail(`  [${store.code}] nada a buscar na Lista (já no banco)`);
+          if (job.kind === "CLOSE" && job.payload.from && job.payload.to) {
+            await syncStoreCashClose(deps, {
+              session: session!,
+              tenantId: job.tenantId,
+              store,
+              from: job.payload.from <= job.payload.to ? job.payload.from : job.payload.to,
+              to: job.payload.from <= job.payload.to ? job.payload.to : job.payload.from,
+              accounts: cashAccounts,
+              accountsOk: cashAccountsOk,
+            });
+          }
           if (shouldSyncCmv(job.kind) && cmvWin) {
             const cmvDays = await daysNeedingHeavySync(deps, {
               kind: job.kind,
@@ -3457,6 +3568,15 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
               linkSellers: linkSellersFor(store),
             };
             await persistListaDerivedDayAggs(deps, { ...win, skipSellers: true });
+            await syncStoreCashClose(deps, {
+              session: session!,
+              tenantId: job.tenantId,
+              store,
+              from,
+              to,
+              accounts: cashAccounts,
+              accountsOk: cashAccountsOk,
+            });
             sellerWindows.push(win);
             storeDays += 1;
           } else {
@@ -3473,6 +3593,15 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
               linkSellers: linkSellersFor(store),
             };
             await persistListaDerivedDayAggs(deps, { ...win, skipSellers: true });
+            await syncStoreCashClose(deps, {
+              session: session!,
+              tenantId: job.tenantId,
+              store,
+              from,
+              to,
+              accounts: cashAccounts,
+              accountsOk: cashAccountsOk,
+            });
             sellerWindows.push(win);
             storeSales += rows.length;
             storeDays += agg.days.length;

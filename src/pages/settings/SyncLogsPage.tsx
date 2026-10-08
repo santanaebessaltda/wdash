@@ -78,6 +78,7 @@ const SOURCE_STYLE: Record<string, { icon: string; tint: string }> = {
   gerador: { icon: "\u2699\uFE0E", tint: "var(--acc)" },
   eventos: { icon: "\u{1F5D3}\uFE0E", tint: "var(--info)" },
   vendedoras: { icon: "\u{1F5E3}\uFE0E", tint: "var(--acc)" },
+  fechamento_caixa: { icon: "\u{1F5D3}\uFE0E", tint: "var(--acc)" },
   millennium_ocupado: { icon: "\u23F1\uFE0E", tint: "var(--warn)" },
 };
 
