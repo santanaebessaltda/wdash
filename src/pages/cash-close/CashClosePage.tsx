@@ -557,7 +557,7 @@ export function CashClosePage() {
   function faceDoDia(day: string): { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; diffCents: number } {
     const info = analise?.porDia.get(day);
     if (day === hoje) return { kind: "hoje", diffCents: info ? Math.max(info.systemCents, info.realCents) : 0 };
-    if (info?.pending) return { kind: "pendente", diffCents: 0 };
+    if (info?.pending) return { kind: "pendente", diffCents: Math.max(info.systemCents, info.realCents) };
     if (!info || (info.systemCents === 0 && info.realCents === 0)) return { kind: "zero", diffCents: 0 };
     if (!info.hasMillennium && !info.hasLines) return { kind: "vazio", diffCents: 0 };
     return { kind: "total", diffCents: info.diffCents };
@@ -766,9 +766,9 @@ function Mes({
                   Pendente
                 </Badge>
               )}
-              {face?.kind === "hoje" && (
+              {(face?.kind === "hoje" || face?.kind === "pendente") && (
                 <div className="mt-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-t2">Movimento</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-t2">Total</p>
                   <p className="truncate font-mono text-[12px] font-extrabold text-t1 sm:text-[13px]">
                     {brlCent(face.diffCents / 100)}
                   </p>

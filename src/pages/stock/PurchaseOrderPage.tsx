@@ -193,6 +193,7 @@ export function PurchaseOrderPage() {
         }
       />
 
+      <div className="mt-8">
       {showSkeleton ? (
         <StockProductsSkeleton />
       ) : !loja ? (
@@ -322,6 +323,7 @@ export function PurchaseOrderPage() {
           {linhas.length > 0 && <TableFooter shown={pageRows.length} total={linhas.length} page={pageSafe} totalPages={totalPages} onPage={setPage} />}
         </Card>
       )}
+      </div>
     </div>
   );
 }
