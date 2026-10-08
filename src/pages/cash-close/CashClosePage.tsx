@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Alert, Badge, Button, Card, Checkbox, FormField, Modal, Skeleton, Textarea, useToast } from "@/components/ui";
+import { Alert, Badge, Button, Card, Checkbox, FormField, Modal, Segmented, Skeleton, Textarea, useToast } from "@/components/ui";
 import { monthCloseSpanFor } from "@/data/wedash/cashCloseMonth";
 import {
   applyCloseReview,
@@ -19,6 +19,7 @@ import {
   fetchCashCloseSales,
   fetchCashCloseSnapshot,
   fetchCloseShifts,
+  fetchShortageCaptures,
   fetchOpenCashCloseJob,
   fetchLatestCashCloseError,
   requestMonthClose,
@@ -26,9 +27,11 @@ import {
   type CashCloseDayMark,
   type CashCloseReview,
   type CashCloseSnapshot,
+  type CloseCaptureRow,
   type CloseSaleRow,
   type CloseShiftRow,
 } from "@/data/wedash/cashCloseRepo";
+import { shortageShares, suggestDayShortage, type ShortageScope, type ShortageSuggestion } from "@/data/wedash/shortageAssign";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { fetchSalesDayAggs, fetchSyncWatermark } from "@/data/wedash/salesRepo";
 import type { Store } from "@/data/wedash/stores";
@@ -140,8 +143,18 @@ type CloseDraft = {
   typed: Partial<Record<CashCloseBucket, string>>;
   acquirer: Partial<Record<CashCloseBucket, string>>;
   justification: string;
-  waive: boolean;
+  scope: ShortageScope;
+  sellers: string[];
+  group: string;
 };
+
+function initialTarget(review: CashCloseReview | undefined, suggestion: ShortageSuggestion): Pick<CloseDraft, "scope" | "sellers" | "group"> {
+  if (review?.waive) return { scope: "store", sellers: [], group: "" };
+  if (review && (review.shortageScope === "seller" || review.shortageScope === "group" || review.shortageScope === "everyone")) {
+    return { scope: review.shortageScope, sellers: review.shortageSellers, group: review.shortageGroup };
+  }
+  return { scope: suggestion.scope, sellers: suggestion.sellers, group: suggestion.group };
+}
 
 function CloseTable({
   lines,
@@ -470,7 +483,7 @@ export function CashClosePage() {
   const [reviews, setReviews] = useState<CashCloseReview[]>([]);
   const [diaAberto, setDiaAberto] = useState<string | null>(null);
   const [dias, setDias] = useState<Record<string, CashCloseSnapshot>>({});
-  const [quebra, setQuebra] = useState<{ sales: CloseSaleRow[]; shifts: CloseShiftRow[] } | "erro" | null>(null);
+  const [quebra, setQuebra] = useState<{ sales: CloseSaleRow[]; shifts: CloseShiftRow[]; captures: CloseCaptureRow[] } | "erro" | null>(null);
   const [diaKey, setDiaKey] = useState("");
   const [erro, setErro] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -610,11 +623,12 @@ export function CashClosePage() {
       Promise.all(lojas.map((loja) => fetchCashCloseSnapshot(session.tenantId, loja.id, diaAberto).then((snap) => [loja.id, snap] as const))),
       fetchCashCloseSales(session.tenantId, ids, diaAberto).catch(() => null),
       fetchCloseShifts(session.tenantId, ids).catch(() => null),
+      fetchShortageCaptures(session.tenantId, ids, diaAberto).catch(() => [] as CloseCaptureRow[]),
     ])
-      .then(([rows, sales, shifts]) => {
+      .then(([rows, sales, shifts, captures]) => {
         if (cancelled) return;
         setDias(Object.fromEntries(rows));
-        setQuebra(sales && shifts ? { sales, shifts } : "erro");
+        setQuebra(sales && shifts ? { sales, shifts, captures } : "erro");
         setDiaKey(key);
       })
       .catch(() => {
@@ -891,6 +905,128 @@ function Mes({
   );
 }
 
+function nomesVenda(sales: CloseSaleRow[], extra: string[]): string[] {
+  return [...new Set([...sales.map((sale) => sale.sellerName.trim()), ...extra.map((name) => name.trim())].filter((name) => name.length > 0))].sort((a, b) =>
+    a.localeCompare(b, "pt-BR"),
+  );
+}
+
+function FaltaDoDia({
+  gestor,
+  draft,
+  lines,
+  sales,
+  captures,
+  shifts,
+  timeZone,
+  onChange,
+}: {
+  gestor: boolean;
+  draft: CloseDraft;
+  lines: CashCloseLine[];
+  sales: CloseSaleRow[];
+  captures: CloseCaptureRow[];
+  shifts: CloseShiftRow[];
+  timeZone: string;
+  onChange: (next: CloseDraft) => void;
+}) {
+  const suggestion = suggestDayShortage({ lines, sales, captures, shifts, timeZone });
+  const shortageCents = Math.abs(closeDayGap(lines).diffCents);
+  const shares = shortageShares({
+    shortageCents,
+    scope: draft.scope,
+    sellers: draft.sellers,
+    group: draft.group,
+    suggestion,
+    sales,
+    shifts,
+    timeZone,
+  });
+  const vendedoras = nomesVenda(sales, suggestion.candidates);
+  const destinos: Array<{ value: ShortageScope; label: string }> = [
+    { value: "seller", label: "Vendedoras" },
+    ...(shifts.length > 0 ? [{ value: "group" as const, label: "Grupo" }] : []),
+    { value: "everyone", label: "Toda a equipe" },
+    { value: "store", label: "A loja assume" },
+  ];
+
+  function escolher(scope: ShortageScope | null) {
+    if (!scope) return;
+    if (scope === "seller") {
+      onChange({ ...draft, scope, sellers: suggestion.scope === "seller" ? suggestion.sellers : draft.sellers });
+      return;
+    }
+    if (scope === "group") {
+      const group = shifts.some((shift) => shift.name === draft.group) ? draft.group : suggestion.group;
+      onChange({ ...draft, scope, group });
+      return;
+    }
+    onChange({ ...draft, scope });
+  }
+
+  return (
+    <div className="mt-4 flex flex-col gap-3">
+      <p className="text-[13px] text-t1">{suggestion.note}</p>
+      {gestor ? (
+        <Segmented options={destinos} value={draft.scope} onChange={escolher} />
+      ) : (
+        <p className="text-[13px] font-bold text-t0">
+          {draft.scope === "store"
+            ? "A loja assumiu esta falta."
+            : draft.scope === "group"
+              ? `A falta fica com o grupo ${draft.group}.`
+              : draft.scope === "everyone"
+                ? "A falta fica com toda a equipe."
+                : "A falta fica com as vendedoras marcadas."}
+        </p>
+      )}
+      {draft.scope === "seller" && gestor && (
+        <div className="flex flex-col gap-2">
+          {vendedoras.length === 0 ? (
+            <p className="text-[12.5px] text-t2">Não há vendedora neste dia.</p>
+          ) : (
+            vendedoras.map((name) => (
+              <Checkbox
+                key={name}
+                label={name}
+                checked={draft.sellers.includes(name)}
+                onChange={() => {
+                  const sellers = draft.sellers.includes(name) ? draft.sellers.filter((item) => item !== name) : [...draft.sellers, name];
+                  onChange({ ...draft, sellers });
+                }}
+              />
+            ))
+          )}
+        </div>
+      )}
+      {draft.scope === "group" && gestor && shifts.length > 0 && (
+        <Segmented
+          options={shifts.map((shift) => ({ value: shift.name, label: shift.name }))}
+          value={draft.group || null}
+          onChange={(group) => onChange({ ...draft, group: group ?? "" })}
+        />
+      )}
+      {draft.scope !== "store" && shares.length > 0 && (
+        <ul className="flex flex-col gap-1">
+          {shares.map((share) => (
+            <li key={share.name} className="text-[12.5px] text-t1">
+              {share.name} · {brlCent(share.cents / 100)}
+            </li>
+          ))}
+        </ul>
+      )}
+      <FormField label="Justificativa">
+        <Textarea
+          value={draft.justification}
+          onChange={(e) => onChange({ ...draft, justification: e.target.value })}
+          placeholder={draft.scope === "store" ? "Por que a loja assume esta falta" : "Ex.: diferença no troco"}
+          disabled={!gestor}
+        />
+      </FormField>
+    </div>
+  );
+}
+
 function DiaModal({
   day,
   lojas,
@@ -909,7 +1045,7 @@ function DiaModal({
   lojas: Store[];
   snaps: Record<string, CashCloseSnapshot>;
   reviews: CashCloseReview[];
-  quebra: { sales: CloseSaleRow[]; shifts: CloseShiftRow[] } | "erro" | null;
+  quebra: { sales: CloseSaleRow[]; shifts: CloseShiftRow[]; captures: CloseCaptureRow[] } | "erro" | null;
   pronto: boolean;
   gestor: boolean;
   fechado: boolean;
@@ -938,15 +1074,27 @@ function DiaModal({
         const shown = manual ?? line.stoneCents;
         acquirer[line.key] = shown == null ? "" : centsToField(shown);
       }
+      const view = buildCashCloseView(snap);
+      const lines = applyCloseReview(view.lines, review ?? null, { pixRequested: snap.pixRequested });
+      const sales = quebra && quebra !== "erro" ? quebra.sales.filter((sale) => sale.storeId === loja.id) : [];
+      const captures = quebra && quebra !== "erro" ? quebra.captures.filter((row) => row.storeId === loja.id) : [];
+      const storeShifts = quebra && quebra !== "erro" ? quebra.shifts.filter((shift) => shift.storeId === loja.id) : [];
+      const suggestion = suggestDayShortage({
+        lines,
+        sales,
+        captures,
+        shifts: storeShifts,
+        timeZone: loja.fuso || "America/Campo_Grande",
+      });
       next[loja.id] = {
         typed,
         acquirer,
         justification: review?.justification ?? "",
-        waive: review?.waive ?? false,
+        ...initialTarget(review, suggestion),
       };
     }
     setDrafts(next);
-  }, [day, pronto, lojas, snaps, reviews]);
+  }, [day, pronto, lojas, snaps, reviews, quebra]);
 
   const comDados = day
     ? lojas.filter((loja) => {
@@ -990,20 +1138,33 @@ function DiaModal({
         return;
       }
       const ajustadas = linesWithDraft(linhas, draft);
-      const quebra = negativeDayDiff(ajustadas, fechado);
-      if (quebra && draft.waive && draft.justification.trim().length === 0) {
+      const falta = negativeDayDiff(ajustadas, fechado);
+      if (falta && draft.scope === "store" && draft.justification.trim().length === 0) {
         setBusy(false);
         show("Informe uma justificativa para não descontar esta falta.", "danger");
+        return;
+      }
+      if (falta && draft.scope === "seller" && draft.sellers.length === 0) {
+        setBusy(false);
+        show("Escolha ao menos uma vendedora.", "danger");
+        return;
+      }
+      if (falta && draft.scope === "group" && draft.group.trim().length === 0) {
+        setBusy(false);
+        show("Escolha o grupo que assume a falta.", "danger");
         return;
       }
       const saved: CashCloseReview = {
         storeId: loja.id,
         day,
         cashTypedCents: typedCents.cash ?? null,
-        justification: quebra ? draft.justification.trim() : "",
-        waive: quebra && draft.waive,
+        justification: falta ? draft.justification.trim() : "",
+        waive: falta && draft.scope === "store",
         typedCents,
         acquirerCents,
+        shortageScope: falta && draft.scope !== "store" ? draft.scope : "",
+        shortageSellers: falta && draft.scope === "seller" ? draft.sellers : [],
+        shortageGroup: falta && draft.scope === "group" ? draft.group : "",
       };
       const r = await saveCashCloseReview({ tenantId, ...saved });
       if (!r.ok) {
@@ -1106,34 +1267,16 @@ function DiaModal({
                   />
                 )}
                 {draft && negativeDayDiff(linhas, fechado) && (
-                  <div className="mt-4 flex flex-col gap-3">
-                    <FormField label="Justificativa">
-                      <Textarea
-                        value={draft.justification}
-                        onChange={(e) =>
-                          setDrafts((atual) => ({
-                            ...atual,
-                            [loja.id]: { ...draft, justification: e.target.value },
-                          }))
-                        }
-                        placeholder="Ex.: diferença no troco"
-                        disabled={!gestor}
-                      />
-                    </FormField>
-                    {gestor && (
-                      <Checkbox
-                        label="Não descontar da equipe. A loja assume esta falta."
-                        checked={draft.waive}
-                        onChange={(e) =>
-                          setDrafts((atual) => ({
-                            ...atual,
-                            [loja.id]: { ...draft, waive: e.target.checked },
-                          }))
-                        }
-                      />
-                    )}
-                    {!gestor && draft.waive && <p className="text-[12.5px] text-t2">A loja assumiu esta falta. Ela não entra no desconto.</p>}
-                  </div>
+                  <FaltaDoDia
+                    gestor={gestor}
+                    draft={draft}
+                    lines={linhas}
+                    sales={quebra && quebra !== "erro" ? quebra.sales.filter((sale) => sale.storeId === loja.id) : []}
+                    captures={quebra && quebra !== "erro" ? quebra.captures.filter((row) => row.storeId === loja.id) : []}
+                    shifts={quebra && quebra !== "erro" ? quebra.shifts.filter((shift) => shift.storeId === loja.id) : []}
+                    timeZone={loja.fuso || "America/Campo_Grande"}
+                    onChange={(next) => setDrafts((atual) => ({ ...atual, [loja.id]: next }))}
+                  />
                 )}
               </section>
             );

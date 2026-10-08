@@ -257,6 +257,8 @@ function amountMap(value: unknown): CloseAmountMap {
   return out;
 }
 
+export type ShortageScopeSaved = "" | "seller" | "group" | "everyone";
+
 export type CashCloseReview = {
   storeId: string;
   day: string;
@@ -265,7 +267,20 @@ export type CashCloseReview = {
   waive: boolean;
   typedCents: CloseAmountMap;
   acquirerCents: CloseAmountMap;
+  shortageScope: ShortageScopeSaved;
+  shortageSellers: string[];
+  shortageGroup: string;
 };
+
+function sellerList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+}
+
+function scopeOf(value: unknown): ShortageScopeSaved {
+  if (value === "seller" || value === "group" || value === "everyone") return value;
+  return "";
+}
 
 export async function fetchCashCloseReviews(tenantId: string, storeIds: string[], from: string, to: string): Promise<CashCloseReview[]> {
   const { getSupabase } = await import("@/lib/supabase");
@@ -273,7 +288,7 @@ export async function fetchCashCloseReviews(tenantId: string, storeIds: string[]
   if (!sb || storeIds.length === 0 || from > to) return [];
   const { data, error } = await sb
     .from("cash_close_review")
-    .select("store_id, day, cash_typed_cents, justification, waive, typed_cents, acquirer_cents")
+    .select("store_id, day, cash_typed_cents, justification, waive, typed_cents, acquirer_cents, shortage_scope, shortage_sellers, shortage_group")
     .eq("tenant_id", tenantId)
     .in("store_id", storeIds)
     .gte("day", from)
@@ -287,6 +302,9 @@ export async function fetchCashCloseReviews(tenantId: string, storeIds: string[]
     waive: row.waive === true,
     typedCents: amountMap(row.typed_cents),
     acquirerCents: amountMap(row.acquirer_cents),
+    shortageScope: scopeOf(row.shortage_scope),
+    shortageSellers: sellerList(row.shortage_sellers),
+    shortageGroup: String(row.shortage_group ?? ""),
   }));
 }
 
@@ -299,6 +317,9 @@ export async function saveCashCloseReview(input: {
   waive: boolean;
   typedCents: CloseAmountMap;
   acquirerCents: CloseAmountMap;
+  shortageScope: ShortageScopeSaved;
+  shortageSellers: string[];
+  shortageGroup: string;
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const { getSupabase } = await import("@/lib/supabase");
   const sb = getSupabase();
@@ -313,6 +334,9 @@ export async function saveCashCloseReview(input: {
       waive: input.waive,
       typed_cents: input.typedCents,
       acquirer_cents: input.acquirerCents,
+      shortage_scope: input.shortageScope,
+      shortage_sellers: input.shortageSellers,
+      shortage_group: input.shortageGroup,
     },
     { onConflict: "tenant_id,store_id,day" },
   );
@@ -359,6 +383,14 @@ export type CloseSaleRow = {
   occurredAt: string;
   paymentMethod: string;
   sellerName: string;
+  revenueCents: number;
+};
+
+export type CloseCaptureRow = {
+  storeId: string;
+  occurredAt: string;
+  paymentMethod: string;
+  capturedCents: number;
 };
 
 export type CloseShiftRow = {
@@ -375,7 +407,7 @@ export async function fetchCashCloseSales(tenantId: string, storeIds: string[], 
   if (!sb || storeIds.length === 0) return [];
   const { data, error } = await sb
     .from("cash_close_sale")
-    .select("store_id, occurred_at, payment_method, seller_name")
+    .select("store_id, occurred_at, payment_method, seller_name, revenue_cents")
     .eq("tenant_id", tenantId)
     .in("store_id", storeIds)
     .eq("day", day)
@@ -386,7 +418,52 @@ export async function fetchCashCloseSales(tenantId: string, storeIds: string[], 
     occurredAt: String(row.occurred_at),
     paymentMethod: String(row.payment_method ?? ""),
     sellerName: String(row.seller_name ?? ""),
+    revenueCents: Number(row.revenue_cents) || 0,
   }));
+}
+
+/** Capturas de cartão e PIX do dia, para achar a venda que não foi cobrada. */
+export async function fetchShortageCaptures(tenantId: string, storeIds: string[], day: string): Promise<CloseCaptureRow[]> {
+  const { getSupabase } = await import("@/lib/supabase");
+  const sb = getSupabase();
+  if (!sb || storeIds.length === 0) return [];
+  const [card, pix] = await Promise.all([
+    sb
+      .from("stone_capture")
+      .select("store_id, occurred_at, payment_method, captured_cents")
+      .eq("tenant_id", tenantId)
+      .in("store_id", storeIds)
+      .eq("day", day)
+      .limit(8000),
+    sb
+      .from("stone_pix")
+      .select("store_id, occurred_at, paid_cents, status")
+      .eq("tenant_id", tenantId)
+      .in("store_id", storeIds)
+      .eq("day", day)
+      .limit(8000),
+  ]);
+  if (card.error) throw new Error(card.error.message);
+  if (pix.error) throw new Error(pix.error.message);
+  const rows: CloseCaptureRow[] = (card.data ?? []).map((row) => ({
+    storeId: String(row.store_id),
+    occurredAt: String(row.occurred_at ?? ""),
+    paymentMethod: String(row.payment_method ?? ""),
+    capturedCents: Number(row.captured_cents) || 0,
+  }));
+  for (const row of pix.data ?? []) {
+    const status = String(row.status ?? "").toLowerCase();
+    if (status === "canceled" || status === "cancelled") continue;
+    const cents = Number(row.paid_cents) || 0;
+    if (cents <= 0) continue;
+    rows.push({
+      storeId: String(row.store_id),
+      occurredAt: row.occurred_at ? String(row.occurred_at) : "",
+      paymentMethod: "Pix",
+      capturedCents: cents,
+    });
+  }
+  return rows;
 }
 
 /** Grupos da loja, no horário local. */
