@@ -5,7 +5,7 @@ import { decryptPassword } from "./decrypt.ts";
 import { fetchStoneConciliation } from "./stoneConciliation.ts";
 import { replaceCaptures } from "./stoneCloseScan.ts";
 import { markStoneFile } from "./stoneIngest.ts";
-import { STONE_PIX_RETRY_MS, requestStonePixFile } from "./stonePix.ts";
+import { STONE_PIX_RETRY_MS, registerStoneWebhook, requestStonePixFile } from "./stonePix.ts";
 import {
   addDaysIso,
   ensureMillenniumSession,
@@ -177,6 +177,18 @@ export async function runCashCloseFillJob(
     if (from > end) continue;
     const files = await stoneState(sb, store.id, from, end);
     const tax = digits(store.taxId);
+    const webhookUrl = process.env.STONE_WEBHOOK_PUBLIC_URL?.trim() ?? "";
+    let pixParado = false;
+    if (tax.length >= 11 && !webhookUrl) {
+      problems.push("Falta o endereço público do aviso do Pix no worker.");
+      pixParado = true;
+    } else if (tax.length >= 11 && webhookUrl) {
+      try {
+        await registerStoneWebhook({ secret, url: webhookUrl });
+      } catch {
+        console.warn(`  AVISO [${store.code}] webhook PIX: não foi possível cadastrar o aviso`);
+      }
+    }
     for (let day = from; day <= end; day = addDaysIso(day, 1)) {
       if (!stoneFileReady(day, now)) continue;
       const file = files.get(day);
@@ -198,7 +210,7 @@ export async function runCashCloseFillJob(
           problems.push(`Não foi possível buscar o cartão da adquirente em ${day}.`);
         }
       }
-      if (tax.length >= 11 && pixDue(file?.pix ?? null, now)) {
+      if (!pixParado && tax.length >= 11 && pixDue(file?.pix ?? null, now)) {
         try {
           await requestStonePixFile({ document: tax, secret, day });
           await markStoneFile(sb, {
@@ -211,8 +223,14 @@ export async function runCashCloseFillJob(
           });
           console.log(`  Stone ${store.code} ${day}: PIX pedido`);
         } catch (e) {
-          console.warn(`  AVISO [${store.code}] PIX ${day}: ${e instanceof Error ? e.message : String(e)}`);
-          problems.push(`Não foi possível pedir o Pix da adquirente em ${day}.`);
+          const msg = e instanceof Error ? e.message : "";
+          console.warn(`  AVISO [${store.code}] PIX ${day}: ${msg}`);
+          if (msg.startsWith("A Stone ainda não confirmou")) {
+            pixParado = true;
+            problems.push(msg);
+          } else {
+            problems.push(`Não foi possível pedir o Pix da adquirente em ${day}.`);
+          }
         }
       }
     }

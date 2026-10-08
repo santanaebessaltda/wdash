@@ -176,7 +176,9 @@ function CloseTable({
                     )}
                   </td>
                   <td className="px-3 py-2.5 text-right">
-                    {gestor && draft && onAcquirer ? (
+                    {row.key === "cash" ? (
+                      <span className="font-mono text-[13px] font-bold text-t0">{money(fieldToCents(typedTxt) ?? row.typedCents)}</span>
+                    ) : gestor && draft && onAcquirer ? (
                       <input
                         value={acqTxt}
                         onChange={(e) => onAcquirer(row.key, e.target.value)}
@@ -542,7 +544,9 @@ export function CashClosePage() {
         pixRequested: mark.snap.pixRequested,
         pixCents: mark.snap.pixCents,
       });
-      rows.push({ day: mark.day, systemCents: totals.systemCents, typedCents: totals.typedCents, pending: awaiting });
+      if (mark.day < hoje) {
+        rows.push({ day: mark.day, systemCents: totals.systemCents, typedCents: totals.typedCents, pending: awaiting });
+      }
       const atual = porDia.get(mark.day) ?? { systemCents: 0, typedCents: 0, hasMillennium: false, hasLines: false };
       atual.systemCents += totals.systemCents;
       atual.typedCents += totals.typedCents;
@@ -551,17 +555,15 @@ export function CashClosePage() {
       porDia.set(mark.day, atual);
     }
     return { resumo: monthCloseSummary(rows), porDia };
-  }, [marks, reviews, marksKey, faixaKey]);
+  }, [marks, reviews, marksKey, faixaKey, hoje]);
 
   function faceDoDia(day: string): { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; diffCents: number } {
+    if (day === hoje) return { kind: "hoje", diffCents: 0 };
     const info = analise?.porDia.get(day);
-    const semMovimento = !info || (info.systemCents === 0 && info.typedCents === 0);
-    if (day < hoje && semMovimento) return { kind: "zero", diffCents: 0 };
-    if (!info || (!info.hasMillennium && !info.hasLines)) return { kind: "vazio", diffCents: 0 };
-    const diffCents = info.typedCents - info.systemCents;
-    if (day === hoje) return { kind: "hoje", diffCents };
+    if (!info || (info.systemCents === 0 && info.typedCents === 0)) return { kind: "zero", diffCents: 0 };
+    if (!info.hasMillennium && !info.hasLines) return { kind: "vazio", diffCents: 0 };
     if (!info.hasMillennium) return { kind: "pendente", diffCents: 0 };
-    return { kind: "total", diffCents };
+    return { kind: "total", diffCents: info.typedCents - info.systemCents };
   }
 
   function abrirDia(iso: string) {
@@ -648,6 +650,7 @@ export function CashClosePage() {
         quebra={diaPronto ? quebra : null}
         pronto={diaPronto}
         gestor={isGestor(session.role)}
+        fechado={diaAberto != null && diaAberto < hoje}
         tenantId={session.tenantId}
         onClose={() => setDiaAberto(null)}
         onSaved={(next) => {
@@ -748,7 +751,7 @@ function Mes({
                   Pendente
                 </Badge>
               )}
-              {(face?.kind === "zero" || face?.kind === "hoje" || face?.kind === "total") && (
+              {(face?.kind === "zero" || face?.kind === "total") && (
                 <div className="mt-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-t2">Total</p>
                   <p
@@ -784,6 +787,7 @@ function DiaModal({
   quebra,
   pronto,
   gestor,
+  fechado,
   tenantId,
   onClose,
   onSaved,
@@ -795,6 +799,7 @@ function DiaModal({
   quebra: { sales: CloseSaleRow[]; shifts: CloseShiftRow[] } | "erro" | null;
   pronto: boolean;
   gestor: boolean;
+  fechado: boolean;
   tenantId: string;
   onClose: () => void;
   onSaved: (review: CashCloseReview) => void;
@@ -856,6 +861,7 @@ function DiaModal({
           break;
         }
         if (typed != null && typed !== line.typedCents) typedCents[line.key] = typed;
+        if (line.key === "cash") continue;
         const raw = draft.acquirer[line.key] ?? "";
         const real = fieldToCents(raw);
         if (raw.trim() && real == null) {
@@ -947,7 +953,11 @@ function DiaModal({
             return (
               <section key={loja.id}>
                 {lojas.length > 1 && <p className="mb-3 text-[13px] font-bold text-t0">{loja.fantasia}</p>}
-                <ContaDoDia systemCents={conta.systemCents} typedCents={conta.typedCents} />
+                {fechado ? (
+                  <ContaDoDia systemCents={conta.systemCents} typedCents={conta.typedCents} />
+                ) : (
+                  <p className="mb-4 text-[13px] text-t2">Este dia ainda não fechou. A sobra ou a quebra aparece a partir de amanhã.</p>
+                )}
                 {cash?.openingCents != null && (
                   <p className="mb-3 text-[12px] text-t2">
                     Fundo de caixa: {brlCent(cash.openingCents / 100)}
@@ -972,20 +982,22 @@ function DiaModal({
                     }))
                   }
                 />
-                <QuebraDoDia
-                  indisponivel={quebra === "erro"}
-                  breaks={
-                    quebra && quebra !== "erro"
-                      ? closeBreaks({
-                          lines: linhas,
-                          sales: quebra.sales.filter((sale) => sale.storeId === loja.id),
-                          shifts: quebra.shifts.filter((shift) => shift.storeId === loja.id),
-                          timeZone: loja.fuso || "America/Campo_Grande",
-                          pixPending: view.pixPending,
-                        })
-                      : []
-                  }
-                />
+                {fechado && (
+                  <QuebraDoDia
+                    indisponivel={quebra === "erro"}
+                    breaks={
+                      quebra && quebra !== "erro"
+                        ? closeBreaks({
+                            lines: linhas,
+                            sales: quebra.sales.filter((sale) => sale.storeId === loja.id),
+                            shifts: quebra.shifts.filter((shift) => shift.storeId === loja.id),
+                            timeZone: loja.fuso || "America/Campo_Grande",
+                            pixPending: view.pixPending,
+                          })
+                        : []
+                    }
+                  />
+                )}
                 {falta && draft && (
                   <div className="mt-4 flex flex-col gap-3">
                     <FormField label="Justificativa">

@@ -140,6 +140,9 @@ export async function requestStonePixFile(opts: {
   });
   if (res.status === 202 || res.status === 200) return;
   const text = await res.text();
+  if (/webhook/i.test(text)) {
+    throw new Error("A Stone ainda não confirmou o endereço de aviso do Pix. O arquivo só sai depois dessa confirmação.");
+  }
   throw new Error(`Stone PIX ${opts.day} → ${res.status} ${text.slice(0, 180)}`);
 }
 
