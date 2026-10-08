@@ -564,11 +564,12 @@ export function CashClosePage() {
   function faceDoDia(day: string): { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; diffCents: number } {
     const info = analise?.porDia.get(day);
     if (day === hoje) return { kind: "hoje", diffCents: info ? Math.max(info.systemCents, info.typedCents) : 0 };
-    if (!diasComVenda.has(day)) return { kind: "zero", diffCents: 0 };
     if (!info || (info.systemCents === 0 && info.typedCents === 0)) return { kind: "zero", diffCents: 0 };
     if (!info.hasMillennium && !info.hasLines) return { kind: "vazio", diffCents: 0 };
     if (!info.hasMillennium) return { kind: "pendente", diffCents: 0 };
-    return { kind: "total", diffCents: info.typedCents - info.systemCents };
+    const diffCents = info.typedCents - info.systemCents;
+    if (diffCents === 0 && !diasComVenda.has(day)) return { kind: "pendente", diffCents: 0 };
+    return { kind: "total", diffCents };
   }
 
   function abrirDia(iso: string) {
