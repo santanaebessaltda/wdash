@@ -281,18 +281,40 @@ function sheetRows(xml: string, strings: string[]): string[][] {
   return rows;
 }
 
-function firstSheetPath(entries: ZipEntry[]): string {
-  const book = zipText(entries, "xl/workbook.xml");
-  const rels = zipText(entries, "xl/_rels/workbook.xml.rels");
-  const rid = book ? /<sheet\b[^>]*r:id="([^"]+)"/.exec(book)?.[1] : null;
-  const tag = rid && rels ? [...rels.matchAll(/<Relationship\b[^>]*>/g)].map((m) => m[0]).find((t) => t.includes(`Id="${rid}"`)) : null;
-  const target = tag ? /Target="([^"]+)"/.exec(tag)?.[1] : null;
-  if (!target) return "xl/worksheets/sheet1.xml";
+function sheetFile(target: string): string {
   const path = target.replace(/\\/g, "/").replace(/^\//, "");
   return path.startsWith("xl/") ? path : `xl/${path}`;
 }
 
-/** Lê a primeira aba de um .xlsx (o nosso, ou um Excel/Google com ZIP comprimido). */
+/** Primeira aba visível. Aba oculta (configuração, backup) não entra. */
+function firstSheetPath(entries: ZipEntry[]): string {
+  const book = zipText(entries, "xl/workbook.xml");
+  const rels = zipText(entries, "xl/_rels/workbook.xml.rels");
+  const rel = new Map<string, string>();
+  if (rels) {
+    for (const tag of rels.matchAll(/<Relationship\b[^>]*>/g)) {
+      const id = /Id="([^"]+)"/.exec(tag[0])?.[1];
+      const target = /Target="([^"]+)"/.exec(tag[0])?.[1];
+      if (id && target) rel.set(id, target);
+    }
+  }
+  const paths: string[] = [];
+  const visible: string[] = [];
+  if (book) {
+    for (const tag of book.matchAll(/<sheet\b[^>]*>/g)) {
+      const rid = /r:id="([^"]+)"/.exec(tag[0])?.[1];
+      const state = /state="([^"]+)"/.exec(tag[0])?.[1] ?? "visible";
+      const target = rid ? rel.get(rid) : null;
+      if (!target) continue;
+      const path = sheetFile(target);
+      paths.push(path);
+      if (state === "visible") visible.push(path);
+    }
+  }
+  return visible[0] ?? paths[0] ?? "xl/worksheets/sheet1.xml";
+}
+
+/** Lê a primeira aba visível de um .xlsx (o nosso, ou um Excel/Google com ZIP comprimido). */
 export async function readXlsx(buf: Uint8Array): Promise<string[][]> {
   const entries = await readZip(buf);
   const sheet = zipText(entries, firstSheetPath(entries));

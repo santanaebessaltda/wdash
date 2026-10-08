@@ -165,6 +165,59 @@ function zipDeflate(stored: Uint8Array): Uint8Array {
   return out;
 }
 
+function storeZip(files: Array<[string, string]>): Uint8Array {
+  const encoded = files.map(([name, body]) => ({ name: new TextEncoder().encode(name), raw: new TextEncoder().encode(body), crc: crc32(body) }));
+  const locals: Uint8Array[] = [];
+  const centrals: Uint8Array[] = [];
+  let offset = 0;
+  for (const file of encoded) {
+    const local = new Uint8Array(30 + file.name.length);
+    const lv = new DataView(local.buffer);
+    lv.setUint32(0, 0x04034b50, true);
+    lv.setUint16(4, 20, true);
+    lv.setUint32(14, file.crc, true);
+    lv.setUint32(18, file.raw.length, true);
+    lv.setUint32(22, file.raw.length, true);
+    lv.setUint16(26, file.name.length, true);
+    local.set(file.name, 30);
+    const central = new Uint8Array(46 + file.name.length);
+    const cv = new DataView(central.buffer);
+    cv.setUint32(0, 0x02014b50, true);
+    cv.setUint16(4, 20, true);
+    cv.setUint16(6, 20, true);
+    cv.setUint32(16, file.crc, true);
+    cv.setUint32(20, file.raw.length, true);
+    cv.setUint32(24, file.raw.length, true);
+    cv.setUint16(28, file.name.length, true);
+    cv.setUint32(42, offset, true);
+    central.set(file.name, 46);
+    locals.push(local, file.raw);
+    centrals.push(central);
+    offset += local.length + file.raw.length;
+  }
+  const centralSize = centrals.reduce((s, c) => s + c.length, 0);
+  const end = new Uint8Array(22);
+  const ev = new DataView(end.buffer);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(8, files.length, true);
+  ev.setUint16(10, files.length, true);
+  ev.setUint32(12, centralSize, true);
+  ev.setUint32(16, offset, true);
+  const out = new Uint8Array(offset + centralSize + end.length);
+  let at = 0;
+  for (const part of [...locals, ...centrals, end]) {
+    out.set(part, at);
+    at += part.length;
+  }
+  return out;
+}
+
+const SHEET_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+
+function inlineSheet(cells: string): string {
+  return `<?xml version="1.0"?><worksheet xmlns="${SHEET_NS}"><sheetData><row r="1">${cells}</row></sheetData></worksheet>`;
+}
+
 describe("readXlsx", () => {
   const sheet = [
     ["COD_PRODUTO", "Descricao1", "Quantidade minin", "Saldo"],
@@ -186,5 +239,31 @@ describe("readXlsx", () => {
     expect(rows[1][0]).toBe("182");
     expect(rows[1][2]).toBe("72");
     expect(rows[2][2]).toBe("");
+  });
+
+  it("ignora a aba oculta e lê a aba visível", async () => {
+    const hidden = inlineSheet('<c r="A1" t="inlineStr"><is><t>Campo</t></is></c><c r="B1" t="inlineStr"><is><t>Valor</t></is></c>');
+    const visible = inlineSheet(
+      '<c r="A1" t="inlineStr"><is><t>COD_PRODUTO</t></is></c><c r="C1" t="inlineStr"><is><t>Quantidade minin</t></is></c>',
+    );
+    const book =
+      `<?xml version="1.0"?><workbook xmlns="${SHEET_NS}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">` +
+      '<sheets><sheet state="hidden" name="_CONFIG" sheetId="1" r:id="rId1"/>' +
+      '<sheet name="LAYOUT" sheetId="2" r:id="rId2"/></sheets></workbook>';
+    const rels =
+      '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
+      '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>' +
+      "</Relationships>";
+    const rows = await readXlsx(
+      storeZip([
+        ["xl/workbook.xml", book],
+        ["xl/_rels/workbook.xml.rels", rels],
+        ["xl/worksheets/sheet1.xml", hidden],
+        ["xl/worksheets/sheet2.xml", visible],
+      ]),
+    );
+    expect(rows[0][0]).toBe("COD_PRODUTO");
+    expect(rows[0][2]).toBe("Quantidade minin");
   });
 });
