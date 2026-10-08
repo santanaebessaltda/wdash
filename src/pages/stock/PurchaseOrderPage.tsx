@@ -26,7 +26,7 @@ import { usePurchaseOrder } from "./usePurchaseOrder";
 
 const PAGE_SIZE = 50;
 
-type SortKey = "nome" | "minimo" | "saldo" | "pedidosAbertos" | "total" | "vendidos30" | "multipla" | "novo" | "aPedir";
+type SortKey = "nome" | "minimo" | "saldo" | "pedidosAbertos" | "total" | "vendidos30" | "multipla" | "novo" | "bloqueado" | "aPedir";
 
 const NUM_COLS: Array<{ key: "saldo" | "pedidosAbertos" | "total" | "vendidos30" | "multipla"; label: string }> = [
   { key: "saldo", label: "Saldo" },
@@ -40,6 +40,7 @@ function sortValue(r: PurchaseOrderRow, k: Exclude<SortKey, "nome">): number {
   if (k === "minimo") return r.minimo ?? -1;
   if (k === "aPedir") return r.aPedir ?? -1;
   if (k === "novo") return r.novo ? 1 : 0;
+  if (k === "bloqueado") return r.bloqueado ? 1 : 0;
   return r[k];
 }
 
@@ -246,6 +247,7 @@ export function PurchaseOrderPage() {
                       <ThSort key={c.key} label={c.label} active={sortKey === c.key} dir={sortDir} onClick={() => toggleSort(c.key)} className="px-1 pb-3" />
                     ))}
                     <ThSort label="Novo" active={sortKey === "novo"} dir={sortDir} onClick={() => toggleSort("novo")} align="center" className="px-1 pb-3" />
+                    <ThSort label="Bloqueado" active={sortKey === "bloqueado"} dir={sortDir} onClick={() => toggleSort("bloqueado")} align="center" className="px-1 pb-3" />
                     <ThSort label="A pedir" active={sortKey === "aPedir"} dir={sortDir} onClick={() => toggleSort("aPedir")} className="px-1 pb-3" />
                   </tr>
                 </thead>
@@ -270,7 +272,11 @@ export function PurchaseOrderPage() {
                           />
                         </td>
                         <td className="px-1 py-2 text-right">
-                          <MinInput value={r.minimo} idx={i} label={`Mínimo de ${r.nome}`} onSave={(raw) => po.saveMin(r.code, raw)} />
+                          {r.bloqueado ? (
+                            <span className="inline-block w-20 pr-2 text-right font-mono text-[13px] font-bold text-t2">{r.minimo == null ? "—" : r.minimo}</span>
+                          ) : (
+                            <MinInput value={r.minimo} idx={i} label={`Mínimo de ${r.nome}`} onSave={(raw) => po.saveMin(r.code, raw)} />
+                          )}
                         </td>
                         {NUM_COLS.map((c) => (
                           <td key={c.key} className="px-1 py-3 text-right">
@@ -279,6 +285,9 @@ export function PurchaseOrderPage() {
                         ))}
                         <td className="px-1 py-3 text-center">
                           {r.novo ? <Badge variant="accent">Sim</Badge> : <span className="text-[13px] font-semibold text-t2">Não</span>}
+                        </td>
+                        <td className="px-1 py-3 text-center">
+                          {r.bloqueado ? <Badge variant="warning">Sim</Badge> : <span className="text-[13px] font-semibold text-t2">Não</span>}
                         </td>
                         <td className="px-1 py-3 text-right">
                           {r.aPedir == null ? <span className="font-mono text-[13px] font-bold text-t2">—</span> : <Qty v={r.aPedir} strong={r.aPedir > 0} />}
@@ -310,6 +319,7 @@ export function PurchaseOrderPage() {
                     <td className="px-1 py-3 text-right">
                       <Qty v={totais.vendidos30} total />
                     </td>
+                    <td />
                     <td />
                     <td />
                     <td className="px-1 py-3 text-right">
@@ -365,7 +375,8 @@ function MinInput({ value, idx, label, onSave }: { value: number | null; idx: nu
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      const next = document.querySelector<HTMLInputElement>(`input[data-min-idx="${idx + 1}"]`);
+      const inputs = [...document.querySelectorAll<HTMLInputElement>("input[data-min-idx]")];
+      const next = inputs[inputs.indexOf(e.currentTarget) + 1];
       if (next) next.focus();
       else e.currentTarget.blur();
     } else if (e.key === "Escape") {

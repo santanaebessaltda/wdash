@@ -126,14 +126,16 @@ describe("parseMinInput (PC-06 AC 3, 4)", () => {
 });
 
 describe("buildPurchaseOrderView", () => {
-  it("lista só os elegíveis com saldo, pedidos em aberto, total, vendidos, múltipla e mínimo (PC-01)", () => {
+  it("lista os que podem comprar e os bloqueados; WP fica de fora (PC-01)", () => {
     const v = view(
-      [stock({ balance: 1, openOrder: 1, total: 2 }), stock({ code: "WP014", position: 1 }), stock({ code: "X1", blocked: true, position: 2 })],
-      { "BSPPAR-ATH-001": 72 },
+      [stock({ balance: 1, openOrder: 1, total: 2 }), stock({ code: "WP014", position: 1 }), stock({ code: "X1", blocked: true, balance: 4, total: 4, position: 2 })],
+      { "BSPPAR-ATH-001": 72, X1: 12 },
       1,
       { "BSPPAR-ATH-001": 15 },
     );
-    expect(v.rows).toHaveLength(1);
+    expect(v.rows.map((r) => r.code)).toEqual(["BSPPAR-ATH-001", "X1"]);
+    expect(v.rows[1]).toMatchObject({ bloqueado: true, minimo: 12, saldo: 4, aPedir: null, noPedido: false });
+    expect(purchaseOrderFileRows(v).map((r) => r[0])).toEqual(["BSPPAR-ATH-001"]);
     expect(v.rows[0]).toMatchObject({
       code: "BSPPAR-ATH-001",
       nome: "BODY SPLASH PARIS 200ML",
@@ -195,16 +197,19 @@ describe("buildPurchaseOrderView", () => {
     expect(v.rows[0].novo).toBe(false);
   });
 
-  it("bloqueado para compra nunca vira Novo, mesmo sem venda (PC-01, PC-02)", () => {
+  it("bloqueado para compra aparece, nunca vira Novo e não entra no pedido (PC-01, PC-02)", () => {
     const v = buildPurchaseOrderView({
-      stock: [stock({ blocked: true })],
-      mins: new Map(),
+      stock: [stock({ blocked: true, registeredAt: "2026-09-20" })],
+      mins: new Map([["BSPPAR-ATH-001", 24]]),
       sold30: new Map(),
       soldEver: new Set(),
       factor: 1,
       todayIso: TODAY,
     });
-    expect(v.rows).toHaveLength(0);
+    expect(v.rows).toHaveLength(1);
+    expect(v.rows[0]).toMatchObject({ bloqueado: true, novo: false, minimo: 24, aPedir: null, noPedido: false });
+    expect(v.contagens.semMinimo).toBe(0);
+    expect(purchaseOrderFileRows(v)).toEqual([]);
   });
 
   it("produto com mais de uma variante elegível: aviso, A pedir '—' e fora do pedido (PC-05 AC 9)", () => {
