@@ -1031,7 +1031,7 @@ function DiaModal({
           <Button variant="outline" onClick={onClose} disabled={busy}>
             {gestor ? "Cancelar" : "Voltar"}
           </Button>
-          {gestor && comDados.length > 0 && (
+          {gestor && fechado && comDados.length > 0 && (
             <Button onClick={() => void salvar()} disabled={busy || !pronto}>
               {busy ? "Salvando…" : "Salvar"}
             </Button>
@@ -1041,6 +1041,15 @@ function DiaModal({
     >
       {!pronto ? (
         <Skeleton className="h-40 w-full" />
+      ) : !fechado ? (
+        <div className="flex flex-col gap-4">
+          {lojas.map((loja) => (
+            <p key={loja.id} className="text-[13px] leading-relaxed text-t2">
+              {lojas.length > 1 ? <span className="mb-1 block font-bold text-t0">{loja.fantasia}</span> : null}
+              Vendido hoje: {soldByStore ? brlCent((soldByStore[loja.id] ?? 0) / 100) : "…"}. Este dia ainda não fechou. Amanhã o valor passa a ser o do fechamento de caixa.
+            </p>
+          ))}
+        </div>
       ) : comDados.length === 0 ? (
         <p className="text-[13.5px] leading-relaxed text-t1">Ainda não há fechamento neste dia.</p>
       ) : (
@@ -1056,15 +1065,10 @@ function DiaModal({
             return (
               <section key={loja.id}>
                 {lojas.length > 1 && <p className="mb-3 text-[13px] font-bold text-t0">{loja.fantasia}</p>}
-                {fechado && !dayWithoutReal(linhas) ? (
+                {!dayWithoutReal(linhas) ? (
                   <ContaDoDia systemCents={conta.comparedSystemCents} realCents={conta.realCents} diffCents={conta.diffCents} />
-                ) : fechado ? (
-                  <p className="mb-4 text-[13px] text-t2">Falta o total real de alguma forma. A diferença aparece quando ele for informado.</p>
                 ) : (
-                  <p className="mb-4 text-[13px] text-t2">
-                    {soldByStore ? `Vendido hoje: ${brlCent((soldByStore[loja.id] ?? 0) / 100)}. ` : ""}
-                    Este dia ainda não fechou. Amanhã o valor passa a ser o do fechamento de caixa.
-                  </p>
+                  <p className="mb-4 text-[13px] text-t2">Falta o total real de alguma forma. A diferença aparece quando ele for informado.</p>
                 )}
                 {cash?.openingCents != null && (
                   <p className="mb-3 text-[12px] text-t2">
