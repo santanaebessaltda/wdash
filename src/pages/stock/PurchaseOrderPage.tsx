@@ -44,6 +44,10 @@ function sortValue(r: PurchaseOrderRow, k: Exclude<SortKey, "nome">): number {
   return r[k];
 }
 
+function YesNo({ yes }: { yes: boolean }) {
+  return yes ? <Badge variant="accent">Sim</Badge> : <Badge variant="neutral">Não</Badge>;
+}
+
 function downloadFile(bytes: Uint8Array, name: string) {
   const blob = new Blob([bytes as BlobPart], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const url = URL.createObjectURL(blob);
@@ -284,10 +288,10 @@ export function PurchaseOrderPage() {
                           </td>
                         ))}
                         <td className="px-1 py-3 text-center">
-                          {r.novo ? <Badge variant="accent">Sim</Badge> : <span className="text-[13px] font-semibold text-t2">Não</span>}
+                          <YesNo yes={r.novo} />
                         </td>
                         <td className="px-1 py-3 text-center">
-                          {r.bloqueado ? <Badge variant="warning">Sim</Badge> : <span className="text-[13px] font-semibold text-t2">Não</span>}
+                          <YesNo yes={r.bloqueado} />
                         </td>
                         <td className="px-1 py-3 text-right">
                           {r.aPedir == null ? <span className="font-mono text-[13px] font-bold text-t2">—</span> : <Qty v={r.aPedir} strong={r.aPedir > 0} />}
