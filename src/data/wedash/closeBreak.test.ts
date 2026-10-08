@@ -53,10 +53,15 @@ describe("quebra do fechamento", () => {
 
   it("valores espelhados podem ser inversão", () => {
     const items = closeBreaks({
-      lines: lines([
-        { method: "CARTÃO DÉBITO", system: 1000, typed: 800 },
-        { method: "CARTÃO CRÉDITO", system: 800, typed: 1000 },
-      ]),
+      lines: buildCashCloseView({
+        millennium: [
+          { paymentMethod: "CARTÃO DÉBITO", openingCents: 0, sangriaCents: null, closingCents: 1000, typedCents: 800 },
+          { paymentMethod: "CARTÃO CRÉDITO", openingCents: 0, sangriaCents: null, closingCents: 800, typedCents: 1000 },
+        ],
+        card: { debitCents: 800, creditCents: 1000, otherCents: 0 },
+        pixCents: null,
+        pixRequested: false,
+      }).lines,
       sales: [],
       shifts,
       timeZone: "America/Sao_Paulo",
@@ -80,7 +85,12 @@ describe("quebra do fechamento", () => {
 
   it("venda sem vendedor fica no grupo e não entra na folha", () => {
     const [item] = closeBreaks({
-      lines: lines([{ method: "PIX", system: 1000, typed: 700 }]),
+      lines: buildCashCloseView({
+        millennium: [{ paymentMethod: "PIX", openingCents: 0, sangriaCents: null, closingCents: 1000, typedCents: 700 }],
+        card: null,
+        pixCents: 700,
+        pixRequested: false,
+      }).lines,
       sales: [{ occurredAt: "2026-10-07T13:30:00.000Z", paymentMethod: "Pix", sellerName: "" }],
       shifts,
       timeZone: "America/Sao_Paulo",
@@ -91,7 +101,12 @@ describe("quebra do fechamento", () => {
 
   it("vendas em dois grupos não separam a quebra", () => {
     const [item] = closeBreaks({
-      lines: lines([{ method: "PIX", system: 1000, typed: 700 }]),
+      lines: buildCashCloseView({
+        millennium: [{ paymentMethod: "PIX", openingCents: 0, sangriaCents: null, closingCents: 1000, typedCents: 700 }],
+        card: null,
+        pixCents: 700,
+        pixRequested: false,
+      }).lines,
       sales: [
         { occurredAt: "2026-10-07T13:30:00.000Z", paymentMethod: "Pix", sellerName: "Ana" },
         { occurredAt: "2026-10-07T18:00:00.000Z", paymentMethod: "Pix", sellerName: "Bia" },
@@ -104,14 +119,14 @@ describe("quebra do fechamento", () => {
     expect(item.reason).toBe("As vendas passaram por MANHÃ e TARDE. A quebra do dia não separa o grupo.");
   });
 
-  it("pix pedido e ainda sem arquivo fica em aberto", () => {
-    const [item] = closeBreaks({
+  it("pix sem arquivo não vira quebra", () => {
+    const items = closeBreaks({
       lines: lines([{ method: "PIX", system: 1000, typed: 700 }]),
       sales: [],
       shifts,
       timeZone: "America/Sao_Paulo",
       pixPending: true,
     });
-    expect(item.reason).toBe("Pix ainda em aberto.");
+    expect(items).toEqual([]);
   });
 });

@@ -160,7 +160,7 @@ function CloseTable({
           <tbody>
             {lines.map((row) => {
               const real = realCentsOf(row);
-              const diff = real - row.systemCents;
+              const diff = real == null ? null : real - row.systemCents;
               const acqTxt = draft?.acquirer[row.key] ?? (row.stoneCents == null ? "" : centsToField(row.stoneCents));
               return (
                 <tr key={row.key} className="border-b border-line">
@@ -180,8 +180,8 @@ function CloseTable({
                       />
                     )}
                   </td>
-                  <td className={cn("px-3 py-3 text-right font-mono text-[13px] font-bold", fechado ? diffClass(diff) : "text-t2")}>
-                    {fechado ? totalDia(diff) : "—"}
+                  <td className={cn("px-3 py-3 text-right font-mono text-[13px] font-bold", fechado && diff != null ? diffClass(diff) : "text-t2")}>
+                    {fechado && diff != null ? totalDia(diff) : "—"}
                   </td>
                 </tr>
               );
@@ -526,8 +526,8 @@ export function CashClosePage() {
 
   const analise = useMemo(() => {
     if (marksKey !== faixaKey) return null;
-    const porDia = new Map<string, { systemCents: number; realCents: number; hasMillennium: boolean; hasLines: boolean; pending: boolean }>();
-    const rows: Array<{ day: string; systemCents: number; typedCents: number; realCents?: number; pending: boolean }> = [];
+    const porDia = new Map<string, { systemCents: number; realCents: number; diffCents: number; hasMillennium: boolean; hasLines: boolean; pending: boolean }>();
+    const rows: Array<{ day: string; systemCents: number; typedCents: number; realCents?: number; diffCents?: number; pending: boolean }> = [];
     for (const mark of marks) {
       const review = reviews.find((r) => r.storeId === mark.storeId && r.day === mark.day) ?? null;
       const view = buildCashCloseView(mark.snap);
@@ -544,11 +544,19 @@ export function CashClosePage() {
         pixCents: mark.snap.pixCents,
       });
       if (mark.day < hoje) {
-        rows.push({ day: mark.day, systemCents: gap.systemCents, typedCents: totals.typedCents, realCents: gap.realCents, pending: awaiting });
+        rows.push({
+          day: mark.day,
+          systemCents: gap.systemCents,
+          typedCents: totals.typedCents,
+          realCents: gap.realCents,
+          diffCents: gap.diffCents,
+          pending: awaiting,
+        });
       }
-      const atual = porDia.get(mark.day) ?? { systemCents: 0, realCents: 0, hasMillennium: false, hasLines: false, pending: false };
+      const atual = porDia.get(mark.day) ?? { systemCents: 0, realCents: 0, diffCents: 0, hasMillennium: false, hasLines: false, pending: false };
       atual.systemCents += gap.systemCents;
       atual.realCents += gap.realCents;
+      atual.diffCents += gap.diffCents;
       atual.hasMillennium = atual.hasMillennium || mark.snap.millennium.length > 0;
       atual.hasLines = atual.hasLines || lines.length > 0;
       atual.pending = atual.pending || awaiting;
@@ -562,7 +570,7 @@ export function CashClosePage() {
     if (day === hoje) return { kind: "hoje", diffCents: info ? Math.max(info.systemCents, info.realCents) : 0 };
     if (!info || (info.systemCents === 0 && info.realCents === 0)) return { kind: "zero", diffCents: 0 };
     if (!info.hasMillennium && !info.hasLines) return { kind: "vazio", diffCents: 0 };
-    const diffCents = info.realCents - info.systemCents;
+    const diffCents = info.diffCents;
     if (diffCents !== 0) return { kind: "total", diffCents };
     if (info.pending || !info.hasMillennium) return { kind: "pendente", diffCents: 0 };
     return { kind: "total", diffCents: 0 };
@@ -686,18 +694,24 @@ function ResumoMes({ resumo }: { resumo: { systemCents: number; typedCents: numb
   );
 }
 
-function ContaDoDia({ systemCents, realCents }: { systemCents: number; realCents: number }) {
-  const diff = realCents - systemCents;
+function ContaDoDia({ systemCents, realCents, diffCents }: { systemCents: number; realCents: number; diffCents: number }) {
+  const fecha = realCents - systemCents === diffCents;
   return (
     <div className="mb-4 flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-[14px] border border-line bg-bg-1 px-3 py-3 text-[13px]">
-      <span className="text-t2">Total real</span>
-      <span className="font-mono font-bold text-t0">{money(realCents)}</span>
-      <span className="text-t2">−</span>
-      <span className="text-t2">Millennium</span>
-      <span className="font-mono font-bold text-t0">{money(systemCents)}</span>
-      <span className="text-t2">=</span>
+      {fecha ? (
+        <>
+          <span className="text-t2">Total real</span>
+          <span className="font-mono font-bold text-t0">{money(realCents)}</span>
+          <span className="text-t2">−</span>
+          <span className="text-t2">Millennium</span>
+          <span className="font-mono font-bold text-t0">{money(systemCents)}</span>
+          <span className="text-t2">=</span>
+        </>
+      ) : (
+        <span className="text-t2">O que está sem total real não entrou nesta conta.</span>
+      )}
       <span className="text-t2">Diferença</span>
-      <span className={cn("font-mono text-[13px] font-bold", diffClass(diff))}>{totalDia(diff)}</span>
+      <span className={cn("font-mono text-[13px] font-bold", diffClass(diffCents))}>{totalDia(diffCents)}</span>
     </div>
   );
 }
@@ -961,7 +975,7 @@ function DiaModal({
               <section key={loja.id}>
                 {lojas.length > 1 && <p className="mb-3 text-[13px] font-bold text-t0">{loja.fantasia}</p>}
                 {fechado ? (
-                  <ContaDoDia systemCents={conta.systemCents} realCents={conta.realCents} />
+                  <ContaDoDia systemCents={conta.systemCents} realCents={conta.realCents} diffCents={conta.diffCents} />
                 ) : (
                   <p className="mb-4 text-[13px] text-t2">Este dia ainda não fechou. A sobra ou a quebra aparece a partir de amanhã.</p>
                 )}
@@ -984,7 +998,7 @@ function DiaModal({
                     }))
                   }
                 />
-                {fechado && (
+                {fechado && conta.diffCents < 0 && (
                   <QuebraDoDia
                     indisponivel={quebra === "erro"}
                     breaks={
@@ -1000,7 +1014,7 @@ function DiaModal({
                     }
                   />
                 )}
-                {falta && draft && (
+                {falta && draft && conta.diffCents < 0 && (
                   <div className="mt-4 flex flex-col gap-3">
                     <FormField label="Justificativa">
                       <Textarea

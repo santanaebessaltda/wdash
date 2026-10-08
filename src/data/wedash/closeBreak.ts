@@ -1,4 +1,4 @@
-import { cashCloseBucket, type CashCloseBucket, type CashCloseLine } from "./cashCloseView";
+import { cashCloseBucket, realCentsOf, type CashCloseBucket, type CashCloseLine } from "./cashCloseView";
 
 export type CloseShift = { name: string; start: string; end: string };
 
@@ -87,7 +87,7 @@ function reasonFor(input: {
   return "A venda ficou fora dos grupos cadastrados.";
 }
 
-/** Diferença digitado − Millennium, com o grupo do horário da venda e um motivo possível. */
+/** Diferença total real − Millennium, com o grupo do horário da venda e um motivo possível. */
 export function closeBreaks(input: {
   lines: CashCloseLine[];
   sales: CloseSalePoint[];
@@ -95,9 +95,12 @@ export function closeBreaks(input: {
   timeZone: string;
   pixPending: boolean;
 }): CloseBreak[] {
-  const rows = input.lines
-    .map((line) => ({ line, diff: line.typedCents - line.systemCents }))
-    .filter((row) => row.diff !== 0);
+  const rows = input.lines.flatMap((line) => {
+    const real = realCentsOf(line);
+    if (real == null) return [];
+    const diff = real - line.systemCents;
+    return diff === 0 ? [] : [{ line, diff }];
+  });
   const opposite = new Map<number, CashCloseLine[]>();
   for (const row of rows) {
     const list = opposite.get(-row.diff) ?? [];

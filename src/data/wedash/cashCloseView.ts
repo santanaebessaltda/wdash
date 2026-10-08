@@ -148,21 +148,32 @@ export function cashCloseChips(input: {
   return ordered;
 }
 
-/** Total real da forma. No dinheiro, é o valor digitado. Sem arquivo, também fica o digitado. */
-export function realCentsOf(line: CashCloseLine): number {
-  if (line.key === "cash" || line.stoneCents == null) return line.typedCents;
+/** Total real da forma. No dinheiro, é o valor digitado. Sem arquivo, não há total real. */
+export function realCentsOf(line: CashCloseLine): number | null {
+  if (line.key === "cash") return line.typedCents;
   return line.stoneCents;
 }
 
-/** Sobra ou quebra do dia: total real − Millennium. */
-export function closeDayGap(lines: CashCloseLine[]): { systemCents: number; realCents: number; diffCents: number } {
+/** Sobra ou quebra do dia: total real − Millennium, só nas formas que têm total real. */
+export function closeDayGap(lines: CashCloseLine[]): {
+  systemCents: number;
+  comparedSystemCents: number;
+  realCents: number;
+  diffCents: number;
+} {
   let systemCents = 0;
+  let comparedSystemCents = 0;
   let realCents = 0;
+  let diffCents = 0;
   for (const line of lines) {
     systemCents += line.systemCents;
-    realCents += realCentsOf(line);
+    const real = realCentsOf(line);
+    if (real == null) continue;
+    comparedSystemCents += line.systemCents;
+    realCents += real;
+    diffCents += real - line.systemCents;
   }
-  return { systemCents, realCents, diffCents: realCents - systemCents };
+  return { systemCents, comparedSystemCents, realCents, diffCents };
 }
 
 export function closeDayTotals(lines: CashCloseLine[]): { systemCents: number; typedCents: number; diffCents: number } {
@@ -211,7 +222,7 @@ export function closeDayFace(input: { awaiting: boolean; hasLines: boolean; hasG
 
 /** Total digitado, diferença total real − Millennium e dias ainda pendentes. O mesmo dia em várias lojas conta uma vez. */
 export function monthCloseSummary(
-  rows: Array<{ day: string; systemCents: number; typedCents: number; realCents?: number; pending: boolean }>,
+  rows: Array<{ day: string; systemCents: number; typedCents: number; realCents?: number; diffCents?: number; pending: boolean }>,
 ): { systemCents: number; typedCents: number; diffCents: number; pendingDays: number } {
   let systemCents = 0;
   let typedCents = 0;
@@ -220,7 +231,7 @@ export function monthCloseSummary(
   for (const row of rows) {
     systemCents += row.systemCents;
     typedCents += row.typedCents;
-    diffCents += (row.realCents ?? row.typedCents) - row.systemCents;
+    diffCents += row.diffCents ?? (row.realCents ?? row.typedCents) - row.systemCents;
     if (row.pending) pending.add(row.day);
   }
   return { systemCents, typedCents, diffCents, pendingDays: pending.size };
