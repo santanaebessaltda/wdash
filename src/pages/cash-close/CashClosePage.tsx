@@ -5,22 +5,19 @@ import { monthCloseSpanFor } from "@/data/wedash/cashCloseMonth";
 import {
   applyCloseReview,
   buildCashCloseView,
-  cashCloseChips,
-  chipsAfterReview,
-  chipsHaveGap,
-  closeDayFace,
   closeDayTotals,
   dayAwaitingClose,
   monthCloseSummary,
   type CashCloseBucket,
-  type CloseDayFace,
   type CashCloseLine,
-  type CloseChip,
 } from "@/data/wedash/cashCloseView";
+import { closeBreaks, type CloseBreak } from "@/data/wedash/closeBreak";
 import {
   fetchCashCloseMonthMarks,
   fetchCashCloseReviews,
+  fetchCashCloseSales,
   fetchCashCloseSnapshot,
+  fetchCloseShifts,
   fetchOpenCashCloseJob,
   fetchLatestCashCloseError,
   requestMonthClose,
@@ -28,6 +25,8 @@ import {
   type CashCloseDayMark,
   type CashCloseReview,
   type CashCloseSnapshot,
+  type CloseSaleRow,
+  type CloseShiftRow,
 } from "@/data/wedash/cashCloseRepo";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import type { Store } from "@/data/wedash/stores";
@@ -48,17 +47,18 @@ const DIAS = [
   { longo: "Sáb", curto: "S" },
 ];
 
-const TOM: Record<CloseChip["tone"], string> = {
-  bad: "bg-bad text-white",
-  ok: "bg-ok text-white",
-  warn: "bg-warn text-t0",
-};
-
 const money = (cents: number | null) => (cents == null ? "—" : brlCent(cents / 100));
 
 function diffClass(cents: number | null): string {
   if (cents == null || cents === 0) return "text-t2";
   return cents < 0 ? "text-bad" : "text-ok";
+}
+
+function totalDia(cents: number): string {
+  const abs = brlCent(Math.abs(cents) / 100);
+  if (cents < 0) return `−${abs}`;
+  if (cents > 0) return `+${abs}`;
+  return abs;
 }
 
 const MESES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -199,22 +199,21 @@ function CloseTable({
   );
 }
 
-function Barras({ chips }: { chips: CloseChip[] }) {
-  if (chips.length === 0) return null;
-  const visiveis = chips.slice(0, 3);
-  const resto = chips.length - visiveis.length;
+function QuebraDoDia({ breaks, indisponivel }: { breaks: CloseBreak[]; indisponivel: boolean }) {
+  if (indisponivel) return <p className="mt-4 text-[12.5px] text-t2">Não foi possível ver o grupo deste dia.</p>;
+  if (breaks.length === 0) return null;
   return (
-    <div className="mt-1.5 flex flex-col gap-1">
-      {visiveis.map((chip) => (
-        <div key={chip.key} className={cn("truncate rounded-md px-1.5 py-1 text-[10px] font-semibold sm:text-[11px]", TOM[chip.tone])}>
-          {chip.label}
+    <div className="mt-4 flex flex-col gap-2">
+      {breaks.map((item) => (
+        <div key={item.key} className="rounded-[12px] border border-line bg-bg-1 px-3 py-2.5">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-[13px] font-bold text-t0">{labelUpper(item.label)}</p>
+            <p className={cn("font-mono text-[13px] font-bold", diffClass(item.diffCents))}>{totalDia(item.diffCents)}</p>
+          </div>
+          <p className="mt-1 text-[12.5px] text-t1">{item.groups.length === 0 ? "Sem grupo" : item.groups.join(" · ")}</p>
+          <p className="mt-0.5 text-[12.5px] text-t2">{item.reason}</p>
         </div>
       ))}
-      {resto > 0 && (
-        <span className="px-1 text-[10px] font-semibold text-t2" aria-label={resto === 1 ? "Mais 1 diferença" : `Mais ${resto} diferenças`}>
-          +{resto}
-        </span>
-      )}
     </div>
   );
 }
@@ -437,6 +436,7 @@ export function CashClosePage() {
   const [reviews, setReviews] = useState<CashCloseReview[]>([]);
   const [diaAberto, setDiaAberto] = useState<string | null>(null);
   const [dias, setDias] = useState<Record<string, CashCloseSnapshot>>({});
+  const [quebra, setQuebra] = useState<{ sales: CloseSaleRow[]; shifts: CloseShiftRow[] } | "erro" | null>(null);
   const [diaKey, setDiaKey] = useState("");
   const [erro, setErro] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -500,10 +500,16 @@ export function CashClosePage() {
     let cancelled = false;
     setErro(false);
     const key = `${storeKey}|${diaAberto}|${reloadKey}`;
-    void Promise.all(lojas.map((loja) => fetchCashCloseSnapshot(session.tenantId, loja.id, diaAberto).then((snap) => [loja.id, snap] as const)))
-      .then((rows) => {
+    const ids = lojas.map((loja) => loja.id);
+    void Promise.all([
+      Promise.all(lojas.map((loja) => fetchCashCloseSnapshot(session.tenantId, loja.id, diaAberto).then((snap) => [loja.id, snap] as const))),
+      fetchCashCloseSales(session.tenantId, ids, diaAberto).catch(() => null),
+      fetchCloseShifts(session.tenantId, ids).catch(() => null),
+    ])
+      .then(([rows, sales, shifts]) => {
         if (cancelled) return;
         setDias(Object.fromEntries(rows));
+        setQuebra(sales && shifts ? { sales, shifts } : "erro");
         setDiaKey(key);
       })
       .catch(() => {
@@ -516,7 +522,7 @@ export function CashClosePage() {
 
   const analise = useMemo(() => {
     if (marksKey !== faixaKey) return null;
-    const porDia = new Map<string, { systemCents: number; awaiting: boolean; hasLines: boolean }>();
+    const porDia = new Map<string, { systemCents: number; typedCents: number; hasMillennium: boolean; hasLines: boolean }>();
     const rows: Array<{ day: string; systemCents: number; typedCents: number; pending: boolean }> = [];
     for (const mark of marks) {
       const review = reviews.find((r) => r.storeId === mark.storeId && r.day === mark.day) ?? null;
@@ -533,43 +539,21 @@ export function CashClosePage() {
         pixCents: mark.snap.pixCents,
       });
       rows.push({ day: mark.day, systemCents: totals.systemCents, typedCents: totals.typedCents, pending: awaiting });
-      const atual = porDia.get(mark.day) ?? { systemCents: 0, awaiting: false, hasLines: false };
+      const atual = porDia.get(mark.day) ?? { systemCents: 0, typedCents: 0, hasMillennium: false, hasLines: false };
       atual.systemCents += totals.systemCents;
-      atual.awaiting = atual.awaiting || awaiting;
+      atual.typedCents += totals.typedCents;
+      atual.hasMillennium = atual.hasMillennium || mark.snap.millennium.length > 0;
       atual.hasLines = atual.hasLines || lines.length > 0;
       porDia.set(mark.day, atual);
     }
     return { resumo: monthCloseSummary(rows), porDia };
   }, [marks, reviews, marksKey, faixaKey]);
 
-  function chipsDoDia(day: string): CloseChip[] {
-    if (marksKey !== faixaKey) return [];
-    const muitos = lojas.length > 1;
-    const chips: CloseChip[] = [];
-    for (const mark of marks) {
-      if (mark.day !== day) continue;
-      const review = reviews.find((r) => r.storeId === mark.storeId && r.day === day) ?? null;
-      const nome = lojas.find((l) => l.id === mark.storeId)?.fantasia;
-      for (const chip of chipsAfterReview(cashCloseChips({ ...mark.snap, cardPending: mark.cardPending, review }), review)) {
-        chips.push({
-          ...chip,
-          key: `${mark.storeId}-${chip.key}`,
-          label: muitos && nome ? `${nome} · ${chip.label}` : chip.label,
-        });
-      }
-    }
-    return chips;
-  }
-
-  function faceDoDia(day: string): { face: CloseDayFace; systemCents: number; chips: CloseChip[] } {
-    const chips = chipsDoDia(day);
+  function faceDoDia(day: string): { kind: "vazio" | "pendente" | "total"; diffCents: number } {
     const info = analise?.porDia.get(day);
-    if (!info) return { face: "vazio", systemCents: 0, chips };
-    return {
-      face: closeDayFace({ awaiting: info.awaiting, hasLines: info.hasLines, hasGap: chipsHaveGap(chips) }),
-      systemCents: info.systemCents,
-      chips,
-    };
+    if (!info || (!info.hasMillennium && !info.hasLines)) return { kind: "vazio", diffCents: 0 };
+    if (!info.hasMillennium) return { kind: "pendente", diffCents: 0 };
+    return { kind: "total", diffCents: info.typedCents - info.systemCents };
   }
 
   function abrirDia(iso: string) {
@@ -653,6 +637,7 @@ export function CashClosePage() {
         lojas={lojas}
         snaps={dias}
         reviews={reviews}
+        quebra={diaPronto ? quebra : null}
         pronto={diaPronto}
         gestor={isGestor(session.role)}
         tenantId={session.tenantId}
@@ -715,7 +700,7 @@ function Mes({
 }: {
   hoje: string;
   cells: Array<string | null>;
-  faceDoDia: (day: string) => { face: CloseDayFace; systemCents: number; chips: CloseChip[] };
+  faceDoDia: (day: string) => { kind: "vazio" | "pendente" | "total"; diffCents: number };
   onOpen: (iso: string) => void;
 }) {
   return (
@@ -731,36 +716,44 @@ function Mes({
       <div className="grid grid-cols-7">
         {cells.map((day, i) => {
           const face = day && day <= hoje ? faceDoDia(day) : null;
+          const cor =
+            face?.kind === "pendente"
+              ? "bg-warn-soft"
+              : face?.kind === "total" && face.diffCents < 0
+                ? "bg-bad-soft"
+                : face?.kind === "total" && face.diffCents > 0
+                  ? "bg-ok-soft"
+                  : "";
           const borda = cn(
             "min-h-[84px] border-b border-r border-line p-1.5 text-left sm:min-h-[110px] sm:p-2",
             (i + 1) % 7 === 0 && "border-r-0",
             !day && "bg-bg-1/30",
-            face?.face === "pendente" && "bg-warn-soft",
+            cor,
           );
           if (!day) return <div key={`vazio-${i}`} className={borda} />;
           const futuro = day > hoje;
           const miolo = (
             <>
               <NumeroDia iso={day} hoje={hoje} />
-              {face?.face === "pendente" && (
-                <div className="mt-1.5">
-                  {face.systemCents !== 0 && (
-                    <>
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-t2">Total</p>
-                      <p className="truncate font-mono text-[11px] font-bold text-t0">{money(face.systemCents)}</p>
-                    </>
-                  )}
-                  <Badge variant="warning" className="mt-1 px-2 py-0.5 text-[10px]">
-                    Pendente
-                  </Badge>
+              {face?.kind === "pendente" && (
+                <Badge variant="warning" className="mt-2 px-2 py-0.5 text-[10px]">
+                  Pendente
+                </Badge>
+              )}
+              {face?.kind === "total" && (
+                <div className="mt-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-t2">Total</p>
+                  <p className={cn("truncate font-mono text-[12px] font-extrabold sm:text-[13px]", diffClass(face.diffCents))}>
+                    {totalDia(face.diffCents)}
+                  </p>
                 </div>
               )}
-              {(face?.face === "diferenca" || face?.face === "fechado") && <Barras chips={face.chips} />}
             </>
           );
           if (futuro) return <div key={day} className={borda}>{miolo}</div>;
+          const pintado = face?.kind === "pendente" || (face?.kind === "total" && face.diffCents !== 0);
           return (
-            <button key={day} type="button" className={cn(borda, face?.face === "pendente" ? "hover:brightness-95" : "hover:bg-bg-3")} onClick={() => onOpen(day)}>
+            <button key={day} type="button" className={cn(borda, pintado ? "hover:brightness-95" : "hover:bg-bg-3")} onClick={() => onOpen(day)}>
               {miolo}
             </button>
           );
@@ -775,6 +768,7 @@ function DiaModal({
   lojas,
   snaps,
   reviews,
+  quebra,
   pronto,
   gestor,
   tenantId,
@@ -785,6 +779,7 @@ function DiaModal({
   lojas: Store[];
   snaps: Record<string, CashCloseSnapshot>;
   reviews: CashCloseReview[];
+  quebra: { sales: CloseSaleRow[]; shifts: CloseShiftRow[] } | "erro" | null;
   pronto: boolean;
   gestor: boolean;
   tenantId: string;
@@ -962,6 +957,20 @@ function DiaModal({
                       ...atual,
                       [loja.id]: { ...(atual[loja.id] ?? draft!), acquirer: { ...(atual[loja.id]?.acquirer ?? {}), [key]: value } },
                     }))
+                  }
+                />
+                <QuebraDoDia
+                  indisponivel={quebra === "erro"}
+                  breaks={
+                    quebra && quebra !== "erro"
+                      ? closeBreaks({
+                          lines: linhas,
+                          sales: quebra.sales.filter((sale) => sale.storeId === loja.id),
+                          shifts: quebra.shifts.filter((shift) => shift.storeId === loja.id),
+                          timeZone: loja.fuso || "America/Campo_Grande",
+                          pixPending: view.pixPending,
+                        })
+                      : []
                   }
                 />
                 {falta && draft && (

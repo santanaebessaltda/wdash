@@ -1,4 +1,5 @@
 import { calendarTodayIso } from "./clock";
+import { shiftName } from "./engine/format";
 import { monthCloseSpanFor } from "./cashCloseMonth";
 import { cashCloseBucket, type CashCloseBucket, type CashCloseMillLine, type CloseAmountMap } from "./cashCloseView";
 
@@ -328,4 +329,59 @@ export async function fetchLatestCashCloseError(tenantId: string): Promise<strin
   if (!row || row.status !== "FAILED") return null;
   const message = String(row.error ?? "");
   return message.startsWith("Não foi possível") ? message : "Não foi possível buscar os fechamentos. Tente novamente.";
+}
+
+export type CloseSaleRow = {
+  storeId: string;
+  occurredAt: string;
+  paymentMethod: string;
+  sellerName: string;
+};
+
+export type CloseShiftRow = {
+  storeId: string;
+  name: string;
+  start: string;
+  end: string;
+};
+
+/** Vendas do dia, para achar o grupo do horário. */
+export async function fetchCashCloseSales(tenantId: string, storeIds: string[], day: string): Promise<CloseSaleRow[]> {
+  const { getSupabase } = await import("@/lib/supabase");
+  const sb = getSupabase();
+  if (!sb || storeIds.length === 0) return [];
+  const { data, error } = await sb
+    .from("cash_close_sale")
+    .select("store_id, occurred_at, payment_method, seller_name")
+    .eq("tenant_id", tenantId)
+    .in("store_id", storeIds)
+    .eq("day", day)
+    .limit(8000);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => ({
+    storeId: String(row.store_id),
+    occurredAt: String(row.occurred_at),
+    paymentMethod: String(row.payment_method ?? ""),
+    sellerName: String(row.seller_name ?? ""),
+  }));
+}
+
+/** Grupos da loja, no horário local. */
+export async function fetchCloseShifts(tenantId: string, storeIds: string[]): Promise<CloseShiftRow[]> {
+  const { getSupabase } = await import("@/lib/supabase");
+  const sb = getSupabase();
+  if (!sb || storeIds.length === 0) return [];
+  const { data, error } = await sb
+    .from("store_shift")
+    .select("store_id, name, start_time, end_time")
+    .eq("tenant_id", tenantId)
+    .in("store_id", storeIds)
+    .order("start_time");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => ({
+    storeId: String(row.store_id),
+    name: shiftName(String(row.name ?? "")),
+    start: String(row.start_time).slice(0, 5),
+    end: String(row.end_time).slice(0, 5),
+  }));
 }
