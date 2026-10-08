@@ -549,11 +549,14 @@ export function CashClosePage() {
     return { resumo: monthCloseSummary(rows), porDia };
   }, [marks, reviews, marksKey, faixaKey]);
 
-  function faceDoDia(day: string): { kind: "vazio" | "pendente" | "total"; diffCents: number } {
+  function faceDoDia(day: string): { kind: "vazio" | "pendente" | "hoje" | "total"; diffCents: number } {
     const info = analise?.porDia.get(day);
     if (!info || (!info.hasMillennium && !info.hasLines)) return { kind: "vazio", diffCents: 0 };
+    if (info.systemCents === 0 && info.typedCents === 0) return { kind: "vazio", diffCents: 0 };
+    const diffCents = info.typedCents - info.systemCents;
+    if (day === hoje) return { kind: "hoje", diffCents };
     if (!info.hasMillennium) return { kind: "pendente", diffCents: 0 };
-    return { kind: "total", diffCents: info.typedCents - info.systemCents };
+    return { kind: "total", diffCents };
   }
 
   function abrirDia(iso: string) {
@@ -700,7 +703,7 @@ function Mes({
 }: {
   hoje: string;
   cells: Array<string | null>;
-  faceDoDia: (day: string) => { kind: "vazio" | "pendente" | "total"; diffCents: number };
+  faceDoDia: (day: string) => { kind: "vazio" | "pendente" | "hoje" | "total"; diffCents: number };
   onOpen: (iso: string) => void;
 }) {
   return (
@@ -739,6 +742,12 @@ function Mes({
                 <Badge variant="warning" className="mt-2 px-2 py-0.5 text-[10px]">
                   Pendente
                 </Badge>
+              )}
+              {face?.kind === "hoje" && (
+                <div className="mt-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-t2">Total</p>
+                  <p className="truncate font-mono text-[12px] font-extrabold text-t1 sm:text-[13px]">{totalDia(face.diffCents)}</p>
+                </div>
               )}
               {face?.kind === "total" && (
                 <div className="mt-2">
@@ -819,7 +828,7 @@ function DiaModal({
   const comDados = day
     ? lojas.filter((loja) => {
         const snap = snaps[loja.id];
-        return snap && buildCashCloseView(snap).lines.length > 0;
+        return snap && buildCashCloseView(snap).lines.some((line) => line.systemCents !== 0 || line.typedCents !== 0 || line.stoneCents != null);
       })
     : [];
 
