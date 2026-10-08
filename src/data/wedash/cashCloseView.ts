@@ -190,7 +190,7 @@ export function realCentsOf(line: CashCloseLine): number | null {
   return line.stoneCents;
 }
 
-/** Sobra ou quebra do dia: total real − Millennium. Sem total real, a forma conta como zero. */
+/** Sobra ou quebra do dia: total real − Millennium. Forma sem total real não entra na diferença. */
 export function closeDayGap(lines: CashCloseLine[]): {
   systemCents: number;
   comparedSystemCents: number;
@@ -198,15 +198,18 @@ export function closeDayGap(lines: CashCloseLine[]): {
   diffCents: number;
 } {
   let systemCents = 0;
+  let comparedSystemCents = 0;
   let realCents = 0;
   let diffCents = 0;
   for (const line of lines) {
     systemCents += line.systemCents;
-    const real = realCentsOf(line) ?? 0;
+    const real = realCentsOf(line);
+    if (real == null) continue;
+    comparedSystemCents += line.systemCents;
     realCents += real;
     diffCents += real - line.systemCents;
   }
-  return { systemCents, comparedSystemCents: systemCents, realCents, diffCents };
+  return { systemCents, comparedSystemCents, realCents, diffCents };
 }
 
 export function closeDayTotals(lines: CashCloseLine[]): { systemCents: number; typedCents: number; diffCents: number } {

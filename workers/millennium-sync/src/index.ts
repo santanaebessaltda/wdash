@@ -13,7 +13,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { installAsciiConsole } from "./consoleAscii.ts";
-import { createAdminClient, disconnectTenantSessions, enqueueDueAutoRefreshJobs, enqueueDueCloseJobs, enqueueDueDeepHistoryJobs, enqueueDueLightJobs, processOneJob, purgeOldSyncLogs, recoverOnStartup, SYNC_LOG_RETENTION_DAYS, recoverStaleRunningJobs } from "./deps.ts";
+import { createAdminClient, disconnectTenantSessions, enqueueDueAutoRefreshJobs, enqueueDueCashCloseCatchUp, enqueueDueCloseJobs, enqueueDueDeepHistoryJobs, enqueueDueLightJobs, processOneJob, purgeOldSyncLogs, recoverOnStartup, SYNC_LOG_RETENTION_DAYS, recoverStaleRunningJobs } from "./deps.ts";
 import { logoutMillennium } from "./millenniumAuth.ts";
 import { closeHour, dailyCloseEnabled, releaseActiveMillenniumSession } from "./runSyncJob.ts";
 import { downloadStonePixCsv } from "./stonePix.ts";
@@ -157,7 +157,9 @@ async function main() {
     if (!dailyCloseEnabled() || Date.now() - lastCloseScan < 10 * 60_000) return 0;
     lastCloseScan = Date.now();
     try {
-      return await enqueueDueCloseJobs(sb);
+      const queued = await enqueueDueCloseJobs(sb);
+      const catchUp = await enqueueDueCashCloseCatchUp(sb);
+      return queued + catchUp;
     } catch (e) {
       console.warn(`Fechamento: varredura falhou: ${e instanceof Error ? e.message : String(e)}`);
       return 0;

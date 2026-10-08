@@ -1515,6 +1515,86 @@ export async function enqueueDueCloseJobs(sb: SupabaseClient, now = new Date()):
 }
 
 /**
+ * Um dia por vez, na madrugada: venda já gravada e ainda sem fechamento de caixa.
+ * Não compete com outro CLOSE na fila. O mês atual da adquirente entra ao conectar.
+ */
+export async function enqueueDueCashCloseCatchUp(sb: SupabaseClient, now = new Date()): Promise<number> {
+  if (!dailyCloseEnabled()) return 0;
+  const { data: creds, error } = await sb.from("erp_credential").select("id, tenant_id, sync_paused").eq("status", "VALID");
+  if (error) throw error;
+  let n = 0;
+  for (const c of creds ?? []) {
+    if (!isIntegrationActive(c as { sync_paused?: boolean | null })) continue;
+    const tenantId = c.tenant_id as string;
+    const credentialId = c.id as string;
+    const { data: firstStore } = await sb
+      .from("store")
+      .select("timezone")
+      .eq("tenant_id", tenantId)
+      .eq("active", true)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (!firstStore) continue;
+    const tz = (firstStore.timezone as string) || "America/Campo_Grande";
+    if (!isCloseWindow(hourInTz(now, tz), closeHour())) continue;
+    const today = ymdInTz(now, tz);
+
+    const { data: busy } = await sb
+      .from("sync_job")
+      .select("id")
+      .eq("credential_id", credentialId)
+      .eq("kind", "CLOSE")
+      .in("status", ["QUEUED", "RUNNING"])
+      .limit(1)
+      .maybeSingle();
+    if (busy) continue;
+
+    const { data: storeRows, error: storeErr } = await sb.from("store").select("id").eq("tenant_id", tenantId).eq("active", true);
+    if (storeErr) throw storeErr;
+    let chosen: { day: string; storeIds: string[] } | null = null;
+    for (const store of storeRows ?? []) {
+      const storeId = store.id as string;
+      const { data: sales, error: salesErr } = await sb
+        .from("sales_day_agg")
+        .select("day")
+        .eq("tenant_id", tenantId)
+        .eq("store_id", storeId)
+        .eq("brand", "ALL")
+        .gt("revenue_cents", 0)
+        .lt("day", today)
+        .order("day", { ascending: false })
+        .limit(45);
+      if (salesErr) throw salesErr;
+      const days = [...new Set((sales ?? []).map((row) => String(row.day).slice(0, 10)))];
+      if (days.length === 0) continue;
+      const { data: closed, error: closedErr } = await sb
+        .from("cash_close_day")
+        .select("day")
+        .eq("store_id", storeId)
+        .in("day", days);
+      if (closedErr) throw closedErr;
+      const have = new Set((closed ?? []).map((row) => String(row.day).slice(0, 10)));
+      const missing = days.find((day) => !have.has(day));
+      if (!missing) continue;
+      if (!chosen || missing > chosen.day) chosen = { day: missing, storeIds: [storeId] };
+      else if (missing === chosen.day) chosen.storeIds.push(storeId);
+    }
+    if (!chosen) continue;
+    const { error: insErr } = await sb.from("sync_job").insert({
+      tenant_id: tenantId,
+      credential_id: credentialId,
+      kind: "CLOSE",
+      status: "QUEUED",
+      payload: { from: chosen.day, to: chosen.day, storeIds: chosen.storeIds, cashOnly: true },
+    });
+    if (insErr) throw insErr;
+    n += 1;
+  }
+  return n;
+}
+
+/**
  * Atualizacao automatica: enfileira o Atualizar de hoje (FORCE com `auto: true`) das lojas no expediente
  * 30 min depois da ultima rodada automatica + a ultima rodada do dia (fechamento + 30 min); loja sem
  * horario configurado nao entra (rodada perdida = roda assim que reconectar). O dia fecha na madrugada.

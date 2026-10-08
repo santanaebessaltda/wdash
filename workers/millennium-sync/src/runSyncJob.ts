@@ -1,4 +1,5 @@
 import { closeSaleDays } from "../../../src/data/wedash/cashCloseView.ts";
+import { stoneFileReady } from "../../../src/data/wedash/stoneClock.ts";
 import { aggregatePaymentDay, aggregateSales, aggregateSellerDay, cashCloseSalesFromRows } from "../../../src/data/wedash/salesAggregate.ts";
 import type { CashCloseDay, CashCloseSale, SalesDayAgg, SalesHourAgg } from "../../../src/data/wedash/salesTypes.ts";
 import type { SaleRow } from "../../../src/data/wedash/salesTypes.ts";
@@ -217,12 +218,13 @@ async function syncStoreStone(
 ): Promise<void> {
   if (!args.store.stoneCode || !args.store.stoneSecretCiphertext) return;
   if (!deps.fetchStoneCaptures || !deps.replaceStoneCaptures) return;
-  const today = ymdInTz(args.now, args.store.timezone);
+  const realNow = new Date();
+  const today = ymdInTz(realNow, args.store.timezone);
   const cardDays = deps.listCashCloseActivity
     ? closeSaleDays(await deps.listCashCloseActivity({ storeId: args.store.id, from: args.from, to: args.to })).card
     : null;
   for (let day = args.from; day <= args.to; day = addDaysIso(day, 1)) {
-    if (day >= today) continue;
+    if (day >= today || !stoneFileReady(day, realNow)) continue;
     if (cardDays && !cardDays.has(day)) {
       console.log(`  ${args.store.code} ${day}: sem venda de cartão no Millennium`);
       continue;

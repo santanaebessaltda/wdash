@@ -114,13 +114,13 @@ serve(async (req) => {
   return json({ ok: true, stoneCode, covers });
 });
 
-/** Do dia 1 do mês anterior até ontem, na fila do worker. A madrugada continua no D+1. */
+/** Do dia 1 do mês atual até ontem. O dia de hoje entra na madrugada seguinte. */
 async function enqueuePastClose(admin: ReturnType<typeof createClient>, tenantId: string, storeId: string): Promise<void> {
   const { data: store } = await admin.from("store").select("timezone").eq("id", storeId).maybeSingle();
   const tz = (store?.timezone as string | null) || "America/Sao_Paulo";
   const today = ymdInTimeZone(new Date(), tz);
   const to = shiftIso(today, -1);
-  const from = previousMonthStart(to);
+  const from = `${today.slice(0, 8)}01`;
   if (to < from) return;
   const { data: cred } = await admin
     .from("erp_credential")
@@ -160,7 +160,3 @@ function shiftIso(iso: string, days: number): string {
   return new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, (d ?? 1) + days)).toISOString().slice(0, 10);
 }
 
-function previousMonthStart(iso: string): string {
-  const [y, m] = iso.split("-").map(Number);
-  return new Date(Date.UTC(y ?? 1970, (m ?? 1) - 2, 1)).toISOString().slice(0, 10);
-}

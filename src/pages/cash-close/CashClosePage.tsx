@@ -159,27 +159,28 @@ function CloseTable({
           <tbody>
             {lines.map((row) => {
               const real = realCentsOf(row);
-              const diff = (real ?? 0) - row.systemCents;
-              const acqTxt = draft?.acquirer[row.key] ?? centsToField(row.stoneCents ?? 0);
+              const diff = real == null ? null : real - row.systemCents;
+              const acqTxt = draft?.acquirer[row.key] ?? (row.stoneCents == null ? "" : centsToField(row.stoneCents));
               return (
                 <tr key={row.key} className="border-b border-line">
                   <td className="px-3 py-3 text-t0">{labelUpper(row.label)}</td>
                   <td className="px-3 py-3 text-right font-mono text-[13px] font-bold text-t0">{money(row.systemCents)}</td>
                   <td className="px-3 py-2.5 text-right">
                     {row.key === "cash" || !(gestor && draft && onAcquirer) ? (
-                      <span className="font-mono text-[13px] font-bold text-t0">{money(real ?? 0)}</span>
+                      <span className="font-mono text-[13px] font-bold text-t0">{real == null ? "—" : money(real)}</span>
                     ) : (
                       <input
                         value={acqTxt}
                         onChange={(e) => onAcquirer(row.key, e.target.value)}
                         inputMode="decimal"
+                        placeholder="—"
                         aria-label={`Total real para ${row.label}`}
                         className={campo}
                       />
                     )}
                   </td>
-                  <td className={cn("px-3 py-3 text-right font-mono text-[13px] font-bold", fechado ? diffClass(diff) : "text-t2")}>
-                    {fechado ? totalDia(diff) : "—"}
+                  <td className={cn("px-3 py-3 text-right font-mono text-[13px] font-bold", fechado && diff != null ? diffClass(diff) : "text-t2")}>
+                    {fechado && diff != null ? totalDia(diff) : "—"}
                   </td>
                 </tr>
               );
@@ -189,9 +190,11 @@ function CloseTable({
             <tr className="bg-bg-1">
               <td className="px-3 py-3 text-[12px] font-bold uppercase tracking-wide text-t2">Total</td>
               <td className="px-3 py-3 text-right font-mono text-[13px] font-bold text-t0">{money(conta.systemCents)}</td>
-              <td className="px-3 py-3 text-right font-mono text-[13px] font-bold text-t0">{money(conta.realCents)}</td>
-              <td className={cn("px-3 py-3 text-right font-mono text-[13px] font-bold", fechado ? diffClass(conta.diffCents) : "text-t2")}>
-                {fechado ? totalDia(conta.diffCents) : "—"}
+              <td className="px-3 py-3 text-right font-mono text-[13px] font-bold text-t0">
+                {dayWithoutReal(lines) ? "—" : money(conta.realCents)}
+              </td>
+              <td className={cn("px-3 py-3 text-right font-mono text-[13px] font-bold", fechado && !dayWithoutReal(lines) ? diffClass(conta.diffCents) : "text-t2")}>
+                {fechado && !dayWithoutReal(lines) ? totalDia(conta.diffCents) : "—"}
               </td>
             </tr>
           </tfoot>
@@ -554,13 +557,13 @@ export function CashClosePage() {
     return { resumo: monthCloseSummary(rows), porDia };
   }, [marks, reviews, marksKey, faixaKey, hoje]);
 
-  function faceDoDia(day: string): { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; diffCents: number } {
+  function faceDoDia(day: string): { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number } {
     const info = analise?.porDia.get(day);
-    if (day === hoje) return { kind: "hoje", diffCents: info ? Math.max(info.systemCents, info.realCents) : 0 };
-    if (info?.pending) return { kind: "pendente", diffCents: Math.max(info.systemCents, info.realCents) };
-    if (!info || (info.systemCents === 0 && info.realCents === 0)) return { kind: "zero", diffCents: 0 };
-    if (!info.hasMillennium && !info.hasLines) return { kind: "vazio", diffCents: 0 };
-    return { kind: "total", diffCents: info.diffCents };
+    if (day === hoje) return { kind: "hoje", totalCents: info ? Math.max(info.systemCents, info.realCents) : 0, diffCents: 0 };
+    if (info?.pending) return { kind: "pendente", totalCents: info.systemCents, diffCents: 0 };
+    if (!info || (info.systemCents === 0 && info.realCents === 0)) return { kind: "zero", totalCents: 0, diffCents: 0 };
+    if (!info.hasMillennium && !info.hasLines) return { kind: "vazio", totalCents: 0, diffCents: 0 };
+    return { kind: "total", totalCents: info.realCents, diffCents: info.diffCents };
   }
 
   function abrirDia(iso: string) {
@@ -726,7 +729,7 @@ function Mes({
 }: {
   hoje: string;
   cells: Array<string | null>;
-  faceDoDia: (day: string) => { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; diffCents: number };
+  faceDoDia: (day: string) => { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number };
   onOpen: (iso: string) => void;
 }) {
   return (
@@ -766,18 +769,18 @@ function Mes({
                   Pendente
                 </Badge>
               )}
-              {(face?.kind === "hoje" || face?.kind === "pendente") && (
+              {(face?.kind === "hoje" || face?.kind === "pendente" || face?.kind === "total") && (
                 <div className="mt-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-t2">Total</p>
                   <p className="truncate font-mono text-[12px] font-extrabold text-t1 sm:text-[13px]">
-                    {brlCent(face.diffCents / 100)}
+                    {brlCent(face.totalCents / 100)}
                   </p>
+                  {face.kind === "total" && face.diffCents !== 0 && (
+                    <Badge variant={face.diffCents > 0 ? "success" : "danger"} className="mt-1 px-2 py-0.5 text-[10px]">
+                      {totalDia(face.diffCents)}
+                    </Badge>
+                  )}
                 </div>
-              )}
-              {face?.kind === "total" && (
-                <p className={cn("mt-2 truncate font-mono text-[12px] font-extrabold sm:text-[13px]", diffClass(face.diffCents))}>
-                  {totalDia(face.diffCents)}
-                </p>
               )}
             </>
           );
@@ -837,7 +840,7 @@ function DiaModal({
         typed[line.key] = centsToField(salvo ?? line.typedCents);
         const manual = review?.acquirerCents[line.key];
         const shown = manual ?? line.stoneCents;
-        acquirer[line.key] = centsToField(shown ?? 0);
+        acquirer[line.key] = shown == null ? "" : centsToField(shown);
       }
       next[loja.id] = {
         typed,
@@ -976,8 +979,10 @@ function DiaModal({
             return (
               <section key={loja.id}>
                 {lojas.length > 1 && <p className="mb-3 text-[13px] font-bold text-t0">{loja.fantasia}</p>}
-                {fechado ? (
-                  <ContaDoDia systemCents={conta.systemCents} realCents={conta.realCents} diffCents={conta.diffCents} />
+                {fechado && !dayWithoutReal(linhas) ? (
+                  <ContaDoDia systemCents={conta.comparedSystemCents} realCents={conta.realCents} diffCents={conta.diffCents} />
+                ) : fechado ? (
+                  <p className="mb-4 text-[13px] text-t2">Falta o total real de alguma forma. A diferença aparece quando ele for informado.</p>
                 ) : (
                   <p className="mb-4 text-[13px] text-t2">Este dia ainda não fechou. A sobra ou a quebra aparecerá a partir de amanhã.</p>
                 )}
