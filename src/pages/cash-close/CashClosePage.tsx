@@ -161,21 +161,20 @@ function CloseTable({
             {lines.map((row) => {
               const real = realCentsOf(row);
               const diff = (real ?? 0) - row.systemCents;
-              const acqTxt = draft?.acquirer[row.key] ?? (row.stoneCents == null ? "" : centsToField(row.stoneCents));
+              const acqTxt = draft?.acquirer[row.key] ?? centsToField(row.stoneCents ?? 0);
               return (
                 <tr key={row.key} className="border-b border-line">
                   <td className="px-3 py-3 text-t0">{labelUpper(row.label)}</td>
                   <td className="px-3 py-3 text-right font-mono text-[13px] font-bold text-t0">{money(row.systemCents)}</td>
                   <td className="px-3 py-2.5 text-right">
                     {row.key === "cash" || !(gestor && draft && onAcquirer) ? (
-                      <span className="font-mono text-[13px] font-bold text-t0">{money(real)}</span>
+                      <span className="font-mono text-[13px] font-bold text-t0">{money(real ?? 0)}</span>
                     ) : (
                       <input
                         value={acqTxt}
                         onChange={(e) => onAcquirer(row.key, e.target.value)}
                         inputMode="decimal"
                         aria-label={`Total real para ${row.label}`}
-                        placeholder="—"
                         className={campo}
                       />
                     )}
@@ -835,7 +834,7 @@ function DiaModal({
         typed[line.key] = centsToField(salvo ?? line.typedCents);
         const manual = review?.acquirerCents[line.key];
         const shown = manual ?? line.stoneCents;
-        acquirer[line.key] = shown == null ? "" : centsToField(shown);
+        acquirer[line.key] = centsToField(shown ?? 0);
       }
       next[loja.id] = {
         typed,
@@ -882,7 +881,7 @@ function DiaModal({
           show(`O total real para ${line.label} não é válido.`, "danger");
           break;
         }
-        if (real != null && real !== line.stoneCents) acquirerCents[line.key] = real;
+        if (real != null && real !== line.stoneCents && !(line.stoneCents == null && real === 0)) acquirerCents[line.key] = real;
       }
       if (invalido) {
         setBusy(false);
@@ -966,7 +965,7 @@ function DiaModal({
               if (line.key !== "cash") {
                 const raw = draft.acquirer[line.key] ?? "";
                 const real = fieldToCents(raw);
-                if (raw.trim() && real != null) next.stoneCents = real;
+                if (raw.trim() && real != null && !(line.stoneCents == null && real === 0)) next.stoneCents = real;
               }
               return next;
             });
