@@ -204,22 +204,18 @@ function CloseTable({
 }
 
 function QuebraDoDia({ breaks, indisponivel }: { breaks: CloseBreak[]; indisponivel: boolean }) {
-  if (indisponivel) return <p className="mt-4 text-[12.5px] text-t2">Não foi possível ver o grupo deste dia.</p>;
-  if (breaks.length === 0) return null;
+  const faltas = breaks.filter((item) => item.diffCents < 0);
+  if (faltas.length === 0) {
+    if (!indisponivel) return null;
+    return <p className="mt-4 text-[12.5px] text-t2">Não foi possível ver o grupo deste dia.</p>;
+  }
   return (
     <div className="mt-4 flex flex-col gap-2">
-      {breaks.map((item) => (
+      {faltas.map((item) => (
         <div key={item.key} className="rounded-[12px] border border-line bg-bg-1 px-3 py-2.5">
-          <div className="flex items-baseline justify-between gap-3">
-            <p className="text-[13px] font-bold text-t0">{labelUpper(item.label)}</p>
-            <p className={cn("font-mono text-[13px] font-bold", diffClass(item.diffCents))}>{totalDia(item.diffCents)}</p>
-          </div>
-          {item.diffCents < 0 && (
-            <>
-              <p className="mt-1 text-[12.5px] text-t1">{item.groups.length === 0 ? "Sem grupo" : item.groups.join(" · ")}</p>
-              <p className="mt-0.5 text-[12.5px] text-t2">{item.reason}</p>
-            </>
-          )}
+          <p className="text-[13px] font-bold text-t0">{labelUpper(item.label)}</p>
+          <p className="mt-1 text-[12.5px] text-t1">{item.groups.length === 0 ? "Sem grupo" : item.groups.join(" · ")}</p>
+          <p className="mt-0.5 text-[12.5px] text-t2">{item.reason}</p>
         </div>
       ))}
     </div>
