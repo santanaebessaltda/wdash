@@ -668,6 +668,21 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
       return fetchCashCloseReport({ ...args, baseUrl: millenniumBaseUrl() });
     },
 
+    async listCashCloseActivity(args) {
+      const { data, error } = await sb
+        .from("cash_close_day")
+        .select("day, payment_method, closing_cents")
+        .eq("store_id", args.storeId)
+        .gte("day", args.from)
+        .lte("day", args.to);
+      if (error) throw error;
+      return (data ?? []).map((row) => ({
+        day: String(row.day),
+        paymentMethod: String(row.payment_method ?? ""),
+        closingCents: Number(row.closing_cents) || 0,
+      }));
+    },
+
     async fetchStoneCaptures(args) {
       const secret = await decryptPassword(args.secretCiphertext, erpSecret);
       return fetchStoneConciliation({ stoneCode: args.stoneCode, secret, day: args.day });

@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { missingCloseDays } from "../../../src/data/wedash/cashCloseMonth.ts";
-import { cashCloseBucket } from "../../../src/data/wedash/cashCloseView.ts";
+import { closeSaleDays } from "../../../src/data/wedash/cashCloseView.ts";
 import { stoneFileReady } from "../../../src/data/wedash/stoneClock.ts";
 import { decryptPassword } from "./decrypt.ts";
 import { fetchStoneConciliation } from "./stoneConciliation.ts";
@@ -22,7 +22,7 @@ function digits(raw: string | null | undefined): string {
   return (raw ?? "").replace(/\D/g, "");
 }
 
-async function millenniumPixDays(sb: SupabaseClient, storeId: string, from: string, to: string): Promise<Set<string>> {
+async function millenniumSaleDays(sb: SupabaseClient, storeId: string, from: string, to: string) {
   const { data, error } = await sb
     .from("cash_close_day")
     .select("day, payment_method, closing_cents")
@@ -30,13 +30,13 @@ async function millenniumPixDays(sb: SupabaseClient, storeId: string, from: stri
     .gte("day", from)
     .lte("day", to);
   if (error) throw error;
-  const days = new Set<string>();
-  for (const row of data ?? []) {
-    if (cashCloseBucket(String(row.payment_method ?? "")) === "pix" && Number(row.closing_cents) > 0) {
-      days.add(String(row.day).slice(0, 10));
-    }
-  }
-  return days;
+  return closeSaleDays(
+    (data ?? []).map((row) => ({
+      day: String(row.day),
+      paymentMethod: String(row.payment_method ?? ""),
+      closingCents: Number(row.closing_cents) || 0,
+    })),
+  );
 }
 
 async function filledDays(sb: SupabaseClient, tenantId: string, storeId: string, from: string, to: string): Promise<Set<string>> {
@@ -198,7 +198,7 @@ export async function runCashCloseFillJob(
     const end = to < today ? to : addDaysIso(today, -1);
     if (from > end) continue;
     const files = await stoneState(sb, store.id, from, end);
-    const pixDays = await millenniumPixDays(sb, store.id, from, end);
+    const sales = await millenniumSaleDays(sb, store.id, from, end);
     const tax = digits(store.taxId);
     const webhookUrl = process.env.STONE_WEBHOOK_PUBLIC_URL?.trim() ?? "";
     let pixParado = false;
@@ -225,7 +225,16 @@ export async function runCashCloseFillJob(
     for (let day = from; day <= end; day = addDaysIso(day, 1)) {
       if (!stoneFileReady(day, now)) continue;
       const file = files.get(day);
-      if (covers === "all" && !file?.card) {
+      const wouldCard = covers === "all" && !file?.card;
+      const wouldPix = !pixParado && tax.length >= 11 && pixDue(file?.pix ?? null, now);
+      if (!sales.any.has(day)) {
+        if (wouldCard || wouldPix) console.log(`  ${store.code} ${day}: sem venda no Millennium`);
+        continue;
+      }
+      if (wouldCard && !sales.card.has(day)) {
+        console.log(`  ${store.code} ${day}: sem venda de cartão no Millennium`);
+      }
+      if (wouldCard && sales.card.has(day)) {
         try {
           const captures = await fetchStoneConciliation({ stoneCode, secret, day });
           await replaceCaptures(sb, { tenantId: job.tenantId, storeId: store.id, day, rows: captures });
@@ -243,10 +252,10 @@ export async function runCashCloseFillJob(
           problems.push(`Não foi possível buscar o cartão da adquirente em ${day}.`);
         }
       }
-      if (!pixParado && tax.length >= 11 && pixDue(file?.pix ?? null, now) && !pixDays.has(day)) {
+      if (wouldPix && !sales.pix.has(day)) {
         console.log(`  ${store.code} ${day}: sem venda de Pix no Millennium`);
       }
-      if (!pixParado && tax.length >= 11 && pixDue(file?.pix ?? null, now) && pixDays.has(day)) {
+      if (wouldPix && sales.pix.has(day)) {
         try {
           await requestStonePixFile({ document: tax, secret, day });
           await markStoneFile(sb, {

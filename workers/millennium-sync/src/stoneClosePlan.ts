@@ -9,6 +9,8 @@ export type StoneCloseStore = {
   covers: "all" | "online_pix";
   /** Dias já encerrados para olhar (ontem e anteontem). */
   days: string[];
+  /** Dias com crédito ou débito no Millennium. */
+  cardDays: string[];
   /** Dias em que o Millennium registrou venda de Pix. */
   pixDays: string[];
 };
@@ -48,7 +50,7 @@ export function planStoneClose(now: Date, stores: StoneCloseStore[], files: Ston
     for (const day of store.days) {
       if (!stoneFileReady(day, now)) continue;
       const file = byKey.get(`${store.storeId}|${day}`);
-      const fetchCard = store.covers === "all" && file?.card !== "received";
+      const fetchCard = store.covers === "all" && store.cardDays.includes(day) && file?.card !== "received";
       const requestPix =
         store.pixDays.includes(day) &&
         store.taxDigits.length >= 11 &&

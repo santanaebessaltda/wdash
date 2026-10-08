@@ -10,6 +10,7 @@ const store: StoneCloseStore = {
   taxDigits: "12345678000199",
   covers: "all",
   days: ["2026-10-07", "2026-10-06"],
+  cardDays: ["2026-10-07", "2026-10-06"],
   pixDays: ["2026-10-07", "2026-10-06"],
 };
 
@@ -60,6 +61,12 @@ describe("planStoneClose", () => {
   it("loja só de PIX online não baixa o extrato de cartão", () => {
     const actions = planStoneClose(now, [{ ...store, covers: "online_pix", days: ["2026-10-07"] }], []);
     expect(actions).toEqual([expect.objectContaining({ fetchCard: false, requestPix: true })]);
+  });
+
+  it("não baixa cartão em dia sem crédito ou débito no Millennium", () => {
+    const actions = planStoneClose(now, [{ ...store, cardDays: ["2026-10-07"] }], []);
+    expect(actions.find((a) => a.day === "2026-10-07")).toMatchObject({ fetchCard: true });
+    expect(actions.find((a) => a.day === "2026-10-06")).toMatchObject({ fetchCard: false, requestPix: true });
   });
 
   it("não pede Pix em dia sem venda de Pix no Millennium", () => {

@@ -12,6 +12,7 @@ import {
   realCentsOf,
   dayAwaitingClose,
   monthCloseSummary,
+  closeSaleDays,
   paidPixCents,
   chipsAfterReview,
 } from "./cashCloseView";
@@ -178,6 +179,17 @@ describe("resumo do fechamento", () => {
     });
     expect(realCentsOf(view.lines[0])).toBeNull();
     expect(closeDayGap(view.lines)).toEqual({ systemCents: 2541340, comparedSystemCents: 2541340, realCents: 0, diffCents: -2541340 });
+  });
+
+  it("separa dia com venda, dia de cartão e dia de Pix", () => {
+    const days = closeSaleDays([
+      { day: "2026-10-01", paymentMethod: "DINHEIRO", closingCents: 0 },
+      { day: "2026-10-06", paymentMethod: "CARTÃO DE CRÉDITO", closingCents: 1000 },
+      { day: "2026-10-07", paymentMethod: "PIX", closingCents: 500 },
+    ]);
+    expect([...days.any].sort()).toEqual(["2026-10-06", "2026-10-07"]);
+    expect([...days.card]).toEqual(["2026-10-06"]);
+    expect([...days.pix]).toEqual(["2026-10-07"]);
   });
 
   it("soma o Pix pago e usa esse total na diferença do dia", () => {

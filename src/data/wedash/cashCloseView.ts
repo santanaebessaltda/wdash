@@ -155,6 +155,24 @@ export function cashCloseChips(input: {
   return ordered;
 }
 
+/** Dias com venda no fechamento do Millennium. Cartão = crédito ou débito. */
+export function closeSaleDays(
+  rows: Array<{ day: string; paymentMethod: string; closingCents: number }>,
+): { any: Set<string>; card: Set<string>; pix: Set<string> } {
+  const any = new Set<string>();
+  const card = new Set<string>();
+  const pix = new Set<string>();
+  for (const row of rows) {
+    if (row.closingCents <= 0) continue;
+    const day = row.day.slice(0, 10);
+    any.add(day);
+    const bucket = cashCloseBucket(row.paymentMethod);
+    if (bucket === "credit" || bucket === "debit") card.add(day);
+    if (bucket === "pix") pix.add(day);
+  }
+  return { any, card, pix };
+}
+
 /** Soma o Pix pago. Cancelado fica de fora. O inteiro já está em centavos. */
 export function paidPixCents(rows: Array<{ status: string; paidCents: number }>): number {
   let total = 0;

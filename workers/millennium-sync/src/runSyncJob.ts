@@ -1,3 +1,4 @@
+import { closeSaleDays } from "../../../src/data/wedash/cashCloseView.ts";
 import { aggregatePaymentDay, aggregateSales, aggregateSellerDay, cashCloseSalesFromRows } from "../../../src/data/wedash/salesAggregate.ts";
 import type { CashCloseDay, CashCloseSale, SalesDayAgg, SalesHourAgg } from "../../../src/data/wedash/salesTypes.ts";
 import type { SaleRow } from "../../../src/data/wedash/salesTypes.ts";
@@ -205,7 +206,7 @@ export async function syncStoreCashClose(
 
 /** Arquivo Stone do dia anterior (e dos dias da janela já encerrados). Hoje ainda não existe. */
 async function syncStoreStone(
-  deps: Pick<SyncJobDeps, "fetchStoneCaptures" | "replaceStoneCaptures">,
+  deps: Pick<SyncJobDeps, "fetchStoneCaptures" | "replaceStoneCaptures" | "listCashCloseActivity">,
   args: {
     tenantId: string;
     store: SyncStore;
@@ -217,8 +218,15 @@ async function syncStoreStone(
   if (!args.store.stoneCode || !args.store.stoneSecretCiphertext) return;
   if (!deps.fetchStoneCaptures || !deps.replaceStoneCaptures) return;
   const today = ymdInTz(args.now, args.store.timezone);
+  const cardDays = deps.listCashCloseActivity
+    ? closeSaleDays(await deps.listCashCloseActivity({ storeId: args.store.id, from: args.from, to: args.to })).card
+    : null;
   for (let day = args.from; day <= args.to; day = addDaysIso(day, 1)) {
     if (day >= today) continue;
+    if (cardDays && !cardDays.has(day)) {
+      console.log(`  ${args.store.code} ${day}: sem venda de cartão no Millennium`);
+      continue;
+    }
     try {
       const captures = await deps.fetchStoneCaptures({
         secretCiphertext: args.store.stoneSecretCiphertext,
@@ -1610,6 +1618,12 @@ export type SyncJobDeps = {
     to: string;
     rows: CashCloseDay[];
   }) => Promise<void>;
+  /** Formas do fechamento já gravadas. A Stone só é pedida no dia que teve venda. */
+  listCashCloseActivity?: (args: {
+    storeId: string;
+    from: string;
+    to: string;
+  }) => Promise<Array<{ day: string; paymentMethod: string; closingCents: number }>>;
   /** Capturas Stone de um dia já fechado (o arquivo só existe no dia seguinte). */
   fetchStoneCaptures?: (args: { secretCiphertext: string; stoneCode: string; day: string }) => Promise<StoneCapture[]>;
   replaceStoneCaptures?: (args: {
