@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Alert, Badge, Button, Card, Checkbox, FormField, Modal, Skeleton, Textarea, Tooltip, useToast } from "@/components/ui";
+import { Alert, Badge, Button, Card, Checkbox, FormField, Modal, Skeleton, Textarea, useToast } from "@/components/ui";
 import { monthCloseSpanFor } from "@/data/wedash/cashCloseMonth";
 import {
   applyCloseReview,
@@ -33,7 +33,8 @@ import { calendarTodayIso } from "@/data/wedash/clock";
 import type { Store } from "@/data/wedash/stores";
 import { isGestor } from "@/layout/nav-wedash";
 import { cn } from "@/lib/cn";
-import { brlCent, dataCurta, dataExtenso, deIso, fimDoMes, inicioDoMes, paraIso, somarDias, labelUpper } from "@/lib/format";
+import { brlCent, dataExtenso, deIso, fimDoMes, inicioDoMes, paraIso, somarDias, labelUpper } from "@/lib/format";
+import { FORCE_REFRESH_CLICK_EVENT, SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { parseNum, SectionHeader, useScopedStores } from "@/pages/operation/shared";
@@ -468,7 +469,10 @@ export function CashClosePage() {
   const [reloadKey, setReloadKey] = useState(0);
 
   const storeKey = lojas.map((l) => l.id).join(",");
-  const span = monthCloseSpanFor(anchor, hoje);
+  const lojasRef = useRef(lojas);
+  lojasRef.current = lojas;
+  const anchorRef = useRef(anchor);
+  anchorRef.current = anchor;
   const podeAvancar = somarMes(anchor, 1) <= hoje;
   const cells = useMemo(() => celulasDoMes(anchor), [anchor]);
   const from = inicioDoMes(anchor);
@@ -479,23 +483,46 @@ export function CashClosePage() {
   useEffect(() => {
     if (!syncing) return;
     let stop = false;
+    let checks = 0;
     const tick = async () => {
+      checks += 1;
       const open = await fetchOpenCashCloseJob(session.tenantId);
+      if (stop || open || checks < 2) return;
+      const message = await fetchLatestCashCloseError(session.tenantId);
       if (stop) return;
-      if (!open) {
-        const message = await fetchLatestCashCloseError(session.tenantId);
-        if (stop) return;
-        setSyncing(false);
-        setReloadKey((n) => n + 1);
-        if (message) show(message, "danger");
-      }
+      setSyncing(false);
+      setReloadKey((n) => n + 1);
+      if (message) show(message, "danger");
     };
+    void tick();
     const id = window.setInterval(() => void tick(), 3000);
     return () => {
       stop = true;
       window.clearInterval(id);
     };
   }, [syncing, session.tenantId, show]);
+
+  const pedirFechamento = useCallback(async () => {
+    const ids = lojasRef.current.map((loja) => loja.id);
+    if (ids.length === 0 || !monthCloseSpanFor(anchorRef.current, calendarTodayIso())) return;
+    const r = await requestMonthClose(ids, anchorRef.current);
+    if (!r.ok) {
+      show(r.message, "danger");
+      return;
+    }
+    setSyncing(true);
+  }, [show]);
+
+  useEffect(() => {
+    const onForce = () => void pedirFechamento();
+    const onSynced = () => setReloadKey((n) => n + 1);
+    window.addEventListener(FORCE_REFRESH_CLICK_EVENT, onForce);
+    window.addEventListener(SALES_SYNCED_EVENT, onSynced);
+    return () => {
+      window.removeEventListener(FORCE_REFRESH_CLICK_EVENT, onForce);
+      window.removeEventListener(SALES_SYNCED_EVENT, onSynced);
+    };
+  }, [pedirFechamento]);
 
   useEffect(() => {
     if (lojasLoading || lojas.length === 0 || from > to) return;
@@ -601,15 +628,6 @@ export function CashClosePage() {
     irParaMes(somarMes(anchor, dir));
   }
 
-  async function sincronizar() {
-    setSyncing(true);
-    const r = await requestMonthClose(lojas.map((l) => l.id), anchor);
-    if (!r.ok) {
-      setSyncing(false);
-      show(r.message, "danger");
-    }
-  }
-
   const diaPronto = diaAberto != null && diaKey === `${storeKey}|${diaAberto}|${reloadKey}`;
   const navBtn =
     "flex h-10 w-10 items-center justify-center rounded-[11px] border border-line bg-bg-2 text-t1 hover:border-line-2 hover:text-t0 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-line disabled:hover:text-t1";
@@ -632,17 +650,6 @@ export function CashClosePage() {
             <button type="button" aria-label="Próximo mês" className={navBtn} disabled={!podeAvancar} onClick={() => mover(1)}>
               <Seta dir="proximo" />
             </button>
-            <Tooltip
-              label={
-                span
-                  ? `Busca os fechamentos de ${dataCurta(span.from)} a ${dataCurta(span.to)}. Dias que já têm fechamento não são buscados novamente.`
-                  : "Os fechamentos deste mês estarão disponíveis a partir de amanhã."
-              }
-            >
-              <Button onClick={() => void sincronizar()} disabled={syncing || !span || lojas.length === 0}>
-                {syncing ? "Buscando…" : "Buscar fechamentos"}
-              </Button>
-            </Tooltip>
           </div>
         </div>
         {erro ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar o fechamento. Tente novamente." /> : null}
