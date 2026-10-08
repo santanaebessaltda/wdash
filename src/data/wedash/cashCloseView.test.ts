@@ -9,6 +9,7 @@ import {
   closeDayFace,
   closeDayGap,
   closeDayTotals,
+  dayWithoutReal,
   realCentsOf,
   dayAwaitingClose,
   monthCloseSummary,
@@ -221,13 +222,28 @@ describe("resumo do fechamento", () => {
     expect(dayAwaitingClose({ hasMillennium: false, pixRequested: false, pixCents: null })).toBe(true);
   });
 
-  it("resume o mês e conta o dia pendente uma vez", () => {
+  it("dia sem total real fica pendente e fora da diferença do mês", () => {
+    const semArquivo = buildCashCloseView({
+      millennium: [{ paymentMethod: "PIX", openingCents: 0, sangriaCents: null, closingCents: 1000, typedCents: 0 }],
+      card: null,
+      pixCents: null,
+      pixRequested: true,
+    });
+    expect(dayWithoutReal(semArquivo.lines)).toBe(true);
+    const comArquivo = buildCashCloseView({
+      millennium: [{ paymentMethod: "PIX", openingCents: 0, sangriaCents: null, closingCents: 1000, typedCents: 0 }],
+      card: null,
+      pixCents: 1000,
+      pixRequested: false,
+    });
+    expect(dayWithoutReal(comArquivo.lines)).toBe(false);
     expect(
       monthCloseSummary([
-        { day: "2026-10-01", systemCents: 1000, typedCents: 800, pending: true },
-        { day: "2026-10-01", systemCents: 500, typedCents: 500, pending: true },
-        { day: "2026-10-02", systemCents: 2000, typedCents: 2000, pending: false },
+        { day: "2026-10-01", diffCents: -1000, pending: true },
+        { day: "2026-10-01", diffCents: -50, pending: true },
+        { day: "2026-10-02", diffCents: 100, pending: false },
+        { day: "2026-10-03", diffCents: -40, pending: false },
       ]),
-    ).toEqual({ systemCents: 3500, typedCents: 3300, diffCents: -200, pendingDays: 1 });
+    ).toEqual({ diffCents: 60, pendingDays: 1 });
   });
 });

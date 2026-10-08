@@ -219,6 +219,11 @@ export function closeDayTotals(lines: CashCloseLine[]): { systemCents: number; t
   return { systemCents, typedCents, diffCents: typedCents - systemCents };
 }
 
+/** Forma com venda no Millennium e sem total real. O dinheiro usa o valor digitado. */
+export function dayWithoutReal(lines: CashCloseLine[]): boolean {
+  return lines.some((line) => line.key !== "cash" && line.systemCents > 0 && realCentsOf(line) == null);
+}
+
 /** Ainda falta o caixa do Millennium, ou o cartão/PIX da Stone não chegou. */
 export function dayAwaitingClose(input: {
   hasMillennium: boolean;
@@ -253,21 +258,17 @@ export function closeDayFace(input: { awaiting: boolean; hasLines: boolean; hasG
   return "vazio";
 }
 
-/** Total digitado, diferença total real − Millennium e dias ainda pendentes. O mesmo dia em várias lojas conta uma vez. */
+/** Diferença dos dias com total real, e dias sem total real. O mesmo dia em várias lojas conta uma vez. */
 export function monthCloseSummary(
-  rows: Array<{ day: string; systemCents: number; typedCents: number; realCents?: number; diffCents?: number; pending: boolean }>,
-): { systemCents: number; typedCents: number; diffCents: number; pendingDays: number } {
-  let systemCents = 0;
-  let typedCents = 0;
+  rows: Array<{ day: string; diffCents: number; pending: boolean }>,
+): { diffCents: number; pendingDays: number } {
   let diffCents = 0;
   const pending = new Set<string>();
   for (const row of rows) {
-    systemCents += row.systemCents;
-    typedCents += row.typedCents;
-    diffCents += row.diffCents ?? (row.realCents ?? row.typedCents) - row.systemCents;
     if (row.pending) pending.add(row.day);
+    else diffCents += row.diffCents;
   }
-  return { systemCents, typedCents, diffCents, pendingDays: pending.size };
+  return { diffCents, pendingDays: pending.size };
 }
 
 /** Falta assumida pela loja deixa de aparecer como desconto no calendário. */

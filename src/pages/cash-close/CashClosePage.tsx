@@ -6,8 +6,7 @@ import {
   applyCloseReview,
   buildCashCloseView,
   closeDayGap,
-  closeDayTotals,
-  dayAwaitingClose,
+  dayWithoutReal,
   monthCloseSummary,
   realCentsOf,
   type CashCloseBucket,
@@ -526,7 +525,7 @@ export function CashClosePage() {
   const analise = useMemo(() => {
     if (marksKey !== faixaKey) return null;
     const porDia = new Map<string, { systemCents: number; realCents: number; diffCents: number; hasMillennium: boolean; hasLines: boolean; pending: boolean }>();
-    const rows: Array<{ day: string; systemCents: number; typedCents: number; realCents?: number; diffCents?: number; pending: boolean }> = [];
+    const rows: Array<{ day: string; diffCents: number; pending: boolean }> = [];
     for (const mark of marks) {
       const review = reviews.find((r) => r.storeId === mark.storeId && r.day === mark.day) ?? null;
       const view = buildCashCloseView(mark.snap);
@@ -534,22 +533,13 @@ export function CashClosePage() {
         cardPending: mark.cardPending,
         pixRequested: mark.snap.pixRequested,
       });
-      const totals = closeDayTotals(lines);
       const gap = closeDayGap(lines);
-      const awaiting = dayAwaitingClose({
-        hasMillennium: mark.snap.millennium.length > 0,
-        cardPending: mark.cardPending,
-        pixRequested: mark.snap.pixRequested,
-        pixCents: mark.snap.pixCents,
-      });
+      const semReal = dayWithoutReal(lines);
       if (mark.day < hoje) {
         rows.push({
           day: mark.day,
-          systemCents: gap.systemCents,
-          typedCents: totals.typedCents,
-          realCents: gap.realCents,
           diffCents: gap.diffCents,
-          pending: awaiting,
+          pending: semReal,
         });
       }
       const atual = porDia.get(mark.day) ?? { systemCents: 0, realCents: 0, diffCents: 0, hasMillennium: false, hasLines: false, pending: false };
@@ -558,7 +548,7 @@ export function CashClosePage() {
       atual.diffCents += gap.diffCents;
       atual.hasMillennium = atual.hasMillennium || mark.snap.millennium.length > 0;
       atual.hasLines = atual.hasLines || lines.length > 0;
-      atual.pending = atual.pending || awaiting;
+      atual.pending = atual.pending || semReal;
       porDia.set(mark.day, atual);
     }
     return { resumo: monthCloseSummary(rows), porDia };
@@ -567,12 +557,10 @@ export function CashClosePage() {
   function faceDoDia(day: string): { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; diffCents: number } {
     const info = analise?.porDia.get(day);
     if (day === hoje) return { kind: "hoje", diffCents: info ? Math.max(info.systemCents, info.realCents) : 0 };
+    if (info?.pending) return { kind: "pendente", diffCents: 0 };
     if (!info || (info.systemCents === 0 && info.realCents === 0)) return { kind: "zero", diffCents: 0 };
     if (!info.hasMillennium && !info.hasLines) return { kind: "vazio", diffCents: 0 };
-    const diffCents = info.diffCents;
-    if (diffCents !== 0) return { kind: "total", diffCents };
-    if (info.pending || !info.hasMillennium) return { kind: "pendente", diffCents: 0 };
-    return { kind: "total", diffCents: 0 };
+    return { kind: "total", diffCents: info.diffCents };
   }
 
   function abrirDia(iso: string) {
@@ -608,7 +596,7 @@ export function CashClosePage() {
       <SectionHeader
         section="Gestão"
         title="Fechamento"
-        subtitle="Confira o fechamento diário comparando o Millennium, o digitado e o total real."
+        subtitle="Confira o fechamento diário comparando o Millennium com o total real."
       />
       <div className="mt-6 pb-6">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
@@ -674,14 +662,29 @@ export function CashClosePage() {
   );
 }
 
-function ResumoMes({ resumo }: { resumo: { systemCents: number; typedCents: number; diffCents: number; pendingDays: number } }) {
+function textoDiferenca(cents: number): string {
+  if (cents > 0) return "Sobra nos dias que já têm total real";
+  if (cents < 0) return "Quebra nos dias que já têm total real";
+  return "Os dias com total real fecharam iguais";
+}
+
+function ResumoMes({ resumo }: { resumo: { diffCents: number; pendingDays: number } }) {
   const itens = [
-    { label: "Total digitado", valor: money(resumo.typedCents), detalhe: `Millennium: ${money(resumo.systemCents)}`, tom: "text-t0" },
-    { label: "Diferença", valor: money(resumo.diffCents), detalhe: "Total real − Millennium", tom: diffClass(resumo.diffCents) },
-    { label: "Dias pendentes", valor: String(resumo.pendingDays), detalhe: "Ainda não fechados", tom: resumo.pendingDays > 0 ? "text-warn" : "text-t0" },
+    {
+      label: "Diferença",
+      valor: totalDia(resumo.diffCents),
+      detalhe: textoDiferenca(resumo.diffCents),
+      tom: diffClass(resumo.diffCents),
+    },
+    {
+      label: "Dias pendentes",
+      valor: String(resumo.pendingDays),
+      detalhe: resumo.pendingDays > 0 ? "Em amarelo, ainda sem total real" : "Nenhum dia sem total real",
+      tom: resumo.pendingDays > 0 ? "text-warn" : "text-t0",
+    },
   ];
   return (
-    <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+    <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
       {itens.map((item) => (
         <Card key={item.label} padding="sm">
           <p className="text-[11px] font-bold uppercase tracking-wide text-t2">{item.label}</p>
