@@ -558,8 +558,8 @@ export function CashClosePage() {
   }, [marks, reviews, marksKey, faixaKey, hoje]);
 
   function faceDoDia(day: string): { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; diffCents: number } {
-    if (day === hoje) return { kind: "hoje", diffCents: 0 };
     const info = analise?.porDia.get(day);
+    if (day === hoje) return { kind: "hoje", diffCents: info ? Math.max(info.systemCents, info.typedCents) : 0 };
     if (!info || (info.systemCents === 0 && info.typedCents === 0)) return { kind: "zero", diffCents: 0 };
     if (!info.hasMillennium && !info.hasLines) return { kind: "vazio", diffCents: 0 };
     if (!info.hasMillennium) return { kind: "pendente", diffCents: 0 };
@@ -568,6 +568,7 @@ export function CashClosePage() {
 
   function abrirDia(iso: string) {
     if (iso > hoje) return;
+    if (iso < hoje && faceDoDia(iso).kind === "zero") return;
     setDiaAberto(iso);
   }
 
@@ -751,7 +752,7 @@ function Mes({
                   Pendente
                 </Badge>
               )}
-              {(face?.kind === "zero" || face?.kind === "total") && (
+              {(face?.kind === "zero" || face?.kind === "hoje" || face?.kind === "total") && (
                 <div className="mt-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-t2">Total</p>
                   <p
@@ -760,13 +761,13 @@ function Mes({
                       face.kind === "total" ? diffClass(face.diffCents) : "text-t1",
                     )}
                   >
-                    {totalDia(face.diffCents)}
+                    {face.kind === "hoje" ? brlCent(face.diffCents / 100) : totalDia(face.diffCents)}
                   </p>
                 </div>
               )}
             </>
           );
-          if (futuro) return <div key={day} className={borda}>{miolo}</div>;
+          if (futuro || face?.kind === "zero") return <div key={day} className={borda}>{miolo}</div>;
           const pintado = face?.kind === "pendente" || (face?.kind === "total" && face.diffCents !== 0);
           return (
             <button key={day} type="button" className={cn(borda, pintado ? "hover:brightness-95" : "hover:bg-bg-3")} onClick={() => onOpen(day)}>
