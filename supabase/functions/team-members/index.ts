@@ -57,7 +57,7 @@ function latest(a: string | null, b: string | null): string | null {
 /** Variáveis do template "Invite user" ({{ .Data.company }}, {{ .Data.role }}). */
 async function inviteData(admin: SupabaseClient, tenantId: string, role: Role) {
   const { data: ten } = await admin.from("tenant").select("name").eq("id", tenantId).maybeSingle();
-  return { company: ten?.name ?? "", role: ROLE_LABEL[role] };
+  return { company: ten?.name ?? "", role: ROLE_LABEL[role], wdash: "member" };
 }
 
 /** Conta nova de vendedor (convite por e-mail). Devolve o id do usuário ou o código do erro. */
@@ -67,7 +67,7 @@ async function inviteSellerAccount(
   email: string,
 ): Promise<{ userId: string } | { error: string }> {
   const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
-    data: { company: await companyName(admin, tenantId), role: "Equipe de vendas" },
+    data: { company: await companyName(admin, tenantId), role: "Equipe de vendas", wdash: "member" },
     redirectTo: inviteRedirect(),
   });
   if (error || !data.user) return { error: authErrorCode(error) };
@@ -81,7 +81,7 @@ async function resendSellerInvite(
   email: string,
 ): Promise<string | null> {
   const { error } = await admin.auth.admin.inviteUserByEmail(email, {
-    data: { company: await companyName(admin, tenantId), role: "Equipe de vendas" },
+    data: { company: await companyName(admin, tenantId), role: "Equipe de vendas", wdash: "member" },
     redirectTo: inviteRedirect(),
   });
   return error ? authErrorCode(error) : null;

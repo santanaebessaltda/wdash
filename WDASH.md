@@ -32,6 +32,7 @@ Remediação do security audit (standard):
 - **Tabelas de venda:** `erp-stock-sync` só grava catálogo global para Gestor. Gerente continua no estoque e no saldo das lojas dele.
 - **HTTP do Millennium:** o host `:6017` não completa TLS. O esquema fica `http` até o ERP oferecer HTTPS. Cooldown do Atualizar continua desligado (decisão de produto: o gestor clica de novo quando quiser).
 - **Escrita por loja:** meta, desafio, turno, horário/fuso da loja e flags da vendedora passam por `staff_can_write_store` (migration `20261008120000_manager_store_writes`). Gerente sem vínculo escreve em todas; com vínculo, só nas lojas ligadas.
+- **Convite do painel Supabase:** `provision_franchisee_invite` abre empresa nova só quando o convite não traz `wdash=member`. Convites da WDash (usuários e vendedores) mandam essa marca. Empresa sem nenhum membership é apagada (`delete_orphan_tenant`).
 
 ### Sem white label (DECIDIDO — 2026-09-27; substitui "URL do tenant" de 2026-09-21)
 - A plataforma aparece **sempre como WDash** (sidebar, login, onboarding, telas de acesso) — `PRODUCT_NAME` + `WedashBrand` (`src/components/wedash/WedashBrand.tsx`). Sem nome, logo ou cor personalizados por empresa.
