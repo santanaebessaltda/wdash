@@ -112,8 +112,17 @@ describe("buildCashCloseView", () => {
     });
     expect(lines.find((l) => l.key === "cash")).toMatchObject({ systemCents: 10000, typedCents: 9000 });
     expect(lines.find((l) => l.key === "debit")).toMatchObject({ typedCents: 800, stoneCents: 750 });
-    const waiting = applyCloseReview(buildCashCloseView(base).lines, { cashTypedCents: null, waive: false, acquirerCents: { debit: 750 } }, { cardPending: true });
-    expect(waiting.find((l) => l.key === "debit")?.stoneCents).toBeNull();
+    const waiting = applyCloseReview(
+      buildCashCloseView(base).lines,
+      { cashTypedCents: null, waive: false, acquirerCents: { debit: 750 } },
+      { cardPending: true },
+    );
+    expect(waiting.find((l) => l.key === "debit")?.stoneCents).toBe(750);
+    const withFile = applyCloseReview(
+      buildCashCloseView({ ...base, card: { creditCents: 0, debitCents: 1000, otherCents: 0 } }).lines,
+      { cashTypedCents: null, waive: false, acquirerCents: { debit: 750 } },
+    );
+    expect(withFile.find((l) => l.key === "debit")?.stoneCents).toBe(750);
   });
 });
 

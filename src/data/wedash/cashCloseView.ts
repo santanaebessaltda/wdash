@@ -87,18 +87,11 @@ function typedOverride(review: CashReview, key: CashCloseBucket): number | null 
   return null;
 }
 
-/** Arquivo da adquirente ainda não chegou, então o valor manual não entra no lugar dele. */
-function acquirerFilePending(key: CashCloseBucket, flags: { cardPending?: boolean; pixRequested?: boolean }): boolean {
-  if (key === "pix") return Boolean(flags.pixRequested);
-  if (key === "credit" || key === "debit" || key === "other") return Boolean(flags.cardPending);
-  return false;
-}
-
-/** Aplica o ajuste na linha já somada. Um valor digitado não se repete em cada lançamento da mesma forma. */
+/** Aplica o ajuste na linha já somada. O total real gravado pelo gestor substitui o arquivo. */
 export function applyCloseReview(
   lines: CashCloseLine[],
   review: CashReview | null,
-  flags: { cardPending?: boolean; pixRequested?: boolean } = {},
+  _flags: { cardPending?: boolean; pixRequested?: boolean } = {},
 ): CashCloseLine[] {
   if (!review) return lines;
   return lines.map((line) => {
@@ -106,7 +99,7 @@ export function applyCloseReview(
     const typed = typedOverride(review, line.key);
     if (typed != null) next.typedCents = typed;
     const manual = review.acquirerCents?.[line.key];
-    if (next.stoneCents == null && manual != null && !acquirerFilePending(line.key, flags)) next.stoneCents = manual;
+    if (manual != null) next.stoneCents = manual;
     return next;
   });
 }
@@ -141,7 +134,7 @@ export function cashCloseChips(input: {
       if (stone !== 0) {
         chips.push({
           key: `${line.key}-stone`,
-          label: `Adquirente · ${CHIP_LABEL[line.key]}: ${signedMoney(stone)}`,
+          label: `Total real · ${CHIP_LABEL[line.key]}: ${signedMoney(stone)}`,
           tone: stone < 0 ? "bad" : "ok",
         });
       }

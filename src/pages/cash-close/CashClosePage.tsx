@@ -113,17 +113,8 @@ type CloseDraft = {
   waive: boolean;
 };
 
-/** Dinheiro não vem da adquirente. Com arquivo gravado ou a caminho, o campo fica só leitura. */
-function adquirenteTravado(line: CashCloseLine, snap: CashCloseSnapshot): boolean {
-  if (line.key === "cash") return true;
-  if (line.stoneCents != null) return true;
-  if (line.key === "pix") return snap.pixRequested;
-  return snap.card != null || snap.cardPending;
-}
-
 function CloseTable({
   lines,
-  snap,
   pixPending,
   gestor,
   draft,
@@ -131,7 +122,6 @@ function CloseTable({
   onAcquirer,
 }: {
   lines: CashCloseLine[];
-  snap: CashCloseSnapshot;
   pixPending: boolean;
   gestor: boolean;
   draft?: CloseDraft;
@@ -141,11 +131,11 @@ function CloseTable({
   if (lines.length === 0) return null;
   const campo =
     "h-9 w-full min-w-0 rounded-[9px] border border-line bg-bg-inset px-2 text-right font-mono text-[13px] font-bold text-t0 outline-none focus:border-acc";
-  const cabecalhos = ["Forma", "Millennium", "Digitado", "Adquirente"];
+  const cabecalhos = ["Forma", "Millennium", "Digitado", "Total real"];
   return (
     <>
       {pixPending && (
-        <Alert className="mb-4" variant="info" title="O fechamento de Pix deste dia já foi solicitado à adquirente. Ele aparecerá assim que estiver disponível." />
+        <Alert className="mb-4" variant="info" title="O fechamento de Pix deste dia já foi solicitado. O total real aparece assim que o arquivo estiver disponível." />
       )}
       <div className="overflow-hidden rounded-[var(--radius-vela-lg)] border border-line bg-bg-2">
         <table className="w-full border-collapse text-sm">
@@ -166,9 +156,8 @@ function CloseTable({
           </thead>
           <tbody>
             {lines.map((row) => {
-              const travado = adquirenteTravado(row, snap);
               const typedTxt = draft?.typed[row.key] ?? centsToField(row.typedCents);
-              const acqTxt = draft?.acquirer[row.key] ?? "";
+              const acqTxt = draft?.acquirer[row.key] ?? (row.stoneCents == null ? "" : centsToField(row.stoneCents));
               return (
                 <tr key={row.key} className="border-b border-line last:border-b-0">
                   <td className="px-3 py-3 text-t0">{labelUpper(row.label)}</td>
@@ -187,19 +176,17 @@ function CloseTable({
                     )}
                   </td>
                   <td className="px-3 py-2.5 text-right">
-                    {!travado && gestor && draft && onAcquirer ? (
+                    {gestor && draft && onAcquirer ? (
                       <input
                         value={acqTxt}
                         onChange={(e) => onAcquirer(row.key, e.target.value)}
                         inputMode="decimal"
-                        aria-label={`Valor da adquirente para ${row.label}`}
+                        aria-label={`Total real para ${row.label}`}
                         placeholder="—"
                         className={campo}
                       />
                     ) : (
-                      <span className="font-mono text-[13px] font-bold text-t0">
-                        {money(row.stoneCents != null ? row.stoneCents : fieldToCents(acqTxt))}
-                      </span>
+                      <span className="font-mono text-[13px] font-bold text-t0">{money(fieldToCents(acqTxt))}</span>
                     )}
                   </td>
                 </tr>
@@ -617,7 +604,7 @@ export function CashClosePage() {
       <SectionHeader
         section="Gestão"
         title="Fechamento"
-        subtitle="Confira o fechamento diário comparando os valores digitados com o Millennium e as adquirentes."
+        subtitle="Confira o fechamento diário comparando o Millennium, o digitado e o total real."
       />
       <div className="mt-6 pb-6">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
@@ -821,7 +808,8 @@ function DiaModal({
         const salvo = review?.typedCents[line.key] ?? (line.key === "cash" ? review?.cashTypedCents : null);
         typed[line.key] = centsToField(salvo ?? line.typedCents);
         const manual = review?.acquirerCents[line.key];
-        acquirer[line.key] = manual == null || line.stoneCents != null ? "" : centsToField(manual);
+        const shown = manual ?? line.stoneCents;
+        acquirer[line.key] = shown == null ? "" : centsToField(shown);
       }
       next[loja.id] = {
         typed,
@@ -860,15 +848,14 @@ function DiaModal({
           break;
         }
         if (typed != null && typed !== line.typedCents) typedCents[line.key] = typed;
-        if (adquirenteTravado(line, snap)) continue;
         const raw = draft.acquirer[line.key] ?? "";
-        const acq = fieldToCents(raw);
-        if (raw.trim() && acq == null) {
+        const real = fieldToCents(raw);
+        if (raw.trim() && real == null) {
           invalido = true;
-          show(`O valor da adquirente para ${line.label} não é válido.`, "danger");
+          show(`O total real para ${line.label} não é válido.`, "danger");
           break;
         }
-        if (acq != null) acquirerCents[line.key] = acq;
+        if (real != null && real !== line.stoneCents) acquirerCents[line.key] = real;
       }
       if (invalido) {
         setBusy(false);
@@ -961,7 +948,6 @@ function DiaModal({
                 )}
                 <CloseTable
                   lines={view.lines}
-                  snap={snap}
                   pixPending={view.pixPending}
                   gestor={gestor}
                   draft={draft}
