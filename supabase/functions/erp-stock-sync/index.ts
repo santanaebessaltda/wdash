@@ -8,10 +8,11 @@
  *   Loja que falhou mantém o saldo guardado e volta em `purchaseFailedStores`; o cadastro (data, múltipla,
  *   bloqueado) do mesmo retorno atualiza o catálogo (best-effort).
  * Gerente só busca estoque/saldo das lojas dele (membership_store vazio = todas).
+ * Tabelas e preços de venda (catálogo global) = só Gestor.
  * Reusa o token salvo em erp_credential; 401 → login com a senha cifrada e persiste o token novo.
  */
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { corsHeaders } from "../_shared/cors.ts";
+import { corsHeaders, serve } from "../_shared/cors.ts";
 import { loginMillennium } from "../_shared/millennium.ts";
 import { MillenniumHttpError } from "../_shared/millenniumSellers.ts";
 import { fetchPurchaseStock, fetchSalePrices, fetchSaleTables, fetchStoreStock } from "../_shared/millenniumProducts.ts";
@@ -202,7 +203,7 @@ async function refreshPurchase(
   return done;
 }
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 
@@ -256,6 +257,10 @@ Deno.serve(async (req) => {
     .limit(1)
     .maybeSingle();
   if (!membership) return json({ error: "forbidden" }, 403);
+  const gestor = membership.role === "OWNER" || membership.role === "ADMIN_GLOBAL";
+  if ((body.saleTables || body.salePriceTableIds.length > 0) && !gestor) {
+    return json({ error: "forbidden" }, 403);
+  }
   const tenantId = membership.tenant_id as string;
 
   let allStores: StoreRow[] = [];

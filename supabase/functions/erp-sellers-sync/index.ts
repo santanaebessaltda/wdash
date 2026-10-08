@@ -4,7 +4,7 @@
  * Reusa o token salvo em erp_credential; 401  ->  login com a senha cifrada e persiste o token novo.
  */
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { corsHeaders } from "../_shared/cors.ts";
+import { corsHeaders, serve } from "../_shared/cors.ts";
 import { loginMillennium } from "../_shared/millennium.ts";
 import {
   fetchStoreSellers,
@@ -87,7 +87,7 @@ async function saveSellers(
   if (accessErr) console.warn("sync_seller_access", accessErr.message);
 }
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 

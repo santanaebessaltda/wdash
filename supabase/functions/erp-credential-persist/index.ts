@@ -3,7 +3,7 @@
  * upsert erp_credential (+ optional stores). Username change wipes tenant sync data.
  */
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { corsHeaders } from "../_shared/cors.ts";
+import { corsHeaders, serve } from "../_shared/cors.ts";
 import { logoutMillennium } from "../_shared/millennium.ts";
 import { GESTOR_ROLES } from "../_shared/staffAuth.ts";
 
@@ -67,7 +67,7 @@ async function wipeTenantErpSync(
   }
 }
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 

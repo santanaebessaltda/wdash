@@ -9,7 +9,7 @@
  * membership_store vazio = todas as lojas.
  */
 import { createClient, type SupabaseClient, type User } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { corsHeaders } from "../_shared/cors.ts";
+import { corsHeaders, serve } from "../_shared/cors.ts";
 import {
   sellerCaller,
   sellerInvite,
@@ -140,7 +140,7 @@ async function invitee(admin: SupabaseClient, user: User) {
   return { identity, memberships: memberships ?? [] };
 }
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 

@@ -11,7 +11,7 @@
  *   { action: "presence"|"heartbeat" }  ->  marca app online (worker pode syncar)
  */
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { corsHeaders } from "../_shared/cors.ts";
+import { corsHeaders, serve } from "../_shared/cors.ts";
 import {
   checkCustomReports,
   listMillenniumStores,
@@ -122,7 +122,7 @@ async function releaseStored(
   return true;
 }
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 

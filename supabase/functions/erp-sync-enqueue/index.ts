@@ -4,7 +4,7 @@
  * Rate limit FORCE: ver FORCE_COOLDOWN_MS (0 = off p/ teste).
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { corsHeaders } from "../_shared/cors.ts";
+import { corsHeaders, serve } from "../_shared/cors.ts";
 import { loadStaffCaller, managerAllowedStores } from "../_shared/staffAuth.ts";
 
 type JobKind = "SEED" | "LIGHT" | "FORCE" | "FORCE_LIGHT" | "RANGE" | "BACKFILL" | "REGISTRY";
@@ -42,7 +42,7 @@ function isIsoDay(s: unknown): s is string {
   return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
 }
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 

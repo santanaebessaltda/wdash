@@ -7,6 +7,7 @@ primary_region = "gru"
   dockerfile = "Dockerfile"
 
 [env]
+  # Host do Millennium (:6017) não fala TLS (HTTPS falha no handshake). Trocar o esquema derruba o sync.
   MILLENNIUM_API_BASE = "http://177.85.160.35:6017/api"
   SYNC_ONBOARDING = "2m"
   AUTO_REFRESH = "on"

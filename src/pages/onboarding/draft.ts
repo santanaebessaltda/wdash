@@ -1,4 +1,4 @@
-/** Rascunho do onboarding (etapa ERP) — sobrevive a F5 (localStorage). Senha do ERP só em sessionStorage. */
+/** Rascunho do onboarding (etapa ERP) sobrevive a F5 (localStorage). Senha do ERP só em memória. */
 
 export type RascunhoOnboarding = {
   erp: {
@@ -50,28 +50,32 @@ export function gravarRascunho(membershipId: string, r: RascunhoOnboarding) {
 }
 
 export function limparRascunho(membershipId: string) {
+  gravarSenhaErp(membershipId, "");
   try {
     window.localStorage.removeItem(chave(membershipId));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Senha do ERP só na memória do separador. F5 pede de novo. Apaga resto antigo no sessionStorage. */
+const senhasErp = new Map<string, string>();
+
+function apagarSenhaGuardada(membershipId: string) {
+  try {
     window.sessionStorage.removeItem(chaveSenha(membershipId));
   } catch {
     /* ignore */
   }
 }
 
-/** Senha do ERP: só sessionStorage (sobrevive F5 na mesma aba; some ao fechar a aba). */
 export function lerSenhaErp(membershipId: string): string {
-  try {
-    return window.sessionStorage.getItem(chaveSenha(membershipId)) ?? "";
-  } catch {
-    return "";
-  }
+  apagarSenhaGuardada(membershipId);
+  return senhasErp.get(membershipId) ?? "";
 }
 
 export function gravarSenhaErp(membershipId: string, senha: string) {
-  try {
-    if (senha) window.sessionStorage.setItem(chaveSenha(membershipId), senha);
-    else window.sessionStorage.removeItem(chaveSenha(membershipId));
-  } catch {
-    /* ignore */
-  }
+  apagarSenhaGuardada(membershipId);
+  if (senha) senhasErp.set(membershipId, senha);
+  else senhasErp.delete(membershipId);
 }

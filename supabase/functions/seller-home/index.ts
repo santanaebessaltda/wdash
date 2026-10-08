@@ -5,7 +5,7 @@
  * O podio do mes traz o faturamento da equipe. A premiacao da meta e so da propria pessoa.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { corsHeaders } from "../_shared/cors.ts";
+import { corsHeaders, serve } from "../_shared/cors.ts";
 import { buildSellerHome, type SellerChallengeInput, type SellerChallengePrize, type SellerHomeInput } from "../_shared/engine/sellerHome.ts";
 import type { SellerProductDay } from "../_shared/engine/sellerChallenge.ts";
 import { fimDoMes, inicioDoMes, paraIso, somarDias } from "../_shared/engine/format.ts";
@@ -109,7 +109,7 @@ async function allPages(query: any): Promise<any[]> { // deno-lint-ignore no-exp
   }
 }
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 

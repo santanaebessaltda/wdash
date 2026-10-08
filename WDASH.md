@@ -26,6 +26,11 @@ Remediação do security audit (standard):
 - **Convite:** `redirectTo` = só `APP_ORIGIN` (nunca origin do body).
 - **Senha provisória:** `mergeWithCache` sempre usa a flag do Auth/DB; cliente limpa só via RPC `clear_own_temporary_password` (não pode setar `true`).
 - **Worker:** sessão Millennium só em memória (+ coluna `millennium_session`); claim de `sync_job` = UPDATE atômico QUEUED→RUNNING; Actions/CLI pinados por SHA/versão; `verify_jwt=true` em todas as Edges no `config.toml`.
+- **Senha do ERP no onboarding:** só na memória do separador (F5 pede de novo). Não vai para `sessionStorage`.
+- **CORS das Edges:** só `APP_ORIGIN` e localhost (`CORS_ORIGINS`).
+- **Headers do site:** `public/_headers` (nosniff, frame, HSTS, CSP).
+- **Tabelas de venda:** `erp-stock-sync` só grava catálogo global para Gestor. Gerente continua no estoque e no saldo das lojas dele.
+- **HTTP do Millennium:** o host `:6017` não completa TLS. O esquema fica `http` até o ERP oferecer HTTPS. Cooldown do Atualizar continua desligado (decisão de produto: o gestor clica de novo quando quiser).
 
 ### Sem white label (DECIDIDO — 2026-09-27; substitui "URL do tenant" de 2026-09-21)
 - A plataforma aparece **sempre como WDash** (sidebar, login, onboarding, telas de acesso) — `PRODUCT_NAME` + `WedashBrand` (`src/components/wedash/WedashBrand.tsx`). Sem nome, logo ou cor personalizados por empresa.
