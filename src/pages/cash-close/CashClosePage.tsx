@@ -5,6 +5,7 @@ import { monthCloseSpanFor } from "@/data/wedash/cashCloseMonth";
 import {
   applyCloseReview,
   buildCashCloseView,
+  closeDayGap,
   closeDayTotals,
   dayAwaitingClose,
   monthCloseSummary,
@@ -15,7 +16,6 @@ import { closeBreaks, type CloseBreak } from "@/data/wedash/closeBreak";
 import {
   fetchCashCloseMonthMarks,
   fetchCashCloseReviews,
-  fetchCashCloseSaleDays,
   fetchCashCloseSales,
   fetchCashCloseSnapshot,
   fetchCloseShifts,
@@ -441,7 +441,6 @@ export function CashClosePage() {
   const [marks, setMarks] = useState<CashCloseDayMark[]>([]);
   const [marksKey, setMarksKey] = useState("");
   const [reviews, setReviews] = useState<CashCloseReview[]>([]);
-  const [diasComVenda, setDiasComVenda] = useState<Set<string>>(new Set());
   const [diaAberto, setDiaAberto] = useState<string | null>(null);
   const [dias, setDias] = useState<Record<string, CashCloseSnapshot>>({});
   const [quebra, setQuebra] = useState<{ sales: CloseSaleRow[]; shifts: CloseShiftRow[] } | "erro" | null>(null);
@@ -488,13 +487,11 @@ export function CashClosePage() {
     void Promise.all([
       fetchCashCloseMonthMarks(session.tenantId, ids, from, to),
       fetchCashCloseReviews(session.tenantId, ids, from, to),
-      fetchCashCloseSaleDays(session.tenantId, ids, from, to),
     ])
-      .then(([rows, ajustes, vendas]) => {
+      .then(([rows, ajustes]) => {
         if (cancelled) return;
         setMarks(rows);
         setReviews(ajustes);
-        setDiasComVenda(vendas);
         setMarksKey(faixaKey);
       })
       .catch(() => {
@@ -532,7 +529,7 @@ export function CashClosePage() {
 
   const analise = useMemo(() => {
     if (marksKey !== faixaKey) return null;
-    const porDia = new Map<string, { systemCents: number; typedCents: number; hasMillennium: boolean; hasLines: boolean }>();
+    const porDia = new Map<string, { systemCents: number; realCents: number; hasMillennium: boolean; hasLines: boolean; pending: boolean }>();
     const rows: Array<{ day: string; systemCents: number; typedCents: number; pending: boolean }> = [];
     for (const mark of marks) {
       const review = reviews.find((r) => r.storeId === mark.storeId && r.day === mark.day) ?? null;
@@ -542,6 +539,7 @@ export function CashClosePage() {
         pixRequested: mark.snap.pixRequested,
       });
       const totals = closeDayTotals(lines);
+      const gap = closeDayGap(lines);
       const awaiting = dayAwaitingClose({
         hasMillennium: mark.snap.millennium.length > 0,
         cardPending: mark.cardPending,
@@ -549,13 +547,14 @@ export function CashClosePage() {
         pixCents: mark.snap.pixCents,
       });
       if (mark.day < hoje) {
-        rows.push({ day: mark.day, systemCents: totals.systemCents, typedCents: totals.typedCents, pending: awaiting });
+        rows.push({ day: mark.day, systemCents: gap.systemCents, typedCents: totals.typedCents, realCents: gap.realCents, pending: awaiting });
       }
-      const atual = porDia.get(mark.day) ?? { systemCents: 0, typedCents: 0, hasMillennium: false, hasLines: false };
-      atual.systemCents += totals.systemCents;
-      atual.typedCents += totals.typedCents;
+      const atual = porDia.get(mark.day) ?? { systemCents: 0, realCents: 0, hasMillennium: false, hasLines: false, pending: false };
+      atual.systemCents += gap.systemCents;
+      atual.realCents += gap.realCents;
       atual.hasMillennium = atual.hasMillennium || mark.snap.millennium.length > 0;
       atual.hasLines = atual.hasLines || lines.length > 0;
+      atual.pending = atual.pending || awaiting;
       porDia.set(mark.day, atual);
     }
     return { resumo: monthCloseSummary(rows), porDia };
@@ -563,13 +562,13 @@ export function CashClosePage() {
 
   function faceDoDia(day: string): { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; diffCents: number } {
     const info = analise?.porDia.get(day);
-    if (day === hoje) return { kind: "hoje", diffCents: info ? Math.max(info.systemCents, info.typedCents) : 0 };
-    if (!info || (info.systemCents === 0 && info.typedCents === 0)) return { kind: "zero", diffCents: 0 };
+    if (day === hoje) return { kind: "hoje", diffCents: info ? Math.max(info.systemCents, info.realCents) : 0 };
+    if (!info || (info.systemCents === 0 && info.realCents === 0)) return { kind: "zero", diffCents: 0 };
     if (!info.hasMillennium && !info.hasLines) return { kind: "vazio", diffCents: 0 };
-    if (!info.hasMillennium) return { kind: "pendente", diffCents: 0 };
-    const diffCents = info.typedCents - info.systemCents;
-    if (diffCents === 0 && !diasComVenda.has(day)) return { kind: "pendente", diffCents: 0 };
-    return { kind: "total", diffCents };
+    const diffCents = info.realCents - info.systemCents;
+    if (diffCents !== 0) return { kind: "total", diffCents };
+    if (info.pending || !info.hasMillennium) return { kind: "pendente", diffCents: 0 };
+    return { kind: "total", diffCents: 0 };
   }
 
   function abrirDia(iso: string) {
@@ -674,7 +673,7 @@ export function CashClosePage() {
 function ResumoMes({ resumo }: { resumo: { systemCents: number; typedCents: number; diffCents: number; pendingDays: number } }) {
   const itens = [
     { label: "Total digitado", valor: money(resumo.typedCents), detalhe: `Millennium: ${money(resumo.systemCents)}`, tom: "text-t0" },
-    { label: "Diferença", valor: money(resumo.diffCents), detalhe: "Digitado − Millennium", tom: diffClass(resumo.diffCents) },
+    { label: "Diferença", valor: money(resumo.diffCents), detalhe: "Total real − Millennium", tom: diffClass(resumo.diffCents) },
     { label: "Dias pendentes", valor: String(resumo.pendingDays), detalhe: "Ainda não fechados", tom: resumo.pendingDays > 0 ? "text-warn" : "text-t0" },
   ];
   return (
@@ -690,22 +689,18 @@ function ResumoMes({ resumo }: { resumo: { systemCents: number; typedCents: numb
   );
 }
 
-function Diff({ cents }: { cents: number | null }) {
-  return <span className={`font-mono text-[13px] font-bold ${diffClass(cents)}`}>{money(cents)}</span>;
-}
-
-function ContaDoDia({ systemCents, typedCents }: { systemCents: number; typedCents: number }) {
-  const diff = typedCents - systemCents;
+function ContaDoDia({ systemCents, realCents }: { systemCents: number; realCents: number }) {
+  const diff = realCents - systemCents;
   return (
     <div className="mb-4 flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-[14px] border border-line bg-bg-1 px-3 py-3 text-[13px]">
-      <span className="text-t2">Digitado</span>
-      <span className="font-mono font-bold text-t0">{money(typedCents)}</span>
+      <span className="text-t2">Total real</span>
+      <span className="font-mono font-bold text-t0">{money(realCents)}</span>
       <span className="text-t2">−</span>
       <span className="text-t2">Millennium</span>
       <span className="font-mono font-bold text-t0">{money(systemCents)}</span>
       <span className="text-t2">=</span>
       <span className="text-t2">Diferença</span>
-      <Diff cents={diff} />
+      <span className={cn("font-mono text-[13px] font-bold", diffClass(diff))}>{totalDia(diff)}</span>
     </div>
   );
 }
@@ -953,15 +948,23 @@ function DiaModal({
             const cashTyped = draft ? fieldToCents(draft.typed.cash ?? "") : null;
             const falta = cash != null && cashTyped != null && cashTyped < cash.systemCents;
             const linhas = view.lines.map((line) => {
-              const typed = draft ? fieldToCents(draft.typed[line.key] ?? "") : null;
-              return typed == null ? line : { ...line, typedCents: typed };
+              const next = { ...line };
+              if (!draft) return next;
+              const typed = fieldToCents(draft.typed[line.key] ?? "");
+              if (typed != null) next.typedCents = typed;
+              if (line.key !== "cash") {
+                const raw = draft.acquirer[line.key] ?? "";
+                const real = fieldToCents(raw);
+                if (raw.trim() && real != null) next.stoneCents = real;
+              }
+              return next;
             });
-            const conta = closeDayTotals(linhas);
+            const conta = closeDayGap(linhas);
             return (
               <section key={loja.id}>
                 {lojas.length > 1 && <p className="mb-3 text-[13px] font-bold text-t0">{loja.fantasia}</p>}
                 {fechado ? (
-                  <ContaDoDia systemCents={conta.systemCents} typedCents={conta.typedCents} />
+                  <ContaDoDia systemCents={conta.systemCents} realCents={conta.realCents} />
                 ) : (
                   <p className="mb-4 text-[13px] text-t2">Este dia ainda não fechou. A sobra ou a quebra aparece a partir de amanhã.</p>
                 )}

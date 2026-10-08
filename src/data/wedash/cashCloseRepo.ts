@@ -205,25 +205,6 @@ export async function fetchCashCloseMonthMarks(
   return [...byKey.values()];
 }
 
-/** Dias do intervalo que têm ao menos uma venda da lista. */
-export async function fetchCashCloseSaleDays(tenantId: string, storeIds: string[], from: string, to: string): Promise<Set<string>> {
-  const { getSupabase } = await import("@/lib/supabase");
-  const sb = getSupabase();
-  const days = new Set<string>();
-  if (!sb || storeIds.length === 0 || from > to) return days;
-  const { data, error } = await sb
-    .from("cash_close_sale")
-    .select("day")
-    .eq("tenant_id", tenantId)
-    .in("store_id", storeIds)
-    .gte("day", from)
-    .lte("day", to)
-    .limit(20000);
-  if (error) throw new Error(error.message);
-  for (const row of data ?? []) days.add(String(row.day).slice(0, 10));
-  return days;
-}
-
 /** Pede o fechamento dos dias do mês visível que ainda não têm, até ontem. */
 export async function requestMonthClose(
   storeIds: string[],

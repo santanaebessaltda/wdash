@@ -6,6 +6,7 @@ import {
   cashCloseChips,
   chipsHaveGap,
   closeDayFace,
+  closeDayGap,
   closeDayTotals,
   dayAwaitingClose,
   monthCloseSummary,
@@ -139,6 +140,20 @@ describe("resumo do fechamento", () => {
     expect(closeDayTotals(view.lines)).toEqual({ systemCents: 10000, typedCents: 10000, diffCents: 0 });
     expect(dayAwaitingClose({ hasMillennium: true, pixRequested: true, pixCents: null })).toBe(true);
     expect(closeDayFace({ awaiting: true, hasLines: true, hasGap: false })).toBe("pendente");
+  });
+
+  it("soma o total real do cartão mesmo quando o digitado bate com o Millennium", () => {
+    const view = buildCashCloseView({
+      millennium: [
+        { paymentMethod: "DINHEIRO", openingCents: 100, sangriaCents: null, closingCents: 18470, typedCents: 18470 },
+        { paymentMethod: "CARTÃO DE DÉBITO", openingCents: 0, sangriaCents: null, closingCents: 0, typedCents: 0 },
+        { paymentMethod: "CARTÃO DE CRÉDITO", openingCents: 0, sangriaCents: null, closingCents: 0, typedCents: 0 },
+      ],
+      card: { creditCents: 0, debitCents: 100, otherCents: 0 },
+      pixCents: null,
+      pixRequested: false,
+    });
+    expect(closeDayGap(view.lines)).toEqual({ systemCents: 18470, realCents: 18570, diffCents: 100 });
   });
 
   it("diferença aparece mesmo com arquivo a caminho, e o dia limpo fica fechado", () => {

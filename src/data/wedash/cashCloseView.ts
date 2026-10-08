@@ -148,6 +148,23 @@ export function cashCloseChips(input: {
   return ordered;
 }
 
+/** Total real da forma. No dinheiro, é o valor digitado. Sem arquivo, também fica o digitado. */
+export function realCentsOf(line: CashCloseLine): number {
+  if (line.key === "cash" || line.stoneCents == null) return line.typedCents;
+  return line.stoneCents;
+}
+
+/** Sobra ou quebra do dia: total real − Millennium. */
+export function closeDayGap(lines: CashCloseLine[]): { systemCents: number; realCents: number; diffCents: number } {
+  let systemCents = 0;
+  let realCents = 0;
+  for (const line of lines) {
+    systemCents += line.systemCents;
+    realCents += realCentsOf(line);
+  }
+  return { systemCents, realCents, diffCents: realCents - systemCents };
+}
+
 export function closeDayTotals(lines: CashCloseLine[]): { systemCents: number; typedCents: number; diffCents: number } {
   let systemCents = 0;
   let typedCents = 0;
@@ -192,19 +209,21 @@ export function closeDayFace(input: { awaiting: boolean; hasLines: boolean; hasG
   return "vazio";
 }
 
-/** Total digitado, diferença digitado − Millennium e dias ainda pendentes. O mesmo dia em várias lojas conta uma vez. */
+/** Total digitado, diferença total real − Millennium e dias ainda pendentes. O mesmo dia em várias lojas conta uma vez. */
 export function monthCloseSummary(
-  rows: Array<{ day: string; systemCents: number; typedCents: number; pending: boolean }>,
+  rows: Array<{ day: string; systemCents: number; typedCents: number; realCents?: number; pending: boolean }>,
 ): { systemCents: number; typedCents: number; diffCents: number; pendingDays: number } {
   let systemCents = 0;
   let typedCents = 0;
+  let diffCents = 0;
   const pending = new Set<string>();
   for (const row of rows) {
     systemCents += row.systemCents;
     typedCents += row.typedCents;
+    diffCents += (row.realCents ?? row.typedCents) - row.systemCents;
     if (row.pending) pending.add(row.day);
   }
-  return { systemCents, typedCents, diffCents: typedCents - systemCents, pendingDays: pending.size };
+  return { systemCents, typedCents, diffCents, pendingDays: pending.size };
 }
 
 /** Falta assumida pela loja deixa de aparecer como desconto no calendário. */
