@@ -146,28 +146,40 @@ export async function requestStonePixFile(opts: {
   throw new Error(`Stone PIX ${opts.day} → ${res.status} ${text.slice(0, 180)}`);
 }
 
-/** 201 cadastrado, 409 já existia. Outro status estoura. */
+/** 201 cadastrado. 409 já existia: atualiza para a Stone confirmar o endereço de novo. */
 export async function registerStoneWebhook(opts: {
   secret: string;
   url: string;
   fetchImpl?: typeof fetch;
-}): Promise<"created" | "exists"> {
+}): Promise<"created" | "updated"> {
   const fetchImpl = opts.fetchImpl ?? fetch;
+  const headers = {
+    Authorization: basic(opts.secret),
+    "x-user-type": "client",
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  };
+  const body = JSON.stringify({ url: opts.url });
   const res = await fetchImpl(`${STONE_URL}/v2/webhook`, {
     method: "POST",
-    headers: {
-      Authorization: basic(opts.secret),
-      "x-user-type": "client",
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({ url: opts.url }),
+    headers,
+    body,
     signal: AbortSignal.timeout(30_000),
   });
   if (res.status === 201) return "created";
-  if (res.status === 409) return "exists";
-  const text = await res.text();
-  throw new Error(`Webhook Stone → ${res.status} ${text.slice(0, 180)}`);
+  if (res.status !== 409) {
+    await res.text().catch(() => "");
+    throw new Error("A Stone não conseguiu confirmar o endereço de aviso do Pix.");
+  }
+  const put = await fetchImpl(`${STONE_URL}/v2/webhook`, {
+    method: "PUT",
+    headers,
+    body,
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (put.status === 204) return "updated";
+  await put.text().catch(() => "");
+  throw new Error("A Stone não conseguiu confirmar o endereço de aviso do Pix.");
 }
 
 const MAX_PIX_CSV_BYTES = 15_000_000;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { stoneFileReady } from "../../../src/data/wedash/stoneClock";
-import { parseStonePixCsv, stonePixPaidCents } from "./stonePix";
+import { parseStonePixCsv, registerStoneWebhook, stonePixPaidCents } from "./stonePix";
 
 const csv = [
   "id;status;created_at;pix_transaction__e2e_id;pix_transaction__paid_amount;pix_transaction__canceled_amount;pix_transaction__fee_amount;pix_transaction__terminal__serial_number",
@@ -29,6 +29,18 @@ describe("parseStonePixCsv", () => {
 
   it("cabeçalho sozinho é um dia sem PIX", () => {
     expect(parseStonePixCsv("id;status\n")).toEqual([]);
+  });
+});
+
+describe("registerStoneWebhook", () => {
+  it("atualiza o aviso quando a Stone já tinha o endereço", async () => {
+    const calls: string[] = [];
+    const fetchImpl = (async (_url: string, init?: RequestInit) => {
+      calls.push(init?.method ?? "GET");
+      return new Response(null, { status: init?.method === "PUT" ? 204 : 409 });
+    }) as typeof fetch;
+    await expect(registerStoneWebhook({ secret: "s", url: "https://example.com/hooks/stone/pix/t", fetchImpl })).resolves.toBe("updated");
+    expect(calls).toEqual(["POST", "PUT"]);
   });
 });
 

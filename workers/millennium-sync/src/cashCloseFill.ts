@@ -185,8 +185,13 @@ export async function runCashCloseFillJob(
     } else if (tax.length >= 11 && webhookUrl) {
       try {
         await registerStoneWebhook({ secret, url: webhookUrl });
-      } catch {
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "";
         console.warn(`  AVISO [${store.code}] webhook PIX: não foi possível cadastrar o aviso`);
+        if (msg.startsWith("A Stone")) {
+          problems.push(msg);
+          pixParado = true;
+        }
       }
     }
     for (let day = from; day <= end; day = addDaysIso(day, 1)) {

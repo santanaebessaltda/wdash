@@ -168,7 +168,7 @@ export async function runStoneCloseScan(sb: SupabaseClient, erpSecret: string, n
   return n;
 }
 
-/** Uma vez por chave. 409 = o endereço já estava cadastrado. */
+/** Uma vez por chave. Se o endereço já existe, atualiza para a Stone confirmar de novo. */
 export async function registerStoneWebhooks(sb: SupabaseClient, erpSecret: string, url: string): Promise<void> {
   const { data, error } = await sb.from("store_stone").select("store_id, secret_ciphertext");
   if (error) throw error;
@@ -180,7 +180,7 @@ export async function registerStoneWebhooks(sb: SupabaseClient, erpSecret: strin
     try {
       const secret = await decryptPassword(cipher, erpSecret);
       const result = await registerStoneWebhook({ secret, url });
-      console.log(result === "created" ? "Webhook PIX Stone cadastrado" : "Webhook PIX Stone já cadastrado");
+      console.log(result === "created" ? "Webhook PIX Stone cadastrado" : "Webhook PIX Stone atualizado");
     } catch (e) {
       console.warn(`AVISO webhook PIX Stone: ${e instanceof Error ? e.message : String(e)}`);
     }
