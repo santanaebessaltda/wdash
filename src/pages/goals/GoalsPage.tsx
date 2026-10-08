@@ -345,7 +345,7 @@ function GoalCard({
       <div className="mt-4 flex items-center justify-between gap-3">
         <div className="flex min-w-0 flex-wrap gap-1.5">
           <Badge variant={STATUS_VARIANT[status]}>{GOAL_STATUS_LABEL[status]}</Badge>
-          <Badge variant="neutral">{g.tierMode === "INDIVIDUAL" ? "Individual" : "Grupo"}</Badge>
+          <Badge variant="neutral">{g.tierMode === "INDIVIDUAL" ? "Individual" : g.tierMode === "GENERAL" ? "Geral" : "Grupo"}</Badge>
           <Badge variant="neutral">
             {g.tiers.length} {g.tiers.length === 1 ? "nível" : "níveis"}
           </Badge>

@@ -2,7 +2,7 @@ const LADO = 512;
 
 export const AVATAR_TIPOS = "image/jpeg,image/png,image/webp";
 
-/** Recorta no centro (quadrado) e reduz para 512px em JPEG — foto de celular vira poucos KB. */
+/** Recorta no centro (quadrado) e reduz para 512px em JPEG  -  foto de celular vira poucos KB. */
 export async function prepararAvatar(file: File): Promise<Blob> {
   const bitmap = await createImageBitmap(file);
   const lado = Math.min(bitmap.width, bitmap.height);

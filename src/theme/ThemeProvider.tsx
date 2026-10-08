@@ -1,11 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 type Theme = "dark" | "light";
-/** Escolha do usuário; "system" segue o tema do aparelho. */
+/** Escolha do usuario; "system" segue o tema do aparelho. */
 export type ThemePreference = Theme | "system";
 
 type ThemeContextValue = {
-  /** Tema aplicado (já resolvido quando a escolha é "system"). */
+  /** Tema aplicado (ja resolvido quando a escolha e "system"). */
   theme: Theme;
   preference: ThemePreference;
   setPreference: (p: ThemePreference) => void;
@@ -16,8 +16,8 @@ type ThemeContextValue = {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 /**
- * Cópia da escolha salva na conta (abre já no tema certo, antes da conta responder).
- * Só gravado quando há escolha; "vela-theme" era gravado sozinho com "dark" e fica ignorado.
+ * Copia da escolha salva na conta (abre ja no tema certo, antes da conta responder).
+ * So gravado quando ha escolha; "vela-theme" era gravado sozinho com "dark" e fica ignorado.
  */
 const STORAGE_KEY = "wedash.theme";
 const DARK_QUERY = "(prefers-color-scheme: dark)";

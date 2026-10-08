@@ -22,7 +22,7 @@ export function localQty(r: StockProductRow, nome: string): number {
   return r.lojas.reduce((s, l) => s + (l.locais.find((x) => x.nome === nome)?.qtd ?? 0), 0);
 }
 
-/** Locais de estoque com saldo em algum produto, na ordem da hierarquia: Estoque, os demais em ordem alfabética, Ponto de venda. */
+/** Locais de estoque com saldo em algum produto, na ordem da hierarquia: Estoque, os demais em ordem alfabetica, Ponto de venda. */
 export function stockLocations(rows: StockProductRow[]): string[] {
   const nomes = new Set<string>();
   for (const r of rows) for (const l of r.lojas) for (const x of l.locais) nomes.add(x.nome);
@@ -38,7 +38,7 @@ export function ExportButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-/** "Mostrando X de Y produtos" + paginação, abaixo da tabela (padrão Data Tables). */
+/** "Mostrando X de Y produtos" + paginacao, abaixo da tabela (padrao Data Tables). */
 export function TableFooter({ shown, total, page, totalPages, onPage }: { shown: number; total: number; page: number; totalPages: number; onPage: (p: number) => void }) {
   return (
     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
@@ -59,11 +59,11 @@ export function UpdatedLine({ text, tip }: { text: string; tip: string }) {
   );
 }
 
-/** Filtros do cabeçalho no padrão da Visão geral: um abaixo do outro no celular, em linha no desktop, e o horário embaixo. */
+/** Filtros do cabecalho no padrao da Visao geral: um abaixo do outro no celular, em linha no desktop, e o horario embaixo. */
 export function HeaderFilters({ children, updated }: { children: ReactNode; updated?: ReactNode }) {
   return (
-    <div className="flex flex-col items-start gap-2 sm:items-end">
-      <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">{children}</div>
+    <div className="flex w-full min-w-0 flex-col items-start gap-2 sm:items-end">
+      <div className="flex w-full min-w-0 flex-col items-start gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">{children}</div>
       {updated}
     </div>
   );

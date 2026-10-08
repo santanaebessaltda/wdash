@@ -1,6 +1,6 @@
 # Fixtures
 
-`vendas-lista.sample.json` — anonymized `VENDAS.Lista` payload for aggregator and client unit tests.
+`sales-list.sample.json` — anonymized `VENDAS.Lista` payload for aggregator and client unit tests.
 
 - Keep `COD_OPERACAO`, `DATA_H`, `VALOR_FINAL`, `QUANTIDADE`, `FILIAL`.
 - Do not commit real customer/seller identifiers.

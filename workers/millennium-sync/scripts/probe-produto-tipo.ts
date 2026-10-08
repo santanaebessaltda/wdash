@@ -1,5 +1,5 @@
 /**
- * Probe: produto.produto.produto — campos TIPO / COD → classificar categorias.
+ * Probe: produto.produto.produto  -  campos TIPO / COD  ->  classificar categorias.
  *   cd workers/millennium-sync && npx tsx scripts/probe-produto-tipo.ts
  */
 import { readFileSync, existsSync } from "node:fs";

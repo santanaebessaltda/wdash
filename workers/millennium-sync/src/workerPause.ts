@@ -1,5 +1,5 @@
 /**
- * Flag local: enquanto existir, o worker não claima jobs nem enfileira LIGHT.
+ * Flag local: enquanto existir, o worker nao claima jobs nem enfileira LIGHT.
  * Use `npm run erp -- pause|resume` (ou crie/apague o arquivo).
  */
 import { existsSync, writeFileSync, unlinkSync } from "node:fs";

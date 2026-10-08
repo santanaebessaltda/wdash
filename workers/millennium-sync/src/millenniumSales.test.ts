@@ -15,7 +15,7 @@ import {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixture = JSON.parse(
-  readFileSync(join(__dirname, "../fixtures/vendas-lista.sample.json"), "utf8"),
+  readFileSync(join(__dirname, "../fixtures/sales-list.sample.json"), "utf8"),
 );
 
 describe("mapVendasListaPayload", () => {
@@ -71,7 +71,7 @@ describe("mapVendasListaPayload", () => {
     );
     expect(rows).toHaveLength(1);
     expect(rows[0].revenueCents).toBe(53_80);
-    // Midnight MS 06/08 — not Jul 31 from T03:00Z
+    // Midnight MS 06/08  -  not Jul 31 from T03:00Z
     expect(rows[0].occurredAt.toISOString()).toBe("2026-08-06T04:00:00.000Z");
   });
 });
@@ -84,7 +84,7 @@ describe("parseDataCalendar / resolveOccurredAt", () => {
   });
 
   it("keeps DATA calendar day when DATA_H would shift to previous day (CG)", () => {
-    // T03:00Z = 31/07 23:00 em Campo Grande — mas DATA diz 01/08
+    // T03:00Z = 31/07 23:00 em Campo Grande  -  mas DATA diz 01/08
     const at = resolveOccurredAt({
       DATA_H: "2026-08-01T03:00:00.000Z",
       DATA: "2026-08-01T03:00:00.000Z",

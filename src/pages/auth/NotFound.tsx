@@ -3,7 +3,7 @@ import { paths } from "@/router/paths";
 import { destinationAfterAuth } from "@/session/authApi";
 import { useSession } from "@/session/SessionProvider";
 
-/** 404 com numerais em gradiente; o botão volta para a tela inicial do usuário (ou login). */
+/** 404 com numerais em gradiente; o botao volta para a tela inicial do usuario (ou login). */
 export function NotFound() {
   const navigate = useNavigate();
   const { session } = useSession();

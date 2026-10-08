@@ -33,7 +33,7 @@ function MenuIcon({ d }: { d: string }) {
 
 const ICON_ALERTA = "M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01";
 
-/** "Hoje" · "Ontem" · "24/09". */
+/** "Hoje"  |  "Ontem"  |  "24/09". */
 function quando(d: Date): string {
   const hoje = new Date();
   if (d.toDateString() === hoje.toDateString()) return "Hoje";
@@ -98,14 +98,14 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
       if (cancelled) return;
       if (loaded.length > 0) setListaLojas(loaded);
       else if (hit.length > 0) setListaLojas(hit);
-      // Não cai no mock f1/f2 se a sessão tem UUIDs — isso quebrava o seletor.
+      // Nao cai no mock f1/f2 se a sessao tem UUIDs  -  isso quebrava o seletor.
     })();
     return () => {
       cancelled = true;
     };
   }, [session.tenantId, session.stores]);
 
-  // Loja é filtro global: Topbar nas telas do produto (não só Dashboard).
+  // Loja e filtro global: Topbar nas telas do produto (nao so Dashboard).
   const mostraStorePicker =
     session.role !== "SELLER" &&
     (location.pathname === paths.dashboard ||
@@ -120,7 +120,7 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
     location.pathname.startsWith(paths.settings.root) ||
     location.pathname === paths.profile);
 
-  // Menu do avatar: Conta = Meu perfil · (Gestor) Integrações, Usuários, Logs · Sair.
+  // Menu do avatar: Conta = Meu perfil  |  (Gestor) Integracoes, Usuarios, Logs  |  Sair.
   const conta: DropdownItem[] = isGestor(session.role)
     ? [
         { label: "Integrações", icon: <MenuIcon d={ICON_INTEGRACOES} />, onClick: () => navigate(paths.settings.erp) },

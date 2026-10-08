@@ -14,7 +14,7 @@ export function Avisos({ itens }: { itens: string[] }) {
   );
 }
 
-/** Leitura da IA no topo da visão. Só renderiza quando há algo a dizer. */
+/** Leitura da IA no topo da visao. So renderiza quando ha algo a dizer. */
 export function LeituraIA({ texto }: { texto: string | null }) {
   if (!texto) return null;
   return (

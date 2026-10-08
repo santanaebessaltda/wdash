@@ -5,8 +5,8 @@ import { deIso } from "@/lib/format";
 import { calendarTodayIso } from "@/data/wedash/clock";
 
 /**
- * Seletor de 1 data — campo "Single date" e calendário de src/pages/forms/DatePickersPage.tsx.
- * Um clique no dia escolhe e fecha. Painel em portal, alinhado à esquerda do campo.
+ * Seletor de 1 data  -  campo "Single date" e calendario de src/pages/forms/DatePickersPage.tsx.
+ * Um clique no dia escolhe e fecha. Painel em portal, alinhado a esquerda do campo.
  */
 
 const DOW_PT = ["D", "S", "T", "Q", "Q", "S", "S"];
@@ -63,7 +63,7 @@ export function DatePicker({
     if (!open) return;
     const base = value ?? (min && min > hoje ? min : hoje);
     setViewMonth(new Date(base.getFullYear(), base.getMonth(), 1));
-  }, [open]); // value lido só no momento do open
+  }, [open]); // value lido so no momento do open
 
   useEffect(() => {
     function onClick(e: MouseEvent) {

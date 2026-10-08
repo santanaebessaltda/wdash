@@ -1,7 +1,7 @@
 /**
- * RELATORIOMARGEM (FRANQUIAS > RELATORIOS) — custo unitário atual por COD_PRODUTO de uma loja no período.
+ * RELATORIOMARGEM (FRANQUIAS > RELATORIOS)  -  custo unitario atual por COD_PRODUTO de uma loja no periodo.
  * Espelho do fetch/parse de workers/millennium-sync/src/millenniumMargem.ts (manter iguais).
- * O custo da margem não é histórico: buscar um período antigo devolve o custo de hoje.
+ * O custo da margem nao e historico: buscar um periodo antigo devolve o custo de hoje.
  */
 import { baseUrl } from "./millennium.ts";
 import { MillenniumHttpError } from "./millenniumSellers.ts";
@@ -28,10 +28,10 @@ function asNum(v: unknown): number | null {
   return null;
 }
 
-/** DATAI/DATAF = datas de calendário inclusivas (meia-noite do Millennium, UTC−4). */
+/** DATAI/DATAF = datas de calendario inclusivas (meia-noite do Millennium, UTC4). */
 const dayBound = (ymd: string) => `${ymd}T04:00:00.000Z`;
 
-/** COD_PRODUTO → custo unitário em reais (CUSTO_TOTAL ÷ QTDE_VENDIDA; só > 0). */
+/** COD_PRODUTO  ->  custo unitario em reais (CUSTO_TOTAL  QTDE_VENDIDA; so > 0). */
 export async function fetchMargemUnitCosts(
   session: string,
   millenniumStoreId: number,

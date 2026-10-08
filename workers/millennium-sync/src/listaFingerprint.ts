@@ -1,14 +1,14 @@
 /**
- * Impressão digital da VENDAS.Lista de hoje por loja — o Atualizar compara com a da última rodada
+ * Impressao digital da VENDAS.Lista de hoje por loja  -  o Atualizar compara com a da ultima rodada
  * completa e, se nada mudou, pula Produtos por cupom e Marca/CMV (1 chamada ao ERP em vez de 3).
- * Fica em memória: reiniciar o worker = próxima rodada de cada loja completa.
+ * Fica em memoria: reiniciar o worker = proxima rodada de cada loja completa.
  */
 import { createHash } from "node:crypto";
 import type { SaleRow } from "../../../src/data/wedash/salesTypes.ts";
 
 type ListaRow = SaleRow & { nf?: unknown; tipoOperacao?: unknown };
 
-/** `dia:nº de linhas:hash` — muda com venda nova, cancelada, valor, itens, forma de pagamento ou vendedora. */
+/** `dia:n de linhas:hash`  -  muda com venda nova, cancelada, valor, itens, forma de pagamento ou vendedora. */
 export function listaFingerprint(day: string, rows: ListaRow[]): string {
   const lines = rows
     .map((r) =>
@@ -32,7 +32,7 @@ export type ListaMemo = {
   get: (storeId: string) => string | undefined;
   set: (storeId: string, fingerprint: string) => void;
   forget: (storeId: string) => void;
-  /** Última Lista vista da loja no dia (qualquer rodada sem falha) — decide se a rodada trouxe venda nova. */
+  /** Ultima Lista vista da loja no dia (qualquer rodada sem falha)  -  decide se a rodada trouxe venda nova. */
   seen: (storeId: string, day: string) => string | undefined;
   setSeen: (storeId: string, day: string, fingerprint: string) => void;
 };
@@ -56,7 +56,7 @@ export function createListaMemo(): ListaMemo {
   };
 }
 
-/** A Lista mudou desde a última vista? Dia sem Lista vista (dia novo, worker reiniciado) = mudou só se tem venda. */
+/** A Lista mudou desde a ultima vista? Dia sem Lista vista (dia novo, worker reiniciado) = mudou so se tem venda. */
 export function listaChanged(prev: string | undefined, fingerprint: string, rowCount: number): boolean {
   return prev ? prev !== fingerprint : rowCount > 0;
 }

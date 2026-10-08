@@ -9,7 +9,7 @@ export const onboardingRoutes: RouteObject[] = [
   { path: paths.onboarding, element: <Onboarding /> },
 ];
 
-/** Fora do AppShell — tela cheia pós-onboarding. */
+/** Fora do AppShell  -  tela cheia pos-onboarding. */
 export const syncingRoutes: RouteObject[] = [
   { path: paths.syncing, element: <SyncingPage /> },
 ];

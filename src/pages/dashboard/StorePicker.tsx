@@ -5,8 +5,8 @@ import { StoreIcon } from "@/pages/dashboards/icons";
 import { cn } from "@/lib/cn";
 
 /**
- * Seletor de loja SINGLE-SELECT — Topbar (no lugar de "Buscar telas" no Dashboard).
- * Hero Store + fantasia + CNPJ; "Todas as lojas" = visão consolidada da rede.
+ * Seletor de loja SINGLE-SELECT  -  Topbar (no lugar de "Buscar telas" no Dashboard).
+ * Hero Store + fantasia + CNPJ; "Todas as lojas" = visao consolidada da rede.
  * Escopo: `filialIds: []` = todas; `[id]` = uma loja.
  */
 export function StorePicker({ escopo, onChange, minhas }: { escopo: Scope; onChange: (e: Scope) => void; minhas: Store[] }) {

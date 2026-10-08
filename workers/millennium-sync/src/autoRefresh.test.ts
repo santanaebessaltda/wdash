@@ -10,8 +10,8 @@ import {
   type AutoStore,
 } from "./autoRefresh.ts";
 
-const TZ = "America/Campo_Grande"; // UTC−4
-/** Horário local em Campo Grande → Date. */
+const TZ = "America/Campo_Grande"; // UTC4
+/** Horario local em Campo Grande  ->  Date. */
 const at = (isoLocal: string) => new Date(`${isoLocal}-04:00`);
 
 const weekdays = parseStoreHours({
@@ -27,7 +27,7 @@ const semHorario = parseStoreHours(null);
 
 describe("localClock", () => {
   it("dia, dia da semana e minuto no fuso", () => {
-    // 2026-09-25 é sexta.
+    // 2026-09-25 e sexta.
     expect(localClock(at("2026-09-25T13:45:00"), TZ)).toEqual({ day: "2026-09-25", dow: 5, minutes: 13 * 60 + 45 });
   });
 });

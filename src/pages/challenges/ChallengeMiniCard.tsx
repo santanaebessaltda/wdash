@@ -4,7 +4,7 @@ import { dataCurta } from "@/lib/format";
 import { challengeHeadline, HeadlineText, mainPrizeLabel } from "@/pages/challenges/shared";
 import { FlameIcon, TrophyIcon } from "@/pages/dashboards/icons";
 
-/** Desafio em andamento na aba Desafios da Equipe: só leitura, clique abre o detalhe. */
+/** Desafio em andamento na aba Desafios da Equipe: so leitura, clique abre o detalhe. */
 export function ChallengeMiniCard({
   challenge: c,
   view,

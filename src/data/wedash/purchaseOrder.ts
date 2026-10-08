@@ -1,11 +1,11 @@
 /**
- * Pedido de compra (Estoque > Pedido de compra), mesma regra da planilha do dono.
+ * Pedido de compra (Gestão > Pedido de compra), mesma regra da planilha do dono.
  * Fonte = Saldo Atual e Futuro do Millennium (ESTOQUEEMCOMPRA): Total = saldo + pedidos em aberto.
- * Na lista = todo o Saldo Atual e Futuro, para o rodapé bater com o Millennium.
- * Elegível para o arquivo = código sem "WP", não bloqueado e múltipla > 0.
- * O que não é elegível (bloqueado, WPINK ou sem múltipla) mostra o mínimo gravado, sem editar, e fica fora do pedido.
- * A pedir = (mínimo × multiplicador − Total) arredondado para cima até a múltipla; Total negativo conta como 0.
- * Novo = cadastrado há menos de 30 dias ou nunca vendido pela loja (só quando o histórico cobre 12 meses ou a inauguração).
+ * Na lista = todo o Saldo Atual e Futuro, para o rodape bater com o Millennium.
+ * Elegivel para o arquivo = codigo sem "WP", nao bloqueado e multipla > 0.
+ * O que nao e elegivel (bloqueado, WPINK ou sem multipla) mostra o minimo gravado, sem editar, e fica fora do pedido.
+ * A pedir = (minimo x multiplicador  Total) arredondado para cima ate a multipla; Total negativo conta como 0.
+ * Novo = cadastrado ha menos de 30 dias ou nunca vendido pela loja (so quando o historico cobre 12 meses ou a inauguracao).
  */
 
 export type PurchaseStockRow = {
@@ -19,9 +19,9 @@ export type PurchaseStockRow = {
   total: number;
   multiple: number | null;
   blocked: boolean;
-  /** YYYY-MM-DD (DATA_CADASTRO no fuso de Brasília). */
+  /** YYYY-MM-DD (DATA_CADASTRO no fuso de Brasilia). */
   registeredAt: string | null;
-  /** Ordem em que o relatório devolveu a linha. */
+  /** Ordem em que o relatorio devolveu a linha. */
   position: number;
 };
 
@@ -38,11 +38,11 @@ export type PurchaseOrderRow = {
   minimo: number | null;
   novo: boolean;
   variasVariantes: boolean;
-  /** Bloqueado para compra: aparece na lista, mínimo só leitura, fora do arquivo. */
+  /** Bloqueado para compra: aparece na lista, minimo so leitura, fora do arquivo. */
   bloqueado: boolean;
-  /** Uma variante elegível: dá para gravar o mínimo e entrar no arquivo. */
+  /** Uma variante elegivel: da para gravar o minimo e entrar no arquivo. */
   podePedir: boolean;
-  /** null = "—" (sem mínimo, bloqueado ou várias variantes). */
+  /** null = " - " (sem minimo, bloqueado ou varias variantes). */
   aPedir: number | null;
   noPedido: boolean;
 };
@@ -50,7 +50,7 @@ export type PurchaseOrderRow = {
 export type PurchaseOrderView = {
   rows: PurchaseOrderRow[];
   contagens: { noPedido: number; semMinimo: number; novos: number };
-  /** Produtos e itens que vão para o arquivo no multiplicador atual. */
+  /** Produtos e itens que vao para o arquivo no multiplicador atual. */
   resumo: { produtos: number; itens: number };
 };
 
@@ -83,7 +83,7 @@ export function isNewProduct(registeredAt: string | null, todayIso: string): boo
 
 export const SOLD_HISTORY_DAYS = 365;
 
-/** "A loja nunca vendeu" só vale com histórico de 12 meses ou desde a inauguração (`firstDay` = 1º dia gravado da loja). */
+/** "A loja nunca vendeu" so vale com historico de 12 meses ou desde a inauguracao (`firstDay` = 1 dia gravado da loja). */
 export function soldHistoryCovers(firstDay: string | null, openedAt: string | null, todayIso: string): boolean {
   if (!firstDay) return false;
   if (dayNumber(todayIso) - dayNumber(firstDay) >= SOLD_HISTORY_DAYS) return true;
@@ -110,7 +110,7 @@ export function buildPurchaseOrderView(input: {
   stock: PurchaseStockRow[];
   mins: Map<string, number>;
   sold30: Map<string, number>;
-  /** Códigos que a loja já vendeu; `null` = histórico ainda não cobre (Novo só pela data de cadastro). */
+  /** Codigos que a loja ja vendeu; `null` = historico ainda nao cobre (Novo so pela data de cadastro). */
   soldEver?: Set<string> | null;
   factor: number;
   todayIso: string;
@@ -174,12 +174,12 @@ export function buildPurchaseOrderView(input: {
 
 export const PURCHASE_FILE_HEADER = ["COD_PRODUTO", "Cod_Cor", "Cod_Estampa", "Tamanho", "Quantidade", "Total em Estoque", "Descricao"] as const;
 
-/** Colunas gravadas como texto no XLSX (índices de PURCHASE_FILE_HEADER): Cod_Cor, Cod_Estampa, Tamanho. */
+/** Colunas gravadas como texto no XLSX (indices de PURCHASE_FILE_HEADER): Cod_Cor, Cod_Estampa, Tamanho. */
 export const PURCHASE_FILE_TEXT_COLUMNS = [1, 2, 3];
 
 export type PurchaseFileRow = [string | number, string, string, string, number, number, string];
 
-/** Linhas do arquivo de importação, na ordem do relatório; COD numérico sem zero à esquerda vai como número (igual ao exemplo). */
+/** Linhas do arquivo de importacao, na ordem do relatorio; COD numerico sem zero a esquerda vai como numero (igual ao exemplo). */
 export function purchaseOrderFileRows(view: PurchaseOrderView): PurchaseFileRow[] {
   return view.rows
     .filter((r) => r.noPedido)
@@ -205,4 +205,171 @@ export function filterPurchaseRows(rows: PurchaseOrderRow[], opts: { busca: stri
     if (opts.filtro === "novos" && !r.novo) return false;
     return !q || fold(r.nome).includes(q) || fold(r.code).includes(q);
   });
+}
+
+export const PURCHASE_MIN_TEMPLATE_HEADER = ["COD_PRODUTO", "Descrição", "Quantidade mínima"] as const;
+
+export const PURCHASE_MIN_SHEET_COLUMNS = "A planilha precisa das colunas COD_PRODUTO e Quantidade mínima.";
+
+export type PurchaseMinUpdate = { code: string; value: number };
+
+export type PurchaseMinSheet =
+  | { ok: true; updates: PurchaseMinUpdate[]; unknown: string[]; invalid: string[] }
+  | { ok: false; message: string };
+
+const codeCell = (code: string): string | number => (/^[1-9]\d*$/.test(code) ? Number(code) : code);
+
+function compareCode(a: string, b: string): number {
+  return a.localeCompare(b, "pt-BR", { numeric: true });
+}
+
+/** Modelo para preencher o mínimo: código, descrição e o mínimo já salvo (vazio quando não tem). */
+export function purchaseMinTemplateRows(view: PurchaseOrderView): Array<Array<string | number>> {
+  const body = [...view.rows]
+    .filter((r) => r.podePedir)
+    .sort((a, b) => compareCode(a.code, b.code))
+    .map((r) => [codeCell(r.code), r.nome, r.minimo ?? ""]);
+  return [[...PURCHASE_MIN_TEMPLATE_HEADER], ...body];
+}
+
+export function purchaseMinTemplateFileName(codFilial: string): string {
+  const safe = codFilial.replace(/[^\w.-]+/g, "") || "loja";
+  return `minimos-${safe}.xlsx`;
+}
+
+const headerKind = (cell: string): "code" | "min" | null => {
+  const h = fold(cell)
+    .replace(/[_./-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (h === "cod produto" || h === "codigo" || h === "codigo produto") return "code";
+  if (h === "minimo" || h === "qtd minima" || h === "qtde minima" || h.startsWith("quantidade min")) return "min";
+  return null;
+};
+
+function parseMinCell(raw: string): { ok: true; value: number } | { ok: false } | { ok: true; value: null } {
+  const t = raw.trim().replace(/\s/g, "");
+  if (!t) return { ok: true, value: null };
+  const normalized = /^\d+([.,]0+)?$/.test(t) ? t.replace(/[.,]0+$/, "") : t;
+  const parsed = parseMinInput(normalized);
+  if (!parsed.ok) return { ok: false };
+  return parsed.value == null ? { ok: true, value: null } : { ok: true, value: parsed.value };
+}
+
+function resolveCode(raw: string, byExact: Map<string, string>, byUpper: Map<string, string>): string | null {
+  const t = raw.trim();
+  if (!t) return null;
+  if (byExact.has(t)) return byExact.get(t)!;
+  const numeric = /^\d+\.0+$/.test(t) ? String(Number(t)) : t;
+  if (byExact.has(numeric)) return byExact.get(numeric)!;
+  return byUpper.get(numeric.toUpperCase()) ?? byUpper.get(t.toUpperCase()) ?? null;
+}
+
+/**
+ * Lê COD_PRODUTO + quantidade mínima. Célula vazia não entra (não apaga o que já está salvo).
+ * Código fora da lista da loja e valor que não é inteiro de 0 a 99.999 ficam de fora.
+ */
+export function parsePurchaseMinSheet(rows: string[][], known: ReadonlySet<string>): PurchaseMinSheet {
+  let headerAt = -1;
+  let codeCol = -1;
+  let minCol = -1;
+  for (let i = 0; i < Math.min(rows.length, 20); i++) {
+    let code = -1;
+    let min = -1;
+    rows[i].forEach((cell, c) => {
+      const kind = headerKind(cell);
+      if (kind === "code" && code < 0) code = c;
+      if (kind === "min" && min < 0) min = c;
+    });
+    if (code >= 0 && min >= 0) {
+      headerAt = i;
+      codeCol = code;
+      minCol = min;
+      break;
+    }
+  }
+  if (headerAt < 0) return { ok: false, message: PURCHASE_MIN_SHEET_COLUMNS };
+
+  const byExact = new Map<string, string>();
+  const upperCount = new Map<string, number>();
+  for (const code of known) {
+    byExact.set(code, code);
+    const key = code.toUpperCase();
+    upperCount.set(key, (upperCount.get(key) ?? 0) + 1);
+  }
+  const byUpper = new Map<string, string>();
+  for (const code of known) {
+    const key = code.toUpperCase();
+    if (upperCount.get(key) === 1) byUpper.set(key, code);
+  }
+
+  const updates = new Map<string, number>();
+  const unknown: string[] = [];
+  const invalid: string[] = [];
+  const seenUnknown = new Set<string>();
+  const seenInvalid = new Set<string>();
+
+  for (const row of rows.slice(headerAt + 1)) {
+    const rawCode = (row[codeCol] ?? "").trim();
+    if (!rawCode) continue;
+    const cell = parseMinCell(row[minCol] ?? "");
+    if (cell.ok && cell.value == null) continue;
+    const code = resolveCode(rawCode, byExact, byUpper);
+    if (!code) {
+      if (!seenUnknown.has(rawCode)) {
+        seenUnknown.add(rawCode);
+        unknown.push(rawCode);
+      }
+      continue;
+    }
+    if (!cell.ok) {
+      updates.delete(code);
+      if (!seenInvalid.has(code)) {
+        seenInvalid.add(code);
+        invalid.push(code);
+      }
+      continue;
+    }
+    const invalidAt = invalid.indexOf(code);
+    if (invalidAt >= 0) invalid.splice(invalidAt, 1);
+    seenInvalid.delete(code);
+    updates.set(code, cell.value);
+  }
+
+  return { ok: true, updates: [...updates.entries()].map(([code, value]) => ({ code, value })), unknown, invalid };
+}
+
+function listaCurta(items: string[]): string {
+  const shown = items.slice(0, 12);
+  const more = items.length - shown.length;
+  return shown.join(", ") + (more > 0 ? ` e mais ${more}` : "");
+}
+
+/** Texto do aviso depois da importação. `unchanged` = a planilha tinha mínimos, mas nenhum diferia do que já está salvo. */
+export function purchaseMinImportNotice(input: {
+  saved: number;
+  unknown: string[];
+  invalid: string[];
+  unchanged: boolean;
+}): { variant: "success" | "warning"; title: string; detail: string | null } {
+  const n = (k: number, one: string, many: string) => `${k} ${k === 1 ? one : many}`;
+  const partes: string[] = [];
+  if (input.unknown.length) partes.push(`Não estão nesta loja: ${listaCurta(input.unknown)}.`);
+  if (input.invalid.length) partes.push(`Valor inválido: ${listaCurta(input.invalid)}.`);
+  const detail = partes.length ? partes.join(" ") : null;
+  if (input.saved > 0) {
+    return {
+      variant: input.unknown.length || input.invalid.length ? "warning" : "success",
+      title: `Mínimos atualizados em ${n(input.saved, "produto", "produtos")}.`,
+      detail,
+    };
+  }
+  if (!input.unknown.length && !input.invalid.length) {
+    return {
+      variant: input.unchanged ? "success" : "warning",
+      title: input.unchanged ? "Os mínimos desta loja já estão iguais à planilha." : "Nenhum mínimo para importar.",
+      detail: null,
+    };
+  }
+  return { variant: "warning", title: "Nenhum mínimo foi importado.", detail };
 }

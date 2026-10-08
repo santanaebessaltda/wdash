@@ -1,12 +1,12 @@
 /**
- * Liga a venda à vendedora do cadastro (FUNCIONARIO no Millennium).
- * 1º pelo código de gerador (relatório de cupom {52DE7BBC}) — trocar o nome no ERP não mexe na meta/histórico.
- * Reserva pelo nome (VENDEDOR_MILLENNIUM da Lista): relatório indisponível ou cadastro sem gerador ainda.
- * `nameKeys` = todos os nomes (normalizados) já vistos para a funcionária — o antigo continua resolvendo.
- * Sincroniza a loja só quando aparece vendedora que não está no cadastro (status Ativo/Inativo = botão
- * Atualizar do card da equipe). Na sincronização do job, quem já tem gerador salvo e o mesmo cargo não é
- * consultado de novo. O cadastro guarda todos os funcionários da loja (gerência inclusive), então venda de
- * gerente/freelancer resolve para o funcionário e não dispara sincronização nem aviso.
+ * Liga a venda a vendedora do cadastro (FUNCIONARIO no Millennium).
+ * 1 pelo codigo de gerador (relatorio de cupom {52DE7BBC})  -  trocar o nome no ERP nao mexe na meta/historico.
+ * Reserva pelo nome (VENDEDOR_MILLENNIUM da Lista): relatorio indisponivel ou cadastro sem gerador ainda.
+ * `nameKeys` = todos os nomes (normalizados) ja vistos para a funcionaria  -  o antigo continua resolvendo.
+ * Sincroniza a loja so quando aparece vendedora que nao esta no cadastro (status Ativo/Inativo = botao
+ * Atualizar do card da equipe). Na sincronizacao do job, quem ja tem gerador salvo e o mesmo cargo nao e
+ * consultado de novo. O cadastro guarda todos os funcionarios da loja (gerencia inclusive), entao venda de
+ * gerente/freelancer resolve para o funcionario e nao dispara sincronizacao nem aviso.
  */
 import { sellerKeyFromName } from "../../../src/data/wedash/salesAggregate.ts";
 import type { SalesSellerDayAgg } from "../../../src/data/wedash/salesTypes.ts";
@@ -23,7 +23,7 @@ export type KnownSeller = {
 
 export type SellerResolution = { employeeId: number } | { ambiguous: true } | null;
 
-/** Vendedora que seguiu sem cadastro após sincronizar não re-dispara a sincronização por 24h. */
+/** Vendedora que seguiu sem cadastro apos sincronizar nao re-dispara a sincronizacao por 24h. */
 export const SELLER_RESYNC_MS = 24 * 60 * 60 * 1000;
 
 function pickEmployee(hits: KnownSeller[], storeId: string): SellerResolution {
@@ -34,7 +34,7 @@ function pickEmployee(hits: KnownSeller[], storeId: string): SellerResolution {
   return ids.size === 1 ? { employeeId: pool[0]!.employeeId } : { ambiguous: true };
 }
 
-/** Prefere a loja da venda; senão qualquer loja do tenant (vendedora cobrindo outra filial). */
+/** Prefere a loja da venda; senao qualquer loja do tenant (vendedora cobrindo outra filial). */
 export function resolveSellerKey(sellers: KnownSeller[], storeId: string, key: string): SellerResolution {
   return pickEmployee(
     sellers.filter((s) => s.nameKeys.includes(key)),
@@ -62,7 +62,7 @@ export function resolveSeller(
   return resolveSellerKey(sellers, storeId, row.sellerKey);
 }
 
-/** Acrescenta o nome atual aos já conhecidos (sem repetir). */
+/** Acrescenta o nome atual aos ja conhecidos (sem repetir). */
 export function mergeNameKeys(prev: readonly string[] | null | undefined, name: string): string[] {
   const out = [...(prev ?? [])];
   const key = sellerKeyFromName(name);
@@ -76,7 +76,7 @@ export type SellerLinkerDeps = {
     session: string;
     millenniumStoreId: number;
     concurrency?: number;
-    /** Com gerador salvo → cargo salvo; mesmo cargo na Lista = sem Consulta. */
+    /** Com gerador salvo  ->  cargo salvo; mesmo cargo na Lista = sem Consulta. */
     known?: ReadonlyMap<number, string | null>;
   }) => Promise<ErpSeller[]>;
   /** Grava e devolve as vendedoras conhecidas da loja (inclui quem saiu do ERP). */
@@ -87,7 +87,7 @@ export type LinkerStore = { id: string; code: string; millenniumStoreId: number 
 
 type Log = (level: "WARN", message: string, store: LinkerStore) => void;
 
-/** Vendedoras que seguiram sem cadastro após sincronizar (por processo). */
+/** Vendedoras que seguiram sem cadastro apos sincronizar (por processo). */
 const checkedUnknown = new Map<string, number>();
 
 export function resetSellerLinkerMemory(): void {
@@ -99,7 +99,7 @@ function unknownMemo(storeId: string, row: Pick<SalesSellerDayAgg, "sellerKey" |
 }
 
 export type SellerLinker = ((store: LinkerStore, rows: SalesSellerDayAgg[]) => Promise<SalesSellerDayAgg[]>) & {
-  /** Sincroniza a equipe da loja agora (carga inicial). 1× por job. */
+  /** Sincroniza a equipe da loja agora (carga inicial). 1x por job. */
   syncStore: (store: LinkerStore) => Promise<void>;
 };
 
@@ -159,7 +159,7 @@ export function createSellerLinker(opts: {
         const msg = e instanceof Error ? e.message : String(e);
         if (opts.isSessionDead(msg)) throw e;
         syncFailed.add(store.id);
-        console.warn(`  ⚠ equipe de vendas não sincronizou: ${msg}`);
+        console.warn(`  AVISO equipe de vendas não sincronizou: ${msg}`);
         opts.log("WARN", `Equipe de vendas (FUNCIONARIOS.Lista/Consulta) falhou: ${msg}`, store);
       }
     })();
@@ -167,7 +167,7 @@ export function createSellerLinker(opts: {
     return task;
   }
 
-  /** Preenche `sellerEmployeeId`; sincroniza a loja 1× por job se aparece vendedora fora do cadastro. */
+  /** Preenche `sellerEmployeeId`; sincroniza a loja 1x por job se aparece vendedora fora do cadastro. */
   async function link(store: LinkerStore, rows: SalesSellerDayAgg[]): Promise<SalesSellerDayAgg[]> {
     await ensureDirectory();
     const nowMs = opts.now().getTime();
@@ -187,7 +187,7 @@ export function createSellerLinker(opts: {
     const warned = new Set<string>();
     for (const row of fresh) {
       const memo = unknownMemo(store.id, row);
-      // Sem cadastro só vira aviso depois de uma sincronização bem-sucedida neste job.
+      // Sem cadastro so vira aviso depois de uma sincronizacao bem-sucedida neste job.
       if (!synced || warned.has(memo) || isKnown(row)) continue;
       warned.add(memo);
       checkedUnknown.set(memo, nowMs);

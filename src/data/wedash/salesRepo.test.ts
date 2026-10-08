@@ -156,7 +156,7 @@ describe("carga do mês", () => {
     expect(await fetchMonthFill("t1", jobClient(block))).toEqual({ currentDay: "2026-08-31", fillUntil: "2026-08-01" });
     const mid = await fetchMonthFill("t1", jobClient({ ...block, progressDay: "2026-08-15" }));
     expect(mid).toEqual({ currentDay: "2026-08-14", fillUntil: "2026-08-01" });
-    // 25/09, carga desde 01/08: 56 dias; faltam 01–14/08.
+    // 25/09, carga desde 01/08: 56 dias; faltam 01 - 14/08.
     expect(monthFillProgress(mid!, "2026-09-25")).toEqual({ done: 42, total: 56 });
   });
 });

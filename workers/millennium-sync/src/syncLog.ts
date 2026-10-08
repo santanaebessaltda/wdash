@@ -1,7 +1,7 @@
 /**
- * Configurações > Logs — erros/avisos do job em memória, gravados em `sync_log` no fim do job.
- * Um job por vez no processo (loop sequencial), então o buffer é por módulo.
- * Mensagens sanitizadas: nada de token WTS-Session, senha ou query string com sessão.
+ * Configuracoes > Logs  -  erros/avisos do job em memoria, gravados em `sync_log` no fim do job.
+ * Um job por vez no processo (loop sequencial), entao o buffer e por modulo.
+ * Mensagens sanitizadas: nada de token WTS-Session, senha ou query string com sessao.
  */
 
 import { execSync } from "node:child_process";
@@ -44,12 +44,12 @@ export type SyncLogRow = {
 
 type Ctx = { tenantId: string; jobId: string; jobKind: string; erpUser?: string };
 
-/** Teto por job — erro repetido vira `detail.count`, não linha nova. */
+/** Teto por job  -  erro repetido vira `detail.count`, nao linha nova. */
 const MAX_ROWS_PER_JOB = 200;
 const MAX_MESSAGE = 1000;
 const MAX_STACK_FRAMES = 8;
 
-/** Commit do worker (`+local` = rodando com alterações não commitadas). `WORKER_VERSION` sobrescreve. */
+/** Commit do worker (`+local` = rodando com alteracoes nao commitadas). `WORKER_VERSION` sobrescreve. */
 function detectWorkerVersion(): string {
   if (process.env.WORKER_VERSION) return process.env.WORKER_VERSION;
   try {
@@ -98,12 +98,12 @@ export function beginSyncLog(next: Ctx): void {
   issues = new Map();
 }
 
-/** Avisos/erros do job atual para a loja (+ os sem loja) — inclusive os agregados. */
+/** Avisos/erros do job atual para a loja (+ os sem loja)  -  inclusive os agregados. */
 export function syncLogIssueCount(storeId: string): number {
   return (issues.get(storeId) ?? 0) + (issues.get("") ?? 0);
 }
 
-/** Usuário ERP do job — vai em `detail.erpUser` de cada registro (inclusive os já gravados no buffer). */
+/** Usuario ERP do job  -  vai em `detail.erpUser` de cada registro (inclusive os ja gravados no buffer). */
 export function setSyncLogErpUser(erpUser: string): void {
   if (!ctx) return;
   ctx.erpUser = erpUser;
@@ -122,7 +122,7 @@ export function syncLog(
     store?: { id: string; code: string } | null;
     day?: string | null;
     detail?: Record<string, unknown>;
-    /** Erro original — em ERROR vira `detail.stack`. */
+    /** Erro original  -  em ERROR vira `detail.stack`. */
     error?: unknown;
   },
 ): void {

@@ -1,4 +1,4 @@
-/** Mock fixtures for the Finance domain pages. Plain typed data — status/
+/** Mock fixtures for the Finance domain pages. Plain typed data  -  status/
  * category values stay free text and are mapped to colors via statusVariant
  * or explicit CSS-variable color tokens at render time. */
 

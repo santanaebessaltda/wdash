@@ -9,7 +9,7 @@ const ComponentsShowcasePage = lazyPage(() => import("./ComponentsShowcasePage")
  * avatars, badges, breadcrumbs, dropdowns, pagination, progress, tooltips,
  * popovers, toasts, timeline, ratings, carousel, offcanvas, loaders,
  * empty-states) are one dynamic route reading the :tab param, not 20
- * separate route entries — see pages/components-showcase/ComponentsShowcasePage.
+ * separate route entries  -  see pages/components-showcase/ComponentsShowcasePage.
  */
 export const componentsShowcaseRoutes: RouteObject[] = [
   { path: paths.components.root, element: <Navigate to={paths.components.tab("buttons")} replace /> },

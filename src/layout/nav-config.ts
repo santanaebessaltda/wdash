@@ -20,7 +20,7 @@ export type NavSingle = {
   icon: string;
   to: string;
   badge?: string;
-  /** Outras rotas que também devem acender esta entrada (ex.: abas de um mesmo módulo). */
+  /** Outras rotas que tambem devem acender esta entrada (ex.: abas de um mesmo modulo). */
   activePaths?: string[];
 };
 

@@ -4,7 +4,7 @@ import { cn } from "@/lib/cn";
 
 /*
  * Skeletons espelham o layout real de cada tela (mesmos cards, grades e paddings),
- * para a troca skeleton → conteúdo não mexer na página.
+ * para a troca skeleton  ->  conteudo nao mexer na pagina.
  */
 
 function Busy({ className, children }: { className?: string; children: ReactNode }) {
@@ -27,9 +27,9 @@ function Ring({ size, thickness }: { size: number; thickness: number }) {
   );
 }
 
-/* ---------------- Dashboard: peças ---------------- */
+/* ---------------- Dashboard: pecas ---------------- */
 
-/** Mesmo desenho do `StatCard`: ícone + badge, rótulo, valor e sub. */
+/** Mesmo desenho do `StatCard`: icone + badge, rotulo, valor e sub. */
 function StatCardSkeleton() {
   return (
     <Card className="min-w-0">
@@ -54,7 +54,7 @@ function KpiRowSkeleton() {
   );
 }
 
-/** Legendas "● Realizado / R$ …" do cabeçalho dos gráficos. */
+/** Legendas " Realizado / R$ ..." do cabecalho dos graficos. */
 function Legends({ n }: { n: number }) {
   return (
     <div className="mt-2.5 flex flex-wrap gap-5">
@@ -86,7 +86,7 @@ function BarsBody() {
   );
 }
 
-/** Card de gráfico (`padding="lg"`): título + rótulo do eixo + legendas + badge + corpo. */
+/** Card de grafico (`padding="lg"`): titulo + rotulo do eixo + legendas + badge + corpo. */
 function ChartCardSkeleton({
   body,
   legends = 0,
@@ -144,7 +144,7 @@ function DonutCardSkeleton({ rows = 4, size = 160, withSub = false, lg = false }
   );
 }
 
-/** Atingimento da meta: anel 150px + 4 linhas rótulo/valor. */
+/** Atingimento da meta: anel 150px + 4 linhas rotulo/valor. */
 function GoalCardSkeleton() {
   return (
     <Card>
@@ -190,7 +190,7 @@ function StoreRankingSkeleton() {
   );
 }
 
-/** Destaques da equipe: posição + avatar + nome/valor + linha de detalhe. */
+/** Destaques da equipe: posicao + avatar + nome/valor + linha de detalhe. */
 function TeamHighlightsSkeleton() {
   return (
     <Card>
@@ -217,7 +217,7 @@ function TeamHighlightsSkeleton() {
   );
 }
 
-/** Top produtos / Top linhas: # + avatar de iniciais + nome/código + 3 colunas numéricas. */
+/** Top produtos / Top linhas: # + avatar de iniciais + nome/codigo + 3 colunas numericas. */
 function TopTableSkeleton({
   titleW = "w-32",
   rows = 5,
@@ -269,7 +269,7 @@ function TopTableSkeleton({
   );
 }
 
-/** Custos da operação: linhas rótulo/valor com divisória; a última é o total. */
+/** Custos da operacao: linhas rotulo/valor com divisoria; a ultima e o total. */
 function CostListSkeleton() {
   return (
     <Card className="flex flex-col">
@@ -286,7 +286,7 @@ function CostListSkeleton() {
   );
 }
 
-/** Tabela larga em card `padding="none"` (Evolução mensal, Desempenho por produto). */
+/** Tabela larga em card `padding="none"` (Evolucao mensal, Desempenho por produto). */
 function WideTableSkeleton({ cols, rows = 6, sub = false, actions = false }: { cols: number; rows?: number; sub?: boolean; actions?: boolean }) {
   return (
     <Card className="mt-4" padding="none">
@@ -328,7 +328,7 @@ function WideTableSkeleton({ cols, rows = 6, sub = false, actions = false }: { c
 
 /* ---------------- Dashboard: telas ---------------- */
 
-/** Visão Geral. `weekdays` = card "Dias da semana x meta" (some em período de 1 dia). */
+/** Visao Geral. `weekdays` = card "Dias da semana x meta" (some em periodo de 1 dia). */
 export function OverviewSkeleton({ weekdays = true }: { weekdays?: boolean }) {
   return (
     <Busy>
@@ -396,6 +396,56 @@ export function StockProductsSkeleton() {
   );
 }
 
+/** Inicio do vendedor: Seus numeros (Hoje | Este mes + 4 KPIs) e um card por loja com as abas e o podio. */
+export function SellerHomeSkeleton({ stores = 1 }: { stores?: number }) {
+  const count = Math.max(1, stores);
+  const podium = [
+    { circle: "h-16 w-16", bar: "h-36 sm:h-40", width: "w-[30%] max-w-[148px]" },
+    { circle: "h-20 w-20", bar: "h-44 sm:h-48", width: "w-[34%] max-w-[168px]" },
+    { circle: "h-16 w-16", bar: "h-28 sm:h-32", width: "w-[30%] max-w-[148px]" },
+  ];
+  return (
+    <Busy className="flex flex-col gap-5">
+      <div>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <Skeleton className="h-4 w-28" />
+          <div className="flex gap-1.5">
+            <Skeleton className="h-8 w-16 rounded-[9px]" />
+            <Skeleton className="h-8 w-24 rounded-[9px]" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }, (_, i) => (
+            <StatCardSkeleton key={i} />
+          ))}
+        </div>
+      </div>
+      {Array.from({ length: count }, (_, i) => (
+        <Card key={i} padding="lg" className="min-w-0">
+          <Skeleton className="mb-4 h-4 w-44" />
+          <div className="flex flex-wrap gap-2.5">
+            <Skeleton className="h-[34px] w-24 rounded-[10px]" />
+            <Skeleton className="h-[34px] w-28 rounded-[10px]" />
+            <Skeleton className="h-[34px] w-20 rounded-[10px]" />
+          </div>
+          <Skeleton className="mt-4 mb-2 h-3 w-24" />
+          <div className="flex items-end justify-center gap-2.5 pt-3 sm:gap-6">
+            {podium.map((step) => (
+              <div key={step.bar} className={cn("flex flex-col items-center", step.width)}>
+                <Skeleton className={cn("rounded-full", step.circle)} />
+                <Skeleton className="mt-2.5 h-3.5 w-16" />
+                <Skeleton className="mt-1.5 h-2.5 w-14" />
+                <Skeleton className="mt-1.5 h-3.5 w-20" />
+                <Skeleton className={cn("mt-3 w-full rounded-t-2xl", step.bar)} />
+              </div>
+            ))}
+          </div>
+        </Card>
+      ))}
+    </Busy>
+  );
+}
+
 export function TeamSkeleton() {
   return (
     <Busy>
@@ -409,11 +459,11 @@ export function TeamSkeleton() {
   );
 }
 
-/* ---------------- Configurações ---------------- */
+/* ---------------- Configuracoes ---------------- */
 
 type TableCell = "person" | "text" | "short" | "pill" | "select" | "menu";
 
-/** Mesmo desenho do `DataTable` (cabeçalho uppercase + linhas px-4 py-3.5). */
+/** Mesmo desenho do `DataTable` (cabecalho uppercase + linhas px-4 py-3.5). */
 function DataTableSkeleton({ cells, rows = 4, bare = false }: { cells: TableCell[]; rows?: number; bare?: boolean }) {
   return (
     <div className={cn("overflow-x-auto", !bare && "rounded-[var(--radius-vela-lg)] border border-line bg-bg-2", bare && "border-t border-line")}>
@@ -470,7 +520,7 @@ export function SegmentedSkeleton({ widths }: { widths: string[] }) {
   );
 }
 
-/** Usuários: pills (Pessoas / Convites pendentes) + tabela Nome · Papel · Lojas · Status · Último acesso. */
+/** Usuarios: pills (Pessoas / Convites pendentes) + tabela Nome  |  Papel  |  Lojas  |  Status  |  Ultimo acesso. */
 export function UsersTableSkeleton() {
   return (
     <Busy>
@@ -482,7 +532,7 @@ export function UsersTableSkeleton() {
   );
 }
 
-/** Logs: mesmo desenho do `Timeline` (bolinha + linha vertical + frase + horário). */
+/** Logs: mesmo desenho do `Timeline` (bolinha + linha vertical + frase + horario). */
 export function TimelineSkeleton({ rows = 5 }: { rows?: number }) {
   return (
     <Busy className="flex flex-col">
@@ -502,7 +552,7 @@ export function TimelineSkeleton({ rows = 5 }: { rows?: number }) {
   );
 }
 
-/** Equipe da loja: tabela Nome · Código ERP · Status (+ Turno nos ativos). */
+/** Equipe da loja: tabela Nome  |  Codigo ERP  |  Status (+ Turno nos ativos). */
 export function TeamTableSkeleton({ withShift = true, rows = 3 }: { withShift?: boolean; rows?: number }) {
   return (
     <Busy>
@@ -511,7 +561,7 @@ export function TeamTableSkeleton({ withShift = true, rows = 3 }: { withShift?: 
   );
 }
 
-/** Metas: card da listagem (ícone + nome/período + status · meta · barra · chips · avatares + botões). */
+/** Metas: card da listagem (icone + nome/periodo + status  |  meta  |  barra  |  chips  |  avatares + botoes). */
 export function GoalCardsSkeleton({ count = 3 }: { count?: number }) {
   return (
     <Busy className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -552,7 +602,7 @@ export function GoalCardsSkeleton({ count = 3 }: { count?: number }) {
   );
 }
 
-/** Detalhe da meta: resumo (ícone + nome + números) · níveis com a barra de progresso · equipe. */
+/** Detalhe da meta: resumo (icone + nome + numeros)  |  niveis com a barra de progresso  |  equipe. */
 export function GoalDetailSkeleton() {
   return (
     <Busy>
@@ -614,7 +664,7 @@ export function GoalDetailSkeleton() {
   );
 }
 
-/** Desafios: card da listagem (ícone + nome/período + botões · líder · prêmio · prazo · chips). */
+/** Desafios: card da listagem (icone + nome/periodo + botoes  |  lider  |  premio  |  prazo  |  chips). */
 export function ChallengeCardsSkeleton({ count = 3 }: { count?: number }) {
   return (
     <Busy className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -647,7 +697,7 @@ export function ChallengeCardsSkeleton({ count = 3 }: { count?: number }) {
   );
 }
 
-/** Detalhe do desafio: resumo (ícone + nome + números) · tabela de participantes. */
+/** Detalhe do desafio: resumo (icone + nome + numeros)  |  tabela de participantes. */
 export function ChallengeDetailSkeleton() {
   return (
     <Busy>
@@ -687,7 +737,7 @@ export function ChallengeDetailSkeleton() {
   );
 }
 
-/** Editor do desafio: cards Informações gerais · Métrica · Modo e prêmios. */
+/** Editor do desafio: cards Informacoes gerais  |  Metrica  |  Modo e premios. */
 export function ChallengeEditorSkeleton() {
   return (
     <Busy className="grid grid-cols-1 items-start gap-5 lg:grid-cols-3">
@@ -708,7 +758,7 @@ export function ChallengeEditorSkeleton() {
   );
 }
 
-/** Lojas: mesmo card da listagem (ícone + fantasia/CNPJ + badge Filial · avatares + "N na equipe"). */
+/** Lojas: mesmo card da listagem (icone + fantasia/CNPJ + badge Filial  |  avatares + "N na equipe"). */
 export function CardGridSkeleton({ count = 3 }: { count?: number }) {
   return (
     <Busy className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -769,7 +819,7 @@ export function StoreDetailSkeleton() {
   );
 }
 
-/** Fuso horário + 7 linhas de horário (Funcionamento da loja). */
+/** Fuso horario + 7 linhas de horario (Funcionamento da loja). */
 function ScheduleSkeleton() {
   return (
     <>
@@ -788,7 +838,7 @@ function ScheduleSkeleton() {
   );
 }
 
-/** Mesmo desenho do `StoreCardHeader`: ícone 40px + fantasia + CNPJ (+ botão à direita). */
+/** Mesmo desenho do `StoreCardHeader`: icone 40px + fantasia + CNPJ (+ botao a direita). */
 function StoreHeadSkeleton({ button = false, className }: { button?: boolean; className?: string }) {
   return (
     <div className={cn("mb-4 flex items-start justify-between gap-3", className)}>
@@ -804,7 +854,7 @@ function StoreHeadSkeleton({ button = false, className }: { button?: boolean; cl
   );
 }
 
-/** Resetar + Salvar alterações (`FormActions`). */
+/** Resetar + Salvar alteracoes (`FormActions`). */
 function FormActionsSkeleton() {
   return (
     <div className="flex gap-2.5 pt-1">
@@ -814,7 +864,7 @@ function FormActionsSkeleton() {
   );
 }
 
-/** Linhas de turno: nome · início – fim · lixeira, + "Adicionar turno" e rodapé do card. */
+/** Linhas de turno: nome  |  inicio  -  fim  |  lixeira, + "Adicionar turno" e rodape do card. */
 export function ShiftRowsSkeleton({ rows = 2 }: { rows?: number }) {
   return (
     <div className="flex flex-col gap-4">
@@ -836,8 +886,8 @@ export function ShiftRowsSkeleton({ rows = 2 }: { rows?: number }) {
 }
 
 /**
- * Telas de Gestão / Configurações: 1 card por loja (ícone + fantasia + CNPJ).
- * `fields` = grade de campos; `rows` = linhas editáveis (Custos); `shifts` = Turnos; `team` = Vendedores.
+ * Telas de Gestao / Configuracoes: 1 card por loja (icone + fantasia + CNPJ).
+ * `fields` = grade de campos; `rows` = linhas editaveis (Custos); `shifts` = Turnos; `team` = Vendedores.
  */
 export function StoreCardsSkeleton({
   count = 2,
@@ -857,9 +907,9 @@ export function StoreCardsSkeleton({
   rows?: number;
   shifts?: boolean;
   team?: boolean;
-  /** Funcionamento: fuso + horário por dia. */
+  /** Funcionamento: fuso + horario por dia. */
   schedule?: boolean;
-  /** Texto de apoio + N seções (título, apoio e 2 campos), ex.: Franquia por marca. */
+  /** Texto de apoio + N secoes (titulo, apoio e 2 campos), ex.: Franquia por marca. */
   sections?: number;
   wide?: boolean;
 }) {

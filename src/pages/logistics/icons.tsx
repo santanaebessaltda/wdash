@@ -1,4 +1,4 @@
-/** Small inline stroke-icon primitives (no icon library in this project — icons are
+/** Small inline stroke-icon primitives (no icon library in this project  -  icons are
  * hand-drawn SVG paths, matching the source prototype's approach). */
 export function Icon({ path, size = 20 }: { path: string; size?: number }) {
   return (

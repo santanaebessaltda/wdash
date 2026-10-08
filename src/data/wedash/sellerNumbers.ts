@@ -51,9 +51,9 @@ function numero(atual: number, anterior: number | null, vs: string | undefined, 
 
 /**
  * Faturamento, vendas, ticket e P.A. do vendedor.
- * Mês compara com o mesmo recorte do período anterior, os dois lados até ontem
- * (mesma regra da Dashboard > Equipe, via `previousPeriod`); Hoje não compara.
- * P.A. fica indisponível quando algum dia com venda não tem itens.
+ * Mes compara com o mesmo recorte do periodo anterior, os dois lados ate ontem
+ * (mesma regra da Dashboard > Equipe, via `previousPeriod`); Hoje nao compara.
+ * P.A. fica indisponivel quando algum dia com venda nao tem itens.
  */
 export function sellerNumbers(days: SellerDay[], period: { from: string; to: string }, today: string, mode: NumbersMode): SellerNumbers {
   if (mode === "hoje") {
@@ -69,7 +69,7 @@ export function sellerNumbers(days: SellerDay[], period: { from: string; to: str
   const resolvido = resolvePeriod({ tipo: "personalizado", inicio: period.from, fim: period.to }, today);
   const compara = resolvido.terminaHoje;
   const faixa = previousPeriod(resolvido);
-  // Período que termina hoje: os dois lados perdem o último dia (não existe venda por pessoa e hora).
+  // Periodo que termina hoje: os dois lados perdem o ultimo dia (nao existe venda por pessoa e hora).
   const fimAtual = compara ? somarDias(period.to, -1) : period.to;
   const fimAnterior = compara ? somarDias(faixa.fim, -1) : faixa.fim;
   const atual = soma(days, period.from, fimAtual);

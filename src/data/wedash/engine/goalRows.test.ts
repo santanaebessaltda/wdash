@@ -43,6 +43,21 @@ describe("goalFromRow", () => {
     ]);
   });
 
+  it("keeps GENERAL and ignores nothing else in the row", () => {
+    const goal = goalFromRow({
+      id: "g3",
+      store_id: "s010",
+      name: "Meta geral",
+      starts_on: "2026-10-01",
+      ends_on: "2026-10-31",
+      target_cents: 10000,
+      tier_mode: "GENERAL",
+      tiers: [],
+      groups: [],
+    });
+    expect(goal.tierMode).toBe("GENERAL");
+  });
+
   it("falls back to INDIVIDUAL and empty lists for unknown data", () => {
     const goal = goalFromRow({
       id: "g2",

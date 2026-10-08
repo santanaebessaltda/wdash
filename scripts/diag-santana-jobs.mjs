@@ -1,4 +1,4 @@
-/** Diagnóstico rápido Santana — jobs abertos. */
+/** Diagnostico rapido Santana  -  jobs abertos. */
 import fs from "node:fs";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";

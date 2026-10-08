@@ -4,7 +4,7 @@ export function nowMs(): number {
   return Date.now();
 }
 
-/** Ex.: 240ms · 1.4s · 23s */
+/** Ex.: 240ms  |  1.4s  |  23s */
 export function formatElapsed(startedMs: number, endedMs = Date.now()): string {
   const ms = Math.max(0, Math.round(endedMs - startedMs));
   if (ms < 1000) return `${ms}ms`;
@@ -58,7 +58,7 @@ export class StepTimings {
     return n;
   }
 
-  /** Linhas "Etapa · N chamada(s) · tempo · média". */
+  /** Linhas "Etapa  |  N chamada(s)  |  tempo  |  media". */
   lines(): string[] {
     return [...this.steps.entries()].map(([step, { ms, calls }]) => {
       const avg = calls > 0 ? ` · média ${formatElapsed(0, ms / calls)}` : "";

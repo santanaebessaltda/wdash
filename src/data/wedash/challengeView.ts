@@ -302,11 +302,14 @@ export function buildChallengeView(args: {
     .filter((x) => concorre(x) && posicaoDe.has(x.a.key))
     .map((x) => ({ valor: x.resultado!, posicao: posicaoDe.get(x.a.key)! }));
 
+  // P.A. oscila ate o ultimo dia: ninguem "atinge" enquanto o desafio esta aberto.
+  const paEmAndamento = c.metric === "PA" && status === "active";
+
   const participantes: ChallengeParticipant[] = base.map(({ a, resultado }) => {
     const posicao = posicaoDe.get(a.key) ?? null;
     let vencedor = false;
     let premio: ChallengePrize | null = null;
-    if (status !== "upcoming") {
+    if (status !== "upcoming" && !paEmAndamento) {
       if (c.mode === "CONTEST") {
         vencedor = posicao != null && posicao <= c.prizes.length && alcancaAlvo(resultado);
         premio = vencedor ? (c.prizes[posicao! - 1] ?? null) : null;
@@ -319,7 +322,9 @@ export function buildChallengeView(args: {
     let falta: string | null = null;
     if (status === "active" && resultado != null) {
       if (a.vendas < minVendas) falta = faltaVendas(minVendas - a.vendas);
-      else if (c.mode === "MINIMUM") {
+      else if (paEmAndamento && alcancaAlvo(resultado) && (c.mode === "MINIMUM" || (posicao != null && posicao <= c.prizes.length))) {
+        falta = "O P.A. só vale no fim do desafio";
+      } else if (c.mode === "MINIMUM") {
         if (!vencedor && c.target != null) falta = `${faltaLabel(c.metric, c.target - resultado)} para o mínimo`;
       } else if (c.target != null && resultado < c.target - 1e-9) {
         falta = `${faltaLabel(c.metric, c.target - resultado)} para o mínimo`;
@@ -406,7 +411,7 @@ export function buildChallengeView(args: {
       resultado,
       alvo: metaGerencia,
       periodoAnterior: null,
-      atingiu: resultado != null && resultado > 0 && resultado >= metaGerencia - 1e-9,
+      atingiu: (c.metric !== "PA" || status === "ended") && resultado != null && resultado > 0 && resultado >= metaGerencia - 1e-9,
       premio: c.managerPrize,
     };
   }

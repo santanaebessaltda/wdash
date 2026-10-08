@@ -1,6 +1,6 @@
 /**
  * Perf: NFE.Lista_Status vs VENDAS.Lista vs ListaTodos
- * + amostra "Produtos por Cupom e Vendedor" (CATALOG 52DE7BBC…).
+ * + amostra "Produtos por Cupom e Vendedor" (CATALOG 52DE7BBC...).
  *
  *   cd workers/millennium-sync && npx tsx scripts/probe-nfe-vs-lista.ts
  */
@@ -16,7 +16,7 @@ import { fetchFilialGeradorMap } from "../src/millenniumBrandReport.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-/** GUID do print — se falhar, tentamos variantes (curl veio com possível typo). */
+/** GUID do print  -  se falhar, tentamos variantes (curl veio com possivel typo). */
 const CUPON_REPORT_GUIDS = [
   "{52DE7BBC-78D4-7765-A232-A5AAD2840284}",
   "{52DE7BBC-78D4-4765-A232-A5AAD2840284}",
@@ -114,7 +114,7 @@ async function main() {
   const stores = await deps.listStores(cred.tenant_id as string);
   const store = stores.find((s) => s.code === "00205")!;
 
-  // Sempre login fresco — token do browser/store costuma expirar entre probes.
+  // Sempre login fresco  -  token do browser/store costuma expirar entre probes.
   let session: string | null =
     (await deps.getStoredSession(cred.id as string)) ??
     listRememberedSessions().find((s) => s.credentialId === (cred.id as string))?.session ??
@@ -122,7 +122,7 @@ async function main() {
 
   async function ensureSession(): Promise<string> {
     if (session) {
-      // smoke: events com token antigo falha com 401 → relogin
+      // smoke: events com token antigo falha com 401  ->  relogin
       try {
         await fetchEventosListaTodos({ session, baseUrl: millenniumBaseUrl() });
         return session;
@@ -235,7 +235,7 @@ async function main() {
     "GET",
   );
 
-  // 4) Produtos por Cupom — INTERVAL 3 = Este Mês
+  // 4) Produtos por Cupom  -  INTERVAL 3 = Este Mes
   const geradorMap = await fetchFilialGeradorMap({ session });
   const g = geradorMap.get("00205") ?? 65728;
   const origin = base.replace(/\/api\/?$/, "");

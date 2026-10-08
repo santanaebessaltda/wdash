@@ -65,7 +65,7 @@ async function main() {
     all.map((d) => `${d.day.slice(8)}=${(Number(d.cmv_cents) / 100).toFixed(0)}`).join(" "),
   );
 
-  // Rede (todas lojas) no mesmo período
+  // Rede (todas lojas) no mesmo periodo
   const { data: allStores } = await sb
     .from("sales_day_agg")
     .select("store_id, brand, cmv_cents")

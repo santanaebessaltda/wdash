@@ -14,7 +14,7 @@ function dataBr(iso: string): string {
   return deIso(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-/** Loja e período do relatório, no formato do cabeçalho do PDF e do nome do arquivo. */
+/** Loja e periodo do relatorio, no formato do cabecalho do PDF e do nome do arquivo. */
 function useReportScope() {
   const session = useActiveSession();
   const { escopo } = useScope();
@@ -34,7 +34,7 @@ function useReportScope() {
   };
 }
 
-/** Exportar da tela: abre a impressão com o layout do relatório (salvar como PDF). */
+/** Exportar da tela: abre a impressao com o layout do relatorio (salvar como PDF). */
 export function useExportPdf(tela: string, extra?: string | null, { periodo = true }: { periodo?: boolean } = {}) {
   const { lojaArquivo, periodoArquivo } = useReportScope();
   return useCallback(
@@ -43,23 +43,23 @@ export function useExportPdf(tela: string, extra?: string | null, { periodo = tr
         tela,
         lojaArquivo,
         extra ?? "",
-        // Tela sem período (retrato, ex.: estoque) leva a data em que foi gerado.
+        // Tela sem periodo (retrato, ex.: estoque) leva a data em que foi gerado.
         periodo ? periodoArquivo : new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }),
       ]),
     [tela, lojaArquivo, extra, periodo, periodoArquivo],
   );
 }
 
-/** Cabeçalho que só aparece no PDF: marca, loja, período, filtros da tela e horário dos dados. */
+/** Cabecalho que so aparece no PDF: marca, loja, periodo, filtros da tela e horario dos dados. */
 export function ReportHeader({
   filtros = [],
   periodo = true,
   atualizado,
 }: {
   filtros?: Array<{ label: string; valor: string }>;
-  /** Telas de retrato (ex.: estoque) não têm período. */
+  /** Telas de retrato (ex.: estoque) nao tem periodo. */
   periodo?: boolean;
-  /** Substitui a linha "Vendas de hoje atualizadas…". */
+  /** Substitui a linha "Vendas de hoje atualizadas...". */
   atualizado?: string;
 }) {
   const { lojaNome, lojaCnpj, lojaCodigo, todas, periodoTexto } = useReportScope();

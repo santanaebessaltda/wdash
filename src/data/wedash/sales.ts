@@ -1,7 +1,7 @@
 /**
- * Gerador determinístico de vendas mockadas, dia a dia e hora a hora, por
+ * Gerador deterministico de vendas mockadas, dia a dia e hora a hora, por
  * filial. Faz o papel do sync do ERP: as telas nunca leem daqui diretamente,
- * só através da camada de visões (loja.ts), que devolve números prontos.
+ * so atraves da camada de visoes (loja.ts), que devolve numeros prontos.
  */
 import { categorias, stores, paymentMethods, type Division, type Store, type PaymentMethod } from "./stores";
 import { collaboratorsOfStore } from "./team";
@@ -29,13 +29,13 @@ interface ParametrosFilial {
   baseDia: number;
   ticket: number;
   pa: number;
-  /** Peso por dia da semana, índice 0 = domingo. */
+  /** Peso por dia da semana, indice 0 = domingo. */
   pesosSemana: number[];
-  /** Peso por hora de funcionamento, índice 0 = hora de abertura. */
+  /** Peso por hora de funcionamento, indice 0 = hora de abertura. */
   pesosHora: number[];
-  /** Fator por mês (chave "AAAA-MM"). */
+  /** Fator por mes (chave "AAAA-MM"). */
   tendencia: Record<string, number>;
-  /** Participação de cada categoria no faturamento. */
+  /** Participacao de cada categoria no faturamento. */
   categorias: Record<number, number>;
   meios: Record<PaymentMethod, number>;
 }
@@ -64,10 +64,10 @@ const PARAMETROS: Record<string, ParametrosFilial> = {
   },
 };
 
-/** Índice de preço relativo por categoria, para derivar itens do faturamento. */
+/** Indice de preco relativo por categoria, para derivar itens do faturamento. */
 const INDICE_PRECO: Record<number, number> = { 1: 1.6, 2: 0.7, 3: 0.8, 4: 0.9, 5: 1.1, 6: 0.75, 7: 1.9, 8: 1.2 };
 
-/** PRNG determinístico (mulberry32). */
+/** PRNG deterministico (mulberry32). */
 function prng(seed: number) {
   let a = seed >>> 0;
   return () => {
@@ -85,7 +85,7 @@ function hash(s: string): number {
   return h >>> 0;
 }
 
-/** Ruído multiplicativo em torno de 1, amplitude ±amp. */
+/** Ruido multiplicativo em torno de 1, amplitude amp. */
 function ruido(r: () => number, amp: number): number {
   return 1 + (r() * 2 - 1) * amp;
 }
@@ -140,7 +140,7 @@ function gerarDia(filial: Store, iso: string): SalesDay {
   });
   const total: Aggregate = { faturamento, atendimentos, itens };
 
-  // Categorias: faturamento por participação, itens pelo índice de preço, CMV pela categoria.
+  // Categorias: faturamento por participacao, itens pelo indice de preco, CMV pela categoria.
   const porCategoria: Record<number, { faturamento: number; itens: number; cmv: number }> = {};
   const entradas = Object.entries(p.categorias).map(([id, share]) => ({ id: Number(id), share: share * ruido(r, 0.12) }));
   const somaShare = entradas.reduce((s, e) => s + e.share, 0);
@@ -156,7 +156,7 @@ function gerarDia(filial: Store, iso: string): SalesDay {
     };
   });
 
-  // Divisão: WPINK = categorias da divisão WPINK; o resto é WEPINK.
+  // Divisao: WPINK = categorias da divisao WPINK; o resto e WEPINK.
   const porDivisao: Record<Division, Aggregate> = {
     WEPINK: { faturamento: 0, atendimentos: 0, itens: 0 },
     WPINK: { faturamento: 0, atendimentos: 0, itens: 0 },
@@ -180,7 +180,7 @@ function gerarDia(filial: Store, iso: string): SalesDay {
     porMeio[m] = Math.round((faturamento * meiosRuido[i]) / somaMeios);
   });
 
-  // Vendedoras: peso relativo, respeitando admissão e inatividade.
+  // Vendedoras: peso relativo, respeitando admissao e inatividade.
   const porVendedora: Record<string, Aggregate> = {};
   const equipe = collaboratorsOfStore(filial.id).filter((c) => {
     if (c.dataAdmissao > iso) return false;
@@ -209,13 +209,13 @@ export function hourRange(filial: Store): number[] {
 
 const INICIO_HISTORICO = "2026-06-01";
 
-/** Índice puro de vendas por filial+data, parametrizável para testes isolados. */
+/** Indice puro de vendas por filial+data, parametrizavel para testes isolados. */
 export class SalesDayStore {
   private readonly indice: Map<string, SalesDay>;
   readonly inicio: string;
   readonly fim: string;
 
-  /** Popula do histórico deterministicamente gerado. */
+  /** Popula do historico deterministicamente gerado. */
   constructor(inicio: string = INICIO_HISTORICO, fim: string = TODAY_ISO) {
     this.inicio = inicio;
     this.fim = fim;
@@ -238,7 +238,7 @@ export class SalesDayStore {
   }
 }
 
-/** Instância padrão usada pela aplicação. */
+/** Instancia padrao usada pela aplicacao. */
 export const store = new SalesDayStore();
 
 export function salesDay(filialId: string, iso: string): SalesDay | undefined {
@@ -249,7 +249,7 @@ export function salesDays(filialId: string, inicio: string, fim: string): SalesD
   return store.dias(filialId, inicio, fim);
 }
 
-/** Agregado de um dia, opcionalmente recortado por divisão e por faixa de horas. */
+/** Agregado de um dia, opcionalmente recortado por divisao e por faixa de horas. */
 export function dayAggregate(dia: SalesDay, divisao: Division | null, horaMax?: number): Aggregate {
   if (horaMax !== undefined) {
     const out: Aggregate = { faturamento: 0, atendimentos: 0, itens: 0 };

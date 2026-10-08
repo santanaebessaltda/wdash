@@ -1,9 +1,9 @@
 /**
  * Tabelas de custo do Millennium.
- * - Lista: lookup `tabela_custo.TABELA` (8 tabelas na rede: CUSTO, SP, RJ E MG, CENTRO OESTE…).
- * - Custos: wtsreports {9701602B} com `TABELA_DE_CUSTO` e filial vazia = tabela inteira (~545 códigos, ~3s).
- *   `F_3814918930` = custo unitário; `F_453092731` = custo × estoque (ignorado).
- *   Mesmo código em várias cores → fica o maior custo.
+ * - Lista: lookup `tabela_custo.TABELA` (8 tabelas na rede: CUSTO, SP, RJ E MG, CENTRO OESTE...).
+ * - Custos: wtsreports {9701602B} com `TABELA_DE_CUSTO` e filial vazia = tabela inteira (~545 codigos, ~3s).
+ *   `F_3814918930` = custo unitario; `F_453092731` = custo x estoque (ignorado).
+ *   Mesmo codigo em varias cores  ->  fica o maior custo.
  */
 import { millenniumBaseUrl } from "./millenniumAuth.ts";
 import { PRODUCT_DIVISION_CATALOG_GUID } from "./millenniumProductDivision.ts";
@@ -40,7 +40,7 @@ export function parseCostTables(payload: unknown): CostTable[] {
   return out;
 }
 
-/** COD_PRODUTO → custo unitário em centavos (só > 0). */
+/** COD_PRODUTO  ->  custo unitario em centavos (so > 0). */
 export function parseCostTablePrices(payload: unknown): Map<string, number> {
   const out = new Map<string, number>();
   for (const r of rowsOf(payload)) {

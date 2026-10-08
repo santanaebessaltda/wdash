@@ -67,7 +67,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
             <circle cx="11" cy="11" r="8" />
             <path d="m21 21-4.3-4.3" />
           </svg>
-          <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={onKeyDown} placeholder="Buscar na WeDash…" className="w-full bg-transparent text-[14px] text-t0 outline-none placeholder:text-t2" />
+          <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={onKeyDown} placeholder="Buscar na WDash…" className="w-full bg-transparent text-[14px] text-t0 outline-none placeholder:text-t2" />
           <kbd className="shrink-0 rounded-md border border-line-2 px-1.5 py-0.5 text-[10px] font-bold text-t2">ESC</kbd>
         </div>
         <div className="max-h-[50vh] overflow-y-auto p-2">

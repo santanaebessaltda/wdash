@@ -1,4 +1,4 @@
-/** Formatação pt-BR usada em todas as telas do produto. */
+/** Formatacao pt-BR usada em todas as telas do produto. */
 
 import { deIso, num } from "../data/wedash/engine/format.ts";
 
@@ -17,12 +17,12 @@ export {
 
 const brlInteiro = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
-/** R$ 84.210 — sem centavos, para painéis. */
+/** R$ 84.210  -  sem centavos, para paineis. */
 export function brl(v: number): string {
   return brlInteiro.format(v);
 }
 
-/** R$ 1,2K · R$ 84K · R$ 1,2M — compacto para cards e gráficos. */
+/** R$ 1,2K  |  R$ 84K  |  R$ 1,2M  -  compacto para cards e graficos. */
 export function brlK(v: number): string {
   const abs = Math.abs(v);
   if (abs >= 1_000_000) return `R$ ${(v / 1_000_000).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}M`;
@@ -30,7 +30,7 @@ export function brlK(v: number): string {
   return brlInteiro.format(v);
 }
 
-/** LOJA / CATEGORIA / PRODUTO — rótulos de catálogo em caixa alta (pt-BR). */
+/** LOJA / CATEGORIA / PRODUTO  -  rotulos de catalogo em caixa alta (pt-BR). */
 export function labelUpper(s: string): string {
   return s.trim().toLocaleUpperCase("pt-BR");
 }
@@ -43,8 +43,8 @@ export function companyNameCase(s: string | null | undefined): string {
 }
 
 /**
- * Nome de pessoa: primeira letra de cada palavra maiúscula ("Ana Paula de Souza").
- * Partículas (de, da, do, das, dos, e) ficam minúsculas fora do início. Espelho SQL na migration
+ * Nome de pessoa: primeira letra de cada palavra maiuscula ("Ana Paula de Souza").
+ * Particulas (de, da, do, das, dos, e) ficam minusculas fora do inicio. Espelho SQL na migration
  * `20260926170000_title_case_names` e em `supabase/functions/_shared/text.ts`.
  */
 export function titleName(s: string | null | undefined): string {
@@ -59,8 +59,8 @@ export function titleName(s: string | null | undefined): string {
 }
 
 /**
- * Nome de produto / categoria / tabela vindo do ERP em Title Case ("DESOD COL VF GOLDEN 100ML" →
- * "Desod Col VF Golden 100ml"). Sigla sem vogal (VF, WP, FPS) fica em maiúsculas.
+ * Nome de produto / categoria / tabela vindo do ERP em Title Case ("DESOD COL VF GOLDEN 100ML"  -> 
+ * "Desod Col VF Golden 100ml"). Sigla sem vogal (VF, WP, FPS) fica em maiusculas.
  */
 export function labelCase(s: string | null | undefined): string {
   const raw = (s ?? "").trim().replace(/\s+/g, " ").split(" ");
@@ -70,12 +70,12 @@ export function labelCase(s: string | null | undefined): string {
     .join(" ");
 }
 
-/** 48% · 48,3% */
+/** 48%  |  48,3% */
 export function pct(v: number, casas = 0): string {
   return `${num(v, casas)}%`;
 }
 
-/** +12% · −8% — sinal explícito para variações. */
+/** +12%  |  8%  -  sinal explicito para variacoes. */
 export function delta(v: number, casas = 0): string {
   const sinal = v > 0 ? "+" : v < 0 ? "−" : "";
   return `${sinal}${num(Math.abs(v), casas)}%`;
@@ -97,7 +97,7 @@ export function dataCompleta(iso: string): string {
   return `${dataCurta(iso)}/${deIso(iso).getFullYear()}`;
 }
 
-/** terça, 15 de setembro */
+/** terca, 15 de setembro */
 export function dataExtenso(iso: string): string {
   const d = deIso(iso);
   return `${DIAS_SEMANA[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]}`;
@@ -136,12 +136,12 @@ export function horaCurta(h: number): string {
   return `${h}h`;
 }
 
-/** Faixa de 1 hora para tooltip: "21h às 22h"; hora em andamento = "14h até agora". */
+/** Faixa de 1 hora para tooltip: "21h as 22h"; hora em andamento = "14h ate agora". */
 export function faixaHora(h: number, emAndamento = false): string {
   return emAndamento ? `${h}h até agora` : `${h}h às ${h + 1}h`;
 }
 
-/** Tooltip de delta: "Em relação ao mês passado." / "Em relação aos 7 dias anteriores." */
+/** Tooltip de delta: "Em relacao ao mes passado." / "Em relacao aos 7 dias anteriores." */
 export function tipRelacao(vs: string): string {
   if (vs.startsWith("os ")) return `Em relação aos ${vs.slice(3)}.`;
   if (vs.startsWith("o ")) return `Em relação ao ${vs.slice(2)}.`;
@@ -149,7 +149,7 @@ export function tipRelacao(vs: string): string {
   return `Em relação a ${vs}.`;
 }
 
-/** Tooltip do badge de delta com o valor comparado: "Em relação ao mês passado: R$ 12.345,67." */
+/** Tooltip do badge de delta com o valor comparado: "Em relacao ao mes passado: R$ 12.345,67." */
 export function tipDelta(delta: { vs?: string; anterior?: string }, metrica?: string): string {
   if (!delta.vs) {
     if (metrica) return `${metrica} no período anterior${delta.anterior ? `: ${delta.anterior}` : ""}.`;
@@ -160,7 +160,7 @@ export function tipDelta(delta: { vs?: string; anterior?: string }, metrica?: st
   return metrica ? `${metrica} ${tip.charAt(0).toLowerCase()}${tip.slice(1)}` : tip;
 }
 
-/** `1 dia` / `N dias` — prazos e badges. */
+/** `1 dia` / `N dias`  -  prazos e badges. */
 export function rotuloDias(n: number): string {
   return n === 1 ? "1 dia" : `${n} dias`;
 }

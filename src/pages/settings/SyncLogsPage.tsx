@@ -47,7 +47,7 @@ function fmtDay(iso: string): string {
   return `${d}/${m}/${y}`;
 }
 
-/** "29/09/2026" · "29/09/2026 a 30/09/2026" (dias seguidos) · lista quando há buraco entre os dias. */
+/** "29/09/2026"  |  "29/09/2026 a 30/09/2026" (dias seguidos)  |  lista quando ha buraco entre os dias. */
 function fmtDays(days: string[]): string {
   const sorted = [...new Set(days)].sort();
   if (sorted.length === 1) return fmtDay(sorted[0]!);
@@ -58,8 +58,8 @@ function fmtDays(days: string[]): string {
 }
 
 /**
- * Ícone e cor do símbolo da Timeline por origem — padrão Activity Logs do Vela (símbolo de uma cor só,
- * sem fundo). `\uFE0E` força o símbolo de texto: sem ele o navegador usa o emoji colorido.
+ * Icone e cor do simbolo da Timeline por origem  -  padrao Activity Logs do Vela (simbolo de uma cor so,
+ * sem fundo). `\uFE0E` forca o simbolo de texto: sem ele o navegador usa o emoji colorido.
  */
 const SOURCE_STYLE: Record<string, { icon: string; tint: string }> = {
   login: { icon: "\u{1F511}", tint: "var(--bad)" },
@@ -94,8 +94,8 @@ function LevelBadge({ level }: { level: SyncLogLevel }) {
 }
 
 /**
- * Configurações > Logs — erros e avisos da sincronização com o Millennium.
- * Leitura só para OWNER / MANAGER (RLS); retenção de 120 dias.
+ * Configuracoes > Logs  -  erros e avisos da sincronizacao com o Millennium.
+ * Leitura so para OWNER / MANAGER (RLS); retencao de 120 dias.
  */
 export function SyncLogsPage() {
   const session = useActiveSession();
@@ -303,7 +303,7 @@ function logParaSuporte(e: SyncLogEntry, loja: string): string {
   const w = workerInfo(e);
   const stack = stackOf(e);
   return [
-    `[WeDash sync_log] ${e.level} · ${e.source} · ${syncLogSummary(e)}`,
+    `[WDash sync_log] ${e.level} · ${e.source} · ${syncLogSummary(e)}`,
     `explicação: ${syncLogExplanation(e)}`,
     `log_id: ${e.id}`,
     `quando: ${e.createdAt}`,

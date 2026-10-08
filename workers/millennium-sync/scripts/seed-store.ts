@@ -80,6 +80,8 @@ async function main() {
         replaceCashCloseDays: noop,
         fetchCashAccounts: async () => [],
         fetchCashCloseReport: async () => [],
+        fetchStoneCaptures: async () => [],
+        replaceStoneCaptures: noop,
         replaceSellerDayAggs: noop,
         upsertHourAggs: noop,
         listCouponBrands: async () => [],

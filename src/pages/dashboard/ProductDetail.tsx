@@ -46,7 +46,7 @@ export const TipHelp = ({ label }: { label: string }) => (
   </Tooltip>
 );
 
-/** Badge de delta — só % no chip; base do comparativo no tooltip (igual StatCard). */
+/** Badge de delta  -  so % no chip; base do comparativo no tooltip (igual StatCard). */
 export function BadgeVsAnterior({ delta, metrica }: { delta?: Delta; metrica?: string }) {
   if (!delta) return null;
   const badge = (
@@ -64,7 +64,7 @@ export const moneyOrDash = (v: number | null) => (v == null ? "—" : brlCent(v)
 
 /* ---------- Dados ---------- */
 
-/** Tudo o que a tela Produtos lê — também usado pelo detalhe aberto de outras telas. */
+/** Tudo o que a tela Produtos le  -  tambem usado pelo detalhe aberto de outras telas. */
 export async function fetchProductsAggInput(tenantId: string, escopo: Scope): Promise<ProductsAggInput> {
   const periodo = resolvePeriod(escopo.periodo, calendarTodayIso());
   const range = financeFetchRange(escopo);
@@ -93,7 +93,7 @@ export interface ProductsDetailData {
   view: ProductsView;
 }
 
-/** O que abrir no detalhe — por chave, para outras telas abrirem sem ter as linhas da tela Produtos. */
+/** O que abrir no detalhe  -  por chave, para outras telas abrirem sem ter as linhas da tela Produtos. */
 export type ProductSelection =
   | { tipo: "produto"; chave: string; nome: string }
   | { tipo: "linha"; nome: string }
@@ -124,8 +124,8 @@ function montarDetalhe(escopo: Scope, { aggs, view }: ProductsDetailData, s: Pro
 }
 
 /**
- * Detalhe de produto / linha / categoria / classe com navegação em pilha ("← Voltar").
- * Com `data` usa os dados da tela; sem `data` busca os dados de Produtos só ao abrir.
+ * Detalhe de produto / linha / categoria / classe com navegacao em pilha (" <-  Voltar").
+ * Com `data` usa os dados da tela; sem `data` busca os dados de Produtos so ao abrir.
  */
 export function useProductDetail({
   escopo,
@@ -145,7 +145,7 @@ export function useProductDetail({
     setPilha([]);
   }, [escopo]);
 
-  // Custos/impostos das lojas chegam depois do 1º render → recalcula.
+  // Custos/impostos das lojas chegam depois do 1 render  ->  recalcula.
   const [storesTick, setStoresTick] = useState(0);
   useEffect(() => {
     const onStores = () => setStoresTick((n) => n + 1);
@@ -186,7 +186,7 @@ export function useProductDetail({
   return { abrir, modal };
 }
 
-/** Busca os dados de Produtos na 1ª abertura; mantém até mudar o filtro ou chegar venda nova. */
+/** Busca os dados de Produtos na 1 abertura; mantem ate mudar o filtro ou chegar venda nova. */
 function useLazyProductsData(escopo: Scope, tenantId: string | undefined, enabled: boolean): ProductsDetailData | null {
   const [data, setData] = useState<ProductsDetailData | null>(null);
   const gen = useRef(0);
@@ -269,7 +269,7 @@ export function MetricaDetalhe({
   );
 }
 
-/** Mesmo padrão da tabela Top produtos (# · Produto · Itens · Faturamento · Lucro bruto · Margem); clique abre o produto. */
+/** Mesmo padrao da tabela Top produtos (#  |  Produto  |  Itens  |  Faturamento  |  Lucro bruto  |  Margem); clique abre o produto. */
 function ProdutosDoGrupo({ produtos, onProduto }: { produtos: ProductDetailItem[]; onProduto: (chave: string) => void }) {
   const [sort, setSort] = useState<TopSort>("faturamento");
   const [dir, setDir] = useState<SortDir>("desc");
@@ -337,7 +337,7 @@ function ProdutosDoGrupo({ produtos, onProduto }: { produtos: ProductDetailItem[
   );
 }
 
-/** Categorias de uma classe da Curva ABC — padrão da tabela Top produtos; clique abre a categoria. */
+/** Categorias de uma classe da Curva ABC  -  padrao da tabela Top produtos; clique abre a categoria. */
 function CategoriasDaClasse({
   categorias,
   onCategoria,

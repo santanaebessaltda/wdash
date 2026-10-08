@@ -1,4 +1,4 @@
-/** Mock fixtures for the CRM domain pages. Plain typed data — status values
+/** Mock fixtures for the CRM domain pages. Plain typed data  -  status values
  * stay free text and are mapped to colors via statusVariant, pipeline stage
  * colors are passed explicitly as CSS-variable tokens. */
 

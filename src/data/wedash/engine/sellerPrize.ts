@@ -1,14 +1,14 @@
-/** Premiação do vendedor: ganho ao chegar no próximo nível e projeção pelo ritmo (regra da Visão geral). */
+/** Premiacao do vendedor: ganho ao chegar no proximo nivel e projecao pelo ritmo (regra da Visao geral). */
 import { deIso, intervaloDias } from "./format.ts";
 import type { GoalRecord } from "./goalTypes.ts";
 import type { SellerGoalLevel } from "./goalView.ts";
 
-/** Parte da pessoa na premiação: 1 no modo Individual; no Grupo, dividida igualmente entre as pessoas do grupo. */
+/** Parte da pessoa na premiacao: 1 no modo Individual; no Grupo, dividida igualmente entre as pessoas do grupo. */
 function share(level: SellerGoalLevel, groupSize: number): number {
   return level.modo === "individual" ? 1 : 1 / Math.max(1, groupSize);
 }
 
-/** Premiação no próximo nível sobre as vendas atuais − premiação agora + bônus do próximo nível; null no último nível. */
+/** Premiacao no proximo nivel sobre as vendas atuais  premiacao agora + bonus do proximo nivel; null no ultimo nivel. */
 export function nextLevelGain(level: SellerGoalLevel, groupSize: number): number | null {
   if (!level.proximo) return null;
   const noProximo = ((level.realizado * level.proximo.comissaoPct) / 100) * share(level, groupSize);
@@ -16,8 +16,8 @@ export function nextLevelGain(level: SellerGoalLevel, groupSize: number): number
 }
 
 /**
- * Premiação + bônus se mantiver o ritmo: vendido até ontem ÷ peso dos dias fechados × peso de todos os dias da meta.
- * Só depois de metade do peso da meta ter passado; antes disso null. Modo Grupo = vendido do grupo.
+ * Premiacao + bonus se mantiver o ritmo: vendido ate ontem  peso dos dias fechados x peso de todos os dias da meta.
+ * So depois de metade do peso da meta ter passado; antes disso null. Modo Grupo = vendido do grupo.
  */
 export function projectedPrize(
   goal: GoalRecord,

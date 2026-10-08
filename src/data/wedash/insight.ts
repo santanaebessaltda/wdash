@@ -1,14 +1,14 @@
 /**
- * Leitura de tela. No produto, o LLM redige a partir de números da camada de
- * métricas; aqui a frase é montada por regra com os mesmos números.
+ * Leitura de tela. No produto, o LLM redige a partir de numeros da camada de
+ * metricas; aqui a frase e montada por regra com os mesmos numeros.
  *
- * Regra do produto: só aparece se disser algo que os números da tela não
- * dizem. Repetir um valor que já está num indicador não conta.
+ * Regra do produto: so aparece se disser algo que os numeros da tela nao
+ * dizem. Repetir um valor que ja esta num indicador nao conta.
  *
- * Um só card de leitura na tela, não um card de leitura mais um de alertas de
- * sistema separado: os alertas (`v.alertas` — sync atrasado, nota pendente)
+ * Um so card de leitura na tela, nao um card de leitura mais um de alertas de
+ * sistema separado: os alertas (`v.alertas`  -  sync atrasado, nota pendente)
  * entram como frase inicial da mesma leitura, antes da narrativa de
- * desempenho, porque os dois respondem à mesma pergunta de quem abre a tela:
+ * desempenho, porque os dois respondem a mesma pergunta de quem abre a tela:
  * "o que eu preciso saber agora?".
  */
 import type { StoreView } from "./dashboard";
@@ -21,7 +21,7 @@ export function buildStoreInsight(v: StoreView): string | null {
 }
 
 function leituraRede(v: StoreView): string | null {
-  if (v.escopo.divisao) return null; // régua vira participação da marca, não fala de meta
+  if (v.escopo.divisao) return null; // regua vira participacao da marca, nao fala de meta
   const regua = v.regua;
   if (!regua || regua.length < 2) return null;
   const pior = regua[0];

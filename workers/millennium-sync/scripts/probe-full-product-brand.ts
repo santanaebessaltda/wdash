@@ -1,5 +1,5 @@
 /**
- * Acha fonte completa produto → WEPINK/WPINK (sem escopo de estoque por loja).
+ * Acha fonte completa produto  ->  WEPINK/WPINK (sem escopo de estoque por loja).
  *
  *   cd workers/millennium-sync && npx tsx scripts/probe-full-product-brand.ts
  */
@@ -213,7 +213,7 @@ async function main() {
   const g205 = geradorMap.get("00205") ?? 65728;
   console.log(`gerador 00205=${g205} · total geradores=${geradorMap.size}`);
 
-  // A) como hoje: filial + divisão
+  // A) como hoje: filial + divisao
   const a101 = await callReport(session, `filial=${g205} div=101`, {
     FILIAL_GERADOR_GERADOR: `(${g205})`,
     PRODUTO_DIVISAO_DIVISAO: DIVISAO_WPINK,
@@ -223,7 +223,7 @@ async function main() {
     PRODUTO_DIVISAO_DIVISAO: DIVISAO_WEPINK,
   });
 
-  // B) sem filial — catálogo global?
+  // B) sem filial  -  catalogo global?
   const b101 = await callReport(session, `sem filial div=101`, {
     FILIAL_GERADOR_GERADOR: null,
     PRODUTO_DIVISAO_DIVISAO: DIVISAO_WPINK,
@@ -239,7 +239,7 @@ async function main() {
     PRODUTO_DIVISAO_DIVISAO: DIVISAO_WPINK,
   });
 
-  // D) só divisão, sem chave filial
+  // D) so divisao, sem chave filial
   const d101 = await callReport(session, `só div=101`, {
     PRODUTO_DIVISAO_DIVISAO: DIVISAO_WPINK,
   });

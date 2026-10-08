@@ -16,7 +16,7 @@ describe("goalCurve", () => {
   it("sem histórico: divide a meta igual entre os dias abertos do mês", () => {
     const w = weekdayWeights(new Map(), week10a22);
     expect(w[0]).toBe(0);
-    // Set/2026: 30 dias, 4 domingos → 26 dias abertos.
+    // Set/2026: 30 dias, 4 domingos  ->  26 dias abertos.
     expect(dailyGoal(26_000, "2026-09-21", w)).toBeCloseTo(1_000);
     expect(dailyGoal(26_000, "2026-09-20", w)).toBe(0);
   });
@@ -28,7 +28,7 @@ describe("goalCurve", () => {
       ["2026-08-26", 100],
       ["2026-08-27", 100],
       ["2026-08-28", 100],
-      ["2026-08-29", 200], // sáb
+      ["2026-08-29", 200], // sab
     ]);
     const w = weekdayWeights(hist, week10a22);
     const seg = dailyGoal(100_000, "2026-09-21", w);

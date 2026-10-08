@@ -70,7 +70,7 @@ export function FormField({
   hint?: string;
   error?: string;
   required?: boolean;
-  /** Mostra "(opcional)" na frente do rótulo. */
+  /** Mostra "(opcional)" na frente do rotulo. */
   optional?: boolean;
   children: ReactNode;
 }) {

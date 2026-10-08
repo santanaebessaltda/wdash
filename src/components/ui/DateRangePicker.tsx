@@ -5,27 +5,27 @@ import { deIso } from "@/lib/format";
 import { calendarTodayIso } from "@/data/wedash/clock";
 
 /**
- * Seletor de intervalo de datas (DateRangePicker) — extraído do markup já
- * validado visualmente em src/pages/forms/DatePickersPage.tsx (calendário
+ * Seletor de intervalo de datas (DateRangePicker)  -  extraido do markup ja
+ * validado visualmente em src/pages/forms/DatePickersPage.tsx (calendario
  * mensal + input de range + quick ranges), mas agora como componente
- * CONTROLADO e com datas reais (Date), não hardcoded em "July 2026".
+ * CONTROLADO e com datas reais (Date), nao hardcoded em "July 2026".
  *
- * Uso principal: filtro de Período das telas do Dashboard. Composto só com
- * primitivos (sem dependência externa de calendário). Estilo idêntico ao do
+ * Uso principal: filtro de Periodo das telas do Dashboard. Composto so com
+ * primitivos (sem dependencia externa de calendario). Estilo identico ao do
  * tema Vela (border-acc/bg-acc-soft quando ativo, bg-bg-inset no input).
  *
- * - value: [inicio, fim] | null  →  null = sem seleção
- * - onChange: dispara ao fechar um intervalo válido (inicio <= fim)
- * - quickRanges: atalhos pré-definidos (Hoje, Esta semana, …)
+ * - value: [inicio, fim] | null   ->   null = sem selecao
+ * - onChange: dispara ao fechar um intervalo valido (inicio <= fim)
+ * - quickRanges: atalhos pre-definidos (Hoje, Esta semana, ...)
  *
- * Painel em portal no `document.body` (position:fixed), alinhado à direita
- * do trigger e limitado à viewport — evita corte pelo overflow-x-hidden /
- * animações com transform dos ancestrais do layout.
+ * Painel em portal no `document.body` (position:fixed), alinhado a direita
+ * do trigger e limitado a viewport  -  evita corte pelo overflow-x-hidden /
+ * animacoes com transform dos ancestrais do layout.
  */
 
 export type DateRange = [Date, Date];
 
-/** Ids dos pills — alinhados a PeriodType no dashboard. */
+/** Ids dos pills  -  alinhados a PeriodType no dashboard. */
 export type DatePresetId =
   | "hoje"
   | "ontem"
@@ -36,7 +36,7 @@ export type DatePresetId =
   | "esteAno";
 
 export interface QuickRange {
-  /** Id do preset — quando presente, onChange informa o preset. */
+  /** Id do preset  -  quando presente, onChange informa o preset. */
   id?: DatePresetId;
   label: string;
   /** Resolve o intervalo [inicio, fim] a partir de "hoje" (data base). */
@@ -71,7 +71,7 @@ function inicioSemestre(hoje: Date): Date {
   return new Date(hoje.getFullYear(), mes, 1);
 }
 
-/** Atalhos padrão alinhados ao escopo (URL `periodo=`). */
+/** Atalhos padrao alinhados ao escopo (URL `periodo=`). */
 export const QUICK_RANGES_PADRAO: QuickRange[] = [
   { id: "hoje", label: "Hoje", resolve: (h) => { const d = zeraHora(h); return [d, d]; } },
   { id: "ontem", label: "Ontem", resolve: (h) => { const d = addDias(zeraHora(h), -1); return [d, d]; } },
@@ -100,7 +100,7 @@ function formatarIntervalo(r: DateRange): string {
 }
 
 export type DateRangeChangeMeta = {
-  /** Preset clicado (pill). Ausente = seleção manual no calendário. */
+  /** Preset clicado (pill). Ausente = selecao manual no calendario. */
   presetId?: DatePresetId;
 };
 
@@ -108,9 +108,9 @@ export function DateRangePicker({
   value,
   onChange,
   quickRanges = QUICK_RANGES_PADRAO,
-  /** Quando o escopo é um preset, mostra o nome no input (ex.: "Este mês"). */
+  /** Quando o escopo e um preset, mostra o nome no input (ex.: "Este mes"). */
   displayLabel,
-  /** Preset ativo no escopo — destaca o pill correspondente. */
+  /** Preset ativo no escopo  -  destaca o pill correspondente. */
   activePresetId,
   className,
   size = "md",
@@ -123,14 +123,14 @@ export function DateRangePicker({
   displayLabel?: string | null;
   activePresetId?: string | null;
   className?: string;
-  /** Alinha ao Button: sm = h-8 (ações do PageHeader), md = h-10. */
+  /** Alinha ao Button: sm = h-8 (acoes do PageHeader), md = h-10. */
   size?: "sm" | "md";
   /** Dias antes disso ficam bloqueados (cobertura sync). */
   minDate?: Date | null;
   /** Dias depois disso ficam bloqueados (default: hoje). */
   maxDate?: Date | null;
 }) {
-  // Dia civil das lojas (Campo Grande) — alinhado a resolvePeriod/calendarTodayIso.
+  // Dia civil das lojas (Campo Grande)  -  alinhado a resolvePeriod/calendarTodayIso.
   const hoje = useMemo(() => deIso(calendarTodayIso()), []);
   const min = useMemo(() => (minDate ? zeraHora(minDate) : null), [minDate]);
   const max = useMemo(() => zeraHora(maxDate ?? hoje), [maxDate, hoje]);
@@ -141,12 +141,12 @@ export function DateRangePicker({
   const triggerRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Ao abrir: zera rascunho e alinha o mês ao valor atual (evita dia “fantasma” do draft).
+  // Ao abrir: zera rascunho e alinha o mes ao valor atual (evita dia "fantasma" do draft).
   useEffect(() => {
     if (!open) return;
     setDraftStart(null);
     if (value) setViewMonth(new Date(value[0].getFullYear(), value[0].getMonth(), 1));
-  }, [open]); // value lido só no momento do open
+  }, [open]); // value lido so no momento do open
 
   function diaBloqueado(dia: Date): boolean {
     if (min && dia < min) return true;
@@ -189,7 +189,7 @@ export function DateRangePicker({
       const vw = window.innerWidth;
       const vh = window.innerHeight;
       const width = Math.min(vw - margem * 2, 640);
-      // Alinha a direita do painel à direita do trigger; empurra pra dentro se passar.
+      // Alinha a direita do painel a direita do trigger; empurra pra dentro se passar.
       let left = rect.right - width;
       if (left < margem) left = margem;
       if (left + width > vw - margem) left = Math.max(margem, vw - margem - width);
@@ -221,7 +221,7 @@ export function DateRangePicker({
   const podeMesProx =
     new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1) <= max;
 
-  /** 1 dia = Hoje/Ontem se bater com o calendário real (igual aos pills). */
+  /** 1 dia = Hoje/Ontem se bater com o calendario real (igual aos pills). */
   function presetDoRange(r: DateRange): DatePresetId | undefined {
     const [a, b] = r;
     if (!mesmoDia(a, b)) return undefined;
@@ -232,7 +232,7 @@ export function DateRangePicker({
 
   function escolherDia(dia: Date) {
     if (diaBloqueado(dia)) return;
-    // 1º clique (ou dia anterior ao início) → marca início; 2º no mesmo dia → só aquele dia.
+    // 1 clique (ou dia anterior ao inicio)  ->  marca inicio; 2 no mesmo dia  ->  so aquele dia.
     if (!draftStart || (!mesmoDia(draftStart, dia) && draftStart > dia)) {
       setDraftStart(dia);
       return;

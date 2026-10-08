@@ -1,7 +1,7 @@
 // Mock data fixtures for the Apps domain (Chat, Contacts, File Manager, Notes,
 // Task Manager, Help Desk, Group Chat, Support Tickets, Email, Calendar).
 // Colors are referenced only as Tailwind design-system utility classes
-// (bg-acc, text-ok, etc) — never raw hex. Avatars derive their color/initials
+// (bg-acc, text-ok, etc)  -  never raw hex. Avatars derive their color/initials
 // from `name` via the shared <Avatar> component, so records just carry names.
 
 /** Small fixed cycle of design-token classes for legend dots / label chips

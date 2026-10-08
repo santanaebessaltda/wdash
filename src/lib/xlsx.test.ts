@@ -1,10 +1,10 @@
-import { crc32 } from "node:zlib";
+import { crc32, deflateRawSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
-import { buildXlsx } from "./xlsx";
+import { buildXlsx, readXlsx } from "./xlsx";
 
 type Entry = { name: string; data: Uint8Array; crc: number; method: number };
 
-/** Lê um ZIP pelo diretório central (independente do escritor). */
+/** Le um ZIP pelo diretorio central (independente do escritor). */
 function readZip(buf: Uint8Array): Entry[] {
   const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
   let eocd = buf.length - 22;
@@ -94,5 +94,97 @@ describe("buildXlsx", () => {
     expect(rels).toContain('Target="styles.xml"');
     expect(rels).toContain('Target="sharedStrings.xml"');
     expect(text(entries, "[Content_Types].xml")).toContain('PartName="/xl/worksheets/sheet1.xml"');
+  });
+});
+
+/** Reempacota o xlsx com deflate, como o Excel faz. */
+function zipDeflate(stored: Uint8Array): Uint8Array {
+  const dv = new DataView(stored.buffer, stored.byteOffset, stored.byteLength);
+  let eocd = stored.length - 22;
+  while (eocd >= 0 && dv.getUint32(eocd, true) !== 0x06054b50) eocd--;
+  const count = dv.getUint16(eocd + 10, true);
+  let p = dv.getUint32(eocd + 16, true);
+  const files: Array<{ name: Uint8Array; raw: Uint8Array; crc: number }> = [];
+  for (let i = 0; i < count; i++) {
+    const crc = dv.getUint32(p + 16, true);
+    const size = dv.getUint32(p + 20, true);
+    const nameLen = dv.getUint16(p + 28, true);
+    const extraLen = dv.getUint16(p + 30, true);
+    const commentLen = dv.getUint16(p + 32, true);
+    const local = dv.getUint32(p + 42, true);
+    const name = stored.slice(p + 46, p + 46 + nameLen);
+    const start = local + 30 + dv.getUint16(local + 26, true) + dv.getUint16(local + 28, true);
+    files.push({ name, raw: stored.slice(start, start + size), crc });
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+  const locals: Uint8Array[] = [];
+  const centrals: Uint8Array[] = [];
+  let offset = 0;
+  for (const file of files) {
+    const data = deflateRawSync(file.raw);
+    const local = new Uint8Array(30 + file.name.length);
+    const lv = new DataView(local.buffer);
+    lv.setUint32(0, 0x04034b50, true);
+    lv.setUint16(4, 20, true);
+    lv.setUint16(8, 8, true);
+    lv.setUint32(14, file.crc, true);
+    lv.setUint32(18, data.length, true);
+    lv.setUint32(22, file.raw.length, true);
+    lv.setUint16(26, file.name.length, true);
+    local.set(file.name, 30);
+    const central = new Uint8Array(46 + file.name.length);
+    const cv = new DataView(central.buffer);
+    cv.setUint32(0, 0x02014b50, true);
+    cv.setUint16(4, 20, true);
+    cv.setUint16(6, 20, true);
+    cv.setUint16(10, 8, true);
+    cv.setUint32(16, file.crc, true);
+    cv.setUint32(20, data.length, true);
+    cv.setUint32(24, file.raw.length, true);
+    cv.setUint16(28, file.name.length, true);
+    cv.setUint32(42, offset, true);
+    central.set(file.name, 46);
+    locals.push(local, data);
+    centrals.push(central);
+    offset += local.length + data.length;
+  }
+  const centralSize = centrals.reduce((s, c) => s + c.length, 0);
+  const end = new Uint8Array(22);
+  const ev = new DataView(end.buffer);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(8, files.length, true);
+  ev.setUint16(10, files.length, true);
+  ev.setUint32(12, centralSize, true);
+  ev.setUint32(16, offset, true);
+  const out = new Uint8Array(offset + centralSize + end.length);
+  let at = 0;
+  for (const part of [...locals, ...centrals, end]) {
+    out.set(part, at);
+    at += part.length;
+  }
+  return out;
+}
+
+describe("readXlsx", () => {
+  const sheet = [
+    ["COD_PRODUTO", "Descricao1", "Quantidade minin", "Saldo"],
+    [182, "BODY SPLASH FATAL ROUGE 200 ML - WEPINK", 72, 0],
+    [185, "BODY SPLASH DIVINE 200ML - WEPINK", "", 1],
+  ];
+
+  it("lê o xlsx que a própria tela gera", async () => {
+    const rows = await readXlsx(buildXlsx(sheet));
+    expect(rows).toEqual([
+      ["COD_PRODUTO", "Descricao1", "Quantidade minin", "Saldo"],
+      ["182", "BODY SPLASH FATAL ROUGE 200 ML - WEPINK", "72", "0"],
+      ["185", "BODY SPLASH DIVINE 200ML - WEPINK", "", "1"],
+    ]);
+  });
+
+  it("lê o mesmo arquivo comprimido, como o Excel grava", async () => {
+    const rows = await readXlsx(zipDeflate(buildXlsx(sheet)));
+    expect(rows[1][0]).toBe("182");
+    expect(rows[1][2]).toBe("72");
+    expect(rows[2][2]).toBe("");
   });
 });

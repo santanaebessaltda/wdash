@@ -9,7 +9,7 @@ import { Button } from "@/components/ui";
 import { WedashBrand } from "@/components/wedash/WedashBrand";
 import { useActiveSession } from "@/session/SessionProvider";
 
-/** True se `path` é (ou está aninhado sob) o destino `to`. */
+/** True se `path` e (ou esta aninhado sob) o destino `to`. */
 function leafMatches(to: string, path: string) {
   return path === to || path.startsWith(to.endsWith("/") ? to : to + "/");
 }
@@ -39,7 +39,7 @@ function GroupIcon({ d }: { d: string }) {
   );
 }
 
-/** Mantém `?filial=` (e demais query) ao trocar de tela pelo menu. */
+/** Mantem `?filial=` (e demais query) ao trocar de tela pelo menu. */
 function comBusca(to: string, search: string) {
   if (!search || search === "?") return to;
   return `${to}${search.startsWith("?") ? search : `?${search}`}`;

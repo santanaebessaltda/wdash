@@ -1,4 +1,4 @@
-/** Régua de progresso: <50 bad · 50–79 warn · ≥80 ok. */
+/** Regua de progresso: <50 bad  |  50 - 79 warn  |  80 ok. */
 export function progressColor(value: number): string {
   const v = Math.min(100, Math.max(0, value));
   if (v < 50) return "var(--bad)";
@@ -6,7 +6,7 @@ export function progressColor(value: number): string {
   return "var(--ok)";
 }
 
-/** Classe de texto alinhada à mesma régua (text-bad / text-warn / text-ok). */
+/** Classe de texto alinhada a mesma regua (text-bad / text-warn / text-ok). */
 export function progressTextClass(value: number): string {
   const v = Math.min(100, Math.max(0, value));
   if (v < 50) return "text-bad";
@@ -16,7 +16,7 @@ export function progressTextClass(value: number): string {
 
 export interface ProgressBarProps {
   value: number; // 0-100
-  /** Se omitido, usa a régua progressiva por valor. */
+  /** Se omitido, usa a regua progressiva por valor. */
   color?: string;
   trackColor?: string;
   height?: number;
@@ -54,10 +54,10 @@ export function RadialProgress({
   value: number;
   size?: number;
   stroke?: number;
-  /** Se omitido, usa a régua progressiva por valor. */
+  /** Se omitido, usa a regua progressiva por valor. */
   color?: string;
   trackColor?: string;
-  /** Subtítulo abaixo do % (ex.: "da meta"). */
+  /** Subtitulo abaixo do % (ex.: "da meta"). */
   label?: string;
 }) {
   const r = (size - stroke) / 2;

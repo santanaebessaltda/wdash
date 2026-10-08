@@ -172,6 +172,7 @@ export function SellersBlock({
   metaAtiva,
   encerrada = false,
   grupo = false,
+  geral = false,
 }: {
   lista: SellerRow[];
   metaAtiva: boolean;
@@ -179,7 +180,11 @@ export function SellersBlock({
   encerrada?: boolean;
   /** Meta no modo Grupo: a meta e o % da linha sao do grupo da pessoa. */
   grupo?: boolean;
+  /** Meta no modo Geral: a meta e o % da linha sao da loja. */
+  geral?: boolean;
 }) {
+  const metaHeader = geral ? "Meta da loja" : grupo ? "Meta do grupo" : "Meta individual";
+  const pctHeader = geral ? "Atingimento da loja" : grupo ? "% da meta do grupo" : "% da meta individual";
   const ranked: LinhaRank[] = lista.map((l, i) => ({ ...l, posicao: i + 1 }));
 
   const colunas: DataTableColumn<LinhaRank>[] = [
@@ -209,7 +214,7 @@ export function SellersBlock({
       ? ([
           {
             key: "meta",
-            header: grupo ? "Meta do grupo" : "Meta individual",
+            header: metaHeader,
             hideBelow: "md",
             sortable: true,
             sortValue: (l: LinhaRank) => (l.semMeta ? null : l.metaIndividualValor),
@@ -218,7 +223,7 @@ export function SellersBlock({
           },
           {
             key: "pctIndiv",
-            header: grupo ? "% da meta do grupo" : "% da meta individual",
+            header: pctHeader,
             sortable: true,
             sortValue: (l: LinhaRank) => (l.semMeta ? null : l.atingimentoPct),
             render: (l: LinhaRank) => <CelulaPctIndividual l={l} />,
@@ -310,6 +315,7 @@ export function SellersCard({
   aside,
   encerrada = false,
   grupo = false,
+  geral = false,
 }: {
   estado: BlockStateTipo;
   lista: SellerRow[] | null;
@@ -317,6 +323,8 @@ export function SellersCard({
   encerrada?: boolean;
   /** Meta no modo Grupo (colunas "Meta do grupo" / "% da meta do grupo"). */
   grupo?: boolean;
+  /** Meta no modo Geral (colunas "Meta da loja" / "Atingimento da loja"). */
+  geral?: boolean;
   /** Sem Card externo  -  bloco continuo apos a projecao (GoalCard). */
   embedded?: boolean;
   title?: string;
@@ -327,7 +335,7 @@ export function SellersCard({
   const tabela =
     lista && lista.length > 0 ? (
       <div className="max-h-[min(520px,70vh)] overflow-x-auto overflow-y-auto pr-1">
-        <SellersBlock lista={lista} metaAtiva={metaAtiva} encerrada={encerrada} grupo={grupo} />
+        <SellersBlock lista={lista} metaAtiva={metaAtiva} encerrada={encerrada} grupo={grupo} geral={geral} />
       </div>
     ) : (
       <div className={embedded ? "py-2" : "p-5"}>
@@ -621,7 +629,7 @@ export function GoalCard({
   metaAtiva: boolean;
   hojeIso?: string;
 }) {
-  const tipoLabel = card.tipo === "individual" ? "Individual" : "Grupo";
+  const tipoLabel = card.tipo === "individual" ? "Individual" : card.tipo === "geral" ? "Geral" : "Grupo";
   return (
     <Card className="min-w-0 overflow-hidden" padding="lg">
       <CardTitle>{card.nome}</CardTitle>
@@ -667,6 +675,7 @@ export function GoalCard({
         lista={card.vendedoras}
         metaAtiva={metaAtiva}
         grupo={card.tipo === "grupo"}
+        geral={card.tipo === "geral"}
       />
     </Card>
   );

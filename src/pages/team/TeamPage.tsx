@@ -460,7 +460,7 @@ export function TeamPage() {
                   description="Cadastre os grupos das lojas e vincule a equipe para comparar o desempenho por grupo."
                   action={
                     podeConfigurar ? (
-                      <Button size="sm" onClick={() => navigate(paths.management.shifts)}>
+                      <Button size="sm" onClick={() => navigate(paths.operation.groups)}>
                         Configurar grupos
                       </Button>
                     ) : undefined

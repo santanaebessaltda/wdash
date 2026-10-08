@@ -16,7 +16,7 @@ export function BrandLogo({ brand, size = 26 }: { brand: BrandKey; size?: number
 
   switch (brand) {
     case "slack":
-      // 4-colour pinwheel of rounded bars — Slack's identity colours.
+      // 4-colour pinwheel of rounded bars  -  Slack's identity colours.
       return (
         <svg {...common} aria-label="Slack">
           <rect x="22" y="5" width="6" height="16" rx="3" fill="#36C5F0" />

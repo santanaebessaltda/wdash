@@ -1,6 +1,6 @@
 import { statusVariant, type StatusVariant } from "@/lib/status";
 
-/** Extends the generic status→color mapping with HR-specific vocabulary
+/** Extends the generic status -> color mapping with HR-specific vocabulary
  * (recruitment stages, leave types) that isn't covered by the shared list. */
 export function hrStatusVariant(status: string): StatusVariant {
   const s = status.trim().toLowerCase();

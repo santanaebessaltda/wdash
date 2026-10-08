@@ -1,13 +1,13 @@
 /**
- * Itens por cupom via wtsreports personalizado — substitui o ConsultaDetMov (1 chamada por cupom)
- * e o top produtos {E7A5C5C7}: 1 chamada por loja × período.
+ * Itens por cupom via wtsreports personalizado  -  substitui o ConsultaDetMov (1 chamada por cupom)
+ * e o top produtos {E7A5C5C7}: 1 chamada por loja x periodo.
  *
  * ERP UI: **WE PINK - PRODUTOS POR CUPOM E VENDEDOR**
  * CATALOG_GUID: {52DE7BBC-78D4-7765-A232-A5MAD2840284}
  *
- * Linha = cupom × produto. Chave do cupom = `COD_OPERACAO|NF|TIPO` (igual à da Lista / cache DetMov).
- * Marca pelo código do produto (WP* = WPINK; resto = WEPINK). Vendedora pelo gerador.
- * Não traz venda sem vendedora → quem chama faz fallback (DetMov só desses cupons).
+ * Linha = cupom x produto. Chave do cupom = `COD_OPERACAO|NF|TIPO` (igual a da Lista / cache DetMov).
+ * Marca pelo codigo do produto (WP* = WPINK; resto = WEPINK). Vendedora pelo gerador.
+ * Nao traz venda sem vendedora  ->  quem chama faz fallback (DetMov so desses cupons).
  */
 import { sellerKeyFromName } from "../../../src/data/wedash/salesAggregate.ts";
 import type { SalesProductDayAgg, SalesSellerProductDayAgg } from "../../../src/data/wedash/salesTypes.ts";
@@ -19,7 +19,7 @@ export const COUPON_REPORT_GUID = "{52DE7BBC-78D4-7765-A232-A5MAD2840284}";
 
 export type CouponReportLine = {
   couponKey: string;
-  /** DATA_DATA_DATA (só a data); null quando o ERP não manda. */
+  /** DATA_DATA_DATA (so a data); null quando o ERP nao manda. */
   day: string | null;
   productId: number;
   productCode: string;
@@ -28,7 +28,7 @@ export type CouponReportLine = {
   revenueCents: number;
   sellerGeradorId: number | null;
   sellerName: string;
-  /** Tabela de preço de venda usada no cupom (VENDA_TABELA_PRECO_TABELA); null = sem tabela / INDEFINIDO. */
+  /** Tabela de preco de venda usada no cupom (VENDA_TABELA_PRECO_TABELA); null = sem tabela / INDEFINIDO. */
   priceTableId?: number | null;
   priceTableName?: string;
 };
@@ -81,7 +81,7 @@ function asDay(v: unknown): string | null {
   return m ? m[1]! : null;
 }
 
-/** RAW_DATA do {52DE7BBC} — ignora cancelados e linhas sem cupom/produto. */
+/** RAW_DATA do {52DE7BBC}  -  ignora cancelados e linhas sem cupom/produto. */
 export function parseCouponReportRawData(payload: unknown): CouponReportLine[] {
   const out: CouponReportLine[] = [];
   for (const raw of extractList(payload)) {
@@ -158,8 +158,8 @@ export function couponBrandFromReportLines(
 }
 
 /**
- * Itens do ConsultaDetMov (venda sem vendedora, fora do relatório) no formato do relatório.
- * O DetMov não traz COD_PRODUTO → vem do catálogo; sem cadastro fica sem código.
+ * Itens do ConsultaDetMov (venda sem vendedora, fora do relatorio) no formato do relatorio.
+ * O DetMov nao traz COD_PRODUTO  ->  vem do catalogo; sem cadastro fica sem codigo.
  */
 export function detMovToCouponLines(
   key: string,
@@ -184,7 +184,7 @@ export function detMovToCouponLines(
     });
 }
 
-/** Vendedora de cada cupom (1ª linha com gerador). */
+/** Vendedora de cada cupom (1 linha com gerador). */
 export function couponSellers(byCoupon: Map<string, CouponReportLine[]>): Map<string, CouponSeller> {
   const out = new Map<string, CouponSeller>();
   for (const [key, lines] of byCoupon) {
@@ -195,7 +195,7 @@ export function couponSellers(byCoupon: Map<string, CouponReportLine[]>): Map<st
 }
 
 /**
- * Top produtos (loja × dia × produto) a partir dos itens dos cupons.
+ * Top produtos (loja x dia x produto) a partir dos itens dos cupons.
  * `dayOf` = dia do cupom (o da Lista); cupom sem dia (fora da Lista) fica de fora.
  */
 export function productDayAggsFromCouponLines(
@@ -232,8 +232,8 @@ export function productDayAggsFromCouponLines(
 }
 
 /**
- * Itens por pessoa × produto × dia (desafios). Mesmo `dayOf` do top produtos; linha sem gerador
- * (venda sem vendedor identificado, itens do DetMov) fica de fora. Produto agrupado pelo código.
+ * Itens por pessoa x produto x dia (desafios). Mesmo `dayOf` do top produtos; linha sem gerador
+ * (venda sem vendedor identificado, itens do DetMov) fica de fora. Produto agrupado pelo codigo.
  */
 export function sellerProductDayAggsFromCouponLines(
   byCoupon: Map<string, CouponReportLine[]>,
@@ -284,7 +284,7 @@ export type PriceTableDayAgg = {
   revenueCents: number;
 };
 
-/** Itens e R$ por tabela de preço de venda (loja × dia). Linha sem tabela (detalhe do movimento) fica de fora. */
+/** Itens e R$ por tabela de preco de venda (loja x dia). Linha sem tabela (detalhe do movimento) fica de fora. */
 export function priceTableDayAggsFromCouponLines(
   byCoupon: Map<string, CouponReportLine[]>,
   dayOf: (couponKey: string, lines: CouponReportLine[]) => string | null,

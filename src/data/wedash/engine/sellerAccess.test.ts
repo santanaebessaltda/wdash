@@ -4,6 +4,7 @@ import {
   accessState,
   canManageStore,
   canTransition,
+  hasSalesGroup,
   invitable,
   normalizeEmail,
   validEmail,
@@ -52,10 +53,18 @@ describe("accessState", () => {
 });
 
 describe("canTransition", () => {
-  it("only Sem acesso → Convite pendente → Ativo ⇄ Suspenso and Convite pendente → Sem acesso", () => {
+  it("Sem acesso → Convite pendente → Ativo ⇄ Suspenso, and convite or acesso ativo volta a Sem acesso", () => {
     const states: AccessState[] = ["NONE", "PENDING", "ACTIVE", "SUSPENDED"];
     const allowed = states.flatMap((from) => states.filter((to) => canTransition(from, to)).map((to) => `${from}>${to}`));
-    expect(allowed.sort()).toEqual(["ACTIVE>SUSPENDED", "NONE>PENDING", "PENDING>ACTIVE", "PENDING>NONE", "SUSPENDED>ACTIVE"]);
+    expect(allowed.sort()).toEqual([
+      "ACTIVE>NONE",
+      "ACTIVE>SUSPENDED",
+      "NONE>PENDING",
+      "PENDING>ACTIVE",
+      "PENDING>NONE",
+      "SUSPENDED>ACTIVE",
+      "SUSPENDED>NONE",
+    ]);
   });
 });
 
@@ -67,5 +76,14 @@ describe("invitable", () => {
     expect(invitable({ active: true, inErp: false, erpRole: "VENDEDOR" })).toBe(false);
     expect(invitable({ active: true, inErp: true, erpRole: null })).toBe(true);
     expect(invitable({ active: true, inErp: true, erpRole: "" })).toBe(false);
+  });
+});
+
+describe("hasSalesGroup", () => {
+  it("requires a linked group before the invite", () => {
+    expect(hasSalesGroup("shift-1")).toBe(true);
+    expect(hasSalesGroup(null)).toBe(false);
+    expect(hasSalesGroup(undefined)).toBe(false);
+    expect(hasSalesGroup("")).toBe(false);
   });
 });

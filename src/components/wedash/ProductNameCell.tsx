@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { AvatarIniciais } from "./InitialsAvatar";
 
-/** 1ª coluna das listas de produto: avatar com iniciais + nome + linha de apoio (código, categoria…). */
+/** 1 coluna das listas de produto: avatar com iniciais + nome + linha de apoio (codigo, categoria...). */
 export function ProductNameCell({
   nome,
   idx,
@@ -10,9 +10,9 @@ export function ProductNameCell({
   upper = false,
 }: {
   nome: string;
-  /** Posição na lista — escolhe a cor do avatar. */
+  /** Posicao na lista  -  escolhe a cor do avatar. */
   idx: number;
-  /** Texto vira a linha cinza abaixo do nome; elemento entra como está (ex.: com tooltip). */
+  /** Texto vira a linha cinza abaixo do nome; elemento entra como esta (ex.: com tooltip). */
   sub?: ReactNode;
   upper?: boolean;
 }) {

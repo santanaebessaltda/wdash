@@ -1,17 +1,17 @@
 import { getSupabase } from "@/lib/supabase";
 
-/** Na fila sem o worker pegar por mais que isso = o sincronizador não está respondendo. */
+/** Na fila sem o worker pegar por mais que isso = o sincronizador nao esta respondendo. */
 const STUCK_QUEUED_MS = 90_000;
 
 /**
- * Busca das vendas de hoje logo após conectar o Millennium (job SEED). O onboarding não espera:
+ * Busca das vendas de hoje logo apos conectar o Millennium (job SEED). O onboarding nao espera:
  * o board abre zerado e este estado alimenta o aviso de cima das telas.
- * - `queued`: na fila, ainda sem o worker (sem aviso — com `SYNC_ONBOARDING=off` o worker encerra o job
- *   assim que pega, e a tela não deve anunciar uma busca que não vai acontecer).
- * - `running`: o worker está buscando.
+ * - `queued`: na fila, ainda sem o worker (sem aviso  -  com `SYNC_ONBOARDING=off` o worker encerra o job
+ *   assim que pega, e a tela nao deve anunciar uma busca que nao vai acontecer).
+ * - `running`: o worker esta buscando.
  * - `stuck`: parado na fila (worker fora do ar).
- * - `failed`: terminou com erro; `busy` = usuário ERP logado em outro lugar.
- * null = terminou, nunca houve, ou um Atualizar posterior já cobriu (a falha deixa de importar).
+ * - `failed`: terminou com erro; `busy` = usuario ERP logado em outro lugar.
+ * null = terminou, nunca houve, ou um Atualizar posterior ja cobriu (a falha deixa de importar).
  */
 export type InitialSync =
   | { phase: "queued" }
@@ -49,7 +49,7 @@ export async function fetchInitialSync(tenantId: string): Promise<InitialSync | 
   return null;
 }
 
-/** Pede a busca das vendas de hoje (SEED). A Edge não duplica se já houver uma na fila. */
+/** Pede a busca das vendas de hoje (SEED). A Edge nao duplica se ja houver uma na fila. */
 export async function requestTodaySync(): Promise<boolean> {
   const sb = getSupabase();
   if (!sb) return true;

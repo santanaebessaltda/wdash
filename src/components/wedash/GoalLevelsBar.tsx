@@ -19,8 +19,8 @@ function larguraTexto(nome: string, extra: string): number {
 }
 
 /**
- * Posição (0–1) de cada corte e largura total (px): cada trecho da barra tem só o espaço do nome do nível
- * (fora de escala) — 0→N1 = meio rótulo do N1; Ni→Ni+1 = meio de cada + folga; o último nível fecha a barra.
+ * Posicao (0 - 1) de cada corte e largura total (px): cada trecho da barra tem so o espaco do nome do nivel
+ * (fora de escala)  -  0 -> N1 = meio rotulo do N1; Ni -> Ni+1 = meio de cada + folga; o ultimo nivel fecha a barra.
  */
 function trechos(ws: number[]): { xs: number[]; largura: number } {
   const k = ws.length;
@@ -36,7 +36,7 @@ function trechos(ws: number[]): { xs: number[]; largura: number } {
   return { xs: fim.map((x) => (largura > 0 ? x / largura : 0)), largura };
 }
 
-/** Preenchimento (0–1): avança proporcionalmente dentro do trecho entre dois níveis. */
+/** Preenchimento (0 - 1): avanca proporcionalmente dentro do trecho entre dois niveis. */
 function preenchimento(pct: number, cortes: number[], xs: number[]): number {
   if (cortes.length === 0) return Math.min(1, Math.max(0, pct / 100));
   let de = 0;
@@ -51,10 +51,10 @@ function preenchimento(pct: number, cortes: number[], xs: number[]): number {
 }
 
 /**
- * Barra da meta de uma pessoa com os cortes dos níveis ("simulação" do progresso: cada trecho tem só o espaço
- * do nome do nível, o preenchimento anda proporcional dentro do trecho e o último nível fecha a barra).
- * `completo` = rótulos "N1 · Meta (1%)" no corte, todos na mesma linha — a barra reserva a largura em que
- * cabem (quem a usa cuida da rolagem lateral); senão só os cortes e os níveis no tooltip.
+ * Barra da meta de uma pessoa com os cortes dos niveis ("simulacao" do progresso: cada trecho tem so o espaco
+ * do nome do nivel, o preenchimento anda proporcional dentro do trecho e o ultimo nivel fecha a barra).
+ * `completo` = rotulos "N1  |  Meta (1%)" no corte, todos na mesma linha  -  a barra reserva a largura em que
+ * cabem (quem a usa cuida da rolagem lateral); senao so os cortes e os niveis no tooltip.
  */
 export function GoalLevelsBar({ pct, marcos, completo = false }: { pct: number; marcos: GoalLevelMark[]; completo?: boolean }) {
   const nome = (m: GoalLevelMark, i: number) => `N${i + 1} · ${m.nome}`;
@@ -116,8 +116,8 @@ export function GoalLevelsBar({ pct, marcos, completo = false }: { pct: number; 
 }
 
 /**
- * "82% da meta · Nível 2 · Super" + barra com os níveis. `rolagem` = a barra rola na lateral quando o espaço
- * é menor que a largura dos rótulos (fora de tabela, que já rola sozinha).
+ * "82% da meta  |  Nivel 2  |  Super" + barra com os niveis. `rolagem` = a barra rola na lateral quando o espaco
+ * e menor que a largura dos rotulos (fora de tabela, que ja rola sozinha).
  */
 export function GoalLevelSummary({
   pct,

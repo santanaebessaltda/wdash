@@ -146,7 +146,7 @@ export interface SellerGoalLevel {
   status: GoalStatus;
   /** Dias que faltam (incluindo hoje) com a meta em andamento; 0 encerrada. */
   diasRestantes: number;
-  modo: "individual" | "grupo";
+  modo: "individual" | "grupo" | "geral";
   /** Grupo de distribuicao da pessoa (null = meta sem grupos). */
   grupo: string | null;
   /** Meta da pessoa (individual) ou do grupo (modo Grupo). */
@@ -192,8 +192,8 @@ export function sellerGoalLevels(input: {
           fim: goal.endsOn,
           status,
           diasRestantes: diasRestantes(goal, input.today),
-          modo: goal.tierMode === "INDIVIDUAL" ? "individual" : "grupo",
-          grupo: goal.groups.length > 0 ? r.grupo : null,
+          modo: goal.tierMode === "INDIVIDUAL" ? "individual" : goal.tierMode === "GENERAL" ? "geral" : "grupo",
+          grupo: goal.tierMode === "GENERAL" || goal.groups.length === 0 ? null : r.grupo,
           metaValor: r.metaIndividualValor,
           realizado: (r.atingimentoPct * r.metaIndividualValor) / 100,
           proximo: r.proximoDegrau
@@ -339,6 +339,7 @@ export function buildGoalCardView(input: {
 
   const pessoas = [...accs.values()];
   const n = pessoas.length;
+  const general = g.tierMode === "GENERAL";
   const individual = g.tierMode === "INDIVIDUAL";
   const escala = Math.max(100, ...g.tiers.map((t) => t.atingimentoMinPct));
   const marcos = g.tiers.map((t) => ({ nome: t.nome, pct: t.atingimentoMinPct, pctPremiacao: t.comissaoPct, bonus: t.bonus }));
@@ -346,12 +347,14 @@ export function buildGoalCardView(input: {
   const equipeTotal = pessoas.reduce((s, p) => s + p.faturamento, 0);
 
   // Sem grupos de distribuicao = um grupo so, com a equipe toda e a meta inteira.
+  // Geral ignora grupos: a loja sobe pelo total vendido e a premiacao se divide.
+  const groups = general ? [] : g.groups;
   const TODOS = "*";
   const metaGrupo = new Map<string, number>(
-    g.groups.length > 0 ? g.groups.map((x) => [x.shiftId, (g.target * x.pct) / 100]) : [[TODOS, g.target]],
+    groups.length > 0 ? groups.map((x) => [x.shiftId, (g.target * x.pct) / 100]) : [[TODOS, g.target]],
   );
   const grupoDe = (p: Acc): string | null => {
-    if (g.groups.length === 0) return TODOS;
+    if (groups.length === 0) return TODOS;
     const sid = p.employeeId != null ? porCodigo.get(p.employeeId)?.shiftId : null;
     return sid && metaGrupo.has(sid) ? sid : null;
   };
@@ -371,7 +374,7 @@ export function buildGoalCardView(input: {
     const membros = k ? (membrosGrupo.get(k) ?? 0) : 0;
     const metaG = k ? (metaGrupo.get(k) ?? 0) : 0;
     const metaInd = membros > 0 ? (individual ? metaG / membros : metaG) : 0;
-    const base = individual ? p.faturamento : k ? (vendasGrupo.get(k) ?? 0) : 0;
+    const base = general ? realizado : individual ? p.faturamento : k ? (vendasGrupo.get(k) ?? 0) : 0;
     const ating = metaInd > 0 ? (base / metaInd) * 100 : 0;
     let idx = -1;
     g.tiers.forEach((t, i) => {
@@ -443,10 +446,10 @@ export function buildGoalCardView(input: {
   return {
     id: g.id,
     nome: g.name,
-    tipo: individual ? "individual" : "grupo",
+    tipo: general ? "geral" : individual ? "individual" : "grupo",
     lojaNome,
     marcas: [],
-    qtdGrupos: g.groups.length,
+    qtdGrupos: groups.length,
     qtdVendedoras: n,
     qtdNiveis: g.tiers.length,
     degraus: g.tiers,

@@ -15,11 +15,11 @@ export type DetMovLine = {
 
 export type FetchDetMovParams = {
   session: string;
-  /** Millennium COD_OPERACAO (numérico). */
+  /** Millennium COD_OPERACAO (numerico). */
   codOperacao: number;
   /** Cupom / NF da Lista. */
   nf: string;
-  /** Default "S" (saída / venda). */
+  /** Default "S" (saida / venda). */
   tipoOperacao?: string;
   baseUrl?: string;
   fetchImpl?: typeof fetch;
@@ -64,7 +64,7 @@ function extractList(payload: unknown): unknown[] {
   return [];
 }
 
-/** Parse JSON do ConsultaDetMov → linhas com produto + R$ + qty. */
+/** Parse JSON do ConsultaDetMov  ->  linhas com produto + R$ + qty. */
 export function parseConsultaDetMovPayload(payload: unknown): DetMovLine[] {
   const out: DetMovLine[] = [];
   for (const raw of extractList(payload)) {

@@ -1,8 +1,8 @@
 /**
- * Vendedoras da loja (espelho de workers/millennium-sync/src/millenniumSellers.ts — manter iguais).
- * FUNCIONARIOS.Lista (sem cargo) + FUNCIONARIOS.Consulta por funcionária (flags de status).
+ * Vendedoras da loja (espelho de workers/millennium-sync/src/millenniumSellers.ts  -  manter iguais).
+ * FUNCIONARIOS.Lista (sem cargo) + FUNCIONARIOS.Consulta por funcionaria (flags de status).
  * Todos entram com o cargo; equipe de vendas = ativa com cargo VENDEDOR ou inativa de qualquer cargo
- * (desativar troca VENDEDOR → INDEFINIDO). Ativos com outro cargo (gerência) ficam fora da equipe e do ranking.
+ * (desativar troca VENDEDOR  ->  INDEFINIDO). Ativos com outro cargo (gerencia) ficam fora da equipe e do ranking.
  */
 import { baseUrl } from "./millennium.ts";
 import { titleName } from "./text.ts";
@@ -23,7 +23,7 @@ export type ErpSeller = {
   role: string;
   active: boolean;
   flags: ErpSellerFlags;
-  /** GERADORES[0].GERADOR do Consulta — código que vem nas vendas do relatório de cupom. */
+  /** GERADORES[0].GERADOR do Consulta  -  codigo que vem nas vendas do relatorio de cupom. */
   geradorId: number | null;
 };
 
@@ -40,7 +40,7 @@ export class MillenniumHttpError extends Error {
   }
 }
 
-/** Espelho de `sellerKeyFromName` (src/data/wedash/salesAggregate.ts): trim, sem acento, upper, espaços colapsados. */
+/** Espelho de `sellerKeyFromName` (src/data/wedash/salesAggregate.ts): trim, sem acento, upper, espacos colapsados. */
 export function sellerKeyFromName(raw: string | null | undefined): string | null {
   const key = (raw ?? "")
     .trim()

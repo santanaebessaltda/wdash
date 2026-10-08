@@ -28,10 +28,9 @@ export const dashboardsRoutes: RouteObject[] = [
   { path: paths.dashboards.bi, element: <BiDashboardPage /> },
   { element: <RequireRole roles={GESTOR_ROLES} />, children: [{ path: paths.financial, element: <FinancePage /> }] },
   { path: paths.products, element: <ProductsPage /> },
-  /** Dashboard > Groups paused — code in GroupsPage.tsx for later. */
   { path: paths.groups, element: <Navigate to={paths.overview} replace /> },
   { path: paths.overview, element: <OverviewPage /> },
-  /* PT legacy → EN */
+  /* PT legacy  ->  EN */
   { path: paths.legacy.finance, element: <Navigate to={paths.financial} replace /> },
   { path: paths.legacy.products, element: <Navigate to={paths.products} replace /> },
   { path: paths.legacy.groups, element: <Navigate to={paths.overview} replace /> },

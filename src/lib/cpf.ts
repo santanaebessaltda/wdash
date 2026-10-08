@@ -1,10 +1,10 @@
-/** Utilidades de CPF: máscara, limpeza e validação do dígito verificador. */
+/** Utilidades de CPF: mascara, limpeza e validacao do digito verificador. */
 
 export function somenteDigitos(v: string): string {
   return v.replace(/\D/g, "");
 }
 
-/** 12345678909 → 123.456.789-09 (parcial enquanto digita). */
+/** 12345678909  ->  123.456.789-09 (parcial enquanto digita). */
 export function mascararCpf(v: string): string {
   const d = somenteDigitos(v).slice(0, 11);
   const p1 = d.slice(0, 3);
@@ -25,7 +25,7 @@ function calcularDigito(base: string, pesoInicial: number): number {
   return resto === 10 ? 0 : resto;
 }
 
-/** Valida os dois dígitos verificadores. Rejeita sequências repetidas. */
+/** Valida os dois digitos verificadores. Rejeita sequencias repetidas. */
 export function cpfValido(v: string): boolean {
   const d = somenteDigitos(v);
   if (d.length !== 11) return false;
@@ -35,7 +35,7 @@ export function cpfValido(v: string): boolean {
   return d1 === Number(d[9]) && d2 === Number(d[10]);
 }
 
-/** Gera um CPF válido a partir dos 9 primeiros dígitos (uso em mocks). */
+/** Gera um CPF valido a partir dos 9 primeiros digitos (uso em mocks). */
 export function cpfDeBase(base9: string): string {
   const d1 = calcularDigito(base9, 10);
   const d2 = calcularDigito(base9 + d1, 11);

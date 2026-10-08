@@ -6,7 +6,7 @@ export interface PageHeaderProps {
   title: string;
   subtitle?: string;
   actions?: ReactNode;
-  /** Avisos da tela: no celular entre o título e os filtros; no desktop abaixo do cabeçalho. */
+  /** Avisos da tela: no celular entre o titulo e os filtros; no desktop abaixo do cabecalho. */
   notices?: ReactNode;
 }
 

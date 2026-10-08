@@ -1,7 +1,7 @@
-/** Peso de cada dia da semana na distribuição da meta (sem dependências fora do motor). */
+/** Peso de cada dia da semana na distribuicao da meta (sem dependencias fora do motor). */
 import { deIso } from "./format.ts";
 
-/** 0 = domingo … 6 = sábado (Date#getDay). */
+/** 0 = domingo ... 6 = sabado (Date#getDay). */
 export type Dow = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 /** null = fechado nesse dia. */
@@ -10,8 +10,8 @@ export type DayHours = { open: string; close: string } | null;
 export type StoreWeekHours = Record<Dow, DayHours>;
 
 /**
- * Peso por dia da semana (índice = Dow). Média do faturamento dos dias com venda;
- * dia sem observação usa a média geral se a loja abre nesse dia, senão 0.
+ * Peso por dia da semana (indice = Dow). Media do faturamento dos dias com venda;
+ * dia sem observacao usa a media geral se a loja abre nesse dia, senao 0.
  */
 export function weekdayWeights(dayRevenue: Map<string, number>, week: StoreWeekHours): number[] {
   const sum = [0, 0, 0, 0, 0, 0, 0];

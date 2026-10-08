@@ -1,6 +1,6 @@
 /**
- * Re-busca o RELATORIOMARGEM de dias antigos e compara o custo unitário com o gravado.
- * Responde: a margem usa o custo da época da venda ou o custo atual da tabela? Só leitura no ERP.
+ * Re-busca o RELATORIOMARGEM de dias antigos e compara o custo unitario com o gravado.
+ * Responde: a margem usa o custo da epoca da venda ou o custo atual da tabela? So leitura no ERP.
  *   cd workers/millennium-sync && npx tsx scripts/probe-margem-refetch.ts
  */
 import { readFileSync, existsSync } from "node:fs";
@@ -32,7 +32,7 @@ function loadDotEnv() {
   }
 }
 
-/** [loja, código] — custo 0 gravado (420, WP014) e custo diferente da tabela atual (259, 901, 504). */
+/** [loja, codigo]  -  custo 0 gravado (420, WP014) e custo diferente da tabela atual (259, 901, 504). */
 const CASES: Array<[string, string]> = [
   ["00114", "420"],
   ["00114", "452"],

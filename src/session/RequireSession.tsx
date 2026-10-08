@@ -5,7 +5,7 @@ import type { Role } from "@/data/wedash/team";
 import { isAwaitingInitialSync } from "./awaitingInitialSync";
 
 /**
- * Protege rotas. Ordem: senha temporária → onboarding → sync inicial → app.
+ * Protege rotas. Ordem: senha temporaria  ->  onboarding  ->  sync inicial  ->  app.
  */
 export function RequireSession({ modo = "app" }: { modo?: "app" | "onboarding" | "create-access" }) {
   const { session, ready } = useSession();
@@ -32,12 +32,12 @@ export function RequireSession({ modo = "app" }: { modo?: "app" | "onboarding" |
 
   if (modo === "app" && needsOnboarding) return <Navigate to={paths.onboarding} replace />;
 
-  // Ao concluir onboarding, NÃO manda pro Dash — manda pra tela de sync.
+  // Ao concluir onboarding, NAO manda pro Dash  -  manda pra tela de sync.
   if (modo === "onboarding" && !needsOnboarding) {
     return <Navigate to={awaitingSync ? paths.syncing : homeForRole(session.role)} replace />;
   }
 
-  // Enquanto SEED não terminou, trava qualquer rota do app (exceto /sincronizando).
+  // Enquanto SEED nao terminou, trava qualquer rota do app (exceto /sincronizando).
   if (modo === "app" && awaitingSync && !onSyncing) {
     return <Navigate to={paths.syncing} replace />;
   }
@@ -45,7 +45,7 @@ export function RequireSession({ modo = "app" }: { modo?: "app" | "onboarding" |
   return <Outlet />;
 }
 
-/** Restringe a rota a alguns papéis; os demais vão para a tela inicial do seu papel. */
+/** Restringe a rota a alguns papeis; os demais vao para a tela inicial do seu papel. */
 export function RequireRole({ roles }: { roles: Role[] }) {
   const { session, ready } = useSession();
   if (!ready) return null;

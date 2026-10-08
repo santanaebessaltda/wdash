@@ -1,12 +1,12 @@
 /**
- * RELATORIOMARGEM — fonte de CMV (custo de mercadoria) e split WEPINK/WPINK (COD WP*).
+ * RELATORIOMARGEM  -  fonte de CMV (custo de mercadoria) e split WEPINK/WPINK (COD WP*).
  *
  * ERP UI / path: **FRANQUIAS > RELATORIOS > RELATORIOMARGEM**
  * API: MILLENIUM!FRANQUIAS.RELATORIOS.RELATORIOMARGEM
  *
- * CMV v1 = Σ CUSTO_TOTAL (= CUSTO_FRANQUIAS × QTDE_VENDIDA), imposto% = 0.
- * Marca = COD_PRODUTO WP* → WPINK; senão WEPINK (TOTALVENDA). Substitui TOTAL VENDA POR DIA.
- * TODO(Configurações>Custos): aplicar imposto_sobre_custo_pct por loja.
+ * CMV v1 =  CUSTO_TOTAL (= CUSTO_FRANQUIAS x QTDE_VENDIDA), imposto% = 0.
+ * Marca = COD_PRODUTO WP*  ->  WPINK; senao WEPINK (TOTALVENDA). Substitui TOTAL VENDA POR DIA.
+ * TODO(Configuracoes>Custos): aplicar imposto_sobre_custo_pct por loja.
  */
 import type { SalesDayAgg, SalesProductCostDayAgg } from "../../../src/data/wedash/salesTypes.ts";
 import { millenniumBaseUrl } from "./millenniumAuth.ts";
@@ -15,9 +15,9 @@ import { milleniumDayBoundIso } from "./millenniumSales.ts";
 export const RELATORIO_MARGEM_PATH = "MILLENIUM!FRANQUIAS.RELATORIOS.RELATORIOMARGEM";
 
 /**
- * RELATORIOMARGEM trata DATAI/DATAF como **datas de calendário inclusivas**
- * (UI: Data Inicial → Data Final). DATAF = meia-noite do dia seguinte puxa o dia
- * seguinte e dobra o CMV no somatório dia a dia.
+ * RELATORIOMARGEM trata DATAI/DATAF como **datas de calendario inclusivas**
+ * (UI: Data Inicial  ->  Data Final). DATAF = meia-noite do dia seguinte puxa o dia
+ * seguinte e dobra o CMV no somatorio dia a dia.
  */
 export function milleniumMargemDataRange(
   from: string,
@@ -32,9 +32,9 @@ export function milleniumMargemDataRange(
 export type MargemLine = {
   codProduto: string;
   qty: number;
-  /** Custo unitário fábrica (reais). */
+  /** Custo unitario fabrica (reais). */
   custoFranquias: number;
-  /** CUSTO_TOTAL = custoFranquias × qty (reais). */
+  /** CUSTO_TOTAL = custoFranquias x qty (reais). */
   custoTotal: number;
   totalVenda: number;
 };
@@ -81,7 +81,7 @@ function extractList(payload: unknown): unknown[] {
   return [];
 }
 
-/** Parse payload → linhas de produto (ignora TOTALVENDA como faturamento). */
+/** Parse payload  ->  linhas de produto (ignora TOTALVENDA como faturamento). */
 export function parseRelatorioMargemPayload(payload: unknown): MargemLine[] {
   const out: MargemLine[] = [];
   for (const raw of extractList(payload)) {
@@ -105,7 +105,7 @@ export function parseRelatorioMargemPayload(payload: unknown): MargemLine[] {
   return out;
 }
 
-/** Soma CMV do período em centavos (imposto% = 0 nesta versão). */
+/** Soma CMV do periodo em centavos (imposto% = 0 nesta versao). */
 export function cmvCentsFromMargemLines(lines: MargemLine[]): number {
   let reais = 0;
   for (const line of lines) {
@@ -115,7 +115,7 @@ export function cmvCentsFromMargemLines(lines: MargemLine[]): number {
 }
 
 /**
- * COD_PRODUTO → marca. WPINK = prefixo WP* (ex.: WP002, WP055).
+ * COD_PRODUTO  ->  marca. WPINK = prefixo WP* (ex.: WP002, WP055).
  * Validado vs TOTAL VENDA POR DIA (diff 0% em 00205 set/26).
  */
 export function brandFromCodProduto(cod: string): "WEPINK" | "WPINK" {
@@ -125,7 +125,7 @@ export function brandFromCodProduto(cod: string): "WEPINK" | "WPINK" {
 }
 
 /**
- * Linhas da margem de 1 dia → sales_day_agg WEPINK/WPINK
+ * Linhas da margem de 1 dia  ->  sales_day_agg WEPINK/WPINK
  * (receita = TOTALVENDA, CMV = CUSTO_TOTAL; counts = 0).
  */
 export function brandDayAggsFromMargemLines(
@@ -175,7 +175,7 @@ export function brandDayAggsFromMargemLines(
   return out;
 }
 
-/** Linhas da margem de 1 dia → CMV por COD_PRODUTO (sales_product_cost_day_agg). */
+/** Linhas da margem de 1 dia  ->  CMV por COD_PRODUTO (sales_product_cost_day_agg). */
 export function productCostDayAggsFromMargemLines(
   lines: MargemLine[],
   opts: { tenantId: string; storeId: string; day: string },

@@ -1,5 +1,5 @@
 /**
- * Reenfileira SEED/RUNNING órfãos do Santana (UI presa em Buscando, worker mudo).
+ * Reenfileira SEED/RUNNING orfaos do Santana (UI presa em Buscando, worker mudo).
  * Usage: node scripts/requeue-santana-seed.mjs
  */
 import fs from "node:fs";

@@ -8,8 +8,8 @@ const OPCOES: { value: Division | null; label: string }[] = [
 ];
 
 /**
- * Filtro de marca (WEPINK / WPINK / todas) — usa o `Dropdown` do Vela
- * (painel com opções estilizadas), não o `<select>` nativo do SO.
+ * Filtro de marca (WEPINK / WPINK / todas)  -  usa o `Dropdown` do Vela
+ * (painel com opcoes estilizadas), nao o `<select>` nativo do SO.
  */
 export function BrandPicker({
   value,

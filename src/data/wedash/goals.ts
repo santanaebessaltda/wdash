@@ -1,4 +1,4 @@
-/** Metas mensais por filial, com degraus configuráveis. Sempre em reais. */
+/** Metas mensais por filial, com degraus configuraveis. Sempre em reais. */
 
 import type { GoalBrand, GoalType, Tier } from "./engine/goalTypes";
 
@@ -16,15 +16,15 @@ export interface Goal {
   tipo: GoalType;
   /**
    * Marcas cobertas pela meta.
-   * Ambas (WEPINK+WPINK) = meta de loja/mix completo; uma só = meta de marca.
+   * Ambas (WEPINK+WPINK) = meta de loja/mix completo; uma so = meta de marca.
    */
   marcas: GoalBrand[];
 }
 
 /**
- * Escada padrão (demo / default de fábrica).
- * Tipicamente: Meta 50% → Super 75% → Hiper 100% (= meta da loja) → Desafio 110%.
- * Não é regra fixa — a loja configura os % na tela de Metas.
+ * Escada padrao (demo / default de fabrica).
+ * Tipicamente: Meta 50%  ->  Super 75%  ->  Hiper 100% (= meta da loja)  ->  Desafio 110%.
+ * Nao e regra fixa  -  a loja configura os % na tela de Metas.
  */
 export const BONUS_PER_LEVEL = 50;
 
@@ -38,8 +38,8 @@ export const defaultTiers: Tier[] = [
 const AMBAS: GoalBrand[] = ["WEPINK", "WPINK"];
 
 export const goals: Goal[] = [
-  // f1 (Shopping Campo Grande) = loja âncora, meta acima de f2.
-  // Valores calibrados ao gerador de vendas (MTD ~ metade do mês ≈ 50% da meta).
+  // f1 (Shopping Campo Grande) = loja ancora, meta acima de f2.
+  // Valores calibrados ao gerador de vendas (MTD ~ metade do mes  50% da meta).
   { id: "m-f1-2026-07", filialId: "f1", competencia: "2026-07", nome: "Julho 2026", valorLoja: 158000, degraus: defaultTiers, tipo: "grupo", marcas: AMBAS },
   { id: "m-f1-2026-08", filialId: "f1", competencia: "2026-08", nome: "Agosto 2026", valorLoja: 162000, degraus: defaultTiers, tipo: "grupo", marcas: AMBAS },
   { id: "m-f1-2026-09", filialId: "f1", competencia: "2026-09", nome: "Setembro 2026", valorLoja: 170000, degraus: defaultTiers, tipo: "grupo", marcas: AMBAS },
@@ -50,14 +50,14 @@ export const goals: Goal[] = [
   { id: "m-f2-2026-09", filialId: "f2", competencia: "2026-09", nome: "Setembro 2026", valorLoja: 98000, degraus: defaultTiers, tipo: "grupo", marcas: AMBAS },
 ];
 
-/** Todas as metas da loja na competência (pode haver mais de uma — ex.: loja + marca). */
+/** Todas as metas da loja na competencia (pode haver mais de uma  -  ex.: loja + marca). */
 export function goalsOfStore(filialId: string, competencia: string): Goal[] {
   return goals.filter((m) => m.filialId === filialId && m.competencia === competencia);
 }
 
 /**
- * Meta “principal” da loja (grupo / mix completo).
- * Usada por KPIs, dashboard e escada — não mistura com metas de marca.
+ * Meta "principal" da loja (grupo / mix completo).
+ * Usada por KPIs, dashboard e escada  -  nao mistura com metas de marca.
  */
 export function goalOfStore(filialId: string, competencia: string): Goal | undefined {
   const list = goalsOfStore(filialId, competencia);

@@ -1,16 +1,16 @@
 /**
- * erp-products-sync — JWT Gestor (OWNER/ADMIN_GLOBAL) busca as tabelas de custo do Millennium.
- * O catálogo de produtos não passa por aqui: o worker recarrega sozinho quando precisa.
- * - `scope: "tables"` (padrão; Atualizar do card Custo dos produtos da loja): só a lista de tabelas de custo (1 chamada).
- * - `scope: "table", tableId` (Salvar do card): preços só dessa tabela (1 chamada, ~3s).
- * - `scope: "registry"` (Atualizar do card Millennium em Integrações): lista de tabelas de custo + dados das
- *   lojas do tenant (FILIAIS.Lista; loja nova no ERP não entra). 2 chamadas, sem lease.
- * - `scope: "costs", storeIds, from, to` (Atualizar custos do aviso de produtos sem custo): preços da tabela
- *   de cada loja afetada + margem do período por loja; grava o custo que o Millennium passou a devolver.
- * Custo fica por tabela (product_cost_table_price), nunca no catálogo: o catálogo é da rede inteira e cada
+ * erp-products-sync  -  JWT Gestor (OWNER/ADMIN_GLOBAL) busca as tabelas de custo do Millennium.
+ * O catalogo de produtos nao passa por aqui: o worker recarrega sozinho quando precisa.
+ * - `scope: "tables"` (padrao; Atualizar do card Custo dos produtos da loja): so a lista de tabelas de custo (1 chamada).
+ * - `scope: "table", tableId` (Salvar do card): precos so dessa tabela (1 chamada, ~3s).
+ * - `scope: "registry"` (Atualizar do card Millennium em Integracoes): lista de tabelas de custo + dados das
+ *   lojas do tenant (FILIAIS.Lista; loja nova no ERP nao entra). 2 chamadas, sem lease.
+ * - `scope: "costs", storeIds, from, to` (Atualizar custos do aviso de produtos sem custo): precos da tabela
+ *   de cada loja afetada + margem do periodo por loja; grava o custo que o Millennium passou a devolver.
+ * Custo fica por tabela (product_cost_table_price), nunca no catalogo: o catalogo e da rede inteira e cada
  * loja usa a tabela do seu estado (store.cost_table_id).
- * Síncrono: não passa pela fila do worker. Usa o mesmo lease do worker (claim_product_catalog_refresh).
- * Reusa o token salvo em erp_credential; 401 → login com a senha cifrada e persiste o token novo.
+ * Sincrono: nao passa pela fila do worker. Usa o mesmo lease do worker (claim_product_catalog_refresh).
+ * Reusa o token salvo em erp_credential; 401  ->  login com a senha cifrada e persiste o token novo.
  */
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeaders, serve } from "../_shared/cors.ts";
@@ -96,7 +96,7 @@ async function refreshTableList(admin: SupabaseClient, session: string): Promise
   return tables.length;
 }
 
-/** Lojas do tenant que o ERP devolve: atualiza código, nome, fantasia, CNPJ e inauguração. Loja nova não entra. */
+/** Lojas do tenant que o ERP devolve: atualiza codigo, nome, fantasia, CNPJ e inauguracao. Loja nova nao entra. */
 async function refreshStores(admin: SupabaseClient, session: string, tenantId: string): Promise<number> {
   const erp = await listMillenniumStores(session);
   const { data, error } = await admin
@@ -130,7 +130,7 @@ async function refreshTablePrices(admin: SupabaseClient, session: string, tableI
   return p.size;
 }
 
-/** Linha da margem com custo 0 → CMV novo; soma a diferença no ALL e na marca do dia. false = já tinha custo. */
+/** Linha da margem com custo 0  ->  CMV novo; soma a diferenca no ALL e na marca do dia. false = ja tinha custo. */
 async function patchZeroCost(admin: SupabaseClient, tenantId: string, r: ZeroRow, cmvCents: number): Promise<boolean> {
   const { data: upd, error } = await admin
     .from("sales_product_cost_day_agg")
@@ -173,9 +173,9 @@ async function patchZeroCost(admin: SupabaseClient, tenantId: string, r: ZeroRow
 }
 
 /**
- * Produtos vendidos com custo 0 nas lojas/período: busca de novo os preços da tabela de custo de cada loja
- * e a margem do período (1 chamada por loja). Custo que o Millennium passou a devolver entra no CMV gravado;
- * preço na tabela entra pelo preenchimento na leitura. `missing` = códigos que seguem sem custo.
+ * Produtos vendidos com custo 0 nas lojas/periodo: busca de novo os precos da tabela de custo de cada loja
+ * e a margem do periodo (1 chamada por loja). Custo que o Millennium passou a devolver entra no CMV gravado;
+ * preco na tabela entra pelo preenchimento na leitura. `missing` = codigos que seguem sem custo.
  */
 async function refreshCosts(
   admin: SupabaseClient,
@@ -265,7 +265,7 @@ async function refresh(
   if (scope === "costs") return refreshCosts(admin, session, tenantId, costs!);
   if (scope === "table") return { prices: await refreshTablePrices(admin, session, tableId!) };
   if (scope === "registry") {
-    // Tabelas primeiro: sessão caída vira MillenniumHttpError 401 (relogin) antes da lista de lojas.
+    // Tabelas primeiro: sessao caida vira MillenniumHttpError 401 (relogin) antes da lista de lojas.
     const tables = await refreshTableList(admin, session);
     return { tables, stores: await refreshStores(admin, session, tenantId) };
   }
@@ -416,7 +416,7 @@ serve(async (req) => {
       }
       result = await refresh(admin, s, tenantId, scope, tableId, costs);
     }
-    // p_ok=false + p_error=null libera sem mexer em refreshed_at (só a recarga do catálogo no worker atualiza).
+    // p_ok=false + p_error=null libera sem mexer em refreshed_at (so a recarga do catalogo no worker atualiza).
     await release(null);
     return json({ ok: true, ...result });
   } catch (e) {

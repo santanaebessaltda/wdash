@@ -18,18 +18,18 @@ const TONES: Record<AlertVariant, { color: string; bg: string; icon: string }> =
 export interface AlertProps {
   variant?: AlertVariant;
   title?: ReactNode;
-  /** Texto abaixo do título. */
+  /** Texto abaixo do titulo. */
   children?: ReactNode;
-  /** Substitui o ícone padrão da variante (ex.: Spinner, RadialProgress). */
+  /** Substitui o icone padrao da variante (ex.: Spinner, RadialProgress). */
   icon?: ReactNode;
-  /** Ações à direita (desktop) / abaixo do texto (celular). */
+  /** Acoes a direita (desktop) / abaixo do texto (celular). */
   action?: ReactNode;
-  /** Conteúdo extra em largura total abaixo do texto (ex.: lista expandida). */
+  /** Conteudo extra em largura total abaixo do texto (ex.: lista expandida). */
   footer?: ReactNode;
   className?: string;
 }
 
-/** Alerta do Vela (Components > Alerts): fundo suave da cor, ícone e título na cor, texto em t1. */
+/** Alerta do Vela (Components > Alerts): fundo suave da cor, icone e titulo na cor, texto em t1. */
 export function Alert({ variant = "info", title, children, icon, action, footer, className }: AlertProps) {
   const tone = TONES[variant];
   return (
@@ -71,7 +71,7 @@ export function Alert({ variant = "info", title, children, icon, action, footer,
   );
 }
 
-/** Link de ação dentro do Alert. */
+/** Link de acao dentro do Alert. */
 export function AlertLink({ className, type = "button", ...rest }: ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button

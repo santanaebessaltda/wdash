@@ -1,6 +1,6 @@
 /**
- * Configurações > Logs — erros/avisos gravados pelo worker Millennium em `sync_log`.
- * RLS: só OWNER / MANAGER / ADMIN_GLOBAL leem. Retenção 120 dias (worker limpa).
+ * Configuracoes > Logs  -  erros/avisos gravados pelo worker Millennium em `sync_log`.
+ * RLS: so OWNER / MANAGER / ADMIN_GLOBAL leem. Retencao 120 dias (worker limpa).
  */
 import { getSupabase } from "@/lib/supabase";
 
@@ -22,7 +22,7 @@ export type SyncLogEntry = {
   detail: Record<string, unknown> | null;
 };
 
-/** Origem (etapa do sync) → rótulo na UI. */
+/** Origem (etapa do sync)  ->  rotulo na UI. */
 export const SYNC_LOG_SOURCE_LABEL: Record<string, string> = {
   job: "Sincronização",
   login: "Acesso ao Millennium",
@@ -148,7 +148,7 @@ const SYNC_LOG_TEXT: Record<string, SyncLogText> = {
   },
 };
 
-/** Nome da pessoa nas mensagens do worker: `Pessoa "MARIA" (gerador 123) …`. */
+/** Nome da pessoa nas mensagens do worker: `Pessoa "MARIA" (gerador 123) ...`. */
 function personName(message: string): string {
   return message.match(/Pessoa "([^"]+)"/)?.[1]?.trim().toUpperCase() || "a pessoa";
 }
@@ -164,7 +164,7 @@ function syncLogText(e: Pick<SyncLogEntry, "source" | "message">): SyncLogText {
       : {
           summary: "Não foi possível acessar o Millennium",
           explanation:
-            "A WeDash não conseguiu acessar o Millennium durante esta sincronização. Os dados deste período podem não estar atualizados.",
+            "A WDash não conseguiu acessar o Millennium durante esta sincronização. Os dados deste período podem não estar atualizados.",
         };
   }
   if (e.source === "vendedoras" && /mais de um cadastro/i.test(e.message)) {

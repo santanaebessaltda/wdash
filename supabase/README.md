@@ -77,7 +77,23 @@ Troque o corpo para mostrar o código, por exemplo:
 
 Sem `{{ .Token }}` no template, o e-mail só traz link e o OTP no app não funciona.
 
-Redirect URLs (Site URL) continuam úteis se alguém abrir um link antigo; o fluxo principal não depende delas.
+**Site URL** (Authentication → URL Configuration) = `https://wdash.app`.
+É esse valor que vira `{{ .SiteURL }}` no e-mail de convite.
+
+Redirect URLs: `https://wdash.app/**`, `https://wdash.app/invite/**`, `https://wdash.app/invite/link`
+(e `http://localhost:5173/**` só em desenvolvimento).
+
+### Franqueado novo (Invite do painel Supabase)
+
+**Authentication → Users → Invite user** (só o e-mail) provisiona automaticamente:
+
+- empresa nova (`tenant`; nome provisório = parte local do e-mail em caixa alta)
+- gestor dono (`OWNER`, `is_owner`, `onboarding_step = 2`)
+- identity/membership `PENDING` até aceitar o link
+
+O franqueado abre o e-mail → Continuar → cria senha → conecta o Millennium.
+
+Convites pela WDash (Configurações → Usuários / Vendedores) mandam `wdash: "member"` nos metadados e **não** abrem empresa nova.
 
 ## Edge Function — `millennium-onboarding`
 

@@ -1,8 +1,8 @@
 /**
  * Compara split WEPINK/WPINK:
- *   A) RELATORIOMARGEM · COD_PRODUTO WP* → WPINK (TOTALVENDA)
+ *   A) RELATORIOMARGEM  |  COD_PRODUTO WP*  ->  WPINK (TOTALVENDA)
  *   B) TOTAL VENDA POR DIA (wtsreports marca)
- *   C) VENDAS.Lista total (ALL) — referência de faturamento
+ *   C) VENDAS.Lista total (ALL)  -  referencia de faturamento
  *
  *   cd workers/millennium-sync && npx tsx scripts/probe-margem-vs-brand-report.ts
  *   STORE=00205 DAY=2026-09-23 npx tsx scripts/probe-margem-vs-brand-report.ts
@@ -48,7 +48,7 @@ function loadDotEnv() {
   }
 }
 
-/** Mesma regra do DetMov: COD WP* → WPINK; senão WEPINK. */
+/** Mesma regra do DetMov: COD WP*  ->  WPINK; senao WEPINK. */
 function brandFromCod(cod: string): "WEPINK" | "WPINK" {
   const t = cod.trim().toUpperCase();
   if (/^WP[\dA-Z]/.test(t) || t === "WP" || t.startsWith("WP ")) return "WPINK";

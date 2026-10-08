@@ -5,7 +5,7 @@ import type { GoalRecord, GoalTeamMember } from "./engine/goalTypes";
 
 export type { GoalGroup, GoalRecord, GoalTeamMember } from "./engine/goalTypes";
 
-/** Demo sem Supabase: metas fixture (lojas f1/f2), só a meta principal de cada mês. */
+/** Demo sem Supabase: metas fixture (lojas f1/f2), so a meta principal de cada mes. */
 function fixtureRecords(): GoalRecord[] {
   return fixtureGoals
     .filter((g) => g.marcas.length !== 1)
@@ -26,7 +26,7 @@ const COLS = "id, store_id, name, starts_on, ends_on, target_cents, tier_mode, t
 
 export type GoalInput = Omit<GoalRecord, "id">;
 
-/** Cria (sem id) ou atualiza a meta. `overlap` = já existe meta da loja com datas que se cruzam. */
+/** Cria (sem id) ou atualiza a meta. `overlap` = ja existe meta da loja com datas que se cruzam. */
 export async function saveGoal(
   tenantId: string,
   id: string | null,
@@ -73,7 +73,7 @@ export async function saveGoal(
   return { ok: true, id: (res.data as { id: string }).id };
 }
 
-/** Metas das lojas com período que cruza [from, to]; mais recentes primeiro. */
+/** Metas das lojas com periodo que cruza [from, to]; mais recentes primeiro. */
 export async function fetchGoals(q: { tenantId: string; storeIds: string[]; from: string; to: string }): Promise<GoalRecord[]> {
   if (q.storeIds.length === 0) return [];
   const { getSupabase } = await import("@/lib/supabase");
@@ -122,7 +122,7 @@ export async function deleteGoal(tenantId: string, id: string): Promise<{ ok: bo
   return { ok: true };
 }
 
-/** Funcionários das lojas (store_seller) com turno — elegibilidade da meta e nome/turno na escada. */
+/** Funcionarios das lojas (store_seller) com turno  -  elegibilidade da meta e nome/turno na escada. */
 export async function fetchGoalTeam(tenantId: string, storeIds: string[]): Promise<GoalTeamMember[]> {
   if (storeIds.length === 0) return [];
   const { getSupabase } = await import("@/lib/supabase");

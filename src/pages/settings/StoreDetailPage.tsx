@@ -10,8 +10,8 @@ import { StoreScheduleForm } from "@/pages/operation/StoreSchedule";
 import { paths } from "@/router/paths";
 
 /**
- * Administração > Lojas > detalhe — funcionamento (fuso + horário), o mesmo formulário de Configurações > Loja.
- * Custos ficam em Configurações; turnos e equipe em Gestão.
+ * Administracao > Lojas > detalhe  -  funcionamento (fuso + horario), o mesmo formulario de Configuracoes > Loja.
+ * Custos ficam em Configuracoes; turnos e equipe em Gestao.
  */
 export function StoreDetailPage() {
   const { id } = useParams();

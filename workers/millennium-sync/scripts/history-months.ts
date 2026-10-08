@@ -1,8 +1,8 @@
 /**
- * HISTORY manual: busca N meses para trás (1 mês fechado por rodada, a partir do dia mais
- * antigo já gravado; para no teto de 24 meses / inauguração da loja).
+ * HISTORY manual: busca N meses para tras (1 mes fechado por rodada, a partir do dia mais
+ * antigo ja gravado; para no teto de 24 meses / inauguracao da loja).
  * Mesmo fluxo do job HISTORY, sem passar pela fila (SYNC_MANUAL_ONLY continua valendo p/ o worker).
- * Não grava sync_job / watermark (last_light_sync_at).
+ * Nao grava sync_job / watermark (last_light_sync_at).
  *   cd workers/millennium-sync && npx tsx scripts/history-months.ts 2
  */
 import { readFileSync, existsSync } from "node:fs";

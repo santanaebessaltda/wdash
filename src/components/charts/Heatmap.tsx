@@ -10,9 +10,9 @@ export function Heatmap({
   cols: string[];
   data: number[][];
   color?: string;
-  /** Formata o valor no tooltip da célula (ex.: brl). */
+  /** Formata o valor no tooltip da celula (ex.: brl). */
   formatValue?: (v: number) => string;
-  /** Largura mínima da coluna de rótulos das linhas. */
+  /** Largura minima da coluna de rotulos das linhas. */
   rowMinWidth?: number;
 }) {
   const max = Math.max(...data.flat(), 1);

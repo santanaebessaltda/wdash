@@ -30,7 +30,7 @@ export function Tooltip({ label, children, side = "top" }: { label: string; chil
       left = Math.max(EDGE, Math.min(left, vw - b.width - EDGE));
 
       let top = side === "top" ? t.top - b.height - EDGE : t.bottom + EDGE;
-      // Flip se não couber no lado pedido
+      // Flip se nao couber no lado pedido
       if (side === "top" && top < EDGE) top = t.bottom + EDGE;
       if (side === "bottom" && top + b.height > vh - EDGE) top = t.top - b.height - EDGE;
       top = Math.max(EDGE, Math.min(top, vh - b.height - EDGE));

@@ -15,7 +15,7 @@ const TABS = [
 const META: Record<string, { title: string; subtitle: string }> = {
   [paths.profile]: {
     title: "Meu perfil",
-    subtitle: "Gerencie seus dados, sua senha e a aparência da WeDash.",
+    subtitle: "Gerencie seus dados, sua senha e a aparência da WDash.",
   },
   [paths.settings.stores]: {
     title: "Lojas",
@@ -23,11 +23,11 @@ const META: Record<string, { title: string; subtitle: string }> = {
   },
   [paths.settings.erp]: {
     title: "Integrações",
-    subtitle: "Gerencie as conexões da WeDash com seus sistemas.",
+    subtitle: "Gerencie as conexões da WDash com seus sistemas.",
   },
   [paths.settings.users]: {
     title: "Usuários",
-    subtitle: "Controle quem acessa a WeDash e quais lojas cada usuário pode visualizar.",
+    subtitle: "Controle quem acessa a WDash e quais lojas cada usuário pode visualizar.",
   },
   [paths.settings.logs]: {
     title: "Logs",
@@ -36,9 +36,9 @@ const META: Record<string, { title: string; subtitle: string }> = {
 };
 
 /**
- * Shell de Conta (menu do avatar) — mesmo padrão Vela (TabNav).
- * Abas só para o Gestor em Meu perfil · Integrações · Usuários · Logs; Gerente vê só Meu perfil (sem abas).
- * Lojas (só por URL por enquanto) fica sem abas.
+ * Shell de Conta (menu do avatar)  -  mesmo padrao Vela (TabNav).
+ * Abas so para o Gestor em Meu perfil  |  Integracoes  |  Usuarios  |  Logs; Gerente ve so Meu perfil (sem abas).
+ * Lojas (so por URL por enquanto) fica sem abas.
  */
 export function WedashSettingsLayout() {
   const { pathname } = useLocation();

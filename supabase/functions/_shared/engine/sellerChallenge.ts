@@ -64,7 +64,7 @@ const ORDINAL = ["1º", "2º", "3º"] as const;
 const METRIC_HOW: Record<SellerChallengeMetric, string> = {
   QUANTITY: "O resultado é a quantidade de itens que você vender no período.",
   VALUE: "O resultado é o faturamento das suas vendas no período.",
-  PA: "O resultado é o seu P.A. (itens por venda) no período.",
+  PA: "O resultado é o seu P.A. (itens por venda), calculado no fim do desafio. Até lá, o número pode mudar.",
   TICKET: "O resultado é o seu ticket médio (valor médio por venda) no período.",
   INDEX:
     "O índice compara seu faturamento médio por pessoa, ticket e P.A. com a média da loja no período (100 = na média).",
@@ -317,9 +317,12 @@ export function challengeStanding(
   if (resultado == null) return { ...empty, unavailable: true };
 
   const posicao = posicaoDe.get(mine.key) ?? null;
+  const fechaNoFim = metric === "PA" && status === "active";
   let won = false;
-  if (challenge.mode === "CONTEST") won = posicao != null && posicao <= prizeCount && alcancaAlvo(resultado);
-  else won = alcancaAlvo(resultado) && mine.vendas >= minVendas && target != null;
+  if (!fechaNoFim) {
+    if (challenge.mode === "CONTEST") won = posicao != null && posicao <= prizeCount && alcancaAlvo(resultado);
+    else won = alcancaAlvo(resultado) && mine.vendas >= minVendas && target != null;
+  }
 
   let gap: string | null = null;
   let progressPct: number | null = won ? 100 : null;
@@ -327,6 +330,9 @@ export function challengeStanding(
     if (mine.vendas < minVendas) {
       gap = gapSales(minVendas - mine.vendas);
       progressPct = bar(mine.vendas, minVendas);
+    } else if (fechaNoFim && alcancaAlvo(resultado) && (challenge.mode === "MINIMUM" || (posicao != null && posicao <= prizeCount))) {
+      gap = "O P.A. só vale no fim do desafio";
+      progressPct = target != null ? bar(resultado, target) : null;
     } else if (challenge.mode === "MINIMUM") {
       if (!won && target != null) {
         gap = `${gapAmount(metric, target - resultado)} para o mínimo`;

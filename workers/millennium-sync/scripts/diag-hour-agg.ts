@@ -1,5 +1,5 @@
 /**
- * Diag: sales_hour_agg de um dia (brand=ALL) por loja + fuso/horário configurado.
+ * Diag: sales_hour_agg de um dia (brand=ALL) por loja + fuso/horario configurado.
  *   cd workers/millennium-sync && npx tsx scripts/diag-hour-agg.ts 2026-09-23
  */
 import { readFileSync, existsSync } from "node:fs";

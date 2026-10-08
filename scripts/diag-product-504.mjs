@@ -1,5 +1,5 @@
 /**
- * Vendas e custo de um produto (margem × tabelas de custo). Só leitura.
+ * Vendas e custo de um produto (margem x tabelas de custo). So leitura.
  * Usage: node scripts/diag-product-504.mjs [COD_PRODUTO]
  */
 import fs from "node:fs";

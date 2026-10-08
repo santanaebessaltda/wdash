@@ -3,7 +3,7 @@ import { cn } from "@/lib/cn";
 
 export type SortOption<K extends string> = { key: K; label: string; text?: boolean };
 
-/** Ordenação das tabelas no celular (onde não há cabeçalho clicável), padrão "Sort by" do Data Tables do Vela: tocar escolhe o campo; tocar de novo inverte. */
+/** Ordenacao das tabelas no celular (onde nao ha cabecalho clicavel), padrao "Sort by" do Data Tables do Vela: tocar escolhe o campo; tocar de novo inverte. */
 export function MobileSortBar<K extends string>({
   options,
   sortKey,
@@ -17,7 +17,7 @@ export function MobileSortBar<K extends string>({
   sortDir: SortDir;
   onChange: (key: K, dir: SortDir) => void;
   className?: string;
-  /** Mostra também no computador (tabela sem cabeçalho clicável). */
+  /** Mostra tambem no computador (tabela sem cabecalho clicavel). */
   always?: boolean;
 }) {
   return (

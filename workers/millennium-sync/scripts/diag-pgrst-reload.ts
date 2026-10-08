@@ -33,7 +33,7 @@ function loadDotEnv() {
 async function main() {
   loadDotEnv();
   const sb = createAdminClient();
-  // PostgREST schema cache — tabela nova às vezes some do REST até reload.
+  // PostgREST schema cache  -  tabela nova as vezes some do REST ate reload.
   const { error: n1 } = await sb.rpc("" as never).maybeSingle?.();
   void n1;
   const { data, error } = await sb
@@ -42,7 +42,7 @@ async function main() {
     .limit(1);
   console.log("service select ok", !error, data?.length, error?.message);
 
-  // Try raw SQL via postgres if available — use REST workaround:
+  // Try raw SQL via postgres if available  -  use REST workaround:
   // supabase js can't NOTIFY easily; use fetch to Management or sql endpoint.
   const url = (process.env.SUPABASE_URL ?? "").replace(/\/$/, "");
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;

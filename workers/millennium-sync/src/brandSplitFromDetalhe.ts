@@ -1,5 +1,5 @@
 /**
- * Classifica itens do ConsultaDetMov → SaleRow WEPINK/WPINK (pra aggregateSales).
+ * Classifica itens do ConsultaDetMov  ->  SaleRow WEPINK/WPINK (pra aggregateSales).
  */
 import type { SaleRow, SalesBrand } from "../../../src/data/wedash/salesTypes.ts";
 import type { DetMovLine } from "./millenniumDetMov.ts";
@@ -15,14 +15,14 @@ export type BrandSplitHeader = {
   storeId: string;
 };
 
-/** Soma linhas por marca. Fora do mapa: infere pela descrição; senão WEPINK. */
+/** Soma linhas por marca. Fora do mapa: infere pela descricao; senao WEPINK. */
 export function inferBrandFromDesc(desc: string): SalesBrand | null {
   const t = desc.trim().toUpperCase();
   if (!t) return null;
-  // Código WP* / rótulo WPINK
+  // Codigo WP* / rotulo WPINK
   if (/\bWPINK\b/.test(t) || /^WP[\dA-Z]/.test(t) || t.startsWith("WP ")) return "WPINK";
   if (/\bWEPINK\b/.test(t) || /\bWE\s*PINK\b/.test(t)) return "WEPINK";
-  // Prefixo do COD no DESC (ex.: "BSVHG-ATH-001-BODY…")
+  // Prefixo do COD no DESC (ex.: "BSVHG-ATH-001-BODY...")
   const cod = /^([A-Z0-9][A-Z0-9._-]*)/.exec(t)?.[1] ?? "";
   if (/^WP[\dA-Z]/.test(cod)) return "WPINK";
   return null;
@@ -38,7 +38,7 @@ export function resolveLineBrand(
   return inferBrandFromDesc(descProduto) ?? "WEPINK";
 }
 
-/** Soma linhas por marca (mapa → desc → default WEPINK). */
+/** Soma linhas por marca (mapa  ->  desc  ->  default WEPINK). */
 export function splitLinesByBrand(
   lines: DetMovLine[],
   productMap: ProductBrandMap,
@@ -55,7 +55,7 @@ export function splitLinesByBrand(
   return out;
 }
 
-/** Headers únicos com NF + COD_OPERACAO numérico (1 DetMov por cupom). */
+/** Headers unicos com NF + COD_OPERACAO numerico (1 DetMov por cupom). */
 export function uniqueBrandSplitHeaders(rows: SaleRowWithFilial[]): BrandSplitHeader[] {
   const seen = new Set<string>();
   const out: BrandSplitHeader[] = [];
@@ -115,7 +115,7 @@ export function couponBrandFromLines(
   };
 }
 
-/** Cupom do cache → 0..2 SaleRows (hora = a da Lista). */
+/** Cupom do cache  ->  0..2 SaleRows (hora = a da Lista). */
 export function saleRowsFromCouponBrand(header: BrandSplitHeader, coupon: CouponBrand): SaleRow[] {
   const out: SaleRow[] = [];
   const parts: Array<[SalesBrand, number, number]> = [
@@ -136,7 +136,7 @@ export function saleRowsFromCouponBrand(header: BrandSplitHeader, coupon: Coupon
   return out;
 }
 
-/** Uma venda (detalhe) → 0..2 SaleRows (WEPINK e/ou WPINK). */
+/** Uma venda (detalhe)  ->  0..2 SaleRows (WEPINK e/ou WPINK). */
 export function saleRowsFromDetLines(
   header: BrandSplitHeader,
   lines: DetMovLine[],

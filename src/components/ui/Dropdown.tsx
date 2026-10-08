@@ -4,37 +4,37 @@ import { cn } from "@/lib/cn";
 
 export interface DropdownItem {
   label: string;
-  /** Texto menor abaixo do rótulo (ex.: corpo de uma notificação). */
+  /** Texto menor abaixo do rotulo (ex.: corpo de uma notificacao). */
   description?: string;
   icon?: ReactNode;
   onClick?: () => void;
   danger?: boolean;
   divider?: boolean;
-  /** Rótulo de seção (não clicável). */
+  /** Rotulo de secao (nao clicavel). */
   heading?: boolean;
-  /** Destaca a opção selecionada (bg-acc-soft + texto acc). */
+  /** Destaca a opcao selecionada (bg-acc-soft + texto acc). */
   active?: boolean;
-  /** Opção não clicável (ex.: filtro ainda indisponível). */
+  /** Opcao nao clicavel (ex.: filtro ainda indisponivel). */
   disabled?: boolean;
-  /** Conteúdo à direita do rótulo (ex.: switch visual). */
+  /** Conteudo a direita do rotulo (ex.: switch visual). */
   trailing?: ReactNode;
-  /** Não fecha o menu ao clicar (toggles). */
+  /** Nao fecha o menu ao clicar (toggles). */
   keepOpen?: boolean;
-  /** Texto na cor primária sem fundo (ex.: notificação não lida). */
+  /** Texto na cor primaria sem fundo (ex.: notificacao nao lida). */
   highlight?: boolean;
 }
 
 export interface DropdownProps {
   trigger: ReactNode;
   items: DropdownItem[];
-  /** Bloco fixo acima dos itens (ex.: usuário logado no menu do avatar). */
+  /** Bloco fixo acima dos itens (ex.: usuario logado no menu do avatar). */
   header?: ReactNode;
   align?: "left" | "right";
-  /** Classes extras do menu (ex.: altura máxima com scroll). */
+  /** Classes extras do menu (ex.: altura maxima com scroll). */
   menuClassName?: string;
-  /** Classes da área dos itens — rolagem só nos itens, com o `header` fixo. */
+  /** Classes da area dos itens  -  rolagem so nos itens, com o `header` fixo. */
   bodyClassName?: string;
-  /** Renderiza o menu no `body` (posição fixa) — para triggers dentro de containers com overflow (tabelas). */
+  /** Renderiza o menu no `body` (posicao fixa)  -  para triggers dentro de containers com overflow (tabelas). */
   portal?: boolean;
 }
 

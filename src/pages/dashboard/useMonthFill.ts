@@ -21,7 +21,7 @@ async function poll(tenantId: string) {
   if (tenantId !== currentTenant) return;
   const prev = current;
   current = next;
-  // Um dia terminou (a cadeia andou para trás ou acabou) → telas recarregam.
+  // Um dia terminou (a cadeia andou para tras ou acabou)  ->  telas recarregam.
   if (prev && (!next || next.currentDay !== prev.currentDay)) {
     window.dispatchEvent(new Event(SALES_SYNCED_EVENT));
   }
@@ -79,8 +79,8 @@ function subscribe(listener: () => void) {
 }
 
 /**
- * Carga do mês pós-onboarding (dias anteriores a hoje chegando por trás).
- * Um poll só para o app inteiro; quando um dia termina dispara `SALES_SYNCED_EVENT`.
+ * Carga do mes pos-onboarding (dias anteriores a hoje chegando por tras).
+ * Um poll so para o app inteiro; quando um dia termina dispara `SALES_SYNCED_EVENT`.
  */
 export function useMonthFill(): MonthFill | null {
   const { tenantId } = useActiveSession();

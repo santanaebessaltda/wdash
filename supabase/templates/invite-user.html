@@ -1,0 +1,89 @@
+<!--
+  Template: Invite user — WDash × Vela (tema claro)
+  Colar em: Supabase Dashboard → Authentication → Emails → Invite user
+
+  Subject sugerido: Crie seu acesso à WDash
+
+  Variáveis:
+    {{ .Data.role }} — Gestor, Gerente ou Equipe de vendas
+    {{ .TokenHash }} — token do convite
+
+  Site URL do Auth (Dashboard) deve ser https://wdash.app.
+  O botão usa esse Site URL: {{ .SiteURL }}/invite/{{ .TokenHash }}
+-->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <meta name="supported-color-schemes" content="light" />
+  <title>Você foi convidado para acessar a WDash</title>
+  <style>
+    :root, body { color-scheme: light; }
+  </style>
+</head>
+<body style="margin:0;padding:0;background:#eef0f5;font-family:Plus Jakarta Sans,Segoe UI,Helvetica,Arial,sans-serif;color-scheme:light;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#eef0f5" style="background:#eef0f5;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff" style="max-width:440px;background:#ffffff;border:1px solid #e6e8ef;border-radius:22px;overflow:hidden;">
+          <!-- Marca -->
+          <tr>
+            <td style="padding:28px 28px 8px 28px;" align="center">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#B01CFF,#7A3FFF 50%,#2C9CFF);text-align:center;vertical-align:middle;font-size:20px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;line-height:40px;">
+                    W
+                  </td>
+                  <td style="padding-left:12px;font-size:17px;font-weight:800;color:#171a23;letter-spacing:-0.02em;">
+                    WDash
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Título + texto -->
+          <tr>
+            <td style="padding:16px 28px 8px 28px;" align="center">
+              <p style="margin:0 0 12px 0;font-size:22px;font-weight:800;color:#171a23;letter-spacing:-0.03em;">
+                Crie seu acesso
+              </p>
+              <p style="margin:0;font-size:14px;line-height:1.55;color:#5a6173;">
+                Você recebeu um convite para acessar a WDash{{ if .Data.role }} como {{ .Data.role }}{{ end }}.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Botão -->
+          <tr>
+            <td style="padding:24px 28px;" align="center">
+              <a href="{{ .SiteURL }}/invite/{{ .TokenHash }}" style="display:inline-block;padding:14px 28px;background:#6a4cff;border-radius:12px;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;">
+                Criar meu acesso
+              </a>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:0 28px 28px 28px;" align="center">
+              <p style="margin:0;font-size:12.5px;line-height:1.5;color:#9097a8;">
+                Se você não esperava este convite, ignore este e-mail. Nenhuma conta será criada até você abrir o link e definir sua senha.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Rodapé -->
+          <tr>
+            <td style="padding:16px 28px 24px 28px;border-top:1px solid #e6e8ef;" align="center">
+              <p style="margin:0;font-size:11.5px;color:#9097a8;">
+                WDash · Gestão clara para sua rede
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

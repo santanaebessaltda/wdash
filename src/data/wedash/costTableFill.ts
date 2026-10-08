@@ -1,11 +1,11 @@
 /**
- * Produto vendido que veio com custo 0 no RELATORIOMARGEM → CMV = itens × custo unitário da tabela de custo
- * da loja (Configurações > Lojas; product_cost_table_price). Calculado na leitura: o histórico se corrige sem
- * nova chamada ao ERP. Custo que veio da margem nunca é trocado; produto sem preço na tabela segue com 0.
+ * Produto vendido que veio com custo 0 no RELATORIOMARGEM  ->  CMV = itens x custo unitario da tabela de custo
+ * da loja (Configuracoes > Lojas; product_cost_table_price). Calculado na leitura: o historico se corrige sem
+ * nova chamada ao ERP. Custo que veio da margem nunca e trocado; produto sem preco na tabela segue com 0.
  */
 import type { SalesDayAgg, SalesProductCostDayAgg } from "./salesTypes";
 
-/** `loja|dia|código` → CMV em centavos vindo da tabela. */
+/** `loja|dia|codigo`  ->  CMV em centavos vindo da tabela. */
 export type TableCostFill = Map<string, number>;
 
 const rowKey = (storeId: string, day: string, code: string) => `${storeId}|${day}|${code}`;
@@ -20,7 +20,7 @@ export function brandFromProductCode(code: string): "WEPINK" | "WPINK" {
 export function buildTableCostFill(
   zeroRows: Array<Pick<SalesProductCostDayAgg, "storeId" | "day" | "productCode" | "itemCount" | "cmvCents">>,
   storeTable: Map<string, number>,
-  /** `tabela|código` → custo unitário em centavos. */
+  /** `tabela|codigo`  ->  custo unitario em centavos. */
   prices: Map<string, number>,
 ): TableCostFill {
   const out: TableCostFill = new Map();

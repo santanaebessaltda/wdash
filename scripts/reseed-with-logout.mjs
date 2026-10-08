@@ -1,4 +1,4 @@
-/** Reinicia SEED sem orphanar sessão Millennium (logout antes de limpar). */
+/** Reinicia SEED sem orphanar sessao Millennium (logout antes de limpar). */
 import fs from "node:fs";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";

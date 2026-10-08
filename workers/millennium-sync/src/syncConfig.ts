@@ -1,14 +1,14 @@
 /**
- * Sincronização no `.env` — cada chave cuida de uma coisa só:
- * - SYNC_ONBOARDING (padrão 1m): só a carga do onboarding. off = sem vendas — ao conectar traz só o
- *   cadastro (gerador, equipe e produtos) · Nd = N dias contando hoje · Nm = N meses contando o atual.
- * - AUTO_REFRESH (padrão on): Atualizar automático a cada 30 min, o dia todo. off = só o manual.
- * - CLOSE_HOUR (padrão 3): hora local do fechamento da madrugada (0–23). off = desligado.
- * - DEEP_HISTORY (padrão off, só Nm): histórico antigo na madrugada, até a inauguração da loja.
+ * Sincronizacao no `.env`  -  cada chave cuida de uma coisa so:
+ * - SYNC_ONBOARDING (padrao 1m): so a carga do onboarding. off = sem vendas  -  ao conectar traz so o
+ *   cadastro (gerador, equipe e produtos)  |  Nd = N dias contando hoje  |  Nm = N meses contando o atual.
+ * - AUTO_REFRESH (padrao on): Atualizar automatico a cada 30 min, o dia todo. off = so o manual.
+ * - CLOSE_HOUR (padrao 3): hora local do fechamento da madrugada (0 - 23). off = desligado.
+ * - DEEP_HISTORY (padrao off, so Nm): historico antigo na madrugada, ate a inauguracao da loja.
  *
- * Dias perdidos (integração desconectada, worker parado) são recuperados por qualquer Atualizar ou
- * fechamento da madrugada a partir do último dia fechado da loja — não depende de nenhuma chave.
- * Valor inválido derruba o worker na partida (`assertSyncConfig`).
+ * Dias perdidos (integracao desconectada, worker parado) sao recuperados por qualquer Atualizar ou
+ * fechamento da madrugada a partir do ultimo dia fechado da loja  -  nao depende de nenhuma chave.
+ * Valor invalido derruba o worker na partida (`assertSyncConfig`).
  */
 import { addDays } from "./autoRefresh.ts";
 import { addMonths, monthStart } from "./deepHistory.ts";
@@ -27,7 +27,7 @@ export function parseSyncSpan(name: string, raw: string | undefined, fallback: S
   return { n, unit: match[2] as "d" | "m" };
 }
 
-/** Primeiro dia coberto pelo período (inclui hoje / o mês atual). */
+/** Primeiro dia coberto pelo periodo (inclui hoje / o mes atual). */
 export function spanStart(span: Exclude<SyncSpan, "off">, todayIso: string): string {
   return span.unit === "d" ? addDays(todayIso, -(span.n - 1)) : addMonths(monthStart(todayIso), -(span.n - 1));
 }
@@ -46,10 +46,10 @@ export function syncOnboardingOff(env: Env = process.env): boolean {
   return onboardingSpan(env) === "off";
 }
 
-/** Anotação do SEED pulado com SYNC_ONBOARDING=off (status SUCCEEDED; o sino ignora). */
+/** Anotacao do SEED pulado com SYNC_ONBOARDING=off (status SUCCEEDED; o sino ignora). */
 export const SYNC_OFF_NOTE = "sync desligado (SYNC_ONBOARDING=off)";
 
-/** Dia mais antigo da carga do histórico depois do SEED (que já trouxe hoje); null = nada antes de hoje. */
+/** Dia mais antigo da carga do historico depois do SEED (que ja trouxe hoje); null = nada antes de hoje. */
 export function onboardingHistoryUntil(todayIso: string, env: Env = process.env): string | null {
   const span = onboardingSpan(env);
   if (span === "off") return null;

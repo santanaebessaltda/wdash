@@ -59,8 +59,17 @@ type TierRow = {
   mgrCommission: string;
   mgrBonus: string;
 };
-/** Individual = cada pessoa sobre a propria meta (meta do grupo  pessoas); Grupo = o grupo todo sobre a meta do grupo. */
-type PrizeMode = "INDIVIDUAL" | "GROUP";
+/** Individual = cada pessoa sobre a propria meta; Grupo = o grupo sobre a soma; Geral = a loja sobre o total vendido, premiacao dividida. */
+type PrizeMode = "INDIVIDUAL" | "GROUP" | "GENERAL";
+
+const PRIZE_MODE_HELP: Record<PrizeMode, string> = {
+  INDIVIDUAL:
+    "Cada pessoa sobe de nível pela própria meta e recebe a premiação sobre as próprias vendas. O bônus também é individual.",
+  GROUP:
+    "O grupo sobe de nível pela soma das vendas. A premiação é dividida igualmente entre as pessoas do grupo, e o bônus vale para cada pessoa.",
+  GENERAL:
+    "A loja sobe de nível pelo total vendido. A premiação é dividida igualmente entre as pessoas da equipe, e o bônus vale para cada pessoa.",
+};
 
 type TierErrors = { meta?: string; commission?: string; mgrCommission?: string };
 type FormErrors = {
@@ -363,7 +372,7 @@ export default function GoalEditorPage() {
         setManagerOn(g.tiers.some((t) => t.gerenciaPct != null));
       }
       savedGroups.current = g.groups;
-      if (g.groups.length > 0) {
+      if (g.groups.length > 0 && g.tierMode !== "GENERAL") {
         setGroupsOn(true);
         setGroups((gs) => gs && applySavedGroups(gs));
       }
@@ -454,7 +463,7 @@ export default function GoalEditorPage() {
           }))
         : [],
       groups:
-        groupsOn && groups
+        prizeMode !== "GENERAL" && groupsOn && groups
           ? groups.map((g) => ({
               shiftId: g.key,
               name: g.name,
@@ -597,19 +606,21 @@ export default function GoalEditorPage() {
                 options={[
                   { value: "INDIVIDUAL", label: "Individual" },
                   { value: "GROUP", label: "Grupo" },
+                  { value: "GENERAL", label: "Geral" },
                 ]}
                 value={prizeMode}
-                onChange={(v) => v && setPrizeMode(v)}
+                onChange={(v) => {
+                  if (!v) return;
+                  setPrizeMode(v);
+                  if (v === "GENERAL") setGroupsOn(false);
+                }}
               />
-              <p className="mt-1.5 text-[11.5px] text-t2">
-                {prizeMode === "INDIVIDUAL"
-                  ? "Cada pessoa sobe de nível pela própria meta e recebe a premiação sobre as próprias vendas. O bônus também é individual."
-                  : "O grupo sobe de nível pela soma das vendas. A premiação é dividida igualmente entre as pessoas do grupo, e o bônus vale para cada pessoa."}
-              </p>
+              <p className="mt-1.5 text-[11.5px] text-t2">{PRIZE_MODE_HELP[prizeMode]}</p>
             </FormField>
           </div>
         </Card>
 
+        {prizeMode !== "GENERAL" && (
         <SideCard
           title="Distribuição por grupos"
           active={groupsOn}
@@ -624,10 +635,11 @@ export default function GoalEditorPage() {
             team={team}
             target={targetValue}
             mode={prizeMode}
-            onCreate={() => navigate(paths.management.shifts)}
+            onCreate={() => navigate(paths.operation.groups)}
             error={errors.groups}
           />
         </SideCard>
+        )}
         <SideCard
           title="Níveis de premiação"
           active={tiersOn}
@@ -651,14 +663,14 @@ export default function GoalEditorPage() {
             target={targetValue}
             errors={errors.tiers}
             mode={prizeMode}
-            hasGroups={Boolean(groupsOn && groups && groups.length > 0)}
+            hasGroups={prizeMode !== "GENERAL" && Boolean(groupsOn && groups && groups.length > 0)}
             managerOn={managerOn}
             setManagerOn={setManagerOn}
           />
         </SideCard>
         <SideCard
           title="Simulação"
-          active={tiersOn && (groupsOn || prizeMode === "GROUP")}
+          active={tiersOn && (prizeMode === "GENERAL" || prizeMode === "GROUP" || groupsOn)}
           emptyIcon="🧮"
           emptyTitle="Simulação indisponível"
           emptyText={
@@ -674,7 +686,7 @@ export default function GoalEditorPage() {
             tiers={tiers}
             target={targetValue}
             mode={prizeMode}
-            equipeToda={!groupsOn && prizeMode === "GROUP"}
+            equipeToda={prizeMode === "GENERAL" || (!groupsOn && prizeMode === "GROUP")}
             managerOn={managerOn}
           />
         </SideCard>
@@ -1231,7 +1243,14 @@ function TiersEditor({
 
       {target != null && (
         <Alert variant="warning">
-          {mode === "INDIVIDUAL" ? (
+          {mode === "GENERAL" ? (
+            <>
+              Os percentuais são aplicados à{" "}
+              <span className="font-semibold">meta da loja</span>. A equipe
+              sobe de nível pelo total vendido da loja, a premiação é dividida
+              igualmente entre as pessoas e o bônus vale para cada uma.
+            </>
+          ) : mode === "INDIVIDUAL" ? (
             <>
               Os percentuais dos níveis são aplicados à{" "}
               <span className="font-semibold">meta individual</span> de cada
@@ -1399,7 +1418,7 @@ function Simulation({
               {g.pct != null && ` · ${numText(Math.round(g.pct * 10) / 10)}%`}
             </p>
             <p className="mb-2.5 mt-0.5 text-[11.5px] text-t2">
-              {individual ? "Meta individual" : "Meta do grupo"}:{" "}
+              {mode === "GENERAL" ? "Meta da loja" : individual ? "Meta individual" : "Meta do grupo"}:{" "}
               <span className="font-mono text-t1">
                 {g.base != null ? brlCent(g.base) : "—"}
               </span>

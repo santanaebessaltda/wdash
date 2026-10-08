@@ -10,8 +10,8 @@ import { useScope } from "@/pages/dashboard/useScope";
 import { useErpConnection } from "@/pages/dashboard/ErpStatusNotice";
 
 /**
- * Aviso (Gestor) quando alguma loja do escopo está sem horário de funcionamento: sem ele não há
- * atualização automática (só o botão Atualizar). Leva para Configurações > Loja.
+ * Aviso (Gestor) quando alguma loja do escopo esta sem horario de funcionamento: sem ele nao ha
+ * atualizacao automatica (so o botao Atualizar). Leva para Configuracoes > Loja.
  */
 export function StoreHoursNotice() {
   const session = useActiveSession();
@@ -25,7 +25,7 @@ export function StoreHoursNotice() {
     return () => window.removeEventListener("wedash:stores", onStores);
   }, []);
 
-  // Integração desligada: nada atualiza (nem o botão), o aviso da integração já explica.
+  // Integracao desligada: nada atualiza (nem o botao), o aviso da integracao ja explica.
   if (!isGestor(session.role) || connection === "disconnected" || connection === "password") return null;
   const lojas = storesForSession(session.stores).filter(
     (s) => escopo.filialIds.length === 0 || escopo.filialIds.includes(s.id),

@@ -194,7 +194,7 @@ async function main() {
   }
   console.log(`LISTAR 102 adicionaria ${newWe} WEPINK ids → mapa ${catalog.map.size}`);
 
-  // sample DetMov: um dia (05/09 — pico)
+  // sample DetMov: um dia (05/09  -  pico)
   const eventoIds = await deps.resolveEventoIds(session, cred.tenant_id as string, store.code);
   const dayRows = await fetchSalesLista({
     session,

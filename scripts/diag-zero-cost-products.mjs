@@ -1,5 +1,5 @@
 /**
- * Produtos vendidos com custo 0 no RELATORIOMARGEM (sales_product_cost_day_agg). Só leitura.
+ * Produtos vendidos com custo 0 no RELATORIOMARGEM (sales_product_cost_day_agg). So leitura.
  * Usage: node scripts/diag-zero-cost-products.mjs
  */
 import fs from "node:fs";

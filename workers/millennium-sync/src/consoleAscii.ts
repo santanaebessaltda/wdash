@@ -1,6 +1,7 @@
 /**
- * Saída do worker no terminal só em ASCII: o console do Windows nem sempre está em UTF-8 e
- * acentos/símbolos viram "�". Os logs gravados no banco (sync_log) não passam por aqui.
+ * No Windows, a saida do terminal vira ASCII: o console nem sempre esta em UTF-8.
+ * No Linux (Fly) o log fica em portugues, com acento.
+ * Logs gravados no banco (sync_log) nao passam por aqui.
  */
 const SYMBOLS: Record<string, string> = {
   "·": "|",

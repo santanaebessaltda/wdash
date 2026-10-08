@@ -1,6 +1,6 @@
 /**
  * Custos do Millennium sob demanda (Edge `erp-products-sync`): tela Produtos e impostos e
- * "Atualizar custos" do aviso de produtos sem custo. O catálogo de produtos se atualiza sozinho no worker.
+ * "Atualizar custos" do aviso de produtos sem custo. O catalogo de produtos se atualiza sozinho no worker.
  */
 
 async function client() {
@@ -19,7 +19,7 @@ const SYNC_PRODUCTS_ERRORS: Record<string, string> = {
   invalid_period: "Período inválido.",
 };
 
-/** Atualizar cadastros roda na própria tela de Integrações: sem apontar para ela. */
+/** Atualizar cadastros roda na propria tela de Integracoes: sem apontar para ela. */
 const REGISTRY_ERRORS: Record<string, string> = {
   credential_missing: "Não foi possível acessar o Millennium. Verifique os dados da integração.",
   credential_invalid: "Não foi possível acessar o Millennium. Verifique os dados da integração.",
@@ -37,14 +37,14 @@ export type ProductsSyncScope =
 type SyncResponse = { ok?: boolean; error?: string; fixed?: number; missing?: number };
 
 /**
- * Busca no Millennium agora: `tables` = só a lista de tabelas de custo; `table` = preços de uma tabela;
- * `costs` = produtos sem custo nas lojas/período (tabela da loja + margem) — `missing` = seguem sem custo.
+ * Busca no Millennium agora: `tables` = so a lista de tabelas de custo; `table` = precos de uma tabela;
+ * `costs` = produtos sem custo nas lojas/periodo (tabela da loja + margem)  -  `missing` = seguem sem custo.
  */
 export async function syncProductsNow(
   request: ProductsSyncScope,
 ): Promise<{ ok: true; fixed: number; missing: number } | { ok: false; message: string }> {
   const sb = await client();
-  if (!sb) return { ok: false, message: "Não foi possível conectar à WeDash. Verifique sua conexão e tente novamente." };
+  if (!sb) return { ok: false, message: "Não foi possível conectar à WDash. Verifique sua conexão e tente novamente." };
   const { data, error } = await sb.functions.invoke("erp-products-sync", { body: request });
   let body = data as SyncResponse | null;
   if ((!body || typeof body !== "object") && error && typeof error === "object") {

@@ -7,7 +7,7 @@ const ERRORS: Record<string, { title: string; desc: string; cta: string }> = {
   "503": { title: "Service unavailable", desc: "The service is temporarily overloaded or under maintenance. Please try again shortly.", cta: "Retry" },
 };
 
-/** Parametrized error page (403/500/503/…) driven by the :code route param. */
+/** Parametrized error page (403/500/503/...) driven by the :code route param. */
 export function ErrorPage() {
   const { code = "500" } = useParams();
   const navigate = useNavigate();

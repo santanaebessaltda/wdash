@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/ui";
 import { addDays } from "@/data/wedash/autoRefresh";
 import { calendarTodayIso } from "@/data/wedash/clock";
-import { buildPurchaseOrderView, parseMinInput, type PurchaseStockRow } from "@/data/wedash/purchaseOrder";
-import { PURCHASE_SYNC_ERROR, fetchPurchaseMins, fetchPurchaseStock, fetchSold30, fetchSoldEver, savePurchaseMin, syncPurchaseStockNow } from "@/data/wedash/purchaseRepo";
+import { buildPurchaseOrderView, parseMinInput, type PurchaseMinUpdate, type PurchaseStockRow } from "@/data/wedash/purchaseOrder";
+import { PURCHASE_SYNC_ERROR, fetchPurchaseMins, fetchPurchaseStock, fetchSold30, fetchSoldEver, savePurchaseMin, savePurchaseMins, syncPurchaseStockNow } from "@/data/wedash/purchaseRepo";
 import type { StockCatalogItem } from "@/data/wedash/stockProducts";
 import { fetchStockCatalog } from "@/data/wedash/stockRepo";
 import { FORCE_REFRESH_CLICK_EVENT } from "@/pages/dashboard/useForceRefresh";
@@ -32,9 +32,9 @@ function hora(iso: string): string {
 const isStale = (syncedAt: string | null, now: number) => !syncedAt || now - Date.parse(syncedAt) > PURCHASE_MAX_AGE_MS;
 
 /**
- * Pedido de compra de uma loja: saldo guardado + mínimos + vendidos em 30 dias (D-30 a D-1) + códigos já vendidos (Novo).
- * Ao abrir (e ao trocar de loja), busca o saldo no Millennium se a última busca tem mais de 30 min;
- * o Atualizar do topo força a busca.
+ * Pedido de compra de uma loja: saldo guardado + minimos + vendidos em 30 dias (D-30 a D-1) + codigos ja vendidos (Novo).
+ * Ao abrir (e ao trocar de loja), busca o saldo no Millennium se a ultima busca tem mais de 30 min;
+ * o Atualizar do topo forca a busca.
  */
 export function usePurchaseOrder(tenantId: string, storeId: string | null) {
   const { show } = useToast();
@@ -64,13 +64,13 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null) {
     [tenantId],
   );
 
-  /** Busca no Millennium e relê o saldo. `false` = não buscou (integração desligada / outra busca rodando). */
+  /** Busca no Millennium e rele o saldo. `false` = nao buscou (integracao desligada / outra busca rodando). */
   const sync = useCallback(
     async (id: string): Promise<boolean> => {
       if (syncRef.current === id) return false;
       syncRef.current = id;
       try {
-        // Integração desligada / senha inválida: o aviso fixo da tela já explica — sem busca e sem alerta.
+        // Integracao desligada / senha invalida: o aviso fixo da tela ja explica  -  sem busca e sem alerta.
         const conexao = await fetchErpConnection(tenantId);
         if (conexao === "disconnected" || conexao === "password") return false;
         setSyncing(true);
@@ -111,7 +111,7 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null) {
           setLoading(false);
           return;
         }
-        // 1ª busca da loja (nada guardado): skeleton até terminar; senão mostra o guardado e busca por trás.
+        // 1 busca da loja (nada guardado): skeleton ate terminar; senao mostra o guardado e busca por tras.
         if (d.syncedAt) setLoading(false);
         await sync(storeId);
         if (!cancelled) setLoading(false);
@@ -155,7 +155,7 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null) {
     [current, factor],
   );
 
-  /** Grava o mínimo digitado. `false` = valor recusado ou gravação falhou (o campo volta ao último gravado). */
+  /** Grava o minimo digitado. `false` = valor recusado ou gravacao falhou (o campo volta ao ultimo gravado). */
   const saveMin = useCallback(
     async (code: string, raw: string): Promise<boolean> => {
       const id = storeRef.current;
@@ -186,6 +186,27 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null) {
     [current, show, tenantId],
   );
 
+  /** Grava os mínimos da planilha na loja aberta e atualiza a tabela. */
+  const importMins = useCallback(
+    async (updates: PurchaseMinUpdate[]): Promise<boolean> => {
+      const id = storeRef.current;
+      if (!id || updates.length === 0) return updates.length === 0;
+      const ok = await savePurchaseMins(tenantId, id, updates);
+      if (!ok) {
+        show(SAVE_ERROR_MSG, "danger");
+        return false;
+      }
+      setData((d) => {
+        if (!d || d.storeId !== id) return d;
+        const mins = new Map(d.mins);
+        for (const u of updates) mins.set(u.code, u.value);
+        return { ...d, mins };
+      });
+      return true;
+    },
+    [show, tenantId],
+  );
+
   const syncedAt = current?.syncedAt ?? null;
   const atualizadoTexto = syncing ? "Buscando saldo…" : syncedAt ? `Saldo atualizado ${hora(syncedAt)}` : "Saldo ainda não atualizado";
 
@@ -203,5 +224,6 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null) {
     factor,
     setFactor,
     saveMin,
+    importMins,
   };
 }

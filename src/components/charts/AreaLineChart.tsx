@@ -1,12 +1,12 @@
 import { useId, useMemo, useState } from "react";
 
 export interface AreaLineChartProps {
-  /** `null` = ponto sem valor (ex.: horas de hoje que ainda não chegaram) — a linha para antes dele. */
+  /** `null` = ponto sem valor (ex.: horas de hoje que ainda nao chegaram)  -  a linha para antes dele. */
   data: (number | null)[];
-  /** Segunda série no mesmo eixo (ex.: meta). Escala compartilhada; `null` = sem ponto. */
+  /** Segunda serie no mesmo eixo (ex.: meta). Escala compartilhada; `null` = sem ponto. */
   compareData?: (number | null)[];
   labels?: string[];
-  /** Título do tooltip por ponto (ex.: "21h às 22h"); sem ele usa `labels`. */
+  /** Titulo do tooltip por ponto (ex.: "21h as 22h"); sem ele usa `labels`. */
   tooltipLabels?: (string | undefined)[];
   color?: string;
   compareColor?: string;
@@ -14,7 +14,7 @@ export interface AreaLineChartProps {
   showArea?: boolean;
   /** Mostra o valor formatado direto em cada ponto da linha. */
   showValues?: boolean;
-  /** Renderiza labels do eixo X dentro da área com scroll (mobile). */
+  /** Renderiza labels do eixo X dentro da area com scroll (mobile). */
   showAxisLabels?: boolean;
   formatValue?: (v: number) => string;
 }
@@ -38,9 +38,9 @@ function buildSmoothPath(points: Point[]) {
   return d;
 }
 
-/** Largura lógica do viewBox — o SVG escala fluidamente (padrão Vela). */
+/** Largura logica do viewBox  -  o SVG escala fluidamente (padrao Vela). */
 const VB_W = 600;
-/** Largura mínima por ponto no mobile — abaixo disso ativa scroll horizontal. */
+/** Largura minima por ponto no mobile  -  abaixo disso ativa scroll horizontal. */
 const MIN_POINT_W = 56;
 
 function toPoints(data: (number | null)[], height: number, padY: number, min: number, range: number) {

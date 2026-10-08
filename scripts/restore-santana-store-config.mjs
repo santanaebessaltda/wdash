@@ -1,7 +1,7 @@
 /**
- * Reaplica a config manual das lojas (fuso, horário, custos, impostos) salva pelo
+ * Reaplica a config manual das lojas (fuso, horario, custos, impostos) salva pelo
  * reset-santana.mjs em .tmp-store-config-santana.json, casando por millennium_store_id.
- * Fica esperando o Onboarding recriar as lojas (poll 500ms, até 30 min).
+ * Fica esperando o Onboarding recriar as lojas (poll 500ms, ate 30 min).
  *
  *   npx tsx scripts/restore-santana-store-config.mjs
  */

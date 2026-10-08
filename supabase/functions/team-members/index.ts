@@ -1,10 +1,10 @@
 /**
- * team-members — Configurações > Usuários (Gestor / Gerente) + aceite do convite.
+ * team-members  -  Configuracoes > Usuarios (Gestor / Gerente) + aceite do convite.
  *
- * Ações do Gestor (OWNER/ADMIN_GLOBAL ativo): list · invite · resend · update · suspend · reactivate · revoke.
- * Ações da pessoa convidada (JWT aberto pelo link do e-mail): invite_info · accept.
+ * Acoes do Gestor (OWNER/ADMIN_GLOBAL ativo): list  |  invite  |  link  |  resend  |  update  |  suspend  |  reactivate  |  revoke.
+ * Acoes da pessoa convidada (JWT aberto pelo link do e-mail): invite_info  |  accept.
  *
- * Convite = Supabase Auth `inviteUserByEmail` (SMTP do projeto), só com o e-mail. identity/membership
+ * Convite = Supabase Auth `inviteUserByEmail` (SMTP do projeto), so com o e-mail. identity/membership
  * nascem PENDING (nome vazio); `accept` grava nome e sobrenome do "Crie seu acesso" e ativa.
  * membership_store vazio = todas as lojas.
  */
@@ -17,6 +17,7 @@ import {
   sellerLink,
   sellerList,
   sellerResend,
+  sellerRemove,
   sellerRevoke,
   sellerSetStatus,
 } from "../_shared/sellerInvite.ts";
@@ -54,13 +55,16 @@ function latest(a: string | null, b: string | null): string | null {
   return Date.parse(a) >= Date.parse(b) ? a : b;
 }
 
-/** Variáveis do template "Invite user" ({{ .Data.company }}, {{ .Data.role }}). */
+/**
+ * Metadados do convite da WDash (Usuarios / vendedores).
+ * `wdash: "member"` impede o trigger de franqueado (Invite do painel Supabase) de abrir empresa nova.
+ */
 async function inviteData(admin: SupabaseClient, tenantId: string, role: Role) {
   const { data: ten } = await admin.from("tenant").select("name").eq("id", tenantId).maybeSingle();
   return { company: ten?.name ?? "", role: ROLE_LABEL[role], wdash: "member" };
 }
 
-/** Conta nova de vendedor (convite por e-mail). Devolve o id do usuário ou o código do erro. */
+/** Conta nova de vendedor (convite por e-mail). Devolve o id do usuario ou o codigo do erro. */
 async function inviteSellerAccount(
   admin: SupabaseClient,
   tenantId: string,
@@ -105,7 +109,7 @@ async function tenantStoreIds(admin: SupabaseClient, tenantId: string): Promise<
   return new Set((data ?? []).map((r) => r.id as string));
 }
 
-/** `allStores` = vazio (todas, inclusive lojas novas); senão ≥1 loja do tenant. */
+/** `allStores` = vazio (todas, inclusive lojas novas); senao 1 loja do tenant. */
 function parseStoreIds(body: Record<string, unknown>, allowed: Set<string>): string[] | null {
   if (body.allStores === true) return [];
   if (!Array.isArray(body.storeIds)) return null;
@@ -134,7 +138,7 @@ async function invitee(admin: SupabaseClient, user: User) {
   if (!identity) return null;
   const { data: memberships } = await admin
     .from("membership")
-    .select("id, role, status, tenant_id, created_at")
+    .select("id, role, status, tenant_id, is_owner, created_at")
     .eq("identity_id", identity.id)
     .order("created_at", { ascending: false });
   return { identity, memberships: memberships ?? [] };
@@ -168,7 +172,24 @@ serve(async (req) => {
 
   /* ---------- Pessoa convidada ---------- */
   if (action === "invite_info" || action === "accept") {
-    const me = await invitee(admin, userData.user);
+    let me = await invitee(admin, userData.user);
+    // Convite orfao: Auth existe, identity ficou sem auth_user_id ou com id antigo.
+    if (!me && userData.user.email) {
+      const email = userData.user.email.trim().toLowerCase();
+      const { data: orphan } = await admin
+        .from("identity")
+        .select("id, name, email, status, auth_user_id")
+        .eq("email", email)
+        .eq("status", "PENDING")
+        .maybeSingle();
+      if (orphan && orphan.auth_user_id !== userData.user.id) {
+        const { error: linkErr } = await admin
+          .from("identity")
+          .update({ auth_user_id: userData.user.id })
+          .eq("id", orphan.id);
+        if (!linkErr) me = await invitee(admin, userData.user);
+      }
+    }
     if (!me) return fail("not_found");
     const pending = me.memberships.find((m) => m.status === "PENDING");
     if (!pending) {
@@ -182,12 +203,15 @@ serve(async (req) => {
         .eq("id", pending.tenant_id)
         .maybeSingle();
       const storeName = pending.role === "SELLER" ? await sellerInviteStoreName(admin, pending.id) : null;
+      // is_owner no PENDING = franqueado provisionado pelo Invite do painel Supabase.
+      const kind = pending.is_owner ? "franchisee" : "member";
       return json({
         ok: true,
         email: me.identity.email,
         role: pending.role,
         companyName: ten?.name ?? "",
         storeName,
+        kind,
       });
     }
     const firstName = titleName(typeof body.firstName === "string" ? body.firstName : "");
@@ -231,7 +255,7 @@ serve(async (req) => {
   if (!caller) return json({ error: "forbidden" }, 403);
   const tenantId = caller.tenant_id as string;
 
-  /* ---------- Vendedor (Gestor em qualquer loja; Gerente só nas lojas dele) ---------- */
+  /* ---------- Vendedor (Gestor em qualquer loja; Gerente so nas lojas dele) ---------- */
   if (action.startsWith("seller_")) {
     const who = await sellerCaller(admin, userData.user.id, tenantId);
     if (!who) return json({ error: "forbidden" }, 403);
@@ -245,6 +269,7 @@ serve(async (req) => {
       : action === "seller_link" ? await sellerLink(admin, who, tenantId, storeSellerId)
       : action === "seller_resend" ? await sellerResend(admin, who, tenantId, storeSellerId, resend)
       : action === "seller_revoke" ? await sellerRevoke(admin, who, tenantId, storeSellerId)
+      : action === "seller_remove" ? await sellerRemove(admin, who, tenantId, storeSellerId)
       : action === "seller_suspend" ? await sellerSetStatus(admin, who, tenantId, storeSellerId, "SUSPENDED")
       : action === "seller_reactivate" ? await sellerSetStatus(admin, who, tenantId, storeSellerId, "ACTIVE")
       : null;
@@ -319,6 +344,22 @@ serve(async (req) => {
       return fail("email_in_use");
     }
 
+    // Auth orfao (e-mail convidado sem identity): remove para o invite criar tudo de novo.
+    try {
+      const { data: listed } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
+      const orphanAuth = (listed?.users ?? []).find((u) => (u.email ?? "").toLowerCase() === email);
+      if (orphanAuth) {
+        const { data: linked } = await admin
+          .from("identity")
+          .select("id")
+          .eq("auth_user_id", orphanAuth.id)
+          .maybeSingle();
+        if (!linked) await admin.auth.admin.deleteUser(orphanAuth.id);
+      }
+    } catch {
+      /* segue para o invite */
+    }
+
     const { data: invited, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
       data: await inviteData(admin, tenantId, role),
       redirectTo: inviteRedirect(),
@@ -355,7 +396,7 @@ serve(async (req) => {
     return json({ ok: true, membershipId: membership.id });
   }
 
-  /* Ações sobre um membro existente do tenant. */
+  /* Acoes sobre um membro existente do tenant. */
   const membershipId = typeof body.membershipId === "string" ? body.membershipId : "";
   if (!membershipId) return fail("invalid_member");
   const { data: target } = await admin
@@ -374,6 +415,17 @@ serve(async (req) => {
     status: string;
   };
   const protectedTarget = target.is_owner || target.id === caller.id;
+
+  if (action === "link") {
+    if (target.status !== "PENDING") return fail("not_pending");
+    const { data, error } = await admin.rpc("invite_link_token", {
+      p_auth_user_id: targetIdentity.auth_user_id,
+    });
+    if (error) return fail("link_failed");
+    const token = typeof data === "string" ? data : "";
+    if (!token) return fail("no_link");
+    return json({ ok: true, token });
+  }
 
   if (action === "resend") {
     if (target.status !== "PENDING") return fail("not_pending");
@@ -421,7 +473,7 @@ serve(async (req) => {
       .from("membership")
       .select("id", { count: "exact", head: true })
       .eq("identity_id", targetIdentity.id);
-    // Conta criada só para este convite: apaga o usuário do Auth (identity cai em cascata).
+    // Conta criada so para este convite: apaga o usuario do Auth (identity cai em cascata).
     if ((count ?? 0) === 0 && targetIdentity.status === "PENDING") {
       await admin.auth.admin.deleteUser(targetIdentity.auth_user_id);
     }

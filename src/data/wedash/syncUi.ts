@@ -1,8 +1,8 @@
 /** Pure helpers for Overview sync watermark / force UI (testable without React). */
 
 /**
- * Cooldown do botão Atualizar.
- * **0 = off** (decisão 2026-09-23 — sem espera entre cliques).
+ * Cooldown do botao Atualizar.
+ * **0 = off** (decisao 2026-09-23  -  sem espera entre cliques).
  * Para religar no futuro: `5 * 60 * 1000`.
  */
 export const FORCE_COOLDOWN_MS = 0;
@@ -12,7 +12,7 @@ export const FORCE_ALL_KEY = "__all__";
 
 export type ForceAtMap = Record<string, string>;
 
-/** "Atualizado às 06:19" (mesmo dia) ou "Atualizado em 23/09 às 18:40". */
+/** "Atualizado as 06:19" (mesmo dia) ou "Atualizado em 23/09 as 18:40". */
 export function formatUpdatedAtLabel(
   at: Date,
   opts: { now?: Date; timeZone?: string } = {},
@@ -62,9 +62,9 @@ export function forceRefreshRetryAfterSec(
 }
 
 /**
- * Cooldown do botão Atualizar conforme loja(s) do StorePicker.
+ * Cooldown do botao Atualizar conforme loja(s) do StorePicker.
  * - 1 loja: bloqueia se essa loja OU um FORCE "Todas" recente.
- * - Todas ([]): bloqueia se QUALQUER FORCE recente (loja ou rede) — opção A.
+ * - Todas ([]): bloqueia se QUALQUER FORCE recente (loja ou rede)  -  opcao A.
  */
 export function forceCooldownForScopeSec(
   map: ForceAtMap,
@@ -87,7 +87,7 @@ export function forceCooldownForScopeSec(
   };
 
   if (storeIds.length === 0) {
-    // Opção A: qualquer FORCE recente bloqueia "Todas".
+    // Opcao A: qualquer FORCE recente bloqueia "Todas".
     for (const iso of Object.values(map)) consider(parse(iso));
     return worst;
   }
@@ -119,7 +119,7 @@ export function forceAtMapStorageKey(tenantId: string): string {
   return `wedash.forceMap.${tenantId}`;
 }
 
-/** @deprecated legacy single-key — migrado em readForceAtMap */
+/** @deprecated legacy single-key  -  migrado em readForceAtMap */
 export function forceLastAtStorageKey(tenantId: string): string {
   return `wedash.forceAt.${tenantId}`;
 }
@@ -137,7 +137,7 @@ export function readForceAtMap(tenantId: string): ForceAtMap {
         return out;
       }
     }
-    // Migra chave legada (cooldown tenant-wide) → __all__
+    // Migra chave legada (cooldown tenant-wide)  ->  __all__
     const legacy = localStorage.getItem(forceLastAtStorageKey(tenantId));
     if (legacy) {
       const d = new Date(legacy);
@@ -178,7 +178,7 @@ export function recordForceAt(
   return map;
 }
 
-/** Compat: último FORCE "global" (só __all__ / legado). */
+/** Compat: ultimo FORCE "global" (so __all__ / legado). */
 export function readForceLastAt(tenantId: string): Date | null {
   const map = readForceAtMap(tenantId);
   const raw = map[FORCE_ALL_KEY];
@@ -191,7 +191,7 @@ export function writeForceLastAt(tenantId: string, at: Date = new Date()): void 
   recordForceAt(tenantId, [], at);
 }
 
-/** FORCE enfileirado ainda QUEUED/RUNNING — sobrevive a fechar o PWA. */
+/** FORCE enfileirado ainda QUEUED/RUNNING  -  sobrevive a fechar o PWA. */
 export type PendingForceJob = {
   /** sync_job.id quando o enqueue devolveu. */
   jobId?: string;

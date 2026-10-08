@@ -1,5 +1,5 @@
 /**
- * Totais por loja×marca set/26 — achar onde está o gap vs ERP 00205.
+ * Totais por lojaxmarca set/26  -  achar onde esta o gap vs ERP 00205.
  * Usage: node scripts/diag-brand-sep-all.mjs
  */
 import fs from "node:fs";

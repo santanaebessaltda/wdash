@@ -10,7 +10,7 @@ import { fetchThemePreference, saveThemePreference, touchLastSeen } from "@/sess
 import { installPrintMode } from "@/lib/printMode";
 import { storedThemePreference, useTheme } from "@/theme/ThemeProvider";
 
-/** O banco só grava 1x a cada 5 min; aqui só evita chamadas à toa. */
+/** O banco so grava 1x a cada 5 min; aqui so evita chamadas a toa. */
 const LAST_SEEN_INTERVAL_MS = 5 * 60_000;
 
 export function AppShell() {
@@ -20,7 +20,7 @@ export function AppShell() {
   const location = useLocation();
   const mainRef = useRef<HTMLElement>(null);
 
-  // html/body com height 100% + overflow-x hidden fazem o <body> rolar (não a janela nem o <main>):
+  // html/body com height 100% + overflow-x hidden fazem o <body> rolar (nao a janela nem o <main>):
   // zera todos para a tela nova abrir no topo.
   useLayoutEffect(() => {
     setMobileNavOpen(false);
@@ -43,7 +43,7 @@ export function AppShell() {
 
   useEffect(() => installPrintMode(), []);
 
-  // Aparência da conta (Meu perfil): igual em qualquer aparelho; relida ao voltar para o app (PWA).
+  // Aparencia da conta (Meu perfil): igual em qualquer aparelho; relida ao voltar para o app (PWA).
   const { preference, setPreference } = useTheme();
   const preferenceRef = useRef(preference);
   preferenceRef.current = preference;
@@ -55,7 +55,7 @@ export function AppShell() {
         if (conta !== preferenceRef.current) setPreference(conta);
         return;
       }
-      // Conta sem escolha: leva a que este aparelho já tinha.
+      // Conta sem escolha: leva a que este aparelho ja tinha.
       const local = storedThemePreference();
       if (local) void saveThemePreference(local);
     };

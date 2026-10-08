@@ -1,8 +1,8 @@
-/** Cliente HTTP do ERP Millennium (só server-side). */
+/** Cliente HTTP do ERP Millennium (so server-side). */
 
 export type LoginReason = "password" | "busy" | "other" | "stores" | "reports";
 
-/** Relatórios personalizados (wtsreports) que o sync usa — usuário ERP precisa ter acesso. */
+/** Relatorios personalizados (wtsreports) que o sync usa  -  usuario ERP precisa ter acesso. */
 export const CUSTOM_REPORTS = [
   {
     key: "cupom",
@@ -14,7 +14,7 @@ export const CUSTOM_REPORTS = [
 
 export type ReportCheck = { key: string; name: string; ok: boolean; error?: string };
 
-/** Formato de loja exposto ao app (inglês). O mapeamento dos campos do ERP fica interno. */
+/** Formato de loja exposto ao app (ingles). O mapeamento dos campos do ERP fica interno. */
 export type MillenniumStore = {
   storeId: number;
   code: string;
@@ -124,7 +124,7 @@ function extractList(payload: unknown): unknown[] {
     const v = o[k];
     if (Array.isArray(v)) return v;
   }
-  // OData às vezes aninha value como string JSON
+  // OData as vezes aninha value como string JSON
   if (typeof o.value === "string") {
     try {
       const inner = JSON.parse(o.value);
@@ -136,7 +136,7 @@ function extractList(payload: unknown): unknown[] {
   return [];
 }
 
-/** Headers + query no padrão do cliente Millennium (GET ?$format=json&$dateformat=iso). */
+/** Headers + query no padrao do cliente Millennium (GET ?$format=json&$dateformat=iso). */
 function sessionHeaders(session: string): Record<string, string> {
   return {
     Accept: "application/json",
@@ -159,7 +159,7 @@ async function callList(
   const headers = sessionHeaders(session);
   let lastErr = "";
 
-  // 1) GET — padrão do cliente millenium-go
+  // 1) GET  -  padrao do cliente millenium-go
   for (const path of paths) {
     try {
       const res = await fetch(methodUrl(path, extraQuery), { method: "GET", headers });
@@ -273,8 +273,8 @@ function errorText(raw: string): string {
 }
 
 /**
- * Smoke de cada relatório personalizado: filial vazia + 01/01/2000 → resposta leve.
- * 200 com `RAW_DATA` = acesso ok; qualquer outra resposta = sem acesso / não existe.
+ * Smoke de cada relatorio personalizado: filial vazia + 01/01/2000  ->  resposta leve.
+ * 200 com `RAW_DATA` = acesso ok; qualquer outra resposta = sem acesso / nao existe.
  */
 export async function checkCustomReports(session: string): Promise<ReportCheck[]> {
   const base = baseUrl();

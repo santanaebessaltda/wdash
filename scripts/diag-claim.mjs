@@ -1,4 +1,4 @@
-/** Diagnóstico: por que o worker não claima o SEED? */
+/** Diagnostico: por que o worker nao claima o SEED? */
 import fs from "node:fs";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";

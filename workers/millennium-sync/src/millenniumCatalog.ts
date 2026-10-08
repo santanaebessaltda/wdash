@@ -1,8 +1,8 @@
 /**
- * Catálogo de produtos do Millennium (lookups comuns, sem relatório personalizado).
- * - Tipos: `$lookup=PRODUTO.tipo.tipo` → PRODUTO_TIPO_TIPO / PRODUTO_TIPO_DESCRICAO (~19).
+ * Catalogo de produtos do Millennium (lookups comuns, sem relatorio personalizado).
+ * - Tipos: `$lookup=PRODUTO.tipo.tipo`  ->  PRODUTO_TIPO_TIPO / PRODUTO_TIPO_DESCRICAO (~19).
  * - Produtos de um tipo: `$lookup=produto.produto.produto` com `PARAM_9` = tipo.
- *   A lista de produtos não traz o tipo na linha — o tipo sai do filtro.
+ *   A lista de produtos nao traz o tipo na linha  -  o tipo sai do filtro.
  */
 import { millenniumBaseUrl } from "./millenniumAuth.ts";
 
@@ -104,7 +104,7 @@ export async function fetchProductTypes(opts: {
 
 export type ProductRegistry = { code: string; registeredAt: string | null; purchaseMultiple: number | null; purchaseBlocked: boolean | null };
 
-/** DATA_CADASTRO vem à meia-noite de Brasília em UTC ("2024-06-05T03:00:00.000Z") → "2024-06-05". */
+/** DATA_CADASTRO vem a meia-noite de Brasilia em UTC ("2024-06-05T03:00:00.000Z")  ->  "2024-06-05". */
 function brDate(v: unknown): string | null {
   const s = asStr(v);
   if (!s) return null;
@@ -113,7 +113,7 @@ function brDate(v: unknown): string | null {
   return new Date(t - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
-/** Linhas por tamanho/cor do mesmo código trazem o mesmo cadastro: fica uma por código. */
+/** Linhas por tamanho/cor do mesmo codigo trazem o mesmo cadastro: fica uma por codigo. */
 export function parseProductRegistry(payload: unknown): ProductRegistry[] {
   const out = new Map<string, ProductRegistry>();
   for (const raw of extractList(payload)) {
@@ -135,9 +135,9 @@ export function parseProductRegistry(payload: unknown): ProductRegistry[] {
 }
 
 /**
- * Cadastro dos produtos pelo relatório "Saldo Atual e Futuro" (FRANQUIAS.RELATORIOS.ESTOQUEEMCOMPRA):
- * data de cadastro, quantidade múltipla e bloqueado compra. Vem por filial, mas o cadastro é o mesmo em
- * todas as lojas — 1 chamada com qualquer loja (~0,5–5s).
+ * Cadastro dos produtos pelo relatorio "Saldo Atual e Futuro" (FRANQUIAS.RELATORIOS.ESTOQUEEMCOMPRA):
+ * data de cadastro, quantidade multipla e bloqueado compra. Vem por filial, mas o cadastro e o mesmo em
+ * todas as lojas  -  1 chamada com qualquer loja (~0,5 - 5s).
  */
 export async function fetchProductRegistry(opts: {
   session: string;

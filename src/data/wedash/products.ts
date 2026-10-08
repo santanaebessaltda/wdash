@@ -34,7 +34,7 @@ function prng(seed: number) {
   };
 }
 
-/** Distribui a receita e a margem da categoria entre produtos, de forma determinística. */
+/** Distribui a receita e a margem da categoria entre produtos, de forma deterministica. */
 export function productsOfCategory(categoriaId: number, escopo: string, receita: number, margem: number, itens: number): ProductSummary[] {
   const cat = categorias.find((c) => c.id === categoriaId);
   const nomes = NOMES[categoriaId] ?? [];

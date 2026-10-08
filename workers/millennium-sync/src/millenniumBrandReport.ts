@@ -4,7 +4,7 @@
  * ERP UI: **TOTAL VENDA POR DIA**
  * CATALOG_GUID: {70F9DE61-9CA7-4798-864F-B40B74E61BE5}
  *
- * VENDAS.Lista não traz marca — este relatório popula sales_day_agg WEPINK/WPINK.
+ * VENDAS.Lista nao traz marca  -  este relatorio popula sales_day_agg WEPINK/WPINK.
  */
 import type { SalesBrand, SalesDayAgg } from "../../../src/data/wedash/salesTypes.ts";
 import { millenniumBaseUrl } from "./millenniumAuth.ts";
@@ -18,11 +18,11 @@ export type FilialGeradorRow = {
 };
 
 export type BrandReportDayRow = {
-  /** Local calendar day YYYY-MM-DD (MS midnight → day). */
+  /** Local calendar day YYYY-MM-DD (MS midnight  ->  day). */
   day: string;
   /** Total receita do dia (todas as marcas no array). */
   totalReais: number;
-  /** Pares marca → receita em R$. */
+  /** Pares marca  ->  receita em R$. */
   byBrand: Array<{ label: string; revenueReais: number }>;
 };
 
@@ -40,7 +40,7 @@ function reportHeaders(session: string, base: string): Record<string, string> {
   };
 }
 
-/** `"22396.27" "0" ` → ["22396.27", "0"] */
+/** `"22396.27" "0" `  ->  ["22396.27", "0"] */
 export function parseQuotedArray(raw: unknown): string[] {
   if (raw == null) return [];
   if (Array.isArray(raw)) return raw.map((v) => String(v).trim()).filter(Boolean);
@@ -52,7 +52,7 @@ export function parseQuotedArray(raw: unknown): string[] {
   return out;
 }
 
-/** "WEPINK" → WEPINK; "WPINK SUPLEMENTOS" / "WPINK …" → WPINK. */
+/** "WEPINK"  ->  WEPINK; "WPINK SUPLEMENTOS" / "WPINK ..."  ->  WPINK. */
 export function normalizeBrandLabel(label: string): SalesBrand | null {
   const t = label.trim().toUpperCase();
   if (!t) return null;
@@ -70,7 +70,7 @@ function reaisToCents(v: unknown): number {
 }
 
 /**
- * Instant ISO do relatório → YYYY-MM-DD civil.
+ * Instant ISO do relatorio  ->  YYYY-MM-DD civil.
  * O wtsreports emite meia-noite local como T03:00Z (SP) ou T04:00Z (MS);
  * +12h e pega a data UTC evita cair no dia anterior.
  */
@@ -115,7 +115,7 @@ export function parseBrandReportRawData(payload: unknown): BrandReportDayRow[] {
   return out;
 }
 
-/** Converte linhas do relatório → sales_day_agg WEPINK/WPINK (só receita; count/itens = 0). */
+/** Converte linhas do relatorio  ->  sales_day_agg WEPINK/WPINK (so receita; count/itens = 0). */
 export function brandReportToDayAggs(
   rows: BrandReportDayRow[],
   opts: { tenantId: string; storeId: string },
@@ -149,8 +149,8 @@ export function brandReportToDayAggs(
 }
 
 /**
- * Mantém receita do relatório e aplica salesCount/itemCount da fonte (DetMov day aggs).
- * Só altera linhas WEPINK/WPINK presentes em `reportDays`.
+ * Mantem receita do relatorio e aplica salesCount/itemCount da fonte (DetMov day aggs).
+ * So altera linhas WEPINK/WPINK presentes em `reportDays`.
  */
 export function applyBrandDayCounts(
   reportDays: SalesDayAgg[],
@@ -173,8 +173,8 @@ export function applyBrandDayCounts(
 }
 
 /**
- * Loja só cosmético (sem WPINK): todas as vendas da Lista são WEPINK —
- * copia counts do ALL para as linhas WEPINK do relatório.
+ * Loja so cosmetico (sem WPINK): todas as vendas da Lista sao WEPINK  - 
+ * copia counts do ALL para as linhas WEPINK do relatorio.
  */
 export function applyAllCountsToWepinkDays(
   reportDays: SalesDayAgg[],
@@ -215,12 +215,12 @@ export async function fetchFilialGeradorMap(opts: {
     signal: AbortSignal.timeout(60_000),
   });
   const text = await res.text();
-  if (!res.ok) throw new Error(`filial.GERADOR.gerador → ${res.status} ${text.slice(0, 240)}`);
+  if (!res.ok) throw new Error(`filial.GERADOR.gerador  ->  ${res.status} ${text.slice(0, 240)}`);
   let parsed: unknown;
   try {
     parsed = text ? JSON.parse(text) : [];
   } catch {
-    throw new Error(`filial.GERADOR.gerador JSON inválido: ${text.slice(0, 240)}`);
+    throw new Error(`filial.GERADOR.gerador JSON invalido: ${text.slice(0, 240)}`);
   }
   const list = Array.isArray(parsed)
     ? parsed
@@ -248,7 +248,7 @@ export async function fetchFilialGeradorMap(opts: {
 
 export type FetchBrandRevenueParams = {
   session: string;
-  /** Um ou mais geradores — para por-loja, passar só 1. */
+  /** Um ou mais geradores  -  para por-loja, passar so 1. */
   geradorIds: number[];
   /** Inclusive YYYY-MM-DD (fuso loja). */
   from: string;
@@ -258,9 +258,9 @@ export type FetchBrandRevenueParams = {
 };
 
 /**
- * Relatório de faturamento por marca (rápido).
- * INTERVAL 0 = "Outro" (custom) — START/END visíveis (format D = YYYY-MM-DD).
- * INTERVAL 3 = "Este Mês" (ignora START/END).
+ * Relatorio de faturamento por marca (rapido).
+ * INTERVAL 0 = "Outro" (custom)  -  START/END visiveis (format D = YYYY-MM-DD).
+ * INTERVAL 3 = "Este Mes" (ignora START/END).
  */
 export async function fetchBrandRevenueReport(
   params: FetchBrandRevenueParams,
@@ -275,7 +275,7 @@ export async function fetchBrandRevenueReport(
         SCRIPT: null,
         DATASOURCE: null,
         FILIAL_GERADOR_GERADOR: `(${params.geradorIds.join(",")})`,
-        /** 0 = Outro (custom); START/END só entram com interval=0. */
+        /** 0 = Outro (custom); START/END so entram com interval=0. */
         DATA_DATA_DATA_INTERVAL: 0,
         DATA_DATA_DATA_START: params.from,
         DATA_DATA_DATA_END: params.to,

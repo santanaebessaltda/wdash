@@ -1,7 +1,7 @@
 import { getSupabase } from "@/lib/supabase";
 import { accessState, type AccessState } from "@/data/wedash/engine/sellerAccess";
 
-/** Acesso de cada vendedor da loja (coluna Acesso em Gestão > Vendedores). */
+/** Acesso de cada vendedor da loja (coluna Acesso em Gestao > Vendedores). */
 export interface SellerAccessRow {
   storeSellerId: string;
   state: AccessState;
@@ -15,13 +15,14 @@ const GENERIC_ERROR = "Não foi possível concluir. Tente novamente.";
 
 const MESSAGES: Record<string, string> = {
   invalid_email: "Informe um e-mail válido.",
-  email_in_use: "Este e-mail já tem acesso à WeDash com outro tipo de acesso.",
+  email_in_use: "Este e-mail já tem acesso à WDash com outro tipo de acesso.",
   already_invited: "Este vendedor já tem um convite pendente. Use Reenviar no menu da linha.",
-  already_member: "Este vendedor já tem acesso à WeDash.",
+  already_member: "Este vendedor já tem acesso à WDash.",
   email_failed: "Não foi possível enviar o convite. Tente novamente.",
   rate_limited: "Muitos convites foram enviados em pouco tempo. Aguarde um minuto e tente novamente.",
   invite_failed: "Não foi possível enviar o convite. Tente novamente.",
   not_invitable: "Só vendedores ativos podem receber acesso.",
+  no_group: "Vincule um grupo antes de convidar.",
   not_pending: "Este convite já foi aceito ou cancelado.",
   no_link: "O link do convite não está mais disponível. Reenvie o convite.",
   no_access: "Este vendedor ainda não tem acesso.",
@@ -31,6 +32,7 @@ const MESSAGES: Record<string, string> = {
   list_failed: "Não foi possível carregar os acessos. Tente novamente.",
   update_failed: "Não foi possível alterar o acesso. Tente novamente.",
   revoke_failed: "Não foi possível cancelar o convite. Tente novamente.",
+  remove_failed: "Não foi possível excluir o acesso. Tente novamente.",
 };
 
 function messageFor(code: string | undefined): string {
@@ -51,7 +53,7 @@ async function invoke(
       const ctx = (error as { context?: Response }).context;
       code = ctx ? ((await ctx.json()) as { error?: string }).error : undefined;
     } catch {
-      /* corpo ilegível */
+      /* corpo ilegivel */
     }
     return { ok: false, message: messageFor(code), code };
   }
@@ -99,5 +101,11 @@ export async function suspendSeller(storeSellerId: string): Promise<SellerAction
 
 export async function reactivateSeller(storeSellerId: string): Promise<SellerActionResult> {
   const r = await invoke({ action: "seller_reactivate", storeSellerId });
+  return r.ok ? { ok: true } : r;
+}
+
+/** Tira o acesso desta loja. A pessoa volta para Convidar. */
+export async function removeSellerAccess(storeSellerId: string): Promise<SellerActionResult> {
+  const r = await invoke({ action: "seller_remove", storeSellerId });
   return r.ok ? { ok: true } : r;
 }

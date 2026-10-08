@@ -1,5 +1,5 @@
 // Copia o motor da meta (src/data/wedash/engine, sem os testes) para supabase/functions/_shared/engine.
-// As Edge Functions importam a cópia; engineCopy.test.ts falha se ela divergir da fonte.
+// As Edge Functions importam a copia; engineCopy.test.ts falha se ela divergir da fonte.
 import { copyFileSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";

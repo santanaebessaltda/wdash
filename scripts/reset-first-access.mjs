@@ -1,11 +1,11 @@
 /**
- * Volta um usuário para o "primeiro acesso" (tela Crie seu acesso) sem mexer em dados do ERP.
- * Marca temporary_password = true; a senha atual vira a "temporária". Apaga a foto de perfil (avatar_url + arquivos).
- * Com --onboarding (só dono): reabre o onboarding na etapa Integração ERP (onboarding_step = 2).
- * Reconectar com o mesmo usuário Millennium não apaga dados; outro usuário apaga os dados de venda do tenant.
+ * Volta um usuario para o "primeiro acesso" (tela Crie seu acesso) sem mexer em dados do ERP.
+ * Marca temporary_password = true; a senha atual vira a "temporaria". Apaga a foto de perfil (avatar_url + arquivos).
+ * Com --onboarding (so dono): reabre o onboarding na etapa Integracao ERP (onboarding_step = 2).
+ * Reconectar com o mesmo usuario Millennium nao apaga dados; outro usuario apaga os dados de venda do tenant.
  * Com --wipe (implica --onboarding): salva backup das lojas (config, turnos, turno das vendedoras) em
  * .tmp-backup-<tenant>-<data>.json e apaga TUDO do tenant (credencial ERP, lojas, vendas, jobs, logs).
- * Catálogo de produtos e tabelas de custo são globais e ficam.
+ * Catalogo de produtos e tabelas de custo sao globais e ficam.
  * Usa a service role de workers/millennium-sync/.env.
  *
  *   node scripts/reset-first-access.mjs email@exemplo.com [--onboarding] [--wipe]

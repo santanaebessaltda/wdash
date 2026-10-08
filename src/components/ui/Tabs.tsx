@@ -5,7 +5,7 @@ export interface TabItem {
   key: string;
   label: string;
   content: ReactNode;
-  /** Ícone opcional à esquerda do rótulo (ex.: FlameIcon). */
+  /** Icone opcional a esquerda do rotulo (ex.: FlameIcon). */
   icon?: ReactNode;
 }
 
@@ -13,7 +13,7 @@ export type TabsVariant = "default" | "accent";
 
 /**
  * Self-contained (state-based) tab widget, for in-page tab switches that don't need a URL.
- * - `default`: track inset (bg-bg-3) + pill ativo elevado — padrão Vela.
+ * - `default`: track inset (bg-bg-3) + pill ativo elevado  -  padrao Vela.
  * - `accent`: pills soltos com borda, ativo = border-acc bg-acc-soft text-acc
  *   (mesmo visual do Theme Customizer).
  */

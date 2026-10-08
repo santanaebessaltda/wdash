@@ -8,22 +8,22 @@ export interface KpiTileProps {
   value: string;
   icon: IconKey;
   tint: TintKey;
-  delta?: { value: string; positive: boolean; /** Base da comparação, ex.: "1–15 ago" */ vs?: string };
+  delta?: { value: string; positive: boolean; /** Base da comparacao, ex.: "1 - 15 ago" */ vs?: string };
   sub?: string;
   /**
-   * Quando true, o subtítulo aceita duas linhas (quebra em " · ") e reserva a
+   * Quando true, o subtitulo aceita duas linhas (quebra em "  |  ") e reserva a
    * altura da segunda mesmo vazia, pra manter todos os tiles de uma grade com
-   * a mesma altura. Usado só onde isso importa (grade 2×2 no mobile); as
-   * demais dashboards mantêm uma linha truncada, como sempre foi.
+   * a mesma altura. Usado so onde isso importa (grade 2x2 no mobile); as
+   * demais dashboards mantem uma linha truncada, como sempre foi.
    */
   subDuasLinhas?: boolean;
-  /** Tooltip exibido ao passar o mouse no ⓘ ao lado do label. */
+  /** Tooltip exibido ao passar o mouse no  ao lado do label. */
   tooltip?: string;
-  /** Sparkline ou outro elemento renderizado abaixo do subtítulo. */
+  /** Sparkline ou outro elemento renderizado abaixo do subtitulo. */
   sparkline?: ReactNode;
 }
 
-/** Subtítulo que quebra em duas linhas no mobile (uma por trecho, separado por " · " no texto de origem) e volta a ficar numa linha só a partir do sm, onde cabe. Reserva a altura da segunda linha mesmo quando não há, pra tiles vizinhos não ficarem com alturas diferentes. */
+/** Subtitulo que quebra em duas linhas no mobile (uma por trecho, separado por "  |  " no texto de origem) e volta a ficar numa linha so a partir do sm, onde cabe. Reserva a altura da segunda linha mesmo quando nao ha, pra tiles vizinhos nao ficarem com alturas diferentes. */
 export function KpiSubtitulo({ texto }: { texto: string }) {
   const [primeira, segunda] = texto.split(" · ");
   return (
@@ -40,7 +40,7 @@ export function KpiSubtitulo({ texto }: { texto: string }) {
 }
 
 /**
- * KPI card used by the Sales / Project / SaaS / BI dashboards — visually
+ * KPI card used by the Sales / Project / SaaS / BI dashboards  -  visually
  * close to `StatCard` but with an uppercase label and an optional
  * secondary "sub" line under the value, matching the source layout.
  */

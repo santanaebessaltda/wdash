@@ -27,7 +27,7 @@ describe("sellerNumbers", () => {
       dia(TODAY, 900, 9, 18),
     ];
     const n = sellerNumbers(days, { from: "2026-10-01", to: TODAY }, TODAY, "mes");
-    // Hoje fica de fora dos dois lados: 01–03/10 × os 4 dias anteriores até 29/09.
+    // Hoje fica de fora dos dois lados: 01 - 03/10 x os 4 dias anteriores ate 29/09.
     expect(n.faturamento.value).toBe(900);
     expect(n.faturamento.delta?.anterior).toBeTruthy();
     expect(n.vendas.value).toBe(9);

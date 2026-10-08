@@ -3,7 +3,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 let client: SupabaseClient | null | undefined;
 
 /**
- * Client browser (anon key). Sem env válido → null (app usa mock de demo).
+ * Client browser (anon key). Sem env valido  ->  null (app usa mock de demo).
  * Nunca use service_role aqui.
  */
 export function getSupabase(): SupabaseClient | null {
@@ -18,8 +18,8 @@ export function getSupabase(): SupabaseClient | null {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      // Login = senha; recovery = OTP. Detectar sessão na URL no boot do PWA
-      // já apagou JWT em alguns browsers (race getSessionFromUrl).
+      // Login = senha; recovery = OTP. Detectar sessao na URL no boot do PWA
+      // ja apagou JWT em alguns browsers (race getSessionFromUrl).
       detectSessionInUrl: false,
       flowType: "pkce",
       storage: typeof window !== "undefined" ? window.localStorage : undefined,

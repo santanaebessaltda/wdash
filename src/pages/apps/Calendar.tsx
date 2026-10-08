@@ -121,7 +121,7 @@ function MonthView({ cells, eventsByDay }: { cells: (number | null)[]; eventsByD
 }
 
 function WeekView({ eventsByDay }: { eventsByDay: Record<number, typeof calendarEvents> }) {
-  // Week containing today (Jul 5–11, 2026: Sun Jul 5 .. Sat Jul 11).
+  // Week containing today (Jul 5 - 11, 2026: Sun Jul 5 .. Sat Jul 11).
   const weekDays = [5, 6, 7, 8, 9, 10, 11];
   return (
     <div className="overflow-hidden rounded-[18px] border border-line bg-bg-2 shadow-[var(--shadow-vela)]">

@@ -1,4 +1,4 @@
-/** Limpa sessão Millennium stale + reenfileira SEED Santana. */
+/** Limpa sessao Millennium stale + reenfileira SEED Santana. */
 import fs from "node:fs";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";

@@ -8,7 +8,7 @@ const ROTULO_ESTADO: Record<Exclude<BlockStateTipo, "disponivel">, string> = {
   indisponivel: "Bloco indisponível no momento",
 };
 
-/** Skeleton / empty / conteúdo conforme o estado do bloco. */
+/** Skeleton / empty / conteudo conforme o estado do bloco. */
 export function BlockState({ estado, children }: { estado: BlockStateTipo; children: ReactNode }) {
   if (estado === "disponivel") return <>{children}</>;
   if (estado === "carregando") {

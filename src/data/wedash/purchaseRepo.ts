@@ -1,5 +1,5 @@
 /**
- * Pedido de compra: saldo guardado (Saldo Atual e Futuro, `store_purchase_stock`), mínimos da loja
+ * Pedido de compra: saldo guardado (Saldo Atual e Futuro, `store_purchase_stock`), minimos da loja
  * (`store_purchase_min`), vendidos em 30 dias e busca do saldo no Millennium (Edge `erp-stock-sync`).
  */
 import { getSupabase } from "@/lib/supabase";
@@ -49,7 +49,7 @@ export function purchaseStockFromRow(r: PurchaseStockDbRow): PurchaseStockRow {
   };
 }
 
-/** Σ itens vendidos por COD_PRODUTO (1 linha por loja × dia × produto). */
+/**  itens vendidos por COD_PRODUTO (1 linha por loja x dia x produto). */
 export function sold30FromAggs(aggs: Pick<SalesProductDayAgg, "productCode" | "itemCount">[]): Map<string, number> {
   const out = new Map<string, number>();
   for (const a of aggs) {
@@ -134,7 +134,29 @@ export async function fetchPurchaseMins(tenantId: string, storeId: string): Prom
   return out;
 }
 
-/** `null` apaga o mínimo (campo vazio); número grava (0 inclusive). */
+/** Grava vários mínimos de uma vez (importação da planilha). 0 inclusive. */
+export async function savePurchaseMins(tenantId: string, storeId: string, updates: Array<{ code: string; value: number }>): Promise<boolean> {
+  const q = from("store_purchase_min");
+  if (!q || updates.length === 0) return updates.length === 0;
+  const now = new Date().toISOString();
+  const rows = updates.map((u) => ({
+    tenant_id: tenantId,
+    store_id: storeId,
+    product_code: u.code,
+    min_qty: u.value,
+    updated_at: now,
+  }));
+  for (let i = 0; i < rows.length; i += 400) {
+    const { error } = await q.upsert(rows.slice(i, i + 400), { onConflict: "store_id,product_code" });
+    if (error) {
+      console.warn("savePurchaseMins:", error.message);
+      return false;
+    }
+  }
+  return true;
+}
+
+/** `null` apaga o minimo (campo vazio); numero grava (0 inclusive). */
 export async function savePurchaseMin(tenantId: string, storeId: string, code: string, value: number | null): Promise<boolean> {
   const q = from("store_purchase_min");
   if (!q) return false;
@@ -157,8 +179,8 @@ export async function fetchSold30(tenantId: string, storeId: string, fromIso: st
 }
 
 /**
- * Códigos que a loja já vendeu, ou `null` quando o histórico gravado ainda não cobre 12 meses nem a inauguração
- * (ou a leitura falhou) — aí "Novo" fica só pela data de cadastro.
+ * Codigos que a loja ja vendeu, ou `null` quando o historico gravado ainda nao cobre 12 meses nem a inauguracao
+ * (ou a leitura falhou)  -  ai "Novo" fica so pela data de cadastro.
  */
 export async function fetchSoldEver(tenantId: string, storeId: string, todayIso: string): Promise<Set<string> | null> {
   const sb = getSupabase();
@@ -186,15 +208,15 @@ export async function fetchSoldEver(tenantId: string, storeId: string, todayIso:
 export const PURCHASE_SYNC_TITLE = "Não foi possível atualizar o saldo";
 export const PURCHASE_SYNC_ERROR = "O pedido usará o último saldo disponível.";
 export const PURCHASE_SYNC_BUSY = "Este usuário do Millennium está conectado em outro local. Encerre a outra sessão e tente novamente.";
-export const PURCHASE_SYNC_OFFLINE = "Não foi possível conectar à WeDash. Verifique sua conexão e tente novamente.";
+export const PURCHASE_SYNC_OFFLINE = "Não foi possível conectar à WDash. Verifique sua conexão e tente novamente.";
 
-/** Código de erro da Edge → texto da tela. */
+/** Codigo de erro da Edge  ->  texto da tela. */
 export function purchaseSyncMessage(error: string | undefined): string {
   if (error === "erp_busy") return PURCHASE_SYNC_BUSY;
   return PURCHASE_SYNC_ERROR;
 }
 
-/** Busca o Saldo Atual e Futuro agora. Loja que falhou mantém o saldo guardado. */
+/** Busca o Saldo Atual e Futuro agora. Loja que falhou mantem o saldo guardado. */
 export async function syncPurchaseStockNow(
   storeIds: string[],
 ): Promise<{ ok: true; failedStores: string[] } | { ok: false; message: string }> {

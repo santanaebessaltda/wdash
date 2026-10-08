@@ -35,7 +35,7 @@ describe("splitLinesByBrand", () => {
       ],
       map,
     );
-    expect(by.get("WEPINK")).toEqual({ revenueCents: 5390, itemCount: 2 }); // 999 → default WEPINK
+    expect(by.get("WEPINK")).toEqual({ revenueCents: 5390, itemCount: 2 }); // 999  ->  default WEPINK
     expect(by.get("WPINK")).toEqual({ revenueCents: 8990, itemCount: 2 });
   });
 

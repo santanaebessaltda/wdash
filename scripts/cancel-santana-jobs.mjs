@@ -1,6 +1,6 @@
 /**
  * Cancela jobs abertos (QUEUED/RUNNING) do tenant de santanaebessaltda@gmail.com.
- * Não apaga dados nem desloga o Millennium.
+ * Nao apaga dados nem desloga o Millennium.
  *
  *   npx tsx scripts/cancel-santana-jobs.mjs
  */

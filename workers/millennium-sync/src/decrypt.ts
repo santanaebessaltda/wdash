@@ -1,4 +1,4 @@
-/** AES-GCM decrypt — same scheme as Edge erp-credential-persist (SHA-256 key + iv.cipher base64). */
+/** AES-GCM decrypt  -  same scheme as Edge erp-credential-persist (SHA-256 key + iv.cipher base64). */
 
 function b64ToBytes(b64: string): Uint8Array {
   return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));

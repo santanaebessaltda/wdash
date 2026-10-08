@@ -1,20 +1,20 @@
 /**
- * Curva da meta — distribui a meta mensal da loja pelos dias e horas
- * conforme o peso histórico de faturamento (Faturamento x meta, Visão Geral).
+ * Curva da meta  -  distribui a meta mensal da loja pelos dias e horas
+ * conforme o peso historico de faturamento (Faturamento x meta, Visao Geral).
  *
- * - Dia: meta do mês × peso do dia da semana ÷ Σ pesos dos dias do mês.
- * - Hora: meta do dia × participação histórica da hora no expediente.
- * Sem histórico → divisão igual (dias abertos / horas do expediente).
+ * - Dia: meta do mes x peso do dia da semana   pesos dos dias do mes.
+ * - Hora: meta do dia x participacao historica da hora no expediente.
+ * Sem historico  ->  divisao igual (dias abertos / horas do expediente).
  */
 import { deIso, fimDoMes, inicioDoMes, intervaloDias, somarDias } from "@/lib/format";
 import { closeHourCeil, openHourFloor, type Dow, type StoreWeekHours } from "./storeHours";
 
 export { weekdayWeights } from "./engine/goalWeights";
 
-/** Semanas de histórico usadas para a curva. */
+/** Semanas de historico usadas para a curva. */
 export const GOAL_CURVE_WEEKS = 6;
 
-/** Dias do histórico (antes do período) para o peso por dia da semana. */
+/** Dias do historico (antes do periodo) para o peso por dia da semana. */
 export function goalHistoryDayRange(periodStart: string): { from: string; to: string } {
   return { from: somarDias(periodStart, -GOAL_CURVE_WEEKS * 7), to: somarDias(periodStart, -1) };
 }
@@ -26,12 +26,12 @@ export function goalHistorySameWeekdays(day: string): string[] {
   return out;
 }
 
-/** Meta de um dia a partir da meta do mês e dos pesos por dia da semana. */
+/** Meta de um dia a partir da meta do mes e dos pesos por dia da semana. */
 export function dailyGoal(monthlyGoal: number, iso: string, weights: number[]): number {
   return periodDailyGoal(monthlyGoal, inicioDoMes(iso), fimDoMes(iso), iso, weights);
 }
 
-/** Meta de um dia a partir da meta de um período (datas da meta) e dos pesos por dia da semana; 0 fora do período. */
+/** Meta de um dia a partir da meta de um periodo (datas da meta) e dos pesos por dia da semana; 0 fora do periodo. */
 export function periodDailyGoal(target: number, from: string, to: string, iso: string, weights: number[]): number {
   if (target <= 0 || iso < from || iso > to) return 0;
   const total = intervaloDias(from, to).reduce((s, d) => s + (weights[deIso(d).getDay()] ?? 0), 0);
@@ -40,8 +40,8 @@ export function periodDailyGoal(target: number, from: string, to: string, iso: s
 }
 
 /**
- * Participação de cada hora (h = h:00–h:59) no expediente do dia. Soma 1.
- * Horas fora do expediente ficam de fora; sem histórico no expediente → divisão igual.
+ * Participacao de cada hora (h = h:00 - h:59) no expediente do dia. Soma 1.
+ * Horas fora do expediente ficam de fora; sem historico no expediente  ->  divisao igual.
  */
 export function hourShares(
   hourRevenue: Map<number, number>,
@@ -52,7 +52,7 @@ export function hourShares(
   let open = openHourFloor(week[dow]);
   let close = closeHourCeil(week[dow]);
   if (open == null || close == null || close <= open) {
-    // Fechado no cadastro mas com venda histórica: usa as horas que venderam.
+    // Fechado no cadastro mas com venda historica: usa as horas que venderam.
     const sold = [...hourRevenue].filter(([, v]) => v > 0).map(([h]) => h);
     if (sold.length === 0) return out;
     open = Math.min(...sold);

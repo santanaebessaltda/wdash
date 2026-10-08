@@ -2,9 +2,9 @@ import { useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 
 /**
- * Modo de impressão (Exportar PDF): tabelas mostram todas as linhas, o tema
- * vira claro e o título da aba vira o nome do arquivo sugerido pelo navegador.
- * Vale também para o Ctrl+P (listeners instalados no AppShell).
+ * Modo de impressao (Exportar PDF): tabelas mostram todas as linhas, o tema
+ * vira claro e o titulo da aba vira o nome do arquivo sugerido pelo navegador.
+ * Vale tambem para o Ctrl+P (listeners instalados no AppShell).
  */
 
 let printing = false;
@@ -46,7 +46,7 @@ function leave() {
   setPrinting(false);
 }
 
-/** Liga os eventos do navegador (Ctrl+P também entra no modo de impressão). */
+/** Liga os eventos do navegador (Ctrl+P tambem entra no modo de impressao). */
 export function installPrintMode(): () => void {
   const before = () => enter();
   const after = () => leave();
@@ -68,8 +68,8 @@ function safeFileTitle(parts: string[]): string {
     .trim();
 }
 
-/** Abre a janela de impressão com o layout do relatório (o usuário salva como PDF). */
+/** Abre a janela de impressao com o layout do relatorio (o usuario salva como PDF). */
 export function exportPdf(parts: string[]) {
-  enter(safeFileTitle(["WeDash", ...parts]));
+  enter(safeFileTitle(["WDash", ...parts]));
   requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
 }

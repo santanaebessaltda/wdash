@@ -1,9 +1,9 @@
 /**
- * Controle manual da sessão Millennium do worker.
+ * Controle manual da sessao Millennium do worker.
  *
- *   npm run erp -- status   # pausado? sessões salvas?
- *   npm run erp -- logout   # encerra sessão WeDash no ERP (libera o usuário)
- *   npm run erp -- pause    # para de syncar + logout (use o ERP à vontade)
+ *   npm run erp -- status   # pausado? sessoes salvas?
+ *   npm run erp -- logout   # encerra sessao WDash no ERP (libera o usuario)
+ *   npm run erp -- pause    # para de syncar + logout (use o ERP a vontade)
  *   npm run erp -- resume   # volta a processar a fila
  */
 import { existsSync, readFileSync } from "node:fs";
@@ -67,7 +67,7 @@ async function cmdLogout() {
   console.log(
     n > 0
       ? `Logout OK · ${n} sessão(ões) encerrada(s) no Millennium`
-      : "Nenhuma sessão WeDash salva para encerrar (já liberado ou worker nunca logou)",
+      : "Nenhuma sessão WDash salva para encerrar (já liberado ou worker nunca logou)",
   );
 }
 

@@ -34,12 +34,12 @@ function loadSnapshot(tenantId: string, force: boolean): Promise<ErpSnapshot> {
   return promise;
 }
 
-/** Status da integração agora (mesmo cache do aviso) — para não iniciar busca no Millennium com a integração desligada. */
+/** Status da integracao agora (mesmo cache do aviso)  -  para nao iniciar busca no Millennium com a integracao desligada. */
 export function fetchErpConnection(tenantId: string): Promise<ErpConnection> {
   return loadSnapshot(tenantId, false).then((s) => s.connection);
 }
 
-/** Status da integração com o Millennium (relê ao voltar para o app e ao terminar uma sincronização). */
+/** Status da integracao com o Millennium (rele ao voltar para o app e ao terminar uma sincronizacao). */
 export function useErpConnection(): ErpSnapshot {
   const session = useActiveSession();
   const [snap, setSnap] = useState<ErpSnapshot>({ connection: "unknown", lastSync: null });
@@ -75,8 +75,8 @@ function desde(at: Date): string {
 }
 
 /**
- * Aviso quando a integração com o Millennium está desconectada ou com senha inválida: as vendas
- * (e o estoque) param de ser atualizados. Gestor ganha o atalho para Integrações; Gerente só o aviso.
+ * Aviso quando a integracao com o Millennium esta desconectada ou com senha invalida: as vendas
+ * (e o estoque) param de ser atualizados. Gestor ganha o atalho para Integracoes; Gerente so o aviso.
  */
 export function ErpStatusNotice({ dado = "vendas", className = "mt-4" }: { dado?: "vendas" | "estoque"; className?: string }) {
   const session = useActiveSession();

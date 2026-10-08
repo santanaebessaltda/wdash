@@ -170,6 +170,34 @@ describe("goalView", () => {
     expect(card.qtdGrupos).toBe(2);
   });
 
+  it("modo Geral: sobe pelo total vendido da loja e divide a premiação igualmente", () => {
+    const card = buildGoalCardView({
+      goal: { ...goal, tierMode: "GENERAL", groups: grupos },
+      lojaNome: "LOJA",
+      dayAggs: [day("s1", "2026-09-05", 8000)],
+      sellerDayAggs: vendasGrupos,
+      team: teamGrupos,
+      today: "2026-09-30",
+    });
+    expect(card.tipo).toBe("geral");
+    expect(card.qtdGrupos).toBe(0);
+    const por = new Map(card.vendedoras.map((l) => [l.nome, l]));
+    const ana = por.get("ANA")!;
+    const bia = por.get("BIA")!;
+    const cau = por.get("CAU")!;
+    const duda = por.get("DUDA")!;
+    // Loja vendeu 8.000 de 10.000 (80%) → nível Meta (50%). 1% de 8.000 = 80, dividido por 4.
+    for (const p of [ana, bia, cau, duda]) {
+      expect(p.semMeta).toBe(false);
+      expect(p.metaIndividualValor).toBe(10_000);
+      expect(p.atingimentoPct).toBeCloseTo(80);
+      expect(p.degrauAtual).toBe("Meta");
+      expect(p.premiacaoAcumulada).toBeCloseTo(20);
+      expect(p.bonusAlcancado).toBe(0);
+    }
+    expect(ana.faturamentoValor).toBe(3000);
+  });
+
   it("grupos modo Grupo: sobe pela soma do grupo e divide a premiação igualmente", () => {
     const card = buildGoalCardView({
       goal: {
@@ -190,12 +218,12 @@ describe("goalView", () => {
     const por = new Map(card.vendedoras.map((l) => [l.nome, l]));
     const ana = por.get("ANA")!;
     const bia = por.get("BIA")!;
-    // Manhã: meta 6.000, vendeu 4.000 (67%) → Meta: 1% × 4.000 = 40 ÷ 2 pessoas.
+    // Manha: meta 6.000, vendeu 4.000 (67%)  ->  Meta: 1% x 4.000 = 40  2 pessoas.
     expect(ana.degrauAtual).toBe("Meta");
     expect(ana.premiacaoAcumulada).toBeCloseTo(20);
     expect(bia.premiacaoAcumulada).toBeCloseTo(20);
     expect(bia.bonusAlcancado).toBe(20);
-    // Tarde: meta 4.000, vendeu 4.000 (100%) → Hiper: 2% × 4.000 = 80; bônus 20 + 50.
+    // Tarde: meta 4.000, vendeu 4.000 (100%)  ->  Hiper: 2% x 4.000 = 80; bonus 20 + 50.
     const cau = por.get("CAU")!;
     expect(cau.degrauAtual).toBe("Hiper");
     expect(cau.premiacaoAcumulada).toBeCloseTo(80);
@@ -215,7 +243,7 @@ describe("goalView", () => {
     expect(niveis.get("e:2")).toMatchObject({ nivel: null, nivelNumero: null });
     expect(niveis.get("e:2")!.atingimentoPct).toBeCloseTo(100 / 3);
     expect(niveis.has("e:4")).toBe(false);
-    // Detalhe da pessoa: Manhã = 6.000 ÷ 2 = 3.000 cada.
+    // Detalhe da pessoa: Manha = 6.000  2 = 3.000 cada.
     expect(niveis.get("e:1")).toMatchObject({
       metaNome: "Meta Setembro",
       status: "active",

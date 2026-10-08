@@ -4,7 +4,7 @@ import { cn } from "@/lib/cn";
 
 export type WizardStep = { num: number; label: string };
 
-/** Indicador de etapas — tipografia idêntica ao Multi-Step Wizard do Vela. */
+/** Indicador de etapas  -  tipografia identica ao Multi-Step Wizard do Vela. */
 export function WizardSteps({ steps, current }: { steps: WizardStep[]; current: number }) {
   return (
     <div className="mb-8 flex items-center justify-center">
@@ -42,7 +42,7 @@ export function WizardSteps({ steps, current }: { steps: WizardStep[]; current: 
   );
 }
 
-/** Título/subtítulo — mesmo markup do Multi-Step Wizard. */
+/** Titulo/subtitulo  -  mesmo markup do Multi-Step Wizard. */
 export function WizardCardHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <>
@@ -64,7 +64,7 @@ const iconNext = (
   </svg>
 );
 
-/** Rodapé Previous / Next — mesmos botões do Multi-Step Wizard. */
+/** Rodape Previous / Next  -  mesmos botoes do Multi-Step Wizard. */
 export function WizardNav({
   onPrevious,
   onNext,

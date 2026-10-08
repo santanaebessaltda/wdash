@@ -1,6 +1,6 @@
 import { statusVariant, type StatusVariant } from "@/lib/status";
 
-/** Extends the generic status→color mapping with logistics-specific vocabulary
+/** Extends the generic status -> color mapping with logistics-specific vocabulary
  * ("in transit", "delayed", "optimized") that isn't covered by the shared list. */
 export function logisticsStatusVariant(status: string): StatusVariant {
   const s = status.trim().toLowerCase();

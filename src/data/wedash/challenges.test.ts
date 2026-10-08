@@ -41,7 +41,7 @@ describe("T1: desafios ativos (EQUIP-05)", () => {
         const c = collaboratorById(id);
         expect(c).toBeDefined();
         expect(c!.tipo).toBe("SELLER");
-        expect(id).not.toBe("c06"); // Fernanda em férias
+        expect(id).not.toBe("c06"); // Fernanda em ferias
         expect(id).not.toBe("c09"); // caixa
       }
     }
@@ -103,7 +103,7 @@ describe("T1: desafios ativos (EQUIP-05)", () => {
     const pa = activeChallenges("2026-09").find((d) => d.id === "d-pa")!;
     expect(challengeManagerTarget(perf, perf.participantes.length)).toBe(challengeFloor(perf) * 3);
     expect(challengeManagerTarget(pa, pa.participantes.length)).toBe(challengeFloor(pa));
-    // 1 pessoa com 10 e 4 com 0 → capped = 3 (não 10)
+    // 1 pessoa com 10 e 4 com 0  ->  capped = 3 (nao 10)
     expect(cappedManagerProgress([10, 0, 0, 0, 0], 3)).toBe(3);
     expect(cappedManagerProgress([3, 3, 3, 0, 0], 3)).toBe(9);
   });

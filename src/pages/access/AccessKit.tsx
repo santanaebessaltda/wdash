@@ -15,7 +15,7 @@ import { AVATAR_TIPOS } from "@/lib/avatar";
 export { AuthGlow } from "@/pages/auth/authKit";
 export { Checkbox, FormField, Input };
 
-/** Escala tipográfica unificada com o Login. */
+/** Escala tipografica unificada com o Login. */
 export const acessoTitulo = "mb-2 text-[26px] font-extrabold tracking-tight text-t0";
 export const acessoSubtitulo = "mb-6 text-sm leading-relaxed text-t1";
 export const acessoBotao =
@@ -73,9 +73,9 @@ function BotaoRevelarSenha({ mostrar, onToggle }: { mostrar: boolean; onToggle: 
 }
 
 /**
- * Ao aceitar a sugestão, o Chrome deixa o valor inteiro selecionado, às vezes
- * depois do evento de input. Só reage a mudança que não veio do teclado
- * (preenchimento do navegador não tem inputType de digitação/colagem).
+ * Ao aceitar a sugestao, o Chrome deixa o valor inteiro selecionado, as vezes
+ * depois do evento de input. So reage a mudanca que nao veio do teclado
+ * (preenchimento do navegador nao tem inputType de digitacao/colagem).
  */
 function useSoltarSelecaoDoAutofill() {
   const ref = useRef<HTMLInputElement>(null);
@@ -114,11 +114,11 @@ function useSoltarSelecaoDoAutofill() {
 const CAMPOS_DE_TEXTO = new Set(["text", "email", "password", "tel", "search", "url"]);
 
 /**
- * Sugestão do navegador que deixa o formulário completo → foco no botão de envio (Enter/toque envia).
- * Nunca envia sozinho: conta errada escolhida, ou "Enviar código" para o e-mail errado, seriam irreversíveis.
- * Digitação e colagem não contam (têm inputType); preenchimento do navegador não tem.
- * No celular (PWA) a senha pode chegar depois do e-mail e às vezes só vem `change` — por isso tenta
- * de novo por ~1,5s e aceita `change` de campo que não foi digitado.
+ * Sugestao do navegador que deixa o formulario completo  ->  foco no botao de envio (Enter/toque envia).
+ * Nunca envia sozinho: conta errada escolhida, ou "Enviar codigo" para o e-mail errado, seriam irreversiveis.
+ * Digitacao e colagem nao contam (tem inputType); preenchimento do navegador nao tem.
+ * No celular (PWA) a senha pode chegar depois do e-mail e as vezes so vem `change`  -  por isso tenta
+ * de novo por ~1,5s e aceita `change` de campo que nao foi digitado.
  */
 export function useFocoNoEnvioAposAutofill() {
   const ref = useRef<HTMLFormElement>(null);
@@ -147,7 +147,7 @@ export function useFocoNoEnvioAposAutofill() {
         try {
           ativo.setSelectionRange(fim, fim);
         } catch {
-          // type="email" não aceita seleção programática em alguns navegadores
+          // type="email" nao aceita selecao programatica em alguns navegadores
         }
         ativo.blur();
       }
@@ -184,7 +184,7 @@ export function useFocoNoEnvioAposAutofill() {
   return ref;
 }
 
-/** E-mail — FormField + Input (Vela). */
+/** E-mail  -  FormField + Input (Vela). */
 export function CampoEmail({
   label = "E-mail",
   value,
@@ -219,7 +219,7 @@ export function CampoEmail({
   );
 }
 
-/** CPF com máscara — FormField + Input (Vela). */
+/** CPF com mascara  -  FormField + Input (Vela). */
 export function CampoCpf({
   label = "CPF",
   value,
@@ -248,7 +248,7 @@ export function CampoCpf({
   );
 }
 
-/** Senha com revelar — FormField + Input (Vela). */
+/** Senha com revelar  -  FormField + Input (Vela). */
 export function CampoSenha({
   label = "Senha",
   value,
@@ -289,7 +289,7 @@ export function nomePessoaValido(n: NomePessoa): boolean {
   return n.nome.trim().length >= 2 && n.sobrenome.trim().length >= 2;
 }
 
-/** Nome · Sobrenome do "Crie seu acesso" (sempre em branco: o convite só traz o e-mail). */
+/** Nome  |  Sobrenome do "Crie seu acesso" (sempre em branco: o convite so traz o e-mail). */
 export function CamposNome({
   valor,
   onChange,
@@ -324,7 +324,7 @@ export function CamposNome({
   );
 }
 
-/** Foto de perfil opcional (padrão da aba Profile do template: quadrado com iniciais + botão "+"). */
+/** Foto de perfil opcional (padrao da aba Profile do template: quadrado com iniciais + botao "+"). */
 export function CampoFoto({
   nome,
   foto,
@@ -415,7 +415,7 @@ export function AvisoCard({ tom = "info", titulo, children }: { tom?: "info" | "
   );
 }
 
-/** Ícone redondo no topo do card, como em ForgotPassword/ResetPassword do template. */
+/** Icone redondo no topo do card, como em ForgotPassword/ResetPassword do template. */
 export function IconeCard({ tom = "acc", centralizado = false, children }: { tom?: "acc" | "ok" | "bad" | "warn" | "info"; centralizado?: boolean; children: ReactNode }) {
   const bg = { acc: "bg-acc-soft", ok: "bg-ok-soft", bad: "bg-bad-soft", warn: "bg-warn-soft", info: "bg-info-soft" }[tom];
   const cor = { acc: "var(--acc)", ok: "var(--ok)", bad: "var(--bad)", warn: "var(--warn)", info: "var(--info)" }[tom];
@@ -426,7 +426,7 @@ export function IconeCard({ tom = "acc", centralizado = false, children }: { tom
   );
 }
 
-/** Medidor de força da senha (barras Vela). */
+/** Medidor de forca da senha (barras Vela). */
 export function ForcaSenha({ senha }: { senha: string }) {
   const n = senha.length;
   const temEspecial = senhaTemEspecial(senha);

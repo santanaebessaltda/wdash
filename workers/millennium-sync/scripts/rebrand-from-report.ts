@@ -1,5 +1,5 @@
 /**
- * Regrava WEPINK/WPINK a partir do relatório oficial (sem re-SEED).
+ * Regrava WEPINK/WPINK a partir do relatorio oficial (sem re-SEED).
  *   cd workers/millennium-sync && npx tsx scripts/rebrand-from-report.ts
  */
 import { readFileSync, existsSync } from "node:fs";
@@ -90,7 +90,7 @@ async function main() {
   const { from, to } = seedWindow(today);
   console.log(`rebrand ${from}→${to} · ${stores.length} loja(s)`);
 
-  // limpa só marcas (ALL fica)
+  // limpa so marcas (ALL fica)
   const { error: delErr, count } = await sb
     .from("sales_day_agg")
     .delete({ count: "exact" })

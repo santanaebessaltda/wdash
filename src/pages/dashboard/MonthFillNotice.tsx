@@ -2,12 +2,12 @@ import { Alert, RadialProgress } from "@/components/ui";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { monthFillProgress, type MonthFill } from "@/data/wedash/salesRepo";
 
-/** Período [inicio, fim] inclui dias que a carga do mês ainda não trouxe. */
+/** Periodo [inicio, fim] inclui dias que a carga do mes ainda nao trouxe. */
 export function monthFillTouches(fill: MonthFill | null, inicio: string, fim: string): boolean {
   return Boolean(fill && inicio <= fill.currentDay && fim >= fill.fillUntil);
 }
 
-/** Durante a carga do histórico o calendário libera desde o dia mais antigo da carga (o aviso explica o parcial). */
+/** Durante a carga do historico o calendario libera desde o dia mais antigo da carga (o aviso explica o parcial). */
 export function pickerMinDate(coverageFrom: Date | null, fill: MonthFill | null): Date | null {
   if (!fill) return coverageFrom;
   const [y, m, d] = fill.fillUntil.split("-").map(Number);
@@ -16,8 +16,8 @@ export function pickerMinDate(coverageFrom: Date | null, fill: MonthFill | null)
 }
 
 /**
- * Alerta com anel de progresso (cor primária) enquanto a carga do histórico (pós-onboarding) roda — some sozinho ao terminar.
- * Se o período da tela inclui dias ainda não carregados, avisa que os totais estão parciais.
+ * Alerta com anel de progresso (cor primaria) enquanto a carga do historico (pos-onboarding) roda  -  some sozinho ao terminar.
+ * Se o periodo da tela inclui dias ainda nao carregados, avisa que os totais estao parciais.
  */
 export function MonthFillNotice({ fill, inicio, fim }: { fill: MonthFill | null; inicio: string; fim: string }) {
   if (!fill) return null;

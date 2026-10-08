@@ -98,7 +98,7 @@ async function main() {
   const base = millenniumBaseUrl().replace(/\/$/, "");
   console.log(`session ok · loja ${store.code} mill=${store.millenniumStoreId} · ${store.name}`);
 
-  // 1) tipos — curl usa GET+body; Node não aceita → POST + X-HTTP-Method:GET
+  // 1) tipos  -  curl usa GET+body; Node nao aceita  ->  POST + X-HTTP-Method:GET
   {
     const res = await fetch(`${base}/millenium?$lookup=produto.tipo.tipo&$top=501`, {
       method: "POST",
@@ -139,7 +139,7 @@ async function main() {
     );
   }
 
-  // 2) gerador — lookup pode 401; curl do gestor usou 126 p/ Santana
+  // 2) gerador  -  lookup pode 401; curl do gestor usou 126 p/ Santana
   let geradorId = 126;
   try {
     const geradorMap = await fetchFilialGeradorMap(session);
@@ -152,7 +152,7 @@ async function main() {
     console.warn(`\ngerador map falhou (${e instanceof Error ? e.message : e}) — fallback ${geradorId}`);
   }
 
-  // 3) report C5BBF0E2 — variantes de data
+  // 3) report C5BBF0E2  -  variantes de data
   const day = "2026-09-22";
   const variants: Array<{ label: string; start: string; end: string }> = [
     { label: "ymd", start: day, end: day },

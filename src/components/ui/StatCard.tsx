@@ -13,11 +13,11 @@ export interface StatCardProps {
   iconBg?: string;
   delta?: { value: string; positive: boolean; vs?: string; diff?: string; anterior?: string };
   sparkline?: ReactNode;
-  /** Texto secundário abaixo do valor (ex.: "1.665 vendas · 2.495 itens"). */
+  /** Texto secundario abaixo do valor (ex.: "1.665 vendas  |  2.495 itens"). */
   sub?: string;
-  /** Segunda linha (ex.: contribuição WPINK na Overview). */
+  /** Segunda linha (ex.: contribuicao WPINK na Overview). */
   sub2?: string;
-  /** Tooltip exibido ao passar o mouse no ⓘ ao lado do label. */
+  /** Tooltip exibido ao passar o mouse no  ao lado do label. */
   tooltip?: string;
   className?: string;
 }

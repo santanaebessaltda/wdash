@@ -7,6 +7,10 @@ import {
   PURCHASE_FILE_HEADER,
   PURCHASE_FILE_TEXT_COLUMNS,
   filterPurchaseRows,
+  parsePurchaseMinSheet,
+  purchaseMinImportNotice,
+  purchaseMinTemplateFileName,
+  purchaseMinTemplateRows,
   purchaseOrderFileName,
   purchaseOrderFileRows,
   type PurchaseFilter,
@@ -16,7 +20,7 @@ import { PURCHASE_SYNC_BUSY, PURCHASE_SYNC_ERROR, PURCHASE_SYNC_OFFLINE, PURCHAS
 import { cn } from "@/lib/cn";
 import { num } from "@/lib/format";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
-import { buildXlsx } from "@/lib/xlsx";
+import { buildXlsx, readXlsx } from "@/lib/xlsx";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { ErpStatusNotice } from "@/pages/dashboard/ErpStatusNotice";
 import { HeaderFilter, HeaderSearch } from "@/pages/dashboard/HeaderFilter";
@@ -72,6 +76,9 @@ export function PurchaseOrderPage() {
   const [sortKey, setSortKey] = useState<SortKey>("nome");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [page, setPage] = useState(1);
+  const [importing, setImporting] = useState(false);
+  const [importNotice, setImportNotice] = useState<ReturnType<typeof purchaseMinImportNotice> | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const showSkeleton = useMinSkeleton(lojasLoading || po.loading);
 
   const contagens = view?.contagens ?? { noPedido: 0, semMinimo: 0, novos: 0 };
@@ -91,6 +98,7 @@ export function PurchaseOrderPage() {
   }, [view, busca, filtro, sortKey, sortDir]);
 
   useEffect(() => setPage(1), [busca, filtro, sortKey, sortDir, loja?.id]);
+  useEffect(() => setImportNotice(null), [loja?.id]);
 
   const totalPages = Math.max(1, Math.ceil(linhas.length / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
@@ -124,6 +132,46 @@ export function PurchaseOrderPage() {
     }
     downloadFile(buildXlsx([[...PURCHASE_FILE_HEADER], ...rows], { textColumns: PURCHASE_FILE_TEXT_COLUMNS }), purchaseOrderFileName(new Date()));
     show(`Pedido gerado com ${rows.length} produto${rows.length === 1 ? "" : "s"}.`, "success");
+  };
+
+  const baixarModelo = () => {
+    if (!view || !loja) return;
+    downloadFile(buildXlsx(purchaseMinTemplateRows(view)), purchaseMinTemplateFileName(loja.codFilial));
+  };
+
+  const importarPlanilha = async (file: File) => {
+    if (!view) return;
+    setImportNotice(null);
+    setImporting(true);
+    try {
+      let grid: string[][];
+      try {
+        grid = await readXlsx(new Uint8Array(await file.arrayBuffer()));
+      } catch {
+        show("Não foi possível ler a planilha. Use um arquivo .xlsx.", "danger");
+        return;
+      }
+      const parsed = parsePurchaseMinSheet(grid, new Set(view.rows.map((r) => r.code)));
+      if (!parsed.ok) {
+        show(parsed.message, "danger");
+        return;
+      }
+      const changed = parsed.updates.filter((u) => po.mins?.get(u.code) !== u.value);
+      if (changed.length > 0) {
+        const ok = await po.importMins(changed);
+        if (!ok) return;
+      }
+      setImportNotice(
+        purchaseMinImportNotice({
+          saved: changed.length,
+          unknown: parsed.unknown,
+          invalid: parsed.invalid,
+          unchanged: parsed.updates.length > 0 && changed.length === 0,
+        }),
+      );
+    } finally {
+      setImporting(false);
+    }
   };
 
   const limparBusca = () => {
@@ -170,7 +218,26 @@ export function PurchaseOrderPage() {
               />
               <TipHelp label="Multiplica o mínimo de cada produto. A quantidade a pedir desconta o total em estoque e arredonda para o múltiplo de compra." />
             </span>
-            <Button variant="primary" size="md" onClick={gerarPedido} disabled={!view || po.syncing}>
+            <Button variant="outline" size="md" onClick={baixarModelo} disabled={!view || po.syncing || importing}>
+              Baixar modelo
+            </Button>
+            <Button variant="outline" size="md" onClick={() => fileRef.current?.click()} disabled={!view || po.syncing || importing}>
+              {importing ? "Importando…" : "Importar mínimos"}
+            </Button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              className="hidden"
+              tabIndex={-1}
+              aria-hidden
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (file) void importarPlanilha(file);
+              }}
+            />
+            <Button variant="primary" size="md" onClick={gerarPedido} disabled={!view || po.syncing || importing}>
               Gerar pedido
             </Button>
           </HeaderFilters>
@@ -194,6 +261,11 @@ export function PurchaseOrderPage() {
                 </Alert>
               ))}
             {!po.syncError && po.stale && po.staleTexto && <Alert variant="warning" title={po.staleTexto} />}
+            {importNotice && (
+              <Alert variant={importNotice.variant} title={importNotice.title}>
+                {importNotice.detail}
+              </Alert>
+            )}
           </>
         }
       />
@@ -360,7 +432,7 @@ function Qty({ v, total = false, strong = false }: { v: number; total?: boolean;
 
 const fmtMin = (v: number | null) => (v == null ? "" : String(v));
 
-/** Mínimo editável: grava ao sair do campo; Enter desce para o mínimo da linha de baixo; Esc desfaz. */
+/** Minimo editavel: grava ao sair do campo; Enter desce para o minimo da linha de baixo; Esc desfaz. */
 function MinInput({ value, idx, label, onSave }: { value: number | null; idx: number; label: string; onSave: (raw: string) => Promise<boolean> }) {
   const [draft, setDraft] = useState(fmtMin(value));
   const cancelRef = useRef(false);

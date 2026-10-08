@@ -6,13 +6,13 @@ export interface SegmentedOption<T extends string = string> {
 }
 
 /**
- * Controle segmentado (toggle de opções mutuamente exclusivas).
- * Uso principal: filtro de marca/divisão WEPINK | WPINK nas telas do
- * Dashboard. Estilo copiado dos botões "Quick ranges" da DatePickersPage
- * (ativo = border-acc bg-acc-soft text-acc), já validado visualmente no tema.
+ * Controle segmentado (toggle de opcoes mutuamente exclusivas).
+ * Uso principal: filtro de marca/divisao WEPINK | WPINK nas telas do
+ * Dashboard. Estilo copiado dos botoes "Quick ranges" da DatePickersPage
+ * (ativo = border-acc bg-acc-soft text-acc), ja validado visualmente no tema.
  *
- * `value === null` representa "Todas / sem filtro" quando `allowClear` está
- * ativo — clicar na opção já selecionada limpa a seleção.
+ * `value === null` representa "Todas / sem filtro" quando `allowClear` esta
+ * ativo  -  clicar na opcao ja selecionada limpa a selecao.
  */
 export function Segmented<T extends string = string>({
   options,

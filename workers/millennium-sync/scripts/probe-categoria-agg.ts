@@ -84,7 +84,7 @@ async function main() {
   const geradorId = 126;
   const day = "2026-09-22";
 
-  // A) dump completo 1 produto via lookup com vários paths
+  // A) dump completo 1 produto via lookup com varios paths
   for (const url of [
     `${base}/millenium/produto.produto.produto(407)`,
     `${base}/millenium?$lookup=produto.produto.produto&PRODUTO_PRODUTO_PRODUTO=407&$top=1&$select=*`,

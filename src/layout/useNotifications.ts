@@ -12,13 +12,13 @@ import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 
 const POLL_MS = 60_000;
 /*
- * Cópia local do estado do banco: vale sem banco (demo), enquanto a resposta não chega
- * e como ponto de partida no 1º uso do banco (o que o aparelho já tinha lido continua lido).
+ * Copia local do estado do banco: vale sem banco (demo), enquanto a resposta nao chega
+ * e como ponto de partida no 1 uso do banco (o que o aparelho ja tinha lido continua lido).
  */
-/** Tudo que foi publicado até esse instante conta como lido. */
+/** Tudo que foi publicado ate esse instante conta como lido. */
 const readBeforeKey = (tenantId: string) => `wedash.notif.seen.${tenantId}`;
 const readIdsKey = (tenantId: string) => `wedash.notif.read.${tenantId}`;
-/** "Limpar": some da lista tudo que foi publicado até esse instante. */
+/** "Limpar": some da lista tudo que foi publicado ate esse instante. */
 const clearedBeforeKey = (tenantId: string) => `wedash.notif.cleared.${tenantId}`;
 
 function storedNumber(key: string): number | null {
@@ -58,14 +58,14 @@ function saveLocal(tenantId: string, s: NotificationState) {
 
 export type AnnouncementNotification = Announcement & { read: boolean };
 
-/** Problema que pede ação do gestor; fica no topo do sino enquanto durar (não é lido nem limpo). */
+/** Problema que pede acao do gestor; fica no topo do sino enquanto durar (nao e lido nem limpo). */
 export type NotificationAlert = { id: string; title: string; body: string };
 
 /**
- * Sino de Notificações: avisos de novidade (tabela `announcement`) + problemas que pedem ação
- * (só quem gerencia a integração: senha do Millennium inválida, integração desconectada).
+ * Sino de Notificacoes: avisos de novidade (tabela `announcement`) + problemas que pedem acao
+ * (so quem gerencia a integracao: senha do Millennium invalida, integracao desconectada).
  * Lidos / limpos ficam no banco por pessoa (iguais no navegador, no PWA e em outros aparelhos).
- * Recarrega a cada 60s, quando uma sincronização termina e ao voltar para o app (PWA).
+ * Recarrega a cada 60s, quando uma sincronizacao termina e ao voltar para o app (PWA).
  */
 export function useNotifications(tenantId: string, role: string, canManageErp: boolean) {
   const [items, setItems] = useState<Announcement[]>([]);
@@ -131,7 +131,7 @@ export function useNotifications(tenantId: string, role: string, canManageErp: b
   const markRead = useCallback(
     (id: string) => {
       if (state.readIds.includes(id)) return;
-      // Guarda só os ids que ainda estão na lista (não cresce para sempre).
+      // Guarda so os ids que ainda estao na lista (nao cresce para sempre).
       const keep = items.map((i) => i.id);
       const next = { ...state, readIds: [...state.readIds.filter((x) => keep.includes(x)), id] };
       saveLocal(tenantId, next);
@@ -156,9 +156,9 @@ export function useNotifications(tenantId: string, role: string, canManageErp: b
     [tenantId, items, state, apply],
   );
 
-  /** Marca como lido tudo que está na lista agora. */
+  /** Marca como lido tudo que esta na lista agora. */
   const markAllRead = useCallback(() => readAll(false), [readAll]);
-  /** Esconde tudo que está na lista agora; os próximos avisos aparecem normalmente. */
+  /** Esconde tudo que esta na lista agora; os proximos avisos aparecem normalmente. */
   const clearAll = useCallback(() => readAll(true), [readAll]);
 
   const notifications: AnnouncementNotification[] = items

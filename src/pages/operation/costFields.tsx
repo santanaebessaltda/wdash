@@ -3,7 +3,7 @@ import { Card, useToast } from "@/components/ui";
 import { EMPTY_STORE_COSTS, updateStoreCosts, type Store, type StoreCosts } from "@/data/wedash/stores";
 import { FormActions, NumberField, SAVE_ERROR_MSG, StoreCardHeader, numText, parseNum } from "./shared";
 
-/** Campo de custo da loja: lê e grava um pedaço de `store.custos`. */
+/** Campo de custo da loja: le e grava um pedaco de `store.custos`. */
 export type CostField = {
   key: string;
   label: string;
@@ -26,13 +26,13 @@ function toText(fields: CostField[], c: StoreCosts): Record<string, string> {
   return Object.fromEntries(fields.map((f) => [f.key, numText(f.get(c), f.unit)]));
 }
 
-/** Estado de edição dos campos de uma loja (texto, alterado, validação e gravação). */
+/** Estado de edicao dos campos de uma loja (texto, alterado, validacao e gravacao). */
 export function useCostFields(loja: Store, fields: CostField[]) {
   const [saved, setSaved] = useState(() => toText(fields, loja.custos ?? EMPTY_STORE_COSTS));
   const [txt, setTxt] = useState(saved);
   const dirty = fields.some((f) => txt[f.key] !== saved[f.key]);
 
-  /** null = algum campo inválido (% fora de 0–100 ou R$ negativo). */
+  /** null = algum campo invalido (% fora de 0 - 100 ou R$ negativo). */
   function merged(): StoreCosts | null {
     let c = loja.custos ?? EMPTY_STORE_COSTS;
     for (const f of fields) {
@@ -60,10 +60,10 @@ export function useCostFields(loja: Store, fields: CostField[]) {
 
 export const INVALID_COSTS_MSG = "Confira os valores. Use percentuais entre 0 e 100 e não informe valores negativos.";
 
-/** Bloco de campos com título e texto de apoio próprios (ex.: uma marca). */
+/** Bloco de campos com titulo e texto de apoio proprios (ex.: uma marca). */
 export type CostFieldSection = { title: string; hint?: string; keys: string[] };
 
-/** Card da loja com campos de custo e Resetar/Salvar próprios. */
+/** Card da loja com campos de custo e Resetar/Salvar proprios. */
 export function CostFieldsCard({
   loja,
   fields,

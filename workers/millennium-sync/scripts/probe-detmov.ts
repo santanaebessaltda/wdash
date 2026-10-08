@@ -1,5 +1,5 @@
 /**
- * Probe: VENDAS.Lista tem NF + COD_OPERACAO numérico? + 1 ConsultaDetMov.
+ * Probe: VENDAS.Lista tem NF + COD_OPERACAO numerico? + 1 ConsultaDetMov.
  *   cd workers/millennium-sync && npx tsx scripts/probe-detmov.ts
  */
 import { readFileSync, existsSync } from "node:fs";

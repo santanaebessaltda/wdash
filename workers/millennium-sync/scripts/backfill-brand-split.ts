@@ -1,7 +1,7 @@
 /**
- * Backfill WEPINK/WPINK em sales_day_agg via wtsreports (não mexe no ALL).
+ * Backfill WEPINK/WPINK em sales_day_agg via wtsreports (nao mexe no ALL).
  * Uso: npx tsx scripts/backfill-brand-split.ts [from] [to]
- * Default: min(day)→max(day) de sales_day_agg ALL do tenant.
+ * Default: min(day) -> max(day) de sales_day_agg ALL do tenant.
  */
 import { readFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";

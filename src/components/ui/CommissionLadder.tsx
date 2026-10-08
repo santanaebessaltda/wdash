@@ -3,16 +3,16 @@ import { ProgressBar } from "./ProgressBar";
 import { cn } from "@/lib/cn";
 
 /**
- * Escada de Premiação (CommissionLadder) — widget central da tela Equipe.
- * Mostra os degraus de meta (ex.: Meta → Super Meta → Hiper Meta) com o
- * progresso atual do faturamento em relação a cada degrau.
+ * Escada de Premiacao (CommissionLadder)  -  widget central da tela Equipe.
+ * Mostra os degraus de meta (ex.: Meta  ->  Super Meta  ->  Hiper Meta) com o
+ * progresso atual do faturamento em relacao a cada degrau.
  *
  * Composto com componentes Vela existentes: ProgressBar (trilho de progresso)
  * + Badge (selo do degrau atual). Estilo alinhado ao tema (acc para ativo,
  * t2 para inativo).
  *
  * - degraus: lista de { label, valor } ordenada do menor pro maior.
- * - realizado: faturamento acumulado no período.
+ * - realizado: faturamento acumulado no periodo.
  * - formatValue: formata os valores em R$ (ex.: brl).
  */
 
@@ -33,9 +33,9 @@ export function CommissionLadder({
   formatValue?: (v: number) => string;
   className?: string;
 }) {
-  // Ordena os degraus do menor pro maior (Meta → Super → Hiper).
+  // Ordena os degraus do menor pro maior (Meta  ->  Super  ->  Hiper).
   const ordenados = [...degraus].sort((a, b) => a.valor - b.valor);
-  // Degrau atual: o último cujo valor foi atingido (realizado >= valor).
+  // Degrau atual: o ultimo cujo valor foi atingido (realizado >= valor).
   const indiceAtual = ordenados.reduce((acc, d, i) => (realizado >= d.valor ? i : acc), -1);
 
   return (

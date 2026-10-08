@@ -56,7 +56,7 @@ export function goalFromRow(r: GoalRow): GoalRecord {
     startsOn: r.starts_on,
     endsOn: r.ends_on,
     target: Number(r.target_cents) / 100,
-    tierMode: r.tier_mode === "GROUP" ? "GROUP" : "INDIVIDUAL",
+    tierMode: r.tier_mode === "GROUP" ? "GROUP" : r.tier_mode === "GENERAL" ? "GENERAL" : "INDIVIDUAL",
     tiers: parseTiers(r.tiers),
     groups: parseGroups(r.groups),
   };

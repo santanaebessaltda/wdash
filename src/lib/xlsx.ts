@@ -1,6 +1,6 @@
 /**
- * XLSX mínimo (1 aba) para arquivos de importação no Millennium — mesmo esqueleto do exemplo exportado pelo Google
- * (sharedStrings + estilo de célula Texto, numFmt 49). ZIP sem compressão (método 0): todo leitor de XLSX aceita.
+ * XLSX minimo (1 aba) para arquivos de importacao no Millennium  -  mesmo esqueleto do exemplo exportado pelo Google
+ * (sharedStrings + estilo de celula Texto, numFmt 49). ZIP sem compressao (metodo 0): todo leitor de XLSX aceita.
  */
 
 export type XlsxCell = string | number;
@@ -113,7 +113,7 @@ function crc32(data: Uint8Array): number {
   return (c ^ 0xffffffff) >>> 0;
 }
 
-/** ZIP sem compressão; data fixa 01/01/1980 (o conteúdo não depende do relógio). */
+/** ZIP sem compressao; data fixa 01/01/1980 (o conteudo nao depende do relogio). */
 function zipStore(files: Array<[string, Uint8Array]>): Uint8Array {
   const enc = new TextEncoder();
   const locals: Uint8Array[] = [];
@@ -172,4 +172,131 @@ export function buildXlsx(rows: XlsxCell[][], opts: { textColumns?: number[]; sh
   const { sheet, sst } = sheetParts(rows, opts.textColumns ?? []);
   const enc = new TextEncoder();
   return zipStore(packageFiles(sheet, sst, opts.sheetName ?? "Página1").map(([name, xml]) => [name, enc.encode(xml)]));
+}
+
+type ZipEntry = { name: string; method: number; data: Uint8Array };
+
+function findEocd(buf: Uint8Array): number {
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  const start = Math.max(0, buf.length - 22 - 0xffff);
+  for (let i = buf.length - 22; i >= start; i--) if (dv.getUint32(i, true) === 0x06054b50) return i;
+  return -1;
+}
+
+async function inflateRaw(data: Uint8Array): Promise<Uint8Array> {
+  const copy = new Uint8Array(data);
+  const stream = new Blob([copy]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+/** ZIP de um xlsx (store ou deflate). Ignora entradas criptografadas. */
+async function readZip(buf: Uint8Array): Promise<ZipEntry[]> {
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  const eocd = findEocd(buf);
+  if (eocd < 0) throw new Error("not-xlsx");
+  const count = dv.getUint16(eocd + 10, true);
+  let p = dv.getUint32(eocd + 16, true);
+  const out: ZipEntry[] = [];
+  for (let i = 0; i < count; i++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) throw new Error("not-xlsx");
+    const flags = dv.getUint16(p + 8, true);
+    const method = dv.getUint16(p + 10, true);
+    const compSize = dv.getUint32(p + 20, true);
+    const nameLen = dv.getUint16(p + 28, true);
+    const extraLen = dv.getUint16(p + 30, true);
+    const commentLen = dv.getUint16(p + 32, true);
+    const localOff = dv.getUint32(p + 42, true);
+    const name = new TextDecoder().decode(buf.subarray(p + 46, p + 46 + nameLen));
+    if (dv.getUint32(localOff, true) !== 0x04034b50) throw new Error("not-xlsx");
+    const start = localOff + 30 + dv.getUint16(localOff + 26, true) + dv.getUint16(localOff + 28, true);
+    const compressed = buf.slice(start, start + compSize);
+    if ((flags & 1) !== 0) throw new Error("not-xlsx");
+    const data = method === 0 ? compressed : method === 8 ? await inflateRaw(compressed) : null;
+    if (!data) throw new Error("not-xlsx");
+    out.push({ name, method, data });
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+  return out;
+}
+
+const xmlText = (s: string) =>
+  s
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&");
+
+function zipText(entries: ZipEntry[], name: string): string | null {
+  const hit = entries.find((e) => e.name.replace(/\\/g, "/") === name);
+  return hit ? new TextDecoder().decode(hit.data) : null;
+}
+
+function sharedStrings(xml: string): string[] {
+  return [...xml.matchAll(/<si\b[^>]*>([\s\S]*?)<\/si>/g)].map((m) => {
+    const body = m[1].replace(/<rPh\b[\s\S]*?<\/rPh>/g, "");
+    return [...body.matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/g)].map((t) => xmlText(t[1])).join("");
+  });
+}
+
+function colIndex(ref: string): number {
+  const letters = /^[A-Z]+/i.exec(ref)?.[0] ?? "A";
+  let n = 0;
+  for (const ch of letters.toUpperCase()) n = n * 26 + (ch.charCodeAt(0) - 64);
+  return n - 1;
+}
+
+/** Primeira aba como grade de texto. Número vira o texto da célula (`72`, `182`). */
+function sheetRows(xml: string, strings: string[]): string[][] {
+  const grid = new Map<number, Map<number, string>>();
+  let maxRow = -1;
+  let maxCol = -1;
+  for (const row of xml.matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/g)) {
+    for (const cell of row[1].matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/g)) {
+      const ref = /r="([A-Z]+\d+)"/i.exec(cell[1])?.[1];
+      if (!ref) continue;
+      const r = Number(/\d+/.exec(ref)?.[0] ?? 1) - 1;
+      const c = colIndex(ref);
+      const type = /t="([^"]+)"/.exec(cell[1])?.[1] ?? "";
+      const inline = /<is\b[^>]*>([\s\S]*?)<\/is>/.exec(cell[2]);
+      const raw = inline ? [...inline[1].matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/g)].map((t) => xmlText(t[1])).join("") : (/<v>([\s\S]*?)<\/v>/.exec(cell[2])?.[1] ?? "");
+      const value = type === "s" ? (strings[Number(raw)] ?? "") : xmlText(raw);
+      const line = grid.get(r) ?? new Map<number, string>();
+      line.set(c, value);
+      grid.set(r, line);
+      if (r > maxRow) maxRow = r;
+      if (c > maxCol) maxCol = c;
+    }
+  }
+  const rows: string[][] = [];
+  for (let r = 0; r <= maxRow; r++) {
+    const line = grid.get(r);
+    if (!line) continue;
+    const cells: string[] = [];
+    for (let c = 0; c <= maxCol; c++) cells.push(line.get(c) ?? "");
+    if (cells.some((v) => v.trim() !== "")) rows.push(cells);
+  }
+  return rows;
+}
+
+function firstSheetPath(entries: ZipEntry[]): string {
+  const book = zipText(entries, "xl/workbook.xml");
+  const rels = zipText(entries, "xl/_rels/workbook.xml.rels");
+  const rid = book ? /<sheet\b[^>]*r:id="([^"]+)"/.exec(book)?.[1] : null;
+  const tag = rid && rels ? [...rels.matchAll(/<Relationship\b[^>]*>/g)].map((m) => m[0]).find((t) => t.includes(`Id="${rid}"`)) : null;
+  const target = tag ? /Target="([^"]+)"/.exec(tag)?.[1] : null;
+  if (!target) return "xl/worksheets/sheet1.xml";
+  const path = target.replace(/\\/g, "/").replace(/^\//, "");
+  return path.startsWith("xl/") ? path : `xl/${path}`;
+}
+
+/** Lê a primeira aba de um .xlsx (o nosso, ou um Excel/Google com ZIP comprimido). */
+export async function readXlsx(buf: Uint8Array): Promise<string[][]> {
+  const entries = await readZip(buf);
+  const sheet = zipText(entries, firstSheetPath(entries));
+  if (!sheet) throw new Error("not-xlsx");
+  const sst = zipText(entries, "xl/sharedStrings.xml");
+  return sheetRows(sheet, sst ? sharedStrings(sst) : []);
 }

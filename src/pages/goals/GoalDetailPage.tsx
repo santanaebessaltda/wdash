@@ -47,6 +47,14 @@ const AJUDA_MODO: Record<GoalRecord["tierMode"], string> = {
     "Cada pessoa sobe de nível pela própria meta e recebe a premiação do nível sobre as próprias vendas. Os bônus dos níveis alcançados são acumulados.",
   GROUP:
     "O grupo sobe de nível pela soma das vendas. A premiação é dividida igualmente entre as pessoas do grupo, e o bônus de cada nível vale para cada pessoa. Os bônus dos níveis alcançados são acumulados.",
+  GENERAL:
+    "A loja sobe de nível pelo total vendido. A premiação é dividida igualmente entre as pessoas da equipe, e o bônus de cada nível vale para cada pessoa. Os bônus dos níveis alcançados são acumulados.",
+};
+
+const MODO_LABEL: Record<GoalRecord["tierMode"], string> = {
+  INDIVIDUAL: "Premiação individual",
+  GROUP: "Premiação por grupo",
+  GENERAL: "Premiação geral",
 };
 
 /** Gestao > Metas > detalhe  -  resumo, niveis com o progresso e equipe; meta encerrada = fechamento da premiacao. */
@@ -180,6 +188,7 @@ export default function GoalDetailPage() {
                 lista={card.vendedoras}
                 metaAtiva
                 grupo={goal.tierMode === "GROUP"}
+                geral={goal.tierMode === "GENERAL"}
                 title="Equipe na meta"
                 help="Veja o nível atual, quanto falta para o próximo nível e a premiação de cada pessoa desde o início da meta."
                 aside={`${card.vendedoras.length} ${card.vendedoras.length === 1 ? "pessoa" : "pessoas"}`}
@@ -268,7 +277,7 @@ function GoalHero({
           </div>
           <p className="flex flex-wrap items-center gap-x-1.5 text-[13.5px] leading-relaxed text-t1">
             {dataCompleta(goal.startsOn)} a {dataCompleta(goal.endsOn)}
-            {lojaNome ? ` · ${lojaNome}` : ""} · {goal.tierMode === "INDIVIDUAL" ? "Premiação individual" : "Premiação por grupo"}
+            {lojaNome ? ` · ${lojaNome}` : ""} · {MODO_LABEL[goal.tierMode]}
             <TipHelp label={AJUDA_MODO[goal.tierMode]} />
           </p>
         </div>
@@ -586,6 +595,11 @@ function GoalPayoutCard({
       {goal.tierMode === "GROUP" && equipe.length > 0 && (
         <p className="mt-3 text-[11.5px] text-t2">
           No modo Grupo, a premiação do grupo é dividida igualmente entre as pessoas. O faturamento exibido continua sendo o de cada pessoa.
+        </p>
+      )}
+      {goal.tierMode === "GENERAL" && equipe.length > 0 && (
+        <p className="mt-3 text-[11.5px] text-t2">
+          No modo Geral, a premiação do total vendido da loja é dividida igualmente entre as pessoas. O faturamento exibido continua sendo o de cada pessoa.
         </p>
       )}
     </Card>

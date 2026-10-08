@@ -6,7 +6,7 @@ import { RequireRole } from "@/session/RequireSession";
 const InventoryPage = lazyPage(() => import("./InventoryPage"), "InventoryPage");
 const PurchaseOrderPage = lazyPage(() => import("./PurchaseOrderPage"), "PurchaseOrderPage");
 
-/** Estoque — Gestor e Gerente. */
+/** Estoque  -  Gestor e Gerente. */
 export const stockRoutes: RouteObject[] = [
   {
     element: <RequireRole roles={["OWNER", "MANAGER", "ADMIN_GLOBAL"]} />,

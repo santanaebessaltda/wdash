@@ -12,9 +12,9 @@ export interface DataTableColumn<T> {
   hideBelow?: "sm" | "md" | "lg";
   align?: "left" | "right" | "center";
   width?: string;
-  /** Clique no título ordena pela coluna. */
+  /** Clique no titulo ordena pela coluna. */
   sortable?: boolean;
-  /** Valor usado na comparação; obrigatório quando `sortable`. */
+  /** Valor usado na comparacao; obrigatorio quando `sortable`. */
   sortValue?: (row: T) => string | number | null | undefined;
 }
 
@@ -25,15 +25,15 @@ export interface DataTableProps<T> {
   onRowClick?: (row: T) => void;
   selectable?: boolean;
   emptyMessage?: string;
-  /** Substitui o `emptyMessage` (ex.: `EmptyState` com ação). */
+  /** Substitui o `emptyMessage` (ex.: `EmptyState` com acao). */
   empty?: ReactNode;
   className?: string;
   /** Coluna inicial ativa (precisa ser `sortable`). */
   defaultSortKey?: string;
   defaultSortDir?: SortDir;
   /**
-   * Pagina no padrão da WeDash (10 por página no desktop, 5 no celular) e mostra
-   * "Mostrando X de Y {paginate}" + paginação quando há mais de uma página. Ex.: `paginate="produtos"`.
+   * Pagina no padrao da WDash (10 por pagina no desktop, 5 no celular) e mostra
+   * "Mostrando X de Y {paginate}" + paginacao quando ha mais de uma pagina. Ex.: `paginate="produtos"`.
    */
   paginate?: string;
 }
@@ -79,7 +79,7 @@ export function DataTable<T>({
   );
   const [sortDir, setSortDir] = useState<SortDir>(defaultSortDir);
 
-  // Se a coluna ativa sumiu (ex.: troca meta on/off), limpa o sort e volta à ordem original.
+  // Se a coluna ativa sumiu (ex.: troca meta on/off), limpa o sort e volta a ordem original.
   const sortKeyAtivo = sortKey && sortableCols.some((c) => c.key === sortKey) ? sortKey : undefined;
 
   const sorted = useMemo(() => {
@@ -101,7 +101,7 @@ export function DataTable<T>({
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setSortKey(key);
-      // Texto → asc; número → desc (padrão do Desempenho por produto).
+      // Texto  ->  asc; numero  ->  desc (padrao do Desempenho por produto).
       const sample = data.length > 0 ? col.sortValue(data[0]) : null;
       setSortDir(typeof sample === "string" ? "asc" : "desc");
     }

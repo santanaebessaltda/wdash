@@ -1,18 +1,18 @@
 export interface BarDatum {
   label: string;
   value: number;
-  /** Meta da categoria/período — desenha linha tracejada sobre as barras. */
+  /** Meta da categoria/periodo  -  desenha linha tracejada sobre as barras. */
   goal?: number;
   color?: string;
 }
 
-/** Largura mínima por barra — abaixo disso ativa scroll-x. */
+/** Largura minima por barra  -  abaixo disso ativa scroll-x. */
 const MIN_BAR_W = 72;
-/** ~px/char em text-[10.5px] font-bold tabular — "R$ 313.390,27" ≈ 14 chars. */
+/** ~px/char em text-[10.5px] font-bold tabular  -  "R$ 313.390,27"  14 chars. */
 const VALUE_CHAR_PX = 8;
 const VALUE_PAD_PX = 28;
 
-/** Largura mínima da coluna para o R$ do topo não invadir a vizinha. */
+/** Largura minima da coluna para o R$ do topo nao invadir a vizinha. */
 function minColWidth(
   data: BarDatum[],
   formatValue: (v: number) => string,
@@ -44,13 +44,13 @@ export function BarChart({
   formatValue?: (v: number) => string;
   /** Valores no topo das barras. Default true. */
   showValues?: boolean;
-  /** Torna cada coluna clicável. */
+  /** Torna cada coluna clicavel. */
   onSelect?: (datum: BarDatum, index: number) => void;
 }) {
   const Col = onSelect ? "button" : "div";
   const hasGoals = data.some((d) => (d.goal ?? 0) > 0);
   const max = Math.max(...data.map((d) => Math.max(d.value, d.goal ?? 0)), 1);
-  /** Área das barras (sem labels/valores) — mesma altura efetiva p/ a linha SVG. */
+  /** Area das barras (sem labels/valores)  -  mesma altura efetiva p/ a linha SVG. */
   const plotH = Math.max(80, height - (showValues ? 28 : 8) - 22);
   const colW = minColWidth(data, formatValue, showValues);
   const gapPx = 16;
@@ -163,11 +163,11 @@ export function BarChart({
 
 /**
  * Barras lado-a-lado: realizado (colorido) vs meta (contorno tracejado).
- * Inspirado em referencia01.png — cada período mostra 2 barras adjacentes:
+ * Inspirado em referencia01.png  -  cada periodo mostra 2 barras adjacentes:
  *   - Esquerda: realizado (preenchido, cor do tema)
  *   - Direita: meta (contorno tracejado, fundo transparente)
  * Valores acima de cada barra. Verde quando realizado >= meta.
- * Sem dots, sem tooltips, sem sobreposição. Leitura imediata.
+ * Sem dots, sem tooltips, sem sobreposicao. Leitura imediata.
  */
 export function StackedBarWithGoal({ data, height = 200, color = "var(--acc)", formatValue = (v: number) => String(v) }: {
   data: { label: string; value: number; goal: number }[];
@@ -232,9 +232,9 @@ export function StackedBarChart({ data, keys, colors, height = 220, showValues =
   keys: string[];
   colors: string[];
   height?: number;
-  /** Mostra o total da coluna (soma das séries) acima da barra. Default true (R$ direto no gráfico). */
+  /** Mostra o total da coluna (soma das series) acima da barra. Default true (R$ direto no grafico). */
   showValues?: boolean;
-  /** Formata o valor exibido (ex.: brl). Só usado quando showValues=true. */
+  /** Formata o valor exibido (ex.: brl). So usado quando showValues=true. */
   formatValue?: (v: number) => string;
 }) {
   const totais = data.map((d) => keys.reduce((sum, k) => sum + (Number(d[k]) || 0), 0));

@@ -23,6 +23,7 @@ import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { Icon, icons } from "@/pages/users/Icons";
 import { accessLabel, roleLabel } from "@/session/session";
 import {
+  copySystemUserInviteLink,
   fetchSystemUsers,
   inviteSystemUser,
   systemUserAction,
@@ -44,7 +45,7 @@ const ROLE_HINT: Record<SystemRole, string> = {
     "Acessa o Dashboard das lojas selecionadas, exceto Financeiro, além de Gestão e dos horários de funcionamento.",
 };
 
-/** A Edge devolve o mesmo código para o Gestor principal e para o próprio acesso; a tela sabe qual dos dois é. */
+/** A Edge devolve o mesmo codigo para o Gestor principal e para o proprio acesso; a tela sabe qual dos dois e. */
 function errorMessage(r: { message: string; code?: string }, user: SystemUser | null): string {
   if (r.code === "protected_member" && user?.isSelf) return "Seu próprio acesso não pode ser alterado aqui.";
   return r.message;
@@ -69,7 +70,7 @@ function storesLabel(ids: string[], stores: SystemUserStore[]): { text: string; 
   return { text: `${names.length} lojas`, title: names.join(" · ") };
 }
 
-/** Convite ainda não aceito não tem nome: mostra o e-mail. */
+/** Convite ainda nao aceito nao tem nome: mostra o e-mail. */
 function displayName(u: SystemUser): string {
   return u.name || u.email;
 }
@@ -77,7 +78,7 @@ function displayName(u: SystemUser): string {
 type Editing = { mode: "invite" } | { mode: "edit"; user: SystemUser };
 type Confirming = { action: "suspend" | "revoke"; user: SystemUser };
 
-/** Configurações > Usuários — gestores e gerentes com acesso ao WeDash (só o Gestor gerencia). */
+/** Configuracoes > Usuarios  -  gestores e gerentes com acesso ao WDash (so o Gestor gerencia). */
 export function SystemUsersPage() {
   const { show } = useToast();
   const [members, setMembers] = useState<SystemUser[]>([]);
@@ -126,6 +127,17 @@ export function SystemUsersPage() {
     }[action];
     show(done, "success");
     await load();
+  }
+
+  async function copyLink(user: SystemUser) {
+    const r = await copySystemUserInviteLink(user.membershipId);
+    if (!r.ok) return show(r.message, "danger");
+    try {
+      await navigator.clipboard.writeText(r.token);
+      show("Link copiado.", "success");
+    } catch {
+      show("Não foi possível copiar o link. Tente novamente.", "danger");
+    }
   }
 
   const nameColumn: DataTableColumn<SystemUser> = {
@@ -236,6 +248,7 @@ export function SystemUsersPage() {
       render: (u) => (
         <RowMenu
           items={[
+            { label: "Copiar link", onClick: () => void copyLink(u) },
             { label: "Reenviar convite", onClick: () => void run("resend", u) },
             { label: "Editar acesso", onClick: () => setEditing({ mode: "edit", user: u }) },
             { label: "Cancelar convite", danger: true, onClick: () => setConfirming({ action: "revoke", user: u }) },
@@ -289,7 +302,7 @@ export function SystemUsersPage() {
                   framed={false}
                   icon="👤"
                   title="Nenhum usuário cadastrado"
-                  description="Convide gestores e gerentes para acessar a WeDash."
+                  description="Convide gestores e gerentes para acessar a WDash."
                   action={inviteButton}
                 />
               }
@@ -353,7 +366,7 @@ export function SystemUsersPage() {
         <p className="text-sm leading-relaxed text-t1">
           {confirming?.action === "revoke"
             ? `O link enviado para ${confirming.user.email} deixará de funcionar.`
-            : `${confirming ? displayName(confirming.user) : ""} não poderá mais entrar na WeDash. O acesso poderá ser reativado depois.`}
+            : `${confirming ? displayName(confirming.user) : ""} não poderá mais entrar na WDash. O acesso poderá ser reativado depois.`}
         </p>
       </Modal>
     </Card>

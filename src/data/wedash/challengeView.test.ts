@@ -254,7 +254,17 @@ describe("buildChallengeView — participantes e resultado", () => {
     expect(p.ANA.resultado).toBeNull();
     expect(p.ANA.vencedor).toBe(false);
     expect(p.ANA.posicao).toBeNull();
-    expect(p.BIA.vencedor).toBe(true);
+    expect(p.BIA.posicao).toBe(1);
+    expect(p.BIA.vencedor).toBe(false);
+    expect(p.BIA.falta).toBe("O P.A. só vale no fim do desafio");
+    const fim = byName(
+      build(
+        challenge({ metric: "PA", products: [], minSales: 1 }),
+        input({ sellerDays: [sellerDay(1, 10, 20, 100_000), sellerDay(1, 4, 0, 30_000, { day: "2026-10-07" }), sellerDay(2, 5, 7, 40_000)] }),
+        "2026-10-12",
+      ),
+    );
+    expect(fim.BIA.vencedor).toBe(true);
   });
 
   it("pessoa desligada que vendeu continua na tabela; quem não é da equipe e não vendeu fica de fora", () => {
@@ -359,18 +369,23 @@ describe("buildChallengeView — Disputa e Mínimo", () => {
     expect(p.BIA.vencedor).toBe(true);
   });
 
-  it("Mínimo de P.A.: P.A. 2,0 com 8 vendas (mínimo 10) não atinge; 1,90 com 10 vendas atinge", () => {
-    const v = build(
-      challenge({ metric: "PA", mode: "MINIMUM", products: [], target: 1.9, minSales: 10, prizes: [{ kind: "MONEY", amount: 50 }] }),
-      input({ sellerDays: [sellerDay(1, 8, 16, 50_000), sellerDay(2, 10, 19, 60_000)] }),
-    );
-    const p = byName(v);
-    expect(p.ANA.vencedor).toBe(false);
-    expect(p.ANA.falta).toBe("Faltam 2 vendas para participar");
-    expect(p.BIA.vencedor).toBe(true);
-    expect(p.BIA.premio).toEqual({ kind: "MONEY", amount: 50 });
-    expect(v.atingiram).toBe(1);
-    expect(v.participantes[0].nome).toBe("BIA");
+  it("Mínimo de P.A.: em andamento não marca Atingiu; no fim, 1,90 com 10 vendas atinge e 2,0 com 8 vendas não", () => {
+    const c = challenge({ metric: "PA", mode: "MINIMUM", products: [], target: 1.9, minSales: 10, prizes: [{ kind: "MONEY", amount: 50 }] });
+    const aggs = input({ sellerDays: [sellerDay(1, 8, 16, 50_000), sellerDay(2, 10, 19, 60_000)] });
+    const andamento = byName(build(c, aggs));
+    expect(andamento.ANA.vencedor).toBe(false);
+    expect(andamento.ANA.falta).toBe("Faltam 2 vendas para participar");
+    expect(andamento.BIA.resultado).toBe(1.9);
+    expect(andamento.BIA.vencedor).toBe(false);
+    expect(andamento.BIA.premio).toBeNull();
+    expect(andamento.BIA.falta).toBe("O P.A. só vale no fim do desafio");
+    expect(build(c, aggs).atingiram).toBe(0);
+
+    const fim = byName(build(c, aggs, "2026-10-12"));
+    expect(fim.ANA.vencedor).toBe(false);
+    expect(fim.BIA.vencedor).toBe(true);
+    expect(fim.BIA.premio).toEqual({ kind: "MONEY", amount: 50 });
+    expect(build(c, aggs, "2026-10-12").atingiram).toBe(1);
   });
 
   it("falta em andamento: Mínimo → para o alvo; Disputa → para a posição de cima ou para o piso", () => {
@@ -431,12 +446,11 @@ describe("buildChallengeView — gerência, incompleto e status", () => {
     expect(v.gerencia).toMatchObject({ resultado: 100, alvo: 100, atingiu: true });
   });
 
-  it("gerência em P.A. = Σ itens ÷ Σ vendas da equipe; na Disputa vale sem piso", () => {
-    const v = build(
-      challenge({ metric: "PA", products: [], minSales: 1, managerPrize: { kind: "MONEY", amount: 80 }, managerTarget: 2 }),
-      input({ sellerDays: [sellerDay(1, 10, 25, 100_000), sellerDay(2, 10, 15, 100_000)] }),
-    );
-    expect(v.gerencia).toMatchObject({ resultado: 2, alvo: 2, atingiu: true });
+  it("gerência em P.A. = Σ itens ÷ Σ vendas da equipe; Atingiu só no fim", () => {
+    const c = challenge({ metric: "PA", products: [], minSales: 1, managerPrize: { kind: "MONEY", amount: 80 }, managerTarget: 2 });
+    const aggs = input({ sellerDays: [sellerDay(1, 10, 25, 100_000), sellerDay(2, 10, 15, 100_000)] });
+    expect(build(c, aggs).gerencia).toMatchObject({ resultado: 2, alvo: 2, atingiu: false });
+    expect(build(c, aggs, "2026-10-12").gerencia).toMatchObject({ resultado: 2, alvo: 2, atingiu: true });
   });
 
   it("gerência em ticket abaixo da meta não atinge", () => {

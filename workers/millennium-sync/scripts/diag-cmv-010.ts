@@ -286,7 +286,7 @@ async function main() {
   }
   console.log(`K date-only DATAF=+1 day-by-day CMV=${(sumYmdExcl / 100).toFixed(2)}`);
 
-  // L: ISO same-day bounds (DATAI=DATAF=dayT04) — hipótese inclusiva
+  // L: ISO same-day bounds (DATAI=DATAF=dayT04)  -  hipotese inclusiva
   let sumSame = 0;
   let sumSameFat = 0;
   for (let i = 1; i <= 22; i++) {
@@ -314,8 +314,8 @@ async function main() {
     `L ISO DATAI=DATAF=dayT04 day-by-day CMV=${(sumSame / 100).toFixed(2)} TOTALVENDA=${sumSameFat.toFixed(2)}`,
   );
 
-  // M: ISO inclusive end = end day T04 (no +1) for range — already tested as C
-  // N: per-day with DATAF = end of local day as next day T03:59:59 — same as exclusive date?
+  // M: ISO inclusive end = end day T04 (no +1) for range  -  already tested as C
+  // N: per-day with DATAF = end of local day as next day T03:59:59  -  same as exclusive date?
 }
 
 main().catch((e) => {

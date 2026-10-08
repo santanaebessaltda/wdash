@@ -50,7 +50,7 @@ export const CartIcon = (p: IconProps) => (
   </Base>
 );
 
-/** Fachada de loja (storefront): o ícone de "loja" do tema. */
+/** Fachada de loja (storefront): o icone de "loja" do tema. */
 export const StoreIcon = (p: IconProps) => (
   <Base {...p}>
     <path d="M4 7V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2" />
@@ -81,7 +81,7 @@ export const AwardIcon = (p: IconProps) => (
   </Base>
 );
 
-/** Lucide Trophy — ranking / premiação. */
+/** Lucide Trophy  -  ranking / premiacao. */
 export const TrophyIcon = (p: IconProps) => (
   <Base {...p}>
     <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
@@ -170,7 +170,7 @@ export const ZapIcon = (p: IconProps) => (
   </Base>
 );
 
-/** Lucide Flame — mesmo traço stroke do set SAAS/Vela. */
+/** Lucide Flame  -  mesmo traco stroke do set SAAS/Vela. */
 export const FlameIcon = (p: IconProps) => (
   <Base {...p}>
     <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />

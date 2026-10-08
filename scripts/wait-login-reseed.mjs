@@ -1,4 +1,4 @@
-/** Tenta login até sair de busy; aí enfileira SEED. */
+/** Tenta login ate sair de busy; ai enfileira SEED. */
 import fs from "node:fs";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";

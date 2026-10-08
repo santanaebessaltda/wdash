@@ -19,10 +19,10 @@ import {
 } from "@/data/wedash/syncUi";
 import { calendarTodayIso } from "@/data/wedash/clock";
 
-/** Disparado no `window` quando um Atualizar (FORCE) termina — telas com dados do ERP recarregam. */
+/** Disparado no `window` quando um Atualizar (FORCE) termina  -  telas com dados do ERP recarregam. */
 export const SALES_SYNCED_EVENT = "wedash:sales-synced";
 
-/** Disparado quando o usuário clica em Atualizar — tela com dado pesado próprio (estoque) busca junto. */
+/** Disparado quando o usuario clica em Atualizar  -  tela com dado pesado proprio (estoque) busca junto. */
 export const FORCE_REFRESH_CLICK_EVENT = "wedash:force-refresh-click";
 
 const DISCONNECTED_MSG = "O Millennium está desconectado. As vendas só podem ser atualizadas depois que a integração for conectada novamente.";
@@ -31,14 +31,14 @@ export type ForceRefreshState = {
   canForce: boolean;
   refreshing: boolean;
   forceError: string | null;
-  /** Muda a cada Atualizar concluído com sucesso (para o toast). */
+  /** Muda a cada Atualizar concluido com sucesso (para o toast). */
   forceDoneAt: number | null;
   forceCooldownSec: number | null;
   forcarAtualizacao: () => Promise<void>;
 };
 
 /**
- * Botão Atualizar do Topbar: enfileira FORCE (hoje, loja do StorePicker),
+ * Botao Atualizar do Topbar: enfileira FORCE (hoje, loja do StorePicker),
  * espera o job e chama `reload`. Retoma o FORCE pendente ao reabrir / voltar da aba.
  */
 export function useForceRefresh({
@@ -48,7 +48,7 @@ export function useForceRefresh({
 }: {
   storeIds: string[];
   reload: () => Promise<void>;
-  /** Integração desconectada: o worker não roda o job → não enfileira nem espera. */
+  /** Integracao desconectada: o worker nao roda o job  ->  nao enfileira nem espera. */
   disconnected?: boolean;
 }): ForceRefreshState {
   const session = useActiveSession();
@@ -102,17 +102,17 @@ export function useForceRefresh({
   const resumeOrWaitForce = useCallback(
     async (
       opts: { jobId?: string; storeIds: string[]; enqueuedAt: string },
-      /** true = clique do usuário; false = retomada ao voltar da aba / remount */
+      /** true = clique do usuario; false = retomada ao voltar da aba / remount */
       fromUserClick = false,
     ) => {
-      // Se já há wait em curso, reusa a mesma Promise (evita return vazio + UI “pronto” cedo).
+      // Se ja ha wait em curso, reusa a mesma Promise (evita return vazio + UI "pronto" cedo).
       if (forceWaitLock.current) {
         await forceWaitLock.current;
         return;
       }
       const run = (async () => {
         try {
-          // Voltou da aba com pending já concluído → limpa sem piscar "Atualizando…".
+          // Voltou da aba com pending ja concluido  ->  limpa sem piscar "Atualizando...".
           if (!fromUserClick && opts.jobId) {
             const done = await peekSyncJob(opts.jobId);
             if (done) {
@@ -139,14 +139,14 @@ export function useForceRefresh({
     [session.tenantId, applyForceWaitResult],
   );
 
-  // Desconectou (ou já estava) com um Atualizar pendente → para de girar.
+  // Desconectou (ou ja estava) com um Atualizar pendente  ->  para de girar.
   useEffect(() => {
     if (!disconnected) return;
     waitAbort.current?.abort();
     clearPendingForce(session.tenantId);
   }, [disconnected, session.tenantId]);
 
-  // Reabre o PWA no meio do FORCE → mantém "Atualizando…" até o job terminar.
+  // Reabre o PWA no meio do FORCE  ->  mantem "Atualizando..." ate o job terminar.
   useEffect(() => {
     if (!canForce || disconnected) return;
     const pending = readPendingForce(session.tenantId);
@@ -154,7 +154,7 @@ export function useForceRefresh({
     void resumeOrWaitForce(pending);
   }, [session.tenantId, canForce, disconnected, resumeOrWaitForce]);
 
-  // Voltou do background: se ainda há pending e o poll parou, retoma.
+  // Voltou do background: se ainda ha pending e o poll parou, retoma.
   useEffect(() => {
     if (!canForce || disconnected) return;
     const onVis = () => {

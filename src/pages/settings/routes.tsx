@@ -14,9 +14,9 @@ const StoreDetailPage = lazyPage(() => import("./StoreDetailPage"), "StoreDetail
 const SystemUsersPage = lazyPage(() => import("./SystemUsersPage"), "SystemUsersPage");
 const MyProfilePage = lazyPage(() => import("./MyProfilePage"), "MyProfilePage");
 /**
- * WeDash: /settings → Lojas; /settings/stores | /settings/erp com TabNav + sidebar.
- * Vela template: /settings/:tab (general, company, …) no SettingsPage.
- * Rotas WeDash registradas antes do :tab para não colidir.
+ * WDash: /settings  ->  Lojas; /settings/stores | /settings/erp com TabNav + sidebar.
+ * Vela template: /settings/:tab (general, company, ...) no SettingsPage.
+ * Rotas WDash registradas antes do :tab para nao colidir.
  */
 export const settingsRoutes: RouteObject[] = [
   { path: paths.settings.root, element: <Navigate to={paths.settings.stores} replace /> },

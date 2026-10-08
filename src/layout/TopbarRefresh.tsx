@@ -11,15 +11,15 @@ import { storesForSession } from "@/data/wedash/stores";
 import { useActiveSession } from "@/session/SessionProvider";
 import { SALES_SYNCED_EVENT, useForceRefresh } from "@/pages/dashboard/useForceRefresh";
 const WATERMARK_POLL_MS = 60_000;
-/** Loja aberta sem busca das vendas há mais que isso (2 rodadas automáticas) = dado atrasado. */
+/** Loja aberta sem busca das vendas ha mais que isso (2 rodadas automaticas) = dado atrasado. */
 const STALE_OPEN_MS = 2 * AUTO_REFRESH_MIN * 60_000;
 
 /**
  * Atualizar global (Topbar, todas as telas): FORCE de hoje na loja do StorePicker.
- * Ao terminar dispara `SALES_SYNCED_EVENT` — a tela aberta recarrega os próprios dados.
- * Rodada automática que terminou (watermark avançou no poll) dispara o mesmo evento.
- * Tooltip = horário da última busca das vendas de hoje + próxima rodada; bolinha amarela =
- * vendas de hoje ainda não buscadas ou busca atrasada com loja aberta.
+ * Ao terminar dispara `SALES_SYNCED_EVENT`  -  a tela aberta recarrega os proprios dados.
+ * Rodada automatica que terminou (watermark avancou no poll) dispara o mesmo evento.
+ * Tooltip = horario da ultima busca das vendas de hoje + proxima rodada; bolinha amarela =
+ * vendas de hoje ainda nao buscadas ou busca atrasada com loja aberta.
  */
 export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
   const session = useActiveSession();
@@ -151,7 +151,7 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
   const buttonClass =
     "relative flex h-9 w-9 items-center justify-center rounded-[10px] border border-line text-t1 hover:bg-bg-3 disabled:cursor-default disabled:hover:bg-transparent";
 
-  // Celular / tablet (sem hover): o toque abre o horário da última busca + "Atualizar agora".
+  // Celular / tablet (sem hover): o toque abre o horario da ultima busca + "Atualizar agora".
   if (semHover) {
     const [linha1, ...resto] = [...statusLines, ...(proximaLine ? [proximaLine] : [])];
     return (

@@ -1,9 +1,9 @@
 /**
- * Convite e ciclo de vida do acesso do vendedor (Gestão > Vendedores).
- * Regras de quem pode e do que é válido vêm do motor (`engine/sellerAccess.ts`).
+ * Convite e ciclo de vida do acesso do vendedor (Gestao > Vendedores).
+ * Regras de quem pode e do que e valido vem do motor (`engine/sellerAccess.ts`).
  */
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { canManageStore, invitable, normalizeEmail, validEmail } from "./engine/sellerAccess.ts";
+import { canManageStore, hasSalesGroup, invitable, normalizeEmail, validEmail } from "./engine/sellerAccess.ts";
 
 export type SellerCaller = { role: string; memberStoreIds: string[] };
 
@@ -16,6 +16,7 @@ export type SellerRow = {
   in_erp: boolean;
   erp_role: string | null;
   membership_id: string | null;
+  shift_id: string | null;
 };
 
 export type MembershipRow = {
@@ -59,7 +60,7 @@ export async function sellerCaller(
 async function sellerOf(admin: SupabaseClient, tenantId: string, storeSellerId: string): Promise<SellerRow | null> {
   const { data } = await admin
     .from("store_seller")
-    .select("id, store_id, name, email, active, in_erp, erp_role, membership_id")
+    .select("id, store_id, name, email, active, in_erp, erp_role, membership_id, shift_id")
     .eq("tenant_id", tenantId)
     .eq("id", storeSellerId)
     .maybeSingle();
@@ -108,14 +109,15 @@ type InviteInput = {
 };
 
 /**
- * Convida o vendedor. E-mail que já é SELLER desta empresa só ganha a loja
- * (`linked: true`, sem e-mail novo). E-mail de outro tipo de acesso é recusado.
+ * Convida o vendedor. E-mail que ja e SELLER desta empresa so ganha a loja
+ * (`linked: true`, sem e-mail novo). E-mail de outro tipo de acesso e recusado.
  */
 export async function sellerInvite(admin: SupabaseClient, caller: SellerCaller, input: InviteInput): Promise<SellerActionResult> {
   const seller = await sellerOf(admin, input.tenantId, input.storeSellerId);
   if (!seller) return err("invalid_seller");
   if (!canManageStore(caller.role, caller.memberStoreIds, seller.store_id)) return err("forbidden");
   if (!invitable({ active: seller.active, inErp: seller.in_erp, erpRole: seller.erp_role })) return err("not_invitable");
+  if (!hasSalesGroup(seller.shift_id)) return err("no_group");
 
   const current = await membershipOf(admin, seller.membership_id);
   if (current) return err(current.status === "PENDING" ? "already_invited" : "already_member");
@@ -137,7 +139,7 @@ export async function sellerInvite(admin: SupabaseClient, caller: SellerCaller, 
       return linkStore(admin, seller, here.id);
     }
     if (live.length > 0) return err("email_in_use");
-    // Conta PENDING sem nenhuma membership: convite órfão. Libera o e-mail.
+    // Conta PENDING sem nenhuma membership: convite orfao. Libera o e-mail.
     if (existing.status === "PENDING") {
       const { data: ident } = await admin.from("identity").select("auth_user_id").eq("id", existing.id).maybeSingle();
       if (ident?.auth_user_id) await admin.auth.admin.deleteUser(ident.auth_user_id as string);
@@ -218,8 +220,8 @@ export async function sellerLink(admin: SupabaseClient, caller: SellerCaller, te
   });
   if (error) return err("link_failed");
   const token = typeof data === "string" ? data : "";
-  // Sem token aberto (convite antigo ou já confirmado): a tela avisa e oferece reenviar.
-  // generateLink criaria um link novo e invalidaria o do e-mail, então não é usado.
+  // Sem token aberto (convite antigo ou ja confirmado): a tela avisa e oferece reenviar.
+  // generateLink criaria um link novo e invalidaria o do e-mail, entao nao e usado.
   if (!token) return err("no_link");
   return ok({ token });
 }
@@ -238,7 +240,47 @@ export async function sellerResend(
   return error ? err(error) : ok();
 }
 
-/** Cancela o convite: volta a "Sem acesso" e apaga o usuário do Auth se a pessoa ficou sem acesso. */
+/**
+ * Exclui o acesso ja aceito (Ativo ou Suspenso) nesta loja.
+ * Conta ligada a outra loja: so esta loja volta a "Sem acesso".
+ * Ultima loja: a pessoa deixa de entrar na WDASH.
+ */
+export async function sellerRemove(admin: SupabaseClient, caller: SellerCaller, tenantId: string, storeSellerId: string): Promise<SellerActionResult> {
+  const seller = await sellerOf(admin, tenantId, storeSellerId);
+  if (!seller) return err("invalid_seller");
+  if (!canManageStore(caller.role, caller.memberStoreIds, seller.store_id)) return err("forbidden");
+  const membership = await membershipOf(admin, seller.membership_id);
+  if (!membership || membership.role !== "SELLER" || !membership.identity) return err("no_access");
+  if (membership.status !== "ACTIVE" && membership.status !== "SUSPENDED") return err("invalid_status");
+
+  const { count } = await admin
+    .from("store_seller")
+    .select("id", { count: "exact", head: true })
+    .eq("membership_id", membership.id)
+    .neq("id", seller.id);
+  if ((count ?? 0) > 0) {
+    const { error: unlink } = await admin.from("store_seller").update({ membership_id: null }).eq("id", seller.id);
+    if (unlink) return err("remove_failed");
+    const { error: storeErr } = await admin
+      .from("membership_store")
+      .delete()
+      .eq("membership_id", membership.id)
+      .eq("store_id", seller.store_id);
+    if (storeErr) return err("remove_failed");
+    return ok();
+  }
+
+  const { error } = await admin.from("membership").delete().eq("id", membership.id);
+  if (error) return err("remove_failed");
+  const { count: left } = await admin
+    .from("membership")
+    .select("id", { count: "exact", head: true })
+    .eq("identity_id", membership.identity.id);
+  if ((left ?? 0) === 0) await admin.auth.admin.deleteUser(membership.identity.auth_user_id);
+  return ok();
+}
+
+/** Cancela o convite: volta a "Sem acesso" e apaga o usuario do Auth se a pessoa ficou sem acesso. */
 export async function sellerRevoke(admin: SupabaseClient, caller: SellerCaller, tenantId: string, storeSellerId: string): Promise<SellerActionResult> {
   const found = await sellerMembership(admin, caller, tenantId, storeSellerId);
   if (!found.ok) return found;

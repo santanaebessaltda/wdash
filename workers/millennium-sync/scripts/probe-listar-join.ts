@@ -1,5 +1,5 @@
 /**
- * JOIN LISTARVENDASSALDO (COD) × lookup produto (COD→id) × mapa estoque.
+ * JOIN LISTARVENDASSALDO (COD) x lookup produto (COD -> id) x mapa estoque.
  *   cd workers/millennium-sync && npx tsx scripts/probe-listar-join.ts
  */
 import { readFileSync, existsSync } from "node:fs";

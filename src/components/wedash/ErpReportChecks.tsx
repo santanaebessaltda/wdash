@@ -1,7 +1,7 @@
 import { Alert } from "@/components/ui";
 import type { ErpReportCheck } from "@/data/wedash/erp";
 
-/** Resultado do teste de acesso aos relatórios personalizados do Millennium (onboarding + Integrações). */
+/** Resultado do teste de acesso aos relatorios personalizados do Millennium (onboarding + Integracoes). */
 export function ErpReportChecks({ reports, username }: { reports: ErpReportCheck[]; username: string }) {
   return (
     <Alert

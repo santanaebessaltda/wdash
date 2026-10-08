@@ -1,4 +1,4 @@
-/** Flag pós-onboarding: bloqueia o app até a carga inicial (SEED) gravar de verdade. */
+/** Flag pos-onboarding: bloqueia o app ate a carga inicial (SEED) gravar de verdade. */
 const FLAG = "wedash.awaitingInitialSync";
 const SINCE = "wedash.awaitingInitialSyncSince";
 
@@ -11,7 +11,7 @@ export function markAwaitingInitialSync(): void {
   }
 }
 
-/** Reinicia o relógio do “aguardando sync” (ex.: Tentar novamente). */
+/** Reinicia o relogio do "aguardando sync" (ex.: Tentar novamente). */
 export function bumpAwaitingInitialSyncSince(): void {
   try {
     if (sessionStorage.getItem(FLAG) === "1") {
@@ -39,7 +39,7 @@ export function isAwaitingInitialSync(): boolean {
   }
 }
 
-/** Instantâneo em que pedimos o SEED — jobs antigos “SUCCEEDED” não liberam a tela. */
+/** Instantaneo em que pedimos o SEED  -  jobs antigos "SUCCEEDED" nao liberam a tela. */
 export function awaitingInitialSyncSince(): string | null {
   try {
     return sessionStorage.getItem(SINCE);

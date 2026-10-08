@@ -5,7 +5,7 @@ import { RequireRole } from "@/session/RequireSession";
 
 /**
  * `/dashboard` e `/loja` eram a tela legada com TabNav interno.
- * Entrada canônica = Visão geral (`/dashboard/visao-geral`).
+ * Entrada canonica = Visao geral (`/dashboard/visao-geral`).
  */
 export const dashboardRoutes: RouteObject[] = [
   {

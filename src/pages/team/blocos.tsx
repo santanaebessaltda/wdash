@@ -276,6 +276,7 @@ export function BlocoVendedoras({
   metaAtiva,
   encerrada = false,
   grupo = false,
+  geral = false,
 }: {
   lista: SellerRow[];
   metaAtiva: boolean;
@@ -283,7 +284,11 @@ export function BlocoVendedoras({
   encerrada?: boolean;
   /** Meta no modo Grupo: a meta e o % da linha são do grupo da pessoa. */
   grupo?: boolean;
+  /** Meta no modo Geral: a meta e o % da linha são da loja. */
+  geral?: boolean;
 }) {
+  const metaHeader = geral ? "Meta da loja" : grupo ? "Meta do grupo" : "Meta individual";
+  const pctHeader = geral ? "Atingimento da loja" : grupo ? "% da meta do grupo" : "% da meta individual";
   const ranked: LinhaRank[] = lista.map((l, i) => ({ ...l, posicao: i + 1 }));
 
   const colunas: DataTableColumn<LinhaRank>[] = [
@@ -313,7 +318,7 @@ export function BlocoVendedoras({
       ? ([
           {
             key: "meta",
-            header: grupo ? "Meta do grupo" : "Meta individual",
+            header: metaHeader,
             hideBelow: "md",
             sortable: true,
             sortValue: (l: LinhaRank) => (l.semMeta ? null : l.metaIndividualValor),
@@ -322,7 +327,7 @@ export function BlocoVendedoras({
           },
           {
             key: "pctIndiv",
-            header: grupo ? "% da meta do grupo" : "% da meta individual",
+            header: pctHeader,
             sortable: true,
             sortValue: (l: LinhaRank) => (l.semMeta ? null : l.atingimentoPct),
             render: (l: LinhaRank) => <CelulaPctIndividual l={l} />,
@@ -414,6 +419,7 @@ export function CardVendedoras({
   aside,
   encerrada = false,
   grupo = false,
+  geral = false,
 }: {
   estado: BlockStateTipo;
   lista: SellerRow[] | null;
@@ -421,6 +427,8 @@ export function CardVendedoras({
   encerrada?: boolean;
   /** Meta no modo Grupo (colunas "Meta do grupo" / "% da meta do grupo"). */
   grupo?: boolean;
+  /** Meta no modo Geral (colunas "Meta da loja" / "Atingimento da loja"). */
+  geral?: boolean;
   /** Sem Card externo — bloco contínuo após a projeção (CardMeta). */
   embedded?: boolean;
   title?: string;
@@ -431,7 +439,7 @@ export function CardVendedoras({
   const tabela =
     lista && lista.length > 0 ? (
       <div className="max-h-[min(520px,70vh)] overflow-x-auto overflow-y-auto pr-1">
-        <BlocoVendedoras lista={lista} metaAtiva={metaAtiva} encerrada={encerrada} grupo={grupo} />
+        <BlocoVendedoras lista={lista} metaAtiva={metaAtiva} encerrada={encerrada} grupo={grupo} geral={geral} />
       </div>
     ) : (
       <div className={embedded ? "py-2" : "p-5"}>

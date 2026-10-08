@@ -1,5 +1,5 @@
 /**
- * Confere o código de gerador de 1 funcionária (FUNCIONARIOS.Consulta, só leitura; reusa a sessão salva).
+ * Confere o codigo de gerador de 1 funcionaria (FUNCIONARIOS.Consulta, so leitura; reusa a sessao salva).
  *   cd workers/millennium-sync && npx tsx scripts/probe-gerador.ts FUNCIONARIO
  */
 import { readFileSync, existsSync } from "node:fs";

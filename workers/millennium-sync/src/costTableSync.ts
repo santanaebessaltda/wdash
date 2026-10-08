@@ -1,20 +1,20 @@
 /**
- * Escolha automática da tabela de custo da loja — só banco, nenhuma chamada ao ERP.
- * Loja sem tabela escolhida (cost_table_set_at null) recebe a tabela cujo custo unitário mais bate
- * (±1 centavo) com o último custo da margem por produto. Roda depois de gravar a margem da loja,
- * no máx. 1× por hora por loja. Os preços das tabelas vêm da recarga de produtos (productCatalog.ts).
+ * Escolha automatica da tabela de custo da loja  -  so banco, nenhuma chamada ao ERP.
+ * Loja sem tabela escolhida (cost_table_set_at null) recebe a tabela cujo custo unitario mais bate
+ * (1 centavo) com o ultimo custo da margem por produto. Roda depois de gravar a margem da loja,
+ * no max. 1x por hora por loja. Os precos das tabelas vem da recarga de produtos (productCatalog.ts).
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-/** Mínimo de produtos com custo igual (e metade dos comparados) para escolher a tabela sozinho. */
+/** Minimo de produtos com custo igual (e metade dos comparados) para escolher a tabela sozinho. */
 export const COST_TABLE_MIN_MATCHES = 20;
 export const COST_TABLE_DETECT_EVERY_MS = 60 * 60 * 1000;
 
 export type CostTableDetectDeps = {
   storeNeedsTable: (storeId: string) => Promise<boolean>;
-  /** COD_PRODUTO → custo unitário (centavos) do dia mais recente com custo na margem da loja. */
+  /** COD_PRODUTO  ->  custo unitario (centavos) do dia mais recente com custo na margem da loja. */
   margemUnitCosts: (storeId: string) => Promise<Map<string, number>>;
-  /** table_id → (COD_PRODUTO → custo unitário em centavos). */
+  /** table_id  ->  (COD_PRODUTO  ->  custo unitario em centavos). */
   tablePrices: () => Promise<Map<number, Map<string, number>>>;
   setStoreTable: (storeId: string, tableId: number) => Promise<void>;
 };
@@ -43,7 +43,7 @@ export function pickCostTable(
 
 const lastAttempt = new Map<string, number>();
 
-/** Tabela escolhida agora (ou null: loja já tem tabela, tentou há pouco ou ainda não dá para decidir). */
+/** Tabela escolhida agora (ou null: loja ja tem tabela, tentou ha pouco ou ainda nao da para decidir). */
 export async function detectStoreCostTable(
   deps: CostTableDetectDeps,
   storeId: string,

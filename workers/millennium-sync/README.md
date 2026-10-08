@@ -2,7 +2,7 @@
 
 Polls `sync_job` and talks to Millennium from a **Brazilian IP**.
 
-👉 **Guia em português (passo a passo):** [COMO-RODAR.md](./COMO-RODAR.md)
+**Guia em português (passo a passo):** [HOW-TO-RUN.md](./HOW-TO-RUN.md)
 
 ## Quick start
 

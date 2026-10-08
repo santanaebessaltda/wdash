@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-/** Mobile = abaixo do `md` do Tailwind (768px), mesmo corte das grades do CLAUDE.md. */
+/** Mobile = abaixo do `md` do Tailwind (768px), mesmo corte das grades do WDASH.md. */
 export const MOBILE_QUERY = "(max-width: 767px)";
 
 export function useMediaQuery(query: string): boolean {

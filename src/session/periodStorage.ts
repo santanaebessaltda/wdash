@@ -1,6 +1,6 @@
 /**
- * Período compartilhado entre as telas (useScope). sessionStorage (não localStorage):
- * fechar o app volta para "Hoje"; o logout também limpa.
+ * Periodo compartilhado entre as telas (useScope). sessionStorage (nao localStorage):
+ * fechar o app volta para "Hoje"; o logout tambem limpa.
  */
 export const PERIOD_STORAGE_KEY = "wedash.period";
 

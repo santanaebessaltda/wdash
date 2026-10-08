@@ -1,6 +1,6 @@
 /**
- * Lojas que o usuário ERP enxerga: millenium.FILIAIS.Lista.
- * Mesmo parse de `supabase/functions/_shared/millennium.ts` (mapStore) — manter iguais.
+ * Lojas que o usuario ERP enxerga: millenium.FILIAIS.Lista.
+ * Mesmo parse de `supabase/functions/_shared/millennium.ts` (mapStore)  -  manter iguais.
  */
 import { millenniumBaseUrl } from "./millenniumAuth.ts";
 

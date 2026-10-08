@@ -1,5 +1,5 @@
 /**
- * Grava 1 aviso + 1 erro de teste em sync_log (Configurações > Logs).
+ * Grava 1 aviso + 1 erro de teste em sync_log (Configuracoes > Logs).
  *   cd workers/millennium-sync
  *   npx tsx scripts/test-sync-logs.ts          # insere
  *   npx tsx scripts/test-sync-logs.ts --clean  # remove os de teste

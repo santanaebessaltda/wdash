@@ -1,10 +1,10 @@
 /**
- * EVENTOS.ListaTodos → IDs used as VENDAS.Lista EVENTO filter "(17,24,…)".
+ * EVENTOS.ListaTodos  ->  IDs used as VENDAS.Lista EVENTO filter "(17,24,...)".
  *
  * Franchise sales screens filter to S-X, S-03 plus S-{COD_FILIAL}
- * (e.g. filial 00010 → S-10). S-100 fica de fora (movimentações que
+ * (e.g. filial 00010  ->  S-10). S-100 fica de fora (movimentacoes que
  * inflavam o faturamento vs o BI). Sem o filtro, Lista devolve
- * transferências / outros eventos.
+ * transferencias / outros eventos.
  */
 
 export type MillenniumEvent = {
@@ -65,7 +65,7 @@ function defaultBaseUrl(): string {
   return (process.env.MILLENNIUM_API_BASE ?? "http://127.0.0.1:6017/api").replace(/\/$/, "");
 }
 
-/** Global + per-store event labels for VENDAS.Lista (COD_FILIAL "00010" → S-10). */
+/** Global + per-store event labels for VENDAS.Lista (COD_FILIAL "00010"  ->  S-10). */
 export function salesEventLabelsForStore(codFilial: string): string[] {
   const stripped = String(Number(String(codFilial).trim() || "0"));
   const labels = new Set(["S-X", "S-03", `S-${stripped}`]);
@@ -109,7 +109,7 @@ export function resolveSalesEventIds(
   return [...ids].sort((a, b) => a - b);
 }
 
-/** True se o cache tem todos os códigos S-* necessários para a loja. */
+/** True se o cache tem todos os codigos S-* necessarios para a loja. */
 export function salesEventLabelsCovered(
   events: MillenniumEvent[],
   codFilial: string,
@@ -127,7 +127,7 @@ export function salesEventLabelsCovered(
   return wanted.every((w) => covered.has(w));
 }
 
-/** Normaliza label → código curto (S-10) pra PK. */
+/** Normaliza label  ->  codigo curto (S-10) pra PK. */
 export function eventCodeFromLabel(label: string): string {
   const t = label.trim().toUpperCase();
   if (!t) return "";

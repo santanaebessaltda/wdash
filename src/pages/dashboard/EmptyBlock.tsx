@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { EmptyState } from "@/components/ui";
 
-/** Vazio padrão dos cards do Dashboard (EmptyState do Vela, sem borda própria).
- *  Sem dados = 📊; filtro/busca sem resultado = 🔍 + ação de limpar.
+/** Vazio padrao dos cards do Dashboard (EmptyState do Vela, sem borda propria).
+ *  Sem dados = ; filtro/busca sem resultado =  + acao de limpar.
  *  O card precisa ser `flex flex-col` para o bloco preencher a altura da linha da grade. */
 export function EmptyBlock({
   icon = "📊",

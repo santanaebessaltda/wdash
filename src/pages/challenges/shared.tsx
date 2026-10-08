@@ -28,20 +28,20 @@ const MAIOR: Record<ChallengeMetric, string> = {
   INDEX: "Maior índice de desempenho",
 };
 
-/** "Maior faturamento" / "Mínimo de 15 itens" — o critério do desafio em uma linha. */
+/** "Maior faturamento" / "Minimo de 15 itens"  -  o criterio do desafio em uma linha. */
 export function challengeCriterion(c: ChallengeRecord): string {
   if (c.mode === "MINIMUM") return c.target != null ? `Mínimo de ${metricValueLabel(c.metric, c.target)}` : "Mínimo não definido";
   const quem = MAIOR[c.metric];
   return c.target != null ? `${quem} · mínimo de ${metricValueLabel(c.metric, c.target)}` : quem;
 }
 
-/** Destaque do card: `label` null = a frase já é completa ("Ainda não há líder"). */
+/** Destaque do card: `label` null = a frase ja e completa ("Ainda nao ha lider"). */
 export interface ChallengeHeadline {
   label: string | null;
   value: string;
 }
 
-/** Linha de destaque do card: líder(es) / vencedor(es) na Disputa, quantas atingiram no Mínimo. */
+/** Linha de destaque do card: lider(es) / vencedor(es) na Disputa, quantas atingiram no Minimo. */
 export function challengeHeadline(c: ChallengeRecord, view: ChallengeView): ChallengeHeadline {
   if (view.status === "upcoming") return { label: "Critério", value: challengeCriterion(c) };
   const encerrado = view.status === "ended";
@@ -63,7 +63,7 @@ export function challengeHeadline(c: ChallengeRecord, view: ChallengeView): Chal
   return { label, value: `${lider}${valor}` };
 }
 
-/** "Líder: ANA · 12 itens" ou a frase inteira quando não há rótulo. */
+/** "Lider: ANA  |  12 itens" ou a frase inteira quando nao ha rotulo. */
 export function HeadlineText({ headline }: { headline: ChallengeHeadline }) {
   return headline.label ? (
     <>
@@ -75,7 +75,7 @@ export function HeadlineText({ headline }: { headline: ChallengeHeadline }) {
   );
 }
 
-/** Prêmio principal: 1º lugar (Disputa) ou o prêmio por pessoa (Mínimo). */
+/** Premio principal: 1 lugar (Disputa) ou o premio por pessoa (Minimo). */
 export function mainPrizeLabel(c: ChallengeRecord): string | null {
   const p = c.prizes[0];
   if (!p) return null;

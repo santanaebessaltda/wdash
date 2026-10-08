@@ -27,7 +27,7 @@ export const accessRoutes: RouteObject[] = [
   { path: paths.access.invite(), element: <Invite /> },
   { path: paths.access.install, element: <Install /> },
 
-  /* Legados PT → EN */
+  /* Legados PT  ->  EN */
   { path: paths.legacy.auth.entrar, element: <Navigate to={paths.access.login} replace /> },
   { path: paths.legacy.auth.recuperar, element: <Navigate to={paths.access.forgot} replace /> },
   { path: paths.legacy.auth.redefinir, element: <Navigate to={paths.access.reset} replace /> },

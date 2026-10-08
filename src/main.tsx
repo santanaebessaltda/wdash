@@ -14,7 +14,7 @@ if ("serviceWorker" in navigator) {
     window.addEventListener("load", async () => {
       try {
         const registro = await navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`);
-        // Nova versão instalada: recarrega uma vez para não ficar com a antiga.
+        // Nova versao instalada: recarrega uma vez para nao ficar com a antiga.
         let recarregando = false;
         navigator.serviceWorker.addEventListener("controllerchange", () => {
           if (recarregando) return;
@@ -23,12 +23,12 @@ if ("serviceWorker" in navigator) {
         });
         registro.update();
       } catch {
-        /* sem service worker: o app funciona igual, só não instala offline */
+        /* sem service worker: o app funciona igual, so nao instala offline */
       }
     });
   } else {
     // Em desenvolvimento nenhum service worker deve ficar no caminho: um
-    // registro antigo serviria a versão anterior do app.
+    // registro antigo serviria a versao anterior do app.
     navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister()));
   }
 }

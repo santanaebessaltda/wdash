@@ -2,18 +2,18 @@ import { getSupabase } from "@/lib/supabase";
 import { stores as demoStores } from "@/data/wedash/stores";
 import { companyNameCase, titleName } from "@/lib/format";
 
-/** Papéis de quem acessa o sistema (fora a equipe de vendas). */
+/** Papeis de quem acessa o sistema (fora a equipe de vendas). */
 export type SystemRole = "OWNER" | "MANAGER";
 export type SystemUserStatus = "PENDING" | "ACTIVE" | "SUSPENDED";
 
 export interface SystemUser {
   membershipId: string;
-  /** Vazio enquanto o convite não foi aceito (o nome vem do "Crie seu acesso"). */
+  /** Vazio enquanto o convite nao foi aceito (o nome vem do "Crie seu acesso"). */
   name: string;
   email: string;
   role: SystemRole;
   status: SystemUserStatus;
-  /** Gestor principal (criou a conta) — não pode ser editado nem suspenso. */
+  /** Gestor principal (criou a conta)  -  nao pode ser editado nem suspenso. */
   isOwner: boolean;
   isSelf: boolean;
   /** Vazio = todas as lojas (inclui lojas novas). */
@@ -41,7 +41,7 @@ export interface InviteInput {
   storeIds: string[];
 }
 
-/** `code` = código de erro da Edge, para a tela trocar a mensagem pelo contexto (ex.: `protected_member`). */
+/** `code` = codigo de erro da Edge, para a tela trocar a mensagem pelo contexto (ex.: `protected_member`). */
 export type ActionResult = { ok: true } | { ok: false; message: string; code?: string };
 
 const GENERIC_ERROR = "Não foi possível concluir. Tente novamente.";
@@ -52,8 +52,8 @@ const MESSAGES: Record<string, string> = {
   invalid_role: "Escolha o tipo de acesso.",
   invalid_stores: "Escolha pelo menos uma loja.",
   already_invited: "Este e-mail já tem um convite pendente. Use Reenviar convite na aba Convites pendentes.",
-  already_member: "Este e-mail já tem acesso à WeDash.",
-  email_in_use: "Este e-mail já está vinculado a outra empresa na WeDash.",
+  already_member: "Este e-mail já tem acesso à WDash.",
+  email_in_use: "Este e-mail já está vinculado a outra empresa na WDash.",
   rate_limited: "Muitos convites foram enviados em pouco tempo. Aguarde um minuto e tente novamente.",
   email_failed: "Não foi possível enviar o e-mail do convite. Tente novamente.",
   invite_failed: "Não foi possível concluir o convite. Se o e-mail chegou, ignore-o e envie um novo convite.",
@@ -61,6 +61,8 @@ const MESSAGES: Record<string, string> = {
   revoke_failed: "Não foi possível cancelar o convite. Tente novamente.",
   protected_member: "O acesso do Gestor principal não pode ser alterado aqui.",
   not_pending: "Este convite já foi aceito ou cancelado.",
+  no_link: "O link do convite não está mais disponível. Reenvie o convite.",
+  link_failed: "Não foi possível copiar o link. Tente novamente.",
   forbidden: "Somente Gestores podem gerenciar usuários.",
 };
 
@@ -161,6 +163,18 @@ export async function updateSystemUser(membershipId: string, role: SystemRole, s
 
 type MemberAction = "resend" | "suspend" | "reactivate" | "revoke";
 
+/** Link igual ao do e-mail, pronto para colar (`/invite/{token}`). */
+export async function copySystemUserInviteLink(
+  membershipId: string,
+): Promise<{ ok: true; token: string } | { ok: false; message: string; code?: string }> {
+  if (!getSupabase()) return { ok: false, message: messageFor("no_link"), code: "no_link" };
+  const r = await invoke<{ token?: string }>({ action: "link", membershipId });
+  if (!r.ok) return r;
+  const token = typeof r.data.token === "string" ? r.data.token : "";
+  if (!token) return { ok: false, message: messageFor("no_link"), code: "no_link" };
+  return { ok: true, token: `${window.location.origin}/invite/${token}` };
+}
+
 export async function systemUserAction(action: MemberAction, membershipId: string): Promise<ActionResult> {
   if (!getSupabase()) {
     if (action === "revoke") return demoPatch(membershipId, null);
@@ -180,15 +194,17 @@ export interface InviteInfo {
   companyName: string;
   /** Loja do convite de vendedor (fantasia). null para Gestor/Gerente. */
   storeName: string | null;
+  /** franchisee = Invite do painel (empresa nova); member = Usuarios/Vendedores. */
+  kind: "franchisee" | "member";
 }
 
 export async function fetchInviteInfo(): Promise<{ ok: true; info: InviteInfo } | { ok: false; code: string }> {
   const sb = getSupabase();
   if (!sb) return { ok: false, code: "not_found" };
   const { data, error } = await sb.functions.invoke("team-members", { body: { action: "invite_info" } });
-  const res = data as ({ ok?: boolean; error?: string } & InviteInfo) | null;
+  const res = data as ({ ok?: boolean; error?: string; kind?: string } & InviteInfo) | null;
   if (error || !res?.ok) return { ok: false, code: res?.error ?? "not_found" };
-  const resAny = res as InviteInfo & { storeName?: string | null };
+  const resAny = res as InviteInfo & { storeName?: string | null; kind?: string };
   return {
     ok: true,
     info: {
@@ -196,6 +212,7 @@ export async function fetchInviteInfo(): Promise<{ ok: true; info: InviteInfo } 
       role: res.role,
       companyName: companyNameCase(res.companyName),
       storeName: resAny.storeName ? companyNameCase(resAny.storeName) : null,
+      kind: resAny.kind === "franchisee" ? "franchisee" : "member",
     },
   };
 }

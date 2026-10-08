@@ -15,7 +15,7 @@ export type FetchSalesListaParams = {
   to: string;
   /**
    * EVENTO ids from EVENTOS.ListaTodos (sales whitelist).
-   * Sent as EVENTO: "(17,24,…)". Required for BI-parity faturamento.
+   * Sent as EVENTO: "(17,24,...)". Required for BI-parity faturamento.
    */
   eventoIds: number[];
   baseUrl?: string;
@@ -25,11 +25,11 @@ export type FetchSalesListaParams = {
 /** Sale row plus Millennium FILIAL from the Lista payload (for all-stores partition). */
 export type SaleRowWithFilial = SaleRow & {
   millenniumFilial: number | null;
-  /** COD_OPERACAO numérico — chave do ConsultaDetMov. */
+  /** COD_OPERACAO numerico  -  chave do ConsultaDetMov. */
   millenniumOpCode: number | null;
-  /** Cupom / NF — chave do ConsultaDetMov. */
+  /** Cupom / NF  -  chave do ConsultaDetMov. */
   nf: string | null;
-  /** "S" = saída/venda. */
+  /** "S" = saida/venda. */
   tipoOperacao: string | null;
 };
 
@@ -96,8 +96,8 @@ export function calendarYmd(v: unknown): string | null {
 }
 
 /**
- * Coluna DATA = dia de calendário da venda (não instante).
- * Ancora no midnight MS (UTC−4 = T04:00Z) — senão T03:00Z vira 31/07 em CG.
+ * Coluna DATA = dia de calendario da venda (nao instante).
+ * Ancora no midnight MS (UTC4 = T04:00Z)  -  senao T03:00Z vira 31/07 em CG.
  */
 export function parseDataCalendar(v: unknown): Date | null {
   const ymd = calendarYmd(v);
@@ -123,7 +123,7 @@ function localHms(
   return { hour, minute: get("minute"), second: get("second") };
 }
 
-/** America/Campo_Grande = UTC−4 o ano todo. */
+/** America/Campo_Grande = UTC4 o ano todo. */
 function msLocalWallToUtc(
   ymd: string,
   hour: number,
@@ -135,8 +135,8 @@ function msLocalWallToUtc(
 }
 
 /**
- * Dia = coluna DATA (calendário ERP). Hora = DATA_H no fuso da loja.
- * Evita 01/08 → 31/07 quando DATA_H vem como T00:00Z / T03:00Z.
+ * Dia = coluna DATA (calendario ERP). Hora = DATA_H no fuso da loja.
+ * Evita 01/08  ->  31/07 quando DATA_H vem como T00:00Z / T03:00Z.
  */
 export function resolveOccurredAt(
   row: Record<string, unknown>,
@@ -156,7 +156,7 @@ export function resolveOccurredAt(
   return null;
 }
 
-/** Add Δ days to YYYY-MM-DD (calendar, not TZ-shifted). */
+/** Add  days to YYYY-MM-DD (calendar, not TZ-shifted). */
 export function addDaysYmd(ymd: string, delta: number): string {
   const [y, m, d] = ymd.split("-").map(Number);
   const utc = new Date(Date.UTC(y, m - 1, d + delta));
@@ -164,7 +164,7 @@ export function addDaysYmd(ymd: string, delta: number): string {
 }
 
 /**
- * Local calendar day → Millennium bound at MS midnight (UTC−4 → T04:00:00.000Z).
+ * Local calendar day  ->  Millennium bound at MS midnight (UTC4  ->  T04:00:00.000Z).
  * DATAF in the UI is exclusive (next local midnight).
  */
 export function milleniumDayBoundIso(ymd: string): string {
@@ -172,7 +172,7 @@ export function milleniumDayBoundIso(ymd: string): string {
 }
 
 /**
- * Inclusive [from,to] → DATAI / DATAF. A API filtra pela coluna DATA com DATAF **inclusivo**:
+ * Inclusive [from,to]  ->  DATAI / DATAF. A API filtra pela coluna DATA com DATAF **inclusivo**:
  * mandar a meia-noite do dia seguinte trazia o dia seguinte inteiro junto.
  */
 export function milleniumDataRange(from: string, to: string): { datai: string; dataf: string } {
@@ -182,7 +182,7 @@ export function milleniumDataRange(from: string, to: string): { datai: string; d
   };
 }
 
-/** Map anonymized / live VENDAS.Lista JSON → SaleRow[] (keeps Millennium FILIAL). */
+/** Map anonymized / live VENDAS.Lista JSON  ->  SaleRow[] (keeps Millennium FILIAL). */
 export function mapVendasListaPayload(
   payload: unknown,
   opts: { storeId: string },
@@ -195,7 +195,7 @@ export function mapVendasListaPayload(
     if (!occurredAt) continue;
     const revenueCents = reaisToCents(pick(o, "VALOR_FINAL", "valor_final"));
     const millenniumOpCode = asNum(pick(o, "COD_OPERACAO", "cod_operacao"));
-    // Sem COD_OPERACAO ainda entra (ex.: R$ 53,80 só com DATA).
+    // Sem COD_OPERACAO ainda entra (ex.: R$ 53,80 so com DATA).
     const operationCode =
       (millenniumOpCode != null ? String(millenniumOpCode) : "") ||
       asStr(pick(o, "COD_OPERACAO", "cod_operacao")) ||
@@ -240,7 +240,7 @@ export function mapVendasListaPayload(
 }
 
 /**
- * Split all-stores Lista rows by Millennium FILIAL → WeDash storeId.
+ * Split all-stores Lista rows by Millennium FILIAL  ->  WeDash storeId.
  * Rows whose FILIAL is missing or unknown are dropped.
  */
 export function partitionRowsByFilial(
@@ -314,7 +314,7 @@ type Attempt = {
 };
 
 /**
- * millenium.VENDAS.Lista — HTTP POST with JSON body (curl --data-raw).
+ * millenium.VENDAS.Lista  -  HTTP POST with JSON body (curl --data-raw).
  * Browser also sends X-HTTP-Method: GET; we try both header variants.
  *
  * `millenniumStoreId: null` = all stores; only allowed when from === to (1 day).
@@ -371,7 +371,7 @@ export async function fetchSalesLista(params: FetchSalesListaParams): Promise<Sa
     },
   });
 
-  // 2) Plain POST (no X-HTTP-Method) — some WTS builds treat body as POST only
+  // 2) Plain POST (no X-HTTP-Method)  -  some WTS builds treat body as POST only
   attempts.push({
     label: "POST",
     url,
@@ -430,8 +430,8 @@ export async function fetchSalesLista(params: FetchSalesListaParams): Promise<Sa
           `  Lista VAZIO · ${params.from}→${params.to} via ${attempt.label} · ${formatElapsed(tAttempt)} · raw=${raw.length}b`,
         );
       }
-      // Sucesso: o caller (runSyncJob) loga com código da loja + tempo.
-      // Aqui só registra se for fallback (não o 1º attempt) para diagnóstico.
+      // Sucesso: o caller (runSyncJob) loga com codigo da loja + tempo.
+      // Aqui so registra se for fallback (nao o 1 attempt) para diagnostico.
       if (attempt !== attempts[0]) {
         console.log(
           `  Lista via ${attempt.label} · ${rows.length} venda(s) · ${formatElapsed(tAttempt)}`,
@@ -441,7 +441,7 @@ export async function fetchSalesLista(params: FetchSalesListaParams): Promise<Sa
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       errors.push(`${attempt.label} → ${msg} (${formatElapsed(tAttempt)})`);
-      // Timeout: ERP lento/travado — POST/GET fallback com o mesmo body só multiplica a espera.
+      // Timeout: ERP lento/travado  -  POST/GET fallback com o mesmo body so multiplica a espera.
       if (/aborted|timeout|TimeoutError/i.test(msg)) break;
     }
   }

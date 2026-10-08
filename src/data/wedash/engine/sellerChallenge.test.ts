@@ -93,6 +93,22 @@ describe("challengeStanding", () => {
     expect(ended.won).toBe(true);
   });
 
+  it("P.A. acima do mínimo em andamento ainda não atingiu", () => {
+    const standing = challengeStanding(
+      { ...base, mode: "MINIMUM", metric: "PA", target: 1.5, minSales: 1 },
+      { today: "2026-09-15", employeeId: 1, team, sellerDays: [day(1, 10, 20, 50_000)] },
+    );
+    expect(standing.result).toBe("2,00");
+    expect(standing.won).toBe(false);
+    expect(standing.gap).toBe("O P.A. só vale no fim do desafio");
+    const fim = challengeStanding(
+      { ...base, mode: "MINIMUM", metric: "PA", target: 1.5, minSales: 1, endsOn: "2026-09-10" },
+      { today: "2026-09-15", employeeId: 1, team, sellerDays: [day(1, 10, 20, 50_000)] },
+    );
+    expect(fim.won).toBe(true);
+    expect(fim.gap).toBeNull();
+  });
+
   it("asks for the remaining sales before the person can take part", () => {
     const standing = challengeStanding(
       { ...base, metric: "TICKET", minSales: 10, target: 100 },
@@ -134,7 +150,7 @@ describe("sellerChallengeRules", () => {
       prizes: [{ kind: "ITEM", label: "Combo" }],
     });
     expect(rules[0]).toMatch(/atingirem o mínimo/i);
-    expect(rules).toContain("O resultado é o seu P.A. (itens por venda) no período.");
+    expect(rules).toContain("O resultado é o seu P.A. (itens por venda), calculado no fim do desafio. Até lá, o número pode mudar.");
     expect(rules).toContain("Precisa de pelo menos 10 vendas para participar.");
     expect(rules).toContain("Mínimo para ganhar: 1,90.");
     expect(rules).toContain("Prêmio: Combo por pessoa.");

@@ -1,5 +1,5 @@
 /**
- * Estoque e Tabelas de venda: leitura (estoque da loja, tabelas/preços de venda, tabela usada nas vendas, catálogo)
+ * Estoque e Tabelas de venda: leitura (estoque da loja, tabelas/precos de venda, tabela usada nas vendas, catalogo)
  * e busca no Millennium sob demanda (Edge `erp-stock-sync`).
  */
 import { labelCase } from "@/lib/format";
@@ -46,10 +46,10 @@ async function priceMap(table: string, idCol: string, valueCol: string, ids: num
   return out;
 }
 
-/** tabela de venda → COD_PRODUTO → preço (centavos). */
+/** tabela de venda  ->  COD_PRODUTO  ->  preco (centavos). */
 export const fetchSalePrices = (ids: number[]) => priceMap("product_sale_price", "table_id", "price_cents", ids);
 
-/** tabela de custo → COD_PRODUTO → custo unitário (centavos). */
+/** tabela de custo  ->  COD_PRODUTO  ->  custo unitario (centavos). */
 export const fetchCostPrices = (ids: number[]) => priceMap("product_cost_table_price", "table_id", "unit_cost_cents", ids);
 
 export async function fetchStoreStock(
@@ -84,8 +84,8 @@ export async function fetchStoreStock(
 }
 
 /**
- * Nome do local em caixa alta; o QUIOSQUE (de onde sai a venda) aparece como "PONTO DE VENDA" — "loja" na WeDash
- * é a filial. Mesma grafia no ERP soma junto.
+ * Nome do local em caixa alta; o QUIOSQUE (de onde sai a venda) aparece como "PONTO DE VENDA"  -  "loja" na WDash
+ * e a filial. Mesma grafia no ERP soma junto.
  */
 function locationsUpper(raw: Record<string, number | string>): Record<string, number> {
   const out: Record<string, number> = {};
@@ -97,7 +97,7 @@ function locationsUpper(raw: Record<string, number | string>): Record<string, nu
   return out;
 }
 
-/** Itens vendidos por tabela de preço (loja × dia) no período. */
+/** Itens vendidos por tabela de preco (loja x dia) no periodo. */
 export async function fetchPriceTableUsage(
   tenantId: string,
   storeIds: string[],
@@ -123,7 +123,7 @@ export async function fetchPriceTableUsage(
 
 let catalogPromise: Promise<Map<string, StockCatalogItem>> | null = null;
 
-/** Catálogo global (código → nome + categoria). 1× por sessão. */
+/** Catalogo global (codigo  ->  nome + categoria). 1x por sessao. */
 export function fetchStockCatalog(): Promise<Map<string, StockCatalogItem>> {
   if (catalogPromise) return catalogPromise;
   const run = (async () => {
@@ -164,7 +164,7 @@ const STOCK_SYNC_ERRORS: Record<string, string> = {
   forbidden: "Você não tem permissão para buscar o estoque.",
 };
 
-/** Busca no Millennium agora (tabelas de venda, preços de tabelas, estoque das lojas). */
+/** Busca no Millennium agora (tabelas de venda, precos de tabelas, estoque das lojas). */
 export async function syncStockNow(req: {
   saleTables?: boolean;
   salePriceTableIds?: number[];
@@ -172,7 +172,7 @@ export async function syncStockNow(req: {
   purchaseStoreIds?: string[];
 }): Promise<{ ok: true; failed: string[]; purchaseFailedStores: string[] } | { ok: false; message: string }> {
   const sb = getSupabase();
-  if (!sb) return { ok: false, message: "Não foi possível conectar à WeDash. Verifique sua conexão e tente novamente." };
+  if (!sb) return { ok: false, message: "Não foi possível conectar à WDash. Verifique sua conexão e tente novamente." };
   const { data, error } = await sb.functions.invoke("erp-stock-sync", { body: req });
   let body = data as { ok?: boolean; error?: string; failed?: string[]; purchaseFailedStores?: string[] } | null;
   if ((!body || typeof body !== "object") && error && typeof error === "object") {

@@ -58,7 +58,7 @@ export function DonutChart({ segments, size = 160, thickness = 24, centerLabel, 
             </div>
           )}
         </div>
-        {/* Legenda lateral: cor + nome + % (padrão Vela / Plan mix); valor opcional via showLegendValue */}
+        {/* Legenda lateral: cor + nome + % (padrao Vela / Plan mix); valor opcional via showLegendValue */}
         <div className="flex flex-col gap-2.5">
           {segments.map((seg) => (
             <div key={seg.label} className="flex items-center gap-2.5 text-[12.5px]">

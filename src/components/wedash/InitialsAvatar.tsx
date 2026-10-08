@@ -1,6 +1,6 @@
 const CORES_RANK = ["var(--ok)", "var(--info)", "var(--warn)", "var(--acc)", "var(--bad)"];
 
-/** Quadrado com as iniciais do nome, na cor da posição na lista — avatar das listas de produtos e da equipe. */
+/** Quadrado com as iniciais do nome, na cor da posicao na lista  -  avatar das listas de produtos e da equipe. */
 export function AvatarIniciais({ nome, idx }: { nome: string; idx: number }) {
   const iniciais = nome.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
   const cor = CORES_RANK[idx % CORES_RANK.length];

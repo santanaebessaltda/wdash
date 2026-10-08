@@ -1,15 +1,15 @@
 /**
- * Linha de produto (fragrância) a partir da descrição do ERP (o Millennium não tem campo de linha):
- * "DESOD COL OBSESSED DELUXE 100 ML - WEPINK" e "BODY SPLASH OBSESSED 200ML - WEPINK" → linha OBSESSED.
+ * Linha de produto (fragrancia) a partir da descricao do ERP (o Millennium nao tem campo de linha):
+ * "DESOD COL OBSESSED DELUXE 100 ML - WEPINK" e "BODY SPLASH OBSESSED 200ML - WEPINK"  ->  linha OBSESSED.
  *
- * 1. Tira o tipo do começo (desodorante colônia, body splash, body cream, roll-on…), o tamanho e a marca.
- * 2. Agrupa pela 1ª palavra da fragrância (2 palavras quando a 1ª é genérica: MY, THE, LE).
- * 3. Nome da linha = começo comum de todas as fragrâncias do grupo no catálogo
- *    (ONE TOUCH LATTE / SILK / WARM → ONE TOUCH; FANTASY KIDS … → FANTASY KIDS).
- * Produto sem tipo de fragrância (skincare, cabelo, maquiagem, suplementos, kits) fica sem linha.
+ * 1. Tira o tipo do comeco (desodorante colonia, body splash, body cream, roll-on...), o tamanho e a marca.
+ * 2. Agrupa pela 1 palavra da fragrancia (2 palavras quando a 1 e generica: MY, THE, LE).
+ * 3. Nome da linha = comeco comum de todas as fragrancias do grupo no catalogo
+ *    (ONE TOUCH LATTE / SILK / WARM  ->  ONE TOUCH; FANTASY KIDS ...  ->  FANTASY KIDS).
+ * Produto sem tipo de fragrancia (skincare, cabelo, maquiagem, suplementos, kits) fica sem linha.
  */
 
-/** Tipos de produto com fragrância, do prefixo mais longo para o mais curto. */
+/** Tipos de produto com fragrancia, do prefixo mais longo para o mais curto. */
 const KIND_PREFIXES: Array<{ prefix: string; kind: string }> = [
   { prefix: "DESODORANTE ROLL-ON MY PROTECTION", kind: "Roll-on" },
   { prefix: "DESODORANTE ROLL-ON", kind: "Roll-on" },
@@ -28,7 +28,7 @@ const KIND_PREFIXES: Array<{ prefix: string; kind: string }> = [
   { prefix: "THE CREAM", kind: "The Cream" },
 ];
 
-/** Grafias diferentes da mesma fragrância no cadastro do ERP. */
+/** Grafias diferentes da mesma fragrancia no cadastro do ERP. */
 const ALIASES: Record<string, string> = {
   GADHAN: "GHADAN",
   INFINTY: "INFINITY",
@@ -37,7 +37,7 @@ const ALIASES: Record<string, string> = {
   VIRGINIA: "VF",
 };
 
-/** 1ª palavra genérica demais para ser a linha sozinha. */
+/** 1 palavra generica demais para ser a linha sozinha. */
 const GENERIC_FIRST = new Set(["MY", "THE", "LE"]);
 
 const normalize = (s: string) =>
@@ -52,7 +52,7 @@ const normalize = (s: string) =>
 
 export type Fragrance = { name: string; kind: string };
 
-/** Fragrância + tipo do produto; null = produto sem fragrância (fora das linhas). */
+/** Fragrancia + tipo do produto; null = produto sem fragrancia (fora das linhas). */
 export function fragranceOf(description: string): Fragrance | null {
   let s = normalize(description);
   const hit = KIND_PREFIXES.find((k) => s === k.prefix || s.startsWith(`${k.prefix} `));
@@ -79,7 +79,7 @@ const groupKey = (name: string) => {
   return GENERIC_FIRST.has(w[0]!) && w.length > 1 ? `${w[0]} ${w[1]}` : w[0]!;
 };
 
-/** Conectivo não fecha nome de linha (FUSION FOR HER / FOR HIM → FUSION). */
+/** Conectivo nao fecha nome de linha (FUSION FOR HER / FOR HIM  ->  FUSION). */
 const TRAILING_CONNECTORS = new Set(["FOR", "DE", "DI", "E", "THE"]);
 
 function commonPrefix(names: string[]): string {
@@ -95,11 +95,11 @@ function commonPrefix(names: string[]): string {
 }
 
 export type ProductLineIndex = {
-  /** Linha do produto; null = sem fragrância. */
+  /** Linha do produto; null = sem fragrancia. */
   lineOf(description: string): { line: string; kind: string } | null;
 };
 
-/** Índice de linhas a partir das descrições do catálogo (e das vendas, para produto fora do catálogo). */
+/** Indice de linhas a partir das descricoes do catalogo (e das vendas, para produto fora do catalogo). */
 export function buildProductLineIndex(descriptions: Iterable<string>): ProductLineIndex {
   const byKey = new Map<string, Set<string>>();
   for (const d of descriptions) {

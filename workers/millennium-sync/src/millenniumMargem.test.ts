@@ -41,7 +41,7 @@ describe("parseRelatorioMargemPayload", () => {
         COD_PRODUTO: "100",
         QTDE_VENDIDA: 2,
         CUSTO_FRANQUIAS: 10,
-        // CUSTO_TOTAL omitido → deriva
+        // CUSTO_TOTAL omitido  ->  deriva
         TOTALVENDA: 50,
       },
     ]);

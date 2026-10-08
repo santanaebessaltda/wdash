@@ -46,9 +46,9 @@ describe("agregadoDoDia: recorte por divisão", () => {
     const d = salesDay("f1", "2026-09-08")!;
     const ag = dayAggregate(d, "WEPINK");
     expect(ag.faturamento).toBe(d.porDivisao["WEPINK"].faturamento);
-    // A fatia é estimada pela fração de faturamento (mock); pode diferir em ±1
+    // A fatia e estimada pela fracao de faturamento (mock); pode diferir em 1
     // do total por arredondamento. Aqui asseveramos que coincide com a fatia
-    // registrada, não que seja ≤ total (o gerador existente permite excedente).
+    // registrada, nao que seja  total (o gerador existente permite excedente).
   });
 });
 
@@ -59,7 +59,7 @@ describe("agregadoDoDia: recorte por hora (horaMax)", () => {
     const cheio = dayAggregate(d, null);
     const ate10 = dayAggregate(d, null, 10);
     expect(ate10.atendimentos).toBeLessThanOrEqual(cheio.atendimentos);
-    // Horas com índice > 10 não entram.
+    // Horas com indice > 10 nao entram.
     const em11 = d.porHora[11] ?? { faturamento: 0, atendimentos: 0, itens: 0 };
     expect(ate10.faturamento).toBeLessThanOrEqual(cheio.faturamento - em11.faturamento);
   });

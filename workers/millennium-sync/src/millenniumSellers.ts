@@ -1,10 +1,10 @@
 /**
- * Funcionários da loja: millenium.FUNCIONARIOS.Lista (sem filtro de cargo) + FUNCIONARIOS.Consulta por funcionária.
- * Todos entram com o cargo (`role`); quem é da equipe de vendas decide a leitura: ativa com cargo VENDEDOR
- * ou inativa de qualquer cargo (ao desativar, o ERP troca VENDEDOR → INDEFINIDO). Ativos com outro cargo
- * (gerência, conta usada por freelancer) ficam fora da equipe e do ranking.
- * A Lista não traz status — flags só vêm no Consulta.
- * Inativa = OR de DESATIVADO (GERADORES[0]) · INATIVO · AFASTADO · NAO_MOSTRAR_NO_EVENTO (ERP marca de formas diferentes).
+ * Funcionarios da loja: millenium.FUNCIONARIOS.Lista (sem filtro de cargo) + FUNCIONARIOS.Consulta por funcionaria.
+ * Todos entram com o cargo (`role`); quem e da equipe de vendas decide a leitura: ativa com cargo VENDEDOR
+ * ou inativa de qualquer cargo (ao desativar, o ERP troca VENDEDOR  ->  INDEFINIDO). Ativos com outro cargo
+ * (gerencia, conta usada por freelancer) ficam fora da equipe e do ranking.
+ * A Lista nao traz status  -  flags so vem no Consulta.
+ * Inativa = OR de DESATIVADO (GERADORES[0])  |  INATIVO  |  AFASTADO  |  NAO_MOSTRAR_NO_EVENTO (ERP marca de formas diferentes).
  */
 import { millenniumBaseUrl } from "./millenniumAuth.ts";
 import { titleName } from "../../../src/lib/format.ts";
@@ -23,10 +23,10 @@ export type ErpSeller = {
   login: string | null;
   /** CARGO da Lista (upper). */
   role: string;
-  /** null = não consultada neste sync (já tinha gerador e o cargo não mudou) — status fica o do banco. */
+  /** null = nao consultada neste sync (ja tinha gerador e o cargo nao mudou)  -  status fica o do banco. */
   active: boolean | null;
   flags: ErpSellerFlags | null;
-  /** GERADORES[0].GERADOR do Consulta — código que vem nas vendas do relatório de cupom. */
+  /** GERADORES[0].GERADOR do Consulta  -  codigo que vem nas vendas do relatorio de cupom. */
   geradorId: number | null;
 };
 
@@ -132,14 +132,14 @@ async function post(base: string, path: string, session: string, body: unknown, 
   }
 }
 
-/** É da equipe de vendas: ativa com cargo VENDEDOR ou inativa de qualquer cargo. */
+/** E da equipe de vendas: ativa com cargo VENDEDOR ou inativa de qualquer cargo. */
 export function isStoreSeller(role: string, active: boolean): boolean {
   return !active || role === SELLER_ROLE;
 }
 
 /**
- * Lista + Consulta de cada funcionária. Quem já tem gerador salvo e o mesmo cargo de antes (`known`)
- * entra só pela Lista; cargo mudou (ex.: desativada → INDEFINIDO, virou gerência) → consulta de novo.
+ * Lista + Consulta de cada funcionaria. Quem ja tem gerador salvo e o mesmo cargo de antes (`known`)
+ * entra so pela Lista; cargo mudou (ex.: desativada  ->  INDEFINIDO, virou gerencia)  ->  consulta de novo.
  * Qualquer Consulta falhando derruba a loja (dados anteriores ficam).
  */
 export async function fetchStoreSellers(params: {
@@ -147,7 +147,7 @@ export async function fetchStoreSellers(params: {
   millenniumStoreId: number;
   /** Consultas em paralelo (default 5; carga inicial usa 1). */
   concurrency?: number;
-  /** Cadastradas com gerador → cargo salvo (null = sem cargo salvo, consulta). */
+  /** Cadastradas com gerador  ->  cargo salvo (null = sem cargo salvo, consulta). */
   known?: ReadonlyMap<number, string | null>;
   baseUrl?: string;
   fetchImpl?: typeof fetch;

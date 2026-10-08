@@ -13,7 +13,7 @@ export interface Session {
   name: string;
   cpf: string;
   email: string;
-  /** Foto de perfil (URL pública no Storage); null = iniciais. */
+  /** Foto de perfil (URL publica no Storage); null = iniciais. */
   avatarUrl: string | null;
   role: Role;
   isOwner: boolean;
@@ -25,7 +25,7 @@ export interface Session {
   /** true = must change password before onboarding/app. */
   temporaryPassword: boolean;
   tenantId: string;
-  /** Company name (tenant.name) — identifies the account; the platform chrome always shows WeDash. */
+  /** Company name (tenant.name)  -  identifies the account; the platform chrome always shows WDash. */
   companyName: string;
   /** Installed the PWA? Used for the persistent install notice. */
   appInstalled: boolean;
@@ -57,8 +57,8 @@ export const roleLabel: Record<Role, string> = {
   SELLER: "Equipe de vendas",
 };
 
-/** Tipo de acesso exibido para a pessoa — quem criou a conta da empresa é o "Gestor principal". */
-/** Lojas da sessão vêm do banco sem ordem garantida: chave estável para comparar. */
+/** Tipo de acesso exibido para a pessoa  -  quem criou a conta da empresa e o "Gestor principal". */
+/** Lojas da sessao vem do banco sem ordem garantida: chave estavel para comparar. */
 export function storesKey(stores: string[]): string {
   return [...stores].sort().join(",");
 }

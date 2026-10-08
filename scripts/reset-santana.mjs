@@ -1,10 +1,10 @@
 /**
- * Reset completo do tenant de santanaebessaltda@gmail.com → volta ao Onboarding (passo 1).
- * Cancela jobs, desloga a sessão Millennium e apaga tudo que veio do ERP
+ * Reset completo do tenant de santanaebessaltda@gmail.com  ->  volta ao Onboarding (passo 1).
+ * Cancela jobs, desloga a sessao Millennium e apaga tudo que veio do ERP
  * (agregados, equipe, eventos, logs, jobs, lojas, credencial).
  * Usa a service role de workers/millennium-sync/.env.
  *
- *   npx tsx scripts/reset-santana.mjs            # só mostra o que existe
+ *   npx tsx scripts/reset-santana.mjs            # so mostra o que existe
  *   npx tsx scripts/reset-santana.mjs --apagar   # apaga
  */
 import fs from "node:fs";
@@ -95,7 +95,7 @@ if (memErr || !membership) {
 const tenantId = membership.tenant_id;
 console.log(`tenant ${tenantId} · membership ${membership.id} · onboarding_step ${membership.onboarding_step}`);
 
-// Filhos antes dos pais (store / erp_credential por último).
+// Filhos antes dos pais (store / erp_credential por ultimo).
 const TENANT_TABLES = [
   "sales_hour_agg",
   "sales_day_agg",
@@ -137,7 +137,7 @@ for (const s of stores ?? []) {
 
 if (!APPLY) process.exit(0);
 
-// 0) Backup da config manual das lojas (Configurações > Lojas) — restore-santana-store-config.mjs reaplica.
+// 0) Backup da config manual das lojas (Configuracoes > Lojas)  -  restore-santana-store-config.mjs reaplica.
 const { data: storeConfig, error: cfgErr } = await sb
   .from("store")
   .select(`millennium_store_id, code, ${STORE_CONFIG_COLUMNS.join(", ")}`)
@@ -149,7 +149,7 @@ if (cfgErr) {
 fs.writeFileSync(BACKUP_FILE, JSON.stringify(storeConfig, null, 2));
 console.log(`backup config de ${storeConfig.length} loja(s) → ${path.relative(root, BACKUP_FILE)}`);
 
-// 1) Jobs abertos → FAILED (worker não pega mais nada deste tenant).
+// 1) Jobs abertos  ->  FAILED (worker nao pega mais nada deste tenant).
 const { data: openJobs } = await sb
   .from("sync_job")
   .select("id, kind, status")
@@ -169,7 +169,7 @@ if (openJobs?.length) {
   console.log("cancelled jobs", openJobs.map((j) => `${j.kind}:${j.status}`).join(", "));
 }
 
-// 2) Logout Millennium (não deixa sessão órfã no ERP).
+// 2) Logout Millennium (nao deixa sessao orfa no ERP).
 const { data: cred } = await sb
   .from("erp_credential")
   .select("id, millennium_session")

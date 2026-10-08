@@ -1,7 +1,7 @@
 /**
- * T8: consistência entre as abas — no mesmo escopo, KPIs da Equipe batem com
- * os da Visão geral (mesma fonte `agregadoLoja`/`agregadoPeriodo`, formatos
- * iguais) e os estados da view são coerentes. EQUIP-01.
+ * T8: consistencia entre as abas  -  no mesmo escopo, KPIs da Equipe batem com
+ * os da Visao geral (mesma fonte `agregadoLoja`/`agregadoPeriodo`, formatos
+ * iguais) e os estados da view sao coerentes. EQUIP-01.
  */
 import { describe, expect, it } from "vitest";
 import { buildTeamView } from "./teamViews";

@@ -1,5 +1,5 @@
 /**
- * Probe minimalista: Lista vs ListaTodos · com/sem FILIAL · 1d vs 30d.
+ * Probe minimalista: Lista vs ListaTodos  |  com/sem FILIAL  |  1d vs 30d.
  *   cd workers/millennium-sync && npx tsx scripts/probe-lista-todos.ts
  */
 import { readFileSync, existsSync } from "node:fs";

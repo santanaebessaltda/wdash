@@ -7,8 +7,8 @@ import { useActiveSession } from "@/session/SessionProvider";
 const POLL_MS = 3_000;
 
 /**
- * Busca das vendas de hoje logo após conectar o Millennium. Confere a cada 3s enquanto roda;
- * ao terminar, as telas recarregam (`SALES_SYNCED_EVENT`) e a carga do histórico entra no aviso dela.
+ * Busca das vendas de hoje logo apos conectar o Millennium. Confere a cada 3s enquanto roda;
+ * ao terminar, as telas recarregam (`SALES_SYNCED_EVENT`) e a carga do historico entra no aviso dela.
  */
 export function useInitialSync(): { sync: InitialSync | null; retry: () => Promise<void>; retrying: boolean } {
   const { tenantId } = useActiveSession();
@@ -38,7 +38,7 @@ export function useInitialSync(): { sync: InitialSync | null; retry: () => Promi
     return () => window.clearInterval(id);
   }, [ativo, check]);
 
-  // Um Atualizar manual também resolve uma busca que falhou.
+  // Um Atualizar manual tambem resolve uma busca que falhou.
   useEffect(() => {
     const onSynced = () => void check();
     window.addEventListener(SALES_SYNCED_EVENT, onSynced);

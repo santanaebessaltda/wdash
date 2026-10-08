@@ -1,6 +1,6 @@
 /**
  * Limpa vendas/jobs do Santana e enfileira SEED novo.
- * Mantém lojas + credencial ERP (não mexe no onboarding).
+ * Mantem lojas + credencial ERP (nao mexe no onboarding).
  *
  * Usage: node scripts/wipe-santana-sales-reseed.mjs
  */

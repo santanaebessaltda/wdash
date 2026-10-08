@@ -1,9 +1,9 @@
 /**
- * Catálogo de produtos + tabelas de custo do Millennium (espelho de workers/millennium-sync/src/
- * millenniumCatalog.ts, millenniumCostTable.ts e dedupeCatalogProducts em productCatalog.ts — manter iguais).
+ * Catalogo de produtos + tabelas de custo do Millennium (espelho de workers/millennium-sync/src/
+ * millenniumCatalog.ts, millenniumCostTable.ts e dedupeCatalogProducts em productCatalog.ts  -  manter iguais).
  * - Tipos: `$lookup=PRODUTO.tipo.tipo`; produtos de um tipo: `$lookup=produto.produto.produto` com PARAM_9.
  * - Tabelas: `$lookup=tabela_custo.TABELA`; custos: wtsreports {9701602B} com TABELA_DE_CUSTO e filial vazia.
- *   `F_3814918930` = custo unitário; mesmo código em várias cores → fica o maior; só > 0.
+ *   `F_3814918930` = custo unitario; mesmo codigo em varias cores  ->  fica o maior; so > 0.
  */
 import { baseUrl } from "./millennium.ts";
 import { MillenniumHttpError } from "./millenniumSellers.ts";
@@ -104,7 +104,7 @@ export async function fetchProductsOfType(session: string, typeId: number): Prom
   return out;
 }
 
-/** Mesmo código de produto em 2 tipos / mesmo id com 2 códigos: fica o último visto. */
+/** Mesmo codigo de produto em 2 tipos / mesmo id com 2 codigos: fica o ultimo visto. */
 export function dedupeCatalogProducts(products: CatalogProduct[]): CatalogProduct[] {
   const byCode = new Map<string, CatalogProduct>();
   const codeById = new Map<number, string>();
@@ -165,7 +165,7 @@ function report(session: string, guid: string, params: Record<string, unknown>, 
   );
 }
 
-/** COD_PRODUTO → custo unitário em centavos (só > 0). */
+/** COD_PRODUTO  ->  custo unitario em centavos (so > 0). */
 export async function fetchCostTablePrices(session: string, tableId: number): Promise<Map<string, number>> {
   const payload = await report(
     session,
@@ -184,13 +184,13 @@ export async function fetchCostTablePrices(session: string, tableId: number): Pr
   return out;
 }
 
-/* ---------- Estoque > Produtos (só Edge `erp-stock-sync`; o worker não usa) ---------- */
+/* ---------- Estoque > Produtos (so Edge `erp-stock-sync`; o worker nao usa) ---------- */
 
 export type SaleTable = { tableId: number; code: string; description: string };
 
 const SALE_PRICE_CATALOG_GUID = "{24B9BF6D-E463-4ED9-B74E-DF3AF5E1E02F}";
 
-/** Tabelas de preço de venda (`$lookup=tabela_venda.TABELA`); sem INDEFINIDO (id ≤ 0). */
+/** Tabelas de preco de venda (`$lookup=tabela_venda.TABELA`); sem INDEFINIDO (id  0). */
 export async function fetchSaleTables(session: string): Promise<SaleTable[]> {
   const payload = await lookup(session, "tabela_venda.TABELA", 501, {
     SCRIPT: null,
@@ -210,8 +210,8 @@ export async function fetchSaleTables(session: string): Promise<SaleTable[]> {
 }
 
 /**
- * COD_PRODUTO → preço de venda em centavos da tabela (wtsreports {24B9BF6D}; `F_3554079995` = venda,
- * `F_3294710456` = custo da tabela de custo passada). Produto com venda bloqueada fica de fora. Só > 0.
+ * COD_PRODUTO  ->  preco de venda em centavos da tabela (wtsreports {24B9BF6D}; `F_3554079995` = venda,
+ * `F_3294710456` = custo da tabela de custo passada). Produto com venda bloqueada fica de fora. So > 0.
  */
 export async function fetchSalePrices(session: string, costTableId: number, saleTableId: number): Promise<Map<string, number>> {
   const payload = await report(
@@ -235,9 +235,9 @@ export async function fetchSalePrices(session: string, costTableId: number, sale
 export type StoreStockItem = { total: number; locations: Record<string, number> };
 
 /**
- * COD_PRODUTO → estoque da loja por local (ESTOQUEPORLOCAL: ESTOQUE, QUIOSQUE, SHOP010…) e total = soma dos
+ * COD_PRODUTO  ->  estoque da loja por local (ESTOQUEPORLOCAL: ESTOQUE, QUIOSQUE, SHOP010...) e total = soma dos
  * locais (bate 100% com o SALDO do ESTOQUEEMCOMPRA). A entrada cai em ESTOQUE e a venda sai do QUIOSQUE:
- * local negativo com outro positivo = transferência pendente; só a soma é o estoque real.
+ * local negativo com outro positivo = transferencia pendente; so a soma e o estoque real.
  */
 export async function fetchStoreStock(session: string, millenniumStoreId: number): Promise<Map<string, StoreStockItem>> {
   const payload = await call(
@@ -271,7 +271,7 @@ export async function fetchStoreStock(session: string, millenniumStoreId: number
   return out;
 }
 
-/** Saldo Atual e Futuro da loja (Pedido de compra), sem período: saldo, pedidos em aberto, múltipla, bloqueio e cadastro. */
+/** Saldo Atual e Futuro da loja (Pedido de compra), sem periodo: saldo, pedidos em aberto, multipla, bloqueio e cadastro. */
 export async function fetchPurchaseStock(session: string, millenniumStoreId: number): Promise<PurchaseStockRow[]> {
   const payload = await call(
     `${baseUrl()}/MILLENIUM!FRANQUIAS.RELATORIOS.ESTOQUEEMCOMPRA?$top=5000`,

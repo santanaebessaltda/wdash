@@ -26,7 +26,7 @@ function iniciais(nome: string): string {
   return `${partes[0]?.charAt(0) ?? ""}${partes.length > 1 ? partes[partes.length - 1]!.charAt(0) : ""}`.toUpperCase();
 }
 
-/** Padrão Account > Profile do Vela: foto 88px com "+", nome, e-mail e papel. A foto grava na hora. */
+/** Padrao Account > Profile do Vela: foto 88px com "+", nome, e-mail e papel. A foto grava na hora. */
 function ProfileSummaryCard({ salvo }: { salvo: NomePessoa }) {
   const session = useActiveSession();
   const { update } = useSession();
@@ -125,7 +125,7 @@ function PersonalDataCard({ salvo, onSaved }: { salvo: NomePessoa; onSaved: (n: 
       <form onSubmit={salvar} noValidate>
         <div className="flex flex-col gap-4">
           <CamposNome valor={nome} onChange={(p) => setNome((n) => ({ ...n, ...p }))} />
-          <FormField label="E-mail" hint="O e-mail é usado para entrar na WeDash e não pode ser alterado aqui.">
+          <FormField label="E-mail" hint="O e-mail é usado para entrar na WDash e não pode ser alterado aqui.">
             <Input value={session.email} readOnly disabled />
           </FormField>
         </div>
@@ -142,7 +142,7 @@ function PersonalDataCard({ salvo, onSaved }: { salvo: NomePessoa; onSaved: (n: 
   );
 }
 
-/** Padrão Account > Security > Change password do Vela. */
+/** Padrao Account > Security > Change password do Vela. */
 function PasswordCard() {
   const session = useActiveSession();
   const { show } = useToast();
@@ -200,7 +200,7 @@ function ThemeCard() {
     <Card>
       <div className="mb-4">
         <CardTitle>Aparência</CardTitle>
-        <CardSubtitle>Escolha como a WeDash aparece para você em todos os aparelhos. No modo Automático, seguimos a configuração do sistema de cada aparelho.</CardSubtitle>
+        <CardSubtitle>Escolha como a WDash aparece para você em todos os aparelhos. No modo Automático, seguimos a configuração do sistema de cada aparelho.</CardSubtitle>
       </div>
       <Segmented
         options={THEME_OPTIONS}
@@ -215,7 +215,7 @@ function ThemeCard() {
   );
 }
 
-/** Conta > Meu perfil — layout Account > Profile do Vela (resumo à esquerda, formulários à direita). */
+/** Conta > Meu perfil  -  layout Account > Profile do Vela (resumo a esquerda, formularios a direita). */
 export function MyProfilePage() {
   const session = useActiveSession();
   const [salvo, setSalvo] = useState<NomePessoa>(() => dividirNome(session.name));
@@ -228,7 +228,7 @@ export function MyProfilePage() {
     return () => {
       vivo = false;
     };
-    // Só na abertura: depois de salvar, `salvo` já vem do formulário.
+    // So na abertura: depois de salvar, `salvo` ja vem do formulario.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

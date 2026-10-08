@@ -1,4 +1,4 @@
-/** Status rápido do SEED Santana pós-wipe. Usage: node scripts/check-seed-brand.mjs */
+/** Status rapido do SEED Santana pos-wipe. Usage: node scripts/check-seed-brand.mjs */
 import fs from "node:fs";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";

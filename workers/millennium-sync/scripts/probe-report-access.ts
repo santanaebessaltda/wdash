@@ -1,8 +1,8 @@
 /**
- * Probe: resposta do wtsreports por usuário (acesso ou não aos personalizados).
+ * Probe: resposta do wtsreports por usuario (acesso ou nao aos personalizados).
  *   cd workers/millennium-sync
  *   $env:PROBE_USER="GERENTE"; $env:PROBE_PASS="..."; npx tsx scripts/probe-report-access.ts
- * Sem PROBE_USER: usa a credencial VALID do banco (sessão salva ou login).
+ * Sem PROBE_USER: usa a credencial VALID do banco (sessao salva ou login).
  */
 import { readFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
@@ -115,7 +115,7 @@ async function probe(session: string) {
     }
   }
 
-  // Catálogo de relatórios visível ao usuário (se a API expuser).
+  // Catalogo de relatorios visivel ao usuario (se a API expuser).
   for (const path of ["millenium:wtsreports/reports/list", "millenium:wtsreports/catalog/list"]) {
     const res = await fetch(`${base}/${path}`, { method: "POST", headers, body: "{}", signal: AbortSignal.timeout(30_000) });
     const text = await res.text();

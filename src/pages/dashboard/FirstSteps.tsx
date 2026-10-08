@@ -16,12 +16,12 @@ import { cn } from "@/lib/cn";
 import { paths } from "@/router/paths";
 import { useActiveSession } from "@/session/SessionProvider";
 
-/** loading = ainda não sabe; hidden = concluído ou não é Gestor; visible = mostra o card. */
+/** loading = ainda nao sabe; hidden = concluido ou nao e Gestor; visible = mostra o card. */
 export type FirstStepsStatus = "loading" | "hidden" | "visible";
 
 /**
- * Primeiros passos da empresa (só Gestor). Os passos se marcam sozinhos pelos dados já salvos;
- * ao chegar a 100% grava no banco e o card não volta mais.
+ * Primeiros passos da empresa (so Gestor). Os passos se marcam sozinhos pelos dados ja salvos;
+ * ao chegar a 100% grava no banco e o card nao volta mais.
  */
 export function useFirstSteps(filialIds: string[] = []) {
   const session = useActiveSession();
@@ -74,7 +74,7 @@ export function useFirstSteps(filialIds: string[] = []) {
   const steps = useMemo(() => (data ? buildFirstSteps({ stores: viewStores, ...data }) : []), [viewStores, data]);
   const doneCount = steps.filter((s) => s.done).length;
   const pendingCount = steps.length - doneCount;
-  // 100% definitivo é da rede inteira, mesmo com uma loja selecionada.
+  // 100% definitivo e da rede inteira, mesmo com uma loja selecionada.
   const allDone = useMemo(
     () => data != null && stores.length > 0 && buildFirstSteps({ stores, ...data }).every((s) => s.done),
     [stores, data],
@@ -101,8 +101,8 @@ function stepAction(step: FirstStep): { label: string; to: string } | null {
       return { label: "Configurar funcionamento", to: paths.operation.store };
     case "groups":
       return step.needsGroups
-        ? { label: "Criar grupos", to: paths.management.shifts }
-        : { label: "Vincular vendedores", to: paths.management.staff };
+        ? { label: "Criar grupos", to: paths.operation.groups }
+        : { label: "Vincular vendedores", to: paths.operation.sellers };
     case "franchise":
       return { label: "Configurar franquia", to: paths.operation.franchise };
     case "rent":

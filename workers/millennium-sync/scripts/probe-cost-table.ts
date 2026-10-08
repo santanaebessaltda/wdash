@@ -1,6 +1,6 @@
 /**
- * Tabelas de custo do Millennium × produtos com custo 0 no RELATORIOMARGEM. Só leitura no ERP.
- * Faz login com a credencial salva e grava a sessão nova em erp_credential (o worker reaproveita).
+ * Tabelas de custo do Millennium x produtos com custo 0 no RELATORIOMARGEM. So leitura no ERP.
+ * Faz login com a credencial salva e grava a sessao nova em erp_credential (o worker reaproveita).
  *   cd workers/millennium-sync && npx tsx scripts/probe-cost-table.ts
  */
 import { readFileSync, existsSync } from "node:fs";

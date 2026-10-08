@@ -17,6 +17,14 @@ dist-ssr
 .env.*
 !.env.example
 
+# Cache local do CLI do Supabase (recriado no link / db push)
+supabase/.temp
+
+# Rascunhos locais de probe e backup (nao entram no app)
+.tmp-*
+scripts/_tmp-*
+workers/millennium-sync/scripts/_tmp-*
+
 # Worker: tokens Millennium em disco (logout de sessão órfã)
 workers/millennium-sync/.millennium-sessions.json
 workers/millennium-sync/.millennium-pause

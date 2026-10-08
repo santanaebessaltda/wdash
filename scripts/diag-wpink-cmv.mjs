@@ -1,6 +1,6 @@
 /**
- * Lista linhas WPINK / ALL de sales_day_agg (set/2026) e se têm CMV.
- * Só leitura. Usage: node scripts/diag-wpink-cmv.mjs [from] [to]
+ * Lista linhas WPINK / ALL de sales_day_agg (set/2026) e se tem CMV.
+ * So leitura. Usage: node scripts/diag-wpink-cmv.mjs [from] [to]
  */
 import fs from "node:fs";
 import path from "node:path";

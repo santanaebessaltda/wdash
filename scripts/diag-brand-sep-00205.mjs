@@ -1,5 +1,5 @@
 /**
- * Compara sales_day_agg (00205, set/26) com totais do relatório ERP.
+ * Compara sales_day_agg (00205, set/26) com totais do relatorio ERP.
  * Usage: node scripts/diag-brand-sep-00205.mjs
  */
 import fs from "node:fs";
@@ -11,7 +11,7 @@ const STORE_CODE = "00205";
 const FROM = "2026-09-01";
 const TO = "2026-09-22";
 
-/** Totais do relatório "WEPINK - TOTAL VENDA POR DIA" (ERP) — set/26 filial 00205 */
+/** Totais do relatorio "WEPINK - TOTAL VENDA POR DIA" (ERP)  -  set/26 filial 00205 */
 const ERP = {
   WEPINK: 165829.25,
   WPINK: 10876.85,

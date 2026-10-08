@@ -1,6 +1,6 @@
 /**
- * Regrava CMV (RELATORIOMARGEM) com DATAF inclusivo — corrige dias gravados
- * com o bound exclusivo da Lista (+1 dia ≈ 2×).
+ * Regrava CMV (RELATORIOMARGEM) com DATAF inclusivo  -  corrige dias gravados
+ * com o bound exclusivo da Lista (+1 dia  2x).
  *
  *   cd workers/millennium-sync && npx tsx scripts/resync-cmv.ts [storeCode]
  *   # default: todas as lojas do tenant da credencial VALID
@@ -79,7 +79,7 @@ async function main() {
     : stores;
   if (targets.length === 0) throw new Error(`no store matching ${process.argv[2]}`);
 
-  // Janela: dias que já têm linha ALL (ou default mês atual → hoje)
+  // Janela: dias que ja tem linha ALL (ou default mes atual  ->  hoje)
   const today = new Date();
   const y = today.getFullYear();
   const m = String(today.getMonth() + 1).padStart(2, "0");

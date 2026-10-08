@@ -1,5 +1,5 @@
 /**
- * Produtos com custo do dia (sales_product_cost_day_agg) de uma loja/dia. Só leitura.
+ * Produtos com custo do dia (sales_product_cost_day_agg) de uma loja/dia. So leitura.
  * Usage: node scripts/diag-wpink-cmv-day.mjs 00205 2026-09-12
  */
 import fs from "node:fs";

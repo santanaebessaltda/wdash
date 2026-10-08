@@ -1,5 +1,5 @@
 /**
- * Saldo Atual e Futuro (FRANQUIAS.RELATORIOS.ESTOQUEEMCOMPRA) → linhas do Pedido de compra.
+ * Saldo Atual e Futuro (FRANQUIAS.RELATORIOS.ESTOQUEEMCOMPRA)  ->  linhas do Pedido de compra.
  * Sem imports: testado no vitest (`purchaseStock.test.ts`). Mesmo formato de `PurchaseStockRow` em
  * src/data/wedash/purchaseOrder.ts (manter iguais).
  */
@@ -46,7 +46,7 @@ function asStr(v: unknown): string {
   return v == null ? "" : String(v).trim();
 }
 
-/** DATA_CADASTRO vem à meia-noite de Brasília em UTC ("2024-06-05T03:00:00.000Z") → "2024-06-05". */
+/** DATA_CADASTRO vem a meia-noite de Brasilia em UTC ("2024-06-05T03:00:00.000Z")  ->  "2024-06-05". */
 function brDate(v: unknown): string | null {
   const s = asStr(v);
   if (!s) return null;
@@ -55,7 +55,7 @@ function brDate(v: unknown): string | null {
   return new Date(t - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
-/** Linhas com o mesmo código + cor + estampa + tamanho são somadas (fica a posição da 1ª). */
+/** Linhas com o mesmo codigo + cor + estampa + tamanho sao somadas (fica a posicao da 1). */
 export function parsePurchaseStock(payload: unknown): PurchaseStockRow[] {
   const out = new Map<string, PurchaseStockRow>();
   let position = 0;
@@ -96,7 +96,7 @@ export function parsePurchaseStock(payload: unknown): PurchaseStockRow[] {
   return [...out.values()];
 }
 
-/** Cadastro por código (variantes do mesmo produto trazem o mesmo cadastro) → `set_product_catalog_registry`. */
+/** Cadastro por codigo (variantes do mesmo produto trazem o mesmo cadastro)  ->  `set_product_catalog_registry`. */
 export function purchaseRegistry(rows: PurchaseStockRow[]): PurchaseRegistry[] {
   const out = new Map<string, PurchaseRegistry>();
   for (const r of rows) {

@@ -16,7 +16,7 @@ export interface Tier {
   gerenciaBonus?: number;
 }
 
-export type GoalType = "individual" | "grupo";
+export type GoalType = "individual" | "grupo" | "geral";
 export type GoalBrand = "WEPINK" | "WPINK";
 
 /** Meta gravada (tabela `goal`): 1 por loja por periodo, valores em reais. */
@@ -29,8 +29,8 @@ export interface GoalRecord {
   endsOn: string;
   /** Meta da loja no periodo (R$). */
   target: number;
-  /** INDIVIDUAL = cada pessoa pela propria meta (meta  pessoas); GROUP = a equipe sobe junta. */
-  tierMode: "INDIVIDUAL" | "GROUP";
+  /** INDIVIDUAL = cada pessoa pela propria meta; GROUP = o grupo sobe pela soma; GENERAL = a loja sobe pelo total vendido e a premiacao se divide. */
+  tierMode: "INDIVIDUAL" | "GROUP" | "GENERAL";
   tiers: Tier[];
   /** % da meta de cada grupo da loja (soma 100); vazio = sem grupos de distribuicao. */
   groups: GoalGroup[];

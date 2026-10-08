@@ -20,7 +20,7 @@ import { cn } from "@/lib/cn";
 import { GOAL_STATUS_LABEL, type SellerGoalLevel } from "@/data/wedash/goalView";
 import { GoalLevelSummary } from "@/components/wedash/GoalLevelsBar";
 
-/** Tudo o que a tela Equipe lê — também usado pelo detalhe aberto da Visão geral. */
+/** Tudo o que a tela Equipe le  -  tambem usado pelo detalhe aberto da Visao geral. */
 export async function fetchTeamAggInput(tenantId: string, escopo: Scope): Promise<TeamAggInput> {
   const periodo = resolvePeriod(escopo.periodo, calendarTodayIso());
   const range = productsFetchRange(escopo);
@@ -37,9 +37,9 @@ type Selecao = { key: string; nome: string };
 
 /**
  * Detalhe de uma pessoa da equipe.
- * Com `data` usa os dados da tela; sem `data` busca os dados da Equipe só ao abrir.
- * `turno` = filtro de turno da tela (participação relativa ao turno, igual à tabela).
- * `niveisMeta` = nível de meta por pessoa (mesma chave da tabela / Destaques) → seção Meta.
+ * Com `data` usa os dados da tela; sem `data` busca os dados da Equipe so ao abrir.
+ * `turno` = filtro de turno da tela (participacao relativa ao turno, igual a tabela).
+ * `niveisMeta` = nivel de meta por pessoa (mesma chave da tabela / Destaques)  ->  secao Meta.
  */
 export function useTeamMemberDetail({
   escopo,
@@ -92,7 +92,7 @@ export function useTeamMemberDetail({
   return { abrir, modal };
 }
 
-/** Busca os dados da Equipe na 1ª abertura; mantém até mudar o filtro ou chegar venda nova. */
+/** Busca os dados da Equipe na 1 abertura; mantem ate mudar o filtro ou chegar venda nova. */
 function useLazyTeamData(escopo: Scope, tenantId: string | undefined, enabled: boolean): TeamAggInput | null {
   const [data, setData] = useState<TeamAggInput | null>(null);
   const gen = useRef(0);
@@ -136,9 +136,10 @@ function InfoMeta({ label, mono, className, children }: { label: string; mono?: 
   );
 }
 
-/** Meta da pessoa: do início da meta até hoje (não segue o filtro de período do modal). */
+/** Meta da pessoa: do inicio da meta ate hoje (nao segue o filtro de periodo do modal). */
 function SecaoMeta({ meta }: { meta: SellerGoalLevel }) {
   const grupo = meta.modo === "grupo";
+  const geral = meta.modo === "geral";
   const nivelAtual = meta.nivelNumero != null ? meta.marcos[meta.nivelNumero - 1] : undefined;
   const total = meta.premiacao + meta.bonus;
   const situacao =
@@ -149,9 +150,11 @@ function SecaoMeta({ meta }: { meta: SellerGoalLevel }) {
       : GOAL_STATUS_LABEL[meta.status].toLowerCase();
   const tipPremiacao = [
     nivelAtual
-      ? grupo
-        ? `${num(nivelAtual.comissaoPct, 1)}% sobre as vendas do grupo, dividido igualmente entre as pessoas.`
-        : `${num(nivelAtual.comissaoPct, 1)}% sobre tudo o que a pessoa vendeu na meta.`
+      ? geral
+        ? `${num(nivelAtual.comissaoPct, 1)}% sobre o total vendido da loja, dividido igualmente entre as pessoas.`
+        : grupo
+          ? `${num(nivelAtual.comissaoPct, 1)}% sobre as vendas do grupo, dividido igualmente entre as pessoas.`
+          : `${num(nivelAtual.comissaoPct, 1)}% sobre tudo o que a pessoa vendeu na meta.`
       : "Ainda abaixo do 1º nível.",
     meta.bonus > 0 ? `Inclui ${brlCent(meta.bonus)} de bônus dos níveis alcançados.` : "",
   ]
@@ -167,9 +170,9 @@ function SecaoMeta({ meta }: { meta: SellerGoalLevel }) {
         </span>
       </div>
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-        <MetricaDetalhe label={grupo ? "Meta do grupo" : "Meta individual"} valor={brlCent(meta.metaValor)} />
+        <MetricaDetalhe label={geral ? "Meta da loja" : grupo ? "Meta do grupo" : "Meta individual"} valor={brlCent(meta.metaValor)} />
         <MetricaDetalhe
-          label={grupo ? "Vendas do grupo" : "Vendas na meta"}
+          label={geral ? "Vendas da loja" : grupo ? "Vendas do grupo" : "Vendas na meta"}
           valor={brlCent(meta.realizado)}
           tip="Do início da meta até hoje. Não segue o período escolhido na tela."
         />
@@ -197,6 +200,11 @@ function SecaoMeta({ meta }: { meta: SellerGoalLevel }) {
           {grupo && meta.grupo && (
             <p className="mt-2.5 text-[11.5px] text-t2">
               Meta por grupo: o grupo <span className="font-semibold text-t1">{meta.grupo}</span> sobe de nível junto, pela soma das vendas.
+            </p>
+          )}
+          {geral && (
+            <p className="mt-2.5 text-[11.5px] text-t2">
+              Meta geral: a equipe sobe de nível junta, pelo total vendido da loja. A premiação é dividida igualmente.
             </p>
           )}
         </div>

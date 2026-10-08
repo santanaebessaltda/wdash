@@ -1,11 +1,11 @@
 /**
- * Mapa PRODUTO (id interno) → WEPINK | WPINK.
+ * Mapa PRODUTO (id interno)  ->  WEPINK | WPINK.
  *
- * 1) wtsreports CATALOG {9701602B…} por gerador×divisão (estoque — incompleto se SALDO=0).
+ * 1) wtsreports CATALOG {9701602B...} por geradorxdivisao (estoque  -  incompleto se SALDO=0).
  * 2) LISTARVENDASSALDO TIPO=101/102 por filial + lookup `produto.produto.produto`
- *    (COD_PRODUTO → id) — catálogo franquia completo (inclui SKU sem estoque).
+ *    (COD_PRODUTO  ->  id)  -  catalogo franquia completo (inclui SKU sem estoque).
  *
- * ConsultaDetMov só traz PRODUTO int; por isso o join COD→id.
+ * ConsultaDetMov so traz PRODUTO int; por isso o join COD -> id.
  */
 import type { SalesBrand } from "../../../src/data/wedash/salesTypes.ts";
 import { millenniumBaseUrl } from "./millenniumAuth.ts";
@@ -16,21 +16,21 @@ export const PRODUCT_DIVISION_CATALOG_GUID = "{9701602B-B363-4770-989C-8C4459B7E
 
 /** WPINK SUPLEMENTOS */
 export const DIVISAO_WPINK = 101;
-/** WEPINK (cosméticos) */
+/** WEPINK (cosmeticos) */
 export const DIVISAO_WEPINK = 102;
 
 export type ProductBrandMap = Map<number, SalesBrand>;
 
-/** Filial Millennium + gerador — liga LISTARVENDASSALDO ao skip DetMov. */
+/** Filial Millennium + gerador  -  liga LISTARVENDASSALDO ao skip DetMov. */
 export type BrandMapStoreRef = {
   millenniumStoreId: number;
   geradorId: number;
 };
 
-/** Resultado do catálogo: mapa global + quais geradores têm WPINK (pra pular DetMov). */
+/** Resultado do catalogo: mapa global + quais geradores tem WPINK (pra pular DetMov). */
 export type ProductBrandCatalog = {
   map: ProductBrandMap;
-  /** Geradores com ≥1 SKU na divisão WPINK (101). */
+  /** Geradores com 1 SKU na divisao WPINK (101). */
   geradorIdsWithWpink: Set<number>;
 };
 
@@ -59,7 +59,7 @@ function extractRawData(payload: unknown): unknown[] {
   return [];
 }
 
-/** Parse RAW_DATA → productId ints (ignora custo / estoque). */
+/** Parse RAW_DATA  ->  productId ints (ignora custo / estoque). */
 export function parseProductDivisionRawData(payload: unknown): number[] {
   const out: number[] = [];
   const seen = new Set<number>();
@@ -86,7 +86,7 @@ export function mergeProductBrandMaps(
   const map: ProductBrandMap = new Map();
   for (const part of parts) {
     for (const id of part.productIds) {
-      // última divisão ganha se houver overlap (não esperado)
+      // ultima divisao ganha se houver overlap (nao esperado)
       map.set(id, part.brand);
     }
   }
@@ -103,7 +103,7 @@ function extractList(payload: unknown): unknown[] {
   return [];
 }
 
-/** Códigos COD_PRODUTO do LISTARVENDASSALDO. */
+/** Codigos COD_PRODUTO do LISTARVENDASSALDO. */
 export function parseListarVendasSaldoCodes(payload: unknown): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
@@ -117,7 +117,7 @@ export function parseListarVendasSaldoCodes(payload: unknown): string[] {
   return out;
 }
 
-/** Lookup produto → Map COD_PRODUTO → PRODUTO id. */
+/** Lookup produto  ->  Map COD_PRODUTO  ->  PRODUTO id. */
 export function parseProductCodeToIdLookup(payload: unknown): Map<string, number> {
   const map = new Map<string, number>();
   for (const raw of extractList(payload)) {
@@ -137,7 +137,7 @@ export function parseProductCodeToIdLookup(payload: unknown): Map<string, number
   return map;
 }
 
-/** Resolve códigos LISTAR → ids via lookup; ignora COD sem id. */
+/** Resolve codigos LISTAR  ->  ids via lookup; ignora COD sem id. */
 export function resolveBrandCodesToIds(
   codes: Iterable<string>,
   codeToId: Map<string, number>,
@@ -270,17 +270,17 @@ async function fetchDivisionProducts(opts: {
 }
 
 /**
- * N geradores → mapa união + set de geradores que têm WPINK.
- * Com `stores` + from/to: enriquece via LISTARVENDASSALDO (catálogo franquia > estoque).
- * Loja cujo gerador não está no set → skip ConsultaDetMov (só ALL).
+ * N geradores  ->  mapa uniao + set de geradores que tem WPINK.
+ * Com `stores` + from/to: enriquece via LISTARVENDASSALDO (catalogo franquia > estoque).
+ * Loja cujo gerador nao esta no set  ->  skip ConsultaDetMov (so ALL).
  */
 export async function fetchProductBrandMap(opts: {
   session: string;
-  /** Um ou mais geradores; produtos são união (cadastro/estoque varia por loja). */
+  /** Um ou mais geradores; produtos sao uniao (cadastro/estoque varia por loja). */
   geradorIds: number[];
-  /** Filiais Millennium + gerador — LISTAR completa SKUs sem estoque. */
+  /** Filiais Millennium + gerador  -  LISTAR completa SKUs sem estoque. */
   stores?: BrandMapStoreRef[];
-  /** Janela do LISTAR (só afeta qty faturada; catálogo vem mesmo com SALDO null). */
+  /** Janela do LISTAR (so afeta qty faturada; catalogo vem mesmo com SALDO null). */
   from?: string;
   to?: string;
   /** Uma chamada por vez (carga inicial). */
@@ -330,7 +330,7 @@ export async function fetchProductBrandMap(opts: {
         fetchImpl,
       });
       console.log(`  LISTAR enrich · ${codeToId.size} COD→id`);
-      // Catálogo franquia: 101=WPINK (fecha buraco do estoque) + 102=WEPINK (idem).
+      // Catalogo franquia: 101=WPINK (fecha buraco do estoque) + 102=WEPINK (idem).
       // 1 filial basta; sequencial (102 pode ser pesado).
       const primary = storeRefs[0]!;
       console.log(`  LISTAR enrich · filial=${primary.millenniumStoreId} TIPO=101…`);
@@ -360,7 +360,7 @@ export async function fetchProductBrandMap(opts: {
         });
         const wepinkIds = resolveBrandCodesToIds(wepinkCodes, codeToId);
         for (const id of wepinkIds) {
-          if (map.get(id) === "WPINK") continue; // não sobrescreve WPINK
+          if (map.get(id) === "WPINK") continue; // nao sobrescreve WPINK
           map.set(id, "WEPINK");
         }
         console.log(`  LISTAR enrich · WEPINK+=${wepinkIds.length}`);

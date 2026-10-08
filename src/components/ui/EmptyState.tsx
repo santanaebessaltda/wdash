@@ -13,7 +13,7 @@ export function EmptyState({
   title: string;
   description?: string;
   action?: ReactNode;
-  /** false = sem borda/fundo próprios (dentro de um Card). */
+  /** false = sem borda/fundo proprios (dentro de um Card). */
   framed?: boolean;
   className?: string;
 }) {

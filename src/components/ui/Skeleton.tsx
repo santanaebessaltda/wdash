@@ -1,6 +1,6 @@
 import { cn } from "@/lib/cn";
 
-/** `cn` não resolve conflito do Tailwind: o `rounded-md` padrão só entra se a classe não trouxer outro `rounded-*`. */
+/** `cn` nao resolve conflito do Tailwind: o `rounded-md` padrao so entra se a classe nao trouxer outro `rounded-*`. */
 export function Skeleton({ className }: { className?: string }) {
   const arredondado = /(^|\s)rounded(-|\s|$)/.test(className ?? "");
   return <div className={cn("animate-vela-shimmer bg-bg-3", !arredondado && "rounded-md", className)} />;

@@ -26,7 +26,7 @@ function parse(value: string | number): Parsed | null {
   const ultimoPonto = num.lastIndexOf(".");
   const depoisDe = (i: number) => num.length - i - 1;
 
-  // O último separador seguido de 1 ou 2 dígitos é decimal; 3 dígitos é agrupador.
+  // O ultimo separador seguido de 1 ou 2 digitos e decimal; 3 digitos e agrupador.
   let decimalSep: "," | "." | null = null;
   if (ultimaVirgula > ultimoPonto && ultimaVirgula !== -1 && depoisDe(ultimaVirgula) <= 2) decimalSep = ",";
   else if (ultimoPonto > ultimaVirgula && ultimoPonto !== -1 && depoisDe(ultimoPonto) <= 2) decimalSep = ".";

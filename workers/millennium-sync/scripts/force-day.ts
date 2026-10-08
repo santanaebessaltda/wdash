@@ -1,7 +1,7 @@
 /**
- * FORCE manual de um dia passado (enquanto o job noturno não existe).
- * Roda o mesmo fluxo do Atualizar com o relógio fixado em 23:59 do dia (fuso −04).
- * Não grava sync_job / watermark (last_light_sync_at).
+ * FORCE manual de um dia passado (enquanto o job noturno nao existe).
+ * Roda o mesmo fluxo do Atualizar com o relogio fixado em 23:59 do dia (fuso 04).
+ * Nao grava sync_job / watermark (last_light_sync_at).
  *   cd workers/millennium-sync && npx tsx scripts/force-day.ts 2026-09-23
  */
 import { readFileSync, existsSync } from "node:fs";
@@ -42,7 +42,7 @@ async function main() {
 
   const sb = createAdminClient();
   const base = buildDeps(sb, process.env.ERP_SECRET_KEY!);
-  // 23:59:30 no fuso −04 (America/Campo_Grande) = dia+1 03:59:30Z
+  // 23:59:30 no fuso 04 (America/Campo_Grande) = dia+1 03:59:30Z
   const fakeNow = new Date(`${day}T23:59:30.000-04:00`);
 
   const deps = {

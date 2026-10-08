@@ -1,6 +1,6 @@
 /**
- * Garante 1 processo worker por máquina/pasta.
- * Sem isso, vários `npm start` brigam pelo mesmo login Millennium (busy).
+ * Garante 1 processo worker por maquina/pasta.
+ * Sem isso, varios `npm start` brigam pelo mesmo login Millennium (busy).
  */
 import { existsSync, openSync, closeSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -40,7 +40,7 @@ function writeLock(pid: number): void {
 }
 
 /**
- * Adquire o lock. Se outro worker vivo já tem, lança erro (não sobe o 2º).
+ * Adquire o lock. Se outro worker vivo ja tem, lanca erro (nao sobe o 2).
  * Se o PID do arquivo morreu (crash), herda o lock.
  */
 export function acquireWorkerLock(): void {
@@ -65,7 +65,7 @@ export function acquireWorkerLock(): void {
         );
       }
 
-      // Lock órfão (processo morto) — remove e tenta de novo.
+      // Lock orfao (processo morto)  -  remove e tenta de novo.
       try {
         unlinkSync(WORKER_LOCK_PATH);
       } catch {
@@ -77,7 +77,7 @@ export function acquireWorkerLock(): void {
   throw new Error(`Não foi possível adquirir o lock do worker: ${WORKER_LOCK_PATH}`);
 }
 
-/** Remove o lock só se ainda for deste processo. */
+/** Remove o lock so se ainda for deste processo. */
 export function releaseWorkerLock(): void {
   const pid = readLockPid();
   if (pid != null && pid !== process.pid) return;

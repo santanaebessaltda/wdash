@@ -1,6 +1,6 @@
 /**
  * Atualiza store.tax_id (CNPJ) a partir do FILIAIS.Lista do Millennium.
- * Não mexe em onboarding / vendas / jobs.
+ * Nao mexe em onboarding / vendas / jobs.
  *
  * Usage: node scripts/backfill-store-tax-id.mjs [email]
  * Default email: santanaebessaltda@gmail.com

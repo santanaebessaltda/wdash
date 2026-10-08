@@ -1,14 +1,14 @@
 /**
  * Isolamento do vendedor (SACC-06): loga como um vendedor de teste e confere que
- *   1. nenhuma tabela da empresa devolve linhas (só as próprias em identity/membership/membership_store/tenant);
- *   2. as funções só do servidor recusam a chamada e staff_tenant_ids() vem vazio;
- *   3. a Edge seller-home responde sem R$ de colegas (ranking só com posição, nome, %, nível).
- * Sai com código 1 listando cada falha. Precisa das migrations aplicadas e da Edge publicada.
+ *   1. nenhuma tabela da empresa devolve linhas (so as proprias em identity/membership/membership_store/tenant);
+ *   2. as funcoes so do servidor recusam a chamada e staff_tenant_ids() vem vazio;
+ *   3. a Edge seller-home responde sem R$ de colegas (ranking so com posicao, nome, %, nivel).
+ * Sai com codigo 1 listando cada falha. Precisa das migrations aplicadas e da Edge publicada.
  *
- * Variáveis (process.env, .env ou workers/millennium-sync/.env):
- *   SUPABASE_URL (ou VITE_SUPABASE_URL) · SUPABASE_ANON_KEY (ou VITE_SUPABASE_ANON_KEY)
- *   SELLER_TEST_EMAIL · SELLER_TEST_PASSWORD   conta SELLER ativa e ligada a uma loja
- *   SELLER_HOME_URL                            opcional; padrão {SUPABASE_URL}/functions/v1/seller-home
+ * Variaveis (process.env, .env ou workers/millennium-sync/.env):
+ *   SUPABASE_URL (ou VITE_SUPABASE_URL)  |  SUPABASE_ANON_KEY (ou VITE_SUPABASE_ANON_KEY)
+ *   SELLER_TEST_EMAIL  |  SELLER_TEST_PASSWORD   conta SELLER ativa e ligada a uma loja
+ *   SELLER_HOME_URL                            opcional; padrao {SUPABASE_URL}/functions/v1/seller-home
  *
  *   node scripts/check-seller-isolation.mjs
  */
@@ -88,7 +88,7 @@ const TENANT_TABLES = [
   "product_sale_price",
 ];
 
-/** Grant só de algumas colunas: `*` daria permission denied sem testar a policy. */
+/** Grant so de algumas colunas: `*` daria permission denied sem testar a policy. */
 const SELECT_COLUMNS = { product_catalog_sync: "id" };
 
 const SERVICE_ONLY_RPCS = [

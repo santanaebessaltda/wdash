@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 
-/** Tempo mínimo do skeleton: carga rápida não vira um "pisca". */
+/** Tempo minimo do skeleton: carga rapida nao vira um "pisca". */
 export const MIN_SKELETON_MS = 600;
 
 /**
- * `true` enquanto `loading` for true e, depois, até completar `ms` desde que começou a carregar.
+ * `true` enquanto `loading` for true e, depois, ate completar `ms` desde que comecou a carregar.
  * Uso: `const showSkeleton = useMinSkeleton(loading)`.
  */
 export function useMinSkeleton(loading: boolean, ms = MIN_SKELETON_MS): boolean {

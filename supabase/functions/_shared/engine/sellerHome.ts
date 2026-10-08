@@ -24,7 +24,7 @@ export interface SellerHomeStore {
     name: string;
     startsOn: string;
     endsOn: string;
-    mode: "individual" | "grupo";
+    mode: "individual" | "grupo" | "geral";
     /** null = fora dos grupos da meta. */
     me: SellerGoalLevel | null;
     nextLevelGain: number | null;
@@ -230,7 +230,11 @@ function buildStore(input: SellerHomeInput, s: SellerHomeInput["stores"][number]
   const size = row ? groupSize(view, row) : 1;
   let projected: number | null = null;
   if (me) {
-    const ontem = buildGoalCardView({ ...viewInput, sellerDayAggs: input.sellerDayAggs.filter((r) => r.day < input.today) });
+    const ontem = buildGoalCardView({
+      ...viewInput,
+      dayAggs: input.dayAggs.filter((r) => r.day < input.today),
+      sellerDayAggs: input.sellerDayAggs.filter((r) => r.day < input.today),
+    });
     const r = ontem.vendedoras.find((x) => x.colaboradorId === meKey);
     const sold = !r ? 0 : me.modo === "individual" ? r.faturamentoValor : (r.atingimentoPct * r.metaIndividualValor) / 100;
     projected = projectedPrize(goal, me, { today: input.today, weights: storeWeights(input, goal, s.week), soldUntilYesterday: sold, groupSize: size });
@@ -242,7 +246,7 @@ function buildStore(input: SellerHomeInput, s: SellerHomeInput["stores"][number]
       name: goal.name,
       startsOn: goal.startsOn,
       endsOn: goal.endsOn,
-      mode: goal.tierMode === "INDIVIDUAL" ? "individual" : "grupo",
+      mode: goal.tierMode === "INDIVIDUAL" ? "individual" : goal.tierMode === "GENERAL" ? "geral" : "grupo",
       me,
       nextLevelGain: me ? nextLevelGain(me, size) : null,
       projectedPrize: projected,

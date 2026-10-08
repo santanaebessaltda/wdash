@@ -1,18 +1,18 @@
 import { getSupabase } from "@/lib/supabase";
 
-/** Aviso do sino (novidade da WeDash), publicado pela equipe WeDash na tabela `announcement`. */
+/** Aviso do sino (novidade da WDash), publicado pela equipe WDash na tabela `announcement`. */
 export type Announcement = { id: string; at: Date; title: string; body: string | null; link: string | null };
 
 type AnnouncementRow = { id: string; title: string; body: string | null; link: string | null; published_at: string };
 
-/** Últimos avisos publicados para o papel da pessoa (`roles` null = todos). */
+/** Ultimos avisos publicados para o papel da pessoa (`roles` null = todos). */
 export async function fetchAnnouncements(role: string, limit = 20): Promise<Announcement[]> {
   const sb = getSupabase();
   if (!sb) return [];
   const { data, error } = await sb
     .from("announcement")
     .select("id, title, body, link, published_at")
-    .or(`roles.is.null,roles.cs.{${role}}`)
+    .or(`roles.is.null,roles.cs.{${role}`)
     .order("published_at", { ascending: false })
     .limit(limit);
   if (error) {
@@ -57,8 +57,8 @@ async function callState(fn: string, args: Record<string, unknown>): Promise<Not
 const iso = (ms: number | null | undefined) => (ms ? new Date(ms).toISOString() : null);
 
 /**
- * Estado salvo no banco. No 1º uso começa com o que este aparelho já tinha (`seed`);
- * sem nada, tudo que já foi publicado conta como lido. `null` = sem banco (demo) ou falha.
+ * Estado salvo no banco. No 1 uso comeca com o que este aparelho ja tinha (`seed`);
+ * sem nada, tudo que ja foi publicado conta como lido. `null` = sem banco (demo) ou falha.
  */
 export function fetchNotificationState(
   tenantId: string,

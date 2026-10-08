@@ -291,7 +291,7 @@ describe("runSyncJob", () => {
     expect(result.reason).toBe("locked");
     expect(deps.calls.login).toBe(0);
     expect(deps.markJobRunning).not.toHaveBeenCalled();
-    // Contenção ≠ falha: job permanece QUEUED (processOneJob para o burst).
+    // Contencao = falha: job permanece QUEUED (processOneJob para o burst).
     expect(deps.markJobFinished).not.toHaveBeenCalled();
   });
 
@@ -600,7 +600,7 @@ describe("runSyncJob", () => {
       expect(allDays.find((d) => d.day === "2026-08-31")?.salesCount).toBe(2);
       expect(allDays.find((d) => d.day === "2026-08-30")?.salesCount).toBe(1);
 
-      // 31: WP002 1 × R$ 10 + BSPPAR (cupom sem vendedora, pelo detalhe) 1 × R$ 5; 30: BSPPAR 2 × R$ 5.
+      // 31: WP002 1 x R$ 10 + BSPPAR (cupom sem vendedora, pelo detalhe) 1 x R$ 5; 30: BSPPAR 2 x R$ 5.
       const cmv = (deps.patchDayCmv as ReturnType<typeof vi.fn>).mock.calls.flatMap((c) => c[0]);
       expect(cmv).toEqual(
         expect.arrayContaining([
@@ -614,7 +614,7 @@ describe("runSyncJob", () => {
       expect(brandDays.find((d) => d.brand === "WPINK")?.revenueCents).toBe(6_000);
       expect(brandDays.find((d) => d.brand === "WEPINK")?.revenueCents).toBe(4_000);
 
-      // Chegou no limite da carga → não encadeia.
+      // Chegou no limite da carga  ->  nao encadeia.
       expect(deps.enqueueMonthFillDay).not.toHaveBeenCalled();
     });
 
@@ -668,7 +668,7 @@ describe("runSyncJob", () => {
       const deps = monthDeps({ fetchCouponReport: vi.fn().mockRejectedValue(new Error("timeout")) });
       const result = await runSyncJob(monthJob(), deps);
       expect(result.ok).toBe(true);
-      // Margem: 1× no mês (custo) + 1 por dia (sem relatório não dá para montar a margem do dia).
+      // Margem: 1x no mes (custo) + 1 por dia (sem relatorio nao da para montar a margem do dia).
       const margemRanges = (deps.fetchRelatorioMargem as ReturnType<typeof vi.fn>).mock.calls.map(
         (c) => `${c[0].from}→${c[0].to}`,
       );
@@ -751,7 +751,7 @@ describe("runSyncJob", () => {
       "s1:2026-09-03",
       "s2:2026-09-03",
     ]);
-    // Dia sem venda grava R$ 0 (tela de sincronização conta o dia).
+    // Dia sem venda grava R$ 0 (tela de sincronizacao conta o dia).
     const zeroDays = (deps.upsertDayAggs as ReturnType<typeof vi.fn>).mock.calls
       .flatMap((c) => c[0] as Array<{ storeId: string; day: string; revenueCents: number }>)
       .filter((d) => d.storeId === "s1" && d.revenueCents === 0)

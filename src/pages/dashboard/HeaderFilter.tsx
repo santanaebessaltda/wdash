@@ -1,11 +1,11 @@
 import { Dropdown } from "@/components/ui";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 
-/** Mesmo desenho do gatilho do DateRangePicker (md) — filtros do cabeçalho das telas. */
+/** Mesmo desenho do gatilho do DateRangePicker (md)  -  filtros do cabecalho das telas. */
 const TRIGGER_CLASS =
   "flex h-10 min-w-0 items-center gap-2.5 rounded-[var(--radius-vela-sm)] border border-line bg-bg-3 px-3.5 text-left transition-colors hover:border-acc";
 
-/** Filtro de opção única no cabeçalho: gatilho igual ao do período + menu com a opção ativa marcada. */
+/** Filtro de opcao unica no cabecalho: gatilho igual ao do periodo + menu com a opcao ativa marcada. */
 export function HeaderFilter<V extends string>({
   value,
   options,
@@ -22,7 +22,7 @@ export function HeaderFilter<V extends string>({
   lead?: string;
 }) {
   const atual = options.find((o) => o.value === value)?.label ?? options[0]?.label ?? "";
-  // Abaixo do `sm` os filtros ficam alinhados à esquerda (um abaixo do outro): o menu abre para a direita.
+  // Abaixo do `sm` os filtros ficam alinhados a esquerda (um abaixo do outro): o menu abre para a direita.
   const empilhado = useMediaQuery("(max-width: 639px)");
   return (
     <Dropdown
@@ -42,7 +42,7 @@ export function HeaderFilter<V extends string>({
   );
 }
 
-/** Busca no cabeçalho, com a mesma altura e borda dos filtros. */
+/** Busca no cabecalho, com a mesma altura e borda dos filtros. */
 export function HeaderSearch({
   value,
   onChange,

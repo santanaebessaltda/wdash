@@ -16,7 +16,7 @@ export const metasRoutes: RouteObject[] = [
       { path: paths.goalNew, element: <GoalEditorPage /> },
       { path: "/goals/:id", element: <GoalDetailPage /> },
       { path: "/goals/:id/edit", element: <GoalEditorPage /> },
-      /** Legado: Metas vivia em Configurações + /metas. */
+      /** Legado: Metas vivia em Configuracoes + /metas. */
       { path: paths.legacy.goals, element: <Navigate to={paths.goals} replace /> },
       { path: paths.legacy.goalsInSettings, element: <Navigate to={paths.goals} replace /> },
     ],

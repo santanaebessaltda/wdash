@@ -1,19 +1,19 @@
 /**
- * Produtos compartilhados pela rede: catálogo (product_type + product_catalog) + cadastro do produto (data de
- * cadastro, quantidade múltipla, bloqueado compra — relatório Saldo Atual e Futuro) + tabelas de custo
- * (product_cost_table + product_cost_table_price). Sem relógio — cada gatilho busca só a sua parte:
- * - catálogo vazio / produto desconhecido nas vendas → tipos + produtos de cada tipo + cadastro (~21 chamadas);
- * - tabelas de custo vazias → lista de tabelas + preços de todas (~9 chamadas);
- * - produto vendido com custo 0 sem preço na tabela da loja → preços só dessa tabela (1 chamada).
- * No máx. 1× por job e 1× a cada 15 min na rede inteira (lease no banco — o 1º worker que precisar busca).
- * O que segue faltando depois da recarga não força outra por 24h.
+ * Produtos compartilhados pela rede: catalogo (product_type + product_catalog) + cadastro do produto (data de
+ * cadastro, quantidade multipla, bloqueado compra  -  relatorio Saldo Atual e Futuro) + tabelas de custo
+ * (product_cost_table + product_cost_table_price). Sem relogio  -  cada gatilho busca so a sua parte:
+ * - catalogo vazio / produto desconhecido nas vendas  ->  tipos + produtos de cada tipo + cadastro (~21 chamadas);
+ * - tabelas de custo vazias  ->  lista de tabelas + precos de todas (~9 chamadas);
+ * - produto vendido com custo 0 sem preco na tabela da loja  ->  precos so dessa tabela (1 chamada).
+ * No max. 1x por job e 1x a cada 15 min na rede inteira (lease no banco  -  o 1 worker que precisar busca).
+ * O que segue faltando depois da recarga nao forca outra por 24h.
  */
 import type { CatalogProduct, ProductRegistry, ProductType } from "./millenniumCatalog.ts";
 import type { CostTable } from "./millenniumCostTable.ts";
 
 export const CATALOG_MIN_INTERVAL_SEC = 15 * 60;
 export const CATALOG_LEASE_SEC = 300;
-/** Chamadas simultâneas na recarga (o Atualizar pode estar com outra frente no ERP ao mesmo tempo). */
+/** Chamadas simultaneas na recarga (o Atualizar pode estar com outra frente no ERP ao mesmo tempo). */
 export const CATALOG_CONCURRENCY = 2;
 
 export type SeenProduct = { erpProductId: number; code: string };
@@ -21,7 +21,7 @@ export type CatalogEntry = { code: string; description: string; typeId: number |
 
 export type CatalogDeps = {
   countCatalog: () => Promise<number>;
-  /** Ids já no catálogo ou marcados como desconhecidos nas últimas 24h. */
+  /** Ids ja no catalogo ou marcados como desconhecidos nas ultimas 24h. */
   knownProductIds: (ids: number[]) => Promise<Set<number>>;
   lookupProducts: (ids: number[]) => Promise<Map<number, CatalogEntry>>;
   claimRefresh: (owner: string, leaseSec: number, minIntervalSec: number) => Promise<boolean>;
@@ -33,32 +33,32 @@ export type CatalogDeps = {
   fetchProductsOfType: (session: string, typeId: number) => Promise<CatalogProduct[]>;
   countCostTables: () => Promise<number>;
   storeCostTable: (storeId: string) => Promise<number | null>;
-  /** Códigos com preço na tabela ou marcados sem preço nas últimas 24h. */
+  /** Codigos com preco na tabela ou marcados sem preco nas ultimas 24h. */
   coveredCostCodes: (tableId: number, codes: string[]) => Promise<Set<string>>;
   recordCostMisses: (tableId: number, codes: string[]) => Promise<void>;
   fetchCostTables: (session: string) => Promise<CostTable[]>;
   fetchCostTablePrices: (session: string, tableId: number) => Promise<Map<string, number>>;
   saveCostTables: (tables: CostTable[]) => Promise<void>;
   saveCostTablePrices: (tableId: number, prices: Map<string, number>) => Promise<void>;
-  /** Data de cadastro, quantidade múltipla e bloqueado compra (ESTOQUEEMCOMPRA; qualquer loja). */
+  /** Data de cadastro, quantidade multipla e bloqueado compra (ESTOQUEEMCOMPRA; qualquer loja). */
   fetchRegistry?: (session: string, millenniumStoreId: number) => Promise<ProductRegistry[]>;
   saveRegistry?: (items: ProductRegistry[]) => Promise<number>;
 };
 
-/** Estado por job: no máx. 1 recarga. */
+/** Estado por job: no max. 1 recarga. */
 export type CatalogGuard = { attempted: boolean };
 
 export type ProductsRefresh = {
   /** Recarregou tipos + produtos + cadastro. */
   catalog: boolean;
-  /** "all" = lista + preços de todas as tabelas; "one" = preços só da tabela da loja; null = não mexeu. */
+  /** "all" = lista + precos de todas as tabelas; "one" = precos so da tabela da loja; null = nao mexeu. */
   costTables: "all" | "one" | null;
   types: number;
   products: number;
   tables: number;
   prices: number;
   calls: number;
-  /** Produtos com cadastro (data/múltipla/bloqueio) gravado; null = não buscou ou falhou. */
+  /** Produtos com cadastro (data/multipla/bloqueio) gravado; null = nao buscou ou falhou. */
   registry: number | null;
   registryError?: string;
 };
@@ -68,7 +68,7 @@ export type EnsureCatalogResult =
   | { status: "skipped"; unknown: number; reason: "job" | "busy" }
   | ({ status: "refreshed"; unknown: number; stillUnknown: number; costMissing: number; stillCostMissing: number } & ProductsRefresh);
 
-/** Mesmo código de produto em 2 tipos / mesmo id com 2 códigos: fica o último visto. */
+/** Mesmo codigo de produto em 2 tipos / mesmo id com 2 codigos: fica o ultimo visto. */
 export function dedupeCatalogProducts(products: CatalogProduct[]): CatalogProduct[] {
   const byCode = new Map<string, CatalogProduct>();
   const codeById = new Map<number, string>();
@@ -94,7 +94,7 @@ async function mapPool<T, R>(items: T[], limit: number, fn: (item: T) => Promise
   return out;
 }
 
-/** Tipos, produtos de cada tipo e cadastro (data/múltipla/bloqueio — soft-fail). */
+/** Tipos, produtos de cada tipo e cadastro (data/multipla/bloqueio  -  soft-fail). */
 export async function refreshCatalog(
   deps: CatalogDeps,
   session: string,
@@ -128,7 +128,7 @@ export async function refreshCatalog(
   };
 }
 
-/** `onlyTableId` = preços só dessa tabela (1 chamada); sem ele = lista de tabelas + preços de todas. */
+/** `onlyTableId` = precos so dessa tabela (1 chamada); sem ele = lista de tabelas + precos de todas. */
 export async function refreshCostTables(
   deps: CatalogDeps,
   session: string,
@@ -165,7 +165,7 @@ export async function ensureProductCatalog(
     zeroCost?: { storeId: string; codes: string[] };
     guard: CatalogGuard;
     owner: string;
-    /** Loja usada para o cadastro (ESTOQUEEMCOMPRA é por filial, mas igual em todas). */
+    /** Loja usada para o cadastro (ESTOQUEEMCOMPRA e por filial, mas igual em todas). */
     millenniumStoreId?: number;
   },
 ): Promise<EnsureCatalogResult> {
