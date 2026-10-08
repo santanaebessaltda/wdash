@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { cashCloseBucket } from "../../../src/data/wedash/cashCloseView.ts";
 import type { StoneCapture } from "./stoneConciliation.ts";
 import { fetchStoneConciliation } from "./stoneConciliation.ts";
 import { planStoneClose, type StoneCloseStore, type StoneFileState } from "./stoneClosePlan.ts";
@@ -83,9 +84,26 @@ export async function runStoneCloseScan(sb: SupabaseClient, erpSecret: string, n
       taxDigits: digits(store.tax_id as string | null),
       covers: stone.covers === "all" ? "all" : "online_pix",
       days: [yesterday, before],
+      pixDays: [],
     });
   }
   if (plannedStores.length === 0) return 0;
+  const { data: closes, error: closeErr } = await sb
+    .from("cash_close_day")
+    .select("store_id, day, payment_method, closing_cents")
+    .in("store_id", plannedStores.map((s) => s.storeId))
+    .in("day", [...daySet]);
+  if (closeErr) throw closeErr;
+  const pixDaysByStore = new Map<string, string[]>();
+  for (const row of closes ?? []) {
+    if (cashCloseBucket(String(row.payment_method ?? "")) !== "pix" || Number(row.closing_cents) <= 0) continue;
+    const id = row.store_id as string;
+    const day = String(row.day).slice(0, 10);
+    const list = pixDaysByStore.get(id) ?? [];
+    if (!list.includes(day)) list.push(day);
+    pixDaysByStore.set(id, list);
+  }
+  for (const store of plannedStores) store.pixDays = pixDaysByStore.get(store.storeId) ?? [];
   const { data: files, error: fileErr } = await sb
     .from("stone_day_file")
     .select("store_id, day, kind, status, requested_at")

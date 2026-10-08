@@ -12,6 +12,7 @@ import {
   realCentsOf,
   dayAwaitingClose,
   monthCloseSummary,
+  paidPixCents,
   chipsAfterReview,
 } from "./cashCloseView";
 
@@ -177,6 +178,23 @@ describe("resumo do fechamento", () => {
     });
     expect(realCentsOf(view.lines[0])).toBeNull();
     expect(closeDayGap(view.lines)).toEqual({ systemCents: 2541340, comparedSystemCents: 2541340, realCents: 0, diffCents: -2541340 });
+  });
+
+  it("soma o Pix pago e usa esse total na diferença do dia", () => {
+    expect(
+      paidPixCents([
+        { status: "paid", paidCents: 2537250 },
+        { status: "canceled", paidCents: 500 },
+        { status: "Cancelled", paidCents: 200 },
+      ]),
+    ).toBe(2537250);
+    const view = buildCashCloseView({
+      millennium: [{ paymentMethod: "PIX", openingCents: 0, sangriaCents: null, closingCents: 2541340, typedCents: 0 }],
+      card: null,
+      pixCents: 2537250,
+      pixRequested: false,
+    });
+    expect(closeDayGap(view.lines).diffCents).toBe(2537250 - 2541340);
   });
 
   it("diferença aparece mesmo com arquivo a caminho, e o dia limpo fica fechado", () => {

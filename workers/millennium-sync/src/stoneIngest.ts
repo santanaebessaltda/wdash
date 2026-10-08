@@ -1,8 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { parseStonePixCsv, type StonePixRow } from "./stonePix.ts";
+import { parseStonePixCsv, stonePixPaidCents, type StonePixRow } from "./stonePix.ts";
 
 function digits(raw: string | null | undefined): string {
   return (raw ?? "").replace(/\D/g, "");
+}
+
+function brl(cents: number): string {
+  const sign = cents < 0 ? "-" : "";
+  const abs = Math.abs(Math.round(cents));
+  const reais = Math.floor(abs / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  const frac = String(abs % 100).padStart(2, "0");
+  return `${sign}R$ ${reais},${frac}`;
 }
 
 export async function ingestStonePixCsv(
@@ -40,7 +48,8 @@ export async function ingestStonePixCsv(
     status: "received",
     receivedAt: new Date().toISOString(),
   });
-  console.log(`PIX Stone ${code} ${args.day}: ${parsed.length} evento(s)`);
+  const paid = parsed.reduce((sum, row) => sum + stonePixPaidCents(row), 0);
+  console.log(`PIX Stone ${code} ${args.day}: ${parsed.length} evento(s) · ${brl(paid)}`);
   return { code, rows: parsed.length };
 }
 

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { missingCloseDays } from "../../../src/data/wedash/cashCloseMonth.ts";
+import { cashCloseBucket } from "../../../src/data/wedash/cashCloseView.ts";
 import { stoneFileReady } from "../../../src/data/wedash/stoneClock.ts";
 import { decryptPassword } from "./decrypt.ts";
 import { fetchStoneConciliation } from "./stoneConciliation.ts";
@@ -19,6 +20,23 @@ import {
 
 function digits(raw: string | null | undefined): string {
   return (raw ?? "").replace(/\D/g, "");
+}
+
+async function millenniumPixDays(sb: SupabaseClient, storeId: string, from: string, to: string): Promise<Set<string>> {
+  const { data, error } = await sb
+    .from("cash_close_day")
+    .select("day, payment_method, closing_cents")
+    .eq("store_id", storeId)
+    .gte("day", from)
+    .lte("day", to);
+  if (error) throw error;
+  const days = new Set<string>();
+  for (const row of data ?? []) {
+    if (cashCloseBucket(String(row.payment_method ?? "")) === "pix" && Number(row.closing_cents) > 0) {
+      days.add(String(row.day).slice(0, 10));
+    }
+  }
+  return days;
 }
 
 async function filledDays(sb: SupabaseClient, tenantId: string, storeId: string, from: string, to: string): Promise<Set<string>> {
@@ -180,6 +198,7 @@ export async function runCashCloseFillJob(
     const end = to < today ? to : addDaysIso(today, -1);
     if (from > end) continue;
     const files = await stoneState(sb, store.id, from, end);
+    const pixDays = await millenniumPixDays(sb, store.id, from, end);
     const tax = digits(store.taxId);
     const webhookUrl = process.env.STONE_WEBHOOK_PUBLIC_URL?.trim() ?? "";
     let pixParado = false;
@@ -224,7 +243,10 @@ export async function runCashCloseFillJob(
           problems.push(`Não foi possível buscar o cartão da adquirente em ${day}.`);
         }
       }
-      if (!pixParado && tax.length >= 11 && pixDue(file?.pix ?? null, now)) {
+      if (!pixParado && tax.length >= 11 && pixDue(file?.pix ?? null, now) && !pixDays.has(day)) {
+        console.log(`  ${store.code} ${day}: sem venda de Pix no Millennium`);
+      }
+      if (!pixParado && tax.length >= 11 && pixDue(file?.pix ?? null, now) && pixDays.has(day)) {
         try {
           await requestStonePixFile({ document: tax, secret, day });
           await markStoneFile(sb, {

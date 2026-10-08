@@ -155,6 +155,17 @@ export function cashCloseChips(input: {
   return ordered;
 }
 
+/** Soma o Pix pago. Cancelado fica de fora. O inteiro já está em centavos. */
+export function paidPixCents(rows: Array<{ status: string; paidCents: number }>): number {
+  let total = 0;
+  for (const row of rows) {
+    const status = row.status.toLowerCase();
+    if (status === "canceled" || status === "cancelled") continue;
+    total += row.paidCents;
+  }
+  return total;
+}
+
 /** Total real da forma. No dinheiro, é o valor digitado. Sem arquivo, não há total real. */
 export function realCentsOf(line: CashCloseLine): number | null {
   if (line.key === "cash") return line.typedCents;

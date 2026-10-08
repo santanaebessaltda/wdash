@@ -110,5 +110,57 @@ serve(async (req) => {
     { onConflict: "store_id" },
   );
   if (error) return json({ error: "persist_failed" }, 500);
+  await enqueuePastClose(admin, caller.tenantId, storeId);
   return json({ ok: true, stoneCode, covers });
 });
+
+/** Do dia 1 do mês anterior até ontem, na fila do worker. A madrugada continua no D+1. */
+async function enqueuePastClose(admin: ReturnType<typeof createClient>, tenantId: string, storeId: string): Promise<void> {
+  const { data: store } = await admin.from("store").select("timezone").eq("id", storeId).maybeSingle();
+  const tz = (store?.timezone as string | null) || "America/Sao_Paulo";
+  const today = ymdInTimeZone(new Date(), tz);
+  const to = shiftIso(today, -1);
+  const from = previousMonthStart(to);
+  if (to < from) return;
+  const { data: cred } = await admin
+    .from("erp_credential")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("status", "VALID")
+    .limit(1)
+    .maybeSingle();
+  if (!cred?.id) return;
+  const { data: open } = await admin
+    .from("sync_job")
+    .select("id, payload")
+    .eq("tenant_id", tenantId)
+    .eq("kind", "CLOSE")
+    .in("status", ["QUEUED", "RUNNING"])
+    .limit(20);
+  const already = (open ?? []).some((row) => {
+    const payload = row.payload as { cashOnly?: boolean; storeIds?: string[] } | null;
+    return payload?.cashOnly === true && (!payload.storeIds?.length || payload.storeIds.includes(storeId));
+  });
+  if (already) return;
+  await admin.from("sync_job").insert({
+    tenant_id: tenantId,
+    kind: "CLOSE",
+    status: "QUEUED",
+    credential_id: cred.id,
+    payload: { from, to, storeIds: [storeId], cashOnly: true },
+  });
+}
+
+function ymdInTimeZone(date: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+}
+
+function shiftIso(iso: string, days: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, (d ?? 1) + days)).toISOString().slice(0, 10);
+}
+
+function previousMonthStart(iso: string): string {
+  const [y, m] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y ?? 1970, (m ?? 1) - 2, 1)).toISOString().slice(0, 10);
+}

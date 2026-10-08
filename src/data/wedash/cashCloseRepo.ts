@@ -1,7 +1,7 @@
 import { calendarTodayIso } from "./clock";
 import { shiftName } from "./engine/format";
 import { monthCloseSpanFor } from "./cashCloseMonth";
-import { captureBucket, type CashCloseBucket, type CashCloseMillLine, type CloseAmountMap } from "./cashCloseView";
+import { captureBucket, paidPixCents, type CashCloseBucket, type CashCloseMillLine, type CloseAmountMap } from "./cashCloseView";
 
 export type CashCloseSnapshot = {
   millennium: CashCloseMillLine[];
@@ -47,12 +47,9 @@ export async function fetchCashCloseSnapshot(tenantId: string, storeId: string, 
     else if (bucket === "debit") debitCents += cents;
     else otherCents += cents;
   }
-  let pixCents = 0;
-  for (const row of pix.data ?? []) {
-    const status = String(row.status ?? "").toLowerCase();
-    if (status === "canceled" || status === "cancelled") continue;
-    pixCents += Number(row.paid_cents) || 0;
-  }
+  const pixCents = paidPixCents(
+    (pix.data ?? []).map((row) => ({ status: String(row.status ?? ""), paidCents: Number(row.paid_cents) || 0 })),
+  );
   return {
     millennium: (mill.data ?? []).map((r) => ({
       paymentMethod: String(r.payment_method ?? ""),
@@ -135,7 +132,7 @@ export async function fetchCashCloseMonthMarks(
   const { getSupabase } = await import("@/lib/supabase");
   const sb = getSupabase();
   if (!sb || storeIds.length === 0 || from > to) return [];
-  const [mill, files, captures] = await Promise.all([
+  const [mill, files, captures, pix] = await Promise.all([
     sb
       .from("cash_close_day")
       .select("store_id, day, payment_method, opening_cents, sangria_cents, closing_cents, typed_cents")
@@ -160,8 +157,18 @@ export async function fetchCashCloseMonthMarks(
       .gte("day", from)
       .lte("day", to)
       .limit(20000),
+    sb
+      .from("stone_pix")
+      .select("store_id, day, status, paid_cents")
+      .eq("tenant_id", tenantId)
+      .in("store_id", storeIds)
+      .gte("day", from)
+      .lte("day", to)
+      .limit(20000),
   ]);
-  if (mill.error || files.error || captures.error) throw new Error(mill.error?.message || files.error?.message || captures.error?.message);
+  if (mill.error || files.error || captures.error || pix.error) {
+    throw new Error(mill.error?.message || files.error?.message || captures.error?.message || pix.error?.message);
+  }
   const byKey = new Map<string, CashCloseDayMark>();
   const slot = (storeId: string, day: string) => {
     const key = `${storeId}|${day}`;
@@ -181,10 +188,26 @@ export async function fetchCashCloseMonthMarks(
       typedCents: Number(row.typed_cents) || 0,
     });
   }
+  const pixReceived = new Set<string>();
   for (const row of files.data ?? []) {
-    const mark = slot(String(row.store_id), String(row.day));
+    const day = String(row.day).slice(0, 10);
+    const mark = slot(String(row.store_id), day);
+    const key = `${row.store_id}|${day}`;
     if (row.kind === "pix" && row.status === "requested") mark.snap.pixRequested = true;
+    if (row.kind === "pix" && row.status === "received") pixReceived.add(key);
     if (row.kind === "card" && row.status === "requested") mark.cardPending = true;
+  }
+  const pixRows = new Map<string, Array<{ status: string; paidCents: number }>>();
+  for (const row of pix.data ?? []) {
+    const key = `${row.store_id}|${String(row.day).slice(0, 10)}`;
+    const list = pixRows.get(key) ?? [];
+    list.push({ status: String(row.status ?? ""), paidCents: Number(row.paid_cents) || 0 });
+    pixRows.set(key, list);
+  }
+  for (const key of pixReceived) {
+    const [storeId, day] = key.split("|");
+    if (!storeId || !day) continue;
+    slot(storeId, day).snap.pixCents = paidPixCents(pixRows.get(key) ?? []);
   }
   const cards = new Map<string, { creditCents: number; debitCents: number; otherCents: number }>();
   for (const row of captures.data ?? []) {
