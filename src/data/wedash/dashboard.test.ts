@@ -472,7 +472,7 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
     expect(v.kpis.find((k) => k.label === "Faturamento")?.valor).toMatch(/R\$\s*0/);
     expect(v.kpis.find((k) => k.label === "CMV")?.valor).toBe("—");
     expect(v.topProdutos).toEqual([]);
-    expect(v.formasPagamento).toEqual([]);
+    expect(v.paymentMethods).toEqual([]);
   });
 
   it("topProdutos from productDayAggs", () => {
@@ -625,7 +625,7 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
     expect(v.categoriaVsMeta[2]?.realizado).toBe(0);
   });
 
-  it("fills formasPagamento from paymentDayAggs (reais)", () => {
+  it("fills paymentMethods from paymentDayAggs (reais)", () => {
     const v = buildOverviewView(escopo("f1"), {
       dayAggs: [
         {
@@ -668,11 +668,11 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
         },
       ],
     });
-    expect(v.formasPagamento).toHaveLength(2);
-    expect(v.formasPagamento[0]?.forma).toBe("Pix");
-    expect(v.formasPagamento[0]?.valor).toBe(100);
-    expect(v.formasPagamento[1]?.forma).toBe("Cartão de crédito");
-    expect(v.formasPagamento[1]?.valor).toBe(50);
+    expect(v.paymentMethods).toHaveLength(2);
+    expect(v.paymentMethods[0]?.method).toBe("Pix");
+    expect(v.paymentMethods[0]?.amount).toBe(100);
+    expect(v.paymentMethods[1]?.method).toBe("Cartão de crédito");
+    expect(v.paymentMethods[1]?.amount).toBe(50);
   });
 
   it("fills topVendedoras from sellerDayAggs without pctMeta", () => {
@@ -724,7 +724,7 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
     expect(v.topVendedoras).toHaveLength(2);
     expect(v.topVendedoras[0]?.nome).toBe("Ana Silva");
     expect(v.topVendedoras[0]?.valor).toBe(150);
-    expect(v.topVendedoras[0]?.ticketMedio).toBe(75);
+    expect(v.topVendedoras[0]?.averageTicket).toBe(75);
     expect(v.topVendedoras[0]?.pctMeta).toBeUndefined();
     expect(v.topVendedoras[0]?.sub).toBe("2 vendas");
     expect(v.topVendedoras[1]?.nome).toBe("Carla");
@@ -1248,7 +1248,7 @@ describe("buildOverviewView — comparativo com o período anterior", () => {
       { dayAggs: [all("2026-08-10", 0), all("2026-08-03", 200), w("2026-08-03", 100)] },
     );
     expect(f.kpis.every((k) => k.delta === undefined)).toBe(true);
-    expect(f.deltaResultado).toBeUndefined();
+    expect(f.resultDelta).toBeUndefined();
     expect(f.kpisWpink.every((k) => k.delta === undefined)).toBe(true);
   });
 });
@@ -1335,22 +1335,22 @@ describe("buildFinanceView com agregados reais", () => {
       { filialIds: ["f1"], periodo: { tipo: "personalizado", inicio: "2026-08-10", fim: "2026-08-11" }, divisao: null },
       { dayAggs: [day("2026-08-08", 150, 60), day("2026-08-10", 200, 80), day("2026-08-11", 100, 40)] },
     );
-    const fat = v.custoLucroMargem.reduce((s, p) => s + p.faturamento, 0);
-    const cmv = v.custoLucroMargem.reduce((s, p) => s + p.custo, 0);
-    const resultado = v.resultadoOperacional.reduce((s, p) => s + p.resultado, 0);
+    const fat = v.costProfitSeries.reduce((s, p) => s + p.revenue, 0);
+    const cmv = v.costProfitSeries.reduce((s, p) => s + p.cost, 0);
+    const resultado = v.operatingResult.reduce((s, p) => s + p.result, 0);
     expect(fat).toBe(300);
     expect(cmv).toBe(120);
     // Sem custos configurados: nenhum custo inventado (resultado = lucro bruto).
     expect(resultado).toBeCloseTo(180);
-    expect(v.custosFixosFranquia.find((l) => l.ehTotal)?.valor).toBe(0);
-    expect(v.custosConfigurados).toBe(false);
-    expect(v.custosFixosFranquia.some((l) => l.rotulo.startsWith("Aluguel"))).toBe(false);
-    expect(v.custosFixosFranquia.some((l) => l.rotulo.includes("WPINK"))).toBe(false);
-    expect(v.faturamentoPorMarca).toBeNull();
+    expect(v.franchiseFixedCosts.find((l) => l.isTotal)?.amount).toBe(0);
+    expect(v.costsConfigured).toBe(false);
+    expect(v.franchiseFixedCosts.some((l) => l.label.startsWith("Aluguel"))).toBe(false);
+    expect(v.franchiseFixedCosts.some((l) => l.label.includes("WPINK"))).toBe(false);
+    expect(v.revenueByBrand).toBeNull();
     expect(v.kpis[0]?.delta).toBeDefined();
-    expect(v.deltaResultado).toBeDefined();
+    expect(v.resultDelta).toBeDefined();
     // Periodo de 2 dias (eixo por dia)  ->  sem Evolucao mensal.
-    expect(v.evolucaoMensal).toEqual([]);
+    expect(v.monthlyEvolution).toEqual([]);
   });
 
   it("1 dia: eixo por hora = expediente da loja (10h–21h), igual ao Faturamento x meta", () => {
@@ -1360,11 +1360,11 @@ describe("buildFinanceView com agregados reais", () => {
       { filialIds: ["f1"], periodo: { tipo: "personalizado", inicio: d, fim: d }, divisao: null },
       { dayAggs: [day(d, 100, 40)], hourAggs: [hr(12, 60), hr(15, 40)] },
     );
-    const labels = v.custoLucroMargem.map((p) => p.mes);
+    const labels = v.costProfitSeries.map((p) => p.label);
     expect(labels[0]).toBe("10h");
     expect(labels[labels.length - 1]).toBe("21h");
-    expect(v.custoLucroMargem.find((p) => p.mes === "12h")?.faturamento).toBe(60);
-    expect(v.custoLucroMargem.some((p) => p.futuro)).toBe(false);
+    expect(v.costProfitSeries.find((p) => p.label === "12h")?.revenue).toBe(60);
+    expect(v.costProfitSeries.some((p) => p.future)).toBe(false);
   });
 
   it("Evolução mensal com vários meses: meses do período, recortados nas pontas", () => {
@@ -1372,10 +1372,10 @@ describe("buildFinanceView com agregados reais", () => {
       { filialIds: ["f1"], periodo: { tipo: "personalizado", inicio: "2026-07-10", fim: "2026-08-31" }, divisao: null },
       { dayAggs: [day("2026-07-05", 999, 0), day("2026-07-10", 200, 80), day("2026-08-11", 100, 40)] },
     );
-    expect(v.mostrarEvolucaoMensal).toBe(true);
-    expect(v.evolucaoMensal.map((r) => r.mes)).toEqual(["julho · 10 a 31", "agosto"]);
-    expect(v.evolucaoMensal.map((r) => r.faturamento)).toEqual([200, 100]);
-    expect(v.rotuloEvolucaoMensal).toBe("10/07 a 31/08");
+    expect(v.showMonthlyEvolution).toBe(true);
+    expect(v.monthlyEvolution.map((r) => r.label)).toEqual(["julho · 10 a 31", "agosto"]);
+    expect(v.monthlyEvolution.map((r) => r.revenue)).toEqual([200, 100]);
+    expect(v.monthlyEvolutionLabel).toBe("10/07 a 31/08");
   });
 
   it("Evolução mensal com 1 mês inteiro (fevereiro, 28 dias): o mês + 5 anteriores", () => {
@@ -1383,10 +1383,10 @@ describe("buildFinanceView com agregados reais", () => {
       { filialIds: ["f1"], periodo: { tipo: "personalizado", inicio: "2026-02-01", fim: "2026-02-28" }, divisao: null },
       { dayAggs: [day("2025-08-20", 999, 0), day("2025-12-10", 300, 100), day("2026-02-11", 100, 40)] },
     );
-    expect(v.mostrarEvolucaoMensal).toBe(true);
-    expect(v.evolucaoMensal.map((r) => r.mes)).toEqual(["dezembro de 2025", "fevereiro de 2026"]);
-    expect(v.evolucaoMensal.map((r) => r.faturamento)).toEqual([300, 100]);
-    expect(v.rotuloEvolucaoMensal).toBe("fevereiro de 2026 e meses anteriores");
+    expect(v.showMonthlyEvolution).toBe(true);
+    expect(v.monthlyEvolution.map((r) => r.label)).toEqual(["dezembro de 2025", "fevereiro de 2026"]);
+    expect(v.monthlyEvolution.map((r) => r.revenue)).toEqual([300, 100]);
+    expect(v.monthlyEvolutionLabel).toBe("fevereiro de 2026 e meses anteriores");
   });
 
   it("monthlyEvolutionMonths: período mensal pelo calendário, não por contagem de dias", () => {
@@ -1445,7 +1445,7 @@ describe("buildFinanceView com agregados reais", () => {
     expect(cmv?.valor).toMatch(/^R\$\s0,00$/);
     expect(lucro?.valor).toMatch(/^R\$\s140,00$/);
     expect(margem?.valor).not.toBe("—");
-    expect(v.produtosSemCusto).toEqual([{ codigo: "WP014", nome: "WP ULTRA - WP", itens: 3, faturamento: 140 }]);
+    expect(v.productsWithoutCost).toEqual([{ code: "WP014", name: "WP ULTRA - WP", items: 3, revenue: 140 }]);
   });
 
   it("impostos da loja saem antes do Lucro bruto: ICMS sobre o faturamento, ICMS ST sobre o CMV", () => {
@@ -1459,11 +1459,11 @@ describe("buildFinanceView com agregados reais", () => {
       );
       const lucro = v.kpis.find((k) => k.label === "Lucro bruto");
       // 200  80  ICMS 20 (10% de 200)  ICMS ST 16 (20% de 80)
-      expect(lucro?.valor).toMatch(/^R\$\s84,00$/);
+      expect(lucro?.value).toMatch(/^R\$\s84,00$/);
       expect(lucro?.sub).toMatch(/^Impostos: R\$\s36,00$/);
-      expect(v.custosFixosFranquia[0]).toMatchObject({ rotulo: "Lucro bruto", valor: 84 });
+      expect(v.franchiseFixedCosts[0]).toMatchObject({ label: "Lucro bruto", amount: 84 });
       // Sem royalties/marketing/aluguel configurados: resultado = lucro bruto.
-      expect(v.custosFixosFranquia.find((l) => l.ehResultado)?.valor).toBeCloseTo(84);
+      expect(v.franchiseFixedCosts.find((l) => l.isResult)?.amount).toBeCloseTo(84);
     } finally {
       loja.custos = antes;
     }
@@ -1490,7 +1490,7 @@ describe("buildFinanceView com agregados reais", () => {
       );
       // ICMS 80 + 8 = 88; ICMS ST 60 + 5 = 65; lucro 1000  400  153 = 447
       const lucro = v.kpis.find((k) => k.label === "Lucro bruto");
-      expect(lucro?.valor).toMatch(/^R\$\s447,00$/);
+      expect(lucro?.value).toMatch(/^R\$\s447,00$/);
     } finally {
       loja.custos = antes;
     }
@@ -1509,9 +1509,9 @@ describe("buildFinanceView com agregados reais", () => {
           { filialIds: ["f1"], periodo: { tipo: "personalizado", inicio: "2026-08-10", fim: "2026-08-11" }, divisao: null },
           { dayAggs: [day("2026-08-10", 200, 80), day("2026-08-11", 100, 40)] },
         );
-        const linha = (r: string) => v.custosFixosFranquia.find((l) => l.rotulo === r || l.rotulo.startsWith(`${r} (`))?.valor;
-        const total = v.custosFixosFranquia.find((l) => l.ehTotal)?.valor;
-        const serie = v.resultadoOperacional.reduce((s, p) => s + p.resultado, 0);
+        const linha = (r: string) => v.franchiseFixedCosts.find((l) => l.label === r || l.label.startsWith(`${r} (`))?.amount;
+        const total = v.franchiseFixedCosts.find((l) => l.isTotal)?.amount;
+        const serie = v.operatingResult.reduce((s, p) => s + p.result, 0);
         return { v, linha, total, serie };
       } finally {
         loja.custos = antes;
@@ -1533,7 +1533,7 @@ describe("buildFinanceView com agregados reais", () => {
       expect(linha("Aluguel percentual excedente")).toBeUndefined();
       expect(total).toBeCloseTo(200);
       expect(serie).toBeCloseTo(180 - 200);
-      expect(v.custosConfigurados).toBe(true);
+      expect(v.costsConfigured).toBe(true);
     });
 
     it("% acima do aluguel: aluguel + só o excedente", () => {
@@ -1562,9 +1562,9 @@ describe("buildFinanceView com agregados reais", () => {
 
   it("loja sem dados não quebra a tela (CMV vazio vira —)", () => {
     const v = buildFinanceView({ filialIds: ["f2"], periodo: { tipo: "hoje" }, divisao: null }, { dayAggs: [] });
-    expect(v.kpis[0]?.valor).toBeDefined();
-    expect(v.kpis[1]?.valor).toBe("—");
-    expect(v.evolucaoMensal).toEqual([]);
+    expect(v.kpis[0]?.value).toBeDefined();
+    expect(v.kpis[1]?.value).toBe("—");
+    expect(v.monthlyEvolution).toEqual([]);
   });
 });
 
@@ -1594,7 +1594,7 @@ describe("buildProductsView com agregados reais", () => {
       productCostDayAggs: [custo("2026-08-10", "A1", 80)],
     });
     expect(v.kpis.map((k) => k.label)).toEqual(["Faturamento", "Lucro bruto", "Margem", "Itens vendidos"]);
-    expect(v.kpis[3]?.valor).toBe("20");
+    expect(v.kpis[3]?.value).toBe("20");
     expect(v.kpis[3]?.delta).toMatchObject({ value: "300%", positive: true });
     expect(v.temVendas).toBe(true);
 
@@ -1726,7 +1726,7 @@ describe("buildTeamDashboardView com agregados reais", () => {
     expect(v.kpis[3]?.valor).toBe("—");
 
     const [ana, bia] = v.pessoas;
-    expect(ana).toMatchObject({ nome: "Ana", faturamento: 300, vendas: 3, ticketMedio: 100, pa: 2, variacaoPct: 100, turno: "Manhã · 09:00–15:00" });
+    expect(ana).toMatchObject({ nome: "Ana", faturamento: 300, vendas: 3, averageTicket: 100, pa: 2, variacaoPct: 100, turno: "Manhã · 09:00–15:00" });
     expect(ana?.participacaoPct).toBeCloseTo(60);
     expect(bia).toMatchObject({ nome: "Bia", pa: null, turno: undefined, variacaoPct: 100 });
 

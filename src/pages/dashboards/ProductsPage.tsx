@@ -332,7 +332,7 @@ export default function ProductsPage() {
       <StoreHoursNotice />
       {!loading && (
         <ProductsWithoutCostNotice
-          produtos={view.produtosSemCusto}
+          produtos={view.productsWithoutCost}
           storeIds={escopo.filialIds}
           from={periodoAtual.inicio}
           to={periodoAtual.fim}
@@ -698,7 +698,7 @@ function KpiCard({ kpi, Icon, colorIdx = 0 }: { kpi: ProductsKpi; Icon: () => Re
   return (
     <StatCard
       label={kpi.label}
-      value={kpi.valor}
+      value={kpi.value}
       icon={<Icon />}
       iconColor={c.iconColor}
       iconBg={c.iconBg}

@@ -137,7 +137,7 @@ const CORES_TURNO = ["var(--acc)", "var(--info)", "var(--ok)", "var(--warn)", "v
 const COR_NEUTRA = "color-mix(in srgb, var(--t2) 40%, transparent)";
 const PODE_CONFIGURAR_LOJA = new Set(["OWNER", "MANAGER", "ADMIN_GLOBAL"]);
 
-type SortKey = "nome" | "faturamento" | "vendas" | "ticketMedio" | "pa" | "participacaoPct" | "variacaoPct";
+type SortKey = "nome" | "faturamento" | "vendas" | "averageTicket" | "pa" | "participacaoPct" | "variacaoPct";
 
 const TipHelp = ({ label }: { label: string }) => (
   <Tooltip label={label}>
@@ -331,7 +331,7 @@ export function TeamPage() {
     return {
       faturamento,
       vendas,
-      ticketMedio: vendas > 0 ? faturamento / vendas : 0,
+      averageTicket: vendas > 0 ? faturamento / vendas : 0,
       pa: completo && vendas > 0 ? itens / vendas : null,
       participacaoPct: linhasTabela.reduce((s, p) => s + p.participacaoPct, 0),
       variacaoPct: fatCmp > 0 && fatAnt > 0 ? ((fatCmp - fatAnt) / fatAnt) * 100 : null,
@@ -672,7 +672,7 @@ export function TeamPage() {
                   <th className="px-1 pb-3 text-left font-bold">Grupo</th>
                   <ThSort label="Faturamento" active={sortKey === "faturamento"} dir={sortDir} onClick={() => toggleSort("faturamento")} className="px-1 pb-3" />
                   <ThSort label="Nº de vendas" active={sortKey === "vendas"} dir={sortDir} onClick={() => toggleSort("vendas")} className="px-1 pb-3" />
-                  <ThSort label="Ticket médio" active={sortKey === "ticketMedio"} dir={sortDir} onClick={() => toggleSort("ticketMedio")} className="px-1 pb-3" />
+                  <ThSort label="Ticket médio" active={sortKey === "averageTicket"} dir={sortDir} onClick={() => toggleSort("averageTicket")} className="px-1 pb-3" />
                   <ThSort label="P.A." active={sortKey === "pa"} dir={sortDir} onClick={() => toggleSort("pa")} className="px-1 pb-3" />
                   <ThSort label="Participação" active={sortKey === "participacaoPct"} dir={sortDir} onClick={() => toggleSort("participacaoPct")} className="px-1 pb-3" />
                   <ThSort label="Variação" active={sortKey === "variacaoPct"} dir={sortDir} onClick={() => toggleSort("variacaoPct")} className="px-1 pb-3" />
@@ -715,7 +715,7 @@ export function TeamPage() {
                       </td>
                       <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.faturamento)}</td>
                       <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(p.vendas)}</td>
-                      <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.ticketMedio)}</td>
+                      <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.averageTicket)}</td>
                       <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", p.pa == null ? "text-t2" : "text-t0")}>{paFmt(p.pa)}</td>
                       <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{pctFmt(p.participacaoPct)}</td>
                       <td className="px-1 py-3 text-right font-mono text-[13px]">
@@ -742,7 +742,7 @@ export function TeamPage() {
                   </td>
                   <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{brlCent(totalTabela.faturamento)}</td>
                   <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{num(totalTabela.vendas)}</td>
-                  <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{brlCent(totalTabela.ticketMedio)}</td>
+                  <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{brlCent(totalTabela.averageTicket)}</td>
                   <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", totalTabela.pa == null ? "text-t2" : "text-t0")}>
                     {paFmt(totalTabela.pa)}
                   </td>

@@ -570,7 +570,7 @@ export default function OverviewPage() {
               {view.gauges.length > 0 &&
                 (view.evolucao[view.evolucao.length - 1]?.realizado ?? 0) + (view.evolucao[view.evolucao.length - 1]?.meta ?? 0) > 0 && (
               <>
-              <p className="mt-0.5 text-[11px] font-semibold text-t2">{view.rotuloSerie}</p>
+              <p className="mt-0.5 text-[11px] font-semibold text-t2">{view.seriesLabel}</p>
               <div className="mt-2.5 flex flex-wrap gap-5">
                 <div>
                   <span className="flex items-center gap-1.5 text-xs font-semibold text-t1">
@@ -818,33 +818,33 @@ export default function OverviewPage() {
           <CardHeader>
             <CardTitle>Formas de pagamento</CardTitle>
           </CardHeader>
-          {view.formasPagamento.length === 0 ? (
+          {view.paymentMethods.length === 0 ? (
             <EmptyBlock />
           ) : (
             (() => {
-              const total = view.formasPagamento.reduce((s, f) => s + f.valor, 0) || 1;
+              const total = view.paymentMethods.reduce((s, f) => s + f.amount, 0) || 1;
               return (
                 <div className="flex flex-1 flex-col justify-center px-4 pb-4">
                   {/* Padrao Expense breakdown  -  igual Financeiro */}
                   <div className="mx-auto my-2">
                     <DonutChart
-                      segments={view.formasPagamento.map((f) => ({
-                        label: labelUpper(f.forma),
-                        value: f.valor,
-                        color: f.cor,
+                      segments={view.paymentMethods.map((f) => ({
+                        label: labelUpper(f.method),
+                        value: f.amount,
+                        color: f.color,
                       }))}
                       centerLabel="Total"
                       centerValue={brlCent(total)}
                     />
                   </div>
                   <div className="mt-2 flex flex-col gap-2">
-                    {view.formasPagamento.map((f) => {
-                      const pct = Math.round((f.valor / total) * 100);
+                    {view.paymentMethods.map((f) => {
+                      const pct = Math.round((f.amount / total) * 100);
                       return (
-                        <div key={f.forma} className="flex items-center gap-2.5">
-                          <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: f.cor }} />
-                          <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-t1">{labelUpper(f.forma)}</span>
-                          <span className="shrink-0 font-mono text-[12.5px] font-bold text-t0">{brlCent(f.valor)}</span>
+                        <div key={f.method} className="flex items-center gap-2.5">
+                          <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: f.color }} />
+                          <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-t1">{labelUpper(f.method)}</span>
+                          <span className="shrink-0 font-mono text-[12.5px] font-bold text-t0">{brlCent(f.amount)}</span>
                           <span className="min-w-[32px] shrink-0 text-right text-[11.5px] font-semibold text-t2">{pct}%</span>
                         </div>
                       );
@@ -907,10 +907,10 @@ export default function OverviewPage() {
                     {!v.meta && hasMeta && <ProgressBar value={Math.min(100, pct)} height={5} />}
                     <div className={`flex flex-wrap items-center gap-x-1.5 text-[11px] text-t2 ${hasMeta && !v.meta ? "mt-0.5" : ""}`}>
                       <span>{v.sub?.split("·")[0]?.trim() ?? ""}</span>
-                      {v.ticketMedio != null && v.ticketMedio > 0 && (
+                      {v.averageTicket != null && v.averageTicket > 0 && (
                         <>
                           <span>·</span>
-                          <span>Ticket médio {brlCent(v.ticketMedio)}</span>
+                          <span>Ticket médio {brlCent(v.averageTicket)}</span>
                         </>
                       )}
                       {v.pa != null && (

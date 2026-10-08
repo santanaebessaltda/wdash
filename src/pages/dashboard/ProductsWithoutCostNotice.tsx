@@ -8,10 +8,10 @@ import { useActiveSession } from "@/session/SessionProvider";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 
 /**
- * Aviso (warn) quando produtos vendidos no período ficam sem custo: R$ 0 na margem do Millennium
- * e sem preço na tabela de custo da loja — CMV e margem ficam otimistas.
- * "Atualizar custos" (Gestor): depois que o custo é cadastrado no Millennium, busca de novo a tabela
- * de custo e a margem das lojas afetadas no período da tela.
+ * Aviso (warn) quando produtos vendidos no periodo ficam sem custo: R$ 0 na margem do Millennium
+ * e sem preco na tabela de custo da loja  -  CMV e margem ficam otimistas.
+ * "Atualizar custos" (Gestor): depois que o custo e cadastrado no Millennium, busca de novo a tabela
+ * de custo e a margem das lojas afetadas no periodo da tela.
  */
 export function ProductsWithoutCostNotice({
   produtos,
@@ -74,13 +74,13 @@ export function ProductsWithoutCostNotice({
         aberto && (
           <ul className="mt-2.5 divide-y divide-warn/20 border-t border-warn/20 text-[12.5px] text-t0">
             {produtos.map((p) => (
-              <li key={p.codigo} className="flex items-center justify-between gap-3 py-1.5">
+              <li key={p.code} className="flex items-center justify-between gap-3 py-1.5">
                 <span className="min-w-0 truncate">
-                  <span className="font-mono text-t2">{p.codigo}</span>
-                  {p.nome ? <span> · {p.nome}</span> : null}
+                  <span className="font-mono text-t2">{p.code}</span>
+                  {p.name ? <span> · {p.name}</span> : null}
                 </span>
                 <span className="shrink-0 tabular-nums text-t1">
-                  {num(p.itens)} {p.itens === 1 ? "item" : "itens"} · {brlCent(p.faturamento)}
+                  {num(p.items)} {p.items === 1 ? "item" : "itens"} · {brlCent(p.revenue)}
                 </span>
               </li>
             ))}

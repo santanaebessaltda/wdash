@@ -248,7 +248,7 @@ function TeamMemberDetailModal({
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
               <MetricaDetalhe label="Faturamento" valor={brlCent(detalhe.faturamento)} delta={cmp?.faturamento} />
               <MetricaDetalhe label="Nº de vendas" valor={num(detalhe.vendas)} delta={cmp?.vendas} />
-              <MetricaDetalhe label="Ticket médio" valor={brlCent(detalhe.ticketMedio)} delta={cmp?.ticket} />
+              <MetricaDetalhe label="Ticket médio" valor={brlCent(detalhe.averageTicket)} delta={cmp?.ticket} />
               <MetricaDetalhe
                 label="P.A."
                 valor={detalhe.pa == null ? "—" : num(detalhe.pa, 2)}

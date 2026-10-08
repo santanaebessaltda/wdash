@@ -325,7 +325,7 @@ export interface TeamView {
   /** Série acumulada Realizado × Meta (mesmo padrão da Visão Geral). */
   evolucaoFaturamento?: { label: string; realizado: number; meta: number }[];
   /** Subtítulo do eixo (ex.: "Este mês · por dia"). */
-  rotuloSerie?: string;
+  seriesLabel?: string;
   /** Grupos da loja/rede (ex.: Grupo 1, Grupo 2) para o filtro do header. */
   gruposDisponiveis: { id: string; nome: string }[];
   vendedoras: SellerRow[] | null;
@@ -1001,9 +1001,9 @@ function montarEvolucaoFatVsMeta(
   filialIds: string[],
   periodo: ResolvedPeriod,
   metaTotal: number,
-): { pontos: { label: string; realizado: number; meta: number }[]; rotuloSerie: string } | undefined {
+): { pontos: { label: string; realizado: number; meta: number }[]; seriesLabel: string } | undefined {
   const eixo = seriesAxisForPeriod(periodo);
-  const rotuloSerie = seriesAxisLabel(periodo, eixo);
+  const seriesLabel = seriesAxisLabel(periodo, eixo);
   const pontos: { label: string; realizado: number; meta: number }[] = [];
 
   if (eixo === "hora") {
@@ -1058,7 +1058,7 @@ function montarEvolucaoFatVsMeta(
     }
   }
 
-  return pontos.length > 1 ? { pontos, rotuloSerie } : undefined;
+  return pontos.length > 1 ? { pontos, seriesLabel } : undefined;
 }
 
 function gruposDaFilial(filialId: string): { id: string; nome: string }[] {
@@ -1186,7 +1186,7 @@ function visaoLoja(escopo: Scope, periodo: ResolvedPeriod, periodoMeta: Resolved
     metasCards,
     leitura: null,
     evolucaoFaturamento: evolucao?.pontos,
-    rotuloSerie: evolucao?.rotuloSerie,
+    seriesLabel: evolucao?.seriesLabel,
     gruposDisponiveis: gruposDaFilial(filialId),
     vendedoras,
     lojas: null,
@@ -1359,7 +1359,7 @@ if (metaAtiva) {
     metasCards,
     leitura: null,
     evolucaoFaturamento: evolucaoRede?.pontos,
-    rotuloSerie: evolucaoRede?.rotuloSerie,
+    seriesLabel: evolucaoRede?.seriesLabel,
     gruposDisponiveis: gruposDoEscopo([]),
     vendedoras: vendedorasFlat,
     lojas: lojas,

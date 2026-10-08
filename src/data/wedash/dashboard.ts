@@ -1437,7 +1437,7 @@ export function buildStoreView(escopo: Scope): StoreView {
 
 export interface FinanceKpi {
   label: string;
-  valor: string;
+  value: string;
   delta?: { value: string; positive: boolean; vs?: string; anterior?: string };
   serie?: number[];
   tooltip?: string;
@@ -1445,53 +1445,53 @@ export interface FinanceKpi {
 }
 
 export interface CostProfitMonth {
-  mes: string;
-  custo: number;
-  lucro: number;
-  margemPct: number;
-  faturamento: number;
-  futuro?: boolean; // Hora de hoje que ainda nao chegou
-  faixa?: string; // Eixo hora: "21h as 22h" (tooltip)
+  label: string;
+  cost: number;
+  profit: number;
+  marginPct: number;
+  revenue: number;
+  future?: boolean; // Hora de hoje que ainda nao chegou
+  rangeLabel?: string; // Eixo hora: "21h as 22h" (tooltip)
 }
 
 export interface OpResultMonth {
-  mes: string;
-  lucro: number;
-  resultado: number;
-  margemOpPct: number;
-  faturamento: number;
-  futuro?: boolean; // Hora de hoje que ainda nao chegou
-  faixa?: string; // Eixo hora: "21h as 22h" (tooltip)
+  label: string;
+  profit: number;
+  result: number;
+  operatingMarginPct: number;
+  revenue: number;
+  future?: boolean; // Hora de hoje que ainda nao chegou
+  rangeLabel?: string; // Eixo hora: "21h as 22h" (tooltip)
 }
 
 export interface PaymentMethodRevenue {
-  forma: string;
-  valor: number;
+  method: string;
+  amount: number;
   pct: number;
-  cor: string;
+  color: string;
 }
 
 export interface FixedCostRow {
-  rotulo: string;
-  valor: number;
-  ehTotal?: boolean;
-  ehResultado?: boolean;
+  label: string;
+  amount: number;
+  isTotal?: boolean;
+  isResult?: boolean;
 }
 
 export interface MonthlyEvolutionRow {
-  mes: string;
-  faturamento: number;
-  custo: number;
-  lucro: number;
-  margemPct: number;
-  ticketMedio: number;
+  label: string;
+  revenue: number;
+  cost: number;
+  profit: number;
+  marginPct: number;
+  averageTicket: number;
 }
 
 export interface RevenueByBrand {
-  marca: string;
-  valor: number;
+  brand: string;
+  amount: number;
   pct: number;
-  cor: string;
+  color: string;
 }
 
 export interface FinanceView {
@@ -1501,30 +1501,30 @@ export interface FinanceView {
   /** Eixo dos cards de tendencia (CMV/Lucro e Resultado). */
   eixoSerie: SeriesAxis;
   /** Ex.: "Hoje  |  por hora". */
-  rotuloSerie: string;
+  seriesLabel: string;
   /** True quando custos fixos foram rateados no eixo (hora/dia). */
-  resultadoRateado: boolean;
-  custoLucroMargem: CostProfitMonth[];
-  resultadoOperacional: OpResultMonth[];
-  deltaResultado?: { value: string; positive: boolean; vs?: string; diff?: string };
-  formasPagamento: PaymentMethodRevenue[];
+  resultIsProrated: boolean;
+  costProfitSeries: CostProfitMonth[];
+  operatingResult: OpResultMonth[];
+  resultDelta?: { value: string; positive: boolean; vs?: string; diff?: string };
+  paymentMethods: PaymentMethodRevenue[];
   /** So quando filtro = todas as marcas; null se WEPINK ou WPINK isolada. */
-  faturamentoPorMarca: RevenueByBrand[] | null;
-  custosFixosFranquia: FixedCostRow[];
+  revenueByBrand: RevenueByBrand[] | null;
+  franchiseFixedCosts: FixedCostRow[];
   /** Alguma loja do escopo tem custo da operacao preenchido (senao o card mostra "Custos nao configurados"). */
-  custosConfigurados: boolean;
-  evolucaoMensal: MonthlyEvolutionRow[];
+  costsConfigured: boolean;
+  monthlyEvolution: MonthlyEvolutionRow[];
   /** Card so em periodo mensal (ver `monthlyEvolutionMonths`). */
-  mostrarEvolucaoMensal: boolean;
-  rotuloEvolucaoMensal: string;
+  showMonthlyEvolution: boolean;
+  monthlyEvolutionLabel: string;
   /** Faixa WPINK (Faturamento  |  CMV  |  Lucro  |  Margem)  -  so se alguma loja do escopo tem a marca. */
   kpisWpink: OverviewKpiWpink[];
   /** Itens vendidos (mesma regra de comparativo dos KPIs)  -  usado pela tela Produtos. */
   kpiItens?: FinanceKpi;
   /** Faturamento do periodo (R$)  -  aviso "sem vendas" independente do eixo. */
-  faturamentoAtual?: number;
+  periodRevenue?: number;
   /** Produtos vendidos no periodo com custo R$ 0 no Millennium (maior faturamento primeiro). */
-  produtosSemCusto?: ProductWithoutCost[];
+  productsWithoutCost?: ProductWithoutCost[];
 }
 
 const CORES_FORMAS: Record<string, string> = {
@@ -1544,16 +1544,16 @@ const PCT_CUSTOS_FIXOS = {
 } as const;
 
 /** Aluguel fixo mockado por filial (mensal). Variaveis (% sobre fat) sao calculadas no view. */
-function aluguelFixoMock(f: Store): number {
+function mockFixedRent(f: Store): number {
   const base = f.id === "f1" ? 6100 : 3450;
   return Math.round(18000 * (base / 5000));
 }
 
 /** Custos da loja (Configuracoes > Lojas); campo vazio cai no padrao mockado. */
-function custosDaFilial(f: Store) {
+function storeCostSnapshot(f: Store) {
   const c = f.custos;
   return {
-    aluguelFixo: c?.rentMin ?? aluguelFixoMock(f),
+    aluguelFixo: c?.rentMin ?? mockFixedRent(f),
     aluguelWepinkPct: c?.rentWepinkPct ?? PCT_CUSTOS_FIXOS.aluguelShopping,
     aluguelWpinkPct: c?.rentWpinkPct ?? PCT_CUSTOS_FIXOS.aluguelShopping,
     royaltiesWepinkPct: c?.royaltiesWepinkPct ?? PCT_CUSTOS_FIXOS.royaltiesWepink,
@@ -1564,7 +1564,7 @@ function custosDaFilial(f: Store) {
 }
 
 /** "(5%)" quando todas as lojas usam o mesmo %; vazio se variam. */
-function rotuloPct(valores: number[]): string {
+function rateSuffix(valores: number[]): string {
   const unicos = [...new Set(valores)];
   return unicos.length === 1 ? ` (${String(unicos[0]).replace(".", ",")}%)` : "";
 }
@@ -1581,7 +1581,7 @@ export function monthlyEvolutionMonths(
   periodo: ResolvedPeriod,
   eixoSerie: SeriesAxis,
 ): { meses: string[]; comAnteriores: boolean } {
-  const doPeriodo = mesesEntre(periodo.inicio, periodo.fim);
+  const doPeriodo = monthsBetween(periodo.inicio, periodo.fim);
   const mensal =
     PRESETS_MENSAIS.has(periodo.tipo) ||
     (periodo.tipo === "personalizado" &&
@@ -1602,14 +1602,14 @@ export function monthlyEvolutionMonths(
 }
 
 /** Nome do mes na Evolucao mensal; ano so se a lista atravessa anos; recorte "(01 a 26)" em mes parcial. */
-function rotuloMesEvolucao(mes: string, meses: string[], ini?: string, fim?: string): string {
+function monthEvolutionLabel(mes: string, meses: string[], ini?: string, fim?: string): string {
   const nome = mesAno(`${mes}-01`);
   const base = meses[0]!.slice(0, 4) === meses[meses.length - 1]!.slice(0, 4) ? nome.split(" de ")[0]! : nome;
   if (!ini || !fim || (ini === `${mes}-01` && fim === fimDoMes(`${mes}-01`))) return base;
   return `${base} · ${ini.slice(8)} a ${fim.slice(8)}`;
 }
 
-function rotuloEvolucao(periodo: ResolvedPeriod, comAnteriores: boolean): string {
+function evolutionCaption(periodo: ResolvedPeriod, comAnteriores: boolean): string {
   return comAnteriores ? `${mesAno(periodo.inicio)} e meses anteriores` : periodo.rotulo;
 }
 
@@ -1630,7 +1630,7 @@ export function seriesAxisLabel(periodo: ResolvedPeriod, eixo: SeriesAxis): stri
   return `${periodo.rotulo} · por mês`;
 }
 
-function mesesEntre(inicio: string, fim: string): string[] {
+function monthsBetween(inicio: string, fim: string): string[] {
   const out: string[] = [];
   let y = Number(inicio.slice(0, 4));
   let m = Number(inicio.slice(5, 7));
@@ -1647,12 +1647,12 @@ function mesesEntre(inicio: string, fim: string): string[] {
   return out;
 }
 
-function diasNoMes(mesYm: string): number {
-  const [y, m] = mesYm.split("-").map(Number);
+function daysInMonth(monthYm: string): number {
+  const [y, m] = monthYm.split("-").map(Number);
   return new Date(y, m, 0).getDate();
 }
 
-function agregadoMes(fs: Store[], mes: string, divisao: Division | null): Aggregate & { cmv: number; porMeio: Record<string, number> } {
+function monthAggregate(fs: Store[], mes: string, divisao: Division | null): Aggregate & { cmv: number; porMeio: Record<string, number> } {
   const inicio = `${mes}-01`;
   const fim = fimDoMes(inicio);
   const agg = sumAggregates(fs.map((f) => agregadoPeriodo(f, inicio, fim, divisao)));
@@ -1705,13 +1705,13 @@ export function buildFinanceView(escopo: Scope, aggs?: FinanceAggInput | null): 
   const kpis: FinanceKpi[] = [
     {
       label: "Faturamento",
-      valor: brlCent(atual.faturamento),
+      value: brlCent(atual.faturamento),
       delta: temComp ? kpiDelta(atual.faturamento, anterior.faturamento, vsRotulo) : undefined,
       serie: serieFaturamento,
     },
     {
       label: "CMV",
-      valor: brlCent(custoAtual),
+      value: brlCent(custoAtual),
       sub: `${(divSeguro(custoAtual, atual.faturamento) * 100).toFixed(0)}% do faturamento`,
       delta: temComp ? kpiDelta(custoAtual, custoAnterior, vsRotulo) : undefined,
       serie: serieCmv,
@@ -1719,14 +1719,14 @@ export function buildFinanceView(escopo: Scope, aggs?: FinanceAggInput | null): 
     },
     {
       label: "Lucro bruto",
-      valor: brlCent(lucroAtual),
+      value: brlCent(lucroAtual),
       delta: temComp ? kpiDelta(lucroAtual, lucroAnterior, vsRotulo) : undefined,
       serie: serieLucro,
       tooltip: TIP_LUCRO_BRUTO,
     },
     {
       label: "Margem",
-      valor: pct(margemAtual),
+      value: pct(margemAtual),
       delta: temComp ? kpiDeltaPp(margemAtual, margemAnterior, vsRotulo) : undefined,
       serie: serieMargem,
       tooltip: TIP_MARGEM,
@@ -1735,8 +1735,8 @@ export function buildFinanceView(escopo: Scope, aggs?: FinanceAggInput | null): 
 
   // Serie de tendencia: eixo hora / dia / mes conforme o periodo filtrado.
   const eixoSerie = seriesAxisForPeriod(periodo);
-  const rotuloSerie = seriesAxisLabel(periodo, eixoSerie);
-  const resultadoRateado = eixoSerie !== "mes";
+  const seriesLabel = seriesAxisLabel(periodo, eixoSerie);
+  const resultIsProrated = eixoSerie !== "mes";
 
   // Faturamento por marca (sempre calculado; donut so quando filtro = todas).
   const fatWepink = sumAggregates(fs.map((f) => agregadoPeriodo(f, periodo.inicio, periodo.fim, "WEPINK"))).faturamento;
@@ -1747,7 +1747,7 @@ export function buildFinanceView(escopo: Scope, aggs?: FinanceAggInput | null): 
   const incluiWepink = !divisao || divisao === "WEPINK";
   const incluiWpink = !divisao || divisao === "WPINK";
   const custosLojas = fs.map((f) => ({
-    c: custosDaFilial(f),
+    c: storeCostSnapshot(f),
     wepink: incluiWepink ? agregadoPeriodo(f, periodo.inicio, periodo.fim, "WEPINK").faturamento : 0,
     wpink: incluiWpink ? agregadoPeriodo(f, periodo.inicio, periodo.fim, "WPINK").faturamento : 0,
   }));
@@ -1759,7 +1759,7 @@ export function buildFinanceView(escopo: Scope, aggs?: FinanceAggInput | null): 
   const royaltiesWpink = somaPct((l) => (l.wpink * l.c.royaltiesWpinkPct) / 100);
   const taxaMktWepink = somaPct((l) => (l.wepink * l.c.mktWepinkPct) / 100);
   const taxaMktWpink = somaPct((l) => (l.wpink * l.c.mktWpinkPct) / 100);
-  const pctAluguel = rotuloPct(
+  const pctAluguel = rateSuffix(
     custosLojas.flatMap((l) => [
       ...(incluiWepink ? [l.c.aluguelWepinkPct] : []),
       ...(incluiWpink && l.wpink > 0 ? [l.c.aluguelWpinkPct] : []),
@@ -1781,8 +1781,8 @@ export function buildFinanceView(escopo: Scope, aggs?: FinanceAggInput | null): 
     custosAgg.taxaMktWepink +
     custosAgg.taxaMktWpink;
 
-  const custoLucroMargem: CostProfitMonth[] = [];
-  const resultadoOperacional: OpResultMonth[] = [];
+  const costProfitSeries: CostProfitMonth[] = [];
+  const operatingResult: OpResultMonth[] = [];
 
   if (eixoSerie === "hora") {
     const abertura = Math.min(...fs.map((f) => f.abertura));
@@ -1793,7 +1793,7 @@ export function buildFinanceView(escopo: Scope, aggs?: FinanceAggInput | null): 
     const diaFat = atual.faturamento;
     const diaCmv = custoAtual;
     const ratioCmv = divSeguro(diaCmv, diaFat);
-    const custoHora = totalCustosFixos / diasNoMes(periodo.inicio.slice(0, 7)) / (horas.length || 1);
+    const custoHora = totalCustosFixos / daysInMonth(periodo.inicio.slice(0, 7)) / (horas.length || 1);
     for (const h of horasVisiveis) {
       const fatH = fs.reduce((s, f) => {
         const a = salesDay(f.id, periodo.inicio)?.porHora[h];
@@ -1806,14 +1806,14 @@ export function buildFinanceView(escopo: Scope, aggs?: FinanceAggInput | null): 
       const cmv = Math.round(fatH * ratioCmv);
       const lucro = fatH - cmv;
       const label = horaCurta(h);
-      custoLucroMargem.push({ mes: label, custo: cmv, lucro, margemPct: divSeguro(lucro, fatH) * 100, faturamento: fatH });
+      costProfitSeries.push({ label, cost: cmv, profit: lucro, marginPct: divSeguro(lucro, fatH) * 100, revenue: fatH });
       const resultado = lucro - custoHora;
-      resultadoOperacional.push({
-        mes: label,
-        lucro,
-        resultado,
-        margemOpPct: divSeguro(resultado, fatH) * 100,
-        faturamento: fatH,
+      operatingResult.push({
+        label,
+        profit: lucro,
+        result: resultado,
+        operatingMarginPct: divSeguro(resultado, fatH) * 100,
+        revenue: fatH,
       });
     }
   } else if (eixoSerie === "dia") {
@@ -1827,49 +1827,49 @@ export function buildFinanceView(escopo: Scope, aggs?: FinanceAggInput | null): 
       const label = periodo.granularidade === "mes"
         ? String(deIso(iso).getDate())
         : diaSemanaCurto(iso);
-      const custoDia = totalCustosFixos / diasNoMes(iso.slice(0, 7));
-      custoLucroMargem.push({
-        mes: label,
-        custo: cmv,
-        lucro,
-        margemPct: divSeguro(lucro, agg.faturamento) * 100,
-        faturamento: agg.faturamento,
+      const custoDia = totalCustosFixos / daysInMonth(iso.slice(0, 7));
+      costProfitSeries.push({
+        label,
+        cost: cmv,
+        profit: lucro,
+        marginPct: divSeguro(lucro, agg.faturamento) * 100,
+        revenue: agg.faturamento,
       });
       const resultado = lucro - custoDia;
-      resultadoOperacional.push({
-        mes: label,
-        lucro,
-        resultado,
-        margemOpPct: divSeguro(resultado, agg.faturamento) * 100,
-        faturamento: agg.faturamento,
+      operatingResult.push({
+        label,
+        profit: lucro,
+        result: resultado,
+        operatingMarginPct: divSeguro(resultado, agg.faturamento) * 100,
+        revenue: agg.faturamento,
       });
     }
   } else {
-    for (const mes of mesesEntre(periodo.inicio, periodo.fim)) {
-      const agg = agregadoMes(fs, mes, divisao);
+    for (const mes of monthsBetween(periodo.inicio, periodo.fim)) {
+      const agg = monthAggregate(fs, mes, divisao);
       const lucro = agg.faturamento - agg.cmv;
       const label = mesAno(`${mes}-01`).split(" de ")[0];
-      custoLucroMargem.push({
-        mes: label,
-        custo: agg.cmv,
-        lucro,
-        margemPct: divSeguro(lucro, agg.faturamento) * 100,
-        faturamento: agg.faturamento,
+      costProfitSeries.push({
+        label,
+        cost: agg.cmv,
+        profit: lucro,
+        marginPct: divSeguro(lucro, agg.faturamento) * 100,
+        revenue: agg.faturamento,
       });
       const resultado = lucro - totalCustosFixos;
-      resultadoOperacional.push({
-        mes: label,
-        lucro,
-        resultado,
-        margemOpPct: divSeguro(resultado, agg.faturamento) * 100,
-        faturamento: agg.faturamento,
+      operatingResult.push({
+        label,
+        profit: lucro,
+        result: resultado,
+        operatingMarginPct: divSeguro(resultado, agg.faturamento) * 100,
+        revenue: agg.faturamento,
       });
     }
   }
 
   const resultadoAtual = lucroAtual - totalCustosFixos;
   const resultadoAnterior = lucroAnterior - totalCustosFixos;
-  const deltaResultado = temComp ? kpiDelta(resultadoAtual, resultadoAnterior, vsRotulo) : undefined;
+  const resultDelta = temComp ? kpiDelta(resultadoAtual, resultadoAnterior, vsRotulo) : undefined;
 
   // Formas de pagamento no periodo.
   const diasPeriodo = intervaloDias(periodo.inicio, periodo.fim);
@@ -1884,57 +1884,57 @@ export function buildFinanceView(escopo: Scope, aggs?: FinanceAggInput | null): 
     }
   }
   const totalFormas = Object.values(totaisForma).reduce((s, v) => s + v, 0) || 1;
-  const formasPagamento: PaymentMethodRevenue[] = Object.entries(totaisForma)
+  const paymentMethods: PaymentMethodRevenue[] = Object.entries(totaisForma)
     .sort((a, b) => b[1] - a[1])
-    .map(([forma, valor]) => ({
-      forma,
-      valor,
-      pct: (valor / totalFormas) * 100,
-      cor: CORES_FORMAS[forma] ?? "var(--t2)",
+    .map(([method, amount]) => ({
+      method,
+      amount,
+      pct: (amount / totalFormas) * 100,
+      color: CORES_FORMAS[method] ?? "var(--t2)",
     }));
 
   // Mini-DRE  ->  Resultado Operacional. Linhas de marca so aparecem no filtro correspondente.
   const linhasMarca: FixedCostRow[] = [];
   if (incluiWepink) {
     linhasMarca.push(
-      { rotulo: `Royalties WEPINK${rotuloPct(custosLojas.map((l) => l.c.royaltiesWepinkPct))}`, valor: custosAgg.royaltiesWepink },
-      { rotulo: `Taxa de marketing WEPINK${rotuloPct(custosLojas.map((l) => l.c.mktWepinkPct))}`, valor: custosAgg.taxaMktWepink },
+      { label: `Royalties WEPINK${rateSuffix(custosLojas.map((l) => l.c.royaltiesWepinkPct))}`, amount: custosAgg.royaltiesWepink },
+      { label: `Taxa de marketing WEPINK${rateSuffix(custosLojas.map((l) => l.c.mktWepinkPct))}`, amount: custosAgg.taxaMktWepink },
     );
   }
   if (incluiWpink) {
     linhasMarca.push(
-      { rotulo: `Royalties WPINK${rotuloPct(custosLojas.map((l) => l.c.royaltiesWpinkPct))}`, valor: custosAgg.royaltiesWpink },
-      { rotulo: `Taxa de marketing WPINK${rotuloPct(custosLojas.map((l) => l.c.mktWpinkPct))}`, valor: custosAgg.taxaMktWpink },
+      { label: `Royalties WPINK${rateSuffix(custosLojas.map((l) => l.c.royaltiesWpinkPct))}`, amount: custosAgg.royaltiesWpink },
+      { label: `Taxa de marketing WPINK${rateSuffix(custosLojas.map((l) => l.c.mktWpinkPct))}`, amount: custosAgg.taxaMktWpink },
     );
   }
-  const custosFixosFranquia: FixedCostRow[] = [
-    { rotulo: "Lucro bruto", valor: lucroAtual },
-    { rotulo: "Aluguel fixo", valor: custosAgg.aluguelFixo },
-    { rotulo: `Aluguel variável${pctAluguel}`, valor: custosAgg.aluguelPct },
+  const franchiseFixedCosts: FixedCostRow[] = [
+    { label: "Lucro bruto", amount: lucroAtual },
+    { label: "Aluguel fixo", amount: custosAgg.aluguelFixo },
+    { label: `Aluguel variável${pctAluguel}`, amount: custosAgg.aluguelPct },
     ...linhasMarca,
-    { rotulo: "Total de custos", valor: totalCustosFixos, ehTotal: true },
-    { rotulo: "Resultado operacional", valor: resultadoAtual, ehResultado: true },
+    { label: "Total de custos", amount: totalCustosFixos, isTotal: true },
+    { label: "Resultado operacional", amount: resultadoAtual, isResult: true },
   ];
 
-  const faturamentoPorMarca: RevenueByBrand[] | null = divisao
+  const revenueByBrand: RevenueByBrand[] | null = divisao
     ? null
     : [
-        { marca: "WEPINK", valor: fatWepink, pct: fatTodasMarcas > 0 ? (fatWepink / fatTodasMarcas) * 100 : 0, cor: "var(--wepink)" },
-        { marca: "WPINK", valor: fatWpink, pct: fatTodasMarcas > 0 ? (fatWpink / fatTodasMarcas) * 100 : 0, cor: "var(--wpink)" },
-      ].filter((m) => m.valor > 0);
+        { brand: "WEPINK", amount: fatWepink, pct: fatTodasMarcas > 0 ? (fatWepink / fatTodasMarcas) * 100 : 0, color: "var(--wepink)" },
+        { brand: "WPINK", amount: fatWpink, pct: fatTodasMarcas > 0 ? (fatWpink / fatTodasMarcas) * 100 : 0, color: "var(--wpink)" },
+      ].filter((m) => m.amount > 0);
 
   const evo = monthlyEvolutionMonths(periodo, eixoSerie);
-  const rotuloEvolucaoMensal = rotuloEvolucao(periodo, evo.comAnteriores);
-  const evolucaoMensal: MonthlyEvolutionRow[] = evo.meses.map((mes) => {
-    const agg = agregadoMes(fs, mes, divisao);
+  const monthlyEvolutionLabel = evolutionCaption(periodo, evo.comAnteriores);
+  const monthlyEvolution: MonthlyEvolutionRow[] = evo.meses.map((mes) => {
+    const agg = monthAggregate(fs, mes, divisao);
     const lucro = agg.faturamento - agg.cmv;
     return {
-      mes: rotuloMesEvolucao(mes, evo.meses),
-      faturamento: agg.faturamento,
-      custo: agg.cmv,
-      lucro,
-      margemPct: divSeguro(lucro, agg.faturamento) * 100,
-      ticketMedio: divSeguro(agg.faturamento, agg.atendimentos),
+      label: monthEvolutionLabel(mes, evo.meses),
+      revenue: agg.faturamento,
+      cost: agg.cmv,
+      profit: lucro,
+      marginPct: divSeguro(lucro, agg.faturamento) * 100,
+      averageTicket: divSeguro(agg.faturamento, agg.atendimentos),
     };
   });
 
@@ -1943,18 +1943,18 @@ export function buildFinanceView(escopo: Scope, aggs?: FinanceAggInput | null): 
     periodo,
     kpis,
     eixoSerie,
-    rotuloSerie,
-    resultadoRateado,
-    custoLucroMargem,
-    resultadoOperacional,
-    deltaResultado,
-    formasPagamento,
-    faturamentoPorMarca,
-    custosFixosFranquia,
-    custosConfigurados: true,
-    evolucaoMensal,
-    mostrarEvolucaoMensal: evo.meses.length > 0,
-    rotuloEvolucaoMensal,
+    seriesLabel,
+    resultIsProrated,
+    costProfitSeries,
+    operatingResult,
+    resultDelta,
+    paymentMethods,
+    revenueByBrand,
+    franchiseFixedCosts,
+    costsConfigured: true,
+    monthlyEvolution,
+    showMonthlyEvolution: evo.meses.length > 0,
+    monthlyEvolutionLabel,
     kpisWpink: [],
   };
 }
@@ -1978,10 +1978,10 @@ export type FinanceAggInput = {
 
 /** Produto vendido com custo R$ 0 no Millennium (CMV e margem ficam otimistas). */
 export interface ProductWithoutCost {
-  codigo: string;
-  nome: string;
-  itens: number;
-  faturamento: number;
+  code: string;
+  name: string;
+  items: number;
+  revenue: number;
 }
 
 type FinMoney = { rev: number; cmv: number; sales: number; items: number };
@@ -2054,7 +2054,7 @@ function finMonthlyCosts(l: FinMonthly): number {
 }
 
 /** Custos da loja para dados reais: campo sem configuracao = 0 (nao inventa R$). */
-function custosDaFilialReal(f: Store) {
+function storeCostRates(f: Store) {
   const c = f.custos;
   const rua = f.pointType === "RUA";
   return {
@@ -2072,7 +2072,7 @@ function custosDaFilialReal(f: Store) {
   };
 }
 
-function impostosDoProduto(
+function productTaxAmount(
   taxa: { icmsWepinkPct: number; icmsWpinkPct: number; icmsStWepinkPct: number; icmsStWpinkPct: number },
   code: string,
   receita: number,
@@ -2121,12 +2121,12 @@ export function buildFinanceViewFromAggs(escopo: Scope, input: FinanceAggInput):
       const share = m.rev / all.rev;
       m = { ...m, sales: Math.round(all.sales * share), items: Math.round(all.items * share) };
     }
-    const c = custosDaFilialReal(f);
+    const c = storeCostRates(f);
     const w = incluiWepink ? wepink.rev : 0;
     const p = incluiWpink ? wpink.rev : 0;
     const cmvW = incluiWepink ? wepink.cmv : 0;
     const cmvP = incluiWpink ? wpink.cmv : 0;
-    const diasMes = diasNoMes(iso.slice(0, 7));
+    const diasMes = daysInMonth(iso.slice(0, 7));
     const aluguelPct = (w * c.aluguelWepinkPct + p * c.aluguelWpinkPct) / 100;
     const aluguelMinBase = c.aluguelMin / diasMes;
     return {
@@ -2255,43 +2255,43 @@ export function buildFinanceViewFromAggs(escopo: Scope, input: FinanceAggInput):
   const kpis: FinanceKpi[] = [
     {
       label: "Faturamento",
-      valor: brlCent(atual.rev),
+      value: brlCent(atual.rev),
       delta: temComp ? kpiDelta(atual.rev, antLine.rev, vsRotulo) : undefined,
     },
     {
       label: "CMV",
-      valor: temCmv ? brlCent(atual.cmv) : "—",
+      value: temCmv ? brlCent(atual.cmv) : "—",
       sub: temCmv ? `${(divSeguro(atual.cmv, atual.rev) * 100).toFixed(0)}% do faturamento` : undefined,
       delta: cmvComparavel ? kpiDelta(atualCmp.cmv, antCmp.cmv, vsCmv) : undefined,
       tooltip: temCmv ? TIP_CMV : TIP_CMV_INDISPONIVEL,
     },
     {
       label: "Lucro bruto",
-      valor: temCmv ? brlCent(lucroAtual) : "—",
+      value: temCmv ? brlCent(lucroAtual) : "—",
       sub: temCmv && impostosAtual > 0 ? `Impostos: ${brlCent(impostosAtual)}` : undefined,
       delta: cmvComparavel ? kpiDelta(lucroAtualCmp, lucroAnteriorCmp, vsCmv) : undefined,
       tooltip: TIP_LUCRO_BRUTO,
     },
     {
       label: "Margem",
-      valor: temCmv ? pct(margemAtual) : "—",
+      value: temCmv ? pct(margemAtual) : "—",
       delta: cmvComparavel ? kpiDeltaPp(margemAtualCmp, margemAnteriorCmp, vsCmv) : undefined,
       tooltip: TIP_MARGEM,
     },
   ];
 
   const eixoSerie = seriesAxisForPeriod(periodo);
-  const rotuloSerie = seriesAxisLabel(periodo, eixoSerie);
-  const resultadoRateado = eixoSerie !== "mes";
+  const seriesLabel = seriesAxisLabel(periodo, eixoSerie);
+  const resultIsProrated = eixoSerie !== "mes";
 
-  const custoLucroMargem: CostProfitMonth[] = [];
-  const resultadoOperacional: OpResultMonth[] = [];
+  const costProfitSeries: CostProfitMonth[] = [];
+  const operatingResult: OpResultMonth[] = [];
   const pushPonto = (label: string, l: FinLine, futuro = false, faixa?: string) => {
     const lucro = finLucro(l);
     const resultado = lucro - finOperatingCosts(l);
-    const f = { ...(futuro ? { futuro: true } : {}), ...(faixa ? { faixa } : {}) };
-    custoLucroMargem.push({ mes: label, custo: l.cmv, lucro, margemPct: divSeguro(lucro, l.rev) * 100, faturamento: l.rev, ...f });
-    resultadoOperacional.push({ mes: label, lucro, resultado, margemOpPct: divSeguro(resultado, l.rev) * 100, faturamento: l.rev, ...f });
+    const f = { ...(futuro ? { future: true } : {}), ...(faixa ? { rangeLabel: faixa } : {}) };
+    costProfitSeries.push({ label, cost: l.cmv, profit: lucro, marginPct: divSeguro(lucro, l.rev) * 100, revenue: l.rev, ...f });
+    operatingResult.push({ label, profit: lucro, result: resultado, operatingMarginPct: divSeguro(resultado, l.rev) * 100, revenue: l.rev, ...f });
   };
 
   if (eixoSerie === "hora") {
@@ -2349,7 +2349,7 @@ export function buildFinanceViewFromAggs(escopo: Scope, input: FinanceAggInput):
       pushPonto(label, { ...sumDays([iso]), aluguelMin: complementoDia.get(iso.slice(0, 7)) ?? 0 });
     }
   } else {
-    for (const mes of mesesEntre(periodo.inicio, periodo.fim)) {
+    for (const mes of monthsBetween(periodo.inicio, periodo.fim)) {
       const ini = `${mes}-01` < periodo.inicio ? periodo.inicio : `${mes}-01`;
       const fimMes = fimDoMes(`${mes}-01`);
       const fim = fimMes > periodo.fim ? periodo.fim : fimMes;
@@ -2361,7 +2361,7 @@ export function buildFinanceViewFromAggs(escopo: Scope, input: FinanceAggInput):
   const resultadoAtual = lucroAtual - totalCustos;
   const resultadoAtualCmp = lucroAtualCmp - finOperatingCosts(atualCmp);
   const resultadoAnteriorCmp = lucroAnteriorCmp - finOperatingCosts(antCmp);
-  const deltaResultado = cmvComparavel ? kpiDelta(resultadoAtualCmp, resultadoAnteriorCmp, vsCmv) : undefined;
+  const resultDelta = cmvComparavel ? kpiDelta(resultadoAtualCmp, resultadoAnteriorCmp, vsCmv) : undefined;
 
   // Formas de pagamento: sempre total (a Lista nao traz marca).
   const scopedIds = new Set(fs.map((f) => f.id));
@@ -2374,46 +2374,46 @@ export function buildFinanceViewFromAggs(escopo: Scope, input: FinanceAggInput):
   }
   const totalFormas = Object.values(totaisForma).reduce((s, v) => s + v, 0) || 1;
   const FORMAS_FALLBACK = ["var(--acc)", "var(--info)", "var(--ok)", "var(--warn)", "var(--t2)"];
-  const formasPagamento: PaymentMethodRevenue[] = Object.entries(totaisForma)
+  const paymentMethods: PaymentMethodRevenue[] = Object.entries(totaisForma)
     .sort((a, b) => b[1] - a[1])
-    .map(([forma, valor], i) => ({
-      forma,
-      valor,
-      pct: (valor / totalFormas) * 100,
-      cor: CORES_FORMAS[forma] ?? FORMAS_FALLBACK[i % FORMAS_FALLBACK.length]!,
+    .map(([method, amount], i) => ({
+      method,
+      amount,
+      pct: (amount / totalFormas) * 100,
+      color: CORES_FORMAS[method] ?? FORMAS_FALLBACK[i % FORMAS_FALLBACK.length]!,
     }));
 
   // Mini-DRE. Linhas WPINK so se alguma loja do escopo tem a marca.
-  const custos = fs.map((f) => custosDaFilialReal(f));
+  const custos = fs.map((f) => storeCostRates(f));
   const temWpink = fs.some((f) => f.temWpink);
   const linhasMarca: FixedCostRow[] = [];
   if (incluiWepink) {
     linhasMarca.push(
-      { rotulo: `Royalties WEPINK${rotuloPct(custos.map((c) => c.royaltiesWepinkPct))}`, valor: atual.royWepink },
-      { rotulo: `Taxa de marketing WEPINK${rotuloPct(custos.map((c) => c.mktWepinkPct))}`, valor: atual.mktWepink },
+      { label: `Royalties WEPINK${rateSuffix(custos.map((c) => c.royaltiesWepinkPct))}`, amount: atual.royWepink },
+      { label: `Taxa de marketing WEPINK${rateSuffix(custos.map((c) => c.mktWepinkPct))}`, amount: atual.mktWepink },
     );
   }
   if (incluiWpink && temWpink) {
-    const cw = fs.filter((f) => f.temWpink).map((f) => custosDaFilialReal(f));
+    const cw = fs.filter((f) => f.temWpink).map((f) => storeCostRates(f));
     linhasMarca.push(
-      { rotulo: `Royalties WPINK${rotuloPct(cw.map((c) => c.royaltiesWpinkPct))}`, valor: atual.royWpink },
-      { rotulo: `Taxa de marketing WPINK${rotuloPct(cw.map((c) => c.mktWpinkPct))}`, valor: atual.mktWpink },
+      { label: `Royalties WPINK${rateSuffix(cw.map((c) => c.royaltiesWpinkPct))}`, amount: atual.royWpink },
+      { label: `Taxa de marketing WPINK${rateSuffix(cw.map((c) => c.mktWpinkPct))}`, amount: atual.mktWpink },
     );
   }
   // Aluguel do mes = maior entre o fixo e o %: mostra o fixo e, se o % passar dele, so o excedente.
   const aluguelFixo = atual.aluguelMinBase;
   const aluguelExcedente = Math.max(0, atual.aluguelPct + atual.aluguelMin - aluguelFixo);
-  const rotuloAluguelPct = `${aluguelFixo > 0 ? "Aluguel percentual excedente" : "Aluguel percentual"}${rotuloPct(custos.map((c) => c.aluguelWepinkPct))}`;
-  const custosFixosFranquia: FixedCostRow[] = [
-    { rotulo: "Lucro bruto", valor: lucroAtual },
-    ...(aluguelFixo > 0 ? [{ rotulo: "Aluguel", valor: aluguelFixo }] : []),
-    ...(aluguelExcedente >= 0.005 ? [{ rotulo: rotuloAluguelPct, valor: aluguelExcedente }] : []),
+  const rentRateLabel = `${aluguelFixo > 0 ? "Aluguel percentual excedente" : "Aluguel percentual"}${rateSuffix(custos.map((c) => c.aluguelWepinkPct))}`;
+  const franchiseFixedCosts: FixedCostRow[] = [
+    { label: "Lucro bruto", amount: lucroAtual },
+    ...(aluguelFixo > 0 ? [{ label: "Aluguel", amount: aluguelFixo }] : []),
+    ...(aluguelExcedente >= 0.005 ? [{ label: rentRateLabel, amount: aluguelExcedente }] : []),
     ...linhasMarca,
-    { rotulo: "Total de custos", valor: totalCustos, ehTotal: true },
-    { rotulo: "Resultado operacional", valor: resultadoAtual, ehResultado: true },
+    { label: "Total de custos", amount: totalCustos, isTotal: true },
+    { label: "Resultado operacional", amount: resultadoAtual, isResult: true },
   ];
 
-  let faturamentoPorMarca: RevenueByBrand[] | null = null;
+  let revenueByBrand: RevenueByBrand[] | null = null;
   if (!divisao) {
     let fatWepink = 0;
     let fatWpink = 0;
@@ -2425,17 +2425,17 @@ export function buildFinanceViewFromAggs(escopo: Scope, input: FinanceAggInput):
       }
     }
     const tot = fatWepink + fatWpink;
-    faturamentoPorMarca = temWpink
+    revenueByBrand = temWpink
       ? [
-          { marca: "WEPINK", valor: fatWepink, pct: tot > 0 ? (fatWepink / tot) * 100 : 0, cor: "var(--wepink)" },
-          { marca: "WPINK", valor: fatWpink, pct: tot > 0 ? (fatWpink / tot) * 100 : 0, cor: "var(--wpink)" },
-        ].filter((m) => m.valor > 0)
+          { brand: "WEPINK", amount: fatWepink, pct: tot > 0 ? (fatWepink / tot) * 100 : 0, color: "var(--wepink)" },
+          { brand: "WPINK", amount: fatWpink, pct: tot > 0 ? (fatWpink / tot) * 100 : 0, color: "var(--wpink)" },
+        ].filter((m) => m.amount > 0)
       : null;
   }
 
   // Evolucao mensal: periodo mensal (calendario)  -  meses do filtro, recortados nas pontas; 1 mes so = + 5 anteriores inteiros.
   const evo = monthlyEvolutionMonths(periodo, eixoSerie);
-  const evolucaoMensal: MonthlyEvolutionRow[] = evo.meses
+  const monthlyEvolution: MonthlyEvolutionRow[] = evo.meses
     .map((mes) => {
       const iniMes = mes === periodo.inicio.slice(0, 7) ? periodo.inicio : `${mes}-01`;
       const fimMes = fimDoMes(`${mes}-01`);
@@ -2443,15 +2443,15 @@ export function buildFinanceViewFromAggs(escopo: Scope, input: FinanceAggInput):
       const l = sumDays(intervaloDias(iniMes, fimCorte));
       const lucro = finLucro(l);
       return {
-        mes: rotuloMesEvolucao(mes, evo.meses, iniMes, fimCorte),
-        faturamento: l.rev,
-        custo: l.cmv,
-        lucro,
-        margemPct: divSeguro(lucro, l.rev) * 100,
-        ticketMedio: divSeguro(l.rev, l.sales),
+        label: monthEvolutionLabel(mes, evo.meses, iniMes, fimCorte),
+        revenue: l.rev,
+        cost: l.cmv,
+        profit: lucro,
+        marginPct: divSeguro(lucro, l.rev) * 100,
+        averageTicket: divSeguro(l.rev, l.sales),
       };
     })
-    .filter((r) => r.faturamento > 0);
+    .filter((r) => r.revenue > 0);
 
   const costDays = new Set<string>();
   const semCusto = new Map<string, ProductWithoutCost>();
@@ -2461,34 +2461,34 @@ export function buildFinanceViewFromAggs(escopo: Scope, input: FinanceAggInput):
     if (r.day < periodo.inicio || r.day > periodo.fim || r.revenueCents <= 0 || r.cmvCents !== 0) continue;
     const codigo = r.productCode.trim();
     if (!codigo) continue;
-    const p = semCusto.get(codigo) ?? { codigo, nome: input.productNames?.[codigo] ?? "", itens: 0, faturamento: 0 };
-    p.itens += r.itemCount;
-    p.faturamento += r.revenueCents / 100;
+    const p = semCusto.get(codigo) ?? { code: codigo, name: input.productNames?.[codigo] ?? "", items: 0, revenue: 0 };
+    p.items += r.itemCount;
+    p.revenue += r.revenueCents / 100;
     semCusto.set(codigo, p);
   }
-  const produtosSemCusto = [...semCusto.values()].sort((a, b) => b.faturamento - a.faturamento);
+  const productsWithoutCost = [...semCusto.values()].sort((a, b) => b.revenue - a.revenue);
 
   return {
     escopo,
     periodo,
     kpis,
     eixoSerie,
-    rotuloSerie,
-    resultadoRateado,
-    custoLucroMargem,
-    resultadoOperacional,
-    deltaResultado,
-    formasPagamento,
-    faturamentoPorMarca,
-    custosFixosFranquia,
-    custosConfigurados: fs.some(storeOperatingCostsConfigured),
-    evolucaoMensal,
-    mostrarEvolucaoMensal: evo.meses.length > 0,
-    rotuloEvolucaoMensal: rotuloEvolucao(periodo, evo.comAnteriores),
-    faturamentoAtual: atual.rev,
+    seriesLabel,
+    resultIsProrated,
+    costProfitSeries,
+    operatingResult,
+    resultDelta,
+    paymentMethods,
+    revenueByBrand,
+    franchiseFixedCosts,
+    costsConfigured: fs.some(storeOperatingCostsConfigured),
+    monthlyEvolution,
+    showMonthlyEvolution: evo.meses.length > 0,
+    monthlyEvolutionLabel: evolutionCaption(periodo, evo.comAnteriores),
+    periodRevenue: atual.rev,
     kpiItens: {
       label: "Itens vendidos",
-      valor: num(Math.round(atual.items)),
+      value: num(Math.round(atual.items)),
       delta:
         temComp && antLine.items > 0 && atual.items > 0
           ? kpiDelta(Math.round(atual.items), Math.round(antLine.items), vsRotulo, "itens")
@@ -2506,7 +2506,7 @@ export function buildFinanceViewFromAggs(escopo: Scope, input: FinanceAggInput):
         vsRotulo: vsCmv,
       },
     }),
-    produtosSemCusto,
+    productsWithoutCost,
   };
 }
 
@@ -2604,7 +2604,7 @@ export interface ProductsView {
   /** Base da coluna Variacao (tooltip). */
   vsVariacao: string;
   /** Produtos vendidos no periodo com custo R$ 0 no Millennium. */
-  produtosSemCusto: ProductWithoutCost[];
+  productsWithoutCost: ProductWithoutCost[];
 }
 
 export type ProductsAggInput = FinanceAggInput & {
@@ -2772,11 +2772,11 @@ export function buildProductsView(escopo: Scope, input: ProductsAggInput = { day
   }
   const vendasMargem = productDaySaleMap((input.productCostDayAggs ?? []).filter((r) => storeById.has(r.storeId)));
   const vendasUsadas = new Set<string>();
-  const custosLoja = new Map<string, ReturnType<typeof custosDaFilialReal>>();
+  const custosLoja = new Map<string, ReturnType<typeof storeCostRates>>();
   const custoDaLoja = (storeId: string) => {
     let c = custosLoja.get(storeId);
     if (!c) {
-      c = custosDaFilialReal(storeById.get(storeId)!);
+      c = storeCostRates(storeById.get(storeId)!);
       custosLoja.set(storeId, c);
     }
     return c;
@@ -2823,7 +2823,7 @@ export function buildProductsView(escopo: Scope, input: ProductsAggInput = { day
       acc.fat += v;
       acc.itens += r.itemCount;
       const taxa = custoDaLoja(r.storeId);
-      acc.impostos += impostosDoProduto(taxa, code, v, 0);
+      acc.impostos += productTaxAmount(taxa, code, v, 0);
       if (v > 0) {
         const k = custoKey(r.storeId, r.day, code);
         const cmv = code ? custos.get(k) : undefined;
@@ -2831,7 +2831,7 @@ export function buildProductsView(escopo: Scope, input: ProductsAggInput = { day
         else if (!custosUsados.has(k)) {
           custosUsados.add(k);
           acc.cmv += cmv;
-          acc.impostos += impostosDoProduto(taxa, code, 0, cmv);
+          acc.impostos += productTaxAmount(taxa, code, 0, cmv);
         }
       }
     }
@@ -2933,7 +2933,7 @@ export function buildProductsView(escopo: Scope, input: ProductsAggInput = { day
     periodo,
     kpis,
     kpisWpink: fin.kpisWpink,
-    temVendas: (fin.faturamentoAtual ?? 0) > 0,
+    temVendas: (fin.periodRevenue ?? 0) > 0,
     categorias,
     deltaCategorias,
     curvaAbcCategorias: classifyAbcCurve(categorias),
@@ -2942,9 +2942,9 @@ export function buildProductsView(escopo: Scope, input: ProductsAggInput = { day
     semLinhaFaturamento,
     temCustoProduto: produtos.some((p) => p.cmv != null),
     vsVariacao: vsCmp,
-    produtosSemCusto: (fin.produtosSemCusto ?? []).map((p) => ({
+    productsWithoutCost: (fin.productsWithoutCost ?? []).map((p) => ({
       ...p,
-      nome: p.nome || prodAcc.get(p.codigo)?.nome || "",
+      name: p.name || prodAcc.get(p.code)?.nome || "",
     })),
   };
 }
@@ -3057,11 +3057,11 @@ function buildItemsDetail(
   const vendasMargem = productDaySaleMap(
     (input.productCostDayAggs ?? []).filter((r) => storeById.has(r.storeId) && chaves.has(r.productCode.trim())),
   );
-  const taxas = new Map<string, ReturnType<typeof custosDaFilialReal>>();
+  const taxas = new Map<string, ReturnType<typeof storeCostRates>>();
   const taxaDaLoja = (storeId: string) => {
     let t = taxas.get(storeId);
     if (!t) {
-      t = custosDaFilialReal(storeById.get(storeId)!);
+      t = storeCostRates(storeById.get(storeId)!);
       taxas.set(storeId, t);
     }
     return t;
@@ -3083,7 +3083,7 @@ function buildItemsDetail(
       itens += r.itemCount;
       const taxa = taxaDaLoja(r.storeId);
       const code = r.productCode.trim();
-      impostos += impostosDoProduto(taxa, code, v, 0);
+      impostos += productTaxAmount(taxa, code, v, 0);
       if (v > 0) {
         const k = custoKey(r.storeId, r.day, code);
         const c = code ? custos.get(k) : undefined;
@@ -3091,7 +3091,7 @@ function buildItemsDetail(
         else if (!usados.has(k)) {
           usados.add(k);
           cmv += c;
-          impostos += impostosDoProduto(taxa, code, 0, c);
+          impostos += productTaxAmount(taxa, code, 0, c);
         }
       }
     }
@@ -3395,7 +3395,7 @@ export interface TeamMemberRow {
   faturamento: number;
   vendas: number;
   itens: number;
-  ticketMedio: number;
+  averageTicket: number;
   /** Itens por venda; null se algum dia com venda nao tem itens gravados (nada estimado). */
   pa: number | null;
   participacaoPct: number;
@@ -3576,7 +3576,7 @@ export function buildTeamDashboardView(
       faturamento: a.atual.fat,
       vendas: a.atual.vendas,
       itens: a.atual.itens,
-      ticketMedio: divSeguro(a.atual.fat, a.atual.vendas),
+      averageTicket: divSeguro(a.atual.fat, a.atual.vendas),
       pa: a.atual.semItens || a.atual.vendas === 0 ? null : a.atual.itens / a.atual.vendas,
       participacaoPct: divSeguro(a.atual.fat, totAtual.fat) * 100,
       variacaoPct: a.ant.fat > 0 && a.cmp.fat > 0 ? ((a.cmp.fat - a.ant.fat) / a.ant.fat) * 100 : null,
@@ -3830,7 +3830,7 @@ export interface TopSeller extends TopItem {
   /** Mesma chave do `TeamMemberRow.key`  -  abre o detalhe da pessoa. */
   key?: string;
   sub?: string;
-  ticketMedio?: number;
+  averageTicket?: number;
   pctMeta?: number;
   /** Itens por venda; ausente se algum dia com venda nao tem itens gravados (nada estimado). */
   pa?: number;
@@ -3858,12 +3858,12 @@ export interface OverviewView {
   /** Delta do faturamento vs periodo anterior (badge dos cards de grafico). */
   deltaFaturamento?: { value: string; positive: boolean; vs?: string };
   eixoSerie: SeriesAxis;
-  rotuloSerie: string;
+  seriesLabel: string;
   categoriaVsMeta: CategoryVsGoal[];
   /** Vazio quando periodo = 1 dia (card oculto na UI). */
   diaVsMeta: DayVsGoal[];
   evolucao: EvolutionPoint[];
-  formasPagamento: PaymentMethodRevenue[];
+  paymentMethods: PaymentMethodRevenue[];
   topVendedoras: TopSeller[];
   /** Ranking completo (maior faturamento primeiro)  -  a tela escolhe a metrica e corta o Top N.
    *  `chave` = mesma do `ProductItemRow` (abre o detalhe do produto). */
@@ -4068,7 +4068,7 @@ function preferAllBrand<T extends { brand: string }>(rows: T[]): T[] {
 export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput): OverviewView {
   const periodo = resolvePeriod(escopo.periodo, calendarTodayIso());
   const eixoSerie = seriesAxisForPeriod(periodo);
-  const rotuloSerie = seriesAxisLabel(periodo, eixoSerie);
+  const seriesLabel = seriesAxisLabel(periodo, eixoSerie);
   // Overview: sempre total (ALL). WPINK na faixa quick stats (se loja tem a marca).
   const brand = null;
   const fs = storesInScope(escopo);
@@ -4609,13 +4609,13 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
   }
   const totalFormas = Object.values(totaisForma).reduce((s, v) => s + v, 0) || 1;
   const FORMAS_FALLBACK = ["var(--acc)", "var(--info)", "var(--ok)", "var(--warn)", "var(--t2)"];
-  const formasPagamento: PaymentMethodRevenue[] = Object.entries(totaisForma)
+  const paymentMethods: PaymentMethodRevenue[] = Object.entries(totaisForma)
     .sort((a, b) => b[1] - a[1])
-    .map(([forma, valor], i) => ({
-      forma,
-      valor,
-      pct: (valor / totalFormas) * 100,
-      cor: CORES_FORMAS[forma] ?? FORMAS_FALLBACK[i % FORMAS_FALLBACK.length]!,
+    .map(([method, amount], i) => ({
+      method,
+      amount,
+      pct: (amount / totalFormas) * 100,
+      color: CORES_FORMAS[method] ?? FORMAS_FALLBACK[i % FORMAS_FALLBACK.length]!,
     }));
 
   // Top vendedoras  -  VENDEDOR_MILLENNIUM (sem % meta ate CRUD de Metas).
@@ -4695,7 +4695,7 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
         nome: v.nome,
         valor: v.fat,
         sub: `${v.vendas} venda${v.vendas === 1 ? "" : "s"}`,
-        ticketMedio: v.vendas > 0 ? v.fat / v.vendas : 0,
+        averageTicket: v.vendas > 0 ? v.fat / v.vendas : 0,
         ...(!v.semItens && v.vendas > 0 ? { pa: v.itens / v.vendas } : {}),
         lojas: lojasDaVendedora(v),
         turno: turnoDaVendedora(v),
@@ -4714,13 +4714,13 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
     const k = custoKey(r.storeId, r.day, r.productCode.trim());
     custos.set(k, (custos.get(k) ?? 0) + r.cmvCents / 100);
   }
-  const taxas = new Map<string, ReturnType<typeof custosDaFilialReal>>();
+  const taxas = new Map<string, ReturnType<typeof storeCostRates>>();
   const taxaDaLoja = (storeId: string) => {
     const f = storeById.get(storeId);
     if (!f) return null;
     let t = taxas.get(storeId);
     if (!t) {
-      t = custosDaFilialReal(f);
+      t = storeCostRates(f);
       taxas.set(storeId, t);
     }
     return t;
@@ -4748,7 +4748,7 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
       const taxa = taxaDaLoja(row.storeId);
       if (!taxa) acc.semCusto = true;
       else {
-        acc.impostos += impostosDoProduto(taxa, code, v, 0);
+        acc.impostos += productTaxAmount(taxa, code, v, 0);
         if (v > 0) {
           const k = custoKey(row.storeId, row.day, code);
           const cmv = code ? custos.get(k) : undefined;
@@ -4756,7 +4756,7 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
           else if (!custosUsados.has(k)) {
             custosUsados.add(k);
             acc.cmv += cmv;
-            acc.impostos += impostosDoProduto(taxa, code, 0, cmv);
+            acc.impostos += productTaxAmount(taxa, code, 0, cmv);
           }
         }
       }
@@ -4791,11 +4791,11 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
     projecaoFechamento,
     metaDescricao,
     eixoSerie,
-    rotuloSerie,
+    seriesLabel,
     categoriaVsMeta,
     diaVsMeta: [],
     evolucao,
-    formasPagamento,
+    paymentMethods,
     topVendedoras,
     topProdutos,
     rankingLojas,
@@ -4967,7 +4967,7 @@ export function buildOverviewView(escopo: Scope, aggs?: OverviewAggInput | null)
 
   // Faturamento por Dia da Semana vs Meta  -  oculto em periodo de 1 dia.
   const eixoSerie = seriesAxisForPeriod(periodo);
-  const rotuloSerie = seriesAxisLabel(periodo, eixoSerie);
+  const seriesLabel = seriesAxisLabel(periodo, eixoSerie);
   const diasSemanaNomes = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
   const dowToIdx = (dow: number) => (dow === 0 ? 6 : dow - 1);
   let diaVsMeta: DayVsGoal[] = [];
@@ -5030,10 +5030,10 @@ export function buildOverviewView(escopo: Scope, aggs?: OverviewAggInput | null)
   } else if (eixoSerie === "mes") {
     let acumR = 0;
     let acumM = 0;
-    const meses = mesesEntre(periodo.inicio, periodo.fim);
+    const meses = monthsBetween(periodo.inicio, periodo.fim);
     const metaPorMes = metaTotal > 0 && meses.length > 0 ? metaTotal / meses.length : 0;
     for (const mes of meses) {
-      const agg = agregadoMes(fs, mes, divisao);
+      const agg = monthAggregate(fs, mes, divisao);
       acumR += agg.faturamento;
       acumM += metaPorMes;
       const label = mesAno(`${mes}-01`).split(" de ")[0];
@@ -5079,13 +5079,13 @@ export function buildOverviewView(escopo: Scope, aggs?: OverviewAggInput | null)
     "Cartão de débito": "var(--info)",
     Dinheiro: "var(--warn)",
   };
-  const formasPagamento: PaymentMethodRevenue[] = Object.entries(totaisForma)
+  const paymentMethods: PaymentMethodRevenue[] = Object.entries(totaisForma)
     .sort((a, b) => b[1] - a[1])
-    .map(([forma, valor]) => ({
-      forma,
-      valor,
-      pct: (valor / totalFormas) * 100,
-      cor: CORES_FORMAS[forma] ?? "var(--t2)",
+    .map(([method, amount]) => ({
+      method,
+      amount,
+      pct: (amount / totalFormas) * 100,
+      color: CORES_FORMAS[method] ?? "var(--t2)",
     }));
 
   // Top 5 Vendedoras (com % da meta individual)
@@ -5119,7 +5119,7 @@ export function buildOverviewView(escopo: Scope, aggs?: OverviewAggInput | null)
       nome: v.nome,
       valor: v.fat,
       sub: `${v.vendas} vendas · ${individualGoal > 0 ? Math.round((v.fat / individualGoal) * 100) : 0}% da meta`,
-      ticketMedio: v.vendas > 0 ? v.fat / v.vendas : 0,
+      averageTicket: v.vendas > 0 ? v.fat / v.vendas : 0,
       pctMeta: individualGoal > 0 ? Math.min(100, (v.fat / individualGoal) * 100) : 0,
       ...(v.vendas > 0 ? { pa: v.itens / v.vendas } : {}),
       lojas: v.loja ? [v.loja] : [],
@@ -5187,11 +5187,11 @@ export function buildOverviewView(escopo: Scope, aggs?: OverviewAggInput | null)
     projecaoFechamento,
     deltaFaturamento: temComp ? kpiDelta(atual.faturamento, anterior.faturamento, vsRotulo) : undefined,
     eixoSerie,
-    rotuloSerie,
+    seriesLabel,
     categoriaVsMeta,
     diaVsMeta,
     evolucao,
-    formasPagamento,
+    paymentMethods,
     topVendedoras,
     topProdutos,
     rankingLojas,

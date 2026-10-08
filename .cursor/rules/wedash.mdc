@@ -7,7 +7,9 @@ alwaysApply: true
 
 ## Fonte de verdade
 - Ler e seguir **`WDASH.md`** (arquitetura, filtros, mocks, decisões, glossário, ordem de build). É a fonte de verdade do produto.
-- Código/pastas/rotas do produto em **inglês**; UI (copy) em português; comentários podem ser PT.
+- **Idioma:** identificador em inglês (arquivo, pasta, rota, tipo, função, variável, constante, campo e chave de objeto). O texto que a pessoa vê fica em português. Comentário pode ser em português. Não traduzir marca (WEPINK, WPINK) nem coluna já gravada no banco.
+  - Ruim: `const faturamentoPorMarca = rows.map((r) => ({ marca: r.brand, valor: r.cents }))`
+  - Certo: `const revenueByBrand = rows.map((r) => ({ brand: r.brand, amount: r.cents }))` e, na tela, o título "Faturamento por marca".
 - Dados do produto: `src/data/wedash/`. Componentes de produto: `src/components/wedash/`.
 - Registrar decisões de produto relevantes em `WDASH.md` para não perder contexto entre sessões.
 - Referências visuais: `docs/referencias/`.
