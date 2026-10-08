@@ -9,6 +9,7 @@ import {
   closeDayTotals,
   dayAwaitingClose,
   monthCloseSummary,
+  realCentsOf,
   type CashCloseBucket,
   type CashCloseLine,
 } from "@/data/wedash/cashCloseView";
@@ -118,27 +119,28 @@ function CloseTable({
   lines,
   pixPending,
   gestor,
+  fechado,
   draft,
-  onTyped,
   onAcquirer,
 }: {
   lines: CashCloseLine[];
   pixPending: boolean;
   gestor: boolean;
+  fechado: boolean;
   draft?: CloseDraft;
-  onTyped?: (key: CashCloseBucket, value: string) => void;
   onAcquirer?: (key: CashCloseBucket, value: string) => void;
 }) {
   if (lines.length === 0) return null;
   const campo =
     "h-9 w-full min-w-0 rounded-[9px] border border-line bg-bg-inset px-2 text-right font-mono text-[13px] font-bold text-t0 outline-none focus:border-acc";
-  const cabecalhos = ["Forma", "Millennium", "Digitado", "Total real"];
+  const cabecalhos = ["Forma", "Millennium", "Total real", "Diferença"];
+  const conta = closeDayGap(lines);
   return (
     <>
       {pixPending && (
         <Alert className="mb-4" variant="info" title="O fechamento de Pix deste dia já foi solicitado. O total real aparece assim que o arquivo estiver disponível." />
       )}
-      <div className="overflow-hidden rounded-[var(--radius-vela-lg)] border border-line bg-bg-2">
+      <div className="overflow-x-auto rounded-[var(--radius-vela-lg)] border border-line bg-bg-2">
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-line">
@@ -157,29 +159,17 @@ function CloseTable({
           </thead>
           <tbody>
             {lines.map((row) => {
-              const typedTxt = draft?.typed[row.key] ?? centsToField(row.typedCents);
+              const real = realCentsOf(row);
+              const diff = real - row.systemCents;
               const acqTxt = draft?.acquirer[row.key] ?? (row.stoneCents == null ? "" : centsToField(row.stoneCents));
               return (
-                <tr key={row.key} className="border-b border-line last:border-b-0">
+                <tr key={row.key} className="border-b border-line">
                   <td className="px-3 py-3 text-t0">{labelUpper(row.label)}</td>
                   <td className="px-3 py-3 text-right font-mono text-[13px] font-bold text-t0">{money(row.systemCents)}</td>
                   <td className="px-3 py-2.5 text-right">
-                    {gestor && draft && onTyped ? (
-                      <input
-                        value={typedTxt}
-                        onChange={(e) => onTyped(row.key, e.target.value)}
-                        inputMode="decimal"
-                        aria-label={`Valor digitado para ${row.label}`}
-                        className={campo}
-                      />
+                    {row.key === "cash" || !(gestor && draft && onAcquirer) ? (
+                      <span className="font-mono text-[13px] font-bold text-t0">{money(real)}</span>
                     ) : (
-                      <span className="font-mono text-[13px] font-bold text-t0">{money(fieldToCents(typedTxt) ?? row.typedCents)}</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2.5 text-right">
-                    {row.key === "cash" ? (
-                      <span className="font-mono text-[13px] font-bold text-t0">{money(fieldToCents(typedTxt) ?? row.typedCents)}</span>
-                    ) : gestor && draft && onAcquirer ? (
                       <input
                         value={acqTxt}
                         onChange={(e) => onAcquirer(row.key, e.target.value)}
@@ -188,14 +178,25 @@ function CloseTable({
                         placeholder="—"
                         className={campo}
                       />
-                    ) : (
-                      <span className="font-mono text-[13px] font-bold text-t0">{money(fieldToCents(acqTxt))}</span>
                     )}
+                  </td>
+                  <td className={cn("px-3 py-3 text-right font-mono text-[13px] font-bold", fechado ? diffClass(diff) : "text-t2")}>
+                    {fechado ? totalDia(diff) : "—"}
                   </td>
                 </tr>
               );
             })}
           </tbody>
+          <tfoot>
+            <tr className="bg-bg-1">
+              <td className="px-3 py-3 text-[12px] font-bold uppercase tracking-wide text-t2">Total</td>
+              <td className="px-3 py-3 text-right font-mono text-[13px] font-bold text-t0">{money(conta.systemCents)}</td>
+              <td className="px-3 py-3 text-right font-mono text-[13px] font-bold text-t0">{money(conta.realCents)}</td>
+              <td className={cn("px-3 py-3 text-right font-mono text-[13px] font-bold", fechado ? diffClass(conta.diffCents) : "text-t2")}>
+                {fechado ? totalDia(conta.diffCents) : "—"}
+              </td>
+            </tr>
+          </tfoot>
         </table>
       </div>
     </>
@@ -530,7 +531,7 @@ export function CashClosePage() {
   const analise = useMemo(() => {
     if (marksKey !== faixaKey) return null;
     const porDia = new Map<string, { systemCents: number; realCents: number; hasMillennium: boolean; hasLines: boolean; pending: boolean }>();
-    const rows: Array<{ day: string; systemCents: number; typedCents: number; pending: boolean }> = [];
+    const rows: Array<{ day: string; systemCents: number; typedCents: number; realCents?: number; pending: boolean }> = [];
     for (const mark of marks) {
       const review = reviews.find((r) => r.storeId === mark.storeId && r.day === mark.day) ?? null;
       const view = buildCashCloseView(mark.snap);
@@ -975,16 +976,11 @@ function DiaModal({
                   </p>
                 )}
                 <CloseTable
-                  lines={view.lines}
+                  lines={linhas}
                   pixPending={view.pixPending}
                   gestor={gestor}
+                  fechado={fechado}
                   draft={draft}
-                  onTyped={(key, value) =>
-                    setDrafts((atual) => ({
-                      ...atual,
-                      [loja.id]: { ...(atual[loja.id] ?? draft!), typed: { ...(atual[loja.id]?.typed ?? {}), [key]: value } },
-                    }))
-                  }
                   onAcquirer={(key, value) =>
                     setDrafts((atual) => ({
                       ...atual,
