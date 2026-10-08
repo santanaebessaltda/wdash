@@ -107,6 +107,26 @@ function fieldToCents(txt: string): number | null {
   return Math.round(n * 100) * (neg ? -1 : 1);
 }
 
+function linesWithDraft(lines: CashCloseLine[], draft: CloseDraft | undefined): CashCloseLine[] {
+  if (!draft) return lines;
+  return lines.map((line) => {
+    const next = { ...line };
+    const typed = fieldToCents(draft.typed[line.key] ?? "");
+    if (typed != null) next.typedCents = typed;
+    if (line.key !== "cash") {
+      const raw = draft.acquirer[line.key] ?? "";
+      const real = fieldToCents(raw);
+      if (raw.trim() && real != null && !(line.stoneCents == null && real === 0)) next.stoneCents = real;
+    }
+    return next;
+  });
+}
+
+/** Justificativa e “Não descontar” só existem com o dia fechado e a diferença negativa. */
+function negativeDayDiff(lines: CashCloseLine[], closed: boolean): boolean {
+  return closed && !dayWithoutReal(lines) && closeDayGap(lines).diffCents < 0;
+}
+
 type CloseDraft = {
   typed: Partial<Record<CashCloseBucket, string>>;
   acquirer: Partial<Record<CashCloseBucket, string>>;
@@ -893,15 +913,9 @@ function DiaModal({
         setBusy(false);
         return;
       }
-      const cash = linhas.find((l) => l.key === "cash");
-      const cashTyped = typedCents.cash ?? cash?.typedCents ?? null;
-      const falta = cash != null && cashTyped != null && cashTyped < cash.systemCents;
-      if (draft.waive && !falta) {
-        setBusy(false);
-        show("A falta só pode ser assumida quando o valor digitado em dinheiro for menor que o valor do Millennium.", "danger");
-        return;
-      }
-      if (draft.waive && draft.justification.trim().length === 0) {
+      const ajustadas = linesWithDraft(linhas, draft);
+      const quebra = negativeDayDiff(ajustadas, fechado);
+      if (quebra && draft.waive && draft.justification.trim().length === 0) {
         setBusy(false);
         show("Informe uma justificativa para não descontar esta falta.", "danger");
         return;
@@ -910,8 +924,8 @@ function DiaModal({
         storeId: loja.id,
         day,
         cashTypedCents: typedCents.cash ?? null,
-        justification: falta ? draft.justification.trim() : "",
-        waive: falta && draft.waive,
+        justification: quebra ? draft.justification.trim() : "",
+        waive: quebra && draft.waive,
         typedCents,
         acquirerCents,
       };
@@ -961,20 +975,7 @@ function DiaModal({
             const view = buildCashCloseView(snap);
             const cash = view.lines.find((l) => l.key === "cash");
             const draft = drafts[loja.id];
-            const cashTyped = draft ? fieldToCents(draft.typed.cash ?? "") : null;
-            const falta = cash != null && cashTyped != null && cashTyped < cash.systemCents;
-            const linhas = view.lines.map((line) => {
-              const next = { ...line };
-              if (!draft) return next;
-              const typed = fieldToCents(draft.typed[line.key] ?? "");
-              if (typed != null) next.typedCents = typed;
-              if (line.key !== "cash") {
-                const raw = draft.acquirer[line.key] ?? "";
-                const real = fieldToCents(raw);
-                if (raw.trim() && real != null && !(line.stoneCents == null && real === 0)) next.stoneCents = real;
-              }
-              return next;
-            });
+            const linhas = linesWithDraft(view.lines, draft);
             const conta = closeDayGap(linhas);
             return (
               <section key={loja.id}>
@@ -1021,7 +1022,7 @@ function DiaModal({
                     }
                   />
                 )}
-                {falta && draft && conta.diffCents < 0 && (
+                {draft && negativeDayDiff(linhas, fechado) && (
                   <div className="mt-4 flex flex-col gap-3">
                     <FormField label="Justificativa">
                       <Textarea
