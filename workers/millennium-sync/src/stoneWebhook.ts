@@ -90,9 +90,9 @@ export function startStoneWebhook(opts: {
       send(res, 404);
       return;
     }
-    const pathToken = decodeURIComponent(url.pathname.slice(prefix.length));
+    const pathToken = decodeURIComponent(url.pathname.slice(prefix.length)).replace(/\/+$/, "");
     if (!opts.token || !tokenMatches(pathToken, opts.token)) {
-      console.warn("AVISO PIX Stone: chamada recebida com token diferente");
+      console.warn(`AVISO PIX Stone: a Stone chamou com este token: ${pathToken || "(vazio)"}`);
       send(res, 404);
       return;
     }
