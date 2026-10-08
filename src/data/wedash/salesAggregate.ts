@@ -1,5 +1,6 @@
 import type {
   AggregateSalesResult,
+  CashCloseSale,
   SaleRow,
   SalesBrand,
   SalesDayAgg,
@@ -298,6 +299,53 @@ export function aggregatePaymentDay(
         a.storeId.localeCompare(b.storeId) ||
         a.paymentMethod.localeCompare(b.paymentMethod, "pt-BR"),
     );
+}
+
+/**
+ * Uma linha por venda × forma, com hora e vendedor.
+ * O agregado diário de formas não muda: isto só guarda o detalhe para o fechamento de caixa.
+ * Venda de R$ 0 fica de fora. Dia além de dayTo também (mesmo corte do agregado).
+ */
+export function cashCloseSalesFromRows(rows: SaleRow[], opts: AggregateSalesOptions): CashCloseSale[] {
+  const map = new Map<string, CashCloseSale>();
+
+  for (const row of rows) {
+    if (row.revenueCents === 0) continue;
+    let { day } = localDayHour(row.occurredAt, opts.timeZone);
+    if (opts.dayTo && day > opts.dayTo) continue;
+    if (opts.dayFrom && day < opts.dayFrom) day = opts.dayFrom;
+
+    const method = normalizePaymentMethod(row.paymentMethod);
+    const key = `${row.storeId}|${row.operationCode}|${method}`;
+    const sellerName = (row.sellerName ?? "").trim();
+    const prev = map.get(key);
+    if (!prev) {
+      map.set(key, {
+        tenantId: opts.tenantId,
+        storeId: row.storeId,
+        operationCode: row.operationCode,
+        day,
+        occurredAt: row.occurredAt.toISOString(),
+        paymentMethod: method,
+        revenueCents: row.revenueCents,
+        sellerName,
+        sellerGeradorId: row.sellerGeradorId ?? null,
+      });
+      continue;
+    }
+    prev.revenueCents += row.revenueCents;
+    if (row.occurredAt.toISOString() < prev.occurredAt) prev.occurredAt = row.occurredAt.toISOString();
+    if (!prev.sellerName && sellerName) prev.sellerName = sellerName;
+    if (prev.sellerGeradorId == null && row.sellerGeradorId != null) prev.sellerGeradorId = row.sellerGeradorId;
+  }
+
+  return [...map.values()].sort(
+    (a, b) =>
+      a.day.localeCompare(b.day) ||
+      a.occurredAt.localeCompare(b.occurredAt) ||
+      a.operationCode.localeCompare(b.operationCode) ||
+      a.paymentMethod.localeCompare(b.paymentMethod, "pt-BR"),
+  );
 }
 
 /**

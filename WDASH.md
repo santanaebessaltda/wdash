@@ -369,6 +369,7 @@ Pergunta: "Quais são meus 80/20? Estou perdendo venda por ruptura? O que descon
  - Tabela `sales_payment_day_agg` (loja×dia×forma, brand=ALL).
  - Worker grava em SEED/HISTORY/FORCE/LIGHT (replace no range da janela).
  - Overview: donut + lista; rótulos Pix / Cartão de crédito / Cartão de débito / Dinheiro / Outros, **exibidos em caixa alta** (PIX, CARTÃO DE CRÉDITO…; 2026-09-29, `labelUpper` na tela — Visão geral e Financeiro; dados e cores seguem com o rótulo original).
+ - **Venda individual do fechamento de caixa** (2026-10-08): `cash_close_sale` guarda cada venda da Lista com valor, forma, vendedor e hora. O agregado `sales_payment_day_agg` e o faturamento não mudam. Dias anteriores a essa gravação não são reescritos.
  - Histórico só após FORCE (ou próximo SEED) — LIGHT só cobre o dia atual.
 
 20c. ✅ **Top vendedoras** (2026-09-23) — `VENDEDOR_MILLENNIUM` da `VENDAS.Lista` (sem relatório novo).

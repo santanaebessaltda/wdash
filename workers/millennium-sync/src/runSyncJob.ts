@@ -1,5 +1,5 @@
-import { aggregatePaymentDay, aggregateSales, aggregateSellerDay } from "../../../src/data/wedash/salesAggregate.ts";
-import type { SalesDayAgg, SalesHourAgg } from "../../../src/data/wedash/salesTypes.ts";
+import { aggregatePaymentDay, aggregateSales, aggregateSellerDay, cashCloseSalesFromRows } from "../../../src/data/wedash/salesAggregate.ts";
+import type { CashCloseSale, SalesDayAgg, SalesHourAgg } from "../../../src/data/wedash/salesTypes.ts";
 import type { SaleRow } from "../../../src/data/wedash/salesTypes.ts";
 import {
   couponBrandFromLines,
@@ -100,16 +100,17 @@ type ListaWindowArgs = {
 
 /** Grava formas de pagamento (+ ranking da equipe, salvo `skipSellers`) da janela Lista (replace no range). */
 async function persistListaDerivedDayAggs(
-  deps: Pick<SyncJobDeps, "replacePaymentDayAggs" | "replaceSellerDayAggs">,
+  deps: Pick<SyncJobDeps, "replacePaymentDayAggs" | "replaceSellerDayAggs" | "replaceCashCloseSales">,
   args: ListaWindowArgs & { skipSellers?: boolean },
 ): Promise<void> {
-  const pay = aggregatePaymentDay(args.rows, {
+  const window = {
     tenantId: args.tenantId,
     timeZone: args.timeZone,
     now: args.now,
     dayFrom: args.from,
     dayTo: args.to,
-  });
+  };
+  const pay = aggregatePaymentDay(args.rows, window);
   await deps.replacePaymentDayAggs({
     tenantId: args.tenantId,
     storeId: args.storeId,
@@ -117,6 +118,15 @@ async function persistListaDerivedDayAggs(
     to: args.to,
     rows: pay,
   });
+  if (deps.replaceCashCloseSales) {
+    await deps.replaceCashCloseSales({
+      tenantId: args.tenantId,
+      storeId: args.storeId,
+      from: args.from,
+      to: args.to,
+      rows: cashCloseSalesFromRows(args.rows, window),
+    });
+  }
   if (!args.skipSellers) await persistSellerDayAggs(deps, args);
 }
 
@@ -1447,6 +1457,17 @@ export type SyncJobDeps = {
     from: string;
     to: string;
     rows: SalesPaymentDayAgg[];
+  }) => Promise<void>;
+  /**
+   * Substitui as vendas individuais do fechamento de caixa no intervalo [from,to].
+   * Nao altera sales_payment_day_agg nem o faturamento.
+   */
+  replaceCashCloseSales?: (args: {
+    tenantId: string;
+    storeId: string;
+    from: string;
+    to: string;
+    rows: CashCloseSale[];
   }) => Promise<void>;
   /**
    * Substitui ranking de vendedoras no intervalo [from,to] da loja

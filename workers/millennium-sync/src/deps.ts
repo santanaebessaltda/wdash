@@ -54,6 +54,7 @@ import { autoRefreshEnabled, deepHistorySpan, spanStart } from "./syncConfig.ts"
 import type {
   SalesDayAgg,
   SalesHourAgg,
+  CashCloseSale,
   SalesPaymentDayAgg,
   SalesProductDayAgg,
   SalesProductCostDayAgg,
@@ -1056,6 +1057,40 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
         onConflict: "tenant_id,store_id,day,payment_method",
       });
       if (error) throw error;
+    },
+
+    async replaceCashCloseSales(args: {
+      tenantId: string;
+      storeId: string;
+      from: string;
+      to: string;
+      rows: CashCloseSale[];
+    }) {
+      const { error: delErr } = await sb
+        .from("cash_close_sale")
+        .delete()
+        .eq("tenant_id", args.tenantId)
+        .eq("store_id", args.storeId)
+        .gte("day", args.from)
+        .lte("day", args.to);
+      if (delErr) throw delErr;
+      const payload = args.rows.map((r) => ({
+        tenant_id: r.tenantId,
+        store_id: r.storeId,
+        operation_code: r.operationCode,
+        day: r.day,
+        occurred_at: r.occurredAt,
+        payment_method: r.paymentMethod,
+        revenue_cents: r.revenueCents,
+        seller_name: r.sellerName,
+        seller_gerador_id: r.sellerGeradorId,
+      }));
+      for (let i = 0; i < payload.length; i += 400) {
+        const { error } = await sb.from("cash_close_sale").upsert(payload.slice(i, i + 400), {
+          onConflict: "tenant_id,store_id,operation_code,payment_method",
+        });
+        if (error) throw error;
+      }
     },
 
     async replaceSellerDayAggs(args: {

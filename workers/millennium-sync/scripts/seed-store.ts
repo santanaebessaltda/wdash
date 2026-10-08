@@ -76,6 +76,7 @@ async function main() {
         replaceProductDayAggs: noop,
         replaceProductCostDayAggs: noop,
         replacePaymentDayAggs: noop,
+        replaceCashCloseSales: noop,
         replaceSellerDayAggs: noop,
         upsertHourAggs: noop,
         listCouponBrands: async () => [],

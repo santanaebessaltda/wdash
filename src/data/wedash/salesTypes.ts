@@ -43,6 +43,26 @@ export type SalesCategoryRef = {
   brand: SalesBrand;
 };
 
+/**
+ * Uma venda da Lista, pronta para o fechamento de caixa.
+ * Não substitui o agregado diário: faturamento, formas e equipe continuam nas tabelas de sempre.
+ */
+export type CashCloseSale = {
+  tenantId: string;
+  storeId: string;
+  /** COD_OPERACAO (ou a chave anônima da Lista). */
+  operationCode: string;
+  /** Dia local da loja. */
+  day: string;
+  /** Instante da venda (ISO). */
+  occurredAt: string;
+  /** Pix, Cartão de crédito, Cartão de débito, Dinheiro, Outros. */
+  paymentMethod: string;
+  revenueCents: number;
+  sellerName: string;
+  sellerGeradorId: number | null;
+};
+
 /** Daily revenue by payment method (CONDICAO) — sales_payment_day_agg. */
 export type SalesPaymentDayAgg = {
   tenantId: string;

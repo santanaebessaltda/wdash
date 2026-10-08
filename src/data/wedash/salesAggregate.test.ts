@@ -3,6 +3,7 @@ import {
   aggregatePaymentDay,
   aggregateSales,
   aggregateSellerDay,
+  cashCloseSalesFromRows,
   normalizePaymentMethod,
   sellerDisplayName,
   sellerKeyFromName,
@@ -191,6 +192,53 @@ describe("normalizePaymentMethod", () => {
     expect(normalizePaymentMethod("DINHEIRO")).toBe("Dinheiro");
     expect(normalizePaymentMethod("")).toBe("Outros");
     expect(normalizePaymentMethod(null)).toBe("Outros");
+  });
+});
+
+describe("cashCloseSalesFromRows", () => {
+  it("guarda valor, forma, vendedor e hora sem somar o dia", () => {
+    const rows: SaleRow[] = [
+      row({
+        operationCode: "C1",
+        occurredAt: new Date("2026-10-07T18:40:00.000Z"),
+        revenueCents: 99_90,
+        paymentMethod: "CREDITO",
+        sellerName: "Ana",
+      }),
+      row({
+        operationCode: "C2",
+        occurredAt: new Date("2026-10-07T18:41:00.000Z"),
+        revenueCents: 99_90,
+        paymentMethod: "DEBITO",
+        sellerName: "Bia",
+      }),
+    ];
+    const lines = cashCloseSalesFromRows(rows, {
+      tenantId: TENANT,
+      timeZone: TZ,
+      dayFrom: "2026-10-07",
+      dayTo: "2026-10-07",
+    });
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatchObject({
+      operationCode: "C1",
+      day: "2026-10-07",
+      paymentMethod: "Cartão de crédito",
+      revenueCents: 99_90,
+      sellerName: "Ana",
+    });
+    expect(lines[1]?.paymentMethod).toBe("Cartão de débito");
+    expect(lines[1]?.sellerName).toBe("Bia");
+    const pay = aggregatePaymentDay(rows, { tenantId: TENANT, timeZone: TZ, dayFrom: "2026-10-07", dayTo: "2026-10-07" });
+    expect(pay.reduce((s, p) => s + p.revenueCents, 0)).toBe(99_90 + 99_90);
+  });
+
+  it("ignora venda zerada e dia fora da janela", () => {
+    const rows: SaleRow[] = [
+      row({ operationCode: "Z", occurredAt: new Date("2026-10-07T15:00:00.000Z"), revenueCents: 0, paymentMethod: "PIX" }),
+      row({ operationCode: "NEXT", occurredAt: new Date("2026-10-08T15:00:00.000Z"), revenueCents: 10_00, paymentMethod: "PIX" }),
+    ];
+    expect(cashCloseSalesFromRows(rows, { tenantId: TENANT, timeZone: TZ, dayFrom: "2026-10-07", dayTo: "2026-10-07" })).toEqual([]);
   });
 });
 
