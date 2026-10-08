@@ -30,7 +30,7 @@ import { useStockData } from "./useStockData";
 
 type StatusFiltro = "todos" | StockStatus;
 type BrandFiltro = "" | "WEPINK" | "WPINK";
-type SortKey = "nome" | "estoque" | "custo" | "status" | `local:${string}`;
+type SortKey = "nome" | "estoque" | "custo" | "valor" | "status" | `local:${string}`;
 
 const STATUS_BADGE: Record<StockStatus, { label: string; variant: StatusVariant }> = {
   negativo: { label: "Negativo", variant: "danger" },
@@ -99,9 +99,10 @@ export function InventoryPage() {
       sortKey === "status" ? STATUS_PESO[s] : sortKey.startsWith("local:") ? localQty(r, sortKey.slice(6)) : r.estoque;
     out.sort((a, b) => {
       if (sortKey === "nome") return a.r.nome.localeCompare(b.r.nome, "pt-BR") * dir;
-      if (sortKey === "custo") {
-        const av = stockCostAmount(a.r).amount;
-        const bv = stockCostAmount(b.r).amount;
+      if (sortKey === "custo" || sortKey === "valor") {
+        const pick = (r: StockProductRow) => (sortKey === "custo" ? stockCostAmount(r).unit : stockCostAmount(r).amount);
+        const av = pick(a.r);
+        const bv = pick(b.r);
         if (av == null && bv == null) return a.r.nome.localeCompare(b.r.nome, "pt-BR");
         if (av == null) return 1;
         if (bv == null) return -1;
@@ -130,9 +131,8 @@ export function InventoryPage() {
     () => ({
       locais: locais.map((nome) => linhas.reduce((s, { r }) => s + localQty(r, nome), 0)),
       estoque: linhas.reduce((s, { r }) => s + r.estoque, 0),
-      custo: linhas.reduce((s, { r }) => s + (stockCostAmount(r).amount ?? 0), 0),
-      temCusto: linhas.some((x) => stockCostAmount(x.r).amount != null),
-      semCusto: linhas.filter((x) => stockCostAmount(x.r).amount == null).length,
+      valor: linhas.reduce((s, { r }) => s + (stockCostAmount(r).amount ?? 0), 0),
+      temValor: linhas.some((x) => stockCostAmount(x.r).amount != null),
     }),
     [linhas, locais],
   );
@@ -239,10 +239,24 @@ export function InventoryPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-sm" style={{ minWidth: 600 + (locais.length + (mostraTotal ? 1 : 0)) * 110 }}>
+              <table
+                className="w-full table-fixed border-collapse text-sm"
+                style={{ minWidth: 44 + 220 + (locais.length + (mostraTotal ? 1 : 0)) * 112 + 168 + 152 + 220 }}
+              >
+                <colgroup>
+                  <col style={{ width: 44 }} />
+                  <col />
+                  {locais.map((nome) => (
+                    <col key={nome} style={{ width: 112 }} />
+                  ))}
+                  {mostraTotal && <col style={{ width: 112 }} />}
+                  <col style={{ width: 168 }} />
+                  <col style={{ width: 152 }} />
+                  <col style={{ width: 220 }} />
+                </colgroup>
                 <thead>
                   <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
-                    <th className="px-1 pb-3 text-left font-bold">#</th>
+                    <th className="w-11 px-1 pb-3 text-center font-bold">#</th>
                     <ThSort label="Produto" active={sortKey === "nome"} dir={sortDir} onClick={() => toggleSort("nome")} align="left" className="px-1 pb-3" />
                     {locais.map((nome) => (
                       <ThSort
@@ -257,14 +271,8 @@ export function InventoryPage() {
                     {mostraTotal && (
                       <ThSort label="Total" active={sortKey === "estoque"} dir={sortDir} onClick={() => toggleSort("estoque")} className="px-1 pb-3" />
                     )}
-                    <ThSort
-                      label="Preço de custo"
-                      active={sortKey === "custo"}
-                      dir={sortDir}
-                      onClick={() => toggleSort("custo")}
-                      className="px-1 pb-3"
-                      aside={<TipHelp label="Saldo × preço de custo unitário da tabela de custo da loja. O total soma o valor dos produtos do filtro." />}
-                    />
+                    <ThSort label="Preço de custo" active={sortKey === "custo"} dir={sortDir} onClick={() => toggleSort("custo")} className="px-1 pb-3" />
+                    <ThSort label="Valor" active={sortKey === "valor"} dir={sortDir} onClick={() => toggleSort("valor")} className="px-1 pb-3" />
                     <ThSort label="Status" active={sortKey === "status"} dir={sortDir} onClick={() => toggleSort("status")} align="left" className="pb-3 pl-4 pr-1" />
                   </tr>
                 </thead>
@@ -288,7 +296,10 @@ export function InventoryPage() {
                           </td>
                         )}
                         <td className="px-1 py-3 text-right">
-                          <CostCell r={r} />
+                          <UnitCost r={r} />
+                        </td>
+                        <td className="px-1 py-3 text-right">
+                          <Money v={stockCostAmount(r).amount} />
                         </td>
                         <td className="py-3 pl-4 pr-1">
                           <StatusCell r={r} status={s} variasLojas={variasLojas} />
@@ -317,8 +328,9 @@ export function InventoryPage() {
                         <Qty v={totais.estoque} total />
                       </td>
                     )}
+                    <td />
                     <td className="px-1 py-3 text-right">
-                      <CostTotal v={totais.temCusto ? totais.custo : null} missing={totais.semCusto} />
+                      <Money v={totais.temValor ? totais.valor : null} total />
                     </td>
                     <td />
                   </tr>
@@ -344,29 +356,19 @@ function Qty({ v, total = false }: { v: number; total?: boolean }) {
   );
 }
 
-function CostCell({ r }: { r: StockProductRow }) {
-  const cost = stockCostAmount(r);
-  if (cost.amount == null) return <span className="font-mono text-[13px] font-bold text-t2">—</span>;
+function Money({ v, total = false }: { v: number | null; total?: boolean }) {
+  if (v == null) return <span className={cn("font-mono text-[13px] text-t2", total ? "font-extrabold" : "font-bold")}>—</span>;
   return (
-    <span className="block">
-      <span className={cn("whitespace-nowrap font-mono text-[13px] font-bold tabular-nums", cost.amount < 0 ? "text-bad" : "text-t0")}>{money(cost.amount)}</span>
-      <span className="mt-0.5 block text-[11px] font-semibold text-t2">{cost.unit == null ? "varia por loja" : `${money(cost.unit)} un.`}</span>
+    <span className={cn("whitespace-nowrap font-mono text-[13px] tabular-nums", total ? "font-extrabold" : "font-bold", v < 0 ? "text-bad" : "text-t0")}>
+      {money(v)}
     </span>
   );
 }
 
-function CostTotal({ v, missing }: { v: number | null; missing: number }) {
-  if (v == null) return <span className="font-mono text-[13px] font-extrabold text-t2">—</span>;
-  return (
-    <span className="block">
-      <span className={cn("whitespace-nowrap font-mono text-[13px] font-extrabold tabular-nums", v < 0 ? "text-bad" : "text-t0")}>{money(v)}</span>
-      {missing > 0 && (
-        <span className="mt-0.5 block text-[11px] font-semibold text-t2">
-          {missing} sem custo
-        </span>
-      )}
-    </span>
-  );
+function UnitCost({ r }: { r: StockProductRow }) {
+  const cost = stockCostAmount(r);
+  if (cost.amount != null && cost.unit == null) return <span className="text-[13px] font-semibold text-t2">Varia</span>;
+  return <Money v={cost.unit} />;
 }
 
 function StatusCell({ r, status, variasLojas }: { r: StockProductRow; status: StockStatus; variasLojas: boolean }) {
