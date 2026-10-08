@@ -184,10 +184,15 @@ export async function runCashCloseFillJob(
       pixParado = true;
     } else if (tax.length >= 11 && webhookUrl) {
       try {
-        await registerStoneWebhook({ secret, url: webhookUrl });
+        const result = await registerStoneWebhook({ secret, url: webhookUrl });
+        console.log(
+          result === "created"
+            ? `  Webhook PIX Stone cadastrado [${store.code}]`
+            : `  Webhook PIX Stone atualizado [${store.code}]`,
+        );
       } catch (e) {
         const msg = e instanceof Error ? e.message : "";
-        console.warn(`  AVISO [${store.code}] webhook PIX: não foi possível cadastrar o aviso`);
+        console.warn(`  AVISO [${store.code}] webhook PIX: ${msg || "não foi possível cadastrar o aviso"}`);
         if (msg.startsWith("A Stone")) {
           problems.push(msg);
           pixParado = true;

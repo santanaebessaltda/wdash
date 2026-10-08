@@ -92,6 +92,7 @@ export function startStoneWebhook(opts: {
     }
     const pathToken = decodeURIComponent(url.pathname.slice(prefix.length));
     if (!opts.token || !tokenMatches(pathToken, opts.token)) {
+      console.warn("AVISO PIX Stone: chamada recebida com token diferente");
       send(res, 404);
       return;
     }
@@ -99,6 +100,7 @@ export function startStoneWebhook(opts: {
       .then((body) => {
         const hook = classifyStoneHook(body);
         send(res, 200);
+        if (hook.kind === "validation") console.log("PIX Stone: confirmação recebida");
         if (hook.kind !== "pix") return;
         void opts.onPix(hook.notice).catch((e) => {
           console.warn(`AVISO PIX Stone: ${e instanceof Error ? e.message : String(e)}`);

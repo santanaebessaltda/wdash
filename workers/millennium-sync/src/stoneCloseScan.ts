@@ -168,6 +168,32 @@ export async function runStoneCloseScan(sb: SupabaseClient, erpSecret: string, n
   return n;
 }
 
+/** O proxy do Fly só entrega nesta máquina depois que ela sobe. A Stone desiste em 3 segundos. */
+export async function publicWebhookReady(
+  url: string,
+  opts?: { fetchImpl?: typeof fetch; attempts?: number; waitMs?: number },
+): Promise<boolean> {
+  let health: string;
+  try {
+    health = new URL("/health", url).href;
+  } catch {
+    return false;
+  }
+  const fetchImpl = opts?.fetchImpl ?? fetch;
+  const attempts = opts?.attempts ?? 12;
+  const waitMs = opts?.waitMs ?? 5_000;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fetchImpl(health, { signal: AbortSignal.timeout(5_000) });
+      if (res.ok) return true;
+    } catch {
+      // o endereço público ainda não cai nesta máquina
+    }
+    if (i < attempts - 1 && waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
+  }
+  return false;
+}
+
 /** Uma vez por chave. Se o endereço já existe, atualiza para a Stone confirmar de novo. */
 export async function registerStoneWebhooks(sb: SupabaseClient, erpSecret: string, url: string): Promise<void> {
   const { data, error } = await sb.from("store_stone").select("store_id, secret_ciphertext");

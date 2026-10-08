@@ -18,7 +18,7 @@ import { logoutMillennium } from "./millenniumAuth.ts";
 import { closeHour, dailyCloseEnabled, releaseActiveMillenniumSession } from "./runSyncJob.ts";
 import { downloadStonePixCsv } from "./stonePix.ts";
 import { ingestStonePixCsv } from "./stoneIngest.ts";
-import { registerStoneWebhooks, runStoneCloseScan } from "./stoneCloseScan.ts";
+import { publicWebhookReady, registerStoneWebhooks, runStoneCloseScan } from "./stoneCloseScan.ts";
 import { startStoneWebhook } from "./stoneWebhook.ts";
 import { assertSyncConfig, autoRefreshEnabled, deepHistorySpan, describeSpan, onboardingSpan } from "./syncConfig.ts";
 import { isWorkerPaused } from "./workerPause.ts";
@@ -99,9 +99,21 @@ async function main() {
       : "  PIX Stone                : sem STONE_WEBHOOK_TOKEN — a rota fica fechada",
   );
   if (webhookToken && webhookUrl) {
-    void registerStoneWebhooks(sb, erpSecret, webhookUrl).catch((e) => {
-      console.warn(`AVISO webhook PIX Stone: ${e instanceof Error ? e.message : String(e)}`);
-    });
+    const listening = webhook.listening
+      ? Promise.resolve()
+      : new Promise<void>((resolve) => webhook.once("listening", resolve));
+    void listening
+      .then(() => publicWebhookReady(webhookUrl))
+      .then(async (ready) => {
+        if (!ready) {
+          console.warn("AVISO webhook PIX Stone: o endereço público ainda não responde");
+          return;
+        }
+        await registerStoneWebhooks(sb, erpSecret, webhookUrl);
+      })
+      .catch((e) => {
+        console.warn(`AVISO webhook PIX Stone: ${e instanceof Error ? e.message : String(e)}`);
+      });
   }
   await recoverOnStartup(sb);
   console.log("Worker Millennium");
