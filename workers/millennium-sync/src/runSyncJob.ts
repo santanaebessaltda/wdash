@@ -34,6 +34,7 @@ import {
   type CashAccount,
   type CashCloseReportLine,
 } from "./millenniumCashClose.ts";
+import type { StoneCapture } from "./stoneConciliation.ts";
 import {
   closedMonthRange,
   isHistoryRangeDay,
@@ -137,7 +138,7 @@ async function persistListaDerivedDayAggs(
 }
 
 /** Fundo, sangria, fechamento e valor digitado da janela. Um dia = uma chamada. Falha não derruba a venda. */
-async function syncStoreCashClose(
+export async function syncStoreCashClose(
   deps: Pick<SyncJobDeps, "fetchCashCloseReport" | "replaceCashCloseDays">,
   args: {
     session: string;
@@ -191,6 +192,50 @@ async function syncStoreCashClose(
       store: args.store,
       day: args.from,
     });
+  }
+}
+
+/** Arquivo Stone do dia anterior (e dos dias da janela já encerrados). Hoje ainda não existe. */
+async function syncStoreStone(
+  deps: Pick<SyncJobDeps, "fetchStoneCaptures" | "replaceStoneCaptures">,
+  args: {
+    tenantId: string;
+    store: SyncStore;
+    from: string;
+    to: string;
+    now: Date;
+  },
+): Promise<void> {
+  if (!args.store.stoneCode || !args.store.stoneSecretCiphertext) return;
+  if (!deps.fetchStoneCaptures || !deps.replaceStoneCaptures) return;
+  const today = ymdInTz(args.now, args.store.timezone);
+  for (let day = args.from; day <= args.to; day = addDaysIso(day, 1)) {
+    if (day >= today) continue;
+    try {
+      const captures = await deps.fetchStoneCaptures({
+        secretCiphertext: args.store.stoneSecretCiphertext,
+        stoneCode: args.store.stoneCode,
+        day,
+      });
+      await deps.replaceStoneCaptures({
+        tenantId: args.tenantId,
+        storeId: args.store.id,
+        day,
+        rows: captures.map((c) => ({
+          ...c,
+          tenantId: args.tenantId,
+          storeId: args.store.id,
+          day,
+        })),
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(`  AVISO [${args.store.code}] Stone ${day}: ${msg}`);
+      syncLog("WARN", "fechamento_caixa", `Arquivo Stone não gravou (${day}): ${msg}`, {
+        store: args.store,
+        day,
+      });
+    }
   }
 }
 
@@ -1311,6 +1356,8 @@ export type SyncJobPayload = {
    * (o agendador enfileira o proximo mes) e sem barra de progresso na tela.
    */
   deep?: boolean;
+  /** Só o fechamento (Millennium + Stone), sem rebuscar as vendas. */
+  cashOnly?: boolean;
 };
 
 export type SyncJob = {
@@ -1354,6 +1401,13 @@ export type SyncStore = {
   geradorId?: number | null;
   /** Ultimo dia fechado (`store.last_closed_day`); null = ainda sem base. */
   lastClosedDay?: string | null;
+  /** Stone Code da conciliação. Sem chave, a loja não busca o arquivo. */
+  stoneCode?: string | null;
+  stoneSecretCiphertext?: string | null;
+  /** all = o arquivo é crédito, débito e PIX desta loja. online_pix = só o PIX online. */
+  stoneCovers?: "online_pix" | "all" | null;
+  /** CNPJ/CPF da loja, para o CSV de PIX. */
+  taxId?: string | null;
 };
 
 export type LoginResult =
@@ -1547,6 +1601,14 @@ export type SyncJobDeps = {
     from: string;
     to: string;
     rows: CashCloseDay[];
+  }) => Promise<void>;
+  /** Capturas Stone de um dia já fechado (o arquivo só existe no dia seguinte). */
+  fetchStoneCaptures?: (args: { secretCiphertext: string; stoneCode: string; day: string }) => Promise<StoneCapture[]>;
+  replaceStoneCaptures?: (args: {
+    tenantId: string;
+    storeId: string;
+    day: string;
+    rows: Array<StoneCapture & { tenantId: string; storeId: string; day: string }>;
   }) => Promise<void>;
   /**
    * Substitui ranking de vendedoras no intervalo [from,to] da loja
@@ -2191,7 +2253,7 @@ async function sessionStillAlive(session: string): Promise<boolean> {
  * Reusa token do tenant; se nao houver / 401, faz login e grava.
  * Renova (novo login) quando forceRenew ou smoke falha.
  */
-async function ensureMillenniumSession(
+export async function ensureMillenniumSession(
   cred: SyncCredential,
   deps: SyncJobDeps,
   opts?: { forceRenew?: boolean },
@@ -3251,6 +3313,13 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
           accounts: cashAccounts,
           accountsOk: cashAccountsOk,
         });
+        await syncStoreStone(deps, {
+          tenantId: job.tenantId,
+          store,
+          from: today,
+          to: today,
+          now,
+        });
         storesDone += 1;
         console.log(
           `Loja ${store.code} · ${rows.length} venda(s) · ${agg.days.length || 1} dia(s)`,
@@ -3305,6 +3374,13 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
               to: job.payload.from <= job.payload.to ? job.payload.to : job.payload.from,
               accounts: cashAccounts,
               accountsOk: cashAccountsOk,
+            });
+            await syncStoreStone(deps, {
+              tenantId: job.tenantId,
+              store,
+              from: job.payload.from <= job.payload.to ? job.payload.from : job.payload.to,
+              to: job.payload.from <= job.payload.to ? job.payload.to : job.payload.from,
+              now,
             });
           }
           if (shouldSyncCmv(job.kind) && cmvWin) {
@@ -3577,6 +3653,7 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
               accounts: cashAccounts,
               accountsOk: cashAccountsOk,
             });
+            await syncStoreStone(deps, { tenantId: job.tenantId, store, from, to, now });
             sellerWindows.push(win);
             storeDays += 1;
           } else {
@@ -3602,6 +3679,7 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
               accounts: cashAccounts,
               accountsOk: cashAccountsOk,
             });
+            await syncStoreStone(deps, { tenantId: job.tenantId, store, from, to, now });
             sellerWindows.push(win);
             storeSales += rows.length;
             storeDays += agg.days.length;

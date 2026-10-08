@@ -1,12 +1,12 @@
 /**
- * Poll loop — claim sync_job → run Millennium sync → enqueue due LIGHT jobs.
+ * Poll loop  -  claim sync_job  ->  run Millennium sync  ->  enqueue due LIGHT jobs.
  *
  * Run from this folder:
  *   npm install
  *   cp .env.example .env   # fill values
  *   npm start
  *
- * Pausar / liberar usuário do ERP (outro terminal):
+ * Pausar / liberar usuario do ERP (outro terminal):
  *   npm run erp -- pause | resume | logout | status
  */
 import { readFileSync, existsSync } from "node:fs";
@@ -16,6 +16,10 @@ import { installAsciiConsole } from "./consoleAscii.ts";
 import { createAdminClient, disconnectTenantSessions, enqueueDueAutoRefreshJobs, enqueueDueCloseJobs, enqueueDueDeepHistoryJobs, enqueueDueLightJobs, processOneJob, purgeOldSyncLogs, recoverOnStartup, SYNC_LOG_RETENTION_DAYS, recoverStaleRunningJobs } from "./deps.ts";
 import { logoutMillennium } from "./millenniumAuth.ts";
 import { closeHour, dailyCloseEnabled, releaseActiveMillenniumSession } from "./runSyncJob.ts";
+import { downloadStonePixCsv } from "./stonePix.ts";
+import { ingestStonePixCsv } from "./stoneIngest.ts";
+import { registerStoneWebhooks, runStoneCloseScan } from "./stoneCloseScan.ts";
+import { startStoneWebhook } from "./stoneWebhook.ts";
 import { assertSyncConfig, autoRefreshEnabled, deepHistorySpan, describeSpan, onboardingSpan } from "./syncConfig.ts";
 import { isWorkerPaused } from "./workerPause.ts";
 import { acquireWorkerLock, releaseWorkerLock } from "./workerLock.ts";
@@ -60,7 +64,7 @@ function sleep(ms: number) {
 }
 
 async function main() {
-  installAsciiConsole();
+  if (process.platform === "win32") installAsciiConsole();
   loadDotEnv();
   acquireWorkerLock();
 
@@ -74,6 +78,31 @@ async function main() {
   assertSyncConfig();
 
   const sb = createAdminClient();
+  const webhookToken = process.env.STONE_WEBHOOK_TOKEN?.trim() ?? "";
+  const webhookUrl = process.env.STONE_WEBHOOK_PUBLIC_URL?.trim() ?? "";
+  const webhookPort = Number(process.env.PORT ?? "8080") || 8080;
+  const webhook = startStoneWebhook({
+    port: webhookPort,
+    token: webhookToken,
+    onPix: async (notice) => {
+      const csv = await downloadStonePixCsv(notice.url);
+      const saved = await ingestStonePixCsv(sb, { document: notice.document, day: notice.referenceDate, csv });
+      if (!saved) console.warn(`AVISO PIX Stone ${notice.referenceDate}: nenhuma loja para o documento`);
+    },
+  });
+  webhook.on("error", (e) => {
+    console.warn(`AVISO PIX Stone: porta ${webhookPort} — ${e instanceof Error ? e.message : String(e)}`);
+  });
+  console.log(
+    webhookToken
+      ? `  PIX Stone                : escutando na porta ${webhookPort}`
+      : "  PIX Stone                : sem STONE_WEBHOOK_TOKEN — a rota fica fechada",
+  );
+  if (webhookToken && webhookUrl) {
+    void registerStoneWebhooks(sb, erpSecret, webhookUrl).catch((e) => {
+      console.warn(`AVISO webhook PIX Stone: ${e instanceof Error ? e.message : String(e)}`);
+    });
+  }
   await recoverOnStartup(sb);
   console.log("Worker Millennium");
   const onboarding = onboardingSpan();
@@ -91,9 +120,9 @@ async function main() {
     `  Histórico antigo         : ${deep === "off" ? "desligado" : `${describeSpan(deep)}, até a inauguração, na madrugada`} (DEEP_HISTORY)`,
   );
   console.log("  Dias perdidos            : recuperados no próximo Atualizar ou fechamento da madrugada");
-  if (process.env.LIGHT_AUTO === "1") console.log("  Sync automático (LIGHT)  : ligado (LIGHT_AUTO=1)");
+  if (process.env.LIGHT_AUTO === "1") console.log("  Atualização rápida (LIGHT): ligada (LIGHT_AUTO=1)");
   if (isWorkerPaused()) {
-    console.log("⚠ Pausado local (.millennium-pause) — npm run erp -- resume");
+    console.log("AVISO Pausado local (.millennium-pause). Retome com: npm run erp -- resume");
   }
 
   let stopping = false;
@@ -144,9 +173,11 @@ async function main() {
       return 0;
     }
   };
+  let lastStoneScan = 0;
   const stop = () => {
     if (stopping) return;
     stopping = true;
+    webhook.close();
     console.log("Encerrando… (token ERP do tenant permanece até pause/logout)");
     void releaseActiveMillenniumSession(logoutMillennium).finally(() => {
       releaseWorkerLock();
@@ -182,6 +213,15 @@ async function main() {
           if (!did) break;
           worked = true;
         }
+        if (Date.now() - lastStoneScan >= 10 * 60_000) {
+          lastStoneScan = Date.now();
+          try {
+            const stone = await runStoneCloseScan(sb, erpSecret);
+            if (stone > 0) console.log(`Stone: ${stone} arquivo(s) de fechamento`);
+          } catch (e) {
+            console.warn(`Stone: varredura falhou: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
         const closes = await enqueueCloseIfDue();
         if (closes > 0) console.log(`+${closes} fechamento de ontem`);
         const autos = await enqueueAutoIfDue();
@@ -191,17 +231,17 @@ async function main() {
         const light = await enqueueDueLightJobs(sb);
         if (light > 0) console.log(`+${light} sync do dia (LIGHT)`);
         const n = closes + autos + deeps + light;
-        // "Aguardando" só na transição para ocioso (não repete a cada poll).
+        // "Aguardando" so na transicao para ocioso (nao repete a cada poll).
         if (!worked && n === 0) {
           if (lastIdleLog === 0) {
-            console.log(`Aguardando jobs… (desde ${new Date().toLocaleTimeString("pt-BR", { hour12: false })})`);
+            console.log(`Aguardando sincronizações (desde ${new Date().toLocaleTimeString("pt-BR", { hour12: false })})`);
             lastIdleLog = Date.now();
           }
         } else {
           lastIdleLog = 0;
         }
         if (stopping) break;
-        // Acabou de trabalhar → recheca rápido (FORCE não espera o poll cheio).
+        // Acabou de trabalhar  ->  recheca rapido (FORCE nao espera o poll cheio).
         await sleep(worked || n > 0 ? Math.min(1_000, pollMs) : pollMs);
         continue;
       }

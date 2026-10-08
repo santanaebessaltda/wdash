@@ -17,10 +17,11 @@ import { metasRoutes } from "@/pages/goals/routes";
 import { aoVivoRoutes } from "@/pages/live/routes";
 import { emBreveRoutes } from "@/pages/coming-soon/routes";
 import { managementRoutes } from "@/pages/management/routes";
+import { cashCloseRoutes } from "@/pages/cash-close/routes";
 import { stockRoutes } from "@/pages/stock/routes";
 import { operationRoutes } from "@/pages/operation/routes";
 
-/* Template Vela (referência, acessível por URL) */
+/* Template Vela (referencia, acessivel por URL) */
 import { dashboardsRoutes } from "@/pages/dashboards/routes";
 import { usersRoutes } from "@/pages/users/routes";
 import { projectsRoutes } from "@/pages/projects/routes";
@@ -44,10 +45,10 @@ import { authRoutes } from "@/pages/auth/routes";
 
 const CreateAccess = lazyPage(() => import("@/pages/access/CreateAccess"), "CreateAccess");
 
-/** Raiz: sem sessão → login; com sessão → senha temp → onboarding → app. */
+/** Raiz: sem sessao  ->  login; com sessao  ->  senha temp  ->  onboarding  ->  app. */
 function Raiz() {
   const { session, ready } = useSession();
-  // PWA start_url = ./ — sem esperar ready bounce pro login e “desloga”.
+  // PWA start_url = ./  -  sem esperar ready bounce pro login e "desloga".
   if (!ready) return null;
   if (!session) return <Navigate to={paths.access.login} replace />;
   return <Navigate to={destinationAfterAuth(session)} replace />;
@@ -87,6 +88,7 @@ const routeTree: RouteObject[] = [
           ...aoVivoRoutes,
           ...metasRoutes,
           ...stockRoutes,
+          ...cashCloseRoutes,
           ...managementRoutes,
           ...operationRoutes,
           ...settingsRoutes,

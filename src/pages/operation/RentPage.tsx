@@ -40,15 +40,15 @@ const POINT_HINT: Record<PointType, string[]> = {
     "Exemplo: aluguel mensal de R$ 10.000,00 e 10% sobre R$ 120.000,00 de faturamento = R$ 12.000,00 de aluguel, sendo R$ 2.000,00 de aluguel percentual excedente.",
     "No mês em andamento, a comparação considera o aluguel mensal proporcional aos dias já passados.",
   ],
-  RUA: ["Na loja de rua, a WeDash considera somente o aluguel mensal."],
+  RUA: ["Na loja de rua, a WDash considera somente o aluguel mensal."],
 };
 
-/** Configurações > Aluguel — aluguel mensal e, em shopping, percentual do faturamento (conta só o que passar do aluguel). */
+/** Configuracoes > Aluguel  -  aluguel mensal e, em shopping, percentual do faturamento (conta so o que passar do aluguel). */
 export function RentPage() {
   const { lojas, loading, refresh } = useScopedStores();
   return (
     <StoreCardsPage
-      section="Configurações"
+      section="Custos"
       title="Aluguel"
       subtitle="Configure o aluguel mensal e, para lojas em shopping, o percentual sobre o faturamento."
       loading={loading}

@@ -14,18 +14,18 @@ import { Icon, icons } from "@/pages/users/Icons";
 import { shiftName } from "@/lib/format";
 import { FormActions, SAVE_ERROR_MSG, StoreCardHeader, StoreCardsPage, TimeSelect, nextHalfHour, useScopedStores } from "@/pages/operation/shared";
 
-/** Linha editável; `id` ausente = turno novo ainda não salvo. */
+/** Linha editavel; `id` ausente = turno novo ainda nao salvo. */
 type ShiftDraft = { key: string; id?: string; name: string; start: string; end: string };
 
 const toDraft = (s: StoreShift): ShiftDraft => ({ key: s.id, id: s.id, name: s.name, start: s.start, end: s.end });
 const toShift = (d: ShiftDraft): StoreShift => ({ id: d.id ?? "", name: shiftName(d.name), start: d.start, end: d.end });
 
-/** Gestão > Grupos — grupos de cada loja (store_shift). O grupo de cada pessoa fica em Vendedores. */
+/** Configurações > Grupos. O grupo de cada pessoa fica em Vendedores. */
 export function ShiftsPage() {
   const { session, lojas, loading } = useScopedStores();
   return (
     <StoreCardsPage
-      section="Gestão"
+      section="Operação"
       title="Grupos"
       subtitle="Configure os grupos de cada loja. O grupo de cada vendedor é definido em Vendedores."
       loading={loading}

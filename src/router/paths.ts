@@ -66,6 +66,8 @@ export const paths = {
     challengeCopyStore: (id: string) => `/management/challenges/new?copy=${encodeURIComponent(id)}&for=store`,
     shifts: "/management/shifts",
     staff: "/management/staff",
+    /** Calendário do fechamento de caixa. A adquirente fica em Custos. */
+    cashClose: "/management/cash-close",
   },
   /** Configuracoes: parametros de custo por loja usados no Financeiro. */
   operation: {
@@ -74,6 +76,11 @@ export const paths = {
     franchise: "/operation/franchise",
     rent: "/operation/rent",
     productsTaxes: "/operation/products-and-taxes",
+    /** Stone de cada loja. Não fica em Integrações: a chave é da loja, não da empresa. */
+    acquirers: "/operation/acquirers",
+    /** Grupos e vendedores: configuração da loja. O Gerente também entra. */
+    groups: "/operation/groups",
+    sellers: "/operation/sellers",
   },
   /** Live  -  painel operacional do mes + pulso do dia. */
   live: {
@@ -128,6 +135,8 @@ export const paths = {
       documents: "/configuracoes/documentos",
       costs: "/configuracoes/custos",
       erp: "/configuracoes/erp",
+      cashClose: "/cash-close",
+      cashCloseAcquirers: "/cash-close/acquirers",
       stores: "/configuracoes/lojas",
       users: "/configuracoes/usuarios",
     },

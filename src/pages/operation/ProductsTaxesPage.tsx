@@ -56,7 +56,7 @@ export function ProductsTaxesPage() {
 
   return (
     <StoreCardsPage
-      section="Configurações"
+      section="Custos"
       title="Produtos e impostos"
       subtitle="Configure a tabela de custo dos produtos e os impostos de cada loja."
       loading={loading}

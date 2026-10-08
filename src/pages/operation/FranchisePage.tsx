@@ -6,7 +6,7 @@ import { StoreCardsPage, useScopedStores } from "./shared";
 const INTRO =
   "Esses percentuais entram nos custos da operação e são considerados no cálculo do resultado operacional no Financeiro. Campos vazios são considerados 0%.";
 
-/** WPINK só aparece para loja que vende a marca. */
+/** WPINK so aparece para loja que vende a marca. */
 function franchiseFields(loja: Store): CostField[] {
   return [
     pctField("royaltiesWepinkPct", "Royalties WEPINK"),
@@ -36,12 +36,12 @@ function franchiseSections(loja: Store): CostFieldSection[] {
   ];
 }
 
-/** Configurações > Franquia — royalties e taxa de marketing por marca. */
+/** Configuracoes > Franquia  -  royalties e taxa de marketing por marca. */
 export function FranchisePage() {
   const { lojas, loading, refresh } = useScopedStores();
   return (
     <StoreCardsPage
-      section="Configurações"
+      section="Custos"
       title="Franquia"
       subtitle="Configure royalties e taxa de marketing pagos à franqueadora."
       loading={loading}

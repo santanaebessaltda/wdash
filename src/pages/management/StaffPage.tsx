@@ -31,7 +31,7 @@ export function StaffPage() {
   const { session, lojas, loading } = useScopedStores();
   return (
     <StoreCardsPage
-      section="Gestão"
+      section="Operação"
       title="Vendedores"
       subtitle="Acompanhe os vendedores de cada loja e defina seus grupos."
       loading={loading}

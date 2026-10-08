@@ -18,6 +18,7 @@ import { fetchErpStores } from "./millenniumStores.ts";
 import { mergeNameKeys, type KnownSeller } from "./sellerLinker.ts";
 import { fetchRelatorioMargem } from "./millenniumMargem.ts";
 import { fetchCashAccounts, fetchCashCloseReport } from "./millenniumCashClose.ts";
+import { fetchStoneConciliation } from "./stoneConciliation.ts";
 import { fetchCouponReport } from "./millenniumCouponReport.ts";
 import { fetchProductBrandMap } from "./millenniumProductDivision.ts";
 import { fetchProductRegistry, fetchProductTypes, fetchProductsOfType } from "./millenniumCatalog.ts";
@@ -52,6 +53,7 @@ import {
   type SyncStore,
 } from "./runSyncJob.ts";
 import { autoRefreshEnabled, deepHistorySpan, spanStart } from "./syncConfig.ts";
+import { runCashCloseFillJob } from "./cashCloseFill.ts";
 import type {
   SalesDayAgg,
   SalesHourAgg,
@@ -371,35 +373,57 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
       const { data, error } = await sb
         .from("store")
         .select(
-          "id, millennium_store_id, code, name, trade_name, timezone, opened_at, has_wpink, millennium_gerador_id, last_closed_day",
+          "id, millennium_store_id, code, name, trade_name, tax_id, timezone, opened_at, has_wpink, millennium_gerador_id, last_closed_day",
         )
         .eq("tenant_id", tenantId)
         .eq("active", true)
         .order("millennium_store_id");
       if (error) throw error;
+      const stoneRes = await sb
+        .from("store_stone")
+        .select("store_id, stone_code, secret_ciphertext, covers")
+        .eq("tenant_id", tenantId);
+      const stoneByStore = new Map<string, { stone_code: string; secret_ciphertext: string; covers: string }>();
+      if (!stoneRes.error) {
+        for (const row of stoneRes.data ?? []) {
+          stoneByStore.set(row.store_id as string, {
+            stone_code: row.stone_code as string,
+            secret_ciphertext: row.secret_ciphertext as string,
+            covers: row.covers as string,
+          });
+        }
+      }
       return ((data ?? []) as Array<{
         id: string;
         millennium_store_id: number;
         code: string | null;
         name: string | null;
         trade_name: string | null;
+        tax_id: string | null;
         timezone: string;
         opened_at: string | null;
         has_wpink: boolean | null;
         millennium_gerador_id: number | null;
         last_closed_day: string | null;
       }>).map(
-        (r): SyncStore => ({
-          id: r.id,
-          millenniumStoreId: r.millennium_store_id,
-          code: r.code || String(r.millennium_store_id).padStart(5, "0"),
-          name: r.trade_name || r.name || null,
-          timezone: r.timezone || "America/Campo_Grande",
-          openedAt: r.opened_at ? String(r.opened_at).slice(0, 10) : null,
-          hasWpink: r.has_wpink,
-          geradorId: r.millennium_gerador_id,
-          lastClosedDay: r.last_closed_day ? String(r.last_closed_day).slice(0, 10) : null,
-        }),
+        (r): SyncStore => {
+          const stone = stoneByStore.get(r.id);
+          return {
+            id: r.id,
+            millenniumStoreId: r.millennium_store_id,
+            code: r.code || String(r.millennium_store_id).padStart(5, "0"),
+            name: r.trade_name || r.name || null,
+            taxId: r.tax_id,
+            timezone: r.timezone || "America/Campo_Grande",
+            openedAt: r.opened_at ? String(r.opened_at).slice(0, 10) : null,
+            hasWpink: r.has_wpink,
+            geradorId: r.millennium_gerador_id,
+            lastClosedDay: r.last_closed_day ? String(r.last_closed_day).slice(0, 10) : null,
+            stoneCode: stone?.stone_code ?? null,
+            stoneSecretCiphertext: stone?.secret_ciphertext ?? null,
+            stoneCovers: stone?.covers === "all" ? "all" : stone ? "online_pix" : null,
+          };
+        },
       );
     },
 
@@ -641,6 +665,11 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
 
     async fetchCashCloseReport(args) {
       return fetchCashCloseReport({ ...args, baseUrl: millenniumBaseUrl() });
+    },
+
+    async fetchStoneCaptures(args) {
+      const secret = await decryptPassword(args.secretCiphertext, erpSecret);
+      return fetchStoneConciliation({ stoneCode: args.stoneCode, secret, day: args.day });
     },
 
     async fetchFilialGeradorMap(session) {
@@ -1132,6 +1161,35 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
       for (let i = 0; i < payload.length; i += 400) {
         const { error } = await sb.from("cash_close_day").upsert(payload.slice(i, i + 400), {
           onConflict: "tenant_id,store_id,day,payment_method",
+        });
+        if (error) throw error;
+      }
+    },
+
+    async replaceStoneCaptures(args) {
+      const { error: delErr } = await sb
+        .from("stone_capture")
+        .delete()
+        .eq("tenant_id", args.tenantId)
+        .eq("store_id", args.storeId)
+        .eq("day", args.day);
+      if (delErr) throw delErr;
+      const payload = args.rows.map((r) => ({
+        tenant_id: r.tenantId,
+        store_id: r.storeId,
+        day: r.day,
+        acquirer_key: r.acquirerKey,
+        occurred_at: r.occurredAt,
+        account_type: r.accountType,
+        payment_method: r.paymentMethod,
+        brand_id: r.brandId,
+        captured_cents: r.capturedCents,
+        authorization_code: r.authorizationCode,
+        installments: r.installments,
+      }));
+      for (let i = 0; i < payload.length; i += 400) {
+        const { error } = await sb.from("stone_capture").upsert(payload.slice(i, i + 400), {
+          onConflict: "tenant_id,store_id,acquirer_key",
         });
         if (error) throw error;
       }
@@ -1736,6 +1794,7 @@ export async function claimNextJob(sb: SupabaseClient): Promise<SyncJob | null> 
       relogin?: unknown;
       closeStoreIds?: unknown;
       deep?: unknown;
+      cashOnly?: unknown;
     };
     const idList = (raw: unknown) =>
       Array.isArray(raw) ? raw.filter((id): id is string => typeof id === "string" && id.length > 0) : undefined;
@@ -1756,6 +1815,7 @@ export async function claimNextJob(sb: SupabaseClient): Promise<SyncJob | null> 
         ...(payload.relogin === true ? { relogin: true } : {}),
         ...(closeStoreIds && closeStoreIds.length > 0 ? { closeStoreIds } : {}),
         ...(payload.deep === true ? { deep: true } : {}),
+        ...(payload.cashOnly === true ? { cashOnly: true } : {}),
       },
     };
   }
@@ -2072,7 +2132,10 @@ export async function processOneJob(sb: SupabaseClient, erpSecret: string): Prom
   const deps = buildDeps(sb, erpSecret);
   let result: Awaited<ReturnType<typeof runSyncJob>>;
   try {
-    result = await runSyncJob(job, deps);
+    result =
+      job.kind === "CLOSE" && job.payload.cashOnly
+        ? await runCashCloseFillJob(job, deps, sb, erpSecret)
+        : await runSyncJob(job, deps);
   } catch (e) {
     if (e instanceof Error && e.message === "job_claim_lost") {
       // Outro worker levou o lease depois do peek — nada a fazer.

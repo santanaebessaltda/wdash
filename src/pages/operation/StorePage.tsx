@@ -4,13 +4,13 @@ import { weekHoursConfigured } from "@/data/wedash/storeHours";
 import { StoreCardHeader, StoreCardsPage, useScopedStores } from "./shared";
 import { StoreScheduleForm } from "./StoreSchedule";
 
-/** Configurações > Loja — funcionamento (fuso + horário) de cada loja; posiciona as vendas por hora nos gráficos. */
+/** Configuracoes > Loja  -  funcionamento (fuso + horario) de cada loja; posiciona as vendas por hora nos graficos. */
 export function StorePage() {
   const { lojas, loading, refresh } = useScopedStores();
   return (
     <StoreCardsPage
-      section="Configurações"
-      title="Loja"
+      section="Operação"
+      title="Funcionamento"
       subtitle="Configure o fuso horário e o funcionamento de cada loja."
       loading={loading}
       skeleton={(n) => <StoreCardsSkeleton count={n} schedule />}

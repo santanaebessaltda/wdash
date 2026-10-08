@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button, Card, CardHeader, CardSubtitle, CardTitle, EmptyState, FormField, Input, PageHeader, Select, TabNav } from "@/components/ui";
-import { managementTabs, operationTabs } from "@/layout/nav-wedash";
+import { costTabs, managementTabs, operationTabs } from "@/layout/nav-wedash";
 import { halfHourOptions } from "@/data/wedash/storeHours";
 import { useActiveSession } from "@/session/SessionProvider";
 import { storesKey } from "@/session/session";
@@ -10,7 +10,7 @@ import { StoreIcon } from "@/pages/dashboards/icons";
 import { cn } from "@/lib/cn";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 
-/** Lojas do escopo do StorePicker ("Todas" = todas as lojas da sessão), já com custos e horário do banco. */
+/** Lojas do escopo do StorePicker ("Todas" = todas as lojas da sessao), ja com custos e horario do banco. */
 export function useScopedStores() {
   const session = useActiveSession();
   const { escopo } = useScope();
@@ -22,7 +22,7 @@ export function useScopedStores() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      // Skeleton só quando as lojas da sessão mudam de verdade (não a cada reidratação da sessão).
+      // Skeleton so quando as lojas da sessao mudam de verdade (nao a cada reidratacao da sessao).
       if (loadedKey.current !== key) setLoading(true);
       if (session.stores.length > 0) {
         await hydrateSessionStores(session.tenantId, session.stores);
@@ -46,32 +46,38 @@ export function useScopedStores() {
   return { session, lojas, loading, refresh: () => setTick((n) => n + 1) };
 }
 
-export type SectionName = "Estoque" | "Gestão" | "Configurações";
+export type SectionName = "Estoque" | "Gestão" | "Operação" | "Custos";
 
-const SECTION_TABS: Record<SectionName, typeof managementTabs> = {
+const SECTION_TABS: Record<SectionName, Array<{ label: string; to: string; end?: boolean }>> = {
   Estoque: [],
   Gestão: managementTabs,
-  "Configurações": operationTabs,
+  Operação: operationTabs,
+  Custos: costTabs,
 };
 
-/** Código das outras abas da seção — baixado junto para a troca de aba não esperar o download. */
+/** Codigo das outras abas da secao  -  baixado junto para a troca de aba nao esperar o download. */
 const SECTION_PAGES: Record<SectionName, Array<() => Promise<unknown>>> = {
-  Estoque: [() => import("@/pages/stock/InventoryPage"), () => import("@/pages/stock/PurchaseOrderPage")],
+  Estoque: [() => import("@/pages/stock/InventoryPage")],
   Gestão: [
     () => import("@/pages/goals/GoalsPage"),
     () => import("@/pages/management/ChallengesPage"),
+    () => import("@/pages/cash-close/CashClosePage"),
+    () => import("@/pages/stock/PurchaseOrderPage"),
+  ],
+  Operação: [
+    () => import("@/pages/operation/StorePage"),
     () => import("@/pages/management/ShiftsPage"),
     () => import("@/pages/management/StaffPage"),
   ],
-  "Configurações": [
-    () => import("@/pages/operation/StorePage"),
+  Custos: [
     () => import("@/pages/operation/FranchisePage"),
     () => import("@/pages/operation/RentPage"),
     () => import("@/pages/operation/ProductsTaxesPage"),
+    () => import("@/pages/cash-close/AcquirersPage"),
   ],
 };
 
-/** Cabeçalho da seção (breadcrumb + abas do grupo do menu). */
+/** Cabecalho da secao (breadcrumb + abas do grupo do menu). */
 export function SectionHeader({
   section,
   title,
@@ -91,13 +97,19 @@ export function SectionHeader({
   const tabs = SECTION_TABS[section];
   return (
     <>
-      <PageHeader crumbs={[{ label: section }, { label: title }]} title={title} subtitle={subtitle} actions={actions} notices={notices} />
+      <PageHeader
+        crumbs={section === title ? [{ label: title }] : [{ label: section }, { label: title }]}
+        title={title}
+        subtitle={subtitle}
+        actions={actions}
+        notices={notices}
+      />
       {tabs.length > 1 && <TabNav items={tabs} />}
     </>
   );
 }
 
-/** Cabeçalho da seção + 1 card por loja do escopo. */
+/** Cabecalho da secao + 1 card por loja do escopo. */
 export function StoreCardsPage({
   section,
   title,
@@ -114,7 +126,7 @@ export function StoreCardsPage({
   subtitle: string;
   actions?: ReactNode;
   loading: boolean;
-  /** Recebe quantos cards desenhar = lojas do StorePicker ("Todas" = todas as da sessão). */
+  /** Recebe quantos cards desenhar = lojas do StorePicker ("Todas" = todas as da sessao). */
   skeleton: (count: number) => ReactNode;
   lojas: Store[];
   wide?: boolean;
@@ -146,7 +158,7 @@ export function StoreCardsPage({
   );
 }
 
-/** Título do card = loja (ícone + fantasia + CNPJ). */
+/** Titulo do card = loja (icone + fantasia + CNPJ). */
 export function StoreCardHeader({ loja, action, className }: { loja: Store; action?: ReactNode; className?: string }) {
   return (
     <CardHeader className={className}>
@@ -179,7 +191,7 @@ export function FormActions({ dirty, saving, onReset }: { dirty: boolean; saving
   );
 }
 
-/** "" = vazio; aceita "2,5", "2.5", "1.234,56" e "3.100" (milhar). NaN = inválido. */
+/** "" = vazio; aceita "2,5", "2.5", "1.234,56" e "3.100" (milhar). NaN = invalido. */
 export function parseNum(txt: string): number | null {
   const raw = txt.trim();
   const t = raw.includes(",")
@@ -199,14 +211,14 @@ export function numText(v: number | null | undefined, unit: "%" | "R$" = "%"): s
   return String(v).replace(".", ",");
 }
 
-/** Máscara de R$: só dígitos, preenchidos pelos centavos ("123456" → "1.234,56"). */
+/** Mascara de R$: so digitos, preenchidos pelos centavos ("123456"  ->  "1.234,56"). */
 export function maskBrl(txt: string): string {
   const digits = txt.replace(/\D/g, "").replace(/^0+/, "").slice(0, 13);
   if (!digits) return "";
   return (Number(digits) / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-/** Campo numérico com sufixo (%) ou prefixo (R$). */
+/** Campo numerico com sufixo (%) ou prefixo (R$). */
 export function NumberField({
   label,
   hint,
@@ -244,7 +256,7 @@ export function NumberInput({
   onChange: (v: string) => void;
   disabled?: boolean;
   unit: "%" | "R$";
-  /** Altura das linhas editáveis (h-9). */
+  /** Altura das linhas editaveis (h-9). */
   compact?: boolean;
   /** Borda vermelha (campo com erro). */
   invalid?: boolean;
@@ -274,7 +286,7 @@ export function NumberInput({
 
 const TIME_OPTS = halfHourOptions();
 
-/** Hora de meia em meia hora (horário da loja, turnos). */
+/** Hora de meia em meia hora (horario da loja, turnos). */
 export function TimeSelect({
   value,
   disabled,
@@ -303,7 +315,7 @@ export function TimeSelect({
   );
 }
 
-/** Próxima meia hora depois de `after` (ou a própria, se for a última). */
+/** Proxima meia hora depois de `after` (ou a propria, se for a ultima). */
 export function nextHalfHour(after: string): string {
   return TIME_OPTS.find((t) => t > after) ?? after;
 }

@@ -1,5 +1,5 @@
 /**
- * erp-sync-enqueue  -  JWT OWNER/MANAGER enfileira SEED | LIGHT | FORCE | RANGE | REGISTRY.
+ * erp-sync-enqueue  -  JWT OWNER/MANAGER enfileira SEED | LIGHT | FORCE | RANGE | REGISTRY | CLOSE (cashOnly).
  * REGISTRY (Atualizar cadastros, Integracoes) = so Gestor (OWNER).
  * Rate limit FORCE: ver FORCE_COOLDOWN_MS (0 = off p/ teste).
  */
@@ -7,7 +7,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeaders, serve } from "../_shared/cors.ts";
 import { loadStaffCaller, managerAllowedStores } from "../_shared/staffAuth.ts";
 
-type JobKind = "SEED" | "LIGHT" | "FORCE" | "FORCE_LIGHT" | "RANGE" | "BACKFILL" | "REGISTRY";
+type JobKind = "SEED" | "LIGHT" | "FORCE" | "FORCE_LIGHT" | "RANGE" | "BACKFILL" | "REGISTRY" | "CLOSE";
 
 /** 0 = off (sem cooldown no Atualizar). Religar: 5 * 60 * 1000. */
 const FORCE_COOLDOWN_MS = 0;
@@ -33,6 +33,8 @@ function mapAction(action: string): JobKind | null {
       return "RANGE";
     case "registry":
       return "REGISTRY";
+    case "cash_close":
+      return "CLOSE";
     default:
       return null;
   }
@@ -72,14 +74,15 @@ serve(async (req) => {
   const kind = mapAction(String(body.action ?? "").trim().toLowerCase());
   if (!kind) return json({ error: "invalid_action" }, 400);
 
-  const payload: { from?: string; to?: string; storeIds?: string[] } = {};
+  const payload: { from?: string; to?: string; storeIds?: string[]; cashOnly?: boolean } = {};
+  if (kind === "CLOSE") payload.cashOnly = true;
   if (kind === "FORCE" || kind === "FORCE_LIGHT") {
     // So hoje  -  client pode mandar from=to=hoje (audit); worker usa fuso da loja.
     if (isIsoDay(body.from) && isIsoDay(body.to) && body.from === body.to) {
       payload.from = body.from;
       payload.to = body.to;
     }
-  } else if (kind === "RANGE") {
+  } else if (kind === "RANGE" || kind === "CLOSE") {
     if (!isIsoDay(body.from) || !isIsoDay(body.to)) {
       return json({ error: "from_to_required" }, 400);
     }
@@ -107,7 +110,7 @@ serve(async (req) => {
 
   // FORCE/RANGE: opcionalmente so as lojas do StorePicker (nao "Todas").
   if (
-    (kind === "FORCE" || kind === "FORCE_LIGHT" || kind === "RANGE") &&
+    (kind === "FORCE" || kind === "FORCE_LIGHT" || kind === "RANGE" || kind === "CLOSE") &&
     Array.isArray(body.storeIds) &&
     body.storeIds.length > 0
   ) {
@@ -250,8 +253,19 @@ serve(async (req) => {
     }
   }
 
-  // Avoid duplicate SEED/RANGE/REGISTRY while one is already queued/running
-  if (kind === "SEED" || kind === "RANGE" || kind === "REGISTRY") {
+  // Avoid duplicate SEED/RANGE/REGISTRY while one is already queued/running.
+  // CLOSE do botão só deduplica outro fechamento manual (cashOnly), não o da madrugada.
+  if (kind === "CLOSE") {
+    const { data: open } = await admin
+      .from("sync_job")
+      .select("id, payload")
+      .eq("tenant_id", tenantId)
+      .eq("kind", "CLOSE")
+      .in("status", ["QUEUED", "RUNNING"])
+      .limit(20);
+    const hit = (open ?? []).find((row) => (row.payload as { cashOnly?: unknown } | null)?.cashOnly === true);
+    if (hit) return json({ ok: true, job: { id: hit.id }, deduped: true });
+  } else if (kind === "SEED" || kind === "RANGE" || kind === "REGISTRY") {
     const { data: open } = await admin
       .from("sync_job")
       .select("id")
