@@ -124,7 +124,7 @@ export type CashCloseDayMark = {
   cardPending: boolean;
 };
 
-/** Fechamentos do intervalo, um por loja e dia. Sem as capturas: a barra usa o digitado e o arquivo pedido. */
+/** Fechamentos do intervalo, um por loja e dia, com o total da adquirente para o calendário. */
 export async function fetchCashCloseMonthMarks(
   tenantId: string,
   storeIds: string[],
@@ -134,7 +134,7 @@ export async function fetchCashCloseMonthMarks(
   const { getSupabase } = await import("@/lib/supabase");
   const sb = getSupabase();
   if (!sb || storeIds.length === 0 || from > to) return [];
-  const [mill, files] = await Promise.all([
+  const [mill, files, captures] = await Promise.all([
     sb
       .from("cash_close_day")
       .select("store_id, day, payment_method, opening_cents, sangria_cents, closing_cents, typed_cents")
@@ -151,8 +151,16 @@ export async function fetchCashCloseMonthMarks(
       .gte("day", from)
       .lte("day", to)
       .limit(5000),
+    sb
+      .from("stone_capture")
+      .select("store_id, day, payment_method, captured_cents")
+      .eq("tenant_id", tenantId)
+      .in("store_id", storeIds)
+      .gte("day", from)
+      .lte("day", to)
+      .limit(20000),
   ]);
-  if (mill.error || files.error) throw new Error(mill.error?.message || files.error?.message);
+  if (mill.error || files.error || captures.error) throw new Error(mill.error?.message || files.error?.message || captures.error?.message);
   const byKey = new Map<string, CashCloseDayMark>();
   const slot = (storeId: string, day: string) => {
     const key = `${storeId}|${day}`;
@@ -176,6 +184,22 @@ export async function fetchCashCloseMonthMarks(
     const mark = slot(String(row.store_id), String(row.day));
     if (row.kind === "pix" && row.status === "requested") mark.snap.pixRequested = true;
     if (row.kind === "card" && row.status === "requested") mark.cardPending = true;
+  }
+  const cards = new Map<string, { creditCents: number; debitCents: number; otherCents: number }>();
+  for (const row of captures.data ?? []) {
+    const key = `${row.store_id}|${String(row.day).slice(0, 10)}`;
+    const card = cards.get(key) ?? { creditCents: 0, debitCents: 0, otherCents: 0 };
+    const cents = Number(row.captured_cents) || 0;
+    const bucket = cashCloseBucket(String(row.payment_method ?? ""));
+    if (bucket === "credit") card.creditCents += cents;
+    else if (bucket === "debit") card.debitCents += cents;
+    else if (bucket !== "pix") card.otherCents += cents;
+    cards.set(key, card);
+  }
+  for (const [key, card] of cards) {
+    const [storeId, day] = key.split("|");
+    if (!storeId || !day) continue;
+    slot(storeId, day).snap.card = card;
   }
   return [...byKey.values()];
 }
@@ -285,4 +309,23 @@ export async function fetchOpenCashCloseJob(tenantId: string): Promise<boolean> 
     .limit(20);
   if (error) return false;
   return (data ?? []).some((row) => (row.payload as { cashOnly?: unknown } | null)?.cashOnly === true);
+}
+
+/** Erro do último fechamento pedido por esta tela. Sucesso devolve null. */
+export async function fetchLatestCashCloseError(tenantId: string): Promise<string | null> {
+  const { getSupabase } = await import("@/lib/supabase");
+  const sb = getSupabase();
+  if (!sb) return null;
+  const { data, error } = await sb
+    .from("sync_job")
+    .select("status, error, payload")
+    .eq("tenant_id", tenantId)
+    .eq("kind", "CLOSE")
+    .order("finished_at", { ascending: false })
+    .limit(5);
+  if (error) return null;
+  const row = (data ?? []).find((item) => (item.payload as { cashOnly?: unknown } | null)?.cashOnly === true);
+  if (!row || row.status !== "FAILED") return null;
+  const message = String(row.error ?? "");
+  return message.startsWith("Não foi possível") ? message : "Não foi possível buscar os fechamentos. Tente novamente.";
 }

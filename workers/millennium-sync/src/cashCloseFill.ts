@@ -130,31 +130,49 @@ export async function runCashCloseFillJob(
   }
 
   const now = deps.now();
+  const problems: string[] = [];
+  if (!accountsOk) problems.push("Não foi possível ler as contas de caixa do Millennium.");
   for (const store of chosen) {
     const today = ymdInTz(now, store.timezone);
     const days = missingCloseDays(from, to, today, await filledDays(sb, job.tenantId, store.id, from, to));
     for (const day of days) {
-      await syncStoreCashClose(deps, {
-        session,
-        tenantId: job.tenantId,
-        store,
-        from: day,
-        to: day,
-        accounts,
-        accountsOk,
-      });
+      try {
+        await syncStoreCashClose(deps, {
+          session,
+          tenantId: job.tenantId,
+          store,
+          from: day,
+          to: day,
+          accounts,
+          accountsOk,
+          strict: true,
+        });
+      } catch {
+        problems.push(`Não foi possível buscar o fechamento do Millennium em ${day}.`);
+      }
     }
-    if (!store.stoneCode || !store.stoneSecretCiphertext) {
+    const { data: stoneRow, error: stoneErr } = await sb
+      .from("store_stone")
+      .select("stone_code, secret_ciphertext, covers")
+      .eq("store_id", store.id)
+      .maybeSingle();
+    if (stoneErr) {
+      problems.push("Não foi possível ler a conexão da adquirente.");
+      continue;
+    }
+    if (!stoneRow) {
       if (days.length > 0) console.log(`  ${store.code}: ${days.length} dia(s) de caixa`);
       continue;
     }
     let secret = "";
     try {
-      secret = await decryptPassword(store.stoneSecretCiphertext, erpSecret);
+      secret = await decryptPassword(String(stoneRow.secret_ciphertext), erpSecret);
     } catch {
-      console.warn(`  AVISO [${store.code}] Stone: chave ilegível`);
+      problems.push("Não foi possível ler a chave da adquirente. Conecte a Stone de novo.");
       continue;
     }
+    const covers = stoneRow.covers === "all" ? "all" : "online_pix";
+    const stoneCode = String(stoneRow.stone_code);
     const end = to < today ? to : addDaysIso(today, -1);
     if (from > end) continue;
     const files = await stoneState(sb, store.id, from, end);
@@ -162,9 +180,9 @@ export async function runCashCloseFillJob(
     for (let day = from; day <= end; day = addDaysIso(day, 1)) {
       if (!stoneFileReady(day, now)) continue;
       const file = files.get(day);
-      if (store.stoneCovers === "all" && !file?.card) {
+      if (covers === "all" && !file?.card) {
         try {
-          const captures = await fetchStoneConciliation({ stoneCode: store.stoneCode, secret, day });
+          const captures = await fetchStoneConciliation({ stoneCode, secret, day });
           await replaceCaptures(sb, { tenantId: job.tenantId, storeId: store.id, day, rows: captures });
           await markStoneFile(sb, {
             tenantId: job.tenantId,
@@ -177,6 +195,7 @@ export async function runCashCloseFillJob(
           console.log(`  Stone ${store.code} ${day}: cartão (${captures.length})`);
         } catch (e) {
           console.warn(`  AVISO [${store.code}] Stone ${day}: ${e instanceof Error ? e.message : String(e)}`);
+          problems.push(`Não foi possível buscar o cartão da adquirente em ${day}.`);
         }
       }
       if (tax.length >= 11 && pixDue(file?.pix ?? null, now)) {
@@ -193,9 +212,10 @@ export async function runCashCloseFillJob(
           console.log(`  Stone ${store.code} ${day}: PIX pedido`);
         } catch (e) {
           console.warn(`  AVISO [${store.code}] PIX ${day}: ${e instanceof Error ? e.message : String(e)}`);
+          problems.push(`Não foi possível pedir o Pix da adquirente em ${day}.`);
         }
       }
     }
   }
-  return finish(undefined, chosen.length);
+  return finish(problems[0], chosen.length);
 }

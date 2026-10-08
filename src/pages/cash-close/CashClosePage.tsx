@@ -22,6 +22,7 @@ import {
   fetchCashCloseReviews,
   fetchCashCloseSnapshot,
   fetchOpenCashCloseJob,
+  fetchLatestCashCloseError,
   requestMonthClose,
   saveCashCloseReview,
   type CashCloseDayMark,
@@ -470,8 +471,11 @@ export function CashClosePage() {
       const open = await fetchOpenCashCloseJob(session.tenantId);
       if (stop) return;
       if (!open) {
+        const message = await fetchLatestCashCloseError(session.tenantId);
+        if (stop) return;
         setSyncing(false);
         setReloadKey((n) => n + 1);
+        if (message) show(message, "danger");
       }
     };
     const id = window.setInterval(() => void tick(), 3000);
@@ -479,7 +483,7 @@ export function CashClosePage() {
       stop = true;
       window.clearInterval(id);
     };
-  }, [syncing, session.tenantId]);
+  }, [syncing, session.tenantId, show]);
 
   useEffect(() => {
     if (lojasLoading || lojas.length === 0 || from > to) return;

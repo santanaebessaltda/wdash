@@ -384,6 +384,7 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
         .select("store_id, stone_code, secret_ciphertext, covers")
         .eq("tenant_id", tenantId);
       const stoneByStore = new Map<string, { stone_code: string; secret_ciphertext: string; covers: string }>();
+      if (stoneRes.error) console.warn(`AVISO Stone das lojas: ${stoneRes.error.message}`);
       if (!stoneRes.error) {
         for (const row of stoneRes.data ?? []) {
           stoneByStore.set(row.store_id as string, {

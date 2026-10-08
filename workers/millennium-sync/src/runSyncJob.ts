@@ -148,12 +148,19 @@ export async function syncStoreCashClose(
     to: string;
     accounts: CashAccount[];
     accountsOk: boolean;
+    /** No fechamento sob pedido, a falha volta para o job em vez de só ir para o log. */
+    strict?: boolean;
   },
 ): Promise<void> {
-  if (!args.accountsOk || !deps.fetchCashCloseReport || !deps.replaceCashCloseDays) return;
+  if (!args.accountsOk || !deps.fetchCashCloseReport || !deps.replaceCashCloseDays) {
+    if (args.strict) throw new Error("contas de caixa indisponíveis");
+    return;
+  }
   const account = cashAccountForStore(args.accounts, args.store.code);
   if (!account) {
-    console.warn(`  AVISO [${args.store.code}] sem caixa no Millennium — valor digitado pulado`);
+    const msg = `sem caixa no Millennium para ${args.store.code}`;
+    console.warn(`  AVISO [${args.store.code}] ${msg}`);
+    if (args.strict) throw new Error(msg);
     return;
   }
   try {
@@ -192,6 +199,7 @@ export async function syncStoreCashClose(
       store: args.store,
       day: args.from,
     });
+    if (args.strict) throw e;
   }
 }
 
