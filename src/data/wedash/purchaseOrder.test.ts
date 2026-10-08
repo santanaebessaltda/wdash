@@ -126,15 +126,17 @@ describe("parseMinInput (PC-06 AC 3, 4)", () => {
 });
 
 describe("buildPurchaseOrderView", () => {
-  it("lista os que podem comprar e os bloqueados; WP fica de fora (PC-01)", () => {
+  it("lista o relatório inteiro; WPINK e bloqueado aparecem e ficam fora do pedido (PC-01)", () => {
     const v = view(
-      [stock({ balance: 1, openOrder: 1, total: 2 }), stock({ code: "WP014", position: 1 }), stock({ code: "X1", blocked: true, balance: 4, total: 4, position: 2 })],
-      { "BSPPAR-ATH-001": 72, X1: 12 },
+      [stock({ balance: 1, openOrder: 1, total: 2 }), stock({ code: "WP014", balance: 8, total: 8, position: 1 }), stock({ code: "X1", blocked: true, balance: 4, total: 4, position: 2 }), stock({ code: "SEM", multiple: null, balance: 3, total: 3, position: 3 })],
+      { "BSPPAR-ATH-001": 72, X1: 12, WP014: 24 },
       1,
       { "BSPPAR-ATH-001": 15 },
     );
-    expect(v.rows.map((r) => r.code)).toEqual(["BSPPAR-ATH-001", "X1"]);
-    expect(v.rows[1]).toMatchObject({ bloqueado: true, minimo: 12, saldo: 4, aPedir: null, noPedido: false });
+    expect(v.rows.map((r) => r.code)).toEqual(["BSPPAR-ATH-001", "WP014", "X1", "SEM"]);
+    expect(v.rows[1]).toMatchObject({ bloqueado: false, podePedir: false, minimo: 24, saldo: 8, aPedir: null, noPedido: false });
+    expect(v.rows[2]).toMatchObject({ bloqueado: true, podePedir: false, minimo: 12, saldo: 4, aPedir: null, noPedido: false });
+    expect(v.rows[3]).toMatchObject({ podePedir: false, saldo: 3, aPedir: null, noPedido: false });
     expect(purchaseOrderFileRows(v).map((r) => r[0])).toEqual(["BSPPAR-ATH-001"]);
     expect(v.rows[0]).toMatchObject({
       code: "BSPPAR-ATH-001",

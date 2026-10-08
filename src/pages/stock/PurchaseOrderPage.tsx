@@ -266,13 +266,13 @@ export function PurchaseOrderPage() {
                             sub={
                               <div className="min-w-0">
                                 <p className="truncate text-[11px] uppercase text-t2">{[r.code, categoria].filter(Boolean).join(" · ")}</p>
-                                {r.variasVariantes && <p className="mt-0.5 text-[11px] font-semibold text-warn">Este produto tem mais de uma cor ou tamanho. Faça o pedido diretamente no Millennium.</p>}
+                                {r.variasVariantes && !r.bloqueado && <p className="mt-0.5 text-[11px] font-semibold text-warn">Este produto tem mais de uma cor ou tamanho. Faça o pedido diretamente no Millennium.</p>}
                               </div>
                             }
                           />
                         </td>
                         <td className="px-1 py-2 text-right">
-                          {r.bloqueado ? (
+                          {!r.podePedir ? (
                             <span className="inline-block w-20 pr-2 text-right font-mono text-[13px] font-bold text-t2">{r.minimo == null ? "—" : r.minimo}</span>
                           ) : (
                             <MinInput value={r.minimo} idx={i} label={`Mínimo de ${r.nome}`} onSave={(raw) => po.saveMin(r.code, raw)} />

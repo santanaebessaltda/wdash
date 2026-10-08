@@ -1,8 +1,9 @@
 /**
  * Pedido de compra (Estoque > Pedido de compra), mesma regra da planilha do dono.
  * Fonte = Saldo Atual e Futuro do Millennium (ESTOQUEEMCOMPRA): Total = saldo + pedidos em aberto.
- * Na lista = código sem "WP" e múltipla > 0, inclusive bloqueado para compra.
- * Elegível para o arquivo = essa lista, sem bloqueado. Bloqueado mostra o mínimo gravado e não entra no pedido.
+ * Na lista = todo o Saldo Atual e Futuro, para o rodapé bater com o Millennium.
+ * Elegível para o arquivo = código sem "WP", não bloqueado e múltipla > 0.
+ * O que não é elegível (bloqueado, WPINK ou sem múltipla) mostra o mínimo gravado, sem editar, e fica fora do pedido.
  * A pedir = (mínimo × multiplicador − Total) arredondado para cima até a múltipla; Total negativo conta como 0.
  * Novo = cadastrado há menos de 30 dias ou nunca vendido pela loja (só quando o histórico cobre 12 meses ou a inauguração).
  */
@@ -39,6 +40,8 @@ export type PurchaseOrderRow = {
   variasVariantes: boolean;
   /** Bloqueado para compra: aparece na lista, mínimo só leitura, fora do arquivo. */
   bloqueado: boolean;
+  /** Uma variante elegível: dá para gravar o mínimo e entrar no arquivo. */
+  podePedir: boolean;
   /** null = "—" (sem mínimo, bloqueado ou várias variantes). */
   aPedir: number | null;
   noPedido: boolean;
@@ -57,14 +60,14 @@ export const PURCHASE_FACTORS = [1, 2, 3, 4, 5] as const;
 export const PURCHASE_MIN_MAX = 99_999;
 const NEW_PRODUCT_DAYS = 30;
 
-/** Entra na lista: sem WP e com múltipla. Bloqueado continua visível. */
+/** Entra na lista: qualquer linha do relatório, para o saldo fechar com o Millennium. */
 export function isListed(r: PurchaseStockRow): boolean {
-  return !r.code.toUpperCase().includes("WP") && (r.multiple ?? 0) > 0;
+  return r.code.trim().length > 0;
 }
 
 /** Vai para o arquivo do pedido. */
 export function isEligible(r: PurchaseStockRow): boolean {
-  return isListed(r) && !r.blocked;
+  return isListed(r) && !r.code.toUpperCase().includes("WP") && !r.blocked && (r.multiple ?? 0) > 0;
 }
 
 function dayNumber(iso: string): number {
@@ -122,16 +125,18 @@ export function buildPurchaseOrderView(input: {
   }
 
   const rows: PurchaseOrderRow[] = [...porCodigo.entries()].map(([code, todas]) => {
-    const liberadas = todas.filter((v) => !v.blocked);
-    const variantes = liberadas.length > 0 ? liberadas : todas;
-    const bloqueado = liberadas.length === 0;
+    const elegiveis = todas.filter(isEligible);
+    const variantes = elegiveis.length > 0 ? elegiveis : todas;
+    const bloqueado = elegiveis.length === 0 && todas.every((v) => v.blocked);
+    const podePedir = elegiveis.length === 1;
     const first = variantes[0];
-    const soma = (f: (v: PurchaseStockRow) => number) => variantes.reduce((s, v) => s + f(v), 0);
+    const soma = (f: (v: PurchaseStockRow) => number) => todas.reduce((s, v) => s + f(v), 0);
+    const totalPedido = elegiveis.reduce((s, v) => s + v.total, 0);
     const total = soma((v) => v.total);
     const multipla = first.multiple ?? 0;
     const minimo = input.mins.get(code) ?? null;
     const variasVariantes = variantes.length > 1;
-    const aPedir = bloqueado || variasVariantes || !minimo ? null : purchaseQuantity(total, minimo, multipla, input.factor);
+    const aPedir = podePedir && minimo ? purchaseQuantity(totalPedido, minimo, multipla, input.factor) : null;
     return {
       code,
       nome: first.description,
@@ -149,6 +154,7 @@ export function buildPurchaseOrderView(input: {
           (soldEver != null && !soldEver.has(code))),
       variasVariantes,
       bloqueado,
+      podePedir,
       aPedir,
       noPedido: (aPedir ?? 0) > 0,
     };
@@ -159,7 +165,7 @@ export function buildPurchaseOrderView(input: {
     rows,
     contagens: {
       noPedido: noPedido.length,
-      semMinimo: rows.filter((r) => !r.bloqueado && !r.minimo).length,
+      semMinimo: rows.filter((r) => r.podePedir && !r.minimo).length,
       novos: rows.filter((r) => r.novo).length,
     },
     resumo: { produtos: noPedido.length, itens: noPedido.reduce((s, r) => s + (r.aPedir ?? 0), 0) },
@@ -195,7 +201,7 @@ export function filterPurchaseRows(rows: PurchaseOrderRow[], opts: { busca: stri
   const q = fold(opts.busca.trim());
   return rows.filter((r) => {
     if (opts.filtro === "pedido" && !r.noPedido) return false;
-    if (opts.filtro === "semMinimo" && (r.bloqueado || r.minimo)) return false;
+    if (opts.filtro === "semMinimo" && (!r.podePedir || r.minimo)) return false;
     if (opts.filtro === "novos" && !r.novo) return false;
     return !q || fold(r.nome).includes(q) || fold(r.code).includes(q);
   });
