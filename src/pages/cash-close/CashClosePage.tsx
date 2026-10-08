@@ -39,13 +39,13 @@ import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { parseNum, SectionHeader, useScopedStores } from "@/pages/operation/shared";
 
 const DIAS = [
-  { longo: "Dom", curto: "D" },
-  { longo: "Seg", curto: "S" },
-  { longo: "Ter", curto: "T" },
-  { longo: "Qua", curto: "Q" },
-  { longo: "Qui", curto: "Q" },
-  { longo: "Sex", curto: "S" },
-  { longo: "Sáb", curto: "S" },
+  { longo: "Domingo", curto: "D" },
+  { longo: "Segunda-feira", curto: "S" },
+  { longo: "Terça-feira", curto: "T" },
+  { longo: "Quarta-feira", curto: "Q" },
+  { longo: "Quinta-feira", curto: "Q" },
+  { longo: "Sexta-feira", curto: "S" },
+  { longo: "Sábado", curto: "S" },
 ];
 
 const money = (cents: number | null) => (cents == null ? "—" : brlCent(cents / 100));
@@ -137,7 +137,7 @@ function CloseTable({
   return (
     <>
       {pixPending && (
-        <Alert className="mb-4" variant="info" title="O fechamento de Pix deste dia já foi solicitado. O total real aparece assim que o arquivo estiver disponível." />
+        <Alert className="mb-4" variant="info" title="O fechamento de Pix deste dia já foi solicitado. O total real aparecerá assim que estiver disponível." />
       )}
       <div className="overflow-x-auto rounded-[var(--radius-vela-lg)] border border-line bg-bg-2">
         <table className="w-full border-collapse text-sm">
@@ -205,7 +205,7 @@ function QuebraDoDia({ breaks, indisponivel }: { breaks: CloseBreak[]; indisponi
   const faltas = breaks.filter((item) => item.diffCents < 0);
   if (faltas.length === 0) {
     if (!indisponivel) return null;
-    return <p className="mt-4 text-[12.5px] text-t2">Não foi possível ver o grupo deste dia.</p>;
+    return <p className="mt-4 text-[12.5px] text-t2">Não foi possível identificar o grupo deste dia.</p>;
   }
   return (
     <div className="mt-4 flex flex-col gap-2">
@@ -710,7 +710,7 @@ function ContaDoDia({ systemCents, realCents, diffCents }: { systemCents: number
           <span className="text-t2">=</span>
         </>
       ) : (
-        <span className="text-t2">O que está sem total real não entrou nesta conta.</span>
+        <span className="text-t2">Valores sem total real não entram nesta diferença.</span>
       )}
       <span className="text-t2">Diferença</span>
       <span className={cn("font-mono text-[13px] font-bold", diffClass(diffCents))}>{totalDia(diffCents)}</span>
@@ -733,9 +733,9 @@ function Mes({
     <div className="overflow-hidden rounded-[18px] border border-line bg-bg-2 shadow-[var(--shadow-vela)]">
       <div className="grid grid-cols-7">
         {DIAS.map((d, i) => (
-          <div key={i} className="border-b border-line px-2 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-t2">
+          <div key={i} className="border-b border-line px-1 py-3 text-center text-[10px] font-bold leading-tight text-t2 sm:text-[11px]">
             <span className="hidden sm:inline">{d.longo}</span>
-            <span className="sm:hidden">{d.curto}</span>
+            <span className="sm:hidden uppercase">{d.curto}</span>
           </div>
         ))}
       </div>
@@ -766,18 +766,18 @@ function Mes({
                   Pendente
                 </Badge>
               )}
-              {(face?.kind === "hoje" || face?.kind === "total") && (
+              {face?.kind === "hoje" && (
                 <div className="mt-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-t2">Total</p>
-                  <p
-                    className={cn(
-                      "truncate font-mono text-[12px] font-extrabold sm:text-[13px]",
-                      face.kind === "total" ? diffClass(face.diffCents) : "text-t1",
-                    )}
-                  >
-                    {face.kind === "hoje" ? brlCent(face.diffCents / 100) : totalDia(face.diffCents)}
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-t2">Movimento</p>
+                  <p className="truncate font-mono text-[12px] font-extrabold text-t1 sm:text-[13px]">
+                    {brlCent(face.diffCents / 100)}
                   </p>
                 </div>
+              )}
+              {face?.kind === "total" && (
+                <p className={cn("mt-2 truncate font-mono text-[12px] font-extrabold sm:text-[13px]", diffClass(face.diffCents))}>
+                  {totalDia(face.diffCents)}
+                </p>
               )}
             </>
           );
@@ -979,7 +979,7 @@ function DiaModal({
                 {fechado ? (
                   <ContaDoDia systemCents={conta.systemCents} realCents={conta.realCents} diffCents={conta.diffCents} />
                 ) : (
-                  <p className="mb-4 text-[13px] text-t2">Este dia ainda não fechou. A sobra ou a quebra aparece a partir de amanhã.</p>
+                  <p className="mb-4 text-[13px] text-t2">Este dia ainda não fechou. A sobra ou a quebra aparecerá a partir de amanhã.</p>
                 )}
                 {cash?.openingCents != null && (
                   <p className="mb-3 text-[12px] text-t2">

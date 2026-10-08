@@ -35,7 +35,7 @@ describe("quebra do fechamento", () => {
       key: "cash",
       diffCents: 500,
       groups: ["MANHÃ"],
-      reason: "Sobra. Não pede justificativa.",
+      reason: "Sobra. Não precisa de justificativa.",
     });
   });
 
@@ -68,7 +68,7 @@ describe("quebra do fechamento", () => {
       pixPending: false,
     });
     expect(items.find((item) => item.key === "debit")?.reason).toBe("Pode ser inversão com cartão de crédito.");
-    expect(items.find((item) => item.key === "credit")?.reason).toBe("Sobra. Não pede justificativa.");
+    expect(items.find((item) => item.key === "credit")?.reason).toBe("Sobra. Não precisa de justificativa.");
   });
 
   it("falta sem venda fica sem grupo até alguém escolher", () => {
@@ -80,7 +80,7 @@ describe("quebra do fechamento", () => {
       pixPending: false,
     });
     expect(item.groups).toEqual([]);
-    expect(item.reason).toBe("Falta sem venda identificada. Fica no grupo até escolher a pessoa.");
+    expect(item.reason).toBe("Falta sem vendedor identificado. Ela permanece no grupo até que um vendedor seja definido.");
   });
 
   it("venda sem vendedor fica no grupo e não entra na folha", () => {
@@ -96,7 +96,7 @@ describe("quebra do fechamento", () => {
       timeZone: "America/Sao_Paulo",
       pixPending: false,
     });
-    expect(item.reason).toBe("Sem vendedor. A falta fica em MANHÃ e não entra na folha.");
+    expect(item.reason).toBe("Sem vendedor identificado. A falta permanece em MANHÃ e não entra na folha.");
   });
 
   it("vendas em dois grupos não separam a quebra", () => {
@@ -116,7 +116,23 @@ describe("quebra do fechamento", () => {
       pixPending: false,
     });
     expect(item.groups).toEqual(["MANHÃ", "TARDE"]);
-    expect(item.reason).toBe("As vendas passaram por MANHÃ e TARDE. A quebra do dia não separa o grupo.");
+    expect(item.reason).toBe("As vendas passaram por MANHÃ e TARDE. Não foi possível atribuir a quebra a um único grupo.");
+  });
+
+  it("venda sem grupo cadastrado não se vincula; venda fora do horário fica fora dos grupos", () => {
+    const linhas = lines([{ method: "DINHEIRO", system: 1000, typed: 700 }]);
+    const sales = [{ occurredAt: "2026-10-07T13:30:00.000Z", paymentMethod: "Dinheiro", sellerName: "Ana" }];
+    const semGrupo = closeBreaks({ lines: linhas, sales, shifts: [], timeZone: "America/Sao_Paulo", pixPending: false });
+    expect(semGrupo[0]?.reason).toBe("A venda não foi vinculada a nenhum grupo.");
+    const fora = closeBreaks({
+      lines: linhas,
+      sales: [{ occurredAt: "2026-10-07T08:00:00.000Z", paymentMethod: "Dinheiro", sellerName: "Ana" }],
+      shifts,
+      timeZone: "America/Sao_Paulo",
+      pixPending: false,
+    });
+    expect(fora[0]?.groups).toEqual([]);
+    expect(fora[0]?.reason).toBe("A venda ficou fora dos grupos cadastrados.");
   });
 
   it("pix sem arquivo não vira quebra", () => {

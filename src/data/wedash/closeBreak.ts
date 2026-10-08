@@ -70,20 +70,22 @@ function reasonFor(input: {
   groups: string[];
   pair: CashCloseLine | null;
   pixPending: boolean;
+  shiftsConfigured: boolean;
 }): string {
-  if (input.diff > 0) return "Sobra. Não pede justificativa.";
+  if (input.diff > 0) return "Sobra. Não precisa de justificativa.";
   if (input.pair) return `Pode ser inversão com ${input.pair.label.toLowerCase()}.`;
   if (input.key === "cash" && input.diff % BAG_CENTS === 0) return "Pode ser sacola de R$ 2.";
   if (input.key === "pix" && input.pixPending) return "Pix ainda em aberto.";
-  if (input.points.length === 0) return "Falta sem venda identificada. Fica no grupo até escolher a pessoa.";
+  if (input.points.length === 0) return "Falta sem vendedor identificado. Ela permanece no grupo até que um vendedor seja definido.";
   const semVendedor = input.points.every((point) => point.sellerName.trim() === "");
   if (input.groups.length === 1 && semVendedor) {
-    return `Sem vendedor. A falta fica em ${input.groups[0]} e não entra na folha.`;
+    return `Sem vendedor identificado. A falta permanece em ${input.groups[0]} e não entra na folha.`;
   }
   if (input.groups.length === 1) return `Quebra em ${input.groups[0]}.`;
   if (input.groups.length > 1) {
-    return `As vendas passaram por ${listGroups(input.groups)}. A quebra do dia não separa o grupo.`;
+    return `As vendas passaram por ${listGroups(input.groups)}. Não foi possível atribuir a quebra a um único grupo.`;
   }
+  if (!input.shiftsConfigured) return "A venda não foi vinculada a nenhum grupo.";
   return "A venda ficou fora dos grupos cadastrados.";
 }
 
@@ -123,6 +125,7 @@ export function closeBreaks(input: {
         groups,
         pair: pair.length === 1 ? pair[0] : null,
         pixPending: input.pixPending,
+        shiftsConfigured: input.shifts.length > 0,
       }),
     };
   });
