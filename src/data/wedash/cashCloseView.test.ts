@@ -157,7 +157,7 @@ describe("resumo do fechamento", () => {
     expect(closeDayGap(view.lines)).toEqual({ systemCents: 18470, comparedSystemCents: 18470, realCents: 18570, diffCents: 100 });
   });
 
-  it("não inventa diferença quando o total real do Pix está vazio", () => {
+  it("deixa a diferença negativa enquanto o total real do Pix não foi informado", () => {
     const view = buildCashCloseView({
       millennium: [{ paymentMethod: "PIX", openingCents: 0, sangriaCents: null, closingCents: 2541340, typedCents: 2538250 }],
       card: null,
@@ -165,7 +165,7 @@ describe("resumo do fechamento", () => {
       pixRequested: true,
     });
     expect(realCentsOf(view.lines[0])).toBeNull();
-    expect(closeDayGap(view.lines)).toEqual({ systemCents: 2541340, comparedSystemCents: 0, realCents: 0, diffCents: 0 });
+    expect(closeDayGap(view.lines)).toEqual({ systemCents: 2541340, comparedSystemCents: 2541340, realCents: 0, diffCents: -2541340 });
   });
 
   it("diferença aparece mesmo com arquivo a caminho, e o dia limpo fica fechado", () => {

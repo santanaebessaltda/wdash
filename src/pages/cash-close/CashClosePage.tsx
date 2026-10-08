@@ -160,7 +160,7 @@ function CloseTable({
           <tbody>
             {lines.map((row) => {
               const real = realCentsOf(row);
-              const diff = real == null ? null : real - row.systemCents;
+              const diff = (real ?? 0) - row.systemCents;
               const acqTxt = draft?.acquirer[row.key] ?? (row.stoneCents == null ? "" : centsToField(row.stoneCents));
               return (
                 <tr key={row.key} className="border-b border-line">
@@ -180,8 +180,8 @@ function CloseTable({
                       />
                     )}
                   </td>
-                  <td className={cn("px-3 py-3 text-right font-mono text-[13px] font-bold", fechado && diff != null ? diffClass(diff) : "text-t2")}>
-                    {fechado && diff != null ? totalDia(diff) : "—"}
+                  <td className={cn("px-3 py-3 text-right font-mono text-[13px] font-bold", fechado ? diffClass(diff) : "text-t2")}>
+                    {fechado ? totalDia(diff) : "—"}
                   </td>
                 </tr>
               );
