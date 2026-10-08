@@ -854,7 +854,7 @@ const SYNC_SELLERS_ERRORS: Record<string, string> = {
 export async function syncStoreSellersNow(storeId: string): Promise<{ ok: true } | { ok: false; message: string }> {
   const { getSupabase } = await import("@/lib/supabase");
   const sb = getSupabase();
-  if (!sb) return { ok: false, message: "Não foi possível conectar à WeDash. Verifique sua conexão e tente novamente." };
+  if (!sb) return { ok: false, message: "Não foi possível conectar à WDash. Verifique sua conexão e tente novamente." };
 
   const { data, error } = await sb.functions.invoke("erp-sellers-sync", { body: { storeId } });
   let body = data as { ok?: boolean; error?: string } | null;

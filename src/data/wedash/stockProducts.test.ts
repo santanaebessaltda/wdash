@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildStockProductsView, composePrice, productBrand, stockStatus, stockTransfers, suggestSaleTable } from "./stockProducts";
+import { buildStockProductsView, composePrice, productBrand, stockCostAmount, stockStatus, stockTransfers, suggestSaleTable } from "./stockProducts";
 import { EMPTY_STORE_COSTS, type Store } from "./stores";
 
 const store = (over: Partial<Store> & Pick<Store, "id">): Store =>
@@ -109,6 +109,8 @@ describe("buildStockProductsView", () => {
     expect(p1.custo).toBeCloseTo(35);
     expect(p1.precoPraticado).toBeCloseTo(90);
     expect(view.negativos).toEqual([{ codigo: "P2", nome: "P2", quantidade: -2, lojas: ["B"] }]);
+    expect(stockCostAmount(p1)).toEqual({ amount: 5 * 30 + 3 * 40, unit: null });
+    expect(stockCostAmount(view.rows.find((r) => r.codigo === "P2")!)).toEqual({ amount: null, unit: null });
   });
 
   it("local negativo com outro local positivo = transferência; total = soma dos locais", () => {

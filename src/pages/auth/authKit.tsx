@@ -1,7 +1,7 @@
 import type { ReactNode, InputHTMLAttributes } from "react";
 import { useId } from "react";
 
-/** Marca WeDash — quadrado com gradiente + “WE” na fonte do tema. */
+/** Marca WDash  -  quadrado com gradiente + "W" na fonte do tema. */
 export function BrandMark({ size = 34, light: _light = false }: { size?: number; light?: boolean }) {
   const uid = useId().replace(/:/g, "");
   const gradId = `wedashGradient-${uid}`;
@@ -23,17 +23,17 @@ export function BrandMark({ size = 34, light: _light = false }: { size?: number;
         <rect width="40" height="40" rx="10" fill={`url(#${gradId})`} />
         <text
           x="20"
-          y="25.5"
+          y="27"
           textAnchor="middle"
           fill="#FFFFFF"
           style={{
             fontFamily: "var(--font-sans)",
-            fontSize: 15.5,
+            fontSize: 22,
             fontWeight: 800,
-            letterSpacing: "-0.06em",
+            letterSpacing: "-0.04em",
           }}
         >
-          WE
+          W
         </text>
       </svg>
     </span>

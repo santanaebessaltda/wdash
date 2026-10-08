@@ -9,12 +9,12 @@
   <rect width="40" height="40" rx="10" fill="url(#wedashGradient)"/>
   <text
     x="20"
-    y="25.5"
+    y="27"
     text-anchor="middle"
     fill="#FFFFFF"
     font-family="Plus Jakarta Sans, ui-sans-serif, system-ui, sans-serif"
-    font-size="15.5"
+    font-size="22"
     font-weight="800"
-    letter-spacing="-0.9"
-  >WE</text>
+    letter-spacing="-0.5"
+  >W</text>
 </svg>

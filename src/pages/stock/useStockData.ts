@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/ui";
 import { buildStockProductsView, type StockCatalogItem, type StockInput } from "@/data/wedash/stockProducts";
-import { fetchStockCatalog, fetchStoreStock, syncStockNow } from "@/data/wedash/stockRepo";
+import { fetchCostPrices, fetchStockCatalog, fetchStoreStock, syncStockNow } from "@/data/wedash/stockRepo";
 import type { Store } from "@/data/wedash/stores";
 import { FORCE_REFRESH_CLICK_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { fetchErpConnection } from "@/pages/dashboard/ErpStatusNotice";
@@ -12,6 +12,7 @@ const STOCK_MAX_AGE_MS = 30 * 60 * 1000;
 type StockLoaded = {
   catalog: Map<string, StockCatalogItem>;
   stock: StockInput["stock"];
+  costPrices: StockInput["costPrices"];
   syncedAt: Map<string, string | null>;
 };
 
@@ -23,14 +24,16 @@ function hora(iso: string): string {
 }
 
 async function loadAll(tenantId: string, lojas: Store[]): Promise<StockLoaded> {
-  const [catalog, stock] = await Promise.all([
+  const tableIds = [...new Set(lojas.map((s) => s.costTableId).filter((id): id is number => id != null))];
+  const [catalog, stock, costPrices] = await Promise.all([
     fetchStockCatalog(),
     fetchStoreStock(
       tenantId,
       lojas.map((s) => s.id),
     ),
+    fetchCostPrices(tableIds),
   ]);
-  return { catalog, stock: stock.rows, syncedAt: stock.syncedAt };
+  return { catalog, stock: stock.rows, costPrices, syncedAt: stock.syncedAt };
 }
 
 /** Estoque das lojas do escopo. Ao abrir, busca no Millennium o estoque com mais de 30 min. */
@@ -65,7 +68,7 @@ export function useStockData() {
 
       syncRef.current = true;
       try {
-        // Integração desligada / senha inválida: o aviso fixo da tela já explica — sem busca e sem toast.
+        // Integracao desligada / senha invalida: o aviso fixo da tela ja explica  -  sem busca e sem toast.
         const conexao = await fetchErpConnection(session.tenantId);
         if (conexao === "disconnected" || conexao === "password") return;
         setSyncing(true);
@@ -119,7 +122,7 @@ export function useStockData() {
             stores: lojas,
             catalog: data.catalog,
             stock: data.stock,
-            costPrices: new Map(),
+            costPrices: data.costPrices,
             salePrices: new Map(),
             saleTableId: null,
             charged: [],

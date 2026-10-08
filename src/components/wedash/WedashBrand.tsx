@@ -2,7 +2,7 @@ import { cn } from "@/lib/cn";
 import { BrandMark } from "@/pages/auth/authKit";
 import { PRODUCT_NAME } from "@/data/wedash/tenant";
 
-/** Marca WeDash com o nome ao lado: nome seguido de ponto em destaque. */
+/** Marca WDash com o nome ao lado: nome seguido de ponto em destaque. */
 export function WedashBrand({ size = 34, showName = true, light = false }: { size?: number; showName?: boolean; light?: boolean }) {
   return (
     <span className="flex items-center gap-2.5">

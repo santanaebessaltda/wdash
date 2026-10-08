@@ -202,6 +202,30 @@ export function stockStatus(r: StockProductRow): StockStatus {
   return r.lojas.some((l) => l.transferencias.length > 0) ? "aguardando" : "ok";
 }
 
+export type StockCostAmount = {
+  /** Saldo x preco unitario da tabela de custo, somando as lojas que tem custo. */
+  amount: number | null;
+  /** Preco unitario quando e o mesmo nas lojas com saldo e custo; null se varia ou nao ha custo. */
+  unit: number | null;
+};
+
+/** Quanto o saldo vale pelo preco de custo da tabela de cada loja. Loja sem custo fica de fora da soma. */
+export function stockCostAmount(r: StockProductRow): StockCostAmount {
+  const units: number[] = [];
+  let amount = 0;
+  let any = false;
+  for (const l of r.lojas) {
+    const unit = l.composicao.custo;
+    if (unit == null || l.estoque === 0) continue;
+    any = true;
+    units.push(unit);
+    amount += l.estoque * unit;
+  }
+  if (!any) return { amount: null, unit: null };
+  const sameUnit = units.every((u) => Math.abs(u - units[0]!) < 0.005);
+  return { amount, unit: sameUnit ? units[0]! : null };
+}
+
 export function buildStockProductsView(input: StockInput): StockProductsView {
   const prices = input.saleTableId == null ? new Map<string, number>() : (input.salePrices.get(input.saleTableId) ?? new Map());
   const stockBy = new Map<string, number>();

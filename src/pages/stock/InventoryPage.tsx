@@ -4,7 +4,7 @@ import type { StatusVariant } from "@/lib/status";
 import { StockProductsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { ProductNameCell } from "@/components/wedash/ProductNameCell";
 import { Tooltip } from "@/components/ui/Tooltip";
-import { stockStatus, type StockProductRow, type StockStatus } from "@/data/wedash/stockProducts";
+import { productBrand, stockCostAmount, stockStatus, type StockProductRow, type StockStatus } from "@/data/wedash/stockProducts";
 import { cn } from "@/lib/cn";
 import { num } from "@/lib/format";
 import { usePrintMode } from "@/lib/printMode";
@@ -22,13 +22,15 @@ import {
   UpdatedLine,
   HeaderFilters,
   localQty,
+  money,
   qty,
   stockLocations,
 } from "./shared";
 import { useStockData } from "./useStockData";
 
 type StatusFiltro = "todos" | StockStatus;
-type SortKey = "nome" | "estoque" | "status" | `local:${string}`;
+type BrandFiltro = "" | "WEPINK" | "WPINK";
+type SortKey = "nome" | "estoque" | "custo" | "status" | `local:${string}`;
 
 const STATUS_BADGE: Record<StockStatus, { label: string; variant: StatusVariant }> = {
   negativo: { label: "Negativo", variant: "danger" },
@@ -36,7 +38,7 @@ const STATUS_BADGE: Record<StockStatus, { label: string; variant: StatusVariant 
   ok: { label: "Regular", variant: "success" },
 };
 
-/** "Transferir 71 de ESTOQUE para PONTO DE VENDA.", uma linha por transferência ("LOJA X: transferir …" quando há várias lojas). */
+/** "Transferir 71 de ESTOQUE para PONTO DE VENDA.", uma linha por transferencia ("LOJA X: transferir ..." quando ha varias lojas). */
 function transferTip(r: StockProductRow, variasLojas: boolean): string {
   return r.lojas
     .flatMap((l) =>
@@ -55,6 +57,7 @@ export function InventoryPage() {
   const { lojas, storeKey, view, loading, syncing, atualizadoTexto } = useStockData();
   const [busca, setBusca] = useState("");
   const [statusSel, setStatus] = useState<StatusFiltro>("todos");
+  const [marca, setMarca] = useState<BrandFiltro>("");
   const [categoria, setCategoria] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("nome");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -63,6 +66,8 @@ export function InventoryPage() {
   const showSkeleton = useMinSkeleton(loading);
   const exportar = useExportPdf("Estoque", null, { periodo: false });
   const variasLojas = lojas.length > 1;
+  const showBrand = lojas.some((s) => s.temWpink);
+  const marcaAtiva: BrandFiltro = showBrand ? marca : "";
 
   const comStatus = useMemo(() => (view?.rows ?? []).map((r) => ({ r, status: stockStatus(r) })), [view]);
   const contagem = (s: StockStatus) => comStatus.filter((x) => x.status === s).length;
@@ -85,6 +90,7 @@ export function InventoryPage() {
     const out = comStatus.filter(
       ({ r, status: s }) =>
         (status === "todos" || s === status) &&
+        (!marcaAtiva || productBrand(r.codigo) === marcaAtiva) &&
         (!categoria || r.categoria === categoria) &&
         (!q || r.nome.toLowerCase().includes(q) || r.codigo.toLowerCase().includes(q)),
     );
@@ -93,12 +99,20 @@ export function InventoryPage() {
       sortKey === "status" ? STATUS_PESO[s] : sortKey.startsWith("local:") ? localQty(r, sortKey.slice(6)) : r.estoque;
     out.sort((a, b) => {
       if (sortKey === "nome") return a.r.nome.localeCompare(b.r.nome, "pt-BR") * dir;
+      if (sortKey === "custo") {
+        const av = stockCostAmount(a.r).amount;
+        const bv = stockCostAmount(b.r).amount;
+        if (av == null && bv == null) return a.r.nome.localeCompare(b.r.nome, "pt-BR");
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        return (av - bv) * dir || a.r.nome.localeCompare(b.r.nome, "pt-BR");
+      }
       return (valor(a) - valor(b)) * dir || a.r.nome.localeCompare(b.r.nome, "pt-BR");
     });
     return out;
-  }, [comStatus, busca, status, categoria, sortKey, sortDir]);
+  }, [comStatus, busca, status, marcaAtiva, categoria, sortKey, sortDir]);
 
-  useEffect(() => setPage(1), [busca, status, categoria, sortKey, sortDir, storeKey]);
+  useEffect(() => setPage(1), [busca, status, marcaAtiva, categoria, sortKey, sortDir, storeKey]);
 
   const totalPages = Math.max(1, Math.ceil(linhas.length / TABLE_PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
@@ -116,6 +130,9 @@ export function InventoryPage() {
     () => ({
       locais: locais.map((nome) => linhas.reduce((s, { r }) => s + localQty(r, nome), 0)),
       estoque: linhas.reduce((s, { r }) => s + r.estoque, 0),
+      custo: linhas.reduce((s, { r }) => s + (stockCostAmount(r).amount ?? 0), 0),
+      temCusto: linhas.some((x) => stockCostAmount(x.r).amount != null),
+      semCusto: linhas.filter((x) => stockCostAmount(x.r).amount == null).length,
     }),
     [linhas, locais],
   );
@@ -129,6 +146,7 @@ export function InventoryPage() {
         atualizado={atualizadoTexto}
         filtros={[
           ...(status !== "todos" ? [{ label: "Status", valor: statusLabel }] : []),
+          ...(marcaAtiva ? [{ label: "Marca", valor: marcaAtiva }] : []),
           ...(categoria ? [{ label: "Categoria", valor: categoria }] : []),
         ]}
       />
@@ -142,6 +160,18 @@ export function InventoryPage() {
           >
             <HeaderSearch value={busca} onChange={setBusca} placeholder="Buscar por produto ou código…" width={240} />
             <HeaderFilter label="Status" value={status} onChange={setStatus} options={statusOpcoes} />
+            {showBrand && (
+              <HeaderFilter
+                label="Marca"
+                value={marca}
+                onChange={setMarca}
+                options={[
+                  { value: "", label: "Todas as marcas" },
+                  { value: "WEPINK", label: "WEPINK" },
+                  { value: "WPINK", label: "WPINK" },
+                ]}
+              />
+            )}
             {categorias.length > 1 && (
               <HeaderFilter
                 label="Categoria"
@@ -197,6 +227,7 @@ export function InventoryPage() {
                       onClick={() => {
                         setBusca("");
                         setStatus("todos");
+                        setMarca("");
                         setCategoria("");
                       }}
                     >
@@ -208,7 +239,7 @@ export function InventoryPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-sm" style={{ minWidth: 460 + (locais.length + (mostraTotal ? 1 : 0)) * 110 }}>
+              <table className="w-full border-collapse text-sm" style={{ minWidth: 600 + (locais.length + (mostraTotal ? 1 : 0)) * 110 }}>
                 <thead>
                   <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
                     <th className="px-1 pb-3 text-left font-bold">#</th>
@@ -226,6 +257,14 @@ export function InventoryPage() {
                     {mostraTotal && (
                       <ThSort label="Total" active={sortKey === "estoque"} dir={sortDir} onClick={() => toggleSort("estoque")} className="px-1 pb-3" />
                     )}
+                    <ThSort
+                      label="Preço de custo"
+                      active={sortKey === "custo"}
+                      dir={sortDir}
+                      onClick={() => toggleSort("custo")}
+                      className="px-1 pb-3"
+                      aside={<TipHelp label="Saldo × preço de custo unitário da tabela de custo da loja. O total soma o valor dos produtos do filtro." />}
+                    />
                     <ThSort label="Status" active={sortKey === "status"} dir={sortDir} onClick={() => toggleSort("status")} align="left" className="pb-3 pl-4 pr-1" />
                   </tr>
                 </thead>
@@ -248,6 +287,9 @@ export function InventoryPage() {
                             <Qty v={r.estoque} />
                           </td>
                         )}
+                        <td className="px-1 py-3 text-right">
+                          <CostCell r={r} />
+                        </td>
                         <td className="py-3 pl-4 pr-1">
                           <StatusCell r={r} status={s} variasLojas={variasLojas} />
                         </td>
@@ -275,6 +317,9 @@ export function InventoryPage() {
                         <Qty v={totais.estoque} total />
                       </td>
                     )}
+                    <td className="px-1 py-3 text-right">
+                      <CostTotal v={totais.temCusto ? totais.custo : null} missing={totais.semCusto} />
+                    </td>
                     <td />
                   </tr>
                 </tbody>
@@ -290,11 +335,36 @@ export function InventoryPage() {
 
 export default InventoryPage;
 
-/** Saldo em mono negrito (como os números do Desempenho por produto): negativo em vermelho, zero em cinza. */
+/** Saldo em mono negrito (como os numeros do Desempenho por produto): negativo em vermelho, zero em cinza. */
 function Qty({ v, total = false }: { v: number; total?: boolean }) {
   return (
     <span className={cn("whitespace-nowrap font-mono text-[13px] tabular-nums", total ? "font-extrabold" : "font-bold", v < 0 ? "text-bad" : v === 0 ? "text-t2" : "text-t0")}>
       {qty(v)}
+    </span>
+  );
+}
+
+function CostCell({ r }: { r: StockProductRow }) {
+  const cost = stockCostAmount(r);
+  if (cost.amount == null) return <span className="font-mono text-[13px] font-bold text-t2">—</span>;
+  return (
+    <span className="block">
+      <span className={cn("whitespace-nowrap font-mono text-[13px] font-bold tabular-nums", cost.amount < 0 ? "text-bad" : "text-t0")}>{money(cost.amount)}</span>
+      <span className="mt-0.5 block text-[11px] font-semibold text-t2">{cost.unit == null ? "varia por loja" : `${money(cost.unit)} un.`}</span>
+    </span>
+  );
+}
+
+function CostTotal({ v, missing }: { v: number | null; missing: number }) {
+  if (v == null) return <span className="font-mono text-[13px] font-extrabold text-t2">—</span>;
+  return (
+    <span className="block">
+      <span className={cn("whitespace-nowrap font-mono text-[13px] font-extrabold tabular-nums", v < 0 ? "text-bad" : "text-t0")}>{money(v)}</span>
+      {missing > 0 && (
+        <span className="mt-0.5 block text-[11px] font-semibold text-t2">
+          {missing} sem custo
+        </span>
+      )}
     </span>
   );
 }
@@ -310,7 +380,7 @@ function StatusCell({ r, status, variasLojas }: { r: StockProductRow; status: St
           {badge}
         </span>
       </Tooltip>
-      {/* No papel não há tooltip: a instrução vai escrita abaixo do badge. */}
+      {/* No papel nao ha tooltip: a instrucao vai escrita abaixo do badge. */}
       <p className="mt-1 hidden whitespace-pre-line text-[11px] leading-4 text-t2 print:block">{tip}</p>
     </>
   );
