@@ -33,7 +33,7 @@ export function FunnelChart({
             key={s.label}
             type={onSelect ? "button" : undefined}
             onClick={onSelect ? () => onSelect(s, i) : undefined}
-            className={cn("flex items-center gap-3", onSelect && "text-left")}
+            className={cn("flex items-center gap-3", onSelect && "cursor-pointer text-left")}
           >
             <span className="w-24 shrink-0 truncate text-[12px] font-semibold text-t1 sm:w-32">
               {s.label}

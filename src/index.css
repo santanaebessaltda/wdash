@@ -265,6 +265,24 @@
   }
 }
 
+/* Clique que abre ou aciona algo mostra a mão. O preflight do Tailwind deixa
+   button com cursor padrão; utilitários (cursor-help, cursor-not-allowed) continuam ganhando. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary,
+  select,
+  label:has(input[type="checkbox"], input[type="radio"], input[type="file"]),
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="file"],
+  input[type="submit"],
+  input[type="button"],
+  input[type="reset"] {
+    cursor: pointer;
+  }
+}
+
 /* Native <select> dropdowns: replace the platform arrow with a consistent,
    theme-aware chevron so every dropdown reads as a dropdown (not a text box).
    Many selects use appearance-none, which otherwise leaves no indicator. */
