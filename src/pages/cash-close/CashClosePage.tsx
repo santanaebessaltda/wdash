@@ -841,16 +841,17 @@ function Mes({
   onOpen: (iso: string) => void;
 }) {
   return (
-    <div className="overflow-hidden rounded-[18px] border border-line bg-bg-2 shadow-[var(--shadow-vela)]">
-      <div className="grid grid-cols-7">
-        {DIAS.map((d, i) => (
-          <div key={i} className="border-b border-line px-1 py-3 text-center text-[10px] font-bold leading-tight text-t2 sm:text-[11px]">
-            <span className="hidden sm:inline">{d.longo}</span>
-            <span className="sm:hidden uppercase">{d.curto}</span>
-          </div>
-        ))}
-      </div>
-      <div className="grid grid-cols-7">
+    <div className="overflow-x-auto rounded-[18px] border border-line bg-bg-2 shadow-[var(--shadow-vela)]">
+      <div className="min-w-[760px]">
+        <div className="grid grid-cols-7">
+          {DIAS.map((d, i) => (
+            <div key={i} className="border-b border-line px-1 py-3 text-center text-[10px] font-bold leading-tight text-t2 sm:text-[11px]">
+              <span className="hidden sm:inline">{d.longo}</span>
+              <span className="sm:hidden uppercase">{d.curto}</span>
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7">
         {cells.map((day, i) => {
           const face = day && day <= hoje ? faceDoDia(day) : null;
           const cor =
@@ -880,7 +881,7 @@ function Mes({
               {(face?.kind === "pendente" || face?.kind === "total" || (face?.kind === "hoje" && !face.aguardando)) && (
                 <div className="mt-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-t2">Total</p>
-                  <p className="truncate font-mono text-[12px] font-extrabold text-t1 sm:text-[13px]">
+                  <p className="whitespace-nowrap font-mono text-[12px] font-extrabold text-t1 sm:text-[13px]">
                     {brlCent(face.totalCents / 100)}
                   </p>
                   {face.kind === "total" && face.diffCents !== 0 && (
@@ -900,6 +901,7 @@ function Mes({
             </button>
           );
         })}
+        </div>
       </div>
     </div>
   );
