@@ -18,6 +18,7 @@ import {
   type PurchaseOrderRow,
 } from "@/data/wedash/purchaseOrder";
 import { PURCHASE_SYNC_BUSY, PURCHASE_SYNC_ERROR, PURCHASE_SYNC_OFFLINE, PURCHASE_SYNC_TITLE, fetchPurchaseStock, savePurchaseMins } from "@/data/wedash/purchaseRepo";
+import { storesForSession } from "@/data/wedash/stores";
 import { cn } from "@/lib/cn";
 import { num } from "@/lib/format";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
@@ -178,7 +179,7 @@ export function PurchaseOrderPage() {
     }
   };
 
-  const outrasLojas = lojas.filter((s) => s.id !== loja?.id);
+  const outrasLojas = storesForSession(session.stores).filter((s) => s.id !== loja?.id);
   const todas = destinoId === "" && outrasLojas.length > 1;
   const destino = outrasLojas.find((s) => s.id === destinoId) ?? null;
 
