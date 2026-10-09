@@ -10,6 +10,8 @@ export interface ModalProps {
   children: ReactNode;
   footer?: ReactNode;
   size?: "sm" | "md" | "lg";
+  /** Substitui o padding e a rolagem padrão do corpo. */
+  bodyClassName?: string;
 }
 
 const sizeClasses = {
@@ -18,7 +20,7 @@ const sizeClasses = {
   lg: "max-w-2xl",
 };
 
-export function Modal({ open, onClose, title, children, footer, size = "md" }: ModalProps) {
+export function Modal({ open, onClose, title, children, footer, size = "md", bodyClassName }: ModalProps) {
   if (!open) return null;
 
   return createPortal(
@@ -48,7 +50,7 @@ export function Modal({ open, onClose, title, children, footer, size = "md" }: M
             </button>
           </div>
         )}
-        <div className="min-h-0 flex-1 overflow-y-auto p-5">{children}</div>
+        <div className={cn("min-h-0 flex-1", bodyClassName ?? "overflow-y-auto p-5")}>{children}</div>
         {footer && <div className="flex shrink-0 items-center justify-end gap-2 border-t border-line px-5 py-4">{footer}</div>}
       </div>
     </div>,
