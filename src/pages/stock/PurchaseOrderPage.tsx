@@ -550,8 +550,8 @@ export function PurchaseOrderPage() {
         </p>
         <div className="flex flex-col gap-2.5">
           <AcaoOpcao
-            titulo="Baixar modelo"
-            detalhe="Baixa a planilha com os produtos e os mínimos desta loja."
+            titulo="Exportar mínimos"
+            detalhe="Baixa a planilha desta loja com o código, a descrição e o mínimo já gravado. Onde não há mínimo, a célula fica vazia."
             onClick={() => {
               setAcoesAberto(false);
               baixarModelo();
@@ -559,7 +559,7 @@ export function PurchaseOrderPage() {
           />
           <AcaoOpcao
             titulo="Importar mínimos"
-            detalhe="Lê a planilha e grava os mínimos nesta loja."
+            detalhe="Lê a planilha exportada daqui ou a planilha antiga do Excel. Precisa ter o código do produto e a quantidade mínima. Célula vazia não apaga o que já está gravado."
             onClick={() => {
               fileRef.current?.click();
               setAcoesAberto(false);
@@ -571,7 +571,7 @@ export function PurchaseOrderPage() {
               detalhe={
                 (po.mins?.size ?? 0) === 0
                   ? "Grave um mínimo nesta loja para poder copiar."
-                  : "Leva os mínimos daqui para outra loja, ou para todas."
+                  : "Grava os mínimos desta loja em outra loja, ou em todas. Só entra o produto que a outra loja também tem."
               }
               disabled={(po.mins?.size ?? 0) === 0}
               onClick={() => {
