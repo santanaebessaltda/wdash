@@ -523,9 +523,6 @@ export function PurchaseOrderPage() {
                 {" · "}
                 {num(resumoPedido.reduce((s, r) => s + (r.aPedir ?? 0), 0))} itens.
               </p>
-              {resumoPedido.some((r) => r.custoCents == null) && (
-                <p className="text-[13px] leading-relaxed text-t2">Produto sem custo fica de fora do total.</p>
-              )}
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-3">
               <ul className="overflow-hidden rounded-[var(--radius-vela-lg)] border border-line">
