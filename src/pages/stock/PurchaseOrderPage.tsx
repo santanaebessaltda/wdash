@@ -179,37 +179,57 @@ export function PurchaseOrderPage() {
   };
 
   const outrasLojas = lojas.filter((s) => s.id !== loja?.id);
-  const destino = outrasLojas.find((s) => s.id === destinoId) ?? outrasLojas[0] ?? null;
+  const todas = destinoId === "" && outrasLojas.length > 1;
+  const destino = outrasLojas.find((s) => s.id === destinoId) ?? null;
 
   const abrirCopia = () => {
-    setDestinoId(outrasLojas[0]?.id ?? "");
+    setDestinoId(outrasLojas.length > 1 ? "" : (outrasLojas[0]?.id ?? ""));
     setCopiarAberto(true);
   };
 
   const copiarMinimos = async () => {
-    if (!loja || !destino || !po.mins || po.mins.size === 0) return;
+    if (!loja || !po.mins || po.mins.size === 0) return;
+    const alvos = todas ? outrasLojas : destino ? [destino] : [];
+    if (alvos.length === 0) return;
     setCopiando(true);
     try {
-      const stock = await fetchPurchaseStock(session.tenantId, destino.id);
-      if (stock.rows.length === 0) {
-        show("A outra loja ainda não tem saldo. Abra o pedido dela e copie de novo.", "warning");
-        return;
+      let copiadas = 0;
+      let semSaldo = 0;
+      let semProduto = 0;
+      let falhas = 0;
+      for (const alvo of alvos) {
+        const stock = await fetchPurchaseStock(session.tenantId, alvo.id);
+        if (stock.rows.length === 0) {
+          semSaldo += 1;
+          continue;
+        }
+        const { updates } = purchaseMinsToCopy(po.mins, new Set(stock.rows.map((row) => row.code)));
+        if (updates.length === 0) {
+          semProduto += 1;
+          continue;
+        }
+        const ok = await savePurchaseMins(session.tenantId, alvo.id, updates);
+        if (!ok) falhas += 1;
+        else copiadas += 1;
       }
-      const { updates, skipped } = purchaseMinsToCopy(po.mins, new Set(stock.rows.map((row) => row.code)));
-      if (updates.length === 0) {
-        show("Nenhum produto com mínimo nesta loja existe na outra.", "warning");
-        return;
-      }
-      const ok = await savePurchaseMins(session.tenantId, destino.id, updates);
-      if (!ok) {
+      if (copiadas === 0 && falhas > 0) {
         show("Não foi possível copiar os mínimos.", "danger");
         return;
       }
-      const fora = skipped > 0 ? ` ${skipped} não estão na outra loja.` : "";
-      show(
-        `Mínimos copiados para ${updates.length} produto${updates.length === 1 ? "" : "s"}.${fora}`,
-        skipped > 0 ? "warning" : "success",
-      );
+      if (copiadas === 0 && semSaldo > 0) {
+        show("As outras lojas ainda não têm saldo. Abra o pedido de cada uma e copie de novo.", "warning");
+        return;
+      }
+      if (copiadas === 0) {
+        show("Nenhum produto com mínimo nesta loja existe nas outras.", "warning");
+        return;
+      }
+      const lojaTxt = copiadas === 1 ? "1 loja" : `${copiadas} lojas`;
+      const partes = [`Mínimos copiados para ${lojaTxt}.`];
+      if (semSaldo > 0) partes.push(`${semSaldo} ainda não têm saldo.`);
+      if (semProduto > 0) partes.push(`${semProduto} não têm estes produtos.`);
+      if (falhas > 0) partes.push(`${falhas} não puderam ser gravadas.`);
+      show(partes.join(" "), semSaldo > 0 || semProduto > 0 || falhas > 0 ? "warning" : "success");
       setCopiarAberto(false);
     } finally {
       setCopiando(false);
@@ -458,7 +478,7 @@ export function PurchaseOrderPage() {
       )}
       </div>
       <Modal
-        open={copiarAberto && destino != null && loja != null}
+        open={copiarAberto && loja != null && (todas || destino != null)}
         onClose={() => {
           if (!copiando) setCopiarAberto(false);
         }}
@@ -469,19 +489,22 @@ export function PurchaseOrderPage() {
             <Button variant="outline" onClick={() => setCopiarAberto(false)} disabled={copiando}>
               Cancelar
             </Button>
-            <Button onClick={() => void copiarMinimos()} disabled={copiando || !destino}>
+            <Button onClick={() => void copiarMinimos()} disabled={copiando || (!todas && !destino)}>
               {copiando ? "Copiando…" : "Copiar"}
             </Button>
           </>
         }
       >
-        {loja && destino && (
+        {loja && (todas || destino) && (
           <div className="flex flex-col gap-3">
             <p className="text-[13px] leading-relaxed text-t1">
-              Os mínimos de {loja.fantasia} passam para os mesmos produtos em {destino.fantasia}. O que a outra loja já tem em produto sem mínimo aqui continua.
+              {todas
+                ? `Os mínimos de ${loja.fantasia} passam para os mesmos produtos nas outras ${outrasLojas.length} lojas. O mínimo que só existe numa delas continua.`
+                : `Os mínimos de ${loja.fantasia} passam para os mesmos produtos em ${destino?.fantasia}. O que a outra loja já tem em produto sem mínimo aqui continua.`}
             </p>
             <FormField label="Loja">
-              <Select value={destino.id} onChange={(e) => setDestinoId(e.target.value)} disabled={copiando}>
+              <Select value={todas ? "" : (destino?.id ?? "")} onChange={(e) => setDestinoId(e.target.value)} disabled={copiando}>
+                {outrasLojas.length > 1 && <option value="">Todas as outras lojas</option>}
                 {outrasLojas.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.codFilial} · {s.fantasia}
