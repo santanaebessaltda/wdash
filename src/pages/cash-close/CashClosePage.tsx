@@ -813,7 +813,7 @@ function Mes({
                   ? "bg-ok-soft"
                   : "";
           const borda = cn(
-            "min-h-[84px] border-b border-r border-line p-1.5 text-left sm:min-h-[110px] sm:p-2",
+            "flex min-h-[84px] flex-col items-start justify-start border-b border-r border-line p-1.5 text-left sm:min-h-[110px] sm:p-2",
             (i + 1) % 7 === 0 && "border-r-0",
             !day && "bg-bg-1/30",
             cor,
@@ -821,7 +821,7 @@ function Mes({
           if (!day) return <div key={`vazio-${i}`} className={borda} />;
           const futuro = day > hoje;
           const totalCor =
-            face?.kind === "total" && face.diffCents === 0 ? "text-ok" : face?.kind === "total" && face.diffCents < 0 ? "text-bad" : "text-t1";
+            face?.kind === "total" && face.diffCents < 0 ? "text-bad" : face?.kind === "total" ? "text-ok" : "text-t1";
           const miolo = (
             <>
               <NumeroDia iso={day} hoje={hoje} />
