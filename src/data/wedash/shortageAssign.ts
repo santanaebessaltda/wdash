@@ -54,7 +54,7 @@ function localMinutes(iso: string, timeZone: string): number | null {
   return hour * 60 + minute;
 }
 
-function groupAt(iso: string, shifts: ShortageShift[], timeZone: string): string | null {
+export function groupNameAt(iso: string, shifts: ShortageShift[], timeZone: string): string | null {
   const minutes = localMinutes(iso, timeZone);
   if (minutes == null) return null;
   const ordered = [...shifts].sort((a, b) => (hhmmToMin(a.start) ?? 0) - (hhmmToMin(b.start) ?? 0));
@@ -101,7 +101,7 @@ export function unpairedSales(sales: ShortageSale[], captures: ShortageCapture[]
 function groupsTouched(sales: ShortageSale[], shifts: ShortageShift[], timeZone: string): string[] {
   const hit = new Set<string>();
   for (const sale of sales) {
-    const name = groupAt(sale.occurredAt, shifts, timeZone);
+    const name = groupNameAt(sale.occurredAt, shifts, timeZone);
     if (name) hit.add(name);
   }
   return shifts.map((shift) => shift.name).filter((name) => hit.has(name));
@@ -287,7 +287,7 @@ export function splitEqual(totalCents: number, names: string[]): { name: string;
 }
 
 export function sellersInGroup(sales: ShortageSale[], shifts: ShortageShift[], group: string, timeZone: string): string[] {
-  return uniqueNames(sales.filter((sale) => groupAt(sale.occurredAt, shifts, timeZone) === group).map((sale) => sale.sellerName));
+  return uniqueNames(sales.filter((sale) => groupNameAt(sale.occurredAt, shifts, timeZone) === group).map((sale) => sale.sellerName));
 }
 
 /** Quanto cada pessoa paga com o destino escolhido. */

@@ -1,3 +1,4 @@
+import { fetchAllPages } from "./salesRepo";
 import { calendarTodayIso } from "./clock";
 import { shiftName } from "./engine/format";
 import { monthCloseSpanFor } from "./cashCloseMonth";
@@ -391,6 +392,7 @@ export type CloseCaptureRow = {
   occurredAt: string;
   paymentMethod: string;
   capturedCents: number;
+  authorizationCode: string;
 };
 
 export type CloseShiftRow = {
@@ -430,7 +432,7 @@ export async function fetchShortageCaptures(tenantId: string, storeIds: string[]
   const [card, pix] = await Promise.all([
     sb
       .from("stone_capture")
-      .select("store_id, occurred_at, payment_method, captured_cents")
+      .select("store_id, occurred_at, payment_method, captured_cents, authorization_code")
       .eq("tenant_id", tenantId)
       .in("store_id", storeIds)
       .eq("day", day)
@@ -450,6 +452,7 @@ export async function fetchShortageCaptures(tenantId: string, storeIds: string[]
     occurredAt: String(row.occurred_at ?? ""),
     paymentMethod: String(row.payment_method ?? ""),
     capturedCents: Number(row.captured_cents) || 0,
+    authorizationCode: String(row.authorization_code ?? ""),
   }));
   for (const row of pix.data ?? []) {
     const status = String(row.status ?? "").toLowerCase();
@@ -461,6 +464,7 @@ export async function fetchShortageCaptures(tenantId: string, storeIds: string[]
       occurredAt: row.occurred_at ? String(row.occurred_at) : "",
       paymentMethod: "Pix",
       capturedCents: cents,
+      authorizationCode: "",
     });
   }
   return rows;
@@ -484,4 +488,102 @@ export async function fetchCloseShifts(tenantId: string, storeIds: string[]): Pr
     start: String(row.start_time).slice(0, 5),
     end: String(row.end_time).slice(0, 5),
   }));
+}
+
+export type SpanSale = CloseSaleRow & { day: string };
+export type SpanCapture = CloseCaptureRow & { day: string };
+
+/** Vendas e capturas do intervalo, para o desconto do mês. */
+export async function fetchCashCloseSpan(
+  tenantId: string,
+  storeIds: string[],
+  from: string,
+  to: string,
+): Promise<{ sales: SpanSale[]; captures: SpanCapture[] }> {
+  const { getSupabase } = await import("@/lib/supabase");
+  const sb = getSupabase();
+  if (!sb || storeIds.length === 0) return { sales: [], captures: [] };
+  const [salesRaw, cardRaw, pixRaw] = await Promise.all([
+    fetchAllPages<{
+      store_id: string;
+      day: string;
+      occurred_at: string;
+      payment_method: string;
+      seller_name: string;
+      revenue_cents: number;
+    }>(
+      sb
+        .from("cash_close_sale")
+        .select("store_id, day, occurred_at, payment_method, seller_name, revenue_cents")
+        .eq("tenant_id", tenantId)
+        .in("store_id", storeIds)
+        .gte("day", from)
+        .lte("day", to)
+        .order("occurred_at")
+        .order("operation_code"),
+      "cash_close_sale span",
+    ),
+    fetchAllPages<{
+      store_id: string;
+      day: string;
+      occurred_at: string;
+      payment_method: string;
+      captured_cents: number;
+      authorization_code: string;
+    }>(
+      sb
+        .from("stone_capture")
+        .select("store_id, day, occurred_at, payment_method, captured_cents, authorization_code")
+        .eq("tenant_id", tenantId)
+        .in("store_id", storeIds)
+        .gte("day", from)
+        .lte("day", to)
+        .order("occurred_at")
+        .order("acquirer_key"),
+      "stone_capture span",
+    ),
+    fetchAllPages<{ store_id: string; day: string; occurred_at: string | null; paid_cents: number; status: string }>(
+      sb
+        .from("stone_pix")
+        .select("store_id, day, occurred_at, paid_cents, status")
+        .eq("tenant_id", tenantId)
+        .in("store_id", storeIds)
+        .gte("day", from)
+        .lte("day", to)
+        .order("occurred_at")
+        .order("e2e_id"),
+      "stone_pix span",
+    ),
+  ]);
+  const sales: SpanSale[] = salesRaw.map((row) => ({
+    storeId: String(row.store_id),
+    day: String(row.day).slice(0, 10),
+    occurredAt: String(row.occurred_at),
+    paymentMethod: String(row.payment_method ?? ""),
+    sellerName: String(row.seller_name ?? ""),
+    revenueCents: Number(row.revenue_cents) || 0,
+  }));
+  const captures: SpanCapture[] = cardRaw.map((row) => ({
+    storeId: String(row.store_id),
+    day: String(row.day).slice(0, 10),
+    occurredAt: String(row.occurred_at ?? ""),
+    paymentMethod: String(row.payment_method ?? ""),
+    capturedCents: Number(row.captured_cents) || 0,
+    authorizationCode: String(row.authorization_code ?? ""),
+  }));
+  for (const row of pixRaw) {
+    const status = String(row.status ?? "").toLowerCase();
+    if (status === "canceled" || status === "cancelled") continue;
+    const cents = Number(row.paid_cents) || 0;
+    if (cents <= 0) continue;
+    captures.push({
+      storeId: String(row.store_id),
+      day: String(row.day).slice(0, 10),
+      occurredAt: row.occurred_at ? String(row.occurred_at) : "",
+      paymentMethod: "Pix",
+      capturedCents: cents,
+      authorizationCode: "",
+    });
+  }
+  return { sales, captures };
 }
