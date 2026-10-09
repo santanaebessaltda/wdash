@@ -218,16 +218,16 @@ export function PurchaseOrderPage() {
         return;
       }
       if (copiadas === 0 && semSaldo > 0) {
-        show("As outras lojas ainda não têm saldo. Abra o pedido de cada uma e copie de novo.", "warning");
+        show("Essas lojas ainda não abriram o pedido. Abra o pedido de cada uma e copie de novo.", "warning");
         return;
       }
       if (copiadas === 0) {
-        show("Nenhum produto com mínimo nesta loja existe nas outras.", "warning");
+        show("Nenhuma outra loja tem os mesmos produtos desta.", "warning");
         return;
       }
       const lojaTxt = copiadas === 1 ? "1 loja" : `${copiadas} lojas`;
       const partes = [`Mínimos copiados para ${lojaTxt}.`];
-      if (semSaldo > 0) partes.push(`${semSaldo} ainda não têm saldo.`);
+      if (semSaldo > 0) partes.push(`${semSaldo} ainda não abriram o pedido.`);
       if (semProduto > 0) partes.push(`${semProduto} não têm estes produtos.`);
       if (falhas > 0) partes.push(`${falhas} não puderam ser gravadas.`);
       show(partes.join(" "), semSaldo > 0 || semProduto > 0 || falhas > 0 ? "warning" : "success");
@@ -289,7 +289,7 @@ export function PurchaseOrderPage() {
             </Button>
             {outrasLojas.length > 0 && (
               <Button variant="outline" size="md" onClick={abrirCopia} disabled={!view || po.syncing || importing || copiando || (po.mins?.size ?? 0) === 0}>
-                Copiar mínimos
+                Copiar para outras lojas
               </Button>
             )}
             <input
@@ -483,7 +483,7 @@ export function PurchaseOrderPage() {
         onClose={() => {
           if (!copiando) setCopiarAberto(false);
         }}
-        title="Copiar mínimos"
+        title="Copiar para outras lojas"
         size="sm"
         footer={
           <>
@@ -500,10 +500,13 @@ export function PurchaseOrderPage() {
           <div className="flex flex-col gap-3">
             <p className="text-[13px] leading-relaxed text-t1">
               {todas
-                ? `Os mínimos de ${loja.fantasia} passam para os mesmos produtos nas outras ${outrasLojas.length} lojas. O mínimo que só existe numa delas continua.`
-                : `Os mínimos de ${loja.fantasia} passam para os mesmos produtos em ${destino?.fantasia}. O que a outra loja já tem em produto sem mínimo aqui continua.`}
+                ? `Você está em ${loja.fantasia}. Os mínimos daqui vão para todas as outras lojas. Fique nesta loja — não precisa mudar o seletor do topo.`
+                : `Você está em ${loja.fantasia}. Os mínimos daqui vão para ${destino?.fantasia}. Fique nesta loja — não precisa mudar o seletor do topo.`}
             </p>
-            <FormField label="Loja">
+            <p className="text-[13px] leading-relaxed text-t2">
+              Entra só o produto que a outra loja também tem. O mínimo que existe só nela permanece.
+            </p>
+            <FormField label="Copiar para">
               <Select value={todas ? "" : (destino?.id ?? "")} onChange={(e) => setDestinoId(e.target.value)} disabled={copiando}>
                 {outrasLojas.length > 1 && <option value="">Todas as outras lojas</option>}
                 {outrasLojas.map((s) => (
