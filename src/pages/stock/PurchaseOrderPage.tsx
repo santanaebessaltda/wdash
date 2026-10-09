@@ -80,6 +80,7 @@ export function PurchaseOrderPage() {
   const [page, setPage] = useState(1);
   const [importing, setImporting] = useState(false);
   const [importNotice, setImportNotice] = useState<ReturnType<typeof purchaseMinImportNotice> | null>(null);
+  const [resumoPedido, setResumoPedido] = useState<PurchaseOrderRow[] | null>(null);
   const [copiarAberto, setCopiarAberto] = useState(false);
   const [destinoId, setDestinoId] = useState("");
   const [copiando, setCopiando] = useState(false);
@@ -103,7 +104,10 @@ export function PurchaseOrderPage() {
   }, [view, busca, filtro, sortKey, sortDir]);
 
   useEffect(() => setPage(1), [busca, filtro, sortKey, sortDir, loja?.id]);
-  useEffect(() => setImportNotice(null), [loja?.id]);
+  useEffect(() => {
+    setImportNotice(null);
+    setResumoPedido(null);
+  }, [loja?.id]);
 
   const totalPages = Math.max(1, Math.ceil(linhas.length / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
@@ -128,15 +132,27 @@ export function PurchaseOrderPage() {
     }
   };
 
-  const gerarPedido = () => {
+  const abrirResumo = () => {
     if (!view) return;
-    const rows = purchaseOrderFileRows(view);
+    const produtos = view.rows.filter((r) => r.noPedido).sort((a, b) => a.position - b.position);
+    if (produtos.length === 0) {
+      show("Nenhum produto precisa ser incluído no pedido.", "warning");
+      return;
+    }
+    setResumoPedido(produtos);
+  };
+
+  const gerarPedido = () => {
+    if (!view || !resumoPedido || resumoPedido.length === 0) return;
+    const rows = purchaseOrderFileRows({ ...view, rows: resumoPedido });
     if (rows.length === 0) {
       show("Nenhum produto precisa ser incluído no pedido.", "warning");
+      setResumoPedido(null);
       return;
     }
     downloadFile(buildXlsx([[...PURCHASE_FILE_HEADER], ...rows], { textColumns: PURCHASE_FILE_TEXT_COLUMNS }), purchaseOrderFileName(new Date()));
     show(`Pedido gerado com ${rows.length} produto${rows.length === 1 ? "" : "s"}.`, "success");
+    setResumoPedido(null);
   };
 
   const baixarModelo = () => {
@@ -305,7 +321,7 @@ export function PurchaseOrderPage() {
                 if (file) void importarPlanilha(file);
               }}
             />
-            <Button variant="primary" size="md" onClick={gerarPedido} disabled={!view || po.syncing || importing || copiando}>
+            <Button variant="primary" size="md" onClick={abrirResumo} disabled={!view || po.syncing || importing || copiando}>
               Gerar pedido
             </Button>
           </HeaderFilters>
@@ -478,6 +494,51 @@ export function PurchaseOrderPage() {
         </Card>
       )}
       </div>
+      <Modal
+        open={resumoPedido != null}
+        onClose={() => setResumoPedido(null)}
+        title="Resumo do pedido"
+        size="lg"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setResumoPedido(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={gerarPedido}>Gerar planilha</Button>
+          </>
+        }
+      >
+        {resumoPedido && (
+          <div className="flex flex-col gap-3">
+            <p className="text-[13px] leading-relaxed text-t1">
+              {loja ? `${loja.fantasia}. ` : ""}
+              {resumoPedido.length === 1 ? "1 produto" : `${num(resumoPedido.length)} produtos`}
+              {" · "}
+              {num(resumoPedido.reduce((s, r) => s + (r.aPedir ?? 0), 0))} itens. Confira as quantidades antes de gerar a planilha.
+            </p>
+            <table className="w-full border-collapse text-sm">
+              <thead className="sticky top-0 bg-bg-2">
+                <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
+                  <th className="pb-2 text-left font-bold">Produto</th>
+                  <th className="pb-2 text-right font-bold">Quantidade</th>
+                </tr>
+              </thead>
+              <tbody>
+                {resumoPedido.map((r, i) => (
+                  <tr key={r.code} className="border-b border-line">
+                    <td className="py-2 pr-3">
+                      <ProductNameCell nome={r.nome} idx={i} sub={r.code} />
+                    </td>
+                    <td className="py-2 text-right">
+                      <Qty v={r.aPedir ?? 0} strong />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Modal>
       <Modal
         open={copiarAberto && loja != null && (todas || destino != null)}
         onClose={() => {
