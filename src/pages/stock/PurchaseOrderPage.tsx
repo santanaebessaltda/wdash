@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { Alert, Badge, Button, Card, CardTitle, FormField, Modal, Select, ThSort, useToast, type SortDir } from "@/components/ui";
+import { Alert, Badge, Button, Card, CardTitle, Dropdown, FormField, Modal, Select, ThSort, useToast, type SortDir } from "@/components/ui";
 import { StockProductsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { ProductNameCell } from "@/components/wedash/ProductNameCell";
 import {
@@ -299,17 +299,32 @@ export function PurchaseOrderPage() {
               />
               <TipHelp label="Multiplica o mínimo de cada produto. A quantidade a pedir desconta o total em estoque e arredonda para o múltiplo de compra." />
             </span>
-            <Button variant="outline" size="md" onClick={baixarModelo} disabled={!view || po.syncing || importing}>
-              Baixar modelo
-            </Button>
-            <Button variant="outline" size="md" onClick={() => fileRef.current?.click()} disabled={!view || po.syncing || importing || copiando}>
-              {importing ? "Importando…" : "Importar mínimos"}
-            </Button>
-            {outrasLojas.length > 0 && (
-              <Button variant="outline" size="md" onClick={abrirCopia} disabled={!view || po.syncing || importing || copiando || (po.mins?.size ?? 0) === 0}>
-                Copiar para outras lojas
-              </Button>
-            )}
+            <Dropdown
+              align="right"
+              portal
+              items={[
+                { label: "Baixar modelo", onClick: baixarModelo, disabled: !view || po.syncing || importing },
+                {
+                  label: importing ? "Importando…" : "Importar mínimos",
+                  onClick: () => fileRef.current?.click(),
+                  disabled: !view || po.syncing || importing || copiando,
+                },
+                ...(outrasLojas.length > 0
+                  ? [
+                      {
+                        label: "Copiar para outras lojas",
+                        onClick: abrirCopia,
+                        disabled: !view || po.syncing || importing || copiando || (po.mins?.size ?? 0) === 0,
+                      },
+                    ]
+                  : []),
+              ]}
+              trigger={
+                <Button variant="secondary" size="md" disabled={!view || po.syncing || importing || copiando} iconRight={<Chevron />}>
+                  {importing ? "Importando…" : "Mínimos"}
+                </Button>
+              }
+            />
             <input
               ref={fileRef}
               type="file"
@@ -591,6 +606,14 @@ export function PurchaseOrderPage() {
 }
 
 export default PurchaseOrderPage;
+
+function Chevron() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
 
 const reais = (cents: number | null) => (cents == null ? null : cents / 100);
 
