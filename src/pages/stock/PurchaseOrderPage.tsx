@@ -7,10 +7,6 @@ import {
   PURCHASE_FILE_HEADER,
   PURCHASE_FILE_TEXT_COLUMNS,
   filterPurchaseRows,
-  parsePurchaseMinSheet,
-  purchaseMinImportNotice,
-  purchaseMinTemplateFileName,
-  purchaseMinTemplateRows,
   purchaseMinsToCopy,
   purchaseLineCents,
   purchaseOrderFileName,
@@ -24,7 +20,7 @@ import { storesForSession } from "@/data/wedash/stores";
 import { cn } from "@/lib/cn";
 import { num } from "@/lib/format";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
-import { buildXlsx, readXlsx } from "@/lib/xlsx";
+import { buildXlsx } from "@/lib/xlsx";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { ErpStatusNotice } from "@/pages/dashboard/ErpStatusNotice";
 import { HeaderFilter, HeaderSearch } from "@/pages/dashboard/HeaderFilter";
@@ -80,14 +76,10 @@ export function PurchaseOrderPage() {
   const [sortKey, setSortKey] = useState<SortKey>("nome");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [page, setPage] = useState(1);
-  const [importing, setImporting] = useState(false);
-  const [importNotice, setImportNotice] = useState<ReturnType<typeof purchaseMinImportNotice> | null>(null);
   const [resumoPedido, setResumoPedido] = useState<PurchaseOrderRow[] | null>(null);
-  const [acoesAberto, setAcoesAberto] = useState(false);
   const [copiarAberto, setCopiarAberto] = useState(false);
   const [destinoId, setDestinoId] = useState("");
   const [copiando, setCopiando] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
   const showSkeleton = useMinSkeleton(lojasLoading || po.loading);
 
   const contagens = view?.contagens ?? { noPedido: 0, semMinimo: 0, novos: 0 };
@@ -108,7 +100,6 @@ export function PurchaseOrderPage() {
 
   useEffect(() => setPage(1), [busca, filtro, sortKey, sortDir, loja?.id]);
   useEffect(() => {
-    setImportNotice(null);
     setResumoPedido(null);
   }, [loja?.id]);
 
@@ -156,46 +147,6 @@ export function PurchaseOrderPage() {
     downloadFile(buildXlsx([[...PURCHASE_FILE_HEADER], ...rows], { textColumns: PURCHASE_FILE_TEXT_COLUMNS }), purchaseOrderFileName(new Date()));
     show(`Pedido gerado com ${rows.length} produto${rows.length === 1 ? "" : "s"}.`, "success");
     setResumoPedido(null);
-  };
-
-  const baixarModelo = () => {
-    if (!view || !loja) return;
-    downloadFile(buildXlsx(purchaseMinTemplateRows(view)), purchaseMinTemplateFileName(loja.codFilial));
-  };
-
-  const importarPlanilha = async (file: File) => {
-    if (!view) return;
-    setImportNotice(null);
-    setImporting(true);
-    try {
-      let grid: string[][];
-      try {
-        grid = await readXlsx(new Uint8Array(await file.arrayBuffer()));
-      } catch {
-        show("Não foi possível ler a planilha. Use um arquivo .xlsx.", "danger");
-        return;
-      }
-      const parsed = parsePurchaseMinSheet(grid, new Set(view.rows.map((r) => r.code)));
-      if (!parsed.ok) {
-        show(parsed.message, "danger");
-        return;
-      }
-      const changed = parsed.updates.filter((u) => po.mins?.get(u.code) !== u.value);
-      if (changed.length > 0) {
-        const ok = await po.importMins(changed);
-        if (!ok) return;
-      }
-      setImportNotice(
-        purchaseMinImportNotice({
-          saved: changed.length,
-          unknown: parsed.unknown,
-          invalid: parsed.invalid,
-          unchanged: parsed.updates.length > 0 && changed.length === 0,
-        }),
-      );
-    } finally {
-      setImporting(false);
-    }
   };
 
   const outrasLojas = storesForSession(session.stores).filter((s) => s.id !== loja?.id);
@@ -300,23 +251,18 @@ export function PurchaseOrderPage() {
               />
               <TipHelp label="Multiplica o mínimo de cada produto. A quantidade a pedir desconta o total em estoque e arredonda para o múltiplo de compra." />
             </span>
-            <Button variant="secondary" size="md" onClick={() => setAcoesAberto(true)} disabled={!view || po.syncing || importing || copiando}>
-              {importing ? "Importando…" : "Ações"}
-            </Button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              className="hidden"
-              tabIndex={-1}
-              aria-hidden
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                e.target.value = "";
-                if (file) void importarPlanilha(file);
-              }}
-            />
-            <Button variant="primary" size="md" onClick={abrirResumo} disabled={!view || po.syncing || importing || copiando}>
+            {outrasLojas.length > 0 && (
+              <Button
+                variant="secondary"
+                size="md"
+                onClick={abrirCopia}
+                disabled={!view || po.syncing || copiando || (po.mins?.size ?? 0) === 0}
+                title={(po.mins?.size ?? 0) === 0 ? "Cadastre pelo menos um mínimo nesta loja para poder copiar." : undefined}
+              >
+                Copiar para outra loja
+              </Button>
+            )}
+            <Button variant="primary" size="md" onClick={abrirResumo} disabled={!view || po.syncing || copiando}>
               Gerar pedido
             </Button>
           </HeaderFilters>
@@ -340,11 +286,6 @@ export function PurchaseOrderPage() {
                 </Alert>
               ))}
             {!po.syncError && po.stale && po.staleTexto && <Alert variant="warning" title={po.staleTexto} />}
-            {importNotice && (
-              <Alert variant={importNotice.variant} title={importNotice.title}>
-                {importNotice.detail}
-              </Alert>
-            )}
           </>
         }
       />
@@ -538,55 +479,6 @@ export function PurchaseOrderPage() {
           </div>
         )}
       </Modal>
-      <Modal open={acoesAberto} onClose={() => setAcoesAberto(false)} title="Ações" size="sm">
-        <p className="mb-4 text-[13px] leading-relaxed text-t1">
-          {loja ? (
-            <>
-              Escolha o que fazer com os mínimos de <span className="font-bold text-t0">{loja.fantasia}</span>.
-            </>
-          ) : (
-            "Escolha o que fazer com os mínimos desta loja."
-          )}
-        </p>
-        <div className="flex flex-col gap-2.5">
-          <AcaoOpcao
-            titulo="Exportar mínimos"
-            detalhe="Exporta uma planilha com o código, a descrição e o mínimo cadastrado de cada produto. Quando não houver mínimo, a célula ficará vazia."
-            onClick={() => {
-              setAcoesAberto(false);
-              baixarModelo();
-            }}
-          />
-          <AcaoOpcao
-            titulo="Importar mínimos"
-            detalhe="Importa a planilha exportada pela WDash ou uma planilha antiga do Excel. Ela precisa conter o código do produto e a quantidade mínima. Células vazias não alteram os mínimos já cadastrados."
-            onClick={() => {
-              fileRef.current?.click();
-              setAcoesAberto(false);
-            }}
-          />
-          {outrasLojas.length > 0 && (
-            <AcaoOpcao
-              titulo="Copiar para outras lojas"
-              detalhe={
-                (po.mins?.size ?? 0) === 0
-                  ? "Cadastre pelo menos um mínimo nesta loja para poder copiar."
-                  : "Copia os mínimos desta loja para outra loja ou para todas as outras lojas. Apenas produtos que também existem na loja de destino serão atualizados."
-              }
-              disabled={(po.mins?.size ?? 0) === 0}
-              onClick={() => {
-                setAcoesAberto(false);
-                abrirCopia();
-              }}
-            />
-          )}
-        </div>
-        <div className="mt-4 flex justify-end">
-          <Button variant="outline" size="sm" onClick={() => setAcoesAberto(false)}>
-            Cancelar
-          </Button>
-        </div>
-      </Modal>
       <Modal
         open={copiarAberto && loja != null && (todas || destino != null)}
         onClose={() => {
@@ -633,23 +525,6 @@ export function PurchaseOrderPage() {
 }
 
 export default PurchaseOrderPage;
-
-function AcaoOpcao({ titulo, detalhe, disabled, onClick }: { titulo: string; detalhe: string; disabled?: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className={cn(
-        "rounded-[var(--radius-vela-lg)] border border-line px-4 py-3 text-left transition-colors",
-        disabled ? "cursor-not-allowed opacity-50" : "hover:border-acc hover:bg-acc-soft/40",
-      )}
-    >
-      <p className="text-[13.5px] font-bold text-t0">{titulo}</p>
-      <p className="mt-0.5 text-[12.5px] leading-snug text-t2">{detalhe}</p>
-    </button>
-  );
-}
 
 const reais = (cents: number | null) => (cents == null ? null : cents / 100);
 

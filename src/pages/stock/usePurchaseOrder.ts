@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/ui";
 import { addDays } from "@/data/wedash/autoRefresh";
 import { calendarTodayIso } from "@/data/wedash/clock";
-import { buildPurchaseOrderView, parseMinInput, type PurchaseMinUpdate, type PurchaseStockRow } from "@/data/wedash/purchaseOrder";
-import { PURCHASE_SYNC_ERROR, fetchPurchaseMins, fetchPurchaseStock, fetchSold30, fetchSoldEver, savePurchaseMin, savePurchaseMins, syncPurchaseStockNow } from "@/data/wedash/purchaseRepo";
+import { buildPurchaseOrderView, parseMinInput, type PurchaseStockRow } from "@/data/wedash/purchaseOrder";
+import { PURCHASE_SYNC_ERROR, fetchPurchaseMins, fetchPurchaseStock, fetchSold30, fetchSoldEver, savePurchaseMin, syncPurchaseStockNow } from "@/data/wedash/purchaseRepo";
 import type { StockCatalogItem } from "@/data/wedash/stockProducts";
 import { fetchCostPrices, fetchStockCatalog } from "@/data/wedash/stockRepo";
 import { FORCE_REFRESH_CLICK_EVENT } from "@/pages/dashboard/useForceRefresh";
@@ -198,27 +198,6 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null, costT
     [current, show, tenantId],
   );
 
-  /** Grava os mínimos da planilha na loja aberta e atualiza a tabela. */
-  const importMins = useCallback(
-    async (updates: PurchaseMinUpdate[]): Promise<boolean> => {
-      const id = storeRef.current;
-      if (!id || updates.length === 0) return updates.length === 0;
-      const ok = await savePurchaseMins(tenantId, id, updates);
-      if (!ok) {
-        show(SAVE_ERROR_MSG, "danger");
-        return false;
-      }
-      setData((d) => {
-        if (!d || d.storeId !== id) return d;
-        const mins = new Map(d.mins);
-        for (const u of updates) mins.set(u.code, u.value);
-        return { ...d, mins };
-      });
-      return true;
-    },
-    [show, tenantId],
-  );
-
   const syncedAt = current?.syncedAt ?? null;
   const atualizadoTexto = syncing ? "Buscando saldo…" : syncedAt ? `Saldo atualizado ${hora(syncedAt)}` : "Saldo ainda não atualizado";
 
@@ -236,6 +215,5 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null, costT
     factor,
     setFactor,
     saveMin,
-    importMins,
   };
 }

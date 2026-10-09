@@ -4,14 +4,10 @@ import {
   PURCHASE_FILE_TEXT_COLUMNS,
   buildPurchaseOrderView,
   filterPurchaseRows,
-  purchaseMinImportNotice,
-  purchaseMinTemplateFileName,
-  purchaseMinTemplateRows,
   purchaseOrderFileName,
   purchaseOrderFileRows,
   purchaseLineCents,
   purchaseOrderTotalCents,
-  parsePurchaseMinSheet,
   purchaseMinsToCopy,
   isEligible,
   isNewProduct,
@@ -354,84 +350,7 @@ describe("filterPurchaseRows (PC-04 AC 7, 8)", () => {
   });
 });
 
-describe("mínimos por planilha", () => {
-  const lista = view(
-    [
-      stock({ code: "210", description: "MYSKIN", position: 2 }),
-      stock({ code: "300", description: "BLOQUEADO", blocked: true, position: 3 }),
-      stock({ code: "182", description: "BODY SPLASH FATAL ROUGE 200 ML - WEPINK", position: 0 }),
-      stock({ code: "185", description: "BODY SPLASH DIVINE 200ML - WEPINK", position: 1 }),
-    ],
-    { "182": 72 },
-  );
-  const known = new Set(["182", "185", "186"]);
-
-  it("o modelo traz código, descrição e o mínimo já salvo, em ordem de código", () => {
-    expect(purchaseMinTemplateRows(lista)).toEqual([
-      ["COD_PRODUTO", "Descrição", "Quantidade mínima"],
-      [182, "BODY SPLASH FATAL ROUGE 200 ML - WEPINK", 72],
-      [185, "BODY SPLASH DIVINE 200ML - WEPINK", ""],
-      [210, "MYSKIN", ""],
-    ]);
-    expect(purchaseMinTemplateFileName("00010")).toBe("minimos-00010.xlsx");
-  });
-
-  it("importa a coluna de mínimo da planilha antiga e ignora saldo e descrição", () => {
-    const parsed = parsePurchaseMinSheet(
-      [
-        ["COD_PRODUTO", "Descricao1", "Quantidade minin", "Saldo", "Quantidade Multip", "Novo"],
-        ["182", "BODY SPLASH", "72", "0", "24", "NÃO"],
-        ["185", "DIVINE", "", "1", "24", "NÃO"],
-        ["186", "DESOD", "0", "4", "12", "NÃO"],
-        ["999", "FORA", "4", "0", "24", "NÃO"],
-        ["185", "DIVINE", "abc", "1", "24", "NÃO"],
-      ],
-      known,
-    );
-    expect(parsed).toEqual({
-      ok: true,
-      updates: [
-        { code: "182", value: 72 },
-        { code: "186", value: 0 },
-      ],
-      unknown: ["999"],
-      invalid: ["185"],
-    });
-  });
-
-  it("célula vazia não apaga, 72,0 conta como 72 e a última linha válida do código vence", () => {
-    const parsed = parsePurchaseMinSheet(
-      [
-        ["Código", "Mínimo"],
-        ["182", ""],
-        ["182", "72,0"],
-        ["182", "10"],
-      ],
-      known,
-    );
-    expect(parsed.ok && parsed.updates).toEqual([{ code: "182", value: 10 }]);
-  });
-
-  it("sem as duas colunas a planilha é recusada", () => {
-    expect(parsePurchaseMinSheet([["Saldo", "Total"]], known)).toEqual({
-      ok: false,
-      message: "A planilha precisa das colunas COD_PRODUTO e Quantidade mínima.",
-    });
-  });
-
-  it("o aviso lista código de fora e valor inválido, e diz quando nada mudou", () => {
-    expect(purchaseMinImportNotice({ saved: 2, unknown: ["999"], invalid: [], unchanged: false })).toEqual({
-      variant: "warning",
-      title: "Mínimos atualizados em 2 produtos.",
-      detail: "Não estão nesta loja: 999.",
-    });
-    expect(purchaseMinImportNotice({ saved: 0, unknown: [], invalid: [], unchanged: true }).title).toBe(
-      "Os mínimos desta loja já estão iguais à planilha.",
-    );
-    expect(purchaseMinImportNotice({ saved: 0, unknown: [], invalid: [], unchanged: false }).title).toBe("Nenhum mínimo para importar.");
-    expect(purchaseMinImportNotice({ saved: 1, unknown: [], invalid: [], unchanged: false }).variant).toBe("success");
-  });
-
+describe("cópia de mínimos", () => {
   it("copia só o mínimo de produto que a outra loja também tem", () => {
     const source = new Map<string, number>([
       ["182", 72],
