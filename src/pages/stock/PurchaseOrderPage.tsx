@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { Alert, Badge, Button, Card, CardTitle, Dropdown, FormField, Modal, Select, ThSort, useToast, type SortDir } from "@/components/ui";
+import { Alert, Badge, Button, Card, CardTitle, FormField, Modal, Select, ThSort, useToast, type SortDir } from "@/components/ui";
 import { StockProductsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { ProductNameCell } from "@/components/wedash/ProductNameCell";
 import {
@@ -83,6 +83,7 @@ export function PurchaseOrderPage() {
   const [importing, setImporting] = useState(false);
   const [importNotice, setImportNotice] = useState<ReturnType<typeof purchaseMinImportNotice> | null>(null);
   const [resumoPedido, setResumoPedido] = useState<PurchaseOrderRow[] | null>(null);
+  const [acoesAberto, setAcoesAberto] = useState(false);
   const [copiarAberto, setCopiarAberto] = useState(false);
   const [destinoId, setDestinoId] = useState("");
   const [copiando, setCopiando] = useState(false);
@@ -299,32 +300,9 @@ export function PurchaseOrderPage() {
               />
               <TipHelp label="Multiplica o mínimo de cada produto. A quantidade a pedir desconta o total em estoque e arredonda para o múltiplo de compra." />
             </span>
-            <Dropdown
-              align="right"
-              portal
-              items={[
-                { label: "Baixar modelo", onClick: baixarModelo, disabled: !view || po.syncing || importing },
-                {
-                  label: importing ? "Importando…" : "Importar mínimos",
-                  onClick: () => fileRef.current?.click(),
-                  disabled: !view || po.syncing || importing || copiando,
-                },
-                ...(outrasLojas.length > 0
-                  ? [
-                      {
-                        label: "Copiar para outras lojas",
-                        onClick: abrirCopia,
-                        disabled: !view || po.syncing || importing || copiando || (po.mins?.size ?? 0) === 0,
-                      },
-                    ]
-                  : []),
-              ]}
-              trigger={
-                <Button variant="secondary" size="md" disabled={!view || po.syncing || importing || copiando} iconRight={<Chevron />}>
-                  {importing ? "Importando…" : "Mínimos"}
-                </Button>
-              }
-            />
+            <Button variant="secondary" size="md" onClick={() => setAcoesAberto(true)} disabled={!view || po.syncing || importing || copiando}>
+              {importing ? "Importando…" : "Ações"}
+            </Button>
             <input
               ref={fileRef}
               type="file"
@@ -560,6 +538,55 @@ export function PurchaseOrderPage() {
           </div>
         )}
       </Modal>
+      <Modal open={acoesAberto} onClose={() => setAcoesAberto(false)} title="Ações" size="sm">
+        <p className="mb-4 text-[13px] leading-relaxed text-t1">
+          {loja ? (
+            <>
+              Escolha o que fazer com os mínimos de <span className="font-bold text-t0">{loja.fantasia}</span>.
+            </>
+          ) : (
+            "Escolha o que fazer com os mínimos desta loja."
+          )}
+        </p>
+        <div className="flex flex-col gap-2.5">
+          <AcaoOpcao
+            titulo="Baixar modelo"
+            detalhe="Baixa a planilha com os produtos e os mínimos desta loja."
+            onClick={() => {
+              setAcoesAberto(false);
+              baixarModelo();
+            }}
+          />
+          <AcaoOpcao
+            titulo="Importar mínimos"
+            detalhe="Lê a planilha e grava os mínimos nesta loja."
+            onClick={() => {
+              fileRef.current?.click();
+              setAcoesAberto(false);
+            }}
+          />
+          {outrasLojas.length > 0 && (
+            <AcaoOpcao
+              titulo="Copiar para outras lojas"
+              detalhe={
+                (po.mins?.size ?? 0) === 0
+                  ? "Grave um mínimo nesta loja para poder copiar."
+                  : "Leva os mínimos daqui para outra loja, ou para todas."
+              }
+              disabled={(po.mins?.size ?? 0) === 0}
+              onClick={() => {
+                setAcoesAberto(false);
+                abrirCopia();
+              }}
+            />
+          )}
+        </div>
+        <div className="mt-4 flex justify-end">
+          <Button variant="outline" size="sm" onClick={() => setAcoesAberto(false)}>
+            Cancelar
+          </Button>
+        </div>
+      </Modal>
       <Modal
         open={copiarAberto && loja != null && (todas || destino != null)}
         onClose={() => {
@@ -607,11 +634,20 @@ export function PurchaseOrderPage() {
 
 export default PurchaseOrderPage;
 
-function Chevron() {
+function AcaoOpcao({ titulo, detalhe, disabled, onClick }: { titulo: string; detalhe: string; disabled?: boolean; onClick: () => void }) {
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="m6 9 6 6 6-6" />
-    </svg>
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        "rounded-[var(--radius-vela-lg)] border border-line px-4 py-3 text-left transition-colors",
+        disabled ? "cursor-not-allowed opacity-50" : "hover:border-acc hover:bg-acc-soft/40",
+      )}
+    >
+      <p className="text-[13.5px] font-bold text-t0">{titulo}</p>
+      <p className="mt-0.5 text-[12.5px] leading-snug text-t2">{detalhe}</p>
+    </button>
   );
 }
 
