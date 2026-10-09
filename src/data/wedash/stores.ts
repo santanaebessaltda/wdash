@@ -850,6 +850,27 @@ const SYNC_SELLERS_ERRORS: Record<string, string> = {
   forbidden: "Você não tem permissão para atualizar os vendedores.",
 };
 
+/** Horário da última busca de vendedores nas lojas (o `synced_at` mais recente). */
+export async function fetchLatestSellerSyncedAt(tenantId: string, storeIds: string[]): Promise<string | null> {
+  if (storeIds.length === 0) return null;
+  const { getSupabase } = await import("@/lib/supabase");
+  const sb = getSupabase();
+  if (!sb) return null;
+  const { data, error } = await sb
+    .from("store_seller")
+    .select("synced_at")
+    .eq("tenant_id", tenantId)
+    .in("store_id", storeIds)
+    .order("synced_at", { ascending: false })
+    .limit(1);
+  if (error) {
+    console.warn("fetchLatestSellerSyncedAt:", error.message);
+    return null;
+  }
+  const at = (data?.[0] as { synced_at?: string } | undefined)?.synced_at;
+  return at ?? null;
+}
+
 /** Busca as vendedoras da loja no Millennium agora (Edge `erp-sellers-sync`) e grava em `store_seller`. */
 export async function syncStoreSellersNow(storeId: string): Promise<{ ok: true } | { ok: false; message: string }> {
   const { getSupabase } = await import("@/lib/supabase");

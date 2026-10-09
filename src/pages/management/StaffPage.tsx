@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Avatar, Badge, Button, Card, DataTable, Dropdown, EmptyState, Modal, Segmented, Select, Skeleton, Tooltip, useToast, type DataTableColumn, type DropdownItem } from "@/components/ui";
 import { SegmentedSkeleton, StoreCardsSkeleton, TeamTableSkeleton } from "@/components/wedash/LoadingSkeletons";
 import {
+  fetchLatestSellerSyncedAt,
   fetchStoreSellers,
   fetchStoreShifts,
   isActiveSalesPerson,
@@ -12,7 +13,7 @@ import {
   type StoreShift,
 } from "@/data/wedash/stores";
 import { shiftName } from "@/lib/format";
-import { useScreenRefresh } from "@/pages/dashboard/screenRefresh";
+import { refreshStatusLine, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { InviteSellerModal } from "@/pages/management/InviteSellerModal";
 import { StoreCardHeader, StoreCardsPage, useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
@@ -37,10 +38,27 @@ export function StaffPage() {
 
   const lojasRef = useRef(lojas);
   lojasRef.current = lojas;
+  const [sellerSyncAt, setSellerSyncAt] = useState<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    if (loading) return;
+    let stop = false;
+    const ids = lojas.map((loja) => loja.id);
+    void fetchLatestSellerSyncedAt(session.tenantId, ids).then((at) => {
+      if (!stop) setSellerSyncAt(at);
+    });
+    return () => {
+      stop = true;
+    };
+  }, [loading, lojas, reloadKey, session.tenantId]);
 
   useScreenRefresh({
     label: "Atualizar os vendedores",
     tip: "Busca no Millennium os vendedores das lojas desta tela.",
+    status:
+      sellerSyncAt === undefined
+        ? undefined
+        : refreshStatusLine("Vendedores atualizados", "Vendedores ainda não atualizados", sellerSyncAt),
     run: async () => {
       const lista = lojasRef.current;
       if (syncing.current || lista.length === 0) return;

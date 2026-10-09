@@ -156,10 +156,13 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
   const proximaLine = proxima
     ? `Próxima atualização às ${proxima.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}`
     : null;
-  const tooltip = tela
+  const telaLinhas = tela
     ? disconnected
-      ? statusLines[0]
-      : tela.tip
+      ? statusLines
+      : [...(proprio && tela.status ? [tela.status] : []), tela.tip]
+    : null;
+  const tooltip = telaLinhas
+    ? telaLinhas.join("\n")
     : [
         ...(watermark || disconnected ? statusLines : loaded ? ["Vendas de hoje ainda não atualizadas"] : []),
         ...(proximaLine ? [proximaLine] : []),
@@ -193,9 +196,7 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
 
   // Celular / tablet (sem hover): o toque abre o horario da ultima busca + "Atualizar agora".
   if (semHover) {
-    const [linha1, ...resto] = tela
-      ? [tooltip]
-      : [...statusLines, ...(proximaLine ? [proximaLine] : [])];
+    const [linha1, ...resto] = telaLinhas ?? [...statusLines, ...(proximaLine ? [proximaLine] : [])];
     return (
       <Dropdown
         trigger={
@@ -217,8 +218,7 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
                     : "Vendas de hoje"}
             </span>
             {!ocupado &&
-              !tela &&
-              (watermark || disconnected ? resto : proximaLine ? [proximaLine] : []).map((l) => (
+              (tela ? resto : watermark || disconnected ? resto : proximaLine ? [proximaLine] : []).map((l) => (
                 <span key={l} className="text-[12px] text-t2">
                   {l}
                 </span>

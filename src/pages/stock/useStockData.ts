@@ -4,7 +4,7 @@ import { buildStockProductsView, type StockCatalogItem, type StockInput } from "
 import { fetchIncomingQty } from "@/data/wedash/purchaseRepo";
 import { fetchCostPrices, fetchStockCatalog, fetchStoreStock, syncStockNow } from "@/data/wedash/stockRepo";
 import type { Store } from "@/data/wedash/stores";
-import { useScreenRefresh } from "@/pages/dashboard/screenRefresh";
+import { refreshStatusLine, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { fetchErpConnection } from "@/pages/dashboard/ErpStatusNotice";
 import { useScopedStores } from "@/pages/operation/shared";
 
@@ -109,9 +109,14 @@ export function useStockData() {
 
   const dataRef = useRef(data);
   dataRef.current = data;
+  const syncedTimes = lojas.map((s) => data?.syncedAt.get(s.id) ?? null);
+  const oldestSync = syncedTimes.every((t) => t != null)
+    ? syncedTimes.reduce<string | null>((m, t) => (m == null || Date.parse(t!) < Date.parse(m) ? t : m), null)
+    : null;
   useScreenRefresh({
     label: "Atualizar o estoque",
     tip: "Busca o estoque e o que está a receber das lojas desta tela.",
+    status: data ? refreshStatusLine("Estoque atualizado", "Estoque ainda não atualizado", oldestSync) : undefined,
     run: async () => {
       const atual = dataRef.current;
       if (atual) await syncIfStale(atual, { force: true });
@@ -136,10 +141,6 @@ export function useStockData() {
     [data, lojas],
   );
 
-  const syncedTimes = lojas.map((s) => data?.syncedAt.get(s.id) ?? null);
-  const oldestSync = syncedTimes.every((t) => t != null)
-    ? syncedTimes.reduce<string | null>((m, t) => (m == null || Date.parse(t!) < Date.parse(m) ? t : m), null)
-    : null;
   const atualizadoTexto = syncing
     ? "Buscando estoque…"
     : oldestSync

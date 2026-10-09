@@ -6,7 +6,7 @@ import { buildPurchaseOrderView, parseMinInput, type PurchaseStockRow } from "@/
 import { PURCHASE_SYNC_ERROR, fetchPurchaseMins, fetchPurchaseStock, fetchSold30, fetchSoldEver, savePurchaseMin, syncPurchaseStockNow } from "@/data/wedash/purchaseRepo";
 import type { StockCatalogItem } from "@/data/wedash/stockProducts";
 import { fetchCostPrices, fetchStockCatalog } from "@/data/wedash/stockRepo";
-import { useScreenRefresh } from "@/pages/dashboard/screenRefresh";
+import { refreshStatusLine, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { fetchErpConnection } from "@/pages/dashboard/ErpStatusNotice";
 import { SAVE_ERROR_MSG } from "@/pages/operation/shared";
 
@@ -136,9 +136,11 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null, costT
     };
   }, [storeId, costTableId, load, sync]);
 
+  const saldoIso = data && data.storeId === storeId ? data.syncedAt : null;
   useScreenRefresh({
     label: "Atualizar o saldo do pedido",
     tip: "Busca no Millennium o saldo do pedido de compra desta loja.",
+    status: data ? refreshStatusLine("Saldo atualizado", "Saldo ainda não atualizado", saldoIso) : undefined,
     run: async () => {
       if (storeRef.current) await sync(storeRef.current);
     },
