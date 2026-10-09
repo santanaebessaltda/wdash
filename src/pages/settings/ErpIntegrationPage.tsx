@@ -119,18 +119,9 @@ export function ErpIntegrationPage() {
                 {ui.label}
               </span>
               {estado === "conectado" ? (
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setAberto(true)}>
-                    Gerenciar
-                  </Button>
-                  {podeAtualizar && (
-                    <Tooltip label="Atualiza lojas e tabelas de custo do Millennium. Não busca vendas.">
-                      <Button size="sm" onClick={() => void atualizarCadastros()} disabled={atualizando}>
-                        {atualizando ? "Atualizando…" : "Atualizar cadastros"}
-                      </Button>
-                    </Tooltip>
-                  )}
-                </div>
+                <Button variant="outline" size="sm" onClick={() => setAberto(true)}>
+                  Gerenciar
+                </Button>
               ) : (
                 <Button size="sm" onClick={() => setAberto(true)} disabled={!canEdit}>
                   Conectar
@@ -147,7 +138,9 @@ export function ErpIntegrationPage() {
         info={info}
         estado={estado}
         canEdit={canEdit}
+        podeAtualizar={podeAtualizar}
         atualizando={atualizando}
+        onAtualizar={atualizarCadastros}
         onChanged={reload}
       />
     </>
@@ -165,7 +158,9 @@ function MillenniumModal({
   info,
   estado,
   canEdit,
+  podeAtualizar,
   atualizando,
+  onAtualizar,
   onChanged,
 }: {
   open: boolean;
@@ -173,7 +168,9 @@ function MillenniumModal({
   info: ErpIntegrationStatus | null;
   estado: Estado;
   canEdit: boolean;
+  podeAtualizar: boolean;
   atualizando: boolean;
+  onAtualizar: () => Promise<void>;
   onChanged: () => Promise<void>;
 }) {
   const session = useActiveSession();
@@ -295,6 +292,13 @@ function MillenniumModal({
           <Button variant="outline" onClick={fechar} disabled={busy}>
             Cancelar
           </Button>
+          {conectado && podeAtualizar && (
+            <Tooltip label="Atualiza lojas e tabelas de custo do Millennium. Não busca vendas.">
+              <Button onClick={() => void onAtualizar()} disabled={atualizando || busy}>
+                {atualizando ? "Atualizando…" : "Atualizar cadastros"}
+              </Button>
+            </Tooltip>
+          )}
           {canEdit &&
             (conectado ? (
               <Button variant="danger" onClick={() => void desconectar()} disabled={busy || atualizando}>
