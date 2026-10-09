@@ -67,10 +67,17 @@ export function Dropdown({ trigger, items, header, align = "right", menuClassNam
       if (!trig) return;
       const below = window.innerHeight - trig.bottom;
       const up = below < menuH + GAP && trig.top > below;
+      const menuW = menuRef.current?.offsetWidth ?? 0;
+      const maxW = window.innerWidth - GAP * 2;
+      const width = Math.min(menuW, maxW);
+      let left = align === "right" ? trig.right - width : trig.left;
+      left = Math.min(left, window.innerWidth - GAP - width);
+      left = Math.max(GAP, left);
       setPos({
         position: "fixed",
         top: up ? Math.max(GAP, trig.top - menuH - GAP) : trig.bottom + GAP,
-        ...(align === "right" ? { right: window.innerWidth - trig.right } : { left: trig.left }),
+        left,
+        maxWidth: maxW,
       });
     }
     place();
