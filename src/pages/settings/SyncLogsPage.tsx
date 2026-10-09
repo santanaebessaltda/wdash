@@ -6,7 +6,6 @@ import {
   EmptyState,
   Input,
   Modal,
-  Select,
   Timeline,
   type TimelineEvent,
   useToast,
@@ -94,7 +93,7 @@ function LevelBadge({ level }: { level: SyncLogLevel }) {
 }
 
 /**
- * Configuracoes > Logs  -  erros e avisos da sincronizacao com o Millennium.
+ * Configuracoes > Logs  -  erros da sincronizacao com o Millennium. Avisos ficam de fora.
  * Leitura so para OWNER / MANAGER (RLS); retencao de 120 dias.
  */
 export function SyncLogsPage() {
@@ -115,7 +114,6 @@ export function SyncLogsPage() {
     };
   }, [session.tenantId, session.stores]);
 
-  const [nivel, setNivel] = useState<SyncLogLevel | "">("");
   const [busca, setBusca] = useState("");
   const [logs, setLogs] = useState<SyncLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -129,7 +127,7 @@ export function SyncLogsPage() {
     setLoading(true);
     setError(null);
     try {
-      setLogs(await fetchSyncLogs({ tenantId: session.tenantId, level: nivel || null }));
+      setLogs(await fetchSyncLogs({ tenantId: session.tenantId, level: "ERROR" }));
     } catch (e) {
       console.warn("fetchSyncLogs:", e);
       setError("Não foi possível carregar os logs. Tente novamente.");
@@ -137,7 +135,7 @@ export function SyncLogsPage() {
     } finally {
       setLoading(false);
     }
-  }, [canView, session.tenantId, nivel]);
+  }, [canView, session.tenantId]);
 
   useEffect(() => {
     void carregar();
@@ -196,23 +194,12 @@ export function SyncLogsPage() {
   return (
     <div>
       <div className="mb-4 flex flex-col sm:flex-row sm:justify-end print:hidden">
-        <div className="flex flex-wrap items-center justify-start gap-2 sm:w-[288px] sm:justify-end">
-          <Input
-            placeholder="Buscar nos logs…"
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            className="h-[38px] w-[160px]"
-          />
-          <Select
-            value={nivel}
-            onChange={(e) => setNivel(e.target.value as SyncLogLevel | "")}
-            className="h-[38px] w-auto"
-          >
-            <option value="">Todos os eventos</option>
-            <option value="ERROR">Erros</option>
-            <option value="WARN">Avisos</option>
-          </Select>
-        </div>
+        <Input
+          placeholder="Buscar nos logs…"
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+          className="h-[38px] w-full sm:w-[288px]"
+        />
       </div>
 
       <Card padding="lg">
@@ -221,22 +208,15 @@ export function SyncLogsPage() {
         ) : showSkeleton ? (
           <TimelineSkeleton rows={5} />
         ) : events.length === 0 ? (
-          busca.trim() || nivel ? (
+          busca.trim() ? (
             <EmptyState
               framed={false}
               icon="🔍"
               title="Nenhum resultado"
-              description="Tente outra busca ou altere o tipo de evento."
+              description="Tente outra busca."
               action={
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setBusca("");
-                    setNivel("");
-                  }}
-                >
-                  Limpar filtros
+                <Button variant="outline" size="sm" onClick={() => setBusca("")}>
+                  Limpar busca
                 </Button>
               }
             />
@@ -245,7 +225,7 @@ export function SyncLogsPage() {
               framed={false}
               icon="✅"
               title="Tudo certo"
-              description="Nenhum erro ou aviso na sincronização."
+              description="Nenhum erro na sincronização."
             />
           )
         ) : (
