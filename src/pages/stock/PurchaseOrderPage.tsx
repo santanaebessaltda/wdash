@@ -551,7 +551,7 @@ export function PurchaseOrderPage() {
         <div className="flex flex-col gap-2.5">
           <AcaoOpcao
             titulo="Exportar mínimos"
-            detalhe="Baixa a planilha desta loja com o código, a descrição e o mínimo já gravado. Onde não há mínimo, a célula fica vazia."
+            detalhe="Exporta uma planilha com o código, a descrição e o mínimo cadastrado de cada produto. Quando não houver mínimo, a célula ficará vazia."
             onClick={() => {
               setAcoesAberto(false);
               baixarModelo();
@@ -559,7 +559,7 @@ export function PurchaseOrderPage() {
           />
           <AcaoOpcao
             titulo="Importar mínimos"
-            detalhe="Lê a planilha exportada daqui ou a planilha antiga do Excel. Precisa ter o código do produto e a quantidade mínima. Célula vazia não apaga o que já está gravado."
+            detalhe="Importa a planilha exportada pela WDash ou uma planilha antiga do Excel. Ela precisa conter o código do produto e a quantidade mínima. Células vazias não alteram os mínimos já cadastrados."
             onClick={() => {
               fileRef.current?.click();
               setAcoesAberto(false);
@@ -570,8 +570,8 @@ export function PurchaseOrderPage() {
               titulo="Copiar para outras lojas"
               detalhe={
                 (po.mins?.size ?? 0) === 0
-                  ? "Grave um mínimo nesta loja para poder copiar."
-                  : "Grava os mínimos desta loja em outra loja, ou em todas. Só entra o produto que a outra loja também tem."
+                  ? "Cadastre pelo menos um mínimo nesta loja para poder copiar."
+                  : "Copia os mínimos desta loja para outra loja ou para todas as outras lojas. Apenas produtos que também existem na loja de destino serão atualizados."
               }
               disabled={(po.mins?.size ?? 0) === 0}
               onClick={() => {
@@ -600,7 +600,7 @@ export function PurchaseOrderPage() {
               Cancelar
             </Button>
             <Button onClick={() => void copiarMinimos()} disabled={copiando || (!todas && !destino)}>
-              {copiando ? "Copiando…" : "Copiar"}
+              {copiando ? "Copiando…" : "Copiar mínimos"}
             </Button>
           </>
         }
@@ -609,11 +609,11 @@ export function PurchaseOrderPage() {
           <div className="flex flex-col gap-3">
             <p className="text-[13px] leading-relaxed text-t1">
               {todas
-                ? `Você está em ${loja.fantasia}. Os mínimos daqui vão para todas as outras lojas. Fique nesta loja — não precisa mudar o seletor do topo.`
-                : `Você está em ${loja.fantasia}. Os mínimos daqui vão para ${destino?.fantasia}. Fique nesta loja — não precisa mudar o seletor do topo.`}
+                ? `Os mínimos de ${loja.fantasia} serão copiados para todas as outras lojas. Não é preciso trocar a loja selecionada no topo.`
+                : `Os mínimos de ${loja.fantasia} serão copiados para ${destino?.fantasia}. Não é preciso trocar a loja selecionada no topo.`}
             </p>
             <p className="text-[13px] leading-relaxed text-t2">
-              Entra só o produto que a outra loja também tem. O mínimo que existe só nela permanece.
+              Apenas produtos que existem nas duas lojas serão atualizados. O mínimo da loja de destino será substituído pelo mínimo desta loja. Produtos que existem somente no destino não serão alterados.
             </p>
             <FormField label="Copiar para">
               <Select value={todas ? "" : (destino?.id ?? "")} onChange={(e) => setDestinoId(e.target.value)} disabled={copiando}>
