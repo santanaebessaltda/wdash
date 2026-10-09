@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Avatar, Badge, Button, Card, DataTable, Dropdown, EmptyState, Modal, Segmented, Select, Skeleton, Tooltip, useToast, type DataTableColumn, type DropdownItem } from "@/components/ui";
 import { SegmentedSkeleton, StoreCardsSkeleton, TeamTableSkeleton } from "@/components/wedash/LoadingSkeletons";
 import {
@@ -12,8 +12,9 @@ import {
   type StoreShift,
 } from "@/data/wedash/stores";
 import { shiftName } from "@/lib/format";
+import { FORCE_REFRESH_CLICK_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { InviteSellerModal } from "@/pages/management/InviteSellerModal";
-import { RefreshIcon, StoreCardHeader, StoreCardsPage, useScopedStores } from "@/pages/operation/shared";
+import { StoreCardHeader, StoreCardsPage, useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
 import {
   copySellerInviteLink,
@@ -30,6 +31,30 @@ import { ACCESS_LABEL, hasSalesGroup, type AccessState } from "@/data/wedash/eng
 /** Configurações > Vendedores. Equipe de cada loja (Millennium) e o grupo de cada pessoa. */
 export function StaffPage() {
   const { session, lojas, loading } = useScopedStores();
+  const { show } = useToast();
+  const [reloadKey, setReloadKey] = useState(0);
+  const syncing = useRef(false);
+
+  useEffect(() => {
+    const onForce = () => {
+      if (syncing.current || lojas.length === 0) return;
+      syncing.current = true;
+      void (async () => {
+        try {
+          const results = await Promise.all(lojas.map((loja) => syncStoreSellersNow(loja.id)));
+          const fail = results.find((r) => !r.ok);
+          if (fail && !fail.ok) show(fail.message, "danger");
+          else show("Vendedores atualizados.", "success");
+          if (results.some((r) => r.ok)) setReloadKey((n) => n + 1);
+        } finally {
+          syncing.current = false;
+        }
+      })();
+    };
+    window.addEventListener(FORCE_REFRESH_CLICK_EVENT, onForce);
+    return () => window.removeEventListener(FORCE_REFRESH_CLICK_EVENT, onForce);
+  }, [lojas, show]);
+
   return (
     <StoreCardsPage
       section="Operação"
@@ -40,17 +65,16 @@ export function StaffPage() {
       lojas={lojas}
       wide
     >
-      {(loja) => <StaffCard tenantId={session.tenantId} loja={loja} />}
+      {(loja) => <StaffCard tenantId={session.tenantId} loja={loja} reloadKey={reloadKey} />}
     </StoreCardsPage>
   );
 }
 
-function StaffCard({ tenantId, loja }: { tenantId: string; loja: Store }) {
+function StaffCard({ tenantId, loja, reloadKey }: { tenantId: string; loja: Store; reloadKey: number }) {
   const { show } = useToast();
   const [equipe, setEquipe] = useState<StoreSeller[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [tick, setTick] = useState(0);
-  const [syncing, setSyncing] = useState(false);
   const [shifts, setShifts] = useState<StoreShift[]>([]);
   const [shiftOf, setShiftOf] = useState<Record<string, string | null>>({});
   const [tab, setTab] = useState<"ativos" | "desligados">("ativos");
@@ -75,7 +99,7 @@ function StaffCard({ tenantId, loja }: { tenantId: string; loja: Store }) {
     return () => {
       cancelled = true;
     };
-  }, [tenantId, loja.id, tick]);
+  }, [tenantId, loja.id, tick, reloadKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -87,7 +111,7 @@ function StaffCard({ tenantId, loja }: { tenantId: string; loja: Store }) {
     return () => {
       cancelled = true;
     };
-  }, [loja.id, tick]);
+  }, [loja.id, tick, reloadKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -102,15 +126,6 @@ function StaffCard({ tenantId, loja }: { tenantId: string; loja: Store }) {
   const ativos = useMemo(() => equipe.filter(isActiveSalesPerson), [equipe]);
   const desligados = useMemo(() => equipe.filter((s) => !s.active), [equipe]);
   const rows = tab === "ativos" ? ativos : desligados;
-
-  async function atualizar() {
-    setSyncing(true);
-    const r = await syncStoreSellersNow(loja.id);
-    setSyncing(false);
-    if (!r.ok) return show(r.message, "danger");
-    setTick((n) => n + 1);
-    show("Vendedores atualizados.", "success");
-  }
 
   async function changeShift(sellerId: string, shiftId: string | null) {
     const antes = shiftOf[sellerId];
@@ -212,33 +227,10 @@ function StaffCard({ tenantId, loja }: { tenantId: string; loja: Store }) {
   );
 
   const semEquipe = loaded && equipe.length === 0;
-  const refreshButton = (variant: "primary" | "secondary") => (
-    <Button
-      type="button"
-      size="sm"
-      variant={variant}
-      onClick={() => void atualizar()}
-      disabled={syncing}
-      title="Busca no Millennium os vendedores desta loja."
-      icon={syncing ? undefined : <RefreshIcon />}
-    >
-      {syncing ? "Atualizando…" : "Atualizar vendedores"}
-    </Button>
-  );
 
   return (
     <Card padding="none">
-      <StoreCardHeader
-        className="mb-0 px-5 pt-5 pb-4"
-        loja={loja}
-        action={
-          !loaded ? (
-            <Skeleton className="h-8 w-24 shrink-0 rounded-[var(--radius-vela-sm)]" />
-          ) : semEquipe ? undefined : (
-            refreshButton("secondary")
-          )
-        }
-      />
+      <StoreCardHeader className="mb-0 px-5 pt-5 pb-4" loja={loja} />
       {!loaded ? (
         <div className="px-5 pb-4">
           <SegmentedSkeleton widths={["w-24", "w-32"]} />
@@ -265,12 +257,11 @@ function StaffCard({ tenantId, loja }: { tenantId: string; loja: Store }) {
           title={semEquipe ? "Nenhum vendedor sincronizado" : tab === "ativos" ? "Nenhum vendedor ativo" : "Nenhum vendedor desligado"}
           description={
             semEquipe
-              ? "Busque no Millennium os vendedores desta loja."
+              ? "Use Atualizar no topo para buscar os vendedores desta loja no Millennium."
               : tab === "ativos"
                 ? "Não há vendedores ativos nesta loja no momento."
                 : "Vendedores desativados no Millennium aparecem aqui."
           }
-          action={semEquipe ? refreshButton("primary") : undefined}
         />
       ) : (
         <DataTable
