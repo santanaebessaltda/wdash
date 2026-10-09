@@ -670,14 +670,10 @@ export default function GoalEditorPage() {
         </SideCard>
         <SideCard
           title="Simulação"
-          active={tiersOn && (prizeMode === "GENERAL" || prizeMode === "GROUP" || groupsOn)}
+          active={tiersOn}
           emptyIcon="🧮"
           emptyTitle="Simulação indisponível"
-          emptyText={
-            tiersOn
-              ? "Configure a distribuição da meta para visualizar a simulação."
-              : "Ative os Níveis de premiação para visualizar a simulação."
-          }
+          emptyText="Ative os Níveis de premiação para visualizar a simulação."
         >
           <Simulation
             storeId={storeId}
@@ -686,7 +682,7 @@ export default function GoalEditorPage() {
             tiers={tiers}
             target={targetValue}
             mode={prizeMode}
-            equipeToda={prizeMode === "GENERAL" || (!groupsOn && prizeMode === "GROUP")}
+            equipeToda={prizeMode === "GENERAL" || !groupsOn}
             managerOn={managerOn}
           />
         </SideCard>
@@ -1306,7 +1302,7 @@ function Simulation({
   tiers: TierRow[];
   target: number | null;
   mode: PrizeMode;
-  /** Modo Grupo sem grupos de distribuicao: a equipe toda e um grupo so, com a meta global. */
+  /** Sem distribuicao por grupos: a equipe toda e um bloco so. Individual divide a meta da loja; Grupo e Geral usam a meta da loja. */
   equipeToda: boolean;
   managerOn: boolean;
 }) {
@@ -1320,7 +1316,12 @@ function Simulation({
             pct: null,
             metaGrupo: target,
             pessoas: team?.length ?? 0,
-            base: target,
+            base:
+              individual && (team?.length ?? 0) > 0
+                ? target / team!.length
+                : individual
+                  ? null
+                  : target,
           },
         ]
       : []
