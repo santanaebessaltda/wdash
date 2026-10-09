@@ -463,5 +463,21 @@ describe("mínimos por planilha", () => {
     const sem = buildPurchaseOrderView({ ...base, costs: new Map([["BSPPAR-ATH-001", 0]]) });
     expect(sem.rows[0].custoCents).toBeNull();
     expect(purchaseOrderTotalCents(sem.rows)).toBeNull();
+    const misto = buildPurchaseOrderView({
+      stock: [
+        stock({ balance: 0, openOrder: 0, total: 0, multiple: 6 }),
+        stock({ code: "SEM", balance: 0, openOrder: 0, total: 0, multiple: 6, position: 1 }),
+      ],
+      mins: new Map([
+        ["BSPPAR-ATH-001", 6],
+        ["SEM", 6],
+      ]),
+      sold30: new Map(),
+      soldEver: null,
+      factor: 1,
+      todayIso: TODAY,
+      costs: new Map([["BSPPAR-ATH-001", 1500]]),
+    });
+    expect(purchaseOrderTotalCents(misto.rows)).toBe(9000);
   });
 });

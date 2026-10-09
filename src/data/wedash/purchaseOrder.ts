@@ -202,17 +202,19 @@ export function purchaseLineCents(r: PurchaseOrderRow): number | null {
   return r.aPedir * r.custoCents;
 }
 
-/** Total do pedido em centavos. Null se algum produto do pedido está sem custo. */
+/** Total do pedido em centavos. Soma as linhas com custo. Null se nenhuma tiver preço. */
 export function purchaseOrderTotalCents(rows: PurchaseOrderRow[]): number | null {
   const pedido = rows.filter((r) => r.noPedido);
   if (pedido.length === 0) return 0;
   let total = 0;
+  let any = false;
   for (const r of pedido) {
     const line = purchaseLineCents(r);
-    if (line == null) return null;
+    if (line == null) continue;
+    any = true;
     total += line;
   }
-  return total;
+  return any ? total : null;
 }
 
 export function purchaseOrderFileName(d: Date): string {

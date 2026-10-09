@@ -34,7 +34,7 @@ import { usePurchaseOrder } from "./usePurchaseOrder";
 
 const PAGE_SIZE = 50;
 
-type SortKey = "nome" | "minimo" | "saldo" | "pedidosAbertos" | "total" | "vendidos30" | "multipla" | "novo" | "bloqueado" | "aPedir" | "custo";
+type SortKey = "nome" | "minimo" | "saldo" | "pedidosAbertos" | "total" | "vendidos30" | "multipla" | "novo" | "bloqueado" | "aPedir";
 
 const NUM_COLS: Array<{ key: "saldo" | "pedidosAbertos" | "total" | "vendidos30" | "multipla"; label: string }> = [
   { key: "saldo", label: "Saldo" },
@@ -47,7 +47,6 @@ const NUM_COLS: Array<{ key: "saldo" | "pedidosAbertos" | "total" | "vendidos30"
 function sortValue(r: PurchaseOrderRow, k: Exclude<SortKey, "nome">): number {
   if (k === "minimo") return r.minimo ?? -1;
   if (k === "aPedir") return r.aPedir ?? -1;
-  if (k === "custo") return r.custoCents ?? -1;
   if (k === "novo") return r.novo ? 1 : 0;
   if (k === "bloqueado") return r.bloqueado ? 1 : 0;
   return r[k];
@@ -400,7 +399,7 @@ export function PurchaseOrderPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1280px] border-collapse text-sm">
+              <table className="w-full min-w-[1160px] border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
                     <th className="px-1 pb-3 text-left font-bold">#</th>
@@ -412,7 +411,6 @@ export function PurchaseOrderPage() {
                     <ThSort label="Novo" active={sortKey === "novo"} dir={sortDir} onClick={() => toggleSort("novo")} align="center" className="px-1 pb-3" />
                     <ThSort label="Bloqueado" active={sortKey === "bloqueado"} dir={sortDir} onClick={() => toggleSort("bloqueado")} align="center" className="px-1 pb-3" />
                     <ThSort label="A pedir" active={sortKey === "aPedir"} dir={sortDir} onClick={() => toggleSort("aPedir")} className="px-1 pb-3" />
-                    <ThSort label="Custo" active={sortKey === "custo"} dir={sortDir} onClick={() => toggleSort("custo")} className="px-1 pb-3" />
                   </tr>
                 </thead>
                 <tbody>
@@ -456,7 +454,6 @@ export function PurchaseOrderPage() {
                         <td className="px-1 py-3 text-right">
                           {r.aPedir == null ? <span className="font-mono text-[13px] font-bold text-t2">—</span> : <Qty v={r.aPedir} strong={r.aPedir > 0} />}
                         </td>
-                        <td className="px-1 py-3 text-right font-mono text-[13px] tabular-nums text-t0">{money(r.custoCents == null ? null : r.custoCents / 100)}</td>
                       </tr>
                     );
                   })}
@@ -489,12 +486,6 @@ export function PurchaseOrderPage() {
                     <td />
                     <td className="px-1 py-3 text-right">
                       <Qty v={totais.aPedir} total />
-                    </td>
-                    <td className="px-1 py-3 text-right">
-                      <span className="inline-flex items-center justify-end gap-1 font-mono text-[13px] font-extrabold tabular-nums text-t0">
-                        {money(reais(purchaseOrderTotalCents(view?.rows ?? [])))}
-                        <TipHelp label="Total do pedido: quantidade a pedir × custo de cada produto que entra na planilha. Sem custo em algum deles, o total não aparece." />
-                      </span>
                     </td>
                   </tr>
                 </tbody>
@@ -531,7 +522,7 @@ export function PurchaseOrderPage() {
               {num(resumoPedido.reduce((s, r) => s + (r.aPedir ?? 0), 0))} itens.
             </p>
             {resumoPedido.some((r) => r.custoCents == null) && (
-              <p className="text-[13px] leading-relaxed text-t2">Algum produto está sem custo. O total só aparece quando todos têm preço.</p>
+              <p className="text-[13px] leading-relaxed text-t2">Produto sem custo fica de fora do total.</p>
             )}
             <table className="w-full table-fixed border-collapse text-sm">
               <thead className="sticky top-0 bg-bg-2">
