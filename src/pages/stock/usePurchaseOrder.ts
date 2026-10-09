@@ -201,7 +201,6 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null, costT
   );
 
   const syncedAt = current?.syncedAt ?? null;
-  const atualizadoTexto = syncing ? "Buscando saldo…" : syncedAt ? `Saldo atualizado ${hora(syncedAt)}` : "Saldo ainda não atualizado";
 
   return {
     view,
@@ -213,7 +212,6 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null, costT
     syncedAt,
     stale: !syncing && syncedAt != null && isStale(syncedAt, now),
     staleTexto: syncedAt ? `O saldo foi atualizado ${hora(syncedAt)}. O pedido pode usar quantidades desatualizadas.` : null,
-    atualizadoTexto,
     factor,
     setFactor,
     saveMin,

@@ -30,12 +30,12 @@ import type { Store } from "@/data/wedash/stores";
 import { isGestor } from "@/layout/nav-wedash";
 import { cn } from "@/lib/cn";
 import { brlCent, dataExtenso, deIso, fimDoMes, inicioDoMes, paraIso, somarDias, labelUpper } from "@/lib/format";
-import { useScreenRefresh } from "@/pages/dashboard/screenRefresh";
+import { refreshStatusLine, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { parseNum, SectionHeader, useScopedStores } from "@/pages/operation/shared";
-import { HeaderFilters, UpdatedLine } from "@/pages/stock/shared";
+import { HeaderFilters } from "@/pages/stock/shared";
 
 const DIAS = [
   { longo: "Domingo", curto: "D" },
@@ -48,12 +48,6 @@ const DIAS = [
 ];
 
 const money = (cents: number | null) => (cents == null ? "—" : brlCent(cents / 100));
-
-function horaAtualizacao(date: Date): string {
-  const h = date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
-  if (date.toDateString() === new Date().toDateString()) return `às ${h}`;
-  return `em ${date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} às ${h}`;
-}
 
 function diffClass(cents: number | null): string {
   if (cents == null || cents === 0) return "text-t2";
@@ -505,6 +499,7 @@ export function CashClosePage() {
   useScreenRefresh({
     label: "Atualizar vendas e fechamento",
     tip: "Busca as vendas de hoje e o fechamento do mês que está na tela.",
+    status: refreshStatusLine("Fechamento atualizado", "Fechamento ainda não atualizado", watermark?.toISOString()),
     sales: true,
     run: () => pedirFechamento(),
   });
@@ -646,13 +641,6 @@ export function CashClosePage() {
     irParaMes(somarMes(anchor, dir));
   }
 
-  const atualizadoTexto =
-    syncing
-      ? "Buscando fechamento…"
-      : watermark
-        ? `Fechamento atualizado ${horaAtualizacao(watermark)}`
-        : "Fechamento ainda não atualizado";
-
   const diaPronto = diaAberto != null && diaKey === `${storeKey}|${diaAberto}|${reloadKey}`;
   const navBtn =
     "flex h-10 w-10 items-center justify-center rounded-[11px] border border-line bg-bg-2 text-t1 hover:border-line-2 hover:text-t0 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-line disabled:hover:text-t1";
@@ -664,14 +652,7 @@ export function CashClosePage() {
         title="Fechamento"
         subtitle="Confira o fechamento diário comparando o Millennium com o total real."
         actions={
-          <HeaderFilters
-            updated={
-              <UpdatedLine
-                text={atualizadoTexto}
-                tip="O Atualizar busca as vendas de hoje e o fechamento do mês que está na tela. O dia de hoje mostra o mesmo faturamento da Visão geral. Do dia anterior para trás, o valor vem do fechamento de caixa."
-              />
-            }
-          >
+          <HeaderFilters>
             <div className="flex flex-wrap items-center gap-2">
               <SeletorMesAno iso={anchor} hoje={hoje} onChange={irParaMes} />
               <button type="button" aria-label="Mês anterior" className={navBtn} onClick={() => mover(-1)}>

@@ -50,21 +50,11 @@ export function TableFooter({ shown, total, page, totalPages, onPage }: { shown:
   );
 }
 
-export function UpdatedLine({ text, tip }: { text: string; tip: string }) {
-  if (!text) return null;
-  return (
-    <Tooltip label={tip}>
-      <span className="cursor-help text-[11.5px] text-t2">{text}</span>
-    </Tooltip>
-  );
-}
-
-/** Filtros do cabecalho no padrao da Visao geral: um abaixo do outro no celular, em linha no desktop, e o horario embaixo. */
-export function HeaderFilters({ children, updated }: { children: ReactNode; updated?: ReactNode }) {
+/** Filtros do cabecalho no padrao da Visao geral: um abaixo do outro no celular, em linha no desktop. O horario da ultima busca fica no botao Atualizar. */
+export function HeaderFilters({ children }: { children: ReactNode }) {
   return (
     <div className="flex w-full min-w-0 flex-col items-start gap-2 sm:items-end">
       <div className="flex w-full min-w-0 flex-col items-start gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">{children}</div>
-      {updated}
     </div>
   );
 }

@@ -19,7 +19,6 @@ import {
   ExportButton,
   TableFooter,
   TipHelp,
-  UpdatedLine,
   HeaderFilters,
   localQty,
   money,
@@ -166,9 +165,7 @@ export function InventoryPage() {
         title="Estoque"
         subtitle="Acompanhe o saldo de cada produto, o que está a receber e o total dos dois."
         actions={
-          <HeaderFilters
-            updated={<UpdatedLine text={atualizadoTexto} tip="O estoque é buscado no Millennium ao abrir esta tela, quando a última busca tem mais de 30 minutos, e quando você usa Atualizar." />}
-          >
+          <HeaderFilters>
             <HeaderSearch value={busca} onChange={setBusca} placeholder="Buscar por produto ou código…" width={240} />
             <HeaderFilter label="Status" value={status} onChange={setStatus} options={statusOpcoes} />
             {showBrand && (

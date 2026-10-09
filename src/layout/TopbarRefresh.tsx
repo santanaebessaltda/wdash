@@ -159,7 +159,7 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
   const telaLinhas = tela
     ? disconnected
       ? statusLines
-      : [...(proprio && tela.status ? [tela.status] : []), tela.tip]
+      : [...(tela.status ? [tela.status] : []), tela.tip]
     : null;
   const tooltip = telaLinhas
     ? telaLinhas.join("\n")

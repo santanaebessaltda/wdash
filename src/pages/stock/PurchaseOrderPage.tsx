@@ -25,7 +25,7 @@ import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { ErpStatusNotice } from "@/pages/dashboard/ErpStatusNotice";
 import { HeaderFilter, HeaderSearch } from "@/pages/dashboard/HeaderFilter";
 import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
-import { HeaderFilters, TableFooter, TipHelp, UpdatedLine, money, qty } from "./shared";
+import { HeaderFilters, TableFooter, TipHelp, money, qty } from "./shared";
 import { usePurchaseOrder } from "./usePurchaseOrder";
 
 const PAGE_SIZE = 50;
@@ -221,16 +221,7 @@ export function PurchaseOrderPage() {
         title="Pedido de compra"
         subtitle="Prepare o pedido de compra de cada loja."
         actions={
-          <HeaderFilters
-            updated={
-              loja && (
-                <UpdatedLine
-                  text={po.atualizadoTexto}
-                  tip="O saldo é buscado no Millennium ao abrir esta tela, quando a última busca tem mais de 30 minutos, e quando você usa Atualizar."
-                />
-              )
-            }
-          >
+          <HeaderFilters>
             {lojas.length > 1 && (
               <HeaderFilter
                 label="Loja"
