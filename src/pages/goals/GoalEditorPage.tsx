@@ -670,16 +670,16 @@ export default function GoalEditorPage() {
         </SideCard>
         <SideCard
           title="Simulação"
-          active={tiersOn}
+          active
           emptyIcon="🧮"
-          emptyTitle="Simulação indisponível"
-          emptyText="Ative os Níveis de premiação para visualizar a simulação."
+          emptyText="Informe a meta da loja para visualizar a simulação."
         >
           <Simulation
             storeId={storeId}
             groups={groups}
             team={team}
             tiers={tiers}
+            tiersOn={tiersOn}
             target={targetValue}
             mode={prizeMode}
             equipeToda={prizeMode === "GENERAL" || !groupsOn}
@@ -1290,6 +1290,7 @@ function Simulation({
   groups: groupsAll,
   team,
   tiers,
+  tiersOn,
   target,
   mode,
   equipeToda,
@@ -1300,6 +1301,8 @@ function Simulation({
   groups: GroupRow[] | null;
   team: GoalTeamMember[] | null;
   tiers: TierRow[];
+  /** Niveis desligados: a simulacao mostra so a meta, sem premiação. */
+  tiersOn: boolean;
   target: number | null;
   mode: PrizeMode;
   /** Sem distribuicao por grupos: a equipe toda e um bloco so. Individual divide a meta da loja; Grupo e Geral usam a meta da loja. */
@@ -1347,7 +1350,7 @@ function Simulation({
       };
     })
     .filter((g) => g.metaGrupo != null);
-  const temNivel = tiers.some((t) => positive(t.meta) != null);
+  const temNivel = tiersOn && tiers.some((t) => positive(t.meta) != null);
 
   if (!storeId) {
     return (
@@ -1385,27 +1388,35 @@ function Simulation({
       />
     );
   }
-  if (grupos.length === 0 || !temNivel) {
+  if (!equipeToda && grupos.length === 0) {
     return (
       <EmptyBlock
         icon="🧮"
         title="Faltam dados"
-        description={
-          equipeToda
-            ? "Informe a meta de pelo menos um nível."
-            : "Informe o percentual de pelo menos um grupo e a meta de pelo menos um nível."
-        }
+        description="Informe o percentual de pelo menos um grupo."
       />
     );
   }
+  const membrosDe = (key: string) =>
+    (equipeToda ? (team ?? []) : (team ?? []).filter((p) => p.shiftId === key))
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   return (
     <div className="flex flex-col gap-3">
       <p className="text-[11.5px] text-t2">
-        {individual
-          ? "Premiação de cada pessoa calculada sobre a própria meta individual."
-          : equipeToda
-            ? "Premiação da equipe calculada sobre a meta da loja e dividida igualmente entre as pessoas."
-            : "Premiação do grupo calculada sobre a meta do grupo e dividida igualmente entre as pessoas."}
+        {temNivel
+          ? individual
+            ? "Premiação de cada pessoa calculada sobre a própria meta individual."
+            : equipeToda
+              ? "Premiação da equipe calculada sobre a meta da loja e dividida igualmente entre as pessoas."
+              : "Premiação do grupo calculada sobre a meta do grupo e dividida igualmente entre as pessoas."
+          : individual
+            ? equipeToda
+              ? "Meta individual de cada pessoa, com a meta da loja dividida pela equipe."
+              : "Meta individual de cada pessoa, com a meta do grupo dividida pelas pessoas do grupo."
+            : equipeToda
+              ? "Meta da loja para a equipe toda."
+              : "Meta de cada grupo conforme a distribuição."}
       </p>
       {grupos.map((g) => {
         const resultados = g.base != null ? tierResults(tiers, g.base) : [];
@@ -1432,7 +1443,7 @@ function Simulation({
                   ? "Nenhuma pessoa na equipe de vendas desta loja."
                   : "Nenhuma pessoa neste grupo."}
               </p>
-            ) : (
+            ) : temNivel ? (
               <div className="flex flex-col gap-1">
                 {tiers.map((t, i) => {
                   const r = resultados[i]!;
@@ -1484,11 +1495,28 @@ function Simulation({
                   );
                 })}
               </div>
+            ) : (
+              <div className="flex flex-col">
+                {membrosDe(g.key).map((p) => (
+                  <div key={`${p.storeId}:${p.employeeId}`} className="flex items-center gap-2.5 py-1">
+                    <Avatar name={p.name} size="sm" />
+                    <p className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-t0">{p.name}</p>
+                    {individual && g.base != null && (
+                      <span className="shrink-0 font-mono text-[12px] text-t1">{brlCent(g.base)}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         );
       })}
-      {managerOn && <ManagerSimulation tiers={tiers} target={target} />}
+      {tiersOn && !temNivel && (
+        <p className="text-[11.5px] text-t2">
+          Informe a meta de pelo menos um nível para simular a premiação.
+        </p>
+      )}
+      {temNivel && managerOn && <ManagerSimulation tiers={tiers} target={target} />}
     </div>
   );
 }
