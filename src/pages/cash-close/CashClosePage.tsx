@@ -803,12 +803,13 @@ function Mes({
         <div className="grid grid-cols-7">
         {cells.map((day, i) => {
           const face = day && day <= hoje ? faceDoDia(day) : null;
+          const fechouIgual = face?.kind === "total" && face.diffCents === 0;
           const cor =
             face?.kind === "pendente"
               ? "bg-warn-soft"
               : face?.kind === "total" && face.diffCents < 0
                 ? "bg-bad-soft"
-                : face?.kind === "total" && face.diffCents > 0
+                : fechouIgual || (face?.kind === "total" && face.diffCents > 0)
                   ? "bg-ok-soft"
                   : "";
           const borda = cn(
@@ -845,7 +846,7 @@ function Mes({
             </>
           );
           if (futuro || face?.kind === "zero") return <div key={day} className={borda}>{miolo}</div>;
-          const pintado = face?.kind === "pendente" || (face?.kind === "total" && face.diffCents !== 0);
+          const pintado = face?.kind === "pendente" || face?.kind === "total";
           return (
             <button key={day} type="button" className={cn(borda, pintado ? "hover:brightness-95" : "hover:bg-bg-3")} onClick={() => onOpen(day)}>
               {miolo}
