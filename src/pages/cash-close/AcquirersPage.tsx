@@ -53,7 +53,7 @@ export function AcquirersPage() {
       <SectionHeader
         section="Custos"
         title="Adquirentes"
-        subtitle="Conecte a Stone de cada loja para buscar os fechamentos de cartão e Pix na WDash."
+        subtitle="Conecte as adquirentes desta loja para buscar os fechamentos de cartão e Pix na WDash."
       />
       {escolher ? (
         <div className="mt-6 max-w-[720px]">

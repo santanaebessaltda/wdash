@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Card, useToast } from "@/components/ui";
 import { EMPTY_STORE_COSTS, updateStoreCosts, type Store, type StoreCosts } from "@/data/wedash/stores";
-import { FormActions, NumberField, SAVE_ERROR_MSG, StoreCardHeader, numText, parseNum } from "./shared";
+import { CostCardTitle, FormActions, NumberField, SAVE_ERROR_MSG, numText, parseNum } from "./shared";
 
 /** Campo de custo da loja: le e grava um pedaco de `store.custos`. */
 export type CostField = {
@@ -67,6 +67,7 @@ export type CostFieldSection = { title: string; hint?: string; keys: string[] };
 export function CostFieldsCard({
   loja,
   fields,
+  title,
   intro,
   sections,
   footer,
@@ -74,6 +75,7 @@ export function CostFieldsCard({
 }: {
   loja: Store;
   fields: CostField[];
+  title: string;
   intro?: ReactNode;
   sections?: CostFieldSection[];
   footer?: ReactNode;
@@ -112,7 +114,7 @@ export function CostFieldsCard({
 
   return (
     <Card>
-      <StoreCardHeader loja={loja} />
+      <CostCardTitle title={title} />
       <form
         className="flex flex-col gap-4"
         onSubmit={(e) => {

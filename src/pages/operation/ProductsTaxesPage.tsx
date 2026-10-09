@@ -4,7 +4,7 @@ import { StoreCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { fetchCostTables, updateStoreCosts, updateStoreCostTable, type CostTable, type Store } from "@/data/wedash/stores";
 import { syncProductsNow } from "@/data/wedash/productCatalog";
 import { INVALID_COSTS_MSG, pctField, useCostFields, type CostField, type CostFieldSection } from "./costFields";
-import { FormActions, NumberField, SAVE_ERROR_MSG, StoreCardHeader, StoreCardsPage, useScopedStores } from "./shared";
+import { CostCardTitle, FormActions, NumberField, SAVE_ERROR_MSG, StoreCardsPage, useScopedStores } from "./shared";
 
 function taxFields(loja: Store): CostField[] {
   return [
@@ -34,7 +34,7 @@ function taxSections(loja: Store): CostFieldSection[] {
 }
 
 const INTRO =
-  "A tabela de custo ajuda a completar produtos vendidos sem custo no Millennium. ICMS e ICMS ST entram no lucro bruto e na margem, cada um sobre a sua marca. Campos vazios são considerados 0.";
+  "A tabela de custo ajuda a completar produtos vendidos sem custo no Millennium. ICMS e ICMS ST são considerados no cálculo do lucro bruto e da margem de cada marca. Nos campos de imposto, valores vazios são considerados 0%.";
 
 /** Configuracoes > Produtos e impostos  -  tabela de custo do Millennium, ICMS e ICMS ST. */
 export function ProductsTaxesPage() {
@@ -58,9 +58,9 @@ export function ProductsTaxesPage() {
     <StoreCardsPage
       section="Custos"
       title="Produtos e impostos"
-      subtitle="Configure a tabela de custo dos produtos e os impostos de cada loja."
+      subtitle="Configure a tabela de custo dos produtos e os impostos da loja."
       loading={loading}
-      skeleton={(n) => <StoreCardsSkeleton count={n} intro fields={1} sections={1} />}
+      skeleton={(n) => <StoreCardsSkeleton count={n} title intro fields={1} sections={1} />}
       lojas={lojas}
       oneStore
     >
@@ -123,7 +123,7 @@ function ProductsTaxesCard({
 
   return (
     <Card>
-      <StoreCardHeader loja={loja} />
+      <CostCardTitle title="Tabela de custo e impostos" />
       <form
         className="flex flex-col gap-4"
         onSubmit={(e) => {
@@ -141,7 +141,7 @@ function ProductsTaxesCard({
             disabled={tablesLoading}
             onChange={(e) => setTable(e.target.value ? Number(e.target.value) : null)}
           >
-            <option value="">{tablesLoading ? "Buscando tabelas no Millennium…" : "Nenhuma"}</option>
+            <option value="">{tablesLoading ? "Buscando tabelas no Millennium…" : "Nenhuma tabela"}</option>
             {!tablesLoading && table != null && !tables.some((t) => t.id === table) && (
               <option value={String(table)}>Tabela {table} · indisponível</option>
             )}

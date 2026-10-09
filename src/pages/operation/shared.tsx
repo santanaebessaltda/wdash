@@ -122,7 +122,7 @@ export function SelectStoreCard() {
         framed={false}
         icon="🏬"
         title="Selecione uma loja"
-        description="Estes dados são de uma filial. Escolha a loja no seletor do topo."
+        description="Estas configurações são definidas por loja. Escolha uma loja no seletor do topo para continuar."
       />
     </Card>
   );
@@ -182,6 +182,15 @@ export function StoreCardsPage({
         )}
       </div>
     </div>
+  );
+}
+
+/** Titulo do card de custo, sem repetir a loja do seletor. */
+export function CostCardTitle({ title }: { title: string }) {
+  return (
+    <CardHeader>
+      <CardTitle>{title}</CardTitle>
+    </CardHeader>
   );
 }
 

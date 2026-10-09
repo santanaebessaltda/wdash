@@ -898,10 +898,13 @@ export function StoreCardsSkeleton({
   schedule = false,
   sections = 0,
   intro = false,
+  title = false,
   wide = false,
 }: {
   /** Linha de texto de apoio antes dos campos. */
   intro?: boolean;
+  /** Titulo do card, no lugar do hero da loja. */
+  title?: boolean;
   count?: number;
   fields?: number;
   rows?: number;
@@ -926,7 +929,7 @@ export function StoreCardsSkeleton({
           </Card>
         ) : (
           <Card key={c}>
-            <StoreHeadSkeleton />
+            {title ? <Skeleton className="mb-4 h-4 w-56" /> : <StoreHeadSkeleton />}
             {shifts && <ShiftRowsSkeleton />}
             {schedule && <ScheduleSkeleton />}
             {sections > 0 && (

@@ -3,7 +3,7 @@ import { Card, Segmented, useToast } from "@/components/ui";
 import { StoreCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { updateStoreCosts, type PointType, type Store } from "@/data/wedash/stores";
 import { INVALID_COSTS_MSG, useCostFields, type CostField } from "./costFields";
-import { FormActions, NumberField, SAVE_ERROR_MSG, StoreCardHeader, StoreCardsPage, parseNum, useScopedStores } from "./shared";
+import { CostCardTitle, FormActions, NumberField, SAVE_ERROR_MSG, StoreCardsPage, parseNum, useScopedStores } from "./shared";
 
 const RENT_MIN: CostField = {
   key: "rentMin",
@@ -36,8 +36,8 @@ const INTRO =
 
 const POINT_HINT: Record<PointType, string[]> = {
   SHOPPING: [
-    "No shopping, vale o maior valor entre o aluguel mensal e o aluguel percentual. Quando o percentual for maior, apenas o valor excedente é acrescentado aos custos da operação.",
-    "Exemplo: aluguel mensal de R$ 10.000,00 e 10% sobre R$ 120.000,00 de faturamento = R$ 12.000,00 de aluguel, sendo R$ 2.000,00 de aluguel percentual excedente.",
+    "No shopping, a WDash considera o maior valor entre o aluguel mensal e o aluguel percentual. Quando o percentual for maior, somente o valor excedente é acrescentado ao aluguel mensal.",
+    "Exemplo: com aluguel mensal de R$ 10.000,00 e aluguel percentual de 10% sobre R$ 120.000,00 de faturamento, o aluguel considerado será de R$ 12.000,00. Os R$ 2.000,00 adicionais correspondem ao aluguel percentual excedente.",
     "No mês em andamento, a comparação considera o aluguel mensal proporcional aos dias já passados.",
   ],
   RUA: ["Na loja de rua, a WDash considera somente o aluguel mensal."],
@@ -52,7 +52,7 @@ export function RentPage() {
       title="Aluguel"
       subtitle="Configure o aluguel mensal e, para lojas em shopping, o percentual sobre o faturamento."
       loading={loading}
-      skeleton={(n) => <StoreCardsSkeleton count={n} intro fields={2} />}
+      skeleton={(n) => <StoreCardsSkeleton count={n} title intro fields={2} />}
       lojas={lojas}
       oneStore
     >
@@ -88,7 +88,7 @@ function RentCard({ loja, onSaved }: { loja: Store; onSaved: () => void }) {
 
   return (
     <Card>
-      <StoreCardHeader loja={loja} />
+      <CostCardTitle title="Aluguel da loja" />
       <form
         className="flex flex-col gap-4"
         onSubmit={(e) => {

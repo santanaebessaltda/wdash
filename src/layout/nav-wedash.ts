@@ -55,7 +55,7 @@ const operacao: NavGroup = {
 /** Franquia  |  Aluguel  |  Produtos e impostos  |  Adquirentes (só Gestor). */
 const custos: NavGroup = {
   label: "Custos",
-  description: "Defina franquia, aluguel, impostos e a adquirente de cada loja.",
+  description: "Configure franquia, aluguel, custos de produtos, impostos e adquirentes de cada loja.",
   icon: ICONE.custos,
   items: [
     { label: "Franquia", to: paths.operation.franchise },
