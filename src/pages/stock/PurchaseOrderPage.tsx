@@ -484,7 +484,7 @@ export function PurchaseOrderPage() {
         onClose={() => {
           if (!copiando) setCopiarAberto(false);
         }}
-        title="Copiar para outras lojas"
+        title="Copiar mínimos"
         size="sm"
         footer={
           <>
@@ -499,14 +499,7 @@ export function PurchaseOrderPage() {
       >
         {loja && (todas || destino) && (
           <div className="flex flex-col gap-3">
-            <p className="text-[13px] leading-relaxed text-t1">
-              {todas
-                ? `Os mínimos de ${loja.fantasia} serão copiados para todas as outras lojas. Não é preciso trocar a loja selecionada no topo.`
-                : `Os mínimos de ${loja.fantasia} serão copiados para ${destino?.fantasia}. Não é preciso trocar a loja selecionada no topo.`}
-            </p>
-            <p className="text-[13px] leading-relaxed text-t2">
-              Apenas produtos que existem nas duas lojas serão atualizados. O mínimo da loja de destino será substituído pelo mínimo desta loja. Produtos que existem somente no destino não serão alterados.
-            </p>
+            <p className="text-[13px] leading-relaxed text-t1">Copie os mínimos de {loja.fantasia} para outra loja ou para todas.</p>
             <FormField label="Copiar para">
               <Select value={todas ? "" : (destino?.id ?? "")} onChange={(e) => setDestinoId(e.target.value)} disabled={copiando}>
                 {outrasLojas.length > 1 && <option value="">Todas as outras lojas</option>}
@@ -517,6 +510,11 @@ export function PurchaseOrderPage() {
                 ))}
               </Select>
             </FormField>
+            <p className="text-[13px] leading-relaxed text-t2">
+              {todas
+                ? "Os mínimos dos produtos em comum serão atualizados nas outras lojas. Os demais não serão alterados."
+                : "Os mínimos dos produtos em comum serão substituídos. Os demais não serão alterados."}
+            </p>
           </div>
         )}
       </Modal>
