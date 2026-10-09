@@ -16,8 +16,14 @@ function hashString(s: string) {
   return h;
 }
 
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/);
+/** Mesma cor do avatar do cabeçalho: o nome escolhe um dos degradês. */
+export function avatarGradient(name: string): string {
+  return GRADIENTS[hashString(name) % GRADIENTS.length];
+}
+
+export function avatarInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
@@ -50,7 +56,7 @@ const statusColors: Record<NonNullable<AvatarProps["status"]>, string> = {
 };
 
 export function Avatar({ name, src, size = "md", status, className, ring }: AvatarProps) {
-  const gradient = GRADIENTS[hashString(name) % GRADIENTS.length];
+  const gradient = avatarGradient(name);
   const [falhou, setFalhou] = useState<string | null>(null);
   const foto = src && falhou !== src ? src : null;
   return (
@@ -71,7 +77,7 @@ export function Avatar({ name, src, size = "md", status, className, ring }: Avat
           )}
           style={{ background: gradient }}
         >
-          {initials(name || "?")}
+          {avatarInitials(name)}
         </span>
       )}
       {status && (

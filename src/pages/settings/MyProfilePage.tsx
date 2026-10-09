@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Badge, Button, Card, CardHeader, CardSubtitle, CardTitle, FormField, Input, useToast } from "@/components/ui";
+import { Badge, Button, Card, CardHeader, CardSubtitle, CardTitle, FormField, Input, useToast, avatarGradient, avatarInitials } from "@/components/ui";
 import { CampoSenha, CamposNome, ForcaSenha, nomePessoaValido, type NomePessoa } from "@/pages/access/AccessKit";
 import { SAVE_ERROR_MSG } from "@/pages/operation/shared";
 import { CheckIcon, PlusIcon } from "@/pages/utility/icons";
@@ -19,11 +19,6 @@ const THEME_OPTIONS: { value: ThemePreference; label: string; background: string
 function dividirNome(nome: string): NomePessoa {
   const [first = "", ...rest] = nome.trim().split(/\s+/);
   return { nome: first, sobrenome: rest.join(" ") };
-}
-
-function iniciais(nome: string): string {
-  const partes = nome.trim().split(/\s+/);
-  return `${partes[0]?.charAt(0) ?? ""}${partes.length > 1 ? partes[partes.length - 1]!.charAt(0) : ""}`.toUpperCase();
 }
 
 /** Padrao Account > Profile do Vela: foto 88px com "+", nome, e-mail e papel. A foto grava na hora. */
@@ -53,10 +48,10 @@ function ProfileSummaryCard({ salvo }: { salvo: NomePessoa }) {
           onClick={escolher}
           aria-label={session.avatarUrl ? "Trocar foto de perfil" : "Adicionar foto de perfil"}
           className="flex h-[88px] w-[88px] items-center justify-center overflow-hidden rounded-[24px] text-[32px] font-extrabold text-white disabled:opacity-60"
-          style={{ background: "linear-gradient(135deg,#7c5cff,#56a8ff)" }}
+          style={{ background: avatarGradient(session.name) }}
           disabled={enviando}
         >
-          {session.avatarUrl ? <img src={session.avatarUrl} alt="" className="h-full w-full object-cover" /> : iniciais(session.name)}
+          {session.avatarUrl ? <img src={session.avatarUrl} alt="" className="h-full w-full object-cover" /> : avatarInitials(session.name)}
         </button>
         <button
           type="button"
