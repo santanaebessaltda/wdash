@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Alert, Badge, Button, Card, Modal, Skeleton, useToast } from "@/components/ui";
+import { Alert, Badge, Button, Card, FormField, Input, Modal, Segmented, Skeleton, Textarea, useToast } from "@/components/ui";
 import { monthCloseSpanFor } from "@/data/wedash/cashCloseMonth";
 import {
   applyCloseReview,
@@ -24,7 +24,6 @@ import {
   type CashCloseReview,
   type CashCloseSnapshot,
 } from "@/data/wedash/cashCloseRepo";
-import type { ShortageScope } from "@/data/wedash/shortageAssign";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { fetchSalesDayAggs, fetchSyncWatermark } from "@/data/wedash/salesRepo";
 import type { Store } from "@/data/wedash/stores";
@@ -127,14 +126,19 @@ function linesWithDraft(lines: CashCloseLine[], draft: CloseDraft | undefined): 
   });
 }
 
+type BreakIntent = "ponder" | "known";
+
 type CloseDraft = {
   typed: Partial<Record<CashCloseBucket, string>>;
   acquirer: Partial<Record<CashCloseBucket, string>>;
   justification: string;
-  scope: ShortageScope;
-  sellers: string[];
-  group: string;
+  intent: BreakIntent;
+  person: string;
 };
+
+function intentOf(review: CashCloseReview | undefined): BreakIntent {
+  return review?.shortageScope === "seller" ? "known" : "ponder";
+}
 
 function CloseTable({
   lines,
@@ -624,13 +628,14 @@ export function CashClosePage() {
     return { resumo: monthCloseSummary(rows), porDia };
   }, [marks, reviews, marksKey, faixaKey, hoje]);
 
-  function faceDoDia(day: string): { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number; aguardando?: boolean } {
+  function faceDoDia(day: string): { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number; aguardando?: boolean; nota?: string } {
     const info = analise?.porDia.get(day);
+    const nota = notaDaQuebra(reviews.filter((review) => review.day === day));
     if (day === hoje) return { kind: "hoje", totalCents: soldToday?.cents ?? 0, diffCents: 0, aguardando: soldToday == null };
     if (info?.pending) return { kind: "pendente", totalCents: info.systemCents, diffCents: 0 };
     if (!info || (info.systemCents === 0 && info.realCents === 0)) return { kind: "zero", totalCents: 0, diffCents: 0 };
     if (!info.hasMillennium && !info.hasLines) return { kind: "vazio", totalCents: 0, diffCents: 0 };
-    return { kind: "total", totalCents: info.realCents, diffCents: info.diffCents };
+    return { kind: "total", totalCents: info.realCents, diffCents: info.diffCents, nota: info.diffCents < 0 ? nota : "" };
   }
 
   function abrirDia(iso: string) {
@@ -725,6 +730,14 @@ export function CashClosePage() {
   );
 }
 
+function notaDaQuebra(reviews: CashCloseReview[]): string {
+  for (const review of reviews) {
+    if (review.shortageScope === "seller") return review.shortageSellers[0]?.trim() || "Motivo anotado";
+    if (review.justification.trim()) return "Ponderar";
+  }
+  return "";
+}
+
 function textoDiferenca(cents: number): string {
   if (cents > 0) return "Sobra nos dias que já têm total real";
   if (cents < 0) return "Quebra nos dias que já têm total real";
@@ -789,7 +802,7 @@ function Mes({
 }: {
   hoje: string;
   cells: Array<string | null>;
-  faceDoDia: (day: string) => { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number; aguardando?: boolean };
+  faceDoDia: (day: string) => { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number; aguardando?: boolean; nota?: string };
   onOpen: (iso: string) => void;
 }) {
   return (
@@ -841,6 +854,7 @@ function Mes({
                       {totalDia(face.diffCents)}
                     </Badge>
                   )}
+                  {face.kind === "total" && face.nota ? <p className="mt-1 truncate text-[10px] font-semibold text-t2">{face.nota}</p> : null}
                 </div>
               )}
             </>
@@ -855,6 +869,53 @@ function Mes({
         })}
         </div>
       </div>
+    </div>
+  );
+}
+
+function JustificativaDaQuebra({
+  gestor,
+  draft,
+  onChange,
+}: {
+  gestor: boolean;
+  draft: CloseDraft;
+  onChange: (next: CloseDraft) => void;
+}) {
+  return (
+    <div className="mt-4 flex flex-col gap-3 rounded-[14px] border border-line bg-bg-1 px-3 py-3">
+      <div>
+        <p className="text-[13px] font-bold text-t0">Justificativa da quebra</p>
+        <p className="mt-0.5 text-[12px] text-t2">A WDash só guarda a anotação. O desconto continua por fora.</p>
+      </div>
+      <Segmented
+        options={[
+          { value: "ponder", label: "Vou ponderar" },
+          { value: "known", label: "Já sei o motivo" },
+        ]}
+        value={draft.intent}
+        onChange={(intent) => {
+          if (gestor && intent) onChange({ ...draft, intent });
+        }}
+      />
+      <FormField label="Motivo">
+        <Textarea
+          value={draft.justification}
+          disabled={!gestor}
+          placeholder={draft.intent === "known" ? "O que aconteceu" : "O que ainda quer olhar"}
+          onChange={(e) => onChange({ ...draft, justification: e.target.value })}
+        />
+      </FormField>
+      {draft.intent === "known" && (
+        <FormField label="Descontar de">
+          <Input
+            value={draft.person}
+            disabled={!gestor}
+            placeholder="Uma pessoa, se já for descontar"
+            onChange={(e) => onChange({ ...draft, person: e.target.value })}
+          />
+        </FormField>
+      )}
     </div>
   );
 }
@@ -907,10 +968,9 @@ function DiaModal({
       next[loja.id] = {
         typed,
         acquirer,
-        justification: "",
-        scope: "store",
-        sellers: [],
-        group: "",
+        justification: review?.justification ?? "",
+        intent: intentOf(review),
+        person: review?.shortageSellers[0] ?? "",
       };
     }
     setDrafts(next);
@@ -957,16 +1017,19 @@ function DiaModal({
         setBusy(false);
         return;
       }
+      const ajustadas = linesWithDraft(linhas, draft);
+      const quebra = fechado && !dayWithoutReal(ajustadas) && closeDayGap(ajustadas).diffCents < 0;
+      const person = draft.person.trim();
       const saved: CashCloseReview = {
         storeId: loja.id,
         day,
         cashTypedCents: typedCents.cash ?? null,
-        justification: "",
+        justification: quebra ? draft.justification.trim() : "",
         waive: false,
         typedCents,
         acquirerCents,
-        shortageScope: "",
-        shortageSellers: [],
+        shortageScope: quebra && draft.intent === "known" ? "seller" : "",
+        shortageSellers: quebra && draft.intent === "known" && person ? [person] : [],
         shortageGroup: "",
       };
       const r = await saveCashCloseReview({ tenantId, ...saved });
@@ -1053,6 +1116,13 @@ function DiaModal({
                     }))
                   }
                 />
+                {draft && fechado && !dayWithoutReal(linhas) && conta.diffCents < 0 && (
+                  <JustificativaDaQuebra
+                    gestor={gestor}
+                    draft={draft}
+                    onChange={(next) => setDrafts((atual) => ({ ...atual, [loja.id]: next }))}
+                  />
+                )}
               </section>
             );
           })}
