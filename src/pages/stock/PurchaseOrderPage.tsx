@@ -512,6 +512,9 @@ export function PurchaseOrderPage() {
         size="lg"
         footer={
           <>
+            <span className="mr-auto min-w-0 text-[13px] font-extrabold text-t0">
+              Total {money(reais(purchaseOrderTotalCents(resumoPedido ?? [])))}
+            </span>
             <Button variant="outline" onClick={() => setResumoPedido(null)}>
               Cancelar
             </Button>
@@ -525,43 +528,34 @@ export function PurchaseOrderPage() {
               {loja ? `${loja.fantasia}. ` : ""}
               {resumoPedido.length === 1 ? "1 produto" : `${num(resumoPedido.length)} produtos`}
               {" · "}
-              {num(resumoPedido.reduce((s, r) => s + (r.aPedir ?? 0), 0))} itens. Confira as quantidades e o custo antes de gerar a planilha.
+              {num(resumoPedido.reduce((s, r) => s + (r.aPedir ?? 0), 0))} itens.
             </p>
             {resumoPedido.some((r) => r.custoCents == null) && (
-              <p className="text-[13px] leading-relaxed text-t2">
-                Algum produto deste pedido está sem custo. O total só aparece quando todos têm preço.
-              </p>
+              <p className="text-[13px] leading-relaxed text-t2">Algum produto está sem custo. O total só aparece quando todos têm preço.</p>
             )}
-            <table className="w-full border-collapse text-sm">
+            <table className="w-full table-fixed border-collapse text-sm">
               <thead className="sticky top-0 bg-bg-2">
-                <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
-                  <th className="pb-2 text-left font-bold">Produto</th>
-                  <th className="pb-2 text-right font-bold">Quantidade</th>
-                  <th className="pb-2 text-right font-bold">Custo</th>
-                  <th className="pb-2 pl-3 text-right font-bold">Total</th>
+                <tr className="border-b border-line text-[11px] font-bold text-t2">
+                  <th className="pb-2 text-left">Produto</th>
+                  <th className="w-12 pb-2 text-right">Qtd</th>
+                  <th className="w-24 pb-2 text-right">Unitário</th>
+                  <th className="w-24 pb-2 text-right">Valor</th>
                 </tr>
               </thead>
               <tbody>
-                {resumoPedido.map((r, i) => (
+                {resumoPedido.map((r) => (
                   <tr key={r.code} className="border-b border-line">
-                    <td className="py-2 pr-3">
-                      <ProductNameCell nome={r.nome} idx={i} sub={r.code} />
+                    <td className="max-w-0 py-2 pr-2">
+                      <p className="truncate text-[13px] font-bold text-t0">{r.nome}</p>
+                      <p className="truncate text-[11px] text-t2">{r.code}</p>
                     </td>
                     <td className="py-2 text-right">
                       <Qty v={r.aPedir ?? 0} strong />
                     </td>
-                    <td className="py-2 text-right font-mono text-[13px] tabular-nums text-t0">{money(r.custoCents == null ? null : r.custoCents / 100)}</td>
-                    <td className="py-2 pl-3 text-right font-mono text-[13px] font-bold tabular-nums text-t0">{money(reais(purchaseLineCents(r)))}</td>
+                    <td className="py-2 text-right font-mono text-[12px] tabular-nums text-t1">{money(r.custoCents == null ? null : r.custoCents / 100)}</td>
+                    <td className="py-2 text-right font-mono text-[12px] font-bold tabular-nums text-t0">{money(reais(purchaseLineCents(r)))}</td>
                   </tr>
                 ))}
-                <tr className="bg-bg-inset">
-                  <td className="py-3 text-[13px] font-extrabold text-t0">Total do pedido</td>
-                  <td />
-                  <td />
-                  <td className="py-3 pl-3 text-right font-mono text-[13px] font-extrabold tabular-nums text-t0">
-                    {money(reais(purchaseOrderTotalCents(resumoPedido)))}
-                  </td>
-                </tr>
               </tbody>
             </table>
           </div>
