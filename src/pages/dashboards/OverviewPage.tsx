@@ -452,7 +452,7 @@ export default function OverviewPage() {
                 activePresetId={periodActivePresetId(escopo.periodo)}
                 minDate={pickerMinDate(coverageFrom, monthFill)}
               />
-              <Button variant="secondary" onClick={exportar}>
+              <Button variant="primary" onClick={exportar}>
                 Exportar
               </Button>
             </div>

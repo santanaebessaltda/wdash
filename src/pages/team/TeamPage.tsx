@@ -402,7 +402,7 @@ export function TeamPage() {
                   options={[{ value: "", label: "Todos os grupos" }, ...view.turnosDisponiveis.map((t) => ({ value: t, label: t }))]}
                 />
               )}
-              <Button variant="secondary" onClick={exportar}>
+              <Button variant="primary" onClick={exportar}>
                 Exportar
               </Button>
             </div>
