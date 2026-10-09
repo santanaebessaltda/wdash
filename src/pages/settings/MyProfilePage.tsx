@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Badge, Button, Card, CardHeader, CardSubtitle, CardTitle, FormField, Input, Segmented, useToast } from "@/components/ui";
+import { Badge, Button, Card, CardHeader, CardSubtitle, CardTitle, FormField, Input, useToast } from "@/components/ui";
 import { CampoSenha, CamposNome, ForcaSenha, nomePessoaValido, type NomePessoa } from "@/pages/access/AccessKit";
 import { SAVE_ERROR_MSG } from "@/pages/operation/shared";
-import { PlusIcon } from "@/pages/utility/icons";
+import { CheckIcon, PlusIcon } from "@/pages/utility/icons";
 import { AVATAR_TIPOS } from "@/lib/avatar";
 import { SENHA_REGRA_TEXTO, senhaValida } from "@/lib/password";
 import { titleName } from "@/lib/format";
@@ -10,10 +10,10 @@ import { changeMyPassword, fetchMyNames, saveMyProfile, saveThemePreference } fr
 import { accessLabel, useActiveSession, useSession } from "@/session/SessionProvider";
 import { useTheme, type ThemePreference } from "@/theme/ThemeProvider";
 
-const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
-  { value: "light", label: "Claro" },
-  { value: "dark", label: "Escuro" },
-  { value: "system", label: "Automático" },
+const THEME_OPTIONS: { value: ThemePreference; label: string; background: string; borderColor: string }[] = [
+  { value: "dark", label: "Escuro", background: "#0c0e15", borderColor: "#1e2230" },
+  { value: "light", label: "Claro", background: "#f5f6fa", borderColor: "#e2e5ee" },
+  { value: "system", label: "Sistema", background: "linear-gradient(135deg,#0c0e15 50%,#f5f6fa 50%)", borderColor: "#1e2230" },
 ];
 
 function dividirNome(nome: string): NomePessoa {
@@ -200,17 +200,34 @@ function ThemeCard() {
     <Card>
       <div className="mb-4">
         <CardTitle>Aparência</CardTitle>
-        <CardSubtitle>Escolha como a WDash aparece para você em todos os aparelhos. No modo Automático, seguimos a configuração do sistema de cada aparelho.</CardSubtitle>
+        <CardSubtitle>Escolha como a WDash aparece para você em todos os aparelhos. No modo Sistema, seguimos a configuração do sistema de cada aparelho.</CardSubtitle>
       </div>
-      <Segmented
-        options={THEME_OPTIONS}
-        value={preference}
-        onChange={(v) => {
-          if (!v) return;
-          setPreference(v);
-          void saveThemePreference(v);
-        }}
-      />
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+        {THEME_OPTIONS.map((m) => {
+          const selected = preference === m.value;
+          return (
+            <button
+              key={m.value}
+              type="button"
+              onClick={() => {
+                setPreference(m.value);
+                void saveThemePreference(m.value);
+              }}
+              className={`rounded-[14px] border-2 p-3.5 text-left ${selected ? "border-acc" : "border-line hover:border-line-2"}`}
+            >
+              <div className="mb-2.5 h-16 rounded-[9px] border" style={{ background: m.background, borderColor: m.borderColor }} />
+              <div className="flex items-center gap-1.5">
+                {selected && (
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-acc">
+                    <CheckIcon size={10} className="text-white" />
+                  </span>
+                )}
+                <span className="text-[12.5px] font-bold text-t0">{m.label}</span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
     </Card>
   );
 }
