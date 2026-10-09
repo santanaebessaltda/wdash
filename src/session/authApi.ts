@@ -656,14 +656,18 @@ export async function fetchThemePreference(): Promise<ThemeChoice | null> {
   return p === "light" || p === "dark" || p === "system" ? p : null;
 }
 
-export async function saveThemePreference(p: ThemeChoice): Promise<void> {
+export async function saveThemePreference(p: ThemeChoice): Promise<boolean> {
   const sb = getSupabase();
-  if (!sb) return;
+  if (!sb) return false;
   const { data: auth } = await sb.auth.getSession();
   const user = auth.session?.user;
-  if (!user) return;
+  if (!user) return false;
   const { error } = await sb.from("identity").update({ theme_preference: p }).eq("auth_user_id", user.id);
-  if (error) console.warn("saveThemePreference:", error.message);
+  if (error) {
+    console.warn("saveThemePreference:", error.message);
+    return false;
+  }
+  return true;
 }
 
 /** Para seed/manual: monta Session a partir de User fixture. */

@@ -186,9 +186,11 @@ function PasswordCard() {
           erro={erroConfirma}
         />
         <ForcaSenha senha={nova} />
-        <Button type="submit" className="self-start" disabled={!pode}>
-          {saving ? "Alterando…" : "Alterar senha"}
-        </Button>
+        <div className="mt-4.5 flex justify-end">
+          <Button type="submit" disabled={!pode}>
+            {saving ? "Alterando…" : "Alterar senha"}
+          </Button>
+        </div>
       </form>
     </Card>
   );
@@ -196,38 +198,79 @@ function PasswordCard() {
 
 function ThemeCard() {
   const { preference, setPreference } = useTheme();
+  const { show } = useToast();
+  const [saved, setSaved] = useState(preference);
+  const [draft, setDraft] = useState(preference);
+  const [saving, setSaving] = useState(false);
+  const dirty = draft !== saved;
+
+  useEffect(() => {
+    if (draft !== saved) return;
+    setSaved(preference);
+    setDraft(preference);
+  }, [preference, draft, saved]);
+
+  function escolher(value: ThemePreference) {
+    setDraft(value);
+    setPreference(value);
+  }
+
+  function desfazer() {
+    setDraft(saved);
+    setPreference(saved);
+  }
+
+  async function salvar(e: FormEvent) {
+    e.preventDefault();
+    if (!dirty || saving) return;
+    setSaving(true);
+    const ok = await saveThemePreference(draft);
+    setSaving(false);
+    if (!ok) return show(SAVE_ERROR_MSG, "danger");
+    setPreference(draft);
+    setSaved(draft);
+    show("Alterações salvas.", "success");
+  }
+
   return (
     <Card>
-      <div className="mb-4">
-        <CardTitle>Aparência</CardTitle>
-        <CardSubtitle>Escolha como a WDash aparece para você em todos os aparelhos. No modo Sistema, seguimos a configuração do sistema de cada aparelho.</CardSubtitle>
-      </div>
-      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
-        {THEME_OPTIONS.map((m) => {
-          const selected = preference === m.value;
-          return (
-            <button
-              key={m.value}
-              type="button"
-              onClick={() => {
-                setPreference(m.value);
-                void saveThemePreference(m.value);
-              }}
-              className={`rounded-[14px] border-2 p-3.5 text-left ${selected ? "border-acc" : "border-line hover:border-line-2"}`}
-            >
-              <div className="mb-2.5 h-16 rounded-[9px] border" style={{ background: m.background, borderColor: m.borderColor }} />
-              <div className="flex items-center gap-1.5">
-                {selected && (
-                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-acc">
-                    <CheckIcon size={10} className="text-white" />
-                  </span>
-                )}
-                <span className="text-[12.5px] font-bold text-t0">{m.label}</span>
-              </div>
-            </button>
-          );
-        })}
-      </div>
+      <form onSubmit={salvar} noValidate>
+        <div className="mb-4">
+          <CardTitle>Aparência</CardTitle>
+          <CardSubtitle>Escolha como a WDash aparece para você em todos os aparelhos. No modo Sistema, seguimos a configuração do sistema de cada aparelho.</CardSubtitle>
+        </div>
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+          {THEME_OPTIONS.map((m) => {
+            const selected = draft === m.value;
+            return (
+              <button
+                key={m.value}
+                type="button"
+                onClick={() => escolher(m.value)}
+                className={`rounded-[14px] border-2 p-3.5 text-left ${selected ? "border-acc" : "border-line hover:border-line-2"}`}
+              >
+                <div className="mb-2.5 h-16 rounded-[9px] border" style={{ background: m.background, borderColor: m.borderColor }} />
+                <div className="flex items-center gap-1.5">
+                  {selected && (
+                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-acc">
+                      <CheckIcon size={10} className="text-white" />
+                    </span>
+                  )}
+                  <span className="text-[12.5px] font-bold text-t0">{m.label}</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+        <div className="mt-4.5 flex justify-end gap-2.5">
+          <Button variant="outline" type="button" onClick={desfazer} disabled={!dirty || saving}>
+            Desfazer alterações
+          </Button>
+          <Button type="submit" disabled={!dirty || saving}>
+            {saving ? "Salvando…" : "Salvar alterações"}
+          </Button>
+        </div>
+      </form>
     </Card>
   );
 }
