@@ -11,12 +11,15 @@ import type { Store } from "@/data/wedash/stores";
 import { isGestor } from "@/layout/nav-wedash";
 import { noAutofill, secretStyle } from "@/lib/noAutofill";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
-import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
+import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
+import { useScope } from "@/pages/dashboard/useScope";
 
 /** Custos > Adquirentes. A chave é da loja, no mesmo desenho do Millennium. */
 export function AcquirersPage() {
   const { show } = useToast();
   const { session, lojas, loading: lojasLoading } = useScopedStores();
+  const { escopo } = useScope();
+  const escolher = pickOneStore(escopo.filialIds, session.stores.length);
   const showSkeleton = useMinSkeleton(lojasLoading);
   const [links, setLinks] = useState<StoneLink[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,6 +55,11 @@ export function AcquirersPage() {
         title="Adquirentes"
         subtitle="Conecte a Stone de cada loja para buscar os fechamentos de cartão e Pix na WDash."
       />
+      {escolher ? (
+        <div className="mt-6 max-w-[720px]">
+          <SelectStoreCard />
+        </div>
+      ) : (
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {showSkeleton || (loading && links.length === 0 && lojas.length > 0) ? (
           <Card>
@@ -91,6 +99,7 @@ export function AcquirersPage() {
           </Card>
       )}
       </div>
+      )}
       <StoneModal
         open={aberto}
         lojas={lojas}

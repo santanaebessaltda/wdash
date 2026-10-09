@@ -54,6 +54,7 @@ export function RentPage() {
       loading={loading}
       skeleton={(n) => <StoreCardsSkeleton count={n} intro fields={2} />}
       lojas={lojas}
+      oneStore
     >
       {(loja) => <RentCard loja={loja} onSaved={refresh} />}
     </StoreCardsPage>

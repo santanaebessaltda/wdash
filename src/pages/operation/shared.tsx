@@ -109,6 +109,25 @@ export function SectionHeader({
   );
 }
 
+/** "Todas" com mais de uma loja na sessão. Quem tem uma loja só segue vendo o conteúdo. */
+export function pickOneStore(filialIds: string[], sessionStoreCount: number): boolean {
+  return filialIds.length === 0 && sessionStoreCount > 1;
+}
+
+/** Card vazio das telas que só fazem sentido com uma filial no seletor. */
+export function SelectStoreCard() {
+  return (
+    <Card>
+      <EmptyState
+        framed={false}
+        icon="🏬"
+        title="Selecione uma loja"
+        description="Estes dados são de uma filial. Escolha a loja no seletor do topo."
+      />
+    </Card>
+  );
+}
+
 /** Cabecalho da secao + 1 card por loja do escopo. */
 export function StoreCardsPage({
   section,
@@ -119,6 +138,7 @@ export function StoreCardsPage({
   skeleton,
   lojas,
   wide = false,
+  oneStore = false,
   children,
 }: {
   section: SectionName;
@@ -130,17 +150,24 @@ export function StoreCardsPage({
   skeleton: (count: number) => ReactNode;
   lojas: Store[];
   wide?: boolean;
+  /** Com "Todas" e mais de uma loja, pede para escolher uma em vez de empilhar os cards. */
+  oneStore?: boolean;
   children: (loja: Store) => ReactNode;
 }) {
   const showSkeleton = useMinSkeleton(loading);
   const session = useActiveSession();
   const { escopo } = useScope();
+  const escolher = oneStore && pickOneStore(escopo.filialIds, session.stores.length);
   const skeletonCount = Math.max(1, escopo.filialIds.length || session.stores.length);
   return (
     <div>
       <SectionHeader section={section} title={title} subtitle={subtitle} actions={actions} />
       <div className="mt-6">
-        {showSkeleton ? (
+        {escolher ? (
+          <div className="max-w-[720px]">
+            <SelectStoreCard />
+          </div>
+        ) : showSkeleton ? (
           skeleton(skeletonCount)
         ) : lojas.length === 0 ? (
           <Card>

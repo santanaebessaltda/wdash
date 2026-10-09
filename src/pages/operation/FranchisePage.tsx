@@ -47,6 +47,7 @@ export function FranchisePage() {
       loading={loading}
       skeleton={(n) => <StoreCardsSkeleton count={n} sections={1} />}
       lojas={lojas}
+      oneStore
     >
       {(loja) => (
         <CostFieldsCard
