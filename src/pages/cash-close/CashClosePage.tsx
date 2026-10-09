@@ -15,11 +15,7 @@ import {
 import {
   fetchCashCloseMonthMarks,
   fetchCashCloseReviews,
-  fetchCashCloseSales,
-  fetchCashCloseSpan,
   fetchCashCloseSnapshot,
-  fetchCloseShifts,
-  fetchShortageCaptures,
   fetchOpenCashCloseJob,
   fetchLatestCashCloseError,
   requestMonthClose,
@@ -27,14 +23,8 @@ import {
   type CashCloseDayMark,
   type CashCloseReview,
   type CashCloseSnapshot,
-  type CloseCaptureRow,
-  type CloseSaleRow,
-  type CloseShiftRow,
-  type SpanCapture,
-  type SpanSale,
 } from "@/data/wedash/cashCloseRepo";
-import { crossDay, monthCharge, type CrossRow, type MonthCharge } from "@/data/wedash/saleCross";
-import { suggestDayShortage, type ShortageScope, type ShortageSuggestion } from "@/data/wedash/shortageAssign";
+import type { ShortageScope } from "@/data/wedash/shortageAssign";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { fetchSalesDayAggs, fetchSyncWatermark } from "@/data/wedash/salesRepo";
 import type { Store } from "@/data/wedash/stores";
@@ -137,11 +127,6 @@ function linesWithDraft(lines: CashCloseLine[], draft: CloseDraft | undefined): 
   });
 }
 
-/** Justificativa e “Não descontar” só existem com o dia fechado e a diferença negativa. */
-function negativeDayDiff(lines: CashCloseLine[], closed: boolean): boolean {
-  return closed && !dayWithoutReal(lines) && closeDayGap(lines).diffCents < 0;
-}
-
 type CloseDraft = {
   typed: Partial<Record<CashCloseBucket, string>>;
   acquirer: Partial<Record<CashCloseBucket, string>>;
@@ -150,14 +135,6 @@ type CloseDraft = {
   sellers: string[];
   group: string;
 };
-
-function initialTarget(review: CashCloseReview | undefined, suggestion: ShortageSuggestion): Pick<CloseDraft, "scope" | "sellers" | "group"> {
-  if (review?.waive) return { scope: "store", sellers: [], group: "" };
-  if (review && (review.shortageScope === "seller" || review.shortageScope === "group" || review.shortageScope === "everyone")) {
-    return { scope: review.shortageScope, sellers: review.shortageSellers, group: review.shortageGroup };
-  }
-  return { scope: suggestion.scope, sellers: suggestion.sellers, group: suggestion.group };
-}
 
 function CloseTable({
   lines,
@@ -246,81 +223,6 @@ function CloseTable({
         </table>
       </div>
     </>
-  );
-}
-
-const CRUZ_STATUS: Record<CrossRow["status"], string> = {
-  invertida: "Invertida",
-  "sem-captura": "Venda sem cobrança",
-  "sem-venda": "Cobrança sem venda",
-};
-
-function horaLoja(iso: string, timeZone: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return new Intl.DateTimeFormat("pt-BR", { timeZone, hour: "2-digit", minute: "2-digit" }).format(d);
-}
-
-function CruzamentoDoDia({
-  indisponivel,
-  sales,
-  captures,
-  shifts,
-  timeZone,
-  day,
-}: {
-  indisponivel: boolean;
-  sales: CloseSaleRow[];
-  captures: CloseCaptureRow[];
-  shifts: CloseShiftRow[];
-  timeZone: string;
-  day: string;
-}) {
-  if (indisponivel) return <p className="mt-4 text-[12.5px] text-t2">Não foi possível cruzar as vendas deste dia.</p>;
-  const cruz = crossDay({
-    day,
-    timeZone,
-    sales,
-    captures,
-    shifts: shifts.map((shift) => ({ name: shift.name, start: shift.start, end: shift.end })),
-  });
-  if (cruz.matched === 0 && cruz.rows.length === 0) return null;
-  return (
-    <div className="mt-4">
-      <p className="text-[12.5px] text-t2">
-        Só o que não fechou. Mesmo valor, até 10 minutos, em qualquer forma. O código de autorização só desempata quando os dois lados têm.
-      </p>
-      <p className="mt-1 text-[13px] font-bold text-t0">
-        {cruz.matched === 1 ? "1 venda cruzou." : `${cruz.matched} vendas cruzaram.`}
-      </p>
-      {cruz.rows.length > 0 && (
-        <div className="mt-2 overflow-x-auto">
-          <table className="w-full min-w-[640px] border-separate border-spacing-0 text-left text-[12.5px]">
-            <thead>
-              <tr>
-                {["Hora", "Valor", "Millennium", "Stone", "Quem", "Status"].map((label) => (
-                  <th key={label} className="border-b border-line px-2 py-2 text-[11px] font-bold uppercase tracking-wide text-t2">
-                    {label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {cruz.rows.map((row, index) => (
-                <tr key={`${row.occurredAt}-${row.status}-${index}`}>
-                  <td className="border-b border-line px-2 py-2 font-mono text-t1">{horaLoja(row.occurredAt, timeZone)}</td>
-                  <td className="border-b border-line px-2 py-2 font-mono text-t0">{brlCent(row.cents / 100)}</td>
-                  <td className="border-b border-line px-2 py-2 text-t1">{row.millenniumMethod ? labelUpper(row.millenniumMethod) : "—"}</td>
-                  <td className="border-b border-line px-2 py-2 text-t1">{row.stoneMethod ? labelUpper(row.stoneMethod) : "—"}</td>
-                  <td className="border-b border-line px-2 py-2 text-t0">{row.sellerName || row.group || "—"}</td>
-                  <td className="border-b border-line px-2 py-2 text-t0">{CRUZ_STATUS[row.status]}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -542,14 +444,11 @@ export function CashClosePage() {
   const [reviews, setReviews] = useState<CashCloseReview[]>([]);
   const [diaAberto, setDiaAberto] = useState<string | null>(null);
   const [dias, setDias] = useState<Record<string, CashCloseSnapshot>>({});
-  const [quebra, setQuebra] = useState<{ sales: CloseSaleRow[]; shifts: CloseShiftRow[]; captures: CloseCaptureRow[] } | "erro" | null>(null);
   const [diaKey, setDiaKey] = useState("");
   const [erro, setErro] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [watermark, setWatermark] = useState<Date | null>(null);
   const [soldToday, setSoldToday] = useState<{ cents: number; byStore: Record<string, number> } | null>(null);
-  const [span, setSpan] = useState<{ sales: SpanSale[]; captures: SpanCapture[]; shifts: CloseShiftRow[] } | "erro" | null>(null);
-  const [spanKey, setSpanKey] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
 
   const storeKey = lojas.map((l) => l.id).join(",");
@@ -642,27 +541,6 @@ export function CashClosePage() {
   }, [lojasLoading, session.tenantId, lojas, from, to, faixaKey]);
 
   useEffect(() => {
-    if (lojasLoading || lojas.length === 0 || from > to) return;
-    let cancelled = false;
-    const ids = lojas.map((l) => l.id);
-    void Promise.all([fetchCashCloseSpan(session.tenantId, ids, from, to), fetchCloseShifts(session.tenantId, ids)])
-      .then(([rows, shifts]) => {
-        if (cancelled) return;
-        setSpan({ sales: rows.sales, captures: rows.captures, shifts });
-        setSpanKey(faixaKey);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setSpan("erro");
-          setSpanKey(faixaKey);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [lojasLoading, session.tenantId, lojas, from, to, faixaKey]);
-
-  useEffect(() => {
     if (lojasLoading || lojas.length === 0 || to < hoje) {
       setSoldToday(null);
       return;
@@ -700,17 +578,10 @@ export function CashClosePage() {
     let cancelled = false;
     setErro(false);
     const key = `${storeKey}|${diaAberto}|${reloadKey}`;
-    const ids = lojas.map((loja) => loja.id);
-    void Promise.all([
-      Promise.all(lojas.map((loja) => fetchCashCloseSnapshot(session.tenantId, loja.id, diaAberto).then((snap) => [loja.id, snap] as const))),
-      fetchCashCloseSales(session.tenantId, ids, diaAberto).catch(() => null),
-      fetchCloseShifts(session.tenantId, ids).catch(() => null),
-      fetchShortageCaptures(session.tenantId, ids, diaAberto).catch(() => [] as CloseCaptureRow[]),
-    ])
-      .then(([rows, sales, shifts, captures]) => {
+    void Promise.all(lojas.map((loja) => fetchCashCloseSnapshot(session.tenantId, loja.id, diaAberto).then((snap) => [loja.id, snap] as const)))
+      .then((rows) => {
         if (cancelled) return;
         setDias(Object.fromEntries(rows));
-        setQuebra(sales && shifts ? { sales, shifts, captures } : "erro");
         setDiaKey(key);
       })
       .catch(() => {
@@ -724,7 +595,6 @@ export function CashClosePage() {
   const analise = useMemo(() => {
     if (marksKey !== faixaKey) return null;
     const porDia = new Map<string, { systemCents: number; realCents: number; diffCents: number; hasMillennium: boolean; hasLines: boolean; pending: boolean }>();
-    const porLoja = new Map<string, number>();
     const rows: Array<{ day: string; diffCents: number; pending: boolean }> = [];
     for (const mark of marks) {
       const review = reviews.find((r) => r.storeId === mark.storeId && r.day === mark.day) ?? null;
@@ -741,7 +611,6 @@ export function CashClosePage() {
           diffCents: gap.diffCents,
           pending: semReal,
         });
-        if (!semReal) porLoja.set(mark.storeId, (porLoja.get(mark.storeId) ?? 0) + gap.diffCents);
       }
       const atual = porDia.get(mark.day) ?? { systemCents: 0, realCents: 0, diffCents: 0, hasMillennium: false, hasLines: false, pending: false };
       atual.systemCents += gap.systemCents;
@@ -752,60 +621,8 @@ export function CashClosePage() {
       atual.pending = atual.pending || semReal;
       porDia.set(mark.day, atual);
     }
-    return { resumo: monthCloseSummary(rows), porDia, porLoja };
+    return { resumo: monthCloseSummary(rows), porDia };
   }, [marks, reviews, marksKey, faixaKey, hoje]);
-
-  const cobrancas = useMemo(() => {
-    if (!analise || spanKey !== faixaKey || span == null || span === "erro") return [];
-    const bags = new Map<string, { sales: SpanSale[]; captures: SpanCapture[] }>();
-    const sellersByStore = new Map<string, Map<string, string[]>>();
-    for (const sale of span.sales) {
-      const key = `${sale.storeId}|${sale.day}`;
-      const bag = bags.get(key) ?? { sales: [], captures: [] };
-      bag.sales.push(sale);
-      bags.set(key, bag);
-      const seller = sale.sellerName.trim();
-      if (!seller) continue;
-      const byDay = sellersByStore.get(sale.storeId) ?? new Map<string, string[]>();
-      const names = byDay.get(sale.day) ?? [];
-      if (!names.includes(seller)) names.push(seller);
-      byDay.set(sale.day, names);
-      sellersByStore.set(sale.storeId, byDay);
-    }
-    for (const capture of span.captures) {
-      const key = `${capture.storeId}|${capture.day}`;
-      const bag = bags.get(key) ?? { sales: [], captures: [] };
-      bag.captures.push(capture);
-      bags.set(key, bag);
-    }
-    const rowsByStore = new Map<string, CrossRow[]>();
-    for (const [key, bag] of bags) {
-      const split = key.indexOf("|");
-      const storeId = key.slice(0, split);
-      const day = key.slice(split + 1);
-      const loja = lojas.find((item) => item.id === storeId);
-      const cruz = crossDay({
-        day,
-        timeZone: loja?.fuso || "America/Campo_Grande",
-        sales: bag.sales,
-        captures: bag.captures,
-        shifts: span.shifts
-          .filter((shift) => shift.storeId === storeId)
-          .map((shift) => ({ name: shift.name, start: shift.start, end: shift.end })),
-      });
-      rowsByStore.set(storeId, [...(rowsByStore.get(storeId) ?? []), ...cruz.rows]);
-    }
-    return lojas.flatMap((loja) => {
-      const charge = monthCharge({
-        monthDiffCents: analise.porLoja.get(loja.id) ?? 0,
-        cashier: loja.pointType === "RUA",
-        cashierName: "Caixa",
-        rows: rowsByStore.get(loja.id) ?? [],
-        sellersByDay: sellersByStore.get(loja.id) ?? new Map(),
-      });
-      return charge ? [{ fantasia: loja.fantasia, charge }] : [];
-    });
-  }, [analise, span, spanKey, faixaKey, lojas]);
 
   function faceDoDia(day: string): { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number; aguardando?: boolean } {
     const info = analise?.porDia.get(day);
@@ -878,7 +695,7 @@ export function CashClosePage() {
         ) : (
           <>
             {analise ? (
-              <ResumoMes resumo={analise.resumo} cobrancas={cobrancas} cobrancaPronta={spanKey === faixaKey} cobrancaErro={span === "erro"} />
+              <ResumoMes resumo={analise.resumo} />
             ) : (
               <Skeleton className="mb-4 h-[76px] w-full rounded-[18px]" />
             )}
@@ -891,7 +708,6 @@ export function CashClosePage() {
         lojas={lojas}
         snaps={dias}
         reviews={reviews}
-        quebra={diaPronto ? quebra : null}
         pronto={diaPronto}
         gestor={isGestor(session.role)}
         fechado={diaAberto != null && diaAberto < hoje}
@@ -915,17 +731,7 @@ function textoDiferenca(cents: number): string {
   return "Os dias com total real fecharam iguais";
 }
 
-function ResumoMes({
-  resumo,
-  cobrancas,
-  cobrancaPronta,
-  cobrancaErro,
-}: {
-  resumo: { diffCents: number; pendingDays: number };
-  cobrancas: Array<{ fantasia: string; charge: MonthCharge }>;
-  cobrancaPronta: boolean;
-  cobrancaErro: boolean;
-}) {
+function ResumoMes({ resumo }: { resumo: { diffCents: number; pendingDays: number } }) {
   const itens = [
     {
       label: "Diferença",
@@ -940,51 +746,15 @@ function ResumoMes({
       tom: resumo.pendingDays > 0 ? "text-warn" : "text-t0",
     },
   ];
-  const apontado = cobrancas.reduce((sum, item) => sum + item.charge.people.reduce((acc, person) => acc + person.cents, 0), 0);
   return (
-    <div className="mb-4 flex flex-col gap-3">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {itens.map((item) => (
-          <Card key={item.label} padding="sm">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-t2">{item.label}</p>
-            <p className={cn("mt-1 truncate font-mono text-xl font-extrabold", item.tom)}>{item.valor}</p>
-            <p className="mt-0.5 text-[11px] text-t2">{item.detalhe}</p>
-          </Card>
-        ))}
-      </div>
-      <Card padding="sm">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Desconto</p>
-        {resumo.diffCents >= 0 ? (
-          <p className="mt-1 text-[13px] text-t1">Não há desconto neste mês.</p>
-        ) : cobrancaErro ? (
-          <p className="mt-1 text-[13px] text-t1">Não foi possível calcular de quem seria o desconto.</p>
-        ) : !cobrancaPronta ? (
-          <p className="mt-1 text-[13px] text-t2">Calculando de quem seria…</p>
-        ) : cobrancas.length === 0 ? (
-          <p className="mt-1 text-[13px] text-t1">A diferença ficou com a loja.</p>
-        ) : (
-          <div className="mt-1 flex flex-col gap-2">
-            {cobrancas.map((item) => (
-              <div key={item.fantasia}>
-                {cobrancas.length > 1 && <p className="text-[12px] font-bold text-t0">{item.fantasia}</p>}
-                {item.charge.people.length === 0 ? (
-                  <p className="text-[13px] text-t1">Nenhuma venda apontou vendedor ou grupo. A diferença fica com a loja.</p>
-                ) : (
-                  <ul className="flex flex-col gap-0.5">
-                    {item.charge.people.map((person) => (
-                      <li key={person.name} className="text-[13px] text-t0">
-                        {person.name} · {brlCent(person.cents / 100)}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ))}
-            {apontado < -resumo.diffCents && <p className="text-[12px] text-t2">O restante fica com a loja.</p>}
-            <p className="text-[12px] text-t2">A WDash mostra de quem seria. O desconto é feito por fora.</p>
-          </div>
-        )}
-      </Card>
+    <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+      {itens.map((item) => (
+        <Card key={item.label} padding="sm">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-t2">{item.label}</p>
+          <p className={cn("mt-1 truncate font-mono text-xl font-extrabold", item.tom)}>{item.valor}</p>
+          <p className="mt-0.5 text-[11px] text-t2">{item.detalhe}</p>
+        </Card>
+      ))}
     </div>
   );
 }
@@ -1094,7 +864,6 @@ function DiaModal({
   lojas,
   snaps,
   reviews,
-  quebra,
   pronto,
   gestor,
   fechado,
@@ -1107,7 +876,6 @@ function DiaModal({
   lojas: Store[];
   snaps: Record<string, CashCloseSnapshot>;
   reviews: CashCloseReview[];
-  quebra: { sales: CloseSaleRow[]; shifts: CloseShiftRow[]; captures: CloseCaptureRow[] } | "erro" | null;
   pronto: boolean;
   gestor: boolean;
   fechado: boolean;
@@ -1136,27 +904,17 @@ function DiaModal({
         const shown = manual ?? line.stoneCents;
         acquirer[line.key] = shown == null ? "" : centsToField(shown);
       }
-      const view = buildCashCloseView(snap);
-      const lines = applyCloseReview(view.lines, review ?? null, { pixRequested: snap.pixRequested });
-      const sales = quebra && quebra !== "erro" ? quebra.sales.filter((sale) => sale.storeId === loja.id) : [];
-      const captures = quebra && quebra !== "erro" ? quebra.captures.filter((row) => row.storeId === loja.id) : [];
-      const storeShifts = quebra && quebra !== "erro" ? quebra.shifts.filter((shift) => shift.storeId === loja.id) : [];
-      const suggestion = suggestDayShortage({
-        lines,
-        sales,
-        captures,
-        shifts: storeShifts,
-        timeZone: loja.fuso || "America/Campo_Grande",
-      });
       next[loja.id] = {
         typed,
         acquirer,
-        justification: review?.justification ?? "",
-        ...initialTarget(review, suggestion),
+        justification: "",
+        scope: "store",
+        sellers: [],
+        group: "",
       };
     }
     setDrafts(next);
-  }, [day, pronto, lojas, snaps, reviews, quebra]);
+  }, [day, pronto, lojas, snaps, reviews]);
 
   const comDados = day
     ? lojas.filter((loja) => {
@@ -1199,34 +957,17 @@ function DiaModal({
         setBusy(false);
         return;
       }
-      const ajustadas = linesWithDraft(linhas, draft);
-      const falta = negativeDayDiff(ajustadas, fechado);
-      if (falta && draft.scope === "store" && draft.justification.trim().length === 0) {
-        setBusy(false);
-        show("Informe uma justificativa para não descontar esta falta.", "danger");
-        return;
-      }
-      if (falta && draft.scope === "seller" && draft.sellers.length === 0) {
-        setBusy(false);
-        show("Escolha ao menos uma vendedora.", "danger");
-        return;
-      }
-      if (falta && draft.scope === "group" && draft.group.trim().length === 0) {
-        setBusy(false);
-        show("Escolha o grupo que assume a falta.", "danger");
-        return;
-      }
       const saved: CashCloseReview = {
         storeId: loja.id,
         day,
         cashTypedCents: typedCents.cash ?? null,
-        justification: falta ? draft.justification.trim() : "",
-        waive: falta && draft.scope === "store",
+        justification: "",
+        waive: false,
         typedCents,
         acquirerCents,
-        shortageScope: falta && draft.scope !== "store" ? draft.scope : "",
-        shortageSellers: falta && draft.scope === "seller" ? draft.sellers : [],
-        shortageGroup: falta && draft.scope === "group" ? draft.group : "",
+        shortageScope: "",
+        shortageSellers: [],
+        shortageGroup: "",
       };
       const r = await saveCashCloseReview({ tenantId, ...saved });
       if (!r.ok) {
@@ -1311,14 +1052,6 @@ function DiaModal({
                       [loja.id]: { ...(atual[loja.id] ?? draft!), acquirer: { ...(atual[loja.id]?.acquirer ?? {}), [key]: value } },
                     }))
                   }
-                />
-                <CruzamentoDoDia
-                  indisponivel={quebra === "erro"}
-                  day={day ?? ""}
-                  timeZone={loja.fuso || "America/Campo_Grande"}
-                  sales={quebra && quebra !== "erro" ? quebra.sales.filter((sale) => sale.storeId === loja.id) : []}
-                  captures={quebra && quebra !== "erro" ? quebra.captures.filter((row) => row.storeId === loja.id) : []}
-                  shifts={quebra && quebra !== "erro" ? quebra.shifts.filter((shift) => shift.storeId === loja.id) : []}
                 />
               </section>
             );
