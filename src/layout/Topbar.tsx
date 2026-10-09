@@ -23,6 +23,19 @@ const ICON_USUARIOS =
 const ICON_LOGS = "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8";
 const ICON_SAIR = "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9";
 
+/** Telas cujo conteúdo muda com o Atualizar do topo. Nas outras o botão fica oculto. */
+function mostraAtualizar(pathname: string): boolean {
+  if (pathname === paths.dashboard || pathname.startsWith(`${paths.dashboard}/`)) return true;
+  if (pathname === paths.stock.inventory || pathname === paths.stock.purchaseOrder) return true;
+  if (pathname === paths.management.cashClose || pathname === paths.operation.sellers) return true;
+  if (pathname === paths.goals) return true;
+  const meta = pathname.match(/^\/goals\/([^/]+)$/);
+  if (meta && meta[1] !== "new") return true;
+  if (pathname === paths.management.challenges) return true;
+  const desafio = pathname.match(/^\/management\/challenges\/([^/]+)$/);
+  return desafio != null && desafio[1] !== "new";
+}
+
 function MenuIcon({ d }: { d: string }) {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 opacity-80">
@@ -154,7 +167,7 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
       )}
 
       <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2.5">
-        <TopbarRefresh storeIds={escopo.filialIds} />
+        {mostraAtualizar(location.pathname) && <TopbarRefresh storeIds={escopo.filialIds} />}
 
         <Dropdown
           align="right"
