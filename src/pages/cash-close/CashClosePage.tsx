@@ -251,8 +251,8 @@ function CloseTable({
 
 const CRUZ_STATUS: Record<CrossRow["status"], string> = {
   invertida: "Invertida",
-  "sem-captura": "Sem captura",
-  "sem-venda": "Sem venda",
+  "sem-captura": "Venda sem cobrança",
+  "sem-venda": "Cobrança sem venda",
 };
 
 function horaLoja(iso: string, timeZone: string): string {
@@ -288,7 +288,7 @@ function CruzamentoDoDia({
   return (
     <div className="mt-4">
       <p className="text-[12.5px] text-t2">
-        Mesmo valor e hora mais próxima, em qualquer forma. O código de autorização só desempata quando os dois lados têm.
+        Só o que não fechou. Mesmo valor, até 10 minutos, em qualquer forma. O código de autorização só desempata quando os dois lados têm.
       </p>
       <p className="mt-1 text-[13px] font-bold text-t0">
         {cruz.matched === 1 ? "1 venda cruzou." : `${cruz.matched} vendas cruzaram.`}

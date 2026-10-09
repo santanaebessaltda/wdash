@@ -1,7 +1,8 @@
 import { cashCloseBucket, type CashCloseBucket } from "./cashCloseView";
 import { groupNameAt, splitEqual, type ShortageShift } from "./shortageAssign";
 
-const WINDOW_MS = 3 * 60 * 1000;
+/** A cobrança na maquininha costuma sair alguns minutos antes do lançamento no Millennium. */
+const WINDOW_MS = 10 * 60 * 1000;
 
 export type CrossSale = {
   occurredAt: string;
@@ -39,43 +40,6 @@ function electronic(method: string): boolean {
   return bucket === "debit" || bucket === "credit" || bucket === "pix";
 }
 
-/** A hora gravada da Stone é o relógio da loja com sufixo Z. Devolve o instante UTC de verdade. */
-export function stoneStoredToInstant(storedIso: string, timeZone: string): number {
-  const parsed = new Date(storedIso);
-  if (Number.isNaN(parsed.getTime())) return Number.NaN;
-  const utcGuess = Date.UTC(
-    parsed.getUTCFullYear(),
-    parsed.getUTCMonth(),
-    parsed.getUTCDate(),
-    parsed.getUTCHours(),
-    parsed.getUTCMinutes(),
-    parsed.getUTCSeconds(),
-  );
-  const offset = zoneOffsetMs(utcGuess, timeZone);
-  let instant = utcGuess - offset;
-  const offsetAt = zoneOffsetMs(instant, timeZone);
-  if (offsetAt !== offset) instant -= offsetAt - offset;
-  return instant;
-}
-
-function zoneOffsetMs(utcMs: number, timeZone: string): number {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(new Date(utcMs));
-  const get = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value);
-  let hour = get("hour");
-  if (hour === 24) hour = 0;
-  const asUtc = Date.UTC(get("year"), get("month") - 1, get("day"), hour, get("minute"), get("second"));
-  return asUtc - utcMs;
-}
-
 function saleInstant(iso: string): number {
   const t = new Date(iso).getTime();
   return Number.isNaN(t) ? Number.NaN : t;
@@ -98,8 +62,9 @@ function who(sellerName: string, at: number, shifts: ShortageShift[], timeZone: 
 }
 
 /**
- * Cruza cada venda eletrônica com a captura do mesmo valor na hora mais próxima (até 3 min),
- * em qualquer forma. Forma diferente = venda invertida. O que cruzou na mesma forma só entra na contagem.
+ * Cruza cada venda eletrônica com a captura do mesmo valor na hora mais próxima (até 10 min),
+ * em qualquer forma. Os instantes já vêm no mesmo relógio. Forma diferente = venda invertida.
+ * O que cruzou na mesma forma só entra na contagem.
  */
 export function crossDay(input: {
   sales: CrossSale[];
@@ -123,7 +88,7 @@ export function crossDay(input: {
   const captures: Side[] = input.captures
     .filter((capture) => electronic(capture.paymentMethod) && capture.capturedCents > 0)
     .map((capture) => ({
-      at: stoneStoredToInstant(capture.occurredAt, input.timeZone),
+      at: saleInstant(capture.occurredAt),
       cents: capture.capturedCents,
       method: capture.paymentMethod,
       bucket: cashCloseBucket(capture.paymentMethod),

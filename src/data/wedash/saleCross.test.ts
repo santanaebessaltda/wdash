@@ -1,14 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { crossDay, monthCharge, stoneStoredToInstant } from "./saleCross";
+import { crossDay, monthCharge } from "./saleCross";
 
 const TZ = "America/Campo_Grande";
-
-describe("stoneStoredToInstant", () => {
-  it("trata o Z da Stone como relógio de Campo Grande", () => {
-    const instant = stoneStoredToInstant("2026-10-08T12:20:05.000Z", TZ);
-    expect(new Date(instant).toISOString()).toBe("2026-10-08T16:20:05.000Z");
-  });
-});
 
 describe("crossDay", () => {
   it("conta o par da mesma forma e lista a invertida", () => {
@@ -20,8 +13,8 @@ describe("crossDay", () => {
         { occurredAt: "2026-10-08T16:30:00.000Z", paymentMethod: "Cartão de crédito", sellerName: "Bia", revenueCents: 2000 },
       ],
       captures: [
-        { occurredAt: "2026-10-08T12:20:20.000Z", paymentMethod: "Cartão de crédito", capturedCents: 1000 },
-        { occurredAt: "2026-10-08T12:30:10.000Z", paymentMethod: "Cartão de débito", capturedCents: 2000 },
+        { occurredAt: "2026-10-08T16:20:20.000Z", paymentMethod: "Cartão de crédito", capturedCents: 1000 },
+        { occurredAt: "2026-10-08T16:30:10.000Z", paymentMethod: "Cartão de débito", capturedCents: 2000 },
       ],
     });
     expect(result.matched).toBe(1);
@@ -39,12 +32,12 @@ describe("crossDay", () => {
     ]);
   });
 
-  it("não cruza fora de 3 minutos e aponta o grupo quando não há vendedor", () => {
+  it("não cruza fora de 10 minutos e aponta o grupo quando não há vendedor", () => {
     const result = crossDay({
       timeZone: TZ,
       shifts: [{ name: "GRUPO 1", start: "08:00", end: "14:00" }],
       sales: [{ occurredAt: "2026-10-08T16:20:00.000Z", paymentMethod: "PIX", sellerName: "", revenueCents: 4300 }],
-      captures: [{ occurredAt: "2026-10-08T12:30:00.000Z", paymentMethod: "PIX", capturedCents: 4300 }],
+      captures: [{ occurredAt: "2026-10-08T16:31:00.000Z", paymentMethod: "PIX", capturedCents: 4300 }],
     });
     expect(result.matched).toBe(0);
     expect(result.rows.map((row) => row.status).sort()).toEqual(["sem-captura", "sem-venda"]);
