@@ -12,8 +12,10 @@ import {
   purchaseMinTemplateFileName,
   purchaseMinTemplateRows,
   purchaseMinsToCopy,
+  purchaseLineCents,
   purchaseOrderFileName,
   purchaseOrderFileRows,
+  purchaseOrderTotalCents,
   type PurchaseFilter,
   type PurchaseOrderRow,
 } from "@/data/wedash/purchaseOrder";
@@ -27,12 +29,12 @@ import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { ErpStatusNotice } from "@/pages/dashboard/ErpStatusNotice";
 import { HeaderFilter, HeaderSearch } from "@/pages/dashboard/HeaderFilter";
 import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
-import { HeaderFilters, TableFooter, TipHelp, UpdatedLine, qty } from "./shared";
+import { HeaderFilters, TableFooter, TipHelp, UpdatedLine, money, qty } from "./shared";
 import { usePurchaseOrder } from "./usePurchaseOrder";
 
 const PAGE_SIZE = 50;
 
-type SortKey = "nome" | "minimo" | "saldo" | "pedidosAbertos" | "total" | "vendidos30" | "multipla" | "novo" | "bloqueado" | "aPedir";
+type SortKey = "nome" | "minimo" | "saldo" | "pedidosAbertos" | "total" | "vendidos30" | "multipla" | "novo" | "bloqueado" | "aPedir" | "custo";
 
 const NUM_COLS: Array<{ key: "saldo" | "pedidosAbertos" | "total" | "vendidos30" | "multipla"; label: string }> = [
   { key: "saldo", label: "Saldo" },
@@ -45,6 +47,7 @@ const NUM_COLS: Array<{ key: "saldo" | "pedidosAbertos" | "total" | "vendidos30"
 function sortValue(r: PurchaseOrderRow, k: Exclude<SortKey, "nome">): number {
   if (k === "minimo") return r.minimo ?? -1;
   if (k === "aPedir") return r.aPedir ?? -1;
+  if (k === "custo") return r.custoCents ?? -1;
   if (k === "novo") return r.novo ? 1 : 0;
   if (k === "bloqueado") return r.bloqueado ? 1 : 0;
   return r[k];
@@ -71,7 +74,7 @@ export function PurchaseOrderPage() {
   const { show } = useToast();
   const [lojaSel, setLojaSel] = useState("");
   const loja = lojas.find((s) => s.id === lojaSel) ?? lojas[0] ?? null;
-  const po = usePurchaseOrder(session.tenantId, loja?.id ?? null);
+  const po = usePurchaseOrder(session.tenantId, loja?.id ?? null, loja?.costTableId ?? null);
   const { view } = po;
   const [busca, setBusca] = useState("");
   const [filtroSel, setFiltro] = useState<PurchaseFilter>("todos");
@@ -397,7 +400,7 @@ export function PurchaseOrderPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1160px] border-collapse text-sm">
+              <table className="w-full min-w-[1280px] border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
                     <th className="px-1 pb-3 text-left font-bold">#</th>
@@ -409,6 +412,7 @@ export function PurchaseOrderPage() {
                     <ThSort label="Novo" active={sortKey === "novo"} dir={sortDir} onClick={() => toggleSort("novo")} align="center" className="px-1 pb-3" />
                     <ThSort label="Bloqueado" active={sortKey === "bloqueado"} dir={sortDir} onClick={() => toggleSort("bloqueado")} align="center" className="px-1 pb-3" />
                     <ThSort label="A pedir" active={sortKey === "aPedir"} dir={sortDir} onClick={() => toggleSort("aPedir")} className="px-1 pb-3" />
+                    <ThSort label="Custo" active={sortKey === "custo"} dir={sortDir} onClick={() => toggleSort("custo")} className="px-1 pb-3" />
                   </tr>
                 </thead>
                 <tbody>
@@ -452,6 +456,7 @@ export function PurchaseOrderPage() {
                         <td className="px-1 py-3 text-right">
                           {r.aPedir == null ? <span className="font-mono text-[13px] font-bold text-t2">—</span> : <Qty v={r.aPedir} strong={r.aPedir > 0} />}
                         </td>
+                        <td className="px-1 py-3 text-right font-mono text-[13px] tabular-nums text-t0">{money(r.custoCents == null ? null : r.custoCents / 100)}</td>
                       </tr>
                     );
                   })}
@@ -485,6 +490,12 @@ export function PurchaseOrderPage() {
                     <td className="px-1 py-3 text-right">
                       <Qty v={totais.aPedir} total />
                     </td>
+                    <td className="px-1 py-3 text-right">
+                      <span className="inline-flex items-center justify-end gap-1 font-mono text-[13px] font-extrabold tabular-nums text-t0">
+                        {money(reais(purchaseOrderTotalCents(view?.rows ?? [])))}
+                        <TipHelp label="Total do pedido: quantidade a pedir × custo de cada produto que entra na planilha. Sem custo em algum deles, o total não aparece." />
+                      </span>
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -514,13 +525,20 @@ export function PurchaseOrderPage() {
               {loja ? `${loja.fantasia}. ` : ""}
               {resumoPedido.length === 1 ? "1 produto" : `${num(resumoPedido.length)} produtos`}
               {" · "}
-              {num(resumoPedido.reduce((s, r) => s + (r.aPedir ?? 0), 0))} itens. Confira as quantidades antes de gerar a planilha.
+              {num(resumoPedido.reduce((s, r) => s + (r.aPedir ?? 0), 0))} itens. Confira as quantidades e o custo antes de gerar a planilha.
             </p>
+            {resumoPedido.some((r) => r.custoCents == null) && (
+              <p className="text-[13px] leading-relaxed text-t2">
+                Algum produto deste pedido está sem custo. O total só aparece quando todos têm preço.
+              </p>
+            )}
             <table className="w-full border-collapse text-sm">
               <thead className="sticky top-0 bg-bg-2">
                 <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
                   <th className="pb-2 text-left font-bold">Produto</th>
                   <th className="pb-2 text-right font-bold">Quantidade</th>
+                  <th className="pb-2 text-right font-bold">Custo</th>
+                  <th className="pb-2 pl-3 text-right font-bold">Total</th>
                 </tr>
               </thead>
               <tbody>
@@ -532,8 +550,18 @@ export function PurchaseOrderPage() {
                     <td className="py-2 text-right">
                       <Qty v={r.aPedir ?? 0} strong />
                     </td>
+                    <td className="py-2 text-right font-mono text-[13px] tabular-nums text-t0">{money(r.custoCents == null ? null : r.custoCents / 100)}</td>
+                    <td className="py-2 pl-3 text-right font-mono text-[13px] font-bold tabular-nums text-t0">{money(reais(purchaseLineCents(r)))}</td>
                   </tr>
                 ))}
+                <tr className="bg-bg-inset">
+                  <td className="py-3 text-[13px] font-extrabold text-t0">Total do pedido</td>
+                  <td />
+                  <td />
+                  <td className="py-3 pl-3 text-right font-mono text-[13px] font-extrabold tabular-nums text-t0">
+                    {money(reais(purchaseOrderTotalCents(resumoPedido)))}
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -585,6 +613,8 @@ export function PurchaseOrderPage() {
 }
 
 export default PurchaseOrderPage;
+
+const reais = (cents: number | null) => (cents == null ? null : cents / 100);
 
 function Qty({ v, total = false, strong = false }: { v: number; total?: boolean; strong?: boolean }) {
   return (

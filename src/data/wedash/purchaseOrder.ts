@@ -45,6 +45,8 @@ export type PurchaseOrderRow = {
   /** null = " - " (sem minimo, bloqueado ou varias variantes). */
   aPedir: number | null;
   noPedido: boolean;
+  /** Preço de custo unitário da tabela da loja, em centavos. Null = sem preço. */
+  custoCents: number | null;
 };
 
 export type PurchaseOrderView = {
@@ -114,6 +116,8 @@ export function buildPurchaseOrderView(input: {
   soldEver?: Set<string> | null;
   factor: number;
   todayIso: string;
+  /** COD_PRODUTO → custo unitário em centavos (tabela de custo da loja). */
+  costs?: Map<string, number>;
 }): PurchaseOrderView {
   const soldEver = input.soldEver ?? null;
   const porCodigo = new Map<string, PurchaseStockRow[]>();
@@ -137,6 +141,7 @@ export function buildPurchaseOrderView(input: {
     const minimo = input.mins.get(code) ?? null;
     const variasVariantes = variantes.length > 1;
     const aPedir = podePedir && minimo ? purchaseQuantity(totalPedido, minimo, multipla, input.factor) : null;
+    const custo = input.costs?.get(code);
     return {
       code,
       nome: first.description,
@@ -157,6 +162,7 @@ export function buildPurchaseOrderView(input: {
       podePedir,
       aPedir,
       noPedido: (aPedir ?? 0) > 0,
+      custoCents: custo != null && custo > 0 ? custo : null,
     };
   });
 
@@ -188,6 +194,25 @@ export function purchaseOrderFileRows(view: PurchaseOrderView): PurchaseFileRow[
       const v = r.variantes[0];
       return [/^[1-9]\d*$/.test(r.code) ? Number(r.code) : r.code, v.color, v.print, v.size, r.aPedir ?? 0, Math.max(0, r.total), v.description];
     });
+}
+
+/** Quantidade a pedir × custo. Null se o produto não entra no pedido ou está sem custo. */
+export function purchaseLineCents(r: PurchaseOrderRow): number | null {
+  if (!r.noPedido || r.aPedir == null || r.custoCents == null) return null;
+  return r.aPedir * r.custoCents;
+}
+
+/** Total do pedido em centavos. Null se algum produto do pedido está sem custo. */
+export function purchaseOrderTotalCents(rows: PurchaseOrderRow[]): number | null {
+  const pedido = rows.filter((r) => r.noPedido);
+  if (pedido.length === 0) return 0;
+  let total = 0;
+  for (const r of pedido) {
+    const line = purchaseLineCents(r);
+    if (line == null) return null;
+    total += line;
+  }
+  return total;
 }
 
 export function purchaseOrderFileName(d: Date): string {

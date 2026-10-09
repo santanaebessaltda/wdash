@@ -5,7 +5,7 @@ import { calendarTodayIso } from "@/data/wedash/clock";
 import { buildPurchaseOrderView, parseMinInput, type PurchaseMinUpdate, type PurchaseStockRow } from "@/data/wedash/purchaseOrder";
 import { PURCHASE_SYNC_ERROR, fetchPurchaseMins, fetchPurchaseStock, fetchSold30, fetchSoldEver, savePurchaseMin, savePurchaseMins, syncPurchaseStockNow } from "@/data/wedash/purchaseRepo";
 import type { StockCatalogItem } from "@/data/wedash/stockProducts";
-import { fetchStockCatalog } from "@/data/wedash/stockRepo";
+import { fetchCostPrices, fetchStockCatalog } from "@/data/wedash/stockRepo";
 import { FORCE_REFRESH_CLICK_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { fetchErpConnection } from "@/pages/dashboard/ErpStatusNotice";
 import { SAVE_ERROR_MSG } from "@/pages/operation/shared";
@@ -20,6 +20,7 @@ type Loaded = {
   sold30: Map<string, number>;
   soldEver: Set<string> | null;
   catalog: Map<string, StockCatalogItem>;
+  costs: Map<string, number>;
 };
 
 function hora(iso: string): string {
@@ -36,7 +37,7 @@ const isStale = (syncedAt: string | null, now: number) => !syncedAt || now - Dat
  * Ao abrir (e ao trocar de loja), busca o saldo no Millennium se a ultima busca tem mais de 30 min;
  * o Atualizar do topo forca a busca.
  */
-export function usePurchaseOrder(tenantId: string, storeId: string | null) {
+export function usePurchaseOrder(tenantId: string, storeId: string | null, costTableId: number | null) {
   const { show } = useToast();
   const [data, setData] = useState<Loaded | null>(null);
   const [loading, setLoading] = useState(true);
@@ -50,16 +51,26 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null) {
   const syncRef = useRef<string | null>(null);
 
   const load = useCallback(
-    async (id: string): Promise<Loaded> => {
+    async (id: string, tableId: number | null): Promise<Loaded> => {
       const hoje = calendarTodayIso();
-      const [stock, mins, sold30, soldEver, catalog] = await Promise.all([
+      const [stock, mins, sold30, soldEver, catalog, priceTables] = await Promise.all([
         fetchPurchaseStock(tenantId, id),
         fetchPurchaseMins(tenantId, id),
         fetchSold30(tenantId, id, addDays(hoje, -30), addDays(hoje, -1)),
         fetchSoldEver(tenantId, id, hoje),
         fetchStockCatalog(),
+        tableId == null ? Promise.resolve(new Map<number, Map<string, number>>()) : fetchCostPrices([tableId]),
       ]);
-      return { storeId: id, rows: stock.rows, syncedAt: stock.syncedAt, mins, sold30, soldEver, catalog };
+      return {
+        storeId: id,
+        rows: stock.rows,
+        syncedAt: stock.syncedAt,
+        mins,
+        sold30,
+        soldEver,
+        catalog,
+        costs: tableId == null ? new Map() : (priceTables.get(tableId) ?? new Map()),
+      };
     },
     [tenantId],
   );
@@ -103,7 +114,7 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null) {
     setSyncError(null);
     (async () => {
       try {
-        const d = await load(storeId);
+        const d = await load(storeId, costTableId);
         if (cancelled) return;
         setData(d);
         setNow(Date.now());
@@ -123,7 +134,7 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null) {
     return () => {
       cancelled = true;
     };
-  }, [storeId, load, sync]);
+  }, [storeId, costTableId, load, sync]);
 
   useEffect(() => {
     const onForce = () => {
@@ -150,6 +161,7 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null) {
             soldEver: current.soldEver,
             factor,
             todayIso: calendarTodayIso(),
+            costs: current.costs,
           })
         : null,
     [current, factor],

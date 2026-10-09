@@ -9,6 +9,8 @@ import {
   purchaseMinTemplateRows,
   purchaseOrderFileName,
   purchaseOrderFileRows,
+  purchaseLineCents,
+  purchaseOrderTotalCents,
   parsePurchaseMinSheet,
   purchaseMinsToCopy,
   isEligible,
@@ -443,5 +445,23 @@ describe("mínimos por planilha", () => {
       ],
       skipped: 1,
     });
+  });
+
+  it("soma o pedido pelo custo e fica sem total se faltar preço", () => {
+    const base = {
+      stock: [stock({ balance: 0, openOrder: 0, total: 0, multiple: 6 })],
+      mins: new Map([["BSPPAR-ATH-001", 6]]),
+      sold30: new Map(),
+      soldEver: null,
+      factor: 1,
+      todayIso: TODAY,
+    };
+    const com = buildPurchaseOrderView({ ...base, costs: new Map([["BSPPAR-ATH-001", 1500]]) });
+    expect(com.rows[0].custoCents).toBe(1500);
+    expect(purchaseLineCents(com.rows[0])).toBe(9000);
+    expect(purchaseOrderTotalCents(com.rows)).toBe(9000);
+    const sem = buildPurchaseOrderView({ ...base, costs: new Map([["BSPPAR-ATH-001", 0]]) });
+    expect(sem.rows[0].custoCents).toBeNull();
+    expect(purchaseOrderTotalCents(sem.rows)).toBeNull();
   });
 });
