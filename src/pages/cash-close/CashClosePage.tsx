@@ -34,7 +34,7 @@ import { FORCE_REFRESH_CLICK_EVENT, SALES_SYNCED_EVENT } from "@/pages/dashboard
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { parseNum, SectionHeader, useScopedStores } from "@/pages/operation/shared";
-import { UpdatedLine } from "@/pages/stock/shared";
+import { HeaderFilters, UpdatedLine } from "@/pages/stock/shared";
 
 const DIAS = [
   { longo: "Domingo", curto: "D" },
@@ -660,11 +660,15 @@ export function CashClosePage() {
         section="Gestão"
         title="Fechamento"
         subtitle="Confira o fechamento diário comparando o Millennium com o total real."
-      />
-      <div className="mt-6 pb-6">
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
-          <h2 className="text-xl font-extrabold text-t0 sm:text-[26px]">{rotuloMesAno(anchor)}</h2>
-          <div className="flex flex-col items-start gap-2 sm:items-end">
+        actions={
+          <HeaderFilters
+            updated={
+              <UpdatedLine
+                text={atualizadoTexto}
+                tip="O Atualizar busca as vendas de hoje e o fechamento do mês que está na tela. O dia de hoje mostra o mesmo faturamento da Visão geral. Do dia anterior para trás, o valor vem do fechamento de caixa."
+              />
+            }
+          >
             <div className="flex flex-wrap items-center gap-2">
               <SeletorMesAno iso={anchor} hoje={hoje} onChange={irParaMes} />
               <button type="button" aria-label="Mês anterior" className={navBtn} onClick={() => mover(-1)}>
@@ -674,12 +678,10 @@ export function CashClosePage() {
                 <Seta dir="proximo" />
               </button>
             </div>
-            <UpdatedLine
-              text={atualizadoTexto}
-              tip="O Atualizar busca as vendas de hoje e o fechamento do mês que está na tela. O dia de hoje mostra o mesmo faturamento da Visão geral. Do dia anterior para trás, o valor vem do fechamento de caixa."
-            />
-          </div>
-        </div>
+          </HeaderFilters>
+        }
+      />
+      <div className="mt-6 pb-6">
         {erro ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar o fechamento. Tente novamente." /> : null}
         {showLojas ? (
           <Skeleton className="h-[520px] w-full rounded-[18px]" />
