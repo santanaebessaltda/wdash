@@ -378,27 +378,15 @@ function MillenniumModal({
           </FormField>
         </div>
         {conectado ? (
-          <div className="space-y-3 text-[12.5px] leading-relaxed">
-            {podeAtualizar && (
-              <div>
-                <p className="font-semibold text-t0">Cadastros</p>
-                <Button className="mt-2" size="sm" onClick={() => void onAtualizar()} disabled={atualizando || busy}>
-                  {atualizando ? "Atualizando…" : "Atualizar cadastros"}
-                </Button>
-                <p className="mt-2 text-t2">Atualiza lojas e tabelas de custo do Millennium. Não busca vendas.</p>
-              </div>
-            )}
-            <div>
-              <p className="font-semibold text-t0">Alterar usuário ou senha</p>
-              <p className="mt-0.5 text-t2">Para trocar o usuário ou a senha, desconecte e conecte novamente com os novos dados.</p>
+          podeAtualizar && (
+            <div className="text-[12.5px] leading-relaxed">
+              <p className="font-semibold text-t0">Cadastros</p>
+              <Button className="mt-2" size="sm" onClick={() => void onAtualizar()} disabled={atualizando || busy}>
+                {atualizando ? "Atualizando…" : "Atualizar cadastros"}
+              </Button>
+              <p className="mt-2 text-t2">Atualiza lojas e tabelas de custo do Millennium. Não busca vendas.</p>
             </div>
-            <div>
-              <p className="font-semibold text-t0">Desconexão</p>
-              <p className="mt-0.5 text-t2">
-                Ao desconectar, a WDash para de sincronizar os dados e encerra a sessão deste usuário no Millennium.
-              </p>
-            </div>
-          </div>
+          )
         ) : (
           <>
             <Checkbox
