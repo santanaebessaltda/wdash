@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { Alert, Badge, Button, Card, CardTitle, FormField, Modal, Select, ThSort, useToast, type SortDir } from "@/components/ui";
+import { Alert, Badge, Button, Card, CardTitle, Dropdown, FormField, Modal, Select, ThSort, useToast, type DropdownItem, type SortDir } from "@/components/ui";
 import { StockProductsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { ProductNameCell } from "@/components/wedash/ProductNameCell";
 import {
@@ -240,31 +240,25 @@ export function PurchaseOrderPage() {
               />
             )}
             <HeaderSearch value={busca} onChange={setBusca} placeholder="Buscar por produto ou código…" width={240} />
-            <HeaderFilter label="Filtro" value={filtro} onChange={setFiltro} options={filtroOpcoes} />
+            <HeaderFilter label="Status dos produtos" lead="Status" value={filtro} onChange={setFiltro} options={filtroOpcoes} />
             <span className="inline-flex items-center gap-1.5">
               <HeaderFilter
                 label="Multiplicador do pedido"
-                lead="Multiplicador do pedido"
+                lead="Multiplicador"
                 value={String(po.factor)}
                 onChange={(v) => po.setFactor(Number(v))}
                 options={PURCHASE_FACTORS.map((f) => ({ value: String(f), label: `${f}x` }))}
               />
               <TipHelp label="Multiplica o mínimo de cada produto. A quantidade a pedir desconta o total em estoque e arredonda para o múltiplo de compra." />
             </span>
-            {outrasLojas.length > 0 && (
-              <Button
-                variant="secondary"
-                size="md"
-                onClick={abrirCopia}
-                disabled={!view || po.syncing || copiando || (po.mins?.size ?? 0) === 0}
-                title={(po.mins?.size ?? 0) === 0 ? "Cadastre pelo menos um mínimo nesta loja para poder copiar." : undefined}
-              >
-                Copiar para outra loja
-              </Button>
-            )}
-            <Button variant="primary" size="md" onClick={abrirResumo} disabled={!view || po.syncing || copiando}>
-              Gerar pedido
-            </Button>
+            <AcoesPedido
+              podeGerar={Boolean(view) && !po.syncing && !copiando}
+              podeCopiar={outrasLojas.length > 0}
+              copiarLiberado={Boolean(view) && !po.syncing && !copiando && (po.mins?.size ?? 0) > 0}
+              semMinimo={(po.mins?.size ?? 0) === 0}
+              onGerar={abrirResumo}
+              onCopiar={abrirCopia}
+            />
           </HeaderFilters>
         }
         notices={
@@ -452,7 +446,8 @@ export function PurchaseOrderPage() {
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="shrink-0 space-y-3 px-5 pt-5">
               <p className="text-[13px] leading-relaxed text-t1">
-                {loja ? `${loja.fantasia}. ` : ""}
+                {loja ? `${loja.codFilial} · ${loja.fantasia}. ` : ""}
+                Multiplicador {po.factor}x.{" "}
                 {resumoPedido.length === 1 ? "1 produto" : `${num(resumoPedido.length)} produtos`}
                 {" · "}
                 {num(resumoPedido.reduce((s, r) => s + (r.aPedir ?? 0), 0))} itens.
@@ -519,6 +514,62 @@ export function PurchaseOrderPage() {
         )}
       </Modal>
     </div>
+  );
+}
+
+function AcoesPedido({
+  podeGerar,
+  podeCopiar,
+  copiarLiberado,
+  semMinimo,
+  onGerar,
+  onCopiar,
+}: {
+  podeGerar: boolean;
+  podeCopiar: boolean;
+  copiarLiberado: boolean;
+  semMinimo: boolean;
+  onGerar: () => void;
+  onCopiar: () => void;
+}) {
+  const items: DropdownItem[] = [
+    {
+      label: "Gerar pedido",
+      description: "Abre o resumo e baixa a planilha desta loja.",
+      disabled: !podeGerar,
+      onClick: onGerar,
+    },
+  ];
+  if (podeCopiar) {
+    items.push({
+      label: "Copiar mínimos para outra loja",
+      description: semMinimo
+        ? "Cadastre pelo menos um mínimo nesta loja para poder copiar."
+        : "Copia os mínimos desta loja. Não copia o arquivo do pedido.",
+      disabled: !copiarLiberado,
+      onClick: onCopiar,
+    });
+  }
+  return (
+    <Dropdown
+      align="right"
+      portal
+      menuClassName="min-w-[280px]"
+      items={items}
+      trigger={
+        <Button type="button" variant="primary" size="md" iconRight={<ChevronDown />}>
+          Ações
+        </Button>
+      }
+    />
+  );
+}
+
+function ChevronDown() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="m6 9 6 6 6-6" />
+    </svg>
   );
 }
 
