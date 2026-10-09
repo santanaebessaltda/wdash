@@ -108,7 +108,12 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null, costT
   );
 
   useEffect(() => {
-    if (!storeId) return;
+    if (!storeId) {
+      setLoading(false);
+      setSyncError(null);
+      setData(null);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     setSyncError(null);

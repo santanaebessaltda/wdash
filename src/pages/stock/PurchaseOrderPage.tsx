@@ -67,8 +67,7 @@ function downloadFile(bytes: Uint8Array, name: string) {
 export function PurchaseOrderPage() {
   const { session, lojas, loading: lojasLoading } = useScopedStores();
   const { show } = useToast();
-  const [lojaSel, setLojaSel] = useState("");
-  const loja = lojas.find((s) => s.id === lojaSel) ?? lojas[0] ?? null;
+  const loja = lojas.length === 1 ? lojas[0] : null;
   const po = usePurchaseOrder(session.tenantId, loja?.id ?? null, loja?.costTableId ?? null);
   const { view } = po;
   const [busca, setBusca] = useState("");
@@ -80,7 +79,7 @@ export function PurchaseOrderPage() {
   const [copiarAberto, setCopiarAberto] = useState(false);
   const [destinoId, setDestinoId] = useState("");
   const [copiando, setCopiando] = useState(false);
-  const showSkeleton = useMinSkeleton(lojasLoading || po.loading);
+  const showSkeleton = useMinSkeleton(lojasLoading || (loja != null && po.loading));
 
   const contagens = view?.contagens ?? { noPedido: 0, semMinimo: 0, novos: 0 };
   const filtroOpcoes: Array<{ value: PurchaseFilter; label: string }> = [
@@ -149,7 +148,8 @@ export function PurchaseOrderPage() {
     setResumoPedido(null);
   };
 
-  const outrasLojas = storesForSession(session.stores).filter((s) => s.id !== loja?.id);
+  const rede = storesForSession(session.stores);
+  const outrasLojas = loja ? rede.filter((s) => s.id !== loja.id) : rede;
   const todas = destinoId === "" && outrasLojas.length > 1;
   const destino = outrasLojas.find((s) => s.id === destinoId) ?? null;
 
@@ -222,14 +222,6 @@ export function PurchaseOrderPage() {
         subtitle="Prepare o pedido de compra de cada loja."
         actions={
           <HeaderFilters>
-            {lojas.length > 1 && (
-              <HeaderFilter
-                label="Loja"
-                value={loja?.id ?? ""}
-                onChange={setLojaSel}
-                options={lojas.map((s) => ({ value: s.id, label: `${s.codFilial} · ${s.fantasia}` }))}
-              />
-            )}
             <HeaderSearch value={busca} onChange={setBusca} placeholder="Buscar por produto ou código…" width={240} />
             <HeaderFilter label="Status dos produtos" lead="Status" value={filtro} onChange={setFiltro} options={filtroOpcoes} />
             <span className="inline-flex items-center gap-1.5">
@@ -243,10 +235,11 @@ export function PurchaseOrderPage() {
               <TipHelp label="Multiplica o mínimo de cada produto. A quantidade a pedir desconta o total em estoque e arredonda para o múltiplo de compra." />
             </span>
             <AcoesPedido
-              podeGerar={Boolean(view) && !po.syncing && !copiando}
-              podeCopiar={outrasLojas.length > 0}
-              copiarLiberado={Boolean(view) && !po.syncing && !copiando && (po.mins?.size ?? 0) > 0}
-              semMinimo={(po.mins?.size ?? 0) === 0}
+              semLoja={loja == null && lojas.length > 1}
+              podeGerar={loja != null && Boolean(view) && !po.syncing && !copiando}
+              podeCopiar={outrasLojas.length > 1 || (loja != null && outrasLojas.length > 0)}
+              copiarLiberado={loja != null && Boolean(view) && !po.syncing && !copiando && (po.mins?.size ?? 0) > 0}
+              semMinimo={loja != null && (po.mins?.size ?? 0) === 0}
               onGerar={abrirResumo}
               onCopiar={abrirCopia}
             />
@@ -280,7 +273,15 @@ export function PurchaseOrderPage() {
         <StockProductsSkeleton />
       ) : !loja ? (
         <Card className="flex flex-col">
-          <EmptyBlock icon="🏬" title="Nenhuma loja disponível" description="Não há lojas disponíveis para este acesso." />
+          <EmptyBlock
+            icon="🏬"
+            title={lojas.length === 0 ? "Nenhuma loja disponível" : "Selecione uma loja"}
+            description={
+              lojas.length === 0
+                ? "Não há lojas disponíveis para este acesso."
+                : "O pedido é de uma filial. Escolha a loja no seletor do topo."
+            }
+          />
         </Card>
       ) : (
         <Card className="flex flex-col">
@@ -509,6 +510,7 @@ export function PurchaseOrderPage() {
 }
 
 function AcoesPedido({
+  semLoja,
   podeGerar,
   podeCopiar,
   copiarLiberado,
@@ -516,6 +518,7 @@ function AcoesPedido({
   onGerar,
   onCopiar,
 }: {
+  semLoja: boolean;
   podeGerar: boolean;
   podeCopiar: boolean;
   copiarLiberado: boolean;
@@ -526,18 +529,20 @@ function AcoesPedido({
   const items: DropdownItem[] = [
     {
       label: "Gerar pedido",
-      description: "Abre o resumo e baixa a planilha desta loja.",
-      disabled: !podeGerar,
+      description: semLoja ? "Selecione uma loja no topo para gerar o pedido." : "Abre o resumo e baixa a planilha desta loja.",
+      disabled: semLoja || !podeGerar,
       onClick: onGerar,
     },
   ];
   if (podeCopiar) {
     items.push({
       label: "Copiar mínimos para outra loja",
-      description: semMinimo
-        ? "Cadastre pelo menos um mínimo nesta loja para poder copiar."
-        : "Copia os mínimos desta loja. Não copia o arquivo do pedido.",
-      disabled: !copiarLiberado,
+      description: semLoja
+        ? "Selecione uma loja no topo para copiar os mínimos."
+        : semMinimo
+          ? "Cadastre pelo menos um mínimo nesta loja para poder copiar."
+          : "Copia os mínimos desta loja. Não copia o arquivo do pedido.",
+      disabled: semLoja || !copiarLiberado,
       onClick: onCopiar,
     });
   }
