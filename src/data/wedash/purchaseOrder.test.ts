@@ -10,6 +10,7 @@ import {
   purchaseOrderFileName,
   purchaseOrderFileRows,
   parsePurchaseMinSheet,
+  purchaseMinsToCopy,
   isEligible,
   isNewProduct,
   parseMinInput,
@@ -427,5 +428,20 @@ describe("mínimos por planilha", () => {
     );
     expect(purchaseMinImportNotice({ saved: 0, unknown: [], invalid: [], unchanged: false }).title).toBe("Nenhum mínimo para importar.");
     expect(purchaseMinImportNotice({ saved: 1, unknown: [], invalid: [], unchanged: false }).variant).toBe("success");
+  });
+
+  it("copia só o mínimo de produto que a outra loja também tem", () => {
+    const source = new Map<string, number>([
+      ["182", 72],
+      ["185", 0],
+      ["999", 4],
+    ]);
+    expect(purchaseMinsToCopy(source, new Set(["185", "182", "300"]))).toEqual({
+      updates: [
+        { code: "182", value: 72 },
+        { code: "185", value: 0 },
+      ],
+      skipped: 1,
+    });
   });
 });

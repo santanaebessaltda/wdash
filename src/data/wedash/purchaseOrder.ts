@@ -345,6 +345,27 @@ function listaCurta(items: string[]): string {
   return shown.join(", ") + (more > 0 ? ` e mais ${more}` : "");
 }
 
+/**
+ * Mínimos da loja aberta que existem na outra. Código que a outra loja não tem no saldo fica de fora.
+ * Mínimo que só a outra loja tem não entra aqui (não é apagado).
+ */
+export function purchaseMinsToCopy(
+  source: ReadonlyMap<string, number>,
+  destinationCodes: ReadonlySet<string>,
+): { updates: PurchaseMinUpdate[]; skipped: number } {
+  const updates: PurchaseMinUpdate[] = [];
+  let skipped = 0;
+  for (const [code, value] of source) {
+    if (!destinationCodes.has(code)) {
+      skipped += 1;
+      continue;
+    }
+    updates.push({ code, value });
+  }
+  updates.sort((a, b) => compareCode(a.code, b.code));
+  return { updates, skipped };
+}
+
 /** Texto do aviso depois da importação. `unchanged` = a planilha tinha mínimos, mas nenhum diferia do que já está salvo. */
 export function purchaseMinImportNotice(input: {
   saved: number;

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { Alert, Badge, Button, Card, CardTitle, ThSort, useToast, type SortDir } from "@/components/ui";
+import { Alert, Badge, Button, Card, CardTitle, FormField, Modal, Select, ThSort, useToast, type SortDir } from "@/components/ui";
 import { StockProductsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { ProductNameCell } from "@/components/wedash/ProductNameCell";
 import {
@@ -11,12 +11,13 @@ import {
   purchaseMinImportNotice,
   purchaseMinTemplateFileName,
   purchaseMinTemplateRows,
+  purchaseMinsToCopy,
   purchaseOrderFileName,
   purchaseOrderFileRows,
   type PurchaseFilter,
   type PurchaseOrderRow,
 } from "@/data/wedash/purchaseOrder";
-import { PURCHASE_SYNC_BUSY, PURCHASE_SYNC_ERROR, PURCHASE_SYNC_OFFLINE, PURCHASE_SYNC_TITLE } from "@/data/wedash/purchaseRepo";
+import { PURCHASE_SYNC_BUSY, PURCHASE_SYNC_ERROR, PURCHASE_SYNC_OFFLINE, PURCHASE_SYNC_TITLE, fetchPurchaseStock, savePurchaseMins } from "@/data/wedash/purchaseRepo";
 import { cn } from "@/lib/cn";
 import { num } from "@/lib/format";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
@@ -78,6 +79,9 @@ export function PurchaseOrderPage() {
   const [page, setPage] = useState(1);
   const [importing, setImporting] = useState(false);
   const [importNotice, setImportNotice] = useState<ReturnType<typeof purchaseMinImportNotice> | null>(null);
+  const [copiarAberto, setCopiarAberto] = useState(false);
+  const [destinoId, setDestinoId] = useState("");
+  const [copiando, setCopiando] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const showSkeleton = useMinSkeleton(lojasLoading || po.loading);
 
@@ -174,6 +178,44 @@ export function PurchaseOrderPage() {
     }
   };
 
+  const outrasLojas = lojas.filter((s) => s.id !== loja?.id);
+  const destino = outrasLojas.find((s) => s.id === destinoId) ?? outrasLojas[0] ?? null;
+
+  const abrirCopia = () => {
+    setDestinoId(outrasLojas[0]?.id ?? "");
+    setCopiarAberto(true);
+  };
+
+  const copiarMinimos = async () => {
+    if (!loja || !destino || !po.mins || po.mins.size === 0) return;
+    setCopiando(true);
+    try {
+      const stock = await fetchPurchaseStock(session.tenantId, destino.id);
+      if (stock.rows.length === 0) {
+        show("A outra loja ainda não tem saldo. Abra o pedido dela e copie de novo.", "warning");
+        return;
+      }
+      const { updates, skipped } = purchaseMinsToCopy(po.mins, new Set(stock.rows.map((row) => row.code)));
+      if (updates.length === 0) {
+        show("Nenhum produto com mínimo nesta loja existe na outra.", "warning");
+        return;
+      }
+      const ok = await savePurchaseMins(session.tenantId, destino.id, updates);
+      if (!ok) {
+        show("Não foi possível copiar os mínimos.", "danger");
+        return;
+      }
+      const fora = skipped > 0 ? ` ${skipped} não estão na outra loja.` : "";
+      show(
+        `Mínimos copiados para ${updates.length} produto${updates.length === 1 ? "" : "s"}.${fora}`,
+        skipped > 0 ? "warning" : "success",
+      );
+      setCopiarAberto(false);
+    } finally {
+      setCopiando(false);
+    }
+  };
+
   const limparBusca = () => {
     setBusca("");
     setFiltro("todos");
@@ -221,9 +263,14 @@ export function PurchaseOrderPage() {
             <Button variant="outline" size="md" onClick={baixarModelo} disabled={!view || po.syncing || importing}>
               Baixar modelo
             </Button>
-            <Button variant="outline" size="md" onClick={() => fileRef.current?.click()} disabled={!view || po.syncing || importing}>
+            <Button variant="outline" size="md" onClick={() => fileRef.current?.click()} disabled={!view || po.syncing || importing || copiando}>
               {importing ? "Importando…" : "Importar mínimos"}
             </Button>
+            {outrasLojas.length > 0 && (
+              <Button variant="outline" size="md" onClick={abrirCopia} disabled={!view || po.syncing || importing || copiando || (po.mins?.size ?? 0) === 0}>
+                Copiar mínimos
+              </Button>
+            )}
             <input
               ref={fileRef}
               type="file"
@@ -237,7 +284,7 @@ export function PurchaseOrderPage() {
                 if (file) void importarPlanilha(file);
               }}
             />
-            <Button variant="primary" size="md" onClick={gerarPedido} disabled={!view || po.syncing || importing}>
+            <Button variant="primary" size="md" onClick={gerarPedido} disabled={!view || po.syncing || importing || copiando}>
               Gerar pedido
             </Button>
           </HeaderFilters>
@@ -410,6 +457,41 @@ export function PurchaseOrderPage() {
         </Card>
       )}
       </div>
+      <Modal
+        open={copiarAberto && destino != null && loja != null}
+        onClose={() => {
+          if (!copiando) setCopiarAberto(false);
+        }}
+        title="Copiar mínimos"
+        size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setCopiarAberto(false)} disabled={copiando}>
+              Cancelar
+            </Button>
+            <Button onClick={() => void copiarMinimos()} disabled={copiando || !destino}>
+              {copiando ? "Copiando…" : "Copiar"}
+            </Button>
+          </>
+        }
+      >
+        {loja && destino && (
+          <div className="flex flex-col gap-3">
+            <p className="text-[13px] leading-relaxed text-t1">
+              Os mínimos de {loja.fantasia} passam para os mesmos produtos em {destino.fantasia}. O que a outra loja já tem em produto sem mínimo aqui continua.
+            </p>
+            <FormField label="Loja">
+              <Select value={destino.id} onChange={(e) => setDestinoId(e.target.value)} disabled={copiando}>
+                {outrasLojas.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.codFilial} · {s.fantasia}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
