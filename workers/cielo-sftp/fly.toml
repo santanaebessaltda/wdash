@@ -1,0 +1,26 @@
+# SFTP da Cielo. A Cielo faz PUT do extrato neste IP dedicado.
+# A porta 22 de dentro da máquina é do SSH do Fly; o sshd escuta 2222.
+app = "wdash-cielo-sftp"
+primary_region = "gru"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[[mounts]]
+  source = "cielo_sftp"
+  destination = "/sftp/cielo/entrada"
+
+[[services]]
+  internal_port = 2222
+  protocol = "tcp"
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[services.ports]]
+    port = 22
+    handlers = []
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
