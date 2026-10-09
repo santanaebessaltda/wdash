@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { Alert, Badge, Button, Card, CardTitle, FormField, Modal, Select, ThSort, useToast, type SortDir } from "@/components/ui";
+import { Alert, Badge, Button, Card, CardTitle, DataTable, FormField, Modal, Select, ThSort, useToast, type DataTableColumn, type SortDir } from "@/components/ui";
 import { StockProductsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { ProductNameCell } from "@/components/wedash/ProductNameCell";
 import {
@@ -33,6 +33,40 @@ import { HeaderFilters, TableFooter, TipHelp, UpdatedLine, money, qty } from "./
 import { usePurchaseOrder } from "./usePurchaseOrder";
 
 const PAGE_SIZE = 50;
+
+const resumoColumns: DataTableColumn<PurchaseOrderRow>[] = [
+  {
+    key: "nome",
+    header: "Produto",
+    render: (r) => (
+      <div className="min-w-0">
+        <p className="truncate font-bold text-t0">{r.nome}</p>
+        <p className="truncate text-[11px] text-t2">{r.code}</p>
+      </div>
+    ),
+  },
+  {
+    key: "qtd",
+    header: "Qtd",
+    align: "right",
+    width: "4.5rem",
+    render: (r) => <Qty v={r.aPedir ?? 0} strong />,
+  },
+  {
+    key: "unitario",
+    header: "Unitário",
+    align: "right",
+    width: "6.5rem",
+    render: (r) => <span className="font-mono text-[12px] tabular-nums text-t1">{money(r.custoCents == null ? null : r.custoCents / 100)}</span>,
+  },
+  {
+    key: "valor",
+    header: "Valor",
+    align: "right",
+    width: "6.5rem",
+    render: (r) => <span className="font-mono text-[12px] font-extrabold tabular-nums">{money(reais(purchaseLineCents(r)))}</span>,
+  },
+];
 
 type SortKey = "nome" | "minimo" | "saldo" | "pedidosAbertos" | "total" | "vendidos30" | "multipla" | "novo" | "bloqueado" | "aPedir";
 
@@ -528,35 +562,26 @@ export function PurchaseOrderPage() {
               )}
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-3">
-              <table className="w-full table-fixed border-separate border-spacing-0 text-sm">
-                <thead>
-                  <tr className="text-[11px] font-bold text-t2">
-                    <th className="sticky top-0 z-10 border-b border-line bg-bg-2 pb-2 text-left">Produto</th>
-                    <th className="sticky top-0 z-10 w-12 border-b border-line bg-bg-2 pb-2 text-right">Qtd</th>
-                    <th className="sticky top-0 z-10 w-24 border-b border-line bg-bg-2 pb-2 text-right">Unitário</th>
-                    <th className="sticky top-0 z-10 w-24 border-b border-line bg-bg-2 pb-2 text-right">Valor</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {resumoPedido.map((r) => (
-                    <tr key={r.code}>
-                      <td className="max-w-0 border-b border-line py-2 pr-2">
-                        <p className="truncate text-[13px] font-bold text-t0">{r.nome}</p>
-                        <p className="truncate text-[11px] text-t2">{r.code}</p>
-                      </td>
-                      <td className="border-b border-line py-2 text-right">
-                        <Qty v={r.aPedir ?? 0} strong />
-                      </td>
-                      <td className="border-b border-line py-2 text-right font-mono text-[12px] tabular-nums text-t1">
-                        {money(r.custoCents == null ? null : r.custoCents / 100)}
-                      </td>
-                      <td className="border-b border-line py-2 text-right font-mono text-[12px] font-bold tabular-nums text-t0">
-                        {money(reais(purchaseLineCents(r)))}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="hidden sm:block">
+                <DataTable columns={resumoColumns} data={resumoPedido} rowKey={(r) => r.code} />
+              </div>
+              <div className="flex flex-col gap-2.5 sm:hidden">
+                {resumoPedido.map((r) => (
+                  <div key={r.code} className="rounded-xl border border-line bg-bg-inset p-3.5">
+                    <p className="truncate text-[13.5px] font-bold text-t0">{r.nome}</p>
+                    <p className="truncate text-[11.5px] text-t2">{r.code}</p>
+                    <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-2.5">
+                      <span className="text-xs text-t2">
+                        Qtd <Qty v={r.aPedir ?? 0} strong />
+                      </span>
+                      <span className="text-right">
+                        <span className="block font-mono text-[11px] text-t2">{money(r.custoCents == null ? null : r.custoCents / 100)}</span>
+                        <span className="font-mono text-[13px] font-extrabold text-t0">{money(reais(purchaseLineCents(r)))}</span>
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
