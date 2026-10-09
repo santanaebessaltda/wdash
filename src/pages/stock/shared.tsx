@@ -32,7 +32,7 @@ export function stockLocations(rows: StockProductRow[]): string[] {
 
 export function ExportButton({ onClick }: { onClick: () => void }) {
   return (
-    <Button variant="secondary" size="md" onClick={onClick}>
+    <Button variant="primary" size="md" onClick={onClick}>
       Exportar
     </Button>
   );
