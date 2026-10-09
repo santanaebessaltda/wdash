@@ -12,7 +12,7 @@ import {
   type StoreShift,
 } from "@/data/wedash/stores";
 import { shiftName } from "@/lib/format";
-import { FORCE_REFRESH_CLICK_EVENT } from "@/pages/dashboard/useForceRefresh";
+import { useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { InviteSellerModal } from "@/pages/management/InviteSellerModal";
 import { StoreCardHeader, StoreCardsPage, useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
@@ -35,25 +35,27 @@ export function StaffPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const syncing = useRef(false);
 
-  useEffect(() => {
-    const onForce = () => {
-      if (syncing.current || lojas.length === 0) return;
+  const lojasRef = useRef(lojas);
+  lojasRef.current = lojas;
+
+  useScreenRefresh({
+    label: "Atualizar os vendedores",
+    tip: "Busca no Millennium os vendedores das lojas desta tela.",
+    run: async () => {
+      const lista = lojasRef.current;
+      if (syncing.current || lista.length === 0) return;
       syncing.current = true;
-      void (async () => {
-        try {
-          const results = await Promise.all(lojas.map((loja) => syncStoreSellersNow(loja.id)));
-          const fail = results.find((r) => !r.ok);
-          if (fail && !fail.ok) show(fail.message, "danger");
-          else show("Vendedores atualizados.", "success");
-          if (results.some((r) => r.ok)) setReloadKey((n) => n + 1);
-        } finally {
-          syncing.current = false;
-        }
-      })();
-    };
-    window.addEventListener(FORCE_REFRESH_CLICK_EVENT, onForce);
-    return () => window.removeEventListener(FORCE_REFRESH_CLICK_EVENT, onForce);
-  }, [lojas, show]);
+      try {
+        const results = await Promise.all(lista.map((loja) => syncStoreSellersNow(loja.id)));
+        const fail = results.find((r) => !r.ok);
+        if (fail && !fail.ok) show(fail.message, "danger");
+        else show("Vendedores atualizados.", "success");
+        if (results.some((r) => r.ok)) setReloadKey((n) => n + 1);
+      } finally {
+        syncing.current = false;
+      }
+    },
+  });
 
   return (
     <StoreCardsPage

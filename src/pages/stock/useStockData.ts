@@ -4,7 +4,7 @@ import { buildStockProductsView, type StockCatalogItem, type StockInput } from "
 import { fetchIncomingQty } from "@/data/wedash/purchaseRepo";
 import { fetchCostPrices, fetchStockCatalog, fetchStoreStock, syncStockNow } from "@/data/wedash/stockRepo";
 import type { Store } from "@/data/wedash/stores";
-import { FORCE_REFRESH_CLICK_EVENT } from "@/pages/dashboard/useForceRefresh";
+import { useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { fetchErpConnection } from "@/pages/dashboard/ErpStatusNotice";
 import { useScopedStores } from "@/pages/operation/shared";
 
@@ -107,13 +107,16 @@ export function useStockData() {
     };
   }, [storeKey, lojasLoading, reload, syncIfStale]);
 
-  useEffect(() => {
-    const onForce = () => {
-      if (data) void syncIfStale(data, { force: true });
-    };
-    window.addEventListener(FORCE_REFRESH_CLICK_EVENT, onForce);
-    return () => window.removeEventListener(FORCE_REFRESH_CLICK_EVENT, onForce);
-  }, [data, syncIfStale]);
+  const dataRef = useRef(data);
+  dataRef.current = data;
+  useScreenRefresh({
+    label: "Atualizar o estoque",
+    tip: "Busca o estoque e o que está a receber das lojas desta tela.",
+    run: async () => {
+      const atual = dataRef.current;
+      if (atual) await syncIfStale(atual, { force: true });
+    },
+  });
 
   const view = useMemo(
     () =>

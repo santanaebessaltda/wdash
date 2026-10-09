@@ -30,7 +30,8 @@ import type { Store } from "@/data/wedash/stores";
 import { isGestor } from "@/layout/nav-wedash";
 import { cn } from "@/lib/cn";
 import { brlCent, dataExtenso, deIso, fimDoMes, inicioDoMes, paraIso, somarDias, labelUpper } from "@/lib/format";
-import { FORCE_REFRESH_CLICK_EVENT, SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
+import { useScreenRefresh } from "@/pages/dashboard/screenRefresh";
+import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { parseNum, SectionHeader, useScopedStores } from "@/pages/operation/shared";
@@ -501,16 +502,18 @@ export function CashClosePage() {
     setSyncing(true);
   }, [show]);
 
+  useScreenRefresh({
+    label: "Atualizar vendas e fechamento",
+    tip: "Busca as vendas de hoje e o fechamento do mês que está na tela.",
+    sales: true,
+    run: () => pedirFechamento(),
+  });
+
   useEffect(() => {
-    const onForce = () => void pedirFechamento();
     const onSynced = () => setReloadKey((n) => n + 1);
-    window.addEventListener(FORCE_REFRESH_CLICK_EVENT, onForce);
     window.addEventListener(SALES_SYNCED_EVENT, onSynced);
-    return () => {
-      window.removeEventListener(FORCE_REFRESH_CLICK_EVENT, onForce);
-      window.removeEventListener(SALES_SYNCED_EVENT, onSynced);
-    };
-  }, [pedirFechamento]);
+    return () => window.removeEventListener(SALES_SYNCED_EVENT, onSynced);
+  }, []);
 
   useEffect(() => {
     if (lojasLoading || lojas.length === 0 || from > to) return;

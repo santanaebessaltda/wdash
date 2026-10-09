@@ -6,7 +6,7 @@ import { buildPurchaseOrderView, parseMinInput, type PurchaseStockRow } from "@/
 import { PURCHASE_SYNC_ERROR, fetchPurchaseMins, fetchPurchaseStock, fetchSold30, fetchSoldEver, savePurchaseMin, syncPurchaseStockNow } from "@/data/wedash/purchaseRepo";
 import type { StockCatalogItem } from "@/data/wedash/stockProducts";
 import { fetchCostPrices, fetchStockCatalog } from "@/data/wedash/stockRepo";
-import { FORCE_REFRESH_CLICK_EVENT } from "@/pages/dashboard/useForceRefresh";
+import { useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { fetchErpConnection } from "@/pages/dashboard/ErpStatusNotice";
 import { SAVE_ERROR_MSG } from "@/pages/operation/shared";
 
@@ -136,13 +136,13 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null, costT
     };
   }, [storeId, costTableId, load, sync]);
 
-  useEffect(() => {
-    const onForce = () => {
-      if (storeRef.current) void sync(storeRef.current);
-    };
-    window.addEventListener(FORCE_REFRESH_CLICK_EVENT, onForce);
-    return () => window.removeEventListener(FORCE_REFRESH_CLICK_EVENT, onForce);
-  }, [sync]);
+  useScreenRefresh({
+    label: "Atualizar o saldo do pedido",
+    tip: "Busca no Millennium o saldo do pedido de compra desta loja.",
+    run: async () => {
+      if (storeRef.current) await sync(storeRef.current);
+    },
+  });
 
   useEffect(() => {
     const t = window.setInterval(() => setNow(Date.now()), 60_000);
