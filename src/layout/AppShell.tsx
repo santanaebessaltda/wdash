@@ -9,6 +9,7 @@ import { PageLoader } from "./PageLoader";
 import { fetchThemePreference, saveThemePreference, touchLastSeen } from "@/session/authApi";
 import { installPrintMode } from "@/lib/printMode";
 import { storedThemePreference, useTheme } from "@/theme/ThemeProvider";
+import { PushRecover } from "@/push/PushRecover";
 
 /** O banco so grava 1x a cada 5 min; aqui so evita chamadas a toa. */
 const LAST_SEEN_INTERVAL_MS = 5 * 60_000;
@@ -98,6 +99,7 @@ export function AppShell() {
       </div>
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      <PushRecover />
     </div>
   );
 }
