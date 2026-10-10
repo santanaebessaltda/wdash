@@ -11,10 +11,10 @@ type Prefs = Record<PrefKey, boolean>;
 const DEFAULTS: Prefs = { sales: true, quiet: false, cashClose: true, storeGoal: true };
 
 const ROWS: Array<{ key: PrefKey; name: string; desc: string }> = [
-  { key: "sales", name: "Vendas do período", desc: "Total vendido a cada 30 minutos, com o valor de cada loja quando couber." },
-  { key: "quiet", name: "Sem venda no período", desc: "Avisa também quando aqueles 30 minutos fecham sem venda nova." },
-  { key: "cashClose", name: "Fechamento", desc: "Um resumo de madrugada: faltou ou sobrou no dinheiro, ou o dia ficou sem total real." },
-  { key: "storeGoal", name: "Meta da loja", desc: "Uma vez, quando a loja cruza um nível da meta. Não repete na rodada seguinte." },
+  { key: "sales", name: "Vendas do período", desc: "Receba o total vendido a cada 30 minutos e, quando disponível, o valor de cada loja." },
+  { key: "quiet", name: "Sem venda no período", desc: "Receba um aviso quando um período de 30 minutos terminar sem novas vendas." },
+  { key: "cashClose", name: "Fechamento", desc: "Receba um resumo do fechamento do dia, com faltas ou sobras em dinheiro e dias ainda sem total real." },
+  { key: "storeGoal", name: "Meta da loja", desc: "Receba um aviso quando a loja atingir um novo nível da meta. Cada nível é avisado uma única vez." },
 ];
 
 function Dot({ on }: { on: boolean }) {
@@ -49,7 +49,7 @@ export function NotificationsPage() {
         .maybeSingle();
       if (!vivo) return;
       if (error) {
-        setErro("Não foi possível carregar as notificações.");
+        setErro("Não foi possível carregar as notificações. Tente novamente.");
         return;
       }
       if (!data) return;
@@ -84,14 +84,14 @@ export function NotificationsPage() {
     );
     if (error) {
       setPrefs(prefs);
-      setErro("Não foi possível salvar. Tente de novo.");
+      setErro("Não foi possível salvar as alterações. Tente novamente.");
     }
   }
 
   return (
     <Card className="max-w-[720px]">
-      <h3 className="mb-1 text-[15px] font-bold text-t0">Notificações</h3>
-      <p className="mb-4.5 text-[12.5px] text-t2">Escolha o que chega no celular. Desligue o que não quiser receber.</p>
+      <h3 className="mb-1 text-[15px] font-bold text-t0">Avisos no celular</h3>
+      <p className="mb-4.5 text-[12.5px] text-t2">Ative ou desative os avisos que deseja receber.</p>
       <div className="grid grid-cols-[1fr_auto] gap-3 border-b border-line pb-3 text-[10.5px] font-bold uppercase tracking-wide text-t2">
         <span>Avisar sobre</span>
         <span className="w-[50px] text-center">Push</span>

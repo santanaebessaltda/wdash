@@ -25,7 +25,7 @@ const META: Record<string, { title: string; subtitle: string }> = {
   },
   [paths.settings.notifications]: {
     title: "Notificações",
-    subtitle: "Escolha quais avisos chegam no celular.",
+    subtitle: "Escolha quais avisos você quer receber no celular.",
   },
   [paths.settings.stores]: {
     title: "Lojas",
