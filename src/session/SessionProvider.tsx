@@ -13,6 +13,7 @@ import {
 } from "@/session/authApi";
 import { accessLabel, roleLabel, sessionFromUser, storesKey, type Session } from "@/session/session";
 import { clearSavedPeriod } from "@/session/periodStorage";
+import { pedirPermissaoAposLogin } from "@/push/salesPush";
 
 export type { Session };
 export { accessLabel, roleLabel, sessionFromUser };
@@ -129,6 +130,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     typeof window !== "undefined" ? ler() : null,
   );
   const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (!session || session.role === "SELLER") return;
+    void pedirPermissaoAposLogin(session.tenantId, session.membershipId);
+  }, [session]);
 
   useEffect(() => {
     let cancel = false;

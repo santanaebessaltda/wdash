@@ -10,6 +10,25 @@ function chave(): Uint8Array {
   return out;
 }
 
+let pedidoNestaAbertura: string | null = null;
+
+/**
+ * Depois do login (e ao reabrir o app já logado): se o aparelho ainda não decidiu,
+ * pede a permissão uma vez. Quem já permitiu só renova a inscrição.
+ * No iPhone o sistema só mostra o pedido com o app na Tela de Início.
+ */
+export async function pedirPermissaoAposLogin(tenantId: string, membershipId: string): Promise<void> {
+  if (pedidoNestaAbertura === membershipId) return;
+  pedidoNestaAbertura = membershipId;
+  if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
+  if (Notification.permission === "granted") {
+    await refreshSalesPush(tenantId);
+    return;
+  }
+  if (Notification.permission !== "default") return;
+  await enableSalesPush(tenantId);
+}
+
 /** Pede permissão e grava a inscrição. No iPhone só funciona com o app na Tela de Início. */
 export async function enableSalesPush(tenantId: string): Promise<"ok" | "denied" | "unsupported"> {
   if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return "unsupported";
