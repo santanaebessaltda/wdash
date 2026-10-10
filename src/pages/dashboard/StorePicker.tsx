@@ -1,12 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import type { Store } from "@/data/wedash/stores";
 import type { Scope } from "@/data/wedash/dashboard";
-import { StoreIcon } from "@/pages/dashboards/icons";
 import { cn } from "@/lib/cn";
 
 /**
- * Seletor de loja SINGLE-SELECT  -  Topbar (no lugar de "Buscar telas" no Dashboard).
- * Hero Store + fantasia + CNPJ; "Todas as lojas" = visao consolidada da rede.
+ * Seletor de loja SINGLE-SELECT no Topbar.
+ * Fantasia + CNPJ; "Todas as lojas" = visao consolidada da rede.
  * Escopo: `filialIds: []` = todas; `[id]` = uma loja.
  */
 export function StorePicker({ escopo, onChange, minhas }: { escopo: Scope; onChange: (e: Scope) => void; minhas: Store[] }) {
@@ -35,12 +34,6 @@ export function StorePicker({ escopo, onChange, minhas }: { escopo: Scope; onCha
     return f.codFilial ? `Filial ${f.codFilial}` : "—";
   }
 
-  const heroStore = (
-    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-acc-soft text-acc">
-      <StoreIcon size={15} />
-    </span>
-  );
-
   return (
     <div ref={ref} className="relative min-w-0">
       <button
@@ -48,7 +41,6 @@ export function StorePicker({ escopo, onChange, minhas }: { escopo: Scope; onCha
         onClick={() => setOpen((v) => !v)}
         className="flex h-12 w-full min-w-0 items-center gap-2.5 rounded-[11px] border border-line bg-bg-inset px-3 text-left transition-colors hover:border-acc"
       >
-        {heroStore}
         <div className="min-w-0 flex-1">
           <p className={cn("truncate text-[13px] font-bold text-t0", filialAtual && "uppercase")}>
             {filialAtual ? filialAtual.fantasia : "Todas as lojas"}
@@ -72,7 +64,6 @@ export function StorePicker({ escopo, onChange, minhas }: { escopo: Scope; onCha
               ehTodas ? "bg-acc-soft" : "hover:bg-bg-3",
             )}
           >
-            {heroStore}
             <div className="min-w-0 flex-1">
               <p className={cn("truncate text-[13px] font-bold", ehTodas ? "text-acc" : "text-t0")}>Todas as lojas</p>
               <p className="truncate text-[11px] text-t2">Rede consolidada</p>
@@ -98,7 +89,6 @@ export function StorePicker({ escopo, onChange, minhas }: { escopo: Scope; onCha
                   ativa ? "bg-acc-soft" : "hover:bg-bg-3",
                 )}
               >
-                {heroStore}
                 <div className="min-w-0 flex-1">
                   <p className={cn("truncate text-[13px] font-bold uppercase", ativa ? "text-acc" : "text-t0")}>{f.fantasia}</p>
                   <p className="truncate text-[11px] text-t2">{subtituloLoja(f)}</p>

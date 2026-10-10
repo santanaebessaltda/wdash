@@ -20,7 +20,7 @@ alwaysApply: true
 - Tema **Vela** estrito: reutilizar `src/components/ui` e `src/components/charts` antes de criar componente novo. Sem libs de chart externas.
 
 ## Filtros
-- Loja: global no Topbar, single-select (1 loja ou todas) via `useScope` — padrão Select with avatars (Avatar + nome + CNPJ).
+- Loja: global no Topbar, single-select (1 loja ou todas) via `useScope` — nome + CNPJ, sem ícone.
 - Período + Marca (WEPINK/WPINK): internos por subtela.
 - Granularidade: **1 dia → hora**; **>1 dia → dia** (não depende da marca).
 
