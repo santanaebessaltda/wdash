@@ -259,7 +259,12 @@ export async function notifyAutoSales(
 ): Promise<void> {
   const audience = await loadAudience(sb, args.tenantId);
   if (!audience) return;
-  const others = await loadOtherStoresToday(sb, args.tenantId, args.stores);
+  let others: Array<{ id: string; name: string; todayCents: number }> = [];
+  try {
+    others = await loadOtherStoresToday(sb, args.tenantId, args.stores);
+  } catch (e) {
+    console.warn(`  AVISO total de hoje das outras lojas não entrou no push: ${e instanceof Error ? e.message : String(e)}`);
+  }
   const seen = new Set<string>();
   for (const sub of audience.subs) {
     const userId = sub.auth_user_id;
