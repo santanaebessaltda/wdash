@@ -1,12 +1,13 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { paths } from "@/router/paths";
 import { AcessoPagina, AvisoCard, IconeCard, acessoTitulo } from "./AccessKit";
-import { useToast, Button } from "@/components/ui";
+import { Button } from "@/components/ui";
 import { useSession } from "@/session/SessionProvider";
 import { homeForRole } from "@/session/RequireSession";
 import { cn } from "@/lib/cn";
 import { enableSalesPush } from "@/push/salesPush";
+import { installPromptDisponivel, ouvirInstallPrompt, pedirInstalacao } from "@/push/installPrompt";
 
 type Plataforma = "ios" | "android" | "desktop";
 
@@ -34,11 +35,22 @@ const passos: Record<Exclude<Plataforma, "desktop">, string[]> = {
 export function Install() {
   const navigate = useNavigate();
   const { session, update } = useSession();
-  const { show } = useToast();
   const detectada = useMemo(detectarPlataforma, []);
   const [plataforma, setPlataforma] = useState<Plataforma>(detectada);
+  const [podeInstalar, setPodeInstalar] = useState(installPromptDisponivel);
+  const [instalando, setInstalando] = useState(false);
+
+  useEffect(() => ouvirInstallPrompt(() => setPodeInstalar(installPromptDisponivel())), []);
 
   const destino = session ? (session.onboardingStep !== null ? paths.onboarding : homeForRole(session.role)) : paths.access.login;
+
+  async function instalar() {
+    setInstalando(true);
+    const aceitou = await pedirInstalacao();
+    setInstalando(false);
+    setPodeInstalar(installPromptDisponivel());
+    if (aceitou) concluir(true);
+  }
 
   function concluir(instalou: boolean) {
     if (session && instalou) {
@@ -71,24 +83,38 @@ export function Install() {
         ))}
       </div>
 
+      {podeInstalar && (
+        <Button size="lg" fullWidth className="!mb-4 !h-[46px] font-bold" disabled={instalando} onClick={() => void instalar()}>
+          {instalando ? "Abrindo a instalação…" : "Instalar app"}
+        </Button>
+      )}
+
       {plataforma === "desktop" ? (
         <div className="flex flex-col gap-3">
-          <AvisoCard tom="info" titulo="Melhor no celular">
-            O app funciona melhor no celular. Envie o link para seu e-mail e instale por lá.
-          </AvisoCard>
-          <Button size="lg" fullWidth className="!h-[46px] font-bold" onClick={() => show("Link enviado para seu e-mail.", "success")}>Enviar link para meu e-mail</Button>
+          {!podeInstalar && (
+            <AvisoCard tom="info" titulo="Instalar neste computador">
+              No Chrome e no Edge, o botão Instalar aparece aqui quando o navegador libera. No iPhone, a instalação continua pelos passos da aba iPhone.
+            </AvisoCard>
+          )}
           <Button size="lg" fullWidth variant="outline" className="!h-[46px] font-bold" onClick={() => concluir(false)}>Continuar no computador</Button>
         </div>
       ) : (
         <div className="flex flex-col gap-4">
-          <ol className="flex flex-col gap-3">
-            {passos[plataforma].map((p, i) => (
-              <li key={i} className="flex gap-3">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-acc-soft text-xs font-extrabold text-acc">{i + 1}</span>
-                <span className="text-sm leading-relaxed text-t0">{p}</span>
-              </li>
-            ))}
-          </ol>
+          {plataforma === "ios" && (
+            <AvisoCard tom="info" titulo="No iPhone, a instalação é manual">
+              O Safari não oferece um botão para criar o atalho. Use os passos abaixo.
+            </AvisoCard>
+          )}
+          {(plataforma === "ios" || !podeInstalar) && (
+            <ol className="flex flex-col gap-3">
+              {passos[plataforma].map((p, i) => (
+                <li key={i} className="flex gap-3">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-acc-soft text-xs font-extrabold text-acc">{i + 1}</span>
+                  <span className="text-sm leading-relaxed text-t0">{p}</span>
+                </li>
+              ))}
+            </ol>
+          )}
           {plataforma === "ios" && (
             <AvisoCard tom="warn" titulo="Notificações no iPhone">
               No iPhone, as notificações só funcionam com a WDash instalada pela Tela de Início.

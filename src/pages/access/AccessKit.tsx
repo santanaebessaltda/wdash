@@ -27,11 +27,12 @@ export const acessoRodape = "text-[13px] text-t2";
 export function AcessoPagina({ children, rodape, largura = 420, marca = true }: { children: ReactNode; rodape?: ReactNode; largura?: number; marca?: boolean }) {
   return (
     <div
-      className="tela-cheia pad-topo pad-base relative flex w-full items-center justify-center overflow-hidden bg-bg-0 px-4"
+      className="tela-cheia pad-topo pad-base relative w-full overflow-y-auto bg-bg-0"
       style={padTopoEBase("2.5rem", "2.5rem")}
     >
       <AuthGlow />
-      <div className="relative w-full" style={{ maxWidth: largura }}>
+      <div className="relative flex min-h-full w-full items-center justify-center px-4">
+        <div className="w-full py-8" style={{ maxWidth: largura }}>
         {marca && (
           <div className="mb-6 flex flex-col items-center gap-3">
             <BrandMark size={56} />
@@ -45,6 +46,7 @@ export function AcessoPagina({ children, rodape, largura = 420, marca = true }: 
           {children}
         </div>
         {rodape && <div className="mt-5">{rodape}</div>}
+        </div>
       </div>
     </div>
   );
