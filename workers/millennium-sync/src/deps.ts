@@ -1194,6 +1194,18 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
       }
     },
 
+    async listFilledCloseDays(args: { tenantId: string; storeId: string; from: string; to: string }) {
+      const { data, error } = await sb
+        .from("cash_close_day")
+        .select("day")
+        .eq("tenant_id", args.tenantId)
+        .eq("store_id", args.storeId)
+        .gte("day", args.from)
+        .lte("day", args.to);
+      if (error) throw error;
+      return [...new Set((data ?? []).map((row) => String(row.day).slice(0, 10)))];
+    },
+
     async replaceCashCloseDays(args: {
       tenantId: string;
       storeId: string;
@@ -1629,13 +1641,35 @@ export async function enqueueDueCashCloseCatchUp(sb: SupabaseClient, now = new D
       if (!chosen || missing > chosen.day) chosen = { day: missing, storeIds: [storeId] };
       else if (missing === chosen.day) chosen.storeIds.push(storeId);
     }
+    const monthFrom = `${today.slice(0, 7)}-01`;
+    const { data: sangriaAlready } = await sb
+      .from("sync_job")
+      .select("id")
+      .eq("credential_id", credentialId)
+      .eq("kind", "CLOSE")
+      .eq("payload->>part", "sangria")
+      .eq("payload->>to", today)
+      .limit(1)
+      .maybeSingle();
+    if (!sangriaAlready && monthFrom <= today) {
+      const { error: sangriaErr } = await sb.from("sync_job").insert({
+        tenant_id: tenantId,
+        credential_id: credentialId,
+        kind: "CLOSE",
+        status: "QUEUED",
+        payload: { from: monthFrom, to: today, cashOnly: true, part: "sangria" },
+      });
+      if (sangriaErr) throw sangriaErr;
+      n += 1;
+      continue;
+    }
     if (!chosen) continue;
     const { error: insErr } = await sb.from("sync_job").insert({
       tenant_id: tenantId,
       credential_id: credentialId,
       kind: "CLOSE",
       status: "QUEUED",
-      payload: { from: chosen.day, to: chosen.day, storeIds: chosen.storeIds, cashOnly: true },
+      payload: { from: chosen.day, to: chosen.day, storeIds: chosen.storeIds, cashOnly: true, part: "close" },
     });
     if (insErr) throw insErr;
     n += 1;
@@ -1940,6 +1974,9 @@ export async function claimNextJob(sb: SupabaseClient): Promise<SyncJob | null> 
       closeStoreIds?: unknown;
       deep?: unknown;
       cashOnly?: unknown;
+      part?: unknown;
+      sangriaFrom?: unknown;
+      sangriaTo?: unknown;
     };
     const idList = (raw: unknown) =>
       Array.isArray(raw) ? raw.filter((id): id is string => typeof id === "string" && id.length > 0) : undefined;
@@ -1961,6 +1998,9 @@ export async function claimNextJob(sb: SupabaseClient): Promise<SyncJob | null> 
         ...(closeStoreIds && closeStoreIds.length > 0 ? { closeStoreIds } : {}),
         ...(payload.deep === true ? { deep: true } : {}),
         ...(payload.cashOnly === true ? { cashOnly: true } : {}),
+        ...(payload.part === "sangria" || payload.part === "close" || payload.part === "both" ? { part: payload.part } : {}),
+        ...(typeof payload.sangriaFrom === "string" ? { sangriaFrom: payload.sangriaFrom } : {}),
+        ...(typeof payload.sangriaTo === "string" ? { sangriaTo: payload.sangriaTo } : {}),
       },
     };
   }

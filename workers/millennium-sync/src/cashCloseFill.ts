@@ -11,6 +11,7 @@ import {
   addDaysIso,
   ensureMillenniumSession,
   syncStoreCashClose,
+  syncStoreSangria,
   ymdInTz,
   type RunSyncResult,
   type SyncJob,
@@ -95,8 +96,10 @@ function pixDue(pix: PixState | null, now: Date): boolean {
 }
 
 /**
- * Fechamento sob pedido: do dia 1 ao dia pedido, só o que ainda não está gravado.
- * Não rebusca as vendas. O CSV do PIX chega depois, pelo webhook.
+ * Pedido da tela, sem rebuscar as vendas.
+ * Sangria: o mês inteiro, do dia 1 até hoje.
+ * Fechamento: só o dia que ainda não está gravado, até ontem. A Stone segue esse pedido.
+ * Sem parte, a madrugada faz os dois. O CSV do PIX chega depois, pelo webhook.
  */
 export async function runCashCloseFillJob(
   job: SyncJob,
@@ -108,12 +111,15 @@ export async function runCashCloseFillJob(
   await deps.markJobRunning(job.id);
   const from = job.payload.from;
   const to = job.payload.to;
+  const part = job.payload.part ?? "both";
   const finish = async (error?: string, storesDone = 0): Promise<RunSyncResult> => {
     await deps.markJobFinished({ jobId: job.id, status: error ? "FAILED" : "SUCCEEDED", ...(error ? { error } : {}) });
-    console.log(`${error ? "ERRO" : "OK"} Fechamento do mês${error ? ` · ${error}` : ` · ${storesDone} loja(s)`}`);
+    const title = part === "sangria" ? "Sangrias do mês" : "Fechamento do mês";
+    console.log(`${error ? "ERRO" : "OK"} ${title}${error ? ` · ${error}` : ` · ${storesDone} loja(s)`}`);
     return error ? { ok: false, reason: "other", error } : { ok: true, storesDone };
   };
-  if (!from || !to || !deps.fetchCashAccounts || !deps.fetchCashCloseReport || !deps.replaceCashCloseDays) {
+  if (!from || !to) return finish("período do fechamento incompleto");
+  if (part !== "sangria" && (!deps.fetchCashAccounts || !deps.fetchCashCloseReport || !deps.replaceCashCloseDays)) {
     return finish("período do fechamento incompleto");
   }
 
@@ -167,22 +173,25 @@ export async function runCashCloseFillJob(
         console.warn(`AVISO chão do fechamento: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
-    const sangriaTo = to < today ? to : today;
-    if (rangeFrom <= sangriaTo) {
+    const sangriaFrom = job.payload.sangriaFrom ?? rangeFrom;
+    const sangriaEnd = job.payload.sangriaTo ?? to;
+    const sangriaTo = sangriaEnd < today ? sangriaEnd : today;
+    if (part !== "close" && sangriaFrom <= sangriaTo) {
       try {
-        await syncStoreCashClose(deps, {
+        await syncStoreSangria(deps, {
           session,
           tenantId: job.tenantId,
           store,
-          from: rangeFrom,
+          from: sangriaFrom,
           to: sangriaTo,
-          accounts,
-          accountsOk,
-          sangriaOnly: true,
         });
       } catch {
         problems.push("Não foi possível buscar as sangrias do Millennium.");
       }
+    }
+    if (part === "sangria") {
+      console.log(`  ${store.code}: sangrias ${sangriaFrom}→${sangriaTo}`);
+      continue;
     }
     const days = missingCloseDays(rangeFrom, to, today, await filledDays(sb, job.tenantId, store.id, rangeFrom, to));
     for (const day of days) {

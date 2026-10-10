@@ -502,9 +502,9 @@ export function CashClosePage() {
     let checks = 0;
     const tick = async () => {
       checks += 1;
-      const open = await fetchOpenCashCloseJob(session.tenantId);
+      const open = await fetchOpenCashCloseJob(session.tenantId, "close");
       if (stop || open || checks < 2) return;
-      const message = await fetchLatestCashCloseError(session.tenantId);
+      const message = await fetchLatestCashCloseError(session.tenantId, "close");
       if (stop) return;
       setSyncing(false);
       setReloadKey((n) => n + 1);

@@ -64,7 +64,7 @@ serve(async (req) => {
   const { data: userData, error: userError } = await userClient.auth.getUser();
   if (userError || !userData.user) return json({ error: "unauthorized" }, 401);
 
-  let body: { action?: string; from?: string; to?: string; storeIds?: unknown };
+  let body: { action?: string; from?: string; to?: string; storeIds?: unknown; part?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -74,8 +74,11 @@ serve(async (req) => {
   const kind = mapAction(String(body.action ?? "").trim().toLowerCase());
   if (!kind) return json({ error: "invalid_action" }, 400);
 
-  const payload: { from?: string; to?: string; storeIds?: string[]; cashOnly?: boolean } = {};
-  if (kind === "CLOSE") payload.cashOnly = true;
+  const payload: { from?: string; to?: string; storeIds?: string[]; cashOnly?: boolean; part?: "sangria" | "close" } = {};
+  if (kind === "CLOSE") {
+    payload.cashOnly = true;
+    if (body.part === "sangria" || body.part === "close") payload.part = body.part;
+  }
   if (kind === "FORCE" || kind === "FORCE_LIGHT") {
     // So hoje  -  client pode mandar from=to=hoje (audit); worker usa fuso da loja.
     if (isIsoDay(body.from) && isIsoDay(body.to) && body.from === body.to) {
@@ -263,7 +266,14 @@ serve(async (req) => {
       .eq("kind", "CLOSE")
       .in("status", ["QUEUED", "RUNNING"])
       .limit(20);
-    const hit = (open ?? []).find((row) => (row.payload as { cashOnly?: unknown } | null)?.cashOnly === true);
+    const hit = (open ?? []).find((row) => {
+      const stored = row.payload as { cashOnly?: unknown; part?: unknown } | null;
+      if (stored?.cashOnly !== true) return false;
+      const existing = stored.part;
+      const wanted = payload.part;
+      if (existing == null || existing === "both" || wanted == null) return true;
+      return existing === wanted;
+    });
     if (hit) return json({ ok: true, job: { id: hit.id }, deduped: true });
   } else if (kind === "SEED" || kind === "RANGE" || kind === "REGISTRY") {
     const { data: open } = await admin

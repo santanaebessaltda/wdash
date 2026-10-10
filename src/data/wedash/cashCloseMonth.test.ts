@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clampCloseRange, closeHistoryFloor, missingCloseDays, monthCloseSpan, monthCloseSpanFor, navMonthFloor, sangriaMonthSpan } from "./cashCloseMonth";
+import { cashCloseJobMatches, clampCloseRange, closeHistoryFloor, missingCloseDays, monthCloseSpan, monthCloseSpanFor, navMonthFloor, sangriaMonthSpan } from "./cashCloseMonth";
 
 describe("monthCloseSpan", () => {
   it("no dia 8 pede do dia 1 até o dia 7", () => {
@@ -50,6 +50,15 @@ describe("navMonthFloor", () => {
   it("com o mês anterior fechado, abre desde o mais antigo que tem dado", () => {
     expect(navMonthFloor("2026-11-10", "2026-10-01", "2026-10-31")).toBe("2026-10-01");
     expect(navMonthFloor("2026-12-10", "2026-10-01", "2026-11-02")).toBe("2026-10-01");
+  });
+});
+
+describe("cashCloseJobMatches", () => {
+  it("a tela de sangria ignora um fechamento e espera o passeio da madrugada", () => {
+    expect(cashCloseJobMatches({ cashOnly: true, part: "close" }, "sangria")).toBe(false);
+    expect(cashCloseJobMatches({ cashOnly: true, part: "sangria" }, "sangria")).toBe(true);
+    expect(cashCloseJobMatches({ cashOnly: true }, "sangria")).toBe(true);
+    expect(cashCloseJobMatches({ cashOnly: true, part: "both" }, "close")).toBe(true);
   });
 });
 

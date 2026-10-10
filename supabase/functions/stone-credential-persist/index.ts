@@ -138,8 +138,8 @@ async function enqueuePastClose(admin: ReturnType<typeof createClient>, tenantId
     .in("status", ["QUEUED", "RUNNING"])
     .limit(20);
   const already = (open ?? []).some((row) => {
-    const payload = row.payload as { cashOnly?: boolean; storeIds?: string[] } | null;
-    return payload?.cashOnly === true && (!payload.storeIds?.length || payload.storeIds.includes(storeId));
+    const payload = row.payload as { cashOnly?: boolean; part?: string; storeIds?: string[] } | null;
+    return payload?.cashOnly === true && payload.part !== "sangria" && (!payload.storeIds?.length || payload.storeIds.includes(storeId));
   });
   if (already) return;
   await admin.from("sync_job").insert({
@@ -147,7 +147,7 @@ async function enqueuePastClose(admin: ReturnType<typeof createClient>, tenantId
     kind: "CLOSE",
     status: "QUEUED",
     credential_id: cred.id,
-    payload: { from, to, storeIds: [storeId], cashOnly: true },
+    payload: { from, to, storeIds: [storeId], cashOnly: true, part: "close" },
   });
 }
 

@@ -59,6 +59,19 @@ export function clampCloseRange(from: string, to: string, floor: string): { from
   return { from: start, to };
 }
 
+export type CashCloseJobPart = "sangria" | "close" | "both";
+
+/** O job da tela espera o pedido dela. Um passeio sem parte (madrugada) serve as duas. */
+export function cashCloseJobMatches(
+  payload: { cashOnly?: unknown; part?: unknown } | null | undefined,
+  part: "sangria" | "close",
+): boolean {
+  if (payload?.cashOnly !== true) return false;
+  const got = payload.part;
+  if (got == null || got === "both") return true;
+  return got === part;
+}
+
 /** Dias do intervalo, até ontem, que ainda não têm fechamento gravado. */
 export function missingCloseDays(from: string, to: string, today: string, filled: ReadonlySet<string>): string[] {
   const yesterday = somarDias(today, -1);

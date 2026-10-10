@@ -36,7 +36,7 @@ import {
   type CashAccount,
   type CashCloseReportLine,
 } from "./millenniumCashClose.ts";
-import { clampCloseRange } from "../../../src/data/wedash/cashCloseMonth.ts";
+import { clampCloseRange, missingCloseDays } from "../../../src/data/wedash/cashCloseMonth.ts";
 import type { ParsedSangria } from "./millenniumSangria.ts";
 import type { StoneCapture } from "./stoneConciliation.ts";
 import {
@@ -157,7 +157,7 @@ async function rangeInsideCloseFloor(
 }
 
 export async function syncStoreCashClose(
-  deps: Pick<SyncJobDeps, "fetchCashCloseReport" | "replaceCashCloseDays" | "fetchSangriaLista" | "upsertSangriaLines" | "closeHistoryFloor">,
+  deps: Pick<SyncJobDeps, "fetchCashCloseReport" | "replaceCashCloseDays" | "listFilledCloseDays" | "closeHistoryFloor">,
   args: {
     session: string;
     tenantId: string;
@@ -168,8 +168,6 @@ export async function syncStoreCashClose(
     accountsOk: boolean;
     /** No fechamento sob pedido, a falha volta para o job em vez de só ir para o log. */
     strict?: boolean;
-    /** Só a lista de sangrias. O fechamento do dia já gravado não é rebuscado. */
-    sangriaOnly?: boolean;
   },
 ): Promise<void> {
   const span = await rangeInsideCloseFloor(deps, {
@@ -179,8 +177,6 @@ export async function syncStoreCashClose(
     to: args.to,
   });
   if (!span) return;
-  await syncStoreSangria(deps, { ...args, from: span.from, to: span.to });
-  if (args.sangriaOnly) return;
   if (!args.accountsOk || !deps.fetchCashCloseReport || !deps.replaceCashCloseDays) {
     if (args.strict) throw new Error("contas de caixa indisponíveis");
     return;
@@ -192,9 +188,25 @@ export async function syncStoreCashClose(
     if (args.strict) throw new Error(msg);
     return;
   }
+  const today = ymdInTz(new Date(), args.store.timezone);
+  let filled = new Set<string>();
+  if (deps.listFilledCloseDays) {
+    try {
+      filled = new Set(await deps.listFilledCloseDays({
+        tenantId: args.tenantId,
+        storeId: args.store.id,
+        from: span.from,
+        to: span.to,
+      }));
+    } catch (e) {
+      console.warn(`  AVISO [${args.store.code}] dias de fechamento: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  const days = missingCloseDays(span.from, span.to, today, filled);
+  if (days.length === 0) return;
   try {
     const rows: CashCloseDay[] = [];
-    for (let day = span.from; day <= span.to; day = addDaysIso(day, 1)) {
+    for (const day of days) {
       const lines = await deps.fetchCashCloseReport({ session: args.session, conta: account.conta, day });
       const byMethod = new Map<string, CashCloseDay>();
       for (const line of lines) {
@@ -214,13 +226,15 @@ export async function syncStoreCashClose(
       }
       rows.push(...byMethod.values());
     }
-    await deps.replaceCashCloseDays({
-      tenantId: args.tenantId,
-      storeId: args.store.id,
-      from: span.from,
-      to: span.to,
-      rows,
-    });
+    for (const day of days) {
+      await deps.replaceCashCloseDays({
+        tenantId: args.tenantId,
+        storeId: args.store.id,
+        from: day,
+        to: day,
+        rows: rows.filter((row) => row.day === day),
+      });
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.warn(`  AVISO [${args.store.code}] fechamento de caixa ${span.from}→${span.to}: ${msg}`);
@@ -232,8 +246,29 @@ export async function syncStoreCashClose(
   }
 }
 
-async function syncStoreSangria(
-  deps: Pick<SyncJobDeps, "fetchSangriaLista" | "upsertSangriaLines">,
+/** Sangrias do intervalo e, em seguida, o fechamento só dos dias que ainda não estão gravados. */
+async function syncStoreCloseSpan(
+  deps: Pick<SyncJobDeps, "fetchCashCloseReport" | "replaceCashCloseDays" | "listFilledCloseDays" | "fetchSangriaLista" | "upsertSangriaLines" | "closeHistoryFloor">,
+  args: {
+    session: string;
+    tenantId: string;
+    store: Pick<SyncStore, "id" | "code" | "millenniumStoreId" | "timezone">;
+    from: string;
+    to: string;
+    accounts: CashAccount[];
+    accountsOk: boolean;
+  },
+): Promise<void> {
+  const today = ymdInTz(new Date(), args.store.timezone);
+  const sangriaTo = args.to < today ? args.to : today;
+  if (args.from <= sangriaTo) {
+    await syncStoreSangria(deps, { ...args, from: args.from, to: sangriaTo });
+  }
+  await syncStoreCashClose(deps, args);
+}
+
+export async function syncStoreSangria(
+  deps: Pick<SyncJobDeps, "fetchSangriaLista" | "upsertSangriaLines" | "closeHistoryFloor">,
   args: {
     session: string;
     tenantId: string;
@@ -243,12 +278,19 @@ async function syncStoreSangria(
   },
 ): Promise<void> {
   if (!deps.fetchSangriaLista || !deps.upsertSangriaLines) return;
+  const span = await rangeInsideCloseFloor(deps, {
+    tenantId: args.tenantId,
+    timeZone: args.store.timezone,
+    from: args.from,
+    to: args.to,
+  });
+  if (!span) return;
   try {
     const lines = await deps.fetchSangriaLista({
       session: args.session,
       millenniumStoreId: args.store.millenniumStoreId,
-      from: args.from,
-      to: args.to,
+      from: span.from,
+      to: span.to,
     });
     await deps.upsertSangriaLines({ tenantId: args.tenantId, storeId: args.store.id, lines });
   } catch (e) {
@@ -1439,6 +1481,11 @@ export type SyncJobPayload = {
   deep?: boolean;
   /** Só o fechamento (Millennium + Stone), sem rebuscar as vendas. */
   cashOnly?: boolean;
+  /** Tela de sangria ou de fechamento. Sem parte, o passeio faz as duas. */
+  part?: "sangria" | "close" | "both";
+  /** Intervalo da lista de sangrias quando o fechamento do job é só um dia. */
+  sangriaFrom?: string;
+  sangriaTo?: string;
 };
 
 export type SyncJob = {
@@ -1687,6 +1734,8 @@ export type SyncJobDeps = {
   fetchCashAccounts?: (session: string) => Promise<CashAccount[]>;
   /** Fechamento detalhado de um dia, na CONTA do caixa. */
   fetchCashCloseReport?: (args: { session: string; conta: number; day: string }) => Promise<CashCloseReportLine[]>;
+  /** Dias que já têm fechamento gravado. Esses dias não são rebuscados. */
+  listFilledCloseDays?: (args: { tenantId: string; storeId: string; from: string; to: string }) => Promise<string[]>;
   /** Dia 1 do mês em que a conta entrou. Fechamento e sangria anteriores ficam de fora. */
   closeHistoryFloor?: (args: { tenantId: string; timeZone: string }) => Promise<string>;
   /** Sangrias da filial no intervalo. Opcional: sem ela o calendário não enche. */
@@ -3458,7 +3507,7 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
             linkSellers: linkSellersFor(store),
           });
         }
-        await syncStoreCashClose(deps, {
+        await syncStoreCloseSpan(deps, {
           session: session!,
           tenantId: job.tenantId,
           store,
@@ -3517,10 +3566,25 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
               }
             : null);
 
+        if (
+          job.kind === "CLOSE" &&
+          !job.payload.cashOnly &&
+          !job.payload.deep &&
+          !job.payload.fillUntil
+        ) {
+          await syncStoreSangria(deps, {
+            session: session!,
+            tenantId: job.tenantId,
+            store,
+            from: `${todayStore.slice(0, 7)}-01`,
+            to: todayStore,
+          });
+        }
+
         if (windows.length === 0) {
           detail(`  [${store.code}] nada a buscar na Lista (já no banco)`);
           if (job.kind === "CLOSE" && job.payload.from && job.payload.to) {
-            await syncStoreCashClose(deps, {
+            await syncStoreCloseSpan(deps, {
               session: session!,
               tenantId: job.tenantId,
               store,
@@ -3798,7 +3862,7 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
               linkSellers: linkSellersFor(store),
             };
             await persistListaDerivedDayAggs(deps, { ...win, skipSellers: true });
-            await syncStoreCashClose(deps, {
+            await syncStoreCloseSpan(deps, {
               session: session!,
               tenantId: job.tenantId,
               store,
@@ -3824,7 +3888,7 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
               linkSellers: linkSellersFor(store),
             };
             await persistListaDerivedDayAggs(deps, { ...win, skipSellers: true });
-            await syncStoreCashClose(deps, {
+            await syncStoreCloseSpan(deps, {
               session: session!,
               tenantId: job.tenantId,
               store,

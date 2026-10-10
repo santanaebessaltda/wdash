@@ -1,6 +1,6 @@
 import { calendarTodayIso } from "./clock";
 import { shiftName } from "./engine/format";
-import { monthCloseSpanFor, navMonthFloor, sangriaMonthSpan } from "./cashCloseMonth";
+import { cashCloseJobMatches, monthCloseSpanFor, navMonthFloor, sangriaMonthSpan, type CashCloseJobPart } from "./cashCloseMonth";
 import { captureBucket, paidPixCents, type CashCloseBucket, type CashCloseMillLine, type CloseAmountMap } from "./cashCloseView";
 
 export type CashCloseSnapshot = {
@@ -256,7 +256,7 @@ export async function requestSangriaMonth(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const span = sangriaMonthSpan(monthDay, calendarTodayIso());
   if (!span) return { ok: false, message: "Não há sangrias para buscar neste mês." };
-  return enqueueCashClose(span.from, span.to, storeIds, "Não foi possível buscar as sangrias deste mês. Tente novamente.");
+  return enqueueCashClose(span.from, span.to, storeIds, "Não foi possível buscar as sangrias deste mês. Tente novamente.", "sangria");
 }
 
 /** Pede o fechamento dos dias do mês visível que ainda não têm, até ontem. */
@@ -266,7 +266,7 @@ export async function requestMonthClose(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const span = monthCloseSpanFor(monthDay, calendarTodayIso());
   if (!span) return { ok: false, message: "Os fechamentos deste mês estarão disponíveis a partir de amanhã." };
-  return enqueueCashClose(span.from, span.to, storeIds, "Não foi possível buscar os fechamentos deste mês. Tente novamente.");
+  return enqueueCashClose(span.from, span.to, storeIds, "Não foi possível buscar os fechamentos deste mês. Tente novamente.", "close");
 }
 
 async function enqueueCashClose(
@@ -274,12 +274,13 @@ async function enqueueCashClose(
   to: string,
   storeIds: string[],
   fail: string,
+  part: CashCloseJobPart,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const { getSupabase } = await import("@/lib/supabase");
   const sb = getSupabase();
   if (!sb) return { ok: true };
   const { error } = await sb.functions.invoke("erp-sync-enqueue", {
-    body: { action: "cash_close", from, to, storeIds },
+    body: { action: "cash_close", from, to, storeIds, part },
   });
   if (error) return { ok: false, message: fail };
   return { ok: true };
@@ -384,7 +385,7 @@ export async function saveCashCloseReview(input: {
   return { ok: true };
 }
 
-export async function fetchOpenCashCloseJob(tenantId: string): Promise<boolean> {
+export async function fetchOpenCashCloseJob(tenantId: string, part: "sangria" | "close"): Promise<boolean> {
   const { getSupabase } = await import("@/lib/supabase");
   const sb = getSupabase();
   if (!sb) return false;
@@ -396,11 +397,11 @@ export async function fetchOpenCashCloseJob(tenantId: string): Promise<boolean> 
     .in("status", ["QUEUED", "RUNNING"])
     .limit(20);
   if (error) return false;
-  return (data ?? []).some((row) => (row.payload as { cashOnly?: unknown } | null)?.cashOnly === true);
+  return (data ?? []).some((row) => cashCloseJobMatches(row.payload as { cashOnly?: unknown; part?: unknown } | null, part));
 }
 
 /** Erro do último fechamento pedido por esta tela. Sucesso devolve null. */
-export async function fetchLatestCashCloseError(tenantId: string): Promise<string | null> {
+export async function fetchLatestCashCloseError(tenantId: string, part: "sangria" | "close"): Promise<string | null> {
   const { getSupabase } = await import("@/lib/supabase");
   const sb = getSupabase();
   if (!sb) return null;
@@ -410,12 +411,15 @@ export async function fetchLatestCashCloseError(tenantId: string): Promise<strin
     .eq("tenant_id", tenantId)
     .eq("kind", "CLOSE")
     .order("finished_at", { ascending: false })
-    .limit(5);
+    .limit(8);
   if (error) return null;
-  const row = (data ?? []).find((item) => (item.payload as { cashOnly?: unknown } | null)?.cashOnly === true);
+  const row = (data ?? []).find((item) => cashCloseJobMatches(item.payload as { cashOnly?: unknown; part?: unknown } | null, part));
   if (!row || row.status !== "FAILED") return null;
   const message = String(row.error ?? "");
-  return message.startsWith("Não foi possível") ? message : "Não foi possível buscar os fechamentos. Tente novamente.";
+  const fallback = part === "sangria"
+    ? "Não foi possível buscar as sangrias. Tente novamente."
+    : "Não foi possível buscar os fechamentos. Tente novamente.";
+  return message.startsWith("Não foi possível") ? message : fallback;
 }
 
 export type CloseSaleRow = {
