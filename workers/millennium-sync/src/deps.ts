@@ -684,6 +684,16 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
       return fetchCashCloseReport({ ...args, baseUrl: millenniumBaseUrl() });
     },
 
+    async fetchSangriaLista(args) {
+      const { fetchSangriaLista } = await import("./millenniumSangria.ts");
+      return fetchSangriaLista({ ...args, baseUrl: millenniumBaseUrl() });
+    },
+
+    async upsertSangriaLines(args) {
+      const { upsertSangriaLines } = await import("./sangriaSync.ts");
+      return upsertSangriaLines(sb, args);
+    },
+
     async listCashCloseActivity(args) {
       const { data, error } = await sb
         .from("cash_close_day")

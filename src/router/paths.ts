@@ -68,6 +68,7 @@ export const paths = {
     staff: "/management/staff",
     /** Calendário do fechamento de caixa. A adquirente fica em Custos. */
     cashClose: "/management/cash-close",
+    sangria: "/management/sangria",
   },
   /** Configuracoes: parametros de custo por loja usados no Financeiro. */
   operation: {

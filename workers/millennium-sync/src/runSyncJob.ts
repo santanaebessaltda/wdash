@@ -36,6 +36,7 @@ import {
   type CashAccount,
   type CashCloseReportLine,
 } from "./millenniumCashClose.ts";
+import type { ParsedSangria } from "./millenniumSangria.ts";
 import type { StoneCapture } from "./stoneConciliation.ts";
 import {
   closedMonthRange,
@@ -141,11 +142,11 @@ async function persistListaDerivedDayAggs(
 
 /** Fundo, sangria, fechamento e valor digitado da janela. Um dia = uma chamada. Falha não derruba a venda. */
 export async function syncStoreCashClose(
-  deps: Pick<SyncJobDeps, "fetchCashCloseReport" | "replaceCashCloseDays">,
+  deps: Pick<SyncJobDeps, "fetchCashCloseReport" | "replaceCashCloseDays" | "fetchSangriaLista" | "upsertSangriaLines">,
   args: {
     session: string;
     tenantId: string;
-    store: Pick<SyncStore, "id" | "code">;
+    store: Pick<SyncStore, "id" | "code" | "millenniumStoreId">;
     from: string;
     to: string;
     accounts: CashAccount[];
@@ -154,6 +155,7 @@ export async function syncStoreCashClose(
     strict?: boolean;
   },
 ): Promise<void> {
+  await syncStoreSangria(deps, args);
   if (!args.accountsOk || !deps.fetchCashCloseReport || !deps.replaceCashCloseDays) {
     if (args.strict) throw new Error("contas de caixa indisponíveis");
     return;
@@ -202,6 +204,35 @@ export async function syncStoreCashClose(
       day: args.from,
     });
     if (args.strict) throw e;
+  }
+}
+
+async function syncStoreSangria(
+  deps: Pick<SyncJobDeps, "fetchSangriaLista" | "upsertSangriaLines">,
+  args: {
+    session: string;
+    tenantId: string;
+    store: Pick<SyncStore, "id" | "code" | "millenniumStoreId">;
+    from: string;
+    to: string;
+  },
+): Promise<void> {
+  if (!deps.fetchSangriaLista || !deps.upsertSangriaLines) return;
+  try {
+    const lines = await deps.fetchSangriaLista({
+      session: args.session,
+      millenniumStoreId: args.store.millenniumStoreId,
+      from: args.from,
+      to: args.to,
+    });
+    await deps.upsertSangriaLines({ tenantId: args.tenantId, storeId: args.store.id, lines });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn(`  AVISO [${args.store.code}] sangria ${args.from}→${args.to}: ${msg}`);
+    syncLog("WARN", "sangria", `Sangria não gravou (${args.from}→${args.to}): ${msg}`, {
+      store: args.store,
+      day: args.from,
+    });
   }
 }
 
@@ -1624,6 +1655,9 @@ export type SyncJobDeps = {
   fetchCashAccounts?: (session: string) => Promise<CashAccount[]>;
   /** Fechamento detalhado de um dia, na CONTA do caixa. */
   fetchCashCloseReport?: (args: { session: string; conta: number; day: string }) => Promise<CashCloseReportLine[]>;
+  /** Sangrias da filial no intervalo. Opcional: sem ela o calendário não enche. */
+  fetchSangriaLista?: (args: { session: string; millenniumStoreId: number; from: string; to: string }) => Promise<ParsedSangria[]>;
+  upsertSangriaLines?: (args: { tenantId: string; storeId: string; lines: ParsedSangria[] }) => Promise<void>;
   /**
    * Substitui fundo, sangria, fechamento e valor digitado no intervalo [from,to].
    * Não altera o faturamento.
