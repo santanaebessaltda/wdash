@@ -26,6 +26,7 @@ import { fetchCostTablePrices, fetchCostTables } from "./millenniumCostTable.ts"
 import type { CatalogDeps, CatalogEntry } from "./productCatalog.ts";
 import { buildCostTableDetectDeps } from "./costTableSync.ts";
 import { AUTO_REFRESH_MIN, AUTO_SESSION_MARK, parseStoreHours, planAutoRound, recoveryFloor } from "./autoRefresh.ts";
+import { notifyAutoSales as sendAutoSalesPush, readTodayRevenue as loadTodayRevenue } from "./salesPush.ts";
 import {
   addMonths,
   DEEP_EMPTY_MONTHS,
@@ -487,6 +488,14 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
           .or(`last_closed_day.is.null,last_closed_day.lt.${r.day}`);
         if (error) throw error;
       }
+    },
+
+    async readTodayRevenue(tenantId, stores) {
+      return loadTodayRevenue(sb, tenantId, stores);
+    },
+
+    async notifyAutoSales(args) {
+      await sendAutoSalesPush(sb, args);
     },
 
     async markStoresSynced(storeIds, at) {

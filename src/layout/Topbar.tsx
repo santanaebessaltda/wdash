@@ -14,6 +14,7 @@ import {
 import { StorePicker } from "@/pages/dashboard/StorePicker";
 import { useScope } from "@/pages/dashboard/useScope";
 import { TopbarRefresh } from "./TopbarRefresh";
+import { SalesPushButton } from "@/push/SalesPushButton";
 
 const ICON_PERFIL = "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8";
 const ICON_INTEGRACOES = "M12 22v-5M9 8V2M15 8V2M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8z";
@@ -123,6 +124,7 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
       )}
 
       <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2.5">
+        {session.role !== "SELLER" && <SalesPushButton tenantId={session.tenantId} />}
         {mostraAtualizar(location.pathname) && <TopbarRefresh storeIds={escopo.filialIds} />}
 
         <Dropdown

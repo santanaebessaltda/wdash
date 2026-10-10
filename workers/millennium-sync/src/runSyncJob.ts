@@ -1447,6 +1447,15 @@ export type SyncJobDeps = {
   /** Erros/avisos do job  ->  `sync_log` (Configuracoes > Logs). Best-effort. */
   insertSyncLogs?: (rows: SyncLogRow[]) => Promise<void>;
   listStores: (tenantId: string) => Promise<SyncStore[]>;
+  /** Faturamento de hoje (marca ALL) antes da rodada, para o push. */
+  readTodayRevenue?: (tenantId: string, stores: Array<{ id: string; timezone: string }>) => Promise<Map<string, number>>;
+  /** Push do que vendeu desde a leitura anterior. Só na rodada automática. */
+  notifyAutoSales?: (args: {
+    tenantId: string;
+    stores: Array<{ id: string; name: string; timezone: string }>;
+    before: Map<string, number>;
+    after: Map<string, number>;
+  }) => Promise<void>;
   /** Days already in sales_day_agg for this store (any brand). */
   listExistingDays: (args: {
     tenantId: string;
@@ -2901,6 +2910,18 @@ async function runRefreshJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyncRe
 
   // Hoje so fecha com pedido explicito (job antigo na fila); o normal e a madrugada (CLOSE) fechar ontem  - 
   // se ela nao rodou, a 1 rodada do dia fecha ontem como dia pendente, acima.
+  let beforeToday: Map<string, number> | null = null;
+  if (auto && deps.readTodayRevenue) {
+    try {
+      beforeToday = await deps.readTodayRevenue(
+        job.tenantId,
+        stores.map((store) => ({ id: store.id, timezone: store.timezone })),
+      );
+    } catch (e) {
+      console.warn(`  AVISO leitura das vendas de hoje falhou: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
   const closeRequested = new Set(job.payload.closeStoreIds ?? []);
   const fullStoreIds = stores.filter((s) => closeRequested.has(s.id)).map((s) => s.id);
   const res = await runSyncJob(
@@ -2926,6 +2947,26 @@ async function runRefreshJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyncRe
     deps,
     stores.filter((s) => full.has(s.id)).map((s) => ({ storeId: s.id, day: localClock(at, s.timezone).day })),
   );
+  if (auto && beforeToday && deps.readTodayRevenue && deps.notifyAutoSales) {
+    try {
+      const after = await deps.readTodayRevenue(
+        job.tenantId,
+        stores.map((store) => ({ id: store.id, timezone: store.timezone })),
+      );
+      await deps.notifyAutoSales({
+        tenantId: job.tenantId,
+        stores: stores.map((store) => ({
+          id: store.id,
+          name: (store.name || store.code).trim() || store.code,
+          timezone: store.timezone,
+        })),
+        before: beforeToday,
+        after,
+      });
+    } catch (e) {
+      console.warn(`  AVISO push de vendas não foi enviado: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
   return finish(res, res.storesDone);
 }
 

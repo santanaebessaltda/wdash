@@ -6,6 +6,7 @@ import { useToast, Button } from "@/components/ui";
 import { useSession } from "@/session/SessionProvider";
 import { homeForRole } from "@/session/RequireSession";
 import { cn } from "@/lib/cn";
+import { enableSalesPush } from "@/push/salesPush";
 
 type Plataforma = "ios" | "android" | "desktop";
 
@@ -40,7 +41,10 @@ export function Install() {
   const destino = session ? (session.onboardingStep !== null ? paths.onboarding : homeForRole(session.role)) : paths.access.login;
 
   function concluir(instalou: boolean) {
-    if (session && instalou) update({ appInstalled: true });
+    if (session && instalou) {
+      update({ appInstalled: true });
+      if (session.role !== "SELLER") void enableSalesPush(session.tenantId);
+    }
     navigate(destino, { replace: true });
   }
 

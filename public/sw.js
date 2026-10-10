@@ -4,7 +4,7 @@
    aponta para pacotes que não existem mais. O cache serve só para abrir
    offline e para os arquivos com hash no nome. Nunca cacheia resposta de erro
    (404 de chunk antigo depois de deploy). */
-const VERSAO = "v9";
+const VERSAO = "v10";
 const CACHE = `wedash-${VERSAO}`;
 // Escopo do SW (= base do app). Em dominio proprio fica "/".
 const BASE = self.registration.scope;
@@ -24,6 +24,34 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))));
   self.clients.claim();
+});
+
+self.addEventListener("push", (event) => {
+  let data = { title: "WDash", body: "Vendas atualizadas.", url: "/" };
+  try {
+    if (event.data) data = { ...data, ...event.data.json() };
+  } catch {
+    /* payload vazio: mostra o texto padrão */
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: new URL("icons/icon-192.png", BASE).href,
+      data: { url: data.url || "/" },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = new URL(event.notification.data?.url || "/", BASE).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((janelas) => {
+      const aberta = janelas.find((janela) => janela.url.startsWith(BASE));
+      if (aberta) return aberta.focus();
+      return self.clients.openWindow(url);
+    }),
+  );
 });
 
 self.addEventListener("fetch", (event) => {
