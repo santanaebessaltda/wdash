@@ -131,8 +131,7 @@
     height: 100%;
   }
   /* No celular, 100% segue a viewport clássica e deixa uma faixa no rodapé.
-     100dvh ocupa a tela visível. No app instalado, o iOS ainda precisa de
-     -webkit-fill-available para chegar até a borda. */
+     100dvh ocupa a tela visível. */
   @supports (height: 100dvh) {
     html,
     body,
@@ -187,16 +186,23 @@
       min-height: 100dvh;
     }
   }
-  @media (display-mode: standalone) {
-    @supports (height: -webkit-fill-available) {
-      html,
-      body,
-      #root,
-      .tela-cheia {
-        height: -webkit-fill-available;
-        min-height: -webkit-fill-available;
-      }
+  /* App instalado: 100dvh e -webkit-fill-available ficam mais curtos que a
+     tela e cortam o rodapé. --tela é a altura real da janela (viewportHeight). */
+  @media (display-mode: standalone), (display-mode: fullscreen) {
+    html,
+    body,
+    #root,
+    .tela-cheia {
+      height: var(--tela, 100lvh);
+      min-height: var(--tela, 100lvh);
     }
+  }
+  html.app-instalado,
+  html.app-instalado body,
+  html.app-instalado #root,
+  html.app-instalado .tela-cheia {
+    height: var(--tela, 100lvh);
+    min-height: var(--tela, 100lvh);
   }
 
   body {
