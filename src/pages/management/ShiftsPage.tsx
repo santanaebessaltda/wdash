@@ -31,6 +31,7 @@ export function ShiftsPage() {
       loading={loading}
       skeleton={(n) => <StoreCardsSkeleton count={n} shifts />}
       lojas={lojas}
+      oneStore
     >
       {(loja) => <ShiftsCard tenantId={session.tenantId} loja={loja} />}
     </StoreCardsPage>

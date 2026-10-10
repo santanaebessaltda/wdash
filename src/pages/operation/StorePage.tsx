@@ -15,6 +15,7 @@ export function StorePage() {
       loading={loading}
       skeleton={(n) => <StoreCardsSkeleton count={n} schedule />}
       lojas={lojas}
+      oneStore
     >
       {(loja) => (
         <Card>

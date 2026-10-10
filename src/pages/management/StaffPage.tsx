@@ -84,6 +84,7 @@ export function StaffPage() {
       skeleton={(n) => <StoreCardsSkeleton count={n} team wide />}
       lojas={lojas}
       wide
+      oneStore
     >
       {(loja) => <StaffCard tenantId={session.tenantId} loja={loja} reloadKey={reloadKey} />}
     </StoreCardsPage>
