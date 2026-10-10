@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Card, Modal, Skeleton, useToast } from "@/components/ui";
+import { Alert, Badge, Button, Card, Checkbox, Modal, Skeleton, useToast } from "@/components/ui";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { fetchLatestCashCloseError, fetchNavMonthFloor, fetchOpenCashCloseJob, requestSangriaMonth } from "@/data/wedash/cashCloseRepo";
 import { fetchSyncWatermark } from "@/data/wedash/salesRepo";
@@ -23,7 +23,15 @@ import { monthNavBtn, SeletorMesAno, Seta } from "@/pages/cash-close/CashClosePa
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { HeaderFilters } from "@/pages/stock/shared";
 
-const WEEK = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const WEEK = [
+  { longo: "Domingo", curto: "D" },
+  { longo: "Segunda-feira", curto: "S" },
+  { longo: "Terça-feira", curto: "T" },
+  { longo: "Quarta-feira", curto: "Q" },
+  { longo: "Quinta-feira", curto: "Q" },
+  { longo: "Sexta-feira", curto: "S" },
+  { longo: "Sábado", curto: "S" },
+];
 const money = (cents: number) => brlCent(cents / 100);
 
 function celulasDoMes(iso: string): Array<string | null> {
@@ -111,9 +119,11 @@ export function SangriaPage() {
 
   useEffect(() => {
     let stop = false;
-    void fetchSyncWatermark(session.tenantId).then((wm) => {
-      if (!stop) setWatermark(wm);
-    });
+    void fetchSyncWatermark(session.tenantId)
+      .catch(() => null)
+      .then((wm) => {
+        if (!stop) setWatermark(wm);
+      });
     return () => {
       stop = true;
     };
@@ -181,6 +191,7 @@ export function SangriaPage() {
   }, [porDia, taken, lines, hoje]);
   const boletoMarcado = depositBoleto(lines, marcados);
   const linhasDia = dia ? (porDia.get(dia) ?? []) : [];
+  const contaDia = dayAmounts(linhasDia);
   const depositoDia = dia ? deposits.find((d) => d.day === dia) : undefined;
   const pronto = loaded === faixa;
 
@@ -238,7 +249,7 @@ export function SangriaPage() {
       <SectionHeader
         section="Gestão"
         title="Sangrias"
-        subtitle="Separe o que vai para o depósito e o que foi compra. O boleto é a soma dos dias que você marcar."
+        subtitle="Marque os dias e faça o depósito. O que saiu para outra coisa não entra no boleto."
         actions={
           <HeaderFilters>
             <div className="flex flex-wrap items-center gap-2">
@@ -249,6 +260,11 @@ export function SangriaPage() {
               <button type="button" aria-label="Próximo mês" className={monthNavBtn} disabled={!podeAvancar} onClick={() => irParaMes(somarMes(anchor, 1))}>
                 <Seta dir="proximo" />
               </button>
+              {!escolher && loja ? (
+                <Button disabled={marcados.length === 0 || depositando} onClick={() => void depositar()}>
+                  {depositando ? "Depositando…" : marcados.length ? `Fazer depósito · ${money(boletoMarcado)}` : "Fazer depósito"}
+                </Button>
+              ) : null}
             </div>
           </HeaderFilters>
         }
@@ -267,71 +283,43 @@ export function SangriaPage() {
           </Card>
         ) : (
           <>
-            <div className="mb-4 grid gap-3 sm:grid-cols-4">
-              <Resumo label="Em aberto" valor={money(aberto)} detalhe="Boleto dos dias ainda sem depósito" />
-              <Resumo label="Total sangria" valor={money(mes.totalCents)} detalhe="Mês na tela" />
-              <Resumo label="Boleto" valor={money(mes.boletoCents)} detalhe="Depois das compras" />
-              <Resumo label="Faltando" valor={money(mes.faltandoCents)} detalhe="Compras do mês" />
+            <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Card padding="sm">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Em aberto</p>
+                <p className="mt-1 truncate font-mono text-xl font-extrabold text-t0">{money(aberto)}</p>
+                <p className="mt-0.5 text-[11px] text-t2">Boleto dos dias ainda sem depósito</p>
+              </Card>
+              <Card padding="sm">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Fora do boleto</p>
+                <p className={cn("mt-1 truncate font-mono text-xl font-extrabold", mes.faltandoCents > 0 ? "text-warn" : "text-t0")}>{money(mes.faltandoCents)}</p>
+                <p className="mt-0.5 text-[11px] text-t2">Compra, premiação, fornecedor</p>
+              </Card>
             </div>
-            <div className="mb-4 flex flex-wrap items-center gap-3">
-              <Button disabled={marcados.length === 0 || depositando} onClick={() => void depositar()}>
-                {depositando ? "Depositando…" : `Fazer depósito${marcados.length ? ` · ${money(boletoMarcado)}` : ""}`}
-              </Button>
-              <span className="text-[12.5px] text-t2">
-                {marcados.length === 0 ? "Marque os dias em aberto no calendário." : `${marcados.length} ${marcados.length === 1 ? "dia marcado" : "dias marcados"}.`}
-              </span>
-            </div>
-            <div className="overflow-hidden rounded-[18px] border border-line bg-bg-2 shadow-[var(--shadow-vela)]">
-              <div className="grid grid-cols-7">
-                {WEEK.map((d) => (
-                  <div key={d} className="border-b border-line px-1 py-2 text-center text-[10px] font-bold text-t2">
-                    {d}
-                  </div>
-                ))}
-                {cells.map((day, i) => {
-                  const rows = day ? (porDia.get(day) ?? []) : [];
-                  const tot = dayAmounts(rows);
-                  const depositado = day ? taken.has(day) : false;
-                  const marcado = day ? marcados.includes(day) : false;
-                  const futuro = day != null && day > hoje;
-                  return (
-                    <div key={day ?? `vazio-${i}`} className="min-h-[88px] border-b border-r border-line p-1.5 sm:min-h-[108px] sm:p-2">
-                      {day ? (
-                        <button
-                          type="button"
-                          disabled={futuro}
-                          onClick={() => setDia(day)}
-                          className={cn(
-                            "flex h-full w-full flex-col rounded-[12px] px-1.5 py-1 text-left",
-                            futuro && "opacity-40",
-                            marcado && "bg-acc/10 ring-1 ring-acc",
-                            depositado && "bg-bg-1",
-                          )}
-                        >
-                          <span className="flex items-center justify-between gap-1">
-                            <span className="text-[12px] font-bold text-t0">{Number(day.slice(8))}</span>
-                            {!futuro && !depositado && rows.length > 0 ? (
-                              <input
-                                type="checkbox"
-                                aria-label={`Marcar ${tituloDia(day)}`}
-                                checked={marcado}
-                                onClick={(e) => e.stopPropagation()}
-                                onChange={() => toggleDia(day)}
-                              />
-                            ) : null}
-                          </span>
-                          {rows.length > 0 ? (
-                            <>
-                              <span className="mt-1 font-mono text-[11px] font-bold text-t0">{money(tot.boletoCents)}</span>
-                              {tot.faltandoCents > 0 ? <span className="text-[10px] text-t2">falta {money(tot.faltandoCents)}</span> : null}
-                              {depositado ? <span className="text-[10px] font-semibold text-ok">Depositado</span> : null}
-                            </>
-                          ) : null}
-                        </button>
-                      ) : null}
+            <div className="overflow-x-auto rounded-[18px] border border-line bg-bg-2 shadow-[var(--shadow-vela)]">
+              <div className="min-w-[760px]">
+                <div className="grid grid-cols-7">
+                  {WEEK.map((d, i) => (
+                    <div key={i} className="border-b border-line px-1 py-3 text-center text-[10px] font-bold leading-tight text-t2 sm:text-[11px]">
+                      <span className="hidden sm:inline">{d.longo}</span>
+                      <span className="sm:hidden uppercase">{d.curto}</span>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
+                <div className="grid grid-cols-7">
+                  {cells.map((day, i) => (
+                    <DiaCelula
+                      key={day ?? `vazio-${i}`}
+                      index={i}
+                      day={day}
+                      hoje={hoje}
+                      rows={day ? (porDia.get(day) ?? []) : []}
+                      depositado={day ? taken.has(day) : false}
+                      marcado={day ? marcados.includes(day) : false}
+                      onOpen={setDia}
+                      onToggle={toggleDia}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
           </>
@@ -357,62 +345,131 @@ export function SangriaPage() {
         {linhasDia.length === 0 ? (
           <p className="text-[13.5px] text-t2">Nenhuma sangria neste dia.</p>
         ) : (
-          <ul className="space-y-3">
-            {linhasDia.map((line) => (
-              <li key={line.id} className="rounded-[14px] border border-line p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="font-mono text-[15px] font-bold text-t0">{money(line.amountCents)}</p>
-                  <div className="flex gap-1">
-                    <KindButton atual={line.kind} valor="deposit" onClick={() => void mudar(line, { kind: "deposit" })}>
-                      Depósito
-                    </KindButton>
-                    <KindButton atual={line.kind} valor="purchase" onClick={() => void mudar(line, { kind: "purchase" })}>
-                      Compra
-                    </KindButton>
-                  </div>
-                </div>
-                <input
-                  className="mt-2 w-full rounded-[10px] border border-line bg-bg-1 px-2.5 py-2 text-[13px] text-t0"
-                  defaultValue={line.note}
-                  key={`${line.id}:${line.note}`}
-                  aria-label="Observação"
-                  onBlur={(e) => {
-                    const note = e.target.value;
-                    if (note !== line.note) void mudar(line, { note });
-                  }}
-                />
-              </li>
-            ))}
-          </ul>
+          <>
+            <div className="mb-4 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[13px]">
+              <span className="text-t2">Total</span>
+              <span className="font-mono font-bold text-t0">{money(contaDia.totalCents)}</span>
+              <span className="text-t2">· Boleto</span>
+              <span className="font-mono font-bold text-t0">{money(contaDia.boletoCents)}</span>
+            </div>
+            <p className="mb-3 text-[12.5px] text-t2">Marque o que não entra no boleto: compra, premiação, fornecedor ou outro uso.</p>
+            <ul className="space-y-3">
+              {linhasDia.map((line) => {
+                const fora = line.kind === "purchase";
+                return (
+                  <li key={line.id} className={cn("rounded-[14px] border border-line p-3", fora && "bg-warn-soft")}>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="font-mono text-[15px] font-bold text-t0">{money(line.amountCents)}</p>
+                        {line.document ? <p className="mt-0.5 text-[12px] text-t2">{line.document}</p> : null}
+                      </div>
+                      <Checkbox
+                        checked={fora}
+                        label="Não entra no boleto"
+                        onChange={(e) => void mudar(line, { kind: e.target.checked ? "purchase" : "deposit" })}
+                      />
+                    </div>
+                    <input
+                      className="mt-2 w-full rounded-[10px] border border-line bg-bg-1 px-2.5 py-2 text-[13px] text-t0"
+                      defaultValue={line.note}
+                      key={`${line.id}:${line.note}`}
+                      aria-label={fora ? "O que foi feito com este valor" : "Observação"}
+                      placeholder={fora ? "Ex.: compra, premiação, fornecedor" : "Observação"}
+                      onBlur={(e) => {
+                        const note = e.target.value;
+                        if (note !== line.note) void mudar(line, { note });
+                      }}
+                    />
+                  </li>
+                );
+              })}
+            </ul>
+          </>
         )}
       </Modal>
     </div>
   );
 }
 
-function Resumo({ label, valor, detalhe }: { label: string; valor: string; detalhe: string }) {
+function DiaCelula({
+  index,
+  day,
+  hoje,
+  rows,
+  depositado,
+  marcado,
+  onOpen,
+  onToggle,
+}: {
+  index: number;
+  day: string | null;
+  hoje: string;
+  rows: SangriaLineRow[];
+  depositado: boolean;
+  marcado: boolean;
+  onOpen: (day: string) => void;
+  onToggle: (day: string) => void;
+}) {
+  const tot = dayAmounts(rows);
+  const futuro = day != null && day > hoje;
+  const abre = day != null && !futuro && (rows.length > 0 || depositado);
+  const borda = cn(
+    "flex min-h-[84px] flex-col items-start justify-start border-b border-r border-line p-1.5 text-left sm:min-h-[110px] sm:p-2",
+    (index + 1) % 7 === 0 && "border-r-0",
+    !day && "bg-bg-1/30",
+    depositado && "bg-ok-soft",
+    marcado && "ring-2 ring-inset ring-acc",
+    futuro && "opacity-40",
+  );
+  const miolo = day ? (
+    <>
+      <span className="flex w-full items-start justify-between gap-1">
+        <NumeroDia iso={day} hoje={hoje} />
+        {!futuro && !depositado && rows.length > 0 ? (
+          <input
+            type="checkbox"
+            aria-label={`Marcar ${tituloDia(day)}`}
+            checked={marcado}
+            className="mt-0.5 h-4 w-4 shrink-0"
+            style={{ accentColor: "var(--acc)" }}
+            onClick={(e) => e.stopPropagation()}
+            onChange={() => onToggle(day)}
+          />
+        ) : null}
+      </span>
+      {rows.length > 0 ? (
+        <div className="mt-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-t2">Total</p>
+          <p className="whitespace-nowrap font-mono text-[12px] font-extrabold text-t2 sm:text-[13px]">{money(tot.totalCents)}</p>
+          {tot.faltandoCents > 0 ? (
+            <Badge variant="warning" className="mt-1 px-2 py-0.5 text-[10px]">
+              fora {money(tot.faltandoCents)}
+            </Badge>
+          ) : null}
+        </div>
+      ) : null}
+    </>
+  ) : null;
+  if (!day) return <div className={borda} />;
+  if (!abre) return <div className={borda}>{miolo}</div>;
   return (
-    <Card padding="sm">
-      <p className="text-[11px] font-bold uppercase tracking-wide text-t2">{label}</p>
-      <p className="mt-1 truncate font-mono text-xl font-extrabold text-t0">{valor}</p>
-      <p className="mt-0.5 text-[11px] text-t2">{detalhe}</p>
-    </Card>
+    <button type="button" className={cn(borda, depositado ? "hover:brightness-95" : "hover:bg-bg-3")} onClick={() => onOpen(day)}>
+      {miolo}
+    </button>
   );
 }
 
-function KindButton({ atual, valor, onClick, children }: { atual: SangriaKind; valor: SangriaKind; onClick: () => void; children: string }) {
-  const on = atual === valor;
+function NumeroDia({ iso, hoje }: { iso: string; hoje: string }) {
+  const futuro = iso > hoje;
   return (
-    <button
-      type="button"
-      onClick={onClick}
+    <span
       className={cn(
-        "rounded-full px-2.5 py-1 text-[12px] font-semibold",
-        on ? "bg-acc text-white" : "border border-line text-t1",
+        "inline-flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-bold",
+        iso === hoje ? "bg-acc text-white" : futuro ? "text-t2" : "text-t1",
       )}
     >
-      {children}
-    </button>
+      {deIso(iso).getDate()}
+    </span>
   );
 }
 

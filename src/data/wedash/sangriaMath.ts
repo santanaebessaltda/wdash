@@ -1,4 +1,4 @@
-/** Sangria do Millennium: o valor vem negativo; na tela é positivo. */
+/** Sangria do Millennium: o valor vem negativo; na tela é positivo. `purchase` não entra no boleto (compra, premiação, fornecedor ou outro uso). */
 
 export type SangriaKind = "deposit" | "purchase";
 
