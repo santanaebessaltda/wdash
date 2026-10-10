@@ -853,8 +853,6 @@ function Mes({
           );
           if (!day) return <div key={`vazio-${i}`} className={borda} />;
           const futuro = day > hoje;
-          const totalCor =
-            face?.kind === "total" && face.diffCents < 0 ? "text-bad" : face?.kind === "total" ? "text-ok" : "text-t1";
           const miolo = (
             <>
               <NumeroDia iso={day} hoje={hoje} />
@@ -866,7 +864,7 @@ function Mes({
               {(face?.kind === "pendente" || face?.kind === "total" || (face?.kind === "hoje" && !face.aguardando)) && (
                 <div className="mt-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-t2">Total</p>
-                  <p className={cn("whitespace-nowrap font-mono text-[12px] font-extrabold sm:text-[13px]", totalCor)}>
+                  <p className="whitespace-nowrap font-mono text-[12px] font-extrabold text-t2 sm:text-[13px]">
                     {brlCent(face.totalCents / 100)}
                   </p>
                   {face.kind === "total" && face.diffCents !== 0 && (
