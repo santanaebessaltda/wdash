@@ -167,6 +167,23 @@ export async function runCashCloseFillJob(
         console.warn(`AVISO chão do fechamento: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
+    const sangriaTo = to < today ? to : today;
+    if (rangeFrom <= sangriaTo) {
+      try {
+        await syncStoreCashClose(deps, {
+          session,
+          tenantId: job.tenantId,
+          store,
+          from: rangeFrom,
+          to: sangriaTo,
+          accounts,
+          accountsOk,
+          sangriaOnly: true,
+        });
+      } catch {
+        problems.push("Não foi possível buscar as sangrias do Millennium.");
+      }
+    }
     const days = missingCloseDays(rangeFrom, to, today, await filledDays(sb, job.tenantId, store.id, rangeFrom, to));
     for (const day of days) {
       try {

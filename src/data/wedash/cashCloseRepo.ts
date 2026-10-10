@@ -1,6 +1,6 @@
 import { calendarTodayIso } from "./clock";
 import { shiftName } from "./engine/format";
-import { monthCloseSpanFor, navMonthFloor } from "./cashCloseMonth";
+import { monthCloseSpanFor, navMonthFloor, sangriaMonthSpan } from "./cashCloseMonth";
 import { captureBucket, paidPixCents, type CashCloseBucket, type CashCloseMillLine, type CloseAmountMap } from "./cashCloseView";
 
 export type CashCloseSnapshot = {
@@ -249,6 +249,16 @@ export async function fetchNavMonthFloor(
   return navMonthFloor(today, oldDay, newDay);
 }
 
+/** Pede as sangrias do mês visível, do dia 1 até hoje. */
+export async function requestSangriaMonth(
+  storeIds: string[],
+  monthDay = calendarTodayIso(),
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const span = sangriaMonthSpan(monthDay, calendarTodayIso());
+  if (!span) return { ok: false, message: "Não há sangrias para buscar neste mês." };
+  return enqueueCashClose(span.from, span.to, storeIds, "Não foi possível buscar as sangrias deste mês. Tente novamente.");
+}
+
 /** Pede o fechamento dos dias do mês visível que ainda não têm, até ontem. */
 export async function requestMonthClose(
   storeIds: string[],
@@ -256,13 +266,22 @@ export async function requestMonthClose(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const span = monthCloseSpanFor(monthDay, calendarTodayIso());
   if (!span) return { ok: false, message: "Os fechamentos deste mês estarão disponíveis a partir de amanhã." };
+  return enqueueCashClose(span.from, span.to, storeIds, "Não foi possível buscar os fechamentos deste mês. Tente novamente.");
+}
+
+async function enqueueCashClose(
+  from: string,
+  to: string,
+  storeIds: string[],
+  fail: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
   const { getSupabase } = await import("@/lib/supabase");
   const sb = getSupabase();
   if (!sb) return { ok: true };
   const { error } = await sb.functions.invoke("erp-sync-enqueue", {
-    body: { action: "cash_close", from: span.from, to: span.to, storeIds },
+    body: { action: "cash_close", from, to, storeIds },
   });
-  if (error) return { ok: false, message: "Não foi possível buscar os fechamentos deste mês. Tente novamente." };
+  if (error) return { ok: false, message: fail };
   return { ok: true };
 }
 

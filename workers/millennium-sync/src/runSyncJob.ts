@@ -168,6 +168,8 @@ export async function syncStoreCashClose(
     accountsOk: boolean;
     /** No fechamento sob pedido, a falha volta para o job em vez de só ir para o log. */
     strict?: boolean;
+    /** Só a lista de sangrias. O fechamento do dia já gravado não é rebuscado. */
+    sangriaOnly?: boolean;
   },
 ): Promise<void> {
   const span = await rangeInsideCloseFloor(deps, {
@@ -178,6 +180,7 @@ export async function syncStoreCashClose(
   });
   if (!span) return;
   await syncStoreSangria(deps, { ...args, from: span.from, to: span.to });
+  if (args.sangriaOnly) return;
   if (!args.accountsOk || !deps.fetchCashCloseReport || !deps.replaceCashCloseDays) {
     if (args.strict) throw new Error("contas de caixa indisponíveis");
     return;

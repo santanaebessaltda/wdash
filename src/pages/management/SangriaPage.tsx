@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, Card, Modal, Skeleton, useToast } from "@/components/ui";
 import { calendarTodayIso } from "@/data/wedash/clock";
-import { fetchLatestCashCloseError, fetchNavMonthFloor, fetchOpenCashCloseJob, requestMonthClose } from "@/data/wedash/cashCloseRepo";
+import { fetchLatestCashCloseError, fetchNavMonthFloor, fetchOpenCashCloseJob, requestSangriaMonth } from "@/data/wedash/cashCloseRepo";
 import { fetchSyncWatermark } from "@/data/wedash/salesRepo";
 import {
   createSangriaDeposit,
@@ -122,7 +122,7 @@ export function SangriaPage() {
   const pedir = useCallback(async () => {
     const atual = lojaRef.current;
     if (escolher || !atual) return;
-    const r = await requestMonthClose([atual.id], anchorRef.current);
+    const r = await requestSangriaMonth([atual.id], anchorRef.current);
     if (!r.ok) {
       show(r.message, "danger");
       return;
