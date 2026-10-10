@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { paths } from "@/router/paths";
 import { AcessoPagina, AvisoCard, IconeCard, acessoTitulo } from "./AccessKit";
-import { Button } from "@/components/ui";
+import { Button, useToast } from "@/components/ui";
 import { useSession } from "@/session/SessionProvider";
 import { homeForRole } from "@/session/RequireSession";
 import { cn } from "@/lib/cn";
@@ -35,6 +35,7 @@ const passos: Record<Exclude<Plataforma, "desktop">, string[]> = {
 export function Install() {
   const navigate = useNavigate();
   const { session, update } = useSession();
+  const { show } = useToast();
   const detectada = useMemo(detectarPlataforma, []);
   const [plataforma, setPlataforma] = useState<Plataforma>(detectada);
   const [podeInstalar, setPodeInstalar] = useState(installPromptDisponivel);
@@ -52,10 +53,15 @@ export function Install() {
     if (aceitou) concluir(true);
   }
 
-  function concluir(instalou: boolean) {
+  async function concluir(instalou: boolean) {
     if (session && instalou) {
       update({ appInstalled: true });
-      if (session.role !== "SELLER") void enableSalesPush(session.tenantId);
+      if (session.role !== "SELLER") {
+        const r = await enableSalesPush(session.tenantId);
+        if (r === "ok") show("Avisos ativados neste celular.", "success");
+        else if (r === "denied") show("O navegador bloqueou os avisos. Libere as notificações da WDash.", "warning");
+        else show("Este aparelho não recebe avisos. No iPhone, instale a WDash na Tela de Início.", "warning");
+      }
     }
     navigate(destino, { replace: true });
   }

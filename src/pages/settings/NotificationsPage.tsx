@@ -1,8 +1,18 @@
 import { useEffect, useState } from "react";
-import { Card } from "@/components/ui";
+import { Button, Card, useToast } from "@/components/ui";
 import { getSupabase } from "@/lib/supabase";
 import { CheckIcon } from "@/pages/utility/icons";
+import { enableSalesPush } from "@/push/salesPush";
 import { useActiveSession } from "@/session/SessionProvider";
+
+type Aparelho = "pedir" | "ativo" | "bloqueado" | "indisponivel";
+
+function aparelhoAtual(): Aparelho {
+  if (typeof Notification === "undefined" || !("PushManager" in window) || !("serviceWorker" in navigator)) return "indisponivel";
+  if (Notification.permission === "granted") return "ativo";
+  if (Notification.permission === "denied") return "bloqueado";
+  return "pedir";
+}
 
 type PrefKey = "sales" | "quiet" | "cashClose" | "storeGoal";
 
@@ -28,6 +38,9 @@ function Dot({ on }: { on: boolean }) {
 /** Conta > Notificações. Só o que o push já envia, e cada linha liga ou desliga. */
 export function NotificationsPage() {
   const session = useActiveSession();
+  const { show } = useToast();
+  const [aparelho, setAparelho] = useState<Aparelho>(aparelhoAtual);
+  const [pedindo, setPedindo] = useState(false);
   const [prefs, setPrefs] = useState<Prefs>(DEFAULTS);
   const [userId, setUserId] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -65,6 +78,22 @@ export function NotificationsPage() {
     };
   }, [session.tenantId]);
 
+  async function ativarCelular() {
+    setPedindo(true);
+    const r = await enableSalesPush(session.tenantId);
+    setPedindo(false);
+    if (r === "ok") {
+      setAparelho("ativo");
+      show("Avisos ativados neste celular.", "success");
+    } else if (r === "denied") {
+      setAparelho("bloqueado");
+      show("O navegador bloqueou os avisos. Libere as notificações da WDash.", "warning");
+    } else {
+      setAparelho("indisponivel");
+      show("Este aparelho não recebe avisos. No iPhone, instale a WDash na Tela de Início.", "warning");
+    }
+  }
+
   async function alternar(key: PrefKey) {
     const sb = getSupabase();
     if (!sb || !userId) return;
@@ -91,7 +120,20 @@ export function NotificationsPage() {
   return (
     <Card className="max-w-[720px]">
       <h3 className="mb-1 text-[15px] font-bold text-t0">Avisos no celular</h3>
-      <p className="mb-4.5 text-[12.5px] text-t2">Ative ou desative os avisos que deseja receber.</p>
+      <p className="mb-4 text-[12.5px] text-t2">Ative ou desative os avisos que deseja receber.</p>
+      {aparelho === "pedir" ? (
+        <Button size="lg" fullWidth className="mb-4.5 !h-[46px] font-bold" disabled={pedindo} onClick={() => void ativarCelular()}>
+          {pedindo ? "Pedindo permissão…" : "Ativar neste celular"}
+        </Button>
+      ) : (
+        <p className="mb-4.5 text-[12.5px] text-t2">
+          {aparelho === "ativo"
+            ? "Este celular já recebe os avisos."
+            : aparelho === "bloqueado"
+              ? "O navegador bloqueou os avisos. Libere as notificações da WDash."
+              : "Este aparelho não recebe avisos. No iPhone, instale a WDash na Tela de Início."}
+        </p>
+      )}
       <div className="grid grid-cols-[1fr_auto] gap-3 border-b border-line pb-3 text-[10.5px] font-bold uppercase tracking-wide text-t2">
         <span>Avisar sobre</span>
         <span className="w-[50px] text-center">Push</span>
