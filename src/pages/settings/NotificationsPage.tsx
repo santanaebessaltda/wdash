@@ -17,12 +17,6 @@ const ROWS: Array<{ key: PrefKey; name: string; desc: string }> = [
   { key: "storeGoal", name: "Meta da loja", desc: "Uma vez, quando a loja cruza um nível da meta. Não repete na rodada seguinte." },
 ];
 
-const LATER = [
-  { name: "Meta do vendedor", desc: "O nível de cada pessoa ainda não entra na rodada automática." },
-  { name: "Desafio", desc: "O prêmio do desafio ainda não entra na rodada automática." },
-  { name: "Estoque", desc: "A busca de estoque não roda a cada 30 minutos." },
-];
-
 function Dot({ on }: { on: boolean }) {
   return (
     <span className={`flex h-[22px] w-[22px] items-center justify-center rounded-[7px] ${on ? "bg-ok" : "bg-bg-inset"}`}>
@@ -31,7 +25,7 @@ function Dot({ on }: { on: boolean }) {
   );
 }
 
-/** Conta > Notificações. O mesmo cartão do Account do Vela; só o Push grava e envia. */
+/** Conta > Notificações. Só o que o push já envia, e cada linha liga ou desliga. */
 export function NotificationsPage() {
   const session = useActiveSession();
   const [prefs, setPrefs] = useState<Prefs>(DEFAULTS);
@@ -97,46 +91,21 @@ export function NotificationsPage() {
   return (
     <Card className="max-w-[720px]">
       <h3 className="mb-1 text-[15px] font-bold text-t0">Notificações</h3>
-      <p className="mb-4.5 text-[12.5px] text-t2">Escolha o que chega no celular. E-mail e SMS ainda não enviam.</p>
-      <div className="grid grid-cols-[2fr_auto_auto_auto] gap-3 border-b border-line pb-3 text-[10.5px] font-bold uppercase tracking-wide text-t2">
+      <p className="mb-4.5 text-[12.5px] text-t2">Escolha o que chega no celular. Desligue o que não quiser receber.</p>
+      <div className="grid grid-cols-[1fr_auto] gap-3 border-b border-line pb-3 text-[10.5px] font-bold uppercase tracking-wide text-t2">
         <span>Avisar sobre</span>
-        <span className="w-[50px] text-center">E-mail</span>
         <span className="w-[50px] text-center">Push</span>
-        <span className="w-[50px] text-center">SMS</span>
       </div>
       {ROWS.map((row) => (
-        <div key={row.key} className="grid grid-cols-[2fr_auto_auto_auto] items-center gap-3 border-b border-line py-3.5">
+        <div key={row.key} className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-line py-3.5 last:border-b-0">
           <div>
             <p className="text-[13.5px] font-bold text-t0">{row.name}</p>
             <p className="mt-0.5 text-[11.5px] text-t2">{row.desc}</p>
           </div>
-          <span className="flex w-[50px] justify-center">
-            <Dot on={false} />
-          </span>
           <span className="flex w-[50px] justify-center">
             <button type="button" aria-pressed={prefs[row.key]} aria-label={row.name} onClick={() => void alternar(row.key)}>
               <Dot on={prefs[row.key]} />
             </button>
-          </span>
-          <span className="flex w-[50px] justify-center">
-            <Dot on={false} />
-          </span>
-        </div>
-      ))}
-      {LATER.map((row) => (
-        <div key={row.name} className="grid grid-cols-[2fr_auto_auto_auto] items-center gap-3 border-b border-line py-3.5 last:border-b-0">
-          <div>
-            <p className="text-[13.5px] font-bold text-t0">{row.name}</p>
-            <p className="mt-0.5 text-[11.5px] text-t2">{row.desc}</p>
-          </div>
-          <span className="flex w-[50px] justify-center">
-            <Dot on={false} />
-          </span>
-          <span className="flex w-[50px] justify-center">
-            <Dot on={false} />
-          </span>
-          <span className="flex w-[50px] justify-center">
-            <Dot on={false} />
           </span>
         </div>
       ))}
