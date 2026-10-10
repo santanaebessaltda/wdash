@@ -32,9 +32,10 @@ import { cn } from "@/lib/cn";
 import { brlCent, dataExtenso, deIso, fimDoMes, inicioDoMes, paraIso, somarDias, labelUpper } from "@/lib/format";
 import { refreshStatusLine, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
+import { useScope } from "@/pages/dashboard/useScope";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
-import { parseNum, SectionHeader, useScopedStores } from "@/pages/operation/shared";
+import { parseNum, SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
 import { HeaderFilters } from "@/pages/stock/shared";
 
 const DIAS = [
@@ -426,6 +427,8 @@ function Seta({ dir }: { dir: "anterior" | "proximo" }) {
 export function CashClosePage() {
   const { show } = useToast();
   const { session, lojas, loading: lojasLoading } = useScopedStores();
+  const { escopo } = useScope();
+  const escolher = pickOneStore(escopo.filialIds, session.stores.length);
   const showLojas = useMinSkeleton(lojasLoading);
   const hoje = calendarTodayIso();
   const [anchor, setAnchor] = useState(hoje);
@@ -486,6 +489,7 @@ export function CashClosePage() {
   }, [session.tenantId, reloadKey]);
 
   const pedirFechamento = useCallback(async () => {
+    if (escolher) return;
     const ids = lojasRef.current.map((loja) => loja.id);
     if (ids.length === 0 || !monthCloseSpanFor(anchorRef.current, calendarTodayIso())) return;
     const r = await requestMonthClose(ids, anchorRef.current);
@@ -494,7 +498,7 @@ export function CashClosePage() {
       return;
     }
     setSyncing(true);
-  }, [show]);
+  }, [show, escolher]);
 
   useScreenRefresh({
     label: "Atualizar vendas e fechamento",
@@ -511,7 +515,7 @@ export function CashClosePage() {
   }, []);
 
   useEffect(() => {
-    if (lojasLoading || lojas.length === 0 || from > to) return;
+    if (lojasLoading || escolher || lojas.length === 0 || from > to) return;
     let cancelled = false;
     setErro(false);
     const ids = lojas.map((l) => l.id);
@@ -531,10 +535,10 @@ export function CashClosePage() {
     return () => {
       cancelled = true;
     };
-  }, [lojasLoading, session.tenantId, lojas, from, to, faixaKey]);
+  }, [lojasLoading, escolher, session.tenantId, lojas, from, to, faixaKey]);
 
   useEffect(() => {
-    if (lojasLoading || lojas.length === 0 || to < hoje) {
+    if (lojasLoading || escolher || lojas.length === 0 || to < hoje) {
       setSoldToday(null);
       return;
     }
@@ -564,10 +568,10 @@ export function CashClosePage() {
     return () => {
       stop = true;
     };
-  }, [lojasLoading, lojas, session.tenantId, hoje, to, reloadKey]);
+  }, [lojasLoading, escolher, lojas, session.tenantId, hoje, to, reloadKey]);
 
   useEffect(() => {
-    if (lojasLoading || !diaAberto || lojas.length === 0 || diaAberto > hoje) return;
+    if (lojasLoading || escolher || !diaAberto || lojas.length === 0 || diaAberto > hoje) return;
     let cancelled = false;
     setErro(false);
     const key = `${storeKey}|${diaAberto}|${reloadKey}`;
@@ -583,7 +587,7 @@ export function CashClosePage() {
     return () => {
       cancelled = true;
     };
-  }, [lojasLoading, diaAberto, session.tenantId, lojas, hoje, storeKey, reloadKey]);
+  }, [lojasLoading, escolher, diaAberto, session.tenantId, lojas, hoje, storeKey, reloadKey]);
 
   const analise = useMemo(() => {
     if (marksKey !== faixaKey) return null;
@@ -667,7 +671,11 @@ export function CashClosePage() {
       />
       <div className="mt-6 pb-6">
         {erro ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar o fechamento. Tente novamente." /> : null}
-        {showLojas ? (
+        {escolher ? (
+          <div className="max-w-[720px]">
+            <SelectStoreCard />
+          </div>
+        ) : showLojas ? (
           <Skeleton className="h-[520px] w-full rounded-[18px]" />
         ) : lojas.length === 0 ? (
           <Card>

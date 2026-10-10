@@ -24,7 +24,7 @@ import { buildXlsx } from "@/lib/xlsx";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { ErpStatusNotice } from "@/pages/dashboard/ErpStatusNotice";
 import { HeaderFilter, HeaderSearch } from "@/pages/dashboard/HeaderFilter";
-import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
+import { SectionHeader, SelectStoreCard, useScopedStores } from "@/pages/operation/shared";
 import { HeaderFilters, TableFooter, TipHelp, money, qty } from "./shared";
 import { usePurchaseOrder } from "./usePurchaseOrder";
 
@@ -272,17 +272,15 @@ export function PurchaseOrderPage() {
       {showSkeleton ? (
         <StockProductsSkeleton />
       ) : !loja ? (
-        <Card className="flex flex-col">
-          <EmptyBlock
-            icon="🏬"
-            title={lojas.length === 0 ? "Nenhuma loja disponível" : "Selecione uma loja"}
-            description={
-              lojas.length === 0
-                ? "Não há lojas disponíveis para este acesso."
-                : "O pedido é de uma filial. Escolha a loja no seletor do topo."
-            }
-          />
-        </Card>
+        lojas.length === 0 ? (
+          <Card className="flex flex-col">
+            <EmptyBlock icon="🏬" title="Nenhuma loja disponível" description="Não há lojas disponíveis para este acesso." />
+          </Card>
+        ) : (
+          <div className="max-w-[720px]">
+            <SelectStoreCard />
+          </div>
+        )
       ) : (
         <Card className="flex flex-col">
           <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">

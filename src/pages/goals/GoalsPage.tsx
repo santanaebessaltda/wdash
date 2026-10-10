@@ -25,7 +25,7 @@ import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useScope } from "@/pages/dashboard/useScope";
 import { TargetIcon } from "@/pages/dashboards/icons";
 import { IconCopy, IconTrash } from "@/pages/ecommerce/icons";
-import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
+import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
 import { paths } from "@/router/paths";
 
@@ -50,6 +50,7 @@ export default function GoalsPage() {
   const janela = useMemo(() => managementScheduleWindow(escopo.periodo, today), [escopo.periodo, today]);
   const storeIds = useMemo(() => lojas.map((l) => l.id), [lojas]);
   const storeKey = storeIds.join(",");
+  const escolher = pickOneStore(escopo.filialIds, session.stores.length);
 
   const [data, setData] = useState<Loaded | null>(null);
   const [loading, setLoading] = useState(true);
@@ -70,6 +71,10 @@ export default function GoalsPage() {
 
   useEffect(() => {
     if (lojasLoading) return;
+    if (escolher) {
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     (async () => {
       // Venda nova (SALES_SYNCED_EVENT) recarrega sem skeleton; so filtro novo mostra o skeleton.
@@ -98,7 +103,7 @@ export default function GoalsPage() {
     return () => {
       cancelled = true;
     };
-  }, [session.tenantId, storeKey, janela.from, janela.to, lojasLoading, reload]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session.tenantId, storeKey, janela.from, janela.to, lojasLoading, reload, escolher]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const showSkeleton = useMinSkeleton(loading || lojasLoading);
 
@@ -161,7 +166,11 @@ export default function GoalsPage() {
       />
 
       <div className="mt-6">
-        {showSkeleton ? (
+        {escolher ? (
+          <div className="max-w-[720px]">
+            <SelectStoreCard />
+          </div>
+        ) : showSkeleton ? (
           <GoalCardsSkeleton count={3} />
         ) : cards.length === 0 ? (
           <Card className="flex min-h-[280px] flex-col">
