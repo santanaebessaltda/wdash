@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { formatSalesPush } from "./salesPush.ts";
+import { formatCashClosePush } from "./cashClosePush.ts";
+import { formatStoreGoalPush, goalLevel } from "./goalPush.ts";
+import { formatQuietSalesPush, formatSalesPush } from "./salesPush.ts";
 
 describe("formatSalesPush", () => {
   it("soma só quem vendeu e omite loja sem venda nova", () => {
@@ -14,5 +16,30 @@ describe("formatSalesPush", () => {
 
   it("não avisa quando o intervalo não teve venda", () => {
     expect(formatSalesPush([{ name: "CENTRO", deltaCents: 0 }])).toBeNull();
+  });
+});
+
+describe("outros avisos", () => {
+  it("período sem venda tem texto fixo", () => {
+    expect(formatQuietSalesPush()).toEqual({ title: "Vendas", body: "Sem vendas nos últimos 30 min" });
+  });
+
+  it("fechamento separa falta, sobra e dia sem total real", () => {
+    const text = formatCashClosePush("2026-10-09", [
+      { name: "CENTRO", diffCents: -1500 },
+      { name: "SHOPPING", diffCents: null },
+    ]);
+    expect(text?.body.replaceAll("\u00a0", " ")).toBe("09/10\nCENTRO · faltou R$ 15,00\nSHOPPING · sem total real");
+  });
+
+  it("nível da meta só sobe na ordem dos percentuais", () => {
+    expect(goalLevel(79, [{ minPct: 80, name: "Prata" }, { minPct: 100, name: "Ouro" }]).level).toBe(0);
+    expect(goalLevel(100, [{ minPct: 100, name: "Ouro" }, { minPct: 80, name: "Prata" }])).toEqual({ level: 2, name: "Ouro" });
+  });
+
+  it("resumo de meta lista a loja uma vez", () => {
+    expect(formatStoreGoalPush([{ storeName: "CENTRO", goalName: "Outubro", levelName: "Prata" }])?.body).toBe(
+      "CENTRO · Outubro · Prata",
+    );
   });
 });

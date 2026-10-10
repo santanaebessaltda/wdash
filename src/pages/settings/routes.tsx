@@ -13,6 +13,7 @@ const SyncLogsPage = lazyPage(() => import("./SyncLogsPage"), "SyncLogsPage");
 const StoreDetailPage = lazyPage(() => import("./StoreDetailPage"), "StoreDetailPage");
 const SystemUsersPage = lazyPage(() => import("./SystemUsersPage"), "SystemUsersPage");
 const MyProfilePage = lazyPage(() => import("./MyProfilePage"), "MyProfilePage");
+const NotificationsPage = lazyPage(() => import("./NotificationsPage"), "NotificationsPage");
 /**
  * WDash: /settings  ->  Lojas; /settings/stores | /settings/erp com TabNav + sidebar.
  * Vela template: /settings/:tab (general, company, ...) no SettingsPage.
@@ -25,6 +26,7 @@ export const settingsRoutes: RouteObject[] = [
     element: <WedashSettingsLayout />,
     children: [
       { path: paths.profile, element: <MyProfilePage /> },
+      { path: paths.settings.notifications, element: <NotificationsPage /> },
       { path: paths.settings.stores, element: <StoresSettingsPage /> },
       {
         element: <RequireRole roles={GESTOR_ROLES} />,

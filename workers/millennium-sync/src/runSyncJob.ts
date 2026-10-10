@@ -1456,6 +1456,12 @@ export type SyncJobDeps = {
     before: Map<string, number>;
     after: Map<string, number>;
   }) => Promise<void>;
+  /** Resumo do dinheiro no fechamento da madrugada. Um dia, sem carga de histórico. */
+  notifyCashClose?: (args: {
+    tenantId: string;
+    day: string;
+    stores: Array<{ id: string; name: string; timezone: string }>;
+  }) => Promise<void>;
   /** Days already in sales_day_agg for this store (any brand). */
   listExistingDays: (args: {
     tenantId: string;
@@ -2760,6 +2766,21 @@ async function runDailyForceJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyn
     else await setRecoveryBase(job, deps);
   } else if (fillUntil) {
     await chainMonthFill(yieldedAt ?? minIso(from, to), fillUntil);
+  }
+  if (!isSeed && !fillUntil && from === to && deps.notifyCashClose) {
+    try {
+      await deps.notifyCashClose({
+        tenantId: job.tenantId,
+        day: from,
+        stores: stores.map((store) => ({
+          id: store.id,
+          name: (store.name || store.code).trim() || store.code,
+          timezone: store.timezone,
+        })),
+      });
+    } catch (e) {
+      console.warn(`  AVISO push de fechamento não foi enviado: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
   return { ok: true, storesDone };
 }

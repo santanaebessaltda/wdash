@@ -345,6 +345,7 @@ export const paths = {
     /** Erros e avisos do sync ERP (worker). */
     logs: "/settings/logs",
     users: "/settings/users",
+    notifications: "/settings/notifications",
   },
 
   utility: {
