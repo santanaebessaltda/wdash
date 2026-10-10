@@ -12,12 +12,17 @@ import { SAVE_ERROR_MSG } from "@/pages/operation/shared";
 
 const PURCHASE_MAX_AGE_MS = 30 * 60 * 1000;
 
+/** Janela da coluna de vendidos. O padrão continua 30 dias (D-N a D-1). */
+export const SOLD_WINDOWS = [30, 60, 90] as const;
+export type SoldWindow = (typeof SOLD_WINDOWS)[number];
+
 type Loaded = {
   storeId: string;
   rows: PurchaseStockRow[];
   syncedAt: string | null;
   mins: Map<string, number>;
   sold30: Map<string, number>;
+  soldWindow: SoldWindow;
   soldEver: Set<string> | null;
   catalog: Map<string, StockCatalogItem>;
   costs: Map<string, number>;
@@ -44,7 +49,10 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null, costT
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [factor, setFactor] = useState(1);
+  const [soldDays, setSoldDays] = useState<SoldWindow>(30);
   const [now, setNow] = useState(() => Date.now());
+  const soldDaysRef = useRef(soldDays);
+  soldDaysRef.current = soldDays;
   const storeRef = useRef(storeId);
   storeRef.current = storeId;
   /** Loja com busca em andamento (trocar de loja no meio libera a busca da nova). */
@@ -53,10 +61,11 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null, costT
   const load = useCallback(
     async (id: string, tableId: number | null): Promise<Loaded> => {
       const hoje = calendarTodayIso();
+      const days = soldDaysRef.current;
       const [stock, mins, sold30, soldEver, catalog, priceTables] = await Promise.all([
         fetchPurchaseStock(tenantId, id),
         fetchPurchaseMins(tenantId, id),
-        fetchSold30(tenantId, id, addDays(hoje, -30), addDays(hoje, -1)),
+        fetchSold30(tenantId, id, addDays(hoje, -days), addDays(hoje, -1)),
         fetchSoldEver(tenantId, id, hoje),
         fetchStockCatalog(),
         tableId == null ? Promise.resolve(new Map<number, Map<string, number>>()) : fetchCostPrices([tableId]),
@@ -67,6 +76,7 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null, costT
         syncedAt: stock.syncedAt,
         mins,
         sold30,
+        soldWindow: days,
         soldEver,
         catalog,
         costs: tableId == null ? new Map() : (priceTables.get(tableId) ?? new Map()),
@@ -140,6 +150,25 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null, costT
       cancelled = true;
     };
   }, [storeId, costTableId, load, sync]);
+
+  useEffect(() => {
+    const id = storeId;
+    if (!id || !data || data.storeId !== id || data.soldWindow === soldDays) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const hoje = calendarTodayIso();
+        const sold = await fetchSold30(tenantId, id, addDays(hoje, -soldDays), addDays(hoje, -1));
+        if (cancelled || storeRef.current !== id) return;
+        setData((d) => (d && d.storeId === id ? { ...d, sold30: sold, soldWindow: soldDays } : d));
+      } catch (e) {
+        console.warn("usePurchaseOrder sold window:", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [soldDays, storeId, tenantId, data]);
 
   const saldoIso = data && data.storeId === storeId ? data.syncedAt : null;
   useScreenRefresh({
@@ -219,6 +248,8 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null, costT
     staleTexto: syncedAt ? `O saldo foi atualizado ${hora(syncedAt)}. O pedido pode usar quantidades desatualizadas.` : null,
     factor,
     setFactor,
+    soldDays,
+    setSoldDays,
     saveMin,
   };
 }

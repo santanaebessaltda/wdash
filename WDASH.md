@@ -492,6 +492,7 @@ Pergunta: "Quais são meus 80/20? Estou perdendo venda por ruptura? O que descon
  - Eixos de hora (Visão Geral e fixtures) usam `unionOpenWindow(horas, dow)` — não mais abertura/fechamento fixos.
  - UI refinável depois; sync já usava `timezone` no worker.
  - ~~**Sincronização não usa horário**~~ (2026-09-29; **revertido em 2026-09-30**, ver #35 "Expediente de volta"): atualização automática volta a seguir o horário da loja.
+ - **Vendidos no pedido** (2026-10-10): o pill do cabeçalho do Pedido de compra troca a coluna entre 30, 60 e 90 dias (padrão 30). A janela segue de D-N a D-1, só nas vendas já gravadas. O título da coluna e o total do filtro acompanham. A quantidade a pedir não usa esse número.
  - **Estoque só com uma loja** (2026-10-10): a tela de Estoque usa o mesmo card vazio quando o seletor está em "Todas" e há mais de uma loja. Quem tem uma loja só vê o saldo. O Atualizar não busca o estoque da rede enquanto a tela pede uma loja. O Dashboard continua em "Todas".
  - **Gestão só com uma loja** (2026-10-10): Metas, Desafios, Fechamento e Pedido de compra usam o mesmo card vazio quando o seletor está em "Todas" e há mais de uma loja. Quem tem uma loja só vê o conteúdo. O Atualizar do Fechamento não dispara o fechamento do mês enquanto a tela pede uma loja.
  - **Operação só com uma loja** (2026-10-10): Funcionamento, Grupos e Vendedores usam o mesmo card vazio de Custos quando o seletor está em "Todas" e há mais de uma loja. Quem tem uma loja só vê o conteúdo. O hero da loja permanece nesses cards.

@@ -26,7 +26,7 @@ import { ErpStatusNotice } from "@/pages/dashboard/ErpStatusNotice";
 import { HeaderFilter, HeaderSearch } from "@/pages/dashboard/HeaderFilter";
 import { SectionHeader, SelectStoreCard, useScopedStores } from "@/pages/operation/shared";
 import { HeaderFilters, TableFooter, TipHelp, money, qty } from "./shared";
-import { usePurchaseOrder } from "./usePurchaseOrder";
+import { SOLD_WINDOWS, usePurchaseOrder } from "./usePurchaseOrder";
 
 const PAGE_SIZE = 50;
 
@@ -223,6 +223,22 @@ export function PurchaseOrderPage() {
         actions={
           <HeaderFilters>
             <HeaderSearch value={busca} onChange={setBusca} placeholder="Buscar por produto ou código…" width={240} />
+            <div className="flex gap-1 rounded-[11px] border border-line bg-bg-2 p-1" role="group" aria-label="Vendidos">
+              {SOLD_WINDOWS.map((days) => (
+                <button
+                  key={days}
+                  type="button"
+                  aria-pressed={po.soldDays === days}
+                  onClick={() => po.setSoldDays(days)}
+                  className={cn(
+                    "rounded-lg px-3 py-1.5 text-[12.5px] font-bold transition-colors",
+                    po.soldDays === days ? "bg-acc text-white" : "text-t1 hover:text-t0",
+                  )}
+                >
+                  {days} dias
+                </button>
+              ))}
+            </div>
             <HeaderFilter label="Status dos produtos" lead="Status" value={filtro} onChange={setFiltro} options={filtroOpcoes} />
             <span className="inline-flex items-center gap-1.5">
               <HeaderFilter
@@ -324,7 +340,14 @@ export function PurchaseOrderPage() {
                     <ThSort label="Produto" active={sortKey === "nome"} dir={sortDir} onClick={() => toggleSort("nome")} align="left" className="px-1 pb-3" />
                     <ThSort label="Mínimo" active={sortKey === "minimo"} dir={sortDir} onClick={() => toggleSort("minimo")} className="px-1 pb-3" />
                     {NUM_COLS.map((c) => (
-                      <ThSort key={c.key} label={c.label} active={sortKey === c.key} dir={sortDir} onClick={() => toggleSort(c.key)} className="px-1 pb-3" />
+                      <ThSort
+                        key={c.key}
+                        label={c.key === "vendidos30" ? `Vendidos em ${po.soldDays} dias` : c.label}
+                        active={sortKey === c.key}
+                        dir={sortDir}
+                        onClick={() => toggleSort(c.key)}
+                        className="px-1 pb-3"
+                      />
                     ))}
                     <ThSort label="Novo" active={sortKey === "novo"} dir={sortDir} onClick={() => toggleSort("novo")} align="center" className="px-1 pb-3" />
                     <ThSort label="Bloqueado" active={sortKey === "bloqueado"} dir={sortDir} onClick={() => toggleSort("bloqueado")} align="center" className="px-1 pb-3" />
