@@ -24,11 +24,18 @@ export function goalLevel(pct: number, tiers: Tier[]): { level: number; name: st
 
 export function formatStoreGoalPush(rows: Array<{ storeName: string; goalName: string; levelName: string }>): { title: string; body: string } | null {
   if (rows.length === 0) return null;
-  const title = rows.length === 1 ? "Meta da loja" : `Metas · ${rows.length} lojas`;
+  if (rows.length === 1) {
+    const only = rows[0]!;
+    return {
+      title: `${only.storeName} chegou ao ${only.levelName} ✨`,
+      body: `Novo nível da meta de ${only.goalName}.`,
+    };
+  }
+  const title = `${rows.length} lojas avançaram de nível ✨`;
   let body = "";
   let shown = 0;
   for (const row of rows) {
-    const line = `${row.storeName} · ${row.goalName} · ${row.levelName}`;
+    const line = `${row.storeName} · ${row.levelName}`;
     const next = body ? `${body}\n${line}` : line;
     if (next.length > BODY_LIMIT && shown > 0) break;
     if (next.length > BODY_LIMIT) break;
@@ -36,7 +43,7 @@ export function formatStoreGoalPush(rows: Array<{ storeName: string; goalName: s
     shown += 1;
   }
   const rest = rows.length - shown;
-  if (rest > 0) body += `\ne mais ${rest}`;
+  if (rest > 0) body += `\ne mais ${rest} ${rest === 1 ? "loja" : "lojas"}`;
   return { title, body };
 }
 

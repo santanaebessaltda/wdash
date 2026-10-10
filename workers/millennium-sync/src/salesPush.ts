@@ -14,7 +14,7 @@ function money(cents: number): string {
 }
 
 export function formatQuietSalesPush(): { title: string; body: string } {
-  return { title: "Vendas", body: "Sem vendas nos últimos 30 min" };
+  return { title: "Sem vendas nos últimos 30 min", body: "Nenhuma nova venda registrada no período." };
 }
 
 /** `null` quando não houve venda nova no intervalo. */
@@ -22,12 +22,12 @@ export function formatSalesPush(rows: Array<{ name: string; deltaCents: number }
   const sold = rows.filter((row) => row.deltaCents > 0).sort((a, b) => b.deltaCents - a.deltaCents || a.name.localeCompare(b.name, "pt-BR"));
   const total = sold.reduce((sum, row) => sum + row.deltaCents, 0);
   if (total <= 0) return null;
-  const title = `Vendas · ${money(total)}`;
+  const title = `${money(total)} em vendas`;
   if (sold.length === 1) {
     const only = sold[0]!;
-    return { title, body: `${only.name} vendeu ${money(only.deltaCents)} nos últimos 30 min` };
+    return { title, body: `${only.name} vendeu ${money(only.deltaCents)} nos últimos 30 min.` };
   }
-  let body = `Total de ${money(total)} nos últimos 30 min`;
+  let body = "Últimos 30 min";
   let shown = 0;
   for (const row of sold) {
     const line = `${row.name} · ${money(row.deltaCents)}`;

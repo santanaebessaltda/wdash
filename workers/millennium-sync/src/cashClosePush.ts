@@ -20,7 +20,9 @@ function isCash(method: string): boolean {
 export function formatCashClosePush(day: string, rows: Array<{ name: string; diffCents: number | null }>): { title: string; body: string } | null {
   if (rows.length === 0) return null;
   const [year, month, date] = day.split("-");
-  let body = date && month && year ? `${date}/${month}` : day;
+  const label = date && month && year ? `${date}/${month}` : day;
+  const title = `Fechamento · ${label}`;
+  let body = "";
   let shown = 0;
   for (const row of rows) {
     const line =
@@ -31,7 +33,7 @@ export function formatCashClosePush(day: string, rows: Array<{ name: string; dif
           : row.diffCents > 0
             ? `${row.name} · sobrou ${money(row.diffCents)}`
             : `${row.name} · sem diferença`;
-    const next = `${body}\n${line}`;
+    const next = body ? `${body}\n${line}` : line;
     if (next.length > BODY_LIMIT && shown > 0) break;
     if (next.length > BODY_LIMIT) break;
     body = next;
@@ -39,7 +41,7 @@ export function formatCashClosePush(day: string, rows: Array<{ name: string; dif
   }
   const rest = rows.length - shown;
   if (rest > 0) body += `\ne mais ${rest} ${rest === 1 ? "loja" : "lojas"}`;
-  return { title: "Fechamento", body };
+  return { title, body };
 }
 
 export async function notifyCashClose(
