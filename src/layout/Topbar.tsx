@@ -28,7 +28,7 @@ const ICON_AVISOS = "M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94
 function mostraAtualizar(pathname: string): boolean {
   if (pathname === paths.dashboard || pathname.startsWith(`${paths.dashboard}/`)) return true;
   if (pathname === paths.stock.inventory || pathname === paths.stock.purchaseOrder) return true;
-  if (pathname === paths.management.cashClose || pathname === paths.operation.sellers) return true;
+  if (pathname === paths.management.cashClose || pathname === paths.management.sangria || pathname === paths.operation.sellers) return true;
   if (pathname === paths.goals) return true;
   const meta = pathname.match(/^\/goals\/([^/]+)$/);
   if (meta && meta[1] !== "new") return true;
