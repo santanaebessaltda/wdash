@@ -6,8 +6,6 @@ const Login = lazyPage(() => import("./Login"), "Login");
 const Forgot = lazyPage(() => import("./Forgot"), "Forgot");
 const Reset = lazyPage(() => import("./Reset"), "Reset");
 const Invite = lazyPage(() => import("./Invite"), "Invite");
-const Install = lazyPage(() => import("./Install"), "Install");
-
 function RedirectResetToken() {
   const { token } = useParams();
   return <Navigate to={`${paths.access.reset}/${token}`} replace />;
@@ -25,7 +23,7 @@ export const accessRoutes: RouteObject[] = [
   /** Demo / estados: /reset/expired|used|invalid */
   { path: `${paths.access.reset}/:token`, element: <Reset /> },
   { path: paths.access.invite(), element: <Invite /> },
-  { path: paths.access.install, element: <Install /> },
+  { path: paths.access.install, element: <Navigate to={paths.home} replace /> },
 
   /* Legados PT  ->  EN */
   { path: paths.legacy.auth.entrar, element: <Navigate to={paths.access.login} replace /> },
@@ -33,7 +31,7 @@ export const accessRoutes: RouteObject[] = [
   { path: paths.legacy.auth.redefinir, element: <Navigate to={paths.access.reset} replace /> },
   { path: `${paths.legacy.auth.redefinir}/:token`, element: <RedirectResetToken /> },
   { path: paths.legacy.auth.convite, element: <RedirectInvite /> },
-  { path: paths.legacy.auth.instalar, element: <Navigate to={paths.access.install} replace /> },
+  { path: paths.legacy.auth.instalar, element: <Navigate to={paths.home} replace /> },
   { path: paths.legacy.auth.trocarSenha, element: <Navigate to={paths.access.createAccess} replace /> },
   { path: paths.legacy.auth.changePassword, element: <Navigate to={paths.access.createAccess} replace /> },
   { path: paths.legacy.auth.createPassword, element: <Navigate to={paths.access.createAccess} replace /> },

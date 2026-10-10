@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
 import { padBase, padTopo } from "@/lib/safeArea";
-import { Link, NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/cn";
-import { paths } from "@/router/paths";
 import { isNavGroup, type NavEntry } from "./nav-config";
 import { navDoPapel } from "./nav-wedash";
-import { Button } from "@/components/ui";
 import { WedashBrand } from "@/components/wedash/WedashBrand";
 import { useActiveSession } from "@/session/SessionProvider";
 
@@ -60,11 +58,6 @@ export function SidebarContent({ collapsed = false, onNavigate }: { collapsed?: 
     setOpenGroup((prev) => (prev === label ? null : label));
   }
 
-  const semApp = !session.appInstalled;
-  const textoApp =
-    session.role === "SELLER"
-      ? "Instale o app para receber avisos quando avançar para um novo nível de premiação."
-      : "Instale o app para receber no celular os avisos da WDash.";
   const busca = location.search;
 
   return (
@@ -116,19 +109,6 @@ export function SidebarContent({ collapsed = false, onNavigate }: { collapsed?: 
           );
         })}
       </nav>
-
-      {!collapsed && semApp && (
-        <div className="relative m-3.5 mt-0 overflow-hidden rounded-[var(--radius-vela-lg)] border border-line bg-bg-3 p-4">
-          <div className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(120% 90% at 100% 0%, var(--acc-soft), transparent 60%)" }} />
-          <p className="relative mb-0.5 text-[13.5px] font-bold text-t0">Instale o app</p>
-          <p className="relative mb-3 text-xs leading-snug text-t1">{textoApp}</p>
-          <Link to={paths.access.install} onClick={onNavigate}>
-            <Button size="sm" fullWidth className="relative">
-              Ver como instalar
-            </Button>
-          </Link>
-        </div>
-      )}
     </div>
   );
 }
