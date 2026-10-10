@@ -6,7 +6,8 @@ import { fetchCostPrices, fetchStockCatalog, fetchStoreStock, syncStockNow } fro
 import type { Store } from "@/data/wedash/stores";
 import { refreshStatusLine, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { fetchErpConnection } from "@/pages/dashboard/ErpStatusNotice";
-import { useScopedStores } from "@/pages/operation/shared";
+import { useScope } from "@/pages/dashboard/useScope";
+import { pickOneStore, useScopedStores } from "@/pages/operation/shared";
 
 const STOCK_MAX_AGE_MS = 30 * 60 * 1000;
 
@@ -42,6 +43,8 @@ async function loadAll(tenantId: string, lojas: Store[]): Promise<StockLoaded> {
 export function useStockData() {
   const { show } = useToast();
   const { session, lojas, loading: lojasLoading } = useScopedStores();
+  const { escopo } = useScope();
+  const escolher = pickOneStore(escopo.filialIds, session.stores.length);
   const storeKey = lojas.map((s) => s.id).join(",");
   const [data, setData] = useState<StockLoaded | null>(null);
   const [loading, setLoading] = useState(true);
@@ -89,6 +92,10 @@ export function useStockData() {
 
   useEffect(() => {
     if (lojasLoading) return;
+    if (escolher) {
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     (async () => {
@@ -105,7 +112,7 @@ export function useStockData() {
     return () => {
       cancelled = true;
     };
-  }, [storeKey, lojasLoading, reload, syncIfStale]);
+  }, [storeKey, lojasLoading, reload, syncIfStale, escolher]);
 
   const dataRef = useRef(data);
   dataRef.current = data;
@@ -118,6 +125,7 @@ export function useStockData() {
     tip: "Busca o estoque e o que está a receber das lojas desta tela.",
     status: data ? refreshStatusLine("Estoque atualizado", "Estoque ainda não atualizado", oldestSync) : undefined,
     run: async () => {
+      if (escolher) return;
       const atual = dataRef.current;
       if (atual) await syncIfStale(atual, { force: true });
     },
@@ -150,6 +158,7 @@ export function useStockData() {
   return {
     lojas,
     storeKey,
+    escolher,
     view,
     loading: loading || lojasLoading,
     syncing,
