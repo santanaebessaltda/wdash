@@ -3,25 +3,52 @@ import { formatCashClosePush } from "./cashClosePush.ts";
 import { formatStoreGoalPush, goalLevel } from "./goalPush.ts";
 import { formatQuietSalesPush, formatSalesPush } from "./salesPush.ts";
 
+const plain = (value: string | undefined) => value?.replaceAll("\u00a0", " ");
+
 describe("formatSalesPush", () => {
-  it("soma só quem vendeu e omite loja sem venda nova", () => {
-    const text = formatSalesPush([
-      { name: "CENTRO", deltaCents: 80000 },
-      { name: "SHOPPING", deltaCents: 0 },
-      { name: "RUA", deltaCents: 44000 },
-    ]);
-    expect(text?.title.replaceAll("\u00a0", " ")).toBe("R$ 1.240,00 em vendas");
-    expect(text?.body.replaceAll("\u00a0", " ")).toBe("Últimos 30 min\nCENTRO · R$ 800,00\nRUA · R$ 440,00");
+  it("acesso com uma loja mostra o acumulado de hoje", () => {
+    const text = formatSalesPush([{ name: "CENTRO", deltaCents: 50000, todayCents: 200000 }]);
+    expect(plain(text?.title)).toBe("R$ 500,00 nos últimos 30 min");
+    expect(plain(text?.body)).toBe("CENTRO · R$ 2.000,00 hoje");
   });
 
-  it("uma loja diz o valor no texto", () => {
-    const text = formatSalesPush([{ name: "CENTRO", deltaCents: 80000 }]);
-    expect(text?.title.replaceAll("\u00a0", " ")).toBe("R$ 800,00 em vendas");
-    expect(text?.body.replaceAll("\u00a0", " ")).toBe("CENTRO vendeu R$ 800,00 nos últimos 30 min.");
+  it("várias lojas e só uma vendeu agora: a loja do intervalo e o dia de todo o acesso", () => {
+    const text = formatSalesPush([
+      { name: "CENTRO", deltaCents: 50000, todayCents: 250000 },
+      { name: "RUA", deltaCents: 0, todayCents: 300000 },
+      { name: "SHOPPING", deltaCents: 0, todayCents: 235000 },
+    ]);
+    expect(plain(text?.title)).toBe("R$ 500,00 nos últimos 30 min");
+    expect(plain(text?.body)).toBe("CENTRO · R$ 500,00\nHoje nas suas lojas · R$ 7.850,00");
+  });
+
+  it("várias lojas no intervalo: o dia primeiro, depois cada loja, sem a que não vendeu agora", () => {
+    const text = formatSalesPush([
+      { name: "CENTRO", deltaCents: 80000, todayCents: 400000 },
+      { name: "SHOPPING", deltaCents: 0, todayCents: 200000 },
+      { name: "RUA", deltaCents: 44000, todayCents: 275000 },
+    ]);
+    expect(plain(text?.title)).toBe("R$ 1.240,00 nos últimos 30 min");
+    expect(plain(text?.body)).toBe("Hoje nas suas lojas · R$ 8.750,00\nCENTRO · R$ 800,00\nRUA · R$ 440,00");
+  });
+
+  it("corta a lista e diz quantas lojas ficaram de fora", () => {
+    const name = (label: string) => label.padEnd(40, "X");
+    const text = formatSalesPush([
+      { name: name("CENTRO"), deltaCents: 80000, todayCents: 80000 },
+      { name: name("RUA"), deltaCents: 64000, todayCents: 64000 },
+      { name: name("SHOPPING"), deltaCents: 40000, todayCents: 40000 },
+      { name: name("NORTE"), deltaCents: 32000, todayCents: 32000 },
+      { name: name("SUL"), deltaCents: 32000, todayCents: 32000 },
+    ]);
+    expect(plain(text?.title)).toBe("R$ 2.480,00 nos últimos 30 min");
+    expect(plain(text?.body)).toBe(
+      `Hoje nas suas lojas · R$ 2.480,00\n${name("CENTRO")} · R$ 800,00\n${name("RUA")} · R$ 640,00\ne mais 3 lojas`,
+    );
   });
 
   it("não avisa quando o intervalo não teve venda", () => {
-    expect(formatSalesPush([{ name: "CENTRO", deltaCents: 0 }])).toBeNull();
+    expect(formatSalesPush([{ name: "CENTRO", deltaCents: 0, todayCents: 200000 }])).toBeNull();
   });
 });
 

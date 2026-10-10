@@ -11,7 +11,7 @@ type Prefs = Record<PrefKey, boolean>;
 const DEFAULTS: Prefs = { sales: true, quiet: false, cashClose: true, storeGoal: true };
 
 const ROWS: Array<{ key: PrefKey; name: string; desc: string }> = [
-  { key: "sales", name: "Vendas do período", desc: "Receba o total vendido a cada 30 minutos e, quando disponível, o valor de cada loja." },
+  { key: "sales", name: "Vendas do período", desc: "Receba o que entrou nos últimos 30 minutos e quanto as suas lojas já venderam hoje." },
   { key: "quiet", name: "Sem venda no período", desc: "Receba um aviso quando um período de 30 minutos terminar sem novas vendas." },
   { key: "cashClose", name: "Fechamento", desc: "Receba um resumo do fechamento do dia, com faltas ou sobras em dinheiro e dias ainda sem total real." },
   { key: "storeGoal", name: "Meta da loja", desc: "Receba um aviso quando a loja atingir um novo nível da meta. Cada nível é avisado uma única vez." },

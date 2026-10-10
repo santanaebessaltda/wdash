@@ -1,6 +1,7 @@
 /**
  * Texto do push da rodada automática e o envio Web Push.
- * O valor é a diferença do faturamento de hoje (marca ALL) desde a rodada anterior.
+ * O título é o que entrou nos últimos 30 min. O texto traz o acumulado de hoje
+ * de todas as lojas do acesso (marca ALL), não só das que venderam nesse intervalo.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { localClock } from "./autoRefresh.ts";
@@ -17,32 +18,51 @@ export function formatQuietSalesPush(): { title: string; body: string } {
   return { title: "Sem vendas nos últimos 30 min", body: "Nenhuma nova venda registrada no período." };
 }
 
-/** `null` quando não houve venda nova no intervalo. */
-export function formatSalesPush(rows: Array<{ name: string; deltaCents: number }>): { title: string; body: string } | null {
-  const sold = rows.filter((row) => row.deltaCents > 0).sort((a, b) => b.deltaCents - a.deltaCents || a.name.localeCompare(b.name, "pt-BR"));
-  const total = sold.reduce((sum, row) => sum + row.deltaCents, 0);
-  if (total <= 0) return null;
-  const title = `${money(total)} em vendas`;
+export type SalesPushRow = { name: string; deltaCents: number; todayCents: number };
+
+function moreStores(count: number): string {
+  return `e mais ${count} ${count === 1 ? "loja" : "lojas"}`;
+}
+
+/** Cabeçalho do dia e as lojas do intervalo, até caber. O que sobra vira "e mais N lojas". */
+function fitStoreLines(header: string, storeLines: string[]): string {
+  const kept: string[] = [];
+  for (const line of storeLines) {
+    const draft = [header, ...kept, line].join("\n");
+    if (draft.length > BODY_LIMIT) break;
+    kept.push(line);
+  }
+  let rest = storeLines.length - kept.length;
+  if (rest === 0) return [header, ...kept].join("\n");
+  while (kept.length > 0) {
+    const draft = [header, ...kept, moreStores(rest)].join("\n");
+    if (draft.length <= BODY_LIMIT) return draft;
+    kept.pop();
+    rest += 1;
+  }
+  return [header, moreStores(rest)].join("\n");
+}
+
+/** `null` quando não houve venda nova no intervalo. `rows` é o acesso inteiro, inclusive loja sem venda nova. */
+export function formatSalesPush(rows: SalesPushRow[]): { title: string; body: string } | null {
+  const sold = rows
+    .filter((row) => row.deltaCents > 0)
+    .sort((a, b) => b.deltaCents - a.deltaCents || a.name.localeCompare(b.name, "pt-BR"));
+  const deltaTotal = sold.reduce((sum, row) => sum + row.deltaCents, 0);
+  if (deltaTotal <= 0) return null;
+  const todayTotal = rows.reduce((sum, row) => sum + row.todayCents, 0);
+  const title = `${money(deltaTotal)} nos últimos 30 min`;
+  if (rows.length === 1) {
+    const only = rows[0]!;
+    return { title, body: `${only.name} · ${money(only.todayCents)} hoje` };
+  }
   if (sold.length === 1) {
     const only = sold[0]!;
-    return { title, body: `${only.name} vendeu ${money(only.deltaCents)} nos últimos 30 min.` };
+    return { title, body: `${only.name} · ${money(only.deltaCents)}\nHoje nas suas lojas · ${money(todayTotal)}` };
   }
-  let body = "Últimos 30 min";
-  let shown = 0;
-  for (const row of sold) {
-    const line = `${row.name} · ${money(row.deltaCents)}`;
-    const next = `${body}\n${line}`;
-    if (next.length > BODY_LIMIT && shown > 0) break;
-    if (next.length > BODY_LIMIT) break;
-    body = next;
-    shown += 1;
-  }
-  const rest = sold.length - shown;
-  if (rest > 0) {
-    const extra = `\ne mais ${rest} ${rest === 1 ? "loja" : "lojas"}`;
-    if ((body + extra).length <= BODY_LIMIT + 24) body += extra;
-  }
-  return { title, body };
+  const header = `Hoje nas suas lojas · ${money(todayTotal)}`;
+  const storeLines = sold.map((row) => `${row.name} · ${money(row.deltaCents)}`);
+  return { title, body: fitStoreLines(header, storeLines) };
 }
 
 export function salesPushConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -205,6 +225,33 @@ export async function notifyScoped(
   }
 }
 
+function storeLabel(row: { trade_name?: string | null; name?: string | null; code?: string | null }): string {
+  return String(row.trade_name ?? "").trim() || String(row.name ?? "").trim() || String(row.code ?? "").trim();
+}
+
+/** Lojas ativas fora desta rodada, com o faturamento de hoje já gravado. */
+async function loadOtherStoresToday(
+  sb: SupabaseClient,
+  tenantId: string,
+  known: SalesPushStore[],
+): Promise<Array<{ id: string; name: string; todayCents: number }>> {
+  const { data, error } = await sb.from("store").select("id, code, name, trade_name, timezone").eq("tenant_id", tenantId).eq("active", true);
+  if (error) throw error;
+  const seen = new Set(known.map((store) => store.id));
+  const missing = (data ?? []).filter((row) => !seen.has(row.id as string));
+  if (missing.length === 0) return [];
+  const revenue = await readTodayRevenue(
+    sb,
+    tenantId,
+    missing.map((row) => ({ id: row.id as string, timezone: (row.timezone as string) || "America/Campo_Grande" })),
+  );
+  return missing.map((row) => ({
+    id: row.id as string,
+    name: storeLabel(row as { trade_name?: string | null; name?: string | null; code?: string | null }),
+    todayCents: revenue.get(row.id as string) ?? 0,
+  }));
+}
+
 /** Avisa gestor e gerente com o app inscrito. Falha de um aparelho não interrompe a rodada. */
 export async function notifyAutoSales(
   sb: SupabaseClient,
@@ -212,18 +259,26 @@ export async function notifyAutoSales(
 ): Promise<void> {
   const audience = await loadAudience(sb, args.tenantId);
   if (!audience) return;
+  const others = await loadOtherStoresToday(sb, args.tenantId, args.stores);
   const seen = new Set<string>();
   for (const sub of audience.subs) {
     const userId = sub.auth_user_id;
     if (seen.has(userId)) continue;
     seen.add(userId);
     const scope = audience.allowed.get(userId);
-    const rows = args.stores
-      .filter((store) => scope == null || scope.has(store.id))
-      .map((store) => ({
+    const inScope = (id: string) => scope == null || scope.has(id);
+    const rows: SalesPushRow[] = [
+      ...args.stores.filter((store) => inScope(store.id)).map((store) => ({
         name: store.name,
         deltaCents: (args.after.get(store.id) ?? 0) - (args.before.get(store.id) ?? 0),
-      }));
+        todayCents: args.after.get(store.id) ?? 0,
+      })),
+      ...others.filter((store) => inScope(store.id)).map((store) => ({
+        name: store.name,
+        deltaCents: 0,
+        todayCents: store.todayCents,
+      })),
+    ];
     if (rows.length === 0) continue;
     const sold = formatSalesPush(rows);
     if (sold && wants(audience, userId, "sales")) await deliver(sb, audience, userId, sold, "/");
