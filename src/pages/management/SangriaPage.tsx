@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, Card, Modal, Skeleton, useToast } from "@/components/ui";
 import { calendarTodayIso } from "@/data/wedash/clock";
-import { fetchLatestCashCloseError, fetchOpenCashCloseJob, requestMonthClose } from "@/data/wedash/cashCloseRepo";
+import { fetchLatestCashCloseError, fetchNavMonthFloor, fetchOpenCashCloseJob, requestMonthClose } from "@/data/wedash/cashCloseRepo";
 import { fetchSyncWatermark } from "@/data/wedash/salesRepo";
 import {
   createSangriaDeposit,
@@ -49,6 +49,7 @@ export function SangriaPage() {
   const showLojas = useMinSkeleton(lojasLoading);
   const hoje = calendarTodayIso();
   const [anchor, setAnchor] = useState(hoje);
+  const [piso, setPiso] = useState(() => inicioDoMes(hoje));
   const [lines, setLines] = useState<SangriaLineRow[]>([]);
   const [deposits, setDeposits] = useState<SangriaDepositDay[]>([]);
   const [loaded, setLoaded] = useState("");
@@ -68,8 +69,23 @@ export function SangriaPage() {
   const from = inicioDoMes(anchor);
   const to = fimDoMes(anchor);
   const podeAvancar = somarMes(anchor, 1) <= hoje;
+  const podeVoltar = somarMes(anchor, -1) >= piso;
   const cells = useMemo(() => celulasDoMes(anchor), [anchor]);
   const faixa = loja ? `${loja.id}|${from}|${reloadKey}` : "";
+
+  const lojaId = loja?.id ?? "";
+  useEffect(() => {
+    if (lojasLoading || escolher || !lojaId) return;
+    let stop = false;
+    void fetchNavMonthFloor("sangria_line", session.tenantId, lojaId, hoje).then((month) => {
+      if (stop) return;
+      setPiso(month);
+      setAnchor((atual) => (inicioDoMes(atual) < month ? month : atual));
+    });
+    return () => {
+      stop = true;
+    };
+  }, [lojasLoading, escolher, lojaId, session.tenantId, hoje, reloadKey]);
 
   useEffect(() => {
     if (!syncing) return;
@@ -211,7 +227,9 @@ export function SangriaPage() {
   }
 
   function irParaMes(alvo: string) {
-    setAnchor(inicioDoMes(alvo) === inicioDoMes(hoje) ? hoje : inicioDoMes(alvo));
+    const mes = inicioDoMes(alvo);
+    if (mes < piso || mes > inicioDoMes(hoje)) return;
+    setAnchor(mes === inicioDoMes(hoje) ? hoje : mes);
     setMarcados([]);
   }
 
@@ -224,8 +242,8 @@ export function SangriaPage() {
         actions={
           <HeaderFilters>
             <div className="flex flex-wrap items-center gap-2">
-              <SeletorMesAno iso={anchor} hoje={hoje} onChange={irParaMes} />
-              <button type="button" aria-label="Mês anterior" className={monthNavBtn} onClick={() => irParaMes(somarMes(anchor, -1))}>
+              <SeletorMesAno iso={anchor} hoje={hoje} minIso={piso} onChange={irParaMes} />
+              <button type="button" aria-label="Mês anterior" className={monthNavBtn} disabled={!podeVoltar} onClick={() => irParaMes(somarMes(anchor, -1))}>
                 <Seta dir="anterior" />
               </button>
               <button type="button" aria-label="Próximo mês" className={monthNavBtn} disabled={!podeAvancar} onClick={() => irParaMes(somarMes(anchor, 1))}>

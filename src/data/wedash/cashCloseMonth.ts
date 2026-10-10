@@ -26,6 +26,23 @@ export function closeHistoryFloor(joinedOn: string): string {
   return month > CLOSE_HISTORY_START ? month : CLOSE_HISTORY_START;
 }
 
+/**
+ * Primeiro mês que a tela deixa abrir.
+ * Sem lançamento no mês anterior já fechado, só o mês de `today`.
+ * Com lançamento nesse mês, abre desde o mês mais antigo que ainda tem dado.
+ */
+export function navMonthFloor(today: string, oldestDay: string | null, newestPastDay: string | null): string {
+  const current = inicioDoMes(today);
+  const [y, m] = current.split("-").map(Number);
+  const prevM = m === 1 ? 12 : m - 1;
+  const prevY = m === 1 ? y - 1 : y;
+  const previous = `${prevY}-${String(prevM).padStart(2, "0")}-01`;
+  const newest = newestPastDay?.slice(0, 10) ?? "";
+  if (!newest || inicioDoMes(newest) !== previous) return current;
+  const oldest = inicioDoMes(oldestDay && oldestDay.slice(0, 10) < current ? oldestDay : previous);
+  return oldest > current ? current : oldest;
+}
+
 /** Recorta o intervalo para o chão. `null` quando o período inteiro é anterior. */
 export function clampCloseRange(from: string, to: string, floor: string): { from: string; to: string } | null {
   const start = from < floor ? floor : from;

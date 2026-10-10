@@ -1,6 +1,6 @@
 import { calendarTodayIso } from "./clock";
 import { shiftName } from "./engine/format";
-import { monthCloseSpanFor } from "./cashCloseMonth";
+import { monthCloseSpanFor, navMonthFloor } from "./cashCloseMonth";
 import { captureBucket, paidPixCents, type CashCloseBucket, type CashCloseMillLine, type CloseAmountMap } from "./cashCloseView";
 
 export type CashCloseSnapshot = {
@@ -226,6 +226,27 @@ export async function fetchCashCloseMonthMarks(
     slot(storeId, day).snap.card = card;
   }
   return [...byKey.values()];
+}
+
+/** Primeiro mês que o calendário deixa abrir para esta loja. */
+export async function fetchNavMonthFloor(
+  table: "cash_close_day" | "sangria_line",
+  tenantId: string,
+  storeId: string,
+  today: string,
+): Promise<string> {
+  const before = `${today.slice(0, 7)}-01`;
+  const { getSupabase } = await import("@/lib/supabase");
+  const sb = getSupabase();
+  if (!sb) return before;
+  const [oldest, newest] = await Promise.all([
+    sb.from(table).select("day").eq("tenant_id", tenantId).eq("store_id", storeId).lt("day", before).order("day", { ascending: true }).limit(1),
+    sb.from(table).select("day").eq("tenant_id", tenantId).eq("store_id", storeId).lt("day", before).order("day", { ascending: false }).limit(1),
+  ]);
+  if (oldest.error || newest.error) return before;
+  const oldDay = oldest.data?.[0] ? String(oldest.data[0].day) : null;
+  const newDay = newest.data?.[0] ? String(newest.data[0].day) : null;
+  return navMonthFloor(today, oldDay, newDay);
 }
 
 /** Pede o fechamento dos dias do mês visível que ainda não têm, até ontem. */

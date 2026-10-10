@@ -16,6 +16,7 @@ import {
   fetchCashCloseMonthMarks,
   fetchCashCloseReviews,
   fetchCashCloseSnapshot,
+  fetchNavMonthFloor,
   fetchOpenCashCloseJob,
   fetchLatestCashCloseError,
   requestMonthClose,
@@ -231,10 +232,24 @@ function NumeroDia({ iso, hoje }: { iso: string; hoje: string }) {
   );
 }
 
-export function SeletorMesAno({ iso, hoje, onChange }: { iso: string; hoje: string; onChange: (alvo: string) => void }) {
+export function SeletorMesAno({
+  iso,
+  hoje,
+  minIso,
+  onChange,
+}: {
+  iso: string;
+  hoje: string;
+  /** Primeiro mês que pode ser escolhido. Antes disso o mês fica bloqueado. */
+  minIso: string;
+  onChange: (alvo: string) => void;
+}) {
   const hojeData = deIso(hoje);
   const hojeAno = hojeData.getFullYear();
   const hojeMes = hojeData.getMonth();
+  const piso = deIso(inicioDoMes(minIso));
+  const pisoAno = piso.getFullYear();
+  const pisoMes = piso.getMonth();
   const selecionado = deIso(inicioDoMes(iso));
   const [open, setOpen] = useState(false);
   const [modo, setModo] = useState<"mes" | "ano">("mes");
@@ -288,14 +303,16 @@ export function SeletorMesAno({ iso, hoje, onChange }: { iso: string; hoje: stri
     };
   }, [open]);
 
-  const podeAnoAnt = modo === "ano" ? anoPagina > 12 : anoVista > 2000;
-  const podeAnoProx = modo === "ano" ? anoPagina < hojeAno : anoVista < hojeAno;
   const anos = Array.from({ length: 12 }, (_, i) => anoPagina - 11 + i);
+  const podeAnoAnt = modo === "ano" ? anos[0] > pisoAno : anoVista > pisoAno;
+  const podeAnoProx = modo === "ano" ? anoPagina < hojeAno : anoVista < hojeAno;
   const navBtn = (ok: boolean) =>
     cn("flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-line text-t1", ok ? "hover:bg-bg-3" : "cursor-not-allowed opacity-40");
 
   function escolherMes(month: number) {
-    if (anoVista > hojeAno || (anoVista === hojeAno && month > hojeMes)) return;
+    const antes = anoVista < pisoAno || (anoVista === pisoAno && month < pisoMes);
+    const futuro = anoVista > hojeAno || (anoVista === hojeAno && month > hojeMes);
+    if (antes || futuro) return;
     onChange(paraIso(new Date(anoVista, month, 1)));
     setOpen(false);
   }
@@ -345,7 +362,11 @@ export function SeletorMesAno({ iso, hoje, onChange }: { iso: string; hoje: stri
             {modo === "mes" ? (
               <div className="grid grid-cols-3 gap-1">
                 {MESES_PT.map((nome, month) => {
-                  const bloqueado = anoVista > hojeAno || (anoVista === hojeAno && month > hojeMes);
+                  const bloqueado =
+                    anoVista < pisoAno ||
+                    (anoVista === pisoAno && month < pisoMes) ||
+                    anoVista > hojeAno ||
+                    (anoVista === hojeAno && month > hojeMes);
                   const ativo = selecionado.getFullYear() === anoVista && selecionado.getMonth() === month;
                   return (
                     <button
@@ -366,7 +387,7 @@ export function SeletorMesAno({ iso, hoje, onChange }: { iso: string; hoje: stri
             ) : (
               <div className="grid grid-cols-3 gap-1">
                 {anos.map((ano) => {
-                  const bloqueado = ano > hojeAno;
+                  const bloqueado = ano < pisoAno || ano > hojeAno;
                   const ativo = selecionado.getFullYear() === ano;
                   return (
                     <button
@@ -435,6 +456,7 @@ export function CashClosePage() {
   const showLojas = useMinSkeleton(lojasLoading);
   const hoje = calendarTodayIso();
   const [anchor, setAnchor] = useState(hoje);
+  const [piso, setPiso] = useState(() => inicioDoMes(hoje));
   const [marks, setMarks] = useState<CashCloseDayMark[]>([]);
   const [marksKey, setMarksKey] = useState("");
   const [reviews, setReviews] = useState<CashCloseReview[]>([]);
@@ -453,11 +475,26 @@ export function CashClosePage() {
   const anchorRef = useRef(anchor);
   anchorRef.current = anchor;
   const podeAvancar = somarMes(anchor, 1) <= hoje;
+  const podeVoltar = somarMes(anchor, -1) >= piso;
   const cells = useMemo(() => celulasDoMes(anchor), [anchor]);
   const from = inicioDoMes(anchor);
   const toBruto = fimDoMes(anchor);
   const to = toBruto < hoje ? toBruto : hoje;
   const faixaKey = `${storeKey}|${from}|${to}|${reloadKey}`;
+
+  const lojaId = lojas[0]?.id ?? "";
+  useEffect(() => {
+    if (lojasLoading || escolher || !lojaId) return;
+    let stop = false;
+    void fetchNavMonthFloor("cash_close_day", session.tenantId, lojaId, hoje).then((month) => {
+      if (stop) return;
+      setPiso(month);
+      setAnchor((atual) => (inicioDoMes(atual) < month ? month : atual));
+    });
+    return () => {
+      stop = true;
+    };
+  }, [lojasLoading, escolher, lojaId, session.tenantId, hoje, reloadKey]);
 
   useEffect(() => {
     if (!syncing) return;
@@ -640,10 +677,13 @@ export function CashClosePage() {
   }
 
   function irParaMes(alvo: string) {
-    setAnchor(inicioDoMes(alvo) === inicioDoMes(hoje) ? hoje : inicioDoMes(alvo));
+    const mes = inicioDoMes(alvo);
+    if (mes < piso || mes > inicioDoMes(hoje)) return;
+    setAnchor(mes === inicioDoMes(hoje) ? hoje : mes);
   }
 
   function mover(dir: -1 | 1) {
+    if (dir < 0 && !podeVoltar) return;
     if (dir > 0 && !podeAvancar) return;
     irParaMes(somarMes(anchor, dir));
   }
@@ -659,8 +699,8 @@ export function CashClosePage() {
         actions={
           <HeaderFilters>
             <div className="flex flex-wrap items-center gap-2">
-              <SeletorMesAno iso={anchor} hoje={hoje} onChange={irParaMes} />
-              <button type="button" aria-label="Mês anterior" className={monthNavBtn} onClick={() => mover(-1)}>
+              <SeletorMesAno iso={anchor} hoje={hoje} minIso={piso} onChange={irParaMes} />
+              <button type="button" aria-label="Mês anterior" className={monthNavBtn} disabled={!podeVoltar} onClick={() => mover(-1)}>
                 <Seta dir="anterior" />
               </button>
               <button type="button" aria-label="Próximo mês" className={monthNavBtn} disabled={!podeAvancar} onClick={() => mover(1)}>

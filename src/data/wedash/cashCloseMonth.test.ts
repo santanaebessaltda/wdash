@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clampCloseRange, closeHistoryFloor, missingCloseDays, monthCloseSpan, monthCloseSpanFor } from "./cashCloseMonth";
+import { clampCloseRange, closeHistoryFloor, missingCloseDays, monthCloseSpan, monthCloseSpanFor, navMonthFloor } from "./cashCloseMonth";
 
 describe("monthCloseSpan", () => {
   it("no dia 8 pede do dia 1 até o dia 7", () => {
@@ -28,6 +28,18 @@ describe("closeHistoryFloor", () => {
 
   it("conta anterior a outubro também começa em outubro", () => {
     expect(closeHistoryFloor("2026-09-02")).toBe("2026-10-01");
+  });
+});
+
+describe("navMonthFloor", () => {
+  it("sem o mês anterior fechado, só deixa o mês atual", () => {
+    expect(navMonthFloor("2026-10-10", null, null)).toBe("2026-10-01");
+    expect(navMonthFloor("2026-12-10", "2026-10-02", "2026-10-20")).toBe("2026-12-01");
+  });
+
+  it("com o mês anterior fechado, abre desde o mais antigo que tem dado", () => {
+    expect(navMonthFloor("2026-11-10", "2026-10-01", "2026-10-31")).toBe("2026-10-01");
+    expect(navMonthFloor("2026-12-10", "2026-10-01", "2026-11-02")).toBe("2026-10-01");
   });
 });
 
