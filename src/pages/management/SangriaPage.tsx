@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, Card, Modal, Skeleton, useToast } from "@/components/ui";
 import { calendarTodayIso } from "@/data/wedash/clock";
-import { fetchOpenCashCloseJob, requestMonthClose } from "@/data/wedash/cashCloseRepo";
+import { fetchLatestCashCloseError, fetchOpenCashCloseJob, requestMonthClose } from "@/data/wedash/cashCloseRepo";
+import { fetchSyncWatermark } from "@/data/wedash/salesRepo";
 import {
   createSangriaDeposit,
   fetchSangriaMonth,
@@ -11,13 +12,15 @@ import {
   type SangriaLineRow,
 } from "@/data/wedash/sangriaRepo";
 import { dayAmounts, depositBoleto, sumAmounts, type SangriaKind } from "@/data/wedash/sangriaMath";
-import { brlCent, dataExtenso, deIso, fimDoMes, inicioDoMes, mesAnoTitulo, somarDias } from "@/lib/format";
+import { brlCent, dataExtenso, deIso, fimDoMes, inicioDoMes, somarDias } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { refreshStatusLine, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { useScope } from "@/pages/dashboard/useScope";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
+import { monthNavBtn, SeletorMesAno, Seta } from "@/pages/cash-close/CashClosePage";
+import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { HeaderFilters } from "@/pages/stock/shared";
 
 const WEEK = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -54,33 +57,76 @@ export function SangriaPage() {
   const [marcados, setMarcados] = useState<string[]>([]);
   const [depositando, setDepositando] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+  const [watermark, setWatermark] = useState<Date | null>(null);
 
   const loja = lojas[0];
+  const lojaRef = useRef(loja);
+  lojaRef.current = loja;
+  const anchorRef = useRef(anchor);
+  anchorRef.current = anchor;
   const from = inicioDoMes(anchor);
   const to = fimDoMes(anchor);
   const podeAvancar = somarMes(anchor, 1) <= hoje;
   const cells = useMemo(() => celulasDoMes(anchor), [anchor]);
   const faixa = loja ? `${loja.id}|${from}|${reloadKey}` : "";
 
-  useScreenRefresh({
-    label: "Atualizar sangrias",
-    tip: "Busca as sangrias do mês que está na tela.",
-    status: refreshStatusLine("Sangrias atualizadas", "Sangrias ainda não atualizadas", null),
-    run: async () => {
-      if (escolher || !loja) return;
-      const r = await requestMonthClose([loja.id], anchor);
-      if (!r.ok) {
-        show(r.message, "danger");
-        return;
-      }
-      for (let i = 0; i < 20; i++) {
-        await new Promise((done) => window.setTimeout(done, 3000));
-        const open = await fetchOpenCashCloseJob(session.tenantId);
-        if (!open && i > 0) break;
-      }
+  useEffect(() => {
+    if (!syncing) return;
+    let stop = false;
+    let checks = 0;
+    const tick = async () => {
+      checks += 1;
+      const open = await fetchOpenCashCloseJob(session.tenantId);
+      if (stop || open || checks < 2) return;
+      const message = await fetchLatestCashCloseError(session.tenantId);
+      if (stop) return;
+      setSyncing(false);
       setReloadKey((n) => n + 1);
-    },
+      if (message) show(message, "danger");
+    };
+    void tick();
+    const id = window.setInterval(() => void tick(), 3000);
+    return () => {
+      stop = true;
+      window.clearInterval(id);
+    };
+  }, [syncing, session.tenantId, show]);
+
+  useEffect(() => {
+    let stop = false;
+    void fetchSyncWatermark(session.tenantId).then((wm) => {
+      if (!stop) setWatermark(wm);
+    });
+    return () => {
+      stop = true;
+    };
+  }, [session.tenantId, reloadKey]);
+
+  const pedir = useCallback(async () => {
+    const atual = lojaRef.current;
+    if (escolher || !atual) return;
+    const r = await requestMonthClose([atual.id], anchorRef.current);
+    if (!r.ok) {
+      show(r.message, "danger");
+      return;
+    }
+    setSyncing(true);
+  }, [escolher, show]);
+
+  useScreenRefresh({
+    label: "Atualizar vendas e sangrias",
+    tip: "Busca as vendas de hoje e as sangrias do mês que está na tela.",
+    status: refreshStatusLine("Sangrias atualizadas", "Sangrias ainda não atualizadas", watermark?.toISOString()),
+    sales: true,
+    run: () => pedir(),
   });
+
+  useEffect(() => {
+    const onSynced = () => setReloadKey((n) => n + 1);
+    window.addEventListener(SALES_SYNCED_EVENT, onSynced);
+    return () => window.removeEventListener(SALES_SYNCED_EVENT, onSynced);
+  }, []);
 
   useEffect(() => {
     if (lojasLoading || escolher || !loja) return;
@@ -178,12 +224,12 @@ export function SangriaPage() {
         actions={
           <HeaderFilters>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[13px] font-semibold text-t0">{mesAnoTitulo(anchor)}</span>
-              <button type="button" className={navBtn} aria-label="Mês anterior" onClick={() => irParaMes(somarMes(anchor, -1))}>
-                ‹
+              <SeletorMesAno iso={anchor} hoje={hoje} onChange={irParaMes} />
+              <button type="button" aria-label="Mês anterior" className={monthNavBtn} onClick={() => irParaMes(somarMes(anchor, -1))}>
+                <Seta dir="anterior" />
               </button>
-              <button type="button" className={navBtn} aria-label="Próximo mês" disabled={!podeAvancar} onClick={() => irParaMes(somarMes(anchor, 1))}>
-                ›
+              <button type="button" aria-label="Próximo mês" className={monthNavBtn} disabled={!podeAvancar} onClick={() => irParaMes(somarMes(anchor, 1))}>
+                <Seta dir="proximo" />
               </button>
             </div>
           </HeaderFilters>
@@ -351,9 +397,6 @@ function KindButton({ atual, valor, onClick, children }: { atual: SangriaKind; v
     </button>
   );
 }
-
-const navBtn =
-  "flex h-10 w-10 items-center justify-center rounded-[11px] border border-line bg-bg-2 text-lg text-t1 hover:border-line-2 disabled:cursor-not-allowed disabled:opacity-40";
 
 function somarMes(iso: string, meses: number): string {
   const d = deIso(inicioDoMes(iso));

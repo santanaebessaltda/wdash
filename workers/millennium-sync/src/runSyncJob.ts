@@ -36,6 +36,7 @@ import {
   type CashAccount,
   type CashCloseReportLine,
 } from "./millenniumCashClose.ts";
+import { clampCloseRange } from "../../../src/data/wedash/cashCloseMonth.ts";
 import type { ParsedSangria } from "./millenniumSangria.ts";
 import type { StoneCapture } from "./stoneConciliation.ts";
 import {
@@ -141,12 +142,26 @@ async function persistListaDerivedDayAggs(
 }
 
 /** Fundo, sangria, fechamento e valor digitado da janela. Um dia = uma chamada. Falha não derruba a venda. */
+async function rangeInsideCloseFloor(
+  deps: Pick<SyncJobDeps, "closeHistoryFloor">,
+  args: { tenantId: string; timeZone: string; from: string; to: string },
+): Promise<{ from: string; to: string } | null> {
+  if (!deps.closeHistoryFloor) return { from: args.from, to: args.to };
+  try {
+    const floor = await deps.closeHistoryFloor({ tenantId: args.tenantId, timeZone: args.timeZone });
+    return clampCloseRange(args.from, args.to, floor);
+  } catch (e) {
+    console.warn(`AVISO chão do fechamento: ${e instanceof Error ? e.message : String(e)}`);
+    return { from: args.from, to: args.to };
+  }
+}
+
 export async function syncStoreCashClose(
-  deps: Pick<SyncJobDeps, "fetchCashCloseReport" | "replaceCashCloseDays" | "fetchSangriaLista" | "upsertSangriaLines">,
+  deps: Pick<SyncJobDeps, "fetchCashCloseReport" | "replaceCashCloseDays" | "fetchSangriaLista" | "upsertSangriaLines" | "closeHistoryFloor">,
   args: {
     session: string;
     tenantId: string;
-    store: Pick<SyncStore, "id" | "code" | "millenniumStoreId">;
+    store: Pick<SyncStore, "id" | "code" | "millenniumStoreId" | "timezone">;
     from: string;
     to: string;
     accounts: CashAccount[];
@@ -155,7 +170,14 @@ export async function syncStoreCashClose(
     strict?: boolean;
   },
 ): Promise<void> {
-  await syncStoreSangria(deps, args);
+  const span = await rangeInsideCloseFloor(deps, {
+    tenantId: args.tenantId,
+    timeZone: args.store.timezone,
+    from: args.from,
+    to: args.to,
+  });
+  if (!span) return;
+  await syncStoreSangria(deps, { ...args, from: span.from, to: span.to });
   if (!args.accountsOk || !deps.fetchCashCloseReport || !deps.replaceCashCloseDays) {
     if (args.strict) throw new Error("contas de caixa indisponíveis");
     return;
@@ -169,7 +191,7 @@ export async function syncStoreCashClose(
   }
   try {
     const rows: CashCloseDay[] = [];
-    for (let day = args.from; day <= args.to; day = addDaysIso(day, 1)) {
+    for (let day = span.from; day <= span.to; day = addDaysIso(day, 1)) {
       const lines = await deps.fetchCashCloseReport({ session: args.session, conta: account.conta, day });
       const byMethod = new Map<string, CashCloseDay>();
       for (const line of lines) {
@@ -192,14 +214,14 @@ export async function syncStoreCashClose(
     await deps.replaceCashCloseDays({
       tenantId: args.tenantId,
       storeId: args.store.id,
-      from: args.from,
-      to: args.to,
+      from: span.from,
+      to: span.to,
       rows,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.warn(`  AVISO [${args.store.code}] fechamento de caixa ${args.from}→${args.to}: ${msg}`);
-    syncLog("WARN", "fechamento_caixa", `Valor digitado não gravou (${args.from}→${args.to}): ${msg}`, {
+    console.warn(`  AVISO [${args.store.code}] fechamento de caixa ${span.from}→${span.to}: ${msg}`);
+    syncLog("WARN", "fechamento_caixa", `Valor digitado não gravou (${span.from}→${span.to}): ${msg}`, {
       store: args.store,
       day: args.from,
     });
@@ -212,7 +234,7 @@ async function syncStoreSangria(
   args: {
     session: string;
     tenantId: string;
-    store: Pick<SyncStore, "id" | "code" | "millenniumStoreId">;
+    store: Pick<SyncStore, "id" | "code" | "millenniumStoreId" | "timezone">;
     from: string;
     to: string;
   },
@@ -238,7 +260,7 @@ async function syncStoreSangria(
 
 /** Arquivo Stone do dia anterior (e dos dias da janela já encerrados). Hoje ainda não existe. */
 async function syncStoreStone(
-  deps: Pick<SyncJobDeps, "fetchStoneCaptures" | "replaceStoneCaptures" | "listCashCloseActivity">,
+  deps: Pick<SyncJobDeps, "fetchStoneCaptures" | "replaceStoneCaptures" | "listCashCloseActivity" | "closeHistoryFloor">,
   args: {
     tenantId: string;
     store: SyncStore;
@@ -247,14 +269,21 @@ async function syncStoreStone(
     now: Date;
   },
 ): Promise<void> {
+  const span = await rangeInsideCloseFloor(deps, {
+    tenantId: args.tenantId,
+    timeZone: args.store.timezone,
+    from: args.from,
+    to: args.to,
+  });
+  if (!span) return;
   if (!args.store.stoneCode || !args.store.stoneSecretCiphertext) return;
   if (!deps.fetchStoneCaptures || !deps.replaceStoneCaptures) return;
   const realNow = new Date();
   const today = ymdInTz(realNow, args.store.timezone);
   const cardDays = deps.listCashCloseActivity
-    ? closeSaleDays(await deps.listCashCloseActivity({ storeId: args.store.id, from: args.from, to: args.to })).card
+    ? closeSaleDays(await deps.listCashCloseActivity({ storeId: args.store.id, from: span.from, to: span.to })).card
     : null;
-  for (let day = args.from; day <= args.to; day = addDaysIso(day, 1)) {
+  for (let day = span.from; day <= span.to; day = addDaysIso(day, 1)) {
     if (day >= today || !stoneFileReady(day, realNow)) continue;
     if (cardDays && !cardDays.has(day)) {
       console.log(`  ${args.store.code} ${day}: sem venda de cartão no Millennium`);
@@ -1655,6 +1684,8 @@ export type SyncJobDeps = {
   fetchCashAccounts?: (session: string) => Promise<CashAccount[]>;
   /** Fechamento detalhado de um dia, na CONTA do caixa. */
   fetchCashCloseReport?: (args: { session: string; conta: number; day: string }) => Promise<CashCloseReportLine[]>;
+  /** Dia 1 do mês em que a conta entrou. Fechamento e sangria anteriores ficam de fora. */
+  closeHistoryFloor?: (args: { tenantId: string; timeZone: string }) => Promise<string>;
   /** Sangrias da filial no intervalo. Opcional: sem ela o calendário não enche. */
   fetchSangriaLista?: (args: { session: string; millenniumStoreId: number; from: string; to: string }) => Promise<ParsedSangria[]>;
   upsertSangriaLines?: (args: { tenantId: string; storeId: string; lines: ParsedSangria[] }) => Promise<void>;

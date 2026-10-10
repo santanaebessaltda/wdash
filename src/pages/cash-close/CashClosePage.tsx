@@ -231,7 +231,7 @@ function NumeroDia({ iso, hoje }: { iso: string; hoje: string }) {
   );
 }
 
-function SeletorMesAno({ iso, hoje, onChange }: { iso: string; hoje: string; onChange: (alvo: string) => void }) {
+export function SeletorMesAno({ iso, hoje, onChange }: { iso: string; hoje: string; onChange: (alvo: string) => void }) {
   const hojeData = deIso(hoje);
   const hojeAno = hojeData.getFullYear();
   const hojeMes = hojeData.getMonth();
@@ -415,7 +415,10 @@ function SeletorMesAno({ iso, hoje, onChange }: { iso: string; hoje: string; onC
   );
 }
 
-function Seta({ dir }: { dir: "anterior" | "proximo" }) {
+export const monthNavBtn =
+  "flex h-10 w-10 items-center justify-center rounded-[11px] border border-line bg-bg-2 text-t1 hover:border-line-2 hover:text-t0 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-line disabled:hover:text-t1";
+
+export function Seta({ dir }: { dir: "anterior" | "proximo" }) {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d={dir === "anterior" ? "m15 18-6-6 6-6" : "m9 18 6-6-6-6"} />
@@ -646,8 +649,6 @@ export function CashClosePage() {
   }
 
   const diaPronto = diaAberto != null && diaKey === `${storeKey}|${diaAberto}|${reloadKey}`;
-  const navBtn =
-    "flex h-10 w-10 items-center justify-center rounded-[11px] border border-line bg-bg-2 text-t1 hover:border-line-2 hover:text-t0 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-line disabled:hover:text-t1";
 
   return (
     <div>
@@ -659,10 +660,10 @@ export function CashClosePage() {
           <HeaderFilters>
             <div className="flex flex-wrap items-center gap-2">
               <SeletorMesAno iso={anchor} hoje={hoje} onChange={irParaMes} />
-              <button type="button" aria-label="Mês anterior" className={navBtn} onClick={() => mover(-1)}>
+              <button type="button" aria-label="Mês anterior" className={monthNavBtn} onClick={() => mover(-1)}>
                 <Seta dir="anterior" />
               </button>
-              <button type="button" aria-label="Próximo mês" className={navBtn} disabled={!podeAvancar} onClick={() => mover(1)}>
+              <button type="button" aria-label="Próximo mês" className={monthNavBtn} disabled={!podeAvancar} onClick={() => mover(1)}>
                 <Seta dir="proximo" />
               </button>
             </div>

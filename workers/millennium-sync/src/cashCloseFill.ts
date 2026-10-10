@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { missingCloseDays } from "../../../src/data/wedash/cashCloseMonth.ts";
+import { clampCloseRange, missingCloseDays } from "../../../src/data/wedash/cashCloseMonth.ts";
 import { closeSaleDays } from "../../../src/data/wedash/cashCloseView.ts";
 import { stoneFileReady } from "../../../src/data/wedash/stoneClock.ts";
 import { decryptPassword } from "./decrypt.ts";
@@ -156,7 +156,18 @@ export async function runCashCloseFillJob(
   if (!accountsOk) problems.push("Não foi possível ler as contas de caixa do Millennium.");
   for (const store of chosen) {
     const today = ymdInTz(now, store.timezone);
-    const days = missingCloseDays(from, to, today, await filledDays(sb, job.tenantId, store.id, from, to));
+    let rangeFrom = from;
+    if (deps.closeHistoryFloor) {
+      try {
+        const floor = await deps.closeHistoryFloor({ tenantId: job.tenantId, timeZone: store.timezone });
+        const span = clampCloseRange(from, to, floor);
+        if (!span) continue;
+        rangeFrom = span.from;
+      } catch (e) {
+        console.warn(`AVISO chão do fechamento: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    const days = missingCloseDays(rangeFrom, to, today, await filledDays(sb, job.tenantId, store.id, rangeFrom, to));
     for (const day of days) {
       try {
         await syncStoreCashClose(deps, {
@@ -196,9 +207,9 @@ export async function runCashCloseFillJob(
     const covers = stoneRow.covers === "all" ? "all" : "online_pix";
     const stoneCode = String(stoneRow.stone_code);
     const end = to < today ? to : addDaysIso(today, -1);
-    if (from > end) continue;
-    const files = await stoneState(sb, store.id, from, end);
-    const sales = await millenniumSaleDays(sb, store.id, from, end);
+    if (rangeFrom > end) continue;
+    const files = await stoneState(sb, store.id, rangeFrom, end);
+    const sales = await millenniumSaleDays(sb, store.id, rangeFrom, end);
     const tax = digits(store.taxId);
     const webhookUrl = process.env.STONE_WEBHOOK_PUBLIC_URL?.trim() ?? "";
     let pixParado = false;
@@ -222,7 +233,7 @@ export async function runCashCloseFillJob(
         }
       }
     }
-    for (let day = from; day <= end; day = addDaysIso(day, 1)) {
+    for (let day = rangeFrom; day <= end; day = addDaysIso(day, 1)) {
       if (!stoneFileReady(day, now)) continue;
       const file = files.get(day);
       const wouldCard = covers === "all" && !file?.card;

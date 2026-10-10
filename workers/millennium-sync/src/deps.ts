@@ -17,6 +17,7 @@ import { fetchStoreSellers, type ErpSeller } from "./millenniumSellers.ts";
 import { fetchErpStores } from "./millenniumStores.ts";
 import { mergeNameKeys, type KnownSeller } from "./sellerLinker.ts";
 import { fetchRelatorioMargem } from "./millenniumMargem.ts";
+import { closeHistoryFloor } from "../../../src/data/wedash/cashCloseMonth.ts";
 import { fetchCashAccounts, fetchCashCloseReport } from "./millenniumCashClose.ts";
 import { fetchStoneConciliation } from "./stoneConciliation.ts";
 import { fetchCouponReport } from "./millenniumCouponReport.ts";
@@ -301,6 +302,7 @@ export function buildCatalogDeps(sb: SupabaseClient): CatalogDeps {
 
 /** Sobrevive entre jobs (buildDeps roda a cada job). */
 const listaMemo = createListaMemo();
+const closeFloorCache = new Map<string, Promise<string>>();
 
 export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
   let eventsCache: import("./millenniumEvents.ts").MillenniumEvent[] | null = null;
@@ -682,6 +684,24 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
 
     async fetchCashCloseReport(args) {
       return fetchCashCloseReport({ ...args, baseUrl: millenniumBaseUrl() });
+    },
+
+    async closeHistoryFloor({ tenantId, timeZone }) {
+      const key = `${tenantId}|${timeZone}`;
+      let pending = closeFloorCache.get(key);
+      if (!pending) {
+        pending = (async () => {
+          const { data, error } = await sb.from("tenant").select("created_at").eq("id", tenantId).maybeSingle();
+          if (error) throw error;
+          const joined = data?.created_at ? ymdInTz(new Date(data.created_at as string), timeZone) : ymdInTz(new Date(), timeZone);
+          return closeHistoryFloor(joined);
+        })().catch((error: unknown) => {
+          closeFloorCache.delete(key);
+          throw error;
+        });
+        closeFloorCache.set(key, pending);
+      }
+      return pending;
     },
 
     async fetchSangriaLista(args) {
@@ -1594,6 +1614,9 @@ export async function enqueueDueCashCloseCatchUp(sb: SupabaseClient, now = new D
       if (salesErr) throw salesErr;
       const days = [...new Set((sales ?? []).map((row) => String(row.day).slice(0, 10)))];
       if (days.length === 0) continue;
+      const { data: tenantRow, error: tenantErr } = await sb.from("tenant").select("created_at").eq("id", tenantId).maybeSingle();
+      if (tenantErr) throw tenantErr;
+      const floor = closeHistoryFloor(tenantRow?.created_at ? ymdInTz(new Date(tenantRow.created_at as string), tz) : today);
       const { data: closed, error: closedErr } = await sb
         .from("cash_close_day")
         .select("day")
@@ -1601,7 +1624,7 @@ export async function enqueueDueCashCloseCatchUp(sb: SupabaseClient, now = new D
         .in("day", days);
       if (closedErr) throw closedErr;
       const have = new Set((closed ?? []).map((row) => String(row.day).slice(0, 10)));
-      const missing = days.find((day) => !have.has(day));
+      const missing = days.find((day) => day >= floor && !have.has(day));
       if (!missing) continue;
       if (!chosen || missing > chosen.day) chosen = { day: missing, storeIds: [storeId] };
       else if (missing === chosen.day) chosen.storeIds.push(storeId);
