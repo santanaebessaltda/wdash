@@ -6,51 +6,50 @@ import { formatQuietSalesPush, formatSalesPush } from "./salesPush.ts";
 const plain = (value: string | undefined) => value?.replaceAll("\u00a0", " ");
 
 describe("formatSalesPush", () => {
-  it("acesso com uma loja mostra o acumulado de hoje", () => {
+  it("acesso com uma loja: o intervalo no título e o dia da loja no texto", () => {
     const text = formatSalesPush([{ name: "CENTRO", deltaCents: 50000, todayCents: 200000 }]);
     expect(plain(text?.title)).toBe("R$ 500,00 nos últimos 30 min");
-    expect(plain(text?.body)).toBe("CENTRO · R$ 2.000,00 hoje");
+    expect(plain(text?.body)).toBe("CENTRO · hoje R$ 2.000,00");
   });
 
-  it("várias lojas e só uma vendeu agora: o dia de cada loja, da maior para a menor", () => {
+  it("várias lojas e só uma vendeu agora: o dia da rede no título e só essa loja na lista", () => {
     const text = formatSalesPush([
       { name: "CENTRO", deltaCents: 50000, todayCents: 250000 },
       { name: "RUA", deltaCents: 0, todayCents: 300000 },
       { name: "SHOPPING", deltaCents: 0, todayCents: 235000 },
     ]);
-    expect(plain(text?.title)).toBe("R$ 500,00 nos últimos 30 min");
-    expect(plain(text?.body)).toBe("Hoje nas suas lojas · R$ 7.850,00\nRUA · R$ 3.000,00\nCENTRO · R$ 2.500,00\nSHOPPING · R$ 2.350,00");
+    expect(plain(text?.title)).toBe("R$ 500,00 nos últimos 30 min · hoje R$ 7.850,00");
+    expect(plain(text?.body)).toBe("CENTRO · R$ 500,00 · hoje R$ 2.500,00");
   });
 
-  it("várias lojas: o dia primeiro e o acumulado de cada uma, inclusive a que não vendeu agora", () => {
+  it("várias lojas: título da rede e uma linha por loja que vendeu, da maior para a menor", () => {
     const text = formatSalesPush([
-      { name: "CENTRO", deltaCents: 80000, todayCents: 400000 },
-      { name: "SHOPPING", deltaCents: 0, todayCents: 200000 },
-      { name: "RUA", deltaCents: 44000, todayCents: 275000 },
+      { name: "CENTRO", deltaCents: 80000, todayCents: 320000 },
+      { name: "SHOPPING", deltaCents: 0, todayCents: 340000 },
+      { name: "RUA", deltaCents: 44000, todayCents: 215000 },
     ]);
-    expect(plain(text?.title)).toBe("R$ 1.240,00 nos últimos 30 min");
-    expect(plain(text?.body)).toBe("Hoje nas suas lojas · R$ 8.750,00\nCENTRO · R$ 4.000,00\nRUA · R$ 2.750,00\nSHOPPING · R$ 2.000,00");
+    expect(plain(text?.title)).toBe("R$ 1.240,00 nos últimos 30 min · hoje R$ 8.750,00");
+    expect(plain(text?.body)).toBe("CENTRO · R$ 800,00 · hoje R$ 3.200,00\nRUA · R$ 440,00 · hoje R$ 2.150,00");
   });
 
-  it("corta a lista e diz quantas lojas ficaram de fora", () => {
-    const name = (label: string) => label.padEnd(40, "X");
+  it("lista todas as lojas que venderam, sem cortar", () => {
     const text = formatSalesPush([
-      { name: name("CENTRO"), deltaCents: 80000, todayCents: 80000 },
-      { name: name("RUA"), deltaCents: 64000, todayCents: 64000 },
-      { name: name("SHOPPING"), deltaCents: 40000, todayCents: 40000 },
-      { name: name("NORTE"), deltaCents: 32000, todayCents: 32000 },
-      { name: name("SUL"), deltaCents: 32000, todayCents: 32000 },
+      { name: "CENTRO", deltaCents: 80000, todayCents: 80000 },
+      { name: "RUA", deltaCents: 64000, todayCents: 64000 },
+      { name: "SHOPPING", deltaCents: 40000, todayCents: 40000 },
+      { name: "NORTE", deltaCents: 32000, todayCents: 32000 },
+      { name: "SUL", deltaCents: 32000, todayCents: 32000 },
     ]);
-    expect(plain(text?.title)).toBe("R$ 2.480,00 nos últimos 30 min");
+    expect(plain(text?.title)).toBe("R$ 2.480,00 nos últimos 30 min · hoje R$ 2.480,00");
     expect(plain(text?.body)).toBe(
-      `Hoje nas suas lojas · R$ 2.480,00\n${name("CENTRO")} · R$ 800,00\n${name("RUA")} · R$ 640,00\ne mais 3 lojas`,
+      "CENTRO · R$ 800,00 · hoje R$ 800,00\nRUA · R$ 640,00 · hoje R$ 640,00\nSHOPPING · R$ 400,00 · hoje R$ 400,00\nNORTE · R$ 320,00 · hoje R$ 320,00\nSUL · R$ 320,00 · hoje R$ 320,00",
     );
   });
 
-  it("sem venda nova ainda resume cada loja", () => {
+  it("uma loja sem venda nova ainda mostra o dia dela", () => {
     const text = formatSalesPush([{ name: "CENTRO", deltaCents: 0, todayCents: 200000 }]);
-    expect(plain(text?.title)).toBe("Sem vendas nos últimos 30 min");
-    expect(plain(text?.body)).toBe("CENTRO · R$ 2.000,00 hoje");
+    expect(plain(text?.title)).toBe("R$ 0,00 nos últimos 30 min");
+    expect(plain(text?.body)).toBe("CENTRO · hoje R$ 2.000,00");
   });
 
   it("sem loja não há texto", () => {

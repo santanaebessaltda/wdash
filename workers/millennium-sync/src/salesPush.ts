@@ -1,12 +1,10 @@
 /**
  * Texto do push da rodada automática e o envio Web Push.
- * O título é o que entrou nos últimos 30 min (ou "sem vendas"). O texto lista
- * cada loja do acesso com o acumulado de hoje (marca ALL), com ou sem venda nova.
+ * Título = a rede. Cada linha = uma loja que vendeu nos últimos 30 min.
+ * O total de hoje no título soma todas as lojas do acesso, mesmo as que não entram na lista.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { localClock } from "./autoRefresh.ts";
-
-const BODY_LIMIT = 180;
 
 export type SalesPushStore = { id: string; name: string; timezone: string };
 
@@ -20,47 +18,25 @@ export function formatQuietSalesPush(): { title: string; body: string } {
 
 export type SalesPushRow = { name: string; deltaCents: number; todayCents: number };
 
-function moreStores(count: number): string {
-  return `e mais ${count} ${count === 1 ? "loja" : "lojas"}`;
-}
-
-/** Cabeçalho do dia e as lojas do intervalo, até caber. O que sobra vira "e mais N lojas". */
-function fitStoreLines(header: string, storeLines: string[]): string {
-  const kept: string[] = [];
-  for (const line of storeLines) {
-    const draft = [header, ...kept, line].join("\n");
-    if (draft.length > BODY_LIMIT) break;
-    kept.push(line);
-  }
-  let rest = storeLines.length - kept.length;
-  if (rest === 0) return [header, ...kept].join("\n");
-  while (kept.length > 0) {
-    const draft = [header, ...kept, moreStores(rest)].join("\n");
-    if (draft.length <= BODY_LIMIT) return draft;
-    kept.pop();
-    rest += 1;
-  }
-  return [header, moreStores(rest)].join("\n");
-}
-
 /**
  * Resumo da rodada. `null` só sem loja no acesso.
- * Com venda nova, o título é o total do intervalo. Sem venda, o título avisa isso.
- * O texto lista cada loja do acesso com o acumulado de hoje.
+ * Uma loja: "R$ … nos últimos 30 min" / "CENTRO · hoje R$ …".
+ * Várias: o título junta o intervalo e o dia da rede; a lista só traz quem vendeu agora.
  */
 export function formatSalesPush(rows: SalesPushRow[]): { title: string; body: string } | null {
   if (rows.length === 0) return null;
   const deltaTotal = rows.reduce((sum, row) => sum + Math.max(0, row.deltaCents), 0);
   const todayTotal = rows.reduce((sum, row) => sum + row.todayCents, 0);
-  const title = deltaTotal > 0 ? `${money(deltaTotal)} nos últimos 30 min` : "Sem vendas nos últimos 30 min";
-  const ordered = [...rows].sort((a, b) => b.todayCents - a.todayCents || a.name.localeCompare(b.name, "pt-BR"));
+  const period = `${money(deltaTotal)} nos últimos 30 min`;
   if (rows.length === 1) {
-    const only = ordered[0]!;
-    return { title, body: `${only.name} · ${money(only.todayCents)} hoje` };
+    const only = rows[0]!;
+    return { title: period, body: `${only.name} · hoje ${money(only.todayCents)}` };
   }
-  const header = `Hoje nas suas lojas · ${money(todayTotal)}`;
-  const storeLines = ordered.map((row) => `${row.name} · ${money(row.todayCents)}`);
-  return { title, body: fitStoreLines(header, storeLines) };
+  const sold = rows
+    .filter((row) => row.deltaCents > 0)
+    .sort((a, b) => b.deltaCents - a.deltaCents || a.name.localeCompare(b.name, "pt-BR"));
+  const body = sold.map((row) => `${row.name} · ${money(row.deltaCents)} · hoje ${money(row.todayCents)}`).join("\n");
+  return { title: `${period} · hoje ${money(todayTotal)}`, body };
 }
 
 export function salesPushConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
