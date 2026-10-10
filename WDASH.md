@@ -283,7 +283,7 @@ Pergunta: "Quais são meus 80/20? Estou perdendo venda por ruptura? O que descon
  - `filialIds`: `[]` = rede; `[id]` = uma loja
  - `periodo`: presets `hoje | ontem | 7dias | esteMes | mesPassado | personalizado`
  - `divisao`: `WEPINK | WPINK | null`
-- **`StorePicker`** (`src/pages/dashboard/StorePicker.tsx`) — single-select no Topbar: fantasia + CNPJ, sem ícone (2026-10-10).
+- **`StorePicker`** (`src/pages/dashboard/StorePicker.tsx`) — single-select no Topbar: fantasia + CNPJ, sem ícone (2026-10-10). "Todas as lojas" e "Rede consolidada" em caixa alta, no botão e na lista (2026-10-10).
 - **`Topbar`** — nas telas do produto (exceto equipe de vendas) → `StorePicker`. O campo **Buscar na WDash** saiu do header (2026-10-04), para gestor, gerente e vendedor. Ctrl+K ainda abre a paleta.
 - **`nav-wedash.ts`** — navegação por role (`OWNER` / `MANAGER` / `SELLER` / `ADMIN_GLOBAL`).
 

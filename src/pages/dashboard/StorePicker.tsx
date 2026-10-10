@@ -42,10 +42,10 @@ export function StorePicker({ escopo, onChange, minhas }: { escopo: Scope; onCha
         className="flex h-12 w-full min-w-0 items-center gap-2.5 rounded-[11px] border border-line bg-bg-inset px-3 text-left transition-colors hover:border-acc"
       >
         <div className="min-w-0 flex-1">
-          <p className={cn("truncate text-[13px] font-bold text-t0", filialAtual && "uppercase")}>
+          <p className="truncate text-[13px] font-bold uppercase text-t0">
             {filialAtual ? filialAtual.fantasia : "Todas as lojas"}
           </p>
-          <p className="truncate text-[11px] text-t2">
+          <p className={cn("truncate text-[11px] text-t2", !filialAtual && "uppercase")}>
             {filialAtual ? subtituloLoja(filialAtual) : "Rede consolidada"}
           </p>
         </div>
@@ -65,8 +65,8 @@ export function StorePicker({ escopo, onChange, minhas }: { escopo: Scope; onCha
             )}
           >
             <div className="min-w-0 flex-1">
-              <p className={cn("truncate text-[13px] font-bold", ehTodas ? "text-acc" : "text-t0")}>Todas as lojas</p>
-              <p className="truncate text-[11px] text-t2">Rede consolidada</p>
+              <p className={cn("truncate text-[13px] font-bold uppercase", ehTodas ? "text-acc" : "text-t0")}>Todas as lojas</p>
+              <p className="truncate text-[11px] uppercase text-t2">Rede consolidada</p>
             </div>
             {ehTodas && (
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
