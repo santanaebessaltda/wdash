@@ -11,7 +11,14 @@ describe("formatSalesPush", () => {
       { name: "RUA", deltaCents: 44000 },
     ]);
     expect(text?.title.replaceAll("\u00a0", " ")).toBe("Vendas · R$ 1.240,00");
-    expect(text?.body.replaceAll("\u00a0", " ")).toBe("Últimos 30 min\nCENTRO · R$ 800,00\nRUA · R$ 440,00");
+    expect(text?.body.replaceAll("\u00a0", " ")).toBe(
+      "Total de R$ 1.240,00 nos últimos 30 min\nCENTRO · R$ 800,00\nRUA · R$ 440,00",
+    );
+  });
+
+  it("uma loja diz o valor no texto", () => {
+    const text = formatSalesPush([{ name: "CENTRO", deltaCents: 80000 }]);
+    expect(text?.body.replaceAll("\u00a0", " ")).toBe("CENTRO vendeu R$ 800,00 nos últimos 30 min");
   });
 
   it("não avisa quando o intervalo não teve venda", () => {
