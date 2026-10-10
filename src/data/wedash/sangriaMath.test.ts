@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayAmounts, depositBlock, depositBoleto, emissionDay, nextNote, parseSangriaLista, reaisToCents, sumAmounts } from "./sangriaMath";
+import { clampFalta, dayAmounts, depositBlock, depositBoleto, emissionDay, nextNote, parseSangriaLista, reaisToCents, sumAmounts } from "./sangriaMath";
 
 describe("sangria", () => {
   it("o dia da planilha é a data de DATA_EMISSAO", () => {
@@ -15,7 +15,8 @@ describe("sangria", () => {
     expect(day).toEqual({
       totalCents: 150450,
       boletoCents: 150000,
-      faltandoCents: 450,
+      foraCents: 450,
+      faltaCents: 0,
       motivo: "SANGRIA CANETA 4,50",
     });
   });
@@ -29,9 +30,21 @@ describe("sangria", () => {
     expect(sumAmounts([dayAmounts(lines.filter((l) => l.day === "2026-08-01")), dayAmounts(lines.filter((l) => l.day === "2026-08-02"))])).toMatchObject({
       totalCents: 290450,
       boletoCents: 290000,
-      faltandoCents: 450,
+      foraCents: 450,
+      faltaCents: 0,
     });
     expect(depositBoleto(lines, ["2026-08-01", "2026-08-02"])).toBe(290000);
+  });
+
+  it("a falta sai do boleto e não passa do que iria depositar", () => {
+    const lines = [
+      { day: "2026-08-01", amountCents: 10000, kind: "deposit" as const, note: "" },
+      { day: "2026-08-01", amountCents: 450, kind: "purchase" as const, note: "Caneta" },
+    ];
+    expect(clampFalta(10000, 1500)).toBe(1500);
+    expect(dayAmounts(lines, 1500)).toMatchObject({ boletoCents: 8500, foraCents: 450, faltaCents: 1500, totalCents: 10450 });
+    expect(dayAmounts(lines, 99999)).toMatchObject({ boletoCents: 0, faltaCents: 10000 });
+    expect(depositBoleto(lines, ["2026-08-01"], new Map([["2026-08-01", 1500]]))).toBe(8500);
   });
 
   it("não deposita dia já usado nem intervalo vazio", () => {

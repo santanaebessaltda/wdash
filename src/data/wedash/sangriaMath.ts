@@ -5,7 +5,10 @@ export type SangriaKind = "deposit" | "purchase";
 export type SangriaAmounts = {
   totalCents: number;
   boletoCents: number;
-  faltandoCents: number;
+  /** Compra, premiação, fornecedor ou outro uso. Não entra no boleto. */
+  foraCents: number;
+  /** Dinheiro da sangria que não estava no caixa. Não entra no boleto. */
+  faltaCents: number;
   motivo: string;
 };
 
@@ -17,7 +20,14 @@ export type ParsedSangria = {
   note: string;
 };
 
-const EMPTY: SangriaAmounts = { totalCents: 0, boletoCents: 0, faltandoCents: 0, motivo: "" };
+const EMPTY: SangriaAmounts = { totalCents: 0, boletoCents: 0, foraCents: 0, faltaCents: 0, motivo: "" };
+
+/** A falta não passa do que ainda iria para o boleto. */
+export function clampFalta(baseBoletoCents: number, faltaCents: number): number {
+  if (!Number.isFinite(faltaCents) || faltaCents <= 0) return 0;
+  const base = Math.max(0, baseBoletoCents);
+  return Math.min(Math.round(faltaCents), base);
+}
 
 function asNum(v: unknown): number | null {
   if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -65,19 +75,25 @@ export function parseSangriaLista(payload: unknown): ParsedSangria[] {
   return out;
 }
 
-export function dayAmounts(lines: Array<{ amountCents: number; kind: SangriaKind; note: string }>): SangriaAmounts {
+export function dayAmounts(
+  lines: Array<{ amountCents: number; kind: SangriaKind; note: string }>,
+  faltaCents = 0,
+): SangriaAmounts {
   let totalCents = 0;
-  let boletoCents = 0;
+  let baseCents = 0;
+  let foraCents = 0;
   const motivos: string[] = [];
   for (const line of lines) {
     totalCents += line.amountCents;
     if (line.kind === "purchase") {
+      foraCents += line.amountCents;
       if (line.note.trim()) motivos.push(line.note.trim());
     } else {
-      boletoCents += line.amountCents;
+      baseCents += line.amountCents;
     }
   }
-  return { totalCents, boletoCents, faltandoCents: totalCents - boletoCents, motivo: motivos.join(" · ") };
+  const falta = clampFalta(baseCents, faltaCents);
+  return { totalCents, boletoCents: baseCents - falta, foraCents, faltaCents: falta, motivo: motivos.join(" · ") };
 }
 
 export function sumAmounts(rows: SangriaAmounts[]): SangriaAmounts {
@@ -85,20 +101,29 @@ export function sumAmounts(rows: SangriaAmounts[]): SangriaAmounts {
     (acc, row) => ({
       totalCents: acc.totalCents + row.totalCents,
       boletoCents: acc.boletoCents + row.boletoCents,
-      faltandoCents: acc.faltandoCents + row.faltandoCents,
+      foraCents: acc.foraCents + row.foraCents,
+      faltaCents: acc.faltaCents + row.faltaCents,
       motivo: "",
     }),
     EMPTY,
   );
 }
 
-/** Boleto dos dias marcados. Compra fica de fora. */
+/** Boleto dos dias marcados. Compra e falta ficam de fora. */
 export function depositBoleto(
   lines: Array<{ day: string; amountCents: number; kind: SangriaKind; note: string }>,
   days: string[],
+  faltaByDay: ReadonlyMap<string, number> = new Map(),
 ): number {
   const marked = new Set(days);
-  return dayAmounts(lines.filter((line) => marked.has(line.day))).boletoCents;
+  let cents = 0;
+  for (const day of marked) {
+    cents += dayAmounts(
+      lines.filter((line) => line.day === day),
+      faltaByDay.get(day) ?? 0,
+    ).boletoCents;
+  }
+  return cents;
 }
 
 /** null quando o depósito pode ser feito. */

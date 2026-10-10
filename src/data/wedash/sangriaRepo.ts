@@ -11,16 +11,18 @@ export type SangriaLineRow = {
 
 export type SangriaDepositDay = { day: string; depositId: string };
 
+export type SangriaShortageRow = { day: string; amountCents: number; note: string };
+
 export async function fetchSangriaMonth(
   tenantId: string,
   storeId: string,
   from: string,
   to: string,
-): Promise<{ lines: SangriaLineRow[]; deposits: SangriaDepositDay[] }> {
+): Promise<{ lines: SangriaLineRow[]; deposits: SangriaDepositDay[]; shortages: SangriaShortageRow[] }> {
   const { getSupabase } = await import("@/lib/supabase");
   const sb = getSupabase();
-  if (!sb) return { lines: [], deposits: [] };
-  const [lines, days] = await Promise.all([
+  if (!sb) return { lines: [], deposits: [], shortages: [] };
+  const [lines, days, gaps] = await Promise.all([
     sb
       .from("sangria_line")
       .select("id, day, amount_cents, document, note, kind")
@@ -30,9 +32,17 @@ export async function fetchSangriaMonth(
       .lte("day", to)
       .order("amount_cents", { ascending: false }),
     sb.from("sangria_deposit_day").select("day, deposit_id").eq("tenant_id", tenantId).eq("store_id", storeId).gte("day", from).lte("day", to),
+    sb
+      .from("sangria_shortage")
+      .select("day, amount_cents, note")
+      .eq("tenant_id", tenantId)
+      .eq("store_id", storeId)
+      .gte("day", from)
+      .lte("day", to),
   ]);
   if (lines.error) throw new Error(lines.error.message);
   if (days.error) throw new Error(days.error.message);
+  if (gaps.error) throw new Error(gaps.error.message);
   return {
     lines: (lines.data ?? []).map((row) => ({
       id: String(row.id),
@@ -43,7 +53,34 @@ export async function fetchSangriaMonth(
       kind: row.kind === "purchase" ? "purchase" : "deposit",
     })),
     deposits: (days.data ?? []).map((row) => ({ day: String(row.day).slice(0, 10), depositId: String(row.deposit_id) })),
+    shortages: (gaps.data ?? []).map((row) => ({
+      day: String(row.day).slice(0, 10),
+      amountCents: Number(row.amount_cents) || 0,
+      note: String(row.note ?? ""),
+    })),
   };
+}
+
+export async function saveSangriaShortage(
+  tenantId: string,
+  storeId: string,
+  day: string,
+  amountCents: number,
+  note: string,
+): Promise<void> {
+  const { getSupabase } = await import("@/lib/supabase");
+  const sb = getSupabase();
+  if (!sb) return;
+  if (amountCents <= 0) {
+    const { error } = await sb.from("sangria_shortage").delete().eq("store_id", storeId).eq("day", day);
+    if (error) throw new Error(error.message);
+    return;
+  }
+  const { error } = await sb.from("sangria_shortage").upsert(
+    { tenant_id: tenantId, store_id: storeId, day, amount_cents: amountCents, note },
+    { onConflict: "store_id,day" },
+  );
+  if (error) throw new Error(error.message);
 }
 
 export async function saveSangriaLine(id: string, patch: { kind?: SangriaKind; note?: string }): Promise<void> {
