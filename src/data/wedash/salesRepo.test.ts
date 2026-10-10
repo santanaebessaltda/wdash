@@ -15,6 +15,7 @@ function mockClient(opts: {
   days?: SalesDayAgg[];
   hours?: SalesHourAgg[];
   watermark?: string | null;
+  watermarkError?: string;
 }): SalesQueryClient {
   const days = opts.days ?? [];
   const hours = opts.hours ?? [];
@@ -50,6 +51,7 @@ function mockClient(opts: {
         },
         maybeSingle: async () => {
           if (table === "erp_credential") {
+            if (opts.watermarkError) return { data: null, error: { message: opts.watermarkError } };
             return {
               data: {
                 last_light_sync_at: opts.watermark ?? null,
@@ -232,6 +234,11 @@ describe("salesRepo", () => {
       new Date("2026-09-19T12:00:00.000Z"),
     );
     await expect(fetchSyncWatermark("t1", empty)).resolves.toBeNull();
+  });
+
+  it("rejects when the watermark read fails", async () => {
+    const failed = mockClient({ watermarkError: "jwt" });
+    await expect(fetchSyncWatermark("t1", failed)).rejects.toMatchObject({ message: "jwt" });
   });
 });
 

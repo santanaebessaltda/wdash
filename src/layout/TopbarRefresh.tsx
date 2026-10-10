@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Dropdown, Tooltip, useToast } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { useMediaQuery } from "@/lib/useMediaQuery";
-import { fetchSyncWatermark } from "@/data/wedash/salesRepo";
+import { fetchSyncWatermark, salesChangedSince } from "@/data/wedash/salesRepo";
 import { canForceSyncRefresh, formatForceCooldownLabel } from "@/data/wedash/syncUi";
 import { AUTO_REFRESH_MIN, nextAutoRefreshAt, storePhase } from "@/data/wedash/autoRefresh";
 import { lastUpdatedLines } from "@/pages/dashboard/LastUpdated";
@@ -11,6 +11,7 @@ import { storesForSession } from "@/data/wedash/stores";
 import { useActiveSession } from "@/session/SessionProvider";
 import { readScreenRefresh, useScreenRefreshGeneration } from "@/pages/dashboard/screenRefresh";
 import { SALES_SYNCED_EVENT, useForceRefresh } from "@/pages/dashboard/useForceRefresh";
+import { CHECK_SALES_EVENT, salesChanged, shouldRefreshScreen, watermarkAfterRead } from "@/push/resumeSales";
 const WATERMARK_POLL_MS = 60_000;
 /** Loja aberta sem busca das vendas ha mais que isso (2 rodadas automaticas) = dado atrasado. */
 const STALE_OPEN_MS = 2 * AUTO_REFRESH_MIN * 60_000;
@@ -19,7 +20,7 @@ const STALE_OPEN_MS = 2 * AUTO_REFRESH_MIN * 60_000;
  * Atualizar global (Topbar). Sem tela registrada: FORCE de hoje na loja do StorePicker.
  * Tela registrada (`useScreenRefresh`): busca só o que aquela tela mostra; o tooltip é o dela.
  * Ao terminar um FORCE de vendas dispara `SALES_SYNCED_EVENT` — a tela aberta recarrega os próprios dados.
- * Rodada automatica que terminou (watermark avancou no poll) dispara o mesmo evento.
+ * Rodada automatica que terminou (watermark avancou no poll, ao voltar ou pelo aviso) dispara o mesmo evento.
  * Tooltip = horario da ultima busca das vendas de hoje + proxima rodada; bolinha amarela =
  * vendas de hoje ainda nao buscadas ou busca atrasada com loja aberta.
  */
@@ -37,8 +38,8 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
   const [telaBusy, setTelaBusy] = useState(false);
 
   const loadWatermark = useCallback(
-    async (notifyIfNewer: boolean) => {
-      if (!pode) return;
+    async (notifyIfNewer: boolean): Promise<boolean> => {
+      if (!pode) return false;
       try {
         const [wm, st, lastAuto] = await Promise.all([
           fetchSyncWatermark(session.tenantId),
@@ -46,16 +47,23 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
           fetchLastAutoRefreshAt(session.tenantId),
         ]);
         const prev = lastWatermark.current;
-        lastWatermark.current = wm?.getTime() ?? null;
+        const stored = watermarkAfterRead(prev, wm);
+        let changed: boolean | null = null;
+        if (notifyIfNewer && salesChanged(prev, stored)) {
+          changed = await salesChangedSince(session.tenantId, new Date(prev as number).toISOString());
+        }
+        lastWatermark.current = stored;
         setErp(st);
         setLastAutoAt(lastAuto);
-        setWatermark(wm);
+        setWatermark(stored != null ? new Date(stored) : null);
         setLoaded(true);
-        if (notifyIfNewer && prev != null && wm && wm.getTime() > prev) {
+        if (shouldRefreshScreen(prev, stored, changed)) {
           window.dispatchEvent(new Event(SALES_SYNCED_EVENT));
         }
+        return true;
       } catch (e) {
         console.warn("TopbarRefresh watermark:", e);
+        return false;
       }
     },
     [session.tenantId, pode],
@@ -64,17 +72,41 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
   useEffect(() => {
     void loadWatermark(false);
     const id = window.setInterval(() => void loadWatermark(true), WATERMARK_POLL_MS);
-    // PWA em segundo plano congela o intervalo: ao voltar, confere na hora se houve rodada nova.
-    const onVisible = () => {
-      if (document.visibilityState === "visible") void loadWatermark(true);
+    // PWA em segundo plano congela o intervalo. No iPhone, abrir pelo aviso
+    // muitas vezes não muda visibilityState: pageshow e focus cobrem isso.
+    // Leitura que falha tenta de novo — senão a marca some e a tela não recarrega.
+    let cancel = false;
+    let resumeTimer = 0;
+    let retryTimer = 0;
+    const onResume = () => {
+      if (document.visibilityState === "hidden") return;
+      window.clearTimeout(resumeTimer);
+      resumeTimer = window.setTimeout(() => {
+        void loadWatermark(true).then((ok) => {
+          if (cancel || ok || document.visibilityState !== "visible") return;
+          window.clearTimeout(retryTimer);
+          retryTimer = window.setTimeout(() => void loadWatermark(true), 1500);
+        });
+      }, 200);
     };
-    const onOnline = () => void loadWatermark(true);
-    document.addEventListener("visibilitychange", onVisible);
-    window.addEventListener("online", onOnline);
+    const onSynced = () => void loadWatermark(false);
+    document.addEventListener("visibilitychange", onResume);
+    window.addEventListener("pageshow", onResume);
+    window.addEventListener("focus", onResume);
+    window.addEventListener("online", onResume);
+    window.addEventListener(CHECK_SALES_EVENT, onResume);
+    window.addEventListener(SALES_SYNCED_EVENT, onSynced);
     return () => {
+      cancel = true;
       window.clearInterval(id);
-      document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener("online", onOnline);
+      window.clearTimeout(resumeTimer);
+      window.clearTimeout(retryTimer);
+      document.removeEventListener("visibilitychange", onResume);
+      window.removeEventListener("pageshow", onResume);
+      window.removeEventListener("focus", onResume);
+      window.removeEventListener("online", onResume);
+      window.removeEventListener(CHECK_SALES_EVENT, onResume);
+      window.removeEventListener(SALES_SYNCED_EVENT, onSynced);
     };
   }, [loadWatermark]);
 

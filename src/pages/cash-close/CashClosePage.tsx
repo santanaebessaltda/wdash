@@ -520,9 +520,11 @@ export function CashClosePage() {
 
   useEffect(() => {
     let stop = false;
-    void fetchSyncWatermark(session.tenantId).then((wm) => {
-      if (!stop) setWatermark(wm);
-    });
+    void fetchSyncWatermark(session.tenantId)
+      .catch(() => null)
+      .then((wm) => {
+        if (!stop) setWatermark(wm);
+      });
     return () => {
       stop = true;
     };

@@ -256,7 +256,7 @@ export default function OverviewPage() {
           from: periodo.inicio,
           to: periodo.fim,
         }),
-        fetchSyncWatermark(session.tenantId),
+        fetchSyncWatermark(session.tenantId).catch(() => null),
         fetchSalesCoverage(session.tenantId, escopo.filialIds),
         fetchSalesDayAggs({
           tenantId: session.tenantId,

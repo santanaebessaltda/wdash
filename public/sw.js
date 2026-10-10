@@ -4,7 +4,7 @@
    aponta para pacotes que não existem mais. O cache serve só para abrir
    offline e para os arquivos com hash no nome. Nunca cacheia resposta de erro
    (404 de chunk antigo depois de deploy). */
-const VERSAO = "v10";
+const VERSAO = "v11";
 const CACHE = `wedash-${VERSAO}`;
 // Escopo do SW (= base do app). Em dominio proprio fica "/".
 const BASE = self.registration.scope;
@@ -33,24 +33,76 @@ self.addEventListener("push", (event) => {
   } catch {
     /* payload vazio: mostra o texto padrão */
   }
+  const opcoes = {
+    body: data.body,
+    icon: new URL("icons/icon-192.png", BASE).href,
+    // A mesma tag troca o resumo anterior e volta a avisar. Sem isso o iPhone
+    // às vezes engole o seguinte depois que o app foi aberto pelo primeiro.
+    tag: data.tag || "wdash-" + Date.now(),
+    renotify: true,
+    data: { url: data.url || "/" },
+  };
   event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: new URL("icons/icon-192.png", BASE).href,
-      data: { url: data.url || "/" },
-    }),
+    self.registration.showNotification(data.title, opcoes).catch(() =>
+      self.registration.showNotification(data.title, {
+        body: opcoes.body,
+        icon: opcoes.icon,
+        data: opcoes.data,
+      }),
+    ),
   );
 });
 
 self.addEventListener("notificationclick", (event) => {
-  event.notification.close();
   const url = new URL(event.notification.data?.url || "/", BASE).href;
+  // Mesmo texto de NOTIFICATION_OPEN em src/push/resumeSales.ts.
+  const aviso = { type: "wedash:notification-open" };
   event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((janelas) => {
-      const aberta = janelas.find((janela) => janela.url.startsWith(BASE));
-      if (aberta) return aberta.focus();
-      return self.clients.openWindow(url);
-    }),
+    (async () => {
+      try {
+        const janelas = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+        const aberta = janelas.find((janela) => janela.url.startsWith(BASE));
+        if (aberta) {
+          // Só o focus deixa o PWA com o número de antes da rodada: em segundo
+          // plano o timer congela e, no iPhone, voltar pelo aviso não dispara
+          // visibilitychange. A página escuta esta mensagem e busca de novo.
+          await aberta.focus();
+          try {
+            aberta.postMessage(aviso);
+          } catch {
+            /* a página também confere ao voltar */
+          }
+        } else {
+          const nova = await self.clients.openWindow(url);
+          try {
+            nova?.postMessage(aviso);
+          } catch {
+            /* página nova já busca ao abrir */
+          }
+        }
+      } finally {
+        // Fechar antes do focus mata o service worker no iPhone.
+        event.notification.close();
+      }
+    })(),
+  );
+});
+
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(
+    (async () => {
+      try {
+        const antiga = event.oldSubscription;
+        const nova =
+          event.newSubscription ||
+          (await self.registration.pushManager.subscribe(antiga ? antiga.options : { userVisibleOnly: true }));
+        const janelas = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+        const troca = { type: "wedash:push-subscription", subscription: nova.toJSON() };
+        for (const janela of janelas) janela.postMessage(troca);
+      } catch {
+        /* a página cria outra inscrição ao abrir */
+      }
+    })(),
   );
 });
 

@@ -10,6 +10,7 @@ import { fetchThemePreference, saveThemePreference, touchLastSeen } from "@/sess
 import { installPrintMode } from "@/lib/printMode";
 import { storedThemePreference, useTheme } from "@/theme/ThemeProvider";
 import { PushRecover } from "@/push/PushRecover";
+import { isNotificationOpen, reloadSalesAfterOpen } from "@/push/resumeSales";
 
 /** O banco so grava 1x a cada 5 min; aqui so evita chamadas a toa. */
 const LAST_SEEN_INTERVAL_MS = 5 * 60_000;
@@ -76,6 +77,16 @@ export function AppShell() {
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", touch);
     };
+  }, []);
+
+  // Toque no aviso com o app já aberto: confere se algum número mudou. Sem mudança, a tela fica.
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    const onMessage = (event: MessageEvent) => {
+      if (isNotificationOpen(event.data)) reloadSalesAfterOpen();
+    };
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () => navigator.serviceWorker.removeEventListener("message", onMessage);
   }, []);
 
   return (

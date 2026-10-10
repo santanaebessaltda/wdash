@@ -103,13 +103,18 @@ function useLazyTeamData(escopo: Scope, tenantId: string | undefined, enabled: b
   }, [escopo, tenantId]);
 
   useEffect(() => {
+    if (!enabled || !tenantId) return;
     const onSynced = () => {
-      gen.current++;
-      setData(null);
+      const g = ++gen.current;
+      fetchTeamAggInput(tenantId, escopo)
+        .then((d) => {
+          if (g === gen.current) setData(d);
+        })
+        .catch((e) => console.error("Team member detail load:", e));
     };
     window.addEventListener(SALES_SYNCED_EVENT, onSynced);
     return () => window.removeEventListener(SALES_SYNCED_EVENT, onSynced);
-  }, []);
+  }, [enabled, tenantId, escopo]);
 
   useEffect(() => {
     if (!enabled || !tenantId || data) return;

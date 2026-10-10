@@ -197,13 +197,18 @@ function useLazyProductsData(escopo: Scope, tenantId: string | undefined, enable
   }, [escopo, tenantId]);
 
   useEffect(() => {
+    if (!enabled || !tenantId) return;
     const onSynced = () => {
-      gen.current++;
-      setData(null);
+      const g = ++gen.current;
+      fetchProductsAggInput(tenantId, escopo)
+        .then((aggs) => {
+          if (g === gen.current) setData({ aggs, view: buildProductsView(escopo, aggs) });
+        })
+        .catch((e) => console.error("Product detail load:", e));
     };
     window.addEventListener(SALES_SYNCED_EVENT, onSynced);
     return () => window.removeEventListener(SALES_SYNCED_EVENT, onSynced);
-  }, []);
+  }, [enabled, tenantId, escopo]);
 
   useEffect(() => {
     if (!enabled || !tenantId || data) return;

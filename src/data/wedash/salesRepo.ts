@@ -704,7 +704,7 @@ export async function fetchSyncWatermark(
 
   if (error) {
     console.warn("fetchSyncWatermark:", error.message ?? error);
-    return null;
+    throw error;
   }
   const row = data as {
     last_light_sync_at?: string | null;
@@ -714,6 +714,29 @@ export async function fetchSyncWatermark(
   if (!raw) return null;
   const d = new Date(raw);
   return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * `true` se alguma rodada concluída desde `sinceIso` mudou venda.
+ * `false` se todas foram sem venda nova. `null` se a leitura falhou.
+ */
+export async function salesChangedSince(tenantId: string, sinceIso: string): Promise<boolean | null> {
+  const client = clientOrNull();
+  if (!client) return null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (client.from("sync_job") as any)
+    .select("payload")
+    .eq("tenant_id", tenantId)
+    .eq("status", "SUCCEEDED")
+    .gt("finished_at", sinceIso)
+    .limit(40);
+  if (error) {
+    console.warn("salesChangedSince:", error.message ?? error);
+    return null;
+  }
+  const rows = (data ?? []) as { payload?: { noSalesChange?: boolean } | null }[];
+  if (rows.length === 0) return true;
+  return rows.some((row) => row.payload?.noSalesChange !== true);
 }
 
 export async function requestForceRefresh(opts: {

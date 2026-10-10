@@ -12,24 +12,24 @@ describe("formatSalesPush", () => {
     expect(plain(text?.body)).toBe("CENTRO · R$ 2.000,00 hoje");
   });
 
-  it("várias lojas e só uma vendeu agora: a loja do intervalo e o dia de todo o acesso", () => {
+  it("várias lojas e só uma vendeu agora: o dia de cada loja, da maior para a menor", () => {
     const text = formatSalesPush([
       { name: "CENTRO", deltaCents: 50000, todayCents: 250000 },
       { name: "RUA", deltaCents: 0, todayCents: 300000 },
       { name: "SHOPPING", deltaCents: 0, todayCents: 235000 },
     ]);
     expect(plain(text?.title)).toBe("R$ 500,00 nos últimos 30 min");
-    expect(plain(text?.body)).toBe("CENTRO · R$ 500,00\nHoje nas suas lojas · R$ 7.850,00");
+    expect(plain(text?.body)).toBe("Hoje nas suas lojas · R$ 7.850,00\nRUA · R$ 3.000,00\nCENTRO · R$ 2.500,00\nSHOPPING · R$ 2.350,00");
   });
 
-  it("várias lojas no intervalo: o dia primeiro, depois cada loja, sem a que não vendeu agora", () => {
+  it("várias lojas: o dia primeiro e o acumulado de cada uma, inclusive a que não vendeu agora", () => {
     const text = formatSalesPush([
       { name: "CENTRO", deltaCents: 80000, todayCents: 400000 },
       { name: "SHOPPING", deltaCents: 0, todayCents: 200000 },
       { name: "RUA", deltaCents: 44000, todayCents: 275000 },
     ]);
     expect(plain(text?.title)).toBe("R$ 1.240,00 nos últimos 30 min");
-    expect(plain(text?.body)).toBe("Hoje nas suas lojas · R$ 8.750,00\nCENTRO · R$ 800,00\nRUA · R$ 440,00");
+    expect(plain(text?.body)).toBe("Hoje nas suas lojas · R$ 8.750,00\nCENTRO · R$ 4.000,00\nRUA · R$ 2.750,00\nSHOPPING · R$ 2.000,00");
   });
 
   it("corta a lista e diz quantas lojas ficaram de fora", () => {
@@ -47,8 +47,14 @@ describe("formatSalesPush", () => {
     );
   });
 
-  it("não avisa quando o intervalo não teve venda", () => {
-    expect(formatSalesPush([{ name: "CENTRO", deltaCents: 0, todayCents: 200000 }])).toBeNull();
+  it("sem venda nova ainda resume cada loja", () => {
+    const text = formatSalesPush([{ name: "CENTRO", deltaCents: 0, todayCents: 200000 }]);
+    expect(plain(text?.title)).toBe("Sem vendas nos últimos 30 min");
+    expect(plain(text?.body)).toBe("CENTRO · R$ 2.000,00 hoje");
+  });
+
+  it("sem loja não há texto", () => {
+    expect(formatSalesPush([])).toBeNull();
   });
 });
 

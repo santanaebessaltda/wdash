@@ -1,7 +1,7 @@
 /**
  * Texto do push da rodada automática e o envio Web Push.
- * O título é o que entrou nos últimos 30 min. O texto traz o acumulado de hoje
- * de todas as lojas do acesso (marca ALL), não só das que venderam nesse intervalo.
+ * O título é o que entrou nos últimos 30 min (ou "sem vendas"). O texto lista
+ * cada loja do acesso com o acumulado de hoje (marca ALL), com ou sem venda nova.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { localClock } from "./autoRefresh.ts";
@@ -43,25 +43,23 @@ function fitStoreLines(header: string, storeLines: string[]): string {
   return [header, moreStores(rest)].join("\n");
 }
 
-/** `null` quando não houve venda nova no intervalo. `rows` é o acesso inteiro, inclusive loja sem venda nova. */
+/**
+ * Resumo da rodada. `null` só sem loja no acesso.
+ * Com venda nova, o título é o total do intervalo. Sem venda, o título avisa isso.
+ * O texto lista cada loja do acesso com o acumulado de hoje.
+ */
 export function formatSalesPush(rows: SalesPushRow[]): { title: string; body: string } | null {
-  const sold = rows
-    .filter((row) => row.deltaCents > 0)
-    .sort((a, b) => b.deltaCents - a.deltaCents || a.name.localeCompare(b.name, "pt-BR"));
-  const deltaTotal = sold.reduce((sum, row) => sum + row.deltaCents, 0);
-  if (deltaTotal <= 0) return null;
+  if (rows.length === 0) return null;
+  const deltaTotal = rows.reduce((sum, row) => sum + Math.max(0, row.deltaCents), 0);
   const todayTotal = rows.reduce((sum, row) => sum + row.todayCents, 0);
-  const title = `${money(deltaTotal)} nos últimos 30 min`;
+  const title = deltaTotal > 0 ? `${money(deltaTotal)} nos últimos 30 min` : "Sem vendas nos últimos 30 min";
+  const ordered = [...rows].sort((a, b) => b.todayCents - a.todayCents || a.name.localeCompare(b.name, "pt-BR"));
   if (rows.length === 1) {
-    const only = rows[0]!;
+    const only = ordered[0]!;
     return { title, body: `${only.name} · ${money(only.todayCents)} hoje` };
   }
-  if (sold.length === 1) {
-    const only = sold[0]!;
-    return { title, body: `${only.name} · ${money(only.deltaCents)}\nHoje nas suas lojas · ${money(todayTotal)}` };
-  }
   const header = `Hoje nas suas lojas · ${money(todayTotal)}`;
-  const storeLines = sold.map((row) => `${row.name} · ${money(row.deltaCents)}`);
+  const storeLines = ordered.map((row) => `${row.name} · ${money(row.todayCents)}`);
   return { title, body: fitStoreLines(header, storeLines) };
 }
 
@@ -123,7 +121,13 @@ function prefsOf(row: Record<string, unknown> | undefined): PushPrefs {
 }
 
 type Audience = {
-  webpush: { sendNotification: (sub: { endpoint: string; keys: { p256dh: string; auth: string } }, payload: string) => Promise<unknown> };
+  webpush: {
+    sendNotification: (
+      sub: { endpoint: string; keys: { p256dh: string; auth: string } },
+      payload: string,
+      options?: { TTL?: number; urgency?: "very-low" | "low" | "normal" | "high" },
+    ) => Promise<unknown>;
+  };
   allowed: Map<string, Set<string> | null>;
   prefs: Map<string, PushPrefs>;
   subs: Array<{ id: string; auth_user_id: string; endpoint: string; p256dh: string; auth: string }>;
@@ -176,17 +180,23 @@ async function deliver(
   userId: string,
   text: { title: string; body: string },
   url: string,
+  tag?: string,
 ): Promise<void> {
   for (const sub of audience.subs) {
     if (sub.auth_user_id !== userId) continue;
     try {
       await audience.webpush.sendNotification(
         { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-        JSON.stringify({ title: text.title, body: text.body, url }),
+        JSON.stringify({ title: text.title, body: text.body, url, ...(tag ? { tag } : {}) }),
+        // high: o iPhone entrega na hora, com o app aberto ou fechado.
+        { TTL: 2 * 60 * 60, urgency: "high" },
       );
     } catch (e) {
       const status = (e as { statusCode?: number }).statusCode;
       if (status === 404 || status === 410) {
+        // Abrir o app pelo aviso invalida a inscrição no iPhone. Sem este aviso
+        // a rodada seguinte parece que não rodou: a linha some e ninguém fica inscrito.
+        console.warn("  AVISO push: inscrição do aparelho expirou e foi removida");
         await sb.from("push_subscription").delete().eq("id", sub.id);
       } else {
         console.warn(`  AVISO push não foi enviado: ${e instanceof Error ? e.message : String(e)}`);
@@ -259,6 +269,10 @@ export async function notifyAutoSales(
 ): Promise<void> {
   const audience = await loadAudience(sb, args.tenantId);
   if (!audience) return;
+  if (audience.subs.length === 0) {
+    console.warn("  AVISO push: nenhum aparelho inscrito");
+    return;
+  }
   let others: Array<{ id: string; name: string; todayCents: number }> = [];
   try {
     others = await loadOtherStoresToday(sb, args.tenantId, args.stores);
@@ -285,8 +299,13 @@ export async function notifyAutoSales(
       })),
     ];
     if (rows.length === 0) continue;
-    const sold = formatSalesPush(rows);
-    if (sold && wants(audience, userId, "sales")) await deliver(sb, audience, userId, sold, "/");
-    else if (!sold && wants(audience, userId, "quiet")) await deliver(sb, audience, userId, formatQuietSalesPush(), "/");
+    const text = formatSalesPush(rows);
+    if (!text) continue;
+    const comVenda = rows.some((row) => row.deltaCents > 0);
+    // Vendas ligado (padrão) manda o resumo em toda rodada, com ou sem venda nova.
+    // "Sem venda" sozinho continua valendo para quem desligou o resumo e deixou só esse aviso.
+    if (wants(audience, userId, "sales") || (!comVenda && wants(audience, userId, "quiet"))) {
+      await deliver(sb, audience, userId, text, "/", "wdash-sales");
+    }
   }
 }
