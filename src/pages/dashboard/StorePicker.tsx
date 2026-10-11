@@ -39,13 +39,13 @@ export function StorePicker({ escopo, onChange, minhas }: { escopo: Scope; onCha
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex h-12 w-full min-w-0 items-center gap-2.5 rounded-[11px] border border-line bg-bg-inset px-3 text-left transition-colors hover:border-acc"
+        className="flex h-9 w-full min-w-0 items-center gap-2 rounded-[10px] border border-line bg-bg-inset px-2.5 text-left transition-colors hover:border-acc"
       >
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] font-bold uppercase text-t0">
+        <div className="min-w-0 flex-1 leading-none">
+          <p className="truncate text-[12px] font-bold uppercase leading-tight text-t0">
             {filialAtual ? filialAtual.fantasia : "Todas as filiais"}
           </p>
-          <p className={cn("truncate text-[11px] text-t2", !filialAtual && "uppercase")}>
+          <p className={cn("truncate text-[10px] leading-tight text-t2", !filialAtual && "uppercase")}>
             {filialAtual ? subtituloLoja(filialAtual) : "Rede consolidada"}
           </p>
         </div>
