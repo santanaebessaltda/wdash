@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyCashReview,
   applyCloseReview,
+  assembleMonthMarks,
   buildCashCloseView,
   captureBucket,
   cashCloseChips,
@@ -238,6 +239,33 @@ describe("resumo do fechamento", () => {
       pixRequested: false,
     });
     expect(dayWithoutReal(comArquivo.lines)).toBe(false);
+    const dia09 = assembleMonthMarks({
+      millennium: [
+        { storeId: "loja", day: "2026-10-09", paymentMethod: "DINHEIRO", openingCents: 22750, sangriaCents: -90000, closingCents: 25560, typedCents: 29600 },
+        { storeId: "loja", day: "2026-10-09T00:00:00", paymentMethod: "CARTÃO DÉBITO", openingCents: 0, sangriaCents: null, closingCents: 604121, typedCents: 605521 },
+        { storeId: "loja", day: "2026-10-09", paymentMethod: "CARTÃO CRÉDITO", openingCents: 0, sangriaCents: null, closingCents: 1401680, typedCents: 1404080 },
+        { storeId: "loja", day: "2026-10-09", paymentMethod: "PIX", openingCents: 0, sangriaCents: null, closingCents: 631650, typedCents: 640340 },
+      ],
+      files: [
+        { storeId: "loja", day: "2026-10-09", kind: "card", status: "received" },
+        { storeId: "loja", day: "2026-10-09T00:00:00", kind: "pix", status: "received" },
+      ],
+      captures: [
+        { storeId: "loja", day: "2026-10-09T00:00:00", accountType: 1, paymentMethod: "Débito", capturedCents: 605521 },
+        { storeId: "loja", day: "2026-10-09", accountType: 2, paymentMethod: "Crédito", capturedCents: 1404080 },
+      ],
+      pix: [{ storeId: "loja", day: "2026-10-09", status: "paid", paidCents: 629150 }],
+    });
+    expect(dia09).toHaveLength(1);
+    expect(dia09[0]?.day).toBe("2026-10-09");
+    const linhas09 = buildCashCloseView({
+      millennium: dia09[0]!.millennium,
+      card: dia09[0]!.card,
+      pixCents: dia09[0]!.pixCents,
+      pixRequested: dia09[0]!.pixRequested,
+    }).lines;
+    expect(dayWithoutReal(linhas09)).toBe(false);
+    expect(closeDayGap(linhas09).diffCents).toBe(5340);
     expect(
       monthCloseSummary([
         { day: "2026-10-01", diffCents: -1000, pending: true },

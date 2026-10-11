@@ -619,9 +619,19 @@ export function CashClosePage() {
     const key = `${storeKey}|${diaAberto}|${reloadKey}`;
     void Promise.all(lojas.map((loja) => fetchCashCloseSnapshot(session.tenantId, loja.id, diaAberto).then((snap) => [loja.id, snap] as const)))
       .then((rows) => {
-        if (cancelled) return;
+        if (cancelled || !diaAberto) return;
         setDias(Object.fromEntries(rows));
         setDiaKey(key);
+        setMarks((atual) => {
+          const next = atual.map((mark) => ({ ...mark }));
+          for (const [storeId, snap] of rows) {
+            const i = next.findIndex((mark) => mark.storeId === storeId && mark.day.slice(0, 10) === diaAberto);
+            const mark = { storeId, day: diaAberto, snap, cardPending: snap.cardPending };
+            if (i >= 0) next[i] = mark;
+            else next.push(mark);
+          }
+          return next;
+        });
       })
       .catch(() => {
         if (!cancelled) setErro(true);
@@ -636,7 +646,8 @@ export function CashClosePage() {
     const porDia = new Map<string, { systemCents: number; realCents: number; diffCents: number; hasMillennium: boolean; hasLines: boolean; pending: boolean }>();
     const rows: Array<{ day: string; diffCents: number; pending: boolean }> = [];
     for (const mark of marks) {
-      const review = reviews.find((r) => r.storeId === mark.storeId && r.day === mark.day) ?? null;
+      const day = mark.day.slice(0, 10);
+      const review = reviews.find((r) => r.storeId === mark.storeId && r.day.slice(0, 10) === day) ?? null;
       const view = buildCashCloseView(mark.snap);
       const lines = applyCloseReview(view.lines, review, {
         cardPending: mark.cardPending,
@@ -644,21 +655,21 @@ export function CashClosePage() {
       });
       const gap = closeDayGap(lines);
       const semReal = dayWithoutReal(lines);
-      if (mark.day < hoje) {
+      if (day < hoje) {
         rows.push({
-          day: mark.day,
+          day,
           diffCents: gap.diffCents,
           pending: semReal,
         });
       }
-      const atual = porDia.get(mark.day) ?? { systemCents: 0, realCents: 0, diffCents: 0, hasMillennium: false, hasLines: false, pending: false };
+      const atual = porDia.get(day) ?? { systemCents: 0, realCents: 0, diffCents: 0, hasMillennium: false, hasLines: false, pending: false };
       atual.systemCents += gap.systemCents;
       atual.realCents += gap.realCents;
       atual.diffCents += gap.diffCents;
       atual.hasMillennium = atual.hasMillennium || mark.snap.millennium.length > 0;
       atual.hasLines = atual.hasLines || lines.length > 0;
       atual.pending = atual.pending || semReal;
-      porDia.set(mark.day, atual);
+      porDia.set(day, atual);
     }
     return { resumo: monthCloseSummary(rows), porDia };
   }, [marks, reviews, marksKey, faixaKey, hoje]);

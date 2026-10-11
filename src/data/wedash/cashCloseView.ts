@@ -327,3 +327,121 @@ export function buildCashCloseView(input: {
   const lines = ORDER.filter((key) => acc.has(key)).map((key) => acc.get(key)!);
   return { lines, pixPending: input.pixRequested && input.pixCents == null };
 }
+
+/** "2026-10-09" e "2026-10-09T00:00:00" caem na mesma célula. */
+export function closeDayKey(value: string): string {
+  return value.slice(0, 10);
+}
+
+export type MonthMarkMillRow = {
+  storeId: string;
+  day: string;
+  paymentMethod: string;
+  openingCents: number;
+  sangriaCents: number | null;
+  closingCents: number;
+  typedCents: number;
+};
+
+export type MonthMarkFileRow = { storeId: string; day: string; kind: string; status: string };
+
+export type MonthMarkCaptureRow = {
+  storeId: string;
+  day: string;
+  accountType: number | null;
+  paymentMethod: string;
+  capturedCents: number;
+};
+
+export type MonthMarkPixRow = { storeId: string; day: string; status: string; paidCents: number };
+
+export type MonthCloseMark = {
+  storeId: string;
+  day: string;
+  millennium: CashCloseMillLine[];
+  card: { creditCents: number; debitCents: number; otherCents: number } | null;
+  pixCents: number | null;
+  pixRequested: boolean;
+  cardPending: boolean;
+};
+
+/** Um fechamento por loja e dia. Cartão e Pix recebidos entram mesmo quando a soma é zero. */
+export function assembleMonthMarks(input: {
+  millennium: MonthMarkMillRow[];
+  files: MonthMarkFileRow[];
+  captures: MonthMarkCaptureRow[];
+  pix: MonthMarkPixRow[];
+}): MonthCloseMark[] {
+  const byKey = new Map<string, MonthCloseMark>();
+  const slot = (storeId: string, dayRaw: string): MonthCloseMark => {
+    const day = closeDayKey(dayRaw);
+    const key = `${storeId}|${day}`;
+    const cur = byKey.get(key);
+    if (cur) return cur;
+    const created: MonthCloseMark = {
+      storeId,
+      day,
+      millennium: [],
+      card: null,
+      pixCents: null,
+      pixRequested: false,
+      cardPending: false,
+    };
+    byKey.set(key, created);
+    return created;
+  };
+  for (const row of input.millennium) {
+    slot(row.storeId, row.day).millennium.push({
+      paymentMethod: row.paymentMethod,
+      openingCents: row.openingCents,
+      sangriaCents: row.sangriaCents,
+      closingCents: row.closingCents,
+      typedCents: row.typedCents,
+    });
+  }
+  const pixReceived = new Set<string>();
+  const cardReceived = new Set<string>();
+  for (const row of input.files) {
+    const mark = slot(row.storeId, row.day);
+    const key = `${mark.storeId}|${mark.day}`;
+    if (row.kind === "pix" && row.status === "requested") mark.pixRequested = true;
+    if (row.kind === "pix" && row.status === "received") pixReceived.add(key);
+    if (row.kind === "card" && row.status === "requested") mark.cardPending = true;
+    if (row.kind === "card" && row.status === "received") cardReceived.add(key);
+  }
+  const pixRows = new Map<string, Array<{ status: string; paidCents: number }>>();
+  for (const row of input.pix) {
+    const mark = slot(row.storeId, row.day);
+    const key = `${mark.storeId}|${mark.day}`;
+    const list = pixRows.get(key) ?? [];
+    list.push({ status: row.status, paidCents: row.paidCents });
+    pixRows.set(key, list);
+  }
+  for (const key of pixReceived) {
+    const [storeId, day] = key.split("|");
+    if (!storeId || !day) continue;
+    slot(storeId, day).pixCents = paidPixCents(pixRows.get(key) ?? []);
+  }
+  const cards = new Map<string, { creditCents: number; debitCents: number; otherCents: number }>();
+  for (const row of input.captures) {
+    const mark = slot(row.storeId, row.day);
+    const key = `${mark.storeId}|${mark.day}`;
+    const card = cards.get(key) ?? { creditCents: 0, debitCents: 0, otherCents: 0 };
+    const bucket = captureBucket(row.accountType, row.paymentMethod);
+    if (bucket === "credit") card.creditCents += row.capturedCents;
+    else if (bucket === "debit") card.debitCents += row.capturedCents;
+    else if (bucket !== "pix") card.otherCents += row.capturedCents;
+    cards.set(key, card);
+  }
+  for (const [key, card] of cards) {
+    const [storeId, day] = key.split("|");
+    if (!storeId || !day) continue;
+    slot(storeId, day).card = card;
+  }
+  for (const key of cardReceived) {
+    const [storeId, day] = key.split("|");
+    if (!storeId || !day || cards.has(key)) continue;
+    slot(storeId, day).card = { creditCents: 0, debitCents: 0, otherCents: 0 };
+  }
+  return [...byKey.values()];
+}

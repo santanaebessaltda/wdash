@@ -1,7 +1,7 @@
 import { calendarTodayIso } from "./clock";
 import { shiftName } from "./engine/format";
 import { cashCloseJobMatches, monthCloseSpanFor, navMonthFloor, sangriaMonthSpan, type CashCloseJobPart } from "./cashCloseMonth";
-import { captureBucket, paidPixCents, type CashCloseBucket, type CashCloseMillLine, type CloseAmountMap } from "./cashCloseView";
+import { assembleMonthMarks, captureBucket, paidPixCents, type CashCloseBucket, type CashCloseMillLine, type CloseAmountMap } from "./cashCloseView";
 
 export type CashCloseSnapshot = {
   millennium: CashCloseMillLine[];
@@ -122,6 +122,22 @@ export type CashCloseDayMark = {
   cardPending: boolean;
 };
 
+const PAGE_SIZE = 1000;
+
+/** PostgREST devolve no máximo 1000 linhas. `.limit` maior não passa disso. */
+async function eachPage<T>(query: {
+  range: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>;
+}): Promise<T[]> {
+  const out: T[] = [];
+  for (let offset = 0; ; offset += PAGE_SIZE) {
+    const { data, error } = await query.range(offset, offset + PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    const rows = data ?? [];
+    out.push(...rows);
+    if (rows.length < PAGE_SIZE) return out;
+  }
+}
+
 /** Fechamentos do intervalo, um por loja e dia, com o total da adquirente para o calendário. */
 export async function fetchCashCloseMonthMarks(
   tenantId: string,
@@ -132,100 +148,89 @@ export async function fetchCashCloseMonthMarks(
   const { getSupabase } = await import("@/lib/supabase");
   const sb = getSupabase();
   if (!sb || storeIds.length === 0 || from > to) return [];
+  const millQuery = sb
+    .from("cash_close_day")
+    .select("store_id, day, payment_method, opening_cents, sangria_cents, closing_cents, typed_cents")
+    .eq("tenant_id", tenantId)
+    .in("store_id", storeIds)
+    .gte("day", from)
+    .lte("day", to)
+    .order("day", { ascending: true })
+    .order("payment_method", { ascending: true });
+  const fileQuery = sb
+    .from("stone_day_file")
+    .select("store_id, day, kind, status")
+    .eq("tenant_id", tenantId)
+    .in("store_id", storeIds)
+    .gte("day", from)
+    .lte("day", to)
+    .order("day", { ascending: true })
+    .order("kind", { ascending: true });
+  const captureQuery = sb
+    .from("stone_capture")
+    .select("store_id, day, account_type, payment_method, captured_cents")
+    .eq("tenant_id", tenantId)
+    .in("store_id", storeIds)
+    .gte("day", from)
+    .lte("day", to)
+    .order("day", { ascending: true })
+    .order("acquirer_key", { ascending: true });
+  const pixQuery = sb
+    .from("stone_pix")
+    .select("store_id, day, status, paid_cents")
+    .eq("tenant_id", tenantId)
+    .in("store_id", storeIds)
+    .gte("day", from)
+    .lte("day", to)
+    .order("day", { ascending: true })
+    .order("event_id", { ascending: true });
   const [mill, files, captures, pix] = await Promise.all([
-    sb
-      .from("cash_close_day")
-      .select("store_id, day, payment_method, opening_cents, sangria_cents, closing_cents, typed_cents")
-      .eq("tenant_id", tenantId)
-      .in("store_id", storeIds)
-      .gte("day", from)
-      .lte("day", to)
-      .limit(10000),
-    sb
-      .from("stone_day_file")
-      .select("store_id, day, kind, status")
-      .eq("tenant_id", tenantId)
-      .in("store_id", storeIds)
-      .gte("day", from)
-      .lte("day", to)
-      .limit(5000),
-    sb
-      .from("stone_capture")
-      .select("store_id, day, account_type, payment_method, captured_cents")
-      .eq("tenant_id", tenantId)
-      .in("store_id", storeIds)
-      .gte("day", from)
-      .lte("day", to)
-      .limit(20000),
-    sb
-      .from("stone_pix")
-      .select("store_id, day, status, paid_cents")
-      .eq("tenant_id", tenantId)
-      .in("store_id", storeIds)
-      .gte("day", from)
-      .lte("day", to)
-      .limit(20000),
+    eachPage(millQuery),
+    eachPage(fileQuery),
+    eachPage(captureQuery),
+    eachPage(pixQuery),
   ]);
-  if (mill.error || files.error || captures.error || pix.error) {
-    throw new Error(mill.error?.message || files.error?.message || captures.error?.message || pix.error?.message);
-  }
-  const byKey = new Map<string, CashCloseDayMark>();
-  const slot = (storeId: string, day: string) => {
-    const key = `${storeId}|${day}`;
-    const cur = byKey.get(key);
-    if (cur) return cur;
-    const created: CashCloseDayMark = { storeId, day, snap: { ...EMPTY, millennium: [] }, cardPending: false };
-    byKey.set(key, created);
-    return created;
-  };
-  for (const row of mill.data ?? []) {
-    const mark = slot(String(row.store_id), String(row.day));
-    mark.snap.millennium.push({
+  return assembleMonthMarks({
+    millennium: mill.map((row) => ({
+      storeId: String(row.store_id),
+      day: String(row.day),
       paymentMethod: String(row.payment_method ?? ""),
       openingCents: Number(row.opening_cents) || 0,
       sangriaCents: row.sangria_cents == null ? null : Number(row.sangria_cents),
       closingCents: Number(row.closing_cents) || 0,
       typedCents: Number(row.typed_cents) || 0,
-    });
-  }
-  const pixReceived = new Set<string>();
-  for (const row of files.data ?? []) {
-    const day = String(row.day).slice(0, 10);
-    const mark = slot(String(row.store_id), day);
-    const key = `${row.store_id}|${day}`;
-    if (row.kind === "pix" && row.status === "requested") mark.snap.pixRequested = true;
-    if (row.kind === "pix" && row.status === "received") pixReceived.add(key);
-    if (row.kind === "card" && row.status === "requested") mark.cardPending = true;
-  }
-  const pixRows = new Map<string, Array<{ status: string; paidCents: number }>>();
-  for (const row of pix.data ?? []) {
-    const key = `${row.store_id}|${String(row.day).slice(0, 10)}`;
-    const list = pixRows.get(key) ?? [];
-    list.push({ status: String(row.status ?? ""), paidCents: Number(row.paid_cents) || 0 });
-    pixRows.set(key, list);
-  }
-  for (const key of pixReceived) {
-    const [storeId, day] = key.split("|");
-    if (!storeId || !day) continue;
-    slot(storeId, day).snap.pixCents = paidPixCents(pixRows.get(key) ?? []);
-  }
-  const cards = new Map<string, { creditCents: number; debitCents: number; otherCents: number }>();
-  for (const row of captures.data ?? []) {
-    const key = `${row.store_id}|${String(row.day).slice(0, 10)}`;
-    const card = cards.get(key) ?? { creditCents: 0, debitCents: 0, otherCents: 0 };
-    const cents = Number(row.captured_cents) || 0;
-    const bucket = captureBucket(row.account_type == null ? null : Number(row.account_type), String(row.payment_method ?? ""));
-    if (bucket === "credit") card.creditCents += cents;
-    else if (bucket === "debit") card.debitCents += cents;
-    else if (bucket !== "pix") card.otherCents += cents;
-    cards.set(key, card);
-  }
-  for (const [key, card] of cards) {
-    const [storeId, day] = key.split("|");
-    if (!storeId || !day) continue;
-    slot(storeId, day).snap.card = card;
-  }
-  return [...byKey.values()];
+    })),
+    files: files.map((row) => ({
+      storeId: String(row.store_id),
+      day: String(row.day),
+      kind: String(row.kind ?? ""),
+      status: String(row.status ?? ""),
+    })),
+    captures: captures.map((row) => ({
+      storeId: String(row.store_id),
+      day: String(row.day),
+      accountType: row.account_type == null ? null : Number(row.account_type),
+      paymentMethod: String(row.payment_method ?? ""),
+      capturedCents: Number(row.captured_cents) || 0,
+    })),
+    pix: pix.map((row) => ({
+      storeId: String(row.store_id),
+      day: String(row.day),
+      status: String(row.status ?? ""),
+      paidCents: Number(row.paid_cents) || 0,
+    })),
+  }).map((mark) => ({
+    storeId: mark.storeId,
+    day: mark.day,
+    cardPending: mark.cardPending,
+    snap: {
+      millennium: mark.millennium,
+      card: mark.card,
+      pixCents: mark.pixCents,
+      pixRequested: mark.pixRequested,
+      cardPending: mark.cardPending,
+    },
+  }));
 }
 
 /** Primeiro mês que o calendário deixa abrir para esta loja. */
