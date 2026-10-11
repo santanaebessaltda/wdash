@@ -66,7 +66,7 @@ export function defaultWeekHours(): StoreWeekHours {
 
 /**
  * Preenchimento sugerido no formulario (Configuracoes > Loja), conforme o tipo do ponto.
- * Shopping/quiosque: seg–sab 10–22, dom 12–22. Loja de rua: seg–sex 08–18, sab 08–17, dom fechado.
+ * Quiosque: todos os dias 10–22. Loja de rua: seg–sex 08–18, sab 08–17, dom fechado.
  */
 export function presetWeekHours(pointType: HoursPointType): StoreWeekHours {
   if (pointType === "RUA") {
@@ -83,9 +83,8 @@ export function presetWeekHours(pointType: HoursPointType): StoreWeekHours {
     };
   }
   const semana: DayHours = { open: "10:00", close: "22:00" };
-  const domingo: DayHours = { open: "12:00", close: "22:00" };
   return {
-    0: { ...domingo },
+    0: { ...semana },
     1: { ...semana },
     2: { ...semana },
     3: { ...semana },
@@ -96,7 +95,7 @@ export function presetWeekHours(pointType: HoursPointType): StoreWeekHours {
 }
 
 export const PRESET_HOURS_HINT: Record<HoursPointType, string> = {
-  SHOPPING: "Padrão de quiosque: seg–sáb 10h–22h · domingo 12h–22h. Ajuste se o funcionamento desta loja for diferente.",
+  SHOPPING: "Padrão de quiosque: todos os dias 10h–22h. Ajuste se o funcionamento desta loja for diferente.",
   RUA: "Padrão de loja de rua: seg–sex 8h–18h · sábado 8h–17h · domingo fechado. Ajuste se o funcionamento desta loja for diferente.",
 };
 

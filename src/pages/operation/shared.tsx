@@ -45,13 +45,13 @@ export function useScopedStores() {
   return { session, lojas, loading, refresh: () => setTick((n) => n + 1) };
 }
 
-export type SectionName = "Estoque" | "Gestão" | "Operação" | "Custos";
+export type SectionName = "Estoque" | "Gestão" | "Operação" | "Configurações";
 
 const SECTION_TABS: Record<SectionName, Array<{ label: string; to: string; end?: boolean }>> = {
   Estoque: [],
   Gestão: managementTabs,
   Operação: operationTabs,
-  Custos: costTabs,
+  Configurações: costTabs,
 };
 
 /** Codigo das outras abas da secao  -  baixado junto para a troca de aba nao esperar o download. */
@@ -64,13 +64,11 @@ const SECTION_PAGES: Record<SectionName, Array<() => Promise<unknown>>> = {
     () => import("@/pages/stock/PurchaseOrderPage"),
   ],
   Operação: [
-    () => import("@/pages/operation/StorePage"),
     () => import("@/pages/management/ShiftsPage"),
     () => import("@/pages/management/StaffPage"),
   ],
-  Custos: [
-    () => import("@/pages/operation/FranchisePage"),
-    () => import("@/pages/operation/RentPage"),
+  Configurações: [
+    () => import("@/pages/operation/FilialPage"),
     () => import("@/pages/operation/ProductsTaxesPage"),
     () => import("@/pages/cash-close/AcquirersPage"),
   ],

@@ -502,7 +502,7 @@ export default function FinancePage() {
               title="Custos não configurados"
               description="Configure franquia e aluguel para acompanhar o resultado operacional."
               action={
-                <Button size="sm" onClick={() => navigate(paths.operation.franchise)}>
+                <Button size="sm" onClick={() => navigate(paths.operation.filial)}>
                   Configurar custos
                 </Button>
               }

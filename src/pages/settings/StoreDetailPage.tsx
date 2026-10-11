@@ -1,17 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Breadcrumbs, Button, Card, CardHeader, CardTitle } from "@/components/ui";
+import { Breadcrumbs, Button } from "@/components/ui";
 import { StoreDetailSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { useActiveSession } from "@/session/SessionProvider";
 import { hydrateSessionStores, storesForSession, type Store } from "@/data/wedash/stores";
 import { Icon, icons } from "@/pages/users/Icons";
-import { StoreScheduleForm } from "@/pages/operation/StoreSchedule";
+import { StoreHoursCard } from "@/pages/operation/StoreSchedule";
 import { paths } from "@/router/paths";
 
 /**
- * Administracao > Lojas > detalhe  -  funcionamento (fuso + horario), o mesmo formulario de Configuracoes > Loja.
- * Custos ficam em Configuracoes; turnos e equipe em Gestao.
+ * Administracao > Lojas > detalhe. O horário é o mesmo card de Configurações > Filial.
  */
 export function StoreDetailPage() {
   const { id } = useParams();
@@ -93,12 +92,7 @@ function StoreDetailForm({
     <div>
       <DetailHeader nome={store.fantasia} onBack={onBack} />
       <div className="flex max-w-[720px] flex-col gap-5">
-        <Card>
-          <CardHeader>
-            <CardTitle>Funcionamento</CardTitle>
-          </CardHeader>
-          <StoreScheduleForm store={store} canEdit={canEdit} onSaved={onSaved} />
-        </Card>
+        <StoreHoursCard store={store} canEdit={canEdit} onSaved={onSaved} />
       </div>
     </div>
   );

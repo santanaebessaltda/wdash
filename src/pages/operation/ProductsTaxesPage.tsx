@@ -33,8 +33,7 @@ function taxSections(loja: Store): CostFieldSection[] {
   ];
 }
 
-const INTRO =
-  "A tabela de custo ajuda a completar produtos vendidos sem custo no Millennium. ICMS e ICMS ST são considerados no cálculo do lucro bruto e da margem de cada marca. Nos campos de imposto, valores vazios são considerados 0%.";
+const TAX_INTRO = "ICMS e ICMS ST são considerados no cálculo do lucro bruto e da margem de cada marca. Campos vazios são considerados 0%.";
 
 /** Configuracoes > Produtos e impostos  -  tabela de custo do Millennium, ICMS e ICMS ST. */
 export function ProductsTaxesPage() {
@@ -56,7 +55,7 @@ export function ProductsTaxesPage() {
 
   return (
     <StoreCardsPage
-      section="Custos"
+      section="Configurações"
       title="Produtos e impostos"
       subtitle="Configure a tabela de custo dos produtos e os impostos da loja."
       loading={loading}
@@ -64,12 +63,17 @@ export function ProductsTaxesPage() {
       lojas={lojas}
       oneStore
     >
-      {(loja) => <ProductsTaxesCard loja={loja} tables={tables} tablesLoading={tablesLoading} onSaved={refresh} />}
+      {(loja) => (
+        <div className="flex flex-col gap-5">
+          <CostTableCard loja={loja} tables={tables} tablesLoading={tablesLoading} onSaved={refresh} />
+          <TaxCard loja={loja} onSaved={refresh} />
+        </div>
+      )}
     </StoreCardsPage>
   );
 }
 
-function ProductsTaxesCard({
+function CostTableCard({
   loja,
   tables,
   tablesLoading,
@@ -81,8 +85,6 @@ function ProductsTaxesCard({
   onSaved: () => void;
 }) {
   const { show } = useToast();
-  const fields = taxFields(loja);
-  const form = useCostFields(loja, fields);
   const [savedTable, setSavedTable] = useState<number | null>(loja.costTableId ?? null);
   const [table, setTable] = useState<number | null>(savedTable);
   const [saving, setSaving] = useState(false);
@@ -90,40 +92,25 @@ function ProductsTaxesCard({
 
   /** Tabela nova busca os precos no Millennium antes; falhou = nada e gravado. */
   async function save() {
-    const custos = form.merged();
-    if (!custos) return show(INVALID_COSTS_MSG, "danger");
     setSaving(true);
-    if (tableDirty && table != null) {
+    if (table != null) {
       const prices = await syncProductsNow({ scope: "table", tableId: table });
       if (!prices.ok) {
         setSaving(false);
         return show(prices.message, "danger");
       }
     }
-    if (form.dirty) {
-      const r = await updateStoreCosts(loja.id, custos);
-      if (!r.ok) {
-        setSaving(false);
-        return show(SAVE_ERROR_MSG, "danger");
-      }
-      form.markSaved(custos);
-    }
-    if (tableDirty) {
-      const r = await updateStoreCostTable(loja.id, table);
-      if (!r.ok) {
-        setSaving(false);
-        return show(SAVE_ERROR_MSG, "danger");
-      }
-      setSavedTable(table);
-    }
+    const r = await updateStoreCostTable(loja.id, table);
     setSaving(false);
+    if (!r.ok) return show(SAVE_ERROR_MSG, "danger");
+    setSavedTable(table);
     onSaved();
     show("Alterações salvas.", "success");
   }
 
   return (
     <Card>
-      <CostCardTitle title="Tabela de custo e impostos" />
+      <CostCardTitle title="Custo dos produtos" />
       <form
         className="flex flex-col gap-4"
         onSubmit={(e) => {
@@ -131,7 +118,6 @@ function ProductsTaxesCard({
           void save();
         }}
       >
-        <p className="text-[12.5px] text-t2">{INTRO}</p>
         <FormField
           label="Tabela de custo dos produtos"
           hint="Usada quando um produto vendido chega do Millennium sem custo. Enquanto nenhuma tabela for escolhida manualmente, a WDash seleciona automaticamente a que mais se aproxima dos custos da loja."
@@ -152,8 +138,43 @@ function ProductsTaxesCard({
             ))}
           </Select>
         </FormField>
-        {taxSections(loja).map((section, i) => (
-          <div key={section.title} className={i > 0 ? "flex flex-col gap-3 border-t border-line pt-4" : "flex flex-col gap-3"}>
+        <FormActions dirty={tableDirty} saving={saving} onReset={() => setTable(savedTable)} />
+      </form>
+    </Card>
+  );
+}
+
+function TaxCard({ loja, onSaved }: { loja: Store; onSaved: () => void }) {
+  const { show } = useToast();
+  const fields = taxFields(loja);
+  const form = useCostFields(loja, fields);
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    const custos = form.merged();
+    if (!custos) return show(INVALID_COSTS_MSG, "danger");
+    setSaving(true);
+    const r = await updateStoreCosts(loja.id, custos);
+    setSaving(false);
+    if (!r.ok) return show(SAVE_ERROR_MSG, "danger");
+    form.markSaved(custos);
+    onSaved();
+    show("Alterações salvas.", "success");
+  }
+
+  return (
+    <Card>
+      <CostCardTitle title="Impostos" />
+      <form
+        className="flex flex-col gap-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void save();
+        }}
+      >
+        <p className="text-[12.5px] text-t2">{TAX_INTRO}</p>
+        {taxSections(loja).map((section) => (
+          <div key={section.title} className="flex flex-col gap-3">
             <div>
               <p className="text-[14px] font-bold text-t0">{section.title}</p>
               {section.hint && <p className="mt-0.5 text-[12.5px] text-t2">{section.hint}</p>}
@@ -174,14 +195,7 @@ function ProductsTaxesCard({
             </div>
           </div>
         ))}
-        <FormActions
-          dirty={form.dirty || tableDirty}
-          saving={saving}
-          onReset={() => {
-            form.reset();
-            setTable(savedTable);
-          }}
-        />
+        <FormActions dirty={form.dirty} saving={saving} onReset={form.reset} />
       </form>
     </Card>
   );

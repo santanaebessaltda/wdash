@@ -41,26 +41,24 @@ const gestao: NavGroup = {
   ],
 };
 
-/** Funcionamento  |  Grupos  |  Vendedores (Gestor e Gerente). */
+/** Grupos  |  Vendedores (Gestor e Gerente). */
 const operacao: NavGroup = {
   label: "Operação",
-  description: "Configure o funcionamento, os grupos e os vendedores de cada loja.",
+  description: "Configure os grupos e os vendedores de cada loja.",
   icon: ICONE.loja,
   items: [
-    { label: "Funcionamento", to: paths.operation.store },
     { label: "Grupos", to: paths.operation.groups },
     { label: "Vendedores", to: paths.operation.sellers },
   ],
 };
 
-/** Franquia  |  Aluguel  |  Produtos e impostos  |  Adquirentes (só Gestor). */
+/** Filial  |  Produtos e impostos  |  Adquirentes (só Gestor). */
 const custos: NavGroup = {
-  label: "Custos",
-  description: "Configure franquia, aluguel, custos de produtos, impostos e adquirentes de cada loja.",
+  label: "Configurações",
+  description: "Configure a filial, os produtos, os impostos e as adquirentes.",
   icon: ICONE.custos,
   items: [
-    { label: "Franquia", to: paths.operation.franchise },
-    { label: "Aluguel", to: paths.operation.rent },
+    { label: "Filial", to: paths.operation.filial },
     { label: "Produtos e impostos", to: paths.operation.productsTaxes },
     { label: "Adquirentes", to: paths.operation.acquirers },
   ],
@@ -88,7 +86,7 @@ const navGestor: NavEntry[] = [
   custos,
 ];
 
-/** Gerente: sem Financeiro e sem Custos. */
+/** Gerente: sem Financeiro e sem Configurações. */
 const navGerente: NavEntry[] = [
   {
     label: "Dashboard",

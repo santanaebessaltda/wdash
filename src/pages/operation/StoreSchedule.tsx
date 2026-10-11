@@ -1,6 +1,6 @@
-import { Fragment, useState } from "react";
-import { FormField, Select, Switch, useToast } from "@/components/ui";
-import { updateStoreSchedule, type Store } from "@/data/wedash/stores";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { Alert, Card, FormField, Select, Switch, useToast } from "@/components/ui";
+import { updateStoreSchedule, type PointType, type Store } from "@/data/wedash/stores";
 import {
   DOW_LABELS,
   PRESET_HOURS_HINT,
@@ -13,7 +13,7 @@ import {
   type StoreWeekHours,
 } from "@/data/wedash/storeHours";
 import { cn } from "@/lib/cn";
-import { FormActions, SAVE_ERROR_MSG, TimeSelect } from "./shared";
+import { CostCardTitle, FormActions, SAVE_ERROR_MSG, TimeSelect } from "./shared";
 
 const DOWS: Dow[] = [0, 1, 2, 3, 4, 5, 6];
 
@@ -23,7 +23,21 @@ function initialHours(store: Store): StoreWeekHours {
 }
 
 /** Funcionamento da loja: fuso horario + horario por dia (Resetar / Salvar alteracoes). */
-export function StoreScheduleForm({ store, canEdit, onSaved }: { store: Store; canEdit: boolean; onSaved: () => void }) {
+export function StoreScheduleForm({
+  store,
+  canEdit,
+  onSaved,
+  pointType,
+  presetStamp = 0,
+}: {
+  store: Store;
+  canEdit: boolean;
+  onSaved: () => void;
+  /** Tipo escolhido na Filial. Grava junto com o horário. */
+  pointType?: PointType;
+  /** Incrementa quando a pessoa troca o tipo, para preencher o padrão. */
+  presetStamp?: number;
+}) {
   const { show } = useToast();
   const [saved, setSaved] = useState(() => ({
     timezone: canonicalStoreTimezone(store.fuso),
@@ -32,9 +46,16 @@ export function StoreScheduleForm({ store, canEdit, onSaved }: { store: Store; c
   const [timezone, setTimezone] = useState(saved.timezone);
   const [hours, setHours] = useState<StoreWeekHours>(() => initialHours(store));
   const [saving, setSaving] = useState(false);
+  const type = pointType ?? store.pointType;
+  const seenPreset = useRef(presetStamp);
+  useEffect(() => {
+    if (presetStamp === seenPreset.current) return;
+    seenPreset.current = presetStamp;
+    setHours(presetWeekHours(type));
+  }, [presetStamp, type]);
   const dirty = timezone !== saved.timezone || JSON.stringify(hours) !== JSON.stringify(saved.hours);
   const showingPreset = !weekHoursConfigured(saved.hours);
-  const preset = presetWeekHours(store.pointType);
+  const preset = presetWeekHours(type);
 
   async function save() {
     const invalid = DOWS.find((d) => {
@@ -46,7 +67,7 @@ export function StoreScheduleForm({ store, canEdit, onSaved }: { store: Store; c
       return;
     }
     setSaving(true);
-    const r = await updateStoreSchedule({ storeId: store.id, timezone, hours }).catch(() => ({ ok: false as const }));
+    const r = await updateStoreSchedule({ storeId: store.id, timezone, hours, pointType: type }).catch(() => ({ ok: false as const }));
     setSaving(false);
     if (!r.ok) {
       show(SAVE_ERROR_MSG, "danger");
@@ -119,7 +140,7 @@ export function StoreScheduleForm({ store, canEdit, onSaved }: { store: Store; c
         </Select>
       </FormField>
 
-      <FormField label="Dias e horários" hint={showingPreset ? PRESET_HOURS_HINT[store.pointType] : undefined}>
+      <FormField label="Dias e horários" hint={showingPreset ? PRESET_HOURS_HINT[type] : undefined}>
         <div>
           {DOWS.map((d) => {
             const day = hours[d];
@@ -174,11 +195,39 @@ export function StoreScheduleForm({ store, canEdit, onSaved }: { store: Store; c
             onClick={applyPreset}
             className="mt-2 text-left text-[12.5px] font-semibold text-acc hover:underline"
           >
-            {store.pointType === "RUA" ? "Preencher com o padrão de loja de rua" : "Preencher com o padrão de quiosque"}
+            {type === "RUA" ? "Preencher com o padrão de loja de rua" : "Preencher com o padrão de quiosque"}
           </button>
         )}
       </FormField>
       {canEdit && <FormActions dirty={dirty} saving={saving} onReset={reset} />}
     </form>
+  );
+}
+
+/** Card de fuso + horário. A Filial e o detalhe da loja usam o mesmo bloco. */
+export function StoreHoursCard({
+  store,
+  canEdit,
+  onSaved,
+  pointType,
+  presetStamp,
+}: {
+  store: Store;
+  canEdit: boolean;
+  onSaved: () => void;
+  pointType?: PointType;
+  presetStamp?: number;
+}) {
+  return (
+    <Card>
+      <CostCardTitle title="Funcionamento" />
+      <p className="mb-4 text-[12.5px] text-t2">Defina o fuso horário e os dias e horários em que esta loja funciona.</p>
+      {!weekHoursConfigured(store.horas) && (
+        <Alert variant="warning" className="mb-4" title="Horário de funcionamento não configurado">
+          Sem o horário configurado, as vendas desta loja só são atualizadas pelo botão Atualizar.
+        </Alert>
+      )}
+      <StoreScheduleForm store={store} canEdit={canEdit} onSaved={onSaved} pointType={pointType} presetStamp={presetStamp} />
+    </Card>
   );
 }

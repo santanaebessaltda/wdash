@@ -576,6 +576,7 @@ export async function updateStoreSchedule(args: {
   storeId: string;
   timezone: string;
   hours: StoreWeekHours;
+  pointType?: PointType;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
     const { getSupabase } = await import("@/lib/supabase");
@@ -589,7 +590,11 @@ export async function updateStoreSchedule(args: {
 
     const { error } = await sb
       .from("store")
-      .update({ timezone: args.timezone, hours: payloadHours })
+      .update({
+        timezone: args.timezone,
+        hours: payloadHours,
+        ...(args.pointType ? { point_type: args.pointType === "RUA" ? "STREET" : "MALL" } : {}),
+      })
       .eq("id", args.storeId);
 
     if (error) return { ok: false, error: error.message };
@@ -601,6 +606,7 @@ export async function updateStoreSchedule(args: {
           ...existing,
           fuso: args.timezone,
           horas: args.hours,
+          ...(args.pointType ? { pointType: args.pointType } : {}),
         }),
       );
     }
