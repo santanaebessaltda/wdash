@@ -12,7 +12,7 @@ import {
 } from "@/data/wedash/stores";
 import { Icon, icons } from "@/pages/users/Icons";
 import { shiftName } from "@/lib/format";
-import { FormActions, SAVE_ERROR_MSG, StoreCardHeader, StoreCardsPage, TimeSelect, nextHalfHour, useScopedStores } from "@/pages/operation/shared";
+import { CostCardTitle, FormActions, SAVE_ERROR_MSG, StoreCardsPage, TimeSelect, nextHalfHour, useScopedStores } from "@/pages/operation/shared";
 
 /** Linha editavel; `id` ausente = turno novo ainda nao salvo. */
 type ShiftDraft = { key: string; id?: string; name: string; start: string; end: string };
@@ -29,7 +29,7 @@ export function ShiftsPage() {
       title="Grupos"
       subtitle="Configure os grupos de cada loja. O grupo de cada vendedor é definido em Vendedores."
       loading={loading}
-      skeleton={(n) => <StoreCardsSkeleton count={n} shifts />}
+      skeleton={(n) => <StoreCardsSkeleton count={n} title shifts />}
       lojas={lojas}
       oneStore
     >
@@ -127,7 +127,7 @@ function ShiftsCard({ tenantId, loja }: { tenantId: string; loja: Store }) {
 
   return (
     <Card>
-      <StoreCardHeader loja={loja} />
+      <CostCardTitle title="Grupos da loja" />
       <form
         className="flex flex-col gap-4"
         onSubmit={(e) => {

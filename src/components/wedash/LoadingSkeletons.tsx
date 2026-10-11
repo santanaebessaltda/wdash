@@ -838,7 +838,7 @@ function ScheduleSkeleton() {
   );
 }
 
-/** Mesmo desenho do `StoreCardHeader`: icone 40px + fantasia + CNPJ (+ botao a direita). */
+/** Ícone 40px + duas linhas, para card que ainda mostra a loja. */
 function StoreHeadSkeleton({ button = false, className }: { button?: boolean; className?: string }) {
   return (
     <div className={cn("mb-4 flex items-start justify-between gap-3", className)}>
@@ -922,7 +922,7 @@ export function StoreCardsSkeleton({
         team ? (
           <Card key={c} padding="none">
             <div className="px-5 pt-5 pb-4">
-              <StoreHeadSkeleton button />
+              <Skeleton className="mb-4 h-4 w-44" />
               <SegmentedSkeleton widths={["w-24", "w-32"]} />
             </div>
             <TeamTableSkeleton />

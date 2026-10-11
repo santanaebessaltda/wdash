@@ -15,7 +15,7 @@ import {
 import { shiftName } from "@/lib/format";
 import { refreshStatusLine, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { InviteSellerModal } from "@/pages/management/InviteSellerModal";
-import { StoreCardHeader, StoreCardsPage, useScopedStores } from "@/pages/operation/shared";
+import { CostCardTitle, StoreCardsPage, useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
 import {
   copySellerInviteLink,
@@ -81,7 +81,7 @@ export function StaffPage() {
       title="Vendedores"
       subtitle="Acompanhe os vendedores de cada loja e defina seus grupos."
       loading={loading}
-      skeleton={(n) => <StoreCardsSkeleton count={n} team wide />}
+      skeleton={(n) => <StoreCardsSkeleton count={n} title team wide />}
       lojas={lojas}
       wide
       oneStore
@@ -251,7 +251,9 @@ function StaffCard({ tenantId, loja, reloadKey }: { tenantId: string; loja: Stor
 
   return (
     <Card padding="none">
-      <StoreCardHeader className="mb-0 px-5 pt-5 pb-4" loja={loja} />
+      <div className="px-5 pt-5">
+        <CostCardTitle title="Vendedores da loja" />
+      </div>
       {!loaded ? (
         <div className="px-5 pb-4">
           <SegmentedSkeleton widths={["w-24", "w-32"]} />

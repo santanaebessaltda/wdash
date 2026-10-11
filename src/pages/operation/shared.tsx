@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Button, Card, CardHeader, CardSubtitle, CardTitle, EmptyState, FormField, Input, PageHeader, Select, TabNav } from "@/components/ui";
+import { Button, Card, CardHeader, CardTitle, EmptyState, FormField, Input, PageHeader, Select, TabNav } from "@/components/ui";
 import { costTabs, managementTabs, operationTabs } from "@/layout/nav-wedash";
 import { halfHourOptions } from "@/data/wedash/storeHours";
 import { useActiveSession } from "@/session/SessionProvider";
 import { storesKey } from "@/session/session";
 import { useScope } from "@/pages/dashboard/useScope";
 import { hydrateSessionStores, storesForSession, type Store } from "@/data/wedash/stores";
-import { StoreIcon } from "@/pages/dashboards/icons";
 import { cn } from "@/lib/cn";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 
@@ -185,29 +184,11 @@ export function StoreCardsPage({
   );
 }
 
-/** Titulo do card de custo, sem repetir a loja do seletor. */
-export function CostCardTitle({ title }: { title: string }) {
-  return (
-    <CardHeader>
-      <CardTitle>{title}</CardTitle>
-    </CardHeader>
-  );
-}
-
-/** Titulo do card = loja (icone + fantasia + CNPJ). */
-export function StoreCardHeader({ loja, action, className }: { loja: Store; action?: ReactNode; className?: string }) {
+/** Titulo do card, sem repetir a loja do seletor. */
+export function CostCardTitle({ title, className }: { title: string; className?: string }) {
   return (
     <CardHeader className={className}>
-      <div className="flex min-w-0 items-center gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-acc-soft text-acc">
-          <StoreIcon size={18} />
-        </span>
-        <div className="min-w-0">
-          <CardTitle className="truncate">{loja.fantasia}</CardTitle>
-          <CardSubtitle className="truncate">{loja.cnpj || `Filial ${loja.codFilial}`}</CardSubtitle>
-        </div>
-      </div>
-      {action}
+      <CardTitle>{title}</CardTitle>
     </CardHeader>
   );
 }
