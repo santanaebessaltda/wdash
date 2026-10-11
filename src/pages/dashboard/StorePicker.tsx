@@ -60,13 +60,13 @@ export function StorePicker({ escopo, onChange, minhas }: { escopo: Scope; onCha
             type="button"
             onClick={() => escolher(null)}
             className={cn(
-              "flex w-full items-center gap-2.5 rounded-[9px] px-2.5 py-2 text-left transition-colors",
+              "flex w-full items-center gap-2 rounded-[9px] px-2.5 py-1 text-left transition-colors",
               ehTodas ? "bg-acc-soft" : "hover:bg-bg-3",
             )}
           >
-            <div className="min-w-0 flex-1">
-              <p className={cn("truncate text-[13px] font-bold uppercase", ehTodas ? "text-acc" : "text-t0")}>Todas as filiais</p>
-              <p className="truncate text-[11px] uppercase text-t2">Rede consolidada</p>
+            <div className="min-w-0 flex-1 leading-none">
+              <p className={cn("truncate text-[12px] font-bold uppercase leading-tight", ehTodas ? "text-acc" : "text-t0")}>Todas as filiais</p>
+              <p className="truncate text-[10px] uppercase leading-tight text-t2">Rede consolidada</p>
             </div>
             {ehTodas && (
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
@@ -85,13 +85,13 @@ export function StorePicker({ escopo, onChange, minhas }: { escopo: Scope; onCha
                 type="button"
                 onClick={() => escolher(f.id)}
                 className={cn(
-                  "flex w-full items-center gap-2.5 rounded-[9px] px-2.5 py-2 text-left transition-colors",
+                  "flex w-full items-center gap-2 rounded-[9px] px-2.5 py-1 text-left transition-colors",
                   ativa ? "bg-acc-soft" : "hover:bg-bg-3",
                 )}
               >
-                <div className="min-w-0 flex-1">
-                  <p className={cn("truncate text-[13px] font-bold uppercase", ativa ? "text-acc" : "text-t0")}>{f.fantasia}</p>
-                  <p className="truncate text-[11px] text-t2">{subtituloLoja(f)}</p>
+                <div className="min-w-0 flex-1 leading-none">
+                  <p className={cn("truncate text-[12px] font-bold uppercase leading-tight", ativa ? "text-acc" : "text-t0")}>{f.fantasia}</p>
+                  <p className="truncate text-[10px] leading-tight text-t2">{subtituloLoja(f)}</p>
                 </div>
                 {ativa && (
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
