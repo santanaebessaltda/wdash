@@ -224,7 +224,7 @@ export function InventoryPage() {
                   <EmptyBlock
                     icon="📦"
                     title="Nenhum saldo encontrado"
-                    description={variasLojas ? "Nenhum produto com saldo nas lojas selecionadas." : "Nenhum produto com saldo nesta loja."}
+                    description={variasLojas ? "Nenhum produto com saldo nas filiais selecionadas." : "Nenhum produto com saldo nesta filial."}
                   />
                 )
               ) : (

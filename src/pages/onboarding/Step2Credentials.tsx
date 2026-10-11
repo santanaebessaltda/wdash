@@ -8,7 +8,7 @@ import { noAutofill, secretStyle } from "@/lib/noAutofill";
 const toastErro: Record<Exclude<ErpLoginResult, { ok: true }>["reason"], string> = {
   password: "Usuário ou senha incorretos. Confira os dados e tente novamente.",
   busy: "Este usuário do Millennium está conectado em outro local. Encerre a outra sessão e tente novamente.",
-  stores: "Conseguimos acessar o Millennium, mas não foi possível identificar as lojas deste usuário. Tente novamente.",
+  stores: "Conseguimos acessar o Millennium, mas não foi possível identificar as filiais deste usuário. Tente novamente.",
   other: "Não foi possível conectar ao Millennium. Tente novamente em alguns minutos.",
   reports: "Este usuário não tem acesso a todos os relatórios necessários para a WDash.",
 };
@@ -70,7 +70,7 @@ export function Step2Credentials({
       await logoutErp(r.session);
       setTestando(false);
       setFalhou(true);
-      show("Este usuário não possui lojas vinculadas no Millennium. Verifique os vínculos no Millennium e tente novamente.", "danger");
+      show("Este usuário não possui filiais vinculadas no Millennium. Verifique os vínculos no Millennium e tente novamente.", "danger");
       return;
     }
     setTestando(false);

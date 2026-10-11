@@ -28,13 +28,13 @@ const RENT_PCT: CostField = {
 const RENT_FIELDS = [RENT_MIN, RENT_PCT];
 
 const POINT_OPTIONS: { value: PointType; label: string }[] = [
-  { value: "SHOPPING", label: "Shopping" },
+  { value: "SHOPPING", label: "Quiosque em shopping" },
   { value: "RUA", label: "Loja de rua" },
 ];
 
 const RENT_HINT: Record<PointType, string[]> = {
   SHOPPING: [
-    "No shopping, a WDash considera o maior valor entre o aluguel mensal e o aluguel percentual. Quando o percentual for maior, somente o valor excedente é acrescentado ao aluguel mensal.",
+    "A WDash considera o maior valor entre o aluguel mensal e o aluguel percentual. Quando o percentual for maior, somente o valor excedente é acrescentado ao aluguel mensal.",
     "Exemplo: com aluguel mensal de R$ 10.000,00 e aluguel percentual de 10% sobre R$ 120.000,00 de faturamento, o aluguel considerado será de R$ 12.000,00. Os R$ 2.000,00 adicionais correspondem ao aluguel percentual excedente.",
     "No mês em andamento, a comparação considera o aluguel mensal proporcional aos dias já passados.",
   ],
@@ -80,7 +80,7 @@ export function FilialPage() {
     <StoreCardsPage
       section="Configurações"
       title="Filial"
-      subtitle="Configure o tipo, o funcionamento, a franquia e o aluguel de cada loja."
+      subtitle="Configure o tipo, o funcionamento, a franquia e o aluguel de cada filial."
       loading={loading}
       skeleton={(n) => <StoreCardsSkeleton count={n} title schedule sections={2} />}
       lojas={lojas}
@@ -104,8 +104,9 @@ function FilialCards({ loja, onSaved }: { loja: Store; onSaved: () => void }) {
   return (
     <div className="flex flex-col gap-5">
       <Card>
-        <CostCardTitle title="Tipo de loja" />
-        <p className="mb-3 text-[12.5px] text-t2">O tipo da loja define o horário sugerido e as opções de aluguel.</p>
+        <CostCardTitle title="Filial" />
+        <p className="mb-3 text-[12.5px] text-t2">O tipo da filial define o horário sugerido e as opções de aluguel.</p>
+        <p className="mb-1.5 text-[12.5px] font-bold text-t0">Tipo de filial</p>
         <Segmented options={POINT_OPTIONS} value={point} onChange={(v) => v && escolher(v)} />
       </Card>
       <StoreHoursCard store={loja} canEdit onSaved={onSaved} pointType={point} presetStamp={presetStamp} />
@@ -127,7 +128,8 @@ function RentCard({ loja, point, onSaved }: { loja: Store; point: PointType; onS
   const form = useCostFields(loja, RENT_FIELDS);
   const [saving, setSaving] = useState(false);
   const rua = point === "RUA";
-  const fields = rua ? [RENT_MIN] : RENT_FIELDS;
+  const mensal = rua ? { ...RENT_MIN, label: "Aluguel mensal" } : RENT_MIN;
+  const fields = rua ? [mensal] : RENT_FIELDS;
   const pctSalvo = parseNum(form.saved[RENT_PCT.key] ?? "");
   const removePct = rua && pctSalvo != null && pctSalvo > 0;
   const typeDirty = point !== loja.pointType;

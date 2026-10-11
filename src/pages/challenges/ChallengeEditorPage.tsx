@@ -134,11 +134,11 @@ export default function ChallengeEditorPage() {
     ? lojasDestino.length === 1
     : Boolean(id) || Boolean(lojaFiltro) || lojas.length === 1;
   const lojaHint = id
-    ? "A loja não pode ser alterada depois que o desafio é criado."
+    ? "A filial não pode ser alterada depois que o desafio é criado."
     : copyForStore
       ? "Escolha a filial de destino."
       : lojaFiltro && lojas.length > 1
-        ? "Para escolher outra loja, selecione Todas as lojas no filtro do topo."
+        ? "Para escolher outra filial, selecione Todas as filiais no filtro do topo."
         : undefined;
   useEffect(() => {
     if (!sourceId) return;
@@ -227,7 +227,7 @@ export default function ChallengeEditorPage() {
         {copiedFrom && (
           <p className="mt-1 text-[13px] text-t2">
             Cópia de <span className="font-semibold text-t1">{copiedFrom}</span>
-            {copiedForStore ? " · mesma configuração para outra loja" : ""}
+            {copiedForStore ? " · mesma configuração para outra filial" : ""}
           </p>
         )}
       </div>
@@ -242,7 +242,7 @@ export default function ChallengeEditorPage() {
           <EmptyBlock
             icon="🔍"
             title="Desafio não encontrado"
-            description="O desafio pode ter sido excluído ou não pertencer às suas lojas."
+            description="O desafio pode ter sido excluído ou não pertencer às suas filiais."
             action={
               <Button size="sm" variant="outline" onClick={() => navigate(paths.management.challenges)}>
                 Voltar para Desafios
@@ -306,7 +306,7 @@ export default function ChallengeEditorPage() {
               />
             </FormField>
           </div>
-          <FormField label="Loja" required error={errors.storeId} hint={lojaHint}>
+          <FormField label="Filial" required error={errors.storeId} hint={lojaHint}>
             <Select
               value={form.storeId}
               onChange={(e) => set({ storeId: e.target.value })}

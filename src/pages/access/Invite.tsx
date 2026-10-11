@@ -220,7 +220,7 @@ export function Invite() {
       <p className={acessoSubtitulo}>
         {info.kind === "franchisee" ? (
           <>
-            Informe seu nome e crie uma senha para começar. Depois você conecta o Millennium e traz as lojas da sua
+            Informe seu nome e crie uma senha para começar. Depois você conecta o Millennium e traz as filiais da sua
             franquia.
           </>
         ) : info.role === "SELLER" ? (

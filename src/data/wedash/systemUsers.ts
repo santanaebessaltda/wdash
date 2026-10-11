@@ -50,7 +50,7 @@ const LOAD_ERROR = "Não foi possível carregar os usuários. Tente novamente.";
 const MESSAGES: Record<string, string> = {
   invalid_email: "Informe um e-mail válido.",
   invalid_role: "Escolha o tipo de acesso.",
-  invalid_stores: "Escolha pelo menos uma loja.",
+  invalid_stores: "Escolha pelo menos uma filial.",
   already_invited: "Este e-mail já tem um convite pendente. Use Reenviar convite na aba Convites pendentes.",
   already_member: "Este e-mail já tem acesso à WDash.",
   email_in_use: "Este e-mail já está vinculado a outra empresa na WDash.",

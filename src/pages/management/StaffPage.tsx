@@ -54,7 +54,7 @@ export function StaffPage() {
 
   useScreenRefresh({
     label: "Atualizar vendedores",
-    tip: "Busca no Millennium os vendedores desta loja.",
+    tip: "Busca no Millennium os vendedores desta filial.",
     status:
       sellerSyncAt === undefined
         ? undefined
@@ -79,7 +79,7 @@ export function StaffPage() {
     <StoreCardsPage
       section="Operação"
       title="Vendedores"
-      subtitle="Acompanhe os vendedores de cada loja e defina seus grupos."
+      subtitle="Acompanhe os vendedores de cada filial e defina seus grupos."
       loading={loading}
       skeleton={(n) => <StoreCardsSkeleton count={n} title team wide />}
       lojas={lojas}
@@ -252,7 +252,7 @@ function StaffCard({ tenantId, loja, reloadKey }: { tenantId: string; loja: Stor
   return (
     <Card padding="none">
       <div className="px-5 pt-5">
-        <CostCardTitle title="Vendedores da loja" />
+        <CostCardTitle title="Vendedores da filial" />
       </div>
       {!loaded ? (
         <div className="px-5 pb-4">
@@ -280,9 +280,9 @@ function StaffCard({ tenantId, loja, reloadKey }: { tenantId: string; loja: Stor
           title={semEquipe ? "Nenhum vendedor sincronizado" : tab === "ativos" ? "Nenhum vendedor ativo" : "Nenhum vendedor desligado"}
           description={
             semEquipe
-              ? "Use Atualizar vendedores no topo para buscar os vendedores desta loja no Millennium."
+              ? "Use Atualizar vendedores no topo para buscar os vendedores desta filial no Millennium."
               : tab === "ativos"
-                ? "Não há vendedores ativos nesta loja no momento."
+                ? "Não há vendedores ativos nesta filial no momento."
                 : "Vendedores desligados no Millennium aparecem aqui."
           }
         />

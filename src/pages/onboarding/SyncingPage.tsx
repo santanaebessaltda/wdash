@@ -313,7 +313,7 @@ export function SyncingPage() {
 
   const preparing = status === "running" && (allFetchDone || jobStatus === "SUCCEEDED");
   const lojasTxt =
-    stores.length === 1 ? "da sua loja" : stores.length > 1 ? `das ${stores.length} lojas` : "das suas lojas";
+    stores.length === 1 ? "da sua filial" : stores.length > 1 ? `das ${stores.length} filiais` : "das suas filiais";
   const subtitle =
     status === "ready"
       ? "Vendas de hoje prontas. Abrindo o dashboard…"

@@ -45,7 +45,7 @@ export function StoreDetailPage() {
   if (showSkeleton || !store) {
     return (
       <div>
-        <DetailHeader nome={store?.fantasia ?? "Loja"} onBack={voltar} />
+        <DetailHeader nome={store?.fantasia ?? "Filial"} onBack={voltar} />
         {showSkeleton ? (
           <StoreDetailSkeleton />
         ) : (
@@ -72,7 +72,7 @@ function DetailHeader({ nome, onBack }: { nome: string; onBack: () => void }) {
       <Button variant="secondary" size="sm" icon={<Icon d={icons.arrowLeft} size={14} />} onClick={onBack}>
         Voltar
       </Button>
-      <Breadcrumbs items={[{ label: "Lojas", to: paths.settings.stores }, { label: nome }]} />
+      <Breadcrumbs items={[{ label: "Filiais", to: paths.settings.stores }, { label: nome }]} />
     </div>
   );
 }

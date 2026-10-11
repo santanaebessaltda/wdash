@@ -24,8 +24,8 @@ function useReportScope() {
   const datas = periodo.inicio === periodo.fim ? dataBr(periodo.inicio) : `${dataBr(periodo.inicio)} a ${dataBr(periodo.fim)}`;
   const preset = periodDisplayLabel(escopo.periodo);
   return {
-    lojaNome: loja ? loja.fantasia : "Todas as lojas",
-    lojaArquivo: loja ? [loja.codFilial.trim(), loja.fantasia].filter(Boolean).join(" ") : "Todas as lojas",
+    lojaNome: loja ? loja.fantasia : "Todas as filiais",
+    lojaArquivo: loja ? [loja.codFilial.trim(), loja.fantasia].filter(Boolean).join(" ") : "Todas as filiais",
     todas: !loja,
     lojaCnpj: loja?.cnpj?.trim() || null,
     lojaCodigo: loja?.codFilial.trim() || null,
@@ -76,9 +76,9 @@ export function ReportHeader({
       </div>
       <div className="mt-3 flex flex-wrap gap-x-8 gap-y-1 text-[12.5px]">
         <p>
-          <span className="text-t2">{todas ? "Lojas: " : "Loja: "}</span>
+          <span className="text-t2">{todas ? "Filiais: " : "Filial: "}</span>
           <span className={todas ? "font-bold text-t0" : "font-bold uppercase text-t0"}>{lojaNome}</span>
-          {lojaCodigo && <span className="text-t2"> · Filial {lojaCodigo}</span>}
+          {lojaCodigo && <span className="text-t2"> · Cód. {lojaCodigo}</span>}
           {lojaCnpj && <span className="text-t2"> · {lojaCnpj}</span>}
         </p>
         {periodo && (

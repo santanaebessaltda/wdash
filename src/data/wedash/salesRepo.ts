@@ -1303,7 +1303,7 @@ export async function fetchTenantStores(
     (r) => ({
       id: r.id,
       code: r.code || "—",
-      name: (r.trade_name || r.name || r.code || "Loja").trim(),
+      name: (r.trade_name || r.name || r.code || "Filial").trim(),
     }),
   );
 }

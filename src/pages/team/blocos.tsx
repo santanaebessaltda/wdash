@@ -287,8 +287,8 @@ export function BlocoVendedoras({
   /** Meta no modo Geral: a meta e o % da linha são da loja. */
   geral?: boolean;
 }) {
-  const metaHeader = geral ? "Meta da loja" : grupo ? "Meta do grupo" : "Meta individual";
-  const pctHeader = geral ? "Atingimento da loja" : grupo ? "% da meta do grupo" : "% da meta individual";
+  const metaHeader = geral ? "Meta da filial" : grupo ? "Meta do grupo" : "Meta individual";
+  const pctHeader = geral ? "Atingimento da filial" : grupo ? "% da meta do grupo" : "% da meta individual";
   const ranked: LinhaRank[] = lista.map((l, i) => ({ ...l, posicao: i + 1 }));
 
   const colunas: DataTableColumn<LinhaRank>[] = [
@@ -334,7 +334,7 @@ export function BlocoVendedoras({
           },
           {
             key: "pctGeral",
-            header: "% da meta da loja",
+            header: "% da meta da filial",
             hideBelow: "lg",
             sortable: true,
             sortValue: (l: LinhaRank) => (l.semMeta ? null : l.pctMetaGeral),

@@ -88,7 +88,7 @@ export function StoresSettingsPage() {
         setParams(next, { replace: true });
       }
     }
-    toast.show(active ? "Loja ativada." : "Loja desativada.", "success");
+    toast.show(active ? "Filial ativada." : "Filial desativada.", "success");
   }
 
   if (showSkeleton) {
@@ -96,7 +96,7 @@ export function StoresSettingsPage() {
   }
 
   if (lojas.length === 0) {
-    return <span className="block py-6 text-center text-[12px] text-t2">Nenhuma loja no seu escopo.</span>;
+    return <span className="block py-6 text-center text-[12px] text-t2">Nenhuma filial disponível.</span>;
   }
 
   const podeAlternar = session.role === "OWNER" || session.role === "MANAGER" || session.role === "ADMIN_GLOBAL";

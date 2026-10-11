@@ -209,8 +209,8 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
       : tela
         ? tela.label
         : storeIds.length === 1
-          ? "Atualizar as vendas de hoje da loja selecionada"
-          : "Atualizar as vendas de hoje de todas as lojas";
+          ? "Atualizar as vendas de hoje da filial selecionada"
+          : "Atualizar as vendas de hoje de todas as filiais";
 
   const bloqueado = ocupado || (!proprio && forceCooldownSec != null);
   const icone = (

@@ -14,7 +14,7 @@ export function PrizeCard({ store, embedded = false }: { store: SellerHomeStore;
     <>
       {!embedded && <h2 className="text-[15px] font-bold text-t0">{store.storeName}</h2>}
       {!goal ? (
-        <EmptyBlock icon="🎯" title="Meta não configurada" description="Quando a meta da loja for cadastrada, ela aparecerá aqui." />
+        <EmptyBlock icon="🎯" title="Meta não configurada" description="Quando a meta da filial for cadastrada, ela aparecerá aqui." />
       ) : !goal.me ? (
         <p className="py-6 text-center text-[13.5px] text-t1">
           Você ainda não está em um grupo desta meta. Fale com a gerência da loja.

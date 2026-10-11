@@ -43,7 +43,7 @@ export function StorePicker({ escopo, onChange, minhas }: { escopo: Scope; onCha
       >
         <div className="min-w-0 flex-1">
           <p className="truncate text-[13px] font-bold uppercase text-t0">
-            {filialAtual ? filialAtual.fantasia : "Todas as lojas"}
+            {filialAtual ? filialAtual.fantasia : "Todas as filiais"}
           </p>
           <p className={cn("truncate text-[11px] text-t2", !filialAtual && "uppercase")}>
             {filialAtual ? subtituloLoja(filialAtual) : "Rede consolidada"}
@@ -65,7 +65,7 @@ export function StorePicker({ escopo, onChange, minhas }: { escopo: Scope; onCha
             )}
           >
             <div className="min-w-0 flex-1">
-              <p className={cn("truncate text-[13px] font-bold uppercase", ehTodas ? "text-acc" : "text-t0")}>Todas as lojas</p>
+              <p className={cn("truncate text-[13px] font-bold uppercase", ehTodas ? "text-acc" : "text-t0")}>Todas as filiais</p>
               <p className="truncate text-[11px] uppercase text-t2">Rede consolidada</p>
             </div>
             {ehTodas && (

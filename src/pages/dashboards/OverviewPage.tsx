@@ -734,7 +734,7 @@ export default function OverviewPage() {
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card className="flex flex-col">
           <CardHeader className="items-center">
-            <CardTitle>Ranking de lojas</CardTitle>
+            <CardTitle>Ranking de filiais</CardTitle>
             {escopo.filialIds.length === 1 && view.rankingLojas.length > 0 && (view.rankingRedeTotal ?? 0) > 0 && (
               <Badge variant="accent">
                 Rede: {brlCent(view.rankingRedeTotal ?? 0)}
@@ -754,7 +754,7 @@ export default function OverviewPage() {
               const demais: (typeof view.rankingLojas)[number] | null =
                 umaLoja && valorDemais > 0
                   ? {
-                      nome: `Demais lojas${view.rankingDemaisLojas ? ` (${view.rankingDemaisLojas})` : ""}`,
+                      nome: `Demais filiais${view.rankingDemaisLojas ? ` (${view.rankingDemaisLojas})` : ""}`,
                       valor: valorDemais,
                     }
                   : null;

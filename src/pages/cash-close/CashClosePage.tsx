@@ -722,7 +722,7 @@ export function CashClosePage() {
           <Skeleton className="h-[520px] w-full rounded-[18px]" />
         ) : lojas.length === 0 ? (
           <Card>
-            <EmptyBlock icon="🏬" title="Nenhuma loja disponível" description="Não há lojas disponíveis para este acesso." />
+            <EmptyBlock icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
           </Card>
         ) : (
           <>

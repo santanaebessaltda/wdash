@@ -35,8 +35,8 @@ export function StoreHoursNotice() {
 
   const titulo =
     sem.length === 1
-      ? `A loja ${sem[0]!.fantasia} está sem horário de funcionamento`
-      : `${sem.length} lojas estão sem horário de funcionamento`;
+      ? `A filial ${sem[0]!.fantasia} está sem horário de funcionamento`
+      : `${sem.length} filiais estão sem horário de funcionamento`;
   return (
     <Alert
       variant="warning"
@@ -45,8 +45,8 @@ export function StoreHoursNotice() {
       action={<AlertLink onClick={() => navigate(paths.operation.filial)}>Configurar funcionamento</AlertLink>}
     >
       {sem.length === 1
-        ? "As vendas dessa loja só são atualizadas pelo botão Atualizar até o horário ser configurado."
-        : `As vendas dessas lojas (${sem.map((s) => s.fantasia).join(", ")}) só são atualizadas pelo botão Atualizar até o horário ser configurado.`}
+        ? "As vendas dessa filial só são atualizadas pelo botão Atualizar até o horário ser configurado."
+        : `As vendas dessas filiais (${sem.map((s) => s.fantasia).join(", ")}) só são atualizadas pelo botão Atualizar até o horário ser configurado.`}
     </Alert>
   );
 }

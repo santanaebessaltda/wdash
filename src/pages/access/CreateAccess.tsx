@@ -14,7 +14,7 @@ import { useSession, useActiveSession } from "@/session/SessionProvider";
 const bullets = [
   "Seu nome identifica você na WDash",
   "Sua senha pessoal substitui a senha temporária",
-  "Depois, conecte o Millennium para adicionar suas lojas",
+  "Depois, conecte o Millennium para adicionar suas filiais",
 ];
 
 /**

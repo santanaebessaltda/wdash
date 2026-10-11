@@ -195,7 +195,7 @@ export function StoreScheduleForm({
             onClick={applyPreset}
             className="mt-2 text-left text-[12.5px] font-semibold text-acc hover:underline"
           >
-            {type === "RUA" ? "Preencher com o padrão de loja de rua" : "Preencher com o padrão de quiosque"}
+            Preencher com horário padrão
           </button>
         )}
       </FormField>
@@ -221,10 +221,10 @@ export function StoreHoursCard({
   return (
     <Card>
       <CostCardTitle title="Funcionamento" />
-      <p className="mb-4 text-[12.5px] text-t2">Defina o fuso horário e os dias e horários em que esta loja funciona.</p>
+      <p className="mb-4 text-[12.5px] text-t2">Defina o fuso horário e os dias e horários de funcionamento desta filial.</p>
       {!weekHoursConfigured(store.horas) && (
         <Alert variant="warning" className="mb-4" title="Horário de funcionamento não configurado">
-          Sem o horário configurado, as vendas desta loja só são atualizadas pelo botão Atualizar.
+          Sem o horário configurado, as vendas desta filial só são atualizadas pelo botão Atualizar.
         </Alert>
       )}
       <StoreScheduleForm store={store} canEdit={canEdit} onSaved={onSaved} pointType={pointType} presetStamp={presetStamp} />

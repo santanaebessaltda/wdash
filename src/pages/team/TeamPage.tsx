@@ -254,7 +254,7 @@ export function TeamPage() {
       .map((goal) =>
         buildGoalCardView({
           goal,
-          lojaNome: nomeLoja.get(goal.storeId) ?? "Loja",
+          lojaNome: nomeLoja.get(goal.storeId) ?? "Filial",
           dayAggs: goalsData.dayAggs,
           sellerDayAggs: goalsData.sellerAggs,
           team: goalsData.team,
@@ -457,7 +457,7 @@ export function TeamPage() {
                 <EmptyBlock
                   icon="👥"
                   title="Grupos não configurados"
-                  description="Cadastre os grupos das lojas e vincule a equipe para comparar o desempenho por grupo."
+                  description="Cadastre os grupos das filiais e vincule a equipe para comparar o desempenho por grupo."
                   action={
                     podeConfigurar ? (
                       <Button size="sm" onClick={() => navigate(paths.operation.groups)}>

@@ -28,8 +28,8 @@ const META: Record<string, { title: string; subtitle: string }> = {
     subtitle: "Escolha quais avisos você quer receber no celular.",
   },
   [paths.settings.stores]: {
-    title: "Lojas",
-    subtitle: "Configure o funcionamento de cada loja.",
+    title: "Filiais",
+    subtitle: "Veja as filiais deste acesso e o funcionamento de cada uma.",
   },
   [paths.settings.erp]: {
     title: "Integrações",
@@ -37,7 +37,7 @@ const META: Record<string, { title: string; subtitle: string }> = {
   },
   [paths.settings.users]: {
     title: "Usuários",
-    subtitle: "Controle quem acessa a WDash e quais lojas cada usuário pode visualizar.",
+    subtitle: "Controle quem acessa a WDash e quais filiais cada usuário pode visualizar.",
   },
   [paths.settings.logs]: {
     title: "Logs",

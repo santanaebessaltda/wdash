@@ -38,7 +38,7 @@ export function InviteSellerModal({
       return;
     }
     if (r.linked) {
-      show("Acesso liberado também nesta loja.", "success");
+      show("Acesso liberado também nesta filial.", "success");
       onDone();
       return;
     }

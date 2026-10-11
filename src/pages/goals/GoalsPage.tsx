@@ -337,7 +337,7 @@ function GoalCard({
         )}
         <span className="text-right text-[11.5px] text-t2">
           {status === "upcoming" ? (
-            "Meta da loja"
+            "Meta da filial"
           ) : (
             <>
               <span className={`font-mono font-bold ${progressTextClass(pct)}`}>{num(pct, 1)}%</span> de {brlCent(g.target)}

@@ -1139,12 +1139,12 @@ export function buildStoreView(escopo: Scope): StoreView {
 
   const avisos: string[] = [];
   if (semMetaPeriodo) avisos.push("Meta e lucro bruto são mensais e não aparecem neste período.");
-  if (divisao) avisos.push(`Marca ${divisao} selecionada. Meta e projeção são da loja inteira e não aparecem no recorte por marca.`);
+  if (divisao) avisos.push(`Marca ${divisao} selecionada. Meta e projeção são da filial inteira e não aparecem no recorte por marca.`);
 
   /* --- Regua de lojas e pontos de atencao --- */
   let regua: RulerRow[] | null = null;
   let pontosAtencao: AttentionPoint[] | null = null;
-  let reguaTitulo: string = "Desempenho das lojas";
+  let reguaTitulo: string = "Desempenho das filiais";
   // Sempre adaptamos ao filtro (AD-047): rede = uma linha por loja; loja unica =
   // painel de meta (ou de participacao da marca, se houver marca). Nunca some.
   if (visao === "rede" || unica) {
@@ -1175,7 +1175,7 @@ export function buildStoreView(escopo: Scope): StoreView {
           faturamento: brlK(fatMarca),
           faturamentoValor: fatMarca,
           atingimentoPct: participacao,
-          atingimentoTexto: `${pct(participacao)} da loja`,
+          atingimentoTexto: `${pct(participacao)} da filial`,
           barraPct: Math.min(100, participacao),
           tint: PALETA_LOJAS[indiceCor % PALETA_LOJAS.length],
           variacaoDia: variacaoBadge(variacaoDoDia(unica)),
@@ -1210,7 +1210,7 @@ export function buildStoreView(escopo: Scope): StoreView {
     } else {
       // Titulo no singular quando o escopo tem uma loja so (painel de meta dela);
       // plural na rede. Nao ha variacao de hoje nem ordenacao na loja unica.
-      reguaTitulo = fs.length > 1 ? "Desempenho das lojas" : "Desempenho da loja";
+      reguaTitulo = fs.length > 1 ? "Desempenho das filiais" : "Desempenho da filial";
       const base = fs.map((f) => {
         const m = calcularMeta([f], competencia);
         const atingimento = m?.atingimentoPct ?? 0;
@@ -4271,8 +4271,8 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
       ? null
       : fs.length > 1
         ? lojasComMeta < fs.length
-          ? `${lojasComMeta} de ${fs.length} lojas com meta`
-          : `Metas de ${lojasComMeta} lojas`
+          ? `${lojasComMeta} de ${fs.length} filiais com meta`
+          : `Metas de ${lojasComMeta} filiais`
         : goalsNoPeriodo.length === 1
           ? `${goalsNoPeriodo[0]!.name} · ${dataCurta(goalsNoPeriodo[0]!.startsOn)} a ${dataCurta(goalsNoPeriodo[0]!.endsOn)}`
           : `${goalsNoPeriodo.length} metas consideradas`;

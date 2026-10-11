@@ -173,7 +173,7 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null, costT
   const saldoIso = data && data.storeId === storeId ? data.syncedAt : null;
   useScreenRefresh({
     label: "Atualizar o saldo do pedido",
-    tip: "Busca no Millennium o saldo do pedido de compra desta loja.",
+    tip: "Busca no Millennium o saldo do pedido de compra desta filial.",
     status: data ? refreshStatusLine("Saldo atualizado", "Saldo ainda não atualizado", saldoIso) : undefined,
     run: async () => {
       if (storeRef.current) await sync(storeRef.current);

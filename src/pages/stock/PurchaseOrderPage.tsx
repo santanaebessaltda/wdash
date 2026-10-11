@@ -188,14 +188,14 @@ export function PurchaseOrderPage() {
         return;
       }
       if (copiadas === 0 && semSaldo > 0) {
-        show("Essas lojas ainda não abriram o pedido. Abra o pedido de cada uma e copie de novo.", "warning");
+        show("Essas filiais ainda não abriram o pedido. Abra o pedido de cada uma e copie de novo.", "warning");
         return;
       }
       if (copiadas === 0) {
-        show("Nenhuma outra loja tem os mesmos produtos desta.", "warning");
+        show("Nenhuma outra filial tem os mesmos produtos desta.", "warning");
         return;
       }
-      const lojaTxt = copiadas === 1 ? "1 loja" : `${copiadas} lojas`;
+      const lojaTxt = copiadas === 1 ? "1 filial" : `${copiadas} filiais`;
       const partes = [`Mínimos copiados para ${lojaTxt}.`];
       if (semSaldo > 0) partes.push(`${semSaldo} ainda não abriram o pedido.`);
       if (semProduto > 0) partes.push(`${semProduto} não têm estes produtos.`);
@@ -219,7 +219,7 @@ export function PurchaseOrderPage() {
       <SectionHeader
         section="Gestão"
         title="Pedido de compra"
-        subtitle="Prepare o pedido de compra de cada loja."
+        subtitle="Prepare o pedido de compra de cada filial."
         actions={
           <HeaderFilters>
             <HeaderSearch value={busca} onChange={setBusca} placeholder="Buscar por produto ou código…" width={240} />
@@ -290,7 +290,7 @@ export function PurchaseOrderPage() {
       ) : !loja ? (
         lojas.length === 0 ? (
           <Card className="flex flex-col">
-            <EmptyBlock icon="🏬" title="Nenhuma loja disponível" description="Não há lojas disponíveis para este acesso." />
+            <EmptyBlock icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
           </Card>
         ) : (
           <div className="max-w-[720px]">
@@ -302,7 +302,7 @@ export function PurchaseOrderPage() {
           <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
             <span className="inline-flex items-center gap-1.5">
               <CardTitle>Produtos</CardTitle>
-              <TipHelp label="Novo: produto cadastrado no Millennium há menos de 30 dias ou que a loja ainda não vendeu. A segunda regra só é usada quando há histórico suficiente desde a inauguração ou dos últimos 12 meses. Produtos bloqueados para compra não aparecem." />
+              <TipHelp label="Novo: produto cadastrado no Millennium há menos de 30 dias ou que a filial ainda não vendeu. A segunda regra só é usada quando há histórico suficiente desde a inauguração ou dos últimos 12 meses. Produtos bloqueados para compra não aparecem." />
             </span>
             {view && view.rows.length > 0 && (
               <span className="text-[12.5px] font-semibold text-t1">
@@ -316,7 +316,7 @@ export function PurchaseOrderPage() {
                 po.syncing ? (
                   <EmptyBlock icon="📦" title="Buscando saldo" description="Buscando o saldo no Millennium…" />
                 ) : (
-                  <EmptyBlock icon="📦" title="Nenhum produto disponível para pedido" description="O Millennium não retornou produtos liberados para compra nesta loja." />
+                  <EmptyBlock icon="📦" title="Nenhum produto disponível para pedido" description="O Millennium não retornou produtos liberados para compra nesta filial." />
                 )
               ) : (
                 <EmptyBlock
@@ -507,10 +507,10 @@ export function PurchaseOrderPage() {
       >
         {loja && (todas || destino) && (
           <div className="flex flex-col gap-3">
-            <p className="text-[13px] leading-relaxed text-t1">Copie os mínimos de {loja.fantasia} para outra loja ou para todas.</p>
+            <p className="text-[13px] leading-relaxed text-t1">Copie os mínimos de {loja.fantasia} para outra filial ou para todas.</p>
             <FormField label="Copiar para">
               <Select value={todas ? "" : (destino?.id ?? "")} onChange={(e) => setDestinoId(e.target.value)} disabled={copiando}>
-                {outrasLojas.length > 1 && <option value="">Todas as outras lojas</option>}
+                {outrasLojas.length > 1 && <option value="">Todas as outras filiais</option>}
                 {outrasLojas.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.codFilial} · {s.fantasia}
@@ -520,7 +520,7 @@ export function PurchaseOrderPage() {
             </FormField>
             <p className="text-[13px] leading-relaxed text-t2">
               {todas
-                ? "Os mínimos dos produtos em comum serão atualizados nas outras lojas. Os demais não serão alterados."
+                ? "Os mínimos dos produtos em comum serão atualizados nas outras filiais. Os demais não serão alterados."
                 : "Os mínimos dos produtos em comum serão substituídos. Os demais não serão alterados."}
             </p>
           </div>
@@ -550,19 +550,19 @@ function AcoesPedido({
   const items: DropdownItem[] = [
     {
       label: "Gerar pedido",
-      description: semLoja ? "Selecione uma loja no topo para gerar o pedido." : "Abre o resumo e baixa a planilha desta loja.",
+      description: semLoja ? "Selecione uma filial no topo para gerar o pedido." : "Abre o resumo e baixa a planilha desta filial.",
       disabled: semLoja || !podeGerar,
       onClick: onGerar,
     },
   ];
   if (podeCopiar) {
     items.push({
-      label: "Copiar mínimos para outra loja",
+      label: "Copiar mínimos para outra filial",
       description: semLoja
-        ? "Selecione uma loja no topo para copiar os mínimos."
+        ? "Selecione uma filial no topo para copiar os mínimos."
         : semMinimo
-          ? "Cadastre pelo menos um mínimo nesta loja para poder copiar."
-          : "Copia os mínimos desta loja. Não copia o arquivo do pedido.",
+          ? "Cadastre pelo menos um mínimo nesta filial para poder copiar."
+          : "Copia os mínimos desta filial. Não copia o arquivo do pedido.",
       disabled: semLoja || !copiarLiberado,
       onClick: onCopiar,
     });

@@ -11,9 +11,9 @@ type Prefs = Record<PrefKey, boolean>;
 const DEFAULTS: Prefs = { sales: true, cashClose: true, storeGoal: true };
 
 const ROWS: Array<{ key: PrefKey; name: string; desc: string }> = [
-  { key: "sales", name: "Vendas do período", desc: "A cada 30 minutos, se alguma loja vendeu, o resumo mostra o que entrou no período e quanto cada loja já vendeu hoje. As lojas aparecem da que mais vendeu no dia para a que menos vendeu. Chega com o app aberto ou fechado." },
+  { key: "sales", name: "Vendas do período", desc: "A cada 30 minutos, se alguma filial vendeu, o resumo mostra o que entrou no período e quanto cada filial já vendeu hoje. As filiais aparecem da que mais vendeu no dia para a que menos vendeu. Chega com o app aberto ou fechado." },
   { key: "cashClose", name: "Fechamento", desc: "Receba um resumo do fechamento do dia, com faltas ou sobras em dinheiro e dias ainda sem total real." },
-  { key: "storeGoal", name: "Meta da loja", desc: "Receba um aviso quando a loja atingir um novo nível da meta. Cada nível é avisado uma única vez." },
+  { key: "storeGoal", name: "Meta da filial", desc: "Receba um aviso quando a filial atingir um novo nível da meta. Cada nível é avisado uma única vez." },
 ];
 
 function Dot({ on }: { on: boolean }) {

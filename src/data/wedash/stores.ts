@@ -616,12 +616,12 @@ export async function updateStoreSchedule(args: {
   }
 }
 
-/** Tabelas de custo do Millennium (sincronizadas pelo worker). Falha  ->  []. */
-export async function fetchCostTables(): Promise<CostTable[]> {
+/** Tabelas de custo do Millennium. Falha de leitura devolve null. */
+export async function fetchCostTables(): Promise<CostTable[] | null> {
   try {
     const { getSupabase } = await import("@/lib/supabase");
     const sb = getSupabase();
-    if (!sb) return [];
+    if (!sb) return null;
     const { data, error } = await sb.from("product_cost_table").select("table_id, code, description").order("code");
     if (error) throw error;
     return (data ?? []).map((r) => ({
@@ -631,7 +631,7 @@ export async function fetchCostTables(): Promise<CostTable[]> {
     }));
   } catch (e) {
     console.warn("fetchCostTables:", e);
-    return [];
+    return null;
   }
 }
 

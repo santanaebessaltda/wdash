@@ -40,12 +40,14 @@ export function ProductsTaxesPage() {
   const { lojas, loading, refresh } = useScopedStores();
   const [tables, setTables] = useState<CostTable[]>([]);
   const [tablesLoading, setTablesLoading] = useState(true);
+  const [tablesError, setTablesError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     void fetchCostTables().then((list) => {
       if (cancelled) return;
-      setTables(list);
+      setTablesError(list == null);
+      setTables(list ?? []);
       setTablesLoading(false);
     });
     return () => {
@@ -57,7 +59,7 @@ export function ProductsTaxesPage() {
     <StoreCardsPage
       section="Configurações"
       title="Produtos e impostos"
-      subtitle="Configure a tabela de custo dos produtos e os impostos da loja."
+      subtitle="Configure a tabela de custo dos produtos e os impostos da filial."
       loading={loading}
       skeleton={(n) => <StoreCardsSkeleton count={n} title intro fields={1} sections={1} />}
       lojas={lojas}
@@ -65,7 +67,7 @@ export function ProductsTaxesPage() {
     >
       {(loja) => (
         <div className="flex flex-col gap-5">
-          <CostTableCard loja={loja} tables={tables} tablesLoading={tablesLoading} onSaved={refresh} />
+          <CostTableCard loja={loja} tables={tables} tablesLoading={tablesLoading} tablesError={tablesError} onSaved={refresh} />
           <TaxCard loja={loja} onSaved={refresh} />
         </div>
       )}
@@ -77,11 +79,13 @@ function CostTableCard({
   loja,
   tables,
   tablesLoading,
+  tablesError,
   onSaved,
 }: {
   loja: Store;
   tables: CostTable[];
   tablesLoading: boolean;
+  tablesError: boolean;
   onSaved: () => void;
 }) {
   const { show } = useToast();
@@ -120,7 +124,7 @@ function CostTableCard({
       >
         <FormField
           label="Tabela de custo dos produtos"
-          hint="Usada quando um produto vendido chega do Millennium sem custo. Enquanto nenhuma tabela for escolhida manualmente, a WDash seleciona automaticamente a que mais se aproxima dos custos da loja."
+          hint="Usada quando um produto vendido chega do Millennium sem custo. Enquanto nenhuma tabela for escolhida manualmente, a WDash seleciona automaticamente a que mais se aproxima dos custos da filial."
         >
           <Select
             value={tablesLoading || table == null ? "" : String(table)}
@@ -133,11 +137,14 @@ function CostTableCard({
             )}
             {tables.map((t) => (
               <option key={t.id} value={String(t.id)}>
-                {t.code} · {t.description}
+                {`Tabela ${t.code || t.id}`}
               </option>
             ))}
           </Select>
         </FormField>
+        {tablesError && (
+          <p className="text-[12.5px] font-semibold text-bad">Não foi possível buscar as tabelas de custo. Tente novamente.</p>
+        )}
         <FormActions dirty={tableDirty} saving={saving} onReset={() => setTable(savedTable)} />
       </form>
     </Card>

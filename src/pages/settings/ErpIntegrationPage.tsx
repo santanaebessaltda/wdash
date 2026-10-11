@@ -50,8 +50,8 @@ const ESTADO_UI: Record<Estado, { label: string; cls: string; dot: string }> = {
 const ERRO_CREDENCIAL: Record<Extract<ErpCredentialChangeResult, { ok: false }>["reason"], string> = {
   password: "Usuário ou senha incorretos. Confira os dados e tente novamente.",
   busy: "Este usuário do Millennium está conectado em outro local. Encerre a outra sessão e tente novamente.",
-  stores: "Conseguimos acessar o Millennium, mas não foi possível identificar as lojas deste usuário. Tente novamente.",
-  no_stores: "Este usuário não possui lojas vinculadas no Millennium. Verifique os vínculos no Millennium e tente novamente.",
+  stores: "Conseguimos acessar o Millennium, mas não foi possível identificar as filiais deste usuário. Tente novamente.",
+  no_stores: "Este usuário não possui filiais vinculadas no Millennium. Verifique os vínculos no Millennium e tente novamente.",
   other: "Não foi possível conectar ao Millennium. Tente novamente em alguns minutos.",
   persist: "A conexão foi testada, mas não foi possível salvá-la. Tente novamente.",
   reports: "Este usuário não tem acesso a todos os relatórios necessários para a WDash.",
@@ -417,8 +417,8 @@ function MillenniumModal({
             variant="danger"
             title={
               pendente.plan.kind === "partial"
-                ? `${pendente.username} não tem acesso a ${pendente.plan.removed.length === 1 ? "1 loja" : `${pendente.plan.removed.length} lojas`}`
-                : `${pendente.username} não tem acesso a nenhuma das lojas atuais`
+                ? `${pendente.username} não tem acesso a ${pendente.plan.removed.length === 1 ? "1 filial" : `${pendente.plan.removed.length} filiais`}`
+                : `${pendente.username} não tem acesso a nenhuma das filiais atuais`
             }
             footer={
               <>
@@ -433,7 +433,7 @@ function MillenniumModal({
                   className="mt-3 items-start text-bad"
                   label={
                     pendente.plan.kind === "partial"
-                      ? `Entendo que essas lojas serão removidas e quero trocar para ${pendente.username}.`
+                      ? `Entendo que essas filiais serão removidas e quero trocar para ${pendente.username}.`
                       : `Entendo que os dados atuais serão removidos e quero trocar para ${pendente.username}.`
                   }
                   checked={aceiteTroca}
@@ -444,14 +444,14 @@ function MillenniumModal({
             }
           >
             {pendente.plan.kind === "partial" ? (
-              "As lojas abaixo deixarão de ser sincronizadas e serão removidas da WDash. As demais continuam normalmente."
+              "As filiais abaixo deixarão de ser sincronizadas e serão removidas da WDash. As demais continuam normalmente."
             ) : (
               <>
                 <span className="block">
-                  A troca substituirá as lojas e os dados sincronizados atualmente na WDash. As lojas disponíveis para o
+                  A troca substituirá as filiais e os dados sincronizados atualmente na WDash. As filiais disponíveis para o
                   novo usuário serão cadastradas novamente e uma nova carga inicial será realizada.
                 </span>
-                <span className="mt-1.5 block">Configurações como fuso e horário das lojas voltarão ao padrão.</span>
+                <span className="mt-1.5 block">Configurações como fuso e horário das filiais voltarão ao padrão.</span>
               </>
             )}
           </Alert>

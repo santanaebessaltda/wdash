@@ -37,7 +37,7 @@ export function storesForFirstStepsView<T extends { id: string }>(stores: T[], f
 
 function lojasFaltando(faltam: number, total: number): string | undefined {
   if (faltam === 0 || total <= 1) return undefined;
-  return `Falta em ${faltam} de ${total} lojas`;
+  return `Falta em ${faltam} de ${total} filiais`;
 }
 
 function franchiseOk(s: FirstStepsStore): boolean {
@@ -90,13 +90,13 @@ export function buildFirstSteps(input: FirstStepsInput): FirstStep[] {
     {
       id: "erp",
       title: "Conectar o Millennium",
-      description: "Sincroniza vendas, custos, lojas e vendedores com a WDash.",
+      description: "Sincroniza vendas, custos, filiais e vendedores com a WDash.",
       done: true,
     },
     {
       id: "sellers",
       title: "Sincronizar os vendedores",
-      description: "Busca no Millennium a equipe de vendas de cada loja.",
+      description: "Busca no Millennium a equipe de vendas de cada filial.",
       done: true,
     },
     {
@@ -108,7 +108,7 @@ export function buildFirstSteps(input: FirstStepsInput): FirstStep[] {
     {
       id: "groups",
       title: "Criar os grupos e vincular os vendedores",
-      description: "Organize os vendedores de cada loja em grupos para acompanhar o desempenho e distribuir metas.",
+      description: "Organize os vendedores de cada filial em grupos para acompanhar o desempenho e distribuir metas.",
       done: semGrupo === 0,
       detail: semGrupo === 0 ? undefined : semGrupo === 1 ? "1 vendedor sem grupo" : `${semGrupo} vendedores sem grupo`,
       needsGroups: lojaSemGrupos,

@@ -122,7 +122,7 @@ export function useStockData() {
     : null;
   useScreenRefresh({
     label: "Atualizar o estoque",
-    tip: "Busca o estoque e o que está a receber das lojas desta tela.",
+    tip: "Busca o estoque e o que está a receber das filiais desta tela.",
     status: data ? refreshStatusLine("Estoque atualizado", "Estoque ainda não atualizado", oldestSync) : undefined,
     run: async () => {
       if (escolher) return;

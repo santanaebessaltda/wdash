@@ -118,8 +118,8 @@ export function SelectStoreCard() {
       <EmptyState
         framed={false}
         icon="🏬"
-        title="Selecione uma loja"
-        description="Estas configurações são definidas por loja. Escolha uma loja no seletor do topo para continuar."
+        title="Selecione uma filial"
+        description="Estas configurações são definidas por filial. Escolha uma filial no seletor do topo para continuar."
       />
     </Card>
   );
@@ -168,7 +168,7 @@ export function StoreCardsPage({
           skeleton(skeletonCount)
         ) : lojas.length === 0 ? (
           <Card>
-            <EmptyState framed={false} icon="🏬" title="Nenhuma loja disponível" description="Não há lojas disponíveis para este acesso." />
+            <EmptyState framed={false} icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
           </Card>
         ) : (
           <div className={wide ? "flex flex-col gap-5" : "flex max-w-[720px] flex-col gap-5"}>

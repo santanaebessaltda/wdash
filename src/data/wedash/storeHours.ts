@@ -83,8 +83,9 @@ export function presetWeekHours(pointType: HoursPointType): StoreWeekHours {
     };
   }
   const semana: DayHours = { open: "10:00", close: "22:00" };
+  const domingo: DayHours = { open: "12:00", close: "22:00" };
   return {
-    0: { ...semana },
+    0: { ...domingo },
     1: { ...semana },
     2: { ...semana },
     3: { ...semana },
@@ -95,8 +96,8 @@ export function presetWeekHours(pointType: HoursPointType): StoreWeekHours {
 }
 
 export const PRESET_HOURS_HINT: Record<HoursPointType, string> = {
-  SHOPPING: "Padrão de quiosque: todos os dias 10h–22h. Ajuste se o funcionamento desta loja for diferente.",
-  RUA: "Padrão de loja de rua: seg–sex 8h–18h · sábado 8h–17h · domingo fechado. Ajuste se o funcionamento desta loja for diferente.",
+  SHOPPING: "Padrão de quiosque em shopping. Ajuste se o funcionamento desta filial for diferente.",
+  RUA: "Padrão de loja de rua. Ajuste se o funcionamento desta filial for diferente.",
 };
 
 /** Nenhum dia aberto = horario ainda nao configurado. */

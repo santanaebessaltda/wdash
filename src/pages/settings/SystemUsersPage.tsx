@@ -40,9 +40,9 @@ const ROLE_OPTIONS: { value: SystemRole; label: string }[] = [
 
 const ROLE_HINT: Record<SystemRole, string> = {
   OWNER:
-    "Acessa todas as áreas das lojas selecionadas, inclusive Financeiro, e pode gerenciar usuários e integrações. Indicado para sócios e administrativo.",
+    "Acessa todas as áreas das filiais selecionadas, inclusive Financeiro, e pode gerenciar usuários e integrações. Indicado para sócios e administrativo.",
   MANAGER:
-    "Acessa o Dashboard das lojas selecionadas, exceto Financeiro, além de Gestão e dos horários de funcionamento.",
+    "Acessa o Dashboard das filiais selecionadas, exceto Financeiro, além de Gestão e Operação.",
 };
 
 /** A Edge devolve o mesmo codigo para o Gestor principal e para o proprio acesso; a tela sabe qual dos dois e. */
@@ -64,10 +64,10 @@ function fmtAgo(iso: string | null): string {
 }
 
 function storesLabel(ids: string[], stores: SystemUserStore[]): { text: string; title?: string } {
-  if (ids.length === 0) return { text: "Todas as lojas" };
-  const names = ids.map((id) => stores.find((s) => s.id === id)?.name ?? "Loja removida");
+  if (ids.length === 0) return { text: "Todas as filiais" };
+  const names = ids.map((id) => stores.find((s) => s.id === id)?.name ?? "Filial removida");
   if (names.length <= 2) return { text: names.join(", ") };
-  return { text: `${names.length} lojas`, title: names.join(" · ") };
+  return { text: `${names.length} filiais`, title: names.join(" · ") };
 }
 
 /** Convite ainda nao aceito nao tem nome: mostra o e-mail. */
@@ -186,7 +186,7 @@ export function SystemUsersPage() {
   };
   const storesColumn: DataTableColumn<SystemUser> = {
     key: "stores",
-    header: "Lojas",
+    header: "Filiais",
     hideBelow: "md",
     render: (u) => {
       const l = storesLabel(u.storeIds, stores);
@@ -488,21 +488,21 @@ function UserModal({
         <FormField label="Tipo de acesso" required hint={ROLE_HINT[role]}>
           <Segmented options={ROLE_OPTIONS} value={role} onChange={(v) => v && setRole(v)} />
         </FormField>
-        <FormField label="Lojas" required hint={!allStores && picked.size === 0 ? "Escolha pelo menos uma loja." : undefined}>
+        <FormField label="Filiais" required hint={!allStores && picked.size === 0 ? "Escolha pelo menos uma filial." : undefined}>
           <div className="overflow-hidden rounded-[var(--radius-vela-md)] border border-line">
             <Checkbox
               className="flex w-full cursor-pointer px-3.5 py-3"
               label={
                 <span className="min-w-0">
-                  <span className="block font-semibold">Todas as lojas</span>
-                  <span className="block text-[11.5px] text-t2">Inclui automaticamente as lojas adicionadas no futuro.</span>
+                  <span className="block font-semibold">Todas as filiais</span>
+                  <span className="block text-[11.5px] text-t2">Inclui automaticamente as filiais adicionadas no futuro.</span>
                 </span>
               }
               checked={allStores}
               onChange={(e) => toggleAll(e.target.checked)}
             />
             <div className="max-h-[240px] divide-y divide-line overflow-y-auto border-t border-line">
-              {stores.length === 0 && <p className="px-3.5 py-3 text-[12.5px] text-t2">Nenhuma loja cadastrada.</p>}
+              {stores.length === 0 && <p className="px-3.5 py-3 text-[12.5px] text-t2">Nenhuma filial cadastrada.</p>}
               {stores.map((s) => (
                 <Checkbox
                   key={s.id}

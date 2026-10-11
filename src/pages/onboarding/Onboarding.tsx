@@ -16,7 +16,7 @@ import { gravarRascunho, limparRascunho, lerRascunho, lerSenhaErp, rascunhoVazio
 /** Etapa do ERP no indicador e em `membership.onboarding_step` (1 = Crie seu acesso, antes do /onboarding). */
 const ETAPA_ERP = 2;
 
-const bullets = ["Conexão testada antes de continuar", "Lojas adicionadas automaticamente", "Dados de acesso protegidos"];
+const bullets = ["Conexão testada antes de continuar", "Filiais adicionadas automaticamente", "Dados de acesso protegidos"];
 
 /** Onboarding  -  shell RegisterSplit: form a esquerda, hero a direita. Unica etapa = Integracao ERP. */
 export function Onboarding() {

@@ -48,7 +48,7 @@ const AJUDA_MODO: Record<GoalRecord["tierMode"], string> = {
   GROUP:
     "O grupo sobe de nível pela soma das vendas. A premiação é dividida igualmente entre as pessoas do grupo, e o bônus de cada nível vale para cada pessoa. Os bônus dos níveis alcançados são acumulados.",
   GENERAL:
-    "A loja sobe de nível pelo total vendido. A premiação é dividida igualmente entre as pessoas da equipe, e o bônus de cada nível vale para cada pessoa. Os bônus dos níveis alcançados são acumulados.",
+    "A filial sobe de nível pelo total vendido. A premiação é dividida igualmente entre as pessoas da equipe, e o bônus de cada nível vale para cada pessoa. Os bônus dos níveis alcançados são acumulados.",
 };
 
 const MODO_LABEL: Record<GoalRecord["tierMode"], string> = {
@@ -106,7 +106,7 @@ export default function GoalDetailPage() {
     if (!data?.goal) return null;
     return buildGoalCardView({
       goal: data.goal,
-      lojaNome: loja?.fantasia ?? "Loja",
+      lojaNome: loja?.fantasia ?? "Filial",
       dayAggs: data.dayAggs,
       sellerDayAggs: data.sellerAggs,
       team: data.team,
@@ -157,7 +157,7 @@ export default function GoalDetailPage() {
           <EmptyBlock
             icon="🔍"
             title="Meta não encontrada"
-            description="A meta pode ter sido excluída ou não pertencer às suas lojas."
+            description="A meta pode ter sido excluída ou não pertencer às suas filiais."
             action={
               <Button size="sm" variant="outline" onClick={() => navigate(paths.goals)}>
                 Ver metas
@@ -228,7 +228,7 @@ function GoalHero({
   const faltam = Math.max(0, goal.target - realizado);
   const liberou = status === "active" && metaLiberouProjecao(goal.startsOn, goal.endsOn, today);
   const stats: { label: string; value: string; cls: string; sub?: string; subCls?: string; help?: string }[] = [
-    { label: "Meta da loja", value: brlCent(goal.target), cls: "text-acc" },
+    { label: "Meta da filial", value: brlCent(goal.target), cls: "text-acc" },
     {
       label: "Realizado",
       value: brlCent(realizado),
@@ -351,7 +351,7 @@ function GoalTiersCard({
             if (t.gerenciaPct != null) {
               const bonusGer = t.gerenciaBonus ?? 0;
               bonusGerAcum += bonusGer;
-              const ger = [`Gerência: ${num(t.gerenciaPct, 1)}% da venda da loja`];
+              const ger = [`Gerência: ${num(t.gerenciaPct, 1)}% da venda da filial`];
               if (bonusGer > 0) ger.push(`bônus de ${brlCent(bonusGer)}`);
               if (bonusGerAcum > bonusGer) ger.push(`total de ${brlCent(bonusGerAcum)}`);
               linhaGerencia = ger.join(" · ");
@@ -388,7 +388,7 @@ function GoalTiersCard({
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-acc-soft px-3.5 py-3 text-[12.5px]">
           <span className="flex items-center gap-1.5 font-bold text-t0">
             Gerência
-            <TipHelp label="A gerência sobe de nível pelo faturamento total da loja, incluindo vendas sem vendedor identificado ou realizadas pela própria gerência. A premiação é calculada sobre o faturamento da loja, e os bônus dos níveis alcançados são acumulados." />
+            <TipHelp label="A gerência sobe de nível pelo faturamento total da filial, incluindo vendas sem vendedor identificado ou realizadas pela própria gerência. A premiação é calculada sobre o faturamento da filial, e os bônus dos níveis alcançados são acumulados." />
           </span>
           <span className={`font-semibold ${gerencia.nivel ? "text-acc" : "text-t2"}`}>
             {gerencia.nivel ? `N${gerencia.nivelNumero} · ${gerencia.nivel}` : "Abaixo do 1º nível"}
@@ -492,7 +492,7 @@ function GoalPayoutCard({
     ? {
         key: "gerencia",
         nome: "GERÊNCIA",
-        sub: "Faturamento total da loja",
+        sub: "Faturamento total da filial",
         nivel: gerencia.nivelNumero ? `N${gerencia.nivelNumero} · ${gerencia.nivel}` : null,
         faturamento: card.faixa.realizado,
         pct: gerencia.pct,

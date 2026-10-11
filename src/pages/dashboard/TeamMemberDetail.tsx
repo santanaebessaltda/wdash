@@ -156,7 +156,7 @@ function SecaoMeta({ meta }: { meta: SellerGoalLevel }) {
   const tipPremiacao = [
     nivelAtual
       ? geral
-        ? `${num(nivelAtual.comissaoPct, 1)}% sobre o total vendido da loja, dividido igualmente entre as pessoas.`
+        ? `${num(nivelAtual.comissaoPct, 1)}% sobre o total vendido da filial, dividido igualmente entre as pessoas.`
         : grupo
           ? `${num(nivelAtual.comissaoPct, 1)}% sobre as vendas do grupo, dividido igualmente entre as pessoas.`
           : `${num(nivelAtual.comissaoPct, 1)}% sobre tudo o que a pessoa vendeu na meta.`
@@ -175,9 +175,9 @@ function SecaoMeta({ meta }: { meta: SellerGoalLevel }) {
         </span>
       </div>
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-        <MetricaDetalhe label={geral ? "Meta da loja" : grupo ? "Meta do grupo" : "Meta individual"} valor={brlCent(meta.metaValor)} />
+        <MetricaDetalhe label={geral ? "Meta da filial" : grupo ? "Meta do grupo" : "Meta individual"} valor={brlCent(meta.metaValor)} />
         <MetricaDetalhe
-          label={geral ? "Vendas da loja" : grupo ? "Vendas do grupo" : "Vendas na meta"}
+          label={geral ? "Vendas da filial" : grupo ? "Vendas do grupo" : "Vendas na meta"}
           valor={brlCent(meta.realizado)}
           tip="Do início da meta até hoje. Não segue o período escolhido na tela."
         />
@@ -240,7 +240,7 @@ function TeamMemberDetailModal({
   const cmp = detalhe?.comparativo;
   const turno = detalhe?.turno ?? TEAM_SEM_TURNO;
   const subtitulo = detalhe
-    ? [detalhe.lojas.length === 1 ? detalhe.lojas[0] : detalhe.lojas.length > 1 ? `${detalhe.lojas.length} lojas` : "", turno, periodo]
+    ? [detalhe.lojas.length === 1 ? detalhe.lojas[0] : detalhe.lojas.length > 1 ? `${detalhe.lojas.length} filiais` : "", turno, periodo]
         .filter(Boolean)
         .join(" · ")
     : "";

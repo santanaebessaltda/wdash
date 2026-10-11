@@ -17,9 +17,8 @@ const ICONE = {
     "M18 18a3 3 0 1 0 0-6 3 3 0 0 0 0 6M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M10 15H6a4 4 0 0 0-4 4v2M21.7 16.4l-.9-.3M15.2 13.9l-.9-.3M16.6 18.7l.3-.9M19.1 12.2l.3-.9M19.6 18.7l-.4-1M16.8 12.3l-.4-1M14.3 16.6l1-.4M20.7 13.8l1-.4",
   /** Caixa  -  estoque. */
   estoque: "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16zM3.27 6.96 12 12.01l8.73-5.05M12 22.08V12",
-  /** Engrenagem. */
-  engrenagem:
-    "M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6",
+  /** SlidersHorizontal. */
+  engrenagem: "M21 4H14M10 4H3M21 12H12M8 12H3M21 20H16M12 20H3M14 2v4M8 10v4M16 18v4",
 };
 
 /** Saldo por local. Página direta, sem submenu. */
@@ -46,7 +45,7 @@ const gestao: NavGroup = {
 /** Grupos  |  Vendedores (Gestor e Gerente). */
 const operacao: NavGroup = {
   label: "Operação",
-  description: "Configure os grupos e os vendedores de cada loja.",
+  description: "Organize os grupos e os vendedores de cada filial.",
   icon: ICONE.loja,
   items: [
     { label: "Grupos", to: paths.operation.groups },
@@ -57,7 +56,7 @@ const operacao: NavGroup = {
 /** Filial  |  Produtos e impostos  |  Adquirentes (só Gestor). */
 const custos: NavGroup = {
   label: "Configurações",
-  description: "Configure a filial, os produtos, os impostos e as adquirentes.",
+  description: "Configure os dados, custos, impostos e integrações de cada filial.",
   icon: ICONE.engrenagem,
   items: [
     { label: "Filial", to: paths.operation.filial },

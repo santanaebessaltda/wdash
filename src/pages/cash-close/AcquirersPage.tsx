@@ -53,7 +53,7 @@ export function AcquirersPage() {
       <SectionHeader
         section="Configurações"
         title="Adquirentes"
-        subtitle="Conecte as adquirentes desta loja para buscar os fechamentos de cartão e Pix na WDash."
+        subtitle="Conecte as adquirentes desta filial para buscar os fechamentos de cartão e Pix na WDash."
       />
       {escolher ? (
         <div className="mt-6 max-w-[720px]">
@@ -90,7 +90,7 @@ export function AcquirersPage() {
               <span className={`flex items-center gap-1.5 text-xs font-bold ${tom}`}>
                 <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
                 {estado}
-                {estado === "Parcial" ? ` · ${conectadas} de ${lojas.length} lojas` : ""}
+                {estado === "Parcial" ? ` · ${conectadas} de ${lojas.length} filiais` : ""}
               </span>
               <Button size="sm" onClick={() => setAberto(true)} disabled={!canEdit || lojas.length === 0}>
                 {conectadas > 0 ? "Gerenciar" : "Conectar"}
@@ -232,7 +232,7 @@ function StoneModal({
           </>
         )}
         {lojas.length > 1 && (
-          <FormField label="Loja" required>
+          <FormField label="Filial" required>
             <Select value={storeId} onChange={(e) => setStoreId(e.target.value)} disabled={busy} {...noAutofill}>
               <option value="" disabled>
                 Selecione a loja

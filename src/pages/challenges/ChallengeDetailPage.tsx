@@ -161,7 +161,7 @@ export default function ChallengeDetailPage() {
           <EmptyBlock
             icon="🔍"
             title="Desafio não encontrado"
-            description="O desafio pode ter sido excluído ou não pertencer às suas lojas."
+            description="O desafio pode ter sido excluído ou não pertencer às suas filiais."
             action={
               <Button size="sm" variant="outline" onClick={voltar}>
                 Voltar para Desafios

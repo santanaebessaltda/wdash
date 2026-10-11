@@ -37,7 +37,7 @@ export const SYNC_LOG_SOURCE_LABEL: Record<string, string> = {
   custo_produto: "CMV por produto",
   itens_pessoa: "Itens por pessoa",
   mapa_produtos: "Mapeamento de produtos",
-  gerador: "Gerador da loja",
+  gerador: "Gerador da filial",
   eventos: "Eventos de venda",
   vendedoras: "Equipe de vendas",
   fechamento_caixa: "Fechamento de caixa",

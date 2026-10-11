@@ -68,7 +68,7 @@ const PRIZE_MODE_HELP: Record<PrizeMode, string> = {
   GROUP:
     "O grupo sobe de nível pela soma das vendas. A premiação é dividida igualmente entre as pessoas do grupo, e o bônus vale para cada pessoa.",
   GENERAL:
-    "A loja sobe de nível pelo total vendido. A premiação é dividida igualmente entre as pessoas da equipe, e o bônus vale para cada pessoa.",
+    "A filial sobe de nível pelo total vendido. A premiação é dividida igualmente entre as pessoas da equipe, e o bônus vale para cada pessoa.",
 };
 
 type TierErrors = { meta?: string; commission?: string; mgrCommission?: string };
@@ -105,12 +105,12 @@ function validateGoal(f: {
   else if (f.startsOn && f.endsOn < f.startsOn)
     e.endsOn = "A data de fim precisa ser depois da data de início.";
   if (!f.storeId) e.storeId = REQUIRED;
-  if (f.target == null) e.target = "Informe a meta da loja.";
+  if (f.target == null) e.target = "Informe a meta da filial.";
 
   if (f.groupsOn && f.storeId) {
-    if (f.groups == null) e.groups = "Os grupos da loja ainda estão carregando.";
+    if (f.groups == null) e.groups = "Os grupos da filial ainda estão carregando.";
     else if (f.groups.length === 0)
-      e.groups = "Crie os grupos da loja ou desative a Distribuição por grupos.";
+      e.groups = "Crie os grupos da filial ou desative a Distribuição por grupos.";
     else {
       const total = f.groups.reduce((s, g) => s + (groupPct(g) ?? 0), 0);
       if (Math.abs(total - 100) >= 0.005)
@@ -317,11 +317,11 @@ export default function GoalEditorPage() {
     ? lojasDestino.length === 1
     : Boolean(id) || Boolean(lojaFiltro) || lojas.length === 1;
   const lojaHint = id
-    ? "A loja não pode ser alterada depois que a meta é criada."
+    ? "A filial não pode ser alterada depois que a meta é criada."
     : copyForStore
       ? "Escolha a filial de destino."
       : lojaFiltro && lojas.length > 1
-        ? "Para escolher outra loja, selecione Todas as lojas no topo."
+        ? "Para escolher outra filial, selecione Todas as filiais no topo."
         : undefined;
   useEffect(() => {
     if (!sourceId) return;
@@ -434,7 +434,7 @@ export default function GoalEditorPage() {
     managerOn,
   };
   const errors: FormErrors = tried ? validateGoal(campos) : {};
-  const overlapMsg = "Já existe uma meta desta loja nesse período.";
+  const overlapMsg = "Já existe uma meta desta filial nesse período.";
   const dateError = (e?: string) => e ?? (overlap ? overlapMsg : undefined);
 
   const submit = async () => {
@@ -509,7 +509,7 @@ export default function GoalEditorPage() {
         {copiedFrom && (
           <p className="mt-1 text-[13px] text-t2">
             Cópia de <span className="font-semibold text-t1">{copiedFrom.name}</span>
-            {copiedFrom.forStore ? " · mesma configuração para outra loja" : ""}
+            {copiedFrom.forStore ? " · mesma configuração para outra filial" : ""}
           </p>
         )}
       </div>
@@ -558,7 +558,7 @@ export default function GoalEditorPage() {
                 />
               </FormField>
             </div>
-            <FormField label="Loja" required error={errors.storeId} hint={lojaHint}>
+            <FormField label="Filial" required error={errors.storeId} hint={lojaHint}>
               <Select
                 value={storeId}
                 onChange={(e) => setStoreId(e.target.value)}
@@ -578,7 +578,7 @@ export default function GoalEditorPage() {
               </Select>
             </FormField>
             <FormField
-              label="Meta da loja"
+              label="Meta da filial"
               required
               error={errors.target}
             >
@@ -588,7 +588,7 @@ export default function GoalEditorPage() {
                 unit="R$"
                 invalid={Boolean(errors.target)}
                 autoFocus={Boolean(copyId)}
-                aria-label="Meta da loja"
+                aria-label="Meta da filial"
               />
               {copiedFrom && !copiedFrom.forStore && (
                 <p className="mt-1.5 text-[12px] text-t2">
@@ -626,7 +626,7 @@ export default function GoalEditorPage() {
           active={groupsOn}
           onToggle={setGroupsOn}
           emptyIcon="👥"
-          emptyText="Distribua a meta da loja entre os grupos, como Manhã 60% e Tarde 40%."
+          emptyText="Distribua a meta da filial entre os grupos, como Manhã 60% e Tarde 40%."
         >
           <GroupsEditor
             storeId={storeId}
@@ -672,7 +672,7 @@ export default function GoalEditorPage() {
           title="Simulação"
           active
           emptyIcon="🧮"
-          emptyText="Informe a meta da loja para visualizar a simulação."
+          emptyText="Informe a meta da filial para visualizar a simulação."
         >
           <Simulation
             storeId={storeId}
@@ -818,8 +818,8 @@ function GroupsEditor({
     return (
       <EmptyBlock
         icon="🏬"
-        title="Selecione a loja"
-        description="Os grupos vêm da loja escolhida em Informações gerais."
+        title="Selecione a filial"
+        description="Os grupos vêm da filial escolhida em Informações gerais."
       />
     );
   }
@@ -838,7 +838,7 @@ function GroupsEditor({
         <EmptyBlock
           icon="👥"
           title="Nenhum grupo cadastrado"
-          description="Crie os grupos da loja para distribuir a meta entre eles."
+          description="Crie os grupos da filial para distribuir a meta entre eles."
           action={
             <Button
               size="sm"
@@ -900,7 +900,7 @@ function GroupsEditor({
             )}
           >
             {passou
-              ? `Total ${totalTxt} · excede a meta da loja em ${numText(Math.round((total - 100) * 10) / 10)}%.`
+              ? `Total ${totalTxt} · excede a meta da filial em ${numText(Math.round((total - 100) * 10) / 10)}%.`
               : fechou
                 ? "Total 100% · distribuição completa."
                 : `Total ${totalTxt} · faltam ${numText(Math.round((100 - total) * 10) / 10)}% para distribuir.`}
@@ -1254,7 +1254,7 @@ function TiersEditor({
               teto.{" "}
               {hasGroups
                 ? "Meta individual = meta do grupo ÷ pessoas do grupo."
-                : "Meta individual = meta da loja ÷ pessoas da equipe."}
+                : "Meta individual = meta da filial ÷ pessoas da equipe."}
             </>
           ) : hasGroups ? (
             <>
@@ -1356,8 +1356,8 @@ function Simulation({
     return (
       <EmptyBlock
         icon="🏬"
-        title="Selecione a loja"
-        description="A simulação usa a equipe e os grupos da loja escolhida em Informações gerais."
+        title="Selecione a filial"
+        description="A simulação usa a equipe e os grupos da filial escolhida em Informações gerais."
       />
     );
   }
@@ -1365,8 +1365,8 @@ function Simulation({
     return (
       <EmptyBlock
         icon="🧮"
-        title="Falta a meta da loja"
-        description="Informe a meta da loja para simular os valores."
+        title="Falta a meta da filial"
+        description="Informe a meta da filial para simular os valores."
       />
     );
   }
@@ -1384,7 +1384,7 @@ function Simulation({
       <EmptyBlock
         icon="🧮"
         title="Nenhum grupo cadastrado"
-        description="Crie os grupos da loja para visualizar a simulação."
+        description="Crie os grupos da filial para visualizar a simulação."
       />
     );
   }
@@ -1408,14 +1408,14 @@ function Simulation({
           ? individual
             ? "Premiação de cada pessoa calculada sobre a própria meta individual."
             : equipeToda
-              ? "Premiação da equipe calculada sobre a meta da loja e dividida igualmente entre as pessoas."
+              ? "Premiação da equipe calculada sobre a meta da filial e dividida igualmente entre as pessoas."
               : "Premiação do grupo calculada sobre a meta do grupo e dividida igualmente entre as pessoas."
           : individual
             ? equipeToda
-              ? "Meta individual de cada pessoa, com a meta da loja dividida pela equipe."
+              ? "Meta individual de cada pessoa, com a meta da filial dividida pela equipe."
               : "Meta individual de cada pessoa, com a meta do grupo dividida pelas pessoas do grupo."
             : equipeToda
-              ? "Meta da loja para a equipe toda."
+              ? "Meta da filial para a equipe toda."
               : "Meta de cada grupo conforme a distribuição."}
       </p>
       {grupos.map((g) => {
@@ -1430,7 +1430,7 @@ function Simulation({
               {g.pct != null && ` · ${numText(Math.round(g.pct * 10) / 10)}%`}
             </p>
             <p className="mb-2.5 mt-0.5 text-[11.5px] text-t2">
-              {mode === "GENERAL" ? "Meta da loja" : individual ? "Meta individual" : "Meta do grupo"}:{" "}
+              {mode === "GENERAL" ? "Meta da filial" : individual ? "Meta individual" : "Meta do grupo"}:{" "}
               <span className="font-mono text-t1">
                 {g.base != null ? brlCent(g.base) : "—"}
               </span>
@@ -1440,7 +1440,7 @@ function Simulation({
             {g.base == null || g.pessoas === 0 ? (
               <p className="text-[11.5px] text-warn">
                 {equipeToda
-                  ? "Nenhuma pessoa na equipe de vendas desta loja."
+                  ? "Nenhuma pessoa na equipe de vendas desta filial."
                   : "Nenhuma pessoa neste grupo."}
               </p>
             ) : temNivel ? (

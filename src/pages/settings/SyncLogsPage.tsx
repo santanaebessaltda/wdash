@@ -143,7 +143,7 @@ export function SyncLogsPage() {
 
   const lojaNome = useCallback(
     (e: SyncLogEntry) => {
-      if (!e.storeId && !e.storeLabel) return "Todas as lojas";
+      if (!e.storeId && !e.storeLabel) return "Todas as filiais";
       const loja = lojas.find((s) => s.id === e.storeId);
       return loja ? loja.fantasia : e.storeLabel ?? "—";
     },
@@ -317,7 +317,7 @@ function LogDetail({ entry, loja }: { entry: SyncLogEntry; loja: string }) {
         label="Tipo de sincronização"
         value={entry.jobKind ? (SYNC_JOB_KIND_LABEL[entry.jobKind] ?? entry.jobKind) : "Sincronização"}
       />
-      <DetailRow label="Loja" value={loja} />
+      <DetailRow label="Filial" value={loja} />
       {entry.days.length > 0 && <DetailRow label="Período afetado" value={fmtDays(entry.days)} />}
       <DetailRow
         label="Ocorrências"

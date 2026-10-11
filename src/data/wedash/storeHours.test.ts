@@ -37,7 +37,7 @@ describe("storeHours", () => {
     const kiosk = presetWeekHours("SHOPPING");
     expect(kiosk[1]).toEqual({ open: "10:00", close: "22:00" });
     expect(kiosk[6]).toEqual({ open: "10:00", close: "22:00" });
-    expect(kiosk[0]).toEqual({ open: "10:00", close: "22:00" });
+    expect(kiosk[0]).toEqual({ open: "12:00", close: "22:00" });
     expect(weekHoursConfigured(kiosk)).toBe(true);
 
     const street = presetWeekHours("RUA");

@@ -27,7 +27,7 @@ export function ShiftsPage() {
     <StoreCardsPage
       section="Operação"
       title="Grupos"
-      subtitle="Configure os grupos de cada loja. O grupo de cada vendedor é definido em Vendedores."
+      subtitle="Configure os grupos de cada filial. O grupo de cada vendedor é definido em Vendedores."
       loading={loading}
       skeleton={(n) => <StoreCardsSkeleton count={n} title shifts />}
       lojas={lojas}
@@ -127,7 +127,7 @@ function ShiftsCard({ tenantId, loja }: { tenantId: string; loja: Store }) {
 
   return (
     <Card>
-      <CostCardTitle title="Grupos da loja" />
+      <CostCardTitle title="Grupos da filial" />
       <form
         className="flex flex-col gap-4"
         onSubmit={(e) => {
@@ -143,7 +143,7 @@ function ShiftsCard({ tenantId, loja }: { tenantId: string; loja: Store }) {
             className="py-4!"
             icon="👥"
             title="Nenhum grupo cadastrado"
-            description="Crie os grupos da loja para organizar os vendedores e acompanhar o desempenho por grupo."
+            description="Crie os grupos da filial para organizar os vendedores e acompanhar o desempenho por grupo."
             action={
               <Button type="button" size="sm" icon={<Icon d={icons.plus} size={14} />} onClick={add}>
                 Adicionar grupo
