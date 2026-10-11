@@ -42,7 +42,7 @@ const ROLE_HINT: Record<SystemRole, string> = {
   OWNER:
     "Acessa todas as áreas das filiais selecionadas, inclusive Financeiro, e pode gerenciar usuários e integrações. Indicado para sócios e administrativo.",
   MANAGER:
-    "Acessa o Dashboard das filiais selecionadas, exceto Financeiro, além de Gestão e Operação.",
+    "Acessa o Dashboard das filiais selecionadas, exceto Financeiro, além de Gestão.",
 };
 
 /** A Edge devolve o mesmo codigo para o Gestor principal e para o proprio acesso; a tela sabe qual dos dois e. */

@@ -70,7 +70,7 @@ export const paths = {
     cashClose: "/management/cash-close",
     sangria: "/management/sangria",
   },
-  /** Configurações da filial e a operação da equipe. */
+  /** Configurações da filial. Vendedores fica em Gestão; a URL antiga de grupos abre essa tela. */
   operation: {
     costs: "/operation/costs",
     store: "/operation/store",
@@ -81,7 +81,7 @@ export const paths = {
     productsTaxes: "/operation/products-and-taxes",
     /** Stone de cada loja. Não fica em Integrações: a chave é da loja, não da empresa. */
     acquirers: "/operation/acquirers",
-    /** Grupos e vendedores: configuração da loja. O Gerente também entra. */
+    /** URL antiga. Abre Vendedores, onde o grupo é criado e administrado. */
     groups: "/operation/groups",
     sellers: "/operation/sellers",
   },

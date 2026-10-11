@@ -15,7 +15,7 @@ export const managementRoutes: RouteObject[] = [
   {
     element: <RequireRole roles={["OWNER", "MANAGER", "ADMIN_GLOBAL"]} />,
     children: [
-      { path: paths.management.shifts, element: <Navigate to={paths.operation.groups} replace /> },
+      { path: paths.management.shifts, element: <Navigate to={paths.operation.sellers} replace /> },
       { path: paths.management.staff, element: <Navigate to={paths.operation.sellers} replace /> },
       { path: paths.management.cashClose, element: <CashClosePage /> },
       { path: paths.management.sangria, element: <SangriaPage /> },

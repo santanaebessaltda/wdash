@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button, Card, CardHeader, CardTitle, EmptyState, FormField, Input, PageHeader, Select, TabNav } from "@/components/ui";
-import { costTabs, managementTabs, operationTabs } from "@/layout/nav-wedash";
+import { costTabs, managementTabs } from "@/layout/nav-wedash";
 import { halfHourOptions } from "@/data/wedash/storeHours";
 import { useActiveSession } from "@/session/SessionProvider";
 import { storesKey } from "@/session/session";
@@ -45,12 +45,11 @@ export function useScopedStores() {
   return { session, lojas, loading, refresh: () => setTick((n) => n + 1) };
 }
 
-export type SectionName = "Estoque" | "Gestão" | "Operação" | "Configurações";
+export type SectionName = "Estoque" | "Gestão" | "Configurações";
 
 const SECTION_TABS: Record<SectionName, Array<{ label: string; to: string; end?: boolean }>> = {
   Estoque: [],
   Gestão: managementTabs,
-  Operação: operationTabs,
   Configurações: costTabs,
 };
 
@@ -58,14 +57,12 @@ const SECTION_TABS: Record<SectionName, Array<{ label: string; to: string; end?:
 const SECTION_PAGES: Record<SectionName, Array<() => Promise<unknown>>> = {
   Estoque: [() => import("@/pages/stock/InventoryPage")],
   Gestão: [
+    () => import("@/pages/management/StaffPage"),
     () => import("@/pages/goals/GoalsPage"),
     () => import("@/pages/management/ChallengesPage"),
     () => import("@/pages/cash-close/CashClosePage"),
+    () => import("@/pages/management/SangriaPage"),
     () => import("@/pages/stock/PurchaseOrderPage"),
-  ],
-  Operação: [
-    () => import("@/pages/management/ShiftsPage"),
-    () => import("@/pages/management/StaffPage"),
   ],
   Configurações: [
     () => import("@/pages/operation/FilialPage"),

@@ -1,21 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Avatar, Badge, Button, Card, DataTable, Dropdown, EmptyState, Modal, Segmented, Select, Skeleton, Tooltip, useToast, type DataTableColumn, type DropdownItem } from "@/components/ui";
+import { Avatar, Badge, Button, Card, DataTable, Dropdown, EmptyState, Modal, Segmented, Skeleton, Tooltip, useToast, type DataTableColumn, type DropdownItem } from "@/components/ui";
 import { SegmentedSkeleton, StoreCardsSkeleton, TeamTableSkeleton } from "@/components/wedash/LoadingSkeletons";
 import {
   fetchLatestSellerSyncedAt,
   fetchStoreSellers,
   fetchStoreShifts,
   isActiveSalesPerson,
+  saveStoreShift,
   setSellerShift,
   syncStoreSellersNow,
   type Store,
   type StoreSeller,
   type StoreShift,
 } from "@/data/wedash/stores";
-import { shiftName } from "@/lib/format";
 import { refreshStatusLine, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { InviteSellerModal } from "@/pages/management/InviteSellerModal";
-import { CostCardTitle, StoreCardsPage, useScopedStores } from "@/pages/operation/shared";
+import { GroupFormModal, GroupPicker, ManageGroupsModal, groupProblem, nextGroupWindow } from "@/pages/management/SellerGroups";
+import { CostCardTitle, SAVE_ERROR_MSG, StoreCardsPage, useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
 import {
   copySellerInviteLink,
@@ -29,12 +30,16 @@ import {
 } from "@/data/wedash/sellerAccess";
 import { ACCESS_LABEL, hasSalesGroup, type AccessState } from "@/data/wedash/engine/sellerAccess";
 
-/** Configurações > Vendedores. Equipe de cada loja (Millennium) e o grupo de cada pessoa. */
+/** Gestão > Vendedores. Equipe da filial, grupo de cada pessoa e acesso à WDash. */
 export function StaffPage() {
   const { session, lojas, loading } = useScopedStores();
   const { show } = useToast();
   const [reloadKey, setReloadKey] = useState(0);
+  const [groupsTick, setGroupsTick] = useState(0);
+  const [manageOpen, setManageOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const syncing = useRef(false);
+  const lojaUnica = lojas.length === 1 ? lojas[0] : null;
 
   const lojasRef = useRef(lojas);
   lojasRef.current = lojas;
@@ -52,6 +57,23 @@ export function StaffPage() {
     };
   }, [loading, lojas, reloadKey, session.tenantId]);
 
+  async function atualizarVendedores() {
+    const lista = lojasRef.current;
+    if (syncing.current || lista.length === 0) return;
+    syncing.current = true;
+    setRefreshing(true);
+    try {
+      const results = await Promise.all(lista.map((loja) => syncStoreSellersNow(loja.id)));
+      const fail = results.find((r) => !r.ok);
+      if (fail && !fail.ok) show(fail.message, "danger");
+      else show("Vendedores atualizados.", "success");
+      if (results.some((r) => r.ok)) setReloadKey((n) => n + 1);
+    } finally {
+      syncing.current = false;
+      setRefreshing(false);
+    }
+  }
+
   useScreenRefresh({
     label: "Atualizar vendedores",
     tip: "Busca no Millennium os vendedores desta filial.",
@@ -59,39 +81,49 @@ export function StaffPage() {
       sellerSyncAt === undefined
         ? undefined
         : refreshStatusLine("Vendedores atualizados", "Vendedores ainda não atualizados", sellerSyncAt),
-    run: async () => {
-      const lista = lojasRef.current;
-      if (syncing.current || lista.length === 0) return;
-      syncing.current = true;
-      try {
-        const results = await Promise.all(lista.map((loja) => syncStoreSellersNow(loja.id)));
-        const fail = results.find((r) => !r.ok);
-        if (fail && !fail.ok) show(fail.message, "danger");
-        else show("Vendedores atualizados.", "success");
-        if (results.some((r) => r.ok)) setReloadKey((n) => n + 1);
-      } finally {
-        syncing.current = false;
-      }
-    },
+    run: atualizarVendedores,
   });
 
   return (
-    <StoreCardsPage
-      section="Operação"
-      title="Vendedores"
-      subtitle="Acompanhe os vendedores de cada filial e defina seus grupos."
-      loading={loading}
-      skeleton={(n) => <StoreCardsSkeleton count={n} title team wide />}
-      lojas={lojas}
-      wide
-      oneStore
-    >
-      {(loja) => <StaffCard tenantId={session.tenantId} loja={loja} reloadKey={reloadKey} />}
-    </StoreCardsPage>
+    <>
+      <StoreCardsPage
+        section="Gestão"
+        title="Vendedores"
+        subtitle="Acompanhe os vendedores da filial, defina seus grupos e gerencie o acesso à WDash."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" variant="secondary" size="sm" disabled={refreshing || lojas.length === 0} onClick={() => void atualizarVendedores()}>
+              {refreshing ? "Atualizando…" : "Atualizar vendedores"}
+            </Button>
+            {lojaUnica && (
+              <Button type="button" variant="outline" size="sm" onClick={() => setManageOpen(true)}>
+                Gerenciar grupos
+              </Button>
+            )}
+          </div>
+        }
+        loading={loading}
+        skeleton={(n) => <StoreCardsSkeleton count={n} title team wide />}
+        lojas={lojas}
+        wide
+        oneStore
+      >
+        {(loja) => <StaffCard tenantId={session.tenantId} loja={loja} reloadKey={reloadKey} groupsTick={groupsTick} />}
+      </StoreCardsPage>
+      {lojaUnica && (
+        <ManageGroupsModal
+          open={manageOpen}
+          tenantId={session.tenantId}
+          storeId={lojaUnica.id}
+          onClose={() => setManageOpen(false)}
+          onChanged={() => setGroupsTick((n) => n + 1)}
+        />
+      )}
+    </>
   );
 }
 
-function StaffCard({ tenantId, loja, reloadKey }: { tenantId: string; loja: Store; reloadKey: number }) {
+function StaffCard({ tenantId, loja, reloadKey, groupsTick }: { tenantId: string; loja: Store; reloadKey: number; groupsTick: number }) {
   const { show } = useToast();
   const [equipe, setEquipe] = useState<StoreSeller[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -104,6 +136,7 @@ function StaffCard({ tenantId, loja, reloadKey }: { tenantId: string; loja: Stor
   const [inviting, setInviting] = useState<StoreSeller | null>(null);
   const [removing, setRemoving] = useState<StoreSeller | null>(null);
   const [removingBusy, setRemovingBusy] = useState(false);
+  const [creating, setCreating] = useState<{ sellerId: string; start: string; end: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -120,7 +153,7 @@ function StaffCard({ tenantId, loja, reloadKey }: { tenantId: string; loja: Stor
     return () => {
       cancelled = true;
     };
-  }, [tenantId, loja.id, tick, reloadKey]);
+  }, [tenantId, loja.id, tick, reloadKey, groupsTick]);
 
   useEffect(() => {
     let cancelled = false;
@@ -142,13 +175,13 @@ function StaffCard({ tenantId, loja, reloadKey }: { tenantId: string; loja: Stor
     return () => {
       cancelled = true;
     };
-  }, [tenantId, loja.id]);
+  }, [tenantId, loja.id, groupsTick]);
 
   const ativos = useMemo(() => equipe.filter(isActiveSalesPerson), [equipe]);
   const desligados = useMemo(() => equipe.filter((s) => !s.active), [equipe]);
   const rows = tab === "ativos" ? ativos : desligados;
 
-  async function changeShift(sellerId: string, shiftId: string | null) {
+  async function changeShift(sellerId: string, shiftId: string | null): Promise<boolean> {
     const antes = shiftOf[sellerId];
     setShiftOf((m) => ({ ...m, [sellerId]: shiftId }));
     setSavingIds((s) => new Set(s).add(sellerId));
@@ -158,7 +191,7 @@ function StaffCard({ tenantId, loja, reloadKey }: { tenantId: string; loja: Stor
       next.delete(sellerId);
       return next;
     });
-    if (r.ok) return;
+    if (r.ok) return true;
     setShiftOf((m) => {
       const next = { ...m };
       if (antes === undefined) delete next[sellerId];
@@ -166,6 +199,25 @@ function StaffCard({ tenantId, loja, reloadKey }: { tenantId: string; loja: Stor
       return next;
     });
     show("Não foi possível alterar o grupo. Tente novamente.", "danger");
+    return false;
+  }
+
+  async function createGroup(draft: { name: string; start: string; end: string }) {
+    if (!creating) return false;
+    const problem = groupProblem(draft.name, draft.start, draft.end, shifts);
+    if (problem) {
+      show(problem, "danger");
+      return false;
+    }
+    const saved = await saveStoreShift({ tenantId, storeId: loja.id, shift: draft });
+    if (!saved.ok) {
+      show(SAVE_ERROR_MSG, "danger");
+      return false;
+    }
+    setShifts(await fetchStoreShifts(tenantId, loja.id));
+    const assigned = await changeShift(creating.sellerId, saved.id);
+    if (assigned) show("Grupo criado.", "success");
+    return true;
   }
 
   async function runAccess(sellerId: string, fn: (id: string) => Promise<{ ok: boolean; message?: string }>, okMsg: string) {
@@ -209,20 +261,14 @@ function StaffCard({ tenantId, loja, reloadKey }: { tenantId: string; loja: Stor
         render: (v) => {
           const atual = v.id in shiftOf ? shiftOf[v.id] : v.shiftId;
           return (
-            <Select
-              className="h-9! min-w-[150px]"
-              value={atual ?? ""}
-              disabled={shifts.length === 0 || savingIds.has(v.id)}
-              onChange={(e) => void changeShift(v.id, e.target.value || null)}
-              aria-label={`Grupo de ${v.name}`}
-            >
-              <option value="">{shifts.length === 0 ? "Cadastre um grupo" : "Sem grupo"}</option>
-              {shifts.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {shiftName(s.name)} · {s.start}–{s.end}
-                </option>
-              ))}
-            </Select>
+            <GroupPicker
+              sellerName={v.name}
+              shifts={shifts}
+              value={atual ?? null}
+              disabled={savingIds.has(v.id)}
+              onChange={(shiftId) => void changeShift(v.id, shiftId)}
+              onCreate={() => setCreating({ sellerId: v.id, ...nextGroupWindow(shifts) })}
+            />
           );
         },
       },
@@ -331,6 +377,14 @@ function StaffCard({ tenantId, loja, reloadKey }: { tenantId: string; loja: Stor
           </p>
         )}
       </Modal>
+      <GroupFormModal
+        open={creating != null}
+        title="Criar grupo"
+        submitLabel="Criar grupo"
+        initial={{ name: "", start: creating?.start ?? "08:00", end: creating?.end ?? "14:00" }}
+        onClose={() => setCreating(null)}
+        onSubmit={createGroup}
+      />
       <InviteSellerModal
         seller={inviting ? { id: inviting.id, name: inviting.name, email: inviting.email } : null}
         onClose={() => setInviting(null)}

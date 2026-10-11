@@ -4,7 +4,6 @@ import type { NavEntry, NavGroup, NavSingle } from "./nav-config";
 
 const ICONE = {
   dashboard: "M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z",
-  loja: "M3 9.5 5 4h14l2 5.5M3 9.5h18M3 9.5v10a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-10M9 20.5v-6h6v6",
   equipe: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8",
   analise: "M3 3v18h18M18 9l-5 5-4-4-4 4",
   meta: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4",
@@ -29,28 +28,18 @@ const estoque: NavSingle = {
   to: paths.stock.inventory,
 };
 
-/** Metas  |  Desafios  |  Fechamento  |  Sangrias  |  Pedido de compra (Gestor e Gerente). */
+/** Vendedores  |  Metas  |  Desafios  |  Fechamento  |  Sangrias  |  Pedido de compra (Gestor e Gerente). */
 const gestao: NavGroup = {
   label: "Gestão",
-  description: "Gerencie metas, desafios, o fechamento, as sangrias e o pedido de compra.",
+  description: "Administre a equipe, as metas, os desafios, o fechamento, as sangrias e o pedido de compra.",
   icon: ICONE.gestao,
   items: [
+    { label: "Vendedores", to: paths.operation.sellers },
     { label: "Metas", to: paths.goals },
     { label: "Desafios", to: paths.management.challenges },
     { label: "Fechamento", to: paths.management.cashClose },
     { label: "Sangrias", to: paths.management.sangria },
     { label: "Pedido de compra", to: paths.stock.purchaseOrder },
-  ],
-};
-
-/** Grupos  |  Vendedores (Gestor e Gerente). */
-const operacao: NavGroup = {
-  label: "Operação",
-  description: "Organize os grupos e os vendedores de cada filial.",
-  icon: ICONE.loja,
-  items: [
-    { label: "Grupos", to: paths.operation.groups },
-    { label: "Vendedores", to: paths.operation.sellers },
   ],
 };
 
@@ -68,7 +57,6 @@ const custos: NavGroup = {
 
 /** Abas das telas de cada grupo = os mesmos itens do menu. */
 export const managementTabs = gestao.items.map(({ label, to }) => ({ label, to }));
-export const operationTabs = operacao.items.map(({ label, to }) => ({ label, to }));
 export const costTabs = custos.items.map(({ label, to }) => ({ label, to }));
 
 const navGestor: NavEntry[] = [
@@ -84,7 +72,6 @@ const navGestor: NavEntry[] = [
   },
   estoque,
   gestao,
-  operacao,
   custos,
 ];
 
@@ -101,7 +88,6 @@ const navGerente: NavEntry[] = [
   },
   estoque,
   gestao,
-  operacao,
 ];
 
 /** Telas so do Gestor (Financeiro, Configuracoes, Usuarios, Integracoes, Logs). */

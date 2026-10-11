@@ -7,15 +7,14 @@ import { GESTOR_ROLES } from "@/layout/nav-wedash";
 const FilialPage = lazyPage(() => import("./FilialPage"), "FilialPage");
 const ProductsTaxesPage = lazyPage(() => import("./ProductsTaxesPage"), "ProductsTaxesPage");
 const AcquirersPage = lazyPage(() => import("../cash-close/AcquirersPage"), "AcquirersPage");
-const ShiftsPage = lazyPage(() => import("../management/ShiftsPage"), "ShiftsPage");
 const StaffPage = lazyPage(() => import("../management/StaffPage"), "StaffPage");
 
-/** Operação: Gestor e Gerente. Configurações: só Gestor. */
+/** Vendedores: Gestor e Gerente. Configurações: só Gestor. */
 export const operationRoutes: RouteObject[] = [
   {
     element: <RequireRole roles={["OWNER", "MANAGER", "ADMIN_GLOBAL"]} />,
     children: [
-      { path: paths.operation.groups, element: <ShiftsPage /> },
+      { path: paths.operation.groups, element: <Navigate to={paths.operation.sellers} replace /> },
       { path: paths.operation.sellers, element: <StaffPage /> },
     ],
   },

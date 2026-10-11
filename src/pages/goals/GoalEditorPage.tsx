@@ -635,7 +635,7 @@ export default function GoalEditorPage() {
             team={team}
             target={targetValue}
             mode={prizeMode}
-            onCreate={() => navigate(paths.operation.groups)}
+            onCreate={() => navigate(paths.operation.sellers)}
             error={errors.groups}
           />
         </SideCard>
@@ -838,14 +838,10 @@ function GroupsEditor({
         <EmptyBlock
           icon="👥"
           title="Nenhum grupo cadastrado"
-          description="Crie os grupos da filial para distribuir a meta entre eles."
+          description="Crie os grupos em Vendedores para distribuir a meta entre eles."
           action={
-            <Button
-              size="sm"
-              icon={<Icon d={icons.plus} size={14} />}
-              onClick={onCreate}
-            >
-              Criar grupo
+            <Button size="sm" onClick={onCreate}>
+              Ir para Vendedores
             </Button>
           }
         />

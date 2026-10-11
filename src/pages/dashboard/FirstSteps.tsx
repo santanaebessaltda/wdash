@@ -101,7 +101,7 @@ function stepAction(step: FirstStep): { label: string; to: string } | null {
       return { label: "Configurar funcionamento", to: paths.operation.filial };
     case "groups":
       return step.needsGroups
-        ? { label: "Criar grupos", to: paths.operation.groups }
+        ? { label: "Criar grupos", to: paths.operation.sellers }
         : { label: "Vincular vendedores", to: paths.operation.sellers };
     case "franchise":
       return { label: "Configurar franquia", to: paths.operation.filial };
