@@ -4,15 +4,14 @@ import { getSupabase } from "@/lib/supabase";
 import { CheckIcon } from "@/pages/utility/icons";
 import { useActiveSession } from "@/session/SessionProvider";
 
-type PrefKey = "sales" | "quiet" | "cashClose" | "storeGoal";
+type PrefKey = "sales" | "cashClose" | "storeGoal";
 
 type Prefs = Record<PrefKey, boolean>;
 
-const DEFAULTS: Prefs = { sales: true, quiet: false, cashClose: true, storeGoal: true };
+const DEFAULTS: Prefs = { sales: true, cashClose: true, storeGoal: true };
 
 const ROWS: Array<{ key: PrefKey; name: string; desc: string }> = [
-  { key: "sales", name: "Vendas do período", desc: "A cada 30 minutos, o resumo de cada loja: o que entrou no período e quanto já vendeu hoje. Chega com ou sem venda nova, com o app aberto ou fechado." },
-  { key: "quiet", name: "Sem venda no período", desc: "O resumo de vendas já inclui o período sem venda. Esta opção só manda esse aviso se o resumo de vendas estiver desligado." },
+  { key: "sales", name: "Vendas do período", desc: "A cada 30 minutos, se alguma loja vendeu, o resumo mostra o que entrou no período e quanto cada loja já vendeu hoje. As lojas aparecem da que mais vendeu no dia para a que menos vendeu. Chega com o app aberto ou fechado." },
   { key: "cashClose", name: "Fechamento", desc: "Receba um resumo do fechamento do dia, com faltas ou sobras em dinheiro e dias ainda sem total real." },
   { key: "storeGoal", name: "Meta da loja", desc: "Receba um aviso quando a loja atingir um novo nível da meta. Cada nível é avisado uma única vez." },
 ];
@@ -43,7 +42,7 @@ export function NotificationsPage() {
       setUserId(uid);
       const { data, error } = await sb
         .from("notification_pref")
-        .select("sales, quiet, cash_close, store_goal")
+        .select("sales, cash_close, store_goal")
         .eq("auth_user_id", uid)
         .eq("tenant_id", session.tenantId)
         .maybeSingle();
@@ -55,7 +54,6 @@ export function NotificationsPage() {
       if (!data) return;
       setPrefs({
         sales: Boolean(data.sales),
-        quiet: Boolean(data.quiet),
         cashClose: Boolean(data.cash_close),
         storeGoal: Boolean(data.store_goal),
       });
@@ -76,7 +74,6 @@ export function NotificationsPage() {
         auth_user_id: userId,
         tenant_id: session.tenantId,
         sales: next.sales,
-        quiet: next.quiet,
         cash_close: next.cashClose,
         store_goal: next.storeGoal,
       },

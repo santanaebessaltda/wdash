@@ -12,19 +12,17 @@ function money(cents: number): string {
   return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-export function formatQuietSalesPush(): { title: string; body: string } {
-  return { title: "Sem vendas nos últimos 30 min", body: "Nenhuma nova venda registrada no período." };
-}
-
 export type SalesPushRow = { name: string; deltaCents: number; todayCents: number };
 
 /**
- * Resumo da rodada. `null` só sem loja no acesso.
+ * Resumo da rodada. `null` sem loja no acesso ou sem venda nova no intervalo.
  * Uma loja: "R$ … nos últimos 30 min" / "CENTRO · hoje R$ …".
- * Várias: o título junta o intervalo e o dia da rede; a lista só traz quem vendeu agora.
+ * Várias: o título junta o intervalo e o dia da rede; a lista só traz quem vendeu agora,
+ * da loja que mais vendeu no dia para a que menos vendeu.
  */
 export function formatSalesPush(rows: SalesPushRow[]): { title: string; body: string } | null {
-  if (rows.length === 0) return null;
+  const sold = rows.filter((row) => row.deltaCents > 0);
+  if (rows.length === 0 || sold.length === 0) return null;
   const deltaTotal = rows.reduce((sum, row) => sum + Math.max(0, row.deltaCents), 0);
   const todayTotal = rows.reduce((sum, row) => sum + row.todayCents, 0);
   const period = `${money(deltaTotal)} nos últimos 30 min`;
@@ -32,10 +30,10 @@ export function formatSalesPush(rows: SalesPushRow[]): { title: string; body: st
     const only = rows[0]!;
     return { title: period, body: `${only.name} · hoje ${money(only.todayCents)}` };
   }
-  const sold = rows
-    .filter((row) => row.deltaCents > 0)
-    .sort((a, b) => b.deltaCents - a.deltaCents || a.name.localeCompare(b.name, "pt-BR"));
-  const body = sold.map((row) => `${row.name} · ${money(row.deltaCents)} · hoje ${money(row.todayCents)}`).join("\n");
+  const ordered = [...sold].sort(
+    (a, b) => b.todayCents - a.todayCents || a.name.localeCompare(b.name, "pt-BR"),
+  );
+  const body = ordered.map((row) => `${row.name} · ${money(row.deltaCents)} · hoje ${money(row.todayCents)}`).join("\n");
   return { title: `${period} · hoje ${money(todayTotal)}`, body };
 }
 
@@ -82,15 +80,14 @@ function authUserId(identity: MemberRow["identity"]): string | null {
   return identity.auth_user_id;
 }
 
-type PushPrefs = { sales: boolean; quiet: boolean; cashClose: boolean; storeGoal: boolean };
+type PushPrefs = { sales: boolean; cashClose: boolean; storeGoal: boolean };
 
-const PREF_DEFAULT: PushPrefs = { sales: true, quiet: false, cashClose: true, storeGoal: true };
+const PREF_DEFAULT: PushPrefs = { sales: true, cashClose: true, storeGoal: true };
 
 function prefsOf(row: Record<string, unknown> | undefined): PushPrefs {
   if (!row) return PREF_DEFAULT;
   return {
     sales: row.sales !== false,
-    quiet: row.quiet === true,
     cashClose: row.cash_close !== false,
     storeGoal: row.store_goal !== false,
   };
@@ -134,7 +131,7 @@ async function loadAudience(sb: SupabaseClient, tenantId: string): Promise<Audie
 
   const [{ data: subs, error: subErr }, { data: prefRows, error: prefErr }] = await Promise.all([
     sb.from("push_subscription").select("id, auth_user_id, endpoint, p256dh, auth").eq("tenant_id", tenantId).in("auth_user_id", userIds),
-    sb.from("notification_pref").select("auth_user_id, sales, quiet, cash_close, store_goal").eq("tenant_id", tenantId).in("auth_user_id", userIds),
+    sb.from("notification_pref").select("auth_user_id, sales, cash_close, store_goal").eq("tenant_id", tenantId).in("auth_user_id", userIds),
   ]);
   if (subErr) throw subErr;
   if (prefErr) throw prefErr;
@@ -276,12 +273,7 @@ export async function notifyAutoSales(
     ];
     if (rows.length === 0) continue;
     const text = formatSalesPush(rows);
-    if (!text) continue;
-    const comVenda = rows.some((row) => row.deltaCents > 0);
-    // Vendas ligado (padrão) manda o resumo em toda rodada, com ou sem venda nova.
-    // "Sem venda" sozinho continua valendo para quem desligou o resumo e deixou só esse aviso.
-    if (wants(audience, userId, "sales") || (!comVenda && wants(audience, userId, "quiet"))) {
-      await deliver(sb, audience, userId, text, "/", "wdash-sales");
-    }
+    if (!text || !wants(audience, userId, "sales")) continue;
+    await deliver(sb, audience, userId, text, "/", "wdash-sales");
   }
 }
