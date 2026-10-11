@@ -53,8 +53,8 @@ export function StaffPage() {
   }, [loading, lojas, reloadKey, session.tenantId]);
 
   useScreenRefresh({
-    label: "Atualizar os vendedores",
-    tip: "Busca no Millennium os vendedores das lojas desta tela.",
+    label: "Atualizar vendedores",
+    tip: "Busca no Millennium os vendedores desta loja.",
     status:
       sellerSyncAt === undefined
         ? undefined
@@ -280,10 +280,10 @@ function StaffCard({ tenantId, loja, reloadKey }: { tenantId: string; loja: Stor
           title={semEquipe ? "Nenhum vendedor sincronizado" : tab === "ativos" ? "Nenhum vendedor ativo" : "Nenhum vendedor desligado"}
           description={
             semEquipe
-              ? "Use Atualizar no topo para buscar os vendedores desta loja no Millennium."
+              ? "Use Atualizar vendedores no topo para buscar os vendedores desta loja no Millennium."
               : tab === "ativos"
                 ? "Não há vendedores ativos nesta loja no momento."
-                : "Vendedores desativados no Millennium aparecem aqui."
+                : "Vendedores desligados no Millennium aparecem aqui."
           }
         />
       ) : (
@@ -327,7 +327,7 @@ function StaffCard({ tenantId, loja, reloadKey }: { tenantId: string; loja: Stor
       >
         {removing && (
           <p className="text-[13.5px] leading-relaxed text-t1">
-            <span className="font-bold text-t0">{removing.name}</span> deixa de entrar na WDash por esta loja. Dá para convidar de novo depois.
+            <span className="font-bold text-t0">{removing.name}</span> não poderá mais acessar esta loja na WDash. Você poderá convidar essa pessoa novamente depois.
           </p>
         )}
       </Modal>
@@ -359,7 +359,7 @@ function AccessCell({ state, grouped, onInvite }: { state: AccessState | "loadin
       </Button>
     );
     if (grouped) return button;
-    return <Tooltip label="Vincule um grupo antes de convidar.">{button}</Tooltip>;
+    return <Tooltip label="Vincule o vendedor a um grupo antes de convidar.">{button}</Tooltip>;
   }
   const b = ACCESS_BADGE[state];
   return <Badge variant={b.variant}>{b.label}</Badge>;
@@ -387,11 +387,11 @@ function AccessMenu({
   const items: DropdownItem[] =
     state === "PENDING" ? [
         { label: "Copiar link", onClick: onCopy },
-        { label: "Reenviar", onClick: onResend },
+        { label: "Reenviar convite", onClick: onResend },
         { label: "Cancelar convite", onClick: onRevoke, danger: true },
       ]
-    : state === "ACTIVE" ? [{ label: "Suspender", onClick: onSuspend }, excluir]
-    : [{ label: "Reativar", onClick: onReactivate }, excluir];
+    : state === "ACTIVE" ? [{ label: "Suspender acesso", onClick: onSuspend }, excluir]
+    : [{ label: "Reativar acesso", onClick: onReactivate }, excluir];
   return (
     <Dropdown
       align="right"

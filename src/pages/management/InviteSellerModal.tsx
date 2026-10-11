@@ -91,7 +91,7 @@ export function InviteSellerModal({
       {sent ? (
         <p className="text-[13.5px] text-t1">
           O convite foi enviado para <span className="font-semibold text-t0">{normalized}</span>. Você também pode copiar o
-          mesmo link do e-mail e enviar por outro canal.
+          link e enviá-lo por outro canal.
         </p>
       ) : (
         <FormField label="E-mail" required error={error ?? (invalid ? "Informe um e-mail válido." : undefined)}>

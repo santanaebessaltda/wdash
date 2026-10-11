@@ -96,8 +96,8 @@ export function presetWeekHours(pointType: HoursPointType): StoreWeekHours {
 }
 
 export const PRESET_HOURS_HINT: Record<HoursPointType, string> = {
-  SHOPPING: "Padrão de quiosque (shopping): seg–sáb 10h–22h · domingo 12h–22h. Ajuste se for diferente.",
-  RUA: "Padrão de loja de rua: seg–sex 8h–18h · sábado 8h–17h · domingo fechado. Ajuste se for diferente.",
+  SHOPPING: "Padrão de quiosque: seg–sáb 10h–22h · domingo 12h–22h. Ajuste se o funcionamento desta loja for diferente.",
+  RUA: "Padrão de loja de rua: seg–sex 8h–18h · sábado 8h–17h · domingo fechado. Ajuste se o funcionamento desta loja for diferente.",
 };
 
 /** Nenhum dia aberto = horario ainda nao configurado. */
