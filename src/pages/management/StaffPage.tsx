@@ -89,7 +89,7 @@ export function StaffPage() {
         subtitle="Acompanhe os vendedores da filial, defina seus grupos e gerencie o acesso à WDash."
         actions={
           lojaUnica ? (
-            <Button type="button" size="sm" onClick={() => setManageOpen(true)}>
+            <Button type="button" onClick={() => setManageOpen(true)}>
               Gerenciar grupos
             </Button>
           ) : undefined
