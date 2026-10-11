@@ -37,7 +37,6 @@ export function StaffPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [groupsTick, setGroupsTick] = useState(0);
   const [manageOpen, setManageOpen] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const syncing = useRef(false);
   const lojaUnica = lojas.length === 1 ? lojas[0] : null;
 
@@ -61,7 +60,6 @@ export function StaffPage() {
     const lista = lojasRef.current;
     if (syncing.current || lista.length === 0) return;
     syncing.current = true;
-    setRefreshing(true);
     try {
       const results = await Promise.all(lista.map((loja) => syncStoreSellersNow(loja.id)));
       const fail = results.find((r) => !r.ok);
@@ -70,7 +68,6 @@ export function StaffPage() {
       if (results.some((r) => r.ok)) setReloadKey((n) => n + 1);
     } finally {
       syncing.current = false;
-      setRefreshing(false);
     }
   }
 
@@ -91,16 +88,11 @@ export function StaffPage() {
         title="Vendedores"
         subtitle="Acompanhe os vendedores da filial, defina seus grupos e gerencie o acesso à WDash."
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="secondary" size="sm" disabled={refreshing || lojas.length === 0} onClick={() => void atualizarVendedores()}>
-              {refreshing ? "Atualizando…" : "Atualizar vendedores"}
+          lojaUnica ? (
+            <Button type="button" size="sm" onClick={() => setManageOpen(true)}>
+              Gerenciar grupos
             </Button>
-            {lojaUnica && (
-              <Button type="button" variant="outline" size="sm" onClick={() => setManageOpen(true)}>
-                Gerenciar grupos
-              </Button>
-            )}
-          </div>
+          ) : undefined
         }
         loading={loading}
         skeleton={(n) => <StoreCardsSkeleton count={n} title team wide />}
