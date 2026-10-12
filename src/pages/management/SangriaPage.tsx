@@ -354,7 +354,7 @@ export function SangriaPage() {
         subtitle="Confira as sangrias, defina o que entra no boleto e acompanhe os valores recebidos."
         actions={
           <HeaderFilters>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2">
               <SeletorMesAno iso={anchor} hoje={hoje} minIso={piso} onChange={irParaMes} />
               <button type="button" aria-label="Mês anterior" className={monthNavBtn} disabled={!podeVoltar} onClick={() => irParaMes(somarMes(anchor, -1))}>
                 <Seta dir="anterior" />
@@ -362,8 +362,8 @@ export function SangriaPage() {
               <button type="button" aria-label="Próximo mês" className={monthNavBtn} disabled={!podeAvancar} onClick={() => irParaMes(somarMes(anchor, 1))}>
                 <Seta dir="proximo" />
               </button>
-              {!escolher && loja ? <MarcarComo dias={marcados.length} rotulo={rotuloMarcar} valor={valorACobrar} recebidoOk={diasRecebiveis.length > 0} foraOk={linhasBoletoAbertas.length > 0} cobrarOk={linhasForaAbertas.length > 0} tudoRecebido={marcados.length > 0 && marcados.every((day) => taken.has(day))} podeDesfazer={depositosMarcados.length > 0} onRecebido={() => setAcao("recebido")} onCobrar={() => setAcao("aCobrar")} onFora={() => { setMotivoLote(""); setAcao("fora"); }} onFalta={abrirFalta} onDesfazer={() => void abrirDesfazer()} /> : null}
             </div>
+            {!escolher && loja ? <MarcarComo dias={marcados.length} rotulo={rotuloMarcar} valor={valorACobrar} recebidoOk={diasRecebiveis.length > 0} foraOk={linhasBoletoAbertas.length > 0} cobrarOk={linhasForaAbertas.length > 0} tudoRecebido={marcados.length > 0 && marcados.every((day) => taken.has(day))} podeDesfazer={depositosMarcados.length > 0} onRecebido={() => setAcao("recebido")} onCobrar={() => setAcao("aCobrar")} onFora={() => { setMotivoLote(""); setAcao("fora"); }} onFalta={abrirFalta} onDesfazer={() => void abrirDesfazer()} /> : null}
           </HeaderFilters>
         }
       />
@@ -866,7 +866,7 @@ function MarcarComo({
   onFalta: () => void;
   onDesfazer: () => void;
 }) {
-  if (dias === 0) return <Button disabled>Marcar como</Button>;
+  if (dias === 0) return <Button className="w-full sm:w-auto" disabled>Marcar como</Button>;
   const itens: DropdownItem[] = [
     ...(podeDesfazer
       ? [
@@ -916,10 +916,12 @@ function MarcarComo({
     },
   ];
   return (
-    <>
-      <Dropdown portal align="right" menuClassName="w-[320px]" trigger={<Button>{rotulo}</Button>} items={itens} />
+    <div className="flex w-full flex-col items-stretch gap-1.5 sm:w-auto sm:flex-row sm:items-center">
+      <div className="w-full sm:w-auto [&>div]:w-full sm:[&>div]:w-auto">
+        <Dropdown portal align="right" menuClassName="w-[320px]" trigger={<Button className="w-full sm:w-auto">{rotulo}</Button>} items={itens} />
+      </div>
       <span className="text-[13px] font-semibold text-t1">{money(valor)} a cobrar</span>
-    </>
+    </div>
   );
 }
 
