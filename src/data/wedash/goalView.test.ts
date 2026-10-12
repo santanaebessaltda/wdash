@@ -195,7 +195,10 @@ describe("goalView", () => {
       expect(p.premiacaoAcumulada).toBeCloseTo(20);
       expect(p.bonusAlcancado).toBe(0);
     }
-    expect(ana.faturamentoValor).toBe(3000);
+    expect(ana.faturamentoValor).toBe(2000);
+    expect(ana.atendimentos).toBeCloseTo(1 / 4);
+    expect(ana.ticketValor).toBe(8000);
+    expect(card.faixa.foraDaEquipe).toBe(0);
   });
 
   it("grupos modo Grupo: sobe pela soma do grupo e divide a premiação igualmente", () => {

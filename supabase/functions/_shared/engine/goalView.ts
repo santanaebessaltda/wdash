@@ -89,6 +89,21 @@ export function goalRealized(g: GoalRecord, dayAggs: SalesDayAgg[]): number {
   return cents / 100;
 }
 
+/** Vendas e itens da filial no período da meta. Itens null = algum dia com venda sem itens. */
+function vendasDaLoja(g: GoalRecord, dayAggs: SalesDayAgg[]): { sales: number; items: number | null } {
+  let sales = 0;
+  let items = 0;
+  let missing = false;
+  for (const a of dayAggs) {
+    if (a.brand !== "ALL" || a.storeId !== g.storeId) continue;
+    if (a.day < g.startsOn || a.day > g.endsOn) continue;
+    sales += a.salesCount;
+    if (!a.itemCount && a.salesCount > 0) missing = true;
+    else items += a.itemCount ?? 0;
+  }
+  return { sales, items: missing ? null : items };
+}
+
 /** Projecao linear pelo ritmo do periodo (so em andamento); encerrada = o realizado. */
 function projetadoPct(pct: number, g: GoalRecord, today: string): number {
   const f = fracaoDecorrida(g, today);
@@ -341,6 +356,7 @@ export function buildGoalCardView(input: {
   const n = pessoas.length;
   const general = g.tierMode === "GENERAL";
   const individual = g.tierMode === "INDIVIDUAL";
+  const lojaVendas = status === "upcoming" ? { sales: 0, items: 0 as number | null } : vendasDaLoja(g, input.dayAggs);
   const escala = Math.max(100, ...g.tiers.map((t) => t.atingimentoMinPct));
   const marcos = g.tiers.map((t) => ({ nome: t.nome, pct: t.atingimentoMinPct, pctPremiacao: t.comissaoPct, bonus: t.bonus }));
   const diasPeriodo = intervaloDias(g.startsOn, g.endsOn).length;
@@ -385,17 +401,23 @@ export function buildGoalCardView(input: {
     const premiacao = degrau && metaInd > 0 ? (base * degrau.comissaoPct) / 100 / (individual ? 1 : membros) : 0;
     const bonus = metaInd > 0 ? g.tiers.slice(0, idx + 1).reduce((s, t) => s + t.bonus, 0) : 0;
     const membro = p.employeeId != null ? porCodigo.get(p.employeeId) : undefined;
-    const ticket = p.vendas > 0 ? p.faturamento / p.vendas : 0;
-    const pa = p.vendas > 0 && p.itens > 0 ? p.itens / p.vendas : 0;
+    // Geral: cada pessoa vê a parte igual da filial (caixa e venda sem vendedor entram no bolo).
+    const parte = general && n > 0;
+    const fatMostrar = parte ? realizado / n : p.faturamento;
+    const vendasMostrar = parte ? lojaVendas.sales / n : p.vendas;
+    const ticket = vendasMostrar > 0 ? fatMostrar / vendasMostrar : 0;
+    const pa = parte
+      ? (lojaVendas.items == null || lojaVendas.sales <= 0 ? 0 : lojaVendas.items / lojaVendas.sales)
+      : (p.vendas > 0 && p.itens > 0 ? p.itens / p.vendas : 0);
     return {
       colaboradorId: p.key,
       nome: p.nome,
       filialId: g.storeId,
       filialNome: lojaNome,
       grupo: membro?.shiftName ?? "Sem grupo definido",
-      faturamentoValor: p.faturamento,
-      faturamento: brlCent(p.faturamento),
-      atendimentos: p.vendas,
+      faturamentoValor: fatMostrar,
+      faturamento: brlCent(fatMostrar),
+      atendimentos: vendasMostrar,
       ticketValor: ticket,
       ticket: brlCent(ticket),
       paValor: pa,
@@ -407,7 +429,7 @@ export function buildGoalCardView(input: {
       diasElegiveis: diasPeriodo,
       atingimentoPct: ating,
       barraPct: Math.min(100, (ating / escala) * 100),
-      pctMetaGeral: g.target > 0 ? (p.faturamento / g.target) * 100 : 0,
+      pctMetaGeral: g.target > 0 ? ((parte ? realizado : p.faturamento) / g.target) * 100 : 0,
       marcosEscada: marcos,
       degrauAtual: degrau?.nome ?? null,
       nivelAtual: degrau ? idx + 1 : null,
@@ -434,7 +456,7 @@ export function buildGoalCardView(input: {
   const faixa: NetworkGlobalGoal = {
     competTexto: g.name,
     realizado,
-    foraDaEquipe: Math.max(0, realizado - equipeTotal),
+    foraDaEquipe: general ? 0 : Math.max(0, realizado - equipeTotal),
     total: g.target,
     pct,
     projetadoPct: status === "upcoming" ? 0 : projetadoPct(pct, g, today),

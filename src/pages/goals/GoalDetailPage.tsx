@@ -49,7 +49,7 @@ const AJUDA_MODO: Record<GoalRecord["tierMode"], string> = {
   GROUP:
     "O grupo sobe de nível pela soma das vendas. A premiação é dividida igualmente entre as pessoas do grupo, e o bônus de cada nível vale para cada pessoa. Os bônus dos níveis alcançados são acumulados.",
   GENERAL:
-    "A filial sobe de nível pelo total vendido. A premiação é dividida igualmente entre as pessoas da equipe, e o bônus de cada nível vale para cada pessoa. Os bônus dos níveis alcançados são acumulados.",
+    "A filial sobe de nível pelo total vendido, inclusive a venda do caixa e a venda sem vendedor. Faturamento e nº de vendas de cada pessoa são a parte igual desse total. Ticket médio e P.A. são os da filial. A premiação é dividida igualmente e o bônus vale para cada pessoa.",
 };
 
 const MODO_LABEL: Record<GoalRecord["tierMode"], string> = {
@@ -610,7 +610,7 @@ function GoalPayoutCard({
       )}
       {goal.tierMode === "GENERAL" && equipe.length > 0 && (
         <p className="mt-3 text-[11.5px] text-t2">
-          No modo Geral, a premiação do total vendido da loja é dividida igualmente entre as pessoas. O faturamento exibido continua sendo o de cada pessoa.
+          No modo Geral, o faturamento de cada pessoa é a parte igual da venda da filial. A premiação desse total é dividida igualmente.
         </p>
       )}
     </Card>

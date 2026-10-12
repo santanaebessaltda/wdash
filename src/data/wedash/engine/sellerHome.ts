@@ -1,4 +1,4 @@
-/** Pacote da tela Inicio do vendedor. O podio do mes traz o faturamento da equipe; a premiacao da meta continua so da propria pessoa. */
+/** Pacote da tela Inicio do vendedor. No modo Geral, numeros e podio sao a parte igual da filial. Nos outros modos, o podio e a venda de cada pessoa. */
 import { brlCent, collaboratorName, inicioDoMes, somarDias } from "./format.ts";
 import type { GoalRecord, GoalTeamMember, SalesDayAgg, SalesSellerDayAgg } from "./goalTypes.ts";
 import { buildGoalCardView, goalStatus, sellerGoalLevels, type SellerGoalLevel } from "./goalView.ts";
@@ -143,6 +143,33 @@ function prizeLabel(prize: SellerChallengePrize | null, mode: SellerChallengeInp
   return mode === "MINIMUM" ? `${value} por pessoa` : `1º lugar: ${value}`;
 }
 
+/** Meta Geral em andamento nesta loja. O caixa (fora da equipe) entra no bolo e sai da divisao. */
+function generalGoal(input: SellerHomeInput, storeId: string): GoalRecord | null {
+  const goal = input.goals.find((g) => g.storeId === storeId && g.tierMode === "GENERAL" && goalStatus(g, input.today) === "active");
+  return goal ?? null;
+}
+
+/** Pessoas da equipe de vendas da loja, com nome para aparecer no podio. */
+function salesTeam(input: SellerHomeInput, storeId: string): GoalTeamMember[] {
+  return input.team.filter((m) => m.storeId === storeId && m.salesPerson && m.employeeId != null && collaboratorName(m.name));
+}
+
+/** Venda da filial num intervalo. Itens null = algum dia com venda sem itens. */
+function storeSlice(input: SellerHomeInput, storeId: string, from: string, to: string): { revenue: number; sales: number; items: number | null } {
+  let revenue = 0;
+  let sales = 0;
+  let items = 0;
+  let missing = false;
+  for (const a of input.dayAggs) {
+    if (a.storeId !== storeId || a.brand !== "ALL" || a.day < from || a.day > to) continue;
+    revenue += a.revenueCents / 100;
+    sales += a.salesCount;
+    if (!a.itemCount && a.salesCount > 0) missing = true;
+    else items += a.itemCount ?? 0;
+  }
+  return { revenue, sales, items: missing ? null : items };
+}
+
 /** Grupo da pessoa na loja. Sem grupo = so quem tambem esta sem grupo. */
 function sellerGroup(input: SellerHomeInput, s: SellerHomeInput["stores"][number]): { shiftId: string | null; name: string | null } | null {
   const mine = input.team.find((m) => m.storeId === s.storeId && m.employeeId === s.employeeId);
@@ -150,8 +177,25 @@ function sellerGroup(input: SellerHomeInput, s: SellerHomeInput["stores"][number
   return { shiftId: mine.shiftId, name: mine.shiftName };
 }
 
-/** Vendedoras do mesmo grupo, do dia 1 ate hoje. Quem ainda nao vendeu entra com zero. */
+/** No modo Geral, a equipe inteira com a mesma parte da filial. Senao, o grupo, do dia 1 ate hoje. */
 function monthRanking(input: SellerHomeInput, s: SellerHomeInput["stores"][number]): MonthRankingEntry[] {
+  const geral = generalGoal(input, s.storeId);
+  const equipe = salesTeam(input, s.storeId);
+  if (geral && equipe.length > 0) {
+    const from = inicioDoMes(input.today);
+    const inicio = from > geral.startsOn ? from : geral.startsOn;
+    const fim = input.today < geral.endsOn ? input.today : geral.endsOn;
+    const tot = inicio <= fim ? storeSlice(input, s.storeId, inicio, fim) : { revenue: 0, sales: 0, items: 0 };
+    const n = equipe.length;
+    const ordered = [...equipe].sort((a, b) => collaboratorName(a.name).localeCompare(collaboratorName(b.name), "pt-BR"));
+    return ordered.map((m) => ({
+      position: 1,
+      name: collaboratorName(m.name),
+      revenue: tot.revenue / n,
+      sales: tot.sales / n,
+      me: m.employeeId === s.employeeId,
+    }));
+  }
   const from = inicioDoMes(input.today);
   const group = sellerGroup(input, s);
   const inGroup = (m: GoalTeamMember) =>
@@ -257,14 +301,28 @@ function buildStore(input: SellerHomeInput, s: SellerHomeInput["stores"][number]
   };
 }
 
-/** Linhas do proprio vendedor (mesma ligacao da meta: codigo, senao nome do cadastro), somadas por loja e dia. */
+/** Linhas do proprio vendedor. Na meta Geral, cada dia dentro da meta e a parte igual da filial. */
 function sellerDays(input: SellerHomeInput): SellerDay[] {
   const days = new Map<string, SellerDay>();
   for (const s of input.stores) {
+    const geral = generalGoal(input, s.storeId);
+    const n = salesTeam(input, s.storeId).length;
+    const naMeta = (day: string) => geral != null && n > 0 && day >= geral.startsOn && day <= geral.endsOn;
+    if (geral && n > 0) {
+      for (const a of input.dayAggs) {
+        if (a.storeId !== s.storeId || a.brand !== "ALL" || !naMeta(a.day)) continue;
+        const key = `${s.storeId}|${a.day}`;
+        const d = days.get(key) ?? { storeId: s.storeId, day: a.day, revenue: 0, sales: 0, items: 0 };
+        d.revenue += a.revenueCents / 100 / n;
+        d.sales += a.salesCount / n;
+        d.items = d.items == null || (!a.itemCount && a.salesCount > 0) ? null : d.items + (a.itemCount ?? 0) / n;
+        days.set(key, d);
+      }
+    }
     const porNome = new Map<string, GoalTeamMember>();
     for (const m of input.team) if (m.storeId === s.storeId) for (const k of m.nameKeys) if (!porNome.has(k)) porNome.set(k, m);
     for (const r of input.sellerDayAggs) {
-      if (r.storeId !== s.storeId) continue;
+      if (r.storeId !== s.storeId || naMeta(r.day)) continue;
       const mine = r.sellerEmployeeId != null ? r.sellerEmployeeId === s.employeeId : porNome.get(r.sellerKey)?.employeeId === s.employeeId;
       if (!mine) continue;
       const key = `${s.storeId}|${r.day}`;

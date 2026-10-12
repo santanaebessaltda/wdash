@@ -70,7 +70,11 @@ export function PerformanceCard({ store }: { store: SellerHomeStore }) {
                 <EmptyBlock icon="🏆" title="Nenhum vendedor neste grupo" description="Quando houver vendedores vinculados a este grupo, o ranking aparecerá aqui." />
               ) : (
                 <div>
-                  {store.groupName && <p className="mb-2 text-[12.5px] font-semibold text-t2">Grupo {store.groupName}</p>}
+                  {store.goal?.mode === "geral" ? (
+                    <p className="mb-2 text-[12.5px] font-semibold text-t2">Equipe da filial</p>
+                  ) : (
+                    store.groupName && <p className="mb-2 text-[12.5px] font-semibold text-t2">Grupo {store.groupName}</p>
+                  )}
                   <RankingBlock ranking={podium} formatValor={brlCent} />
                   {rest.length > 0 && (
                     <ul className="mt-3 flex flex-col divide-y divide-line">

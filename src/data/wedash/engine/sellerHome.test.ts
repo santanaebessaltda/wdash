@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { GoalRecord, GoalTeamMember, SalesSellerDayAgg } from "./goalTypes.ts";
+import type { GoalRecord, GoalTeamMember, SalesDayAgg, SalesSellerDayAgg } from "./goalTypes.ts";
 import { sellerGoalLevels } from "./goalView.ts";
 import type { StoreWeekHours } from "./goalWeights.ts";
 import { brlCent } from "./format.ts";
@@ -166,6 +166,34 @@ describe("buildSellerHome", () => {
       ["s1", "LOJA 1", "Meta setembro"],
       ["s2", "LOJA 2", "Meta loja 2"],
     ]);
+  });
+
+  it("meta Geral: números e pódio são a parte igual da filial, e o caixa fica de fora", () => {
+    const geral: GoalRecord = {
+      ...goal,
+      tierMode: "GENERAL",
+      groups: [],
+      tiers: [{ nome: "Meta", atingimentoMinPct: 50, comissaoPct: 1, bonus: 0 }],
+    };
+    const caixa: GoalTeamMember = { ...member(9, "CAIXA", null), salesPerson: false };
+    const day = (reais: number, salesCount: number, itemCount: number): SalesDayAgg => ({
+      tenantId: "t",
+      storeId: "s1",
+      day: "2026-09-10",
+      brand: "ALL",
+      revenueCents: reais * 100,
+      salesCount,
+      itemCount,
+    });
+    const out = buildSellerHome(input({ goals: [geral], dayAggs: [day(8000, 8, 16)], team: [...team, caixa] }));
+    expect(out.myDays).toEqual([{ storeId: "s1", day: "2026-09-10", revenue: 2000, sales: 2, items: 4 }]);
+    const ranking = out.stores[0]!.monthRanking;
+    expect(ranking).toHaveLength(4);
+    expect(ranking.every((r) => r.position === 1 && r.revenue === 2000 && r.sales === 2)).toBe(true);
+    expect(ranking.map((r) => r.name)).toEqual(["ANA", "BIA", "CAU", "DUDA"]);
+    expect(ranking.find((r) => r.me)?.name).toBe("ANA");
+    expect(out.stores[0]!.goal!.me!.atingimentoPct).toBeCloseTo(80);
+    expect(out.stores[0]!.goal!.me!.premiacao).toBeCloseTo(20);
   });
 
   it("myDays has only the seller's rows (by código or by the registered name), summed per store and day", () => {

@@ -67,7 +67,7 @@ const METRIC_HOW: Record<SellerChallengeMetric, string> = {
   PA: "O resultado é o seu P.A. (itens por venda), calculado no fim do desafio. Até lá, o número pode mudar.",
   TICKET: "O resultado é o seu ticket médio (valor médio por venda) no período.",
   INDEX:
-    "O índice compara seu faturamento médio por pessoa, ticket e P.A. com a média da loja no período (100 = na média).",
+    "O índice compara seu faturamento médio por pessoa, ticket e P.A. com a média da filial no período (100 = na média).",
 };
 
 function prizeText(p: ChallengePrizeShape): string {

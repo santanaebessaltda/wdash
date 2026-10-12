@@ -69,7 +69,7 @@ const PRIZE_MODE_HELP: Record<PrizeMode, string> = {
   GROUP:
     "O grupo sobe de nível pela soma das vendas. A premiação é dividida igualmente entre as pessoas do grupo, e o bônus vale para cada pessoa.",
   GENERAL:
-    "A filial sobe de nível pelo total vendido. A premiação é dividida igualmente entre as pessoas da equipe, e o bônus vale para cada pessoa.",
+    "A filial sobe de nível pelo total vendido, inclusive a venda do caixa e a venda sem vendedor. Faturamento e nº de vendas de cada pessoa são a parte igual desse total. Ticket médio e P.A. são os da filial. A premiação é dividida igualmente e o bônus vale para cada pessoa.",
 };
 
 type TierErrors = { meta?: string; commission?: string; mgrCommission?: string };
@@ -1242,8 +1242,9 @@ function TiersEditor({
             <>
               Os percentuais são aplicados à{" "}
               <span className="font-semibold">meta da loja</span>. A equipe
-              sobe de nível pelo total vendido da loja, a premiação é dividida
-              igualmente entre as pessoas e o bônus vale para cada uma.
+              sobe de nível pelo total vendido da loja. Faturamento e nº de
+              vendas de cada pessoa são a parte igual desse total. A premiação
+              é dividida igualmente e o bônus vale para cada uma.
             </>
           ) : mode === "INDIVIDUAL" ? (
             <>
