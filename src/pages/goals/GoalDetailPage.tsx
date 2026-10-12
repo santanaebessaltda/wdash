@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Badge, Breadcrumbs, Button, Card, CardTitle, progressTextClass } from "@/components/ui";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { DuplicateChoiceModal } from "@/components/wedash/DuplicateChoiceModal";
@@ -29,6 +29,7 @@ import { useReturnWhenStoreChanges } from "@/pages/dashboard/useScope";
 import { TargetIcon } from "@/pages/dashboards/icons";
 import { CardVendedoras, FaixaMetaGlobal, metaLiberouProjecao } from "@/pages/team/blocos";
 import { Icon, icons } from "@/pages/users/Icons";
+import { goalBackPath } from "@/pages/goals/backPath";
 import { paths } from "@/router/paths";
 import { useActiveSession } from "@/session/SessionProvider";
 
@@ -61,13 +62,16 @@ const MODO_LABEL: Record<GoalRecord["tierMode"], string> = {
 export default function GoalDetailPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const session = useActiveSession();
   const today = calendarTodayIso();
   const [data, setData] = useState<Loaded | null>(null);
   const [reload, setReload] = useState(0);
   const [duplicarAberto, setDuplicarAberto] = useState(false);
   const hasOtherStores = storesForSession(session.stores).length > 1;
-  useReturnWhenStoreChanges(data?.goal?.storeId, paths.goals);
+  const voltarPara = goalBackPath(location.state);
+  const daEquipe = voltarPara.startsWith(paths.team);
+  useReturnWhenStoreChanges(data?.goal?.storeId, voltarPara);
 
   useEffect(() => {
     const onSync = () => setReload((n) => n + 1);
@@ -116,21 +120,28 @@ export default function GoalDetailPage() {
 
   const status = goal ? goalStatus(goal, today) : null;
   const gerencia = goal && card ? goalManagerPrize(goal, card.faixa.realizado) : null;
+  const voltar = () => navigate(voltarPara);
 
   return (
     <div>
       {goal && card && status === "ended" && <PayoutReportHeader goal={goal} lojaNome={loja?.fantasia} />}
       <div className="mb-5 flex flex-wrap items-center gap-3 print:hidden">
-        <Button variant="secondary" size="sm" icon={<Icon d={icons.arrowLeft} size={14} />} onClick={() => navigate(paths.goals)}>
+        <Button variant="secondary" size="sm" icon={<Icon d={icons.arrowLeft} size={14} />} onClick={voltar}>
           Voltar
         </Button>
-        <Breadcrumbs items={[{ label: "Gestão" }, { label: "Metas", to: paths.goals }, { label: goal?.name ?? "Detalhe" }]} />
+        <Breadcrumbs
+          items={
+            daEquipe
+              ? [{ label: "Dashboard", to: paths.overview }, { label: "Equipe", to: voltarPara }, { label: goal?.name ?? "Detalhe" }]
+              : [{ label: "Gestão" }, { label: "Metas", to: paths.goals }, { label: goal?.name ?? "Detalhe" }]
+          }
+        />
         {goal && !showSkeleton && (
           <div className="ml-auto flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setDuplicarAberto(true)}>
               Duplicar meta
             </Button>
-            <Button size="sm" onClick={() => navigate(paths.goalEdit(goal.id))}>
+            <Button size="sm" onClick={() => navigate(paths.goalEdit(goal.id), { state: location.state })}>
               Editar meta
             </Button>
           </div>
@@ -159,8 +170,8 @@ export default function GoalDetailPage() {
             title="Meta não encontrada"
             description="A meta pode ter sido excluída ou não pertencer às suas filiais."
             action={
-              <Button size="sm" variant="outline" onClick={() => navigate(paths.goals)}>
-                Ver metas
+              <Button size="sm" variant="outline" onClick={voltar}>
+                {daEquipe ? "Voltar para Equipe" : "Ver metas"}
               </Button>
             }
           />

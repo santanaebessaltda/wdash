@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { paths } from "@/router/paths";
 import { HeaderFilter } from "@/pages/dashboard/HeaderFilter";
 import { Button, Card, CardHeader, CardTitle, DateRangePicker, PageHeader, Pagination, StatCard, Tabs, ThSort, type SortDir } from "@/components/ui";
@@ -21,6 +21,7 @@ import { GoalLevelSummary } from "@/components/wedash/GoalLevelsBar";
 import { AvatarIniciais } from "@/components/wedash/InitialsAvatar";
 import type { SalesDayAgg, SalesSellerDayAgg } from "@/data/wedash/salesTypes";
 import { storesForSession } from "@/data/wedash/stores";
+import { teamGoalsReturn } from "@/pages/goals/backPath";
 import { GoalCard } from "./blocks";
 import {
   emptyChallengeAggInput,
@@ -184,8 +185,10 @@ function rotuloLojas(lojas: string[]): string | null {
 export function TeamPage() {
   const session = useActiveSession();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
-  const abaDesempenho = searchParams.get("aba") === "desafios" ? "desafios" : "ranking";
+  const abaParam = searchParams.get("aba");
+  const abaDesempenho = abaParam === "desafios" || abaParam === "metas" ? abaParam : "ranking";
   const { escopo, mudar } = useScope();
   const [aggs, setAggs] = useState<TeamAggInput>({ dayAggs: [] });
   const [coverageFrom, setCoverageFrom] = useState<Date | null>(null);
@@ -620,7 +623,13 @@ export function TeamPage() {
                     metaCards.length > 0 ? (
                       <div className="flex flex-col gap-4">
                         {metaCards.map((card) => (
-                          <GoalCard key={card.id} card={card} metaAtiva hojeIso={hojeIso} />
+                          <GoalCard
+                            key={card.id}
+                            card={card}
+                            metaAtiva
+                            hojeIso={hojeIso}
+                            onOpen={() => navigate(paths.goalDetail(card.id), { state: { from: teamGoalsReturn(location.search) } })}
+                          />
                         ))}
                       </div>
                     ) : (

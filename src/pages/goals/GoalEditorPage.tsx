@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Alert,
   Avatar,
@@ -37,6 +37,7 @@ import {
   SAVE_ERROR_MSG,
 } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
+import { goalBackPath } from "@/pages/goals/backPath";
 import { paths } from "@/router/paths";
 import { useActiveSession } from "@/session/SessionProvider";
 
@@ -267,10 +268,12 @@ export default function GoalEditorPage() {
   const copyId = id ? null : searchParams.get("copy");
   const copyForStore = Boolean(copyId) && searchParams.get("for") === "store";
   const navigate = useNavigate();
+  const location = useLocation();
   const session = useActiveSession();
   const toast = useToast();
   const titulo = id ? "Editar meta" : "Nova meta";
-  const voltar = () => navigate(id ? paths.goalDetail(id) : paths.goals);
+  const origem = goalBackPath(location.state);
+  const voltar = () => navigate(id ? paths.goalDetail(id) : origem, id ? { state: location.state } : undefined);
 
   const { escopo } = useScope();
   const lojas = useMemo(
@@ -281,7 +284,7 @@ export default function GoalEditorPage() {
     () => (copyForStore ? "" : escopo.filialIds[0] ?? (lojas.length === 1 ? lojas[0]!.id : "")),
   );
   const lojaFiltro = escopo.filialIds[0];
-  useReturnWhenStoreChanges(id ? storeId || undefined : undefined, paths.goals);
+  useReturnWhenStoreChanges(id ? storeId || undefined : undefined, origem);
   useEffect(() => {
     if (!id && !copyForStore && lojaFiltro) setStoreId(lojaFiltro);
   }, [id, lojaFiltro, copyForStore]);
@@ -480,7 +483,7 @@ export default function GoalEditorPage() {
       return;
     }
     toast.show(id ? "Alterações salvas." : "Meta criada.", "success");
-    navigate(paths.goalDetail(res.id));
+    navigate(paths.goalDetail(res.id), { state: location.state });
   };
 
   return (

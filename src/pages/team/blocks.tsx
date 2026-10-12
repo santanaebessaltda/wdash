@@ -16,7 +16,10 @@ import { cn } from "@/lib/cn";
 
 const TipHelp = ({ label }: { label: string }) => (
   <Tooltip label={label}>
-    <span className="inline-flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full bg-bg-inset text-[10px] font-semibold text-t2 transition-colors hover:text-t1">
+    <span
+      onClick={(e) => e.stopPropagation()}
+      className="inline-flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full bg-bg-inset text-[10px] font-semibold text-t2 transition-colors hover:text-t1"
+    >
       ?
     </span>
   </Tooltip>
@@ -624,14 +627,17 @@ export function GoalCard({
   card,
   metaAtiva,
   hojeIso,
+  onOpen,
 }: {
   card: GoalCardView;
   metaAtiva: boolean;
   hojeIso?: string;
+  /** Clique no resumo abre o detalhe. A escada não navega. */
+  onOpen?: () => void;
 }) {
   const tipoLabel = card.tipo === "individual" ? "Individual" : card.tipo === "geral" ? "Geral" : "Grupo";
-  return (
-    <Card className="min-w-0 overflow-hidden" padding="lg">
+  const resumo = (
+    <>
       <CardTitle>{card.nome}</CardTitle>
 
       <div className="mt-2.5 flex flex-wrap gap-1.5">
@@ -668,6 +674,29 @@ export function GoalCard({
       <div className="mt-4">
         <GoalProgressBar meta={card.faixa} embedded hideTitle degraus={card.degraus} hojeIso={hojeIso} />
       </div>
+    </>
+  );
+  return (
+    <Card className={cn("min-w-0 overflow-hidden", onOpen && "transition-colors hover:border-line-2")} padding="lg">
+      {onOpen ? (
+        <div
+          role="link"
+          tabIndex={0}
+          onClick={onOpen}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onOpen();
+            }
+          }}
+          aria-label={`Ver detalhe da meta ${card.nome}`}
+          className="cursor-pointer rounded-[10px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc"
+        >
+          {resumo}
+        </div>
+      ) : (
+        resumo
+      )}
 
       <SellersCard
         embedded
