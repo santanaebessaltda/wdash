@@ -22,12 +22,13 @@ import { fetchCashAccounts, fetchCashCloseReport } from "./millenniumCashClose.t
 import { fetchStoneConciliation } from "./stoneConciliation.ts";
 import { fetchCouponReport } from "./millenniumCouponReport.ts";
 import { fetchProductBrandMap } from "./millenniumProductDivision.ts";
-import { fetchProductRegistry, fetchProductTypes, fetchProductsOfType } from "./millenniumCatalog.ts";
+import { fetchProductRegistry, fetchProductTypes, fetchProductsOfType, fetchPurchaseStockReport } from "./millenniumCatalog.ts";
 import { fetchCostTablePrices, fetchCostTables } from "./millenniumCostTable.ts";
 import type { CatalogDeps, CatalogEntry } from "./productCatalog.ts";
 import { buildCostTableDetectDeps } from "./costTableSync.ts";
 import { AUTO_REFRESH_MIN, AUTO_SESSION_MARK, parseStoreHours, planAutoRound, recoveryFloor } from "./autoRefresh.ts";
 import { notifyCashClose as sendCashClosePush } from "./cashClosePush.ts";
+import { notifyStockLow as sendStockPush } from "./stockPush.ts";
 import { notifyStoreGoals as sendStoreGoalPush } from "./goalPush.ts";
 import { notifyAutoSales as sendAutoSalesPush, readTodayRevenue as loadTodayRevenue } from "./salesPush.ts";
 import {
@@ -505,6 +506,13 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
 
     async notifyCashClose(args) {
       await sendCashClosePush(sb, args);
+    },
+
+    async notifyStockLow(args) {
+      await sendStockPush(sb, {
+        ...args,
+        fetchReport: (millenniumStoreId) => fetchPurchaseStockReport({ session: args.session, millenniumStoreId }),
+      });
     },
 
     async markStoresSynced(storeIds, at) {

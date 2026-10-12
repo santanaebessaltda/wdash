@@ -96,9 +96,9 @@ function authUserId(identity: MemberRow["identity"]): string | null {
   return identity.auth_user_id;
 }
 
-type PushPrefs = { sales: boolean; cashClose: boolean; storeGoal: boolean };
+type PushPrefs = { sales: boolean; cashClose: boolean; storeGoal: boolean; stock: boolean };
 
-const PREF_DEFAULT: PushPrefs = { sales: true, cashClose: true, storeGoal: true };
+const PREF_DEFAULT: PushPrefs = { sales: true, cashClose: true, storeGoal: true, stock: true };
 
 function prefsOf(row: Record<string, unknown> | undefined): PushPrefs {
   if (!row) return PREF_DEFAULT;
@@ -106,6 +106,7 @@ function prefsOf(row: Record<string, unknown> | undefined): PushPrefs {
     sales: row.sales !== false,
     cashClose: row.cash_close !== false,
     storeGoal: row.store_goal !== false,
+    stock: row.stock !== false,
   };
 }
 
@@ -147,7 +148,7 @@ async function loadAudience(sb: SupabaseClient, tenantId: string): Promise<Audie
 
   const [{ data: subs, error: subErr }, { data: prefRows, error: prefErr }] = await Promise.all([
     sb.from("push_subscription").select("id, auth_user_id, endpoint, p256dh, auth").eq("tenant_id", tenantId).in("auth_user_id", userIds),
-    sb.from("notification_pref").select("auth_user_id, sales, cash_close, store_goal").eq("tenant_id", tenantId).in("auth_user_id", userIds),
+    sb.from("notification_pref").select("auth_user_id, sales, cash_close, store_goal, stock").eq("tenant_id", tenantId).in("auth_user_id", userIds),
   ]);
   if (subErr) throw subErr;
   if (prefErr) throw prefErr;

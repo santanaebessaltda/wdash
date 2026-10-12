@@ -4,16 +4,17 @@ import { getSupabase } from "@/lib/supabase";
 import { CheckIcon } from "@/pages/utility/icons";
 import { useActiveSession } from "@/session/SessionProvider";
 
-type PrefKey = "sales" | "cashClose" | "storeGoal";
+type PrefKey = "sales" | "cashClose" | "storeGoal" | "stock";
 
 type Prefs = Record<PrefKey, boolean>;
 
-const DEFAULTS: Prefs = { sales: true, cashClose: true, storeGoal: true };
+const DEFAULTS: Prefs = { sales: true, cashClose: true, storeGoal: true, stock: true };
 
 const ROWS: Array<{ key: PrefKey; name: string; desc: string }> = [
   { key: "sales", name: "Vendas do período", desc: "A cada 30 minutos, se alguma filial vendeu, o resumo mostra o que entrou no período e quanto cada filial já vendeu hoje. As filiais aparecem da que mais vendeu no dia para a que menos vendeu. Chega com o app aberto ou fechado." },
   { key: "cashClose", name: "Fechamento", desc: "Receba um resumo do fechamento do dia, com faltas ou sobras em dinheiro e dias ainda sem total real." },
   { key: "storeGoal", name: "Meta da filial", desc: "Receba um aviso quando a filial atingir um novo nível da meta. Cada nível é avisado uma única vez." },
+  { key: "stock", name: "Estoque abaixo do mínimo", desc: "Uma vez por dia, na primeira atualização automática depois que a filial abre, avisa os produtos cujo total está abaixo do mínimo do Pedido de compra." },
 ];
 
 function Dot({ on }: { on: boolean }) {
@@ -42,7 +43,7 @@ export function NotificationsPage() {
       setUserId(uid);
       const { data, error } = await sb
         .from("notification_pref")
-        .select("sales, cash_close, store_goal")
+        .select("sales, cash_close, store_goal, stock")
         .eq("auth_user_id", uid)
         .eq("tenant_id", session.tenantId)
         .maybeSingle();
@@ -56,6 +57,7 @@ export function NotificationsPage() {
         sales: Boolean(data.sales),
         cashClose: Boolean(data.cash_close),
         storeGoal: Boolean(data.store_goal),
+        stock: data.stock !== false,
       });
     })();
     return () => {
@@ -76,6 +78,7 @@ export function NotificationsPage() {
         sales: next.sales,
         cash_close: next.cashClose,
         store_goal: next.storeGoal,
+        stock: next.stock,
       },
       { onConflict: "auth_user_id,tenant_id" },
     );

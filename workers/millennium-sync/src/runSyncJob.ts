@@ -1572,6 +1572,12 @@ export type SyncJobDeps = {
     day: string;
     stores: Array<{ id: string; name: string; timezone: string }>;
   }) => Promise<void>;
+  /** Produtos abaixo do mínimo, uma vez por filial por dia, na rodada automática. */
+  notifyStockLow?: (args: {
+    tenantId: string;
+    session: string;
+    stores: Array<{ id: string; name: string; timezone: string; millenniumStoreId: number }>;
+  }) => Promise<void>;
   /** Days already in sales_day_agg for this store (any brand). */
   listExistingDays: (args: {
     tenantId: string;
@@ -3103,6 +3109,25 @@ async function runRefreshJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyncRe
       });
     } catch (e) {
       console.warn(`  AVISO push de vendas não foi enviado: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  if (auto && deps.notifyStockLow) {
+    try {
+      const session = await deps.getStoredSession(job.credentialId);
+      if (session) {
+        await deps.notifyStockLow({
+          tenantId: job.tenantId,
+          session,
+          stores: stores.map((store) => ({
+            id: store.id,
+            name: (store.name || store.code).trim() || store.code,
+            timezone: store.timezone,
+            millenniumStoreId: store.millenniumStoreId,
+          })),
+        });
+      }
+    } catch (e) {
+      console.warn(`  AVISO push de estoque não foi enviado: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
   return finish(res, res.storesDone);

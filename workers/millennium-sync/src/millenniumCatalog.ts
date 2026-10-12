@@ -169,6 +169,36 @@ export async function fetchProductRegistry(opts: {
   }
 }
 
+/** Saldo Atual e Futuro da filial, o mesmo relatório do Pedido de compra. */
+export async function fetchPurchaseStockReport(opts: {
+  session: string;
+  millenniumStoreId: number;
+  baseUrl?: string;
+  fetchImpl?: typeof fetch;
+}): Promise<unknown> {
+  const base = (opts.baseUrl ?? millenniumBaseUrl()).replace(/\/$/, "");
+  const res = await (opts.fetchImpl ?? fetch)(`${base}/MILLENIUM!FRANQUIAS.RELATORIOS.ESTOQUEEMCOMPRA?$top=5000`, {
+    method: "POST",
+    headers: {
+      Accept: "*/*",
+      "Content-Type": "application/json",
+      "WTS-Session": opts.session,
+      "X-DateFormat": "ISOTZ",
+      "X-HTTP-Method": "GET",
+      "X-IdentifierCase": "upper",
+    },
+    body: JSON.stringify({ FILIAL: opts.millenniumStoreId, DESC: null, TIPO: null, DATAI: null, DATAF: null }),
+    signal: AbortSignal.timeout(120_000),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`ESTOQUEEMCOMPRA → ${res.status} ${text.slice(0, 240)}`);
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    throw new Error(`ESTOQUEEMCOMPRA JSON inválido: ${text.slice(0, 200)}`);
+  }
+}
+
 export async function fetchProductsOfType(opts: {
   session: string;
   typeId: number;
