@@ -768,7 +768,7 @@ export function CashClosePage() {
             ) : (
               <Skeleton className="mb-4 h-[72px] w-full rounded-[18px]" />
             )}
-            <Mes hoje={hoje} cells={cells} faceDoDia={faceDoDia} onOpen={abrirDia} />
+            <Mes hoje={hoje} cells={cells} pronto={analise != null} faceDoDia={faceDoDia} onOpen={abrirDia} />
           </>
         )}
       </div>
@@ -857,6 +857,15 @@ export function ChipDia({ cor, children }: { cor: string; children: string }) {
   );
 }
 
+/** Dia passado sem fato. Não ocupa a largura da célula nem usa as cores de estado. */
+export function ChipNeutro({ children }: { children: string }) {
+  return (
+    <div title={children} className="mt-1 inline-flex max-w-full truncate rounded-md bg-bg-3 px-1.5 py-0.5 text-[10px] font-semibold text-t2 sm:text-[11px]">
+      {children}
+    </div>
+  );
+}
+
 function dicaDoDia(face: { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number }): string | undefined {
   if (face.kind === "total" && face.diffCents > 0) return `Sobra de ${brlCent(face.diffCents / 100)}`;
   if (face.kind === "total" && face.diffCents < 0) return `Quebra de ${brlCent(Math.abs(face.diffCents) / 100)}`;
@@ -866,11 +875,13 @@ function dicaDoDia(face: { kind: "vazio" | "zero" | "pendente" | "hoje" | "total
 function Mes({
   hoje,
   cells,
+  pronto,
   faceDoDia,
   onOpen,
 }: {
   hoje: string;
   cells: Array<string | null>;
+  pronto: boolean;
   faceDoDia: (day: string) => { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number; aguardando?: boolean };
   onOpen: (iso: string) => void;
 }) {
@@ -912,6 +923,7 @@ function Mes({
                   {face.kind === "total" && face.diffCents === 0 && <ChipDia cor="bg-t2">Sem diferença</ChipDia>}
                 </div>
               )}
+              {pronto && face?.kind === "zero" ? <ChipNeutro>Sem movimento</ChipNeutro> : null}
             </>
           );
           if (futuro || face?.kind === "zero") return <div key={day} className={borda}>{miolo}</div>;

@@ -23,7 +23,7 @@ import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRe
 import { useScope } from "@/pages/dashboard/useScope";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { NumberInput, SectionHeader, SelectStoreCard, parseNum, pickOneStore, useScopedStores } from "@/pages/operation/shared";
-import { ChipDia, monthNavBtn, SeletorMesAno, Seta } from "@/pages/cash-close/CashClosePage";
+import { ChipDia, ChipNeutro, monthNavBtn, SeletorMesAno, Seta } from "@/pages/cash-close/CashClosePage";
 import { QuickStat } from "@/pages/dashboards/QuickStat";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { HeaderFilters } from "@/pages/stock/shared";
@@ -500,7 +500,7 @@ function DiaCelula({
           {chip ? <ChipDia cor={chip.cor}>{chip.texto}</ChipDia> : null}
         </div>
       ) : day < hoje && faltaCents <= 0 && !depositado ? (
-        <span title="Sem sangria" className="mt-1 inline-flex max-w-full truncate rounded-md bg-bg-3 px-1.5 py-0.5 text-[10px] font-semibold text-t2 sm:text-[11px]">Sem sangria</span>
+        <ChipNeutro>Sem sangria</ChipNeutro>
       ) : null}
     </>
   ) : null;
