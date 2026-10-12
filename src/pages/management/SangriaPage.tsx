@@ -513,7 +513,7 @@ function DiaCelula({
     "flex min-h-[84px] w-full min-w-0 flex-col items-stretch justify-start border-b border-r border-line p-1.5 text-left sm:min-h-[110px] sm:p-2",
     (index + 1) % 7 === 0 && "border-r-0",
     !day && "bg-bg-1/30",
-    marcado && "ring-2 ring-inset ring-t0",
+    marcado && "bg-acc-soft/40 ring-1 ring-inset ring-acc",
   );
   const miolo = day ? (
     <>
@@ -548,7 +548,7 @@ function DiaCelula({
   if (!day) return <div className={borda} />;
   if (!abre) return <div className={borda}>{miolo}</div>;
   return (
-    <button type="button" className={cn(borda, "hover:bg-bg-3")} onClick={() => onOpen(day)}>
+    <button type="button" className={cn(borda, marcado ? "hover:bg-acc-soft/40" : "hover:bg-bg-3")} onClick={() => onOpen(day)}>
       {miolo}
     </button>
   );
@@ -916,11 +916,11 @@ function MarcarComo({
     },
   ];
   return (
-    <div className="flex w-full flex-col items-stretch gap-1.5 sm:w-auto sm:flex-row sm:items-center">
+    <div className="flex w-full flex-col items-stretch gap-1.5 lg:w-auto lg:flex-row lg:items-center">
       <div className="w-full sm:w-auto [&>div]:w-full sm:[&>div]:w-auto">
         <Dropdown portal align="right" menuClassName="w-[320px]" trigger={<Button className="w-full sm:w-auto">{rotulo}</Button>} items={itens} />
       </div>
-      <span className="text-[13px] font-semibold text-t1">{money(valor)} a cobrar</span>
+      <span className="w-full text-[13px] font-semibold text-t1 lg:w-auto">{money(valor)} a cobrar</span>
     </div>
   );
 }
