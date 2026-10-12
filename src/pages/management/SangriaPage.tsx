@@ -23,8 +23,7 @@ import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRe
 import { useScope } from "@/pages/dashboard/useScope";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { NumberInput, SectionHeader, SelectStoreCard, parseNum, pickOneStore, useScopedStores } from "@/pages/operation/shared";
-import { ChipDia, monthNavBtn, SeletorMesAno, Seta } from "@/pages/cash-close/CashClosePage";
-import { QuickStat } from "@/pages/dashboards/QuickStat";
+import { ChipDia, monthNavBtn, PlainKpi, SeletorMesAno, Seta } from "@/pages/cash-close/CashClosePage";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { HeaderFilters } from "@/pages/stock/shared";
 
@@ -591,15 +590,15 @@ function campoParaCentavos(txt: string): number | null {
 
 function ResumoMes({ aCobrar, recebido, fora, falta }: { aCobrar: number; recebido: number; fora: number; falta: number }) {
   const cards = [
-    { label: "A cobrar", value: money(aCobrar), icon: <IconCobrar />, tint: "acc" as const, tooltip: "Valor que ainda entra no próximo boleto." },
-    { label: "Recebido", value: money(recebido), icon: <IconRecebido />, tint: "ok" as const, tooltip: "Valor já recebido." },
-    { label: "Fora do boleto", value: money(fora), icon: <IconFora />, tint: "info" as const, tooltip: "Valor destinado a compras, fornecedores, premiações ou outros pagamentos." },
-    { label: "Falta", value: money(falta), icon: <IconFalta />, tint: "bad" as const, tooltip: "Valor da sangria que deveria estar no caixa e não foi encontrado." },
+    { label: "A cobrar", value: money(aCobrar), color: "var(--acc)", tooltip: "Valor que ainda entra no próximo boleto." },
+    { label: "Recebido", value: money(recebido), color: "var(--ok)", tooltip: "Valor já recebido." },
+    { label: "Fora do boleto", value: money(fora), color: "var(--info)", tooltip: "Valor destinado a compras, fornecedores, premiações ou outros pagamentos." },
+    { label: "Falta", value: money(falta), color: "var(--bad)", tooltip: "Valor da sangria que deveria estar no caixa e não foi encontrado." },
   ];
   return (
     <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {cards.map((card) => (
-        <QuickStat key={card.label} label={card.label} value={card.value} icon={card.icon} tint={card.tint} tooltip={card.tooltip} />
+        <PlainKpi key={card.label} label={card.label} value={card.value} color={card.color} tooltip={card.tooltip} />
       ))}
     </div>
   );
@@ -1056,39 +1055,3 @@ function AcaoModal({
   );
 }
 
-function IconCobrar() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <path d="M3 10h18" />
-    </svg>
-  );
-}
-
-function IconRecebido() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 6 9 17l-5-5" />
-    </svg>
-  );
-}
-
-function IconFora() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
-      <path d="M3 6h18" />
-      <path d="M16 10a4 4 0 0 1-8 0" />
-    </svg>
-  );
-}
-
-function IconFalta() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 8v5" />
-      <path d="M12 16h.01" />
-    </svg>
-  );
-}

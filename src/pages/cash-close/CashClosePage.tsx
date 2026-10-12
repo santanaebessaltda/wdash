@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Alert, Badge, Button, Card, Modal, Skeleton, useToast } from "@/components/ui";
+import { Alert, Badge, Button, Card, Modal, Skeleton, Tooltip, useToast } from "@/components/ui";
 import { monthCloseSpanFor } from "@/data/wedash/cashCloseMonth";
 import {
   applyCloseReview,
@@ -38,7 +38,6 @@ import { useScope } from "@/pages/dashboard/useScope";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { parseNum, SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
-import { QuickStat } from "@/pages/dashboards/QuickStat";
 import { HeaderFilters } from "@/pages/stock/shared";
 
 const DIAS = [
@@ -64,27 +63,6 @@ function totalDia(cents: number): string {
   if (cents > 0) return `+${abs}`;
   return abs;
 }
-
-const IconReal = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="2" y="5" width="20" height="14" rx="2" />
-    <path d="M2 10h20" />
-  </svg>
-);
-const IconDif = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 3v18" />
-    <path d="M5 8h14" />
-    <path d="M7 8l-3 6a4 4 0 0 0 8 0L9 8" />
-    <path d="M17 8l-3 6a4 4 0 0 0 8 0l-3-6" />
-  </svg>
-);
-const IconPendente = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="9" />
-    <path d="M12 7v6l4 2" />
-  </svg>
-);
 
 const MESES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -766,7 +744,7 @@ export function CashClosePage() {
             {analise ? (
               <ResumoMes resumo={analise.resumo} />
             ) : (
-              <Skeleton className="mb-4 h-[72px] w-full rounded-[18px]" />
+              <Skeleton className="mb-4 h-[88px] w-full rounded-[18px]" />
             )}
             <Mes hoje={hoje} cells={cells} faceDoDia={faceDoDia} onOpen={abrirDia} />
           </>
@@ -800,32 +778,38 @@ function dicaDiferenca(resumo: MonthCloseSummary): string {
   return `${base}\nSobras: ${brlCent(resumo.surplusCents / 100)} · Quebras: ${brlCent(resumo.shortageCents / 100)}`;
 }
 
+function corDaDiferenca(cents: number): string {
+  if (cents > 0) return "var(--ok)";
+  if (cents < 0) return "var(--bad)";
+  return "var(--t0)";
+}
+
+export function PlainKpi({ label, value, color, tooltip }: { label: string; value: string; color: string; tooltip?: string }) {
+  return (
+    <Card>
+      <p className="flex items-center gap-1.5 text-[11.5px] font-bold uppercase tracking-wide text-t2">
+        {label}
+        {tooltip ? (
+          <Tooltip label={tooltip} side="bottom">
+            <span className="inline-flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full bg-bg-inset text-[10px] font-semibold normal-case tracking-normal text-t2 transition-colors hover:text-t1">?</span>
+          </Tooltip>
+        ) : null}
+      </p>
+      <p className="mt-1.5 truncate font-mono text-[22px] font-extrabold" style={{ color }}>{value}</p>
+    </Card>
+  );
+}
+
 function ResumoMes({ resumo }: { resumo: MonthCloseSummary }) {
   const cards = [
-    {
-      label: "Total real",
-      value: brlCent(resumo.realCents / 100),
-      icon: <IconReal />,
-      tint: "acc" as const,
-    },
-    {
-      label: "Diferença",
-      value: totalDia(resumo.diffCents),
-      icon: <IconDif />,
-      tint: "ok" as const,
-      tooltip: dicaDiferenca(resumo),
-    },
-    {
-      label: "Dias pendentes",
-      value: String(resumo.pendingDays),
-      icon: <IconPendente />,
-      tint: "warn" as const,
-    },
+    { label: "Total real", value: brlCent(resumo.realCents / 100), color: "var(--t0)" },
+    { label: "Diferença", value: totalDia(resumo.diffCents), color: corDaDiferenca(resumo.diffCents), tooltip: dicaDiferenca(resumo) },
+    { label: "Dias pendentes", value: String(resumo.pendingDays), color: "var(--t0)" },
   ];
   return (
     <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
       {cards.map((card) => (
-        <QuickStat key={card.label} label={card.label} value={card.value} icon={card.icon} tint={card.tint} tooltip={"tooltip" in card ? card.tooltip : undefined} />
+        <PlainKpi key={card.label} label={card.label} value={card.value} color={card.color} tooltip={"tooltip" in card ? card.tooltip : undefined} />
       ))}
     </div>
   );
@@ -857,10 +841,15 @@ export function ChipDia({ cor, children }: { cor: string; children: string }) {
   );
 }
 
+function chipDaDiferenca(cents: number): { cor: string; texto: string } {
+  if (cents > 0) return { cor: "bg-ok", texto: `Sobra ${brlCent(cents / 100)}` };
+  if (cents < 0) return { cor: "bg-bad", texto: `Quebra ${brlCent(Math.abs(cents) / 100)}` };
+  return { cor: "bg-chip-gray", texto: "Sem diferença" };
+}
+
 function dicaDoDia(face: { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number }): string | undefined {
-  if (face.kind === "total" && face.diffCents > 0) return `Sobra de ${brlCent(face.diffCents / 100)}`;
-  if (face.kind === "total" && face.diffCents < 0) return `Quebra de ${brlCent(Math.abs(face.diffCents) / 100)}`;
-  return undefined;
+  if (face.kind !== "total" || face.diffCents === 0) return undefined;
+  return chipDaDiferenca(face.diffCents).texto;
 }
 
 function Mes({
@@ -897,6 +886,7 @@ function Mes({
           const futuro = day > hoje;
           const mostraTotal = face?.kind === "pendente" || face?.kind === "total" || (face?.kind === "hoje" && !face.aguardando);
           const dica = face ? dicaDoDia(face) : undefined;
+          const chip = face?.kind === "total" ? chipDaDiferenca(face.diffCents) : null;
           const miolo = (
             <>
               <NumeroDia iso={day} hoje={hoje} />
@@ -907,9 +897,7 @@ function Mes({
                   </p>
                   {face.kind === "pendente" && <ChipDia cor="bg-warn">Pendente</ChipDia>}
                   {face.kind === "hoje" && <ChipDia cor="bg-acc">Em aberto</ChipDia>}
-                  {face.kind === "total" && face.diffCents > 0 && <ChipDia cor="bg-ok">{totalDia(face.diffCents)}</ChipDia>}
-                  {face.kind === "total" && face.diffCents < 0 && <ChipDia cor="bg-bad">{totalDia(face.diffCents)}</ChipDia>}
-                  {face.kind === "total" && face.diffCents === 0 && <ChipDia cor="bg-chip-gray">Sem diferença</ChipDia>}
+                  {chip && <ChipDia cor={chip.cor}>{chip.texto}</ChipDia>}
                 </div>
               )}
             </>
