@@ -31,7 +31,6 @@
   --info: #56a8ff;
   /* Chips do calendário: cinza neutro e azul-acinzentado, sólidos nos dois temas. */
   --chip-gray: #6a707c;
-  --chip-quiet: #3d5166;
   --chip-blue: #2457c5;
   --ok-soft: rgba(51, 212, 147, 0.14);
   --bad-soft: rgba(247, 109, 125, 0.14);
@@ -66,7 +65,6 @@
   --bad: #e8556a;
   --info: #3b8ef0;
   --chip-gray: #6a707c;
-  --chip-quiet: #3d5166;
   --chip-blue: #2457c5;
   --ok-soft: rgba(22, 182, 126, 0.12);
   --bad-soft: rgba(232, 85, 106, 0.12);
@@ -104,7 +102,6 @@
   --color-bad: var(--bad);
   --color-info: var(--info);
   --color-chip-gray: var(--chip-gray);
-  --color-chip-quiet: var(--chip-quiet);
   --color-chip-blue: var(--chip-blue);
   --color-ok-soft: var(--ok-soft);
   --color-bad-soft: var(--bad-soft);

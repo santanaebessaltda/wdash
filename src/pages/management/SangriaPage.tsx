@@ -543,10 +543,6 @@ function DiaCelula({
             <ChipDia key={chip.texto} cor={chip.cor}>{chip.texto}</ChipDia>
           ))}
         </div>
-      ) : day < hoje && faltaCents <= 0 && !depositado ? (
-        <div className="mt-1.5 w-full min-w-0">
-          <ChipDia cor="bg-chip-quiet">Sem sangria</ChipDia>
-        </div>
       ) : null}
     </>
   ) : null;

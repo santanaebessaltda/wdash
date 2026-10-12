@@ -768,7 +768,7 @@ export function CashClosePage() {
             ) : (
               <Skeleton className="mb-4 h-[72px] w-full rounded-[18px]" />
             )}
-            <Mes hoje={hoje} cells={cells} pronto={analise != null} faceDoDia={faceDoDia} onOpen={abrirDia} />
+            <Mes hoje={hoje} cells={cells} faceDoDia={faceDoDia} onOpen={abrirDia} />
           </>
         )}
       </div>
@@ -866,13 +866,11 @@ function dicaDoDia(face: { kind: "vazio" | "zero" | "pendente" | "hoje" | "total
 function Mes({
   hoje,
   cells,
-  pronto,
   faceDoDia,
   onOpen,
 }: {
   hoje: string;
   cells: Array<string | null>;
-  pronto: boolean;
   faceDoDia: (day: string) => { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number; aguardando?: boolean };
   onOpen: (iso: string) => void;
 }) {
@@ -914,11 +912,6 @@ function Mes({
                   {face.kind === "total" && face.diffCents === 0 && <ChipDia cor="bg-chip-gray">Sem diferença</ChipDia>}
                 </div>
               )}
-              {pronto && face?.kind === "zero" ? (
-                <div className="mt-1.5 w-full min-w-0">
-                  <ChipDia cor="bg-chip-quiet">Sem movimento</ChipDia>
-                </div>
-              ) : null}
             </>
           );
           if (futuro || face?.kind === "zero") return <div key={day} className={borda}>{miolo}</div>;
