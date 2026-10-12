@@ -23,10 +23,10 @@ describe("formatSalesPush", () => {
     expect(plain(text?.body)).toBe(
       [
         "Hoje · R$ 26.180,60",
-        "LOJAWEPINK.CENTRO.CAMPOGRANDE · +R$ 3.182,70 · R$ 19.265,00 hoje",
-        "SB EMPREENDIMENTOS · +R$ 804,00 · R$ 3.124,00 hoje",
-        "QUIOSQUESHOPPINGNORTESULPLAZA · +R$ 540,40 · R$ 2.115,00 hoje",
-        "QUIOSQUESHOPPINGTRESLAGOAS · +R$ 358,40 · R$ 1.676,60 hoje",
+        "LOJAWEPINK.CENTRO.CAMPOGRANDE · +R$ 3.182,70 · R$ 19.265,00",
+        "SB EMPREENDIMENTOS · +R$ 804,00 · R$ 3.124,00",
+        "QUIOSQUESHOPPINGNORTESULPLAZA · +R$ 540,40 · R$ 2.115,00",
+        "QUIOSQUESHOPPINGTRESLAGOAS · +R$ 358,40 · R$ 1.676,60",
       ].join("\n"),
     );
   });
@@ -41,9 +41,9 @@ describe("formatSalesPush", () => {
     expect(plain(text?.body)).toBe(
       [
         "Hoje · R$ 7.850,00",
-        "CENTRO · +R$ 500,00 · R$ 2.500,00 hoje",
-        "RUA · R$ 0,00 · R$ 3.000,00 hoje",
-        "SHOPPING · R$ 0,00 · R$ 2.350,00 hoje",
+        "CENTRO · +R$ 500,00 · R$ 2.500,00",
+        "RUA · R$ 0,00 · R$ 3.000,00",
+        "SHOPPING · R$ 0,00 · R$ 2.350,00",
       ].join("\n"),
     );
   });

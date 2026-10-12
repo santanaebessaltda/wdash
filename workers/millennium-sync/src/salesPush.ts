@@ -17,7 +17,7 @@ export type SalesPushRow = { name: string; deltaCents: number; todayCents: numbe
  * Resumo da rodada. `null` sem filial no acesso.
  * O nome da filial é o do Millennium, como está cadastrado.
  * Com venda: título "Vendas · +R$ …". Uma filial: "NOME · R$ … hoje".
- * Várias: "Hoje · R$ …" e uma linha por filial, da que mais vendeu no intervalo para a que menos vendeu.
+ * Várias: "Hoje · R$ …" e uma linha por filial ("NOME · +R$ … · R$ …"), da que mais vendeu no intervalo para a que menos vendeu.
  * Sem venda nova: título "Sem vendas nos últimos 30 min" e a posição do dia.
  */
 export function formatSalesPush(rows: SalesPushRow[]): { title: string; body: string } | null {
@@ -48,7 +48,7 @@ export function formatSalesPush(rows: SalesPushRow[]): { title: string; body: st
   }
   const lines = ordered.map((row) => {
     const recent = row.deltaCents > 0 ? `+${money(row.deltaCents)}` : money(0);
-    return `${row.label} · ${recent} · ${money(row.todayCents)} hoje`;
+    return `${row.label} · ${recent} · ${money(row.todayCents)}`;
   });
   return { title: `Vendas · +${money(deltaTotal)}`, body: [`Hoje · ${money(todayTotal)}`, ...lines].join("\n") };
 }
