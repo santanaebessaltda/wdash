@@ -1,48 +1,32 @@
 import { describe, expect, it } from "vitest";
 import { formatCashClosePush } from "./cashClosePush.ts";
 import { formatStoreGoalPush, goalLevel } from "./goalPush.ts";
-import { formatSalesPush, pushStoreName } from "./salesPush.ts";
+import { formatSalesPush } from "./salesPush.ts";
 
 const plain = (value: string | undefined) => value?.replaceAll("\u00a0", " ");
 
-describe("pushStoreName", () => {
-  it("corta em LOJA ou QUIOSQUE e troca o ponto por espaço", () => {
-    expect(pushStoreName("LOJAWEPINK.CENTRO.CAMPOGRANDE")).toBe("CENTRO CAMPOGRANDE");
-    expect(pushStoreName("QUIOSQUEWEPINK.SHOPPING.NORTE.SUL.PLAZA")).toBe("SHOPPING NORTE SUL PLAZA");
-    expect(pushStoreName("LOJAWPINK.RUA")).toBe("RUA");
-    expect(pushStoreName("QUIOSQUEWPINK.CENTRO")).toBe("CENTRO");
-    expect(pushStoreName("LOJA.WEPINK.CENTRO.CAMPO.GRANDE")).toBe("CENTRO CAMPO GRANDE");
-    expect(pushStoreName("QUIOSQUE.SHOPPING.NORTE.SUL")).toBe("SHOPPING NORTE SUL");
-    expect(pushStoreName("QUIOSQUESHOPPING.NORTE.SUL.PLAZA")).toBe("SHOPPING NORTE SUL PLAZA");
-  });
-
-  it("deixa o nome que já está legível", () => {
-    expect(pushStoreName("SB EMPREENDIMENTOS")).toBe("SB EMPREENDIMENTOS");
-  });
-});
-
 describe("formatSalesPush", () => {
   it("uma filial: o intervalo no título e o dia no fim da linha", () => {
-    const text = formatSalesPush([{ name: "LOJAWEPINK.CENTRO.CAMPO.GRANDE", deltaCents: 80000, todayCents: 345000 }]);
+    const text = formatSalesPush([{ name: "LOJAWEPINK.CENTRO.CAMPOGRANDE", deltaCents: 80000, todayCents: 345000 }]);
     expect(plain(text?.title)).toBe("Vendas · +R$ 800,00");
-    expect(plain(text?.body)).toBe("CENTRO CAMPO GRANDE · R$ 3.450,00 hoje");
+    expect(plain(text?.body)).toBe("LOJAWEPINK.CENTRO.CAMPOGRANDE · R$ 3.450,00 hoje");
   });
 
   it("várias filiais: hoje da rede e cada filial, da que mais vendeu no intervalo para a que menos vendeu", () => {
     const text = formatSalesPush([
-      { name: "QUIOSQUEWEPINK.SHOPPING.TRES.LAGOAS", deltaCents: 35840, todayCents: 167660 },
+      { name: "QUIOSQUESHOPPINGTRESLAGOAS", deltaCents: 35840, todayCents: 167660 },
       { name: "SB EMPREENDIMENTOS", deltaCents: 80400, todayCents: 312400 },
-      { name: "LOJAWEPINK.CENTRO.CAMPO.GRANDE", deltaCents: 318270, todayCents: 1926500 },
-      { name: "QUIOSQUEWPINK.SHOPPING.NORTE.SUL.PLAZA", deltaCents: 54040, todayCents: 211500 },
+      { name: "LOJAWEPINK.CENTRO.CAMPOGRANDE", deltaCents: 318270, todayCents: 1926500 },
+      { name: "QUIOSQUESHOPPINGNORTESULPLAZA", deltaCents: 54040, todayCents: 211500 },
     ]);
     expect(plain(text?.title)).toBe("Vendas · +R$ 4.885,50");
     expect(plain(text?.body)).toBe(
       [
         "Hoje · R$ 26.180,60",
-        "CENTRO CAMPO GRANDE · +R$ 3.182,70 · R$ 19.265,00 hoje",
+        "LOJAWEPINK.CENTRO.CAMPOGRANDE · +R$ 3.182,70 · R$ 19.265,00 hoje",
         "SB EMPREENDIMENTOS · +R$ 804,00 · R$ 3.124,00 hoje",
-        "SHOPPING NORTE SUL PLAZA · +R$ 540,40 · R$ 2.115,00 hoje",
-        "SHOPPING TRES LAGOAS · +R$ 358,40 · R$ 1.676,60 hoje",
+        "QUIOSQUESHOPPINGNORTESULPLAZA · +R$ 540,40 · R$ 2.115,00 hoje",
+        "QUIOSQUESHOPPINGTRESLAGOAS · +R$ 358,40 · R$ 1.676,60 hoje",
       ].join("\n"),
     );
   });
@@ -70,7 +54,7 @@ describe("formatSalesPush", () => {
       { name: "LOJAWEPINK.CENTRO.CAMPO.GRANDE", deltaCents: 0, todayCents: 1926500 },
     ]);
     expect(plain(text?.title)).toBe("Sem vendas nos últimos 30 min");
-    expect(plain(text?.body)).toBe("Hoje · R$ 22.389,00\nCENTRO CAMPO GRANDE · R$ 19.265,00\nSB EMPREENDIMENTOS · R$ 3.124,00");
+    expect(plain(text?.body)).toBe("Hoje · R$ 22.389,00\nLOJAWEPINK.CENTRO.CAMPO.GRANDE · R$ 19.265,00\nSB EMPREENDIMENTOS · R$ 3.124,00");
   });
 
   it("uma filial sem venda nova não repete o dia em duas linhas", () => {

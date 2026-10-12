@@ -13,40 +13,9 @@ function money(cents: number): string {
 
 export type SalesPushRow = { name: string; deltaCents: number; todayCents: number };
 
-const PUSH_NAME_MARKS = ["QUIOSQUE", "LOJA"] as const;
-const PUSH_NAME_BRANDS = ["WEPINK", "WPINK"] as const;
-
-/** Nome da filial só no texto do push: corta em LOJA ou QUIOSQUE e troca ponto por espaço. */
-export function pushStoreName(name: string): string {
-  const text = name.trim().replace(/\s+/g, " ");
-  const upper = text.toUpperCase();
-  let at = -1;
-  let mark = "";
-  for (const word of PUSH_NAME_MARKS) {
-    const i = upper.indexOf(word);
-    if (i >= 0 && (at < 0 || i < at)) {
-      at = i;
-      mark = word;
-    }
-  }
-  let rest = text;
-  if (at >= 0) {
-    rest = text.slice(at + mark.length).replace(/^[\s.]+/, "");
-    const restUpper = rest.toUpperCase();
-    for (const brand of PUSH_NAME_BRANDS) {
-      if (restUpper.startsWith(brand)) {
-        rest = rest.slice(brand.length).replace(/^[\s.]+/, "");
-        break;
-      }
-    }
-  }
-  const cleaned = rest.replaceAll(".", " ").replace(/\s+/g, " ").trim();
-  if (cleaned) return cleaned;
-  return text.replaceAll(".", " ").replace(/\s+/g, " ").trim();
-}
-
 /**
  * Resumo da rodada. `null` sem filial no acesso.
+ * O nome da filial é o do Millennium, como está cadastrado.
  * Com venda: título "Vendas · +R$ …". Uma filial: "NOME · R$ … hoje".
  * Várias: "Hoje · R$ …" e uma linha por filial, da que mais vendeu no intervalo para a que menos vendeu.
  * Sem venda nova: título "Sem vendas nos últimos 30 min" e a posição do dia.
@@ -56,7 +25,7 @@ export function formatSalesPush(rows: SalesPushRow[]): { title: string; body: st
   const labeled = rows.map((row) => ({
     ...row,
     deltaCents: Math.max(0, row.deltaCents),
-    label: pushStoreName(row.name),
+    label: row.name.trim(),
   }));
   const deltaTotal = labeled.reduce((sum, row) => sum + row.deltaCents, 0);
   const todayTotal = labeled.reduce((sum, row) => sum + row.todayCents, 0);
