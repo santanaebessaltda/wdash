@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Alert, Badge, Breadcrumbs, Button, Card, CardTitle } from "@/components/ui";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { DuplicateChoiceModal } from "@/components/wedash/DuplicateChoiceModal";
@@ -33,6 +33,7 @@ import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import {
   CHALLENGE_MODE_HELP,
   CHALLENGE_STATUS_VARIANT,
+  challengeBackPath,
   challengeCriterion,
   challengeHeadline,
 } from "@/pages/challenges/shared";
@@ -75,13 +76,16 @@ function managerGoalText(c: ChallengeRecord): string {
 export default function ChallengeDetailPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const session = useActiveSession();
   const today = calendarTodayIso();
   const [data, setData] = useState<Loaded | null>(null);
   const [reload, setReload] = useState(0);
   const [duplicarAberto, setDuplicarAberto] = useState(false);
   const hasOtherStores = storesForSession(session.stores).length > 1;
-  useReturnWhenStoreChanges(data?.challenge?.storeId, paths.management.challenges);
+  const daEquipe = (location.state as { from?: string } | null)?.from === "team";
+  const voltarPara = challengeBackPath(location.state);
+  useReturnWhenStoreChanges(data?.challenge?.storeId, voltarPara);
 
   useEffect(() => {
     const onSync = () => setReload((n) => n + 1);
@@ -112,7 +116,7 @@ export default function ChallengeDetailPage() {
     [data, today],
   );
 
-  const voltar = () => navigate(paths.management.challenges);
+  const voltar = () => navigate(voltarPara);
   const periodo = challenge ? `${dataCompleta(challenge.startsOn)} a ${dataCompleta(challenge.endsOn)}` : "";
 
   return (
@@ -123,14 +127,18 @@ export default function ChallengeDetailPage() {
           Voltar
         </Button>
         <Breadcrumbs
-          items={[{ label: "Gestão" }, { label: "Desafios", to: paths.management.challenges }, { label: challenge?.name ?? "Detalhe" }]}
+          items={
+            daEquipe
+              ? [{ label: "Dashboard", to: paths.overview }, { label: "Equipe", to: voltarPara }, { label: challenge?.name ?? "Detalhe" }]
+              : [{ label: "Gestão" }, { label: "Desafios", to: paths.management.challenges }, { label: challenge?.name ?? "Detalhe" }]
+          }
         />
         {challenge && !showSkeleton && (
           <div className="ml-auto flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setDuplicarAberto(true)}>
               Duplicar desafio
             </Button>
-            <Button size="sm" onClick={() => navigate(paths.management.challengeEdit(challenge.id))}>
+            <Button size="sm" onClick={() => navigate(paths.management.challengeEdit(challenge.id), { state: location.state })}>
               Editar desafio
             </Button>
           </div>
@@ -164,7 +172,7 @@ export default function ChallengeDetailPage() {
             description="O desafio pode ter sido excluído ou não pertencer às suas filiais."
             action={
               <Button size="sm" variant="outline" onClick={voltar}>
-                Voltar para Desafios
+                {daEquipe ? "Voltar para Equipe" : "Voltar para Desafios"}
               </Button>
             }
           />

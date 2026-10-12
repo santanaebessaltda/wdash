@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Breadcrumbs,
   Button,
@@ -48,7 +48,7 @@ import {
 import { storesForSession } from "@/data/wedash/stores";
 import { cn } from "@/lib/cn";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
-import { CHALLENGE_MODE_HELP } from "@/pages/challenges/shared";
+import { CHALLENGE_MODE_HELP, challengeBackPath } from "@/pages/challenges/shared";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { useReturnWhenStoreChanges, useScope } from "@/pages/dashboard/useScope";
 import { NumberInput, SAVE_ERROR_MSG } from "@/pages/operation/shared";
@@ -102,10 +102,13 @@ export default function ChallengeEditorPage() {
   const copyId = id ? null : searchParams.get("copy");
   const copyForStore = Boolean(copyId) && searchParams.get("for") === "store";
   const navigate = useNavigate();
+  const location = useLocation();
   const session = useActiveSession();
   const toast = useToast();
   const titulo = id ? "Editar desafio" : "Novo desafio";
-  const voltar = () => navigate(id ? paths.management.challengeDetail(id) : paths.management.challenges);
+  const voltarPara = challengeBackPath(location.state);
+  const voltar = () =>
+    navigate(id ? paths.management.challengeDetail(id) : voltarPara, id ? { state: location.state } : undefined);
 
   const { escopo } = useScope();
   const lojas = useMemo(() => storesForSession(session.stores), [session.stores]);
@@ -117,7 +120,7 @@ export default function ChallengeEditorPage() {
   useEffect(() => {
     if (!id && !copyForStore && lojaFiltro) setForm((f) => ({ ...f, storeId: lojaFiltro }));
   }, [id, lojaFiltro, copyForStore]);
-  useReturnWhenStoreChanges(id ? form.storeId || undefined : undefined, paths.management.challenges);
+  useReturnWhenStoreChanges(id ? form.storeId || undefined : undefined, voltarPara);
 
   const sourceId = id ?? copyId;
   const [loadingSource, setLoadingSource] = useState(Boolean(sourceId));
@@ -201,7 +204,7 @@ export default function ChallengeEditorPage() {
       return;
     }
     toast.show(id ? "Alterações salvas." : "Desafio criado.", "success");
-    navigate(paths.management.challengeDetail(res.id));
+    navigate(paths.management.challengeDetail(res.id), { state: location.state });
   };
 
   const setMetric = (metric: ChallengeMetric) =>
@@ -244,8 +247,8 @@ export default function ChallengeEditorPage() {
             title="Desafio não encontrado"
             description="O desafio pode ter sido excluído ou não pertencer às suas filiais."
             action={
-              <Button size="sm" variant="outline" onClick={() => navigate(paths.management.challenges)}>
-                Voltar para Desafios
+              <Button size="sm" variant="outline" onClick={() => navigate(voltarPara)}>
+                {voltarPara.startsWith(paths.team) ? "Voltar para Equipe" : "Voltar para Desafios"}
               </Button>
             }
           />

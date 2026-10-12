@@ -1,4 +1,5 @@
 import type { ChallengeMetric, ChallengeRecord } from "@/data/wedash/challengesRepo";
+import { paths } from "@/router/paths";
 import {
   challengeCardSummary,
   metricValueLabel,
@@ -73,6 +74,12 @@ export function HeadlineText({ headline }: { headline: ChallengeHeadline }) {
   ) : (
     <span className="font-bold text-t0">{headline.value}</span>
   );
+}
+
+/** Detalhe aberto pela Equipe volta para a aba Desafios. Sem origem, volta para a lista. */
+export function challengeBackPath(state: unknown): string {
+  if ((state as { from?: string } | null)?.from === "team") return `${paths.team}?aba=desafios`;
+  return paths.management.challenges;
 }
 
 /** Premio principal: 1 lugar (Disputa) ou o premio por pessoa (Minimo). */

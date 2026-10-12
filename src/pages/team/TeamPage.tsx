@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { paths } from "@/router/paths";
 import { HeaderFilter } from "@/pages/dashboard/HeaderFilter";
 import { Button, Card, CardHeader, CardTitle, DateRangePicker, PageHeader, Pagination, StatCard, Tabs, ThSort, type SortDir } from "@/components/ui";
@@ -184,6 +184,8 @@ function rotuloLojas(lojas: string[]): string | null {
 export function TeamPage() {
   const session = useActiveSession();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const abaDesempenho = searchParams.get("aba") === "desafios" ? "desafios" : "ranking";
   const { escopo, mudar } = useScope();
   const [aggs, setAggs] = useState<TeamAggInput>({ dayAggs: [] });
   const [coverageFrom, setCoverageFrom] = useState<Date | null>(null);
@@ -572,7 +574,7 @@ export function TeamPage() {
             ) : (
             <Tabs
               variant="accent"
-              defaultKey="ranking"
+              defaultKey={abaDesempenho}
               items={[
                 {
                   key: "ranking",
@@ -593,7 +595,7 @@ export function TeamPage() {
                             challenge={challenge}
                             view={desafio}
                             lojaNome={mostraLojaDesafio ? lojaNome : undefined}
-                            onOpen={() => navigate(paths.management.challengeDetail(challenge.id))}
+                            onOpen={() => navigate(paths.management.challengeDetail(challenge.id), { state: { from: "team" } })}
                           />
                         ))}
                       </div>
