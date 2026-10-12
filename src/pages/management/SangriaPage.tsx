@@ -510,11 +510,12 @@ function DiaCelula({
   const abre = day != null && !futuro && (rows.length > 0 || depositado || faltaCents > 0);
   const chips = rows.length > 0 || faltaCents > 0 ? chipsDoDia(tot, depositado) : [];
   const borda = cn(
-    "flex min-h-[84px] w-full min-w-0 flex-col items-stretch justify-start border-b border-r border-line p-1.5 text-left sm:min-h-[110px] sm:p-2",
+    "relative flex h-full min-h-[84px] w-full min-w-0 flex-col items-stretch justify-start border-b border-r border-line p-1.5 text-left sm:min-h-[110px] sm:p-2",
     (index + 1) % 7 === 0 && "border-r-0",
     !day && "bg-bg-1/30",
-    marcado && "bg-acc-soft/40 ring-1 ring-inset ring-acc",
+    marcado && "bg-acc-soft/40",
   );
+  const marca = marcado ? <span aria-hidden className="pointer-events-none absolute inset-0 z-10 border border-acc" /> : null;
   const miolo = day ? (
     <>
       <span className="flex w-full items-start justify-between gap-1">
@@ -546,9 +547,10 @@ function DiaCelula({
     </>
   ) : null;
   if (!day) return <div className={borda} />;
-  if (!abre) return <div className={borda}>{miolo}</div>;
+  if (!abre) return <div className={borda}>{marca}{miolo}</div>;
   return (
     <button type="button" className={cn(borda, marcado ? "hover:bg-acc-soft/40" : "hover:bg-bg-3")} onClick={() => onOpen(day)}>
+      {marca}
       {miolo}
     </button>
   );
