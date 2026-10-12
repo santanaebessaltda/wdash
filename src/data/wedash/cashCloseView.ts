@@ -261,17 +261,58 @@ export function closeDayFace(input: { awaiting: boolean; hasLines: boolean; hasG
   return "vazio";
 }
 
+export type MonthCloseSummary = {
+  /** Millennium e total real só dos dias que já têm total real. Pendente fica de fora dos dois. */
+  systemCents: number;
+  realCents: number;
+  diffCents: number;
+  surplusCents: number;
+  shortageCents: number;
+  surplusDays: number;
+  shortageDays: number;
+  pendingDays: number;
+};
+
 /** Diferença dos dias com total real, e dias sem total real. O mesmo dia em várias lojas conta uma vez. */
 export function monthCloseSummary(
-  rows: Array<{ day: string; diffCents: number; pending: boolean }>,
-): { diffCents: number; pendingDays: number } {
-  let diffCents = 0;
-  const pending = new Set<string>();
+  rows: Array<{ day: string; systemCents: number; realCents: number; diffCents: number; pending: boolean }>,
+): MonthCloseSummary {
+  const byDay = new Map<string, { systemCents: number; realCents: number; diffCents: number; pending: boolean }>();
   for (const row of rows) {
-    if (row.pending) pending.add(row.day);
-    else diffCents += row.diffCents;
+    const cur = byDay.get(row.day) ?? { systemCents: 0, realCents: 0, diffCents: 0, pending: false };
+    cur.systemCents += row.systemCents;
+    cur.realCents += row.realCents;
+    cur.diffCents += row.diffCents;
+    cur.pending = cur.pending || row.pending;
+    byDay.set(row.day, cur);
   }
-  return { diffCents, pendingDays: pending.size };
+  const out: MonthCloseSummary = {
+    systemCents: 0,
+    realCents: 0,
+    diffCents: 0,
+    surplusCents: 0,
+    shortageCents: 0,
+    surplusDays: 0,
+    shortageDays: 0,
+    pendingDays: 0,
+  };
+  for (const day of byDay.values()) {
+    if (day.pending) {
+      out.pendingDays += 1;
+      continue;
+    }
+    out.systemCents += day.systemCents;
+    out.realCents += day.realCents;
+    out.diffCents += day.diffCents;
+    if (day.diffCents > 0) {
+      out.surplusCents += day.diffCents;
+      out.surplusDays += 1;
+    } else if (day.diffCents < 0) {
+      out.shortageCents += Math.abs(day.diffCents);
+      out.shortageDays += 1;
+    }
+  }
+  return out;
 }
 
 /** Falta assumida pela loja deixa de aparecer como desconto no calendário. */

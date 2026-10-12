@@ -6,7 +6,7 @@ import { padTopoEBase } from "@/lib/safeArea";
 export interface ModalProps {
   open: boolean;
   onClose: () => void;
-  title?: string;
+  title?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
   size?: "sm" | "md" | "lg";
@@ -40,7 +40,7 @@ export function Modal({ open, onClose, title, children, footer, size = "md", bod
       >
         {title && (
           <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-5 py-4">
-            <h3 className="min-w-0 text-[15px] font-bold text-t0">{title}</h3>
+            <h3 className="flex min-w-0 flex-wrap items-center gap-2 text-[15px] font-bold text-t0">{title}</h3>
             <button
               onClick={onClose}
               aria-label="Fechar"

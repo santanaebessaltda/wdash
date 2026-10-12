@@ -268,11 +268,20 @@ describe("resumo do fechamento", () => {
     expect(closeDayGap(linhas09).diffCents).toBe(5340);
     expect(
       monthCloseSummary([
-        { day: "2026-10-01", diffCents: -1000, pending: true },
-        { day: "2026-10-01", diffCents: -50, pending: true },
-        { day: "2026-10-02", diffCents: 100, pending: false },
-        { day: "2026-10-03", diffCents: -40, pending: false },
+        { day: "2026-10-01", systemCents: 5000, realCents: 0, diffCents: -1000, pending: true },
+        { day: "2026-10-01", systemCents: 20, realCents: 0, diffCents: -50, pending: true },
+        { day: "2026-10-02", systemCents: 1000, realCents: 1100, diffCents: 100, pending: false },
+        { day: "2026-10-03", systemCents: 200, realCents: 160, diffCents: -40, pending: false },
       ]),
-    ).toEqual({ diffCents: 60, pendingDays: 1 });
+    ).toEqual({
+      systemCents: 1200,
+      realCents: 1260,
+      diffCents: 60,
+      surplusCents: 100,
+      shortageCents: 40,
+      surplusDays: 1,
+      shortageDays: 1,
+      pendingDays: 1,
+    });
   });
 });

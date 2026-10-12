@@ -1,6 +1,6 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Alert, Button, Card, Modal, Skeleton, useToast } from "@/components/ui";
+import { Alert, Badge, Button, Card, Modal, Skeleton, StatCard, useToast } from "@/components/ui";
 import { monthCloseSpanFor } from "@/data/wedash/cashCloseMonth";
 import {
   applyCloseReview,
@@ -11,6 +11,7 @@ import {
   realCentsOf,
   type CashCloseBucket,
   type CashCloseLine,
+  type MonthCloseSummary,
 } from "@/data/wedash/cashCloseView";
 import {
   fetchCashCloseMonthMarks,
@@ -62,6 +63,49 @@ function totalDia(cents: number): string {
   if (cents > 0) return `+${abs}`;
   return abs;
 }
+
+function significado(cents: number): "Sobra" | "Quebra" | "Sem diferença" {
+  if (cents > 0) return "Sobra";
+  if (cents < 0) return "Quebra";
+  return "Sem diferença";
+}
+
+function contaDias(n: number, fato: string): string {
+  return `${n} ${n === 1 ? "dia" : "dias"} com ${fato}`;
+}
+
+const KPI_COLORS = [
+  { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" },
+  { iconColor: "var(--info)", iconBg: "rgba(59,130,246,0.12)" },
+  { iconColor: "var(--ok)", iconBg: "var(--ok-soft)" },
+  { iconColor: "var(--warn)", iconBg: "rgba(245,158,11,0.12)" },
+];
+
+const IconMillennium = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+  </svg>
+);
+const IconReal = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="5" width="20" height="14" rx="2" />
+    <path d="M2 10h20" />
+  </svg>
+);
+const IconDif = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 3v18" />
+    <path d="M5 8h14" />
+    <path d="M7 8l-3 6a4 4 0 0 0 8 0L9 8" />
+    <path d="M17 8l-3 6a4 4 0 0 0 8 0l-3-6" />
+  </svg>
+);
+const IconPendente = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7v6l4 2" />
+  </svg>
+);
 
 const MESES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -194,7 +238,14 @@ function CloseTable({
                     )}
                   </td>
                   <td className={cn("px-3 py-3 text-right font-mono text-[13px] font-bold", fechado && diff != null ? diffClass(diff) : "text-t2")}>
-                    {fechado && diff != null ? totalDia(diff) : "—"}
+                    {fechado && diff != null ? (
+                      <>
+                        <span className="block">{totalDia(diff)}</span>
+                        <span className="mt-0.5 block text-[10px] font-semibold normal-case tracking-normal">{significado(diff)}</span>
+                      </>
+                    ) : (
+                      "—"
+                    )}
                   </td>
                 </tr>
               );
@@ -208,7 +259,7 @@ function CloseTable({
                 {dayWithoutReal(lines) ? "—" : money(conta.realCents)}
               </td>
               <td className={cn("px-3 py-3 text-right font-mono text-[13px] font-bold", fechado && !dayWithoutReal(lines) ? diffClass(conta.diffCents) : "text-t2")}>
-                {fechado && !dayWithoutReal(lines) ? totalDia(conta.diffCents) : "—"}
+                {fechado && !dayWithoutReal(lines) ? `${totalDia(conta.diffCents)} · ${significado(conta.diffCents)}` : "—"}
               </td>
             </tr>
           </tfoot>
@@ -645,7 +696,7 @@ export function CashClosePage() {
   const analise = useMemo(() => {
     if (marksKey !== faixaKey) return null;
     const porDia = new Map<string, { systemCents: number; realCents: number; diffCents: number; hasMillennium: boolean; hasLines: boolean; pending: boolean }>();
-    const rows: Array<{ day: string; diffCents: number; pending: boolean }> = [];
+    const rows: Array<{ day: string; systemCents: number; realCents: number; diffCents: number; pending: boolean }> = [];
     for (const mark of marks) {
       const day = mark.day.slice(0, 10);
       const review = reviews.find((r) => r.storeId === mark.storeId && r.day.slice(0, 10) === day) ?? null;
@@ -659,6 +710,8 @@ export function CashClosePage() {
       if (day < hoje) {
         rows.push({
           day,
+          systemCents: gap.comparedSystemCents,
+          realCents: gap.realCents,
           diffCents: gap.diffCents,
           pending: semReal,
         });
@@ -709,7 +762,7 @@ export function CashClosePage() {
       <SectionHeader
         section="Gestão"
         title="Fechamento"
-        subtitle="Confira o fechamento diário comparando o Millennium com o total real."
+        subtitle="Compare o Millennium com o total real e acompanhe sobras, quebras e pendências do mês."
         actions={
           <HeaderFilters>
             <div className="flex flex-wrap items-center gap-2">
@@ -741,7 +794,7 @@ export function CashClosePage() {
             {analise ? (
               <ResumoMes resumo={analise.resumo} />
             ) : (
-              <Skeleton className="mb-4 h-[76px] w-full rounded-[18px]" />
+              <Skeleton className="mb-4 h-[148px] w-full rounded-[18px]" />
             )}
             <Mes hoje={hoje} cells={cells} faceDoDia={faceDoDia} onOpen={abrirDia} />
           </>
@@ -769,66 +822,101 @@ export function CashClosePage() {
   );
 }
 
-function textoDiferenca(cents: number): string {
-  if (cents > 0) return "Sobra nos dias que já têm total real";
-  if (cents < 0) return "Quebra nos dias que já têm total real";
-  return "Os dias com total real fecharam iguais";
+function apoioDiferenca(cents: number): string {
+  if (cents > 0) return "Sobra acumulada";
+  if (cents < 0) return "Quebra acumulada";
+  return "Sem diferença acumulada";
 }
 
-function ResumoMes({ resumo }: { resumo: { diffCents: number; pendingDays: number } }) {
-  const itens = [
+function textoPendentes(n: number): string {
+  if (n === 0) return "Nenhum dia sem total real";
+  if (n === 1) return "1 dia sem total real";
+  return `${n} dias sem total real`;
+}
+
+function ResumoMes({ resumo }: { resumo: MonthCloseSummary }) {
+  const dias =
+    resumo.surplusDays === 0 && resumo.shortageDays === 0
+      ? "Nenhum dia com sobra ou quebra"
+      : `${contaDias(resumo.surplusDays, "sobra")} · ${contaDias(resumo.shortageDays, "quebra")}`;
+  const partes = `Sobras ${brlCent(resumo.surplusCents / 100)} · Quebras ${brlCent(resumo.shortageCents / 100)}`;
+  const cards = [
+    {
+      label: "Millennium",
+      value: brlCent(resumo.systemCents / 100),
+      icon: <IconMillennium />,
+      sub: "Dias com total real",
+      tooltip: "Soma do Millennium só nos dias que já têm total real. Dia pendente não entra.",
+    },
+    {
+      label: "Total real",
+      value: brlCent(resumo.realCents / 100),
+      icon: <IconReal />,
+      sub: "Dias já fechados",
+      tooltip: "Soma do total real nos mesmos dias do Millennium. Dia pendente não entra.",
+    },
     {
       label: "Diferença",
-      valor: totalDia(resumo.diffCents),
-      detalhe: textoDiferenca(resumo.diffCents),
-      tom: diffClass(resumo.diffCents),
+      value: totalDia(resumo.diffCents),
+      icon: <IconDif />,
+      sub: apoioDiferenca(resumo.diffCents),
+      sub2: partes,
+      tooltip: `${dias}. ${partes}.`,
     },
     {
       label: "Dias pendentes",
-      valor: String(resumo.pendingDays),
-      detalhe: resumo.pendingDays > 0 ? "Etiqueta amarela, ainda sem total real" : "Nenhum dia sem total real",
-      tom: resumo.pendingDays > 0 ? "text-warn" : "text-t0",
+      value: String(resumo.pendingDays),
+      icon: <IconPendente />,
+      sub: textoPendentes(resumo.pendingDays),
+      tooltip: "Dia passado que ainda não tem total real em alguma forma.",
     },
   ];
   return (
-    <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-      {itens.map((item) => (
-        <Card key={item.label} padding="sm">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-t2">{item.label}</p>
-          <p className={cn("mt-1 truncate font-mono text-xl font-extrabold", item.tom)}>{item.valor}</p>
-          <p className="mt-0.5 text-[11px] text-t2">{item.detalhe}</p>
-        </Card>
-      ))}
+    <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {cards.map((card, i) => {
+        const cor = KPI_COLORS[i % KPI_COLORS.length];
+        return (
+          <StatCard
+            key={card.label}
+            label={card.label}
+            value={card.value}
+            icon={card.icon}
+            iconColor={cor.iconColor}
+            iconBg={cor.iconBg}
+            sub={card.sub}
+            sub2={"sub2" in card ? card.sub2 : undefined}
+            tooltip={card.tooltip}
+          />
+        );
+      })}
     </div>
   );
 }
 
 function ContaDoDia({ systemCents, realCents, diffCents }: { systemCents: number; realCents: number; diffCents: number }) {
-  const fecha = realCents - systemCents === diffCents;
+  const itens = [
+    { label: "Millennium", value: money(systemCents), apoio: null, tom: "text-t0" },
+    { label: "Total real", value: money(realCents), apoio: null, tom: "text-t0" },
+    { label: "Diferença", value: totalDia(diffCents), apoio: significado(diffCents), tom: diffClass(diffCents) },
+  ];
   return (
-    <div className="mb-4 flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-[14px] border border-line bg-bg-1 px-3 py-3 text-[13px]">
-      {fecha ? (
-        <>
-          <span className="text-t2">Total real</span>
-          <span className="font-mono font-bold text-t0">{money(realCents)}</span>
-          <span className="text-t2">−</span>
-          <span className="text-t2">Millennium</span>
-          <span className="font-mono font-bold text-t0">{money(systemCents)}</span>
-          <span className="text-t2">=</span>
-        </>
-      ) : (
-        <span className="text-t2">Valores sem total real não entram nesta diferença.</span>
-      )}
-      <span className="text-t2">Diferença</span>
-      <span className={cn("font-mono text-[13px] font-bold", diffClass(diffCents))}>{totalDia(diffCents)}</span>
+    <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+      {itens.map((item) => (
+        <div key={item.label} className="min-w-0 rounded-[14px] border border-line bg-bg-1 px-3 py-3">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-t2">{item.label}</p>
+          <p className={cn("mt-1 truncate font-mono text-lg font-extrabold", item.tom)}>{item.value}</p>
+          {item.apoio && <p className={cn("mt-0.5 text-[11px] font-semibold", item.tom)}>{item.apoio}</p>}
+        </div>
+      ))}
     </div>
   );
 }
 
-function EtiquetaDia({ tom, children }: { tom: "ok" | "bad" | "warn"; children: string }) {
-  const cor = tom === "ok" ? "bg-ok" : tom === "bad" ? "bg-bad" : "bg-warn";
+function EtiquetaDia({ tom, children }: { tom: "ok" | "bad" | "warn" | "info" | "neutral"; children: ReactNode }) {
+  const cor =
+    tom === "ok" ? "bg-ok text-white" : tom === "bad" ? "bg-bad text-white" : tom === "warn" ? "bg-warn text-white" : tom === "info" ? "bg-info text-white" : "bg-bg-inset text-t1";
   return (
-    <div className={cn("mt-1 max-w-full truncate rounded-md px-1.5 py-1 text-[10px] font-semibold text-white sm:text-[11px]", cor)}>
+    <div className={cn("mt-1 max-w-full truncate rounded-md px-1.5 py-1 text-[10px] font-semibold sm:text-[11px]", cor)}>
       {children}
     </div>
   );
@@ -872,13 +960,17 @@ function Mes({
               <NumeroDia iso={day} hoje={hoje} />
               {mostraTotal && face && (
                 <div className="mt-1.5 w-full min-w-0">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-t2">Total</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-t2">
+                    {face.kind === "pendente" ? "Millennium" : face.kind === "hoje" ? "Movimento" : "Total real"}
+                  </p>
                   <p className="whitespace-nowrap font-mono text-[12px] font-extrabold text-t0 sm:text-[13px]">
                     {brlCent(face.totalCents / 100)}
                   </p>
-                  {face.kind === "pendente" && <EtiquetaDia tom="warn">Pendente</EtiquetaDia>}
-                  {face.kind === "total" && face.diffCents > 0 && <EtiquetaDia tom="ok">{totalDia(face.diffCents)}</EtiquetaDia>}
-                  {face.kind === "total" && face.diffCents < 0 && <EtiquetaDia tom="bad">{totalDia(face.diffCents)}</EtiquetaDia>}
+                  {face.kind === "pendente" && <EtiquetaDia tom="warn">Pendente · sem total real</EtiquetaDia>}
+                  {face.kind === "hoje" && <EtiquetaDia tom="info">Em aberto</EtiquetaDia>}
+                  {face.kind === "total" && face.diffCents > 0 && <EtiquetaDia tom="ok">{`${totalDia(face.diffCents)} · Sobra`}</EtiquetaDia>}
+                  {face.kind === "total" && face.diffCents < 0 && <EtiquetaDia tom="bad">{`${totalDia(face.diffCents)} · Quebra`}</EtiquetaDia>}
+                  {face.kind === "total" && face.diffCents === 0 && <EtiquetaDia tom="neutral">R$ 0,00 · Sem diferença</EtiquetaDia>}
                 </div>
               )}
             </>
@@ -953,6 +1045,21 @@ function DiaModal({
       })
     : [];
 
+  const diaPendente =
+    fechado &&
+    pronto &&
+    (comDados.length === 0 ||
+      comDados.some((loja) => {
+        const snap = snaps[loja.id];
+        if (!snap || !day) return true;
+        const review = reviews.find((r) => r.storeId === loja.id && r.day === day) ?? null;
+        const lines = applyCloseReview(buildCashCloseView(snap).lines, review, {
+          cardPending: snap.cardPending,
+          pixRequested: snap.pixRequested,
+        });
+        return dayWithoutReal(lines);
+      }));
+
   async function salvar() {
     if (!day) return;
     setBusy(true);
@@ -1019,7 +1126,20 @@ function DiaModal({
       onClose={() => {
         if (!busy) onClose();
       }}
-      title={day ? tituloDia(day) : ""}
+      title={
+        day ? (
+          <>
+            <span>{tituloDia(day)}</span>
+            {(!fechado || pronto) && (
+              <Badge variant={!fechado ? "info" : diaPendente ? "warning" : "success"}>
+                {!fechado ? "Em aberto" : diaPendente ? "Pendente" : "Fechado"}
+              </Badge>
+            )}
+          </>
+        ) : (
+          ""
+        )
+      }
       size="lg"
       footer={
         <>
@@ -1067,8 +1187,8 @@ function DiaModal({
                 )}
                 {cash?.openingCents != null && (
                   <p className="mb-3 text-[12px] text-t2">
-                    Fundo de caixa: {brlCent(cash.openingCents / 100)}
-                    {cash.sangriaCents != null ? ` · Sangria: ${brlCent(cash.sangriaCents / 100)}` : ""}
+                    Fundo de caixa {brlCent(cash.openingCents / 100)}
+                    {cash.sangriaCents != null ? ` · Sangria ${brlCent(Math.abs(cash.sangriaCents) / 100)}` : ""}
                   </p>
                 )}
                 <CloseTable
