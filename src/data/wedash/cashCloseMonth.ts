@@ -72,14 +72,21 @@ export function cashCloseJobMatches(
   return got === part;
 }
 
-/** Dias do intervalo, até ontem, que ainda não têm fechamento gravado. */
+/**
+ * A primeira leitura pode sair antes de a loja fechar o caixa.
+ * Ontem e os dois dias anteriores são lidos de novo, mesmo já gravados.
+ */
+export const CLOSE_REOPEN_DAYS = 3;
+
+/** Dias do intervalo, até ontem, que ainda não têm fechamento, mais a janela recente. */
 export function missingCloseDays(from: string, to: string, today: string, filled: ReadonlySet<string>): string[] {
   const yesterday = somarDias(today, -1);
   const end = to < yesterday ? to : yesterday;
   if (from > end) return [];
+  const reopenFrom = somarDias(yesterday, -(CLOSE_REOPEN_DAYS - 1));
   const out: string[] = [];
   for (let day = from; day <= end; day = somarDias(day, 1)) {
-    if (!filled.has(day)) out.push(day);
+    if (!filled.has(day) || day >= reopenFrom) out.push(day);
   }
   return out;
 }

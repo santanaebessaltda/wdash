@@ -73,4 +73,16 @@ describe("missingCloseDays", () => {
       "2026-10-07",
     ]);
   });
+
+  it("relê ontem e os dois dias anteriores mesmo já gravados", () => {
+    const filled = new Set(["2026-10-02", "2026-10-05", "2026-10-06", "2026-10-07"]);
+    expect(missingCloseDays("2026-10-01", "2026-10-07", "2026-10-08", filled)).toEqual([
+      "2026-10-01",
+      "2026-10-03",
+      "2026-10-04",
+      "2026-10-05",
+      "2026-10-06",
+      "2026-10-07",
+    ]);
+  });
 });
