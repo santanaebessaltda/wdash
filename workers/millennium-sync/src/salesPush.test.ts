@@ -78,6 +78,35 @@ describe("outros avisos", () => {
     expect(text?.body.replaceAll("\u00a0", " ")).toBe("CENTRO · faltou R$ 15,00\nSHOPPING · sem total real");
   });
 
+  it("quando cabe, o fechamento mantém a ordem do acesso", () => {
+    const text = formatCashClosePush("2026-10-09", [
+      { name: "SB EMPREENDIMENTOS", diffCents: 0 },
+      { name: "LOJAWEPINK.CENTRO.CAMPOGRANDE", diffCents: -20000 },
+    ]);
+    expect(text?.body.replaceAll("\u00a0", " ")).toBe(
+      "SB EMPREENDIMENTOS · sem diferença\nLOJAWEPINK.CENTRO.CAMPOGRANDE · faltou R$ 200,00",
+    );
+  });
+
+  it("quando não cabe, o fechamento mostra primeiro o que pede atenção", () => {
+    const quiet = (letter: string) => ({ name: letter.repeat(40), diffCents: 0 });
+    const text = formatCashClosePush("2026-10-09", [
+      quiet("A"),
+      quiet("B"),
+      quiet("C"),
+      quiet("D"),
+      { name: "CENTRO", diffCents: -20000 },
+      { name: "RUA", diffCents: null },
+    ]);
+    const body = text?.body.replaceAll("\u00a0", " ") ?? "";
+    const lines = body.split("\n");
+    expect(lines[0]).toBe("CENTRO · faltou R$ 200,00");
+    expect(lines[1]).toBe("RUA · sem total real");
+    expect(lines[2]?.startsWith("A".repeat(40))).toBe(true);
+    expect(body.includes("C".repeat(40))).toBe(false);
+    expect(lines.at(-1)).toBe("e mais 2 filiais");
+  });
+
   it("nível da meta só sobe na ordem dos percentuais", () => {
     expect(goalLevel(79, [{ minPct: 80, name: "Prata" }, { minPct: 100, name: "Ouro" }]).level).toBe(0);
     expect(goalLevel(100, [{ minPct: 100, name: "Ouro" }, { minPct: 80, name: "Prata" }])).toEqual({ level: 2, name: "Ouro" });

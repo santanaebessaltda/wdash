@@ -1,7 +1,9 @@
 /**
  * Fechamento da madrugada: um resumo do dinheiro (digitado − Millennium).
  * Sem valor digitado e com movimento, diz "sem total real". Cartão e Pix ficam de fora
- * até o arquivo do adquirente entrar na conta.
+ * da conta, e o texto do push não explica isso.
+ * Quando todas as linhas cabem, a ordem é a do acesso. Quando o texto estoura,
+ * entra primeiro o que pede atenção: faltou, sem total real, sobrou, sem diferença.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { notifyScoped, type SalesPushStore } from "./salesPush.ts";
@@ -17,30 +19,51 @@ function isCash(method: string): boolean {
   return s.includes("DINHEIRO");
 }
 
+function closeLine(row: { name: string; diffCents: number | null }): string {
+  if (row.diffCents == null) return `${row.name} · sem total real`;
+  if (row.diffCents < 0) return `${row.name} · faltou ${money(row.diffCents)}`;
+  if (row.diffCents > 0) return `${row.name} · sobrou ${money(row.diffCents)}`;
+  return `${row.name} · sem diferença`;
+}
+
+/** 0 = faltou, 1 = sem total real, 2 = sobrou, 3 = sem diferença. */
+function attentionRank(diffCents: number | null): number {
+  if (diffCents != null && diffCents < 0) return 0;
+  if (diffCents == null) return 1;
+  if (diffCents > 0) return 2;
+  return 3;
+}
+
+function fitLines(rows: Array<{ name: string; diffCents: number | null }>): { body: string; shown: number } {
+  let body = "";
+  let shown = 0;
+  for (const row of rows) {
+    const line = closeLine(row);
+    const next = body ? `${body}\n${line}` : line;
+    if (next.length > BODY_LIMIT) break;
+    body = next;
+    shown += 1;
+  }
+  return { body, shown };
+}
+
 export function formatCashClosePush(day: string, rows: Array<{ name: string; diffCents: number | null }>): { title: string; body: string } | null {
   if (rows.length === 0) return null;
   const [year, month, date] = day.split("-");
   const label = date && month && year ? `${date}/${month}` : day;
   const title = `Fechamento · ${label}`;
-  let body = "";
-  let shown = 0;
-  for (const row of rows) {
-    const line =
-      row.diffCents == null
-        ? `${row.name} · sem total real`
-        : row.diffCents < 0
-          ? `${row.name} · faltou ${money(row.diffCents)}`
-          : row.diffCents > 0
-            ? `${row.name} · sobrou ${money(row.diffCents)}`
-            : `${row.name} · sem diferença`;
-    const next = body ? `${body}\n${line}` : line;
-    if (next.length > BODY_LIMIT && shown > 0) break;
-    if (next.length > BODY_LIMIT) break;
-    body = next;
-    shown += 1;
-  }
-  const rest = rows.length - shown;
-  if (rest > 0) body += `\ne mais ${rest} ${rest === 1 ? "loja" : "lojas"}`;
+  const inOrder = fitLines(rows);
+  const ordered =
+    inOrder.shown === rows.length
+      ? rows
+      : rows
+          .map((row, index) => ({ row, index }))
+          .sort((a, b) => attentionRank(a.row.diffCents) - attentionRank(b.row.diffCents) || a.index - b.index)
+          .map((item) => item.row);
+  const fitted = inOrder.shown === rows.length ? inOrder : fitLines(ordered);
+  const rest = rows.length - fitted.shown;
+  const more = rest > 0 ? `e mais ${rest} ${rest === 1 ? "filial" : "filiais"}` : "";
+  const body = [fitted.body, more].filter(Boolean).join("\n");
   return { title, body };
 }
 
