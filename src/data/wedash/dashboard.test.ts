@@ -1042,7 +1042,7 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
     expect(pontos[pontos.length - 1]).toMatchObject({ label: "22h", realizado: 100 });
   });
 
-  it("loja de rua: venda na hora 0 não puxa o eixo para 00:00 e entra na abertura", () => {
+  it("loja de rua: venda na hora 0 não puxa o eixo e o realizado fecha com o dia", () => {
     const day = "2026-09-21";
     const v = buildOverviewView(
       { filialIds: ["f2"], periodo: { tipo: "personalizado", inicio: day, fim: day }, divisao: null },
@@ -1059,7 +1059,9 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
     const pontos = v.evolucao.filter((e) => !e.ancora);
     expect(pontos[0]?.label).toBe("8h");
     expect(pontos[pontos.length - 1]?.label).toBe("17h");
-    expect(pontos.find((e) => e.label === "8h")?.realizado).toBe(40);
+    // Hora 0 (R$ 40) fica de fora; a hora 10 (R$ 60) é ajustada para o faturamento do dia (R$ 100).
+    expect(pontos.find((e) => e.label === "8h")?.realizado).toBe(0);
+    expect(pontos.find((e) => e.label === "10h")?.realizado).toBe(100);
     expect(pontos[pontos.length - 1]?.realizado).toBe(100);
     expect(pontos.some((e) => e.label === "0h")).toBe(false);
   });
@@ -1414,7 +1416,7 @@ describe("buildFinanceView com agregados reais", () => {
     expect(v.costProfitSeries.some((p) => p.future)).toBe(false);
   });
 
-  it("loja de rua: hora 0 não abre o eixo e o valor entra na abertura", () => {
+  it("loja de rua: hora 0 não abre o eixo e o faturamento fecha com o dia", () => {
     const d = "2026-09-21";
     const hr = (hour: number, rev: number) => ({
       tenantId: "t1",
@@ -1437,7 +1439,8 @@ describe("buildFinanceView com agregados reais", () => {
     const labels = v.costProfitSeries.map((p) => p.label);
     expect(labels[0]).toBe("8h");
     expect(labels[labels.length - 1]).toBe("17h");
-    expect(v.costProfitSeries.find((p) => p.label === "8h")?.revenue).toBe(40);
+    expect(v.costProfitSeries.find((p) => p.label === "8h")?.revenue).toBe(0);
+    expect(v.costProfitSeries.find((p) => p.label === "10h")?.revenue).toBe(100);
     expect(v.costProfitSeries.reduce((s, p) => s + p.revenue, 0)).toBe(100);
   });
 

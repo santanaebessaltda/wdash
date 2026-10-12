@@ -39,6 +39,21 @@ describe("goalCurve", () => {
     expect(total).toBeCloseTo(100_000);
   });
 
+  it("segunda com venda residual usa o dia típico da loja", () => {
+    const hist = new Map<string, number>([
+      ["2026-08-24", 10], // seg residual
+      ["2026-08-25", 1_000],
+      ["2026-08-26", 1_000],
+      ["2026-08-27", 1_000],
+      ["2026-08-28", 1_000],
+      ["2026-08-29", 1_000],
+    ]);
+    const w = weekdayWeights(hist, week10a22);
+    const seg = dailyGoal(100_000, "2026-09-21", w);
+    const ter = dailyGoal(100_000, "2026-09-22", w);
+    expect(seg).toBeGreaterThan(ter * 0.5);
+  });
+
   it("hora segue a participação histórica dentro do expediente", () => {
     const shares = hourShares(new Map([[10, 10], [15, 30], [23, 999]]), week10a22, 1);
     expect(shares.size).toBe(12);

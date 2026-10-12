@@ -2327,14 +2327,16 @@ export function buildFinanceViewFromAggs(escopo: Scope, input: FinanceAggInput):
     const horasAbertas = Math.max(1, win.fechamento - win.abertura);
     const mensalHora = finMonthlyCosts(atual) / horasAbertas;
     const nowH = calendarCurrentHour();
+    // O total do grafico e o faturamento do dia. Hora 0 (cupom sem hora) fica de fora do eixo.
+    let somaRev = 0;
+    for (let h = first; h <= last; h++) somaRev += porHora.get(h)?.rev ?? 0;
+    const fatorRev = atual.rev > 0 && somaRev > 0 ? atual.rev / somaRev : 1;
+    const diaSemMensal: FinLine = { ...atual, fixos: 0, outras: 0, aluguelMinBase: 0, aluguelMin: 0 };
     for (let h = first; h <= last; h++) {
-      // Venda fora do eixo (ex.: 00:00 de cupom sem hora) entra na ponta, sem alargar o grafico.
-      let l = porHora.get(h) ?? FIN_LINE_ZERO;
-      if (h === first || h === last) {
-        for (const [oh, ol] of porHora) {
-          if ((h === first && oh < first) || (h === last && oh > last)) l = finAdd(l, ol);
-        }
-      }
+      const base = porHora.get(h) ?? FIN_LINE_ZERO;
+      const l = somaRev === 0 && atual.rev > 0 && h === first
+        ? diaSemMensal
+        : fatorRev === 1 ? base : finScale(base, fatorRev);
       const futuro = periodo.ehHoje && h > nowH && l.rev <= 0;
       const dentro = !futuro && h >= win.abertura && h < win.fechamento;
       pushPonto(
@@ -4503,6 +4505,12 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
     );
     const horas: number[] = [];
     for (let h = first; h <= last; h++) horas.push(h);
+    // Realizado do card = faturamento do dia. A curva segue as horas do expediente;
+    // venda na hora 0 (cupom sem hora) nao entra na soma nem alarga o eixo.
+    const diaReais = byDay.get(periodo.inicio) ?? 0;
+    let somaHoras = 0;
+    for (const h of horas) somaHoras += byHour.get(h) ?? 0;
+    const fatorHora = diaReais > 0 && somaHoras > 0 ? diaReais / somaHoras : 1;
     // Meta de horas fora do eixo (loja sem venda com expediente mais largo) vai para as pontas.
     const metaNoEixo = (h: number) => {
       let v = metaByHour.get(h) ?? 0;
@@ -4517,12 +4525,8 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
     let acum = 0;
     let acumM = 0;
     for (const h of horas) {
-      let realizadoH = byHour.get(h) ?? 0;
-      if (h === first || h === last) {
-        for (const [oh, ov] of byHour) {
-          if ((h === first && oh < first) || (h === last && oh > last)) realizadoH += ov;
-        }
-      }
+      let realizadoH = (byHour.get(h) ?? 0) * fatorHora;
+      if (somaHoras === 0 && diaReais > 0 && h === first) realizadoH = diaReais;
       acum += realizadoH;
       acumM += metaNoEixo(h);
       const emAndamento = periodo.ehHoje && h === nowH;
