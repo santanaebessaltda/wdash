@@ -866,7 +866,7 @@ function MarcarComo({
   onFalta: () => void;
   onDesfazer: () => void;
 }) {
-  if (dias === 0) return <Button className="w-full sm:w-auto" disabled>Marcar como</Button>;
+  if (dias === 0) return <Button disabled>Marcar como</Button>;
   const itens: DropdownItem[] = [
     ...(podeDesfazer
       ? [
@@ -916,11 +916,9 @@ function MarcarComo({
     },
   ];
   return (
-    <div className="flex w-full flex-col items-stretch gap-1.5 lg:w-auto lg:flex-row lg:items-center">
-      <div className="w-full sm:w-auto [&>div]:w-full sm:[&>div]:w-auto">
-        <Dropdown portal align="right" menuClassName="w-[320px]" trigger={<Button className="w-full sm:w-auto">{rotulo}</Button>} items={itens} />
-      </div>
-      <span className="w-full text-[13px] font-semibold text-t1 lg:w-auto">{money(valor)} a cobrar</span>
+    <div className="flex flex-col items-start gap-1.5 lg:flex-row lg:items-center">
+      <Dropdown portal align="right" menuClassName="w-[320px]" trigger={<Button>{rotulo}</Button>} items={itens} />
+      <span className="text-[13px] font-semibold text-t1">{money(valor)} a cobrar</span>
     </div>
   );
 }
