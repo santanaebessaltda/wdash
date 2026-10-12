@@ -907,17 +907,29 @@ function Mes({
               <NumeroDia iso={day} hoje={hoje} />
               {mostraTotal && face && (
                 <div className="mt-1.5 w-full min-w-0">
-                  <p className="whitespace-nowrap font-mono text-[12px] font-extrabold text-t0 sm:text-[13px]">
+                  <p className={cn("whitespace-nowrap font-mono text-[12px] font-extrabold sm:text-[13px]", day === hoje ? "text-acc" : "text-t1")}>
                     {brlCent(face.totalCents / 100)}
                   </p>
-                  {face.kind === "pendente" && <p className="mt-0.5 text-[11px] font-semibold text-warn">Pendente</p>}
-                  {face.kind === "hoje" && <p className="mt-0.5 text-[11px] font-semibold text-acc">Em aberto</p>}
-                  {face.kind === "total" && face.diffCents !== 0 && (
-                    <p className={cn("mt-0.5 whitespace-nowrap font-mono text-[11px] font-bold sm:text-[12px]", diffClass(face.diffCents))}>
-                      {totalDia(face.diffCents)}
-                    </p>
+                  {face.kind === "pendente" && (
+                    <Badge variant="warning" className="mt-1 max-w-full truncate">
+                      Pendente
+                    </Badge>
                   )}
-                  {face.kind === "total" && face.diffCents === 0 && <p className="mt-0.5 text-[11px] font-semibold text-t2">Sem diferença</p>}
+                  {face.kind === "hoje" && (
+                    <Badge variant="accent" className="mt-1 max-w-full truncate">
+                      Em aberto
+                    </Badge>
+                  )}
+                  {face.kind === "total" && face.diffCents !== 0 && (
+                    <Badge variant={face.diffCents > 0 ? "success" : "danger"} className="mt-1 max-w-full truncate font-mono">
+                      {totalDia(face.diffCents)}
+                    </Badge>
+                  )}
+                  {face.kind === "total" && face.diffCents === 0 && (
+                    <Badge variant="neutral" className="mt-1 max-w-full truncate">
+                      Sem diferença
+                    </Badge>
+                  )}
                 </div>
               )}
             </>
