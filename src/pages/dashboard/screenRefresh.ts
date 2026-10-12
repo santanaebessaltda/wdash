@@ -4,24 +4,27 @@ import { useEffect, useRef, useSyncExternalStore } from "react";
 export type ScreenRefresh = {
   /** Nome acessível do botão. */
   label: string;
-  /** Tooltip: só o que este clique busca. */
+  /** Subtítulo: o que este clique busca. Igual em todas as situações da tela. */
   tip: string;
-  /** Última busca, no formato "Estoque atualizado às HH:MM". */
-  status?: string;
-  /** Também busca as vendas de hoje. O tooltip da tela substitui o das vendas. */
+  /** Título do estado: última busca, nenhuma, ou ainda carregando. */
+  status: string;
+  /** Título enquanto a busca desta tela roda. A ação do menu continua "Atualizando…". */
+  busyLabel: string;
+  /** Também busca as vendas de hoje. O texto da tela substitui o das vendas. */
   sales?: boolean;
   run: () => void | Promise<void>;
 };
 
-/** "Estoque atualizado às HH:MM" hoje, "Estoque atualizado em DD/MM às HH:MM" em outro dia. */
-export function refreshStatusLine(done: string, pending: string, iso: string | null | undefined): string {
-  if (!iso) return pending;
+/** Título único do Atualizar. `undefined` = a hora ainda carrega. `null` = nunca buscou. */
+export function refreshMomentTitle(iso: string | null | undefined, now = new Date()): string {
+  if (iso === undefined) return "Carregando última atualização…";
+  if (!iso) return "Nenhuma atualização ainda";
   const at = new Date(iso);
-  if (Number.isNaN(at.getTime())) return pending;
+  if (Number.isNaN(at.getTime())) return "Nenhuma atualização ainda";
   const hora = at.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
-  if (at.toDateString() === new Date().toDateString()) return `${done} às ${hora}`;
+  if (at.toDateString() === now.toDateString()) return `Última atualização às ${hora}`;
   const dia = at.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-  return `${done} em ${dia} às ${hora}`;
+  return `Última atualização em ${dia} às ${hora}`;
 }
 
 let holder: { read: () => ScreenRefresh } | null = null;
@@ -38,7 +41,7 @@ export function useScreenRefresh(claim: ScreenRefresh) {
   const ref = useRef(claim);
   ref.current = claim;
   const mine = useRef<{ read: () => ScreenRefresh } | null>(null);
-  const fingerprint = `${claim.label}\n${claim.tip}\n${claim.status ?? ""}\n${claim.sales ? "1" : "0"}`;
+  const fingerprint = `${claim.label}\n${claim.tip}\n${claim.status}\n${claim.busyLabel}\n${claim.sales ? "1" : "0"}`;
   useEffect(() => {
     const entry = { read: () => ref.current };
     mine.current = entry;

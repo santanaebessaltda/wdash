@@ -4,7 +4,7 @@ import { buildStockProductsView, type StockCatalogItem, type StockInput } from "
 import { fetchIncomingQty } from "@/data/wedash/purchaseRepo";
 import { fetchCostPrices, fetchStockCatalog, fetchStoreStock, syncStockNow } from "@/data/wedash/stockRepo";
 import type { Store } from "@/data/wedash/stores";
-import { refreshStatusLine, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
+import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { fetchErpConnection } from "@/pages/dashboard/ErpStatusNotice";
 import { useScope } from "@/pages/dashboard/useScope";
 import { pickOneStore, useScopedStores } from "@/pages/operation/shared";
@@ -122,8 +122,9 @@ export function useStockData() {
     : null;
   useScreenRefresh({
     label: "Atualizar o estoque",
-    tip: "Busca o estoque e o que está a receber das filiais desta tela.",
-    status: data ? refreshStatusLine("Estoque atualizado", "Estoque ainda não atualizado", oldestSync) : undefined,
+    tip: "Busca no Millennium o estoque e as quantidades a receber das filiais desta tela.",
+    status: refreshMomentTitle(data ? oldestSync : undefined),
+    busyLabel: "Buscando estoque…",
     run: async () => {
       if (escolher) return;
       const atual = dataRef.current;

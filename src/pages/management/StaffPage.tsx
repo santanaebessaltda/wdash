@@ -13,7 +13,7 @@ import {
   type StoreSeller,
   type StoreShift,
 } from "@/data/wedash/stores";
-import { refreshStatusLine, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
+import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { InviteSellerModal } from "@/pages/management/InviteSellerModal";
 import { GroupFormModal, GroupPicker, ManageGroupsModal, groupProblem, nextGroupWindow } from "@/pages/management/SellerGroups";
 import { CostCardTitle, SAVE_ERROR_MSG, StoreCardsPage, useScopedStores } from "@/pages/operation/shared";
@@ -74,10 +74,8 @@ export function StaffPage() {
   useScreenRefresh({
     label: "Atualizar vendedores",
     tip: "Busca no Millennium os vendedores desta filial.",
-    status:
-      sellerSyncAt === undefined
-        ? undefined
-        : refreshStatusLine("Vendedores atualizados", "Vendedores ainda não atualizados", sellerSyncAt),
+    status: refreshMomentTitle(sellerSyncAt),
+    busyLabel: "Buscando vendedores…",
     run: atualizarVendedores,
   });
 

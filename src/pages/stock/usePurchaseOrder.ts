@@ -6,7 +6,7 @@ import { buildPurchaseOrderView, parseMinInput, type PurchaseStockRow } from "@/
 import { PURCHASE_SYNC_ERROR, fetchPurchaseMins, fetchPurchaseStock, fetchSold30, fetchSoldEver, savePurchaseMin, syncPurchaseStockNow } from "@/data/wedash/purchaseRepo";
 import type { StockCatalogItem } from "@/data/wedash/stockProducts";
 import { fetchCostPrices, fetchStockCatalog } from "@/data/wedash/stockRepo";
-import { refreshStatusLine, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
+import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { fetchErpConnection } from "@/pages/dashboard/ErpStatusNotice";
 import { SAVE_ERROR_MSG } from "@/pages/operation/shared";
 
@@ -170,11 +170,11 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null, costT
     };
   }, [soldDays, storeId, tenantId, data]);
 
-  const saldoIso = data && data.storeId === storeId ? data.syncedAt : null;
   useScreenRefresh({
     label: "Atualizar o saldo do pedido",
-    tip: "Busca no Millennium o saldo do pedido de compra desta filial.",
-    status: data ? refreshStatusLine("Saldo atualizado", "Saldo ainda não atualizado", saldoIso) : undefined,
+    tip: "Busca no Millennium o saldo usado no pedido de compra desta filial.",
+    status: refreshMomentTitle(data && data.storeId === storeId ? data.syncedAt : undefined),
+    busyLabel: "Buscando saldo do pedido…",
     run: async () => {
       if (storeRef.current) await sync(storeRef.current);
     },

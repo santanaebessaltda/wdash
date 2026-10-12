@@ -4,12 +4,11 @@ import { cn } from "@/lib/cn";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { fetchSyncWatermark, salesChangedSince } from "@/data/wedash/salesRepo";
 import { canForceSyncRefresh, formatForceCooldownLabel } from "@/data/wedash/syncUi";
-import { AUTO_REFRESH_MIN, nextAutoRefreshAt, storePhase } from "@/data/wedash/autoRefresh";
-import { lastUpdatedLines } from "@/pages/dashboard/LastUpdated";
-import { fetchErpIntegrationStatus, fetchLastAutoRefreshAt, type ErpIntegrationStatus } from "@/data/wedash/erp";
+import { AUTO_REFRESH_MIN, storePhase } from "@/data/wedash/autoRefresh";
+import { fetchErpIntegrationStatus, type ErpIntegrationStatus } from "@/data/wedash/erp";
 import { storesForSession } from "@/data/wedash/stores";
 import { useActiveSession } from "@/session/SessionProvider";
-import { readScreenRefresh, useScreenRefreshGeneration } from "@/pages/dashboard/screenRefresh";
+import { readScreenRefresh, refreshMomentTitle, useScreenRefreshGeneration } from "@/pages/dashboard/screenRefresh";
 import { SALES_SYNCED_EVENT, useForceRefresh } from "@/pages/dashboard/useForceRefresh";
 import { CHECK_SALES_EVENT, salesChanged, shouldRefreshScreen, watermarkAfterRead } from "@/push/resumeSales";
 const WATERMARK_POLL_MS = 60_000;
@@ -21,15 +20,14 @@ const STALE_OPEN_MS = 2 * AUTO_REFRESH_MIN * 60_000;
  * Tela registrada (`useScreenRefresh`): busca só o que aquela tela mostra; o tooltip é o dela.
  * Ao terminar um FORCE de vendas dispara `SALES_SYNCED_EVENT` — a tela aberta recarrega os próprios dados.
  * Rodada automatica que terminou (watermark avancou no poll, ao voltar ou pelo aviso) dispara o mesmo evento.
- * Tooltip = horario da ultima busca das vendas de hoje + proxima rodada; bolinha amarela =
- * vendas de hoje ainda nao buscadas ou busca atrasada com loja aberta.
+ * Tooltip e menu: título = estado da última busca; subtítulo = o que este clique busca.
+ * Bolinha amarela = vendas de hoje ainda nao buscadas ou busca atrasada com loja aberta.
  */
 export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
   const session = useActiveSession();
   const { show } = useToast();
   const pode = canForceSyncRefresh(session.role);
   const [erp, setErp] = useState<ErpIntegrationStatus | null>(null);
-  const [lastAutoAt, setLastAutoAt] = useState<Date | null>(null);
   const [watermark, setWatermark] = useState<Date | null>(null);
   const [loaded, setLoaded] = useState(false);
   const lastWatermark = useRef<number | null>(null);
@@ -41,10 +39,9 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
     async (notifyIfNewer: boolean): Promise<boolean> => {
       if (!pode) return false;
       try {
-        const [wm, st, lastAuto] = await Promise.all([
+        const [wm, st] = await Promise.all([
           fetchSyncWatermark(session.tenantId),
           fetchErpIntegrationStatus(session.tenantId),
-          fetchLastAutoRefreshAt(session.tenantId),
         ]);
         const prev = lastWatermark.current;
         const stored = watermarkAfterRead(prev, wm);
@@ -54,7 +51,6 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
         }
         lastWatermark.current = stored;
         setErp(st);
-        setLastAutoAt(lastAuto);
         setWatermark(stored != null ? new Date(stored) : null);
         setLoaded(true);
         if (shouldRefreshScreen(prev, stored, changed)) {
@@ -153,16 +149,7 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
   };
 
   const now = new Date();
-  const autoOn = erp != null && !disconnected && erp.autoRefreshEnabled;
   const lojas = storesForSession(session.stores).filter((s) => storeIds.length === 0 || storeIds.includes(s.id));
-  const proxima = autoOn
-    ? nextAutoRefreshAt({
-        stores: lojas.map((s) => ({ hours: s.horas, timezone: s.fuso })),
-        now,
-        intervalMin: AUTO_REFRESH_MIN,
-        lastAutoAt,
-      })
-    : null;
   if (!pode || !canForce) return null;
 
   // telaGen re-renderiza quando a tela assume ou solta o botão.
@@ -180,30 +167,20 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
       watermark.toDateString() !== now.toDateString() ||
       (algumaAberta && now.getTime() - watermark.getTime() > STALE_OPEN_MS));
 
-  const statusLines = disconnected
-    ? [erp?.status === "INVALID" && !erp.syncPaused ? "A senha do Millennium não é mais válida" : "Millennium desconectado"]
-    : watermark
-      ? lastUpdatedLines(watermark, now)
-      : [];
-  const proximaLine = proxima
-    ? `Próxima atualização às ${proxima.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}`
-    : null;
-  const telaLinhas = tela
-    ? disconnected
-      ? statusLines
-      : [...(tela.status ? [tela.status] : []), tela.tip]
-    : null;
-  const tooltip = telaLinhas
-    ? telaLinhas.join("\n")
-    : [
-        ...(watermark || disconnected ? statusLines : loaded ? ["Vendas de hoje ainda não atualizadas"] : []),
-        ...(proximaLine ? [proximaLine] : []),
-      ].join("\n");
+  const salesTip =
+    storeIds.length === 1
+      ? "Busca no Millennium as vendas de hoje da filial selecionada."
+      : "Busca no Millennium as vendas de hoje de todas as filiais.";
+  const tip = tela?.tip ?? salesTip;
+  const busyLabel = tela?.busyLabel ?? "Buscando as vendas de hoje…";
+  const disconnectTitle =
+    erp?.status === "INVALID" && !erp.syncPaused ? "A senha do Millennium não é mais válida" : "Millennium desconectado";
+  const idleTitle = tela ? tela.status : refreshMomentTitle(!loaded ? undefined : watermark ? watermark.toISOString() : null);
+  const title = ocupado ? busyLabel : disconnected ? disconnectTitle : idleTitle;
+  const tooltip = `${title}\n${tip}`;
 
   const ariaLabel = ocupado
-    ? proprio
-      ? "Atualizando…"
-      : "Buscando as vendas de hoje no Millennium…"
+    ? busyLabel
     : !proprio && forceCooldownSec != null
       ? `Próxima atualização em ${formatForceCooldownLabel(forceCooldownSec)}`
       : tela
@@ -228,7 +205,6 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
 
   // Celular / tablet (sem hover): o toque abre o horario da ultima busca + "Atualizar agora".
   if (semHover) {
-    const [linha1, ...resto] = telaLinhas ?? [...statusLines, ...(proximaLine ? [proximaLine] : [])];
     return (
       <Dropdown
         trigger={
@@ -238,23 +214,8 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
         }
         header={
           <div className="flex flex-col gap-0.5">
-            <span className="text-[13px] font-bold text-t0">
-              {ocupado
-                ? proprio
-                  ? "Atualizando…"
-                  : "Buscando as vendas de hoje…"
-                : tela
-                  ? linha1
-                  : watermark || disconnected
-                    ? linha1
-                    : "Vendas de hoje"}
-            </span>
-            {!ocupado &&
-              (tela ? resto : watermark || disconnected ? resto : proximaLine ? [proximaLine] : []).map((l) => (
-                <span key={l} className="text-[12px] text-t2">
-                  {l}
-                </span>
-              ))}
+            <span className="text-[13px] font-bold text-t0">{title}</span>
+            <span className="text-[12px] font-normal text-t2">{tip}</span>
           </div>
         }
         items={[
@@ -266,7 +227,7 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
             onClick: () => void clicar(),
           },
         ]}
-        menuClassName={tela ? "w-[280px]" : "w-[240px]"}
+        menuClassName="w-[280px]"
       />
     );
   }

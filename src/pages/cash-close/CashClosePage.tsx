@@ -31,7 +31,7 @@ import type { Store } from "@/data/wedash/stores";
 import { isGestor } from "@/layout/nav-wedash";
 import { cn } from "@/lib/cn";
 import { brlCent, dataExtenso, deIso, fimDoMes, inicioDoMes, paraIso, somarDias, labelUpper } from "@/lib/format";
-import { refreshStatusLine, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
+import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useScope } from "@/pages/dashboard/useScope";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
@@ -465,7 +465,7 @@ export function CashClosePage() {
   const [diaKey, setDiaKey] = useState("");
   const [erro, setErro] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [watermark, setWatermark] = useState<Date | null>(null);
+  const [watermark, setWatermark] = useState<Date | null | undefined>(undefined);
   const [soldToday, setSoldToday] = useState<{ cents: number; byStore: Record<string, number> } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -544,8 +544,9 @@ export function CashClosePage() {
 
   useScreenRefresh({
     label: "Atualizar vendas e fechamento",
-    tip: "Busca as vendas de hoje e o fechamento do mês que está na tela.",
-    status: refreshStatusLine("Fechamento atualizado", "Fechamento ainda não atualizado", watermark?.toISOString()),
+    tip: "Busca as vendas de hoje e os fechamentos do mês exibido.",
+    status: refreshMomentTitle(watermark ? watermark.toISOString() : watermark),
+    busyLabel: "Buscando vendas e fechamentos…",
     sales: true,
     run: () => pedirFechamento(),
   });

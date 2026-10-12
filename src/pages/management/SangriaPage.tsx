@@ -17,7 +17,7 @@ import { dayAmounts, depositBoleto, sumAmounts, type SangriaKind } from "@/data/
 import { brlCent, dataExtenso, deIso, fimDoMes, inicioDoMes, somarDias } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
-import { refreshStatusLine, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
+import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { useScope } from "@/pages/dashboard/useScope";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { SectionHeader, SelectStoreCard, parseNum, pickOneStore, useScopedStores } from "@/pages/operation/shared";
@@ -70,7 +70,7 @@ export function SangriaPage() {
   const [depositando, setDepositando] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [syncing, setSyncing] = useState(false);
-  const [watermark, setWatermark] = useState<Date | null>(null);
+  const [watermark, setWatermark] = useState<Date | null | undefined>(undefined);
 
   const loja = lojas[0];
   const lojaRef = useRef(loja);
@@ -145,8 +145,9 @@ export function SangriaPage() {
 
   useScreenRefresh({
     label: "Atualizar vendas e sangrias",
-    tip: "Busca as vendas de hoje e as sangrias do mês que está na tela.",
-    status: refreshStatusLine("Sangrias atualizadas", "Sangrias ainda não atualizadas", watermark?.toISOString()),
+    tip: "Busca as vendas de hoje e as sangrias do mês exibido.",
+    status: refreshMomentTitle(watermark ? watermark.toISOString() : watermark),
+    busyLabel: "Buscando vendas e sangrias…",
     sales: true,
     run: () => pedir(),
   });
