@@ -192,7 +192,7 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
   const bloqueado = ocupado || (!proprio && forceCooldownSec != null);
   const icone = (
     <>
-      <RefreshIcon className={cn("shrink-0", ocupado && "animate-spin")} />
+      <RefreshIcon className={cn("shrink-0", ocupado && "animate-spin text-acc")} />
       {atrasado && (
         <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-warn">
           <span className="sr-only">As vendas de hoje precisam ser atualizadas</span>
@@ -201,7 +201,7 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
     </>
   );
   const buttonClass =
-    "relative flex h-9 w-9 items-center justify-center rounded-[10px] bg-acc text-white shadow-[0_10px_24px_-10px_var(--acc-soft)] hover:bg-acc-2 disabled:cursor-default disabled:opacity-50 disabled:hover:bg-acc";
+    "relative flex h-9 w-9 items-center justify-center rounded-[10px] border border-line text-t1 hover:bg-bg-3 disabled:cursor-default disabled:hover:bg-transparent";
 
   // Celular / tablet (sem hover): o toque abre o horario da ultima busca + "Atualizar agora".
   if (semHover) {
