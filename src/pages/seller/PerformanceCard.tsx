@@ -42,8 +42,9 @@ function ChallengeProgress({ challenge: c }: { challenge: SellerChallenge }) {
 const STATUS_LABEL = { active: "Em andamento", upcoming: "A começar", ended: "Encerrado" } as const;
 const STATUS_VARIANT = { active: "success", upcoming: "info", ended: "neutral" } as const;
 
-/** O mesmo card da Equipe: Ranking (podio do mes), Desafios e Meta. A meta vazia nao esconde as outras abas. */
+/** O mesmo card da Equipe: Ranking (podio do mes), Desafios e Meta. Na meta Geral o ranking some: a parte e igual para todos. */
 export function PerformanceCard({ store }: { store: SellerHomeStore }) {
+  const geral = store.goal?.mode === "geral";
   const ranking = store.monthRanking ?? [];
   const challenges = store.challenges ?? [];
   const podium: RankingRow[] = ranking.slice(0, 3).map((r) => ({
@@ -59,9 +60,11 @@ export function PerformanceCard({ store }: { store: SellerHomeStore }) {
       <CardTitle className="mb-4">{store.storeName}</CardTitle>
       <Tabs
         variant="accent"
-        defaultKey="ranking"
+        defaultKey={geral ? "desafios" : "ranking"}
         items={[
-          {
+          ...(!geral
+            ? [
+                {
             key: "ranking",
             label: "Ranking",
             icon: <TrophyIcon size={14} />,
@@ -70,11 +73,7 @@ export function PerformanceCard({ store }: { store: SellerHomeStore }) {
                 <EmptyBlock icon="🏆" title="Nenhum vendedor neste grupo" description="Quando houver vendedores vinculados a este grupo, o ranking aparecerá aqui." />
               ) : (
                 <div>
-                  {store.goal?.mode === "geral" ? (
-                    <p className="mb-2 text-[12.5px] font-semibold text-t2">Equipe da filial</p>
-                  ) : (
-                    store.groupName && <p className="mb-2 text-[12.5px] font-semibold text-t2">Grupo {store.groupName}</p>
-                  )}
+                  {store.groupName && <p className="mb-2 text-[12.5px] font-semibold text-t2">Grupo {store.groupName}</p>}
                   <RankingBlock ranking={podium} formatValor={brlCent} />
                   {rest.length > 0 && (
                     <ul className="mt-3 flex flex-col divide-y divide-line">
@@ -94,6 +93,8 @@ export function PerformanceCard({ store }: { store: SellerHomeStore }) {
                 </div>
               ),
           },
+              ]
+            : []),
           {
             key: "desafios",
             label: "Desafios",
