@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Alert, Badge, Button, Card, Modal, Skeleton, useToast } from "@/components/ui";
+import { Alert, Button, Card, Modal, Skeleton, useToast } from "@/components/ui";
 import { monthCloseSpanFor } from "@/data/wedash/cashCloseMonth";
 import {
   applyCloseReview,
@@ -786,7 +786,7 @@ function ResumoMes({ resumo }: { resumo: { diffCents: number; pendingDays: numbe
     {
       label: "Dias pendentes",
       valor: String(resumo.pendingDays),
-      detalhe: resumo.pendingDays > 0 ? "Em amarelo, ainda sem total real" : "Nenhum dia sem total real",
+      detalhe: resumo.pendingDays > 0 ? "Etiqueta amarela, ainda sem total real" : "Nenhum dia sem total real",
       tom: resumo.pendingDays > 0 ? "text-warn" : "text-t0",
     },
   ];
@@ -825,6 +825,15 @@ function ContaDoDia({ systemCents, realCents, diffCents }: { systemCents: number
   );
 }
 
+function EtiquetaDia({ tom, children }: { tom: "ok" | "bad" | "warn"; children: string }) {
+  const cor = tom === "ok" ? "bg-ok" : tom === "bad" ? "bg-bad" : "bg-warn";
+  return (
+    <div className={cn("mt-1 max-w-full truncate rounded-md px-1.5 py-1 text-[10px] font-semibold text-white sm:text-[11px]", cor)}>
+      {children}
+    </div>
+  );
+}
+
 function Mes({
   hoje,
   cells,
@@ -850,50 +859,33 @@ function Mes({
         <div className="grid grid-cols-7">
         {cells.map((day, i) => {
           const face = day && day <= hoje ? faceDoDia(day) : null;
-          const fechouIgual = face?.kind === "total" && face.diffCents === 0;
-          const cor =
-            face?.kind === "pendente"
-              ? "bg-warn-soft"
-              : face?.kind === "total" && face.diffCents < 0
-                ? "bg-bad-soft"
-                : fechouIgual || (face?.kind === "total" && face.diffCents > 0)
-                  ? "bg-ok-soft"
-                  : "";
           const borda = cn(
             "flex min-h-[84px] flex-col items-start justify-start border-b border-r border-line p-1.5 text-left sm:min-h-[110px] sm:p-2",
             (i + 1) % 7 === 0 && "border-r-0",
             !day && "bg-bg-1/30",
-            cor,
           );
           if (!day) return <div key={`vazio-${i}`} className={borda} />;
           const futuro = day > hoje;
+          const mostraTotal = face?.kind === "pendente" || face?.kind === "total" || (face?.kind === "hoje" && !face.aguardando);
           const miolo = (
             <>
               <NumeroDia iso={day} hoje={hoje} />
-              {face?.kind === "pendente" && (
-                <Badge variant="warning" className="mt-2 px-2 py-0.5 text-[10px]">
-                  Pendente
-                </Badge>
-              )}
-              {(face?.kind === "pendente" || face?.kind === "total" || (face?.kind === "hoje" && !face.aguardando)) && (
-                <div className="mt-2">
+              {mostraTotal && face && (
+                <div className="mt-1.5 w-full min-w-0">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-t2">Total</p>
-                  <p className="whitespace-nowrap font-mono text-[12px] font-extrabold text-t2 sm:text-[13px]">
+                  <p className="whitespace-nowrap font-mono text-[12px] font-extrabold text-t0 sm:text-[13px]">
                     {brlCent(face.totalCents / 100)}
                   </p>
-                  {face.kind === "total" && face.diffCents !== 0 && (
-                    <Badge variant={face.diffCents > 0 ? "success" : "danger"} className="mt-1 px-2 py-0.5 text-[10px]">
-                      {totalDia(face.diffCents)}
-                    </Badge>
-                  )}
+                  {face.kind === "pendente" && <EtiquetaDia tom="warn">Pendente</EtiquetaDia>}
+                  {face.kind === "total" && face.diffCents > 0 && <EtiquetaDia tom="ok">{totalDia(face.diffCents)}</EtiquetaDia>}
+                  {face.kind === "total" && face.diffCents < 0 && <EtiquetaDia tom="bad">{totalDia(face.diffCents)}</EtiquetaDia>}
                 </div>
               )}
             </>
           );
           if (futuro || face?.kind === "zero") return <div key={day} className={borda}>{miolo}</div>;
-          const pintado = face?.kind === "pendente" || face?.kind === "total";
           return (
-            <button key={day} type="button" className={cn(borda, pintado ? "hover:brightness-95" : "hover:bg-bg-3")} onClick={() => onOpen(day)}>
+            <button key={day} type="button" className={cn(borda, "hover:bg-bg-3")} onClick={() => onOpen(day)}>
               {miolo}
             </button>
           );
