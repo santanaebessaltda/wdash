@@ -911,7 +911,7 @@ function Mes({
                     {brlCent(face.totalCents / 100)}
                   </p>
                   {face.kind === "pendente" && <p className="mt-0.5 text-[11px] font-semibold text-warn">Pendente</p>}
-                  {face.kind === "hoje" && <p className="mt-0.5 text-[11px] font-semibold text-info">Em aberto</p>}
+                  {face.kind === "hoje" && <p className="mt-0.5 text-[11px] font-semibold text-acc">Em aberto</p>}
                   {face.kind === "total" && face.diffCents !== 0 && (
                     <p className={cn("mt-0.5 whitespace-nowrap font-mono text-[11px] font-bold sm:text-[12px]", diffClass(face.diffCents))}>
                       {totalDia(face.diffCents)}
@@ -1078,7 +1078,7 @@ function DiaModal({
           <>
             <span>{tituloDia(day)}</span>
             {(!fechado || pronto) && (
-              <Badge variant={!fechado ? "info" : diaPendente ? "warning" : "success"}>
+              <Badge variant={!fechado ? "accent" : diaPendente ? "warning" : "success"}>
                 {!fechado ? "Em aberto" : diaPendente ? "Pendente" : "Fechado"}
               </Badge>
             )}
