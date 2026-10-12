@@ -1,6 +1,6 @@
 /** Formatacao pt-BR usada em todas as telas do produto. */
 
-import { deIso, num } from "../data/wedash/engine/format.ts";
+import { deIso, intervaloDias, num } from "../data/wedash/engine/format.ts";
 
 export {
   brlCent,
@@ -124,6 +124,22 @@ export function mesCurto(iso: string): string {
 /** ter */
 export function diaSemanaCurto(iso: string): string {
   return DIAS_SEMANA_CURTO[deIso(iso).getDay()];
+}
+
+/** Eixo com um ponto por dia. Mes cheio ou mais de 7 dias no mesmo mes: "01". Cruza meses: "01/10". Semana: "seg". */
+export function dayAxisLabel(
+  iso: string,
+  period: { inicio: string; fim: string; granularidade: "dia" | "mes" | "periodo" },
+): string {
+  if (period.inicio.slice(0, 7) !== period.fim.slice(0, 7)) return dataCurta(iso);
+  const days = intervaloDias(period.inicio, period.fim).length;
+  if (period.granularidade === "mes" || days > 7) return String(deIso(iso).getDate()).padStart(2, "0");
+  return diaSemanaCurto(iso);
+}
+
+/** Detalhe do ponto diario: "11/10 seg". */
+export function dayPointDetail(iso: string): string {
+  return `${dataCurta(iso)} ${diaSemanaCurto(iso)}`;
 }
 
 /** 14:32 */

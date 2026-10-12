@@ -17,7 +17,7 @@ import { effectiveWeekHours, hourAxisRange, unionOpenWindow, type Dow } from "./
 import { hourShares, periodDailyGoal, weekdayWeights } from "./goalCurve";
 import { sellerGoalLevels } from "./goalView";
 import { dayAggregate, salesDay, salesDays, storeOpen, dayWeight, sumAggregates, type Aggregate } from "./sales";
-import { brl, brlCent, dataCompleta, dataCurta, deIso, delta as fmtDelta, diaSemanaCurto, faixaHora, fimDoMes, horaCurta, inicioDoMes, intervaloDias, labelUpper, mesAno, mesCurto, pct, somarDias } from "@/lib/format";
+import { brl, brlCent, dataCompleta, dataCurta, dayAxisLabel, dayPointDetail, deIso, delta as fmtDelta, faixaHora, fimDoMes, horaCurta, inicioDoMes, intervaloDias, labelUpper, mesAno, mesCurto, pct, somarDias } from "@/lib/format";
 import type { TintKey } from "@/pages/dashboards/icons";
 import { buildStoreInsight } from "./insight";
 import { brandFromProductCode } from "./costTableFill";
@@ -1295,7 +1295,7 @@ export function buildStoreView(escopo: Scope): StoreView {
     const valores = dias.map((iso) => sumAggregates(fs.map((f) => dayAggregate(salesDay(f.id, iso)!, divisao))).faturamento);
     const anteriores = diasAnt.map((iso) => sumAggregates(fs.map((f) => (salesDay(f.id, iso) ? dayAggregate(salesDay(f.id, iso)!, divisao) : { faturamento: 0, atendimentos: 0, itens: 0 }))).faturamento);
     evolucao = {
-      rotulos: dias.map((iso) => (periodo.granularidade === "mes" ? String(deIso(iso).getDate()) : diaSemanaCurto(iso))),
+      rotulos: dias.map((iso) => dayAxisLabel(iso, periodo)),
       valores,
       anterior: anteriores.length === valores.length ? anteriores : null,
       rotuloAnterior: ant.rotulo,
@@ -1824,9 +1824,8 @@ export function buildFinanceView(escopo: Scope, aggs?: FinanceAggInput | null): 
       }));
       const cmv = custoPeriodo(fs, iso, iso, divisao).cmv;
       const lucro = agg.faturamento - cmv;
-      const label = periodo.granularidade === "mes"
-        ? String(deIso(iso).getDate())
-        : diaSemanaCurto(iso);
+      const label = dayAxisLabel(iso, periodo);
+      const detail = dayPointDetail(iso);
       const custoDia = totalCustosFixos / daysInMonth(iso.slice(0, 7));
       costProfitSeries.push({
         label,
@@ -1834,6 +1833,7 @@ export function buildFinanceView(escopo: Scope, aggs?: FinanceAggInput | null): 
         profit: lucro,
         marginPct: divSeguro(lucro, agg.faturamento) * 100,
         revenue: agg.faturamento,
+        rangeLabel: detail,
       });
       const resultado = lucro - custoDia;
       operatingResult.push({
@@ -1842,6 +1842,7 @@ export function buildFinanceView(escopo: Scope, aggs?: FinanceAggInput | null): 
         result: resultado,
         operatingMarginPct: divSeguro(resultado, agg.faturamento) * 100,
         revenue: agg.faturamento,
+        rangeLabel: detail,
       });
     }
   } else {
@@ -2345,8 +2346,7 @@ export function buildFinanceViewFromAggs(escopo: Scope, input: FinanceAggInput):
       complementoDia.set(mes, sumDays(diasDoMes).aluguelMin / diasDoMes.length);
     }
     for (const iso of diasPeriodo) {
-      const label = periodo.granularidade === "mes" ? String(deIso(iso).getDate()) : diaSemanaCurto(iso);
-      pushPonto(label, { ...sumDays([iso]), aluguelMin: complementoDia.get(iso.slice(0, 7)) ?? 0 });
+      pushPonto(dayAxisLabel(iso, periodo), { ...sumDays([iso]), aluguelMin: complementoDia.get(iso.slice(0, 7)) ?? 0 }, false, dayPointDetail(iso));
     }
   } else {
     for (const mes of monthsBetween(periodo.inicio, periodo.fim)) {
@@ -2997,7 +2997,7 @@ export interface ProductDetail {
   lucro: number | null;
   margemPct: number | null;
   /** Faturamento/itens por dia (2 - 31 dias) ou por mes (> 31); null em 1 dia (sem dado por hora). */
-  serie: { label: string; faturamento: number; itens: number }[] | null;
+  serie: { label: string; detail?: string; faturamento: number; itens: number }[] | null;
   serieGranularidade: "dia" | "mes";
   /** So com mais de 1 loja no escopo. */
   lojas: ProductDetailStore[];
@@ -3129,7 +3129,8 @@ function buildItemsDetail(
       label:
         serieGranularidade === "mes"
           ? `${mesCurto(`${k}-01`)}${variosAnos ? `/${k.slice(2, 4)}` : ""}`
-          : dataCurta(k),
+          : dayAxisLabel(k, periodo),
+      ...(serieGranularidade === "dia" ? { detail: dayPointDetail(k) } : {}),
       faturamento: porDia.get(k)?.faturamento ?? 0,
       itens: porDia.get(k)?.itens ?? 0,
     }));
@@ -3668,7 +3669,7 @@ export function buildTeamDashboardView(
 }
 
 export interface TeamMemberDetail extends TeamMemberRow {
-  serie: { label: string; faturamento: number; vendas: number }[] | null;
+  serie: { label: string; detail?: string; faturamento: number; vendas: number }[] | null;
   serieGranularidade: "dia" | "mes";
   comparativo: {
     vs: string;
@@ -3751,7 +3752,8 @@ export function buildTeamMemberDetail(
     const eixo = serieGranularidade === "mes" ? [...new Set(dias.map((d) => d.slice(0, 7)))] : dias;
     const variosAnos = periodo.inicio.slice(0, 4) !== periodo.fim.slice(0, 4);
     serie = eixo.map((k) => ({
-      label: serieGranularidade === "mes" ? `${mesCurto(`${k}-01`)}${variosAnos ? `/${k.slice(2, 4)}` : ""}` : dataCurta(k),
+      label: serieGranularidade === "mes" ? `${mesCurto(`${k}-01`)}${variosAnos ? `/${k.slice(2, 4)}` : ""}` : dayAxisLabel(k, periodo),
+      ...(serieGranularidade === "dia" ? { detail: dayPointDetail(k) } : {}),
       faturamento: porDia.get(k)?.faturamento ?? 0,
       vendas: porDia.get(k)?.vendas ?? 0,
     }));
@@ -3817,7 +3819,7 @@ export interface EvolutionPoint {
   ancora?: boolean;
   /** Hora de hoje que ainda nao chegou: so a meta (o realizado para em "Agora"). */
   futuro?: boolean;
-  /** Eixo hora: faixa completa para o tooltip ("21h as 22h"). */
+  /** Tooltip do ponto: faixa da hora ("21h as 22h") ou dia ("11/10 seg"). */
   faixa?: string;
 }
 
@@ -4526,12 +4528,14 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
     let acumM = 0;
     const diasPeriodo = intervaloDias(periodo.inicio, periodo.fim);
     const mesesLbl = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+    const diario = eixoSerie === "dia";
     for (const iso of diasPeriodo) {
       acum += byDay.get(iso) ?? 0;
       acumM += fs.reduce((s, f) => s + metaLojaDia(f, iso), 0);
       const d = deIso(iso);
       evolucao.push({
-        label: `${String(d.getDate()).padStart(2, "0")} ${mesesLbl[d.getMonth()]}`,
+        label: diario ? dayAxisLabel(iso, periodo) : `${String(d.getDate()).padStart(2, "0")} ${mesesLbl[d.getMonth()]}`,
+        ...(diario ? { faixa: dayPointDetail(iso) } : {}),
         realizado: acum,
         meta: acumM,
         projecao: null,
@@ -5053,12 +5057,13 @@ export function buildOverviewView(escopo: Scope, aggs?: OverviewAggInput | null)
       }
       acumRealizado += fatDia;
       acumMeta += metaPorDia;
-      const d = deIso(iso);
-      const mesesLbl = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-      const label = periodo.granularidade === "mes"
-        ? String(d.getDate())
-        : `${String(d.getDate()).padStart(2, "0")} ${mesesLbl[d.getMonth()]}`;
-      evolucao.push({ label, realizado: acumRealizado, meta: acumMeta, projecao: null });
+      evolucao.push({
+        label: dayAxisLabel(iso, periodo),
+        faixa: dayPointDetail(iso),
+        realizado: acumRealizado,
+        meta: acumMeta,
+        projecao: null,
+      });
     }
   }
   // Formas de pagamento (reusa logica do Financeiro)

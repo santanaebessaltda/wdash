@@ -16,11 +16,36 @@ describe("tooltip do badge com unidade", () => {
     );
   });
 });
+
+describe("rótulo do eixo por dia", () => {
+  it("mês cheio no mesmo mês mostra o dia; o detalhe traz data e dia da semana", () => {
+    const mes = { inicio: "2026-10-01", fim: "2026-10-31", granularidade: "mes" as const };
+    expect(dayAxisLabel("2026-10-05", mes)).toBe("05");
+    expect(dayPointDetail("2026-10-05")).toBe("05/10 seg");
+  });
+
+  it("mais de 7 dias no mesmo mês, fora do filtro de mês, também mostra só o dia", () => {
+    const faixa = { inicio: "2026-10-01", fim: "2026-10-10", granularidade: "periodo" as const };
+    expect(dayAxisLabel("2026-10-01", faixa)).toBe("01");
+  });
+
+  it("até 7 dias no mesmo mês mantém o dia da semana no eixo", () => {
+    const semana = { inicio: "2026-10-05", fim: "2026-10-11", granularidade: "periodo" as const };
+    expect(dayAxisLabel("2026-10-05", semana)).toBe("seg");
+    expect(dayPointDetail("2026-10-11")).toBe("11/10 dom");
+  });
+
+  it("intervalo que cruza meses usa dd/MM no eixo", () => {
+    const cruza = { inicio: "2026-09-28", fim: "2026-10-04", granularidade: "periodo" as const };
+    expect(dayAxisLabel("2026-09-28", cruza)).toBe("28/09");
+    expect(dayAxisLabel("2026-10-01", cruza)).toBe("01/10");
+  });
+});
 import { goalOfStore } from "./goals";
 import { EMPTY_STORE_COSTS, stores, storeById } from "./stores";
 import { TODAY_ISO } from "./clock";
 import { dayAggregate, salesDay, storeOpen, dayWeight } from "./sales";
-import { fimDoMes, intervaloDias, somarDias } from "@/lib/format";
+import { dayAxisLabel, dayPointDetail, fimDoMes, intervaloDias, somarDias } from "@/lib/format";
 
 function escopo(filialId: string = "todas", periodo: Scope["periodo"] = { tipo: "esteMes" }): Scope {
   return { filialIds: filialId === "todas" ? [] : [filialId], periodo, divisao: null };

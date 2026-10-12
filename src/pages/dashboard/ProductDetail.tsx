@@ -528,6 +528,7 @@ function ProductDetailModal({
               <AreaLineChart
                 data={detalhe.serie.map((d) => d.faturamento)}
                 labels={detalhe.serie.map((d) => d.label)}
+                tooltipLabels={detalhe.serie.map((d) => d.detail ?? d.label)}
                 formatValue={brlCent}
                 height={200}
                 showAxisLabels
