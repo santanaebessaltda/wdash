@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { scopeShowsBrandPicker, type Division } from "@/data/wedash/stores";
 import type { Scope, PeriodType } from "@/data/wedash/dashboard";
 import { useActiveSession } from "@/session/SessionProvider";
 import { PERIOD_STORAGE_KEY } from "@/session/periodStorage";
+import { routeShowsPeriod } from "./periodQuery";
 
 const PERIODOS: PeriodType[] = [
   "hoje",
@@ -71,8 +72,9 @@ function periodoDaUrl(params: URLSearchParams): PeriodoSalvo | null {
 
 /**
  * Escopo (lojas, periodo, divisao) mora na URL, nao no estado de uma pagina.
- * **Loja** e **periodo** tambem ficam em sessionStorage: sao filtros globais de todas as telas
- * e os NavLinks do menu nao carregam a query string. Periodo padrao = Hoje.
+ * **Loja** fica na URL de todas as telas (o menu copia `filial`) e no sessionStorage.
+ * **Periodo** vale em todas as telas via sessionStorage; `periodo`/`de`/`ate` so entram
+ * na URL das telas que mostram o campo. Periodo padrao = Hoje.
  *
  * Single-select de loja: `filial` na URL e um id (ex.: "filial=f1").
  * Ausente / vazio = "Todas as lojas" (consolida a rede), salvo se houver
@@ -81,6 +83,8 @@ function periodoDaUrl(params: URLSearchParams): PeriodoSalvo | null {
  */
 export function useScope() {
   const session = useActiveSession();
+  const { pathname } = useLocation();
+  const mostraPeriodo = routeShowsPeriod(pathname);
   const [params, setParams] = useSearchParams();
   const [catalogTick, setCatalogTick] = useState(0);
 
@@ -134,24 +138,36 @@ export function useScope() {
     if (per) salvarPeriodo(per);
   }, [params]);
 
-  // Reidrata `?filial=` na URL quando a preferencia veio so do storage.
+  // Uma escrita só: filial, periodo (só com o campo) e divisao. Dois setParams no mesmo
+  // render se apagam — o segundo navega com a query antiga.
   useEffect(() => {
-    if (params.has("filial")) return;
-    const id = escopo.filialIds[0];
-    if (!id) return;
     const p = new URLSearchParams(params);
-    p.set("filial", id);
-    setParams(p, { replace: true });
-  }, [params, escopo.filialIds, setParams]);
+    let dirty = false;
 
-  // Sem WPINK no escopo  ->  some o filtro e limpa `divisao` da URL.
-  useEffect(() => {
-    if (showBrandPicker) return;
-    if (!params.get("divisao")) return;
-    const p = new URLSearchParams(params);
-    p.delete("divisao");
+    if (!mostraPeriodo) {
+      for (const key of ["periodo", "de", "ate"] as const) {
+        if (!p.has(key)) continue;
+        p.delete(key);
+        dirty = true;
+      }
+    }
+
+    if (!p.has("filial")) {
+      const id = escopo.filialIds[0];
+      if (id) {
+        p.set("filial", id);
+        dirty = true;
+      }
+    }
+
+    if (!showBrandPicker && p.has("divisao")) {
+      p.delete("divisao");
+      dirty = true;
+    }
+
+    if (!dirty) return;
     setParams(p, { replace: true });
-  }, [showBrandPicker, params, setParams]);
+  }, [mostraPeriodo, params, escopo.filialIds, showBrandPicker, setParams]);
 
   function mudar(e: Scope) {
     const p = new URLSearchParams();
@@ -163,10 +179,13 @@ export function useScope() {
     } else {
       salvarFilial("");
     }
-    p.set("periodo", e.periodo.tipo);
-    if (e.periodo.tipo === "personalizado") {
-      if (e.periodo.inicio) p.set("de", e.periodo.inicio);
-      if (e.periodo.fim) p.set("ate", e.periodo.fim);
+    // Fora das telas com o campo, o periodo fica só no sessionStorage.
+    if (mostraPeriodo) {
+      p.set("periodo", e.periodo.tipo);
+      if (e.periodo.tipo === "personalizado") {
+        if (e.periodo.inicio) p.set("de", e.periodo.inicio);
+        if (e.periodo.fim) p.set("ate", e.periodo.fim);
+      }
     }
     salvarPeriodo({ tipo: e.periodo.tipo, de: e.periodo.inicio, ate: e.periodo.fim });
     const keepBrand = scopeShowsBrandPicker(e.filialIds, session.stores);

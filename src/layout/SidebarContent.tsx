@@ -5,6 +5,7 @@ import { cn } from "@/lib/cn";
 import { isNavGroup, type NavEntry } from "./nav-config";
 import { navDoPapel } from "./nav-wedash";
 import { WedashBrand } from "@/components/wedash/WedashBrand";
+import { searchForRoute } from "@/pages/dashboard/periodQuery";
 import { useActiveSession } from "@/session/SessionProvider";
 
 /** True se `path` e (ou esta aninhado sob) o destino `to`. */
@@ -37,10 +38,10 @@ function GroupIcon({ d }: { d: string }) {
   );
 }
 
-/** Mantem `?filial=` (e demais query) ao trocar de tela pelo menu. */
+/** Mantém `?filial=` ao trocar de tela. `periodo` só segue se o destino tem o campo. */
 function comBusca(to: string, search: string) {
-  if (!search || search === "?") return to;
-  return `${to}${search.startsWith("?") ? search : `?${search}`}`;
+  const q = searchForRoute(to, search);
+  return q ? `${to}${q}` : to;
 }
 
 export function SidebarContent({ collapsed = false, onNavigate }: { collapsed?: boolean; onNavigate?: () => void }) {

@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { isNavGroup } from "./nav-config";
 import { navDoPapel } from "./nav-wedash";
+import { searchForRoute } from "@/pages/dashboard/periodQuery";
 import { useActiveSession } from "@/session/SessionProvider";
 
 interface FlatItem {
@@ -38,7 +39,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   }, [open]);
 
   function go(item: FlatItem) {
-    navigate({ pathname: item.to, search: location.search });
+    navigate({ pathname: item.to, search: searchForRoute(item.to, location.search) });
     onClose();
   }
 
