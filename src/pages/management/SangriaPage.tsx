@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Badge, Button, Card, Checkbox, Modal, Skeleton, useToast } from "@/components/ui";
+import { Alert, Button, Card, Checkbox, Modal, Skeleton, StatCard, useToast } from "@/components/ui";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { fetchLatestCashCloseError, fetchNavMonthFloor, fetchOpenCashCloseJob, requestSangriaMonth } from "@/data/wedash/cashCloseRepo";
 import { fetchSyncWatermark } from "@/data/wedash/salesRepo";
@@ -13,7 +13,7 @@ import {
   type SangriaLineRow,
   type SangriaShortageRow,
 } from "@/data/wedash/sangriaRepo";
-import { dayAmounts, depositBoleto, sumAmounts, type SangriaKind } from "@/data/wedash/sangriaMath";
+import { dayAmounts, depositBoleto, sumAmounts, type SangriaAmounts, type SangriaKind } from "@/data/wedash/sangriaMath";
 import { brlCent, dataExtenso, deIso, fimDoMes, inicioDoMes, somarDias } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
@@ -21,7 +21,7 @@ import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRe
 import { useScope } from "@/pages/dashboard/useScope";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { SectionHeader, SelectStoreCard, parseNum, pickOneStore, useScopedStores } from "@/pages/operation/shared";
-import { monthNavBtn, SeletorMesAno, Seta } from "@/pages/cash-close/CashClosePage";
+import { ChipDia, monthNavBtn, SeletorMesAno, Seta } from "@/pages/cash-close/CashClosePage";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { HeaderFilters } from "@/pages/stock/shared";
 
@@ -181,8 +181,6 @@ export function SangriaPage() {
 
   const taken = useMemo(() => new Set(deposits.map((d) => d.day)), [deposits]);
   const faltaPorDia = useMemo(() => new Map(shortages.map((s) => [s.day, s.amountCents])), [shortages]);
-  const shortagesRef = useRef(shortages);
-  shortagesRef.current = shortages;
   const porDia = useMemo(() => {
     const map = new Map<string, SangriaLineRow[]>();
     for (const line of lines) {
@@ -202,11 +200,6 @@ export function SangriaPage() {
   }, [porDia, taken, lines, hoje, faltaPorDia]);
   const depositado = useMemo(() => depositBoleto(lines, deposits.map((d) => d.day), faltaPorDia), [lines, deposits, faltaPorDia]);
   const boletoMarcado = depositBoleto(lines, marcados, faltaPorDia);
-  const linhasDia = dia ? (porDia.get(dia) ?? []) : [];
-  const contaDia = dayAmounts(linhasDia, dia ? (faltaPorDia.get(dia) ?? 0) : 0);
-  const faltaDia = dia ? shortages.find((s) => s.day === dia) : undefined;
-  const baseBoletoDia = linhasDia.reduce((sum, line) => (line.kind === "purchase" ? sum : sum + line.amountCents), 0);
-  const depositoDia = dia ? deposits.find((d) => d.day === dia) : undefined;
   const pronto = loaded === faixa;
 
   function toggleDia(day: string) {
@@ -229,56 +222,6 @@ export function SangriaPage() {
     }
   }
 
-  async function desfazer() {
-    if (!depositoDia) return;
-    try {
-      await undoSangriaDeposit(depositoDia.depositId);
-      setDeposits((atual) => atual.filter((d) => d.depositId !== depositoDia.depositId));
-      setDia(null);
-      setReloadKey((n) => n + 1);
-    } catch {
-      show("Não foi possível desfazer o depósito. Tente novamente.", "danger");
-    }
-  }
-
-  async function mudar(line: SangriaLineRow, patch: { kind?: SangriaKind; note?: string }) {
-    setLines((atual) => atual.map((row) => (row.id === line.id ? { ...row, ...patch } : row)));
-    try {
-      await saveSangriaLine(line.id, patch);
-    } catch {
-      show("Não foi possível salvar a sangria. Tente novamente.", "danger");
-      setReloadKey((n) => n + 1);
-    }
-  }
-
-  async function salvarFalta(valor: string, note: string) {
-    if (!loja || !dia) return;
-    const cents = campoParaCentavos(valor);
-    if (cents == null) {
-      show("O valor da falta não é válido.", "danger");
-      return;
-    }
-    if (cents > baseBoletoDia) {
-      show("A falta não pode passar do valor que iria para o boleto.", "danger");
-      return;
-    }
-    const texto = cents === 0 ? "" : note.trim();
-    const atual = shortagesRef.current.find((s) => s.day === dia);
-    if ((atual?.amountCents ?? 0) === cents && (atual?.note ?? "") === texto) return;
-    const next =
-      cents === 0
-        ? shortagesRef.current.filter((s) => s.day !== dia)
-        : [...shortagesRef.current.filter((s) => s.day !== dia), { day: dia, amountCents: cents, note: texto }];
-    shortagesRef.current = next;
-    setShortages(next);
-    try {
-      await saveSangriaShortage(session.tenantId, loja.id, dia, cents, texto);
-    } catch {
-      show("Não foi possível salvar a falta. Tente novamente.", "danger");
-      setReloadKey((n) => n + 1);
-    }
-  }
-
   function irParaMes(alvo: string) {
     const mes = inicioDoMes(alvo);
     if (mes < piso || mes > inicioDoMes(hoje)) return;
@@ -291,7 +234,7 @@ export function SangriaPage() {
       <SectionHeader
         section="Gestão"
         title="Sangrias"
-        subtitle="Marque os dias e faça o depósito. O que saiu para outra coisa, ou faltou, não entra no boleto."
+        subtitle="Confira as sangrias, separe o que entra no boleto e acompanhe os valores recebidos."
         actions={
           <HeaderFilters>
             <div className="flex flex-wrap items-center gap-2">
@@ -325,28 +268,7 @@ export function SangriaPage() {
           </Card>
         ) : (
           <>
-            <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <Card padding="sm">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Em aberto</p>
-                <p className="mt-1 truncate font-mono text-xl font-extrabold text-t0">{money(aberto)}</p>
-                <p className="mt-0.5 text-[11px] text-t2">Boleto dos dias ainda sem depósito</p>
-              </Card>
-              <Card padding="sm">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Depositado</p>
-                <p className={cn("mt-1 truncate font-mono text-xl font-extrabold", depositado > 0 ? "text-ok" : "text-t0")}>{money(depositado)}</p>
-                <p className="mt-0.5 text-[11px] text-t2">Boleto dos dias já depositados neste mês</p>
-              </Card>
-              <Card padding="sm">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Fora do boleto</p>
-                <p className={cn("mt-1 truncate font-mono text-xl font-extrabold", mes.foraCents > 0 ? "text-warn" : "text-t0")}>{money(mes.foraCents)}</p>
-                <p className="mt-0.5 text-[11px] text-t2">Compra, premiação, fornecedor</p>
-              </Card>
-              <Card padding="sm">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Falta</p>
-                <p className={cn("mt-1 truncate font-mono text-xl font-extrabold", mes.faltaCents > 0 ? "text-bad" : "text-t0")}>{money(mes.faltaCents)}</p>
-                <p className="mt-0.5 text-[11px] text-t2">Dinheiro que faltou nas sangrias</p>
-              </Card>
-            </div>
+            <ResumoMes aCobrar={aberto} recebido={depositado} fora={mes.foraCents} falta={mes.faltaCents} />
             <div className="overflow-x-auto rounded-[18px] border border-line bg-bg-2 shadow-[var(--shadow-vela)]">
               <div className="min-w-[760px]">
                 <div className="grid grid-cols-7">
@@ -378,77 +300,49 @@ export function SangriaPage() {
           </>
         )}
       </div>
-      <Modal
-        open={dia != null}
-        onClose={() => setDia(null)}
-        size="md"
-        title={dia ? tituloDia(dia) : ""}
-        footer={
-          depositoDia ? (
-            <Button variant="outline" onClick={() => void desfazer()}>
-              Desfazer depósito
-            </Button>
-          ) : (
-            <Button variant="outline" onClick={() => setDia(null)}>
-              Fechar
-            </Button>
-          )
-        }
-      >
-        {linhasDia.length === 0 ? (
-          <p className="text-[13.5px] text-t2">Nenhuma sangria neste dia.</p>
-        ) : (
-          <>
-            <div className="mb-4 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[13px]">
-              <span className="text-t2">Total</span>
-              <span className="font-mono font-bold text-t0">{money(contaDia.totalCents)}</span>
-              <span className="text-t2">· Boleto</span>
-              <span className="font-mono font-bold text-t0">{money(contaDia.boletoCents)}</span>
-              {contaDia.faltaCents > 0 ? (
-                <>
-                  <span className="text-t2">· Falta</span>
-                  <span className="font-mono font-bold text-bad">{money(contaDia.faltaCents)}</span>
-                </>
-              ) : null}
-            </div>
-            <p className="mb-3 text-[12.5px] text-t2">Marque o que não entra no boleto: compra, premiação, fornecedor ou outro uso.</p>
-            <ul className="space-y-3">
-              {linhasDia.map((line) => {
-                const fora = line.kind === "purchase";
-                return (
-                  <li key={line.id} className={cn("rounded-[14px] border border-line p-3", fora && "bg-warn-soft")}>
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="font-mono text-[15px] font-bold text-t0">{money(line.amountCents)}</p>
-                        {line.document ? <p className="mt-0.5 text-[12px] text-t2">{line.document}</p> : null}
-                      </div>
-                      <Checkbox
-                        checked={fora}
-                        label="Não entra no boleto"
-                        onChange={(e) => void mudar(line, { kind: e.target.checked ? "purchase" : "deposit" })}
-                      />
-                    </div>
-                    <input
-                      className="mt-2 w-full rounded-[10px] border border-line bg-bg-1 px-2.5 py-2 text-[13px] text-t0"
-                      defaultValue={line.note}
-                      key={`${line.id}:${line.note}`}
-                      aria-label={fora ? "O que foi feito com este valor" : "Observação"}
-                      placeholder={fora ? "Ex.: compra, premiação, fornecedor" : "Observação"}
-                      onBlur={(e) => {
-                        const note = e.target.value;
-                        if (note !== line.note) void mudar(line, { note });
-                      }}
-                    />
-                  </li>
-                );
-              })}
-            </ul>
-            {dia ? <FaltaDia key={dia} amountCents={faltaDia?.amountCents ?? 0} note={faltaDia?.note ?? ""} onCommit={(valor, texto) => void salvarFalta(valor, texto)} /> : null}
-          </>
-        )}
-      </Modal>
+      {dia && loja ? (
+        <DiaModal
+          key={dia}
+          day={dia}
+          rows={porDia.get(dia) ?? []}
+          shortage={shortages.find((s) => s.day === dia)}
+          deposit={deposits.find((d) => d.day === dia)}
+          tenantId={session.tenantId}
+          storeId={loja.id}
+          onClose={() => setDia(null)}
+          onSaved={(nextLines, nextShortage) => {
+            setLines((atual) => atual.map((row) => nextLines.find((n) => n.id === row.id) ?? row));
+            setShortages((atual) => {
+              const sem = atual.filter((s) => s.day !== dia);
+              return nextShortage ? [...sem, nextShortage] : sem;
+            });
+          }}
+          onUndo={async (depositId) => {
+            try {
+              await undoSangriaDeposit(depositId);
+              setDeposits((atual) => atual.filter((d) => d.depositId !== depositId));
+              setDia(null);
+              setReloadKey((n) => n + 1);
+            } catch {
+              show("Não foi possível desfazer o depósito. Tente novamente.", "danger");
+            }
+          }}
+        />
+      ) : null}
     </div>
   );
+}
+
+function chipDoDia(tot: SangriaAmounts, recebido: boolean): { cor: string; texto: string } | null {
+  if (tot.totalCents <= 0 && tot.faltaCents <= 0) return null;
+  if (tot.faltaCents > 0) return { cor: "bg-bad", texto: `Falta ${money(tot.faltaCents)}` };
+  if (tot.boletoCents > 0 && tot.foraCents > 0) {
+    return { cor: recebido ? "bg-ok" : "bg-acc", texto: `Boleto ${money(tot.boletoCents)} · Fora ${money(tot.foraCents)}` };
+  }
+  if (tot.foraCents > 0) return { cor: "bg-warn", texto: "Fora do boleto" };
+  if (recebido) return { cor: "bg-ok", texto: "Recebido" };
+  if (tot.boletoCents > 0) return { cor: "bg-acc", texto: "A cobrar" };
+  return null;
 }
 
 function DiaCelula({
@@ -475,19 +369,18 @@ function DiaCelula({
   const tot = dayAmounts(rows, faltaCents);
   const futuro = day != null && day > hoje;
   const abre = day != null && !futuro && (rows.length > 0 || depositado);
+  const chip = rows.length > 0 || faltaCents > 0 ? chipDoDia(tot, depositado) : null;
   const borda = cn(
     "flex min-h-[84px] flex-col items-start justify-start border-b border-r border-line p-1.5 text-left sm:min-h-[110px] sm:p-2",
     (index + 1) % 7 === 0 && "border-r-0",
     !day && "bg-bg-1/30",
-    depositado && "bg-ok-soft",
     marcado && "ring-2 ring-inset ring-acc",
-    futuro && "opacity-40",
   );
   const miolo = day ? (
     <>
       <span className="flex w-full items-start justify-between gap-1">
         <NumeroDia iso={day} hoje={hoje} />
-        {!futuro && !depositado && rows.length > 0 ? (
+        {!futuro && !depositado && tot.boletoCents > 0 ? (
           <input
             type="checkbox"
             aria-label={`Marcar ${tituloDia(day)}`}
@@ -500,19 +393,11 @@ function DiaCelula({
         ) : null}
       </span>
       {rows.length > 0 ? (
-        <div className="mt-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-t2">Total</p>
-          <p className="whitespace-nowrap font-mono text-[12px] font-extrabold text-t2 sm:text-[13px]">{money(tot.totalCents)}</p>
-          {tot.foraCents > 0 ? (
-            <Badge variant="warning" className="mt-1 px-2 py-0.5 text-[10px]">
-              fora {money(tot.foraCents)}
-            </Badge>
-          ) : null}
-          {tot.faltaCents > 0 ? (
-            <Badge variant="danger" className="mt-1 px-2 py-0.5 text-[10px]">
-              falta {money(tot.faltaCents)}
-            </Badge>
-          ) : null}
+        <div className="mt-1.5 w-full min-w-0">
+          <p className={cn("whitespace-nowrap font-mono text-[12px] font-extrabold sm:text-[13px]", day === hoje ? "text-acc" : "text-t1")}>
+            {money(tot.totalCents)}
+          </p>
+          {chip ? <ChipDia cor={chip.cor}>{chip.texto}</ChipDia> : null}
         </div>
       ) : null}
     </>
@@ -520,7 +405,7 @@ function DiaCelula({
   if (!day) return <div className={borda} />;
   if (!abre) return <div className={borda}>{miolo}</div>;
   return (
-    <button type="button" className={cn(borda, depositado ? "hover:brightness-95" : "hover:bg-bg-3")} onClick={() => onOpen(day)}>
+    <button type="button" className={cn(borda, "hover:bg-bg-3")} onClick={() => onOpen(day)}>
       {miolo}
     </button>
   );
@@ -560,48 +445,245 @@ function campoParaCentavos(txt: string): number | null {
   return Math.round(n * 100);
 }
 
-function FaltaDia({
-  amountCents,
-  note,
-  onCommit,
-}: {
-  amountCents: number;
-  note: string;
-  onCommit: (valor: string, texto: string) => void;
-}) {
-  const [valor, setValor] = useState(() => reaisCampo(amountCents));
-  const [texto, setTexto] = useState(note);
-  const valorRef = useRef(valor);
-  const textoRef = useRef(texto);
-  valorRef.current = valor;
-  textoRef.current = texto;
+const KPI_COLORS = [
+  { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" },
+  { iconColor: "var(--ok)", iconBg: "var(--ok-soft)" },
+  { iconColor: "var(--warn)", iconBg: "rgba(245,158,11,0.12)" },
+  { iconColor: "var(--bad)", iconBg: "var(--bad-soft)" },
+];
+
+function ResumoMes({ aCobrar, recebido, fora, falta }: { aCobrar: number; recebido: number; fora: number; falta: number }) {
+  const cards = [
+    { label: "A cobrar", value: money(aCobrar), icon: <IconCobrar />, tooltip: "Sangrias que entram no próximo boleto." },
+    { label: "Recebido", value: money(recebido), icon: <IconRecebido />, tooltip: "Valores dos boletos já pagos." },
+    { label: "Fora do boleto", value: money(fora), icon: <IconFora />, tooltip: "Sangrias usadas para compras, fornecedores, premiações ou outros pagamentos." },
+    { label: "Falta", value: money(falta), icon: <IconFalta />, tooltip: "Valor em dinheiro que faltou nas sangrias." },
+  ];
   return (
-    <div className="mt-4 rounded-[14px] border border-line p-3">
-      <p className="text-[12.5px] font-bold text-t0">Falta</p>
-      <p className="mt-0.5 text-[12px] text-t2">Dinheiro da sangria que não estava no caixa. Não entra no boleto.</p>
-      <input
-        inputMode="decimal"
-        className="mt-2 h-9 w-full rounded-[10px] border border-line bg-bg-1 px-2.5 text-right font-mono text-[13px] font-bold text-t0 outline-none focus:border-acc"
-        value={valor}
-        placeholder="0,00"
-        aria-label="Valor da falta"
-        onChange={(e) => setValor(e.target.value)}
-        onBlur={() => {
-          const cents = campoParaCentavos(valorRef.current);
-          const mostrado = cents != null && cents > 0 ? reaisCampo(cents) : valorRef.current;
-          valorRef.current = mostrado;
-          if (mostrado !== valor) setValor(mostrado);
-          onCommit(mostrado, textoRef.current);
-        }}
-      />
-      <input
-        className="mt-2 w-full rounded-[10px] border border-line bg-bg-1 px-2.5 py-2 text-[13px] text-t0"
-        value={texto}
-        placeholder="Por que faltou"
-        aria-label="Justificativa da falta"
-        onChange={(e) => setTexto(e.target.value)}
-        onBlur={() => onCommit(valorRef.current, textoRef.current)}
-      />
+    <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {cards.map((card, i) => {
+        const cor = KPI_COLORS[i];
+        return (
+          <StatCard
+            key={card.label}
+            label={card.label}
+            value={card.value}
+            icon={card.icon}
+            iconColor={cor.iconColor}
+            iconBg={cor.iconBg}
+            tooltip={card.tooltip}
+          />
+        );
+      })}
     </div>
+  );
+}
+
+function MetricasDia({ itens }: { itens: Array<{ label: string; value: string; tom: string }> }) {
+  const cols = itens.length >= 4 ? "sm:grid-cols-2 lg:grid-cols-4" : itens.length === 3 ? "sm:grid-cols-3" : itens.length === 2 ? "sm:grid-cols-2" : "";
+  return (
+    <div className={cn("mb-4 grid grid-cols-1 gap-2", cols)}>
+      {itens.map((item) => (
+        <div key={item.label} className="min-w-0 rounded-[14px] border border-line bg-bg-1 px-3 py-3">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-t2">{item.label}</p>
+          <p className={cn("mt-1 truncate font-mono text-lg font-extrabold", item.tom)}>{item.value}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DiaModal({
+  day,
+  rows,
+  shortage,
+  deposit,
+  tenantId,
+  storeId,
+  onClose,
+  onSaved,
+  onUndo,
+}: {
+  day: string;
+  rows: SangriaLineRow[];
+  shortage?: SangriaShortageRow;
+  deposit?: SangriaDepositDay;
+  tenantId: string;
+  storeId: string;
+  onClose: () => void;
+  onSaved: (lines: SangriaLineRow[], shortage: SangriaShortageRow | null) => void;
+  onUndo: (depositId: string) => Promise<void>;
+}) {
+  const { show } = useToast();
+  const [linhas, setLinhas] = useState(rows);
+  const [falta, setFalta] = useState(() => reaisCampo(shortage?.amountCents ?? 0));
+  const [motivo, setMotivo] = useState(shortage?.note ?? "");
+  const [salvando, setSalvando] = useState(false);
+  const consulta = rows.length === 0;
+  const preview = dayAmounts(
+    linhas.map((line) => ({ amountCents: line.amountCents, kind: line.kind, note: line.note })),
+    campoParaCentavos(falta) ?? shortage?.amountCents ?? 0,
+  );
+  const metricas = [
+    preview.totalCents > 0 ? { label: "Sangrias", value: money(preview.totalCents), tom: "text-t0" } : null,
+    preview.boletoCents > 0 ? { label: "Para boleto", value: money(preview.boletoCents), tom: "text-t0" } : null,
+    preview.foraCents > 0 ? { label: "Fora do boleto", value: money(preview.foraCents), tom: "text-t0" } : null,
+    preview.faltaCents > 0 ? { label: "Falta", value: money(preview.faltaCents), tom: "text-bad" } : null,
+  ].filter((item): item is { label: string; value: string; tom: string } => item != null);
+
+  async function salvar() {
+    const cents = campoParaCentavos(falta);
+    if (cents == null) {
+      show("O valor da falta não é válido.", "danger");
+      return;
+    }
+    const base = linhas.reduce((sum, line) => (line.kind === "purchase" ? sum : sum + line.amountCents), 0);
+    if (cents > base) {
+      show("A falta não pode passar do valor que iria para o boleto.", "danger");
+      return;
+    }
+    setSalvando(true);
+    try {
+      for (const line of linhas) {
+        const antes = rows.find((row) => row.id === line.id);
+        if (!antes || (antes.kind === line.kind && antes.note === line.note)) continue;
+        await saveSangriaLine(line.id, { kind: line.kind, note: line.note });
+      }
+      const texto = cents === 0 ? "" : motivo.trim();
+      const mudouFalta = (shortage?.amountCents ?? 0) !== cents || (shortage?.note ?? "") !== texto;
+      if (mudouFalta) await saveSangriaShortage(tenantId, storeId, day, cents, texto);
+      onSaved(linhas, cents === 0 ? null : { day, amountCents: cents, note: texto });
+      show("Sangria atualizada.", "success");
+      onClose();
+    } catch {
+      show("Não foi possível salvar a sangria. Tente novamente.", "danger");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <Modal
+      open
+      onClose={() => {
+        if (!salvando) onClose();
+      }}
+      size="lg"
+      title={tituloDia(day)}
+      footer={
+        consulta ? (
+          <Button variant="outline" onClick={onClose}>
+            Voltar
+          </Button>
+        ) : (
+          <>
+            {deposit ? (
+              <Button variant="outline" onClick={() => void onUndo(deposit.depositId)} disabled={salvando}>
+                Desfazer depósito
+              </Button>
+            ) : null}
+            <Button variant="outline" onClick={onClose} disabled={salvando}>
+              Cancelar
+            </Button>
+            <Button onClick={() => void salvar()} disabled={salvando}>
+              {salvando ? "Salvando…" : "Salvar"}
+            </Button>
+          </>
+        )
+      }
+    >
+      {rows.length === 0 ? (
+        <p className="text-[13.5px] text-t2">Nenhuma sangria neste dia.</p>
+      ) : (
+        <>
+          {metricas.length > 0 ? <MetricasDia itens={metricas} /> : null}
+          <ul className="space-y-3">
+            {linhas.map((line) => {
+              const fora = line.kind === "purchase";
+              return (
+                <li key={line.id} className="rounded-[14px] border border-line px-3 py-3">
+                  <p className="font-mono text-[15px] font-bold text-t0">{money(line.amountCents)}</p>
+                  {line.document ? <p className="mt-0.5 text-[12px] text-t2">{line.document}</p> : null}
+                  <input
+                    className="mt-2 w-full rounded-[10px] border border-line bg-bg-1 px-2.5 py-2 text-[13px] text-t0"
+                    value={line.note}
+                    aria-label="Descrição"
+                    placeholder="Descrição"
+                    onChange={(e) => setLinhas((atual) => atual.map((row) => (row.id === line.id ? { ...row, note: e.target.value } : row)))}
+                  />
+                  <div className="mt-2">
+                    <Checkbox
+                      checked={fora}
+                      label="Fora do boleto"
+                      onChange={(e) => {
+                        const kind: SangriaKind = e.target.checked ? "purchase" : "deposit";
+                        setLinhas((atual) => atual.map((row) => (row.id === line.id ? { ...row, kind } : row)));
+                      }}
+                    />
+                    {fora ? <p className="mt-1 text-[12px] text-t2">Use para compras, fornecedores, premiações ou outros pagamentos.</p> : null}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="mt-4 rounded-[14px] border border-line p-3">
+            <p className="text-[12.5px] font-bold text-t0">Falta em dinheiro</p>
+            <input
+              inputMode="decimal"
+              className="mt-2 h-9 w-full rounded-[10px] border border-line bg-bg-1 px-2.5 text-right font-mono text-[13px] font-bold text-t0 outline-none focus:border-acc"
+              value={falta}
+              placeholder="0,00"
+              aria-label="Valor da falta"
+              onChange={(e) => setFalta(e.target.value)}
+            />
+            <p className="mt-3 text-[12.5px] font-bold text-t0">Motivo da falta</p>
+            <input
+              className="mt-2 w-full rounded-[10px] border border-line bg-bg-1 px-2.5 py-2 text-[13px] text-t0"
+              value={motivo}
+              placeholder="Ex.: diferença no caixa"
+              aria-label="Motivo da falta"
+              onChange={(e) => setMotivo(e.target.value)}
+            />
+          </div>
+        </>
+      )}
+    </Modal>
+  );
+}
+
+function IconCobrar() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M3 10h18" />
+    </svg>
+  );
+}
+
+function IconRecebido() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+
+function IconFora() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
+      <path d="M3 6h18" />
+      <path d="M16 10a4 4 0 0 1-8 0" />
+    </svg>
+  );
+}
+
+function IconFalta() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 8v5" />
+      <path d="M12 16h.01" />
+    </svg>
   );
 }

@@ -862,8 +862,12 @@ function ContaDoDia({ systemCents, realCents, diffCents }: { systemCents: number
   );
 }
 
-function ChipDia({ cor, children }: { cor: string; children: string }) {
-  return <div className={cn("mt-1 w-full truncate rounded-md px-1.5 py-1 text-[10px] font-semibold text-white sm:text-[11px]", cor)}>{children}</div>;
+export function ChipDia({ cor, children }: { cor: string; children: string }) {
+  return (
+    <div title={children} className={cn("mt-1 w-full truncate rounded-md px-1.5 py-1 text-[10px] font-semibold text-white sm:text-[11px]", cor)}>
+      {children}
+    </div>
+  );
 }
 
 function dicaDoDia(face: { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number }): string | undefined {
