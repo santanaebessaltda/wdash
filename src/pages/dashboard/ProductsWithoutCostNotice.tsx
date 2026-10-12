@@ -74,8 +74,8 @@ export function ProductsWithoutCostNotice({
         aberto && (
           <ul className="mt-2.5 divide-y divide-warn/20 border-t border-warn/20 text-[12.5px] text-t0">
             {produtos.map((p) => (
-              <li key={p.code} className="flex items-center justify-between gap-3 py-1.5">
-                <span className="min-w-0 truncate">
+              <li key={p.code} className="flex flex-col gap-0.5 py-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                <span className="min-w-0 break-words sm:truncate">
                   <span className="font-mono text-t2">{p.code}</span>
                   {p.name ? <span> · {p.name}</span> : null}
                 </span>
