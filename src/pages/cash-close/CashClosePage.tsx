@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Alert, Badge, Button, Card, Modal, Skeleton, StatCard, useToast } from "@/components/ui";
 import { monthCloseSpanFor } from "@/data/wedash/cashCloseMonth";
@@ -64,28 +64,12 @@ function totalDia(cents: number): string {
   return abs;
 }
 
-function significado(cents: number): "Sobra" | "Quebra" | "Sem diferença" {
-  if (cents > 0) return "Sobra";
-  if (cents < 0) return "Quebra";
-  return "Sem diferença";
-}
-
-function contaDias(n: number, fato: string): string {
-  return `${n} ${n === 1 ? "dia" : "dias"} com ${fato}`;
-}
-
 const KPI_COLORS = [
   { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" },
-  { iconColor: "var(--info)", iconBg: "rgba(59,130,246,0.12)" },
   { iconColor: "var(--ok)", iconBg: "var(--ok-soft)" },
   { iconColor: "var(--warn)", iconBg: "rgba(245,158,11,0.12)" },
 ];
 
-const IconMillennium = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-  </svg>
-);
 const IconReal = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="2" y="5" width="20" height="14" rx="2" />
@@ -238,14 +222,7 @@ function CloseTable({
                     )}
                   </td>
                   <td className={cn("px-3 py-3 text-right font-mono text-[13px] font-bold", fechado && diff != null ? diffClass(diff) : "text-t2")}>
-                    {fechado && diff != null ? (
-                      <>
-                        <span className="block">{totalDia(diff)}</span>
-                        <span className="mt-0.5 block text-[10px] font-semibold normal-case tracking-normal">{significado(diff)}</span>
-                      </>
-                    ) : (
-                      "—"
-                    )}
+                    {fechado && diff != null ? totalDia(diff) : "—"}
                   </td>
                 </tr>
               );
@@ -259,7 +236,7 @@ function CloseTable({
                 {dayWithoutReal(lines) ? "—" : money(conta.realCents)}
               </td>
               <td className={cn("px-3 py-3 text-right font-mono text-[13px] font-bold", fechado && !dayWithoutReal(lines) ? diffClass(conta.diffCents) : "text-t2")}>
-                {fechado && !dayWithoutReal(lines) ? `${totalDia(conta.diffCents)} · ${significado(conta.diffCents)}` : "—"}
+                {fechado && !dayWithoutReal(lines) ? totalDia(conta.diffCents) : "—"}
               </td>
             </tr>
           </tfoot>
@@ -794,7 +771,7 @@ export function CashClosePage() {
             {analise ? (
               <ResumoMes resumo={analise.resumo} />
             ) : (
-              <Skeleton className="mb-4 h-[148px] w-full rounded-[18px]" />
+              <Skeleton className="mb-4 h-[120px] w-full rounded-[18px]" />
             )}
             <Mes hoje={hoje} cells={cells} faceDoDia={faceDoDia} onOpen={abrirDia} />
           </>
@@ -822,57 +799,33 @@ export function CashClosePage() {
   );
 }
 
-function apoioDiferenca(cents: number): string {
-  if (cents > 0) return "Sobra acumulada";
-  if (cents < 0) return "Quebra acumulada";
-  return "Sem diferença acumulada";
-}
-
-function textoPendentes(n: number): string {
-  if (n === 0) return "Nenhum dia sem total real";
-  if (n === 1) return "1 dia sem total real";
-  return `${n} dias sem total real`;
+function dicaDiferenca(resumo: MonthCloseSummary): string {
+  const base = "Diferença acumulada entre o total real e o Millennium nos dias já fechados.";
+  if (resumo.surplusCents === 0 && resumo.shortageCents === 0) return base;
+  return `${base}\nSobras: ${brlCent(resumo.surplusCents / 100)} · Quebras: ${brlCent(resumo.shortageCents / 100)}`;
 }
 
 function ResumoMes({ resumo }: { resumo: MonthCloseSummary }) {
-  const dias =
-    resumo.surplusDays === 0 && resumo.shortageDays === 0
-      ? "Nenhum dia com sobra ou quebra"
-      : `${contaDias(resumo.surplusDays, "sobra")} · ${contaDias(resumo.shortageDays, "quebra")}`;
-  const partes = `Sobras ${brlCent(resumo.surplusCents / 100)} · Quebras ${brlCent(resumo.shortageCents / 100)}`;
   const cards = [
-    {
-      label: "Millennium",
-      value: brlCent(resumo.systemCents / 100),
-      icon: <IconMillennium />,
-      sub: "Dias com total real",
-      tooltip: "Soma do Millennium só nos dias que já têm total real. Dia pendente não entra.",
-    },
     {
       label: "Total real",
       value: brlCent(resumo.realCents / 100),
       icon: <IconReal />,
-      sub: "Dias já fechados",
-      tooltip: "Soma do total real nos mesmos dias do Millennium. Dia pendente não entra.",
     },
     {
       label: "Diferença",
       value: totalDia(resumo.diffCents),
       icon: <IconDif />,
-      sub: apoioDiferenca(resumo.diffCents),
-      sub2: partes,
-      tooltip: `${dias}. ${partes}.`,
+      tooltip: dicaDiferenca(resumo),
     },
     {
       label: "Dias pendentes",
       value: String(resumo.pendingDays),
       icon: <IconPendente />,
-      sub: textoPendentes(resumo.pendingDays),
-      tooltip: "Dia passado que ainda não tem total real em alguma forma.",
     },
   ];
   return (
-    <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
       {cards.map((card, i) => {
         const cor = KPI_COLORS[i % KPI_COLORS.length];
         return (
@@ -883,9 +836,7 @@ function ResumoMes({ resumo }: { resumo: MonthCloseSummary }) {
             icon={card.icon}
             iconColor={cor.iconColor}
             iconBg={cor.iconBg}
-            sub={card.sub}
-            sub2={"sub2" in card ? card.sub2 : undefined}
-            tooltip={card.tooltip}
+            tooltip={"tooltip" in card ? card.tooltip : undefined}
           />
         );
       })}
@@ -895,9 +846,9 @@ function ResumoMes({ resumo }: { resumo: MonthCloseSummary }) {
 
 function ContaDoDia({ systemCents, realCents, diffCents }: { systemCents: number; realCents: number; diffCents: number }) {
   const itens = [
-    { label: "Millennium", value: money(systemCents), apoio: null, tom: "text-t0" },
-    { label: "Total real", value: money(realCents), apoio: null, tom: "text-t0" },
-    { label: "Diferença", value: totalDia(diffCents), apoio: significado(diffCents), tom: diffClass(diffCents) },
+    { label: "Millennium", value: money(systemCents), tom: "text-t0" },
+    { label: "Total real", value: money(realCents), tom: "text-t0" },
+    { label: "Diferença", value: totalDia(diffCents), tom: diffClass(diffCents) },
   ];
   return (
     <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -905,21 +856,16 @@ function ContaDoDia({ systemCents, realCents, diffCents }: { systemCents: number
         <div key={item.label} className="min-w-0 rounded-[14px] border border-line bg-bg-1 px-3 py-3">
           <p className="text-[10px] font-bold uppercase tracking-wide text-t2">{item.label}</p>
           <p className={cn("mt-1 truncate font-mono text-lg font-extrabold", item.tom)}>{item.value}</p>
-          {item.apoio && <p className={cn("mt-0.5 text-[11px] font-semibold", item.tom)}>{item.apoio}</p>}
         </div>
       ))}
     </div>
   );
 }
 
-function EtiquetaDia({ tom, children }: { tom: "ok" | "bad" | "warn" | "info" | "neutral"; children: ReactNode }) {
-  const cor =
-    tom === "ok" ? "bg-ok text-white" : tom === "bad" ? "bg-bad text-white" : tom === "warn" ? "bg-warn text-white" : tom === "info" ? "bg-info text-white" : "bg-bg-inset text-t1";
-  return (
-    <div className={cn("mt-1 max-w-full truncate rounded-md px-1.5 py-1 text-[10px] font-semibold sm:text-[11px]", cor)}>
-      {children}
-    </div>
-  );
+function dicaDoDia(face: { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number }): string | undefined {
+  if (face.kind === "total" && face.diffCents > 0) return `Sobra de ${brlCent(face.diffCents / 100)}`;
+  if (face.kind === "total" && face.diffCents < 0) return `Quebra de ${brlCent(Math.abs(face.diffCents) / 100)}`;
+  return undefined;
 }
 
 function Mes({
@@ -955,29 +901,30 @@ function Mes({
           if (!day) return <div key={`vazio-${i}`} className={borda} />;
           const futuro = day > hoje;
           const mostraTotal = face?.kind === "pendente" || face?.kind === "total" || (face?.kind === "hoje" && !face.aguardando);
+          const dica = face ? dicaDoDia(face) : undefined;
           const miolo = (
             <>
               <NumeroDia iso={day} hoje={hoje} />
               {mostraTotal && face && (
                 <div className="mt-1.5 w-full min-w-0">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-t2">
-                    {face.kind === "pendente" ? "Millennium" : face.kind === "hoje" ? "Movimento" : "Total real"}
-                  </p>
                   <p className="whitespace-nowrap font-mono text-[12px] font-extrabold text-t0 sm:text-[13px]">
                     {brlCent(face.totalCents / 100)}
                   </p>
-                  {face.kind === "pendente" && <EtiquetaDia tom="warn">Pendente · sem total real</EtiquetaDia>}
-                  {face.kind === "hoje" && <EtiquetaDia tom="info">Em aberto</EtiquetaDia>}
-                  {face.kind === "total" && face.diffCents > 0 && <EtiquetaDia tom="ok">{`${totalDia(face.diffCents)} · Sobra`}</EtiquetaDia>}
-                  {face.kind === "total" && face.diffCents < 0 && <EtiquetaDia tom="bad">{`${totalDia(face.diffCents)} · Quebra`}</EtiquetaDia>}
-                  {face.kind === "total" && face.diffCents === 0 && <EtiquetaDia tom="neutral">R$ 0,00 · Sem diferença</EtiquetaDia>}
+                  {face.kind === "pendente" && <p className="mt-0.5 text-[11px] font-semibold text-warn">Pendente</p>}
+                  {face.kind === "hoje" && <p className="mt-0.5 text-[11px] font-semibold text-info">Em aberto</p>}
+                  {face.kind === "total" && face.diffCents !== 0 && (
+                    <p className={cn("mt-0.5 whitespace-nowrap font-mono text-[11px] font-bold sm:text-[12px]", diffClass(face.diffCents))}>
+                      {totalDia(face.diffCents)}
+                    </p>
+                  )}
+                  {face.kind === "total" && face.diffCents === 0 && <p className="mt-0.5 text-[11px] font-semibold text-t2">Sem diferença</p>}
                 </div>
               )}
             </>
           );
           if (futuro || face?.kind === "zero") return <div key={day} className={borda}>{miolo}</div>;
           return (
-            <button key={day} type="button" className={cn(borda, "hover:bg-bg-3")} onClick={() => onOpen(day)}>
+            <button key={day} type="button" title={dica} className={cn(borda, "hover:bg-bg-3")} onClick={() => onOpen(day)}>
               {miolo}
             </button>
           );
