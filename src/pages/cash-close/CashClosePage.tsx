@@ -246,7 +246,7 @@ function NumeroDia({ iso, hoje }: { iso: string; hoje: string }) {
   return (
     <span
       className={cn(
-        "inline-flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-bold",
+        "inline-flex h-6 w-6 shrink-0 items-center justify-center self-start rounded-full text-[12px] font-bold",
         iso === hoje ? "bg-acc text-white" : futuro ? "text-t2" : "text-t1",
       )}
     >
@@ -851,7 +851,7 @@ function ContaDoDia({ systemCents, realCents, diffCents }: { systemCents: number
 
 export function ChipDia({ cor, children }: { cor: string; children: string }) {
   return (
-    <div title={children} className={cn("mt-1 w-full truncate rounded-md px-1.5 py-1 text-[10px] font-semibold text-white sm:text-[11px]", cor)}>
+    <div title={children} className={cn("mt-1 w-full self-stretch truncate rounded-md px-1.5 py-1 text-[10px] font-semibold text-white sm:text-[11px]", cor)}>
       {children}
     </div>
   );
@@ -891,7 +891,7 @@ function Mes({
         {cells.map((day, i) => {
           const face = day && day <= hoje ? faceDoDia(day) : null;
           const borda = cn(
-            "flex min-h-[84px] flex-col items-start justify-start border-b border-r border-line p-1.5 text-left sm:min-h-[110px] sm:p-2",
+            "flex min-h-[84px] w-full min-w-0 flex-col items-stretch justify-start border-b border-r border-line p-1.5 text-left sm:min-h-[110px] sm:p-2",
             (i + 1) % 7 === 0 && "border-r-0",
             !day && "bg-bg-1/30",
           );
@@ -914,7 +914,11 @@ function Mes({
                   {face.kind === "total" && face.diffCents === 0 && <ChipDia cor="bg-chip-gray">Sem diferença</ChipDia>}
                 </div>
               )}
-              {pronto && face?.kind === "zero" ? <ChipDia cor="bg-chip-quiet">Sem movimento</ChipDia> : null}
+              {pronto && face?.kind === "zero" ? (
+                <div className="mt-1.5 w-full min-w-0">
+                  <ChipDia cor="bg-chip-quiet">Sem movimento</ChipDia>
+                </div>
+              ) : null}
             </>
           );
           if (futuro || face?.kind === "zero") return <div key={day} className={borda}>{miolo}</div>;
