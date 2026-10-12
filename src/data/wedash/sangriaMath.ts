@@ -126,10 +126,10 @@ export function depositBoleto(
   return cents;
 }
 
-/** null quando o depósito pode ser feito. */
+/** null quando o recebimento pode ser feito. */
 export function depositBlock(days: string[], taken: ReadonlySet<string>): string | null {
   if (days.length === 0) return "Marque ao menos um dia.";
-  if (days.some((day) => taken.has(day))) return "Um desses dias já está num depósito.";
+  if (days.some((day) => taken.has(day))) return "Um desses dias já está num recebimento.";
   return null;
 }
 

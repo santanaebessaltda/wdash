@@ -49,7 +49,7 @@ describe("sangria", () => {
 
   it("não deposita dia já usado nem intervalo vazio", () => {
     expect(depositBlock([], new Set())).toBe("Marque ao menos um dia.");
-    expect(depositBlock(["2026-08-01"], new Set(["2026-08-01"]))).toBe("Um desses dias já está num depósito.");
+    expect(depositBlock(["2026-08-01"], new Set(["2026-08-01"]))).toBe("Um desses dias já está num recebimento.");
     expect(depositBlock(["2026-08-02"], new Set(["2026-08-01"]))).toBeNull();
   });
 

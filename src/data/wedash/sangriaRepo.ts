@@ -91,6 +91,19 @@ export async function saveSangriaLine(id: string, patch: { kind?: SangriaKind; n
   if (error) throw new Error(error.message);
 }
 
+export async function saveSangriaLines(rows: Array<{ id: string; kind: SangriaKind; note: string }>): Promise<void> {
+  await Promise.all(rows.map((row) => saveSangriaLine(row.id, { kind: row.kind, note: row.note })));
+}
+
+export async function fetchDepositDayCount(depositId: string): Promise<number> {
+  const { getSupabase } = await import("@/lib/supabase");
+  const sb = getSupabase();
+  if (!sb) return 0;
+  const { count, error } = await sb.from("sangria_deposit_day").select("day", { count: "exact", head: true }).eq("deposit_id", depositId);
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
 export async function createSangriaDeposit(
   tenantId: string,
   storeId: string,
@@ -101,16 +114,16 @@ export async function createSangriaDeposit(
   if (block) throw new Error(block);
   const { getSupabase } = await import("@/lib/supabase");
   const sb = getSupabase();
-  if (!sb) throw new Error("Não foi possível fazer o depósito. Tente novamente.");
+  if (!sb) throw new Error("Não foi possível marcar como recebido. Tente novamente.");
   const { data, error } = await sb.from("sangria_deposit").insert({ tenant_id: tenantId, store_id: storeId }).select("id").single();
-  if (error || !data) throw new Error(error?.message || "Não foi possível fazer o depósito. Tente novamente.");
+  if (error || !data) throw new Error(error?.message || "Não foi possível marcar como recebido. Tente novamente.");
   const id = String(data.id);
   const { error: dayErr } = await sb.from("sangria_deposit_day").insert(
     days.map((day) => ({ deposit_id: id, tenant_id: tenantId, store_id: storeId, day })),
   );
   if (dayErr) {
     await sb.from("sangria_deposit").delete().eq("id", id);
-    throw new Error(dayErr.message.includes("duplicate") ? "Um desses dias já está num depósito." : "Não foi possível fazer o depósito. Tente novamente.");
+    throw new Error(dayErr.message.includes("duplicate") ? "Um desses dias já está num recebimento." : "Não foi possível marcar como recebido. Tente novamente.");
   }
   return id;
 }
