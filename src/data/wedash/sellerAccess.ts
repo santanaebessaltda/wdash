@@ -14,6 +14,8 @@ export type SellerActionResult =
 const MESSAGES: Record<string, string> = {
   invalid_email: "Informe um e-mail válido.",
   email_in_use: "Este e-mail já está vinculado à WDash com outro tipo de acesso.",
+  email_pending: "Este e-mail já tem um convite pendente para outro vendedor.",
+  email_taken: "Este e-mail já está em uso por outro vendedor desta filial.",
   already_invited: "Este vendedor já tem um convite pendente. Use Reenviar convite no menu da linha.",
   already_member: "Este vendedor já tem acesso à WDash.",
   email_failed: "Não foi possível enviar o convite. Tente novamente.",

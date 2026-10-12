@@ -109,8 +109,9 @@ type InviteInput = {
 };
 
 /**
- * Convida o vendedor. E-mail que ja e SELLER desta empresa so ganha a loja
- * (`linked: true`, sem e-mail novo). E-mail de outro tipo de acesso e recusado.
+ * Convida o vendedor. E-mail que ja e SELLER desta empresa em outra filial so ganha a loja
+ * (`linked: true`, sem e-mail novo). O mesmo e-mail em outro vendedor da mesma filial e recusado.
+ * E-mail de outro tipo de acesso tambem e recusado.
  */
 export async function sellerInvite(admin: SupabaseClient, caller: SellerCaller, input: InviteInput): Promise<SellerActionResult> {
   const seller = await sellerOf(admin, input.tenantId, input.storeSellerId);
@@ -136,6 +137,15 @@ export async function sellerInvite(admin: SupabaseClient, caller: SellerCaller, 
     const live = ms;
     if (here) {
       if (here.role !== "SELLER") return err("email_in_use");
+      const { data: taken, error: takenErr } = await admin
+        .from("store_seller")
+        .select("id")
+        .eq("store_id", seller.store_id)
+        .eq("membership_id", here.id)
+        .neq("id", seller.id)
+        .limit(1);
+      if (takenErr) return err("invite_failed");
+      if (taken && taken.length > 0) return err(here.status === "PENDING" ? "email_pending" : "email_taken");
       return linkStore(admin, seller, here.id);
     }
     if (live.length > 0) return err("email_in_use");
