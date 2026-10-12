@@ -59,7 +59,7 @@ export function GroupPicker({
     })),
     { label: "Sem grupo", active: !value, onClick: () => onChange(null) },
     { label: "", divider: true },
-    { label: "Criar grupo", highlight: true, icon: <Icon d={icons.plus} size={14} />, onClick: onCreate },
+    { label: "+ Criar grupo", highlight: true, onClick: onCreate },
   ];
   return (
     <div className={disabled ? "pointer-events-none opacity-50" : undefined}>
@@ -90,6 +90,7 @@ export function GroupFormModal({
   open,
   title,
   submitLabel,
+  busyLabel = "Salvando…",
   initial,
   onClose,
   onSubmit,
@@ -97,6 +98,7 @@ export function GroupFormModal({
   open: boolean;
   title: string;
   submitLabel: string;
+  busyLabel?: string;
   initial: { name: string; start: string; end: string };
   onClose: () => void;
   onSubmit: (draft: { name: string; start: string; end: string }) => Promise<boolean>;
@@ -137,7 +139,7 @@ export function GroupFormModal({
             Cancelar
           </Button>
           <Button type="submit" form={formId} disabled={busy}>
-            {busy ? "Salvando…" : submitLabel}
+            {busy ? busyLabel : submitLabel}
           </Button>
         </>
       }
@@ -151,7 +153,7 @@ export function GroupFormModal({
         }}
       >
         <FormField label="Nome do grupo">
-          <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="Manhã" aria-label="Nome do grupo" />
+          <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="Ex.: Manhã" aria-label="Nome do grupo" />
         </FormField>
         <div className="flex gap-3">
           <FormField label="Início">
@@ -185,6 +187,7 @@ export function ManageGroupsModal({
   const [loaded, setLoaded] = useState(false);
   const [tick, setTick] = useState(0);
   const [editing, setEditing] = useState<StoreShift | null>(null);
+  const [creating, setCreating] = useState<{ start: string; end: string } | null>(null);
   const [removing, setRemoving] = useState<StoreShift | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -210,6 +213,22 @@ export function ManageGroupsModal({
   function refresh() {
     setTick((n) => n + 1);
     onChanged();
+  }
+
+  async function saveCreate(draft: { name: string; start: string; end: string }) {
+    const problem = groupProblem(draft.name, draft.start, draft.end, shifts);
+    if (problem) {
+      show(problem, "danger");
+      return false;
+    }
+    const r = await saveStoreShift({ tenantId, storeId, shift: draft });
+    if (!r.ok) {
+      show(SAVE_ERROR_MSG, "danger");
+      return false;
+    }
+    show("Grupo criado.", "success");
+    refresh();
+    return true;
   }
 
   async function saveEdit(draft: { name: string; start: string; end: string }) {
@@ -251,11 +270,19 @@ export function ManageGroupsModal({
         open={open}
         onClose={() => {
           setEditing(null);
+          setCreating(null);
           setRemoving(null);
           onClose();
         }}
         title="Gerenciar grupos"
         size="md"
+        footer={
+          loaded ? (
+            <Button type="button" onClick={() => setCreating(nextGroupWindow(shifts))}>
+              Criar grupo
+            </Button>
+          ) : undefined
+        }
       >
         {!loaded ? (
           <div className="flex flex-col gap-3">
@@ -268,7 +295,7 @@ export function ManageGroupsModal({
             className="py-2!"
             icon="👥"
             title="Nenhum grupo cadastrado"
-            description="Crie um grupo na coluna Grupo, ao lado do vendedor."
+            description="Crie um grupo para organizar os vendedores desta filial."
           />
         ) : (
           <ul className="flex flex-col gap-2">
@@ -302,9 +329,19 @@ export function ManageGroupsModal({
         )}
       </Modal>
       <GroupFormModal
+        open={creating != null}
+        title="Criar grupo"
+        submitLabel="Criar grupo"
+        busyLabel="Criando…"
+        initial={{ name: "", start: creating?.start ?? "08:00", end: creating?.end ?? "14:00" }}
+        onClose={() => setCreating(null)}
+        onSubmit={saveCreate}
+      />
+      <GroupFormModal
         open={editing != null}
         title="Editar grupo"
-        submitLabel="Salvar"
+        submitLabel="Salvar alterações"
+        busyLabel="Salvando…"
         initial={{ name: editing?.name ?? "", start: editing?.start ?? "08:00", end: editing?.end ?? "14:00" }}
         onClose={() => setEditing(null)}
         onSubmit={saveEdit}

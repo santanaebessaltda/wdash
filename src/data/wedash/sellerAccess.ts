@@ -11,39 +11,51 @@ export type SellerActionResult =
   | { ok: true; linked?: boolean; token?: string }
   | { ok: false; message: string; code?: string };
 
-const GENERIC_ERROR = "Não foi possível concluir. Tente novamente.";
-
 const MESSAGES: Record<string, string> = {
   invalid_email: "Informe um e-mail válido.",
-  email_in_use: "Este e-mail já tem acesso à WDash com outro tipo de acesso.",
+  email_in_use: "Este e-mail já está vinculado à WDash com outro tipo de acesso.",
   already_invited: "Este vendedor já tem um convite pendente. Use Reenviar convite no menu da linha.",
   already_member: "Este vendedor já tem acesso à WDash.",
   email_failed: "Não foi possível enviar o convite. Tente novamente.",
-  rate_limited: "Muitos convites foram enviados em pouco tempo. Aguarde um minuto e tente novamente.",
+  rate_limited: "Muitos convites foram enviados em pouco tempo. Tente novamente em um minuto.",
   invite_failed: "Não foi possível enviar o convite. Tente novamente.",
-  not_invitable: "Só vendedores ativos podem receber acesso.",
+  not_invitable: "Somente vendedores ativos podem receber acesso.",
   no_group: "Vincule o vendedor a um grupo antes de convidar.",
   not_pending: "Este convite já foi aceito ou cancelado.",
   no_link: "O link do convite não está mais disponível. Reenvie o convite.",
-  no_access: "Este vendedor ainda não tem acesso.",
-  invalid_status: "O acesso deste vendedor mudou. Atualize a página.",
+  no_access: "Este vendedor ainda não tem acesso à WDash.",
+  invalid_status: "O acesso deste vendedor foi alterado. Atualize a página e tente novamente.",
   forbidden: "Você não tem permissão para gerenciar o acesso dos vendedores desta filial.",
   invalid_seller: "Vendedor não encontrado nesta filial.",
-  list_failed: "Não foi possível carregar os acessos. Tente novamente.",
+  list_failed: "Não foi possível carregar os acessos dos vendedores. Tente novamente.",
   update_failed: "Não foi possível alterar o acesso. Tente novamente.",
   revoke_failed: "Não foi possível cancelar o convite. Tente novamente.",
   remove_failed: "Não foi possível excluir o acesso. Tente novamente.",
+  link_failed: "Não foi possível copiar o link. Tente novamente.",
 };
 
-function messageFor(code: string | undefined): string {
-  return (code && MESSAGES[code]) || GENERIC_ERROR;
+/** Quando a Edge não devolve um código conhecido, a frase segue a ação. */
+const ACTION_FALLBACK: Record<string, string> = {
+  seller_list: MESSAGES.list_failed!,
+  seller_invite: MESSAGES.invite_failed!,
+  seller_resend: MESSAGES.invite_failed!,
+  seller_link: MESSAGES.link_failed!,
+  seller_revoke: MESSAGES.revoke_failed!,
+  seller_suspend: MESSAGES.update_failed!,
+  seller_reactivate: MESSAGES.update_failed!,
+  seller_remove: MESSAGES.remove_failed!,
+};
+
+function messageFor(code: string | undefined, fallback: string): string {
+  return (code && MESSAGES[code]) || fallback;
 }
 
 async function invoke(
   body: Record<string, unknown>,
 ): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; message: string; code?: string }> {
+  const fallback = ACTION_FALLBACK[String(body.action)] ?? "Não foi possível concluir. Tente novamente.";
   const sb = getSupabase();
-  if (!sb) return { ok: false, message: GENERIC_ERROR };
+  if (!sb) return { ok: false, message: fallback };
   const { data, error } = await sb.functions.invoke("team-members", {
     body: { ...body, origin: window.location.origin },
   });
@@ -55,10 +67,10 @@ async function invoke(
     } catch {
       /* corpo ilegivel */
     }
-    return { ok: false, message: messageFor(code), code };
+    return { ok: false, message: messageFor(code, fallback), code };
   }
   const res = (data ?? {}) as { ok?: boolean; error?: string };
-  if (!res.ok) return { ok: false, message: messageFor(res.error), code: res.error };
+  if (!res.ok) return { ok: false, message: messageFor(res.error, fallback), code: res.error };
   return { ok: true, data: data as Record<string, unknown> };
 }
 
@@ -80,7 +92,7 @@ export async function copySellerInviteLink(storeSellerId: string): Promise<Selle
   const r = await invoke({ action: "seller_link", storeSellerId });
   if (!r.ok) return r;
   const token = typeof r.data.token === "string" ? r.data.token : "";
-  if (!token) return { ok: false, message: messageFor("no_link"), code: "no_link" };
+  if (!token) return { ok: false, message: messageFor("no_link", MESSAGES.no_link!), code: "no_link" };
   return { ok: true, token: `${window.location.origin}/invite/${token}` };
 }
 

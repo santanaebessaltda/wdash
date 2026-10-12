@@ -368,7 +368,7 @@ function StaffCard({ tenantId, loja, reloadKey, groupsTick }: { tenantId: string
       >
         {removing && (
           <p className="text-[13.5px] leading-relaxed text-t1">
-            <span className="font-bold text-t0">{removing.name}</span> não poderá mais acessar esta loja na WDash. Você poderá convidar essa pessoa novamente depois.
+            <span className="font-bold text-t0">{removing.name}</span> não poderá mais acessar esta filial na WDash. Você poderá convidar essa pessoa novamente depois.
           </p>
         )}
       </Modal>
@@ -376,6 +376,7 @@ function StaffCard({ tenantId, loja, reloadKey, groupsTick }: { tenantId: string
         open={creating != null}
         title="Criar grupo"
         submitLabel="Criar grupo"
+        busyLabel="Criando…"
         initial={{ name: "", start: creating?.start ?? "08:00", end: creating?.end ?? "14:00" }}
         onClose={() => setCreating(null)}
         onSubmit={createGroup}
