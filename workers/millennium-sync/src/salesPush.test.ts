@@ -6,16 +6,18 @@ import { formatSalesPush, pushStoreName } from "./salesPush.ts";
 const plain = (value: string | undefined) => value?.replaceAll("\u00a0", " ");
 
 describe("pushStoreName", () => {
-  it("tira o prefixo técnico do início e troca o ponto por espaço", () => {
+  it("corta em LOJA ou QUIOSQUE e troca o ponto por espaço", () => {
     expect(pushStoreName("LOJAWEPINK.CENTRO.CAMPOGRANDE")).toBe("CENTRO CAMPOGRANDE");
     expect(pushStoreName("QUIOSQUEWEPINK.SHOPPING.NORTE.SUL.PLAZA")).toBe("SHOPPING NORTE SUL PLAZA");
     expect(pushStoreName("LOJAWPINK.RUA")).toBe("RUA");
     expect(pushStoreName("QUIOSQUEWPINK.CENTRO")).toBe("CENTRO");
+    expect(pushStoreName("LOJA.WEPINK.CENTRO.CAMPO.GRANDE")).toBe("CENTRO CAMPO GRANDE");
+    expect(pushStoreName("QUIOSQUE.SHOPPING.NORTE.SUL")).toBe("SHOPPING NORTE SUL");
+    expect(pushStoreName("QUIOSQUESHOPPING.NORTE.SUL.PLAZA")).toBe("SHOPPING NORTE SUL PLAZA");
   });
 
   it("deixa o nome que já está legível", () => {
     expect(pushStoreName("SB EMPREENDIMENTOS")).toBe("SB EMPREENDIMENTOS");
-    expect(pushStoreName("CENTRO.LOJAWEPINK.SUL")).toBe("CENTRO LOJAWEPINK SUL");
   });
 });
 

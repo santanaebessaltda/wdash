@@ -13,18 +13,35 @@ function money(cents: number): string {
 
 export type SalesPushRow = { name: string; deltaCents: number; todayCents: number };
 
-const PUSH_NAME_PREFIXES = ["LOJAWEPINK.", "LOJAWPINK.", "QUIOSQUEWEPINK.", "QUIOSQUEWPINK."];
+const PUSH_NAME_MARKS = ["QUIOSQUE", "LOJA"] as const;
+const PUSH_NAME_BRANDS = ["WEPINK", "WPINK"] as const;
 
-/** Nome da filial só no texto do push: tira prefixo técnico do início e troca ponto por espaço. */
+/** Nome da filial só no texto do push: corta em LOJA ou QUIOSQUE e troca ponto por espaço. */
 export function pushStoreName(name: string): string {
-  let text = name.trim().replace(/\s+/g, " ");
+  const text = name.trim().replace(/\s+/g, " ");
   const upper = text.toUpperCase();
-  for (const prefix of PUSH_NAME_PREFIXES) {
-    if (upper.startsWith(prefix)) {
-      text = text.slice(prefix.length).trim();
-      break;
+  let at = -1;
+  let mark = "";
+  for (const word of PUSH_NAME_MARKS) {
+    const i = upper.indexOf(word);
+    if (i >= 0 && (at < 0 || i < at)) {
+      at = i;
+      mark = word;
     }
   }
+  let rest = text;
+  if (at >= 0) {
+    rest = text.slice(at + mark.length).replace(/^[\s.]+/, "");
+    const restUpper = rest.toUpperCase();
+    for (const brand of PUSH_NAME_BRANDS) {
+      if (restUpper.startsWith(brand)) {
+        rest = rest.slice(brand.length).replace(/^[\s.]+/, "");
+        break;
+      }
+    }
+  }
+  const cleaned = rest.replaceAll(".", " ").replace(/\s+/g, " ").trim();
+  if (cleaned) return cleaned;
   return text.replaceAll(".", " ").replace(/\s+/g, " ").trim();
 }
 
