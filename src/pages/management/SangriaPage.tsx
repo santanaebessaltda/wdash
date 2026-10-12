@@ -480,7 +480,7 @@ function chipsDoDia(tot: SangriaAmounts, recebido: boolean): Array<{ cor: string
         : { cor: "bg-acc", texto: `A cobrar ${money(tot.boletoCents)}` },
     );
   }
-  if (tot.foraCents > 0) chips.push({ cor: "bg-chip-blue", texto: `Fora ${money(tot.foraCents)}` });
+  if (tot.foraCents > 0) chips.push({ cor: "bg-info", texto: `Fora ${money(tot.foraCents)}` });
   if (tot.faltaCents > 0) chips.push({ cor: "bg-bad", texto: `Falta ${money(tot.faltaCents)}` });
   return chips;
 }
@@ -593,7 +593,7 @@ function ResumoMes({ aCobrar, recebido, fora, falta }: { aCobrar: number; recebi
   const cards = [
     { label: "A cobrar", value: money(aCobrar), icon: <IconCobrar />, tint: "acc" as const, tooltip: "Valor que ainda entra no próximo boleto." },
     { label: "Recebido", value: money(recebido), icon: <IconRecebido />, tint: "ok" as const, tooltip: "Valor já recebido." },
-    { label: "Fora do boleto", value: money(fora), icon: <IconFora />, tint: "warn" as const, tooltip: "Valor destinado a compras, fornecedores, premiações ou outros pagamentos." },
+    { label: "Fora do boleto", value: money(fora), icon: <IconFora />, tint: "info" as const, tooltip: "Valor destinado a compras, fornecedores, premiações ou outros pagamentos." },
     { label: "Falta", value: money(falta), icon: <IconFalta />, tint: "bad" as const, tooltip: "Valor da sangria que deveria estar no caixa e não foi encontrado." },
   ];
   return (
