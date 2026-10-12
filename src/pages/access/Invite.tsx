@@ -171,7 +171,7 @@ export function Invite() {
               ? "O site ainda não está conectado ao banco. Peça ao responsável para tentar de novo em alguns minutos."
               : incomplete
                 ? "O e-mail abriu, mas o acesso ainda não foi criado na WDash. Peça um novo convite em Configurações > Usuários."
-                : "O link expirou ou já foi usado. Peça um novo convite ao responsável pelo seu acesso."}
+                : "O link expirou, já foi usado ou é de um convite cancelado. Abra o e-mail mais recente."}
         </p>
         <Link to={paths.access.login} className={cn("block text-center", acessoLink)}>
           Ir para o login

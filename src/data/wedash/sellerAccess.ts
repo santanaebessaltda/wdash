@@ -21,6 +21,7 @@ const MESSAGES: Record<string, string> = {
   email_failed: "Não foi possível enviar o convite. Tente novamente.",
   rate_limited: "Muitos convites foram enviados em pouco tempo. Tente novamente em um minuto.",
   invite_failed: "Não foi possível enviar o convite. Tente novamente.",
+  email_not_released: "Este e-mail ainda está preso a um convite cancelado. Espere um instante e tente de novo.",
   not_invitable: "Somente vendedores ativos podem receber acesso.",
   no_group: "Vincule o vendedor a um grupo antes de convidar.",
   not_pending: "Este convite já foi aceito ou cancelado.",

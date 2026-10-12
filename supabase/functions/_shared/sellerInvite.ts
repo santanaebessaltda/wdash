@@ -100,6 +100,42 @@ export async function sellerList(
   return ok({ sellers });
 }
 
+/**
+ * true = o e-mail esta livre. false = a conta cancelada nao saiu; nao manda e-mail novo.
+ * Conta com acesso ou ja aceita nao e apagada.
+ */
+async function releaseOrphanInvite(admin: SupabaseClient, email: string): Promise<boolean> {
+  const { data: ident } = await admin
+    .from("identity")
+    .select("id, status, auth_user_id, membership (id)")
+    .eq("email", email)
+    .maybeSingle();
+  const ms = (ident?.membership as { id: string }[] | null) ?? [];
+  if (ident && (ident.status !== "PENDING" || ms.length > 0)) return false;
+  if (ident?.auth_user_id) await admin.auth.admin.deleteUser(ident.auth_user_id as string);
+  const { data, error } = await admin.rpc("release_orphan_invite", { p_email: email });
+  if (!error) return data !== false;
+  const { data: left } = await admin.from("identity").select("id").eq("email", email).maybeSingle();
+  return !left;
+}
+
+/** Cria a identity do convite. Se o gatilho de franqueado ja criou a linha deste usuario, reaproveita. */
+async function ensureInviteIdentity(
+  admin: SupabaseClient,
+  userId: string,
+  email: string,
+  name: string,
+): Promise<string | null> {
+  const { data: inserted, error } = await admin
+    .from("identity")
+    .insert({ auth_user_id: userId, email, name, status: "PENDING" })
+    .select("id")
+    .single();
+  if (!error && inserted) return inserted.id as string;
+  const { data: byUser } = await admin.from("identity").select("id").eq("auth_user_id", userId).maybeSingle();
+  return (byUser?.id as string | undefined) ?? null;
+}
+
 type InviteInput = {
   tenantId: string;
   storeSellerId: string;
@@ -149,14 +185,13 @@ export async function sellerInvite(admin: SupabaseClient, caller: SellerCaller, 
       return linkStore(admin, seller, here.id);
     }
     if (live.length > 0) return err("email_in_use");
-    // Conta PENDING sem nenhuma membership: convite orfao. Libera o e-mail.
-    if (existing.status === "PENDING") {
-      const { data: ident } = await admin.from("identity").select("auth_user_id").eq("id", existing.id).maybeSingle();
-      if (ident?.auth_user_id) await admin.auth.admin.deleteUser(ident.auth_user_id as string);
-    } else {
-      return err("email_in_use");
-    }
+    if (existing.status !== "PENDING") return err("email_in_use");
   }
+
+  // Convite cancelado ainda ocupa o e-mail. So manda o novo depois que essa conta some;
+  // senao o link chega e a conta e apagada em seguida ("Este convite nao e mais valido").
+  const freed = await releaseOrphanInvite(admin, email);
+  if (!freed) return err("email_not_released");
 
   const invited = await input.invite(email);
   if ("error" in invited) return err(invited.error);
@@ -164,19 +199,15 @@ export async function sellerInvite(admin: SupabaseClient, caller: SellerCaller, 
   const rollback = async () => {
     await admin.auth.admin.deleteUser(invited.userId);
   };
-  const { data: identity, error: idErr } = await admin
-    .from("identity")
-    .insert({ auth_user_id: invited.userId, email, name: seller.name, status: "PENDING" })
-    .select("id")
-    .single();
-  if (idErr || !identity) {
+  const identityId = await ensureInviteIdentity(admin, invited.userId, email, seller.name);
+  if (!identityId) {
     await rollback();
     return err("invite_failed");
   }
   const { data: membership, error: mErr } = await admin
     .from("membership")
     .insert({
-      identity_id: identity.id,
+      identity_id: identityId,
       tenant_id: input.tenantId,
       role: "SELLER",
       status: "PENDING",
@@ -302,7 +333,7 @@ export async function sellerRevoke(admin: SupabaseClient, caller: SellerCaller, 
     .select("id", { count: "exact", head: true })
     .eq("identity_id", found.membership.identity.id);
   if ((count ?? 0) === 0 && found.membership.identity.status === "PENDING") {
-    await admin.auth.admin.deleteUser(found.membership.identity.auth_user_id);
+    await releaseOrphanInvite(admin, found.membership.identity.email);
   }
   return ok();
 }
