@@ -60,7 +60,7 @@ export function PerformanceCard({ store }: { store: SellerHomeStore }) {
       <CardTitle className="mb-4">{store.storeName}</CardTitle>
       <Tabs
         variant="accent"
-        defaultKey={geral ? "desafios" : "ranking"}
+        defaultKey={geral ? "metas" : "ranking"}
         items={[
           ...(!geral
             ? [
@@ -95,6 +95,12 @@ export function PerformanceCard({ store }: { store: SellerHomeStore }) {
           },
               ]
             : []),
+          {
+            key: "metas",
+            label: "Metas",
+            icon: <TargetIcon size={14} />,
+            content: <PrizeCard store={store} embedded />,
+          },
           {
             key: "desafios",
             label: "Desafios",
@@ -131,12 +137,6 @@ export function PerformanceCard({ store }: { store: SellerHomeStore }) {
                   ))}
                 </ul>
               ),
-          },
-          {
-            key: "metas",
-            label: "Metas",
-            icon: <TargetIcon size={14} />,
-            content: <PrizeCard store={store} embedded />,
           },
         ]}
       />

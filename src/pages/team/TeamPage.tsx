@@ -566,7 +566,7 @@ export function TeamPage() {
             </Card>
           </div>
 
-          {/* Desempenho da equipe  -  abas Ranking  |  Desafios  |  Metas (mesmo card do Ao vivo) */}
+          {/* Desempenho da equipe  -  abas Ranking  |  Metas  |  Desafios */}
           <Card className="mt-4 min-w-0 overflow-hidden" padding="lg">
             <div className="mb-4 flex items-center gap-1.5">
               <CardTitle>Desempenho da equipe</CardTitle>
@@ -584,36 +584,6 @@ export function TeamPage() {
                   label: "Ranking",
                   icon: <TrophyIcon size={14} />,
                   content: !temVendasEquipe ? <EmptyBlock /> : abaRanking(),
-                },
-                {
-                  key: "desafios",
-                  label: "Desafios",
-                  icon: <FlameIcon size={14} />,
-                  content:
-                    desafioCards.length > 0 ? (
-                      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                        {desafioCards.map(({ challenge, view: desafio, lojaNome }) => (
-                          <ChallengeMiniCard
-                            key={challenge.id}
-                            challenge={challenge}
-                            view={desafio}
-                            lojaNome={mostraLojaDesafio ? lojaNome : undefined}
-                            onOpen={() => navigate(paths.management.challengeDetail(challenge.id), { state: { from: "team" } })}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <EmptyBlock
-                        icon="🔥"
-                        title="Desafio não configurado"
-                        description="Crie um desafio para engajar a equipe e acompanhar o progresso de cada pessoa."
-                        action={
-                          <Button size="sm" onClick={() => navigate(paths.management.challenges)}>
-                            Criar desafio
-                          </Button>
-                        }
-                      />
-                    ),
                 },
                 {
                   key: "metas",
@@ -640,6 +610,36 @@ export function TeamPage() {
                         action={
                           <Button size="sm" onClick={() => navigate(paths.goals)}>
                             Criar meta
+                          </Button>
+                        }
+                      />
+                    ),
+                },
+                {
+                  key: "desafios",
+                  label: "Desafios",
+                  icon: <FlameIcon size={14} />,
+                  content:
+                    desafioCards.length > 0 ? (
+                      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                        {desafioCards.map(({ challenge, view: desafio, lojaNome }) => (
+                          <ChallengeMiniCard
+                            key={challenge.id}
+                            challenge={challenge}
+                            view={desafio}
+                            lojaNome={mostraLojaDesafio ? lojaNome : undefined}
+                            onOpen={() => navigate(paths.management.challengeDetail(challenge.id), { state: { from: "team" } })}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <EmptyBlock
+                        icon="🔥"
+                        title="Desafio não configurado"
+                        description="Crie um desafio para engajar a equipe e acompanhar o progresso de cada pessoa."
+                        action={
+                          <Button size="sm" onClick={() => navigate(paths.management.challenges)}>
+                            Criar desafio
                           </Button>
                         }
                       />
