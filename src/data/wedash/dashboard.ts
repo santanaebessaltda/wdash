@@ -2328,7 +2328,13 @@ export function buildFinanceViewFromAggs(escopo: Scope, input: FinanceAggInput):
     const mensalHora = finMonthlyCosts(atual) / horasAbertas;
     const nowH = calendarCurrentHour();
     for (let h = first; h <= last; h++) {
-      const l = porHora.get(h) ?? FIN_LINE_ZERO;
+      // Venda fora do eixo (ex.: 00:00 de cupom sem hora) entra na ponta, sem alargar o grafico.
+      let l = porHora.get(h) ?? FIN_LINE_ZERO;
+      if (h === first || h === last) {
+        for (const [oh, ol] of porHora) {
+          if ((h === first && oh < first) || (h === last && oh > last)) l = finAdd(l, ol);
+        }
+      }
       const futuro = periodo.ehHoje && h > nowH && l.rev <= 0;
       const dentro = !futuro && h >= win.abertura && h < win.fechamento;
       pushPonto(
@@ -4511,7 +4517,13 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
     let acum = 0;
     let acumM = 0;
     for (const h of horas) {
-      acum += byHour.get(h) ?? 0;
+      let realizadoH = byHour.get(h) ?? 0;
+      if (h === first || h === last) {
+        for (const [oh, ov] of byHour) {
+          if ((h === first && oh < first) || (h === last && oh > last)) realizadoH += ov;
+        }
+      }
+      acum += realizadoH;
       acumM += metaNoEixo(h);
       const emAndamento = periodo.ehHoje && h === nowH;
       evolucao.push({

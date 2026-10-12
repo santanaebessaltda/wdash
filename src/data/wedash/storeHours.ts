@@ -136,28 +136,36 @@ export function parseWeekHours(raw: unknown): StoreWeekHours {
   return base;
 }
 
-/** "09:00"  ->  9; "09:30"  ->  9.5 */
-export function hhmmToHour(hhmm: string): number {
-  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
-  if (!m) return 0;
+/** "09:00" / "09:00:00" -> 9; "09:30" -> 9.5. Invalido -> null (nao vira meia-noite). */
+function parseHhmm(hhmm: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(hhmm.trim());
+  if (!m) return null;
   const h = Number(m[1]);
   const min = Number(m[2]);
-  if (!Number.isFinite(h) || !Number.isFinite(min)) return 0;
+  if (!Number.isFinite(h) || !Number.isFinite(min) || h > 23 || min > 59) return null;
   return h + min / 60;
+}
+
+/** "09:00"  ->  9; "09:30"  ->  9.5. Texto invalido -> 0. */
+export function hhmmToHour(hhmm: string): number {
+  return parseHhmm(hhmm) ?? 0;
 }
 
 /** Primeira hora cheia inclusiva do expediente. */
 export function openHourFloor(day: DayHours): number | null {
   if (!day) return null;
-  return Math.floor(hhmmToHour(day.open));
+  const open = parseHhmm(day.open);
+  return open == null ? null : Math.floor(open);
 }
 
 /** Ultima hora cheia exclusiva do expediente (ex.: fecha 21:00  ->  eixo ate 20). */
 export function closeHourCeil(day: DayHours): number | null {
   if (!day) return null;
-  const c = hhmmToHour(day.close);
+  const open = openHourFloor(day);
+  const c = parseHhmm(day.close);
+  if (open == null || c == null) return null;
   const floor = Math.floor(c);
-  return c > floor ? floor + 1 : Math.max(floor, openHourFloor(day)! + 1);
+  return c > floor ? floor + 1 : Math.max(floor, open + 1);
 }
 
 /** Opcoes de select a cada 30 min (00:00 - 23:30). */
@@ -186,9 +194,20 @@ export function unionConfiguredWindow(
 }
 
 /**
+ * Vendas que podem alargar o eixo. Com expediente, a hora 0 nao puxa o inicio para meia-noite:
+ * venda sem horario no ERP cai em 00:00 e nao e abertura da loja. Venda colada no expediente
+ * (antes de abrir ou depois de fechar) continua estendendo.
+ */
+function soldHoursForAxis(soldHours: number[], abertura: number | null): number[] {
+  if (abertura == null || abertura <= 0) return soldHours;
+  return soldHours.filter((h) => h !== 0);
+}
+
+/**
  * Eixo dos graficos por hora (1 dia), igual em todas as telas: expediente configurado das lojas no dia
- * (Configuracoes > Loja); venda fora do expediente estende o eixo. Nenhuma loja com horario  ->  horas com
- * venda  `fallbackHours` (ex.: horas com meta); sem nada, 10h - 22h. `first`/`last` inclusivos.
+ * (Configuracoes > Loja); venda fora do expediente estende o eixo, exceto a hora 0 quando a loja abre
+ * depois. Nenhuma loja com horario  ->  horas com venda  `fallbackHours` (ex.: horas com meta); sem nada,
+ * 10h - 22h. `first`/`last` inclusivos.
  */
 export function hourAxisRange(
   hoursList: StoreWeekHours[],
@@ -197,15 +216,17 @@ export function hourAxisRange(
   fallbackHours: number[] = [],
 ): { first: number; last: number; win: { abertura: number; fechamento: number } } {
   const configured = unionConfiguredWindow(hoursList, dow);
-  const livres = [...soldHours, ...fallbackHours];
+  const axisSold = soldHoursForAxis(soldHours, configured?.abertura ?? null);
+  const livres = [...axisSold, ...fallbackHours];
   const win =
     configured ??
     (livres.length > 0
       ? { abertura: Math.min(...livres), fechamento: Math.max(...livres) + 1 }
       : { abertura: 10, fechamento: 22 });
+  const edges = soldHoursForAxis(soldHours, configured ? win.abertura : null);
   return {
-    first: Math.min(win.abertura, ...soldHours),
-    last: Math.max(win.fechamento - 1, ...soldHours),
+    first: Math.min(win.abertura, ...edges),
+    last: Math.max(win.fechamento - 1, ...edges),
     win,
   };
 }

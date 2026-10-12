@@ -1042,6 +1042,28 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
     expect(pontos[pontos.length - 1]).toMatchObject({ label: "22h", realizado: 100 });
   });
 
+  it("loja de rua: venda na hora 0 não puxa o eixo para 00:00 e entra na abertura", () => {
+    const day = "2026-09-21";
+    const v = buildOverviewView(
+      { filialIds: ["f2"], periodo: { tipo: "personalizado", inicio: day, fim: day }, divisao: null },
+      {
+        dayAggs: [
+          { tenantId: "t1", storeId: "f2", day, brand: "ALL", revenueCents: 100_00, salesCount: 2, itemCount: 2 },
+        ],
+        hourAggs: [
+          { tenantId: "t1", storeId: "f2", day, hour: 0, brand: "ALL", revenueCents: 40_00, salesCount: 1, itemCount: 1 },
+          { tenantId: "t1", storeId: "f2", day, hour: 10, brand: "ALL", revenueCents: 60_00, salesCount: 1, itemCount: 1 },
+        ],
+      },
+    );
+    const pontos = v.evolucao.filter((e) => !e.ancora);
+    expect(pontos[0]?.label).toBe("8h");
+    expect(pontos[pontos.length - 1]?.label).toBe("17h");
+    expect(pontos.find((e) => e.label === "8h")?.realizado).toBe(40);
+    expect(pontos[pontos.length - 1]?.realizado).toBe(100);
+    expect(pontos.some((e) => e.label === "0h")).toBe(false);
+  });
+
   it("Faturamento x meta: meta do dia (não do mês) e curva pela hora histórica", () => {
     const day = "2026-09-21";
     const sale = { tenantId: "t1", storeId: "f1", day, brand: "ALL" as const, revenueCents: 50_00, salesCount: 1, itemCount: 1 };
@@ -1390,6 +1412,33 @@ describe("buildFinanceView com agregados reais", () => {
     expect(labels[labels.length - 1]).toBe("21h");
     expect(v.costProfitSeries.find((p) => p.label === "12h")?.revenue).toBe(60);
     expect(v.costProfitSeries.some((p) => p.future)).toBe(false);
+  });
+
+  it("loja de rua: hora 0 não abre o eixo e o valor entra na abertura", () => {
+    const d = "2026-09-21";
+    const hr = (hour: number, rev: number) => ({
+      tenantId: "t1",
+      storeId: "f2",
+      day: d,
+      brand: "ALL" as const,
+      revenueCents: rev * 100,
+      cmvCents: 0,
+      salesCount: 1,
+      itemCount: 1,
+      hour,
+    });
+    const v = buildFinanceView(
+      { filialIds: ["f2"], periodo: { tipo: "personalizado", inicio: d, fim: d }, divisao: null },
+      {
+        dayAggs: [{ tenantId: "t1", storeId: "f2", day: d, brand: "ALL", revenueCents: 100_00, cmvCents: 0, salesCount: 2, itemCount: 2 }],
+        hourAggs: [hr(0, 40), hr(10, 60)],
+      },
+    );
+    const labels = v.costProfitSeries.map((p) => p.label);
+    expect(labels[0]).toBe("8h");
+    expect(labels[labels.length - 1]).toBe("17h");
+    expect(v.costProfitSeries.find((p) => p.label === "8h")?.revenue).toBe(40);
+    expect(v.costProfitSeries.reduce((s, p) => s + p.revenue, 0)).toBe(100);
   });
 
   it("Evolução mensal com vários meses: meses do período, recortados nas pontas", () => {
