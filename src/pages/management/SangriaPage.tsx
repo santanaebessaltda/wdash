@@ -39,7 +39,7 @@ const WEEK = [
 ];
 const money = (cents: number) => brlCent(cents / 100);
 
-type AcaoLote = "recebido" | "aCobrar" | "fora" | "falta";
+type AcaoLote = "recebido" | "aCobrar" | "fora" | "falta" | "desfazer";
 
 function celulasDoMes(iso: string): Array<string | null> {
   const inicio = inicioDoMes(iso);
@@ -77,6 +77,7 @@ export function SangriaPage() {
   const [motivoLote, setMotivoLote] = useState("");
   const [faltaLote, setFaltaLote] = useState("");
   const [motivoFaltaLote, setMotivoFaltaLote] = useState("");
+  const [diasDesfazer, setDiasDesfazer] = useState(1);
   const [reloadKey, setReloadKey] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [watermark, setWatermark] = useState<Date | null | undefined>(undefined);
@@ -222,12 +223,33 @@ export function SangriaPage() {
     () => lines.filter((line) => diasAbertos.includes(line.day) && line.kind === "deposit"),
     [lines, diasAbertos],
   );
+  const depositosMarcados = useMemo(() => {
+    const ids = new Set<string>();
+    for (const day of marcados) {
+      const id = deposits.find((d) => d.day === day)?.depositId;
+      if (id) ids.add(id);
+    }
+    return [...ids];
+  }, [marcados, deposits]);
   const pronto = loaded === faixa;
   const rotuloMarcar = marcados.length === 0 ? "Marcar como" : marcados.length === 1 ? "Marcar como · 1 dia" : `Marcar como · ${marcados.length} dias`;
 
   function toggleDia(day: string) {
     if (day > hoje) return;
     setMarcados((atual) => (atual.includes(day) ? atual.filter((d) => d !== day) : [...atual, day]));
+  }
+
+  async function abrirDesfazer() {
+    if (depositosMarcados.length === 0) return;
+    let total = marcados.filter((day) => taken.has(day)).length;
+    try {
+      const counts = await Promise.all(depositosMarcados.map((id) => fetchDepositDayCount(id)));
+      total = counts.reduce((sum, n) => sum + n, 0);
+    } catch {
+      total = marcados.filter((day) => taken.has(day)).length;
+    }
+    setDiasDesfazer(Math.max(1, total));
+    setAcao("desfazer");
   }
 
   function abrirFalta() {
@@ -242,6 +264,23 @@ export function SangriaPage() {
     if (!loja || !acao) return;
     if (acao === "fora" && !motivoLote.trim()) {
       show("Informe o motivo.", "danger");
+      return;
+    }
+    if (acao === "desfazer") {
+      setDepositando(true);
+      try {
+        await Promise.all(depositosMarcados.map((id) => undoSangriaDeposit(id)));
+        const ids = new Set(depositosMarcados);
+        setDeposits((atual) => atual.filter((d) => !ids.has(d.depositId)));
+        setMarcados((atual) => atual.filter((day) => !taken.has(day)));
+        setReloadKey((n) => n + 1);
+        setAcao(null);
+        show(depositosMarcados.length > 1 ? "Recebimentos desfeitos." : "Recebimento desfeito.", "success");
+      } catch {
+        show("Não foi possível desfazer o recebimento. Tente novamente.", "danger");
+      } finally {
+        setDepositando(false);
+      }
       return;
     }
     if (acao === "falta") {
@@ -324,7 +363,7 @@ export function SangriaPage() {
               <button type="button" aria-label="Próximo mês" className={monthNavBtn} disabled={!podeAvancar} onClick={() => irParaMes(somarMes(anchor, 1))}>
                 <Seta dir="proximo" />
               </button>
-              {!escolher && loja ? <MarcarComo dias={marcados.length} rotulo={rotuloMarcar} valor={valorACobrar} recebidoOk={diasRecebiveis.length > 0} foraOk={linhasBoletoAbertas.length > 0} cobrarOk={linhasForaAbertas.length > 0} tudoRecebido={marcados.length > 0 && marcados.every((day) => taken.has(day))} onRecebido={() => setAcao("recebido")} onCobrar={() => setAcao("aCobrar")} onFora={() => { setMotivoLote(""); setAcao("fora"); }} onFalta={abrirFalta} /> : null}
+              {!escolher && loja ? <MarcarComo dias={marcados.length} rotulo={rotuloMarcar} valor={valorACobrar} recebidoOk={diasRecebiveis.length > 0} foraOk={linhasBoletoAbertas.length > 0} cobrarOk={linhasForaAbertas.length > 0} tudoRecebido={marcados.length > 0 && marcados.every((day) => taken.has(day))} podeDesfazer={depositosMarcados.length > 0} onRecebido={() => setAcao("recebido")} onCobrar={() => setAcao("aCobrar")} onFora={() => { setMotivoLote(""); setAcao("fora"); }} onFalta={abrirFalta} onDesfazer={() => void abrirDesfazer()} /> : null}
             </div>
           </HeaderFilters>
         }
@@ -420,6 +459,8 @@ export function SangriaPage() {
         motivoFalta={motivoFaltaLote}
         onMotivoFalta={setMotivoFaltaLote}
         diaRecebido={marcados.length === 1 && taken.has(marcados[0]!)}
+        recebimentos={depositosMarcados.length}
+        diasDesfazer={diasDesfazer}
         onClose={() => {
           if (!depositando) setAcao(null);
         }}
@@ -429,9 +470,18 @@ export function SangriaPage() {
   );
 }
 
+function partesDaFalta(tot: SangriaAmounts, recebido: boolean): Array<{ texto: string; tom: string }> {
+  const partes: Array<{ texto: string; tom: string }> = [];
+  if (recebido) partes.push({ texto: `Recebido ${money(tot.boletoCents)}`, tom: "text-ok" });
+  else if (tot.boletoCents > 0) partes.push({ texto: `A cobrar ${money(tot.boletoCents)}`, tom: "text-acc" });
+  if (tot.foraCents > 0) partes.push({ texto: `Fora ${money(tot.foraCents)}`, tom: "text-warn" });
+  partes.push({ texto: `Falta ${money(tot.faltaCents)}`, tom: "text-bad" });
+  return partes;
+}
+
 function chipDoDia(tot: SangriaAmounts, recebido: boolean): { cor: string; texto: string } | null {
   if (tot.totalCents <= 0 && tot.faltaCents <= 0) return null;
-  if (tot.faltaCents > 0) return { cor: "bg-bad", texto: `Falta ${money(tot.faltaCents)}` };
+  if (tot.faltaCents > 0) return null;
   if (tot.boletoCents > 0 && tot.foraCents > 0) {
     return recebido
       ? { cor: "bg-ok", texto: `Recebido · Fora ${money(tot.foraCents)}` }
@@ -468,8 +518,9 @@ function DiaCelula({
   const futuro = day != null && day > hoje;
   const abre = day != null && !futuro && (rows.length > 0 || depositado || faltaCents > 0);
   const chip = rows.length > 0 || faltaCents > 0 ? chipDoDia(tot, depositado) : null;
+  const partes = tot.faltaCents > 0 ? partesDaFalta(tot, depositado) : [];
   const borda = cn(
-    "flex min-h-[84px] flex-col items-start justify-start border-b border-r border-line p-1.5 text-left sm:min-h-[110px] sm:p-2",
+    "flex min-h-[84px] w-full min-w-0 flex-col items-stretch justify-start border-b border-r border-line p-1.5 text-left sm:min-h-[110px] sm:p-2",
     (index + 1) % 7 === 0 && "border-r-0",
     !day && "bg-bg-1/30",
     marcado && "ring-2 ring-inset ring-t0",
@@ -490,17 +541,24 @@ function DiaCelula({
           />
         ) : null}
       </span>
-      {rows.length > 0 || chip ? (
+      {rows.length > 0 || chip || partes.length > 0 ? (
         <div className="mt-1.5 w-full min-w-0">
           {rows.length > 0 ? (
             <p className={cn("whitespace-nowrap font-mono text-[12px] font-extrabold sm:text-[13px]", day === hoje ? "text-acc" : "text-t1")}>
               {money(tot.totalCents)}
             </p>
           ) : null}
+          {partes.map((parte) => (
+            <p key={parte.texto} className={cn("mt-0.5 truncate text-[11px] font-semibold", parte.tom)}>
+              {parte.texto}
+            </p>
+          ))}
           {chip ? <ChipDia cor={chip.cor}>{chip.texto}</ChipDia> : null}
         </div>
       ) : day < hoje && faltaCents <= 0 && !depositado ? (
-        <ChipDia cor="bg-chip-quiet">Sem sangria</ChipDia>
+        <div className="mt-1.5 w-full min-w-0">
+          <ChipDia cor="bg-chip-quiet">Sem sangria</ChipDia>
+        </div>
       ) : null}
     </>
   ) : null;
@@ -518,7 +576,7 @@ function NumeroDia({ iso, hoje }: { iso: string; hoje: string }) {
   return (
     <span
       className={cn(
-        "inline-flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-bold",
+        "inline-flex h-6 w-6 shrink-0 items-center justify-center self-start rounded-full text-[12px] font-bold",
         iso === hoje ? "bg-acc text-white" : futuro ? "text-t2" : "text-t1",
       )}
     >
@@ -804,10 +862,12 @@ function MarcarComo({
   foraOk,
   cobrarOk,
   tudoRecebido,
+  podeDesfazer,
   onRecebido,
   onCobrar,
   onFora,
   onFalta,
+  onDesfazer,
 }: {
   dias: number;
   rotulo: string;
@@ -816,13 +876,25 @@ function MarcarComo({
   foraOk: boolean;
   cobrarOk: boolean;
   tudoRecebido: boolean;
+  podeDesfazer: boolean;
   onRecebido: () => void;
   onCobrar: () => void;
   onFora: () => void;
   onFalta: () => void;
+  onDesfazer: () => void;
 }) {
   if (dias === 0) return <Button disabled>Marcar como</Button>;
   const itens: DropdownItem[] = [
+    ...(podeDesfazer
+      ? [
+          {
+            label: "Desfazer recebimento",
+            description: "Devolve o valor recebido para A cobrar.",
+            onClick: onDesfazer,
+          },
+          { divider: true, label: "" },
+        ]
+      : []),
     {
       label: "Recebido",
       description: recebidoOk
@@ -882,6 +954,8 @@ function AcaoModal({
   motivoFalta,
   onMotivoFalta,
   diaRecebido,
+  recebimentos,
+  diasDesfazer,
   onClose,
   onConfirm,
 }: {
@@ -898,6 +972,8 @@ function AcaoModal({
   motivoFalta: string;
   onMotivoFalta: (value: string) => void;
   diaRecebido: boolean;
+  recebimentos: number;
+  diasDesfazer: number;
   onClose: () => void;
   onConfirm: () => void;
 }) {
@@ -910,9 +986,19 @@ function AcaoModal({
           ? "Fora do boleto"
           : acao === "falta"
             ? "Registrar falta"
-            : "";
+            : acao === "desfazer"
+              ? "Desfazer recebimento?"
+              : "";
   const confirmar =
-    acao === "recebido" ? "Marcar como recebido" : acao === "aCobrar" ? "Marcar como A cobrar" : acao === "fora" ? "Marcar como fora do boleto" : "Registrar falta";
+    acao === "recebido"
+      ? "Marcar como recebido"
+      : acao === "aCobrar"
+        ? "Marcar como A cobrar"
+        : acao === "fora"
+          ? "Marcar como fora do boleto"
+          : acao === "desfazer"
+            ? "Desfazer recebimento"
+            : "Registrar falta";
   return (
     <Modal
       open={acao != null}
@@ -924,11 +1010,20 @@ function AcaoModal({
             Cancelar
           </Button>
           <Button onClick={onConfirm} disabled={gravando}>
-            {gravando ? "Salvando…" : confirmar}
+            {gravando ? (acao === "desfazer" ? "Desfazendo…" : "Salvando…") : confirmar}
           </Button>
         </>
       }
     >
+      {acao === "desfazer" ? (
+        <p className="text-[13.5px] text-t1">
+          {recebimentos > 1
+            ? `${recebimentos} recebimentos serão desfeitos. Os valores voltam para A cobrar.`
+            : diasDesfazer <= 1
+              ? "O valor voltará para A cobrar."
+              : `Este recebimento inclui ${diasDesfazer} dias. Ao desfazer, os valores de todos eles voltarão para A cobrar.`}
+        </p>
+      ) : null}
       {acao === "recebido" ? (
         <p className="text-[13.5px] text-t1">{dias === 1 ? "1 dia será incluído neste recebimento." : `${dias} dias serão incluídos neste recebimento.`}</p>
       ) : null}
