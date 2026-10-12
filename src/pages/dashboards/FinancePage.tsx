@@ -41,7 +41,7 @@ import { FinanceSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { brlCent, deIso, labelUpper, tipDelta } from "@/lib/format";
 import { cn } from "@/lib/cn";
-import { TINT } from "@/pages/dashboards/icons";
+import { QuickStat } from "@/pages/dashboards/QuickStat";
 import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePicker";
 import {
   applyPeriodDateChange,
@@ -318,33 +318,17 @@ export default function FinancePage() {
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {view.kpisWpink.map((kpi, i) => {
             const Icon = KPI_ICONS[i] ?? IconRevenue;
-            const tint = TINT[kpi.tint];
             return (
-              <Card key={kpi.label} padding="sm" className="flex items-center gap-3.5">
-                <span
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px]"
-                  style={{ background: tint.bg, color: tint.fg }}
-                >
-                  <Icon />
-                </span>
-                <div className="min-w-0">
-                  <p className="flex items-center gap-1.5 text-[11.5px] font-semibold text-t2">
-                    {kpi.label}
-                    {kpi.tooltip ? (
-                      <Tooltip label={kpi.tooltip} side="bottom">
-                        <span className="inline-flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full bg-bg-inset text-[10px] font-semibold text-t2 hover:text-t1 transition-colors">
-                          ?
-                        </span>
-                      </Tooltip>
-                    ) : null}
-                  </p>
-                  <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2">
-                    <p className="truncate font-mono text-lg font-extrabold text-t0">{kpi.valor}</p>
-                    <PriorPeriodBadge delta={kpi.delta} />
-                  </div>
-                  {kpi.sub ? <p className="text-[11px] text-t2">{kpi.sub}</p> : null}
-                </div>
-              </Card>
+              <QuickStat
+                key={kpi.label}
+                label={kpi.label}
+                value={kpi.valor}
+                icon={<Icon />}
+                tint={kpi.tint}
+                tooltip={kpi.tooltip}
+                sub={kpi.sub}
+                badge={<PriorPeriodBadge delta={kpi.delta} />}
+              />
             );
           })}
         </div>

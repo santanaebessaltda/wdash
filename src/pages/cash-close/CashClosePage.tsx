@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Alert, Badge, Button, Card, Modal, Skeleton, StatCard, useToast } from "@/components/ui";
+import { Alert, Badge, Button, Card, Modal, Skeleton, useToast } from "@/components/ui";
 import { monthCloseSpanFor } from "@/data/wedash/cashCloseMonth";
 import {
   applyCloseReview,
@@ -38,6 +38,7 @@ import { useScope } from "@/pages/dashboard/useScope";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { parseNum, SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
+import { QuickStat } from "@/pages/dashboards/QuickStat";
 import { HeaderFilters } from "@/pages/stock/shared";
 
 const DIAS = [
@@ -63,12 +64,6 @@ function totalDia(cents: number): string {
   if (cents > 0) return `+${abs}`;
   return abs;
 }
-
-const KPI_COLORS = [
-  { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" },
-  { iconColor: "var(--ok)", iconBg: "var(--ok-soft)" },
-  { iconColor: "var(--warn)", iconBg: "rgba(245,158,11,0.12)" },
-];
 
 const IconReal = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -771,7 +766,7 @@ export function CashClosePage() {
             {analise ? (
               <ResumoMes resumo={analise.resumo} />
             ) : (
-              <Skeleton className="mb-4 h-[120px] w-full rounded-[18px]" />
+              <Skeleton className="mb-4 h-[72px] w-full rounded-[18px]" />
             )}
             <Mes hoje={hoje} cells={cells} faceDoDia={faceDoDia} onOpen={abrirDia} />
           </>
@@ -811,35 +806,27 @@ function ResumoMes({ resumo }: { resumo: MonthCloseSummary }) {
       label: "Total real",
       value: brlCent(resumo.realCents / 100),
       icon: <IconReal />,
+      tint: "acc" as const,
     },
     {
       label: "Diferença",
       value: totalDia(resumo.diffCents),
       icon: <IconDif />,
+      tint: "ok" as const,
       tooltip: dicaDiferenca(resumo),
     },
     {
       label: "Dias pendentes",
       value: String(resumo.pendingDays),
       icon: <IconPendente />,
+      tint: "warn" as const,
     },
   ];
   return (
     <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-      {cards.map((card, i) => {
-        const cor = KPI_COLORS[i % KPI_COLORS.length];
-        return (
-          <StatCard
-            key={card.label}
-            label={card.label}
-            value={card.value}
-            icon={card.icon}
-            iconColor={cor.iconColor}
-            iconBg={cor.iconBg}
-            tooltip={"tooltip" in card ? card.tooltip : undefined}
-          />
-        );
-      })}
+      {cards.map((card) => (
+        <QuickStat key={card.label} label={card.label} value={card.value} icon={card.icon} tint={card.tint} tooltip={"tooltip" in card ? card.tooltip : undefined} />
+      ))}
     </div>
   );
 }

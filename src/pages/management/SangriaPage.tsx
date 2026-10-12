@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Card, Checkbox, Modal, Skeleton, StatCard, useToast } from "@/components/ui";
+import { Alert, Button, Card, Checkbox, Modal, Skeleton, useToast } from "@/components/ui";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { fetchLatestCashCloseError, fetchNavMonthFloor, fetchOpenCashCloseJob, requestSangriaMonth } from "@/data/wedash/cashCloseRepo";
 import { fetchSyncWatermark } from "@/data/wedash/salesRepo";
@@ -22,6 +22,7 @@ import { useScope } from "@/pages/dashboard/useScope";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { NumberInput, SectionHeader, SelectStoreCard, parseNum, pickOneStore, useScopedStores } from "@/pages/operation/shared";
 import { ChipDia, monthNavBtn, SeletorMesAno, Seta } from "@/pages/cash-close/CashClosePage";
+import { QuickStat } from "@/pages/dashboards/QuickStat";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { HeaderFilters } from "@/pages/stock/shared";
 
@@ -445,36 +446,18 @@ function campoParaCentavos(txt: string): number | null {
   return Math.round(n * 100);
 }
 
-const KPI_COLORS = [
-  { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" },
-  { iconColor: "var(--ok)", iconBg: "var(--ok-soft)" },
-  { iconColor: "var(--warn)", iconBg: "rgba(245,158,11,0.12)" },
-  { iconColor: "var(--bad)", iconBg: "var(--bad-soft)" },
-];
-
 function ResumoMes({ aCobrar, recebido, fora, falta }: { aCobrar: number; recebido: number; fora: number; falta: number }) {
   const cards = [
-    { label: "A cobrar", value: money(aCobrar), icon: <IconCobrar />, tooltip: "Sangrias que entram no próximo boleto." },
-    { label: "Recebido", value: money(recebido), icon: <IconRecebido />, tooltip: "Valores dos boletos já pagos." },
-    { label: "Fora do boleto", value: money(fora), icon: <IconFora />, tooltip: "Sangrias usadas para compras, fornecedores, premiações ou outros pagamentos." },
-    { label: "Falta", value: money(falta), icon: <IconFalta />, tooltip: "Valor em dinheiro que faltou nas sangrias." },
+    { label: "A cobrar", value: money(aCobrar), icon: <IconCobrar />, tint: "acc" as const, tooltip: "Sangrias que entram no próximo boleto." },
+    { label: "Recebido", value: money(recebido), icon: <IconRecebido />, tint: "ok" as const, tooltip: "Valores dos boletos já pagos." },
+    { label: "Fora do boleto", value: money(fora), icon: <IconFora />, tint: "warn" as const, tooltip: "Sangrias usadas para compras, fornecedores, premiações ou outros pagamentos." },
+    { label: "Falta", value: money(falta), icon: <IconFalta />, tint: "bad" as const, tooltip: "Valor em dinheiro que faltou nas sangrias." },
   ];
   return (
     <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {cards.map((card, i) => {
-        const cor = KPI_COLORS[i];
-        return (
-          <StatCard
-            key={card.label}
-            label={card.label}
-            value={card.value}
-            icon={card.icon}
-            iconColor={cor.iconColor}
-            iconBg={cor.iconBg}
-            tooltip={card.tooltip}
-          />
-        );
-      })}
+      {cards.map((card) => (
+        <QuickStat key={card.label} label={card.label} value={card.value} icon={card.icon} tint={card.tint} tooltip={card.tooltip} />
+      ))}
     </div>
   );
 }
