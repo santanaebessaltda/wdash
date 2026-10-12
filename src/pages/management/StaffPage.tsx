@@ -14,6 +14,7 @@ import {
   type StoreShift,
 } from "@/data/wedash/stores";
 import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
+import { shiftName } from "@/lib/format";
 import { InviteSellerModal } from "@/pages/management/InviteSellerModal";
 import { GroupFormModal, GroupPicker, ManageGroupsModal, groupProblem, nextGroupWindow } from "@/pages/management/SellerGroups";
 import { CostCardTitle, SAVE_ERROR_MSG, StoreCardsPage, useScopedStores } from "@/pages/operation/shared";
@@ -234,6 +235,8 @@ function StaffCard({ tenantId, loja, reloadKey, groupsTick }: { tenantId: string
       {
         key: "access",
         header: "Acesso",
+        sortable: true,
+        sortValue: (v) => (access == null ? null : accessLabel(access.get(v.id) ?? "NONE")),
         render: (v) => {
           const grupo = v.id in shiftOf ? shiftOf[v.id] : v.shiftId;
           return (
@@ -248,6 +251,8 @@ function StaffCard({ tenantId, loja, reloadKey, groupsTick }: { tenantId: string
       {
         key: "shift",
         header: "Grupo",
+        sortable: true,
+        sortValue: (v) => groupLabel(v.id in shiftOf ? shiftOf[v.id] : v.shiftId, shifts),
         render: (v) => {
           const atual = v.id in shiftOf ? shiftOf[v.id] : v.shiftId;
           return (
@@ -450,10 +455,21 @@ function AccessMenu({
   );
 }
 
+function accessLabel(state: AccessState): string {
+  return state === "NONE" ? "Convidar" : ACCESS_LABEL[state];
+}
+
+function groupLabel(shiftId: string | null | undefined, shifts: StoreShift[]): string {
+  const shift = shifts.find((s) => s.id === shiftId);
+  return shift ? shiftName(shift.name) : "Sem grupo";
+}
+
 const SELLER_COLUMNS: DataTableColumn<StoreSeller>[] = [
   {
     key: "seller",
     header: "Nome",
+    sortable: true,
+    sortValue: (v) => v.name,
     render: (v) => (
       <div className="flex min-w-0 items-center gap-3">
         <Avatar name={v.name} />
@@ -464,11 +480,15 @@ const SELLER_COLUMNS: DataTableColumn<StoreSeller>[] = [
   {
     key: "code",
     header: "Código no Millennium",
+    sortable: true,
+    sortValue: (v) => v.code?.trim() || null,
     render: (v) => <span className="tabular-nums text-t1">{v.code || "—"}</span>,
   },
   {
     key: "status",
     header: "Status",
+    sortable: true,
+    sortValue: (v) => (v.active ? "Ativo" : "Desligado"),
     render: (v) => (v.active ? <Badge variant="success">Ativo</Badge> : <Badge variant="neutral">Desligado</Badge>),
   },
 ];
