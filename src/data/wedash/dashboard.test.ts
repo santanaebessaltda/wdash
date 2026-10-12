@@ -546,7 +546,7 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
     expect(v.topProdutos[0]?.itens).toBe(2);
   });
 
-  it("topProdutos traz o ranking completo (tela corta o Top 5 pela métrica escolhida)", () => {
+  it("topProdutos traz o ranking completo (tela corta o Top 10 pela métrica escolhida)", () => {
     const day = "2026-09-23";
     // 6 produtos: o 6 em faturamento e o 1 em quantidade.
     const productDayAggs = [
@@ -753,6 +753,23 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
     expect(v.topVendedoras[0]?.pctMeta).toBeUndefined();
     expect(v.topVendedoras[0]?.sub).toBe("2 vendas");
     expect(v.topVendedoras[1]?.nome).toBe("Carla");
+  });
+
+  it("topVendedoras corta no Top 10", () => {
+    const sellerDayAggs = Array.from({ length: 12 }, (_, i) => ({
+      tenantId: "t1",
+      storeId: "f1",
+      day: "2026-09-10",
+      sellerKey: `P${i}`,
+      sellerName: `Pessoa ${i}`,
+      brand: "ALL" as const,
+      revenueCents: (12 - i) * 100,
+      salesCount: 1,
+    }));
+    const v = buildOverviewView(escopo("f1"), { dayAggs: [], sellerDayAggs });
+    expect(v.topVendedoras).toHaveLength(10);
+    expect(v.topVendedoras[0]?.nome).toBe("Pessoa 0");
+    expect(v.topVendedoras.some((s) => s.nome === "Pessoa 11")).toBe(false);
   });
 
   it("topVendedoras junta a mesma funcionária (código do ERP) mesmo com nome trocado", () => {

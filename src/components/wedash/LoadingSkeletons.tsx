@@ -199,7 +199,7 @@ function TeamHighlightsSkeleton() {
         <Pill className="w-12" />
       </div>
       <div className="flex flex-col gap-4 px-4 pb-4">
-        {Array.from({ length: 5 }, (_, i) => (
+        {Array.from({ length: 10 }, (_, i) => (
           <div key={i} className="flex items-center gap-3">
             <Skeleton className="h-3 w-5 shrink-0" />
             <Skeleton className="h-8 w-8 shrink-0 rounded-full" />
@@ -220,14 +220,14 @@ function TeamHighlightsSkeleton() {
 /** Top produtos / Top linhas: # + avatar de iniciais + nome/codigo + 3 colunas numericas. */
 function TopTableSkeleton({
   titleW = "w-32",
-  rows = 5,
+  rows = 10,
   search = false,
   variacao = false,
   className,
 }: {
   titleW?: string;
   rows?: number;
-  /** Busca no lugar do badge "Top 5" (Desempenho por produto). */
+  /** Busca no lugar do badge "Top 10" (Desempenho por produto). */
   search?: boolean;
   variacao?: boolean;
   className?: string;

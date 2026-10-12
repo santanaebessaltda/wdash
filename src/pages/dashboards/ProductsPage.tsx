@@ -7,6 +7,7 @@ import { useScope } from "@/pages/dashboard/useScope";
 import {
   buildProductsView,
   resolvePeriod,
+  TOP_CARD_SIZE,
   type AbcClass,
   type ProductItemRow,
   type ProductLineRow,
@@ -177,8 +178,8 @@ export default function ProductsPage() {
     mudar(applyPeriodDateChange(escopo, r, meta));
   }
 
-  // A metrica escolhe QUAIS 5 entram (sempre os maiores); a direcao so reordena os 5.
-  // "Produto" (nome) reordena o Top 5 por faturamento.
+  // A metrica escolhe quais entram (sempre os maiores); a direcao so reordena esses.
+  // "Produto" (nome) reordena o Top por faturamento.
   const topProdutos = useMemo(() => {
     const metrica = (p: ProductItemRow) =>
       topProdSort === "itens"
@@ -188,12 +189,12 @@ export default function ProductsPage() {
           : topProdSort === "margem"
             ? (p.margemPct ?? -Infinity)
             : p.faturamento;
-    const top5 = [...view.produtos].sort((a, b) => metrica(b) - metrica(a) || b.faturamento - a.faturamento).slice(0, 5);
+    const top = [...view.produtos].sort((a, b) => metrica(b) - metrica(a) || b.faturamento - a.faturamento).slice(0, TOP_CARD_SIZE);
     if (topProdSort === "nome") {
       const dir = topProdDir === "asc" ? 1 : -1;
-      return top5.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR") * dir);
+      return top.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR") * dir);
     }
-    return topProdDir === "asc" ? top5.reverse() : top5;
+    return topProdDir === "asc" ? top.reverse() : top;
   }, [view.produtos, topProdSort, topProdDir]);
 
   function toggleTopProdSort(key: TopProdSort) {
@@ -205,7 +206,7 @@ export default function ProductsPage() {
     }
   }
 
-  // Mesma regra do Top produtos: a metrica escolhe as 5 linhas; a direcao so reordena.
+  // Mesma regra do Top produtos: a metrica escolhe as linhas; a direcao so reordena.
   const topLinhas = useMemo(() => {
     const metrica = (l: ProductLineRow) =>
       topLinhaSort === "itens"
@@ -215,12 +216,12 @@ export default function ProductsPage() {
           : topLinhaSort === "margem"
             ? (l.margemPct ?? -Infinity)
             : l.faturamento;
-    const top5 = [...view.linhas].sort((a, b) => metrica(b) - metrica(a) || b.faturamento - a.faturamento).slice(0, 5);
+    const top = [...view.linhas].sort((a, b) => metrica(b) - metrica(a) || b.faturamento - a.faturamento).slice(0, TOP_CARD_SIZE);
     if (topLinhaSort === "nome") {
       const dir = topLinhaDir === "asc" ? 1 : -1;
-      return top5.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR") * dir);
+      return top.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR") * dir);
     }
-    return topLinhaDir === "asc" ? top5.reverse() : top5;
+    return topLinhaDir === "asc" ? top.reverse() : top;
   }, [view.linhas, topLinhaSort, topLinhaDir]);
 
   function toggleTopLinhaSort(key: TopProdSort) {
@@ -442,7 +443,7 @@ export default function ProductsPage() {
               <CardTitle>Top linhas de produto</CardTitle>
               <TipHelp label={"Agrupa produtos da mesma linha, mesmo quando existem em diferentes tipos, como colônia, body splash, body cream ou roll-on.\n\nExemplo: Obsessed, Obsessed Deluxe e Obsessed Intense pertencem à linha OBSESSED."} />
             </div>
-            <Badge variant="accent">Top 5</Badge>
+            <Badge variant="accent">Top {TOP_CARD_SIZE}</Badge>
           </CardHeader>
           {topLinhas.length === 0 ? (
             <EmptyBlock />
@@ -504,7 +505,7 @@ export default function ProductsPage() {
         <Card className="flex flex-col">
           <CardHeader>
             <CardTitle>Top produtos</CardTitle>
-            <Badge variant="accent">Top 5</Badge>
+            <Badge variant="accent">Top {TOP_CARD_SIZE}</Badge>
           </CardHeader>
           {topProdutos.length === 0 ? (
             <EmptyBlock />

@@ -22,6 +22,9 @@ import type { TintKey } from "@/pages/dashboards/icons";
 import { buildStoreInsight } from "./insight";
 import { brandFromProductCode } from "./costTableFill";
 
+/** Linhas dos cards de ranking: Destaques da equipe, Top produtos e Top linhas. */
+export const TOP_CARD_SIZE = 10;
+
 export type PeriodType =
   | "hoje"
   | "ontem"
@@ -4707,7 +4710,7 @@ export function buildOverviewViewFromAggs(escopo: Scope, input: OverviewAggInput
   });
   const topVendedoras: TopSeller[] = [...vendMap.entries()]
     .sort((a, b) => b[1].fat - a[1].fat)
-    .slice(0, 5)
+    .slice(0, TOP_CARD_SIZE)
     .map(([key, v]) => {
       const meta = niveisMeta.get(key);
       return {
@@ -5109,7 +5112,7 @@ export function buildOverviewView(escopo: Scope, aggs?: OverviewAggInput | null)
       color: CORES_FORMAS[method] ?? "var(--t2)",
     }));
 
-  // Top 5 Vendedoras (com % da meta individual)
+  // Top vendedoras (com % da meta individual)
   const vendMap = new Map<string, { nome: string; fat: number; vendas: number; itens: number; loja: string }>();
   for (const f of fs) {
     const cols = collaboratorsOfStore(f.id);
@@ -5135,7 +5138,7 @@ export function buildOverviewView(escopo: Scope, aggs?: OverviewAggInput | null)
   const individualGoal = metaTotalLoja / numVendedoras;
   const topVendedoras: TopSeller[] = [...vendMap.values()]
     .sort((a, b) => b.fat - a.fat)
-    .slice(0, 5)
+    .slice(0, TOP_CARD_SIZE)
     .map((v) => ({
       nome: v.nome,
       valor: v.fat,
@@ -5146,7 +5149,7 @@ export function buildOverviewView(escopo: Scope, aggs?: OverviewAggInput | null)
       lojas: v.loja ? [v.loja] : [],
     }));
 
-  // Top 5 Produtos (com categoria e trend)
+  // Top produtos (com categoria e trend)
   const prodMap = new Map<string, { nome: string; fat: number; itens: number; categoriaNome: string }>();
   for (const [catId, c] of catMap.entries()) {
     const cat = categorias.find((x) => x.id === catId);

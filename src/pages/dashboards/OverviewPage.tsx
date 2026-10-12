@@ -7,7 +7,7 @@ import { Avatar, Badge, Card, CardHeader, CardTitle, ProgressBar, RadialProgress
 import { Tooltip } from "@/components/ui/Tooltip";
 import { AreaLineChart, BarChart, DonutChart } from "@/components/charts";
 import { useScope } from "@/pages/dashboard/useScope";
-import { buildOverviewView, resolvePeriod, previousPeriod, type OverviewKpi } from "@/data/wedash/dashboard";
+import { buildOverviewView, resolvePeriod, previousPeriod, TOP_CARD_SIZE, type OverviewKpi } from "@/data/wedash/dashboard";
 import {
   fetchSalesDayAggs,
   fetchSalesHourAggs,
@@ -386,8 +386,8 @@ export default function OverviewPage() {
     [escopo, dayAggs, hourAggs, categoryDayAggs, categoryCatalog, paymentDayAggs, sellerDayAggs, sellerShifts, productDayAggs, productCostDayAggs, goalHistoryDayAggs, goalHistoryHourAggs, prevDayAggs, prevHourAggs, goals, goalDayAggs, goalSellerDayAggs, goalTeam, storesTick],
   );
 
-  // A metrica escolhe QUAIS 5 entram (sempre os maiores); a direcao so reordena os 5.
-  // "Produto" (nome) reordena o Top 5 por faturamento.
+  // A metrica escolhe quais entram (sempre os maiores); a direcao so reordena esses.
+  // "Produto" (nome) reordena o Top por faturamento.
   const topProdutosOrdenados = useMemo(() => {
     type P = (typeof view.topProdutos)[number];
     const metrica = (p: P) =>
@@ -398,14 +398,14 @@ export default function OverviewPage() {
           : topProdSort === "variacao"
             ? (p.trend ?? -Infinity)
             : p.valor;
-    const top5 = [...view.topProdutos]
+    const top = [...view.topProdutos]
       .sort((a, b) => metrica(b) - metrica(a) || b.valor - a.valor)
-      .slice(0, 5);
+      .slice(0, TOP_CARD_SIZE);
     if (topProdSort === "nome") {
       const dir = topProdDir === "asc" ? 1 : -1;
-      return top5.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR") * dir);
+      return top.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR") * dir);
     }
-    return topProdDir === "asc" ? top5.reverse() : top5;
+    return topProdDir === "asc" ? top.reverse() : top;
   }, [view.topProdutos, topProdSort, topProdDir]);
 
   function toggleTopProdSort(key: TopProdSort) {
@@ -863,7 +863,7 @@ export default function OverviewPage() {
           <CardHeader>
             <div className="flex w-full items-center justify-between gap-1.5">
               <CardTitle>Destaques da equipe</CardTitle>
-              <Badge variant="accent">Top 5</Badge>
+              <Badge variant="accent">Top {TOP_CARD_SIZE}</Badge>
             </div>
           </CardHeader>
           {view.topVendedoras.length === 0 ? (
@@ -949,7 +949,7 @@ export default function OverviewPage() {
           <CardHeader>
             <div className="flex w-full items-center justify-between gap-1.5">
               <CardTitle>Top produtos</CardTitle>
-              <Badge variant="accent">Top 5</Badge>
+              <Badge variant="accent">Top {TOP_CARD_SIZE}</Badge>
             </div>
           </CardHeader>
           {topProdutosOrdenados.length === 0 ? (
