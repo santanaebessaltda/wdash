@@ -20,7 +20,7 @@ import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { useScope } from "@/pages/dashboard/useScope";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
-import { SectionHeader, SelectStoreCard, parseNum, pickOneStore, useScopedStores } from "@/pages/operation/shared";
+import { NumberInput, SectionHeader, SelectStoreCard, parseNum, pickOneStore, useScopedStores } from "@/pages/operation/shared";
 import { ChipDia, monthNavBtn, SeletorMesAno, Seta } from "@/pages/cash-close/CashClosePage";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { HeaderFilters } from "@/pages/stock/shared";
@@ -628,14 +628,7 @@ function DiaModal({
           </ul>
           <div className="mt-4 rounded-[14px] border border-line p-3">
             <p className="text-[12.5px] font-bold text-t0">Falta em dinheiro</p>
-            <input
-              inputMode="decimal"
-              className="mt-2 h-9 w-full rounded-[10px] border border-line bg-bg-1 px-2.5 text-right font-mono text-[13px] font-bold text-t0 outline-none focus:border-acc"
-              value={falta}
-              placeholder="0,00"
-              aria-label="Valor da falta"
-              onChange={(e) => setFalta(e.target.value)}
-            />
+            <NumberInput className="mt-2" compact unit="R$" value={falta} aria-label="Valor da falta" onChange={setFalta} />
             <p className="mt-3 text-[12.5px] font-bold text-t0">Motivo da falta</p>
             <input
               className="mt-2 w-full rounded-[10px] border border-line bg-bg-1 px-2.5 py-2 text-[13px] text-t0"
