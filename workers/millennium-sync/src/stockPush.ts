@@ -1,6 +1,7 @@
 /**
- * Alerta de estoque: uma vez por dia, na primeira rodada automática da filial.
- * Compara o total do Pedido de compra (estoque + a receber) com o mínimo gravado.
+ * Alerta de estoque: na primeira rodada automática do dia, só quando o produto
+ * passa a ficar abaixo do mínimo. Continua abaixo, não repete. Voltou ao mínimo
+ * e caiu de novo, avisa outra vez.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { localClock } from "./autoRefresh.ts";
@@ -10,7 +11,10 @@ const BODY_LIMIT = 180;
 
 export type PurchaseTotalLine = { code: string; description: string; total: number };
 
-export type StockShort = { name: string; total: number; min: number };
+export type StockShort = { code: string; name: string; total: number; min: number };
+
+const daySubject = (storeId: string, day: string) => `day|${storeId}|${day}`;
+const productSubject = (storeId: string, code: string) => `prod|${storeId}|${code}`;
 
 function asNum(v: unknown): number | null {
   if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -65,10 +69,28 @@ export function productsBelowMin(lines: PurchaseTotalLine[], mins: Map<string, n
   for (const [code, row] of byCode) {
     const min = mins.get(code);
     if (min == null || min <= 0 || row.total >= min) continue;
-    out.push({ name: row.description || code, total: row.total, min });
+    out.push({ code, name: row.description || code, total: row.total, min });
   }
   out.sort((a, b) => b.min - b.total - (a.min - a.total) || a.name.localeCompare(b.name, "pt-BR"));
   return out;
+}
+
+/** `already` são os códigos já avisados enquanto estavam abaixo. Some do conjunto quando volta ao mínimo. */
+export function planStockAlerts(
+  lines: PurchaseTotalLine[],
+  mins: Map<string, number>,
+  already: Set<string>,
+): { alert: StockShort[]; rearm: string[] } {
+  const below = productsBelowMin(lines, mins);
+  const belowCodes = new Set(below.map((product) => product.code));
+  const present = new Set(lines.map((line) => line.code));
+  const rearm: string[] = [];
+  for (const code of already) {
+    if (belowCodes.has(code)) continue;
+    const min = mins.get(code);
+    if (min == null || min <= 0 || present.has(code)) rearm.push(code);
+  }
+  return { alert: below.filter((product) => !already.has(product.code)), rearm };
 }
 
 export function formatStockPush(stores: Array<{ name: string; products: StockShort[] }>): { title: string; body: string } | null {
@@ -79,7 +101,7 @@ export function formatStockPush(stores: Array<{ name: string; products: StockSho
   const items = listed.flatMap((store) =>
     store.products.map((product, index) => ({
       header: index === 0 ? store.name : null,
-      line: `${product.name} · ${qty(product.total)} · mínimo ${qty(product.min)}`,
+      line: `${product.name} · ${qty(product.total)} de ${qty(product.min)}`,
     })),
   );
   const lines: string[] = [];
@@ -112,25 +134,27 @@ export async function notifyStockLow(
     store,
     day: localClock(now, store.timezone || "America/Campo_Grande").day,
   }));
-  const subjects = due.map(({ store, day }) => `${store.id}|${day}`);
-  const { data: marks, error: markErr } = await sb
+  const daySubjects = due.map(({ store, day }) => daySubject(store.id, day));
+  const { data: dayMarks, error: dayErr } = await sb
     .from("notification_mark")
     .select("subject")
     .eq("tenant_id", args.tenantId)
     .eq("kind", "stock_low")
-    .in("subject", subjects);
-  if (markErr) throw markErr;
-  const done = new Set((marks ?? []).map((row) => row.subject as string));
-  const pending = due.filter(({ store, day }) => !done.has(`${store.id}|${day}`));
+    .in("subject", daySubjects);
+  if (dayErr) throw dayErr;
+  const done = new Set((dayMarks ?? []).map((row) => row.subject as string));
+  const pending = due.filter(({ store, day }) => !done.has(daySubject(store.id, day)));
   if (pending.length === 0) return;
 
   const ids = pending.map(({ store }) => store.id);
-  const { data: minRows, error: minErr } = await sb
-    .from("store_purchase_min")
-    .select("store_id, product_code, min_qty")
-    .eq("tenant_id", args.tenantId)
-    .in("store_id", ids);
+  const pendingIds = new Set(ids);
+  const [{ data: minRows, error: minErr }, { data: prodMarks, error: prodErr }] = await Promise.all([
+    sb.from("store_purchase_min").select("store_id, product_code, min_qty").eq("tenant_id", args.tenantId).in("store_id", ids),
+    sb.from("notification_mark").select("subject").eq("tenant_id", args.tenantId).eq("kind", "stock_low").like("subject", "prod|%"),
+  ]);
   if (minErr) throw minErr;
+  if (prodErr) throw prodErr;
+
   const minsByStore = new Map<string, Map<string, number>>();
   for (const row of minRows ?? []) {
     const storeId = row.store_id as string;
@@ -138,22 +162,33 @@ export async function notifyStockLow(
     mins.set(String(row.product_code), Number(row.min_qty) || 0);
     minsByStore.set(storeId, mins);
   }
+  const alreadyByStore = new Map<string, Set<string>>();
+  for (const row of prodMarks ?? []) {
+    const match = /^prod\|([^|]+)\|(.*)$/.exec(String(row.subject));
+    if (!match || !pendingIds.has(match[1])) continue;
+    const codes = alreadyByStore.get(match[1]) ?? new Set<string>();
+    codes.add(match[2]);
+    alreadyByStore.set(match[1], codes);
+  }
 
-  const alerts: Array<{ id: string; name: string; timezone: string; day: string; products: StockShort[] }> = [];
+  const alerts: Array<{ id: string; name: string; timezone: string; day: string; products: StockShort[]; rearm: string[] }> = [];
   for (const { store, day } of pending) {
-    const mins = minsByStore.get(store.id);
-    if (!mins || mins.size === 0) {
-      alerts.push({ id: store.id, name: store.name, timezone: store.timezone, day, products: [] });
+    const mins = minsByStore.get(store.id) ?? new Map<string, number>();
+    const already = alreadyByStore.get(store.id) ?? new Set<string>();
+    if (mins.size === 0) {
+      alerts.push({ id: store.id, name: store.name, timezone: store.timezone, day, products: [], rearm: [...already] });
       continue;
     }
     try {
       const payload = await args.fetchReport(store.millenniumStoreId);
+      const plan = planStockAlerts(parsePurchaseTotals(payload), mins, already);
       alerts.push({
         id: store.id,
         name: store.name,
         timezone: store.timezone,
         day,
-        products: productsBelowMin(parsePurchaseTotals(payload), mins),
+        products: plan.alert,
+        rearm: plan.rearm,
       });
     } catch (e) {
       console.warn(`  AVISO estoque da filial ${store.name} não entrou no push: ${e instanceof Error ? e.message : String(e)}`);
@@ -161,24 +196,40 @@ export async function notifyStockLow(
   }
   if (alerts.length === 0) return;
 
-  const byId = new Map(alerts.map((store) => [store.id, store]));
-  await notifyScoped(sb, {
-    tenantId: args.tenantId,
-    stores: alerts.map((store) => ({ id: store.id, name: store.name, timezone: store.timezone })),
-    pref: "stock",
-    url: "/stock/purchase-order",
-    text: (stores) => formatStockPush(stores.flatMap((store) => {
-      const alert = byId.get(store.id);
-      return alert ? [{ name: alert.name, products: alert.products }] : [];
-    })),
-  });
+  const announced = alerts.filter((store) => store.products.length > 0);
+  if (announced.length > 0) {
+    const byId = new Map(announced.map((store) => [store.id, store]));
+    await notifyScoped(sb, {
+      tenantId: args.tenantId,
+      stores: announced.map((store) => ({ id: store.id, name: store.name, timezone: store.timezone })),
+      pref: "stock",
+      url: "/stock/purchase-order",
+      text: (stores) => formatStockPush(stores.flatMap((store) => {
+        const alert = byId.get(store.id);
+        return alert ? [{ name: alert.name, products: alert.products }] : [];
+      })),
+    });
+  }
 
-  const rows = alerts.map((store) => ({
-    tenant_id: args.tenantId,
-    kind: "stock_low",
-    subject: `${store.id}|${store.day}`,
-    level: 1,
-  }));
+  const rows = alerts.flatMap((store) => [
+    { tenant_id: args.tenantId, kind: "stock_low", subject: daySubject(store.id, store.day), level: 1 },
+    ...store.products.map((product) => ({
+      tenant_id: args.tenantId,
+      kind: "stock_low",
+      subject: productSubject(store.id, product.code),
+      level: 1,
+    })),
+  ]);
   const { error } = await sb.from("notification_mark").upsert(rows, { onConflict: "tenant_id,kind,subject" });
   if (error) throw error;
+
+  const rearm = alerts.flatMap((store) => store.rearm.map((code) => productSubject(store.id, code)));
+  if (rearm.length === 0) return;
+  const { error: dropErr } = await sb
+    .from("notification_mark")
+    .delete()
+    .eq("tenant_id", args.tenantId)
+    .eq("kind", "stock_low")
+    .in("subject", rearm);
+  if (dropErr) throw dropErr;
 }

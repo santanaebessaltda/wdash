@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatStockPush, parsePurchaseTotals, productsBelowMin } from "./stockPush.ts";
+import { formatStockPush, parsePurchaseTotals, planStockAlerts, productsBelowMin } from "./stockPush.ts";
 
 const plain = (value: string | undefined) => value?.replaceAll("\u00a0", " ");
 
@@ -36,7 +36,7 @@ describe("productsBelowMin", () => {
       ],
       mins,
     );
-    expect(shorts).toEqual([{ name: "ÓLEO", total: 2, min: 6 }]);
+    expect(shorts).toEqual([{ code: "A1", name: "ÓLEO", total: 2, min: 6 }]);
   });
 
   it("ordena pelo maior buraco", () => {
@@ -55,20 +55,66 @@ describe("productsBelowMin", () => {
   });
 });
 
+describe("planStockAlerts", () => {
+  const lines = [
+    { code: "A1", description: "ÓLEO", total: 2 },
+    { code: "B2", description: "BODY", total: 6 },
+  ];
+  const mins = new Map([
+    ["A1", 6],
+    ["B2", 4],
+  ]);
+
+  it("avisa só quem acabou de ficar abaixo", () => {
+    const plan = planStockAlerts(lines, mins, new Set(["A1"]));
+    expect(plan.alert).toEqual([]);
+    expect(plan.rearm).toEqual([]);
+  });
+
+  it("rearma quando o total volta ao mínimo e avisa de novo na queda seguinte", () => {
+    const recovered = planStockAlerts(lines, mins, new Set(["B2"]));
+    expect(recovered.rearm).toEqual(["B2"]);
+    expect(recovered.alert.map((product) => product.code)).toEqual(["A1"]);
+
+    const again = planStockAlerts(
+      [{ code: "B2", description: "BODY", total: 1 }],
+      new Map([["B2", 4]]),
+      new Set(),
+    );
+    expect(again.alert.map((product) => product.name)).toEqual(["BODY"]);
+  });
+
+  it("mínimo novo que deixa o produto abaixo entra no próximo aviso", () => {
+    const plan = planStockAlerts(lines, new Map([["B2", 8]]), new Set());
+    expect(plan.alert.map((product) => product.code)).toEqual(["B2"]);
+  });
+
+  it("produto que sumiu do relatório continua armado", () => {
+    const plan = planStockAlerts([], new Map([["A1", 6]]), new Set(["A1"]));
+    expect(plan.alert).toEqual([]);
+    expect(plan.rearm).toEqual([]);
+  });
+
+  it("tirar o mínimo rearma o produto", () => {
+    const plan = planStockAlerts(lines, new Map(), new Set(["A1"]));
+    expect(plan.rearm).toEqual(["A1"]);
+  });
+});
+
 describe("formatStockPush", () => {
   it("uma filial abre com o nome e uma linha por produto", () => {
     const text = formatStockPush([
       {
         name: "LOJAWEPINK.CENTRO.CAMPOGRANDE",
         products: [
-          { name: "ÓLEO", total: 2, min: 6 },
-          { name: "BODY", total: 0, min: 4 },
+          { code: "A1", name: "ÓLEO", total: 2, min: 6 },
+          { code: "B2", name: "BODY", total: 0, min: 4 },
         ],
       },
     ]);
     expect(plain(text?.title)).toBe("Estoque · 2 abaixo do mínimo");
     expect(plain(text?.body)).toBe(
-      ["LOJAWEPINK.CENTRO.CAMPOGRANDE", "ÓLEO · 2 · mínimo 6", "BODY · 0 · mínimo 4"].join("\n"),
+      ["LOJAWEPINK.CENTRO.CAMPOGRANDE", "ÓLEO · 2 de 6", "BODY · 0 de 4"].join("\n"),
     );
   });
 
@@ -77,7 +123,7 @@ describe("formatStockPush", () => {
   });
 
   it("quando não cabe, o resto vira e mais N produtos", () => {
-    const product = (letter: string) => ({ name: letter.repeat(70), total: 0, min: 10 });
+    const product = (letter: string) => ({ code: letter, name: letter.repeat(70), total: 0, min: 10 });
     const text = formatStockPush([
       { name: "LOJAWEPINK.CENTRO.CAMPOGRANDE", products: [product("A"), product("B"), product("C")] },
       { name: "SB EMPREENDIMENTOS", products: [product("D")] },
