@@ -337,12 +337,11 @@ export function SangriaPage() {
 function chipDoDia(tot: SangriaAmounts, recebido: boolean): { cor: string; texto: string } | null {
   if (tot.totalCents <= 0 && tot.faltaCents <= 0) return null;
   if (tot.faltaCents > 0) return { cor: "bg-bad", texto: `Falta ${money(tot.faltaCents)}` };
-  if (tot.boletoCents > 0 && tot.foraCents > 0) {
-    return { cor: recebido ? "bg-ok" : "bg-acc", texto: `Boleto ${money(tot.boletoCents)} · Fora ${money(tot.foraCents)}` };
-  }
-  if (tot.foraCents > 0) return { cor: "bg-warn", texto: "Fora do boleto" };
-  if (recebido) return { cor: "bg-ok", texto: "Recebido" };
-  if (tot.boletoCents > 0) return { cor: "bg-acc", texto: "A cobrar" };
+  if (tot.foraCents > 0 && tot.boletoCents <= 0) return { cor: "bg-warn", texto: "Fora do boleto" };
+  const estado = `${recebido ? "Recebido" : "A cobrar"} ${money(tot.boletoCents)}`;
+  const cor = recebido ? "bg-ok" : "bg-acc";
+  if (tot.boletoCents > 0 && tot.foraCents > 0) return { cor, texto: `${estado} · Fora ${money(tot.foraCents)}` };
+  if (tot.boletoCents > 0) return { cor, texto: estado };
   return null;
 }
 
