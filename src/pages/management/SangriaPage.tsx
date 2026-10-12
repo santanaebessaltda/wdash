@@ -590,10 +590,10 @@ function campoParaCentavos(txt: string): number | null {
 
 function ResumoMes({ aCobrar, recebido, fora, falta }: { aCobrar: number; recebido: number; fora: number; falta: number }) {
   const cards = [
-    { label: "A cobrar", value: money(aCobrar), color: "var(--acc)", tooltip: "Valor que ainda entra no próximo boleto." },
-    { label: "Recebido", value: money(recebido), color: "var(--ok)", tooltip: "Valor já recebido." },
-    { label: "Fora do boleto", value: money(fora), color: "var(--info)", tooltip: "Valor destinado a compras, fornecedores, premiações ou outros pagamentos." },
-    { label: "Falta", value: money(falta), color: "var(--bad)", tooltip: "Valor da sangria que deveria estar no caixa e não foi encontrado." },
+    { label: "A cobrar", value: money(aCobrar), color: "var(--t0)", tooltip: "Valor que ainda entra no próximo boleto." },
+    { label: "Recebido", value: money(recebido), color: "var(--t0)", tooltip: "Valor já recebido." },
+    { label: "Fora do boleto", value: money(fora), color: "var(--t0)", tooltip: "Valor destinado a compras, fornecedores, premiações ou outros pagamentos." },
+    { label: "Falta", value: money(falta), color: "var(--t0)", tooltip: "Valor da sangria que deveria estar no caixa e não foi encontrado." },
   ];
   return (
     <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
