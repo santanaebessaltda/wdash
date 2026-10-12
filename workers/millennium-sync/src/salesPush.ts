@@ -1,7 +1,6 @@
 /**
  * Texto do push da rodada automática e o envio Web Push.
- * Título = a rede. Cada linha = uma loja que vendeu nos últimos 30 min.
- * O total de hoje no título soma todas as lojas do acesso, mesmo as que não entram na lista.
+ * Título = o que entrou nos últimos 30 min. O corpo traz o dia da rede e cada filial do acesso.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { localClock } from "./autoRefresh.ts";
@@ -14,27 +13,58 @@ function money(cents: number): string {
 
 export type SalesPushRow = { name: string; deltaCents: number; todayCents: number };
 
+const PUSH_NAME_PREFIXES = ["LOJAWEPINK.", "LOJAWPINK.", "QUIOSQUEWEPINK.", "QUIOSQUEWPINK."];
+
+/** Nome da filial só no texto do push: tira prefixo técnico do início e troca ponto por espaço. */
+export function pushStoreName(name: string): string {
+  let text = name.trim().replace(/\s+/g, " ");
+  const upper = text.toUpperCase();
+  for (const prefix of PUSH_NAME_PREFIXES) {
+    if (upper.startsWith(prefix)) {
+      text = text.slice(prefix.length).trim();
+      break;
+    }
+  }
+  return text.replaceAll(".", " ").replace(/\s+/g, " ").trim();
+}
+
 /**
- * Resumo da rodada. `null` sem loja no acesso ou sem venda nova no intervalo.
- * Uma loja: "R$ … nos últimos 30 min" / "CENTRO · hoje R$ …".
- * Várias: o título junta o intervalo e o dia da rede; a lista só traz quem vendeu agora,
- * da loja que mais vendeu no dia para a que menos vendeu.
+ * Resumo da rodada. `null` sem filial no acesso.
+ * Com venda: título "Vendas · +R$ …". Uma filial: "NOME · R$ … hoje".
+ * Várias: "Hoje · R$ …" e uma linha por filial, da que mais vendeu no intervalo para a que menos vendeu.
+ * Sem venda nova: título "Sem vendas nos últimos 30 min" e a posição do dia.
  */
 export function formatSalesPush(rows: SalesPushRow[]): { title: string; body: string } | null {
-  const sold = rows.filter((row) => row.deltaCents > 0);
-  if (rows.length === 0 || sold.length === 0) return null;
-  const deltaTotal = rows.reduce((sum, row) => sum + Math.max(0, row.deltaCents), 0);
-  const todayTotal = rows.reduce((sum, row) => sum + row.todayCents, 0);
-  const period = `${money(deltaTotal)} nos últimos 30 min`;
-  if (rows.length === 1) {
-    const only = rows[0]!;
-    return { title: period, body: `${only.name} · hoje ${money(only.todayCents)}` };
+  if (rows.length === 0) return null;
+  const labeled = rows.map((row) => ({
+    ...row,
+    deltaCents: Math.max(0, row.deltaCents),
+    label: pushStoreName(row.name),
+  }));
+  const deltaTotal = labeled.reduce((sum, row) => sum + row.deltaCents, 0);
+  const todayTotal = labeled.reduce((sum, row) => sum + row.todayCents, 0);
+  const quiet = deltaTotal === 0;
+  const byRecent = (a: (typeof labeled)[number], b: (typeof labeled)[number]) =>
+    b.deltaCents - a.deltaCents || b.todayCents - a.todayCents || a.label.localeCompare(b.label, "pt-BR");
+
+  if (labeled.length === 1) {
+    const only = labeled[0]!;
+    return {
+      title: quiet ? "Sem vendas nos últimos 30 min" : `Vendas · +${money(deltaTotal)}`,
+      body: `${only.label} · ${money(only.todayCents)} hoje`,
+    };
   }
-  const ordered = [...sold].sort(
-    (a, b) => b.todayCents - a.todayCents || a.name.localeCompare(b.name, "pt-BR"),
-  );
-  const body = ordered.map((row) => `${row.name} · ${money(row.deltaCents)} · hoje ${money(row.todayCents)}`).join("\n");
-  return { title: `${period} · hoje ${money(todayTotal)}`, body };
+
+  const ordered = [...labeled].sort(byRecent);
+  if (quiet) {
+    const lines = ordered.map((row) => `${row.label} · ${money(row.todayCents)}`);
+    return { title: "Sem vendas nos últimos 30 min", body: [`Hoje · ${money(todayTotal)}`, ...lines].join("\n") };
+  }
+  const lines = ordered.map((row) => {
+    const recent = row.deltaCents > 0 ? `+${money(row.deltaCents)}` : money(0);
+    return `${row.label} · ${recent} · ${money(row.todayCents)} hoje`;
+  });
+  return { title: `Vendas · +${money(deltaTotal)}`, body: [`Hoje · ${money(todayTotal)}`, ...lines].join("\n") };
 }
 
 export function salesPushConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
