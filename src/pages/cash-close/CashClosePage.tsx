@@ -862,6 +862,10 @@ function ContaDoDia({ systemCents, realCents, diffCents }: { systemCents: number
   );
 }
 
+function ChipDia({ cor, children }: { cor: string; children: string }) {
+  return <div className={cn("mt-1 w-full truncate rounded-md px-1.5 py-1 text-[10px] font-semibold text-white sm:text-[11px]", cor)}>{children}</div>;
+}
+
 function dicaDoDia(face: { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number }): string | undefined {
   if (face.kind === "total" && face.diffCents > 0) return `Sobra de ${brlCent(face.diffCents / 100)}`;
   if (face.kind === "total" && face.diffCents < 0) return `Quebra de ${brlCent(Math.abs(face.diffCents) / 100)}`;
@@ -910,26 +914,11 @@ function Mes({
                   <p className={cn("whitespace-nowrap font-mono text-[12px] font-extrabold sm:text-[13px]", day === hoje ? "text-acc" : "text-t1")}>
                     {brlCent(face.totalCents / 100)}
                   </p>
-                  {face.kind === "pendente" && (
-                    <Badge variant="warning" className="mt-1 max-w-full truncate">
-                      Pendente
-                    </Badge>
-                  )}
-                  {face.kind === "hoje" && (
-                    <Badge variant="accent" className="mt-1 max-w-full truncate">
-                      Em aberto
-                    </Badge>
-                  )}
-                  {face.kind === "total" && face.diffCents !== 0 && (
-                    <Badge variant={face.diffCents > 0 ? "success" : "danger"} className="mt-1 max-w-full truncate font-mono">
-                      {totalDia(face.diffCents)}
-                    </Badge>
-                  )}
-                  {face.kind === "total" && face.diffCents === 0 && (
-                    <Badge variant="neutral" className="mt-1 max-w-full truncate">
-                      Sem diferença
-                    </Badge>
-                  )}
+                  {face.kind === "pendente" && <ChipDia cor="bg-warn">Pendente</ChipDia>}
+                  {face.kind === "hoje" && <ChipDia cor="bg-acc">Em aberto</ChipDia>}
+                  {face.kind === "total" && face.diffCents > 0 && <ChipDia cor="bg-ok">{totalDia(face.diffCents)}</ChipDia>}
+                  {face.kind === "total" && face.diffCents < 0 && <ChipDia cor="bg-bad">{totalDia(face.diffCents)}</ChipDia>}
+                  {face.kind === "total" && face.diffCents === 0 && <ChipDia cor="bg-t2">Sem diferença</ChipDia>}
                 </div>
               )}
             </>
