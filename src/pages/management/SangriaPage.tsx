@@ -470,27 +470,19 @@ export function SangriaPage() {
   );
 }
 
-function partesDaFalta(tot: SangriaAmounts, recebido: boolean): Array<{ texto: string; tom: string }> {
-  const partes: Array<{ texto: string; tom: string }> = [];
-  if (recebido) partes.push({ texto: `Recebido ${money(tot.boletoCents)}`, tom: "text-ok" });
-  else if (tot.boletoCents > 0) partes.push({ texto: `A cobrar ${money(tot.boletoCents)}`, tom: "text-acc" });
-  if (tot.foraCents > 0) partes.push({ texto: `Fora ${money(tot.foraCents)}`, tom: "text-warn" });
-  partes.push({ texto: `Falta ${money(tot.faltaCents)}`, tom: "text-bad" });
-  return partes;
-}
-
-function chipDoDia(tot: SangriaAmounts, recebido: boolean): { cor: string; texto: string } | null {
-  if (tot.totalCents <= 0 && tot.faltaCents <= 0) return null;
-  if (tot.faltaCents > 0) return null;
-  if (tot.boletoCents > 0 && tot.foraCents > 0) {
-    return recebido
-      ? { cor: "bg-ok", texto: `Recebido · Fora ${money(tot.foraCents)}` }
-      : { cor: "bg-acc", texto: `A cobrar ${money(tot.boletoCents)} · Fora ${money(tot.foraCents)}` };
+function chipsDoDia(tot: SangriaAmounts, recebido: boolean): Array<{ cor: string; texto: string }> {
+  if (tot.totalCents <= 0 && tot.faltaCents <= 0) return [];
+  const chips: Array<{ cor: string; texto: string }> = [];
+  if (tot.boletoCents > 0) {
+    chips.push(
+      recebido
+        ? { cor: "bg-ok", texto: `Recebido ${money(tot.boletoCents)}` }
+        : { cor: "bg-acc", texto: `A cobrar ${money(tot.boletoCents)}` },
+    );
   }
-  if (tot.foraCents > 0) return { cor: "bg-warn", texto: "Fora do boleto" };
-  if (recebido && tot.boletoCents > 0) return { cor: "bg-ok", texto: "Recebido" };
-  if (tot.boletoCents > 0) return { cor: "bg-acc", texto: "A cobrar" };
-  return null;
+  if (tot.foraCents > 0) chips.push({ cor: "bg-chip-blue", texto: `Fora ${money(tot.foraCents)}` });
+  if (tot.faltaCents > 0) chips.push({ cor: "bg-bad", texto: `Falta ${money(tot.faltaCents)}` });
+  return chips;
 }
 
 function DiaCelula({
@@ -517,8 +509,7 @@ function DiaCelula({
   const tot = dayAmounts(rows, faltaCents);
   const futuro = day != null && day > hoje;
   const abre = day != null && !futuro && (rows.length > 0 || depositado || faltaCents > 0);
-  const chip = rows.length > 0 || faltaCents > 0 ? chipDoDia(tot, depositado) : null;
-  const partes = tot.faltaCents > 0 ? partesDaFalta(tot, depositado) : [];
+  const chips = rows.length > 0 || faltaCents > 0 ? chipsDoDia(tot, depositado) : [];
   const borda = cn(
     "flex min-h-[84px] w-full min-w-0 flex-col items-stretch justify-start border-b border-r border-line p-1.5 text-left sm:min-h-[110px] sm:p-2",
     (index + 1) % 7 === 0 && "border-r-0",
@@ -541,19 +532,16 @@ function DiaCelula({
           />
         ) : null}
       </span>
-      {rows.length > 0 || chip || partes.length > 0 ? (
+      {rows.length > 0 || chips.length > 0 ? (
         <div className="mt-1.5 w-full min-w-0">
           {rows.length > 0 ? (
             <p className={cn("whitespace-nowrap font-mono text-[12px] font-extrabold sm:text-[13px]", day === hoje ? "text-acc" : "text-t1")}>
               {money(tot.totalCents)}
             </p>
           ) : null}
-          {partes.map((parte) => (
-            <p key={parte.texto} className={cn("mt-0.5 truncate text-[11px] font-semibold", parte.tom)}>
-              {parte.texto}
-            </p>
+          {chips.map((chip) => (
+            <ChipDia key={chip.texto} cor={chip.cor}>{chip.texto}</ChipDia>
           ))}
-          {chip ? <ChipDia cor={chip.cor}>{chip.texto}</ChipDia> : null}
         </div>
       ) : day < hoje && faltaCents <= 0 && !depositado ? (
         <div className="mt-1.5 w-full min-w-0">
