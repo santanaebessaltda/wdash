@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Alert, Button, Card, DateRangePicker, Modal, Skeleton, useToast, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
+import { Alert, Button, Card, DateRangePicker, Modal, Skeleton, useToast, QUICK_RANGES_CALENDARIO, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
 import { ChipDia, PlainKpi } from "@/pages/cash-close/CashClosePage";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { periodLabels } from "@/data/wedash/dashboard";
@@ -70,7 +70,7 @@ export function SalesReportPage() {
   const showLojas = useMinSkeleton(lojasLoading);
   const hoje = calendarTodayIso();
   const [rangeFrom, setRangeFrom] = useState(() => inicioDoMes(hoje));
-  const [rangeTo, setRangeTo] = useState(() => hoje);
+  const [rangeTo, setRangeTo] = useState(() => fimDoMes(hoje));
   const [presetId, setPresetId] = useState<DatePresetId | null>("esteMes");
   const [piso, setPiso] = useState(() => inicioDoMes(hoje));
   const [sold, setSold] = useState<Record<string, number>>({});
@@ -242,6 +242,7 @@ export function SalesReportPage() {
                 value={[deIso(from), deIso(to)]}
                 minDate={deIso(piso)}
                 maxDate={deIso(fimDoMes(hoje))}
+                quickRanges={QUICK_RANGES_CALENDARIO}
                 displayLabel={presetId ? periodLabels[presetId] : null}
                 activePresetId={presetId}
                 onChange={([inicio, fim], meta) => aplicarIntervalo(inicio, fim, meta)}

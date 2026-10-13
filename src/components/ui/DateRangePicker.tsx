@@ -82,6 +82,19 @@ export const QUICK_RANGES_PADRAO: QuickRange[] = [
   { id: "esteAno", label: "Este ano", resolve: (h) => { const d = zeraHora(h); return [new Date(d.getFullYear(), 0, 1), d]; } },
 ];
 
+/** Calendários de Fechamento, Sangria e Informe: Este mês mostra o mês civil inteiro. */
+export const QUICK_RANGES_CALENDARIO: QuickRange[] = QUICK_RANGES_PADRAO.map((qr) =>
+  qr.id !== "esteMes"
+    ? qr
+    : {
+        ...qr,
+        resolve: (hoje) => {
+          const d = zeraHora(hoje);
+          return [new Date(d.getFullYear(), d.getMonth(), 1), new Date(d.getFullYear(), d.getMonth() + 1, 0)];
+        },
+      },
+);
+
 const DOW_PT = ["D", "S", "T", "Q", "Q", "S", "S"];
 const MESES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 const MESES_CURTO = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];

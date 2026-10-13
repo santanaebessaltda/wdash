@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Card, DateRangePicker, Dropdown, Modal, Segmented, Skeleton, useToast, type DatePresetId, type DateRangeChangeMeta, type DropdownItem } from "@/components/ui";
+import { Alert, Button, Card, DateRangePicker, Dropdown, Modal, Segmented, Skeleton, useToast, QUICK_RANGES_CALENDARIO, type DatePresetId, type DateRangeChangeMeta, type DropdownItem } from "@/components/ui";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { periodLabels } from "@/data/wedash/dashboard";
 import { fetchLatestCashCloseError, fetchNavMonthFloor, fetchOpenCashCloseJob, requestSangriaMonth } from "@/data/wedash/cashCloseRepo";
@@ -63,7 +63,7 @@ export function SangriaPage() {
   const showLojas = useMinSkeleton(lojasLoading);
   const hoje = calendarTodayIso();
   const [rangeFrom, setRangeFrom] = useState(() => inicioDoMes(hoje));
-  const [rangeTo, setRangeTo] = useState(() => hoje);
+  const [rangeTo, setRangeTo] = useState(() => fimDoMes(hoje));
   const [presetId, setPresetId] = useState<DatePresetId | null>("esteMes");
   const [piso, setPiso] = useState(() => inicioDoMes(hoje));
   const [lines, setLines] = useState<SangriaLineRow[]>([]);
@@ -380,6 +380,7 @@ export function SangriaPage() {
               value={[deIso(from), deIso(to)]}
               minDate={deIso(piso)}
               maxDate={deIso(fimDoMes(hoje))}
+              quickRanges={QUICK_RANGES_CALENDARIO}
               displayLabel={presetId ? periodLabels[presetId] : null}
               activePresetId={presetId}
               onChange={([inicio, fim], meta) => aplicarIntervalo(inicio, fim, meta)}
