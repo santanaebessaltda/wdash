@@ -10,7 +10,7 @@ import {
   GOAL_STATUS_LABEL,
   goalManagerPrize,
   goalStatus,
-  prazoRestante,
+  prazoRemaining,
   type GoalManagerPrize,
   type GoalStatus,
 } from "@/data/wedash/goalView";
@@ -67,11 +67,11 @@ export default function GoalDetailPage() {
   const today = calendarTodayIso();
   const [data, setData] = useState<Loaded | null>(null);
   const [reload, setReload] = useState(0);
-  const [duplicarAberto, setDuplicarAberto] = useState(false);
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
   const hasOtherStores = storesForSession(session.stores).length > 1;
-  const voltarPara = goalBackPath(location.state);
-  const fromTeam = voltarPara.startsWith(paths.team);
-  useReturnWhenStoreChanges(data?.goal?.storeId, voltarPara);
+  const backTo = goalBackPath(location.state);
+  const fromTeam = backTo.startsWith(paths.team);
+  useReturnWhenStoreChanges(data?.goal?.storeId, backTo);
 
   useEffect(() => {
     const onSync = () => setReload((n) => n + 1);
@@ -110,7 +110,7 @@ export default function GoalDetailPage() {
     if (!data?.goal) return null;
     return buildGoalCardView({
       goal: data.goal,
-      storeNameValue: store?.fantasia ?? "Filial",
+      storeNameValue: store?.tradeName ?? "Filial",
       dayAggs: data.dayAggs,
       sellerDayAggs: data.sellerAggs,
       team: data.team,
@@ -119,26 +119,26 @@ export default function GoalDetailPage() {
   }, [data, store, today]);
 
   const status = goal ? goalStatus(goal, today) : null;
-  const gerencia = goal && card ? goalManagerPrize(goal, card.band.achieved) : null;
-  const voltar = () => navigate(voltarPara);
+  const management = goal && card ? goalManagerPrize(goal, card.band.achieved) : null;
+  const back = () => navigate(backTo);
 
   return (
     <div>
-      {goal && card && status === "ended" && <PayoutReportHeader goal={goal} storeNameValue={store?.fantasia} />}
+      {goal && card && status === "ended" && <PayoutReportHeader goal={goal} storeNameValue={store?.tradeName} />}
       <div className="mb-5 flex flex-wrap items-center gap-3 print:hidden">
-        <Button variant="secondary" size="sm" icon={<Icon d={icons.arrowLeft} size={14} />} onClick={voltar}>
+        <Button variant="secondary" size="sm" icon={<Icon d={icons.arrowLeft} size={14} />} onClick={back}>
           Voltar
         </Button>
         <Breadcrumbs
           items={
             fromTeam
-              ? [{ label: "Dashboard", to: paths.overview }, { label: "Equipe", to: voltarPara }, { label: goal?.name ?? "Detalhe" }]
+              ? [{ label: "Dashboard", to: paths.overview }, { label: "Equipe", to: backTo }, { label: goal?.name ?? "Detalhe" }]
               : [{ label: "Gestão" }, { label: "Metas", to: paths.goals }, { label: goal?.name ?? "Detalhe" }]
           }
         />
         {goal && !showSkeleton && (
           <div className="ml-auto flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setDuplicarAberto(true)}>
+            <Button variant="outline" size="sm" onClick={() => setDuplicateOpen(true)}>
               Duplicar meta
             </Button>
             <Button size="sm" onClick={() => navigate(paths.goalEdit(goal.id), { state: location.state })}>
@@ -149,14 +149,14 @@ export default function GoalDetailPage() {
       </div>
 
       <DuplicateChoiceModal
-        open={duplicarAberto}
-        onClose={() => setDuplicarAberto(false)}
+        open={duplicateOpen}
+        onClose={() => setDuplicateOpen(false)}
         kind="meta"
         name={goal?.name ?? null}
         hasOtherStores={hasOtherStores}
         onChoose={(choice) => {
           if (!goal) return;
-          setDuplicarAberto(false);
+          setDuplicateOpen(false);
           navigate(choice === "store" ? paths.goalCopyStore(goal.id) : paths.goalCopy(goal.id));
         }}
       />
@@ -170,7 +170,7 @@ export default function GoalDetailPage() {
             title="Meta não encontrada"
             description="A meta pode ter sido excluída ou não pertencer às suas filiais."
             action={
-              <Button size="sm" variant="outline" onClick={voltar}>
+              <Button size="sm" variant="outline" onClick={back}>
                 {fromTeam ? "Voltar para Equipe" : "Ver metas"}
               </Button>
             }
@@ -178,25 +178,25 @@ export default function GoalDetailPage() {
         </Card>
       ) : (
         <>
-          <GoalHero goal={goal} card={card} status={status} storeNameValue={store?.fantasia} gerencia={gerencia} today={today} />
+          <GoalHero goal={goal} card={card} status={status} storeNameValue={store?.tradeName} management={management} today={today} />
 
           {status === "ended" ? (
             <>
               <GoalPayoutCard
                 goal={goal}
                 card={card}
-                gerencia={gerencia}
+                management={management}
                 today={today}
-                onExport={() => exportPdf(["Fechamento da meta", store?.fantasia ?? "", goal.name, `${fullDate(goal.startsOn)} a ${fullDate(goal.endsOn)}`])}
+                onExport={() => exportPdf(["Fechamento da meta", store?.tradeName ?? "", goal.name, `${fullDate(goal.startsOn)} a ${fullDate(goal.endsOn)}`])}
               />
-              <GoalTiersCard goal={goal} card={card} status={status} gerencia={gerencia} today={today} />
+              <GoalTiersCard goal={goal} card={card} status={status} management={management} today={today} />
             </>
           ) : (
             <div className="flex flex-col gap-5">
-              <GoalTiersCard goal={goal} card={card} status={status} gerencia={gerencia} today={today} />
+              <GoalTiersCard goal={goal} card={card} status={status} management={management} today={today} />
               <SellersCard
-                estado={card.sellers.length > 0 ? "available" : "noData"}
-                lista={card.sellers}
+                status={card.sellers.length > 0 ? "available" : "noData"}
+                list={card.sellers}
                 activeGoal
                 group={goal.tierMode === "GROUP"}
                 geral={goal.tierMode === "GENERAL"}
@@ -212,10 +212,10 @@ export default function GoalDetailPage() {
   );
 }
 
-function prazoTexto(goal: GoalRecord, card: GoalCardView, status: GoalStatus): string {
+function prazoText(goal: GoalRecord, card: GoalCardView, status: GoalStatus): string {
   if (status === "upcoming") return `Começa em ${shortDate(goal.startsOn)}`;
   if (status === "ended") return "Encerrada";
-  return prazoRestante(card.band.daysRemaining);
+  return prazoRemaining(card.band.daysRemaining);
 }
 
 function GoalHero({
@@ -223,20 +223,20 @@ function GoalHero({
   card,
   status,
   storeNameValue,
-  gerencia,
+  management,
   today,
 }: {
   goal: GoalRecord;
   card: GoalCardView;
   status: GoalStatus;
   storeNameValue?: string;
-  gerencia: GoalManagerPrize | null;
+  management: GoalManagerPrize | null;
   today: string;
 }) {
   const { achieved, pct, projectedPct } = card.band;
   const prizeAmount =
-    card.sellers.reduce((s, v) => s + v.accruedPrize + v.bonusReached, 0) + (gerencia ? gerencia.prizeAmount + gerencia.bonus : 0);
-  const faltam = Math.max(0, goal.target - achieved);
+    card.sellers.reduce((s, v) => s + v.accruedPrize + v.bonusReached, 0) + (management ? management.prizeAmount + management.bonus : 0);
+  const missing = Math.max(0, goal.target - achieved);
   const liberou = status === "active" && goalUnlockedProjection(goal.startsOn, goal.endsOn, today);
   const stats: { label: string; value: string; cls: string; sub?: string; subCls?: string; help?: string }[] = [
     { label: "Meta da filial", value: brlCent(goal.target), cls: "text-acc" },
@@ -248,9 +248,9 @@ function GoalHero({
       subCls: progressTextClass(pct),
     },
     {
-      label: status === "ended" && faltam > 0 ? "Faltou" : "Faltam",
-      value: faltam <= 0 ? "Meta atingida" : brlCent(faltam),
-      cls: faltam > 0 ? "text-warn" : "text-ok",
+      label: status === "ended" && missing > 0 ? "Faltou" : "Faltam",
+      value: missing <= 0 ? "Meta atingida" : brlCent(missing),
+      cls: missing > 0 ? "text-warn" : "text-ok",
     },
     ...(status === "active"
       ? [
@@ -272,7 +272,7 @@ function GoalHero({
           ? "Total de premiação e bônus obtidos pela equipe e, quando aplicável, pela gerência no período da meta."
           : "Total de premiação e bônus já garantidos pela equipe e, quando aplicável, pela gerência desde o início da meta.",
     },
-    { label: "Prazo", value: prazoTexto(goal, card, status), cls: "text-t0" },
+    { label: "Prazo", value: prazoText(goal, card, status), cls: "text-t0" },
   ];
 
   return (
@@ -314,13 +314,13 @@ function GoalTiersCard({
   goal,
   card,
   status,
-  gerencia,
+  management,
   today,
 }: {
   goal: GoalRecord;
   card: GoalCardView;
   status: GoalStatus;
-  gerencia: GoalManagerPrize | null;
+  management: GoalManagerPrize | null;
   today: string;
 }) {
   const participants = card.sellers.filter((v) => !v.noGoal);
@@ -358,14 +358,14 @@ function GoalTiersCard({
               if (bonusAcum > t.bonus) partes.push(`bônus acumulado de ${brlCent(bonusAcum)}`);
             }
             if (participants.length > 0) partes.push(`${alcancaram} de ${participants.length} ${participants.length === 1 ? "pessoa" : "pessoas"}`);
-            let linhaGerencia: string | null = null;
+            let lineManagement: string | null = null;
             if (t.managerPct != null) {
               const bonusGer = t.managerBonus ?? 0;
               bonusGerAcum += bonusGer;
               const ger = [`Gerência: ${num(t.managerPct, 1)}% da venda da filial`];
               if (bonusGer > 0) ger.push(`bônus de ${brlCent(bonusGer)}`);
               if (bonusGerAcum > bonusGer) ger.push(`total de ${brlCent(bonusGerAcum)}`);
-              linhaGerencia = ger.join(" · ");
+              lineManagement = ger.join(" · ");
             }
             return (
               <div
@@ -384,7 +384,7 @@ function GoalTiersCard({
                     N{i + 1} · {t.name}
                   </p>
                   <p className="mt-0.5 text-[11.5px] text-t2">{partes.join(" · ")}</p>
-                  {linhaGerencia && <p className="mt-0.5 text-[11.5px] text-t2">{linhaGerencia}</p>}
+                  {lineManagement && <p className="mt-0.5 text-[11.5px] text-t2">{lineManagement}</p>}
                 </div>
                 <div className="shrink-0 text-right">
                   <p className={`font-mono text-[13px] font-extrabold ${feito ? "text-ok" : "text-t1"}`}>{num(t.commissionPct, 1)}%</p>
@@ -395,23 +395,23 @@ function GoalTiersCard({
           })}
         </div>
       )}
-      {gerencia && status === "active" && (
+      {management && status === "active" && (
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-acc-soft px-3.5 py-3 text-[12.5px]">
           <span className="flex items-center gap-1.5 font-bold text-t0">
             Gerência
             <TipHelp label="A gerência sobe de nível pelo faturamento total da filial, incluindo vendas sem vendedor identificado ou realizadas pela própria gerência. A premiação é calculada sobre o faturamento da filial, e os bônus dos níveis alcançados são acumulados." />
           </span>
-          <span className={`font-semibold ${gerencia.nivel ? "text-acc" : "text-t2"}`}>
-            {gerencia.nivel ? `N${gerencia.nivelNumero} · ${gerencia.nivel}` : "Abaixo do 1º nível"}
+          <span className={`font-semibold ${management.level ? "text-acc" : "text-t2"}`}>
+            {management.level ? `N${management.levelNumber} · ${management.level}` : "Abaixo do 1º nível"}
           </span>
           <span className="text-t1">
-            Premiação até agora: <span className="font-mono font-bold text-t0">{brlCent(gerencia.prizeAmount + gerencia.bonus)}</span>
+            Premiação até agora: <span className="font-mono font-bold text-t0">{brlCent(management.prizeAmount + management.bonus)}</span>
           </span>
           <span className="text-t1 sm:ml-auto">
-            {gerencia.proximo ? (
+            {management.next ? (
               <>
-                Falta <span className="font-mono font-bold text-warn">{brlCent(gerencia.proximo.falta)}</span> para N{gerencia.proximo.numero} ·{" "}
-                {gerencia.proximo.name}
+                Falta <span className="font-mono font-bold text-warn">{brlCent(management.next.gap)}</span> para N{management.next.number} ·{" "}
+                {management.next.name}
               </>
             ) : (
               <span className="font-semibold text-ok">Último nível</span>
@@ -425,8 +425,8 @@ function GoalTiersCard({
 
 /** Cabecalho que so aparece no PDF do fechamento: marca, loja, meta e periodo. */
 function PayoutReportHeader({ goal, storeNameValue }: { goal: GoalRecord; storeNameValue?: string }) {
-  const agora = new Date();
-  const geradoEm = `${agora.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })} às ${agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}`;
+  const now = new Date();
+  const geradoEm = `${now.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}`;
   return (
     <div className="mb-5 hidden border-b border-line pb-4 print:block">
       <div className="flex items-start justify-between gap-6">
@@ -459,7 +459,7 @@ type PayoutRow = {
   key: string;
   name: string;
   sub: string | null;
-  nivel: string | null;
+  level: string | null;
   revenue: number;
   pct: number;
   prizeAmount: number;
@@ -471,19 +471,19 @@ type PayoutRow = {
 function GoalPayoutCard({
   goal,
   card,
-  gerencia,
+  management,
   today,
   onExport,
 }: {
   goal: GoalRecord;
   card: GoalCardView;
-  gerencia: GoalManagerPrize | null;
+  management: GoalManagerPrize | null;
   today: string;
   onExport: () => void;
 }) {
-  const fimMais1 = isoToDate(goal.endsOn);
-  fimMais1.setDate(fimMais1.getDate() + 1);
-  const emFechamento = today <= dateToIso(fimMais1);
+  const endMais1 = isoToDate(goal.endsOn);
+  endMais1.setDate(endMais1.getDate() + 1);
+  const emClosing = today <= dateToIso(endMais1);
 
   const team: PayoutRow[] = card.sellers
     .filter((v) => !v.noGoal)
@@ -491,7 +491,7 @@ function GoalPayoutCard({
       key: v.employeeId || v.name,
       name: v.name,
       sub: goal.groups.length > 0 ? v.group : null,
-      nivel: v.currentLevel ? `N${v.currentLevel} · ${v.currentTierName}` : null,
+      level: v.currentLevel ? `N${v.currentLevel} · ${v.currentTierName}` : null,
       revenue: v.revenueAmount,
       pct: v.commissionPct,
       prizeAmount: v.accruedPrize,
@@ -499,28 +499,28 @@ function GoalPayoutCard({
       total: v.accruedPrize + v.bonusReached,
     }))
     .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, "pt-BR"));
-  const linhaGerencia: PayoutRow | null = gerencia
+  const lineManagement: PayoutRow | null = management
     ? {
         key: "gerencia",
         name: "GERÊNCIA",
         sub: "Faturamento total da filial",
-        nivel: gerencia.nivelNumero ? `N${gerencia.nivelNumero} · ${gerencia.nivel}` : null,
+        level: management.levelNumber ? `N${management.levelNumber} · ${management.level}` : null,
         revenue: card.band.achieved,
-        pct: gerencia.pct,
-        prizeAmount: gerencia.prizeAmount,
-        bonus: gerencia.bonus,
-        total: gerencia.prizeAmount + gerencia.bonus,
+        pct: management.pct,
+        prizeAmount: management.prizeAmount,
+        bonus: management.bonus,
+        total: management.prizeAmount + management.bonus,
       }
     : null;
   const teamTotal = team.reduce((s, r) => s + r.total, 0);
-  const totalGerencia = linhaGerencia?.total ?? 0;
-  const linhas = linhaGerencia ? [...team, linhaGerencia] : team;
-  const soma = (k: "prizeAmount" | "bonus" | "total") => linhas.reduce((s, r) => s + r[k], 0);
+  const totalManagement = lineManagement?.total ?? 0;
+  const lines = lineManagement ? [...team, lineManagement] : team;
+  const sum = (k: "prizeAmount" | "bonus" | "total") => lines.reduce((s, r) => s + r[k], 0);
 
   const summary = [
     { label: "Equipe", value: teamTotal },
-    ...(linhaGerencia ? [{ label: "Gerência", value: totalGerencia }] : []),
-    { label: "Total ganho", value: teamTotal + totalGerencia, destaque: true },
+    ...(lineManagement ? [{ label: "Gerência", value: totalManagement }] : []),
+    { label: "Total ganho", value: teamTotal + totalManagement, destaque: true },
   ];
 
   return (
@@ -529,9 +529,9 @@ function GoalPayoutCard({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <CardTitle>Fechamento da premiação</CardTitle>
-            {emFechamento && (
+            {emClosing && (
               <Tooltip
-                label={`O último dia da meta será fechado na madrugada de ${shortDate(dateToIso(fimMais1))}. Vendas incluídas ou canceladas até lá ainda podem alterar os valores.`}
+                label={`O último dia da meta será fechado na madrugada de ${shortDate(dateToIso(endMais1))}. Vendas incluídas ou canceladas até lá ainda podem alterar os valores.`}
               >
                 <span className="inline-flex cursor-help">
                   <Badge variant="warning">Fechamento em andamento</Badge>
@@ -540,7 +540,7 @@ function GoalPayoutCard({
             )}
           </div>
           <p className="mt-0.5 text-[12px] text-t2">
-            {linhaGerencia ? "Veja a premiação final de cada pessoa e da gerência." : "Veja a premiação final de cada pessoa."}
+            {lineManagement ? "Veja a premiação final de cada pessoa e da gerência." : "Veja a premiação final de cada pessoa."}
           </p>
         </div>
         <Button variant="secondary" size="sm" className="print:hidden" onClick={onExport}>
@@ -557,7 +557,7 @@ function GoalPayoutCard({
         ))}
       </div>
 
-      {linhas.length === 0 ? (
+      {lines.length === 0 ? (
         <EmptyBlock icon="👤" title="Nenhuma pessoa na meta" description="Nenhuma pessoa da equipe participa desta meta." />
       ) : (
         <div className="overflow-x-auto">
@@ -573,13 +573,13 @@ function GoalPayoutCard({
               </tr>
             </thead>
             <tbody>
-              {linhas.map((r) => (
+              {lines.map((r) => (
                 <tr key={r.key} className={`border-b border-line ${r.key === "gerencia" ? "bg-bg-inset" : ""}`}>
                   <td className="py-2.5 pr-3">
                     <p className="font-bold text-t0">{r.name}</p>
                     {r.sub && <p className="text-[11px] text-t2">{r.sub}</p>}
                   </td>
-                  <td className={`py-2.5 pr-3 font-semibold ${r.nivel ? "text-acc" : "text-t2"}`}>{r.nivel ?? "Abaixo do 1º nível"}</td>
+                  <td className={`py-2.5 pr-3 font-semibold ${r.level ? "text-acc" : "text-t2"}`}>{r.level ?? "Abaixo do 1º nível"}</td>
                   <td className="py-2.5 pr-3 text-right font-mono font-bold text-t1">{brlCent(r.revenue)}</td>
                   <td className="py-2.5 pr-3 text-right">
                     <p className="font-mono font-bold text-t0">{r.prizeAmount > 0 ? brlCent(r.prizeAmount) : "—"}</p>
@@ -595,9 +595,9 @@ function GoalPayoutCard({
                 <td className="pt-3 pr-3 font-extrabold" colSpan={3}>
                   Total
                 </td>
-                <td className="pt-3 pr-3 text-right font-mono font-extrabold">{brlCent(soma("prizeAmount"))}</td>
-                <td className="pt-3 pr-3 text-right font-mono font-extrabold">{brlCent(soma("bonus"))}</td>
-                <td className="pt-3 text-right font-mono font-extrabold text-ok">{brlCent(soma("total"))}</td>
+                <td className="pt-3 pr-3 text-right font-mono font-extrabold">{brlCent(sum("prizeAmount"))}</td>
+                <td className="pt-3 pr-3 text-right font-mono font-extrabold">{brlCent(sum("bonus"))}</td>
+                <td className="pt-3 text-right font-mono font-extrabold text-ok">{brlCent(sum("total"))}</td>
               </tr>
             </tfoot>
           </table>

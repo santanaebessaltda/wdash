@@ -5,7 +5,7 @@ import type { DayHours, Dow, StoreWeekHours } from "./engine/goalWeights.ts";
 export type { DayHours, Dow, StoreWeekHours } from "./engine/goalWeights.ts";
 
 /** Mesmo conceito de `Store.pointType` (evita import ciclico com stores.ts). */
-export type HoursPointType = "SHOPPING" | "RUA";
+export type HoursPointType = "SHOPPING" | "STREET";
 
 export const DOW_LABELS: Record<Dow, string> = {
   0: "Domingo",
@@ -69,7 +69,7 @@ export function defaultWeekHours(): StoreWeekHours {
  * Quiosque: todos os dias 10–22. Loja de rua: seg–sex 08–18, sab 08–17, dom fechado.
  */
 export function presetWeekHours(pointType: HoursPointType): StoreWeekHours {
-  if (pointType === "RUA") {
+  if (pointType === "STREET") {
     const util: DayHours = { open: "08:00", close: "18:00" };
     const sab: DayHours = { open: "08:00", close: "17:00" };
     return {
@@ -82,22 +82,22 @@ export function presetWeekHours(pointType: HoursPointType): StoreWeekHours {
       6: { ...sab },
     };
   }
-  const semana: DayHours = { open: "10:00", close: "22:00" };
-  const domingo: DayHours = { open: "12:00", close: "22:00" };
+  const week: DayHours = { open: "10:00", close: "22:00" };
+  const sunday: DayHours = { open: "12:00", close: "22:00" };
   return {
-    0: { ...domingo },
-    1: { ...semana },
-    2: { ...semana },
-    3: { ...semana },
-    4: { ...semana },
-    5: { ...semana },
-    6: { ...semana },
+    0: { ...sunday },
+    1: { ...week },
+    2: { ...week },
+    3: { ...week },
+    4: { ...week },
+    5: { ...week },
+    6: { ...week },
   };
 }
 
 export const PRESET_HOURS_HINT: Record<HoursPointType, string> = {
   SHOPPING: "Padrão de quiosque em shopping. Ajuste se o funcionamento desta filial for diferente.",
-  RUA: "Padrão de loja de rua. Ajuste se o funcionamento desta filial for diferente.",
+  STREET: "Padrão de loja de rua. Ajuste se o funcionamento desta filial for diferente.",
 };
 
 /** Nenhum dia aberto = horario ainda nao configurado. */
@@ -186,7 +186,7 @@ export function halfHourOptions(): string[] {
 export function unionConfiguredWindow(
   hoursList: StoreWeekHours[],
   dow: Dow,
-): { abertura: number; fechamento: number } | null {
+): { opening: number; closing: number } | null {
   const configured = hoursList.filter(weekHoursConfigured);
   if (configured.length === 0) return null;
   const w = unionOpenWindow(configured, dow);
@@ -198,8 +198,8 @@ export function unionConfiguredWindow(
  * venda sem horario no ERP cai em 00:00 e nao e abertura da loja. Venda colada no expediente
  * (antes de abrir ou depois de fechar) continua estendendo.
  */
-function soldHoursForAxis(soldHours: number[], abertura: number | null): number[] {
-  if (abertura == null || abertura <= 0) return soldHours;
+function soldHoursForAxis(soldHours: number[], opening: number | null): number[] {
+  if (opening == null || opening <= 0) return soldHours;
   return soldHours.filter((h) => h !== 0);
 }
 
@@ -214,19 +214,19 @@ export function hourAxisRange(
   dow: Dow,
   soldHours: number[],
   fallbackHours: number[] = [],
-): { first: number; last: number; win: { abertura: number; fechamento: number } } {
+): { first: number; last: number; win: { opening: number; closing: number } } {
   const configured = unionConfiguredWindow(hoursList, dow);
-  const axisSold = soldHoursForAxis(soldHours, configured?.abertura ?? null);
+  const axisSold = soldHoursForAxis(soldHours, configured?.opening ?? null);
   const livres = [...axisSold, ...fallbackHours];
   const win =
     configured ??
     (livres.length > 0
-      ? { abertura: Math.min(...livres), fechamento: Math.max(...livres) + 1 }
-      : { abertura: 10, fechamento: 22 });
-  const edges = soldHoursForAxis(soldHours, configured ? win.abertura : null);
+      ? { opening: Math.min(...livres), closing: Math.max(...livres) + 1 }
+      : { opening: 10, closing: 22 });
+  const edges = soldHoursForAxis(soldHours, configured ? win.opening : null);
   return {
-    first: Math.min(win.abertura, ...edges),
-    last: Math.max(win.fechamento - 1, ...edges),
+    first: Math.min(win.opening, ...edges),
+    last: Math.max(win.closing - 1, ...edges),
     win,
   };
 }
@@ -234,17 +234,17 @@ export function hourAxisRange(
 export function unionOpenWindow(
   hoursList: StoreWeekHours[],
   dow: Dow,
-): { abertura: number; fechamento: number } {
-  let abertura = 24;
-  let fechamento = 0;
+): { opening: number; closing: number } {
+  let opening = 24;
+  let closing = 0;
   for (const hours of hoursList) {
     const day = hours[dow];
     const a = openHourFloor(day);
     const c = closeHourCeil(day);
     if (a == null || c == null) continue;
-    abertura = Math.min(abertura, a);
-    fechamento = Math.max(fechamento, c);
+    opening = Math.min(opening, a);
+    closing = Math.max(closing, c);
   }
-  if (abertura >= fechamento) return { abertura: 9, fechamento: 21 };
-  return { abertura, fechamento };
+  if (opening >= closing) return { opening: 9, closing: 21 };
+  return { opening, closing };
 }

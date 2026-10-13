@@ -250,7 +250,7 @@ describe("excludeNonSalesPeople", () => {
     sellerKey: "X",
     sellerName: "X",
     sellerEmployeeId: null,
-    sellerGeradorId: null,
+    sellerGeneratorId: null,
     brand: "ALL",
     revenueCents: 100,
     salesCount: 1,
@@ -260,14 +260,14 @@ describe("excludeNonSalesPeople", () => {
   it("drops non-sales people by employee id, gerador or store+name; keeps the team", () => {
     const rows = [
       row({ sellerKey: "NORTE.SUL", sellerEmployeeId: 40587 }),
-      row({ sellerKey: "NORTE.SUL", sellerGeradorId: 42345 }),
+      row({ sellerKey: "NORTE.SUL", sellerGeneratorId: 42345 }),
       row({ sellerKey: "NORTE.SUL" }),
       row({ sellerKey: "NORTE.SUL", storeId: "s010" }),
       row({ sellerKey: "DALINNE", sellerEmployeeId: 162457 }),
     ];
     const out = excludeNonSalesPeople(rows, {
       employeeIds: new Set([40587]),
-      geradorIds: new Set([42345]),
+      generatorIds: new Set([42345]),
       storeNameKeys: new Set(["s114|NORTE.SUL"]),
     });
     expect(out.map((r) => `${r.storeId}:${r.sellerKey}`)).toEqual(["s010:NORTE.SUL", "s114:DALINNE"]);
@@ -275,7 +275,7 @@ describe("excludeNonSalesPeople", () => {
 
   it("returns rows untouched when everyone is sales", () => {
     const rows = [row({})];
-    const empty = { employeeIds: new Set<number>(), geradorIds: new Set<number>(), storeNameKeys: new Set<string>() };
+    const empty = { employeeIds: new Set<number>(), generatorIds: new Set<number>(), storeNameKeys: new Set<string>() };
     expect(excludeNonSalesPeople(rows, empty)).toBe(rows);
   });
 });

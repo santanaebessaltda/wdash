@@ -11,7 +11,7 @@ import {
   type FirstStepsData,
 } from "@/data/wedash/firstSteps";
 import { storesForSession } from "@/data/wedash/stores";
-import { isGestor } from "@/layout/nav-wedash";
+import { isOwner } from "@/layout/nav-wedash";
 import { cn } from "@/lib/cn";
 import { paths } from "@/router/paths";
 import { useActiveSession } from "@/session/SessionProvider";
@@ -26,14 +26,14 @@ export type FirstStepsStatus = "loading" | "hidden" | "visible";
 export function useFirstSteps(storeIds: string[] = []) {
   const session = useActiveSession();
   const { show } = useToast();
-  const gestor = isGestor(session.role);
+  const owner = isOwner(session.role);
   const [doneFlag, setDoneFlag] = useState<boolean | null>(null);
   const [data, setData] = useState<FirstStepsData | null>(null);
   const [storesTick, setStoresTick] = useState(0);
   const completing = useRef(false);
 
   useEffect(() => {
-    if (!gestor) return;
+    if (!owner) return;
     let cancelled = false;
     void fetchFirstStepsDone(session.tenantId).then((d) => {
       if (!cancelled) setDoneFlag(d);
@@ -41,7 +41,7 @@ export function useFirstSteps(storeIds: string[] = []) {
     return () => {
       cancelled = true;
     };
-  }, [gestor, session.tenantId]);
+  }, [owner, session.tenantId]);
 
   const stores = useMemo(
     () => storesForSession(session.stores),
@@ -56,7 +56,7 @@ export function useFirstSteps(storeIds: string[] = []) {
   }, [session.tenantId, storesKey]);
 
   useEffect(() => {
-    if (!gestor || doneFlag !== false) return;
+    if (!owner || doneFlag !== false) return;
     void reload();
     const onStores = () => setStoresTick((n) => n + 1);
     const onVisible = () => {
@@ -68,7 +68,7 @@ export function useFirstSteps(storeIds: string[] = []) {
       window.removeEventListener("wedash:stores", onStores);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [gestor, doneFlag, reload]);
+  }, [owner, doneFlag, reload]);
 
   const viewStores = useMemo(() => storesForFirstStepsView(stores, storeIds), [stores, storeIds]);
   const steps = useMemo(() => (data ? buildFirstSteps({ stores: viewStores, ...data }) : []), [viewStores, data]);
@@ -91,7 +91,7 @@ export function useFirstSteps(storeIds: string[] = []) {
     });
   }, [allDone, doneFlag, session.tenantId, show]);
 
-  const status: FirstStepsStatus = !gestor || doneFlag === true || allDone ? "hidden" : data == null ? "loading" : "visible";
+  const status: FirstStepsStatus = !owner || doneFlag === true || allDone ? "hidden" : data == null ? "loading" : "visible";
   return { status, steps, doneCount, pendingCount, tenantId: session.tenantId };
 }
 

@@ -11,7 +11,7 @@ import { useSession, useActiveSession } from "@/session/SessionProvider";
 import { saveOnboardingStep, persistErpCredentialAndStores } from "@/session/authApi";
 import { Step2Credentials } from "./Step2Credentials";
 import { ONBOARDING_STEPS } from "./steps";
-import { gravarRascunho, limparRascunho, lerRascunho, readErpPassword, rascunhoVazio, type RascunhoOnboarding } from "./draft";
+import { saveDraft, clearDraft, lerDraft, readErpPassword, draftEmpty, type DraftOnboarding } from "./draft";
 
 /** Etapa do ERP no indicador e em `membership.onboarding_step` (1 = Crie seu acesso, antes do /onboarding). */
 const ETAPA_ERP = 2;
@@ -26,11 +26,11 @@ export function Onboarding() {
   const { show } = useToast();
   const membershipId = session.membershipId;
 
-  const [draft, setDraft] = useState<RascunhoOnboarding>(() => lerRascunho(membershipId) ?? rascunhoVazio());
+  const [draft, setDraft] = useState<DraftOnboarding>(() => lerDraft(membershipId) ?? draftEmpty());
   const [conectando, setConectando] = useState(false);
 
   useEffect(() => {
-    gravarRascunho(membershipId, draft);
+    saveDraft(membershipId, draft);
   }, [draft, membershipId]);
 
   // Legado (1 = antiga Empresa, 3 = antiga Lojas)  ->  ERP.
@@ -46,7 +46,7 @@ export function Onboarding() {
    */
   async function conectar(stores: StoreErp[], millenniumSession: string | undefined) {
     const password = readErpPassword(membershipId);
-    if (!draft.erp.usuario.trim() || !password) {
+    if (!draft.erp.username.trim() || !password) {
       show("Informe novamente o usuário e a senha do Millennium.", "danger");
       return;
     }
@@ -54,7 +54,7 @@ export function Onboarding() {
     const persisted = await persistErpCredentialAndStores({
       tenantId: session.tenantId,
       membershipId,
-      username: draft.erp.usuario.trim(),
+      username: draft.erp.username.trim(),
       password,
       dedicated: draft.erp.dedicada,
       stores,
@@ -72,14 +72,14 @@ export function Onboarding() {
     await saveOnboardingStep(membershipId, null);
     await requestTodaySync();
 
-    limparRascunho(membershipId);
+    clearDraft(membershipId);
     update({ onboardingStep: null, stores: persisted.storeIds });
     show("Millennium conectado.", "success");
     navigate(`${paths.overview}?periodo=hoje`, { replace: true });
   }
 
   function sairOnboarding() {
-    limparRascunho(membershipId);
+    clearDraft(membershipId);
     signOut();
     navigate(paths.access.login);
   }

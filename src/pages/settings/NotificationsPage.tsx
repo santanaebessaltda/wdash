@@ -30,16 +30,16 @@ export function NotificationsPage() {
   const session = useActiveSession();
   const [prefs, setPrefs] = useState<Prefs>(DEFAULTS);
   const [userId, setUserId] = useState<string | null>(null);
-  const [erro, setErro] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const sb = getSupabase();
     if (!sb) return;
-    let vivo = true;
+    let live = true;
     void (async () => {
       const { data: auth } = await sb.auth.getUser();
       const uid = auth.user?.id;
-      if (!uid || !vivo) return;
+      if (!uid || !live) return;
       setUserId(uid);
       const { data, error } = await sb
         .from("notification_pref")
@@ -47,9 +47,9 @@ export function NotificationsPage() {
         .eq("auth_user_id", uid)
         .eq("tenant_id", session.tenantId)
         .maybeSingle();
-      if (!vivo) return;
+      if (!live) return;
       if (error) {
-        setErro("Não foi possível carregar as notificações. Tente novamente.");
+        setError("Não foi possível carregar as notificações. Tente novamente.");
         return;
       }
       if (!data) return;
@@ -61,16 +61,16 @@ export function NotificationsPage() {
       });
     })();
     return () => {
-      vivo = false;
+      live = false;
     };
   }, [session.tenantId]);
 
-  async function alternar(key: PrefKey) {
+  async function toggle(key: PrefKey) {
     const sb = getSupabase();
     if (!sb || !userId) return;
     const next = { ...prefs, [key]: !prefs[key] };
     setPrefs(next);
-    setErro(null);
+    setError(null);
     const { error } = await sb.from("notification_pref").upsert(
       {
         auth_user_id: userId,
@@ -84,7 +84,7 @@ export function NotificationsPage() {
     );
     if (error) {
       setPrefs(prefs);
-      setErro("Não foi possível salvar as alterações. Tente novamente.");
+      setError("Não foi possível salvar as alterações. Tente novamente.");
     }
   }
 
@@ -103,13 +103,13 @@ export function NotificationsPage() {
             <p className="mt-0.5 text-[11.5px] text-t2">{row.desc}</p>
           </div>
           <span className="flex w-[50px] justify-center">
-            <button type="button" aria-pressed={prefs[row.key]} aria-label={row.name} onClick={() => void alternar(row.key)}>
+            <button type="button" aria-pressed={prefs[row.key]} aria-label={row.name} onClick={() => void toggle(row.key)}>
               <Dot on={prefs[row.key]} />
             </button>
           </span>
         </div>
       ))}
-      {erro && <p className="mt-3 text-[12.5px] text-t2">{erro}</p>}
+      {error && <p className="mt-3 text-[12.5px] text-t2">{error}</p>}
     </Card>
   );
 }

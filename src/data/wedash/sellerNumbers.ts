@@ -6,12 +6,12 @@ export type NumbersMode = "today" | "month";
 
 export interface SellerNumber {
   value: number | null;
-  delta?: { value: string; positive: boolean; vs?: string; anterior?: string };
+  delta?: { value: string; positive: boolean; vs?: string; previous?: string };
 }
 
 export interface SellerNumbers {
   revenue: SellerNumber;
-  vendas: SellerNumber;
+  sales: SellerNumber;
   ticket: SellerNumber;
   /** null = algum dia com venda sem itens gravados (nada estimado). */
   pa: SellerNumber;
@@ -19,7 +19,7 @@ export interface SellerNumbers {
 
 const ZERO: SellerNumbers = {
   revenue: { value: 0 },
-  vendas: { value: 0 },
+  sales: { value: 0 },
   ticket: { value: 0 },
   pa: { value: 0 },
 };
@@ -30,23 +30,23 @@ interface Totais {
   items: number | null;
 }
 
-function soma(days: SellerDay[], from: string, to: string): Totais {
+function sum(days: SellerDay[], from: string, to: string): Totais {
   let revenue = 0;
   let sales = 0;
   let items = 0;
-  let semItens = false;
+  let withoutItems = false;
   for (const d of days) {
     if (d.day < from || d.day > to) continue;
     revenue += d.revenue;
     sales += d.sales;
-    if (d.items == null && d.sales > 0) semItens = true;
+    if (d.items == null && d.sales > 0) withoutItems = true;
     else items += d.items ?? 0;
   }
-  return { revenue, sales, items: semItens ? null : items };
+  return { revenue, sales, items: withoutItems ? null : items };
 }
 
-function numero(atual: number, anterior: number | null, vs: string | undefined, unit: "brl" | "vendas" | "pa"): SellerNumber {
-  return { value: atual, delta: anterior == null ? undefined : kpiDelta(atual, anterior, vs, unit) };
+function number(current: number, previous: number | null, vs: string | undefined, unit: "brl" | "sales" | "pa"): SellerNumber {
+  return { value: current, delta: previous == null ? undefined : kpiDelta(current, previous, vs, unit) };
 }
 
 /**
@@ -57,10 +57,10 @@ function numero(atual: number, anterior: number | null, vs: string | undefined, 
  */
 export function sellerNumbers(days: SellerDay[], period: { from: string; to: string }, today: string, mode: NumbersMode): SellerNumbers {
   if (mode === "today") {
-    const t = soma(days, today, today);
+    const t = sum(days, today, today);
     return {
       revenue: { value: t.revenue },
-      vendas: { value: t.sales },
+      sales: { value: t.sales },
       ticket: { value: t.sales > 0 ? t.revenue / t.sales : 0 },
       pa: { value: t.items == null ? null : t.sales > 0 ? t.items / t.sales : 0 },
     };
@@ -70,24 +70,24 @@ export function sellerNumbers(days: SellerDay[], period: { from: string; to: str
   const compara = resolvido.endsToday;
   const band = previousPeriod(resolvido);
   // Periodo que termina hoje: os dois lados perdem o ultimo dia (nao existe venda por pessoa e hora).
-  const fimAtual = compara ? addDays(period.to, -1) : period.to;
-  const fimAnterior = compara ? addDays(band.end, -1) : band.end;
-  const atual = soma(days, period.from, fimAtual);
-  if (atual.sales === 0 && atual.revenue === 0) return { ...ZERO, pa: { value: atual.items == null ? null : 0 } };
+  const endCurrent = compara ? addDays(period.to, -1) : period.to;
+  const endPrevious = compara ? addDays(band.end, -1) : band.end;
+  const current = sum(days, period.from, endCurrent);
+  if (current.sales === 0 && current.revenue === 0) return { ...ZERO, pa: { value: current.items == null ? null : 0 } };
 
-  const anterior = soma(days, band.start, fimAnterior);
-  const temAnterior = anterior.sales > 0 || anterior.revenue > 0;
+  const previous = sum(days, band.start, endPrevious);
+  const hasPrevious = previous.sales > 0 || previous.revenue > 0;
   const vs = band.label;
 
-  const ticketAtual = atual.sales > 0 ? atual.revenue / atual.sales : 0;
-  const ticketAnterior = anterior && anterior.sales > 0 ? anterior.revenue / anterior.sales : null;
-  const paAtual = atual.items == null ? null : atual.sales > 0 ? atual.items / atual.sales : 0;
-  const paAnterior = anterior == null || anterior.items == null ? null : anterior.sales > 0 ? anterior.items / anterior.sales : null;
+  const ticketCurrent = current.sales > 0 ? current.revenue / current.sales : 0;
+  const ticketPrevious = previous && previous.sales > 0 ? previous.revenue / previous.sales : null;
+  const paCurrent = current.items == null ? null : current.sales > 0 ? current.items / current.sales : 0;
+  const paPrevious = previous == null || previous.items == null ? null : previous.sales > 0 ? previous.items / previous.sales : null;
 
   return {
-    revenue: numero(atual.revenue, temAnterior && anterior ? anterior.revenue : null, vs, "brl"),
-    vendas: numero(atual.sales, temAnterior && anterior ? anterior.sales : null, vs, "vendas"),
-    ticket: numero(ticketAtual, temAnterior && ticketAnterior != null ? ticketAnterior : null, vs, "brl"),
-    pa: { value: paAtual, delta: paAtual != null && paAnterior != null ? kpiDelta(paAtual, paAnterior, vs, "pa") : undefined },
+    revenue: number(current.revenue, hasPrevious && previous ? previous.revenue : null, vs, "brl"),
+    sales: number(current.sales, hasPrevious && previous ? previous.sales : null, vs, "sales"),
+    ticket: number(ticketCurrent, hasPrevious && ticketPrevious != null ? ticketPrevious : null, vs, "brl"),
+    pa: { value: paCurrent, delta: paCurrent != null && paPrevious != null ? kpiDelta(paCurrent, paPrevious, vs, "pa") : undefined },
   };
 }

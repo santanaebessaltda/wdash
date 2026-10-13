@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { isNavGroup } from "./nav-config";
-import { applyShoppingMenu, navOfPapel } from "./nav-wedash";
+import { applyShoppingMenu, navForRole } from "./nav-wedash";
 import { useShoppingMenu } from "./useShoppingMenu";
 import { searchForRoute } from "@/pages/dashboard/periodQuery";
 import { useActiveSession } from "@/session/SessionProvider";
@@ -22,7 +22,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const { settings, report } = useShoppingMenu();
 
   const flatItems = useMemo<FlatItem[]>(
-    () => applyShoppingMenu(navOfPapel(session.role), { settings, report }).flatMap((entry) => (isNavGroup(entry) ? entry.items.map((i) => ({ label: i.label, to: i.to, group: entry.label })) : [{ label: entry.label, to: entry.to, group: "Principal" }])),
+    () => applyShoppingMenu(navForRole(session.role), { settings, report }).flatMap((entry) => (isNavGroup(entry) ? entry.items.map((i) => ({ label: i.label, to: i.to, group: entry.label })) : [{ label: entry.label, to: entry.to, group: "Principal" }])),
     [session.role, settings, report],
   );
 

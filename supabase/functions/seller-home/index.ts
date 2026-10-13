@@ -222,7 +222,7 @@ serve(async (req) => {
       sellerProducts = productRows.map((r) => ({
         storeId: String(r.store_id),
         day: String(r.day),
-        sellerGeradorId: Number(r.seller_gerador_id),
+        sellerGeneratorId: Number(r.seller_generator_id),
         sellerKey: String(r.seller_key ?? ""),
         sellerName: String(r.seller_name ?? ""),
         productCode: String(r.product_code ?? "").trim(),
@@ -237,11 +237,11 @@ serve(async (req) => {
     const team = teamRows.map(teamMemberFromRow);
     const nonSales = {
       employeeIds: new Set(team.filter((m) => !m.salesPerson && m.employeeId != null).map((m) => m.employeeId as number)),
-      geradorIds: new Set(team.filter((m) => !m.salesPerson && m.geradorId != null).map((m) => m.geradorId as number)),
+      generatorIds: new Set(team.filter((m) => !m.salesPerson && m.generatorId != null).map((m) => m.generatorId as number)),
       storeNameKeys: new Set(team.filter((m) => !m.salesPerson).flatMap((m) => m.nameKeys.map((k) => `${m.storeId}|${k}`))),
     };
     sellerProducts = sellerProducts.filter(
-      (r) => !nonSales.geradorIds.has(r.sellerGeradorId) && !nonSales.storeNameKeys.has(`${r.storeId}|${r.sellerKey}`),
+      (r) => !nonSales.generatorIds.has(r.sellerGeneratorId) && !nonSales.storeNameKeys.has(`${r.storeId}|${r.sellerKey}`),
     );
     const input: SellerHomeInput = {
       today,

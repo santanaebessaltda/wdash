@@ -38,7 +38,7 @@ const member = (employeeId: number, name: string, shiftId: string | null, storeI
   shiftName: shiftId ? shiftId.toUpperCase() : null,
 });
 
-const sale = (employeeId: number | null, key: string, day: string, reais: number, storeId = "s1", itemCount = 3): SalesSellerDayAgg => ({
+const sale = (employeeId: number | null, key: string, day: string, brl: number, storeId = "s1", itemCount = 3): SalesSellerDayAgg => ({
   tenantId: "t",
   storeId,
   day,
@@ -46,7 +46,7 @@ const sale = (employeeId: number | null, key: string, day: string, reais: number
   sellerName: key,
   sellerEmployeeId: employeeId,
   brand: "ALL",
-  revenueCents: reais * 100,
+  revenueCents: brl * 100,
   salesCount: 2,
   itemCount,
 });
@@ -74,8 +74,8 @@ describe("buildSellerHome", () => {
   it("active goal with the seller in a group: premiação, nível, falta, ganho e ranking", () => {
     const [store] = buildSellerHome(input()).stores;
     const g = store!.goal!;
-    expect(g.me).toMatchObject({ nivel: "Super", nivelNumero: 2, group: "M", prizeAmount: 72, bonus: 150 });
-    expect(g.me!.proximo).toMatchObject({ name: "Hiper", numero: 3, falta: 900 });
+    expect(g.me).toMatchObject({ level: "Super", levelNumber: 2, group: "M", prizeAmount: 72, bonus: 150 });
+    expect(g.me!.next).toMatchObject({ name: "Hiper", number: 3, gap: 900 });
     expect(g.nextLevelGain).toBeCloseTo(186);
     expect(g.projectedPrize).toBeNull();
     expect(g.ranking.map((e) => [e.position, e.name, e.me])).toEqual([
@@ -175,17 +175,17 @@ describe("buildSellerHome", () => {
       groups: [],
       tiers: [{ name: "Meta", minAttainmentPct: 50, commissionPct: 1, bonus: 0 }],
     };
-    const caixa: GoalTeamMember = { ...member(9, "CAIXA", null), salesPerson: false };
-    const day = (reais: number, salesCount: number, itemCount: number): SalesDayAgg => ({
+    const cashBox: GoalTeamMember = { ...member(9, "CAIXA", null), salesPerson: false };
+    const day = (brl: number, salesCount: number, itemCount: number): SalesDayAgg => ({
       tenantId: "t",
       storeId: "s1",
       day: "2026-09-10",
       brand: "ALL",
-      revenueCents: reais * 100,
+      revenueCents: brl * 100,
       salesCount,
       itemCount,
     });
-    const out = buildSellerHome(input({ goals: [geral], dayAggs: [day(8000, 8, 16)], team: [...team, caixa] }));
+    const out = buildSellerHome(input({ goals: [geral], dayAggs: [day(8000, 8, 16)], team: [...team, cashBox] }));
     expect(out.myDays).toEqual([{ storeId: "s1", day: "2026-09-10", revenue: 2000, sales: 2, items: 4 }]);
     const ranking = out.stores[0]!.monthRanking;
     expect(ranking).toHaveLength(4);

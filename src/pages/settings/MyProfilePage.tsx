@@ -3,7 +3,7 @@ import { Badge, Button, Card, CardHeader, CardSubtitle, CardTitle, FormField, In
 import { PasswordField, NameFields, PasswordStrength, personNameIsValid, type PersonName } from "@/pages/access/AccessKit";
 import { SAVE_ERROR_MSG } from "@/pages/operation/shared";
 import { CheckIcon, PlusIcon } from "@/pages/utility/icons";
-import { AVATAR_TIPOS } from "@/lib/avatar";
+import { AVATAR_KINDS } from "@/lib/avatar";
 import { PASSWORD_RULE_TEXT, passwordIsValid } from "@/lib/password";
 import { titleName } from "@/lib/format";
 import { changeMyPassword, fetchMyNames, saveMyProfile, saveThemePreference } from "@/session/authApi";
@@ -18,20 +18,20 @@ const THEME_OPTIONS: { value: ThemePreference; label: string; background: string
 
 function splitPersonName(name: string): PersonName {
   const [first = "", ...rest] = name.trim().split(/\s+/);
-  return { name: first, sobrenome: rest.join(" ") };
+  return { name: first, lastName: rest.join(" ") };
 }
 
 /** Padrao Account > Profile do Vela: foto 88px com "+", nome, e-mail e papel. A foto grava na hora. */
-function ProfileSummaryCard({ salvo }: { salvo: PersonName }) {
+function ProfileSummaryCard({ saved }: { saved: PersonName }) {
   const session = useActiveSession();
   const { update } = useSession();
   const { show } = useToast();
   const input = useRef<HTMLInputElement>(null);
   const [enviando, setEnviando] = useState(false);
 
-  async function gravarFoto(photo: File | null) {
+  async function savePhoto(photo: File | null) {
     setEnviando(true);
-    const r = await saveMyProfile({ firstName: salvo.name, lastName: salvo.sobrenome, photo, removePhoto: photo === null });
+    const r = await saveMyProfile({ firstName: saved.name, lastName: saved.lastName, photo, removePhoto: photo === null });
     setEnviando(false);
     if (!r.ok) return show(r.error || SAVE_ERROR_MSG, "danger");
     update({ name: r.name, avatarUrl: r.avatarUrl ?? null });
@@ -65,12 +65,12 @@ function ProfileSummaryCard({ salvo }: { salvo: PersonName }) {
         <input
           ref={input}
           type="file"
-          accept={AVATAR_TIPOS}
+          accept={AVATAR_KINDS}
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0] ?? null;
             e.target.value = "";
-            if (f) void gravarFoto(f);
+            if (f) void savePhoto(f);
           }}
         />
       </div>
@@ -79,7 +79,7 @@ function ProfileSummaryCard({ salvo }: { salvo: PersonName }) {
       <Badge variant="accent">{accessLabel(session.role, session.isOwner)}</Badge>
       {session.avatarUrl && (
         <div className="mt-3.5">
-          <button type="button" onClick={() => void gravarFoto(null)} disabled={enviando} className="text-[12.5px] font-semibold text-t2 hover:text-bad">
+          <button type="button" onClick={() => void savePhoto(null)} disabled={enviando} className="text-[12.5px] font-semibold text-t2 hover:text-bad">
             Remover foto
           </button>
         </div>
@@ -88,27 +88,27 @@ function ProfileSummaryCard({ salvo }: { salvo: PersonName }) {
   );
 }
 
-function PersonalDataCard({ salvo, onSaved }: { salvo: PersonName; onSaved: (n: PersonName) => void }) {
+function PersonalDataCard({ saved, onSaved }: { saved: PersonName; onSaved: (n: PersonName) => void }) {
   const session = useActiveSession();
   const { update } = useSession();
   const { show } = useToast();
-  const [name, setNome] = useState<PersonName>(salvo);
+  const [name, setName] = useState<PersonName>(saved);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => setNome(salvo), [salvo]);
+  useEffect(() => setName(saved), [saved]);
 
-  const dirty = name.name.trim() !== salvo.name || name.sobrenome.trim() !== salvo.sobrenome;
+  const dirty = name.name.trim() !== saved.name || name.lastName.trim() !== saved.lastName;
 
-  async function salvar(e: FormEvent) {
+  async function save(e: FormEvent) {
     e.preventDefault();
     if (!dirty || saving) return;
     if (!personNameIsValid(name)) return show("Informe nome e sobrenome com pelo menos 2 letras cada.", "danger");
     setSaving(true);
-    const r = await saveMyProfile({ firstName: name.name, lastName: name.sobrenome, photo: null, removePhoto: false });
+    const r = await saveMyProfile({ firstName: name.name, lastName: name.lastName, photo: null, removePhoto: false });
     setSaving(false);
     if (!r.ok) return show(r.error || SAVE_ERROR_MSG, "danger");
     update({ name: r.name });
-    onSaved({ name: titleName(name.name), sobrenome: titleName(name.sobrenome) });
+    onSaved({ name: titleName(name.name), lastName: titleName(name.lastName) });
     show("Alterações salvas.", "success");
   }
 
@@ -117,15 +117,15 @@ function PersonalDataCard({ salvo, onSaved }: { salvo: PersonName; onSaved: (n: 
       <CardHeader>
         <CardTitle>Dados pessoais</CardTitle>
       </CardHeader>
-      <form onSubmit={salvar} noValidate>
+      <form onSubmit={save} noValidate>
         <div className="flex flex-col gap-4">
-          <NameFields amount={name} onChange={(p) => setNome((n) => ({ ...n, ...p }))} />
+          <NameFields amount={name} onChange={(p) => setName((n) => ({ ...n, ...p }))} />
           <FormField label="E-mail" hint="O e-mail é usado para entrar na WDash e não pode ser alterado aqui.">
             <Input value={session.email} readOnly disabled />
           </FormField>
         </div>
         <div className="mt-4.5 flex justify-end gap-2.5">
-          <Button variant="outline" type="button" onClick={() => setNome(salvo)} disabled={!dirty || saving}>
+          <Button variant="outline" type="button" onClick={() => setName(saved)} disabled={!dirty || saving}>
             Desfazer alterações
           </Button>
           <Button type="submit" disabled={!dirty || saving}>
@@ -141,23 +141,23 @@ function PersonalDataCard({ salvo, onSaved }: { salvo: PersonName; onSaved: (n: 
 function PasswordCard() {
   const session = useActiveSession();
   const { show } = useToast();
-  const [atual, setAtual] = useState("");
-  const [nova, setNova] = useState("");
+  const [current, setCurrent] = useState("");
+  const [isNew, setNew] = useState("");
   const [confirma, setConfirma] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const erroConfirma = confirma.length > 0 && confirma !== nova ? "As senhas não coincidem." : null;
-  const pode = atual.length > 0 && passwordIsValid(nova) && confirma === nova && !saving;
+  const errorConfirma = confirma.length > 0 && confirma !== isNew ? "As senhas não coincidem." : null;
+  const can = current.length > 0 && passwordIsValid(isNew) && confirma === isNew && !saving;
 
-  async function salvar(e: FormEvent) {
+  async function save(e: FormEvent) {
     e.preventDefault();
-    if (!pode) return;
+    if (!can) return;
     setSaving(true);
-    const r = await changeMyPassword(session.email, atual, nova);
+    const r = await changeMyPassword(session.email, current, isNew);
     setSaving(false);
     if (!r.ok) return show(r.error ?? SAVE_ERROR_MSG, "danger");
-    setAtual("");
-    setNova("");
+    setCurrent("");
+    setNew("");
     setConfirma("");
     show("Senha alterada.", "success");
   }
@@ -167,22 +167,22 @@ function PasswordCard() {
       <CardHeader>
         <CardTitle>Alterar senha</CardTitle>
       </CardHeader>
-      <form onSubmit={salvar} className="flex flex-col gap-3.5" noValidate>
+      <form onSubmit={save} className="flex flex-col gap-3.5" noValidate>
         {/* Escondido: gerenciador de senhas associa a senha nova a este login. */}
         <input type="email" name="username" autoComplete="username" value={session.email} readOnly tabIndex={-1} aria-hidden className="sr-only" />
-        <PasswordField label="Senha atual" value={atual} onChange={setAtual} placeholder="Digite sua senha atual" autoComplete="current-password" />
-        <PasswordField label="Nova senha" value={nova} onChange={setNova} placeholder={PASSWORD_RULE_TEXT} autoComplete="new-password" />
+        <PasswordField label="Senha atual" value={current} onChange={setCurrent} placeholder="Digite sua senha atual" autoComplete="current-password" />
+        <PasswordField label="Nova senha" value={isNew} onChange={setNew} placeholder={PASSWORD_RULE_TEXT} autoComplete="new-password" />
         <PasswordField
           label="Confirme a nova senha"
           value={confirma}
           onChange={setConfirma}
           placeholder="Digite novamente"
           autoComplete="new-password"
-          erro={erroConfirma}
+          error={errorConfirma}
         />
-        <PasswordStrength senha={nova} />
+        <PasswordStrength password={isNew} />
         <div className="mt-4.5 flex justify-end">
-          <Button type="submit" disabled={!pode}>
+          <Button type="submit" disabled={!can}>
             {saving ? "Alterando…" : "Alterar senha"}
           </Button>
         </div>
@@ -210,12 +210,12 @@ function ThemeCard() {
     setPreference(value);
   }
 
-  function desfazer() {
+  function undo() {
     setDraft(saved);
     setPreference(saved);
   }
 
-  async function salvar(e: FormEvent) {
+  async function save(e: FormEvent) {
     e.preventDefault();
     if (!dirty || saving) return;
     setSaving(true);
@@ -229,7 +229,7 @@ function ThemeCard() {
 
   return (
     <Card>
-      <form onSubmit={salvar} noValidate>
+      <form onSubmit={save} noValidate>
         <div className="mb-4">
           <CardTitle>Aparência</CardTitle>
           <CardSubtitle>Escolha como a WDash aparece para você em todos os aparelhos. No modo Sistema, seguimos a configuração do sistema de cada aparelho.</CardSubtitle>
@@ -258,7 +258,7 @@ function ThemeCard() {
           })}
         </div>
         <div className="mt-4.5 flex justify-end gap-2.5">
-          <Button variant="outline" type="button" onClick={desfazer} disabled={!dirty || saving}>
+          <Button variant="outline" type="button" onClick={undo} disabled={!dirty || saving}>
             Desfazer alterações
           </Button>
           <Button type="submit" disabled={!dirty || saving}>
@@ -273,15 +273,15 @@ function ThemeCard() {
 /** Conta > Meu perfil  -  layout Account > Profile do Vela (resumo a esquerda, formularios a direita). */
 export function MyProfilePage() {
   const session = useActiveSession();
-  const [salvo, setSalvo] = useState<PersonName>(() => splitPersonName(session.name));
+  const [saved, setSaved] = useState<PersonName>(() => splitPersonName(session.name));
 
   useEffect(() => {
-    let vivo = true;
+    let live = true;
     void fetchMyNames(session.name).then((n) => {
-      if (vivo) setSalvo({ name: n.firstName, sobrenome: n.lastName });
+      if (live) setSaved({ name: n.firstName, lastName: n.lastName });
     });
     return () => {
-      vivo = false;
+      live = false;
     };
     // So na abertura: depois de salvar, `salvo` ja vem do formulario.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -289,9 +289,9 @@ export function MyProfilePage() {
 
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-[300px_1fr] lg:items-start">
-      <ProfileSummaryCard salvo={salvo} />
+      <ProfileSummaryCard saved={saved} />
       <div className="flex min-w-0 flex-col gap-5">
-        <PersonalDataCard salvo={salvo} onSaved={setSalvo} />
+        <PersonalDataCard saved={saved} onSaved={setSaved} />
         <PasswordCard />
         <ThemeCard />
       </div>

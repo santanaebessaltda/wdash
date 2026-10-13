@@ -2,7 +2,7 @@ import type { RouteObject } from "react-router-dom";
 import { paths } from "@/router/paths";
 import { RedirectTo } from "@/router/RedirectTo";
 import { RequireRole } from "@/session/RequireSession";
-import { GESTOR_ROLES } from "@/layout/nav-wedash";
+import { OWNER_ROLES } from "@/layout/nav-wedash";
 
 /** URLs antigas. Configurações abre em `/settings`. Equipe abre em Gestão. */
 export const operationRoutes: RouteObject[] = [
@@ -14,7 +14,7 @@ export const operationRoutes: RouteObject[] = [
     ],
   },
   {
-    element: <RequireRole roles={GESTOR_ROLES} />,
+    element: <RequireRole roles={OWNER_ROLES} />,
     children: [
       { path: paths.legacy.operationBranch, element: <RedirectTo to={paths.operation.branch} /> },
       { path: paths.legacy.branch, element: <RedirectTo to={paths.operation.branch} /> },

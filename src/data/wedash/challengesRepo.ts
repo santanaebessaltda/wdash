@@ -146,10 +146,10 @@ function parseManagerTarget(raw: unknown, fallback: number | null): number | nul
 
 export function challengeFromRow(r: ChallengeRow): ChallengeRecord {
   const metricScope = parseMetricScope(r.metric, r.scope);
-  const indice = isIndexMetric(metricScope.metric);
+  const index = isIndexMetric(metricScope.metric);
   // Indice: o piso das vendedoras nao serve de meta da gerencia (outra escala)  ->  sem meta, sem premio.
-  const managerTargetRaw = parseManagerTarget(r.manager_prize, indice ? null : numOrNull(r.target));
-  const managerPrize = indice && managerTargetRaw == null ? null : parsePrize(r.manager_prize);
+  const managerTargetRaw = parseManagerTarget(r.manager_prize, index ? null : numOrNull(r.target));
+  const managerPrize = index && managerTargetRaw == null ? null : parsePrize(r.manager_prize);
   return {
     id: r.id,
     storeId: r.store_id,
@@ -360,13 +360,13 @@ export interface DayRange {
 export function managerIndexWindows(
   c: Pick<ChallengeRecord, "startsOn" | "endsOn">,
   today: string,
-): { anterior: DayRange; atual: DayRange | null; comparado: DayRange | null } {
+): { previous: DayRange; current: DayRange | null; comparado: DayRange | null } {
   const dur = eachDay(c.startsOn, c.endsOn).length;
-  const anterior = { from: addDays(c.startsOn, -dur), to: addDays(c.startsOn, -1) };
+  const previous = { from: addDays(c.startsOn, -dur), to: addDays(c.startsOn, -1) };
   const end = c.endsOn < today ? c.endsOn : addDays(today, -1);
-  if (end < c.startsOn) return { anterior, atual: null, comparado: null };
-  const dias = eachDay(c.startsOn, end).length;
-  return { anterior, atual: { from: c.startsOn, to: end }, comparado: { from: anterior.from, to: addDays(anterior.from, dias - 1) } };
+  if (end < c.startsOn) return { previous, current: null, comparado: null };
+  const days = eachDay(c.startsOn, end).length;
+  return { previous, current: { from: c.startsOn, to: end }, comparado: { from: previous.from, to: addDays(previous.from, days - 1) } };
 }
 
 /** Dados que a conta do desafio precisa (lidos 1x para todos os desafios da tela). */
@@ -391,9 +391,9 @@ export function excludeNonSalesSellerProducts(
   rows: SalesSellerProductDayAgg[],
   people: NonSalesPeople,
 ): SalesSellerProductDayAgg[] {
-  if (people.geradorIds.size === 0 && people.storeNameKeys.size === 0) return rows;
+  if (people.generatorIds.size === 0 && people.storeNameKeys.size === 0) return rows;
   return rows.filter(
-    (r) => !people.geradorIds.has(r.sellerGeradorId) && !people.storeNameKeys.has(`${r.storeId}|${r.sellerKey}`),
+    (r) => !people.generatorIds.has(r.sellerGeneratorId) && !people.storeNameKeys.has(`${r.storeId}|${r.sellerKey}`),
   );
 }
 
@@ -401,7 +401,7 @@ type SellerProductRow = {
   tenant_id: string;
   store_id: string;
   day: string;
-  seller_gerador_id: number;
+  seller_generator_id: number;
   seller_key: string;
   seller_name: string;
   product_code: string;
@@ -428,7 +428,7 @@ export async function fetchChallengeInput(q: {
   const storeIds = [...new Set(q.challenges.map((c) => c.storeId))];
   // Indice com premio da gerencia compara a equipe com o mesmo n de dias antes do desafio.
   const start = (c: ChallengeRecord) =>
-    isIndexMetric(c.metric) && c.managerPrize ? managerIndexWindows(c, q.today).anterior.from : c.startsOn;
+    isIndexMetric(c.metric) && c.managerPrize ? managerIndexWindows(c, q.today).previous.from : c.startsOn;
   const from = q.challenges.reduce((m, c) => (start(c) < m ? start(c) : m), start(q.challenges[0]));
   const maxEnd = q.challenges.reduce((m, c) => (c.endsOn > m ? c.endsOn : m), q.challenges[0].endsOn);
   const to = maxEnd < q.today ? maxEnd : q.today;
@@ -463,7 +463,7 @@ export async function fetchChallengeInput(q: {
             tenantId: r.tenant_id,
             storeId: r.store_id,
             day: r.day,
-            sellerGeradorId: Number(r.seller_gerador_id),
+            sellerGeneratorId: Number(r.seller_generator_id),
             sellerKey: String(r.seller_key ?? ""),
             sellerName: String(r.seller_name ?? ""),
             productCode: String(r.product_code ?? "").trim(),

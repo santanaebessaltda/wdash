@@ -16,7 +16,7 @@ export interface KpiTileProps {
    * a mesma altura. Usado so onde isso importa (grade 2x2 no mobile); as
    * demais dashboards mantem uma linha truncada, como sempre foi.
    */
-  subDuasLinhas?: boolean;
+  subDuasLines?: boolean;
   /** Tooltip exibido ao passar o mouse no  ao lado do label. */
   tooltip?: string;
   /** Sparkline ou outro elemento renderizado abaixo do subtitulo. */
@@ -25,14 +25,14 @@ export interface KpiTileProps {
 
 /** Subtitulo que quebra em duas linhas no mobile (uma por trecho, separado por "  |  " no texto de origem) e volta a ficar numa linha so a partir do sm, onde cabe. Reserva a altura da segunda linha mesmo quando nao ha, pra tiles vizinhos nao ficarem com alturas diferentes. */
 export function KpiSubtitle({ text }: { text: string }) {
-  const [primeira, segunda] = text.split(" · ");
+  const [first, monday] = text.split(" · ");
   return (
     <div className="mt-1 min-h-[2.4em] text-[11.5px] leading-snug text-t2">
-      <span className="block sm:inline">{primeira}</span>
-      {segunda && (
+      <span className="block sm:inline">{first}</span>
+      {monday && (
         <>
           <span className="hidden sm:inline"> · </span>
-          <span className="block sm:inline">{segunda}</span>
+          <span className="block sm:inline">{monday}</span>
         </>
       )}
     </div>
@@ -44,7 +44,7 @@ export function KpiSubtitle({ text }: { text: string }) {
  * close to `StatCard` but with an uppercase label and an optional
  * secondary "sub" line under the value, matching the source layout.
  */
-export function KpiTile({ label, value, icon, tint, delta, sub, subDuasLinhas, tooltip, sparkline }: KpiTileProps) {
+export function KpiTile({ label, value, icon, tint, delta, sub, subDuasLines, tooltip, sparkline }: KpiTileProps) {
   const Icon = ICONS[icon];
   return (
     <Card className="min-w-0">
@@ -78,7 +78,7 @@ export function KpiTile({ label, value, icon, tint, delta, sub, subDuasLinhas, t
         )}
       </div>
       <AnimatedNumber value={value} className="mt-1.5 block truncate text-2xl font-extrabold tracking-tight text-t0" />
-      {sub && (subDuasLinhas ? <KpiSubtitle text={sub} /> : <p className="mt-0.5 truncate text-[11.5px] text-t2">{sub}</p>)}
+      {sub && (subDuasLines ? <KpiSubtitle text={sub} /> : <p className="mt-0.5 truncate text-[11.5px] text-t2">{sub}</p>)}
       {sparkline && <div className="mt-3 h-9">{sparkline}</div>}
     </Card>
   );

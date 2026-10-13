@@ -29,7 +29,7 @@ const RENT_FIELDS = [RENT_MIN, RENT_PCT];
 
 const POINT_OPTIONS: { value: PointType; label: string }[] = [
   { value: "SHOPPING", label: "Quiosque em shopping" },
-  { value: "RUA", label: "Loja de rua" },
+  { value: "STREET", label: "Loja de rua" },
 ];
 
 const RENT_HINT: Record<PointType, string[]> = {
@@ -38,7 +38,7 @@ const RENT_HINT: Record<PointType, string[]> = {
     "Exemplo: com aluguel mensal de R$ 10.000,00 e aluguel percentual de 10% sobre R$ 120.000,00 de faturamento, o aluguel considerado será de R$ 12.000,00. Os R$ 2.000,00 adicionais correspondem ao aluguel percentual excedente.",
     "No mês em andamento, a comparação considera o aluguel mensal proporcional aos dias já passados.",
   ],
-  RUA: ["Na loja de rua, a WDash considera somente o aluguel mensal."],
+  STREET: ["Na loja de rua, a WDash considera somente o aluguel mensal."],
 };
 
 const FRANCHISE_INTRO =
@@ -48,7 +48,7 @@ function franchiseFields(store: Store): CostField[] {
   return [
     pctField("royaltiesWepinkPct", "Royalties WEPINK"),
     pctField("marketingWepinkPct", "Taxa de marketing WEPINK"),
-    ...(store.temWpink
+    ...(store.hasWpink
       ? [pctField("royaltiesWpinkPct", "Royalties WPINK"), pctField("marketingWpinkPct", "Taxa de marketing WPINK")]
       : []),
   ];
@@ -61,7 +61,7 @@ function franchiseSections(store: Store): CostFieldSection[] {
       hint: "Royalties e taxa de marketing são calculados sobre o faturamento WEPINK.",
       keys: ["royaltiesWepinkPct", "marketingWepinkPct"],
     },
-    ...(store.temWpink
+    ...(store.hasWpink
       ? [
           {
             title: "WPINK",
@@ -127,22 +127,22 @@ function RentCard({ store, point, onSaved }: { store: Store; point: PointType; o
   const { show } = useToast();
   const form = useCostFields(store, RENT_FIELDS);
   const [saving, setSaving] = useState(false);
-  const rua = point === "RUA";
-  const mensal = rua ? { ...RENT_MIN, label: "Aluguel mensal" } : RENT_MIN;
-  const fields = rua ? [mensal] : RENT_FIELDS;
-  const pctSalvo = parseNum(form.saved[RENT_PCT.key] ?? "");
-  const removePct = rua && pctSalvo != null && pctSalvo > 0;
+  const street = point === "STREET";
+  const monthly = street ? { ...RENT_MIN, label: "Aluguel mensal" } : RENT_MIN;
+  const fields = street ? [monthly] : RENT_FIELDS;
+  const pctSaved = parseNum(form.saved[RENT_PCT.key] ?? "");
+  const removePct = street && pctSaved != null && pctSaved > 0;
   const typeDirty = point !== store.pointType;
 
   async function save() {
     const merged = form.merged();
     if (!merged) return show(INVALID_COSTS_MSG, "danger");
-    const custos = rua ? RENT_PCT.set(merged, null) : merged;
+    const costs = street ? RENT_PCT.set(merged, null) : merged;
     setSaving(true);
-    const r = await updateStoreCosts(store.id, custos, point);
+    const r = await updateStoreCosts(store.id, costs, point);
     setSaving(false);
     if (!r.ok) return show(SAVE_ERROR_MSG, "danger");
-    form.markSaved(custos);
+    form.markSaved(costs);
     onSaved();
     show("Alterações salvas.", "success");
   }

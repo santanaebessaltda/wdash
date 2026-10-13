@@ -143,15 +143,15 @@ export function useNotifications(tenantId: string, role: string, canManageErp: b
 
   const readAll = useCallback(
     (clear: boolean) => {
-      const ate = Math.max(Date.now(), ...items.map((i) => i.at.getTime()));
+      const until = Math.max(Date.now(), ...items.map((i) => i.at.getTime()));
       const next: NotificationState = {
-        readBefore: Math.max(state.readBefore, ate),
-        clearedBefore: clear ? Math.max(state.clearedBefore, ate) : state.clearedBefore,
+        readBefore: Math.max(state.readBefore, until),
+        clearedBefore: clear ? Math.max(state.clearedBefore, until) : state.clearedBefore,
         readIds: [],
       };
       saveLocal(tenantId, next);
       setState(next);
-      void markAllNotificationsRead(tenantId, ate, clear).then(apply);
+      void markAllNotificationsRead(tenantId, until, clear).then(apply);
     },
     [tenantId, items, state, apply],
   );

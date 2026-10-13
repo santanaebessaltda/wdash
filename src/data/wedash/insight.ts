@@ -14,7 +14,7 @@
 import type { StoreView } from "./dashboard";
 
 export function buildStoreInsight(v: StoreView): string | null {
-  const partes = v.alertas.map((a) => a.text);
+  const partes = v.alerts.map((a) => a.text);
   const narrativa = v.scopeView === "network" ? readNetwork(v) : v.scopeView === "day" ? null : readMonth(v);
   if (narrativa) partes.push(narrativa);
   return partes.length > 0 ? partes.join(" ") : null;
@@ -24,21 +24,21 @@ function readNetwork(v: StoreView): string | null {
   if (v.scope.division) return null; // regua vira participacao da marca, nao fala de meta
   const regua = v.regua;
   if (!regua || regua.length < 2) return null;
-  const pior = regua[0];
-  const melhor = regua[regua.length - 1];
+  const worst = regua[0];
+  const best = regua[regua.length - 1];
 
-  const distancia = melhor.attainmentPct - pior.attainmentPct;
+  const distancia = best.attainmentPct - worst.attainmentPct;
   if (distancia < 4) return null;
 
-  const queda = pior.variacaoDiaValor !== null && pior.variacaoDiaValor < -0.5;
-  const tamanho = pior.variacaoDiaValor === null ? "" : `${Math.abs(Math.round(pior.variacaoDiaValor))}%`;
-  const todaySlice = queda
-    ? `${pior.name} está ${tamanho} abaixo do mesmo dia da semana passada e em ${pior.atingimentoTexto} do mês.`
-    : `${pior.name} está em ${pior.atingimentoTexto} do mês, ${Math.round(distancia)} pontos atrás de ${melhor.name}.`;
-  const parteAcao = queda
-    ? `Vale checar o que mudou hoje em ${pior.name} (equipe, fluxo de loja) e reagir ainda no dia.`
-    : `Pra fechar a distância, veja o que ${melhor.name} está fazendo diferente e leve pra ${pior.name}.`;
-  return `${todaySlice} ${parteAcao}`;
+  const drop = worst.variationDayAmount !== null && worst.variationDayAmount < -0.5;
+  const tamanho = worst.variationDayAmount === null ? "" : `${Math.abs(Math.round(worst.variationDayAmount))}%`;
+  const todaySlice = drop
+    ? `${worst.name} está ${tamanho} abaixo do mesmo dia da semana passada e em ${worst.attainmentText} do mês.`
+    : `${worst.name} está em ${worst.attainmentText} do mês, ${Math.round(distancia)} pontos atrás de ${best.name}.`;
+  const parteAction = drop
+    ? `Vale checar o que mudou hoje em ${worst.name} (equipe, fluxo de loja) e reagir ainda no dia.`
+    : `Pra fechar a distância, veja o que ${best.name} está fazendo diferente e leve pra ${worst.name}.`;
+  return `${todaySlice} ${parteAction}`;
 }
 
 function readMonth(v: StoreView): string | null {

@@ -9,8 +9,8 @@ import {
 import type { ChallengeRecord } from "./challengesRepo";
 
 const d = (iso: string) => {
-  const [a, m, dia] = iso.split("-").map(Number);
-  return new Date(a, m - 1, dia);
+  const [a, m, day] = iso.split("-").map(Number);
+  return new Date(a, m - 1, day);
 };
 
 const valid = (over: Partial<ChallengeForm> = {}): ChallengeForm => ({
@@ -121,13 +121,13 @@ describe("validateChallengeForm", () => {
   });
 
   it("gerência ligada exige prêmio e meta própria, mesmo na Disputa sem piso", () => {
-    const vazio = { kind: "MONEY" as const, amount: "", label: "" };
-    const e = validateChallengeForm(valid({ target: "", managerOn: true, managerPrize: vazio, managerTarget: "" }));
+    const empty = { kind: "MONEY" as const, amount: "", label: "" };
+    const e = validateChallengeForm(valid({ target: "", managerOn: true, managerPrize: empty, managerTarget: "" }));
     expect([e.managerPrize, e.managerTarget, e.target]).toEqual(["Campo obrigatório.", "Campo obrigatório.", undefined]);
-    expect(validateChallengeForm(valid({ managerOn: true, managerPrize: vazio, managerTarget: "0" })).managerTarget).toBe(
+    expect(validateChallengeForm(valid({ managerOn: true, managerPrize: empty, managerTarget: "0" })).managerTarget).toBe(
       "Informe um número inteiro de itens maior que 0.",
     );
-    expect(validateChallengeForm(valid({ managerOn: false, managerPrize: vazio, managerTarget: "" }))).toEqual({});
+    expect(validateChallengeForm(valid({ managerOn: false, managerPrize: empty, managerTarget: "" }))).toEqual({});
   });
 });
 

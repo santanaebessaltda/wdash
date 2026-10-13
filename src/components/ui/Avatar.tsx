@@ -58,14 +58,14 @@ const statusColors: Record<NonNullable<AvatarProps["status"]>, string> = {
 export function Avatar({ name, src, size = "md", status, className, ring }: AvatarProps) {
   const gradient = avatarGradient(name);
   const [falhou, setFalhou] = useState<string | null>(null);
-  const foto = src && falhou !== src ? src : null;
+  const photo = src && falhou !== src ? src : null;
   return (
     <span className={cn("vela-avatar relative inline-flex shrink-0", className)}>
-      {foto ? (
+      {photo ? (
         <img
-          src={foto}
+          src={photo}
           alt={name}
-          onError={() => setFalhou(foto)}
+          onError={() => setFalhou(photo)}
           className={cn("rounded-full object-cover", sizeClasses[size], ring && "ring-2 ring-bg-2")}
         />
       ) : (

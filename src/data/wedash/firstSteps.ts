@@ -15,7 +15,7 @@ export interface FirstStep {
   needsGroups?: boolean;
 }
 
-export type FirstStepsStore = Pick<Store, "id" | "temWpink" | "pointType" | "horas" | "custos">;
+export type FirstStepsStore = Pick<Store, "id" | "hasWpink" | "pointType" | "hours" | "costs">;
 
 export interface FirstStepsInput {
   stores: FirstStepsStore[];
@@ -35,37 +35,37 @@ export function storesForFirstStepsView<T extends { id: string }>(stores: T[], s
   return one.length === 1 ? one : stores;
 }
 
-function missingStoreLabel(faltam: number, total: number): string | undefined {
-  if (faltam === 0 || total <= 1) return undefined;
-  return `Falta em ${faltam} de ${total} filiais`;
+function missingStoreLabel(missing: number, total: number): string | undefined {
+  if (missing === 0 || total <= 1) return undefined;
+  return `Falta em ${missing} de ${total} filiais`;
 }
 
 function franchiseOk(s: FirstStepsStore): boolean {
-  const c = s.custos;
+  const c = s.costs;
   if (!c || c.royaltiesWepinkPct == null || c.marketingWepinkPct == null) return false;
-  return !s.temWpink || (c.royaltiesWpinkPct != null && c.marketingWpinkPct != null);
+  return !s.hasWpink || (c.royaltiesWpinkPct != null && c.marketingWpinkPct != null);
 }
 
 /** Loja de rua so tem aluguel mensal; shopping pode ter so o percentual. */
 function rentOk(s: FirstStepsStore): boolean {
-  const c = s.custos;
+  const c = s.costs;
   if (!c) return false;
   if (c.rentMin != null) return true;
   return s.pointType === "SHOPPING" && c.rentWepinkPct != null;
 }
 
 function taxesOk(s: FirstStepsStore): boolean {
-  const c = s.custos;
+  const c = s.costs;
   if (!c || c.icmsWepinkPct == null || c.icmsStWepinkPct == null) return false;
-  return !s.temWpink || (c.icmsWpinkPct != null && c.icmsStWpinkPct != null);
+  return !s.hasWpink || (c.icmsWpinkPct != null && c.icmsStWpinkPct != null);
 }
 
 export function buildFirstSteps(input: FirstStepsInput): FirstStep[] {
   const { stores } = input;
   const total = stores.length;
   const byStore = (ok: (s: FirstStepsStore) => boolean) => {
-    const faltam = stores.filter((s) => !ok(s)).length;
-    return { done: faltam === 0, detail: missingStoreLabel(faltam, total) };
+    const missing = stores.filter((s) => !ok(s)).length;
+    return { done: missing === 0, detail: missingStoreLabel(missing, total) };
   };
 
   // Grupos, meta e desafio so nas lojas com equipe de vendas (loja parada nao precisa).
@@ -73,17 +73,17 @@ export function buildFirstSteps(input: FirstStepsInput): FirstStep[] {
   const withTeam = stores.filter((s) => team(s.id).length > 0);
   const storePeople = withTeam.length > 0 ? withTeam : stores;
 
-  let semGrupo = 0;
-  let lojaSemGrupos = false;
+  let withoutGroup = 0;
+  let storeWithoutGroups = false;
   for (const s of withTeam) {
     const groups = input.shiftIdsByStore.get(s.id) ?? [];
-    if (groups.length === 0) lojaSemGrupos = true;
-    semGrupo += team(s.id).filter((p) => !p.shiftId || !groups.includes(p.shiftId)).length;
+    if (groups.length === 0) storeWithoutGroups = true;
+    withoutGroup += team(s.id).filter((p) => !p.shiftId || !groups.includes(p.shiftId)).length;
   }
 
   const criados = (set: Set<string>) => {
-    const faltam = storePeople.filter((s) => !set.has(s.id)).length;
-    return { done: faltam === 0, detail: missingStoreLabel(faltam, storePeople.length) };
+    const missing = storePeople.filter((s) => !set.has(s.id)).length;
+    return { done: missing === 0, detail: missingStoreLabel(missing, storePeople.length) };
   };
 
   return [
@@ -103,15 +103,15 @@ export function buildFirstSteps(input: FirstStepsInput): FirstStep[] {
       id: "hours",
       title: "Configurar o horário de funcionamento",
       description: "Define quando as vendas são atualizadas automaticamente e organiza as vendas por hora.",
-      ...byStore((s) => weekHoursConfigured(s.horas)),
+      ...byStore((s) => weekHoursConfigured(s.hours)),
     },
     {
       id: "groups",
       title: "Criar os grupos e vincular os vendedores",
       description: "Organize os vendedores de cada filial em grupos para acompanhar o desempenho e distribuir metas.",
-      done: semGrupo === 0,
-      detail: semGrupo === 0 ? undefined : semGrupo === 1 ? "1 vendedor sem grupo" : `${semGrupo} vendedores sem grupo`,
-      needsGroups: lojaSemGrupos,
+      done: withoutGroup === 0,
+      detail: withoutGroup === 0 ? undefined : withoutGroup === 1 ? "1 vendedor sem grupo" : `${withoutGroup} vendedores sem grupo`,
+      needsGroups: storeWithoutGroups,
     },
     {
       id: "franchise",

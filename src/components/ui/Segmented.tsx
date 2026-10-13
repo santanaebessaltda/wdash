@@ -30,15 +30,15 @@ export function Segmented<T extends string = string>({
   return (
     <div className={cn("inline-flex flex-wrap gap-1.5", className)}>
       {options.map((opt) => {
-        const ativa = value === opt.value;
+        const active = value === opt.value;
         return (
           <button
             key={opt.value}
             type="button"
-            onClick={() => onChange(allowClear && ativa ? null : opt.value)}
+            onClick={() => onChange(allowClear && active ? null : opt.value)}
             className={cn(
               "h-8 cursor-pointer rounded-[9px] border px-3 text-xs font-semibold transition-colors",
-              ativa ? "border-acc bg-acc-soft text-acc" : "border-line text-t1 hover:border-acc",
+              active ? "border-acc bg-acc-soft text-acc" : "border-line text-t1 hover:border-acc",
             )}
           >
             {opt.label}

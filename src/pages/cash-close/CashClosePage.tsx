@@ -40,7 +40,7 @@ import {
 } from "@/data/wedash/employeeWithdrawal";
 import { fetchSalesDayAggs, fetchSyncWatermark } from "@/data/wedash/salesRepo";
 import { fetchStoreSellers, type Store, type StoreSeller } from "@/data/wedash/stores";
-import { isGestor } from "@/layout/nav-wedash";
+import { isOwner } from "@/layout/nav-wedash";
 import { cn } from "@/lib/cn";
 import { brlCent, longDate, isoToDate, endOfMonth, startOfMonth, dateToIso, addDays, labelUpper } from "@/lib/format";
 import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
@@ -73,9 +73,9 @@ function monthYearLabel(iso: string): string {
   return `${MONTHS_PT[d.getMonth()]} de ${d.getFullYear()}`;
 }
 
-function pageEndYear(ano: number, todayYear: number): number {
-  const alvo = Math.min(ano, todayYear);
-  return todayYear - Math.floor((todayYear - alvo) / 12) * 12;
+function pageEndYear(year: number, todayYear: number): number {
+  const target = Math.min(year, todayYear);
+  return todayYear - Math.floor((todayYear - target) / 12) * 12;
 }
 
 function rangeCells(from: string, to: string): Array<string | null> {
@@ -127,20 +127,20 @@ type CloseDraft = {
 function CloseTable({
   lines,
   pixPending,
-  gestor,
+  owner,
   closed,
   draft,
   onAcquirer,
 }: {
   lines: CashCloseLine[];
   pixPending: boolean;
-  gestor: boolean;
+  owner: boolean;
   closed: boolean;
   draft?: CloseDraft;
   onAcquirer?: (key: CashCloseBucket, value: string) => void;
 }) {
   if (lines.length === 0) return null;
-  const campo =
+  const field =
     "h-9 w-full min-w-0 rounded-[9px] border border-line bg-bg-inset px-2 text-right font-mono text-[13px] font-bold text-t0 outline-none focus:border-acc";
   const cabecalhos = ["Forma", "Millennium", "Total real", "Diferença"];
   const conta = closeDayGap(lines);
@@ -176,7 +176,7 @@ function CloseTable({
                   <td className="px-3 py-3 text-t0">{labelUpper(row.label)}</td>
                   <td className="px-3 py-3 text-right font-mono text-[13px] font-bold text-t0">{money(row.systemCents)}</td>
                   <td className="px-3 py-2.5 text-right">
-                    {row.key === "cash" || !(gestor && draft && onAcquirer) ? (
+                    {row.key === "cash" || !(owner && draft && onAcquirer) ? (
                       <span className="font-mono text-[13px] font-bold text-t0">{real == null ? "—" : money(real)}</span>
                     ) : (
                       <input
@@ -185,7 +185,7 @@ function CloseTable({
                         inputMode="decimal"
                         placeholder="—"
                         aria-label={`Total real para ${row.label}`}
-                        className={campo}
+                        className={field}
                       />
                     )}
                   </td>
@@ -224,19 +224,19 @@ export function MonthYearPicker({
   today: string;
   /** Primeiro mês que pode ser escolhido. Antes disso o mês fica bloqueado. */
   minIso: string;
-  onChange: (alvo: string) => void;
+  onChange: (target: string) => void;
 }) {
   const todayDateValue = isoToDate(today);
   const todayYear = todayDateValue.getFullYear();
   const todayMonth = todayDateValue.getMonth();
-  const piso = isoToDate(startOfMonth(minIso));
-  const pisoAno = piso.getFullYear();
-  const pisoMes = piso.getMonth();
-  const selecionado = isoToDate(startOfMonth(iso));
+  const floor = isoToDate(startOfMonth(minIso));
+  const floorYear = floor.getFullYear();
+  const floorMonth = floor.getMonth();
+  const selected = isoToDate(startOfMonth(iso));
   const [open, setOpen] = useState(false);
   const [modo, setModo] = useState<"month" | "year">("month");
-  const [anoVista, setAnoVista] = useState(selecionado.getFullYear());
-  const [anoPagina, setAnoPagina] = useState(todayYear);
+  const [yearView, setYearView] = useState(selected.getFullYear());
+  const [yearPage, setYearPage] = useState(todayYear);
   const [panelPos, setPanelPos] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -244,7 +244,7 @@ export function MonthYearPicker({
   useEffect(() => {
     if (!open) return;
     setModo("month");
-    setAnoVista(selecionado.getFullYear());
+    setYearView(selected.getFullYear());
   }, [open]); // ano lido só ao abrir
 
   useEffect(() => {
@@ -266,15 +266,15 @@ export function MonthYearPicker({
     function colocar() {
       if (!triggerRef.current) return;
       const rect = triggerRef.current.getBoundingClientRect();
-      const margem = 12;
+      const margin = 12;
       const vw = window.innerWidth;
       const vh = window.innerHeight;
-      const width = Math.min(vw - margem * 2, 300);
+      const width = Math.min(vw - margin * 2, 300);
       let left = rect.right - width;
-      if (left < margem) left = margem;
-      if (left + width > vw - margem) left = Math.max(margem, vw - margem - width);
-      const top = Math.min(rect.bottom + 8, vh - margem - 80);
-      setPanelPos({ top, left, width, maxHeight: Math.max(200, vh - top - margem) });
+      if (left < margin) left = margin;
+      if (left + width > vw - margin) left = Math.max(margin, vw - margin - width);
+      const top = Math.min(rect.bottom + 8, vh - margin - 80);
+      setPanelPos({ top, left, width, maxHeight: Math.max(200, vh - top - margin) });
     }
     colocar();
     window.addEventListener("resize", colocar);
@@ -285,17 +285,17 @@ export function MonthYearPicker({
     };
   }, [open]);
 
-  const anos = Array.from({ length: 12 }, (_, i) => anoPagina - 11 + i);
-  const podeAnoAnt = modo === "year" ? anos[0] > pisoAno : anoVista > pisoAno;
-  const podeAnoProx = modo === "year" ? anoPagina < todayYear : anoVista < todayYear;
+  const anos = Array.from({ length: 12 }, (_, i) => yearPage - 11 + i);
+  const canYearPrev = modo === "year" ? anos[0] > floorYear : yearView > floorYear;
+  const canYearProx = modo === "year" ? yearPage < todayYear : yearView < todayYear;
   const navBtn = (ok: boolean) =>
     cn("flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-line text-t1", ok ? "hover:bg-bg-3" : "cursor-not-allowed opacity-40");
 
   function pickMonth(month: number) {
-    const antes = anoVista < pisoAno || (anoVista === pisoAno && month < pisoMes);
-    const futuro = anoVista > todayYear || (anoVista === todayYear && month > todayMonth);
-    if (antes || futuro) return;
-    onChange(dateToIso(new Date(anoVista, month, 1)));
+    const before = yearView < floorYear || (yearView === floorYear && month < floorMonth);
+    const future = yearView > todayYear || (yearView === todayYear && month > todayMonth);
+    if (before || future) return;
+    onChange(dateToIso(new Date(yearView, month, 1)));
     setOpen(false);
   }
 
@@ -310,10 +310,10 @@ export function MonthYearPicker({
             <div className="mb-3 flex items-center justify-between">
               <button
                 type="button"
-                disabled={!podeAnoAnt}
+                disabled={!canYearPrev}
                 aria-label={modo === "year" ? "Anos anteriores" : "Ano anterior"}
-                className={navBtn(podeAnoAnt)}
-                onClick={() => (modo === "year" ? setAnoPagina((n) => n - 12) : setAnoVista((n) => n - 1))}
+                className={navBtn(canYearPrev)}
+                onClick={() => (modo === "year" ? setYearPage((n) => n - 12) : setYearView((n) => n - 1))}
               >
                 <MonthStep dir="anterior" />
               </button>
@@ -322,21 +322,21 @@ export function MonthYearPicker({
                 className="rounded-lg px-2 py-1 text-sm font-bold text-t0 hover:bg-bg-3"
                 onClick={() => {
                   if (modo === "month") {
-                    setAnoPagina(pageEndYear(anoVista, todayYear));
+                    setYearPage(pageEndYear(yearView, todayYear));
                     setModo("year");
                     return;
                   }
                   setModo("month");
                 }}
               >
-                {modo === "month" ? anoVista : `${anos[0]} – ${anos[anos.length - 1]}`}
+                {modo === "month" ? yearView : `${anos[0]} – ${anos[anos.length - 1]}`}
               </button>
               <button
                 type="button"
-                disabled={!podeAnoProx}
+                disabled={!canYearProx}
                 aria-label={modo === "year" ? "Próximos anos" : "Próximo ano"}
-                className={navBtn(podeAnoProx)}
-                onClick={() => (modo === "year" ? setAnoPagina((n) => Math.min(todayYear, n + 12)) : setAnoVista((n) => n + 1))}
+                className={navBtn(canYearProx)}
+                onClick={() => (modo === "year" ? setYearPage((n) => Math.min(todayYear, n + 12)) : setYearView((n) => n + 1))}
               >
                 <MonthStep dir="proximo" />
               </button>
@@ -344,21 +344,21 @@ export function MonthYearPicker({
             {modo === "month" ? (
               <div className="grid grid-cols-3 gap-1">
                 {MONTHS_PT.map((name, month) => {
-                  const bloqueado =
-                    anoVista < pisoAno ||
-                    (anoVista === pisoAno && month < pisoMes) ||
-                    anoVista > todayYear ||
-                    (anoVista === todayYear && month > todayMonth);
-                  const ativo = selecionado.getFullYear() === anoVista && selecionado.getMonth() === month;
+                  const blocked =
+                    yearView < floorYear ||
+                    (yearView === floorYear && month < floorMonth) ||
+                    yearView > todayYear ||
+                    (yearView === todayYear && month > todayMonth);
+                  const active = selected.getFullYear() === yearView && selected.getMonth() === month;
                   return (
                     <button
                       key={name}
                       type="button"
-                      disabled={bloqueado}
+                      disabled={blocked}
                       onClick={() => pickMonth(month)}
                       className={cn(
                         "h-9 truncate rounded-[9px] px-1 text-[12.5px] font-semibold transition-colors",
-                        bloqueado ? "cursor-not-allowed text-t2 opacity-30" : ativo ? "bg-acc text-white" : "text-t1 hover:bg-bg-3",
+                        blocked ? "cursor-not-allowed text-t2 opacity-30" : active ? "bg-acc text-white" : "text-t1 hover:bg-bg-3",
                       )}
                     >
                       {name}
@@ -368,24 +368,24 @@ export function MonthYearPicker({
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-1">
-                {anos.map((ano) => {
-                  const bloqueado = ano < pisoAno || ano > todayYear;
-                  const ativo = selecionado.getFullYear() === ano;
+                {anos.map((year) => {
+                  const blocked = year < floorYear || year > todayYear;
+                  const active = selected.getFullYear() === year;
                   return (
                     <button
-                      key={ano}
+                      key={year}
                       type="button"
-                      disabled={bloqueado}
+                      disabled={blocked}
                       onClick={() => {
-                        setAnoVista(ano);
+                        setYearView(year);
                         setModo("month");
                       }}
                       className={cn(
                         "h-9 rounded-[9px] text-[12.5px] font-semibold transition-colors",
-                        bloqueado ? "cursor-not-allowed text-t2 opacity-30" : ativo ? "bg-acc text-white" : "text-t1 hover:bg-bg-3",
+                        blocked ? "cursor-not-allowed text-t2 opacity-30" : active ? "bg-acc text-white" : "text-t1 hover:bg-bg-3",
                       )}
                     >
-                      {ano}
+                      {year}
                     </button>
                   );
                 })}
@@ -432,23 +432,23 @@ export function MonthStep({ dir }: { dir: "anterior" | "proximo" }) {
 /** Gestão > Fechamento. Calendário do mês, no desenho do Vela. */
 export function CashClosePage() {
   const { show } = useToast();
-  const { session, storeRows, loading: lojasLoading } = useScopedStores();
+  const { session, storeRows, loading: storesLoading } = useScopedStores();
   const { scope } = useScope();
   const escolher = pickOneStore(scope.storeIds, session.stores.length);
-  const showStores = useMinSkeleton(lojasLoading);
+  const showStores = useMinSkeleton(storesLoading);
   const today = calendarTodayIso();
   const [rangeFrom, setRangeFrom] = useState(() => startOfMonth(today));
   const [rangeTo, setRangeTo] = useState(() => endOfMonth(today));
   const [presetId, setPresetId] = useState<DatePresetId | null>("thisMonth");
-  const [piso, setPiso] = useState(() => startOfMonth(today));
+  const [floor, setFloor] = useState(() => startOfMonth(today));
   const [marks, setMarks] = useState<CashCloseDayMark[]>([]);
   const [marksKey, setMarksKey] = useState("");
   const [reviews, setReviews] = useState<CashCloseReview[]>([]);
   const [sellersByStore, setSellersByStore] = useState<Map<string, StoreSeller[]>>(new Map());
-  const [diaAberto, setDiaAberto] = useState<string | null>(null);
-  const [dias, setDias] = useState<Record<string, CashCloseSnapshot>>({});
-  const [diaKey, setDiaKey] = useState("");
-  const [erro, setErro] = useState(false);
+  const [dayOpen, setDayOpen] = useState<string | null>(null);
+  const [days, setDays] = useState<Record<string, CashCloseSnapshot>>({});
+  const [dayKey, setDayKey] = useState("");
+  const [error, setError] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [watermark, setWatermark] = useState<Date | null | undefined>(undefined);
   const [soldToday, setSoldToday] = useState<{ cents: number; byStore: Record<string, number> } | null>(null);
@@ -463,13 +463,13 @@ export function CashClosePage() {
   rangeToRef.current = rangeTo;
   const cells = useMemo(() => rangeCells(rangeFrom, rangeTo), [rangeFrom, rangeTo]);
   const from = rangeFrom;
-  const toBruto = rangeTo;
-  const to = toBruto < today ? toBruto : today;
+  const toGross = rangeTo;
+  const to = toGross < today ? toGross : today;
   const bandKey = `${storeKey}|${from}|${to}|${reloadKey}`;
 
   const storeIdValue = storeRows[0]?.id ?? "";
   useEffect(() => {
-    if (lojasLoading || escolher || storeRows.length === 0) return;
+    if (storesLoading || escolher || storeRows.length === 0) return;
     let stop = false;
     void fetchStoreSellers(session.tenantId, storeRows.map((store) => store.id)).then((map) => {
       if (!stop) setSellersByStore(map);
@@ -477,15 +477,15 @@ export function CashClosePage() {
     return () => {
       stop = true;
     };
-  }, [lojasLoading, escolher, session.tenantId, storeRows]);
+  }, [storesLoading, escolher, session.tenantId, storeRows]);
   useEffect(() => {
-    if (lojasLoading || escolher || !storeIdValue) return;
+    if (storesLoading || escolher || !storeIdValue) return;
     let stop = false;
     void fetchNavMonthFloor("cash_close_day", session.tenantId, storeIdValue, today).then((month) => {
       if (stop) return;
-      setPiso(month);
-      setRangeFrom((atual) => {
-        if (atual >= month) return atual;
+      setFloor(month);
+      setRangeFrom((current) => {
+        if (current >= month) return current;
         setPresetId(null);
         return month;
       });
@@ -493,7 +493,7 @@ export function CashClosePage() {
     return () => {
       stop = true;
     };
-  }, [lojasLoading, escolher, storeIdValue, session.tenantId, today, reloadKey]);
+  }, [storesLoading, escolher, storeIdValue, session.tenantId, today, reloadKey]);
 
   useEffect(() => {
     if (!syncing) return;
@@ -529,15 +529,15 @@ export function CashClosePage() {
     };
   }, [session.tenantId, reloadKey]);
 
-  const pedirFechamento = useCallback(async () => {
+  const requestClosing = useCallback(async () => {
     if (escolher) return;
     const ids = storesRef.current.map((store) => store.id);
     if (ids.length === 0) return;
     const months = monthsTouched(rangeFromRef.current, rangeToRef.current);
     const todayIso = calendarTodayIso();
-    const comDia = months.filter((month) => monthCloseSpanFor(month, todayIso));
-    const alvos = comDia.length > 0 ? comDia : [months[0]];
-    for (const month of alvos) {
+    const withDay = months.filter((month) => monthCloseSpanFor(month, todayIso));
+    const targets = withDay.length > 0 ? withDay : [months[0]];
+    for (const month of targets) {
       const r = await requestMonthClose(ids, month);
       if (!r.ok) {
         show(r.message, "danger");
@@ -553,7 +553,7 @@ export function CashClosePage() {
     status: refreshMomentTitle(watermark ? watermark.toISOString() : watermark),
     busyLabel: "Atualizando…",
     sales: true,
-    run: () => pedirFechamento(),
+    run: () => requestClosing(),
   });
 
   useEffect(() => {
@@ -563,9 +563,9 @@ export function CashClosePage() {
   }, []);
 
   useEffect(() => {
-    if (lojasLoading || escolher || storeRows.length === 0 || from > to) return;
+    if (storesLoading || escolher || storeRows.length === 0 || from > to) return;
     let cancelled = false;
-    setErro(false);
+    setError(false);
     const ids = storeRows.map((l) => l.id);
     void Promise.all([
       fetchCashCloseMonthMarks(session.tenantId, ids, from, to),
@@ -578,15 +578,15 @@ export function CashClosePage() {
         setMarksKey(bandKey);
       })
       .catch(() => {
-        if (!cancelled) setErro(true);
+        if (!cancelled) setError(true);
       });
     return () => {
       cancelled = true;
     };
-  }, [lojasLoading, escolher, session.tenantId, storeRows, from, to, bandKey]);
+  }, [storesLoading, escolher, session.tenantId, storeRows, from, to, bandKey]);
 
   useEffect(() => {
-    if (lojasLoading || escolher || storeRows.length === 0 || to < today) {
+    if (storesLoading || escolher || storeRows.length === 0 || to < today) {
       setSoldToday(null);
       return;
     }
@@ -616,23 +616,23 @@ export function CashClosePage() {
     return () => {
       stop = true;
     };
-  }, [lojasLoading, escolher, storeRows, session.tenantId, today, to, reloadKey]);
+  }, [storesLoading, escolher, storeRows, session.tenantId, today, to, reloadKey]);
 
   useEffect(() => {
-    if (lojasLoading || escolher || !diaAberto || storeRows.length === 0 || diaAberto > today) return;
+    if (storesLoading || escolher || !dayOpen || storeRows.length === 0 || dayOpen > today) return;
     let cancelled = false;
-    setErro(false);
-    const key = `${storeKey}|${diaAberto}|${reloadKey}`;
-    void Promise.all(storeRows.map((store) => fetchCashCloseSnapshot(session.tenantId, store.id, diaAberto).then((snap) => [store.id, snap] as const)))
+    setError(false);
+    const key = `${storeKey}|${dayOpen}|${reloadKey}`;
+    void Promise.all(storeRows.map((store) => fetchCashCloseSnapshot(session.tenantId, store.id, dayOpen).then((snap) => [store.id, snap] as const)))
       .then((rows) => {
-        if (cancelled || !diaAberto) return;
-        setDias(Object.fromEntries(rows));
-        setDiaKey(key);
-        setMarks((atual) => {
-          const next = atual.map((mark) => ({ ...mark }));
+        if (cancelled || !dayOpen) return;
+        setDays(Object.fromEntries(rows));
+        setDayKey(key);
+        setMarks((current) => {
+          const next = current.map((mark) => ({ ...mark }));
           for (const [storeId, snap] of rows) {
-            const i = next.findIndex((mark) => mark.storeId === storeId && mark.day.slice(0, 10) === diaAberto);
-            const mark = { storeId, day: diaAberto, snap, cardPending: snap.cardPending };
+            const i = next.findIndex((mark) => mark.storeId === storeId && mark.day.slice(0, 10) === dayOpen);
+            const mark = { storeId, day: dayOpen, snap, cardPending: snap.cardPending };
             if (i >= 0) next[i] = mark;
             else next.push(mark);
           }
@@ -640,16 +640,16 @@ export function CashClosePage() {
         });
       })
       .catch(() => {
-        if (!cancelled) setErro(true);
+        if (!cancelled) setError(true);
       });
     return () => {
       cancelled = true;
     };
-  }, [lojasLoading, escolher, diaAberto, session.tenantId, storeRows, today, storeKey, reloadKey]);
+  }, [storesLoading, escolher, dayOpen, session.tenantId, storeRows, today, storeKey, reloadKey]);
 
-  const analise = useMemo(() => {
+  const analysis = useMemo(() => {
     if (marksKey !== bandKey) return null;
-    const porDia = new Map<string, { systemCents: number; realCents: number; diffCents: number; withdrawalCents: number; hasMillennium: boolean; hasLines: boolean; pending: boolean }>();
+    const byDay = new Map<string, { systemCents: number; realCents: number; diffCents: number; withdrawalCents: number; hasMillennium: boolean; hasLines: boolean; pending: boolean }>();
     const rows: Array<{ day: string; systemCents: number; realCents: number; diffCents: number; pending: boolean }> = [];
     for (const mark of marks) {
       const day = mark.day.slice(0, 10);
@@ -660,7 +660,7 @@ export function CashClosePage() {
         pixRequested: mark.snap.pixRequested,
       });
       const gap = closeDayGap(lines);
-      const semReal = dayWithoutReal(lines);
+      const withoutReal = dayWithoutReal(lines);
       const retirada = (review?.withdrawals ?? []).reduce((sum, row) => sum + row.cents, 0);
       const diffCents = netCloseDiff(gap.diffCents, retirada);
       if (day < today) {
@@ -669,24 +669,24 @@ export function CashClosePage() {
           systemCents: gap.comparedSystemCents,
           realCents: gap.realCents,
           diffCents,
-          pending: semReal,
+          pending: withoutReal,
         });
       }
-      const atual = porDia.get(day) ?? { systemCents: 0, realCents: 0, diffCents: 0, withdrawalCents: 0, hasMillennium: false, hasLines: false, pending: false };
-      atual.systemCents += gap.systemCents;
-      atual.realCents += gap.realCents;
-      atual.diffCents += diffCents;
-      atual.withdrawalCents += retirada;
-      atual.hasMillennium = atual.hasMillennium || mark.snap.millennium.length > 0;
-      atual.hasLines = atual.hasLines || lines.length > 0;
-      atual.pending = atual.pending || semReal;
-      porDia.set(day, atual);
+      const current = byDay.get(day) ?? { systemCents: 0, realCents: 0, diffCents: 0, withdrawalCents: 0, hasMillennium: false, hasLines: false, pending: false };
+      current.systemCents += gap.systemCents;
+      current.realCents += gap.realCents;
+      current.diffCents += diffCents;
+      current.withdrawalCents += retirada;
+      current.hasMillennium = current.hasMillennium || mark.snap.millennium.length > 0;
+      current.hasLines = current.hasLines || lines.length > 0;
+      current.pending = current.pending || withoutReal;
+      byDay.set(day, current);
     }
-    return { summary: monthCloseSummary(rows), porDia };
+    return { summary: monthCloseSummary(rows), byDay };
   }, [marks, reviews, marksKey, bandKey, today]);
 
   function dayFace(day: string): { kind: "empty" | "zero" | "pending" | "today" | "total"; totalCents: number; diffCents: number; withdrawalCents: number; awaiting?: boolean } {
-    const info = analise?.porDia.get(day);
+    const info = analysis?.byDay.get(day);
     if (day === today) return { kind: "today", totalCents: soldToday?.cents ?? 0, diffCents: 0, withdrawalCents: 0, awaiting: soldToday == null };
     if (info?.pending) return { kind: "pending", totalCents: info.systemCents, diffCents: 0, withdrawalCents: 0 };
     if (!info || (info.systemCents === 0 && info.realCents === 0)) return { kind: "zero", totalCents: 0, diffCents: 0, withdrawalCents: 0 };
@@ -697,16 +697,16 @@ export function CashClosePage() {
   function openDay(iso: string) {
     if (iso > today) return;
     if (iso < today && dayFace(iso).kind === "zero") return;
-    setDiaAberto(iso);
+    setDayOpen(iso);
   }
 
-  function aplicarIntervalo(start: Date, end: Date, goal?: DateRangeChangeMeta) {
+  function applyInterval(start: Date, end: Date, goal?: DateRangeChangeMeta) {
     setRangeFrom(dateToIso(start));
     setRangeTo(dateToIso(end));
     setPresetId(goal?.presetId ?? null);
   }
 
-  const diaPronto = diaAberto != null && diaKey === `${storeKey}|${diaAberto}|${reloadKey}`;
+  const dayPronto = dayOpen != null && dayKey === `${storeKey}|${dayOpen}|${reloadKey}`;
 
   return (
     <div>
@@ -718,18 +718,18 @@ export function CashClosePage() {
           <HeaderFilters>
             <DateRangePicker
               value={[isoToDate(rangeFrom), isoToDate(rangeTo)]}
-              minDate={isoToDate(piso)}
+              minDate={isoToDate(floor)}
               maxDate={isoToDate(endOfMonth(today))}
               quickRanges={CALENDAR_QUICK_RANGES}
               displayLabel={presetId ? periodLabels[presetId] : null}
               activePresetId={presetId}
-              onChange={([start, end], goal) => aplicarIntervalo(start, end, goal)}
+              onChange={([start, end], goal) => applyInterval(start, end, goal)}
             />
           </HeaderFilters>
         }
       />
       <div className="mt-6 pb-6">
-        {erro ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar o fechamento. Tente novamente." /> : null}
+        {error ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar o fechamento. Tente novamente." /> : null}
         {escolher ? (
           <div className="max-w-[720px]">
             <SelectStoreCard />
@@ -742,31 +742,31 @@ export function CashClosePage() {
           </Card>
         ) : (
           <>
-            {analise ? (
-              <MonthSummary summary={analise.summary} />
+            {analysis ? (
+              <MonthSummary summary={analysis.summary} />
             ) : (
               <Skeleton className="mb-4 h-[88px] w-full rounded-[18px]" />
             )}
-            <Mes today={today} cells={cells} dayFace={dayFace} onOpen={openDay} />
+            <Month today={today} cells={cells} dayFace={dayFace} onOpen={openDay} />
           </>
         )}
       </div>
       <DayModal
-        day={diaAberto}
+        day={dayOpen}
         storeRows={storeRows}
-        snaps={dias}
+        snaps={days}
         reviews={reviews}
-        pronto={diaPronto}
-        gestor={isGestor(session.role)}
-        closed={diaAberto != null && diaAberto < today}
+        pronto={dayPronto}
+        owner={isOwner(session.role)}
+        closed={dayOpen != null && dayOpen < today}
         tenantId={session.tenantId}
         soldByStore={soldToday?.byStore ?? null}
         sellersByStore={sellersByStore}
-        onClose={() => setDiaAberto(null)}
+        onClose={() => setDayOpen(null)}
         onSaved={(next) => {
-          setReviews((atual) => {
-            const sem = atual.filter((r) => !(r.storeId === next.storeId && r.day === next.day));
-            return [...sem, next];
+          setReviews((current) => {
+            const without = current.filter((r) => !(r.storeId === next.storeId && r.day === next.day));
+            return [...without, next];
           });
         }}
       />
@@ -818,35 +818,35 @@ function MonthSummary({ summary }: { summary: MonthCloseSummary }) {
 }
 
 function DayTotals({ systemCents, realCents, diffCents }: { systemCents: number; realCents: number; diffCents: number }) {
-  const itens = [
-    { label: "Millennium", value: money(systemCents), tom: "text-t0" },
-    { label: "Total real", value: money(realCents), tom: "text-t0" },
-    { label: "Diferença", value: dayTotal(diffCents), tom: diffClass(diffCents) },
+  const items = [
+    { label: "Millennium", value: money(systemCents), tone: "text-t0" },
+    { label: "Total real", value: money(realCents), tone: "text-t0" },
+    { label: "Diferença", value: dayTotal(diffCents), tone: diffClass(diffCents) },
   ];
   return (
     <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
-      {itens.map((item) => (
+      {items.map((item) => (
         <div key={item.label} className="min-w-0 rounded-[14px] border border-line bg-bg-1 px-3 py-3">
           <p className="text-[10px] font-bold uppercase tracking-wide text-t2">{item.label}</p>
-          <p className={cn("mt-1 truncate font-mono text-lg font-extrabold", item.tom)}>{item.value}</p>
+          <p className={cn("mt-1 truncate font-mono text-lg font-extrabold", item.tone)}>{item.value}</p>
         </div>
       ))}
     </div>
   );
 }
 
-export function DayChip({ cor, children }: { cor: string; children: string }) {
+export function DayChip({ color, children }: { color: string; children: string }) {
   return (
-    <div title={children} className={cn("mt-1 w-full self-stretch truncate rounded-md px-1.5 py-1 text-[10px] font-semibold text-white sm:text-[11px]", cor)}>
+    <div title={children} className={cn("mt-1 w-full self-stretch truncate rounded-md px-1.5 py-1 text-[10px] font-semibold text-white sm:text-[11px]", color)}>
       {children}
     </div>
   );
 }
 
-function differenceChip(cents: number): { cor: string; text: string } {
-  if (cents > 0) return { cor: "bg-ok", text: `Sobra ${brlCent(cents / 100)}` };
-  if (cents < 0) return { cor: "bg-bad", text: `Quebra ${brlCent(Math.abs(cents) / 100)}` };
-  return { cor: "bg-chip-gray", text: "Sem diferença" };
+function differenceChip(cents: number): { color: string; text: string } {
+  if (cents > 0) return { color: "bg-ok", text: `Sobra ${brlCent(cents / 100)}` };
+  if (cents < 0) return { color: "bg-bad", text: `Quebra ${brlCent(Math.abs(cents) / 100)}` };
+  return { color: "bg-chip-gray", text: "Sem diferença" };
 }
 
 function dayHint(face: { kind: "empty" | "zero" | "pending" | "today" | "total"; totalCents: number; diffCents: number; withdrawalCents: number }): string | undefined {
@@ -857,7 +857,7 @@ function dayHint(face: { kind: "empty" | "zero" | "pending" | "today" | "total";
   return partes.length > 0 ? partes.join(" · ") : undefined;
 }
 
-function Mes({
+function Month({
   today,
   cells,
   dayFace,
@@ -874,7 +874,7 @@ function Mes({
         if (!day) return <div key={`vazio-${i}`} className={blankDayClass(i)} />;
         const face = day <= today ? dayFace(day) : null;
         const showsTotal = face?.kind === "pending" || face?.kind === "total" || (face?.kind === "today" && !face.awaiting);
-        const dica = face ? dayHint(face) : undefined;
+        const hint = face ? dayHint(face) : undefined;
         const open = Boolean(face && face.kind !== "zero" && face.kind !== "empty");
         return (
           <DayFace
@@ -884,19 +884,19 @@ function Mes({
             today={today}
             openable={open}
             openLabel={`Abrir ${dayTitle(day)}`}
-            title={dica}
+            title={hint}
             onOpen={() => onOpen(day)}
             amount={showsTotal && face ? brlCent(face.totalCents / 100) : null}
             badges={
               face?.kind === "today" || face?.kind === "pending" || face?.kind === "total" ? (
                 <>
-                  {face.kind === "pending" && <DayChip cor="bg-warn">{`Pendente ${brlCent(face.totalCents / 100)}`}</DayChip>}
-                  {face.kind === "today" && <DayChip cor="bg-acc">Em aberto</DayChip>}
+                  {face.kind === "pending" && <DayChip color="bg-warn">{`Pendente ${brlCent(face.totalCents / 100)}`}</DayChip>}
+                  {face.kind === "today" && <DayChip color="bg-acc">Em aberto</DayChip>}
                   {face.kind === "total" && (face.diffCents !== 0 || face.withdrawalCents === 0) && (
-                    <DayChip cor={differenceChip(face.diffCents).cor}>{differenceChip(face.diffCents).text}</DayChip>
+                    <DayChip color={differenceChip(face.diffCents).color}>{differenceChip(face.diffCents).text}</DayChip>
                   )}
                   {face.kind === "total" && face.withdrawalCents > 0 && (
-                    <DayChip cor="bg-info">{`Retirada ${brlCent(face.withdrawalCents / 100)}`}</DayChip>
+                    <DayChip color="bg-info">{`Retirada ${brlCent(face.withdrawalCents / 100)}`}</DayChip>
                   )}
                 </>
               ) : null
@@ -914,7 +914,7 @@ function DayModal({
   snaps,
   reviews,
   pronto,
-  gestor,
+  owner,
   closed,
   tenantId,
   soldByStore,
@@ -927,7 +927,7 @@ function DayModal({
   snaps: Record<string, CashCloseSnapshot>;
   reviews: CashCloseReview[];
   pronto: boolean;
-  gestor: boolean;
+  owner: boolean;
   closed: boolean;
   tenantId: string;
   soldByStore: Record<string, number> | null;
@@ -951,8 +951,8 @@ function DayModal({
       const typed: CloseDraft["typed"] = {};
       const acquirer: CloseDraft["acquirer"] = {};
       for (const line of buildCashCloseView(snap).lines) {
-        const salvo = review?.typedCents[line.key] ?? (line.key === "cash" ? review?.cashTypedCents : null);
-        typed[line.key] = centsToField(salvo ?? line.typedCents);
+        const saved = review?.typedCents[line.key] ?? (line.key === "cash" ? review?.cashTypedCents : null);
+        typed[line.key] = centsToField(saved ?? line.typedCents);
         const manual = review?.acquirerCents[line.key];
         const shown = manual ?? line.stoneCents;
         acquirer[line.key] = shown == null ? "" : centsToField(shown);
@@ -964,18 +964,18 @@ function DayModal({
     setWithdrawalDrafts(nextWithdrawals);
   }, [day, pronto, storeRows, snaps, reviews]);
 
-  const comDados = day
+  const withDados = day
     ? storeRows.filter((store) => {
         const snap = snaps[store.id];
         return snap && buildCashCloseView(snap).lines.some((line) => line.systemCents !== 0 || line.typedCents !== 0 || line.stoneCents != null);
       })
     : [];
 
-  const diaPendente =
+  const dayPending =
     closed &&
     pronto &&
-    (comDados.length === 0 ||
-      comDados.some((store) => {
+    (withDados.length === 0 ||
+      withDados.some((store) => {
         const snap = snaps[store.id];
         if (!snap || !day) return true;
         const review = reviews.find((r) => r.storeId === store.id && r.day === day) ?? null;
@@ -986,22 +986,22 @@ function DayModal({
         return dayWithoutReal(lines);
       }));
 
-  async function salvar() {
+  async function save() {
     if (!day) return;
     setBusy(true);
-    for (const store of comDados) {
+    for (const store of withDados) {
       const snap = snaps[store.id];
       const draft = drafts[store.id];
       if (!snap || !draft) continue;
-      const linhas = buildCashCloseView(snap).lines;
+      const lines = buildCashCloseView(snap).lines;
       const typedCents: CashCloseReview["typedCents"] = {};
       const acquirerCents: CashCloseReview["acquirerCents"] = {};
-      let invalido = false;
-      for (const line of linhas) {
+      let invalid = false;
+      for (const line of lines) {
         const typedRaw = draft.typed[line.key] ?? "";
         const typed = fieldToCents(typedRaw);
         if (typedRaw.trim() && typed == null) {
-          invalido = true;
+          invalid = true;
           show(`O valor digitado para ${line.label} não é válido.`, "danger");
           break;
         }
@@ -1010,13 +1010,13 @@ function DayModal({
         const raw = draft.acquirer[line.key] ?? "";
         const real = fieldToCents(raw);
         if (raw.trim() && real == null) {
-          invalido = true;
+          invalid = true;
           show(`O total real para ${line.label} não é válido.`, "danger");
           break;
         }
         if (real != null && real !== line.stoneCents && !(line.stoneCents == null && real === 0)) acquirerCents[line.key] = real;
       }
-      if (invalido) {
+      if (invalid) {
         setBusy(false);
         return;
       }
@@ -1026,7 +1026,7 @@ function DayModal({
         (withdrawalDrafts[store.id]?.rows ?? []).map((row) => row.sellerId),
       );
       const retiro = withdrawalSave({
-        shortageCents: dayShortageCents(closeDayGap(linesWithDraft(linhas, draft)).diffCents),
+        shortageCents: dayShortageCents(closeDayGap(linesWithDraft(lines, draft)).diffCents),
         enabled: withdrawalDrafts[store.id]?.enabled ?? false,
         rows: withdrawalDrafts[store.id]?.rows ?? [],
         parseCents: fieldToCents,
@@ -1074,8 +1074,8 @@ function DayModal({
           <>
             <span>{dayTitle(day)}</span>
             {(!closed || pronto) && (
-              <Badge variant={!closed ? "accent" : diaPendente ? "warning" : "success"}>
-                {!closed ? "Em aberto" : diaPendente ? "Pendente" : "Fechado"}
+              <Badge variant={!closed ? "accent" : dayPending ? "warning" : "success"}>
+                {!closed ? "Em aberto" : dayPending ? "Pendente" : "Fechado"}
               </Badge>
             )}
           </>
@@ -1087,10 +1087,10 @@ function DayModal({
       footer={
         <>
           <Button variant="outline" onClick={onClose} disabled={busy}>
-            {gestor ? "Cancelar" : "Voltar"}
+            {owner ? "Cancelar" : "Voltar"}
           </Button>
-          {gestor && closed && comDados.length > 0 && (
-            <Button onClick={() => void salvar()} disabled={busy || !pronto}>
+          {owner && closed && withDados.length > 0 && (
+            <Button onClick={() => void save()} disabled={busy || !pronto}>
               {busy ? "Salvando…" : "Salvar"}
             </Button>
           )}
@@ -1105,33 +1105,33 @@ function DayModal({
             const cents = soldByStore && store.id in soldByStore ? soldByStore[store.id] : null;
             return (
               <div key={store.id}>
-                {storeRows.length > 1 ? <p className="mb-2 text-[13px] font-bold text-t0">{store.fantasia}</p> : null}
+                {storeRows.length > 1 ? <p className="mb-2 text-[13px] font-bold text-t0">{store.tradeName}</p> : null}
                 <DayMetrics items={[{ label: "Vendido hoje", value: cents == null ? "—" : brlCent(cents / 100) }]} />
                 <p className="text-[13px] leading-relaxed text-t2">Este dia ainda está em aberto. A diferença será calculada após o fechamento.</p>
               </div>
             );
           })}
         </div>
-      ) : comDados.length === 0 ? (
+      ) : withDados.length === 0 ? (
         <p className="text-[13.5px] leading-relaxed text-t1">Ainda não há fechamento neste dia.</p>
       ) : (
         <div className="flex flex-col gap-6">
-          {comDados.map((store) => {
+          {withDados.map((store) => {
             const snap = snaps[store.id];
             if (!snap) return null;
             const view = buildCashCloseView(snap);
             const cash = view.lines.find((l) => l.key === "cash");
             const draft = drafts[store.id];
-            const linhas = linesWithDraft(view.lines, draft);
-            const conta = closeDayGap(linhas);
+            const lines = linesWithDraft(view.lines, draft);
+            const conta = closeDayGap(lines);
             const people = withdrawalPeople(
               (sellersByStore.get(store.id) ?? []).map((seller) => ({ id: seller.id, name: seller.name, active: seller.active })),
               (withdrawalDrafts[store.id]?.rows ?? []).map((row) => row.sellerId),
             );
             return (
               <section key={store.id}>
-                {storeRows.length > 1 && <p className="mb-3 text-[13px] font-bold text-t0">{store.fantasia}</p>}
-                {!dayWithoutReal(linhas) ? (
+                {storeRows.length > 1 && <p className="mb-3 text-[13px] font-bold text-t0">{store.tradeName}</p>}
+                {!dayWithoutReal(lines) ? (
                   <DayTotals systemCents={conta.comparedSystemCents} realCents={conta.realCents} diffCents={conta.diffCents} />
                 ) : (
                   <p className="mb-4 text-[13px] text-t2">Falta o total real de alguma forma. A diferença aparece quando ele for informado.</p>
@@ -1139,28 +1139,28 @@ function DayModal({
                 {cash?.openingCents != null && (
                   <p className="mb-3 text-[12px] text-t2">
                     Fundo de caixa {brlCent(cash.openingCents / 100)}
-                    {cash.sangriaCents != null ? ` · Sangria ${brlCent(Math.abs(cash.sangriaCents) / 100)}` : ""}
+                    {cash.cashDropCents != null ? ` · Sangria ${brlCent(Math.abs(cash.cashDropCents) / 100)}` : ""}
                   </p>
                 )}
                 <CloseTable
-                  lines={linhas}
+                  lines={lines}
                   pixPending={view.pixPending}
-                  gestor={gestor}
+                  owner={owner}
                   closed={closed}
                   draft={draft}
                   onAcquirer={(key, value) =>
-                    setDrafts((atual) => ({
-                      ...atual,
-                      [store.id]: { ...(atual[store.id] ?? draft!), acquirer: { ...(atual[store.id]?.acquirer ?? {}), [key]: value } },
+                    setDrafts((current) => ({
+                      ...current,
+                      [store.id]: { ...(current[store.id] ?? draft!), acquirer: { ...(current[store.id]?.acquirer ?? {}), [key]: value } },
                     }))
                   }
                 />
                 <EmployeeWithdrawal
-                  gestor={gestor}
+                  owner={owner}
                   shortageCents={dayShortageCents(conta.diffCents)}
                   people={people}
                   draft={withdrawalDrafts[store.id] ?? { enabled: false, rows: [] }}
-                  onChange={(next) => setWithdrawalDrafts((atual) => ({ ...atual, [store.id]: next }))}
+                  onChange={(next) => setWithdrawalDrafts((current) => ({ ...current, [store.id]: next }))}
                   toCents={fieldToCents}
                 />
               </section>

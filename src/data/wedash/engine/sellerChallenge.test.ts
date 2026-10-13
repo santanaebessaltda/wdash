@@ -6,7 +6,7 @@ import { challengeStanding, sellerChallengeRules, type SellerProductDay } from "
 const member = (employeeId: number, name: string): GoalTeamMember => ({
   storeId: "s1",
   employeeId,
-  geradorId: employeeId + 1000,
+  generatorId: employeeId + 1000,
   name,
   nameKeys: [name],
   salesPerson: true,
@@ -21,7 +21,7 @@ const day = (employeeId: number, sales: number, items: number, cents: number, is
   sellerKey: String(employeeId),
   sellerName: String(employeeId),
   sellerEmployeeId: employeeId,
-  sellerGeradorId: employeeId + 1000,
+  sellerGeneratorId: employeeId + 1000,
   brand: "ALL",
   revenueCents: cents,
   salesCount: sales,
@@ -31,7 +31,7 @@ const day = (employeeId: number, sales: number, items: number, cents: number, is
 const product = (employeeId: number, code: string, items: number): SellerProductDay => ({
   storeId: "s1",
   day: "2026-09-10",
-  sellerGeradorId: employeeId + 1000,
+  sellerGeneratorId: employeeId + 1000,
   sellerKey: String(employeeId),
   sellerName: String(employeeId),
   productCode: code,

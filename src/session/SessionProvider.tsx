@@ -6,14 +6,14 @@ import { companyNameCase, titleName } from "@/lib/format";
 import { paths } from "@/router/paths";
 import {
   emRecovery,
-  limparRecovery,
+  clearRecovery,
   logoutAuth,
-  marcarRecovery,
+  markRecovery,
   sessionFromPersistedAuth,
 } from "@/session/authApi";
 import { accessLabel, roleLabel, sessionFromUser, storesKey, type Session } from "@/session/session";
 import { clearSavedPeriod } from "@/session/periodStorage";
-import { pedirPermissaoAposLogin, watchSalesPush } from "@/push/salesPush";
+import { requestPermissionAfterLogin, watchSalesPush } from "@/push/salesPush";
 
 export type { Session };
 export { accessLabel, roleLabel, sessionFromUser };
@@ -21,14 +21,14 @@ export { accessLabel, roleLabel, sessionFromUser };
 interface SessionContextValue {
   session: Session | null;
   ready: boolean;
-  signIn: (usuario: User) => Session;
+  signIn: (username: User) => Session;
   applySession: (s: Session) => void;
   signOut: () => void;
   update: (patch: Partial<Session>) => void;
 }
 
-const CHAVE = "wedash-session";
-const CHAVE_LEGACY = "wedash-sessao";
+const ROWKEY = "wedash-session";
+const ROWKEY_LEGACY = "wedash-sessao";
 
 const Contexto = createContext<SessionContextValue | null>(null);
 
@@ -44,20 +44,20 @@ function migrateLegacySession(raw: Record<string, unknown>): Session {
     stores: (raw.stores as string[]) ?? [],
     collaboratorId: (raw.collaboratorId ?? raw.employeeId ?? null) as string | null,
     onboardingStep: (raw.onboardingStep ?? raw.onboardingEtapa ?? null) as number | null,
-    temporaryPassword: Boolean(raw.temporaryPassword ?? raw.senhaTemporaria),
+    temporaryPassword: Boolean(raw.temporaryPassword ?? raw.temporaryPassword),
     tenantId: raw.tenantId as string,
-    companyName: companyNameCase((raw.companyName ?? raw.empresaNome ?? raw.name ?? raw.name ?? "") as string),
+    companyName: companyNameCase((raw.companyName ?? raw.empresaName ?? raw.name ?? raw.name ?? "") as string),
     appInstalled: Boolean(raw.appInstalled ?? raw.appInstalado),
   };
 }
 
 function ler(): Session | null {
   try {
-    let raw = window.localStorage.getItem(CHAVE);
+    let raw = window.localStorage.getItem(ROWKEY);
     if (!raw) {
-      raw = window.localStorage.getItem(CHAVE_LEGACY);
+      raw = window.localStorage.getItem(ROWKEY_LEGACY);
       if (raw) {
-        window.localStorage.removeItem(CHAVE_LEGACY);
+        window.localStorage.removeItem(ROWKEY_LEGACY);
       }
     }
     if (!raw) return null;
@@ -68,11 +68,11 @@ function ler(): Session | null {
   }
 }
 
-function gravar(s: Session | null) {
+function save(s: Session | null) {
   try {
-    if (s) window.localStorage.setItem(CHAVE, JSON.stringify(s));
-    else window.localStorage.removeItem(CHAVE);
-    window.localStorage.removeItem(CHAVE_LEGACY);
+    if (s) window.localStorage.setItem(ROWKEY, JSON.stringify(s));
+    else window.localStorage.removeItem(ROWKEY);
+    window.localStorage.removeItem(ROWKEY_LEGACY);
   } catch {
     /* armazenamento indisponivel */
   }
@@ -115,12 +115,12 @@ function mergeWithCache(fromAuth: Session, cached: Session | null): Session {
  * O supabase-js emite SIGNED_IN de novo toda vez que a aba volta a ficar visivel. Sessao igual
  * mantem o mesmo objeto (e o mesmo array de lojas)  -  senao as telas recarregam com skeleton.
  */
-function keepIfSame(atual: Session | null, nova: Session): Session {
-  if (!atual) return nova;
+function keepIfSame(current: Session | null, isNew: Session): Session {
+  if (!current) return isNew;
   // Lojas vem do banco sem ordem garantida: mesma lista em outra ordem = mesmas lojas.
-  const sameStores = storesKey(atual.stores) === storesKey(nova.stores);
-  const candidata = sameStores ? { ...nova, stores: atual.stores } : nova;
-  return JSON.stringify(atual) === JSON.stringify(candidata) ? atual : candidata;
+  const sameStores = storesKey(current.stores) === storesKey(isNew.stores);
+  const candidata = sameStores ? { ...isNew, stores: current.stores } : isNew;
+  return JSON.stringify(current) === JSON.stringify(candidata) ? current : candidata;
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
@@ -133,7 +133,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!session || session.role === "SELLER") return;
-    void pedirPermissaoAposLogin(session.tenantId, session.membershipId);
+    void requestPermissionAfterLogin(session.tenantId, session.membershipId);
   }, [session]);
 
   useEffect(() => {
@@ -172,18 +172,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if (cancel) return;
 
         if (event === "PASSWORD_RECOVERY") {
-          marcarRecovery();
+          markRecovery();
           setSession(null);
-          gravar(null);
+          save(null);
           finishBoot();
           navigate(paths.access.reset, { replace: true });
           return;
         }
 
         if (event === "SIGNED_OUT") {
-          limparRecovery();
+          clearRecovery();
           setSession(null);
-          gravar(null);
+          save(null);
           finishBoot();
           return;
         }
@@ -200,7 +200,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         ) {
           if (emRecovery()) {
             setSession(null);
-            gravar(null);
+            save(null);
             finishBoot();
             return;
           }
@@ -217,8 +217,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
                   if (cancel) return;
                   if (s) {
                     const merged = mergeWithCache(s, cached);
-                    setSession((atual) => keepIfSame(atual, merged));
-                    gravar(merged);
+                    setSession((current) => keepIfSame(current, merged));
+                    save(merged);
                   } else {
                     setSession(cached);
                   }
@@ -226,7 +226,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
                   setSession(cached);
                 } else if (!hasStoredAuthToken()) {
                   setSession(null);
-                  gravar(null);
+                  save(null);
                 } else {
                   setSession(cached);
                 }
@@ -241,14 +241,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           const s = await sessionFromPersistedAuth();
           if (cancel) return;
           if (s) {
-            setSession((atual) => {
-              const merged = keepIfSame(atual, mergeWithCache(s, atual ?? cached));
-              if (merged !== atual) gravar(merged);
+            setSession((current) => {
+              const merged = keepIfSame(current, mergeWithCache(s, current ?? cached));
+              if (merged !== current) save(merged);
               return merged;
             });
           } else {
             // JWT ok, hydrate falhou (rede)  -  manter cache.
-            setSession((atual) => atual ?? cached ?? ler());
+            setSession((current) => current ?? cached ?? ler());
           }
           finishBoot();
         }
@@ -270,29 +270,29 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback((u: User) => {
     const s = sessionFromUser(u);
     setSession(s);
-    gravar(s);
+    save(s);
     return s;
   }, []);
 
   const applySession = useCallback((s: Session) => {
     setSession(s);
-    gravar(s);
+    save(s);
   }, []);
 
   const signOut = useCallback(() => {
     // Nao desconecta Millennium  -  so Configuracoes > Integracao ERP.
     clearSavedPeriod();
     setSession(null);
-    gravar(null);
+    save(null);
     void logoutAuth();
   }, []);
 
   const update = useCallback((patch: Partial<Session>) => {
-    setSession((atual) => {
-      if (!atual) return atual;
-      const nova = { ...atual, ...patch };
-      gravar(nova);
-      return nova;
+    setSession((current) => {
+      if (!current) return current;
+      const isNew = { ...current, ...patch };
+      save(isNew);
+      return isNew;
     });
   }, []);
 

@@ -89,7 +89,7 @@ const MANAGER_TARGET_HELP: Record<ChallengeMetric, string> = {
 
 const PODIUM_LABEL = ["Prêmio do 1º lugar", "Prêmio do 2º lugar", "Prêmio do 3º lugar"];
 
-const semAcento = (s: string) =>
+const withoutAcento = (s: string) =>
   s
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -106,9 +106,9 @@ export default function ChallengeEditorPage() {
   const session = useActiveSession();
   const toast = useToast();
   const title = id ? "Editar desafio" : "Novo desafio";
-  const voltarPara = challengeBackPath(location.state);
-  const voltar = () =>
-    navigate(id ? paths.management.challengeDetail(id) : voltarPara, id ? { state: location.state } : undefined);
+  const backTo = challengeBackPath(location.state);
+  const back = () =>
+    navigate(id ? paths.management.challengeDetail(id) : backTo, id ? { state: location.state } : undefined);
 
   const { scope } = useScope();
   const storeRows = useMemo(() => storesForSession(session.stores), [session.stores]);
@@ -120,7 +120,7 @@ export default function ChallengeEditorPage() {
   useEffect(() => {
     if (!id && !copyForStore && storeFilter) setForm((f) => ({ ...f, storeId: storeFilter }));
   }, [id, storeFilter, copyForStore]);
-  useReturnWhenStoreChanges(id ? form.storeId || undefined : undefined, voltarPara);
+  useReturnWhenStoreChanges(id ? form.storeId || undefined : undefined, backTo);
 
   const sourceId = id ?? copyId;
   const [loadingSource, setLoadingSource] = useState(Boolean(sourceId));
@@ -153,10 +153,10 @@ export default function ChallengeEditorPage() {
       else if (copyId) {
         if (copyForStore) {
           setSourceStoreId(c.storeId);
-          const outras = storeRows.filter((l) => l.id !== c.storeId);
-          const destino =
-            storeFilter && storeFilter !== c.storeId ? storeFilter : outras.length === 1 ? outras[0]!.id : "";
-          setForm({ ...challengeToForm(copyChallengeToStore(c)), storeId: destino });
+          const others = storeRows.filter((l) => l.id !== c.storeId);
+          const destination =
+            storeFilter && storeFilter !== c.storeId ? storeFilter : others.length === 1 ? others[0]!.id : "";
+          setForm({ ...challengeToForm(copyChallengeToStore(c)), storeId: destination });
           setCopiedFrom(c.name);
           setCopiedForStore(true);
         } else {
@@ -218,7 +218,7 @@ export default function ChallengeEditorPage() {
   const header = (
     <>
       <div className="mb-5 flex flex-wrap items-center gap-3">
-        <Button variant="secondary" size="sm" icon={<Icon d={icons.arrowLeft} size={14} />} onClick={voltar}>
+        <Button variant="secondary" size="sm" icon={<Icon d={icons.arrowLeft} size={14} />} onClick={back}>
           Voltar
         </Button>
         <Breadcrumbs
@@ -247,8 +247,8 @@ export default function ChallengeEditorPage() {
             title="Desafio não encontrado"
             description="O desafio pode ter sido excluído ou não pertencer às suas filiais."
             action={
-              <Button size="sm" variant="outline" onClick={() => navigate(voltarPara)}>
-                {voltarPara.startsWith(paths.team) ? "Voltar para Equipe" : "Voltar para Desafios"}
+              <Button size="sm" variant="outline" onClick={() => navigate(backTo)}>
+                {backTo.startsWith(paths.team) ? "Voltar para Equipe" : "Voltar para Desafios"}
               </Button>
             }
           />
@@ -266,9 +266,9 @@ export default function ChallengeEditorPage() {
     );
   }
 
-  const usaVendas = usesMinSales(form.metric);
+  const usesSales = usesMinSales(form.metric);
   const metricUsesScope = usesScope(form.metric);
-  const indice = isIndexMetric(form.metric);
+  const index = isIndexMetric(form.metric);
   const modo = form.mode;
   const podio = modo === "CONTEST" ? form.prizes.slice(0, MAX_PODIUM) : form.prizes.slice(0, 1);
 
@@ -323,7 +323,7 @@ export default function ChallengeEditorPage() {
               {!form.storeId && <option value="">Selecione a loja</option>}
               {targetStores.map((l) => (
                 <option key={l.id} value={l.id}>
-                  {l.fantasia} · Filial {l.codFilial}
+                  {l.tradeName} · Filial {l.branchCode}
                 </option>
               ))}
             </Select>
@@ -407,12 +407,12 @@ export default function ChallengeEditorPage() {
               hint={
                 modo === "MINIMUM"
                   ? "Quem atingir esse valor no período ganha o prêmio."
-                  : `Quem ficar abaixo deste ${indice ? "índice" : "valor"} não recebe prêmio, mesmo que esteja entre as primeiras posições.`
+                  : `Quem ficar abaixo deste ${index ? "índice" : "valor"} não recebe prêmio, mesmo que esteja entre as primeiras posições.`
               }
             >
               <TargetInput metric={form.metric} value={form.target} onChange={(target) => set({ target })} invalid={Boolean(errors.target)} />
             </FormField>
-            {usaVendas && (
+            {usesSales && (
               <FormField
                 label="Vendas mínimas para participar"
                 optional
@@ -474,20 +474,20 @@ export default function ChallengeEditorPage() {
                 checked={form.managerOn}
                 onChange={(v) =>
                   set(
-                    v && !form.managerTarget.trim() && !indice ? { managerOn: v, managerTarget: form.target } : { managerOn: v },
+                    v && !form.managerTarget.trim() && !index ? { managerOn: v, managerTarget: form.target } : { managerOn: v },
                   )
                 }
               />
             </div>
             <p className="mt-1.5 text-[11.5px] text-t2">
-              {indice
+              {index
                 ? "A gerência recebe o prêmio quando o índice da equipe, comparado com o período anterior de mesma duração, atingir o mínimo definido abaixo."
                 : "A gerência recebe o prêmio quando a equipe atinge a meta definida abaixo."}
             </p>
             {form.managerOn && (
               <div className="mt-3 flex flex-col gap-4">
                 <FormField
-                  label={indice ? "Índice mínimo da gerência" : "Meta da gerência"}
+                  label={index ? "Índice mínimo da gerência" : "Meta da gerência"}
                   required
                   error={errors.managerTarget}
                   hint={MANAGER_TARGET_HELP[form.metric]}
@@ -514,7 +514,7 @@ export default function ChallengeEditorPage() {
       </div>
 
       <div className="mt-5 flex justify-end gap-2.5">
-        <Button variant="outline" onClick={voltar}>
+        <Button variant="outline" onClick={back}>
           Cancelar
         </Button>
         <Button onClick={() => void submit()} disabled={saving}>
@@ -549,19 +549,19 @@ function TargetInput({
         aria-label={metric === "TICKET" ? "Ticket médio" : "Faturamento"}
       />
     );
-  const itens = metric === "QUANTITY";
-  const indice = metric === "INDEX";
+  const items = metric === "QUANTITY";
+  const index = metric === "INDEX";
   return (
     <div className="relative">
       <Input
-        inputMode={itens ? "numeric" : "decimal"}
-        placeholder={itens ? "0" : indice ? "0,0" : "0,00"}
+        inputMode={items ? "numeric" : "decimal"}
+        placeholder={items ? "0" : index ? "0,0" : "0,00"}
         value={value}
-        onChange={(e) => onChange(itens ? e.target.value.replace(/\D/g, "").slice(0, 6) : e.target.value.replace(/[^\d,]/g, "").slice(0, 6))}
-        className={cn(itens && "pr-12", invalid && "border-bad!")}
-        aria-label={itens ? "Itens vendidos" : indice ? "Índice de desempenho" : "P.A."}
+        onChange={(e) => onChange(items ? e.target.value.replace(/\D/g, "").slice(0, 6) : e.target.value.replace(/[^\d,]/g, "").slice(0, 6))}
+        className={cn(items && "pr-12", invalid && "border-bad!")}
+        aria-label={items ? "Itens vendidos" : index ? "Índice de desempenho" : "P.A."}
       />
-      {itens && (
+      {items && (
         <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[13px] text-t2">itens</span>
       )}
     </div>
@@ -604,11 +604,11 @@ function PickerShell({ label, error, children }: { label: string; error?: string
   );
 }
 
-const TAGS_VISIVEIS = 12;
+const TAGS_VISIBLE = 12;
 
 /** Parte do nome que bate com a busca, na cor primaria. */
 function destacar(name: string, q: string): ReactNode {
-  const i = q ? semAcento(name).indexOf(q) : -1;
+  const i = q ? withoutAcento(name).indexOf(q) : -1;
   if (i < 0) return name;
   return (
     <>
@@ -638,68 +638,68 @@ function ProductPicker({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [soEscolhidos, setSoEscolhidos] = useState(false);
-  const [ativo, setAtivo] = useState(0);
-  const [verTodas, setVerTodas] = useState(false);
+  const [active, setActive] = useState(0);
+  const [verAll, setVerAll] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   const escolhidos = useMemo(() => new Set(selected.map((p) => p.code)), [selected]);
-  const q = semAcento(query.trim());
-  const lista = useMemo(() => {
+  const q = withoutAcento(query.trim());
+  const list = useMemo(() => {
     if (!catalog) return [];
     return catalog.products.filter(
-      (p) => (!soEscolhidos || escolhidos.has(p.code)) && (!q || semAcento(p.name).includes(q) || semAcento(p.code).includes(q)),
+      (p) => (!soEscolhidos || escolhidos.has(p.code)) && (!q || withoutAcento(p.name).includes(q) || withoutAcento(p.code).includes(q)),
     );
   }, [catalog, q, soEscolhidos, escolhidos]);
-  const alternar = (p: { code: string; name: string }) =>
+  const toggle = (p: { code: string; name: string }) =>
     onChange(escolhidos.has(p.code) ? selected.filter((x) => x.code !== p.code) : [...selected, { code: p.code, name: p.name }]);
   const buscando = q.length > 0;
-  const todosDaBusca = lista.length > 0 && lista.every((p) => escolhidos.has(p.code));
-  const faltamNaBusca = lista.filter((p) => !escolhidos.has(p.code)).length;
+  const allOfSearch = list.length > 0 && list.every((p) => escolhidos.has(p.code));
+  const missingInSearch = list.filter((p) => !escolhidos.has(p.code)).length;
 
-  const fechar = () => {
+  const close = () => {
     setOpen(false);
     setQuery("");
     setSoEscolhidos(false);
-    setAtivo(0);
+    setActive(0);
   };
   useEffect(() => {
     if (!open) return;
-    const fora = (e: MouseEvent) => {
-      if (boxRef.current && !boxRef.current.contains(e.target as Node)) fechar();
+    const excluded = (e: MouseEvent) => {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) close();
     };
-    document.addEventListener("mousedown", fora);
-    return () => document.removeEventListener("mousedown", fora);
+    document.addEventListener("mousedown", excluded);
+    return () => document.removeEventListener("mousedown", excluded);
   }, [open]);
   useEffect(() => {
-    listRef.current?.querySelector(`[data-idx="${ativo}"]`)?.scrollIntoView({ block: "nearest" });
-  }, [ativo]);
+    listRef.current?.querySelector(`[data-idx="${active}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [active]);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setAtivo((i) => Math.min(i + 1, lista.length - 1));
+      setActive((i) => Math.min(i + 1, list.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setAtivo((i) => Math.max(i - 1, 0));
+      setActive((i) => Math.max(i - 1, 0));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      const p = lista[ativo];
-      if (p) alternar(p);
+      const p = list[active];
+      if (p) toggle(p);
     } else if (e.key === "Escape") {
       e.preventDefault();
-      fechar();
+      close();
       triggerRef.current?.focus();
     }
   };
-  const tags = verTodas ? selected : selected.slice(0, TAGS_VISIVEIS);
-  const alternarBusca = () => {
-    if (todosDaBusca) {
-      const daBusca = new Set(lista.map((p) => p.code));
-      onChange(selected.filter((x) => !daBusca.has(x.code)));
+  const tags = verAll ? selected : selected.slice(0, TAGS_VISIBLE);
+  const toggleSearch = () => {
+    if (allOfSearch) {
+      const ofSearch = new Set(list.map((p) => p.code));
+      onChange(selected.filter((x) => !ofSearch.has(x.code)));
     } else {
-      onChange([...selected, ...lista.filter((p) => !escolhidos.has(p.code)).map((p) => ({ code: p.code, name: p.name }))]);
+      onChange([...selected, ...list.filter((p) => !escolhidos.has(p.code)).map((p) => ({ code: p.code, name: p.name }))]);
     }
   };
 
@@ -709,7 +709,7 @@ function ProductPicker({
         <button
           ref={triggerRef}
           type="button"
-          onClick={() => (open ? fechar() : setOpen(true))}
+          onClick={() => (open ? close() : setOpen(true))}
           disabled={!catalog}
           aria-expanded={open}
           aria-haspopup="listbox"
@@ -740,7 +740,7 @@ function ProductPicker({
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value);
-                  setAtivo(0);
+                  setActive(0);
                 }}
                 placeholder="Buscar por produto ou código…"
                 aria-label="Buscar produto"
@@ -751,7 +751,7 @@ function ProductPicker({
                   type="button"
                   onClick={() => {
                     setQuery("");
-                    setAtivo(0);
+                    setActive(0);
                   }}
                   aria-label="Limpar busca"
                   className="shrink-0 cursor-pointer hover:text-t0"
@@ -772,7 +772,7 @@ function ProductPicker({
                     type="button"
                     onClick={() => {
                       setSoEscolhidos(t.v);
-                      setAtivo(0);
+                      setActive(0);
                     }}
                     className={cn(
                       "h-7 cursor-pointer rounded-[8px] border px-2.5 text-[11.5px] font-semibold transition-colors",
@@ -783,20 +783,20 @@ function ProductPicker({
                   </button>
                 ))}
               </div>
-              {(buscando || soEscolhidos) && lista.length > 0 && (
-                <button type="button" onClick={alternarBusca} className="cursor-pointer text-[11.5px] font-semibold text-acc hover:underline">
-                  {todosDaBusca ? "Desmarcar todos" : `Selecionar todos (${faltamNaBusca})`}
+              {(buscando || soEscolhidos) && list.length > 0 && (
+                <button type="button" onClick={toggleSearch} className="cursor-pointer text-[11.5px] font-semibold text-acc hover:underline">
+                  {allOfSearch ? "Desmarcar todos" : `Selecionar todos (${missingInSearch})`}
                 </button>
               )}
             </div>
 
             <div ref={listRef} role="listbox" aria-multiselectable className="max-h-64 overflow-y-auto p-1">
-              {lista.length === 0 ? (
+              {list.length === 0 ? (
                 <p className="px-2.5 py-6 text-center text-[12.5px] text-t2">
                   {soEscolhidos && !buscando ? "Nenhum produto escolhido." : "Nenhum produto encontrado."}
                 </p>
               ) : (
-                lista.map((p, i) => {
+                list.map((p, i) => {
                   const marcado = escolhidos.has(p.code);
                   return (
                     <button
@@ -805,12 +805,12 @@ function ProductPicker({
                       role="option"
                       aria-selected={marcado}
                       data-idx={i}
-                      onClick={() => alternar(p)}
-                      onMouseMove={() => ativo !== i && setAtivo(i)}
+                      onClick={() => toggle(p)}
+                      onMouseMove={() => active !== i && setActive(i)}
                       className={cn(
                         "flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left transition-colors",
-                        marcado ? "bg-acc-soft" : i === ativo && "bg-bg-3",
-                        marcado && i === ativo && "ring-1 ring-inset ring-acc/40",
+                        marcado ? "bg-acc-soft" : i === active && "bg-bg-3",
+                        marcado && i === active && "ring-1 ring-inset ring-acc/40",
                       )}
                     >
                       <span
@@ -844,7 +844,7 @@ function ProductPicker({
                 >
                   Limpar
                 </button>
-                <Button size="sm" onClick={fechar}>
+                <Button size="sm" onClick={close}>
                   Concluir
                 </Button>
               </div>
@@ -872,13 +872,13 @@ function ProductPicker({
               </button>
             </span>
           ))}
-          {selected.length > TAGS_VISIVEIS && (
+          {selected.length > TAGS_VISIBLE && (
             <button
               type="button"
-              onClick={() => setVerTodas((v) => !v)}
+              onClick={() => setVerAll((v) => !v)}
               className="h-[26px] cursor-pointer rounded-lg border border-line px-2.5 text-xs font-semibold text-t1 transition-colors hover:border-acc hover:text-acc"
             >
-              {verTodas ? "Mostrar menos" : `+${selected.length - TAGS_VISIVEIS}`}
+              {verAll ? "Mostrar menos" : `+${selected.length - TAGS_VISIBLE}`}
             </button>
           )}
         </div>
@@ -900,27 +900,27 @@ function CategoryPicker({
   error?: string;
 }) {
   const escolhidas = new Set(selected.map((c) => c.typeId));
-  const opcoes = catalog?.categories ?? [];
-  const fora = selected.filter((s) => !opcoes.some((o) => o.typeId === s.typeId));
+  const options = catalog?.categories ?? [];
+  const excluded = selected.filter((s) => !options.some((o) => o.typeId === s.typeId));
   return (
     <PickerShell label="Categorias" error={error}>
       {!catalog ? (
         <p className="text-[12.5px] text-t2">Carregando categorias…</p>
       ) : (
         <div className="flex flex-wrap gap-1.5">
-          {[...opcoes, ...fora].map((c) => {
-            const ativa = escolhidas.has(c.typeId);
+          {[...options, ...excluded].map((c) => {
+            const active = escolhidas.has(c.typeId);
             return (
               <button
                 key={c.typeId}
                 type="button"
-                aria-pressed={ativa}
+                aria-pressed={active}
                 onClick={() =>
-                  onChange(ativa ? selected.filter((s) => s.typeId !== c.typeId) : [...selected, { typeId: c.typeId, name: c.name }])
+                  onChange(active ? selected.filter((s) => s.typeId !== c.typeId) : [...selected, { typeId: c.typeId, name: c.name }])
                 }
                 className={cn(
                   "h-8 cursor-pointer rounded-[9px] border px-3 text-xs font-semibold transition-colors",
-                  ativa ? "border-acc bg-acc-soft text-acc" : "border-line text-t1 hover:border-acc",
+                  active ? "border-acc bg-acc-soft text-acc" : "border-line text-t1 hover:border-acc",
                 )}
               >
                 {c.name}

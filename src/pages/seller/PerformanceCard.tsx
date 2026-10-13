@@ -48,10 +48,10 @@ export function PerformanceCard({ store }: { store: SellerHomeStore }) {
   const ranking = store.monthRanking ?? [];
   const challenges = store.challenges ?? [];
   const podium: RankingRow[] = ranking.slice(0, 3).map((r) => ({
-    posicao: r.position,
+    position: r.position,
     employeeId: r.me ? "me" : `p${r.position}-${r.name}`,
     name: r.me ? "VOCÊ" : r.name,
-    vendas: r.sales,
+    sales: r.sales,
     revenue: r.revenue,
   }));
   const rest = ranking.slice(3);
@@ -74,7 +74,7 @@ export function PerformanceCard({ store }: { store: SellerHomeStore }) {
               ) : (
                 <div>
                   {store.groupName && <p className="mb-2 text-[12.5px] font-semibold text-t2">Grupo {store.groupName}</p>}
-                  <RankingBlock ranking={podium} formatValor={brlCent} />
+                  <RankingBlock ranking={podium} formatAmount={brlCent} />
                   {rest.length > 0 && (
                     <ul className="mt-3 flex flex-col divide-y divide-line">
                       {rest.map((r) => (

@@ -27,22 +27,22 @@ export function CreateAccess() {
   const navigate = useNavigate();
   const { show } = useToast();
 
-  const [name, setNome] = useState<PersonName>({ name: "", sobrenome: "" });
-  const [foto, setFoto] = useState<File | null>(null);
-  const [senha, setSenha] = useState("");
+  const [name, setName] = useState<PersonName>({ name: "", lastName: "" });
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [password, setPassword] = useState("");
   const [confirma, setConfirma] = useState("");
-  const [carregando, setCarregando] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const comOnboarding = session.onboardingStep !== null;
-  const erroConfirma = confirma.length > 0 && confirma !== senha ? "As senhas não coincidem." : null;
-  const pode = personNameIsValid(name) && passwordIsValid(senha) && confirma === senha && !carregando;
+  const withOnboarding = session.onboardingStep !== null;
+  const errorConfirma = confirma.length > 0 && confirma !== password ? "As senhas não coincidem." : null;
+  const can = personNameIsValid(name) && passwordIsValid(password) && confirma === password && !loading;
 
-  async function salvar(e: FormEvent) {
+  async function save(e: FormEvent) {
     e.preventDefault();
-    if (!pode) return;
-    setCarregando(true);
-    const r = await createAccess({ firstName: name.name, lastName: name.sobrenome, password: senha, photo: foto });
-    setCarregando(false);
+    if (!can) return;
+    setLoading(true);
+    const r = await createAccess({ firstName: name.name, lastName: name.lastName, password: password, photo: photo });
+    setLoading(false);
     if (!r.ok) {
       show(r.error, "danger");
       return;
@@ -77,20 +77,20 @@ export function CreateAccess() {
         </div>
 
         <div className="mx-auto flex w-full max-w-[400px] flex-1 flex-col justify-center py-4">
-          {comOnboarding && <WizardSteps steps={ONBOARDING_STEPS} current={1} />}
+          {withOnboarding && <WizardSteps steps={ONBOARDING_STEPS} current={1} />}
 
           <h1 className="mb-2 text-2xl font-extrabold tracking-tight text-t0">Crie seu acesso</h1>
           <p className="mb-7 text-sm text-t2">Informe seu nome e crie a senha que você usará para acessar a WDash.</p>
 
-          <form onSubmit={salvar} className="flex flex-col gap-3.5" noValidate>
-            <PhotoField name={name} foto={foto} onChange={setFoto} />
-            <NameFields amount={name} onChange={(p) => setNome((n) => ({ ...n, ...p }))} autoFocus />
+          <form onSubmit={save} className="flex flex-col gap-3.5" noValidate>
+            <PhotoField name={name} photo={photo} onChange={setPhoto} />
+            <NameFields amount={name} onChange={(p) => setName((n) => ({ ...n, ...p }))} autoFocus />
             {/* Escondido: gerenciador de senhas associa a senha nova a este login. */}
             <input type="email" name="username" autoComplete="username" value={session.email} readOnly tabIndex={-1} aria-hidden className="sr-only" />
             <PasswordField
               label="Nova senha"
-              value={senha}
-              onChange={setSenha}
+              value={password}
+              onChange={setPassword}
               placeholder={PASSWORD_RULE_TEXT}
               autoComplete="new-password"
             />
@@ -100,11 +100,11 @@ export function CreateAccess() {
               onChange={setConfirma}
               placeholder="Digite novamente"
               autoComplete="new-password"
-              erro={erroConfirma}
+              error={errorConfirma}
             />
-            <PasswordStrength senha={senha} />
-            <button type="submit" disabled={!pode} className={`mt-1 ${accessButton}`} style={{ boxShadow: "0 8px 24px -8px var(--acc)" }}>
-              {carregando ? "Salvando…" : "Salvar e continuar"}
+            <PasswordStrength password={password} />
+            <button type="submit" disabled={!can} className={`mt-1 ${accessButton}`} style={{ boxShadow: "0 8px 24px -8px var(--acc)" }}>
+              {loading ? "Salvando…" : "Salvar e continuar"}
             </button>
           </form>
         </div>

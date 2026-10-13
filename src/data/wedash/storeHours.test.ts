@@ -24,13 +24,13 @@ describe("storeHours", () => {
   });
 
   it("padrão no banco = tudo desligado; cálculos usam 10h–22h enquanto não configurado", () => {
-    const vazio = defaultWeekHours();
-    expect(Object.values(vazio).every((d) => d === null)).toBe(true);
-    expect(weekHoursConfigured(vazio)).toBe(false);
-    expect(effectiveWeekHours(vazio)[0]).toEqual({ open: "10:00", close: "22:00" });
-    const umDia = parseWeekHours({ 1: { open: "09:00", close: "18:00" } });
-    expect(weekHoursConfigured(umDia)).toBe(true);
-    expect(effectiveWeekHours(umDia)).toBe(umDia);
+    const empty = defaultWeekHours();
+    expect(Object.values(empty).every((d) => d === null)).toBe(true);
+    expect(weekHoursConfigured(empty)).toBe(false);
+    expect(effectiveWeekHours(empty)[0]).toEqual({ open: "10:00", close: "22:00" });
+    const oneDay = parseWeekHours({ 1: { open: "09:00", close: "18:00" } });
+    expect(weekHoursConfigured(oneDay)).toBe(true);
+    expect(effectiveWeekHours(oneDay)).toBe(oneDay);
   });
 
   it("preset quiosque (shopping) e loja de rua", () => {
@@ -40,7 +40,7 @@ describe("storeHours", () => {
     expect(kiosk[0]).toEqual({ open: "12:00", close: "22:00" });
     expect(weekHoursConfigured(kiosk)).toBe(true);
 
-    const street = presetWeekHours("RUA");
+    const street = presetWeekHours("STREET");
     expect(street[1]).toEqual({ open: "08:00", close: "18:00" });
     expect(street[5]).toEqual({ open: "08:00", close: "18:00" });
     expect(street[6]).toEqual({ open: "08:00", close: "17:00" });
@@ -58,11 +58,11 @@ describe("storeHours", () => {
   });
 
   it("unionConfiguredWindow ignora lojas sem horário (eixo sai das vendas)", () => {
-    const semHorario = defaultWeekHours();
-    const comHorario = parseWeekHours({ 1: { open: "08:00", close: "18:00" } });
-    expect(unionConfiguredWindow([semHorario], 1)).toBeNull();
-    expect(unionConfiguredWindow([semHorario, comHorario], 1)).toEqual({ abertura: 8, fechamento: 18 });
-    expect(unionConfiguredWindow([comHorario], 0)).toBeNull();
+    const withoutSchedule = defaultWeekHours();
+    const withSchedule = parseWeekHours({ 1: { open: "08:00", close: "18:00" } });
+    expect(unionConfiguredWindow([withoutSchedule], 1)).toBeNull();
+    expect(unionConfiguredWindow([withoutSchedule, withSchedule], 1)).toEqual({ opening: 8, closing: 18 });
+    expect(unionConfiguredWindow([withSchedule], 0)).toBeNull();
   });
 
   it("unionOpenWindow across stores", () => {
@@ -70,26 +70,26 @@ describe("storeHours", () => {
     a[1] = { open: "10:00", close: "22:00" };
     const b = defaultWeekHours();
     b[1] = { open: "08:00", close: "18:00" };
-    expect(unionOpenWindow([a, b], 1)).toEqual({ abertura: 8, fechamento: 22 });
-    expect(unionOpenWindow([a], 0).abertura).toBe(9); // domingo null  ->  default
+    expect(unionOpenWindow([a, b], 1)).toEqual({ opening: 8, closing: 22 });
+    expect(unionOpenWindow([a], 0).opening).toBe(9); // domingo null  ->  default
   });
 
   it("hourAxisRange: expediente configurado manda; venda fora estende; meta não", () => {
     const store = parseWeekHours({ 3: { open: "10:00", close: "22:00" } });
     expect(hourAxisRange([store], 3, [], [8, 23])).toMatchObject({ first: 10, last: 21 });
     expect(hourAxisRange([store], 3, [9, 12])).toMatchObject({ first: 9, last: 21 });
-    expect(hourAxisRange([store], 3, [22])).toMatchObject({ first: 10, last: 22, win: { abertura: 10, fechamento: 22 } });
+    expect(hourAxisRange([store], 3, [22])).toMatchObject({ first: 10, last: 22, win: { opening: 10, closing: 22 } });
     // Cupom sem hora cai em 00:00 e nao puxa o eixo para a meia-noite.
     expect(hourAxisRange([store], 3, [0, 12])).toMatchObject({ first: 10, last: 21 });
-    const rua = parseWeekHours({ 1: { open: "08:00", close: "18:00" }, 6: { open: "08:00", close: "17:00" } });
-    expect(hourAxisRange([rua], 1, [0, 16])).toMatchObject({ first: 8, last: 17 });
-    expect(hourAxisRange([rua], 6, [0, 16])).toMatchObject({ first: 8, last: 16 });
+    const street = parseWeekHours({ 1: { open: "08:00", close: "18:00" }, 6: { open: "08:00", close: "17:00" } });
+    expect(hourAxisRange([street], 1, [0, 16])).toMatchObject({ first: 8, last: 17 });
+    expect(hourAxisRange([street], 6, [0, 16])).toMatchObject({ first: 8, last: 16 });
   });
 
   it("hourAxisRange sem horário: vendas ∪ meta; sem nada, 10h–22h", () => {
-    const sem = defaultWeekHours();
-    expect(hourAxisRange([sem], 3, [11, 15], [12])).toMatchObject({ first: 11, last: 15 });
-    expect(hourAxisRange([sem], 3, [], [9, 20])).toMatchObject({ first: 9, last: 20 });
-    expect(hourAxisRange([sem], 3, [])).toMatchObject({ first: 10, last: 21 });
+    const without = defaultWeekHours();
+    expect(hourAxisRange([without], 3, [11, 15], [12])).toMatchObject({ first: 11, last: 15 });
+    expect(hourAxisRange([without], 3, [], [9, 20])).toMatchObject({ first: 9, last: 20 });
+    expect(hourAxisRange([without], 3, [])).toMatchObject({ first: 10, last: 21 });
   });
 });

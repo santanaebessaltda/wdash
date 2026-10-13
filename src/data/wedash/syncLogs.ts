@@ -26,22 +26,22 @@ export type SyncLogEntry = {
 export const SYNC_LOG_SOURCE_LABEL: Record<string, string> = {
   job: "Sincronização",
   login: "Acesso ao Millennium",
-  vendas: "Vendas",
-  margem: "Marca · WEPINK/WPINK",
+  "vendas": "Vendas",
+  margin: "Marca · WEPINK/WPINK",
   cmv: "CMV",
-  detalhe_movimento: "Detalhe da venda",
-  categorias: "Categorias",
-  catalogo: "Catálogo de produtos",
-  top_produtos: "Top produtos",
-  cupom: "Produtos por venda",
-  custo_produto: "CMV por produto",
-  itens_pessoa: "Itens por pessoa",
-  mapa_produtos: "Mapeamento de produtos",
-  gerador: "Gerador da filial",
-  eventos: "Eventos de venda",
+  "detalhe_movimento": "Detalhe da venda",
+  "categorias": "Categorias",
+  "catalogo": "Catálogo de produtos",
+  "top_produtos": "Top produtos",
+  coupon: "Produtos por venda",
+  "custo_produto": "CMV por produto",
+  "itens_pessoa": "Itens por pessoa",
+  "mapa_produtos": "Mapeamento de produtos",
+  "gerador": "Gerador da filial",
+  "eventos": "Eventos de venda",
   sellers: "Equipe de vendas",
-  fechamento_caixa: "Fechamento de caixa",
-  millennium_ocupado: "Millennium ocupado",
+  "fechamento_caixa": "Fechamento de caixa",
+  "millennium_ocupado": "Millennium ocupado",
 };
 
 export const SYNC_JOB_KIND_LABEL: Record<string, string> = {
@@ -66,12 +66,12 @@ const SYNC_LOG_TEXT: Record<string, SyncLogText> = {
     summary: "Sincronização interrompida",
     explanation: "A sincronização foi interrompida antes de terminar. Parte dos dados pode não ter sido atualizada.",
   },
-  vendas: {
+  "vendas": {
     summary: "Vendas não carregadas",
     explanation:
       "Não foi possível carregar todas as vendas deste período. O faturamento e outros indicadores podem estar incompletos.",
   },
-  margem: {
+  margin: {
     summary: "Faturamento por marca não carregado",
     explanation:
       "Não foi possível separar o faturamento entre WEPINK e WPINK neste período. O faturamento total pode continuar disponível.",
@@ -81,57 +81,57 @@ const SYNC_LOG_TEXT: Record<string, SyncLogText> = {
     explanation:
       "Não foi possível carregar o custo dos produtos deste período. CMV, lucro bruto e margem podem ficar indisponíveis ou incompletos.",
   },
-  detalhe_movimento: {
+  "detalhe_movimento": {
     summary: "Vendas por hora incompletas",
     explanation:
       "Parte das vendas não pôde ser distribuída por horário. Os totais podem estar corretos, mas gráficos por hora podem ficar incompletos.",
   },
-  categorias: {
+  "categorias": {
     summary: "Categorias não carregadas",
     explanation:
       "Não foi possível identificar a categoria de parte dos produtos. As análises por categoria podem ficar incompletas.",
   },
-  catalogo: {
+  "catalogo": {
     summary: "Produtos novos sem categoria",
     explanation:
       "Foram encontrados produtos novos sem categoria identificada no Millennium. Eles podem aparecer fora das análises por categoria.",
   },
-  top_produtos: {
+  "top_produtos": {
     summary: "Top produtos não carregados",
     explanation:
       "Não foi possível carregar todos os produtos vendidos neste período. O ranking de produtos pode ficar incompleto.",
   },
-  cupom: {
+  coupon: {
     summary: "Top produtos e faturamento por marca incompletos",
     explanation:
       "Parte dos produtos vendidos não pôde ser identificada. O ranking de produtos e o faturamento por marca podem ficar incompletos.",
   },
-  custo_produto: {
+  "custo_produto": {
     summary: "CMV por produto não calculado",
     explanation:
       "Não foi possível calcular o CMV de alguns produtos. Lucro bruto e margem por produto podem ficar indisponíveis.",
   },
-  itens_pessoa: {
+  "itens_pessoa": {
     summary: "Itens por pessoa não gravados",
     explanation:
       "Não foi possível gravar os produtos vendidos por cada pessoa neste dia. Desafios de produtos e categorias podem ficar incompletos.",
   },
-  mapa_produtos: {
+  "mapa_produtos": {
     summary: "Mapeamento de produtos incompleto",
     explanation:
       "Alguns produtos não puderam ser identificados corretamente. Análises por marca, categoria ou produto podem ficar incompletas.",
   },
-  gerador: {
+  "gerador": {
     summary: "Loja sem gerador no Millennium",
     explanation:
       "A loja não possui o gerador necessário configurado no Millennium. Algumas análises de produtos e categorias não puderam ser carregadas.",
   },
-  eventos: {
+  "eventos": {
     summary: "Eventos de venda não carregados",
     explanation:
       "Não foi possível carregar todos os eventos de venda deste período. Algumas informações detalhadas podem ficar incompletas.",
   },
-  fechamento_caixa: {
+  "fechamento_caixa": {
     summary: "Valor digitado não gravado",
     explanation:
       "Não foi possível gravar o fundo, a sangria, o fechamento ou o valor digitado deste dia. O faturamento não foi alterado.",
@@ -141,7 +141,7 @@ const SYNC_LOG_TEXT: Record<string, SyncLogText> = {
     explanation:
       "Não foi possível atualizar todos os colaboradores da equipe de vendas. Rankings e indicadores individuais podem ficar incompletos.",
   },
-  millennium_ocupado: {
+  "millennium_ocupado": {
     summary: "Millennium lento · sincronização mais demorada",
     explanation:
       "O Millennium está respondendo mais lentamente que o normal. A sincronização continua, mas pode levar mais tempo para terminar.",
@@ -167,13 +167,13 @@ function syncLogText(e: Pick<SyncLogEntry, "source" | "message">): SyncLogText {
             "A WDash não conseguiu acessar o Millennium durante esta sincronização. Os dados deste período podem não estar atualizados.",
         };
   }
-  if (e.source === "vendedoras" && /mais de um cadastro/i.test(e.message)) {
+  if (e.source === "vendedoras" && /mais from one registration/i.test(e.message)) {
     return {
       summary: "Colaborador com cadastro duplicado no Millennium",
       explanation: `Foram encontrados vários cadastros compatíveis com ${personName(e.message)}. As vendas foram mantidas pelo nome, sem vínculo com um cadastro específico.`,
     };
   }
-  if (e.source === "vendedoras" && /não está no cadastro/i.test(e.message)) {
+  if (e.source === "vendedoras" && /não está no registration/i.test(e.message)) {
     return {
       summary: "Colaborador não identificado no Millennium",
       explanation: `A venda foi mantida pelo nome, mas não foi possível vincular ${personName(e.message)} ao cadastro de colaboradores.`,

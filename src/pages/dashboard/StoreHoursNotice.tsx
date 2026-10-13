@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Alert, AlertLink } from "@/components/ui";
 import { weekHoursConfigured } from "@/data/wedash/storeHours";
 import { storesForSession } from "@/data/wedash/stores";
-import { isGestor } from "@/layout/nav-wedash";
+import { isOwner } from "@/layout/nav-wedash";
 import { paths } from "@/router/paths";
 import { useActiveSession } from "@/session/SessionProvider";
 import { useScope } from "@/pages/dashboard/useScope";
@@ -26,17 +26,17 @@ export function StoreHoursNotice() {
   }, []);
 
   // Integracao desligada: nada atualiza (nem o botao), o aviso da integracao ja explica.
-  if (!isGestor(session.role) || connection === "disconnected" || connection === "password") return null;
+  if (!isOwner(session.role) || connection === "disconnected" || connection === "password") return null;
   const storeRows = storesForSession(session.stores).filter(
     (s) => scope.storeIds.length === 0 || scope.storeIds.includes(s.id),
   );
-  const sem = storeRows.filter((s) => !weekHoursConfigured(s.horas));
-  if (sem.length === 0) return null;
+  const without = storeRows.filter((s) => !weekHoursConfigured(s.hours));
+  if (without.length === 0) return null;
 
   const title =
-    sem.length === 1
-      ? `A filial ${sem[0]!.fantasia} está sem horário de funcionamento`
-      : `${sem.length} filiais estão sem horário de funcionamento`;
+    without.length === 1
+      ? `A filial ${without[0]!.tradeName} está sem horário de funcionamento`
+      : `${without.length} filiais estão sem horário de funcionamento`;
   return (
     <Alert
       variant="warning"
@@ -44,9 +44,9 @@ export function StoreHoursNotice() {
       title={title}
       action={<AlertLink onClick={() => navigate(paths.operation.branch)}>Configurar funcionamento</AlertLink>}
     >
-      {sem.length === 1
+      {without.length === 1
         ? "As vendas dessa filial só são atualizadas pelo botão Atualizar até o horário ser configurado."
-        : `As vendas dessas filiais (${sem.map((s) => s.fantasia).join(", ")}) só são atualizadas pelo botão Atualizar até o horário ser configurado.`}
+        : `As vendas dessas filiais (${without.map((s) => s.tradeName).join(", ")}) só são atualizadas pelo botão Atualizar até o horário ser configurado.`}
     </Alert>
   );
 }

@@ -12,7 +12,7 @@ function lines(rows: Array<{ method: string; system: number; typed: number }>) {
     millennium: rows.map((row) => ({
       paymentMethod: row.method,
       openingCents: 0,
-      sangriaCents: null,
+      cashDropCents: null,
       closingCents: row.system,
       typedCents: row.typed,
     })),
@@ -55,8 +55,8 @@ describe("quebra do fechamento", () => {
     const items = closeBreaks({
       lines: buildCashCloseView({
         millennium: [
-          { paymentMethod: "CARTÃO DÉBITO", openingCents: 0, sangriaCents: null, closingCents: 1000, typedCents: 800 },
-          { paymentMethod: "CARTÃO CRÉDITO", openingCents: 0, sangriaCents: null, closingCents: 800, typedCents: 1000 },
+          { paymentMethod: "CARTÃO DÉBITO", openingCents: 0, cashDropCents: null, closingCents: 1000, typedCents: 800 },
+          { paymentMethod: "CARTÃO CRÉDITO", openingCents: 0, cashDropCents: null, closingCents: 800, typedCents: 1000 },
         ],
         card: { debitCents: 800, creditCents: 1000, otherCents: 0 },
         pixCents: null,
@@ -86,7 +86,7 @@ describe("quebra do fechamento", () => {
   it("venda sem vendedor fica no grupo e não entra na folha", () => {
     const [item] = closeBreaks({
       lines: buildCashCloseView({
-        millennium: [{ paymentMethod: "PIX", openingCents: 0, sangriaCents: null, closingCents: 1000, typedCents: 700 }],
+        millennium: [{ paymentMethod: "PIX", openingCents: 0, cashDropCents: null, closingCents: 1000, typedCents: 700 }],
         card: null,
         pixCents: 700,
         pixRequested: false,
@@ -102,7 +102,7 @@ describe("quebra do fechamento", () => {
   it("vendas em dois grupos não separam a quebra", () => {
     const [item] = closeBreaks({
       lines: buildCashCloseView({
-        millennium: [{ paymentMethod: "PIX", openingCents: 0, sangriaCents: null, closingCents: 1000, typedCents: 700 }],
+        millennium: [{ paymentMethod: "PIX", openingCents: 0, cashDropCents: null, closingCents: 1000, typedCents: 700 }],
         card: null,
         pixCents: 700,
         pixRequested: false,
@@ -120,19 +120,19 @@ describe("quebra do fechamento", () => {
   });
 
   it("venda sem grupo cadastrado não se vincula; venda fora do horário fica fora dos grupos", () => {
-    const linhas = lines([{ method: "DINHEIRO", system: 1000, typed: 700 }]);
+    const lines = lines([{ method: "DINHEIRO", system: 1000, typed: 700 }]);
     const sales = [{ occurredAt: "2026-10-07T13:30:00.000Z", paymentMethod: "Dinheiro", sellerName: "Ana" }];
-    const semGrupo = closeBreaks({ lines: linhas, sales, shifts: [], timeZone: "America/Sao_Paulo", pixPending: false });
-    expect(semGrupo[0]?.reason).toBe("A venda não foi vinculada a nenhum grupo.");
-    const fora = closeBreaks({
-      lines: linhas,
+    const withoutGroup = closeBreaks({ lines: lines, sales, shifts: [], timeZone: "America/Sao_Paulo", pixPending: false });
+    expect(withoutGroup[0]?.reason).toBe("A venda não foi vinculada a nenhum grupo.");
+    const excluded = closeBreaks({
+      lines: lines,
       sales: [{ occurredAt: "2026-10-07T08:00:00.000Z", paymentMethod: "Dinheiro", sellerName: "Ana" }],
       shifts,
       timeZone: "America/Sao_Paulo",
       pixPending: false,
     });
-    expect(fora[0]?.groups).toEqual([]);
-    expect(fora[0]?.reason).toBe("A venda ficou fora dos grupos cadastrados.");
+    expect(excluded[0]?.groups).toEqual([]);
+    expect(excluded[0]?.reason).toBe("A venda ficou fora dos grupos cadastrados.");
   });
 
   it("pix sem arquivo não vira quebra", () => {

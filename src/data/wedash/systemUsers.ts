@@ -123,7 +123,7 @@ export async function fetchSystemUsers(): Promise<{ ok: true; data: SystemUsersD
       ok: true,
       data: {
         members: demoMembers().map((m) => ({ ...m, name: titleName(m.name) })),
-        stores: demoStores.map((s) => ({ id: s.id, code: String(s.codFilial), name: s.fantasia })),
+        stores: demoStores.map((s) => ({ id: s.id, code: String(s.branchCode), name: s.tradeName })),
       },
     };
   }

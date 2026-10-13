@@ -441,7 +441,7 @@ export async function fetchSalesPaymentDayAggs(
 export { excludeNonSalesPeople, type NonSalesPeople } from "./engine/goalRows";
 
 export async function fetchNonSalesPeople(client: SalesQueryClient, tenantId: string): Promise<NonSalesPeople> {
-  const out: NonSalesPeople = { employeeIds: new Set(), geradorIds: new Set(), storeNameKeys: new Set() };
+  const out: NonSalesPeople = { employeeIds: new Set(), generatorIds: new Set(), storeNameKeys: new Set() };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (client.from("store_seller") as any)
     .select("store_id, millennium_employee_id, millennium_gerador_id, name_keys")
@@ -456,11 +456,11 @@ export async function fetchNonSalesPeople(client: SalesQueryClient, tenantId: st
   for (const r of (data ?? []) as {
     store_id: string;
     millennium_employee_id: number | null;
-    millennium_gerador_id: number | null;
+    millennium_generator_id: number | null;
     name_keys: string[] | null;
   }[]) {
     if (r.millennium_employee_id != null) out.employeeIds.add(Number(r.millennium_employee_id));
-    if (r.millennium_gerador_id != null) out.geradorIds.add(Number(r.millennium_gerador_id));
+    if (r.millennium_generator_id != null) out.generatorIds.add(Number(r.millennium_generator_id));
     for (const k of r.name_keys ?? []) out.storeNameKeys.add(`${r.store_id}|${k}`);
   }
   return out;
@@ -486,7 +486,7 @@ export async function fetchSellerShifts(
   for (const r of (data ?? []) as {
     store_id: string;
     millennium_employee_id: number | null;
-    millennium_gerador_id: number | null;
+    millennium_generator_id: number | null;
     name_keys: string[] | null;
     store_shift: { name: string; start_time: string; end_time: string } | null;
   }[]) {
@@ -494,7 +494,7 @@ export async function fetchSellerShifts(
     out.push({
       storeId: r.store_id,
       employeeId: r.millennium_employee_id == null ? null : Number(r.millennium_employee_id),
-      geradorId: r.millennium_gerador_id == null ? null : Number(r.millennium_gerador_id),
+      generatorId: r.millennium_generator_id == null ? null : Number(r.millennium_generator_id),
       nameKeys: r.name_keys ?? [],
       name: shiftName(r.store_shift.name),
       start: String(r.store_shift.start_time).slice(0, 5),

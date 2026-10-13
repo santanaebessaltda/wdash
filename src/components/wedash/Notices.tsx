@@ -1,11 +1,11 @@
 import { Alert, Card } from "@/components/ui";
 
 /** Avisos explicando blocos ocultos. Nunca silencioso: quem tira print entende o que falta. */
-export function Avisos({ itens }: { itens: string[] }) {
-  if (itens.length === 0) return null;
+export function Notices({ items }: { items: string[] }) {
+  if (items.length === 0) return null;
   return (
     <div className="flex flex-col gap-2">
-      {itens.map((a) => (
+      {items.map((a) => (
         <Alert key={a} variant="info">
           {a}
         </Alert>

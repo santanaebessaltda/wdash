@@ -77,8 +77,8 @@ function reasonFor(input: {
   if (input.key === "cash" && input.diff % BAG_CENTS === 0) return "Pode ser sacola de R$ 2.";
   if (input.key === "pix" && input.pixPending) return "Pix ainda em aberto.";
   if (input.points.length === 0) return "Falta sem vendedor identificado. Ela permanece no grupo até que um vendedor seja definido.";
-  const semVendedor = input.points.every((point) => point.sellerName.trim() === "");
-  if (input.groups.length === 1 && semVendedor) {
+  const withoutSeller = input.points.every((point) => point.sellerName.trim() === "");
+  if (input.groups.length === 1 && withoutSeller) {
     return `Sem vendedor identificado. A falta permanece em ${input.groups[0]} e não entra na folha.`;
   }
   if (input.groups.length === 1) return `Quebra em ${input.groups[0]}.`;

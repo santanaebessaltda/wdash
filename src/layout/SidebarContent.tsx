@@ -3,7 +3,7 @@ import { padBottom, padTop } from "@/lib/safeArea";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/cn";
 import { isNavGroup, type NavEntry } from "./nav-config";
-import { applyShoppingMenu, navOfPapel } from "./nav-wedash";
+import { applyShoppingMenu, navForRole } from "./nav-wedash";
 import { useShoppingMenu } from "./useShoppingMenu";
 import { WedashBrand } from "@/components/wedash/WedashBrand";
 import { searchForRoute } from "@/pages/dashboard/periodQuery";
@@ -50,7 +50,7 @@ export function SidebarContent({ collapsed = false, onNavigate }: { collapsed?: 
   const session = useActiveSession();
   const { settings, report } = useShoppingMenu();
   const entries = useMemo(
-    () => applyShoppingMenu(navOfPapel(session.role), { settings, report }),
+    () => applyShoppingMenu(navForRole(session.role), { settings, report }),
     [session.role, settings, report],
   );
   const [openGroup, setOpenGroup] = useState<string | null>(() => owningGroupLabel(entries, location.pathname));

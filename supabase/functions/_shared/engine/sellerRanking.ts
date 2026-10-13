@@ -20,7 +20,7 @@ export interface SellerRanking {
 
 /** Mesmo grupo = mesmo nome, mesma meta e mesmo atingimento (no modo Grupo todos do grupo tem o mesmo %). */
 function groupKey(view: GoalCardView, r: SellerRow): string {
-  return view.qtdGrupos === 0 ? "*" : `${r.group}|${r.individualGoalAmount}|${r.attainmentPct}`;
+  return view.qtyGroups === 0 ? "*" : `${r.group}|${r.individualGoalAmount}|${r.attainmentPct}`;
 }
 
 /** Pessoas do grupo da linha (modo Grupo); 1 no modo Individual. */

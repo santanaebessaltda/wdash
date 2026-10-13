@@ -337,7 +337,7 @@ function inputAttrs(tag: string): Record<string, string> {
 export function formatAllosAmount(cents: number): string {
   const negative = cents < 0;
   const abs = Math.abs(Math.round(cents));
-  const reais = Math.floor(abs / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  const brl = Math.floor(abs / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   const centavos = String(abs % 100).padStart(2, "0");
-  return `${negative ? "-" : ""}${reais},${centavos}`;
+  return `${negative ? "-" : ""}${brl},${centavos}`;
 }

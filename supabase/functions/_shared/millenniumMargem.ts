@@ -6,7 +6,7 @@
 import { baseUrl } from "./millennium.ts";
 import { MillenniumHttpError } from "./millenniumSellers.ts";
 
-const RELATORIO_MARGEM_PATH = "MILLENIUM!FRANQUIAS.RELATORIOS.RELATORIOMARGEM";
+const REPORT_MARGIN_PATH = "MILLENIUM!FRANQUIAS.RELATORIOS.RELATORIOMARGEM";
 
 function rowsOf(payload: unknown): Record<string, unknown>[] {
   if (Array.isArray(payload)) return payload as Record<string, unknown>[];
@@ -32,13 +32,13 @@ function asNum(v: unknown): number | null {
 const dayBound = (ymd: string) => `${ymd}T04:00:00.000Z`;
 
 /** COD_PRODUTO  ->  custo unitario em reais (CUSTO_TOTAL  QTDE_VENDIDA; so > 0). */
-export async function fetchMargemUnitCosts(
+export async function fetchMarginUnitCosts(
   session: string,
   millenniumStoreId: number,
   from: string,
   to: string,
 ): Promise<Map<string, number>> {
-  const res = await fetch(`${baseUrl()}/${RELATORIO_MARGEM_PATH}`, {
+  const res = await fetch(`${baseUrl()}/${REPORT_MARGIN_PATH}`, {
     method: "POST",
     headers: {
       Accept: "*/*",
@@ -48,7 +48,7 @@ export async function fetchMargemUnitCosts(
       "X-HTTP-Method": "GET",
       "X-IdentifierCase": "upper",
     },
-    body: JSON.stringify({ FILIAL: millenniumStoreId, DESC: null, DATAI: dayBound(from), DATAF: dayBound(to), TIPO: null }),
+    body: JSON.stringify({ BRANCH: millenniumStoreId, DESC: null, DATAI: dayBound(from), DATAF: dayBound(to), KIND: null }),
     signal: AbortSignal.timeout(120_000),
   });
   const text = await res.text();

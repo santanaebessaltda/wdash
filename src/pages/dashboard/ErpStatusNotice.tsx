@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Alert, AlertLink } from "@/components/ui";
 import { fetchErpIntegrationStatus, type ErpIntegrationStatus } from "@/data/wedash/erp";
 import { fetchSyncWatermark } from "@/data/wedash/salesRepo";
-import { isGestor } from "@/layout/nav-wedash";
+import { isOwner } from "@/layout/nav-wedash";
 import { paths } from "@/router/paths";
 import { useActiveSession } from "@/session/SessionProvider";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
@@ -68,29 +68,29 @@ export function useErpConnection(): ErpSnapshot {
   return snap;
 }
 
-function desde(at: Date): string {
+function since(at: Date): string {
   const clockLabel = at.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
-  const dia = at.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-  return at.toDateString() === new Date().toDateString() ? `hoje às ${clockLabel}` : `${dia} às ${clockLabel}`;
+  const day = at.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  return at.toDateString() === new Date().toDateString() ? `hoje às ${clockLabel}` : `${day} às ${clockLabel}`;
 }
 
 /**
  * Aviso quando a integracao com o Millennium esta desconectada ou com senha invalida: as vendas
  * (e o estoque) param de ser atualizados. Gestor ganha o atalho para Integracoes; Gerente so o aviso.
  */
-export function ErpStatusNotice({ dado = "vendas", className = "mt-4" }: { dado?: "vendas" | "estoque"; className?: string }) {
+export function ErpStatusNotice({ dado = "sales", className = "mt-4" }: { dado?: "sales" | "estoque"; className?: string }) {
   const session = useActiveSession();
   const navigate = useNavigate();
   const { connection, lastSync } = useErpConnection();
   if (connection !== "disconnected" && connection !== "password") return null;
 
-  const gestor = isGestor(session.role);
+  const owner = isOwner(session.role);
   const title = connection === "password" ? "A senha do Millennium não é mais válida" : "Millennium desconectado";
   const text =
     dado === "estoque"
       ? "O estoque não está sendo atualizado. Os valores mostram a última atualização disponível."
       : lastSync
-        ? `As vendas não estão sendo atualizadas desde ${desde(lastSync)}. Os números mostram as vendas até esse momento.`
+        ? `As vendas não estão sendo atualizadas desde ${since(lastSync)}. Os números mostram as vendas até esse momento.`
         : "As vendas não estão sendo atualizadas.";
 
   return (
@@ -99,12 +99,12 @@ export function ErpStatusNotice({ dado = "vendas", className = "mt-4" }: { dado?
       className={className}
       title={title}
       action={
-        gestor ? (
+        owner ? (
           <AlertLink onClick={() => navigate(paths.settings.erp)}>{connection === "password" ? "Atualizar senha" : "Conectar"}</AlertLink>
         ) : undefined
       }
     >
-      {gestor
+      {owner
         ? text
         : `${text} ${connection === "password" ? "Peça ao gestor da conta para atualizar a integração." : "Peça ao gestor da conta para conectar novamente."}`}
     </Alert>

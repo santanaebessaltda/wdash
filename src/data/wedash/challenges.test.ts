@@ -20,17 +20,17 @@ describe("T1: desafios ativos (EQUIP-05)", () => {
   });
 
   it("cobre os tipos usados no mock: quantidade, produto, P.A. e ticket", () => {
-    const tipos = activeChallenges("2026-09").map((d) => d.kind);
-    expect(new Set(tipos)).toEqual(new Set(["quantidade", "produto", "pa", "ticket"]));
+    const kinds = activeChallenges("2026-09").map((d) => d.kind);
+    expect(new Set(kinds)).toEqual(new Set(["quantity", "product", "pa", "ticket"]));
   });
 
   it("desafios nunca em reais como unidade de meta: prêmio é o único campo de recompensa", () => {
     for (const d of challenges) {
       expect(["un", "x", "R$"]).toContain(d.unit);
       expect(d.prize).toBeGreaterThan(0);
-      expect(d.premioGerente).toBeGreaterThan(0);
-      expect(d.minimoVendedorasAtingindo).toBeGreaterThan(0);
-      expect(d.minimoVendedorasAtingindo).toBeLessThanOrEqual(d.participants.length);
+      expect(d.prizeManager).toBeGreaterThan(0);
+      expect(d.minimumSellersAtingindo).toBeGreaterThan(0);
+      expect(d.minimumSellersAtingindo).toBeLessThanOrEqual(d.participants.length);
     }
   });
 

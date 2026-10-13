@@ -30,7 +30,7 @@ export function StoresSettingsPage() {
   const toast = useToast();
   const [loading, setLoading] = useState(true);
   const showSkeleton = useMinSkeleton(loading);
-  const [storeRows, setLojas] = useState<Store[]>([]);
+  const [storeRows, setStores] = useState<Store[]>([]);
   const [sellers, setSellers] = useState<Map<string, StoreSeller[]>>(new Map());
   const [savingId, setSavingId] = useState<string | null>(null);
 
@@ -41,7 +41,7 @@ export function StoresSettingsPage() {
       setLoading(true);
       const rows = await fetchManagedStores(session.tenantId, session.membershipId);
       if (!cancelled) {
-        setLojas(rows);
+        setStores(rows);
         setLoading(false);
       }
     })();
@@ -63,7 +63,7 @@ export function StoresSettingsPage() {
 
   if (!session) return null;
 
-  async function alternar(store: Store, active: boolean) {
+  async function toggle(store: Store, active: boolean) {
     if (!session || savingId) return;
     setSavingId(store.id);
     const res = await setStoreActive(store.id, active);
@@ -72,7 +72,7 @@ export function StoresSettingsPage() {
       toast.show(res.error, "danger");
       return;
     }
-    setLojas((rows) => rows.map((s) => (s.id === store.id ? { ...s, active } : s)));
+    setStores((rows) => rows.map((s) => (s.id === store.id ? { ...s, active } : s)));
     const ativas = active ? [...session.stores, store.id] : session.stores.filter((id) => id !== store.id);
     update({ stores: [...new Set(ativas)] });
     if (active) void hydrateSessionStores(session.tenantId, [...new Set(ativas)]);
@@ -100,24 +100,24 @@ export function StoresSettingsPage() {
     return <span className="block py-6 text-center text-[12px] text-t2">Nenhuma filial disponível.</span>;
   }
 
-  const podeAlternar = session.role === "OWNER" || session.role === "MANAGER" || session.role === "ADMIN_GLOBAL";
+  const canToggle = session.role === "OWNER" || session.role === "MANAGER" || session.role === "ADMIN_GLOBAL";
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {storeRows.map((s) => {
         const team = (sellers.get(s.id) ?? []).filter(isActiveSalesPerson);
-        const desativada = s.active === false;
-        const abrir = () => navigate(paths.settings.storeDetail(s.id));
+        const deactivated = s.active === false;
+        const open = () => navigate(paths.settings.storeDetail(s.id));
         return (
           <Card
             key={s.id}
             role="button"
             tabIndex={0}
-            onClick={abrir}
+            onClick={open}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
-                abrir();
+                open();
               }
             }}
             className="cursor-pointer transition-colors hover:border-acc"
@@ -127,12 +127,12 @@ export function StoresSettingsPage() {
                 <StoreIcon size={20} />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[15px] font-bold text-t0">{s.fantasia}</p>
+                <p className="truncate text-[15px] font-bold text-t0">{s.tradeName}</p>
                 <p className="mt-0.5 truncate text-xs text-t2">{s.cnpj || "—"}</p>
               </div>
               <span className="flex shrink-0 flex-col items-end gap-1 self-start">
-                <Badge variant="accent">Filial {s.codFilial}</Badge>
-                {desativada ? <Badge variant="neutral">Desativada</Badge> : null}
+                <Badge variant="accent">Filial {s.branchCode}</Badge>
+                {deactivated ? <Badge variant="neutral">Desativada</Badge> : null}
               </span>
             </div>
             <div className="flex min-h-8 items-center justify-between gap-3">
@@ -143,13 +143,13 @@ export function StoresSettingsPage() {
               )}
               <span className="shrink-0 text-xs font-semibold text-t2">{team.length} na equipe</span>
             </div>
-            {podeAlternar ? (
+            {canToggle ? (
               <div
                 className="mt-3 flex justify-end border-t border-line pt-3"
                 onClick={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
               >
-                <Switch checked={!desativada} onChange={(v) => void alternar(s, v)} label="Em operação" />
+                <Switch checked={!deactivated} onChange={(v) => void toggle(s, v)} label="Em operação" />
               </div>
             ) : null}
           </Card>

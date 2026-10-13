@@ -10,7 +10,7 @@
 import { collaborators, eligibleSeller } from "./team";
 import { TODAY_ISO } from "./clock";
 
-export type ChallengeType = "produto" | "quantidade" | "faturamento" | "pa" | "ticket";
+export type ChallengeType = "product" | "quantity" | "revenue" | "pa" | "ticket";
 export type ChallengeUnit = "un" | "x" | "R$";
 
 export interface Challenge {
@@ -35,12 +35,12 @@ export interface Challenge {
    * R$ do gerente se a regra de loja fechar
    * (min. N vendedoras atingindo o alvo individual).
    */
-  premioGerente: number;
+  prizeManager: number;
   /**
    * Quantas vendedoras precisam bater o alvo individual
    * para o gerente fechar. Meta gerente = este x piso/alvo (tipos un/R$ soma).
    */
-  minimoVendedorasAtingindo: number;
+  minimumSellersAtingindo: number;
   /** "AAAA-MM" */
   competence: string;
   /** Inicio da janela do desafio (ISO). */
@@ -48,7 +48,7 @@ export interface Challenge {
   /** Fim da janela do desafio (ISO), inclusive. */
   end: string;
   /** Produto/categoria alvo (tipo produto/quantidade), quando aplicavel. */
-  produtoId: number | null;
+  productId: number | null;
   participants: string[];
 }
 
@@ -58,8 +58,8 @@ function activeIdsForBranch(storeId: string): string[] {
       (c) =>
         c.storeId === storeId &&
         eligibleSeller(c) &&
-        c.dataAdmissao <= "2026-09-01" &&
-        (!c.dataInatividade || c.dataInatividade > "2026-09-15"),
+        c.hiredAt <= "2026-09-01" &&
+        (!c.inactiveAt || c.inactiveAt > "2026-09-15"),
     )
     .map((c) => c.id);
 }
@@ -80,36 +80,36 @@ export const challenges: Challenge[] = [
     id: "d-perfumaria",
     name: "Perfumaria — 3 acima de R$ 150",
     objective: "Vender 3 perfumes acima de R$ 150 e ganhar R$ 50,00.",
-    kind: "quantidade",
+    kind: "quantity",
     storeId: "f1",
     individualTarget: 3,
     minimum: 3,
     unit: "un",
     prize: 50,
-    premioGerente: 50,
-    minimoVendedorasAtingindo: 3,
+    prizeManager: 50,
+    minimumSellersAtingindo: 3,
     competence: "2026-09",
     start: "2026-09-01",
     end: "2026-09-10",
-    produtoId: 1,
+    productId: 1,
     participants: ["c01", "c02", "c03", "c04", "c05", "c07"],
   },
   {
     id: "d-bodycream",
     name: "Body Cream — quem vender mais",
     objective: "Quem vender mais Body Cream (mínimo 15 un) ganha R$ 50,00.",
-    kind: "produto",
+    kind: "product",
     storeId: "f2",
     individualTarget: 15,
     minimum: 15,
     unit: "un",
     prize: 50,
-    premioGerente: 50,
-    minimoVendedorasAtingindo: 4,
+    prizeManager: 50,
+    minimumSellersAtingindo: 4,
     competence: "2026-09",
     start: "2026-09-01",
     end: "2026-09-30",
-    produtoId: 3,
+    productId: 3,
     participants: ["c11", "c12", "c13", "c14", "c15", "c17"],
   },
   {
@@ -122,12 +122,12 @@ export const challenges: Challenge[] = [
     minimum: 1.9,
     unit: "x",
     prize: 50,
-    premioGerente: 50,
-    minimoVendedorasAtingindo: 5,
+    prizeManager: 50,
+    minimumSellersAtingindo: 5,
     competence: "2026-09",
     start: "2026-09-01",
     end: "2026-09-30",
-    produtoId: null,
+    productId: null,
     participants: ATIVAS_F1,
   },
   {
@@ -140,12 +140,12 @@ export const challenges: Challenge[] = [
     minimum: 185,
     unit: "R$",
     prize: 50,
-    premioGerente: 50,
-    minimoVendedorasAtingindo: 5,
+    prizeManager: 50,
+    minimumSellersAtingindo: 5,
     competence: "2026-09",
     start: "2026-09-20",
     end: "2026-09-30",
-    produtoId: null,
+    productId: null,
     participants: ATIVAS_F2,
   },
 ];
@@ -154,7 +154,7 @@ export const challenges: Challenge[] = [
  * Progresso fixo por participante  -  valores na unidade do desafio.
  * Cobrem <50% (vermelho), 50 - 79% (amarelo) e 80% (verde) nas barras.
  */
-const PROGRESSO_FIXO: Record<string, Record<string, number>> = {
+const PROGRESSO_FIXED: Record<string, Record<string, number>> = {
   // Campo Grande  |  encerrado  ->  agregado vermelho (~44%).
   "d-perfumaria": {
     c01: 2,
@@ -212,9 +212,9 @@ export function challengeIsIndex(d: Pick<Challenge, "kind">): boolean {
  * No escopo filtrado, N nunca passa do n de participantes visiveis.
  * Para indices (pa/ticket), a UI usa o proprio piso como alvo da media.
  */
-export function challengeManagerTarget(d: Challenge, participantesNoEscopo: number): number {
+export function challengeManagerTarget(d: Challenge, participantesNoScope: number): number {
   if (challengeIsIndex(d)) return challengeFloor(d);
-  const n = Math.min(d.minimoVendedorasAtingindo, Math.max(0, participantesNoEscopo));
+  const n = Math.min(d.minimumSellersAtingindo, Math.max(0, participantesNoScope));
   return challengeFloor(d) * n;
 }
 
@@ -222,14 +222,14 @@ export function challengeManagerTarget(d: Challenge, participantesNoEscopo: numb
  * Progresso rumo a meta do gerente (regra A, tipos un/R$): cada vendedora
  * contribui no maximo ate o piso individual  -  uma nao "carrega" as outras.
  */
-export function cappedManagerProgress(progressos: number[], piso: number): number {
-  return progressos.reduce((s, p) => s + Math.min(Math.max(0, p), piso), 0);
+export function cappedManagerProgress(progressValues: number[], floor: number): number {
+  return progressValues.reduce((s, p) => s + Math.min(Math.max(0, p), floor), 0);
 }
 
 /** Media aritmetica (indices pa/ticket). */
-export function averageProgress(progressos: number[]): number {
-  if (progressos.length === 0) return 0;
-  return progressos.reduce((s, p) => s + Math.max(0, p), 0) / progressos.length;
+export function averageProgress(progressValues: number[]): number {
+  if (progressValues.length === 0) return 0;
+  return progressValues.reduce((s, p) => s + Math.max(0, p), 0) / progressValues.length;
 }
 
 /**
@@ -239,7 +239,7 @@ export function averageProgress(progressos: number[]): number {
 export function individualProgress(d: Challenge, employeeId: string): number {
   if (!d.participants.includes(employeeId)) return 0;
   if (TODAY_ISO < d.start) return 0;
-  const fixo = PROGRESSO_FIXO[d.id]?.[employeeId];
-  if (fixo != null) return fixo;
+  const fixed = PROGRESSO_FIXED[d.id]?.[employeeId];
+  if (fixed != null) return fixed;
   return 0;
 }

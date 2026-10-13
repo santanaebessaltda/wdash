@@ -4,12 +4,12 @@ import { cn } from "@/lib/cn";
 import type { RankingRow } from "@/data/wedash/live";
 /** Medalhas do leaderboard Vela (SalesDashboard / CRM)  -  anel, trofeu e rotulos. */
 const MEDALHA = {
-  1: { cor: "#f7b84e", glow: "0 0 32px rgba(247,184,78,0.4)" },
-  2: { cor: "#c7cdd6", glow: "none" },
-  3: { cor: "#d99a5c", glow: "none" },
+  1: { color: "#f7b84e", glow: "0 0 32px rgba(247,184,78,0.4)" },
+  2: { color: "#c7cdd6", glow: "none" },
+  3: { color: "#d99a5c", glow: "none" },
 } as const;
 
-const PODIO_ALTURA: Record<1 | 2 | 3, string> = {
+const PODIO_HEIGHT: Record<1 | 2 | 3, string> = {
   1: "h-44 sm:h-48",
   2: "h-36 sm:h-40",
   3: "h-28 sm:h-32",
@@ -37,11 +37,11 @@ function MedalhaBadge({ pos, apagada = false }: { pos: 1 | 2 | 3; apagada?: bool
 /** Podio top 3  -  aba Ranking (ouro / prata / bronze; degrau na cor primaria). */
 export function RankingBlock({
   ranking,
-  formatValor = brlK,
+  formatAmount = brlK,
   onSelect,
 }: {
   ranking: RankingRow[];
-  formatValor?: (v: number) => string;
+  formatAmount?: (v: number) => string;
   onSelect?: (row: RankingRow) => void;
 }) {
   if (ranking.length === 0) {
@@ -83,7 +83,7 @@ export function RankingBlock({
               <p className="mt-0.5 text-[11px] font-semibold text-t3">Nenhuma venda</p>
               <p className="mt-0.5 font-mono text-[13px] font-extrabold text-t3 sm:text-[14px]">—</p>
               <div
-                className={cn("mt-3 flex w-full items-end justify-center rounded-t-2xl", PODIO_ALTURA[pos])}
+                className={cn("mt-3 flex w-full items-end justify-center rounded-t-2xl", PODIO_HEIGHT[pos])}
                 style={{ background: "color-mix(in srgb, var(--acc) 16%, transparent)" }}
               >
                 <span className="pb-3 text-[24px] font-extrabold leading-none text-t3 sm:text-[28px]">{pos}º</span>
@@ -117,7 +117,7 @@ export function RankingBlock({
               <span
                 className="relative inline-flex rounded-full"
                 style={{
-                  boxShadow: `0 0 0 3px ${medal.cor}${isOuro ? `, ${medal.glow}` : ""}`,
+                  boxShadow: `0 0 0 3px ${medal.color}${isOuro ? `, ${medal.glow}` : ""}`,
                 }}
               >
                 <Avatar size={isOuro ? "2xl" : "xl"} name={l.name} />
@@ -127,16 +127,16 @@ export function RankingBlock({
 
             <p className="truncate text-[13px] font-bold text-t0 sm:text-[14px]">{l.name.split(" ")[0]}</p>
             <p className="mt-0.5 text-[11px] font-semibold text-t2">
-              {num(l.vendas)} {l.vendas === 1 ? "venda" : "vendas"}
+              {num(l.sales)} {l.sales === 1 ? "venda" : "vendas"}
             </p>
-            <p className="mt-0.5 font-mono text-[13px] font-extrabold sm:text-[14px]" style={{ color: medal.cor }}>
-              {formatValor(l.revenue)}
+            <p className="mt-0.5 font-mono text-[13px] font-extrabold sm:text-[14px]" style={{ color: medal.color }}>
+              {formatAmount(l.revenue)}
             </p>
 
             <div
               className={cn(
                 "mt-3 flex w-full items-end justify-center rounded-t-2xl",
-                PODIO_ALTURA[pos],
+                PODIO_HEIGHT[pos],
               )}
               style={{
                 background: "color-mix(in srgb, var(--acc) 48%, transparent)",
@@ -145,7 +145,7 @@ export function RankingBlock({
             >
               <span
                 className="pb-3 text-[24px] font-extrabold leading-none sm:text-[28px]"
-                style={{ color: medal.cor }}
+                style={{ color: medal.color }}
               >
                 {pos}º
               </span>

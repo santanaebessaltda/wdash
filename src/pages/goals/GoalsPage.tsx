@@ -6,7 +6,7 @@ import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePi
 import { DuplicateChoiceModal } from "@/components/wedash/DuplicateChoiceModal";
 import { GoalCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { calendarTodayIso } from "@/data/wedash/clock";
-import { buildGoalSummary, GOAL_STATUS_LABEL, goalTeamNames, prazoRestante, type GoalStatus, type GoalSummary } from "@/data/wedash/goalView";
+import { buildGoalSummary, GOAL_STATUS_LABEL, goalTeamNames, prazoRemaining, type GoalStatus, type GoalSummary } from "@/data/wedash/goalView";
 import { deleteGoal, fetchGoalTeam, fetchGoals, type GoalRecord, type GoalTeamMember } from "@/data/wedash/goalsRepo";
 import { fetchSalesDayAggs } from "@/data/wedash/salesRepo";
 import type { SalesDayAgg } from "@/data/wedash/salesTypes";
@@ -44,7 +44,7 @@ function maxPickerDate(today: string): Date {
 export default function GoalsPage() {
   const navigate = useNavigate();
   const { show } = useToast();
-  const { session, storeRows, loading: lojasLoading } = useScopedStores();
+  const { session, storeRows, loading: storesLoading } = useScopedStores();
   const { scope, setScope } = useScope();
   const today = calendarTodayIso();
   const janela = useMemo(() => managementScheduleWindow(scope.period, today), [scope.period, today]);
@@ -55,9 +55,9 @@ export default function GoalsPage() {
   const [data, setData] = useState<Loaded | null>(null);
   const [loading, setLoading] = useState(true);
   const [reload, setReload] = useState(0);
-  const [confirmar, setConfirmar] = useState<GoalRecord | null>(null);
+  const [confirm, setConfirm] = useState<GoalRecord | null>(null);
   const [excluindo, setExcluindo] = useState(false);
-  const [duplicar, setDuplicar] = useState<GoalRecord | null>(null);
+  const [duplicate, setDuplicate] = useState<GoalRecord | null>(null);
   const hasOtherStores = storesForSession(session.stores).length > 1;
 
   useEffect(() => {
@@ -66,11 +66,11 @@ export default function GoalsPage() {
     return () => window.removeEventListener(SALES_SYNCED_EVENT, onSync);
   }, []);
 
-  const filtroKey = `${session.tenantId}|${storeKey}|${janela.from}|${janela.to}`;
+  const filterKey = `${session.tenantId}|${storeKey}|${janela.from}|${janela.to}`;
   const loadedKey = useRef<string | null>(null);
 
   useEffect(() => {
-    if (lojasLoading) return;
+    if (storesLoading) return;
     if (escolher) {
       setLoading(false);
       return;
@@ -78,7 +78,7 @@ export default function GoalsPage() {
     let cancelled = false;
     (async () => {
       // Venda nova (SALES_SYNCED_EVENT) recarrega sem skeleton; so filtro novo mostra o skeleton.
-      if (loadedKey.current !== filtroKey) setLoading(true);
+      if (loadedKey.current !== filterKey) setLoading(true);
       const goals = await fetchGoals({ tenantId: session.tenantId, storeIds, from: janela.from, to: janela.to });
       let dayAggs: SalesDayAgg[] = [];
       let team: GoalTeamMember[] = [];
@@ -96,16 +96,16 @@ export default function GoalsPage() {
       }
       if (!cancelled) {
         setData({ goals, dayAggs, team });
-        loadedKey.current = filtroKey;
+        loadedKey.current = filterKey;
         setLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [session.tenantId, storeKey, janela.from, janela.to, lojasLoading, reload, escolher]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session.tenantId, storeKey, janela.from, janela.to, storesLoading, reload, escolher]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const showSkeleton = useMinSkeleton(loading || lojasLoading);
+  const showSkeleton = useMinSkeleton(loading || storesLoading);
 
   const cards = useMemo(() => {
     if (!data) return [];
@@ -120,7 +120,7 @@ export default function GoalsPage() {
         (a, b) =>
           STATUS_ORDER[a.summary.status] - STATUS_ORDER[b.summary.status] ||
           b.summary.goal.startsOn.localeCompare(a.summary.goal.startsOn) ||
-          (a.store?.fantasia ?? "").localeCompare(b.store?.fantasia ?? "", "pt-BR"),
+          (a.store?.tradeName ?? "").localeCompare(b.store?.tradeName ?? "", "pt-BR"),
       );
   }, [data, storeRows, today]);
 
@@ -129,16 +129,16 @@ export default function GoalsPage() {
     setScope(applyPeriodDateChange(scope, r, goal));
   }
 
-  async function excluir() {
-    if (!confirmar) return;
+  async function exclude() {
+    if (!confirm) return;
     setExcluindo(true);
-    const res = await deleteGoal(session.tenantId, confirmar.id);
+    const res = await deleteGoal(session.tenantId, confirm.id);
     setExcluindo(false);
     if (!res.ok) {
       show("Não foi possível excluir a meta. Tente novamente.", "danger");
       return;
     }
-    setConfirmar(null);
+    setConfirm(null);
     show("Meta excluída.", "success");
     setReload((n) => n + 1);
   }
@@ -192,11 +192,11 @@ export default function GoalsPage() {
                 key={summary.goal.id}
                 summary={summary}
                 store={store}
-                mostraLoja={storeRows.length > 1}
+                showsStore={storeRows.length > 1}
                 team={team}
                 onDetail={() => navigate(paths.goalDetail(summary.goal.id))}
-                onCopy={() => setDuplicar(summary.goal)}
-                onDelete={() => setConfirmar(summary.goal)}
+                onCopy={() => setDuplicate(summary.goal)}
+                onDelete={() => setConfirm(summary.goal)}
               />
             ))}
           </div>
@@ -204,37 +204,37 @@ export default function GoalsPage() {
       </div>
 
       <DuplicateChoiceModal
-        open={duplicar !== null}
-        onClose={() => setDuplicar(null)}
+        open={duplicate !== null}
+        onClose={() => setDuplicate(null)}
         kind="meta"
-        name={duplicar?.name ?? null}
+        name={duplicate?.name ?? null}
         hasOtherStores={hasOtherStores}
         onChoose={(choice) => {
-          if (!duplicar) return;
-          const id = duplicar.id;
-          setDuplicar(null);
+          if (!duplicate) return;
+          const id = duplicate.id;
+          setDuplicate(null);
           navigate(choice === "store" ? paths.goalCopyStore(id) : paths.goalCopy(id));
         }}
       />
 
       <Modal
-        open={confirmar !== null}
-        onClose={() => !excluindo && setConfirmar(null)}
+        open={confirm !== null}
+        onClose={() => !excluindo && setConfirm(null)}
         title="Excluir meta?"
         footer={
           <>
-            <Button variant="outline" onClick={() => setConfirmar(null)} disabled={excluindo}>
+            <Button variant="outline" onClick={() => setConfirm(null)} disabled={excluindo}>
               Cancelar
             </Button>
-            <Button variant="danger" onClick={() => void excluir()} disabled={excluindo}>
+            <Button variant="danger" onClick={() => void exclude()} disabled={excluindo}>
               {excluindo ? "Excluindo…" : "Excluir meta"}
             </Button>
           </>
         }
       >
-        {confirmar && (
+        {confirm && (
           <p className="text-[13px] leading-relaxed text-t1">
-            A meta <span className="font-bold text-t0">{confirmar.name}</span>, de {fullDate(confirmar.startsOn)} a {fullDate(confirmar.endsOn)}, será
+            A meta <span className="font-bold text-t0">{confirm.name}</span>, de {fullDate(confirm.startsOn)} a {fullDate(confirm.endsOn)}, será
             excluída. Essa ação não pode ser desfeita.
           </p>
         )}
@@ -246,7 +246,7 @@ export default function GoalsPage() {
 function GoalCard({
   summary,
   store,
-  mostraLoja,
+  showsStore,
   team,
   onDetail,
   onCopy,
@@ -254,16 +254,16 @@ function GoalCard({
 }: {
   summary: GoalSummary;
   store: Store | undefined;
-  mostraLoja: boolean;
+  showsStore: boolean;
   team: string[];
   onDetail: () => void;
   onCopy: () => void;
   onDelete: () => void;
 }) {
-  const { goal: g, status, achieved, pct, projectedPct, daysRemaining, currentLevel, nivelNumero } = summary;
+  const { goal: g, status, achieved, pct, projectedPct, daysRemaining, currentLevel, levelNumber } = summary;
   const period = `${fullDate(g.startsOn)} a ${fullDate(g.endsOn)}`;
-  const prazo = prazoRestante(daysRemaining);
-  const rodape =
+  const prazo = prazoRemaining(daysRemaining);
+  const footer =
     status === "active"
       ? projectedPct != null
         ? `Projeção: ${num(projectedPct, 0)}% · ${prazo.toLowerCase()}`
@@ -271,10 +271,10 @@ function GoalCard({
       : status === "upcoming"
         ? `Começa em ${fullDate(g.startsOn)}`
         : currentLevel
-          ? `Nível final: N${nivelNumero} · ${currentLevel}`
+          ? `Nível final: N${levelNumber} · ${currentLevel}`
           : "Nenhum nível atingido";
 
-  const acao = (fn: () => void) => (e: MouseEvent) => {
+  const action = (fn: () => void) => (e: MouseEvent) => {
     e.stopPropagation();
     fn();
   };
@@ -302,14 +302,14 @@ function GoalCard({
           <p className="truncate text-[15px] font-bold text-t0">{g.name}</p>
           <p className="mt-0.5 truncate text-[12.5px] text-t2">
             {period}
-            {mostraLoja && store ? ` · ${store.fantasia}` : ""}
+            {showsStore && store ? ` · ${store.tradeName}` : ""}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5 self-start">
           <Tooltip label="Duplicar meta">
             <button
               type="button"
-              onClick={acao(onCopy)}
+              onClick={action(onCopy)}
               aria-label="Duplicar meta"
               className="flex h-7 w-7 items-center justify-center rounded-lg border border-line text-t2 transition-colors hover:border-acc hover:text-acc"
             >
@@ -319,7 +319,7 @@ function GoalCard({
           <Tooltip label="Excluir meta">
             <button
               type="button"
-              onClick={acao(onDelete)}
+              onClick={action(onDelete)}
               aria-label="Excluir meta"
               className="flex h-7 w-7 items-center justify-center rounded-lg border border-line text-t2 transition-colors hover:border-bad hover:text-bad"
             >
@@ -348,7 +348,7 @@ function GoalCard({
       <div className="mt-2">
         <ProgressBar value={status === "upcoming" ? 0 : pct} height={5} />
       </div>
-      <p className="mt-2 text-[11.5px] text-t2">{rodape}</p>
+      <p className="mt-2 text-[11.5px] text-t2">{footer}</p>
 
       <div className="flex-1" />
       <div className="mt-4 flex items-center justify-between gap-3">

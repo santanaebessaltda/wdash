@@ -36,9 +36,9 @@ export function dateToIso(d: Date): string {
 }
 
 /** Adiciona dias a um ISO. */
-export function addDays(iso: string, dias: number): string {
+export function addDays(iso: string, days: number): string {
   const d = isoToDate(iso);
-  d.setDate(d.getDate() + dias);
+  d.setDate(d.getDate() + days);
   return dateToIso(d);
 }
 
@@ -57,10 +57,10 @@ export function endOfMonth(iso: string): string {
 /** Lista de ISOs entre inicio e fim, inclusive. */
 export function eachDay(start: string, end: string): string[] {
   const out: string[] = [];
-  let atual = start;
-  while (atual <= end) {
-    out.push(atual);
-    atual = addDays(atual, 1);
+  let current = start;
+  while (current <= end) {
+    out.push(current);
+    current = addDays(current, 1);
   }
   return out;
 }

@@ -42,9 +42,9 @@ const NUM_COLS: Array<{ key: "saldo" | "pedidosAbertos" | "total" | "vendidos30"
 
 function sortValue(r: PurchaseOrderRow, k: Exclude<SortKey, "name">): number {
   if (k === "minimo") return r.minimum ?? -1;
-  if (k === "aPedir") return r.aPedir ?? -1;
-  if (k === "novo") return r.novo ? 1 : 0;
-  if (k === "bloqueado") return r.bloqueado ? 1 : 0;
+  if (k === "aPedir") return r.aRequest ?? -1;
+  if (k === "novo") return r.isNew ? 1 : 0;
+  if (k === "bloqueado") return r.blocked ? 1 : 0;
   return r[k];
 }
 
@@ -65,56 +65,56 @@ function downloadFile(bytes: Uint8Array, name: string) {
 }
 
 export function PurchaseOrderPage() {
-  const { session, storeRows, loading: lojasLoading } = useScopedStores();
+  const { session, storeRows, loading: storesLoading } = useScopedStores();
   const { show } = useToast();
   const store = storeRows.length === 1 ? storeRows[0] : null;
   const po = usePurchaseOrder(session.tenantId, store?.id ?? null, store?.costTableId ?? null);
   const { view } = po;
-  const [busca, setBusca] = useState("");
-  const [filtroSel, setFiltro] = useState<PurchaseFilter>("todos");
+  const [search, setSearch] = useState("");
+  const [filterPicked, setFilter] = useState<PurchaseFilter>("todos");
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [page, setPage] = useState(1);
-  const [resumoPedido, setResumoPedido] = useState<PurchaseOrderRow[] | null>(null);
-  const [copiarAberto, setCopiarAberto] = useState(false);
-  const [destinoId, setDestinoId] = useState("");
+  const [summaryOrder, setSummaryOrder] = useState<PurchaseOrderRow[] | null>(null);
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [destinationId, setDestinationId] = useState("");
   const [copiando, setCopiando] = useState(false);
-  const showSkeleton = useMinSkeleton(lojasLoading || (store != null && po.loading));
+  const showSkeleton = useMinSkeleton(storesLoading || (store != null && po.loading));
 
-  const contagens = view?.contagens ?? { noPedido: 0, semMinimo: 0, novos: 0 };
-  const filtroOpcoes: Array<{ value: PurchaseFilter; label: string }> = [
+  const counts = view?.counts ?? { onOrder: 0, withoutMinimum: 0, novos: 0 };
+  const filterOptions: Array<{ value: PurchaseFilter; label: string }> = [
     { value: "todos", label: "Todos os produtos" },
-    { value: "pedido", label: `Vai para o pedido (${contagens.noPedido})` },
-    { value: "semMinimo", label: `Sem mínimo (${contagens.semMinimo})` },
-    { value: "novos", label: `Novos (${contagens.novos})` },
+    { value: "pedido", label: `Vai para o pedido (${counts.onOrder})` },
+    { value: "semMinimo", label: `Sem mínimo (${counts.withoutMinimum})` },
+    { value: "novos", label: `Novos (${counts.novos})` },
   ];
-  const filtro = filtroSel;
+  const filter = filterPicked;
 
-  const linhas = useMemo(() => {
-    const out = filterPurchaseRows(view?.rows ?? [], { busca, filtro });
+  const lines = useMemo(() => {
+    const out = filterPurchaseRows(view?.rows ?? [], { search, filter });
     const dir = sortDir === "asc" ? 1 : -1;
     const byName = (a: PurchaseOrderRow, b: PurchaseOrderRow) => a.name.localeCompare(b.name, "pt-BR");
     return out.sort((a, b) => (sortKey === "name" ? byName(a, b) * dir : (sortValue(a, sortKey) - sortValue(b, sortKey)) * dir || byName(a, b)));
-  }, [view, busca, filtro, sortKey, sortDir]);
+  }, [view, search, filter, sortKey, sortDir]);
 
-  useEffect(() => setPage(1), [busca, filtro, sortKey, sortDir, store?.id]);
+  useEffect(() => setPage(1), [search, filter, sortKey, sortDir, store?.id]);
   useEffect(() => {
-    setResumoPedido(null);
+    setSummaryOrder(null);
   }, [store?.id]);
 
-  const totalPages = Math.max(1, Math.ceil(linhas.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(lines.length / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
-  const pageRows = linhas.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
+  const pageRows = lines.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
   const totais = useMemo(
     () => ({
-      saldo: linhas.reduce((s, r) => s + r.saldo, 0),
-      pedidosAbertos: linhas.reduce((s, r) => s + r.pedidosAbertos, 0),
-      total: linhas.reduce((s, r) => s + r.total, 0),
-      vendidos30: linhas.reduce((s, r) => s + r.vendidos30, 0),
-      aPedir: linhas.reduce((s, r) => s + (r.aPedir ?? 0), 0),
+      saldo: lines.reduce((s, r) => s + r.saldo, 0),
+      pedidosAbertos: lines.reduce((s, r) => s + r.pedidosAbertos, 0),
+      total: lines.reduce((s, r) => s + r.total, 0),
+      vendidos30: lines.reduce((s, r) => s + r.vendidos30, 0),
+      aRequest: lines.reduce((s, r) => s + (r.aRequest ?? 0), 0),
     }),
-    [linhas],
+    [lines],
   );
 
   const toggleSort = (k: SortKey) => {
@@ -127,59 +127,59 @@ export function PurchaseOrderPage() {
 
   const openSummary = () => {
     if (!view) return;
-    const produtos = view.rows.filter((r) => r.noPedido).sort((a, b) => a.position - b.position);
-    if (produtos.length === 0) {
+    const products = view.rows.filter((r) => r.onOrder).sort((a, b) => a.position - b.position);
+    if (products.length === 0) {
       show("Nenhum produto precisa ser incluído no pedido.", "warning");
       return;
     }
-    setResumoPedido(produtos);
+    setSummaryOrder(products);
   };
 
-  const gerarPedido = () => {
-    if (!view || !resumoPedido || resumoPedido.length === 0) return;
-    const rows = purchaseOrderFileRows({ ...view, rows: resumoPedido });
+  const generateOrder = () => {
+    if (!view || !summaryOrder || summaryOrder.length === 0) return;
+    const rows = purchaseOrderFileRows({ ...view, rows: summaryOrder });
     if (rows.length === 0) {
       show("Nenhum produto precisa ser incluído no pedido.", "warning");
-      setResumoPedido(null);
+      setSummaryOrder(null);
       return;
     }
     downloadFile(buildXlsx([[...PURCHASE_FILE_HEADER], ...rows], { textColumns: PURCHASE_FILE_TEXT_COLUMNS }), purchaseOrderFileName(new Date()));
     show(`Pedido gerado com ${rows.length} produto${rows.length === 1 ? "" : "s"}.`, "success");
-    setResumoPedido(null);
+    setSummaryOrder(null);
   };
 
-  const rede = storesForSession(session.stores);
-  const otherStores = store ? rede.filter((s) => s.id !== store.id) : rede;
-  const todas = destinoId === "" && otherStores.length > 1;
-  const destino = otherStores.find((s) => s.id === destinoId) ?? null;
+  const network = storesForSession(session.stores);
+  const otherStores = store ? network.filter((s) => s.id !== store.id) : network;
+  const all = destinationId === "" && otherStores.length > 1;
+  const destination = otherStores.find((s) => s.id === destinationId) ?? null;
 
   const openCopy = () => {
-    setDestinoId(otherStores.length > 1 ? "" : (otherStores[0]?.id ?? ""));
-    setCopiarAberto(true);
+    setDestinationId(otherStores.length > 1 ? "" : (otherStores[0]?.id ?? ""));
+    setCopyOpen(true);
   };
 
-  const copiarMinimos = async () => {
+  const copyMinimums = async () => {
     if (!store || !po.mins || po.mins.size === 0) return;
-    const alvos = todas ? otherStores : destino ? [destino] : [];
-    if (alvos.length === 0) return;
+    const targets = all ? otherStores : destination ? [destination] : [];
+    if (targets.length === 0) return;
     setCopiando(true);
     try {
       let copiadas = 0;
-      let semSaldo = 0;
-      let semProduto = 0;
+      let withoutSaldo = 0;
+      let withoutProduct = 0;
       let falhas = 0;
-      for (const alvo of alvos) {
-        const stock = await fetchPurchaseStock(session.tenantId, alvo.id);
+      for (const target of targets) {
+        const stock = await fetchPurchaseStock(session.tenantId, target.id);
         if (stock.rows.length === 0) {
-          semSaldo += 1;
+          withoutSaldo += 1;
           continue;
         }
         const { updates } = purchaseMinsToCopy(po.mins, new Set(stock.rows.map((row) => row.code)));
         if (updates.length === 0) {
-          semProduto += 1;
+          withoutProduct += 1;
           continue;
         }
-        const ok = await savePurchaseMins(session.tenantId, alvo.id, updates);
+        const ok = await savePurchaseMins(session.tenantId, target.id, updates);
         if (!ok) falhas += 1;
         else copiadas += 1;
       }
@@ -187,7 +187,7 @@ export function PurchaseOrderPage() {
         show("Não foi possível copiar os mínimos.", "danger");
         return;
       }
-      if (copiadas === 0 && semSaldo > 0) {
+      if (copiadas === 0 && withoutSaldo > 0) {
         show("Essas filiais ainda não abriram o pedido. Abra o pedido de cada uma e copie de novo.", "warning");
         return;
       }
@@ -197,22 +197,22 @@ export function PurchaseOrderPage() {
       }
       const storeText = copiadas === 1 ? "1 filial" : `${copiadas} filiais`;
       const partes = [`Mínimos copiados para ${storeText}.`];
-      if (semSaldo > 0) partes.push(`${semSaldo} ainda não abriram o pedido.`);
-      if (semProduto > 0) partes.push(`${semProduto} não têm estes produtos.`);
+      if (withoutSaldo > 0) partes.push(`${withoutSaldo} ainda não abriram o pedido.`);
+      if (withoutProduct > 0) partes.push(`${withoutProduct} não têm estes produtos.`);
       if (falhas > 0) partes.push(`${falhas} não puderam ser gravadas.`);
-      show(partes.join(" "), semSaldo > 0 || semProduto > 0 || falhas > 0 ? "warning" : "success");
-      setCopiarAberto(false);
+      show(partes.join(" "), withoutSaldo > 0 || withoutProduct > 0 || falhas > 0 ? "warning" : "success");
+      setCopyOpen(false);
     } finally {
       setCopiando(false);
     }
   };
 
-  const limparBusca = () => {
-    setBusca("");
-    setFiltro("todos");
+  const clearSearch = () => {
+    setSearch("");
+    setFilter("todos");
   };
 
-  const summary = view?.summary ?? { produtos: 0, itens: 0 };
+  const summary = view?.summary ?? { products: 0, items: 0 };
 
   return (
     <div className="flex flex-col p-4 sm:p-6">
@@ -222,7 +222,7 @@ export function PurchaseOrderPage() {
         subtitle="Prepare o pedido de compra de cada filial."
         actions={
           <HeaderFilters>
-            <HeaderSearch value={busca} onChange={setBusca} placeholder="Buscar por produto ou código…" width={240} />
+            <HeaderSearch value={search} onChange={setSearch} placeholder="Buscar por produto ou código…" width={240} />
             <div className="flex gap-1 rounded-[11px] border border-line bg-bg-2 p-1" role="group" aria-label="Vendidos">
               {SOLD_WINDOWS.map((days) => (
                 <button
@@ -239,7 +239,7 @@ export function PurchaseOrderPage() {
                 </button>
               ))}
             </div>
-            <HeaderFilter label="Status dos produtos" lead="Status" value={filtro} onChange={setFiltro} options={filtroOpcoes} />
+            <HeaderFilter label="Status dos produtos" lead="Status" value={filter} onChange={setFilter} options={filterOptions} />
             <span className="inline-flex items-center gap-1.5">
               <HeaderFilter
                 label="Multiplicador do pedido"
@@ -250,14 +250,14 @@ export function PurchaseOrderPage() {
               />
               <TipHelp label="Multiplica o mínimo de cada produto. A quantidade a pedir desconta o total em estoque e arredonda para o múltiplo de compra." />
             </span>
-            <AcoesPedido
-              semLoja={store == null && storeRows.length > 1}
-              podeGerar={store != null && Boolean(view) && !po.syncing && !copiando}
-              podeCopiar={otherStores.length > 1 || (store != null && otherStores.length > 0)}
-              copiarLiberado={store != null && Boolean(view) && !po.syncing && !copiando && (po.mins?.size ?? 0) > 0}
-              semMinimo={store != null && (po.mins?.size ?? 0) === 0}
-              onGerar={openSummary}
-              onCopiar={openCopy}
+            <ActionsOrder
+              withoutStore={store == null && storeRows.length > 1}
+              canGenerate={store != null && Boolean(view) && !po.syncing && !copiando}
+              canCopy={otherStores.length > 1 || (store != null && otherStores.length > 0)}
+              copyLiberado={store != null && Boolean(view) && !po.syncing && !copiando && (po.mins?.size ?? 0) > 0}
+              withoutMinimum={store != null && (po.mins?.size ?? 0) === 0}
+              onGenerate={openSummary}
+              onCopy={openCopy}
             />
           </HeaderFilters>
         }
@@ -279,7 +279,7 @@ export function PurchaseOrderPage() {
                   )}
                 </Alert>
               ))}
-            {!po.syncError && po.stale && po.staleTexto && <Alert variant="warning" title={po.staleTexto} />}
+            {!po.syncError && po.stale && po.staleText && <Alert variant="warning" title={po.staleText} />}
           </>
         }
       />
@@ -306,11 +306,11 @@ export function PurchaseOrderPage() {
             </span>
             {view && view.rows.length > 0 && (
               <span className="text-[12.5px] font-semibold text-t1">
-                {num(summary.produtos)} produto{summary.produtos === 1 ? "" : "s"} · {num(summary.itens)} ite{summary.itens === 1 ? "m" : "ns"} no pedido
+                {num(summary.products)} produto{summary.products === 1 ? "" : "s"} · {num(summary.items)} ite{summary.items === 1 ? "m" : "ns"} no pedido
               </span>
             )}
           </div>
-          {linhas.length === 0 ? (
+          {lines.length === 0 ? (
             <div className="flex flex-1">
               {!view || view.rows.length === 0 ? (
                 po.syncing ? (
@@ -324,7 +324,7 @@ export function PurchaseOrderPage() {
                   title="Nenhum produto encontrado"
                   description="Tente buscar por outro nome ou código ou altere os filtros."
                   action={
-                    <Button variant="outline" size="sm" onClick={limparBusca}>
+                    <Button variant="outline" size="sm" onClick={clearSearch}>
                       Limpar filtros
                     </Button>
                   }
@@ -357,10 +357,10 @@ export function PurchaseOrderPage() {
                 <tbody>
                   {pageRows.map((r, i) => {
                     const idx = (pageSafe - 1) * PAGE_SIZE + i;
-                    const categoria = po.catalog?.get(r.code)?.category;
+                    const category = po.catalog?.get(r.code)?.category;
                     return (
-                      <tr key={r.code} className={cn("border-b border-line", r.noPedido && "bg-warn-soft")}>
-                        <td className={cn("px-1 py-3 text-center text-[13px] font-extrabold text-t2", r.noPedido && "shadow-[inset_3px_0_0_var(--warn)]")}>{idx + 1}</td>
+                      <tr key={r.code} className={cn("border-b border-line", r.onOrder && "bg-warn-soft")}>
+                        <td className={cn("px-1 py-3 text-center text-[13px] font-extrabold text-t2", r.onOrder && "shadow-[inset_3px_0_0_var(--warn)]")}>{idx + 1}</td>
                         <td className="px-1 py-3">
                           <ProductNameCell
                             name={r.name}
@@ -368,14 +368,14 @@ export function PurchaseOrderPage() {
                             upper
                             sub={
                               <div className="min-w-0">
-                                <p className="truncate text-[11px] uppercase text-t2">{[r.code, categoria].filter(Boolean).join(" · ")}</p>
-                                {r.variasVariantes && !r.bloqueado && <p className="mt-0.5 text-[11px] font-semibold text-warn">Este produto tem mais de uma cor ou tamanho. Faça o pedido diretamente no Millennium.</p>}
+                                <p className="truncate text-[11px] uppercase text-t2">{[r.code, category].filter(Boolean).join(" · ")}</p>
+                                {r.variasVariantes && !r.blocked && <p className="mt-0.5 text-[11px] font-semibold text-warn">Este produto tem mais de uma cor ou tamanho. Faça o pedido diretamente no Millennium.</p>}
                               </div>
                             }
                           />
                         </td>
                         <td className="px-1 py-2 text-right">
-                          {!r.podePedir ? (
+                          {!r.canRequest ? (
                             <span className="inline-block w-20 pr-2 text-right font-mono text-[13px] font-bold text-t2">{r.minimum == null ? "—" : r.minimum}</span>
                           ) : (
                             <MinInput value={r.minimum} idx={i} label={`Mínimo de ${r.name}`} onSave={(raw) => po.saveMin(r.code, raw)} />
@@ -387,13 +387,13 @@ export function PurchaseOrderPage() {
                           </td>
                         ))}
                         <td className="px-1 py-3 text-center">
-                          <YesNo yes={r.novo} />
+                          <YesNo yes={r.isNew} />
                         </td>
                         <td className="px-1 py-3 text-center">
-                          <YesNo yes={r.bloqueado} />
+                          <YesNo yes={r.blocked} />
                         </td>
                         <td className="px-1 py-3 text-right">
-                          {r.aPedir == null ? <span className="font-mono text-[13px] font-bold text-t2">—</span> : <Qty v={r.aPedir} strong={r.aPedir > 0} />}
+                          {r.aRequest == null ? <span className="font-mono text-[13px] font-bold text-t2">—</span> : <Qty v={r.aRequest} strong={r.aRequest > 0} />}
                         </td>
                       </tr>
                     );
@@ -406,7 +406,7 @@ export function PurchaseOrderPage() {
                         <TipHelp label="Soma todos os produtos encontrados no filtro, inclusive os que não aparecem nesta página." />
                       </span>
                       <span className="mt-0.5 block text-[11px] font-semibold text-t2">
-                        {num(linhas.length)} produto{linhas.length === 1 ? "" : "s"}
+                        {num(lines.length)} produto{lines.length === 1 ? "" : "s"}
                       </span>
                     </td>
                     <td />
@@ -426,58 +426,58 @@ export function PurchaseOrderPage() {
                     <td />
                     <td />
                     <td className="px-1 py-3 text-right">
-                      <Qty v={totais.aPedir} total />
+                      <Qty v={totais.aRequest} total />
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
           )}
-          {linhas.length > 0 && <TableFooter shown={pageRows.length} total={linhas.length} page={pageSafe} totalPages={totalPages} onPage={setPage} />}
+          {lines.length > 0 && <TableFooter shown={pageRows.length} total={lines.length} page={pageSafe} totalPages={totalPages} onPage={setPage} />}
         </Card>
       )}
       </div>
       <Modal
-        open={resumoPedido != null}
-        onClose={() => setResumoPedido(null)}
+        open={summaryOrder != null}
+        onClose={() => setSummaryOrder(null)}
         title="Resumo do pedido"
         size="lg"
         bodyClassName="flex flex-col overflow-hidden p-0"
         footer={
           <>
             <span className="mr-auto min-w-0 text-[13px] font-extrabold text-t0">
-              Total {money(reais(purchaseOrderTotalCents(resumoPedido ?? [])))}
+              Total {money(brl(purchaseOrderTotalCents(summaryOrder ?? [])))}
             </span>
-            <Button variant="outline" onClick={() => setResumoPedido(null)}>
+            <Button variant="outline" onClick={() => setSummaryOrder(null)}>
               Cancelar
             </Button>
-            <Button onClick={gerarPedido}>Gerar planilha</Button>
+            <Button onClick={generateOrder}>Gerar planilha</Button>
           </>
         }
       >
-        {resumoPedido && (
+        {summaryOrder && (
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="shrink-0 space-y-3 px-5 pt-5">
               <p className="text-[13px] leading-relaxed text-t1">
-                {store ? `${store.codFilial} · ${store.fantasia}. ` : ""}
+                {store ? `${store.branchCode} · ${store.tradeName}. ` : ""}
                 Multiplicador {po.factor}x.{" "}
-                {resumoPedido.length === 1 ? "1 produto" : `${num(resumoPedido.length)} produtos`}
+                {summaryOrder.length === 1 ? "1 produto" : `${num(summaryOrder.length)} produtos`}
                 {" · "}
-                {num(resumoPedido.reduce((s, r) => s + (r.aPedir ?? 0), 0))} itens.
+                {num(summaryOrder.reduce((s, r) => s + (r.aRequest ?? 0), 0))} itens.
               </p>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-3">
               <ul className="overflow-hidden rounded-[var(--radius-vela-lg)] border border-line">
-                {resumoPedido.map((r) => (
+                {summaryOrder.map((r) => (
                   <li key={r.code} className="flex items-center gap-3 border-b border-line px-3 py-2.5 last:border-b-0">
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[13px] font-bold text-t0">{r.name}</p>
                       <p className="truncate text-[11px] text-t2">{r.code}</p>
                     </div>
                     <div className="shrink-0 text-right">
-                      <p className="font-mono text-[13px] font-extrabold tabular-nums text-t0">{money(reais(purchaseLineCents(r)))}</p>
+                      <p className="font-mono text-[13px] font-extrabold tabular-nums text-t0">{money(brl(purchaseLineCents(r)))}</p>
                       <p className="whitespace-nowrap font-mono text-[11px] tabular-nums text-t2">
-                        {qty(r.aPedir ?? 0)} × {money(r.custoCents == null ? null : r.custoCents / 100)}
+                        {qty(r.aRequest ?? 0)} × {money(r.costCents == null ? null : r.costCents / 100)}
                       </p>
                     </div>
                   </li>
@@ -488,38 +488,38 @@ export function PurchaseOrderPage() {
         )}
       </Modal>
       <Modal
-        open={copiarAberto && store != null && (todas || destino != null)}
+        open={copyOpen && store != null && (all || destination != null)}
         onClose={() => {
-          if (!copiando) setCopiarAberto(false);
+          if (!copiando) setCopyOpen(false);
         }}
         title="Copiar mínimos"
         size="sm"
         footer={
           <>
-            <Button variant="outline" onClick={() => setCopiarAberto(false)} disabled={copiando}>
+            <Button variant="outline" onClick={() => setCopyOpen(false)} disabled={copiando}>
               Cancelar
             </Button>
-            <Button onClick={() => void copiarMinimos()} disabled={copiando || (!todas && !destino)}>
+            <Button onClick={() => void copyMinimums()} disabled={copiando || (!all && !destination)}>
               {copiando ? "Copiando…" : "Copiar mínimos"}
             </Button>
           </>
         }
       >
-        {store && (todas || destino) && (
+        {store && (all || destination) && (
           <div className="flex flex-col gap-3">
-            <p className="text-[13px] leading-relaxed text-t1">Copie os mínimos de {store.fantasia} para outra filial ou para todas.</p>
+            <p className="text-[13px] leading-relaxed text-t1">Copie os mínimos de {store.tradeName} para outra filial ou para todas.</p>
             <FormField label="Copiar para">
-              <Select value={todas ? "" : (destino?.id ?? "")} onChange={(e) => setDestinoId(e.target.value)} disabled={copiando}>
+              <Select value={all ? "" : (destination?.id ?? "")} onChange={(e) => setDestinationId(e.target.value)} disabled={copiando}>
                 {otherStores.length > 1 && <option value="">Todas as outras filiais</option>}
                 {otherStores.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.codFilial} · {s.fantasia}
+                    {s.branchCode} · {s.tradeName}
                   </option>
                 ))}
               </Select>
             </FormField>
             <p className="text-[13px] leading-relaxed text-t2">
-              {todas
+              {all
                 ? "Os mínimos dos produtos em comum serão atualizados nas outras filiais. Os demais não serão alterados."
                 : "Os mínimos dos produtos em comum serão substituídos. Os demais não serão alterados."}
             </p>
@@ -530,41 +530,41 @@ export function PurchaseOrderPage() {
   );
 }
 
-function AcoesPedido({
-  semLoja,
-  podeGerar,
-  podeCopiar,
-  copiarLiberado,
-  semMinimo,
-  onGerar,
-  onCopiar,
+function ActionsOrder({
+  withoutStore,
+  canGenerate,
+  canCopy,
+  copyLiberado,
+  withoutMinimum,
+  onGenerate,
+  onCopy,
 }: {
-  semLoja: boolean;
-  podeGerar: boolean;
-  podeCopiar: boolean;
-  copiarLiberado: boolean;
-  semMinimo: boolean;
-  onGerar: () => void;
-  onCopiar: () => void;
+  withoutStore: boolean;
+  canGenerate: boolean;
+  canCopy: boolean;
+  copyLiberado: boolean;
+  withoutMinimum: boolean;
+  onGenerate: () => void;
+  onCopy: () => void;
 }) {
   const items: DropdownItem[] = [
     {
       label: "Gerar pedido",
-      description: semLoja ? "Selecione uma filial no topo para gerar o pedido." : "Abre o resumo e baixa a planilha desta filial.",
-      disabled: semLoja || !podeGerar,
-      onClick: onGerar,
+      description: withoutStore ? "Selecione uma filial no topo para gerar o pedido." : "Abre o resumo e baixa a planilha desta filial.",
+      disabled: withoutStore || !canGenerate,
+      onClick: onGenerate,
     },
   ];
-  if (podeCopiar) {
+  if (canCopy) {
     items.push({
       label: "Copiar mínimos para outra filial",
-      description: semLoja
+      description: withoutStore
         ? "Selecione uma filial no topo para copiar os mínimos."
-        : semMinimo
+        : withoutMinimum
           ? "Cadastre pelo menos um mínimo nesta filial para poder copiar."
           : "Copia os mínimos desta filial. Não copia o arquivo do pedido.",
-      disabled: semLoja || !copiarLiberado,
-      onClick: onCopiar,
+      disabled: withoutStore || !copyLiberado,
+      onClick: onCopy,
     });
   }
   return (
@@ -592,7 +592,7 @@ function ChevronDown() {
 
 export default PurchaseOrderPage;
 
-const reais = (cents: number | null) => (cents == null ? null : cents / 100);
+const brl = (cents: number | null) => (cents == null ? null : cents / 100);
 
 function Qty({ v, total = false, strong = false }: { v: number; total?: boolean; strong?: boolean }) {
   return (

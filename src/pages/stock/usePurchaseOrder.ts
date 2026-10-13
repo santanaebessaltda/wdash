@@ -245,7 +245,7 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null, costT
     syncError,
     syncedAt,
     stale: !syncing && syncedAt != null && isStale(syncedAt, now),
-    staleTexto: syncedAt ? `O saldo foi atualizado ${clockLabel(syncedAt)}. O pedido pode usar quantidades desatualizadas.` : null,
+    staleText: syncedAt ? `O saldo foi atualizado ${clockLabel(syncedAt)}. O pedido pode usar quantidades desatualizadas.` : null,
     factor,
     setFactor,
     soldDays,

@@ -47,7 +47,7 @@ export interface GoalTeamMember {
   storeId: string;
   employeeId: number;
   /** Codigo de gerador no Millennium (liga os itens por pessoa dos desafios). */
-  geradorId?: number | null;
+  generatorId?: number | null;
   name: string;
   /** Nomes normalizados ja vistos (liga venda gravada so pelo nome). */
   nameKeys: string[];
@@ -131,9 +131,9 @@ export interface GoalCardView {
   kind: GoalType;
   storeNameValue: string;
   brands: GoalBrand[];
-  qtdGrupos: number;
-  qtdVendedoras: number;
-  qtdNiveis: number;
+  qtyGroups: number;
+  qtySellers: number;
+  qtyLevels: number;
   tiers: Tier[];
   band: NetworkGlobalGoal;
   sellers: SellerRow[];
@@ -171,7 +171,7 @@ export type SalesSellerDayAgg = {
   /** Codigo da funcionaria no Millennium (FUNCIONARIO)  -  resolvido pelo nome na gravacao; null = so nome. */
   sellerEmployeeId?: number | null;
   /** Gerador da vendedora no Millennium (relatorio de cupom); null = so pelo nome. */
-  sellerGeradorId?: number | null;
+  sellerGeneratorId?: number | null;
   brand: SalesBrand;
   revenueCents: number;
   /** Distinct COD_OPERACAO count. */

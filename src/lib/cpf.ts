@@ -1,12 +1,12 @@
 /** Utilidades de CPF: mascara, limpeza e validacao do digito verificador. */
 
-export function somenteDigitos(v: string): string {
+export function onlyDigitos(v: string): string {
   return v.replace(/\D/g, "");
 }
 
 /** 12345678909  ->  123.456.789-09 (parcial enquanto digita). */
 export function mascararCpf(v: string): string {
-  const d = somenteDigitos(v).slice(0, 11);
+  const d = onlyDigitos(v).slice(0, 11);
   const p1 = d.slice(0, 3);
   const p2 = d.slice(3, 6);
   const p3 = d.slice(6, 9);
@@ -18,16 +18,16 @@ export function mascararCpf(v: string): string {
   return out;
 }
 
-function checkDigit(base: string, pesoInicial: number): number {
-  let soma = 0;
-  for (let i = 0; i < base.length; i++) soma += Number(base[i]) * (pesoInicial - i);
-  const resto = (soma * 10) % 11;
+function checkDigit(base: string, weightInicial: number): number {
+  let sum = 0;
+  for (let i = 0; i < base.length; i++) sum += Number(base[i]) * (weightInicial - i);
+  const resto = (sum * 10) % 11;
   return resto === 10 ? 0 : resto;
 }
 
 /** Valida os dois digitos verificadores. Rejeita sequencias repetidas. */
-export function cpfValido(v: string): boolean {
-  const d = somenteDigitos(v);
+export function cpfValid(v: string): boolean {
+  const d = onlyDigitos(v);
   if (d.length !== 11) return false;
   if (/^(\d)\1{10}$/.test(d)) return false;
   const d1 = checkDigit(d.slice(0, 9), 10);
@@ -36,7 +36,7 @@ export function cpfValido(v: string): boolean {
 }
 
 /** Gera um CPF valido a partir dos 9 primeiros digitos (uso em mocks). */
-export function cpfDeBase(base9: string): string {
+export function cpfOfBase(base9: string): string {
   const d1 = checkDigit(base9, 10);
   const d2 = checkDigit(base9 + d1, 11);
   return `${base9}${d1}${d2}`;

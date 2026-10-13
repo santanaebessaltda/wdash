@@ -42,7 +42,7 @@ async function loadAll(tenantId: string, storeRows: Store[]): Promise<StockLoade
 /** Estoque das lojas do escopo. Ao abrir, busca no Millennium o estoque com mais de 30 min. */
 export function useStockData() {
   const { show } = useToast();
-  const { session, storeRows, loading: lojasLoading } = useScopedStores();
+  const { session, storeRows, loading: storesLoading } = useScopedStores();
   const { scope } = useScope();
   const escolher = pickOneStore(scope.storeIds, session.stores.length);
   const storeKey = storeRows.map((s) => s.id).join(",");
@@ -91,7 +91,7 @@ export function useStockData() {
   );
 
   useEffect(() => {
-    if (lojasLoading) return;
+    if (storesLoading) return;
     if (escolher) {
       setLoading(false);
       return;
@@ -112,7 +112,7 @@ export function useStockData() {
     return () => {
       cancelled = true;
     };
-  }, [storeKey, lojasLoading, reload, syncIfStale, escolher]);
+  }, [storeKey, storesLoading, reload, syncIfStale, escolher]);
 
   const dataRef = useRef(data);
   dataRef.current = data;
@@ -127,8 +127,8 @@ export function useStockData() {
     busyLabel: "Buscando estoque…",
     run: async () => {
       if (escolher) return;
-      const atual = dataRef.current;
-      if (atual) await syncIfStale(atual, { force: true });
+      const current = dataRef.current;
+      if (current) await syncIfStale(current, { force: true });
     },
   });
 
@@ -150,7 +150,7 @@ export function useStockData() {
     [data, storeRows],
   );
 
-  const atualizadoTexto = syncing
+  const atualizadoText = syncing
     ? "Buscando estoque…"
     : oldestSync
       ? `Estoque atualizado ${clockLabel(oldestSync)}`
@@ -161,8 +161,8 @@ export function useStockData() {
     storeKey,
     escolher,
     view,
-    loading: loading || lojasLoading,
+    loading: loading || storesLoading,
     syncing,
-    atualizadoTexto,
+    atualizadoText,
   };
 }

@@ -3,7 +3,7 @@ import type { RouteObject } from "react-router-dom";
 import { Navigate } from "react-router-dom";
 import { paths } from "@/router/paths";
 import { RequireRole } from "@/session/RequireSession";
-import { GESTOR_ROLES } from "@/layout/nav-wedash";
+import { OWNER_ROLES } from "@/layout/nav-wedash";
 
 const SettingsPage = lazyPage(() => import("./SettingsPage"), "SettingsPage");
 const WedashSettingsLayout = lazyPage(() => import("./WedashSettingsLayout"), "WedashSettingsLayout");
@@ -33,7 +33,7 @@ export const settingsRoutes: RouteObject[] = [
       { path: paths.settings.notifications, element: <NotificationsPage /> },
       { path: paths.settings.stores, element: <StoresSettingsPage /> },
       {
-        element: <RequireRole roles={GESTOR_ROLES} />,
+        element: <RequireRole roles={OWNER_ROLES} />,
         children: [
           { path: paths.settings.users, element: <SystemUsersPage /> },
           { path: paths.settings.erp, element: <ErpIntegrationPage /> },
@@ -44,7 +44,7 @@ export const settingsRoutes: RouteObject[] = [
   },
   { path: paths.settings.storeDetail(":id"), element: <StoreDetailPage /> },
   {
-    element: <RequireRole roles={GESTOR_ROLES} />,
+    element: <RequireRole roles={OWNER_ROLES} />,
     children: [
       { path: paths.operation.branch, element: <BranchPage /> },
       { path: paths.operation.productsTaxes, element: <ProductsTaxesPage /> },

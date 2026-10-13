@@ -62,13 +62,13 @@ function startOfWeek(today: Date): Date {
 }
 
 function startOfQuarter(today: Date): Date {
-  const mes = Math.floor(today.getMonth() / 3) * 3;
-  return new Date(today.getFullYear(), mes, 1);
+  const month = Math.floor(today.getMonth() / 3) * 3;
+  return new Date(today.getFullYear(), month, 1);
 }
 
 function startOfHalf(today: Date): Date {
-  const mes = today.getMonth() < 6 ? 0 : 6;
-  return new Date(today.getFullYear(), mes, 1);
+  const month = today.getMonth() < 6 ? 0 : 6;
+  return new Date(today.getFullYear(), month, 1);
 }
 
 /** Atalhos padrao alinhados ao escopo (URL `periodo=`). */
@@ -161,9 +161,9 @@ export function DateRangePicker({
     if (value) setViewMonth(new Date(value[0].getFullYear(), value[0].getMonth(), 1));
   }, [open]); // value lido so no momento do open
 
-  function diaBloqueado(dia: Date): boolean {
-    if (min && dia < min) return true;
-    if (dia > max) return true;
+  function dayBlocked(day: Date): boolean {
+    if (min && day < min) return true;
+    if (day > max) return true;
     return false;
   }
 
@@ -198,16 +198,16 @@ export function DateRangePicker({
     function colocar() {
       if (!triggerRef.current) return;
       const rect = triggerRef.current.getBoundingClientRect();
-      const margem = 12;
+      const margin = 12;
       const vw = window.innerWidth;
       const vh = window.innerHeight;
-      const width = Math.min(vw - margem * 2, 640);
+      const width = Math.min(vw - margin * 2, 640);
       // Alinha a direita do painel a direita do trigger; empurra pra dentro se passar.
       let left = rect.right - width;
-      if (left < margem) left = margem;
-      if (left + width > vw - margem) left = Math.max(margem, vw - margem - width);
-      const top = Math.min(rect.bottom + 8, vh - margem - 80);
-      const maxHeight = Math.max(200, vh - top - margem);
+      if (left < margin) left = margin;
+      if (left + width > vw - margin) left = Math.max(margin, vw - margin - width);
+      const top = Math.min(rect.bottom + 8, vh - margin - 80);
+      const maxHeight = Math.max(200, vh - top - margin);
       setPanelPos({ top, left, width, maxHeight });
     }
 
@@ -230,12 +230,12 @@ export function DateRangePicker({
     return arr;
   }, [viewMonth]);
 
-  const podeMesAnt = !min || new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 0) >= min;
-  const podeMesProx =
+  const canMonthPrev = !min || new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 0) >= min;
+  const canMonthProx =
     new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1) <= max;
 
   /** 1 dia = Hoje/Ontem se bater com o calendario real (igual aos pills). */
-  function presetDoRange(r: DateRange): DatePresetId | undefined {
+  function presetOfRange(r: DateRange): DatePresetId | undefined {
     const [a, b] = r;
     if (!sameCalendarDay(a, b)) return undefined;
     if (sameCalendarDay(a, today)) return "today";
@@ -243,22 +243,22 @@ export function DateRangePicker({
     return undefined;
   }
 
-  function pickDay(dia: Date) {
-    if (diaBloqueado(dia)) return;
+  function pickDay(day: Date) {
+    if (dayBlocked(day)) return;
     // 1 clique (ou dia anterior ao inicio)  ->  marca inicio; 2 no mesmo dia  ->  so aquele dia.
-    if (!draftStart || (!sameCalendarDay(draftStart, dia) && draftStart > dia)) {
-      setDraftStart(dia);
+    if (!draftStart || (!sameCalendarDay(draftStart, day) && draftStart > day)) {
+      setDraftStart(day);
       return;
     }
-    const clamped = clampRange([draftStart, dia]);
+    const clamped = clampRange([draftStart, day]);
     if (!clamped) return;
-    const presetId = presetDoRange(clamped);
+    const presetId = presetOfRange(clamped);
     onChange(clamped, presetId ? { presetId } : undefined);
     setDraftStart(null);
     setOpen(false);
   }
 
-  function aplicarQuick(qr: QuickRange) {
+  function applyQuick(qr: QuickRange) {
     const raw = qr.resolve(today);
     const clamped = clampRange(raw);
     if (!clamped) return;
@@ -268,22 +268,22 @@ export function DateRangePicker({
     setOpen(false);
   }
 
-  function quickDisponivel(qr: QuickRange): boolean {
+  function quickAvailable(qr: QuickRange): boolean {
     return clampRange(qr.resolve(today)) != null;
   }
 
-  function ehSelecionado(dia: Date): boolean {
-    if (draftStart && sameCalendarDay(draftStart, dia)) return true;
-    if (value) return sameCalendarDay(value[0], dia) || sameCalendarDay(value[1], dia);
+  function isSelected(day: Date): boolean {
+    if (draftStart && sameCalendarDay(draftStart, day)) return true;
+    if (value) return sameCalendarDay(value[0], day) || sameCalendarDay(value[1], day);
     return false;
   }
 
-  function ehDentro(dia: Date): boolean {
-    const lo = draftStart ?? (value ? value[0] : dia);
-    const hi = value ? value[1] : dia;
-    if (!draftStart && value) return dia > value[0] && dia < value[1];
+  function isInside(day: Date): boolean {
+    const lo = draftStart ?? (value ? value[0] : day);
+    const hi = value ? value[1] : day;
+    if (!draftStart && value) return day > value[0] && day < value[1];
     if (draftStart) return false;
-    return dia > lo && dia < hi;
+    return day > lo && day < hi;
   }
 
   const label = displayLabel?.trim()
@@ -303,19 +303,19 @@ export function DateRangePicker({
             <div className="flex shrink-0 flex-row flex-wrap gap-2 sm:w-[150px] sm:flex-col sm:flex-nowrap">
               <span className="mb-0.5 hidden text-[11px] font-bold uppercase tracking-wide text-t2 sm:block">Períodos</span>
               {quickRanges.map((qr) => {
-                const ok = quickDisponivel(qr);
-                const ativo = Boolean(qr.id && activePresetId && qr.id === activePresetId);
+                const ok = quickAvailable(qr);
+                const active = Boolean(qr.id && activePresetId && qr.id === activePresetId);
                 return (
                   <button
                     key={qr.id ?? qr.label}
                     type="button"
                     disabled={!ok}
-                    onClick={() => aplicarQuick(qr)}
+                    onClick={() => applyQuick(qr)}
                     className={cn(
                       "h-8 rounded-[9px] border px-3 text-left text-xs font-semibold transition-colors",
                       !ok
                         ? "cursor-not-allowed border-line/60 text-t2 opacity-40"
-                        : ativo
+                        : active
                           ? "border-acc bg-acc-soft text-acc"
                           : "border-line text-t1 hover:border-acc hover:text-acc",
                     )}
@@ -330,12 +330,12 @@ export function DateRangePicker({
               <div className="mb-3 flex items-center justify-between">
                 <button
                   type="button"
-                  disabled={!podeMesAnt}
+                  disabled={!canMonthPrev}
                   onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1))}
                   aria-label="Mês anterior"
                   className={cn(
                     "flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-line text-t1",
-                    podeMesAnt ? "hover:bg-bg-3" : "cursor-not-allowed opacity-40",
+                    canMonthPrev ? "hover:bg-bg-3" : "cursor-not-allowed opacity-40",
                   )}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -347,12 +347,12 @@ export function DateRangePicker({
                 </span>
                 <button
                   type="button"
-                  disabled={!podeMesProx}
+                  disabled={!canMonthProx}
                   onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1))}
                   aria-label="Próximo mês"
                   className={cn(
                     "flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-line text-t1",
-                    podeMesProx ? "hover:bg-bg-3" : "cursor-not-allowed opacity-40",
+                    canMonthProx ? "hover:bg-bg-3" : "cursor-not-allowed opacity-40",
                   )}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -370,34 +370,34 @@ export function DateRangePicker({
               </div>
 
               <div className="grid grid-cols-7 gap-1">
-                {cells.map((dia, i) => {
-                  if (dia === null) return <span key={`e${i}`} />;
-                  const isTodayFlag = sameCalendarDay(dia, today);
-                  const bloqueado = diaBloqueado(dia);
-                  const selecionado = ehSelecionado(dia);
-                  const dentro = ehDentro(dia);
+                {cells.map((day, i) => {
+                  if (day === null) return <span key={`e${i}`} />;
+                  const isTodayFlag = sameCalendarDay(day, today);
+                  const blocked = dayBlocked(day);
+                  const selected = isSelected(day);
+                  const inside = isInside(day);
                   return (
                     <button
-                      key={dia.toISOString()}
+                      key={day.toISOString()}
                       type="button"
-                      disabled={bloqueado}
-                      onClick={() => pickDay(dia)}
+                      disabled={blocked}
+                      onClick={() => pickDay(day)}
                       aria-current={isTodayFlag ? "date" : undefined}
                       title={isTodayFlag ? "Hoje" : undefined}
                       className={cn(
                         "flex h-9 min-w-0 items-center justify-center rounded-[9px] text-[12.5px] transition-colors",
-                        bloqueado
+                        blocked
                           ? "cursor-not-allowed text-t2 opacity-30"
-                          : selecionado
+                          : selected
                             ? "bg-acc font-bold text-white"
-                            : dentro
+                            : inside
                               ? "bg-acc-soft font-semibold text-acc"
                               : isTodayFlag
                                 ? "font-bold text-acc ring-1 ring-acc/50 hover:bg-acc-soft"
                                 : "font-semibold text-t1 hover:bg-bg-3",
                       )}
                     >
-                      {dia.getDate()}
+                      {day.getDate()}
                     </button>
                   );
                 })}

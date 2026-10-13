@@ -121,17 +121,17 @@ function validateGoal(f: {
 
   if (f.tiersOn) {
     const tiers: Record<number, TierErrors> = {};
-    let anterior: number | null = null;
+    let previous: number | null = null;
     for (const t of f.tiers) {
       const te: TierErrors = {};
       const goal = positive(t.goal);
       if (goal == null) te.goal = REQUIRED;
-      else if (anterior != null && goal <= anterior)
-        te.goal = `A meta deste nível precisa ser maior que a do nível anterior (${numText(anterior)}%).`;
+      else if (previous != null && goal <= previous)
+        te.goal = `A meta deste nível precisa ser maior que a do nível anterior (${numText(previous)}%).`;
       if (positive(t.commission) == null) te.commission = REQUIRED;
       if (f.managerOn && positive(t.mgrCommission) == null) te.mgrCommission = REQUIRED;
       if (te.goal || te.commission || te.mgrCommission) tiers[t.key] = te;
-      if (goal != null) anterior = goal;
+      if (goal != null) previous = goal;
     }
     if (Object.keys(tiers).length > 0) e.tiers = tiers;
   }
@@ -155,15 +155,15 @@ function tierResults(
   /** Bonus somados ate este nivel (bateu o 2 = bonus do 1 + do 2). */
   bonusTotal: number;
 }[] {
-  let acumulado = 0;
+  let accumulated = 0;
   return tiers.map((t) => {
     const m = positive(t.goal);
     const atingir = m != null && base ? (base * m) / 100 : null;
     const c = positive(t.commission);
     const commission = c != null && atingir != null ? (atingir * c) / 100 : null;
     const bonus = positive(t.bonus);
-    acumulado += bonus ?? 0;
-    return { atingir, commission, bonus, bonusTotal: acumulado };
+    accumulated += bonus ?? 0;
+    return { atingir, commission, bonus, bonusTotal: accumulated };
   });
 }
 
@@ -185,13 +185,13 @@ function managerResult(
 }
 
 /** "bonus de R$ X". A soma dos niveis ("total de R$ Y") so entra na simulacao. */
-function bonusItems(bonus: number | null, total: number, porPessoa = false, soma = false): ReactNode[] {
+function bonusItems(bonus: number | null, total: number, byPerson = false, sum = false): ReactNode[] {
   if (total <= 0) return [];
-  const sufixo = porPessoa ? " por pessoa" : "";
+  const suffix = byPerson ? " por pessoa" : "";
   const amount = (v: number) => <span className="font-mono font-semibold text-ok">{brlCent(v)}</span>;
   const items: ReactNode[] = [];
-  if (bonus != null) items.push(<>bônus de {amount(bonus)}{sufixo}</>);
-  if (soma && total > (bonus ?? 0)) items.push(<>total de {amount(total)}{sufixo}</>);
+  if (bonus != null) items.push(<>bônus de {amount(bonus)}{suffix}</>);
+  if (sum && total > (bonus ?? 0)) items.push(<>total de {amount(total)}{suffix}</>);
   return items;
 }
 
@@ -208,14 +208,14 @@ function distributeGroups(
   const rows = gs.map((g) =>
     g.key === key ? { ...g, pct, editedAt: groupEditSeq++ } : g,
   );
-  const outros = rows.filter((g) => g.key !== key);
-  if (outros.length === 0) return rows;
-  let autos = outros.filter((g) => g.editedAt === 0);
+  const others = rows.filter((g) => g.key !== key);
+  if (others.length === 0) return rows;
+  let autos = others.filter((g) => g.editedAt === 0);
   if (autos.length === 0) {
-    const maisAntigo = outros.reduce((a, b) =>
+    const maisOld = others.reduce((a, b) =>
       b.editedAt < a.editedAt ? b : a,
     );
-    autos = [maisAntigo];
+    autos = [maisOld];
   }
   const autoKeys = new Set(autos.map((g) => g.key));
   const manual = rows
@@ -223,10 +223,10 @@ function distributeGroups(
     .reduce((s, g) => s + (groupPct(g) ?? 0), 0);
   const resto = Math.max(0, Math.round((100 - manual) * 10));
   const parte = Math.floor(resto / autos.length);
-  let sobra = resto - parte * autos.length;
+  let surplus = resto - parte * autos.length;
   return rows.map((g) => {
     if (!autoKeys.has(g.key)) return g;
-    const decimos = parte + (sobra-- > 0 ? 1 : 0);
+    const decimos = parte + (surplus-- > 0 ? 1 : 0);
     return { ...g, pct: numText(decimos / 10), editedAt: 0 };
   });
 }
@@ -272,8 +272,8 @@ export default function GoalEditorPage() {
   const session = useActiveSession();
   const toast = useToast();
   const title = id ? "Editar meta" : "Nova meta";
-  const origem = goalBackPath(location.state);
-  const voltar = () => navigate(id ? paths.goalDetail(id) : origem, id ? { state: location.state } : undefined);
+  const origin = goalBackPath(location.state);
+  const back = () => navigate(id ? paths.goalDetail(id) : origin, id ? { state: location.state } : undefined);
 
   const { scope } = useScope();
   const storeRows = useMemo(
@@ -284,7 +284,7 @@ export default function GoalEditorPage() {
     () => (copyForStore ? "" : scope.storeIds[0] ?? (storeRows.length === 1 ? storeRows[0]!.id : "")),
   );
   const storeFilter = scope.storeIds[0];
-  useReturnWhenStoreChanges(id ? storeId || undefined : undefined, origem);
+  useReturnWhenStoreChanges(id ? storeId || undefined : undefined, origin);
   useEffect(() => {
     if (!id && !copyForStore && storeFilter) setStoreId(storeFilter);
   }, [id, storeFilter, copyForStore]);
@@ -334,10 +334,10 @@ export default function GoalEditorPage() {
       if (copyId) {
         if (copyForStore) {
           setSourceStoreId(g.storeId);
-          const outras = storeRows.filter((l) => l.id !== g.storeId);
-          const destino =
-            storeFilter && storeFilter !== g.storeId ? storeFilter : outras.length === 1 ? outras[0]!.id : "";
-          setStoreId(destino);
+          const others = storeRows.filter((l) => l.id !== g.storeId);
+          const destination =
+            storeFilter && storeFilter !== g.storeId ? storeFilter : others.length === 1 ? others[0]!.id : "";
+          setStoreId(destination);
           setName(g.name);
           setStartsOn(isoToDate(g.startsOn));
           setEndsOn(isoToDate(g.endsOn));
@@ -424,7 +424,7 @@ export default function GoalEditorPage() {
   const [saving, setSaving] = useState(false);
   const [overlap, setOverlap] = useState(false);
   useEffect(() => setOverlap(false), [startsOn, endsOn, storeId]);
-  const campos = {
+  const fields = {
     name,
     startsOn,
     endsOn,
@@ -436,13 +436,13 @@ export default function GoalEditorPage() {
     tiers,
     managerOn,
   };
-  const errors: FormErrors = tried ? validateGoal(campos) : {};
+  const errors: FormErrors = tried ? validateGoal(fields) : {};
   const overlapMsg = "Já existe uma meta desta filial nesse período.";
   const dateError = (e?: string) => e ?? (overlap ? overlapMsg : undefined);
 
   const submit = async () => {
     setTried(true);
-    if (Object.keys(validateGoal(campos)).length > 0) {
+    if (Object.keys(validateGoal(fields)).length > 0) {
       toast.show("Revise os campos destacados.", "danger");
       return;
     }
@@ -493,7 +493,7 @@ export default function GoalEditorPage() {
           variant="secondary"
           size="sm"
           icon={<Icon d={icons.arrowLeft} size={14} />}
-          onClick={voltar}
+          onClick={back}
         >
           Voltar
         </Button>
@@ -575,7 +575,7 @@ export default function GoalEditorPage() {
                 {!storeId && <option value="">Selecione a loja</option>}
                 {targetStores.map((l) => (
                   <option key={l.id} value={l.id}>
-                    {l.fantasia} · Filial {l.codFilial}
+                    {l.tradeName} · Filial {l.branchCode}
                   </option>
                 ))}
               </Select>
@@ -601,7 +601,7 @@ export default function GoalEditorPage() {
               <GlobalSplit
                 target={targetValue}
                 teamSize={teamSize}
-                porPessoa={prizeMode === "INDIVIDUAL" && !(groupsOn && groups && groups.length > 0)}
+                byPerson={prizeMode === "INDIVIDUAL" && !(groupsOn && groups && groups.length > 0)}
               />
             </FormField>
             <FormField label="Modo de premiação" required>
@@ -638,7 +638,7 @@ export default function GoalEditorPage() {
             team={team}
             target={targetValue}
             mode={prizeMode}
-            onCreate={() => navigate(paths.operation.sellers)}
+            onCreate={() => navigate(paths.management.team)}
             error={errors.groups}
           />
         </SideCard>
@@ -685,14 +685,14 @@ export default function GoalEditorPage() {
             tiersOn={tiersOn}
             target={targetValue}
             mode={prizeMode}
-            equipeToda={prizeMode === "GENERAL" || !groupsOn}
+            teamToda={prizeMode === "GENERAL" || !groupsOn}
             managerOn={managerOn}
           />
         </SideCard>
       </div>
 
       <div className="mt-5 flex justify-end gap-2.5">
-        <Button variant="outline" onClick={voltar}>
+        <Button variant="outline" onClick={back}>
           Cancelar
         </Button>
         <Button onClick={() => void submit()} disabled={saving}>
@@ -704,17 +704,17 @@ export default function GoalEditorPage() {
 }
 
 /**
- * Meta global  equipe de vendas ativa da loja. So no modo Individual sem grupos de distribuicao  - 
- * com grupos a meta de cada um vem do % do grupo; no modo Grupo a meta nao e dividida por pessoa.
+ * Meta global  team from sales active ofValue store. So no modo Individual without groups from distribuicao  - 
+ * withValue groups a meta from each one vem do % do group; no modo Group a meta nao e dividida by person.
  */
 function GlobalSplit({
   target,
   teamSize,
-  porPessoa,
+  byPerson,
 }: {
   target: number | null;
   teamSize: number | null;
-  porPessoa: boolean;
+  byPerson: boolean;
 }) {
   if (target == null || teamSize == null) return null;
   if (teamSize === 0) {
@@ -724,7 +724,7 @@ function GlobalSplit({
       </p>
     );
   }
-  if (!porPessoa) return null;
+  if (!byPerson) return null;
   return (
     <p className="mt-1.5 text-[12px] font-semibold text-acc">
       Meta individual: {brlCent(target / teamSize)} · {teamSize} {teamSize === 1 ? "pessoa" : "pessoas"} na equipe
@@ -912,7 +912,7 @@ function GroupsEditor({
   );
 }
 
-/** Meta de cada grupo e as pessoas dele (o grupo de cada pessoa e definido em Gestao > Equipe). */
+/** Meta from cada group e as pessoas dele (o group from cada pessoa e definido em Gestao > Equipe). */
 function GroupsSimulation({
   groups,
   team,
@@ -925,11 +925,11 @@ function GroupsSimulation({
   mode: PrizeMode;
 }) {
   const ids = new Set(groups.map((g) => g.key));
-  const pessoas = [...(team ?? [])].sort((a, b) =>
+  const people = [...(team ?? [])].sort((a, b) =>
     a.name.localeCompare(b.name, "pt-BR"),
   );
-  const semGrupo = pessoas.filter((p) => !p.shiftId || !ids.has(p.shiftId));
-  const pessoaRow = (p: GoalTeamMember, goal: string | null) => (
+  const withoutGroup = people.filter((p) => !p.shiftId || !ids.has(p.shiftId));
+  const personRow = (p: GoalTeamMember, goal: string | null) => (
     <div
       key={`${p.storeId}:${p.employeeId}`}
       className="flex items-center gap-2.5 py-1"
@@ -957,10 +957,10 @@ function GroupsSimulation({
           {groups.map((g) => {
             const goal = groupTarget(g, target);
             const pct = groupPct(g);
-            const membros = pessoas.filter((p) => p.shiftId === g.key);
-            const cada =
-              mode === "INDIVIDUAL" && goal != null && membros.length > 0
-                ? brlCent(goal / membros.length)
+            const members = people.filter((p) => p.shiftId === g.key);
+            const each =
+              mode === "INDIVIDUAL" && goal != null && members.length > 0
+                ? brlCent(goal / members.length)
                 : null;
             return (
               <div key={g.key} className="py-2.5 first:pt-0 last:pb-0">
@@ -978,24 +978,24 @@ function GroupsSimulation({
                     {goal != null ? brlCent(goal) : "—"}
                   </span>
                 </div>
-                {membros.length === 0 ? (
+                {members.length === 0 ? (
                   <p className="text-[11.5px] text-warn">
                     Nenhuma pessoa neste grupo.
                   </p>
                 ) : (
-                  membros.map((p) => pessoaRow(p, cada))
+                  members.map((p) => personRow(p, each))
                 )}
               </div>
             );
           })}
-          {semGrupo.length > 0 && (
+          {withoutGroup.length > 0 && (
             <div className="py-2.5 last:pb-0">
               <p className="mb-1 text-[12.5px] font-bold text-warn">
                 Sem grupo definido
               </p>
-              {semGrupo.map((p) => pessoaRow(p, null))}
+              {withoutGroup.map((p) => personRow(p, null))}
               <p className="mt-1 text-[11.5px] text-warn">
-                {semGrupo.length === 1 ? "Fica" : "Ficam"} fora da distribuição
+                {withoutGroup.length === 1 ? "Fica" : "Ficam"} fora da distribuição
                 por grupos. Defina o grupo em Gestão &gt; Equipe.
               </p>
             </div>
@@ -1014,7 +1014,7 @@ function InfoLine({
   items: ReactNode[];
   className?: string;
 }) {
-  const visiveis = items.filter((it) => it != null && it !== false);
+  const visible = items.filter((it) => it != null && it !== false);
   return (
     <div
       className={cn(
@@ -1022,7 +1022,7 @@ function InfoLine({
         className,
       )}
     >
-      {visiveis.map((it, i) => (
+      {visible.map((it, i) => (
         <span key={i} className="max-sm:first-letter:uppercase lg:first-letter:uppercase">
           {i > 0 && <span className="hidden sm:inline lg:hidden">{" · "}</span>}
           {it}
@@ -1293,7 +1293,7 @@ function Simulation({
   tiersOn,
   target,
   mode,
-  equipeToda,
+  teamToda,
   managerOn,
 }: {
   storeId: string;
@@ -1306,11 +1306,11 @@ function Simulation({
   target: number | null;
   mode: PrizeMode;
   /** Sem distribuicao por grupos: a equipe toda e um bloco so. Individual divide a meta da loja; Grupo e Geral usam a meta da loja. */
-  equipeToda: boolean;
+  teamToda: boolean;
   managerOn: boolean;
 }) {
   const individual = mode === "INDIVIDUAL";
-  const groups = equipeToda
+  const groups = teamToda
     ? target != null
       ? [
           {
@@ -1318,7 +1318,7 @@ function Simulation({
             name: "Equipe toda",
             pct: null,
             groupGoal: target,
-            pessoas: team?.length ?? 0,
+            people: team?.length ?? 0,
             base:
               individual && (team?.length ?? 0) > 0
                 ? target / team!.length
@@ -1331,13 +1331,13 @@ function Simulation({
     : (groupsAll ?? [])
     .map((g) => {
       const groupGoal = groupTarget(g, target);
-      const pessoas = team?.filter((m) => m.shiftId === g.key).length ?? 0;
+      const people = team?.filter((m) => m.shiftId === g.key).length ?? 0;
       const base =
         groupGoal == null
           ? null
           : individual
-            ? pessoas > 0
-              ? groupGoal / pessoas
+            ? people > 0
+              ? groupGoal / people
               : null
             : groupGoal;
       return {
@@ -1345,12 +1345,12 @@ function Simulation({
         name: g.name,
         pct: groupPct(g),
         groupGoal,
-        pessoas,
+        people,
         base,
       };
     })
     .filter((g) => g.groupGoal != null);
-  const temNivel = tiersOn && tiers.some((t) => positive(t.goal) != null);
+  const hasLevel = tiersOn && tiers.some((t) => positive(t.goal) != null);
 
   if (!storeId) {
     return (
@@ -1370,7 +1370,7 @@ function Simulation({
       />
     );
   }
-  if (team == null || (!equipeToda && groupsAll == null)) {
+  if (team == null || (!teamToda && groupsAll == null)) {
     return (
       <div className="flex flex-col gap-3">
         {[0, 1].map((i) => (
@@ -1379,7 +1379,7 @@ function Simulation({
       </div>
     );
   }
-  if (!equipeToda && groupsAll!.length === 0) {
+  if (!teamToda && groupsAll!.length === 0) {
     return (
       <EmptyBlock
         icon="🧮"
@@ -1388,7 +1388,7 @@ function Simulation({
       />
     );
   }
-  if (!equipeToda && groups.length === 0) {
+  if (!teamToda && groups.length === 0) {
     return (
       <EmptyBlock
         icon="🧮"
@@ -1397,24 +1397,24 @@ function Simulation({
       />
     );
   }
-  const membrosDe = (key: string) =>
-    (equipeToda ? (team ?? []) : (team ?? []).filter((p) => p.shiftId === key))
+  const membersOf = (key: string) =>
+    (teamToda ? (team ?? []) : (team ?? []).filter((p) => p.shiftId === key))
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   return (
     <div className="flex flex-col gap-3">
       <p className="text-[11.5px] text-t2">
-        {temNivel
+        {hasLevel
           ? individual
             ? "Premiação de cada pessoa calculada sobre a própria meta individual."
-            : equipeToda
+            : teamToda
               ? "Premiação da equipe calculada sobre a meta da filial e dividida igualmente entre as pessoas."
               : "Premiação do grupo calculada sobre a meta do grupo e dividida igualmente entre as pessoas."
           : individual
-            ? equipeToda
+            ? teamToda
               ? "Meta individual de cada pessoa, com a meta da filial dividida pela equipe."
               : "Meta individual de cada pessoa, com a meta do grupo dividida pelas pessoas do grupo."
-            : equipeToda
+            : teamToda
               ? "Meta da filial para a equipe toda."
               : "Meta de cada grupo conforme a distribuição."}
       </p>
@@ -1435,15 +1435,15 @@ function Simulation({
                 {g.base != null ? brlCent(g.base) : "—"}
               </span>
               {" · "}
-              {g.pessoas} {g.pessoas === 1 ? "pessoa" : "pessoas"}
+              {g.people} {g.people === 1 ? "pessoa" : "pessoas"}
             </p>
-            {g.base == null || g.pessoas === 0 ? (
+            {g.base == null || g.people === 0 ? (
               <p className="text-[11.5px] text-warn">
-                {equipeToda
+                {teamToda
                   ? "Nenhuma pessoa na equipe de vendas desta filial."
                   : "Nenhuma pessoa neste grupo."}
               </p>
-            ) : temNivel ? (
+            ) : hasLevel ? (
               <div className="flex flex-col gap-1">
                 {tiers.map((t, i) => {
                   const r = resultados[i]!;
@@ -1480,10 +1480,10 @@ function Simulation({
                               </span>
                             </>
                           ),
-                          taxa != null && r.commission != null && (individual || g.pessoas > 0) && (
+                          taxa != null && r.commission != null && (individual || g.people > 0) && (
                             <>
                               <span className="font-mono font-semibold text-ok">
-                                {brlCent(individual ? r.commission : r.commission / g.pessoas)}
+                                {brlCent(individual ? r.commission : r.commission / g.people)}
                               </span>{" "}
                               por pessoa
                             </>
@@ -1497,7 +1497,7 @@ function Simulation({
               </div>
             ) : (
               <div className="flex flex-col">
-                {membrosDe(g.key).map((p) => (
+                {membersOf(g.key).map((p) => (
                   <div key={`${p.storeId}:${p.employeeId}`} className="flex items-center gap-2.5 py-1">
                     <Avatar name={p.name} size="sm" />
                     <p className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-t0">{p.name}</p>
@@ -1511,12 +1511,12 @@ function Simulation({
           </div>
         );
       })}
-      {tiersOn && !temNivel && (
+      {tiersOn && !hasLevel && (
         <p className="text-[11.5px] text-t2">
           Informe a meta de pelo menos um nível para simular a premiação.
         </p>
       )}
-      {temNivel && managerOn && <ManagerSimulation tiers={tiers} target={target} />}
+      {hasLevel && managerOn && <ManagerSimulation tiers={tiers} target={target} />}
     </div>
   );
 }

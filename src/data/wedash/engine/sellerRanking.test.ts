@@ -28,7 +28,7 @@ const member = (employeeId: number, name: string, shiftId: string | null = null)
   shiftName: shiftId ? shiftId.toUpperCase() : null,
 });
 
-const sale = (employeeId: number, reais: number): SalesSellerDayAgg => ({
+const sale = (employeeId: number, brl: number): SalesSellerDayAgg => ({
   tenantId: "t",
   storeId: "s1",
   day: "2026-09-10",
@@ -36,7 +36,7 @@ const sale = (employeeId: number, reais: number): SalesSellerDayAgg => ({
   sellerName: `K${employeeId}`,
   sellerEmployeeId: employeeId,
   brand: "ALL",
-  revenueCents: reais * 100,
+  revenueCents: brl * 100,
   salesCount: 1,
   itemCount: 1,
 });

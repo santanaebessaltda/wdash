@@ -13,7 +13,7 @@ import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { useScope } from "@/pages/dashboard/useScope";
-import { isGestor } from "@/layout/nav-wedash";
+import { isOwner } from "@/layout/nav-wedash";
 import { paths } from "@/router/paths";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
@@ -51,13 +51,13 @@ function dayAmount(
   return row.soldCents;
 }
 
-function dayStatus(soldCents: number, informedCents: number | null): { text: string; cor: string } {
+function dayStatus(soldCents: number, informedCents: number | null): { text: string; color: string } {
   const gap = informedGap(soldCents, informedCents);
-  if (gap === "missing" || informedCents == null) return { text: "Não informado", cor: "bg-warn" };
+  if (gap === "missing" || informedCents == null) return { text: "Não informado", color: "bg-warn" };
   const text = `Informado ${money(informedCents)}`;
-  if (gap === "match") return { text, cor: "bg-ok" };
-  if (gap === "over") return { text, cor: "bg-warn" };
-  return { text, cor: "bg-bad" };
+  if (gap === "match") return { text, color: "bg-ok" };
+  if (gap === "over") return { text, color: "bg-warn" };
+  return { text, color: "bg-bad" };
 }
 
 function rangeCells(from: string, to: string): Array<string | null> {
@@ -71,25 +71,25 @@ function rangeCells(from: string, to: string): Array<string | null> {
 export function SalesReportPage() {
   const navigate = useNavigate();
   const { show } = useToast();
-  const { session, storeRows, loading: lojasLoading } = useScopedStores();
+  const { session, storeRows, loading: storesLoading } = useScopedStores();
   const { scope } = useScope();
   const escolher = pickOneStore(scope.storeIds, session.stores.length);
-  const showStores = useMinSkeleton(lojasLoading);
+  const showStores = useMinSkeleton(storesLoading);
   const today = calendarTodayIso();
   const [rangeFrom, setRangeFrom] = useState(() => startOfMonth(today));
   const [rangeTo, setRangeTo] = useState(() => endOfMonth(today));
   const [presetId, setPresetId] = useState<DatePresetId | null>("thisMonth");
-  const [piso, setPiso] = useState(() => startOfMonth(today));
+  const [floor, setFloor] = useState(() => startOfMonth(today));
   const [sold, setSold] = useState<Record<string, number>>({});
   const [launched, setLaunched] = useState<Record<string, number>>({});
   const [account, setAccount] = useState<ShoppingAccount | null>(null);
   const [loaded, setLoaded] = useState("");
-  const [erro, setErro] = useState(false);
+  const [error, setError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [marcados, setMarcados] = useState<string[]>([]);
   const [lancando, setLancando] = useState(false);
-  const [confirmar, setConfirmar] = useState(false);
-  const [diaAberto, setDiaAberto] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState(false);
+  const [dayOpen, setDayOpen] = useState<string | null>(null);
 
   const store = storeRows[0];
   const storeRef = useRef(store);
@@ -105,17 +105,17 @@ export function SalesReportPage() {
   const markedRef = useRef(marcados);
   markedRef.current = marcados;
   const band = store ? `${store.id}|${from}|${to}|${reloadKey}` : "";
-  const quiosque = store?.pointType === "SHOPPING";
+  const kiosk = store?.pointType === "SHOPPING";
 
   useEffect(() => {
-    if (lojasLoading || escolher || !store) return;
+    if (storesLoading || escolher || !store) return;
     let stop = false;
     void fetchSalesCoverage(session.tenantId, [store.id]).then((coverage) => {
       if (stop || !coverage.from) return;
       const month = startOfMonth(coverage.from);
-      setPiso(month);
-      setRangeFrom((atual) => {
-        if (atual >= month) return atual;
+      setFloor(month);
+      setRangeFrom((current) => {
+        if (current >= month) return current;
         setPresetId(null);
         return month;
       });
@@ -123,12 +123,12 @@ export function SalesReportPage() {
     return () => {
       stop = true;
     };
-  }, [lojasLoading, escolher, store, session.tenantId, reloadKey]);
+  }, [storesLoading, escolher, store, session.tenantId, reloadKey]);
 
   useEffect(() => {
-    if (lojasLoading || escolher || !store) return;
+    if (storesLoading || escolher || !store) return;
     let cancel = false;
-    setErro(false);
+    setError(false);
     void Promise.all([
       fetchSalesDayAggs({ tenantId: session.tenantId, storeIds: [store.id], from, to }),
       fetchLaunchedDays(session.tenantId, store.id, from, to),
@@ -142,57 +142,57 @@ export function SalesReportPage() {
         setLoaded(band);
       })
       .catch(() => {
-        if (!cancel) setErro(true);
+        if (!cancel) setError(true);
       });
     return () => {
       cancel = true;
     };
-  }, [lojasLoading, escolher, store, session.tenantId, from, to, band]);
+  }, [storesLoading, escolher, store, session.tenantId, from, to, band]);
 
   const pronto = loaded === band;
 
   const puxar = useCallback(async () => {
-    const atual = storeRef.current;
-    if (escolher || !atual) {
+    const current = storeRef.current;
+    if (escolher || !current) {
       show("Escolha uma filial para atualizar o informe de vendas.", "danger");
       return;
     }
     const gate = forceLaunchAllowed({
-      kiosk: atual.pointType === "SHOPPING",
+      kiosk: current.pointType === "SHOPPING",
       administrator: accountRef.current?.administrator ?? null,
     });
     if (!gate.ok) {
       show(gate.message, "danger");
       return;
     }
-    const result = await requestShoppingRead(atual.id);
+    const result = await requestShoppingRead(current.id);
     setReloadKey((n) => n + 1);
     if (!result.ok) show(result.message, "danger");
   }, [escolher, show]);
 
   const lancar = useCallback(async () => {
-    const atual = storeRef.current;
-    if (lancando || escolher || !atual) {
-      if (escolher || !atual) show("Escolha uma filial para informar as vendas ao shopping.", "danger");
+    const current = storeRef.current;
+    if (lancando || escolher || !current) {
+      if (escolher || !current) show("Escolha uma filial para informar as vendas ao shopping.", "danger");
       return;
     }
     const gate = forceLaunchAllowed({
-      kiosk: atual.pointType === "SHOPPING",
+      kiosk: current.pointType === "SHOPPING",
       administrator: accountRef.current?.administrator ?? null,
     });
     if (!gate.ok) {
       show(gate.message, "danger");
       return;
     }
-    const jaLancado = new Set(Object.keys(launchedRef.current));
-    const dias = markedRef.current.filter((day) => day < today && !jaLancado.has(day));
-    if (dias.length === 0) {
+    const alreadyLancado = new Set(Object.keys(launchedRef.current));
+    const days = markedRef.current.filter((day) => day < today && !alreadyLancado.has(day));
+    if (days.length === 0) {
       show(ALREADY_LAUNCHED, "success");
       return;
     }
     const span = rangeRef.current;
     setLancando(true);
-    const result = await requestShoppingLaunch(atual.id, { from: span.from, to: span.to, days: dias });
+    const result = await requestShoppingLaunch(current.id, { from: span.from, to: span.to, days: days });
     setLancando(false);
     setReloadKey((n) => n + 1);
     if (!result.ok) show(result.message, "danger");
@@ -217,25 +217,25 @@ export function SalesReportPage() {
     return () => window.removeEventListener(SALES_SYNCED_EVENT, onSynced);
   }, []);
 
-  const dias = useMemo(() => reportDays(eachDay(from, to), sold, launched, today), [from, to, sold, launched, today]);
-  const summary = useMemo(() => monthReport(dias, today), [dias, today]);
-  const porDia = useMemo(() => new Map(dias.map((day) => [day.date, day])), [dias]);
+  const days = useMemo(() => reportDays(eachDay(from, to), sold, launched, today), [from, to, sold, launched, today]);
+  const summary = useMemo(() => monthReport(days, today), [days, today]);
+  const byDay = useMemo(() => new Map(days.map((day) => [day.date, day])), [days]);
   const cells = useMemo(() => rangeCells(from, to), [from, to]);
-  const gestor = isGestor(session.role);
-  const paraLancar = marcados.filter((day) => day < today && launched[day] == null);
+  const owner = isOwner(session.role);
+  const toLancar = marcados.filter((day) => day < today && launched[day] == null);
 
-  function aplicarIntervalo(start: Date, end: Date, goal?: DateRangeChangeMeta) {
+  function applyInterval(start: Date, end: Date, goal?: DateRangeChangeMeta) {
     const nextFrom = dateToIso(start);
     const nextTo = dateToIso(end);
     setRangeFrom(nextFrom);
     setRangeTo(nextTo);
     setPresetId(goal?.presetId ?? null);
-    setMarcados((atual) => atual.filter((day) => day >= nextFrom && day <= nextTo));
-    setDiaAberto((atual) => (atual && atual >= nextFrom && atual <= nextTo ? atual : null));
+    setMarcados((current) => current.filter((day) => day >= nextFrom && day <= nextTo));
+    setDayOpen((current) => (current && current >= nextFrom && current <= nextTo ? current : null));
   }
 
-  function toggleDia(day: string) {
-    setMarcados((atual) => (atual.includes(day) ? atual.filter((item) => item !== day) : [...atual, day]));
+  function toggleDay(day: string) {
+    setMarcados((current) => (current.includes(day) ? current.filter((item) => item !== day) : [...current, day]));
   }
 
   return (
@@ -249,22 +249,22 @@ export function SalesReportPage() {
             <div className="flex flex-wrap items-center gap-2">
               <DateRangePicker
                 value={[isoToDate(from), isoToDate(to)]}
-                minDate={isoToDate(piso)}
+                minDate={isoToDate(floor)}
                 maxDate={isoToDate(endOfMonth(today))}
                 quickRanges={CALENDAR_QUICK_RANGES}
                 displayLabel={presetId ? periodLabels[presetId] : null}
                 activePresetId={presetId}
-                onChange={([start, end], goal) => aplicarIntervalo(start, end, goal)}
+                onChange={([start, end], goal) => applyInterval(start, end, goal)}
               />
-              <Button onClick={() => setConfirmar(true)} disabled={lancando || paraLancar.length === 0}>
-                {lancando ? "Informando…" : paraLancar.length === 0 ? "Informar vendas" : paraLancar.length === 1 ? "Informar vendas · 1 dia" : `Informar vendas · ${paraLancar.length} dias`}
+              <Button onClick={() => setConfirm(true)} disabled={lancando || toLancar.length === 0}>
+                {lancando ? "Informando…" : toLancar.length === 0 ? "Informar vendas" : toLancar.length === 1 ? "Informar vendas · 1 dia" : `Informar vendas · ${toLancar.length} dias`}
               </Button>
             </div>
           </HeaderFilters>
         }
       />
       <div className="mt-6 pb-8">
-        {erro ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar o informe de vendas. Tente novamente." /> : null}
+        {error ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar o informe de vendas. Tente novamente." /> : null}
         {account?.administrator === "allos" && account.lastError ? <Alert className="mb-4" variant="danger" title={account.lastError} /> : null}
         {escolher ? (
           <div className="max-w-[720px]">
@@ -276,7 +276,7 @@ export function SalesReportPage() {
           <Card>
             <EmptyBlock icon="🧾" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
           </Card>
-        ) : !quiosque ? (
+        ) : !kiosk ? (
           <Card>
             <EmptyBlock icon="🧾" title="Informe de vendas indisponível" description="Esta tela está disponível apenas para filiais do tipo Quiosque em shopping." />
           </Card>
@@ -289,8 +289,8 @@ export function SalesReportPage() {
             <EmptyBlock
               icon="🧾"
               title="Administradora não configurada"
-              description={gestor ? "Configure a administradora desta filial para informar as vendas ao shopping." : "O Gestor ainda não configurou a administradora desta filial."}
-              action={gestor ? <Button onClick={() => navigate(paths.operation.shopping)}>Configurar shopping</Button> : undefined}
+              description={owner ? "Configure a administradora desta filial para informar as vendas ao shopping." : "O Gestor ainda não configurou a administradora desta filial."}
+              action={owner ? <Button onClick={() => navigate(paths.operation.shopping)}>Configurar shopping</Button> : undefined}
             />
           </Card>
         ) : (
@@ -308,12 +308,12 @@ export function SalesReportPage() {
             <MonthCalendar>
               {cells.map((day, i) => {
                 if (!day) return <div key={`vazio-${i}`} className={blankDayClass(i)} />;
-                const row = porDia.get(day);
-                const passado = day < today;
+                const row = byDay.get(day);
+                const past = day < today;
                 const todayDay = day === today;
-                const vendido = dayAmount(day, today, row, sold);
-                const status = todayDay ? { text: "Em aberto", cor: "bg-acc" } : passado && row ? dayStatus(row.soldCents, row.launchedCents) : null;
-                const pendente = passado && row != null && row.launchedCents == null;
+                const amount = dayAmount(day, today, row, sold);
+                const status = todayDay ? { text: "Em aberto", color: "bg-acc" } : past && row ? dayStatus(row.soldCents, row.launchedCents) : null;
+                const pending = past && row != null && row.launchedCents == null;
                 return (
                   <DayFace
                     key={day}
@@ -321,12 +321,12 @@ export function SalesReportPage() {
                     iso={day}
                     today={today}
                     selected={marcados.includes(day)}
-                    openable={todayDay || passado}
+                    openable={todayDay || past}
                     openLabel={`Abrir ${dayTitle(day)}`}
-                    onOpen={() => setDiaAberto(day)}
-                    amount={vendido != null ? money(vendido) : null}
-                    check={pendente ? { checked: marcados.includes(day), label: `Marcar ${dayTitle(day)}`, onToggle: () => toggleDia(day) } : null}
-                    badges={status ? <DayChip cor={status.cor}>{status.text}</DayChip> : null}
+                    onOpen={() => setDayOpen(day)}
+                    amount={amount != null ? money(amount) : null}
+                    check={pending ? { checked: marcados.includes(day), label: `Marcar ${dayTitle(day)}`, onToggle: () => toggleDay(day) } : null}
+                    badges={status ? <DayChip color={status.color}>{status.text}</DayChip> : null}
                   />
                 );
               })}
@@ -335,26 +335,26 @@ export function SalesReportPage() {
         )}
       </div>
       <InformedDayModal
-        day={diaAberto}
+        day={dayOpen}
         today={today}
-        sold={diaAberto == null ? null : diaAberto === today ? (sold[today] != null && sold[today] > 0 ? sold[today] : null) : (porDia.get(diaAberto)?.soldCents ?? 0)}
-        informed={diaAberto && diaAberto < today ? (porDia.get(diaAberto)?.launchedCents ?? null) : null}
-        onClose={() => setDiaAberto(null)}
+        sold={dayOpen == null ? null : dayOpen === today ? (sold[today] != null && sold[today] > 0 ? sold[today] : null) : (byDay.get(dayOpen)?.soldCents ?? 0)}
+        informed={dayOpen && dayOpen < today ? (byDay.get(dayOpen)?.launchedCents ?? null) : null}
+        onClose={() => setDayOpen(null)}
       />
       <Modal
-        open={confirmar}
-        onClose={() => { if (!lancando) setConfirmar(false); }}
+        open={confirm}
+        onClose={() => { if (!lancando) setConfirm(false); }}
         title="Informar vendas ao shopping?"
         size="sm"
         footer={
           <>
-            <Button variant="outline" onClick={() => setConfirmar(false)} disabled={lancando}>Cancelar</Button>
-            <Button onClick={() => { setConfirmar(false); void lancar(); }} disabled={lancando || paraLancar.length === 0}>Informar vendas</Button>
+            <Button variant="outline" onClick={() => setConfirm(false)} disabled={lancando}>Cancelar</Button>
+            <Button onClick={() => { setConfirm(false); void lancar(); }} disabled={lancando || toLancar.length === 0}>Informar vendas</Button>
           </>
         }
       >
         <div className="flex flex-col gap-2 text-[13.5px] leading-relaxed text-t1">
-          <p>{paraLancar.length === 1 ? "O valor vendido em 1 dia será informado ao shopping." : `Os valores vendidos em ${paraLancar.length} dias serão informados ao shopping.`}</p>
+          <p>{toLancar.length === 1 ? "O valor vendido em 1 dia será informado ao shopping." : `Os valores vendidos em ${toLancar.length} dias serão informados ao shopping.`}</p>
           <p className="text-t2">Dias que já têm valor informado não serão alterados.</p>
         </div>
       </Modal>
@@ -379,7 +379,7 @@ function InformedDayModal({
   const faltando = day != null && !todayDay && informed == null;
   const status = todayDay ? "Em aberto" : faltando ? "Não informado" : "Informado";
   const variant = todayDay ? "accent" : faltando ? "warning" : "success";
-  const diferenca = sold != null && informed != null ? informed - sold : null;
+  const difference = sold != null && informed != null ? informed - sold : null;
   return (
     <Modal
       open={day != null}
@@ -403,7 +403,7 @@ function InformedDayModal({
             items={[
               { label: "Vendido", value: sold == null ? "—" : money(sold) },
               { label: "Informado", value: todayDay ? "—" : informed == null ? "Não informado" : money(informed) },
-              { label: "Diferença", value: diferenca == null ? "—" : differenceAmount(diferenca), color: diferenca == null ? undefined : differenceColor(diferenca) },
+              { label: "Diferença", value: difference == null ? "—" : differenceAmount(difference), color: difference == null ? undefined : differenceColor(difference) },
             ]}
           />
           {todayDay ? <p className="text-[13px] leading-relaxed text-t2">Este dia ainda está em aberto. O valor será informado depois do fechamento.</p> : null}

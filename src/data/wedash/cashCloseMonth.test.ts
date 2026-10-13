@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cashCloseJobMatches, clampCloseRange, closeHistoryFloor, missingCloseDays, monthCloseSpan, monthCloseSpanFor, monthsTouched, navMonthFloor, sangriaMonthSpan } from "./cashCloseMonth";
+import { cashCloseJobMatches, clampCloseRange, closeHistoryFloor, missingCloseDays, monthCloseSpan, monthCloseSpanFor, monthsTouched, navMonthFloor, cashDropMonthSpan } from "./cashCloseMonth";
 
 describe("monthsTouched", () => {
   it("um mês devolve só esse mês", () => {
@@ -43,11 +43,11 @@ describe("closeHistoryFloor", () => {
 
 describe("sangriaMonthSpan", () => {
   it("no dia 10 pede do dia 1 até hoje", () => {
-    expect(sangriaMonthSpan("2026-10-10", "2026-10-10")).toEqual({ from: "2026-10-01", to: "2026-10-10" });
+    expect(cashDropMonthSpan("2026-10-10", "2026-10-10")).toEqual({ from: "2026-10-01", to: "2026-10-10" });
   });
 
   it("um mês já passado pede o mês inteiro", () => {
-    expect(sangriaMonthSpan("2026-11-02", "2026-12-10")).toEqual({ from: "2026-11-01", to: "2026-11-30" });
+    expect(cashDropMonthSpan("2026-11-02", "2026-12-10")).toEqual({ from: "2026-11-01", to: "2026-11-30" });
   });
 });
 

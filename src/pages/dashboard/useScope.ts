@@ -108,8 +108,8 @@ export function useScope() {
 
     // Sem `?filial=` na URL (navegacao pelo menu): recupera a ultima loja.
     if (!hasBranchParameter) {
-      const salva = readSavedBranch();
-      if (salva) idsRaw = [salva];
+      const saved = readSavedBranch();
+      if (saved) idsRaw = [saved];
     }
 
     // So aceita ids que a sessao realmente pode ver; single-select  ->  no max. 1.

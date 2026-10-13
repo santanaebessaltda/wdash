@@ -6,16 +6,16 @@ import { BrandMark } from "@/pages/auth/authKit";
 import { PRODUCT_NAME } from "@/data/wedash/tenant";
 import { users } from "@/data/wedash/team";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { loginWithEmail, MENSAGEM_LOGIN, destinationAfterAuth } from "@/session/authApi";
+import { loginWithEmail, MESSAGE_LOGIN, destinationAfterAuth } from "@/session/authApi";
 import { useSession } from "@/session/SessionProvider";
 import { accessButton, EmailField, PasswordField, Checkbox, useFocusSubmitAfterAutofill } from "./AccessKit";
 
-function emailValido(v: string) {
+function emailValid(v: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 }
 
 /** Evita toast duplicado (React StrictMode remonta o effect). */
-const avisosJaExibidos = new Set<string>();
+const noticesAlreadyExibidos = new Set<string>();
 
 export function Login() {
   const navigate = useNavigate();
@@ -24,12 +24,12 @@ export function Login() {
   const { session, ready, applySession, signIn } = useSession();
 
   const [email, setEmail] = useState("");
-  const [senha, setSenha] = useState("");
+  const [password, setPassword] = useState("");
   const [lembrar, setLembrar] = useState(true);
-  const [carregando, setCarregando] = useState(false);
+  const [loading, setLoading] = useState(false);
   const formRef = useFocusSubmitAfterAutofill();
 
-  const podeEnviar = email.trim().length > 0 && senha.length > 0 && !carregando;
+  const canSend = email.trim().length > 0 && password.length > 0 && !loading;
 
   // Se a sessao voltou depois (race PWA) ou ja estava logado, nao fica na tela.
   useEffect(() => {
@@ -38,38 +38,38 @@ export function Login() {
   }, [ready, session, navigate]);
 
   useEffect(() => {
-    const state = location.state as { aviso?: string; avisoId?: string; de?: string } | null;
-    if (!state?.aviso) return;
-    const id = state.avisoId ?? state.aviso;
-    const de = state.de;
+    const state = location.state as { notice?: string; noticeId?: string; from?: string } | null;
+    if (!state?.notice) return;
+    const id = state.noticeId ?? state.notice;
+    const from = state.from;
     // Limpa o state antes de qualquer coisa  -  o 2 run do StrictMode nao reprocessa.
-    navigate(location.pathname, { replace: true, state: de ? { de } : {} });
-    if (avisosJaExibidos.has(id)) return;
-    avisosJaExibidos.add(id);
-    show(state.aviso, "success");
+    navigate(location.pathname, { replace: true, state: from ? { from } : {} });
+    if (noticesAlreadyExibidos.has(id)) return;
+    noticesAlreadyExibidos.add(id);
+    show(state.notice, "success");
   }, [location.state, location.pathname, navigate, show]);
 
   useEffect(() => {
-    const como = new URLSearchParams(location.search).get("como");
-    if (!como || isSupabaseConfigured()) return;
-    const usuario = users.find((u) => u.membershipId === como);
-    if (!usuario) return;
-    const session = signIn(usuario);
+    const how = new URLSearchParams(location.search).get("como");
+    if (!how || isSupabaseConfigured()) return;
+    const username = users.find((u) => u.membershipId === how);
+    if (!username) return;
+    const session = signIn(username);
     navigate(destinationAfterAuth(session), { replace: true });
   }, [location.search, signIn, navigate]);
 
-  async function enviar(e: FormEvent) {
+  async function send(e: FormEvent) {
     e.preventDefault();
-    if (!podeEnviar) return;
-    if (!emailValido(email)) {
+    if (!canSend) return;
+    if (!emailValid(email)) {
       show("Informe um e-mail válido.", "danger");
       return;
     }
-    setCarregando(true);
-    const r = await loginWithEmail(email, senha);
-    setCarregando(false);
+    setLoading(true);
+    const r = await loginWithEmail(email, password);
+    setLoading(false);
     if (!r.ok) {
-      show(`${r.error || MENSAGEM_LOGIN} Confira os dados e tente novamente.`, "danger");
+      show(`${r.error || MESSAGE_LOGIN} Confira os dados e tente novamente.`, "danger");
       return;
     }
     applySession(r.session);
@@ -119,9 +119,9 @@ export function Login() {
           <h1 className="mb-2 text-[26px] font-extrabold tracking-tight text-t0">Acesse a WDash</h1>
           <p className="mb-7 text-sm text-t1">Entre com seu e-mail e senha.</p>
 
-          <form ref={formRef} onSubmit={enviar} className="flex flex-col gap-3.5" noValidate>
+          <form ref={formRef} onSubmit={send} className="flex flex-col gap-3.5" noValidate>
             <EmailField label="E-mail" value={email} onChange={setEmail} autoFocus />
-            <PasswordField label="Senha" value={senha} onChange={setSenha} />
+            <PasswordField label="Senha" value={password} onChange={setPassword} />
 
             <div className="flex items-center justify-between">
               <Checkbox label="Manter conectado" checked={lembrar} onChange={(e) => setLembrar(e.target.checked)} />
@@ -132,11 +132,11 @@ export function Login() {
 
             <button
               type="submit"
-              disabled={!podeEnviar || carregando}
+              disabled={!canSend || loading}
               className={`mt-1 ${accessButton}`}
               style={{ boxShadow: "0 10px 24px -10px var(--acc)" }}
             >
-              {carregando ? "Entrando…" : "Entrar"}
+              {loading ? "Entrando…" : "Entrar"}
             </button>
           </form>
         </div>

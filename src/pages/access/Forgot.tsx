@@ -14,7 +14,7 @@ import {
   useFocusSubmitAfterAutofill,
 } from "./AccessKit";
 
-function emailValido(v: string) {
+function emailValid(v: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 }
 
@@ -31,18 +31,18 @@ export function Forgot() {
   const { show } = useToast();
   const emailInicial = (location.state as { email?: string } | null)?.email ?? "";
   const [email, setEmail] = useState(emailInicial);
-  const [carregando, setCarregando] = useState(false);
+  const [loading, setLoading] = useState(false);
   const formRef = useFocusSubmitAfterAutofill();
 
-  async function enviar(e: FormEvent) {
+  async function send(e: FormEvent) {
     e.preventDefault();
-    if (!emailValido(email)) {
+    if (!emailValid(email)) {
       show("Informe um e-mail válido.", "danger");
       return;
     }
-    setCarregando(true);
+    setLoading(true);
     await requestPasswordReset(email);
-    setCarregando(false);
+    setLoading(false);
     // Mesma tela de sucesso para qualquer e-mail (anti-enumeration); segue para digitar o OTP.
     navigate(paths.access.reset, {
       replace: true,
@@ -60,15 +60,15 @@ export function Forgot() {
           <p className={accessSubtitle}>
             Informe seu e-mail para receber um código de verificação.
           </p>
-          <form ref={formRef} onSubmit={enviar} className="text-left" noValidate>
+          <form ref={formRef} onSubmit={send} className="text-left" noValidate>
             <EmailField label="E-mail" value={email} onChange={setEmail} autoFocus />
             <div className="mb-4 mt-3.5">
               <button
                 type="submit"
-                disabled={email.trim().length === 0 || carregando}
+                disabled={email.trim().length === 0 || loading}
                 className={accessButton}
               >
-                {carregando ? "Enviando…" : "Enviar código"}
+                {loading ? "Enviando…" : "Enviar código"}
               </button>
             </div>
           </form>

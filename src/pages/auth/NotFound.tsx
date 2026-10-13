@@ -7,7 +7,7 @@ import { useSession } from "@/session/SessionProvider";
 export function NotFound() {
   const navigate = useNavigate();
   const { session } = useSession();
-  const destino = session ? destinationAfterAuth(session) : paths.access.login;
+  const destination = session ? destinationAfterAuth(session) : paths.access.login;
   return (
     <div className="relative flex min-h-screen w-full flex-col items-center justify-center overflow-hidden bg-bg-0 p-10 text-center">
       <div
@@ -32,7 +32,7 @@ export function NotFound() {
         </p>
         <div className="flex flex-wrap justify-center gap-3">
           <button
-            onClick={() => navigate(destino, { replace: true })}
+            onClick={() => navigate(destination, { replace: true })}
             className="flex h-[46px] items-center gap-2 rounded-xl bg-acc px-[22px] text-sm font-bold text-white transition-colors hover:bg-acc-2"
             style={{ boxShadow: "0 10px 24px -10px var(--acc)" }}
           >

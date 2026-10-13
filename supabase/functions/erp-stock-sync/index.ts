@@ -257,8 +257,8 @@ serve(async (req) => {
     .limit(1)
     .maybeSingle();
   if (!membership) return json({ error: "forbidden" }, 403);
-  const gestor = membership.role === "OWNER" || membership.role === "ADMIN_GLOBAL";
-  if ((body.saleTables || body.salePriceTableIds.length > 0) && !gestor) {
+  const owner = membership.role === "OWNER" || membership.role === "ADMIN_GLOBAL";
+  if ((body.saleTables || body.salePriceTableIds.length > 0) && !owner) {
     return json({ error: "forbidden" }, 403);
   }
   const tenantId = membership.tenant_id as string;

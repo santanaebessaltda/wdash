@@ -63,22 +63,22 @@ function fmtDays(days: string[]): string {
 const SOURCE_STYLE: Record<string, { icon: string; tint: string }> = {
   login: { icon: "\u{1F511}", tint: "var(--bad)" },
   job: { icon: "\u27F3", tint: "var(--bad)" },
-  vendas: { icon: "\u{1F5CE}", tint: "var(--acc)" },
-  margem: { icon: "\u{1F5E0}", tint: "var(--ok)" },
+  "vendas": { icon: "\u{1F5CE}", tint: "var(--acc)" },
+  margin: { icon: "\u{1F5E0}", tint: "var(--ok)" },
   cmv: { icon: "\u{1F5E0}", tint: "var(--ok)" },
-  custo_produto: { icon: "\u{1F5E0}", tint: "var(--ok)" },
-  detalhe_movimento: { icon: "\u{1F6CD}\uFE0E", tint: "var(--info)" },
-  cupom: { icon: "\u{1F6CD}\uFE0E", tint: "var(--info)" },
-  itens_pessoa: { icon: "\u{1F6CD}\uFE0E", tint: "var(--info)" },
-  categorias: { icon: "\u{1F5C4}\uFE0E", tint: "var(--info)" },
-  catalogo: { icon: "\u{1F5C4}\uFE0E", tint: "var(--info)" },
-  top_produtos: { icon: "\u{1F5C4}\uFE0E", tint: "var(--info)" },
-  mapa_produtos: { icon: "\u{1F5C4}\uFE0E", tint: "var(--info)" },
-  gerador: { icon: "\u2699\uFE0E", tint: "var(--acc)" },
-  eventos: { icon: "\u{1F5D3}\uFE0E", tint: "var(--info)" },
+  "custo_produto": { icon: "\u{1F5E0}", tint: "var(--ok)" },
+  "detalhe_movimento": { icon: "\u{1F6CD}\uFE0E", tint: "var(--info)" },
+  coupon: { icon: "\u{1F6CD}\uFE0E", tint: "var(--info)" },
+  "itens_pessoa": { icon: "\u{1F6CD}\uFE0E", tint: "var(--info)" },
+  "categorias": { icon: "\u{1F5C4}\uFE0E", tint: "var(--info)" },
+  "catalogo": { icon: "\u{1F5C4}\uFE0E", tint: "var(--info)" },
+  "top_produtos": { icon: "\u{1F5C4}\uFE0E", tint: "var(--info)" },
+  "mapa_produtos": { icon: "\u{1F5C4}\uFE0E", tint: "var(--info)" },
+  "gerador": { icon: "\u2699\uFE0E", tint: "var(--acc)" },
+  "eventos": { icon: "\u{1F5D3}\uFE0E", tint: "var(--info)" },
   sellers: { icon: "\u{1F5E3}\uFE0E", tint: "var(--acc)" },
-  fechamento_caixa: { icon: "\u{1F5D3}\uFE0E", tint: "var(--acc)" },
-  millennium_ocupado: { icon: "\u23F1\uFE0E", tint: "var(--warn)" },
+  "fechamento_caixa": { icon: "\u{1F5D3}\uFE0E", tint: "var(--acc)" },
+  "millennium_ocupado": { icon: "\u23F1\uFE0E", tint: "var(--warn)" },
 };
 
 function sourceStyle(e: SyncLogEntry): { icon: string; tint: string } {
@@ -114,15 +114,15 @@ export function SyncLogsPage() {
     };
   }, [session.tenantId, session.stores]);
 
-  const [busca, setBusca] = useState("");
+  const [search, setSearch] = useState("");
   const [logs, setLogs] = useState<SyncLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const showSkeleton = useMinSkeleton(loading);
   const [error, setError] = useState<string | null>(null);
-  const [detail, setDetalhe] = useState<SyncLogEntry | null>(null);
+  const [detail, setDetail] = useState<SyncLogEntry | null>(null);
   const { show } = useToast();
 
-  const carregar = useCallback(async () => {
+  const load = useCallback(async () => {
     if (!canView) return;
     setLoading(true);
     setError(null);
@@ -138,27 +138,27 @@ export function SyncLogsPage() {
   }, [canView, session.tenantId]);
 
   useEffect(() => {
-    void carregar();
-  }, [carregar]);
+    void load();
+  }, [load]);
 
   const storeNameValue = useCallback(
     (e: SyncLogEntry) => {
       if (!e.storeId && !e.storeLabel) return "Todas as filiais";
       const store = storeRows.find((s) => s.id === e.storeId);
-      return store ? store.fantasia : e.storeLabel ?? "—";
+      return store ? store.tradeName : e.storeLabel ?? "—";
     },
     [storeRows],
   );
 
   const filtrados = useMemo(() => {
-    const q = busca.trim().toLowerCase();
+    const q = search.trim().toLowerCase();
     if (!q) return logs;
     return logs.filter((e) =>
       [syncLogSummary(e), syncLogExplanation(e), e.message, syncLogSourceLabel(e.source), storeNameValue(e)].some((t) =>
         t.toLowerCase().includes(q),
       ),
     );
-  }, [logs, busca, storeNameValue]);
+  }, [logs, search, storeNameValue]);
 
   const events: TimelineEvent[] = filtrados.map((e) => {
     const hasStore = Boolean(e.storeId || e.storeLabel);
@@ -168,7 +168,7 @@ export function SyncLogsPage() {
       title: (
         <button
           type="button"
-          onClick={() => setDetalhe(e)}
+          onClick={() => setDetail(e)}
           className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 text-left"
         >
           <strong className="font-bold">{syncLogSummary(e)}</strong>
@@ -196,8 +196,8 @@ export function SyncLogsPage() {
       <div className="mb-4 flex flex-col sm:flex-row sm:justify-end print:hidden">
         <Input
           placeholder="Buscar nos logs…"
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
           className="h-[38px] w-full sm:w-[288px]"
         />
       </div>
@@ -208,14 +208,14 @@ export function SyncLogsPage() {
         ) : showSkeleton ? (
           <TimelineSkeleton rows={5} />
         ) : events.length === 0 ? (
-          busca.trim() ? (
+          search.trim() ? (
             <EmptyState
               framed={false}
               icon="🔍"
               title="Nenhum resultado"
               description="Tente outra busca."
               action={
-                <Button variant="outline" size="sm" onClick={() => setBusca("")}>
+                <Button variant="outline" size="sm" onClick={() => setSearch("")}>
                   Limpar busca
                 </Button>
               }
@@ -235,18 +235,18 @@ export function SyncLogsPage() {
 
       <Modal
         open={detail != null}
-        onClose={() => setDetalhe(null)}
+        onClose={() => setDetail(null)}
         title="Detalhe do log"
         footer={
           <>
-            <Button variant="outline" onClick={() => setDetalhe(null)}>
+            <Button variant="outline" onClick={() => setDetail(null)}>
               Fechar
             </Button>
             {detail && (
               <Button
                 onClick={() => {
                   void navigator.clipboard
-                    .writeText(logParaSuporte(detail, storeNameValue(detail)))
+                    .writeText(logToSuporte(detail, storeNameValue(detail)))
                     .then(() => show("Detalhes copiados.", "success"))
                     .catch(() => show("Não foi possível copiar.", "danger"));
                 }}
@@ -263,7 +263,7 @@ export function SyncLogsPage() {
   );
 }
 
-/** Bloco de texto para colar em chamado / conversa de suporte. */
+/** Bloco from texto para colar em chamado / conversa from suporte. */
 const DETAIL_KEYS_INTERNAS = new Set(["count", "days", "worker", "stack", "test", "erpUser"]);
 
 function erpUserOf(e: SyncLogEntry): string | null {
@@ -279,7 +279,7 @@ function stackOf(e: SyncLogEntry): string | null {
   return typeof e.detail?.stack === "string" ? e.detail.stack : null;
 }
 
-function logParaSuporte(e: SyncLogEntry, store: string): string {
+function logToSuporte(e: SyncLogEntry, store: string): string {
   const w = workerInfo(e);
   const stack = stackOf(e);
   return [

@@ -27,7 +27,7 @@ export function monthCloseSpanFor(monthDay: string, today: string): { from: stri
 }
 
 /** Sangria do mês visível, do dia 1 até hoje (ou até o fim do mês, se ele já passou). */
-export function sangriaMonthSpan(monthDay: string, today: string): { from: string; to: string } | null {
+export function cashDropMonthSpan(monthDay: string, today: string): { from: string; to: string } | null {
   const from = startOfMonth(monthDay);
   const end = endOfMonth(monthDay);
   const to = end < today ? end : today;

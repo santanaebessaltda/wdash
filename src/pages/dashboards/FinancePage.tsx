@@ -86,7 +86,7 @@ const TipHelp = ({ label }: { label: string }) => (
 );
 
 /** Badge de delta  -  so % no chip; base do comparativo no tooltip (igual StatCard). */
-function PriorPeriodBadge({ delta }: { delta?: { value: string; positive: boolean; vs?: string; diff?: string; anterior?: string } }) {
+function PriorPeriodBadge({ delta }: { delta?: { value: string; positive: boolean; vs?: string; diff?: string; previous?: string } }) {
   if (!delta) return null;
   const badge = (
     <Badge variant={delta.positive ? "success" : "danger"}>
@@ -142,7 +142,7 @@ const monthlyEvolutionColumns: DataTableColumn<MonthlyEvolutionRow>[] = [
     render: (r) => <span className="font-extrabold tabular-nums text-ok">{brlCent(r.profit)}</span>,
   },
   {
-    key: "margem",
+    key: "margin",
     header: "Margem",
     align: "right",
     hideBelow: "md",
@@ -162,22 +162,22 @@ const monthlyEvolutionColumns: DataTableColumn<MonthlyEvolutionRow>[] = [
 ];
 
 /** Hierarquia visual no padrao Income statement (ProfitLoss). */
-function costRowStyle(linha: FixedCostRow): { bold: boolean; indent: boolean; color?: string; text: string } {
-  if (linha.isResult) {
+function costRowStyle(line: FixedCostRow): { bold: boolean; indent: boolean; color?: string; text: string } {
+  if (line.isResult) {
     return {
       bold: true,
       indent: false,
-      color: linha.amount < 0 ? "var(--bad)" : "var(--acc)",
-      text: brlCent(linha.amount),
+      color: line.amount < 0 ? "var(--bad)" : "var(--acc)",
+      text: brlCent(line.amount),
     };
   }
-  if (linha.isTotal) {
-    return { bold: true, indent: false, text: `−${brlCent(linha.amount)}` };
+  if (line.isTotal) {
+    return { bold: true, indent: false, text: `−${brlCent(line.amount)}` };
   }
-  if (linha.label === "Lucro bruto") {
-    return { bold: true, indent: false, color: "var(--ok)", text: brlCent(linha.amount) };
+  if (line.label === "Lucro bruto") {
+    return { bold: true, indent: false, color: "var(--ok)", text: brlCent(line.amount) };
   }
-  return { bold: false, indent: true, text: `−${brlCent(linha.amount)}` };
+  return { bold: false, indent: true, text: `−${brlCent(line.amount)}` };
 }
 
 export default function FinancePage() {
@@ -252,7 +252,7 @@ export default function FinancePage() {
   const currentPeriod = resolvePeriod(scope.period, calendarTodayIso());
   const monthFill = useMonthFill();
   const deepHistoryFill = useDeepHistoryFill();
-  const exportar = useExportPdf("Financeiro");
+  const exportValue = useExportPdf("Financeiro");
   function onDateChange(r: DateRange, goal?: DateRangeChangeMeta) {
     setScope(applyPeriodDateChange(scope, r, goal));
   }
@@ -274,7 +274,7 @@ export default function FinancePage() {
                 activePresetId={periodActivePresetId(scope.period)}
                 minDate={pickerMinDate(coverageFrom, monthFill)}
               />
-              <Button variant="primary" onClick={exportar}>
+              <Button variant="primary" onClick={exportValue}>
                 Exportar
               </Button>
             </div>
@@ -294,7 +294,7 @@ export default function FinancePage() {
       <StoreHoursNotice />
       {!loading && (
         <ProductsWithoutCostNotice
-          produtos={view.productsWithoutCost}
+          products={view.productsWithoutCost}
           storeIds={scope.storeIds}
           from={currentPeriod.start}
           to={currentPeriod.end}
@@ -337,12 +337,12 @@ export default function FinancePage() {
       {/* Par: CMV/Lucro + Resultado operacional */}
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         {(() => {
-          const serie = view.costProfitSeries;
-          const totalLucro = serie.reduce((s, m) => s + m.profit, 0);
-          const totalCmv = serie.reduce((s, m) => s + m.cost, 0);
-          const totalFat = serie.reduce((s, m) => s + m.revenue, 0);
-          const margemPct = totalFat > 0 ? (totalLucro / totalFat) * 100 : 0;
-          const deltaLucro = view.kpis.find((k) => k.label === "Lucro bruto")?.delta;
+          const series = view.costProfitSeries;
+          const totalProfit = series.reduce((s, m) => s + m.profit, 0);
+          const totalCmv = series.reduce((s, m) => s + m.cost, 0);
+          const totalRevenue = series.reduce((s, m) => s + m.revenue, 0);
+          const marginPct = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+          const deltaProfit = view.kpis.find((k) => k.label === "Lucro bruto")?.delta;
           return (
             <Card padding="lg" className="flex flex-col">
               <div className="mb-4">
@@ -353,10 +353,10 @@ export default function FinancePage() {
                       <TipHelp label="Compare a evolução do CMV e do lucro bruto e acompanhe a margem do período." />
                     </div>
                     <div className="shrink-0">
-                      <PriorPeriodBadge delta={deltaLucro} />
+                      <PriorPeriodBadge delta={deltaProfit} />
                     </div>
                   </div>
-                  {totalFat > 0 && (
+                  {totalRevenue > 0 && (
                   <>
                   <p className="mt-0.5 text-[11px] font-semibold text-t2">{view.seriesLabel}</p>
                   <div className="mt-2.5 flex flex-wrap gap-5">
@@ -364,7 +364,7 @@ export default function FinancePage() {
                       <span className="flex items-center gap-1.5 text-xs font-semibold text-t1">
                         <span className="h-2.5 w-2.5 rounded-[3px] bg-[var(--ok)]" />Lucro bruto
                       </span>
-                      <p className="mt-0.5 font-mono text-base font-extrabold text-t0">{brlCent(totalLucro)}</p>
+                      <p className="mt-0.5 font-mono text-base font-extrabold text-t0">{brlCent(totalProfit)}</p>
                     </div>
                     <div>
                       <span className="flex items-center gap-1.5 text-xs font-semibold text-t1">
@@ -374,21 +374,21 @@ export default function FinancePage() {
                     </div>
                     <div>
                       <span className="flex items-center gap-1.5 text-xs font-semibold text-t1">Margem</span>
-                      <p className="mt-0.5 font-mono text-base font-extrabold text-t0">{margemPct.toFixed(1)}%</p>
+                      <p className="mt-0.5 font-mono text-base font-extrabold text-t0">{marginPct.toFixed(1)}%</p>
                     </div>
                   </div>
                   </>
                   )}
                 </div>
               </div>
-              {totalFat === 0 ? (
+              {totalRevenue === 0 ? (
                 <EmptyBlock />
               ) : (
                 <AreaLineChart
-                  data={serie.map((m) => (m.future ? null : m.profit))}
-                  compareData={serie.map((m) => (m.future ? null : m.cost))}
-                  labels={serie.map((m) => m.label)}
-                  tooltipLabels={serie.map((m) => m.rangeLabel)}
+                  data={series.map((m) => (m.future ? null : m.profit))}
+                  compareData={series.map((m) => (m.future ? null : m.cost))}
+                  labels={series.map((m) => m.label)}
+                  tooltipLabels={series.map((m) => m.rangeLabel)}
                   color="var(--ok)"
                   compareColor="var(--bad)"
                   formatValue={brlCent}
@@ -400,12 +400,12 @@ export default function FinancePage() {
         })()}
 
         {(() => {
-          const serie = view.operatingResult;
-          const totalLucro = serie.reduce((s, m) => s + m.profit, 0);
-          const totalRes = serie.reduce((s, m) => s + m.result, 0);
-          const totalFat = serie.reduce((s, m) => s + m.revenue, 0);
-          const operatingMarginPct = totalFat > 0 ? (totalRes / totalFat) * 100 : 0;
-          const tipResultado = view.resultIsProrated
+          const series = view.operatingResult;
+          const totalProfit = series.reduce((s, m) => s + m.profit, 0);
+          const totalRes = series.reduce((s, m) => s + m.result, 0);
+          const totalRevenue = series.reduce((s, m) => s + m.revenue, 0);
+          const operatingMarginPct = totalRevenue > 0 ? (totalRes / totalRevenue) * 100 : 0;
+          const tipResult = view.resultIsProrated
             ? "Em períodos curtos, os custos mensais são distribuídos proporcionalmente por dia ou por hora."
             : "Valor que permanece após descontar do lucro bruto os custos da operação.";
           return (
@@ -415,13 +415,13 @@ export default function FinancePage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-1.5">
                       <CardTitle>Resultado operacional</CardTitle>
-                      <TipHelp label={tipResultado} />
+                      <TipHelp label={tipResult} />
                     </div>
                     <div className="shrink-0">
                       <PriorPeriodBadge delta={view.resultDelta} />
                     </div>
                   </div>
-                  {totalFat > 0 && (
+                  {totalRevenue > 0 && (
                   <>
                   <p className="mt-0.5 text-[11px] font-semibold text-t2">{view.seriesLabel}</p>
                   <div className="mt-2.5 flex flex-wrap gap-5">
@@ -429,7 +429,7 @@ export default function FinancePage() {
                       <span className="flex items-center gap-1.5 text-xs font-semibold text-t1">
                         <span className="h-2.5 w-2.5 rounded-[3px] bg-[var(--ok)]" />Lucro bruto
                       </span>
-                      <p className="mt-0.5 font-mono text-base font-extrabold text-t0">{brlCent(totalLucro)}</p>
+                      <p className="mt-0.5 font-mono text-base font-extrabold text-t0">{brlCent(totalProfit)}</p>
                     </div>
                     <div>
                       <span className="flex items-center gap-1.5 text-xs font-semibold text-t1">
@@ -446,14 +446,14 @@ export default function FinancePage() {
                   )}
                 </div>
               </div>
-              {totalFat === 0 ? (
+              {totalRevenue === 0 ? (
                 <EmptyBlock />
               ) : (
                 <AreaLineChart
-                  data={serie.map((m) => (m.future ? null : m.profit))}
-                  compareData={serie.map((m) => (m.future ? null : m.result))}
-                  labels={serie.map((m) => m.label)}
-                  tooltipLabels={serie.map((m) => m.rangeLabel)}
+                  data={series.map((m) => (m.future ? null : m.profit))}
+                  compareData={series.map((m) => (m.future ? null : m.result))}
+                  labels={series.map((m) => m.label)}
+                  tooltipLabels={series.map((m) => m.rangeLabel)}
                   color="var(--ok)"
                   compareColor="var(--acc)"
                   formatValue={brlCent}
@@ -495,17 +495,17 @@ export default function FinancePage() {
             <EmptyBlock />
           ) : (
           <div className="px-4 pb-4">
-            {view.franchiseFixedCosts.map((linha) => {
-              const estilo = costRowStyle(linha);
+            {view.franchiseFixedCosts.map((line) => {
+              const estilo = costRowStyle(line);
               return (
-                <div key={linha.label} className="flex items-center justify-between border-b border-line py-3 last:border-b-0">
+                <div key={line.label} className="flex items-center justify-between border-b border-line py-3 last:border-b-0">
                   <span
                     className={cn(
                       estilo.bold ? "text-sm font-extrabold text-t0" : "text-[13px] font-semibold",
                       estilo.indent ? "pl-4 text-t2 sm:pl-5" : "text-t0",
                     )}
                   >
-                    {linha.label}
+                    {line.label}
                   </span>
                   <span
                     className={cn("font-mono tabular-nums", estilo.bold ? "text-[15px] font-extrabold" : "text-[13.5px] font-bold")}
@@ -628,31 +628,31 @@ export default function FinancePage() {
 
         {/* Mobile  -  stack em cards (padrao Responsive Tables) */}
         <div className="flex flex-col gap-2.5 p-3.5 md:hidden">
-          {view.monthlyEvolution.map((linha) => (
-              <div key={linha.label} className="rounded-xl border border-line bg-bg-inset p-3.5">
+          {view.monthlyEvolution.map((line) => (
+              <div key={line.label} className="rounded-xl border border-line bg-bg-inset p-3.5">
                 <div className="mb-3 flex items-center justify-between gap-2">
-                  <p className="text-[13.5px] font-bold text-t0">{linha.label}</p>
+                  <p className="text-[13.5px] font-bold text-t0">{line.label}</p>
                   <div className="text-right">
                     <p className="text-[10px] font-semibold uppercase tracking-wide text-t2">Lucro bruto</p>
-                    <span className="text-[13px] font-extrabold tabular-nums text-ok">{brlCent(linha.profit)}</span>
+                    <span className="text-[13px] font-extrabold tabular-nums text-ok">{brlCent(line.profit)}</span>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2 border-t border-line pt-2.5 text-[11.5px]">
                   <div className="flex justify-between gap-2">
                     <span className="text-t2">Faturamento</span>
-                    <span className="font-semibold tabular-nums text-t0">{brlCent(linha.revenue)}</span>
+                    <span className="font-semibold tabular-nums text-t0">{brlCent(line.revenue)}</span>
                   </div>
                   <div className="flex justify-between gap-2">
                     <span className="text-t2">CMV</span>
-                    <span className="font-semibold tabular-nums text-t0">{brlCent(linha.cost)}</span>
+                    <span className="font-semibold tabular-nums text-t0">{brlCent(line.cost)}</span>
                   </div>
                   <div className="flex justify-between gap-2">
                     <span className="text-t2">Margem</span>
-                    <span className="font-semibold tabular-nums text-t0">{linha.marginPct.toFixed(1)}%</span>
+                    <span className="font-semibold tabular-nums text-t0">{line.marginPct.toFixed(1)}%</span>
                   </div>
                   <div className="flex justify-between gap-2">
                     <span className="text-t2">Ticket médio</span>
-                    <span className="font-semibold tabular-nums text-t0">{brlCent(linha.averageTicket)}</span>
+                    <span className="font-semibold tabular-nums text-t0">{brlCent(line.averageTicket)}</span>
                   </div>
                 </div>
               </div>

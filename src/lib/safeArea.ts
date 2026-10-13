@@ -22,6 +22,6 @@ export function pinBottom(base: string): CSSProperties {
 }
 
 /** Combina espacamento de topo e base num unico objeto de estilo. */
-export function padTopAndBottom(topo: string, base: string): CSSProperties {
-  return { "--pad-topo": topo, "--pad-base": base } as CSSProperties;
+export function padTopAndBottom(top: string, base: string): CSSProperties {
+  return { "--pad-topo": top, "--pad-base": base } as CSSProperties;
 }

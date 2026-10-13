@@ -23,7 +23,7 @@ export function MonthFillNotice({ fill, start, end }: { fill: MonthFill | null; 
   if (!fill) return null;
   const { done, total } = monthFillProgress(fill, calendarTodayIso());
   const pct = Math.round((done / total) * 100);
-  const parcial = monthFillTouches(fill, start, end);
+  const partial = monthFillTouches(fill, start, end);
   return (
     <Alert
       variant="accent"
@@ -39,7 +39,7 @@ export function MonthFillNotice({ fill, start, end }: { fill: MonthFill | null; 
         </>
       }
     >
-      {parcial
+      {partial
         ? "Os dados deste período ainda são parciais e serão atualizados automaticamente conforme o histórico for carregado."
         : "Os dados anteriores serão adicionados automaticamente. Você pode continuar usando o painel normalmente."}
     </Alert>

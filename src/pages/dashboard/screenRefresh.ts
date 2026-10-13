@@ -23,8 +23,8 @@ export function refreshMomentTitle(iso: string | null | undefined, now = new Dat
   if (Number.isNaN(at.getTime())) return "Nenhuma atualização ainda";
   const clockLabel = at.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
   if (at.toDateString() === now.toDateString()) return `Última atualização às ${clockLabel}`;
-  const dia = at.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-  return `Última atualização em ${dia} às ${clockLabel}`;
+  const day = at.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  return `Última atualização em ${day} às ${clockLabel}`;
 }
 
 let holder: { read: () => ScreenRefresh } | null = null;

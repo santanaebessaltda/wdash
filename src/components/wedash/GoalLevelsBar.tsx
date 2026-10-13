@@ -4,14 +4,14 @@ import { num } from "@/lib/format";
 
 export type GoalLevelMark = { name: string; pct: number; commissionPct?: number };
 
-const PX_POR_CARACTERE = 5.6;
+const PX_BY_CARACTERE = 5.6;
 const GAP_PX = 12;
-const ALTURA_LINHA = 13;
+const HEIGHT_LINE = 13;
 
 let canvasCtx: CanvasRenderingContext2D | null | undefined;
-function larguraTexto(name: string, extra: string): number {
+function widthText(name: string, extra: string): number {
   if (canvasCtx === undefined) canvasCtx = typeof document !== "undefined" ? document.createElement("canvas").getContext("2d") : null;
-  if (!canvasCtx) return (name + extra).length * PX_POR_CARACTERE + 4;
+  if (!canvasCtx) return (name + extra).length * PX_BY_CARACTERE + 4;
   canvasCtx.font = "700 10px 'Plus Jakarta Sans', sans-serif";
   const a = canvasCtx.measureText(name).width;
   canvasCtx.font = "600 10px 'Plus Jakarta Sans', sans-serif";
@@ -22,29 +22,29 @@ function larguraTexto(name: string, extra: string): number {
  * Posicao (0 - 1) de cada corte e largura total (px): cada trecho da barra tem so o espaco do nome do nivel
  * (fora de escala)  -  0 -> N1 = meio rotulo do N1; Ni -> Ni+1 = meio de cada + folga; o ultimo nivel fecha a barra.
  */
-function trechos(ws: number[]): { xs: number[]; largura: number } {
+function trechos(ws: number[]): { xs: number[]; width: number } {
   const k = ws.length;
   const end: number[] = [];
   let acc = 0;
   for (let i = 0; i < k; i++) {
-    const ultimo = i === k - 1;
-    if (i === 0) acc += ultimo ? ws[0]! : ws[0]! / 2;
-    else acc += ws[i - 1]! / 2 + GAP_PX + (ultimo ? ws[i]! : ws[i]! / 2);
+    const last = i === k - 1;
+    if (i === 0) acc += last ? ws[0]! : ws[0]! / 2;
+    else acc += ws[i - 1]! / 2 + GAP_PX + (last ? ws[i]! : ws[i]! / 2);
     end.push(acc);
   }
-  const largura = Math.ceil(acc);
-  return { xs: end.map((x) => (largura > 0 ? x / largura : 0)), largura };
+  const width = Math.ceil(acc);
+  return { xs: end.map((x) => (width > 0 ? x / width : 0)), width };
 }
 
 /** Preenchimento (0 - 1): avanca proporcionalmente dentro do trecho entre dois niveis. */
 function preenchimento(pct: number, cortes: number[], xs: number[]): number {
   if (cortes.length === 0) return Math.min(1, Math.max(0, pct / 100));
-  let de = 0;
+  let from = 0;
   let x0 = 0;
   for (let i = 0; i < cortes.length; i++) {
-    const ate = cortes[i]!;
-    if (pct < ate) return x0 + (ate > de ? ((Math.max(pct, de) - de) / (ate - de)) * (xs[i]! - x0) : 0);
-    de = ate;
+    const until = cortes[i]!;
+    if (pct < until) return x0 + (until > from ? ((Math.max(pct, from) - from) / (until - from)) * (xs[i]! - x0) : 0);
+    from = until;
     x0 = xs[i]!;
   }
   return 1;
@@ -56,15 +56,15 @@ function preenchimento(pct: number, cortes: number[], xs: number[]): number {
  * `completo` = rotulos "N1  |  Meta (1%)" no corte, todos na mesma linha  -  a barra reserva a largura em que
  * cabem (quem a usa cuida da rolagem lateral); senao so os cortes e os niveis no tooltip.
  */
-export function GoalLevelsBar({ pct, marcos, completo = false }: { pct: number; marcos: GoalLevelMark[]; completo?: boolean }) {
+export function GoalLevelsBar({ pct, marcos, complete = false }: { pct: number; marcos: GoalLevelMark[]; complete?: boolean }) {
   const name = (m: GoalLevelMark, i: number) => `N${i + 1} · ${m.name}`;
   const extra = (m: GoalLevelMark) => (m.commissionPct != null ? ` (${num(m.commissionPct, 1)}%)` : "");
-  const dicaNivel = (m: GoalLevelMark, i: number) =>
+  const hintLevel = (m: GoalLevelMark, i: number) =>
     `${name(m, i)} · a partir de ${num(m.pct, 0)}% da meta${m.commissionPct != null ? ` · premiação de ${num(m.commissionPct, 1)}%` : ""}`;
-  const dica = marcos.map(dicaNivel).join("\n");
-  const { xs, largura } = trechos(marcos.map((m, i) => larguraTexto(name(m, i), extra(m))));
-  const minWidth = completo ? largura : undefined;
-  const cheio = preenchimento(
+  const hint = marcos.map(hintLevel).join("\n");
+  const { xs, width } = trechos(marcos.map((m, i) => widthText(name(m, i), extra(m))));
+  const minWidth = complete ? width : undefined;
+  const full = preenchimento(
     pct,
     marcos.map((m) => m.pct),
     xs,
@@ -72,10 +72,10 @@ export function GoalLevelsBar({ pct, marcos, completo = false }: { pct: number; 
 
   return (
     <div style={minWidth ? { minWidth } : undefined}>
-      <div className="relative h-[6px] w-full overflow-hidden rounded-full" style={{ background: "var(--bg-3)" }} title={completo ? undefined : dica}>
+      <div className="relative h-[6px] w-full overflow-hidden rounded-full" style={{ background: "var(--bg-3)" }} title={complete ? undefined : hint}>
         <div
           className="h-full rounded-full transition-[width] duration-500"
-          style={{ width: `${cheio * 100}%`, background: progressColor(pct) }}
+          style={{ width: `${full * 100}%`, background: progressColor(pct) }}
         />
         {marcos.map((m, i) => {
           if (xs[i]! >= 0.995) return null;
@@ -89,20 +89,20 @@ export function GoalLevelsBar({ pct, marcos, completo = false }: { pct: number; 
           );
         })}
       </div>
-      {completo && (
-      <div className="relative mt-0.5 w-full" style={{ height: ALTURA_LINHA }}>
+      {complete && (
+      <div className="relative mt-0.5 w-full" style={{ height: HEIGHT_LINE }}>
         {marcos.map((m, i) => {
-          const naPonta = i === marcos.length - 1;
+          const atEnd = i === marcos.length - 1;
           return (
             <span
               key={m.name}
-              title={dicaNivel(m, i)}
+              title={hintLevel(m, i)}
               className={cn(
                 "absolute top-0 whitespace-nowrap text-[10px] font-bold",
-                naPonta ? "right-0" : "-translate-x-1/2",
+                atEnd ? "right-0" : "-translate-x-1/2",
                 pct >= m.pct ? "text-acc" : "text-t2",
               )}
-              style={{ lineHeight: `${ALTURA_LINHA}px`, ...(naPonta ? {} : { left: `${xs[i]! * 100}%` }) }}
+              style={{ lineHeight: `${HEIGHT_LINE}px`, ...(atEnd ? {} : { left: `${xs[i]! * 100}%` }) }}
             >
               {name(m, i)}
               {extra(m) && <span className="font-semibold opacity-75">{extra(m)}</span>}
@@ -121,29 +121,29 @@ export function GoalLevelsBar({ pct, marcos, completo = false }: { pct: number; 
  */
 export function GoalLevelSummary({
   pct,
-  nivel,
-  nivelNumero,
+  level,
+  levelNumber,
   marcos,
-  completo = true,
+  complete = true,
   rolagem = false,
 }: {
   pct: number;
-  nivel: string | null;
-  nivelNumero: number | null;
+  level: string | null;
+  levelNumber: number | null;
   marcos: GoalLevelMark[];
-  completo?: boolean;
+  complete?: boolean;
   rolagem?: boolean;
 }) {
-  const barra = <GoalLevelsBar pct={pct} marcos={marcos} completo={completo} />;
+  const barra = <GoalLevelsBar pct={pct} marcos={marcos} complete={complete} />;
   return (
     <div className="min-w-0">
       <p className="mb-1 text-[11.5px] text-t2">
         <span className={cn("font-mono font-bold", progressTextClass(pct))}>{num(pct, 0)}%</span> da meta
-        {nivel && (
+        {level && (
           <>
             {" · "}
             <span className="font-semibold text-t1">
-              N{nivelNumero} · {nivel}
+              N{levelNumber} · {level}
             </span>
           </>
         )}

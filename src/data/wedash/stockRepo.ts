@@ -143,9 +143,9 @@ export function fetchStockCatalog(): Promise<Map<string, StockCatalogItem>> {
     );
     for (const r of rows) {
       const code = String(r.product_code).trim();
-      const category = r.type_id == null ? "" : (typeName.get(Number(r.type_id)) ?? "").trim();
-      const categoria = category.toUpperCase();
-      out.set(code, { code, name: (r.description ?? "").trim().toUpperCase(), category: categoria === "INDEFINIDO" ? "" : categoria });
+      const rawCategory = r.type_id == null ? "" : (typeName.get(Number(r.type_id)) ?? "").trim();
+      const category = rawCategory.toUpperCase();
+      out.set(code, { code, name: (r.description ?? "").trim().toUpperCase(), category: category === "INDEFINIDO" ? "" : category });
     }
     return out;
   })();

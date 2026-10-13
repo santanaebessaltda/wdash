@@ -7,13 +7,13 @@ import { userByEmail, type User } from "@/data/wedash/team";
 import { sessionFromUser, type Session } from "@/session/session";
 import { paths } from "@/router/paths";
 
-export const MENSAGEM_LOGIN = "E-mail ou senha incorretos.";
+export const MESSAGE_LOGIN = "E-mail ou senha incorretos.";
 export const GENERIC_PASSWORD_MESSAGE = "Não foi possível salvar sua senha. Tente novamente.";
-export const MENSAGEM_OTP_INVALIDO = "Código inválido ou expirado. Solicite um novo código.";
-export const MENSAGEM_OTP_GENERICA = "Não foi possível verificar o código. Tente novamente.";
-export const MENSAGEM_SESSAO_EXPIRADA = "Sua sessão expirou. Entre novamente.";
-const MENSAGEM_FOTO_ENVIO_SEM_PONTO = "Não foi possível enviar a foto. Tente novamente";
-const MENSAGEM_FOTO_ENVIO = `${MENSAGEM_FOTO_ENVIO_SEM_PONTO}.`;
+export const MESSAGE_OTP_INVALID = "Código inválido ou expirado. Solicite um novo código.";
+export const MESSAGE_OTP_GENERICA = "Não foi possível verificar o código. Tente novamente.";
+export const MESSAGE_SESSAO_EXPIRADA = "Sua sessão expirou. Entre novamente.";
+const MESSAGE_PHOTO_ENVIO_WITHOUT_DOT = "Não foi possível enviar a foto. Tente novamente";
+const MESSAGE_PHOTO_ENVIO = `${MESSAGE_PHOTO_ENVIO_WITHOUT_DOT}.`;
 /** Tamanho do OTP de recovery  -  alinhar com Auth  ->  Providers  ->  Email  ->  OTP length. */
 export const RECOVERY_OTP_LENGTH = 6;
 /** Aceita letra+numero (A - Z / 0 - 9). Se o Dashboard so gerar digitos, continua valido. */
@@ -36,7 +36,7 @@ export function passwordAuthError(error: { code?: string; message?: string } | n
     return PASSWORD_RULE_TEXT;
   }
   if (code === "session_not_found" || (msg.includes("session") && msg.includes("not found"))) {
-    return MENSAGEM_OTP_INVALIDO;
+    return MESSAGE_OTP_INVALID;
   }
   if (msg.includes("rate limit") || code.includes("over_request")) {
     return GENERIC_PASSWORD_MESSAGE;
@@ -47,7 +47,7 @@ export function passwordAuthError(error: { code?: string; message?: string } | n
 
 /** Traduz erros do Auth na etapa de OTP (recovery). */
 export function otpAuthError(error: { code?: string; message?: string } | null): string {
-  if (!error) return MENSAGEM_OTP_GENERICA;
+  if (!error) return MESSAGE_OTP_GENERICA;
   const code = (error.code ?? "").toLowerCase();
   const msg = (error.message ?? "").toLowerCase();
 
@@ -60,15 +60,15 @@ export function otpAuthError(error: { code?: string; message?: string } | null):
     code === "session_not_found" ||
     (msg.includes("session") && msg.includes("not found"))
   ) {
-    return MENSAGEM_OTP_INVALIDO;
+    return MESSAGE_OTP_INVALID;
   }
-  return MENSAGEM_OTP_GENERICA;
+  return MESSAGE_OTP_GENERICA;
 }
 
 /** sessionStorage: fluxo de recuperacao ativo (nao hidratar app Session). */
-export const CHAVE_RECOVERY = "wedash-password-recovery";
+export const ROWKEY_RECOVERY = "wedash-password-recovery";
 /** E-mail para o qual o OTP de recovery foi pedido. */
-export const CHAVE_RECOVERY_EMAIL = "wedash-recovery-email";
+export const ROWKEY_RECOVERY_EMAIL = "wedash-recovery-email";
 
 export type AuthResult =
   | { ok: true; session: Session }
@@ -78,18 +78,18 @@ function emailOk(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
 
-export function marcarRecovery(): void {
+export function markRecovery(): void {
   try {
-    sessionStorage.setItem(CHAVE_RECOVERY, "1");
+    sessionStorage.setItem(ROWKEY_RECOVERY, "1");
   } catch {
     /* ignore */
   }
 }
 
-export function limparRecovery(): void {
+export function clearRecovery(): void {
   try {
-    sessionStorage.removeItem(CHAVE_RECOVERY);
-    sessionStorage.removeItem(CHAVE_RECOVERY_EMAIL);
+    sessionStorage.removeItem(ROWKEY_RECOVERY);
+    sessionStorage.removeItem(ROWKEY_RECOVERY_EMAIL);
   } catch {
     /* ignore */
   }
@@ -97,7 +97,7 @@ export function limparRecovery(): void {
 
 export function emRecovery(): boolean {
   try {
-    return sessionStorage.getItem(CHAVE_RECOVERY) === "1";
+    return sessionStorage.getItem(ROWKEY_RECOVERY) === "1";
   } catch {
     return false;
   }
@@ -105,7 +105,7 @@ export function emRecovery(): boolean {
 
 export function saveRecoveryEmail(email: string): void {
   try {
-    sessionStorage.setItem(CHAVE_RECOVERY_EMAIL, email.trim().toLowerCase());
+    sessionStorage.setItem(ROWKEY_RECOVERY_EMAIL, email.trim().toLowerCase());
   } catch {
     /* ignore */
   }
@@ -113,7 +113,7 @@ export function saveRecoveryEmail(email: string): void {
 
 export function readRecoveryEmail(): string | null {
   try {
-    return sessionStorage.getItem(CHAVE_RECOVERY_EMAIL);
+    return sessionStorage.getItem(ROWKEY_RECOVERY_EMAIL);
   } catch {
     return null;
   }
@@ -125,35 +125,35 @@ export function passwordResetUrl(): string {
 }
 
 /** Login: Supabase Auth se configurado; senao mock por e-mail (demo). */
-export async function loginWithEmail(email: string, senha: string): Promise<AuthResult> {
+export async function loginWithEmail(email: string, password: string): Promise<AuthResult> {
   const e = email.trim().toLowerCase();
-  if (!emailOk(e) || !senha) return { ok: false, error: MENSAGEM_LOGIN };
+  if (!emailOk(e) || !password) return { ok: false, error: MESSAGE_LOGIN };
 
   const sb = getSupabase();
   if (!sb) {
     await delay(400);
     const u = userByEmail(e);
-    if (!u) return { ok: false, error: MENSAGEM_LOGIN };
+    if (!u) return { ok: false, error: MESSAGE_LOGIN };
     return { ok: true, session: sessionFromUser(u) };
   }
 
-  limparRecovery();
-  const { data, error } = await sb.auth.signInWithPassword({ email: e, password: senha });
-  if (error || !data.user) return { ok: false, error: MENSAGEM_LOGIN };
+  clearRecovery();
+  const { data, error } = await sb.auth.signInWithPassword({ email: e, password: password });
+  if (error || !data.user) return { ok: false, error: MESSAGE_LOGIN };
 
   const session = await hydrateSessionFromAuth(data.user.id, e);
   if (!session || session === SELLER_SUSPENDED) {
     await sb.auth.signOut();
     return {
       ok: false,
-      error: session === SELLER_SUSPENDED ? "Seu acesso está suspenso. Fale com o responsável pelos acessos da WDash." : MENSAGEM_LOGIN,
+      error: session === SELLER_SUSPENDED ? "Seu acesso está suspenso. Fale com o responsável pelos acessos da WDash." : MESSAGE_LOGIN,
     };
   }
   return { ok: true, session };
 }
 
 export async function logoutAuth(): Promise<void> {
-  limparRecovery();
+  clearRecovery();
   const sb = getSupabase();
   if (sb) await sb.auth.signOut();
 }
@@ -170,7 +170,7 @@ export async function requestPasswordReset(email: string): Promise<void> {
     await delay(600);
     if (emailOk(e)) {
       saveRecoveryEmail(e);
-      marcarRecovery();
+      markRecovery();
     }
     return;
   }
@@ -179,7 +179,7 @@ export async function requestPasswordReset(email: string): Promise<void> {
     return;
   }
   saveRecoveryEmail(e);
-  marcarRecovery();
+  markRecovery();
   // Dispara e-mail de recovery. O template no Dashboard deve mostrar {{ .Token }} (OTP).
   await sb.auth.resetPasswordForEmail(e);
 }
@@ -194,17 +194,17 @@ export async function verifyRecoveryOtp(
   const e = email.trim().toLowerCase();
   const code = normalizeRecoveryOtp(otp);
   if (!emailOk(e) || !RECOVERY_OTP_PATTERN.test(code)) {
-    return { ok: false, error: MENSAGEM_OTP_INVALIDO };
+    return { ok: false, error: MESSAGE_OTP_INVALID };
   }
 
   const sb = getSupabase();
   if (!sb) {
     await delay(400);
-    if (!emRecovery()) return { ok: false, error: MENSAGEM_OTP_INVALIDO };
+    if (!emRecovery()) return { ok: false, error: MESSAGE_OTP_INVALID };
     return { ok: true };
   }
 
-  marcarRecovery();
+  markRecovery();
   const { error } = await sb.auth.verifyOtp({
     email: e,
     token: code,
@@ -221,11 +221,11 @@ export async function verifyRecoveryOtp(
 export async function resetPasswordWithOtp(
   email: string,
   otp: string,
-  novaSenha: string,
+  newPassword: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const verified = await verifyRecoveryOtp(email, otp);
   if (!verified.ok) return verified;
-  const updated = await updatePassword(novaSenha);
+  const updated = await updatePassword(newPassword);
   if (!updated.ok) return { ok: false, error: updated.error ?? GENERIC_PASSWORD_MESSAGE };
   return { ok: true };
 }
@@ -243,23 +243,23 @@ export async function canResetPassword(): Promise<boolean> {
 }
 
 /** Redefine senha quando ja existe sessao de recovery (OTP ou link legado). */
-export async function updatePassword(novaSenha: string): Promise<{ ok: boolean; error?: string }> {
-  const check = validatePassword(novaSenha);
+export async function updatePassword(newPassword: string): Promise<{ ok: boolean; error?: string }> {
+  const check = validatePassword(newPassword);
   if (!check.ok) return { ok: false, error: check.error };
   const sb = getSupabase();
   if (!sb) {
     await delay(500);
-    limparRecovery();
+    clearRecovery();
     return { ok: true };
   }
-  const { error } = await sb.auth.updateUser({ password: novaSenha });
+  const { error } = await sb.auth.updateUser({ password: newPassword });
   if (error) return { ok: false, error: passwordAuthError(error) };
 
   // Recovery define senha definitiva  -  limpa a flag de provisoria antes do signOut.
   const { error: flagErr } = await sb.rpc("clear_own_temporary_password");
   if (flagErr) console.warn("updatePassword temporary_password:", flagErr.message);
 
-  limparRecovery();
+  clearRecovery();
   await sb.auth.signOut();
   return { ok: true };
 }
@@ -357,7 +357,7 @@ export async function uploadAvatar(photo: File): Promise<{ ok: true; url: string
   if (!sb) return { ok: true, url: URL.createObjectURL(photo) };
   const { data: userData } = await sb.auth.getUser();
   const uid = userData.user?.id;
-  if (!uid) return { ok: false, error: MENSAGEM_SESSAO_EXPIRADA };
+  if (!uid) return { ok: false, error: MESSAGE_SESSAO_EXPIRADA };
   let blob: Blob;
   try {
     blob = await prepararAvatar(photo);
@@ -368,7 +368,7 @@ export async function uploadAvatar(photo: File): Promise<{ ok: true; url: string
   const { error } = await sb.storage.from("avatars").upload(path, blob, { contentType: "image/jpeg" });
   if (error) {
     console.warn("uploadAvatar:", error.message);
-    return { ok: false, error: MENSAGEM_FOTO_ENVIO };
+    return { ok: false, error: MESSAGE_PHOTO_ENVIO };
   }
   return { ok: true, url: sb.storage.from("avatars").getPublicUrl(path).data.publicUrl };
 }
@@ -404,7 +404,7 @@ export async function createAccess(
   if (input.photo) {
     const up = await uploadAvatar(input.photo);
     if (!up.ok) {
-      return { ok: false, error: up.error === MENSAGEM_FOTO_ENVIO ? `${MENSAGEM_FOTO_ENVIO_SEM_PONTO} ou continue sem foto.` : up.error };
+      return { ok: false, error: up.error === MESSAGE_PHOTO_ENVIO ? `${MESSAGE_PHOTO_ENVIO_WITHOUT_DOT} ou continue sem foto.` : up.error };
     }
     avatarUrl = up.url;
   }
@@ -462,7 +462,7 @@ export async function saveMyProfile(
 
   const { data: userData } = await sb.auth.getUser();
   const uid = userData.user?.id;
-  if (!uid) return { ok: false, error: MENSAGEM_SESSAO_EXPIRADA };
+  if (!uid) return { ok: false, error: MESSAGE_SESSAO_EXPIRADA };
 
   let avatarUrl: string | null | undefined;
   if (input.photo) {
@@ -485,20 +485,20 @@ export async function saveMyProfile(
 }
 
 /** Meu perfil: confere a senha atual (novo login) e troca a senha sem encerrar a sessao. */
-export async function changeMyPassword(email: string, atual: string, nova: string): Promise<{ ok: boolean; error?: string }> {
-  const check = validatePassword(nova);
+export async function changeMyPassword(email: string, current: string, isNew: string): Promise<{ ok: boolean; error?: string }> {
+  const check = validatePassword(isNew);
   if (!check.ok) return { ok: false, error: check.error };
   const sb = getSupabase();
   if (!sb) {
     await delay(400);
     return { ok: true };
   }
-  const { error: loginErr } = await sb.auth.signInWithPassword({ email: email.trim().toLowerCase(), password: atual });
+  const { error: loginErr } = await sb.auth.signInWithPassword({ email: email.trim().toLowerCase(), password: current });
   if (loginErr) return { ok: false, error: "Senha atual incorreta." };
-  const { error } = await sb.auth.updateUser({ password: nova });
+  const { error } = await sb.auth.updateUser({ password: isNew });
   if (error) {
     const msg = passwordAuthError(error);
-    if (msg === MENSAGEM_OTP_INVALIDO) return { ok: false, error: MENSAGEM_SESSAO_EXPIRADA };
+    if (msg === MESSAGE_OTP_INVALID) return { ok: false, error: MESSAGE_SESSAO_EXPIRADA };
     if (msg === GENERIC_PASSWORD_MESSAGE) return { ok: false, error: "Não foi possível alterar sua senha. Tente novamente." };
     return { ok: false, error: msg };
   }
@@ -506,7 +506,7 @@ export async function changeMyPassword(email: string, atual: string, nova: strin
 }
 
 /** Destino apos login / troca de senha / raiz. */
-export function destinationAfterAuth(s: Session, de?: string | null): string {
+export function destinationAfterAuth(s: Session, from?: string | null): string {
   if (s.temporaryPassword) return paths.access.createAccess;
   if (s.onboardingStep !== null) return paths.onboarding;
   // Pos-onboarding: nao manda pro Dash enquanto a carga inicial nao terminou.
@@ -517,7 +517,7 @@ export function destinationAfterAuth(s: Session, de?: string | null): string {
   } catch {
     /* ignore */
   }
-  if (de && de !== "/" && !de.startsWith(paths.access.login)) return de;
+  if (from && from !== "/" && !from.startsWith(paths.access.login)) return from;
   if (s.role === "SELLER") return paths.seller.home;
   return paths.overview;
 }

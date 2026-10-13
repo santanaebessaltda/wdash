@@ -50,7 +50,7 @@ export function GroupPicker({
   onChange: (shiftId: string | null) => void;
   onCreate: () => void;
 }) {
-  const atual = shifts.find((s) => s.id === value);
+  const current = shifts.find((s) => s.id === value);
   const items: DropdownItem[] = [
     ...shifts.map((s) => ({
       label: shiftName(s.name),
@@ -75,7 +75,7 @@ export function GroupPicker({
             aria-label={`Grupo de ${sellerName}`}
             className="inline-flex h-9 min-w-[132px] max-w-[200px] items-center justify-between gap-2 rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-2.5 text-[13px] font-medium text-t0"
           >
-            <span className={atual ? "truncate" : "truncate text-t2"}>{atual ? shiftName(atual.name) : "Sem grupo"}</span>
+            <span className={current ? "truncate" : "truncate text-t2"}>{current ? shiftName(current.name) : "Sem grupo"}</span>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-t2">
               <path d="m6 9 6 6 6-6" />
             </svg>
@@ -197,11 +197,11 @@ export function ManageGroupsModal({
     setLoaded(false);
     void Promise.all([fetchStoreShifts(tenantId, storeId), fetchStoreSellers(tenantId, [storeId])]).then(([list, sellers]) => {
       if (cancelled) return;
-      const contagem = new Map<string, number>();
+      const count = new Map<string, number>();
       for (const seller of sellers.get(storeId) ?? []) {
-        if (seller.shiftId && isActiveSalesPerson(seller)) contagem.set(seller.shiftId, (contagem.get(seller.shiftId) ?? 0) + 1);
+        if (seller.shiftId && isActiveSalesPerson(seller)) count.set(seller.shiftId, (count.get(seller.shiftId) ?? 0) + 1);
       }
-      setCounts(contagem);
+      setCounts(count);
       setShifts(list);
       setLoaded(true);
     });

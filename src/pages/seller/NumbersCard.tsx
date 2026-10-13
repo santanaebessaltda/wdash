@@ -4,12 +4,12 @@ import { brlCent, num } from "@/data/wedash/engine/format";
 import { sellerNumbers, type NumbersMode } from "@/data/wedash/sellerNumbers";
 import type { SellerDay } from "@/data/wedash/engine/sellerHome";
 
-const IconFat = () => (
+const IconRevenue = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
   </svg>
 );
-const IconVendas = () => (
+const IconSales = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
     <line x1="3" y1="6" x2="21" y2="6" />
@@ -30,7 +30,7 @@ const IconPa = () => (
   </svg>
 );
 
-const KPI_ICONS = [IconFat, IconVendas, IconTicket, IconPa];
+const KPI_ICONS = [IconRevenue, IconSales, IconTicket, IconPa];
 
 /** Mesma paleta da Visao geral e do Financeiro. */
 const KPI_COLORS = [
@@ -55,7 +55,7 @@ export function NumbersCard({
   const pa = n.pa.value == null ? "—" : num(n.pa.value, 2);
   const cards: { label: string; value: string; delta?: (typeof n.revenue)["delta"]; tooltip?: string }[] = [
     { label: "Faturamento", value: brlCent(n.revenue.value ?? 0), delta: n.revenue.delta },
-    { label: "Nº de vendas", value: num(n.vendas.value ?? 0, 0), delta: n.vendas.delta },
+    { label: "Nº de vendas", value: num(n.sales.value ?? 0, 0), delta: n.sales.delta },
     { label: "Ticket médio", value: brlCent(n.ticket.value ?? 0), delta: n.ticket.delta },
     {
       label: "P.A.",
@@ -79,7 +79,7 @@ export function NumbersCard({
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((kpi, i) => {
-          const Icon = KPI_ICONS[i] ?? IconFat;
+          const Icon = KPI_ICONS[i] ?? IconRevenue;
           const c = KPI_COLORS[i % KPI_COLORS.length]!;
           return (
             <StatCard

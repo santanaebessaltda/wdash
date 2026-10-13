@@ -16,6 +16,6 @@ export const noAutofill = {
   "data-form-type": "other",
 } as const;
 
-export function secretStyle(visivel: boolean): CSSProperties {
-  return { WebkitTextSecurity: visivel ? "none" : "disc" } as CSSProperties;
+export function secretStyle(visible: boolean): CSSProperties {
+  return { WebkitTextSecurity: visible ? "none" : "disc" } as CSSProperties;
 }

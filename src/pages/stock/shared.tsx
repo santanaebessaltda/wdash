@@ -19,15 +19,15 @@ export const qty = (v: number) => num(v, v % 1 === 0 ? 0 : 3);
 
 /** Saldo do produto num local de estoque, somando as lojas do filtro. */
 export function localQty(r: StockProductRow, name: string): number {
-  return r.storeRows.reduce((s, l) => s + (l.locais.find((x) => x.name === name)?.qtd ?? 0), 0);
+  return r.storeRows.reduce((s, l) => s + (l.locations.find((x) => x.name === name)?.qty ?? 0), 0);
 }
 
 /** Locais de estoque com saldo em algum produto, na ordem da hierarquia: Estoque, os demais em ordem alfabetica, Ponto de venda. */
 export function stockLocations(rows: StockProductRow[]): string[] {
-  const nomes = new Set<string>();
-  for (const r of rows) for (const l of r.storeRows) for (const x of l.locais) nomes.add(x.name);
-  const ordem = (n: string) => (n === "ESTOQUE" ? 0 : n === STOCK_SALES_LOCATION ? 2 : 1);
-  return [...nomes].sort((a, b) => ordem(a) - ordem(b) || a.localeCompare(b, "pt-BR"));
+  const names = new Set<string>();
+  for (const r of rows) for (const l of r.storeRows) for (const x of l.locations) names.add(x.name);
+  const order = (n: string) => (n === "ESTOQUE" ? 0 : n === STOCK_SALES_LOCATION ? 2 : 1);
+  return [...names].sort((a, b) => order(a) - order(b) || a.localeCompare(b, "pt-BR"));
 }
 
 export function ExportButton({ onClick }: { onClick: () => void }) {

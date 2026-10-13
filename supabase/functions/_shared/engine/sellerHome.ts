@@ -185,14 +185,14 @@ function monthRanking(input: SellerHomeInput, s: SellerHomeInput["stores"][numbe
     const from = startOfMonth(input.today);
     const start = from > geral.startsOn ? from : geral.startsOn;
     const end = input.today < geral.endsOn ? input.today : geral.endsOn;
-    const tot = start <= end ? storeSlice(input, s.storeId, start, end) : { revenue: 0, sales: 0, items: 0 };
+    const total = start <= end ? storeSlice(input, s.storeId, start, end) : { revenue: 0, sales: 0, items: 0 };
     const n = team.length;
     const ordered = [...team].sort((a, b) => collaboratorName(a.name).localeCompare(collaboratorName(b.name), "pt-BR"));
     return ordered.map((m) => ({
       position: 1,
       name: collaboratorName(m.name),
-      revenue: tot.revenue / n,
-      sales: tot.sales / n,
+      revenue: total.revenue / n,
+      sales: total.sales / n,
       me: m.employeeId === s.employeeId,
     }));
   }
@@ -319,11 +319,11 @@ function sellerDays(input: SellerHomeInput): SellerDay[] {
         days.set(key, d);
       }
     }
-    const porNome = new Map<string, GoalTeamMember>();
-    for (const m of input.team) if (m.storeId === s.storeId) for (const k of m.nameKeys) if (!porNome.has(k)) porNome.set(k, m);
+    const byName = new Map<string, GoalTeamMember>();
+    for (const m of input.team) if (m.storeId === s.storeId) for (const k of m.nameKeys) if (!byName.has(k)) byName.set(k, m);
     for (const r of input.sellerDayAggs) {
       if (r.storeId !== s.storeId || onGoal(r.day)) continue;
-      const mine = r.sellerEmployeeId != null ? r.sellerEmployeeId === s.employeeId : porNome.get(r.sellerKey)?.employeeId === s.employeeId;
+      const mine = r.sellerEmployeeId != null ? r.sellerEmployeeId === s.employeeId : byName.get(r.sellerKey)?.employeeId === s.employeeId;
       if (!mine) continue;
       const key = `${s.storeId}|${r.day}`;
       const d = days.get(key) ?? { storeId: s.storeId, day: r.day, revenue: 0, sales: 0, items: 0 };

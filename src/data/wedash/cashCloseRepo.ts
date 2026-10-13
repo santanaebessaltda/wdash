@@ -1,7 +1,7 @@
 import { calendarTodayIso } from "./clock";
 import { parseWithdrawalRows, type WithdrawalLine } from "./employeeWithdrawal";
 import { shiftName } from "./engine/format";
-import { cashCloseJobMatches, monthCloseSpanFor, navMonthFloor, sangriaMonthSpan, type CashCloseJobPart } from "./cashCloseMonth";
+import { cashCloseJobMatches, monthCloseSpanFor, navMonthFloor, cashDropMonthSpan, type CashCloseJobPart } from "./cashCloseMonth";
 import { assembleMonthMarks, captureBucket, paidPixCents, type CashCloseBucket, type CashCloseMillLine, type CloseAmountMap } from "./cashCloseView";
 
 export type CashCloseSnapshot = {
@@ -55,7 +55,7 @@ export async function fetchCashCloseSnapshot(tenantId: string, storeId: string, 
     millennium: (mill.data ?? []).map((r) => ({
       paymentMethod: String(r.payment_method ?? ""),
       openingCents: Number(r.opening_cents) || 0,
-      sangriaCents: r.sangria_cents == null ? null : Number(r.sangria_cents),
+      cashDropCents: r.sangria_cents == null ? null : Number(r.sangria_cents),
       closingCents: Number(r.closing_cents) || 0,
       typedCents: Number(r.typed_cents) || 0,
     })),
@@ -197,7 +197,7 @@ export async function fetchCashCloseMonthMarks(
       day: String(row.day),
       paymentMethod: String(row.payment_method ?? ""),
       openingCents: Number(row.opening_cents) || 0,
-      sangriaCents: row.sangria_cents == null ? null : Number(row.sangria_cents),
+      cashDropCents: row.sangria_cents == null ? null : Number(row.sangria_cents),
       closingCents: Number(row.closing_cents) || 0,
       typedCents: Number(row.typed_cents) || 0,
     })),
@@ -260,7 +260,7 @@ export async function requestCashDropMonth(
   storeIds: string[],
   monthDay = calendarTodayIso(),
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const span = sangriaMonthSpan(monthDay, calendarTodayIso());
+  const span = cashDropMonthSpan(monthDay, calendarTodayIso());
   if (!span) return { ok: false, message: "Não há sangrias para buscar neste mês." };
   return enqueueCashClose(span.from, span.to, storeIds, "Não foi possível buscar as sangrias deste mês. Tente novamente.", "sangria");
 }

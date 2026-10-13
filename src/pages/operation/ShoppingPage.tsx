@@ -47,8 +47,8 @@ export function ShoppingPage() {
   }, [storesLoading, escolher, store, session.tenantId]);
 
   const conectado = account != null;
-  const estado = conectado ? "Configurado" : "Não configurado";
-  const tom = conectado ? "text-ok" : "text-t2";
+  const status = conectado ? "Configurado" : "Não configurado";
+  const tone = conectado ? "text-ok" : "text-t2";
   const dot = conectado ? "bg-ok" : "bg-t2";
 
   return (
@@ -98,9 +98,9 @@ export function ShoppingPage() {
                 </div>
               </div>
               <div className="flex items-center justify-between border-t border-line pt-3">
-                <span className={`flex items-center gap-1.5 text-xs font-bold ${tom}`}>
+                <span className={`flex items-center gap-1.5 text-xs font-bold ${tone}`}>
                   <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
-                  {estado}
+                  {status}
                 </span>
                 <Button size="sm" onClick={() => setOpen(true)} disabled={!store}>
                   {conectado ? "Gerenciar" : "Configurar"}
@@ -154,7 +154,7 @@ function IntranetMallModal({
   const [slug, setSlug] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [autorizo, setAutorizo] = useState(false);
   const [busy, setBusy] = useState(false);
   const baseUrl = intranetMallBaseUrl(slug);
@@ -164,11 +164,11 @@ function IntranetMallModal({
     setSlug(account ? (intranetMallSlug(account.baseUrl) ?? "") : "");
     setUsername(account?.username ?? "");
     setPassword("");
-    setMostrarSenha(false);
+    setShowPassword(false);
     setAutorizo(false);
   }, [open, account]);
 
-  function fechar() {
+  function close() {
     if (busy) return;
     onClose();
   }
@@ -195,18 +195,18 @@ function IntranetMallModal({
     });
   }
 
-  const slugErro = slug.length > 0 && !baseUrl ? "Use o slug da filial, como shoppingcampogrande4." : undefined;
+  const slugError = slug.length > 0 && !baseUrl ? "Use o slug da filial, como shoppingcampogrande4." : undefined;
   const canConectar =
     !busy && baseUrl != null && username.trim().length > 0 && (password.trim().length > 0 || conectado) && (conectado || autorizo);
 
   return (
     <Modal
       open={open}
-      onClose={fechar}
+      onClose={close}
       title="Intranet Mall"
       footer={
         <>
-          <Button variant="outline" onClick={fechar} disabled={busy}>
+          <Button variant="outline" onClick={close} disabled={busy}>
             Cancelar
           </Button>
           <Button onClick={() => void conectar()} disabled={!canConectar}>
@@ -222,10 +222,10 @@ function IntranetMallModal({
         <FormField
           label="Slug"
           required
-          error={slugErro}
+          error={slugError}
           hint="Abra a Intranet Mall no navegador e copie o trecho do endereço depois de intranetmall.com/. Em https://app3.intranetmall.com/shoppingcampogrande4/ o slug é shoppingcampogrande4."
         >
-          <div className={cn("flex flex-col overflow-hidden rounded-[var(--radius-vela-md)] border bg-bg-inset focus-within:border-acc sm:h-[42px] sm:flex-row", slugErro ? "border-bad" : "border-line")}>
+          <div className={cn("flex flex-col overflow-hidden rounded-[var(--radius-vela-md)] border bg-bg-inset focus-within:border-acc sm:h-[42px] sm:flex-row", slugError ? "border-bad" : "border-line")}>
             <span className="flex shrink-0 items-center border-b border-line bg-bg-3 px-3 py-2 text-[12px] text-t2 sm:border-b-0 sm:border-r sm:py-0">
               {INTRANET_MALL_ORIGIN.replace("https://", "")}/
             </span>
@@ -253,7 +253,7 @@ function IntranetMallModal({
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder={conectado ? "Senha já cadastrada" : "Digite a senha"}
-              style={secretStyle(mostrarSenha && password.length > 0)}
+              style={secretStyle(showPassword && password.length > 0)}
               disabled={busy}
               className={!conectado || password.length > 0 ? "pr-12" : undefined}
               {...noAutofill}
@@ -261,12 +261,12 @@ function IntranetMallModal({
             {!conectado || password.length > 0 ? (
             <button
               type="button"
-              onClick={() => setMostrarSenha((current) => !current)}
-              aria-label={mostrarSenha ? "Ocultar senha" : "Mostrar senha"}
+              onClick={() => setShowPassword((current) => !current)}
+              aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
               disabled={busy}
               className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-t2 hover:bg-bg-3 hover:text-t0"
             >
-              {mostrarSenha ? (
+              {showPassword ? (
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22" />
                 </svg>

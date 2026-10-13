@@ -7,18 +7,18 @@ import {
 } from "@/data/wedash/employeeWithdrawal";
 import { brlCent } from "@/lib/format";
 
-const campo =
+const field =
   "h-9 w-full min-w-0 rounded-[9px] border border-line bg-bg-inset px-2 text-[13px] text-t0 outline-none focus:border-acc";
 
 export function EmployeeWithdrawal({
-  gestor,
+  owner,
   shortageCents,
   people,
   draft,
   onChange,
   toCents,
 }: {
-  gestor: boolean;
+  owner: boolean;
   shortageCents: number;
   people: WithdrawalPerson[];
   draft: WithdrawalDraft;
@@ -27,7 +27,7 @@ export function EmployeeWithdrawal({
 }) {
   if (shortageCents <= 0 && !draft.enabled) return null;
   const named = new Map(people.map((person) => [person.id, person.name]));
-  if (!gestor) {
+  if (!owner) {
     if (!draft.enabled || draft.rows.length === 0) return null;
     return (
       <section className="mt-4 rounded-[var(--radius-vela-lg)] border border-line bg-bg-2 p-3">
@@ -78,7 +78,7 @@ export function EmployeeWithdrawal({
                         rows: draft.rows.map((item) => (item.id === row.id ? { ...item, sellerId: event.target.value } : item)),
                       })
                     }
-                    className={campo}
+                    className={field}
                   >
                     <option value="">Escolher</option>
                     {options.map((person) => (
@@ -98,7 +98,7 @@ export function EmployeeWithdrawal({
                     inputMode="decimal"
                     placeholder="0,00"
                     aria-label="Valor da retirada"
-                    className={`${campo} text-right font-mono font-bold sm:w-32`}
+                    className={`${field} text-right font-mono font-bold sm:w-32`}
                   />
                   <Button
                     type="button"

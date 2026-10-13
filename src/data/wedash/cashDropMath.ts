@@ -6,27 +6,27 @@ export type CashDropAmounts = {
   totalCents: number;
   boletoCents: number;
   /** Compra, premiação, fornecedor ou outro uso. Não entra no boleto. */
-  foraCents: number;
+  excludedCents: number;
   /** Dinheiro da sangria que não estava no caixa. Não entra no boleto. */
-  faltaCents: number;
-  motivo: string;
+  gapCents: number;
+  reason: string;
 };
 
 export type ParsedCashDrop = {
-  erpLancamento: number;
+  erpEntry: number;
   day: string;
   amountCents: number;
   document: string;
   note: string;
 };
 
-const EMPTY: CashDropAmounts = { totalCents: 0, boletoCents: 0, foraCents: 0, faltaCents: 0, motivo: "" };
+const EMPTY: CashDropAmounts = { totalCents: 0, boletoCents: 0, excludedCents: 0, gapCents: 0, reason: "" };
 
 /** A falta não passa do que ainda iria para o boleto. */
-export function clampShortage(baseBoletoCents: number, faltaCents: number): number {
-  if (!Number.isFinite(faltaCents) || faltaCents <= 0) return 0;
+export function clampShortage(baseBoletoCents: number, gapCents: number): number {
+  if (!Number.isFinite(gapCents) || gapCents <= 0) return 0;
   const base = Math.max(0, baseBoletoCents);
-  return Math.min(Math.round(faltaCents), base);
+  return Math.min(Math.round(gapCents), base);
 }
 
 function asNum(v: unknown): number | null {
@@ -51,8 +51,8 @@ export function emissionDay(iso: string): string {
   return iso.slice(0, 10);
 }
 
-export function reaisToCents(reais: number): number {
-  return Math.round(Math.abs(reais) * 100);
+export function brlToCents(brl: number): number {
+  return Math.round(Math.abs(brl) * 100);
 }
 
 export function parseCashDropList(payload: unknown): ParsedCashDrop[] {
@@ -60,14 +60,14 @@ export function parseCashDropList(payload: unknown): ParsedCashDrop[] {
   for (const raw of listOf(payload)) {
     if (!raw || typeof raw !== "object") continue;
     const row = raw as Record<string, unknown>;
-    const erpLancamento = asNum(row.LANCAMENTO);
-    const iso = asStr(row.DATA_EMISSAO);
-    const reais = asNum(row.VALOR_PAGO) ?? asNum(row.VALOR_INICIAL);
-    if (erpLancamento == null || iso.length < 10 || reais == null) continue;
+    const erpEntry = asNum(row.ENTRY);
+    const iso = asStr(row.DATA_ISSUEDATE);
+    const brl = asNum(row.AMOUNT_PAGO) ?? asNum(row.AMOUNT_INICIAL);
+    if (erpEntry == null || iso.length < 10 || brl == null) continue;
     out.push({
-      erpLancamento,
+      erpEntry,
       day: emissionDay(iso),
-      amountCents: reaisToCents(reais),
+      amountCents: brlToCents(brl),
       document: asStr(row.N_DOCUMENTO),
       note: asStr(row.OBS),
     });
@@ -77,23 +77,23 @@ export function parseCashDropList(payload: unknown): ParsedCashDrop[] {
 
 export function dayAmounts(
   lines: Array<{ amountCents: number; kind: CashDropKind; note: string }>,
-  faltaCents = 0,
+  gapCents = 0,
 ): CashDropAmounts {
   let totalCents = 0;
   let baseCents = 0;
-  let foraCents = 0;
+  let excludedCents = 0;
   const motivos: string[] = [];
   for (const line of lines) {
     totalCents += line.amountCents;
     if (line.kind === "purchase") {
-      foraCents += line.amountCents;
+      excludedCents += line.amountCents;
       if (line.note.trim()) motivos.push(line.note.trim());
     } else {
       baseCents += line.amountCents;
     }
   }
-  const falta = clampShortage(baseCents, faltaCents);
-  return { totalCents, boletoCents: baseCents - falta, foraCents, faltaCents: falta, motivo: motivos.join(" · ") };
+  const gap = clampShortage(baseCents, gapCents);
+  return { totalCents, boletoCents: baseCents - gap, excludedCents, gapCents: gap, reason: motivos.join(" · ") };
 }
 
 export function sumAmounts(rows: CashDropAmounts[]): CashDropAmounts {
@@ -101,9 +101,9 @@ export function sumAmounts(rows: CashDropAmounts[]): CashDropAmounts {
     (acc, row) => ({
       totalCents: acc.totalCents + row.totalCents,
       boletoCents: acc.boletoCents + row.boletoCents,
-      foraCents: acc.foraCents + row.foraCents,
-      faltaCents: acc.faltaCents + row.faltaCents,
-      motivo: "",
+      excludedCents: acc.excludedCents + row.excludedCents,
+      gapCents: acc.gapCents + row.gapCents,
+      reason: "",
     }),
     EMPTY,
   );
@@ -113,14 +113,14 @@ export function sumAmounts(rows: CashDropAmounts[]): CashDropAmounts {
 export function depositBoleto(
   lines: Array<{ day: string; amountCents: number; kind: CashDropKind; note: string }>,
   days: string[],
-  faltaByDay: ReadonlyMap<string, number> = new Map(),
+  gapByDay: ReadonlyMap<string, number> = new Map(),
 ): number {
   const marked = new Set(days);
   let cents = 0;
   for (const day of marked) {
     cents += dayAmounts(
       lines.filter((line) => line.day === day),
-      faltaByDay.get(day) ?? 0,
+      gapByDay.get(day) ?? 0,
     ).boletoCents;
   }
   return cents;

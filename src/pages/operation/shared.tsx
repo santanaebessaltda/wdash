@@ -40,8 +40,8 @@ export function useScopedStores() {
   }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const storeRows = useMemo(() => {
-    const todas = storesForSession(session.stores);
-    return scope.storeIds.length === 0 ? todas : todas.filter((s) => scope.storeIds.includes(s.id));
+    const all = storesForSession(session.stores);
+    return scope.storeIds.length === 0 ? all : all.filter((s) => scope.storeIds.includes(s.id));
   }, [session.stores, scope.storeIds, tick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return { session, storeRows, loading, refresh: () => setTick((n) => n + 1) };

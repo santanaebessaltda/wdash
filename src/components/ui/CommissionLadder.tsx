@@ -36,20 +36,20 @@ export function CommissionLadder({
   // Ordena os degraus do menor pro maior (Meta  ->  Super  ->  Hiper).
   const ordenados = [...tiers].sort((a, b) => a.amount - b.amount);
   // Degrau atual: o ultimo cujo valor foi atingido (realizado >= valor).
-  const indiceAtual = ordenados.reduce((acc, d, i) => (achieved >= d.amount ? i : acc), -1);
+  const indexCurrent = ordenados.reduce((acc, d, i) => (achieved >= d.amount ? i : acc), -1);
 
   return (
     <div className={cn("flex flex-col gap-4", className)}>
       {ordenados.map((tier, i) => {
         const pct = Math.min(100, (achieved / tier.amount) * 100);
         const atingido = achieved >= tier.amount;
-        const ehAtual = i === indiceAtual;
+        const isCurrent = i === indexCurrent;
         return (
           <div key={tier.label} className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className={cn("text-[13px] font-bold", atingido ? "text-ok" : "text-t0")}>{tier.label}</span>
-                {ehAtual && !atingido && (
+                {isCurrent && !atingido && (
                   <Badge variant="info" dot>
                     Em andamento
                   </Badge>

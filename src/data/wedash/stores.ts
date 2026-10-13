@@ -2,33 +2,33 @@ import { defaultWeekHours, effectiveWeekHours, openHourFloor, closeHourCeil, par
 import { collaboratorName, shiftName } from "@/lib/format";
 import { SELLER_ROLE } from "./engine/goalRows";
 
-export type PointType = "SHOPPING" | "RUA";
+export type PointType = "SHOPPING" | "STREET";
 export type Division = "WEPINK" | "WPINK";
 export type { StoreWeekHours };
 
 export interface Store {
   id: string;
   millenniumBranch: number;
-  codFilial: string;
+  branchCode: string;
   name: string;
-  fantasia: string;
+  tradeName: string;
   cnpj: string;
-  cidade: string;
+  city: string;
   uf: string;
   kind: "M" | "F";
   pointType: PointType;
-  temWpink: boolean;
-  fuso: string;
+  hasWpink: boolean;
+  timezone: string;
   /** Horario por dia (0=dom..6=sab), como configurado. Calculos usam `effectiveWeekHours(horas)`. */
-  horas: StoreWeekHours;
+  hours: StoreWeekHours;
   /** Derivado do horario de hoje / primeira janela aberta  -  compat charts legados. */
-  abertura: number;
-  fechamento: number;
+  opening: number;
+  closing: number;
   /** Dias da semana fechados (0 = domingo). */
-  diasFechados: number[];
-  dataInauguracao: string;
+  daysClosed: number[];
+  openedAt: string;
   /** Custos da operacao (Configuracoes > Lojas). Ausente/null = nao configurado. */
-  custos?: StoreCosts;
+  costs?: StoreCosts;
   /** Tabela de custo do Millennium: completa o custo de produto que vem zerado na margem. */
   costTableId?: number | null;
   /** false = desativada: some do seletor e da operacao. Ausente = em operacao. */
@@ -77,7 +77,7 @@ export const EMPTY_STORE_COSTS: StoreCosts = {
 /** Campos obrigatorios da loja (WPINK so se a loja vende WPINK). */
 /** Algum custo da operacao (royalties, marketing, aluguel) preenchido em Configuracoes > Lojas. */
 export function storeOperatingCostsConfigured(s: Store): boolean {
-  const c = s.custos;
+  const c = s.costs;
   if (!c) return false;
   return [
     c.royaltiesWepinkPct,
@@ -91,55 +91,55 @@ export function storeOperatingCostsConfigured(s: Store): boolean {
 }
 
 export function storeCostsPending(s: Store): boolean {
-  const c = s.custos ?? EMPTY_STORE_COSTS;
+  const c = s.costs ?? EMPTY_STORE_COSTS;
   const base = [c.royaltiesWepinkPct, c.marketingWepinkPct, c.rentWepinkPct, c.rentMin];
-  const wpink = s.temWpink ? [c.royaltiesWpinkPct, c.marketingWpinkPct, c.rentWpinkPct] : [];
+  const wpink = s.hasWpink ? [c.royaltiesWpinkPct, c.marketingWpinkPct, c.rentWpinkPct] : [];
   return [...base, ...wpink].some((v) => v == null);
 }
 
-function derivedOpenClose(horas: StoreWeekHours): {
-  abertura: number;
-  fechamento: number;
-  diasFechados: number[];
+function derivedOpenClose(hours: StoreWeekHours): {
+  opening: number;
+  closing: number;
+  daysClosed: number[];
 } {
-  const diasFechados: number[] = [];
-  let abertura = 24;
-  let fechamento = 0;
+  const daysClosed: number[] = [];
+  let opening = 24;
+  let closing = 0;
   for (let d = 0; d <= 6; d++) {
-    const day = horas[d as 0 | 1 | 2 | 3 | 4 | 5 | 6];
+    const day = hours[d as 0 | 1 | 2 | 3 | 4 | 5 | 6];
     if (!day) {
-      diasFechados.push(d);
+      daysClosed.push(d);
       continue;
     }
     const a = openHourFloor(day);
     const c = closeHourCeil(day);
     if (a == null || c == null) continue;
-    abertura = Math.min(abertura, a);
-    fechamento = Math.max(fechamento, c);
+    opening = Math.min(opening, a);
+    closing = Math.max(closing, c);
   }
-  if (abertura >= fechamento) {
-    abertura = 9;
-    fechamento = 21;
+  if (opening >= closing) {
+    opening = 9;
+    closing = 21;
   }
-  return { abertura, fechamento, diasFechados };
+  return { opening, closing, daysClosed };
 }
 
 function withHours(
-  base: Omit<Store, "horas" | "abertura" | "fechamento" | "diasFechados"> & {
-    horas?: StoreWeekHours;
-    abertura?: number;
-    fechamento?: number;
-    diasFechados?: number[];
+  base: Omit<Store, "hours" | "opening" | "closing" | "daysClosed"> & {
+    hours?: StoreWeekHours;
+    opening?: number;
+    closing?: number;
+    daysClosed?: number[];
   },
 ): Store {
-  const horas = base.horas ?? defaultWeekHours();
-  const der = derivedOpenClose(effectiveWeekHours(horas));
+  const hours = base.hours ?? defaultWeekHours();
+  const der = derivedOpenClose(effectiveWeekHours(hours));
   return {
     ...base,
-    horas,
-    abertura: base.abertura ?? der.abertura,
-    fechamento: base.fechamento ?? der.fechamento,
-    diasFechados: base.diasFechados ?? der.diasFechados,
+    hours,
+    opening: base.opening ?? der.opening,
+    closing: base.closing ?? der.closing,
+    daysClosed: base.daysClosed ?? der.daysClosed,
   };
 }
 
@@ -147,17 +147,17 @@ export const stores: Store[] = [
   withHours({
     id: "f1",
     millenniumBranch: 8,
-    codFilial: "00008",
+    branchCode: "00008",
     name: "ESSENCIA PERFUMARIA CG SHOPPING",
-    fantasia: "Shopping Campo Grande",
+    tradeName: "Shopping Campo Grande",
     cnpj: "45.812.330/0001-19",
-    cidade: "Campo Grande",
+    city: "Campo Grande",
     uf: "MS",
     kind: "M",
     pointType: "SHOPPING",
-    temWpink: false,
-    fuso: "America/Campo_Grande",
-    horas: {
+    hasWpink: false,
+    timezone: "America/Campo_Grande",
+    hours: {
       0: { open: "12:00", close: "20:00" },
       1: { open: "10:00", close: "22:00" },
       2: { open: "10:00", close: "22:00" },
@@ -166,22 +166,22 @@ export const stores: Store[] = [
       5: { open: "10:00", close: "22:00" },
       6: { open: "10:00", close: "22:00" },
     },
-    dataInauguracao: "2024-03-14",
+    openedAt: "2024-03-14",
   }),
   withHours({
     id: "f2",
     millenniumBranch: 10,
-    codFilial: "00010",
+    branchCode: "00010",
     name: "ESSENCIA PERFUMARIA TRES LAGOAS",
-    fantasia: "Shopping Três Lagoas",
+    tradeName: "Shopping Três Lagoas",
     cnpj: "45.812.330/0002-08",
-    cidade: "Três Lagoas",
+    city: "Três Lagoas",
     uf: "MS",
     kind: "F",
-    pointType: "RUA",
-    temWpink: true,
-    fuso: "America/Campo_Grande",
-    horas: {
+    pointType: "STREET",
+    hasWpink: true,
+    timezone: "America/Campo_Grande",
+    hours: {
       0: null,
       1: { open: "08:00", close: "18:00" },
       2: { open: "08:00", close: "18:00" },
@@ -190,7 +190,7 @@ export const stores: Store[] = [
       5: { open: "08:00", close: "18:00" },
       6: { open: "08:00", close: "18:00" },
     },
-    dataInauguracao: "2025-06-02",
+    openedAt: "2025-06-02",
   }),
 ];
 
@@ -202,7 +202,7 @@ export function storeById(id: string): Store {
 
 /** Casa lojas do Millennium com o catalogo local (millenniumFilial  ->  id). */
 export function storeIdsFromErp(
-  lista: {
+  list: {
     storeId: number;
     tradeName?: string;
     taxId?: string;
@@ -216,7 +216,7 @@ export function storeIdsFromErp(
   }[],
 ): string[] {
   const ids: string[] = [];
-  for (const e of lista) {
+  for (const e of list) {
     const hit = stores.find((f) => f.millenniumBranch === e.storeId);
     if (hit) {
       if (!ids.includes(hit.id)) ids.push(hit.id);
@@ -228,35 +228,35 @@ export function storeIdsFromErp(
       withHours({
         id,
         millenniumBranch: e.storeId,
-        codFilial: e.code ?? String(e.storeId).padStart(5, "0"),
+        branchCode: e.code ?? String(e.storeId).padStart(5, "0"),
         name: e.name ?? e.tradeName ?? id,
-        fantasia: e.tradeName ?? e.name ?? id,
+        tradeName: e.tradeName ?? e.name ?? id,
         cnpj: formatCnpjDisplay(e.taxId ?? ""),
-        cidade: e.city ?? "",
+        city: e.city ?? "",
         uf: e.state ?? "",
         kind: e.type ?? "F",
-        pointType: "RUA",
-        temWpink: Boolean(e.hasWpink),
-        fuso: "America/Sao_Paulo",
-        dataInauguracao: e.openedAt ?? "2024-01-01",
+        pointType: "STREET",
+        hasWpink: Boolean(e.hasWpink),
+        timezone: "America/Sao_Paulo",
+        openedAt: e.openedAt ?? "2024-01-01",
       }),
     );
   }
   return ids;
 }
 
-const CHAVE_EXTRAS = "wedash-filiais-extra";
+const ROWKEY_EXTRAS = "wedash-filiais-extra";
 
 function lerExtras(): Store[] {
   try {
-    const raw = window.localStorage.getItem(CHAVE_EXTRAS);
+    const raw = window.localStorage.getItem(ROWKEY_EXTRAS);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as Store[];
     if (!Array.isArray(parsed)) return [];
     return parsed.map((s) =>
       withHours({
         ...s,
-        horas: s.horas ? parseWeekHours(s.horas) : defaultWeekHours(),
+        hours: s.hours ? parseWeekHours(s.hours) : defaultWeekHours(),
       }),
     );
   } catch {
@@ -267,7 +267,7 @@ function lerExtras(): Store[] {
 function registerExtraStore(f: Store, opts?: { silent?: boolean }) {
   try {
     const atuais = lerExtras().filter((x) => x.id !== f.id);
-    window.localStorage.setItem(CHAVE_EXTRAS, JSON.stringify([...atuais, f]));
+    window.localStorage.setItem(ROWKEY_EXTRAS, JSON.stringify([...atuais, f]));
     if (!opts?.silent) window.dispatchEvent(new Event("wedash:stores"));
   } catch {
     /* ignore */
@@ -351,25 +351,25 @@ function rowToStore(r: {
   cost_table_id?: number | string | null;
   active?: boolean | null;
 }): Store {
-  const horas = parseWeekHours(r.hours);
+  const hours = parseWeekHours(r.hours);
   const num = (v: number | string | null | undefined) => (v == null || v === "" ? null : Number(v));
   const rentCents = num(r.rent_min_cents);
   return withHours({
     id: r.id,
     millenniumBranch: r.millennium_store_id,
-    codFilial: r.code || String(r.millennium_store_id).padStart(5, "0"),
+    branchCode: r.code || String(r.millennium_store_id).padStart(5, "0"),
     name: r.name || r.trade_name || r.code || r.id,
-    fantasia: r.trade_name || r.name || r.code || r.id,
+    tradeName: r.trade_name || r.name || r.code || r.id,
     cnpj: formatCnpjDisplay(r.tax_id ?? ""),
-    cidade: "",
+    city: "",
     uf: "",
     kind: "F",
-    pointType: r.point_type === "STREET" ? "RUA" : "SHOPPING",
-    temWpink: Boolean(r.has_wpink),
-    fuso: r.timezone || "America/Campo_Grande",
-    horas,
-    dataInauguracao: r.opened_at ? String(r.opened_at).slice(0, 10) : "2024-01-01",
-    custos: {
+    pointType: r.point_type === "STREET" ? "STREET" : "SHOPPING",
+    hasWpink: Boolean(r.has_wpink),
+    timezone: r.timezone || "America/Campo_Grande",
+    hours,
+    openedAt: r.opened_at ? String(r.opened_at).slice(0, 10) : "2024-01-01",
+    costs: {
       royaltiesWepinkPct: num(r.royalties_wepink_pct),
       royaltiesWpinkPct: num(r.royalties_wpink_pct),
       marketingWepinkPct: num(r.marketing_wepink_pct),
@@ -403,7 +403,7 @@ export function scopeShowsBrandPicker(storeIds: string[], sessionStoreIds: strin
   const ids = storeIds.length > 0 ? storeIds : sessionStoreIds;
   if (ids.length === 0) return false;
   const byId = new Map(storesForSession(sessionStoreIds).map((s) => [s.id, s]));
-  return ids.some((id) => byId.get(id)?.temWpink === true);
+  return ids.some((id) => byId.get(id)?.hasWpink === true);
 }
 
 /** Formata CNPJ 14 digitos; se ja vier mascarado, devolve como esta. */
@@ -458,7 +458,7 @@ export async function hydrateSessionStores(tenantId: string, sessionStoreIds: st
     // Substitui o catalogo local: lojas de resets/reseeds antigos (com horario
     // padrao 9 - 21) nao podem continuar entrando em "Todas" e nos eixos de hora.
     try {
-      window.localStorage.setItem(CHAVE_EXTRAS, JSON.stringify(out));
+      window.localStorage.setItem(ROWKEY_EXTRAS, JSON.stringify(out));
     } catch {
       /* ignore */
     }
@@ -559,7 +559,7 @@ export async function setStoreActive(storeId: string, active: boolean): Promise<
     if (!active) {
       try {
         const atuais = lerExtras().filter((x) => x.id !== storeId);
-        window.localStorage.setItem(CHAVE_EXTRAS, JSON.stringify(atuais));
+        window.localStorage.setItem(ROWKEY_EXTRAS, JSON.stringify(atuais));
         window.dispatchEvent(new Event("wedash:stores"));
       } catch {
         /* ignore */
@@ -593,7 +593,7 @@ export async function updateStoreSchedule(args: {
       .update({
         timezone: args.timezone,
         hours: payloadHours,
-        ...(args.pointType ? { point_type: args.pointType === "RUA" ? "STREET" : "MALL" } : {}),
+        ...(args.pointType ? { point_type: args.pointType === "STREET" ? "STREET" : "MALL" } : {}),
       })
       .eq("id", args.storeId);
 
@@ -604,8 +604,8 @@ export async function updateStoreSchedule(args: {
       registerExtraStore(
         withHours({
           ...existing,
-          fuso: args.timezone,
-          horas: args.hours,
+          timezone: args.timezone,
+          hours: args.hours,
           ...(args.pointType ? { pointType: args.pointType } : {}),
         }),
       );
@@ -662,7 +662,7 @@ export async function updateStoreCostTable(
 /** Persiste custos da operacao da loja (Configuracoes > Lojas > Custos). */
 export async function updateStoreCosts(
   storeId: string,
-  custos: StoreCosts,
+  costs: StoreCosts,
   pointType?: PointType,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
@@ -673,25 +673,25 @@ export async function updateStoreCosts(
     const { error } = await sb
       .from("store")
       .update({
-        royalties_wepink_pct: custos.royaltiesWepinkPct,
-        royalties_wpink_pct: custos.royaltiesWpinkPct,
-        marketing_wepink_pct: custos.marketingWepinkPct,
-        marketing_wpink_pct: custos.marketingWpinkPct,
-        rent_wepink_pct: custos.rentWepinkPct,
-        rent_wpink_pct: custos.rentWpinkPct,
-        rent_min_cents: custos.rentMin == null ? null : Math.round(custos.rentMin * 100),
-        icms_wepink_pct: custos.icmsWepinkPct,
-        icms_wpink_pct: custos.icmsWpinkPct,
-        icms_st_wepink_pct: custos.icmsStWepinkPct,
-        icms_st_wpink_pct: custos.icmsStWpinkPct,
-        ...(pointType ? { point_type: pointType === "RUA" ? "STREET" : "MALL" } : {}),
+        royalties_wepink_pct: costs.royaltiesWepinkPct,
+        royalties_wpink_pct: costs.royaltiesWpinkPct,
+        marketing_wepink_pct: costs.marketingWepinkPct,
+        marketing_wpink_pct: costs.marketingWpinkPct,
+        rent_wepink_pct: costs.rentWepinkPct,
+        rent_wpink_pct: costs.rentWpinkPct,
+        rent_min_cents: costs.rentMin == null ? null : Math.round(costs.rentMin * 100),
+        icms_wepink_pct: costs.icmsWepinkPct,
+        icms_wpink_pct: costs.icmsWpinkPct,
+        icms_st_wepink_pct: costs.icmsStWepinkPct,
+        icms_st_wpink_pct: costs.icmsStWpinkPct,
+        ...(pointType ? { point_type: pointType === "STREET" ? "STREET" : "MALL" } : {}),
       })
       .eq("id", storeId);
     if (error) return { ok: false, error: error.message };
 
     const existing = allStores().find((s) => s.id === storeId);
     if (existing) {
-      registerExtraStore({ ...existing, custos, ...(pointType ? { pointType } : {}) });
+      registerExtraStore({ ...existing, costs, ...(pointType ? { pointType } : {}) });
     }
     return { ok: true };
   } catch (e) {
@@ -923,49 +923,49 @@ export async function syncStoreSellersNow(storeId: string): Promise<{ ok: true }
 
 type DayHoursJson = { open: string; close: string } | null;
 
-export interface Grupo {
+export interface Group {
   id: string;
   storeId: string;
   name: string;
-  horaInicio: number;
-  horaFim: number;
+  hourStart: number;
+  hourEnd: number;
 }
 
-export const groups: Grupo[] = [
-  { id: "t-f1-manha", storeId: "f1", name: "Grupo 1", horaInicio: 0, horaFim: 16 },
-  { id: "t-f1-tarde", storeId: "f1", name: "Grupo 2", horaInicio: 16, horaFim: 24 },
-  { id: "t-f2-manha", storeId: "f2", name: "Grupo 1", horaInicio: 0, horaFim: 13 },
-  { id: "t-f2-tarde", storeId: "f2", name: "Grupo 2", horaInicio: 13, horaFim: 24 },
+export const groups: Group[] = [
+  { id: "t-f1-manha", storeId: "f1", name: "Grupo 1", hourStart: 0, hourEnd: 16 },
+  { id: "t-f1-tarde", storeId: "f1", name: "Grupo 2", hourStart: 16, hourEnd: 24 },
+  { id: "t-f2-manha", storeId: "f2", name: "Grupo 1", hourStart: 0, hourEnd: 13 },
+  { id: "t-f2-tarde", storeId: "f2", name: "Grupo 2", hourStart: 13, hourEnd: 24 },
 ];
 
-export interface Tarefa {
+export interface Task {
   id: string;
   storeId: string;
-  grupoId: string;
+  groupId: string;
   title: string;
-  ordem: number;
+  order: number;
 }
 
-export const tarefas: Tarefa[] = [
-  { id: "tf1", storeId: "f1", grupoId: "t-f1-manha", title: "Abrir caixa e conferir fundo de troco", ordem: 1 },
-  { id: "tf2", storeId: "f1", grupoId: "t-f1-manha", title: "Reposição da vitrine de perfumaria", ordem: 2 },
-  { id: "tf3", storeId: "f1", grupoId: "t-f1-manha", title: "Testar provadores e repor blotters", ordem: 3 },
-  { id: "tf4", storeId: "f1", grupoId: "t-f1-manha", title: "Conferir etiquetas de preço da promoção", ordem: 4 },
-  { id: "tf5", storeId: "f1", grupoId: "t-f1-manha", title: "Limpeza das prateleiras de body splash", ordem: 5 },
-  { id: "tf6", storeId: "f1", grupoId: "t-f1-tarde", title: "Passagem de grupo: caixa e pendências", ordem: 1 },
-  { id: "tf7", storeId: "f1", grupoId: "t-f1-tarde", title: "Reposição de estoque na loja", ordem: 2 },
-  { id: "tf8", storeId: "f1", grupoId: "t-f1-tarde", title: "Organizar kits de presente", ordem: 3 },
-  { id: "tf9", storeId: "f1", grupoId: "t-f1-tarde", title: "Fechamento de caixa e sangria", ordem: 4 },
-  { id: "tf10", storeId: "f2", grupoId: "t-f2-manha", title: "Abrir loja e conferir fundo de troco", ordem: 1 },
-  { id: "tf11", storeId: "f2", grupoId: "t-f2-manha", title: "Conferir vitrine externa", ordem: 2 },
-  { id: "tf12", storeId: "f2", grupoId: "t-f2-manha", title: "Repor suplementos WPINK no expositor", ordem: 3 },
-  { id: "tf13", storeId: "f2", grupoId: "t-f2-manha", title: "Registrar temperatura do estoque", ordem: 4 },
-  { id: "tf14", storeId: "f2", grupoId: "t-f2-tarde", title: "Passagem de grupo", ordem: 1 },
-  { id: "tf15", storeId: "f2", grupoId: "t-f2-tarde", title: "Reposição de perfumaria", ordem: 2 },
-  { id: "tf16", storeId: "f2", grupoId: "t-f2-tarde", title: "Fechamento de caixa", ordem: 3 },
+export const tasks: Task[] = [
+  { id: "tf1", storeId: "f1", groupId: "t-f1-manha", title: "Abrir caixa e conferir fundo de troco", order: 1 },
+  { id: "tf2", storeId: "f1", groupId: "t-f1-manha", title: "Reposição da vitrine de perfumaria", order: 2 },
+  { id: "tf3", storeId: "f1", groupId: "t-f1-manha", title: "Testar provadores e repor blotters", order: 3 },
+  { id: "tf4", storeId: "f1", groupId: "t-f1-manha", title: "Conferir etiquetas de preço da promoção", order: 4 },
+  { id: "tf5", storeId: "f1", groupId: "t-f1-manha", title: "Limpeza das prateleiras de body splash", order: 5 },
+  { id: "tf6", storeId: "f1", groupId: "t-f1-tarde", title: "Passagem de grupo: caixa e pendências", order: 1 },
+  { id: "tf7", storeId: "f1", groupId: "t-f1-tarde", title: "Reposição de estoque na loja", order: 2 },
+  { id: "tf8", storeId: "f1", groupId: "t-f1-tarde", title: "Organizar kits de presente", order: 3 },
+  { id: "tf9", storeId: "f1", groupId: "t-f1-tarde", title: "Fechamento de caixa e sangria", order: 4 },
+  { id: "tf10", storeId: "f2", groupId: "t-f2-manha", title: "Abrir loja e conferir fundo de troco", order: 1 },
+  { id: "tf11", storeId: "f2", groupId: "t-f2-manha", title: "Conferir vitrine externa", order: 2 },
+  { id: "tf12", storeId: "f2", groupId: "t-f2-manha", title: "Repor suplementos WPINK no expositor", order: 3 },
+  { id: "tf13", storeId: "f2", groupId: "t-f2-manha", title: "Registrar temperatura do estoque", order: 4 },
+  { id: "tf14", storeId: "f2", groupId: "t-f2-tarde", title: "Passagem de grupo", order: 1 },
+  { id: "tf15", storeId: "f2", groupId: "t-f2-tarde", title: "Reposição de perfumaria", order: 2 },
+  { id: "tf16", storeId: "f2", groupId: "t-f2-tarde", title: "Fechamento de caixa", order: 3 },
 ];
 
-export interface Categoria {
+export interface Category {
   id: number;
   name: string;
   division: Division;
@@ -974,7 +974,7 @@ export interface Categoria {
 }
 
 /** Categorias por TIPO do ERP, agrupadas por id. */
-export const categorias: Categoria[] = [
+export const categories: Category[] = [
   { id: 1, name: "Perfumaria", division: "WEPINK", cmvPct: 0.3 },
   { id: 2, name: "Body Splash", division: "WEPINK", cmvPct: 0.27 },
   { id: 3, name: "Body Cream", division: "WEPINK", cmvPct: 0.31 },
@@ -990,11 +990,11 @@ export type PaymentMethod = (typeof paymentMethods)[number];
 
 export interface StoreConfig {
   storeId: string;
-  impostoSobreCustoPct: number;
-  margemMinimaPct: number | null;
+  taxSobreCostPct: number;
+  marginMinimaPct: number | null;
 }
 
 export const storeConfigs: StoreConfig[] = [
-  { storeId: "f1", impostoSobreCustoPct: 4, margemMinimaPct: 55 },
-  { storeId: "f2", impostoSobreCustoPct: 4, margemMinimaPct: null },
+  { storeId: "f1", taxSobreCostPct: 4, marginMinimaPct: 55 },
+  { storeId: "f2", taxSobreCostPct: 4, marginMinimaPct: null },
 ];

@@ -42,12 +42,12 @@ describe("T8: integração — Equipe e Visão geral concordam (EQUIP-01)", () =
   });
 
   it("estados coerentes: kpis e desafios disponíveis mesmo com filtro Hoje (AD-046)", () => {
-    const dia = buildTeamView(scope("f1", { kind: "today" }));
-    expect(dia.states.kpis).toBe("available");
-    expect(dia.states.challenges).toBe("available");
-    expect(dia.activeGoal).toBe(true);
-    const mes = buildTeamView(scope("f1", { kind: "thisMonth" }));
-    expect(mes.states.kpis).toBe("available");
-    expect(mes.states.challenges).toBe("available");
+    const day = buildTeamView(scope("f1", { kind: "today" }));
+    expect(day.states.kpis).toBe("available");
+    expect(day.states.challenges).toBe("available");
+    expect(day.activeGoal).toBe(true);
+    const month = buildTeamView(scope("f1", { kind: "thisMonth" }));
+    expect(month.states.kpis).toBe("available");
+    expect(month.states.challenges).toBe("available");
   });
 });

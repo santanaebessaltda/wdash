@@ -40,12 +40,12 @@ export function StoreDetailPage() {
     };
   }, [session.tenantId, session.stores]);
 
-  const voltar = () => navigate(paths.settings.stores);
+  const back = () => navigate(paths.settings.stores);
 
   if (showSkeleton || !store) {
     return (
       <div>
-        <DetailHeader name={store?.fantasia ?? "Filial"} onBack={voltar} />
+        <DetailHeader name={store?.tradeName ?? "Filial"} onBack={back} />
         {showSkeleton ? (
           <StoreDetailSkeleton />
         ) : (
@@ -60,7 +60,7 @@ export function StoreDetailPage() {
       key={store.id}
       store={store}
       canEdit={session.role === "OWNER" || session.role === "MANAGER" || session.role === "ADMIN_GLOBAL"}
-      onBack={voltar}
+      onBack={back}
       onSaved={() => setCatalogTick((n) => n + 1)}
     />
   );
@@ -90,7 +90,7 @@ function StoreDetailForm({
 }) {
   return (
     <div>
-      <DetailHeader name={store.fantasia} onBack={onBack} />
+      <DetailHeader name={store.tradeName} onBack={onBack} />
       <div className="flex max-w-[720px] flex-col gap-5">
         <StoreHoursCard store={store} canEdit={canEdit} onSaved={onSaved} />
       </div>

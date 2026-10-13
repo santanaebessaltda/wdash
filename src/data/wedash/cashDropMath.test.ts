@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { clampShortage, dayAmounts, depositBlock, depositBoleto, emissionDay, nextNote, parseCashDropList, reaisToCents, sumAmounts } from "./cashDropMath";
+import { clampShortage, dayAmounts, depositBlock, depositBoleto, emissionDay, nextNote, parseCashDropList, brlToCents, sumAmounts } from "./cashDropMath";
 
 describe("sangria", () => {
   it("o dia da planilha é a data de DATA_EMISSAO", () => {
     expect(emissionDay("2026-08-01T03:00:00.000Z")).toBe("2026-08-01");
-    expect(reaisToCents(-4.5)).toBe(450);
+    expect(brlToCents(-4.5)).toBe(450);
   });
 
   it("separa depósito e compra no dia", () => {
@@ -15,9 +15,9 @@ describe("sangria", () => {
     expect(day).toEqual({
       totalCents: 150450,
       boletoCents: 150000,
-      foraCents: 450,
-      faltaCents: 0,
-      motivo: "SANGRIA CANETA 4,50",
+      excludedCents: 450,
+      gapCents: 0,
+      reason: "SANGRIA CANETA 4,50",
     });
   });
 
@@ -30,8 +30,8 @@ describe("sangria", () => {
     expect(sumAmounts([dayAmounts(lines.filter((l) => l.day === "2026-08-01")), dayAmounts(lines.filter((l) => l.day === "2026-08-02"))])).toMatchObject({
       totalCents: 290450,
       boletoCents: 290000,
-      foraCents: 450,
-      faltaCents: 0,
+      excludedCents: 450,
+      gapCents: 0,
     });
     expect(depositBoleto(lines, ["2026-08-01", "2026-08-02"])).toBe(290000);
   });
@@ -42,8 +42,8 @@ describe("sangria", () => {
       { day: "2026-08-01", amountCents: 450, kind: "purchase" as const, note: "Caneta" },
     ];
     expect(clampShortage(10000, 1500)).toBe(1500);
-    expect(dayAmounts(lines, 1500)).toMatchObject({ boletoCents: 8500, foraCents: 450, faltaCents: 1500, totalCents: 10450 });
-    expect(dayAmounts(lines, 99999)).toMatchObject({ boletoCents: 0, faltaCents: 10000 });
+    expect(dayAmounts(lines, 1500)).toMatchObject({ boletoCents: 8500, excludedCents: 450, gapCents: 1500, totalCents: 10450 });
+    expect(dayAmounts(lines, 99999)).toMatchObject({ boletoCents: 0, gapCents: 10000 });
     expect(depositBoleto(lines, ["2026-08-01"], new Map([["2026-08-01", 1500]]))).toBe(8500);
   });
 
@@ -61,12 +61,12 @@ describe("sangria", () => {
   it("lê o lançamento do Millennium", () => {
     const rows = parseCashDropList({
       value: [
-        { LANCAMENTO: 13224037, DATA_EMISSAO: "2026-08-02T03:00:00.000Z", VALOR_PAGO: -4.5, N_DOCUMENTO: "AV248488", OBS: "SANGRIA CANETA 4,50" },
-        { LANCAMENTO: null },
+        { ENTRY: 13224037, DATA_ISSUEDATE: "2026-08-02T03:00:00.000Z", AMOUNT_PAGO: -4.5, N_DOCUMENTO: "AV248488", OBS: "SANGRIA CANETA 4,50" },
+        { ENTRY: null },
       ],
     });
     expect(rows).toEqual([
-      { erpLancamento: 13224037, day: "2026-08-02", amountCents: 450, document: "AV248488", note: "SANGRIA CANETA 4,50" },
+      { erpEntry: 13224037, day: "2026-08-02", amountCents: 450, document: "AV248488", note: "SANGRIA CANETA 4,50" },
     ]);
   });
 });

@@ -62,12 +62,12 @@ import {
   periodActivePresetId,
   periodDisplayLabel,
 } from "@/pages/dashboard/periodPicker";
-type TopProdSort = "name" | "itens" | "faturamento" | "lucro" | "variacao";
+type TopProdSort = "name" | "items" | "revenue" | "profit" | "variation";
 
 /** Ouro / prata / bronze  -  mesmo padrao do Sales leaderboard (Vela). */
 const RANK_MEDAL = ["#f7b84e", "#c7cdd6", "#d99a5c"];
 
-const IconFat = () => (
+const IconRevenue = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
   </svg>
@@ -79,7 +79,7 @@ const IconCmv = () => (
     <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" />
   </svg>
 );
-const IconVendas = () => (
+const IconSales = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
     <circle cx="9" cy="7" r="4" />
@@ -94,7 +94,7 @@ const IconTicket = () => (
   </svg>
 );
 
-const KPI_ICONS = [IconFat, IconCmv, IconVendas, IconTicket];
+const KPI_ICONS = [IconRevenue, IconCmv, IconSales, IconTicket];
 
 /** Cores fixas para as lojas no donut e barras do Ranking de Lojas. */
 const STORE_COLORS = ["var(--acc)", "var(--info)", "var(--ok)", "var(--warn)", "var(--bad)"];
@@ -114,11 +114,11 @@ const KPI_COLORS = [
  * `metrica` nomeia o que o badge compara quando o titulo do card fala de outra coisa
  * ("Faturamento total em relacao ao mes passado: R$ ...").
  */
-function BadgeVsAnterior({
+function BadgeVsPrevious({
   delta,
   metric,
 }: {
-  delta?: { value: string; positive: boolean; vs?: string; diff?: string; anterior?: string };
+  delta?: { value: string; positive: boolean; vs?: string; diff?: string; previous?: string };
   metric?: string;
 }) {
   if (!delta) return null;
@@ -170,7 +170,7 @@ export default function OverviewPage() {
     window.addEventListener("wedash:stores", onStores);
     return () => window.removeEventListener("wedash:stores", onStores);
   }, []);
-  const [topProdSort, setTopProdSort] = useState<TopProdSort>("faturamento");
+  const [topProdSort, setTopProdSort] = useState<TopProdSort>("revenue");
   const [topProdDir, setTopProdDir] = useState<SortDir>("desc");
   /** So a leitura mais recente aplica setState (evita corrida stale sobrescrever pos-FORCE). */
   const reloadGen = useRef(0);
@@ -178,7 +178,7 @@ export default function OverviewPage() {
   const reloadAggs = useCallback(async () => {
     const gen = ++reloadGen.current;
     const period = resolvePeriod(scope.period, calendarTodayIso());
-    const ant = previousPeriod(period);
+    const prev = previousPeriod(period);
     const singleDay = period.start === period.end;
     const goalDays = goalHistoryDayRange(period.start);
     const today = calendarTodayIso();
@@ -187,13 +187,13 @@ export default function OverviewPage() {
     const goalsP = fetchGoals({ tenantId: session.tenantId, storeIds: goalStoreIds, from: period.start, to: period.end });
     // Atingimento da meta = do inicio de cada meta ate hoje (pode sair do periodo da tela).
     // Nivel de meta no Destaques da equipe = mesma janela, por pessoa.
-    const vazio = { days: [] as SalesDayAgg[], sellers: [] as SalesSellerDayAgg[], team: [] as GoalTeamMember[] };
+    const empty = { days: [] as SalesDayAgg[], sellers: [] as SalesSellerDayAgg[], team: [] as GoalTeamMember[] };
     const goalDataP = goalsP.then(async (gs) => {
-      if (gs.length === 0) return vazio;
+      if (gs.length === 0) return empty;
       const from = gs.reduce((m, g) => (g.startsOn < m ? g.startsOn : m), gs[0]!.startsOn);
       const end = gs.reduce((m, g) => (g.endsOn > m ? g.endsOn : m), gs[0]!.endsOn);
       const to = end < today ? end : today;
-      if (from > to) return vazio;
+      if (from > to) return empty;
       const storeIds = [...new Set(gs.map((g) => g.storeId))];
       const [days, sellers, team] = await Promise.all([
         fetchSalesDayAggs({ tenantId: session.tenantId, storeIds, from, to, brand: "ALL" }),
@@ -247,7 +247,7 @@ export default function OverviewPage() {
         fetchSalesProductDayAggs({
           tenantId: session.tenantId,
           storeIds: scope.storeIds,
-          from: ant.start < period.start ? ant.start : period.start,
+          from: prev.start < period.start ? prev.start : period.start,
           to: period.end,
         }),
         fetchSalesProductCostDayAggs({
@@ -276,15 +276,15 @@ export default function OverviewPage() {
         fetchSalesDayAggs({
           tenantId: session.tenantId,
           storeIds: scope.storeIds,
-          from: ant.start,
-          to: ant.end,
+          from: prev.start,
+          to: prev.end,
           brand: null,
         }),
         period.endsToday
           ? fetchSalesHourAggs({
               tenantId: session.tenantId,
               storeIds: scope.storeIds,
-              day: ant.end,
+              day: prev.end,
               brand: null,
             })
           : Promise.resolve([] as SalesHourAgg[]),
@@ -388,17 +388,17 @@ export default function OverviewPage() {
 
   // A metrica escolhe quais entram (sempre os maiores); a direcao so reordena esses.
   // "Produto" (nome) reordena o Top por faturamento.
-  const topProdutosOrdenados = useMemo(() => {
-    type P = (typeof view.topProdutos)[number];
+  const topProductsOrdenados = useMemo(() => {
+    type P = (typeof view.topProducts)[number];
     const metric = (p: P) =>
-      topProdSort === "itens"
-        ? (p.itens ?? 0)
-        : topProdSort === "lucro"
-          ? (p.lucro ?? -Infinity)
-          : topProdSort === "variacao"
+      topProdSort === "items"
+        ? (p.items ?? 0)
+        : topProdSort === "profit"
+          ? (p.profit ?? -Infinity)
+          : topProdSort === "variation"
             ? (p.trend ?? -Infinity)
             : p.amount;
-    const top = [...view.topProdutos]
+    const top = [...view.topProducts]
       .sort((a, b) => metric(b) - metric(a) || b.amount - a.amount)
       .slice(0, TOP_CARD_SIZE);
     if (topProdSort === "name") {
@@ -406,7 +406,7 @@ export default function OverviewPage() {
       return top.sort((a, b) => a.name.localeCompare(b.name, "pt-BR") * dir);
     }
     return topProdDir === "asc" ? top.reverse() : top;
-  }, [view.topProdutos, topProdSort, topProdDir]);
+  }, [view.topProducts, topProdSort, topProdDir]);
 
   function toggleTopProdSort(key: TopProdSort) {
     if (topProdSort === key) {
@@ -423,14 +423,14 @@ export default function OverviewPage() {
   const monthFill = useMonthFill();
   const deepHistoryFill = useDeepHistoryFill();
   const printing = usePrintMode();
-  const exportar = useExportPdf("Visão geral");
+  const exportValue = useExportPdf("Visão geral");
   const firstSteps = useFirstSteps(scope.storeIds);
-  const { abrir: abrirDetalhe, modal: detalheModal } = useProductDetail({ scope, tenantId: session.tenantId });
+  const { open: openDetail, modal: detailModal } = useProductDetail({ scope, tenantId: session.tenantId });
   const goalLevels = useMemo(
     () => new Map(view.topSellers.flatMap((v) => (v.key && v.goal ? [[v.key, v.goal] as const] : []))),
     [view.topSellers],
   );
-  const { abrir: abrirPessoa, modal: pessoaModal } = useTeamMemberDetail({ scope, tenantId: session.tenantId, goalLevels });
+  const { open: openPerson, modal: personModal } = useTeamMemberDetail({ scope, tenantId: session.tenantId, goalLevels });
   function onDateChange(r: DateRange, goal?: DateRangeChangeMeta) {
     setScope(applyPeriodDateChange(scope, r, goal));
   }
@@ -452,7 +452,7 @@ export default function OverviewPage() {
                 activePresetId={periodActivePresetId(scope.period)}
                 minDate={pickerMinDate(coverageFrom, monthFill)}
               />
-              <Button variant="primary" onClick={exportar}>
+              <Button variant="primary" onClick={exportValue}>
                 Exportar
               </Button>
             </div>
@@ -491,14 +491,14 @@ export default function OverviewPage() {
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.6fr]">
         {(() => {
           const goal = view.gauges.find((g) => g.name === "Meta") ?? view.gauges[0];
-          const fatAcum = view.evolucao[view.evolucao.length - 1]?.achieved ?? 0;
+          const revenueAcum = view.evolution[view.evolution.length - 1]?.achieved ?? 0;
           const pct = goal ? Math.round(goal.pct) : 0;
-          const achieved = goal?.achieved ?? fatAcum;
-          const alvo = goal?.alvo ?? 0;
-          const faltamValor = goal ? Math.max(0, goal.alvo - goal.achieved) : 0;
-          const closedGoal = view.projecaoFechamento === "Meta encerrada";
-          const projecaoValor =
-            goal && !closedGoal ? (view.projecaoFechamento?.replace(/^Projeção:\s*/i, "") ?? "—") : "—";
+          const achieved = goal?.achieved ?? revenueAcum;
+          const target = goal?.target ?? 0;
+          const missingAmount = goal ? Math.max(0, goal.target - goal.achieved) : 0;
+          const closedGoal = view.projectionClosing === "Meta encerrada";
+          const projectionAmount =
+            goal && !closedGoal ? (view.projectionClosing?.replace(/^Projeção:\s*/i, "") ?? "—") : "—";
           if (!goal) {
             return (
               <Card className="flex flex-col">
@@ -535,19 +535,19 @@ export default function OverviewPage() {
                 <div className="flex justify-between">
                   <span className="text-[12.5px] text-t2">Meta</span>
                   <span className={`text-[13px] font-bold ${goal && pct < 100 ? "text-warn" : goal ? "text-ok" : "text-t2"}`}>
-                    {goal ? brlCent(alvo) : "—"}
+                    {goal ? brlCent(target) : "—"}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[12.5px] text-t2">Faltam</span>
-                  <span className={`text-[13px] font-bold ${goal && faltamValor > 0 ? "text-warn" : goal ? "text-ok" : "text-t2"}`}>
-                    {!goal ? "—" : faltamValor <= 0 ? "Meta atingida" : brlCent(faltamValor)}
+                  <span className={`text-[13px] font-bold ${goal && missingAmount > 0 ? "text-warn" : goal ? "text-ok" : "text-t2"}`}>
+                    {!goal ? "—" : missingAmount <= 0 ? "Meta atingida" : brlCent(missingAmount)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[12.5px] text-t2">Projeção</span>
                   <span className="text-right">
-                    <span className={`block text-[13px] font-bold ${goal && !closedGoal ? "text-t0" : "text-t2"}`}>{projecaoValor}</span>
+                    <span className={`block text-[13px] font-bold ${goal && !closedGoal ? "text-t0" : "text-t2"}`}>{projectionAmount}</span>
                     {closedGoal && <span className="block text-[11px] font-semibold text-t2">Meta encerrada</span>}
                   </span>
                 </div>
@@ -568,7 +568,7 @@ export default function OverviewPage() {
                 </Tooltip>
               </div>
               {view.gauges.length > 0 &&
-                (view.evolucao[view.evolucao.length - 1]?.achieved ?? 0) + (view.evolucao[view.evolucao.length - 1]?.goal ?? 0) > 0 && (
+                (view.evolution[view.evolution.length - 1]?.achieved ?? 0) + (view.evolution[view.evolution.length - 1]?.goal ?? 0) > 0 && (
               <>
               <p className="mt-0.5 text-[11px] font-semibold text-t2">{view.seriesLabel}</p>
               <div className="mt-2.5 flex flex-wrap gap-5">
@@ -577,7 +577,7 @@ export default function OverviewPage() {
                     <span className="h-2.5 w-2.5 rounded-[3px] bg-[var(--ok)]" />Realizado
                   </span>
                   <p className="mt-0.5 font-mono text-base font-extrabold text-t0">
-                    {brlCent(view.evolucao[view.evolucao.length - 1]?.achieved ?? 0)}
+                    {brlCent(view.evolution[view.evolution.length - 1]?.achieved ?? 0)}
                   </p>
                 </div>
                 <div>
@@ -585,14 +585,14 @@ export default function OverviewPage() {
                     <span className="h-2.5 w-2.5 rounded-[3px] bg-[var(--warn)]" />Meta
                   </span>
                   <p className="mt-0.5 font-mono text-base font-extrabold text-t0">
-                    {brlCent(view.evolucao[view.evolucao.length - 1]?.goal ?? 0)}
+                    {brlCent(view.evolution[view.evolution.length - 1]?.goal ?? 0)}
                   </p>
                 </div>
               </div>
               </>
               )}
             </div>
-            {view.gauges.length > 0 && <BadgeVsAnterior delta={view.revenueDelta} />}
+            {view.gauges.length > 0 && <BadgeVsPrevious delta={view.revenueDelta} />}
           </div>
           {(() => {
             if (view.gauges.length === 0) {
@@ -610,25 +610,25 @@ export default function OverviewPage() {
               );
             }
             // evolucao vem acumulada; o grafico mostra o valor de cada hora/dia/mes.
-            const serie = view.evolucao
+            const series = view.evolution
               .map((e, i) => {
-                const prev = view.evolucao[i - 1];
+                const prev = view.evolution[i - 1];
                 return {
                   ...e,
                   achieved: e.achieved - (prev?.achieved ?? 0),
                   goal: e.goal - (prev?.goal ?? 0),
                 };
               })
-              .filter((e) => !e.ancora);
-            if (serie.every((e) => e.achieved === 0 && e.goal === 0)) {
+              .filter((e) => !e.anchor);
+            if (series.every((e) => e.achieved === 0 && e.goal === 0)) {
               return <EmptyBlock />;
             }
             return (
               <AreaLineChart
-                data={serie.map((e) => (e.futuro ? null : e.achieved))}
-                compareData={serie.map((e) => e.goal)}
-                labels={serie.map((e) => e.label)}
-                tooltipLabels={serie.map((e) => e.band)}
+                data={series.map((e) => (e.future ? null : e.achieved))}
+                compareData={series.map((e) => e.goal)}
+                labels={series.map((e) => e.label)}
+                tooltipLabels={series.map((e) => e.band)}
                 color="var(--ok)"
                 compareColor="var(--warn)"
                 formatValue={brlCent}
@@ -640,7 +640,7 @@ export default function OverviewPage() {
       </div>
 
       {/* Linha: Categoria vs Meta + Dia da Semana vs Meta (Dia some em periodo de 1 dia) */}
-      <div className={`mt-4 grid grid-cols-1 gap-4 ${view.diaVsMeta.length > 0 ? "lg:grid-cols-2" : ""}`}>
+      <div className={`mt-4 grid grid-cols-1 gap-4 ${view.dayVsMeta.length > 0 ? "lg:grid-cols-2" : ""}`}>
         <Card padding="lg" className="flex flex-col">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -653,7 +653,7 @@ export default function OverviewPage() {
                 </Tooltip>
               </div>
             </div>
-            <BadgeVsAnterior delta={view.revenueDelta} metric="Faturamento total" />
+            <BadgeVsPrevious delta={view.revenueDelta} metric="Faturamento total" />
           </div>
           {view.categoryVsGoal.filter((c) => c.achieved > 0).length === 0 ? (
             <EmptyBlock />
@@ -662,17 +662,17 @@ export default function OverviewPage() {
               data={view.categoryVsGoal
                 .filter((c) => c.achieved > 0)
                 .map((c) => ({
-                  label: c.categoria,
+                  label: c.category,
                   value: c.achieved,
                 }))}
               height={220}
               color="var(--acc)"
               formatValue={brlCent}
-              onSelect={(d) => abrirDetalhe({ kind: "categoria", name: d.label })}
+              onSelect={(d) => openDetail({ kind: "category", name: d.label })}
             />
           )}
         </Card>
-        {view.diaVsMeta.length > 0 && (
+        {view.dayVsMeta.length > 0 && (
           <Card padding="lg" className="flex flex-col">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -684,14 +684,14 @@ export default function OverviewPage() {
                     </span>
                   </Tooltip>
                 </div>
-                {!view.diaVsMeta.every((d) => d.achieved === 0 && d.goal === 0) && (
+                {!view.dayVsMeta.every((d) => d.achieved === 0 && d.goal === 0) && (
                 <div className="mt-2.5 flex flex-wrap gap-5">
                   <div>
                     <span className="flex items-center gap-1.5 text-xs font-semibold text-t1">
                       <span className="h-2.5 w-2.5 rounded-[3px] bg-[var(--info)]" />Realizado
                     </span>
                     <p className="mt-0.5 font-mono text-base font-extrabold text-t0">
-                      {brlCent(view.diaVsMeta.reduce((s, d) => s + d.achieved, 0))}
+                      {brlCent(view.dayVsMeta.reduce((s, d) => s + d.achieved, 0))}
                     </p>
                   </div>
                   <div>
@@ -703,20 +703,20 @@ export default function OverviewPage() {
                       Meta
                     </span>
                     <p className="mt-0.5 font-mono text-base font-extrabold text-t0">
-                      {brlCent(view.diaVsMeta.reduce((s, d) => s + d.goal, 0))}
+                      {brlCent(view.dayVsMeta.reduce((s, d) => s + d.goal, 0))}
                     </p>
                   </div>
                 </div>
                 )}
               </div>
-              <BadgeVsAnterior delta={view.revenueDelta} metric="Faturamento total" />
+              <BadgeVsPrevious delta={view.revenueDelta} metric="Faturamento total" />
             </div>
-            {view.diaVsMeta.every((d) => d.achieved === 0 && d.goal === 0) ? (
+            {view.dayVsMeta.every((d) => d.achieved === 0 && d.goal === 0) ? (
               <EmptyBlock />
             ) : (
             <BarChart
-              data={view.diaVsMeta.map((d) => ({
-                label: d.dia,
+              data={view.dayVsMeta.map((d) => ({
+                label: d.day,
                 value: d.achieved,
                 goal: d.goal > 0 ? d.goal : undefined,
               }))}
@@ -735,9 +735,9 @@ export default function OverviewPage() {
         <Card className="flex flex-col">
           <CardHeader className="items-center">
             <CardTitle>Ranking de filiais</CardTitle>
-            {scope.storeIds.length === 1 && view.storesRanking.length > 0 && (view.rankingRedeTotal ?? 0) > 0 && (
+            {scope.storeIds.length === 1 && view.storesRanking.length > 0 && (view.rankingNetworkTotal ?? 0) > 0 && (
               <Badge variant="accent">
-                Rede: {brlCent(view.rankingRedeTotal ?? 0)}
+                Rede: {brlCent(view.rankingNetworkTotal ?? 0)}
               </Badge>
             )}
           </CardHeader>
@@ -745,17 +745,17 @@ export default function OverviewPage() {
             <EmptyBlock />
           ) : (
             (() => {
-              const totalRede =
-                (view.rankingRedeTotal ?? view.storesRanking.reduce((s, l) => s + l.amount, 0)) || 1;
+              const totalNetwork =
+                (view.rankingNetworkTotal ?? view.storesRanking.reduce((s, l) => s + l.amount, 0)) || 1;
               const singleStore = scope.storeIds.length === 1;
               const storeAmount = view.storesRanking[0]?.amount ?? 0;
-              const valorDemais = singleStore ? Math.max(0, totalRede - storeAmount) : 0;
+              const amountRest = singleStore ? Math.max(0, totalNetwork - storeAmount) : 0;
               // 1 loja: fatia da loja x "Demais lojas" (resto da rede)  -  mostra o peso real na rede.
-              const demais: (typeof view.storesRanking)[number] | null =
-                singleStore && valorDemais > 0
+              const rest: (typeof view.storesRanking)[number] | null =
+                singleStore && amountRest > 0
                   ? {
                       name: `Demais filiais${view.otherStoresRanking ? ` (${view.otherStoresRanking})` : ""}`,
-                      amount: valorDemais,
+                      amount: amountRest,
                     }
                   : null;
               const donutSegments = [
@@ -764,7 +764,7 @@ export default function OverviewPage() {
                   value: l.amount,
                   color: STORE_COLORS[i % STORE_COLORS.length],
                 })),
-                ...(demais ? [{ label: demais.name, value: demais.amount, color: OTHER_STORES_COLOR }] : []),
+                ...(rest ? [{ label: rest.name, value: rest.amount, color: OTHER_STORES_COLOR }] : []),
               ];
               return (
                 <>
@@ -776,23 +776,23 @@ export default function OverviewPage() {
                       centerLabel={singleStore ? "da rede" : "Total"}
                       centerValue={
                         singleStore
-                          ? `${Math.round((storeAmount / totalRede) * 100)}%`
-                          : brlCent(totalRede)
+                          ? `${Math.round((storeAmount / totalNetwork) * 100)}%`
+                          : brlCent(totalNetwork)
                       }
                     />
                   </div>
                   <div className="mt-4 flex flex-col gap-3">
-                    {[...view.storesRanking, ...(demais ? [demais] : [])].map((store, idx) => {
-                      const pctRede = Math.round(
-                        store.pctRede ?? (totalRede > 0 ? (store.amount / totalRede) * 100 : 0),
+                    {[...view.storesRanking, ...(rest ? [rest] : [])].map((store, idx) => {
+                      const pctNetwork = Math.round(
+                        store.pctNetwork ?? (totalNetwork > 0 ? (store.amount / totalNetwork) * 100 : 0),
                       );
-                      const pctBar = Math.min(100, Math.max(0, pctRede));
-                      const cor = store === demais ? OTHER_STORES_COLOR : STORE_COLORS[idx % STORE_COLORS.length];
+                      const pctBar = Math.min(100, Math.max(0, pctNetwork));
+                      const color = store === rest ? OTHER_STORES_COLOR : STORE_COLORS[idx % STORE_COLORS.length];
                       return (
                         <div key={"id" in store && store.id ? String(store.id) : `${store.name}-${idx}`} className="min-w-0 rounded-xl bg-bg-inset p-3">
                           <div className="mb-1.5 flex min-w-0 items-baseline gap-2">
                             <span className="flex min-w-0 flex-1 items-center gap-2 text-[13px] font-bold text-t0">
-                              <span className="h-2.5 w-2.5 shrink-0 rounded-[4px]" style={{ background: cor }} />
+                              <span className="h-2.5 w-2.5 shrink-0 rounded-[4px]" style={{ background: color }} />
                               <span className="min-w-0 truncate uppercase" title={store.name}>{store.name}</span>
                             </span>
                             <span className="shrink-0 font-mono text-[13px] font-extrabold tabular-nums text-t0">
@@ -800,7 +800,7 @@ export default function OverviewPage() {
                             </span>
                           </div>
                           <div className="mb-1.5 h-1.5 overflow-hidden rounded-full bg-bg-2">
-                            <div className="h-full rounded-full" style={{ width: `${pctBar}%`, background: cor }} />
+                            <div className="h-full rounded-full" style={{ width: `${pctBar}%`, background: color }} />
                           </div>
                           <span className="text-[11px] font-semibold text-t2">
                             {pctBar}% da rede
@@ -874,22 +874,22 @@ export default function OverviewPage() {
               const hasGoal = v.goal != null || v.goalPct != null;
               const pct = v.goal?.attainmentPct ?? v.goalPct ?? 0;
               const key = v.key;
-              const abrir = key ? () => abrirPessoa(key, v.name) : undefined;
+              const open = key ? () => openPerson(key, v.name) : undefined;
               return (
                 <div
                   key={v.name}
-                  role={abrir ? "button" : undefined}
-                  tabIndex={abrir ? 0 : undefined}
-                  onClick={abrir}
+                  role={open ? "button" : undefined}
+                  tabIndex={open ? 0 : undefined}
+                  onClick={open}
                   onKeyDown={(e) => {
-                    if (abrir && (e.key === "Enter" || e.key === " ")) {
+                    if (open && (e.key === "Enter" || e.key === " ")) {
                       e.preventDefault();
-                      abrir();
+                      open();
                     }
                   }}
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-2 py-1.5",
-                    abrir && "cursor-pointer transition-colors hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none",
+                    open && "cursor-pointer transition-colors hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none",
                   )}
                 >
                   <span
@@ -930,10 +930,10 @@ export default function OverviewPage() {
                       <div className="mt-2">
                         <GoalLevelSummary
                           pct={pct}
-                          nivel={v.goal.nivel}
-                          nivelNumero={v.goal.nivelNumero}
+                          level={v.goal.level}
+                          levelNumber={v.goal.levelNumber}
                           marcos={v.goal.marcos}
-                          completo={!printing}
+                          complete={!printing}
                           rolagem
                         />
                       </div>
@@ -952,7 +952,7 @@ export default function OverviewPage() {
               <Badge variant="accent">Top {TOP_CARD_SIZE}</Badge>
             </div>
           </CardHeader>
-          {topProdutosOrdenados.length === 0 ? (
+          {topProductsOrdenados.length === 0 ? (
             <EmptyBlock />
           ) : (
           <div className="overflow-x-auto">
@@ -970,67 +970,67 @@ export default function OverviewPage() {
                   />
                   <ThSort
                     label="Itens vendidos"
-                    active={topProdSort === "itens"}
+                    active={topProdSort === "items"}
                     dir={topProdDir}
-                    onClick={() => toggleTopProdSort("itens")}
+                    onClick={() => toggleTopProdSort("items")}
                     className="px-1 pb-3"
                   />
                   <ThSort
                     label="Faturamento"
-                    active={topProdSort === "faturamento"}
+                    active={topProdSort === "revenue"}
                     dir={topProdDir}
-                    onClick={() => toggleTopProdSort("faturamento")}
+                    onClick={() => toggleTopProdSort("revenue")}
                     className="px-1 pb-3"
                   />
                   <ThSort
                     label="Lucro bruto"
-                    active={topProdSort === "lucro"}
+                    active={topProdSort === "profit"}
                     dir={topProdDir}
-                    onClick={() => toggleTopProdSort("lucro")}
+                    onClick={() => toggleTopProdSort("profit")}
                     className="px-1 pb-3"
                   />
                   <ThSort
                     label="Variação"
-                    active={topProdSort === "variacao"}
+                    active={topProdSort === "variation"}
                     dir={topProdDir}
-                    onClick={() => toggleTopProdSort("variacao")}
+                    onClick={() => toggleTopProdSort("variation")}
                     className="px-1 pb-3"
                   />
                 </tr>
               </thead>
               <tbody>
-                {topProdutosOrdenados.map((p, idx) => {
-                  const chave = p.chave;
-                  const abrir = chave ? () => abrirDetalhe({ kind: "produto", chave, name: p.name }) : undefined;
+                {topProductsOrdenados.map((p, idx) => {
+                  const rowKey = p.rowKey;
+                  const open = rowKey ? () => openDetail({ kind: "product", rowKey, name: p.name }) : undefined;
                   return (
                     <tr
                       key={p.name}
-                      tabIndex={abrir ? 0 : undefined}
-                      onClick={abrir}
+                      tabIndex={open ? 0 : undefined}
+                      onClick={open}
                       onKeyDown={(e) => {
-                        if (abrir && (e.key === "Enter" || e.key === " ")) {
+                        if (open && (e.key === "Enter" || e.key === " ")) {
                           e.preventDefault();
-                          abrir();
+                          open();
                         }
                       }}
                       className={cn(
                         "border-b border-line last:border-b-0",
-                        abrir && "cursor-pointer transition-colors hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none",
+                        open && "cursor-pointer transition-colors hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none",
                       )}
                     >
                       <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
                       <td className="px-1 py-3">
-                        <ProductNameCell name={p.name} idx={idx} sub={p.categoria} upper />
+                        <ProductNameCell name={p.name} idx={idx} sub={p.category} upper />
                       </td>
-                      <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{p.itens != null ? p.itens.toLocaleString("pt-BR") : (p.sub?.replace(" itens", "") ?? "—")}</td>
+                      <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{p.items != null ? p.items.toLocaleString("pt-BR") : (p.sub?.replace(" itens", "") ?? "—")}</td>
                       <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.amount)}</td>
                       <td
                         className={cn(
                           "px-1 py-3 text-right font-mono text-[13px] font-bold",
-                          p.lucro == null ? "text-t2" : p.lucro < 0 ? "text-bad" : "text-ok",
+                          p.profit == null ? "text-t2" : p.profit < 0 ? "text-bad" : "text-ok",
                         )}
                       >
-                        {p.lucro == null ? "—" : brlCent(p.lucro)}
+                        {p.profit == null ? "—" : brlCent(p.profit)}
                       </td>
                       <td className="px-1 py-3 text-right text-xs font-bold" style={{ color: p.trend != null ? (p.trend >= 0 ? "var(--ok)" : "var(--bad)") : undefined }}>
                         {p.trend != null ? `${p.trend >= 0 ? "+" : ""}${p.trend}%` : "—"}
@@ -1047,8 +1047,8 @@ export default function OverviewPage() {
       </>
       )}
 
-      {detalheModal}
-      {pessoaModal}
+      {detailModal}
+      {personModal}
     </div>
   );
 }

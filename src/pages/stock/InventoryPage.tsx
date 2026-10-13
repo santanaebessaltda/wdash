@@ -27,12 +27,12 @@ import {
 } from "./shared";
 import { useStockData } from "./useStockData";
 
-type StatusFiltro = "todos" | StockStatus;
-type BrandFiltro = "" | "WEPINK" | "WPINK";
+type StatusFilter = "todos" | StockStatus;
+type BrandFilter = "" | "WEPINK" | "WPINK";
 type SortKey = "name" | "estoque" | "receber" | "totalGeral" | "custo" | "valor" | "status" | `local:${string}`;
 
 const STATUS_BADGE: Record<StockStatus, { label: string; variant: StatusVariant }> = {
-  negativo: { label: "Negativo", variant: "danger" },
+  negative: { label: "Negativo", variant: "danger" },
   awaiting: { label: "Aguardando transferência", variant: "warning" },
   ok: { label: "Regular", variant: "success" },
 };
@@ -42,64 +42,64 @@ function transferTip(r: StockProductRow, multipleStores: boolean): string {
   return r.storeRows
     .flatMap((l) =>
       l.transferencias.map((t) => {
-        const acao = `transferir ${qty(t.qtd)} de ${t.de} para ${t.para}.`;
-        return multipleStores ? `${l.store.fantasia}: ${acao}` : acao.charAt(0).toUpperCase() + acao.slice(1);
+        const action = `transferir ${qty(t.qty)} de ${t.from} para ${t.to}.`;
+        return multipleStores ? `${l.store.tradeName}: ${action}` : action.charAt(0).toUpperCase() + action.slice(1);
       }),
     )
     .join("\n");
 }
 
 /** Ordenar por Status: do maior para o menor = o mais grave primeiro. */
-const STATUS_PESO: Record<StockStatus, number> = { negativo: 2, awaiting: 1, ok: 0 };
+const STATUS_WEIGHT: Record<StockStatus, number> = { negative: 2, awaiting: 1, ok: 0 };
 
 export function InventoryPage() {
-  const { storeRows, storeKey, escolher, view, loading, syncing, atualizadoTexto } = useStockData();
-  const [busca, setBusca] = useState("");
-  const [statusSel, setStatus] = useState<StatusFiltro>("todos");
-  const [brand, setMarca] = useState<BrandFiltro>("");
-  const [categoria, setCategoria] = useState("");
+  const { storeRows, storeKey, escolher, view, loading, syncing, atualizadoText } = useStockData();
+  const [search, setSearch] = useState("");
+  const [statusPicked, setStatus] = useState<StatusFilter>("todos");
+  const [brand, setBrand] = useState<BrandFilter>("");
+  const [category, setCategory] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [page, setPage] = useState(1);
   const printing = usePrintMode();
   const showSkeleton = useMinSkeleton(loading);
-  const exportar = useExportPdf("Estoque", null, { period: false });
+  const exportValue = useExportPdf("Estoque", null, { period: false });
   const multipleStores = storeRows.length > 1;
-  const showBrand = storeRows.some((s) => s.temWpink);
-  const activeBrand: BrandFiltro = showBrand ? brand : "";
+  const showBrand = storeRows.some((s) => s.hasWpink);
+  const activeBrand: BrandFilter = showBrand ? brand : "";
 
-  const comStatus = useMemo(() => (view?.rows ?? []).map((r) => ({ r, status: stockStatus(r) })), [view]);
-  const contagem = (s: StockStatus) => comStatus.filter((x) => x.status === s).length;
-  const nNegativo = contagem("negativo");
-  const statusOpcoes: Array<{ value: StatusFiltro; label: string }> = [
+  const withStatus = useMemo(() => (view?.rows ?? []).map((r) => ({ r, status: stockStatus(r) })), [view]);
+  const count = (s: StockStatus) => withStatus.filter((x) => x.status === s).length;
+  const nNegative = count("negative");
+  const statusOptions: Array<{ value: StatusFilter; label: string }> = [
     { value: "todos", label: "Todos os status" },
     ...(Object.keys(STATUS_BADGE) as StockStatus[])
-      .map((s) => ({ value: s, label: `${STATUS_BADGE[s].label} (${contagem(s)})`, n: contagem(s) }))
+      .map((s) => ({ value: s, label: `${STATUS_BADGE[s].label} (${count(s)})`, n: count(s) }))
       .filter((o) => o.n > 0)
       .map(({ value, label }) => ({ value, label })),
   ];
-  const status = statusOpcoes.some((o) => o.value === statusSel) ? statusSel : "todos";
-  const categorias = view?.categorias ?? [];
+  const status = statusOptions.some((o) => o.value === statusPicked) ? statusPicked : "todos";
+  const categories = view?.categories ?? [];
 
-  const locais = useMemo(() => (view ? stockLocations(view.rows) : []), [view]);
-  const showsTotal = locais.length !== 1;
+  const locations = useMemo(() => (view ? stockLocations(view.rows) : []), [view]);
+  const showsTotal = locations.length !== 1;
 
-  const linhas = useMemo(() => {
-    const q = busca.trim().toLowerCase();
-    const out = comStatus.filter(
+  const lines = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const out = withStatus.filter(
       ({ r, status: s }) =>
         (status === "todos" || s === status) &&
-        (!activeBrand || productBrand(r.codigo) === activeBrand) &&
-        (!categoria || r.categoria === categoria) &&
-        (!q || r.name.toLowerCase().includes(q) || r.codigo.toLowerCase().includes(q)),
+        (!activeBrand || productBrand(r.code) === activeBrand) &&
+        (!category || r.category === category) &&
+        (!q || r.name.toLowerCase().includes(q) || r.code.toLowerCase().includes(q)),
     );
     const dir = sortDir === "asc" ? 1 : -1;
     const amount = ({ r, status: s }: (typeof out)[number]): number =>
-      sortKey === "status" ? STATUS_PESO[s] : sortKey.startsWith("local:") ? localQty(r, sortKey.slice(6)) : r.estoque;
+      sortKey === "status" ? STATUS_WEIGHT[s] : sortKey.startsWith("local:") ? localQty(r, sortKey.slice(6)) : r.stock;
     out.sort((a, b) => {
       if (sortKey === "name") return a.r.name.localeCompare(b.r.name, "pt-BR") * dir;
       if (sortKey === "receber" || sortKey === "totalGeral") {
-        const pick = (r: StockProductRow) => (sortKey === "receber" ? r.aReceber : r.totalGeral);
+        const pick = (r: StockProductRow) => (sortKey === "receber" ? r.aReceive : r.totalGeral);
         const av = pick(a.r);
         const bv = pick(b.r);
         if (av == null && bv == null) return a.r.name.localeCompare(b.r.name, "pt-BR");
@@ -119,13 +119,13 @@ export function InventoryPage() {
       return (amount(a) - amount(b)) * dir || a.r.name.localeCompare(b.r.name, "pt-BR");
     });
     return out;
-  }, [comStatus, busca, status, activeBrand, categoria, sortKey, sortDir]);
+  }, [withStatus, search, status, activeBrand, category, sortKey, sortDir]);
 
-  useEffect(() => setPage(1), [busca, status, activeBrand, categoria, sortKey, sortDir, storeKey]);
+  useEffect(() => setPage(1), [search, status, activeBrand, category, sortKey, sortDir, storeKey]);
 
-  const totalPages = Math.max(1, Math.ceil(linhas.length / TABLE_PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(lines.length / TABLE_PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
-  const pageRows = printing ? linhas : linhas.slice((pageSafe - 1) * TABLE_PAGE_SIZE, pageSafe * TABLE_PAGE_SIZE);
+  const pageRows = printing ? lines : lines.slice((pageSafe - 1) * TABLE_PAGE_SIZE, pageSafe * TABLE_PAGE_SIZE);
 
   const toggleSort = (k: SortKey) => {
     if (k === sortKey) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -137,27 +137,27 @@ export function InventoryPage() {
 
   const totais = useMemo(
     () => ({
-      locais: locais.map((name) => linhas.reduce((s, { r }) => s + localQty(r, name), 0)),
-      estoque: linhas.reduce((s, { r }) => s + r.estoque, 0),
-      receber: linhas.every(({ r }) => r.aReceber == null) ? null : linhas.reduce((s, { r }) => s + (r.aReceber ?? 0), 0),
-      totalGeral: linhas.every(({ r }) => r.totalGeral == null) ? null : linhas.reduce((s, { r }) => s + (r.totalGeral ?? 0), 0),
-      amount: linhas.reduce((s, { r }) => s + (stockCostAmount(r).amount ?? 0), 0),
-      temValor: linhas.some((x) => stockCostAmount(x.r).amount != null),
+      locations: locations.map((name) => lines.reduce((s, { r }) => s + localQty(r, name), 0)),
+      stock: lines.reduce((s, { r }) => s + r.stock, 0),
+      receive: lines.every(({ r }) => r.aReceive == null) ? null : lines.reduce((s, { r }) => s + (r.aReceive ?? 0), 0),
+      totalGeral: lines.every(({ r }) => r.totalGeral == null) ? null : lines.reduce((s, { r }) => s + (r.totalGeral ?? 0), 0),
+      amount: lines.reduce((s, { r }) => s + (stockCostAmount(r).amount ?? 0), 0),
+      hasAmount: lines.some((x) => stockCostAmount(x.r).amount != null),
     }),
-    [linhas, locais],
+    [lines, locations],
   );
 
-  const statusLabel = statusOpcoes.find((o) => o.value === status)?.label ?? "Todos os status";
+  const statusLabel = statusOptions.find((o) => o.value === status)?.label ?? "Todos os status";
 
   return (
     <div className="flex flex-col p-4 sm:p-6 print:p-0">
       <ReportHeader
         period={false}
-        atualizado={atualizadoTexto}
-        filtros={[
+        atualizado={atualizadoText}
+        filters={[
           ...(status !== "todos" ? [{ label: "Status", amount: statusLabel }] : []),
           ...(activeBrand ? [{ label: "Marca", amount: activeBrand }] : []),
-          ...(categoria ? [{ label: "Categoria", amount: categoria }] : []),
+          ...(category ? [{ label: "Categoria", amount: category }] : []),
         ]}
       />
       <SectionHeader
@@ -166,13 +166,13 @@ export function InventoryPage() {
         subtitle="Acompanhe o saldo de cada produto, o que está a receber e o total dos dois."
         actions={
           <HeaderFilters>
-            <HeaderSearch value={busca} onChange={setBusca} placeholder="Buscar por produto ou código…" width={240} />
-            <HeaderFilter label="Status" value={status} onChange={setStatus} options={statusOpcoes} />
+            <HeaderSearch value={search} onChange={setSearch} placeholder="Buscar por produto ou código…" width={240} />
+            <HeaderFilter label="Status" value={status} onChange={setStatus} options={statusOptions} />
             {showBrand && (
               <HeaderFilter
                 label="Marca"
                 value={brand}
-                onChange={setMarca}
+                onChange={setBrand}
                 options={[
                   { value: "", label: "Todas as marcas" },
                   { value: "WEPINK", label: "WEPINK" },
@@ -180,24 +180,24 @@ export function InventoryPage() {
                 ]}
               />
             )}
-            {categorias.length > 1 && (
+            {categories.length > 1 && (
               <HeaderFilter
                 label="Categoria"
-                value={categoria}
-                onChange={setCategoria}
-                options={[{ value: "", label: "Todas as categorias" }, ...categorias.map((c) => ({ value: c, label: c }))]}
+                value={category}
+                onChange={setCategory}
+                options={[{ value: "", label: "Todas as categorias" }, ...categories.map((c) => ({ value: c, label: c }))]}
               />
             )}
-            <ExportButton onClick={exportar} />
+            <ExportButton onClick={exportValue} />
           </HeaderFilters>
         }
         notices={
           <>
             <ErpStatusNotice dado="estoque" className="" />
-            {!escolher && !showSkeleton && view && nNegativo > 0 && (
+            {!escolher && !showSkeleton && view && nNegative > 0 && (
               <Alert
                 variant="warning"
-                title={nNegativo === 1 ? "1 produto está com estoque negativo no Millennium" : `${nNegativo} produtos estão com estoque negativo no Millennium`}
+                title={nNegative === 1 ? "1 produto está com estoque negativo no Millennium" : `${nNegative} produtos estão com estoque negativo no Millennium`}
               >
                 Confira as entradas e saídas desses produtos.
               </Alert>
@@ -215,7 +215,7 @@ export function InventoryPage() {
       ) : (
         <Card className="flex flex-col">
           <CardTitle className="mb-4">Produtos</CardTitle>
-          {linhas.length === 0 ? (
+          {lines.length === 0 ? (
             <div className="flex flex-1">
               {view.rows.length === 0 ? (
                 syncing ? (
@@ -237,10 +237,10 @@ export function InventoryPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        setBusca("");
+                        setSearch("");
                         setStatus("todos");
-                        setMarca("");
-                        setCategoria("");
+                        setBrand("");
+                        setCategory("");
                       }}
                     >
                       Limpar filtros
@@ -256,7 +256,7 @@ export function InventoryPage() {
                   <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
                     <th className="w-11 whitespace-nowrap px-1 pb-3 text-center font-bold">#</th>
                     <ThSort label="Produto" active={sortKey === "name"} dir={sortDir} onClick={() => toggleSort("name")} align="left" className="w-full px-1 pb-3" />
-                    {locais.map((name) => (
+                    {locations.map((name) => (
                       <ThSort
                         key={name}
                         label={name}
@@ -280,23 +280,23 @@ export function InventoryPage() {
                   {pageRows.map(({ r, status: s }, i) => {
                     const idx = (printing ? 0 : (pageSafe - 1) * TABLE_PAGE_SIZE) + i;
                     return (
-                      <tr key={r.codigo} className="border-b border-line">
+                      <tr key={r.code} className="border-b border-line">
                         <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
                         <td className="px-1 py-3">
-                          <ProductNameCell name={r.name} idx={idx} sub={[r.codigo, r.categoria].filter(Boolean).join(" · ")} />
+                          <ProductNameCell name={r.name} idx={idx} sub={[r.code, r.category].filter(Boolean).join(" · ")} />
                         </td>
-                        {locais.map((name) => (
+                        {locations.map((name) => (
                           <td key={name} className="whitespace-nowrap px-4 py-3 text-right">
                             <Qty v={localQty(r, name)} />
                           </td>
                         ))}
                         {showsTotal && (
                           <td className="whitespace-nowrap px-4 py-3 text-right">
-                            <Qty v={r.estoque} />
+                            <Qty v={r.stock} />
                           </td>
                         )}
                         <td className="whitespace-nowrap px-4 py-3 text-right">
-                          <Qty v={r.aReceber} />
+                          <Qty v={r.aReceive} />
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-right">
                           <Qty v={r.totalGeral} />
@@ -321,28 +321,28 @@ export function InventoryPage() {
                         <TipHelp label="Soma todos os produtos encontrados no filtro, inclusive os que não aparecem nesta página." />
                       </span>
                       <span className="mt-0.5 block text-[11px] font-semibold text-t2">
-                        {num(linhas.length)} produto{linhas.length === 1 ? "" : "s"}
+                        {num(lines.length)} produto{lines.length === 1 ? "" : "s"}
                       </span>
                     </td>
-                    {totais.locais.map((v, i) => (
-                      <td key={locais[i]} className="whitespace-nowrap px-4 py-3 text-right">
+                    {totais.locations.map((v, i) => (
+                      <td key={locations[i]} className="whitespace-nowrap px-4 py-3 text-right">
                         <Qty v={v} total />
                       </td>
                     ))}
                     {showsTotal && (
                       <td className="whitespace-nowrap px-4 py-3 text-right">
-                        <Qty v={totais.estoque} total />
+                        <Qty v={totais.stock} total />
                       </td>
                     )}
                     <td className="whitespace-nowrap px-4 py-3 text-right">
-                      <Qty v={totais.receber} total />
+                      <Qty v={totais.receive} total />
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right">
                       <Qty v={totais.totalGeral} total />
                     </td>
                     <td />
                     <td className="whitespace-nowrap py-3 pl-4 pr-8 text-right">
-                      <Money v={totais.temValor ? totais.amount : null} total />
+                      <Money v={totais.hasAmount ? totais.amount : null} total />
                     </td>
                     <td />
                   </tr>
@@ -350,7 +350,7 @@ export function InventoryPage() {
               </table>
             </div>
           )}
-          {linhas.length > 0 && <TableFooter shown={pageRows.length} total={linhas.length} page={pageSafe} totalPages={totalPages} onPage={setPage} />}
+          {lines.length > 0 && <TableFooter shown={pageRows.length} total={lines.length} page={pageSafe} totalPages={totalPages} onPage={setPage} />}
         </Card>
       )}
     </div>

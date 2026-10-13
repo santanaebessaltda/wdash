@@ -10,7 +10,7 @@ function taxFields(store: Store): CostField[] {
   return [
     pctField("icmsWepinkPct", "ICMS"),
     pctField("icmsStWepinkPct", "ICMS ST"),
-    ...(store.temWpink ? [pctField("icmsWpinkPct", "ICMS"), pctField("icmsStWpinkPct", "ICMS ST")] : []),
+    ...(store.hasWpink ? [pctField("icmsWpinkPct", "ICMS"), pctField("icmsStWpinkPct", "ICMS ST")] : []),
   ];
 }
 
@@ -21,7 +21,7 @@ function taxSections(store: Store): CostFieldSection[] {
       hint: "ICMS é calculado sobre o faturamento WEPINK. ICMS ST é calculado sobre o CMV WEPINK.",
       keys: ["icmsWepinkPct", "icmsStWepinkPct"],
     },
-    ...(store.temWpink
+    ...(store.hasWpink
       ? [
           {
             title: "WPINK",
@@ -158,13 +158,13 @@ function TaxCard({ store, onSaved }: { store: Store; onSaved: () => void }) {
   const [saving, setSaving] = useState(false);
 
   async function save() {
-    const custos = form.merged();
-    if (!custos) return show(INVALID_COSTS_MSG, "danger");
+    const costs = form.merged();
+    if (!costs) return show(INVALID_COSTS_MSG, "danger");
     setSaving(true);
-    const r = await updateStoreCosts(store.id, custos);
+    const r = await updateStoreCosts(store.id, costs);
     setSaving(false);
     if (!r.ok) return show(SAVE_ERROR_MSG, "danger");
-    form.markSaved(custos);
+    form.markSaved(costs);
     onSaved();
     show("Alterações salvas.", "success");
   }

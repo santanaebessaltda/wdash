@@ -36,7 +36,7 @@ import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { brlCent, num, deltaTip, comparedWithTip } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
-type Delta = { value: string; positive: boolean; vs?: string; diff?: string; anterior?: string };
+type Delta = { value: string; positive: boolean; vs?: string; diff?: string; previous?: string };
 
 export const TipHelp = ({ label }: { label: string }) => (
   <Tooltip label={label}>
@@ -47,7 +47,7 @@ export const TipHelp = ({ label }: { label: string }) => (
 );
 
 /** Badge de delta  -  so % no chip; base do comparativo no tooltip (igual StatCard). */
-export function BadgeVsAnterior({ delta, metric }: { delta?: Delta; metric?: string }) {
+export function BadgeVsPrevious({ delta, metric }: { delta?: Delta; metric?: string }) {
   if (!delta) return null;
   const badge = (
     <Badge variant={delta.positive ? "success" : "danger"}>
@@ -95,31 +95,31 @@ export interface ProductsDetailData {
 
 /** O que abrir no detalhe  -  por chave, para outras telas abrirem sem ter as linhas da tela Produtos. */
 export type ProductSelection =
-  | { kind: "produto"; chave: string; name: string }
-  | { kind: "linha"; name: string }
-  | { kind: "categoria"; name: string; categoriaId?: number }
-  | { kind: "classe"; classe: AbcClass };
+  | { kind: "product"; rowKey: string; name: string }
+  | { kind: "line"; name: string }
+  | { kind: "category"; name: string; categoryId?: number }
+  | { kind: "class"; productClass: AbcClass };
 
-const nomeSelecao = (s: ProductSelection) => (s.kind === "classe" ? `Classe ${s.classe}` : s.name);
+const nameSelection = (s: ProductSelection) => (s.kind === "class" ? `Classe ${s.productClass}` : s.name);
 
 function buildDetail(scope: Scope, { aggs, view }: ProductsDetailData, s: ProductSelection): ProductDetail | null {
   switch (s.kind) {
-    case "produto": {
-      const row = view.produtos.find((p) => p.chave === s.chave);
+    case "product": {
+      const row = view.products.find((p) => p.rowKey === s.rowKey);
       return row ? buildProductDetail(scope, aggs, row) : null;
     }
-    case "linha": {
-      const row = view.linhas.find((l) => l.name === s.name);
+    case "line": {
+      const row = view.lines.find((l) => l.name === s.name);
       return row ? buildProductLineDetail(scope, aggs, row) : null;
     }
-    case "categoria": {
-      const row = view.curvaAbcCategorias.itens.find((c) =>
-        s.categoriaId != null ? c.categoriaId === s.categoriaId : c.name === s.name,
+    case "category": {
+      const row = view.curveAbcCategories.items.find((c) =>
+        s.categoryId != null ? c.categoryId === s.categoryId : c.name === s.name,
       );
       return row ? buildCategoryDetail(scope, aggs, row) : null;
     }
-    case "classe":
-      return buildAbcClassDetail(scope, aggs, view, s.classe);
+    case "class":
+      return buildAbcClassDetail(scope, aggs, view, s.productClass);
   }
 }
 
@@ -135,10 +135,10 @@ export function useProductDetail({
   scope: Scope;
   data?: ProductsDetailData;
   tenantId?: string;
-}): { abrir: (s: ProductSelection) => void; modal: ReactNode } {
+}): { open: (s: ProductSelection) => void; modal: ReactNode } {
   const [pilha, setPilha] = useState<ProductSelection[]>([]);
-  const topo = pilha.at(-1) ?? null;
-  const abrir = useCallback((s: ProductSelection) => setPilha([s]), []);
+  const top = pilha.at(-1) ?? null;
+  const open = useCallback((s: ProductSelection) => setPilha([s]), []);
   const empilhar = (s: ProductSelection) => setPilha((p) => [...p, s]);
 
   useEffect(() => {
@@ -153,37 +153,37 @@ export function useProductDetail({
     return () => window.removeEventListener("wedash:stores", onStores);
   }, []);
 
-  const lazy = useLazyProductsData(scope, tenantId, !data && topo != null);
-  const fonte = data ?? lazy;
+  const lazy = useLazyProductsData(scope, tenantId, !data && top != null);
+  const source = data ?? lazy;
 
   const detail = useMemo(
-    () => (topo && fonte ? buildDetail(scope, fonte, topo) : null),
+    () => (top && source ? buildDetail(scope, source, top) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [topo, fonte, scope, storesTick],
+    [top, source, scope, storesTick],
   );
 
   const modal = (
     <ProductDetailModal
-      open={topo != null}
-      loading={topo != null && !fonte}
-      title={topo ? nomeSelecao(topo) : undefined}
+      open={top != null}
+      loading={top != null && !source}
+      title={top ? nameSelection(top) : undefined}
       detail={detail}
       period={resolvePeriod(scope.period, calendarTodayIso()).label}
       onClose={() => setPilha([])}
-      onProduto={(chave) => {
-        const row = fonte?.view.produtos.find((p) => p.chave === chave);
-        if (row) empilhar({ kind: "produto", chave, name: row.name });
+      onProduct={(rowKey) => {
+        const row = source?.view.products.find((p) => p.rowKey === rowKey);
+        if (row) empilhar({ kind: "product", rowKey, name: row.name });
       }}
-      onCategoria={(id) => {
-        const row = fonte?.view.curvaAbcCategorias.itens.find((c) => c.categoriaId === id);
-        if (row) empilhar({ kind: "categoria", categoriaId: id, name: row.name });
+      onCategory={(id) => {
+        const row = source?.view.curveAbcCategories.items.find((c) => c.categoryId === id);
+        if (row) empilhar({ kind: "category", categoryId: id, name: row.name });
       }}
-      voltarPara={pilha.length > 1 ? nomeSelecao(pilha[pilha.length - 2]) : undefined}
-      onVoltar={() => setPilha((p) => p.slice(0, -1))}
+      backTo={pilha.length > 1 ? nameSelection(pilha[pilha.length - 2]) : undefined}
+      onBack={() => setPilha((p) => p.slice(0, -1))}
     />
   );
 
-  return { abrir, modal };
+  return { open, modal };
 }
 
 /** Busca os dados de Produtos na 1 abertura; mantem ate mudar o filtro ou chegar venda nova. */
@@ -220,8 +220,8 @@ function useLazyProductsData(scope: Scope, tenantId: string | undefined, enabled
       .catch((e) => {
         console.error("Product detail load:", e);
         if (g !== gen.current) return;
-        const vazio: ProductsAggInput = { dayAggs: [] };
-        setData({ aggs: vazio, view: buildProductsView(scope, vazio) });
+        const empty: ProductsAggInput = { dayAggs: [] };
+        setData({ aggs: empty, view: buildProductsView(scope, empty) });
       });
   }, [enabled, tenantId, data, scope]);
 
@@ -230,10 +230,10 @@ function useLazyProductsData(scope: Scope, tenantId: string | undefined, enabled
 
 /* ---------- Modal ---------- */
 
-type TopSort = "name" | "itens" | "faturamento" | "lucro" | "margem";
+type TopSort = "name" | "items" | "revenue" | "profit" | "margin";
 
-const valorDoSort = (r: { itens: number; revenue: number; lucro: number | null; margemPct: number | null }, sort: TopSort) =>
-  sort === "itens" ? r.itens : sort === "lucro" ? r.lucro : sort === "margem" ? r.margemPct : r.revenue;
+const amountOfSort = (r: { items: number; revenue: number; profit: number | null; marginPct: number | null }, sort: TopSort) =>
+  sort === "items" ? r.items : sort === "profit" ? r.profit : sort === "margin" ? r.marginPct : r.revenue;
 
 function ProfitCell({ v }: { v: number | null }) {
   return (
@@ -267,7 +267,7 @@ export function MetricDetail({
       </p>
       {delta && (
         <div className="mt-1.5">
-          <BadgeVsAnterior delta={delta} />
+          <BadgeVsPrevious delta={delta} />
         </div>
       )}
     </div>
@@ -275,22 +275,22 @@ export function MetricDetail({
 }
 
 /** Mesmo padrao da tabela Top produtos (#  |  Produto  |  Itens  |  Faturamento  |  Lucro bruto  |  Margem); clique abre o produto. */
-function ProdutosDoGrupo({ produtos, onProduto }: { produtos: ProductDetailItem[]; onProduto: (chave: string) => void }) {
-  const [sort, setSort] = useState<TopSort>("faturamento");
+function ProductsOfGroup({ products, onProduct }: { products: ProductDetailItem[]; onProduct: (rowKey: string) => void }) {
+  const [sort, setSort] = useState<TopSort>("revenue");
   const [dir, setDir] = useState<SortDir>("desc");
-  const linhas = useMemo(() => {
+  const lines = useMemo(() => {
     const d = dir === "asc" ? 1 : -1;
-    return [...produtos].sort((a, b) => {
+    return [...products].sort((a, b) => {
       if (sort === "name") return a.name.localeCompare(b.name, "pt-BR") * d;
-      const va = valorDoSort(a, sort);
-      const vb = valorDoSort(b, sort);
+      const va = amountOfSort(a, sort);
+      const vb = amountOfSort(b, sort);
       if (va == null && vb == null) return b.revenue - a.revenue;
       if (va == null) return 1;
       if (vb == null) return -1;
       return (va - vb) * d || b.revenue - a.revenue;
     });
-  }, [produtos, sort, dir]);
-  const alternar = (k: TopSort) => {
+  }, [products, sort, dir]);
+  const toggle = (k: TopSort) => {
     if (sort === k) setDir((x) => (x === "asc" ? "desc" : "asc"));
     else {
       setSort(k);
@@ -303,36 +303,36 @@ function ProdutosDoGrupo({ produtos, onProduto }: { produtos: ProductDetailItem[
         <thead>
           <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
             <th className="px-1 pb-3 text-left font-bold">#</th>
-            <ThSort label="Produto" active={sort === "name"} dir={dir} onClick={() => alternar("name")} align="left" className="px-1 pb-3" />
-            <ThSort label="Itens vendidos" active={sort === "itens"} dir={dir} onClick={() => alternar("itens")} className="px-1 pb-3" />
-            <ThSort label="Faturamento" active={sort === "faturamento"} dir={dir} onClick={() => alternar("faturamento")} className="px-1 pb-3" />
-            <ThSort label="Lucro bruto" active={sort === "lucro"} dir={dir} onClick={() => alternar("lucro")} className="px-1 pb-3" />
-            <ThSort label="Margem" active={sort === "margem"} dir={dir} onClick={() => alternar("margem")} className="px-1 pb-3" />
+            <ThSort label="Produto" active={sort === "name"} dir={dir} onClick={() => toggle("name")} align="left" className="px-1 pb-3" />
+            <ThSort label="Itens vendidos" active={sort === "items"} dir={dir} onClick={() => toggle("items")} className="px-1 pb-3" />
+            <ThSort label="Faturamento" active={sort === "revenue"} dir={dir} onClick={() => toggle("revenue")} className="px-1 pb-3" />
+            <ThSort label="Lucro bruto" active={sort === "profit"} dir={dir} onClick={() => toggle("profit")} className="px-1 pb-3" />
+            <ThSort label="Margem" active={sort === "margin"} dir={dir} onClick={() => toggle("margin")} className="px-1 pb-3" />
           </tr>
         </thead>
         <tbody>
-          {linhas.map((p, idx) => (
+          {lines.map((p, idx) => (
             <tr
-              key={p.chave}
+              key={p.rowKey}
               tabIndex={0}
-              onClick={() => onProduto(p.chave)}
+              onClick={() => onProduct(p.rowKey)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  onProduto(p.chave);
+                  onProduct(p.rowKey);
                 }
               }}
               className="cursor-pointer border-b border-line transition-colors last:border-b-0 hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none"
             >
               <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
               <td className="px-1 py-3">
-                <ProductNameCell name={p.name} idx={idx} sub={p.codigo} />
+                <ProductNameCell name={p.name} idx={idx} sub={p.code} />
               </td>
-              <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(p.itens)}</td>
+              <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(p.items)}</td>
               <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.revenue)}</td>
-              <ProfitCell v={p.lucro} />
-              <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", p.margemPct == null ? "text-t2" : "text-ok")}>
-                {pctFmt(p.margemPct)}
+              <ProfitCell v={p.profit} />
+              <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", p.marginPct == null ? "text-t2" : "text-ok")}>
+                {pctFmt(p.marginPct)}
               </td>
             </tr>
           ))}
@@ -343,28 +343,28 @@ function ProdutosDoGrupo({ produtos, onProduto }: { produtos: ProductDetailItem[
 }
 
 /** Categorias de uma classe da Curva ABC  -  padrao da tabela Top produtos; clique abre a categoria. */
-function CategoriasDaClasse({
-  categorias,
-  onCategoria,
+function CategoriesOfClass({
+  categories,
+  onCategory,
 }: {
-  categorias: ProductDetailCategory[];
-  onCategoria: (categoriaId: number) => void;
+  categories: ProductDetailCategory[];
+  onCategory: (categoryId: number) => void;
 }) {
-  const [sort, setSort] = useState<TopSort>("faturamento");
+  const [sort, setSort] = useState<TopSort>("revenue");
   const [dir, setDir] = useState<SortDir>("desc");
-  const linhas = useMemo(() => {
+  const lines = useMemo(() => {
     const d = dir === "asc" ? 1 : -1;
-    return [...categorias].sort((a, b) => {
+    return [...categories].sort((a, b) => {
       if (sort === "name") return a.name.localeCompare(b.name, "pt-BR") * d;
-      const va = valorDoSort(a, sort);
-      const vb = valorDoSort(b, sort);
+      const va = amountOfSort(a, sort);
+      const vb = amountOfSort(b, sort);
       if (va == null && vb == null) return b.revenue - a.revenue;
       if (va == null) return 1;
       if (vb == null) return -1;
       return (va - vb) * d || b.revenue - a.revenue;
     });
-  }, [categorias, sort, dir]);
-  const alternar = (k: TopSort) => {
+  }, [categories, sort, dir]);
+  const toggle = (k: TopSort) => {
     if (sort === k) setDir((x) => (x === "asc" ? "desc" : "asc"));
     else {
       setSort(k);
@@ -377,11 +377,11 @@ function CategoriasDaClasse({
         <thead>
           <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
             <th className="px-1 pb-3 text-left font-bold">#</th>
-            <ThSort label="Categoria" active={sort === "name"} dir={dir} onClick={() => alternar("name")} align="left" className="px-1 pb-3" />
-            <ThSort label="Itens vendidos" active={sort === "itens"} dir={dir} onClick={() => alternar("itens")} className="px-1 pb-3" />
-            <ThSort label="Faturamento" active={sort === "faturamento"} dir={dir} onClick={() => alternar("faturamento")} className="px-1 pb-3" />
-            <ThSort label="Lucro bruto" active={sort === "lucro"} dir={dir} onClick={() => alternar("lucro")} className="px-1 pb-3" />
-            <ThSort label="Margem" active={sort === "margem"} dir={dir} onClick={() => alternar("margem")} className="px-1 pb-3" />
+            <ThSort label="Categoria" active={sort === "name"} dir={dir} onClick={() => toggle("name")} align="left" className="px-1 pb-3" />
+            <ThSort label="Itens vendidos" active={sort === "items"} dir={dir} onClick={() => toggle("items")} className="px-1 pb-3" />
+            <ThSort label="Faturamento" active={sort === "revenue"} dir={dir} onClick={() => toggle("revenue")} className="px-1 pb-3" />
+            <ThSort label="Lucro bruto" active={sort === "profit"} dir={dir} onClick={() => toggle("profit")} className="px-1 pb-3" />
+            <ThSort label="Margem" active={sort === "margin"} dir={dir} onClick={() => toggle("margin")} className="px-1 pb-3" />
             <th className="px-1 pb-3 text-right font-bold">
               <span className="inline-flex items-center gap-1">
                 Participação
@@ -391,15 +391,15 @@ function CategoriasDaClasse({
           </tr>
         </thead>
         <tbody>
-          {linhas.map((c, idx) => (
+          {lines.map((c, idx) => (
             <tr
-              key={c.categoriaId}
+              key={c.categoryId}
               tabIndex={0}
-              onClick={() => onCategoria(c.categoriaId)}
+              onClick={() => onCategory(c.categoryId)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  onCategoria(c.categoriaId);
+                  onCategory(c.categoryId);
                 }
               }}
               className="cursor-pointer border-b border-line transition-colors last:border-b-0 hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none"
@@ -408,15 +408,15 @@ function CategoriasDaClasse({
               <td className="px-1 py-3">
                 <ProductNameCell name={c.name} idx={idx} />
               </td>
-              <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(c.itens)}</td>
+              <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(c.items)}</td>
               <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(c.revenue)}</td>
-              <ProfitCell v={c.lucro} />
-              <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", c.margemPct == null ? "text-t2" : "text-ok")}>
-                {pctFmt(c.margemPct)}
+              <ProfitCell v={c.profit} />
+              <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", c.marginPct == null ? "text-t2" : "text-ok")}>
+                {pctFmt(c.marginPct)}
               </td>
               <td className="px-1 py-3 text-right">
                 <p className="font-mono text-[13px] font-bold text-t0">{pctFmt(c.pct)}</p>
-                <p className="text-[11px] text-t2">acum. {pctFmt(c.pctAcumulado)}</p>
+                <p className="text-[11px] text-t2">acum. {pctFmt(c.pctAccumulated)}</p>
               </td>
             </tr>
           ))}
@@ -426,7 +426,7 @@ function CategoriasDaClasse({
   );
 }
 
-export function DetalheSkeleton() {
+export function DetailSkeleton() {
   return (
     <div className="flex flex-col gap-5">
       <Skeleton className="h-3.5 w-48" />
@@ -447,10 +447,10 @@ function ProductDetailModal({
   detail,
   period,
   onClose,
-  onProduto,
-  onCategoria,
-  voltarPara,
-  onVoltar,
+  onProduct,
+  onCategory,
+  backTo,
+  onBack,
 }: {
   open: boolean;
   loading: boolean;
@@ -458,31 +458,31 @@ function ProductDetailModal({
   detail: ProductDetail | null;
   period: string;
   onClose: () => void;
-  onProduto: (chave: string) => void;
-  onCategoria: (categoriaId: number) => void;
+  onProduct: (rowKey: string) => void;
+  onCategory: (categoryId: number) => void;
   /** Nome do detalhe anterior (aberto a partir dele). */
-  voltarPara?: string;
-  onVoltar: () => void;
+  backTo?: string;
+  onBack: () => void;
 }) {
-  const cmp = detail?.comparativo;
-  const kind = detail?.kind ?? "produto";
-  const artigo = { produto: "do produto", linha: "da linha", categoria: "da categoria", classe: "da classe" }[kind];
+  const cmp = detail?.comparison;
+  const kind = detail?.kind ?? "product";
+  const article = { product: "do produto", line: "da linha", category: "da categoria", class: "da classe" }[kind];
   const plural = (n: number, s: string) => `${n} ${s}${n === 1 ? "" : "s"}`;
   const subtitle = !detail
     ? ""
-    : kind === "linha"
-      ? ["Linha de produto", plural(detail.produtos.length, "produto"), period].join(" · ")
-      : kind === "categoria"
-        ? ["Categoria", detail.classe ? `Classe ${detail.classe}` : "", plural(detail.produtos.length, "produto"), period]
+    : kind === "line"
+      ? ["Linha de produto", plural(detail.products.length, "produto"), period].join(" · ")
+      : kind === "category"
+        ? ["Categoria", detail.productClass ? `Classe ${detail.productClass}` : "", plural(detail.products.length, "produto"), period]
             .filter(Boolean)
             .join(" · ")
-        : kind === "classe"
-          ? ["Curva ABC", plural(detail.categorias.length, "categoria"), period].join(" · ")
-          : [detail.codigo, period].filter(Boolean).join(" · ");
+        : kind === "class"
+          ? ["Curva ABC", plural(detail.categories.length, "category"), period].join(" · ")
+          : [detail.code, period].filter(Boolean).join(" · ");
   return (
     <Modal open={open} onClose={onClose} title={detail?.name ?? title} size="lg">
       {loading ? (
-        <DetalheSkeleton />
+        <DetailSkeleton />
       ) : !detail ? (
         <div className="flex min-h-[220px] flex-col">
           <EmptyBlock />
@@ -490,9 +490,9 @@ function ProductDetailModal({
       ) : (
         <div className="flex flex-col gap-5">
           <div className="-mt-1">
-            {voltarPara && (
-              <button type="button" onClick={onVoltar} className="mb-1.5 text-[12px] font-semibold text-acc hover:underline">
-                ← Voltar para {voltarPara}
+            {backTo && (
+              <button type="button" onClick={onBack} className="mb-1.5 text-[12px] font-semibold text-acc hover:underline">
+                ← Voltar para {backTo}
               </button>
             )}
             <p className="text-[12px] font-semibold text-t2">{subtitle}</p>
@@ -501,34 +501,34 @@ function ProductDetailModal({
           <div>
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
               <MetricDetail label="Faturamento" amount={brlCent(detail.revenue)} delta={cmp?.revenue} />
-              <MetricDetail label="Itens vendidos" amount={num(detail.itens)} delta={cmp?.itens} />
-              <MetricDetail label="Preço médio" amount={brlCent(detail.precoMedio)} />
+              <MetricDetail label="Itens vendidos" amount={num(detail.items)} delta={cmp?.items} />
+              <MetricDetail label="Preço médio" amount={brlCent(detail.priceAverage)} />
               <MetricDetail
                 label="Participação"
-                amount={pctFmt(detail.participacaoPct)}
-                tip={`Participação ${artigo} no faturamento de todos os produtos do período.`}
+                amount={pctFmt(detail.participationPct)}
+                tip={`Participação ${article} no faturamento de todos os produtos do período.`}
               />
               <MetricDetail label="CMV" amount={moneyOrDash(detail.cmv)} />
-              <MetricDetail label="Lucro bruto" amount={moneyOrDash(detail.lucro)} destaque />
-              <MetricDetail label="Margem" amount={pctFmt(detail.margemPct)} delta={cmp?.margem} />
+              <MetricDetail label="Lucro bruto" amount={moneyOrDash(detail.profit)} destaque />
+              <MetricDetail label="Margem" amount={pctFmt(detail.marginPct)} delta={cmp?.margin} />
             </div>
             <p className="mt-2.5 text-[11.5px] text-t2">
               {cmp
                 ? `Variação ${comparedWithTip(cmp.vs).replace(/^Em/, "em")}`
-                : `Sem vendas ${artigo} no período anterior para comparar.`}
+                : `Sem vendas ${article} no período anterior para comparar.`}
               {detail.cmv == null && " CMV, lucro e margem ficam indisponíveis quando faltam dados de custo no período."}
             </p>
           </div>
 
-          {detail.serie && (
+          {detail.series && (
             <section>
               <h4 className="mb-2 text-[13px] font-bold text-t0">
                 Faturamento {detail.seriesGranularity === "month" ? "por mês" : "por dia"}
               </h4>
               <AreaLineChart
-                data={detail.serie.map((d) => d.revenue)}
-                labels={detail.serie.map((d) => d.label)}
-                tooltipLabels={detail.serie.map((d) => d.detail ?? d.label)}
+                data={detail.series.map((d) => d.revenue)}
+                labels={detail.series.map((d) => d.label)}
+                tooltipLabels={detail.series.map((d) => d.detail ?? d.label)}
                 formatValue={brlCent}
                 height={200}
                 showAxisLabels
@@ -536,18 +536,18 @@ function ProductDetailModal({
             </section>
           )}
 
-          {(kind === "linha" || kind === "categoria") && detail.produtos.length > 0 && (
+          {(kind === "line" || kind === "category") && detail.products.length > 0 && (
             <section>
-              <h4 className="text-[13px] font-bold text-t0">Produtos {artigo}</h4>
-              {detail.tipos.length > 0 && <p className="mt-0.5 text-[11.5px] text-t2">{detail.tipos.join(" · ")}</p>}
-              <ProdutosDoGrupo key={`${kind}-${detail.chave}`} produtos={detail.produtos} onProduto={onProduto} />
+              <h4 className="text-[13px] font-bold text-t0">Produtos {article}</h4>
+              {detail.kinds.length > 0 && <p className="mt-0.5 text-[11.5px] text-t2">{detail.kinds.join(" · ")}</p>}
+              <ProductsOfGroup key={`${kind}-${detail.rowKey}`} products={detail.products} onProduct={onProduct} />
             </section>
           )}
 
-          {kind === "classe" && detail.categorias.length > 0 && (
+          {kind === "class" && detail.categories.length > 0 && (
             <section>
               <h4 className="text-[13px] font-bold text-t0">Categorias da classe</h4>
-              <CategoriasDaClasse key={detail.chave} categorias={detail.categorias} onCategoria={onCategoria} />
+              <CategoriesOfClass key={detail.rowKey} categories={detail.categories} onCategory={onCategory} />
             </section>
           )}
 
@@ -560,7 +560,7 @@ function ProductDetailModal({
                     <div className="mb-1.5 flex items-baseline gap-2">
                       <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-t1">{l.name}</span>
                       <span className="shrink-0 text-[11.5px] text-t2">
-                        {num(l.itens)} ite{l.itens === 1 ? "m" : "ns"}
+                        {num(l.items)} ite{l.items === 1 ? "m" : "ns"}
                       </span>
                       <span className="shrink-0 font-mono text-[12.5px] font-bold text-t0">{brlCent(l.revenue)}</span>
                       <span className="min-w-[40px] shrink-0 text-right text-[11.5px] font-semibold text-t2">{pctFmt(l.pct, 0)}</span>

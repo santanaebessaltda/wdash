@@ -5,7 +5,7 @@ import {
   buildTeamMemberDetail,
   productsFetchRange,
   resolvePeriod,
-  TEAM_SEM_TURNO,
+  TEAM_WITHOUT_SHIFT,
   type Scope,
   type TeamAggInput,
   type TeamMemberDetail,
@@ -14,7 +14,7 @@ import { fetchSalesDayAggs, fetchSalesSellerDayAggs, fetchSellerShifts } from "@
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
-import { DetalheSkeleton, MetricDetail, pctFmt } from "@/pages/dashboard/ProductDetail";
+import { DetailSkeleton, MetricDetail, pctFmt } from "@/pages/dashboard/ProductDetail";
 import { brlCent, shortDate, num, comparedWithTip } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { GOAL_STATUS_LABEL, type SellerGoalLevel } from "@/data/wedash/goalView";
@@ -33,7 +33,7 @@ export async function fetchTeamAggInput(tenantId: string, scope: Scope): Promise
   return { dayAggs, sellerDayAggs, sellerShifts };
 }
 
-type Selecao = { key: string; name: string };
+type Selection = { key: string; name: string };
 
 /**
  * Detalhe de uma pessoa da equipe.
@@ -45,20 +45,20 @@ export function useTeamMemberDetail({
   scope,
   data,
   tenantId,
-  turno,
+  shift,
   goalLevels,
 }: {
   scope: Scope;
   data?: TeamAggInput;
   tenantId?: string;
-  turno?: string | null;
+  shift?: string | null;
   goalLevels?: Map<string, SellerGoalLevel>;
-}): { abrir: (key: string, name: string) => void; modal: ReactNode } {
-  const [sel, setSel] = useState<Selecao | null>(null);
-  const abrir = useCallback((key: string, name: string) => setSel({ key, name }), []);
+}): { open: (key: string, name: string) => void; modal: ReactNode } {
+  const [picked, setPicked] = useState<Selection | null>(null);
+  const open = useCallback((key: string, name: string) => setPicked({ key, name }), []);
 
   useEffect(() => {
-    setSel(null);
+    setPicked(null);
   }, [scope]);
 
   const [storesTick, setStoresTick] = useState(0);
@@ -68,28 +68,28 @@ export function useTeamMemberDetail({
     return () => window.removeEventListener("wedash:stores", onStores);
   }, []);
 
-  const lazy = useLazyTeamData(scope, tenantId, !data && sel != null);
-  const fonte = data ?? lazy;
+  const lazy = useLazyTeamData(scope, tenantId, !data && picked != null);
+  const source = data ?? lazy;
 
   const detail = useMemo(
-    () => (sel && fonte ? buildTeamMemberDetail(scope, fonte, sel.key, { turno }) : null),
+    () => (picked && source ? buildTeamMemberDetail(scope, source, picked.key, { shift }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sel, fonte, scope, turno, storesTick],
+    [picked, source, scope, shift, storesTick],
   );
 
   const modal = (
     <TeamMemberDetailModal
-      open={sel != null}
-      loading={sel != null && !fonte}
-      title={sel?.name}
+      open={picked != null}
+      loading={picked != null && !source}
+      title={picked?.name}
       detail={detail}
-      goal={sel ? goalLevels?.get(sel.key) : undefined}
-      turnoFiltro={turno ?? null}
+      goal={picked ? goalLevels?.get(picked.key) : undefined}
+      shiftFilter={shift ?? null}
       period={resolvePeriod(scope.period, calendarTodayIso()).label}
-      onClose={() => setSel(null)}
+      onClose={() => setPicked(null)}
     />
   );
-  return { abrir, modal };
+  return { open, modal };
 }
 
 /** Busca os dados da Equipe na 1 abertura; mantem ate mudar o filtro ou chegar venda nova. */
@@ -145,7 +145,7 @@ function GoalInfo({ label, mono, className, children }: { label: string; mono?: 
 function GoalSection({ goal }: { goal: SellerGoalLevel }) {
   const group = goal.modo === "grupo";
   const geral = goal.modo === "geral";
-  const currentLevel = goal.nivelNumero != null ? goal.marcos[goal.nivelNumero - 1] : undefined;
+  const currentLevel = goal.levelNumber != null ? goal.marcos[goal.levelNumber - 1] : undefined;
   const total = goal.prizeAmount + goal.bonus;
   const situacao =
     goal.status === "active"
@@ -171,7 +171,7 @@ function GoalSection({ goal }: { goal: SellerGoalLevel }) {
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
         <h4 className="text-[13px] font-bold text-t0">Meta</h4>
         <span className="text-[11.5px] font-semibold text-t2">
-          {goal.metaNome} · {shortDate(goal.start)} a {shortDate(goal.end)} · {situacao}
+          {goal.metaName} · {shortDate(goal.start)} a {shortDate(goal.end)} · {situacao}
         </span>
       </div>
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
@@ -184,19 +184,19 @@ function GoalSection({ goal }: { goal: SellerGoalLevel }) {
         <MetricDetail label="Premiação até agora" amount={brlCent(total)} destaque={total > 0} tip={prizeTip} />
       </div>
       <div className="mt-2.5 rounded-xl border border-line bg-bg-inset p-3">
-        <GoalLevelSummary pct={goal.attainmentPct} nivel={goal.nivel} nivelNumero={goal.nivelNumero} marcos={goal.marcos} rolagem />
+        <GoalLevelSummary pct={goal.attainmentPct} level={goal.level} levelNumber={goal.levelNumber} marcos={goal.marcos} rolagem />
         <div className="mt-3 border-t border-line pt-3">
-          {goal.proximo ? (
+          {goal.next ? (
             <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 sm:grid-cols-3">
               <GoalInfo label="Próximo nível" className="col-span-2 sm:col-span-1">
-                N{goal.proximo.numero} · {goal.proximo.name}
+                N{goal.next.number} · {goal.next.name}
               </GoalInfo>
               <GoalInfo label="Falta para o próximo nível" mono>
-                {brlCent(goal.proximo.falta)}
+                {brlCent(goal.next.gap)}
               </GoalInfo>
               <GoalInfo label="Ao chegar">
-                {num(goal.proximo.commissionPct, 1)}% de premiação
-                {goal.proximo.bonus > 0 && <span className="block text-[12px] font-semibold text-t2">+ {brlCent(goal.proximo.bonus)} de bônus</span>}
+                {num(goal.next.commissionPct, 1)}% de premiação
+                {goal.next.bonus > 0 && <span className="block text-[12px] font-semibold text-t2">+ {brlCent(goal.next.bonus)} de bônus</span>}
               </GoalInfo>
             </div>
           ) : (
@@ -224,7 +224,7 @@ function TeamMemberDetailModal({
   title,
   detail,
   goal,
-  turnoFiltro,
+  shiftFilter,
   period,
   onClose,
 }: {
@@ -233,22 +233,22 @@ function TeamMemberDetailModal({
   title?: string;
   detail: TeamMemberDetail | null;
   goal?: SellerGoalLevel;
-  turnoFiltro: string | null;
+  shiftFilter: string | null;
   period: string;
   onClose: () => void;
 }) {
-  const cmp = detail?.comparativo;
-  const turno = detail?.turno ?? TEAM_SEM_TURNO;
+  const cmp = detail?.comparison;
+  const shift = detail?.shift ?? TEAM_WITHOUT_SHIFT;
   const subtitle = detail
-    ? [detail.storeRows.length === 1 ? detail.storeRows[0] : detail.storeRows.length > 1 ? `${detail.storeRows.length} filiais` : "", turno, period]
+    ? [detail.storeRows.length === 1 ? detail.storeRows[0] : detail.storeRows.length > 1 ? `${detail.storeRows.length} filiais` : "", shift, period]
         .filter(Boolean)
         .join(" · ")
     : "";
-  const base = turnoFiltro ? `do grupo ${turnoFiltro}` : "da equipe";
+  const base = shiftFilter ? `do grupo ${shiftFilter}` : "da equipe";
   return (
     <Modal open={open} onClose={onClose} title={detail?.name ?? title} size="lg">
       {loading ? (
-        <DetalheSkeleton />
+        <DetailSkeleton />
       ) : !detail ? (
         <div className="flex min-h-[220px] flex-col">
           <EmptyBlock />
@@ -260,7 +260,7 @@ function TeamMemberDetailModal({
           <div>
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
               <MetricDetail label="Faturamento" amount={brlCent(detail.revenue)} delta={cmp?.revenue} />
-              <MetricDetail label="Nº de vendas" amount={num(detail.vendas)} delta={cmp?.vendas} />
+              <MetricDetail label="Nº de vendas" amount={num(detail.sales)} delta={cmp?.sales} />
               <MetricDetail label="Ticket médio" amount={brlCent(detail.averageTicket)} delta={cmp?.ticket} />
               <MetricDetail
                 label="P.A."
@@ -268,10 +268,10 @@ function TeamMemberDetailModal({
                 delta={cmp?.pa}
                 tip="Média de itens por venda."
               />
-              <MetricDetail label="Itens vendidos" amount={detail.pa == null ? "—" : num(detail.itens)} />
+              <MetricDetail label="Itens vendidos" amount={detail.pa == null ? "—" : num(detail.items)} />
               <MetricDetail
                 label="Participação"
-                amount={pctFmt(detail.participacaoPct)}
+                amount={pctFmt(detail.participationPct)}
                 tip={`Participação da pessoa no faturamento ${base} no período.`}
               />
             </div>
@@ -285,15 +285,15 @@ function TeamMemberDetailModal({
 
           {goal && <GoalSection goal={goal} />}
 
-          {detail.serie && (
+          {detail.series && (
             <section>
               <h4 className="mb-2 text-[13px] font-bold text-t0">
                 Faturamento {detail.seriesGranularity === "month" ? "por mês" : "por dia"}
               </h4>
               <AreaLineChart
-                data={detail.serie.map((d) => d.revenue)}
-                labels={detail.serie.map((d) => d.label)}
-                tooltipLabels={detail.serie.map((d) => d.detail ?? d.label)}
+                data={detail.series.map((d) => d.revenue)}
+                labels={detail.series.map((d) => d.label)}
+                tooltipLabels={detail.series.map((d) => d.detail ?? d.label)}
                 formatValue={brlCent}
                 height={200}
                 showAxisLabels

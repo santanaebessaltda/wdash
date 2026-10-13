@@ -18,8 +18,8 @@ export function useInitialSync(): { sync: InitialSync | null; retry: () => Promi
 
   const check = useCallback(async () => {
     const next = await fetchInitialSync(tenantId);
-    const pendente = prev.current?.phase === "queued" || prev.current?.phase === "running";
-    if (pendente && !next) {
+    const pending = prev.current?.phase === "queued" || prev.current?.phase === "running";
+    if (pending && !next) {
       window.dispatchEvent(new Event(SALES_SYNCED_EVENT));
       refreshMonthFill();
     }
@@ -31,12 +31,12 @@ export function useInitialSync(): { sync: InitialSync | null; retry: () => Promi
     void check();
   }, [check]);
 
-  const ativo = sync !== null && sync.phase !== "failed";
+  const active = sync !== null && sync.phase !== "failed";
   useEffect(() => {
-    if (!ativo) return;
+    if (!active) return;
     const id = window.setInterval(() => void check(), POLL_MS);
     return () => window.clearInterval(id);
-  }, [ativo, check]);
+  }, [active, check]);
 
   // Um Atualizar manual tambem resolve uma busca que falhou.
   useEffect(() => {

@@ -8,7 +8,7 @@ import { getSupabase } from "@/lib/supabase";
 import { persistErpCredentialAndStores } from "@/session/authApi";
 import { syncProductsNow } from "./productCatalog";
 
-function esperar(ms: number) {
+function wait(ms: number) {
   return new Promise<void>((r) => setTimeout(r, ms));
 }
 
@@ -49,16 +49,16 @@ function storesMock(): StoreErp[] {
   return stores.map(
     (f: Store): StoreErp => ({
       storeId: f.millenniumBranch,
-      code: f.codFilial,
+      code: f.branchCode,
       name: f.name,
-      tradeName: f.fantasia,
+      tradeName: f.tradeName,
       taxId: f.cnpj,
-      city: f.cidade,
+      city: f.city,
       state: f.uf,
       franchise: "WEPINK",
       type: f.kind,
-      hasWpink: f.temWpink,
-      openedAt: f.dataInauguracao,
+      hasWpink: f.hasWpink,
+      openedAt: f.openedAt,
     }),
   );
 }
@@ -69,9 +69,9 @@ function storesMock(): StoreErp[] {
  * Sem acesso a algum relatorio  ->  `reason: "reports"` + lista (Edge ja deslogou).
  * Demo (sem Edge): senha "errada" | "ocupado" | "falha" | "relatorio"; qualquer outra  ->  ok + mock.
  */
-export async function testErpLogin(usuario: string, senha: string): Promise<ErpLoginResult> {
-  const u = usuario.trim();
-  if (!u || !senha) return { ok: false, reason: "password" };
+export async function testErpLogin(username: string, password: string): Promise<ErpLoginResult> {
+  const u = username.trim();
+  if (!u || !password) return { ok: false, reason: "password" };
 
   const sb = getSupabase();
   if (sb) {
@@ -81,11 +81,11 @@ export async function testErpLogin(usuario: string, senha: string): Promise<ErpL
     } catch {
       /* best-effort */
     }
-    await esperar(400);
+    await wait(400);
 
     const attempt = async () =>
       sb.functions.invoke<EdgeResponse>("millennium-onboarding", {
-        body: { username: u, password: senha, includeStores: true, keepSession: true, checkReports: true },
+        body: { username: u, password: password, includeStores: true, keepSession: true, checkReports: true },
       });
 
     let { data, error } = await attempt();
@@ -96,7 +96,7 @@ export async function testErpLogin(usuario: string, senha: string): Promise<ErpL
       } catch {
         /* ignore */
       }
-      await esperar(1500);
+      await wait(1500);
       ({ data, error } = await attempt());
     }
     if (data && typeof data === "object" && "ok" in data) {
@@ -115,8 +115,8 @@ export async function testErpLogin(usuario: string, senha: string): Promise<ErpL
     return { ok: false, reason: "other" };
   }
 
-  await esperar(1400);
-  const s = senha.trim().toLowerCase();
+  await wait(1400);
+  const s = password.trim().toLowerCase();
   if (s === "errada") return { ok: false, reason: "password" };
   if (s === "ocupado") return { ok: false, reason: "busy" };
   if (s === "falha") return { ok: false, reason: "other" };
@@ -221,7 +221,7 @@ export async function fetchErpIntegrationStatus(
  */
 export async function refreshErpRegistry(): Promise<{ ok: true } | { ok: false; message: string }> {
   if (!getSupabase()) {
-    await esperar(1200);
+    await wait(1200);
     return { ok: true };
   }
   const r = await syncProductsNow({ scope: "registry" });
@@ -397,6 +397,6 @@ export async function pauseErpForLogout(): Promise<void> {
 /** Preferir lojas ja trazidas no login; fallback mock so sem sessao. */
 export async function listErpStores(precarregadas?: StoreErp[]): Promise<StoreErp[]> {
   if (precarregadas) return precarregadas;
-  await esperar(900);
+  await wait(900);
   return storesMock();
 }

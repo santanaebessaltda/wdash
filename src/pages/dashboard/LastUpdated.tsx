@@ -6,9 +6,9 @@ import { SALES_SYNCED_EVENT } from "./useForceRefresh";
 /** Horario da ultima busca das vendas de hoje (Atualizar manual/automatico, carga do onboarding), em linhas. */
 export function lastUpdatedLines(at: Date, now: Date = new Date()): string[] {
   const clockLabel = at.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
-  const dia = at.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  const day = at.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
   if (at.toDateString() === now.toDateString()) return [`Vendas de hoje atualizadas às ${clockLabel}`];
-  return ["Vendas de hoje ainda não atualizadas", `Última atualização em ${dia} às ${clockLabel}`];
+  return ["Vendas de hoje ainda não atualizadas", `Última atualização em ${day} às ${clockLabel}`];
 }
 
 /** Mesma informacao numa linha so (cabecalho do PDF). */

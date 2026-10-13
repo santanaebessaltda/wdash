@@ -2,7 +2,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import { PageHeader, TabNav } from "@/components/ui";
 import { paths } from "@/router/paths";
 import { useActiveSession } from "@/session/SessionProvider";
-import { isGestor } from "@/layout/nav-wedash";
+import { isOwner } from "@/layout/nav-wedash";
 
 /** Mesma ordem do menu do avatar. Notificações fica para gestor e gerente. */
 const TABS = [
@@ -54,7 +54,7 @@ export function WedashSettingsLayout() {
   const { pathname } = useLocation();
   const session = useActiveSession();
   const goal = META[pathname] ?? META[paths.settings.stores]!;
-  const items = isGestor(session.role) ? TABS : session.role === "MANAGER" ? MANAGER_TABS : [];
+  const items = isOwner(session.role) ? TABS : session.role === "MANAGER" ? MANAGER_TABS : [];
   const tabs = items.some((t) => t.to === pathname) ? items : [];
 
   return (

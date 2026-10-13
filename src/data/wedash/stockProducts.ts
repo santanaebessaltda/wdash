@@ -30,20 +30,20 @@ export type StockInput = {
 export type CostLine = { label: string; pct: number; amount: number };
 
 export type PriceComposition = {
-  preco: number | null;
-  custo: number | null;
+  price: number | null;
+  cost: number | null;
   icmsStPct: number;
   icmsSt: number | null;
-  custoAquisicao: number | null;
+  costAquisicao: number | null;
   /** Despesas sobre a venda (so as > 0%); valor = % x preco. */
   despesas: CostLine[];
   pctTotal: number;
-  impostos: number | null;
-  franquiaAluguel: number | null;
-  custoTotal: number | null;
-  lucro: number | null;
-  margemPct: number | null;
-  precoMinimo: number | null;
+  taxes: number | null;
+  franchiseRent: number | null;
+  costTotal: number | null;
+  profit: number | null;
+  marginPct: number | null;
+  priceMinimum: number | null;
 };
 
 export function productBrand(code: string): "WEPINK" | "WPINK" {
@@ -53,7 +53,7 @@ export function productBrand(code: string): "WEPINK" | "WPINK" {
 
 /** % sobre o preco de venda que a loja paga em cada peca do produto. */
 export function saleCostPcts(store: Store, code: string): CostLine[] {
-  const c = store.custos;
+  const c = store.costs;
   const wpink = productBrand(code) === "WPINK";
   const rent = store.pointType === "SHOPPING" ? (c?.rentWepinkPct ?? c?.rentWpinkPct ?? 0) : 0;
   const lines: CostLine[] = [
@@ -66,48 +66,48 @@ export function saleCostPcts(store: Store, code: string): CostLine[] {
 }
 
 export function composePrice(store: Store, code: string, priceCents: number | null, costCents: number | null): PriceComposition {
-  const preco = priceCents == null ? null : priceCents / 100;
-  const custo = costCents == null ? null : costCents / 100;
+  const price = priceCents == null ? null : priceCents / 100;
+  const cost = costCents == null ? null : costCents / 100;
   const wpink = productBrand(code) === "WPINK";
-  const icmsStPct = (wpink ? store.custos?.icmsStWpinkPct : store.custos?.icmsStWepinkPct) ?? 0;
-  const icmsSt = custo == null ? null : (custo * icmsStPct) / 100;
-  const custoAquisicao = custo == null ? null : custo + (icmsSt ?? 0);
+  const icmsStPct = (wpink ? store.costs?.icmsStWpinkPct : store.costs?.icmsStWepinkPct) ?? 0;
+  const icmsSt = cost == null ? null : (cost * icmsStPct) / 100;
+  const costAquisicao = cost == null ? null : cost + (icmsSt ?? 0);
   const pcts = saleCostPcts(store, code);
   const pctTotal = pcts.reduce((s, l) => s + l.pct, 0);
-  const despesas = pcts.map((l) => ({ ...l, amount: preco == null ? 0 : (preco * l.pct) / 100 }));
+  const despesas = pcts.map((l) => ({ ...l, amount: price == null ? 0 : (price * l.pct) / 100 }));
   const icms = despesas.find((l) => l.label === "ICMS")?.amount ?? 0;
-  const franquiaAluguel = preco == null ? null : despesas.filter((l) => l.label !== "ICMS").reduce((s, l) => s + l.amount, 0);
-  const impostos = custo == null ? null : (icmsSt ?? 0) + (preco == null ? 0 : icms);
-  const custoTotal = custoAquisicao == null || preco == null ? null : custoAquisicao + icms + (franquiaAluguel ?? 0);
-  const lucro = custoTotal == null || preco == null ? null : preco - custoTotal;
+  const franchiseRent = price == null ? null : despesas.filter((l) => l.label !== "ICMS").reduce((s, l) => s + l.amount, 0);
+  const taxes = cost == null ? null : (icmsSt ?? 0) + (price == null ? 0 : icms);
+  const costTotal = costAquisicao == null || price == null ? null : costAquisicao + icms + (franchiseRent ?? 0);
+  const profit = costTotal == null || price == null ? null : price - costTotal;
   return {
-    preco,
-    custo,
+    price,
+    cost,
     icmsStPct,
     icmsSt,
-    custoAquisicao,
+    costAquisicao,
     despesas,
     pctTotal,
-    impostos,
-    franquiaAluguel,
-    custoTotal,
-    lucro,
-    margemPct: lucro == null || !preco ? null : (lucro / preco) * 100,
-    precoMinimo: custoAquisicao == null || pctTotal >= 100 ? null : custoAquisicao / (1 - pctTotal / 100),
+    taxes,
+    franchiseRent,
+    costTotal,
+    profit,
+    marginPct: profit == null || !price ? null : (profit / price) * 100,
+    priceMinimum: costAquisicao == null || pctTotal >= 100 ? null : costAquisicao / (1 - pctTotal / 100),
   };
 }
 
-export type StockLocation = { name: string; qtd: number };
+export type StockLocation = { name: string; qty: number };
 
 /** `qtd` pecas do local `de` para o local `para`, na mesma loja. */
-export type StockTransfer = { de: string; para: string; qtd: number };
+export type StockTransfer = { from: string; to: string; qty: number };
 
-type LocalNivel = "estoque" | "intermediario" | "loja";
+type LocalLevel = "estoque" | "intermediario" | "loja";
 
 /** Nome na interface do local de onde sai a venda (QUIOSQUE no Millennium). */
 export const STOCK_SALES_LOCATION = "PONTO DE VENDA";
 
-function localNivel(name: string): LocalNivel {
+function localLevel(name: string): LocalLevel {
   const n = name.trim().toUpperCase();
   if (n === "ESTOQUE") return "estoque";
   if (n === STOCK_SALES_LOCATION || n === "QUIOSQUE") return "loja";
@@ -119,70 +119,70 @@ function localNivel(name: string): LocalNivel {
  * (Shop010...) sao filhos do Estoque; a Loja (QUIOSQUE, de onde sai a venda) e filha de todos. Cobre primeiro os
  * locais intermediarios negativos (so pelo Estoque) e depois a Loja (pelo que sobrar, do local com mais saldo).
  */
-export function stockTransfers(locais: StockLocation[]): StockTransfer[] {
-  const saldo = new Map(locais.map((l) => [l.name, l.qtd]));
+export function stockTransfers(locations: StockLocation[]): StockTransfer[] {
+  const saldo = new Map(locations.map((l) => [l.name, l.qty]));
   const out: StockTransfer[] = [];
-  const cobrir = (para: string, pais: (name: string) => boolean) => {
-    let falta = -(saldo.get(para) ?? 0);
-    const origens = [...saldo].filter(([name, q]) => name !== para && q > 0 && pais(name)).sort((a, b) => b[1] - a[1]);
-    for (const [de, q] of origens) {
-      if (falta <= 0) break;
-      const qtd = Math.min(q, falta);
-      saldo.set(de, q - qtd);
-      falta -= qtd;
-      out.push({ de, para, qtd });
+  const cobrir = (to: string, pais: (name: string) => boolean) => {
+    let gap = -(saldo.get(to) ?? 0);
+    const origens = [...saldo].filter(([name, q]) => name !== to && q > 0 && pais(name)).sort((a, b) => b[1] - a[1]);
+    for (const [from, q] of origens) {
+      if (gap <= 0) break;
+      const qty = Math.min(q, gap);
+      saldo.set(from, q - qty);
+      gap -= qty;
+      out.push({ from, to, qty });
     }
   };
-  const negativos = [...locais].filter((l) => l.qtd < 0).sort((a, b) => a.qtd - b.qtd);
-  for (const l of negativos) if (localNivel(l.name) === "intermediario") cobrir(l.name, (n) => localNivel(n) === "estoque");
-  for (const l of negativos) if (localNivel(l.name) === "loja") cobrir(l.name, (n) => localNivel(n) !== "loja");
+  const negativos = [...locations].filter((l) => l.qty < 0).sort((a, b) => a.qty - b.qty);
+  for (const l of negativos) if (localLevel(l.name) === "intermediario") cobrir(l.name, (n) => localLevel(n) === "estoque");
+  for (const l of negativos) if (localLevel(l.name) === "loja") cobrir(l.name, (n) => localLevel(n) !== "loja");
   return out;
 }
 
 export type StockStoreDetail = {
   store: Store;
-  estoque: number;
+  stock: number;
   /** Saldo por local (so locais com saldo = 0), maior primeiro. */
-  locais: StockLocation[];
+  locations: StockLocation[];
   transferencias: StockTransfer[];
-  composicao: PriceComposition;
-  praticado: { preco: number; itens: number; lucro: number | null; margemPct: number | null } | null;
+  composition: PriceComposition;
+  praticado: { price: number; items: number; profit: number | null; marginPct: number | null } | null;
   /** Pecas vendidas nos ultimos 30 dias na loja. */
   vendidos30d: number;
 };
 
 export type StockProductRow = {
-  codigo: string;
+  code: string;
   name: string;
-  categoria: string;
-  estoque: number;
+  category: string;
+  stock: number;
   /** Pecas a transferir entre locais de estoque, somando as lojas do filtro. */
-  transferir: number;
-  custo: number | null;
-  impostos: number | null;
-  franquiaAluguel: number | null;
-  custoTotal: number | null;
-  preco: number | null;
-  lucro: number | null;
-  margemPct: number | null;
-  precoMinimo: number | null;
-  precoPraticado: number | null;
-  margemPraticadaPct: number | null;
-  itensVendidos30d: number;
+  transfer: number;
+  cost: number | null;
+  taxes: number | null;
+  franchiseRent: number | null;
+  costTotal: number | null;
+  price: number | null;
+  profit: number | null;
+  marginPct: number | null;
+  priceMinimum: number | null;
+  shelfPrice: number | null;
+  marginPraticadaPct: number | null;
+  itemsVendidos30d: number;
   /** Custo / lucro diferentes entre as lojas do filtro: valores = media das lojas. */
-  variaPorLoja: boolean;
+  variesByStore: boolean;
   /** Pecas pedidas e ainda nao recebidas, somando as lojas do filtro. Null = saldo futuro ainda nao buscado. */
-  aReceber: number | null;
+  aReceive: number | null;
   /** Saldo em estoque + a receber. */
   totalGeral: number | null;
   storeRows: StockStoreDetail[];
 };
 
-export type NegativeStock = { codigo: string; name: string; quantidade: number; storeRows: string[] };
+export type NegativeStock = { code: string; name: string; quantity: number; storeRows: string[] };
 
 export type StockProductsView = {
   rows: StockProductRow[];
-  categorias: string[];
+  categories: string[];
   negativos: NegativeStock[];
 };
 
@@ -203,10 +203,10 @@ export function costCentsFor(costPrices: StockInput["costPrices"], store: Store,
  * Hierarquia: Estoque e pai de todos; os demais (Shop010...) sao filhos do Estoque; a Loja (QUIOSQUE, de onde sai
  * a venda) e filha de todos.
  */
-export type StockStatus = "negativo" | "awaiting" | "ok";
+export type StockStatus = "negative" | "awaiting" | "ok";
 
 export function stockStatus(r: StockProductRow): StockStatus {
-  if (r.storeRows.some((l) => l.estoque < 0)) return "negativo";
+  if (r.storeRows.some((l) => l.stock < 0)) return "negative";
   return r.storeRows.some((l) => l.transferencias.length > 0) ? "awaiting" : "ok";
 }
 
@@ -223,11 +223,11 @@ export function stockCostAmount(r: StockProductRow): StockCostAmount {
   let amount = 0;
   let any = false;
   for (const l of r.storeRows) {
-    const unit = l.composicao.custo;
-    if (unit == null || l.estoque === 0) continue;
+    const unit = l.composition.cost;
+    if (unit == null || l.stock === 0) continue;
     any = true;
     units.push(unit);
-    amount += l.estoque * unit;
+    amount += l.stock * unit;
   }
   if (!any) return { amount: null, unit: null };
   const sameUnit = units.every((u) => Math.abs(u - units[0]!) < 0.005);
@@ -277,71 +277,71 @@ export function buildStockProductsView(input: StockInput): StockProductsView {
     const name = cat?.name || code;
     const priceCents = prices.get(code) ?? null;
     const storeRows: StockStoreDetail[] = input.stores.map((store) => {
-      const estoque = stockBy.get(`${store.id}|${code}`) ?? 0;
-      const locais = Object.entries(locationsBy.get(`${store.id}|${code}`) ?? {})
+      const stock = stockBy.get(`${store.id}|${code}`) ?? 0;
+      const locations = Object.entries(locationsBy.get(`${store.id}|${code}`) ?? {})
         .filter(([, q]) => q !== 0)
-        .map(([name, q]) => ({ name, qtd: q }))
-        .sort((a, b) => b.qtd - a.qtd);
+        .map(([name, q]) => ({ name, qty: q }))
+        .sort((a, b) => b.qty - a.qty);
       const costCents = costCentsFor(input.costPrices, store, code);
-      const composicao = composePrice(store, code, priceCents, costCents);
+      const composition = composePrice(store, code, priceCents, costCents);
       const ch = chargedBy.get(`${store.id}|${code}`);
       let praticado: StockStoreDetail["praticado"] = null;
       if (ch && ch.items > 0 && ch.revenueCents > 0) {
         const p = composePrice(store, code, Math.round(ch.revenueCents / ch.items), costCents);
-        praticado = { preco: ch.revenueCents / ch.items / 100, itens: ch.items, lucro: p.lucro, margemPct: p.margemPct };
+        praticado = { price: ch.revenueCents / ch.items / 100, items: ch.items, profit: p.profit, marginPct: p.marginPct };
       }
-      return { store, estoque, locais, transferencias: stockTransfers(locais), composicao, praticado, vendidos30d: ch?.items ?? 0 };
+      return { store, stock, locations, transferencias: stockTransfers(locations), composition, praticado, vendidos30d: ch?.items ?? 0 };
     });
 
-    const neg = storeRows.filter((l) => l.estoque < 0);
+    const neg = storeRows.filter((l) => l.stock < 0);
     if (neg.length > 0) {
-      negativos.push({ codigo: code, name, quantidade: neg.reduce((s, l) => s + l.estoque, 0), storeRows: neg.map((l) => l.store.fantasia) });
+      negativos.push({ code: code, name, quantity: neg.reduce((s, l) => s + l.stock, 0), storeRows: neg.map((l) => l.store.tradeName) });
     }
 
-    const comp = storeRows.map((l) => l.composicao);
+    const comp = storeRows.map((l) => l.composition);
     const pick = (f: (c: PriceComposition) => number | null) => {
       const vals = comp.map(f);
       return same(vals) ? vals[0]! : mean(vals);
     };
-    const estoque = storeRows.reduce((s, l) => s + l.estoque, 0);
-    const aReceber = allIncomingKnown ? input.stores.reduce((s, store) => s + (incoming.get(`${store.id}|${code}`) ?? 0), 0) : null;
-    const varia = comp.length > 1 && !same(comp.map((c) => c.lucro ?? c.custoAquisicao));
+    const stock = storeRows.reduce((s, l) => s + l.stock, 0);
+    const aReceive = allIncomingKnown ? input.stores.reduce((s, store) => s + (incoming.get(`${store.id}|${code}`) ?? 0), 0) : null;
+    const varies = comp.length > 1 && !same(comp.map((c) => c.profit ?? c.costAquisicao));
     const ch = storeRows.filter((l) => l.praticado);
-    const itensPraticados = ch.reduce((s, l) => s + l.praticado!.itens, 0);
-    const receitaPraticada = ch.reduce((s, l) => s + l.praticado!.preco * l.praticado!.itens, 0);
-    const lucroPraticado = ch.every((l) => l.praticado!.lucro != null)
-      ? ch.reduce((s, l) => s + l.praticado!.lucro! * l.praticado!.itens, 0)
+    const itemsPracticed = ch.reduce((s, l) => s + l.praticado!.items, 0);
+    const revenuePraticada = ch.reduce((s, l) => s + l.praticado!.price * l.praticado!.items, 0);
+    const profitPraticado = ch.every((l) => l.praticado!.profit != null)
+      ? ch.reduce((s, l) => s + l.praticado!.profit! * l.praticado!.items, 0)
       : null;
 
     rows.push({
-      codigo: code,
+      code: code,
       name,
-      categoria: cat?.category || "Sem categoria",
-      estoque,
-      aReceber,
-      totalGeral: aReceber == null ? null : estoque + aReceber,
-      transferir: storeRows.reduce((s, l) => s + l.transferencias.reduce((t, x) => t + x.qtd, 0), 0),
-      custo: pick((c) => c.custo),
-      impostos: pick((c) => c.impostos),
-      franquiaAluguel: pick((c) => c.franquiaAluguel),
-      custoTotal: pick((c) => c.custoTotal),
-      preco: priceCents == null ? null : priceCents / 100,
-      lucro: pick((c) => c.lucro),
-      margemPct: pick((c) => c.margemPct),
-      precoMinimo: pick((c) => c.precoMinimo),
-      precoPraticado: itensPraticados > 0 ? receitaPraticada / itensPraticados : null,
-      margemPraticadaPct: lucroPraticado != null && receitaPraticada > 0 ? (lucroPraticado / receitaPraticada) * 100 : null,
-      itensVendidos30d: storeRows.reduce((s, l) => s + l.vendidos30d, 0),
-      variaPorLoja: varia,
+      category: cat?.category || "Sem categoria",
+      stock,
+      aReceive,
+      totalGeral: aReceive == null ? null : stock + aReceive,
+      transfer: storeRows.reduce((s, l) => s + l.transferencias.reduce((t, x) => t + x.qty, 0), 0),
+      cost: pick((c) => c.cost),
+      taxes: pick((c) => c.taxes),
+      franchiseRent: pick((c) => c.franchiseRent),
+      costTotal: pick((c) => c.costTotal),
+      price: priceCents == null ? null : priceCents / 100,
+      profit: pick((c) => c.profit),
+      marginPct: pick((c) => c.marginPct),
+      priceMinimum: pick((c) => c.priceMinimum),
+      shelfPrice: itemsPracticed > 0 ? revenuePraticada / itemsPracticed : null,
+      marginPraticadaPct: profitPraticado != null && revenuePraticada > 0 ? (profitPraticado / revenuePraticada) * 100 : null,
+      itemsVendidos30d: storeRows.reduce((s, l) => s + l.vendidos30d, 0),
+      variesByStore: varies,
       storeRows,
     });
   }
 
   rows.sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
-  negativos.sort((a, b) => a.quantidade - b.quantidade);
+  negativos.sort((a, b) => a.quantity - b.quantity);
   return {
     rows,
-    categorias: [...new Set(rows.map((r) => r.categoria))].sort((a, b) => a.localeCompare(b, "pt-BR")),
+    categories: [...new Set(rows.map((r) => r.category))].sort((a, b) => a.localeCompare(b, "pt-BR")),
     negativos,
   };
 }
@@ -349,10 +349,10 @@ export function buildStockProductsView(input: StockInput): StockProductsView {
 /** Tabela mais usada (em pecas) no periodo, somando as lojas; `usadas` = tabelas com venda no periodo, mais usada primeiro. */
 export function suggestSaleTable(usage: Array<{ day: string; tableId: number; items: number }>): {
   sugerida: number | null;
-  usadas: number[];
+  used: number[];
 } {
   const m = new Map<number, number>();
   for (const u of usage) m.set(u.tableId, (m.get(u.tableId) ?? 0) + u.items);
-  const usadas = [...m].sort((a, b) => b[1] - a[1]).map(([id]) => id);
-  return { sugerida: usadas[0] ?? null, usadas };
+  const used = [...m].sort((a, b) => b[1] - a[1]).map(([id]) => id);
+  return { sugerida: used[0] ?? null, used };
 }

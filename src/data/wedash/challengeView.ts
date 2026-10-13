@@ -13,7 +13,7 @@ import {
 } from "./challengesRepo";
 import type { GoalTeamMember } from "./goalsRepo";
 import type { SalesSellerDayAgg } from "./salesTypes";
-import { goalStatus, prazoRestante, type GoalStatus } from "./goalView";
+import { goalStatus, prazoRemaining, type GoalStatus } from "./goalView";
 
 export type ChallengeStatus = GoalStatus;
 
@@ -36,7 +36,7 @@ export const INDEX_WEIGHTS = { revenue: 0.5, ticket: 0.25, pa: 0.25 } as const;
 
 export interface IndexTeamBase {
   /** Faturamento medio por pessoa (so quem vendeu). */
-  faturamentoMedio: number;
+  revenueAverage: number;
   /** Media dos tickets individuais (nao o ticket consolidado: quem vende mais nao pesa mais). */
   ticket: number;
   /** Media dos P.A.s individuais. */
@@ -44,51 +44,51 @@ export interface IndexTeamBase {
 }
 
 /** Medias simples entre quem vendeu  ->  a media dos indices dessas pessoas e exatamente 100. */
-export function indexTeamBase(pessoas: { revenue: number; vendas: number; itens: number }[]): IndexTeamBase | null {
-  const comVenda = pessoas.filter((p) => p.vendas > 0);
-  if (comVenda.length === 0) return null;
-  const media = (f: (p: (typeof comVenda)[number]) => number) => comVenda.reduce((s, p) => s + f(p), 0) / comVenda.length;
+export function indexTeamBase(people: { revenue: number; sales: number; items: number }[]): IndexTeamBase | null {
+  const withSale = people.filter((p) => p.sales > 0);
+  if (withSale.length === 0) return null;
+  const media = (f: (p: (typeof withSale)[number]) => number) => withSale.reduce((s, p) => s + f(p), 0) / withSale.length;
   return {
-    faturamentoMedio: media((p) => p.revenue),
-    ticket: media((p) => p.revenue / p.vendas),
-    pa: media((p) => p.itens / p.vendas),
+    revenueAverage: media((p) => p.revenue),
+    ticket: media((p) => p.revenue / p.sales),
+    pa: media((p) => p.items / p.sales),
   };
 }
 
 /** Faturamento em R$ ou centavos  -  so precisa ser a mesma unidade da base. */
-export function performanceIndex(p: { revenue: number; vendas: number; itens: number }, base: IndexTeamBase): number {
-  if (p.vendas <= 0) return 0;
+export function performanceIndex(p: { revenue: number; sales: number; items: number }, base: IndexTeamBase): number {
+  if (p.sales <= 0) return 0;
   const parte = (v: number, ref: number) => (ref > 0 ? v / ref : 0);
   const w = INDEX_WEIGHTS;
   return (
     100 *
-    (w.revenue * parte(p.revenue, base.faturamentoMedio) +
-      w.ticket * parte(p.revenue / p.vendas, base.ticket) +
-      w.pa * parte(p.itens / p.vendas, base.pa))
+    (w.revenue * parte(p.revenue, base.revenueAverage) +
+      w.ticket * parte(p.revenue / p.sales, base.ticket) +
+      w.pa * parte(p.items / p.sales, base.pa))
   );
 }
 
 export interface IndexPersonTotals {
   revenue: number;
-  vendas: number;
-  itens: number;
-  semItens: boolean;
+  sales: number;
+  items: number;
+  withoutItems: boolean;
 }
 
 /**
  * Indice da equipe (gerencia): mesma formula, com as medias da equipe agora x as do periodo anterior.
  * 100 = igual ao periodo anterior. Sem venda em algum lado ou com dia sem itens = null (nada estimado).
  */
-export function teamIndex(atual: IndexPersonTotals[], anterior: IndexPersonTotals[]): number | null {
-  if ([...atual, ...anterior].some((p) => p.vendas > 0 && p.semItens)) return null;
-  const a = indexTeamBase(atual);
-  const b = indexTeamBase(anterior);
+export function teamIndex(current: IndexPersonTotals[], previous: IndexPersonTotals[]): number | null {
+  if ([...current, ...previous].some((p) => p.sales > 0 && p.withoutItems)) return null;
+  const a = indexTeamBase(current);
+  const b = indexTeamBase(previous);
   if (!a || !b) return null;
   const parte = (v: number, ref: number) => (ref > 0 ? v / ref : 0);
   const w = INDEX_WEIGHTS;
   return (
     100 *
-    (w.revenue * parte(a.faturamentoMedio, b.faturamentoMedio) +
+    (w.revenue * parte(a.revenueAverage, b.revenueAverage) +
       w.ticket * parte(a.ticket, b.ticket) +
       w.pa * parte(a.pa, b.pa))
   );
@@ -110,23 +110,23 @@ export interface ChallengeParticipant {
   name: string;
   group: string | null;
   /** null = a comecar ou P.A. sem itens gravados (" - "). */
-  resultado: number | null;
-  vendas: number;
+  result: number | null;
+  sales: number;
   /** Disputa: posicao entre quem concorre (empate compartilha). */
-  posicao: number | null;
+  position: number | null;
   /** Disputa: venceu  |  Minimo: atingiu. */
-  vencedor: boolean;
+  winner: boolean;
   prize: ChallengePrize | null;
   /** So em andamento. */
-  falta: string | null;
+  gap: string | null;
 }
 
 export interface ChallengeManagerResult {
   /** Media da equipe (Indice: indice da equipe x periodo anterior). */
-  resultado: number | null;
-  alvo: number;
+  result: number | null;
+  target: number;
   /** So no Indice: periodo anterior inteiro usado na comparacao. */
-  periodoAnterior: { from: string; to: string } | null;
+  periodPrevious: { from: string; to: string } | null;
   atingiu: boolean;
   prize: ChallengePrize;
 }
@@ -136,13 +136,13 @@ export interface ChallengeView {
   status: ChallengeStatus;
   prazo: string;
   /** Encerrado ontem: o ultimo dia fecha na madrugada e ainda pode mudar. */
-  emFechamento: boolean;
+  emClosing: boolean;
   participants: ChallengeParticipant[];
   /** Minimo: quantas pessoas atingiram. */
-  atingiram: number;
-  gerencia: ChallengeManagerResult | null;
+  reachedCount: number;
+  management: ChallengeManagerResult | null;
   /** Dias com venda da loja e sem itens por pessoa (produtos/categorias escolhidos). */
-  diasIncompletos: string[];
+  daysIncomplete: string[];
 }
 
 const usesMinSales = (m: ChallengeMetric) => m === "PA" || m === "TICKET" || m === "INDEX";
@@ -157,19 +157,19 @@ export function metricValueLabel(metric: ChallengeMetric, value: number): string
   if (metric === "PA") return num(value, 2);
   if (metric === "INDEX") return num(value, 1);
   if (metric === "TICKET" || metric === "VALUE") return brlCent(value);
-  const inteiro = Number.isInteger(value);
-  return `${num(value, inteiro ? 0 : 1)} ${value === 1 ? "item" : "itens"}`;
+  const integer = Number.isInteger(value);
+  return `${num(value, integer ? 0 : 1)} ${value === 1 ? "item" : "itens"}`;
 }
 
 export function prizeLabel(p: ChallengePrize): string {
   return p.kind === "MONEY" ? brlCent(p.amount) : p.label;
 }
 
-function faltaLabel(metric: ChallengeMetric, diff: number): string {
+function gapLabel(metric: ChallengeMetric, diff: number): string {
   if (metric === "PA") return `Falta ${num(diff, 2)} de P.A.`;
   if (metric === "INDEX") {
-    const pontos = Math.max(0.1, Math.ceil(diff * 10 - 1e-9) / 10);
-    return pontos === 1 ? "Falta 1,0 ponto" : `Faltam ${num(pontos, 1)} pontos`;
+    const points = Math.max(0.1, Math.ceil(diff * 10 - 1e-9) / 10);
+    return points === 1 ? "Falta 1,0 ponto" : `Faltam ${num(points, 1)} pontos`;
   }
   if (metric === "TICKET") return `Faltam ${brlCent(diff)} de ticket médio`;
   if (metric === "VALUE") return `Faltam ${brlCent(diff)}`;
@@ -177,19 +177,19 @@ function faltaLabel(metric: ChallengeMetric, diff: number): string {
   return n === 1 ? "Falta 1 item" : `Faltam ${num(n)} itens`;
 }
 
-const faltaVendas = (n: number) => (n === 1 ? "Falta 1 venda para participar" : `Faltam ${num(n)} vendas para participar`);
+const gapSales = (n: number) => (n === 1 ? "Falta 1 venda para participar" : `Faltam ${num(n)} vendas para participar`);
 
 interface Acc {
   key: string;
   name: string;
   group: string | null;
   /** Itens e R$ dos produtos/categorias escolhidos. */
-  itens: number;
-  valorCents: number;
-  vendas: number;
-  itensVendas: number;
-  faturamentoCents: number;
-  semItens: boolean;
+  items: number;
+  amountCents: number;
+  sales: number;
+  itemsSales: number;
+  revenueCents: number;
+  withoutItems: boolean;
 }
 
 export function buildChallengeView(args: {
@@ -199,31 +199,31 @@ export function buildChallengeView(args: {
 }): ChallengeView {
   const { challenge: c, aggs, today } = args;
   const status = goalStatus(c, today);
-  const ate = c.endsOn < today ? c.endsOn : today;
-  const inPeriod = (r: { storeId: string; day: string }) => r.storeId === c.storeId && r.day >= c.startsOn && r.day <= ate;
+  const until = c.endsOn < today ? c.endsOn : today;
+  const inPeriod = (r: { storeId: string; day: string }) => r.storeId === c.storeId && r.day >= c.startsOn && r.day <= until;
 
   const team = aggs.team.filter((m) => m.storeId === c.storeId);
-  const porCodigo = new Map(team.map((m) => [m.employeeId, m]));
-  const porGerador = new Map<number, GoalTeamMember>();
-  for (const m of team) if (m.geradorId != null) porGerador.set(m.geradorId, m);
-  const porNome = new Map<string, GoalTeamMember>();
-  for (const m of team) for (const k of m.nameKeys) if (!porNome.has(k)) porNome.set(k, m);
+  const byCode = new Map(team.map((m) => [m.employeeId, m]));
+  const byGenerator = new Map<number, GoalTeamMember>();
+  for (const m of team) if (m.generatorId != null) byGenerator.set(m.generatorId, m);
+  const byName = new Map<string, GoalTeamMember>();
+  for (const m of team) for (const k of m.nameKeys) if (!byName.has(k)) byName.set(k, m);
 
   const accs = new Map<string, Acc>();
-  const acc = (membro: GoalTeamMember | undefined, sellerKey: string, sellerName: string): Acc => {
-    const key = membro ? `e:${membro.employeeId}` : `n:${sellerKey}`;
+  const acc = (member: GoalTeamMember | undefined, sellerKey: string, sellerName: string): Acc => {
+    const key = member ? `e:${member.employeeId}` : `n:${sellerKey}`;
     let a = accs.get(key);
     if (!a) {
       a = {
         key,
-        name: collaboratorName(membro?.name ?? (sellerName || sellerKey)),
-        group: membro?.shiftName ?? null,
-        itens: 0,
-        valorCents: 0,
-        vendas: 0,
-        itensVendas: 0,
-        faturamentoCents: 0,
-        semItens: false,
+        name: collaboratorName(member?.name ?? (sellerName || sellerKey)),
+        group: member?.shiftName ?? null,
+        items: 0,
+        amountCents: 0,
+        sales: 0,
+        itemsSales: 0,
+        revenueCents: 0,
+        withoutItems: false,
       };
       accs.set(key, a);
     }
@@ -232,201 +232,201 @@ export function buildChallengeView(args: {
 
   for (const m of team) if (m.salesPerson) acc(m, "", m.name);
 
-  const membroDoDia = (r: SalesSellerDayAgg): GoalTeamMember | undefined =>
-    (r.sellerEmployeeId != null ? porCodigo.get(r.sellerEmployeeId) : undefined) ??
-    (r.sellerGeradorId != null ? porGerador.get(r.sellerGeradorId) : undefined) ??
-    porNome.get(r.sellerKey);
+  const memberOfDay = (r: SalesSellerDayAgg): GoalTeamMember | undefined =>
+    (r.sellerEmployeeId != null ? byCode.get(r.sellerEmployeeId) : undefined) ??
+    (r.sellerGeneratorId != null ? byGenerator.get(r.sellerGeneratorId) : undefined) ??
+    byName.get(r.sellerKey);
 
-  const porProduto = usesScope(c.metric) && c.scope !== "ALL";
+  const byProduct = usesScope(c.metric) && c.scope !== "ALL";
   if (status !== "upcoming") {
-    if (porProduto) {
+    if (byProduct) {
       const codigos = new Set(c.products.map((p) => p.code));
-      const tipos = new Set(c.categories.map((t) => t.typeId));
+      const kinds = new Set(c.categories.map((t) => t.typeId));
       const conta = (code: string) =>
-        c.scope === "PRODUCTS" ? codigos.has(code) : tipos.has(aggs.typeByCode.get(code) ?? Number.NaN);
+        c.scope === "PRODUCTS" ? codigos.has(code) : kinds.has(aggs.typeByCode.get(code) ?? Number.NaN);
       for (const r of aggs.sellerProducts) {
         if (!inPeriod(r)) continue;
-        const membro = porGerador.get(r.sellerGeradorId) ?? porNome.get(r.sellerKey);
-        const a = acc(membro, r.sellerKey, r.sellerName);
+        const member = byGenerator.get(r.sellerGeneratorId) ?? byName.get(r.sellerKey);
+        const a = acc(member, r.sellerKey, r.sellerName);
         if (conta(r.productCode)) {
-          a.itens += r.itemCount;
-          a.valorCents += r.revenueCents;
+          a.items += r.itemCount;
+          a.amountCents += r.revenueCents;
         }
       }
     }
     for (const r of aggs.sellerDays) {
       if (!inPeriod(r)) continue;
-      const a = acc(membroDoDia(r), r.sellerKey, r.sellerName);
-      a.vendas += r.salesCount;
-      a.faturamentoCents += r.revenueCents;
-      a.itensVendas += r.itemCount ?? 0;
-      if (r.salesCount > 0 && !(r.itemCount && r.itemCount > 0)) a.semItens = true;
+      const a = acc(memberOfDay(r), r.sellerKey, r.sellerName);
+      a.sales += r.salesCount;
+      a.revenueCents += r.revenueCents;
+      a.itemsSales += r.itemCount ?? 0;
+      if (r.salesCount > 0 && !(r.itemCount && r.itemCount > 0)) a.withoutItems = true;
     }
   }
 
-  const indexBase: IndexTeamBase | null = [...accs.values()].some((a) => a.vendas > 0 && a.semItens)
+  const indexBase: IndexTeamBase | null = [...accs.values()].some((a) => a.sales > 0 && a.withoutItems)
     ? null
-    : indexTeamBase([...accs.values()].map((a) => ({ revenue: a.faturamentoCents, vendas: a.vendas, itens: a.itensVendas })));
+    : indexTeamBase([...accs.values()].map((a) => ({ revenue: a.revenueCents, sales: a.sales, items: a.itemsSales })));
 
-  const resultadoDe = (a: Acc): number | null => {
+  const resultOf = (a: Acc): number | null => {
     if (status === "upcoming") return null;
     if (c.metric === "INDEX") {
-      if (a.vendas <= 0) return 0;
+      if (a.sales <= 0) return 0;
       return indexBase
-        ? round2(performanceIndex({ revenue: a.faturamentoCents, vendas: a.vendas, itens: a.itensVendas }, indexBase))
+        ? round2(performanceIndex({ revenue: a.revenueCents, sales: a.sales, items: a.itemsSales }, indexBase))
         : null;
     }
-    if (c.metric === "QUANTITY") return porProduto ? a.itens : a.semItens ? null : a.itensVendas;
-    if (c.metric === "VALUE") return round2((porProduto ? a.valorCents : a.faturamentoCents) / 100);
-    if (a.vendas <= 0) return 0;
-    if (c.metric === "PA") return a.semItens ? null : round2(a.itensVendas / a.vendas);
-    return round2(a.faturamentoCents / 100 / a.vendas);
+    if (c.metric === "QUANTITY") return byProduct ? a.items : a.withoutItems ? null : a.itemsSales;
+    if (c.metric === "VALUE") return round2((byProduct ? a.amountCents : a.revenueCents) / 100);
+    if (a.sales <= 0) return 0;
+    if (c.metric === "PA") return a.withoutItems ? null : round2(a.itemsSales / a.sales);
+    return round2(a.revenueCents / 100 / a.sales);
   };
 
-  const minVendas = usesMinSales(c.metric) && c.minSales != null ? Math.max(1, c.minSales) : 0;
-  const base = [...accs.values()].map((a) => ({ a, resultado: resultadoDe(a) }));
-  const concorre = (x: { a: Acc; resultado: number | null }) =>
-    x.resultado != null && x.resultado > 0 && x.a.vendas >= minVendas;
-  const alcancaAlvo = (v: number | null) => v != null && v > 0 && (c.target == null || v >= c.target - 1e-9);
+  const minSales = usesMinSales(c.metric) && c.minSales != null ? Math.max(1, c.minSales) : 0;
+  const base = [...accs.values()].map((a) => ({ a, result: resultOf(a) }));
+  const concorre = (x: { a: Acc; result: number | null }) =>
+    x.result != null && x.result > 0 && x.a.sales >= minSales;
+  const alcancaTarget = (v: number | null) => v != null && v > 0 && (c.target == null || v >= c.target - 1e-9);
 
-  const posicaoDe = new Map<string, number>();
+  const positionOf = new Map<string, number>();
   if (c.mode === "CONTEST" && status !== "upcoming") {
-    const pool = base.filter(concorre).sort((x, y) => (y.resultado ?? 0) - (x.resultado ?? 0));
+    const pool = base.filter(concorre).sort((x, y) => (y.result ?? 0) - (x.result ?? 0));
     pool.forEach((x, i) => {
-      const anterior = pool[i - 1];
-      posicaoDe.set(x.a.key, anterior && anterior.resultado === x.resultado ? posicaoDe.get(anterior.a.key)! : i + 1);
+      const previous = pool[i - 1];
+      positionOf.set(x.a.key, previous && previous.result === x.result ? positionOf.get(previous.a.key)! : i + 1);
     });
   }
 
-  const valoresAcima = base
-    .filter((x) => concorre(x) && posicaoDe.has(x.a.key))
-    .map((x) => ({ amount: x.resultado!, posicao: posicaoDe.get(x.a.key)! }));
+  const amountsAbove = base
+    .filter((x) => concorre(x) && positionOf.has(x.a.key))
+    .map((x) => ({ amount: x.result!, position: positionOf.get(x.a.key)! }));
 
   // P.A. oscila ate o ultimo dia: ninguem "atinge" enquanto o desafio esta aberto.
-  const paEmAndamento = c.metric === "PA" && status === "active";
+  const paEmProgress = c.metric === "PA" && status === "active";
 
-  const participants: ChallengeParticipant[] = base.map(({ a, resultado }) => {
-    const posicao = posicaoDe.get(a.key) ?? null;
-    let vencedor = false;
+  const participants: ChallengeParticipant[] = base.map(({ a, result }) => {
+    const position = positionOf.get(a.key) ?? null;
+    let winner = false;
     let prize: ChallengePrize | null = null;
-    if (status !== "upcoming" && !paEmAndamento) {
+    if (status !== "upcoming" && !paEmProgress) {
       if (c.mode === "CONTEST") {
-        vencedor = posicao != null && posicao <= c.prizes.length && alcancaAlvo(resultado);
-        prize = vencedor ? (c.prizes[posicao! - 1] ?? null) : null;
+        winner = position != null && position <= c.prizes.length && alcancaTarget(result);
+        prize = winner ? (c.prizes[position! - 1] ?? null) : null;
       } else {
-        vencedor = alcancaAlvo(resultado) && a.vendas >= minVendas && c.target != null;
-        prize = vencedor ? (c.prizes[0] ?? null) : null;
+        winner = alcancaTarget(result) && a.sales >= minSales && c.target != null;
+        prize = winner ? (c.prizes[0] ?? null) : null;
       }
     }
 
-    let falta: string | null = null;
-    if (status === "active" && resultado != null) {
-      if (a.vendas < minVendas) falta = faltaVendas(minVendas - a.vendas);
-      else if (paEmAndamento && alcancaAlvo(resultado) && (c.mode === "MINIMUM" || (posicao != null && posicao <= c.prizes.length))) {
-        falta = "O P.A. só vale no fim do desafio";
+    let gap: string | null = null;
+    if (status === "active" && result != null) {
+      if (a.sales < minSales) gap = gapSales(minSales - a.sales);
+      else if (paEmProgress && alcancaTarget(result) && (c.mode === "MINIMUM" || (position != null && position <= c.prizes.length))) {
+        gap = "O P.A. só vale no fim do desafio";
       } else if (c.mode === "MINIMUM") {
-        if (!vencedor && c.target != null) falta = `${faltaLabel(c.metric, c.target - resultado)} para o mínimo`;
-      } else if (c.target != null && resultado < c.target - 1e-9) {
-        falta = `${faltaLabel(c.metric, c.target - resultado)} para o mínimo`;
+        if (!winner && c.target != null) gap = `${gapLabel(c.metric, c.target - result)} para o mínimo`;
+      } else if (c.target != null && result < c.target - 1e-9) {
+        gap = `${gapLabel(c.metric, c.target - result)} para o mínimo`;
       } else {
-        const acima = valoresAcima
-          .filter((v) => v.amount > resultado + 1e-9)
+        const above = amountsAbove
+          .filter((v) => v.amount > result + 1e-9)
           .sort((x, y) => x.amount - y.amount)[0];
-        if (acima) falta = `${faltaLabel(c.metric, acima.amount - resultado)} para o ${acima.posicao}º lugar`;
+        if (above) gap = `${gapLabel(c.metric, above.amount - result)} para o ${above.position}º lugar`;
       }
     }
 
-    return { key: a.key, name: a.name, group: a.group, resultado, vendas: a.vendas, posicao, vencedor, prize, falta };
+    return { key: a.key, name: a.name, group: a.group, result, sales: a.sales, position, winner, prize, gap };
   });
 
   participants.sort((x, y) => {
     if (status !== "upcoming") {
       if (c.mode === "CONTEST") {
-        const px = x.posicao ?? Number.POSITIVE_INFINITY;
-        const py = y.posicao ?? Number.POSITIVE_INFINITY;
+        const px = x.position ?? Number.POSITIVE_INFINITY;
+        const py = y.position ?? Number.POSITIVE_INFINITY;
         if (px !== py) return px - py;
-      } else if (x.vencedor !== y.vencedor) return x.vencedor ? -1 : 1;
-      const rx = x.resultado ?? Number.NEGATIVE_INFINITY;
-      const ry = y.resultado ?? Number.NEGATIVE_INFINITY;
+      } else if (x.winner !== y.winner) return x.winner ? -1 : 1;
+      const rx = x.result ?? Number.NEGATIVE_INFINITY;
+      const ry = y.result ?? Number.NEGATIVE_INFINITY;
       if (rx !== ry) return ry - rx;
     }
     return x.name.localeCompare(y.name, "pt-BR");
   });
 
-  let gerencia: ChallengeManagerResult | null = null;
+  let management: ChallengeManagerResult | null = null;
   const managerGoal = c.managerTarget;
   if (c.managerPrize && managerGoal != null && c.metric === "INDEX") {
     const janelas = managerIndexWindows(c, today);
-    const pessoasNa = (j: DayRange) => {
+    const peopleIn = (j: DayRange) => {
       const m = new Map<string, IndexPersonTotals>();
       for (const r of aggs.sellerDays) {
         if (r.storeId !== c.storeId || r.day < j.from || r.day > j.to) continue;
-        const membro = membroDoDia(r);
-        const key = membro ? `e:${membro.employeeId}` : r.sellerKey ? `n:${r.sellerKey}` : null;
+        const member = memberOfDay(r);
+        const key = member ? `e:${member.employeeId}` : r.sellerKey ? `n:${r.sellerKey}` : null;
         if (!key) continue;
-        const p = m.get(key) ?? { revenue: 0, vendas: 0, itens: 0, semItens: false };
+        const p = m.get(key) ?? { revenue: 0, sales: 0, items: 0, withoutItems: false };
         p.revenue += r.revenueCents;
-        p.vendas += r.salesCount;
-        p.itens += r.itemCount ?? 0;
-        if (r.salesCount > 0 && !(r.itemCount && r.itemCount > 0)) p.semItens = true;
+        p.sales += r.salesCount;
+        p.items += r.itemCount ?? 0;
+        if (r.salesCount > 0 && !(r.itemCount && r.itemCount > 0)) p.withoutItems = true;
         m.set(key, p);
       }
       return [...m.values()];
     };
-    const indice =
-      status === "upcoming" || !janelas.atual || !janelas.comparado
+    const index =
+      status === "upcoming" || !janelas.current || !janelas.comparado
         ? null
-        : teamIndex(pessoasNa(janelas.atual), pessoasNa(janelas.comparado));
-    const resultado = indice == null ? null : round2(indice);
-    gerencia = {
-      resultado,
-      alvo: managerGoal,
-      periodoAnterior: janelas.anterior,
-      atingiu: resultado != null && resultado >= managerGoal - 1e-9,
+        : teamIndex(peopleIn(janelas.current), peopleIn(janelas.comparado));
+    const result = index == null ? null : round2(index);
+    management = {
+      result,
+      target: managerGoal,
+      periodPrevious: janelas.previous,
+      atingiu: result != null && result >= managerGoal - 1e-9,
       prize: c.managerPrize,
     };
   } else if (c.managerPrize && managerGoal != null) {
-    let resultado: number | null = null;
+    let result: number | null = null;
     if (status !== "upcoming") {
-      const todos = [...accs.values()];
-      const vendas = todos.reduce((s, a) => s + a.vendas, 0);
+      const all = [...accs.values()];
+      const sales = all.reduce((s, a) => s + a.sales, 0);
       if (usesScope(c.metric)) {
-        const porPessoa = todos.map(resultadoDe);
-        resultado = porPessoa.some((v) => v == null)
+        const byPerson = all.map(resultOf);
+        result = byPerson.some((v) => v == null)
           ? null
-          : todos.length > 0
-            ? round2(porPessoa.reduce<number>((s, v) => s + (v ?? 0), 0) / todos.length)
+          : all.length > 0
+            ? round2(byPerson.reduce<number>((s, v) => s + (v ?? 0), 0) / all.length)
             : 0;
       } else if (c.metric === "PA") {
-        resultado = todos.some((a) => a.semItens)
+        result = all.some((a) => a.withoutItems)
           ? null
-          : vendas > 0
-            ? round2(todos.reduce((s, a) => s + a.itensVendas, 0) / vendas)
+          : sales > 0
+            ? round2(all.reduce((s, a) => s + a.itemsSales, 0) / sales)
             : 0;
       } else {
-        resultado = vendas > 0 ? round2(todos.reduce((s, a) => s + a.faturamentoCents, 0) / 100 / vendas) : 0;
+        result = sales > 0 ? round2(all.reduce((s, a) => s + a.revenueCents, 0) / 100 / sales) : 0;
       }
     }
-    gerencia = {
-      resultado,
-      alvo: managerGoal,
-      periodoAnterior: null,
-      atingiu: (c.metric !== "PA" || status === "ended") && resultado != null && resultado > 0 && resultado >= managerGoal - 1e-9,
+    management = {
+      result,
+      target: managerGoal,
+      periodPrevious: null,
+      atingiu: (c.metric !== "PA" || status === "ended") && result != null && result > 0 && result >= managerGoal - 1e-9,
       prize: c.managerPrize,
     };
   }
 
-  const diasIncompletos: string[] = [];
-  if (porProduto && status !== "upcoming") {
-    const comItens = new Set(aggs.sellerProducts.filter(inPeriod).map((r) => r.day));
-    for (const day of eachDay(c.startsOn, ate)) {
-      if (aggs.storeSaleDays.has(`${c.storeId}|${day}`) && !comItens.has(day)) diasIncompletos.push(day);
+  const daysIncomplete: string[] = [];
+  if (byProduct && status !== "upcoming") {
+    const withItems = new Set(aggs.sellerProducts.filter(inPeriod).map((r) => r.day));
+    for (const day of eachDay(c.startsOn, until)) {
+      if (aggs.storeSaleDays.has(`${c.storeId}|${day}`) && !withItems.has(day)) daysIncomplete.push(day);
     }
   }
 
   const prazo =
     status === "active"
-      ? prazoRestante(daysBetween(today, c.endsOn))
+      ? prazoRemaining(daysBetween(today, c.endsOn))
       : status === "upcoming"
         ? `Começa em ${shortDate(c.startsOn)}`
         : "Encerrado";
@@ -435,11 +435,11 @@ export function buildChallengeView(args: {
     mode: c.mode,
     status,
     prazo,
-    emFechamento: status === "ended" && today <= addDays(c.endsOn, 1),
+    emClosing: status === "ended" && today <= addDays(c.endsOn, 1),
     participants,
-    atingiram: c.mode === "MINIMUM" ? participants.filter((p) => p.vencedor).length : 0,
-    gerencia,
-    diasIncompletos,
+    reachedCount: c.mode === "MINIMUM" ? participants.filter((p) => p.winner).length : 0,
+    management,
+    daysIncomplete,
   };
 }
 
@@ -447,60 +447,60 @@ export interface ChallengeWinner {
   name: string;
   group: string | null;
   /** "1 lugar"  |  "Atingiu" */
-  colocacao: string;
+  rank: string;
   prize: ChallengePrize;
 }
 
 export interface ChallengePayout {
   vencedores: ChallengeWinner[];
-  gerencia: ChallengePrize | null;
+  management: ChallengePrize | null;
   /**  premios em R$ (pessoas + gerencia). */
-  totalReais: number;
+  totalBrl: number;
   /** Outros premios (texto livre), um por vencedor (+ gerencia). */
   especie: string[];
 }
 
 export function challengePayout(view: ChallengeView): ChallengePayout {
   const vencedores: ChallengeWinner[] = view.participants
-    .filter((p) => p.vencedor && p.prize)
+    .filter((p) => p.winner && p.prize)
     .map((p) => ({
       name: p.name,
       group: p.group,
-      colocacao: p.posicao != null ? `${p.posicao}º lugar` : "Atingiu",
+      rank: p.position != null ? `${p.position}º lugar` : "Atingiu",
       prize: p.prize!,
     }));
-  const gerencia = view.gerencia?.atingiu ? view.gerencia.prize : null;
-  const premios = [...vencedores.map((w) => w.prize), ...(gerencia ? [gerencia] : [])];
+  const management = view.management?.atingiu ? view.management.prize : null;
+  const prizes = [...vencedores.map((w) => w.prize), ...(management ? [management] : [])];
   return {
     vencedores,
-    gerencia,
-    totalReais: premios.reduce((s, p) => s + (p.kind === "MONEY" ? p.amount : 0), 0),
-    especie: premios.flatMap((p) => (p.kind === "ITEM" ? [p.label] : [])),
+    management,
+    totalBrl: prizes.reduce((s, p) => s + (p.kind === "MONEY" ? p.amount : 0), 0),
+    especie: prizes.flatMap((p) => (p.kind === "ITEM" ? [p.label] : [])),
   };
 }
 
-function juntarNomes(nomes: string[]): string {
-  if (nomes.length <= 1) return nomes[0] ?? "";
-  return `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}`;
+function joinNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} e ${names[names.length - 1]}`;
 }
 
 /** Resumo do card da listagem: lider(es) na Disputa  |  quantas atingiram no Minimo. */
-export function challengeCardSummary(view: ChallengeView): { lider: string | null; atingiram: number | null } {
-  if (view.mode === "MINIMUM") return { lider: null, atingiram: view.status === "upcoming" ? null : view.atingiram };
-  const lideres = view.participants.filter((p) => p.posicao === 1).map((p) => p.name);
-  return { lider: lideres.length > 0 ? juntarNomes(lideres) : null, atingiram: null };
+export function challengeCardSummary(view: ChallengeView): { leader: string | null; reachedCount: number | null } {
+  if (view.mode === "MINIMUM") return { leader: null, reachedCount: view.status === "upcoming" ? null : view.reachedCount };
+  const leaders = view.participants.filter((p) => p.position === 1).map((p) => p.name);
+  return { leader: leaders.length > 0 ? joinNames(leaders) : null, reachedCount: null };
 }
 
 /** Copia para "Duplicar desafio": comeca no dia seguinte ao fim, com a mesma duracao. */
 export function copyChallenge(c: ChallengeRecord): ChallengeInput {
   const { id: _id, ...rest } = c;
-  const duracao = daysBetween(c.startsOn, c.endsOn);
+  const duration = daysBetween(c.startsOn, c.endsOn);
   const startsOn = addDays(c.endsOn, 1);
   return {
     ...rest,
     name: `${c.name} (cópia)`,
     startsOn,
-    endsOn: addDays(startsOn, duracao - 1),
+    endsOn: addDays(startsOn, duration - 1),
     products: c.products.map((p) => ({ ...p })),
     categories: c.categories.map((t) => ({ ...t })),
     prizes: c.prizes.map((p) => ({ ...p })),

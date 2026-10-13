@@ -33,12 +33,12 @@ describe("buildCashCloseView", () => {
   it("soma TEF no cartão e deixa a Stone em branco enquanto o arquivo não chegou", () => {
     const view = buildCashCloseView({
       millennium: [
-        { paymentMethod: "DINHEIRO", openingCents: 44775, sangriaCents: -485000, closingCents: -10275, typedCents: 25850 },
-        { paymentMethod: "CARTÃO CRÉDITO", openingCents: 0, sangriaCents: null, closingCents: 2_068_060, typedCents: 2_145_930 },
-        { paymentMethod: "TEF CARTÃO CRÉDITO", openingCents: 0, sangriaCents: null, closingCents: 44910, typedCents: 44910 },
-        { paymentMethod: "CARTÃO DÉBITO", openingCents: 0, sangriaCents: null, closingCents: 1_740_940, typedCents: 1_778_890 },
-        { paymentMethod: "TEF CARTÃO DÉBITO", openingCents: 0, sangriaCents: null, closingCents: 66100, typedCents: 66100 },
-        { paymentMethod: "PIX", openingCents: 0, sangriaCents: null, closingCents: 1_431_330, typedCents: 1_433_930 },
+        { paymentMethod: "DINHEIRO", openingCents: 44775, cashDropCents: -485000, closingCents: -10275, typedCents: 25850 },
+        { paymentMethod: "CARTÃO CRÉDITO", openingCents: 0, cashDropCents: null, closingCents: 2_068_060, typedCents: 2_145_930 },
+        { paymentMethod: "TEF CARTÃO CRÉDITO", openingCents: 0, cashDropCents: null, closingCents: 44910, typedCents: 44910 },
+        { paymentMethod: "CARTÃO DÉBITO", openingCents: 0, cashDropCents: null, closingCents: 1_740_940, typedCents: 1_778_890 },
+        { paymentMethod: "TEF CARTÃO DÉBITO", openingCents: 0, cashDropCents: null, closingCents: 66100, typedCents: 66100 },
+        { paymentMethod: "PIX", openingCents: 0, cashDropCents: null, closingCents: 1_431_330, typedCents: 1_433_930 },
       ],
       card: null,
       pixCents: null,
@@ -51,14 +51,14 @@ describe("buildCashCloseView", () => {
     expect(debit).toMatchObject({ systemCents: 1_807_040, stoneCents: null });
     expect(pix?.stoneCents).toBeNull();
     expect(view.pixPending).toBe(true);
-    expect(view.lines.find((l) => l.key === "cash")?.sangriaCents).toBe(-485000);
+    expect(view.lines.find((l) => l.key === "cash")?.cashDropCents).toBe(-485000);
   });
 
   it("com os arquivos gravados, a Stone entra na conferência", () => {
     const view = buildCashCloseView({
       millennium: [
-        { paymentMethod: "CARTÃO CRÉDITO", openingCents: 0, sangriaCents: null, closingCents: 1000, typedCents: 1000 },
-        { paymentMethod: "PIX", openingCents: 0, sangriaCents: null, closingCents: 500, typedCents: 500 },
+        { paymentMethod: "CARTÃO CRÉDITO", openingCents: 0, cashDropCents: null, closingCents: 1000, typedCents: 1000 },
+        { paymentMethod: "PIX", openingCents: 0, cashDropCents: null, closingCents: 500, typedCents: 500 },
       ],
       card: { creditCents: 1000, debitCents: 0, otherCents: 0 },
       pixCents: 480,
@@ -69,16 +69,16 @@ describe("buildCashCloseView", () => {
   });
 
   it("marca falta no calendário e, sem diferença, o dia fechado", () => {
-    const falta = cashCloseChips({
-      millennium: [{ paymentMethod: "DINHEIRO", openingCents: 0, sangriaCents: null, closingCents: 10000, typedCents: 8000 }],
+    const gap = cashCloseChips({
+      millennium: [{ paymentMethod: "DINHEIRO", openingCents: 0, cashDropCents: null, closingCents: 10000, typedCents: 8000 }],
       card: null,
       pixCents: null,
       pixRequested: false,
     });
-    expect(falta[0]).toMatchObject({ tone: "bad", label: expect.stringContaining("Dinheiro") });
+    expect(gap[0]).toMatchObject({ tone: "bad", label: expect.stringContaining("Dinheiro") });
 
     const ok = cashCloseChips({
-      millennium: [{ paymentMethod: "DINHEIRO", openingCents: 0, sangriaCents: null, closingCents: 10000, typedCents: 10000 }],
+      millennium: [{ paymentMethod: "DINHEIRO", openingCents: 0, cashDropCents: null, closingCents: 10000, typedCents: 10000 }],
       card: null,
       pixCents: null,
       pixRequested: true,
@@ -86,7 +86,7 @@ describe("buildCashCloseView", () => {
     expect(ok.map((c) => c.key)).toEqual(["pix-pending"]);
 
     const closed = cashCloseChips({
-      millennium: [{ paymentMethod: "DINHEIRO", openingCents: 0, sangriaCents: null, closingCents: 10000, typedCents: 10000 }],
+      millennium: [{ paymentMethod: "DINHEIRO", openingCents: 0, cashDropCents: null, closingCents: 10000, typedCents: 10000 }],
       card: null,
       pixCents: null,
       pixRequested: false,
@@ -96,13 +96,13 @@ describe("buildCashCloseView", () => {
 
   it("o gestor troca o dinheiro digitado e a falta assumida sai do desconto", () => {
     const base = {
-      millennium: [{ paymentMethod: "DINHEIRO", openingCents: 0, sangriaCents: null, closingCents: 10000, typedCents: 8000 }],
+      millennium: [{ paymentMethod: "DINHEIRO", openingCents: 0, cashDropCents: null, closingCents: 10000, typedCents: 8000 }],
       card: null,
       pixCents: null,
       pixRequested: false,
     };
-    const ajustado = applyCashReview(base, { cashTypedCents: 9000, waive: false });
-    expect(ajustado.millennium[0]?.typedCents).toBe(9000);
+    const adjusted = applyCashReview(base, { cashTypedCents: 9000, waive: false });
+    expect(adjusted.millennium[0]?.typedCents).toBe(9000);
     const chips = cashCloseChips(base);
     expect(chipsAfterReview(chips, { cashTypedCents: 8000, waive: true })[0]).toMatchObject({
       label: "Falta assumida",
@@ -113,9 +113,9 @@ describe("buildCashCloseView", () => {
   it("o valor digitado entra uma vez na linha já somada", () => {
     const base = {
       millennium: [
-        { paymentMethod: "DINHEIRO", openingCents: 0, sangriaCents: null, closingCents: 6000, typedCents: 4000 },
-        { paymentMethod: "DINHEIRO", openingCents: 0, sangriaCents: null, closingCents: 4000, typedCents: 4000 },
-        { paymentMethod: "CARTÃO DÉBITO", openingCents: 0, sangriaCents: null, closingCents: 1000, typedCents: 1000 },
+        { paymentMethod: "DINHEIRO", openingCents: 0, cashDropCents: null, closingCents: 6000, typedCents: 4000 },
+        { paymentMethod: "DINHEIRO", openingCents: 0, cashDropCents: null, closingCents: 4000, typedCents: 4000 },
+        { paymentMethod: "CARTÃO DÉBITO", openingCents: 0, cashDropCents: null, closingCents: 1000, typedCents: 1000 },
       ],
       card: null,
       pixCents: null,
@@ -144,15 +144,15 @@ describe("buildCashCloseView", () => {
 });
 
 describe("resumo do fechamento", () => {
-  const dinheiro = (system: number, typed: number) => ({
-    millennium: [{ paymentMethod: "DINHEIRO", openingCents: 0, sangriaCents: null, closingCents: system, typedCents: typed }],
+  const cash = (system: number, typed: number) => ({
+    millennium: [{ paymentMethod: "DINHEIRO", openingCents: 0, cashDropCents: null, closingCents: system, typedCents: typed }],
     card: null,
     pixCents: null,
     pixRequested: false,
   });
 
   it("soma sistema e digitado e marca o dia pendente enquanto a Stone não chega", () => {
-    const view = buildCashCloseView({ ...dinheiro(10000, 10000), pixRequested: true });
+    const view = buildCashCloseView({ ...cash(10000, 10000), pixRequested: true });
     expect(closeDayTotals(view.lines)).toEqual({ systemCents: 10000, typedCents: 10000, diffCents: 0 });
     expect(dayAwaitingClose({ hasMillennium: true, pixRequested: true, pixCents: null })).toBe(true);
     expect(closeDayFace({ awaiting: true, hasLines: true, hasGap: false })).toBe("pending");
@@ -161,9 +161,9 @@ describe("resumo do fechamento", () => {
   it("soma o total real do cartão mesmo quando o digitado bate com o Millennium", () => {
     const view = buildCashCloseView({
       millennium: [
-        { paymentMethod: "DINHEIRO", openingCents: 100, sangriaCents: null, closingCents: 18470, typedCents: 18470 },
-        { paymentMethod: "CARTÃO DE DÉBITO", openingCents: 0, sangriaCents: null, closingCents: 0, typedCents: 0 },
-        { paymentMethod: "CARTÃO DE CRÉDITO", openingCents: 0, sangriaCents: null, closingCents: 0, typedCents: 0 },
+        { paymentMethod: "DINHEIRO", openingCents: 100, cashDropCents: null, closingCents: 18470, typedCents: 18470 },
+        { paymentMethod: "CARTÃO DE DÉBITO", openingCents: 0, cashDropCents: null, closingCents: 0, typedCents: 0 },
+        { paymentMethod: "CARTÃO DE CRÉDITO", openingCents: 0, cashDropCents: null, closingCents: 0, typedCents: 0 },
       ],
       card: { creditCents: 0, debitCents: 100, otherCents: 0 },
       pixCents: null,
@@ -174,7 +174,7 @@ describe("resumo do fechamento", () => {
 
   it("não inventa quebra enquanto o total real do Pix não foi informado", () => {
     const view = buildCashCloseView({
-      millennium: [{ paymentMethod: "PIX", openingCents: 0, sangriaCents: null, closingCents: 2541340, typedCents: 2538250 }],
+      millennium: [{ paymentMethod: "PIX", openingCents: 0, cashDropCents: null, closingCents: 2541340, typedCents: 2538250 }],
       card: null,
       pixCents: null,
       pixRequested: true,
@@ -204,7 +204,7 @@ describe("resumo do fechamento", () => {
       ]),
     ).toBe(2537250);
     const view = buildCashCloseView({
-      millennium: [{ paymentMethod: "PIX", openingCents: 0, sangriaCents: null, closingCents: 2541340, typedCents: 0 }],
+      millennium: [{ paymentMethod: "PIX", openingCents: 0, cashDropCents: null, closingCents: 2541340, typedCents: 0 }],
       card: null,
       pixCents: 2537250,
       pixRequested: false,
@@ -213,7 +213,7 @@ describe("resumo do fechamento", () => {
   });
 
   it("diferença aparece mesmo com arquivo a caminho, e o dia limpo fica fechado", () => {
-    const chips = cashCloseChips(dinheiro(10000, 8000));
+    const chips = cashCloseChips(cash(10000, 8000));
     expect(chipsHaveGap(chips)).toBe(true);
     expect(closeDayFace({ awaiting: true, hasLines: true, hasGap: true })).toBe("difference");
     expect(chipsHaveGap([{ key: "loja-card-pending", label: "Aguardando cartão", tone: "warn" }])).toBe(false);
@@ -225,26 +225,26 @@ describe("resumo do fechamento", () => {
   });
 
   it("dia sem total real fica pendente e fora da diferença do mês", () => {
-    const semArquivo = buildCashCloseView({
-      millennium: [{ paymentMethod: "PIX", openingCents: 0, sangriaCents: null, closingCents: 1000, typedCents: 0 }],
+    const withoutFile = buildCashCloseView({
+      millennium: [{ paymentMethod: "PIX", openingCents: 0, cashDropCents: null, closingCents: 1000, typedCents: 0 }],
       card: null,
       pixCents: null,
       pixRequested: true,
     });
-    expect(dayWithoutReal(semArquivo.lines)).toBe(true);
-    const comArquivo = buildCashCloseView({
-      millennium: [{ paymentMethod: "PIX", openingCents: 0, sangriaCents: null, closingCents: 1000, typedCents: 0 }],
+    expect(dayWithoutReal(withoutFile.lines)).toBe(true);
+    const withFile = buildCashCloseView({
+      millennium: [{ paymentMethod: "PIX", openingCents: 0, cashDropCents: null, closingCents: 1000, typedCents: 0 }],
       card: null,
       pixCents: 1000,
       pixRequested: false,
     });
-    expect(dayWithoutReal(comArquivo.lines)).toBe(false);
+    expect(dayWithoutReal(withFile.lines)).toBe(false);
     const dia09 = assembleMonthMarks({
       millennium: [
-        { storeId: "loja", day: "2026-10-09", paymentMethod: "DINHEIRO", openingCents: 22750, sangriaCents: -90000, closingCents: 25560, typedCents: 29600 },
-        { storeId: "loja", day: "2026-10-09T00:00:00", paymentMethod: "CARTÃO DÉBITO", openingCents: 0, sangriaCents: null, closingCents: 604121, typedCents: 605521 },
-        { storeId: "loja", day: "2026-10-09", paymentMethod: "CARTÃO CRÉDITO", openingCents: 0, sangriaCents: null, closingCents: 1401680, typedCents: 1404080 },
-        { storeId: "loja", day: "2026-10-09", paymentMethod: "PIX", openingCents: 0, sangriaCents: null, closingCents: 631650, typedCents: 640340 },
+        { storeId: "loja", day: "2026-10-09", paymentMethod: "DINHEIRO", openingCents: 22750, cashDropCents: -90000, closingCents: 25560, typedCents: 29600 },
+        { storeId: "loja", day: "2026-10-09T00:00:00", paymentMethod: "CARTÃO DÉBITO", openingCents: 0, cashDropCents: null, closingCents: 604121, typedCents: 605521 },
+        { storeId: "loja", day: "2026-10-09", paymentMethod: "CARTÃO CRÉDITO", openingCents: 0, cashDropCents: null, closingCents: 1401680, typedCents: 1404080 },
+        { storeId: "loja", day: "2026-10-09", paymentMethod: "PIX", openingCents: 0, cashDropCents: null, closingCents: 631650, typedCents: 640340 },
       ],
       files: [
         { storeId: "loja", day: "2026-10-09", kind: "card", status: "received" },

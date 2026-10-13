@@ -54,7 +54,7 @@ type SellerBucket = {
   day: string;
   sellerKey: string;
   sellerName: string;
-  sellerGeradorId: number | null;
+  sellerGeneratorId: number | null;
   revenueCents: number;
   itemCount: number;
   ops: Set<string>;
@@ -329,14 +329,14 @@ export function cashCloseSalesFromRows(rows: SaleRow[], opts: AggregateSalesOpti
         paymentMethod: method,
         revenueCents: row.revenueCents,
         sellerName,
-        sellerGeradorId: row.sellerGeradorId ?? null,
+        sellerGeneratorId: row.sellerGeneratorId ?? null,
       });
       continue;
     }
     prev.revenueCents += row.revenueCents;
     if (row.occurredAt.toISOString() < prev.occurredAt) prev.occurredAt = row.occurredAt.toISOString();
     if (!prev.sellerName && sellerName) prev.sellerName = sellerName;
-    if (prev.sellerGeradorId == null && row.sellerGeradorId != null) prev.sellerGeradorId = row.sellerGeradorId;
+    if (prev.sellerGeneratorId == null && row.sellerGeneratorId != null) prev.sellerGeneratorId = row.sellerGeneratorId;
   }
 
   return [...map.values()].sort(
@@ -374,14 +374,14 @@ export function aggregateSellerDay(
         day,
         sellerKey: key,
         sellerName: display,
-        sellerGeradorId: null,
+        sellerGeneratorId: null,
         revenueCents: 0,
         itemCount: 0,
         ops: new Set(),
       };
       map.set(sk, bucket);
     }
-    if (bucket.sellerGeradorId == null && row.sellerGeradorId != null) bucket.sellerGeradorId = row.sellerGeradorId;
+    if (bucket.sellerGeneratorId == null && row.sellerGeneratorId != null) bucket.sellerGeneratorId = row.sellerGeneratorId;
     bucket.revenueCents += row.revenueCents;
     bucket.itemCount += row.itemQty;
     bucket.ops.add(row.operationCode);
@@ -394,7 +394,7 @@ export function aggregateSellerDay(
       day: b.day,
       sellerKey: b.sellerKey,
       sellerName: b.sellerName,
-      ...(b.sellerGeradorId != null ? { sellerGeradorId: b.sellerGeradorId } : {}),
+      ...(b.sellerGeneratorId != null ? { sellerGeneratorId: b.sellerGeneratorId } : {}),
       brand: "ALL" as const,
       revenueCents: b.revenueCents,
       salesCount: b.ops.size,

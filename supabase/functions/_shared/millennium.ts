@@ -8,7 +8,7 @@ export const CUSTOM_REPORTS = [
     key: "cupom",
     guid: "{52DE7BBC-78D4-7765-A232-A5MAD2840284}",
     name: "WE PINK - PRODUTOS POR CUPOM E VENDEDOR",
-    params: { VENDA_MOVIMENTO_NFS: "", PRODUTO_PRODUTO_PRODUTO: null },
+    params: { SALE_MOVIMENTO_NFS: "", PRODUCT_PRODUCT_PRODUCT: null },
   },
 ] as const;
 
@@ -304,7 +304,7 @@ export async function checkCustomReports(session: string): Promise<ReportCheck[]
                 DATA_DATA_DATA_INTERVAL: 0,
                 DATA_DATA_DATA_START: "2000-01-01",
                 DATA_DATA_DATA_END: "2000-01-01",
-                FILIAL_GERADOR_GERADOR: null,
+                BRANCH_GERADOR_GERADOR: null,
                 ...r.params,
               },
             ],

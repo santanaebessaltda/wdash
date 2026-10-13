@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildProductLineIndex, fragranceOf } from "./productLines";
 
-const CATALOGO = [
+const CATALOG = [
   "DESOD COL OBSESSED 100ML - WEPINK",
   "DESOD COL OBSESSED DELUXE 100 ML - WEPINK",
   "DESOD COL OBSESSED INTENSE 100ML - WEPINK",
@@ -43,7 +43,7 @@ describe("fragranceOf", () => {
 });
 
 describe("buildProductLineIndex", () => {
-  const idx = buildProductLineIndex(CATALOGO);
+  const idx = buildProductLineIndex(CATALOG);
   const line = (d: string) => idx.lineOf(d)?.line ?? null;
 
   it("agrupa a mesma fragrância em todos os tipos", () => {

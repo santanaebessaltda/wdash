@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Alert, AlertLink, useToast } from "@/components/ui";
 import type { ProductWithoutCost } from "@/data/wedash/dashboard";
 import { syncProductsNow } from "@/data/wedash/productCatalog";
-import { isGestor } from "@/layout/nav-wedash";
+import { isOwner } from "@/layout/nav-wedash";
 import { brlCent, num } from "@/lib/format";
 import { useActiveSession } from "@/session/SessionProvider";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
@@ -14,22 +14,22 @@ import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
  * de custo e a margem das lojas afetadas no periodo da tela.
  */
 export function ProductsWithoutCostNotice({
-  produtos,
+  products,
   storeIds,
   from,
   to,
 }: {
-  produtos?: ProductWithoutCost[];
+  products?: ProductWithoutCost[];
   storeIds: string[];
   from: string;
   to: string;
 }) {
   const session = useActiveSession();
   const { show } = useToast();
-  const [open, setAberto] = useState(false);
+  const [open, setOpen] = useState(false);
   const [atualizando, setAtualizando] = useState(false);
-  if (!produtos || produtos.length === 0) return null;
-  const n = produtos.length;
+  if (!products || products.length === 0) return null;
+  const n = products.length;
 
   async function refreshCosts() {
     if (atualizando) return;
@@ -58,8 +58,8 @@ export function ProductsWithoutCostNotice({
       title={n === 1 ? "1 produto está sem custo no Millennium." : `${n} produtos estão sem custo no Millennium.`}
       action={
         <>
-          <AlertLink onClick={() => setAberto((v) => !v)}>{open ? "Ocultar" : "Ver produtos"}</AlertLink>
-          {isGestor(session.role) && (
+          <AlertLink onClick={() => setOpen((v) => !v)}>{open ? "Ocultar" : "Ver produtos"}</AlertLink>
+          {isOwner(session.role) && (
             <AlertLink
               onClick={() => void refreshCosts()}
               disabled={atualizando}
@@ -73,7 +73,7 @@ export function ProductsWithoutCostNotice({
       footer={
         open && (
           <ul className="mt-2.5 divide-y divide-warn/20 border-t border-warn/20 text-[12.5px] text-t0">
-            {produtos.map((p) => (
+            {products.map((p) => (
               <li key={p.code} className="flex flex-col gap-0.5 py-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                 <span className="min-w-0 break-words sm:truncate">
                   <span className="font-mono text-t2">{p.code}</span>
@@ -88,7 +88,7 @@ export function ProductsWithoutCostNotice({
         )
       }
     >
-      Isso pode deixar o CMV e a margem incorretos.
+      Isso can deixar o CMV e a margin incorretos.
     </Alert>
   );
 }

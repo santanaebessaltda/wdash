@@ -137,9 +137,9 @@ describe("buildPurchaseOrderView", () => {
       { "BSPPAR-ATH-001": 15 },
     );
     expect(v.rows.map((r) => r.code)).toEqual(["BSPPAR-ATH-001", "WP014", "X1", "SEM"]);
-    expect(v.rows[1]).toMatchObject({ bloqueado: false, podePedir: false, minimum: 24, saldo: 8, aPedir: null, noPedido: false });
-    expect(v.rows[2]).toMatchObject({ bloqueado: true, podePedir: false, minimum: 12, saldo: 4, aPedir: null, noPedido: false });
-    expect(v.rows[3]).toMatchObject({ podePedir: false, saldo: 3, aPedir: null, noPedido: false });
+    expect(v.rows[1]).toMatchObject({ blocked: false, canRequest: false, minimum: 24, saldo: 8, aRequest: null, onOrder: false });
+    expect(v.rows[2]).toMatchObject({ blocked: true, canRequest: false, minimum: 12, saldo: 4, aRequest: null, onOrder: false });
+    expect(v.rows[3]).toMatchObject({ canRequest: false, saldo: 3, aRequest: null, onOrder: false });
     expect(purchaseOrderFileRows(v).map((r) => r[0])).toEqual(["BSPPAR-ATH-001"]);
     expect(v.rows[0]).toMatchObject({
       code: "BSPPAR-ATH-001",
@@ -155,28 +155,28 @@ describe("buildPurchaseOrderView", () => {
 
   it("abaixo do mínimo: destaca e mostra A pedir da regra (PC-03 AC 4)", () => {
     const r = view([stock()], { "BSPPAR-ATH-001": 72 }).rows[0];
-    expect(r.noPedido).toBe(true);
-    expect(r.aPedir).toBe(72);
+    expect(r.onOrder).toBe(true);
+    expect(r.aRequest).toBe(72);
   });
 
   it("mínimo vazio ou 0: A pedir '—' (null) e sem destaque (PC-03 AC 5)", () => {
-    const [semMin, zero] = view([stock(), stock({ code: "B2", position: 1 })], { B2: 0 }).rows;
-    expect(semMin.aPedir).toBeNull();
-    expect(semMin.noPedido).toBe(false);
-    expect(zero.aPedir).toBeNull();
-    expect(zero.noPedido).toBe(false);
+    const [withoutMin, zero] = view([stock(), stock({ code: "B2", position: 1 })], { B2: 0 }).rows;
+    expect(withoutMin.aRequest).toBeNull();
+    expect(withoutMin.onOrder).toBe(false);
+    expect(zero.aRequest).toBeNull();
+    expect(zero.onOrder).toBe(false);
   });
 
   it("com estoque suficiente: A pedir 0 e sem destaque", () => {
     const r = view([stock({ total: 80 })], { "BSPPAR-ATH-001": 72 }).rows[0];
-    expect(r.aPedir).toBe(0);
-    expect(r.noPedido).toBe(false);
+    expect(r.aRequest).toBe(0);
+    expect(r.onOrder).toBe(false);
   });
 
   it("selo Novo pela data de cadastro (PC-02)", () => {
-    const [velho, novo] = view([stock(), stock({ code: "N1", registeredAt: "2026-09-20", position: 1 })]).rows;
-    expect(velho.novo).toBe(false);
-    expect(novo.novo).toBe(true);
+    const [old, isNew] = view([stock(), stock({ code: "N1", registeredAt: "2026-09-20", position: 1 })]).rows;
+    expect(old.isNew).toBe(false);
+    expect(isNew.isNew).toBe(true);
   });
 
   it("Novo também quando a loja nunca vendeu, com histórico que cobre (PC-02)", () => {
@@ -189,17 +189,17 @@ describe("buildPurchaseOrderView", () => {
       factor: 1,
       todayIso: TODAY,
     });
-    expect(v.rows.map((r) => [r.code, r.novo])).toEqual([
+    expect(v.rows.map((r) => [r.code, r.isNew])).toEqual([
       ["BSPPAR-ATH-001", true],
       ["V1", false],
       ["N1", true],
     ]);
-    expect(v.contagens.novos).toBe(2);
+    expect(v.counts.novos).toBe(2);
   });
 
   it("sem histórico que cobre (soldEver null), Novo só pela data de cadastro (PC-02)", () => {
     const v = buildPurchaseOrderView({ stock: [stock()], mins: new Map(), sold30: new Map(), soldEver: null, factor: 1, todayIso: TODAY });
-    expect(v.rows[0].novo).toBe(false);
+    expect(v.rows[0].isNew).toBe(false);
   });
 
   it("bloqueado para compra aparece, nunca vira Novo e não entra no pedido (PC-01, PC-02)", () => {
@@ -212,8 +212,8 @@ describe("buildPurchaseOrderView", () => {
       todayIso: TODAY,
     });
     expect(v.rows).toHaveLength(1);
-    expect(v.rows[0]).toMatchObject({ bloqueado: true, novo: false, minimum: 24, aPedir: null, noPedido: false });
-    expect(v.contagens.semMinimo).toBe(0);
+    expect(v.rows[0]).toMatchObject({ blocked: true, isNew: false, minimum: 24, aRequest: null, onOrder: false });
+    expect(v.counts.withoutMinimum).toBe(0);
     expect(purchaseOrderFileRows(v)).toEqual([]);
   });
 
@@ -224,15 +224,15 @@ describe("buildPurchaseOrderView", () => {
     );
     expect(v.rows).toHaveLength(1);
     expect(v.rows[0].variasVariantes).toBe(true);
-    expect(v.rows[0].aPedir).toBeNull();
-    expect(v.rows[0].noPedido).toBe(false);
-    expect(v.summary).toEqual({ produtos: 0, itens: 0 });
+    expect(v.rows[0].aRequest).toBeNull();
+    expect(v.rows[0].onOrder).toBe(false);
+    expect(v.summary).toEqual({ products: 0, items: 0 });
   });
 
   it("uma variante bloqueada não conta como variante elegível", () => {
     const v = view([stock({ code: "41228", size: "P" }), stock({ code: "41228", size: "M", blocked: true, position: 1 })], { "41228": 72 });
     expect(v.rows[0].variasVariantes).toBe(false);
-    expect(v.rows[0].aPedir).toBe(72);
+    expect(v.rows[0].aRequest).toBe(72);
   });
 
   it("mínimo de produto que não veio no relatório não gera linha", () => {
@@ -246,10 +246,10 @@ describe("buildPurchaseOrderView", () => {
       stock({ code: "C", total: 0, position: 2, registeredAt: "2026-10-01" }),
     ];
     const mins = { A: 72, B: 24 };
-    expect(view(rows, mins, 1).summary).toEqual({ produtos: 1, itens: 72 });
+    expect(view(rows, mins, 1).summary).toEqual({ products: 1, items: 72 });
     const dobrado = view(rows, mins, 2);
-    expect(dobrado.summary).toEqual({ produtos: 2, itens: 144 + 24 });
-    expect(dobrado.contagens).toEqual({ noPedido: 2, semMinimo: 1, novos: 1 });
+    expect(dobrado.summary).toEqual({ products: 2, items: 144 + 24 });
+    expect(dobrado.counts).toEqual({ onOrder: 2, withoutMinimum: 1, novos: 1 });
   });
 });
 
@@ -326,8 +326,8 @@ describe("filterPurchaseRows (PC-04 AC 7, 8)", () => {
     ],
     { A1: 12, C3: 12 },
   );
-  const codes = (filtro: Parameters<typeof filterPurchaseRows>[1]["filtro"], busca = "") =>
-    filterPurchaseRows(v.rows, { busca, filtro }).map((r) => r.code);
+  const codes = (filter: Parameters<typeof filterPurchaseRows>[1]["filtro"], search = "") =>
+    filterPurchaseRows(v.rows, { search, filter }).map((r) => r.code);
 
   it("busca no nome sem diferenciar maiúsculas e acentos", () => {
     expect(codes("todos", "colonia")).toEqual(["A1"]);
@@ -341,9 +341,9 @@ describe("filterPurchaseRows (PC-04 AC 7, 8)", () => {
   });
   it("Sem mínimo = mínimo vazio ou 0", () => {
     expect(codes("semMinimo")).toEqual(["B2"]);
-    const comZero = view([stock({ code: "Z0", total: 0 }), stock({ code: "N1", total: 0, position: 1 }), stock({ code: "M5", total: 0, position: 2 })], { Z0: 0, M5: 5 });
-    expect(filterPurchaseRows(comZero.rows, { busca: "", filtro: "semMinimo" }).map((r) => r.code)).toEqual(["Z0", "N1"]);
-    expect(comZero.contagens.semMinimo).toBe(2);
+    const withZero = view([stock({ code: "Z0", total: 0 }), stock({ code: "N1", total: 0, position: 1 }), stock({ code: "M5", total: 0, position: 2 })], { Z0: 0, M5: 5 });
+    expect(filterPurchaseRows(withZero.rows, { search: "", filter: "semMinimo" }).map((r) => r.code)).toEqual(["Z0", "N1"]);
+    expect(withZero.counts.withoutMinimum).toBe(2);
   });
   it("Novos = só com selo Novo", () => {
     expect(codes("novos")).toEqual(["B2"]);
@@ -375,13 +375,13 @@ describe("cópia de mínimos", () => {
       factor: 1,
       todayIso: TODAY,
     };
-    const com = buildPurchaseOrderView({ ...base, costs: new Map([["BSPPAR-ATH-001", 1500]]) });
-    expect(com.rows[0].custoCents).toBe(1500);
-    expect(purchaseLineCents(com.rows[0])).toBe(9000);
-    expect(purchaseOrderTotalCents(com.rows)).toBe(9000);
-    const sem = buildPurchaseOrderView({ ...base, costs: new Map([["BSPPAR-ATH-001", 0]]) });
-    expect(sem.rows[0].custoCents).toBeNull();
-    expect(purchaseOrderTotalCents(sem.rows)).toBeNull();
+    const withValue = buildPurchaseOrderView({ ...base, costs: new Map([["BSPPAR-ATH-001", 1500]]) });
+    expect(withValue.rows[0].costCents).toBe(1500);
+    expect(purchaseLineCents(withValue.rows[0])).toBe(9000);
+    expect(purchaseOrderTotalCents(withValue.rows)).toBe(9000);
+    const without = buildPurchaseOrderView({ ...base, costs: new Map([["BSPPAR-ATH-001", 0]]) });
+    expect(without.rows[0].costCents).toBeNull();
+    expect(purchaseOrderTotalCents(without.rows)).toBeNull();
     const misto = buildPurchaseOrderView({
       stock: [
         stock({ balance: 0, openOrder: 0, total: 0, multiple: 6 }),

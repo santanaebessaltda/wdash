@@ -80,17 +80,17 @@ export function DataTable<T>({
   const [sortDir, setSortDir] = useState<SortDir>(defaultSortDir);
 
   // Se a coluna ativa sumiu (ex.: troca meta on/off), limpa o sort e volta a ordem original.
-  const sortKeyAtivo = sortKey && sortableCols.some((c) => c.key === sortKey) ? sortKey : undefined;
+  const sortKeyActive = sortKey && sortableCols.some((c) => c.key === sortKey) ? sortKey : undefined;
 
   const sorted = useMemo(() => {
-    if (!sortKeyAtivo) return data;
-    const col = columns.find((c) => c.key === sortKeyAtivo);
+    if (!sortKeyActive) return data;
+    const col = columns.find((c) => c.key === sortKeyActive);
     if (!col?.sortValue) return data;
     return [...data].sort((a, b) => compareSortValues(col.sortValue!(a), col.sortValue!(b), sortDir));
-  }, [columns, data, sortKeyAtivo, sortDir]);
+  }, [columns, data, sortKeyActive, sortDir]);
 
   const firstKey = sorted.length > 0 ? rowKey(sorted[0]!) : "";
-  const paged = usePagedRows(sorted, `${sorted.length}|${firstKey}|${sortKeyAtivo}|${sortDir}`);
+  const paged = usePagedRows(sorted, `${sorted.length}|${firstKey}|${sortKeyActive}|${sortDir}`);
   const rows = paginate ? paged.pageRows : sorted;
   const showPager = Boolean(paginate) && paged.totalPages > 1;
 
@@ -123,7 +123,7 @@ export function DataTable<T>({
                 <ThSort
                   key={col.key}
                   label={col.header}
-                  active={sortKeyAtivo === col.key}
+                  active={sortKeyActive === col.key}
                   dir={sortDir}
                   onClick={() => toggleSort(col.key)}
                   align={col.align ?? "left"}

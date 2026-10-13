@@ -4,7 +4,7 @@
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeaders, serve } from "../_shared/cors.ts";
-import { canAccessStore, GESTOR_ROLES, loadStaffCaller } from "../_shared/staffAuth.ts";
+import { canAccessStore, OWNER_ROLES, loadStaffCaller } from "../_shared/staffAuth.ts";
 
 const INTRANET_MALL_SLUG = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/;
 
@@ -69,7 +69,7 @@ serve(async (req) => {
   if (userError || !userData.user) return json({ error: "unauthorized" }, 401);
 
   const admin = createClient(supabaseUrl, serviceKey);
-  const caller = await loadStaffCaller(admin, userData.user.id, GESTOR_ROLES);
+  const caller = await loadStaffCaller(admin, userData.user.id, OWNER_ROLES);
   if (!caller) return json({ error: "forbidden" }, 403);
 
   let body: { storeId?: unknown; administrator?: unknown; baseUrl?: unknown; username?: unknown; password?: unknown };

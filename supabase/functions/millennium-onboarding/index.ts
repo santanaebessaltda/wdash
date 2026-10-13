@@ -134,8 +134,8 @@ serve(async (req) => {
     action?: string;
     username?: string;
     password?: string;
-    usuario?: string;
-    senha?: string;
+    username?: string;
+    password?: string;
     session?: string;
     includeStores?: boolean;
     keepSession?: boolean;
@@ -211,8 +211,8 @@ serve(async (req) => {
     return json(r);
   }
 
-  const username = String(body.username ?? body.usuario ?? "").trim().toUpperCase();
-  const password = String(body.password ?? body.senha ?? "");
+  const username = String(body.username ?? body.username ?? "").trim().toUpperCase();
+  const password = String(body.password ?? body.password ?? "");
   const includeStores = (body.includeStores ?? body.incluirFiliais) !== false;
   const keepSession = (body.keepSession ?? body.manterSessao) !== false;
   const checkReports = body.checkReports === true;

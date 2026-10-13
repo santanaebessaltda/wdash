@@ -26,13 +26,13 @@ import { useScope } from "@/pages/dashboard/useScope";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { NumberInput, SectionHeader, SelectStoreCard, parseNum, pickOneStore, useScopedStores } from "@/pages/operation/shared";
 import { DayChip, PlainKpi } from "@/pages/cash-close/CashClosePage";
-import { monthsTouched, sangriaMonthSpan } from "@/data/wedash/cashCloseMonth";
+import { monthsTouched, cashDropMonthSpan } from "@/data/wedash/cashCloseMonth";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { HeaderFilters } from "@/pages/stock/shared";
 
 const money = (cents: number) => brlCent(cents / 100);
 
-type AcaoLote = "recebido" | "aCobrar" | "fora" | "falta" | "desfazer";
+type ActionBatch = "recebido" | "aCobrar" | "fora" | "falta" | "desfazer";
 
 function rangeCells(from: string, to: string): Array<string | null> {
   const cells: Array<string | null> = Array.from({ length: isoToDate(from).getDay() }, () => null);
@@ -49,28 +49,28 @@ function dayTitle(iso: string): string {
 /** Gestão > Sangrias. Calendário do mês e o recebimento dos dias em aberto. */
 export function CashDropPage() {
   const { show } = useToast();
-  const { session, storeRows, loading: lojasLoading } = useScopedStores();
+  const { session, storeRows, loading: storesLoading } = useScopedStores();
   const { scope } = useScope();
   const escolher = pickOneStore(scope.storeIds, session.stores.length);
-  const showStores = useMinSkeleton(lojasLoading);
+  const showStores = useMinSkeleton(storesLoading);
   const today = calendarTodayIso();
   const [rangeFrom, setRangeFrom] = useState(() => startOfMonth(today));
   const [rangeTo, setRangeTo] = useState(() => endOfMonth(today));
   const [presetId, setPresetId] = useState<DatePresetId | null>("thisMonth");
-  const [piso, setPiso] = useState(() => startOfMonth(today));
+  const [floor, setFloor] = useState(() => startOfMonth(today));
   const [lines, setLines] = useState<CashDropLineRow[]>([]);
   const [deposits, setDeposits] = useState<CashDropDepositDay[]>([]);
   const [shortages, setShortages] = useState<CashDropShortageRow[]>([]);
   const [loaded, setLoaded] = useState("");
-  const [erro, setErro] = useState(false);
-  const [dia, setDia] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  const [day, setDay] = useState<string | null>(null);
   const [marcados, setMarcados] = useState<string[]>([]);
   const [depositando, setDepositando] = useState(false);
-  const [acao, setAcao] = useState<AcaoLote | null>(null);
-  const [motivoLote, setMotivoLote] = useState("");
-  const [faltaLote, setFaltaLote] = useState("");
-  const [motivoFaltaLote, setMotivoFaltaLote] = useState("");
-  const [diasDesfazer, setDiasDesfazer] = useState(1);
+  const [action, setAction] = useState<ActionBatch | null>(null);
+  const [reasonBatch, setReasonBatch] = useState("");
+  const [gapBatch, setGapBatch] = useState("");
+  const [reasonGapBatch, setReasonGapBatch] = useState("");
+  const [daysUndo, setDaysUndo] = useState(1);
   const [reloadKey, setReloadKey] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [watermark, setWatermark] = useState<Date | null | undefined>(undefined);
@@ -89,21 +89,21 @@ export function CashDropPage() {
 
   const storeIdValue = store?.id ?? "";
   const storeSelection = escolher ? "" : storeIdValue;
-  const [lojaVista, setLojaVista] = useState(storeSelection);
-  if (lojaVista !== storeSelection) {
-    setLojaVista(storeSelection);
-    setDia(null);
+  const [storeView, setStoreView] = useState(storeSelection);
+  if (storeView !== storeSelection) {
+    setStoreView(storeSelection);
+    setDay(null);
     setMarcados([]);
-    setAcao(null);
+    setAction(null);
   }
   useEffect(() => {
-    if (lojasLoading || escolher || !storeIdValue) return;
+    if (storesLoading || escolher || !storeIdValue) return;
     let stop = false;
     void fetchNavMonthFloor("sangria_line", session.tenantId, storeIdValue, today).then((month) => {
       if (stop) return;
-      setPiso(month);
-      setRangeFrom((atual) => {
-        if (atual >= month) return atual;
+      setFloor(month);
+      setRangeFrom((current) => {
+        if (current >= month) return current;
         setPresetId(null);
         return month;
       });
@@ -111,7 +111,7 @@ export function CashDropPage() {
     return () => {
       stop = true;
     };
-  }, [lojasLoading, escolher, storeIdValue, session.tenantId, today, reloadKey]);
+  }, [storesLoading, escolher, storeIdValue, session.tenantId, today, reloadKey]);
 
   useEffect(() => {
     if (!syncing) return;
@@ -147,15 +147,15 @@ export function CashDropPage() {
     };
   }, [session.tenantId, reloadKey]);
 
-  const pedir = useCallback(async () => {
-    const atual = storeRef.current;
-    if (escolher || !atual) return;
+  const request = useCallback(async () => {
+    const current = storeRef.current;
+    if (escolher || !current) return;
     const months = monthsTouched(rangeFromRef.current, rangeToRef.current);
     const todayIso = calendarTodayIso();
-    const comDia = months.filter((month) => sangriaMonthSpan(month, todayIso));
-    const alvos = comDia.length > 0 ? comDia : [months[0]];
-    for (const month of alvos) {
-      const r = await requestCashDropMonth([atual.id], month);
+    const withDay = months.filter((month) => cashDropMonthSpan(month, todayIso));
+    const targets = withDay.length > 0 ? withDay : [months[0]];
+    for (const month of targets) {
+      const r = await requestCashDropMonth([current.id], month);
       if (!r.ok) {
         show(r.message, "danger");
         return;
@@ -170,7 +170,7 @@ export function CashDropPage() {
     status: refreshMomentTitle(watermark ? watermark.toISOString() : watermark),
     busyLabel: "Atualizando…",
     sales: true,
-    run: () => pedir(),
+    run: () => request(),
   });
 
   useEffect(() => {
@@ -180,9 +180,9 @@ export function CashDropPage() {
   }, []);
 
   useEffect(() => {
-    if (lojasLoading || escolher || !store) return;
+    if (storesLoading || escolher || !store) return;
     let cancel = false;
-    setErro(false);
+    setError(false);
     void fetchCashDropMonth(session.tenantId, store.id, from, to)
       .then((res) => {
         if (cancel) return;
@@ -190,19 +190,19 @@ export function CashDropPage() {
         setDeposits(res.deposits);
         setShortages(res.shortages);
         setLoaded(band);
-        setMarcados((atual) => atual.filter((day) => !res.deposits.some((d) => d.day === day)));
+        setMarcados((current) => current.filter((day) => !res.deposits.some((d) => d.day === day)));
       })
       .catch(() => {
-        if (!cancel) setErro(true);
+        if (!cancel) setError(true);
       });
     return () => {
       cancel = true;
     };
-  }, [lojasLoading, escolher, store, session.tenantId, from, to, band]);
+  }, [storesLoading, escolher, store, session.tenantId, from, to, band]);
 
   const taken = useMemo(() => new Set(deposits.map((d) => d.day)), [deposits]);
-  const faltaPorDia = useMemo(() => new Map(shortages.map((s) => [s.day, s.amountCents])), [shortages]);
-  const porDia = useMemo(() => {
+  const gapByDay = useMemo(() => new Map(shortages.map((s) => [s.day, s.amountCents])), [shortages]);
+  const byDay = useMemo(() => {
     const map = new Map<string, CashDropLineRow[]>();
     for (const line of lines) {
       const list = map.get(line.day) ?? [];
@@ -211,26 +211,26 @@ export function CashDropPage() {
     }
     return map;
   }, [lines]);
-  const mes = useMemo(() => {
-    const days = new Set<string>([...porDia.keys(), ...faltaPorDia.keys()]);
-    return sumAmounts([...days].map((day) => dayAmounts(porDia.get(day) ?? [], faltaPorDia.get(day) ?? 0)));
-  }, [porDia, faltaPorDia]);
+  const month = useMemo(() => {
+    const days = new Set<string>([...byDay.keys(), ...gapByDay.keys()]);
+    return sumAmounts([...days].map((day) => dayAmounts(byDay.get(day) ?? [], gapByDay.get(day) ?? 0)));
+  }, [byDay, gapByDay]);
   const open = useMemo(() => {
-    const days = [...porDia.keys()].filter((day) => !taken.has(day) && day <= today);
-    return depositBoleto(lines, days, faltaPorDia);
-  }, [porDia, taken, lines, today, faltaPorDia]);
-  const depositado = useMemo(() => depositBoleto(lines, deposits.map((d) => d.day), faltaPorDia), [lines, deposits, faltaPorDia]);
+    const days = [...byDay.keys()].filter((day) => !taken.has(day) && day <= today);
+    return depositBoleto(lines, days, gapByDay);
+  }, [byDay, taken, lines, today, gapByDay]);
+  const depositado = useMemo(() => depositBoleto(lines, deposits.map((d) => d.day), gapByDay), [lines, deposits, gapByDay]);
   const openDays = useMemo(() => marcados.filter((day) => !taken.has(day)), [marcados, taken]);
-  const diasRecebiveis = useMemo(
-    () => openDays.filter((day) => day < today && dayAmounts(porDia.get(day) ?? [], faltaPorDia.get(day) ?? 0).boletoCents > 0),
-    [openDays, porDia, faltaPorDia, today],
+  const daysReceivables = useMemo(
+    () => openDays.filter((day) => day < today && dayAmounts(byDay.get(day) ?? [], gapByDay.get(day) ?? 0).boletoCents > 0),
+    [openDays, byDay, gapByDay, today],
   );
-  const amountToReceive = depositBoleto(lines, diasRecebiveis, faltaPorDia);
-  const linhasForaAbertas = useMemo(
+  const amountToReceive = depositBoleto(lines, daysReceivables, gapByDay);
+  const linesExcludedAbertas = useMemo(
     () => lines.filter((line) => openDays.includes(line.day) && line.kind === "purchase"),
     [lines, openDays],
   );
-  const linhasBoletoAbertas = useMemo(
+  const linesBoletoAbertas = useMemo(
     () => lines.filter((line) => openDays.includes(line.day) && line.kind === "deposit"),
     [lines, openDays],
   );
@@ -245,9 +245,9 @@ export function CashDropPage() {
   const pronto = loaded === band;
   const markLabel = marcados.length === 0 ? "Marcar como" : marcados.length === 1 ? "Marcar como · 1 dia" : `Marcar como · ${marcados.length} dias`;
 
-  function toggleDia(day: string) {
+  function toggleDay(day: string) {
     if (day > today) return;
-    setMarcados((atual) => (atual.includes(day) ? atual.filter((d) => d !== day) : [...atual, day]));
+    setMarcados((current) => (current.includes(day) ? current.filter((d) => d !== day) : [...current, day]));
   }
 
   async function openUndo() {
@@ -259,33 +259,33 @@ export function CashDropPage() {
     } catch {
       total = marcados.filter((day) => taken.has(day)).length;
     }
-    setDiasDesfazer(Math.max(1, total));
-    setAcao("desfazer");
+    setDaysUndo(Math.max(1, total));
+    setAction("desfazer");
   }
 
   function openShortage() {
     const day = marcados[0];
-    const atual = day ? shortages.find((s) => s.day === day) : undefined;
-    setFaltaLote(reaisField(atual?.amountCents ?? 0));
-    setMotivoFaltaLote(atual?.note ?? "");
-    setAcao("falta");
+    const current = day ? shortages.find((s) => s.day === day) : undefined;
+    setGapBatch(brlField(current?.amountCents ?? 0));
+    setReasonGapBatch(current?.note ?? "");
+    setAction("falta");
   }
 
-  async function confirmarAcao() {
-    if (!store || !acao) return;
-    if (acao === "fora" && !motivoLote.trim()) {
+  async function confirmAction() {
+    if (!store || !action) return;
+    if (action === "fora" && !reasonBatch.trim()) {
       show("Informe o motivo.", "danger");
       return;
     }
-    if (acao === "desfazer") {
+    if (action === "desfazer") {
       setDepositando(true);
       try {
         await Promise.all(markedDeposits.map((id) => undoCashDropDeposit(id)));
         const ids = new Set(markedDeposits);
-        setDeposits((atual) => atual.filter((d) => !ids.has(d.depositId)));
-        setMarcados((atual) => atual.filter((day) => !taken.has(day)));
+        setDeposits((current) => current.filter((d) => !ids.has(d.depositId)));
+        setMarcados((current) => current.filter((day) => !taken.has(day)));
         setReloadKey((n) => n + 1);
-        setAcao(null);
+        setAction(null);
         show(markedDeposits.length > 1 ? "Recebimentos desfeitos." : "Recebimento desfeito.", "success");
       } catch {
         show("Não foi possível desfazer o recebimento. Tente novamente.", "danger");
@@ -294,28 +294,28 @@ export function CashDropPage() {
       }
       return;
     }
-    if (acao === "falta") {
+    if (action === "falta") {
       const day = marcados[0];
       if (!day) return;
-      const cents = fieldToCents(faltaLote);
+      const cents = fieldToCents(gapBatch);
       if (cents == null) {
         show("O valor da falta não é válido.", "danger");
         return;
       }
-      const base = (porDia.get(day) ?? []).reduce((sum, line) => (line.kind === "purchase" ? sum : sum + line.amountCents), 0);
+      const base = (byDay.get(day) ?? []).reduce((sum, line) => (line.kind === "purchase" ? sum : sum + line.amountCents), 0);
       if (cents > base) {
         show("A falta não pode passar do valor que iria para o boleto.", "danger");
         return;
       }
       setDepositando(true);
       try {
-        const text = cents === 0 ? "" : motivoFaltaLote.trim();
+        const text = cents === 0 ? "" : reasonGapBatch.trim();
         await saveCashDropShortage(session.tenantId, store.id, day, cents, text);
-        setShortages((atual) => {
-          const sem = atual.filter((s) => s.day !== day);
-          return cents === 0 ? sem : [...sem, { day, amountCents: cents, note: text }];
+        setShortages((current) => {
+          const without = current.filter((s) => s.day !== day);
+          return cents === 0 ? without : [...without, { day, amountCents: cents, note: text }];
         });
-        setAcao(null);
+        setAction(null);
         show(cents === 0 ? "Falta removida." : "Falta registrada.", "success");
       } catch {
         show("Não foi possível registrar a falta. Tente novamente.", "danger");
@@ -326,24 +326,24 @@ export function CashDropPage() {
     }
     setDepositando(true);
     try {
-      if (acao === "recebido") {
-        await createCashDropDeposit(session.tenantId, store.id, diasRecebiveis, taken);
+      if (action === "recebido") {
+        await createCashDropDeposit(session.tenantId, store.id, daysReceivables, taken);
         setMarcados([]);
         setReloadKey((n) => n + 1);
         show("Valor marcado como recebido.", "success");
-      } else if (acao === "aCobrar") {
-        const next = linhasForaAbertas.map((line) => ({ ...line, kind: "deposit" as const }));
+      } else if (action === "aCobrar") {
+        const next = linesExcludedAbertas.map((line) => ({ ...line, kind: "deposit" as const }));
         await saveCashDropLines(next);
-        setLines((atual) => atual.map((row) => next.find((n) => n.id === row.id) ?? row));
+        setLines((current) => current.map((row) => next.find((n) => n.id === row.id) ?? row));
         show("Sangrias marcadas como a receber.", "success");
       } else {
-        const motivo = motivoLote.trim();
-        const next = linhasBoletoAbertas.map((line) => ({ ...line, kind: "purchase" as const, note: line.note.trim() || motivo }));
+        const reason = reasonBatch.trim();
+        const next = linesBoletoAbertas.map((line) => ({ ...line, kind: "purchase" as const, note: line.note.trim() || reason }));
         await saveCashDropLines(next);
-        setLines((atual) => atual.map((row) => next.find((n) => n.id === row.id) ?? row));
+        setLines((current) => current.map((row) => next.find((n) => n.id === row.id) ?? row));
         show("Sangrias marcadas como fora do boleto.", "success");
       }
-      setAcao(null);
+      setAction(null);
     } catch (e) {
       show(e instanceof Error ? e.message : "Não foi possível marcar as sangrias. Tente novamente.", "danger");
     } finally {
@@ -351,13 +351,13 @@ export function CashDropPage() {
     }
   }
 
-  function aplicarIntervalo(start: Date, end: Date, goal?: DateRangeChangeMeta) {
+  function applyInterval(start: Date, end: Date, goal?: DateRangeChangeMeta) {
     const nextFrom = dateToIso(start);
     const nextTo = dateToIso(end);
     setRangeFrom(nextFrom);
     setRangeTo(nextTo);
     setPresetId(goal?.presetId ?? null);
-    setMarcados((atual) => atual.filter((day) => day >= nextFrom && day <= nextTo));
+    setMarcados((current) => current.filter((day) => day >= nextFrom && day <= nextTo));
   }
 
   return (
@@ -370,19 +370,19 @@ export function CashDropPage() {
           <HeaderFilters>
             <DateRangePicker
               value={[isoToDate(from), isoToDate(to)]}
-              minDate={isoToDate(piso)}
+              minDate={isoToDate(floor)}
               maxDate={isoToDate(endOfMonth(today))}
               quickRanges={CALENDAR_QUICK_RANGES}
               displayLabel={presetId ? periodLabels[presetId] : null}
               activePresetId={presetId}
-              onChange={([start, end], goal) => aplicarIntervalo(start, end, goal)}
+              onChange={([start, end], goal) => applyInterval(start, end, goal)}
             />
-            {!escolher && store ? <MarkAs dias={marcados.length} label={markLabel} amount={amountToReceive} recebidoOk={diasRecebiveis.length > 0} foraOk={linhasBoletoAbertas.length > 0} cobrarOk={linhasForaAbertas.length > 0} tudoRecebido={marcados.length > 0 && marcados.every((day) => taken.has(day))} podeDesfazer={markedDeposits.length > 0} onRecebido={() => setAcao("recebido")} onCobrar={() => setAcao("aCobrar")} onFora={() => { setMotivoLote(""); setAcao("fora"); }} onFalta={openShortage} onDesfazer={() => void openUndo()} /> : null}
+            {!escolher && store ? <MarkAs days={marcados.length} label={markLabel} amount={amountToReceive} recebidoOk={daysReceivables.length > 0} excludedOk={linesBoletoAbertas.length > 0} cobrarOk={linesExcludedAbertas.length > 0} tudoRecebido={marcados.length > 0 && marcados.every((day) => taken.has(day))} canUndo={markedDeposits.length > 0} onRecebido={() => setAction("recebido")} onCobrar={() => setAction("aCobrar")} onExcluded={() => { setReasonBatch(""); setAction("fora"); }} onGap={openShortage} onUndo={() => void openUndo()} /> : null}
           </HeaderFilters>
         }
       />
       <div className="mt-6 pb-8">
-        {erro ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar as sangrias. Tente novamente." /> : null}
+        {error ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar as sangrias. Tente novamente." /> : null}
         {escolher ? (
           <div className="max-w-[720px]">
             <SelectStoreCard />
@@ -395,7 +395,7 @@ export function CashDropPage() {
           </Card>
         ) : (
           <>
-            <MonthSummary aCobrar={open} recebido={depositado} fora={mes.foraCents} falta={mes.faltaCents} />
+            <MonthSummary aCobrar={open} recebido={depositado} excluded={month.excludedCents} gap={month.gapCents} />
             <MonthCalendar>
               {cells.map((day, i) => (
                 <DayCell
@@ -403,41 +403,41 @@ export function CashDropPage() {
                   index={i}
                   day={day}
                   today={today}
-                  rows={day ? (porDia.get(day) ?? []) : []}
+                  rows={day ? (byDay.get(day) ?? []) : []}
                   depositado={day ? taken.has(day) : false}
                   marcado={day ? marcados.includes(day) : false}
-                  faltaCents={day ? (faltaPorDia.get(day) ?? 0) : 0}
-                  onOpen={setDia}
-                  onToggle={toggleDia}
+                  gapCents={day ? (gapByDay.get(day) ?? 0) : 0}
+                  onOpen={setDay}
+                  onToggle={toggleDay}
                 />
               ))}
             </MonthCalendar>
           </>
         )}
       </div>
-      {dia && store ? (
+      {day && store ? (
         <DayModal
-          key={`${store.id}|${dia}`}
-          day={dia}
+          key={`${store.id}|${day}`}
+          day={day}
           today={today}
-          rows={porDia.get(dia) ?? []}
-          shortage={shortages.find((s) => s.day === dia)}
-          deposit={deposits.find((d) => d.day === dia)}
+          rows={byDay.get(day) ?? []}
+          shortage={shortages.find((s) => s.day === day)}
+          deposit={deposits.find((d) => d.day === day)}
           tenantId={session.tenantId}
           storeId={store.id}
-          onClose={() => setDia(null)}
+          onClose={() => setDay(null)}
           onSaved={(nextLines, nextShortage) => {
-            setLines((atual) => atual.map((row) => nextLines.find((n) => n.id === row.id) ?? row));
-            setShortages((atual) => {
-              const sem = atual.filter((s) => s.day !== dia);
-              return nextShortage ? [...sem, nextShortage] : sem;
+            setLines((current) => current.map((row) => nextLines.find((n) => n.id === row.id) ?? row));
+            setShortages((current) => {
+              const without = current.filter((s) => s.day !== day);
+              return nextShortage ? [...without, nextShortage] : without;
             });
           }}
           onUndo={async (depositId) => {
             try {
               await undoCashDropDeposit(depositId);
-              setDeposits((atual) => atual.filter((d) => d.depositId !== depositId));
-              setDia(null);
+              setDeposits((current) => current.filter((d) => d.depositId !== depositId));
+              setDay(null);
               setReloadKey((n) => n + 1);
               show("Recebimento desfeito.", "success");
             } catch {
@@ -448,42 +448,42 @@ export function CashDropPage() {
         />
       ) : null}
       <ActionModal
-        acao={acao}
+        action={action}
         gravando={depositando}
         amount={amountToReceive}
-        dias={diasRecebiveis.length}
-        faltaNoRecebido={acao === "aCobrar" && marcados.some((day) => taken.has(day))}
-        foraNoRecebido={acao === "fora" && marcados.some((day) => taken.has(day))}
-        motivo={motivoLote}
-        onMotivo={setMotivoLote}
-        falta={faltaLote}
-        onFalta={setFaltaLote}
-        motivoFalta={motivoFaltaLote}
-        onMotivoFalta={setMotivoFaltaLote}
-        diaRecebido={marcados.length === 1 && taken.has(marcados[0]!)}
+        days={daysReceivables.length}
+        gapNoRecebido={action === "aCobrar" && marcados.some((day) => taken.has(day))}
+        excludedNoRecebido={action === "fora" && marcados.some((day) => taken.has(day))}
+        reason={reasonBatch}
+        onReason={setReasonBatch}
+        gap={gapBatch}
+        onGap={setGapBatch}
+        reasonGap={reasonGapBatch}
+        onReasonGap={setReasonGapBatch}
+        dayRecebido={marcados.length === 1 && taken.has(marcados[0]!)}
         recebimentos={markedDeposits.length}
-        diasDesfazer={diasDesfazer}
+        daysUndo={daysUndo}
         onClose={() => {
-          if (!depositando) setAcao(null);
+          if (!depositando) setAction(null);
         }}
-        onConfirm={() => void confirmarAcao()}
+        onConfirm={() => void confirmAction()}
       />
     </div>
   );
 }
 
-function dayChips(tot: CashDropAmounts, recebido: boolean, open: boolean): Array<{ cor: string; text: string }> {
-  if (tot.totalCents <= 0 && tot.faltaCents <= 0) return [];
-  const chips: Array<{ cor: string; text: string }> = [];
-  if (tot.boletoCents > 0 && !(open && !recebido)) {
+function dayChips(total: CashDropAmounts, recebido: boolean, open: boolean): Array<{ color: string; text: string }> {
+  if (total.totalCents <= 0 && total.gapCents <= 0) return [];
+  const chips: Array<{ color: string; text: string }> = [];
+  if (total.boletoCents > 0 && !(open && !recebido)) {
     chips.push(
       recebido
-        ? { cor: "bg-ok", text: `Recebido ${money(tot.boletoCents)}` }
-        : { cor: "bg-warn", text: `A receber ${money(tot.boletoCents)}` },
+        ? { color: "bg-ok", text: `Recebido ${money(total.boletoCents)}` }
+        : { color: "bg-warn", text: `A receber ${money(total.boletoCents)}` },
     );
   }
-  if (tot.foraCents > 0) chips.push({ cor: "bg-info", text: `Fora ${money(tot.foraCents)}` });
-  if (tot.faltaCents > 0) chips.push({ cor: "bg-bad", text: `Falta ${money(tot.faltaCents)}` });
+  if (total.excludedCents > 0) chips.push({ color: "bg-info", text: `Fora ${money(total.excludedCents)}` });
+  if (total.gapCents > 0) chips.push({ color: "bg-bad", text: `Falta ${money(total.gapCents)}` });
   return chips;
 }
 
@@ -494,7 +494,7 @@ function DayCell({
   rows,
   depositado,
   marcado,
-  faltaCents,
+  gapCents,
   onOpen,
   onToggle,
 }: {
@@ -504,35 +504,35 @@ function DayCell({
   rows: CashDropLineRow[];
   depositado: boolean;
   marcado: boolean;
-  faltaCents: number;
+  gapCents: number;
   onOpen: (day: string) => void;
   onToggle: (day: string) => void;
 }) {
   if (!day) return <div className={blankDayClass(index)} />;
-  const tot = dayAmounts(rows, faltaCents);
-  const futuro = day > today;
-  const temAcao = !futuro && (rows.length > 0 || faltaCents > 0 || depositado);
-  const partes = rows.length > 0 || faltaCents > 0 ? dayChips(tot, depositado, day === today) : [];
-  const chips = day === today ? [{ cor: "bg-acc", text: "Em aberto" }, ...partes] : partes;
+  const total = dayAmounts(rows, gapCents);
+  const future = day > today;
+  const hasAction = !future && (rows.length > 0 || gapCents > 0 || depositado);
+  const partes = rows.length > 0 || gapCents > 0 ? dayChips(total, depositado, day === today) : [];
+  const chips = day === today ? [{ color: "bg-acc", text: "Em aberto" }, ...partes] : partes;
   return (
     <DayFace
       index={index}
       iso={day}
       today={today}
       selected={marcado}
-      openable={day === today || temAcao}
+      openable={day === today || hasAction}
       openLabel={`Abrir ${dayTitle(day)}`}
       onOpen={() => onOpen(day)}
-      amount={rows.length > 0 ? money(tot.totalCents) : null}
-      check={temAcao ? { checked: marcado, label: `Marcar ${dayTitle(day)}`, onToggle: () => onToggle(day) } : null}
+      amount={rows.length > 0 ? money(total.totalCents) : null}
+      check={hasAction ? { checked: marcado, label: `Marcar ${dayTitle(day)}`, onToggle: () => onToggle(day) } : null}
       badges={chips.length > 0 ? chips.map((chip) => (
-        <DayChip key={chip.text} cor={chip.cor}>{chip.text}</DayChip>
+        <DayChip key={chip.text} color={chip.color}>{chip.text}</DayChip>
       )) : null}
     />
   );
 }
 
-function reaisField(cents: number): string {
+function brlField(cents: number): string {
   if (cents <= 0) return "";
   return (cents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -544,12 +544,12 @@ function fieldToCents(txt: string): number | null {
   return Math.round(n * 100);
 }
 
-function MonthSummary({ aCobrar, recebido, fora, falta }: { aCobrar: number; recebido: number; fora: number; falta: number }) {
+function MonthSummary({ aCobrar, recebido, excluded, gap }: { aCobrar: number; recebido: number; excluded: number; gap: number }) {
   const cards = [
     { label: "A receber", value: money(aCobrar), color: "var(--t0)", tooltip: "Valor das sangrias que ainda precisa ser repassado pela filial." },
     { label: "Recebido", value: money(recebido), color: "var(--t0)", tooltip: "Valor já recebido." },
-    { label: "Fora do boleto", value: money(fora), color: "var(--t0)", tooltip: "Valor destinado a compras, fornecedores, premiações ou outros pagamentos." },
-    { label: "Falta", value: money(falta), color: "var(--t0)", tooltip: "Valor da sangria que deveria estar no caixa e não foi encontrado." },
+    { label: "Fora do boleto", value: money(excluded), color: "var(--t0)", tooltip: "Valor destinado a compras, fornecedores, premiações ou outros pagamentos." },
+    { label: "Falta", value: money(gap), color: "var(--t0)", tooltip: "Valor da sangria que deveria estar no caixa e não foi encontrado." },
   ];
   return (
     <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -560,14 +560,14 @@ function MonthSummary({ aCobrar, recebido, fora, falta }: { aCobrar: number; rec
   );
 }
 
-function DayFigures({ itens }: { itens: Array<{ label: string; value: string; tom: string }> }) {
-  const cols = itens.length >= 4 ? "sm:grid-cols-2 lg:grid-cols-4" : itens.length === 3 ? "sm:grid-cols-3" : itens.length === 2 ? "sm:grid-cols-2" : "";
+function DayFigures({ items }: { items: Array<{ label: string; value: string; tone: string }> }) {
+  const cols = items.length >= 4 ? "sm:grid-cols-2 lg:grid-cols-4" : items.length === 3 ? "sm:grid-cols-3" : items.length === 2 ? "sm:grid-cols-2" : "";
   return (
     <div className={cn("mb-4 grid grid-cols-1 gap-2", cols)}>
-      {itens.map((item) => (
+      {items.map((item) => (
         <div key={item.label} className="min-w-0 rounded-[14px] border border-line bg-bg-1 px-3 py-3">
           <p className="text-[10px] font-bold uppercase tracking-wide text-t2">{item.label}</p>
-          <p className={cn("mt-1 truncate font-mono text-lg font-extrabold", item.tom)}>{item.value}</p>
+          <p className={cn("mt-1 truncate font-mono text-lg font-extrabold", item.tone)}>{item.value}</p>
         </div>
       ))}
     </div>
@@ -598,52 +598,52 @@ function DayModal({
   onUndo: (depositId: string) => Promise<void>;
 }) {
   const { show } = useToast();
-  const [linhas, setLinhas] = useState(rows);
-  const [falta, setFalta] = useState(() => reaisField(shortage?.amountCents ?? 0));
-  const [motivo, setMotivo] = useState(shortage?.note ?? "");
+  const [lines, setLines] = useState(rows);
+  const [gap, setGap] = useState(() => brlField(shortage?.amountCents ?? 0));
+  const [reason, setReason] = useState(shortage?.note ?? "");
   const [salvando, setSalvando] = useState(false);
-  const [confirmarDesfazer, setConfirmarDesfazer] = useState(false);
-  const [diasRecebimento, setDiasRecebimento] = useState(1);
+  const [confirmUndo, setConfirmUndo] = useState(false);
+  const [daysReceipt, setDaysReceipt] = useState(1);
   const [desfazendo, setDesfazendo] = useState(false);
   const consulta = rows.length === 0;
   const travado = Boolean(deposit);
   const preview = dayAmounts(
-    linhas.map((line) => ({ amountCents: line.amountCents, kind: line.kind, note: line.note })),
-    fieldToCents(falta) ?? shortage?.amountCents ?? 0,
+    lines.map((line) => ({ amountCents: line.amountCents, kind: line.kind, note: line.note })),
+    fieldToCents(gap) ?? shortage?.amountCents ?? 0,
   );
   const metrics = [
-    preview.totalCents > 0 ? { label: "Sangrias", value: money(preview.totalCents), tom: "text-t0" } : null,
-    preview.boletoCents > 0 ? { label: travado ? "Recebido" : "A receber", value: money(preview.boletoCents), tom: "text-t0" } : null,
-    preview.foraCents > 0 ? { label: "Fora do boleto", value: money(preview.foraCents), tom: "text-t0" } : null,
-    preview.faltaCents > 0 ? { label: "Falta", value: money(preview.faltaCents), tom: "text-bad" } : null,
-  ].filter((item): item is { label: string; value: string; tom: string } => item != null);
+    preview.totalCents > 0 ? { label: "Sangrias", value: money(preview.totalCents), tone: "text-t0" } : null,
+    preview.boletoCents > 0 ? { label: travado ? "Recebido" : "A receber", value: money(preview.boletoCents), tone: "text-t0" } : null,
+    preview.excludedCents > 0 ? { label: "Fora do boleto", value: money(preview.excludedCents), tone: "text-t0" } : null,
+    preview.gapCents > 0 ? { label: "Falta", value: money(preview.gapCents), tone: "text-bad" } : null,
+  ].filter((item): item is { label: string; value: string; tone: string } => item != null);
 
-  async function salvar() {
-    const cents = fieldToCents(falta);
+  async function save() {
+    const cents = fieldToCents(gap);
     if (cents == null) {
       show("O valor da falta não é válido.", "danger");
       return;
     }
-    const base = linhas.reduce((sum, line) => (line.kind === "purchase" ? sum : sum + line.amountCents), 0);
+    const base = lines.reduce((sum, line) => (line.kind === "purchase" ? sum : sum + line.amountCents), 0);
     if (cents > base) {
       show("A falta não pode passar do valor que iria para o boleto.", "danger");
       return;
     }
-    if (!travado && linhas.some((line) => line.kind === "purchase" && !line.note.trim())) {
+    if (!travado && lines.some((line) => line.kind === "purchase" && !line.note.trim())) {
       show("Informe a descrição das sangrias fora do boleto.", "danger");
       return;
     }
     setSalvando(true);
     try {
-      for (const line of linhas) {
-        const antes = rows.find((row) => row.id === line.id);
-        if (!antes || (antes.kind === line.kind && antes.note === line.note)) continue;
+      for (const line of lines) {
+        const before = rows.find((row) => row.id === line.id);
+        if (!before || (before.kind === line.kind && before.note === line.note)) continue;
         await saveCashDropLine(line.id, { kind: line.kind, note: line.note });
       }
-      const text = cents === 0 ? "" : motivo.trim();
-      const mudouFalta = (shortage?.amountCents ?? 0) !== cents || (shortage?.note ?? "") !== text;
-      if (mudouFalta) await saveCashDropShortage(tenantId, storeId, day, cents, text);
-      onSaved(linhas, cents === 0 ? null : { day, amountCents: cents, note: text });
+      const text = cents === 0 ? "" : reason.trim();
+      const changedGap = (shortage?.amountCents ?? 0) !== cents || (shortage?.note ?? "") !== text;
+      if (changedGap) await saveCashDropShortage(tenantId, storeId, day, cents, text);
+      onSaved(lines, cents === 0 ? null : { day, amountCents: cents, note: text });
       show("Sangrias atualizadas.", "success");
       onClose();
     } catch {
@@ -661,11 +661,11 @@ function DayModal({
     } catch {
       n = 1;
     }
-    setDiasRecebimento(Math.max(1, n));
-    setConfirmarDesfazer(true);
+    setDaysReceipt(Math.max(1, n));
+    setConfirmUndo(true);
   }
 
-  async function desfazer() {
+  async function undo() {
     if (!deposit) return;
     setDesfazendo(true);
     try {
@@ -713,7 +713,7 @@ function DayModal({
             <Button variant="outline" onClick={onClose} disabled={salvando || desfazendo}>
               Cancelar
             </Button>
-            <Button onClick={() => void salvar()} disabled={salvando || desfazendo}>
+            <Button onClick={() => void save()} disabled={salvando || desfazendo}>
               {salvando ? "Salvando…" : "Salvar"}
             </Button>
           </>
@@ -724,10 +724,10 @@ function DayModal({
         <p className="text-[13.5px] text-t2">Nenhuma sangria neste dia.</p>
       ) : (
         <>
-          {metrics.length > 0 ? <DayFigures itens={metrics} /> : null}
+          {metrics.length > 0 ? <DayFigures items={metrics} /> : null}
           <ul className="space-y-3">
-            {linhas.map((line) => {
-              const fora = line.kind === "purchase";
+            {lines.map((line) => {
+              const excluded = line.kind === "purchase";
               return (
                 <li key={line.id} className="rounded-[14px] border border-line px-3 py-3">
                   <p className="font-mono text-[15px] font-bold text-t0">{money(line.amountCents)}</p>
@@ -739,12 +739,12 @@ function DayModal({
                     aria-label="Descrição"
                     placeholder="Descrição"
                     disabled={travado}
-                    onChange={(e) => setLinhas((atual) => atual.map((row) => (row.id === line.id ? { ...row, note: e.target.value } : row)))}
+                    onChange={(e) => setLines((current) => current.map((row) => (row.id === line.id ? { ...row, note: e.target.value } : row)))}
                   />
                   <div className="mt-2">
                     {travado ? (
                       <>
-                        <p className="text-[13px] font-semibold text-t0">{fora ? "Fora do boleto" : "Recebido"}</p>
+                        <p className="text-[13px] font-semibold text-t0">{excluded ? "Fora do boleto" : "Recebido"}</p>
                         <p className="mt-1 text-[12px] text-t2">Desfaça o recebimento para alterar.</p>
                       </>
                     ) : (
@@ -756,11 +756,11 @@ function DayModal({
                         value={line.kind}
                         onChange={(kind) => {
                           if (!kind) return;
-                          setLinhas((atual) => atual.map((row) => (row.id === line.id ? { ...row, kind } : row)));
+                          setLines((current) => current.map((row) => (row.id === line.id ? { ...row, kind } : row)));
                         }}
                       />
                     )}
-                    {fora && !travado ? <p className="mt-1 text-[12px] text-t2">A descrição é obrigatória.</p> : null}
+                    {excluded && !travado ? <p className="mt-1 text-[12px] text-t2">A descrição é obrigatória.</p> : null}
                   </div>
                 </li>
               );
@@ -769,40 +769,40 @@ function DayModal({
           <div className="mt-4 rounded-[14px] border border-line p-3">
             <p className="text-[12.5px] font-bold text-t0">Falta em dinheiro</p>
             {travado ? <p className="mt-1 text-[12px] text-t2">Este dia já foi recebido. A falta reduz o valor recebido.</p> : null}
-            <NumberInput className="mt-2" compact unit="R$" value={falta} aria-label="Valor da falta" onChange={setFalta} />
+            <NumberInput className="mt-2" compact unit="R$" value={gap} aria-label="Valor da falta" onChange={setGap} />
             <p className="mt-3 text-[12.5px] font-bold text-t0">Motivo da falta</p>
             <input
               className="mt-2 w-full rounded-[10px] border border-line bg-bg-1 px-2.5 py-2 text-[13px] text-t0"
-              value={motivo}
+              value={reason}
               placeholder="Ex.: diferença no caixa"
               aria-label="Motivo da falta"
-              onChange={(e) => setMotivo(e.target.value)}
+              onChange={(e) => setReason(e.target.value)}
             />
           </div>
         </>
       )}
     </Modal>
     <Modal
-      open={confirmarDesfazer}
+      open={confirmUndo}
       onClose={() => {
-        if (!desfazendo) setConfirmarDesfazer(false);
+        if (!desfazendo) setConfirmUndo(false);
       }}
       title="Desfazer recebimento?"
       footer={
         <>
-          <Button variant="outline" onClick={() => setConfirmarDesfazer(false)} disabled={desfazendo}>
+          <Button variant="outline" onClick={() => setConfirmUndo(false)} disabled={desfazendo}>
             Cancelar
           </Button>
-          <Button onClick={() => void desfazer()} disabled={desfazendo}>
+          <Button onClick={() => void undo()} disabled={desfazendo}>
             {desfazendo ? "Desfazendo…" : "Desfazer recebimento"}
           </Button>
         </>
       }
     >
       <p className="text-[13.5px] text-t1">
-        {diasRecebimento <= 1
+        {daysReceipt <= 1
           ? "O valor voltará para A receber."
-          : `Este recebimento inclui ${diasRecebimento} dias. Ao desfazer, os valores de todos eles voltarão para A receber.`}
+          : `Este recebimento inclui ${daysReceipt} dias. Ao desfazer, os valores de todos eles voltarão para A receber.`}
       </p>
     </Modal>
     </>
@@ -810,42 +810,42 @@ function DayModal({
 }
 
 function MarkAs({
-  dias,
+  days,
   label,
   amount,
   recebidoOk,
-  foraOk,
+  excludedOk,
   cobrarOk,
   tudoRecebido,
-  podeDesfazer,
+  canUndo,
   onRecebido,
   onCobrar,
-  onFora,
-  onFalta,
-  onDesfazer,
+  onExcluded,
+  onGap,
+  onUndo,
 }: {
-  dias: number;
+  days: number;
   label: string;
   amount: number;
   recebidoOk: boolean;
-  foraOk: boolean;
+  excludedOk: boolean;
   cobrarOk: boolean;
   tudoRecebido: boolean;
-  podeDesfazer: boolean;
+  canUndo: boolean;
   onRecebido: () => void;
   onCobrar: () => void;
-  onFora: () => void;
-  onFalta: () => void;
-  onDesfazer: () => void;
+  onExcluded: () => void;
+  onGap: () => void;
+  onUndo: () => void;
 }) {
-  if (dias === 0) return <Button disabled>Marcar como</Button>;
-  const itens: DropdownItem[] = [
-    ...(podeDesfazer
+  if (days === 0) return <Button disabled>Marcar como</Button>;
+  const items: DropdownItem[] = [
+    ...(canUndo
       ? [
           {
             label: "Desfazer recebimento",
             description: "Devolve o valor recebido para A receber.",
-            onClick: onDesfazer,
+            onClick: onUndo,
           },
           { divider: true, label: "" },
         ]
@@ -872,91 +872,91 @@ function MarkAs({
     },
     {
       label: "Fora do boleto",
-      description: foraOk
+      description: excludedOk
         ? "Retira do boleto as sangrias dos dias selecionados."
         : tudoRecebido
           ? "Desfaça o recebimento para alterar estes dias."
           : "Não há sangrias a receber nos dias selecionados.",
-      disabled: !foraOk,
-      onClick: onFora,
+      disabled: !excludedOk,
+      onClick: onExcluded,
     },
     {
       label: "Registrar falta",
-      description: dias === 1 ? "Informe o valor que deveria estar no caixa e não foi encontrado." : "Selecione apenas um dia para registrar a falta.",
-      disabled: dias !== 1,
-      onClick: onFalta,
+      description: days === 1 ? "Informe o valor que deveria estar no caixa e não foi encontrado." : "Selecione apenas um dia para registrar a falta.",
+      disabled: days !== 1,
+      onClick: onGap,
     },
   ];
   return (
     <div className="flex flex-col items-start gap-1.5 lg:flex-row lg:items-center">
-      <Dropdown portal align="right" menuClassName="w-[320px]" trigger={<Button>{label}</Button>} items={itens} />
+      <Dropdown portal align="right" menuClassName="w-[320px]" trigger={<Button>{label}</Button>} items={items} />
       <span className="text-[13px] font-semibold text-t1">{money(amount)} a receber</span>
     </div>
   );
 }
 
 function ActionModal({
-  acao,
+  action,
   gravando,
   amount,
-  dias,
-  faltaNoRecebido,
-  foraNoRecebido,
-  motivo,
-  onMotivo,
-  falta,
-  onFalta,
-  motivoFalta,
-  onMotivoFalta,
-  diaRecebido,
+  days,
+  gapNoRecebido,
+  excludedNoRecebido,
+  reason,
+  onReason,
+  gap,
+  onGap,
+  reasonGap,
+  onReasonGap,
+  dayRecebido,
   recebimentos,
-  diasDesfazer,
+  daysUndo,
   onClose,
   onConfirm,
 }: {
-  acao: AcaoLote | null;
+  action: ActionBatch | null;
   gravando: boolean;
   amount: number;
-  dias: number;
-  faltaNoRecebido: boolean;
-  foraNoRecebido: boolean;
-  motivo: string;
-  onMotivo: (value: string) => void;
-  falta: string;
-  onFalta: (value: string) => void;
-  motivoFalta: string;
-  onMotivoFalta: (value: string) => void;
-  diaRecebido: boolean;
+  days: number;
+  gapNoRecebido: boolean;
+  excludedNoRecebido: boolean;
+  reason: string;
+  onReason: (value: string) => void;
+  gap: string;
+  onGap: (value: string) => void;
+  reasonGap: string;
+  onReasonGap: (value: string) => void;
+  dayRecebido: boolean;
   recebimentos: number;
-  diasDesfazer: number;
+  daysUndo: number;
   onClose: () => void;
   onConfirm: () => void;
 }) {
   const title =
-    acao === "recebido"
+    action === "recebido"
       ? `Marcar ${money(amount)} como recebido?`
-      : acao === "aCobrar"
+      : action === "aCobrar"
         ? "Marcar como A receber?"
-        : acao === "fora"
+        : action === "fora"
           ? "Fora do boleto"
-          : acao === "falta"
+          : action === "falta"
             ? "Registrar falta"
-            : acao === "desfazer"
+            : action === "desfazer"
               ? "Desfazer recebimento?"
               : "";
-  const confirmar =
-    acao === "recebido"
+  const confirm =
+    action === "recebido"
       ? "Marcar como recebido"
-      : acao === "aCobrar"
+      : action === "aCobrar"
         ? "Marcar como A receber"
-        : acao === "fora"
+        : action === "fora"
           ? "Marcar como fora do boleto"
-          : acao === "desfazer"
+          : action === "desfazer"
             ? "Desfazer recebimento"
             : "Registrar falta";
   return (
     <Modal
-      open={acao != null}
+      open={action != null}
       onClose={onClose}
       title={title}
       footer={
@@ -965,61 +965,61 @@ function ActionModal({
             Cancelar
           </Button>
           <Button onClick={onConfirm} disabled={gravando}>
-            {gravando ? (acao === "desfazer" ? "Desfazendo…" : "Salvando…") : confirmar}
+            {gravando ? (action === "desfazer" ? "Desfazendo…" : "Salvando…") : confirm}
           </Button>
         </>
       }
     >
-      {acao === "desfazer" ? (
+      {action === "desfazer" ? (
         <p className="text-[13.5px] text-t1">
           {recebimentos > 1
             ? `${recebimentos} recebimentos serão desfeitos. Os valores voltam para A receber.`
-            : diasDesfazer <= 1
+            : daysUndo <= 1
               ? "O valor voltará para A receber."
-              : `Este recebimento inclui ${diasDesfazer} dias. Ao desfazer, os valores de todos eles voltarão para A receber.`}
+              : `Este recebimento inclui ${daysUndo} dias. Ao desfazer, os valores de todos eles voltarão para A receber.`}
         </p>
       ) : null}
-      {acao === "recebido" ? (
-        <p className="text-[13.5px] text-t1">{dias === 1 ? "1 dia será incluído neste recebimento." : `${dias} dias serão incluídos neste recebimento.`}</p>
+      {action === "recebido" ? (
+        <p className="text-[13.5px] text-t1">{days === 1 ? "1 dia será incluído neste recebimento." : `${days} dias serão incluídos neste recebimento.`}</p>
       ) : null}
-      {acao === "aCobrar" ? (
+      {action === "aCobrar" ? (
         <p className="text-[13.5px] text-t1">
-          {faltaNoRecebido
+          {gapNoRecebido
             ? "As sangrias fora do boleto voltarão para A receber. Os dias já recebidos não mudam."
             : "As sangrias dos dias selecionados voltarão para A receber."}
         </p>
       ) : null}
-      {acao === "fora" ? (
+      {action === "fora" ? (
         <div>
           <p className="text-[13.5px] text-t1">
-            {foraNoRecebido
+            {excludedNoRecebido
               ? "As sangrias a receber dos dias selecionados ficarão fora do boleto. Os dias já recebidos não mudam."
               : "Todas as sangrias dos dias selecionados ficarão fora do boleto."}
           </p>
           <p className="mt-3 text-[12.5px] font-bold text-t0">Motivo</p>
           <input
             className="mt-2 w-full rounded-[10px] border border-line bg-bg-1 px-2.5 py-2 text-[13px] text-t0"
-            value={motivo}
+            value={reason}
             placeholder="Ex.: pagamento de fornecedor"
             aria-label="Motivo"
-            onChange={(e) => onMotivo(e.target.value)}
+            onChange={(e) => onReason(e.target.value)}
           />
           <p className="mt-1 text-[12px] text-t2">A descrição que a sangria já tem permanece.</p>
         </div>
       ) : null}
-      {acao === "falta" ? (
+      {action === "falta" ? (
         <div>
           <p className="text-[13.5px] text-t1">Informe o valor que deveria estar no caixa e não foi encontrado.</p>
-          {diaRecebido ? <p className="mt-2 text-[13.5px] text-t1">Este dia já foi recebido. A falta reduz o valor recebido.</p> : null}
+          {dayRecebido ? <p className="mt-2 text-[13.5px] text-t1">Este dia já foi recebido. A falta reduz o valor recebido.</p> : null}
           <p className="mt-3 text-[12.5px] font-bold text-t0">Valor da falta</p>
-          <NumberInput className="mt-2" compact unit="R$" value={falta} aria-label="Valor da falta" onChange={onFalta} />
+          <NumberInput className="mt-2" compact unit="R$" value={gap} aria-label="Valor da falta" onChange={onGap} />
           <p className="mt-3 text-[12.5px] font-bold text-t0">Motivo da falta</p>
           <input
             className="mt-2 w-full rounded-[10px] border border-line bg-bg-1 px-2.5 py-2 text-[13px] text-t0"
-            value={motivoFalta}
+            value={reasonGap}
             placeholder="Ex.: diferença no caixa"
             aria-label="Motivo da falta"
-            onChange={(e) => onMotivoFalta(e.target.value)}
+            onChange={(e) => onReasonGap(e.target.value)}
           />
         </div>
       ) : null}

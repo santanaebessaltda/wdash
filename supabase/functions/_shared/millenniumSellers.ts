@@ -27,7 +27,7 @@ export type ErpSeller = {
   geradorId: number | null;
 };
 
-type ListaRow = { employeeId: number; code: string; name: string; login: string | null; role: string };
+type ListRow = { employeeId: number; code: string; name: string; login: string | null; role: string };
 
 const CONSULTA_CONCURRENCY = 5;
 
@@ -83,17 +83,17 @@ function asBool(v: unknown): boolean {
   return v === true || v === 1 || v === "1" || (typeof v === "string" && v.toLowerCase() === "true");
 }
 
-function parseLista(payload: unknown): ListaRow[] {
-  const out: ListaRow[] = [];
+function parseList(payload: unknown): ListRow[] {
+  const out: ListRow[] = [];
   for (const raw of extractList(payload)) {
     if (!raw || typeof raw !== "object") continue;
     const o = raw as Record<string, unknown>;
-    const employeeId = asNum(o.FUNCIONARIO);
-    const name = titleName(asStr(o.NOME));
+    const employeeId = asNum(o.EMPLOYEE);
+    const name = titleName(asStr(o.NAME));
     if (employeeId == null || !name) continue;
     out.push({
       employeeId,
-      code: asStr(o.COD_FUNCIONARIO),
+      code: asStr(o.CODE_EMPLOYEE),
       name,
       login: asStr(o.LOGIN) || null,
       role: asStr(o.CARGO).toUpperCase(),
@@ -115,7 +115,7 @@ function parseFlags(payload: unknown): ErpSellerFlags {
     desativado: asBool(gerador?.DESATIVADO),
     inativo: asBool(o.INATIVO),
     afastado: asBool(o.AFASTADO),
-    naoMostrarNoEvento: asBool(o.NAO_MOSTRAR_NO_EVENTO),
+    naoMostrarNoEvento: asBool(o.NOT_SHOW_NO_EVENTO),
   };
 }
 
@@ -148,32 +148,32 @@ async function post(path: string, session: string, body: unknown): Promise<unkno
 }
 
 export async function fetchStoreSellers(session: string, millenniumStoreId: number): Promise<ErpSeller[]> {
-  const lista = parseLista(
+  const list = parseList(
     await post("millenium.FUNCIONARIOS.Lista?$top=500", session, {
       ORDEM: 1,
-      CAMPO: 1,
-      FILTRO: 2,
-      VALOR_FILTRO: null,
-      VALOR_1: null,
-      VALOR_2: null,
-      FILIAL: millenniumStoreId,
+      FIELD: 1,
+      FILTER: 2,
+      AMOUNT_FILTER: null,
+      AMOUNT_1: null,
+      AMOUNT_2: null,
+      BRANCH: millenniumStoreId,
       CARGO: null,
       RESPONSAVEL: null,
     }),
   );
 
-  const out: (ErpSeller | null)[] = new Array(lista.length).fill(null);
+  const out: (ErpSeller | null)[] = new Array(list.length).fill(null);
   let next = 0;
   const worker = async () => {
-    while (next < lista.length) {
+    while (next < list.length) {
       const i = next++;
-      const row = lista[i]!;
-      const consulta = await post("millenium.FUNCIONARIOS.Consulta", session, { FUNCIONARIO: row.employeeId });
+      const row = list[i]!;
+      const consulta = await post("millenium.FUNCIONARIOS.Consulta", session, { EMPLOYEE: row.employeeId });
       const flags = parseFlags(consulta);
       const active = !(flags.desativado || flags.inativo || flags.afastado || flags.naoMostrarNoEvento);
       out[i] = { ...row, flags, active, geradorId: parseGerador(consulta) };
     }
   };
-  await Promise.all(Array.from({ length: Math.min(CONSULTA_CONCURRENCY, lista.length) }, worker));
+  await Promise.all(Array.from({ length: Math.min(CONSULTA_CONCURRENCY, list.length) }, worker));
   return out.filter((s): s is ErpSeller => s != null);
 }

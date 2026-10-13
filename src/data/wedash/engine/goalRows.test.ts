@@ -81,7 +81,7 @@ describe("teamMemberFromRow", () => {
   const base = {
     store_id: "s010",
     millennium_employee_id: 61643,
-    millennium_gerador_id: 66161,
+    millennium_generator_id: 66161,
     name: "  Gabriela   Souza ",
     name_keys: ["GABRIELA SOUZA"],
     active: true,
@@ -94,7 +94,7 @@ describe("teamMemberFromRow", () => {
     expect(teamMemberFromRow(base)).toEqual({
       storeId: "s010",
       employeeId: 61643,
-      geradorId: 66161,
+      generatorId: 66161,
       name: "GABRIELA SOUZA",
       nameKeys: ["GABRIELA SOUZA"],
       salesPerson: true,
@@ -112,12 +112,12 @@ describe("teamMemberFromRow", () => {
   it("handles missing gerador, keys and shift", () => {
     const m = teamMemberFromRow({
       ...base,
-      millennium_gerador_id: null,
+      millennium_generator_id: null,
       name_keys: null,
       shift_id: null,
       store_shift: null,
     });
-    expect(m.geradorId).toBeNull();
+    expect(m.generatorId).toBeNull();
     expect(m.nameKeys).toEqual([]);
     expect(m.shiftId).toBeNull();
     expect(m.shiftName).toBeNull();
@@ -135,7 +135,7 @@ describe("sellerDayFromRow", () => {
         seller_key: "GABRIELA SOUZA",
         seller_name: "Gabriela Souza",
         seller_employee_id: null,
-        seller_gerador_id: 66161,
+        seller_generator_id: 66161,
         brand: "ALL",
         revenue_cents: 12345,
         sales_count: 3,
@@ -148,7 +148,7 @@ describe("sellerDayFromRow", () => {
       sellerKey: "GABRIELA SOUZA",
       sellerName: "GABRIELA SOUZA",
       sellerEmployeeId: null,
-      sellerGeradorId: 66161,
+      sellerGeneratorId: 66161,
       brand: "ALL",
       revenueCents: 12345,
       salesCount: 3,
@@ -164,7 +164,7 @@ describe("sellerDayFromRow", () => {
       seller_key: "NORTE.SUL",
       seller_name: "",
       seller_employee_id: 40587,
-      seller_gerador_id: null,
+      seller_generator_id: null,
       brand: "ALL",
       revenue_cents: 100,
       sales_count: 1,
@@ -184,7 +184,7 @@ describe("excludeNonSalesPeople", () => {
     sellerKey: "X",
     sellerName: "X",
     sellerEmployeeId: null,
-    sellerGeradorId: null,
+    sellerGeneratorId: null,
     brand: "ALL",
     revenueCents: 100,
     salesCount: 1,
@@ -192,7 +192,7 @@ describe("excludeNonSalesPeople", () => {
   });
   const people: NonSalesPeople = {
     employeeIds: new Set([40587]),
-    geradorIds: new Set([42345]),
+    generatorIds: new Set([42345]),
     storeNameKeys: new Set(["s114|NORTE.SUL"]),
   };
 
@@ -206,7 +206,7 @@ describe("excludeNonSalesPeople", () => {
 
   it("drops by gerador", () => {
     const out = excludeNonSalesPeople(
-      [row({ sellerKey: "NORTE.SUL", sellerGeradorId: 42345 }), row({ sellerKey: "ANA", sellerGeradorId: 7 })],
+      [row({ sellerKey: "NORTE.SUL", sellerGeneratorId: 42345 }), row({ sellerKey: "ANA", sellerGeneratorId: 7 })],
       people,
     );
     expect(out.map((r) => r.sellerKey)).toEqual(["ANA"]);

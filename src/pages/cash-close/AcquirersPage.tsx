@@ -8,7 +8,7 @@ import {
   type StoneLink,
 } from "@/data/wedash/cashCloseRepo";
 import type { Store } from "@/data/wedash/stores";
-import { isGestor } from "@/layout/nav-wedash";
+import { isOwner } from "@/layout/nav-wedash";
 import { noAutofill, secretStyle } from "@/lib/noAutofill";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
@@ -17,14 +17,14 @@ import { useScope } from "@/pages/dashboard/useScope";
 /** Configurações > Adquirentes. A chave é da loja, no mesmo desenho do Millennium. */
 export function AcquirersPage() {
   const { show } = useToast();
-  const { session, storeRows, loading: lojasLoading } = useScopedStores();
+  const { session, storeRows, loading: storesLoading } = useScopedStores();
   const { scope } = useScope();
   const escolher = pickOneStore(scope.storeIds, session.stores.length);
-  const showSkeleton = useMinSkeleton(lojasLoading);
+  const showSkeleton = useMinSkeleton(storesLoading);
   const [links, setLinks] = useState<StoneLink[]>([]);
   const [loading, setLoading] = useState(true);
-  const [open, setAberto] = useState(false);
-  const canEdit = isGestor(session.role);
+  const [open, setOpen] = useState(false);
+  const canEdit = isOwner(session.role);
 
   const reload = useCallback(async () => {
     try {
@@ -39,13 +39,13 @@ export function AcquirersPage() {
   }, [session.tenantId, storeRows]);
 
   useEffect(() => {
-    if (lojasLoading) return;
+    if (storesLoading) return;
     void reload();
-  }, [lojasLoading, reload]);
+  }, [storesLoading, reload]);
 
   const conectadas = links.length;
-  const estado = conectadas === 0 ? "Não configurado" : conectadas === storeRows.length ? "Conectado" : "Parcial";
-  const tom = conectadas === 0 ? "text-t2" : conectadas === storeRows.length ? "text-ok" : "text-warn";
+  const status = conectadas === 0 ? "Não configurado" : conectadas === storeRows.length ? "Conectado" : "Parcial";
+  const tone = conectadas === 0 ? "text-t2" : conectadas === storeRows.length ? "text-ok" : "text-warn";
   const dot = conectadas === 0 ? "bg-t2" : conectadas === storeRows.length ? "bg-ok" : "bg-warn";
 
   return (
@@ -87,12 +87,12 @@ export function AcquirersPage() {
               </div>
             </div>
             <div className="flex items-center justify-between border-t border-line pt-3">
-              <span className={`flex items-center gap-1.5 text-xs font-bold ${tom}`}>
+              <span className={`flex items-center gap-1.5 text-xs font-bold ${tone}`}>
                 <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
-                {estado}
-                {estado === "Parcial" ? ` · ${conectadas} de ${storeRows.length} filiais` : ""}
+                {status}
+                {status === "Parcial" ? ` · ${conectadas} de ${storeRows.length} filiais` : ""}
               </span>
-              <Button size="sm" onClick={() => setAberto(true)} disabled={!canEdit || storeRows.length === 0}>
+              <Button size="sm" onClick={() => setOpen(true)} disabled={!canEdit || storeRows.length === 0}>
                 {conectadas > 0 ? "Gerenciar" : "Conectar"}
               </Button>
             </div>
@@ -104,13 +104,13 @@ export function AcquirersPage() {
         open={open}
         storeRows={storeRows}
         links={links}
-        onClose={() => setAberto(false)}
+        onClose={() => setOpen(false)}
         onSaved={async (storeId) => {
           await reload();
-          const pedido = await requestMonthClose([storeId]);
-          if (!pedido.ok) show(pedido.message, "danger");
+          const order = await requestMonthClose([storeId]);
+          if (!order.ok) show(order.message, "danger");
           else show("Stone conectada. Buscando os fechamentos deste mês.", "success");
-          setAberto(false);
+          setOpen(false);
         }}
         onDisconnected={async () => {
           await reload();
@@ -142,7 +142,7 @@ function StoneModal({
   const conectado = Boolean(link);
   const [stoneCode, setStoneCode] = useState("");
   const [secret, setSecret] = useState("");
-  const [mostrarChave, setMostrarChave] = useState(false);
+  const [showRowKey, setShowRowKey] = useState(false);
   const [autorizo, setAutorizo] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -156,11 +156,11 @@ function StoneModal({
   useEffect(() => {
     setStoneCode(link?.stoneCode ?? "");
     setSecret("");
-    setMostrarChave(false);
+    setShowRowKey(false);
     setAutorizo(false);
   }, [link?.stoneCode, storeId]);
 
-  function fechar() {
+  function close() {
     if (busy) return;
     onClose();
   }
@@ -189,17 +189,17 @@ function StoneModal({
   }
 
   const travado = conectado || busy;
-  const podeConectar =
+  const canConectar =
     !conectado && autorizo && storeId.length > 0 && stoneCode.trim().length >= 5 && secret.trim().length > 0 && !busy;
 
   return (
     <Modal
       open={open}
-      onClose={fechar}
+      onClose={close}
       title="Stone"
       footer={
         <>
-          <Button variant="outline" onClick={fechar} disabled={busy}>
+          <Button variant="outline" onClick={close} disabled={busy}>
             Cancelar
           </Button>
           {conectado ? (
@@ -207,7 +207,7 @@ function StoneModal({
               {busy ? "Desconectando…" : "Desconectar"}
             </Button>
           ) : (
-            <Button onClick={() => void conectar()} disabled={!podeConectar}>
+            <Button onClick={() => void conectar()} disabled={!canConectar}>
               {busy ? "Conectando…" : "Conectar"}
             </Button>
           )}
@@ -239,7 +239,7 @@ function StoneModal({
               </option>
               {storeRows.map((l) => (
                 <option key={l.id} value={l.id}>
-                  {l.fantasia}
+                  {l.tradeName}
                 </option>
               ))}
             </Select>
@@ -262,7 +262,7 @@ function StoneModal({
               value={secret}
               onChange={(e) => setSecret(e.target.value)}
               placeholder={conectado ? "Chave já cadastrada" : "Digite a chave secreta"}
-              style={secretStyle(mostrarChave && !conectado)}
+              style={secretStyle(showRowKey && !conectado)}
               disabled={travado}
               className={conectado ? undefined : "pr-12"}
               {...noAutofill}
@@ -270,12 +270,12 @@ function StoneModal({
             {!conectado && (
               <button
                 type="button"
-                onClick={() => setMostrarChave((m) => !m)}
-                aria-label={mostrarChave ? "Ocultar chave" : "Mostrar chave"}
+                onClick={() => setShowRowKey((m) => !m)}
+                aria-label={showRowKey ? "Ocultar chave" : "Mostrar chave"}
                 disabled={busy}
                 className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-t2 hover:bg-bg-3 hover:text-t0"
               >
-                {mostrarChave ? (
+                {showRowKey ? (
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22" />
                   </svg>

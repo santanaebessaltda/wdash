@@ -26,18 +26,18 @@ const STALE_OPEN_MS = 2 * AUTO_REFRESH_MIN * 60_000;
 export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
   const session = useActiveSession();
   const { show } = useToast();
-  const pode = canForceSyncRefresh(session.role);
+  const can = canForceSyncRefresh(session.role);
   const [erp, setErp] = useState<ErpIntegrationStatus | null>(null);
   const [watermark, setWatermark] = useState<Date | null>(null);
   const [loaded, setLoaded] = useState(false);
   const lastWatermark = useRef<number | null>(null);
-  const semHover = useMediaQuery("(hover: none)");
-  const telaGen = useScreenRefreshGeneration();
-  const [telaBusy, setTelaBusy] = useState(false);
+  const withoutHover = useMediaQuery("(hover: none)");
+  const screenGen = useScreenRefreshGeneration();
+  const [screenBusy, setScreenBusy] = useState(false);
 
   const loadWatermark = useCallback(
     async (notifyIfNewer: boolean): Promise<boolean> => {
-      if (!pode) return false;
+      if (!can) return false;
       try {
         const [wm, st] = await Promise.all([
           fetchSyncWatermark(session.tenantId),
@@ -62,7 +62,7 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
         return false;
       }
     },
-    [session.tenantId, pode],
+    [session.tenantId, can],
   );
 
   useEffect(() => {
@@ -112,7 +112,7 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
   }, [loadWatermark]);
 
   const disconnected = erp != null && (erp.status !== "VALID" || erp.syncPaused);
-  const { canForce, refreshing, forceError, forceDoneAt, forceCooldownSec, forcarAtualizacao } = useForceRefresh({
+  const { canForce, refreshing, forceError, forceDoneAt, forceCooldownSec, forcarUpdate } = useForceRefresh({
     storeIds,
     reload,
     disconnected,
@@ -127,83 +127,83 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
   }, [forceDoneAt, show]);
 
   const clicar = async () => {
-    const tela = readScreenRefresh();
-    if (tela && !tela.sales) {
-      if (telaBusy) return;
+    const screen = readScreenRefresh();
+    if (screen && !screen.sales) {
+      if (screenBusy) return;
       if (disconnected) {
         show("O Millennium está desconectado. Conecte a integração para atualizar esta tela.", "danger");
         return;
       }
-      setTelaBusy(true);
+      setScreenBusy(true);
       try {
-        await tela.run();
+        await screen.run();
       } catch (e) {
         console.warn("screen refresh:", e);
       } finally {
-        setTelaBusy(false);
+        setScreenBusy(false);
       }
       return;
     }
-    if (tela?.sales) {
-      if (telaBusy) return;
-      setTelaBusy(true);
+    if (screen?.sales) {
+      if (screenBusy) return;
+      setScreenBusy(true);
       try {
-        await Promise.all([Promise.resolve(tela.run()), forcarAtualizacao()]);
+        await Promise.all([Promise.resolve(screen.run()), forcarUpdate()]);
       } catch (e) {
         console.warn("screen refresh:", e);
       } finally {
-        setTelaBusy(false);
+        setScreenBusy(false);
       }
       return;
     }
-    await forcarAtualizacao();
+    await forcarUpdate();
   };
 
   const now = new Date();
   const storeRows = storesForSession(session.stores).filter((s) => storeIds.length === 0 || storeIds.includes(s.id));
-  if (!pode || !canForce) return null;
+  if (!can || !canForce) return null;
 
   // telaGen re-renderiza quando a tela assume ou solta o botão.
-  const tela = telaGen >= 0 ? readScreenRefresh() : null;
-  const proprio = tela != null && !tela.sales;
-  const ocupado = telaBusy || (!proprio && refreshing);
+  const screen = screenGen >= 0 ? readScreenRefresh() : null;
+  const own = screen != null && !screen.sales;
+  const busy = screenBusy || (!own && refreshing);
 
-  const algumaAberta = storeRows.some((s) => storePhase(s.horas, now, s.fuso) === "open");
+  const anyOpen = storeRows.some((s) => storePhase(s.hours, now, s.timezone) === "open");
   const atrasado =
-    !proprio &&
+    !own &&
     loaded &&
-    !ocupado &&
+    !busy &&
     !disconnected &&
     (!watermark ||
       watermark.toDateString() !== now.toDateString() ||
-      (algumaAberta && now.getTime() - watermark.getTime() > STALE_OPEN_MS));
+      (anyOpen && now.getTime() - watermark.getTime() > STALE_OPEN_MS));
 
   const salesTip =
     storeIds.length === 1
       ? "Busca no Millennium as vendas de hoje da filial selecionada."
       : "Busca no Millennium as vendas de hoje de todas as filiais.";
-  const tip = tela?.tip ?? salesTip;
-  const busyLabel = tela?.busyLabel ?? "Buscando as vendas de hoje…";
+  const tip = screen?.tip ?? salesTip;
+  const busyLabel = screen?.busyLabel ?? "Buscando as vendas de hoje…";
   const disconnectTitle =
     erp?.status === "INVALID" && !erp.syncPaused ? "A senha do Millennium não é mais válida" : "Millennium desconectado";
-  const idleTitle = tela ? tela.status : refreshMomentTitle(!loaded ? undefined : watermark ? watermark.toISOString() : null);
-  const title = ocupado ? busyLabel : disconnected ? disconnectTitle : idleTitle;
+  const idleTitle = screen ? screen.status : refreshMomentTitle(!loaded ? undefined : watermark ? watermark.toISOString() : null);
+  const title = busy ? busyLabel : disconnected ? disconnectTitle : idleTitle;
   const tooltip = `${title}\n${tip}`;
 
-  const ariaLabel = ocupado
+  const ariaLabel = busy
     ? busyLabel
-    : !proprio && forceCooldownSec != null
+    : !own && forceCooldownSec != null
       ? `Próxima atualização em ${formatForceCooldownLabel(forceCooldownSec)}`
-      : tela
-        ? tela.label
+      : screen
+        ? screen.label
         : storeIds.length === 1
           ? "Atualizar as vendas de hoje da filial selecionada"
           : "Atualizar as vendas de hoje de todas as filiais";
 
-  const bloqueado = ocupado || (!proprio && forceCooldownSec != null);
-  const icone = (
+  const blocked = busy || (!own && forceCooldownSec != null);
+  const icon = (
     <>
-      <RefreshIcon className={cn("shrink-0", ocupado && "animate-spin text-acc")} />
+      <RefreshIcon className={cn("shrink-0", busy && "animate-spin text-acc")} />
       {atrasado && (
         <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-warn">
           <span className="sr-only">As vendas de hoje precisam ser atualizadas</span>
@@ -215,12 +215,12 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
     "relative flex h-9 w-9 items-center justify-center rounded-[10px] border border-line text-t1 hover:bg-bg-3 disabled:cursor-default disabled:hover:bg-transparent";
 
   // Celular / tablet (sem hover): o toque abre o horario da ultima busca + "Atualizar agora".
-  if (semHover) {
+  if (withoutHover) {
     return (
       <Dropdown
         trigger={
           <button type="button" aria-label={ariaLabel} className={buttonClass}>
-            {icone}
+            {icon}
           </button>
         }
         header={
@@ -231,10 +231,10 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
         }
         items={[
           {
-            label: ocupado ? "Atualizando…" : "Atualizar agora",
-            icon: <RefreshIcon className={cn("shrink-0", ocupado && "animate-spin")} />,
+            label: busy ? "Atualizando…" : "Atualizar agora",
+            icon: <RefreshIcon className={cn("shrink-0", busy && "animate-spin")} />,
             highlight: true,
-            disabled: bloqueado,
+            disabled: blocked,
             onClick: () => void clicar(),
           },
         ]}
@@ -244,12 +244,12 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
   }
 
   const button = (
-    <button type="button" onClick={() => void clicar()} disabled={bloqueado} aria-label={ariaLabel} className={buttonClass}>
-      {icone}
+    <button type="button" onClick={() => void clicar()} disabled={blocked} aria-label={ariaLabel} className={buttonClass}>
+      {icon}
     </button>
   );
 
-  if (!tooltip || ocupado) return button;
+  if (!tooltip || busy) return button;
   return (
     <Tooltip label={tooltip} side="bottom">
       {button}

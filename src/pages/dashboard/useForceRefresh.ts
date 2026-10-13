@@ -34,7 +34,7 @@ export type ForceRefreshState = {
   /** Muda a cada Atualizar concluido com sucesso (para o toast). */
   forceDoneAt: number | null;
   forceCooldownSec: number | null;
-  forcarAtualizacao: () => Promise<void>;
+  forcarUpdate: () => Promise<void>;
 };
 
 /**
@@ -168,7 +168,7 @@ export function useForceRefresh({
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [session.tenantId, canForce, disconnected, resumeOrWaitForce]);
 
-  const forcarAtualizacao = useCallback(async () => {
+  const forcarUpdate = useCallback(async () => {
     if (!canForce || refreshing || forceCooldownSec != null) return;
     if (disconnected) {
       setForceError(DISCONNECTED_MSG);
@@ -203,5 +203,5 @@ export function useForceRefresh({
     await resumeOrWaitForce(pending, true);
   }, [canForce, refreshing, forceCooldownSec, disconnected, storeIds, session.tenantId, resumeOrWaitForce]);
 
-  return { canForce, refreshing, forceError, forceDoneAt, forceCooldownSec, forcarAtualizacao };
+  return { canForce, refreshing, forceError, forceDoneAt, forceCooldownSec, forcarUpdate };
 }

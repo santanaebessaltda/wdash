@@ -36,24 +36,24 @@ export type PurchaseOrderRow = {
   vendidos30: number;
   multipla: number;
   minimum: number | null;
-  novo: boolean;
+  isNew: boolean;
   variasVariantes: boolean;
   /** Bloqueado para compra: aparece na lista, minimo so leitura, fora do arquivo. */
-  bloqueado: boolean;
+  blocked: boolean;
   /** Uma variante elegivel: da para gravar o minimo e entrar no arquivo. */
-  podePedir: boolean;
+  canRequest: boolean;
   /** null = " - " (sem minimo, bloqueado ou varias variantes). */
-  aPedir: number | null;
-  noPedido: boolean;
+  aRequest: number | null;
+  onOrder: boolean;
   /** Preço de custo unitário da tabela da loja, em centavos. Null = sem preço. */
-  custoCents: number | null;
+  costCents: number | null;
 };
 
 export type PurchaseOrderView = {
   rows: PurchaseOrderRow[];
-  contagens: { noPedido: number; semMinimo: number; novos: number };
+  counts: { onOrder: number; withoutMinimum: number; novos: number };
   /** Produtos e itens que vao para o arquivo no multiplicador atual. */
-  summary: { produtos: number; itens: number };
+  summary: { products: number; items: number };
 };
 
 export type PurchaseFilter = "todos" | "pedido" | "semMinimo" | "novos";
@@ -79,8 +79,8 @@ function dayNumber(iso: string): number {
 
 export function isNewProduct(registeredAt: string | null, todayIso: string): boolean {
   if (!registeredAt) return false;
-  const dias = dayNumber(todayIso) - dayNumber(registeredAt);
-  return dias >= 0 && dias < NEW_PRODUCT_DAYS;
+  const days = dayNumber(todayIso) - dayNumber(registeredAt);
+  return days >= 0 && days < NEW_PRODUCT_DAYS;
 }
 
 export const SOLD_HISTORY_DAYS = 365;
@@ -94,10 +94,10 @@ export function soldHistoryCovers(firstDay: string | null, openedAt: string | nu
 
 export function purchaseQuantity(total: number, min: number | null, multiple: number, factor: number): number {
   if (!min || min <= 0 || multiple <= 0) return 0;
-  const alvo = min * factor;
-  const estoque = Math.max(0, total);
-  if (estoque >= alvo) return 0;
-  return Math.ceil((alvo - estoque) / multiple) * multiple;
+  const target = min * factor;
+  const stock = Math.max(0, total);
+  if (stock >= target) return 0;
+  return Math.ceil((target - stock) / multiple) * multiple;
 }
 
 export function parseMinInput(raw: string): { ok: true; value: number | null } | { ok: false } {
@@ -120,61 +120,61 @@ export function buildPurchaseOrderView(input: {
   costs?: Map<string, number>;
 }): PurchaseOrderView {
   const soldEver = input.soldEver ?? null;
-  const porCodigo = new Map<string, PurchaseStockRow[]>();
+  const byCode = new Map<string, PurchaseStockRow[]>();
   for (const r of [...input.stock].sort((a, b) => a.position - b.position)) {
     if (!isListed(r)) continue;
-    const lista = porCodigo.get(r.code);
-    if (lista) lista.push(r);
-    else porCodigo.set(r.code, [r]);
+    const list = byCode.get(r.code);
+    if (list) list.push(r);
+    else byCode.set(r.code, [r]);
   }
 
-  const rows: PurchaseOrderRow[] = [...porCodigo.entries()].map(([code, todas]) => {
-    const elegiveis = todas.filter(isEligible);
-    const variantes = elegiveis.length > 0 ? elegiveis : todas;
-    const bloqueado = elegiveis.length === 0 && todas.every((v) => v.blocked);
-    const podePedir = elegiveis.length === 1;
+  const rows: PurchaseOrderRow[] = [...byCode.entries()].map(([code, all]) => {
+    const eligible = all.filter(isEligible);
+    const variantes = eligible.length > 0 ? eligible : all;
+    const blocked = eligible.length === 0 && all.every((v) => v.blocked);
+    const canRequest = eligible.length === 1;
     const first = variantes[0];
-    const soma = (f: (v: PurchaseStockRow) => number) => todas.reduce((s, v) => s + f(v), 0);
-    const totalPedido = elegiveis.reduce((s, v) => s + v.total, 0);
-    const total = soma((v) => v.total);
+    const sum = (f: (v: PurchaseStockRow) => number) => all.reduce((s, v) => s + f(v), 0);
+    const totalOrder = eligible.reduce((s, v) => s + v.total, 0);
+    const total = sum((v) => v.total);
     const multipla = first.multiple ?? 0;
     const minimum = input.mins.get(code) ?? null;
     const variasVariantes = variantes.length > 1;
-    const aPedir = podePedir && minimum ? purchaseQuantity(totalPedido, minimum, multipla, input.factor) : null;
-    const custo = input.costs?.get(code);
+    const aRequest = canRequest && minimum ? purchaseQuantity(totalOrder, minimum, multipla, input.factor) : null;
+    const cost = input.costs?.get(code);
     return {
       code,
       name: first.description,
       variantes,
       position: first.position,
-      saldo: soma((v) => v.balance),
-      pedidosAbertos: soma((v) => v.openOrder),
+      saldo: sum((v) => v.balance),
+      pedidosAbertos: sum((v) => v.openOrder),
       total,
       vendidos30: input.sold30.get(code) ?? 0,
       multipla,
       minimum,
-      novo:
-        !bloqueado &&
+      isNew:
+        !blocked &&
         (isNewProduct(variantes.find((v) => v.registeredAt)?.registeredAt ?? null, input.todayIso) ||
           (soldEver != null && !soldEver.has(code))),
       variasVariantes,
-      bloqueado,
-      podePedir,
-      aPedir,
-      noPedido: (aPedir ?? 0) > 0,
-      custoCents: custo != null && custo > 0 ? custo : null,
+      blocked,
+      canRequest,
+      aRequest,
+      onOrder: (aRequest ?? 0) > 0,
+      costCents: cost != null && cost > 0 ? cost : null,
     };
   });
 
-  const noPedido = rows.filter((r) => r.noPedido);
+  const onOrder = rows.filter((r) => r.onOrder);
   return {
     rows,
-    contagens: {
-      noPedido: noPedido.length,
-      semMinimo: rows.filter((r) => r.podePedir && !r.minimum).length,
-      novos: rows.filter((r) => r.novo).length,
+    counts: {
+      onOrder: onOrder.length,
+      withoutMinimum: rows.filter((r) => r.canRequest && !r.minimum).length,
+      novos: rows.filter((r) => r.isNew).length,
     },
-    summary: { produtos: noPedido.length, itens: noPedido.reduce((s, r) => s + (r.aPedir ?? 0), 0) },
+    summary: { products: onOrder.length, items: onOrder.reduce((s, r) => s + (r.aRequest ?? 0), 0) },
   };
 }
 
@@ -188,27 +188,27 @@ export type PurchaseFileRow = [string | number, string, string, string, number, 
 /** Linhas do arquivo de importacao, na ordem do relatorio; COD numerico sem zero a esquerda vai como numero (igual ao exemplo). */
 export function purchaseOrderFileRows(view: PurchaseOrderView): PurchaseFileRow[] {
   return view.rows
-    .filter((r) => r.noPedido)
+    .filter((r) => r.onOrder)
     .sort((a, b) => a.position - b.position)
     .map((r) => {
       const v = r.variantes[0];
-      return [/^[1-9]\d*$/.test(r.code) ? Number(r.code) : r.code, v.color, v.print, v.size, r.aPedir ?? 0, Math.max(0, r.total), v.description];
+      return [/^[1-9]\d*$/.test(r.code) ? Number(r.code) : r.code, v.color, v.print, v.size, r.aRequest ?? 0, Math.max(0, r.total), v.description];
     });
 }
 
 /** Quantidade a pedir × custo. Null se o produto não entra no pedido ou está sem custo. */
 export function purchaseLineCents(r: PurchaseOrderRow): number | null {
-  if (!r.noPedido || r.aPedir == null || r.custoCents == null) return null;
-  return r.aPedir * r.custoCents;
+  if (!r.onOrder || r.aRequest == null || r.costCents == null) return null;
+  return r.aRequest * r.costCents;
 }
 
 /** Total do pedido em centavos. Soma as linhas com custo. Null se nenhuma tiver preço. */
 export function purchaseOrderTotalCents(rows: PurchaseOrderRow[]): number | null {
-  const pedido = rows.filter((r) => r.noPedido);
-  if (pedido.length === 0) return 0;
+  const order = rows.filter((r) => r.onOrder);
+  if (order.length === 0) return 0;
   let total = 0;
   let any = false;
-  for (const r of pedido) {
+  for (const r of order) {
     const line = purchaseLineCents(r);
     if (line == null) continue;
     any = true;
@@ -224,12 +224,12 @@ export function purchaseOrderFileName(d: Date): string {
 
 const fold = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 
-export function filterPurchaseRows(rows: PurchaseOrderRow[], opts: { busca: string; filtro: PurchaseFilter }): PurchaseOrderRow[] {
-  const q = fold(opts.busca.trim());
+export function filterPurchaseRows(rows: PurchaseOrderRow[], opts: { search: string; filter: PurchaseFilter }): PurchaseOrderRow[] {
+  const q = fold(opts.search.trim());
   return rows.filter((r) => {
-    if (opts.filtro === "pedido" && !r.noPedido) return false;
-    if (opts.filtro === "semMinimo" && (!r.podePedir || r.minimum)) return false;
-    if (opts.filtro === "novos" && !r.novo) return false;
+    if (opts.filter === "pedido" && !r.onOrder) return false;
+    if (opts.filter === "semMinimo" && (!r.canRequest || r.minimum)) return false;
+    if (opts.filter === "novos" && !r.isNew) return false;
     return !q || fold(r.name).includes(q) || fold(r.code).includes(q);
   });
 }

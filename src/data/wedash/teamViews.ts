@@ -42,23 +42,23 @@ function divSeguro(a: number, b: number): number {
 /** Vendedora elegivel presente na loja no dia (admissao  dia < inatividade). */
 export function presentOnDay(c: Collaborator, iso: string): boolean {
   if (!eligibleSeller(c)) return false;
-  if (c.dataAdmissao > iso) return false;
-  if (c.dataInatividade && c.dataInatividade <= iso) return false;
+  if (c.hiredAt > iso) return false;
+  if (c.inactiveAt && c.inactiveAt <= iso) return false;
   return true;
 }
 
 /** Dias abertos da loja em que a vendedora estava presente, dentro do intervalo. */
 function eligibleDays(c: Collaborator, branch: Store, start: string, end: string): string[] {
-  const primeiro = c.dataAdmissao > start ? c.dataAdmissao : start;
-  const ultimo = c.dataInatividade && c.dataInatividade <= end ? addDays(c.dataInatividade, -1) : end;
-  if (primeiro > ultimo) return [];
-  return eachDay(primeiro, ultimo).filter((iso) => storeOpen(branch, iso));
+  const first = c.hiredAt > start ? c.hiredAt : start;
+  const last = c.inactiveAt && c.inactiveAt <= end ? addDays(c.inactiveAt, -1) : end;
+  if (first > last) return [];
+  return eachDay(first, last).filter((iso) => storeOpen(branch, iso));
 }
 
 /** Vendedoras elegiveis presentes na loja no mes (base de listas e somas). */
 export function sellersOfStore(storeId: string, competence: string): Collaborator[] {
-  const primeiroMes = `${competence}-01`;
-  return collaboratorsOfStore(storeId).filter((c) => presentOnDay(c, primeiroMes) || presentOnDay(c, TODAY_ISO));
+  const firstMonth = `${competence}-01`;
+  return collaboratorsOfStore(storeId).filter((c) => presentOnDay(c, firstMonth) || presentOnDay(c, TODAY_ISO));
 }
 
 export interface IndividualGoal {
@@ -80,21 +80,21 @@ export function individualGoal(c: Collaborator, storeId: string, competence: str
   const goal = goalOfStore(storeId, competence);
   if (!goal) return null;
   const branch = storeById(storeId);
-  const primeiroMes = `${competence}-01`;
-  const ultimoMes = endOfMonth(primeiroMes);
-  const elegiveisMes = sellersOfStore(storeId, competence);
-  if (elegiveisMes.length === 0) return null;
+  const firstMonth = `${competence}-01`;
+  const lastMonth = endOfMonth(firstMonth);
+  const eligibleMonth = sellersOfStore(storeId, competence);
+  if (eligibleMonth.length === 0) return null;
 
-  const openDaysInMonth = eachDay(primeiroMes, ultimoMes).filter((iso) => storeOpen(branch, iso)).length;
-  const dias = eligibleDays(c, branch, primeiroMes, ultimoMes);
-  const pesoAjustado = c.pesoVenda * (openDaysInMonth > 0 ? dias.length / openDaysInMonth : 0);
-  const somaPesosAjustados = elegiveisMes.reduce((s, x) => {
-    const d = eligibleDays(x, branch, primeiroMes, ultimoMes);
-    return s + x.pesoVenda * (openDaysInMonth > 0 ? d.length / openDaysInMonth : 0);
+  const openDaysInMonth = eachDay(firstMonth, lastMonth).filter((iso) => storeOpen(branch, iso)).length;
+  const days = eligibleDays(c, branch, firstMonth, lastMonth);
+  const weightAdjusted = c.saleWeight * (openDaysInMonth > 0 ? days.length / openDaysInMonth : 0);
+  const sumWeightsAdjusted = eligibleMonth.reduce((s, x) => {
+    const d = eligibleDays(x, branch, firstMonth, lastMonth);
+    return s + x.saleWeight * (openDaysInMonth > 0 ? d.length / openDaysInMonth : 0);
   }, 0);
-  if (somaPesosAjustados <= 0) return null;
-  const amount = (goal.storeAmount * pesoAjustado) / somaPesosAjustados;
-  return { amount, proportional: dias.length < openDaysInMonth, eligibleDays: dias.length, openDaysInMonth };
+  if (sumWeightsAdjusted <= 0) return null;
+  const amount = (goal.storeAmount * weightAdjusted) / sumWeightsAdjusted;
+  return { amount, proportional: days.length < openDaysInMonth, eligibleDays: days.length, openDaysInMonth };
 }
 
 /* ------------------------- Agregado por vendedora (EQUIP-02) ------------------------- */
@@ -103,31 +103,31 @@ export interface SellerAggregate {
   employeeId: string;
   revenue: number;
   salesCount: number;
-  itens: number;
+  items: number;
   daysWorked: number;
 }
 
 /** Agregado da vendedora no periodo (respeitando a fracao do dia de hoje). */
 export function sellerAggregateForPeriod(c: Collaborator, storeId: string, start: string, end: string): SellerAggregate {
-  const out = { employeeId: c.id, revenue: 0, salesCount: 0, itens: 0, daysWorked: 0 };
+  const out = { employeeId: c.id, revenue: 0, salesCount: 0, items: 0, daysWorked: 0 };
   for (const iso of eachDay(start, end)) {
     if (!presentOnDay(c, iso)) continue;
-    const dia = salesDay(storeId, iso);
-    if (!dia) continue;
+    const day = salesDay(storeId, iso);
+    if (!day) continue;
     // Hoje incompleto: o gerador ja trunca porHora na hora atual; o total do
     // dia, nao. Recorte a fatia da vendedora pela fracao do dia realizada.
-    const horaMax = iso === TODAY_ISO ? CURRENT_HOUR : undefined;
-    const dayTotal = dayAggregate(dia, null, horaMax);
-    const doDia = dia.bySeller[c.id];
-    if (!doDia || dayTotal.revenue <= 0) continue;
-    const fr = dayTotal.revenue / dia.total.revenue;
-    const revenue = Math.round(doDia.revenue * fr);
-    const salesCount = Math.round(doDia.salesCount * fr);
-    const itens = Math.round(doDia.itens * fr);
+    const hourMax = iso === TODAY_ISO ? CURRENT_HOUR : undefined;
+    const dayTotal = dayAggregate(day, null, hourMax);
+    const ofDay = day.bySeller[c.id];
+    if (!ofDay || dayTotal.revenue <= 0) continue;
+    const fr = dayTotal.revenue / day.total.revenue;
+    const revenue = Math.round(ofDay.revenue * fr);
+    const salesCount = Math.round(ofDay.salesCount * fr);
+    const items = Math.round(ofDay.items * fr);
     if (revenue > 0 || salesCount > 0) out.daysWorked += 1;
     out.revenue += revenue;
     out.salesCount += salesCount;
-    out.itens += itens;
+    out.items += items;
   }
   return out;
 }
@@ -142,7 +142,7 @@ export interface LadderRow {
   /** Bonus do degrau  -  so entra quando o degrau e alcancado. */
   bonus: number;
   /** Proximo degrau, quanto falta e o que ele passa a pagar; null no ultimo. */
-  proximo: { name: string; gapAmount: number; prizePct: number; bonus: number; minAttainmentPct: number } | null;
+  next: { name: string; gapAmount: number; prizePct: number; bonus: number; minAttainmentPct: number } | null;
 }
 
 /** Escada de degraus da Meta customizada da filial (nao a padrao global). */
@@ -171,17 +171,17 @@ export function sellerLadder(
   const idx = tier ? tiers.indexOf(tier) : -1;
   const prizeAmount = tier ? (achieved * tier.commissionPct) / 100 : 0;
   const bonus = tier ? tier.bonus : 0;
-  const seguinte = idx + 1 < tiers.length ? tiers[idx + 1] : null;
-  const proximo = seguinte
+  const following = idx + 1 < tiers.length ? tiers[idx + 1] : null;
+  const next = following
     ? {
-        name: seguinte.name,
-        gapAmount: Math.max(0, (personGoal.amount * seguinte.minAttainmentPct) / 100 - achieved),
-        prizePct: seguinte.commissionPct,
-        bonus: seguinte.bonus,
-        minAttainmentPct: seguinte.minAttainmentPct,
+        name: following.name,
+        gapAmount: Math.max(0, (personGoal.amount * following.minAttainmentPct) / 100 - achieved),
+        prizePct: following.commissionPct,
+        bonus: following.bonus,
+        minAttainmentPct: following.minAttainmentPct,
       }
     : null;
-  return { tier, prizeAmount, bonus, proximo };
+  return { tier, prizeAmount, bonus, next };
 }
 
 /* ------------------------- Tipos da visao ------------------------- */
@@ -192,7 +192,7 @@ export interface TeamKpiValue {
   /** Linha auxiliar sob o valor (mesmo padrao VG/Fin/Prod). */
   sub?: string;
   /** Serie diaria (reservada; KPIs da Equipe nao renderizam sparkline). */
-  serie?: number[];
+  series?: number[];
 }
 
 export interface ChallengeParticipantView {
@@ -204,11 +204,11 @@ export interface ChallengeParticipantView {
   group: string;
   progress: number;
   /** Piso/alvo contra o qual a barra e medida. */
-  alvo: number;
-  progressoPct: number;
+  target: number;
+  progressPct: number;
   /** Ex.: "8/15 un"  |  "1,85/1,90"  |  "R$ 178/R$ 185". */
-  progressoRotulo: string;
-  status: "atingiu" | "quase" | "below" | "nao_comecou";
+  progressLabel: string;
+  status: "reached" | "near" | "below" | "notStarted";
 }
 
 export interface ChallengeView {
@@ -222,45 +222,45 @@ export interface ChallengeView {
   /** Valor minimo configurado (null = sem piso explicito). */
   minimum: number | null;
   /** Se ha minimo discriminado no card (minimo != null). */
-  temMinimo: boolean;
+  hasMinimum: boolean;
   kind: Challenge["kind"];
   /** Cor do icone de fogo no card (CSS color / token). */
-  corIcone: string;
+  colorIcon: string;
   individualTarget: number;
   unit: Challenge["unit"];
   /** Premio da vendedora que fechar. */
   prize: number;
   /** Premio do gerente se a regra de N vendedoras fechar. */
-  premioGerente: number;
+  prizeManager: number;
   /** Quantas vendedoras precisam atingir (parametrizacao do gerente). */
-  minimoVendedorasAtingindo: number;
+  minimumSellersAtingindo: number;
   participants: number;
-  engajadas: number;
+  engaged: number;
   /**
    * Progresso agregado: un/R$ = soma capped (regra A); pa/ticket = media da equipe.
    */
-  progressoAgregado: number;
+  aggregatedProgress: number;
   /**
    * Alvo agregado: un/R$ = piso x N gerente; pa/ticket = o proprio piso (ex.: 1,90).
    */
-  alvoAgregado: number;
-  progressoPct: number;
+  targetAgregado: number;
+  progressPct: number;
   /** Ex.: "6/9 un"  -  progresso da meta do gerente. */
-  progressoAgregadoRotulo: string;
+  aggregatedProgressLabel: string;
   /** Quantas participantes ja atingiram o alvo individual. */
-  atingiram: number;
-  projetadoAgregado: number;
-  fechaNoRitmo: boolean;
-  semEngajamento: boolean;
-  tipoTexto: string;
+  reachedCount: number;
+  projectedAgregado: number;
+  fechaNoPace: boolean;
+  withoutEngagement: boolean;
+  kindText: string;
   /** Dias restantes (ativo), dias ate comecar (agendado) ou 0 (encerrado). */
   daysRemaining: number;
   /** Rotulo do badge de prazo: "15d"  |  "Em 5d"  |  "Encerrado". */
-  prazoRotulo: string;
+  prazoLabel: string;
   /** Janela do desafio, ex.: "01/09  -  15/09". */
-  janelaRotulo: string;
+  janelaLabel: string;
   /** Tom do prazo: ok=ativo, muted=a comecar, bad=encerrado. */
-  prazoTom: "ok" | "bad" | "muted";
+  prazoTone: "ok" | "bad" | "muted";
   /** Status temporal do desafio. */
   statusLabel: "Ativo" | "Encerrado" | "A começar";
   statusVariant: "success" | "danger" | "neutral" | "warning" | "info";
@@ -288,13 +288,13 @@ export interface StoreTeamSummary {
   achievedAmount: number;
   /** Meta da loja / meta global x 100 (0 se meta global = 0). */
   networkGoalPct: number;
-  melhor: { name: string; attainmentPct: number } | null;
-  pior: { name: string; attainmentPct: number } | null;
+  best: { name: string; attainmentPct: number } | null;
+  worst: { name: string; attainmentPct: number } | null;
 }
 
 export interface TeamBlockStates {
   kpis: BlockState;
-  leitura: BlockState;
+  reading: BlockState;
   sellers: BlockState;
   challenges: BlockState;
 }
@@ -321,7 +321,7 @@ export interface TeamView {
   networkGoal: NetworkGlobalGoal | null;
   /** Uma entrada por meta ativa no escopo (loja principal + metas de marca, etc.). */
   goalCardsList: GoalCardView[];
-  leitura: string | null;
+  reading: string | null;
   /** Serie acumulada Realizado x Meta (mesmo padrao da Visao Geral). */
   revenueEvolution?: { label: string; achieved: number; goal: number }[];
   /** Subtitulo do eixo (ex.: "Este mes  |  por dia"). */
@@ -340,21 +340,21 @@ export interface TeamView {
 function storeAggregate(storeId: string, start: string, end: string): Aggregate {
   return sumAggregates(
     eachDay(start, end).map((iso) => {
-      const dia = salesDay(storeId, iso);
-      if (!dia) return { revenue: 0, salesCount: 0, itens: 0 };
-      return dayAggregate(dia, null, iso === TODAY_ISO ? CURRENT_HOUR : undefined);
+      const day = salesDay(storeId, iso);
+      if (!day) return { revenue: 0, salesCount: 0, items: 0 };
+      return dayAggregate(day, null, iso === TODAY_ISO ? CURRENT_HOUR : undefined);
     }),
   );
 }
 
 /** Tendencia: ultimos 7 dias vs. 7 anteriores da vendedora; 5% = estavel. */
-function sellerTrend(c: Collaborator, storeId: string, fimIso: string): SellerRow["trend"] {
-  const soma = (start: string, end: string) =>
+function sellerTrend(c: Collaborator, storeId: string, endIso: string): SellerRow["trend"] {
+  const sum = (start: string, end: string) =>
     eachDay(start, end).reduce((s, iso) => s + sellerAggregateForPeriod(c, storeId, iso, iso).revenue, 0);
-  const ultimos = soma(addDays(fimIso, -6), fimIso);
-  const anteriores = soma(addDays(fimIso, -13), addDays(fimIso, -7));
-  if (anteriores <= 0 || ultimos <= 0) return "flat";
-  const v = ((ultimos - anteriores) / anteriores) * 100;
+  const ultimos = sum(addDays(endIso, -6), endIso);
+  const previous = sum(addDays(endIso, -13), addDays(endIso, -7));
+  if (previous <= 0 || ultimos <= 0) return "flat";
+  const v = ((ultimos - previous) / previous) * 100;
   if (v > 5) return "up";
   if (v < -5) return "down";
   return "flat";
@@ -367,7 +367,7 @@ function sellerTrend(c: Collaborator, storeId: string, fimIso: string): SellerRo
  * f1 (Shopping CG) no mock de set/26 esta no Hiper (N3 100% da meta);
  * fatores espalham vendedoras entre N1 - N4 (Desafio = 110%).
  */
-const DEMO_FATOR_RITMO: Record<string, number> = {
+const DEMO_FACTOR_PACE: Record<string, number> = {
   // f1  -  Campo Grande (loja no Hiper / N3)
   c01: 1.25,
   c02: 1.15,
@@ -390,47 +390,47 @@ const DEMO_FATOR_RITMO: Record<string, number> = {
 function sellersView(storeId: string, period: ResolvedPeriod, activeGoal: boolean, competence: string): SellerRow[] {
   const branch = storeById(storeId);
   const storeAgg = storeAggregate(storeId, period.start, period.end);
-  const storeAvgItems = divSeguro(storeAgg.itens, storeAgg.salesCount);
+  const storeAvgItems = divSeguro(storeAgg.items, storeAgg.salesCount);
   const tiers = tiersOfStore(storeId, competence);
-  const elegiveis = sellersOfStore(storeId, competence);
+  const eligible = sellersOfStore(storeId, competence);
 
   // 1 passagem: agregado real por vendedora (fonte unica de R$).
-  const brutos = elegiveis.map((c) => {
+  const gross = eligible.map((c) => {
     const ag = sellerAggregateForPeriod(c, storeId, period.start, period.end);
     return { c, ag };
   });
-  const somaBruta = brutos.reduce((s, x) => s + x.ag.revenue, 0);
-  const somaPeso = brutos.reduce((s, x) => {
-    const fat = Math.max(0, x.ag.revenue);
-    const fator = DEMO_FATOR_RITMO[x.c.id] ?? 1;
-    return s + fat * fator;
+  const sumGross = gross.reduce((s, x) => s + x.ag.revenue, 0);
+  const sumWeight = gross.reduce((s, x) => {
+    const revenue = Math.max(0, x.ag.revenue);
+    const factor = DEMO_FACTOR_PACE[x.c.id] ?? 1;
+    return s + revenue * factor;
   }, 0);
 
-  return brutos
+  return gross
     .map(({ c, ag: agRaw }) => {
     const personGoal = activeGoal ? individualGoal(c, storeId, competence) : null;
 
     // Redistribui o mesmo bolo: fat_i = soma x (fat_bruta x fator) / (...).
     let revenue = agRaw.revenue;
     let salesCount = agRaw.salesCount;
-    let itens = agRaw.itens;
-    if (somaBruta > 0 && somaPeso > 0) {
-      const fator = DEMO_FATOR_RITMO[c.id] ?? 1;
-      const fatAlvo = Math.round((somaBruta * Math.max(0, agRaw.revenue) * fator) / somaPeso);
-      if (agRaw.revenue > 0 && fatAlvo !== agRaw.revenue) {
-        const escala = fatAlvo / agRaw.revenue;
-        revenue = fatAlvo;
-        salesCount = Math.max(fatAlvo > 0 ? 1 : 0, Math.round(agRaw.salesCount * escala));
-        itens = Math.max(salesCount, Math.round(agRaw.itens * escala));
-      } else if (agRaw.revenue === 0 && fatAlvo > 0) {
-        revenue = fatAlvo;
-        salesCount = Math.max(1, Math.round(fatAlvo / 120));
-        itens = Math.round(salesCount * 1.5);
+    let items = agRaw.items;
+    if (sumGross > 0 && sumWeight > 0) {
+      const factor = DEMO_FACTOR_PACE[c.id] ?? 1;
+      const revenueTarget = Math.round((sumGross * Math.max(0, agRaw.revenue) * factor) / sumWeight);
+      if (agRaw.revenue > 0 && revenueTarget !== agRaw.revenue) {
+        const scale = revenueTarget / agRaw.revenue;
+        revenue = revenueTarget;
+        salesCount = Math.max(revenueTarget > 0 ? 1 : 0, Math.round(agRaw.salesCount * scale));
+        items = Math.max(salesCount, Math.round(agRaw.items * scale));
+      } else if (agRaw.revenue === 0 && revenueTarget > 0) {
+        revenue = revenueTarget;
+        salesCount = Math.max(1, Math.round(revenueTarget / 120));
+        items = Math.round(salesCount * 1.5);
       }
     }
 
     const ticket = divSeguro(revenue, salesCount);
-    const pa = divSeguro(itens, salesCount);
+    const pa = divSeguro(items, salesCount);
     const trend = sellerTrend(c, storeId, period.end);
 
     // Projecao do fechamento individual: realizado escalado pela fracao da
@@ -438,9 +438,9 @@ function sellersView(storeId: string, period: ResolvedPeriod, activeGoal: boolea
     const closed = endOfMonth(`${competence}-01`) < TODAY_ISO;
     let finalProjection = 0;
     if (personGoal && personGoal.amount > 0 && !closed) {
-      const curva = revenueCurve([branch], competence);
+      const curve = revenueCurve([branch], competence);
       let accumulatedShare = 0;
-      for (const iso of eachDay(`${competence}-01`, TODAY_ISO)) accumulatedShare += curva.peso(iso);
+      for (const iso of eachDay(`${competence}-01`, TODAY_ISO)) accumulatedShare += curve.weight(iso);
       if (accumulatedShare > 0) finalProjection = revenue / accumulatedShare;
     }
     const atingProjPct = personGoal && personGoal.amount > 0 ? (finalProjection / personGoal.amount) * 100 : 0;
@@ -469,9 +469,9 @@ function sellersView(storeId: string, period: ResolvedPeriod, activeGoal: boolea
     // abaixo da media da loja  ->  tendencia caindo (com leitura de ritmo).
     let attention: SellerRow["attention"] = null;
     if (personGoal && personGoal.amount > 0) {
-      const paAbaixoPct = storeAvgItems > 0 && pa > 0 && pa < storeAvgItems * 0.95 ? (pa / storeAvgItems - 1) * 100 : null;
-      if (paAbaixoPct !== null) {
-        attention = { kind: "pa", text: `P.A. ${num(pa, 2)}`, detail: `${num(Math.abs(paAbaixoPct), 0)}% abaixo` };
+      const paBelowPct = storeAvgItems > 0 && pa > 0 && pa < storeAvgItems * 0.95 ? (pa / storeAvgItems - 1) * 100 : null;
+      if (paBelowPct !== null) {
+        attention = { kind: "pa", text: `P.A. ${num(pa, 2)}`, detail: `${num(Math.abs(paBelowPct), 0)}% abaixo` };
       } else if (trend === "down") {
         attention =
           atingProjPct < 100
@@ -481,14 +481,14 @@ function sellersView(storeId: string, period: ResolvedPeriod, activeGoal: boolea
     }
 
     const storeGoal = activeGoal ? goalOfStore(storeId, competence)?.storeAmount ?? 0 : 0;
-    const nivelIdx = ladderShown?.tier ? tiers.indexOf(ladderShown.tier) : -1;
+    const levelIdx = ladderShown?.tier ? tiers.indexOf(ladderShown.tier) : -1;
 
     return {
       employeeId: c.id,
       name: c.name,
       storeId,
-      storeName: branch.fantasia,
-      group: c.grupoId ? groups.find((t) => t.id === c.grupoId)?.name ?? "Sem grupo" : "Sem grupo",
+      storeName: branch.tradeName,
+      group: c.groupId ? groups.find((t) => t.id === c.groupId)?.name ?? "Sem grupo" : "Sem grupo",
       revenueAmount: revenue,
       revenue: brl(revenue),
       salesCount,
@@ -511,8 +511,8 @@ function sellersView(storeId: string, period: ResolvedPeriod, activeGoal: boolea
       // degrau + % de premiacao que ele paga acima dele).
       ladderMarks: tiers.map((d) => ({ name: d.name, pct: d.minAttainmentPct, prizePct: d.commissionPct, bonus: d.bonus })),
       currentTierName: ladderShown?.tier?.name ?? null,
-      currentLevel: nivelIdx >= 0 ? nivelIdx + 1 : null,
-      nextTier: ladderShown?.proximo ?? null,
+      currentLevel: levelIdx >= 0 ? levelIdx + 1 : null,
+      nextTier: ladderShown?.next ?? null,
       accruedPrize: ladderToDate?.prizeAmount ?? 0,
       commissionPct: ladderShown?.tier?.commissionPct ?? 0,
       projectedIndividualPrize,
@@ -533,62 +533,62 @@ function sellersView(storeId: string, period: ResolvedPeriod, activeGoal: boolea
 
 /* ------------------------- Desafios (EQUIP-05) ------------------------- */
 
-const TIPO_TEXTO: Record<Challenge["kind"], string> = {
-  produto: "Produto",
-  quantidade: "Quantidade",
-  faturamento: "Faturamento",
+const KIND_TEXT: Record<Challenge["kind"], string> = {
+  product: "Produto",
+  quantity: "Quantidade",
+  revenue: "Faturamento",
   pa: "P.A.",
   ticket: "Ticket médio",
 };
 
 /** Icone de fogo em todos os cards  -  so a cor muda (por desafio ou tipo). */
-const COR_ICONE_DESAFIO: Record<string, string> = {
+const COLOR_ICON_CHALLENGE: Record<string, string> = {
   "d-perfumaria": "var(--acc)",
   "d-bodycream": "var(--warn)",
   "d-pa": "var(--info)",
   "d-ticket": "var(--ok)",
 };
 
-const COR_ICONE_TIPO: Record<Challenge["kind"], string> = {
-  produto: "var(--acc)",
-  quantidade: "var(--warn)",
-  faturamento: "#9d86ff",
+const COLOR_ICON_KIND: Record<Challenge["kind"], string> = {
+  product: "var(--acc)",
+  quantity: "var(--warn)",
+  revenue: "#9d86ff",
   pa: "var(--info)",
   ticket: "var(--ok)",
 };
 
 function challengeAmountLabel(v: number, d: Challenge): string {
-  if (d.kind === "ticket" || d.kind === "faturamento" || d.unit === "R$") return brlK(v);
+  if (d.kind === "ticket" || d.kind === "revenue" || d.unit === "R$") return brlK(v);
   if (d.kind === "pa" || d.unit === "x") return num(v, v % 1 !== 0 ? 2 : 0);
   return num(Math.round(v), 0);
 }
 
-function progressLabel(progress: number, piso: number, d: Challenge): string {
+function progressLabel(progress: number, floor: number, d: Challenge): string {
   const a = challengeAmountLabel(progress, d);
-  const b = challengeAmountLabel(piso, d);
+  const b = challengeAmountLabel(floor, d);
   if (d.unit === "un") return `${a}/${b} un`;
   return `${a}/${b}`;
 }
 
-function statusParticipante(progress: number, alvo: number): ChallengeParticipantView["status"] {
-  if (progress <= 0) return "nao_comecou";
-  if (progress >= alvo) return "atingiu";
-  if (alvo > 0 && progress / alvo >= 0.8) return "quase";
+function statusParticipante(progress: number, target: number): ChallengeParticipantView["status"] {
+  if (progress <= 0) return "notStarted";
+  if (progress >= target) return "reached";
+  if (target > 0 && progress / target >= 0.8) return "near";
   return "below";
 }
 
-const ORDEM_STATUS: Record<ChallengeParticipantView["status"], number> = {
-  atingiu: 0,
-  quase: 1,
+const STATUS_ORDER: Record<ChallengeParticipantView["status"], number> = {
+  reached: 0,
+  near: 1,
   below: 2,
-  nao_comecou: 3,
+  notStarted: 3,
 };
 
 /** Veredito de ritmo + status temporal pela janela inicio/fim do desafio. */
-function desafioView(
+function challengeView(
   d: Challenge,
-  diasDecorridos: number,
-  diasTotais: number,
+  daysElapsed: number,
+  daysTotais: number,
   scopedStoreIds: string[],
   showStore: boolean,
 ): ChallengeView {
@@ -596,44 +596,44 @@ function desafioView(
     const c = collaboratorById(id);
     return c && scopedStoreIds.includes(c.storeId);
   });
-  const linhas: ChallengeParticipantView[] = ids.map((id) => {
+  const lines: ChallengeParticipantView[] = ids.map((id) => {
     const c = collaboratorById(id);
     const progress = individualProgress(d, id);
-    const piso = challengeFloor(d);
-    const grupoNome = c?.grupoId ? groups.find((t) => t.id === c.grupoId)?.name ?? "—" : "—";
-    const storeNameValue = c ? storeById(c.storeId).fantasia : "—";
+    const floor = challengeFloor(d);
+    const groupName = c?.groupId ? groups.find((t) => t.id === c.groupId)?.name ?? "—" : "—";
+    const storeNameValue = c ? storeById(c.storeId).tradeName : "—";
     return {
       employeeId: id,
       name: c?.name ?? id,
       store: storeNameValue,
-      group: grupoNome,
+      group: groupName,
       progress,
-      alvo: piso,
-      progressoPct: piso > 0 ? Math.min(100, (progress / piso) * 100) : 0,
-      progressoRotulo: progressLabel(progress, piso, d),
-      status: statusParticipante(progress, piso),
+      target: floor,
+      progressPct: floor > 0 ? Math.min(100, (progress / floor) * 100) : 0,
+      progressLabel: progressLabel(progress, floor, d),
+      status: statusParticipante(progress, floor),
     };
   });
-  const piso = challengeFloor(d);
-  const atingiram = linhas.filter((p) => p.status === "atingiu").length;
-  const minimoGerente = Math.min(d.minimoVendedorasAtingindo, ids.length);
-  const progressos = linhas.map((p) => p.progress);
+  const floor = challengeFloor(d);
+  const reachedCount = lines.filter((p) => p.status === "reached").length;
+  const minimumManager = Math.min(d.minimumSellersAtingindo, ids.length);
+  const progressValues = lines.map((p) => p.progress);
   /** Indices (P.A./ticket): media vs piso. Un/R$: soma capped (regra A). */
-  const progressoAgregado = challengeIsIndex(d)
-    ? averageProgress(progressos)
-    : cappedManagerProgress(progressos, piso);
-  const alvoAgregado = challengeManagerTarget(d, ids.length);
-  const projetado = diasDecorridos > 0 ? (progressoAgregado / diasDecorridos) * diasTotais : 0;
-  const semEngajamento = progressoAgregado <= 0;
-  const ranking = [...linhas].sort(
-    (a, b) => ORDEM_STATUS[a.status] - ORDEM_STATUS[b.status] || b.progress - a.progress || b.progressoPct - a.progressoPct,
+  const aggregatedProgress = challengeIsIndex(d)
+    ? averageProgress(progressValues)
+    : cappedManagerProgress(progressValues, floor);
+  const targetAgregado = challengeManagerTarget(d, ids.length);
+  const projected = daysElapsed > 0 ? (aggregatedProgress / daysElapsed) * daysTotais : 0;
+  const withoutEngagement = aggregatedProgress <= 0;
+  const ranking = [...lines].sort(
+    (a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || b.progress - a.progress || b.progressPct - a.progressPct,
   );
   const goalLabel =
     d.kind === "pa"
       ? num(d.individualTarget, 2)
-      : d.kind === "ticket" || d.unit === "R$" || d.kind === "faturamento"
+      : d.kind === "ticket" || d.unit === "R$" || d.kind === "revenue"
         ? brlK(d.individualTarget)
-        : `${num(d.kind === "produto" ? piso : d.individualTarget, 0)} un`;
+        : `${num(d.kind === "product" ? floor : d.individualTarget, 0)} un`;
   const minimumLabel =
     d.minimum == null
       ? null
@@ -645,39 +645,39 @@ function desafioView(
 
   let statusLabel: ChallengeView["statusLabel"];
   let statusVariant: ChallengeView["statusVariant"];
-  let prazoTom: ChallengeView["prazoTom"];
+  let prazoTone: ChallengeView["prazoTone"];
   let daysRemaining: number;
-  let prazoRotulo: string;
+  let prazoLabel: string;
   if (TODAY_ISO < d.start) {
     statusLabel = "A começar";
     statusVariant = "info";
-    prazoTom = "muted";
+    prazoTone = "muted";
     daysRemaining = eachDay(TODAY_ISO, d.start).length - 1;
-    prazoRotulo = daysRemaining <= 0 ? "Hoje" : `Em ${dayCountLabel(daysRemaining)}`;
+    prazoLabel = daysRemaining <= 0 ? "Hoje" : `Em ${dayCountLabel(daysRemaining)}`;
   } else if (TODAY_ISO > d.end) {
     statusLabel = "Encerrado";
     statusVariant = "neutral";
-    prazoTom = "bad";
+    prazoTone = "bad";
     daysRemaining = 0;
-    prazoRotulo = "Encerrado";
+    prazoLabel = "Encerrado";
   } else {
     statusLabel = "Ativo";
     statusVariant = "success";
-    prazoTom = "ok";
+    prazoTone = "ok";
     daysRemaining = eachDay(TODAY_ISO, d.end).length;
-    prazoRotulo = dayCountLabel(daysRemaining);
+    prazoLabel = dayCountLabel(daysRemaining);
   }
 
-  const fechaNoRitmo =
-    semEngajamento || statusLabel !== "Ativo"
+  const fechaNoPace =
+    withoutEngagement || statusLabel !== "Ativo"
       ? false
-      : atingiram >= minimoGerente || projetado >= alvoAgregado;
+      : reachedCount >= minimumManager || projected >= targetAgregado;
   const description =
     minimumLabel != null
       ? `Meta: ${goalLabel} · Mínimo: ${minimumLabel} · Prêmio: ${brl(d.prize)}`
       : `Meta: ${goalLabel} · Prêmio: ${brl(d.prize)}`;
   const storeLabel = d.storeId
-    ? storeById(d.storeId).fantasia.replace(/^Shopping\s+/i, "")
+    ? storeById(d.storeId).tradeName.replace(/^Shopping\s+/i, "")
     : "Rede";
   return {
     id: d.id,
@@ -686,29 +686,29 @@ function desafioView(
     objective: d.objective,
     goalLabel,
     minimum: d.minimum,
-    temMinimo: d.minimum != null,
+    hasMinimum: d.minimum != null,
     kind: d.kind,
-    corIcone: COR_ICONE_DESAFIO[d.id] ?? COR_ICONE_TIPO[d.kind],
+    colorIcon: COLOR_ICON_CHALLENGE[d.id] ?? COLOR_ICON_KIND[d.kind],
     individualTarget: d.individualTarget,
     unit: d.unit,
     prize: d.prize,
-    premioGerente: d.premioGerente,
-    minimoVendedorasAtingindo: minimoGerente,
+    prizeManager: d.prizeManager,
+    minimumSellersAtingindo: minimumManager,
     participants: ids.length,
-    engajadas: linhas.filter((p) => p.status !== "nao_comecou").length,
-    progressoAgregado,
-    alvoAgregado,
-    progressoPct: alvoAgregado > 0 ? (progressoAgregado / alvoAgregado) * 100 : 0,
-    progressoAgregadoRotulo: progressLabel(progressoAgregado, alvoAgregado, d),
-    atingiram,
-    projetadoAgregado: projetado,
-    fechaNoRitmo,
-    semEngajamento,
-    tipoTexto: TIPO_TEXTO[d.kind],
+    engaged: lines.filter((p) => p.status !== "notStarted").length,
+    aggregatedProgress,
+    targetAgregado,
+    progressPct: targetAgregado > 0 ? (aggregatedProgress / targetAgregado) * 100 : 0,
+    aggregatedProgressLabel: progressLabel(aggregatedProgress, targetAgregado, d),
+    reachedCount,
+    projectedAgregado: projected,
+    fechaNoPace,
+    withoutEngagement,
+    kindText: KIND_TEXT[d.kind],
     daysRemaining,
-    prazoRotulo,
-    janelaRotulo: `${shortDate(d.start)} – ${shortDate(d.end)}`,
-    prazoTom,
+    prazoLabel,
+    janelaLabel: `${shortDate(d.start)} – ${shortDate(d.end)}`,
+    prazoTone,
     statusLabel,
     statusVariant,
     storeId: d.storeId,
@@ -719,9 +719,9 @@ function desafioView(
 }
 
 function openDaysInPeriod(competence: string, scopedStoreIds: string[]): { elapsedOpenDays: number; totais: number } {
-  const primeiro = `${competence}-01`;
-  const ultimo = endOfMonth(primeiro);
-  const openOnes = eachDay(primeiro, ultimo).filter((iso) => scopedStoreIds.some((id) => storeOpen(storeById(id), iso)));
+  const first = `${competence}-01`;
+  const last = endOfMonth(first);
+  const openOnes = eachDay(first, last).filter((iso) => scopedStoreIds.some((id) => storeOpen(storeById(id), iso)));
   const elapsedOpenDays = openOnes.filter((iso) => iso <= TODAY_ISO).length;
   return { elapsedOpenDays, totais: openOnes.length };
 }
@@ -731,7 +731,7 @@ function challengesViewForCompetence(competence: string, scopedStoreIds: string[
   const { elapsedOpenDays, totais } = openDaysInPeriod(competence, scopedStoreIds);
   const showStore = scopedStoreIds.length > 1;
   return challengesInScope(competence, scopedStoreIds)
-    .map((d) => desafioView(d, elapsedOpenDays, totais, scopedStoreIds, showStore))
+    .map((d) => challengeView(d, elapsedOpenDays, totais, scopedStoreIds, showStore))
     .filter((d) => d.statusLabel === "Ativo")
     .sort(
       (a, b) =>
@@ -753,16 +753,16 @@ function ladderPrize(storeId: string, competence: string, sellers: SellerRow[]):
   const goal = goalOfStore(storeId, competence);
   if (!goal) return null;
   const branch = storeById(storeId);
-  const primeiro = `${competence}-01`;
-  const closed = endOfMonth(primeiro) < TODAY_ISO;
+  const first = `${competence}-01`;
+  const closed = endOfMonth(first) < TODAY_ISO;
 
   if (closed) {
     return sellers.reduce((s, l) => s + l.accruedPrize + l.bonusReached, 0);
   }
 
-  const curva = revenueCurve([branch], competence);
+  const curve = revenueCurve([branch], competence);
   let accumulatedShare = 0;
-  for (const iso of eachDay(primeiro, TODAY_ISO)) accumulatedShare += curva.peso(iso);
+  for (const iso of eachDay(first, TODAY_ISO)) accumulatedShare += curve.weight(iso);
   if (accumulatedShare <= 0) return null;
 
   let total = 0;
@@ -801,8 +801,8 @@ function challengePrizes(competence: string, scopedStoreIds: string[]): number {
       if (closed) {
         total += winsNow ? d.prize : 0;
       } else if (elapsedOpenDays > 0) {
-        const projetado = (p / elapsedOpenDays) * totais;
-        if (projetado >= d.individualTarget) total += d.prize;
+        const projected = (p / elapsedOpenDays) * totais;
+        if (projected >= d.individualTarget) total += d.prize;
       }
     }
   }
@@ -815,10 +815,10 @@ function challengePrizes(competence: string, scopedStoreIds: string[]): number {
  * unica vez (ver visaoRede).
  */
 function projectedPrize(storeId: string, competence: string, sellers: SellerRow[]): number | null {
-  const escada = ladderPrize(storeId, competence, sellers);
+  const ladder = ladderPrize(storeId, competence, sellers);
   const challenges = challengePrizes(competence, [storeId]);
-  if (escada === null) return challenges > 0 ? challenges : null;
-  return escada + challenges;
+  if (ladder === null) return challenges > 0 ? challenges : null;
+  return ladder + challenges;
 }
 
 /* ------------------------- Leitura da IA (EQUIP-06) ------------------------- */
@@ -830,7 +830,7 @@ function projectedPrize(storeId: string, competence: string, sellers: SellerRow[
  */
 export function buildTeamInsight(v: TeamView): string | null {
   const partes: string[] = [];
-  const linhas = v.sellers ?? [];
+  const lines = v.sellers ?? [];
 
   // Linha (a): efeito de ticket/P.A.  -  so quando o delta diz algo.
   const pa = v.kpiPA.delta;
@@ -844,36 +844,36 @@ export function buildTeamInsight(v: TeamView): string | null {
   // Linha (b): quem esta abaixo da meta e caindo (omitida quando ninguem).
   // So com meta ativa: sem meta no periodo nao existe "abaixo da meta".
   if (v.activeGoal) {
-    const emRisco = linhas.filter((l) => l.attainmentPct < 100 && l.trend === "down");
+    const emRisco = lines.filter((l) => l.attainmentPct < 100 && l.trend === "down");
     if (emRisco.length > 0) {
-      const nomes = emRisco.map((l) => firstName(l.name)).join(", ");
-      const acao = emRisco.length === 1 ? `Vale uma conversa hoje com ${firstName(emRisco[0].name)}` : "Vale conversar com cada pessoa hoje";
-      partes.push(`${nomes} ${emRisco.length === 1 ? "está" : "estão"} abaixo da meta individual e caindo. ${acao}.`);
+      const names = emRisco.map((l) => firstName(l.name)).join(", ");
+      const action = emRisco.length === 1 ? `Vale uma conversa hoje com ${firstName(emRisco[0].name)}` : "Vale conversar com cada pessoa hoje";
+      partes.push(`${names} ${emRisco.length === 1 ? "está" : "estão"} abaixo da meta individual e caindo. ${action}.`);
     }
   }
   return partes.length > 0 ? partes.join(" ") : null;
 }
 
-function firstName(nomeCompleto: string): string {
-  return nomeCompleto.split(" ")[0];
+function firstName(nameComplete: string): string {
+  return nameComplete.split(" ")[0];
 }
 
 function buildGoalBand(achieved: number, total: number, competence: string, storesInScope: Store[]): NetworkGlobalGoal | null {
   if (total <= 0) return null;
-  const primeiro = `${competence}-01`;
-  const ultimo = endOfMonth(primeiro);
+  const first = `${competence}-01`;
+  const last = endOfMonth(first);
   const pct = (achieved / total) * 100;
-  const closed = ultimo < TODAY_ISO;
+  const closed = last < TODAY_ISO;
   let projectedPct = pct;
   if (!closed) {
-    const curva = revenueCurve(storesInScope, competence);
+    const curve = revenueCurve(storesInScope, competence);
     let accumulatedShare = 0;
-    for (const iso of eachDay(primeiro, TODAY_ISO)) accumulatedShare += curva.peso(iso);
+    for (const iso of eachDay(first, TODAY_ISO)) accumulatedShare += curve.weight(iso);
     if (accumulatedShare > 0) projectedPct = (achieved / accumulatedShare / total) * 100;
   }
-  const remainingOpen = eachDay(TODAY_ISO, ultimo).filter((iso) => storesInScope.some((f) => storeOpen(f, iso)));
+  const remainingOpen = eachDay(TODAY_ISO, last).filter((iso) => storesInScope.some((f) => storeOpen(f, iso)));
   const goalName =
-    storesInScope.map((f) => goalOfStore(f.id, competence)?.name).find((n): n is string => Boolean(n)) ?? monthYear(primeiro);
+    storesInScope.map((f) => goalOfStore(f.id, competence)?.name).find((n): n is string => Boolean(n)) ?? monthYear(first);
   return {
     competenceText: goalName,
     achieved,
@@ -881,8 +881,8 @@ function buildGoalBand(achieved: number, total: number, competence: string, stor
     pct,
     projectedPct,
     daysRemaining: closed ? 0 : remainingOpen.length,
-    start: primeiro,
-    end: ultimo,
+    start: first,
+    end: last,
   };
 }
 
@@ -892,23 +892,23 @@ function buildGoalBand(achieved: number, total: number, competence: string, stor
  */
 function bandWithOutsideTeam(
   band: NetworkGlobalGoal | null,
-  somaEquipe: number,
+  sumTeam: number,
 ): NetworkGlobalGoal | null {
   if (!band) return null;
-  const fora = Math.round((band.achieved - somaEquipe) * 100) / 100;
-  return fora > 0 ? { ...band, outsideTeam: fora } : band;
+  const excluded = Math.round((band.achieved - sumTeam) * 100) / 100;
+  return excluded > 0 ? { ...band, outsideTeam: excluded } : band;
 }
 
 /** Faturamento da competencia filtrado por marca (1 marca) ou total (null). */
 function achievedCompetence(storeId: string, competence: string, brand: GoalBrand | null): number {
-  const primeiro = `${competence}-01`;
-  const ultimo = endOfMonth(primeiro);
-  const fimReal = ultimo < TODAY_ISO ? ultimo : TODAY_ISO;
+  const first = `${competence}-01`;
+  const last = endOfMonth(first);
+  const endReal = last < TODAY_ISO ? last : TODAY_ISO;
   return sumAggregates(
-    eachDay(primeiro, fimReal).map((iso) => {
-      const dia = salesDay(storeId, iso);
-      if (!dia) return { revenue: 0, salesCount: 0, itens: 0 };
-      return dayAggregate(dia, brand, iso === TODAY_ISO ? CURRENT_HOUR : undefined);
+    eachDay(first, endReal).map((iso) => {
+      const day = salesDay(storeId, iso);
+      if (!day) return { revenue: 0, salesCount: 0, items: 0 };
+      return dayAggregate(day, brand, iso === TODAY_ISO ? CURRENT_HOUR : undefined);
     }),
   ).revenue;
 }
@@ -926,7 +926,7 @@ function buildGoalCards(
   for (const storeId of storeIds) {
     const branch = storeById(storeId);
     if (!branch) continue;
-    const lista = sellersByBranch.get(storeId) ?? [];
+    const list = sellersByBranch.get(storeId) ?? [];
     const groupCount = groupsForBranch(storeId).length;
     for (const m of goalsOfStore(storeId, competence)) {
       const singleBrand = m.brands.length === 1 ? m.brands[0] : null;
@@ -935,7 +935,7 @@ function buildGoalCards(
         ? buildGoalBand(achieved, m.storeAmount, competence, [branch])
         : bandWithOutsideTeam(
             buildGoalBand(achieved, m.storeAmount, competence, [branch]),
-            lista.reduce((s, l) => s + l.revenueAmount, 0),
+            list.reduce((s, l) => s + l.revenueAmount, 0),
           );
       if (!band) continue;
       band.competenceText = m.name;
@@ -943,14 +943,14 @@ function buildGoalCards(
         id: m.id,
         name: m.name,
         kind: m.kind,
-        storeNameValue: branch.fantasia,
+        storeNameValue: branch.tradeName,
         brands: m.brands,
-        qtdGrupos: groupCount,
-        qtdVendedoras: lista.length,
-        qtdNiveis: m.tiers.length,
+        qtyGroups: groupCount,
+        qtySellers: list.length,
+        qtyLevels: m.tiers.length,
         tiers: m.tiers,
         band,
-        sellers: lista,
+        sellers: list,
       });
     }
   }
@@ -959,27 +959,27 @@ function buildGoalCards(
 
 /* ------------------------- Evolucao Fat vs Meta (padrao Visao Geral) ------------------------- */
 
-const MESES_CURTOS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+const MONTHS_CURTOS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
 function storesDayRevenue(storeIds: string[], iso: string): number {
   return sumAggregates(
     storeIds.map((id) => {
-      const dia = salesDay(id, iso);
-      return dia ? dayAggregate(dia, null, iso === TODAY_ISO ? CURRENT_HOUR : undefined) : { revenue: 0, salesCount: 0, itens: 0 };
+      const day = salesDay(id, iso);
+      return day ? dayAggregate(day, null, iso === TODAY_ISO ? CURRENT_HOUR : undefined) : { revenue: 0, salesCount: 0, items: 0 };
     }),
   ).revenue;
 }
 
-function fatHoraFiliais(storeIds: string[], iso: string, h: number): number {
-  let fat = 0;
+function revenueHourBranches(storeIds: string[], iso: string, h: number): number {
+  let revenue = 0;
   for (const id of storeIds) {
-    const a = salesDay(id, iso)?.porHora[h];
-    if (a) fat += a.revenue;
+    const a = salesDay(id, iso)?.byHour[h];
+    if (a) revenue += a.revenue;
   }
-  return fat;
+  return revenue;
 }
 
-function mesesEntre(start: string, end: string): string[] {
+function monthsBetween(start: string, end: string): string[] {
   const out: string[] = [];
   let y = Number(start.slice(0, 4));
   let m = Number(start.slice(5, 7));
@@ -1001,64 +1001,64 @@ function buildRevenueVsGoal(
   storeIds: string[],
   period: ResolvedPeriod,
   metaTotal: number,
-): { pontos: { label: string; achieved: number; goal: number }[]; seriesLabel: string } | undefined {
+): { points: { label: string; achieved: number; goal: number }[]; seriesLabel: string } | undefined {
   const eixo = seriesAxisForPeriod(period);
   const seriesLabel = seriesAxisLabel(period, eixo);
-  const pontos: { label: string; achieved: number; goal: number }[] = [];
+  const points: { label: string; achieved: number; goal: number }[] = [];
 
   if (eixo === "hour") {
     const fs = storeIds.map((id) => storeById(id)).filter((f): f is Store => Boolean(f));
     if (fs.length === 0) return undefined;
-    const abertura = Math.min(...fs.map((f) => f.abertura));
-    const fechamento = Math.max(...fs.map((f) => f.fechamento));
-    const horas: number[] = [];
-    for (let h = abertura; h < fechamento; h++) horas.push(h);
-    const horasVisiveis = period.isToday ? horas.filter((h) => h <= CURRENT_HOUR) : horas;
-    if (horasVisiveis.length < 2) return undefined;
-    const goalByHour = metaTotal > 0 && horas.length > 0 ? metaTotal / horas.length : 0;
+    const opening = Math.min(...fs.map((f) => f.opening));
+    const closing = Math.max(...fs.map((f) => f.closing));
+    const hours: number[] = [];
+    for (let h = opening; h < closing; h++) hours.push(h);
+    const hoursVisible = period.isToday ? hours.filter((h) => h <= CURRENT_HOUR) : hours;
+    if (hoursVisible.length < 2) return undefined;
+    const goalByHour = metaTotal > 0 && hours.length > 0 ? metaTotal / hours.length : 0;
     let acumR = 0;
     let acumM = 0;
-    for (const h of horasVisiveis) {
-      acumR += fatHoraFiliais(storeIds, period.start, h);
+    for (const h of hoursVisible) {
+      acumR += revenueHourBranches(storeIds, period.start, h);
       acumM += goalByHour;
-      pontos.push({ label: shortHour(h), achieved: acumR, goal: acumM });
+      points.push({ label: shortHour(h), achieved: acumR, goal: acumM });
     }
   } else if (eixo === "month") {
-    const meses = mesesEntre(period.start, period.end);
-    if (meses.length < 2) return undefined;
-    const goalByMonth = metaTotal > 0 ? metaTotal / meses.length : 0;
+    const months = monthsBetween(period.start, period.end);
+    if (months.length < 2) return undefined;
+    const goalByMonth = metaTotal > 0 ? metaTotal / months.length : 0;
     let acumR = 0;
     let acumM = 0;
-    for (const mes of meses) {
-      const monthStart = `${mes}-01`;
-      const fimMes = endOfMonth(monthStart);
+    for (const month of months) {
+      const monthStart = `${month}-01`;
+      const endMonth = endOfMonth(monthStart);
       const ini = monthStart < period.start ? period.start : monthStart;
-      const end = fimMes > period.end ? period.end : fimMes;
+      const end = endMonth > period.end ? period.end : endMonth;
       for (const iso of eachDay(ini, end)) {
         acumR += storesDayRevenue(storeIds, iso);
       }
       acumM += goalByMonth;
-      pontos.push({ label: monthYear(monthStart).split(" de ")[0], achieved: acumR, goal: acumM });
+      points.push({ label: monthYear(monthStart).split(" de ")[0], achieved: acumR, goal: acumM });
     }
   } else {
-    const dias = eachDay(period.start, period.end);
-    if (dias.length < 2) return undefined;
-    const goalByDay = metaTotal > 0 ? metaTotal / dias.length : 0;
+    const days = eachDay(period.start, period.end);
+    if (days.length < 2) return undefined;
+    const goalByDay = metaTotal > 0 ? metaTotal / days.length : 0;
     let acumR = 0;
     let acumM = 0;
-    for (const iso of dias) {
+    for (const iso of days) {
       acumR += storesDayRevenue(storeIds, iso);
       acumM += goalByDay;
       const d = isoToDate(iso);
-      pontos.push({
-        label: `${String(d.getDate()).padStart(2, "0")} ${MESES_CURTOS[d.getMonth()]}`,
+      points.push({
+        label: `${String(d.getDate()).padStart(2, "0")} ${MONTHS_CURTOS[d.getMonth()]}`,
         achieved: acumR,
         goal: acumM,
       });
     }
   }
 
-  return pontos.length > 1 ? { pontos, seriesLabel } : undefined;
+  return points.length > 1 ? { points, seriesLabel } : undefined;
 }
 
 function groupsForBranch(storeId: string): { id: string; name: string }[] {
@@ -1082,45 +1082,45 @@ function groupsInScope(storeIds: string[]): { id: string; name: string }[] {
 function storeView(scope: Scope, period: ResolvedPeriod, goalPeriod: ResolvedPeriod, competence: string, activeGoal: boolean): TeamView {
   const storeId = scope.storeIds.length === 1 ? scope.storeIds[0] : stores[0]?.id ?? "";
   const branch = storeById(storeId);
-  const ant = previousPeriod(period);
+  const prev = previousPeriod(period);
   // KPIs de desempenho: periodo filtrado (AD-046).
-  const atual = storeAggregate(storeId, period.start, period.end);
-  const anterior = sumAggregates(
-    eachDay(ant.start, ant.end).map((iso) => {
-      const dia = salesDay(storeId, iso);
-      if (!dia) return { revenue: 0, salesCount: 0, itens: 0 };
-      const horaMax = iso === ant.end && ant.horaMax !== undefined ? ant.horaMax : undefined;
-      return dayAggregate(dia, null, horaMax);
+  const current = storeAggregate(storeId, period.start, period.end);
+  const previous = sumAggregates(
+    eachDay(prev.start, prev.end).map((iso) => {
+      const day = salesDay(storeId, iso);
+      if (!day) return { revenue: 0, salesCount: 0, items: 0 };
+      const hourMax = iso === prev.end && prev.hourMax !== undefined ? prev.hourMax : undefined;
+      return dayAggregate(day, null, hourMax);
     }),
   );
 
-  const temComparacao = anterior.salesCount > 0;
-  const vsLabel = temComparacao ? ant.label : undefined;
-  const ticket = divSeguro(atual.revenue, atual.salesCount);
-  const pa = divSeguro(atual.itens, atual.salesCount);
-  const ticketAnt = divSeguro(anterior.revenue, anterior.salesCount);
-  const paAnt = divSeguro(anterior.itens, anterior.salesCount);
+  const hasComparison = previous.salesCount > 0;
+  const vsLabel = hasComparison ? prev.label : undefined;
+  const ticket = divSeguro(current.revenue, current.salesCount);
+  const pa = divSeguro(current.items, current.salesCount);
+  const ticketPrev = divSeguro(previous.revenue, previous.salesCount);
+  const paPrev = divSeguro(previous.items, previous.salesCount);
 
   // Series diarias para sparklines nos KPIs
   const periodDays = eachDay(period.start, period.end);
-  const serieFat: number[] = [];
-  const serieAtend: number[] = [];
-  const serieTicket: number[] = [];
-  const seriePA: number[] = [];
+  const seriesRevenue: number[] = [];
+  const seriesVisits: number[] = [];
+  const seriesTicket: number[] = [];
+  const seriesPA: number[] = [];
   for (const iso of periodDays) {
-    const dia = salesDay(storeId, iso);
-    if (!dia) {
-      serieFat.push(0);
-      serieAtend.push(0);
-      serieTicket.push(0);
-      seriePA.push(0);
+    const day = salesDay(storeId, iso);
+    if (!day) {
+      seriesRevenue.push(0);
+      seriesVisits.push(0);
+      seriesTicket.push(0);
+      seriesPA.push(0);
       continue;
     }
-    const ag = dayAggregate(dia, null, iso === TODAY_ISO ? CURRENT_HOUR : undefined);
-    serieFat.push(ag.revenue);
-    serieAtend.push(ag.salesCount);
-    serieTicket.push(divSeguro(ag.revenue, ag.salesCount));
-    seriePA.push(divSeguro(ag.itens, ag.salesCount));
+    const ag = dayAggregate(day, null, iso === TODAY_ISO ? CURRENT_HOUR : undefined);
+    seriesRevenue.push(ag.revenue);
+    seriesVisits.push(ag.salesCount);
+    seriesTicket.push(divSeguro(ag.revenue, ag.salesCount));
+    seriesPA.push(divSeguro(ag.items, ag.salesCount));
   }
 
   // Meta/escada/premiacao: sempre janela da competencia (AD-046).
@@ -1147,8 +1147,8 @@ function storeView(scope: Scope, period: ResolvedPeriod, goalPeriod: ResolvedPer
     ? buildGoalCards([storeId], competence, new Map([[storeId, sellers]]))
     : [];
 
-  const nDias = periodDays.length;
-  const evolucao = buildRevenueVsGoal([storeId], period, storeGoalAmount);
+  const nDays = periodDays.length;
+  const evolution = buildRevenueVsGoal([storeId], period, storeGoalAmount);
   const challenges = activeGoal ? challengesViewForCompetence(competence, [branch.id]) : null;
 
   return {
@@ -1160,40 +1160,40 @@ function storeView(scope: Scope, period: ResolvedPeriod, goalPeriod: ResolvedPer
     competenceNotice: null, // preenchido em montarEquipeView
     notices,
     kpiRevenue: {
-      amount: brlK(atual.revenue),
-      delta: temComparacao ? kpiDelta(atual.revenue, anterior.revenue, vsLabel) : undefined,
+      amount: brlK(current.revenue),
+      delta: hasComparison ? kpiDelta(current.revenue, previous.revenue, vsLabel) : undefined,
       sub: storeGoalAmount > 0 ? `Meta: ${brlK(storeGoalAmount)}` : undefined,
-      serie: serieFat.length > 1 ? serieFat : undefined,
+      series: seriesRevenue.length > 1 ? seriesRevenue : undefined,
     },
     kpiSalesCount: {
-      amount: num(atual.salesCount),
-      delta: temComparacao ? kpiDelta(atual.salesCount, anterior.salesCount, vsLabel, "vendas") : undefined,
-      sub: nDias > 1 ? `Média de ${num(atual.salesCount / nDias, 0)}/dia` : undefined,
-      serie: serieAtend.length > 1 ? serieAtend : undefined,
+      amount: num(current.salesCount),
+      delta: hasComparison ? kpiDelta(current.salesCount, previous.salesCount, vsLabel, "sales") : undefined,
+      sub: nDays > 1 ? `Média de ${num(current.salesCount / nDays, 0)}/dia` : undefined,
+      series: seriesVisits.length > 1 ? seriesVisits : undefined,
     },
     kpiTicket: {
       amount: brl(ticket),
-      delta: temComparacao ? kpiDelta(ticket, ticketAnt, vsLabel) : undefined,
-      serie: serieTicket.length > 1 ? serieTicket : undefined,
+      delta: hasComparison ? kpiDelta(ticket, ticketPrev, vsLabel) : undefined,
+      series: seriesTicket.length > 1 ? seriesTicket : undefined,
     },
     kpiPA: {
       amount: num(pa, 2),
-      delta: temComparacao ? kpiDelta(pa, paAnt, vsLabel, "pa") : undefined,
-      serie: seriePA.length > 1 ? seriePA : undefined,
+      delta: hasComparison ? kpiDelta(pa, paPrev, vsLabel, "pa") : undefined,
+      series: seriesPA.length > 1 ? seriesPA : undefined,
     },
     kpiPrize: prizeAmount === null ? null : { amount: brl(prizeAmount), delta: undefined },
     networkGoal,
     goalCardsList,
-    leitura: null,
-    revenueEvolution: evolucao?.pontos,
-    seriesLabel: evolucao?.seriesLabel,
+    reading: null,
+    revenueEvolution: evolution?.points,
+    seriesLabel: evolution?.seriesLabel,
     availableGroups: groupsForBranch(storeId),
     sellers,
     storeRows: null,
     challenges,
     states: {
       kpis: "available",
-      leitura: "noData",
+      reading: "noData",
       sellers: sellers.length > 0 ? "available" : "noData",
       challenges: activeGoal ? (challenges !== null && challenges.length > 0 ? "available" : "noData") : "unavailable",
     },
@@ -1211,18 +1211,18 @@ function networkView(scope: Scope, period: ResolvedPeriod, goalPeriod: ResolvedP
   const storeRows: StoreTeamSummary[] = stores.map((f, i) => {
     const storeScope: Scope = { ...scope, storeIds: [f.id] };
     const storeValue = storeView(storeScope, period, goalPeriod, competence, activeGoal);
-    const linhas = storeValue.sellers ?? [];
-    sellersFlat.push(...linhas);
-    sellersByBranch.set(f.id, linhas);
-    const withGoal = activeGoal ? linhas.filter((l) => !l.noGoal) : [];
+    const lines = storeValue.sellers ?? [];
+    sellersFlat.push(...lines);
+    sellersByBranch.set(f.id, lines);
+    const withGoal = activeGoal ? lines.filter((l) => !l.noGoal) : [];
     const ordenadas = [...withGoal].sort((a, b) => b.attainmentPct - a.attainmentPct);
-    const melhor = ordenadas.length > 0 ? { name: firstName(ordenadas[0].name), attainmentPct: ordenadas[0].attainmentPct } : null;
-    const pior = ordenadas.length > 0 ? { name: firstName(ordenadas[ordenadas.length - 1].name), attainmentPct: ordenadas[ordenadas.length - 1].attainmentPct } : null;
+    const best = ordenadas.length > 0 ? { name: firstName(ordenadas[0].name), attainmentPct: ordenadas[0].attainmentPct } : null;
+    const worst = ordenadas.length > 0 ? { name: firstName(ordenadas[ordenadas.length - 1].name), attainmentPct: ordenadas[ordenadas.length - 1].attainmentPct } : null;
     const goalAmount = goalOfStore(f.id, competence)?.storeAmount ?? 0;
-    const achievedAmount = linhas.reduce((s, l) => s + l.revenueAmount, 0);
+    const achievedAmount = lines.reduce((s, l) => s + l.revenueAmount, 0);
     return {
       storeId: f.id,
-      name: f.fantasia,
+      name: f.tradeName,
       tint: STORE_TINTS[i % STORE_TINTS.length],
       revenue: storeValue.kpiRevenue.amount,
       ticket: storeValue.kpiTicket.amount,
@@ -1233,8 +1233,8 @@ function networkView(scope: Scope, period: ResolvedPeriod, goalPeriod: ResolvedP
       goalAmount,
       achievedAmount,
       networkGoalPct: globalGoalTotal > 0 ? (goalAmount / globalGoalTotal) * 100 : 0,
-      melhor,
-      pior,
+      best,
+      worst,
     };
   });
 
@@ -1246,35 +1246,35 @@ function networkView(scope: Scope, period: ResolvedPeriod, goalPeriod: ResolvedP
   });
 
   // KPIs da rede: soma das lojas (ticket e P.A. recalculados sobre a soma).
-  const atual = sumAggregates(stores.map((f) => storeAggregate(f.id, period.start, period.end)));
-  const ant = previousPeriod(period);
-  const anterior = sumAggregates(
-    eachDay(ant.start, ant.end).map((iso) => {
-      const horaMax = iso === ant.end && ant.horaMax !== undefined ? ant.horaMax : undefined;
+  const current = sumAggregates(stores.map((f) => storeAggregate(f.id, period.start, period.end)));
+  const prev = previousPeriod(period);
+  const previous = sumAggregates(
+    eachDay(prev.start, prev.end).map((iso) => {
+      const hourMax = iso === prev.end && prev.hourMax !== undefined ? prev.hourMax : undefined;
       return sumAggregates(stores.map((f) => {
-        const dia = salesDay(f.id, iso);
-        return dia ? dayAggregate(dia, null, horaMax) : { revenue: 0, salesCount: 0, itens: 0 };
+        const day = salesDay(f.id, iso);
+        return day ? dayAggregate(day, null, hourMax) : { revenue: 0, salesCount: 0, items: 0 };
       }));
     }),
   );
-  const temComparacao = anterior.salesCount > 0;
-  const vsLabel = temComparacao ? ant.label : undefined;
+  const hasComparison = previous.salesCount > 0;
+  const vsLabel = hasComparison ? prev.label : undefined;
 
   // Series diarias para sparklines nos KPIs da rede
   const networkPeriodDays = eachDay(period.start, period.end);
-  const serieFatRede: number[] = [];
-  const serieAtendRede: number[] = [];
-  const serieTicketRede: number[] = [];
-  const seriePARede: number[] = [];
+  const seriesRevenueNetwork: number[] = [];
+  const seriesVisitsNetwork: number[] = [];
+  const seriesTicketNetwork: number[] = [];
+  const seriesPANetwork: number[] = [];
   for (const iso of networkPeriodDays) {
-    const agDia = sumAggregates(stores.map((f) => {
-      const dia = salesDay(f.id, iso);
-      return dia ? dayAggregate(dia, null, iso === TODAY_ISO ? CURRENT_HOUR : undefined) : { revenue: 0, salesCount: 0, itens: 0 };
+    const agDay = sumAggregates(stores.map((f) => {
+      const day = salesDay(f.id, iso);
+      return day ? dayAggregate(day, null, iso === TODAY_ISO ? CURRENT_HOUR : undefined) : { revenue: 0, salesCount: 0, items: 0 };
     }));
-    serieFatRede.push(agDia.revenue);
-    serieAtendRede.push(agDia.salesCount);
-    serieTicketRede.push(divSeguro(agDia.revenue, agDia.salesCount));
-    seriePARede.push(divSeguro(agDia.itens, agDia.salesCount));
+    seriesRevenueNetwork.push(agDay.revenue);
+    seriesVisitsNetwork.push(agDay.salesCount);
+    seriesTicketNetwork.push(divSeguro(agDay.revenue, agDay.salesCount));
+    seriesPANetwork.push(divSeguro(agDay.items, agDay.salesCount));
   }
 
   const challenges = activeGoal ? challengesViewForCompetence(competence, stores.map((f) => f.id)) : null;
@@ -1282,16 +1282,16 @@ function networkView(scope: Scope, period: ResolvedPeriod, goalPeriod: ResolvedP
 
 // Premiacao da rede = escada de metas de cada loja + desafios uma unica
 // vez (desafio e da competencia inteira, nao por loja).
-let premiacaoRede: number | null = null;
+let awardNetwork: number | null = null;
 if (activeGoal) {
-  let parteEscada = 0;
+  let parteLadder = 0;
   for (const f of stores) {
     const storeValue = storeView({ ...scope, storeIds: [f.id] }, period, goalPeriod, competence, activeGoal);
     const storeLadder = ladderPrize(f.id, competence, storeValue.sellers ?? []);
-    if (storeLadder !== null) parteEscada += storeLadder;
+    if (storeLadder !== null) parteLadder += storeLadder;
   }
   const challengesPart = challengePrizes(competence, stores.map((f) => f.id));
-  premiacaoRede = parteEscada > 0 || challengesPart > 0 ? parteEscada + challengesPart : null;
+  awardNetwork = parteLadder > 0 || challengesPart > 0 ? parteLadder + challengesPart : null;
 }
 
   // Faixa de progresso da meta (rede) = faturamento das lojas (mesma base das lojas / Visao Geral).
@@ -1312,17 +1312,17 @@ if (activeGoal) {
       )
     : [];
 
-  const evolucaoRede = buildRevenueVsGoal(
+  const evolucaoNetwork = buildRevenueVsGoal(
     stores.map((f) => f.id),
     period,
     activeGoal ? globalGoalTotal : 0,
   );
 
-  const nDiasRede = networkPeriodDays.length;
-  const paRede = divSeguro(atual.itens, atual.salesCount);
-  const ticketRede = divSeguro(atual.revenue, atual.salesCount);
-  const paRedeAnt = divSeguro(anterior.itens, anterior.salesCount);
-  const ticketRedeAnt = divSeguro(anterior.revenue, anterior.salesCount);
+  const nDaysNetwork = networkPeriodDays.length;
+  const paNetwork = divSeguro(current.items, current.salesCount);
+  const ticketNetwork = divSeguro(current.revenue, current.salesCount);
+  const paNetworkPrev = divSeguro(previous.items, previous.salesCount);
+  const ticketNetworkPrev = divSeguro(previous.revenue, previous.salesCount);
 
   return {
     scope,
@@ -1333,40 +1333,40 @@ if (activeGoal) {
     competenceNotice: null,
     notices: [],
     kpiRevenue: {
-      amount: brlK(atual.revenue),
-      delta: temComparacao ? kpiDelta(atual.revenue, anterior.revenue, vsLabel) : undefined,
+      amount: brlK(current.revenue),
+      delta: hasComparison ? kpiDelta(current.revenue, previous.revenue, vsLabel) : undefined,
       sub: globalGoalTotal > 0 ? `Meta: ${brlK(globalGoalTotal)}` : undefined,
-      serie: serieFatRede.length > 1 ? serieFatRede : undefined,
+      series: seriesRevenueNetwork.length > 1 ? seriesRevenueNetwork : undefined,
     },
     kpiSalesCount: {
-      amount: num(atual.salesCount),
-      delta: temComparacao ? kpiDelta(atual.salesCount, anterior.salesCount, vsLabel, "vendas") : undefined,
-      sub: nDiasRede > 1 ? `Média de ${num(atual.salesCount / nDiasRede, 0)}/dia` : undefined,
-      serie: serieAtendRede.length > 1 ? serieAtendRede : undefined,
+      amount: num(current.salesCount),
+      delta: hasComparison ? kpiDelta(current.salesCount, previous.salesCount, vsLabel, "sales") : undefined,
+      sub: nDaysNetwork > 1 ? `Média de ${num(current.salesCount / nDaysNetwork, 0)}/dia` : undefined,
+      series: seriesVisitsNetwork.length > 1 ? seriesVisitsNetwork : undefined,
     },
     kpiTicket: {
-      amount: brl(ticketRede),
-      delta: temComparacao ? kpiDelta(ticketRede, ticketRedeAnt, vsLabel) : undefined,
-      serie: serieTicketRede.length > 1 ? serieTicketRede : undefined,
+      amount: brl(ticketNetwork),
+      delta: hasComparison ? kpiDelta(ticketNetwork, ticketNetworkPrev, vsLabel) : undefined,
+      series: seriesTicketNetwork.length > 1 ? seriesTicketNetwork : undefined,
     },
     kpiPA: {
-      amount: num(paRede, 2),
-      delta: temComparacao ? kpiDelta(paRede, paRedeAnt, vsLabel, "pa") : undefined,
-      serie: seriePARede.length > 1 ? seriePARede : undefined,
+      amount: num(paNetwork, 2),
+      delta: hasComparison ? kpiDelta(paNetwork, paNetworkPrev, vsLabel, "pa") : undefined,
+      series: seriesPANetwork.length > 1 ? seriesPANetwork : undefined,
     },
-    kpiPrize: premiacaoRede === null ? null : { amount: brl(premiacaoRede), delta: undefined },
+    kpiPrize: awardNetwork === null ? null : { amount: brl(awardNetwork), delta: undefined },
     networkGoal,
     goalCardsList,
-    leitura: null,
-    revenueEvolution: evolucaoRede?.pontos,
-    seriesLabel: evolucaoRede?.seriesLabel,
+    reading: null,
+    revenueEvolution: evolucaoNetwork?.points,
+    seriesLabel: evolucaoNetwork?.seriesLabel,
     availableGroups: groupsInScope([]),
     sellers: sellersFlat,
     storeRows: storeRows,
     challenges,
     states: {
       kpis: "available",
-      leitura: "noData",
+      reading: "noData",
       sellers: sellersFlat.length > 0 ? "available" : "noData",
       challenges: activeGoal ? (withoutChallenges ? "noData" : "available") : "unavailable",
     },
@@ -1401,12 +1401,12 @@ export function buildTeamView(scope: Scope): TeamView {
   const period = resolvePeriod(scope.period);
   const competence = teamCompetence(period);
   const goalPeriod = periodOfCompetence(competence);
-  const ehRede = scope.storeIds.length === 0;
-  const storesInScope = ehRede ? stores : scope.storeIds.map((id) => storeById(id)).filter(Boolean) as Store[];
+  const isNetwork = scope.storeIds.length === 0;
+  const storesInScope = isNetwork ? stores : scope.storeIds.map((id) => storeById(id)).filter(Boolean) as Store[];
   // Meta ativa = existe meta cadastrada na competencia (nao depende mais do filtro).
   const activeGoal = storesInScope.some((f) => Boolean(goalOfStore(f.id, competence)));
 
-  const v = ehRede ? networkView(scope, period, goalPeriod, competence, activeGoal) : storeView(scope, period, goalPeriod, competence, activeGoal);
+  const v = isNetwork ? networkView(scope, period, goalPeriod, competence, activeGoal) : storeView(scope, period, goalPeriod, competence, activeGoal);
 
   if (activeGoal && !periodMatchesCompetence(period, competence)) {
     v.competenceNotice = `Os indicadores seguem o período selecionado. Metas, premiações e desafios consideram a competência ${monthYear(`${competence}-01`)}.`;
@@ -1414,7 +1414,7 @@ export function buildTeamView(scope: Scope): TeamView {
     v.competenceNotice = `Metas e premiações referentes à competência ${monthYear(`${competence}-01`)}.`;
   }
 
-  v.leitura = null;
-  v.states.leitura = "noData";
+  v.reading = null;
+  v.states.reading = "noData";
   return v;
 }

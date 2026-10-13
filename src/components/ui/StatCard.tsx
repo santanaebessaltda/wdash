@@ -11,7 +11,7 @@ export interface StatCardProps {
   icon: ReactNode;
   iconColor?: string;
   iconBg?: string;
-  delta?: { value: string; positive: boolean; vs?: string; diff?: string; anterior?: string };
+  delta?: { value: string; positive: boolean; vs?: string; diff?: string; previous?: string };
   sparkline?: ReactNode;
   /** Texto secundario abaixo do valor (ex.: "1.665 vendas  |  2.495 itens"). */
   sub?: string;

@@ -20,8 +20,8 @@ export function StorePicker({ scope, onChange, minhas }: { scope: Scope; onChang
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const ehTodas = scope.storeIds.length === 0;
-  const currentBranch = ehTodas ? null : minhas.find((f) => f.id === scope.storeIds[0]) ?? null;
+  const isAll = scope.storeIds.length === 0;
+  const currentBranch = isAll ? null : minhas.find((f) => f.id === scope.storeIds[0]) ?? null;
 
   function escolher(id: string | null) {
     onChange({ ...scope, storeIds: id ? [id] : [] });
@@ -31,7 +31,7 @@ export function StorePicker({ scope, onChange, minhas }: { scope: Scope; onChang
   function storeSubtitle(f: Store): string {
     const cnpj = f.cnpj?.trim();
     if (cnpj) return cnpj;
-    return f.codFilial ? `Filial ${f.codFilial}` : "—";
+    return f.branchCode ? `Filial ${f.branchCode}` : "—";
   }
 
   return (
@@ -43,7 +43,7 @@ export function StorePicker({ scope, onChange, minhas }: { scope: Scope; onChang
       >
         <div className="min-w-0 flex-1 leading-none">
           <p className="truncate text-[12px] font-bold uppercase leading-tight text-t0">
-            {currentBranch ? currentBranch.fantasia : "Todas as filiais"}
+            {currentBranch ? currentBranch.tradeName : "Todas as filiais"}
           </p>
           <p className={cn("truncate text-[10px] leading-tight text-t2", !currentBranch && "uppercase")}>
             {currentBranch ? storeSubtitle(currentBranch) : "Rede consolidada"}
@@ -61,14 +61,14 @@ export function StorePicker({ scope, onChange, minhas }: { scope: Scope; onChang
             onClick={() => escolher(null)}
             className={cn(
               "flex w-full items-center gap-2 rounded-[9px] px-2.5 py-1 text-left transition-colors",
-              ehTodas ? "bg-acc-soft" : "hover:bg-bg-3",
+              isAll ? "bg-acc-soft" : "hover:bg-bg-3",
             )}
           >
             <div className="min-w-0 flex-1 leading-none">
-              <p className={cn("truncate text-[12px] font-bold uppercase leading-tight", ehTodas ? "text-acc" : "text-t0")}>Todas as filiais</p>
+              <p className={cn("truncate text-[12px] font-bold uppercase leading-tight", isAll ? "text-acc" : "text-t0")}>Todas as filiais</p>
               <p className="truncate text-[10px] uppercase leading-tight text-t2">Rede consolidada</p>
             </div>
-            {ehTodas && (
+            {isAll && (
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
@@ -78,7 +78,7 @@ export function StorePicker({ scope, onChange, minhas }: { scope: Scope; onChang
           <div className="my-1 h-px bg-line" />
 
           {minhas.map((f) => {
-            const ativa = !ehTodas && currentBranch?.id === f.id;
+            const active = !isAll && currentBranch?.id === f.id;
             return (
               <button
                 key={f.id}
@@ -86,14 +86,14 @@ export function StorePicker({ scope, onChange, minhas }: { scope: Scope; onChang
                 onClick={() => escolher(f.id)}
                 className={cn(
                   "flex w-full items-center gap-2 rounded-[9px] px-2.5 py-1 text-left transition-colors",
-                  ativa ? "bg-acc-soft" : "hover:bg-bg-3",
+                  active ? "bg-acc-soft" : "hover:bg-bg-3",
                 )}
               >
                 <div className="min-w-0 flex-1 leading-none">
-                  <p className={cn("truncate text-[12px] font-bold uppercase leading-tight", ativa ? "text-acc" : "text-t0")}>{f.fantasia}</p>
+                  <p className={cn("truncate text-[12px] font-bold uppercase leading-tight", active ? "text-acc" : "text-t0")}>{f.tradeName}</p>
                   <p className="truncate text-[10px] leading-tight text-t2">{storeSubtitle(f)}</p>
                 </div>
-                {ativa && (
+                {active && (
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
                     <polyline points="20 6 9 17 4 12" />
                   </svg>

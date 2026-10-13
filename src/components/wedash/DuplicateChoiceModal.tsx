@@ -18,17 +18,17 @@ export function DuplicateChoiceModal({
   hasOtherStores: boolean;
   onChoose: (choice: DuplicateChoice) => void;
 }) {
-  const artigo = kind === "meta" ? "a" : "o";
+  const article = kind === "meta" ? "a" : "o";
   const label = kind === "meta" ? "meta" : "desafio";
   return (
     <Modal open={open} onClose={onClose} title={`Duplicar ${label}?`} size="sm">
       <p className="mb-4 text-[13px] leading-relaxed text-t1">
         {name ? (
           <>
-            Como deseja copiar {artigo} <span className="font-bold text-t0">{name}</span>?
+            Como deseja copiar {article} <span className="font-bold text-t0">{name}</span>?
           </>
         ) : (
-          <>Como deseja copiar {artigo} {label}?</>
+          <>Como deseja copiar {article} {label}?</>
         )}
       </p>
       <div className="flex flex-col gap-2.5">

@@ -21,7 +21,7 @@ export const CHALLENGE_MODE_HELP: Record<ChallengeRecord["mode"], string> = {
   MINIMUM: "Todas as pessoas que atingirem o mínimo ganham o prêmio.",
 };
 
-const MAIOR: Record<ChallengeMetric, string> = {
+const HIGHER: Record<ChallengeMetric, string> = {
   QUANTITY: "Mais itens vendidos",
   VALUE: "Maior faturamento",
   PA: "Maior P.A.",
@@ -32,7 +32,7 @@ const MAIOR: Record<ChallengeMetric, string> = {
 /** "Maior faturamento" / "Minimo de 15 itens"  -  o criterio do desafio em uma linha. */
 export function challengeCriterion(c: ChallengeRecord): string {
   if (c.mode === "MINIMUM") return c.target != null ? `Mínimo de ${metricValueLabel(c.metric, c.target)}` : "Mínimo não definido";
-  const quem = MAIOR[c.metric];
+  const quem = HIGHER[c.metric];
   return c.target != null ? `${quem} · mínimo de ${metricValueLabel(c.metric, c.target)}` : quem;
 }
 
@@ -45,23 +45,23 @@ export interface ChallengeHeadline {
 /** Linha de destaque do card: lider(es) / vencedor(es) na Disputa, quantas atingiram no Minimo. */
 export function challengeHeadline(c: ChallengeRecord, view: ChallengeView): ChallengeHeadline {
   if (view.status === "upcoming") return { label: "Critério", value: challengeCriterion(c) };
-  const encerrado = view.status === "ended";
+  const ended = view.status === "ended";
   if (c.mode === "MINIMUM") {
-    const n = view.atingiram;
-    const alvo = c.target != null ? ` · mínimo de ${metricValueLabel(c.metric, c.target)}` : "";
-    if (n === 0) return { label: null, value: encerrado ? "Ninguém atingiu" : "Ninguém atingiu ainda" };
-    if (n === 1) return { label: null, value: `1 pessoa atingiu${alvo}` };
-    return { label: "Atingiram", value: `${n} pessoas${alvo}` };
+    const n = view.reachedCount;
+    const target = c.target != null ? ` · mínimo de ${metricValueLabel(c.metric, c.target)}` : "";
+    if (n === 0) return { label: null, value: ended ? "Ninguém atingiu" : "Ninguém atingiu ainda" };
+    if (n === 1) return { label: null, value: `1 pessoa atingiu${target}` };
+    return { label: "Atingiram", value: `${n} pessoas${target}` };
   }
-  const { lider } = challengeCardSummary(view);
-  const primeiros = view.participants.filter((p) => p.posicao === 1);
-  if (!lider || primeiros.length === 0 || (encerrado && !primeiros[0].vencedor)) {
-    return { label: null, value: encerrado ? "Nenhum vencedor" : "Ainda não há líder" };
+  const { leader } = challengeCardSummary(view);
+  const primeiros = view.participants.filter((p) => p.position === 1);
+  if (!leader || primeiros.length === 0 || (ended && !primeiros[0].winner)) {
+    return { label: null, value: ended ? "Nenhum vencedor" : "Ainda não há líder" };
   }
-  const amount = primeiros[0].resultado != null ? ` · ${metricValueLabel(c.metric, primeiros[0].resultado)}` : "";
+  const amount = primeiros[0].result != null ? ` · ${metricValueLabel(c.metric, primeiros[0].result)}` : "";
   const varios = primeiros.length > 1;
-  const label = encerrado ? (varios ? "Vencedores" : "Vencedor") : varios ? "Líderes" : "Líder";
-  return { label, value: `${lider}${amount}` };
+  const label = ended ? (varios ? "Vencedores" : "Vencedor") : varios ? "Líderes" : "Líder";
+  return { label, value: `${leader}${amount}` };
 }
 
 /** "Lider: ANA  |  12 itens" ou a frase inteira quando nao ha rotulo. */

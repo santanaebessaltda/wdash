@@ -24,15 +24,15 @@ export function formatUpdatedAtLabel(
     hourCycle: "h23",
     timeZone: opts.timeZone,
   }).format(at);
-  const dia = new Intl.DateTimeFormat("pt-BR", {
+  const day = new Intl.DateTimeFormat("pt-BR", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
     timeZone: opts.timeZone,
   });
-  const diaAt = dia.format(at);
-  if (diaAt === dia.format(now)) return `Atualizado às ${clockLabel}`;
-  return `Atualizado em ${diaAt.slice(0, 5)} às ${clockLabel}`;
+  const dayAt = day.format(at);
+  if (dayAt === day.format(now)) return `Atualizado às ${clockLabel}`;
+  return `Atualizado em ${dayAt.slice(0, 5)} às ${clockLabel}`;
 }
 
 export function formatSyncWatermarkLabel(

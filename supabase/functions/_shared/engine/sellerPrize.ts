@@ -10,9 +10,9 @@ function share(level: SellerGoalLevel, groupSize: number): number {
 
 /** Premiacao no proximo nivel sobre as vendas atuais  premiacao agora + bonus do proximo nivel; null no ultimo nivel. */
 export function nextLevelGain(level: SellerGoalLevel, groupSize: number): number | null {
-  if (!level.proximo) return null;
-  const noProximo = ((level.achieved * level.proximo.commissionPct) / 100) * share(level, groupSize);
-  return noProximo - level.prizeAmount + level.proximo.bonus;
+  if (!level.next) return null;
+  const inNext = ((level.achieved * level.next.commissionPct) / 100) * share(level, groupSize);
+  return inNext - level.prizeAmount + level.next.bonus;
 }
 
 /**
@@ -33,13 +33,13 @@ export function projectedPrize(
     if (iso < input.today) closed += w;
   }
   if (total <= 0 || closed < total / 2) return null;
-  const projetado = (input.soldUntilYesterday * total) / closed;
-  const pct = (projetado / level.goalAmount) * 100;
+  const projected = (input.soldUntilYesterday * total) / closed;
+  const pct = (projected / level.goalAmount) * 100;
   let idx = -1;
   goal.tiers.forEach((t, i) => {
     if (pct >= t.minAttainmentPct && i === idx + 1) idx = i;
   });
   if (idx < 0) return 0;
-  const prizeAmount = ((projetado * goal.tiers[idx]!.commissionPct) / 100) * share(level, input.groupSize);
+  const prizeAmount = ((projected * goal.tiers[idx]!.commissionPct) / 100) * share(level, input.groupSize);
   return prizeAmount + goal.tiers.slice(0, idx + 1).reduce((s, t) => s + t.bonus, 0);
 }

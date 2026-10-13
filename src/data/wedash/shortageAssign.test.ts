@@ -14,7 +14,7 @@ function lines(rows: Array<{ method: string; system: number; real: number }>) {
     millennium: rows.map((row) => ({
       paymentMethod: row.method,
       openingCents: 0,
-      sangriaCents: null,
+      cashDropCents: null,
       closingCents: row.system,
       typedCents: row.method.includes("DINHEIRO") ? row.real : 0,
     })),

@@ -59,7 +59,7 @@ function maxPickerDate(today: string): Date {
 export function ChallengesPage() {
   const navigate = useNavigate();
   const { show } = useToast();
-  const { session, storeRows, loading: lojasLoading } = useScopedStores();
+  const { session, storeRows, loading: storesLoading } = useScopedStores();
   const { scope, setScope } = useScope();
   const today = calendarTodayIso();
   const janela = useMemo(() => managementScheduleWindow(scope.period, today), [scope.period, today]);
@@ -70,9 +70,9 @@ export function ChallengesPage() {
   const [data, setData] = useState<Loaded | null>(null);
   const [loading, setLoading] = useState(true);
   const [reload, setReload] = useState(0);
-  const [confirmar, setConfirmar] = useState<ChallengeRecord | null>(null);
+  const [confirm, setConfirm] = useState<ChallengeRecord | null>(null);
   const [excluindo, setExcluindo] = useState(false);
-  const [duplicar, setDuplicar] = useState<ChallengeRecord | null>(null);
+  const [duplicate, setDuplicate] = useState<ChallengeRecord | null>(null);
   const hasOtherStores = storesForSession(session.stores).length > 1;
 
   useEffect(() => {
@@ -81,11 +81,11 @@ export function ChallengesPage() {
     return () => window.removeEventListener(SALES_SYNCED_EVENT, onSync);
   }, []);
 
-  const filtroKey = `${session.tenantId}|${storeKey}|${janela.from}|${janela.to}`;
+  const filterKey = `${session.tenantId}|${storeKey}|${janela.from}|${janela.to}`;
   const loadedKey = useRef<string | null>(null);
 
   useEffect(() => {
-    if (lojasLoading) return;
+    if (storesLoading) return;
     if (escolher) {
       setLoading(false);
       return;
@@ -93,7 +93,7 @@ export function ChallengesPage() {
     let cancelled = false;
     (async () => {
       // Venda nova (SALES_SYNCED_EVENT) recarrega sem skeleton; so filtro novo mostra o skeleton.
-      if (loadedKey.current !== filtroKey) setLoading(true);
+      if (loadedKey.current !== filterKey) setLoading(true);
       const challenges = await fetchChallenges({ tenantId: session.tenantId, storeIds, from: janela.from, to: janela.to });
       const aggs =
         challenges.length > 0
@@ -101,16 +101,16 @@ export function ChallengesPage() {
           : emptyChallengeAggInput();
       if (!cancelled) {
         setData({ challenges, aggs });
-        loadedKey.current = filtroKey;
+        loadedKey.current = filterKey;
         setLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [session.tenantId, storeKey, janela.from, janela.to, lojasLoading, reload, escolher]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session.tenantId, storeKey, janela.from, janela.to, storesLoading, reload, escolher]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const showSkeleton = useMinSkeleton(loading || lojasLoading);
+  const showSkeleton = useMinSkeleton(loading || storesLoading);
 
   const cards = useMemo(() => {
     if (!data) return [];
@@ -123,7 +123,7 @@ export function ChallengesPage() {
           (a.view.status === "ended"
             ? b.challenge.endsOn.localeCompare(a.challenge.endsOn)
             : a.challenge.startsOn.localeCompare(b.challenge.startsOn)) ||
-          (a.store?.fantasia ?? "").localeCompare(b.store?.fantasia ?? "", "pt-BR") ||
+          (a.store?.tradeName ?? "").localeCompare(b.store?.tradeName ?? "", "pt-BR") ||
           a.challenge.name.localeCompare(b.challenge.name, "pt-BR"),
       );
   }, [data, storeRows, today]);
@@ -133,16 +133,16 @@ export function ChallengesPage() {
     setScope(applyPeriodDateChange(scope, r, goal));
   }
 
-  async function excluir() {
-    if (!confirmar) return;
+  async function exclude() {
+    if (!confirm) return;
     setExcluindo(true);
-    const res = await deleteChallenge(session.tenantId, confirmar.id);
+    const res = await deleteChallenge(session.tenantId, confirm.id);
     setExcluindo(false);
     if (!res.ok) {
       show("Não foi possível excluir o desafio. Tente novamente.", "danger");
       return;
     }
-    setConfirmar(null);
+    setConfirm(null);
     show("Desafio excluído.", "success");
     setReload((n) => n + 1);
   }
@@ -197,10 +197,10 @@ export function ChallengesPage() {
                 challenge={challenge}
                 view={view}
                 store={store}
-                mostraLoja={storeRows.length > 1}
+                showsStore={storeRows.length > 1}
                 onDetail={() => navigate(paths.management.challengeDetail(challenge.id))}
-                onCopy={() => setDuplicar(challenge)}
-                onDelete={() => setConfirmar(challenge)}
+                onCopy={() => setDuplicate(challenge)}
+                onDelete={() => setConfirm(challenge)}
               />
             ))}
           </div>
@@ -208,38 +208,38 @@ export function ChallengesPage() {
       </div>
 
       <DuplicateChoiceModal
-        open={duplicar !== null}
-        onClose={() => setDuplicar(null)}
+        open={duplicate !== null}
+        onClose={() => setDuplicate(null)}
         kind="desafio"
-        name={duplicar?.name ?? null}
+        name={duplicate?.name ?? null}
         hasOtherStores={hasOtherStores}
         onChoose={(choice) => {
-          if (!duplicar) return;
-          const id = duplicar.id;
-          setDuplicar(null);
+          if (!duplicate) return;
+          const id = duplicate.id;
+          setDuplicate(null);
           navigate(choice === "store" ? paths.management.challengeCopyStore(id) : paths.management.challengeCopy(id));
         }}
       />
 
       <Modal
-        open={confirmar !== null}
-        onClose={() => !excluindo && setConfirmar(null)}
+        open={confirm !== null}
+        onClose={() => !excluindo && setConfirm(null)}
         title="Excluir desafio?"
         footer={
           <>
-            <Button variant="outline" onClick={() => setConfirmar(null)} disabled={excluindo}>
+            <Button variant="outline" onClick={() => setConfirm(null)} disabled={excluindo}>
               Cancelar
             </Button>
-            <Button variant="danger" onClick={() => void excluir()} disabled={excluindo}>
+            <Button variant="danger" onClick={() => void exclude()} disabled={excluindo}>
               {excluindo ? "Excluindo…" : "Excluir desafio"}
             </Button>
           </>
         }
       >
-        {confirmar && (
+        {confirm && (
           <p className="text-[13px] leading-relaxed text-t1">
-            O desafio <span className="font-bold text-t0">{confirmar.name}</span>, de {fullDate(confirmar.startsOn)} a{" "}
-            {fullDate(confirmar.endsOn)}, será excluído. Essa ação não pode ser desfeita.
+            O desafio <span className="font-bold text-t0">{confirm.name}</span>, de {fullDate(confirm.startsOn)} a{" "}
+            {fullDate(confirm.endsOn)}, será excluído. Essa ação não pode ser desfeita.
           </p>
         )}
       </Modal>
@@ -251,7 +251,7 @@ function ChallengeCard({
   challenge: c,
   view,
   store,
-  mostraLoja,
+  showsStore,
   onDetail,
   onCopy,
   onDelete,
@@ -259,7 +259,7 @@ function ChallengeCard({
   challenge: ChallengeRecord;
   view: ChallengeView;
   store: Store | undefined;
-  mostraLoja: boolean;
+  showsStore: boolean;
   onDetail: () => void;
   onCopy: () => void;
   onDelete: () => void;
@@ -268,7 +268,7 @@ function ChallengeCard({
   const destaque = challengeHeadline(c, view);
   const prize = mainPrizeLabel(c);
 
-  const acao = (fn: () => void) => (e: MouseEvent) => {
+  const action = (fn: () => void) => (e: MouseEvent) => {
     e.stopPropagation();
     fn();
   };
@@ -296,14 +296,14 @@ function ChallengeCard({
           <p className="truncate text-[15px] font-bold text-t0">{c.name}</p>
           <p className="mt-0.5 truncate text-[12.5px] text-t2">
             {period}
-            {mostraLoja && store ? ` · ${store.fantasia}` : ""}
+            {showsStore && store ? ` · ${store.tradeName}` : ""}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5 self-start">
           <Tooltip label="Duplicar desafio">
             <button
               type="button"
-              onClick={acao(onCopy)}
+              onClick={action(onCopy)}
               aria-label="Duplicar desafio"
               className="flex h-7 w-7 items-center justify-center rounded-lg border border-line text-t2 transition-colors hover:border-acc hover:text-acc"
             >
@@ -313,7 +313,7 @@ function ChallengeCard({
           <Tooltip label="Excluir desafio">
             <button
               type="button"
-              onClick={acao(onDelete)}
+              onClick={action(onDelete)}
               aria-label="Excluir desafio"
               className="flex h-7 w-7 items-center justify-center rounded-lg border border-line text-t2 transition-colors hover:border-bad hover:text-bad"
             >

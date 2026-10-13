@@ -29,8 +29,8 @@ export function PrizeCard({ store, embedded = false }: { store: SellerHomeStore;
 }
 
 function PrizeBody({ goal, me }: { goal: Goal; me: NonNullable<Goal["me"]> }) {
-  const nivel = me.nivelNumero != null && me.nivel ? `N${me.nivelNumero} · ${me.nivel}` : null;
-  const proximo = me.proximo ? `N${me.proximo.numero} · ${me.proximo.name}` : null;
+  const level = me.levelNumber != null && me.level ? `N${me.levelNumber} · ${me.level}` : null;
+  const next = me.next ? `N${me.next.number} · ${me.next.name}` : null;
   return (
     <div className="mt-3 flex flex-col gap-3">
       <div className="flex items-end justify-between gap-3">
@@ -38,14 +38,14 @@ function PrizeBody({ goal, me }: { goal: Goal; me: NonNullable<Goal["me"]> }) {
           <p className="text-[12px] font-semibold text-t2">Sua premiação até agora</p>
           <p className="font-mono text-[26px] font-extrabold text-t0">{brlCent(me.prizeAmount + me.bonus)}</p>
         </div>
-        {nivel && <Badge variant="accent">{nivel}</Badge>}
+        {level && <Badge variant="accent">{level}</Badge>}
       </div>
       <div className="overflow-x-auto">
-        <GoalLevelsBar pct={me.attainmentPct} marcos={me.marcos} completo />
+        <GoalLevelsBar pct={me.attainmentPct} marcos={me.marcos} complete />
       </div>
-      {proximo ? (
+      {next ? (
         <div className="flex flex-col gap-1 text-[13px] text-t1">
-          <p>Faltam {brlCent(me.proximo!.falta)} para {proximo}</p>
+          <p>Faltam {brlCent(me.next!.gap)} para {next}</p>
           {goal.nextLevelGain != null && <p>Ao chegar: +{brlCent(goal.nextLevelGain)} em premiação</p>}
         </div>
       ) : (

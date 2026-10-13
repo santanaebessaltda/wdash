@@ -1,7 +1,7 @@
 import { Dropdown } from "@/components/ui";
 import type { Division } from "@/data/wedash/stores";
 
-const OPCOES: { value: Division | null; label: string }[] = [
+const OPTIONS: { value: Division | null; label: string }[] = [
   { value: null, label: "Todas as marcas" },
   { value: "WEPINK", label: "WEPINK" },
   { value: "WPINK", label: "WPINK" },
@@ -18,7 +18,7 @@ export function BrandPicker({
   value: Division | null;
   onChange: (v: Division | null) => void;
 }) {
-  const label = OPCOES.find((o) => o.value === value)?.label ?? "Todas as marcas";
+  const label = OPTIONS.find((o) => o.value === value)?.label ?? "Todas as marcas";
 
   return (
     <Dropdown
@@ -34,7 +34,7 @@ export function BrandPicker({
           </svg>
         </button>
       }
-      items={OPCOES.map((o) => ({
+      items={OPTIONS.map((o) => ({
         label: o.label,
         active: o.value === value,
         onClick: () => onChange(o.value),

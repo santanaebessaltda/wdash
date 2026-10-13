@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { padTop } from "@/lib/safeArea";
 import { Avatar, Dropdown, type DropdownItem } from "@/components/ui";
-import { isGestor } from "./nav-wedash";
+import { isOwner } from "./nav-wedash";
 import { paths } from "@/router/paths";
 import { accessLabel, useSession, useActiveSession } from "@/session/SessionProvider";
 import {
@@ -102,7 +102,7 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
     ...(session.role === "SELLER"
       ? []
       : [{ label: "Notificações", icon: <MenuIcon d={ICON_NOTICES} />, onClick: () => navigate(paths.settings.notifications) }]),
-    ...(isGestor(session.role)
+    ...(isOwner(session.role)
       ? [
           { label: "Integrações", icon: <MenuIcon d={ICON_INTEGRACOES} />, onClick: () => navigate(paths.settings.erp) },
           { label: "Usuários", icon: <MenuIcon d={ICON_USUARIOS} />, onClick: () => navigate(paths.settings.users) },

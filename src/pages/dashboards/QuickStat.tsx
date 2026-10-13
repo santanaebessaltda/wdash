@@ -20,12 +20,12 @@ export function QuickStat({
   sub?: string;
   badge?: ReactNode;
 }) {
-  const cor = TINT[tint];
+  const color = TINT[tint];
   return (
     <Card padding="sm" className="flex items-center gap-3.5">
       <span
         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px]"
-        style={{ background: cor.bg, color: cor.fg }}
+        style={{ background: color.bg, color: color.fg }}
       >
         {icon}
       </span>

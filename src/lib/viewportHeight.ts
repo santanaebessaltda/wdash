@@ -8,16 +8,16 @@ function instalado(): boolean {
   );
 }
 
-function aplicarAlturaDaTela(): void {
+function applyViewportHeight(): void {
   const visual = window.visualViewport;
-  const altura = Math.max(window.innerHeight, visual ? visual.height + visual.offsetTop : 0);
-  document.documentElement.style.setProperty("--tela", `${Math.round(altura)}px`);
+  const height = Math.max(window.innerHeight, visual ? visual.height + visual.offsetTop : 0);
+  document.documentElement.style.setProperty("--tela", `${Math.round(height)}px`);
   document.documentElement.classList.toggle("app-instalado", instalado());
 }
 
 export function installViewportHeight(): void {
-  aplicarAlturaDaTela();
-  window.addEventListener("resize", aplicarAlturaDaTela);
-  window.addEventListener("orientationchange", aplicarAlturaDaTela);
-  window.visualViewport?.addEventListener("resize", aplicarAlturaDaTela);
+  applyViewportHeight();
+  window.addEventListener("resize", applyViewportHeight);
+  window.addEventListener("orientationchange", applyViewportHeight);
+  window.visualViewport?.addEventListener("resize", applyViewportHeight);
 }

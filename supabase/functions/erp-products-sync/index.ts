@@ -16,7 +16,7 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
 import { corsHeaders, serve } from "../_shared/cors.ts";
 import { listMillenniumStores, loginMillennium } from "../_shared/millennium.ts";
 import { MillenniumHttpError } from "../_shared/millenniumSellers.ts";
-import { fetchMargemUnitCosts } from "../_shared/millenniumMargem.ts";
+import { fetchMarginUnitCosts } from "../_shared/millenniumMargem.ts";
 import { fetchCostTablePrices, fetchCostTables } from "../_shared/millenniumProducts.ts";
 
 const LEASE_SEC = 300;
@@ -237,7 +237,7 @@ async function refreshCosts(
     }
     const units = new Map<string, number>();
     for (const [from, to] of windows) {
-      for (const [code, unit] of await fetchMargemUnitCosts(session, Number(store.millennium_store_id), from, to)) {
+      for (const [code, unit] of await fetchMarginUnitCosts(session, Number(store.millennium_store_id), from, to)) {
         units.set(code, unit);
       }
     }

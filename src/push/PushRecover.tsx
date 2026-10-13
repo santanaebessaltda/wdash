@@ -5,7 +5,7 @@ import { enableSalesPush } from "./salesPush";
 
 const DISPENSADO = "wedash.push-recover-dismissed";
 
-function bloqueado(): boolean {
+function blocked(): boolean {
   return "Notification" in window && Notification.permission === "denied";
 }
 
@@ -23,8 +23,8 @@ function passos(): string {
 /** Quem recusou o aviso do sistema não recebe outro pedido. Este aviso mostra como ligar de novo. */
 export function PushRecover() {
   const session = useActiveSession();
-  const [open, setAberto] = useState(false);
-  const [ainda, setAinda] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [still, setStill] = useState(false);
   const [tentando, setTentando] = useState(false);
 
   useEffect(() => {
@@ -34,11 +34,11 @@ export function PushRecover() {
     } catch {
       /* private mode */
     }
-    if (bloqueado()) setAberto(true);
+    if (blocked()) setOpen(true);
   }, [session.role]);
 
   function dispensar() {
-    setAberto(false);
+    setOpen(false);
     try {
       sessionStorage.setItem(DISPENSADO, "1");
     } catch {
@@ -46,16 +46,16 @@ export function PushRecover() {
     }
   }
 
-  async function tentar() {
+  async function retry() {
     setTentando(true);
-    setAinda(false);
+    setStill(false);
     const r = await enableSalesPush(session.tenantId);
     setTentando(false);
     if (r === "ok") {
-      setAberto(false);
+      setOpen(false);
       return;
     }
-    setAinda(true);
+    setStill(true);
   }
 
   if (session.role === "SELLER") return null;
@@ -71,7 +71,7 @@ export function PushRecover() {
           <Button variant="outline" onClick={dispensar}>
             Agora não
           </Button>
-          <Button disabled={tentando} onClick={() => void tentar()}>
+          <Button disabled={tentando} onClick={() => void retry()}>
             {tentando ? "Verificando…" : "Tentar de novo"}
           </Button>
         </>
@@ -80,7 +80,7 @@ export function PushRecover() {
       <p className="text-[13.5px] leading-relaxed text-t1">
         O celular ou o navegador não pergunta de novo depois do Não. {passos()}
       </p>
-      {ainda && <p className="mt-3 text-[13px] text-t2">Ainda está desativado neste aparelho.</p>}
+      {still && <p className="mt-3 text-[13px] text-t2">Ainda está desativado neste aparelho.</p>}
     </Modal>
   );
 }

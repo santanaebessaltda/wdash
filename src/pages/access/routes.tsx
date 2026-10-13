@@ -30,9 +30,9 @@ export const accessRoutes: RouteObject[] = [
   { path: paths.legacy.auth.recuperar, element: <Navigate to={paths.access.forgot} replace /> },
   { path: paths.legacy.auth.redefinir, element: <Navigate to={paths.access.reset} replace /> },
   { path: `${paths.legacy.auth.redefinir}/:token`, element: <RedirectResetToken /> },
-  { path: paths.legacy.auth.convite, element: <RedirectInvite /> },
+  { path: paths.legacy.auth.invite, element: <RedirectInvite /> },
   { path: paths.legacy.auth.instalar, element: <Navigate to={paths.home} replace /> },
-  { path: paths.legacy.auth.trocarSenha, element: <Navigate to={paths.access.createAccess} replace /> },
+  { path: paths.legacy.auth.trocarPassword, element: <Navigate to={paths.access.createAccess} replace /> },
   { path: paths.legacy.auth.changePassword, element: <Navigate to={paths.access.createAccess} replace /> },
   { path: paths.legacy.auth.createPassword, element: <Navigate to={paths.access.createAccess} replace /> },
 ];

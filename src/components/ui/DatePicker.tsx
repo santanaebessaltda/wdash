@@ -21,7 +21,7 @@ function sameCalendarDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-function formatar(d: Date): string {
+function format(d: Date): string {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 }
 
@@ -84,13 +84,13 @@ export function DatePicker({
     function colocar() {
       if (!triggerRef.current) return;
       const rect = triggerRef.current.getBoundingClientRect();
-      const margem = 12;
+      const margin = 12;
       const vw = window.innerWidth;
       const vh = window.innerHeight;
       let left = rect.left;
-      if (left + PANEL_WIDTH > vw - margem) left = Math.max(margem, vw - margem - PANEL_WIDTH);
-      const top = Math.min(rect.bottom + 8, vh - margem - 80);
-      setPanelPos({ top, left, maxHeight: Math.max(200, vh - top - margem) });
+      if (left + PANEL_WIDTH > vw - margin) left = Math.max(margin, vw - margin - PANEL_WIDTH);
+      const top = Math.min(rect.bottom + 8, vh - margin - 80);
+      setPanelPos({ top, left, maxHeight: Math.max(200, vh - top - margin) });
     }
     colocar();
     window.addEventListener("resize", colocar);
@@ -109,9 +109,9 @@ export function DatePicker({
     return arr;
   }, [viewMonth]);
 
-  const bloqueado = (dia: Date) => Boolean((min && dia < min) || (max && dia > max));
-  const podeMesAnt = !min || new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 0) >= min;
-  const podeMesProx = !max || new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1) <= max;
+  const blocked = (day: Date) => Boolean((min && day < min) || (max && day > max));
+  const canMonthPrev = !min || new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 0) >= min;
+  const canMonthProx = !max || new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1) <= max;
 
   const navBtn = (enabled: boolean) =>
     cn(
@@ -130,10 +130,10 @@ export function DatePicker({
             <div className="mb-3.5 flex items-center justify-between">
               <button
                 type="button"
-                disabled={!podeMesAnt}
+                disabled={!canMonthPrev}
                 onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1))}
                 aria-label="Mês anterior"
-                className={navBtn(podeMesAnt)}
+                className={navBtn(canMonthPrev)}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="m15 18-6-6 6-6" />
@@ -144,10 +144,10 @@ export function DatePicker({
               </span>
               <button
                 type="button"
-                disabled={!podeMesProx}
+                disabled={!canMonthProx}
                 onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1))}
                 aria-label="Próximo mês"
-                className={navBtn(podeMesProx)}
+                className={navBtn(canMonthProx)}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="m9 18 6-6-6-6" />
@@ -164,25 +164,25 @@ export function DatePicker({
             </div>
 
             <div className="grid grid-cols-7 gap-1">
-              {cells.map((dia, i) => {
-                if (dia === null) return <span key={`e${i}`} />;
-                const off = bloqueado(dia);
-                const selecionado = value != null && sameCalendarDay(value, dia);
+              {cells.map((day, i) => {
+                if (day === null) return <span key={`e${i}`} />;
+                const off = blocked(day);
+                const selected = value != null && sameCalendarDay(value, day);
                 return (
                   <button
-                    key={dia.toISOString()}
+                    key={day.toISOString()}
                     type="button"
                     disabled={off}
                     onClick={() => {
-                      onChange(dia);
+                      onChange(day);
                       setOpen(false);
                     }}
                     className={cn(
                       "flex h-9 min-w-0 items-center justify-center rounded-[9px] text-[12.5px] font-semibold transition-colors",
-                      off ? "cursor-not-allowed text-t2 opacity-30" : selecionado ? "bg-acc text-white" : "text-t1 hover:bg-bg-3",
+                      off ? "cursor-not-allowed text-t2 opacity-30" : selected ? "bg-acc text-white" : "text-t1 hover:bg-bg-3",
                     )}
                   >
-                    {dia.getDate()}
+                    {day.getDate()}
                   </button>
                 );
               })}
@@ -218,7 +218,7 @@ export function DatePicker({
           <path d="M16 2v4M8 2v4M3 10h18" />
         </svg>
         <span className={cn("min-w-0 truncate text-[13.5px] font-semibold", value ? "text-t0" : "text-t2")}>
-          {value ? formatar(value) : placeholder}
+          {value ? format(value) : placeholder}
         </span>
       </button>
       {painel}

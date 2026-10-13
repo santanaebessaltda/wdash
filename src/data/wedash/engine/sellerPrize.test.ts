@@ -32,7 +32,7 @@ const member = (employeeId: number, name: string): GoalTeamMember => ({
 const ANA = member(1, "ANA");
 const BIA = member(2, "BIA");
 
-const sale = (employeeId: number, reais: number): SalesSellerDayAgg => ({
+const sale = (employeeId: number, brl: number): SalesSellerDayAgg => ({
   tenantId: "t",
   storeId: "s1",
   day: "2026-09-10",
@@ -40,7 +40,7 @@ const sale = (employeeId: number, reais: number): SalesSellerDayAgg => ({
   sellerName: `K${employeeId}`,
   sellerEmployeeId: employeeId,
   brand: "ALL",
-  revenueCents: reais * 100,
+  revenueCents: brl * 100,
   salesCount: 1,
   itemCount: 1,
 });
@@ -82,9 +82,9 @@ describe("projectedPrize", () => {
   });
 
   it("usa o peso dos dias da semana (loja fechada aos domingos)", () => {
-    const semDomingo = [0, 1, 1, 1, 1, 1, 1];
-    expect(projectedPrize(goal, level, { today: "2026-09-15", weights: semDomingo, soldUntilYesterday: 7_000, groupSize: 1 })).toBeNull();
-    expect(projectedPrize(goal, level, { today: "2026-09-17", weights: semDomingo, soldUntilYesterday: 7_000, groupSize: 1 })).toBeCloseTo(410);
+    const withoutSunday = [0, 1, 1, 1, 1, 1, 1];
+    expect(projectedPrize(goal, level, { today: "2026-09-15", weights: withoutSunday, soldUntilYesterday: 7_000, groupSize: 1 })).toBeNull();
+    expect(projectedPrize(goal, level, { today: "2026-09-17", weights: withoutSunday, soldUntilYesterday: 7_000, groupSize: 1 })).toBeCloseTo(410);
   });
 
   it("modo Grupo: projeta o vendido do grupo e dá a parte da pessoa", () => {

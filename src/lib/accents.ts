@@ -3,4 +3,4 @@ export const ACCENTS = ["#7c5cff", "#56a8ff", "#2fd48f", "#ff7a5c", "#f7b84e", "
 
 export type AccentColor = (typeof ACCENTS)[number];
 
-export const ACCENT_PADRAO: AccentColor = ACCENTS[0];
+export const ACCENT_DEFAULT: AccentColor = ACCENTS[0];

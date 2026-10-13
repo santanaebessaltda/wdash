@@ -3,7 +3,7 @@ export type CashCloseBucket = "cash" | "credit" | "debit" | "pix" | "other";
 export type CashCloseMillLine = {
   paymentMethod: string;
   openingCents: number;
-  sangriaCents: number | null;
+  cashDropCents: number | null;
   closingCents: number;
   typedCents: number;
 };
@@ -16,7 +16,7 @@ export type CashCloseLine = {
   /** null = o arquivo da Stone deste dia ainda não chegou. */
   stoneCents: number | null;
   openingCents: number | null;
-  sangriaCents: number | null;
+  cashDropCents: number | null;
 };
 
 const ORDER: CashCloseBucket[] = ["cash", "debit", "credit", "pix", "other"];
@@ -128,12 +128,12 @@ export function cashCloseChips(input: {
   if (lines.length === 0 && !view.pixPending && !input.cardPending) return [];
   const chips: CloseChip[] = [];
   for (const line of lines) {
-    const caixa = line.typedCents - line.systemCents;
-    if (caixa !== 0) {
+    const cashBox = line.typedCents - line.systemCents;
+    if (cashBox !== 0) {
       chips.push({
         key: `${line.key}-caixa`,
-        label: `${CHIP_LABEL[line.key]} · ${signedMoney(caixa)}`,
-        tone: caixa < 0 ? "bad" : "ok",
+        label: `${CHIP_LABEL[line.key]} · ${signedMoney(cashBox)}`,
+        tone: cashBox < 0 ? "bad" : "ok",
       });
     }
     if (line.stoneCents != null) {
@@ -242,13 +242,13 @@ function chipEspera(key: string): boolean {
   return key === "card-pending" || key.endsWith("-card-pending") || key === "pix-pending" || key.endsWith("-pix-pending");
 }
 
-function chipFechado(key: string): boolean {
+function chipClosed(key: string): boolean {
   return key === "ok" || key.endsWith("-ok");
 }
 
 /** Falta ou sobra que ainda aparece na célula. Arquivo a caminho e dia fechado não contam. */
 export function chipsHaveGap(chips: CloseChip[]): boolean {
-  return chips.some((chip) => chip.label !== "Falta assumida" && !chipEspera(chip.key) && !chipFechado(chip.key));
+  return chips.some((chip) => chip.label !== "Falta assumida" && !chipEspera(chip.key) && !chipClosed(chip.key));
 }
 
 export type CloseDayFace = "empty" | "pending" | "difference" | "closed";
@@ -344,7 +344,7 @@ export function buildCashCloseView(input: {
       typedCents: 0,
       stoneCents: null,
       openingCents: null,
-      sangriaCents: null,
+      cashDropCents: null,
     };
     acc.set(key, line);
     return line;
@@ -356,7 +356,7 @@ export function buildCashCloseView(input: {
     line.typedCents += row.typedCents;
     if (key === "cash") {
       line.openingCents = row.openingCents;
-      line.sangriaCents = row.sangriaCents;
+      line.cashDropCents = row.cashDropCents;
     }
   }
   if (input.card) {
@@ -379,7 +379,7 @@ export type MonthMarkMillRow = {
   day: string;
   paymentMethod: string;
   openingCents: number;
-  sangriaCents: number | null;
+  cashDropCents: number | null;
   closingCents: number;
   typedCents: number;
 };
@@ -435,7 +435,7 @@ export function assembleMonthMarks(input: {
     slot(row.storeId, row.day).millennium.push({
       paymentMethod: row.paymentMethod,
       openingCents: row.openingCents,
-      sangriaCents: row.sangriaCents,
+      cashDropCents: row.cashDropCents,
       closingCents: row.closingCents,
       typedCents: row.typedCents,
     });

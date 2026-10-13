@@ -18,7 +18,7 @@ import { CostCardTitle, FormActions, SAVE_ERROR_MSG, TimeSelect } from "./shared
 const DOWS: Dow[] = [0, 1, 2, 3, 4, 5, 6];
 
 function initialHours(store: Store): StoreWeekHours {
-  const saved = parseWeekHours(store.horas);
+  const saved = parseWeekHours(store.hours);
   return weekHoursConfigured(saved) ? saved : presetWeekHours(store.pointType);
 }
 
@@ -40,8 +40,8 @@ export function StoreScheduleForm({
 }) {
   const { show } = useToast();
   const [saved, setSaved] = useState(() => ({
-    timezone: canonicalStoreTimezone(store.fuso),
-    hours: parseWeekHours(store.horas),
+    timezone: canonicalStoreTimezone(store.timezone),
+    hours: parseWeekHours(store.hours),
   }));
   const [timezone, setTimezone] = useState(saved.timezone);
   const [hours, setHours] = useState<StoreWeekHours>(() => initialHours(store));
@@ -222,7 +222,7 @@ export function StoreHoursCard({
     <Card>
       <CostCardTitle title="Funcionamento" />
       <p className="mb-4 text-[12.5px] text-t2">Defina o fuso horário e os dias e horários de funcionamento desta filial.</p>
-      {!weekHoursConfigured(store.horas) && (
+      {!weekHoursConfigured(store.hours) && (
         <Alert variant="warning" className="mb-4" title="Horário de funcionamento não configurado">
           Sem o horário configurado, as vendas desta filial só são atualizadas pelo botão Atualizar.
         </Alert>

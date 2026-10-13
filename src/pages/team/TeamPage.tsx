@@ -9,7 +9,7 @@ import { useScope } from "@/pages/dashboard/useScope";
 import {
   buildTeamDashboardView,
   resolvePeriod,
-  TEAM_SEM_TURNO,
+  TEAM_WITHOUT_SHIFT,
   type Scope,
   type TeamAggInput,
   type TeamMemberRow,
@@ -64,7 +64,7 @@ import {
 } from "@/pages/dashboard/periodPicker";
 
 type GoalsData = { goals: GoalRecord[]; dayAggs: SalesDayAgg[]; sellerAggs: SalesSellerDayAgg[]; team: GoalTeamMember[] };
-const GOALS_VAZIO: GoalsData = { goals: [], dayAggs: [], sellerAggs: [], team: [] };
+const GOALS_EMPTY: GoalsData = { goals: [], dayAggs: [], sellerAggs: [], team: [] };
 
 /** Metas das lojas do filtro que cruzam o periodo; vendas do inicio de cada meta ate hoje (igual ao detalhe da meta). */
 async function fetchGoalsData(tenantId: string, scope: Scope, sessionStores: string[]): Promise<GoalsData> {
@@ -72,7 +72,7 @@ async function fetchGoalsData(tenantId: string, scope: Scope, sessionStores: str
   const period = resolvePeriod(scope.period, today);
   const storeIds = scope.storeIds.length > 0 ? scope.storeIds : storesForSession(sessionStores).map((s) => s.id);
   const goals = await fetchGoals({ tenantId, storeIds, from: period.start, to: period.end });
-  if (goals.length === 0) return GOALS_VAZIO;
+  if (goals.length === 0) return GOALS_EMPTY;
   const storeRows = [...new Set(goals.map((g) => g.storeId))];
   const from = goals.reduce((m, g) => (g.startsOn < m ? g.startsOn : m), goals[0]!.startsOn);
   const end = goals.reduce((m, g) => (g.endsOn > m ? g.endsOn : m), goals[0]!.endsOn);
@@ -87,7 +87,7 @@ async function fetchGoalsData(tenantId: string, scope: Scope, sessionStores: str
 }
 
 type ChallengesData = { challenges: ChallengeRecord[]; aggs: ChallengeAggInput };
-const CHALLENGES_VAZIO: ChallengesData = { challenges: [], aggs: emptyChallengeAggInput() };
+const CHALLENGES_EMPTY: ChallengesData = { challenges: [], aggs: emptyChallengeAggInput() };
 
 /** Desafios das lojas do filtro cujo periodo cruza o filtro da tela (em andamento, a comecar e encerrados). */
 async function fetchPeriodChallenges(tenantId: string, scope: Scope, sessionStores: string[]): Promise<ChallengesData> {
@@ -95,16 +95,16 @@ async function fetchPeriodChallenges(tenantId: string, scope: Scope, sessionStor
   const period = resolvePeriod(scope.period, today);
   const storeIds = scope.storeIds.length > 0 ? scope.storeIds : storesForSession(sessionStores).map((s) => s.id);
   const challenges = await fetchChallenges({ tenantId, storeIds, from: period.start, to: period.end });
-  if (challenges.length === 0) return CHALLENGES_VAZIO;
+  if (challenges.length === 0) return CHALLENGES_EMPTY;
   return { challenges, aggs: await fetchChallengeInput({ tenantId, challenges, today: today }) };
 }
 
-const IconFat = () => (
+const IconRevenue = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
   </svg>
 );
-const IconVendas = () => (
+const IconSales = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
     <line x1="3" y1="6" x2="21" y2="6" />
@@ -117,14 +117,14 @@ const IconTicket = () => (
     <path d="M13 5v2M13 17v2M13 11v2" />
   </svg>
 );
-const IconItens = () => (
+const IconItems = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
     <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
     <line x1="12" y1="22.08" x2="12" y2="12" />
   </svg>
 );
-const KPI_ICONS = [IconFat, IconVendas, IconTicket, IconItens];
+const KPI_ICONS = [IconRevenue, IconSales, IconTicket, IconItems];
 
 const KPI_COLORS = [
   { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" },
@@ -133,12 +133,12 @@ const KPI_COLORS = [
   { iconColor: "var(--warn)", iconBg: "rgba(245,158,11,0.12)" },
 ];
 
-const CORES_TURNO = ["var(--acc)", "var(--info)", "var(--ok)", "var(--warn)", "var(--bad)"];
+const COLORS_SHIFT = ["var(--acc)", "var(--info)", "var(--ok)", "var(--warn)", "var(--bad)"];
 /** Fatia neutra (sem turno / fora da equipe)  -  nao compete com as demais. */
-const COR_NEUTRA = "color-mix(in srgb, var(--t2) 40%, transparent)";
+const COLOR_NEUTRA = "color-mix(in srgb, var(--t2) 40%, transparent)";
 const CAN_CONFIGURE_STORE = new Set(["OWNER", "MANAGER", "ADMIN_GLOBAL"]);
 
-type SortKey = "name" | "revenue" | "vendas" | "averageTicket" | "pa" | "participacaoPct" | "variacaoPct";
+type SortKey = "name" | "revenue" | "sales" | "averageTicket" | "pa" | "participationPct" | "variationPct";
 
 const TipHelp = ({ label }: { label: string }) => (
   <Tooltip label={label}>
@@ -148,13 +148,13 @@ const TipHelp = ({ label }: { label: string }) => (
   </Tooltip>
 );
 
-const filtroInputClass =
+const filterInputClass =
   "h-8 rounded-[var(--radius-vela-sm)] border border-line bg-bg-3 px-3 text-xs font-semibold text-t0 transition-colors hover:border-acc focus:border-acc focus:outline-none";
 
 const pctFmt = (v: number | null, casas = 1) => (v == null ? "—" : `${num(v, casas)}%`);
 const paFmt = (v: number | null) => (v == null ? "—" : num(v, 2));
 
-function Variacao({ v }: { v: number | null }) {
+function Variation({ v }: { v: number | null }) {
   if (v == null) return <span className="text-t2">—</span>;
   const r = Math.round(v);
   return (
@@ -166,10 +166,10 @@ function Variacao({ v }: { v: number | null }) {
 }
 
 /** "Manha  |  09:00 - 15:00"  ->  nome + horario. */
-function partesTurno(turno?: string): { name: string; horario?: string } {
-  if (!turno) return { name: TEAM_SEM_TURNO };
-  const [name, horario] = turno.split(" · ");
-  return { name: name ?? turno, horario };
+function partesShift(shift?: string): { name: string; schedule?: string } {
+  if (!shift) return { name: TEAM_WITHOUT_SHIFT };
+  const [name, schedule] = shift.split(" · ");
+  return { name: name ?? shift, schedule };
 }
 
 /** Loja principal (+N)  -  so com mais de 1 loja no escopo. */
@@ -194,13 +194,13 @@ export function TeamPage() {
   const [coverageFrom, setCoverageFrom] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
   const showSkeleton = useMinSkeleton(loading);
-  const [busca, setBusca] = useState("");
+  const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("revenue");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(1);
-  const [turnoSel, setTurnoSel] = useState<string | null>(null);
-  const [goalsData, setGoalsData] = useState<GoalsData>(GOALS_VAZIO);
-  const [challengesData, setChallengesData] = useState<ChallengesData>(CHALLENGES_VAZIO);
+  const [shiftPicked, setShiftPicked] = useState<string | null>(null);
+  const [goalsData, setGoalsData] = useState<GoalsData>(GOALS_EMPTY);
+  const [challengesData, setChallengesData] = useState<ChallengesData>(CHALLENGES_EMPTY);
   const printing = usePrintMode();
   const [storesTick, setStoresTick] = useState(0);
   useEffect(() => {
@@ -214,20 +214,20 @@ export function TeamPage() {
   const reload = useCallback(async () => {
     const gen = ++reloadGen.current;
     try {
-      const [next, cov, metas, desafios] = await Promise.all([
+      const [next, cov, goals, challenges] = await Promise.all([
         fetchTeamAggInput(session.tenantId, scope),
         fetchSalesCoverage(session.tenantId, scope.storeIds),
         fetchGoalsData(session.tenantId, scope, session.stores),
         fetchPeriodChallenges(session.tenantId, scope, session.stores).catch((e: unknown) => {
           console.error("Team challenges:", e);
-          return CHALLENGES_VAZIO;
+          return CHALLENGES_EMPTY;
         }),
       ]);
       if (gen !== reloadGen.current) return;
       setAggs(next);
       setCoverageFrom(cov.from ? isoToDate(cov.from) : null);
-      setGoalsData(metas);
-      setChallengesData(desafios);
+      setGoalsData(goals);
+      setChallengesData(challenges);
     } catch (e) {
       if (gen !== reloadGen.current) return;
       console.error("Team reload:", e);
@@ -245,17 +245,17 @@ export function TeamPage() {
   }, [reload]);
 
   const view = useMemo(
-    () => buildTeamDashboardView(scope, aggs, { turno: turnoSel }),
+    () => buildTeamDashboardView(scope, aggs, { shift: shiftPicked }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [scope, aggs, storesTick, turnoSel],
+    [scope, aggs, storesTick, shiftPicked],
   );
 
   const todayIso = calendarTodayIso();
   const goalCards = useMemo(() => {
-    const storeName = new Map(storesForSession(session.stores).map((s) => [s.id, s.fantasia]));
-    const ordem = { active: 0, upcoming: 1, ended: 2 } as const;
+    const storeName = new Map(storesForSession(session.stores).map((s) => [s.id, s.tradeName]));
+    const order = { active: 0, upcoming: 1, ended: 2 } as const;
     return [...goalsData.goals]
-      .sort((a, b) => ordem[goalStatus(a, todayIso)] - ordem[goalStatus(b, todayIso)] || b.startsOn.localeCompare(a.startsOn))
+      .sort((a, b) => order[goalStatus(a, todayIso)] - order[goalStatus(b, todayIso)] || b.startsOn.localeCompare(a.startsOn))
       .map((goal) =>
         buildGoalCardView({
           goal,
@@ -269,8 +269,8 @@ export function TeamPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [goalsData, session.stores, todayIso, storesTick]);
 
-  const desafioCards = useMemo(() => {
-    const storeName = new Map(storesForSession(session.stores).map((s) => [s.id, s.fantasia]));
+  const challengeCards = useMemo(() => {
+    const storeName = new Map(storesForSession(session.stores).map((s) => [s.id, s.tradeName]));
     return challengesData.challenges
       .map((challenge) => ({
         challenge,
@@ -309,12 +309,12 @@ export function TeamPage() {
     setScope(applyPeriodDateChange(scope, r, goal));
   }
 
-  const linhasTabela = useMemo(() => {
-    let lista = view.pessoas;
-    const q = busca.trim().toLowerCase();
-    if (q) lista = lista.filter((p) => p.name.toLowerCase().includes(q));
+  const tableLines = useMemo(() => {
+    let list = view.people;
+    const q = search.trim().toLowerCase();
+    if (q) list = list.filter((p) => p.name.toLowerCase().includes(q));
     const dir = sortDir === "asc" ? 1 : -1;
-    return [...lista].sort((a, b) => {
+    return [...list].sort((a, b) => {
       if (sortKey === "name") return a.name.localeCompare(b.name, "pt-BR") * dir;
       const va = a[sortKey];
       const vb = b[sortKey];
@@ -324,33 +324,33 @@ export function TeamPage() {
       if (vb == null) return -1;
       return (va - vb) * dir;
     });
-  }, [view.pessoas, busca, sortKey, sortDir]);
+  }, [view.people, search, sortKey, sortDir]);
 
-  const totalTabela = useMemo(() => {
-    const revenue = linhasTabela.reduce((s, p) => s + p.revenue, 0);
-    const vendas = linhasTabela.reduce((s, p) => s + p.vendas, 0);
-    const itens = linhasTabela.reduce((s, p) => s + p.itens, 0);
-    const completo = linhasTabela.every((p) => p.pa != null || p.vendas === 0);
-    const fatCmp = linhasTabela.reduce((s, p) => s + p.faturamentoCmp, 0);
-    const fatAnt = linhasTabela.reduce((s, p) => s + p.faturamentoAnt, 0);
+  const tableTotal = useMemo(() => {
+    const revenue = tableLines.reduce((s, p) => s + p.revenue, 0);
+    const sales = tableLines.reduce((s, p) => s + p.sales, 0);
+    const items = tableLines.reduce((s, p) => s + p.items, 0);
+    const complete = tableLines.every((p) => p.pa != null || p.sales === 0);
+    const revenueCmp = tableLines.reduce((s, p) => s + p.revenueCmp, 0);
+    const revenuePrev = tableLines.reduce((s, p) => s + p.revenuePrev, 0);
     return {
       revenue,
-      vendas,
-      averageTicket: vendas > 0 ? revenue / vendas : 0,
-      pa: completo && vendas > 0 ? itens / vendas : null,
-      participacaoPct: linhasTabela.reduce((s, p) => s + p.participacaoPct, 0),
-      variacaoPct: fatCmp > 0 && fatAnt > 0 ? ((fatCmp - fatAnt) / fatAnt) * 100 : null,
+      sales,
+      averageTicket: sales > 0 ? revenue / sales : 0,
+      pa: complete && sales > 0 ? items / sales : null,
+      participationPct: tableLines.reduce((s, p) => s + p.participationPct, 0),
+      variationPct: revenueCmp > 0 && revenuePrev > 0 ? ((revenueCmp - revenuePrev) / revenuePrev) * 100 : null,
     };
-  }, [linhasTabela]);
+  }, [tableLines]);
 
   const pageSize = TABLE_PAGE_SIZE;
-  const totalPages = Math.max(1, Math.ceil(linhasTabela.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(tableLines.length / pageSize));
   const pageSafe = Math.min(page, totalPages);
-  const pageRows = printing ? linhasTabela : linhasTabela.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
+  const pageRows = printing ? tableLines : tableLines.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
 
   useEffect(() => {
     setPage(1);
-  }, [busca, sortKey, sortDir, scope, turnoSel]);
+  }, [search, sortKey, sortDir, scope, shiftPicked]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -361,30 +361,30 @@ export function TeamPage() {
     }
   }
 
-  const exportar = useExportPdf("Equipe", view.turnoFiltro);
-  const { abrir: abrirPessoa, modal: pessoaModal } = useTeamMemberDetail({ scope, data: aggs, turno: view.turnoFiltro, goalLevels });
+  const exportValue = useExportPdf("Equipe", view.shiftFilter);
+  const { open: openPerson, modal: personModal } = useTeamMemberDetail({ scope, data: aggs, shift: view.shiftFilter, goalLevels });
   const teclaAbre = (p: TeamMemberRow) => (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      abrirPessoa(p.key, p.name);
+      openPerson(p.key, p.name);
     }
   };
-  const tipVariacao = `Faturamento ${comparedWithTip(view.vsVariacao).replace(/^Em/, "em").replace(/\.$/, "")}.`;
-  const tipVariacaoTotal = `Faturamento total das pessoas do filtro ${comparedWithTip(view.vsVariacao).replace(/^Em/, "em").replace(/\.$/, "")}.`;
-  const hasTeamSales = view.pessoas.length > 0;
-  const podeConfigurar = CAN_CONFIGURE_STORE.has(session.role);
-  const rankPorKey = new Map(view.pessoas.map((p, i) => [p.key, i]));
-  const podio: RankingRow[] = view.pessoas.slice(0, 3).map((p, i) => ({
-    posicao: i + 1,
+  const tipVariation = `Faturamento ${comparedWithTip(view.vsVariation).replace(/^Em/, "em").replace(/\.$/, "")}.`;
+  const tipVariationTotal = `Faturamento total das pessoas do filtro ${comparedWithTip(view.vsVariation).replace(/^Em/, "em").replace(/\.$/, "")}.`;
+  const hasTeamSales = view.people.length > 0;
+  const canConfigure = CAN_CONFIGURE_STORE.has(session.role);
+  const rankByKey = new Map(view.people.map((p, i) => [p.key, i]));
+  const podio: RankingRow[] = view.people.slice(0, 3).map((p, i) => ({
+    position: i + 1,
     employeeId: p.key,
     name: p.name,
-    vendas: p.vendas,
+    sales: p.sales,
     revenue: p.revenue,
   }));
 
   return (
     <div className="flex flex-col p-4 sm:p-6 print:p-0">
-      <ReportHeader filtros={view.availableShifts.length > 0 ? [{ label: "Grupo", amount: view.turnoFiltro ?? "Todos os grupos" }] : []} />
+      <ReportHeader filters={view.availableShifts.length > 0 ? [{ label: "Grupo", amount: view.shiftFilter ?? "Todos os grupos" }] : []} />
       <PageHeader
         crumbs={[{ label: "Dashboard", to: "/dashboard/visao-geral" }, { label: "Equipe" }]}
         title="Equipe"
@@ -402,12 +402,12 @@ export function TeamPage() {
               {view.availableShifts.length > 0 && (
                 <HeaderFilter
                   label="Grupo"
-                  value={view.turnoFiltro ?? ""}
-                  onChange={(v) => setTurnoSel(v || null)}
+                  value={view.shiftFilter ?? ""}
+                  onChange={(v) => setShiftPicked(v || null)}
                   options={[{ value: "", label: "Todos os grupos" }, ...view.availableShifts.map((t) => ({ value: t, label: t }))]}
                 />
               )}
-              <Button variant="primary" onClick={exportar}>
+              <Button variant="primary" onClick={exportValue}>
                 Exportar
               </Button>
             </div>
@@ -433,7 +433,7 @@ export function TeamPage() {
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {view.kpis.map((kpi, i) => {
               const c = KPI_COLORS[i % KPI_COLORS.length]!;
-              const Icon = KPI_ICONS[i] ?? IconFat;
+              const Icon = KPI_ICONS[i] ?? IconRevenue;
               return (
                 <StatCard
                   key={kpi.label}
@@ -458,14 +458,14 @@ export function TeamPage() {
               </CardHeader>
               {!hasTeamSales ? (
                 <EmptyBlock />
-              ) : !view.turnosConfigurados ? (
+              ) : !view.shiftsConfigured ? (
                 <EmptyBlock
                   icon="👥"
                   title="Grupos não configurados"
                   description="Cadastre os grupos das filiais e vincule a equipe para comparar o desempenho por grupo."
                   action={
-                    podeConfigurar ? (
-                      <Button size="sm" onClick={() => navigate(paths.operation.sellers)}>
+                    canConfigure ? (
+                      <Button size="sm" onClick={() => navigate(paths.management.team)}>
                         Gerenciar grupos
                       </Button>
                     ) : undefined
@@ -473,25 +473,25 @@ export function TeamPage() {
                 />
               ) : (
                 (() => {
-                  const total = view.turnos.reduce((s, t) => s + t.revenue, 0) || 1;
-                  let corIdx = 0;
-                  const cores = view.turnos.map((t) => (t.name === TEAM_SEM_TURNO ? COR_NEUTRA : CORES_TURNO[corIdx++ % CORES_TURNO.length]!));
+                  const total = view.shifts.reduce((s, t) => s + t.revenue, 0) || 1;
+                  let colorIdx = 0;
+                  const colors = view.shifts.map((t) => (t.name === TEAM_WITHOUT_SHIFT ? COLOR_NEUTRA : COLORS_SHIFT[colorIdx++ % COLORS_SHIFT.length]!));
                   return (
                     <div className="flex flex-1 flex-col justify-center px-4 pb-4">
                       <div className="mx-auto my-2">
                         <DonutChart
-                          segments={view.turnos.map((t, i) => ({ label: partesTurno(t.name === TEAM_SEM_TURNO ? undefined : t.name).name, value: t.revenue, color: cores[i]! }))}
+                          segments={view.shifts.map((t, i) => ({ label: partesShift(t.name === TEAM_WITHOUT_SHIFT ? undefined : t.name).name, value: t.revenue, color: colors[i]! }))}
                           centerLabel="Total"
                           centerValue={brlCent(total)}
                         />
                       </div>
                       <div className="mt-2 flex flex-col gap-2.5">
-                        {view.turnos.map((t, i) => {
+                        {view.shifts.map((t, i) => {
                           const pct = Math.round((t.revenue / total) * 100);
-                          const pt = partesTurno(t.name === TEAM_SEM_TURNO ? undefined : t.name);
+                          const pt = partesShift(t.name === TEAM_WITHOUT_SHIFT ? undefined : t.name);
                           return (
                             <div key={t.name} className="flex items-start gap-2.5">
-                              <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: cores[i] }} />
+                              <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: colors[i] }} />
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-baseline gap-2">
                                   <span className="min-w-0 truncate text-[12.5px] font-semibold text-t1">{pt.name}</span>
@@ -499,8 +499,8 @@ export function TeamPage() {
                                   <span className="min-w-[32px] shrink-0 text-right text-[11.5px] font-semibold text-t2">{pct}%</span>
                                 </div>
                                 <p className="mt-0.5 text-[11.5px] text-t2">
-                                  {pt.horario ? `${pt.horario} · ` : ""}
-                                  {t.pessoas} {t.pessoas === 1 ? "pessoa" : "pessoas"}
+                                  {pt.schedule ? `${pt.schedule} · ` : ""}
+                                  {t.people} {t.people === 1 ? "pessoa" : "pessoas"}
                                 </p>
                               </div>
                             </div>
@@ -521,28 +521,28 @@ export function TeamPage() {
                   <TipHelp label="Mostra quanto do faturamento foi atribuído à equipe e quanto veio de vendas sem vendedor identificado ou realizadas pela gerência." />
                 </div>
               </CardHeader>
-              {view.composicao.total <= 0 ? (
+              {view.composition.total <= 0 ? (
                 <EmptyBlock />
               ) : (
                 (() => {
-                  const { team, fora, total, turno } = view.composicao;
+                  const { team, excluded, total, shift } = view.composition;
                   const fatias = (
-                    turno != null && view.turnoFiltro
+                    shift != null && view.shiftFilter
                       ? [
-                          { name: view.turnoFiltro, amount: turno, cor: "var(--acc)" },
-                          { name: "Demais da equipe", amount: Math.max(0, team - turno), cor: "var(--info)" },
-                          { name: "Sem vendedor identificado ou gerência", amount: fora, cor: COR_NEUTRA },
+                          { name: view.shiftFilter, amount: shift, color: "var(--acc)" },
+                          { name: "Demais da equipe", amount: Math.max(0, team - shift), color: "var(--info)" },
+                          { name: "Sem vendedor identificado ou gerência", amount: excluded, color: COLOR_NEUTRA },
                         ]
                       : [
-                          { name: "Equipe de vendas", amount: team, cor: "var(--acc)" },
-                          { name: "Sem vendedor identificado ou gerência", amount: fora, cor: COR_NEUTRA },
+                          { name: "Equipe de vendas", amount: team, color: "var(--acc)" },
+                          { name: "Sem vendedor identificado ou gerência", amount: excluded, color: COLOR_NEUTRA },
                         ]
                   ).filter((f) => f.amount > 0);
                   return (
                     <div className="flex flex-1 flex-col justify-center px-4 pb-4">
                       <div className="mx-auto my-2">
                         <DonutChart
-                          segments={fatias.map((f) => ({ label: labelUpper(f.name), value: f.amount, color: f.cor }))}
+                          segments={fatias.map((f) => ({ label: labelUpper(f.name), value: f.amount, color: f.color }))}
                           centerLabel="Total"
                           centerValue={brlCent(total)}
                         />
@@ -550,7 +550,7 @@ export function TeamPage() {
                       <div className="mt-2 flex flex-col gap-2">
                         {fatias.map((f) => (
                           <div key={f.name} className="flex items-center gap-2.5">
-                            <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: f.cor }} />
+                            <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: f.color }} />
                             <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-t1">{labelUpper(f.name)}</span>
                             <span className="shrink-0 font-mono text-[12.5px] font-bold text-t0">{brlCent(f.amount)}</span>
                             <span className="min-w-[32px] shrink-0 text-right text-[11.5px] font-semibold text-t2">
@@ -620,13 +620,13 @@ export function TeamPage() {
                   label: "Desafios",
                   icon: <FlameIcon size={14} />,
                   content:
-                    desafioCards.length > 0 ? (
+                    challengeCards.length > 0 ? (
                       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                        {desafioCards.map(({ challenge, view: desafio, storeNameValue }) => (
+                        {challengeCards.map(({ challenge, view: challengeView, storeNameValue }) => (
                           <ChallengeMiniCard
                             key={challenge.id}
                             challenge={challenge}
-                            view={desafio}
+                            view={challengeView}
                             storeNameValue={showChallengeStore ? storeNameValue : undefined}
                             onOpen={() => navigate(paths.management.challengeDetail(challenge.id), { state: { from: "team" } })}
                           />
@@ -652,27 +652,27 @@ export function TeamPage() {
         </>
       )}
 
-      {pessoaModal}
+      {personModal}
     </div>
   );
 
   function abaRanking() {
     return (
       <div className="flex flex-col">
-        <RankingBlock ranking={podio} formatValor={brlCent} onSelect={(r) => abrirPessoa(r.employeeId, r.name)} />
+        <RankingBlock ranking={podio} formatAmount={brlCent} onSelect={(r) => openPerson(r.employeeId, r.name)} />
 
         <div className="mt-6 mb-4 flex flex-wrap items-center gap-2 sm:justify-end print:hidden">
           <input
             type="search"
             placeholder="Buscar por nome…"
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            className={cn(filtroInputClass, "sm:w-56")}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className={cn(filterInputClass, "sm:w-56")}
           />
         </div>
 
-        {linhasTabela.length === 0 ? (
-          <SemResultado temDados={hasTeamSales} onLimpar={() => setBusca("")} />
+        {tableLines.length === 0 ? (
+          <WithoutResult hasDados={hasTeamSales} onClear={() => setSearch("")} />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] border-collapse text-sm">
@@ -682,24 +682,24 @@ export function TeamPage() {
                   <ThSort label="Nome" active={sortKey === "name"} dir={sortDir} onClick={() => toggleSort("name")} align="left" className="px-1 pb-3" />
                   <th className="px-1 pb-3 text-left font-bold">Grupo</th>
                   <ThSort label="Faturamento" active={sortKey === "revenue"} dir={sortDir} onClick={() => toggleSort("revenue")} className="px-1 pb-3" />
-                  <ThSort label="Nº de vendas" active={sortKey === "vendas"} dir={sortDir} onClick={() => toggleSort("vendas")} className="px-1 pb-3" />
+                  <ThSort label="Nº de vendas" active={sortKey === "sales"} dir={sortDir} onClick={() => toggleSort("sales")} className="px-1 pb-3" />
                   <ThSort label="Ticket médio" active={sortKey === "averageTicket"} dir={sortDir} onClick={() => toggleSort("averageTicket")} className="px-1 pb-3" />
                   <ThSort label="P.A." active={sortKey === "pa"} dir={sortDir} onClick={() => toggleSort("pa")} className="px-1 pb-3" />
-                  <ThSort label="Participação" active={sortKey === "participacaoPct"} dir={sortDir} onClick={() => toggleSort("participacaoPct")} className="px-1 pb-3" />
-                  <ThSort label="Variação" active={sortKey === "variacaoPct"} dir={sortDir} onClick={() => toggleSort("variacaoPct")} className="px-1 pb-3" />
+                  <ThSort label="Participação" active={sortKey === "participationPct"} dir={sortDir} onClick={() => toggleSort("participationPct")} className="px-1 pb-3" />
+                  <ThSort label="Variação" active={sortKey === "variationPct"} dir={sortDir} onClick={() => toggleSort("variationPct")} className="px-1 pb-3" />
                   {hasGoalColumn && <th className="pb-3 pl-5 pr-1 text-left font-bold">Nível da meta</th>}
                 </tr>
               </thead>
               <tbody>
                 {pageRows.map((p) => {
-                  const rank = rankPorKey.get(p.key) ?? 0;
-                  const turno = partesTurno(p.turno);
-                  const store = view.multiLoja ? storesLabel(p.storeRows) : null;
+                  const rank = rankByKey.get(p.key) ?? 0;
+                  const shift = partesShift(p.shift);
+                  const store = view.multiStore ? storesLabel(p.storeRows) : null;
                   return (
                     <tr
                       key={p.key}
                       tabIndex={0}
-                      onClick={() => abrirPessoa(p.key, p.name)}
+                      onClick={() => openPerson(p.key, p.name)}
                       onKeyDown={teclaAbre(p)}
                       className="cursor-pointer border-b border-line transition-colors hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none"
                     >
@@ -721,22 +721,22 @@ export function TeamPage() {
                         </div>
                       </td>
                       <td className="px-1 py-3">
-                        <p className={cn("text-[12.5px] font-semibold", p.turno ? "text-t1" : "text-t2")}>{turno.name}</p>
-                        {turno.horario && <p className="text-[11px] text-t2">{turno.horario}</p>}
+                        <p className={cn("text-[12.5px] font-semibold", p.shift ? "text-t1" : "text-t2")}>{shift.name}</p>
+                        {shift.schedule && <p className="text-[11px] text-t2">{shift.schedule}</p>}
                       </td>
                       <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.revenue)}</td>
-                      <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(p.vendas)}</td>
+                      <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(p.sales)}</td>
                       <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.averageTicket)}</td>
                       <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", p.pa == null ? "text-t2" : "text-t0")}>{paFmt(p.pa)}</td>
-                      <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{pctFmt(p.participacaoPct)}</td>
+                      <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{pctFmt(p.participationPct)}</td>
                       <td className="px-1 py-3 text-right font-mono text-[13px]">
-                        <Tooltip label={tipVariacao}>
+                        <Tooltip label={tipVariation}>
                           <span>
-                            <Variacao v={p.variacaoPct} />
+                            <Variation v={p.variationPct} />
                           </span>
                         </Tooltip>
                       </td>
-                      {hasGoalColumn && <GoalLevelCell nivel={goalLevels.get(p.key)} completo={!printing} />}
+                      {hasGoalColumn && <GoalLevelCell level={goalLevels.get(p.key)} complete={!printing} />}
                     </tr>
                   );
                 })}
@@ -748,20 +748,20 @@ export function TeamPage() {
                       <TipHelp label="Soma todas as pessoas encontradas no filtro, inclusive as que não aparecem nesta página." />
                     </span>
                     <span className="mt-0.5 block text-[11px] font-semibold text-t2">
-                      {num(linhasTabela.length)} {linhasTabela.length === 1 ? "pessoa" : "pessoas"}
+                      {num(tableLines.length)} {tableLines.length === 1 ? "pessoa" : "pessoas"}
                     </span>
                   </td>
-                  <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{brlCent(totalTabela.revenue)}</td>
-                  <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{num(totalTabela.vendas)}</td>
-                  <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{brlCent(totalTabela.averageTicket)}</td>
-                  <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", totalTabela.pa == null ? "text-t2" : "text-t0")}>
-                    {paFmt(totalTabela.pa)}
+                  <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{brlCent(tableTotal.revenue)}</td>
+                  <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{num(tableTotal.sales)}</td>
+                  <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{brlCent(tableTotal.averageTicket)}</td>
+                  <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", tableTotal.pa == null ? "text-t2" : "text-t0")}>
+                    {paFmt(tableTotal.pa)}
                   </td>
-                  <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{pctFmt(totalTabela.participacaoPct)}</td>
+                  <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{pctFmt(tableTotal.participationPct)}</td>
                   <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold">
-                    <Tooltip label={tipVariacaoTotal}>
+                    <Tooltip label={tipVariationTotal}>
                       <span>
-                        <Variacao v={totalTabela.variacaoPct} />
+                        <Variation v={tableTotal.variationPct} />
                       </span>
                     </Tooltip>
                   </td>
@@ -772,10 +772,10 @@ export function TeamPage() {
           </div>
         )}
 
-        {linhasTabela.length > 0 && (
+        {tableLines.length > 0 && (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
             <span className="text-[12.5px] text-t2">
-              Mostrando {pageRows.length} de {num(linhasTabela.length)} pessoas
+              Mostrando {pageRows.length} de {num(tableLines.length)} pessoas
             </span>
             {totalPages > 1 && <Pagination page={pageSafe} totalPages={totalPages} onChange={setPage} />}
           </div>
@@ -786,24 +786,24 @@ export function TeamPage() {
 }
 
 /** Barra da meta da pessoa com os niveis (N1  |  nome (premiacao %)); sem meta = " - ". */
-function GoalLevelCell({ nivel, completo }: { nivel?: SellerGoalLevel; completo: boolean }) {
-  if (!nivel) return <td className="py-3 pl-5 pr-1 text-[13px] text-t2">—</td>;
+function GoalLevelCell({ level, complete }: { level?: SellerGoalLevel; complete: boolean }) {
+  if (!level) return <td className="py-3 pl-5 pr-1 text-[13px] text-t2">—</td>;
   return (
     <td className="py-3 pl-5 pr-1 align-middle">
-      <GoalLevelSummary pct={nivel.attainmentPct} nivel={nivel.nivel} nivelNumero={nivel.nivelNumero} marcos={nivel.marcos} completo={completo} />
+      <GoalLevelSummary pct={level.attainmentPct} level={level.level} levelNumber={level.levelNumber} marcos={level.marcos} complete={complete} />
     </td>
   );
 }
 
-function SemResultado({ temDados, onLimpar }: { temDados: boolean; onLimpar: () => void }) {
-  if (!temDados) return <EmptyBlock />;
+function WithoutResult({ hasDados, onClear }: { hasDados: boolean; onClear: () => void }) {
+  if (!hasDados) return <EmptyBlock />;
   return (
     <EmptyBlock
       icon="🔍"
       title="Nenhuma pessoa encontrada"
       description="Tente buscar por outro nome."
       action={
-        <Button variant="outline" size="sm" onClick={onLimpar}>
+        <Button variant="outline" size="sm" onClick={onClear}>
           Limpar busca
         </Button>
       }

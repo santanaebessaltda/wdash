@@ -12,7 +12,7 @@ export function RequireSession({ modo = "app" }: { modo?: "app" | "onboarding" |
   const location = useLocation();
 
   if (!ready) return null;
-  if (!session) return <Navigate to={paths.access.login} replace state={{ de: location.pathname }} />;
+  if (!session) return <Navigate to={paths.access.login} replace state={{ from: location.pathname }} />;
 
   const needsPassword = session.temporaryPassword;
   const needsOnboarding = session.onboardingStep !== null;

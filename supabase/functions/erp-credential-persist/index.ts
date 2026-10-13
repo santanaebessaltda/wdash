@@ -5,7 +5,7 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeaders, serve } from "../_shared/cors.ts";
 import { logoutMillennium } from "../_shared/millennium.ts";
-import { GESTOR_ROLES } from "../_shared/staffAuth.ts";
+import { OWNER_ROLES } from "../_shared/staffAuth.ts";
 
 type StoreIn = {
   storeId: number;
@@ -140,7 +140,7 @@ serve(async (req) => {
     .eq("status", "ACTIVE")
     .maybeSingle();
   // Integracoes / onboarding ERP = so Gestor (wipe de dados nao e papel do Gerente).
-  if (!membership || !(GESTOR_ROLES as readonly string[]).includes(membership.role as string)) {
+  if (!membership || !(OWNER_ROLES as readonly string[]).includes(membership.role as string)) {
     return json({ error: "forbidden" }, 403);
   }
 

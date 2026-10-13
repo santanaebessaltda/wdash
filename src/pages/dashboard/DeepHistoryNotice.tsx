@@ -2,7 +2,7 @@ import { Alert, RadialProgress } from "@/components/ui";
 import type { DeepHistoryFill, MonthFill } from "@/data/wedash/salesRepo";
 
 /** Periodo pede dias ainda nao trazidos pela carga funda. */
-export function deepHistoryTouches(fill: DeepHistoryFill | null, start: string, _fim: string): boolean {
+export function deepHistoryTouches(fill: DeepHistoryFill | null, start: string, _end: string): boolean {
   return Boolean(fill && start < fill.oldestLoaded);
 }
 
@@ -23,7 +23,7 @@ export function DeepHistoryNotice({
 }) {
   if (monthFill || !fill || fill.total <= 0) return null;
   const pct = Math.round((fill.done / fill.total) * 100);
-  const parcial = deepHistoryTouches(fill, start, end);
+  const partial = deepHistoryTouches(fill, start, end);
   return (
     <Alert
       variant="accent"
@@ -39,7 +39,7 @@ export function DeepHistoryNotice({
         </>
       }
     >
-      {parcial
+      {partial
         ? "Os dados deste período ainda são parciais. A recuperação continua de madrugada (0h–6h), um mês a cada 15 minutos."
         : "A recuperação continua de madrugada (0h–6h), um mês a cada 15 minutos. Você pode continuar usando o painel normalmente."}
     </Alert>

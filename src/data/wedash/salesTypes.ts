@@ -20,7 +20,7 @@ export type SaleRow = {
   /** VENDEDOR_MILLENNIUM da Lista (nome; vazio = fora do ranking). */
   sellerName?: string | null;
   /** FUNCIONARIO_GERADOR_GERADOR do relatório de cupom (código estável da vendedora). */
-  sellerGeradorId?: number | null;
+  sellerGeneratorId?: number | null;
 };
 
 /** Daily revenue by product tipo — sales_category_day_view (top produtos × product_catalog). */
@@ -60,7 +60,7 @@ export type CashCloseSale = {
   paymentMethod: string;
   revenueCents: number;
   sellerName: string;
-  sellerGeradorId: number | null;
+  sellerGeneratorId: number | null;
 };
 
 /**
@@ -76,7 +76,7 @@ export type CashCloseDay = {
   /** CONTA do caixa (Lista_Caixas), não o id da filial. */
   accountId: number;
   openingCents: number;
-  sangriaCents: number | null;
+  cashDropCents: number | null;
   closingCents: number;
   typedCents: number;
 };
@@ -98,7 +98,7 @@ export type SalesPaymentDayAgg = {
 export type SellerShiftRef = {
   storeId: string;
   employeeId: number | null;
-  geradorId: number | null;
+  generatorId: number | null;
   /** Nomes normalizados (mesma chave de `sellerKey`). */
   nameKeys: string[];
   name: string;
@@ -138,7 +138,7 @@ export type SalesSellerProductDayAgg = {
   tenantId: string;
   storeId: string;
   day: string;
-  sellerGeradorId: number;
+  sellerGeneratorId: number;
   /** Nome normalizado (liga pessoa sem cadastro). */
   sellerKey: string;
   sellerName: string;

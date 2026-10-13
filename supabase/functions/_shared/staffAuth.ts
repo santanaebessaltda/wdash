@@ -5,7 +5,7 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 export const STAFF_ROLES = ["OWNER", "MANAGER", "ADMIN_GLOBAL"] as const;
-export const GESTOR_ROLES = ["OWNER", "ADMIN_GLOBAL"] as const;
+export const OWNER_ROLES = ["OWNER", "ADMIN_GLOBAL"] as const;
 
 export type StaffCaller = {
   membershipId: string;

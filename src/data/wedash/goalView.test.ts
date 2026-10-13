@@ -26,17 +26,17 @@ const goal: GoalRecord = {
   groups: [],
 };
 
-const day = (storeId: string, d: string, reais: number, brand: SalesDayAgg["brand"] = "ALL"): SalesDayAgg => ({
+const day = (storeId: string, d: string, brl: number, brand: SalesDayAgg["brand"] = "ALL"): SalesDayAgg => ({
   tenantId: "t",
   storeId,
   day: d,
   brand,
-  revenueCents: reais * 100,
+  revenueCents: brl * 100,
   salesCount: 1,
   itemCount: 1,
 });
 
-const seller = (d: string, key: string, reais: number, employeeId: number | null): SalesSellerDayAgg => ({
+const seller = (d: string, key: string, brl: number, employeeId: number | null): SalesSellerDayAgg => ({
   tenantId: "t",
   storeId: "s1",
   day: d,
@@ -44,7 +44,7 @@ const seller = (d: string, key: string, reais: number, employeeId: number | null
   sellerName: key,
   sellerEmployeeId: employeeId,
   brand: "ALL",
-  revenueCents: reais * 100,
+  revenueCents: brl * 100,
   salesCount: 2,
   itemCount: 3,
 });
@@ -68,22 +68,22 @@ describe("goalView", () => {
 
   it("premiação da gerência pelo faturamento total da loja", () => {
     expect(goalManagerPrize(goal, 6_000)).toBeNull();
-    const comGerencia: GoalRecord = {
+    const withManagement: GoalRecord = {
       ...goal,
       tiers: [
         { ...goal.tiers[0]!, managerPct: 0.5, managerBonus: 100 },
         { ...goal.tiers[1]!, managerPct: 1, managerBonus: 200 },
       ],
     };
-    const below = goalManagerPrize(comGerencia, 4_000)!;
-    expect(below.nivel).toBeNull();
+    const below = goalManagerPrize(withManagement, 4_000)!;
+    expect(below.level).toBeNull();
     expect(below.prizeAmount).toBe(0);
-    expect(below.proximo).toMatchObject({ numero: 1, falta: 1_000 });
-    const n1 = goalManagerPrize(comGerencia, 6_000)!;
-    expect(n1).toMatchObject({ nivelNumero: 1, pct: 0.5, prizeAmount: 30, bonus: 100 });
-    expect(n1.proximo).toMatchObject({ numero: 2, falta: 4_000, pct: 1 });
-    const n2 = goalManagerPrize(comGerencia, 12_000)!;
-    expect(n2).toMatchObject({ nivelNumero: 2, prizeAmount: 120, bonus: 300, proximo: null });
+    expect(below.next).toMatchObject({ number: 1, gap: 1_000 });
+    const n1 = goalManagerPrize(withManagement, 6_000)!;
+    expect(n1).toMatchObject({ levelNumber: 1, pct: 0.5, prizeAmount: 30, bonus: 100 });
+    expect(n1.next).toMatchObject({ number: 2, gap: 4_000, pct: 1 });
+    const n2 = goalManagerPrize(withManagement, 12_000)!;
+    expect(n2).toMatchObject({ levelNumber: 2, prizeAmount: 120, bonus: 300, next: null });
   });
 
   it("status pelo período", () => {
@@ -122,7 +122,7 @@ describe("goalView", () => {
       team,
       today: "2026-09-30",
     });
-    expect(card.qtdVendedoras).toBe(3);
+    expect(card.qtySellers).toBe(3);
     const [ana, ex, bia] = card.sellers;
     expect(ana.name).toBe("ANA");
     expect(ana.group).toBe("MANHA");
@@ -159,15 +159,15 @@ describe("goalView", () => {
       team: teamGroups,
       today: "2026-09-30",
     });
-    const por = new Map(card.sellers.map((l) => [l.name, l]));
-    const ana = por.get("ANA")!;
+    const by = new Map(card.sellers.map((l) => [l.name, l]));
+    const ana = by.get("ANA")!;
     expect(ana.individualGoalAmount).toBeCloseTo(3000);
     expect(ana.currentTierName).toBe("Hiper");
     expect(ana.accruedPrize).toBeCloseTo(60);
     expect(ana.bonusReached).toBe(50);
-    expect(por.get("CAU")!.individualGoalAmount).toBeCloseTo(4000);
-    expect(por.get("DUDA")!.noGoal).toBe(true);
-    expect(card.qtdGrupos).toBe(2);
+    expect(by.get("CAU")!.individualGoalAmount).toBeCloseTo(4000);
+    expect(by.get("DUDA")!.noGoal).toBe(true);
+    expect(card.qtyGroups).toBe(2);
   });
 
   it("modo Geral: sobe pelo total vendido da loja e divide a premiação igualmente", () => {
@@ -180,12 +180,12 @@ describe("goalView", () => {
       today: "2026-09-30",
     });
     expect(card.kind).toBe("geral");
-    expect(card.qtdGrupos).toBe(0);
-    const por = new Map(card.sellers.map((l) => [l.name, l]));
-    const ana = por.get("ANA")!;
-    const bia = por.get("BIA")!;
-    const cau = por.get("CAU")!;
-    const duda = por.get("DUDA")!;
+    expect(card.qtyGroups).toBe(0);
+    const by = new Map(card.sellers.map((l) => [l.name, l]));
+    const ana = by.get("ANA")!;
+    const bia = by.get("BIA")!;
+    const cau = by.get("CAU")!;
+    const duda = by.get("DUDA")!;
     // Loja vendeu 8.000 de 10.000 (80%) → nível Meta (50%). 1% de 8.000 = 80, dividido por 4.
     for (const p of [ana, bia, cau, duda]) {
       expect(p.noGoal).toBe(false);
@@ -218,16 +218,16 @@ describe("goalView", () => {
       team: teamGroups,
       today: "2026-09-30",
     });
-    const por = new Map(card.sellers.map((l) => [l.name, l]));
-    const ana = por.get("ANA")!;
-    const bia = por.get("BIA")!;
+    const by = new Map(card.sellers.map((l) => [l.name, l]));
+    const ana = by.get("ANA")!;
+    const bia = by.get("BIA")!;
     // Manha: meta 6.000, vendeu 4.000 (67%)  ->  Meta: 1% x 4.000 = 40  2 pessoas.
     expect(ana.currentTierName).toBe("Meta");
     expect(ana.accruedPrize).toBeCloseTo(20);
     expect(bia.accruedPrize).toBeCloseTo(20);
     expect(bia.bonusReached).toBe(20);
     // Tarde: meta 4.000, vendeu 4.000 (100%)  ->  Hiper: 2% x 4.000 = 80; bonus 20 + 50.
-    const cau = por.get("CAU")!;
+    const cau = by.get("CAU")!;
     expect(cau.currentTierName).toBe("Hiper");
     expect(cau.accruedPrize).toBeCloseTo(80);
     expect(cau.bonusReached).toBe(70);
@@ -241,25 +241,25 @@ describe("goalView", () => {
       team: teamGroups,
       today: "2026-09-30",
     });
-    expect(levels.get("e:1")).toMatchObject({ nivel: "Hiper", nivelNumero: 2 });
-    expect(levels.get("n:ANA")?.nivel).toBe("Hiper");
-    expect(levels.get("e:2")).toMatchObject({ nivel: null, nivelNumero: null });
+    expect(levels.get("e:1")).toMatchObject({ level: "Hiper", levelNumber: 2 });
+    expect(levels.get("n:ANA")?.level).toBe("Hiper");
+    expect(levels.get("e:2")).toMatchObject({ level: null, levelNumber: null });
     expect(levels.get("e:2")!.attainmentPct).toBeCloseTo(100 / 3);
     expect(levels.has("e:4")).toBe(false);
     // Detalhe da pessoa: Manha = 6.000  2 = 3.000 cada.
     expect(levels.get("e:1")).toMatchObject({
-      metaNome: "Meta Setembro",
+      metaName: "Meta Setembro",
       status: "active",
       daysRemaining: 1,
       modo: "individual",
       group: "MANHA",
       goalAmount: 3000,
       achieved: 3000,
-      proximo: null,
+      next: null,
       prizeAmount: 60,
       bonus: 50,
     });
-    expect(levels.get("e:2")!.proximo).toMatchObject({ name: "Meta", numero: 1, falta: 500, commissionPct: 1 });
+    expect(levels.get("e:2")!.next).toMatchObject({ name: "Meta", number: 1, gap: 500, commissionPct: 1 });
     expect(levels.get("e:2")!.prizeAmount).toBe(0);
   });
 });

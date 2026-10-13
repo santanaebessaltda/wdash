@@ -15,7 +15,7 @@ import {
 import { isSupabaseConfigured } from "@/lib/supabase";
 import {
   canResetPassword,
-  limparRecovery,
+  clearRecovery,
   normalizeRecoveryOtp,
   readRecoveryEmail,
   RECOVERY_OTP_LENGTH,
@@ -92,8 +92,8 @@ function OtpBoxes({
           autoCapitalize="off"
           autoCorrect="off"
           spellCheck={false}
-          // iOS/Android sugerem o codigo do e-mail/SMS no 1 campo (QuickType).
-          // maxLength no 1 precisa caber o OTP inteiro  -  senao o autofill corta em 1 digito.
+          // iOS/Android sugerem o codigo do e-mail/SMS no 1 field (QuickType).
+          // maxLength no 1 precisa caber o OTP integer  -  senao o autofill corta em 1 digito.
           autoComplete={i === 0 ? "one-time-code" : "off"}
           name={i === 0 ? "one-time-code" : undefined}
           autoFocus={i === 0}
@@ -139,7 +139,7 @@ export function Reset() {
   const navigate = useNavigate();
   const location = useLocation();
   const { show } = useToast();
-  const tokenDemoInvalido =
+  const tokenDemoInvalid =
     token === "expired" ||
     token === "used" ||
     token === "invalid" ||
@@ -151,35 +151,35 @@ export function Reset() {
   const [email] = useState(() => emailFromState || readRecoveryEmail() || "");
   const [step, setStep] = useState<Step>("otp");
   const [otp, setOtp] = useState("");
-  const [senha, setSenha] = useState("");
+  const [password, setPassword] = useState("");
   const [confirma, setConfirma] = useState("");
-  const [carregando, setCarregando] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [reenviando, setReenviando] = useState(false);
   /** Segundos restantes ate poder reenviar (ja chega com codigo do /forgot). */
   const [resendIn, setResendIn] = useState(RESEND_COOLDOWN_SEC);
-  const [pronto, setPronto] = useState(tokenDemoInvalido);
+  const [pronto, setPronto] = useState(tokenDemoInvalid);
 
-  const erroConfirma = confirma.length > 0 && confirma !== senha ? "As senhas não coincidem." : null;
+  const errorConfirma = confirma.length > 0 && confirma !== password ? "As senhas não coincidem." : null;
   const otpOk = otp.length === RECOVERY_OTP_LENGTH && /^[A-Z0-9]+$/.test(otp);
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  const canSetPassword = passwordIsValid(senha) && confirma === senha && !carregando;
+  const canSetPassword = passwordIsValid(password) && confirma === password && !loading;
 
   useEffect(() => {
-    if (tokenDemoInvalido) return;
-    let ativo = true;
+    if (tokenDemoInvalid) return;
+    let active = true;
     (async () => {
       const ok = await canResetPassword();
       // Link legado: ja tem sessao Auth e nao veio do fluxo OTP  ->  pula pro passo senha.
-      if (ativo && ok && isSupabaseConfigured()) {
+      if (active && ok && isSupabaseConfigured()) {
         const hasEmail = Boolean(emailFromState || readRecoveryEmail());
         if (!hasEmail) setStep("password");
       }
-      if (ativo) setPronto(true);
+      if (active) setPronto(true);
     })();
     return () => {
-      ativo = false;
+      active = false;
     };
-  }, [tokenDemoInvalido, emailFromState]);
+  }, [tokenDemoInvalid, emailFromState]);
 
   // Contagem regressiva do reenvio
   useEffect(() => {
@@ -190,12 +190,12 @@ export function Reset() {
     return () => window.clearInterval(id);
   }, [step, resendIn]);
 
-  function voltarTrocarEmail() {
-    limparRecovery();
+  function backTrocarEmail() {
+    clearRecovery();
     navigate(paths.access.forgot, { replace: true, state: { email } });
   }
 
-  async function reenviarCodigo() {
+  async function reenviarCode() {
     if (!emailOk || reenviando || resendIn > 0) return;
     setReenviando(true);
     await requestPasswordReset(email);
@@ -205,12 +205,12 @@ export function Reset() {
     show("Se houver uma conta com esse e-mail, um novo código será enviado.", "success");
   }
 
-  async function confirmarCodigo(e: FormEvent) {
+  async function confirmCode(e: FormEvent) {
     e.preventDefault();
-    if (!otpOk || !emailOk || carregando) return;
-    setCarregando(true);
+    if (!otpOk || !emailOk || loading) return;
+    setLoading(true);
     const r = await verifyRecoveryOtp(email, otp);
-    setCarregando(false);
+    setLoading(false);
     if (!r.ok) {
       show(r.error, "danger");
       setOtp("");
@@ -222,9 +222,9 @@ export function Reset() {
   async function savePassword(e: FormEvent) {
     e.preventDefault();
     if (!canSetPassword) return;
-    setCarregando(true);
-    const r = await updatePassword(senha);
-    setCarregando(false);
+    setLoading(true);
+    const r = await updatePassword(password);
+    setLoading(false);
     if (!r.ok) {
       show(r.error ?? "Não foi possível salvar sua senha. Tente novamente.", "danger");
       return;
@@ -232,13 +232,13 @@ export function Reset() {
     navigate(paths.access.login, {
       replace: true,
       state: {
-        aviso: "Senha alterada. Entre com a nova senha.",
-        avisoId: `senha-${Date.now()}`,
+        notice: "Senha alterada. Entre com a nova senha.",
+        noticeId: `senha-${Date.now()}`,
       },
     });
   }
 
-  if (tokenDemoInvalido) {
+  if (tokenDemoInvalid) {
     return (
       <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-bg-0 p-10">
         <AuthGlow />
@@ -313,15 +313,15 @@ export function Reset() {
               <p className={accessSubtitle}>
                 Enviamos um código de {RECOVERY_OTP_LENGTH} dígitos para{" "}
                 <span className="font-semibold text-t0">{email}</span>.{" "}
-                <button type="button" onClick={voltarTrocarEmail} className={accessLink}>
+                <button type="button" onClick={backTrocarEmail} className={accessLink}>
                   Trocar e-mail
                 </button>
               </p>
 
-              <form onSubmit={confirmarCodigo} className="flex flex-col gap-4" noValidate>
-                <OtpBoxes length={RECOVERY_OTP_LENGTH} value={otp} onChange={setOtp} disabled={carregando} />
-                <button type="submit" disabled={!otpOk || carregando} className={accessButton}>
-                  {carregando ? "Verificando…" : "Continuar"}
+              <form onSubmit={confirmCode} className="flex flex-col gap-4" noValidate>
+                <OtpBoxes length={RECOVERY_OTP_LENGTH} value={otp} onChange={setOtp} disabled={loading} />
+                <button type="submit" disabled={!otpOk || loading} className={accessButton}>
+                  {loading ? "Verificando…" : "Continuar"}
                 </button>
               </form>
 
@@ -329,7 +329,7 @@ export function Reset() {
                 Não recebeu?{" "}
                 <button
                   type="button"
-                  onClick={() => void reenviarCodigo()}
+                  onClick={() => void reenviarCode()}
                   disabled={reenviando || resendIn > 0}
                   className={cn(accessLink, "disabled:opacity-50")}
                 >
@@ -351,8 +351,8 @@ export function Reset() {
                 <input type="email" name="username" autoComplete="username" value={email} readOnly tabIndex={-1} aria-hidden className="sr-only" />
                 <PasswordField
                   label="Nova senha"
-                  value={senha}
-                  onChange={setSenha}
+                  value={password}
+                  onChange={setPassword}
                   placeholder={PASSWORD_RULE_TEXT}
                   autoComplete="new-password"
                   autoFocus
@@ -363,11 +363,11 @@ export function Reset() {
                   onChange={setConfirma}
                   placeholder="Digite novamente"
                   autoComplete="new-password"
-                  erro={erroConfirma}
+                  error={errorConfirma}
                 />
-                <PasswordStrength senha={senha} />
+                <PasswordStrength password={password} />
                 <button type="submit" disabled={!canSetPassword} className={accessButton}>
-                  {carregando ? "Salvando…" : "Salvar senha"}
+                  {loading ? "Salvando…" : "Salvar senha"}
                 </button>
               </form>
             </>

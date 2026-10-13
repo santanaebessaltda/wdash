@@ -5,7 +5,7 @@ import { ErpReportChecks } from "@/components/wedash/ErpReportChecks";
 import { writeErpPassword, readErpPassword } from "./draft";
 import { noAutofill, secretStyle } from "@/lib/noAutofill";
 
-const toastErro: Record<Exclude<ErpLoginResult, { ok: true }>["reason"], string> = {
+const toastError: Record<Exclude<ErpLoginResult, { ok: true }>["reason"], string> = {
   password: "Usuário ou senha incorretos. Confira os dados e tente novamente.",
   busy: "Este usuário do Millennium está conectado em outro local. Encerre a outra sessão e tente novamente.",
   stores: "Conseguimos acessar o Millennium, mas não foi possível identificar as filiais deste usuário. Tente novamente.",
@@ -16,8 +16,8 @@ const toastErro: Record<Exclude<ErpLoginResult, { ok: true }>["reason"], string>
 const btnPrimario =
   "h-[46px] w-full rounded-xl bg-acc text-sm font-bold text-white transition-colors hover:bg-acc-2 disabled:cursor-not-allowed disabled:opacity-50";
 
-export type ErpRascunho = {
-  usuario: string;
+export type ErpDraft = {
+  username: string;
   dedicada: boolean;
   aceite: boolean;
 };
@@ -34,38 +34,38 @@ export function Step2Credentials({
   conectando = false,
 }: {
   membershipId: string;
-  inicial: ErpRascunho;
-  onErpChange: (erp: ErpRascunho) => void;
+  inicial: ErpDraft;
+  onErpChange: (erp: ErpDraft) => void;
   onConectar: (r: Extract<ErpLoginResult, { ok: true }>) => void;
   conectando?: boolean;
 }) {
   const { show } = useToast();
-  const [usuario, setUsuario] = useState(inicial.usuario);
-  const [senha, setSenha] = useState(() => readErpPassword(membershipId));
+  const [username, setUsername] = useState(inicial.username);
+  const [password, setPassword] = useState(() => readErpPassword(membershipId));
   const [dedicada, setDedicada] = useState(inicial.dedicada);
   const [aceite, setAceite] = useState(inicial.aceite);
   const [testando, setTestando] = useState(false);
-  const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [relatorios, setRelatorios] = useState<ErpReportCheck[] | null>(null);
   const [falhou, setFalhou] = useState(false);
 
-  function syncErp(next: Partial<ErpRascunho> & { usuario?: string; dedicada?: boolean; aceite?: boolean }) {
+  function syncErp(next: Partial<ErpDraft> & { username?: string; dedicada?: boolean; aceite?: boolean }) {
     const erp = {
-      usuario: next.usuario ?? usuario,
+      username: next.username ?? username,
       dedicada: next.dedicada ?? dedicada,
       aceite: next.aceite ?? aceite,
     };
     onErpChange(erp);
   }
 
-  const ocupado = testando || conectando;
-  const pode = usuario.trim().length > 0 && senha.length > 0 && aceite && !ocupado;
+  const busy = testando || conectando;
+  const can = username.trim().length > 0 && password.length > 0 && aceite && !busy;
 
   async function testar() {
-    if (!pode) return;
+    if (!can) return;
     setTestando(true);
     setRelatorios(null);
-    const r = await testErpLogin(usuario, senha);
+    const r = await testErpLogin(username, password);
     if (r.ok && r.stores.length === 0) {
       await logoutErp(r.session);
       setTestando(false);
@@ -77,7 +77,7 @@ export function Step2Credentials({
     setFalhou(!r.ok);
     if (!r.ok) {
       if (r.reason === "reports" && r.reports) setRelatorios(r.reports);
-      show(toastErro[r.reason], "danger");
+      show(toastError[r.reason], "danger");
       return;
     }
     onConectar(r);
@@ -95,11 +95,11 @@ export function Step2Credentials({
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
           <FormField label="Usuário do Millennium" required>
             <Input
-              value={usuario}
+              value={username}
               onChange={(e) => {
                 const v = e.target.value.toUpperCase();
-                setUsuario(v);
-                syncErp({ usuario: v });
+                setUsername(v);
+                syncErp({ username: v });
               }}
               placeholder="Ex.: ESSENCIA.INTEGRACAO"
               {...noAutofill}
@@ -111,23 +111,23 @@ export function Step2Credentials({
             <div className="relative">
               <Input
                 type="text"
-                value={senha}
+                value={password}
                 onChange={(e) => {
-                  setSenha(e.target.value);
+                  setPassword(e.target.value);
                   writeErpPassword(membershipId, e.target.value);
                 }}
                 placeholder="Digite a senha"
                 {...noAutofill}
-                style={secretStyle(mostrarSenha)}
+                style={secretStyle(showPassword)}
                 className="pr-12"
               />
               <button
                 type="button"
-                onClick={() => setMostrarSenha((m) => !m)}
-                aria-label={mostrarSenha ? "Ocultar senha" : "Mostrar senha"}
+                onClick={() => setShowPassword((m) => !m)}
+                aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                 className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-t2 hover:bg-bg-3 hover:text-t0"
               >
-                {mostrarSenha ? (
+                {showPassword ? (
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22" />
                   </svg>
@@ -176,9 +176,9 @@ export function Step2Credentials({
           Autorizo a WDash a usar este acesso para realizar a sincronização.
         </label>
 
-        {relatorios && <ErpReportChecks reports={relatorios} username={usuario.trim()} />}
+        {relatorios && <ErpReportChecks reports={relatorios} username={username.trim()} />}
 
-        <button type="button" disabled={!pode} onClick={testar} className={btnPrimario} style={{ boxShadow: "0 8px 24px -8px var(--acc)" }}>
+        <button type="button" disabled={!can} onClick={testar} className={btnPrimario} style={{ boxShadow: "0 8px 24px -8px var(--acc)" }}>
           {conectando ? "Conectando…" : testando ? "Testando conexão…" : falhou ? "Testar novamente" : "Testar e conectar"}
         </button>
       </div>

@@ -60,11 +60,11 @@ export function StaffPage() {
   }, [loading, storeRows, reloadKey, session.tenantId]);
 
   async function refreshTeam() {
-    const lista = storesRef.current;
-    if (syncing.current || lista.length === 0) return;
+    const list = storesRef.current;
+    if (syncing.current || list.length === 0) return;
     syncing.current = true;
     try {
-      const results = await Promise.all(lista.map((store) => syncStoreSellersNow(store.id)));
+      const results = await Promise.all(list.map((store) => syncStoreSellersNow(store.id)));
       const fail = results.find((r) => !r.ok);
       if (fail && !fail.ok) show(fail.message, "danger");
       else show("Equipe atualizada.", "success");
@@ -118,7 +118,7 @@ export function StaffPage() {
 
 function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: string; store: Store; reloadKey: number; groupsTick: number }) {
   const { show } = useToast();
-  const [team, setEquipe] = useState<StoreSeller[]>([]);
+  const [team, setTeam] = useState<StoreSeller[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [tick, setTick] = useState(0);
   const [shifts, setShifts] = useState<StoreShift[]>([]);
@@ -136,7 +136,7 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
     void fetchStoreSellers(tenantId, [store.id])
       .then((m) => {
         if (!cancelled) {
-          setEquipe(m.get(store.id) ?? []);
+          setTeam(m.get(store.id) ?? []);
           setShiftOf({});
         }
       })
@@ -175,7 +175,7 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
   const rows = tab === "ativos" ? ativos : desligados;
 
   async function changeShift(sellerId: string, shiftId: string | null): Promise<boolean> {
-    const antes = shiftOf[sellerId];
+    const before = shiftOf[sellerId];
     setShiftOf((m) => ({ ...m, [sellerId]: shiftId }));
     setSavingIds((s) => new Set(s).add(sellerId));
     const r = await setSellerShift(sellerId, shiftId);
@@ -187,8 +187,8 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
     if (r.ok) return true;
     setShiftOf((m) => {
       const next = { ...m };
-      if (antes === undefined) delete next[sellerId];
-      else next[sellerId] = antes;
+      if (before === undefined) delete next[sellerId];
+      else next[sellerId] = before;
       return next;
     });
     show("Não foi possível alterar o grupo. Tente novamente.", "danger");
@@ -258,12 +258,12 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
         sortValue: (v) => (isActiveSalesPerson(v) ? groupLabel(v.id in shiftOf ? shiftOf[v.id] : v.shiftId, shifts) : null),
         render: (v) => {
           if (!isActiveSalesPerson(v)) return <span className="text-t2">—</span>;
-          const atual = v.id in shiftOf ? shiftOf[v.id] : v.shiftId;
+          const current = v.id in shiftOf ? shiftOf[v.id] : v.shiftId;
           return (
             <GroupPicker
               sellerName={v.name}
               shifts={shifts}
-              value={atual ?? null}
+              value={current ?? null}
               disabled={savingIds.has(v.id)}
               onChange={(shiftId) => void changeShift(v.id, shiftId)}
               onCreate={() => setCreating({ sellerId: v.id, ...nextGroupWindow(shifts) })}
@@ -437,15 +437,15 @@ function AccessMenu({
   onRemove: () => void;
 }) {
   if (!state || state === "NONE") return null;
-  const excluir: DropdownItem = { label: "Excluir acesso", onClick: onRemove, danger: true };
+  const exclude: DropdownItem = { label: "Excluir acesso", onClick: onRemove, danger: true };
   const items: DropdownItem[] =
     state === "PENDING" ? [
         { label: "Copiar link", onClick: onCopy },
         { label: "Reenviar convite", onClick: onResend },
         { label: "Cancelar convite", onClick: onRevoke, danger: true },
       ]
-    : state === "ACTIVE" ? [{ label: "Suspender acesso", onClick: onSuspend }, excluir]
-    : [{ label: "Reativar acesso", onClick: onReactivate }, excluir];
+    : state === "ACTIVE" ? [{ label: "Suspender acesso", onClick: onSuspend }, exclude]
+    : [{ label: "Reativar acesso", onClick: onReactivate }, exclude];
   return (
     <Dropdown
       align="right"

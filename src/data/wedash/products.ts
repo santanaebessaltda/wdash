@@ -1,18 +1,18 @@
 /** Produtos mockados por categoria, para o drill de margem por categoria. */
-import { categorias } from "./stores";
+import { categories } from "./stores";
 
 export interface ProductSummary {
-  codProduto: string;
+  productCode: string;
   name: string;
-  receita: number;
-  itens: number;
-  margem: number;
-  margemPct: number;
-  coberturaDias: number | null;
-  bloqueadoCompra: boolean;
+  revenue: number;
+  items: number;
+  margin: number;
+  marginPct: number;
+  coverageDays: number | null;
+  blockedPurchase: boolean;
 }
 
-const NOMES: Record<number, string[]> = {
+const NAMES: Record<number, string[]> = {
   1: ["Perfume Pink Dream 100ml", "Perfume Cherry Blossom 100ml", "Perfume Black Orchid 75ml", "Perfume Sweet Vanilla 100ml", "Perfume Ocean Breeze 75ml", "Perfume Golden Musk 50ml"],
   2: ["Body Splash Cherry Blossom 250ml", "Body Splash Pink Dream 250ml", "Body Splash Sweet Vanilla 250ml", "Body Splash Coconut 250ml", "Body Splash Fresh Mint 250ml", "Body Splash Lavanda 250ml"],
   3: ["Body Cream Cherry Blossom 200g", "Body Cream Pink Dream 200g", "Body Cream Vanilla 200g", "Body Cream Coconut 200g", "Body Cream Karité 200g"],
@@ -35,29 +35,29 @@ function prng(seed: number) {
 }
 
 /** Distribui a receita e a margem da categoria entre produtos, de forma deterministica. */
-export function productsOfCategory(categoriaId: number, scope: string, receita: number, margem: number, itens: number): ProductSummary[] {
-  const cat = categorias.find((c) => c.id === categoriaId);
-  const nomes = NOMES[categoriaId] ?? [];
-  if (!cat || nomes.length === 0) return [];
-  const r = prng(categoriaId * 7919 + scope.length * 31);
-  const pesos = nomes.map((_, i) => Math.pow(0.72, i) * (0.8 + r() * 0.4));
-  const soma = pesos.reduce((s, x) => s + x, 0);
-  return nomes
+export function productsOfCategory(categoryId: number, scope: string, revenue: number, margin: number, items: number): ProductSummary[] {
+  const cat = categories.find((c) => c.id === categoryId);
+  const names = NAMES[categoryId] ?? [];
+  if (!cat || names.length === 0) return [];
+  const r = prng(categoryId * 7919 + scope.length * 31);
+  const weights = names.map((_, i) => Math.pow(0.72, i) * (0.8 + r() * 0.4));
+  const sum = weights.reduce((s, x) => s + x, 0);
+  return names
     .map((name, i) => {
-      const fr = pesos[i] / soma;
-      const rec = Math.round(receita * fr);
-      const mg = Math.round(margem * fr * (0.9 + r() * 0.2));
-      const cobertura = r() < 0.12 ? null : Math.round(6 + r() * 90);
+      const fr = weights[i] / sum;
+      const rec = Math.round(revenue * fr);
+      const mg = Math.round(margin * fr * (0.9 + r() * 0.2));
+      const coverage = r() < 0.12 ? null : Math.round(6 + r() * 90);
       return {
-        codProduto: `${categoriaId}${String(i + 1).padStart(3, "0")}`,
+        productCode: `${categoryId}${String(i + 1).padStart(3, "0")}`,
         name,
-        receita: rec,
-        itens: Math.round(itens * fr),
-        margem: mg,
-        margemPct: rec > 0 ? (mg / rec) * 100 : 0,
-        coberturaDias: cobertura,
-        bloqueadoCompra: name.includes("Wedrop") || r() < 0.08,
+        revenue: rec,
+        items: Math.round(items * fr),
+        margin: mg,
+        marginPct: rec > 0 ? (mg / rec) * 100 : 0,
+        coverageDays: coverage,
+        blockedPurchase: name.includes("Wedrop") || r() < 0.08,
       };
     })
-    .sort((a, b) => b.receita - a.receita);
+    .sort((a, b) => b.revenue - a.revenue);
 }

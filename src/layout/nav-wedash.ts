@@ -5,19 +5,19 @@ import { isNavGroup, type NavEntry, type NavGroup, type NavSingle } from "./nav-
 const ICON = {
   dashboard: "M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z",
   team: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8",
-  analise: "M3 3v18h18M18 9l-5 5-4-4-4 4",
+  analysis: "M3 3v18h18M18 9l-5 5-4-4-4 4",
   goal: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4",
-  tarefas: "M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11",
+  tasks: "M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11",
   ranking: "M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4a2 2 0 0 0 0 4h3M17 6h3a2 2 0 0 1 0 4h-3",
   /** Ondas de transmissao  -  "ao vivo" / tempo real (nao raio). */
-  aoVivo: "M4.9 19.1C1 15.2 1 8.8 4.9 4.9M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5M19.1 4.9C23 8.8 23 15.1 19.1 19M9.5 12a2.5 2.5 0 1 0 5 0 2.5 2.5 0 1 0-5 0",
+  live: "M4.9 19.1C1 15.2 1 8.8 4.9 4.9M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5M19.1 4.9C23 8.8 23 15.1 19.1 19M9.5 12a2.5 2.5 0 1 0 5 0 2.5 2.5 0 1 0-5 0",
   /** ClipboardList  -  metas, desafios, fechamento, sangrias e pedido. */
-  gestao:
+  management:
     "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M9 2h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zM12 11h4M12 16h4M8 11h.01M8 16h.01",
   /** Caixa  -  estoque. */
   stock: "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16zM3.27 6.96 12 12.01l8.73-5.05M12 22.08V12",
   /** Engrenagem. */
-  engrenagem:
+  gear:
     "M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6",
 };
 
@@ -29,10 +29,10 @@ const stock: NavSingle = {
 };
 
 /** Equipe  |  Metas  |  Desafios  |  Fechamento  |  Sangrias  |  Pedido de compra (Gestor e Gerente). */
-const gestao: NavGroup = {
+const management: NavGroup = {
   label: "Gestão",
   description: "Administre a equipe, as metas, os desafios, o fechamento, as sangrias, o informe de vendas e o pedido de compra.",
-  icon: ICON.gestao,
+  icon: ICON.management,
   items: [
     { label: "Equipe", to: paths.management.team },
     { label: "Metas", to: paths.goals },
@@ -48,7 +48,7 @@ const gestao: NavGroup = {
 const costs: NavGroup = {
   label: "Configurações",
   description: "Configure os dados, custos, impostos e integrações de cada filial.",
-  icon: ICON.engrenagem,
+  icon: ICON.gear,
   items: [
     { label: "Filial", to: paths.operation.branch },
     { label: "Produtos e impostos", to: paths.operation.productsTaxes },
@@ -73,10 +73,10 @@ export function applyShoppingMenu(entries: NavEntry[], menu: { settings: boolean
 }
 
 /** Abas das telas de cada grupo = os mesmos itens do menu. */
-export const managementTabs = gestao.items.map(({ label, to }) => ({ label, to }));
+export const managementTabs = management.items.map(({ label, to }) => ({ label, to }));
 export const costTabs = costs.items.map(({ label, to }) => ({ label, to }));
 
-const navGestor: NavEntry[] = [
+const navOwner: NavEntry[] = [
   {
     label: "Dashboard",
     icon: ICON.dashboard,
@@ -88,7 +88,7 @@ const navGestor: NavEntry[] = [
     ],
   },
   stock,
-  gestao,
+  management,
   costs,
 ];
 
@@ -104,27 +104,27 @@ const navManager: NavEntry[] = [
     ],
   },
   stock,
-  gestao,
+  management,
 ];
 
 /** Telas so do Gestor (Financeiro, Configuracoes, Usuarios, Integracoes, Logs). */
-export const GESTOR_ROLES: Role[] = ["OWNER", "ADMIN_GLOBAL"];
+export const OWNER_ROLES: Role[] = ["OWNER", "ADMIN_GLOBAL"];
 
-export function isGestor(role: Role): boolean {
-  return GESTOR_ROLES.includes(role);
+export function isOwner(role: Role): boolean {
+  return OWNER_ROLES.includes(role);
 }
 
 const sellerNav: NavEntry[] = [
   { label: "Início", icon: ICON.dashboard, to: paths.seller.home },
 ];
 
-export function navOfPapel(role: Role): NavEntry[] {
+export function navForRole(role: Role): NavEntry[] {
   switch (role) {
     case "SELLER":
       return sellerNav;
     case "MANAGER":
       return navManager;
     default:
-      return navGestor;
+      return navOwner;
   }
 }

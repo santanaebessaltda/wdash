@@ -64,7 +64,7 @@ export function DayFace({
   check?: { checked: boolean; label: string; onToggle: () => void } | null;
   onOpen?: () => void;
 }) {
-  const futuro = iso > today;
+  const future = iso > today;
   return (
     <div
       title={title}
@@ -84,7 +84,7 @@ export function DayFace({
           <span
             className={cn(
               "inline-flex h-6 w-6 shrink-0 items-center justify-center self-start rounded-full text-[12px] font-bold",
-              iso === today ? "bg-acc text-white" : futuro ? "text-t2" : "text-t1",
+              iso === today ? "bg-acc text-white" : future ? "text-t2" : "text-t1",
             )}
           >
             {isoToDate(iso).getDate()}

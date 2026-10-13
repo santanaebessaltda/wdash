@@ -31,23 +31,23 @@ import {
 import { ErpReportChecks } from "@/components/wedash/ErpReportChecks";
 import { noAutofill, secretStyle } from "@/lib/noAutofill";
 
-type Estado = "desconectado" | "pausado" | "conectado" | "senha";
+type ErpLinkState = "disconnected" | "paused" | "connected" | "password";
 
-function estadoDe(info: ErpIntegrationStatus | null): Estado {
-  if (!info || info.status === "NOT_CONFIGURED") return "desconectado";
-  if (info.syncPaused) return "pausado";
-  if (info.status === "INVALID") return "senha";
-  return "conectado";
+function linkStateOf(info: ErpIntegrationStatus | null): ErpLinkState {
+  if (!info || info.status === "NOT_CONFIGURED") return "disconnected";
+  if (info.syncPaused) return "paused";
+  if (info.status === "INVALID") return "password";
+  return "connected";
 }
 
-const ESTADO_UI: Record<Estado, { label: string; cls: string; dot: string }> = {
-  conectado: { label: "Conectado", cls: "text-ok", dot: "bg-ok" },
-  pausado: { label: "Desconectado", cls: "text-t2", dot: "bg-t2" },
-  senha: { label: "Senha inválida", cls: "text-bad", dot: "bg-bad" },
-  desconectado: { label: "Não configurado", cls: "text-t2", dot: "bg-t2" },
+const LINK_STATE_UI: Record<ErpLinkState, { label: string; cls: string; dot: string }> = {
+  connected: { label: "Conectado", cls: "text-ok", dot: "bg-ok" },
+  paused: { label: "Desconectado", cls: "text-t2", dot: "bg-t2" },
+  password: { label: "Senha inválida", cls: "text-bad", dot: "bg-bad" },
+  disconnected: { label: "Não configurado", cls: "text-t2", dot: "bg-t2" },
 };
 
-const ERRO_CREDENCIAL: Record<Extract<ErpCredentialChangeResult, { ok: false }>["reason"], string> = {
+const ERROR_CREDENCIAL: Record<Extract<ErpCredentialChangeResult, { ok: false }>["reason"], string> = {
   password: "Usuário ou senha incorretos. Confira os dados e tente novamente.",
   busy: "Este usuário do Millennium está conectado em outro local. Encerre a outra sessão e tente novamente.",
   stores: "Conseguimos acessar o Millennium, mas não foi possível identificar as filiais deste usuário. Tente novamente.",
@@ -66,7 +66,7 @@ export function ErpIntegrationPage() {
   const [info, setInfo] = useState<ErpIntegrationStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const showSkeleton = useMinSkeleton(loading);
-  const [open, setAberto] = useState(false);
+  const [open, setOpen] = useState(false);
 
   const reload = useCallback(async () => {
     const st = await fetchErpIntegrationStatus(session.tenantId);
@@ -80,10 +80,10 @@ export function ErpIntegrationPage() {
 
   const { show } = useToast();
   const [atualizando, setAtualizando] = useState(false);
-  const estado = estadoDe(info);
-  const ui = ESTADO_UI[estado];
+  const status = linkStateOf(info);
+  const ui = LINK_STATE_UI[status];
   const canEdit = session.role === "OWNER" || session.role === "MANAGER";
-  const canRefresh = estado === "conectado" && session.role === "OWNER";
+  const canRefresh = status === "connected" && session.role === "OWNER";
 
   async function refreshRecords() {
     setAtualizando(true);
@@ -117,12 +117,12 @@ export function ErpIntegrationPage() {
                 <span className={`h-1.5 w-1.5 rounded-full ${ui.dot}`} />
                 {ui.label}
               </span>
-              {estado === "conectado" ? (
-                <Button variant="outline" size="sm" onClick={() => setAberto(true)}>
+              {status === "connected" ? (
+                <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
                   Gerenciar
                 </Button>
               ) : (
-                <Button size="sm" onClick={() => setAberto(true)} disabled={!canEdit}>
+                <Button size="sm" onClick={() => setOpen(true)} disabled={!canEdit}>
                   Conectar
                 </Button>
               )}
@@ -133,13 +133,13 @@ export function ErpIntegrationPage() {
 
       <MillenniumModal
         open={open}
-        onClose={() => setAberto(false)}
+        onClose={() => setOpen(false)}
         info={info}
-        estado={estado}
+        status={status}
         canEdit={canEdit}
         canRefresh={canRefresh}
         atualizando={atualizando}
-        onAtualizar={refreshRecords}
+        onRefresh={refreshRecords}
         onChanged={reload}
       />
     </>
@@ -155,21 +155,21 @@ function MillenniumModal({
   open,
   onClose,
   info,
-  estado,
+  status,
   canEdit,
   canRefresh,
   atualizando,
-  onAtualizar,
+  onRefresh,
   onChanged,
 }: {
   open: boolean;
   onClose: () => void;
   info: ErpIntegrationStatus | null;
-  estado: Estado;
+  status: ErpLinkState;
   canEdit: boolean;
   canRefresh: boolean;
   atualizando: boolean;
-  onAtualizar: () => Promise<void>;
+  onRefresh: () => Promise<void>;
   onChanged: () => Promise<void>;
 }) {
   const session = useActiveSession();
@@ -177,42 +177,42 @@ function MillenniumModal({
   const navigate = useNavigate();
   const { show } = useToast();
   const [busy, setBusy] = useState(false);
-  const [usuario, setUsuario] = useState("");
-  const [senha, setSenha] = useState("");
-  const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [dedicada, setDedicada] = useState(false);
   const [autorizo, setAutorizo] = useState(false);
-  const [aceiteTroca, setAceiteTroca] = useState(false);
+  const [aceiteExchange, setAceiteExchange] = useState(false);
   const [relatorios, setRelatorios] = useState<ErpReportCheck[] | null>(null);
   /** Login ok, mas a troca remove lojas  -  aguardando confirmacao. */
-  const [pendente, setPendente] = useState<PreparedErpChange | null>(null);
+  const [pending, setPending] = useState<PreparedErpChange | null>(null);
   useEffect(() => {
     if (!open) return;
     setRelatorios(null);
-    setPendente(null);
-    setUsuario(info?.username ?? "");
-    setSenha("");
-    setMostrarSenha(false);
+    setPending(null);
+    setUsername(info?.username ?? "");
+    setPassword("");
+    setShowPassword(false);
     setDedicada(info?.dedicated ?? false);
     setAutorizo(false);
-    setAceiteTroca(false);
+    setAceiteExchange(false);
   }, [open, info]);
 
-  const conectado = estado === "conectado";
-  const usuarioAnterior = (info?.username ?? "").trim().toUpperCase();
-  const usuarioNovo = usuario.trim().toUpperCase();
-  const podeConectar = canEdit && usuarioNovo.length > 0 && senha.length > 0 && autorizo && !busy;
+  const conectado = status === "connected";
+  const usernamePrevious = (info?.username ?? "").trim().toUpperCase();
+  const usernameNew = username.trim().toUpperCase();
+  const canConectar = canEdit && usernameNew.length > 0 && password.length > 0 && autorizo && !busy;
 
-  function descartarPendente() {
-    if (!pendente) return;
-    void cancelErpCredentialChange(pendente);
-    setPendente(null);
-    setAceiteTroca(false);
+  function descartarPending() {
+    if (!pending) return;
+    void cancelErpCredentialChange(pending);
+    setPending(null);
+    setAceiteExchange(false);
   }
 
-  function fechar() {
+  function close() {
     if (busy) return;
-    descartarPendente();
+    descartarPending();
     onClose();
   }
 
@@ -230,39 +230,39 @@ function MillenniumModal({
   }
 
   async function conectar() {
-    if (!podeConectar) return;
+    if (!canConectar) return;
     setBusy(true);
     setRelatorios(null);
     const prep = await prepareErpCredentialChange({
       tenantId: session.tenantId,
       membershipId: session.membershipId,
       currentUsername: info?.username ?? null,
-      username: usuario,
-      password: senha,
+      username: username,
+      password: password,
       dedicated: dedicada,
     });
     if (!prep.ok) {
       setBusy(false);
       if (prep.reason === "reports" && prep.reports) setRelatorios(prep.reports);
-      show(ERRO_CREDENCIAL[prep.reason], "danger");
+      show(ERROR_CREDENCIAL[prep.reason], "danger");
       return;
     }
     if (erpChangeNeedsConfirm(prep.change.plan)) {
       setBusy(false);
-      setAceiteTroca(false);
-      setPendente(prep.change);
+      setAceiteExchange(false);
+      setPending(prep.change);
       return;
     }
-    await aplicar(prep.change);
+    await apply(prep.change);
   }
 
-  async function aplicar(change: PreparedErpChange) {
+  async function apply(change: PreparedErpChange) {
     setBusy(true);
     const r = await applyErpCredentialChange(change);
     setBusy(false);
-    setPendente(null);
+    setPending(null);
     if (!r.ok) {
-      show(ERRO_CREDENCIAL[r.reason], "danger");
+      show(ERROR_CREDENCIAL[r.reason], "danger");
       return;
     }
     if (change.plan.kind === "partial") update({ stores: r.storeIds });
@@ -284,11 +284,11 @@ function MillenniumModal({
   return (
     <Modal
       open={open}
-      onClose={fechar}
+      onClose={close}
       title="Millennium"
       footer={
         <>
-          <Button variant="outline" onClick={fechar} disabled={busy}>
+          <Button variant="outline" onClick={close} disabled={busy}>
             Cancelar
           </Button>
           {canEdit &&
@@ -296,12 +296,12 @@ function MillenniumModal({
               <Button variant="danger" onClick={() => void desconectar()} disabled={busy || atualizando}>
                 {busy ? "Desconectando…" : "Desconectar"}
               </Button>
-            ) : pendente ? (
-              <Button variant="danger" onClick={() => void aplicar(pendente)} disabled={!aceiteTroca || busy}>
+            ) : pending ? (
+              <Button variant="danger" onClick={() => void apply(pending)} disabled={!aceiteExchange || busy}>
                 {busy ? "Trocando…" : "Confirmar troca"}
               </Button>
             ) : (
-              <Button onClick={() => void conectar()} disabled={!podeConectar}>
+              <Button onClick={() => void conectar()} disabled={!canConectar}>
                 {busy ? "Testando conexão…" : "Conectar"}
               </Button>
             ))}
@@ -312,10 +312,10 @@ function MillenniumModal({
         {conectado ? (
           <p className="text-[13.5px] leading-relaxed text-t1">
             A WDash está conectada ao Millennium com o usuário{" "}
-            <strong className="font-semibold text-t0">{usuarioAnterior}</strong>. As sincronizações acontecem
+            <strong className="font-semibold text-t0">{usernamePrevious}</strong>. As sincronizações acontecem
             automaticamente enquanto a conexão estiver ativa.
           </p>
-        ) : estado === "senha" ? (
+        ) : status === "password" ? (
           <Alert variant="danger" title="A senha do Millennium não é mais válida.">
             Conecte novamente com a senha atual para retomar a sincronização.
           </Alert>
@@ -328,10 +328,10 @@ function MillenniumModal({
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
           <FormField label="Usuário do Millennium" required>
             <Input
-              value={usuario}
+              value={username}
               onChange={(e) => {
-                setUsuario(e.target.value.toUpperCase());
-                descartarPendente();
+                setUsername(e.target.value.toUpperCase());
+                descartarPending();
               }}
               placeholder="Ex.: ESSENCIA.INTEGRACAO"
               {...noAutofill}
@@ -343,26 +343,26 @@ function MillenniumModal({
             <div className="relative">
               <Input
                 type="text"
-                value={senha}
+                value={password}
                 onChange={(e) => {
-                  setSenha(e.target.value);
-                  descartarPendente();
+                  setPassword(e.target.value);
+                  descartarPending();
                 }}
                 placeholder={conectado ? "Senha já cadastrada" : "Digite a senha"}
                 {...noAutofill}
-                style={secretStyle(mostrarSenha && !conectado)}
+                style={secretStyle(showPassword && !conectado)}
                 disabled={travado}
                 className={conectado ? undefined : "pr-12"}
               />
               {!conectado && (
                 <button
                   type="button"
-                  onClick={() => setMostrarSenha((m) => !m)}
-                  aria-label={mostrarSenha ? "Ocultar senha" : "Mostrar senha"}
+                  onClick={() => setShowPassword((m) => !m)}
+                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                   disabled={busy}
                   className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-t2 hover:bg-bg-3 hover:text-t0"
                 >
-                  {mostrarSenha ? (
+                  {showPassword ? (
                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22" />
                     </svg>
@@ -381,7 +381,7 @@ function MillenniumModal({
           canRefresh && (
             <div className="text-[12.5px] leading-relaxed">
               <p className="font-semibold text-t0">Cadastros</p>
-              <Button className="mt-2" size="sm" onClick={() => void onAtualizar()} disabled={atualizando || busy}>
+              <Button className="mt-2" size="sm" onClick={() => void onRefresh()} disabled={atualizando || busy}>
                 {atualizando ? "Atualizando…" : "Atualizar cadastros"}
               </Button>
               <p className="mt-2 text-t2">Atualiza lojas e tabelas de custo do Millennium. Não busca vendas.</p>
@@ -412,19 +412,19 @@ function MillenniumModal({
             />
           </>
         )}
-        {pendente && (pendente.plan.kind === "partial" || pendente.plan.kind === "full") && (
+        {pending && (pending.plan.kind === "partial" || pending.plan.kind === "full") && (
           <Alert
             variant="danger"
             title={
-              pendente.plan.kind === "partial"
-                ? `${pendente.username} não tem acesso a ${pendente.plan.removed.length === 1 ? "1 filial" : `${pendente.plan.removed.length} filiais`}`
-                : `${pendente.username} não tem acesso a nenhuma das filiais atuais`
+              pending.plan.kind === "partial"
+                ? `${pending.username} não tem acesso a ${pending.plan.removed.length === 1 ? "1 filial" : `${pending.plan.removed.length} filiais`}`
+                : `${pending.username} não tem acesso a nenhuma das filiais atuais`
             }
             footer={
               <>
-                {pendente.plan.kind === "partial" && (
+                {pending.plan.kind === "partial" && (
                   <ul className="mt-2 list-disc space-y-0.5 pl-4 text-[12.5px] font-semibold text-t0">
-                    {pendente.plan.removed.map((s) => (
+                    {pending.plan.removed.map((s) => (
                       <li key={s.storeId}>{s.name}</li>
                     ))}
                   </ul>
@@ -432,18 +432,18 @@ function MillenniumModal({
                 <Checkbox
                   className="mt-3 items-start text-bad"
                   label={
-                    pendente.plan.kind === "partial"
-                      ? `Entendo que essas filiais serão removidas e quero trocar para ${pendente.username}.`
-                      : `Entendo que os dados atuais serão removidos e quero trocar para ${pendente.username}.`
+                    pending.plan.kind === "partial"
+                      ? `Entendo que essas filiais serão removidas e quero trocar para ${pending.username}.`
+                      : `Entendo que os dados atuais serão removidos e quero trocar para ${pending.username}.`
                   }
-                  checked={aceiteTroca}
-                  onChange={(e) => setAceiteTroca(e.target.checked)}
+                  checked={aceiteExchange}
+                  onChange={(e) => setAceiteExchange(e.target.checked)}
                   disabled={busy}
                 />
               </>
             }
           >
-            {pendente.plan.kind === "partial" ? (
+            {pending.plan.kind === "partial" ? (
               "As filiais abaixo deixarão de ser sincronizadas e serão removidas da WDash. As demais continuam normalmente."
             ) : (
               <>
@@ -456,7 +456,7 @@ function MillenniumModal({
             )}
           </Alert>
         )}
-        {relatorios && !conectado && <ErpReportChecks reports={relatorios} username={usuarioNovo} />}
+        {relatorios && !conectado && <ErpReportChecks reports={relatorios} username={usernameNew} />}
         {!canEdit && <p className="text-xs text-t2">Você não tem permissão para alterar esta integração.</p>}
       </div>
     </Modal>
