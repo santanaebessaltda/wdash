@@ -157,7 +157,6 @@ export function SalesReportPage() {
   const dias = useMemo(() => reportDays(intervaloDias(from, to), sold, launched, hoje), [from, to, sold, launched, hoje]);
   const resumo = useMemo(() => monthReport(dias, hoje), [dias, hoje]);
   const porDia = useMemo(() => new Map(dias.map((day) => [day.date, day])), [dias]);
-  const semLeitura = dias.length > 0 && dias.every((day) => day.launchedCents == null);
 
   function irParaMes(alvo: string) {
     const mes = inicioDoMes(alvo);
@@ -208,11 +207,11 @@ export function SalesReportPage() {
           <>
             <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
               <PlainKpi label="Vendido" value={money(resumo.soldCents)} color="var(--t0)" />
-              <PlainKpi label="Lançado" value={semLeitura ? "—" : money(resumo.launchedCents)} color="var(--t0)" />
+              <PlainKpi label="Lançado" value={money(resumo.launchedCents)} color="var(--t0)" />
               <PlainKpi
                 label="Diferença"
-                value={semLeitura ? "Ainda não lido" : textoDiferenca(resumo.differenceCents)}
-                color={semLeitura ? "var(--t2)" : resumo.differenceCents === 0 ? "var(--ok)" : "var(--bad)"}
+                value={textoDiferenca(resumo.differenceCents)}
+                color={resumo.differenceCents === 0 ? "var(--ok)" : "var(--bad)"}
                 tooltip="Lançado menos vendido. Positivo é aluguel percentual a mais. Negativo é risco de multa. Dia passado sem lançamento conta como zero."
               />
             </div>
@@ -258,7 +257,8 @@ function DiaCelula({
   );
   if (!day) return <div className={borda} />;
   const futuro = day >= hoje;
-  const igual = row?.launchedCents != null && row.launchedCents === row.soldCents;
+  const lancado = row?.launchedCents ?? 0;
+  const igual = row != null && lancado === row.soldCents;
   return (
     <div className={borda}>
       <span
@@ -272,9 +272,7 @@ function DiaCelula({
       {row ? (
         <>
           <ChipDia cor="bg-chip-gray">{`Vendido ${money(row.soldCents)}`}</ChipDia>
-          <ChipDia cor={row.launchedCents == null ? "bg-chip-gray" : igual ? "bg-ok" : "bg-bad"}>
-            {row.launchedCents == null ? "Lançado —" : `Lançado ${money(row.launchedCents)}`}
-          </ChipDia>
+          <ChipDia cor={igual ? "bg-ok" : "bg-bad"}>{`Lançado ${money(lancado)}`}</ChipDia>
         </>
       ) : null}
     </div>
