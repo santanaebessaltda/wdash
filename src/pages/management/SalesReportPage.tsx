@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Alert, Card, CardSubtitle, CardTitle, DataTable, Skeleton, useToast, type DataTableColumn } from "@/components/ui";
+import { Alert, Button, Card, Skeleton, useToast } from "@/components/ui";
 import { ChipDia, monthNavBtn, PlainKpi, SeletorMesAno, Seta } from "@/pages/cash-close/CashClosePage";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { fetchSalesCoverage, fetchSalesDayAggs } from "@/data/wedash/salesRepo";
 import { fetchLaunchedDays, fetchShoppingAccount, requestShoppingLaunch, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
-import { ALREADY_LAUNCHED, forceLaunchAllowed, monthReport, periodReports, reportDays, sumSoldByDay, unlaunchedDays, type PeriodReport } from "@/data/wedash/shoppingReport";
+import { ALREADY_LAUNCHED, allosPeriods, forceLaunchAllowed, monthReport, reportDays, sumSoldByDay, unlaunchedDays } from "@/data/wedash/shoppingReport";
 import { brlCent, deIso, fimDoMes, inicioDoMes, intervaloDias, somarDias } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { useScope } from "@/pages/dashboard/useScope";
-import { useShoppingMenu } from "@/layout/useShoppingMenu";
+import { isGestor } from "@/layout/nav-wedash";
 import { paths } from "@/router/paths";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
@@ -64,35 +64,11 @@ function rotuloPeriodo(from: string, to: string): string {
   return `${inicio.getDate()} de ${mesInicio} a ${fim.getDate()} de ${mes}`;
 }
 
-function colunasPeriodo(hoje: string): DataTableColumn<PeriodReport>[] {
-  return [
-    {
-      key: "period",
-      header: "Período",
-      render: (row) => (
-        <div>
-          <div className="font-semibold">{rotuloPeriodo(row.from, row.to)}</div>
-          {row.to >= hoje ? <div className="mt-0.5 text-xs text-t2">Só os dias já fechados</div> : null}
-        </div>
-      ),
-    },
-    { key: "sold", header: "Vendido", align: "right", render: (row) => money(row.soldCents) },
-    { key: "launched", header: "Lançado", align: "right", render: (row) => money(row.launchedCents) },
-    {
-      key: "difference",
-      header: "Diferença",
-      align: "right",
-      render: (row) => (
-        <span style={{ color: row.differenceCents === 0 ? "var(--ok)" : "var(--bad)" }}>{textoDiferenca(row.differenceCents)}</span>
-      ),
-    },
-  ];
-}
+const filtroBtn = "rounded-lg px-3 py-1.5 text-[12.5px] font-bold transition-colors";
 
 /** Gestão > Informe de vendas. Calendário do que foi informado no shopping. */
 export function SalesReportPage() {
   const navigate = useNavigate();
-  const menu = useShoppingMenu();
   const { show } = useToast();
   const { session, lojas, loading: lojasLoading } = useScopedStores();
   const { escopo } = useScope();
@@ -107,6 +83,8 @@ export function SalesReportPage() {
   const [loaded, setLoaded] = useState("");
   const [erro, setErro] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [granularity, setGranularity] = useState<"month" | "week">("month");
+  const [weekFrom, setWeekFrom] = useState<string | null>(null);
 
   const loja = lojas[0];
   const lojaRef = useRef(loja);
@@ -167,14 +145,12 @@ export function SalesReportPage() {
   const pronto = loaded === faixa;
   prontoRef.current = pronto;
 
-  useEffect(() => {
-    if (!menu.ready || menu.report) return;
-    navigate(paths.management.sangria, { replace: true });
-  }, [menu.ready, menu.report, navigate]);
-
   const pedir = useCallback(async () => {
     const atual = lojaRef.current;
-    if (escolher || !atual) return;
+    if (escolher || !atual) {
+      show("Escolha uma filial para lançar no shopping.", "danger");
+      return;
+    }
     const gate = forceLaunchAllowed({
       kiosk: atual.pointType === "SHOPPING",
       administrator: accountRef.current?.administrator ?? null,
@@ -204,18 +180,52 @@ export function SalesReportPage() {
   });
 
   const dias = useMemo(() => reportDays(intervaloDias(from, to), sold, launched, hoje), [from, to, sold, launched, hoje]);
-  const resumo = useMemo(() => monthReport(dias, hoje), [dias, hoje]);
-  const periodos = useMemo(() => periodReports(dias, from, to), [dias, from, to]);
-  const colunas = useMemo(() => colunasPeriodo(hoje), [hoje]);
+  const blocos = useMemo(() => allosPeriods(from, to), [from, to]);
+  const bloco = useMemo(() => {
+    const escolhido = weekFrom ? blocos.find((period) => period.from === weekFrom) : undefined;
+    return escolhido ?? blocos.find((period) => period.from <= hoje && hoje <= period.to) ?? blocos[blocos.length - 1];
+  }, [blocos, weekFrom, hoje]);
+  const diasVisiveis = useMemo(
+    () => (granularity === "week" && bloco ? dias.filter((day) => day.date >= bloco.from && day.date <= bloco.to) : dias),
+    [granularity, bloco, dias],
+  );
+  const resumo = useMemo(() => monthReport(diasVisiveis, hoje), [diasVisiveis, hoje]);
   const porDia = useMemo(() => new Map(dias.map((day) => [day.date, day])), [dias]);
+  const gestor = isGestor(session.role);
+  const primeiro = allosPeriods(piso, fimDoMes(piso))[0];
+  const ultimo = allosPeriods(inicioDoMes(hoje), fimDoMes(hoje)).at(-1);
+  const podeVoltarPeriodo = bloco != null && bloco.from !== primeiro?.from;
+  const podeAvancarPeriodo = bloco != null && bloco.from !== ultimo?.from;
 
   function irParaMes(alvo: string) {
     const mes = inicioDoMes(alvo);
     if (mes < piso || mes > inicioDoMes(hoje)) return;
+    setWeekFrom(null);
     setAnchor(mes === inicioDoMes(hoje) ? hoje : mes);
   }
 
-  if (menu.ready && !menu.report) return null;
+  function irPeriodo(delta: number) {
+    if (!bloco) return;
+    const index = blocos.findIndex((period) => period.from === bloco.from);
+    const next = index + delta;
+    if (next >= 0 && next < blocos.length) {
+      setWeekFrom(blocos[next].from);
+      return;
+    }
+    if (delta < 0) {
+      const prevMonth = somarMes(anchor, -1);
+      if (prevMonth < piso) return;
+      const prev = allosPeriods(prevMonth, fimDoMes(prevMonth));
+      setWeekFrom(prev.at(-1)?.from ?? null);
+      setAnchor(prevMonth === inicioDoMes(hoje) ? hoje : prevMonth);
+      return;
+    }
+    const nextMonth = somarMes(anchor, 1);
+    if (nextMonth > inicioDoMes(hoje)) return;
+    const following = allosPeriods(nextMonth, fimDoMes(nextMonth));
+    setWeekFrom(following[0]?.from ?? null);
+    setAnchor(nextMonth === inicioDoMes(hoje) ? hoje : nextMonth);
+  }
 
   return (
     <div>
@@ -225,21 +235,43 @@ export function SalesReportPage() {
         subtitle="Compare o que a filial vendeu com o que foi lançado no shopping."
         actions={
           <HeaderFilters>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex gap-1 rounded-[11px] border border-line bg-bg-2 p-1">
+                <button type="button" className={cn(filtroBtn, granularity === "month" ? "bg-acc text-white" : "text-t1 hover:text-t0")} onClick={() => setGranularity("month")}>
+                  Mensal
+                </button>
+                <button type="button" className={cn(filtroBtn, granularity === "week" ? "bg-acc text-white" : "text-t1 hover:text-t0")} onClick={() => setGranularity("week")}>
+                  Semanal
+                </button>
+              </div>
               <SeletorMesAno iso={anchor} hoje={hoje} minIso={piso} onChange={irParaMes} />
-              <button type="button" aria-label="Mês anterior" className={monthNavBtn} disabled={!podeVoltar} onClick={() => irParaMes(somarMes(anchor, -1))}>
-                <Seta dir="anterior" />
-              </button>
-              <button type="button" aria-label="Próximo mês" className={monthNavBtn} disabled={!podeAvancar} onClick={() => irParaMes(somarMes(anchor, 1))}>
-                <Seta dir="proximo" />
-              </button>
+              {granularity === "month" ? (
+                <>
+                  <button type="button" aria-label="Mês anterior" className={monthNavBtn} disabled={!podeVoltar} onClick={() => irParaMes(somarMes(anchor, -1))}>
+                    <Seta dir="anterior" />
+                  </button>
+                  <button type="button" aria-label="Próximo mês" className={monthNavBtn} disabled={!podeAvancar} onClick={() => irParaMes(somarMes(anchor, 1))}>
+                    <Seta dir="proximo" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="text-[13px] font-bold text-t0">{bloco ? rotuloPeriodo(bloco.from, bloco.to) : ""}</span>
+                  <button type="button" aria-label="Período anterior" className={monthNavBtn} disabled={!podeVoltarPeriodo} onClick={() => irPeriodo(-1)}>
+                    <Seta dir="anterior" />
+                  </button>
+                  <button type="button" aria-label="Próximo período" className={monthNavBtn} disabled={!podeAvancarPeriodo} onClick={() => irPeriodo(1)}>
+                    <Seta dir="proximo" />
+                  </button>
+                </>
+              )}
             </div>
           </HeaderFilters>
         }
       />
       <div className="mt-6 pb-8">
         {erro ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar o informe de vendas. Tente novamente." /> : null}
-        {account?.lastError ? <Alert className="mb-4" variant="danger" title={account.lastError} /> : null}
+        {account?.administrator === "allos" && account.lastError ? <Alert className="mb-4" variant="danger" title={account.lastError} /> : null}
         {escolher ? (
           <div className="max-w-[720px]">
             <SelectStoreCard />
@@ -252,7 +284,16 @@ export function SalesReportPage() {
           </Card>
         ) : !quiosque ? (
           <Card>
-            <EmptyBlock icon="🏬" title="Loja de rua" description="O informe de vendas vale para quiosque em shopping." />
+            <EmptyBlock icon="🏬" title="Quiosque em shopping" description="Esta tela vale para filial que é quiosque em shopping." />
+          </Card>
+        ) : account?.administrator !== "allos" ? (
+          <Card>
+            <EmptyBlock
+              icon="🏬"
+              title="Allos não conectada"
+              description={gestor ? "Conecte a administradora desta filial para informar as vendas no shopping." : "O Gestor ainda não conectou a administradora desta filial."}
+              action={gestor ? <Button onClick={() => navigate(paths.operation.shopping)}>Conectar a Allos</Button> : undefined}
+            />
           </Card>
         ) : (
           <>
@@ -266,11 +307,6 @@ export function SalesReportPage() {
                 tooltip="Lançado menos vendido. Positivo é aluguel percentual a mais. Negativo é risco de multa. Dia passado sem lançamento conta como zero."
               />
             </div>
-            <div className="mb-4">
-              <CardTitle>Por período</CardTitle>
-              <CardSubtitle>Cada linha é um bloco da Allos. Vendido é o total da Millennium nesses dias.</CardSubtitle>
-              <DataTable className="mt-3" columns={colunas} data={periodos} rowKey={(row) => row.from} emptyMessage="Nenhum período fechado neste mês." />
-            </div>
             <div className="overflow-x-auto rounded-[18px] border border-line bg-bg-2 shadow-[var(--shadow-vela)]">
               <div className="min-w-[980px]">
                 <div className="grid grid-cols-7">
@@ -283,7 +319,15 @@ export function SalesReportPage() {
                 </div>
                 <div className="grid grid-cols-7">
                   {cells.map((day, i) => (
-                    <DiaCelula key={day ?? `vazio-${i}`} index={i} day={day} hoje={hoje} row={day ? porDia.get(day) : undefined} />
+                    <DiaCelula
+                      key={day ?? `vazio-${i}`}
+                      index={i}
+                      day={day}
+                      hoje={hoje}
+                      marcado={granularity === "month" || (bloco != null && day != null && day >= bloco.from && day <= bloco.to)}
+                      destaque={granularity === "week" && bloco != null && day != null && day >= bloco.from && day <= bloco.to}
+                      row={day ? porDia.get(day) : undefined}
+                    />
                   ))}
                 </div>
               </div>
@@ -299,17 +343,23 @@ function DiaCelula({
   index,
   day,
   hoje,
+  marcado,
+  destaque,
   row,
 }: {
   index: number;
   day: string | null;
   hoje: string;
+  marcado: boolean;
+  destaque: boolean;
   row?: { soldCents: number; launchedCents: number | null };
 }) {
   const borda = cn(
     "flex min-h-[108px] w-full min-w-0 flex-col items-stretch justify-start border-b border-r border-line p-1.5 text-left sm:min-h-[132px] sm:p-2",
     (index + 1) % 7 === 0 && "border-r-0",
     !day && "bg-bg-1/30",
+    destaque && "bg-acc-soft",
+    day && !marcado && "opacity-40",
   );
   if (!day) return <div className={borda} />;
   const futuro = day >= hoje;

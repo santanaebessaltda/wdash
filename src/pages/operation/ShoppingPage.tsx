@@ -1,19 +1,15 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Button, Card, Checkbox, FormField, Input, Modal, Skeleton, useToast } from "@/components/ui";
 import { fetchShoppingAccount, saveShoppingAccount, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
 import { noAutofill, secretStyle } from "@/lib/noAutofill";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { useScope } from "@/pages/dashboard/useScope";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
-import { SHOPPING_MENU_EVENT, useShoppingMenu } from "@/layout/useShoppingMenu";
-import { paths } from "@/router/paths";
+import { SHOPPING_MENU_EVENT } from "@/layout/useShoppingMenu";
 import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
 
 /** Configurações > Shopping. O card da Allos abre a modal, no mesmo desenho de Adquirentes. */
 export function ShoppingPage() {
-  const navigate = useNavigate();
-  const menu = useShoppingMenu();
   const { show } = useToast();
   const { session, lojas, loading: lojasLoading } = useScopedStores();
   const { escopo } = useScope();
@@ -48,17 +44,10 @@ export function ShoppingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lojasLoading, escolher, loja, session.tenantId]);
 
-  useEffect(() => {
-    if (!menu.ready || menu.settings) return;
-    navigate(paths.operation.filial, { replace: true });
-  }, [menu.ready, menu.settings, navigate]);
-
   const conectado = account != null;
   const estado = conectado ? "Conectado" : "Não configurado";
   const tom = conectado ? "text-ok" : "text-t2";
   const dot = conectado ? "bg-ok" : "bg-t2";
-
-  if (menu.ready && !menu.settings) return null;
 
   return (
     <div>
@@ -93,7 +82,7 @@ export function ShoppingPage() {
             </Card>
           ) : loja.pointType !== "SHOPPING" ? (
             <Card>
-              <EmptyBlock icon="🏬" title="Loja de rua" description="O informe de vendas vale para quiosque em shopping." />
+              <EmptyBlock icon="🏬" title="Quiosque em shopping" description="Esta tela vale para filial que é quiosque em shopping." />
             </Card>
           ) : (
             <Card>

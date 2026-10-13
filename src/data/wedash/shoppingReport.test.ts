@@ -174,11 +174,8 @@ describe("reportDays", () => {
 });
 
 describe("shoppingMenu", () => {
-  it("shows settings on a kiosk and the report only when Allos is saved", () => {
-    expect(shoppingMenu({ kiosk: false, administrator: "allos" })).toEqual({ settings: false, report: false });
-    expect(shoppingMenu({ kiosk: true, administrator: null })).toEqual({ settings: true, report: false });
-    expect(shoppingMenu({ kiosk: true, administrator: "argo" })).toEqual({ settings: true, report: false });
-    expect(shoppingMenu({ kiosk: true, administrator: "allos" })).toEqual({ settings: true, report: true });
+  it("keeps the report and the shopping settings in the menu", () => {
+    expect(shoppingMenu()).toEqual({ settings: true, report: true });
   });
 });
 

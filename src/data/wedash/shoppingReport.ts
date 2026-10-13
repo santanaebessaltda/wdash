@@ -126,15 +126,11 @@ function nextIso(iso: string): string {
 export type ShoppingAdministrator = "allos" | "argo";
 
 /**
- * Menu do shopping da filial selecionada.
- * Configuração só no quiosque. Informe de vendas só com Allos, a integração que lança hoje.
+ * Informe de vendas e Shopping ficam no menu.
+ * A tela explica quando a filial não é quiosque ou ainda não tem Allos.
  */
-export function shoppingMenu(input: {
-  kiosk: boolean;
-  administrator: ShoppingAdministrator | null;
-}): { settings: boolean; report: boolean } {
-  if (!input.kiosk) return { settings: false, report: false };
-  return { settings: true, report: input.administrator === "allos" };
+export function shoppingMenu(): { settings: boolean; report: boolean } {
+  return { settings: true, report: true };
 }
 
 /** O Atualizar desta tela só chama o shopping quando a filial é quiosque e o acesso está salvo. */

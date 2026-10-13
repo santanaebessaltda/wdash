@@ -73,8 +73,8 @@ O gestor lança, à mão, as vendas brutas de cada quiosque no painel do shoppin
 2. The system SHALL compute Diferença as lançado minus vendido, in cents.
 3. WHEN a past day has no launch THEN the system SHALL count its lançado as 0 and mark the day blank.
 4. The system SHALL show the screen as Informe de vendas at /management/sales-report for Gestor and Gerente.
-5. WHEN the selected store is not one kiosk, or that kiosk has no Allos access THEN the system SHALL hide Informe de vendas.
-6. WHEN the selected kiosk has Allos saved THEN the system SHALL show Informe de vendas.
+5. WHEN the selected store is not a kiosk THEN the system SHALL keep Informe de vendas in the menu and SHALL show that the screen is only for a shopping kiosk.
+6. WHEN the selected kiosk has no Allos access THEN the system SHALL keep Informe de vendas in the menu and SHALL show that the administrator is not connected.
 7. WHEN the person uses Atualizar on Informe de vendas THEN the system SHALL run the same fill as the dawn routine for the selected kiosk.
 8. IF the store is not a kiosk, or the shopping access is not saved THEN the system SHALL not call the mall.
 9. IF the mall save fails THEN the system SHALL keep the stored shopping values.
@@ -82,7 +82,7 @@ O gestor lança, à mão, as vendas brutas de cada quiosque no painel do shoppin
 11. WHEN a past day is on the calendar THEN the system SHALL show a Vendido badge and a Lançado badge. The Lançado badge SHALL be green when the two amounts are equal and red when they differ.
 12. IF the mall answers that the login was not accepted THEN the system SHALL keep the stored shopping values and SHALL NOT call the mall again only because the report was opened.
 13. WHEN the mall login requires the browser verification THEN the system SHALL open that login page in a browser session before posting the password.
-14. WHEN the month is open THEN the system SHALL show one row per mall period in that month, with Vendido, Lançado and Diferença for the closed days inside that period.
+14. WHEN the person selects Semanal THEN the system SHALL show Vendido, Lançado and Diferença for the closed days of the selected mall period. WHEN the person selects Mensal THEN the system SHALL show those amounts for the closed days of the month.
 15. WHEN every closed day of the open month already has a stored launch THEN the system SHALL NOT open the mall browser.
 
 **Independent Test**: Mês com um dia vendido a R$ 100,00 e lançado a R$ 120,00, e outro vendido a R$ 50,00 sem lançamento. Vendido R$ 150,00, lançado R$ 120,00, diferença R$ 30,00 a menos.
@@ -98,11 +98,11 @@ O gestor lança, à mão, as vendas brutas de cada quiosque no painel do shoppin
 **Acceptance Criteria**:
 
 1. WHERE the store type is quiosque em shopping the system SHALL show an Allos card at /operation/shopping that opens a modal with URL, user and password.
-2. WHEN the selected store is not one kiosk THEN the system SHALL hide Shopping.
+2. WHEN the selected store is not one kiosk THEN the system SHALL keep Shopping in the menu and SHALL show that the screen is only for a shopping kiosk.
 3. The system SHALL allow only the Gestor to save that card.
 4. The system SHALL keep the password unreadable after it is saved.
 
-**Independent Test**: Salvar Allos, uma URL e um usuário numa filial quiosque. A senha não volta em claro. Loja de rua não mostra o card.
+**Independent Test**: Salvar Allos, uma URL e um usuário numa filial quiosque. A senha não volta em claro. Loja de rua mantém o menu e mostra que a tela vale para quiosque.
 
 ---
 
