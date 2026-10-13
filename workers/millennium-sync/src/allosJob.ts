@@ -1,8 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { groupComUnit } from "../../../src/data/wedash/groupCom.ts";
 import { ALREADY_LAUNCHED, forceLaunchAllowed, sumSoldByDay, unlaunchedDays, type LaunchValue } from "../../../src/data/wedash/shoppingReport.ts";
 import { allosBrowserCookies, chromePath } from "./allosBrowser.ts";
 import { postAllosWeeks, readAllosWeeks } from "./allosFill.ts";
 import { decryptPassword } from "./decrypt.ts";
+import { postGroupCom, readGroupCom } from "./groupComFill.ts";
 
 const KEEP = "Não foi possível informar as vendas ao shopping. Os valores já informados foram mantidos.";
 const LOGIN_FAIL = "Não foi possível acessar a Intranet Mall porque o painel solicitou uma verificação no navegador. Nada foi alterado.";
@@ -71,10 +73,10 @@ async function runShoppingNow(
   if (!store) return { ok: false, message: KEEP };
   const { data: account } = await sb
     .from("store_shopping")
-    .select("administrator, base_url, username, secret_ciphertext")
+    .select("administrator, base_url, username, secret_ciphertext, unit")
     .eq("store_id", storeId)
     .maybeSingle();
-  const administrator = account?.administrator === "allos" || account?.administrator === "argo" ? account.administrator : null;
+  const administrator = account?.administrator === "allos" || account?.administrator === "argo" || account?.administrator === "groupcom" ? account.administrator : null;
   const gate = forceLaunchAllowed({ kiosk: store.point_type === "MALL", administrator });
   if (!gate.ok) return gate;
 
@@ -97,35 +99,53 @@ async function runShoppingNow(
     const password = await decryptPassword(String(account?.secret_ciphertext ?? ""), erpSecret);
     const baseUrl = String(account?.base_url ?? "");
     const username = String(account?.username ?? "");
-    const session = await allosBrowserCookies({ baseUrl, username, password, executablePath: chromePath() });
-    if (!session.ok) {
-      message = LOGIN_FAIL;
-    } else {
-      const posted = read
-        ? await readAllosWeeks(baseUrl, session.cookie, session.userAgent, today)
-        : await postAllosWeeks(baseUrl, session.cookie, session.userAgent, today, async (from, to) => {
-            const { data, error } = await sb
-              .from("sales_day_agg")
-              .select("day, brand, revenue_cents")
-              .eq("tenant_id", store.tenant_id)
-              .eq("store_id", storeId)
-              .gte("day", from)
-              .lte("day", to);
-            if (error) throw new Error(error.message);
-            return sumSoldByDay(
-              (data ?? []).map((row) => ({
-                day: String(row.day),
-                brand: typeof row.brand === "string" ? row.brand : null,
-                revenueCents: Number(row.revenue_cents) || 0,
-              })),
-            );
-          }, only);
-      if (posted.ok) {
-        await remember(sb, store.tenant_id as string, storeId, posted.days);
-        await sb.from("store_shopping").update({ last_run_at: new Date().toISOString(), last_error: "" }).eq("store_id", storeId);
-        return { ok: true };
+    const sold = async (from: string, to: string) => {
+      const { data, error } = await sb
+        .from("sales_day_agg")
+        .select("day, brand, revenue_cents")
+        .eq("tenant_id", store.tenant_id)
+        .eq("store_id", storeId)
+        .gte("day", from)
+        .lte("day", to);
+      if (error) throw new Error(error.message);
+      return sumSoldByDay(
+        (data ?? []).map((row) => ({
+          day: String(row.day),
+          brand: typeof row.brand === "string" ? row.brand : null,
+          revenueCents: Number(row.revenue_cents) || 0,
+        })),
+      );
+    };
+    if (administrator === "groupcom") {
+      const unit = groupComUnit(account?.unit);
+      if (!unit) {
+        message = "A unidade do Group COM não está salva. Nada foi alterado.";
+      } else {
+        const posted = read
+          ? await readGroupCom(baseUrl, username, password, unit, today, span.from, span.to)
+          : await postGroupCom(baseUrl, username, password, unit, today, span.from, span.to, sold, only);
+        if (posted.ok) {
+          await remember(sb, store.tenant_id as string, storeId, posted.days);
+          await sb.from("store_shopping").update({ last_run_at: new Date().toISOString(), last_error: "" }).eq("store_id", storeId);
+          return { ok: true };
+        }
+        message = posted.message;
       }
-      message = posted.message;
+    } else {
+      const session = await allosBrowserCookies({ baseUrl, username, password, executablePath: chromePath() });
+      if (!session.ok) {
+        message = LOGIN_FAIL;
+      } else {
+        const posted = read
+          ? await readAllosWeeks(baseUrl, session.cookie, session.userAgent, today)
+          : await postAllosWeeks(baseUrl, session.cookie, session.userAgent, today, sold, only);
+        if (posted.ok) {
+          await remember(sb, store.tenant_id as string, storeId, posted.days);
+          await sb.from("store_shopping").update({ last_run_at: new Date().toISOString(), last_error: "" }).eq("store_id", storeId);
+          return { ok: true };
+        }
+        message = posted.message;
+      }
     }
   } catch (error) {
     console.warn(`Allos: ${error instanceof Error ? error.message : "falha"}`);

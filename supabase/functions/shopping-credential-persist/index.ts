@@ -4,6 +4,7 @@
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeaders, serve } from "../_shared/cors.ts";
+import { groupComBaseUrl, listGroupComUnits, type GroupComUnit } from "../_shared/groupCom.ts";
 import { canAccessStore, OWNER_ROLES, loadStaffCaller } from "../_shared/staffAuth.ts";
 
 const INTRANET_MALL_SLUG = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/;
@@ -72,7 +73,7 @@ serve(async (req) => {
   const caller = await loadStaffCaller(admin, userData.user.id, OWNER_ROLES);
   if (!caller) return json({ error: "forbidden" }, 403);
 
-  let body: { storeId?: unknown; administrator?: unknown; baseUrl?: unknown; username?: unknown; password?: unknown };
+  let body: { storeId?: unknown; administrator?: unknown; baseUrl?: unknown; username?: unknown; password?: unknown; listUnits?: unknown; unit?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -80,8 +81,10 @@ serve(async (req) => {
   }
 
   const storeId = typeof body.storeId === "string" ? body.storeId : "";
-  const administrator = body.administrator === "allos" || body.administrator === "argo" ? body.administrator : "";
-  const baseUrl = intranetMallBaseUrl(typeof body.baseUrl === "string" ? body.baseUrl : "");
+  const listUnits = body.listUnits === true;
+  const requested = body.administrator === "allos" || body.administrator === "argo" || body.administrator === "groupcom" ? body.administrator : "";
+  const administrator = listUnits ? "groupcom" : requested;
+  const baseUrl = administrator === "groupcom" ? groupComBaseUrl(typeof body.baseUrl === "string" ? body.baseUrl : "") : intranetMallBaseUrl(typeof body.baseUrl === "string" ? body.baseUrl : "");
   const username = typeof body.username === "string" ? body.username.trim() : "";
   const password = typeof body.password === "string" ? body.password : "";
   if (!storeId || !administrator || !baseUrl || !username) return json({ error: "invalid_input" }, 400);
@@ -95,10 +98,26 @@ serve(async (req) => {
     .maybeSingle();
   if (storeErr || !store || store.point_type !== "MALL") return json({ error: "invalid_store" }, 400);
 
-  const { data: existing } = await admin.from("store_shopping").select("secret_ciphertext").eq("store_id", storeId).maybeSingle();
+  if (listUnits) {
+    if (!password.trim()) return json({ error: "secret_required" }, 400);
+    const listed = await listGroupComUnits(baseUrl, username, password);
+    if (!listed.ok) {
+      const message = listed.error === "no_units" ? "Nenhuma unidade de lojista encontrada nesse Group COM." : "Não foi possível entrar no Group COM. Confira o e-mail e a senha.";
+      return json({ ok: false, message });
+    }
+    return json({ ok: true, units: listed.units });
+  }
+
+  const { data: existing } = await admin.from("store_shopping").select("secret_ciphertext, unit").eq("store_id", storeId).maybeSingle();
   const previous = (existing?.secret_ciphertext as string | undefined) ?? "";
   if (!password.trim() && !previous) return json({ error: "secret_required" }, 400);
   const ciphertext = password.trim() ? await encryptPassword(password.trim(), erpSecret) : previous;
+  let unit: GroupComUnit | null = null;
+  if (administrator === "groupcom") {
+    const picked = await chosenUnit(baseUrl, username, password, body.unit, existing?.unit);
+    if (!picked.ok) return json({ ok: false, message: picked.message });
+    unit = picked.unit;
+  }
 
   const { error } = await admin.from("store_shopping").upsert(
     {
@@ -108,9 +127,46 @@ serve(async (req) => {
       base_url: baseUrl,
       username,
       secret_ciphertext: ciphertext,
+      unit,
     },
     { onConflict: "store_id" },
   );
   if (error) return json({ error: "persist_failed" }, 500);
-  return json({ ok: true, administrator, baseUrl, username });
+  return json({ ok: true, administrator, baseUrl, username, unit });
 });
+
+async function chosenUnit(
+  baseUrl: string,
+  username: string,
+  password: string,
+  submitted: unknown,
+  stored: unknown,
+): Promise<{ ok: true; unit: GroupComUnit } | { ok: false; message: string }> {
+  const wanted = contractId(submitted) ?? contractId(stored);
+  if (!wanted) return { ok: false, message: "Escolha a unidade dessa filial no Group COM." };
+  if (!password.trim()) {
+    const current = sameContract(stored, wanted) ? asUnit(stored) : null;
+    return current ? { ok: true, unit: current } : { ok: false, message: "Escolha a unidade dessa filial no Group COM." };
+  }
+  const listed = await listGroupComUnits(baseUrl, username, password);
+  if (!listed.ok) {
+    const message = listed.error === "no_units" ? "Nenhuma unidade de lojista encontrada nesse Group COM." : "Não foi possível entrar no Group COM. Confira o e-mail e a senha.";
+    return { ok: false, message };
+  }
+  const unit = listed.units.find((item) => item.contractId === wanted);
+  return unit ? { ok: true, unit } : { ok: false, message: "Escolha a unidade dessa filial no Group COM." };
+}
+
+function contractId(value: unknown): number | null {
+  if (!value || typeof value !== "object") return null;
+  const id = (value as { contractId?: unknown }).contractId;
+  return typeof id === "number" && Number.isInteger(id) && id > 0 ? id : null;
+}
+
+function sameContract(value: unknown, id: number): boolean {
+  return contractId(value) === id;
+}
+
+function asUnit(value: unknown): GroupComUnit | null {
+  return value && typeof value === "object" ? value as GroupComUnit : null;
+}

@@ -67,7 +67,7 @@ export function monthReport(days: ClosedDay[], today: string): MonthReport {
   };
 }
 
-export type ShoppingAdministrator = "allos" | "argo";
+export type ShoppingAdministrator = "allos" | "argo" | "groupcom";
 
 /** O Atualizar desta tela só chama o shopping quando a filial é quiosque e o acesso está salvo. */
 export function forceLaunchAllowed(input: {
@@ -137,7 +137,7 @@ export function shoppingAccountView(row: {
   lastRunAt: string | null;
   lastError: string;
 } | null {
-  if (row.administrator !== "allos" && row.administrator !== "argo") return null;
+  if (row.administrator !== "allos" && row.administrator !== "argo" && row.administrator !== "groupcom") return null;
   return {
     storeId: row.store_id,
     administrator: row.administrator,

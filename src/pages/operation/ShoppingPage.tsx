@@ -8,6 +8,7 @@ import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { useScope } from "@/pages/dashboard/useScope";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { SHOPPING_MENU_EVENT } from "@/layout/useShoppingMenu";
+import { GroupComModal } from "@/pages/operation/GroupComModal";
 import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
 
 /** Configurações > Shopping. O card da Intranet Mall abre a modal, no mesmo desenho de Adquirentes. */
@@ -21,6 +22,7 @@ export function ShoppingPage() {
   const [account, setAccount] = useState<ShoppingAccount | null>(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [groupOpen, setGroupOpen] = useState(false);
 
   useEffect(() => {
     if (storesLoading || escolher || !store || store.pointType !== "SHOPPING") {
@@ -31,7 +33,7 @@ export function ShoppingPage() {
     setLoading(true);
     void fetchShoppingAccount(session.tenantId, store.id)
       .then((access) => {
-        if (!cancel) setAccount(access?.administrator === "allos" ? access : null);
+        if (!cancel) setAccount(access);
       })
       .catch(() => {
         if (!cancel) show("Não foi possível carregar o shopping desta filial. Tente novamente.", "danger");
@@ -46,10 +48,8 @@ export function ShoppingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storesLoading, escolher, store, session.tenantId]);
 
-  const conectado = account != null;
-  const status = conectado ? "Configurado" : "Não configurado";
-  const tone = conectado ? "text-ok" : "text-t2";
-  const dot = conectado ? "bg-ok" : "bg-t2";
+  const intranet = account?.administrator === "allos" ? account : null;
+  const group = account?.administrator === "groupcom" ? account : null;
 
   return (
     <div>
@@ -65,19 +65,10 @@ export function ShoppingPage() {
       ) : (
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {showSkeleton || (loading && store?.pointType === "SHOPPING") ? (
-            <Card>
-              <div className="mb-3.5 flex items-center gap-3" aria-busy="true" aria-label="Carregando shopping…">
-                <Skeleton className="h-[46px] w-[46px] rounded-[13px]" />
-                <div className="flex-1">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="mt-2 h-3 w-40" />
-                </div>
-              </div>
-              <div className="flex items-center justify-between border-t border-line pt-3">
-                <Skeleton className="h-3.5 w-24" />
-                <Skeleton className="h-8 w-24 rounded-[var(--radius-vela-sm)]" />
-              </div>
-            </Card>
+            <>
+              <CardSkeleton />
+              <CardSkeleton />
+            </>
           ) : !store ? (
             <Card>
               <EmptyBlock icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
@@ -87,44 +78,96 @@ export function ShoppingPage() {
               <EmptyBlock icon="🏬" title="Shopping indisponível" description="Esta tela está disponível apenas para filiais do tipo Quiosque em shopping." />
             </Card>
           ) : (
-            <Card>
-              <div className="mb-3.5 flex items-center gap-3">
-                <span className="flex h-[46px] w-[46px] shrink-0 items-center justify-center overflow-hidden rounded-[13px] border border-line bg-bg-inset">
-                  <img src="/intranet.png" alt="Intranet Mall" className="h-full w-full object-contain p-1.5" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[14.5px] font-bold text-t0">Intranet Mall</p>
-                  <p className="mt-0.5 text-[11.5px] text-t2">Informe de vendas</p>
-                </div>
-              </div>
-              <div className="flex items-center justify-between border-t border-line pt-3">
-                <span className={`flex items-center gap-1.5 text-xs font-bold ${tone}`}>
-                  <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
-                  {status}
-                </span>
-                <Button size="sm" onClick={() => setOpen(true)} disabled={!store}>
-                  {conectado ? "Gerenciar" : "Configurar"}
-                </Button>
-              </div>
-            </Card>
+            <>
+              <ShoppingCard logo="/intranet.png" name="Intranet Mall" detail="Informe de vendas" connected={intranet != null} onOpen={() => setOpen(true)} />
+              <ShoppingCard
+                logo="/group-com.png"
+                name="Group COM"
+                detail={group?.unit ? [group.unit.floor, group.unit.code].filter(Boolean).join(" / ") : "Informe de vendas"}
+                connected={group != null}
+                onOpen={() => setGroupOpen(true)}
+              />
+            </>
           )}
         </div>
       )}
       {store && store.pointType === "SHOPPING" ? (
+        <>
         <IntranetMallModal
           open={open}
-          account={account}
+          account={intranet}
+          replacesOther={group != null}
           storeId={store.id}
           onClose={() => setOpen(false)}
           onSaved={(next) => {
             setAccount(next);
             window.dispatchEvent(new Event(SHOPPING_MENU_EVENT));
-            show(account ? "Alterações salvas." : "Acesso da Intranet Mall configurado.", "success");
+            show(intranet ? "Alterações salvas." : "Acesso da Intranet Mall configurado.", "success");
             setOpen(false);
           }}
         />
+        <GroupComModal
+          open={groupOpen}
+          account={group}
+          replacesOther={account != null && account.administrator !== "groupcom"}
+          storeId={store.id}
+          onClose={() => setGroupOpen(false)}
+          onSaved={(next) => {
+            setAccount(next);
+            window.dispatchEvent(new Event(SHOPPING_MENU_EVENT));
+            show(group ? "Alterações salvas." : "Acesso do Group COM configurado.", "success");
+            setGroupOpen(false);
+          }}
+        />
+        </>
       ) : null}
     </div>
+  );
+}
+
+function CardSkeleton() {
+  return (
+    <Card>
+      <div className="mb-3.5 flex items-center gap-3" aria-busy="true" aria-label="Carregando shopping…">
+        <Skeleton className="h-[46px] w-[46px] rounded-[13px]" />
+        <div className="flex-1">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="mt-2 h-3 w-40" />
+        </div>
+      </div>
+      <div className="flex items-center justify-between border-t border-line pt-3">
+        <Skeleton className="h-3.5 w-24" />
+        <Skeleton className="h-8 w-24 rounded-[var(--radius-vela-sm)]" />
+      </div>
+    </Card>
+  );
+}
+
+function ShoppingCard({ logo, name, detail, connected, onOpen }: { logo: string; name: string; detail: string; connected: boolean; onOpen: () => void }) {
+  const status = connected ? "Configurado" : "Não configurado";
+  const tone = connected ? "text-ok" : "text-t2";
+  const dot = connected ? "bg-ok" : "bg-t2";
+  return (
+    <Card>
+      <div className="mb-3.5 flex items-center gap-3">
+        <span className="flex h-[46px] w-[46px] shrink-0 items-center justify-center overflow-hidden rounded-[13px] border border-line bg-bg-inset">
+          <img src={logo} alt={name} className="h-full w-full object-contain p-1.5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[14.5px] font-bold text-t0">{name}</p>
+          <p className="mt-0.5 truncate text-[11.5px] text-t2">{detail}</p>
+        </div>
+      </div>
+      <div className="flex items-center justify-between border-t border-line pt-3">
+        <span className={`flex items-center gap-1.5 text-xs font-bold ${tone}`}>
+          <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+          {status}
+        </span>
+        <Button size="sm" onClick={onOpen}>
+          {connected ? "Gerenciar" : "Configurar"}
+        </Button>
+      </div>
+    </Card>
   );
 }
 
@@ -139,12 +182,14 @@ function slugFieldValue(value: string): string {
 function IntranetMallModal({
   open,
   account,
+  replacesOther,
   storeId,
   onClose,
   onSaved,
 }: {
   open: boolean;
   account: ShoppingAccount | null;
+  replacesOther: boolean;
   storeId: string;
   onClose: () => void;
   onSaved: (account: ShoppingAccount) => void;
@@ -192,6 +237,7 @@ function IntranetMallModal({
       username: username.trim(),
       lastRunAt: account?.lastRunAt ?? null,
       lastError: account?.lastError ?? "",
+      unit: null,
     });
   }
 
@@ -219,6 +265,9 @@ function IntranetMallModal({
         <p className="text-[13.5px] leading-relaxed text-t1">
           Informe o slug e o acesso da Intranet Mall desta filial. A WDash protege esses dados e os usa somente para informar as vendas ao shopping.
         </p>
+        {replacesOther ? (
+          <p className="text-[13px] leading-relaxed text-t1">Salvar aqui passa a valer no lugar do acesso do Group COM desta filial.</p>
+        ) : null}
         <FormField
           label="Slug"
           required

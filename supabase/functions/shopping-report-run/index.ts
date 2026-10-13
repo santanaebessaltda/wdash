@@ -50,7 +50,7 @@ serve(async (req) => {
   if (!store) return json({ ok: false, message: KEEP });
 
   const { data: account } = await admin.from("store_shopping").select("administrator").eq("store_id", storeId).maybeSingle();
-  const administrator = account?.administrator === "allos" || account?.administrator === "argo" ? account.administrator : null;
+  const administrator = account?.administrator === "allos" || account?.administrator === "argo" || account?.administrator === "groupcom" ? account.administrator : null;
   const gate = forceLaunchAllowed({ kiosk: store.point_type === "MALL", administrator });
   if (!gate.ok) return json({ ok: false, message: gate.message });
 

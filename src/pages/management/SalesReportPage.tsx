@@ -7,7 +7,7 @@ import { calendarTodayIso } from "@/data/wedash/clock";
 import { periodLabels } from "@/data/wedash/dashboard";
 import { fetchSalesCoverage, fetchSalesDayAggs } from "@/data/wedash/salesRepo";
 import { fetchLaunchedDays, fetchShoppingAccount, requestShoppingLaunch, requestShoppingRead, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
-import { ALREADY_LAUNCHED, forceLaunchAllowed, informedGap, monthReport, reportDays, sumSoldByDay } from "@/data/wedash/shoppingReport";
+import { ALREADY_LAUNCHED, forceLaunchAllowed, informedGap, monthReport, reportDays, shoppingSendsSales, sumSoldByDay } from "@/data/wedash/shoppingReport";
 import { brlCent, longDate, isoToDate, endOfMonth, startOfMonth, eachDay, dateToIso, addDays } from "@/lib/format";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
@@ -165,10 +165,10 @@ export function SalesReportPage() {
       show(gate.message, "danger");
       return;
     }
-    const result = await requestShoppingRead(current.id);
+    const result = await requestShoppingRead(current.id, { from, to });
     setReloadKey((n) => n + 1);
     if (!result.ok) show(result.message, "danger");
-  }, [escolher, show]);
+  }, [escolher, from, show, to]);
 
   const lancar = useCallback(async () => {
     const current = storeRef.current;
@@ -265,7 +265,7 @@ export function SalesReportPage() {
       />
       <div className="mt-6 pb-8">
         {error ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar o informe de vendas. Tente novamente." /> : null}
-        {account?.administrator === "allos" && account.lastError ? <Alert className="mb-4" variant="danger" title={account.lastError} /> : null}
+        {shoppingSendsSales(account?.administrator) && account?.lastError ? <Alert className="mb-4" variant="danger" title={account.lastError} /> : null}
         {escolher ? (
           <div className="max-w-[720px]">
             <SelectStoreCard />
@@ -284,7 +284,7 @@ export function SalesReportPage() {
           <Card>
             <EmptyBlock icon="🧾" title="Argo ainda não disponível" description="A integração com a Argo ainda não está disponível na WDash." />
           </Card>
-        ) : account?.administrator !== "allos" ? (
+        ) : !shoppingSendsSales(account?.administrator) ? (
           <Card>
             <EmptyBlock
               icon="🧾"

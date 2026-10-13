@@ -206,6 +206,7 @@ describe("forceLaunchAllowed", () => {
       message: "A integração com a Argo ainda não está disponível na WDash.",
     });
     expect(forceLaunchAllowed({ kiosk: true, administrator: "allos" })).toEqual({ ok: true });
+    expect(forceLaunchAllowed({ kiosk: true, administrator: "groupcom" })).toEqual({ ok: true });
   });
 });
 
@@ -241,6 +242,7 @@ describe("shoppingAccountView", () => {
       username: "LUCF019",
       lastRunAt: null,
       lastError: "",
+      unit: null,
     });
     expect(JSON.stringify(view)).not.toContain("segredo");
   });

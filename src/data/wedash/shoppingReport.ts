@@ -1,3 +1,5 @@
+import { groupComUnit, type GroupComUnit } from "./groupCom";
+
 /** Informe de vendas no shopping. A data é AAAA-MM-DD no fuso da filial. */
 
 export type InformedDay = {
@@ -124,7 +126,9 @@ function nextIso(iso: string): string {
   return `${date.getUTCFullYear()}-${mm}-${dd}`;
 }
 
-export type ShoppingAdministrator = "allos" | "argo";
+export type ShoppingAdministrator = "allos" | "argo" | "groupcom";
+
+export type { GroupComUnit };
 
 /** O host não muda. O slug é o trecho da filial, como shoppingcampogrande4. */
 export const INTRANET_MALL_ORIGIN = "https://app3.intranetmall.com";
@@ -174,6 +178,11 @@ export function forceLaunchAllowed(input: {
     return { ok: false, message: "A integração com a Argo ainda não está disponível na WDash." };
   }
   return { ok: true };
+}
+
+/** Intranet Mall e Group COM informam venda. Argo ainda não. */
+export function shoppingSendsSales(administrator: string | null | undefined): boolean {
+  return administrator === "allos" || administrator === "groupcom";
 }
 
 /**
@@ -231,6 +240,7 @@ export function shoppingAccountView(row: {
   last_run_at?: string | null;
   last_error?: string | null;
   secret_ciphertext?: string;
+  unit?: unknown;
 }): {
   storeId: string;
   administrator: ShoppingAdministrator;
@@ -238,8 +248,9 @@ export function shoppingAccountView(row: {
   username: string;
   lastRunAt: string | null;
   lastError: string;
+  unit: GroupComUnit | null;
 } | null {
-  if (row.administrator !== "allos" && row.administrator !== "argo") return null;
+  if (row.administrator !== "allos" && row.administrator !== "argo" && row.administrator !== "groupcom") return null;
   return {
     storeId: row.store_id,
     administrator: row.administrator,
@@ -247,6 +258,7 @@ export function shoppingAccountView(row: {
     username: row.username,
     lastRunAt: row.last_run_at ?? null,
     lastError: row.last_error ?? "",
+    unit: row.administrator === "groupcom" ? groupComUnit(row.unit) : null,
   };
 }
 
