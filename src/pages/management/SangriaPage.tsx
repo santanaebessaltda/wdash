@@ -94,6 +94,14 @@ export function SangriaPage() {
   const faixa = loja ? `${loja.id}|${from}|${reloadKey}` : "";
 
   const lojaId = loja?.id ?? "";
+  const selecaoLoja = escolher ? "" : lojaId;
+  const [lojaVista, setLojaVista] = useState(selecaoLoja);
+  if (lojaVista !== selecaoLoja) {
+    setLojaVista(selecaoLoja);
+    setDia(null);
+    setMarcados([]);
+    setAcao(null);
+  }
   useEffect(() => {
     if (lojasLoading || escolher || !lojaId) return;
     let stop = false;
@@ -415,7 +423,7 @@ export function SangriaPage() {
       </div>
       {dia && loja ? (
         <DiaModal
-          key={dia}
+          key={`${loja.id}|${dia}`}
           day={dia}
           rows={porDia.get(dia) ?? []}
           shortage={shortages.find((s) => s.day === dia)}
