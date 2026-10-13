@@ -43,7 +43,7 @@ describe("retirada de funcionários", () => {
     });
     expect(saved.ok).toBe(true);
     expect(netCloseDiff(day, 80802)).toBe(-7690);
-    expect(netCloseDiff(day, 90000)).toBe(0);
+    expect(netCloseDiff(day, 90000)).toBe(1508);
     expect(netCloseDiff(5000, 1000)).toBe(5000);
   });
 
@@ -65,7 +65,7 @@ describe("retirada de funcionários", () => {
     expect(withdrawalPreview(5000, [2000, 1500])).toEqual({
       withdrawalCents: 3500,
       breakCents: 1500,
-      overflow: false,
+      surplusCents: 0,
     });
   });
 
@@ -75,19 +75,27 @@ describe("retirada de funcionários", () => {
     expect(withdrawalPreview(800, [800]).breakCents).toBe(0);
   });
 
-  it("recusa a soma acima da quebra de caixa", () => {
+  it("grava a retirada mesmo acima da quebra, e o excedente vira sobra", () => {
     expect(save({ shortageCents: 1000, rows: [{ sellerId: "ana", amount: "1001" }] })).toEqual({
-      ok: false,
-      message: "A retirada passa da quebra de caixa.",
+      ok: true,
+      lines: [{ sellerId: "ana", cents: 1001 }],
+    });
+    expect(withdrawalPreview(1000, [1001])).toEqual({
+      withdrawalCents: 1001,
+      breakCents: 0,
+      surplusCents: 1,
     });
   });
 
-  it("ignora a opção desligada e o dia sem quebra", () => {
+  it("ignora a opção desligada e mantém a retirada num dia que já sobra", () => {
     expect(save({ shortageCents: 1000, enabled: false, rows: [{ sellerId: "ana", amount: "400" }] })).toEqual({
       ok: true,
       lines: [],
     });
-    expect(save({ shortageCents: 0, rows: [{ sellerId: "ana", amount: "400" }] })).toEqual({ ok: true, lines: [] });
+    expect(save({ shortageCents: 0, rows: [{ sellerId: "ana", amount: "400" }] })).toEqual({
+      ok: true,
+      lines: [{ sellerId: "ana", cents: 400 }],
+    });
   });
 
   it("pede funcionário, valor e linha única", () => {

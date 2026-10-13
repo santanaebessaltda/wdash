@@ -25,7 +25,7 @@ export function EmployeeWithdrawal({
   onChange: (next: WithdrawalDraft) => void;
   toCents: (raw: string) => number | null;
 }) {
-  if (shortageCents <= 0) return null;
+  if (shortageCents <= 0 && !draft.enabled) return null;
   const named = new Map(people.map((person) => [person.id, person.name]));
   if (!gestor) {
     if (!draft.enabled || draft.rows.length === 0) return null;
@@ -58,7 +58,7 @@ export function EmployeeWithdrawal({
         label="Retirada de funcionários"
       />
       <p className="mt-1.5 text-[12.5px] leading-relaxed text-t2">
-        Descontada no holerite do mês seguinte. O que sobrar continua quebra de caixa.
+        Descontada no holerite do mês seguinte. O que passar da quebra fica como sobra.
       </p>
       {draft.enabled && (
         <div className="mt-3 flex flex-col gap-2">
@@ -173,9 +173,9 @@ function Split({
   });
   const preview = withdrawalPreview(shortageCents, cents);
   return (
-    <p className={`mt-2 text-[12.5px] ${preview.overflow ? "font-bold text-bad" : "text-t2"}`}>
-      {preview.overflow
-        ? "A retirada passa da quebra de caixa."
+    <p className="mt-2 text-[12.5px] text-t2">
+      {preview.surplusCents > 0
+        ? `Retirada ${brlCent(preview.withdrawalCents / 100)} · Sobra ${brlCent(preview.surplusCents / 100)}`
         : `Retirada ${brlCent(preview.withdrawalCents / 100)} · Quebra de caixa ${brlCent(preview.breakCents / 100)}`}
     </p>
   );

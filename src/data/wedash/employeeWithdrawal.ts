@@ -25,10 +25,10 @@ export function dayShortageCents(diffCents: number): number {
   return diffCents < 0 ? -diffCents : 0;
 }
 
-/** A retirada abate a quebra. O que passa dela não vira sobra. */
+/** A retirada abate a quebra. O que passa dela fica como sobra. */
 export function netCloseDiff(diffCents: number, withdrawalCents: number): number {
   if (withdrawalCents <= 0 || diffCents >= 0) return diffCents;
-  return Math.min(0, diffCents + withdrawalCents);
+  return diffCents + withdrawalCents;
 }
 
 /** Ativos da loja, mais quem já tem retirada gravada mesmo tendo saído. */
@@ -82,13 +82,13 @@ export function blankWithdrawalRow(): WithdrawalDraftRow {
 export function withdrawalPreview(shortageCents: number, cents: number[]): {
   withdrawalCents: number;
   breakCents: number;
-  overflow: boolean;
+  surplusCents: number;
 } {
   const withdrawalCents = cents.reduce((sum, value) => sum + value, 0);
   return {
     withdrawalCents,
     breakCents: Math.max(0, shortageCents - withdrawalCents),
-    overflow: withdrawalCents > shortageCents,
+    surplusCents: shortageCents > 0 ? Math.max(0, withdrawalCents - shortageCents) : 0,
   };
 }
 
@@ -99,7 +99,7 @@ export function withdrawalSave(input: {
   parseCents: (raw: string) => number | null;
   names: Map<string, string>;
 }): { ok: true; lines: WithdrawalLine[] } | { ok: false; message: string } {
-  if (!input.enabled || input.shortageCents <= 0) return { ok: true, lines: [] };
+  if (!input.enabled) return { ok: true, lines: [] };
   const filled = input.rows.filter((row) => row.sellerId.trim() !== "" || row.amount.trim() !== "");
   const lines: WithdrawalLine[] = [];
   const seen = new Set<string>();
@@ -113,7 +113,5 @@ export function withdrawalSave(input: {
     if (cents == null || cents <= 0) return { ok: false, message: `Informe o valor da retirada de ${name}.` };
     lines.push({ sellerId, cents: Math.round(cents) });
   }
-  const total = lines.reduce((sum, line) => sum + line.cents, 0);
-  if (total > input.shortageCents) return { ok: false, message: "A retirada passa da quebra de caixa." };
   return { ok: true, lines };
 }
