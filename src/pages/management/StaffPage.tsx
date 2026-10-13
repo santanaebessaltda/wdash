@@ -2,10 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Avatar, Badge, Button, Card, DataTable, Dropdown, EmptyState, Modal, Segmented, Skeleton, Tooltip, useToast, type DataTableColumn, type DropdownItem } from "@/components/ui";
 import { SegmentedSkeleton, StoreCardsSkeleton, TeamTableSkeleton } from "@/components/wedash/LoadingSkeletons";
 import {
+  branchRoleLabel,
   fetchLatestSellerSyncedAt,
   fetchStoreSellers,
   fetchStoreShifts,
   isActiveSalesPerson,
+  isBranchTeamMember,
   saveStoreShift,
   setSellerShift,
   syncStoreSellersNow,
@@ -31,7 +33,7 @@ import {
 } from "@/data/wedash/sellerAccess";
 import { ACCESS_LABEL, hasSalesGroup, type AccessState } from "@/data/wedash/engine/sellerAccess";
 
-/** Gestão > Vendedores. Equipe da filial, grupo de cada pessoa e acesso à WDash. */
+/** Gestão > Equipe. Pessoas da filial no Millennium; grupo e acesso à WDash só do vendedor. */
 export function StaffPage() {
   const { session, lojas, loading } = useScopedStores();
   const { show } = useToast();
@@ -57,7 +59,7 @@ export function StaffPage() {
     };
   }, [loading, lojas, reloadKey, session.tenantId]);
 
-  async function atualizarVendedores() {
+  async function atualizarEquipe() {
     const lista = lojasRef.current;
     if (syncing.current || lista.length === 0) return;
     syncing.current = true;
@@ -65,7 +67,7 @@ export function StaffPage() {
       const results = await Promise.all(lista.map((loja) => syncStoreSellersNow(loja.id)));
       const fail = results.find((r) => !r.ok);
       if (fail && !fail.ok) show(fail.message, "danger");
-      else show("Vendedores atualizados.", "success");
+      else show("Equipe atualizada.", "success");
       if (results.some((r) => r.ok)) setReloadKey((n) => n + 1);
     } finally {
       syncing.current = false;
@@ -73,19 +75,19 @@ export function StaffPage() {
   }
 
   useScreenRefresh({
-    label: "Atualizar vendedores",
-    tip: "Busca no Millennium os vendedores desta filial.",
+    label: "Atualizar equipe",
+    tip: "Busca no Millennium a equipe desta filial.",
     status: refreshMomentTitle(sellerSyncAt),
-    busyLabel: "Buscando vendedores…",
-    run: atualizarVendedores,
+    busyLabel: "Buscando equipe…",
+    run: atualizarEquipe,
   });
 
   return (
     <>
       <StoreCardsPage
         section="Gestão"
-        title="Vendedores"
-        subtitle="Acompanhe os vendedores da filial, defina seus grupos e gerencie o acesso à WDash."
+        title="Equipe"
+        subtitle="Acompanhe a equipe da filial e gerencie grupos e acessos dos vendedores."
         actions={
           lojaUnica ? (
             <Button type="button" onClick={() => setManageOpen(true)}>
@@ -168,7 +170,7 @@ function StaffCard({ tenantId, loja, reloadKey, groupsTick }: { tenantId: string
     };
   }, [tenantId, loja.id, groupsTick]);
 
-  const ativos = useMemo(() => equipe.filter(isActiveSalesPerson), [equipe]);
+  const ativos = useMemo(() => equipe.filter(isBranchTeamMember), [equipe]);
   const desligados = useMemo(() => equipe.filter((s) => !s.active), [equipe]);
   const rows = tab === "ativos" ? ativos : desligados;
 
@@ -236,8 +238,9 @@ function StaffCard({ tenantId, loja, reloadKey, groupsTick }: { tenantId: string
         key: "access",
         header: "Acesso",
         sortable: true,
-        sortValue: (v) => (access == null ? null : accessLabel(access.get(v.id) ?? "NONE")),
+        sortValue: (v) => (access == null || !isActiveSalesPerson(v) ? null : accessLabel(access.get(v.id) ?? "NONE")),
         render: (v) => {
+          if (!isActiveSalesPerson(v)) return <span className="text-t2">—</span>;
           const grupo = v.id in shiftOf ? shiftOf[v.id] : v.shiftId;
           return (
             <AccessCell
@@ -252,8 +255,9 @@ function StaffCard({ tenantId, loja, reloadKey, groupsTick }: { tenantId: string
         key: "shift",
         header: "Grupo",
         sortable: true,
-        sortValue: (v) => groupLabel(v.id in shiftOf ? shiftOf[v.id] : v.shiftId, shifts),
+        sortValue: (v) => (isActiveSalesPerson(v) ? groupLabel(v.id in shiftOf ? shiftOf[v.id] : v.shiftId, shifts) : null),
         render: (v) => {
+          if (!isActiveSalesPerson(v)) return <span className="text-t2">—</span>;
           const atual = v.id in shiftOf ? shiftOf[v.id] : v.shiftId;
           return (
             <GroupPicker
@@ -273,7 +277,7 @@ function StaffCard({ tenantId, loja, reloadKey, groupsTick }: { tenantId: string
         align: "right",
         render: (v) => (
           <AccessMenu
-            state={access?.get(v.id) ?? null}
+            state={isActiveSalesPerson(v) ? (access?.get(v.id) ?? null) : null}
             onCopy={() => void copyLink(v.id)}
             onResend={() => void runAccess(v.id, resendSellerInvite, "Convite reenviado.")}
             onRevoke={() => void runAccess(v.id, revokeSellerInvite, "Convite cancelado.")}
@@ -293,7 +297,7 @@ function StaffCard({ tenantId, loja, reloadKey, groupsTick }: { tenantId: string
   return (
     <Card padding="none">
       <div className="px-5 pt-5">
-        <CostCardTitle title="Vendedores da filial" />
+        <CostCardTitle title="Equipe da filial" />
       </div>
       {!loaded ? (
         <div className="px-5 pb-4">
@@ -318,13 +322,13 @@ function StaffCard({ tenantId, loja, reloadKey, groupsTick }: { tenantId: string
           framed={false}
           className="pt-4!"
           icon="👥"
-          title={semEquipe ? "Nenhum vendedor sincronizado" : tab === "ativos" ? "Nenhum vendedor ativo" : "Nenhum vendedor desligado"}
+          title={semEquipe ? "Nenhuma pessoa sincronizada" : tab === "ativos" ? "Nenhuma pessoa ativa" : "Nenhuma pessoa desligada"}
           description={
             semEquipe
-              ? "Use Atualizar vendedores no topo para buscar os vendedores desta filial no Millennium."
+              ? "Use Atualizar equipe no topo para buscar a equipe desta filial no Millennium."
               : tab === "ativos"
-                ? "Não há vendedores ativos nesta filial no momento."
-                : "Vendedores desligados no Millennium aparecem aqui."
+                ? "Não há vendedores, operadores de caixa ou gerência ativos nesta filial no momento."
+                : "Pessoas desligadas no Millennium aparecem aqui."
           }
         />
       ) : (
@@ -333,7 +337,7 @@ function StaffCard({ tenantId, loja, reloadKey, groupsTick }: { tenantId: string
           columns={tab === "ativos" ? columns : SELLER_COLUMNS}
           data={rows}
           rowKey={(v) => v.id}
-          paginate="vendedores"
+          paginate="pessoas"
         />
       )}
       <Modal
@@ -477,6 +481,13 @@ const SELLER_COLUMNS: DataTableColumn<StoreSeller>[] = [
         <span className="truncate text-[13.5px] font-bold text-t0">{v.name}</span>
       </div>
     ),
+  },
+  {
+    key: "role",
+    header: "Cargo",
+    sortable: true,
+    sortValue: (v) => branchRoleLabel(v.role),
+    render: (v) => <span className="text-t1">{branchRoleLabel(v.role)}</span>,
   },
   {
     key: "code",

@@ -841,10 +841,10 @@ function GroupsEditor({
         <EmptyBlock
           icon="👥"
           title="Nenhum grupo cadastrado"
-          description="Crie os grupos em Vendedores para distribuir a meta entre eles."
+          description="Crie os grupos em Equipe para distribuir a meta entre eles."
           action={
             <Button size="sm" onClick={onCreate}>
-              Ir para Vendedores
+              Ir para Equipe
             </Button>
           }
         />
@@ -912,7 +912,7 @@ function GroupsEditor({
   );
 }
 
-/** Meta de cada grupo e as pessoas dele (o grupo de cada pessoa e definido em Gestao > Vendedores). */
+/** Meta de cada grupo e as pessoas dele (o grupo de cada pessoa e definido em Gestao > Equipe). */
 function GroupsSimulation({
   groups,
   team,
@@ -996,7 +996,7 @@ function GroupsSimulation({
               {semGrupo.map((p) => pessoaRow(p, null))}
               <p className="mt-1 text-[11.5px] text-warn">
                 {semGrupo.length === 1 ? "Fica" : "Ficam"} fora da distribuição
-                por grupos. Defina o grupo em Gestão &gt; Vendedores.
+                por grupos. Defina o grupo em Gestão &gt; Equipe.
               </p>
             </div>
           )}

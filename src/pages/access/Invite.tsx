@@ -225,7 +225,7 @@ export function Invite() {
           </>
         ) : info.role === "SELLER" ? (
           <>
-            Informe seu nome e crie uma senha para acessar a WDash como parte da equipe de vendas
+            Informe seu nome e crie uma senha para acessar a WDash como vendedor
             {info.storeName ? (
               <>
                 {" "}

@@ -556,7 +556,7 @@ export function TimelineSkeleton({ rows = 5 }: { rows?: number }) {
 export function TeamTableSkeleton({ withShift = true, rows = 3 }: { withShift?: boolean; rows?: number }) {
   return (
     <Busy>
-      <DataTableSkeleton bare rows={rows} cells={withShift ? ["person", "short", "pill", "select"] : ["person", "short", "pill"]} />
+      <DataTableSkeleton bare rows={rows} cells={withShift ? ["person", "short", "short", "pill", "select"] : ["person", "short", "short", "pill"]} />
     </Busy>
   );
 }

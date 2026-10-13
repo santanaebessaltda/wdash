@@ -717,9 +717,27 @@ export interface StoreSeller {
 
 export { SELLER_ROLE };
 
-/** Na equipe de vendas agora: ativo com cargo VENDEDOR (gerencia / conta de freelancer fica fora). */
+/** Na equipe de vendas agora: ativo com cargo VENDEDOR (gerencia / conta de freelancer fica fora do ranking). */
 export function isActiveSalesPerson(s: Pick<StoreSeller, "active" | "role">): boolean {
   return s.active && (s.role == null || s.role === SELLER_ROLE);
+}
+
+/** Cargos que a tela Gestão > Equipe lista. O ranking continua só com `isActiveSalesPerson`. */
+const BRANCH_TEAM_ROLES = new Set<string>([SELLER_ROLE, "GERENCIA", "OPERADOR DE CAIXA"]);
+
+/** Ativo na lista da filial: vendedor, operador de caixa ou gerência. Cargo null (legado, ainda não sincronizado) conta como vendedor. */
+export function isBranchTeamMember(s: Pick<StoreSeller, "active" | "role">): boolean {
+  return s.active && (s.role == null || BRANCH_TEAM_ROLES.has(s.role));
+}
+
+/** Rótulo do cargo do Millennium na tela Equipe. */
+export function branchRoleLabel(role: string | null): string {
+  if (role == null || role === SELLER_ROLE) return "Vendedor";
+  if (role === "") return "Sem cargo";
+  if (role === "GERENCIA") return "Gerência";
+  if (role === "OPERADOR DE CAIXA") return "Operador de caixa";
+  if (role === "INDEFINIDO") return "Indefinido";
+  return role;
 }
 
 /**
@@ -853,7 +871,7 @@ const SYNC_SELLERS_ERRORS: Record<string, string> = {
   credential_invalid: "Não foi possível acessar o Millennium. Verifique os dados da integração em Conta › Integrações.",
   integration_paused: "A conexão com o Millennium está desconectada. Acesse Conta › Integrações para conectar novamente.",
   erp_busy: "Este usuário do Millennium está conectado em outro local. Encerre a outra sessão e tente novamente.",
-  forbidden: "Você não tem permissão para atualizar os vendedores.",
+  forbidden: "Você não tem permissão para atualizar a equipe.",
 };
 
 /** Horário da última busca de vendedores nas lojas (o `synced_at` mais recente). */
@@ -899,7 +917,7 @@ export async function syncStoreSellersNow(storeId: string): Promise<{ ok: true }
   const code = body?.error ?? "";
   return {
     ok: false,
-    message: SYNC_SELLERS_ERRORS[code] ?? "Não foi possível atualizar os vendedores. Tente novamente.",
+    message: SYNC_SELLERS_ERRORS[code] ?? "Não foi possível atualizar a equipe. Tente novamente.",
   };
 }
 

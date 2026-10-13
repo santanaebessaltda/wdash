@@ -54,7 +54,7 @@ export const roleLabel: Record<Role, string> = {
   ADMIN_GLOBAL: "Administrador",
   OWNER: "Gestor",
   MANAGER: "Gerente",
-  SELLER: "Equipe de vendas",
+  SELLER: "Vendedor",
 };
 
 /** Tipo de acesso exibido para a pessoa  -  quem criou a conta da empresa e o "Gestor principal". */

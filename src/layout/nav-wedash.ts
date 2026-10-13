@@ -28,13 +28,13 @@ const estoque: NavSingle = {
   to: paths.stock.inventory,
 };
 
-/** Vendedores  |  Metas  |  Desafios  |  Fechamento  |  Sangrias  |  Pedido de compra (Gestor e Gerente). */
+/** Equipe  |  Metas  |  Desafios  |  Fechamento  |  Sangrias  |  Pedido de compra (Gestor e Gerente). */
 const gestao: NavGroup = {
   label: "Gestão",
   description: "Administre a equipe, as metas, os desafios, o fechamento, as sangrias e o pedido de compra.",
   icon: ICONE.gestao,
   items: [
-    { label: "Vendedores", to: paths.operation.sellers },
+    { label: "Equipe", to: paths.operation.sellers },
     { label: "Metas", to: paths.goals },
     { label: "Desafios", to: paths.management.challenges },
     { label: "Fechamento", to: paths.management.cashClose },
