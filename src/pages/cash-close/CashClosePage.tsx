@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Alert, Badge, Button, Card, Modal, Skeleton, Tooltip, useToast } from "@/components/ui";
+import { Alert, Badge, Button, Card, DateRangePicker, Modal, Skeleton, Tooltip, useToast, type QuickRange } from "@/components/ui";
 import { EmployeeWithdrawal } from "@/pages/cash-close/EmployeeWithdrawal";
 import { monthCloseSpanFor } from "@/data/wedash/cashCloseMonth";
 import {
@@ -75,11 +75,6 @@ function totalDia(cents: number): string {
 
 const MESES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
-function somarMes(iso: string, meses: number): string {
-  const d = deIso(inicioDoMes(iso));
-  return paraIso(new Date(d.getFullYear(), d.getMonth() + meses, 1));
-}
-
 function rotuloMesAno(iso: string): string {
   const d = deIso(inicioDoMes(iso));
   return `${MESES_PT[d.getMonth()]} de ${d.getFullYear()}`;
@@ -90,11 +85,17 @@ function fimDaPagina(ano: number, hojeAno: number): number {
   return hojeAno - Math.floor((hojeAno - alvo) / 12) * 12;
 }
 
-function celulasDoMes(iso: string): Array<string | null> {
-  const inicio = inicioDoMes(iso);
-  const fim = fimDoMes(iso);
-  const cells: Array<string | null> = Array.from({ length: deIso(inicio).getDay() }, () => null);
-  for (let day = inicio; day <= fim; day = somarDias(day, 1)) cells.push(day);
+const MES_CHEIO: QuickRange[] = [
+  {
+    id: "esteMes",
+    label: "Este mês",
+    resolve: (hoje) => [new Date(hoje.getFullYear(), hoje.getMonth(), 1), new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)],
+  },
+];
+
+function celulasDoIntervalo(from: string, to: string): Array<string | null> {
+  const cells: Array<string | null> = Array.from({ length: deIso(from).getDay() }, () => null);
+  for (let day = from; day <= to; day = somarDias(day, 1)) cells.push(day);
   while (cells.length % 7 !== 0) cells.push(null);
   return cells;
 }
@@ -465,7 +466,8 @@ export function CashClosePage() {
   const escolher = pickOneStore(escopo.filialIds, session.stores.length);
   const showLojas = useMinSkeleton(lojasLoading);
   const hoje = calendarTodayIso();
-  const [anchor, setAnchor] = useState(hoje);
+  const [rangeFrom, setRangeFrom] = useState(() => inicioDoMes(hoje));
+  const [rangeTo, setRangeTo] = useState(() => fimDoMes(hoje));
   const [piso, setPiso] = useState(() => inicioDoMes(hoje));
   const [marks, setMarks] = useState<CashCloseDayMark[]>([]);
   const [marksKey, setMarksKey] = useState("");
@@ -483,13 +485,13 @@ export function CashClosePage() {
   const storeKey = lojas.map((l) => l.id).join(",");
   const lojasRef = useRef(lojas);
   lojasRef.current = lojas;
-  const anchorRef = useRef(anchor);
-  anchorRef.current = anchor;
-  const podeAvancar = somarMes(anchor, 1) <= hoje;
-  const podeVoltar = somarMes(anchor, -1) >= piso;
-  const cells = useMemo(() => celulasDoMes(anchor), [anchor]);
-  const from = inicioDoMes(anchor);
-  const toBruto = fimDoMes(anchor);
+  const rangeFromRef = useRef(rangeFrom);
+  rangeFromRef.current = rangeFrom;
+  const rangeToRef = useRef(rangeTo);
+  rangeToRef.current = rangeTo;
+  const cells = useMemo(() => celulasDoIntervalo(rangeFrom, rangeTo), [rangeFrom, rangeTo]);
+  const from = rangeFrom;
+  const toBruto = rangeTo;
   const to = toBruto < hoje ? toBruto : hoje;
   const faixaKey = `${storeKey}|${from}|${to}|${reloadKey}`;
 
@@ -510,7 +512,7 @@ export function CashClosePage() {
     void fetchNavMonthFloor("cash_close_day", session.tenantId, lojaId, hoje).then((month) => {
       if (stop) return;
       setPiso(month);
-      setAnchor((atual) => (inicioDoMes(atual) < month ? month : atual));
+      setRangeFrom((atual) => (atual < month ? month : atual));
     });
     return () => {
       stop = true;
@@ -554,18 +556,26 @@ export function CashClosePage() {
   const pedirFechamento = useCallback(async () => {
     if (escolher) return;
     const ids = lojasRef.current.map((loja) => loja.id);
-    if (ids.length === 0 || !monthCloseSpanFor(anchorRef.current, calendarTodayIso())) return;
-    const r = await requestMonthClose(ids, anchorRef.current);
-    if (!r.ok) {
-      show(r.message, "danger");
-      return;
+    if (ids.length === 0) return;
+    const inicio = inicioDoMes(rangeFromRef.current);
+    const fim = inicioDoMes(rangeToRef.current);
+    const months = inicio === fim ? [inicio] : [inicio, fim];
+    const hojeIso = calendarTodayIso();
+    const comDia = months.filter((month) => monthCloseSpanFor(month, hojeIso));
+    const alvos = comDia.length > 0 ? comDia : [inicio];
+    for (const month of alvos) {
+      const r = await requestMonthClose(ids, month);
+      if (!r.ok) {
+        show(r.message, "danger");
+        return;
+      }
     }
     setSyncing(true);
   }, [show, escolher]);
 
   useScreenRefresh({
     label: "Atualizar vendas e fechamento",
-    tip: "Busca as vendas de hoje e os fechamentos do mês exibido.",
+    tip: "Busca as vendas de hoje e os fechamentos do mês deste período.",
     status: refreshMomentTitle(watermark ? watermark.toISOString() : watermark),
     busyLabel: "Buscando vendas e fechamentos…",
     sales: true,
@@ -716,16 +726,11 @@ export function CashClosePage() {
     setDiaAberto(iso);
   }
 
-  function irParaMes(alvo: string) {
-    const mes = inicioDoMes(alvo);
-    if (mes < piso || mes > inicioDoMes(hoje)) return;
-    setAnchor(mes === inicioDoMes(hoje) ? hoje : mes);
-  }
+  const mesAtual = rangeFrom === inicioDoMes(hoje) && rangeTo === fimDoMes(hoje);
 
-  function mover(dir: -1 | 1) {
-    if (dir < 0 && !podeVoltar) return;
-    if (dir > 0 && !podeAvancar) return;
-    irParaMes(somarMes(anchor, dir));
+  function aplicarIntervalo(inicio: Date, fim: Date) {
+    setRangeFrom(paraIso(inicio));
+    setRangeTo(paraIso(fim));
   }
 
   const diaPronto = diaAberto != null && diaKey === `${storeKey}|${diaAberto}|${reloadKey}`;
@@ -738,15 +743,15 @@ export function CashClosePage() {
         subtitle="Compare o Millennium com o total real e acompanhe sobras, quebras e pendências do mês."
         actions={
           <HeaderFilters>
-            <div className="flex flex-wrap items-center gap-2">
-              <SeletorMesAno iso={anchor} hoje={hoje} minIso={piso} onChange={irParaMes} />
-              <button type="button" aria-label="Mês anterior" className={monthNavBtn} disabled={!podeVoltar} onClick={() => mover(-1)}>
-                <Seta dir="anterior" />
-              </button>
-              <button type="button" aria-label="Próximo mês" className={monthNavBtn} disabled={!podeAvancar} onClick={() => mover(1)}>
-                <Seta dir="proximo" />
-              </button>
-            </div>
+            <DateRangePicker
+              value={[deIso(rangeFrom), deIso(rangeTo)]}
+              minDate={deIso(piso)}
+              maxDate={deIso(fimDoMes(hoje))}
+              quickRanges={MES_CHEIO}
+              displayLabel={mesAtual ? "Este mês" : null}
+              activePresetId={mesAtual ? "esteMes" : null}
+              onChange={([inicio, fim]) => aplicarIntervalo(inicio, fim)}
+            />
           </HeaderFilters>
         }
       />

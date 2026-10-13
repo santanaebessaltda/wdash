@@ -87,7 +87,7 @@ async function main() {
     port: webhookPort,
     token: webhookToken,
     shoppingToken,
-    onShopping: (body) => runShoppingStore(sb, erpSecret, body.storeId, body.read, { from: body.from, to: body.to }),
+    onShopping: (body) => runShoppingStore(sb, erpSecret, body.storeId, body.read, { from: body.from, to: body.to, days: body.days }),
     onPix: async (notice) => {
       const csv = await downloadStonePixCsv(notice.url);
       const saved = await ingestStonePixCsv(sb, { document: notice.document, day: notice.referenceDate, csv });

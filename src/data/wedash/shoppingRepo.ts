@@ -70,11 +70,11 @@ export async function requestShoppingRead(storeId: string): Promise<ShoppingLaun
 }
 
 /** Mesma rotina da madrugada, para a filial aberta. */
-export async function requestShoppingLaunch(storeId: string, month: { from: string; to: string }): Promise<ShoppingLaunchResult> {
+export async function requestShoppingLaunch(storeId: string, month: { from: string; to: string; days: string[] }): Promise<ShoppingLaunchResult> {
   const { getSupabase } = await import("@/lib/supabase");
   const sb = getSupabase();
   if (!sb) return { ok: false, message: FAIL };
-  const { data, error } = await sb.functions.invoke("shopping-report-run", { body: { storeId, from: month.from, to: month.to } });
+  const { data, error } = await sb.functions.invoke("shopping-report-run", { body: { storeId, from: month.from, to: month.to, days: month.days } });
   if (error || !data) return { ok: false, message: FAIL };
   if (data.ok === true) return { ok: true, message: typeof data.message === "string" ? data.message : undefined };
   return { ok: false, message: typeof data.message === "string" ? data.message : FAIL };

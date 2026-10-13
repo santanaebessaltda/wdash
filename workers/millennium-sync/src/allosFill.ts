@@ -74,7 +74,14 @@ export async function readAllosWeeks(baseUrl: string, cookie: string, userAgent:
 }
 
 /** Preenche os dias passados vazios e só grava o que a Allos devolveu igual. */
-export async function postAllosWeeks(baseUrl: string, cookie: string, userAgent: string, today: string, sold: SoldLookup): Promise<AllosResult> {
+export async function postAllosWeeks(
+  baseUrl: string,
+  cookie: string,
+  userAgent: string,
+  today: string,
+  sold: SoldLookup,
+  only?: ReadonlySet<string>,
+): Promise<AllosResult> {
   const base = baseUrl.replace(/\/$/, "");
   const jar = seedCookieJar(cookie);
   const opened = await weekIds(jar, base, userAgent, KEEP);
@@ -84,9 +91,10 @@ export async function postAllosWeeks(baseUrl: string, cookie: string, userAgent:
     const formHtml = await browse(jar, `${base}/loja/vendas-s4/vendas_alterar.asp?IDSEMANA=${weekId}`, userAgent);
     const parsed = formHtml ? parseAllosForm(formHtml) : null;
     if (!formHtml || !parsed || parsed.weekId !== weekId) return { ok: false, message: KEEP };
+    if (only && !parsed.fields.some((field) => only.has(field.date))) continue;
     const from = parsed.fields[0]?.date ?? today;
     const to = parsed.fields[parsed.fields.length - 1]?.date ?? today;
-    const filled = fillAllosWeek(parsed, await sold(from, to), today);
+    const filled = fillAllosWeek(parsed, await sold(from, to), today, only);
     const saved = await browse(jar, `${base}/loja/vendas-s4/vendas_atualizar.asp`, userAgent, {
       method: "POST",
       body: filled.body,

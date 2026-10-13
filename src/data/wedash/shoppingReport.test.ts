@@ -280,4 +280,21 @@ describe("fillAllosWeek", () => {
     expect(filled.body).toContain("venda1=25,00");
     expect(filled.body).not.toContain("dias=7");
   });
+
+  it("leaves a blank day empty when it was not selected", () => {
+    const html = `
+      <input name="data_cadastra" value="2026-10-11">
+      <input name="venda0" value="">
+      <input name="data_cadastra" value="2026-10-12">
+      <input name="venda1" value="">
+      <input name="idsemana" value="9291">
+      <input name="dias" value="2">
+    `;
+    const parsed = parseAllosForm(html);
+    const filled = fillAllosWeek(parsed!, { "2026-10-11": 10000, "2026-10-12": 9000 }, "2026-10-15", new Set(["2026-10-11"]));
+    expect(filled.days.map((day) => day.cents)).toEqual([10000, null]);
+    expect(filled.body).toContain("venda0=100,00");
+    expect(filled.body).toContain("venda1=");
+    expect(filled.body).not.toContain("venda1=90,00");
+  });
 });

@@ -144,7 +144,18 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
       }
       return;
     }
-    if (!disconnected && tela?.sales) void tela.run();
+    if (tela?.sales) {
+      if (telaBusy) return;
+      setTelaBusy(true);
+      try {
+        await Promise.all([Promise.resolve(tela.run()), forcarAtualizacao()]);
+      } catch (e) {
+        console.warn("screen refresh:", e);
+      } finally {
+        setTelaBusy(false);
+      }
+      return;
+    }
     await forcarAtualizacao();
   };
 
@@ -155,7 +166,7 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
   // telaGen re-renderiza quando a tela assume ou solta o botão.
   const tela = telaGen >= 0 ? readScreenRefresh() : null;
   const proprio = tela != null && !tela.sales;
-  const ocupado = proprio ? telaBusy : refreshing;
+  const ocupado = telaBusy || (!proprio && refreshing);
 
   const algumaAberta = lojas.some((s) => storePhase(s.horas, now, s.fuso) === "open");
   const atrasado =

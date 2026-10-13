@@ -85,7 +85,7 @@ export function startStoneWebhook(opts: {
   token: string;
   onPix: (notice: StonePixNotice) => Promise<void>;
   shoppingToken?: string;
-  onShopping?: (body: { storeId: string; read: boolean; from: string; to: string }) => Promise<{ ok: boolean; message?: string }>;
+  onShopping?: (body: { storeId: string; read: boolean; from: string; to: string; days: string[] }) => Promise<{ ok: boolean; message?: string }>;
 }): Server {
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
@@ -111,6 +111,7 @@ export function startStoneWebhook(opts: {
             read: record.read === true,
             from: typeof record.from === "string" ? record.from : "",
             to: typeof record.to === "string" ? record.to : "",
+            days: Array.isArray(record.days) ? record.days.filter((day): day is string => typeof day === "string") : [],
           });
           sendJson(res, result);
         })

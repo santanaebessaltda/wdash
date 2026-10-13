@@ -47,9 +47,10 @@ export function informedLaunchValues(windows: SalesWindow[], today: string): Lau
   return days.map((day) => ({ date: day.date, cents: launchCents(day, today) }));
 }
 
-function launchCents(day: InformedDay, today: string): number | null {
+function launchCents(day: InformedDay, today: string, only?: ReadonlySet<string>): number | null {
   if (!isClosedDay(day.date, today)) return null;
   if (day.fieldCents != null) return day.fieldCents;
+  if (only && !only.has(day.date)) return null;
   return day.soldCents;
 }
 
@@ -246,20 +247,16 @@ export function fillAllosWeek(
   parsed: { weekId: string; fields: AllosField[] },
   soldCentsByDay: Record<string, number>,
   today: string,
+  only?: ReadonlySet<string>,
 ): { weekId: string; body: string; days: LaunchValue[] } {
-  const days = informedLaunchValues(
-    [
-      {
-        kind: "informed",
-        days: parsed.fields.map((field) => ({
-          date: field.date,
-          fieldCents: field.fieldCents,
-          soldCents: soldCentsByDay[field.date] ?? 0,
-        })),
-      },
-    ],
-    today,
-  );
+  const days = parsed.fields.map((field) => ({
+    date: field.date,
+    cents: launchCents(
+      { date: field.date, fieldCents: field.fieldCents, soldCents: soldCentsByDay[field.date] ?? 0 },
+      today,
+      only,
+    ),
+  }));
   return { weekId: parsed.weekId, days, body: allosWeekBody(days, parsed.weekId) };
 }
 

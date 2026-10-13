@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { Alert, Button, Card, Skeleton, useToast } from "@/components/ui";
-import { ChipDia, monthNavBtn, PlainKpi, SeletorMesAno, Seta } from "@/pages/cash-close/CashClosePage";
+import { Alert, Button, Card, DateRangePicker, Skeleton, useToast, type QuickRange } from "@/components/ui";
+import { ChipDia, PlainKpi } from "@/pages/cash-close/CashClosePage";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { fetchSalesCoverage, fetchSalesDayAggs } from "@/data/wedash/salesRepo";
-import { fetchLaunchedDays, fetchShoppingAccount, requestShoppingLaunch, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
-import { ALREADY_LAUNCHED, allosPeriods, forceLaunchAllowed, monthReport, reportDays, sumSoldByDay, unlaunchedDays } from "@/data/wedash/shoppingReport";
-import { brlCent, deIso, fimDoMes, inicioDoMes, intervaloDias, somarDias } from "@/lib/format";
+import { fetchLaunchedDays, fetchShoppingAccount, requestShoppingLaunch, requestShoppingRead, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
+import { ALREADY_LAUNCHED, forceLaunchAllowed, monthReport, reportDays, sumSoldByDay } from "@/data/wedash/shoppingReport";
+import { brlCent, deIso, fimDoMes, inicioDoMes, intervaloDias, paraIso, somarDias } from "@/lib/format";
+import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { cn } from "@/lib/cn";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
@@ -30,7 +30,13 @@ const WEEK = [
 
 const money = (cents: number) => brlCent(cents / 100);
 
-const MESES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+const MES_CHEIO: QuickRange[] = [
+  {
+    id: "esteMes",
+    label: "Este mês",
+    resolve: (hoje) => [new Date(hoje.getFullYear(), hoje.getMonth(), 1), new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)],
+  },
+];
 
 function valorDiferenca(cents: number): string {
   const abs = brlCent(Math.abs(cents) / 100);
@@ -45,44 +51,12 @@ function corDaDiferenca(cents: number): string {
   return "var(--t0)";
 }
 
-function somarMes(iso: string, meses: number): string {
-  const d = deIso(inicioDoMes(iso));
-  d.setMonth(d.getMonth() + meses);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  return `${y}-${m}-01`;
-}
-
-function celulasDoMes(iso: string): Array<string | null> {
-  const inicio = inicioDoMes(iso);
-  const fim = fimDoMes(iso);
-  const cells: Array<string | null> = Array.from({ length: deIso(inicio).getDay() }, () => null);
-  for (let day = inicio; day <= fim; day = somarDias(day, 1)) cells.push(day);
-  while (cells.length % 7 !== 0) cells.push(null);
-  return cells;
-}
-
-function rotuloPeriodo(from: string, to: string, hoje: string): string {
-  const inicio = deIso(from);
-  const fim = deIso(to);
-  const mesFim = MESES_PT[fim.getMonth()];
-  const ano = fim.getFullYear() === deIso(hoje).getFullYear() ? "" : ` de ${fim.getFullYear()}`;
-  if (inicio.getMonth() === fim.getMonth() && inicio.getFullYear() === fim.getFullYear()) {
-    if (from === to) return `${inicio.getDate()} de ${mesFim}${ano}`;
-    return `${inicio.getDate()} a ${fim.getDate()} de ${mesFim}${ano}`;
-  }
-  const mesInicio = MESES_PT[inicio.getMonth()];
-  return `${inicio.getDate()} de ${mesInicio} a ${fim.getDate()} de ${mesFim}${ano}`;
-}
-
-function celulasDoPeriodo(from: string, to: string): Array<string | null> {
+function celulasDoIntervalo(from: string, to: string): Array<string | null> {
   const cells: Array<string | null> = Array.from({ length: deIso(from).getDay() }, () => null);
   for (let day = from; day <= to; day = somarDias(day, 1)) cells.push(day);
   while (cells.length % 7 !== 0) cells.push(null);
   return cells;
 }
-
-const filtroBtn = "rounded-lg px-3 py-1.5 text-[12.5px] font-bold transition-colors";
 
 /** Gestão > Informe de vendas. Calendário do que foi informado no shopping. */
 export function SalesReportPage() {
@@ -93,7 +67,8 @@ export function SalesReportPage() {
   const escolher = pickOneStore(escopo.filialIds, session.stores.length);
   const showLojas = useMinSkeleton(lojasLoading);
   const hoje = calendarTodayIso();
-  const [anchor, setAnchor] = useState(hoje);
+  const [rangeFrom, setRangeFrom] = useState(() => inicioDoMes(hoje));
+  const [rangeTo, setRangeTo] = useState(() => fimDoMes(hoje));
   const [piso, setPiso] = useState(() => inicioDoMes(hoje));
   const [sold, setSold] = useState<Record<string, number>>({});
   const [launched, setLaunched] = useState<Record<string, number>>({});
@@ -101,8 +76,8 @@ export function SalesReportPage() {
   const [loaded, setLoaded] = useState("");
   const [erro, setErro] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
-  const [granularity, setGranularity] = useState<"month" | "week">("month");
-  const [weekFrom, setWeekFrom] = useState<string | null>(null);
+  const [marcados, setMarcados] = useState<string[]>([]);
+  const [lancando, setLancando] = useState(false);
 
   const loja = lojas[0];
   const lojaRef = useRef(loja);
@@ -111,14 +86,13 @@ export function SalesReportPage() {
   accountRef.current = account;
   const launchedRef = useRef(launched);
   launchedRef.current = launched;
-  const prontoRef = useRef(false);
-  const from = inicioDoMes(anchor);
-  const to = fimDoMes(anchor);
-  const monthRef = useRef({ from, to });
-  monthRef.current = { from, to };
-  const podeAvancar = somarMes(anchor, 1) <= hoje;
-  const podeVoltar = somarMes(anchor, -1) >= piso;
-  const faixa = loja ? `${loja.id}|${from}|${reloadKey}` : "";
+  const from = rangeFrom;
+  const to = rangeTo;
+  const rangeRef = useRef({ from, to });
+  rangeRef.current = { from, to };
+  const marcadosRef = useRef(marcados);
+  marcadosRef.current = marcados;
+  const faixa = loja ? `${loja.id}|${from}|${to}|${reloadKey}` : "";
   const quiosque = loja?.pointType === "SHOPPING";
 
   useEffect(() => {
@@ -128,7 +102,7 @@ export function SalesReportPage() {
       if (stop || !coverage.from) return;
       const month = inicioDoMes(coverage.from);
       setPiso(month);
-      setAnchor((atual) => (inicioDoMes(atual) < month ? month : atual));
+      setRangeFrom((atual) => (atual < month ? month : atual));
     });
     return () => {
       stop = true;
@@ -160,12 +134,11 @@ export function SalesReportPage() {
   }, [lojasLoading, escolher, loja, session.tenantId, from, to, faixa]);
 
   const pronto = loaded === faixa;
-  prontoRef.current = pronto;
 
-  const pedir = useCallback(async () => {
+  const puxar = useCallback(async () => {
     const atual = lojaRef.current;
     if (escolher || !atual) {
-      show("Escolha uma filial para lançar no shopping.", "danger");
+      show("Escolha uma filial para ler o shopping.", "danger");
       return;
     }
     const gate = forceLaunchAllowed({
@@ -176,76 +149,76 @@ export function SalesReportPage() {
       show(gate.message, "danger");
       return;
     }
-    const month = monthRef.current;
-    const pending = unlaunchedDays(month.from, month.to, hoje, new Set(Object.keys(launchedRef.current)));
-    if (prontoRef.current && pending.length === 0) {
+    const result = await requestShoppingRead(atual.id);
+    setReloadKey((n) => n + 1);
+    if (!result.ok) show(result.message, "danger");
+  }, [escolher, show]);
+
+  const lancar = useCallback(async () => {
+    const atual = lojaRef.current;
+    if (lancando || escolher || !atual) {
+      if (escolher || !atual) show("Escolha uma filial para lançar no shopping.", "danger");
+      return;
+    }
+    const gate = forceLaunchAllowed({
+      kiosk: atual.pointType === "SHOPPING",
+      administrator: accountRef.current?.administrator ?? null,
+    });
+    if (!gate.ok) {
+      show(gate.message, "danger");
+      return;
+    }
+    const jaLancado = new Set(Object.keys(launchedRef.current));
+    const dias = marcadosRef.current.filter((day) => day < hoje && !jaLancado.has(day));
+    if (dias.length === 0) {
       show(ALREADY_LAUNCHED, "success");
       return;
     }
-    const result = await requestShoppingLaunch(atual.id, month);
+    const span = rangeRef.current;
+    setLancando(true);
+    const result = await requestShoppingLaunch(atual.id, { from: span.from, to: span.to, days: dias });
+    setLancando(false);
     setReloadKey((n) => n + 1);
     if (!result.ok) show(result.message, "danger");
-    else show(result.message ?? "Vendas lançadas no shopping.", "success");
-  }, [escolher, hoje, show]);
+    else {
+      setMarcados([]);
+      show(result.message ?? "Vendas lançadas no shopping.", "success");
+    }
+  }, [escolher, hoje, lancando, show]);
 
   useScreenRefresh({
-    label: "Lançar vendas no shopping",
-    tip: "Abre o shopping só se este mês ainda tiver dia passado sem lançamento.",
+    label: "Atualizar vendas e lançamentos",
+    tip: "Busca as vendas de hoje e lê o que já está lançado no shopping. Não lança venda.",
     status: refreshMomentTitle(pronto ? (account?.lastRunAt ?? null) : undefined),
-    busyLabel: "Lançando vendas no shopping…",
-    run: () => pedir(),
+    busyLabel: "Lendo o shopping…",
+    sales: true,
+    run: () => puxar(),
   });
 
-  const dias = useMemo(() => reportDays(intervaloDias(from, to), sold, launched, hoje), [from, to, sold, launched, hoje]);
-  const blocos = useMemo(() => allosPeriods(from, to), [from, to]);
-  const bloco = useMemo(() => {
-    const escolhido = weekFrom ? blocos.find((period) => period.from === weekFrom) : undefined;
-    return escolhido ?? blocos.find((period) => period.from <= hoje && hoje <= period.to) ?? blocos[blocos.length - 1];
-  }, [blocos, weekFrom, hoje]);
-  const diasVisiveis = useMemo(
-    () => (granularity === "week" && bloco ? dias.filter((day) => day.date >= bloco.from && day.date <= bloco.to) : dias),
-    [granularity, bloco, dias],
-  );
-  const resumo = useMemo(() => monthReport(diasVisiveis, hoje), [diasVisiveis, hoje]);
-  const porDia = useMemo(() => new Map(dias.map((day) => [day.date, day])), [dias]);
-  const cells = useMemo(
-    () => (granularity === "week" && bloco ? celulasDoPeriodo(bloco.from, bloco.to) : celulasDoMes(anchor)),
-    [granularity, bloco, anchor],
-  );
-  const gestor = isGestor(session.role);
-  const primeiro = allosPeriods(piso, fimDoMes(piso))[0];
-  const ultimo = allosPeriods(inicioDoMes(hoje), fimDoMes(hoje)).at(-1);
-  const podeVoltarPeriodo = bloco != null && bloco.from !== primeiro?.from;
-  const podeAvancarPeriodo = bloco != null && bloco.from !== ultimo?.from;
+  useEffect(() => {
+    const onSynced = () => setReloadKey((n) => n + 1);
+    window.addEventListener(SALES_SYNCED_EVENT, onSynced);
+    return () => window.removeEventListener(SALES_SYNCED_EVENT, onSynced);
+  }, []);
 
-  function irParaMes(alvo: string) {
-    const mes = inicioDoMes(alvo);
-    if (mes < piso || mes > inicioDoMes(hoje)) return;
-    setWeekFrom(null);
-    setAnchor(mes === inicioDoMes(hoje) ? hoje : mes);
+  const dias = useMemo(() => reportDays(intervaloDias(from, to), sold, launched, hoje), [from, to, sold, launched, hoje]);
+  const resumo = useMemo(() => monthReport(dias, hoje), [dias, hoje]);
+  const porDia = useMemo(() => new Map(dias.map((day) => [day.date, day])), [dias]);
+  const cells = useMemo(() => celulasDoIntervalo(from, to), [from, to]);
+  const gestor = isGestor(session.role);
+  const mesAtual = from === inicioDoMes(hoje) && to === fimDoMes(hoje);
+  const paraLancar = marcados.filter((day) => day < hoje && launched[day] == null);
+
+  function aplicarIntervalo(inicio: Date, fim: Date) {
+    const nextFrom = paraIso(inicio);
+    const nextTo = paraIso(fim);
+    setRangeFrom(nextFrom);
+    setRangeTo(nextTo);
+    setMarcados((atual) => atual.filter((day) => day >= nextFrom && day <= nextTo));
   }
 
-  function irPeriodo(delta: number) {
-    if (!bloco) return;
-    const index = blocos.findIndex((period) => period.from === bloco.from);
-    const next = index + delta;
-    if (next >= 0 && next < blocos.length) {
-      setWeekFrom(blocos[next].from);
-      return;
-    }
-    if (delta < 0) {
-      const prevMonth = somarMes(anchor, -1);
-      if (prevMonth < piso) return;
-      const prev = allosPeriods(prevMonth, fimDoMes(prevMonth));
-      setWeekFrom(prev.at(-1)?.from ?? null);
-      setAnchor(prevMonth === inicioDoMes(hoje) ? hoje : prevMonth);
-      return;
-    }
-    const nextMonth = somarMes(anchor, 1);
-    if (nextMonth > inicioDoMes(hoje)) return;
-    const following = allosPeriods(nextMonth, fimDoMes(nextMonth));
-    setWeekFrom(following[0]?.from ?? null);
-    setAnchor(nextMonth === inicioDoMes(hoje) ? hoje : nextMonth);
+  function toggleDia(day: string) {
+    setMarcados((atual) => (atual.includes(day) ? atual.filter((item) => item !== day) : [...atual, day]));
   }
 
   return (
@@ -257,47 +230,18 @@ export function SalesReportPage() {
         actions={
           <HeaderFilters>
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex gap-1 rounded-[11px] border border-line bg-bg-2 p-1">
-                <button type="button" className={cn(filtroBtn, granularity === "month" ? "bg-acc text-white" : "text-t1 hover:text-t0")} onClick={() => setGranularity("month")}>
-                  Mensal
-                </button>
-                <button type="button" className={cn(filtroBtn, granularity === "week" ? "bg-acc text-white" : "text-t1 hover:text-t0")} onClick={() => setGranularity("week")}>
-                  Semanal
-                </button>
-              </div>
-              {granularity === "month" ? (
-                <SeletorMesAno iso={anchor} hoje={hoje} minIso={piso} onChange={irParaMes} />
-              ) : (
-                <SeletorPeriodo
-                  period={bloco}
-                  hoje={hoje}
-                  piso={piso}
-                  onChange={(inicio) => {
-                    setWeekFrom(inicio);
-                    const mes = inicioDoMes(inicio);
-                    setAnchor(mes === inicioDoMes(hoje) ? hoje : mes);
-                  }}
-                />
-              )}
-              {granularity === "month" ? (
-                <>
-                  <button type="button" aria-label="Mês anterior" className={monthNavBtn} disabled={!podeVoltar} onClick={() => irParaMes(somarMes(anchor, -1))}>
-                    <Seta dir="anterior" />
-                  </button>
-                  <button type="button" aria-label="Próximo mês" className={monthNavBtn} disabled={!podeAvancar} onClick={() => irParaMes(somarMes(anchor, 1))}>
-                    <Seta dir="proximo" />
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button type="button" aria-label="Período anterior" className={monthNavBtn} disabled={!podeVoltarPeriodo} onClick={() => irPeriodo(-1)}>
-                    <Seta dir="anterior" />
-                  </button>
-                  <button type="button" aria-label="Próximo período" className={monthNavBtn} disabled={!podeAvancarPeriodo} onClick={() => irPeriodo(1)}>
-                    <Seta dir="proximo" />
-                  </button>
-                </>
-              )}
+              <DateRangePicker
+                value={[deIso(from), deIso(to)]}
+                minDate={deIso(piso)}
+                maxDate={deIso(fimDoMes(hoje))}
+                quickRanges={MES_CHEIO}
+                displayLabel={mesAtual ? "Este mês" : null}
+                activePresetId={mesAtual ? "esteMes" : null}
+                onChange={([inicio, fim]) => aplicarIntervalo(inicio, fim)}
+              />
+              <Button onClick={() => void lancar()} disabled={lancando || paraLancar.length === 0}>
+                {lancando ? "Lançando…" : paraLancar.length === 0 ? "Lançar" : paraLancar.length === 1 ? "Lançar · 1 dia" : `Lançar · ${paraLancar.length} dias`}
+              </Button>
             </div>
           </HeaderFilters>
         }
@@ -352,7 +296,15 @@ export function SalesReportPage() {
                 </div>
                 <div className="grid grid-cols-7">
                   {cells.map((day, i) => (
-                    <DiaCelula key={day ?? `vazio-${i}`} index={i} day={day} hoje={hoje} row={day ? porDia.get(day) : undefined} />
+                    <DiaCelula
+                      key={day ?? `vazio-${i}`}
+                      index={i}
+                      day={day}
+                      hoje={hoje}
+                      marcado={day != null && marcados.includes(day)}
+                      onToggle={toggleDia}
+                      row={day ? porDia.get(day) : undefined}
+                    />
                   ))}
                 </div>
               </div>
@@ -368,31 +320,49 @@ function DiaCelula({
   index,
   day,
   hoje,
+  marcado,
+  onToggle,
   row,
 }: {
   index: number;
   day: string | null;
   hoje: string;
+  marcado: boolean;
+  onToggle: (day: string) => void;
   row?: { soldCents: number; launchedCents: number | null };
 }) {
   const borda = cn(
-    "flex min-h-[108px] w-full min-w-0 flex-col items-stretch justify-start border-b border-r border-line p-1.5 text-left sm:min-h-[132px] sm:p-2",
+    "relative flex min-h-[108px] w-full min-w-0 flex-col items-stretch justify-start border-b border-r border-line p-1.5 text-left sm:min-h-[132px] sm:p-2",
     (index + 1) % 7 === 0 && "border-r-0",
     !day && "bg-bg-1/30",
+    marcado && "bg-acc-soft/40",
   );
   if (!day) return <div className={borda} />;
-  const futuro = day >= hoje;
+  const passado = day < hoje;
   const lancado = row?.launchedCents ?? 0;
   const igual = row != null && lancado === row.soldCents;
   return (
     <div className={borda}>
-      <span
-        className={cn(
-          "inline-flex h-6 w-6 shrink-0 items-center justify-center self-start rounded-full text-[12px] font-bold",
-          day === hoje ? "bg-acc text-white" : futuro ? "text-t2" : "text-t1",
-        )}
-      >
-        {deIso(day).getDate()}
+      {marcado ? <span aria-hidden className="pointer-events-none absolute inset-0 z-10 border border-acc" /> : null}
+      <span className="flex w-full items-start justify-between gap-1">
+        <span
+          className={cn(
+            "inline-flex h-6 w-6 shrink-0 items-center justify-center self-start rounded-full text-[12px] font-bold",
+            day === hoje ? "bg-acc text-white" : passado ? "text-t1" : "text-t2",
+          )}
+        >
+          {deIso(day).getDate()}
+        </span>
+        {passado ? (
+          <input
+            type="checkbox"
+            aria-label={`Marcar ${deIso(day).getDate()}`}
+            checked={marcado}
+            className="mt-0.5 h-4 w-4 shrink-0"
+            style={{ accentColor: "var(--acc)" }}
+            onChange={() => onToggle(day)}
+          />
+        ) : null}
       </span>
       {row ? (
         <>
@@ -400,137 +370,6 @@ function DiaCelula({
           <ChipDia cor={igual ? "bg-ok" : "bg-bad"}>{`Lançado ${money(lancado)}`}</ChipDia>
         </>
       ) : null}
-    </div>
-  );
-}
-
-/** No Semanal, o campo lista os blocos da Allos e o rótulo é o intervalo, como 11 a 17 de Outubro. */
-function SeletorPeriodo({
-  period,
-  hoje,
-  piso,
-  onChange,
-}: {
-  period?: { from: string; to: string };
-  hoje: string;
-  piso: string;
-  onChange: (from: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [vista, setVista] = useState(() => inicioDoMes(period?.from ?? hoje));
-  const [panelPos, setPanelPos] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
-  const triggerRef = useRef<HTMLDivElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const rotulo = period ? rotuloPeriodo(period.from, period.to, hoje) : "";
-  const periodos = allosPeriods(inicioDoMes(vista), fimDoMes(vista));
-  const titulo = `${MESES_PT[deIso(vista).getMonth()]} de ${deIso(vista).getFullYear()}`;
-  const podeMesAnt = somarMes(vista, -1) >= piso;
-  const podeMesProx = somarMes(vista, 1) <= inicioDoMes(hoje);
-  const navBtn = (ok: boolean) =>
-    cn("flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-line text-t1", ok ? "hover:bg-bg-3" : "cursor-not-allowed opacity-40");
-
-  useEffect(() => {
-    if (!open || !period) return;
-    setVista(inicioDoMes(period.from));
-  }, [open, period]);
-
-  useEffect(() => {
-    function onClick(e: MouseEvent) {
-      const target = e.target as Node;
-      if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) return;
-      setOpen(false);
-    }
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, []);
-
-  useEffect(() => {
-    if (!open || !triggerRef.current) {
-      setPanelPos(null);
-      return;
-    }
-    function colocar() {
-      if (!triggerRef.current) return;
-      const rect = triggerRef.current.getBoundingClientRect();
-      const margem = 12;
-      const width = Math.min(window.innerWidth - margem * 2, 280);
-      let left = rect.right - width;
-      if (left < margem) left = margem;
-      const top = Math.min(rect.bottom + 8, window.innerHeight - margem - 80);
-      setPanelPos({ top, left, width, maxHeight: Math.max(200, window.innerHeight - top - margem) });
-    }
-    colocar();
-    window.addEventListener("resize", colocar);
-    window.addEventListener("scroll", colocar, true);
-    return () => {
-      window.removeEventListener("resize", colocar);
-      window.removeEventListener("scroll", colocar, true);
-    };
-  }, [open]);
-
-  const painel =
-    open && panelPos
-      ? createPortal(
-          <div
-            ref={panelRef}
-            style={{ top: panelPos.top, left: panelPos.left, width: panelPos.width, maxHeight: panelPos.maxHeight }}
-            className="fixed z-[80] overflow-y-auto rounded-[14px] border border-line bg-bg-2 p-4 shadow-[var(--shadow-vela)]"
-          >
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <button type="button" disabled={!podeMesAnt} aria-label="Mês anterior" className={navBtn(podeMesAnt)} onClick={() => setVista((atual) => somarMes(atual, -1))}>
-                <Seta dir="anterior" />
-              </button>
-              <span className="truncate text-sm font-bold text-t0">{titulo}</span>
-              <button type="button" disabled={!podeMesProx} aria-label="Próximo mês" className={navBtn(podeMesProx)} onClick={() => setVista((atual) => somarMes(atual, 1))}>
-                <Seta dir="proximo" />
-              </button>
-            </div>
-            <div className="flex flex-col gap-1">
-              {periodos.map((item) => {
-                const ativo = period?.from === item.from;
-                const bloqueado = item.to < piso || inicioDoMes(item.from) > inicioDoMes(hoje);
-                return (
-                  <button
-                    key={item.from}
-                    type="button"
-                    disabled={bloqueado}
-                    onClick={() => {
-                      onChange(item.from);
-                      setOpen(false);
-                    }}
-                    className={cn(
-                      "h-9 rounded-[9px] px-2 text-left text-[12.5px] font-semibold transition-colors",
-                      bloqueado ? "cursor-not-allowed text-t2 opacity-30" : ativo ? "bg-acc text-white" : "text-t1 hover:bg-bg-3",
-                    )}
-                  >
-                    {rotuloPeriodo(item.from, item.to, hoje)}
-                  </button>
-                );
-              })}
-            </div>
-          </div>,
-          document.body,
-        )
-      : null;
-
-  return (
-    <div ref={triggerRef} className="relative inline-flex">
-      <button
-        type="button"
-        aria-label={`Período: ${rotulo}`}
-        onClick={() => setOpen((atual) => !atual)}
-        className={cn(
-          "flex h-10 min-w-0 items-center gap-2.5 rounded-[var(--radius-vela-sm)] border bg-bg-3 px-3.5 text-left transition-colors",
-          open ? "border-acc" : "border-line hover:border-acc",
-        )}
-      >
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={open ? "var(--acc)" : "var(--t2)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-          <rect x="3" y="4" width="18" height="18" rx="2" />
-          <path d="M16 2v4M8 2v4M3 10h18" />
-        </svg>
-        <span className="truncate text-[13.5px] font-semibold text-t0">{rotulo}</span>
-      </button>
-      {painel}
     </div>
   );
 }

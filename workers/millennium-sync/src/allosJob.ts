@@ -33,7 +33,7 @@ export function runShoppingStore(
   erpSecret: string,
   storeId: string,
   read: boolean,
-  month?: { from: string; to: string },
+  month?: { from: string; to: string; days?: string[] },
 ): Promise<{ ok: true; message?: string } | { ok: false; message: string }> {
   const run = tail.then(() => runShoppingNow(sb, erpSecret, storeId, read, month), () => runShoppingNow(sb, erpSecret, storeId, read, month));
   tail = run.then(
@@ -49,6 +49,11 @@ function monthAround(today: string): { from: string; to: string } {
   return { from: `${today.slice(0, 8)}01`, to: `${today.slice(0, 8)}${String(last).padStart(2, "0")}` };
 }
 
+function chosenDays(days: string[] | undefined): string[] {
+  const iso = /^\d{4}-\d{2}-\d{2}$/;
+  return [...new Set((days ?? []).filter((day) => iso.test(day)))].sort();
+}
+
 function chosenMonth(today: string, month?: { from: string; to: string }): { from: string; to: string } {
   const iso = /^\d{4}-\d{2}-\d{2}$/;
   if (month && iso.test(month.from) && iso.test(month.to) && month.from <= month.to) return month;
@@ -60,7 +65,7 @@ async function runShoppingNow(
   erpSecret: string,
   storeId: string,
   read: boolean,
-  month?: { from: string; to: string },
+  month?: { from: string; to: string; days?: string[] },
 ): Promise<{ ok: true; message?: string } | { ok: false; message: string }> {
   const { data: store } = await sb.from("store").select("id, tenant_id, point_type, timezone").eq("id", storeId).maybeSingle();
   if (!store) return { ok: false, message: KEEP };
@@ -75,11 +80,17 @@ async function runShoppingNow(
 
   const today = todayIn((store.timezone as string | null) || "America/Campo_Grande");
   const span = chosenMonth(today, month);
+  const selected = chosenDays(month?.days);
+  let only: ReadonlySet<string> | undefined;
   if (!read) {
     const { data: stored, error: storedError } = await sb.from("shopping_day").select("day").eq("store_id", storeId).gte("day", span.from).lte("day", span.to);
     if (storedError) return { ok: false, message: KEEP };
     const launched = new Set((stored ?? []).map((row) => String(row.day).slice(0, 10)));
-    if (unlaunchedDays(span.from, span.to, today, launched).length === 0) return { ok: true, message: ALREADY_LAUNCHED };
+    const pending = selected.length > 0
+      ? selected.filter((day) => day >= span.from && day <= span.to && day < today && !launched.has(day))
+      : unlaunchedDays(span.from, span.to, today, launched);
+    if (pending.length === 0) return { ok: true, message: ALREADY_LAUNCHED };
+    if (selected.length > 0) only = new Set(pending);
   }
   let message = read ? "Não foi possível ler o que já está no shopping. Nada foi alterado." : KEEP;
   try {
@@ -108,7 +119,7 @@ async function runShoppingNow(
                 revenueCents: Number(row.revenue_cents) || 0,
               })),
             );
-          });
+          }, only);
       if (posted.ok) {
         await remember(sb, store.tenant_id as string, storeId, posted.days);
         await sb.from("store_shopping").update({ last_run_at: new Date().toISOString(), last_error: "" }).eq("store_id", storeId);

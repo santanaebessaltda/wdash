@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Card, Dropdown, Modal, Segmented, Skeleton, useToast, type DropdownItem } from "@/components/ui";
+import { Alert, Button, Card, DateRangePicker, Dropdown, Modal, Segmented, Skeleton, useToast, type DropdownItem, type QuickRange } from "@/components/ui";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { fetchLatestCashCloseError, fetchNavMonthFloor, fetchOpenCashCloseJob, requestSangriaMonth } from "@/data/wedash/cashCloseRepo";
 import { fetchSyncWatermark } from "@/data/wedash/salesRepo";
@@ -16,14 +16,15 @@ import {
   type SangriaShortageRow,
 } from "@/data/wedash/sangriaRepo";
 import { dayAmounts, depositBoleto, sumAmounts, type SangriaAmounts } from "@/data/wedash/sangriaMath";
-import { brlCent, dataExtenso, deIso, fimDoMes, inicioDoMes, somarDias } from "@/lib/format";
+import { brlCent, dataExtenso, deIso, fimDoMes, inicioDoMes, paraIso, somarDias } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { useScope } from "@/pages/dashboard/useScope";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { NumberInput, SectionHeader, SelectStoreCard, parseNum, pickOneStore, useScopedStores } from "@/pages/operation/shared";
-import { ChipDia, monthNavBtn, PlainKpi, SeletorMesAno, Seta } from "@/pages/cash-close/CashClosePage";
+import { ChipDia, PlainKpi } from "@/pages/cash-close/CashClosePage";
+import { sangriaMonthSpan } from "@/data/wedash/cashCloseMonth";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { HeaderFilters } from "@/pages/stock/shared";
 
@@ -40,11 +41,17 @@ const money = (cents: number) => brlCent(cents / 100);
 
 type AcaoLote = "recebido" | "aCobrar" | "fora" | "falta" | "desfazer";
 
-function celulasDoMes(iso: string): Array<string | null> {
-  const inicio = inicioDoMes(iso);
-  const fim = fimDoMes(iso);
-  const cells: Array<string | null> = Array.from({ length: deIso(inicio).getDay() }, () => null);
-  for (let day = inicio; day <= fim; day = somarDias(day, 1)) cells.push(day);
+const MES_CHEIO: QuickRange[] = [
+  {
+    id: "esteMes",
+    label: "Este mês",
+    resolve: (hoje) => [new Date(hoje.getFullYear(), hoje.getMonth(), 1), new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)],
+  },
+];
+
+function celulasDoIntervalo(from: string, to: string): Array<string | null> {
+  const cells: Array<string | null> = Array.from({ length: deIso(from).getDay() }, () => null);
+  for (let day = from; day <= to; day = somarDias(day, 1)) cells.push(day);
   while (cells.length % 7 !== 0) cells.push(null);
   return cells;
 }
@@ -62,7 +69,8 @@ export function SangriaPage() {
   const escolher = pickOneStore(escopo.filialIds, session.stores.length);
   const showLojas = useMinSkeleton(lojasLoading);
   const hoje = calendarTodayIso();
-  const [anchor, setAnchor] = useState(hoje);
+  const [rangeFrom, setRangeFrom] = useState(() => inicioDoMes(hoje));
+  const [rangeTo, setRangeTo] = useState(() => fimDoMes(hoje));
   const [piso, setPiso] = useState(() => inicioDoMes(hoje));
   const [lines, setLines] = useState<SangriaLineRow[]>([]);
   const [deposits, setDeposits] = useState<SangriaDepositDay[]>([]);
@@ -84,14 +92,14 @@ export function SangriaPage() {
   const loja = lojas[0];
   const lojaRef = useRef(loja);
   lojaRef.current = loja;
-  const anchorRef = useRef(anchor);
-  anchorRef.current = anchor;
-  const from = inicioDoMes(anchor);
-  const to = fimDoMes(anchor);
-  const podeAvancar = somarMes(anchor, 1) <= hoje;
-  const podeVoltar = somarMes(anchor, -1) >= piso;
-  const cells = useMemo(() => celulasDoMes(anchor), [anchor]);
-  const faixa = loja ? `${loja.id}|${from}|${reloadKey}` : "";
+  const rangeFromRef = useRef(rangeFrom);
+  rangeFromRef.current = rangeFrom;
+  const rangeToRef = useRef(rangeTo);
+  rangeToRef.current = rangeTo;
+  const from = rangeFrom;
+  const to = rangeTo;
+  const cells = useMemo(() => celulasDoIntervalo(from, to), [from, to]);
+  const faixa = loja ? `${loja.id}|${from}|${to}|${reloadKey}` : "";
 
   const lojaId = loja?.id ?? "";
   const selecaoLoja = escolher ? "" : lojaId;
@@ -108,7 +116,7 @@ export function SangriaPage() {
     void fetchNavMonthFloor("sangria_line", session.tenantId, lojaId, hoje).then((month) => {
       if (stop) return;
       setPiso(month);
-      setAnchor((atual) => (inicioDoMes(atual) < month ? month : atual));
+      setRangeFrom((atual) => (atual < month ? month : atual));
     });
     return () => {
       stop = true;
@@ -152,17 +160,25 @@ export function SangriaPage() {
   const pedir = useCallback(async () => {
     const atual = lojaRef.current;
     if (escolher || !atual) return;
-    const r = await requestSangriaMonth([atual.id], anchorRef.current);
-    if (!r.ok) {
-      show(r.message, "danger");
-      return;
+    const inicio = inicioDoMes(rangeFromRef.current);
+    const fim = inicioDoMes(rangeToRef.current);
+    const months = inicio === fim ? [inicio] : [inicio, fim];
+    const hojeIso = calendarTodayIso();
+    const comDia = months.filter((month) => sangriaMonthSpan(month, hojeIso));
+    const alvos = comDia.length > 0 ? comDia : [inicio];
+    for (const month of alvos) {
+      const r = await requestSangriaMonth([atual.id], month);
+      if (!r.ok) {
+        show(r.message, "danger");
+        return;
+      }
     }
     setSyncing(true);
   }, [escolher, show]);
 
   useScreenRefresh({
     label: "Atualizar vendas e sangrias",
-    tip: "Busca as vendas de hoje e as sangrias do mês exibido.",
+    tip: "Busca as vendas de hoje e as sangrias do mês deste período.",
     status: refreshMomentTitle(watermark ? watermark.toISOString() : watermark),
     busyLabel: "Buscando vendas e sangrias…",
     sales: true,
@@ -347,11 +363,14 @@ export function SangriaPage() {
     }
   }
 
-  function irParaMes(alvo: string) {
-    const mes = inicioDoMes(alvo);
-    if (mes < piso || mes > inicioDoMes(hoje)) return;
-    setAnchor(mes === inicioDoMes(hoje) ? hoje : mes);
-    setMarcados([]);
+  const mesAtual = from === inicioDoMes(hoje) && to === fimDoMes(hoje);
+
+  function aplicarIntervalo(inicio: Date, fim: Date) {
+    const nextFrom = paraIso(inicio);
+    const nextTo = paraIso(fim);
+    setRangeFrom(nextFrom);
+    setRangeTo(nextTo);
+    setMarcados((atual) => atual.filter((day) => day >= nextFrom && day <= nextTo));
   }
 
   return (
@@ -362,15 +381,15 @@ export function SangriaPage() {
         subtitle="Confira as sangrias, defina o que entra no boleto e acompanhe os valores recebidos."
         actions={
           <HeaderFilters>
-            <div className="flex items-center gap-2">
-              <SeletorMesAno iso={anchor} hoje={hoje} minIso={piso} onChange={irParaMes} />
-              <button type="button" aria-label="Mês anterior" className={monthNavBtn} disabled={!podeVoltar} onClick={() => irParaMes(somarMes(anchor, -1))}>
-                <Seta dir="anterior" />
-              </button>
-              <button type="button" aria-label="Próximo mês" className={monthNavBtn} disabled={!podeAvancar} onClick={() => irParaMes(somarMes(anchor, 1))}>
-                <Seta dir="proximo" />
-              </button>
-            </div>
+            <DateRangePicker
+              value={[deIso(from), deIso(to)]}
+              minDate={deIso(piso)}
+              maxDate={deIso(fimDoMes(hoje))}
+              quickRanges={MES_CHEIO}
+              displayLabel={mesAtual ? "Este mês" : null}
+              activePresetId={mesAtual ? "esteMes" : null}
+              onChange={([inicio, fim]) => aplicarIntervalo(inicio, fim)}
+            />
             {!escolher && loja ? <MarcarComo dias={marcados.length} rotulo={rotuloMarcar} valor={valorACobrar} recebidoOk={diasRecebiveis.length > 0} foraOk={linhasBoletoAbertas.length > 0} cobrarOk={linhasForaAbertas.length > 0} tudoRecebido={marcados.length > 0 && marcados.every((day) => taken.has(day))} podeDesfazer={depositosMarcados.length > 0} onRecebido={() => setAcao("recebido")} onCobrar={() => setAcao("aCobrar")} onFora={() => { setMotivoLote(""); setAcao("fora"); }} onFalta={abrirFalta} onDesfazer={() => void abrirDesfazer()} /> : null}
           </HeaderFilters>
         }
@@ -576,14 +595,6 @@ function NumeroDia({ iso, hoje }: { iso: string; hoje: string }) {
       {deIso(iso).getDate()}
     </span>
   );
-}
-
-function somarMes(iso: string, meses: number): string {
-  const d = deIso(inicioDoMes(iso));
-  d.setMonth(d.getMonth() + meses);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  return `${y}-${m}-01`;
 }
 
 function reaisCampo(cents: number): string {

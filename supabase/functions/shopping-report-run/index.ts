@@ -36,7 +36,7 @@ serve(async (req) => {
   const caller = await loadStaffCaller(admin, userData.user.id);
   if (!caller) return json({ error: "forbidden" }, 403);
 
-  let body: { storeId?: unknown; read?: unknown; from?: unknown; to?: unknown };
+  let body: { storeId?: unknown; read?: unknown; from?: unknown; to?: unknown; days?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -67,6 +67,7 @@ serve(async (req) => {
         read: readOnly,
         from: typeof body.from === "string" ? body.from : "",
         to: typeof body.to === "string" ? body.to : "",
+        days: Array.isArray(body.days) ? body.days.filter((day): day is string => typeof day === "string") : [],
       }),
     });
     const data = await remote.json().catch(() => null);
