@@ -82,7 +82,7 @@ O gestor lança, à mão, as vendas brutas de cada quiosque no painel do shoppin
 11. WHEN a past day is on the calendar THEN the system SHALL show a Vendido badge and a Lançado badge. The Lançado badge SHALL be green when the two amounts are equal and red when they differ.
 12. IF the mall answers that the login was not accepted THEN the system SHALL keep the stored shopping values and SHALL NOT call the mall again only because the report was opened.
 13. WHEN the mall login requires the browser verification THEN the system SHALL open that login page in a browser session before posting the password.
-14. WHEN the report is open THEN the period control SHALL be a start and end date, defaulting to the current month, and the calendar SHALL show only the days inside that range. Vendido, Lançado and Diferença SHALL follow the closed days of that range.
+14. WHEN the report is open THEN the period control SHALL offer Hoje, Ontem, Esta semana, Este mês, Este trimestre, Este semestre and Este ano, SHALL default to Este mês from the first day of the month through today, and the calendar SHALL show only the days inside that range. Vendido, Lançado and Diferença SHALL follow the closed days of that range.
 15. WHEN the person launches selected days THEN the system SHALL post only the selected past days that have no stored launch. WHEN none of those days is pending THEN the system SHALL NOT open the mall browser.
 
 **Independent Test**: Mês com um dia vendido a R$ 100,00 e lançado a R$ 120,00, e outro vendido a R$ 50,00 sem lançamento. Vendido R$ 150,00, lançado R$ 120,00, diferença R$ 30,00 a menos.

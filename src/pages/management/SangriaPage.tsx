@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Card, DateRangePicker, Dropdown, Modal, Segmented, Skeleton, useToast, type DropdownItem, type QuickRange } from "@/components/ui";
+import { Alert, Button, Card, DateRangePicker, Dropdown, Modal, Segmented, Skeleton, useToast, type DatePresetId, type DateRangeChangeMeta, type DropdownItem } from "@/components/ui";
 import { calendarTodayIso } from "@/data/wedash/clock";
+import { periodLabels } from "@/data/wedash/dashboard";
 import { fetchLatestCashCloseError, fetchNavMonthFloor, fetchOpenCashCloseJob, requestSangriaMonth } from "@/data/wedash/cashCloseRepo";
 import { fetchSyncWatermark } from "@/data/wedash/salesRepo";
 import {
@@ -24,7 +25,7 @@ import { useScope } from "@/pages/dashboard/useScope";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { NumberInput, SectionHeader, SelectStoreCard, parseNum, pickOneStore, useScopedStores } from "@/pages/operation/shared";
 import { ChipDia, PlainKpi } from "@/pages/cash-close/CashClosePage";
-import { sangriaMonthSpan } from "@/data/wedash/cashCloseMonth";
+import { monthsTouched, sangriaMonthSpan } from "@/data/wedash/cashCloseMonth";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { HeaderFilters } from "@/pages/stock/shared";
 
@@ -40,14 +41,6 @@ const WEEK = [
 const money = (cents: number) => brlCent(cents / 100);
 
 type AcaoLote = "recebido" | "aCobrar" | "fora" | "falta" | "desfazer";
-
-const MES_CHEIO: QuickRange[] = [
-  {
-    id: "esteMes",
-    label: "Este mês",
-    resolve: (hoje) => [new Date(hoje.getFullYear(), hoje.getMonth(), 1), new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)],
-  },
-];
 
 function celulasDoIntervalo(from: string, to: string): Array<string | null> {
   const cells: Array<string | null> = Array.from({ length: deIso(from).getDay() }, () => null);
@@ -70,7 +63,8 @@ export function SangriaPage() {
   const showLojas = useMinSkeleton(lojasLoading);
   const hoje = calendarTodayIso();
   const [rangeFrom, setRangeFrom] = useState(() => inicioDoMes(hoje));
-  const [rangeTo, setRangeTo] = useState(() => fimDoMes(hoje));
+  const [rangeTo, setRangeTo] = useState(() => hoje);
+  const [presetId, setPresetId] = useState<DatePresetId | null>("esteMes");
   const [piso, setPiso] = useState(() => inicioDoMes(hoje));
   const [lines, setLines] = useState<SangriaLineRow[]>([]);
   const [deposits, setDeposits] = useState<SangriaDepositDay[]>([]);
@@ -116,7 +110,11 @@ export function SangriaPage() {
     void fetchNavMonthFloor("sangria_line", session.tenantId, lojaId, hoje).then((month) => {
       if (stop) return;
       setPiso(month);
-      setRangeFrom((atual) => (atual < month ? month : atual));
+      setRangeFrom((atual) => {
+        if (atual >= month) return atual;
+        setPresetId(null);
+        return month;
+      });
     });
     return () => {
       stop = true;
@@ -160,12 +158,10 @@ export function SangriaPage() {
   const pedir = useCallback(async () => {
     const atual = lojaRef.current;
     if (escolher || !atual) return;
-    const inicio = inicioDoMes(rangeFromRef.current);
-    const fim = inicioDoMes(rangeToRef.current);
-    const months = inicio === fim ? [inicio] : [inicio, fim];
+    const months = monthsTouched(rangeFromRef.current, rangeToRef.current);
     const hojeIso = calendarTodayIso();
     const comDia = months.filter((month) => sangriaMonthSpan(month, hojeIso));
-    const alvos = comDia.length > 0 ? comDia : [inicio];
+    const alvos = comDia.length > 0 ? comDia : [months[0]];
     for (const month of alvos) {
       const r = await requestSangriaMonth([atual.id], month);
       if (!r.ok) {
@@ -363,13 +359,12 @@ export function SangriaPage() {
     }
   }
 
-  const mesAtual = from === inicioDoMes(hoje) && to === fimDoMes(hoje);
-
-  function aplicarIntervalo(inicio: Date, fim: Date) {
+  function aplicarIntervalo(inicio: Date, fim: Date, meta?: DateRangeChangeMeta) {
     const nextFrom = paraIso(inicio);
     const nextTo = paraIso(fim);
     setRangeFrom(nextFrom);
     setRangeTo(nextTo);
+    setPresetId(meta?.presetId ?? null);
     setMarcados((atual) => atual.filter((day) => day >= nextFrom && day <= nextTo));
   }
 
@@ -385,10 +380,9 @@ export function SangriaPage() {
               value={[deIso(from), deIso(to)]}
               minDate={deIso(piso)}
               maxDate={deIso(fimDoMes(hoje))}
-              quickRanges={MES_CHEIO}
-              displayLabel={mesAtual ? "Este mês" : null}
-              activePresetId={mesAtual ? "esteMes" : null}
-              onChange={([inicio, fim]) => aplicarIntervalo(inicio, fim)}
+              displayLabel={presetId ? periodLabels[presetId] : null}
+              activePresetId={presetId}
+              onChange={([inicio, fim], meta) => aplicarIntervalo(inicio, fim, meta)}
             />
             {!escolher && loja ? <MarcarComo dias={marcados.length} rotulo={rotuloMarcar} valor={valorACobrar} recebidoOk={diasRecebiveis.length > 0} foraOk={linhasBoletoAbertas.length > 0} cobrarOk={linhasForaAbertas.length > 0} tudoRecebido={marcados.length > 0 && marcados.every((day) => taken.has(day))} podeDesfazer={depositosMarcados.length > 0} onRecebido={() => setAcao("recebido")} onCobrar={() => setAcao("aCobrar")} onFora={() => { setMotivoLote(""); setAcao("fora"); }} onFalta={abrirFalta} onDesfazer={() => void abrirDesfazer()} /> : null}
           </HeaderFilters>

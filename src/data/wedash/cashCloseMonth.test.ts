@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { cashCloseJobMatches, clampCloseRange, closeHistoryFloor, missingCloseDays, monthCloseSpan, monthCloseSpanFor, navMonthFloor, sangriaMonthSpan } from "./cashCloseMonth";
+import { cashCloseJobMatches, clampCloseRange, closeHistoryFloor, missingCloseDays, monthCloseSpan, monthCloseSpanFor, monthsTouched, navMonthFloor, sangriaMonthSpan } from "./cashCloseMonth";
+
+describe("monthsTouched", () => {
+  it("um mês devolve só esse mês", () => {
+    expect(monthsTouched("2026-10-01", "2026-10-13")).toEqual(["2026-10-01"]);
+  });
+
+  it("atravessa a virada do ano", () => {
+    expect(monthsTouched("2026-11-20", "2027-01-02")).toEqual(["2026-11-01", "2026-12-01", "2027-01-01"]);
+  });
+});
 
 describe("monthCloseSpan", () => {
   it("no dia 8 pede do dia 1 até o dia 7", () => {

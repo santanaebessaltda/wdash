@@ -1,5 +1,21 @@
 import { fimDoMes, inicioDoMes, somarDias } from "./engine/format.ts";
 
+/** Meses civis que o intervalo toca, do primeiro ao último, inclusive. */
+export function monthsTouched(from: string, to: string): string[] {
+  const start = inicioDoMes(from <= to ? from : to);
+  const end = inicioDoMes(from <= to ? to : from);
+  const months: string[] = [];
+  let cursor = start;
+  while (cursor <= end) {
+    months.push(cursor);
+    const [year, month] = cursor.split("-").map(Number);
+    const nextYear = month === 12 ? year + 1 : year;
+    const nextMonth = month === 12 ? 1 : month + 1;
+    cursor = `${nextYear}-${String(nextMonth).padStart(2, "0")}-01`;
+  }
+  return months;
+}
+
 /** Do dia 1 do mês de `monthDay` até ontem, ou até o fim do mês se ele já passou. */
 export function monthCloseSpanFor(monthDay: string, today: string): { from: string; to: string } | null {
   const from = inicioDoMes(monthDay);

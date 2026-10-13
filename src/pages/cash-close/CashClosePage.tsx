@@ -1,8 +1,8 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Alert, Badge, Button, Card, DateRangePicker, Modal, Skeleton, Tooltip, useToast, type QuickRange } from "@/components/ui";
+import { Alert, Badge, Button, Card, DateRangePicker, Modal, Skeleton, Tooltip, useToast, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
 import { EmployeeWithdrawal } from "@/pages/cash-close/EmployeeWithdrawal";
-import { monthCloseSpanFor } from "@/data/wedash/cashCloseMonth";
+import { monthCloseSpanFor, monthsTouched } from "@/data/wedash/cashCloseMonth";
 import {
   applyCloseReview,
   buildCashCloseView,
@@ -28,6 +28,7 @@ import {
   type CashCloseSnapshot,
 } from "@/data/wedash/cashCloseRepo";
 import { calendarTodayIso } from "@/data/wedash/clock";
+import { periodLabels } from "@/data/wedash/dashboard";
 import {
   dayShortageCents,
   netCloseDiff,
@@ -84,14 +85,6 @@ function fimDaPagina(ano: number, hojeAno: number): number {
   const alvo = Math.min(ano, hojeAno);
   return hojeAno - Math.floor((hojeAno - alvo) / 12) * 12;
 }
-
-const MES_CHEIO: QuickRange[] = [
-  {
-    id: "esteMes",
-    label: "Este mês",
-    resolve: (hoje) => [new Date(hoje.getFullYear(), hoje.getMonth(), 1), new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)],
-  },
-];
 
 function celulasDoIntervalo(from: string, to: string): Array<string | null> {
   const cells: Array<string | null> = Array.from({ length: deIso(from).getDay() }, () => null);
@@ -467,7 +460,8 @@ export function CashClosePage() {
   const showLojas = useMinSkeleton(lojasLoading);
   const hoje = calendarTodayIso();
   const [rangeFrom, setRangeFrom] = useState(() => inicioDoMes(hoje));
-  const [rangeTo, setRangeTo] = useState(() => fimDoMes(hoje));
+  const [rangeTo, setRangeTo] = useState(() => hoje);
+  const [presetId, setPresetId] = useState<DatePresetId | null>("esteMes");
   const [piso, setPiso] = useState(() => inicioDoMes(hoje));
   const [marks, setMarks] = useState<CashCloseDayMark[]>([]);
   const [marksKey, setMarksKey] = useState("");
@@ -512,7 +506,11 @@ export function CashClosePage() {
     void fetchNavMonthFloor("cash_close_day", session.tenantId, lojaId, hoje).then((month) => {
       if (stop) return;
       setPiso(month);
-      setRangeFrom((atual) => (atual < month ? month : atual));
+      setRangeFrom((atual) => {
+        if (atual >= month) return atual;
+        setPresetId(null);
+        return month;
+      });
     });
     return () => {
       stop = true;
@@ -557,12 +555,10 @@ export function CashClosePage() {
     if (escolher) return;
     const ids = lojasRef.current.map((loja) => loja.id);
     if (ids.length === 0) return;
-    const inicio = inicioDoMes(rangeFromRef.current);
-    const fim = inicioDoMes(rangeToRef.current);
-    const months = inicio === fim ? [inicio] : [inicio, fim];
+    const months = monthsTouched(rangeFromRef.current, rangeToRef.current);
     const hojeIso = calendarTodayIso();
     const comDia = months.filter((month) => monthCloseSpanFor(month, hojeIso));
-    const alvos = comDia.length > 0 ? comDia : [inicio];
+    const alvos = comDia.length > 0 ? comDia : [months[0]];
     for (const month of alvos) {
       const r = await requestMonthClose(ids, month);
       if (!r.ok) {
@@ -726,11 +722,10 @@ export function CashClosePage() {
     setDiaAberto(iso);
   }
 
-  const mesAtual = rangeFrom === inicioDoMes(hoje) && rangeTo === fimDoMes(hoje);
-
-  function aplicarIntervalo(inicio: Date, fim: Date) {
+  function aplicarIntervalo(inicio: Date, fim: Date, meta?: DateRangeChangeMeta) {
     setRangeFrom(paraIso(inicio));
     setRangeTo(paraIso(fim));
+    setPresetId(meta?.presetId ?? null);
   }
 
   const diaPronto = diaAberto != null && diaKey === `${storeKey}|${diaAberto}|${reloadKey}`;
@@ -747,10 +742,9 @@ export function CashClosePage() {
               value={[deIso(rangeFrom), deIso(rangeTo)]}
               minDate={deIso(piso)}
               maxDate={deIso(fimDoMes(hoje))}
-              quickRanges={MES_CHEIO}
-              displayLabel={mesAtual ? "Este mês" : null}
-              activePresetId={mesAtual ? "esteMes" : null}
-              onChange={([inicio, fim]) => aplicarIntervalo(inicio, fim)}
+              displayLabel={presetId ? periodLabels[presetId] : null}
+              activePresetId={presetId}
+              onChange={([inicio, fim], meta) => aplicarIntervalo(inicio, fim, meta)}
             />
           </HeaderFilters>
         }

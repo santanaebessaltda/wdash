@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Alert, Button, Card, DateRangePicker, Skeleton, useToast, type QuickRange } from "@/components/ui";
+import { Alert, Button, Card, DateRangePicker, Skeleton, useToast, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
 import { ChipDia, PlainKpi } from "@/pages/cash-close/CashClosePage";
 import { calendarTodayIso } from "@/data/wedash/clock";
+import { periodLabels } from "@/data/wedash/dashboard";
 import { fetchSalesCoverage, fetchSalesDayAggs } from "@/data/wedash/salesRepo";
 import { fetchLaunchedDays, fetchShoppingAccount, requestShoppingLaunch, requestShoppingRead, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
 import { ALREADY_LAUNCHED, forceLaunchAllowed, monthReport, reportDays, sumSoldByDay } from "@/data/wedash/shoppingReport";
@@ -29,14 +30,6 @@ const WEEK = [
 ];
 
 const money = (cents: number) => brlCent(cents / 100);
-
-const MES_CHEIO: QuickRange[] = [
-  {
-    id: "esteMes",
-    label: "Este mês",
-    resolve: (hoje) => [new Date(hoje.getFullYear(), hoje.getMonth(), 1), new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)],
-  },
-];
 
 function valorDiferenca(cents: number): string {
   const abs = brlCent(Math.abs(cents) / 100);
@@ -68,7 +61,8 @@ export function SalesReportPage() {
   const showLojas = useMinSkeleton(lojasLoading);
   const hoje = calendarTodayIso();
   const [rangeFrom, setRangeFrom] = useState(() => inicioDoMes(hoje));
-  const [rangeTo, setRangeTo] = useState(() => fimDoMes(hoje));
+  const [rangeTo, setRangeTo] = useState(() => hoje);
+  const [presetId, setPresetId] = useState<DatePresetId | null>("esteMes");
   const [piso, setPiso] = useState(() => inicioDoMes(hoje));
   const [sold, setSold] = useState<Record<string, number>>({});
   const [launched, setLaunched] = useState<Record<string, number>>({});
@@ -102,7 +96,11 @@ export function SalesReportPage() {
       if (stop || !coverage.from) return;
       const month = inicioDoMes(coverage.from);
       setPiso(month);
-      setRangeFrom((atual) => (atual < month ? month : atual));
+      setRangeFrom((atual) => {
+        if (atual >= month) return atual;
+        setPresetId(null);
+        return month;
+      });
     });
     return () => {
       stop = true;
@@ -206,14 +204,14 @@ export function SalesReportPage() {
   const porDia = useMemo(() => new Map(dias.map((day) => [day.date, day])), [dias]);
   const cells = useMemo(() => celulasDoIntervalo(from, to), [from, to]);
   const gestor = isGestor(session.role);
-  const mesAtual = from === inicioDoMes(hoje) && to === fimDoMes(hoje);
   const paraLancar = marcados.filter((day) => day < hoje && launched[day] == null);
 
-  function aplicarIntervalo(inicio: Date, fim: Date) {
+  function aplicarIntervalo(inicio: Date, fim: Date, meta?: DateRangeChangeMeta) {
     const nextFrom = paraIso(inicio);
     const nextTo = paraIso(fim);
     setRangeFrom(nextFrom);
     setRangeTo(nextTo);
+    setPresetId(meta?.presetId ?? null);
     setMarcados((atual) => atual.filter((day) => day >= nextFrom && day <= nextTo));
   }
 
@@ -234,10 +232,9 @@ export function SalesReportPage() {
                 value={[deIso(from), deIso(to)]}
                 minDate={deIso(piso)}
                 maxDate={deIso(fimDoMes(hoje))}
-                quickRanges={MES_CHEIO}
-                displayLabel={mesAtual ? "Este mês" : null}
-                activePresetId={mesAtual ? "esteMes" : null}
-                onChange={([inicio, fim]) => aplicarIntervalo(inicio, fim)}
+                displayLabel={presetId ? periodLabels[presetId] : null}
+                activePresetId={presetId}
+                onChange={([inicio, fim], meta) => aplicarIntervalo(inicio, fim, meta)}
               />
               <Button onClick={() => void lancar()} disabled={lancando || paraLancar.length === 0}>
                 {lancando ? "Lançando…" : paraLancar.length === 0 ? "Lançar" : paraLancar.length === 1 ? "Lançar · 1 dia" : `Lançar · ${paraLancar.length} dias`}

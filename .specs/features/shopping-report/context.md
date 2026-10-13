@@ -40,7 +40,7 @@ A madrugada informa as vendas brutas dos quiosques no painel do shopping e a tel
 
 - Gestão > Informe de vendas, `/management/sales-report`, depois de Sangrias. Gestor e Gerente. O item fica no menu. Loja de rua e quiosque sem Allos mostram empty state, sem esconder o item.
 - Configurações > Shopping fica no menu do Gestor. Fora de quiosque, a tela mostra que vale para quiosque em shopping.
-- Calendário no padrão de Fechamento e Sangrias. O campo é início e fim. Ao abrir, o intervalo é o mês atual e o calendário mostra só esses dias. Os totais seguem os dias fechados do intervalo.
+- Calendário no padrão de Fechamento e Sangrias. O campo de período é o mesmo das outras telas: Hoje, Ontem, Esta semana, Este mês, Este trimestre, Este semestre e Este ano. Ao abrir, o período é Este mês, do dia 1 até hoje, e o calendário mostra só esses dias. Os totais seguem os dias fechados do intervalo.
 - O Atualizar do topo busca as vendas de hoje e abre a Allos só para ler o que já está lançado. Não grava venda. O botão Lançar, na tela, envia só os dias passados marcados que ainda não têm lançamento. Loja de rua, filial sem acesso e Argo não chamam o painel.
 - KPIs dos dias anteriores a hoje: Vendido, Lançado, Diferença (lançado menos vendido), sempre em reais. Diferença zero é R$ 0,00. Os números seguem Mensal ou Semanal.
 - Vendido é o total da filial (marca ALL). WEPINK e WPINK não somam de novo.
