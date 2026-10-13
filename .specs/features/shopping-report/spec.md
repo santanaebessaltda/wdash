@@ -81,6 +81,7 @@ O gestor lança, à mão, as vendas brutas de cada quiosque no painel do shoppin
 10. WHERE the day has a brand ALL row THEN the system SHALL use that row as Vendido and SHALL NOT add WEPINK or WPINK on top of it.
 11. WHEN a past day is on the calendar THEN the system SHALL show a Vendido badge and a Lançado badge. The Lançado badge SHALL be green when the two amounts are equal and red when they differ.
 12. IF the mall answers that the login was not accepted THEN the system SHALL keep the stored shopping values and SHALL NOT call the mall again only because the report was opened.
+13. WHEN the mall login requires the browser verification THEN the system SHALL open that login page in a browser session before posting the password.
 
 **Independent Test**: Mês com um dia vendido a R$ 100,00 e lançado a R$ 120,00, e outro vendido a R$ 50,00 sem lançamento. Vendido R$ 150,00, lançado R$ 120,00, diferença R$ 30,00 a menos.
 

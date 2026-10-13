@@ -7,6 +7,9 @@ COPY workers/millennium-sync/package.json workers/millennium-sync/package-lock.j
 
 WORKDIR /app/workers/millennium-sync
 RUN npm ci
+RUN apt-get update && apt-get install -y --no-install-recommends chromium \
+  && rm -rf /var/lib/apt/lists/*
+ENV ALLOS_CHROME_PATH=/usr/bin/chromium
 
 WORKDIR /app
 COPY workers/millennium-sync ./workers/millennium-sync

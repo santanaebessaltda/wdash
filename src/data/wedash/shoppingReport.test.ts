@@ -225,5 +225,25 @@ describe("fillAllosWeek", () => {
     expect(filled.body).toContain("venda2=");
     expect(filled.body).not.toContain("venda2=0,00");
     expect(filled.body).toContain("idsemana=9291");
+    expect(filled.body).toContain("dias=7");
+  });
+
+  it("keeps a short month-start week and sends that day count", () => {
+    const html = `
+      <input name="data_cadastra" value="2026-10-1">
+      <input name="venda0" value="10,00">
+      <input name="data_cadastra" value="2026-10-2">
+      <input name="venda1" value="">
+      <input name="data_cadastra" value="2026-10-3">
+      <input name="venda2" value="">
+      <input name="idsemana" value="9267">
+      <input name="dias" value="3">
+    `;
+    const parsed = parseAllosForm(html);
+    expect(parsed?.fields).toHaveLength(3);
+    const filled = fillAllosWeek(parsed!, { "2026-10-02": 2500 }, today);
+    expect(filled.body).toContain("dias=3");
+    expect(filled.body).toContain("venda1=25,00");
+    expect(filled.body).not.toContain("dias=7");
   });
 });

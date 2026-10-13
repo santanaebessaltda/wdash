@@ -23,6 +23,7 @@ import { startStoneWebhook } from "./stoneWebhook.ts";
 import { assertSyncConfig, autoRefreshEnabled, deepHistorySpan, describeSpan, onboardingSpan } from "./syncConfig.ts";
 import { isWorkerPaused } from "./workerPause.ts";
 import { acquireWorkerLock, releaseWorkerLock } from "./workerLock.ts";
+import { runShoppingStore } from "./allosJob.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -81,9 +82,12 @@ async function main() {
   const webhookToken = process.env.STONE_WEBHOOK_TOKEN?.trim() ?? "";
   const webhookUrl = process.env.STONE_WEBHOOK_PUBLIC_URL?.trim() ?? "";
   const webhookPort = Number(process.env.PORT ?? "8080") || 8080;
+  const shoppingToken = process.env.ALLOS_RUN_TOKEN?.trim() ?? "";
   const webhook = startStoneWebhook({
     port: webhookPort,
     token: webhookToken,
+    shoppingToken,
+    onShopping: (body) => runShoppingStore(sb, erpSecret, body.storeId, body.read),
     onPix: async (notice) => {
       const csv = await downloadStonePixCsv(notice.url);
       const saved = await ingestStonePixCsv(sb, { document: notice.document, day: notice.referenceDate, csv });
@@ -97,6 +101,11 @@ async function main() {
     webhookToken
       ? `  PIX Stone                : escutando na porta ${webhookPort}`
       : "  PIX Stone                : sem STONE_WEBHOOK_TOKEN — a rota fica fechada",
+  );
+  console.log(
+    shoppingToken
+      ? "  Allos                    : navegador nesta máquina"
+      : "  Allos                    : sem ALLOS_RUN_TOKEN — o Atualizar não entra",
   );
   if (webhookToken && webhookUrl) {
     const listening = webhook.listening

@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { timingSafeEqual } from "node:crypto";
+import { bearerMatches } from "./allosAuth.ts";
 
 export type StonePixNotice = {
   document: string;
@@ -73,16 +74,42 @@ function send(res: ServerResponse, status: number) {
   res.end(status === 200 ? "{}" : "");
 }
 
+function sendJson(res: ServerResponse, body: unknown) {
+  res.writeHead(200, { "Content-Type": "application/json" });
+  res.end(JSON.stringify(body));
+}
+
 /** Escuta o aviso da Stone. Responde na hora; o download do CSV fica no `onPix`. */
 export function startStoneWebhook(opts: {
   port: number;
   token: string;
   onPix: (notice: StonePixNotice) => Promise<void>;
+  shoppingToken?: string;
+  onShopping?: (body: { storeId: string; read: boolean }) => Promise<{ ok: boolean; message?: string }>;
 }): Server {
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
     if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/health")) {
       send(res, 200);
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/shopping/run") {
+      if (!opts.onShopping || !bearerMatches(req.headers.authorization, opts.shoppingToken ?? "")) {
+        send(res, 404);
+        return;
+      }
+      void readJson(req)
+        .then(async (body) => {
+          const record = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+          const storeId = typeof record.storeId === "string" ? record.storeId : "";
+          if (!storeId) {
+            sendJson(res, { ok: false, message: "Não foi possível lançar no shopping. Os valores já informados foram mantidos." });
+            return;
+          }
+          const result = await opts.onShopping?.({ storeId, read: record.read === true });
+          sendJson(res, result);
+        })
+        .catch(() => send(res, 400));
       return;
     }
     const prefix = "/hooks/stone/pix/";

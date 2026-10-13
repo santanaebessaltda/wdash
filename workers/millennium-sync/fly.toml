@@ -29,7 +29,8 @@ primary_region = "gru"
 
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "512mb"
+  # Chromium da Allos sobe só no Atualizar / job e fecha em seguida. 512 MB derruba o sync.
+  memory = "2048mb"
   processes = ["worker"]
 
 kill_timeout = 30

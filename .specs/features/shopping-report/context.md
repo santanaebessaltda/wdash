@@ -26,7 +26,7 @@ A madrugada informa as vendas brutas dos quiosques no painel do shopping e a tel
 
 - Host de exemplo: `app3.intranetmall.com/{caminho-da-filial}/`.
 - Passos: login em `db/autentica.asp`, semanas em `loja/vendas-s4/vendas.asp`, dias em `vendas_alterar.asp?IDSEMANA=`, salvar em `vendas_atualizar.asp`, sair em `logout.asp`.
-- O salvar manda `dias=7`, `idsemana` e `venda0` … `venda6` com `data_cadastra`. Valor no formato `6.756,80`. Vazio vai vazio.
+- O salvar manda `dias` com a quantidade que a Allos mostrou (1 a 11; a primeira semana do mês pode ser curta), `idsemana` e `venda0` … com `data_cadastra`. Valor no formato `6.756,80`. Vazio vai vazio.
 - Só a linha Informada. Online não recebe número.
 
 ### Rotina
@@ -43,7 +43,7 @@ A madrugada informa as vendas brutas dos quiosques no painel do shopping e a tel
 - O Atualizar do topo, nesta tela, força o mesmo lançamento da madrugada. Loja de rua, filial sem acesso e Argo não chamam o painel.
 - KPIs dos dias anteriores a hoje: Vendido, Lançado, Diferença (lançado menos vendido).
 - Vendido é o total da filial (marca ALL). WEPINK e WPINK não somam de novo.
-- Abrir o informe só lê o que já está gravado. A Allos entra pelo job da madrugada ou pelo Atualizar do topo, o mesmo botão de Fechamento e Sangrias.
+- Abrir o informe só lê o que já está gravado. A Allos entra pelo job da madrugada ou pelo Atualizar do topo, o mesmo botão de Fechamento e Sangrias. O clique abre o login num navegador no sincronizador e reusa essa sessão, com o mesmo identificador do navegador. Um POST só com usuário e senha é recusado.
 - Dia passado sem lançamento gravado conta como zero no KPI e no badge.
 - Cada dia passado mostra o badge Vendido e o badge Lançado. Lançado verde quando os dois são iguais, vermelho quando diferem.
 - Diferença positiva: aluguel percentual a mais. Negativa: risco de multa. Dia passado sem lançamento conta como zero lançado.

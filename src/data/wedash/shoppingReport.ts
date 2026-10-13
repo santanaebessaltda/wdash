@@ -173,13 +173,15 @@ export function informedWeekIds(html: string): string[] {
 
 export type AllosField = { date: string; fieldCents: number | null };
 
-/** Lê o formulário da semana. Sem os sete dias, não há o que salvar. */
+/** Lê o formulário da semana. A Allos manda de 1 a 11 dias; a primeira semana do mês pode ser curta. */
 export function parseAllosForm(html: string): { weekId: string; fields: AllosField[] } | null {
   const inputs = [...html.matchAll(/<input\b[^>]*>/gi)].map((match) => inputAttrs(match[0]));
   const weekId = inputs.find((input) => input.name === "idsemana")?.value?.trim() ?? "";
   const dates = inputs.filter((input) => input.name === "data_cadastra").map((input) => isoFromAllosDate(input.value ?? ""));
-  const amounts = Array.from({ length: 7 }, (_, index) => inputs.find((input) => input.name === `venda${index}`));
-  if (!weekId || dates.length !== 7 || dates.some((date) => date == null) || amounts.some((input) => input == null)) return null;
+  const stated = Number(inputs.find((input) => input.name === "dias")?.value ?? "");
+  const amounts = Array.from({ length: dates.length }, (_, index) => inputs.find((input) => input.name === `venda${index}`));
+  if (!weekId || dates.length < 1 || dates.length > 11 || dates.some((date) => date == null) || amounts.some((input) => input == null)) return null;
+  if (Number.isFinite(stated) && stated > 0 && stated !== dates.length) return null;
   return {
     weekId,
     fields: dates.map((date, index) => ({ date: date as string, fieldCents: parseAllosAmount(amounts[index]?.value ?? "") })),
@@ -214,7 +216,7 @@ export function allosWeekBody(days: LaunchValue[], weekId: string): string {
     parts.push(`data_cadastra=${allosDateParam(day.date)}`);
     parts.push(`venda${index}=${day.cents == null ? "" : formatAllosAmount(day.cents)}`);
   });
-  parts.push("dias=7");
+  parts.push(`dias=${days.length}`);
   parts.push(`idsemana=${weekId}`);
   return parts.join("&");
 }
