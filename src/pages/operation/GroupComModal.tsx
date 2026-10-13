@@ -9,14 +9,14 @@ import { noAutofill, secretStyle } from "@/lib/noAutofill";
 export function GroupComModal({
   open,
   account,
-  replacesOther,
+  replacedName,
   storeId,
   onClose,
   onSaved,
 }: {
   open: boolean;
   account: ShoppingAccount | null;
-  replacesOther: boolean;
+  replacedName: string | null;
   storeId: string;
   onClose: () => void;
   onSaved: (account: ShoppingAccount) => void;
@@ -115,8 +115,8 @@ export function GroupComModal({
         <p className="text-[13.5px] leading-relaxed text-t1">
           Informe o slug, o e-mail e a senha do Group COM. Depois escolha a unidade desta filial. A WDash protege esses dados e os usa somente para informar as vendas ao shopping.
         </p>
-        {replacesOther ? (
-          <p className="text-[13px] leading-relaxed text-t1">Salvar aqui passa a valer no lugar do acesso da Intranet Mall desta filial.</p>
+        {replacedName ? (
+          <p className="text-[13px] leading-relaxed text-t1">Salvar aqui substitui o acesso da {replacedName} desta filial. Cada filial integra com uma administradora.</p>
         ) : null}
         <FormField
           label="Slug"

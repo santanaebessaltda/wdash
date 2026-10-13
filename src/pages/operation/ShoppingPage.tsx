@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button, Card, Checkbox, FormField, Input, Modal, Skeleton, useToast } from "@/components/ui";
-import { INTRANET_MALL_ORIGIN, intranetMallBaseUrl, intranetMallSlug } from "@/data/wedash/shoppingReport";
+import { INTRANET_MALL_ORIGIN, intranetMallBaseUrl, intranetMallSlug, shoppingAdministratorName } from "@/data/wedash/shoppingReport";
 import { fetchShoppingAccount, saveShoppingAccount, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
 import { cn } from "@/lib/cn";
 import { noAutofill, secretStyle } from "@/lib/noAutofill";
@@ -56,7 +56,7 @@ export function ShoppingPage() {
       <SectionHeader
         section="Configurações"
         title="Shopping"
-        subtitle="Configure o acesso à administradora do shopping desta filial."
+        subtitle="Configure a administradora desta filial. Cada filial integra com uma só."
       />
       {escolher ? (
         <div className="mt-6 max-w-[720px]">
@@ -96,7 +96,7 @@ export function ShoppingPage() {
         <IntranetMallModal
           open={open}
           account={intranet}
-          replacesOther={group != null}
+          replacedName={group != null ? "Group COM" : null}
           storeId={store.id}
           onClose={() => setOpen(false)}
           onSaved={(next) => {
@@ -109,7 +109,7 @@ export function ShoppingPage() {
         <GroupComModal
           open={groupOpen}
           account={group}
-          replacesOther={account != null && account.administrator !== "groupcom"}
+          replacedName={account != null && account.administrator !== "groupcom" ? shoppingAdministratorName(account.administrator) : null}
           storeId={store.id}
           onClose={() => setGroupOpen(false)}
           onSaved={(next) => {
@@ -182,14 +182,14 @@ function slugFieldValue(value: string): string {
 function IntranetMallModal({
   open,
   account,
-  replacesOther,
+  replacedName,
   storeId,
   onClose,
   onSaved,
 }: {
   open: boolean;
   account: ShoppingAccount | null;
-  replacesOther: boolean;
+  replacedName: string | null;
   storeId: string;
   onClose: () => void;
   onSaved: (account: ShoppingAccount) => void;
@@ -265,8 +265,8 @@ function IntranetMallModal({
         <p className="text-[13.5px] leading-relaxed text-t1">
           Informe o slug e o acesso da Intranet Mall desta filial. A WDash protege esses dados e os usa somente para informar as vendas ao shopping.
         </p>
-        {replacesOther ? (
-          <p className="text-[13px] leading-relaxed text-t1">Salvar aqui passa a valer no lugar do acesso do Group COM desta filial.</p>
+        {replacedName ? (
+          <p className="text-[13px] leading-relaxed text-t1">Salvar aqui substitui o acesso da {replacedName} desta filial. Cada filial integra com uma administradora.</p>
         ) : null}
         <FormField
           label="Slug"

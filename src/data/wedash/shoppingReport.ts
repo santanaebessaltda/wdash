@@ -185,6 +185,13 @@ export function shoppingSendsSales(administrator: string | null | undefined): bo
   return administrator === "allos" || administrator === "groupcom";
 }
 
+/** Nome da administradora na tela. Cada filial guarda uma só. */
+export function shoppingAdministratorName(administrator: ShoppingAdministrator): string {
+  if (administrator === "groupcom") return "Group COM";
+  if (administrator === "argo") return "Argo";
+  return "Intranet Mall";
+}
+
 /**
  * Faturamento bruto da filial no dia.
  * A linha ALL já é o total. WEPINK e WPINK são a divisão dessa mesma venda e não entram de novo.
