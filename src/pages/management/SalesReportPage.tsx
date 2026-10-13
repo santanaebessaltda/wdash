@@ -406,7 +406,7 @@ function DiaCelula({
         </p>
       ) : null}
       {status ? <ChipDia cor={status.cor}>{status.texto}</ChipDia> : null}
-      {hojeDia ? <p className="mt-1 text-[11px] font-semibold text-t2">Em aberto</p> : null}
+      {hojeDia ? <ChipDia cor="bg-acc">Em aberto</ChipDia> : null}
     </div>
   );
 }

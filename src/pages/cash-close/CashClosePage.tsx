@@ -916,6 +916,11 @@ function Mes({
           const miolo = (
             <>
               <NumeroDia iso={day} hoje={hoje} />
+              {face?.kind === "hoje" && face.aguardando ? (
+                <div className="mt-1.5 w-full min-w-0">
+                  <ChipDia cor="bg-acc">Em aberto</ChipDia>
+                </div>
+              ) : null}
               {mostraTotal && face && (
                 <div className="mt-1.5 w-full min-w-0">
                   <p className="whitespace-nowrap font-mono text-[12px] font-extrabold text-t1 sm:text-[13px]">
