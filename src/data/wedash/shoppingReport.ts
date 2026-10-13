@@ -87,6 +87,17 @@ export function allosPeriods(from: string, to: string): Array<{ from: string; to
   return periods;
 }
 
+export const ALREADY_LAUNCHED = "Os dias passados deste mês já estão lançados. O shopping não foi aberto.";
+
+/** Dias anteriores a hoje, no mês, que ainda não têm lançamento gravado. */
+export function unlaunchedDays(from: string, to: string, today: string, launched: ReadonlySet<string>): string[] {
+  const pending: string[] = [];
+  for (let day = from; day <= to && day < today; day = nextIso(day)) {
+    if (!launched.has(day)) pending.push(day);
+  }
+  return pending;
+}
+
 /** Uma linha por bloco da Allos. Só entram dias anteriores a hoje. */
 export function periodReports(days: ClosedDay[], monthFrom: string, monthTo: string): PeriodReport[] {
   return allosPeriods(monthFrom, monthTo).flatMap((period) => {

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { forceLaunchAllowed, sumSoldByDay, type LaunchValue } from "../../../src/data/wedash/shoppingReport.ts";
+import { ALREADY_LAUNCHED, forceLaunchAllowed, sumSoldByDay, unlaunchedDays, type LaunchValue } from "../../../src/data/wedash/shoppingReport.ts";
 import { allosBrowserCookies, chromePath } from "./allosBrowser.ts";
 import { postAllosWeeks, readAllosWeeks } from "./allosFill.ts";
 import { decryptPassword } from "./decrypt.ts";
@@ -33,8 +33,9 @@ export function runShoppingStore(
   erpSecret: string,
   storeId: string,
   read: boolean,
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const run = tail.then(() => runShoppingNow(sb, erpSecret, storeId, read), () => runShoppingNow(sb, erpSecret, storeId, read));
+  month?: { from: string; to: string },
+): Promise<{ ok: true; message?: string } | { ok: false; message: string }> {
+  const run = tail.then(() => runShoppingNow(sb, erpSecret, storeId, read, month), () => runShoppingNow(sb, erpSecret, storeId, read, month));
   tail = run.then(
     () => undefined,
     () => undefined,
@@ -42,12 +43,25 @@ export function runShoppingStore(
   return run;
 }
 
+function monthAround(today: string): { from: string; to: string } {
+  const [year, month] = today.split("-").map(Number);
+  const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return { from: `${today.slice(0, 8)}01`, to: `${today.slice(0, 8)}${String(last).padStart(2, "0")}` };
+}
+
+function chosenMonth(today: string, month?: { from: string; to: string }): { from: string; to: string } {
+  const iso = /^\d{4}-\d{2}-\d{2}$/;
+  if (month && iso.test(month.from) && iso.test(month.to) && month.from <= month.to) return month;
+  return monthAround(today);
+}
+
 async function runShoppingNow(
   sb: SupabaseClient,
   erpSecret: string,
   storeId: string,
   read: boolean,
-): Promise<{ ok: true } | { ok: false; message: string }> {
+  month?: { from: string; to: string },
+): Promise<{ ok: true; message?: string } | { ok: false; message: string }> {
   const { data: store } = await sb.from("store").select("id, tenant_id, point_type, timezone").eq("id", storeId).maybeSingle();
   if (!store) return { ok: false, message: KEEP };
   const { data: account } = await sb
@@ -60,6 +74,13 @@ async function runShoppingNow(
   if (!gate.ok) return gate;
 
   const today = todayIn((store.timezone as string | null) || "America/Campo_Grande");
+  const span = chosenMonth(today, month);
+  if (!read) {
+    const { data: stored, error: storedError } = await sb.from("shopping_day").select("day").eq("store_id", storeId).gte("day", span.from).lte("day", span.to);
+    if (storedError) return { ok: false, message: KEEP };
+    const launched = new Set((stored ?? []).map((row) => String(row.day).slice(0, 10)));
+    if (unlaunchedDays(span.from, span.to, today, launched).length === 0) return { ok: true, message: ALREADY_LAUNCHED };
+  }
   let message = read ? "Não foi possível ler o que já está no shopping. Nada foi alterado." : KEEP;
   try {
     const password = await decryptPassword(String(account?.secret_ciphertext ?? ""), erpSecret);

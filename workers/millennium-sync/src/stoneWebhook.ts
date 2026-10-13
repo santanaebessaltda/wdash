@@ -85,7 +85,7 @@ export function startStoneWebhook(opts: {
   token: string;
   onPix: (notice: StonePixNotice) => Promise<void>;
   shoppingToken?: string;
-  onShopping?: (body: { storeId: string; read: boolean }) => Promise<{ ok: boolean; message?: string }>;
+  onShopping?: (body: { storeId: string; read: boolean; from: string; to: string }) => Promise<{ ok: boolean; message?: string }>;
 }): Server {
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
@@ -106,7 +106,12 @@ export function startStoneWebhook(opts: {
             sendJson(res, { ok: false, message: "Não foi possível lançar no shopping. Os valores já informados foram mantidos." });
             return;
           }
-          const result = await opts.onShopping?.({ storeId, read: record.read === true });
+          const result = await opts.onShopping?.({
+            storeId,
+            read: record.read === true,
+            from: typeof record.from === "string" ? record.from : "",
+            to: typeof record.to === "string" ? record.to : "",
+          });
           sendJson(res, result);
         })
         .catch(() => send(res, 400));

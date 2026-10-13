@@ -7,9 +7,11 @@ import {
   formatAllosAmount,
   informedLaunchValues,
   informedStoredValues,
+  ALREADY_LAUNCHED,
   allosPeriods,
   monthReport,
   periodReports,
+  unlaunchedDays,
   parseAllosForm,
   reportDays,
   shoppingAccountView,
@@ -99,6 +101,16 @@ describe("periodReports", () => {
       { from: "2026-10-04", to: "2026-10-10", soldCents: 4000, launchedCents: 3000, differenceCents: -1000 },
       { from: "2026-10-11", to: "2026-10-17", soldCents: 8500, launchedCents: 0, differenceCents: -8500 },
     ]);
+  });
+});
+
+describe("unlaunchedDays", () => {
+  it("opens the mall only while a closed day has no stored launch", () => {
+    const launched = new Set(["2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08", "2026-10-09", "2026-10-10", "2026-10-11", "2026-10-12"]);
+    expect(unlaunchedDays("2026-10-01", "2026-10-31", today, launched)).toEqual([]);
+    expect(unlaunchedDays("2026-10-01", "2026-10-31", today, new Set(["2026-10-01"]))).toContain("2026-10-05");
+    expect(unlaunchedDays("2026-10-01", "2026-10-31", "2026-10-01", new Set())).toEqual([]);
+    expect(ALREADY_LAUNCHED).toContain("não foi aberto");
   });
 });
 

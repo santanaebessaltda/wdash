@@ -5,7 +5,7 @@ import { ChipDia, monthNavBtn, PlainKpi, SeletorMesAno, Seta } from "@/pages/cas
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { fetchSalesCoverage, fetchSalesDayAggs } from "@/data/wedash/salesRepo";
 import { fetchLaunchedDays, fetchShoppingAccount, requestShoppingLaunch, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
-import { forceLaunchAllowed, monthReport, periodReports, reportDays, sumSoldByDay, type PeriodReport } from "@/data/wedash/shoppingReport";
+import { ALREADY_LAUNCHED, forceLaunchAllowed, monthReport, periodReports, reportDays, sumSoldByDay, unlaunchedDays, type PeriodReport } from "@/data/wedash/shoppingReport";
 import { brlCent, deIso, fimDoMes, inicioDoMes, intervaloDias, somarDias } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
@@ -113,8 +113,13 @@ export function SalesReportPage() {
   lojaRef.current = loja;
   const accountRef = useRef(account);
   accountRef.current = account;
+  const launchedRef = useRef(launched);
+  launchedRef.current = launched;
+  const prontoRef = useRef(false);
   const from = inicioDoMes(anchor);
   const to = fimDoMes(anchor);
+  const monthRef = useRef({ from, to });
+  monthRef.current = { from, to };
   const podeAvancar = somarMes(anchor, 1) <= hoje;
   const podeVoltar = somarMes(anchor, -1) >= piso;
   const cells = useMemo(() => celulasDoMes(anchor), [anchor]);
@@ -160,6 +165,7 @@ export function SalesReportPage() {
   }, [lojasLoading, escolher, loja, session.tenantId, from, to, faixa]);
 
   const pronto = loaded === faixa;
+  prontoRef.current = pronto;
 
   useEffect(() => {
     if (!menu.ready || menu.report) return;
@@ -177,15 +183,21 @@ export function SalesReportPage() {
       show(gate.message, "danger");
       return;
     }
-    const result = await requestShoppingLaunch(atual.id);
+    const month = monthRef.current;
+    const pending = unlaunchedDays(month.from, month.to, hoje, new Set(Object.keys(launchedRef.current)));
+    if (prontoRef.current && pending.length === 0) {
+      show(ALREADY_LAUNCHED, "success");
+      return;
+    }
+    const result = await requestShoppingLaunch(atual.id, month);
     setReloadKey((n) => n + 1);
     if (!result.ok) show(result.message, "danger");
-    else show("Vendas lançadas no shopping.", "success");
-  }, [escolher, show]);
+    else show(result.message ?? "Vendas lançadas no shopping.", "success");
+  }, [escolher, hoje, show]);
 
   useScreenRefresh({
     label: "Lançar vendas no shopping",
-    tip: "Informa no shopping os dias passados que ainda estão vazios.",
+    tip: "Abre o shopping só se este mês ainda tiver dia passado sem lançamento.",
     status: refreshMomentTitle(pronto ? (account?.lastRunAt ?? null) : undefined),
     busyLabel: "Lançando vendas no shopping…",
     run: () => pedir(),

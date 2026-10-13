@@ -83,6 +83,7 @@ O gestor lança, à mão, as vendas brutas de cada quiosque no painel do shoppin
 12. IF the mall answers that the login was not accepted THEN the system SHALL keep the stored shopping values and SHALL NOT call the mall again only because the report was opened.
 13. WHEN the mall login requires the browser verification THEN the system SHALL open that login page in a browser session before posting the password.
 14. WHEN the month is open THEN the system SHALL show one row per mall period in that month, with Vendido, Lançado and Diferença for the closed days inside that period.
+15. WHEN every closed day of the open month already has a stored launch THEN the system SHALL NOT open the mall browser.
 
 **Independent Test**: Mês com um dia vendido a R$ 100,00 e lançado a R$ 120,00, e outro vendido a R$ 50,00 sem lançamento. Vendido R$ 150,00, lançado R$ 120,00, diferença R$ 30,00 a menos.
 

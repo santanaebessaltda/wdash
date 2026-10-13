@@ -2,7 +2,7 @@ import { shoppingAccountView, type ShoppingAdministrator } from "./shoppingRepor
 
 export type ShoppingAccount = NonNullable<ReturnType<typeof shoppingAccountView>>;
 
-export type ShoppingLaunchResult = { ok: true } | { ok: false; message: string };
+export type ShoppingLaunchResult = { ok: true; message?: string } | { ok: false; message: string };
 
 const FAIL = "Não foi possível lançar no shopping. Os valores já informados foram mantidos.";
 const SAVE_FAIL = "Não foi possível salvar o acesso do shopping. Tente novamente.";
@@ -70,12 +70,12 @@ export async function requestShoppingRead(storeId: string): Promise<ShoppingLaun
 }
 
 /** Mesma rotina da madrugada, para a filial aberta. */
-export async function requestShoppingLaunch(storeId: string): Promise<ShoppingLaunchResult> {
+export async function requestShoppingLaunch(storeId: string, month: { from: string; to: string }): Promise<ShoppingLaunchResult> {
   const { getSupabase } = await import("@/lib/supabase");
   const sb = getSupabase();
   if (!sb) return { ok: false, message: FAIL };
-  const { data, error } = await sb.functions.invoke("shopping-report-run", { body: { storeId } });
+  const { data, error } = await sb.functions.invoke("shopping-report-run", { body: { storeId, from: month.from, to: month.to } });
   if (error || !data) return { ok: false, message: FAIL };
-  if (data.ok === true) return { ok: true };
+  if (data.ok === true) return { ok: true, message: typeof data.message === "string" ? data.message : undefined };
   return { ok: false, message: typeof data.message === "string" ? data.message : FAIL };
 }

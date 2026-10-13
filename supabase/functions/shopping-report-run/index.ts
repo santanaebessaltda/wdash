@@ -36,7 +36,7 @@ serve(async (req) => {
   const caller = await loadStaffCaller(admin, userData.user.id);
   if (!caller) return json({ error: "forbidden" }, 403);
 
-  let body: { storeId?: unknown; read?: unknown };
+  let body: { storeId?: unknown; read?: unknown; from?: unknown; to?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -62,7 +62,12 @@ serve(async (req) => {
     const remote = await fetch(runUrl, {
       method: "POST",
       headers: { Authorization: `Bearer ${runToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ storeId, read: readOnly }),
+      body: JSON.stringify({
+        storeId,
+        read: readOnly,
+        from: typeof body.from === "string" ? body.from : "",
+        to: typeof body.to === "string" ? body.to : "",
+      }),
     });
     const data = await remote.json().catch(() => null);
     if (!data || typeof data !== "object") return json({ ok: false, message: KEEP });

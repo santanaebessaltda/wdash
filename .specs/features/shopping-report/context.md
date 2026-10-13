@@ -47,6 +47,7 @@ A madrugada informa as vendas brutas dos quiosques no painel do shopping e a tel
 - Dia passado sem lançamento gravado conta como zero no KPI e no badge.
 - Cada dia passado mostra o badge Vendido e o badge Lançado. Lançado verde quando os dois são iguais, vermelho quando diferem.
 - Abaixo dos totais, cada bloco da Allos (domingo a sábado, cortado no mês) soma o vendido na Millennium e o lançado. O bloco aberto só entra com os dias já fechados.
+- O Atualizar não abre o navegador se todo dia passado do mês na tela já tem lançamento gravado. Dois cliques seguidos esperam na mesma máquina; o segundo não abre de novo se o primeiro já cobriu o mês.
 - Diferença positiva: aluguel percentual a mais. Negativa: risco de multa. Dia passado sem lançamento conta como zero lançado.
 
 ### Agent's Discretion
