@@ -5,9 +5,10 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeaders, serve } from "../_shared/cors.ts";
 import { canAccessStore, loadStaffCaller } from "../_shared/staffAuth.ts";
-import { fillAllosWeek, forceLaunchAllowed, informedWeekIds, parseAllosForm, sumSoldByDay, type LaunchValue } from "../_shared/shoppingFill.ts";
+import { fillAllosWeek, forceLaunchAllowed, informedStoredValues, informedWeekIds, parseAllosForm, sumSoldByDay, type LaunchValue } from "../_shared/shoppingFill.ts";
 
 const KEEP = "Não foi possível lançar no shopping. Os valores já informados foram mantidos.";
+const READ_FAIL = "Não foi possível ler o que já está no shopping. Nada foi alterado.";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -56,12 +57,13 @@ serve(async (req) => {
   const caller = await loadStaffCaller(admin, userData.user.id);
   if (!caller) return json({ error: "forbidden" }, 403);
 
-  let body: { storeId?: unknown };
+  let body: { storeId?: unknown; read?: unknown };
   try {
     body = await req.json();
   } catch {
     return json({ ok: false, message: KEEP });
   }
+  const readOnly = body.read === true;
   const storeId = typeof body.storeId === "string" ? body.storeId : "";
   if (!storeId || !canAccessStore(caller.role, caller.memberStoreIds, storeId)) return json({ error: "forbidden" }, 403);
 
@@ -78,20 +80,30 @@ serve(async (req) => {
   if (!gate.ok) return json({ ok: false, message: gate.message });
 
   const today = todayIn((store.timezone as string | null) || "America/Campo_Grande");
-  let message = KEEP;
+  let message = readOnly ? READ_FAIL : KEEP;
   try {
     const password = await decryptPassword(String(account?.secret_ciphertext ?? ""), erpSecret);
-    const posted = await postAllos(String(account?.base_url ?? ""), String(account?.username ?? ""), password, today, async (from, to) => {
-      const { data, error } = await admin
-        .from("sales_day_agg")
-        .select("day, revenue_cents")
-        .eq("tenant_id", caller.tenantId)
-        .eq("store_id", storeId)
-        .gte("day", from)
-        .lte("day", to);
-      if (error) throw new Error(error.message);
-      return sumSoldByDay((data ?? []).map((row) => ({ day: String(row.day), revenueCents: Number(row.revenue_cents) || 0 })));
-    });
+    const baseUrl = String(account?.base_url ?? "");
+    const username = String(account?.username ?? "");
+    const posted = readOnly
+      ? await readAllos(baseUrl, username, password, today)
+      : await postAllos(baseUrl, username, password, today, async (from, to) => {
+          const { data, error } = await admin
+            .from("sales_day_agg")
+            .select("day, brand, revenue_cents")
+            .eq("tenant_id", caller.tenantId)
+            .eq("store_id", storeId)
+            .gte("day", from)
+            .lte("day", to);
+          if (error) throw new Error(error.message);
+          return sumSoldByDay(
+            (data ?? []).map((row) => ({
+              day: String(row.day),
+              brand: typeof row.brand === "string" ? row.brand : null,
+              revenueCents: Number(row.revenue_cents) || 0,
+            })),
+          );
+        });
     if (posted.ok) {
       await remember(admin, caller.tenantId, storeId, posted.days);
       await admin.from("store_shopping").update({ last_run_at: new Date().toISOString(), last_error: "" }).eq("store_id", storeId);
@@ -119,6 +131,50 @@ async function remember(admin: SupabaseClient, tenantId: string, storeId: string
 
 type SoldLookup = (from: string, to: string) => Promise<Record<string, number>>;
 
+async function openAllos(
+  baseUrl: string,
+  username: string,
+  password: string,
+  fail: string,
+): Promise<{ ok: true; jar: Map<string, string>; base: string; weekIds: string[] } | { ok: false; message: string }> {
+  const base = baseUrl.replace(/\/$/, "");
+  const jar = new Map<string, string>();
+  const home = await browse(jar, `${base}/`);
+  if (!home || challenge(home)) return { ok: false, message: fail };
+  const fields = loginFields(home);
+  if (!fields) return { ok: false, message: fail };
+  const form = new URLSearchParams();
+  form.set(fields.user, username);
+  form.set(fields.password, password);
+  const logged = await browse(jar, `${base}/db/autentica.asp`, { method: "POST", body: form.toString(), headers: { "Content-Type": "application/x-www-form-urlencoded" } });
+  if (!logged || challenge(logged)) return { ok: false, message: fail };
+  const list = await browse(jar, `${base}/loja/vendas-s4/vendas.asp`);
+  if (!list || challenge(list)) return { ok: false, message: fail };
+  const weekIds = informedWeekIds(list);
+  if (weekIds.length === 0) return { ok: false, message: fail };
+  return { ok: true, jar, base, weekIds };
+}
+
+/** Lê a linha Informada e não envia nada. */
+async function readAllos(
+  baseUrl: string,
+  username: string,
+  password: string,
+  today: string,
+): Promise<{ ok: true; days: LaunchValue[] } | { ok: false; message: string }> {
+  const opened = await openAllos(baseUrl, username, password, READ_FAIL);
+  if (!opened.ok) return opened;
+  const accepted: LaunchValue[] = [];
+  for (const weekId of opened.weekIds) {
+    const formHtml = await browse(opened.jar, `${opened.base}/loja/vendas-s4/vendas_alterar.asp?IDSEMANA=${weekId}`);
+    const parsed = formHtml ? parseAllosForm(formHtml) : null;
+    if (!formHtml || !parsed || parsed.weekId !== weekId) return { ok: false, message: READ_FAIL };
+    accepted.push(...informedStoredValues(parsed.fields, today));
+  }
+  await browse(opened.jar, `${opened.base}/logout.asp`);
+  return { ok: true, days: accepted };
+}
+
 async function postAllos(
   baseUrl: string,
   username: string,
@@ -126,42 +182,28 @@ async function postAllos(
   today: string,
   sold: SoldLookup,
 ): Promise<{ ok: true; days: LaunchValue[] } | { ok: false; message: string }> {
-  const base = baseUrl.replace(/\/$/, "");
-  const jar = new Map<string, string>();
-  const home = await browse(jar, `${base}/`);
-  if (!home || challenge(home)) return { ok: false, message: KEEP };
-  const fields = loginFields(home);
-  if (!fields) return { ok: false, message: KEEP };
-  const form = new URLSearchParams();
-  form.set(fields.user, username);
-  form.set(fields.password, password);
-  const logged = await browse(jar, `${base}/db/autentica.asp`, { method: "POST", body: form.toString(), headers: { "Content-Type": "application/x-www-form-urlencoded" } });
-  if (!logged || challenge(logged)) return { ok: false, message: KEEP };
-
-  const list = await browse(jar, `${base}/loja/vendas-s4/vendas.asp`);
-  if (!list || challenge(list)) return { ok: false, message: KEEP };
-  const weekIds = informedWeekIds(list);
-  if (weekIds.length === 0) return { ok: false, message: KEEP };
+  const opened = await openAllos(baseUrl, username, password, KEEP);
+  if (!opened.ok) return opened;
 
   const accepted: LaunchValue[] = [];
-  for (const weekId of weekIds) {
-    const formHtml = await browse(jar, `${base}/loja/vendas-s4/vendas_alterar.asp?IDSEMANA=${weekId}`);
+  for (const weekId of opened.weekIds) {
+    const formHtml = await browse(opened.jar, `${opened.base}/loja/vendas-s4/vendas_alterar.asp?IDSEMANA=${weekId}`);
     const parsed = formHtml ? parseAllosForm(formHtml) : null;
     if (!formHtml || !parsed || parsed.weekId !== weekId) return { ok: false, message: KEEP };
     const from = parsed.fields[0]?.date ?? today;
     const to = parsed.fields[parsed.fields.length - 1]?.date ?? today;
     const filled = fillAllosWeek(parsed, await sold(from, to), today);
-    const saved = await browse(jar, `${base}/loja/vendas-s4/vendas_atualizar.asp`, {
+    const saved = await browse(opened.jar, `${opened.base}/loja/vendas-s4/vendas_atualizar.asp`, {
       method: "POST",
       body: filled.body,
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
     });
     if (!saved || challenge(saved)) return { ok: false, message: KEEP };
-    const echoed = parseAllosForm(await browse(jar, `${base}/loja/vendas-s4/vendas_alterar.asp?IDSEMANA=${weekId}`) ?? "");
+    const echoed = parseAllosForm(await browse(opened.jar, `${opened.base}/loja/vendas-s4/vendas_alterar.asp?IDSEMANA=${weekId}`) ?? "");
     if (!echoed || !sameDays(filled.days, echoed.fields)) return { ok: false, message: KEEP };
     accepted.push(...filled.days);
   }
-  await browse(jar, `${base}/logout.asp`);
+  await browse(opened.jar, `${opened.base}/logout.asp`);
   return { ok: true, days: accepted };
 }
 

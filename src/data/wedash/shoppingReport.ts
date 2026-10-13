@@ -93,14 +93,28 @@ export function forceLaunchAllowed(input: {
   return { ok: true };
 }
 
-/** Soma as marcas do dia. O painel pede o faturamento bruto da filial. */
-export function sumSoldByDay(rows: Array<{ day: string; revenueCents: number }>): Record<string, number> {
+/**
+ * Faturamento bruto da filial no dia.
+ * A linha ALL já é o total. WEPINK e WPINK são a divisão dessa mesma venda e não entram de novo.
+ */
+export function sumSoldByDay(rows: Array<{ day: string; revenueCents: number; brand?: string | null }>): Record<string, number> {
+  const hasBrand = rows.some((row) => row.brand === "ALL" || row.brand === "WEPINK" || row.brand === "WPINK");
+  const all = rows.filter((row) => row.brand === "ALL");
+  const chosen = !hasBrand ? rows : all.length > 0 ? all : rows.filter((row) => row.brand === "WEPINK" || row.brand === "WPINK");
   const out: Record<string, number> = {};
-  for (const row of rows) {
+  for (const row of chosen) {
     const day = row.day.slice(0, 10);
     out[day] = (out[day] ?? 0) + row.revenueCents;
   }
   return out;
+}
+
+/** O que a linha Informada já tem. Campo vazio passado conta como zero. Hoje e o futuro ficam de fora. */
+export function informedStoredValues(fields: AllosField[], today: string): LaunchValue[] {
+  return fields.flatMap((field) => {
+    if (!isClosedDay(field.date, today)) return [];
+    return [{ date: field.date, cents: field.fieldCents ?? 0 }];
+  });
 }
 
 /** Dias do mês anteriores a hoje. Sem lançamento gravado, o dia conta como em branco. */

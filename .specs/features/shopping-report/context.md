@@ -42,12 +42,15 @@ A madrugada informa as vendas brutas dos quiosques no painel do shopping e a tel
 - Calendário do mês, no padrão de Fechamento e Sangrias.
 - O Atualizar do topo, nesta tela, força o mesmo lançamento da madrugada. Loja de rua, filial sem acesso e Argo não chamam o painel.
 - KPIs dos dias anteriores a hoje: Vendido, Lançado, Diferença (lançado menos vendido).
+- Vendido é o total da filial (marca ALL). WEPINK e WPINK não somam de novo.
+- Ao abrir, a tela lê o que a linha Informada já tem e não envia venda. Enquanto essa leitura não volta, Lançado fica "—" em vez de R$ 0,00.
+- Cada dia passado mostra o badge Vendido e o badge Lançado. Lançado verde quando os dois são iguais, vermelho quando diferem.
 - Diferença positiva: aluguel percentual a mais. Negativa: risco de multa. Dia passado sem lançamento conta como zero lançado.
 
 ### Agent's Discretion
 
 - Onde cifrar a senha, desde que o padrão seja o da chave da adquirente.
-- O texto curto do dia no calendário, desde que o valor lançado e a diferença apareçam.
+- O texto curto do dia no calendário ficou definido: badge Vendido e badge Lançado.
 
 ### Declined / Undiscussed Gray Areas → Assumptions
 

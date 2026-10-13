@@ -6,6 +6,7 @@ import {
   informedWeekIds,
   formatAllosAmount,
   informedLaunchValues,
+  informedStoredValues,
   monthReport,
   parseAllosForm,
   reportDays,
@@ -80,6 +81,36 @@ describe("formatAllosAmount", () => {
   it("uses the shopping form's thousands and decimal marks", () => {
     expect(formatAllosAmount(675680)).toBe("6.756,80");
     expect(formatAllosAmount(0)).toBe("0,00");
+  });
+});
+
+describe("sumSoldByDay", () => {
+  it("keeps the store total and does not add the brand split again", () => {
+    expect(
+      sumSoldByDay([
+        { day: "2026-10-01", brand: "ALL", revenueCents: 10000 },
+        { day: "2026-10-01", brand: "WEPINK", revenueCents: 7000 },
+        { day: "2026-10-01", brand: "WPINK", revenueCents: 3000 },
+      ]),
+    ).toEqual({ "2026-10-01": 10000 });
+  });
+});
+
+describe("informedStoredValues", () => {
+  it("keeps a filled past day, stores a blank past day as zero, and skips today", () => {
+    expect(
+      informedStoredValues(
+        [
+          { date: "2026-10-11", fieldCents: 12000 },
+          { date: "2026-10-12", fieldCents: null },
+          { date: "2026-10-13", fieldCents: 9999 },
+        ],
+        today,
+      ),
+    ).toEqual([
+      { date: "2026-10-11", cents: 12000 },
+      { date: "2026-10-12", cents: 0 },
+    ]);
   });
 });
 

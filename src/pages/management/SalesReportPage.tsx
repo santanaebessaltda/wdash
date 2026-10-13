@@ -4,7 +4,7 @@ import { Alert, Card, Skeleton, useToast } from "@/components/ui";
 import { ChipDia, monthNavBtn, PlainKpi, SeletorMesAno, Seta } from "@/pages/cash-close/CashClosePage";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { fetchSalesCoverage, fetchSalesDayAggs } from "@/data/wedash/salesRepo";
-import { fetchLaunchedDays, fetchShoppingAccount, requestShoppingLaunch, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
+import { fetchLaunchedDays, fetchShoppingAccount, requestShoppingLaunch, requestShoppingRead, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
 import { forceLaunchAllowed, monthReport, reportDays, sumSoldByDay } from "@/data/wedash/shoppingReport";
 import { brlCent, deIso, fimDoMes, inicioDoMes, intervaloDias, somarDias } from "@/lib/format";
 import { cn } from "@/lib/cn";
@@ -70,6 +70,8 @@ export function SalesReportPage() {
   const [loaded, setLoaded] = useState("");
   const [erro, setErro] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [lendo, setLendo] = useState(false);
+  const leitura = useRef("");
 
   const loja = lojas[0];
   const lojaRef = useRef(loja);
@@ -157,6 +159,34 @@ export function SalesReportPage() {
   const dias = useMemo(() => reportDays(intervaloDias(from, to), sold, launched, hoje), [from, to, sold, launched, hoje]);
   const resumo = useMemo(() => monthReport(dias, hoje), [dias, hoje]);
   const porDia = useMemo(() => new Map(dias.map((day) => [day.date, day])), [dias]);
+  const semLeitura = dias.length > 0 && dias.every((day) => day.launchedCents == null);
+
+  useEffect(() => {
+    if (!pronto || !loja || account?.administrator !== "allos") return;
+    const chave = loja.id;
+    if (leitura.current === chave) return;
+    leitura.current = chave;
+    let cancel = false;
+    setLendo(true);
+    void requestShoppingRead(loja.id)
+      .then((result) => {
+        if (cancel) return;
+        if (!result.ok) {
+          show(result.message, "danger");
+          return;
+        }
+        setReloadKey((n) => n + 1);
+      })
+      .catch(() => {
+        if (!cancel) show("Não foi possível ler o que já está no shopping. Nada foi alterado.", "danger");
+      })
+      .finally(() => {
+        if (!cancel) setLendo(false);
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [pronto, loja, account?.administrator, show]);
 
   function irParaMes(alvo: string) {
     const mes = inicioDoMes(alvo);
@@ -207,16 +237,16 @@ export function SalesReportPage() {
           <>
             <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
               <PlainKpi label="Vendido" value={money(resumo.soldCents)} color="var(--t0)" />
-              <PlainKpi label="Lançado" value={money(resumo.launchedCents)} color="var(--t0)" />
+              <PlainKpi label="Lançado" value={lendo && semLeitura ? "Lendo…" : semLeitura ? "—" : money(resumo.launchedCents)} color="var(--t0)" />
               <PlainKpi
                 label="Diferença"
-                value={textoDiferenca(resumo.differenceCents)}
-                color={resumo.differenceCents === 0 ? "var(--ok)" : "var(--bad)"}
+                value={lendo && semLeitura ? "Lendo…" : semLeitura ? "Ainda não lido" : textoDiferenca(resumo.differenceCents)}
+                color={semLeitura ? "var(--t2)" : resumo.differenceCents === 0 ? "var(--ok)" : "var(--bad)"}
                 tooltip="Lançado menos vendido. Positivo é aluguel percentual a mais. Negativo é risco de multa. Dia passado sem lançamento conta como zero."
               />
             </div>
             <div className="overflow-x-auto rounded-[18px] border border-line bg-bg-2 shadow-[var(--shadow-vela)]">
-              <div className="min-w-[760px]">
+              <div className="min-w-[980px]">
                 <div className="grid grid-cols-7">
                   {WEEK.map((d, i) => (
                     <div key={i} className="border-b border-line px-1 py-3 text-center text-[10px] font-bold leading-tight text-t2 sm:text-[11px]">
@@ -251,13 +281,13 @@ function DiaCelula({
   row?: { soldCents: number; launchedCents: number | null };
 }) {
   const borda = cn(
-    "flex min-h-[84px] w-full min-w-0 flex-col items-stretch justify-start border-b border-r border-line p-1.5 text-left sm:min-h-[110px] sm:p-2",
+    "flex min-h-[108px] w-full min-w-0 flex-col items-stretch justify-start border-b border-r border-line p-1.5 text-left sm:min-h-[132px] sm:p-2",
     (index + 1) % 7 === 0 && "border-r-0",
     !day && "bg-bg-1/30",
   );
   if (!day) return <div className={borda} />;
   const futuro = day >= hoje;
-  const diferenca = row && row.launchedCents != null ? row.launchedCents - row.soldCents : row ? 0 - row.soldCents : 0;
+  const igual = row?.launchedCents != null && row.launchedCents === row.soldCents;
   return (
     <div className={borda}>
       <span
@@ -270,12 +300,10 @@ function DiaCelula({
       </span>
       {row ? (
         <>
-          <p className="mt-1 truncate font-mono text-[12px] font-bold text-t0 sm:text-[13px]">{row.launchedCents == null ? "—" : money(row.launchedCents)}</p>
-          {row.launchedCents == null ? (
-            <ChipDia cor="bg-chip-gray">Em branco</ChipDia>
-          ) : diferenca !== 0 ? (
-            <ChipDia cor="bg-bad">{textoDiferenca(diferenca)}</ChipDia>
-          ) : null}
+          <ChipDia cor="bg-chip-gray">{`Vendido ${money(row.soldCents)}`}</ChipDia>
+          <ChipDia cor={row.launchedCents == null ? "bg-chip-gray" : igual ? "bg-ok" : "bg-bad"}>
+            {row.launchedCents == null ? "Lançado —" : `Lançado ${money(row.launchedCents)}`}
+          </ChipDia>
         </>
       ) : null}
     </div>

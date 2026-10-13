@@ -56,6 +56,19 @@ export async function saveShoppingAccount(input: {
   return { ok: true };
 }
 
+const READ_FAIL = "Não foi possível ler o que já está no shopping. Nada foi alterado.";
+
+/** Lê a linha Informada já salva. Não envia venda. */
+export async function requestShoppingRead(storeId: string): Promise<ShoppingLaunchResult> {
+  const { getSupabase } = await import("@/lib/supabase");
+  const sb = getSupabase();
+  if (!sb) return { ok: false, message: READ_FAIL };
+  const { data, error } = await sb.functions.invoke("shopping-report-run", { body: { storeId, read: true } });
+  if (error || !data) return { ok: false, message: READ_FAIL };
+  if (data.ok === true) return { ok: true };
+  return { ok: false, message: typeof data.message === "string" ? data.message : READ_FAIL };
+}
+
 /** Mesma rotina da madrugada, para a filial aberta. */
 export async function requestShoppingLaunch(storeId: string): Promise<ShoppingLaunchResult> {
   const { getSupabase } = await import("@/lib/supabase");
