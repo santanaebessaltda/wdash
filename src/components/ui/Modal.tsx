@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
-import { padTopoEBase } from "@/lib/safeArea";
+import { padTopAndBottom } from "@/lib/safeArea";
 
 export interface ModalProps {
   open: boolean;
@@ -26,7 +26,7 @@ export function Modal({ open, onClose, title, children, footer, size = "md", bod
   return createPortal(
     <div
       className="pad-topo pad-base fixed inset-0 z-[100] flex items-center justify-center px-4"
-      style={padTopoEBase("1rem", "1rem")}
+      style={padTopAndBottom("1rem", "1rem")}
       role="dialog"
       aria-modal="true"
     >

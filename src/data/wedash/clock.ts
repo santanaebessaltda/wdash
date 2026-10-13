@@ -1,4 +1,4 @@
-import { hora } from "@/lib/format";
+import { clockTime } from "@/lib/format";
 
 /**
  * Relogio congelado do mock (fixtures Equipe/Financeiro/...).
@@ -13,7 +13,7 @@ export const LAST_SYNC = new Date(2026, 8, 15, 14, 30);
 export const SYNC_INTERVAL_MIN = 2;
 
 /** Sync e da conta, nao de uma tela: qualquer aba do Dashboard mostra o mesmo horario. */
-export const UPDATED_AT = hora(LAST_SYNC);
+export const UPDATED_AT = clockTime(LAST_SYNC);
 
 /** "ha 2 min"  -  para o subtitulo do Dashboard, no lugar de uma frase fixa. */
 const MINUTES_SINCE_SYNC = Math.floor((NOW.getTime() - LAST_SYNC.getTime()) / 60000);

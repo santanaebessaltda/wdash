@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type InputHTMLAttributes, type ReactNode } from "react";
-import { padTopoEBase } from "@/lib/safeArea";
+import { padTopAndBottom } from "@/lib/safeArea";
 import { cn } from "@/lib/cn";
-import { SENHA_MIN, dicaForcaSenha, senhaTemEspecial } from "@/lib/password";
+import { PASSWORD_MIN, passwordStrengthHint, passwordHasSpecial } from "@/lib/password";
 import { Alert, Checkbox, FormField, Input } from "@/components/ui";
 import { AuthGlow, BrandMark } from "@/pages/auth/authKit";
 import { PRODUCT_NAME } from "@/data/wedash/tenant";
@@ -16,19 +16,19 @@ export { AuthGlow } from "@/pages/auth/authKit";
 export { Checkbox, FormField, Input };
 
 /** Escala tipografica unificada com o Login. */
-export const acessoTitulo = "mb-2 text-[26px] font-extrabold tracking-tight text-t0";
-export const acessoSubtitulo = "mb-6 text-sm leading-relaxed text-t1";
-export const acessoBotao =
+export const accessTitle = "mb-2 text-[26px] font-extrabold tracking-tight text-t0";
+export const accessSubtitle = "mb-6 text-sm leading-relaxed text-t1";
+export const accessButton =
   "h-[46px] w-full rounded-xl bg-acc text-sm font-bold text-white transition-colors hover:bg-acc-2 disabled:opacity-60";
-export const acessoLink = "text-[13px] font-bold text-acc";
-export const acessoRodape = "text-[13px] text-t2";
+export const accessLink = "text-[13px] font-bold text-acc";
+export const accessFooter = "text-[13px] text-t2";
 
 /** Moldura das telas de acesso, no mesmo formato de ForgotPassword/ResetPassword do template. */
-export function AcessoPagina({ children, rodape, largura = 420, marca = true }: { children: ReactNode; rodape?: ReactNode; largura?: number; marca?: boolean }) {
+export function AccessShell({ children, rodape, largura = 420, marca = true }: { children: ReactNode; rodape?: ReactNode; largura?: number; marca?: boolean }) {
   return (
     <div
       className="tela-cheia pad-topo pad-base relative w-full overflow-y-auto bg-bg-0"
-      style={padTopoEBase("2.5rem", "2.5rem")}
+      style={padTopAndBottom("2.5rem", "2.5rem")}
     >
       <AuthGlow />
       <div className="relative flex min-h-full w-full items-center justify-center px-4">
@@ -57,7 +57,7 @@ const inputErro = "!border-2 !border-bad bg-bad-soft";
 const olhoBtn =
   "absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-t2 hover:bg-bg-3 hover:text-t0";
 
-function BotaoRevelarSenha({ mostrar, onToggle }: { mostrar: boolean; onToggle: () => void }) {
+function RevealPasswordButton({ mostrar, onToggle }: { mostrar: boolean; onToggle: () => void }) {
   return (
     <button type="button" onClick={onToggle} aria-label={mostrar ? "Ocultar senha" : "Mostrar senha"} className={olhoBtn}>
       {mostrar ? (
@@ -122,7 +122,7 @@ const CAMPOS_DE_TEXTO = new Set(["text", "email", "password", "tel", "search", "
  * No celular (PWA) a senha pode chegar depois do e-mail e as vezes so vem `change`  -  por isso tenta
  * de novo por ~1,5s e aceita `change` de campo que nao foi digitado.
  */
-export function useFocoNoEnvioAposAutofill() {
+export function useFocusSubmitAfterAutofill() {
   const ref = useRef<HTMLFormElement>(null);
   useEffect(() => {
     const form = ref.current;
@@ -187,7 +187,7 @@ export function useFocoNoEnvioAposAutofill() {
 }
 
 /** E-mail  -  FormField + Input (Vela). */
-export function CampoEmail({
+export function EmailField({
   label = "E-mail",
   value,
   onChange,
@@ -222,7 +222,7 @@ export function CampoEmail({
 }
 
 /** CPF com mascara  -  FormField + Input (Vela). */
-export function CampoCpf({
+export function CpfField({
   label = "CPF",
   value,
   onChange,
@@ -251,7 +251,7 @@ export function CampoCpf({
 }
 
 /** Senha com revelar  -  FormField + Input (Vela). */
-export function CampoSenha({
+export function PasswordField({
   label = "Senha",
   value,
   onChange,
@@ -279,26 +279,26 @@ export function CampoSenha({
           autoComplete={autoComplete}
           className={cn("pr-12", erro && inputErro, className)}
         />
-        <BotaoRevelarSenha mostrar={mostrar} onToggle={() => setMostrar((m) => !m)} />
+        <RevealPasswordButton mostrar={mostrar} onToggle={() => setMostrar((m) => !m)} />
       </div>
     </FormField>
   );
 }
 
-export type NomePessoa = { nome: string; sobrenome: string };
+export type PersonName = { nome: string; sobrenome: string };
 
-export function nomePessoaValido(n: NomePessoa): boolean {
+export function personNameIsValid(n: PersonName): boolean {
   return n.nome.trim().length >= 2 && n.sobrenome.trim().length >= 2;
 }
 
 /** Nome  |  Sobrenome do "Crie seu acesso" (sempre em branco: o convite so traz o e-mail). */
-export function CamposNome({
+export function NameFields({
   valor,
   onChange,
   autoFocus,
 }: {
-  valor: NomePessoa;
-  onChange: (patch: Partial<NomePessoa>) => void;
+  valor: PersonName;
+  onChange: (patch: Partial<PersonName>) => void;
   autoFocus?: boolean;
 }) {
   return (
@@ -327,12 +327,12 @@ export function CamposNome({
 }
 
 /** Foto de perfil opcional (padrao da aba Profile do template: quadrado com iniciais + botao "+"). */
-export function CampoFoto({
+export function PhotoField({
   nome,
   foto,
   onChange,
 }: {
-  nome: NomePessoa;
+  nome: PersonName;
   foto: File | null;
   onChange: (foto: File | null) => void;
 }) {
@@ -386,7 +386,7 @@ export function CampoFoto({
         </button>
       </div>
       {foto ? (
-        <button type="button" onClick={() => onChange(null)} className={cn(acessoLink, "mt-2.5")}>
+        <button type="button" onClick={() => onChange(null)} className={cn(accessLink, "mt-2.5")}>
           Remover foto
         </button>
       ) : (
@@ -408,7 +408,7 @@ export function CampoFoto({
 }
 
 /** Aviso dentro do card (Alert do Vela). */
-export function AvisoCard({ tom = "info", titulo, children }: { tom?: "info" | "ok" | "bad" | "warn"; titulo?: ReactNode; children: ReactNode }) {
+export function NoticeCard({ tom = "info", titulo, children }: { tom?: "info" | "ok" | "bad" | "warn"; titulo?: ReactNode; children: ReactNode }) {
   const variant = { info: "info", ok: "success", bad: "danger", warn: "warning" } as const;
   return (
     <Alert variant={variant[tom]} title={titulo}>
@@ -418,7 +418,7 @@ export function AvisoCard({ tom = "info", titulo, children }: { tom?: "info" | "
 }
 
 /** Icone redondo no topo do card, como em ForgotPassword/ResetPassword do template. */
-export function IconeCard({ tom = "acc", centralizado = false, children }: { tom?: "acc" | "ok" | "bad" | "warn" | "info"; centralizado?: boolean; children: ReactNode }) {
+export function IconCard({ tom = "acc", centralizado = false, children }: { tom?: "acc" | "ok" | "bad" | "warn" | "info"; centralizado?: boolean; children: ReactNode }) {
   const bg = { acc: "bg-acc-soft", ok: "bg-ok-soft", bad: "bg-bad-soft", warn: "bg-warn-soft", info: "bg-info-soft" }[tom];
   const cor = { acc: "var(--acc)", ok: "var(--ok)", bad: "var(--bad)", warn: "var(--warn)", info: "var(--info)" }[tom];
   return (
@@ -429,10 +429,10 @@ export function IconeCard({ tom = "acc", centralizado = false, children }: { tom
 }
 
 /** Medidor de forca da senha (barras Vela). */
-export function ForcaSenha({ senha }: { senha: string }) {
+export function PasswordStrength({ senha }: { senha: string }) {
   const n = senha.length;
-  const temEspecial = senhaTemEspecial(senha);
-  const nivel = n === 0 ? 0 : n < SENHA_MIN ? 1 : !temEspecial ? 2 : n < 12 ? 3 : 4;
+  const temEspecial = passwordHasSpecial(senha);
+  const nivel = n === 0 ? 0 : n < PASSWORD_MIN ? 1 : !temEspecial ? 2 : n < 12 ? 3 : 4;
   const cor = nivel <= 1 ? "bg-bad" : nivel === 2 ? "bg-warn" : "bg-ok";
   return (
     <div>
@@ -441,7 +441,7 @@ export function ForcaSenha({ senha }: { senha: string }) {
           <span key={i} className={cn("h-[5px] flex-1 rounded-sm", i <= nivel ? cor : "bg-bg-inset")} />
         ))}
       </div>
-      <p className="mt-1.5 text-[11.5px] text-t2">{dicaForcaSenha(senha)}</p>
+      <p className="mt-1.5 text-[11.5px] text-t2">{passwordStrengthHint(senha)}</p>
     </div>
   );
 }

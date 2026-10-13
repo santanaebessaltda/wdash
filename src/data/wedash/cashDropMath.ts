@@ -1,8 +1,8 @@
 /** Sangria do Millennium: o valor vem negativo; na tela é positivo. `purchase` não entra no boleto (compra, premiação, fornecedor ou outro uso). */
 
-export type SangriaKind = "deposit" | "purchase";
+export type CashDropKind = "deposit" | "purchase";
 
-export type SangriaAmounts = {
+export type CashDropAmounts = {
   totalCents: number;
   boletoCents: number;
   /** Compra, premiação, fornecedor ou outro uso. Não entra no boleto. */
@@ -12,7 +12,7 @@ export type SangriaAmounts = {
   motivo: string;
 };
 
-export type ParsedSangria = {
+export type ParsedCashDrop = {
   erpLancamento: number;
   day: string;
   amountCents: number;
@@ -20,10 +20,10 @@ export type ParsedSangria = {
   note: string;
 };
 
-const EMPTY: SangriaAmounts = { totalCents: 0, boletoCents: 0, foraCents: 0, faltaCents: 0, motivo: "" };
+const EMPTY: CashDropAmounts = { totalCents: 0, boletoCents: 0, foraCents: 0, faltaCents: 0, motivo: "" };
 
 /** A falta não passa do que ainda iria para o boleto. */
-export function clampFalta(baseBoletoCents: number, faltaCents: number): number {
+export function clampShortage(baseBoletoCents: number, faltaCents: number): number {
   if (!Number.isFinite(faltaCents) || faltaCents <= 0) return 0;
   const base = Math.max(0, baseBoletoCents);
   return Math.min(Math.round(faltaCents), base);
@@ -55,8 +55,8 @@ export function reaisToCents(reais: number): number {
   return Math.round(Math.abs(reais) * 100);
 }
 
-export function parseSangriaLista(payload: unknown): ParsedSangria[] {
-  const out: ParsedSangria[] = [];
+export function parseCashDropList(payload: unknown): ParsedCashDrop[] {
+  const out: ParsedCashDrop[] = [];
   for (const raw of listOf(payload)) {
     if (!raw || typeof raw !== "object") continue;
     const row = raw as Record<string, unknown>;
@@ -76,9 +76,9 @@ export function parseSangriaLista(payload: unknown): ParsedSangria[] {
 }
 
 export function dayAmounts(
-  lines: Array<{ amountCents: number; kind: SangriaKind; note: string }>,
+  lines: Array<{ amountCents: number; kind: CashDropKind; note: string }>,
   faltaCents = 0,
-): SangriaAmounts {
+): CashDropAmounts {
   let totalCents = 0;
   let baseCents = 0;
   let foraCents = 0;
@@ -92,11 +92,11 @@ export function dayAmounts(
       baseCents += line.amountCents;
     }
   }
-  const falta = clampFalta(baseCents, faltaCents);
+  const falta = clampShortage(baseCents, faltaCents);
   return { totalCents, boletoCents: baseCents - falta, foraCents, faltaCents: falta, motivo: motivos.join(" · ") };
 }
 
-export function sumAmounts(rows: SangriaAmounts[]): SangriaAmounts {
+export function sumAmounts(rows: CashDropAmounts[]): CashDropAmounts {
   return rows.reduce(
     (acc, row) => ({
       totalCents: acc.totalCents + row.totalCents,
@@ -111,7 +111,7 @@ export function sumAmounts(rows: SangriaAmounts[]): SangriaAmounts {
 
 /** Boleto dos dias marcados. Compra e falta ficam de fora. */
 export function depositBoleto(
-  lines: Array<{ day: string; amountCents: number; kind: SangriaKind; note: string }>,
+  lines: Array<{ day: string; amountCents: number; kind: CashDropKind; note: string }>,
   days: string[],
   faltaByDay: ReadonlyMap<string, number> = new Map(),
 ): number {

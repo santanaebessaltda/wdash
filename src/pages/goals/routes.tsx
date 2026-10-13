@@ -8,7 +8,7 @@ const GoalsPage = lazyPage(() => import("./GoalsPage"), "default");
 const GoalDetailPage = lazyPage(() => import("./GoalDetailPage"), "default");
 const GoalEditorPage = lazyPage(() => import("./GoalEditorPage"), "default");
 
-export const metasRoutes: RouteObject[] = [
+export const goalRoutes: RouteObject[] = [
   {
     element: <RequireRole roles={["OWNER", "MANAGER", "ADMIN_GLOBAL"]} />,
     children: [

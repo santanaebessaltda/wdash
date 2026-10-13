@@ -78,7 +78,7 @@ export interface SellerRow {
   // Meta individual (so com meta ativa; sem meta ficam zerados e semMeta=true)
   metaIndividualValor: number;
   metaProporcional: boolean;
-  diasElegiveis: number;
+  eligibleDays: number;
   atingimentoPct: number;
   barraPct: number;
   /** Participacao no faturamento vs. meta da loja (valorLoja). */
@@ -117,7 +117,7 @@ export interface NetworkGlobalGoal {
   /** Projecao pelo indice de desempenho acumulado (AD-021). */
   projetadoPct: number;
   /** Dias abertos da competencia a partir de hoje (incluindo hoje). */
-  diasRestantes: number;
+  daysRemaining: number;
   /** Inicio da competencia (ISO). */
   inicio: string;
   /** Fim da competencia (ISO). */

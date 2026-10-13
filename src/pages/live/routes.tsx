@@ -4,7 +4,7 @@ import { paths } from "@/router/paths";
 /** Ao vivo saiu do produto. As URLs antigas abrem a Visao geral. */
 const toOverview = <Navigate to={paths.overview} replace />;
 
-export const aoVivoRoutes: RouteObject[] = [
+export const liveRoutes: RouteObject[] = [
   paths.live.root,
   paths.live.share,
   paths.live.tv,

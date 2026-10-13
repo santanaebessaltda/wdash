@@ -1,5 +1,5 @@
 /** Pacote da tela Inicio do vendedor. No modo Geral, numeros e podio sao a parte igual da filial. Nos outros modos, o podio e a venda de cada pessoa. */
-import { brlCent, collaboratorName, inicioDoMes, somarDias } from "./format.ts";
+import { brlCent, collaboratorName, startOfMonth, addDays } from "./format.ts";
 import type { GoalRecord, GoalTeamMember, SalesDayAgg, SalesSellerDayAgg } from "./goalTypes.ts";
 import { buildGoalCardView, goalStatus, sellerGoalLevels, type SellerGoalLevel } from "./goalView.ts";
 import { weekdayWeights, type StoreWeekHours } from "./goalWeights.ts";
@@ -128,7 +128,7 @@ export interface SellerHomeInput {
 }
 
 function storeWeights(input: SellerHomeInput, goal: GoalRecord, week: StoreWeekHours): number[] {
-  const from = somarDias(goal.startsOn, -HISTORY_WEEKS * 7);
+  const from = addDays(goal.startsOn, -HISTORY_WEEKS * 7);
   const hist = new Map<string, number>();
   for (const a of input.dayAggs) {
     if (a.storeId !== goal.storeId || a.brand !== "ALL" || a.day < from || a.day >= goal.startsOn) continue;
@@ -182,7 +182,7 @@ function monthRanking(input: SellerHomeInput, s: SellerHomeInput["stores"][numbe
   const geral = generalGoal(input, s.storeId);
   const equipe = salesTeam(input, s.storeId);
   if (geral && equipe.length > 0) {
-    const from = inicioDoMes(input.today);
+    const from = startOfMonth(input.today);
     const inicio = from > geral.startsOn ? from : geral.startsOn;
     const fim = input.today < geral.endsOn ? input.today : geral.endsOn;
     const tot = inicio <= fim ? storeSlice(input, s.storeId, inicio, fim) : { revenue: 0, sales: 0, items: 0 };
@@ -196,7 +196,7 @@ function monthRanking(input: SellerHomeInput, s: SellerHomeInput["stores"][numbe
       me: m.employeeId === s.employeeId,
     }));
   }
-  const from = inicioDoMes(input.today);
+  const from = startOfMonth(input.today);
   const group = sellerGroup(input, s);
   const inGroup = (m: GoalTeamMember) =>
     m.storeId === s.storeId && m.salesPerson && (group == null || m.shiftId === group.shiftId);

@@ -8,7 +8,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeaders, serve } from "../_shared/cors.ts";
 import { buildSellerHome, type SellerChallengeInput, type SellerChallengePrize, type SellerHomeInput } from "../_shared/engine/sellerHome.ts";
 import type { SellerProductDay } from "../_shared/engine/sellerChallenge.ts";
-import { fimDoMes, inicioDoMes, paraIso, somarDias } from "../_shared/engine/format.ts";
+import { endOfMonth, startOfMonth, dateToIso, addDays } from "../_shared/engine/format.ts";
 import { excludeNonSalesPeople, goalFromRow, sellerDayFromRow, teamMemberFromRow } from "../_shared/engine/goalRows.ts";
 import type { DayHours, Dow, StoreWeekHours } from "../_shared/engine/goalWeights.ts";
 
@@ -163,13 +163,13 @@ serve(async (req) => {
     });
   if (stores.length === 0) return fail("not_linked", 403);
 
-  const today = paraIso(new Date());
+  const today = dateToIso(new Date());
   const storeIds = stores.map((s) => s.storeId);
-  const from = somarDias(inicioDoMes(somarDias(today, -HISTORY_WEEKS * 7)), 0);
+  const from = addDays(startOfMonth(addDays(today, -HISTORY_WEEKS * 7)), 0);
 
   try {
-    const monthStart = inicioDoMes(today);
-    const monthEnd = fimDoMes(today);
+    const monthStart = startOfMonth(today);
+    const monthEnd = endOfMonth(today);
     const [dayRows, sellerRows, teamRows, goalRows, challengeRows] = await Promise.all([
       allPages(
         admin.from("sales_day_agg").select("tenant_id, store_id, day, brand, revenue_cents, sales_count, item_count, cmv_cents")

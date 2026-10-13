@@ -1,5 +1,5 @@
 import { kpiDelta, previousPeriod, resolvePeriod } from "@/data/wedash/dashboard";
-import { somarDias } from "@/data/wedash/engine/format";
+import { addDays } from "@/data/wedash/engine/format";
 import type { SellerDay } from "@/data/wedash/engine/sellerHome";
 
 export type NumbersMode = "hoje" | "mes";
@@ -70,8 +70,8 @@ export function sellerNumbers(days: SellerDay[], period: { from: string; to: str
   const compara = resolvido.terminaHoje;
   const faixa = previousPeriod(resolvido);
   // Periodo que termina hoje: os dois lados perdem o ultimo dia (nao existe venda por pessoa e hora).
-  const fimAtual = compara ? somarDias(period.to, -1) : period.to;
-  const fimAnterior = compara ? somarDias(faixa.fim, -1) : faixa.fim;
+  const fimAtual = compara ? addDays(period.to, -1) : period.to;
+  const fimAnterior = compara ? addDays(faixa.fim, -1) : faixa.fim;
   const atual = soma(days, period.from, fimAtual);
   if (atual.sales === 0 && atual.revenue === 0) return { ...ZERO, pa: { value: atual.items == null ? null : 0 } };
 

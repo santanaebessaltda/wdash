@@ -23,7 +23,7 @@ const PERIODOS: PeriodType[] = [
 const STORE_STORAGE_KEY = "wedash.store";
 const STORE_STORAGE_KEY_LEGACY = "gestao.filial";
 
-function lerFilialSalva(): string | null {
+function readSavedBranch(): string | null {
   try {
     return sessionStorage.getItem(STORE_STORAGE_KEY) ?? sessionStorage.getItem(STORE_STORAGE_KEY_LEGACY);
   } catch {
@@ -31,7 +31,7 @@ function lerFilialSalva(): string | null {
   }
 }
 
-function salvarFilial(id: string) {
+function saveBranch(id: string) {
   try {
     sessionStorage.setItem(STORE_STORAGE_KEY, id);
     sessionStorage.removeItem(STORE_STORAGE_KEY_LEGACY);
@@ -64,10 +64,17 @@ function salvarPeriodo(p: PeriodoSalvo) {
   }
 }
 
+function firstParam(params: URLSearchParams, keys: string[]): string | null {
+  for (const key of keys) {
+    if (params.has(key)) return params.get(key);
+  }
+  return null;
+}
+
 function periodoDaUrl(params: URLSearchParams): PeriodoSalvo | null {
-  const tipo = params.get("periodo") as PeriodType | null;
+  const tipo = firstParam(params, ["period", "periodo"]) as PeriodType | null;
   if (!tipo || !PERIODOS.includes(tipo)) return null;
-  return { tipo, de: params.get("de") ?? undefined, ate: params.get("ate") ?? undefined };
+  return { tipo, de: firstParam(params, ["from", "de"]) ?? undefined, ate: firstParam(params, ["to", "ate"]) ?? undefined };
 }
 
 /**
@@ -95,13 +102,13 @@ export function useScope() {
   }, []);
 
   const escopo = useMemo<Scope>(() => {
-    const temParamFilial = params.has("filial");
-    const filialRaw = params.get("filial");
+    const hasBranchParameter = params.has("store") || params.has("filial");
+    const filialRaw = firstParam(params, ["store", "filial"]);
     let idsRaw = filialRaw ? filialRaw.split(",").map((s) => s.trim()).filter(Boolean) : [];
 
     // Sem `?filial=` na URL (navegacao pelo menu): recupera a ultima loja.
-    if (!temParamFilial) {
-      const salva = lerFilialSalva();
+    if (!hasBranchParameter) {
+      const salva = readSavedBranch();
       if (salva) idsRaw = [salva];
     }
 
@@ -116,7 +123,7 @@ export function useScope() {
 
     // Sem `?periodo=` (navegacao pelo menu): ultimo periodo da sessao; senao Hoje.
     const per = periodoDaUrl(params) ?? lerPeriodoSalvo() ?? { tipo: PERIODO_PADRAO };
-    const divisaoParam = params.get("divisao");
+    const divisaoParam = firstParam(params, ["brand", "divisao"]);
     const divisao: Division | null = divisaoParam === "WEPINK" || divisaoParam === "WPINK" ? divisaoParam : null;
 
     return {
@@ -133,7 +140,7 @@ export function useScope() {
 
   // Mantem storage alinhado com a URL (bookmark / share / abas do Dashboard).
   useEffect(() => {
-    if (params.has("filial")) salvarFilial(params.get("filial")?.split(",")[0]?.trim() || "");
+    if (params.has("store") || params.has("filial")) saveBranch(firstParam(params, ["store", "filial"])?.split(",")[0]?.trim() || "");
     const per = periodoDaUrl(params);
     if (per) salvarPeriodo(per);
   }, [params]);
@@ -145,23 +152,49 @@ export function useScope() {
     let dirty = false;
 
     if (!mostraPeriodo) {
-      for (const key of ["periodo", "de", "ate"] as const) {
+      for (const key of ["period", "from", "to", "periodo", "de", "ate"]) {
         if (!p.has(key)) continue;
         p.delete(key);
         dirty = true;
       }
     }
 
-    if (!p.has("filial")) {
+    if (p.has("filial")) {
+      if (!p.has("store")) p.set("store", p.get("filial") ?? "");
+      p.delete("filial");
+      dirty = true;
+    }
+    if (p.has("periodo")) {
+      if (!p.has("period")) p.set("period", p.get("periodo") ?? "");
+      p.delete("periodo");
+      dirty = true;
+    }
+    if (p.has("de")) {
+      if (!p.has("from")) p.set("from", p.get("de") ?? "");
+      p.delete("de");
+      dirty = true;
+    }
+    if (p.has("ate")) {
+      if (!p.has("to")) p.set("to", p.get("ate") ?? "");
+      p.delete("ate");
+      dirty = true;
+    }
+    if (p.has("divisao")) {
+      if (!p.has("brand")) p.set("brand", p.get("divisao") ?? "");
+      p.delete("divisao");
+      dirty = true;
+    }
+
+    if (!p.has("store")) {
       const id = escopo.filialIds[0];
       if (id) {
-        p.set("filial", id);
+        p.set("store", id);
         dirty = true;
       }
     }
 
-    if (!showBrandPicker && p.has("divisao")) {
-      p.delete("divisao");
+    if (!showBrandPicker && p.has("brand")) {
+      p.delete("brand");
       dirty = true;
     }
 
@@ -174,22 +207,22 @@ export function useScope() {
     // Array vazio = "Todas as lojas"  ->  nao grava id (URL limpa) + storage "".
     // Single-select: grava no max. o primeiro id.
     if (e.filialIds.length > 0) {
-      p.set("filial", e.filialIds[0]);
-      salvarFilial(e.filialIds[0]);
+      p.set("store", e.filialIds[0]);
+      saveBranch(e.filialIds[0]);
     } else {
-      salvarFilial("");
+      saveBranch("");
     }
     // Fora das telas com o campo, o periodo fica só no sessionStorage.
     if (mostraPeriodo) {
-      p.set("periodo", e.periodo.tipo);
+      p.set("period", e.periodo.tipo);
       if (e.periodo.tipo === "personalizado") {
-        if (e.periodo.inicio) p.set("de", e.periodo.inicio);
-        if (e.periodo.fim) p.set("ate", e.periodo.fim);
+        if (e.periodo.inicio) p.set("from", e.periodo.inicio);
+        if (e.periodo.fim) p.set("to", e.periodo.fim);
       }
     }
     salvarPeriodo({ tipo: e.periodo.tipo, de: e.periodo.inicio, ate: e.periodo.fim });
     const keepBrand = scopeShowsBrandPicker(e.filialIds, session.stores);
-    if (keepBrand && e.divisao) p.set("divisao", e.divisao);
+    if (keepBrand && e.divisao) p.set("brand", e.divisao);
     setParams(p, { replace: true });
   }
 

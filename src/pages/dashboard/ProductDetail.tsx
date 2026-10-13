@@ -33,7 +33,7 @@ import type { SalesHourAgg } from "@/data/wedash/salesTypes";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
-import { brlCent, num, tipDelta, tipRelacao } from "@/lib/format";
+import { brlCent, num, deltaTip, comparedWithTip } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
 type Delta = { value: string; positive: boolean; vs?: string; diff?: string; anterior?: string };
@@ -55,7 +55,7 @@ export function BadgeVsAnterior({ delta, metrica }: { delta?: Delta; metrica?: s
       {delta.value}
     </Badge>
   );
-  const tip = tipDelta(delta, metrica);
+  const tip = deltaTip(delta, metrica);
   return tip ? <Tooltip label={tip}>{badge}</Tooltip> : badge;
 }
 
@@ -235,7 +235,7 @@ type TopSort = "nome" | "itens" | "faturamento" | "lucro" | "margem";
 const valorDoSort = (r: { itens: number; faturamento: number; lucro: number | null; margemPct: number | null }, sort: TopSort) =>
   sort === "itens" ? r.itens : sort === "lucro" ? r.lucro : sort === "margem" ? r.margemPct : r.faturamento;
 
-function CelulaLucro({ v }: { v: number | null }) {
+function ProfitCell({ v }: { v: number | null }) {
   return (
     <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", v == null ? "text-t2" : v < 0 ? "text-bad" : "text-ok")}>
       {v == null ? "—" : brlCent(v)}
@@ -330,7 +330,7 @@ function ProdutosDoGrupo({ produtos, onProduto }: { produtos: ProductDetailItem[
               </td>
               <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(p.itens)}</td>
               <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.faturamento)}</td>
-              <CelulaLucro v={p.lucro} />
+              <ProfitCell v={p.lucro} />
               <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", p.margemPct == null ? "text-t2" : "text-ok")}>
                 {pctFmt(p.margemPct)}
               </td>
@@ -410,7 +410,7 @@ function CategoriasDaClasse({
               </td>
               <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(c.itens)}</td>
               <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(c.faturamento)}</td>
-              <CelulaLucro v={c.lucro} />
+              <ProfitCell v={c.lucro} />
               <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", c.margemPct == null ? "text-t2" : "text-ok")}>
                 {pctFmt(c.margemPct)}
               </td>
@@ -514,7 +514,7 @@ function ProductDetailModal({
             </div>
             <p className="mt-2.5 text-[11.5px] text-t2">
               {cmp
-                ? `Variação ${tipRelacao(cmp.vs).replace(/^Em/, "em")}`
+                ? `Variação ${comparedWithTip(cmp.vs).replace(/^Em/, "em")}`
                 : `Sem vendas ${artigo} no período anterior para comparar.`}
               {detalhe.cmv == null && " CMV, lucro e margem ficam indisponíveis quando faltam dados de custo no período."}
             </p>

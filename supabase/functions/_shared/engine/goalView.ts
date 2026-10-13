@@ -1,4 +1,4 @@
-import { brlCent, deIso, fimDoMes, intervaloDias, num, paraIso, somarDias } from "./format.ts";
+import { brlCent, isoToDate, endOfMonth, eachDay, num, dateToIso, addDays } from "./format.ts";
 import type {
   GoalCardView,
   GoalRecord,
@@ -23,8 +23,8 @@ export const GOAL_STATUS_LABEL: Record<GoalStatus, string> = {
   ended: "Encerrada",
 };
 
-function diasEntre(inicio: string, fim: string): number {
-  return Math.round((deIso(fim).getTime() - deIso(inicio).getTime()) / 86_400_000) + 1;
+function daysBetween(inicio: string, fim: string): number {
+  return Math.round((isoToDate(fim).getTime() - isoToDate(inicio).getTime()) / 86_400_000) + 1;
 }
 
 /** Fracao do periodo ja decorrida (hoje conta inteiro); 0 antes de comecar, 1 depois de acabar. */
@@ -32,12 +32,12 @@ function fracaoDecorrida(g: GoalRecord, today: string): number {
   const status = goalStatus(g, today);
   if (status === "upcoming") return 0;
   if (status === "ended") return 1;
-  return diasEntre(g.startsOn, today) / diasEntre(g.startsOn, g.endsOn);
+  return daysBetween(g.startsOn, today) / daysBetween(g.startsOn, g.endsOn);
 }
 
 /** Dias que faltam (incluindo hoje) na meta em andamento; 0 fora dela. */
-function diasRestantes(g: GoalRecord, today: string): number {
-  return goalStatus(g, today) === "active" ? diasEntre(today, g.endsOn) : 0;
+function daysRemaining(g: GoalRecord, today: string): number {
+  return goalStatus(g, today) === "active" ? daysBetween(today, g.endsOn) : 0;
 }
 
 /** Prazo da meta em andamento ("12 dias restantes"); `dias` inclui hoje, entao 1 = "Ultimo dia". */
@@ -51,15 +51,15 @@ export function prazoRestante(dias: number): string {
  * com a mesma quantidade de meses; senao comeca no dia seguinte ao fim, com a mesma duracao.
  */
 export function nextGoalPeriod(startsOn: string, endsOn: string): { startsOn: string; endsOn: string } {
-  const ini = deIso(startsOn);
-  const fim = deIso(endsOn);
-  if (ini.getDate() === 1 && fimDoMes(endsOn) === endsOn) {
+  const ini = isoToDate(startsOn);
+  const fim = isoToDate(endsOn);
+  if (ini.getDate() === 1 && endOfMonth(endsOn) === endsOn) {
     const meses = (fim.getFullYear() - ini.getFullYear()) * 12 + fim.getMonth() - ini.getMonth() + 1;
     const novoIni = new Date(fim.getFullYear(), fim.getMonth() + 1, 1);
-    return { startsOn: paraIso(novoIni), endsOn: paraIso(new Date(novoIni.getFullYear(), novoIni.getMonth() + meses, 0)) };
+    return { startsOn: dateToIso(novoIni), endsOn: dateToIso(new Date(novoIni.getFullYear(), novoIni.getMonth() + meses, 0)) };
   }
-  const novoIni = somarDias(endsOn, 1);
-  return { startsOn: novoIni, endsOn: somarDias(novoIni, diasEntre(startsOn, endsOn) - 1) };
+  const novoIni = addDays(endsOn, 1);
+  return { startsOn: novoIni, endsOn: addDays(novoIni, daysBetween(startsOn, endsOn) - 1) };
 }
 
 const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
@@ -69,7 +69,7 @@ const MES_NO_NOME = /(janeiro|fevereiro|mar[çc]o|abril|maio|junho|julho|agosto|
 export function copyGoalName(name: string, newStartsOn: string): string {
   const achados = [...name.matchAll(MES_NO_NOME)];
   if (achados.length !== 1) return `${name} (cópia)`;
-  const d = deIso(newStartsOn);
+  const d = isoToDate(newStartsOn);
   const mes = MESES[d.getMonth()]!;
   return name.replace(MES_NO_NOME, (m: string, nomeMes: string, sep: string | undefined, ano: string | undefined) => {
     const novo =
@@ -90,7 +90,7 @@ export function goalRealized(g: GoalRecord, dayAggs: SalesDayAgg[]): number {
 }
 
 /** Vendas e itens da filial no período da meta. Itens null = algum dia com venda sem itens. */
-function vendasDaLoja(g: GoalRecord, dayAggs: SalesDayAgg[]): { sales: number; items: number | null } {
+function storeSales(g: GoalRecord, dayAggs: SalesDayAgg[]): { sales: number; items: number | null } {
   let sales = 0;
   let items = 0;
   let missing = false;
@@ -118,7 +118,7 @@ export interface GoalSummary {
   pct: number;
   /** Projecao de fechamento (% da meta)  -  so em andamento e depois de 50% do periodo (igual ao detalhe). */
   projetadoPct: number | null;
-  diasRestantes: number;
+  daysRemaining: number;
   /** Nivel da loja na escada pelo realizado (null = nenhum ainda). */
   nivelAtual: string | null;
   /** Numero do nivel (1 = N1); null = nenhum ainda. */
@@ -142,7 +142,7 @@ export function buildGoalSummary(g: GoalRecord, dayAggs: SalesDayAgg[], today: s
     realizado,
     pct,
     projetadoPct: status === "active" && fracaoDecorrida(g, today) >= 0.5 ? projetadoPct(pct, g, today) : null,
-    diasRestantes: diasRestantes(g, today),
+    daysRemaining: daysRemaining(g, today),
     nivelAtual: nivel,
     nivelNumero,
   };
@@ -160,7 +160,7 @@ export interface SellerGoalLevel {
   fim: string;
   status: GoalStatus;
   /** Dias que faltam (incluindo hoje) com a meta em andamento; 0 encerrada. */
-  diasRestantes: number;
+  daysRemaining: number;
   modo: "individual" | "grupo" | "geral";
   /** Grupo de distribuicao da pessoa (null = meta sem grupos). */
   grupo: string | null;
@@ -206,7 +206,7 @@ export function sellerGoalLevels(input: {
           inicio: goal.startsOn,
           fim: goal.endsOn,
           status,
-          diasRestantes: diasRestantes(goal, input.today),
+          daysRemaining: daysRemaining(goal, input.today),
           modo: goal.tierMode === "INDIVIDUAL" ? "individual" : goal.tierMode === "GENERAL" ? "geral" : "grupo",
           grupo: goal.tierMode === "GENERAL" || goal.groups.length === 0 ? null : r.grupo,
           metaValor: r.metaIndividualValor,
@@ -257,10 +257,10 @@ export interface GoalManagerPrize {
  */
 export function goalManagerPrize(g: GoalRecord, realizado: number): GoalManagerPrize | null {
   if (!g.tiers.some((t) => t.gerenciaPct != null)) return null;
-  const pctLoja = g.target > 0 ? (realizado / g.target) * 100 : 0;
+  const storePct = g.target > 0 ? (realizado / g.target) * 100 : 0;
   let idx = -1;
   g.tiers.forEach((t, i) => {
-    if (pctLoja >= t.atingimentoMinPct && i === idx + 1) idx = i;
+    if (storePct >= t.atingimentoMinPct && i === idx + 1) idx = i;
   });
   const degrau = idx >= 0 ? g.tiers[idx]! : null;
   const seguinte = idx + 1 < g.tiers.length ? g.tiers[idx + 1]! : null;
@@ -356,10 +356,10 @@ export function buildGoalCardView(input: {
   const n = pessoas.length;
   const general = g.tierMode === "GENERAL";
   const individual = g.tierMode === "INDIVIDUAL";
-  const lojaVendas = status === "upcoming" ? { sales: 0, items: 0 as number | null } : vendasDaLoja(g, input.dayAggs);
+  const lojaVendas = status === "upcoming" ? { sales: 0, items: 0 as number | null } : storeSales(g, input.dayAggs);
   const escala = Math.max(100, ...g.tiers.map((t) => t.atingimentoMinPct));
   const marcos = g.tiers.map((t) => ({ nome: t.nome, pct: t.atingimentoMinPct, pctPremiacao: t.comissaoPct, bonus: t.bonus }));
-  const diasPeriodo = intervaloDias(g.startsOn, g.endsOn).length;
+  const diasPeriodo = eachDay(g.startsOn, g.endsOn).length;
   const equipeTotal = pessoas.reduce((s, p) => s + p.faturamento, 0);
 
   // Sem grupos de distribuicao = um grupo so, com a equipe toda e a meta inteira.
@@ -426,7 +426,7 @@ export function buildGoalCardView(input: {
       tendencia: "estavel",
       metaIndividualValor: metaInd,
       metaProporcional: false,
-      diasElegiveis: diasPeriodo,
+      eligibleDays: diasPeriodo,
       atingimentoPct: ating,
       barraPct: Math.min(100, (ating / escala) * 100),
       pctMetaGeral: g.target > 0 ? ((parte ? realizado : p.faturamento) / g.target) * 100 : 0,
@@ -460,7 +460,7 @@ export function buildGoalCardView(input: {
     total: g.target,
     pct,
     projetadoPct: status === "upcoming" ? 0 : projetadoPct(pct, g, today),
-    diasRestantes: status === "upcoming" ? diasEntre(g.startsOn, g.endsOn) : diasRestantes(g, today),
+    daysRemaining: status === "upcoming" ? daysBetween(g.startsOn, g.endsOn) : daysRemaining(g, today),
     inicio: g.startsOn,
     fim: g.endsOn,
   };

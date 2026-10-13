@@ -9,13 +9,13 @@ import { destinationAfterAuth } from "@/session/authApi";
 import { lazyPage } from "@/lib/lazyPage";
 
 /* Produto */
-import { acessoRoutes } from "@/pages/access/routes";
+import { accessRoutes } from "@/pages/access/routes";
 import { onboardingRoutes, syncingRoutes } from "@/pages/onboarding/routes";
 import { dashboardRoutes } from "@/pages/dashboard/routes";
-import { equipeRoutes } from "@/pages/team/routes";
-import { metasRoutes } from "@/pages/goals/routes";
-import { aoVivoRoutes } from "@/pages/live/routes";
-import { emBreveRoutes } from "@/pages/coming-soon/routes";
+import { teamRoutes } from "@/pages/team/routes";
+import { goalRoutes } from "@/pages/goals/routes";
+import { liveRoutes } from "@/pages/live/routes";
+import { retiredRoutes } from "@/pages/coming-soon/routes";
 import { managementRoutes } from "@/pages/management/routes";
 import { cashCloseRoutes } from "@/pages/cash-close/routes";
 import { stockRoutes } from "@/pages/stock/routes";
@@ -58,7 +58,7 @@ const routeTree: RouteObject[] = [
   { path: paths.home, element: <Raiz /> },
   {
     element: <AuthLayout />,
-    children: [...acessoRoutes, ...authRoutes],
+    children: [...accessRoutes, ...authRoutes],
   },
   {
     element: <RequireSession modo="create-access" />,
@@ -84,15 +84,15 @@ const routeTree: RouteObject[] = [
         element: <AppShell />,
         children: [
           ...dashboardRoutes,
-          ...equipeRoutes,
-          ...aoVivoRoutes,
-          ...metasRoutes,
+          ...teamRoutes,
+          ...liveRoutes,
+          ...goalRoutes,
           ...stockRoutes,
           ...cashCloseRoutes,
           ...managementRoutes,
           ...operationRoutes,
           ...settingsRoutes,
-          ...emBreveRoutes,
+          ...retiredRoutes,
           ...dashboardsRoutes,
           ...usersRoutes,
           ...projectsRoutes,

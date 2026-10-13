@@ -6,7 +6,7 @@
 import type { ReactNode } from "react";
 import { Avatar, Badge, Card, CardTitle, DataTable, EmptyState, ProgressBar, progressColor, progressTextClass, type DataTableColumn } from "@/components/ui";
 import { Tooltip } from "@/components/ui/Tooltip";
-import { brl, brlCent, intervaloDias, num } from "@/lib/format";
+import { brl, brlCent, eachDay, num } from "@/lib/format";
 import type { BlockState as BlockStateTipo } from "@/data/wedash/dashboard";
 import { BlockState } from "@/pages/dashboard/BlockState";
 import type { GoalCardView, NetworkGlobalGoal, SellerRow } from "@/data/wedash/teamViews";
@@ -25,7 +25,7 @@ const TipHelp = ({ label }: { label: string }) => (
   </Tooltip>
 );
 
-function IconRelogio() {
+function ClockIcon() {
   return (
     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
       <circle cx="12" cy="12" r="9" />
@@ -34,7 +34,7 @@ function IconRelogio() {
   );
 }
 
-function lojaCurta(fantasia: string): string {
+function shortStoreName(fantasia: string): string {
   return fantasia.replace(/^Shopping\s+/i, "");
 }
 
@@ -42,21 +42,21 @@ function lojaCurta(fantasia: string): string {
 
 type LinhaRank = SellerRow & { posicao: number };
 
-function CelulaVendedora({ l }: { l: LinhaRank }) {
+function SellerCell({ l }: { l: LinhaRank }) {
   return (
     <div className="flex min-w-0 items-center gap-2.5">
       <Avatar name={l.nome} size="sm" />
       <div className="min-w-0">
         <p className="truncate text-[13px] font-bold text-t0">{l.nome}</p>
         <p className="truncate text-[11px] text-t2">
-          {l.grupo} · {lojaCurta(l.filialNome)}
+          {l.grupo} · {shortStoreName(l.filialNome)}
         </p>
       </div>
     </div>
   );
 }
 
-function CelulaFaturamento({ l }: { l: LinhaRank }) {
+function RevenueCell({ l }: { l: LinhaRank }) {
   return (
     <div>
       <p className="font-mono text-[12.5px] font-bold text-t0">{l.faturamento}</p>
@@ -67,7 +67,7 @@ function CelulaFaturamento({ l }: { l: LinhaRank }) {
   );
 }
 
-function CelulaPctIndividual({ l }: { l: LinhaRank }) {
+function IndividualPctCell({ l }: { l: LinhaRank }) {
   if (l.semMeta) return <span className="text-t2">—</span>;
   const escala = Math.max(...l.marcosEscada.map((m) => m.pct), 100);
   return (
@@ -80,7 +80,7 @@ function CelulaPctIndividual({ l }: { l: LinhaRank }) {
   );
 }
 
-function CelulaNivel({ l }: { l: LinhaRank }) {
+function LevelCell({ l }: { l: LinhaRank }) {
   if (l.semMeta || !l.degrauAtual || l.nivelAtual == null) return <span className="text-t2">—</span>;
   const pctRef = l.atingimentoProjetadoPct ?? l.atingimentoPct;
   return (
@@ -90,7 +90,7 @@ function CelulaNivel({ l }: { l: LinhaRank }) {
   );
 }
 
-function CelulaProximo({ l }: { l: LinhaRank }) {
+function NextCell({ l }: { l: LinhaRank }) {
   if (l.semMeta) return <span className="text-t2">—</span>;
   if (!l.proximoDegrau) {
     return <p className="text-[12.5px] font-bold text-ok">Último nível</p>;
@@ -103,7 +103,7 @@ function CelulaProximo({ l }: { l: LinhaRank }) {
   );
 }
 
-function CelulaPremiacao({ l }: { l: LinhaRank }) {
+function PrizeCell({ l }: { l: LinhaRank }) {
   if (l.semMeta) return <span className="text-t2">—</span>;
   const valor = l.premiacaoAcumulada + l.bonusAlcancado;
   if (valor <= 0 && l.comissaoPct <= 0) return <span className="text-t2">—</span>;
@@ -120,7 +120,7 @@ function CelulaPremiacao({ l }: { l: LinhaRank }) {
   );
 }
 
-function CardMobileVendedora({ l, metaAtiva, encerrada = false }: { l: LinhaRank; metaAtiva: boolean; encerrada?: boolean }) {
+function SellerMobileCard({ l, metaAtiva, encerrada = false }: { l: LinhaRank; metaAtiva: boolean; encerrada?: boolean }) {
   return (
     <div className="rounded-xl border border-line bg-bg-inset p-3.5">
       <div className="mb-3 flex items-center gap-2.5">
@@ -129,7 +129,7 @@ function CardMobileVendedora({ l, metaAtiva, encerrada = false }: { l: LinhaRank
         <div className="min-w-0 flex-1">
           <p className="truncate text-[13.5px] font-bold text-t0">{l.nome}</p>
           <p className="truncate text-[11.5px] text-t2">
-            {l.grupo} · {lojaCurta(l.filialNome)}
+            {l.grupo} · {shortStoreName(l.filialNome)}
           </p>
         </div>
       </div>
@@ -137,25 +137,25 @@ function CardMobileVendedora({ l, metaAtiva, encerrada = false }: { l: LinhaRank
         <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 border-t border-line pt-2.5 text-[12px]">
           <div>
             <p className="text-[10.5px] font-bold uppercase tracking-wide text-t2">Faturamento</p>
-            <CelulaFaturamento l={l} />
+            <RevenueCell l={l} />
           </div>
           <div>
             <p className="text-[10.5px] font-bold uppercase tracking-wide text-t2">% da meta</p>
-            <CelulaPctIndividual l={l} />
+            <IndividualPctCell l={l} />
           </div>
           <div>
             <p className="text-[10.5px] font-bold uppercase tracking-wide text-t2">Nível</p>
-            <CelulaNivel l={l} />
+            <LevelCell l={l} />
           </div>
           {!encerrada && (
             <div>
               <p className="text-[10.5px] font-bold uppercase tracking-wide text-t2">Falta</p>
-              <CelulaProximo l={l} />
+              <NextCell l={l} />
             </div>
           )}
           <div className="col-span-2 text-right">
             <p className="text-[10.5px] font-bold uppercase tracking-wide text-t2">Premiação</p>
-            <CelulaPremiacao l={l} />
+            <PrizeCell l={l} />
           </div>
         </div>
       ) : (
@@ -204,14 +204,14 @@ export function SellersBlock({
       header: "Nome",
       sortable: true,
       sortValue: (l) => l.nome,
-      render: (l) => <CelulaVendedora l={l} />,
+      render: (l) => <SellerCell l={l} />,
     },
     {
       key: "faturamento",
       header: "Faturamento",
       sortable: true,
       sortValue: (l) => l.faturamentoValor,
-      render: (l) => <CelulaFaturamento l={l} />,
+      render: (l) => <RevenueCell l={l} />,
     },
     ...(metaAtiva
       ? ([
@@ -229,7 +229,7 @@ export function SellersBlock({
             header: pctHeader,
             sortable: true,
             sortValue: (l: LinhaRank) => (l.semMeta ? null : l.atingimentoPct),
-            render: (l: LinhaRank) => <CelulaPctIndividual l={l} />,
+            render: (l: LinhaRank) => <IndividualPctCell l={l} />,
           },
           {
             key: "pctGeral",
@@ -246,7 +246,7 @@ export function SellersBlock({
             hideBelow: "md",
             sortable: true,
             sortValue: (l: LinhaRank) => l.nivelAtual ?? 0,
-            render: (l: LinhaRank) => <CelulaNivel l={l} />,
+            render: (l: LinhaRank) => <LevelCell l={l} />,
           },
           ...(encerrada ? [] : [{
             key: "proximo",
@@ -254,7 +254,7 @@ export function SellersBlock({
             hideBelow: "lg",
             sortable: true,
             sortValue: (l: LinhaRank) => l.proximoDegrau?.faltaValor ?? null,
-            render: (l: LinhaRank) => <CelulaProximo l={l} />,
+            render: (l: LinhaRank) => <NextCell l={l} />,
           }]),
           {
             key: "premiacao",
@@ -262,7 +262,7 @@ export function SellersBlock({
             align: "right",
             sortable: true,
             sortValue: (l: LinhaRank) => (l.semMeta ? null : l.premiacaoAcumulada + l.bonusAlcancado),
-            render: (l: LinhaRank) => <CelulaPremiacao l={l} />,
+            render: (l: LinhaRank) => <PrizeCell l={l} />,
           },
         ] as DataTableColumn<LinhaRank>[])
       : ([
@@ -300,7 +300,7 @@ export function SellersBlock({
       </div>
       <div className="flex flex-col gap-2.5 p-3.5 md:hidden">
         {ranked.map((l) => (
-          <CardMobileVendedora key={`${l.filialId}-${l.colaboradorId}`} l={l} metaAtiva={metaAtiva} encerrada={encerrada} />
+          <SellerMobileCard key={`${l.filialId}-${l.colaboradorId}`} l={l} metaAtiva={metaAtiva} encerrada={encerrada} />
         ))}
       </div>
     </>
@@ -373,9 +373,9 @@ export function SellersCard({
 export function goalShowsProjection(inicio: string, fim: string, hojeIso: string = TODAY_ISO): boolean {
   if (hojeIso < inicio) return false;
   if (hojeIso >= fim) return true;
-  const total = intervaloDias(inicio, fim).length;
+  const total = eachDay(inicio, fim).length;
   if (total <= 0) return false;
-  const decorridos = intervaloDias(inicio, hojeIso).length;
+  const decorridos = eachDay(inicio, hojeIso).length;
   return decorridos / total >= 0.5;
 }
 
@@ -436,12 +436,12 @@ export function GoalProgressBar({
             </Tooltip>
           )}
           <Badge variant="neutral" className="gap-1">
-            <IconRelogio />
-            {meta.diasRestantes <= 0
+            <ClockIcon />
+            {meta.daysRemaining <= 0
               ? "Encerrada"
-              : meta.diasRestantes === 1
+              : meta.daysRemaining === 1
                 ? "Último dia"
-                : `${meta.diasRestantes} dias restantes`}
+                : `${meta.daysRemaining} dias restantes`}
           </Badge>
         </div>
       </div>
@@ -554,7 +554,7 @@ function IconBadge({ children }: { children: ReactNode }) {
   );
 }
 
-function IconTipoIndividual() {
+function IndividualTypeIcon() {
   return (
     <IconBadge>
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -563,7 +563,7 @@ function IconTipoIndividual() {
   );
 }
 
-function IconTipoGrupo() {
+function GroupTypeIcon() {
   return (
     <IconBadge>
       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -574,7 +574,7 @@ function IconTipoGrupo() {
   );
 }
 
-function IconLoja() {
+function StoreIcon() {
   return (
     <IconBadge>
       <path d="M4 7V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2" />
@@ -584,7 +584,7 @@ function IconLoja() {
   );
 }
 
-function IconMarca() {
+function BrandIcon() {
   return (
     <IconBadge>
       <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
@@ -593,7 +593,7 @@ function IconMarca() {
   );
 }
 
-function IconGrupos() {
+function GroupsIcon() {
   return (
     <IconBadge>
       <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -604,7 +604,7 @@ function IconGrupos() {
   );
 }
 
-function IconVendedoras() {
+function SellersIcon() {
   return (
     <IconBadge>
       <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
@@ -615,7 +615,7 @@ function IconVendedoras() {
   );
 }
 
-function IconNiveis() {
+function LevelsIcon() {
   return (
     <IconBadge>
       <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
@@ -642,31 +642,31 @@ export function GoalCard({
 
       <div className="mt-2.5 flex flex-wrap gap-1.5">
         <Badge variant="neutral" className="gap-1">
-          {card.tipo === "individual" ? <IconTipoIndividual /> : <IconTipoGrupo />}
+          {card.tipo === "individual" ? <IndividualTypeIcon /> : <GroupTypeIcon />}
           {tipoLabel}
         </Badge>
         <Badge variant="neutral" className="gap-1">
-          <IconLoja />
+          <StoreIcon />
           {card.lojaNome}
         </Badge>
         {card.marcas.map((m) => (
           <Badge key={m} variant="neutral" className="gap-1">
-            <IconMarca />
+            <BrandIcon />
             {m}
           </Badge>
         ))}
         {card.qtdGrupos > 0 ? (
           <Badge variant="neutral" className="gap-1">
-            <IconGrupos />
+            <GroupsIcon />
             {card.qtdGrupos} {card.qtdGrupos === 1 ? "grupo" : "grupos"}
           </Badge>
         ) : null}
         <Badge variant="neutral" className="gap-1">
-          <IconVendedoras />
+          <SellersIcon />
           {card.qtdVendedoras} na equipe
         </Badge>
         <Badge variant="neutral" className="gap-1">
-          <IconNiveis />
+          <LevelsIcon />
           {card.qtdNiveis} {card.qtdNiveis === 1 ? "nível" : "níveis"}
         </Badge>
       </div>

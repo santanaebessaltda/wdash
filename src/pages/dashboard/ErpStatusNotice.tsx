@@ -69,9 +69,9 @@ export function useErpConnection(): ErpSnapshot {
 }
 
 function desde(at: Date): string {
-  const hora = at.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  const clockLabel = at.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
   const dia = at.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-  return at.toDateString() === new Date().toDateString() ? `hoje às ${hora}` : `${dia} às ${hora}`;
+  return at.toDateString() === new Date().toDateString() ? `hoje às ${clockLabel}` : `${dia} às ${clockLabel}`;
 }
 
 /**

@@ -105,7 +105,7 @@ describe("goalView", () => {
     expect(s.pct).toBeCloseTo(60);
     expect(s.nivelAtual).toBe("Meta");
     expect(s.projetadoPct).toBeCloseTo(120);
-    expect(s.diasRestantes).toBe(16);
+    expect(s.daysRemaining).toBe(16);
     expect(buildGoalSummary(goal, aggs, "2026-09-10").projetadoPct).toBeNull();
   });
 
@@ -250,7 +250,7 @@ describe("goalView", () => {
     expect(niveis.get("e:1")).toMatchObject({
       metaNome: "Meta Setembro",
       status: "active",
-      diasRestantes: 1,
+      daysRemaining: 1,
       modo: "individual",
       grupo: "MANHA",
       metaValor: 3000,

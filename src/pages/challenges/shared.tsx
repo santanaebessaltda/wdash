@@ -78,7 +78,7 @@ export function HeadlineText({ headline }: { headline: ChallengeHeadline }) {
 
 /** Detalhe aberto pela Equipe volta para a aba Desafios. Sem origem, volta para a lista. */
 export function challengeBackPath(state: unknown): string {
-  if ((state as { from?: string } | null)?.from === "team") return `${paths.team}?aba=desafios`;
+  if ((state as { from?: string } | null)?.from === "team") return `${paths.team}?tab=challenges`;
   return paths.management.challenges;
 }
 

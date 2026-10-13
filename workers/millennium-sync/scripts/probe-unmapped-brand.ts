@@ -10,7 +10,7 @@ import { loginMillennium, millenniumBaseUrl } from "../src/millenniumAuth.ts";
 import { listRememberedSessions } from "../src/sessionStore.ts";
 import { milleniumDataRange } from "../src/millenniumSales.ts";
 import { fetchProductBrandMap } from "../src/millenniumProductDivision.ts";
-import { fetchFilialGeradorMap } from "../src/millenniumBrandReport.ts";
+import { fetchBranchGeneratorMap } from "../src/millenniumBrandReport.ts";
 import { fetchConsultaDetMov } from "../src/millenniumDetMov.ts";
 import { fetchSalesLista } from "../src/millenniumSales.ts";
 import { uniqueBrandSplitHeaders } from "../src/brandSplitFromDetalhe.ts";
@@ -138,7 +138,7 @@ async function main() {
 
   const from = "2026-09-01";
   const to = "2026-09-22";
-  const geradorMap = await fetchFilialGeradorMap({ session });
+  const geradorMap = await fetchBranchGeneratorMap({ session });
   const geradorId = geradorMap.get(store.code)!;
   console.log("gerador", geradorId, "filial", store.millenniumStoreId);
 

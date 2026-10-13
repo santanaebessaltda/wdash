@@ -256,7 +256,7 @@ export async function fetchNavMonthFloor(
 }
 
 /** Pede as sangrias do mês visível, do dia 1 até hoje. */
-export async function requestSangriaMonth(
+export async function requestCashDropMonth(
   storeIds: string[],
   monthDay = calendarTodayIso(),
 ): Promise<{ ok: true } | { ok: false; message: string }> {

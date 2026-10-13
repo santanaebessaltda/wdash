@@ -23,44 +23,44 @@ export function num(v: number, casas = 0): string {
 }
 
 /** Converte "2026-09-15" em Date local (meia-noite), sem armadilha de fuso. */
-export function deIso(iso: string): Date {
+export function isoToDate(iso: string): Date {
   const [a, m, d] = iso.split("-").map(Number);
   return new Date(a, m - 1, d);
 }
 
 /** Converte Date em "2026-09-15" no fuso local. */
-export function paraIso(d: Date): string {
+export function dateToIso(d: Date): string {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${d.getFullYear()}-${mm}-${dd}`;
 }
 
 /** Adiciona dias a um ISO. */
-export function somarDias(iso: string, dias: number): string {
-  const d = deIso(iso);
+export function addDays(iso: string, dias: number): string {
+  const d = isoToDate(iso);
   d.setDate(d.getDate() + dias);
-  return paraIso(d);
+  return dateToIso(d);
 }
 
 /** Primeiro dia do mes do ISO. */
-export function inicioDoMes(iso: string): string {
-  const d = deIso(iso);
-  return paraIso(new Date(d.getFullYear(), d.getMonth(), 1));
+export function startOfMonth(iso: string): string {
+  const d = isoToDate(iso);
+  return dateToIso(new Date(d.getFullYear(), d.getMonth(), 1));
 }
 
 /** Ultimo dia do mes do ISO. */
-export function fimDoMes(iso: string): string {
-  const d = deIso(iso);
-  return paraIso(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+export function endOfMonth(iso: string): string {
+  const d = isoToDate(iso);
+  return dateToIso(new Date(d.getFullYear(), d.getMonth() + 1, 0));
 }
 
 /** Lista de ISOs entre inicio e fim, inclusive. */
-export function intervaloDias(inicio: string, fim: string): string[] {
+export function eachDay(inicio: string, fim: string): string[] {
   const out: string[] = [];
   let atual = inicio;
   while (atual <= fim) {
     out.push(atual);
-    atual = somarDias(atual, 1);
+    atual = addDays(atual, 1);
   }
   return out;
 }

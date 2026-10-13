@@ -1,4 +1,4 @@
-import { paraIso, deIso } from "@/lib/format";
+import { dateToIso, isoToDate } from "@/lib/format";
 import {
   PRIZE_LABEL_MAX,
   usesScope,
@@ -177,8 +177,8 @@ export function challengeFormToInput(f: ChallengeForm): ChallengeInput {
   return {
     storeId: f.storeId,
     name: f.name.trim(),
-    startsOn: paraIso(f.startsOn!),
-    endsOn: paraIso(f.endsOn!),
+    startsOn: dateToIso(f.startsOn!),
+    endsOn: dateToIso(f.endsOn!),
     metric: f.metric,
     scope,
     mode: f.mode,
@@ -213,8 +213,8 @@ function targetToText(metric: ChallengeMetric, v: number | null): string {
 export function challengeToForm(c: ChallengeRecord | ChallengeInput): ChallengeForm {
   return {
     name: c.name,
-    startsOn: deIso(c.startsOn),
-    endsOn: deIso(c.endsOn),
+    startsOn: isoToDate(c.startsOn),
+    endsOn: isoToDate(c.endsOn),
     storeId: c.storeId,
     metric: c.metric,
     scope: usesScope(c.metric) && c.scope !== "ALL" ? c.scope : "PRODUCTS",

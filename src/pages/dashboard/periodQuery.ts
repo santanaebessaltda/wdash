@@ -10,7 +10,7 @@ const PERIOD_ROUTES = new Set<string>([
   paths.management.challenges,
 ]);
 
-const PERIOD_KEYS = ["periodo", "de", "ate"] as const;
+const PERIOD_KEYS = ["period", "from", "to", "periodo", "de", "ate"] as const;
 
 export function routeShowsPeriod(pathname: string): boolean {
   return PERIOD_ROUTES.has(pathname);

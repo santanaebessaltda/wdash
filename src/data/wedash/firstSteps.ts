@@ -35,7 +35,7 @@ export function storesForFirstStepsView<T extends { id: string }>(stores: T[], f
   return one.length === 1 ? one : stores;
 }
 
-function lojasFaltando(faltam: number, total: number): string | undefined {
+function missingStoreLabel(faltam: number, total: number): string | undefined {
   if (faltam === 0 || total <= 1) return undefined;
   return `Falta em ${faltam} de ${total} filiais`;
 }
@@ -63,9 +63,9 @@ function taxesOk(s: FirstStepsStore): boolean {
 export function buildFirstSteps(input: FirstStepsInput): FirstStep[] {
   const { stores } = input;
   const total = stores.length;
-  const porLoja = (ok: (s: FirstStepsStore) => boolean) => {
+  const byStore = (ok: (s: FirstStepsStore) => boolean) => {
     const faltam = stores.filter((s) => !ok(s)).length;
-    return { done: faltam === 0, detail: lojasFaltando(faltam, total) };
+    return { done: faltam === 0, detail: missingStoreLabel(faltam, total) };
   };
 
   // Grupos, meta e desafio so nas lojas com equipe de vendas (loja parada nao precisa).
@@ -83,7 +83,7 @@ export function buildFirstSteps(input: FirstStepsInput): FirstStep[] {
 
   const criados = (set: Set<string>) => {
     const faltam = lojasPessoas.filter((s) => !set.has(s.id)).length;
-    return { done: faltam === 0, detail: lojasFaltando(faltam, lojasPessoas.length) };
+    return { done: faltam === 0, detail: missingStoreLabel(faltam, lojasPessoas.length) };
   };
 
   return [
@@ -103,7 +103,7 @@ export function buildFirstSteps(input: FirstStepsInput): FirstStep[] {
       id: "hours",
       title: "Configurar o horário de funcionamento",
       description: "Define quando as vendas são atualizadas automaticamente e organiza as vendas por hora.",
-      ...porLoja((s) => weekHoursConfigured(s.horas)),
+      ...byStore((s) => weekHoursConfigured(s.horas)),
     },
     {
       id: "groups",
@@ -117,19 +117,19 @@ export function buildFirstSteps(input: FirstStepsInput): FirstStep[] {
       id: "franchise",
       title: "Informar as taxas da franquia",
       description: "Royalties e taxa de marketing entram nos custos da operação e afetam o resultado operacional.",
-      ...porLoja(franchiseOk),
+      ...byStore(franchiseOk),
     },
     {
       id: "rent",
       title: "Informar o aluguel",
       description: "O aluguel entra nos custos da operação e afeta o resultado operacional.",
-      ...porLoja(rentOk),
+      ...byStore(rentOk),
     },
     {
       id: "taxes",
       title: "Informar os impostos",
       description: "ICMS e ICMS ST de cada marca entram no cálculo do lucro bruto e da margem.",
-      ...porLoja(taxesOk),
+      ...byStore(taxesOk),
     },
     {
       id: "goal",
@@ -166,13 +166,13 @@ export async function fetchFirstStepsData(tenantId: string, storeIds: string[]):
   if (storeIds.length === 0) return out;
   const sb = await client();
   if (!sb) return out;
-  const porLoja = (table: string, cols: string) =>
+  const byStore = (table: string, cols: string) =>
     sb.from(table).select(cols).eq("tenant_id", tenantId).in("store_id", storeIds).limit(5000);
   const [sellers, shifts, goals, challenges] = await Promise.all([
     fetchStoreSellers(tenantId, storeIds),
-    porLoja("store_shift", "id, store_id"),
-    porLoja("goal", "store_id"),
-    porLoja("challenge", "store_id"),
+    byStore("store_shift", "id, store_id"),
+    byStore("goal", "store_id"),
+    byStore("challenge", "store_id"),
   ]);
   out.sellersByStore = sellers;
   for (const r of (shifts.data ?? []) as unknown as { id: string; store_id: string }[]) {

@@ -38,12 +38,12 @@ const STATUS_BADGE: Record<StockStatus, { label: string; variant: StatusVariant 
 };
 
 /** "Transferir 71 de ESTOQUE para PONTO DE VENDA.", uma linha por transferencia ("LOJA X: transferir ..." quando ha varias lojas). */
-function transferTip(r: StockProductRow, variasLojas: boolean): string {
+function transferTip(r: StockProductRow, multipleStores: boolean): string {
   return r.lojas
     .flatMap((l) =>
       l.transferencias.map((t) => {
         const acao = `transferir ${qty(t.qtd)} de ${t.de} para ${t.para}.`;
-        return variasLojas ? `${l.store.fantasia}: ${acao}` : acao.charAt(0).toUpperCase() + acao.slice(1);
+        return multipleStores ? `${l.store.fantasia}: ${acao}` : acao.charAt(0).toUpperCase() + acao.slice(1);
       }),
     )
     .join("\n");
@@ -64,7 +64,7 @@ export function InventoryPage() {
   const printing = usePrintMode();
   const showSkeleton = useMinSkeleton(loading);
   const exportar = useExportPdf("Estoque", null, { periodo: false });
-  const variasLojas = lojas.length > 1;
+  const multipleStores = lojas.length > 1;
   const showBrand = lojas.some((s) => s.temWpink);
   const marcaAtiva: BrandFiltro = showBrand ? marca : "";
 
@@ -224,7 +224,7 @@ export function InventoryPage() {
                   <EmptyBlock
                     icon="📦"
                     title="Nenhum saldo encontrado"
-                    description={variasLojas ? "Nenhum produto com saldo nas filiais selecionadas." : "Nenhum produto com saldo nesta filial."}
+                    description={multipleStores ? "Nenhum produto com saldo nas filiais selecionadas." : "Nenhum produto com saldo nesta filial."}
                   />
                 )
               ) : (
@@ -308,7 +308,7 @@ export function InventoryPage() {
                           <Money v={stockCostAmount(r).amount} />
                         </td>
                         <td className="whitespace-nowrap py-3 pl-8 pr-1">
-                          <StatusCell r={r} status={s} variasLojas={variasLojas} />
+                          <StatusCell r={r} status={s} multipleStores={multipleStores} />
                         </td>
                       </tr>
                     );
@@ -384,10 +384,10 @@ function UnitCost({ r }: { r: StockProductRow }) {
   return <Money v={cost.unit} />;
 }
 
-function StatusCell({ r, status, variasLojas }: { r: StockProductRow; status: StockStatus; variasLojas: boolean }) {
+function StatusCell({ r, status, multipleStores }: { r: StockProductRow; status: StockStatus; multipleStores: boolean }) {
   const badge = <Badge variant={STATUS_BADGE[status].variant}>{STATUS_BADGE[status].label}</Badge>;
   if (status !== "aguardando") return badge;
-  const tip = transferTip(r, variasLojas);
+  const tip = transferTip(r, multipleStores);
   return (
     <>
       <Tooltip label={tip}>

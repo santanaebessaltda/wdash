@@ -1,18 +1,18 @@
 /** Formatacao pt-BR usada em todas as telas do produto. */
 
-import { deIso, intervaloDias, num } from "../data/wedash/engine/format.ts";
+import { isoToDate, eachDay, num } from "../data/wedash/engine/format.ts";
 
 export {
   brlCent,
   collaboratorName,
-  deIso,
-  fimDoMes,
-  inicioDoMes,
-  intervaloDias,
+  isoToDate,
+  endOfMonth,
+  startOfMonth,
+  eachDay,
   num,
-  paraIso,
+  dateToIso,
   shiftName,
-  somarDias,
+  addDays,
 } from "../data/wedash/engine/format.ts";
 
 const brlInteiro = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
@@ -87,43 +87,43 @@ const DIAS_SEMANA = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta"
 const DIAS_SEMANA_CURTO = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 
 /** 15/09 */
-export function dataCurta(iso: string): string {
-  const d = deIso(iso);
+export function shortDate(iso: string): string {
+  const d = isoToDate(iso);
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
 /** 15/09/2026 */
-export function dataCompleta(iso: string): string {
-  return `${dataCurta(iso)}/${deIso(iso).getFullYear()}`;
+export function fullDate(iso: string): string {
+  return `${shortDate(iso)}/${isoToDate(iso).getFullYear()}`;
 }
 
 /** terca, 15 de setembro */
-export function dataExtenso(iso: string): string {
-  const d = deIso(iso);
+export function longDate(iso: string): string {
+  const d = isoToDate(iso);
   return `${DIAS_SEMANA[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]}`;
 }
 
 /** setembro de 2026 */
-export function mesAno(iso: string): string {
-  const d = deIso(iso);
+export function monthYear(iso: string): string {
+  const d = isoToDate(iso);
   return `${MESES[d.getMonth()]} de ${d.getFullYear()}`;
 }
 
 /** Setembro 2026 (para nome de meta) */
-export function mesAnoTitulo(iso: string): string {
-  const d = deIso(iso);
+export function monthYearTitle(iso: string): string {
+  const d = isoToDate(iso);
   const m = MESES[d.getMonth()];
   return `${m.charAt(0).toUpperCase()}${m.slice(1)} ${d.getFullYear()}`;
 }
 
 /** set */
-export function mesCurto(iso: string): string {
-  return MESES_CURTO[deIso(iso).getMonth()];
+export function shortMonth(iso: string): string {
+  return MESES_CURTO[isoToDate(iso).getMonth()];
 }
 
 /** ter */
-export function diaSemanaCurto(iso: string): string {
-  return DIAS_SEMANA_CURTO[deIso(iso).getDay()];
+export function shortWeekday(iso: string): string {
+  return DIAS_SEMANA_CURTO[isoToDate(iso).getDay()];
 }
 
 /** Eixo com um ponto por dia. Mes cheio ou mais de 7 dias no mesmo mes: "01". Cruza meses: "01/10". Semana: "seg". */
@@ -131,34 +131,34 @@ export function dayAxisLabel(
   iso: string,
   period: { inicio: string; fim: string; granularidade: "dia" | "mes" | "periodo" },
 ): string {
-  if (period.inicio.slice(0, 7) !== period.fim.slice(0, 7)) return dataCurta(iso);
-  const days = intervaloDias(period.inicio, period.fim).length;
-  if (period.granularidade === "mes" || days > 7) return String(deIso(iso).getDate()).padStart(2, "0");
-  return diaSemanaCurto(iso);
+  if (period.inicio.slice(0, 7) !== period.fim.slice(0, 7)) return shortDate(iso);
+  const days = eachDay(period.inicio, period.fim).length;
+  if (period.granularidade === "mes" || days > 7) return String(isoToDate(iso).getDate()).padStart(2, "0");
+  return shortWeekday(iso);
 }
 
 /** Detalhe do ponto diario: "11/10 seg". */
 export function dayPointDetail(iso: string): string {
-  return `${dataCurta(iso)} ${diaSemanaCurto(iso)}`;
+  return `${shortDate(iso)} ${shortWeekday(iso)}`;
 }
 
 /** 14:32 */
-export function hora(d: Date): string {
+export function clockTime(d: Date): string {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 /** 14h */
-export function horaCurta(h: number): string {
+export function shortHour(h: number): string {
   return `${h}h`;
 }
 
 /** Faixa de 1 hora para tooltip: "21h as 22h"; hora em andamento = "14h ate agora". */
-export function faixaHora(h: number, emAndamento = false): string {
+export function hourSpan(h: number, emAndamento = false): string {
   return emAndamento ? `${h}h até agora` : `${h}h às ${h + 1}h`;
 }
 
 /** Tooltip de delta: "Em relacao ao mes passado." / "Em relacao aos 7 dias anteriores." */
-export function tipRelacao(vs: string): string {
+export function comparedWithTip(vs: string): string {
   if (vs.startsWith("os ")) return `Em relação aos ${vs.slice(3)}.`;
   if (vs.startsWith("o ")) return `Em relação ao ${vs.slice(2)}.`;
   if (vs.startsWith("a ")) return `Em relação à ${vs.slice(2)}.`;
@@ -166,17 +166,17 @@ export function tipRelacao(vs: string): string {
 }
 
 /** Tooltip do badge de delta com o valor comparado: "Em relacao ao mes passado: R$ 12.345,67." */
-export function tipDelta(delta: { vs?: string; anterior?: string }, metrica?: string): string {
+export function deltaTip(delta: { vs?: string; anterior?: string }, metrica?: string): string {
   if (!delta.vs) {
     if (metrica) return `${metrica} no período anterior${delta.anterior ? `: ${delta.anterior}` : ""}.`;
     return delta.anterior ? `Período anterior: ${delta.anterior}.` : "";
   }
-  const base = tipRelacao(delta.vs);
+  const base = comparedWithTip(delta.vs);
   const tip = delta.anterior ? `${base.slice(0, -1)}: ${delta.anterior}.` : base;
   return metrica ? `${metrica} ${tip.charAt(0).toLowerCase()}${tip.slice(1)}` : tip;
 }
 
 /** `1 dia` / `N dias`  -  prazos e badges. */
-export function rotuloDias(n: number): string {
+export function dayCountLabel(n: number): string {
   return n === 1 ? "1 dia" : `${n} dias`;
 }

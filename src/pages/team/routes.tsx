@@ -6,11 +6,12 @@ import { RequireRole } from "@/session/RequireSession";
 
 const TeamPage = lazyPage(() => import("./TeamPage"), "TeamPage");
 
-export const equipeRoutes: RouteObject[] = [
+export const teamRoutes: RouteObject[] = [
   {
     element: <RequireRole roles={["OWNER", "MANAGER", "ADMIN_GLOBAL"]} />,
     children: [
       { path: paths.team, element: <TeamPage /> },
+      { path: paths.legacy.team, element: <Navigate to={paths.team} replace /> },
       { path: paths.legacy.teamRoot, element: <Navigate to={paths.team} replace /> },
     ],
   },

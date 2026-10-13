@@ -25,6 +25,6 @@ describe("periodo na URL", () => {
     expect(routeShowsPeriod(paths.management.challengeDetail("abc"))).toBe(false);
     expect(searchForRoute(paths.stock.inventory, "?filial=f1&periodo=hoje&de=2026-10-01&ate=2026-10-11")).toBe("?filial=f1");
     expect(searchForRoute(paths.profile, "?periodo=hoje")).toBe("");
-    expect(searchForRoute(paths.operation.filial, "")).toBe("");
+    expect(searchForRoute(paths.operation.branch, "")).toBe("");
   });
 });

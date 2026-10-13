@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { createAdminClient, buildDeps } from "../src/deps.ts";
 import { loginMillennium, millenniumBaseUrl } from "../src/millenniumAuth.ts";
 import { listRememberedSessions } from "../src/sessionStore.ts";
-import { fetchFilialGeradorMap } from "../src/millenniumBrandReport.ts";
+import { fetchBranchGeneratorMap } from "../src/millenniumBrandReport.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STOCK_DIV_GUID = "{9701602B-B363-4770-989C-8C4459B7E105}";
@@ -187,7 +187,7 @@ async function main() {
     else console.log(estoque.preview);
 
     console.log("\n========== B) wtsreports {9701602B} divisao=101 ==========");
-    const geradorMap = await fetchFilialGeradorMap({ session });
+    const geradorMap = await fetchBranchGeneratorMap({ session });
     const g00205 = geradorMap.get("00205") ?? 65728;
     console.log(`gerador 00205=${g00205} (map size ${geradorMap.size})`);
     const report = await callStockDivReport(session, g00205, 101);

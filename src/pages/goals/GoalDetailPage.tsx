@@ -20,14 +20,14 @@ import type { SalesDayAgg, SalesSellerDayAgg } from "@/data/wedash/salesTypes";
 import { storesForSession } from "@/data/wedash/stores";
 import type { GoalCardView } from "@/data/wedash/teamViews";
 import { WedashBrand } from "@/components/wedash/WedashBrand";
-import { brlCent, dataCompleta, dataCurta, deIso, num, paraIso, shiftName } from "@/lib/format";
+import { brlCent, fullDate, shortDate, isoToDate, num, dateToIso, shiftName } from "@/lib/format";
 import { exportPdf } from "@/lib/printMode";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useReturnWhenStoreChanges } from "@/pages/dashboard/useScope";
 import { TargetIcon } from "@/pages/dashboards/icons";
-import { CardVendedoras, FaixaMetaGlobal, metaLiberouProjecao } from "@/pages/team/blocos";
+import { SellersCard, GlobalGoalBand, goalUnlockedProjection } from "@/pages/team/goalBlocks";
 import { Icon, icons } from "@/pages/users/Icons";
 import { goalBackPath } from "@/pages/goals/backPath";
 import { paths } from "@/router/paths";
@@ -187,14 +187,14 @@ export default function GoalDetailPage() {
                 card={card}
                 gerencia={gerencia}
                 today={today}
-                onExport={() => exportPdf(["Fechamento da meta", loja?.fantasia ?? "", goal.name, `${dataCompleta(goal.startsOn)} a ${dataCompleta(goal.endsOn)}`])}
+                onExport={() => exportPdf(["Fechamento da meta", loja?.fantasia ?? "", goal.name, `${fullDate(goal.startsOn)} a ${fullDate(goal.endsOn)}`])}
               />
               <GoalTiersCard goal={goal} card={card} status={status} gerencia={gerencia} today={today} />
             </>
           ) : (
             <div className="flex flex-col gap-5">
               <GoalTiersCard goal={goal} card={card} status={status} gerencia={gerencia} today={today} />
-              <CardVendedoras
+              <SellersCard
                 estado={card.vendedoras.length > 0 ? "disponivel" : "sem_dados"}
                 lista={card.vendedoras}
                 metaAtiva
@@ -213,9 +213,9 @@ export default function GoalDetailPage() {
 }
 
 function prazoTexto(goal: GoalRecord, card: GoalCardView, status: GoalStatus): string {
-  if (status === "upcoming") return `Começa em ${dataCurta(goal.startsOn)}`;
+  if (status === "upcoming") return `Começa em ${shortDate(goal.startsOn)}`;
   if (status === "ended") return "Encerrada";
-  return prazoRestante(card.faixa.diasRestantes);
+  return prazoRestante(card.faixa.daysRemaining);
 }
 
 function GoalHero({
@@ -237,7 +237,7 @@ function GoalHero({
   const premiacao =
     card.vendedoras.reduce((s, v) => s + v.premiacaoAcumulada + v.bonusAlcancado, 0) + (gerencia ? gerencia.premiacao + gerencia.bonus : 0);
   const faltam = Math.max(0, goal.target - realizado);
-  const liberou = status === "active" && metaLiberouProjecao(goal.startsOn, goal.endsOn, today);
+  const liberou = status === "active" && goalUnlockedProjection(goal.startsOn, goal.endsOn, today);
   const stats: { label: string; value: string; cls: string; sub?: string; subCls?: string; help?: string }[] = [
     { label: "Meta da filial", value: brlCent(goal.target), cls: "text-acc" },
     {
@@ -287,7 +287,7 @@ function GoalHero({
             <Badge variant={status === "active" ? "success" : status === "upcoming" ? "info" : "neutral"}>{GOAL_STATUS_LABEL[status]}</Badge>
           </div>
           <p className="flex flex-wrap items-center gap-x-1.5 text-[13.5px] leading-relaxed text-t1">
-            {dataCompleta(goal.startsOn)} a {dataCompleta(goal.endsOn)}
+            {fullDate(goal.startsOn)} a {fullDate(goal.endsOn)}
             {lojaNome ? ` · ${lojaNome}` : ""} · {MODO_LABEL[goal.tierMode]}
             <TipHelp label={AJUDA_MODO[goal.tierMode]} />
           </p>
@@ -331,7 +331,7 @@ function GoalTiersCard({
       <div className="mb-4 flex items-center gap-1.5">
         <CardTitle>Níveis e premiação</CardTitle>
       </div>
-      <FaixaMetaGlobal meta={card.faixa} degraus={card.degraus} hojeIso={today} embedded soBarra />
+      <GlobalGoalBand meta={card.faixa} degraus={card.degraus} hojeIso={today} embedded soBarra />
       {goal.groups.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[12px]">
           <span className="mr-1 text-t2">Grupos:</span>
@@ -447,7 +447,7 @@ function PayoutReportHeader({ goal, lojaNome }: { goal: GoalRecord; lojaNome?: s
         <p>
           <span className="text-t2">Período: </span>
           <span className="font-bold text-t0">
-            {dataCompleta(goal.startsOn)} a {dataCompleta(goal.endsOn)}
+            {fullDate(goal.startsOn)} a {fullDate(goal.endsOn)}
           </span>
         </p>
       </div>
@@ -481,9 +481,9 @@ function GoalPayoutCard({
   today: string;
   onExport: () => void;
 }) {
-  const fimMais1 = deIso(goal.endsOn);
+  const fimMais1 = isoToDate(goal.endsOn);
   fimMais1.setDate(fimMais1.getDate() + 1);
-  const emFechamento = today <= paraIso(fimMais1);
+  const emFechamento = today <= dateToIso(fimMais1);
 
   const equipe: PayoutRow[] = card.vendedoras
     .filter((v) => !v.semMeta)
@@ -531,7 +531,7 @@ function GoalPayoutCard({
             <CardTitle>Fechamento da premiação</CardTitle>
             {emFechamento && (
               <Tooltip
-                label={`O último dia da meta será fechado na madrugada de ${dataCurta(paraIso(fimMais1))}. Vendas incluídas ou canceladas até lá ainda podem alterar os valores.`}
+                label={`O último dia da meta será fechado na madrugada de ${shortDate(dateToIso(fimMais1))}. Vendas incluídas ou canceladas até lá ainda podem alterar os valores.`}
               >
                 <span className="inline-flex cursor-help">
                   <Badge variant="warning">Fechamento em andamento</Badge>

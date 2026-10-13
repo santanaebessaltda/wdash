@@ -6,12 +6,12 @@ import { paths } from "@/router/paths";
 import { PRODUCT_NAME } from "@/data/wedash/tenant";
 import { logoutErp, type StoreErp } from "@/data/wedash/erp";
 import { requestTodaySync } from "@/data/wedash/initialSync";
-import { padTopoEBase } from "@/lib/safeArea";
+import { padTopAndBottom } from "@/lib/safeArea";
 import { useSession, useActiveSession } from "@/session/SessionProvider";
 import { saveOnboardingStep, persistErpCredentialAndStores } from "@/session/authApi";
 import { Step2Credentials } from "./Step2Credentials";
 import { ONBOARDING_STEPS } from "./steps";
-import { gravarRascunho, limparRascunho, lerRascunho, lerSenhaErp, rascunhoVazio, type RascunhoOnboarding } from "./draft";
+import { gravarRascunho, limparRascunho, lerRascunho, readErpPassword, rascunhoVazio, type RascunhoOnboarding } from "./draft";
 
 /** Etapa do ERP no indicador e em `membership.onboarding_step` (1 = Crie seu acesso, antes do /onboarding). */
 const ETAPA_ERP = 2;
@@ -45,7 +45,7 @@ export function Onboarding() {
    * pede as vendas de hoje e abre o board sem esperar: os numeros chegam sozinhos em segundos.
    */
   async function conectar(stores: StoreErp[], millenniumSession: string | undefined) {
-    const password = lerSenhaErp(membershipId);
+    const password = readErpPassword(membershipId);
     if (!draft.erp.usuario.trim() || !password) {
       show("Informe novamente o usuário e a senha do Millennium.", "danger");
       return;
@@ -88,7 +88,7 @@ export function Onboarding() {
     <div className="grid min-h-screen w-full bg-bg-0 lg:grid-cols-2">
       <div
         className="pad-topo pad-base flex flex-col px-6 pb-10 sm:px-14 lg:overflow-y-auto"
-        style={padTopoEBase("2.5rem", "2.5rem")}
+        style={padTopAndBottom("2.5rem", "2.5rem")}
       >
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-2.5">

@@ -2,7 +2,7 @@
  * Gestao > Desafios  -  tabela `challenge` (1 loja por desafio; varios desafios da loja podem cruzar o periodo).
  * Premio no banco em centavos (`{kind:"MONEY",cents}`); no app em reais (`{kind:"MONEY",amount}`).
  */
-import { intervaloDias, somarDias } from "@/lib/format";
+import { eachDay, addDays } from "@/lib/format";
 import type { GoalTeamMember } from "./goalsRepo";
 import type { NonSalesPeople } from "./salesRepo";
 import type { SalesSellerDayAgg, SalesSellerProductDayAgg } from "./salesTypes";
@@ -361,12 +361,12 @@ export function managerIndexWindows(
   c: Pick<ChallengeRecord, "startsOn" | "endsOn">,
   today: string,
 ): { anterior: DayRange; atual: DayRange | null; comparado: DayRange | null } {
-  const dur = intervaloDias(c.startsOn, c.endsOn).length;
-  const anterior = { from: somarDias(c.startsOn, -dur), to: somarDias(c.startsOn, -1) };
-  const fim = c.endsOn < today ? c.endsOn : somarDias(today, -1);
+  const dur = eachDay(c.startsOn, c.endsOn).length;
+  const anterior = { from: addDays(c.startsOn, -dur), to: addDays(c.startsOn, -1) };
+  const fim = c.endsOn < today ? c.endsOn : addDays(today, -1);
   if (fim < c.startsOn) return { anterior, atual: null, comparado: null };
-  const dias = intervaloDias(c.startsOn, fim).length;
-  return { anterior, atual: { from: c.startsOn, to: fim }, comparado: { from: anterior.from, to: somarDias(anterior.from, dias - 1) } };
+  const dias = eachDay(c.startsOn, fim).length;
+  return { anterior, atual: { from: c.startsOn, to: fim }, comparado: { from: anterior.from, to: addDays(anterior.from, dias - 1) } };
 }
 
 /** Dados que a conta do desafio precisa (lidos 1x para todos os desafios da tela). */

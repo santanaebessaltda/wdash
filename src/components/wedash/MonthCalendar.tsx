@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
-import { deIso } from "@/lib/format";
+import { isoToDate } from "@/lib/format";
 
 const WEEK = [
   { longo: "Domingo", curto: "D" },
@@ -87,7 +87,7 @@ export function DayFace({
               iso === today ? "bg-acc text-white" : futuro ? "text-t2" : "text-t1",
             )}
           >
-            {deIso(iso).getDate()}
+            {isoToDate(iso).getDate()}
           </span>
           {check ? (
             <input

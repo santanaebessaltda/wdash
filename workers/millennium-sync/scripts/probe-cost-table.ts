@@ -191,7 +191,7 @@ async function main() {
     const codes = new Set(rows.map((r) => String(r.PRODUTO_PRODUTO_COD_PRODUTO).trim()));
     const dup = rows.length - codes.size;
     console.log(`multi (${gers}): ${res.status} · ${rows.length} linhas · ${codes.size} códigos · ${dup} repetidos · ${Date.now() - t0}ms`);
-    const semFilial = await fetch(`${base}/millenium:wtsreports/reports/process`, {
+    const withoutBranch = await fetch(`${base}/millenium:wtsreports/reports/process`, {
       method: "POST",
       headers: {
         Accept: "*/*",
@@ -213,9 +213,9 @@ async function main() {
         PARAMETERS_DESCRIPTION: "Tabela=20104",
       }),
     });
-    const t2 = await semFilial.text();
-    const rows2 = semFilial.ok ? rowsOf(JSON.parse(t2)) : [];
-    console.log(`sem filial: ${semFilial.status} · ${rows2.length} linhas · ${new Set(rows2.map((r) => String(r.PRODUTO_PRODUTO_COD_PRODUTO).trim())).size} códigos${semFilial.ok ? "" : " · " + t2.slice(0, 200)}`);
+    const t2 = await withoutBranch.text();
+    const rows2 = withoutBranch.ok ? rowsOf(JSON.parse(t2)) : [];
+    console.log(`sem filial: ${withoutBranch.status} · ${rows2.length} linhas · ${new Set(rows2.map((r) => String(r.PRODUTO_PRODUTO_COD_PRODUTO).trim())).size} códigos${withoutBranch.ok ? "" : " · " + t2.slice(0, 200)}`);
     return;
   }
 

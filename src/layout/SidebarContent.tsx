@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { padBase, padTopo } from "@/lib/safeArea";
+import { padBottom, padTop } from "@/lib/safeArea";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/cn";
 import { isNavGroup, type NavEntry } from "./nav-config";
@@ -67,8 +67,8 @@ export function SidebarContent({ collapsed = false, onNavigate }: { collapsed?: 
   const busca = location.search;
 
   return (
-    <div className="pad-base flex h-full flex-col" style={padBase("0px")}>
-      <div className="pad-topo flex items-center gap-2.5 px-5 pb-[18px]" style={{ minHeight: 74, ...padTopo("18px") }}>
+    <div className="pad-base flex h-full flex-col" style={padBottom("0px")}>
+      <div className="pad-topo flex items-center gap-2.5 px-5 pb-[18px]" style={{ minHeight: 74, ...padTop("18px") }}>
         <WedashBrand size={34} showName={!collapsed} />
       </div>
 

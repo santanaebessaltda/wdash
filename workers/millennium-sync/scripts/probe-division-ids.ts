@@ -13,7 +13,7 @@ import {
   DIVISAO_WPINK,
   fetchProductBrandMap,
 } from "../src/millenniumProductDivision.ts";
-import { fetchFilialGeradorMap } from "../src/millenniumBrandReport.ts";
+import { fetchBranchGeneratorMap } from "../src/millenniumBrandReport.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -61,7 +61,7 @@ async function main() {
     if (!login.ok) throw new Error(login.reason);
     session = login.session;
   }
-  const geradorMap = await fetchFilialGeradorMap({ session });
+  const geradorMap = await fetchBranchGeneratorMap({ session });
   const geradorIds = [...geradorMap.values()];
   if (geradorIds.length === 0) throw new Error("no gerador");
   console.log(`divisões: WPINK=${DIVISAO_WPINK} WEPINK=${DIVISAO_WEPINK} geradores=${geradorIds.join(",")}`);

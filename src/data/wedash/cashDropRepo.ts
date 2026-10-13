@@ -1,24 +1,24 @@
-import { depositBlock, type SangriaKind } from "./sangriaMath";
+import { depositBlock, type CashDropKind } from "./cashDropMath";
 
-export type SangriaLineRow = {
+export type CashDropLineRow = {
   id: string;
   day: string;
   amountCents: number;
   document: string;
   note: string;
-  kind: SangriaKind;
+  kind: CashDropKind;
 };
 
-export type SangriaDepositDay = { day: string; depositId: string };
+export type CashDropDepositDay = { day: string; depositId: string };
 
-export type SangriaShortageRow = { day: string; amountCents: number; note: string };
+export type CashDropShortageRow = { day: string; amountCents: number; note: string };
 
-export async function fetchSangriaMonth(
+export async function fetchCashDropMonth(
   tenantId: string,
   storeId: string,
   from: string,
   to: string,
-): Promise<{ lines: SangriaLineRow[]; deposits: SangriaDepositDay[]; shortages: SangriaShortageRow[] }> {
+): Promise<{ lines: CashDropLineRow[]; deposits: CashDropDepositDay[]; shortages: CashDropShortageRow[] }> {
   const { getSupabase } = await import("@/lib/supabase");
   const sb = getSupabase();
   if (!sb) return { lines: [], deposits: [], shortages: [] };
@@ -61,7 +61,7 @@ export async function fetchSangriaMonth(
   };
 }
 
-export async function saveSangriaShortage(
+export async function saveCashDropShortage(
   tenantId: string,
   storeId: string,
   day: string,
@@ -83,7 +83,7 @@ export async function saveSangriaShortage(
   if (error) throw new Error(error.message);
 }
 
-export async function saveSangriaLine(id: string, patch: { kind?: SangriaKind; note?: string }): Promise<void> {
+export async function saveCashDropLine(id: string, patch: { kind?: CashDropKind; note?: string }): Promise<void> {
   const { getSupabase } = await import("@/lib/supabase");
   const sb = getSupabase();
   if (!sb) return;
@@ -91,8 +91,8 @@ export async function saveSangriaLine(id: string, patch: { kind?: SangriaKind; n
   if (error) throw new Error(error.message);
 }
 
-export async function saveSangriaLines(rows: Array<{ id: string; kind: SangriaKind; note: string }>): Promise<void> {
-  await Promise.all(rows.map((row) => saveSangriaLine(row.id, { kind: row.kind, note: row.note })));
+export async function saveCashDropLines(rows: Array<{ id: string; kind: CashDropKind; note: string }>): Promise<void> {
+  await Promise.all(rows.map((row) => saveCashDropLine(row.id, { kind: row.kind, note: row.note })));
 }
 
 export async function fetchDepositDayCount(depositId: string): Promise<number> {
@@ -104,7 +104,7 @@ export async function fetchDepositDayCount(depositId: string): Promise<number> {
   return count ?? 0;
 }
 
-export async function createSangriaDeposit(
+export async function createCashDropDeposit(
   tenantId: string,
   storeId: string,
   days: string[],
@@ -128,7 +128,7 @@ export async function createSangriaDeposit(
   return id;
 }
 
-export async function undoSangriaDeposit(depositId: string): Promise<void> {
+export async function undoCashDropDeposit(depositId: string): Promise<void> {
   const { getSupabase } = await import("@/lib/supabase");
   const sb = getSupabase();
   if (!sb) return;

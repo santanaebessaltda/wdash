@@ -29,7 +29,7 @@ export const paths = {
   },
   onboarding: "/onboarding",
   /** Pos-onboarding  -  aguarda SEED antes do Dashboard. */
-  syncing: "/sincronizando",
+  syncing: "/syncing",
   /** Entrada canonica do Dashboard = overview. `/dashboard` redireciona. */
   dashboard: "/dashboard",
   overview: "/dashboard/overview",
@@ -68,7 +68,7 @@ export const paths = {
     staff: "/management/staff",
     /** Calendário do fechamento de caixa. A adquirente fica em Configurações. */
     cashClose: "/management/cash-close",
-    sangria: "/management/sangria",
+    cashDrop: "/management/cash-drop",
     /** Calendário do informe de vendas no shopping. */
     salesReport: "/management/sales-report",
   },
@@ -79,7 +79,7 @@ export const paths = {
     franchise: "/operation/franchise",
     rent: "/operation/rent",
     /** Tipo, horário, franquia e aluguel. */
-    filial: "/operation/filial",
+    branch: "/operation/branch",
     productsTaxes: "/operation/products-and-taxes",
     /** Stone de cada loja. Não fica em Integrações: a chave é da loja, não da empresa. */
     acquirers: "/operation/acquirers",
@@ -120,6 +120,9 @@ export const paths = {
     finance: "/dashboard/financeiro",
     products: "/dashboard/produtos",
     groups: "/dashboard/grupos",
+    syncing: "/sincronizando",
+    cashDrop: "/management/sangria",
+    branch: "/operation/filial",
     team: "/dashboard/equipe",
     teamRoot: "/equipe",
     shifts: "/dashboard/turnos",

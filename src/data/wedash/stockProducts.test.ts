@@ -4,7 +4,7 @@ import { EMPTY_STORE_COSTS, type Store } from "./stores";
 
 const store = (over: Partial<Store> & Pick<Store, "id">): Store =>
   ({
-    millenniumFilial: 1,
+    millenniumBranch: 1,
     codFilial: "00001",
     nome: "LOJA",
     fantasia: "LOJA",

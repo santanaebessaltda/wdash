@@ -27,7 +27,7 @@ import {
 } from "@/data/wedash/challengeView";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { storesForSession } from "@/data/wedash/stores";
-import { brlCent, dataCompleta, dataCurta, deIso, num, paraIso } from "@/lib/format";
+import { brlCent, fullDate, shortDate, isoToDate, num, dateToIso } from "@/lib/format";
 import { exportPdf } from "@/lib/printMode";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import {
@@ -117,7 +117,7 @@ export default function ChallengeDetailPage() {
   );
 
   const voltar = () => navigate(voltarPara);
-  const periodo = challenge ? `${dataCompleta(challenge.startsOn)} a ${dataCompleta(challenge.endsOn)}` : "";
+  const periodo = challenge ? `${fullDate(challenge.startsOn)} a ${fullDate(challenge.endsOn)}` : "";
 
   return (
     <div>
@@ -184,7 +184,7 @@ export default function ChallengeDetailPage() {
           {view.diasIncompletos.length > 0 && (
             <div className="mb-5 print:hidden">
               <Alert variant="warning" title="Resultado incompleto">
-                Os itens por pessoa ainda não foram carregados para {diasTexto(view.diasIncompletos)}. O resultado pode mudar quando{" "}
+                Os itens por pessoa ainda não foram carregados para {daysText(view.diasIncompletos)}. O resultado pode mudar quando{" "}
                 {view.diasIncompletos.length === 1 ? "esse dia for atualizado." : "esses dias forem atualizados."}
               </Alert>
             </div>
@@ -204,9 +204,9 @@ export default function ChallengeDetailPage() {
   );
 }
 
-function diasTexto(dias: string[]): string {
-  if (dias.length === 1) return dataCurta(dias[0]!);
-  const lista = dias.map(dataCurta);
+function daysText(dias: string[]): string {
+  if (dias.length === 1) return shortDate(dias[0]!);
+  const lista = dias.map(shortDate);
   return `${lista.slice(0, -1).join(", ")} e ${lista[lista.length - 1]}`;
 }
 
@@ -257,7 +257,7 @@ function ChallengeHero({ challenge: c, view, lojaNome }: { challenge: ChallengeR
             <Badge variant={CHALLENGE_STATUS_VARIANT[view.status]}>{CHALLENGE_STATUS_LABEL[view.status]}</Badge>
           </div>
           <p className="flex flex-wrap items-center gap-x-1.5 text-[13.5px] leading-relaxed text-t1">
-            {dataCompleta(c.startsOn)} a {dataCompleta(c.endsOn)}
+            {fullDate(c.startsOn)} a {fullDate(c.endsOn)}
             {lojaNome ? ` · ${lojaNome}` : ""} · {CHALLENGE_MODE_LABEL[c.mode]}
             <TipHelp label={CHALLENGE_MODE_HELP[c.mode]} />
           </p>
@@ -306,7 +306,7 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
             <span className="font-mono font-bold">{view.gerencia.resultado != null ? metricValueLabel(c.metric, view.gerencia.resultado) : "—"}</span>
             {view.gerencia.periodoAnterior && (
               <TipHelp
-                label={`Compara a equipe durante o desafio com o período de ${dataCurta(view.gerencia.periodoAnterior.from)} a ${dataCurta(view.gerencia.periodoAnterior.to)}: 50% faturamento médio por pessoa, 25% ticket médio e 25% P.A. 100 representa o mesmo desempenho do período anterior. Com o desafio em andamento, os dois lados consideram até ontem.${view.gerencia.resultado == null ? " Fica indisponível no primeiro dia do desafio, sem vendas em um dos períodos ou quando faltam dados de itens." : ""}`}
+                label={`Compara a equipe durante o desafio com o período de ${shortDate(view.gerencia.periodoAnterior.from)} a ${shortDate(view.gerencia.periodoAnterior.to)}: 50% faturamento médio por pessoa, 25% ticket médio e 25% P.A. 100 representa o mesmo desempenho do período anterior. Com o desafio em andamento, os dois lados consideram até ontem.${view.gerencia.resultado == null ? " Fica indisponível no primeiro dia do desafio, sem vendas em um dos períodos ou quando faltam dados de itens." : ""}`}
               />
             )}
           </p>
@@ -400,7 +400,7 @@ function PayoutReportHeader({ challenge: c, lojaNome }: { challenge: ChallengeRe
         <p>
           <span className="text-t2">Período: </span>
           <span className="font-bold text-t0">
-            {dataCompleta(c.startsOn)} a {dataCompleta(c.endsOn)}
+            {fullDate(c.startsOn)} a {fullDate(c.endsOn)}
           </span>
         </p>
       </div>
@@ -411,7 +411,7 @@ function PayoutReportHeader({ challenge: c, lojaNome }: { challenge: ChallengeRe
 /** Desafio encerrado: quem ganhou o que. Outro premio (texto livre) aparece pelo nome e nao entra no total em R$. */
 function ChallengePayoutCard({ challenge: c, view, onExport }: { challenge: ChallengeRecord; view: ChallengeView; onExport: () => void }) {
   const payout = challengePayout(view);
-  const fimMais1 = deIso(c.endsOn);
+  const fimMais1 = isoToDate(c.endsOn);
   fimMais1.setDate(fimMais1.getDate() + 1);
   const linhas = [
     ...payout.vencedores.map((w, i) => ({ key: `p${i}`, nome: w.nome, sub: w.grupo, colocacao: w.colocacao, premio: w.premio })),
@@ -429,7 +429,7 @@ function ChallengePayoutCard({ challenge: c, view, onExport }: { challenge: Chal
             <CardTitle>Fechamento do desafio</CardTitle>
             {view.emFechamento && (
               <Tooltip
-                label={`O último dia do desafio será fechado na madrugada de ${dataCurta(paraIso(fimMais1))}. Vendas incluídas ou canceladas até lá ainda podem alterar o resultado.`}
+                label={`O último dia do desafio será fechado na madrugada de ${shortDate(dateToIso(fimMais1))}. Vendas incluídas ou canceladas até lá ainda podem alterar o resultado.`}
               >
                 <span className="inline-flex cursor-help">
                   <Badge variant="warning">Fechamento em andamento</Badge>

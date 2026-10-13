@@ -2,7 +2,7 @@ import { useState } from "react";
 import { FormField, Input, useToast } from "@/components/ui";
 import { logoutErp, testErpLogin, type ErpLoginResult, type ErpReportCheck } from "@/data/wedash/erp";
 import { ErpReportChecks } from "@/components/wedash/ErpReportChecks";
-import { gravarSenhaErp, lerSenhaErp } from "./draft";
+import { writeErpPassword, readErpPassword } from "./draft";
 import { noAutofill, secretStyle } from "@/lib/noAutofill";
 
 const toastErro: Record<Exclude<ErpLoginResult, { ok: true }>["reason"], string> = {
@@ -41,7 +41,7 @@ export function Step2Credentials({
 }) {
   const { show } = useToast();
   const [usuario, setUsuario] = useState(inicial.usuario);
-  const [senha, setSenha] = useState(() => lerSenhaErp(membershipId));
+  const [senha, setSenha] = useState(() => readErpPassword(membershipId));
   const [dedicada, setDedicada] = useState(inicial.dedicada);
   const [aceite, setAceite] = useState(inicial.aceite);
   const [testando, setTestando] = useState(false);
@@ -114,7 +114,7 @@ export function Step2Credentials({
                 value={senha}
                 onChange={(e) => {
                   setSenha(e.target.value);
-                  gravarSenhaErp(membershipId, e.target.value);
+                  writeErpPassword(membershipId, e.target.value);
                 }}
                 placeholder="Digite a senha"
                 {...noAutofill}

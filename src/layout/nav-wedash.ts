@@ -38,7 +38,7 @@ const gestao: NavGroup = {
     { label: "Metas", to: paths.goals },
     { label: "Desafios", to: paths.management.challenges },
     { label: "Fechamento", to: paths.management.cashClose },
-    { label: "Sangrias", to: paths.management.sangria },
+    { label: "Sangrias", to: paths.management.cashDrop },
     { label: "Informe de vendas", to: paths.management.salesReport },
     { label: "Pedido de compra", to: paths.stock.purchaseOrder },
   ],
@@ -50,7 +50,7 @@ const custos: NavGroup = {
   description: "Configure os dados, custos, impostos e integrações de cada filial.",
   icon: ICONE.engrenagem,
   items: [
-    { label: "Filial", to: paths.operation.filial },
+    { label: "Filial", to: paths.operation.branch },
     { label: "Produtos e impostos", to: paths.operation.productsTaxes },
     { label: "Adquirentes", to: paths.operation.acquirers },
     { label: "Shopping", to: paths.operation.shopping },
@@ -114,14 +114,14 @@ export function isGestor(role: Role): boolean {
   return GESTOR_ROLES.includes(role);
 }
 
-const navVendedora: NavEntry[] = [
+const sellerNav: NavEntry[] = [
   { label: "Início", icon: ICONE.dashboard, to: paths.seller.home },
 ];
 
 export function navDoPapel(role: Role): NavEntry[] {
   switch (role) {
     case "SELLER":
-      return navVendedora;
+      return sellerNav;
     case "MANAGER":
       return navGerente;
     default:

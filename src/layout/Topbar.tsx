@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { padTopo } from "@/lib/safeArea";
+import { padTop } from "@/lib/safeArea";
 import { Avatar, Dropdown, type DropdownItem } from "@/components/ui";
 import { isGestor } from "./nav-wedash";
 import { paths } from "@/router/paths";
@@ -28,7 +28,7 @@ const ICON_AVISOS = "M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94
 function mostraAtualizar(pathname: string): boolean {
   if (pathname === paths.dashboard || pathname.startsWith(`${paths.dashboard}/`)) return true;
   if (pathname === paths.stock.inventory || pathname === paths.stock.purchaseOrder) return true;
-  if (pathname === paths.management.cashClose || pathname === paths.management.sangria || pathname === paths.management.salesReport || pathname === paths.operation.sellers) return true;
+  if (pathname === paths.management.cashClose || pathname === paths.management.cashDrop || pathname === paths.management.salesReport || pathname === paths.operation.sellers) return true;
   if (pathname === paths.goals) return true;
   const meta = pathname.match(/^\/goals\/([^/]+)$/);
   if (meta && meta[1] !== "new") return true;
@@ -111,7 +111,7 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
   ];
 
   return (
-    <header className="pad-topo sticky top-0 z-30 flex flex-none items-center gap-2.5 border-b border-line bg-bg-1/80 px-3.5 pb-3 backdrop-blur-md sm:gap-3.5 sm:px-6" style={padTopo("0.75rem")}>
+    <header className="pad-topo sticky top-0 z-30 flex flex-none items-center gap-2.5 border-b border-line bg-bg-1/80 px-3.5 pb-3 backdrop-blur-md sm:gap-3.5 sm:px-6" style={padTop("0.75rem")}>
       <button onClick={onOpenMobileNav} aria-label="Abrir menu" title="Abrir menu" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border border-line text-t1 hover:bg-bg-3 lg:hidden">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M3 6h18M3 12h18M3 18h18" />

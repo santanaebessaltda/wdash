@@ -12,7 +12,7 @@ import { loginMillennium, millenniumBaseUrl } from "../src/millenniumAuth.ts";
 import { listRememberedSessions } from "../src/sessionStore.ts";
 import { milleniumDataRange } from "../src/millenniumSales.ts";
 import { fetchEventosListaTodos, resolveSalesEventIds } from "../src/millenniumEvents.ts";
-import { fetchFilialGeradorMap } from "../src/millenniumBrandReport.ts";
+import { fetchBranchGeneratorMap } from "../src/millenniumBrandReport.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -236,7 +236,7 @@ async function main() {
   );
 
   // 4) Produtos por Cupom  -  INTERVAL 3 = Este Mes
-  const geradorMap = await fetchFilialGeradorMap({ session });
+  const geradorMap = await fetchBranchGeneratorMap({ session });
   const g = geradorMap.get("00205") ?? 65728;
   const origin = base.replace(/\/api\/?$/, "");
   let cupomOk = false;

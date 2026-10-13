@@ -23,8 +23,8 @@ export type FetchSalesListaParams = {
 };
 
 /** Sale row plus Millennium FILIAL from the Lista payload (for all-stores partition). */
-export type SaleRowWithFilial = SaleRow & {
-  millenniumFilial: number | null;
+export type SaleRowWithBranch = SaleRow & {
+  millenniumBranch: number | null;
   /** COD_OPERACAO numerico  -  chave do ConsultaDetMov. */
   millenniumOpCode: number | null;
   /** Cupom / NF  -  chave do ConsultaDetMov. */
@@ -186,8 +186,8 @@ export function milleniumDataRange(from: string, to: string): { datai: string; d
 export function mapVendasListaPayload(
   payload: unknown,
   opts: { storeId: string },
-): SaleRowWithFilial[] {
-  const out: SaleRowWithFilial[] = [];
+): SaleRowWithBranch[] {
+  const out: SaleRowWithBranch[] = [];
   for (const raw of extractList(payload)) {
     if (!raw || typeof raw !== "object") continue;
     const o = raw as Record<string, unknown>;
@@ -202,7 +202,7 @@ export function mapVendasListaPayload(
       asStr(pick(o, "DOCUMENTO", "documento")) ||
       asStr(pick(o, "COD", "cod")) ||
       `anon-${occurredAt.toISOString()}-${revenueCents}-${out.length}`;
-    const millenniumFilial = asNum(pick(o, "FILIAL", "filial", "COD_FILIAL", "cod_filial"));
+    const millenniumBranch = asNum(pick(o, "FILIAL", "filial", "COD_FILIAL", "cod_filial"));
     const nfRaw = pick(o, "NF", "nf");
     const nf =
       nfRaw == null || asStr(nfRaw) === ""
@@ -230,7 +230,7 @@ export function mapVendasListaPayload(
       brand: "ALL",
       paymentMethod: condicaoRaw || null,
       sellerName: sellerRaw || null,
-      millenniumFilial,
+      millenniumBranch,
       millenniumOpCode,
       nf,
       tipoOperacao,
@@ -243,16 +243,16 @@ export function mapVendasListaPayload(
  * Split all-stores Lista rows by Millennium FILIAL  ->  WeDash storeId.
  * Rows whose FILIAL is missing or unknown are dropped.
  */
-export function partitionRowsByFilial(
-  rows: SaleRowWithFilial[],
+export function partitionRowsByBranch(
+  rows: SaleRowWithBranch[],
   storesByMillenniumId: Map<number, { id: string }>,
-): Map<string, SaleRowWithFilial[]> {
-  const out = new Map<string, SaleRowWithFilial[]>();
+): Map<string, SaleRowWithBranch[]> {
+  const out = new Map<string, SaleRowWithBranch[]>();
   for (const row of rows) {
-    if (row.millenniumFilial == null) continue;
-    const store = storesByMillenniumId.get(row.millenniumFilial);
+    if (row.millenniumBranch == null) continue;
+    const store = storesByMillenniumId.get(row.millenniumBranch);
     if (!store) continue;
-    const stamped: SaleRowWithFilial = { ...row, storeId: store.id };
+    const stamped: SaleRowWithBranch = { ...row, storeId: store.id };
     const list = out.get(store.id);
     if (list) list.push(stamped);
     else out.set(store.id, [stamped]);
@@ -319,7 +319,7 @@ type Attempt = {
  *
  * `millenniumStoreId: null` = all stores; only allowed when from === to (1 day).
  */
-export async function fetchSalesLista(params: FetchSalesListaParams): Promise<SaleRowWithFilial[]> {
+export async function fetchSalesLista(params: FetchSalesListaParams): Promise<SaleRowWithBranch[]> {
   if (!params.eventoIds.length) {
     throw new Error("VENDAS.Lista requires eventoIds (sales event whitelist)");
   }

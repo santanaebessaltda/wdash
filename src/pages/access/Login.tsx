@@ -8,7 +8,7 @@ import { users } from "@/data/wedash/team";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { loginWithEmail, MENSAGEM_LOGIN, destinationAfterAuth } from "@/session/authApi";
 import { useSession } from "@/session/SessionProvider";
-import { acessoBotao, CampoEmail, CampoSenha, Checkbox, useFocoNoEnvioAposAutofill } from "./AccessKit";
+import { accessButton, EmailField, PasswordField, Checkbox, useFocusSubmitAfterAutofill } from "./AccessKit";
 
 function emailValido(v: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
@@ -27,7 +27,7 @@ export function Login() {
   const [senha, setSenha] = useState("");
   const [lembrar, setLembrar] = useState(true);
   const [carregando, setCarregando] = useState(false);
-  const formRef = useFocoNoEnvioAposAutofill();
+  const formRef = useFocusSubmitAfterAutofill();
 
   const podeEnviar = email.trim().length > 0 && senha.length > 0 && !carregando;
 
@@ -120,8 +120,8 @@ export function Login() {
           <p className="mb-7 text-sm text-t1">Entre com seu e-mail e senha.</p>
 
           <form ref={formRef} onSubmit={enviar} className="flex flex-col gap-3.5" noValidate>
-            <CampoEmail label="E-mail" value={email} onChange={setEmail} autoFocus />
-            <CampoSenha label="Senha" value={senha} onChange={setSenha} />
+            <EmailField label="E-mail" value={email} onChange={setEmail} autoFocus />
+            <PasswordField label="Senha" value={senha} onChange={setSenha} />
 
             <div className="flex items-center justify-between">
               <Checkbox label="Manter conectado" checked={lembrar} onChange={(e) => setLembrar(e.target.checked)} />
@@ -133,7 +133,7 @@ export function Login() {
             <button
               type="submit"
               disabled={!podeEnviar || carregando}
-              className={`mt-1 ${acessoBotao}`}
+              className={`mt-1 ${accessButton}`}
               style={{ boxShadow: "0 10px 24px -10px var(--acc)" }}
             >
               {carregando ? "Entrando…" : "Entrar"}

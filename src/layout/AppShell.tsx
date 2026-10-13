@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { padBase } from "@/lib/safeArea";
+import { padBottom } from "@/lib/safeArea";
 import { Outlet, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { MobileDrawer } from "./MobileDrawer";
@@ -102,7 +102,7 @@ export function AppShell() {
         </div>
         <main ref={mainRef} className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-3.5 pt-5 sm:px-6 sm:pt-6 print:overflow-visible print:p-0">
           <Suspense fallback={<PageLoader />}>
-            <div key={location.pathname} className="pad-base vela-page-enter print:pb-0" style={padBase("0px")}>
+            <div key={location.pathname} className="pad-base vela-page-enter print:pb-0" style={padBottom("0px")}>
               <Outlet />
             </div>
           </Suspense>

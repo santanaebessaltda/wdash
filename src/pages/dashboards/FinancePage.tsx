@@ -39,7 +39,7 @@ import { ReportHeader, useExportPdf } from "@/pages/dashboard/ReportHeader";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { FinanceSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
-import { brlCent, deIso, labelUpper, tipDelta } from "@/lib/format";
+import { brlCent, isoToDate, labelUpper, deltaTip } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { QuickStat } from "@/pages/dashboards/QuickStat";
 import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePicker";
@@ -94,7 +94,7 @@ function PriorPeriodBadge({ delta }: { delta?: { value: string; positive: boolea
       {delta.value}
     </Badge>
   );
-  const tip = tipDelta(delta);
+  const tip = deltaTip(delta);
   return tip ? <Tooltip label={tip}>{badge}</Tooltip> : badge;
 }
 
@@ -224,7 +224,7 @@ export default function FinancePage() {
       );
       if (gen !== reloadGen.current) return;
       setAggs({ dayAggs, hourAggs, prevHourAggs, paymentDayAggs, productCostDayAggs, productNames });
-      setCoverageFrom(cov.from ? deIso(cov.from) : null);
+      setCoverageFrom(cov.from ? isoToDate(cov.from) : null);
     } catch (e) {
       if (gen !== reloadGen.current) return;
       console.error("Finance reload:", e);
@@ -486,7 +486,7 @@ export default function FinancePage() {
               title="Custos não configurados"
               description="Configure franquia e aluguel para acompanhar o resultado operacional."
               action={
-                <Button size="sm" onClick={() => navigate(paths.operation.filial)}>
+                <Button size="sm" onClick={() => navigate(paths.operation.branch)}>
                   Configurar custos
                 </Button>
               }

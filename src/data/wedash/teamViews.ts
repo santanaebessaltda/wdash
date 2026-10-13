@@ -25,7 +25,7 @@ import { TODAY_ISO, CURRENT_HOUR } from "./clock";
 import { dayAggregate, salesDay, storeOpen, sumAggregates, type Aggregate } from "./sales";
 import { storeById, stores, grupos, type Store } from "./stores";
 import { brlK, revenueCurve, seriesAxisForPeriod, kpiDelta, previousPeriod, resolvePeriod, seriesAxisLabel, type Scope, type ResolvedPeriod, type BlockState } from "./dashboard";
-import { brl, dataCurta, deIso, fimDoMes, horaCurta, intervaloDias, mesAno, num, rotuloDias, somarDias } from "@/lib/format";
+import { brl, shortDate, isoToDate, endOfMonth, shortHour, eachDay, monthYear, num, dayCountLabel, addDays } from "@/lib/format";
 import type { TintKey } from "@/pages/dashboards/icons";
 import type { GoalCardView, NetworkGlobalGoal, SellerRow } from "./engine/goalTypes";
 
@@ -48,11 +48,11 @@ export function presentOnDay(c: Collaborator, iso: string): boolean {
 }
 
 /** Dias abertos da loja em que a vendedora estava presente, dentro do intervalo. */
-function diasElegiveis(c: Collaborator, filial: Store, inicio: string, fim: string): string[] {
+function eligibleDays(c: Collaborator, filial: Store, inicio: string, fim: string): string[] {
   const primeiro = c.dataAdmissao > inicio ? c.dataAdmissao : inicio;
-  const ultimo = c.dataInatividade && c.dataInatividade <= fim ? somarDias(c.dataInatividade, -1) : fim;
+  const ultimo = c.dataInatividade && c.dataInatividade <= fim ? addDays(c.dataInatividade, -1) : fim;
   if (primeiro > ultimo) return [];
-  return intervaloDias(primeiro, ultimo).filter((iso) => storeOpen(filial, iso));
+  return eachDay(primeiro, ultimo).filter((iso) => storeOpen(filial, iso));
 }
 
 /** Vendedoras elegiveis presentes na loja no mes (base de listas e somas). */
@@ -65,7 +65,7 @@ export interface IndividualGoal {
   valor: number;
   /** Admissao ou inatividade no meio do mes: meta proporcional aos dias elegiveis. */
   proporcional: boolean;
-  diasElegiveis: number;
+  eligibleDays: number;
   /** Dias abertos da loja no mes inteiro  -  base da proporcionalidade. */
   diasAbertosMes: number;
 }
@@ -81,20 +81,20 @@ export function individualGoal(c: Collaborator, filialId: string, competencia: s
   if (!meta) return null;
   const filial = storeById(filialId);
   const primeiroMes = `${competencia}-01`;
-  const ultimoMes = fimDoMes(primeiroMes);
+  const ultimoMes = endOfMonth(primeiroMes);
   const elegiveisMes = sellersOfStore(filialId, competencia);
   if (elegiveisMes.length === 0) return null;
 
-  const diasAbertosMes = intervaloDias(primeiroMes, ultimoMes).filter((iso) => storeOpen(filial, iso)).length;
-  const dias = diasElegiveis(c, filial, primeiroMes, ultimoMes);
+  const diasAbertosMes = eachDay(primeiroMes, ultimoMes).filter((iso) => storeOpen(filial, iso)).length;
+  const dias = eligibleDays(c, filial, primeiroMes, ultimoMes);
   const pesoAjustado = c.pesoVenda * (diasAbertosMes > 0 ? dias.length / diasAbertosMes : 0);
   const somaPesosAjustados = elegiveisMes.reduce((s, x) => {
-    const d = diasElegiveis(x, filial, primeiroMes, ultimoMes);
+    const d = eligibleDays(x, filial, primeiroMes, ultimoMes);
     return s + x.pesoVenda * (diasAbertosMes > 0 ? d.length / diasAbertosMes : 0);
   }, 0);
   if (somaPesosAjustados <= 0) return null;
-  const valor = (meta.valorLoja * pesoAjustado) / somaPesosAjustados;
-  return { valor, proporcional: dias.length < diasAbertosMes, diasElegiveis: dias.length, diasAbertosMes };
+  const valor = (meta.storeAmount * pesoAjustado) / somaPesosAjustados;
+  return { valor, proporcional: dias.length < diasAbertosMes, eligibleDays: dias.length, diasAbertosMes };
 }
 
 /* ------------------------- Agregado por vendedora (EQUIP-02) ------------------------- */
@@ -110,17 +110,17 @@ export interface SellerAggregate {
 /** Agregado da vendedora no periodo (respeitando a fracao do dia de hoje). */
 export function sellerAggregateForPeriod(c: Collaborator, filialId: string, inicio: string, fim: string): SellerAggregate {
   const out = { colaboradorId: c.id, faturamento: 0, atendimentos: 0, itens: 0, diasTrabalhados: 0 };
-  for (const iso of intervaloDias(inicio, fim)) {
+  for (const iso of eachDay(inicio, fim)) {
     if (!presentOnDay(c, iso)) continue;
     const dia = salesDay(filialId, iso);
     if (!dia) continue;
     // Hoje incompleto: o gerador ja trunca porHora na hora atual; o total do
     // dia, nao. Recorte a fatia da vendedora pela fracao do dia realizada.
     const horaMax = iso === TODAY_ISO ? CURRENT_HOUR : undefined;
-    const totalDia = dayAggregate(dia, null, horaMax);
-    const doDia = dia.porVendedora[c.id];
-    if (!doDia || totalDia.faturamento <= 0) continue;
-    const fr = totalDia.faturamento / dia.total.faturamento;
+    const dayTotal = dayAggregate(dia, null, horaMax);
+    const doDia = dia.bySeller[c.id];
+    if (!doDia || dayTotal.faturamento <= 0) continue;
+    const fr = dayTotal.faturamento / dia.total.faturamento;
     const faturamento = Math.round(doDia.faturamento * fr);
     const atendimentos = Math.round(doDia.atendimentos * fr);
     const itens = Math.round(doDia.itens * fr);
@@ -218,7 +218,7 @@ export interface ChallengeView {
   descricao: string;
   objetivo: string;
   /** Ex.: "15 un" / "1,90" / "R$ 185"  -  so o valor (o verbo fica no objetivo). */
-  metaRotulo: string;
+  goalLabel: string;
   /** Valor minimo configurado (null = sem piso explicito). */
   minimo: number | null;
   /** Se ha minimo discriminado no card (minimo != null). */
@@ -254,7 +254,7 @@ export interface ChallengeView {
   semEngajamento: boolean;
   tipoTexto: string;
   /** Dias restantes (ativo), dias ate comecar (agendado) ou 0 (encerrado). */
-  diasRestantes: number;
+  daysRemaining: number;
   /** Rotulo do badge de prazo: "15d"  |  "Em 5d"  |  "Encerrado". */
   prazoRotulo: string;
   /** Janela do desafio, ex.: "01/09  -  15/09". */
@@ -267,9 +267,9 @@ export interface ChallengeView {
   /** Loja dona (`null` = rede). */
   filialId: string | null;
   /** Rotulo curto da loja (ex.: "Campo Grande") ou "Rede". */
-  lojaRotulo: string;
+  storeLabel: string;
   /** Exibir loja no card (visao Todas as lojas). */
-  exibirLoja: boolean;
+  showStore: boolean;
   /** Todos os participantes, ordenados: atingiu  ->  quase  ->  abaixo  ->  nao comecou. */
   ranking: ChallengeParticipantView[];
 }
@@ -337,9 +337,9 @@ export interface TeamView {
 /* ------------------------- Loja: KPIs e lista ------------------------- */
 
 /** Agregado da loja no periodo, com o dia de hoje truncado na hora atual. */
-function agregadoLoja(filialId: string, inicio: string, fim: string): Aggregate {
+function storeAggregate(filialId: string, inicio: string, fim: string): Aggregate {
   return sumAggregates(
-    intervaloDias(inicio, fim).map((iso) => {
+    eachDay(inicio, fim).map((iso) => {
       const dia = salesDay(filialId, iso);
       if (!dia) return { faturamento: 0, atendimentos: 0, itens: 0 };
       return dayAggregate(dia, null, iso === TODAY_ISO ? CURRENT_HOUR : undefined);
@@ -348,11 +348,11 @@ function agregadoLoja(filialId: string, inicio: string, fim: string): Aggregate 
 }
 
 /** Tendencia: ultimos 7 dias vs. 7 anteriores da vendedora; 5% = estavel. */
-function tendenciaVendedora(c: Collaborator, filialId: string, fimIso: string): SellerRow["tendencia"] {
+function sellerTrend(c: Collaborator, filialId: string, fimIso: string): SellerRow["tendencia"] {
   const soma = (inicio: string, fim: string) =>
-    intervaloDias(inicio, fim).reduce((s, iso) => s + sellerAggregateForPeriod(c, filialId, iso, iso).faturamento, 0);
-  const ultimos = soma(somarDias(fimIso, -6), fimIso);
-  const anteriores = soma(somarDias(fimIso, -13), somarDias(fimIso, -7));
+    eachDay(inicio, fim).reduce((s, iso) => s + sellerAggregateForPeriod(c, filialId, iso, iso).faturamento, 0);
+  const ultimos = soma(addDays(fimIso, -6), fimIso);
+  const anteriores = soma(addDays(fimIso, -13), addDays(fimIso, -7));
   if (anteriores <= 0 || ultimos <= 0) return "estavel";
   const v = ((ultimos - anteriores) / anteriores) * 100;
   if (v > 5) return "subindo";
@@ -387,10 +387,10 @@ const DEMO_FATOR_RITMO: Record<string, number> = {
   c18: 0.45,
 };
 
-function visaoVendedoras(filialId: string, periodo: ResolvedPeriod, metaAtiva: boolean, competencia: string): SellerRow[] {
+function sellersView(filialId: string, periodo: ResolvedPeriod, metaAtiva: boolean, competencia: string): SellerRow[] {
   const filial = storeById(filialId);
-  const agLoja = agregadoLoja(filialId, periodo.inicio, periodo.fim);
-  const paMedioLoja = divSeguro(agLoja.itens, agLoja.atendimentos);
+  const storeAgg = storeAggregate(filialId, periodo.inicio, periodo.fim);
+  const storeAvgItems = divSeguro(storeAgg.itens, storeAgg.atendimentos);
   const degraus = tiersOfStore(filialId, competencia);
   const elegiveis = sellersOfStore(filialId, competencia);
 
@@ -431,16 +431,16 @@ function visaoVendedoras(filialId: string, periodo: ResolvedPeriod, metaAtiva: b
 
     const ticket = divSeguro(faturamento, atendimentos);
     const pa = divSeguro(itens, atendimentos);
-    const tendencia = tendenciaVendedora(c, filialId, periodo.fim);
+    const tendencia = sellerTrend(c, filialId, periodo.fim);
 
     // Projecao do fechamento individual: realizado escalado pela fracao da
     // curva de receita ja decorrida da competencia (mesma base do Dashboard).
-    const fechado = fimDoMes(`${competencia}-01`) < TODAY_ISO;
+    const fechado = endOfMonth(`${competencia}-01`) < TODAY_ISO;
     let projecaoFinal = 0;
     if (metaInd && metaInd.valor > 0 && !fechado) {
       const curva = revenueCurve([filial], competencia);
       let fracaoAcum = 0;
-      for (const iso of intervaloDias(`${competencia}-01`, TODAY_ISO)) fracaoAcum += curva.peso(iso);
+      for (const iso of eachDay(`${competencia}-01`, TODAY_ISO)) fracaoAcum += curva.peso(iso);
       if (fracaoAcum > 0) projecaoFinal = faturamento / fracaoAcum;
     }
     const atingProjPct = metaInd && metaInd.valor > 0 ? (projecaoFinal / metaInd.valor) * 100 : 0;
@@ -469,7 +469,7 @@ function visaoVendedoras(filialId: string, periodo: ResolvedPeriod, metaAtiva: b
     // abaixo da media da loja  ->  tendencia caindo (com leitura de ritmo).
     let atencao: SellerRow["atencao"] = null;
     if (metaInd && metaInd.valor > 0) {
-      const paAbaixoPct = paMedioLoja > 0 && pa > 0 && pa < paMedioLoja * 0.95 ? (pa / paMedioLoja - 1) * 100 : null;
+      const paAbaixoPct = storeAvgItems > 0 && pa > 0 && pa < storeAvgItems * 0.95 ? (pa / storeAvgItems - 1) * 100 : null;
       if (paAbaixoPct !== null) {
         atencao = { tipo: "pa", texto: `P.A. ${num(pa, 2)}`, detalhe: `${num(Math.abs(paAbaixoPct), 0)}% abaixo` };
       } else if (tendencia === "caindo") {
@@ -480,7 +480,7 @@ function visaoVendedoras(filialId: string, periodo: ResolvedPeriod, metaAtiva: b
       }
     }
 
-    const metaLoja = metaAtiva ? goalOfStore(filialId, competencia)?.valorLoja ?? 0 : 0;
+    const storeGoal = metaAtiva ? goalOfStore(filialId, competencia)?.storeAmount ?? 0 : 0;
     const nivelIdx = escadaUi?.degrau ? degraus.indexOf(escadaUi.degrau) : -1;
 
     return {
@@ -500,13 +500,13 @@ function visaoVendedoras(filialId: string, periodo: ResolvedPeriod, metaAtiva: b
       tendencia,
       metaIndividualValor: metaInd?.valor ?? 0,
       metaProporcional: metaInd?.proporcional ?? false,
-      diasElegiveis: metaInd?.diasElegiveis ?? 0,
+      eligibleDays: metaInd?.eligibleDays ?? 0,
       atingimentoPct: metaInd && metaInd.valor > 0 ? (faturamento / metaInd.valor) * 100 : 0,
       barraPct:
         metaInd && metaInd.valor > 0
           ? Math.min(100, (faturamento / metaInd.valor) * 100 / Math.max(...degraus.map((d) => d.atingimentoMinPct), 100) * 100)
           : 0,
-      pctMetaGeral: metaLoja > 0 ? (faturamento / metaLoja) * 100 : 0,
+      pctMetaGeral: storeGoal > 0 ? (faturamento / storeGoal) * 100 : 0,
       // Marcos da escada para a barra segmentada do mockup (posicao % de cada
       // degrau + % de premiacao que ele paga acima dele).
       marcosEscada: degraus.map((d) => ({ nome: d.nome, pct: d.atingimentoMinPct, pctPremiacao: d.comissaoPct, bonus: d.bonus })),
@@ -557,15 +557,15 @@ const COR_ICONE_TIPO: Record<Challenge["tipo"], string> = {
   ticket: "var(--ok)",
 };
 
-function fmtValorDesafio(v: number, d: Challenge): string {
+function challengeAmountLabel(v: number, d: Challenge): string {
   if (d.tipo === "ticket" || d.tipo === "faturamento" || d.unidade === "R$") return brlK(v);
   if (d.tipo === "pa" || d.unidade === "x") return num(v, v % 1 !== 0 ? 2 : 0);
   return num(Math.round(v), 0);
 }
 
-function fmtProgressoRotulo(progresso: number, piso: number, d: Challenge): string {
-  const a = fmtValorDesafio(progresso, d);
-  const b = fmtValorDesafio(piso, d);
+function progressLabel(progresso: number, piso: number, d: Challenge): string {
+  const a = challengeAmountLabel(progresso, d);
+  const b = challengeAmountLabel(piso, d);
   if (d.unidade === "un") return `${a}/${b} un`;
   return `${a}/${b}`;
 }
@@ -590,7 +590,7 @@ function desafioView(
   diasDecorridos: number,
   diasTotais: number,
   filiaisIds: string[],
-  exibirLoja: boolean,
+  showStore: boolean,
 ): ChallengeView {
   const ids = d.participantes.filter((id) => {
     const c = collaboratorById(id);
@@ -610,7 +610,7 @@ function desafioView(
       progresso,
       alvo: piso,
       progressoPct: piso > 0 ? Math.min(100, (progresso / piso) * 100) : 0,
-      progressoRotulo: fmtProgressoRotulo(progresso, piso, d),
+      progressoRotulo: progressLabel(progresso, piso, d),
       status: statusParticipante(progresso, piso),
     };
   });
@@ -628,13 +628,13 @@ function desafioView(
   const ranking = [...linhas].sort(
     (a, b) => ORDEM_STATUS[a.status] - ORDEM_STATUS[b.status] || b.progresso - a.progresso || b.progressoPct - a.progressoPct,
   );
-  const metaRotulo =
+  const goalLabel =
     d.tipo === "pa"
       ? num(d.alvoIndividual, 2)
       : d.tipo === "ticket" || d.unidade === "R$" || d.tipo === "faturamento"
         ? brlK(d.alvoIndividual)
         : `${num(d.tipo === "produto" ? piso : d.alvoIndividual, 0)} un`;
-  const minimoRotulo =
+  const minimumLabel =
     d.minimo == null
       ? null
       : d.unidade === "un"
@@ -646,26 +646,26 @@ function desafioView(
   let statusLabel: ChallengeView["statusLabel"];
   let statusVariant: ChallengeView["statusVariant"];
   let prazoTom: ChallengeView["prazoTom"];
-  let diasRestantes: number;
+  let daysRemaining: number;
   let prazoRotulo: string;
   if (TODAY_ISO < d.inicio) {
     statusLabel = "A começar";
     statusVariant = "info";
     prazoTom = "muted";
-    diasRestantes = intervaloDias(TODAY_ISO, d.inicio).length - 1;
-    prazoRotulo = diasRestantes <= 0 ? "Hoje" : `Em ${rotuloDias(diasRestantes)}`;
+    daysRemaining = eachDay(TODAY_ISO, d.inicio).length - 1;
+    prazoRotulo = daysRemaining <= 0 ? "Hoje" : `Em ${dayCountLabel(daysRemaining)}`;
   } else if (TODAY_ISO > d.fim) {
     statusLabel = "Encerrado";
     statusVariant = "neutral";
     prazoTom = "bad";
-    diasRestantes = 0;
+    daysRemaining = 0;
     prazoRotulo = "Encerrado";
   } else {
     statusLabel = "Ativo";
     statusVariant = "success";
     prazoTom = "ok";
-    diasRestantes = intervaloDias(TODAY_ISO, d.fim).length;
-    prazoRotulo = rotuloDias(diasRestantes);
+    daysRemaining = eachDay(TODAY_ISO, d.fim).length;
+    prazoRotulo = dayCountLabel(daysRemaining);
   }
 
   const fechaNoRitmo =
@@ -673,10 +673,10 @@ function desafioView(
       ? false
       : atingiram >= minimoGerente || projetado >= alvoAgregado;
   const descricao =
-    minimoRotulo != null
-      ? `Meta: ${metaRotulo} · Mínimo: ${minimoRotulo} · Prêmio: ${brl(d.premio)}`
-      : `Meta: ${metaRotulo} · Prêmio: ${brl(d.premio)}`;
-  const lojaRotulo = d.filialId
+    minimumLabel != null
+      ? `Meta: ${goalLabel} · Mínimo: ${minimumLabel} · Prêmio: ${brl(d.premio)}`
+      : `Meta: ${goalLabel} · Prêmio: ${brl(d.premio)}`;
+  const storeLabel = d.filialId
     ? storeById(d.filialId).fantasia.replace(/^Shopping\s+/i, "")
     : "Rede";
   return {
@@ -684,7 +684,7 @@ function desafioView(
     nome: d.nome,
     descricao,
     objetivo: d.objetivo,
-    metaRotulo,
+    goalLabel,
     minimo: d.minimo,
     temMinimo: d.minimo != null,
     tipo: d.tipo,
@@ -699,44 +699,44 @@ function desafioView(
     progressoAgregado,
     alvoAgregado,
     progressoPct: alvoAgregado > 0 ? (progressoAgregado / alvoAgregado) * 100 : 0,
-    progressoAgregadoRotulo: fmtProgressoRotulo(progressoAgregado, alvoAgregado, d),
+    progressoAgregadoRotulo: progressLabel(progressoAgregado, alvoAgregado, d),
     atingiram,
     projetadoAgregado: projetado,
     fechaNoRitmo,
     semEngajamento,
     tipoTexto: TIPO_TEXTO[d.tipo],
-    diasRestantes,
+    daysRemaining,
     prazoRotulo,
-    janelaRotulo: `${dataCurta(d.inicio)} – ${dataCurta(d.fim)}`,
+    janelaRotulo: `${shortDate(d.inicio)} – ${shortDate(d.fim)}`,
     prazoTom,
     statusLabel,
     statusVariant,
     filialId: d.filialId,
-    lojaRotulo,
-    exibirLoja,
+    storeLabel,
+    showStore,
     ranking,
   };
 }
 
-function diasAbertosDaCompetencia(competencia: string, filiaisIds: string[]): { decorridos: number; totais: number } {
+function openDaysInPeriod(competencia: string, filiaisIds: string[]): { decorridos: number; totais: number } {
   const primeiro = `${competencia}-01`;
-  const ultimo = fimDoMes(primeiro);
-  const abertos = intervaloDias(primeiro, ultimo).filter((iso) => filiaisIds.some((id) => storeOpen(storeById(id), iso)));
+  const ultimo = endOfMonth(primeiro);
+  const abertos = eachDay(primeiro, ultimo).filter((iso) => filiaisIds.some((id) => storeOpen(storeById(id), iso)));
   const decorridos = abertos.filter((iso) => iso <= TODAY_ISO).length;
   return { decorridos, totais: abertos.length };
 }
 
 /** Lista da Equipe/Ao vivo: so desafios vigentes (status Ativo). Encerrados e "a comecar" ficam de fora. */
 function desafiosViewDaCompetencia(competencia: string, filiaisIds: string[]): ChallengeView[] {
-  const { decorridos, totais } = diasAbertosDaCompetencia(competencia, filiaisIds);
-  const exibirLoja = filiaisIds.length > 1;
+  const { decorridos, totais } = openDaysInPeriod(competencia, filiaisIds);
+  const showStore = filiaisIds.length > 1;
   return challengesInScope(competencia, filiaisIds)
-    .map((d) => desafioView(d, decorridos, totais, filiaisIds, exibirLoja))
+    .map((d) => desafioView(d, decorridos, totais, filiaisIds, showStore))
     .filter((d) => d.statusLabel === "Ativo")
     .sort(
       (a, b) =>
-        a.diasRestantes - b.diasRestantes ||
-        a.lojaRotulo.localeCompare(b.lojaRotulo, "pt-BR") ||
+        a.daysRemaining - b.daysRemaining ||
+        a.storeLabel.localeCompare(b.storeLabel, "pt-BR") ||
         a.nome.localeCompare(b.nome, "pt-BR"),
     );
 }
@@ -754,7 +754,7 @@ function premiacaoEscada(filialId: string, competencia: string, vendedoras: Sell
   if (!meta) return null;
   const filial = storeById(filialId);
   const primeiro = `${competencia}-01`;
-  const fechado = fimDoMes(primeiro) < TODAY_ISO;
+  const fechado = endOfMonth(primeiro) < TODAY_ISO;
 
   if (fechado) {
     return vendedoras.reduce((s, l) => s + l.premiacaoAcumulada + l.bonusAlcancado, 0);
@@ -762,7 +762,7 @@ function premiacaoEscada(filialId: string, competencia: string, vendedoras: Sell
 
   const curva = revenueCurve([filial], competencia);
   let fracaoAcum = 0;
-  for (const iso of intervaloDias(primeiro, TODAY_ISO)) fracaoAcum += curva.peso(iso);
+  for (const iso of eachDay(primeiro, TODAY_ISO)) fracaoAcum += curva.peso(iso);
   if (fracaoAcum <= 0) return null;
 
   let total = 0;
@@ -789,10 +789,10 @@ function premiacaoEscada(filialId: string, competencia: string, vendedoras: Sell
  * `desafioView`). Cada desafio e da loja (ou rede); na visao rede entra
  * uma vez por desafio. Competencia encerrada: premio dos que de fato fecharam.
  */
-function premiacaoDesafios(competencia: string, filiaisIds: string[]): number {
-  const { decorridos, totais } = diasAbertosDaCompetencia(competencia, filiaisIds);
+function challengePrizes(competencia: string, filiaisIds: string[]): number {
+  const { decorridos, totais } = openDaysInPeriod(competencia, filiaisIds);
   let total = 0;
-  const fechado = fimDoMes(`${competencia}-01`) < TODAY_ISO;
+  const fechado = endOfMonth(`${competencia}-01`) < TODAY_ISO;
   for (const d of challengesInScope(competencia, filiaisIds)) {
     for (const id of d.participantes) {
       const p = individualProgress(d, id);
@@ -816,7 +816,7 @@ function premiacaoDesafios(competencia: string, filiaisIds: string[]): number {
  */
 function premiacaoProjetada(filialId: string, competencia: string, vendedoras: SellerRow[]): number | null {
   const escada = premiacaoEscada(filialId, competencia, vendedoras);
-  const challenges = premiacaoDesafios(competencia, [filialId]);
+  const challenges = challengePrizes(competencia, [filialId]);
   if (escada === null) return challenges > 0 ? challenges : null;
   return escada + challenges;
 }
@@ -861,26 +861,26 @@ function primeiroNome(nomeCompleto: string): string {
 function montarMetaFaixa(realizado: number, total: number, competencia: string, filiaisEscopo: Store[]): NetworkGlobalGoal | null {
   if (total <= 0) return null;
   const primeiro = `${competencia}-01`;
-  const ultimo = fimDoMes(primeiro);
+  const ultimo = endOfMonth(primeiro);
   const pct = (realizado / total) * 100;
   const fechado = ultimo < TODAY_ISO;
   let projetadoPct = pct;
   if (!fechado) {
     const curva = revenueCurve(filiaisEscopo, competencia);
     let fracaoAcum = 0;
-    for (const iso of intervaloDias(primeiro, TODAY_ISO)) fracaoAcum += curva.peso(iso);
+    for (const iso of eachDay(primeiro, TODAY_ISO)) fracaoAcum += curva.peso(iso);
     if (fracaoAcum > 0) projetadoPct = (realizado / fracaoAcum / total) * 100;
   }
-  const abertosRestantes = intervaloDias(TODAY_ISO, ultimo).filter((iso) => filiaisEscopo.some((f) => storeOpen(f, iso)));
+  const abertosRestantes = eachDay(TODAY_ISO, ultimo).filter((iso) => filiaisEscopo.some((f) => storeOpen(f, iso)));
   const nomeMeta =
-    filiaisEscopo.map((f) => goalOfStore(f.id, competencia)?.nome).find((n): n is string => Boolean(n)) ?? mesAno(primeiro);
+    filiaisEscopo.map((f) => goalOfStore(f.id, competencia)?.nome).find((n): n is string => Boolean(n)) ?? monthYear(primeiro);
   return {
     competTexto: nomeMeta,
     realizado,
     total,
     pct,
     projetadoPct,
-    diasRestantes: fechado ? 0 : abertosRestantes.length,
+    daysRemaining: fechado ? 0 : abertosRestantes.length,
     inicio: primeiro,
     fim: ultimo,
   };
@@ -902,10 +902,10 @@ function faixaComForaDaEquipe(
 /** Faturamento da competencia filtrado por marca (1 marca) ou total (null). */
 function realizadoCompetencia(filialId: string, competencia: string, marca: GoalBrand | null): number {
   const primeiro = `${competencia}-01`;
-  const ultimo = fimDoMes(primeiro);
+  const ultimo = endOfMonth(primeiro);
   const fimReal = ultimo < TODAY_ISO ? ultimo : TODAY_ISO;
   return sumAggregates(
-    intervaloDias(primeiro, fimReal).map((iso) => {
+    eachDay(primeiro, fimReal).map((iso) => {
       const dia = salesDay(filialId, iso);
       if (!dia) return { faturamento: 0, atendimentos: 0, itens: 0 };
       return dayAggregate(dia, marca, iso === TODAY_ISO ? CURRENT_HOUR : undefined);
@@ -920,21 +920,21 @@ function realizadoCompetencia(filialId: string, competencia: string, marca: Goal
 function montarMetasCards(
   filialIds: string[],
   competencia: string,
-  vendedorasPorFilial: Map<string, SellerRow[]>,
+  sellersByBranch: Map<string, SellerRow[]>,
 ): GoalCardView[] {
   const cards: GoalCardView[] = [];
   for (const filialId of filialIds) {
     const filial = storeById(filialId);
     if (!filial) continue;
-    const lista = vendedorasPorFilial.get(filialId) ?? [];
-    const nGrupos = gruposDaFilial(filialId).length;
+    const lista = sellersByBranch.get(filialId) ?? [];
+    const nGrupos = groupsForBranch(filialId).length;
     for (const m of goalsOfStore(filialId, competencia)) {
       const marcaUnica = m.marcas.length === 1 ? m.marcas[0] : null;
       const realizado = realizadoCompetencia(filialId, competencia, marcaUnica);
       const faixa = marcaUnica
-        ? montarMetaFaixa(realizado, m.valorLoja, competencia, [filial])
+        ? montarMetaFaixa(realizado, m.storeAmount, competencia, [filial])
         : faixaComForaDaEquipe(
-            montarMetaFaixa(realizado, m.valorLoja, competencia, [filial]),
+            montarMetaFaixa(realizado, m.storeAmount, competencia, [filial]),
             lista.reduce((s, l) => s + l.faturamentoValor, 0),
           );
       if (!faixa) continue;
@@ -961,7 +961,7 @@ function montarMetasCards(
 
 const MESES_CURTOS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
-function fatDiaFiliais(filialIds: string[], iso: string): number {
+function storesDayRevenue(filialIds: string[], iso: string): number {
   return sumAggregates(
     filialIds.map((id) => {
       const dia = salesDay(id, iso);
@@ -1021,7 +1021,7 @@ function montarEvolucaoFatVsMeta(
     for (const h of horasVisiveis) {
       acumR += fatHoraFiliais(filialIds, periodo.inicio, h);
       acumM += metaPorHora;
-      pontos.push({ label: horaCurta(h), realizado: acumR, meta: acumM });
+      pontos.push({ label: shortHour(h), realizado: acumR, meta: acumM });
     }
   } else if (eixo === "mes") {
     const meses = mesesEntre(periodo.inicio, periodo.fim);
@@ -1031,25 +1031,25 @@ function montarEvolucaoFatVsMeta(
     let acumM = 0;
     for (const mes of meses) {
       const inicioMes = `${mes}-01`;
-      const fimMes = fimDoMes(inicioMes);
+      const fimMes = endOfMonth(inicioMes);
       const ini = inicioMes < periodo.inicio ? periodo.inicio : inicioMes;
       const fim = fimMes > periodo.fim ? periodo.fim : fimMes;
-      for (const iso of intervaloDias(ini, fim)) {
-        acumR += fatDiaFiliais(filialIds, iso);
+      for (const iso of eachDay(ini, fim)) {
+        acumR += storesDayRevenue(filialIds, iso);
       }
       acumM += metaPorMes;
-      pontos.push({ label: mesAno(inicioMes).split(" de ")[0], realizado: acumR, meta: acumM });
+      pontos.push({ label: monthYear(inicioMes).split(" de ")[0], realizado: acumR, meta: acumM });
     }
   } else {
-    const dias = intervaloDias(periodo.inicio, periodo.fim);
+    const dias = eachDay(periodo.inicio, periodo.fim);
     if (dias.length < 2) return undefined;
     const metaPorDia = metaTotal > 0 ? metaTotal / dias.length : 0;
     let acumR = 0;
     let acumM = 0;
     for (const iso of dias) {
-      acumR += fatDiaFiliais(filialIds, iso);
+      acumR += storesDayRevenue(filialIds, iso);
       acumM += metaPorDia;
-      const d = deIso(iso);
+      const d = isoToDate(iso);
       pontos.push({
         label: `${String(d.getDate()).padStart(2, "0")} ${MESES_CURTOS[d.getMonth()]}`,
         realizado: acumR,
@@ -1061,7 +1061,7 @@ function montarEvolucaoFatVsMeta(
   return pontos.length > 1 ? { pontos, seriesLabel } : undefined;
 }
 
-function gruposDaFilial(filialId: string): { id: string; nome: string }[] {
+function groupsForBranch(filialId: string): { id: string; nome: string }[] {
   return grupos.filter((t) => t.filialId === filialId).map((t) => ({ id: t.id, nome: t.nome }));
 }
 
@@ -1070,7 +1070,7 @@ function gruposDoEscopo(filialIds: string[]): { id: string; nome: string }[] {
   const ids = filialIds.length > 0 ? filialIds : stores.map((f) => f.id);
   const visto = new Map<string, { id: string; nome: string }>();
   for (const id of ids) {
-    for (const g of gruposDaFilial(id)) {
+    for (const g of groupsForBranch(id)) {
       if (!visto.has(g.nome)) visto.set(g.nome, { id: g.nome, nome: g.nome });
     }
   }
@@ -1079,14 +1079,14 @@ function gruposDoEscopo(filialIds: string[]): { id: string; nome: string }[] {
 
 /* ------------------------- Visao loja ------------------------- */
 
-function visaoLoja(escopo: Scope, periodo: ResolvedPeriod, periodoMeta: ResolvedPeriod, competencia: string, metaAtiva: boolean): TeamView {
+function storeView(escopo: Scope, periodo: ResolvedPeriod, periodoMeta: ResolvedPeriod, competencia: string, metaAtiva: boolean): TeamView {
   const filialId = escopo.filialIds.length === 1 ? escopo.filialIds[0] : stores[0]?.id ?? "";
   const filial = storeById(filialId);
   const ant = previousPeriod(periodo);
   // KPIs de desempenho: periodo filtrado (AD-046).
-  const atual = agregadoLoja(filialId, periodo.inicio, periodo.fim);
+  const atual = storeAggregate(filialId, periodo.inicio, periodo.fim);
   const anterior = sumAggregates(
-    intervaloDias(ant.inicio, ant.fim).map((iso) => {
+    eachDay(ant.inicio, ant.fim).map((iso) => {
       const dia = salesDay(filialId, iso);
       if (!dia) return { faturamento: 0, atendimentos: 0, itens: 0 };
       const horaMax = iso === ant.fim && ant.horaMax !== undefined ? ant.horaMax : undefined;
@@ -1095,14 +1095,14 @@ function visaoLoja(escopo: Scope, periodo: ResolvedPeriod, periodoMeta: Resolved
   );
 
   const temComparacao = anterior.atendimentos > 0;
-  const vsRotulo = temComparacao ? ant.rotulo : undefined;
+  const vsLabel = temComparacao ? ant.rotulo : undefined;
   const ticket = divSeguro(atual.faturamento, atual.atendimentos);
   const pa = divSeguro(atual.itens, atual.atendimentos);
   const ticketAnt = divSeguro(anterior.faturamento, anterior.atendimentos);
   const paAnt = divSeguro(anterior.itens, anterior.atendimentos);
 
   // Series diarias para sparklines nos KPIs
-  const diasPeriodo = intervaloDias(periodo.inicio, periodo.fim);
+  const diasPeriodo = eachDay(periodo.inicio, periodo.fim);
   const serieFat: number[] = [];
   const serieAtend: number[] = [];
   const serieTicket: number[] = [];
@@ -1124,7 +1124,7 @@ function visaoLoja(escopo: Scope, periodo: ResolvedPeriod, periodoMeta: Resolved
   }
 
   // Meta/escada/premiacao: sempre janela da competencia (AD-046).
-  const vendedoras = visaoVendedoras(filialId, periodoMeta, metaAtiva, competencia);
+  const vendedoras = sellersView(filialId, periodoMeta, metaAtiva, competencia);
   const premiacao = metaAtiva ? premiacaoProjetada(filialId, competencia, vendedoras) : null;
 
   const avisos: string[] = [];
@@ -1135,10 +1135,10 @@ function visaoLoja(escopo: Scope, periodo: ResolvedPeriod, periodoMeta: Resolved
   // Faixa de progresso da meta da loja = faturamento da loja (igual a Visao Geral). O que ficou
   // fora do ranking (venda sem vendedora, gerencia) aparece como "foraDaEquipe".
   let metaGlobal: NetworkGlobalGoal | null = null;
-  const metaLojaValor = metaAtiva ? (goalOfStore(filialId, competencia)?.valorLoja ?? 0) : 0;
-  if (metaAtiva && metaLojaValor > 0) {
+  const storeGoalAmount = metaAtiva ? (goalOfStore(filialId, competencia)?.storeAmount ?? 0) : 0;
+  if (metaAtiva && storeGoalAmount > 0) {
     metaGlobal = faixaComForaDaEquipe(
-      montarMetaFaixa(realizadoCompetencia(filialId, competencia, null), metaLojaValor, competencia, [filial]),
+      montarMetaFaixa(realizadoCompetencia(filialId, competencia, null), storeGoalAmount, competencia, [filial]),
       vendedoras.reduce((s, l) => s + l.faturamentoValor, 0),
     );
   }
@@ -1148,7 +1148,7 @@ function visaoLoja(escopo: Scope, periodo: ResolvedPeriod, periodoMeta: Resolved
     : [];
 
   const nDias = diasPeriodo.length;
-  const evolucao = montarEvolucaoFatVsMeta([filialId], periodo, metaLojaValor);
+  const evolucao = montarEvolucaoFatVsMeta([filialId], periodo, storeGoalAmount);
   const challenges = metaAtiva ? desafiosViewDaCompetencia(competencia, [filial.id]) : null;
 
   return {
@@ -1161,24 +1161,24 @@ function visaoLoja(escopo: Scope, periodo: ResolvedPeriod, periodoMeta: Resolved
     avisos,
     kpiFaturamento: {
       valor: brlK(atual.faturamento),
-      delta: temComparacao ? kpiDelta(atual.faturamento, anterior.faturamento, vsRotulo) : undefined,
-      sub: metaLojaValor > 0 ? `Meta: ${brlK(metaLojaValor)}` : undefined,
+      delta: temComparacao ? kpiDelta(atual.faturamento, anterior.faturamento, vsLabel) : undefined,
+      sub: storeGoalAmount > 0 ? `Meta: ${brlK(storeGoalAmount)}` : undefined,
       serie: serieFat.length > 1 ? serieFat : undefined,
     },
     kpiAtendimentos: {
       valor: num(atual.atendimentos),
-      delta: temComparacao ? kpiDelta(atual.atendimentos, anterior.atendimentos, vsRotulo, "vendas") : undefined,
+      delta: temComparacao ? kpiDelta(atual.atendimentos, anterior.atendimentos, vsLabel, "vendas") : undefined,
       sub: nDias > 1 ? `Média de ${num(atual.atendimentos / nDias, 0)}/dia` : undefined,
       serie: serieAtend.length > 1 ? serieAtend : undefined,
     },
     kpiTicket: {
       valor: brl(ticket),
-      delta: temComparacao ? kpiDelta(ticket, ticketAnt, vsRotulo) : undefined,
+      delta: temComparacao ? kpiDelta(ticket, ticketAnt, vsLabel) : undefined,
       serie: serieTicket.length > 1 ? serieTicket : undefined,
     },
     kpiPA: {
       valor: num(pa, 2),
-      delta: temComparacao ? kpiDelta(pa, paAnt, vsRotulo, "pa") : undefined,
+      delta: temComparacao ? kpiDelta(pa, paAnt, vsLabel, "pa") : undefined,
       serie: seriePA.length > 1 ? seriePA : undefined,
     },
     kpiPremiacao: premiacao === null ? null : { valor: brl(premiacao), delta: undefined },
@@ -1187,7 +1187,7 @@ function visaoLoja(escopo: Scope, periodo: ResolvedPeriod, periodoMeta: Resolved
     leitura: null,
     evolucaoFaturamento: evolucao?.pontos,
     seriesLabel: evolucao?.seriesLabel,
-    gruposDisponiveis: gruposDaFilial(filialId),
+    gruposDisponiveis: groupsForBranch(filialId),
     vendedoras,
     lojas: null,
     challenges,
@@ -1204,32 +1204,32 @@ function visaoLoja(escopo: Scope, periodo: ResolvedPeriod, periodoMeta: Resolved
 
 function visaoRede(escopo: Scope, periodo: ResolvedPeriod, periodoMeta: ResolvedPeriod, competencia: string, metaAtiva: boolean): TeamView {
   // Meta global = soma das metas das lojas do escopo que tem meta (REDE-08).
-  const metaGlobalTotal = stores.reduce((s, f) => s + (goalOfStore(f.id, competencia)?.valorLoja ?? 0), 0);
+  const metaGlobalTotal = stores.reduce((s, f) => s + (goalOfStore(f.id, competencia)?.storeAmount ?? 0), 0);
 
   const vendedorasFlat: SellerRow[] = [];
-  const vendedorasPorFilial = new Map<string, SellerRow[]>();
+  const sellersByBranch = new Map<string, SellerRow[]>();
   const lojas: StoreTeamSummary[] = stores.map((f, i) => {
-    const escopoLoja: Scope = { ...escopo, filialIds: [f.id] };
-    const vLoja = visaoLoja(escopoLoja, periodo, periodoMeta, competencia, metaAtiva);
-    const linhas = vLoja.vendedoras ?? [];
+    const storeScope: Scope = { ...escopo, filialIds: [f.id] };
+    const storeValue = storeView(storeScope, periodo, periodoMeta, competencia, metaAtiva);
+    const linhas = storeValue.vendedoras ?? [];
     vendedorasFlat.push(...linhas);
-    vendedorasPorFilial.set(f.id, linhas);
+    sellersByBranch.set(f.id, linhas);
     const comMeta = metaAtiva ? linhas.filter((l) => !l.semMeta) : [];
     const ordenadas = [...comMeta].sort((a, b) => b.atingimentoPct - a.atingimentoPct);
     const melhor = ordenadas.length > 0 ? { nome: primeiroNome(ordenadas[0].nome), atingimentoPct: ordenadas[0].atingimentoPct } : null;
     const pior = ordenadas.length > 0 ? { nome: primeiroNome(ordenadas[ordenadas.length - 1].nome), atingimentoPct: ordenadas[ordenadas.length - 1].atingimentoPct } : null;
-    const metaValor = goalOfStore(f.id, competencia)?.valorLoja ?? 0;
+    const metaValor = goalOfStore(f.id, competencia)?.storeAmount ?? 0;
     const realizadoValor = linhas.reduce((s, l) => s + l.faturamentoValor, 0);
     return {
       filialId: f.id,
       nome: f.fantasia,
       tint: PALETA_LOJAS[i % PALETA_LOJAS.length],
-      faturamento: vLoja.kpiFaturamento.valor,
-      ticket: vLoja.kpiTicket.valor,
-      pa: vLoja.kpiPA.valor,
+      faturamento: storeValue.kpiFaturamento.valor,
+      ticket: storeValue.kpiTicket.valor,
+      pa: storeValue.kpiPA.valor,
       // Premiacao da loja = so a escada de metas dela; os desafios sao da rede
       // e entram uma vez no KPI da visao rede (nao dobram por loja).
-      premiacaoProjetada: vLoja.kpiPremiacao?.valor ?? "—",
+      premiacaoProjetada: storeValue.kpiPremiacao?.valor ?? "—",
       metaValor,
       realizadoValor,
       pctMetaGlobal: metaGlobalTotal > 0 ? (metaValor / metaGlobalTotal) * 100 : 0,
@@ -1246,10 +1246,10 @@ function visaoRede(escopo: Scope, periodo: ResolvedPeriod, periodoMeta: Resolved
   });
 
   // KPIs da rede: soma das lojas (ticket e P.A. recalculados sobre a soma).
-  const atual = sumAggregates(stores.map((f) => agregadoLoja(f.id, periodo.inicio, periodo.fim)));
+  const atual = sumAggregates(stores.map((f) => storeAggregate(f.id, periodo.inicio, periodo.fim)));
   const ant = previousPeriod(periodo);
   const anterior = sumAggregates(
-    intervaloDias(ant.inicio, ant.fim).map((iso) => {
+    eachDay(ant.inicio, ant.fim).map((iso) => {
       const horaMax = iso === ant.fim && ant.horaMax !== undefined ? ant.horaMax : undefined;
       return sumAggregates(stores.map((f) => {
         const dia = salesDay(f.id, iso);
@@ -1258,10 +1258,10 @@ function visaoRede(escopo: Scope, periodo: ResolvedPeriod, periodoMeta: Resolved
     }),
   );
   const temComparacao = anterior.atendimentos > 0;
-  const vsRotulo = temComparacao ? ant.rotulo : undefined;
+  const vsLabel = temComparacao ? ant.rotulo : undefined;
 
   // Series diarias para sparklines nos KPIs da rede
-  const diasPeriodoRede = intervaloDias(periodo.inicio, periodo.fim);
+  const diasPeriodoRede = eachDay(periodo.inicio, periodo.fim);
   const serieFatRede: number[] = [];
   const serieAtendRede: number[] = [];
   const serieTicketRede: number[] = [];
@@ -1278,7 +1278,7 @@ function visaoRede(escopo: Scope, periodo: ResolvedPeriod, periodoMeta: Resolved
   }
 
   const challenges = metaAtiva ? desafiosViewDaCompetencia(competencia, stores.map((f) => f.id)) : null;
-  const semDesafios = metaAtiva && (challenges === null || challenges.length === 0);
+  const withoutChallenges = metaAtiva && (challenges === null || challenges.length === 0);
 
 // Premiacao da rede = escada de metas de cada loja + desafios uma unica
 // vez (desafio e da competencia inteira, nao por loja).
@@ -1286,12 +1286,12 @@ let premiacaoRede: number | null = null;
 if (metaAtiva) {
   let parteEscada = 0;
   for (const f of stores) {
-    const vLoja = visaoLoja({ ...escopo, filialIds: [f.id] }, periodo, periodoMeta, competencia, metaAtiva);
-    const escadaLoja = premiacaoEscada(f.id, competencia, vLoja.vendedoras ?? []);
-    if (escadaLoja !== null) parteEscada += escadaLoja;
+    const storeValue = storeView({ ...escopo, filialIds: [f.id] }, periodo, periodoMeta, competencia, metaAtiva);
+    const storeLadder = premiacaoEscada(f.id, competencia, storeValue.vendedoras ?? []);
+    if (storeLadder !== null) parteEscada += storeLadder;
   }
-  const parteDesafios = premiacaoDesafios(competencia, stores.map((f) => f.id));
-  premiacaoRede = parteEscada > 0 || parteDesafios > 0 ? parteEscada + parteDesafios : null;
+  const challengesPart = challengePrizes(competencia, stores.map((f) => f.id));
+  premiacaoRede = parteEscada > 0 || challengesPart > 0 ? parteEscada + challengesPart : null;
 }
 
   // Faixa de progresso da meta (rede) = faturamento das lojas (mesma base das lojas / Visao Geral).
@@ -1308,7 +1308,7 @@ if (metaAtiva) {
     ? montarMetasCards(
         stores.map((f) => f.id),
         competencia,
-        vendedorasPorFilial,
+        sellersByBranch,
       )
     : [];
 
@@ -1334,24 +1334,24 @@ if (metaAtiva) {
     avisos: [],
     kpiFaturamento: {
       valor: brlK(atual.faturamento),
-      delta: temComparacao ? kpiDelta(atual.faturamento, anterior.faturamento, vsRotulo) : undefined,
+      delta: temComparacao ? kpiDelta(atual.faturamento, anterior.faturamento, vsLabel) : undefined,
       sub: metaGlobalTotal > 0 ? `Meta: ${brlK(metaGlobalTotal)}` : undefined,
       serie: serieFatRede.length > 1 ? serieFatRede : undefined,
     },
     kpiAtendimentos: {
       valor: num(atual.atendimentos),
-      delta: temComparacao ? kpiDelta(atual.atendimentos, anterior.atendimentos, vsRotulo, "vendas") : undefined,
+      delta: temComparacao ? kpiDelta(atual.atendimentos, anterior.atendimentos, vsLabel, "vendas") : undefined,
       sub: nDiasRede > 1 ? `Média de ${num(atual.atendimentos / nDiasRede, 0)}/dia` : undefined,
       serie: serieAtendRede.length > 1 ? serieAtendRede : undefined,
     },
     kpiTicket: {
       valor: brl(ticketRede),
-      delta: temComparacao ? kpiDelta(ticketRede, ticketRedeAnt, vsRotulo) : undefined,
+      delta: temComparacao ? kpiDelta(ticketRede, ticketRedeAnt, vsLabel) : undefined,
       serie: serieTicketRede.length > 1 ? serieTicketRede : undefined,
     },
     kpiPA: {
       valor: num(paRede, 2),
-      delta: temComparacao ? kpiDelta(paRede, paRedeAnt, vsRotulo, "pa") : undefined,
+      delta: temComparacao ? kpiDelta(paRede, paRedeAnt, vsLabel, "pa") : undefined,
       serie: seriePARede.length > 1 ? seriePARede : undefined,
     },
     kpiPremiacao: premiacaoRede === null ? null : { valor: brl(premiacaoRede), delta: undefined },
@@ -1368,7 +1368,7 @@ if (metaAtiva) {
       kpis: "disponivel",
       leitura: "sem_dados",
       vendedoras: vendedorasFlat.length > 0 ? "disponivel" : "sem_dados",
-      challenges: metaAtiva ? (semDesafios ? "sem_dados" : "disponivel") : "indisponivel",
+      challenges: metaAtiva ? (withoutChallenges ? "sem_dados" : "disponivel") : "indisponivel",
     },
   };
 }
@@ -1406,12 +1406,12 @@ export function buildTeamView(escopo: Scope): TeamView {
   // Meta ativa = existe meta cadastrada na competencia (nao depende mais do filtro).
   const metaAtiva = filiaisEscopo.some((f) => Boolean(goalOfStore(f.id, competencia)));
 
-  const v = ehRede ? visaoRede(escopo, periodo, periodoMeta, competencia, metaAtiva) : visaoLoja(escopo, periodo, periodoMeta, competencia, metaAtiva);
+  const v = ehRede ? visaoRede(escopo, periodo, periodoMeta, competencia, metaAtiva) : storeView(escopo, periodo, periodoMeta, competencia, metaAtiva);
 
   if (metaAtiva && !periodoBateComCompetencia(periodo, competencia)) {
-    v.avisoCompetencia = `Os indicadores seguem o período selecionado. Metas, premiações e desafios consideram a competência ${mesAno(`${competencia}-01`)}.`;
+    v.avisoCompetencia = `Os indicadores seguem o período selecionado. Metas, premiações e desafios consideram a competência ${monthYear(`${competencia}-01`)}.`;
   } else if (metaAtiva && periodo.tipo === "mesPassado") {
-    v.avisoCompetencia = `Metas e premiações referentes à competência ${mesAno(`${competencia}-01`)}.`;
+    v.avisoCompetencia = `Metas e premiações referentes à competência ${monthYear(`${competencia}-01`)}.`;
   }
 
   v.leitura = null;

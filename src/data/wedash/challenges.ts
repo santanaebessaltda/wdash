@@ -52,7 +52,7 @@ export interface Challenge {
   participantes: string[];
 }
 
-function ativasDaFilial(filialId: string): string[] {
+function activeIdsForBranch(filialId: string): string[] {
   return collaborators
     .filter(
       (c) =>
@@ -64,8 +64,8 @@ function ativasDaFilial(filialId: string): string[] {
     .map((c) => c.id);
 }
 
-const ATIVAS_F1 = ativasDaFilial("f1");
-const ATIVAS_F2 = ativasDaFilial("f2");
+const ATIVAS_F1 = activeIdsForBranch("f1");
+const ATIVAS_F2 = activeIdsForBranch("f2");
 
 /**
  * Desafios de setembro/2026  -  2 por loja (HOJE = 2026-09-15).

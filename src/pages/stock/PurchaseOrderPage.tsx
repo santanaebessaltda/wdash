@@ -149,18 +149,18 @@ export function PurchaseOrderPage() {
   };
 
   const rede = storesForSession(session.stores);
-  const outrasLojas = loja ? rede.filter((s) => s.id !== loja.id) : rede;
-  const todas = destinoId === "" && outrasLojas.length > 1;
-  const destino = outrasLojas.find((s) => s.id === destinoId) ?? null;
+  const otherStores = loja ? rede.filter((s) => s.id !== loja.id) : rede;
+  const todas = destinoId === "" && otherStores.length > 1;
+  const destino = otherStores.find((s) => s.id === destinoId) ?? null;
 
   const abrirCopia = () => {
-    setDestinoId(outrasLojas.length > 1 ? "" : (outrasLojas[0]?.id ?? ""));
+    setDestinoId(otherStores.length > 1 ? "" : (otherStores[0]?.id ?? ""));
     setCopiarAberto(true);
   };
 
   const copiarMinimos = async () => {
     if (!loja || !po.mins || po.mins.size === 0) return;
-    const alvos = todas ? outrasLojas : destino ? [destino] : [];
+    const alvos = todas ? otherStores : destino ? [destino] : [];
     if (alvos.length === 0) return;
     setCopiando(true);
     try {
@@ -253,7 +253,7 @@ export function PurchaseOrderPage() {
             <AcoesPedido
               semLoja={loja == null && lojas.length > 1}
               podeGerar={loja != null && Boolean(view) && !po.syncing && !copiando}
-              podeCopiar={outrasLojas.length > 1 || (loja != null && outrasLojas.length > 0)}
+              podeCopiar={otherStores.length > 1 || (loja != null && otherStores.length > 0)}
               copiarLiberado={loja != null && Boolean(view) && !po.syncing && !copiando && (po.mins?.size ?? 0) > 0}
               semMinimo={loja != null && (po.mins?.size ?? 0) === 0}
               onGerar={abrirResumo}
@@ -510,8 +510,8 @@ export function PurchaseOrderPage() {
             <p className="text-[13px] leading-relaxed text-t1">Copie os mínimos de {loja.fantasia} para outra filial ou para todas.</p>
             <FormField label="Copiar para">
               <Select value={todas ? "" : (destino?.id ?? "")} onChange={(e) => setDestinoId(e.target.value)} disabled={copiando}>
-                {outrasLojas.length > 1 && <option value="">Todas as outras filiais</option>}
-                {outrasLojas.map((s) => (
+                {otherStores.length > 1 && <option value="">Todas as outras filiais</option>}
+                {otherStores.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.codFilial} · {s.fantasia}
                   </option>

@@ -1,5 +1,5 @@
 /** Peso de cada dia da semana na distribuicao da meta (sem dependencias fora do motor). */
-import { deIso } from "./format.ts";
+import { isoToDate } from "./format.ts";
 
 /** 0 = domingo ... 6 = sabado (Date#getDay). */
 export type Dow = 0 | 1 | 2 | 3 | 4 | 5 | 6;
@@ -25,7 +25,7 @@ export function weekdayWeights(dayRevenue: Map<string, number>, week: StoreWeekH
   const count = [0, 0, 0, 0, 0, 0, 0];
   for (const [iso, v] of dayRevenue) {
     if (v <= 0) continue;
-    const dow = deIso(iso).getDay();
+    const dow = isoToDate(iso).getDay();
     sum[dow] += v;
     count[dow] += 1;
   }

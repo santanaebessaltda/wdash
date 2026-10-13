@@ -48,7 +48,7 @@ const REPORTS_MOCK: ErpReportCheck[] = [
 function storesMock(): StoreErp[] {
   return stores.map(
     (f: Store): StoreErp => ({
-      storeId: f.millenniumFilial,
+      storeId: f.millenniumBranch,
       code: f.codFilial,
       name: f.nome,
       tradeName: f.fantasia,

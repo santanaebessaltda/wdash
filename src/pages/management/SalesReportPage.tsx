@@ -2,13 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Alert, Badge, Button, Card, DateRangePicker, Modal, Skeleton, useToast, QUICK_RANGES_CALENDARIO, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
 import { DayFace, DayMetrics, MonthCalendar, blankDayClass } from "@/components/wedash/MonthCalendar";
-import { ChipDia, PlainKpi } from "@/pages/cash-close/CashClosePage";
+import { DayChip, PlainKpi } from "@/pages/cash-close/CashClosePage";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { periodLabels } from "@/data/wedash/dashboard";
 import { fetchSalesCoverage, fetchSalesDayAggs } from "@/data/wedash/salesRepo";
 import { fetchLaunchedDays, fetchShoppingAccount, requestShoppingLaunch, requestShoppingRead, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
 import { ALREADY_LAUNCHED, forceLaunchAllowed, informedGap, monthReport, reportDays, sumSoldByDay } from "@/data/wedash/shoppingReport";
-import { brlCent, dataExtenso, deIso, fimDoMes, inicioDoMes, intervaloDias, paraIso, somarDias } from "@/lib/format";
+import { brlCent, longDate, isoToDate, endOfMonth, startOfMonth, eachDay, dateToIso, addDays } from "@/lib/format";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
@@ -21,25 +21,25 @@ import { HeaderFilters } from "@/pages/stock/shared";
 
 const money = (cents: number) => brlCent(cents / 100);
 
-function valorDiferenca(cents: number): string {
+function differenceAmount(cents: number): string {
   const abs = brlCent(Math.abs(cents) / 100);
   if (cents < 0) return `−${abs}`;
   if (cents > 0) return `+${abs}`;
   return abs;
 }
 
-function corDaDiferenca(cents: number): string {
+function differenceColor(cents: number): string {
   if (cents > 0) return "var(--warn)";
   if (cents < 0) return "var(--bad)";
   return "var(--t0)";
 }
 
-function tituloDia(iso: string): string {
-  const s = dataExtenso(iso);
+function dayTitle(iso: string): string {
+  const s = longDate(iso);
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function valorDoDia(
+function dayAmount(
   day: string,
   hoje: string,
   row: { soldCents: number; launchedCents: number | null } | undefined,
@@ -51,7 +51,7 @@ function valorDoDia(
   return row.soldCents;
 }
 
-function statusDoDia(soldCents: number, informedCents: number | null): { texto: string; cor: string } {
+function dayStatus(soldCents: number, informedCents: number | null): { texto: string; cor: string } {
   const gap = informedGap(soldCents, informedCents);
   if (gap === "missing" || informedCents == null) return { texto: "Não informado", cor: "bg-warn" };
   const texto = `Informado ${money(informedCents)}`;
@@ -60,9 +60,9 @@ function statusDoDia(soldCents: number, informedCents: number | null): { texto: 
   return { texto, cor: "bg-bad" };
 }
 
-function celulasDoIntervalo(from: string, to: string): Array<string | null> {
-  const cells: Array<string | null> = Array.from({ length: deIso(from).getDay() }, () => null);
-  for (let day = from; day <= to; day = somarDias(day, 1)) cells.push(day);
+function rangeCells(from: string, to: string): Array<string | null> {
+  const cells: Array<string | null> = Array.from({ length: isoToDate(from).getDay() }, () => null);
+  for (let day = from; day <= to; day = addDays(day, 1)) cells.push(day);
   while (cells.length % 7 !== 0) cells.push(null);
   return cells;
 }
@@ -74,12 +74,12 @@ export function SalesReportPage() {
   const { session, lojas, loading: lojasLoading } = useScopedStores();
   const { escopo } = useScope();
   const escolher = pickOneStore(escopo.filialIds, session.stores.length);
-  const showLojas = useMinSkeleton(lojasLoading);
+  const showStores = useMinSkeleton(lojasLoading);
   const hoje = calendarTodayIso();
-  const [rangeFrom, setRangeFrom] = useState(() => inicioDoMes(hoje));
-  const [rangeTo, setRangeTo] = useState(() => fimDoMes(hoje));
+  const [rangeFrom, setRangeFrom] = useState(() => startOfMonth(hoje));
+  const [rangeTo, setRangeTo] = useState(() => endOfMonth(hoje));
   const [presetId, setPresetId] = useState<DatePresetId | null>("esteMes");
-  const [piso, setPiso] = useState(() => inicioDoMes(hoje));
+  const [piso, setPiso] = useState(() => startOfMonth(hoje));
   const [sold, setSold] = useState<Record<string, number>>({});
   const [launched, setLaunched] = useState<Record<string, number>>({});
   const [account, setAccount] = useState<ShoppingAccount | null>(null);
@@ -112,7 +112,7 @@ export function SalesReportPage() {
     let stop = false;
     void fetchSalesCoverage(session.tenantId, [loja.id]).then((coverage) => {
       if (stop || !coverage.from) return;
-      const month = inicioDoMes(coverage.from);
+      const month = startOfMonth(coverage.from);
       setPiso(month);
       setRangeFrom((atual) => {
         if (atual >= month) return atual;
@@ -217,16 +217,16 @@ export function SalesReportPage() {
     return () => window.removeEventListener(SALES_SYNCED_EVENT, onSynced);
   }, []);
 
-  const dias = useMemo(() => reportDays(intervaloDias(from, to), sold, launched, hoje), [from, to, sold, launched, hoje]);
+  const dias = useMemo(() => reportDays(eachDay(from, to), sold, launched, hoje), [from, to, sold, launched, hoje]);
   const resumo = useMemo(() => monthReport(dias, hoje), [dias, hoje]);
   const porDia = useMemo(() => new Map(dias.map((day) => [day.date, day])), [dias]);
-  const cells = useMemo(() => celulasDoIntervalo(from, to), [from, to]);
+  const cells = useMemo(() => rangeCells(from, to), [from, to]);
   const gestor = isGestor(session.role);
   const paraLancar = marcados.filter((day) => day < hoje && launched[day] == null);
 
   function aplicarIntervalo(inicio: Date, fim: Date, meta?: DateRangeChangeMeta) {
-    const nextFrom = paraIso(inicio);
-    const nextTo = paraIso(fim);
+    const nextFrom = dateToIso(inicio);
+    const nextTo = dateToIso(fim);
     setRangeFrom(nextFrom);
     setRangeTo(nextTo);
     setPresetId(meta?.presetId ?? null);
@@ -248,9 +248,9 @@ export function SalesReportPage() {
           <HeaderFilters>
             <div className="flex flex-wrap items-center gap-2">
               <DateRangePicker
-                value={[deIso(from), deIso(to)]}
-                minDate={deIso(piso)}
-                maxDate={deIso(fimDoMes(hoje))}
+                value={[isoToDate(from), isoToDate(to)]}
+                minDate={isoToDate(piso)}
+                maxDate={isoToDate(endOfMonth(hoje))}
                 quickRanges={QUICK_RANGES_CALENDARIO}
                 displayLabel={presetId ? periodLabels[presetId] : null}
                 activePresetId={presetId}
@@ -270,7 +270,7 @@ export function SalesReportPage() {
           <div className="max-w-[720px]">
             <SelectStoreCard />
           </div>
-        ) : showLojas || (loja != null && !pronto) ? (
+        ) : showStores || (loja != null && !pronto) ? (
           <Skeleton className="h-[520px] w-full rounded-[18px]" />
         ) : lojas.length === 0 || !loja ? (
           <Card>
@@ -300,8 +300,8 @@ export function SalesReportPage() {
               <PlainKpi label="Informado" value={money(resumo.launchedCents)} color="var(--t0)" />
               <PlainKpi
                 label="Diferença"
-                value={valorDiferenca(resumo.differenceCents)}
-                color={corDaDiferenca(resumo.differenceCents)}
+                value={differenceAmount(resumo.differenceCents)}
+                color={differenceColor(resumo.differenceCents)}
                 tooltip="Informado − vendido. Valor a mais pode aumentar o aluguel percentual; valor a menos pode gerar divergência na auditoria."
               />
             </div>
@@ -311,8 +311,8 @@ export function SalesReportPage() {
                 const row = porDia.get(day);
                 const passado = day < hoje;
                 const hojeDia = day === hoje;
-                const vendido = valorDoDia(day, hoje, row, sold);
-                const status = hojeDia ? { texto: "Em aberto", cor: "bg-acc" } : passado && row ? statusDoDia(row.soldCents, row.launchedCents) : null;
+                const vendido = dayAmount(day, hoje, row, sold);
+                const status = hojeDia ? { texto: "Em aberto", cor: "bg-acc" } : passado && row ? dayStatus(row.soldCents, row.launchedCents) : null;
                 const pendente = passado && row != null && row.launchedCents == null;
                 return (
                   <DayFace
@@ -322,11 +322,11 @@ export function SalesReportPage() {
                     today={hoje}
                     selected={marcados.includes(day)}
                     openable={hojeDia || passado}
-                    openLabel={`Abrir ${tituloDia(day)}`}
+                    openLabel={`Abrir ${dayTitle(day)}`}
                     onOpen={() => setDiaAberto(day)}
                     amount={vendido != null ? money(vendido) : null}
-                    check={pendente ? { checked: marcados.includes(day), label: `Marcar ${tituloDia(day)}`, onToggle: () => toggleDia(day) } : null}
-                    badges={status ? <ChipDia cor={status.cor}>{status.texto}</ChipDia> : null}
+                    check={pendente ? { checked: marcados.includes(day), label: `Marcar ${dayTitle(day)}`, onToggle: () => toggleDia(day) } : null}
+                    badges={status ? <DayChip cor={status.cor}>{status.texto}</DayChip> : null}
                   />
                 );
               })}
@@ -334,7 +334,7 @@ export function SalesReportPage() {
           </>
         )}
       </div>
-      <DiaInforme
+      <InformedDayModal
         day={diaAberto}
         hoje={hoje}
         sold={diaAberto == null ? null : diaAberto === hoje ? (sold[hoje] != null && sold[hoje] > 0 ? sold[hoje] : null) : (porDia.get(diaAberto)?.soldCents ?? 0)}
@@ -362,7 +362,7 @@ export function SalesReportPage() {
   );
 }
 
-function DiaInforme({
+function InformedDayModal({
   day,
   hoje,
   sold,
@@ -388,7 +388,7 @@ function DiaInforme({
       title={
         day ? (
           <>
-            <span>{tituloDia(day)}</span>
+            <span>{dayTitle(day)}</span>
             <Badge variant={variant}>{status}</Badge>
           </>
         ) : (
@@ -403,7 +403,7 @@ function DiaInforme({
             items={[
               { label: "Vendido", value: sold == null ? "—" : money(sold) },
               { label: "Informado", value: hojeDia ? "—" : informed == null ? "Não informado" : money(informed) },
-              { label: "Diferença", value: diferenca == null ? "—" : valorDiferenca(diferenca), color: diferenca == null ? undefined : corDaDiferenca(diferenca) },
+              { label: "Diferença", value: diferenca == null ? "—" : differenceAmount(diferenca), color: diferenca == null ? undefined : differenceColor(diferenca) },
             ]}
           />
           {hojeDia ? <p className="text-[13px] leading-relaxed text-t2">Este dia ainda está em aberto. O valor será informado depois do fechamento.</p> : null}

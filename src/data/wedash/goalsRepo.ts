@@ -1,4 +1,4 @@
-import { fimDoMes } from "@/lib/format";
+import { endOfMonth } from "@/lib/format";
 import { goals as fixtureGoals } from "./goals";
 import { goalFromRow, teamMemberFromRow, type GoalRow, type GoalTeamRow } from "./engine/goalRows";
 import type { GoalRecord, GoalTeamMember } from "./engine/goalTypes";
@@ -14,8 +14,8 @@ function fixtureRecords(): GoalRecord[] {
       storeId: g.filialId,
       name: g.nome,
       startsOn: `${g.competencia}-01`,
-      endsOn: fimDoMes(`${g.competencia}-01`),
-      target: g.valorLoja,
+      endsOn: endOfMonth(`${g.competencia}-01`),
+      target: g.storeAmount,
       tierMode: g.tipo === "individual" ? "INDIVIDUAL" : "GROUP",
       tiers: g.degraus,
       groups: [],

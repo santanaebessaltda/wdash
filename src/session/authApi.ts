@@ -1,5 +1,5 @@
 import { getSupabase } from "@/lib/supabase";
-import { validarSenha, SENHA_REGRA_TEXTO } from "@/lib/password";
+import { validatePassword, PASSWORD_RULE_TEXT } from "@/lib/password";
 import { prepararAvatar } from "@/lib/avatar";
 import { companyNameCase, titleName } from "@/lib/format";
 import { sessionStoreIds, stores } from "@/data/wedash/stores";
@@ -24,7 +24,7 @@ export function normalizeRecoveryOtp(raw: string): string {
 }
 
 /** Traduz erros do Supabase Auth (ingles) para copy PT da tela Nova senha. */
-export function mensagemErroSenhaAuth(error: { code?: string; message?: string } | null): string {
+export function passwordAuthError(error: { code?: string; message?: string } | null): string {
   if (!error) return MENSAGEM_SENHA_GENERICA;
   const code = (error.code ?? "").toLowerCase();
   const msg = (error.message ?? "").toLowerCase();
@@ -33,7 +33,7 @@ export function mensagemErroSenhaAuth(error: { code?: string; message?: string }
     return "A nova senha precisa ser diferente da senha atual.";
   }
   if (code === "weak_password" || msg.includes("weak password") || msg.includes("password should be")) {
-    return SENHA_REGRA_TEXTO;
+    return PASSWORD_RULE_TEXT;
   }
   if (code === "session_not_found" || (msg.includes("session") && msg.includes("not found"))) {
     return MENSAGEM_OTP_INVALIDO;
@@ -46,7 +46,7 @@ export function mensagemErroSenhaAuth(error: { code?: string; message?: string }
 }
 
 /** Traduz erros do Auth na etapa de OTP (recovery). */
-export function mensagemErroOtpAuth(error: { code?: string; message?: string } | null): string {
+export function otpAuthError(error: { code?: string; message?: string } | null): string {
   if (!error) return MENSAGEM_OTP_GENERICA;
   const code = (error.code ?? "").toLowerCase();
   const msg = (error.message ?? "").toLowerCase();
@@ -120,7 +120,7 @@ export function readRecoveryEmail(): string | null {
 }
 
 /** @deprecated callback de link  -  OTP nao depende disso; mantido por compat. */
-export function urlRedefinirSenha(): string {
+export function passwordResetUrl(): string {
   return `${window.location.origin}${paths.access.reset}`;
 }
 
@@ -210,7 +210,7 @@ export async function verifyRecoveryOtp(
     token: code,
     type: "recovery",
   });
-  if (error) return { ok: false, error: mensagemErroOtpAuth(error) };
+  if (error) return { ok: false, error: otpAuthError(error) };
   return { ok: true };
 }
 
@@ -244,8 +244,8 @@ export async function canResetPassword(): Promise<boolean> {
 
 /** Redefine senha quando ja existe sessao de recovery (OTP ou link legado). */
 export async function updatePassword(novaSenha: string): Promise<{ ok: boolean; error?: string }> {
-  const check = validarSenha(novaSenha);
-  if (!check.ok) return { ok: false, error: check.erro };
+  const check = validatePassword(novaSenha);
+  if (!check.ok) return { ok: false, error: check.error };
   const sb = getSupabase();
   if (!sb) {
     await delay(500);
@@ -253,7 +253,7 @@ export async function updatePassword(novaSenha: string): Promise<{ ok: boolean; 
     return { ok: true };
   }
   const { error } = await sb.auth.updateUser({ password: novaSenha });
-  if (error) return { ok: false, error: mensagemErroSenhaAuth(error) };
+  if (error) return { ok: false, error: passwordAuthError(error) };
 
   // Recovery define senha definitiva  -  limpa a flag de provisoria antes do signOut.
   const { error: flagErr } = await sb.rpc("clear_own_temporary_password");
@@ -383,8 +383,8 @@ export type CreateAccessInput = { firstName: string; lastName: string; password:
 export async function createAccess(
   input: CreateAccessInput,
 ): Promise<{ ok: true; name: string; avatarUrl: string | null } | { ok: false; error: string }> {
-  const check = validarSenha(input.password);
-  if (!check.ok) return { ok: false, error: check.erro };
+  const check = validatePassword(input.password);
+  if (!check.ok) return { ok: false, error: check.error };
 
   const firstName = titleName(input.firstName);
   const lastName = titleName(input.lastName);
@@ -420,7 +420,7 @@ export async function createAccess(
   }
 
   const { error } = await sb.auth.updateUser({ password: input.password });
-  if (error) return { ok: false, error: mensagemErroSenhaAuth(error) };
+  if (error) return { ok: false, error: passwordAuthError(error) };
 
   const { error: flagErr } = await sb.rpc("clear_own_temporary_password");
   if (flagErr) console.warn("createAccess temporary_password:", flagErr.message);
@@ -486,8 +486,8 @@ export async function saveMyProfile(
 
 /** Meu perfil: confere a senha atual (novo login) e troca a senha sem encerrar a sessao. */
 export async function changeMyPassword(email: string, atual: string, nova: string): Promise<{ ok: boolean; error?: string }> {
-  const check = validarSenha(nova);
-  if (!check.ok) return { ok: false, error: check.erro };
+  const check = validatePassword(nova);
+  if (!check.ok) return { ok: false, error: check.error };
   const sb = getSupabase();
   if (!sb) {
     await delay(400);
@@ -497,7 +497,7 @@ export async function changeMyPassword(email: string, atual: string, nova: strin
   if (loginErr) return { ok: false, error: "Senha atual incorreta." };
   const { error } = await sb.auth.updateUser({ password: nova });
   if (error) {
-    const msg = mensagemErroSenhaAuth(error);
+    const msg = passwordAuthError(error);
     if (msg === MENSAGEM_OTP_INVALIDO) return { ok: false, error: MENSAGEM_SESSAO_EXPIRADA };
     if (msg === MENSAGEM_SENHA_GENERICA) return { ok: false, error: "Não foi possível alterar sua senha. Tente novamente." };
     return { ok: false, error: msg };

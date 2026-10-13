@@ -36,6 +36,3 @@ export const accessRoutes: RouteObject[] = [
   { path: paths.legacy.auth.changePassword, element: <Navigate to={paths.access.createAccess} replace /> },
   { path: paths.legacy.auth.createPassword, element: <Navigate to={paths.access.createAccess} replace /> },
 ];
-
-/** @deprecated alias */
-export const acessoRoutes = accessRoutes;

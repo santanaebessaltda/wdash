@@ -82,8 +82,9 @@ export function StoresSettingsPage() {
       } catch {
         /* ignore */
       }
-      if (params.get("filial") === loja.id) {
+      if ((params.get("store") ?? params.get("filial")) === loja.id) {
         const next = new URLSearchParams(params);
+        next.delete("store");
         next.delete("filial");
         setParams(next, { replace: true });
       }

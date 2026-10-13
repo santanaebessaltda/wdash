@@ -6,7 +6,7 @@
 import { categorias, stores, paymentMethods, type Division, type Store, type PaymentMethod } from "./stores";
 import { collaboratorsOfStore } from "./team";
 import { TODAY_ISO, CURRENT_HOUR } from "./clock";
-import { deIso, intervaloDias } from "@/lib/format";
+import { isoToDate, eachDay } from "@/lib/format";
 
 export interface Aggregate {
   faturamento: number;
@@ -19,13 +19,13 @@ export interface SalesDay {
   filialId: string;
   total: Aggregate;
   porHora: Record<number, Aggregate>;
-  porVendedora: Record<string, Aggregate>;
+  bySeller: Record<string, Aggregate>;
   porCategoria: Record<number, { faturamento: number; itens: number; cmv: number }>;
   porMeio: Record<PaymentMethod, number>;
   porDivisao: Record<Division, Aggregate>;
 }
 
-interface ParametrosFilial {
+interface BranchParameters {
   baseDia: number;
   ticket: number;
   pa: number;
@@ -40,7 +40,7 @@ interface ParametrosFilial {
   meios: Record<PaymentMethod, number>;
 }
 
-const PARAMETROS: Record<string, ParametrosFilial> = {
+const PARAMETROS: Record<string, BranchParameters> = {
   f1: {
     baseDia: 6100,
     ticket: 186,
@@ -91,14 +91,14 @@ function ruido(r: () => number, amp: number): number {
 }
 
 export function dayWeight(filial: Store, iso: string): number {
-  return PARAMETROS[filial.id].pesosSemana[deIso(iso).getDay()];
+  return PARAMETROS[filial.id].pesosSemana[isoToDate(iso).getDay()];
 }
 
 export function storeOpen(filial: Store, iso: string): boolean {
-  return !filial.diasFechados.includes(deIso(iso).getDay());
+  return !filial.diasFechados.includes(isoToDate(iso).getDay());
 }
 
-function gerarDia(filial: Store, iso: string): SalesDay {
+function buildMockDay(filial: Store, iso: string): SalesDay {
   const p = PARAMETROS[filial.id];
   const r = prng(hash(`${filial.id}|${iso}`));
   const vazio: SalesDay = {
@@ -106,7 +106,7 @@ function gerarDia(filial: Store, iso: string): SalesDay {
     filialId: filial.id,
     total: { faturamento: 0, atendimentos: 0, itens: 0 },
     porHora: {},
-    porVendedora: {},
+    bySeller: {},
     porCategoria: {},
     porMeio: { Pix: 0, "Cartão de crédito": 0, "Cartão de débito": 0, Dinheiro: 0 },
     porDivisao: { WEPINK: { faturamento: 0, atendimentos: 0, itens: 0 }, WPINK: { faturamento: 0, atendimentos: 0, itens: 0 } },
@@ -181,7 +181,7 @@ function gerarDia(filial: Store, iso: string): SalesDay {
   });
 
   // Vendedoras: peso relativo, respeitando admissao e inatividade.
-  const porVendedora: Record<string, Aggregate> = {};
+  const bySeller: Record<string, Aggregate> = {};
   const equipe = collaboratorsOfStore(filial.id).filter((c) => {
     if (c.dataAdmissao > iso) return false;
     if (c.dataInatividade && c.dataInatividade <= iso) return false;
@@ -191,14 +191,14 @@ function gerarDia(filial: Store, iso: string): SalesDay {
   const somaPesosV = pesos.reduce((s, x) => s + x, 0);
   equipe.forEach((c, i) => {
     const fr = pesos[i] / somaPesosV;
-    porVendedora[c.id] = {
+    bySeller[c.id] = {
       faturamento: Math.round(faturamento * fr),
       atendimentos: Math.round(atendimentos * fr),
       itens: Math.round(itens * fr),
     };
   });
 
-  return { data: iso, filialId: filial.id, total, porHora, porVendedora, porCategoria, porMeio, porDivisao };
+  return { data: iso, filialId: filial.id, total, porHora, bySeller, porCategoria, porMeio, porDivisao };
 }
 
 export function hourRange(filial: Store): number[] {
@@ -221,8 +221,8 @@ export class SalesDayStore {
     this.fim = fim;
     this.indice = new Map<string, SalesDay>();
     for (const f of stores) {
-      for (const iso of intervaloDias(inicio, fim)) {
-        this.indice.set(`${f.id}|${iso}`, gerarDia(f, iso));
+      for (const iso of eachDay(inicio, fim)) {
+        this.indice.set(`${f.id}|${iso}`, buildMockDay(f, iso));
       }
     }
   }
@@ -232,7 +232,7 @@ export class SalesDayStore {
   }
 
   dias(filialId: string, inicio: string, fim: string): SalesDay[] {
-    return intervaloDias(inicio, fim)
+    return eachDay(inicio, fim)
       .map((iso) => this.indice.get(`${filialId}|${iso}`))
       .filter((d): d is SalesDay => Boolean(d));
   }

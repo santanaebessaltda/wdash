@@ -1,5 +1,5 @@
 /** Premiacao do vendedor: ganho ao chegar no proximo nivel e projecao pelo ritmo (regra da Visao geral). */
-import { deIso, intervaloDias } from "./format.ts";
+import { isoToDate, eachDay } from "./format.ts";
 import type { GoalRecord } from "./goalTypes.ts";
 import type { SellerGoalLevel } from "./goalView.ts";
 
@@ -27,8 +27,8 @@ export function projectedPrize(
   if (level.metaValor <= 0) return null;
   let total = 0;
   let closed = 0;
-  for (const iso of intervaloDias(goal.startsOn, goal.endsOn)) {
-    const w = input.weights[deIso(iso).getDay()] ?? 0;
+  for (const iso of eachDay(goal.startsOn, goal.endsOn)) {
+    const w = input.weights[isoToDate(iso).getDay()] ?? 0;
     total += w;
     if (iso < input.today) closed += w;
   }

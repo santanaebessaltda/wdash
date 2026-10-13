@@ -8,7 +8,7 @@ export type { StoreWeekHours };
 
 export interface Store {
   id: string;
-  millenniumFilial: number;
+  millenniumBranch: number;
   codFilial: string;
   nome: string;
   fantasia: string;
@@ -146,7 +146,7 @@ function withHours(
 export const stores: Store[] = [
   withHours({
     id: "f1",
-    millenniumFilial: 8,
+    millenniumBranch: 8,
     codFilial: "00008",
     nome: "ESSENCIA PERFUMARIA CG SHOPPING",
     fantasia: "Shopping Campo Grande",
@@ -170,7 +170,7 @@ export const stores: Store[] = [
   }),
   withHours({
     id: "f2",
-    millenniumFilial: 10,
+    millenniumBranch: 10,
     codFilial: "00010",
     nome: "ESSENCIA PERFUMARIA TRES LAGOAS",
     fantasia: "Shopping Três Lagoas",
@@ -217,7 +217,7 @@ export function storeIdsFromErp(
 ): string[] {
   const ids: string[] = [];
   for (const e of lista) {
-    const hit = stores.find((f) => f.millenniumFilial === e.storeId);
+    const hit = stores.find((f) => f.millenniumBranch === e.storeId);
     if (hit) {
       if (!ids.includes(hit.id)) ids.push(hit.id);
       continue;
@@ -227,7 +227,7 @@ export function storeIdsFromErp(
     registerExtraStore(
       withHours({
         id,
-        millenniumFilial: e.storeId,
+        millenniumBranch: e.storeId,
         codFilial: e.code ?? String(e.storeId).padStart(5, "0"),
         nome: e.name ?? e.tradeName ?? id,
         fantasia: e.tradeName ?? e.name ?? id,
@@ -356,7 +356,7 @@ function rowToStore(r: {
   const rentCents = num(r.rent_min_cents);
   return withHours({
     id: r.id,
-    millenniumFilial: r.millennium_store_id,
+    millenniumBranch: r.millennium_store_id,
     codFilial: r.code || String(r.millennium_store_id).padStart(5, "0"),
     nome: r.name || r.trade_name || r.code || r.id,
     fantasia: r.trade_name || r.name || r.code || r.id,

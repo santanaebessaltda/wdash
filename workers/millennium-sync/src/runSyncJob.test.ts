@@ -89,7 +89,7 @@ function makeDeps(overrides: Partial<SyncJobDeps> = {}): SyncJobDeps & {
       expect(p.eventoIds.length).toBeGreaterThan(0);
       return [];
     }),
-    fetchFilialGeradorMap: vi.fn().mockResolvedValue(new Map([["00010", 126], ["00114", 41562]])),
+    fetchBranchGeneratorMap: vi.fn().mockResolvedValue(new Map([["00010", 126], ["00114", 41562]])),
     fetchProductBrandMap: vi.fn().mockResolvedValue({
       map: new Map(),
       geradorIdsWithWpink: new Set(),
@@ -532,7 +532,7 @@ describe("runSyncJob", () => {
       itemQty: 2,
       brand: "ALL" as const,
       sellerName,
-      millenniumFilial: 1,
+      millenniumBranch: 1,
       millenniumOpCode: op,
       nf,
       tipoOperacao: "S",
@@ -797,7 +797,7 @@ describe("runSyncJob", () => {
       revenueCents: 10_000,
       itemQty: 2,
       brand: "ALL" as const,
-      millenniumFilial: 1,
+      millenniumBranch: 1,
       millenniumOpCode: op,
       nf,
       tipoOperacao: "S",
@@ -853,7 +853,7 @@ describe("runSyncJob", () => {
       itemQty: 2,
       brand: "ALL" as const,
       sellerName,
-      millenniumFilial: 1,
+      millenniumBranch: 1,
       millenniumOpCode: op,
       nf,
       tipoOperacao: "S",
@@ -917,7 +917,7 @@ describe("runSyncJob", () => {
       itemQty: 2,
       brand: "ALL" as const,
       sellerName,
-      millenniumFilial: 1,
+      millenniumBranch: 1,
       millenniumOpCode: op,
       nf,
       tipoOperacao: "S",
@@ -991,7 +991,7 @@ describe("runSyncJob", () => {
       itemQty: 2,
       brand: "ALL" as const,
       sellerName: "",
-      millenniumFilial: 1,
+      millenniumBranch: 1,
       millenniumOpCode: op,
       nf,
       tipoOperacao: "S",
@@ -1034,14 +1034,14 @@ describe("runSyncJob", () => {
       listStores: vi.fn().mockResolvedValue(stores.map((s, i) => ({ ...s, geradorId: [126, 41562][i] }))),
     });
     await runSyncJob(baseJob({ kind: "FORCE" }), deps);
-    expect(deps.fetchFilialGeradorMap).not.toHaveBeenCalled();
+    expect(deps.fetchBranchGeneratorMap).not.toHaveBeenCalled();
   });
 
   it("loja sem gerador salvo → consulta o lookup e grava na loja", async () => {
     const setStoresGerador = vi.fn().mockResolvedValue(undefined);
     const deps = makeDeps({ setStoresGerador });
     await runSyncJob(baseJob({ kind: "FORCE" }), deps);
-    expect(deps.fetchFilialGeradorMap).toHaveBeenCalledTimes(1);
+    expect(deps.fetchBranchGeneratorMap).toHaveBeenCalledTimes(1);
     expect(setStoresGerador).toHaveBeenCalledWith([
       { storeId: stores[0]!.id, geradorId: 126 },
       { storeId: stores[1]!.id, geradorId: 41562 },

@@ -40,7 +40,7 @@ import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { ProductsWithoutCostNotice } from "@/pages/dashboard/ProductsWithoutCostNotice";
 import { ProductsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
-import { brlCent, deIso, num, tipRelacao } from "@/lib/format";
+import { brlCent, isoToDate, num, comparedWithTip } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePicker";
 import {
@@ -147,7 +147,7 @@ export default function ProductsPage() {
       ]);
       if (gen !== reloadGen.current) return;
       setAggs(next);
-      setCoverageFrom(cov.from ? deIso(cov.from) : null);
+      setCoverageFrom(cov.from ? isoToDate(cov.from) : null);
     } catch (e) {
       if (gen !== reloadGen.current) return;
       console.error("Products reload:", e);
@@ -290,8 +290,8 @@ export default function ProductsPage() {
   }
 
   const totalCategorias = view.categorias.reduce((s, c) => s + c.faturamento, 0);
-  const tipVariacao = `Faturamento do produto ${tipRelacao(view.vsVariacao).replace(/^Em/, "em").replace(/\.$/, "")}.`;
-  const tipVariacaoTotal = `Faturamento total dos produtos do filtro ${tipRelacao(view.vsVariacao).replace(/^Em/, "em")}`;
+  const tipVariacao = `Faturamento do produto ${comparedWithTip(view.vsVariacao).replace(/^Em/, "em").replace(/\.$/, "")}.`;
+  const tipVariacaoTotal = `Faturamento total dos produtos do filtro ${comparedWithTip(view.vsVariacao).replace(/^Em/, "em")}`;
   const tipCmvProduto = view.temCustoProduto
     ? "Acompanhe faturamento, CMV, lucro bruto e margem de cada produto no período.\n\nQuando aparecer “—”, faltam dados de custo para calcular o indicador corretamente."
     : "O CMV por produto não está disponível para este período.";

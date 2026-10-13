@@ -2,14 +2,14 @@ import { describe, expect, it } from "vitest";
 import { dayAggregate, SalesDayStore, salesDay, sumAggregates } from "./sales";
 import { stores } from "./stores";
 import { TODAY_ISO } from "./clock";
-import { intervaloDias } from "@/lib/format";
+import { eachDay } from "@/lib/format";
 
 describe("DiaVendasStore", () => {
   it("gera histórico de INICIO_HISTORICO até HOJE_ISO para todas as filiais", () => {
     const s = new SalesDayStore();
     for (const f of stores) {
       const dias = s.dias(f.id, "2026-06-01", TODAY_ISO);
-      expect(dias.length).toBe(intervaloDias("2026-06-01", TODAY_ISO).length);
+      expect(dias.length).toBe(eachDay("2026-06-01", TODAY_ISO).length);
       for (const d of dias) {
         expect(d.filialId).toBe(f.id);
         expect(d.total.faturamento).toBeGreaterThanOrEqual(0);

@@ -4,13 +4,13 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { paths } from "@/router/paths";
 import { AuthGlow } from "@/pages/auth/authKit";
 import {
-  CampoSenha,
-  ForcaSenha,
-  acessoBotao,
-  acessoLink,
-  acessoRodape,
-  acessoSubtitulo,
-  acessoTitulo,
+  PasswordField,
+  PasswordStrength,
+  accessButton,
+  accessLink,
+  accessFooter,
+  accessSubtitle,
+  accessTitle,
 } from "./AccessKit";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import {
@@ -23,7 +23,7 @@ import {
   updatePassword,
   verifyRecoveryOtp,
 } from "@/session/authApi";
-import { SENHA_REGRA_TEXTO, senhaValida } from "@/lib/password";
+import { PASSWORD_RULE_TEXT, passwordIsValid } from "@/lib/password";
 import { cn } from "@/lib/cn";
 
 /** Caixinhas 1 caractere cada  -  quantidade = length do OTP. */
@@ -162,7 +162,7 @@ export function Reset() {
   const erroConfirma = confirma.length > 0 && confirma !== senha ? "As senhas não coincidem." : null;
   const otpOk = otp.length === RECOVERY_OTP_LENGTH && /^[A-Z0-9]+$/.test(otp);
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  const podeSenha = senhaValida(senha) && confirma === senha && !carregando;
+  const canSetPassword = passwordIsValid(senha) && confirma === senha && !carregando;
 
   useEffect(() => {
     if (tokenDemoInvalido) return;
@@ -219,9 +219,9 @@ export function Reset() {
     setStep("password");
   }
 
-  async function salvarSenha(e: FormEvent) {
+  async function savePassword(e: FormEvent) {
     e.preventDefault();
-    if (!podeSenha) return;
+    if (!canSetPassword) return;
     setCarregando(true);
     const r = await updatePassword(senha);
     setCarregando(false);
@@ -250,10 +250,10 @@ export function Reset() {
                 <path d="M12 8v4M12 16h.01" />
               </svg>
             </div>
-            <h2 className={acessoTitulo}>Código ou link inválido</h2>
-            <p className={acessoSubtitulo}>Solicite um novo código para continuar.</p>
+            <h2 className={accessTitle}>Código ou link inválido</h2>
+            <p className={accessSubtitle}>Solicite um novo código para continuar.</p>
             <Link to={paths.access.forgot} className="block">
-              <button type="button" className={acessoBotao}>
+              <button type="button" className={accessButton}>
                 Solicitar novo código
               </button>
             </Link>
@@ -279,10 +279,10 @@ export function Reset() {
         <AuthGlow />
         <div className="relative w-full max-w-[420px]">
           <div className="rounded-[22px] border border-line bg-bg-2 p-9 text-center" style={{ boxShadow: "0 20px 60px -20px rgba(0,0,0,.6)" }}>
-            <h2 className={acessoTitulo}>Informe seu e-mail</h2>
-            <p className={acessoSubtitulo}>Comece pela recuperação de senha para receber um código de verificação.</p>
+            <h2 className={accessTitle}>Informe seu e-mail</h2>
+            <p className={accessSubtitle}>Comece pela recuperação de senha para receber um código de verificação.</p>
             <Link to={paths.access.forgot} className="mb-4 block">
-              <button type="button" className={acessoBotao}>
+              <button type="button" className={accessButton}>
                 Recuperar senha
               </button>
             </Link>
@@ -309,29 +309,29 @@ export function Reset() {
 
           {step === "otp" ? (
             <>
-              <h2 className={acessoTitulo}>Digite o código</h2>
-              <p className={acessoSubtitulo}>
+              <h2 className={accessTitle}>Digite o código</h2>
+              <p className={accessSubtitle}>
                 Enviamos um código de {RECOVERY_OTP_LENGTH} dígitos para{" "}
                 <span className="font-semibold text-t0">{email}</span>.{" "}
-                <button type="button" onClick={voltarTrocarEmail} className={acessoLink}>
+                <button type="button" onClick={voltarTrocarEmail} className={accessLink}>
                   Trocar e-mail
                 </button>
               </p>
 
               <form onSubmit={confirmarCodigo} className="flex flex-col gap-4" noValidate>
                 <OtpBoxes length={RECOVERY_OTP_LENGTH} value={otp} onChange={setOtp} disabled={carregando} />
-                <button type="submit" disabled={!otpOk || carregando} className={acessoBotao}>
+                <button type="submit" disabled={!otpOk || carregando} className={accessButton}>
                   {carregando ? "Verificando…" : "Continuar"}
                 </button>
               </form>
 
-              <p className={cn(acessoRodape, "mt-4")}>
+              <p className={cn(accessFooter, "mt-4")}>
                 Não recebeu?{" "}
                 <button
                   type="button"
                   onClick={() => void reenviarCodigo()}
                   disabled={reenviando || resendIn > 0}
-                  className={cn(acessoLink, "disabled:opacity-50")}
+                  className={cn(accessLink, "disabled:opacity-50")}
                 >
                   {reenviando
                     ? "Reenviando…"
@@ -343,21 +343,21 @@ export function Reset() {
             </>
           ) : (
             <>
-              <h2 className={acessoTitulo}>Crie uma nova senha</h2>
-              <p className={acessoSubtitulo}>Escolha a senha que você usará para acessar a WDash.</p>
+              <h2 className={accessTitle}>Crie uma nova senha</h2>
+              <p className={accessSubtitle}>Escolha a senha que você usará para acessar a WDash.</p>
 
-              <form onSubmit={salvarSenha} className="flex flex-col gap-3.5 text-left" noValidate>
+              <form onSubmit={savePassword} className="flex flex-col gap-3.5 text-left" noValidate>
                 {/* Escondido: gerenciador de senhas associa a senha nova a este login. */}
                 <input type="email" name="username" autoComplete="username" value={email} readOnly tabIndex={-1} aria-hidden className="sr-only" />
-                <CampoSenha
+                <PasswordField
                   label="Nova senha"
                   value={senha}
                   onChange={setSenha}
-                  placeholder={SENHA_REGRA_TEXTO}
+                  placeholder={PASSWORD_RULE_TEXT}
                   autoComplete="new-password"
                   autoFocus
                 />
-                <CampoSenha
+                <PasswordField
                   label="Confirme a nova senha"
                   value={confirma}
                   onChange={setConfirma}
@@ -365,16 +365,16 @@ export function Reset() {
                   autoComplete="new-password"
                   erro={erroConfirma}
                 />
-                <ForcaSenha senha={senha} />
-                <button type="submit" disabled={!podeSenha} className={acessoBotao}>
+                <PasswordStrength senha={senha} />
+                <button type="submit" disabled={!canSetPassword} className={accessButton}>
                   {carregando ? "Salvando…" : "Salvar senha"}
                 </button>
               </form>
             </>
           )}
 
-          <p className={cn(acessoRodape, "mt-4")}>
-            <Link to={paths.access.login} className={acessoLink}>
+          <p className={cn(accessFooter, "mt-4")}>
+            <Link to={paths.access.login} className={accessLink}>
               Voltar ao login
             </Link>
           </p>

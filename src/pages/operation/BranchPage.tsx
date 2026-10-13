@@ -74,7 +74,7 @@ function franchiseSections(loja: Store): CostFieldSection[] {
 }
 
 /** Configurações > Filial. Tipo, funcionamento, franquia e aluguel da unidade. */
-export function FilialPage() {
+export function BranchPage() {
   const { lojas, loading, refresh } = useScopedStores();
   return (
     <StoreCardsPage
@@ -86,12 +86,12 @@ export function FilialPage() {
       lojas={lojas}
       oneStore
     >
-      {(loja) => <FilialCards loja={loja} onSaved={refresh} />}
+      {(loja) => <BranchCards loja={loja} onSaved={refresh} />}
     </StoreCardsPage>
   );
 }
 
-function FilialCards({ loja, onSaved }: { loja: Store; onSaved: () => void }) {
+function BranchCards({ loja, onSaved }: { loja: Store; onSaved: () => void }) {
   const [point, setPoint] = useState<PointType>(loja.pointType);
   const [presetStamp, setPresetStamp] = useState(0);
 
@@ -188,4 +188,4 @@ function RentCard({ loja, point, onSaved }: { loja: Store; point: PointType; onS
   );
 }
 
-export default FilialPage;
+export default BranchPage;

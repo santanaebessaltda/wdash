@@ -32,7 +32,7 @@ import type {
   SalesProductCostDayAgg,
   SellerShiftRef,
 } from "@/data/wedash/salesTypes";
-import { brlCent, deIso, labelUpper, num, tipDelta, titleName } from "@/lib/format";
+import { brlCent, isoToDate, labelUpper, num, deltaTip, titleName } from "@/lib/format";
 import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePicker";
 import { useActiveSession } from "@/session/SessionProvider";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
@@ -128,7 +128,7 @@ function BadgeVsAnterior({
       {delta.value}
     </Badge>
   );
-  const tip = tipDelta(delta, metrica);
+  const tip = deltaTip(delta, metrica);
   return tip ? <Tooltip label={tip}>{badge}</Tooltip> : badge;
 }
 
@@ -311,7 +311,7 @@ export default function OverviewPage() {
       setProductDayAggs(products);
       setProductCostDayAggs(productCosts);
       setWatermark(wm);
-      setCoverageFrom(cov.from ? deIso(cov.from) : null);
+      setCoverageFrom(cov.from ? isoToDate(cov.from) : null);
     } catch (e) {
       if (gen !== reloadGen.current) return;
       console.error("Overview reloadAggs:", e);
@@ -355,7 +355,7 @@ export default function OverviewPage() {
   useEffect(() => {
     const id = window.setInterval(() => {
       void fetchSalesCoverage(session.tenantId, escopo.filialIds).then((cov) => {
-        setCoverageFrom(cov.from ? deIso(cov.from) : null);
+        setCoverageFrom(cov.from ? isoToDate(cov.from) : null);
       });
     }, 30_000);
     return () => window.clearInterval(id);
@@ -427,8 +427,8 @@ export default function OverviewPage() {
   const firstSteps = useFirstSteps(escopo.filialIds);
   const { abrir: abrirDetalhe, modal: detalheModal } = useProductDetail({ escopo, tenantId: session.tenantId });
   const niveisMeta = useMemo(
-    () => new Map(view.topVendedoras.flatMap((v) => (v.key && v.meta ? [[v.key, v.meta] as const] : []))),
-    [view.topVendedoras],
+    () => new Map(view.topSellers.flatMap((v) => (v.key && v.meta ? [[v.key, v.meta] as const] : []))),
+    [view.topSellers],
   );
   const { abrir: abrirPessoa, modal: pessoaModal } = useTeamMemberDetail({ escopo, tenantId: session.tenantId, niveisMeta });
   function onDateChange(r: DateRange, meta?: DateRangeChangeMeta) {
@@ -735,31 +735,31 @@ export default function OverviewPage() {
         <Card className="flex flex-col">
           <CardHeader className="items-center">
             <CardTitle>Ranking de filiais</CardTitle>
-            {escopo.filialIds.length === 1 && view.rankingLojas.length > 0 && (view.rankingRedeTotal ?? 0) > 0 && (
+            {escopo.filialIds.length === 1 && view.storesRanking.length > 0 && (view.rankingRedeTotal ?? 0) > 0 && (
               <Badge variant="accent">
                 Rede: {brlCent(view.rankingRedeTotal ?? 0)}
               </Badge>
             )}
           </CardHeader>
-          {view.rankingLojas.length === 0 ? (
+          {view.storesRanking.length === 0 ? (
             <EmptyBlock />
           ) : (
             (() => {
               const totalRede =
-                (view.rankingRedeTotal ?? view.rankingLojas.reduce((s, l) => s + l.valor, 0)) || 1;
-              const umaLoja = escopo.filialIds.length === 1;
-              const valorLoja = view.rankingLojas[0]?.valor ?? 0;
-              const valorDemais = umaLoja ? Math.max(0, totalRede - valorLoja) : 0;
+                (view.rankingRedeTotal ?? view.storesRanking.reduce((s, l) => s + l.valor, 0)) || 1;
+              const singleStore = escopo.filialIds.length === 1;
+              const storeAmount = view.storesRanking[0]?.valor ?? 0;
+              const valorDemais = singleStore ? Math.max(0, totalRede - storeAmount) : 0;
               // 1 loja: fatia da loja x "Demais lojas" (resto da rede)  -  mostra o peso real na rede.
-              const demais: (typeof view.rankingLojas)[number] | null =
-                umaLoja && valorDemais > 0
+              const demais: (typeof view.storesRanking)[number] | null =
+                singleStore && valorDemais > 0
                   ? {
-                      nome: `Demais filiais${view.rankingDemaisLojas ? ` (${view.rankingDemaisLojas})` : ""}`,
+                      nome: `Demais filiais${view.otherStoresRanking ? ` (${view.otherStoresRanking})` : ""}`,
                       valor: valorDemais,
                     }
                   : null;
               const donutSegments = [
-                ...view.rankingLojas.map((l, i) => ({
+                ...view.storesRanking.map((l, i) => ({
                   label: l.nome,
                   value: l.valor,
                   color: CORES_LOJAS[i % CORES_LOJAS.length],
@@ -773,16 +773,16 @@ export default function OverviewPage() {
                       segments={donutSegments}
                       size={148}
                       thickness={20}
-                      centerLabel={umaLoja ? "da rede" : "Total"}
+                      centerLabel={singleStore ? "da rede" : "Total"}
                       centerValue={
-                        umaLoja
-                          ? `${Math.round((valorLoja / totalRede) * 100)}%`
+                        singleStore
+                          ? `${Math.round((storeAmount / totalRede) * 100)}%`
                           : brlCent(totalRede)
                       }
                     />
                   </div>
                   <div className="mt-4 flex flex-col gap-3">
-                    {[...view.rankingLojas, ...(demais ? [demais] : [])].map((loja, idx) => {
+                    {[...view.storesRanking, ...(demais ? [demais] : [])].map((loja, idx) => {
                       const pctRede = Math.round(
                         loja.pctRede ?? (totalRede > 0 ? (loja.valor / totalRede) * 100 : 0),
                       );
@@ -866,11 +866,11 @@ export default function OverviewPage() {
               <Badge variant="accent">Top {TOP_CARD_SIZE}</Badge>
             </div>
           </CardHeader>
-          {view.topVendedoras.length === 0 ? (
+          {view.topSellers.length === 0 ? (
             <EmptyBlock />
           ) : (
           <div className="flex flex-col gap-1 px-2 pb-3">
-            {view.topVendedoras.map((v, idx) => {
+            {view.topSellers.map((v, idx) => {
               const hasMeta = v.meta != null || v.pctMeta != null;
               const pct = v.meta?.atingimentoPct ?? v.pctMeta ?? 0;
               const key = v.key;

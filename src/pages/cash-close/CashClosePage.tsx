@@ -42,7 +42,7 @@ import { fetchSalesDayAggs, fetchSyncWatermark } from "@/data/wedash/salesRepo";
 import { fetchStoreSellers, type Store, type StoreSeller } from "@/data/wedash/stores";
 import { isGestor } from "@/layout/nav-wedash";
 import { cn } from "@/lib/cn";
-import { brlCent, dataExtenso, deIso, fimDoMes, inicioDoMes, paraIso, somarDias, labelUpper } from "@/lib/format";
+import { brlCent, longDate, isoToDate, endOfMonth, startOfMonth, dateToIso, addDays, labelUpper } from "@/lib/format";
 import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useScope } from "@/pages/dashboard/useScope";
@@ -59,7 +59,7 @@ function diffClass(cents: number | null): string {
   return cents < 0 ? "text-bad" : "text-ok";
 }
 
-function totalDia(cents: number): string {
+function dayTotal(cents: number): string {
   const abs = brlCent(Math.abs(cents) / 100);
   if (cents < 0) return `−${abs}`;
   if (cents > 0) return `+${abs}`;
@@ -68,25 +68,25 @@ function totalDia(cents: number): string {
 
 const MESES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
-function rotuloMesAno(iso: string): string {
-  const d = deIso(inicioDoMes(iso));
+function monthYearLabel(iso: string): string {
+  const d = isoToDate(startOfMonth(iso));
   return `${MESES_PT[d.getMonth()]} de ${d.getFullYear()}`;
 }
 
-function fimDaPagina(ano: number, hojeAno: number): number {
+function pageEndYear(ano: number, hojeAno: number): number {
   const alvo = Math.min(ano, hojeAno);
   return hojeAno - Math.floor((hojeAno - alvo) / 12) * 12;
 }
 
-function celulasDoIntervalo(from: string, to: string): Array<string | null> {
-  const cells: Array<string | null> = Array.from({ length: deIso(from).getDay() }, () => null);
-  for (let day = from; day <= to; day = somarDias(day, 1)) cells.push(day);
+function rangeCells(from: string, to: string): Array<string | null> {
+  const cells: Array<string | null> = Array.from({ length: isoToDate(from).getDay() }, () => null);
+  for (let day = from; day <= to; day = addDays(day, 1)) cells.push(day);
   while (cells.length % 7 !== 0) cells.push(null);
   return cells;
 }
 
-function tituloDia(iso: string): string {
-  const s = dataExtenso(iso);
+function dayTitle(iso: string): string {
+  const s = longDate(iso);
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
@@ -190,7 +190,7 @@ function CloseTable({
                     )}
                   </td>
                   <td className={cn("px-3 py-3 text-right font-mono text-[13px] font-bold", fechado && diff != null ? diffClass(diff) : "text-t2")}>
-                    {fechado && diff != null ? totalDia(diff) : "—"}
+                    {fechado && diff != null ? dayTotal(diff) : "—"}
                   </td>
                 </tr>
               );
@@ -204,7 +204,7 @@ function CloseTable({
                 {dayWithoutReal(lines) ? "—" : money(conta.realCents)}
               </td>
               <td className={cn("px-3 py-3 text-right font-mono text-[13px] font-bold", fechado && !dayWithoutReal(lines) ? diffClass(conta.diffCents) : "text-t2")}>
-                {fechado && !dayWithoutReal(lines) ? totalDia(conta.diffCents) : "—"}
+                {fechado && !dayWithoutReal(lines) ? dayTotal(conta.diffCents) : "—"}
               </td>
             </tr>
           </tfoot>
@@ -214,7 +214,7 @@ function CloseTable({
   );
 }
 
-export function SeletorMesAno({
+export function MonthYearPicker({
   iso,
   hoje,
   minIso,
@@ -226,13 +226,13 @@ export function SeletorMesAno({
   minIso: string;
   onChange: (alvo: string) => void;
 }) {
-  const hojeData = deIso(hoje);
+  const hojeData = isoToDate(hoje);
   const hojeAno = hojeData.getFullYear();
   const hojeMes = hojeData.getMonth();
-  const piso = deIso(inicioDoMes(minIso));
+  const piso = isoToDate(startOfMonth(minIso));
   const pisoAno = piso.getFullYear();
   const pisoMes = piso.getMonth();
-  const selecionado = deIso(inicioDoMes(iso));
+  const selecionado = isoToDate(startOfMonth(iso));
   const [open, setOpen] = useState(false);
   const [modo, setModo] = useState<"mes" | "ano">("mes");
   const [anoVista, setAnoVista] = useState(selecionado.getFullYear());
@@ -295,7 +295,7 @@ export function SeletorMesAno({
     const antes = anoVista < pisoAno || (anoVista === pisoAno && month < pisoMes);
     const futuro = anoVista > hojeAno || (anoVista === hojeAno && month > hojeMes);
     if (antes || futuro) return;
-    onChange(paraIso(new Date(anoVista, month, 1)));
+    onChange(dateToIso(new Date(anoVista, month, 1)));
     setOpen(false);
   }
 
@@ -315,14 +315,14 @@ export function SeletorMesAno({
                 className={navBtn(podeAnoAnt)}
                 onClick={() => (modo === "ano" ? setAnoPagina((n) => n - 12) : setAnoVista((n) => n - 1))}
               >
-                <Seta dir="anterior" />
+                <MonthStep dir="anterior" />
               </button>
               <button
                 type="button"
                 className="rounded-lg px-2 py-1 text-sm font-bold text-t0 hover:bg-bg-3"
                 onClick={() => {
                   if (modo === "mes") {
-                    setAnoPagina(fimDaPagina(anoVista, hojeAno));
+                    setAnoPagina(pageEndYear(anoVista, hojeAno));
                     setModo("ano");
                     return;
                   }
@@ -338,7 +338,7 @@ export function SeletorMesAno({
                 className={navBtn(podeAnoProx)}
                 onClick={() => (modo === "ano" ? setAnoPagina((n) => Math.min(hojeAno, n + 12)) : setAnoVista((n) => n + 1))}
               >
-                <Seta dir="proximo" />
+                <MonthStep dir="proximo" />
               </button>
             </div>
             {modo === "mes" ? (
@@ -400,7 +400,7 @@ export function SeletorMesAno({
     <div ref={triggerRef} className="relative inline-flex">
       <button
         type="button"
-        aria-label={`Mês e ano: ${rotuloMesAno(iso)}`}
+        aria-label={`Mês e ano: ${monthYearLabel(iso)}`}
         onClick={() => setOpen((v) => !v)}
         className={cn(
           "flex h-10 min-w-0 items-center gap-2.5 rounded-[var(--radius-vela-sm)] border bg-bg-3 px-3.5 text-left transition-colors",
@@ -411,7 +411,7 @@ export function SeletorMesAno({
           <rect x="3" y="4" width="18" height="18" rx="2" />
           <path d="M16 2v4M8 2v4M3 10h18" />
         </svg>
-        <span className="truncate text-[13.5px] font-semibold text-t0">{rotuloMesAno(iso)}</span>
+        <span className="truncate text-[13.5px] font-semibold text-t0">{monthYearLabel(iso)}</span>
       </button>
       {painel}
     </div>
@@ -421,7 +421,7 @@ export function SeletorMesAno({
 export const monthNavBtn =
   "flex h-10 w-10 items-center justify-center rounded-[11px] border border-line bg-bg-2 text-t1 hover:border-line-2 hover:text-t0 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-line disabled:hover:text-t1";
 
-export function Seta({ dir }: { dir: "anterior" | "proximo" }) {
+export function MonthStep({ dir }: { dir: "anterior" | "proximo" }) {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d={dir === "anterior" ? "m15 18-6-6 6-6" : "m9 18 6-6-6-6"} />
@@ -435,12 +435,12 @@ export function CashClosePage() {
   const { session, lojas, loading: lojasLoading } = useScopedStores();
   const { escopo } = useScope();
   const escolher = pickOneStore(escopo.filialIds, session.stores.length);
-  const showLojas = useMinSkeleton(lojasLoading);
+  const showStores = useMinSkeleton(lojasLoading);
   const hoje = calendarTodayIso();
-  const [rangeFrom, setRangeFrom] = useState(() => inicioDoMes(hoje));
-  const [rangeTo, setRangeTo] = useState(() => fimDoMes(hoje));
+  const [rangeFrom, setRangeFrom] = useState(() => startOfMonth(hoje));
+  const [rangeTo, setRangeTo] = useState(() => endOfMonth(hoje));
   const [presetId, setPresetId] = useState<DatePresetId | null>("esteMes");
-  const [piso, setPiso] = useState(() => inicioDoMes(hoje));
+  const [piso, setPiso] = useState(() => startOfMonth(hoje));
   const [marks, setMarks] = useState<CashCloseDayMark[]>([]);
   const [marksKey, setMarksKey] = useState("");
   const [reviews, setReviews] = useState<CashCloseReview[]>([]);
@@ -461,7 +461,7 @@ export function CashClosePage() {
   rangeFromRef.current = rangeFrom;
   const rangeToRef = useRef(rangeTo);
   rangeToRef.current = rangeTo;
-  const cells = useMemo(() => celulasDoIntervalo(rangeFrom, rangeTo), [rangeFrom, rangeTo]);
+  const cells = useMemo(() => rangeCells(rangeFrom, rangeTo), [rangeFrom, rangeTo]);
   const from = rangeFrom;
   const toBruto = rangeTo;
   const to = toBruto < hoje ? toBruto : hoje;
@@ -701,8 +701,8 @@ export function CashClosePage() {
   }
 
   function aplicarIntervalo(inicio: Date, fim: Date, meta?: DateRangeChangeMeta) {
-    setRangeFrom(paraIso(inicio));
-    setRangeTo(paraIso(fim));
+    setRangeFrom(dateToIso(inicio));
+    setRangeTo(dateToIso(fim));
     setPresetId(meta?.presetId ?? null);
   }
 
@@ -717,9 +717,9 @@ export function CashClosePage() {
         actions={
           <HeaderFilters>
             <DateRangePicker
-              value={[deIso(rangeFrom), deIso(rangeTo)]}
-              minDate={deIso(piso)}
-              maxDate={deIso(fimDoMes(hoje))}
+              value={[isoToDate(rangeFrom), isoToDate(rangeTo)]}
+              minDate={isoToDate(piso)}
+              maxDate={isoToDate(endOfMonth(hoje))}
               quickRanges={QUICK_RANGES_CALENDARIO}
               displayLabel={presetId ? periodLabels[presetId] : null}
               activePresetId={presetId}
@@ -734,7 +734,7 @@ export function CashClosePage() {
           <div className="max-w-[720px]">
             <SelectStoreCard />
           </div>
-        ) : showLojas ? (
+        ) : showStores ? (
           <Skeleton className="h-[520px] w-full rounded-[18px]" />
         ) : lojas.length === 0 ? (
           <Card>
@@ -743,7 +743,7 @@ export function CashClosePage() {
         ) : (
           <>
             {analise ? (
-              <ResumoMes resumo={analise.resumo} />
+              <MonthSummary resumo={analise.resumo} />
             ) : (
               <Skeleton className="mb-4 h-[88px] w-full rounded-[18px]" />
             )}
@@ -751,7 +751,7 @@ export function CashClosePage() {
           </>
         )}
       </div>
-      <DiaModal
+      <DayModal
         day={diaAberto}
         lojas={lojas}
         snaps={dias}
@@ -774,13 +774,13 @@ export function CashClosePage() {
   );
 }
 
-function dicaDiferenca(resumo: MonthCloseSummary): string {
+function differenceHint(resumo: MonthCloseSummary): string {
   const base = "Diferença acumulada entre o total real e o Millennium nos dias já fechados.";
   if (resumo.surplusCents === 0 && resumo.shortageCents === 0) return base;
   return `${base}\nSobras: ${brlCent(resumo.surplusCents / 100)} · Quebras: ${brlCent(resumo.shortageCents / 100)}`;
 }
 
-function corDaDiferenca(cents: number): string {
+function differenceColor(cents: number): string {
   if (cents > 0) return "var(--ok)";
   if (cents < 0) return "var(--bad)";
   return "var(--t0)";
@@ -802,10 +802,10 @@ export function PlainKpi({ label, value, color, tooltip }: { label: string; valu
   );
 }
 
-function ResumoMes({ resumo }: { resumo: MonthCloseSummary }) {
+function MonthSummary({ resumo }: { resumo: MonthCloseSummary }) {
   const cards = [
     { label: "Total real", value: brlCent(resumo.realCents / 100), color: "var(--t0)" },
-    { label: "Diferença", value: totalDia(resumo.diffCents), color: corDaDiferenca(resumo.diffCents), tooltip: dicaDiferenca(resumo) },
+    { label: "Diferença", value: dayTotal(resumo.diffCents), color: differenceColor(resumo.diffCents), tooltip: differenceHint(resumo) },
     { label: "Dias pendentes", value: String(resumo.pendingDays), color: "var(--t0)" },
   ];
   return (
@@ -817,11 +817,11 @@ function ResumoMes({ resumo }: { resumo: MonthCloseSummary }) {
   );
 }
 
-function ContaDoDia({ systemCents, realCents, diffCents }: { systemCents: number; realCents: number; diffCents: number }) {
+function DayTotals({ systemCents, realCents, diffCents }: { systemCents: number; realCents: number; diffCents: number }) {
   const itens = [
     { label: "Millennium", value: money(systemCents), tom: "text-t0" },
     { label: "Total real", value: money(realCents), tom: "text-t0" },
-    { label: "Diferença", value: totalDia(diffCents), tom: diffClass(diffCents) },
+    { label: "Diferença", value: dayTotal(diffCents), tom: diffClass(diffCents) },
   ];
   return (
     <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -835,7 +835,7 @@ function ContaDoDia({ systemCents, realCents, diffCents }: { systemCents: number
   );
 }
 
-export function ChipDia({ cor, children }: { cor: string; children: string }) {
+export function DayChip({ cor, children }: { cor: string; children: string }) {
   return (
     <div title={children} className={cn("mt-1 w-full self-stretch truncate rounded-md px-1.5 py-1 text-[10px] font-semibold text-white sm:text-[11px]", cor)}>
       {children}
@@ -843,16 +843,16 @@ export function ChipDia({ cor, children }: { cor: string; children: string }) {
   );
 }
 
-function chipDaDiferenca(cents: number): { cor: string; texto: string } {
+function differenceChip(cents: number): { cor: string; texto: string } {
   if (cents > 0) return { cor: "bg-ok", texto: `Sobra ${brlCent(cents / 100)}` };
   if (cents < 0) return { cor: "bg-bad", texto: `Quebra ${brlCent(Math.abs(cents) / 100)}` };
   return { cor: "bg-chip-gray", texto: "Sem diferença" };
 }
 
-function dicaDoDia(face: { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number; withdrawalCents: number }): string | undefined {
+function dayHint(face: { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number; withdrawalCents: number }): string | undefined {
   if (face.kind !== "total") return undefined;
   const partes: string[] = [];
-  if (face.diffCents !== 0) partes.push(chipDaDiferenca(face.diffCents).texto);
+  if (face.diffCents !== 0) partes.push(differenceChip(face.diffCents).texto);
   if (face.withdrawalCents > 0) partes.push(`Retirada ${brlCent(face.withdrawalCents / 100)}`);
   return partes.length > 0 ? partes.join(" · ") : undefined;
 }
@@ -874,7 +874,7 @@ function Mes({
         if (!day) return <div key={`vazio-${i}`} className={blankDayClass(i)} />;
         const face = day <= hoje ? faceDoDia(day) : null;
         const mostraTotal = face?.kind === "pendente" || face?.kind === "total" || (face?.kind === "hoje" && !face.aguardando);
-        const dica = face ? dicaDoDia(face) : undefined;
+        const dica = face ? dayHint(face) : undefined;
         const aberto = Boolean(face && face.kind !== "zero" && face.kind !== "vazio");
         return (
           <DayFace
@@ -883,20 +883,20 @@ function Mes({
             iso={day}
             today={hoje}
             openable={aberto}
-            openLabel={`Abrir ${tituloDia(day)}`}
+            openLabel={`Abrir ${dayTitle(day)}`}
             title={dica}
             onOpen={() => onOpen(day)}
             amount={mostraTotal && face ? brlCent(face.totalCents / 100) : null}
             badges={
               face?.kind === "hoje" || face?.kind === "pendente" || face?.kind === "total" ? (
                 <>
-                  {face.kind === "pendente" && <ChipDia cor="bg-warn">{`Pendente ${brlCent(face.totalCents / 100)}`}</ChipDia>}
-                  {face.kind === "hoje" && <ChipDia cor="bg-acc">Em aberto</ChipDia>}
+                  {face.kind === "pendente" && <DayChip cor="bg-warn">{`Pendente ${brlCent(face.totalCents / 100)}`}</DayChip>}
+                  {face.kind === "hoje" && <DayChip cor="bg-acc">Em aberto</DayChip>}
                   {face.kind === "total" && (face.diffCents !== 0 || face.withdrawalCents === 0) && (
-                    <ChipDia cor={chipDaDiferenca(face.diffCents).cor}>{chipDaDiferenca(face.diffCents).texto}</ChipDia>
+                    <DayChip cor={differenceChip(face.diffCents).cor}>{differenceChip(face.diffCents).texto}</DayChip>
                   )}
                   {face.kind === "total" && face.withdrawalCents > 0 && (
-                    <ChipDia cor="bg-info">{`Retirada ${brlCent(face.withdrawalCents / 100)}`}</ChipDia>
+                    <DayChip cor="bg-info">{`Retirada ${brlCent(face.withdrawalCents / 100)}`}</DayChip>
                   )}
                 </>
               ) : null
@@ -908,7 +908,7 @@ function Mes({
   );
 }
 
-function DiaModal({
+function DayModal({
   day,
   lojas,
   snaps,
@@ -1072,7 +1072,7 @@ function DiaModal({
       title={
         day ? (
           <>
-            <span>{tituloDia(day)}</span>
+            <span>{dayTitle(day)}</span>
             {(!fechado || pronto) && (
               <Badge variant={!fechado ? "accent" : diaPendente ? "warning" : "success"}>
                 {!fechado ? "Em aberto" : diaPendente ? "Pendente" : "Fechado"}
@@ -1132,7 +1132,7 @@ function DiaModal({
               <section key={loja.id}>
                 {lojas.length > 1 && <p className="mb-3 text-[13px] font-bold text-t0">{loja.fantasia}</p>}
                 {!dayWithoutReal(linhas) ? (
-                  <ContaDoDia systemCents={conta.comparedSystemCents} realCents={conta.realCents} diffCents={conta.diffCents} />
+                  <DayTotals systemCents={conta.comparedSystemCents} realCents={conta.realCents} diffCents={conta.diffCents} />
                 ) : (
                   <p className="mb-4 text-[13px] text-t2">Falta o total real de alguma forma. A diferença aparece quando ele for informado.</p>
                 )}

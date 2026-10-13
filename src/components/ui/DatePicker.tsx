@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
-import { deIso } from "@/lib/format";
+import { isoToDate } from "@/lib/format";
 import { calendarTodayIso } from "@/data/wedash/clock";
 
 /**
@@ -17,7 +17,7 @@ function zeraHora(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
-function mesmoDia(a: Date, b: Date): boolean {
+function sameCalendarDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
@@ -47,7 +47,7 @@ export function DatePicker({
   className?: string;
   "aria-label"?: string;
 }) {
-  const hoje = useMemo(() => deIso(calendarTodayIso()), []);
+  const hoje = useMemo(() => isoToDate(calendarTodayIso()), []);
   const min = useMemo(() => (minDate ? zeraHora(minDate) : null), [minDate]);
   const max = useMemo(() => (maxDate ? zeraHora(maxDate) : null), [maxDate]);
   const [open, setOpen] = useState(false);
@@ -167,7 +167,7 @@ export function DatePicker({
               {cells.map((dia, i) => {
                 if (dia === null) return <span key={`e${i}`} />;
                 const off = bloqueado(dia);
-                const selecionado = value != null && mesmoDia(value, dia);
+                const selecionado = value != null && sameCalendarDay(value, dia);
                 return (
                   <button
                     key={dia.toISOString()}

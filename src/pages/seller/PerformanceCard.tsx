@@ -1,7 +1,7 @@
 import { Avatar, Badge, Card, CardTitle, ProgressBar, Tabs } from "@/components/ui";
 import { brlCent, num } from "@/data/wedash/engine/format";
 import type { SellerChallenge, SellerHomeStore } from "@/data/wedash/engine/sellerHome";
-import { dataCurta } from "@/lib/format";
+import { shortDate } from "@/lib/format";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { FlameIcon, TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
 import { RankingBlock } from "@/pages/live/blocks";
@@ -117,7 +117,7 @@ export function PerformanceCard({ store }: { store: SellerHomeStore }) {
                         <Badge variant={STATUS_VARIANT[c.status]}>{STATUS_LABEL[c.status]}</Badge>
                       </div>
                       <p className="mt-0.5 text-[12px] text-t2">
-                        {dataCurta(c.startsOn)} a {dataCurta(c.endsOn)}
+                        {shortDate(c.startsOn)} a {shortDate(c.endsOn)}
                       </p>
                       {c.prize && <p className="mt-2 text-[13px] font-semibold text-t1">{c.prize}</p>}
                       {c.rules.length > 0 && (

@@ -9,19 +9,19 @@ import type { CSSProperties } from "react";
  * acrescimo da area do sistema e somado pelo CSS, e so onde o navegador
  * suporta env(). Onde nao suporta, fica o espacamento normal.
  */
-export function padTopo(base: string): CSSProperties {
+export function padTop(base: string): CSSProperties {
   return { "--pad-topo": base } as CSSProperties;
 }
 
-export function padBase(base: string): CSSProperties {
+export function padBottom(base: string): CSSProperties {
   return { "--pad-base": base } as CSSProperties;
 }
 
-export function posBase(base: string): CSSProperties {
+export function pinBottom(base: string): CSSProperties {
   return { "--pos-base": base } as CSSProperties;
 }
 
 /** Combina espacamento de topo e base num unico objeto de estilo. */
-export function padTopoEBase(topo: string, base: string): CSSProperties {
+export function padTopAndBottom(topo: string, base: string): CSSProperties {
   return { "--pad-topo": topo, "--pad-base": base } as CSSProperties;
 }

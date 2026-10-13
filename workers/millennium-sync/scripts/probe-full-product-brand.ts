@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { createAdminClient, buildDeps } from "../src/deps.ts";
 import { loginMillennium, millenniumBaseUrl } from "../src/millenniumAuth.ts";
 import { listRememberedSessions } from "../src/sessionStore.ts";
-import { fetchFilialGeradorMap } from "../src/millenniumBrandReport.ts";
+import { fetchBranchGeneratorMap } from "../src/millenniumBrandReport.ts";
 import {
   PRODUCT_DIVISION_CATALOG_GUID,
   DIVISAO_WEPINK,
@@ -209,7 +209,7 @@ async function main() {
   const full = await deps.loadCredential(cred.id as string);
   const session = await ensureSession(deps, cred.id as string, full.username, full.password);
 
-  const geradorMap = await fetchFilialGeradorMap({ session });
+  const geradorMap = await fetchBranchGeneratorMap({ session });
   const g205 = geradorMap.get("00205") ?? 65728;
   console.log(`gerador 00205=${g205} · total geradores=${geradorMap.size}`);
 

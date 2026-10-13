@@ -118,8 +118,8 @@ function mergeWithCache(fromAuth: Session, cached: Session | null): Session {
 function keepIfSame(atual: Session | null, nova: Session): Session {
   if (!atual) return nova;
   // Lojas vem do banco sem ordem garantida: mesma lista em outra ordem = mesmas lojas.
-  const mesmasLojas = storesKey(atual.stores) === storesKey(nova.stores);
-  const candidata = mesmasLojas ? { ...nova, stores: atual.stores } : nova;
+  const sameStores = storesKey(atual.stores) === storesKey(nova.stores);
+  const candidata = sameStores ? { ...nova, stores: atual.stores } : nova;
   return JSON.stringify(atual) === JSON.stringify(candidata) ? atual : candidata;
 }
 

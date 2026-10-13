@@ -69,7 +69,7 @@ describe("flags", () => {
 
 describe("fetchStoreSellers", () => {
   it("Lista sem cargo + Consulta; guarda todos com o cargo (gerência ativa e ex-vendedora INDEFINIDO)", async () => {
-    const listaLoja = {
+    const storeList = {
       value: [
         ...lista.value,
         { FUNCIONARIO: 162866, COD_FUNCIONARIO: "", NOME: "DONO DA LOJA", CARGO: null },
@@ -81,7 +81,7 @@ describe("fetchStoreSellers", () => {
       const body = JSON.parse(String(init?.body));
       if (url.includes("FUNCIONARIOS.Lista")) {
         expect(body).toMatchObject({ FILIAL: 8, CARGO: null });
-        return new Response(JSON.stringify(listaLoja));
+        return new Response(JSON.stringify(storeList));
       }
       return new Response(JSON.stringify(consulta({ desativado: inativas.has(body.FUNCIONARIO) })));
     });

@@ -1,10 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { nextNote, type ParsedSangria } from "../../../src/data/wedash/sangriaMath.ts";
+import { nextNote, type ParsedCashDrop } from "../../../src/data/wedash/cashDropMath.ts";
 
 /** Grava os lançamentos da janela. Mantém a marca e o texto que a pessoa editou. */
-export async function upsertSangriaLines(
+export async function upsertCashDropLines(
   sb: SupabaseClient,
-  args: { tenantId: string; storeId: string; lines: ParsedSangria[] },
+  args: { tenantId: string; storeId: string; lines: ParsedCashDrop[] },
 ): Promise<void> {
   if (args.lines.length === 0) return;
   const ids = args.lines.map((line) => line.erpLancamento);

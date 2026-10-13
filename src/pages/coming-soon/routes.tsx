@@ -4,7 +4,7 @@ import { RequireRole } from "@/session/RequireSession";
 import { SellerHomePage } from "@/pages/seller/SellerHomePage";
 
 /** URLs antigas que nao tem mais tela. */
-export const emBreveRoutes: RouteObject[] = [
+export const retiredRoutes: RouteObject[] = [
   { path: paths.analytics, element: <Navigate to={paths.overview} replace /> },
   { path: paths.legacy.analytics, element: <Navigate to={paths.overview} replace /> },
   { path: paths.legacy.settings.root, element: <Navigate to={paths.settings.stores} replace /> },
@@ -17,7 +17,7 @@ export const emBreveRoutes: RouteObject[] = [
   { path: paths.legacy.settings.messages, element: <Navigate to={paths.profile} replace /> },
   { path: paths.settings.documents, element: <Navigate to={paths.profile} replace /> },
   { path: paths.legacy.settings.documents, element: <Navigate to={paths.profile} replace /> },
-  { path: paths.legacy.settings.costs, element: <Navigate to={paths.operation.filial} replace /> },
+  { path: paths.legacy.settings.costs, element: <Navigate to={paths.operation.branch} replace /> },
   { path: "/configuracoes/marca", element: <Navigate to={paths.settings.stores} replace /> },
   { path: "/settings/brand", element: <Navigate to={paths.settings.stores} replace /> },
   { path: paths.legacy.settings.erp, element: <Navigate to={paths.settings.erp} replace /> },
@@ -25,7 +25,7 @@ export const emBreveRoutes: RouteObject[] = [
   { path: paths.legacy.settings.users, element: <Navigate to={paths.settings.users} replace /> },
   { path: paths.settings.challenges, element: <Navigate to={paths.management.challenges} replace /> },
   { path: paths.settings.staff, element: <Navigate to={paths.operation.sellers} replace /> },
-  { path: paths.settings.costs, element: <Navigate to={paths.operation.filial} replace /> },
+  { path: paths.settings.costs, element: <Navigate to={paths.operation.branch} replace /> },
   { path: paths.legacy.profile, element: <Navigate to={paths.profile} replace /> },
   {
     element: <RequireRole roles={["SELLER"]} />,

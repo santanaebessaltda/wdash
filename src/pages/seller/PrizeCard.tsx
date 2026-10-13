@@ -2,7 +2,7 @@ import { Badge, Card } from "@/components/ui";
 import { GoalLevelsBar } from "@/components/wedash/GoalLevelsBar";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { brlCent } from "@/data/wedash/engine/format";
-import { dataCurta } from "@/lib/format";
+import { shortDate } from "@/lib/format";
 import type { SellerHomeStore } from "@/data/wedash/engine/sellerHome";
 
 type Goal = NonNullable<SellerHomeStore["goal"]>;
@@ -53,7 +53,7 @@ function PrizeBody({ goal, me }: { goal: Goal; me: NonNullable<Goal["me"]> }) {
       )}
       {goal.projectedPrize != null && (
         <div>
-          <p className="text-[13px] font-semibold text-t1">Projeção: {brlCent(goal.projectedPrize)} até {dataCurta(goal.endsOn)}</p>
+          <p className="text-[13px] font-semibold text-t1">Projeção: {brlCent(goal.projectedPrize)} até {shortDate(goal.endsOn)}</p>
           <p className="text-[12.5px] text-t2">Se mantiver o ritmo atual.</p>
         </div>
       )}

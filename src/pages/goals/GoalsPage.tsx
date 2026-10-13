@@ -11,7 +11,7 @@ import { deleteGoal, fetchGoalTeam, fetchGoals, type GoalRecord, type GoalTeamMe
 import { fetchSalesDayAggs } from "@/data/wedash/salesRepo";
 import type { SalesDayAgg } from "@/data/wedash/salesTypes";
 import { storesForSession, type Store } from "@/data/wedash/stores";
-import { brlCent, dataCompleta, fimDoMes, num, paraIso, deIso } from "@/lib/format";
+import { brlCent, fullDate, endOfMonth, num, dateToIso, isoToDate } from "@/lib/format";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import {
@@ -36,8 +36,8 @@ type Loaded = { goals: GoalRecord[]; dayAggs: SalesDayAgg[]; team: GoalTeamMembe
 
 /** Metas podem ser cadastradas para frente: o calendario vai ate o fim do mes daqui a 12 meses. */
 function maxPickerDate(today: string): Date {
-  const d = deIso(today);
-  return deIso(fimDoMes(paraIso(new Date(d.getFullYear(), d.getMonth() + 12, 1))));
+  const d = isoToDate(today);
+  return isoToDate(endOfMonth(dateToIso(new Date(d.getFullYear(), d.getMonth() + 12, 1))));
 }
 
 /** Gestao > Metas  -  1 card por meta (loja do StorePicker x periodo do filtro). */
@@ -234,7 +234,7 @@ export default function GoalsPage() {
       >
         {confirmar && (
           <p className="text-[13px] leading-relaxed text-t1">
-            A meta <span className="font-bold text-t0">{confirmar.name}</span>, de {dataCompleta(confirmar.startsOn)} a {dataCompleta(confirmar.endsOn)}, será
+            A meta <span className="font-bold text-t0">{confirmar.name}</span>, de {fullDate(confirmar.startsOn)} a {fullDate(confirmar.endsOn)}, será
             excluída. Essa ação não pode ser desfeita.
           </p>
         )}
@@ -260,16 +260,16 @@ function GoalCard({
   onCopy: () => void;
   onDelete: () => void;
 }) {
-  const { goal: g, status, realizado, pct, projetadoPct, diasRestantes, nivelAtual, nivelNumero } = summary;
-  const periodo = `${dataCompleta(g.startsOn)} a ${dataCompleta(g.endsOn)}`;
-  const prazo = prazoRestante(diasRestantes);
+  const { goal: g, status, realizado, pct, projetadoPct, daysRemaining, nivelAtual, nivelNumero } = summary;
+  const periodo = `${fullDate(g.startsOn)} a ${fullDate(g.endsOn)}`;
+  const prazo = prazoRestante(daysRemaining);
   const rodape =
     status === "active"
       ? projetadoPct != null
         ? `Projeção: ${num(projetadoPct, 0)}% · ${prazo.toLowerCase()}`
         : prazo
       : status === "upcoming"
-        ? `Começa em ${dataCompleta(g.startsOn)}`
+        ? `Começa em ${fullDate(g.startsOn)}`
         : nivelAtual
           ? `Nível final: N${nivelNumero} · ${nivelAtual}`
           : "Nenhum nível atingido";

@@ -1,4 +1,4 @@
-import { deIso, fimDoMes } from "@/lib/format";
+import { isoToDate, endOfMonth } from "@/lib/format";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import {
   periodLabels,
@@ -13,7 +13,7 @@ import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePi
  *  Usa o dia civil real das lojas  -  nao o TODAY_ISO congelado do mock. */
 export function dateRangeFromPeriod(periodo: Period): DateRange {
   const r = resolvePeriod(periodo, calendarTodayIso());
-  return [deIso(r.inicio), deIso(r.fim)];
+  return [isoToDate(r.inicio), isoToDate(r.fim)];
 }
 
 /**
@@ -25,7 +25,7 @@ export function dateRangeFromPeriod(periodo: Period): DateRange {
 export function managementScheduleWindow(periodo: Period, hojeIso: string = calendarTodayIso()): { from: string; to: string } {
   if (periodo.tipo === "esteMes") {
     const r = resolvePeriod(periodo, hojeIso);
-    return { from: r.inicio, to: fimDoMes(r.inicio) };
+    return { from: r.inicio, to: endOfMonth(r.inicio) };
   }
   if (periodo.tipo === "personalizado" && periodo.inicio && periodo.fim) {
     const from = periodo.inicio;
@@ -39,7 +39,7 @@ export function managementScheduleWindow(periodo: Period, hojeIso: string = cale
 /** Range do DateRangePicker nas listagens de Metas/Desafios (respeita fim futuro). */
 export function dateRangeFromManagementPeriod(periodo: Period): DateRange {
   if (periodo.tipo === "personalizado" && periodo.inicio && periodo.fim) {
-    return [deIso(periodo.inicio), deIso(periodo.fim)];
+    return [isoToDate(periodo.inicio), isoToDate(periodo.fim)];
   }
   return dateRangeFromPeriod(periodo);
 }

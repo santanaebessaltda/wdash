@@ -3,7 +3,7 @@ import { Button, PageHeader } from "@/components/ui";
 import { SellerHomeSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { fetchSellerHome } from "@/data/wedash/sellerHomeRepo";
 import type { SellerHomePayload } from "@/data/wedash/engine/sellerHome";
-import { dataCurta, titleName } from "@/lib/format";
+import { shortDate, titleName } from "@/lib/format";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useSession } from "@/session/SessionProvider";
@@ -51,7 +51,7 @@ export function SellerHomePage() {
 
   const firstName = titleName(session?.name).split(" ")[0]?.trim() ?? "";
   const periodo = home
-    ? `Este mês · ${dataCurta(home.numbersPeriod.from)} a ${dataCurta(home.numbersPeriod.to)}`
+    ? `Este mês · ${shortDate(home.numbersPeriod.from)} a ${shortDate(home.numbersPeriod.to)}`
     : undefined;
 
   return (

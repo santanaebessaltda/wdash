@@ -4,18 +4,18 @@
  */
 import { millenniumBaseUrl } from "./millenniumAuth.ts";
 import { milleniumDataRange } from "./millenniumSales.ts";
-import { parseSangriaLista, type ParsedSangria } from "../../../src/data/wedash/sangriaMath.ts";
+import { parseCashDropList, type ParsedCashDrop } from "../../../src/data/wedash/cashDropMath.ts";
 
-export type { ParsedSangria };
+export type { ParsedCashDrop };
 
-export async function fetchSangriaLista(params: {
+export async function fetchCashDropList(params: {
   session: string;
   millenniumStoreId: number;
   from: string;
   to: string;
   baseUrl?: string;
   fetchImpl?: typeof fetch;
-}): Promise<ParsedSangria[]> {
+}): Promise<ParsedCashDrop[]> {
   const base = (params.baseUrl ?? millenniumBaseUrl()).replace(/\/$/, "");
   const origin = base.replace(/\/api\/?$/, "");
   const { datai, dataf } = milleniumDataRange(params.from, params.to);
@@ -46,5 +46,5 @@ export async function fetchSangriaLista(params: {
     signal: AbortSignal.timeout(60_000),
   });
   if (!res.ok) throw new Error(`LANCAMENTOS.Lista ${res.status}`);
-  return parseSangriaLista(await res.json());
+  return parseCashDropList(await res.json());
 }

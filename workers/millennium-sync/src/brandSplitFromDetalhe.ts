@@ -4,7 +4,7 @@
 import type { SaleRow, SalesBrand } from "../../../src/data/wedash/salesTypes.ts";
 import type { DetMovLine } from "./millenniumDetMov.ts";
 import type { ProductBrandMap } from "./millenniumProductDivision.ts";
-import type { SaleRowWithFilial } from "./millenniumSales.ts";
+import type { SaleRowWithBranch } from "./millenniumSales.ts";
 
 export type BrandSplitHeader = {
   operationCode: string;
@@ -56,7 +56,7 @@ export function splitLinesByBrand(
 }
 
 /** Headers unicos com NF + COD_OPERACAO numerico (1 DetMov por cupom). */
-export function uniqueBrandSplitHeaders(rows: SaleRowWithFilial[]): BrandSplitHeader[] {
+export function uniqueBrandSplitHeaders(rows: SaleRowWithBranch[]): BrandSplitHeader[] {
   const seen = new Set<string>();
   const out: BrandSplitHeader[] = [];
   for (const row of rows) {

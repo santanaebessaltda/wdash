@@ -37,7 +37,7 @@ export function RequireSession({ modo = "app" }: { modo?: "app" | "onboarding" |
     return <Navigate to={awaitingSync ? paths.syncing : homeForRole(session.role)} replace />;
   }
 
-  // Enquanto SEED nao terminou, trava qualquer rota do app (exceto /sincronizando).
+  // Enquanto SEED nao terminou, trava qualquer rota do app (exceto /syncing).
   if (modo === "app" && awaitingSync && !onSyncing) {
     return <Navigate to={paths.syncing} replace />;
   }

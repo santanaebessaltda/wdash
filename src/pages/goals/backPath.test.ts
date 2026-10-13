@@ -10,10 +10,10 @@ describe("volta do detalhe da meta", () => {
   });
 
   it("origem da Equipe preserva filial, período e abre a aba Metas", () => {
-    expect(teamGoalsReturn("?filial=f1&periodo=esteMes")).toBe(`${paths.team}?filial=f1&periodo=esteMes&aba=metas`);
+    expect(teamGoalsReturn("?filial=f1&periodo=esteMes")).toBe(`${paths.team}?filial=f1&periodo=esteMes&tab=goals`);
     expect(goalBackPath({ from: teamGoalsReturn("?filial=f1&periodo=hoje") })).toBe(
-      `${paths.team}?filial=f1&periodo=hoje&aba=metas`,
+      `${paths.team}?filial=f1&periodo=hoje&tab=goals`,
     );
-    expect(teamGoalsReturn("?aba=ranking&filial=f1")).toBe(`${paths.team}?aba=metas&filial=f1`);
+    expect(teamGoalsReturn("?aba=ranking&filial=f1")).toBe(`${paths.team}?aba=ranking&filial=f1&tab=goals`);
   });
 });

@@ -11,7 +11,7 @@ import { listRememberedSessions } from "../src/sessionStore.ts";
 import {
   brandReportToDayAggs,
   fetchBrandRevenueReport,
-  fetchFilialGeradorMap,
+  fetchBranchGeneratorMap,
 } from "../src/millenniumBrandReport.ts";
 import { seedWindow, ymdInTz } from "../src/runSyncJob.ts";
 
@@ -83,7 +83,7 @@ async function main() {
   const full = await deps.loadCredential(cred.id as string);
   const stores = await deps.listStores(cred.tenant_id as string);
   const session = await ensureSession(deps, cred.id as string, full.username, full.password);
-  const geradorMap = await fetchFilialGeradorMap({ session });
+  const geradorMap = await fetchBranchGeneratorMap({ session });
 
   const tz = stores[0]?.timezone ?? "America/Sao_Paulo";
   const today = ymdInTz(new Date(), tz);

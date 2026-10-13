@@ -28,7 +28,7 @@ export function StorePicker({ escopo, onChange, minhas }: { escopo: Scope; onCha
     setOpen(false);
   }
 
-  function subtituloLoja(f: Store): string {
+  function storeSubtitle(f: Store): string {
     const cnpj = f.cnpj?.trim();
     if (cnpj) return cnpj;
     return f.codFilial ? `Filial ${f.codFilial}` : "—";
@@ -46,7 +46,7 @@ export function StorePicker({ escopo, onChange, minhas }: { escopo: Scope; onCha
             {filialAtual ? filialAtual.fantasia : "Todas as filiais"}
           </p>
           <p className={cn("truncate text-[10px] leading-tight text-t2", !filialAtual && "uppercase")}>
-            {filialAtual ? subtituloLoja(filialAtual) : "Rede consolidada"}
+            {filialAtual ? storeSubtitle(filialAtual) : "Rede consolidada"}
           </p>
         </div>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={cn("shrink-0 transition-transform", open && "rotate-180")}>
@@ -91,7 +91,7 @@ export function StorePicker({ escopo, onChange, minhas }: { escopo: Scope; onCha
               >
                 <div className="min-w-0 flex-1 leading-none">
                   <p className={cn("truncate text-[12px] font-bold uppercase leading-tight", ativa ? "text-acc" : "text-t0")}>{f.fantasia}</p>
-                  <p className="truncate text-[10px] leading-tight text-t2">{subtituloLoja(f)}</p>
+                  <p className="truncate text-[10px] leading-tight text-t2">{storeSubtitle(f)}</p>
                 </div>
                 {ativa && (
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">

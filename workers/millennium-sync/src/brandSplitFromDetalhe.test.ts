@@ -6,7 +6,7 @@ import {
   splitLinesByBrand,
   uniqueBrandSplitHeaders,
 } from "./brandSplitFromDetalhe";
-import type { SaleRowWithFilial } from "./millenniumSales";
+import type { SaleRowWithBranch } from "./millenniumSales";
 
 describe("inferBrandFromDesc", () => {
   it("detects WPINK from code/label", () => {
@@ -59,7 +59,7 @@ describe("resolveLineBrand", () => {
 describe("uniqueBrandSplitHeaders", () => {
   it("dedupes COD_OPERACAO+NF and drops rows without NF", () => {
     const at = new Date("2026-09-21T15:00:00.000Z");
-    const rows: SaleRowWithFilial[] = [
+    const rows: SaleRowWithBranch[] = [
       {
         operationCode: "13199979",
         occurredAt: at,
@@ -67,7 +67,7 @@ describe("uniqueBrandSplitHeaders", () => {
         itemQty: 1,
         storeId: "s1",
         brand: "ALL",
-        millenniumFilial: 40261,
+        millenniumBranch: 40261,
         millenniumOpCode: 13199979,
         nf: "14286",
         tipoOperacao: "S",
@@ -79,7 +79,7 @@ describe("uniqueBrandSplitHeaders", () => {
         itemQty: 1,
         storeId: "s1",
         brand: "ALL",
-        millenniumFilial: 40261,
+        millenniumBranch: 40261,
         millenniumOpCode: 13199979,
         nf: "14286",
         tipoOperacao: "S",
@@ -91,7 +91,7 @@ describe("uniqueBrandSplitHeaders", () => {
         itemQty: 1,
         storeId: "s1",
         brand: "ALL",
-        millenniumFilial: 40261,
+        millenniumBranch: 40261,
         millenniumOpCode: null,
         nf: null,
         tipoOperacao: null,

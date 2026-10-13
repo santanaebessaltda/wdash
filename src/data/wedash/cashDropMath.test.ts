@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clampFalta, dayAmounts, depositBlock, depositBoleto, emissionDay, nextNote, parseSangriaLista, reaisToCents, sumAmounts } from "./sangriaMath";
+import { clampShortage, dayAmounts, depositBlock, depositBoleto, emissionDay, nextNote, parseCashDropList, reaisToCents, sumAmounts } from "./cashDropMath";
 
 describe("sangria", () => {
   it("o dia da planilha é a data de DATA_EMISSAO", () => {
@@ -41,7 +41,7 @@ describe("sangria", () => {
       { day: "2026-08-01", amountCents: 10000, kind: "deposit" as const, note: "" },
       { day: "2026-08-01", amountCents: 450, kind: "purchase" as const, note: "Caneta" },
     ];
-    expect(clampFalta(10000, 1500)).toBe(1500);
+    expect(clampShortage(10000, 1500)).toBe(1500);
     expect(dayAmounts(lines, 1500)).toMatchObject({ boletoCents: 8500, foraCents: 450, faltaCents: 1500, totalCents: 10450 });
     expect(dayAmounts(lines, 99999)).toMatchObject({ boletoCents: 0, faltaCents: 10000 });
     expect(depositBoleto(lines, ["2026-08-01"], new Map([["2026-08-01", 1500]]))).toBe(8500);
@@ -59,7 +59,7 @@ describe("sangria", () => {
   });
 
   it("lê o lançamento do Millennium", () => {
-    const rows = parseSangriaLista({
+    const rows = parseCashDropList({
       value: [
         { LANCAMENTO: 13224037, DATA_EMISSAO: "2026-08-02T03:00:00.000Z", VALOR_PAGO: -4.5, N_DOCUMENTO: "AV248488", OBS: "SANGRIA CANETA 4,50" },
         { LANCAMENTO: null },

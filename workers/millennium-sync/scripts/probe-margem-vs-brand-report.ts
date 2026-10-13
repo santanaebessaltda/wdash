@@ -15,7 +15,7 @@ import { loginMillennium, millenniumBaseUrl } from "../src/millenniumAuth.ts";
 import { listRememberedSessions } from "../src/sessionStore.ts";
 import {
   fetchBrandRevenueReport,
-  fetchFilialGeradorMap,
+  fetchBranchGeneratorMap,
   normalizeBrandLabel,
 } from "../src/millenniumBrandReport.ts";
 import {
@@ -149,7 +149,7 @@ async function main() {
   if (!store) throw new Error(`loja ${storeCode} não encontrada`);
 
   const session = await ensureSession(deps, cred.id as string, full.username, full.password);
-  const geradorMap = await fetchFilialGeradorMap({ session });
+  const geradorMap = await fetchBranchGeneratorMap({ session });
   const geradorId = geradorMap.get(store.code);
   if (geradorId == null) throw new Error(`sem GERADOR para ${store.code}`);
 

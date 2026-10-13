@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Badge, Button, Card, CardHeader, CardSubtitle, CardTitle, FormField, Input, useToast, avatarGradient, avatarInitials } from "@/components/ui";
-import { CampoSenha, CamposNome, ForcaSenha, nomePessoaValido, type NomePessoa } from "@/pages/access/AccessKit";
+import { PasswordField, NameFields, PasswordStrength, personNameIsValid, type PersonName } from "@/pages/access/AccessKit";
 import { SAVE_ERROR_MSG } from "@/pages/operation/shared";
 import { CheckIcon, PlusIcon } from "@/pages/utility/icons";
 import { AVATAR_TIPOS } from "@/lib/avatar";
-import { SENHA_REGRA_TEXTO, senhaValida } from "@/lib/password";
+import { PASSWORD_RULE_TEXT, passwordIsValid } from "@/lib/password";
 import { titleName } from "@/lib/format";
 import { changeMyPassword, fetchMyNames, saveMyProfile, saveThemePreference } from "@/session/authApi";
 import { accessLabel, useActiveSession, useSession } from "@/session/SessionProvider";
@@ -16,13 +16,13 @@ const THEME_OPTIONS: { value: ThemePreference; label: string; background: string
   { value: "system", label: "Sistema", background: "linear-gradient(135deg,#0c0e15 50%,#f5f6fa 50%)", borderColor: "#1e2230" },
 ];
 
-function dividirNome(nome: string): NomePessoa {
+function splitPersonName(nome: string): PersonName {
   const [first = "", ...rest] = nome.trim().split(/\s+/);
   return { nome: first, sobrenome: rest.join(" ") };
 }
 
 /** Padrao Account > Profile do Vela: foto 88px com "+", nome, e-mail e papel. A foto grava na hora. */
-function ProfileSummaryCard({ salvo }: { salvo: NomePessoa }) {
+function ProfileSummaryCard({ salvo }: { salvo: PersonName }) {
   const session = useActiveSession();
   const { update } = useSession();
   const { show } = useToast();
@@ -88,11 +88,11 @@ function ProfileSummaryCard({ salvo }: { salvo: NomePessoa }) {
   );
 }
 
-function PersonalDataCard({ salvo, onSaved }: { salvo: NomePessoa; onSaved: (n: NomePessoa) => void }) {
+function PersonalDataCard({ salvo, onSaved }: { salvo: PersonName; onSaved: (n: PersonName) => void }) {
   const session = useActiveSession();
   const { update } = useSession();
   const { show } = useToast();
-  const [nome, setNome] = useState<NomePessoa>(salvo);
+  const [nome, setNome] = useState<PersonName>(salvo);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => setNome(salvo), [salvo]);
@@ -102,7 +102,7 @@ function PersonalDataCard({ salvo, onSaved }: { salvo: NomePessoa; onSaved: (n: 
   async function salvar(e: FormEvent) {
     e.preventDefault();
     if (!dirty || saving) return;
-    if (!nomePessoaValido(nome)) return show("Informe nome e sobrenome com pelo menos 2 letras cada.", "danger");
+    if (!personNameIsValid(nome)) return show("Informe nome e sobrenome com pelo menos 2 letras cada.", "danger");
     setSaving(true);
     const r = await saveMyProfile({ firstName: nome.nome, lastName: nome.sobrenome, photo: null, removePhoto: false });
     setSaving(false);
@@ -119,7 +119,7 @@ function PersonalDataCard({ salvo, onSaved }: { salvo: NomePessoa; onSaved: (n: 
       </CardHeader>
       <form onSubmit={salvar} noValidate>
         <div className="flex flex-col gap-4">
-          <CamposNome valor={nome} onChange={(p) => setNome((n) => ({ ...n, ...p }))} />
+          <NameFields valor={nome} onChange={(p) => setNome((n) => ({ ...n, ...p }))} />
           <FormField label="E-mail" hint="O e-mail é usado para entrar na WDash e não pode ser alterado aqui.">
             <Input value={session.email} readOnly disabled />
           </FormField>
@@ -147,7 +147,7 @@ function PasswordCard() {
   const [saving, setSaving] = useState(false);
 
   const erroConfirma = confirma.length > 0 && confirma !== nova ? "As senhas não coincidem." : null;
-  const pode = atual.length > 0 && senhaValida(nova) && confirma === nova && !saving;
+  const pode = atual.length > 0 && passwordIsValid(nova) && confirma === nova && !saving;
 
   async function salvar(e: FormEvent) {
     e.preventDefault();
@@ -170,9 +170,9 @@ function PasswordCard() {
       <form onSubmit={salvar} className="flex flex-col gap-3.5" noValidate>
         {/* Escondido: gerenciador de senhas associa a senha nova a este login. */}
         <input type="email" name="username" autoComplete="username" value={session.email} readOnly tabIndex={-1} aria-hidden className="sr-only" />
-        <CampoSenha label="Senha atual" value={atual} onChange={setAtual} placeholder="Digite sua senha atual" autoComplete="current-password" />
-        <CampoSenha label="Nova senha" value={nova} onChange={setNova} placeholder={SENHA_REGRA_TEXTO} autoComplete="new-password" />
-        <CampoSenha
+        <PasswordField label="Senha atual" value={atual} onChange={setAtual} placeholder="Digite sua senha atual" autoComplete="current-password" />
+        <PasswordField label="Nova senha" value={nova} onChange={setNova} placeholder={PASSWORD_RULE_TEXT} autoComplete="new-password" />
+        <PasswordField
           label="Confirme a nova senha"
           value={confirma}
           onChange={setConfirma}
@@ -180,7 +180,7 @@ function PasswordCard() {
           autoComplete="new-password"
           erro={erroConfirma}
         />
-        <ForcaSenha senha={nova} />
+        <PasswordStrength senha={nova} />
         <div className="mt-4.5 flex justify-end">
           <Button type="submit" disabled={!pode}>
             {saving ? "Alterando…" : "Alterar senha"}
@@ -273,7 +273,7 @@ function ThemeCard() {
 /** Conta > Meu perfil  -  layout Account > Profile do Vela (resumo a esquerda, formularios a direita). */
 export function MyProfilePage() {
   const session = useActiveSession();
-  const [salvo, setSalvo] = useState<NomePessoa>(() => dividirNome(session.name));
+  const [salvo, setSalvo] = useState<PersonName>(() => splitPersonName(session.name));
 
   useEffect(() => {
     let vivo = true;

@@ -9,7 +9,7 @@ import {
   milleniumDataRange,
   milleniumDayBoundIso,
   parseDataCalendar,
-  partitionRowsByFilial,
+  partitionRowsByBranch,
   resolveOccurredAt,
 } from "./millenniumSales";
 
@@ -23,7 +23,7 @@ describe("mapVendasListaPayload", () => {
     const rows = mapVendasListaPayload(fixture, { storeId: "store-uuid-1" });
     expect(rows.length).toBe(5);
     expect(rows[0].revenueCents).toBe(189_90);
-    expect(rows[0].millenniumFilial).toBe(1);
+    expect(rows[0].millenniumBranch).toBe(1);
     expect(rows[0].sellerName).toBe("VENDEDORA A");
     expect(rows[2].sellerName).toBe("VENDEDORA B");
   });
@@ -109,12 +109,12 @@ describe("partitionRowsByFilial", () => {
       [1, { id: "wd-store-a" }],
       [2, { id: "wd-store-b" }],
     ]);
-    const parts = partitionRowsByFilial(rows, map);
+    const parts = partitionRowsByBranch(rows, map);
     expect(parts.size).toBe(2);
     expect(parts.get("wd-store-a")).toHaveLength(4);
     expect(parts.get("wd-store-b")).toHaveLength(1);
     expect(parts.get("wd-store-a")![0].storeId).toBe("wd-store-a");
-    expect(parts.get("wd-store-a")![0].millenniumFilial).toBe(1);
+    expect(parts.get("wd-store-a")![0].millenniumBranch).toBe(1);
   });
 });
 
@@ -181,7 +181,7 @@ describe("fetchSalesLista", () => {
     });
 
     expect(rows).toHaveLength(5);
-    expect(rows[0].millenniumFilial).toBe(1);
+    expect(rows[0].millenniumBranch).toBe(1);
     const body = JSON.parse(String(fetchMock.mock.calls[0][1].body));
     expect(body.FILIAL).toBeNull();
   });

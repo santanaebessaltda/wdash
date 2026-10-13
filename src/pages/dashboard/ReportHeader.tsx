@@ -3,7 +3,7 @@ import { WedashBrand } from "@/components/wedash/WedashBrand";
 import { resolvePeriod } from "@/data/wedash/dashboard";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { storesForSession } from "@/data/wedash/stores";
-import { deIso } from "@/lib/format";
+import { isoToDate } from "@/lib/format";
 import { exportPdf } from "@/lib/printMode";
 import { useActiveSession } from "@/session/SessionProvider";
 import { LastUpdated } from "./LastUpdated";
@@ -11,7 +11,7 @@ import { periodDisplayLabel } from "./periodPicker";
 import { useScope } from "./useScope";
 
 function dataBr(iso: string): string {
-  return deIso(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return isoToDate(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 /** Loja e periodo do relatorio, no formato do cabecalho do PDF e do nome do arquivo. */

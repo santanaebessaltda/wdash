@@ -15,7 +15,7 @@ function chave(membershipId: string) {
   return `${PREFIXO}${membershipId}`;
 }
 
-function chaveSenha(membershipId: string) {
+function passwordKey(membershipId: string) {
   return `${PREFIXO_SENHA}${membershipId}`;
 }
 
@@ -50,7 +50,7 @@ export function gravarRascunho(membershipId: string, r: RascunhoOnboarding) {
 }
 
 export function limparRascunho(membershipId: string) {
-  gravarSenhaErp(membershipId, "");
+  writeErpPassword(membershipId, "");
   try {
     window.localStorage.removeItem(chave(membershipId));
   } catch {
@@ -61,21 +61,21 @@ export function limparRascunho(membershipId: string) {
 /** Senha do ERP só na memória do separador. F5 pede de novo. Apaga resto antigo no sessionStorage. */
 const senhasErp = new Map<string, string>();
 
-function apagarSenhaGuardada(membershipId: string) {
+function clearStoredPassword(membershipId: string) {
   try {
-    window.sessionStorage.removeItem(chaveSenha(membershipId));
+    window.sessionStorage.removeItem(passwordKey(membershipId));
   } catch {
     /* ignore */
   }
 }
 
-export function lerSenhaErp(membershipId: string): string {
-  apagarSenhaGuardada(membershipId);
+export function readErpPassword(membershipId: string): string {
+  clearStoredPassword(membershipId);
   return senhasErp.get(membershipId) ?? "";
 }
 
-export function gravarSenhaErp(membershipId: string, senha: string) {
-  apagarSenhaGuardada(membershipId);
+export function writeErpPassword(membershipId: string, senha: string) {
+  clearStoredPassword(membershipId);
   if (senha) senhasErp.set(membershipId, senha);
   else senhasErp.delete(membershipId);
 }

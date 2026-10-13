@@ -5,13 +5,13 @@ import { paths } from "@/router/paths";
 import { AuthGlow } from "@/pages/auth/authKit";
 import { requestPasswordReset } from "@/session/authApi";
 import {
-  CampoEmail,
-  acessoBotao,
-  acessoLink,
-  acessoRodape,
-  acessoSubtitulo,
-  acessoTitulo,
-  useFocoNoEnvioAposAutofill,
+  EmailField,
+  accessButton,
+  accessLink,
+  accessFooter,
+  accessSubtitle,
+  accessTitle,
+  useFocusSubmitAfterAutofill,
 } from "./AccessKit";
 
 function emailValido(v: string) {
@@ -32,7 +32,7 @@ export function Forgot() {
   const emailInicial = (location.state as { email?: string } | null)?.email ?? "";
   const [email, setEmail] = useState(emailInicial);
   const [carregando, setCarregando] = useState(false);
-  const formRef = useFocoNoEnvioAposAutofill();
+  const formRef = useFocusSubmitAfterAutofill();
 
   async function enviar(e: FormEvent) {
     e.preventDefault();
@@ -56,24 +56,24 @@ export function Forgot() {
       <div className="relative w-full max-w-[420px]">
         <div className="rounded-[22px] border border-line bg-bg-2 p-9 text-center" style={{ boxShadow: "0 20px 60px -20px rgba(0,0,0,.6)" }}>
           <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-[18px] bg-acc-soft">{mailIcon}</div>
-          <h2 className={acessoTitulo}>Redefina sua senha</h2>
-          <p className={acessoSubtitulo}>
+          <h2 className={accessTitle}>Redefina sua senha</h2>
+          <p className={accessSubtitle}>
             Informe seu e-mail para receber um código de verificação.
           </p>
           <form ref={formRef} onSubmit={enviar} className="text-left" noValidate>
-            <CampoEmail label="E-mail" value={email} onChange={setEmail} autoFocus />
+            <EmailField label="E-mail" value={email} onChange={setEmail} autoFocus />
             <div className="mb-4 mt-3.5">
               <button
                 type="submit"
                 disabled={email.trim().length === 0 || carregando}
-                className={acessoBotao}
+                className={accessButton}
               >
                 {carregando ? "Enviando…" : "Enviar código"}
               </button>
             </div>
           </form>
-          <p className={acessoRodape}>
-            <Link to={paths.access.login} className={acessoLink}>
+          <p className={accessFooter}>
+            <Link to={paths.access.login} className={accessLink}>
               Voltar ao login
             </Link>
           </p>

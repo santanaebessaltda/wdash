@@ -9,7 +9,7 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createAdminClient, buildDeps } from "../src/deps.ts";
 import { loginMillennium, millenniumBaseUrl } from "../src/millenniumAuth.ts";
-import { fetchFilialGeradorMap } from "../src/millenniumBrandReport.ts";
+import { fetchBranchGeneratorMap } from "../src/millenniumBrandReport.ts";
 import { listRememberedSessions } from "../src/sessionStore.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -142,7 +142,7 @@ async function main() {
   // 2) gerador  -  lookup pode 401; curl do gestor usou 126 p/ Santana
   let geradorId = 126;
   try {
-    const geradorMap = await fetchFilialGeradorMap(session);
+    const geradorMap = await fetchBranchGeneratorMap(session);
     geradorId =
       geradorMap.get(store.code) ??
       geradorMap.get(store.code.replace(/^0+/, "")) ??

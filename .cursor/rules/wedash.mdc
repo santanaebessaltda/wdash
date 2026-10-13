@@ -7,9 +7,10 @@ alwaysApply: true
 
 ## Fonte de verdade
 - Ler e seguir **`WDASH.md`** (arquitetura, filtros, mocks, decisões, glossário, ordem de build). É a fonte de verdade do produto.
-- **Idioma:** identificador em inglês (arquivo, pasta, rota, tipo, função, variável, constante, campo e chave de objeto). O texto que a pessoa vê fica em português. Comentário pode ser em português. Não traduzir marca (WEPINK, WPINK) nem coluna já gravada no banco.
-  - Ruim: `const faturamentoPorMarca = rows.map((r) => ({ marca: r.brand, valor: r.cents }))`
-  - Certo: `const revenueByBrand = rows.map((r) => ({ brand: r.brand, amount: r.cents }))` e, na tela, o título "Faturamento por marca".
+- **Idioma do código:** arquivo, pasta, rota no código, tipo, função, variável, constante, serviço, campo e chave de objeto ficam em inglês. Comentário pode ser em português. O texto que a pessoa vê na tela fica em português, dentro da string, não no nome.
+  - Ruim: `function validarSenha`, `FilialPage.tsx`, `const faturamentoPorMarca = rows.map((r) => ({ marca: r.brand, valor: r.cents }))`
+  - Certo: `function validatePassword`, `BranchPage.tsx`, `const revenueByBrand = rows.map((r) => ({ brand: r.brand, amount: r.cents }))` e, na tela, o título "Faturamento por marca".
+  - Não traduzir marca (WEPINK, WPINK) nem coluna, tabela ou valor já gravado no banco. A rota canônica é em inglês. O endereço antigo em português só redireciona.
 - Dados do produto: `src/data/wedash/`. Componentes de produto: `src/components/wedash/`.
 - Registrar decisões de produto relevantes em `WDASH.md` para não perder contexto entre sessões.
 - Referências visuais: `docs/referencias/`.

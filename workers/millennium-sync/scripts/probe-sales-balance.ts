@@ -10,7 +10,7 @@ import { loginMillennium, millenniumBaseUrl } from "../src/millenniumAuth.ts";
 import { listRememberedSessions } from "../src/sessionStore.ts";
 import { milleniumDataRange } from "../src/millenniumSales.ts";
 import { fetchProductBrandMap } from "../src/millenniumProductDivision.ts";
-import { fetchFilialGeradorMap } from "../src/millenniumBrandReport.ts";
+import { fetchBranchGeneratorMap } from "../src/millenniumBrandReport.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -186,7 +186,7 @@ async function main() {
   console.log(`\noverlap códigos 101∩102: ${overlap.length}`, overlap.slice(0, 10));
 
   // mapa atual (id interno)  -  quantos COD_PRODUTO WP* ele cobre via report uniao
-  const geradorMap = await fetchFilialGeradorMap({ session });
+  const geradorMap = await fetchBranchGeneratorMap({ session });
   const catalog = await fetchProductBrandMap({
     session,
     geradorIds: [...geradorMap.values()],

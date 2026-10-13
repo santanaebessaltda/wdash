@@ -15,7 +15,7 @@ import { calendarTodayIso } from "@/data/wedash/clock";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { DetalheSkeleton, MetricaDetalhe, pctFmt } from "@/pages/dashboard/ProductDetail";
-import { brlCent, dataCurta, num, tipRelacao } from "@/lib/format";
+import { brlCent, shortDate, num, comparedWithTip } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { GOAL_STATUS_LABEL, type SellerGoalLevel } from "@/data/wedash/goalView";
 import { GoalLevelSummary } from "@/components/wedash/GoalLevelsBar";
@@ -149,11 +149,11 @@ function SecaoMeta({ meta }: { meta: SellerGoalLevel }) {
   const total = meta.premiacao + meta.bonus;
   const situacao =
     meta.status === "active"
-      ? meta.diasRestantes === 1
+      ? meta.daysRemaining === 1
         ? "último dia"
-        : `faltam ${meta.diasRestantes} dias`
+        : `faltam ${meta.daysRemaining} dias`
       : GOAL_STATUS_LABEL[meta.status].toLowerCase();
-  const tipPremiacao = [
+  const prizeTip = [
     nivelAtual
       ? geral
         ? `${num(nivelAtual.comissaoPct, 1)}% sobre o total vendido da filial, dividido igualmente entre as pessoas.`
@@ -171,7 +171,7 @@ function SecaoMeta({ meta }: { meta: SellerGoalLevel }) {
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
         <h4 className="text-[13px] font-bold text-t0">Meta</h4>
         <span className="text-[11.5px] font-semibold text-t2">
-          {meta.metaNome} · {dataCurta(meta.inicio)} a {dataCurta(meta.fim)} · {situacao}
+          {meta.metaNome} · {shortDate(meta.inicio)} a {shortDate(meta.fim)} · {situacao}
         </span>
       </div>
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
@@ -181,7 +181,7 @@ function SecaoMeta({ meta }: { meta: SellerGoalLevel }) {
           valor={brlCent(meta.realizado)}
           tip="Do início da meta até hoje. Não segue o período escolhido na tela."
         />
-        <MetricaDetalhe label="Premiação até agora" valor={brlCent(total)} destaque={total > 0} tip={tipPremiacao} />
+        <MetricaDetalhe label="Premiação até agora" valor={brlCent(total)} destaque={total > 0} tip={prizeTip} />
       </div>
       <div className="mt-2.5 rounded-xl border border-line bg-bg-inset p-3">
         <GoalLevelSummary pct={meta.atingimentoPct} nivel={meta.nivel} nivelNumero={meta.nivelNumero} marcos={meta.marcos} rolagem />
@@ -277,7 +277,7 @@ function TeamMemberDetailModal({
             </div>
             <p className="mt-2.5 text-[11.5px] text-t2">
               {cmp
-                ? `Variação ${tipRelacao(cmp.vs).replace(/^Em/, "em")}`
+                ? `Variação ${comparedWithTip(cmp.vs).replace(/^Em/, "em")}`
                 : "Sem vendas no período anterior para comparar."}
               {detalhe.pa == null && " P.A. e itens vendidos ficam indisponíveis quando faltam dados de itens no período."}
             </p>

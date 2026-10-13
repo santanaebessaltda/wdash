@@ -1,4 +1,4 @@
-import { brlCent, collaboratorName, dataCurta, deIso, intervaloDias, num, somarDias } from "@/lib/format";
+import { brlCent, collaboratorName, shortDate, isoToDate, eachDay, num, addDays } from "@/lib/format";
 import {
   managerIndexWindows,
   usesScope,
@@ -148,8 +148,8 @@ export interface ChallengeView {
 const usesMinSales = (m: ChallengeMetric) => m === "PA" || m === "TICKET" || m === "INDEX";
 const round2 = (v: number) => Math.round(v * 100) / 100;
 
-function diasEntre(inicio: string, fim: string): number {
-  return Math.round((deIso(fim).getTime() - deIso(inicio).getTime()) / 86_400_000) + 1;
+function daysBetween(inicio: string, fim: string): number {
+  return Math.round((isoToDate(fim).getTime() - isoToDate(inicio).getTime()) / 86_400_000) + 1;
 }
 
 /** 12 itens  |  1 item  |  7,5 itens  |  1,85  |  R$ 92,30  |  112,4 (indice) */
@@ -419,23 +419,23 @@ export function buildChallengeView(args: {
   const diasIncompletos: string[] = [];
   if (porProduto && status !== "upcoming") {
     const comItens = new Set(aggs.sellerProducts.filter(noPeriodo).map((r) => r.day));
-    for (const day of intervaloDias(c.startsOn, ate)) {
+    for (const day of eachDay(c.startsOn, ate)) {
       if (aggs.storeSaleDays.has(`${c.storeId}|${day}`) && !comItens.has(day)) diasIncompletos.push(day);
     }
   }
 
   const prazo =
     status === "active"
-      ? prazoRestante(diasEntre(today, c.endsOn))
+      ? prazoRestante(daysBetween(today, c.endsOn))
       : status === "upcoming"
-        ? `Começa em ${dataCurta(c.startsOn)}`
+        ? `Começa em ${shortDate(c.startsOn)}`
         : "Encerrado";
 
   return {
     mode: c.mode,
     status,
     prazo,
-    emFechamento: status === "ended" && today <= somarDias(c.endsOn, 1),
+    emFechamento: status === "ended" && today <= addDays(c.endsOn, 1),
     participantes,
     atingiram: c.mode === "MINIMUM" ? participantes.filter((p) => p.vencedor).length : 0,
     gerencia,
@@ -494,13 +494,13 @@ export function challengeCardSummary(view: ChallengeView): { lider: string | nul
 /** Copia para "Duplicar desafio": comeca no dia seguinte ao fim, com a mesma duracao. */
 export function copyChallenge(c: ChallengeRecord): ChallengeInput {
   const { id: _id, ...rest } = c;
-  const duracao = diasEntre(c.startsOn, c.endsOn);
-  const startsOn = somarDias(c.endsOn, 1);
+  const duracao = daysBetween(c.startsOn, c.endsOn);
+  const startsOn = addDays(c.endsOn, 1);
   return {
     ...rest,
     name: `${c.name} (cópia)`,
     startsOn,
-    endsOn: somarDias(startsOn, duracao - 1),
+    endsOn: addDays(startsOn, duracao - 1),
     products: c.products.map((p) => ({ ...p })),
     categories: c.categories.map((t) => ({ ...t })),
     prizes: c.prizes.map((p) => ({ ...p })),

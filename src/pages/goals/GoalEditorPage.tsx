@@ -26,7 +26,7 @@ import {
 } from "@/data/wedash/goalsRepo";
 import { copyGoalName, nextGoalPeriod } from "@/data/wedash/goalView";
 import { fetchStoreShifts, storesForSession } from "@/data/wedash/stores";
-import { brlCent, deIso, paraIso } from "@/lib/format";
+import { brlCent, isoToDate, dateToIso } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { useReturnWhenStoreChanges, useScope } from "@/pages/dashboard/useScope";
@@ -339,8 +339,8 @@ export default function GoalEditorPage() {
             lojaFiltro && lojaFiltro !== g.storeId ? lojaFiltro : outras.length === 1 ? outras[0]!.id : "";
           setStoreId(destino);
           setName(g.name);
-          setStartsOn(deIso(g.startsOn));
-          setEndsOn(deIso(g.endsOn));
+          setStartsOn(isoToDate(g.startsOn));
+          setEndsOn(isoToDate(g.endsOn));
           setTarget(numText(g.target, "R$"));
           setCopiedFrom({ name: g.name, target: g.target, forStore: true });
         } else {
@@ -348,16 +348,16 @@ export default function GoalEditorPage() {
           const periodo = nextGoalPeriod(g.startsOn, g.endsOn);
           setStoreId(lojaFiltro ?? g.storeId);
           setName(copyGoalName(g.name, periodo.startsOn));
-          setStartsOn(deIso(periodo.startsOn));
-          setEndsOn(deIso(periodo.endsOn));
+          setStartsOn(isoToDate(periodo.startsOn));
+          setEndsOn(isoToDate(periodo.endsOn));
           setTarget("");
           setCopiedFrom({ name: g.name, target: g.target });
         }
       } else {
         setStoreId(g.storeId);
         setName(g.name);
-        setStartsOn(deIso(g.startsOn));
-        setEndsOn(deIso(g.endsOn));
+        setStartsOn(isoToDate(g.startsOn));
+        setEndsOn(isoToDate(g.endsOn));
         setTarget(numText(g.target, "R$"));
       }
       setPrizeMode(g.tierMode);
@@ -450,8 +450,8 @@ export default function GoalEditorPage() {
     const res = await saveGoal(session.tenantId, id ?? null, {
       storeId,
       name,
-      startsOn: paraIso(startsOn!),
-      endsOn: paraIso(endsOn!),
+      startsOn: dateToIso(startsOn!),
+      endsOn: dateToIso(endsOn!),
       target: targetValue!,
       tierMode: prizeMode,
       tiers: tiersOn

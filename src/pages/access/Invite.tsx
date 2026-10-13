@@ -2,24 +2,24 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { paths } from "@/router/paths";
 import {
-  AcessoPagina,
-  CampoSenha,
-  CamposNome,
-  ForcaSenha,
-  IconeCard,
-  acessoLink,
-  acessoSubtitulo,
-  acessoTitulo,
-  nomePessoaValido,
-  type NomePessoa,
+  AccessShell,
+  PasswordField,
+  NameFields,
+  PasswordStrength,
+  IconCard,
+  accessLink,
+  accessSubtitle,
+  accessTitle,
+  personNameIsValid,
+  type PersonName,
 } from "./AccessKit";
 import { Skeleton, Button, useToast } from "@/components/ui";
 import { roleLabel, useSession } from "@/session/SessionProvider";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import { cn } from "@/lib/cn";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
-import { SENHA_REGRA_TEXTO, senhaValida } from "@/lib/password";
-import { destinationAfterAuth, mensagemErroSenhaAuth, sessionFromPersistedAuth } from "@/session/authApi";
+import { PASSWORD_RULE_TEXT, passwordIsValid } from "@/lib/password";
+import { destinationAfterAuth, passwordAuthError, sessionFromPersistedAuth } from "@/session/authApi";
 import { acceptInvite, fetchInviteInfo, type InviteInfo } from "@/data/wedash/systemUsers";
 
 type State =
@@ -86,7 +86,7 @@ export function Invite() {
   // Link padrao do Supabase ja traz a sessao no hash: abre sozinho.
   // TokenHash do e-mail espera o clique (anti-prefetch).
   const [state, setState] = useState<State>(() => (token === "link" ? { kind: "loading" } : { kind: "ready" }));
-  const [nome, setNome] = useState<NomePessoa>({ nome: "", sobrenome: "" });
+  const [nome, setNome] = useState<PersonName>({ nome: "", sobrenome: "" });
   const [senha, setSenha] = useState("");
   const [confirma, setConfirma] = useState("");
   const [erro, setErro] = useState<string | null>(null);
@@ -117,30 +117,30 @@ export function Invite() {
 
   if (showSkeleton || state.kind === "loading") {
     return (
-      <AcessoPagina>
+      <AccessShell>
         <Skeleton className="mb-5 h-16 w-16 rounded-[18px]" />
         <Skeleton className="mb-3 h-7 w-2/3" />
         <Skeleton className="mb-2 h-4 w-full" />
         <Skeleton className="mb-6 h-4 w-5/6" />
         <Skeleton className="h-[46px] w-full rounded-xl" />
-      </AcessoPagina>
+      </AccessShell>
     );
   }
 
   if (state.kind === "ready") {
     return (
-      <AcessoPagina>
-        <IconeCard tom="ok">
+      <AccessShell>
+        <IconCard tom="ok">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
           </svg>
-        </IconeCard>
-        <h1 className={acessoTitulo}>Crie seu acesso</h1>
-        <p className={acessoSubtitulo}>Para proteger seu convite, confirme que é você antes de criar a senha.</p>
+        </IconCard>
+        <h1 className={accessTitle}>Crie seu acesso</h1>
+        <p className={accessSubtitle}>Para proteger seu convite, confirme que é você antes de criar a senha.</p>
         <Button type="button" size="lg" fullWidth className="!h-[46px] font-bold" onClick={() => void continuar()}>
           Continuar
         </Button>
-      </AcessoPagina>
+      </AccessShell>
     );
   }
 
@@ -149,13 +149,13 @@ export function Invite() {
     const missingConfig = state.kind === "invalid" && state.detail === "missing_config";
     const incomplete = state.kind === "invalid" && state.detail === "not_found";
     return (
-      <AcessoPagina>
-        <IconeCard tom={active ? "ok" : "warn"}>
+      <AccessShell>
+        <IconCard tom={active ? "ok" : "warn"}>
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             {active ? <path d="M20 6 9 17l-5-5" /> : <path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 8v4M12 16h.01" />}
           </svg>
-        </IconeCard>
-        <h1 className={acessoTitulo}>
+        </IconCard>
+        <h1 className={accessTitle}>
           {active
             ? "Seu acesso já está ativo"
             : missingConfig
@@ -164,7 +164,7 @@ export function Invite() {
                 ? "Este convite está incompleto"
                 : "Este convite não é mais válido"}
         </h1>
-        <p className={acessoSubtitulo}>
+        <p className={accessSubtitle}>
           {active
             ? "Entre com seu e-mail e a senha que você criou."
             : missingConfig
@@ -173,16 +173,16 @@ export function Invite() {
                 ? "O e-mail abriu, mas o acesso ainda não foi criado na WDash. Peça um novo convite em Configurações > Usuários."
                 : "O link expirou, já foi usado ou é de um convite cancelado. Abra o e-mail mais recente."}
         </p>
-        <Link to={paths.access.login} className={cn("block text-center", acessoLink)}>
+        <Link to={paths.access.login} className={cn("block text-center", accessLink)}>
           Ir para o login
         </Link>
-      </AcessoPagina>
+      </AccessShell>
     );
   }
 
   const { info } = state;
   const erroConfirma = confirma.length > 0 && confirma !== senha ? "As senhas não coincidem." : null;
-  const pode = nomePessoaValido(nome) && senhaValida(senha) && confirma === senha && !carregando;
+  const pode = personNameIsValid(nome) && passwordIsValid(senha) && confirma === senha && !carregando;
 
   async function criar(e: FormEvent) {
     e.preventDefault();
@@ -193,7 +193,7 @@ export function Invite() {
     setErro(null);
     const { error } = await sb.auth.updateUser({ password: senha });
     if (error) {
-      setErro(mensagemErroSenhaAuth(error));
+      setErro(passwordAuthError(error));
       setCarregando(false);
       return;
     }
@@ -210,14 +210,14 @@ export function Invite() {
   }
 
   return (
-    <AcessoPagina>
-      <IconeCard tom="ok">
+    <AccessShell>
+      <IconCard tom="ok">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
         </svg>
-      </IconeCard>
-      <h1 className={acessoTitulo}>Crie seu acesso</h1>
-      <p className={acessoSubtitulo}>
+      </IconCard>
+      <h1 className={accessTitle}>Crie seu acesso</h1>
+      <p className={accessSubtitle}>
         {info.kind === "franchisee" ? (
           <>
             Informe seu nome e crie uma senha para começar. Depois você conecta o Millennium e traz as filiais da sua
@@ -248,17 +248,17 @@ export function Invite() {
         )}
       </p>
       <form onSubmit={criar} className="flex flex-col gap-4" noValidate>
-        <CamposNome valor={nome} onChange={(p) => setNome((n) => ({ ...n, ...p }))} autoFocus />
+        <NameFields valor={nome} onChange={(p) => setNome((n) => ({ ...n, ...p }))} autoFocus />
         {/* Escondido: gerenciador de senhas associa a senha nova a este login. */}
         <input type="email" name="username" autoComplete="username" value={info.email} readOnly tabIndex={-1} aria-hidden className="sr-only" />
-        <CampoSenha
+        <PasswordField
           label="Nova senha"
           value={senha}
           onChange={setSenha}
-          placeholder={SENHA_REGRA_TEXTO}
+          placeholder={PASSWORD_RULE_TEXT}
           autoComplete="new-password"
         />
-        <CampoSenha
+        <PasswordField
           label="Confirme a nova senha"
           value={confirma}
           onChange={setConfirma}
@@ -266,11 +266,11 @@ export function Invite() {
           autoComplete="new-password"
           erro={erroConfirma ?? erro}
         />
-        <ForcaSenha senha={senha} />
+        <PasswordStrength senha={senha} />
         <Button type="submit" size="lg" fullWidth className="!h-[46px] font-bold" disabled={!pode}>
           {carregando ? "Salvando…" : "Salvar e entrar"}
         </Button>
       </form>
-    </AcessoPagina>
+    </AccessShell>
   );
 }

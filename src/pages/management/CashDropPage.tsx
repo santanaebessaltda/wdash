@@ -3,29 +3,29 @@ import { Alert, Button, Card, DateRangePicker, Dropdown, Modal, Segmented, Skele
 import { DayFace, MonthCalendar, blankDayClass } from "@/components/wedash/MonthCalendar";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { periodLabels } from "@/data/wedash/dashboard";
-import { fetchLatestCashCloseError, fetchNavMonthFloor, fetchOpenCashCloseJob, requestSangriaMonth } from "@/data/wedash/cashCloseRepo";
+import { fetchLatestCashCloseError, fetchNavMonthFloor, fetchOpenCashCloseJob, requestCashDropMonth } from "@/data/wedash/cashCloseRepo";
 import { fetchSyncWatermark } from "@/data/wedash/salesRepo";
 import {
-  createSangriaDeposit,
+  createCashDropDeposit,
   fetchDepositDayCount,
-  fetchSangriaMonth,
-  saveSangriaLine,
-  saveSangriaLines,
-  saveSangriaShortage,
-  undoSangriaDeposit,
-  type SangriaDepositDay,
-  type SangriaLineRow,
-  type SangriaShortageRow,
-} from "@/data/wedash/sangriaRepo";
-import { dayAmounts, depositBoleto, sumAmounts, type SangriaAmounts } from "@/data/wedash/sangriaMath";
-import { brlCent, dataExtenso, deIso, fimDoMes, inicioDoMes, paraIso, somarDias } from "@/lib/format";
+  fetchCashDropMonth,
+  saveCashDropLine,
+  saveCashDropLines,
+  saveCashDropShortage,
+  undoCashDropDeposit,
+  type CashDropDepositDay,
+  type CashDropLineRow,
+  type CashDropShortageRow,
+} from "@/data/wedash/cashDropRepo";
+import { dayAmounts, depositBoleto, sumAmounts, type CashDropAmounts } from "@/data/wedash/cashDropMath";
+import { brlCent, longDate, isoToDate, endOfMonth, startOfMonth, dateToIso, addDays } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { useScope } from "@/pages/dashboard/useScope";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { NumberInput, SectionHeader, SelectStoreCard, parseNum, pickOneStore, useScopedStores } from "@/pages/operation/shared";
-import { ChipDia, PlainKpi } from "@/pages/cash-close/CashClosePage";
+import { DayChip, PlainKpi } from "@/pages/cash-close/CashClosePage";
 import { monthsTouched, sangriaMonthSpan } from "@/data/wedash/cashCloseMonth";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { HeaderFilters } from "@/pages/stock/shared";
@@ -34,33 +34,33 @@ const money = (cents: number) => brlCent(cents / 100);
 
 type AcaoLote = "recebido" | "aCobrar" | "fora" | "falta" | "desfazer";
 
-function celulasDoIntervalo(from: string, to: string): Array<string | null> {
-  const cells: Array<string | null> = Array.from({ length: deIso(from).getDay() }, () => null);
-  for (let day = from; day <= to; day = somarDias(day, 1)) cells.push(day);
+function rangeCells(from: string, to: string): Array<string | null> {
+  const cells: Array<string | null> = Array.from({ length: isoToDate(from).getDay() }, () => null);
+  for (let day = from; day <= to; day = addDays(day, 1)) cells.push(day);
   while (cells.length % 7 !== 0) cells.push(null);
   return cells;
 }
 
-function tituloDia(iso: string): string {
-  const s = dataExtenso(iso);
+function dayTitle(iso: string): string {
+  const s = longDate(iso);
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 /** Gestão > Sangrias. Calendário do mês e o recebimento dos dias em aberto. */
-export function SangriaPage() {
+export function CashDropPage() {
   const { show } = useToast();
   const { session, lojas, loading: lojasLoading } = useScopedStores();
   const { escopo } = useScope();
   const escolher = pickOneStore(escopo.filialIds, session.stores.length);
-  const showLojas = useMinSkeleton(lojasLoading);
+  const showStores = useMinSkeleton(lojasLoading);
   const hoje = calendarTodayIso();
-  const [rangeFrom, setRangeFrom] = useState(() => inicioDoMes(hoje));
-  const [rangeTo, setRangeTo] = useState(() => fimDoMes(hoje));
+  const [rangeFrom, setRangeFrom] = useState(() => startOfMonth(hoje));
+  const [rangeTo, setRangeTo] = useState(() => endOfMonth(hoje));
   const [presetId, setPresetId] = useState<DatePresetId | null>("esteMes");
-  const [piso, setPiso] = useState(() => inicioDoMes(hoje));
-  const [lines, setLines] = useState<SangriaLineRow[]>([]);
-  const [deposits, setDeposits] = useState<SangriaDepositDay[]>([]);
-  const [shortages, setShortages] = useState<SangriaShortageRow[]>([]);
+  const [piso, setPiso] = useState(() => startOfMonth(hoje));
+  const [lines, setLines] = useState<CashDropLineRow[]>([]);
+  const [deposits, setDeposits] = useState<CashDropDepositDay[]>([]);
+  const [shortages, setShortages] = useState<CashDropShortageRow[]>([]);
   const [loaded, setLoaded] = useState("");
   const [erro, setErro] = useState(false);
   const [dia, setDia] = useState<string | null>(null);
@@ -84,14 +84,14 @@ export function SangriaPage() {
   rangeToRef.current = rangeTo;
   const from = rangeFrom;
   const to = rangeTo;
-  const cells = useMemo(() => celulasDoIntervalo(from, to), [from, to]);
+  const cells = useMemo(() => rangeCells(from, to), [from, to]);
   const faixa = loja ? `${loja.id}|${from}|${to}|${reloadKey}` : "";
 
   const lojaId = loja?.id ?? "";
-  const selecaoLoja = escolher ? "" : lojaId;
-  const [lojaVista, setLojaVista] = useState(selecaoLoja);
-  if (lojaVista !== selecaoLoja) {
-    setLojaVista(selecaoLoja);
+  const storeSelection = escolher ? "" : lojaId;
+  const [lojaVista, setLojaVista] = useState(storeSelection);
+  if (lojaVista !== storeSelection) {
+    setLojaVista(storeSelection);
     setDia(null);
     setMarcados([]);
     setAcao(null);
@@ -155,7 +155,7 @@ export function SangriaPage() {
     const comDia = months.filter((month) => sangriaMonthSpan(month, hojeIso));
     const alvos = comDia.length > 0 ? comDia : [months[0]];
     for (const month of alvos) {
-      const r = await requestSangriaMonth([atual.id], month);
+      const r = await requestCashDropMonth([atual.id], month);
       if (!r.ok) {
         show(r.message, "danger");
         return;
@@ -183,7 +183,7 @@ export function SangriaPage() {
     if (lojasLoading || escolher || !loja) return;
     let cancel = false;
     setErro(false);
-    void fetchSangriaMonth(session.tenantId, loja.id, from, to)
+    void fetchCashDropMonth(session.tenantId, loja.id, from, to)
       .then((res) => {
         if (cancel) return;
         setLines(res.lines);
@@ -203,7 +203,7 @@ export function SangriaPage() {
   const taken = useMemo(() => new Set(deposits.map((d) => d.day)), [deposits]);
   const faltaPorDia = useMemo(() => new Map(shortages.map((s) => [s.day, s.amountCents])), [shortages]);
   const porDia = useMemo(() => {
-    const map = new Map<string, SangriaLineRow[]>();
+    const map = new Map<string, CashDropLineRow[]>();
     for (const line of lines) {
       const list = map.get(line.day) ?? [];
       list.push(line);
@@ -266,7 +266,7 @@ export function SangriaPage() {
   function abrirFalta() {
     const day = marcados[0];
     const atual = day ? shortages.find((s) => s.day === day) : undefined;
-    setFaltaLote(reaisCampo(atual?.amountCents ?? 0));
+    setFaltaLote(reaisField(atual?.amountCents ?? 0));
     setMotivoFaltaLote(atual?.note ?? "");
     setAcao("falta");
   }
@@ -280,7 +280,7 @@ export function SangriaPage() {
     if (acao === "desfazer") {
       setDepositando(true);
       try {
-        await Promise.all(depositosMarcados.map((id) => undoSangriaDeposit(id)));
+        await Promise.all(depositosMarcados.map((id) => undoCashDropDeposit(id)));
         const ids = new Set(depositosMarcados);
         setDeposits((atual) => atual.filter((d) => !ids.has(d.depositId)));
         setMarcados((atual) => atual.filter((day) => !taken.has(day)));
@@ -297,7 +297,7 @@ export function SangriaPage() {
     if (acao === "falta") {
       const day = marcados[0];
       if (!day) return;
-      const cents = campoParaCentavos(faltaLote);
+      const cents = fieldToCents(faltaLote);
       if (cents == null) {
         show("O valor da falta não é válido.", "danger");
         return;
@@ -310,7 +310,7 @@ export function SangriaPage() {
       setDepositando(true);
       try {
         const texto = cents === 0 ? "" : motivoFaltaLote.trim();
-        await saveSangriaShortage(session.tenantId, loja.id, day, cents, texto);
+        await saveCashDropShortage(session.tenantId, loja.id, day, cents, texto);
         setShortages((atual) => {
           const sem = atual.filter((s) => s.day !== day);
           return cents === 0 ? sem : [...sem, { day, amountCents: cents, note: texto }];
@@ -327,19 +327,19 @@ export function SangriaPage() {
     setDepositando(true);
     try {
       if (acao === "recebido") {
-        await createSangriaDeposit(session.tenantId, loja.id, diasRecebiveis, taken);
+        await createCashDropDeposit(session.tenantId, loja.id, diasRecebiveis, taken);
         setMarcados([]);
         setReloadKey((n) => n + 1);
         show("Valor marcado como recebido.", "success");
       } else if (acao === "aCobrar") {
         const next = linhasForaAbertas.map((line) => ({ ...line, kind: "deposit" as const }));
-        await saveSangriaLines(next);
+        await saveCashDropLines(next);
         setLines((atual) => atual.map((row) => next.find((n) => n.id === row.id) ?? row));
         show("Sangrias marcadas como a receber.", "success");
       } else {
         const motivo = motivoLote.trim();
         const next = linhasBoletoAbertas.map((line) => ({ ...line, kind: "purchase" as const, note: line.note.trim() || motivo }));
-        await saveSangriaLines(next);
+        await saveCashDropLines(next);
         setLines((atual) => atual.map((row) => next.find((n) => n.id === row.id) ?? row));
         show("Sangrias marcadas como fora do boleto.", "success");
       }
@@ -352,8 +352,8 @@ export function SangriaPage() {
   }
 
   function aplicarIntervalo(inicio: Date, fim: Date, meta?: DateRangeChangeMeta) {
-    const nextFrom = paraIso(inicio);
-    const nextTo = paraIso(fim);
+    const nextFrom = dateToIso(inicio);
+    const nextTo = dateToIso(fim);
     setRangeFrom(nextFrom);
     setRangeTo(nextTo);
     setPresetId(meta?.presetId ?? null);
@@ -369,15 +369,15 @@ export function SangriaPage() {
         actions={
           <HeaderFilters>
             <DateRangePicker
-              value={[deIso(from), deIso(to)]}
-              minDate={deIso(piso)}
-              maxDate={deIso(fimDoMes(hoje))}
+              value={[isoToDate(from), isoToDate(to)]}
+              minDate={isoToDate(piso)}
+              maxDate={isoToDate(endOfMonth(hoje))}
               quickRanges={QUICK_RANGES_CALENDARIO}
               displayLabel={presetId ? periodLabels[presetId] : null}
               activePresetId={presetId}
               onChange={([inicio, fim], meta) => aplicarIntervalo(inicio, fim, meta)}
             />
-            {!escolher && loja ? <MarcarComo dias={marcados.length} rotulo={rotuloMarcar} valor={valorACobrar} recebidoOk={diasRecebiveis.length > 0} foraOk={linhasBoletoAbertas.length > 0} cobrarOk={linhasForaAbertas.length > 0} tudoRecebido={marcados.length > 0 && marcados.every((day) => taken.has(day))} podeDesfazer={depositosMarcados.length > 0} onRecebido={() => setAcao("recebido")} onCobrar={() => setAcao("aCobrar")} onFora={() => { setMotivoLote(""); setAcao("fora"); }} onFalta={abrirFalta} onDesfazer={() => void abrirDesfazer()} /> : null}
+            {!escolher && loja ? <MarkAs dias={marcados.length} rotulo={rotuloMarcar} valor={valorACobrar} recebidoOk={diasRecebiveis.length > 0} foraOk={linhasBoletoAbertas.length > 0} cobrarOk={linhasForaAbertas.length > 0} tudoRecebido={marcados.length > 0 && marcados.every((day) => taken.has(day))} podeDesfazer={depositosMarcados.length > 0} onRecebido={() => setAcao("recebido")} onCobrar={() => setAcao("aCobrar")} onFora={() => { setMotivoLote(""); setAcao("fora"); }} onFalta={abrirFalta} onDesfazer={() => void abrirDesfazer()} /> : null}
           </HeaderFilters>
         }
       />
@@ -387,7 +387,7 @@ export function SangriaPage() {
           <div className="max-w-[720px]">
             <SelectStoreCard />
           </div>
-        ) : showLojas || (loja != null && !pronto) ? (
+        ) : showStores || (loja != null && !pronto) ? (
           <Skeleton className="h-[520px] w-full rounded-[18px]" />
         ) : lojas.length === 0 || !loja ? (
           <Card>
@@ -395,10 +395,10 @@ export function SangriaPage() {
           </Card>
         ) : (
           <>
-            <ResumoMes aCobrar={aberto} recebido={depositado} fora={mes.foraCents} falta={mes.faltaCents} />
+            <MonthSummary aCobrar={aberto} recebido={depositado} fora={mes.foraCents} falta={mes.faltaCents} />
             <MonthCalendar>
               {cells.map((day, i) => (
-                <DiaCelula
+                <DayCell
                   key={day ?? `vazio-${i}`}
                   index={i}
                   day={day}
@@ -416,7 +416,7 @@ export function SangriaPage() {
         )}
       </div>
       {dia && loja ? (
-        <DiaModal
+        <DayModal
           key={`${loja.id}|${dia}`}
           day={dia}
           hoje={hoje}
@@ -435,7 +435,7 @@ export function SangriaPage() {
           }}
           onUndo={async (depositId) => {
             try {
-              await undoSangriaDeposit(depositId);
+              await undoCashDropDeposit(depositId);
               setDeposits((atual) => atual.filter((d) => d.depositId !== depositId));
               setDia(null);
               setReloadKey((n) => n + 1);
@@ -447,7 +447,7 @@ export function SangriaPage() {
           }}
         />
       ) : null}
-      <AcaoModal
+      <ActionModal
         acao={acao}
         gravando={depositando}
         valor={valorACobrar}
@@ -472,7 +472,7 @@ export function SangriaPage() {
   );
 }
 
-function chipsDoDia(tot: SangriaAmounts, recebido: boolean, aberto: boolean): Array<{ cor: string; texto: string }> {
+function dayChips(tot: CashDropAmounts, recebido: boolean, aberto: boolean): Array<{ cor: string; texto: string }> {
   if (tot.totalCents <= 0 && tot.faltaCents <= 0) return [];
   const chips: Array<{ cor: string; texto: string }> = [];
   if (tot.boletoCents > 0 && !(aberto && !recebido)) {
@@ -487,7 +487,7 @@ function chipsDoDia(tot: SangriaAmounts, recebido: boolean, aberto: boolean): Ar
   return chips;
 }
 
-function DiaCelula({
+function DayCell({
   index,
   day,
   hoje,
@@ -501,7 +501,7 @@ function DiaCelula({
   index: number;
   day: string | null;
   hoje: string;
-  rows: SangriaLineRow[];
+  rows: CashDropLineRow[];
   depositado: boolean;
   marcado: boolean;
   faltaCents: number;
@@ -512,7 +512,7 @@ function DiaCelula({
   const tot = dayAmounts(rows, faltaCents);
   const futuro = day > hoje;
   const temAcao = !futuro && (rows.length > 0 || faltaCents > 0 || depositado);
-  const partes = rows.length > 0 || faltaCents > 0 ? chipsDoDia(tot, depositado, day === hoje) : [];
+  const partes = rows.length > 0 || faltaCents > 0 ? dayChips(tot, depositado, day === hoje) : [];
   const chips = day === hoje ? [{ cor: "bg-acc", texto: "Em aberto" }, ...partes] : partes;
   return (
     <DayFace
@@ -521,30 +521,30 @@ function DiaCelula({
       today={hoje}
       selected={marcado}
       openable={day === hoje || temAcao}
-      openLabel={`Abrir ${tituloDia(day)}`}
+      openLabel={`Abrir ${dayTitle(day)}`}
       onOpen={() => onOpen(day)}
       amount={rows.length > 0 ? money(tot.totalCents) : null}
-      check={temAcao ? { checked: marcado, label: `Marcar ${tituloDia(day)}`, onToggle: () => onToggle(day) } : null}
+      check={temAcao ? { checked: marcado, label: `Marcar ${dayTitle(day)}`, onToggle: () => onToggle(day) } : null}
       badges={chips.length > 0 ? chips.map((chip) => (
-        <ChipDia key={chip.texto} cor={chip.cor}>{chip.texto}</ChipDia>
+        <DayChip key={chip.texto} cor={chip.cor}>{chip.texto}</DayChip>
       )) : null}
     />
   );
 }
 
-function reaisCampo(cents: number): string {
+function reaisField(cents: number): string {
   if (cents <= 0) return "";
   return (cents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function campoParaCentavos(txt: string): number | null {
+function fieldToCents(txt: string): number | null {
   if (!txt.trim()) return 0;
   const n = parseNum(txt);
   if (n == null || Number.isNaN(n) || n < 0) return null;
   return Math.round(n * 100);
 }
 
-function ResumoMes({ aCobrar, recebido, fora, falta }: { aCobrar: number; recebido: number; fora: number; falta: number }) {
+function MonthSummary({ aCobrar, recebido, fora, falta }: { aCobrar: number; recebido: number; fora: number; falta: number }) {
   const cards = [
     { label: "A receber", value: money(aCobrar), color: "var(--t0)", tooltip: "Valor das sangrias que ainda precisa ser repassado pela filial." },
     { label: "Recebido", value: money(recebido), color: "var(--t0)", tooltip: "Valor já recebido." },
@@ -560,7 +560,7 @@ function ResumoMes({ aCobrar, recebido, fora, falta }: { aCobrar: number; recebi
   );
 }
 
-function MetricasDia({ itens }: { itens: Array<{ label: string; value: string; tom: string }> }) {
+function DayFigures({ itens }: { itens: Array<{ label: string; value: string; tom: string }> }) {
   const cols = itens.length >= 4 ? "sm:grid-cols-2 lg:grid-cols-4" : itens.length === 3 ? "sm:grid-cols-3" : itens.length === 2 ? "sm:grid-cols-2" : "";
   return (
     <div className={cn("mb-4 grid grid-cols-1 gap-2", cols)}>
@@ -574,7 +574,7 @@ function MetricasDia({ itens }: { itens: Array<{ label: string; value: string; t
   );
 }
 
-function DiaModal({
+function DayModal({
   day,
   hoje,
   rows,
@@ -588,18 +588,18 @@ function DiaModal({
 }: {
   day: string;
   hoje: string;
-  rows: SangriaLineRow[];
-  shortage?: SangriaShortageRow;
-  deposit?: SangriaDepositDay;
+  rows: CashDropLineRow[];
+  shortage?: CashDropShortageRow;
+  deposit?: CashDropDepositDay;
   tenantId: string;
   storeId: string;
   onClose: () => void;
-  onSaved: (lines: SangriaLineRow[], shortage: SangriaShortageRow | null) => void;
+  onSaved: (lines: CashDropLineRow[], shortage: CashDropShortageRow | null) => void;
   onUndo: (depositId: string) => Promise<void>;
 }) {
   const { show } = useToast();
   const [linhas, setLinhas] = useState(rows);
-  const [falta, setFalta] = useState(() => reaisCampo(shortage?.amountCents ?? 0));
+  const [falta, setFalta] = useState(() => reaisField(shortage?.amountCents ?? 0));
   const [motivo, setMotivo] = useState(shortage?.note ?? "");
   const [salvando, setSalvando] = useState(false);
   const [confirmarDesfazer, setConfirmarDesfazer] = useState(false);
@@ -609,7 +609,7 @@ function DiaModal({
   const travado = Boolean(deposit);
   const preview = dayAmounts(
     linhas.map((line) => ({ amountCents: line.amountCents, kind: line.kind, note: line.note })),
-    campoParaCentavos(falta) ?? shortage?.amountCents ?? 0,
+    fieldToCents(falta) ?? shortage?.amountCents ?? 0,
   );
   const metricas = [
     preview.totalCents > 0 ? { label: "Sangrias", value: money(preview.totalCents), tom: "text-t0" } : null,
@@ -619,7 +619,7 @@ function DiaModal({
   ].filter((item): item is { label: string; value: string; tom: string } => item != null);
 
   async function salvar() {
-    const cents = campoParaCentavos(falta);
+    const cents = fieldToCents(falta);
     if (cents == null) {
       show("O valor da falta não é válido.", "danger");
       return;
@@ -638,11 +638,11 @@ function DiaModal({
       for (const line of linhas) {
         const antes = rows.find((row) => row.id === line.id);
         if (!antes || (antes.kind === line.kind && antes.note === line.note)) continue;
-        await saveSangriaLine(line.id, { kind: line.kind, note: line.note });
+        await saveCashDropLine(line.id, { kind: line.kind, note: line.note });
       }
       const texto = cents === 0 ? "" : motivo.trim();
       const mudouFalta = (shortage?.amountCents ?? 0) !== cents || (shortage?.note ?? "") !== texto;
-      if (mudouFalta) await saveSangriaShortage(tenantId, storeId, day, cents, texto);
+      if (mudouFalta) await saveCashDropShortage(tenantId, storeId, day, cents, texto);
       onSaved(linhas, cents === 0 ? null : { day, amountCents: cents, note: texto });
       show("Sangrias atualizadas.", "success");
       onClose();
@@ -693,7 +693,7 @@ function DiaModal({
               : null;
         return (
           <>
-            <span>{tituloDia(day)}</span>
+            <span>{dayTitle(day)}</span>
             {selo ? <Badge variant={selo.variant}>{selo.texto}</Badge> : null}
           </>
         );
@@ -724,7 +724,7 @@ function DiaModal({
         <p className="text-[13.5px] text-t2">Nenhuma sangria neste dia.</p>
       ) : (
         <>
-          {metricas.length > 0 ? <MetricasDia itens={metricas} /> : null}
+          {metricas.length > 0 ? <DayFigures itens={metricas} /> : null}
           <ul className="space-y-3">
             {linhas.map((line) => {
               const fora = line.kind === "purchase";
@@ -809,7 +809,7 @@ function DiaModal({
   );
 }
 
-function MarcarComo({
+function MarkAs({
   dias,
   rotulo,
   valor,
@@ -895,7 +895,7 @@ function MarcarComo({
   );
 }
 
-function AcaoModal({
+function ActionModal({
   acao,
   gravando,
   valor,

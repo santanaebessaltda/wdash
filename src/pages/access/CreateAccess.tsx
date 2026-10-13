@@ -2,11 +2,11 @@ import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { WizardSteps, useToast } from "@/components/ui";
 import { BrandMark } from "@/pages/auth/authKit";
-import { CampoFoto, CampoSenha, CamposNome, ForcaSenha, acessoBotao, nomePessoaValido, type NomePessoa } from "@/pages/access/AccessKit";
+import { PhotoField, PasswordField, NameFields, PasswordStrength, accessButton, personNameIsValid, type PersonName } from "@/pages/access/AccessKit";
 import { ONBOARDING_STEPS } from "@/pages/onboarding/steps";
 import { PRODUCT_NAME } from "@/data/wedash/tenant";
-import { SENHA_REGRA_TEXTO, senhaValida } from "@/lib/password";
-import { padTopoEBase } from "@/lib/safeArea";
+import { PASSWORD_RULE_TEXT, passwordIsValid } from "@/lib/password";
+import { padTopAndBottom } from "@/lib/safeArea";
 import { paths } from "@/router/paths";
 import { destinationAfterAuth, createAccess } from "@/session/authApi";
 import { useSession, useActiveSession } from "@/session/SessionProvider";
@@ -27,7 +27,7 @@ export function CreateAccess() {
   const navigate = useNavigate();
   const { show } = useToast();
 
-  const [nome, setNome] = useState<NomePessoa>({ nome: "", sobrenome: "" });
+  const [nome, setNome] = useState<PersonName>({ nome: "", sobrenome: "" });
   const [foto, setFoto] = useState<File | null>(null);
   const [senha, setSenha] = useState("");
   const [confirma, setConfirma] = useState("");
@@ -35,7 +35,7 @@ export function CreateAccess() {
 
   const comOnboarding = session.onboardingStep !== null;
   const erroConfirma = confirma.length > 0 && confirma !== senha ? "As senhas não coincidem." : null;
-  const pode = nomePessoaValido(nome) && senhaValida(senha) && confirma === senha && !carregando;
+  const pode = personNameIsValid(nome) && passwordIsValid(senha) && confirma === senha && !carregando;
 
   async function salvar(e: FormEvent) {
     e.preventDefault();
@@ -57,7 +57,7 @@ export function CreateAccess() {
     <div className="grid min-h-screen w-full bg-bg-0 lg:grid-cols-2">
       <div
         className="pad-topo pad-base flex flex-col px-6 pb-10 sm:px-14 lg:overflow-y-auto"
-        style={padTopoEBase("2.5rem", "2.5rem")}
+        style={padTopAndBottom("2.5rem", "2.5rem")}
       >
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -83,18 +83,18 @@ export function CreateAccess() {
           <p className="mb-7 text-sm text-t2">Informe seu nome e crie a senha que você usará para acessar a WDash.</p>
 
           <form onSubmit={salvar} className="flex flex-col gap-3.5" noValidate>
-            <CampoFoto nome={nome} foto={foto} onChange={setFoto} />
-            <CamposNome valor={nome} onChange={(p) => setNome((n) => ({ ...n, ...p }))} autoFocus />
+            <PhotoField nome={nome} foto={foto} onChange={setFoto} />
+            <NameFields valor={nome} onChange={(p) => setNome((n) => ({ ...n, ...p }))} autoFocus />
             {/* Escondido: gerenciador de senhas associa a senha nova a este login. */}
             <input type="email" name="username" autoComplete="username" value={session.email} readOnly tabIndex={-1} aria-hidden className="sr-only" />
-            <CampoSenha
+            <PasswordField
               label="Nova senha"
               value={senha}
               onChange={setSenha}
-              placeholder={SENHA_REGRA_TEXTO}
+              placeholder={PASSWORD_RULE_TEXT}
               autoComplete="new-password"
             />
-            <CampoSenha
+            <PasswordField
               label="Confirme a nova senha"
               value={confirma}
               onChange={setConfirma}
@@ -102,8 +102,8 @@ export function CreateAccess() {
               autoComplete="new-password"
               erro={erroConfirma}
             />
-            <ForcaSenha senha={senha} />
-            <button type="submit" disabled={!pode} className={`mt-1 ${acessoBotao}`} style={{ boxShadow: "0 8px 24px -8px var(--acc)" }}>
+            <PasswordStrength senha={senha} />
+            <button type="submit" disabled={!pode} className={`mt-1 ${accessButton}`} style={{ boxShadow: "0 8px 24px -8px var(--acc)" }}>
               {carregando ? "Salvando…" : "Salvar e continuar"}
             </button>
           </form>

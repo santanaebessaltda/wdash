@@ -10,7 +10,7 @@ import { createAdminClient } from "../src/deps.ts";
 import {
   brandReportToDayAggs,
   fetchBrandRevenueReport,
-  fetchFilialGeradorMap,
+  fetchBranchGeneratorMap,
 } from "../src/millenniumBrandReport.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -86,7 +86,7 @@ async function main() {
   if (!from || !to) throw new Error("sem range (passe from to ou tenha ALL no banco)");
   console.log(`backfill brand ${from} → ${to} · ${(stores ?? []).length} loja(s)`);
 
-  const geradorMap = await fetchFilialGeradorMap({ session });
+  const geradorMap = await fetchBranchGeneratorMap({ session });
   console.log("geradores", Object.fromEntries(geradorMap));
 
   for (const store of stores ?? []) {

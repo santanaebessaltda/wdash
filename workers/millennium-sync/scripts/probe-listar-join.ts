@@ -10,7 +10,7 @@ import { loginMillennium, millenniumBaseUrl } from "../src/millenniumAuth.ts";
 import { listRememberedSessions } from "../src/sessionStore.ts";
 import { milleniumDataRange } from "../src/millenniumSales.ts";
 import { fetchProductBrandMap } from "../src/millenniumProductDivision.ts";
-import { fetchFilialGeradorMap } from "../src/millenniumBrandReport.ts";
+import { fetchBranchGeneratorMap } from "../src/millenniumBrandReport.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -165,7 +165,7 @@ async function main() {
     listarCodes(session, filial, 101, from, to),
     listarCodes(session, filial, 102, from, to),
     productCodeToId(session),
-    fetchFilialGeradorMap({ session }),
+    fetchBranchGeneratorMap({ session }),
   ]);
   const catalog = await fetchProductBrandMap({
     session,

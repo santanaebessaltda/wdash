@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
-import { deIso } from "@/lib/format";
+import { isoToDate } from "@/lib/format";
 import { calendarTodayIso } from "@/data/wedash/clock";
 
 /**
@@ -47,7 +47,7 @@ function zeraHora(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
-function addDias(d: Date, n: number): Date {
+function addCalendarDays(d: Date, n: number): Date {
   const r = new Date(d);
   r.setDate(r.getDate() + n);
   return r;
@@ -58,7 +58,7 @@ function inicioSemana(hoje: Date): Date {
   const d = zeraHora(hoje);
   const dow = d.getDay();
   const diff = dow === 0 ? -6 : 1 - dow;
-  return addDias(d, diff);
+  return addCalendarDays(d, diff);
 }
 
 function inicioTrimestre(hoje: Date): Date {
@@ -74,7 +74,7 @@ function inicioSemestre(hoje: Date): Date {
 /** Atalhos padrao alinhados ao escopo (URL `periodo=`). */
 export const QUICK_RANGES_PADRAO: QuickRange[] = [
   { id: "hoje", label: "Hoje", resolve: (h) => { const d = zeraHora(h); return [d, d]; } },
-  { id: "ontem", label: "Ontem", resolve: (h) => { const d = addDias(zeraHora(h), -1); return [d, d]; } },
+  { id: "ontem", label: "Ontem", resolve: (h) => { const d = addCalendarDays(zeraHora(h), -1); return [d, d]; } },
   { id: "estaSemana", label: "Esta semana", resolve: (h) => { const d = zeraHora(h); return [inicioSemana(d), d]; } },
   { id: "esteMes", label: "Este mês", resolve: (h) => { const d = zeraHora(h); return [new Date(d.getFullYear(), d.getMonth(), 1), d]; } },
   { id: "esteTrimestre", label: "Este trimestre", resolve: (h) => { const d = zeraHora(h); return [inicioTrimestre(d), d]; } },
@@ -99,7 +99,7 @@ const DOW_PT = ["D", "S", "T", "Q", "Q", "S", "S"];
 const MESES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 const MESES_CURTO = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
-function mesmoDia(a: Date, b: Date): boolean {
+function sameCalendarDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
@@ -109,7 +109,7 @@ function formatarCurto(d: Date): string {
 
 function formatarIntervalo(r: DateRange): string {
   const [a, b] = r;
-  return mesmoDia(a, b) ? formatarCurto(a) : `${formatarCurto(a)} – ${formatarCurto(b)}`;
+  return sameCalendarDay(a, b) ? formatarCurto(a) : `${formatarCurto(a)} – ${formatarCurto(b)}`;
 }
 
 export type DateRangeChangeMeta = {
@@ -144,7 +144,7 @@ export function DateRangePicker({
   maxDate?: Date | null;
 }) {
   // Dia civil das lojas (Campo Grande)  -  alinhado a resolvePeriod/calendarTodayIso.
-  const hoje = useMemo(() => deIso(calendarTodayIso()), []);
+  const hoje = useMemo(() => isoToDate(calendarTodayIso()), []);
   const min = useMemo(() => (minDate ? zeraHora(minDate) : null), [minDate]);
   const max = useMemo(() => zeraHora(maxDate ?? hoje), [maxDate, hoje]);
   const [open, setOpen] = useState(false);
@@ -237,16 +237,16 @@ export function DateRangePicker({
   /** 1 dia = Hoje/Ontem se bater com o calendario real (igual aos pills). */
   function presetDoRange(r: DateRange): DatePresetId | undefined {
     const [a, b] = r;
-    if (!mesmoDia(a, b)) return undefined;
-    if (mesmoDia(a, hoje)) return "hoje";
-    if (mesmoDia(a, addDias(hoje, -1))) return "ontem";
+    if (!sameCalendarDay(a, b)) return undefined;
+    if (sameCalendarDay(a, hoje)) return "hoje";
+    if (sameCalendarDay(a, addCalendarDays(hoje, -1))) return "ontem";
     return undefined;
   }
 
   function escolherDia(dia: Date) {
     if (diaBloqueado(dia)) return;
     // 1 clique (ou dia anterior ao inicio)  ->  marca inicio; 2 no mesmo dia  ->  so aquele dia.
-    if (!draftStart || (!mesmoDia(draftStart, dia) && draftStart > dia)) {
+    if (!draftStart || (!sameCalendarDay(draftStart, dia) && draftStart > dia)) {
       setDraftStart(dia);
       return;
     }
@@ -273,8 +273,8 @@ export function DateRangePicker({
   }
 
   function ehSelecionado(dia: Date): boolean {
-    if (draftStart && mesmoDia(draftStart, dia)) return true;
-    if (value) return mesmoDia(value[0], dia) || mesmoDia(value[1], dia);
+    if (draftStart && sameCalendarDay(draftStart, dia)) return true;
+    if (value) return sameCalendarDay(value[0], dia) || sameCalendarDay(value[1], dia);
     return false;
   }
 
@@ -372,7 +372,7 @@ export function DateRangePicker({
               <div className="grid grid-cols-7 gap-1">
                 {cells.map((dia, i) => {
                   if (dia === null) return <span key={`e${i}`} />;
-                  const isHoje = mesmoDia(dia, hoje);
+                  const isHoje = sameCalendarDay(dia, hoje);
                   const bloqueado = diaBloqueado(dia);
                   const selecionado = ehSelecionado(dia);
                   const dentro = ehDentro(dia);

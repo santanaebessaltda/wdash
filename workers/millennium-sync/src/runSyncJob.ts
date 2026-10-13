@@ -37,7 +37,7 @@ import {
   type CashCloseReportLine,
 } from "./millenniumCashClose.ts";
 import { clampCloseRange, missingCloseDays } from "../../../src/data/wedash/cashCloseMonth.ts";
-import type { ParsedSangria } from "./millenniumSangria.ts";
+import type { ParsedCashDrop } from "./millenniumCashDrop.ts";
 import type { StoneCapture } from "./stoneConciliation.ts";
 import {
   closedMonthRange,
@@ -92,9 +92,9 @@ import { createSellerLinker, type LinkerStore, type SellerLinkerDeps } from "./s
 import type { ErpStore } from "./millenniumStores.ts";
 import { AUTO_SESSION_MARK, localClock, pendingDays } from "./autoRefresh.ts";
 import {
-  partitionRowsByFilial,
+  partitionRowsByBranch,
   type FetchSalesListaParams,
-  type SaleRowWithFilial,
+  type SaleRowWithBranch,
 } from "./millenniumSales.ts";
 
 type ListaWindowArgs = {
@@ -262,12 +262,12 @@ async function syncStoreCloseSpan(
   const today = ymdInTz(new Date(), args.store.timezone);
   const sangriaTo = args.to < today ? args.to : today;
   if (args.from <= sangriaTo) {
-    await syncStoreSangria(deps, { ...args, from: args.from, to: sangriaTo });
+    await syncStoreCashDrop(deps, { ...args, from: args.from, to: sangriaTo });
   }
   await syncStoreCashClose(deps, args);
 }
 
-export async function syncStoreSangria(
+export async function syncStoreCashDrop(
   deps: Pick<SyncJobDeps, "fetchSangriaLista" | "upsertSangriaLines" | "closeHistoryFloor">,
   args: {
     session: string;
@@ -277,7 +277,7 @@ export async function syncStoreSangria(
     to: string;
   },
 ): Promise<void> {
-  if (!deps.fetchSangriaLista || !deps.upsertSangriaLines) return;
+  if (!deps.fetchCashDropList || !deps.upsertCashDropLines) return;
   const span = await rangeInsideCloseFloor(deps, {
     tenantId: args.tenantId,
     timeZone: args.store.timezone,
@@ -286,13 +286,13 @@ export async function syncStoreSangria(
   });
   if (!span) return;
   try {
-    const lines = await deps.fetchSangriaLista({
+    const lines = await deps.fetchCashDropList({
       session: args.session,
       millenniumStoreId: args.store.millenniumStoreId,
       from: span.from,
       to: span.to,
     });
-    await deps.upsertSangriaLines({ tenantId: args.tenantId, storeId: args.store.id, lines });
+    await deps.upsertCashDropLines({ tenantId: args.tenantId, storeId: args.store.id, lines });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.warn(`  AVISO [${args.store.code}] sangria ${args.from}→${args.to}: ${msg}`);
@@ -364,7 +364,7 @@ async function syncStoreStone(
 
 /** Cupom que veio no relatorio de cupom  ->  vendedora pelo gerador, com o nome atual do ERP. */
 export function withCouponSeller(row: SaleRow, sellers: Map<string, CouponSeller>): SaleRow {
-  const x = row as Partial<SaleRowWithFilial>;
+  const x = row as Partial<SaleRowWithBranch>;
   if (x.millenniumOpCode == null || !x.nf) return row;
   const tipo = (x.tipoOperacao ?? "S").trim() || "S";
   const seller = sellers.get(couponKey({ millenniumOpCode: x.millenniumOpCode, nf: x.nf, tipoOperacao: tipo }));
@@ -438,7 +438,7 @@ async function upsertBrandSplit(
     store: SyncStore;
     from: string;
     to: string;
-    rows: SaleRowWithFilial[];
+    rows: SaleRowWithBranch[];
     productMap: ProductBrandMap;
     geradorMap: Map<string, number>;
     geradorIdsWithWpink: Set<number>;
@@ -1155,7 +1155,7 @@ async function closedMonthMargem(
     tenantId: string;
     store: SyncStore;
     day: string;
-    storeRows: SaleRowWithFilial[];
+    storeRows: SaleRowWithBranch[];
     couponLines?: CouponReportLine[] | null | Promise<CouponReportLine[] | null>;
     detMovLines?: Map<string, DetMovLine[]>;
     timings?: StepTimings;
@@ -1216,7 +1216,7 @@ async function saveCouponProducts(
     tenantId: string;
     store: SyncStore;
     coupon: CouponFetch;
-    listaRows: SaleRowWithFilial[];
+    listaRows: SaleRowWithBranch[];
     catalogGuard: CatalogGuard;
     detMovLines?: Map<string, DetMovLine[]>;
     timings?: StepTimings;
@@ -1619,9 +1619,9 @@ export type SyncJobDeps = {
     tenantId: string,
     codFilial: string,
   ) => Promise<number[]>;
-  fetchSalesLista: (params: FetchSalesListaParams) => Promise<SaleRowWithFilial[] | SaleRow[]>;
+  fetchSalesLista: (params: FetchSalesListaParams) => Promise<SaleRowWithBranch[] | SaleRow[]>;
   /** Lookup COD_FILIAL  ->  FILIAL_GERADOR_GERADOR (wtsreports). */
-  fetchFilialGeradorMap: (session: string) => Promise<Map<string, number>>;
+  fetchBranchGeneratorMap: (session: string) => Promise<Map<string, number>>;
   /** Mapa PRODUTO  ->  WEPINK|WPINK (report + LISTAR; 1x por job, uniao das lojas). */
   fetchProductBrandMap: (params: {
     session: string;
@@ -1745,8 +1745,8 @@ export type SyncJobDeps = {
   /** Dia 1 do mês em que a conta entrou. Fechamento e sangria anteriores ficam de fora. */
   closeHistoryFloor?: (args: { tenantId: string; timeZone: string }) => Promise<string>;
   /** Sangrias da filial no intervalo. Opcional: sem ela o calendário não enche. */
-  fetchSangriaLista?: (args: { session: string; millenniumStoreId: number; from: string; to: string }) => Promise<ParsedSangria[]>;
-  upsertSangriaLines?: (args: { tenantId: string; storeId: string; lines: ParsedSangria[] }) => Promise<void>;
+  fetchCashDropList?: (args: { session: string; millenniumStoreId: number; from: string; to: string }) => Promise<ParsedCashDrop[]>;
+  upsertCashDropLines?: (args: { tenantId: string; storeId: string; lines: ParsedCashDrop[] }) => Promise<void>;
   /**
    * Substitui fundo, sangria, fechamento e valor digitado no intervalo [from,to].
    * Não altera o faturamento.
@@ -2490,7 +2490,7 @@ async function syncOnboardingRegistry(job: SyncJob, deps: SyncJobDeps): Promise<
   const missingGerador = stores.filter((s) => s.geradorId == null);
   if (missingGerador.length > 0 && deps.setStoresGerador) {
     try {
-      const found = await deps.fetchFilialGeradorMap(session);
+      const found = await deps.fetchBranchGeneratorMap(session);
       const rows = missingGerador.flatMap((s) => {
         const g = found.get(s.code);
         return g == null ? [] : [{ storeId: s.id, geradorId: g }];
@@ -2609,7 +2609,7 @@ async function runRegistryJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyncR
     if (deps.setStoresGerador) {
       const setStoresGerador = deps.setStoresGerador;
       await step("gerador das lojas", async () => {
-        const found = await deps.fetchFilialGeradorMap(session);
+        const found = await deps.fetchBranchGeneratorMap(session);
         const rows = stores.flatMap((s) => {
           const g = found.get(s.code);
           return g == null || g === s.geradorId ? [] : [{ storeId: s.id, geradorId: g }];
@@ -3340,7 +3340,7 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
     if (missingGerador.length > 0) {
       try {
         const tGer = nowMs();
-        const found = await timed(jobTimings, STEP.gerador, () => deps.fetchFilialGeradorMap(session!));
+        const found = await timed(jobTimings, STEP.gerador, () => deps.fetchBranchGeneratorMap(session!));
         const toSave: Array<{ storeId: string; geradorId: number }> = [];
         for (const s of missingGerador) {
           const g = found.get(s.code);
@@ -3468,9 +3468,9 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
         eventoIds,
       });
       const byMillenium = new Map(storeList.map((s) => [s.millenniumStoreId, { id: s.id }]));
-      const withFilial: SaleRowWithFilial[] = rawRows.map((r) => {
-        const x = r as SaleRowWithFilial;
-        if (x.millenniumFilial != null) {
+      const withBranch: SaleRowWithBranch[] = rawRows.map((r) => {
+        const x = r as SaleRowWithBranch;
+        if (x.millenniumBranch != null) {
           return {
             ...x,
             millenniumOpCode: x.millenniumOpCode ?? null,
@@ -3480,13 +3480,13 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
         }
         return {
           ...x,
-          millenniumFilial: null,
+          millenniumBranch: null,
           millenniumOpCode: x.millenniumOpCode ?? null,
           nf: x.nf ?? null,
           tipoOperacao: x.tipoOperacao ?? null,
         };
       });
-      const parts = partitionRowsByFilial(withFilial, byMillenium);
+      const parts = partitionRowsByBranch(withBranch, byMillenium);
       for (const store of storeList) {
         const rows = parts.get(store.id) ?? [];
         const agg = aggregateSales(rows, {
@@ -3597,7 +3597,7 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
           !job.payload.deep &&
           !job.payload.fillUntil
         ) {
-          await syncStoreSangria(deps, {
+          await syncStoreCashDrop(deps, {
             session: session!,
             tenantId: job.tenantId,
             store,
@@ -3726,7 +3726,7 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
         let dayErrors = 0;
         let brandFrom = windows[0]!.from;
         let brandTo = windows[0]!.to;
-        const listaForBrand: SaleRowWithFilial[] = [];
+        const listaForBrand: SaleRowWithBranch[] = [];
         for (const w of windows) {
           if (w.from < brandFrom) brandFrom = w.from;
           if (w.to > brandTo) brandTo = w.to;
@@ -3840,11 +3840,11 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
           }
 
           for (const r of rows) {
-            const x = r as SaleRowWithFilial;
+            const x = r as SaleRowWithBranch;
             listaForBrand.push({
               ...x,
               storeId: store.id,
-              millenniumFilial: x.millenniumFilial ?? store.millenniumStoreId,
+              millenniumBranch: x.millenniumBranch ?? store.millenniumStoreId,
               millenniumOpCode: x.millenniumOpCode ?? null,
               nf: x.nf ?? null,
               tipoOperacao: x.tipoOperacao ?? null,

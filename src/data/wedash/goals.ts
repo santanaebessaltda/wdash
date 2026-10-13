@@ -10,7 +10,7 @@ export interface Goal {
   /** "AAAA-MM" */
   competencia: string;
   nome: string;
-  valorLoja: number;
+  storeAmount: number;
   degraus: Tier[];
   /** Individual = meta por vendedora; grupo = meta compartilhada do time. */
   tipo: GoalType;
@@ -40,14 +40,14 @@ const AMBAS: GoalBrand[] = ["WEPINK", "WPINK"];
 export const goals: Goal[] = [
   // f1 (Shopping Campo Grande) = loja ancora, meta acima de f2.
   // Valores calibrados ao gerador de vendas (MTD ~ metade do mes  50% da meta).
-  { id: "m-f1-2026-07", filialId: "f1", competencia: "2026-07", nome: "Julho 2026", valorLoja: 158000, degraus: defaultTiers, tipo: "grupo", marcas: AMBAS },
-  { id: "m-f1-2026-08", filialId: "f1", competencia: "2026-08", nome: "Agosto 2026", valorLoja: 162000, degraus: defaultTiers, tipo: "grupo", marcas: AMBAS },
-  { id: "m-f1-2026-09", filialId: "f1", competencia: "2026-09", nome: "Setembro 2026", valorLoja: 170000, degraus: defaultTiers, tipo: "grupo", marcas: AMBAS },
+  { id: "m-f1-2026-07", filialId: "f1", competencia: "2026-07", nome: "Julho 2026", storeAmount: 158000, degraus: defaultTiers, tipo: "grupo", marcas: AMBAS },
+  { id: "m-f1-2026-08", filialId: "f1", competencia: "2026-08", nome: "Agosto 2026", storeAmount: 162000, degraus: defaultTiers, tipo: "grupo", marcas: AMBAS },
+  { id: "m-f1-2026-09", filialId: "f1", competencia: "2026-09", nome: "Setembro 2026", storeAmount: 170000, degraus: defaultTiers, tipo: "grupo", marcas: AMBAS },
   // Meta de marca paralela (demo de N cards no Ao vivo).
-  { id: "m-f1-2026-09-wpink", filialId: "f1", competencia: "2026-09", nome: "Meta WPINK", valorLoja: 32000, degraus: defaultTiers.slice(0, 3), tipo: "individual", marcas: ["WPINK"] },
-  { id: "m-f2-2026-07", filialId: "f2", competencia: "2026-07", nome: "Julho 2026", valorLoja: 88000, degraus: defaultTiers, tipo: "grupo", marcas: AMBAS },
-  { id: "m-f2-2026-08", filialId: "f2", competencia: "2026-08", nome: "Agosto 2026", valorLoja: 92000, degraus: defaultTiers, tipo: "grupo", marcas: AMBAS },
-  { id: "m-f2-2026-09", filialId: "f2", competencia: "2026-09", nome: "Setembro 2026", valorLoja: 98000, degraus: defaultTiers, tipo: "grupo", marcas: AMBAS },
+  { id: "m-f1-2026-09-wpink", filialId: "f1", competencia: "2026-09", nome: "Meta WPINK", storeAmount: 32000, degraus: defaultTiers.slice(0, 3), tipo: "individual", marcas: ["WPINK"] },
+  { id: "m-f2-2026-07", filialId: "f2", competencia: "2026-07", nome: "Julho 2026", storeAmount: 88000, degraus: defaultTiers, tipo: "grupo", marcas: AMBAS },
+  { id: "m-f2-2026-08", filialId: "f2", competencia: "2026-08", nome: "Agosto 2026", storeAmount: 92000, degraus: defaultTiers, tipo: "grupo", marcas: AMBAS },
+  { id: "m-f2-2026-09", filialId: "f2", competencia: "2026-09", nome: "Setembro 2026", storeAmount: 98000, degraus: defaultTiers, tipo: "grupo", marcas: AMBAS },
 ];
 
 /** Todas as metas da loja na competencia (pode haver mais de uma  -  ex.: loja + marca). */

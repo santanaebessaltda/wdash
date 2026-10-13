@@ -18,7 +18,7 @@ export function formatUpdatedAtLabel(
   opts: { now?: Date; timeZone?: string } = {},
 ): string {
   const now = opts.now ?? new Date();
-  const hora = new Intl.DateTimeFormat("pt-BR", {
+  const clockLabel = new Intl.DateTimeFormat("pt-BR", {
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
@@ -31,8 +31,8 @@ export function formatUpdatedAtLabel(
     timeZone: opts.timeZone,
   });
   const diaAt = dia.format(at);
-  if (diaAt === dia.format(now)) return `Atualizado às ${hora}`;
-  return `Atualizado em ${diaAt.slice(0, 5)} às ${hora}`;
+  if (diaAt === dia.format(now)) return `Atualizado às ${clockLabel}`;
+  return `Atualizado em ${diaAt.slice(0, 5)} às ${clockLabel}`;
 }
 
 export function formatSyncWatermarkLabel(

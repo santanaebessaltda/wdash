@@ -28,7 +28,7 @@ type Loaded = {
   costs: Map<string, number>;
 };
 
-function hora(iso: string): string {
+function clockLabel(iso: string): string {
   const d = new Date(iso);
   const h = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
   if (d.toDateString() === new Date().toDateString()) return `às ${h}`;
@@ -245,7 +245,7 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null, costT
     syncError,
     syncedAt,
     stale: !syncing && syncedAt != null && isStale(syncedAt, now),
-    staleTexto: syncedAt ? `O saldo foi atualizado ${hora(syncedAt)}. O pedido pode usar quantidades desatualizadas.` : null,
+    staleTexto: syncedAt ? `O saldo foi atualizado ${clockLabel(syncedAt)}. O pedido pode usar quantidades desatualizadas.` : null,
     factor,
     setFactor,
     soldDays,

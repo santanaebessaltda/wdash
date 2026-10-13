@@ -53,7 +53,7 @@ import { FlameIcon, TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
 import { RankingBlock } from "@/pages/live/blocks";
 import type { RankingRow } from "@/data/wedash/live";
 import { TABLE_PAGE_SIZE } from "@/lib/usePagedRows";
-import { brlCent, deIso, labelUpper, num, tipRelacao } from "@/lib/format";
+import { brlCent, isoToDate, labelUpper, num, comparedWithTip } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePicker";
 import {
@@ -173,7 +173,7 @@ function partesTurno(turno?: string): { nome: string; horario?: string } {
 }
 
 /** Loja principal (+N)  -  so com mais de 1 loja no escopo. */
-function rotuloLojas(lojas: string[]): string | null {
+function storesLabel(lojas: string[]): string | null {
   if (lojas.length === 0) return null;
   return lojas.length > 1 ? `${lojas[0]} · +${lojas.length - 1}` : lojas[0]!;
 }
@@ -187,8 +187,8 @@ export function TeamPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const abaParam = searchParams.get("aba");
-  const abaDesempenho = abaParam === "desafios" || abaParam === "metas" ? abaParam : "ranking";
+  const abaParam = searchParams.get("tab") ?? searchParams.get("aba");
+  const abaDesempenho = abaParam === "challenges" || abaParam === "desafios" ? "challenges" : abaParam === "goals" || abaParam === "metas" ? "goals" : "ranking";
   const { escopo, mudar } = useScope();
   const [aggs, setAggs] = useState<TeamAggInput>({ dayAggs: [] });
   const [coverageFrom, setCoverageFrom] = useState<Date | null>(null);
@@ -225,7 +225,7 @@ export function TeamPage() {
       ]);
       if (gen !== reloadGen.current) return;
       setAggs(next);
-      setCoverageFrom(cov.from ? deIso(cov.from) : null);
+      setCoverageFrom(cov.from ? isoToDate(cov.from) : null);
       setGoalsData(metas);
       setChallengesData(desafios);
     } catch (e) {
@@ -252,14 +252,14 @@ export function TeamPage() {
 
   const hojeIso = calendarTodayIso();
   const metaCards = useMemo(() => {
-    const nomeLoja = new Map(storesForSession(session.stores).map((s) => [s.id, s.fantasia]));
+    const storeName = new Map(storesForSession(session.stores).map((s) => [s.id, s.fantasia]));
     const ordem = { active: 0, upcoming: 1, ended: 2 } as const;
     return [...goalsData.goals]
       .sort((a, b) => ordem[goalStatus(a, hojeIso)] - ordem[goalStatus(b, hojeIso)] || b.startsOn.localeCompare(a.startsOn))
       .map((goal) =>
         buildGoalCardView({
           goal,
-          lojaNome: nomeLoja.get(goal.storeId) ?? "Filial",
+          lojaNome: storeName.get(goal.storeId) ?? "Filial",
           dayAggs: goalsData.dayAggs,
           sellerDayAggs: goalsData.sellerAggs,
           team: goalsData.team,
@@ -270,12 +270,12 @@ export function TeamPage() {
   }, [goalsData, session.stores, hojeIso, storesTick]);
 
   const desafioCards = useMemo(() => {
-    const nomeLoja = new Map(storesForSession(session.stores).map((s) => [s.id, s.fantasia]));
+    const storeName = new Map(storesForSession(session.stores).map((s) => [s.id, s.fantasia]));
     return challengesData.challenges
       .map((challenge) => ({
         challenge,
         view: buildChallengeView({ challenge, aggs: challengesData.aggs, today: hojeIso }),
-        lojaNome: nomeLoja.get(challenge.storeId),
+        lojaNome: storeName.get(challenge.storeId),
       }))
       .sort(
         (a, b) =>
@@ -286,7 +286,7 @@ export function TeamPage() {
           a.challenge.name.localeCompare(b.challenge.name, "pt-BR"),
       );
   }, [challengesData, session.stores, hojeIso]);
-  const mostraLojaDesafio = escopo.filialIds.length === 0 && storesForSession(session.stores).length > 1;
+  const showChallengeStore = escopo.filialIds.length === 0 && storesForSession(session.stores).length > 1;
 
   const niveisMeta = useMemo(
     () =>
@@ -369,8 +369,8 @@ export function TeamPage() {
       abrirPessoa(p.key, p.nome);
     }
   };
-  const tipVariacao = `Faturamento ${tipRelacao(view.vsVariacao).replace(/^Em/, "em").replace(/\.$/, "")}.`;
-  const tipVariacaoTotal = `Faturamento total das pessoas do filtro ${tipRelacao(view.vsVariacao).replace(/^Em/, "em").replace(/\.$/, "")}.`;
+  const tipVariacao = `Faturamento ${comparedWithTip(view.vsVariacao).replace(/^Em/, "em").replace(/\.$/, "")}.`;
+  const tipVariacaoTotal = `Faturamento total das pessoas do filtro ${comparedWithTip(view.vsVariacao).replace(/^Em/, "em").replace(/\.$/, "")}.`;
   const temVendasEquipe = view.pessoas.length > 0;
   const podeConfigurar = PODE_CONFIGURAR_LOJA.has(session.role);
   const rankPorKey = new Map(view.pessoas.map((p, i) => [p.key, i]));
@@ -586,7 +586,7 @@ export function TeamPage() {
                   content: !temVendasEquipe ? <EmptyBlock /> : abaRanking(),
                 },
                 {
-                  key: "metas",
+                  key: "goals",
                   label: "Metas",
                   icon: <TargetIcon size={14} />,
                   content:
@@ -616,7 +616,7 @@ export function TeamPage() {
                     ),
                 },
                 {
-                  key: "desafios",
+                  key: "challenges",
                   label: "Desafios",
                   icon: <FlameIcon size={14} />,
                   content:
@@ -627,7 +627,7 @@ export function TeamPage() {
                             key={challenge.id}
                             challenge={challenge}
                             view={desafio}
-                            lojaNome={mostraLojaDesafio ? lojaNome : undefined}
+                            lojaNome={showChallengeStore ? lojaNome : undefined}
                             onOpen={() => navigate(paths.management.challengeDetail(challenge.id), { state: { from: "team" } })}
                           />
                         ))}
@@ -694,7 +694,7 @@ export function TeamPage() {
                 {pageRows.map((p) => {
                   const rank = rankPorKey.get(p.key) ?? 0;
                   const turno = partesTurno(p.turno);
-                  const loja = view.multiLoja ? rotuloLojas(p.lojas) : null;
+                  const loja = view.multiLoja ? storesLabel(p.lojas) : null;
                   return (
                     <tr
                       key={p.key}
@@ -736,7 +736,7 @@ export function TeamPage() {
                           </span>
                         </Tooltip>
                       </td>
-                      {temColunaMeta && <CelulaNivelMeta nivel={niveisMeta.get(p.key)} completo={!printing} />}
+                      {temColunaMeta && <GoalLevelCell nivel={niveisMeta.get(p.key)} completo={!printing} />}
                     </tr>
                   );
                 })}
@@ -786,7 +786,7 @@ export function TeamPage() {
 }
 
 /** Barra da meta da pessoa com os niveis (N1  |  nome (premiacao %)); sem meta = " - ". */
-function CelulaNivelMeta({ nivel, completo }: { nivel?: SellerGoalLevel; completo: boolean }) {
+function GoalLevelCell({ nivel, completo }: { nivel?: SellerGoalLevel; completo: boolean }) {
   if (!nivel) return <td className="py-3 pl-5 pr-1 text-[13px] text-t2">—</td>;
   return (
     <td className="py-3 pl-5 pr-1 align-middle">

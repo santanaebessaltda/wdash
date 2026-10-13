@@ -22,7 +22,7 @@ import {
 } from "@/data/wedash/challengeView";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { storesForSession, type Store } from "@/data/wedash/stores";
-import { dataCompleta, deIso, fimDoMes, paraIso } from "@/lib/format";
+import { fullDate, isoToDate, endOfMonth, dateToIso } from "@/lib/format";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import {
   CHALLENGE_STATUS_ORDER,
@@ -51,8 +51,8 @@ type Loaded = { challenges: ChallengeRecord[]; aggs: ChallengeAggInput };
 
 /** Desafios podem ser cadastrados para frente: o calendario vai ate o fim do mes daqui a 12 meses. */
 function maxPickerDate(today: string): Date {
-  const d = deIso(today);
-  return deIso(fimDoMes(paraIso(new Date(d.getFullYear(), d.getMonth() + 12, 1))));
+  const d = isoToDate(today);
+  return isoToDate(endOfMonth(dateToIso(new Date(d.getFullYear(), d.getMonth() + 12, 1))));
 }
 
 /** Gestao > Desafios  -  1 card por desafio (lojas do StorePicker x periodo do filtro). */
@@ -238,8 +238,8 @@ export function ChallengesPage() {
       >
         {confirmar && (
           <p className="text-[13px] leading-relaxed text-t1">
-            O desafio <span className="font-bold text-t0">{confirmar.name}</span>, de {dataCompleta(confirmar.startsOn)} a{" "}
-            {dataCompleta(confirmar.endsOn)}, será excluído. Essa ação não pode ser desfeita.
+            O desafio <span className="font-bold text-t0">{confirmar.name}</span>, de {fullDate(confirmar.startsOn)} a{" "}
+            {fullDate(confirmar.endsOn)}, será excluído. Essa ação não pode ser desfeita.
           </p>
         )}
       </Modal>
@@ -264,7 +264,7 @@ function ChallengeCard({
   onCopy: () => void;
   onDelete: () => void;
 }) {
-  const periodo = `${dataCompleta(c.startsOn)} a ${dataCompleta(c.endsOn)}`;
+  const periodo = `${fullDate(c.startsOn)} a ${fullDate(c.endsOn)}`;
   const destaque = challengeHeadline(c, view);
   const premio = mainPrizeLabel(c);
 

@@ -161,7 +161,7 @@ export function SyncLogsPage() {
   }, [logs, busca, lojaNome]);
 
   const events: TimelineEvent[] = filtrados.map((e) => {
-    const temLoja = Boolean(e.storeId || e.storeLabel);
+    const hasStore = Boolean(e.storeId || e.storeLabel);
     const rotina = e.jobKind ? (SYNC_JOB_KIND_LABEL[e.jobKind] ?? e.jobKind) : "Sincronização";
     return {
       id: e.id,
@@ -175,7 +175,7 @@ export function SyncLogsPage() {
           <LevelBadge level={e.level} />
         </button>
       ),
-      time: [rotina, fmtAgo(e.createdAt), temLoja ? lojaNome(e) : null, e.count > 1 ? `${e.count} ocorrências` : null]
+      time: [rotina, fmtAgo(e.createdAt), hasStore ? lojaNome(e) : null, e.count > 1 ? `${e.count} ocorrências` : null]
         .filter(Boolean)
         .join(" · "),
       color: "transparent",

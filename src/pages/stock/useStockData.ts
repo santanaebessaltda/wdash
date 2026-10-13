@@ -20,7 +20,7 @@ type StockLoaded = {
   incomingSyncedAt: Map<string, string | null>;
 };
 
-function hora(iso: string): string {
+function clockLabel(iso: string): string {
   const d = new Date(iso);
   const h = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
   if (d.toDateString() === new Date().toDateString()) return `às ${h}`;
@@ -153,7 +153,7 @@ export function useStockData() {
   const atualizadoTexto = syncing
     ? "Buscando estoque…"
     : oldestSync
-      ? `Estoque atualizado ${hora(oldestSync)}`
+      ? `Estoque atualizado ${clockLabel(oldestSync)}`
       : "Estoque ainda não atualizado";
 
   return {

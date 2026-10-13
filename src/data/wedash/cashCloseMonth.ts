@@ -1,9 +1,9 @@
-import { fimDoMes, inicioDoMes, somarDias } from "./engine/format.ts";
+import { endOfMonth, startOfMonth, addDays } from "./engine/format.ts";
 
 /** Meses civis que o intervalo toca, do primeiro ao último, inclusive. */
 export function monthsTouched(from: string, to: string): string[] {
-  const start = inicioDoMes(from <= to ? from : to);
-  const end = inicioDoMes(from <= to ? to : from);
+  const start = startOfMonth(from <= to ? from : to);
+  const end = startOfMonth(from <= to ? to : from);
   const months: string[] = [];
   let cursor = start;
   while (cursor <= end) {
@@ -18,9 +18,9 @@ export function monthsTouched(from: string, to: string): string[] {
 
 /** Do dia 1 do mês de `monthDay` até ontem, ou até o fim do mês se ele já passou. */
 export function monthCloseSpanFor(monthDay: string, today: string): { from: string; to: string } | null {
-  const from = inicioDoMes(monthDay);
-  const yesterday = somarDias(today, -1);
-  const end = fimDoMes(monthDay);
+  const from = startOfMonth(monthDay);
+  const yesterday = addDays(today, -1);
+  const end = endOfMonth(monthDay);
   const to = end < yesterday ? end : yesterday;
   if (from > to) return null;
   return { from, to };
@@ -28,8 +28,8 @@ export function monthCloseSpanFor(monthDay: string, today: string): { from: stri
 
 /** Sangria do mês visível, do dia 1 até hoje (ou até o fim do mês, se ele já passou). */
 export function sangriaMonthSpan(monthDay: string, today: string): { from: string; to: string } | null {
-  const from = inicioDoMes(monthDay);
-  const end = fimDoMes(monthDay);
+  const from = startOfMonth(monthDay);
+  const end = endOfMonth(monthDay);
   const to = end < today ? end : today;
   if (from > to) return null;
   return { from, to };
@@ -57,14 +57,14 @@ export function closeHistoryFloor(joinedOn: string): string {
  * Com lançamento nesse mês, abre desde o mês mais antigo que ainda tem dado.
  */
 export function navMonthFloor(today: string, oldestDay: string | null, newestPastDay: string | null): string {
-  const current = inicioDoMes(today);
+  const current = startOfMonth(today);
   const [y, m] = current.split("-").map(Number);
   const prevM = m === 1 ? 12 : m - 1;
   const prevY = m === 1 ? y - 1 : y;
   const previous = `${prevY}-${String(prevM).padStart(2, "0")}-01`;
   const newest = newestPastDay?.slice(0, 10) ?? "";
-  if (!newest || inicioDoMes(newest) !== previous) return current;
-  const oldest = inicioDoMes(oldestDay && oldestDay.slice(0, 10) < current ? oldestDay : previous);
+  if (!newest || startOfMonth(newest) !== previous) return current;
+  const oldest = startOfMonth(oldestDay && oldestDay.slice(0, 10) < current ? oldestDay : previous);
   return oldest > current ? current : oldest;
 }
 
@@ -96,12 +96,12 @@ export const CLOSE_REOPEN_DAYS = 3;
 
 /** Dias do intervalo, até ontem, que ainda não têm fechamento, mais a janela recente. */
 export function missingCloseDays(from: string, to: string, today: string, filled: ReadonlySet<string>): string[] {
-  const yesterday = somarDias(today, -1);
+  const yesterday = addDays(today, -1);
   const end = to < yesterday ? to : yesterday;
   if (from > end) return [];
-  const reopenFrom = somarDias(yesterday, -(CLOSE_REOPEN_DAYS - 1));
+  const reopenFrom = addDays(yesterday, -(CLOSE_REOPEN_DAYS - 1));
   const out: string[] = [];
-  for (let day = from; day <= end; day = somarDias(day, 1)) {
+  for (let day = from; day <= end; day = addDays(day, 1)) {
     if (!filled.has(day) || day >= reopenFrom) out.push(day);
   }
   return out;

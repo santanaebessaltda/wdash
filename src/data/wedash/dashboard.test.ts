@@ -1,17 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildStoreView, buildOverviewView, buildFinanceView, buildProductsView, buildTeamDashboardView, TEAM_SEM_TURNO, kpiDelta, monthlyEvolutionMonths, previousPeriod, resolvePeriod, revenueCurve, seriesAxisForPeriod, type ComparisonView, type Period, type Scope, type TrackStatus } from "./dashboard";
-import { tipDelta } from "@/lib/format";
+import { deltaTip } from "@/lib/format";
 
 describe("tooltip do badge com unidade", () => {
   it("quantidade nunca aparece solta", () => {
-    expect(tipDelta(kpiDelta(1500, 1234, "o mês passado", "itens")!)).toBe("Em relação ao mês passado: 1.234 itens.");
-    expect(tipDelta(kpiDelta(900, 840, "a semana passada", "vendas")!)).toBe("Em relação à semana passada: 840 vendas.");
+    expect(deltaTip(kpiDelta(1500, 1234, "o mês passado", "itens")!)).toBe("Em relação ao mês passado: 1.234 itens.");
+    expect(deltaTip(kpiDelta(900, 840, "a semana passada", "vendas")!)).toBe("Em relação à semana passada: 840 vendas.");
     expect(kpiDelta(1.8, 1.57, "o mês passado", "pa")!.anterior).toBe("1,57 itens por venda");
     expect(kpiDelta(120, 100, "o mês passado")!.anterior).toBe("R$\u00a0100,00");
   });
 
   it("prefixo da métrica", () => {
-    expect(tipDelta(kpiDelta(120, 100, "o mês passado")!, "Faturamento das categorias")).toBe(
+    expect(deltaTip(kpiDelta(120, 100, "o mês passado")!, "Faturamento das categorias")).toBe(
       "Faturamento das categorias em relação ao mês passado: R$\u00a0100,00.",
     );
   });
@@ -45,7 +45,7 @@ import { goalOfStore } from "./goals";
 import { EMPTY_STORE_COSTS, stores, storeById } from "./stores";
 import { TODAY_ISO } from "./clock";
 import { dayAggregate, salesDay, storeOpen, dayWeight } from "./sales";
-import { dayAxisLabel, dayPointDetail, fimDoMes, intervaloDias, somarDias } from "@/lib/format";
+import { dayAxisLabel, dayPointDetail, endOfMonth, eachDay, addDays } from "@/lib/format";
 
 function escopo(filialId: string = "todas", periodo: Scope["periodo"] = { tipo: "esteMes" }): Scope {
   return { filialIds: filialId === "todas" ? [] : [filialId], periodo, divisao: null };
@@ -53,7 +53,7 @@ function escopo(filialId: string = "todas", periodo: Scope["periodo"] = { tipo: 
 
 function realizadoAcumulado(filialId: string, competencia: string, ate: string): number {
   let soma = 0;
-  for (const iso of intervaloDias(`${competencia}-01`, ate)) {
+  for (const iso of eachDay(`${competencia}-01`, ate)) {
     const d = salesDay(filialId, iso);
     if (d) soma += dayAggregate(d, null).faturamento;
   }
@@ -65,10 +65,10 @@ function curvaReferencia(filialId: string, competencia: string): (iso: string) =
   const f = storeById(filialId);
   const pesos = new Map<string, number>();
   let soma = 0;
-  for (const iso of intervaloDias(`${competencia}-01`, fimDoMes(`${competencia}-01`))) {
+  for (const iso of eachDay(`${competencia}-01`, endOfMonth(`${competencia}-01`))) {
     if (!storeOpen(f, iso)) continue;
     const ocas = [7, 14, 21, 28]
-      .map((n) => somarDias(iso, -n))
+      .map((n) => addDays(iso, -n))
       .map((ref) => {
         const d = salesDay(filialId, ref);
         return d && storeOpen(f, ref) ? d : undefined;
@@ -84,7 +84,7 @@ function curvaReferencia(filialId: string, competencia: string): (iso: string) =
 describe("T3: curvaReceita (AD-034)", () => {
   it("soma dos pesos normalizados = 1 nos dias abertos", () => {
     const c = revenueCurve([storeById("f1")], "2026-09");
-    const abertos = intervaloDias("2026-09-01", fimDoMes("2026-09-01")).filter((iso) => storeOpen(storeById("f1"), iso));
+    const abertos = eachDay("2026-09-01", endOfMonth("2026-09-01")).filter((iso) => storeOpen(storeById("f1"), iso));
     const soma = abertos.reduce((s, iso) => s + c.peso(iso), 0);
     expect(soma).toBeCloseTo(1, 5);
   });
@@ -115,9 +115,9 @@ describe("T3: LOJA-01 status do trilho", () => {
 
   it("percentual = realizado ÷ metaAcumulada (AC 2)", () => {
     const v = buildStoreView(escopo("f1"));
-    const meta = goalOfStore("f1", "2026-09")!.valorLoja;
+    const meta = goalOfStore("f1", "2026-09")!.storeAmount;
     const pCurva = curvaReferencia("f1", "2026-09");
-    const fracaoAcum = intervaloDias("2026-09-01", TODAY_ISO).reduce((s, iso) => s + pCurva(iso), 0);
+    const fracaoAcum = eachDay("2026-09-01", TODAY_ISO).reduce((s, iso) => s + pCurva(iso), 0);
     const metaAcum = meta * fracaoAcum;
     const realizado = realizadoAcumulado("f1", "2026-09", TODAY_ISO);
     const esperado = (realizado / metaAcum) * 100;
@@ -145,7 +145,7 @@ describe("T3: LOJA-02 venda necessária hoje", () => {
       return;
     }
     expect(v.vendaNecessaria.valor).toBeGreaterThanOrEqual(0);
-    expect(v.vendaNecessaria.diasRestantes).toBeGreaterThan(0);
+    expect(v.vendaNecessaria.daysRemaining).toBeGreaterThan(0);
     expect(v.vendaNecessaria.diaReferencia).toBeTruthy();
   });
 
@@ -154,11 +154,11 @@ describe("T3: LOJA-02 venda necessária hoje", () => {
     if (!v.vendaNecessaria) return;
     const realizadoHoje = dayAggregate(salesDay("f1", TODAY_ISO)!, null).faturamento;
     expect(v.vendaNecessaria.realizadoHoje).toBe(realizadoHoje);
-    const meta = goalOfStore("f1", "2026-09")!.valorLoja;
+    const meta = goalOfStore("f1", "2026-09")!.storeAmount;
     const realizado = realizadoAcumulado("f1", "2026-09", TODAY_ISO);
     const falta = meta - realizado;
     const pCurva = curvaReferencia("f1", "2026-09");
-    const restantes = intervaloDias(TODAY_ISO, fimDoMes("2026-09-01")).filter((iso) => storeOpen(storeById("f1"), iso));
+    const restantes = eachDay(TODAY_ISO, endOfMonth("2026-09-01")).filter((iso) => storeOpen(storeById("f1"), iso));
     const somaPesos = restantes.reduce((s, iso) => s + pCurva(iso), 0);
     const necessarioBruto = (falta * pCurva(TODAY_ISO)) / somaPesos;
     expect(v.vendaNecessaria.valor).toBeCloseTo(Math.max(0, necessarioBruto - realizadoHoje), 1);
@@ -199,9 +199,9 @@ describe("T4: projeção de fechamento (LOJA-03)", () => {
     expect(p.encerrada).toBe(false);
     expect(p.indice).not.toBeNull();
     // Replica a formula: realizado + meta x fracaoRestante x indice
-    const meta = goalOfStore("f1", "2026-09")!.valorLoja;
+    const meta = goalOfStore("f1", "2026-09")!.storeAmount;
     const pCurva = curvaReferencia("f1", "2026-09");
-    const fracaoRestante = 1 - intervaloDias("2026-09-01", TODAY_ISO).reduce((s, iso) => s + pCurva(iso), 0);
+    const fracaoRestante = 1 - eachDay("2026-09-01", TODAY_ISO).reduce((s, iso) => s + pCurva(iso), 0);
     const realizado = realizadoAcumulado("f1", "2026-09", TODAY_ISO);
     const metaAcum = meta * (1 - fracaoRestante);
     const indice = metaAcum > 0 ? realizado / metaAcum : 0;
@@ -211,7 +211,7 @@ describe("T4: projeção de fechamento (LOJA-03)", () => {
 
   it("competência encerrada: encher é realizado fechado (AC 6)", () => {
     const v = buildStoreView(escopo("f1", { tipo: "mesPassado" }));
-    const realizado = realizadoAcumulado("f1", "2026-08", fimDoMes("2026-08-01"));
+    const realizado = realizadoAcumulado("f1", "2026-08", endOfMonth("2026-08-01"));
     expect(v.projecao).not.toBeNull();
     expect(v.projecao!.encerrada).toBe(true);
     expect(v.projecao!.valor).toBe(realizado);
@@ -392,7 +392,7 @@ describe("régua: rede, loja única e dia", () => {
     const v = buildStoreView(escopo("f1", { tipo: "7dias" }));
     expect(v.reguaTitulo).toBe("Desempenho da loja");
     expect(v.regua!.length).toBe(1);
-    const realizadoMes = realizadoAcumulado("f1", "2026-09", fimDoMes(TODAY_ISO));
+    const realizadoMes = realizadoAcumulado("f1", "2026-09", endOfMonth(TODAY_ISO));
     expect(v.regua![0].faturamentoValor).toBeCloseTo(realizadoMes, 0);
     expect(v.regua![0].atingimentoTexto).toContain("da meta");
   });
@@ -746,13 +746,13 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
         },
       ],
     });
-    expect(v.topVendedoras).toHaveLength(2);
-    expect(v.topVendedoras[0]?.nome).toBe("Ana Silva");
-    expect(v.topVendedoras[0]?.valor).toBe(150);
-    expect(v.topVendedoras[0]?.averageTicket).toBe(75);
-    expect(v.topVendedoras[0]?.pctMeta).toBeUndefined();
-    expect(v.topVendedoras[0]?.sub).toBe("2 vendas");
-    expect(v.topVendedoras[1]?.nome).toBe("Carla");
+    expect(v.topSellers).toHaveLength(2);
+    expect(v.topSellers[0]?.nome).toBe("Ana Silva");
+    expect(v.topSellers[0]?.valor).toBe(150);
+    expect(v.topSellers[0]?.averageTicket).toBe(75);
+    expect(v.topSellers[0]?.pctMeta).toBeUndefined();
+    expect(v.topSellers[0]?.sub).toBe("2 vendas");
+    expect(v.topSellers[1]?.nome).toBe("Carla");
   });
 
   it("topVendedoras corta no Top 10", () => {
@@ -767,9 +767,9 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
       salesCount: 1,
     }));
     const v = buildOverviewView(escopo("f1"), { dayAggs: [], sellerDayAggs });
-    expect(v.topVendedoras).toHaveLength(10);
-    expect(v.topVendedoras[0]?.nome).toBe("Pessoa 0");
-    expect(v.topVendedoras.some((s) => s.nome === "Pessoa 11")).toBe(false);
+    expect(v.topSellers).toHaveLength(10);
+    expect(v.topSellers[0]?.nome).toBe("Pessoa 0");
+    expect(v.topSellers.some((s) => s.nome === "Pessoa 11")).toBe(false);
   });
 
   it("topVendedoras junta a mesma funcionária (código do ERP) mesmo com nome trocado", () => {
@@ -782,9 +782,9 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
         { ...base, day: "2026-09-10", sellerKey: "CARLA", sellerName: "Carla", revenueCents: 150_00 },
       ],
     });
-    expect(v.topVendedoras).toHaveLength(2);
-    expect(v.topVendedoras[0]).toMatchObject({ nome: "Ana Souza", valor: 220, sub: "2 vendas" });
-    expect(v.topVendedoras[1]?.nome).toBe("Carla");
+    expect(v.topSellers).toHaveLength(2);
+    expect(v.topSellers[0]).toMatchObject({ nome: "Ana Souza", valor: 220, sub: "2 vendas" });
+    expect(v.topSellers[1]?.nome).toBe("Carla");
   });
 
   it("topVendedoras: P.A. só com itens em todos os dias; lojas da maior para a menor", () => {
@@ -796,16 +796,16 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
     ];
     const dayAggs = [{ ...base, storeId: "f1", revenueCents: 600_00, salesCount: 6, itemCount: 6 }];
     const rede = buildOverviewView(escopo("todas"), { dayAggs, sellerDayAggs });
-    expect(rede.topVendedoras[0]).toMatchObject({
+    expect(rede.topSellers[0]).toMatchObject({
       nome: "Ana",
       pa: 1.5,
       lojas: ["Shopping Campo Grande", "Shopping Três Lagoas"],
     });
-    expect(rede.topVendedoras[1]?.pa).toBeUndefined();
-    expect(rede.topVendedoras[1]?.lojas).toEqual(["Shopping Três Lagoas"]);
+    expect(rede.topSellers[1]?.pa).toBeUndefined();
+    expect(rede.topSellers[1]?.lojas).toEqual(["Shopping Três Lagoas"]);
 
-    const umaLoja = buildOverviewView(escopo("f1"), { dayAggs, sellerDayAggs });
-    expect(umaLoja.topVendedoras[0]?.lojas).toEqual(["Shopping Campo Grande"]);
+    const singleStore = buildOverviewView(escopo("f1"), { dayAggs, sellerDayAggs });
+    expect(singleStore.topSellers[0]?.lojas).toEqual(["Shopping Campo Grande"]);
   });
 
   it("topVendedoras: turno cadastrado pelo código da funcionária, gerador ou nome", () => {
@@ -825,7 +825,7 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
         { ...turno, nameKeys: ["CARLA"], name: "Tarde", start: "15:00", end: "22:00" },
       ],
     });
-    expect(v.topVendedoras.map((s) => s.turno)).toEqual([
+    expect(v.topSellers.map((s) => s.turno)).toEqual([
       "Manhã · 09:00–15:00",
       "Tarde · 15:00–22:00",
       "Tarde · 15:00–22:00",
@@ -856,10 +856,10 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
         },
       ],
     });
-    expect(v.rankingLojas.length).toBeGreaterThanOrEqual(2);
-    expect(v.rankingLojas[0]?.valor).toBe(300);
-    expect(v.rankingLojas[1]?.valor).toBe(100);
-    expect(v.rankingLojas[0]?.nome).toMatch(/Campo Grande|f1/i);
+    expect(v.storesRanking.length).toBeGreaterThanOrEqual(2);
+    expect(v.storesRanking[0]?.valor).toBe(300);
+    expect(v.storesRanking[1]?.valor).toBe(100);
+    expect(v.storesRanking[0]?.nome).toMatch(/Campo Grande|f1/i);
   });
 
   it("rankingLojas with single store ignores other stores in dayAggs", () => {
@@ -885,12 +885,12 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
         },
       ],
     });
-    expect(v.rankingLojas).toHaveLength(1);
-    expect(v.rankingLojas[0]?.valor).toBe(300);
+    expect(v.storesRanking).toHaveLength(1);
+    expect(v.storesRanking[0]?.valor).toBe(300);
     expect(v.rankingRedeTotal).toBe(400);
-    expect(v.rankingLojas[0]?.pctRede).toBe(75);
-    expect(v.rankingLojas[0]?.nome).toMatch(/Campo Grande|f1/i);
-    expect(v.rankingDemaisLojas).toBe(1);
+    expect(v.storesRanking[0]?.pctRede).toBe(75);
+    expect(v.storesRanking[0]?.nome).toMatch(/Campo Grande|f1/i);
+    expect(v.otherStoresRanking).toBe(1);
   });
 
   it("rankingLojas rede omits stores with zero revenue (no ghost cards)", () => {
@@ -907,9 +907,9 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
         },
       ],
     });
-    expect(v.rankingLojas.every((l) => l.valor > 0)).toBe(true);
-    expect(v.rankingLojas).toHaveLength(1);
-    expect(v.rankingLojas[0]?.valor).toBe(300);
+    expect(v.storesRanking.every((l) => l.valor > 0)).toBe(true);
+    expect(v.storesRanking).toHaveLength(1);
+    expect(v.storesRanking[0]?.valor).toBe(300);
   });
 
   it("Overview ignores brand filter — KPIs use ALL; WPINK goes to kpisWpink strip", () => {

@@ -11,7 +11,7 @@ import { millenniumBaseUrl } from "./millenniumAuth.ts";
 
 export const BRAND_REVENUE_CATALOG_GUID = "{70F9DE61-9CA7-4798-864F-B40B74E61BE5}";
 
-export type FilialGeradorRow = {
+export type BranchGeneratorRow = {
   geradorId: number;
   code: string;
   name: string;
@@ -196,7 +196,7 @@ export function applyAllCountsToWepinkDays(
   });
 }
 
-export async function fetchFilialGeradorMap(opts: {
+export async function fetchBranchGeneratorMap(opts: {
   session: string;
   baseUrl?: string;
   fetchImpl?: typeof fetch;

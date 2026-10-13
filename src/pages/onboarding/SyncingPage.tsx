@@ -22,7 +22,7 @@ import { calendarTodayIso } from "@/data/wedash/clock";
 import { getSupabase } from "@/lib/supabase";
 import { BrandMark } from "@/pages/auth/authKit";
 import { PRODUCT_NAME } from "@/data/wedash/tenant";
-import { padTopoEBase } from "@/lib/safeArea";
+import { padTopAndBottom } from "@/lib/safeArea";
 
 /** Job na fila sem worker pegar  ->  erro (nao espera infinito). */
 const STUCK_QUEUED_MS = 90_000;
@@ -328,7 +328,7 @@ export function SyncingPage() {
   return (
     <div
       className="pad-topo pad-base flex min-h-screen w-full flex-col bg-bg-0 px-6 pb-10 sm:px-14"
-      style={padTopoEBase("2.5rem", "2.5rem")}
+      style={padTopAndBottom("2.5rem", "2.5rem")}
     >
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-2.5">

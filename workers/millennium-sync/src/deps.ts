@@ -10,7 +10,7 @@ import {
   type MillenniumEvent,
 } from "./millenniumEvents.ts";
 import { fetchSalesLista } from "./millenniumSales.ts";
-import { fetchFilialGeradorMap, fetchBrandRevenueReport } from "./millenniumBrandReport.ts";
+import { fetchBranchGeneratorMap, fetchBrandRevenueReport } from "./millenniumBrandReport.ts";
 import { fetchConsultaDetMov, type DetMovLine } from "./millenniumDetMov.ts";
 import type { CouponBrand } from "./brandSplitFromDetalhe.ts";
 import { fetchStoreSellers, type ErpSeller } from "./millenniumSellers.ts";
@@ -712,14 +712,14 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
       return pending;
     },
 
-    async fetchSangriaLista(args) {
-      const { fetchSangriaLista } = await import("./millenniumSangria.ts");
-      return fetchSangriaLista({ ...args, baseUrl: millenniumBaseUrl() });
+    async fetchCashDropList(args) {
+      const { fetchCashDropList } = await import("./millenniumCashDrop.ts");
+      return fetchCashDropList({ ...args, baseUrl: millenniumBaseUrl() });
     },
 
-    async upsertSangriaLines(args) {
-      const { upsertSangriaLines } = await import("./sangriaSync.ts");
-      return upsertSangriaLines(sb, args);
+    async upsertCashDropLines(args) {
+      const { upsertCashDropLines } = await import("./cashDropSync.ts");
+      return upsertCashDropLines(sb, args);
     },
 
     async listCashCloseActivity(args) {
@@ -742,8 +742,8 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
       return fetchStoneConciliation({ stoneCode: args.stoneCode, secret, day: args.day });
     },
 
-    async fetchFilialGeradorMap(session) {
-      return fetchFilialGeradorMap({
+    async fetchBranchGeneratorMap(session) {
+      return fetchBranchGeneratorMap({
         session,
         baseUrl: millenniumBaseUrl(),
       });

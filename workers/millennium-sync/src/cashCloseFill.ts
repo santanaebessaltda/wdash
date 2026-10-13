@@ -11,7 +11,7 @@ import {
   addDaysIso,
   ensureMillenniumSession,
   syncStoreCashClose,
-  syncStoreSangria,
+  syncStoreCashDrop,
   ymdInTz,
   type RunSyncResult,
   type SyncJob,
@@ -178,7 +178,7 @@ export async function runCashCloseFillJob(
     const sangriaTo = sangriaEnd < today ? sangriaEnd : today;
     if (part !== "close" && sangriaFrom <= sangriaTo) {
       try {
-        await syncStoreSangria(deps, {
+        await syncStoreCashDrop(deps, {
           session,
           tenantId: job.tenantId,
           store,

@@ -1,6 +1,6 @@
 import type { ChallengeRecord } from "@/data/wedash/challengesRepo";
 import type { ChallengeView } from "@/data/wedash/challengeView";
-import { dataCurta } from "@/lib/format";
+import { shortDate } from "@/lib/format";
 import { challengeHeadline, HeadlineText, mainPrizeLabel } from "@/pages/challenges/shared";
 import { FlameIcon, TrophyIcon } from "@/pages/dashboards/icons";
 
@@ -34,7 +34,7 @@ export function ChallengeMiniCard({
           <span className="shrink-0 text-[11.5px] font-semibold text-t2">{view.prazo}</span>
         </span>
         <span className="mt-0.5 block truncate text-[12px] text-t2">
-          {dataCurta(c.startsOn)} a {dataCurta(c.endsOn)}
+          {shortDate(c.startsOn)} a {shortDate(c.endsOn)}
           {lojaNome ? ` · ${lojaNome}` : ""}
         </span>
         <span className="mt-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
