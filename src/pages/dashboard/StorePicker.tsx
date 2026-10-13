@@ -8,7 +8,7 @@ import { cn } from "@/lib/cn";
  * Fantasia + CNPJ; "Todas as lojas" = visao consolidada da rede.
  * Escopo: `filialIds: []` = todas; `[id]` = uma loja.
  */
-export function StorePicker({ escopo, onChange, minhas }: { escopo: Scope; onChange: (e: Scope) => void; minhas: Store[] }) {
+export function StorePicker({ scope, onChange, minhas }: { scope: Scope; onChange: (e: Scope) => void; minhas: Store[] }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -20,11 +20,11 @@ export function StorePicker({ escopo, onChange, minhas }: { escopo: Scope; onCha
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const ehTodas = escopo.filialIds.length === 0;
-  const filialAtual = ehTodas ? null : minhas.find((f) => f.id === escopo.filialIds[0]) ?? null;
+  const ehTodas = scope.storeIds.length === 0;
+  const currentBranch = ehTodas ? null : minhas.find((f) => f.id === scope.storeIds[0]) ?? null;
 
   function escolher(id: string | null) {
-    onChange({ ...escopo, filialIds: id ? [id] : [] });
+    onChange({ ...scope, storeIds: id ? [id] : [] });
     setOpen(false);
   }
 
@@ -43,10 +43,10 @@ export function StorePicker({ escopo, onChange, minhas }: { escopo: Scope; onCha
       >
         <div className="min-w-0 flex-1 leading-none">
           <p className="truncate text-[12px] font-bold uppercase leading-tight text-t0">
-            {filialAtual ? filialAtual.fantasia : "Todas as filiais"}
+            {currentBranch ? currentBranch.fantasia : "Todas as filiais"}
           </p>
-          <p className={cn("truncate text-[10px] leading-tight text-t2", !filialAtual && "uppercase")}>
-            {filialAtual ? storeSubtitle(filialAtual) : "Rede consolidada"}
+          <p className={cn("truncate text-[10px] leading-tight text-t2", !currentBranch && "uppercase")}>
+            {currentBranch ? storeSubtitle(currentBranch) : "Rede consolidada"}
           </p>
         </div>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={cn("shrink-0 transition-transform", open && "rotate-180")}>
@@ -78,7 +78,7 @@ export function StorePicker({ escopo, onChange, minhas }: { escopo: Scope; onCha
           <div className="my-1 h-px bg-line" />
 
           {minhas.map((f) => {
-            const ativa = !ehTodas && filialAtual?.id === f.id;
+            const ativa = !ehTodas && currentBranch?.id === f.id;
             return (
               <button
                 key={f.id}

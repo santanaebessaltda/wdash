@@ -82,7 +82,7 @@ export function delta(v: number, casas = 0): string {
 }
 
 const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
-const MESES_CURTO = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+const SHORT_MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 const DIAS_SEMANA = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
 const DIAS_SEMANA_CURTO = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 
@@ -118,7 +118,7 @@ export function monthYearTitle(iso: string): string {
 
 /** set */
 export function shortMonth(iso: string): string {
-  return MESES_CURTO[isoToDate(iso).getMonth()];
+  return SHORT_MONTHS[isoToDate(iso).getMonth()];
 }
 
 /** ter */
@@ -129,11 +129,11 @@ export function shortWeekday(iso: string): string {
 /** Eixo com um ponto por dia. Mes cheio ou mais de 7 dias no mesmo mes: "01". Cruza meses: "01/10". Semana: "seg". */
 export function dayAxisLabel(
   iso: string,
-  period: { inicio: string; fim: string; granularidade: "dia" | "mes" | "periodo" },
+  period: { start: string; end: string; granularity: "day" | "month" | "period" },
 ): string {
-  if (period.inicio.slice(0, 7) !== period.fim.slice(0, 7)) return shortDate(iso);
-  const days = eachDay(period.inicio, period.fim).length;
-  if (period.granularidade === "mes" || days > 7) return String(isoToDate(iso).getDate()).padStart(2, "0");
+  if (period.start.slice(0, 7) !== period.end.slice(0, 7)) return shortDate(iso);
+  const days = eachDay(period.start, period.end).length;
+  if (period.granularity === "month" || days > 7) return String(isoToDate(iso).getDate()).padStart(2, "0");
   return shortWeekday(iso);
 }
 
@@ -166,14 +166,14 @@ export function comparedWithTip(vs: string): string {
 }
 
 /** Tooltip do badge de delta com o valor comparado: "Em relacao ao mes passado: R$ 12.345,67." */
-export function deltaTip(delta: { vs?: string; anterior?: string }, metrica?: string): string {
+export function deltaTip(delta: { vs?: string; anterior?: string }, metric?: string): string {
   if (!delta.vs) {
-    if (metrica) return `${metrica} no período anterior${delta.anterior ? `: ${delta.anterior}` : ""}.`;
+    if (metric) return `${metric} no período anterior${delta.anterior ? `: ${delta.anterior}` : ""}.`;
     return delta.anterior ? `Período anterior: ${delta.anterior}.` : "";
   }
   const base = comparedWithTip(delta.vs);
   const tip = delta.anterior ? `${base.slice(0, -1)}: ${delta.anterior}.` : base;
-  return metrica ? `${metrica} ${tip.charAt(0).toLowerCase()}${tip.slice(1)}` : tip;
+  return metric ? `${metric} ${tip.charAt(0).toLowerCase()}${tip.slice(1)}` : tip;
 }
 
 /** `1 dia` / `N dias`  -  prazos e badges. */

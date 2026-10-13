@@ -59,13 +59,13 @@ function maxPickerDate(today: string): Date {
 export function ChallengesPage() {
   const navigate = useNavigate();
   const { show } = useToast();
-  const { session, lojas, loading: lojasLoading } = useScopedStores();
-  const { escopo, mudar } = useScope();
+  const { session, storeRows, loading: lojasLoading } = useScopedStores();
+  const { scope, setScope } = useScope();
   const today = calendarTodayIso();
-  const janela = useMemo(() => managementScheduleWindow(escopo.periodo, today), [escopo.periodo, today]);
-  const storeIds = useMemo(() => lojas.map((l) => l.id), [lojas]);
+  const janela = useMemo(() => managementScheduleWindow(scope.period, today), [scope.period, today]);
+  const storeIds = useMemo(() => storeRows.map((l) => l.id), [storeRows]);
   const storeKey = storeIds.join(",");
-  const escolher = pickOneStore(escopo.filialIds, session.stores.length);
+  const escolher = pickOneStore(scope.storeIds, session.stores.length);
 
   const [data, setData] = useState<Loaded | null>(null);
   const [loading, setLoading] = useState(true);
@@ -114,23 +114,23 @@ export function ChallengesPage() {
 
   const cards = useMemo(() => {
     if (!data) return [];
-    const byId = new Map(lojas.map((l) => [l.id, l]));
+    const byId = new Map(storeRows.map((l) => [l.id, l]));
     return data.challenges
-      .map((c) => ({ challenge: c, view: buildChallengeView({ challenge: c, aggs: data.aggs, today }), loja: byId.get(c.storeId) }))
+      .map((c) => ({ challenge: c, view: buildChallengeView({ challenge: c, aggs: data.aggs, today }), store: byId.get(c.storeId) }))
       .sort(
         (a, b) =>
           CHALLENGE_STATUS_ORDER[a.view.status] - CHALLENGE_STATUS_ORDER[b.view.status] ||
           (a.view.status === "ended"
             ? b.challenge.endsOn.localeCompare(a.challenge.endsOn)
             : a.challenge.startsOn.localeCompare(b.challenge.startsOn)) ||
-          (a.loja?.fantasia ?? "").localeCompare(b.loja?.fantasia ?? "", "pt-BR") ||
+          (a.store?.fantasia ?? "").localeCompare(b.store?.fantasia ?? "", "pt-BR") ||
           a.challenge.name.localeCompare(b.challenge.name, "pt-BR"),
       );
-  }, [data, lojas, today]);
+  }, [data, storeRows, today]);
 
-  const dateRange = useMemo(() => dateRangeFromManagementPeriod(escopo.periodo), [escopo.periodo]);
-  function onDateChange(r: DateRange, meta?: DateRangeChangeMeta) {
-    mudar(applyPeriodDateChange(escopo, r, meta));
+  const dateRange = useMemo(() => dateRangeFromManagementPeriod(scope.period), [scope.period]);
+  function onDateChange(r: DateRange, goal?: DateRangeChangeMeta) {
+    setScope(applyPeriodDateChange(scope, r, goal));
   }
 
   async function excluir() {
@@ -158,8 +158,8 @@ export function ChallengesPage() {
             <DateRangePicker
               value={dateRange}
               onChange={onDateChange}
-              displayLabel={periodDisplayLabel(escopo.periodo)}
-              activePresetId={periodActivePresetId(escopo.periodo)}
+              displayLabel={periodDisplayLabel(scope.period)}
+              activePresetId={periodActivePresetId(scope.period)}
               maxDate={maxPickerDate(today)}
             />
             <Button icon={<Icon d={icons.plus} size={14} />} onClick={() => navigate(paths.management.challengeNew)}>
@@ -191,13 +191,13 @@ export function ChallengesPage() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {cards.map(({ challenge, view, loja }) => (
+            {cards.map(({ challenge, view, store }) => (
               <ChallengeCard
                 key={challenge.id}
                 challenge={challenge}
                 view={view}
-                loja={loja}
-                mostraLoja={lojas.length > 1}
+                store={store}
+                mostraLoja={storeRows.length > 1}
                 onDetail={() => navigate(paths.management.challengeDetail(challenge.id))}
                 onCopy={() => setDuplicar(challenge)}
                 onDelete={() => setConfirmar(challenge)}
@@ -250,7 +250,7 @@ export function ChallengesPage() {
 function ChallengeCard({
   challenge: c,
   view,
-  loja,
+  store,
   mostraLoja,
   onDetail,
   onCopy,
@@ -258,15 +258,15 @@ function ChallengeCard({
 }: {
   challenge: ChallengeRecord;
   view: ChallengeView;
-  loja: Store | undefined;
+  store: Store | undefined;
   mostraLoja: boolean;
   onDetail: () => void;
   onCopy: () => void;
   onDelete: () => void;
 }) {
-  const periodo = `${fullDate(c.startsOn)} a ${fullDate(c.endsOn)}`;
+  const period = `${fullDate(c.startsOn)} a ${fullDate(c.endsOn)}`;
   const destaque = challengeHeadline(c, view);
-  const premio = mainPrizeLabel(c);
+  const prize = mainPrizeLabel(c);
 
   const acao = (fn: () => void) => (e: MouseEvent) => {
     e.stopPropagation();
@@ -295,8 +295,8 @@ function ChallengeCard({
         <div className="min-w-0 flex-1">
           <p className="truncate text-[15px] font-bold text-t0">{c.name}</p>
           <p className="mt-0.5 truncate text-[12.5px] text-t2">
-            {periodo}
-            {mostraLoja && loja ? ` · ${loja.fantasia}` : ""}
+            {period}
+            {mostraLoja && store ? ` · ${store.fantasia}` : ""}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5 self-start">
@@ -327,10 +327,10 @@ function ChallengeCard({
         <p className="min-w-0 truncate text-[13px] text-t1">
           <HeadlineText headline={destaque} />
         </p>
-        {premio && (
+        {prize && (
           <span className="flex shrink-0 items-center gap-1 text-[12px] font-semibold text-t1">
             <TrophyIcon size={13} className="text-warn" />
-            {premio}
+            {prize}
           </span>
         )}
       </div>

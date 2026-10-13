@@ -9,14 +9,14 @@ export type RascunhoOnboarding = {
 };
 
 const PREFIXO = "wedash-onboarding:";
-const PREFIXO_SENHA = "wedash-onboarding-senha:";
+const PASSWORD_PREFIX = "wedash-onboarding-senha:";
 
 function chave(membershipId: string) {
   return `${PREFIXO}${membershipId}`;
 }
 
 function passwordKey(membershipId: string) {
-  return `${PREFIXO_SENHA}${membershipId}`;
+  return `${PASSWORD_PREFIX}${membershipId}`;
 }
 
 export function rascunhoVazio(): RascunhoOnboarding {
@@ -59,7 +59,7 @@ export function limparRascunho(membershipId: string) {
 }
 
 /** Senha do ERP só na memória do separador. F5 pede de novo. Apaga resto antigo no sessionStorage. */
-const senhasErp = new Map<string, string>();
+const erpPasswords = new Map<string, string>();
 
 function clearStoredPassword(membershipId: string) {
   try {
@@ -71,11 +71,11 @@ function clearStoredPassword(membershipId: string) {
 
 export function readErpPassword(membershipId: string): string {
   clearStoredPassword(membershipId);
-  return senhasErp.get(membershipId) ?? "";
+  return erpPasswords.get(membershipId) ?? "";
 }
 
 export function writeErpPassword(membershipId: string, senha: string) {
   clearStoredPassword(membershipId);
-  if (senha) senhasErp.set(membershipId, senha);
-  else senhasErp.delete(membershipId);
+  if (senha) erpPasswords.set(membershipId, senha);
+  else erpPasswords.delete(membershipId);
 }

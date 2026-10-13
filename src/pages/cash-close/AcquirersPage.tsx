@@ -17,18 +17,18 @@ import { useScope } from "@/pages/dashboard/useScope";
 /** Configurações > Adquirentes. A chave é da loja, no mesmo desenho do Millennium. */
 export function AcquirersPage() {
   const { show } = useToast();
-  const { session, lojas, loading: lojasLoading } = useScopedStores();
-  const { escopo } = useScope();
-  const escolher = pickOneStore(escopo.filialIds, session.stores.length);
+  const { session, storeRows, loading: lojasLoading } = useScopedStores();
+  const { scope } = useScope();
+  const escolher = pickOneStore(scope.storeIds, session.stores.length);
   const showSkeleton = useMinSkeleton(lojasLoading);
   const [links, setLinks] = useState<StoneLink[]>([]);
   const [loading, setLoading] = useState(true);
-  const [aberto, setAberto] = useState(false);
+  const [open, setAberto] = useState(false);
   const canEdit = isGestor(session.role);
 
   const reload = useCallback(async () => {
     try {
-      setLinks(await fetchStoneLinks(session.tenantId, lojas.map((l) => l.id)));
+      setLinks(await fetchStoneLinks(session.tenantId, storeRows.map((l) => l.id)));
     } catch {
       show("Não foi possível carregar a conexão com a Stone. Tente novamente.", "danger");
     } finally {
@@ -36,7 +36,7 @@ export function AcquirersPage() {
     }
     // show do toast muda de identidade; a carga segue a loja.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session.tenantId, lojas]);
+  }, [session.tenantId, storeRows]);
 
   useEffect(() => {
     if (lojasLoading) return;
@@ -44,9 +44,9 @@ export function AcquirersPage() {
   }, [lojasLoading, reload]);
 
   const conectadas = links.length;
-  const estado = conectadas === 0 ? "Não configurado" : conectadas === lojas.length ? "Conectado" : "Parcial";
-  const tom = conectadas === 0 ? "text-t2" : conectadas === lojas.length ? "text-ok" : "text-warn";
-  const dot = conectadas === 0 ? "bg-t2" : conectadas === lojas.length ? "bg-ok" : "bg-warn";
+  const estado = conectadas === 0 ? "Não configurado" : conectadas === storeRows.length ? "Conectado" : "Parcial";
+  const tom = conectadas === 0 ? "text-t2" : conectadas === storeRows.length ? "text-ok" : "text-warn";
+  const dot = conectadas === 0 ? "bg-t2" : conectadas === storeRows.length ? "bg-ok" : "bg-warn";
 
   return (
     <div>
@@ -61,7 +61,7 @@ export function AcquirersPage() {
         </div>
       ) : (
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {showSkeleton || (loading && links.length === 0 && lojas.length > 0) ? (
+      {showSkeleton || (loading && links.length === 0 && storeRows.length > 0) ? (
           <Card>
             <div className="mb-3.5 flex items-center gap-3" aria-busy="true" aria-label="Carregando adquirentes…">
               <Skeleton className="h-[46px] w-[46px] rounded-[13px]" />
@@ -90,9 +90,9 @@ export function AcquirersPage() {
               <span className={`flex items-center gap-1.5 text-xs font-bold ${tom}`}>
                 <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
                 {estado}
-                {estado === "Parcial" ? ` · ${conectadas} de ${lojas.length} filiais` : ""}
+                {estado === "Parcial" ? ` · ${conectadas} de ${storeRows.length} filiais` : ""}
               </span>
-              <Button size="sm" onClick={() => setAberto(true)} disabled={!canEdit || lojas.length === 0}>
+              <Button size="sm" onClick={() => setAberto(true)} disabled={!canEdit || storeRows.length === 0}>
                 {conectadas > 0 ? "Gerenciar" : "Conectar"}
               </Button>
             </div>
@@ -101,8 +101,8 @@ export function AcquirersPage() {
       </div>
       )}
       <StoneModal
-        open={aberto}
-        lojas={lojas}
+        open={open}
+        storeRows={storeRows}
         links={links}
         onClose={() => setAberto(false)}
         onSaved={async (storeId) => {
@@ -123,14 +123,14 @@ export function AcquirersPage() {
 
 function StoneModal({
   open,
-  lojas,
+  storeRows,
   links,
   onClose,
   onSaved,
   onDisconnected,
 }: {
   open: boolean;
-  lojas: Store[];
+  storeRows: Store[];
   links: StoneLink[];
   onClose: () => void;
   onSaved: (storeId: string) => Promise<void>;
@@ -148,10 +148,10 @@ function StoneModal({
 
   useEffect(() => {
     if (!open) return;
-    if (lojas.length <= 1) setStoreId(lojas[0]?.id ?? "");
-    else if (!lojas.some((l) => l.id === storeId)) setStoreId("");
+    if (storeRows.length <= 1) setStoreId(storeRows[0]?.id ?? "");
+    else if (!storeRows.some((l) => l.id === storeId)) setStoreId("");
     setAutorizo(false);
-  }, [open, lojas, storeId]);
+  }, [open, storeRows, storeId]);
 
   useEffect(() => {
     setStoneCode(link?.stoneCode ?? "");
@@ -231,13 +231,13 @@ function StoneModal({
             </p>
           </>
         )}
-        {lojas.length > 1 && (
+        {storeRows.length > 1 && (
           <FormField label="Filial" required>
             <Select value={storeId} onChange={(e) => setStoreId(e.target.value)} disabled={busy} {...noAutofill}>
               <option value="" disabled>
                 Selecione a loja
               </option>
-              {lojas.map((l) => (
+              {storeRows.map((l) => (
                 <option key={l.id} value={l.id}>
                   {l.fantasia}
                 </option>

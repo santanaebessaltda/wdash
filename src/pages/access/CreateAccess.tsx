@@ -27,7 +27,7 @@ export function CreateAccess() {
   const navigate = useNavigate();
   const { show } = useToast();
 
-  const [nome, setNome] = useState<PersonName>({ nome: "", sobrenome: "" });
+  const [name, setNome] = useState<PersonName>({ name: "", sobrenome: "" });
   const [foto, setFoto] = useState<File | null>(null);
   const [senha, setSenha] = useState("");
   const [confirma, setConfirma] = useState("");
@@ -35,13 +35,13 @@ export function CreateAccess() {
 
   const comOnboarding = session.onboardingStep !== null;
   const erroConfirma = confirma.length > 0 && confirma !== senha ? "As senhas não coincidem." : null;
-  const pode = personNameIsValid(nome) && passwordIsValid(senha) && confirma === senha && !carregando;
+  const pode = personNameIsValid(name) && passwordIsValid(senha) && confirma === senha && !carregando;
 
   async function salvar(e: FormEvent) {
     e.preventDefault();
     if (!pode) return;
     setCarregando(true);
-    const r = await createAccess({ firstName: nome.nome, lastName: nome.sobrenome, password: senha, photo: foto });
+    const r = await createAccess({ firstName: name.name, lastName: name.sobrenome, password: senha, photo: foto });
     setCarregando(false);
     if (!r.ok) {
       show(r.error, "danger");
@@ -83,8 +83,8 @@ export function CreateAccess() {
           <p className="mb-7 text-sm text-t2">Informe seu nome e crie a senha que você usará para acessar a WDash.</p>
 
           <form onSubmit={salvar} className="flex flex-col gap-3.5" noValidate>
-            <PhotoField nome={nome} foto={foto} onChange={setFoto} />
-            <NameFields valor={nome} onChange={(p) => setNome((n) => ({ ...n, ...p }))} autoFocus />
+            <PhotoField name={name} foto={foto} onChange={setFoto} />
+            <NameFields amount={name} onChange={(p) => setNome((n) => ({ ...n, ...p }))} autoFocus />
             {/* Escondido: gerenciador de senhas associa a senha nova a este login. */}
             <input type="email" name="username" autoComplete="username" value={session.email} readOnly tabIndex={-1} aria-hidden className="sr-only" />
             <PasswordField

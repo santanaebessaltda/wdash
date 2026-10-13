@@ -86,8 +86,8 @@ const KPI_COLORS = [
   { iconColor: "var(--warn)", iconBg: "rgba(245,158,11,0.12)" },
 ];
 
-type SortKey = "nome" | "faturamento" | "itens" | "cmv" | "lucro" | "margemPct" | "variacaoPct";
-type TopProdSort = "nome" | "itens" | "faturamento" | "lucro" | "margem";
+type SortKey = "name" | "revenue" | "itens" | "cmv" | "lucro" | "margemPct" | "variacaoPct";
+type TopProdSort = "name" | "itens" | "revenue" | "lucro" | "margem";
 
 const CORES_ABC: Record<AbcClass, string> = {
   A: "var(--bad)",
@@ -113,17 +113,17 @@ function Variacao({ v }: { v: number | null }) {
 
 export default function ProductsPage() {
   const session = useActiveSession();
-  const { escopo, mudar } = useScope();
+  const { scope, setScope } = useScope();
   const [aggs, setAggs] = useState<ProductsAggInput>({ dayAggs: [] });
   const [coverageFrom, setCoverageFrom] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
   const showSkeleton = useMinSkeleton(loading);
   const [busca, setBusca] = useState("");
-  const [sortKey, setSortKey] = useState<SortKey>("faturamento");
+  const [sortKey, setSortKey] = useState<SortKey>("revenue");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [topProdSort, setTopProdSort] = useState<TopProdSort>("faturamento");
+  const [topProdSort, setTopProdSort] = useState<TopProdSort>("revenue");
   const [topProdDir, setTopProdDir] = useState<SortDir>("desc");
-  const [topLinhaSort, setTopLinhaSort] = useState<TopProdSort>("faturamento");
+  const [topLinhaSort, setTopLinhaSort] = useState<TopProdSort>("revenue");
   const [topLinhaDir, setTopLinhaDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(1);
   const printing = usePrintMode();
@@ -142,8 +142,8 @@ export default function ProductsPage() {
     const gen = ++reloadGen.current;
     try {
       const [next, cov] = await Promise.all([
-        fetchProductsAggInput(session.tenantId, escopo),
-        fetchSalesCoverage(session.tenantId, escopo.filialIds),
+        fetchProductsAggInput(session.tenantId, scope),
+        fetchSalesCoverage(session.tenantId, scope.storeIds),
       ]);
       if (gen !== reloadGen.current) return;
       setAggs(next);
@@ -152,7 +152,7 @@ export default function ProductsPage() {
       if (gen !== reloadGen.current) return;
       console.error("Products reload:", e);
     }
-  }, [escopo, session.tenantId]);
+  }, [scope, session.tenantId]);
 
   useEffect(() => {
     void reload().finally(() => setLoading(false));
@@ -165,34 +165,34 @@ export default function ProductsPage() {
   }, [reload]);
 
   const view = useMemo(
-    () => buildProductsView(escopo, aggs),
+    () => buildProductsView(scope, aggs),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [escopo, aggs, storesTick],
+    [scope, aggs, storesTick],
   );
 
-  const dateRange = useMemo(() => dateRangeFromPeriod(escopo.periodo), [escopo.periodo]);
-  const periodoAtual = resolvePeriod(escopo.periodo, calendarTodayIso());
+  const dateRange = useMemo(() => dateRangeFromPeriod(scope.period), [scope.period]);
+  const currentPeriod = resolvePeriod(scope.period, calendarTodayIso());
   const monthFill = useMonthFill();
   const deepHistoryFill = useDeepHistoryFill();
-  function onDateChange(r: DateRange, meta?: DateRangeChangeMeta) {
-    mudar(applyPeriodDateChange(escopo, r, meta));
+  function onDateChange(r: DateRange, goal?: DateRangeChangeMeta) {
+    setScope(applyPeriodDateChange(scope, r, goal));
   }
 
   // A metrica escolhe quais entram (sempre os maiores); a direcao so reordena esses.
   // "Produto" (nome) reordena o Top por faturamento.
   const topProdutos = useMemo(() => {
-    const metrica = (p: ProductItemRow) =>
+    const metric = (p: ProductItemRow) =>
       topProdSort === "itens"
         ? p.itens
         : topProdSort === "lucro"
           ? (p.lucro ?? -Infinity)
           : topProdSort === "margem"
             ? (p.margemPct ?? -Infinity)
-            : p.faturamento;
-    const top = [...view.produtos].sort((a, b) => metrica(b) - metrica(a) || b.faturamento - a.faturamento).slice(0, TOP_CARD_SIZE);
-    if (topProdSort === "nome") {
+            : p.revenue;
+    const top = [...view.produtos].sort((a, b) => metric(b) - metric(a) || b.revenue - a.revenue).slice(0, TOP_CARD_SIZE);
+    if (topProdSort === "name") {
       const dir = topProdDir === "asc" ? 1 : -1;
-      return top.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR") * dir);
+      return top.sort((a, b) => a.name.localeCompare(b.name, "pt-BR") * dir);
     }
     return topProdDir === "asc" ? top.reverse() : top;
   }, [view.produtos, topProdSort, topProdDir]);
@@ -202,24 +202,24 @@ export default function ProductsPage() {
       setTopProdDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setTopProdSort(key);
-      setTopProdDir(key === "nome" ? "asc" : "desc");
+      setTopProdDir(key === "name" ? "asc" : "desc");
     }
   }
 
   // Mesma regra do Top produtos: a metrica escolhe as linhas; a direcao so reordena.
   const topLinhas = useMemo(() => {
-    const metrica = (l: ProductLineRow) =>
+    const metric = (l: ProductLineRow) =>
       topLinhaSort === "itens"
         ? l.itens
         : topLinhaSort === "lucro"
           ? (l.lucro ?? -Infinity)
           : topLinhaSort === "margem"
             ? (l.margemPct ?? -Infinity)
-            : l.faturamento;
-    const top = [...view.linhas].sort((a, b) => metrica(b) - metrica(a) || b.faturamento - a.faturamento).slice(0, TOP_CARD_SIZE);
-    if (topLinhaSort === "nome") {
+            : l.revenue;
+    const top = [...view.linhas].sort((a, b) => metric(b) - metric(a) || b.revenue - a.revenue).slice(0, TOP_CARD_SIZE);
+    if (topLinhaSort === "name") {
       const dir = topLinhaDir === "asc" ? 1 : -1;
-      return top.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR") * dir);
+      return top.sort((a, b) => a.name.localeCompare(b.name, "pt-BR") * dir);
     }
     return topLinhaDir === "asc" ? top.reverse() : top;
   }, [view.linhas, topLinhaSort, topLinhaDir]);
@@ -229,21 +229,21 @@ export default function ProductsPage() {
       setTopLinhaDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setTopLinhaSort(key);
-      setTopLinhaDir(key === "nome" ? "asc" : "desc");
+      setTopLinhaDir(key === "name" ? "asc" : "desc");
     }
   }
 
   const linhasTabela = useMemo(() => {
     let lista = view.produtos;
     const q = busca.trim().toLowerCase();
-    if (q) lista = lista.filter((p) => p.nome.toLowerCase().includes(q) || p.codigo.toLowerCase().includes(q));
+    if (q) lista = lista.filter((p) => p.name.toLowerCase().includes(q) || p.codigo.toLowerCase().includes(q));
     const dir = sortDir === "asc" ? 1 : -1;
     return [...lista].sort((a, b) => {
-      if (sortKey === "nome") return a.nome.localeCompare(b.nome, "pt-BR") * dir;
+      if (sortKey === "name") return a.name.localeCompare(b.name, "pt-BR") * dir;
       const va = a[sortKey];
       const vb = b[sortKey];
       // Sem dado (" - ") sempre no fim, nas duas direcoes.
-      if (va == null && vb == null) return b.faturamento - a.faturamento;
+      if (va == null && vb == null) return b.revenue - a.revenue;
       if (va == null) return 1;
       if (vb == null) return -1;
       return (va - vb) * dir;
@@ -251,7 +251,7 @@ export default function ProductsPage() {
   }, [view.produtos, busca, sortKey, sortDir]);
 
   const totalTabela = useMemo(() => {
-    const faturamento = linhasTabela.reduce((s, p) => s + p.faturamento, 0);
+    const revenue = linhasTabela.reduce((s, p) => s + p.revenue, 0);
     const itens = linhasTabela.reduce((s, p) => s + p.itens, 0);
     const completo = linhasTabela.length > 0 && linhasTabela.every((p) => p.cmv != null);
     const cmv = completo ? linhasTabela.reduce((s, p) => s + (p.cmv ?? 0), 0) : null;
@@ -259,12 +259,12 @@ export default function ProductsPage() {
     const fatCmp = linhasTabela.reduce((s, p) => s + p.faturamentoCmp, 0);
     const fatAnt = linhasTabela.reduce((s, p) => s + p.faturamentoAnt, 0);
     return {
-      faturamento,
+      revenue,
       itens,
       cmv,
       lucro,
       variacaoPct: fatCmp > 0 && fatAnt > 0 ? ((fatCmp - fatAnt) / fatAnt) * 100 : null,
-      margemPct: lucro != null && faturamento > 0 ? (lucro / faturamento) * 100 : null,
+      margemPct: lucro != null && revenue > 0 ? (lucro / revenue) * 100 : null,
     };
   }, [linhasTabela]);
 
@@ -275,21 +275,21 @@ export default function ProductsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [busca, sortKey, sortDir, escopo]);
+  }, [busca, sortKey, sortDir, scope]);
 
   const detalheData = useMemo(() => ({ aggs, view }), [aggs, view]);
-  const { abrir, modal: detalheModal } = useProductDetail({ escopo, data: detalheData });
+  const { abrir, modal: detalheModal } = useProductDetail({ scope, data: detalheData });
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setSortKey(key);
-      setSortDir(key === "nome" ? "asc" : "desc");
+      setSortDir(key === "name" ? "asc" : "desc");
     }
   }
 
-  const totalCategorias = view.categorias.reduce((s, c) => s + c.faturamento, 0);
+  const totalCategorias = view.categorias.reduce((s, c) => s + c.revenue, 0);
   const tipVariacao = `Faturamento do produto ${comparedWithTip(view.vsVariacao).replace(/^Em/, "em").replace(/\.$/, "")}.`;
   const tipVariacaoTotal = `Faturamento total dos produtos do filtro ${comparedWithTip(view.vsVariacao).replace(/^Em/, "em")}`;
   const tipCmvProduto = view.temCustoProduto
@@ -309,8 +309,8 @@ export default function ProductsPage() {
               <DateRangePicker
                 value={dateRange}
                 onChange={onDateChange}
-                displayLabel={periodDisplayLabel(escopo.periodo)}
-                activePresetId={periodActivePresetId(escopo.periodo)}
+                displayLabel={periodDisplayLabel(scope.period)}
+                activePresetId={periodActivePresetId(scope.period)}
                 minDate={pickerMinDate(coverageFrom, monthFill)}
               />
               <Button variant="primary" onClick={exportar}>
@@ -323,20 +323,20 @@ export default function ProductsPage() {
 
       <ErpStatusNotice />
       <InitialSyncNotice />
-      <MonthFillNotice fill={monthFill} inicio={periodoAtual.inicio} fim={periodoAtual.fim} />
+      <MonthFillNotice fill={monthFill} start={currentPeriod.start} end={currentPeriod.end} />
       <DeepHistoryNotice
         fill={deepHistoryFill}
         monthFill={monthFill}
-        inicio={periodoAtual.inicio}
-        fim={periodoAtual.fim}
+        start={currentPeriod.start}
+        end={currentPeriod.end}
       />
       <StoreHoursNotice />
       {!loading && (
         <ProductsWithoutCostNotice
           produtos={view.productsWithoutCost}
-          storeIds={escopo.filialIds}
-          from={periodoAtual.inicio}
-          to={periodoAtual.fim}
+          storeIds={scope.storeIds}
+          from={currentPeriod.start}
+          to={currentPeriod.end}
         />
       )}
 
@@ -360,7 +360,7 @@ export default function ProductsPage() {
                 <p className="mt-1.5 font-mono text-2xl font-extrabold text-t0">{brlCent(totalCategorias)}</p>
               )}
             </div>
-            {view.categorias.length > 0 && <BadgeVsAnterior delta={view.deltaCategorias} metrica="Faturamento das categorias" />}
+            {view.categorias.length > 0 && <BadgeVsAnterior delta={view.deltaCategorias} metric="Faturamento das categorias" />}
           </div>
           {view.categorias.length === 0 ? (
             <EmptyBlock />
@@ -368,12 +368,12 @@ export default function ProductsPage() {
             <div className="overflow-x-auto">
               <div className="min-w-[420px]">
                 <BarChart
-                  data={view.categorias.map((c) => ({ label: c.nome, value: c.faturamento }))}
+                  data={view.categorias.map((c) => ({ label: c.name, value: c.revenue }))}
                   height={220}
                   formatValue={brlCent}
                   onSelect={(_, i) => {
                     const c = view.categorias[i];
-                    if (c) abrir({ tipo: "categoria", categoriaId: c.categoriaId, nome: c.nome });
+                    if (c) abrir({ kind: "categoria", categoriaId: c.categoriaId, name: c.name });
                   }}
                 />
               </div>
@@ -390,15 +390,15 @@ export default function ProductsPage() {
             <EmptyBlock />
           ) : (
             (() => {
-              const classes = view.curvaAbcCategorias.resumo.filter((r) => r.faturamento > 0);
-              const total = classes.reduce((s, r) => s + r.faturamento, 0) || 1;
+              const classes = view.curvaAbcCategorias.summary.filter((r) => r.revenue > 0);
+              const total = classes.reduce((s, r) => s + r.revenue, 0) || 1;
               return (
                 <div className="flex flex-1 flex-col justify-center px-1 pb-1 pt-3">
                   <div className="mx-auto my-2">
                     <DonutChart
                       segments={classes.map((r) => ({
                         label: `Classe ${r.classe}`,
-                        value: r.faturamento,
+                        value: r.revenue,
                         color: CORES_ABC[r.classe],
                       }))}
                       centerLabel="Total"
@@ -407,20 +407,20 @@ export default function ProductsPage() {
                   </div>
                   <div className="mt-2 flex flex-col gap-1">
                     {classes.map((r) => {
-                      const pct = Math.round((r.faturamento / total) * 100);
-                      const nomes = view.curvaAbcCategorias.itens.filter((i) => i.classe === r.classe).map((i) => i.nome);
+                      const pct = Math.round((r.revenue / total) * 100);
+                      const nomes = view.curvaAbcCategorias.itens.filter((i) => i.classe === r.classe).map((i) => i.name);
                       return (
                         <button
                           key={r.classe}
                           type="button"
-                          onClick={() => abrir({ tipo: "classe", classe: r.classe })}
+                          onClick={() => abrir({ kind: "classe", classe: r.classe })}
                           className="-mx-2 flex items-start gap-2.5 rounded-[var(--radius-vela-sm)] px-2 py-1.5 text-left transition-colors hover:bg-bg-3"
                         >
                           <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: CORES_ABC[r.classe] }} />
                           <div className="min-w-0 flex-1">
                             <div className="flex items-baseline gap-2">
                               <span className="text-[12.5px] font-semibold text-t1">Classe {r.classe}</span>
-                              <span className="ml-auto shrink-0 font-mono text-[12.5px] font-bold text-t0">{brlCent(r.faturamento)}</span>
+                              <span className="ml-auto shrink-0 font-mono text-[12.5px] font-bold text-t0">{brlCent(r.revenue)}</span>
                               <span className="min-w-[32px] shrink-0 text-right text-[11.5px] font-semibold text-t2">{pct}%</span>
                             </div>
                             <p className="mt-0.5 text-[11.5px] leading-snug text-t2">{nomes.join(" · ")}</p>
@@ -453,9 +453,9 @@ export default function ProductsPage() {
               <thead>
                 <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
                   <th className="px-1 pb-3 text-left font-bold">#</th>
-                  <ThSort label="Linha" active={topLinhaSort === "nome"} dir={topLinhaDir} onClick={() => toggleTopLinhaSort("nome")} align="left" className="px-1 pb-3" />
+                  <ThSort label="Linha" active={topLinhaSort === "name"} dir={topLinhaDir} onClick={() => toggleTopLinhaSort("name")} align="left" className="px-1 pb-3" />
                   <ThSort label="Itens vendidos" active={topLinhaSort === "itens"} dir={topLinhaDir} onClick={() => toggleTopLinhaSort("itens")} className="px-1 pb-3" />
-                  <ThSort label="Faturamento" active={topLinhaSort === "faturamento"} dir={topLinhaDir} onClick={() => toggleTopLinhaSort("faturamento")} className="px-1 pb-3" />
+                  <ThSort label="Faturamento" active={topLinhaSort === "revenue"} dir={topLinhaDir} onClick={() => toggleTopLinhaSort("revenue")} className="px-1 pb-3" />
                   <ThSort label="Lucro bruto" active={topLinhaSort === "lucro"} dir={topLinhaDir} onClick={() => toggleTopLinhaSort("lucro")} className="px-1 pb-3" />
                   <ThSort label="Margem" active={topLinhaSort === "margem"} dir={topLinhaDir} onClick={() => toggleTopLinhaSort("margem")} className="px-1 pb-3" />
                 </tr>
@@ -463,13 +463,13 @@ export default function ProductsPage() {
               <tbody>
                 {topLinhas.map((l, idx) => (
                   <tr
-                    key={l.nome}
+                    key={l.name}
                     tabIndex={0}
-                    onClick={() => abrir({ tipo: "linha", nome: l.nome })}
+                    onClick={() => abrir({ kind: "linha", name: l.name })}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
-                        abrir({ tipo: "linha", nome: l.nome });
+                        abrir({ kind: "linha", name: l.name });
                       }
                     }}
                     className="cursor-pointer border-b border-line transition-colors last:border-b-0 hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none"
@@ -477,7 +477,7 @@ export default function ProductsPage() {
                     <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
                     <td className="px-1 py-3">
                       <ProductNameCell
-                        nome={l.nome}
+                        name={l.name}
                         idx={idx}
                         sub={
                           <Tooltip label={l.tipos.join(" · ")}>
@@ -489,7 +489,7 @@ export default function ProductsPage() {
                       />
                     </td>
                     <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(l.itens)}</td>
-                    <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(l.faturamento)}</td>
+                    <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(l.revenue)}</td>
                     <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", corLucro(l.lucro))}>{moneyOrDash(l.lucro)}</td>
                     <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", l.margemPct == null ? "text-t2" : "text-ok")}>
                       {pctFmt(l.margemPct)}
@@ -515,9 +515,9 @@ export default function ProductsPage() {
               <thead>
                 <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
                   <th className="px-1 pb-3 text-left font-bold">#</th>
-                  <ThSort label="Produto" active={topProdSort === "nome"} dir={topProdDir} onClick={() => toggleTopProdSort("nome")} align="left" className="px-1 pb-3" />
+                  <ThSort label="Produto" active={topProdSort === "name"} dir={topProdDir} onClick={() => toggleTopProdSort("name")} align="left" className="px-1 pb-3" />
                   <ThSort label="Itens vendidos" active={topProdSort === "itens"} dir={topProdDir} onClick={() => toggleTopProdSort("itens")} className="px-1 pb-3" />
-                  <ThSort label="Faturamento" active={topProdSort === "faturamento"} dir={topProdDir} onClick={() => toggleTopProdSort("faturamento")} className="px-1 pb-3" />
+                  <ThSort label="Faturamento" active={topProdSort === "revenue"} dir={topProdDir} onClick={() => toggleTopProdSort("revenue")} className="px-1 pb-3" />
                   <ThSort label="Lucro bruto" active={topProdSort === "lucro"} dir={topProdDir} onClick={() => toggleTopProdSort("lucro")} className="px-1 pb-3" />
                   <ThSort label="Margem" active={topProdSort === "margem"} dir={topProdDir} onClick={() => toggleTopProdSort("margem")} className="px-1 pb-3" />
                 </tr>
@@ -527,21 +527,21 @@ export default function ProductsPage() {
                   <tr
                     key={p.chave}
                     tabIndex={0}
-                    onClick={() => abrir({ tipo: "produto", chave: p.chave, nome: p.nome })}
+                    onClick={() => abrir({ kind: "produto", chave: p.chave, name: p.name })}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
-                        abrir({ tipo: "produto", chave: p.chave, nome: p.nome });
+                        abrir({ kind: "produto", chave: p.chave, name: p.name });
                       }
                     }}
                     className="cursor-pointer border-b border-line transition-colors last:border-b-0 hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none"
                   >
                     <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
                     <td className="px-1 py-3">
-                      <ProductNameCell nome={p.nome} idx={idx} sub={p.codigo} />
+                      <ProductNameCell name={p.name} idx={idx} sub={p.codigo} />
                     </td>
                     <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(p.itens)}</td>
-                    <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.faturamento)}</td>
+                    <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.revenue)}</td>
                     <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", corLucro(p.lucro))}>{moneyOrDash(p.lucro)}</td>
                     <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", p.margemPct == null ? "text-t2" : "text-ok")}>
                       {pctFmt(p.margemPct)}
@@ -596,9 +596,9 @@ export default function ProductsPage() {
               <thead>
                 <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
                   <th className="px-1 pb-3 text-left font-bold">#</th>
-                  <ThSort label="Produto" active={sortKey === "nome"} dir={sortDir} onClick={() => toggleSort("nome")} align="left" className="px-1 pb-3" />
+                  <ThSort label="Produto" active={sortKey === "name"} dir={sortDir} onClick={() => toggleSort("name")} align="left" className="px-1 pb-3" />
                   <ThSort label="Itens vendidos" active={sortKey === "itens"} dir={sortDir} onClick={() => toggleSort("itens")} className="px-1 pb-3" />
-                  <ThSort label="Faturamento" active={sortKey === "faturamento"} dir={sortDir} onClick={() => toggleSort("faturamento")} className="px-1 pb-3" />
+                  <ThSort label="Faturamento" active={sortKey === "revenue"} dir={sortDir} onClick={() => toggleSort("revenue")} className="px-1 pb-3" />
                   <ThSort label="CMV" active={sortKey === "cmv"} dir={sortDir} onClick={() => toggleSort("cmv")} className="px-1 pb-3" />
                   <ThSort label="Lucro bruto" active={sortKey === "lucro"} dir={sortDir} onClick={() => toggleSort("lucro")} className="px-1 pb-3" />
                   <ThSort label="Margem" active={sortKey === "margemPct"} dir={sortDir} onClick={() => toggleSort("margemPct")} className="px-1 pb-3" />
@@ -612,21 +612,21 @@ export default function ProductsPage() {
                     <tr
                       key={p.chave}
                       tabIndex={0}
-                      onClick={() => abrir({ tipo: "produto", chave: p.chave, nome: p.nome })}
+                      onClick={() => abrir({ kind: "produto", chave: p.chave, name: p.name })}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
-                          abrir({ tipo: "produto", chave: p.chave, nome: p.nome });
+                          abrir({ kind: "produto", chave: p.chave, name: p.name });
                         }
                       }}
                       className="cursor-pointer border-b border-line transition-colors hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none"
                     >
                       <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
                       <td className="px-1 py-3">
-                        <ProductNameCell nome={p.nome} idx={idx} sub={p.codigo} />
+                        <ProductNameCell name={p.name} idx={idx} sub={p.codigo} />
                       </td>
                       <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(p.itens)}</td>
-                      <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.faturamento)}</td>
+                      <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.revenue)}</td>
                       <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", p.cmv == null ? "text-t2" : "text-t0")}>{moneyOrDash(p.cmv)}</td>
                       <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", corLucro(p.lucro))}>{moneyOrDash(p.lucro)}</td>
                       <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", p.margemPct == null ? "text-t2" : "text-ok")}>
@@ -654,7 +654,7 @@ export default function ProductsPage() {
                     </span>
                   </td>
                   <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{num(totalTabela.itens)}</td>
-                  <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{brlCent(totalTabela.faturamento)}</td>
+                  <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{brlCent(totalTabela.revenue)}</td>
                   <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", totalTabela.cmv == null ? "text-t2" : "text-t0")}>
                     {moneyOrDash(totalTabela.cmv)}
                   </td>

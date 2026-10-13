@@ -75,12 +75,12 @@ describe("storeHours", () => {
   });
 
   it("hourAxisRange: expediente configurado manda; venda fora estende; meta não", () => {
-    const loja = parseWeekHours({ 3: { open: "10:00", close: "22:00" } });
-    expect(hourAxisRange([loja], 3, [], [8, 23])).toMatchObject({ first: 10, last: 21 });
-    expect(hourAxisRange([loja], 3, [9, 12])).toMatchObject({ first: 9, last: 21 });
-    expect(hourAxisRange([loja], 3, [22])).toMatchObject({ first: 10, last: 22, win: { abertura: 10, fechamento: 22 } });
+    const store = parseWeekHours({ 3: { open: "10:00", close: "22:00" } });
+    expect(hourAxisRange([store], 3, [], [8, 23])).toMatchObject({ first: 10, last: 21 });
+    expect(hourAxisRange([store], 3, [9, 12])).toMatchObject({ first: 9, last: 21 });
+    expect(hourAxisRange([store], 3, [22])).toMatchObject({ first: 10, last: 22, win: { abertura: 10, fechamento: 22 } });
     // Cupom sem hora cai em 00:00 e nao puxa o eixo para a meia-noite.
-    expect(hourAxisRange([loja], 3, [0, 12])).toMatchObject({ first: 10, last: 21 });
+    expect(hourAxisRange([store], 3, [0, 12])).toMatchObject({ first: 10, last: 21 });
     const rua = parseWeekHours({ 1: { open: "08:00", close: "18:00" }, 6: { open: "08:00", close: "17:00" } });
     expect(hourAxisRange([rua], 1, [0, 16])).toMatchObject({ first: 8, last: 17 });
     expect(hourAxisRange([rua], 6, [0, 16])).toMatchObject({ first: 8, last: 16 });

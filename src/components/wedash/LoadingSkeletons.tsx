@@ -90,13 +90,13 @@ function BarsBody() {
 function ChartCardSkeleton({
   body,
   legends = 0,
-  rotulo = true,
+  label = true,
   bigValue = false,
   badge = true,
 }: {
   body: "area" | "bars";
   legends?: number;
-  rotulo?: boolean;
+  label?: boolean;
   bigValue?: boolean;
   badge?: boolean;
 }) {
@@ -105,7 +105,7 @@ function ChartCardSkeleton({
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <Title />
-          {rotulo && <Skeleton className="mt-2 h-3 w-24" />}
+          {label && <Skeleton className="mt-2 h-3 w-24" />}
           {bigValue && <Skeleton className="mt-2.5 h-7 w-40" />}
           {legends > 0 && <Legends n={legends} />}
         </div>
@@ -338,8 +338,8 @@ export function OverviewSkeleton({ weekdays = true }: { weekdays?: boolean }) {
         <ChartCardSkeleton body="area" legends={2} />
       </div>
       <div className={cn("mt-4 grid grid-cols-1 gap-4", weekdays && "lg:grid-cols-2")}>
-        <ChartCardSkeleton body="bars" rotulo={false} />
-        {weekdays && <ChartCardSkeleton body="bars" rotulo={false} legends={2} />}
+        <ChartCardSkeleton body="bars" label={false} />
+        {weekdays && <ChartCardSkeleton body="bars" label={false} legends={2} />}
       </div>
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <StoreRankingSkeleton />
@@ -375,7 +375,7 @@ export function ProductsSkeleton() {
     <Busy>
       <KpiRowSkeleton />
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <ChartCardSkeleton body="bars" rotulo={false} bigValue />
+        <ChartCardSkeleton body="bars" label={false} bigValue />
         <DonutCardSkeleton rows={3} withSub lg />
       </div>
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">

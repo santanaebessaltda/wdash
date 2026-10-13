@@ -11,9 +11,9 @@ import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePi
 
 /** Intervalo Date a partir do escopo (presets + personalizado).
  *  Usa o dia civil real das lojas  -  nao o TODAY_ISO congelado do mock. */
-export function dateRangeFromPeriod(periodo: Period): DateRange {
-  const r = resolvePeriod(periodo, calendarTodayIso());
-  return [isoToDate(r.inicio), isoToDate(r.fim)];
+export function dateRangeFromPeriod(period: Period): DateRange {
+  const r = resolvePeriod(period, calendarTodayIso());
+  return [isoToDate(r.start), isoToDate(r.end)];
 }
 
 /**
@@ -22,37 +22,37 @@ export function dateRangeFromPeriod(periodo: Period): DateRange {
  * senao desafio/meta que ainda vai comecar some da lista. Personalizado tambem pode
  * apontar para o futuro (o calendario dessas telas permite).
  */
-export function managementScheduleWindow(periodo: Period, hojeIso: string = calendarTodayIso()): { from: string; to: string } {
-  if (periodo.tipo === "esteMes") {
-    const r = resolvePeriod(periodo, hojeIso);
-    return { from: r.inicio, to: endOfMonth(r.inicio) };
+export function managementScheduleWindow(period: Period, todayIso: string = calendarTodayIso()): { from: string; to: string } {
+  if (period.kind === "thisMonth") {
+    const r = resolvePeriod(period, todayIso);
+    return { from: r.start, to: endOfMonth(r.start) };
   }
-  if (periodo.tipo === "personalizado" && periodo.inicio && periodo.fim) {
-    const from = periodo.inicio;
-    const to = periodo.fim;
+  if (period.kind === "custom" && period.start && period.end) {
+    const from = period.start;
+    const to = period.end;
     return from > to ? { from: to, to } : { from, to };
   }
-  const r = resolvePeriod(periodo, hojeIso);
-  return { from: r.inicio, to: r.fim };
+  const r = resolvePeriod(period, todayIso);
+  return { from: r.start, to: r.end };
 }
 
 /** Range do DateRangePicker nas listagens de Metas/Desafios (respeita fim futuro). */
-export function dateRangeFromManagementPeriod(periodo: Period): DateRange {
-  if (periodo.tipo === "personalizado" && periodo.inicio && periodo.fim) {
-    return [isoToDate(periodo.inicio), isoToDate(periodo.fim)];
+export function dateRangeFromManagementPeriod(period: Period): DateRange {
+  if (period.kind === "custom" && period.start && period.end) {
+    return [isoToDate(period.start), isoToDate(period.end)];
   }
-  return dateRangeFromPeriod(periodo);
+  return dateRangeFromPeriod(period);
 }
 
 /** Rotulo do input: nome do preset; personalizado  ->  null (mostra o range). */
-export function periodDisplayLabel(periodo: Period): string | null {
-  if (periodo.tipo === "personalizado") return null;
-  return periodLabels[periodo.tipo];
+export function periodDisplayLabel(period: Period): string | null {
+  if (period.kind === "custom") return null;
+  return periodLabels[period.kind];
 }
 
-export function periodActivePresetId(periodo: Period): PeriodType | null {
-  if (periodo.tipo === "personalizado") return null;
-  return periodo.tipo;
+export function periodActivePresetId(period: Period): PeriodType | null {
+  if (period.kind === "custom") return null;
+  return period.kind;
 }
 
 function toIsoLocal(d: Date): string {
@@ -64,19 +64,19 @@ function toIsoLocal(d: Date): string {
 
 /** Aplica clique no pill (preset) ou range manual no calendario. */
 export function applyPeriodDateChange(
-  escopo: Scope,
+  scope: Scope,
   range: DateRange,
-  meta?: DateRangeChangeMeta,
+  goal?: DateRangeChangeMeta,
 ): Scope {
-  if (meta?.presetId) {
-    return { ...escopo, periodo: { tipo: meta.presetId } };
+  if (goal?.presetId) {
+    return { ...scope, period: { kind: goal.presetId } };
   }
   return {
-    ...escopo,
-    periodo: {
-      tipo: "personalizado",
-      inicio: toIsoLocal(range[0]),
-      fim: toIsoLocal(range[1]),
+    ...scope,
+    period: {
+      kind: "custom",
+      start: toIsoLocal(range[0]),
+      end: toIsoLocal(range[1]),
     },
   };
 }

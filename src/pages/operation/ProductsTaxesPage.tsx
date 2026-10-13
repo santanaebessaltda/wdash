@@ -6,22 +6,22 @@ import { syncProductsNow } from "@/data/wedash/productCatalog";
 import { INVALID_COSTS_MSG, pctField, useCostFields, type CostField, type CostFieldSection } from "./costFields";
 import { CostCardTitle, FormActions, NumberField, SAVE_ERROR_MSG, StoreCardsPage, useScopedStores } from "./shared";
 
-function taxFields(loja: Store): CostField[] {
+function taxFields(store: Store): CostField[] {
   return [
     pctField("icmsWepinkPct", "ICMS"),
     pctField("icmsStWepinkPct", "ICMS ST"),
-    ...(loja.temWpink ? [pctField("icmsWpinkPct", "ICMS"), pctField("icmsStWpinkPct", "ICMS ST")] : []),
+    ...(store.temWpink ? [pctField("icmsWpinkPct", "ICMS"), pctField("icmsStWpinkPct", "ICMS ST")] : []),
   ];
 }
 
-function taxSections(loja: Store): CostFieldSection[] {
+function taxSections(store: Store): CostFieldSection[] {
   return [
     {
       title: "WEPINK",
       hint: "ICMS é calculado sobre o faturamento WEPINK. ICMS ST é calculado sobre o CMV WEPINK.",
       keys: ["icmsWepinkPct", "icmsStWepinkPct"],
     },
-    ...(loja.temWpink
+    ...(store.temWpink
       ? [
           {
             title: "WPINK",
@@ -37,7 +37,7 @@ const TAX_INTRO = "ICMS e ICMS ST são considerados no cálculo do lucro bruto e
 
 /** Configuracoes > Produtos e impostos  -  tabela de custo do Millennium, ICMS e ICMS ST. */
 export function ProductsTaxesPage() {
-  const { lojas, loading, refresh } = useScopedStores();
+  const { storeRows, loading, refresh } = useScopedStores();
   const [tables, setTables] = useState<CostTable[]>([]);
   const [tablesLoading, setTablesLoading] = useState(true);
   const [tablesError, setTablesError] = useState(false);
@@ -62,13 +62,13 @@ export function ProductsTaxesPage() {
       subtitle="Configure a tabela de custo dos produtos e os impostos da filial."
       loading={loading}
       skeleton={(n) => <StoreCardsSkeleton count={n} title intro fields={1} sections={1} />}
-      lojas={lojas}
+      storeRows={storeRows}
       oneStore
     >
-      {(loja) => (
+      {(store) => (
         <div className="flex flex-col gap-5">
-          <CostTableCard loja={loja} tables={tables} tablesLoading={tablesLoading} tablesError={tablesError} onSaved={refresh} />
-          <TaxCard loja={loja} onSaved={refresh} />
+          <CostTableCard store={store} tables={tables} tablesLoading={tablesLoading} tablesError={tablesError} onSaved={refresh} />
+          <TaxCard store={store} onSaved={refresh} />
         </div>
       )}
     </StoreCardsPage>
@@ -76,20 +76,20 @@ export function ProductsTaxesPage() {
 }
 
 function CostTableCard({
-  loja,
+  store,
   tables,
   tablesLoading,
   tablesError,
   onSaved,
 }: {
-  loja: Store;
+  store: Store;
   tables: CostTable[];
   tablesLoading: boolean;
   tablesError: boolean;
   onSaved: () => void;
 }) {
   const { show } = useToast();
-  const [savedTable, setSavedTable] = useState<number | null>(loja.costTableId ?? null);
+  const [savedTable, setSavedTable] = useState<number | null>(store.costTableId ?? null);
   const [table, setTable] = useState<number | null>(savedTable);
   const [saving, setSaving] = useState(false);
   const tableDirty = table !== savedTable;
@@ -104,7 +104,7 @@ function CostTableCard({
         return show(prices.message, "danger");
       }
     }
-    const r = await updateStoreCostTable(loja.id, table);
+    const r = await updateStoreCostTable(store.id, table);
     setSaving(false);
     if (!r.ok) return show(SAVE_ERROR_MSG, "danger");
     setSavedTable(table);
@@ -151,17 +151,17 @@ function CostTableCard({
   );
 }
 
-function TaxCard({ loja, onSaved }: { loja: Store; onSaved: () => void }) {
+function TaxCard({ store, onSaved }: { store: Store; onSaved: () => void }) {
   const { show } = useToast();
-  const fields = taxFields(loja);
-  const form = useCostFields(loja, fields);
+  const fields = taxFields(store);
+  const form = useCostFields(store, fields);
   const [saving, setSaving] = useState(false);
 
   async function save() {
     const custos = form.merged();
     if (!custos) return show(INVALID_COSTS_MSG, "danger");
     setSaving(true);
-    const r = await updateStoreCosts(loja.id, custos);
+    const r = await updateStoreCosts(store.id, custos);
     setSaving(false);
     if (!r.ok) return show(SAVE_ERROR_MSG, "danger");
     form.markSaved(custos);
@@ -180,7 +180,7 @@ function TaxCard({ loja, onSaved }: { loja: Store; onSaved: () => void }) {
         }}
       >
         <p className="text-[12.5px] text-t2">{TAX_INTRO}</p>
-        {taxSections(loja).map((section) => (
+        {taxSections(store).map((section) => (
           <div key={section.title} className="flex flex-col gap-3">
             <div>
               <p className="text-[14px] font-bold text-t0">{section.title}</p>

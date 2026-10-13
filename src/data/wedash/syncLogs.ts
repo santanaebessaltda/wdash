@@ -39,7 +39,7 @@ export const SYNC_LOG_SOURCE_LABEL: Record<string, string> = {
   mapa_produtos: "Mapeamento de produtos",
   gerador: "Gerador da filial",
   eventos: "Eventos de venda",
-  vendedoras: "Equipe de vendas",
+  sellers: "Equipe de vendas",
   fechamento_caixa: "Fechamento de caixa",
   millennium_ocupado: "Millennium ocupado",
 };
@@ -136,7 +136,7 @@ const SYNC_LOG_TEXT: Record<string, SyncLogText> = {
     explanation:
       "Não foi possível gravar o fundo, a sangria, o fechamento ou o valor digitado deste dia. O faturamento não foi alterado.",
   },
-  vendedoras: {
+  sellers: {
     summary: "Equipe de vendas não sincronizada",
     explanation:
       "Não foi possível atualizar todos os colaboradores da equipe de vendas. Rankings e indicadores individuais podem ficar incompletos.",

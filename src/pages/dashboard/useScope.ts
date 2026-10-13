@@ -6,17 +6,17 @@ import { useActiveSession } from "@/session/SessionProvider";
 import { PERIOD_STORAGE_KEY } from "@/session/periodStorage";
 import { routeShowsPeriod } from "./periodQuery";
 
-const PERIODOS: PeriodType[] = [
-  "hoje",
-  "estaSemana",
-  "esteMes",
-  "esteTrimestre",
-  "esteSemestre",
-  "esteAno",
-  "ontem",
-  "7dias",
-  "mesPassado",
-  "personalizado",
+const PERIOD_TYPES: PeriodType[] = [
+  "today",
+  "thisWeek",
+  "thisMonth",
+  "thisQuarter",
+  "thisHalf",
+  "thisYear",
+  "yesterday",
+  "last7Days",
+  "lastMonth",
+  "custom",
 ];
 
 /** Store filter  -  survives navigation even when Link omits `?filial=`. */
@@ -40,23 +40,23 @@ function saveBranch(id: string) {
   }
 }
 
-const PERIODO_PADRAO: PeriodType = "hoje";
+const DEFAULT_PERIOD: PeriodType = "today";
 
-type PeriodoSalvo = { tipo: PeriodType; de?: string; ate?: string };
+type SavedPeriod = { kind: PeriodType; from?: string; to?: string };
 
-function lerPeriodoSalvo(): PeriodoSalvo | null {
+function readSavedPeriod(): SavedPeriod | null {
   try {
     const raw = sessionStorage.getItem(PERIOD_STORAGE_KEY);
     if (!raw) return null;
-    const p = JSON.parse(raw) as Partial<PeriodoSalvo>;
-    if (!p.tipo || !PERIODOS.includes(p.tipo)) return null;
-    return { tipo: p.tipo, de: p.de, ate: p.ate };
+    const p = JSON.parse(raw) as Partial<SavedPeriod>;
+    if (!p.kind || !PERIOD_TYPES.includes(p.kind)) return null;
+    return { kind: p.kind, from: p.from, to: p.to };
   } catch {
     return null;
   }
 }
 
-function salvarPeriodo(p: PeriodoSalvo) {
+function savePeriod(p: SavedPeriod) {
   try {
     sessionStorage.setItem(PERIOD_STORAGE_KEY, JSON.stringify(p));
   } catch {
@@ -71,10 +71,10 @@ function firstParam(params: URLSearchParams, keys: string[]): string | null {
   return null;
 }
 
-function periodoDaUrl(params: URLSearchParams): PeriodoSalvo | null {
-  const tipo = firstParam(params, ["period", "periodo"]) as PeriodType | null;
-  if (!tipo || !PERIODOS.includes(tipo)) return null;
-  return { tipo, de: firstParam(params, ["from", "de"]) ?? undefined, ate: firstParam(params, ["to", "ate"]) ?? undefined };
+function periodFromUrl(params: URLSearchParams): SavedPeriod | null {
+  const kind = params.get("period") as PeriodType | null;
+  if (!kind || !PERIOD_TYPES.includes(kind)) return null;
+  return { kind, from: params.get("from") ?? undefined, to: params.get("to") ?? undefined };
 }
 
 /**
@@ -91,7 +91,7 @@ function periodoDaUrl(params: URLSearchParams): PeriodoSalvo | null {
 export function useScope() {
   const session = useActiveSession();
   const { pathname } = useLocation();
-  const mostraPeriodo = routeShowsPeriod(pathname);
+  const showsPeriod = routeShowsPeriod(pathname);
   const [params, setParams] = useSearchParams();
   const [catalogTick, setCatalogTick] = useState(0);
 
@@ -101,10 +101,10 @@ export function useScope() {
     return () => window.removeEventListener("wedash:stores", onStores);
   }, []);
 
-  const escopo = useMemo<Scope>(() => {
+  const scope = useMemo<Scope>(() => {
     const hasBranchParameter = params.has("store") || params.has("filial");
-    const filialRaw = firstParam(params, ["store", "filial"]);
-    let idsRaw = filialRaw ? filialRaw.split(",").map((s) => s.trim()).filter(Boolean) : [];
+    const branchRaw = firstParam(params, ["store", "filial"]);
+    let idsRaw = branchRaw ? branchRaw.split(",").map((s) => s.trim()).filter(Boolean) : [];
 
     // Sem `?filial=` na URL (navegacao pelo menu): recupera a ultima loja.
     if (!hasBranchParameter) {
@@ -114,7 +114,7 @@ export function useScope() {
 
     // So aceita ids que a sessao realmente pode ver; single-select  ->  no max. 1.
     const validos = idsRaw.filter((id) => session.stores.includes(id));
-    const filialIds =
+    const storeIds =
       validos.length === 0
         ? session.stores.length === 1
           ? [session.stores[0]]
@@ -122,27 +122,27 @@ export function useScope() {
         : [validos[0]];
 
     // Sem `?periodo=` (navegacao pelo menu): ultimo periodo da sessao; senao Hoje.
-    const per = periodoDaUrl(params) ?? lerPeriodoSalvo() ?? { tipo: PERIODO_PADRAO };
-    const divisaoParam = firstParam(params, ["brand", "divisao"]);
-    const divisao: Division | null = divisaoParam === "WEPINK" || divisaoParam === "WPINK" ? divisaoParam : null;
+    const per = periodFromUrl(params) ?? readSavedPeriod() ?? { kind: DEFAULT_PERIOD };
+    const divisionParam = firstParam(params, ["brand", "divisao"]);
+    const division: Division | null = divisionParam === "WEPINK" || divisionParam === "WPINK" ? divisionParam : null;
 
     return {
-      filialIds,
-      periodo: per.tipo === "personalizado" ? { tipo: per.tipo, inicio: per.de, fim: per.ate } : { tipo: per.tipo },
-      divisao,
+      storeIds,
+      period: per.kind === "custom" ? { kind: per.kind, start: per.from, end: per.to } : { kind: per.kind },
+      division,
     };
   }, [params, session.stores]);
 
   const showBrandPicker = useMemo(
-    () => scopeShowsBrandPicker(escopo.filialIds, session.stores),
-    [escopo.filialIds, session.stores, catalogTick],
+    () => scopeShowsBrandPicker(scope.storeIds, session.stores),
+    [scope.storeIds, session.stores, catalogTick],
   );
 
   // Mantem storage alinhado com a URL (bookmark / share / abas do Dashboard).
   useEffect(() => {
     if (params.has("store") || params.has("filial")) saveBranch(firstParam(params, ["store", "filial"])?.split(",")[0]?.trim() || "");
-    const per = periodoDaUrl(params);
-    if (per) salvarPeriodo(per);
+    const per = periodFromUrl(params);
+    if (per) savePeriod(per);
   }, [params]);
 
   // Uma escrita só: filial, periodo (só com o campo) e divisao. Dois setParams no mesmo
@@ -151,8 +151,8 @@ export function useScope() {
     const p = new URLSearchParams(params);
     let dirty = false;
 
-    if (!mostraPeriodo) {
-      for (const key of ["period", "from", "to", "periodo", "de", "ate"]) {
+    if (!showsPeriod) {
+      for (const key of ["period", "from", "to"]) {
         if (!p.has(key)) continue;
         p.delete(key);
         dirty = true;
@@ -164,29 +164,27 @@ export function useScope() {
       p.delete("filial");
       dirty = true;
     }
-    if (p.has("periodo")) {
-      if (!p.has("period")) p.set("period", p.get("periodo") ?? "");
-      p.delete("periodo");
-      dirty = true;
-    }
-    if (p.has("de")) {
-      if (!p.has("from")) p.set("from", p.get("de") ?? "");
-      p.delete("de");
-      dirty = true;
-    }
-    if (p.has("ate")) {
-      if (!p.has("to")) p.set("to", p.get("ate") ?? "");
-      p.delete("ate");
-      dirty = true;
-    }
     if (p.has("divisao")) {
       if (!p.has("brand")) p.set("brand", p.get("divisao") ?? "");
       p.delete("divisao");
       dirty = true;
     }
+    for (const key of ["periodo", "de", "ate"]) {
+      if (!p.has(key)) continue;
+      p.delete(key);
+      dirty = true;
+    }
+
+    const periodValue = p.get("period");
+    if (periodValue && !PERIOD_TYPES.includes(periodValue as PeriodType)) {
+      p.delete("period");
+      p.delete("from");
+      p.delete("to");
+      dirty = true;
+    }
 
     if (!p.has("store")) {
-      const id = escopo.filialIds[0];
+      const id = scope.storeIds[0];
       if (id) {
         p.set("store", id);
         dirty = true;
@@ -200,33 +198,33 @@ export function useScope() {
 
     if (!dirty) return;
     setParams(p, { replace: true });
-  }, [mostraPeriodo, params, escopo.filialIds, showBrandPicker, setParams]);
+  }, [showsPeriod, params, scope.storeIds, showBrandPicker, setParams]);
 
-  function mudar(e: Scope) {
+  function setScope(e: Scope) {
     const p = new URLSearchParams();
     // Array vazio = "Todas as lojas"  ->  nao grava id (URL limpa) + storage "".
     // Single-select: grava no max. o primeiro id.
-    if (e.filialIds.length > 0) {
-      p.set("store", e.filialIds[0]);
-      saveBranch(e.filialIds[0]);
+    if (e.storeIds.length > 0) {
+      p.set("store", e.storeIds[0]);
+      saveBranch(e.storeIds[0]);
     } else {
       saveBranch("");
     }
     // Fora das telas com o campo, o periodo fica só no sessionStorage.
-    if (mostraPeriodo) {
-      p.set("period", e.periodo.tipo);
-      if (e.periodo.tipo === "personalizado") {
-        if (e.periodo.inicio) p.set("from", e.periodo.inicio);
-        if (e.periodo.fim) p.set("to", e.periodo.fim);
+    if (showsPeriod) {
+      p.set("period", e.period.kind);
+      if (e.period.kind === "custom") {
+        if (e.period.start) p.set("from", e.period.start);
+        if (e.period.end) p.set("to", e.period.end);
       }
     }
-    salvarPeriodo({ tipo: e.periodo.tipo, de: e.periodo.inicio, ate: e.periodo.fim });
-    const keepBrand = scopeShowsBrandPicker(e.filialIds, session.stores);
-    if (keepBrand && e.divisao) p.set("brand", e.divisao);
+    savePeriod({ kind: e.period.kind, from: e.period.start, to: e.period.end });
+    const keepBrand = scopeShowsBrandPicker(e.storeIds, session.stores);
+    if (keepBrand && e.division) p.set("brand", e.division);
     setParams(p, { replace: true });
   }
 
-  return { escopo, mudar, showBrandPicker };
+  return { scope, setScope, showBrandPicker };
 }
 
 /**
@@ -235,10 +233,10 @@ export function useScope() {
  */
 export function useReturnWhenStoreChanges(storeId: string | undefined, to: string) {
   const navigate = useNavigate();
-  const { escopo } = useScope();
-  const loja = escopo.filialIds[0];
+  const { scope } = useScope();
+  const store = scope.storeIds[0];
   useEffect(() => {
-    if (!storeId || !loja || storeId === loja) return;
+    if (!storeId || !store || storeId === store) return;
     navigate(to, { replace: true });
-  }, [storeId, loja, to, navigate]);
+  }, [storeId, store, to, navigate]);
 }

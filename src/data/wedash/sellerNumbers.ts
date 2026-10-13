@@ -2,7 +2,7 @@ import { kpiDelta, previousPeriod, resolvePeriod } from "@/data/wedash/dashboard
 import { addDays } from "@/data/wedash/engine/format";
 import type { SellerDay } from "@/data/wedash/engine/sellerHome";
 
-export type NumbersMode = "hoje" | "mes";
+export type NumbersMode = "today" | "month";
 
 export interface SellerNumber {
   value: number | null;
@@ -10,7 +10,7 @@ export interface SellerNumber {
 }
 
 export interface SellerNumbers {
-  faturamento: SellerNumber;
+  revenue: SellerNumber;
   vendas: SellerNumber;
   ticket: SellerNumber;
   /** null = algum dia com venda sem itens gravados (nada estimado). */
@@ -18,7 +18,7 @@ export interface SellerNumbers {
 }
 
 const ZERO: SellerNumbers = {
-  faturamento: { value: 0 },
+  revenue: { value: 0 },
   vendas: { value: 0 },
   ticket: { value: 0 },
   pa: { value: 0 },
@@ -45,8 +45,8 @@ function soma(days: SellerDay[], from: string, to: string): Totais {
   return { revenue, sales, items: semItens ? null : items };
 }
 
-function numero(atual: number, anterior: number | null, vs: string | undefined, unidade: "brl" | "vendas" | "pa"): SellerNumber {
-  return { value: atual, delta: anterior == null ? undefined : kpiDelta(atual, anterior, vs, unidade) };
+function numero(atual: number, anterior: number | null, vs: string | undefined, unit: "brl" | "vendas" | "pa"): SellerNumber {
+  return { value: atual, delta: anterior == null ? undefined : kpiDelta(atual, anterior, vs, unit) };
 }
 
 /**
@@ -56,28 +56,28 @@ function numero(atual: number, anterior: number | null, vs: string | undefined, 
  * P.A. fica indisponivel quando algum dia com venda nao tem itens.
  */
 export function sellerNumbers(days: SellerDay[], period: { from: string; to: string }, today: string, mode: NumbersMode): SellerNumbers {
-  if (mode === "hoje") {
+  if (mode === "today") {
     const t = soma(days, today, today);
     return {
-      faturamento: { value: t.revenue },
+      revenue: { value: t.revenue },
       vendas: { value: t.sales },
       ticket: { value: t.sales > 0 ? t.revenue / t.sales : 0 },
       pa: { value: t.items == null ? null : t.sales > 0 ? t.items / t.sales : 0 },
     };
   }
 
-  const resolvido = resolvePeriod({ tipo: "personalizado", inicio: period.from, fim: period.to }, today);
-  const compara = resolvido.terminaHoje;
-  const faixa = previousPeriod(resolvido);
+  const resolvido = resolvePeriod({ kind: "custom", start: period.from, end: period.to }, today);
+  const compara = resolvido.endsToday;
+  const band = previousPeriod(resolvido);
   // Periodo que termina hoje: os dois lados perdem o ultimo dia (nao existe venda por pessoa e hora).
   const fimAtual = compara ? addDays(period.to, -1) : period.to;
-  const fimAnterior = compara ? addDays(faixa.fim, -1) : faixa.fim;
+  const fimAnterior = compara ? addDays(band.end, -1) : band.end;
   const atual = soma(days, period.from, fimAtual);
   if (atual.sales === 0 && atual.revenue === 0) return { ...ZERO, pa: { value: atual.items == null ? null : 0 } };
 
-  const anterior = soma(days, faixa.inicio, fimAnterior);
+  const anterior = soma(days, band.start, fimAnterior);
   const temAnterior = anterior.sales > 0 || anterior.revenue > 0;
-  const vs = faixa.rotulo;
+  const vs = band.label;
 
   const ticketAtual = atual.sales > 0 ? atual.revenue / atual.sales : 0;
   const ticketAnterior = anterior && anterior.sales > 0 ? anterior.revenue / anterior.sales : null;
@@ -85,7 +85,7 @@ export function sellerNumbers(days: SellerDay[], period: { from: string; to: str
   const paAnterior = anterior == null || anterior.items == null ? null : anterior.sales > 0 ? anterior.items / anterior.sales : null;
 
   return {
-    faturamento: numero(atual.revenue, temAnterior && anterior ? anterior.revenue : null, vs, "brl"),
+    revenue: numero(atual.revenue, temAnterior && anterior ? anterior.revenue : null, vs, "brl"),
     vendas: numero(atual.sales, temAnterior && anterior ? anterior.sales : null, vs, "vendas"),
     ticket: numero(ticketAtual, temAnterior && ticketAnterior != null ? ticketAnterior : null, vs, "brl"),
     pa: { value: paAtual, delta: paAtual != null && paAnterior != null ? kpiDelta(paAtual, paAnterior, vs, "pa") : undefined },

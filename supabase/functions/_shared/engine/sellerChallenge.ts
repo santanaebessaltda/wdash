@@ -216,7 +216,7 @@ export function challengeStanding(
   if (status === "upcoming") return empty;
 
   const ate = challenge.endsOn < input.today ? challenge.endsOn : input.today;
-  const noPeriodo = (r: { storeId: string; day: string }) =>
+  const inPeriod = (r: { storeId: string; day: string }) =>
     r.storeId === challenge.storeId && r.day >= challenge.startsOn && r.day <= ate;
   const team = input.team.filter((m) => m.storeId === challenge.storeId);
   const porCodigo = new Map(team.map((m) => [m.employeeId, m]));
@@ -244,7 +244,7 @@ export function challengeStanding(
     const typeByCode = new Map((input.productTypes ?? []).map((t) => [t.code, t.typeId]));
     const conta = (code: string) => (scope === "PRODUCTS" ? codigos.has(code) : tipos.has(typeByCode.get(code) ?? Number.NaN));
     for (const r of input.products ?? []) {
-      if (!noPeriodo(r) || !conta(r.productCode)) continue;
+      if (!inPeriod(r) || !conta(r.productCode)) continue;
       const membro = porGerador.get(r.sellerGeradorId) ?? porNome.get(r.sellerKey);
       const row = acc(membro, r.sellerKey);
       row.itens += r.itemCount;
@@ -252,7 +252,7 @@ export function challengeStanding(
     }
   }
   for (const r of input.sellerDays) {
-    if (!noPeriodo(r)) continue;
+    if (!inPeriod(r)) continue;
     const membro =
       (r.sellerEmployeeId != null ? porCodigo.get(r.sellerEmployeeId) : undefined) ??
       (r.sellerGeradorId != null ? porGerador.get(r.sellerGeradorId) : undefined) ??

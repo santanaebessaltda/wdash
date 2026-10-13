@@ -15,7 +15,7 @@ import { useErpConnection } from "@/pages/dashboard/ErpStatusNotice";
  */
 export function StoreHoursNotice() {
   const session = useActiveSession();
-  const { escopo } = useScope();
+  const { scope } = useScope();
   const navigate = useNavigate();
   const { connection } = useErpConnection();
   const [, setTick] = useState(0);
@@ -27,13 +27,13 @@ export function StoreHoursNotice() {
 
   // Integracao desligada: nada atualiza (nem o botao), o aviso da integracao ja explica.
   if (!isGestor(session.role) || connection === "disconnected" || connection === "password") return null;
-  const lojas = storesForSession(session.stores).filter(
-    (s) => escopo.filialIds.length === 0 || escopo.filialIds.includes(s.id),
+  const storeRows = storesForSession(session.stores).filter(
+    (s) => scope.storeIds.length === 0 || scope.storeIds.includes(s.id),
   );
-  const sem = lojas.filter((s) => !weekHoursConfigured(s.horas));
+  const sem = storeRows.filter((s) => !weekHoursConfigured(s.horas));
   if (sem.length === 0) return null;
 
-  const titulo =
+  const title =
     sem.length === 1
       ? `A filial ${sem[0]!.fantasia} está sem horário de funcionamento`
       : `${sem.length} filiais estão sem horário de funcionamento`;
@@ -41,7 +41,7 @@ export function StoreHoursNotice() {
     <Alert
       variant="warning"
       className="mt-4"
-      title={titulo}
+      title={title}
       action={<AlertLink onClick={() => navigate(paths.operation.branch)}>Configurar funcionamento</AlertLink>}
     >
       {sem.length === 1

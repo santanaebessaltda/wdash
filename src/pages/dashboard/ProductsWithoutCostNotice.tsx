@@ -26,12 +26,12 @@ export function ProductsWithoutCostNotice({
 }) {
   const session = useActiveSession();
   const { show } = useToast();
-  const [aberto, setAberto] = useState(false);
+  const [open, setAberto] = useState(false);
   const [atualizando, setAtualizando] = useState(false);
   if (!produtos || produtos.length === 0) return null;
   const n = produtos.length;
 
-  async function atualizarCustos() {
+  async function refreshCosts() {
     if (atualizando) return;
     setAtualizando(true);
     const r = await syncProductsNow({ scope: "costs", storeIds, from, to });
@@ -58,10 +58,10 @@ export function ProductsWithoutCostNotice({
       title={n === 1 ? "1 produto está sem custo no Millennium." : `${n} produtos estão sem custo no Millennium.`}
       action={
         <>
-          <AlertLink onClick={() => setAberto((v) => !v)}>{aberto ? "Ocultar" : "Ver produtos"}</AlertLink>
+          <AlertLink onClick={() => setAberto((v) => !v)}>{open ? "Ocultar" : "Ver produtos"}</AlertLink>
           {isGestor(session.role) && (
             <AlertLink
-              onClick={() => void atualizarCustos()}
+              onClick={() => void refreshCosts()}
               disabled={atualizando}
               title="Depois de cadastrar os custos no Millennium, atualize para buscar os novos valores."
             >
@@ -71,7 +71,7 @@ export function ProductsWithoutCostNotice({
         </>
       }
       footer={
-        aberto && (
+        open && (
           <ul className="mt-2.5 divide-y divide-warn/20 border-t border-warn/20 text-[12.5px] text-t0">
             {produtos.map((p) => (
               <li key={p.code} className="flex flex-col gap-0.5 py-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">

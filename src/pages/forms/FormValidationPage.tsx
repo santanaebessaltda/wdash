@@ -11,7 +11,7 @@ function passwordScore(pw: string) {
   return score;
 }
 
-const strengthMeta = [
+const goalStrength = [
   { label: "Very weak", color: "var(--bad)" },
   { label: "Weak", color: "var(--bad)" },
   { label: "Medium", color: "var(--warn)" },
@@ -102,13 +102,13 @@ export function FormValidationPage() {
                   <span
                     key={i}
                     className="h-1 flex-1 rounded-full"
-                    style={{ background: i < score ? strengthMeta[score].color : "var(--bg-inset)" }}
+                    style={{ background: i < score ? goalStrength[score].color : "var(--bg-inset)" }}
                   />
                 ))}
               </div>
               {password.length > 0 && (
                 <p className={cn("mt-1.5 text-[11.5px] font-medium", score < 3 ? "text-warn" : "text-ok")}>
-                  Password strength: {strengthMeta[score].label}
+                  Password strength: {goalStrength[score].label}
                   {score < 3 && ". Add numbers and symbols."}
                 </p>
               )}

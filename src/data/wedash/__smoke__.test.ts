@@ -4,7 +4,7 @@ import { goalOfStore } from "./goals";
 // Smoke test provando que o runner Vitest resolve o alias `@` e importa modulos de dominio.
 describe("smoke", () => {
   it("lê uma meta mockada da camada de domínio", () => {
-    const meta = goalOfStore("f1", "2026-09");
-    expect(meta?.storeAmount).toBe(170000);
+    const goal = goalOfStore("f1", "2026-09");
+    expect(goal?.storeAmount).toBe(170000);
   });
 });

@@ -20,36 +20,36 @@ export interface SellerRanking {
 
 /** Mesmo grupo = mesmo nome, mesma meta e mesmo atingimento (no modo Grupo todos do grupo tem o mesmo %). */
 function groupKey(view: GoalCardView, r: SellerRow): string {
-  return view.qtdGrupos === 0 ? "*" : `${r.grupo}|${r.metaIndividualValor}|${r.atingimentoPct}`;
+  return view.qtdGrupos === 0 ? "*" : `${r.group}|${r.individualGoalAmount}|${r.attainmentPct}`;
 }
 
 /** Pessoas do grupo da linha (modo Grupo); 1 no modo Individual. */
 export function groupSize(view: GoalCardView, row: SellerRow): number {
-  if (view.tipo === "individual") return 1;
+  if (view.kind === "individual") return 1;
   const key = groupKey(view, row);
-  return view.vendedoras.filter((r) => !r.semMeta && groupKey(view, r) === key).length;
+  return view.sellers.filter((r) => !r.noGoal && groupKey(view, r) === key).length;
 }
 
 function individualPct(view: GoalCardView, r: SellerRow): number {
-  if (view.tipo === "individual") return r.atingimentoPct;
-  const metaPessoa = r.metaIndividualValor / groupSize(view, r);
-  return metaPessoa > 0 ? (r.faturamentoValor / metaPessoa) * 100 : 0;
+  if (view.kind === "individual") return r.attainmentPct;
+  const personGoal = r.individualGoalAmount / groupSize(view, r);
+  return personGoal > 0 ? (r.revenueAmount / personGoal) * 100 : 0;
 }
 
 export function buildSellerRanking(view: GoalCardView, meKey: string): SellerRanking {
-  const ordered = view.vendedoras
-    .filter((r) => !r.semMeta)
+  const ordered = view.sellers
+    .filter((r) => !r.noGoal)
     .map((r) => ({ r, pct: individualPct(view, r) }))
-    .sort((a, b) => b.pct - a.pct || a.r.nome.localeCompare(b.r.nome, "pt-BR"));
+    .sort((a, b) => b.pct - a.pct || a.r.name.localeCompare(b.r.name, "pt-BR"));
   const entries: SellerRankingEntry[] = [];
   ordered.forEach(({ r, pct }, i) => {
     const prev = entries[i - 1];
     entries.push({
       position: prev && prev.pct === pct ? prev.position : i + 1,
-      name: r.nome,
+      name: r.name,
       pct,
-      level: r.nivelAtual ? `N${r.nivelAtual} · ${r.degrauAtual}` : null,
-      me: r.colaboradorId === meKey,
+      level: r.currentLevel ? `N${r.currentLevel} · ${r.currentTierName}` : null,
+      me: r.employeeId === meKey,
     });
   });
   const me = entries.find((e) => e.me);

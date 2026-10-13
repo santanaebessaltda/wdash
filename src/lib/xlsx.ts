@@ -248,7 +248,7 @@ function colIndex(ref: string): number {
   return n - 1;
 }
 
-/** Primeira aba como grade de texto. Número vira o texto da célula (`72`, `182`). */
+/** Primeira aba como grade de text. Número vira o text da célula (`72`, `182`). */
 function sheetRows(xml: string, strings: string[]): string[][] {
   const grid = new Map<number, Map<number, string>>();
   let maxRow = -1;

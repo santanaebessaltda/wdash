@@ -17,16 +17,16 @@ function parseTiers(raw: unknown): Tier[] {
   if (!Array.isArray(raw)) return [];
   return (raw as TierJson[])
     .map((t): Tier => ({
-      nome: String(t.name ?? "").trim(),
-      atingimentoMinPct: Number(t.minPct ?? 0),
-      comissaoPct: Number(t.commissionPct ?? 0),
+      name: String(t.name ?? "").trim(),
+      minAttainmentPct: Number(t.minPct ?? 0),
+      commissionPct: Number(t.commissionPct ?? 0),
       bonus: Number(t.bonusCents ?? 0) / 100,
       ...(t.managerCommissionPct != null
-        ? { gerenciaPct: Number(t.managerCommissionPct), gerenciaBonus: Number(t.managerBonusCents ?? 0) / 100 }
+        ? { managerPct: Number(t.managerCommissionPct), managerBonus: Number(t.managerBonusCents ?? 0) / 100 }
         : {}),
     }))
-    .filter((t) => t.nome && Number.isFinite(t.atingimentoMinPct))
-    .sort((a, b) => a.atingimentoMinPct - b.atingimentoMinPct);
+    .filter((t) => t.name && Number.isFinite(t.minAttainmentPct))
+    .sort((a, b) => a.minAttainmentPct - b.minAttainmentPct);
 }
 
 function parseGroups(raw: unknown): GoalGroup[] {

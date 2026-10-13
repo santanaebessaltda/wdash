@@ -6,19 +6,19 @@ export type { GoalBrand, GoalType, Tier } from "./engine/goalTypes";
 
 export interface Goal {
   id: string;
-  filialId: string;
+  storeId: string;
   /** "AAAA-MM" */
-  competencia: string;
-  nome: string;
+  competence: string;
+  name: string;
   storeAmount: number;
-  degraus: Tier[];
+  tiers: Tier[];
   /** Individual = meta por vendedora; grupo = meta compartilhada do time. */
-  tipo: GoalType;
+  kind: GoalType;
   /**
    * Marcas cobertas pela meta.
    * Ambas (WEPINK+WPINK) = meta de loja/mix completo; uma so = meta de marca.
    */
-  marcas: GoalBrand[];
+  brands: GoalBrand[];
 }
 
 /**
@@ -29,10 +29,10 @@ export interface Goal {
 export const BONUS_PER_LEVEL = 50;
 
 export const defaultTiers: Tier[] = [
-  { nome: "Meta", atingimentoMinPct: 50, comissaoPct: 1.5, bonus: BONUS_PER_LEVEL * 1 },
-  { nome: "Super Meta", atingimentoMinPct: 75, comissaoPct: 2.0, bonus: BONUS_PER_LEVEL * 2 },
-  { nome: "Hiper Meta", atingimentoMinPct: 100, comissaoPct: 2.5, bonus: BONUS_PER_LEVEL * 3 },
-  { nome: "Meta Desafio", atingimentoMinPct: 110, comissaoPct: 3.0, bonus: BONUS_PER_LEVEL * 4 },
+  { name: "Meta", minAttainmentPct: 50, commissionPct: 1.5, bonus: BONUS_PER_LEVEL * 1 },
+  { name: "Super Meta", minAttainmentPct: 75, commissionPct: 2.0, bonus: BONUS_PER_LEVEL * 2 },
+  { name: "Hiper Meta", minAttainmentPct: 100, commissionPct: 2.5, bonus: BONUS_PER_LEVEL * 3 },
+  { name: "Meta Desafio", minAttainmentPct: 110, commissionPct: 3.0, bonus: BONUS_PER_LEVEL * 4 },
 ];
 
 const AMBAS: GoalBrand[] = ["WEPINK", "WPINK"];
@@ -40,30 +40,30 @@ const AMBAS: GoalBrand[] = ["WEPINK", "WPINK"];
 export const goals: Goal[] = [
   // f1 (Shopping Campo Grande) = loja ancora, meta acima de f2.
   // Valores calibrados ao gerador de vendas (MTD ~ metade do mes  50% da meta).
-  { id: "m-f1-2026-07", filialId: "f1", competencia: "2026-07", nome: "Julho 2026", storeAmount: 158000, degraus: defaultTiers, tipo: "grupo", marcas: AMBAS },
-  { id: "m-f1-2026-08", filialId: "f1", competencia: "2026-08", nome: "Agosto 2026", storeAmount: 162000, degraus: defaultTiers, tipo: "grupo", marcas: AMBAS },
-  { id: "m-f1-2026-09", filialId: "f1", competencia: "2026-09", nome: "Setembro 2026", storeAmount: 170000, degraus: defaultTiers, tipo: "grupo", marcas: AMBAS },
+  { id: "m-f1-2026-07", storeId: "f1", competence: "2026-07", name: "Julho 2026", storeAmount: 158000, tiers: defaultTiers, kind: "grupo", brands: AMBAS },
+  { id: "m-f1-2026-08", storeId: "f1", competence: "2026-08", name: "Agosto 2026", storeAmount: 162000, tiers: defaultTiers, kind: "grupo", brands: AMBAS },
+  { id: "m-f1-2026-09", storeId: "f1", competence: "2026-09", name: "Setembro 2026", storeAmount: 170000, tiers: defaultTiers, kind: "grupo", brands: AMBAS },
   // Meta de marca paralela (demo de N cards no Ao vivo).
-  { id: "m-f1-2026-09-wpink", filialId: "f1", competencia: "2026-09", nome: "Meta WPINK", storeAmount: 32000, degraus: defaultTiers.slice(0, 3), tipo: "individual", marcas: ["WPINK"] },
-  { id: "m-f2-2026-07", filialId: "f2", competencia: "2026-07", nome: "Julho 2026", storeAmount: 88000, degraus: defaultTiers, tipo: "grupo", marcas: AMBAS },
-  { id: "m-f2-2026-08", filialId: "f2", competencia: "2026-08", nome: "Agosto 2026", storeAmount: 92000, degraus: defaultTiers, tipo: "grupo", marcas: AMBAS },
-  { id: "m-f2-2026-09", filialId: "f2", competencia: "2026-09", nome: "Setembro 2026", storeAmount: 98000, degraus: defaultTiers, tipo: "grupo", marcas: AMBAS },
+  { id: "m-f1-2026-09-wpink", storeId: "f1", competence: "2026-09", name: "Meta WPINK", storeAmount: 32000, tiers: defaultTiers.slice(0, 3), kind: "individual", brands: ["WPINK"] },
+  { id: "m-f2-2026-07", storeId: "f2", competence: "2026-07", name: "Julho 2026", storeAmount: 88000, tiers: defaultTiers, kind: "grupo", brands: AMBAS },
+  { id: "m-f2-2026-08", storeId: "f2", competence: "2026-08", name: "Agosto 2026", storeAmount: 92000, tiers: defaultTiers, kind: "grupo", brands: AMBAS },
+  { id: "m-f2-2026-09", storeId: "f2", competence: "2026-09", name: "Setembro 2026", storeAmount: 98000, tiers: defaultTiers, kind: "grupo", brands: AMBAS },
 ];
 
 /** Todas as metas da loja na competencia (pode haver mais de uma  -  ex.: loja + marca). */
-export function goalsOfStore(filialId: string, competencia: string): Goal[] {
-  return goals.filter((m) => m.filialId === filialId && m.competencia === competencia);
+export function goalsOfStore(storeId: string, competence: string): Goal[] {
+  return goals.filter((m) => m.storeId === storeId && m.competence === competence);
 }
 
 /**
  * Meta "principal" da loja (grupo / mix completo).
  * Usada por KPIs, dashboard e escada  -  nao mistura com metas de marca.
  */
-export function goalOfStore(filialId: string, competencia: string): Goal | undefined {
-  const list = goalsOfStore(filialId, competencia);
+export function goalOfStore(storeId: string, competence: string): Goal | undefined {
+  const list = goalsOfStore(storeId, competence);
   return (
-    list.find((m) => m.tipo === "grupo" && m.marcas.length !== 1) ??
-    list.find((m) => m.tipo === "grupo") ??
+    list.find((m) => m.kind === "grupo" && m.brands.length !== 1) ??
+    list.find((m) => m.kind === "grupo") ??
     list[0]
   );
 }

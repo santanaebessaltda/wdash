@@ -85,13 +85,13 @@ describe("buildCashCloseView", () => {
     });
     expect(ok.map((c) => c.key)).toEqual(["pix-pending"]);
 
-    const fechado = cashCloseChips({
+    const closed = cashCloseChips({
       millennium: [{ paymentMethod: "DINHEIRO", openingCents: 0, sangriaCents: null, closingCents: 10000, typedCents: 10000 }],
       card: null,
       pixCents: null,
       pixRequested: false,
     });
-    expect(fechado).toEqual([{ key: "ok", label: "Fechado", tone: "ok" }]);
+    expect(closed).toEqual([{ key: "ok", label: "Fechado", tone: "ok" }]);
   });
 
   it("o gestor troca o dinheiro digitado e a falta assumida sai do desconto", () => {
@@ -155,7 +155,7 @@ describe("resumo do fechamento", () => {
     const view = buildCashCloseView({ ...dinheiro(10000, 10000), pixRequested: true });
     expect(closeDayTotals(view.lines)).toEqual({ systemCents: 10000, typedCents: 10000, diffCents: 0 });
     expect(dayAwaitingClose({ hasMillennium: true, pixRequested: true, pixCents: null })).toBe(true);
-    expect(closeDayFace({ awaiting: true, hasLines: true, hasGap: false })).toBe("pendente");
+    expect(closeDayFace({ awaiting: true, hasLines: true, hasGap: false })).toBe("pending");
   });
 
   it("soma o total real do cartão mesmo quando o digitado bate com o Millennium", () => {
@@ -215,12 +215,12 @@ describe("resumo do fechamento", () => {
   it("diferença aparece mesmo com arquivo a caminho, e o dia limpo fica fechado", () => {
     const chips = cashCloseChips(dinheiro(10000, 8000));
     expect(chipsHaveGap(chips)).toBe(true);
-    expect(closeDayFace({ awaiting: true, hasLines: true, hasGap: true })).toBe("diferenca");
+    expect(closeDayFace({ awaiting: true, hasLines: true, hasGap: true })).toBe("difference");
     expect(chipsHaveGap([{ key: "loja-card-pending", label: "Aguardando cartão", tone: "warn" }])).toBe(false);
     expect(chipsHaveGap([{ key: "loja-ok", label: "Fechado", tone: "ok" }])).toBe(false);
     expect(chipsHaveGap([{ key: "loja-cash-caixa", label: "Falta assumida", tone: "ok" }])).toBe(false);
     expect(dayAwaitingClose({ hasMillennium: true, pixRequested: false, pixCents: null })).toBe(false);
-    expect(closeDayFace({ awaiting: false, hasLines: true, hasGap: false })).toBe("fechado");
+    expect(closeDayFace({ awaiting: false, hasLines: true, hasGap: false })).toBe("closed");
     expect(dayAwaitingClose({ hasMillennium: false, pixRequested: false, pixCents: null })).toBe(true);
   });
 

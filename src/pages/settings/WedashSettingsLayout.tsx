@@ -53,16 +53,16 @@ const META: Record<string, { title: string; subtitle: string }> = {
 export function WedashSettingsLayout() {
   const { pathname } = useLocation();
   const session = useActiveSession();
-  const meta = META[pathname] ?? META[paths.settings.stores]!;
+  const goal = META[pathname] ?? META[paths.settings.stores]!;
   const items = isGestor(session.role) ? TABS : session.role === "MANAGER" ? MANAGER_TABS : [];
   const tabs = items.some((t) => t.to === pathname) ? items : [];
 
   return (
     <div>
       <PageHeader
-        crumbs={[{ label: "Conta" }, { label: meta.title }]}
-        title={meta.title}
-        subtitle={meta.subtitle}
+        crumbs={[{ label: "Conta" }, { label: goal.title }]}
+        title={goal.title}
+        subtitle={goal.subtitle}
       />
       {tabs.length > 0 && <TabNav items={tabs} />}
       <div className="mt-6">

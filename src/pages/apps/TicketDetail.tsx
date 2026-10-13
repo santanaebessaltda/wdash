@@ -26,7 +26,7 @@ export function TicketDetail() {
     setDraft("");
   }
 
-  const meta = [
+  const goal = [
     { label: "Category", value: ticket.category },
     { label: "Priority", value: ticket.priority, urgent: ticket.priority === "High" },
     { label: "Status", value: ticket.status },
@@ -183,7 +183,7 @@ export function TicketDetail() {
           <div className="rounded-2xl border border-line bg-bg-2 p-4.5 shadow-[var(--shadow-vela)]">
             <p className="mb-3 text-[11.5px] font-bold uppercase tracking-wide text-t2">Details</p>
             <div className="flex flex-col gap-2.5">
-              {meta.map((m) => (
+              {goal.map((m) => (
                 <div key={m.label} className="flex items-center justify-between gap-3">
                   <span className="text-xs text-t2">{m.label}</span>
                   <span className={cn("truncate text-[12.5px] font-bold", m.urgent ? "text-bad" : "text-t0")}>{m.value}</span>

@@ -27,9 +27,9 @@ function clockLabel(iso: string): string {
   return `em ${d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} às ${h}`;
 }
 
-async function loadAll(tenantId: string, lojas: Store[]): Promise<StockLoaded> {
-  const tableIds = [...new Set(lojas.map((s) => s.costTableId).filter((id): id is number => id != null))];
-  const storeIds = lojas.map((s) => s.id);
+async function loadAll(tenantId: string, storeRows: Store[]): Promise<StockLoaded> {
+  const tableIds = [...new Set(storeRows.map((s) => s.costTableId).filter((id): id is number => id != null))];
+  const storeIds = storeRows.map((s) => s.id);
   const [catalog, stock, costPrices, incoming] = await Promise.all([
     fetchStockCatalog(),
     fetchStoreStock(tenantId, storeIds),
@@ -42,19 +42,19 @@ async function loadAll(tenantId: string, lojas: Store[]): Promise<StockLoaded> {
 /** Estoque das lojas do escopo. Ao abrir, busca no Millennium o estoque com mais de 30 min. */
 export function useStockData() {
   const { show } = useToast();
-  const { session, lojas, loading: lojasLoading } = useScopedStores();
-  const { escopo } = useScope();
-  const escolher = pickOneStore(escopo.filialIds, session.stores.length);
-  const storeKey = lojas.map((s) => s.id).join(",");
+  const { session, storeRows, loading: lojasLoading } = useScopedStores();
+  const { scope } = useScope();
+  const escolher = pickOneStore(scope.storeIds, session.stores.length);
+  const storeKey = storeRows.map((s) => s.id).join(",");
   const [data, setData] = useState<StockLoaded | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const syncRef = useRef(false);
-  const lojasRef = useRef(lojas);
-  lojasRef.current = lojas;
+  const storesRef = useRef(storeRows);
+  storesRef.current = storeRows;
 
   const reload = useCallback(async () => {
-    const d = await loadAll(session.tenantId, lojasRef.current);
+    const d = await loadAll(session.tenantId, storesRef.current);
     setData(d);
     return d;
   }, [session.tenantId]);
@@ -64,8 +64,8 @@ export function useStockData() {
       if (syncRef.current) return;
       const now = Date.now();
       const stale = (at: string | null | undefined) => opts.force || !at || now - Date.parse(at) > STOCK_MAX_AGE_MS;
-      const stockIds = lojasRef.current.map((s) => s.id).filter((id) => stale(d.syncedAt.get(id)));
-      const purchaseIds = lojasRef.current.map((s) => s.id).filter((id) => stale(d.incomingSyncedAt.get(id)));
+      const stockIds = storesRef.current.map((s) => s.id).filter((id) => stale(d.syncedAt.get(id)));
+      const purchaseIds = storesRef.current.map((s) => s.id).filter((id) => stale(d.incomingSyncedAt.get(id)));
       if (stockIds.length === 0 && purchaseIds.length === 0) return;
 
       syncRef.current = true;
@@ -116,7 +116,7 @@ export function useStockData() {
 
   const dataRef = useRef(data);
   dataRef.current = data;
-  const syncedTimes = lojas.map((s) => data?.syncedAt.get(s.id) ?? null);
+  const syncedTimes = storeRows.map((s) => data?.syncedAt.get(s.id) ?? null);
   const oldestSync = syncedTimes.every((t) => t != null)
     ? syncedTimes.reduce<string | null>((m, t) => (m == null || Date.parse(t!) < Date.parse(m) ? t : m), null)
     : null;
@@ -136,7 +136,7 @@ export function useStockData() {
     () =>
       data
         ? buildStockProductsView({
-            stores: lojas,
+            stores: storeRows,
             catalog: data.catalog,
             stock: data.stock,
             costPrices: data.costPrices,
@@ -147,7 +147,7 @@ export function useStockData() {
             charged: [],
           })
         : null,
-    [data, lojas],
+    [data, storeRows],
   );
 
   const atualizadoTexto = syncing
@@ -157,7 +157,7 @@ export function useStockData() {
       : "Estoque ainda não atualizado";
 
   return {
-    lojas,
+    storeRows,
     storeKey,
     escolher,
     view,

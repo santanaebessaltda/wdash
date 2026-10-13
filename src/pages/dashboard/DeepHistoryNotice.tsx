@@ -2,8 +2,8 @@ import { Alert, RadialProgress } from "@/components/ui";
 import type { DeepHistoryFill, MonthFill } from "@/data/wedash/salesRepo";
 
 /** Periodo pede dias ainda nao trazidos pela carga funda. */
-export function deepHistoryTouches(fill: DeepHistoryFill | null, inicio: string, _fim: string): boolean {
-  return Boolean(fill && inicio < fill.oldestLoaded);
+export function deepHistoryTouches(fill: DeepHistoryFill | null, start: string, _fim: string): boolean {
+  return Boolean(fill && start < fill.oldestLoaded);
 }
 
 /**
@@ -13,17 +13,17 @@ export function deepHistoryTouches(fill: DeepHistoryFill | null, inicio: string,
 export function DeepHistoryNotice({
   fill,
   monthFill,
-  inicio,
-  fim,
+  start,
+  end,
 }: {
   fill: DeepHistoryFill | null;
   monthFill: MonthFill | null;
-  inicio: string;
-  fim: string;
+  start: string;
+  end: string;
 }) {
   if (monthFill || !fill || fill.total <= 0) return null;
   const pct = Math.round((fill.done / fill.total) * 100);
-  const parcial = deepHistoryTouches(fill, inicio, fim);
+  const parcial = deepHistoryTouches(fill, start, end);
   return (
     <Alert
       variant="accent"

@@ -60,13 +60,13 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null, costT
 
   const load = useCallback(
     async (id: string, tableId: number | null): Promise<Loaded> => {
-      const hoje = calendarTodayIso();
+      const today = calendarTodayIso();
       const days = soldDaysRef.current;
       const [stock, mins, sold30, soldEver, catalog, priceTables] = await Promise.all([
         fetchPurchaseStock(tenantId, id),
         fetchPurchaseMins(tenantId, id),
-        fetchSold30(tenantId, id, addDays(hoje, -days), addDays(hoje, -1)),
-        fetchSoldEver(tenantId, id, hoje),
+        fetchSold30(tenantId, id, addDays(today, -days), addDays(today, -1)),
+        fetchSoldEver(tenantId, id, today),
         fetchStockCatalog(),
         tableId == null ? Promise.resolve(new Map<number, Map<string, number>>()) : fetchCostPrices([tableId]),
       ]);
@@ -157,8 +157,8 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null, costT
     let cancelled = false;
     (async () => {
       try {
-        const hoje = calendarTodayIso();
-        const sold = await fetchSold30(tenantId, id, addDays(hoje, -soldDays), addDays(hoje, -1));
+        const today = calendarTodayIso();
+        const sold = await fetchSold30(tenantId, id, addDays(today, -soldDays), addDays(today, -1));
         if (cancelled || storeRef.current !== id) return;
         setData((d) => (d && d.storeId === id ? { ...d, sold30: sold, soldWindow: soldDays } : d));
       } catch (e) {

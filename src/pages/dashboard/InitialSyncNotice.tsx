@@ -10,13 +10,13 @@ export function InitialSyncNotice() {
   if (!sync || sync.phase === "queued") return null;
 
   const falhou = sync.phase === "failed";
-  const titulo =
+  const title =
     sync.phase === "running"
       ? "Buscando as vendas de hoje"
       : sync.phase === "stuck"
         ? "A sincronização está demorando mais que o normal"
         : "Não foi possível buscar as vendas de hoje";
-  const texto =
+  const text =
     sync.phase === "running"
       ? "As vendas aparecerão automaticamente assim que a sincronização terminar."
       : sync.phase === "stuck"
@@ -29,7 +29,7 @@ export function InitialSyncNotice() {
     <Alert
       variant={sync.phase === "running" ? "accent" : sync.phase === "stuck" ? "warning" : "danger"}
       className="mt-4"
-      title={titulo}
+      title={title}
       icon={
         sync.phase === "running" ? (
           <span className="mt-0.5 shrink-0">
@@ -45,7 +45,7 @@ export function InitialSyncNotice() {
         )
       }
     >
-      {texto}
+      {text}
     </Alert>
   );
 }

@@ -1,8 +1,8 @@
 /** Linha do podio (Equipe e Inicio do vendedor). */
 export interface RankingRow {
   posicao: number;
-  colaboradorId: string;
-  nome: string;
+  employeeId: string;
+  name: string;
   vendas: number;
-  faturamento: number;
+  revenue: number;
 }

@@ -93,7 +93,7 @@ export function RankingBlock({
         }
         return (
           <div
-            key={l.colaboradorId}
+            key={l.employeeId}
             {...(onSelect
               ? {
                   role: "button",
@@ -120,17 +120,17 @@ export function RankingBlock({
                   boxShadow: `0 0 0 3px ${medal.cor}${isOuro ? `, ${medal.glow}` : ""}`,
                 }}
               >
-                <Avatar size={isOuro ? "2xl" : "xl"} name={l.nome} />
+                <Avatar size={isOuro ? "2xl" : "xl"} name={l.name} />
               </span>
               <MedalhaBadge pos={pos} />
             </div>
 
-            <p className="truncate text-[13px] font-bold text-t0 sm:text-[14px]">{l.nome.split(" ")[0]}</p>
+            <p className="truncate text-[13px] font-bold text-t0 sm:text-[14px]">{l.name.split(" ")[0]}</p>
             <p className="mt-0.5 text-[11px] font-semibold text-t2">
               {num(l.vendas)} {l.vendas === 1 ? "venda" : "vendas"}
             </p>
             <p className="mt-0.5 font-mono text-[13px] font-extrabold sm:text-[14px]" style={{ color: medal.cor }}>
-              {formatValor(l.faturamento)}
+              {formatValor(l.revenue)}
             </p>
 
             <div

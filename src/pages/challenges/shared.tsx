@@ -54,14 +54,14 @@ export function challengeHeadline(c: ChallengeRecord, view: ChallengeView): Chal
     return { label: "Atingiram", value: `${n} pessoas${alvo}` };
   }
   const { lider } = challengeCardSummary(view);
-  const primeiros = view.participantes.filter((p) => p.posicao === 1);
+  const primeiros = view.participants.filter((p) => p.posicao === 1);
   if (!lider || primeiros.length === 0 || (encerrado && !primeiros[0].vencedor)) {
     return { label: null, value: encerrado ? "Nenhum vencedor" : "Ainda não há líder" };
   }
-  const valor = primeiros[0].resultado != null ? ` · ${metricValueLabel(c.metric, primeiros[0].resultado)}` : "";
+  const amount = primeiros[0].resultado != null ? ` · ${metricValueLabel(c.metric, primeiros[0].resultado)}` : "";
   const varios = primeiros.length > 1;
   const label = encerrado ? (varios ? "Vencedores" : "Vencedor") : varios ? "Líderes" : "Líder";
-  return { label, value: `${lider}${valor}` };
+  return { label, value: `${lider}${amount}` };
 }
 
 /** "Lider: ANA  |  12 itens" ou a frase inteira quando nao ha rotulo. */

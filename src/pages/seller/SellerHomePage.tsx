@@ -50,13 +50,13 @@ export function SellerHomePage() {
   }, [load]);
 
   const firstName = titleName(session?.name).split(" ")[0]?.trim() ?? "";
-  const periodo = home
+  const period = home
     ? `Este mês · ${shortDate(home.numbersPeriod.from)} a ${shortDate(home.numbersPeriod.to)}`
     : undefined;
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader title={firstName ? `Bem-vindo(a) de volta, ${firstName} 👋` : "Bem-vindo(a) de volta 👋"} subtitle={periodo} />
+      <PageHeader title={firstName ? `Bem-vindo(a) de volta, ${firstName} 👋` : "Bem-vindo(a) de volta 👋"} subtitle={period} />
       {showSkeleton ? (
         <SellerHomeSkeleton stores={session?.stores.length ?? 1} />
       ) : failed || !home ? (

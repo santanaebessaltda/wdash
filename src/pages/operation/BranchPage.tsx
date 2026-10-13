@@ -44,24 +44,24 @@ const RENT_HINT: Record<PointType, string[]> = {
 const FRANCHISE_INTRO =
   "Esses percentuais entram nos custos da operação e são considerados no cálculo do resultado operacional no Financeiro. Campos vazios são considerados 0%.";
 
-function franchiseFields(loja: Store): CostField[] {
+function franchiseFields(store: Store): CostField[] {
   return [
     pctField("royaltiesWepinkPct", "Royalties WEPINK"),
     pctField("marketingWepinkPct", "Taxa de marketing WEPINK"),
-    ...(loja.temWpink
+    ...(store.temWpink
       ? [pctField("royaltiesWpinkPct", "Royalties WPINK"), pctField("marketingWpinkPct", "Taxa de marketing WPINK")]
       : []),
   ];
 }
 
-function franchiseSections(loja: Store): CostFieldSection[] {
+function franchiseSections(store: Store): CostFieldSection[] {
   return [
     {
       title: "WEPINK",
       hint: "Royalties e taxa de marketing são calculados sobre o faturamento WEPINK.",
       keys: ["royaltiesWepinkPct", "marketingWepinkPct"],
     },
-    ...(loja.temWpink
+    ...(store.temWpink
       ? [
           {
             title: "WPINK",
@@ -75,7 +75,7 @@ function franchiseSections(loja: Store): CostFieldSection[] {
 
 /** Configurações > Filial. Tipo, funcionamento, franquia e aluguel da unidade. */
 export function BranchPage() {
-  const { lojas, loading, refresh } = useScopedStores();
+  const { storeRows, loading, refresh } = useScopedStores();
   return (
     <StoreCardsPage
       section="Configurações"
@@ -83,16 +83,16 @@ export function BranchPage() {
       subtitle="Configure o tipo, o funcionamento, a franquia e o aluguel de cada filial."
       loading={loading}
       skeleton={(n) => <StoreCardsSkeleton count={n} title schedule sections={2} />}
-      lojas={lojas}
+      storeRows={storeRows}
       oneStore
     >
-      {(loja) => <BranchCards loja={loja} onSaved={refresh} />}
+      {(store) => <BranchCards store={store} onSaved={refresh} />}
     </StoreCardsPage>
   );
 }
 
-function BranchCards({ loja, onSaved }: { loja: Store; onSaved: () => void }) {
-  const [point, setPoint] = useState<PointType>(loja.pointType);
+function BranchCards({ store, onSaved }: { store: Store; onSaved: () => void }) {
+  const [point, setPoint] = useState<PointType>(store.pointType);
   const [presetStamp, setPresetStamp] = useState(0);
 
   function escolher(next: PointType) {
@@ -109,37 +109,37 @@ function BranchCards({ loja, onSaved }: { loja: Store; onSaved: () => void }) {
         <p className="mb-1.5 text-[12.5px] font-bold text-t0">Tipo de filial</p>
         <Segmented options={POINT_OPTIONS} value={point} onChange={(v) => v && escolher(v)} />
       </Card>
-      <StoreHoursCard store={loja} canEdit onSaved={onSaved} pointType={point} presetStamp={presetStamp} />
+      <StoreHoursCard store={store} canEdit onSaved={onSaved} pointType={point} presetStamp={presetStamp} />
       <CostFieldsCard
-        loja={loja}
+        store={store}
         title="Royalties e taxa de marketing"
-        fields={franchiseFields(loja)}
+        fields={franchiseFields(store)}
         intro={FRANCHISE_INTRO}
-        sections={franchiseSections(loja)}
+        sections={franchiseSections(store)}
         onSaved={onSaved}
       />
-      <RentCard loja={loja} point={point} onSaved={onSaved} />
+      <RentCard store={store} point={point} onSaved={onSaved} />
     </div>
   );
 }
 
-function RentCard({ loja, point, onSaved }: { loja: Store; point: PointType; onSaved: () => void }) {
+function RentCard({ store, point, onSaved }: { store: Store; point: PointType; onSaved: () => void }) {
   const { show } = useToast();
-  const form = useCostFields(loja, RENT_FIELDS);
+  const form = useCostFields(store, RENT_FIELDS);
   const [saving, setSaving] = useState(false);
   const rua = point === "RUA";
   const mensal = rua ? { ...RENT_MIN, label: "Aluguel mensal" } : RENT_MIN;
   const fields = rua ? [mensal] : RENT_FIELDS;
   const pctSalvo = parseNum(form.saved[RENT_PCT.key] ?? "");
   const removePct = rua && pctSalvo != null && pctSalvo > 0;
-  const typeDirty = point !== loja.pointType;
+  const typeDirty = point !== store.pointType;
 
   async function save() {
     const merged = form.merged();
     if (!merged) return show(INVALID_COSTS_MSG, "danger");
     const custos = rua ? RENT_PCT.set(merged, null) : merged;
     setSaving(true);
-    const r = await updateStoreCosts(loja.id, custos, point);
+    const r = await updateStoreCosts(store.id, custos, point);
     setSaving(false);
     if (!r.ok) return show(SAVE_ERROR_MSG, "danger");
     form.markSaved(custos);

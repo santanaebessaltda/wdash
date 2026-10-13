@@ -85,8 +85,8 @@ export function ErpStatusNotice({ dado = "vendas", className = "mt-4" }: { dado?
   if (connection !== "disconnected" && connection !== "password") return null;
 
   const gestor = isGestor(session.role);
-  const titulo = connection === "password" ? "A senha do Millennium não é mais válida" : "Millennium desconectado";
-  const texto =
+  const title = connection === "password" ? "A senha do Millennium não é mais válida" : "Millennium desconectado";
+  const text =
     dado === "estoque"
       ? "O estoque não está sendo atualizado. Os valores mostram a última atualização disponível."
       : lastSync
@@ -97,7 +97,7 @@ export function ErpStatusNotice({ dado = "vendas", className = "mt-4" }: { dado?
     <Alert
       variant="warning"
       className={className}
-      title={titulo}
+      title={title}
       action={
         gestor ? (
           <AlertLink onClick={() => navigate(paths.settings.erp)}>{connection === "password" ? "Atualizar senha" : "Conectar"}</AlertLink>
@@ -105,8 +105,8 @@ export function ErpStatusNotice({ dado = "vendas", className = "mt-4" }: { dado?
       }
     >
       {gestor
-        ? texto
-        : `${texto} ${connection === "password" ? "Peça ao gestor da conta para atualizar a integração." : "Peça ao gestor da conta para conectar novamente."}`}
+        ? text
+        : `${text} ${connection === "password" ? "Peça ao gestor da conta para atualizar a integração." : "Peça ao gestor da conta para conectar novamente."}`}
     </Alert>
   );
 }

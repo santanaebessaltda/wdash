@@ -4,12 +4,12 @@ import { AvatarIniciais } from "./InitialsAvatar";
 
 /** 1 coluna das listas de produto: avatar com iniciais + nome + linha de apoio (codigo, categoria...). */
 export function ProductNameCell({
-  nome,
+  name,
   idx,
   sub,
   upper = false,
 }: {
-  nome: string;
+  name: string;
   /** Posicao na lista  -  escolhe a cor do avatar. */
   idx: number;
   /** Texto vira a linha cinza abaixo do nome; elemento entra como esta (ex.: com tooltip). */
@@ -18,9 +18,9 @@ export function ProductNameCell({
 }) {
   return (
     <div className="flex min-w-0 items-center gap-2.5">
-      <AvatarIniciais nome={nome} idx={idx} />
+      <AvatarIniciais name={name} idx={idx} />
       <div className="min-w-0">
-        <p className={cn("truncate text-[13px] font-bold text-t0", upper && "uppercase")}>{nome}</p>
+        <p className={cn("truncate text-[13px] font-bold text-t0", upper && "uppercase")}>{name}</p>
         {typeof sub === "string" ? sub && <p className={cn("truncate text-[11px] text-t2", upper && "uppercase")}>{sub}</p> : sub}
       </div>
     </div>

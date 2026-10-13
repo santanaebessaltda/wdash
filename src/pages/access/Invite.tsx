@@ -86,7 +86,7 @@ export function Invite() {
   // Link padrao do Supabase ja traz a sessao no hash: abre sozinho.
   // TokenHash do e-mail espera o clique (anti-prefetch).
   const [state, setState] = useState<State>(() => (token === "link" ? { kind: "loading" } : { kind: "ready" }));
-  const [nome, setNome] = useState<PersonName>({ nome: "", sobrenome: "" });
+  const [name, setNome] = useState<PersonName>({ name: "", sobrenome: "" });
   const [senha, setSenha] = useState("");
   const [confirma, setConfirma] = useState("");
   const [erro, setErro] = useState<string | null>(null);
@@ -182,7 +182,7 @@ export function Invite() {
 
   const { info } = state;
   const erroConfirma = confirma.length > 0 && confirma !== senha ? "As senhas não coincidem." : null;
-  const pode = personNameIsValid(nome) && passwordIsValid(senha) && confirma === senha && !carregando;
+  const pode = personNameIsValid(name) && passwordIsValid(senha) && confirma === senha && !carregando;
 
   async function criar(e: FormEvent) {
     e.preventDefault();
@@ -197,7 +197,7 @@ export function Invite() {
       setCarregando(false);
       return;
     }
-    const aceito = await acceptInvite({ firstName: nome.nome, lastName: nome.sobrenome });
+    const aceito = await acceptInvite({ firstName: name.name, lastName: name.sobrenome });
     const session = aceito ? await sessionFromPersistedAuth() : null;
     if (!session) {
       setErro("Não foi possível ativar seu acesso. Tente novamente.");
@@ -248,7 +248,7 @@ export function Invite() {
         )}
       </p>
       <form onSubmit={criar} className="flex flex-col gap-4" noValidate>
-        <NameFields valor={nome} onChange={(p) => setNome((n) => ({ ...n, ...p }))} autoFocus />
+        <NameFields amount={name} onChange={(p) => setNome((n) => ({ ...n, ...p }))} autoFocus />
         {/* Escondido: gerenciador de senhas associa a senha nova a este login. */}
         <input type="email" name="username" autoComplete="username" value={info.email} readOnly tabIndex={-1} aria-hidden className="sr-only" />
         <PasswordField

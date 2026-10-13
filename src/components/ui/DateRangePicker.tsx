@@ -27,23 +27,23 @@ export type DateRange = [Date, Date];
 
 /** Ids dos pills  -  alinhados a PeriodType no dashboard. */
 export type DatePresetId =
-  | "hoje"
-  | "ontem"
-  | "estaSemana"
-  | "esteMes"
-  | "esteTrimestre"
-  | "esteSemestre"
-  | "esteAno";
+  | "today"
+  | "yesterday"
+  | "thisWeek"
+  | "thisMonth"
+  | "thisQuarter"
+  | "thisHalf"
+  | "thisYear";
 
 export interface QuickRange {
   /** Id do preset  -  quando presente, onChange informa o preset. */
   id?: DatePresetId;
   label: string;
   /** Resolve o intervalo [inicio, fim] a partir de "hoje" (data base). */
-  resolve: (hoje: Date) => DateRange;
+  resolve: (today: Date) => DateRange;
 }
 
-function zeraHora(d: Date): Date {
+function startOfCalendarDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
@@ -54,62 +54,62 @@ function addCalendarDays(d: Date, n: number): Date {
 }
 
 /** Segunda-feira da semana (PT-BR / ISO). */
-function inicioSemana(hoje: Date): Date {
-  const d = zeraHora(hoje);
+function startOfWeek(today: Date): Date {
+  const d = startOfCalendarDay(today);
   const dow = d.getDay();
   const diff = dow === 0 ? -6 : 1 - dow;
   return addCalendarDays(d, diff);
 }
 
-function inicioTrimestre(hoje: Date): Date {
-  const mes = Math.floor(hoje.getMonth() / 3) * 3;
-  return new Date(hoje.getFullYear(), mes, 1);
+function startOfQuarter(today: Date): Date {
+  const mes = Math.floor(today.getMonth() / 3) * 3;
+  return new Date(today.getFullYear(), mes, 1);
 }
 
-function inicioSemestre(hoje: Date): Date {
-  const mes = hoje.getMonth() < 6 ? 0 : 6;
-  return new Date(hoje.getFullYear(), mes, 1);
+function startOfHalf(today: Date): Date {
+  const mes = today.getMonth() < 6 ? 0 : 6;
+  return new Date(today.getFullYear(), mes, 1);
 }
 
 /** Atalhos padrao alinhados ao escopo (URL `periodo=`). */
-export const QUICK_RANGES_PADRAO: QuickRange[] = [
-  { id: "hoje", label: "Hoje", resolve: (h) => { const d = zeraHora(h); return [d, d]; } },
-  { id: "ontem", label: "Ontem", resolve: (h) => { const d = addCalendarDays(zeraHora(h), -1); return [d, d]; } },
-  { id: "estaSemana", label: "Esta semana", resolve: (h) => { const d = zeraHora(h); return [inicioSemana(d), d]; } },
-  { id: "esteMes", label: "Este mês", resolve: (h) => { const d = zeraHora(h); return [new Date(d.getFullYear(), d.getMonth(), 1), d]; } },
-  { id: "esteTrimestre", label: "Este trimestre", resolve: (h) => { const d = zeraHora(h); return [inicioTrimestre(d), d]; } },
-  { id: "esteSemestre", label: "Este semestre", resolve: (h) => { const d = zeraHora(h); return [inicioSemestre(d), d]; } },
-  { id: "esteAno", label: "Este ano", resolve: (h) => { const d = zeraHora(h); return [new Date(d.getFullYear(), 0, 1), d]; } },
+export const DEFAULT_QUICK_RANGES: QuickRange[] = [
+  { id: "today", label: "Hoje", resolve: (h) => { const d = startOfCalendarDay(h); return [d, d]; } },
+  { id: "yesterday", label: "Ontem", resolve: (h) => { const d = addCalendarDays(startOfCalendarDay(h), -1); return [d, d]; } },
+  { id: "thisWeek", label: "Esta semana", resolve: (h) => { const d = startOfCalendarDay(h); return [startOfWeek(d), d]; } },
+  { id: "thisMonth", label: "Este mês", resolve: (h) => { const d = startOfCalendarDay(h); return [new Date(d.getFullYear(), d.getMonth(), 1), d]; } },
+  { id: "thisQuarter", label: "Este trimestre", resolve: (h) => { const d = startOfCalendarDay(h); return [startOfQuarter(d), d]; } },
+  { id: "thisHalf", label: "Este semestre", resolve: (h) => { const d = startOfCalendarDay(h); return [startOfHalf(d), d]; } },
+  { id: "thisYear", label: "Este ano", resolve: (h) => { const d = startOfCalendarDay(h); return [new Date(d.getFullYear(), 0, 1), d]; } },
 ];
 
 /** Calendários de Fechamento, Sangria e Informe: Este mês mostra o mês civil inteiro. */
-export const QUICK_RANGES_CALENDARIO: QuickRange[] = QUICK_RANGES_PADRAO.map((qr) =>
-  qr.id !== "esteMes"
+export const CALENDAR_QUICK_RANGES: QuickRange[] = DEFAULT_QUICK_RANGES.map((qr) =>
+  qr.id !== "thisMonth"
     ? qr
     : {
         ...qr,
-        resolve: (hoje) => {
-          const d = zeraHora(hoje);
+        resolve: (today) => {
+          const d = startOfCalendarDay(today);
           return [new Date(d.getFullYear(), d.getMonth(), 1), new Date(d.getFullYear(), d.getMonth() + 1, 0)];
         },
       },
 );
 
-const DOW_PT = ["D", "S", "T", "Q", "Q", "S", "S"];
-const MESES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-const MESES_CURTO = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+const WEEKDAY_INITIALS = ["D", "S", "T", "Q", "Q", "S", "S"];
+const MONTHS_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+const SHORT_MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
 function sameCalendarDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-function formatarCurto(d: Date): string {
-  return `${d.getDate()} ${MESES_CURTO[d.getMonth()]}`;
+function formatShort(d: Date): string {
+  return `${d.getDate()} ${SHORT_MONTHS[d.getMonth()]}`;
 }
 
-function formatarIntervalo(r: DateRange): string {
+function formatRange(r: DateRange): string {
   const [a, b] = r;
-  return sameCalendarDay(a, b) ? formatarCurto(a) : `${formatarCurto(a)} – ${formatarCurto(b)}`;
+  return sameCalendarDay(a, b) ? formatShort(a) : `${formatShort(a)} – ${formatShort(b)}`;
 }
 
 export type DateRangeChangeMeta = {
@@ -120,7 +120,7 @@ export type DateRangeChangeMeta = {
 export function DateRangePicker({
   value,
   onChange,
-  quickRanges = QUICK_RANGES_PADRAO,
+  quickRanges = DEFAULT_QUICK_RANGES,
   /** Quando o escopo e um preset, mostra o nome no input (ex.: "Este mes"). */
   displayLabel,
   /** Preset ativo no escopo  -  destaca o pill correspondente. */
@@ -131,7 +131,7 @@ export function DateRangePicker({
   maxDate,
 }: {
   value: DateRange | null;
-  onChange: (r: DateRange, meta?: DateRangeChangeMeta) => void;
+  onChange: (r: DateRange, goal?: DateRangeChangeMeta) => void;
   quickRanges?: QuickRange[];
   displayLabel?: string | null;
   activePresetId?: string | null;
@@ -144,11 +144,11 @@ export function DateRangePicker({
   maxDate?: Date | null;
 }) {
   // Dia civil das lojas (Campo Grande)  -  alinhado a resolvePeriod/calendarTodayIso.
-  const hoje = useMemo(() => isoToDate(calendarTodayIso()), []);
-  const min = useMemo(() => (minDate ? zeraHora(minDate) : null), [minDate]);
-  const max = useMemo(() => zeraHora(maxDate ?? hoje), [maxDate, hoje]);
+  const today = useMemo(() => isoToDate(calendarTodayIso()), []);
+  const min = useMemo(() => (minDate ? startOfCalendarDay(minDate) : null), [minDate]);
+  const max = useMemo(() => startOfCalendarDay(maxDate ?? today), [maxDate, today]);
   const [open, setOpen] = useState(false);
-  const [viewMonth, setViewMonth] = useState<Date>(() => (value ? new Date(value[0].getFullYear(), value[0].getMonth(), 1) : new Date(hoje.getFullYear(), hoje.getMonth(), 1)));
+  const [viewMonth, setViewMonth] = useState<Date>(() => (value ? new Date(value[0].getFullYear(), value[0].getMonth(), 1) : new Date(today.getFullYear(), today.getMonth(), 1)));
   const [draftStart, setDraftStart] = useState<Date | null>(null);
   const [panelPos, setPanelPos] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
@@ -238,12 +238,12 @@ export function DateRangePicker({
   function presetDoRange(r: DateRange): DatePresetId | undefined {
     const [a, b] = r;
     if (!sameCalendarDay(a, b)) return undefined;
-    if (sameCalendarDay(a, hoje)) return "hoje";
-    if (sameCalendarDay(a, addCalendarDays(hoje, -1))) return "ontem";
+    if (sameCalendarDay(a, today)) return "today";
+    if (sameCalendarDay(a, addCalendarDays(today, -1))) return "yesterday";
     return undefined;
   }
 
-  function escolherDia(dia: Date) {
+  function pickDay(dia: Date) {
     if (diaBloqueado(dia)) return;
     // 1 clique (ou dia anterior ao inicio)  ->  marca inicio; 2 no mesmo dia  ->  so aquele dia.
     if (!draftStart || (!sameCalendarDay(draftStart, dia) && draftStart > dia)) {
@@ -259,7 +259,7 @@ export function DateRangePicker({
   }
 
   function aplicarQuick(qr: QuickRange) {
-    const raw = qr.resolve(hoje);
+    const raw = qr.resolve(today);
     const clamped = clampRange(raw);
     if (!clamped) return;
     onChange(clamped, qr.id ? { presetId: qr.id } : undefined);
@@ -269,7 +269,7 @@ export function DateRangePicker({
   }
 
   function quickDisponivel(qr: QuickRange): boolean {
-    return clampRange(qr.resolve(hoje)) != null;
+    return clampRange(qr.resolve(today)) != null;
   }
 
   function ehSelecionado(dia: Date): boolean {
@@ -286,10 +286,10 @@ export function DateRangePicker({
     return dia > lo && dia < hi;
   }
 
-  const rotulo = displayLabel?.trim()
+  const label = displayLabel?.trim()
     ? displayLabel
     : value
-      ? formatarIntervalo(value)
+      ? formatRange(value)
       : "Período personalizado";
 
   const painel =
@@ -343,7 +343,7 @@ export function DateRangePicker({
                   </svg>
                 </button>
                 <span className="text-sm font-bold text-t0">
-                  {MESES_PT[viewMonth.getMonth()]} {viewMonth.getFullYear()}
+                  {MONTHS_PT[viewMonth.getMonth()]} {viewMonth.getFullYear()}
                 </span>
                 <button
                   type="button"
@@ -362,7 +362,7 @@ export function DateRangePicker({
               </div>
 
               <div className="mb-1.5 grid grid-cols-7 gap-1">
-                {DOW_PT.map((d, i) => (
+                {WEEKDAY_INITIALS.map((d, i) => (
                   <span key={`${d}-${i}`} className="py-1 text-center text-[10.5px] font-bold text-t2">
                     {d}
                   </span>
@@ -372,7 +372,7 @@ export function DateRangePicker({
               <div className="grid grid-cols-7 gap-1">
                 {cells.map((dia, i) => {
                   if (dia === null) return <span key={`e${i}`} />;
-                  const isHoje = sameCalendarDay(dia, hoje);
+                  const isTodayFlag = sameCalendarDay(dia, today);
                   const bloqueado = diaBloqueado(dia);
                   const selecionado = ehSelecionado(dia);
                   const dentro = ehDentro(dia);
@@ -381,9 +381,9 @@ export function DateRangePicker({
                       key={dia.toISOString()}
                       type="button"
                       disabled={bloqueado}
-                      onClick={() => escolherDia(dia)}
-                      aria-current={isHoje ? "date" : undefined}
-                      title={isHoje ? "Hoje" : undefined}
+                      onClick={() => pickDay(dia)}
+                      aria-current={isTodayFlag ? "date" : undefined}
+                      title={isTodayFlag ? "Hoje" : undefined}
                       className={cn(
                         "flex h-9 min-w-0 items-center justify-center rounded-[9px] text-[12.5px] transition-colors",
                         bloqueado
@@ -392,7 +392,7 @@ export function DateRangePicker({
                             ? "bg-acc font-bold text-white"
                             : dentro
                               ? "bg-acc-soft font-semibold text-acc"
-                              : isHoje
+                              : isTodayFlag
                                 ? "font-bold text-acc ring-1 ring-acc/50 hover:bg-acc-soft"
                                 : "font-semibold text-t1 hover:bg-bg-3",
                       )}
@@ -443,7 +443,7 @@ export function DateRangePicker({
           <rect x="3" y="4" width="18" height="18" rx="2" />
           <path d="M16 2v4M8 2v4M3 10h18" />
         </svg>
-        <span className={cn("min-w-0 truncate font-semibold", size === "sm" ? "text-xs" : "text-[13.5px]", value || displayLabel ? "text-t0" : "text-t2")}>{rotulo}</span>
+        <span className={cn("min-w-0 truncate font-semibold", size === "sm" ? "text-xs" : "text-[13.5px]", value || displayLabel ? "text-t0" : "text-t2")}>{label}</span>
       </button>
       {painel}
     </div>

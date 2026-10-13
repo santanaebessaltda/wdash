@@ -284,9 +284,9 @@ Pergunta: "Quais são meus 80/20? Estou perdendo venda por ruptura? O que descon
 
 ### Já existe e funciona:
 - **`useScope()`** (`src/pages/dashboard/useScope.ts`) — hook que centraliza o escopo (loja, período, divisão/marca) e **persiste na URL** via `useSearchParams`. Estado compartilhável, bookmarkable, sobrevive a reload. Storage key: `wedash.store`.
- - `filialIds`: `[]` = rede; `[id]` = uma loja
- - `periodo`: presets `hoje | ontem | 7dias | esteMes | mesPassado | personalizado`
- - `divisao`: `WEPINK | WPINK | null`
+ - `storeIds`: `[]` = rede; `[id]` = uma loja
+ - `period.kind`: `today | yesterday | last7Days | thisMonth | lastMonth | custom` (e os outros presets `thisWeek`, `thisQuarter`, `thisHalf`, `thisYear`). Na URL: `period`, `from`, `to`
+ - `division`: `WEPINK | WPINK | null` (URL: `brand`)
 - **`StorePicker`** (`src/pages/dashboard/StorePicker.tsx`) — single-select no Topbar: fantasia + CNPJ, sem ícone (2026-10-10). "Todas as lojas" e "Rede consolidada" em caixa alta, no botão e na lista (2026-10-10).
 - **`Topbar`** — nas telas do produto (exceto equipe de vendas) → `StorePicker`. O campo **Buscar na WDash** saiu do header (2026-10-04), para gestor, gerente e vendedor. Ctrl+K ainda abre a paleta.
 - **`nav-wedash.ts`** — navegação por role (`OWNER` / `MANAGER` / `SELLER` / `ADMIN_GLOBAL`).
@@ -701,10 +701,10 @@ Pergunta: "Quais são meus 80/20? Estou perdendo venda por ruptura? O que descon
  - **Copy de componente compartilhado é global** (2026-10-01, decisão do dono): os detalhes (modais) de Produto/Categoria/Linha/Classe (Visão geral + Produtos) e de Pessoa (Visão geral + Equipe), a barra de níveis e os cards de meta usam o mesmo texto em todas as telas — sem texto que dependa da tela de origem; navegação interna = "← Voltar para {NOME}". Nível da meta = **"N2 · Super"** em todo lugar (inclusive tabela do ranking do `CardMeta` e "Fechou no N2 · Super" da listagem de Metas). Nas revisões de copy, o dono separa o que é exclusivo da tela do que é global.
 
 37. ✅ **Período padrão = Hoje, compartilhado entre telas** (2026-09-25) — `useScope`.
- - Sem `?periodo=` na URL → último período escolhido na sessão (`sessionStorage` `wedash.period`) → senão **Hoje** (antes: Este mês).
- - Trocar o período numa tela vale para todas. O menu leva `filial`; `periodo` só segue para as telas com o campo.
+ - Sem `?period=` na URL → último período escolhido na sessão (`sessionStorage` `wedash.period`) → senão **Hoje** (antes: Este mês).
+ - Trocar o período numa tela vale para todas. O menu leva `store`; `period` só segue para as telas com o campo.
  - Fechar o app (sessionStorage some) ou fazer logout (`clearSavedPeriod`) → volta para Hoje.
- - **URL só onde tem o campo** (2026-10-11): `periodo`, `de` e `ate` ficam na URL de Visão geral, Financeiro, Produtos, Equipe, Metas e Desafios. Nas outras telas o menu, a busca rápida e a troca de filial não gravam esses parâmetros; a escolha segue no `sessionStorage`.
+ - **URL só onde tem o campo** (2026-10-11, chaves em inglês em 2026-10-13): `period`, `from` e `to` ficam na URL de Visão geral, Financeiro, Produtos, Equipe, Metas e Desafios. Valores: `today`, `yesterday`, `thisWeek`, `thisMonth`, `thisQuarter`, `thisHalf`, `thisYear`, `last7Days`, `lastMonth`, `custom`. Nas outras telas o menu, a busca rápida e a troca de filial não gravam esses parâmetros; a escolha segue no `sessionStorage`. Link antigo com `periodo=hoje` abre no período padrão.
 
 38. ✅ **Destaques da equipe — loja e turno no clique do nome** (2026-09-26) — Visão Geral.
  - Nome da loja saiu da linha; clicar no nome da vendedora abre `Popover` com **Loja(s)** (maior faturamento primeiro, "Também vendeu em…") e **Turno**.

@@ -25,13 +25,13 @@ const ICON_SAIR = "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9
 const ICON_AVISOS = "M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0";
 
 /** Telas cujo conteúdo muda com o Atualizar do topo. Nas outras o botão fica oculto. */
-function mostraAtualizar(pathname: string): boolean {
+function showsRefresh(pathname: string): boolean {
   if (pathname === paths.dashboard || pathname.startsWith(`${paths.dashboard}/`)) return true;
   if (pathname === paths.stock.inventory || pathname === paths.stock.purchaseOrder) return true;
   if (pathname === paths.management.cashClose || pathname === paths.management.cashDrop || pathname === paths.management.salesReport || pathname === paths.operation.sellers) return true;
   if (pathname === paths.goals) return true;
-  const meta = pathname.match(/^\/goals\/([^/]+)$/);
-  if (meta && meta[1] !== "new") return true;
+  const goal = pathname.match(/^\/goals\/([^/]+)$/);
+  if (goal && goal[1] !== "new") return true;
   if (pathname === paths.management.challenges) return true;
   const desafio = pathname.match(/^\/management\/challenges\/([^/]+)$/);
   return desafio != null && desafio[1] !== "new";
@@ -50,7 +50,7 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
   const { signOut } = useSession();
   const navigate = useNavigate();
   const location = useLocation();
-  const { escopo, mudar } = useScope();
+  const { scope, setScope } = useScope();
 
   const [listaLojas, setListaLojas] = useState<Store[]>(() => {
     const hit = storesForSession(session.stores);
@@ -82,7 +82,7 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
   }, [session.tenantId, session.stores]);
 
   // Loja e filtro global: Topbar nas telas do produto (nao so Dashboard).
-  const mostraStorePicker =
+  const showsStorePicker =
     session.role !== "SELLER" &&
     (location.pathname === paths.dashboard ||
     location.pathname.startsWith(paths.dashboard + "/") ||
@@ -128,14 +128,14 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
         </svg>
       </button>
 
-      {mostraStorePicker && (
+      {showsStorePicker && (
         <div className="min-w-0 flex-1 sm:max-w-sm">
-          <StorePicker escopo={escopo} onChange={mudar} minhas={listaLojas} />
+          <StorePicker scope={scope} onChange={setScope} minhas={listaLojas} />
         </div>
       )}
 
       <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2.5">
-        {mostraAtualizar(location.pathname) && <TopbarRefresh storeIds={escopo.filialIds} />}
+        {showsRefresh(location.pathname) && <TopbarRefresh storeIds={scope.storeIds} />}
 
         <Dropdown
           align="right"

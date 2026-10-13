@@ -23,7 +23,7 @@ export type FirstStepsStatus = "loading" | "hidden" | "visible";
  * Primeiros passos da empresa (so Gestor). Os passos se marcam sozinhos pelos dados ja salvos;
  * ao chegar a 100% grava no banco e o card nao volta mais.
  */
-export function useFirstSteps(filialIds: string[] = []) {
+export function useFirstSteps(storeIds: string[] = []) {
   const session = useActiveSession();
   const { show } = useToast();
   const gestor = isGestor(session.role);
@@ -70,7 +70,7 @@ export function useFirstSteps(filialIds: string[] = []) {
     };
   }, [gestor, doneFlag, reload]);
 
-  const viewStores = useMemo(() => storesForFirstStepsView(stores, filialIds), [stores, filialIds]);
+  const viewStores = useMemo(() => storesForFirstStepsView(stores, storeIds), [stores, storeIds]);
   const steps = useMemo(() => (data ? buildFirstSteps({ stores: viewStores, ...data }) : []), [viewStores, data]);
   const doneCount = steps.filter((s) => s.done).length;
   const pendingCount = steps.length - doneCount;

@@ -11,23 +11,23 @@ import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@
 /** Configurações > Shopping. O card da Allos abre a modal, no mesmo desenho de Adquirentes. */
 export function ShoppingPage() {
   const { show } = useToast();
-  const { session, lojas, loading: lojasLoading } = useScopedStores();
-  const { escopo } = useScope();
-  const escolher = pickOneStore(escopo.filialIds, session.stores.length);
+  const { session, storeRows, loading: lojasLoading } = useScopedStores();
+  const { scope } = useScope();
+  const escolher = pickOneStore(scope.storeIds, session.stores.length);
   const showSkeleton = useMinSkeleton(lojasLoading);
-  const loja = lojas[0];
+  const store = storeRows[0];
   const [account, setAccount] = useState<ShoppingAccount | null>(null);
   const [loading, setLoading] = useState(true);
-  const [aberto, setAberto] = useState(false);
+  const [open, setAberto] = useState(false);
 
   useEffect(() => {
-    if (lojasLoading || escolher || !loja || loja.pointType !== "SHOPPING") {
+    if (lojasLoading || escolher || !store || store.pointType !== "SHOPPING") {
       setLoading(false);
       return;
     }
     let cancel = false;
     setLoading(true);
-    void fetchShoppingAccount(session.tenantId, loja.id)
+    void fetchShoppingAccount(session.tenantId, store.id)
       .then((access) => {
         if (!cancel) setAccount(access?.administrator === "allos" ? access : null);
       })
@@ -42,7 +42,7 @@ export function ShoppingPage() {
     };
     // show do toast muda de identidade; a carga segue a filial.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lojasLoading, escolher, loja, session.tenantId]);
+  }, [lojasLoading, escolher, store, session.tenantId]);
 
   const conectado = account != null;
   const estado = conectado ? "Configurado" : "Não configurado";
@@ -62,7 +62,7 @@ export function ShoppingPage() {
         </div>
       ) : (
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {showSkeleton || (loading && loja?.pointType === "SHOPPING") ? (
+          {showSkeleton || (loading && store?.pointType === "SHOPPING") ? (
             <Card>
               <div className="mb-3.5 flex items-center gap-3" aria-busy="true" aria-label="Carregando shopping…">
                 <Skeleton className="h-[46px] w-[46px] rounded-[13px]" />
@@ -76,11 +76,11 @@ export function ShoppingPage() {
                 <Skeleton className="h-8 w-24 rounded-[var(--radius-vela-sm)]" />
               </div>
             </Card>
-          ) : !loja ? (
+          ) : !store ? (
             <Card>
               <EmptyBlock icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
             </Card>
-          ) : loja.pointType !== "SHOPPING" ? (
+          ) : store.pointType !== "SHOPPING" ? (
             <Card>
               <EmptyBlock icon="🏬" title="Shopping indisponível" description="Esta tela está disponível apenas para filiais do tipo Quiosque em shopping." />
             </Card>
@@ -100,7 +100,7 @@ export function ShoppingPage() {
                   <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
                   {estado}
                 </span>
-                <Button size="sm" onClick={() => setAberto(true)} disabled={!loja}>
+                <Button size="sm" onClick={() => setAberto(true)} disabled={!store}>
                   {conectado ? "Gerenciar" : "Configurar"}
                 </Button>
               </div>
@@ -108,11 +108,11 @@ export function ShoppingPage() {
           )}
         </div>
       )}
-      {loja && loja.pointType === "SHOPPING" ? (
+      {store && store.pointType === "SHOPPING" ? (
         <AllosModal
-          open={aberto}
+          open={open}
           account={account}
-          storeId={loja.id}
+          storeId={store.id}
           onClose={() => setAberto(false)}
           onSaved={(next) => {
             setAccount(next);

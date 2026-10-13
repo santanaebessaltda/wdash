@@ -312,7 +312,7 @@ export function SyncingPage() {
   }
 
   const preparing = status === "running" && (allFetchDone || jobStatus === "SUCCEEDED");
-  const lojasTxt =
+  const storesText =
     stores.length === 1 ? "da sua filial" : stores.length > 1 ? `das ${stores.length} filiais` : "das suas filiais";
   const subtitle =
     status === "ready"
@@ -323,7 +323,7 @@ export function SyncingPage() {
           ? "Aguardando a sessão do Millennium ficar disponível…"
           : preparing
             ? "Quase lá — abrindo o dashboard."
-            : `Buscando as vendas de hoje ${lojasTxt} no Millennium. Isso pode levar alguns instantes.`;
+            : `Buscando as vendas de hoje ${storesText} no Millennium. Isso pode levar alguns instantes.`;
 
   return (
     <div

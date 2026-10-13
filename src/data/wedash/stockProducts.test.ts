@@ -6,12 +6,12 @@ const store = (over: Partial<Store> & Pick<Store, "id">): Store =>
   ({
     millenniumBranch: 1,
     codFilial: "00001",
-    nome: "LOJA",
+    name: "LOJA",
     fantasia: "LOJA",
     cnpj: "",
     cidade: "",
     uf: "",
-    tipo: "F",
+    kind: "F",
     pointType: "SHOPPING",
     temWpink: true,
     fuso: "America/Campo_Grande",
@@ -108,7 +108,7 @@ describe("buildStockProductsView", () => {
     expect(p1.variaPorLoja).toBe(true);
     expect(p1.custo).toBeCloseTo(35);
     expect(p1.precoPraticado).toBeCloseTo(90);
-    expect(view.negativos).toEqual([{ codigo: "P2", nome: "P2", quantidade: -2, lojas: ["B"] }]);
+    expect(view.negativos).toEqual([{ codigo: "P2", name: "P2", quantidade: -2, storeRows: ["B"] }]);
     expect(stockCostAmount(p1)).toEqual({ amount: 5 * 30 + 3 * 40, unit: null });
     expect(stockCostAmount(view.rows.find((r) => r.codigo === "P2")!)).toEqual({ amount: null, unit: null });
     expect(p1.aReceber).toBeNull();
@@ -156,11 +156,11 @@ describe("buildStockProductsView", () => {
     const p = view.rows.find((r) => r.codigo === "OLEBOS")!;
     expect(p.estoque).toBe(73);
     expect(p.transferir).toBe(71);
-    expect(p.lojas[0].locais).toEqual([
-      { nome: "ESTOQUE", qtd: 144 },
-      { nome: "QUIOSQUE", qtd: -71 },
+    expect(p.storeRows[0].locais).toEqual([
+      { name: "ESTOQUE", qtd: 144 },
+      { name: "QUIOSQUE", qtd: -71 },
     ]);
-    expect(p.lojas[0].transferencias).toEqual([{ de: "ESTOQUE", para: "QUIOSQUE", qtd: 71 }]);
+    expect(p.storeRows[0].transferencias).toEqual([{ de: "ESTOQUE", para: "QUIOSQUE", qtd: 71 }]);
     expect(view.rows.find((r) => r.codigo === "X")!.transferir).toBe(0);
   });
 
@@ -188,13 +188,13 @@ describe("buildStockProductsView", () => {
     });
     const status = (c: string) => stockStatus(view.rows.find((r) => r.codigo === c)!);
     expect(status("P1")).toBe("negativo");
-    expect(status("P2")).toBe("aguardando");
+    expect(status("P2")).toBe("awaiting");
     expect(status("P3")).toBe("ok");
     expect(status("P5")).toBe("ok");
     expect(status("P6")).toBe("ok");
     expect(status("P7")).toBe("negativo");
-    expect(status("P8")).toBe("aguardando");
-    expect(status("P9")).toBe("aguardando");
+    expect(status("P8")).toBe("awaiting");
+    expect(status("P9")).toBe("awaiting");
     expect(status("P10")).toBe("ok");
     expect(status("P11")).toBe("ok");
     expect(view.rows.some((r) => r.codigo === "P4")).toBe(false);
@@ -205,9 +205,9 @@ describe("stockTransfers", () => {
   it("Loja recebe de qualquer local, no máximo o que eles têm (maior saldo primeiro)", () => {
     expect(
       stockTransfers([
-        { nome: "ESTOQUE", qtd: 10 },
-        { nome: "SHOP010", qtd: 5 },
-        { nome: "QUIOSQUE", qtd: -20 },
+        { name: "ESTOQUE", qtd: 10 },
+        { name: "SHOP010", qtd: 5 },
+        { name: "QUIOSQUE", qtd: -20 },
       ]),
     ).toEqual([
       { de: "ESTOQUE", para: "QUIOSQUE", qtd: 10 },
@@ -218,16 +218,16 @@ describe("stockTransfers", () => {
   it("local intermediário só recebe do Estoque, antes da Loja", () => {
     expect(
       stockTransfers([
-        { nome: "Estoque", qtd: 8 },
-        { nome: "Shop010", qtd: -3 },
-        { nome: "PONTO DE VENDA", qtd: -10 },
+        { name: "Estoque", qtd: 8 },
+        { name: "Shop010", qtd: -3 },
+        { name: "PONTO DE VENDA", qtd: -10 },
       ]),
     ).toEqual([
       { de: "Estoque", para: "Shop010", qtd: 3 },
       { de: "Estoque", para: "PONTO DE VENDA", qtd: 5 },
     ]);
-    expect(stockTransfers([{ nome: "PONTO DE VENDA", qtd: 3 }, { nome: "Shop010", qtd: -2 }])).toEqual([]);
-    expect(stockTransfers([{ nome: "Estoque", qtd: -1 }, { nome: "PONTO DE VENDA", qtd: 3 }])).toEqual([]);
+    expect(stockTransfers([{ name: "PONTO DE VENDA", qtd: 3 }, { name: "Shop010", qtd: -2 }])).toEqual([]);
+    expect(stockTransfers([{ name: "Estoque", qtd: -1 }, { name: "PONTO DE VENDA", qtd: 3 }])).toEqual([]);
   });
 });
 

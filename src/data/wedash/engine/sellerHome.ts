@@ -180,14 +180,14 @@ function sellerGroup(input: SellerHomeInput, s: SellerHomeInput["stores"][number
 /** No modo Geral, a equipe inteira com a mesma parte da filial. Senao, o grupo, do dia 1 ate hoje. */
 function monthRanking(input: SellerHomeInput, s: SellerHomeInput["stores"][number]): MonthRankingEntry[] {
   const geral = generalGoal(input, s.storeId);
-  const equipe = salesTeam(input, s.storeId);
-  if (geral && equipe.length > 0) {
+  const team = salesTeam(input, s.storeId);
+  if (geral && team.length > 0) {
     const from = startOfMonth(input.today);
-    const inicio = from > geral.startsOn ? from : geral.startsOn;
-    const fim = input.today < geral.endsOn ? input.today : geral.endsOn;
-    const tot = inicio <= fim ? storeSlice(input, s.storeId, inicio, fim) : { revenue: 0, sales: 0, items: 0 };
-    const n = equipe.length;
-    const ordered = [...equipe].sort((a, b) => collaboratorName(a.name).localeCompare(collaboratorName(b.name), "pt-BR"));
+    const start = from > geral.startsOn ? from : geral.startsOn;
+    const end = input.today < geral.endsOn ? input.today : geral.endsOn;
+    const tot = start <= end ? storeSlice(input, s.storeId, start, end) : { revenue: 0, sales: 0, items: 0 };
+    const n = team.length;
+    const ordered = [...team].sort((a, b) => collaboratorName(a.name).localeCompare(collaboratorName(b.name), "pt-BR"));
     return ordered.map((m) => ({
       position: 1,
       name: collaboratorName(m.name),
@@ -267,20 +267,20 @@ function buildStore(input: SellerHomeInput, s: SellerHomeInput["stores"][number]
   const goal = input.goals.find((g) => g.storeId === s.storeId && goalStatus(g, input.today) === "active");
   if (!goal) return { ...base, goal: null };
   const meKey = `e:${s.employeeId}`;
-  const viewInput = { goal, lojaNome: s.storeName, dayAggs: input.dayAggs, sellerDayAggs: input.sellerDayAggs, team: input.team, today: input.today };
+  const viewInput = { goal, storeNameValue: s.storeName, dayAggs: input.dayAggs, sellerDayAggs: input.sellerDayAggs, team: input.team, today: input.today };
   const view = buildGoalCardView(viewInput);
   const me = sellerGoalLevels({ goals: [goal], dayAggs: input.dayAggs, sellerDayAggs: input.sellerDayAggs, team: input.team, today: input.today }).get(meKey) ?? null;
-  const row = view.vendedoras.find((r) => r.colaboradorId === meKey);
+  const row = view.sellers.find((r) => r.employeeId === meKey);
   const size = row ? groupSize(view, row) : 1;
   let projected: number | null = null;
   if (me) {
-    const ontem = buildGoalCardView({
+    const yesterday = buildGoalCardView({
       ...viewInput,
       dayAggs: input.dayAggs.filter((r) => r.day < input.today),
       sellerDayAggs: input.sellerDayAggs.filter((r) => r.day < input.today),
     });
-    const r = ontem.vendedoras.find((x) => x.colaboradorId === meKey);
-    const sold = !r ? 0 : me.modo === "individual" ? r.faturamentoValor : (r.atingimentoPct * r.metaIndividualValor) / 100;
+    const r = yesterday.sellers.find((x) => x.employeeId === meKey);
+    const sold = !r ? 0 : me.modo === "individual" ? r.revenueAmount : (r.attainmentPct * r.individualGoalAmount) / 100;
     projected = projectedPrize(goal, me, { today: input.today, weights: storeWeights(input, goal, s.week), soldUntilYesterday: sold, groupSize: size });
   }
   const ranking = buildSellerRanking(view, meKey);
@@ -307,10 +307,10 @@ function sellerDays(input: SellerHomeInput): SellerDay[] {
   for (const s of input.stores) {
     const geral = generalGoal(input, s.storeId);
     const n = salesTeam(input, s.storeId).length;
-    const naMeta = (day: string) => geral != null && n > 0 && day >= geral.startsOn && day <= geral.endsOn;
+    const onGoal = (day: string) => geral != null && n > 0 && day >= geral.startsOn && day <= geral.endsOn;
     if (geral && n > 0) {
       for (const a of input.dayAggs) {
-        if (a.storeId !== s.storeId || a.brand !== "ALL" || !naMeta(a.day)) continue;
+        if (a.storeId !== s.storeId || a.brand !== "ALL" || !onGoal(a.day)) continue;
         const key = `${s.storeId}|${a.day}`;
         const d = days.get(key) ?? { storeId: s.storeId, day: a.day, revenue: 0, sales: 0, items: 0 };
         d.revenue += a.revenueCents / 100 / n;
@@ -322,7 +322,7 @@ function sellerDays(input: SellerHomeInput): SellerDay[] {
     const porNome = new Map<string, GoalTeamMember>();
     for (const m of input.team) if (m.storeId === s.storeId) for (const k of m.nameKeys) if (!porNome.has(k)) porNome.set(k, m);
     for (const r of input.sellerDayAggs) {
-      if (r.storeId !== s.storeId || naMeta(r.day)) continue;
+      if (r.storeId !== s.storeId || onGoal(r.day)) continue;
       const mine = r.sellerEmployeeId != null ? r.sellerEmployeeId === s.employeeId : porNome.get(r.sellerKey)?.employeeId === s.employeeId;
       if (!mine) continue;
       const key = `${s.storeId}|${r.day}`;

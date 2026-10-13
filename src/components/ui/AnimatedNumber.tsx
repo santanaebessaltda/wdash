@@ -31,14 +31,14 @@ function parse(value: string | number): Parsed | null {
   if (ultimaVirgula > ultimoPonto && ultimaVirgula !== -1 && depoisDe(ultimaVirgula) <= 2) decimalSep = ",";
   else if (ultimoPonto > ultimaVirgula && ultimoPonto !== -1 && depoisDe(ultimoPonto) <= 2) decimalSep = ".";
 
-  const grupoSep = decimalSep === "," ? "." : decimalSep === "." ? "," : ultimaVirgula !== -1 ? "," : ultimoPonto !== -1 ? "." : null;
-  const semGrupo = grupoSep ? num.split(grupoSep).join("") : num;
+  const groupSeparator = decimalSep === "," ? "." : decimalSep === "." ? "," : ultimaVirgula !== -1 ? "," : ultimoPonto !== -1 ? "." : null;
+  const semGrupo = groupSeparator ? num.split(groupSeparator).join("") : num;
   const cru = decimalSep === "," ? semGrupo.replace(",", ".") : semGrupo;
   const target = parseFloat(cru);
   if (Number.isNaN(target)) return null;
 
   const casas = decimalSep ? depoisDe(decimalSep === "," ? ultimaVirgula : ultimoPonto) : 0;
-  const locale = grupoSep === "." || decimalSep === "," ? "pt-BR" : grupoSep === "," || decimalSep === "." ? "en-US" : undefined;
+  const locale = groupSeparator === "." || decimalSep === "," ? "pt-BR" : groupSeparator === "," || decimalSep === "." ? "en-US" : undefined;
   return { prefix, suffix, target, casas, locale };
 }
 

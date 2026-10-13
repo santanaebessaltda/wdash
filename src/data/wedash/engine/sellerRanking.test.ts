@@ -12,8 +12,8 @@ const goal: GoalRecord = {
   target: 12_000,
   tierMode: "INDIVIDUAL",
   tiers: [
-    { nome: "Meta", atingimentoMinPct: 100, comissaoPct: 1, bonus: 50 },
-    { nome: "Super", atingimentoMinPct: 120, comissaoPct: 2, bonus: 100 },
+    { name: "Meta", minAttainmentPct: 100, commissionPct: 1, bonus: 50 },
+    { name: "Super", minAttainmentPct: 120, commissionPct: 2, bonus: 100 },
   ],
   groups: [],
 };
@@ -42,7 +42,7 @@ const sale = (employeeId: number, reais: number): SalesSellerDayAgg => ({
 });
 
 const ranking = (g: GoalRecord, team: GoalTeamMember[], sales: SalesSellerDayAgg[], meKey: string): SellerRanking =>
-  buildSellerRanking(buildGoalCardView({ goal: g, lojaNome: "LOJA", dayAggs: [], sellerDayAggs: sales, team, today: "2026-09-15" }), meKey);
+  buildSellerRanking(buildGoalCardView({ goal: g, storeNameValue: "LOJA", dayAggs: [], sellerDayAggs: sales, team, today: "2026-09-15" }), meKey);
 
 const rows = (r: SellerRanking) => r.entries.map((e) => [e.position, e.name, Math.round(e.pct * 100) / 100, e.level, e.me]);
 

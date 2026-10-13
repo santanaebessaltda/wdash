@@ -183,7 +183,7 @@ function costRowStyle(linha: FixedCostRow): { bold: boolean; indent: boolean; co
 export default function FinancePage() {
   const session = useActiveSession();
   const navigate = useNavigate();
-  const { escopo, mudar } = useScope();
+  const { scope, setScope } = useScope();
   const [aggs, setAggs] = useState<FinanceAggInput>({ dayAggs: [] });
   const [coverageFrom, setCoverageFrom] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
@@ -200,26 +200,26 @@ export default function FinancePage() {
   const reloadGen = useRef(0);
   const reload = useCallback(async () => {
     const gen = ++reloadGen.current;
-    const periodo = resolvePeriod(escopo.periodo, calendarTodayIso());
-    const range = financeFetchRange(escopo);
-    const costRange = productsFetchRange(escopo);
-    const storeIds = escopo.filialIds;
+    const period = resolvePeriod(scope.period, calendarTodayIso());
+    const range = financeFetchRange(scope);
+    const costRange = productsFetchRange(scope);
+    const storeIds = scope.storeIds;
     try {
       const [dayAggs, hourAggs, prevHourAggs, paymentDayAggs, productCostDayAggs, cov] = await Promise.all([
         fetchSalesDayAggs({ tenantId: session.tenantId, storeIds, from: range.from, to: range.to, brand: null }),
-        periodo.inicio === periodo.fim
-          ? fetchSalesHourAggs({ tenantId: session.tenantId, storeIds, day: periodo.inicio, brand: null })
+        period.start === period.end
+          ? fetchSalesHourAggs({ tenantId: session.tenantId, storeIds, day: period.start, brand: null })
           : Promise.resolve([] as SalesHourAgg[]),
         range.prevHourDay
           ? fetchSalesHourAggs({ tenantId: session.tenantId, storeIds, day: range.prevHourDay, brand: null })
           : Promise.resolve([] as SalesHourAgg[]),
-        fetchSalesPaymentDayAggs({ tenantId: session.tenantId, storeIds, from: periodo.inicio, to: periodo.fim }),
+        fetchSalesPaymentDayAggs({ tenantId: session.tenantId, storeIds, from: period.start, to: period.end }),
         fetchSalesProductCostDayAggs({ tenantId: session.tenantId, storeIds, from: costRange.from, to: costRange.to }),
         fetchSalesCoverage(session.tenantId, storeIds),
       ]);
       const productNames = await fetchProductNames(
         productCostDayAggs
-          .filter((r) => r.day >= periodo.inicio && r.day <= periodo.fim && r.revenueCents > 0 && r.cmvCents === 0)
+          .filter((r) => r.day >= period.start && r.day <= period.end && r.revenueCents > 0 && r.cmvCents === 0)
           .map((r) => r.productCode),
       );
       if (gen !== reloadGen.current) return;
@@ -229,7 +229,7 @@ export default function FinancePage() {
       if (gen !== reloadGen.current) return;
       console.error("Finance reload:", e);
     }
-  }, [escopo, session.tenantId]);
+  }, [scope, session.tenantId]);
 
   useEffect(() => {
     void reload().finally(() => setLoading(false));
@@ -242,19 +242,19 @@ export default function FinancePage() {
   }, [reload]);
 
   const view = useMemo(
-    () => buildFinanceView({ ...escopo, divisao: null }, aggs),
+    () => buildFinanceView({ ...scope, division: null }, aggs),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [escopo, aggs, storesTick],
+    [scope, aggs, storesTick],
   );
 
   // Resolve o DateRange a partir do escopo  -  sempre mostra algo selecionado.
-  const dateRange = useMemo(() => dateRangeFromPeriod(escopo.periodo), [escopo.periodo]);
-  const periodoAtual = resolvePeriod(escopo.periodo, calendarTodayIso());
+  const dateRange = useMemo(() => dateRangeFromPeriod(scope.period), [scope.period]);
+  const currentPeriod = resolvePeriod(scope.period, calendarTodayIso());
   const monthFill = useMonthFill();
   const deepHistoryFill = useDeepHistoryFill();
   const exportar = useExportPdf("Financeiro");
-  function onDateChange(r: DateRange, meta?: DateRangeChangeMeta) {
-    mudar(applyPeriodDateChange(escopo, r, meta));
+  function onDateChange(r: DateRange, goal?: DateRangeChangeMeta) {
+    setScope(applyPeriodDateChange(scope, r, goal));
   }
 
   return (
@@ -270,8 +270,8 @@ export default function FinancePage() {
               <DateRangePicker
                 value={dateRange}
                 onChange={onDateChange}
-                displayLabel={periodDisplayLabel(escopo.periodo)}
-                activePresetId={periodActivePresetId(escopo.periodo)}
+                displayLabel={periodDisplayLabel(scope.period)}
+                activePresetId={periodActivePresetId(scope.period)}
                 minDate={pickerMinDate(coverageFrom, monthFill)}
               />
               <Button variant="primary" onClick={exportar}>
@@ -284,20 +284,20 @@ export default function FinancePage() {
 
       <ErpStatusNotice />
       <InitialSyncNotice />
-      <MonthFillNotice fill={monthFill} inicio={periodoAtual.inicio} fim={periodoAtual.fim} />
+      <MonthFillNotice fill={monthFill} start={currentPeriod.start} end={currentPeriod.end} />
       <DeepHistoryNotice
         fill={deepHistoryFill}
         monthFill={monthFill}
-        inicio={periodoAtual.inicio}
-        fim={periodoAtual.fim}
+        start={currentPeriod.start}
+        end={currentPeriod.end}
       />
       <StoreHoursNotice />
       {!loading && (
         <ProductsWithoutCostNotice
           produtos={view.productsWithoutCost}
-          storeIds={escopo.filialIds}
-          from={periodoAtual.inicio}
-          to={periodoAtual.fim}
+          storeIds={scope.storeIds}
+          from={currentPeriod.start}
+          to={currentPeriod.end}
         />
       )}
 
@@ -322,7 +322,7 @@ export default function FinancePage() {
               <QuickStat
                 key={kpi.label}
                 label={kpi.label}
-                value={kpi.valor}
+                value={kpi.amount}
                 icon={<Icon />}
                 tint={kpi.tint}
                 tooltip={kpi.tooltip}

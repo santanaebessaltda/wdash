@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Alert, Badge, Button, Card, DateRangePicker, Modal, Skeleton, Tooltip, useToast, QUICK_RANGES_CALENDARIO, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
+import { Alert, Badge, Button, Card, DateRangePicker, Modal, Skeleton, Tooltip, useToast, CALENDAR_QUICK_RANGES, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
 import { DayFace, DayMetrics, MonthCalendar, blankDayClass } from "@/components/wedash/MonthCalendar";
 import { EmployeeWithdrawal } from "@/pages/cash-close/EmployeeWithdrawal";
 import { monthCloseSpanFor, monthsTouched } from "@/data/wedash/cashCloseMonth";
@@ -66,16 +66,16 @@ function dayTotal(cents: number): string {
   return abs;
 }
 
-const MESES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+const MONTHS_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
 function monthYearLabel(iso: string): string {
   const d = isoToDate(startOfMonth(iso));
-  return `${MESES_PT[d.getMonth()]} de ${d.getFullYear()}`;
+  return `${MONTHS_PT[d.getMonth()]} de ${d.getFullYear()}`;
 }
 
-function pageEndYear(ano: number, hojeAno: number): number {
-  const alvo = Math.min(ano, hojeAno);
-  return hojeAno - Math.floor((hojeAno - alvo) / 12) * 12;
+function pageEndYear(ano: number, todayYear: number): number {
+  const alvo = Math.min(ano, todayYear);
+  return todayYear - Math.floor((todayYear - alvo) / 12) * 12;
 }
 
 function rangeCells(from: string, to: string): Array<string | null> {
@@ -128,14 +128,14 @@ function CloseTable({
   lines,
   pixPending,
   gestor,
-  fechado,
+  closed,
   draft,
   onAcquirer,
 }: {
   lines: CashCloseLine[];
   pixPending: boolean;
   gestor: boolean;
-  fechado: boolean;
+  closed: boolean;
   draft?: CloseDraft;
   onAcquirer?: (key: CashCloseBucket, value: string) => void;
 }) {
@@ -189,8 +189,8 @@ function CloseTable({
                       />
                     )}
                   </td>
-                  <td className={cn("px-3 py-3 text-right font-mono text-[13px] font-bold", fechado && diff != null ? diffClass(diff) : "text-t2")}>
-                    {fechado && diff != null ? dayTotal(diff) : "—"}
+                  <td className={cn("px-3 py-3 text-right font-mono text-[13px] font-bold", closed && diff != null ? diffClass(diff) : "text-t2")}>
+                    {closed && diff != null ? dayTotal(diff) : "—"}
                   </td>
                 </tr>
               );
@@ -203,8 +203,8 @@ function CloseTable({
               <td className="px-3 py-3 text-right font-mono text-[13px] font-bold text-t0">
                 {dayWithoutReal(lines) ? "—" : money(conta.realCents)}
               </td>
-              <td className={cn("px-3 py-3 text-right font-mono text-[13px] font-bold", fechado && !dayWithoutReal(lines) ? diffClass(conta.diffCents) : "text-t2")}>
-                {fechado && !dayWithoutReal(lines) ? dayTotal(conta.diffCents) : "—"}
+              <td className={cn("px-3 py-3 text-right font-mono text-[13px] font-bold", closed && !dayWithoutReal(lines) ? diffClass(conta.diffCents) : "text-t2")}>
+                {closed && !dayWithoutReal(lines) ? dayTotal(conta.diffCents) : "—"}
               </td>
             </tr>
           </tfoot>
@@ -216,34 +216,34 @@ function CloseTable({
 
 export function MonthYearPicker({
   iso,
-  hoje,
+  today,
   minIso,
   onChange,
 }: {
   iso: string;
-  hoje: string;
+  today: string;
   /** Primeiro mês que pode ser escolhido. Antes disso o mês fica bloqueado. */
   minIso: string;
   onChange: (alvo: string) => void;
 }) {
-  const hojeData = isoToDate(hoje);
-  const hojeAno = hojeData.getFullYear();
-  const hojeMes = hojeData.getMonth();
+  const todayDateValue = isoToDate(today);
+  const todayYear = todayDateValue.getFullYear();
+  const todayMonth = todayDateValue.getMonth();
   const piso = isoToDate(startOfMonth(minIso));
   const pisoAno = piso.getFullYear();
   const pisoMes = piso.getMonth();
   const selecionado = isoToDate(startOfMonth(iso));
   const [open, setOpen] = useState(false);
-  const [modo, setModo] = useState<"mes" | "ano">("mes");
+  const [modo, setModo] = useState<"month" | "year">("month");
   const [anoVista, setAnoVista] = useState(selecionado.getFullYear());
-  const [anoPagina, setAnoPagina] = useState(hojeAno);
+  const [anoPagina, setAnoPagina] = useState(todayYear);
   const [panelPos, setPanelPos] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
-    setModo("mes");
+    setModo("month");
     setAnoVista(selecionado.getFullYear());
   }, [open]); // ano lido só ao abrir
 
@@ -286,14 +286,14 @@ export function MonthYearPicker({
   }, [open]);
 
   const anos = Array.from({ length: 12 }, (_, i) => anoPagina - 11 + i);
-  const podeAnoAnt = modo === "ano" ? anos[0] > pisoAno : anoVista > pisoAno;
-  const podeAnoProx = modo === "ano" ? anoPagina < hojeAno : anoVista < hojeAno;
+  const podeAnoAnt = modo === "year" ? anos[0] > pisoAno : anoVista > pisoAno;
+  const podeAnoProx = modo === "year" ? anoPagina < todayYear : anoVista < todayYear;
   const navBtn = (ok: boolean) =>
     cn("flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-line text-t1", ok ? "hover:bg-bg-3" : "cursor-not-allowed opacity-40");
 
-  function escolherMes(month: number) {
+  function pickMonth(month: number) {
     const antes = anoVista < pisoAno || (anoVista === pisoAno && month < pisoMes);
-    const futuro = anoVista > hojeAno || (anoVista === hojeAno && month > hojeMes);
+    const futuro = anoVista > todayYear || (anoVista === todayYear && month > todayMonth);
     if (antes || futuro) return;
     onChange(dateToIso(new Date(anoVista, month, 1)));
     setOpen(false);
@@ -311,9 +311,9 @@ export function MonthYearPicker({
               <button
                 type="button"
                 disabled={!podeAnoAnt}
-                aria-label={modo === "ano" ? "Anos anteriores" : "Ano anterior"}
+                aria-label={modo === "year" ? "Anos anteriores" : "Ano anterior"}
                 className={navBtn(podeAnoAnt)}
-                onClick={() => (modo === "ano" ? setAnoPagina((n) => n - 12) : setAnoVista((n) => n - 1))}
+                onClick={() => (modo === "year" ? setAnoPagina((n) => n - 12) : setAnoVista((n) => n - 1))}
               >
                 <MonthStep dir="anterior" />
               </button>
@@ -321,47 +321,47 @@ export function MonthYearPicker({
                 type="button"
                 className="rounded-lg px-2 py-1 text-sm font-bold text-t0 hover:bg-bg-3"
                 onClick={() => {
-                  if (modo === "mes") {
-                    setAnoPagina(pageEndYear(anoVista, hojeAno));
-                    setModo("ano");
+                  if (modo === "month") {
+                    setAnoPagina(pageEndYear(anoVista, todayYear));
+                    setModo("year");
                     return;
                   }
-                  setModo("mes");
+                  setModo("month");
                 }}
               >
-                {modo === "mes" ? anoVista : `${anos[0]} – ${anos[anos.length - 1]}`}
+                {modo === "month" ? anoVista : `${anos[0]} – ${anos[anos.length - 1]}`}
               </button>
               <button
                 type="button"
                 disabled={!podeAnoProx}
-                aria-label={modo === "ano" ? "Próximos anos" : "Próximo ano"}
+                aria-label={modo === "year" ? "Próximos anos" : "Próximo ano"}
                 className={navBtn(podeAnoProx)}
-                onClick={() => (modo === "ano" ? setAnoPagina((n) => Math.min(hojeAno, n + 12)) : setAnoVista((n) => n + 1))}
+                onClick={() => (modo === "year" ? setAnoPagina((n) => Math.min(todayYear, n + 12)) : setAnoVista((n) => n + 1))}
               >
                 <MonthStep dir="proximo" />
               </button>
             </div>
-            {modo === "mes" ? (
+            {modo === "month" ? (
               <div className="grid grid-cols-3 gap-1">
-                {MESES_PT.map((nome, month) => {
+                {MONTHS_PT.map((name, month) => {
                   const bloqueado =
                     anoVista < pisoAno ||
                     (anoVista === pisoAno && month < pisoMes) ||
-                    anoVista > hojeAno ||
-                    (anoVista === hojeAno && month > hojeMes);
+                    anoVista > todayYear ||
+                    (anoVista === todayYear && month > todayMonth);
                   const ativo = selecionado.getFullYear() === anoVista && selecionado.getMonth() === month;
                   return (
                     <button
-                      key={nome}
+                      key={name}
                       type="button"
                       disabled={bloqueado}
-                      onClick={() => escolherMes(month)}
+                      onClick={() => pickMonth(month)}
                       className={cn(
                         "h-9 truncate rounded-[9px] px-1 text-[12.5px] font-semibold transition-colors",
                         bloqueado ? "cursor-not-allowed text-t2 opacity-30" : ativo ? "bg-acc text-white" : "text-t1 hover:bg-bg-3",
                       )}
                     >
-                      {nome}
+                      {name}
                     </button>
                   );
                 })}
@@ -369,7 +369,7 @@ export function MonthYearPicker({
             ) : (
               <div className="grid grid-cols-3 gap-1">
                 {anos.map((ano) => {
-                  const bloqueado = ano < pisoAno || ano > hojeAno;
+                  const bloqueado = ano < pisoAno || ano > todayYear;
                   const ativo = selecionado.getFullYear() === ano;
                   return (
                     <button
@@ -378,7 +378,7 @@ export function MonthYearPicker({
                       disabled={bloqueado}
                       onClick={() => {
                         setAnoVista(ano);
-                        setModo("mes");
+                        setModo("month");
                       }}
                       className={cn(
                         "h-9 rounded-[9px] text-[12.5px] font-semibold transition-colors",
@@ -432,15 +432,15 @@ export function MonthStep({ dir }: { dir: "anterior" | "proximo" }) {
 /** Gestão > Fechamento. Calendário do mês, no desenho do Vela. */
 export function CashClosePage() {
   const { show } = useToast();
-  const { session, lojas, loading: lojasLoading } = useScopedStores();
-  const { escopo } = useScope();
-  const escolher = pickOneStore(escopo.filialIds, session.stores.length);
+  const { session, storeRows, loading: lojasLoading } = useScopedStores();
+  const { scope } = useScope();
+  const escolher = pickOneStore(scope.storeIds, session.stores.length);
   const showStores = useMinSkeleton(lojasLoading);
-  const hoje = calendarTodayIso();
-  const [rangeFrom, setRangeFrom] = useState(() => startOfMonth(hoje));
-  const [rangeTo, setRangeTo] = useState(() => endOfMonth(hoje));
-  const [presetId, setPresetId] = useState<DatePresetId | null>("esteMes");
-  const [piso, setPiso] = useState(() => startOfMonth(hoje));
+  const today = calendarTodayIso();
+  const [rangeFrom, setRangeFrom] = useState(() => startOfMonth(today));
+  const [rangeTo, setRangeTo] = useState(() => endOfMonth(today));
+  const [presetId, setPresetId] = useState<DatePresetId | null>("thisMonth");
+  const [piso, setPiso] = useState(() => startOfMonth(today));
   const [marks, setMarks] = useState<CashCloseDayMark[]>([]);
   const [marksKey, setMarksKey] = useState("");
   const [reviews, setReviews] = useState<CashCloseReview[]>([]);
@@ -454,9 +454,9 @@ export function CashClosePage() {
   const [soldToday, setSoldToday] = useState<{ cents: number; byStore: Record<string, number> } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
-  const storeKey = lojas.map((l) => l.id).join(",");
-  const lojasRef = useRef(lojas);
-  lojasRef.current = lojas;
+  const storeKey = storeRows.map((l) => l.id).join(",");
+  const storesRef = useRef(storeRows);
+  storesRef.current = storeRows;
   const rangeFromRef = useRef(rangeFrom);
   rangeFromRef.current = rangeFrom;
   const rangeToRef = useRef(rangeTo);
@@ -464,24 +464,24 @@ export function CashClosePage() {
   const cells = useMemo(() => rangeCells(rangeFrom, rangeTo), [rangeFrom, rangeTo]);
   const from = rangeFrom;
   const toBruto = rangeTo;
-  const to = toBruto < hoje ? toBruto : hoje;
-  const faixaKey = `${storeKey}|${from}|${to}|${reloadKey}`;
+  const to = toBruto < today ? toBruto : today;
+  const bandKey = `${storeKey}|${from}|${to}|${reloadKey}`;
 
-  const lojaId = lojas[0]?.id ?? "";
+  const storeIdValue = storeRows[0]?.id ?? "";
   useEffect(() => {
-    if (lojasLoading || escolher || lojas.length === 0) return;
+    if (lojasLoading || escolher || storeRows.length === 0) return;
     let stop = false;
-    void fetchStoreSellers(session.tenantId, lojas.map((loja) => loja.id)).then((map) => {
+    void fetchStoreSellers(session.tenantId, storeRows.map((store) => store.id)).then((map) => {
       if (!stop) setSellersByStore(map);
     });
     return () => {
       stop = true;
     };
-  }, [lojasLoading, escolher, session.tenantId, lojas]);
+  }, [lojasLoading, escolher, session.tenantId, storeRows]);
   useEffect(() => {
-    if (lojasLoading || escolher || !lojaId) return;
+    if (lojasLoading || escolher || !storeIdValue) return;
     let stop = false;
-    void fetchNavMonthFloor("cash_close_day", session.tenantId, lojaId, hoje).then((month) => {
+    void fetchNavMonthFloor("cash_close_day", session.tenantId, storeIdValue, today).then((month) => {
       if (stop) return;
       setPiso(month);
       setRangeFrom((atual) => {
@@ -493,7 +493,7 @@ export function CashClosePage() {
     return () => {
       stop = true;
     };
-  }, [lojasLoading, escolher, lojaId, session.tenantId, hoje, reloadKey]);
+  }, [lojasLoading, escolher, storeIdValue, session.tenantId, today, reloadKey]);
 
   useEffect(() => {
     if (!syncing) return;
@@ -531,11 +531,11 @@ export function CashClosePage() {
 
   const pedirFechamento = useCallback(async () => {
     if (escolher) return;
-    const ids = lojasRef.current.map((loja) => loja.id);
+    const ids = storesRef.current.map((store) => store.id);
     if (ids.length === 0) return;
     const months = monthsTouched(rangeFromRef.current, rangeToRef.current);
-    const hojeIso = calendarTodayIso();
-    const comDia = months.filter((month) => monthCloseSpanFor(month, hojeIso));
+    const todayIso = calendarTodayIso();
+    const comDia = months.filter((month) => monthCloseSpanFor(month, todayIso));
     const alvos = comDia.length > 0 ? comDia : [months[0]];
     for (const month of alvos) {
       const r = await requestMonthClose(ids, month);
@@ -563,10 +563,10 @@ export function CashClosePage() {
   }, []);
 
   useEffect(() => {
-    if (lojasLoading || escolher || lojas.length === 0 || from > to) return;
+    if (lojasLoading || escolher || storeRows.length === 0 || from > to) return;
     let cancelled = false;
     setErro(false);
-    const ids = lojas.map((l) => l.id);
+    const ids = storeRows.map((l) => l.id);
     void Promise.all([
       fetchCashCloseMonthMarks(session.tenantId, ids, from, to),
       fetchCashCloseReviews(session.tenantId, ids, from, to),
@@ -575,7 +575,7 @@ export function CashClosePage() {
         if (cancelled) return;
         setMarks(rows);
         setReviews(ajustes);
-        setMarksKey(faixaKey);
+        setMarksKey(bandKey);
       })
       .catch(() => {
         if (!cancelled) setErro(true);
@@ -583,19 +583,19 @@ export function CashClosePage() {
     return () => {
       cancelled = true;
     };
-  }, [lojasLoading, escolher, session.tenantId, lojas, from, to, faixaKey]);
+  }, [lojasLoading, escolher, session.tenantId, storeRows, from, to, bandKey]);
 
   useEffect(() => {
-    if (lojasLoading || escolher || lojas.length === 0 || to < hoje) {
+    if (lojasLoading || escolher || storeRows.length === 0 || to < today) {
       setSoldToday(null);
       return;
     }
     let stop = false;
     void fetchSalesDayAggs({
       tenantId: session.tenantId,
-      storeIds: lojas.map((loja) => loja.id),
-      from: hoje,
-      to: hoje,
+      storeIds: storeRows.map((store) => store.id),
+      from: today,
+      to: today,
       brand: null,
     })
       .then((rows) => {
@@ -616,14 +616,14 @@ export function CashClosePage() {
     return () => {
       stop = true;
     };
-  }, [lojasLoading, escolher, lojas, session.tenantId, hoje, to, reloadKey]);
+  }, [lojasLoading, escolher, storeRows, session.tenantId, today, to, reloadKey]);
 
   useEffect(() => {
-    if (lojasLoading || escolher || !diaAberto || lojas.length === 0 || diaAberto > hoje) return;
+    if (lojasLoading || escolher || !diaAberto || storeRows.length === 0 || diaAberto > today) return;
     let cancelled = false;
     setErro(false);
     const key = `${storeKey}|${diaAberto}|${reloadKey}`;
-    void Promise.all(lojas.map((loja) => fetchCashCloseSnapshot(session.tenantId, loja.id, diaAberto).then((snap) => [loja.id, snap] as const)))
+    void Promise.all(storeRows.map((store) => fetchCashCloseSnapshot(session.tenantId, store.id, diaAberto).then((snap) => [store.id, snap] as const)))
       .then((rows) => {
         if (cancelled || !diaAberto) return;
         setDias(Object.fromEntries(rows));
@@ -645,10 +645,10 @@ export function CashClosePage() {
     return () => {
       cancelled = true;
     };
-  }, [lojasLoading, escolher, diaAberto, session.tenantId, lojas, hoje, storeKey, reloadKey]);
+  }, [lojasLoading, escolher, diaAberto, session.tenantId, storeRows, today, storeKey, reloadKey]);
 
   const analise = useMemo(() => {
-    if (marksKey !== faixaKey) return null;
+    if (marksKey !== bandKey) return null;
     const porDia = new Map<string, { systemCents: number; realCents: number; diffCents: number; withdrawalCents: number; hasMillennium: boolean; hasLines: boolean; pending: boolean }>();
     const rows: Array<{ day: string; systemCents: number; realCents: number; diffCents: number; pending: boolean }> = [];
     for (const mark of marks) {
@@ -663,7 +663,7 @@ export function CashClosePage() {
       const semReal = dayWithoutReal(lines);
       const retirada = (review?.withdrawals ?? []).reduce((sum, row) => sum + row.cents, 0);
       const diffCents = netCloseDiff(gap.diffCents, retirada);
-      if (day < hoje) {
+      if (day < today) {
         rows.push({
           day,
           systemCents: gap.comparedSystemCents,
@@ -682,28 +682,28 @@ export function CashClosePage() {
       atual.pending = atual.pending || semReal;
       porDia.set(day, atual);
     }
-    return { resumo: monthCloseSummary(rows), porDia };
-  }, [marks, reviews, marksKey, faixaKey, hoje]);
+    return { summary: monthCloseSummary(rows), porDia };
+  }, [marks, reviews, marksKey, bandKey, today]);
 
-  function faceDoDia(day: string): { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number; withdrawalCents: number; aguardando?: boolean } {
+  function dayFace(day: string): { kind: "empty" | "zero" | "pending" | "today" | "total"; totalCents: number; diffCents: number; withdrawalCents: number; awaiting?: boolean } {
     const info = analise?.porDia.get(day);
-    if (day === hoje) return { kind: "hoje", totalCents: soldToday?.cents ?? 0, diffCents: 0, withdrawalCents: 0, aguardando: soldToday == null };
-    if (info?.pending) return { kind: "pendente", totalCents: info.systemCents, diffCents: 0, withdrawalCents: 0 };
+    if (day === today) return { kind: "today", totalCents: soldToday?.cents ?? 0, diffCents: 0, withdrawalCents: 0, awaiting: soldToday == null };
+    if (info?.pending) return { kind: "pending", totalCents: info.systemCents, diffCents: 0, withdrawalCents: 0 };
     if (!info || (info.systemCents === 0 && info.realCents === 0)) return { kind: "zero", totalCents: 0, diffCents: 0, withdrawalCents: 0 };
-    if (!info.hasMillennium && !info.hasLines) return { kind: "vazio", totalCents: 0, diffCents: 0, withdrawalCents: 0 };
+    if (!info.hasMillennium && !info.hasLines) return { kind: "empty", totalCents: 0, diffCents: 0, withdrawalCents: 0 };
     return { kind: "total", totalCents: info.realCents, diffCents: info.diffCents, withdrawalCents: info.withdrawalCents };
   }
 
-  function abrirDia(iso: string) {
-    if (iso > hoje) return;
-    if (iso < hoje && faceDoDia(iso).kind === "zero") return;
+  function openDay(iso: string) {
+    if (iso > today) return;
+    if (iso < today && dayFace(iso).kind === "zero") return;
     setDiaAberto(iso);
   }
 
-  function aplicarIntervalo(inicio: Date, fim: Date, meta?: DateRangeChangeMeta) {
-    setRangeFrom(dateToIso(inicio));
-    setRangeTo(dateToIso(fim));
-    setPresetId(meta?.presetId ?? null);
+  function aplicarIntervalo(start: Date, end: Date, goal?: DateRangeChangeMeta) {
+    setRangeFrom(dateToIso(start));
+    setRangeTo(dateToIso(end));
+    setPresetId(goal?.presetId ?? null);
   }
 
   const diaPronto = diaAberto != null && diaKey === `${storeKey}|${diaAberto}|${reloadKey}`;
@@ -719,11 +719,11 @@ export function CashClosePage() {
             <DateRangePicker
               value={[isoToDate(rangeFrom), isoToDate(rangeTo)]}
               minDate={isoToDate(piso)}
-              maxDate={isoToDate(endOfMonth(hoje))}
-              quickRanges={QUICK_RANGES_CALENDARIO}
+              maxDate={isoToDate(endOfMonth(today))}
+              quickRanges={CALENDAR_QUICK_RANGES}
               displayLabel={presetId ? periodLabels[presetId] : null}
               activePresetId={presetId}
-              onChange={([inicio, fim], meta) => aplicarIntervalo(inicio, fim, meta)}
+              onChange={([start, end], goal) => aplicarIntervalo(start, end, goal)}
             />
           </HeaderFilters>
         }
@@ -736,29 +736,29 @@ export function CashClosePage() {
           </div>
         ) : showStores ? (
           <Skeleton className="h-[520px] w-full rounded-[18px]" />
-        ) : lojas.length === 0 ? (
+        ) : storeRows.length === 0 ? (
           <Card>
             <EmptyBlock icon="📒" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
           </Card>
         ) : (
           <>
             {analise ? (
-              <MonthSummary resumo={analise.resumo} />
+              <MonthSummary summary={analise.summary} />
             ) : (
               <Skeleton className="mb-4 h-[88px] w-full rounded-[18px]" />
             )}
-            <Mes hoje={hoje} cells={cells} faceDoDia={faceDoDia} onOpen={abrirDia} />
+            <Mes today={today} cells={cells} dayFace={dayFace} onOpen={openDay} />
           </>
         )}
       </div>
       <DayModal
         day={diaAberto}
-        lojas={lojas}
+        storeRows={storeRows}
         snaps={dias}
         reviews={reviews}
         pronto={diaPronto}
         gestor={isGestor(session.role)}
-        fechado={diaAberto != null && diaAberto < hoje}
+        closed={diaAberto != null && diaAberto < today}
         tenantId={session.tenantId}
         soldByStore={soldToday?.byStore ?? null}
         sellersByStore={sellersByStore}
@@ -774,10 +774,10 @@ export function CashClosePage() {
   );
 }
 
-function differenceHint(resumo: MonthCloseSummary): string {
+function differenceHint(summary: MonthCloseSummary): string {
   const base = "Diferença acumulada entre o total real e o Millennium nos dias já fechados.";
-  if (resumo.surplusCents === 0 && resumo.shortageCents === 0) return base;
-  return `${base}\nSobras: ${brlCent(resumo.surplusCents / 100)} · Quebras: ${brlCent(resumo.shortageCents / 100)}`;
+  if (summary.surplusCents === 0 && summary.shortageCents === 0) return base;
+  return `${base}\nSobras: ${brlCent(summary.surplusCents / 100)} · Quebras: ${brlCent(summary.shortageCents / 100)}`;
 }
 
 function differenceColor(cents: number): string {
@@ -802,11 +802,11 @@ export function PlainKpi({ label, value, color, tooltip }: { label: string; valu
   );
 }
 
-function MonthSummary({ resumo }: { resumo: MonthCloseSummary }) {
+function MonthSummary({ summary }: { summary: MonthCloseSummary }) {
   const cards = [
-    { label: "Total real", value: brlCent(resumo.realCents / 100), color: "var(--t0)" },
-    { label: "Diferença", value: dayTotal(resumo.diffCents), color: differenceColor(resumo.diffCents), tooltip: differenceHint(resumo) },
-    { label: "Dias pendentes", value: String(resumo.pendingDays), color: "var(--t0)" },
+    { label: "Total real", value: brlCent(summary.realCents / 100), color: "var(--t0)" },
+    { label: "Diferença", value: dayTotal(summary.diffCents), color: differenceColor(summary.diffCents), tooltip: differenceHint(summary) },
+    { label: "Dias pendentes", value: String(summary.pendingDays), color: "var(--t0)" },
   ];
   return (
     <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -843,57 +843,57 @@ export function DayChip({ cor, children }: { cor: string; children: string }) {
   );
 }
 
-function differenceChip(cents: number): { cor: string; texto: string } {
-  if (cents > 0) return { cor: "bg-ok", texto: `Sobra ${brlCent(cents / 100)}` };
-  if (cents < 0) return { cor: "bg-bad", texto: `Quebra ${brlCent(Math.abs(cents) / 100)}` };
-  return { cor: "bg-chip-gray", texto: "Sem diferença" };
+function differenceChip(cents: number): { cor: string; text: string } {
+  if (cents > 0) return { cor: "bg-ok", text: `Sobra ${brlCent(cents / 100)}` };
+  if (cents < 0) return { cor: "bg-bad", text: `Quebra ${brlCent(Math.abs(cents) / 100)}` };
+  return { cor: "bg-chip-gray", text: "Sem diferença" };
 }
 
-function dayHint(face: { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number; withdrawalCents: number }): string | undefined {
+function dayHint(face: { kind: "empty" | "zero" | "pending" | "today" | "total"; totalCents: number; diffCents: number; withdrawalCents: number }): string | undefined {
   if (face.kind !== "total") return undefined;
   const partes: string[] = [];
-  if (face.diffCents !== 0) partes.push(differenceChip(face.diffCents).texto);
+  if (face.diffCents !== 0) partes.push(differenceChip(face.diffCents).text);
   if (face.withdrawalCents > 0) partes.push(`Retirada ${brlCent(face.withdrawalCents / 100)}`);
   return partes.length > 0 ? partes.join(" · ") : undefined;
 }
 
 function Mes({
-  hoje,
+  today,
   cells,
-  faceDoDia,
+  dayFace,
   onOpen,
 }: {
-  hoje: string;
+  today: string;
   cells: Array<string | null>;
-  faceDoDia: (day: string) => { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number; withdrawalCents: number; aguardando?: boolean };
+  dayFace: (day: string) => { kind: "empty" | "zero" | "pending" | "today" | "total"; totalCents: number; diffCents: number; withdrawalCents: number; awaiting?: boolean };
   onOpen: (iso: string) => void;
 }) {
   return (
     <MonthCalendar>
       {cells.map((day, i) => {
         if (!day) return <div key={`vazio-${i}`} className={blankDayClass(i)} />;
-        const face = day <= hoje ? faceDoDia(day) : null;
-        const mostraTotal = face?.kind === "pendente" || face?.kind === "total" || (face?.kind === "hoje" && !face.aguardando);
+        const face = day <= today ? dayFace(day) : null;
+        const showsTotal = face?.kind === "pending" || face?.kind === "total" || (face?.kind === "today" && !face.awaiting);
         const dica = face ? dayHint(face) : undefined;
-        const aberto = Boolean(face && face.kind !== "zero" && face.kind !== "vazio");
+        const open = Boolean(face && face.kind !== "zero" && face.kind !== "empty");
         return (
           <DayFace
             key={day}
             index={i}
             iso={day}
-            today={hoje}
-            openable={aberto}
+            today={today}
+            openable={open}
             openLabel={`Abrir ${dayTitle(day)}`}
             title={dica}
             onOpen={() => onOpen(day)}
-            amount={mostraTotal && face ? brlCent(face.totalCents / 100) : null}
+            amount={showsTotal && face ? brlCent(face.totalCents / 100) : null}
             badges={
-              face?.kind === "hoje" || face?.kind === "pendente" || face?.kind === "total" ? (
+              face?.kind === "today" || face?.kind === "pending" || face?.kind === "total" ? (
                 <>
-                  {face.kind === "pendente" && <DayChip cor="bg-warn">{`Pendente ${brlCent(face.totalCents / 100)}`}</DayChip>}
-                  {face.kind === "hoje" && <DayChip cor="bg-acc">Em aberto</DayChip>}
+                  {face.kind === "pending" && <DayChip cor="bg-warn">{`Pendente ${brlCent(face.totalCents / 100)}`}</DayChip>}
+                  {face.kind === "today" && <DayChip cor="bg-acc">Em aberto</DayChip>}
                   {face.kind === "total" && (face.diffCents !== 0 || face.withdrawalCents === 0) && (
-                    <DayChip cor={differenceChip(face.diffCents).cor}>{differenceChip(face.diffCents).texto}</DayChip>
+                    <DayChip cor={differenceChip(face.diffCents).cor}>{differenceChip(face.diffCents).text}</DayChip>
                   )}
                   {face.kind === "total" && face.withdrawalCents > 0 && (
                     <DayChip cor="bg-info">{`Retirada ${brlCent(face.withdrawalCents / 100)}`}</DayChip>
@@ -910,12 +910,12 @@ function Mes({
 
 function DayModal({
   day,
-  lojas,
+  storeRows,
   snaps,
   reviews,
   pronto,
   gestor,
-  fechado,
+  closed,
   tenantId,
   soldByStore,
   sellersByStore,
@@ -923,12 +923,12 @@ function DayModal({
   onSaved,
 }: {
   day: string | null;
-  lojas: Store[];
+  storeRows: Store[];
   snaps: Record<string, CashCloseSnapshot>;
   reviews: CashCloseReview[];
   pronto: boolean;
   gestor: boolean;
-  fechado: boolean;
+  closed: boolean;
   tenantId: string;
   soldByStore: Record<string, number> | null;
   sellersByStore: Map<string, StoreSeller[]>;
@@ -944,10 +944,10 @@ function DayModal({
     if (!day || !pronto) return;
     const next: Record<string, CloseDraft> = {};
     const nextWithdrawals: Record<string, WithdrawalDraft> = {};
-    for (const loja of lojas) {
-      const snap = snaps[loja.id];
+    for (const store of storeRows) {
+      const snap = snaps[store.id];
       if (!snap) continue;
-      const review = reviews.find((r) => r.storeId === loja.id && r.day === day);
+      const review = reviews.find((r) => r.storeId === store.id && r.day === day);
       const typed: CloseDraft["typed"] = {};
       const acquirer: CloseDraft["acquirer"] = {};
       for (const line of buildCashCloseView(snap).lines) {
@@ -957,28 +957,28 @@ function DayModal({
         const shown = manual ?? line.stoneCents;
         acquirer[line.key] = shown == null ? "" : centsToField(shown);
       }
-      next[loja.id] = { typed, acquirer };
-      nextWithdrawals[loja.id] = withdrawalDraftFrom(review?.withdrawals ?? [], centsToField);
+      next[store.id] = { typed, acquirer };
+      nextWithdrawals[store.id] = withdrawalDraftFrom(review?.withdrawals ?? [], centsToField);
     }
     setDrafts(next);
     setWithdrawalDrafts(nextWithdrawals);
-  }, [day, pronto, lojas, snaps, reviews]);
+  }, [day, pronto, storeRows, snaps, reviews]);
 
   const comDados = day
-    ? lojas.filter((loja) => {
-        const snap = snaps[loja.id];
+    ? storeRows.filter((store) => {
+        const snap = snaps[store.id];
         return snap && buildCashCloseView(snap).lines.some((line) => line.systemCents !== 0 || line.typedCents !== 0 || line.stoneCents != null);
       })
     : [];
 
   const diaPendente =
-    fechado &&
+    closed &&
     pronto &&
     (comDados.length === 0 ||
-      comDados.some((loja) => {
-        const snap = snaps[loja.id];
+      comDados.some((store) => {
+        const snap = snaps[store.id];
         if (!snap || !day) return true;
-        const review = reviews.find((r) => r.storeId === loja.id && r.day === day) ?? null;
+        const review = reviews.find((r) => r.storeId === store.id && r.day === day) ?? null;
         const lines = applyCloseReview(buildCashCloseView(snap).lines, review, {
           cardPending: snap.cardPending,
           pixRequested: snap.pixRequested,
@@ -989,9 +989,9 @@ function DayModal({
   async function salvar() {
     if (!day) return;
     setBusy(true);
-    for (const loja of comDados) {
-      const snap = snaps[loja.id];
-      const draft = drafts[loja.id];
+    for (const store of comDados) {
+      const snap = snaps[store.id];
+      const draft = drafts[store.id];
       if (!snap || !draft) continue;
       const linhas = buildCashCloseView(snap).lines;
       const typedCents: CashCloseReview["typedCents"] = {};
@@ -1020,15 +1020,15 @@ function DayModal({
         setBusy(false);
         return;
       }
-      const review = reviews.find((item) => item.storeId === loja.id && item.day === day);
+      const review = reviews.find((item) => item.storeId === store.id && item.day === day);
       const people = withdrawalPeople(
-        (sellersByStore.get(loja.id) ?? []).map((seller) => ({ id: seller.id, name: seller.name, active: seller.active })),
-        (withdrawalDrafts[loja.id]?.rows ?? []).map((row) => row.sellerId),
+        (sellersByStore.get(store.id) ?? []).map((seller) => ({ id: seller.id, name: seller.name, active: seller.active })),
+        (withdrawalDrafts[store.id]?.rows ?? []).map((row) => row.sellerId),
       );
       const retiro = withdrawalSave({
         shortageCents: dayShortageCents(closeDayGap(linesWithDraft(linhas, draft)).diffCents),
-        enabled: withdrawalDrafts[loja.id]?.enabled ?? false,
-        rows: withdrawalDrafts[loja.id]?.rows ?? [],
+        enabled: withdrawalDrafts[store.id]?.enabled ?? false,
+        rows: withdrawalDrafts[store.id]?.rows ?? [],
         parseCents: fieldToCents,
         names: new Map(people.map((person) => [person.id, person.name])),
       });
@@ -1038,7 +1038,7 @@ function DayModal({
         return;
       }
       const saved: CashCloseReview = {
-        storeId: loja.id,
+        storeId: store.id,
         day,
         cashTypedCents: typedCents.cash ?? null,
         justification: review?.justification ?? "",
@@ -1073,9 +1073,9 @@ function DayModal({
         day ? (
           <>
             <span>{dayTitle(day)}</span>
-            {(!fechado || pronto) && (
-              <Badge variant={!fechado ? "accent" : diaPendente ? "warning" : "success"}>
-                {!fechado ? "Em aberto" : diaPendente ? "Pendente" : "Fechado"}
+            {(!closed || pronto) && (
+              <Badge variant={!closed ? "accent" : diaPendente ? "warning" : "success"}>
+                {!closed ? "Em aberto" : diaPendente ? "Pendente" : "Fechado"}
               </Badge>
             )}
           </>
@@ -1089,7 +1089,7 @@ function DayModal({
           <Button variant="outline" onClick={onClose} disabled={busy}>
             {gestor ? "Cancelar" : "Voltar"}
           </Button>
-          {gestor && fechado && comDados.length > 0 && (
+          {gestor && closed && comDados.length > 0 && (
             <Button onClick={() => void salvar()} disabled={busy || !pronto}>
               {busy ? "Salvando…" : "Salvar"}
             </Button>
@@ -1099,13 +1099,13 @@ function DayModal({
     >
       {!pronto ? (
         <Skeleton className="h-40 w-full" />
-      ) : !fechado ? (
+      ) : !closed ? (
         <div className="flex flex-col gap-4">
-          {lojas.map((loja) => {
-            const cents = soldByStore && loja.id in soldByStore ? soldByStore[loja.id] : null;
+          {storeRows.map((store) => {
+            const cents = soldByStore && store.id in soldByStore ? soldByStore[store.id] : null;
             return (
-              <div key={loja.id}>
-                {lojas.length > 1 ? <p className="mb-2 text-[13px] font-bold text-t0">{loja.fantasia}</p> : null}
+              <div key={store.id}>
+                {storeRows.length > 1 ? <p className="mb-2 text-[13px] font-bold text-t0">{store.fantasia}</p> : null}
                 <DayMetrics items={[{ label: "Vendido hoje", value: cents == null ? "—" : brlCent(cents / 100) }]} />
                 <p className="text-[13px] leading-relaxed text-t2">Este dia ainda está em aberto. A diferença será calculada após o fechamento.</p>
               </div>
@@ -1116,21 +1116,21 @@ function DayModal({
         <p className="text-[13.5px] leading-relaxed text-t1">Ainda não há fechamento neste dia.</p>
       ) : (
         <div className="flex flex-col gap-6">
-          {comDados.map((loja) => {
-            const snap = snaps[loja.id];
+          {comDados.map((store) => {
+            const snap = snaps[store.id];
             if (!snap) return null;
             const view = buildCashCloseView(snap);
             const cash = view.lines.find((l) => l.key === "cash");
-            const draft = drafts[loja.id];
+            const draft = drafts[store.id];
             const linhas = linesWithDraft(view.lines, draft);
             const conta = closeDayGap(linhas);
             const people = withdrawalPeople(
-              (sellersByStore.get(loja.id) ?? []).map((seller) => ({ id: seller.id, name: seller.name, active: seller.active })),
-              (withdrawalDrafts[loja.id]?.rows ?? []).map((row) => row.sellerId),
+              (sellersByStore.get(store.id) ?? []).map((seller) => ({ id: seller.id, name: seller.name, active: seller.active })),
+              (withdrawalDrafts[store.id]?.rows ?? []).map((row) => row.sellerId),
             );
             return (
-              <section key={loja.id}>
-                {lojas.length > 1 && <p className="mb-3 text-[13px] font-bold text-t0">{loja.fantasia}</p>}
+              <section key={store.id}>
+                {storeRows.length > 1 && <p className="mb-3 text-[13px] font-bold text-t0">{store.fantasia}</p>}
                 {!dayWithoutReal(linhas) ? (
                   <DayTotals systemCents={conta.comparedSystemCents} realCents={conta.realCents} diffCents={conta.diffCents} />
                 ) : (
@@ -1146,12 +1146,12 @@ function DayModal({
                   lines={linhas}
                   pixPending={view.pixPending}
                   gestor={gestor}
-                  fechado={fechado}
+                  closed={closed}
                   draft={draft}
                   onAcquirer={(key, value) =>
                     setDrafts((atual) => ({
                       ...atual,
-                      [loja.id]: { ...(atual[loja.id] ?? draft!), acquirer: { ...(atual[loja.id]?.acquirer ?? {}), [key]: value } },
+                      [store.id]: { ...(atual[store.id] ?? draft!), acquirer: { ...(atual[store.id]?.acquirer ?? {}), [key]: value } },
                     }))
                   }
                 />
@@ -1159,8 +1159,8 @@ function DayModal({
                   gestor={gestor}
                   shortageCents={dayShortageCents(conta.diffCents)}
                   people={people}
-                  draft={withdrawalDrafts[loja.id] ?? { enabled: false, rows: [] }}
-                  onChange={(next) => setWithdrawalDrafts((atual) => ({ ...atual, [loja.id]: next }))}
+                  draft={withdrawalDrafts[store.id] ?? { enabled: false, rows: [] }}
+                  onChange={(next) => setWithdrawalDrafts((atual) => ({ ...atual, [store.id]: next }))}
                   toCents={fieldToCents}
                 />
               </section>

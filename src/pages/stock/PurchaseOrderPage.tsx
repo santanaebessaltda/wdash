@@ -30,7 +30,7 @@ import { SOLD_WINDOWS, usePurchaseOrder } from "./usePurchaseOrder";
 
 const PAGE_SIZE = 50;
 
-type SortKey = "nome" | "minimo" | "saldo" | "pedidosAbertos" | "total" | "vendidos30" | "multipla" | "novo" | "bloqueado" | "aPedir";
+type SortKey = "name" | "minimo" | "saldo" | "pedidosAbertos" | "total" | "vendidos30" | "multipla" | "novo" | "bloqueado" | "aPedir";
 
 const NUM_COLS: Array<{ key: "saldo" | "pedidosAbertos" | "total" | "vendidos30" | "multipla"; label: string }> = [
   { key: "saldo", label: "Saldo" },
@@ -40,8 +40,8 @@ const NUM_COLS: Array<{ key: "saldo" | "pedidosAbertos" | "total" | "vendidos30"
   { key: "multipla", label: "Múltiplo de compra" },
 ];
 
-function sortValue(r: PurchaseOrderRow, k: Exclude<SortKey, "nome">): number {
-  if (k === "minimo") return r.minimo ?? -1;
+function sortValue(r: PurchaseOrderRow, k: Exclude<SortKey, "name">): number {
+  if (k === "minimo") return r.minimum ?? -1;
   if (k === "aPedir") return r.aPedir ?? -1;
   if (k === "novo") return r.novo ? 1 : 0;
   if (k === "bloqueado") return r.bloqueado ? 1 : 0;
@@ -65,21 +65,21 @@ function downloadFile(bytes: Uint8Array, name: string) {
 }
 
 export function PurchaseOrderPage() {
-  const { session, lojas, loading: lojasLoading } = useScopedStores();
+  const { session, storeRows, loading: lojasLoading } = useScopedStores();
   const { show } = useToast();
-  const loja = lojas.length === 1 ? lojas[0] : null;
-  const po = usePurchaseOrder(session.tenantId, loja?.id ?? null, loja?.costTableId ?? null);
+  const store = storeRows.length === 1 ? storeRows[0] : null;
+  const po = usePurchaseOrder(session.tenantId, store?.id ?? null, store?.costTableId ?? null);
   const { view } = po;
   const [busca, setBusca] = useState("");
   const [filtroSel, setFiltro] = useState<PurchaseFilter>("todos");
-  const [sortKey, setSortKey] = useState<SortKey>("nome");
+  const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [page, setPage] = useState(1);
   const [resumoPedido, setResumoPedido] = useState<PurchaseOrderRow[] | null>(null);
   const [copiarAberto, setCopiarAberto] = useState(false);
   const [destinoId, setDestinoId] = useState("");
   const [copiando, setCopiando] = useState(false);
-  const showSkeleton = useMinSkeleton(lojasLoading || (loja != null && po.loading));
+  const showSkeleton = useMinSkeleton(lojasLoading || (store != null && po.loading));
 
   const contagens = view?.contagens ?? { noPedido: 0, semMinimo: 0, novos: 0 };
   const filtroOpcoes: Array<{ value: PurchaseFilter; label: string }> = [
@@ -93,14 +93,14 @@ export function PurchaseOrderPage() {
   const linhas = useMemo(() => {
     const out = filterPurchaseRows(view?.rows ?? [], { busca, filtro });
     const dir = sortDir === "asc" ? 1 : -1;
-    const byName = (a: PurchaseOrderRow, b: PurchaseOrderRow) => a.nome.localeCompare(b.nome, "pt-BR");
-    return out.sort((a, b) => (sortKey === "nome" ? byName(a, b) * dir : (sortValue(a, sortKey) - sortValue(b, sortKey)) * dir || byName(a, b)));
+    const byName = (a: PurchaseOrderRow, b: PurchaseOrderRow) => a.name.localeCompare(b.name, "pt-BR");
+    return out.sort((a, b) => (sortKey === "name" ? byName(a, b) * dir : (sortValue(a, sortKey) - sortValue(b, sortKey)) * dir || byName(a, b)));
   }, [view, busca, filtro, sortKey, sortDir]);
 
-  useEffect(() => setPage(1), [busca, filtro, sortKey, sortDir, loja?.id]);
+  useEffect(() => setPage(1), [busca, filtro, sortKey, sortDir, store?.id]);
   useEffect(() => {
     setResumoPedido(null);
-  }, [loja?.id]);
+  }, [store?.id]);
 
   const totalPages = Math.max(1, Math.ceil(linhas.length / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
@@ -121,11 +121,11 @@ export function PurchaseOrderPage() {
     if (k === sortKey) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else {
       setSortKey(k);
-      setSortDir(k === "nome" ? "asc" : "desc");
+      setSortDir(k === "name" ? "asc" : "desc");
     }
   };
 
-  const abrirResumo = () => {
+  const openSummary = () => {
     if (!view) return;
     const produtos = view.rows.filter((r) => r.noPedido).sort((a, b) => a.position - b.position);
     if (produtos.length === 0) {
@@ -149,17 +149,17 @@ export function PurchaseOrderPage() {
   };
 
   const rede = storesForSession(session.stores);
-  const otherStores = loja ? rede.filter((s) => s.id !== loja.id) : rede;
+  const otherStores = store ? rede.filter((s) => s.id !== store.id) : rede;
   const todas = destinoId === "" && otherStores.length > 1;
   const destino = otherStores.find((s) => s.id === destinoId) ?? null;
 
-  const abrirCopia = () => {
+  const openCopy = () => {
     setDestinoId(otherStores.length > 1 ? "" : (otherStores[0]?.id ?? ""));
     setCopiarAberto(true);
   };
 
   const copiarMinimos = async () => {
-    if (!loja || !po.mins || po.mins.size === 0) return;
+    if (!store || !po.mins || po.mins.size === 0) return;
     const alvos = todas ? otherStores : destino ? [destino] : [];
     if (alvos.length === 0) return;
     setCopiando(true);
@@ -195,8 +195,8 @@ export function PurchaseOrderPage() {
         show("Nenhuma outra filial tem os mesmos produtos desta.", "warning");
         return;
       }
-      const lojaTxt = copiadas === 1 ? "1 filial" : `${copiadas} filiais`;
-      const partes = [`Mínimos copiados para ${lojaTxt}.`];
+      const storeText = copiadas === 1 ? "1 filial" : `${copiadas} filiais`;
+      const partes = [`Mínimos copiados para ${storeText}.`];
       if (semSaldo > 0) partes.push(`${semSaldo} ainda não abriram o pedido.`);
       if (semProduto > 0) partes.push(`${semProduto} não têm estes produtos.`);
       if (falhas > 0) partes.push(`${falhas} não puderam ser gravadas.`);
@@ -212,7 +212,7 @@ export function PurchaseOrderPage() {
     setFiltro("todos");
   };
 
-  const resumo = view?.resumo ?? { produtos: 0, itens: 0 };
+  const summary = view?.summary ?? { produtos: 0, itens: 0 };
 
   return (
     <div className="flex flex-col p-4 sm:p-6">
@@ -251,13 +251,13 @@ export function PurchaseOrderPage() {
               <TipHelp label="Multiplica o mínimo de cada produto. A quantidade a pedir desconta o total em estoque e arredonda para o múltiplo de compra." />
             </span>
             <AcoesPedido
-              semLoja={loja == null && lojas.length > 1}
-              podeGerar={loja != null && Boolean(view) && !po.syncing && !copiando}
-              podeCopiar={otherStores.length > 1 || (loja != null && otherStores.length > 0)}
-              copiarLiberado={loja != null && Boolean(view) && !po.syncing && !copiando && (po.mins?.size ?? 0) > 0}
-              semMinimo={loja != null && (po.mins?.size ?? 0) === 0}
-              onGerar={abrirResumo}
-              onCopiar={abrirCopia}
+              semLoja={store == null && storeRows.length > 1}
+              podeGerar={store != null && Boolean(view) && !po.syncing && !copiando}
+              podeCopiar={otherStores.length > 1 || (store != null && otherStores.length > 0)}
+              copiarLiberado={store != null && Boolean(view) && !po.syncing && !copiando && (po.mins?.size ?? 0) > 0}
+              semMinimo={store != null && (po.mins?.size ?? 0) === 0}
+              onGerar={openSummary}
+              onCopiar={openCopy}
             />
           </HeaderFilters>
         }
@@ -287,8 +287,8 @@ export function PurchaseOrderPage() {
       <div className="mt-8">
       {showSkeleton ? (
         <StockProductsSkeleton />
-      ) : !loja ? (
-        lojas.length === 0 ? (
+      ) : !store ? (
+        storeRows.length === 0 ? (
           <Card className="flex flex-col">
             <EmptyBlock icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
           </Card>
@@ -306,7 +306,7 @@ export function PurchaseOrderPage() {
             </span>
             {view && view.rows.length > 0 && (
               <span className="text-[12.5px] font-semibold text-t1">
-                {num(resumo.produtos)} produto{resumo.produtos === 1 ? "" : "s"} · {num(resumo.itens)} ite{resumo.itens === 1 ? "m" : "ns"} no pedido
+                {num(summary.produtos)} produto{summary.produtos === 1 ? "" : "s"} · {num(summary.itens)} ite{summary.itens === 1 ? "m" : "ns"} no pedido
               </span>
             )}
           </div>
@@ -337,7 +337,7 @@ export function PurchaseOrderPage() {
                 <thead>
                   <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
                     <th className="px-1 pb-3 text-left font-bold">#</th>
-                    <ThSort label="Produto" active={sortKey === "nome"} dir={sortDir} onClick={() => toggleSort("nome")} align="left" className="px-1 pb-3" />
+                    <ThSort label="Produto" active={sortKey === "name"} dir={sortDir} onClick={() => toggleSort("name")} align="left" className="px-1 pb-3" />
                     <ThSort label="Mínimo" active={sortKey === "minimo"} dir={sortDir} onClick={() => toggleSort("minimo")} className="px-1 pb-3" />
                     {NUM_COLS.map((c) => (
                       <ThSort
@@ -363,7 +363,7 @@ export function PurchaseOrderPage() {
                         <td className={cn("px-1 py-3 text-center text-[13px] font-extrabold text-t2", r.noPedido && "shadow-[inset_3px_0_0_var(--warn)]")}>{idx + 1}</td>
                         <td className="px-1 py-3">
                           <ProductNameCell
-                            nome={r.nome}
+                            name={r.name}
                             idx={idx}
                             upper
                             sub={
@@ -376,9 +376,9 @@ export function PurchaseOrderPage() {
                         </td>
                         <td className="px-1 py-2 text-right">
                           {!r.podePedir ? (
-                            <span className="inline-block w-20 pr-2 text-right font-mono text-[13px] font-bold text-t2">{r.minimo == null ? "—" : r.minimo}</span>
+                            <span className="inline-block w-20 pr-2 text-right font-mono text-[13px] font-bold text-t2">{r.minimum == null ? "—" : r.minimum}</span>
                           ) : (
-                            <MinInput value={r.minimo} idx={i} label={`Mínimo de ${r.nome}`} onSave={(raw) => po.saveMin(r.code, raw)} />
+                            <MinInput value={r.minimum} idx={i} label={`Mínimo de ${r.name}`} onSave={(raw) => po.saveMin(r.code, raw)} />
                           )}
                         </td>
                         {NUM_COLS.map((c) => (
@@ -459,7 +459,7 @@ export function PurchaseOrderPage() {
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="shrink-0 space-y-3 px-5 pt-5">
               <p className="text-[13px] leading-relaxed text-t1">
-                {loja ? `${loja.codFilial} · ${loja.fantasia}. ` : ""}
+                {store ? `${store.codFilial} · ${store.fantasia}. ` : ""}
                 Multiplicador {po.factor}x.{" "}
                 {resumoPedido.length === 1 ? "1 produto" : `${num(resumoPedido.length)} produtos`}
                 {" · "}
@@ -471,7 +471,7 @@ export function PurchaseOrderPage() {
                 {resumoPedido.map((r) => (
                   <li key={r.code} className="flex items-center gap-3 border-b border-line px-3 py-2.5 last:border-b-0">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] font-bold text-t0">{r.nome}</p>
+                      <p className="truncate text-[13px] font-bold text-t0">{r.name}</p>
                       <p className="truncate text-[11px] text-t2">{r.code}</p>
                     </div>
                     <div className="shrink-0 text-right">
@@ -488,7 +488,7 @@ export function PurchaseOrderPage() {
         )}
       </Modal>
       <Modal
-        open={copiarAberto && loja != null && (todas || destino != null)}
+        open={copiarAberto && store != null && (todas || destino != null)}
         onClose={() => {
           if (!copiando) setCopiarAberto(false);
         }}
@@ -505,9 +505,9 @@ export function PurchaseOrderPage() {
           </>
         }
       >
-        {loja && (todas || destino) && (
+        {store && (todas || destino) && (
           <div className="flex flex-col gap-3">
-            <p className="text-[13px] leading-relaxed text-t1">Copie os mínimos de {loja.fantasia} para outra filial ou para todas.</p>
+            <p className="text-[13px] leading-relaxed text-t1">Copie os mínimos de {store.fantasia} para outra filial ou para todas.</p>
             <FormField label="Copiar para">
               <Select value={todas ? "" : (destino?.id ?? "")} onChange={(e) => setDestinoId(e.target.value)} disabled={copiando}>
                 {otherStores.length > 1 && <option value="">Todas as outras filiais</option>}

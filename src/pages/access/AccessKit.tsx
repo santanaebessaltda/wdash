@@ -24,7 +24,7 @@ export const accessLink = "text-[13px] font-bold text-acc";
 export const accessFooter = "text-[13px] text-t2";
 
 /** Moldura das telas de acesso, no mesmo formato de ForgotPassword/ResetPassword do template. */
-export function AccessShell({ children, rodape, largura = 420, marca = true }: { children: ReactNode; rodape?: ReactNode; largura?: number; marca?: boolean }) {
+export function AccessShell({ children, rodape, largura = 420, brand = true }: { children: ReactNode; rodape?: ReactNode; largura?: number; brand?: boolean }) {
   return (
     <div
       className="tela-cheia pad-topo pad-base relative w-full overflow-y-auto bg-bg-0"
@@ -33,7 +33,7 @@ export function AccessShell({ children, rodape, largura = 420, marca = true }: {
       <AuthGlow />
       <div className="relative flex min-h-full w-full items-center justify-center px-4">
         <div className="w-full py-8" style={{ maxWidth: largura }}>
-        {marca && (
+        {brand && (
           <div className="mb-6 flex flex-col items-center gap-3">
             <BrandMark size={56} />
             <p className="text-[17px] font-extrabold tracking-tight text-t0">
@@ -87,14 +87,14 @@ function useSoltarSelecaoDoAutofill() {
     let mudouEm = -Infinity;
     const timers: number[] = [];
     const soltar = () => {
-      const fim = el.value.length;
-      if (fim > 0 && document.activeElement === el && el.selectionStart === 0 && el.selectionEnd === fim) {
-        el.setSelectionRange(fim, fim);
+      const end = el.value.length;
+      if (end > 0 && document.activeElement === el && el.selectionStart === 0 && el.selectionEnd === end) {
+        el.setSelectionRange(end, end);
       }
     };
     const aoMudar = (e: Event) => {
-      const tipo = (e as InputEvent).inputType;
-      if (tipo && tipo !== "insertReplacementText") return;
+      const kind = (e as InputEvent).inputType;
+      if (kind && kind !== "insertReplacementText") return;
       mudouEm = performance.now();
       requestAnimationFrame(soltar);
       timers.push(window.setTimeout(soltar, 60), window.setTimeout(soltar, 250));
@@ -145,9 +145,9 @@ export function useFocusSubmitAfterAutofill() {
       if (campos.some((i) => i.value.trim() === "")) return;
       cancelar();
       if (ativo instanceof HTMLInputElement) {
-        const fim = ativo.value.length;
+        const end = ativo.value.length;
         try {
-          ativo.setSelectionRange(fim, fim);
+          ativo.setSelectionRange(end, end);
         } catch {
           // type="email" nao aceita selecao programatica em alguns navegadores
         }
@@ -162,8 +162,8 @@ export function useFocusSubmitAfterAutofill() {
     const aoDigitar = (e: Event) => {
       const alvo = e.target as HTMLInputElement;
       if (!CAMPOS_DE_TEXTO.has(alvo.type)) return;
-      const tipo = (e as InputEvent).inputType;
-      if (tipo && tipo !== "insertReplacementText") {
+      const kind = (e as InputEvent).inputType;
+      if (kind && kind !== "insertReplacementText") {
         digitados.add(alvo);
         cancelar();
         return;
@@ -285,19 +285,19 @@ export function PasswordField({
   );
 }
 
-export type PersonName = { nome: string; sobrenome: string };
+export type PersonName = { name: string; sobrenome: string };
 
 export function personNameIsValid(n: PersonName): boolean {
-  return n.nome.trim().length >= 2 && n.sobrenome.trim().length >= 2;
+  return n.name.trim().length >= 2 && n.sobrenome.trim().length >= 2;
 }
 
 /** Nome  |  Sobrenome do "Crie seu acesso" (sempre em branco: o convite so traz o e-mail). */
 export function NameFields({
-  valor,
+  amount,
   onChange,
   autoFocus,
 }: {
-  valor: PersonName;
+  amount: PersonName;
   onChange: (patch: Partial<PersonName>) => void;
   autoFocus?: boolean;
 }) {
@@ -305,8 +305,8 @@ export function NameFields({
     <div className="grid grid-cols-2 gap-3">
       <FormField label="Nome">
         <Input
-          value={valor.nome}
-          onChange={(e) => onChange({ nome: e.target.value })}
+          value={amount.name}
+          onChange={(e) => onChange({ name: e.target.value })}
           placeholder="Seu nome"
           autoComplete="given-name"
           autoFocus={autoFocus}
@@ -315,7 +315,7 @@ export function NameFields({
       </FormField>
       <FormField label="Sobrenome">
         <Input
-          value={valor.sobrenome}
+          value={amount.sobrenome}
           onChange={(e) => onChange({ sobrenome: e.target.value })}
           placeholder="Seu sobrenome"
           autoComplete="family-name"
@@ -328,11 +328,11 @@ export function NameFields({
 
 /** Foto de perfil opcional (padrao da aba Profile do template: quadrado com iniciais + botao "+"). */
 export function PhotoField({
-  nome,
+  name,
   foto,
   onChange,
 }: {
-  nome: PersonName;
+  name: PersonName;
   foto: File | null;
   onChange: (foto: File | null) => void;
 }) {
@@ -349,7 +349,7 @@ export function PhotoField({
     return () => URL.revokeObjectURL(url);
   }, [foto]);
 
-  const iniciais = `${nome.nome.trim().charAt(0)}${nome.sobrenome.trim().charAt(0)}`.toUpperCase();
+  const iniciais = `${name.name.trim().charAt(0)}${name.sobrenome.trim().charAt(0)}`.toUpperCase();
   const escolher = () => input.current?.click();
 
   return (
@@ -408,10 +408,10 @@ export function PhotoField({
 }
 
 /** Aviso dentro do card (Alert do Vela). */
-export function NoticeCard({ tom = "info", titulo, children }: { tom?: "info" | "ok" | "bad" | "warn"; titulo?: ReactNode; children: ReactNode }) {
+export function NoticeCard({ tom = "info", title, children }: { tom?: "info" | "ok" | "bad" | "warn"; title?: ReactNode; children: ReactNode }) {
   const variant = { info: "info", ok: "success", bad: "danger", warn: "warning" } as const;
   return (
-    <Alert variant={variant[tom]} title={titulo}>
+    <Alert variant={variant[tom]} title={title}>
       {children}
     </Alert>
   );

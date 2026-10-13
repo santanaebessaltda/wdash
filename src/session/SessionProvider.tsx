@@ -35,18 +35,18 @@ const Contexto = createContext<SessionContextValue | null>(null);
 function migrateLegacySession(raw: Record<string, unknown>): Session {
   return {
     membershipId: (raw.membershipId ?? raw.vinculoId) as string,
-    name: titleName((raw.name ?? raw.nome) as string),
+    name: titleName((raw.name ?? raw.name) as string),
     cpf: raw.cpf as string,
     email: raw.email as string,
     avatarUrl: (raw.avatarUrl as string | null | undefined) ?? null,
     role: raw.role as Session["role"],
     isOwner: Boolean(raw.isOwner ?? raw.proprietario),
     stores: (raw.stores as string[]) ?? [],
-    collaboratorId: (raw.collaboratorId ?? raw.colaboradorId ?? null) as string | null,
+    collaboratorId: (raw.collaboratorId ?? raw.employeeId ?? null) as string | null,
     onboardingStep: (raw.onboardingStep ?? raw.onboardingEtapa ?? null) as number | null,
     temporaryPassword: Boolean(raw.temporaryPassword ?? raw.senhaTemporaria),
     tenantId: raw.tenantId as string,
-    companyName: companyNameCase((raw.companyName ?? raw.empresaNome ?? raw.name ?? raw.nome ?? "") as string),
+    companyName: companyNameCase((raw.companyName ?? raw.empresaNome ?? raw.name ?? raw.name ?? "") as string),
     appInstalled: Boolean(raw.appInstalled ?? raw.appInstalado),
   };
 }
@@ -296,11 +296,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const valor = useMemo(
+  const amount = useMemo(
     () => ({ session, ready, signIn, applySession, signOut, update }),
     [session, ready, signIn, applySession, signOut, update],
   );
-  return <Contexto.Provider value={valor}>{children}</Contexto.Provider>;
+  return <Contexto.Provider value={amount}>{children}</Contexto.Provider>;
 }
 
 export function useSession(): SessionContextValue {

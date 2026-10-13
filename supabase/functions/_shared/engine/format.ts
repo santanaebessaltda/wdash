@@ -55,10 +55,10 @@ export function endOfMonth(iso: string): string {
 }
 
 /** Lista de ISOs entre inicio e fim, inclusive. */
-export function eachDay(inicio: string, fim: string): string[] {
+export function eachDay(start: string, end: string): string[] {
   const out: string[] = [];
-  let atual = inicio;
-  while (atual <= fim) {
+  let atual = start;
+  while (atual <= end) {
     out.push(atual);
     atual = addDays(atual, 1);
   }

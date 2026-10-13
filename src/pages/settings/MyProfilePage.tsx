@@ -16,9 +16,9 @@ const THEME_OPTIONS: { value: ThemePreference; label: string; background: string
   { value: "system", label: "Sistema", background: "linear-gradient(135deg,#0c0e15 50%,#f5f6fa 50%)", borderColor: "#1e2230" },
 ];
 
-function splitPersonName(nome: string): PersonName {
-  const [first = "", ...rest] = nome.trim().split(/\s+/);
-  return { nome: first, sobrenome: rest.join(" ") };
+function splitPersonName(name: string): PersonName {
+  const [first = "", ...rest] = name.trim().split(/\s+/);
+  return { name: first, sobrenome: rest.join(" ") };
 }
 
 /** Padrao Account > Profile do Vela: foto 88px com "+", nome, e-mail e papel. A foto grava na hora. */
@@ -31,7 +31,7 @@ function ProfileSummaryCard({ salvo }: { salvo: PersonName }) {
 
   async function gravarFoto(photo: File | null) {
     setEnviando(true);
-    const r = await saveMyProfile({ firstName: salvo.nome, lastName: salvo.sobrenome, photo, removePhoto: photo === null });
+    const r = await saveMyProfile({ firstName: salvo.name, lastName: salvo.sobrenome, photo, removePhoto: photo === null });
     setEnviando(false);
     if (!r.ok) return show(r.error || SAVE_ERROR_MSG, "danger");
     update({ name: r.name, avatarUrl: r.avatarUrl ?? null });
@@ -92,23 +92,23 @@ function PersonalDataCard({ salvo, onSaved }: { salvo: PersonName; onSaved: (n: 
   const session = useActiveSession();
   const { update } = useSession();
   const { show } = useToast();
-  const [nome, setNome] = useState<PersonName>(salvo);
+  const [name, setNome] = useState<PersonName>(salvo);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => setNome(salvo), [salvo]);
 
-  const dirty = nome.nome.trim() !== salvo.nome || nome.sobrenome.trim() !== salvo.sobrenome;
+  const dirty = name.name.trim() !== salvo.name || name.sobrenome.trim() !== salvo.sobrenome;
 
   async function salvar(e: FormEvent) {
     e.preventDefault();
     if (!dirty || saving) return;
-    if (!personNameIsValid(nome)) return show("Informe nome e sobrenome com pelo menos 2 letras cada.", "danger");
+    if (!personNameIsValid(name)) return show("Informe nome e sobrenome com pelo menos 2 letras cada.", "danger");
     setSaving(true);
-    const r = await saveMyProfile({ firstName: nome.nome, lastName: nome.sobrenome, photo: null, removePhoto: false });
+    const r = await saveMyProfile({ firstName: name.name, lastName: name.sobrenome, photo: null, removePhoto: false });
     setSaving(false);
     if (!r.ok) return show(r.error || SAVE_ERROR_MSG, "danger");
     update({ name: r.name });
-    onSaved({ nome: titleName(nome.nome), sobrenome: titleName(nome.sobrenome) });
+    onSaved({ name: titleName(name.name), sobrenome: titleName(name.sobrenome) });
     show("Alterações salvas.", "success");
   }
 
@@ -119,7 +119,7 @@ function PersonalDataCard({ salvo, onSaved }: { salvo: PersonName; onSaved: (n: 
       </CardHeader>
       <form onSubmit={salvar} noValidate>
         <div className="flex flex-col gap-4">
-          <NameFields valor={nome} onChange={(p) => setNome((n) => ({ ...n, ...p }))} />
+          <NameFields amount={name} onChange={(p) => setNome((n) => ({ ...n, ...p }))} />
           <FormField label="E-mail" hint="O e-mail é usado para entrar na WDash e não pode ser alterado aqui.">
             <Input value={session.email} readOnly disabled />
           </FormField>
@@ -278,7 +278,7 @@ export function MyProfilePage() {
   useEffect(() => {
     let vivo = true;
     void fetchMyNames(session.name).then((n) => {
-      if (vivo) setSalvo({ nome: n.firstName, sobrenome: n.lastName });
+      if (vivo) setSalvo({ name: n.firstName, sobrenome: n.lastName });
     });
     return () => {
       vivo = false;

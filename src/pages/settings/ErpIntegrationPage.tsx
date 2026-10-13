@@ -66,7 +66,7 @@ export function ErpIntegrationPage() {
   const [info, setInfo] = useState<ErpIntegrationStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const showSkeleton = useMinSkeleton(loading);
-  const [aberto, setAberto] = useState(false);
+  const [open, setAberto] = useState(false);
 
   const reload = useCallback(async () => {
     const st = await fetchErpIntegrationStatus(session.tenantId);
@@ -83,9 +83,9 @@ export function ErpIntegrationPage() {
   const estado = estadoDe(info);
   const ui = ESTADO_UI[estado];
   const canEdit = session.role === "OWNER" || session.role === "MANAGER";
-  const podeAtualizar = estado === "conectado" && session.role === "OWNER";
+  const canRefresh = estado === "conectado" && session.role === "OWNER";
 
-  async function atualizarCadastros() {
+  async function refreshRecords() {
     setAtualizando(true);
     const r = await refreshErpRegistry();
     setAtualizando(false);
@@ -132,14 +132,14 @@ export function ErpIntegrationPage() {
       </div>
 
       <MillenniumModal
-        open={aberto}
+        open={open}
         onClose={() => setAberto(false)}
         info={info}
         estado={estado}
         canEdit={canEdit}
-        podeAtualizar={podeAtualizar}
+        canRefresh={canRefresh}
         atualizando={atualizando}
-        onAtualizar={atualizarCadastros}
+        onAtualizar={refreshRecords}
         onChanged={reload}
       />
     </>
@@ -157,7 +157,7 @@ function MillenniumModal({
   info,
   estado,
   canEdit,
-  podeAtualizar,
+  canRefresh,
   atualizando,
   onAtualizar,
   onChanged,
@@ -167,7 +167,7 @@ function MillenniumModal({
   info: ErpIntegrationStatus | null;
   estado: Estado;
   canEdit: boolean;
-  podeAtualizar: boolean;
+  canRefresh: boolean;
   atualizando: boolean;
   onAtualizar: () => Promise<void>;
   onChanged: () => Promise<void>;
@@ -378,7 +378,7 @@ function MillenniumModal({
           </FormField>
         </div>
         {conectado ? (
-          podeAtualizar && (
+          canRefresh && (
             <div className="text-[12.5px] leading-relaxed">
               <p className="font-semibold text-t0">Cadastros</p>
               <Button className="mt-2" size="sm" onClick={() => void onAtualizar()} disabled={atualizando || busy}>

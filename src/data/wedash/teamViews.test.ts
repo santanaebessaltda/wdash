@@ -6,31 +6,31 @@ import { activeChallenges, individualProgress, type Challenge } from "./challeng
 import { TODAY_ISO } from "./clock";
 import type { Scope } from "./dashboard";
 
-function escopo(filialId: string = "todas", periodo: Scope["periodo"] = { tipo: "esteMes" }): Scope {
-  return { filialIds: filialId === "todas" ? [] : [filialId], periodo, divisao: null };
+function scope(storeId: string = "todas", period: Scope["period"] = { kind: "thisMonth" }): Scope {
+  return { storeIds: storeId === "todas" ? [] : [storeId], period, division: null };
 }
 
 /** "R$ 185,0k", "R$ 2.345,67"  ->  numero aproximado; para comparacao tolerante. */
-function parseBrl(texto: string): number {
-  const ehK = texto.includes("k");
-  const limpo = texto.replace(/[R$\s.k]/g, "").replace(/\./g, ehK ? "" : "").replace(",", ".");
+function parseBrl(text: string): number {
+  const ehK = text.includes("k");
+  const limpo = text.replace(/[R$\s.k]/g, "").replace(/\./g, ehK ? "" : "").replace(",", ".");
   const n = Number(limpo);
   return ehK ? n * 1000 : n;
 }
 
 describe("T2: meta individual derivada (EQUIP-03)", () => {
   it("soma das metas individuais fecha exato com a meta da loja", () => {
-    const meta = goalOfStore("f1", "2026-09")!.storeAmount;
-    const vendedoras = sellersOfStore("f1", "2026-09");
-    const soma = vendedoras.reduce((s, c) => s + (individualGoal(c, "f1", "2026-09")?.valor ?? 0), 0);
-    expect(Math.round(soma)).toBe(meta);
+    const goal = goalOfStore("f1", "2026-09")!.storeAmount;
+    const sellers = sellersOfStore("f1", "2026-09");
+    const soma = sellers.reduce((s, c) => s + (individualGoal(c, "f1", "2026-09")?.amount ?? 0), 0);
+    expect(Math.round(soma)).toBe(goal);
   });
 
   it("meta individual segue o peso: maior pesoVenda recebe maior meta", () => {
     const ana = collaboratorById("c01")!; // peso 1.35
     const helena = collaboratorById("c08")!; // peso 0.7
-    const mAna = individualGoal(ana, "f1", "2026-09")!.valor;
-    const mHelena = individualGoal(helena, "f1", "2026-09")!.valor;
+    const mAna = individualGoal(ana, "f1", "2026-09")!.amount;
+    const mHelena = individualGoal(helena, "f1", "2026-09")!.amount;
     expect(mAna).toBeGreaterThan(mHelena);
   });
 
@@ -43,19 +43,19 @@ describe("T2: meta individual derivada (EQUIP-03)", () => {
     // Fernanda (c06) entra em ferias em 10/09: dias elegiveis < dias abertos do mes.
     const fernanda = collaboratorById("c06")!;
     const m = individualGoal(fernanda, "f1", "2026-09")!;
-    expect(m.proporcional).toBe(true);
-    expect(m.eligibleDays).toBeLessThan(m.diasAbertosMes);
+    expect(m.proportional).toBe(true);
+    expect(m.eligibleDays).toBeLessThan(m.openDaysInMonth);
     expect(m.eligibleDays).toBeGreaterThan(0);
     // A metade cheia de outra vendedora nao e proporcional.
     const ana = collaboratorById("c01")!;
     const mAna = individualGoal(ana, "f1", "2026-09")!;
-    expect(mAna.proporcional).toBe(false);
+    expect(mAna.proportional).toBe(false);
   });
 
   it("elegibilidade por data: Rafaela (admissão 08/09) é parcial no mês", () => {
     const rafaela = collaboratorById("c18")!;
     const m = individualGoal(rafaela, "f2", "2026-09")!;
-    expect(m.proporcional).toBe(true);
+    expect(m.proportional).toBe(true);
   });
 
   it("dias elegíveis respeitam a inatividade (Fernanda: 1–9/set em loja que abre todo dia)", () => {
@@ -69,76 +69,76 @@ describe("T2: agregados por vendedora no período (EQUIP-02)", () => {
   it("agregado de uma vendedora é consistente com o mês da loja", () => {
     const ana = collaboratorById("c01")!;
     const a = sellerAggregateForPeriod(ana, "f1", "2026-09-01", TODAY_ISO);
-    expect(a.faturamento).toBeGreaterThan(0);
-    expect(a.diasTrabalhados).toBeGreaterThan(0);
+    expect(a.revenue).toBeGreaterThan(0);
+    expect(a.daysWorked).toBeGreaterThan(0);
     // Faturamento individual e fracao do total; nao pode exceder o total do mes da loja.
-    const totalMeta = goalOfStore("f1", "2026-09")!.storeAmount;
-    expect(a.faturamento).toBeLessThan(totalMeta);
+    const goalTotal = goalOfStore("f1", "2026-09")!.storeAmount;
+    expect(a.revenue).toBeLessThan(goalTotal);
   });
 
   it("vendedora sem venda no período devolve zeros sem erro", () => {
     const ana = collaboratorById("c01")!;
     const a = sellerAggregateForPeriod(ana, "f1", "2024-01-01", "2024-01-05");
-    expect(a.faturamento).toBe(0);
-    expect(a.atendimentos).toBe(0);
-    expect(a.diasTrabalhados).toBe(0);
+    expect(a.revenue).toBe(0);
+    expect(a.salesCount).toBe(0);
+    expect(a.daysWorked).toBe(0);
   });
 
   it("vendedora inativa no período soma só até a inatividade (Fernanda, férias 10/09)", () => {
     const fernanda = collaboratorById("c06")!;
     const a = sellerAggregateForPeriod(fernanda, "f1", "2026-09-01", TODAY_ISO);
     // Tem venda de 1 - 9/set e nenhuma de 10/09 em diante.
-    expect(a.faturamento).toBeGreaterThan(0);
+    expect(a.revenue).toBeGreaterThan(0);
     const ate9 = sellerAggregateForPeriod(fernanda, "f1", "2026-09-01", "2026-09-09");
-    expect(a.faturamento).toBe(ate9.faturamento);
+    expect(a.revenue).toBe(ate9.revenue);
   });
 
   it("hoje conta só até a hora atual (agregado de hoje é fração do dia)", () => {
     const ana = collaboratorById("c01")!;
     const ateAgora = sellerAggregateForPeriod(ana, "f1", TODAY_ISO, TODAY_ISO);
-    expect(ateAgora.faturamento).toBeGreaterThanOrEqual(0);
+    expect(ateAgora.revenue).toBeGreaterThanOrEqual(0);
   });
 });
 
 describe("T3: escada de degraus e premiação (EQUIP-04)", () => {
   const defaultTiers = tiersOfStore("f1", "2026-09");
-  const metaBase: IndividualGoal = { valor: 1000, proporcional: false, eligibleDays: 30, diasAbertosMes: 30 };
-  const escadaDe = (degraus: Tier[], meta = metaBase) => (realizado: number) => sellerLadder(realizado, meta, degraus);
+  const goalBase: IndividualGoal = { amount: 1000, proportional: false, eligibleDays: 30, openDaysInMonth: 30 };
+  const escadaDe = (tiers: Tier[], goal = goalBase) => (achieved: number) => sellerLadder(achieved, goal, tiers);
 
   it("antes do primeiro degrau: degrau null, premiação e bônus 0", () => {
     const e = escadaDe(defaultTiers)(400); // 40% < Meta (50%)
-    expect(e!.degrau).toBeNull();
-    expect(e!.premiacao).toBe(0);
+    expect(e!.tier).toBeNull();
+    expect(e!.prizeAmount).toBe(0);
     expect(e!.bonus).toBe(0);
   });
 
   it("fronteira exata: 50% → Meta, 75% → Super Meta", () => {
     const exata = escadaDe(defaultTiers)(500);
-    expect(exata!.degrau!.nome).toBe("Meta");
-    expect(exata!.premiacao).toBeCloseTo(500 * 0.015, 6);
+    expect(exata!.tier!.name).toBe("Meta");
+    expect(exata!.prizeAmount).toBeCloseTo(500 * 0.015, 6);
     expect(exata!.bonus).toBe(50);
-    const superMeta = escadaDe(defaultTiers)(750);
-    expect(superMeta!.degrau!.nome).toBe("Super Meta");
-    expect(superMeta!.premiacao).toBeCloseTo(750 * 0.02, 6);
-    expect(superMeta!.bonus).toBe(100);
+    const superGoal = escadaDe(defaultTiers)(750);
+    expect(superGoal!.tier!.name).toBe("Super Meta");
+    expect(superGoal!.prizeAmount).toBeCloseTo(750 * 0.02, 6);
+    expect(superGoal!.bonus).toBe(100);
   });
 
   it("degrau alcançado é o maior possível (100% → Hiper, não Super)", () => {
     const e = escadaDe(defaultTiers)(1000);
-    expect(e!.degrau!.nome).toBe("Hiper Meta");
+    expect(e!.tier!.name).toBe("Hiper Meta");
   });
 
   it("bônus entra uma única vez (não dobra na projeção)", () => {
     const e = escadaDe(defaultTiers)(1000);
     // bonus do Hiper = 150, uma vez; premiacao separada do bonus.
     expect(e!.bonus).toBe(150);
-    expect(e!.premiacao).toBeCloseTo(1000 * 0.025, 6);
+    expect(e!.prizeAmount).toBeCloseTo(1000 * 0.025, 6);
   });
 
   it("próximo degrau: falta = meta × minPct ÷ 100 − realizado", () => {
     const e = escadaDe(defaultTiers)(500); // 50%  ->  Meta; proximo = Super 75%
-    expect(e!.proximo!.nome).toBe("Super Meta");
-    expect(e!.proximo!.faltaValor).toBeCloseTo(750 - 500, 6);
+    expect(e!.proximo!.name).toBe("Super Meta");
+    expect(e!.proximo!.gapAmount).toBeCloseTo(750 - 500, 6);
     // Ja no ultimo: null.
     const topo = escadaDe(defaultTiers)(1200); // 120% > Desafio 110%
     expect(topo!.proximo).toBeNull();
@@ -146,306 +146,306 @@ describe("T3: escada de degraus e premiação (EQUIP-04)", () => {
 
   it("sem meta individual (null ou zero) escada é null", () => {
     expect(sellerLadder(500, null, defaultTiers)).toBeNull();
-    expect(sellerLadder(500, { ...metaBase, valor: 0 }, defaultTiers)).toBeNull();
+    expect(sellerLadder(500, { ...goalBase, amount: 0 }, defaultTiers)).toBeNull();
   });
 
   it("escada lê degraus CUSTOMIZADOS da meta da filial, não os padrões", () => {
     const custom: Tier[] = [
-      { nome: "Bronze", atingimentoMinPct: 60, comissaoPct: 1.0, bonus: 10 },
-      { nome: "Prata", atingimentoMinPct: 90, comissaoPct: 2.0, bonus: 30 },
+      { name: "Bronze", minAttainmentPct: 60, commissionPct: 1.0, bonus: 10 },
+      { name: "Prata", minAttainmentPct: 90, commissionPct: 2.0, bonus: 30 },
     ];
     const e = escadaDe(custom)(900); // 90%  ->  Prata na custom (seria Sem degrau na padrao)
-    expect(e!.degrau!.nome).toBe("Prata");
-    expect(e!.premiacao).toBeCloseTo(900 * 0.02, 6);
+    expect(e!.tier!.name).toBe("Prata");
+    expect(e!.prizeAmount).toBeCloseTo(900 * 0.02, 6);
     expect(e!.bonus).toBe(30);
     expect(e!.proximo).toBeNull();
   });
 
   it("degrausDaFilial devolve os degraus da competência (smoke da fonte)", () => {
-    expect(tiersOfStore("f1", "2026-09")).toBe(goalOfStore("f1", "2026-09")!.degraus);
+    expect(tiersOfStore("f1", "2026-09")).toBe(goalOfStore("f1", "2026-09")!.tiers);
   });
 });
 
 describe("T4: montarEquipeView — visão loja com metaAtiva (EQUIP-01/02/03)", () => {
   it("Este mês: metaAtiva, KPI premiação unificada, colunas de meta preenchidas e desafios presentes", () => {
-    const v = buildTeamView(escopo("f1", { tipo: "esteMes" }));
-    expect(v.visao).toBe("loja");
-    expect(v.metaAtiva).toBe(true);
-    expect(v.kpiPremiacao).not.toBeNull();
+    const v = buildTeamView(scope("f1", { kind: "thisMonth" }));
+    expect(v.scopeView).toBe("store");
+    expect(v.activeGoal).toBe(true);
+    expect(v.kpiPrize).not.toBeNull();
     expect(v.challenges).not.toBeNull();
-    expect(v.vendedoras!.length).toBeGreaterThan(0);
-    const comMeta = v.vendedoras!.filter((l) => !l.semMeta);
-    expect(comMeta.length).toBe(v.vendedoras!.length);
-    expect(comMeta[0].metaIndividualValor).toBeGreaterThan(0);
-    expect(comMeta[0].atingimentoPct).toBeGreaterThanOrEqual(0);
+    expect(v.sellers!.length).toBeGreaterThan(0);
+    const withGoal = v.sellers!.filter((l) => !l.noGoal);
+    expect(withGoal.length).toBe(v.sellers!.length);
+    expect(withGoal[0].individualGoalAmount).toBeGreaterThan(0);
+    expect(withGoal[0].attainmentPct).toBeGreaterThanOrEqual(0);
   });
 
   it("KPI Atendimentos sempre presente e plausível", () => {
-    for (const tipo of ["esteMes", "hoje"] as const) {
-      const v = buildTeamView(escopo("f1", { tipo }));
-      expect(Number(v.kpiAtendimentos.valor.replace(/\D/g, "")), tipo).toBeGreaterThanOrEqual(0);
+    for (const kind of ["thisMonth", "today"] as const) {
+      const v = buildTeamView(scope("f1", { kind }));
+      expect(Number(v.kpiSalesCount.amount.replace(/\D/g, "")), kind).toBeGreaterThanOrEqual(0);
     }
   });
 
   it("Premiação projetada = escada de metas + prêmios dos desafios (verba única)", () => {
-    const v = buildTeamView(escopo("f1", { tipo: "esteMes" }));
-    expect(v.kpiPremiacao).not.toBeNull();
+    const v = buildTeamView(scope("f1", { kind: "thisMonth" }));
+    expect(v.kpiPrize).not.toBeNull();
     // Fonte desafios: premio x participantes cuja projecao individual fecha
     // (POR PARTICIPANTE, nao pelo veredito agregado do desafio).
-    const decorridos = 15;
+    const elapsedOpenDays = 15;
     const totais = 30; // dias abertos de setembro no mock
     let desafiosEsperado = 0;
     for (const d of activeChallenges("2026-09")) {
-      for (const id of d.participantes) {
+      for (const id of d.participants) {
         const p = individualProgress(d, id);
-        if (p > 0 && (p / decorridos) * totais >= d.alvoIndividual) desafiosEsperado += d.premio;
+        if (p > 0 && (p / elapsedOpenDays) * totais >= d.individualTarget) desafiosEsperado += d.prize;
       }
     }
     // Fonte escada: soma das premiacoes acumuladas por degrau das linhas.
-    const escadaEsperado = v.vendedoras!.reduce((s, l) => s + l.premiacaoAcumulada, 0);
+    const escadaEsperado = v.sellers!.reduce((s, l) => s + l.accruedPrize, 0);
     // KPI  cada fonte sozinha (e a soma delas) e  soma dos tetos.
-    const total = parseBrl(v.kpiPremiacao!.valor);
+    const total = parseBrl(v.kpiPrize!.amount);
     expect(total).toBeGreaterThanOrEqual(desafiosEsperado - 1);
     expect(total).toBeGreaterThanOrEqual(escadaEsperado - 1);
     // A diferenca KPI  desafios tem que ser plausivel com a escada (nao
     // negativa e nao gigante): escada projetada  10% do faturamento das linhas
     // (demo do ranking ancora % da meta individual, nao o total da loja).
-    const fatLinhas = v.vendedoras!.reduce((s, l) => s + l.faturamentoValor, 0);
+    const fatLinhas = v.sellers!.reduce((s, l) => s + l.revenueAmount, 0);
     const parteEscada = total - desafiosEsperado;
     expect(parteEscada).toBeGreaterThanOrEqual(-1);
     expect(parteEscada).toBeLessThan(fatLinhas * 0.1);
   });
 
   it("Premiação presente com filtro 7 dias (AD-046 — competência corrente)", () => {
-    const v = buildTeamView(escopo("f1", { tipo: "7dias" }));
-    expect(v.kpiPremiacao).not.toBeNull();
-    expect(v.avisoCompetencia).toContain("seguem o período");
+    const v = buildTeamView(scope("f1", { kind: "last7Days" }));
+    expect(v.kpiPrize).not.toBeNull();
+    expect(v.competenceNotice).toContain("seguem o período");
   });
 
   it("Mês passado: metaAtiva com aviso de competência", () => {
-    const v = buildTeamView(escopo("f1", { tipo: "mesPassado" }));
-    expect(v.metaAtiva).toBe(true);
-    expect(v.avisoCompetencia).toContain("competência");
-    expect(v.kpiPremiacao).not.toBeNull();
+    const v = buildTeamView(scope("f1", { kind: "lastMonth" }));
+    expect(v.activeGoal).toBe(true);
+    expect(v.competenceNotice).toContain("competência");
+    expect(v.kpiPrize).not.toBeNull();
   });
 
   it("Hoje/Ontem/7 dias: meta continua ativa (AD-046) com aviso; KPIs seguem o período", () => {
-    for (const tipo of ["hoje", "ontem", "7dias"] as const) {
-      const v = buildTeamView(escopo("f1", { tipo }));
-      expect(v.metaAtiva, tipo).toBe(true);
-      expect(v.kpiPremiacao, tipo).not.toBeNull();
-      expect(v.challenges, tipo).not.toBeNull();
-      expect(v.avisoCompetencia, tipo).toContain("seguem o período");
-      expect(v.competencia, tipo).toBe("2026-09");
+    for (const kind of ["today", "yesterday", "last7Days"] as const) {
+      const v = buildTeamView(scope("f1", { kind }));
+      expect(v.activeGoal, kind).toBe(true);
+      expect(v.kpiPrize, kind).not.toBeNull();
+      expect(v.challenges, kind).not.toBeNull();
+      expect(v.competenceNotice, kind).toContain("seguem o período");
+      expect(v.competence, kind).toBe("2026-09");
       // Colunas de meta preenchidas com a janela da competencia (nao do filtro).
-      const comMeta = v.vendedoras!.filter((l) => !l.semMeta);
-      expect(comMeta.length, tipo).toBeGreaterThan(0);
-      expect(comMeta[0].metaIndividualValor, tipo).toBeGreaterThan(0);
+      const withGoal = v.sellers!.filter((l) => !l.noGoal);
+      expect(withGoal.length, kind).toBeGreaterThan(0);
+      expect(withGoal[0].individualGoalAmount, kind).toBeGreaterThan(0);
     }
   });
 
   it("KPIs vêm com delta contra o período anterior equivalente (7 dias)", () => {
-    const v = buildTeamView(escopo("f1", { tipo: "7dias" }));
-    expect(v.kpiFaturamento.delta).toBeDefined();
-    expect(v.kpiFaturamento.delta!.value).toMatch(/%$/);
+    const v = buildTeamView(scope("f1", { kind: "last7Days" }));
+    expect(v.kpiRevenue.delta).toBeDefined();
+    expect(v.kpiRevenue.delta!.value).toMatch(/%$/);
   });
 
   it("lista ordenada por atingimento com meta ativa (maior → menor), zeros no fim", () => {
-    const v = buildTeamView(escopo("f1", { tipo: "esteMes" }));
-    const pcts = v.vendedoras!.filter((l) => !l.semMeta).map((l) => l.atingimentoPct);
+    const v = buildTeamView(scope("f1", { kind: "thisMonth" }));
+    const pcts = v.sellers!.filter((l) => !l.noGoal).map((l) => l.attainmentPct);
     expect([...pcts].sort((a, b) => b - a)).toEqual(pcts);
   });
 
   it("KPI de Hoje recorta o dia; meta da linha continua MTD da competência", () => {
-    const hoje = buildTeamView(escopo("f1", { tipo: "hoje" }));
-    const mes = buildTeamView(escopo("f1", { tipo: "esteMes" }));
+    const today = buildTeamView(scope("f1", { kind: "today" }));
+    const mes = buildTeamView(scope("f1", { kind: "thisMonth" }));
     // KPI do topo: Hoje  Este mes.
-    expect(parseBrl(hoje.kpiFaturamento.valor)).toBeLessThanOrEqual(parseBrl(mes.kpiFaturamento.valor) + 1);
+    expect(parseBrl(today.kpiRevenue.amount)).toBeLessThanOrEqual(parseBrl(mes.kpiRevenue.amount) + 1);
     // Linhas de meta: mesmo atingimento (mesma janela de competencia).
-    expect(hoje.vendedoras!.length).toBe(mes.vendedoras!.length);
-    for (let i = 0; i < hoje.vendedoras!.length; i++) {
-      expect(hoje.vendedoras![i].colaboradorId).toBe(mes.vendedoras![i].colaboradorId);
-      expect(hoje.vendedoras![i].atingimentoPct).toBeCloseTo(mes.vendedoras![i].atingimentoPct, 6);
+    expect(today.sellers!.length).toBe(mes.sellers!.length);
+    for (let i = 0; i < today.sellers!.length; i++) {
+      expect(today.sellers![i].employeeId).toBe(mes.sellers![i].employeeId);
+      expect(today.sellers![i].attainmentPct).toBeCloseTo(mes.sellers![i].attainmentPct, 6);
     }
   });
 
   it("tendência existe para todas e é um dos três valores", () => {
-    const v = buildTeamView(escopo("f1", { tipo: "esteMes" }));
-    for (const l of v.vendedoras!) {
-      expect(["subindo", "estavel", "caindo"]).toContain(l.tendencia);
+    const v = buildTeamView(scope("f1", { kind: "thisMonth" }));
+    for (const l of v.sellers!) {
+      expect(["up", "flat", "down"]).toContain(l.trend);
     }
   });
 
   it("ponto de atenção: um por vendedora, sempre que P.A. cai ≥5% abaixo da média", () => {
-    const v = buildTeamView(escopo("f1", { tipo: "esteMes" }));
-    const alertas = v.vendedoras!.filter((l) => l.atencao?.tipo === "pa");
+    const v = buildTeamView(scope("f1", { kind: "thisMonth" }));
+    const alertas = v.sellers!.filter((l) => l.attention?.kind === "pa");
     for (const l of alertas) {
       // Detalhe do mockup: "P.A. X,XX  |  Y% abaixo".
-      expect(l.atencao!.texto).toContain("P.A.");
-      expect(l.atencao!.detalhe).toContain("abaixo");
+      expect(l.attention!.text).toContain("P.A.");
+      expect(l.attention!.detail).toContain("abaixo");
     }
     // E a media da loja fica entre o melhor e o pior P.A. individual.
-    const pas = v.vendedoras!.filter((l) => l.paValor > 0).map((l) => l.paValor);
+    const pas = v.sellers!.filter((l) => l.paAmount > 0).map((l) => l.paAmount);
     if (pas.length > 1) {
       expect(Math.max(...pas)).toBeGreaterThanOrEqual(Math.min(...pas));
     }
   });
 
   it("premiação projetada individual: coerente com projeção × degrau (não-nula com meta)", () => {
-    const v = buildTeamView(escopo("f1", { tipo: "esteMes" }));
-    for (const l of v.vendedoras!) {
-      if (l.semMeta) continue;
+    const v = buildTeamView(scope("f1", { kind: "thisMonth" }));
+    for (const l of v.sellers!) {
+      if (l.noGoal) continue;
       // Com meta ativa e mes em curso, toda vendedora tem projecao calculada.
-      expect(l.premiacaoProjetadaIndividual, l.nome).not.toBeNull();
-      expect(l.atingimentoProjetadoPct, l.nome).not.toBeNull();
-      expect(l.atingimentoProjetadoPct!, l.nome).toBeGreaterThan(0);
+      expect(l.projectedIndividualPrize, l.name).not.toBeNull();
+      expect(l.projectedAttainmentPct, l.name).not.toBeNull();
+      expect(l.projectedAttainmentPct!, l.name).toBeGreaterThan(0);
     }
   });
 
   it("estados por bloco: desafios disponíveis mesmo com filtro Hoje (AD-046)", () => {
-    const vDia = buildTeamView(escopo("f1", { tipo: "hoje" }));
-    expect(vDia.estados.kpis).toBe("disponivel");
-    expect(vDia.estados.vendedoras).toBe("disponivel");
-    expect(vDia.estados.challenges).toBe("disponivel");
-    const vMes = buildTeamView(escopo("f1", { tipo: "esteMes" }));
-    expect(vMes.estados.challenges).toBe("disponivel");
-    expect(vMes.avisoCompetencia).toBeNull();
+    const vDia = buildTeamView(scope("f1", { kind: "today" }));
+    expect(vDia.states.kpis).toBe("available");
+    expect(vDia.states.sellers).toBe("available");
+    expect(vDia.states.challenges).toBe("available");
+    const vMes = buildTeamView(scope("f1", { kind: "thisMonth" }));
+    expect(vMes.states.challenges).toBe("available");
+    expect(vMes.competenceNotice).toBeNull();
   });
 
   it("período personalizado antigo: KPIs do período; meta/aviso da competência corrente", () => {
-    const v = buildTeamView(escopo("f1", { tipo: "personalizado", inicio: "2025-06-01", fim: "2025-06-30" }));
+    const v = buildTeamView(scope("f1", { kind: "custom", start: "2025-06-01", end: "2025-06-30" }));
     // AD-046: competencia = mes corrente (ha meta em 2026-09).
-    expect(v.metaAtiva).toBe(true);
-    expect(v.competencia).toBe("2026-09");
-    expect(v.avisoCompetencia).toContain("seguem o período");
-    expect(v.vendedoras!.length).toBeGreaterThan(0);
+    expect(v.activeGoal).toBe(true);
+    expect(v.competence).toBe("2026-09");
+    expect(v.competenceNotice).toContain("seguem o período");
+    expect(v.sellers!.length).toBeGreaterThan(0);
   });
 });
 
 describe("T6: montarEquipeView — visão rede (EQUIP-07)", () => {
   it("todas as lojas: resumo por filial + vendedoras flat com filialNome (REDE-01/02)", () => {
-    const v = buildTeamView(escopo("todas", { tipo: "esteMes" }));
-    expect(v.visao).toBe("rede");
-    expect(v.vendedoras).not.toBeNull();
-    expect(v.vendedoras!.length).toBeGreaterThan(0);
-    expect(v.lojas!.length).toBe(2);
+    const v = buildTeamView(scope("todas", { kind: "thisMonth" }));
+    expect(v.scopeView).toBe("network");
+    expect(v.sellers).not.toBeNull();
+    expect(v.sellers!.length).toBeGreaterThan(0);
+    expect(v.storeRows!.length).toBe(2);
     // Toda linha carrega a filial (coluna Shopping).
-    for (const l of v.vendedoras!) {
-      expect(l.filialId, l.nome).toBeTruthy();
-      expect(l.filialNome, l.nome).toBeTruthy();
+    for (const l of v.sellers!) {
+      expect(l.storeId, l.name).toBeTruthy();
+      expect(l.storeName, l.name).toBeTruthy();
     }
     // Uniao das linhas por filial cobre todas as lojas do escopo.
-    const filiaisNaTabela = new Set(v.vendedoras!.map((l) => l.filialId));
-    for (const loja of v.lojas!) expect(filiaisNaTabela.has(loja.filialId)).toBe(true);
-    for (const l of v.lojas!) {
-      expect(l.faturamento).toBeTruthy();
+    const filiaisNaTabela = new Set(v.sellers!.map((l) => l.storeId));
+    for (const store of v.storeRows!) expect(filiaisNaTabela.has(store.storeId)).toBe(true);
+    for (const l of v.storeRows!) {
+      expect(l.revenue).toBeTruthy();
       expect(l.ticket).toBeTruthy();
       expect(l.pa).toBeTruthy();
     }
   });
 
   it("pctMetaGlobal das lojas com meta soma ~100 (REDE-13)", () => {
-    const v = buildTeamView(escopo("todas", { tipo: "esteMes" }));
-    const comMeta = v.lojas!.filter((l) => l.metaValor > 0);
-    expect(comMeta.length).toBeGreaterThan(0);
-    const soma = comMeta.reduce((s, l) => s + l.pctMetaGlobal, 0);
+    const v = buildTeamView(scope("todas", { kind: "thisMonth" }));
+    const withGoal = v.storeRows!.filter((l) => l.goalAmount > 0);
+    expect(withGoal.length).toBeGreaterThan(0);
+    const soma = withGoal.reduce((s, l) => s + l.networkGoalPct, 0);
     expect(soma).toBeCloseTo(100, 1);
     // metaValor + realizadoValor coerentes.
-    for (const l of comMeta) {
-      expect(l.metaValor).toBeGreaterThan(0);
-      expect(l.realizadoValor).toBeGreaterThanOrEqual(0);
+    for (const l of withGoal) {
+      expect(l.goalAmount).toBeGreaterThan(0);
+      expect(l.achievedAmount).toBeGreaterThanOrEqual(0);
     }
   });
 
   it("metaGlobal: total = soma das metas; pct = realizado/total; presente na rede mesmo com 7 dias (AD-046)", () => {
-    const comMeta = buildTeamView(escopo("todas", { tipo: "esteMes" }));
-    expect(comMeta.metaGlobal).not.toBeNull();
-    const g = comMeta.metaGlobal!;
-    const somaMetas = comMeta.lojas!.reduce((s, l) => s + l.metaValor, 0);
-    expect(g.total).toBe(somaMetas);
+    const withGoal = buildTeamView(scope("todas", { kind: "thisMonth" }));
+    expect(withGoal.networkGoal).not.toBeNull();
+    const g = withGoal.networkGoal!;
+    const goalSums = withGoal.storeRows!.reduce((s, l) => s + l.goalAmount, 0);
+    expect(g.total).toBe(goalSums);
     expect(g.total).toBeGreaterThan(0);
-    expect(g.pct).toBeCloseTo((g.realizado / g.total) * 100, 6);
-    expect(g.projetadoPct).toBeGreaterThan(0);
+    expect(g.pct).toBeCloseTo((g.achieved / g.total) * 100, 6);
+    expect(g.projectedPct).toBeGreaterThan(0);
     expect(g.daysRemaining).toBeGreaterThan(0);
-    expect(g.competTexto).toBeTruthy();
+    expect(g.competenceText).toBeTruthy();
 
     // AD-046: faixa global permanece com filtro curto (mesma competencia).
-    const seteDias = buildTeamView(escopo("todas", { tipo: "7dias" }));
-    expect(seteDias.metaGlobal).not.toBeNull();
-    expect(seteDias.metaGlobal!.total).toBe(g.total);
+    const seteDias = buildTeamView(scope("todas", { kind: "last7Days" }));
+    expect(seteDias.networkGoal).not.toBeNull();
+    expect(seteDias.networkGoal!.total).toBe(g.total);
 
-    const loja = buildTeamView(escopo("f1", { tipo: "esteMes" }));
-    expect(loja.metaGlobal).not.toBeNull();
-    expect(loja.metaGlobal!.total).toBe(170000);
-    expect(loja.metaGlobal!.inicio).toBe("2026-09-01");
-    expect(loja.metaGlobal!.fim).toBe("2026-09-30");
+    const store = buildTeamView(scope("f1", { kind: "thisMonth" }));
+    expect(store.networkGoal).not.toBeNull();
+    expect(store.networkGoal!.total).toBe(170000);
+    expect(store.networkGoal!.start).toBe("2026-09-01");
+    expect(store.networkGoal!.end).toBe("2026-09-30");
   });
 
   it("melhor/pior atingimento por loja consistentes com a lista da loja", () => {
-    const rede = buildTeamView(escopo("todas", { tipo: "esteMes" }));
-    for (const resumo of rede.lojas!) {
-      const loja = buildTeamView(escopo(resumo.filialId, { tipo: "esteMes" }));
-      const comMeta = loja.vendedoras!.filter((l) => !l.semMeta);
-      const ordenadas = [...comMeta].sort((a, b) => b.atingimentoPct - a.atingimentoPct);
+    const rede = buildTeamView(scope("todas", { kind: "thisMonth" }));
+    for (const summary of rede.storeRows!) {
+      const store = buildTeamView(scope(summary.storeId, { kind: "thisMonth" }));
+      const withGoal = store.sellers!.filter((l) => !l.noGoal);
+      const ordenadas = [...withGoal].sort((a, b) => b.attainmentPct - a.attainmentPct);
       if (ordenadas.length > 0) {
-        expect(resumo.melhor!.nome).toBe(ordenadas[0].nome.split(" ")[0]);
-        expect(resumo.pior!.nome).toBe(ordenadas[ordenadas.length - 1].nome.split(" ")[0]);
-        expect(resumo.melhor!.atingimentoPct).toBeCloseTo(ordenadas[0].atingimentoPct, 6);
+        expect(summary.melhor!.name).toBe(ordenadas[0].name.split(" ")[0]);
+        expect(summary.pior!.name).toBe(ordenadas[ordenadas.length - 1].name.split(" ")[0]);
+        expect(summary.melhor!.attainmentPct).toBeCloseTo(ordenadas[0].attainmentPct, 6);
       } else {
-        expect(resumo.melhor).toBeNull();
-        expect(resumo.pior).toBeNull();
+        expect(summary.melhor).toBeNull();
+        expect(summary.pior).toBeNull();
       }
     }
   });
 
   it("KPIs da rede somam as lojas (faturamento da rede ≥ qualquer loja isolada)", () => {
-    const rede = buildTeamView(escopo("todas", { tipo: "esteMes" }));
-    for (const l of rede.lojas!) {
-      const isolada = buildTeamView(escopo(l.filialId, { tipo: "esteMes" }));
+    const rede = buildTeamView(scope("todas", { kind: "thisMonth" }));
+    for (const l of rede.storeRows!) {
+      const isolada = buildTeamView(scope(l.storeId, { kind: "thisMonth" }));
       // Rede soma as lojas; o valor da rede nunca e menor que o de uma loja.
-      expect(parseBrl(rede.kpiFaturamento.valor)).toBeGreaterThanOrEqual(parseBrl(isolada.kpiFaturamento.valor) - 1);
+      expect(parseBrl(rede.kpiRevenue.amount)).toBeGreaterThanOrEqual(parseBrl(isolada.kpiRevenue.amount) - 1);
     }
   });
 
   it("rede com filtro 7 dias: meta/desafios/faixa da competência; KPIs do período", () => {
-    const v = buildTeamView(escopo("todas", { tipo: "7dias" }));
-    expect(v.metaAtiva).toBe(true);
+    const v = buildTeamView(scope("todas", { kind: "last7Days" }));
+    expect(v.activeGoal).toBe(true);
     expect(v.challenges).not.toBeNull();
-    expect(v.kpiPremiacao).not.toBeNull();
-    expect(v.metaGlobal).not.toBeNull();
-    expect(v.avisoCompetencia).toContain("seguem o período");
-    for (const l of v.lojas!) expect(l.premiacaoProjetada).not.toBe("—");
+    expect(v.kpiPrize).not.toBeNull();
+    expect(v.networkGoal).not.toBeNull();
+    expect(v.competenceNotice).toContain("seguem o período");
+    for (const l of v.storeRows!) expect(l.projectedPrize).not.toBe("—");
   });
 
   it("premiação da rede = escada das duas lojas + desafios (que não dobram)", () => {
-    const rede = buildTeamView(escopo("todas", { tipo: "esteMes" }));
-    expect(rede.kpiPremiacao).not.toBeNull();
-    const r1 = buildTeamView(escopo("f1", { tipo: "esteMes" }));
-    const r2 = buildTeamView(escopo("f2", { tipo: "esteMes" }));
+    const rede = buildTeamView(scope("todas", { kind: "thisMonth" }));
+    expect(rede.kpiPrize).not.toBeNull();
+    const r1 = buildTeamView(scope("f1", { kind: "thisMonth" }));
+    const r2 = buildTeamView(scope("f2", { kind: "thisMonth" }));
     // Rede  qualquer loja isolada (soma as escadas; desafios entram 1x).
-    expect(parseBrl(rede.kpiPremiacao!.valor)).toBeGreaterThanOrEqual(parseBrl(r1.kpiPremiacao!.valor) - 1);
-    expect(parseBrl(rede.kpiPremiacao!.valor)).toBeGreaterThanOrEqual(parseBrl(r2.kpiPremiacao!.valor) - 1);
+    expect(parseBrl(rede.kpiPrize!.amount)).toBeGreaterThanOrEqual(parseBrl(r1.kpiPrize!.amount) - 1);
+    expect(parseBrl(rede.kpiPrize!.amount)).toBeGreaterThanOrEqual(parseBrl(r2.kpiPrize!.amount) - 1);
     // E  soma das duas lojas + desafios de uma (desafios nao dobram).
-    const sumStores = parseBrl(r1.kpiPremiacao!.valor) + parseBrl(r2.kpiPremiacao!.valor);
-    expect(parseBrl(rede.kpiPremiacao!.valor)).toBeLessThanOrEqual(sumStores + 1);
+    const sumStores = parseBrl(r1.kpiPrize!.amount) + parseBrl(r2.kpiPrize!.amount);
+    expect(parseBrl(rede.kpiPrize!.amount)).toBeLessThanOrEqual(sumStores + 1);
   });
 });
 
 describe("T5: desafios na visão (EQUIP-05)", () => {
   it("lista só desafios Ativo (sem encerrados nem a começar)", () => {
-    const v = buildTeamView(escopo("todas", { tipo: "esteMes" }));
+    const v = buildTeamView(scope("todas", { kind: "thisMonth" }));
     expect(v.challenges!.length).toBe(2);
     expect(v.challenges!.every((d) => d.statusLabel === "Ativo")).toBe(true);
     expect(v.challenges!.map((d) => d.id).sort()).toEqual(["d-bodycream", "d-pa"]);
   });
 
   it("progresso agregado: un/R$ = soma capped; pa/ticket = média vs piso", () => {
-    const v = buildTeamView(escopo("todas", { tipo: "esteMes" }));
+    const v = buildTeamView(scope("todas", { kind: "thisMonth" }));
     expect(v.challenges!.length).toBe(2);
     for (const d of v.challenges!) {
-      const piso = d.minimo ?? d.alvoIndividual;
-      const progressos = d.ranking.map((p) => p.progresso);
-      if (d.tipo === "pa" || d.tipo === "ticket") {
+      const piso = d.minimum ?? d.individualTarget;
+      const progressos = d.ranking.map((p) => p.progress);
+      if (d.kind === "pa" || d.kind === "ticket") {
         const media = progressos.length ? progressos.reduce((s, p) => s + p, 0) / progressos.length : 0;
         expect(d.progressoAgregado).toBeCloseTo(media, 6);
         expect(d.alvoAgregado).toBe(piso);
@@ -456,31 +456,31 @@ describe("T5: desafios na visão (EQUIP-05)", () => {
         expect(d.progressoAgregado).toBeCloseTo(capped, 6);
         expect(d.alvoAgregado).toBe(piso * d.minimoVendedorasAtingindo);
       }
-      expect(d.minimoVendedorasAtingindo).toBeLessThanOrEqual(d.participantes);
-      expect(d.ranking.length).toBe(d.participantes);
+      expect(d.minimoVendedorasAtingindo).toBeLessThanOrEqual(d.participants);
+      expect(d.ranking.length).toBe(d.participants);
       expect(d.progressoAgregadoRotulo).toContain("/");
       expect(d.atingiram).toBe(d.ranking.filter((p) => p.status === "atingiu").length);
-      expect(d.atingiram).toBeLessThanOrEqual(d.participantes);
+      expect(d.atingiram).toBeLessThanOrEqual(d.participants);
       expect(d.premioGerente).toBeGreaterThan(0);
-      expect(d.descricao).toContain("Meta:");
-      expect(d.descricao).toContain("Prêmio:");
+      expect(d.description).toContain("Meta:");
+      expect(d.description).toContain("Prêmio:");
       expect(d.goalLabel).toBeTruthy();
-      expect(d.minimo).not.toBeNull();
+      expect(d.minimum).not.toBeNull();
       expect(d.temMinimo).toBe(true);
       expect(d.daysRemaining).toBeGreaterThanOrEqual(0);
       expect(d.prazoRotulo).toBeTruthy();
       expect(d.janelaRotulo).toMatch(/^\d{2}\/\d{2} – \d{2}\/\d{2}$/);
       expect(d.statusLabel).toBe("Ativo");
       for (const p of d.ranking) {
-        expect(p.loja).toBeTruthy();
-        expect(p.grupo).toBeTruthy();
+        expect(p.store).toBeTruthy();
+        expect(p.group).toBeTruthy();
         expect(p.progressoRotulo).toContain("/");
       }
     }
   });
 
   it("demo cobre amarelo e verde nas barras dos ativos", () => {
-    const v = buildTeamView(escopo("todas", { tipo: "esteMes" }));
+    const v = buildTeamView(scope("todas", { kind: "thisMonth" }));
     const byId = Object.fromEntries(v.challenges!.map((d) => [d.id, d]));
     expect(byId["d-bodycream"].progressoPct).toBeGreaterThanOrEqual(50);
     expect(byId["d-bodycream"].progressoPct).toBeLessThan(80);
@@ -488,21 +488,21 @@ describe("T5: desafios na visão (EQUIP-05)", () => {
   });
 
   it("ranking lista todos os participantes ordenados por status e progresso", () => {
-    const v = buildTeamView(escopo("todas", { tipo: "esteMes" }));
+    const v = buildTeamView(scope("todas", { kind: "thisMonth" }));
     for (const d of v.challenges!) {
       expect(d.corIcone).toBeTruthy();
       expect(d.projetadoAgregado).toBeGreaterThanOrEqual(0);
       for (const p of d.ranking) {
-        expect(p.progresso).toBeGreaterThanOrEqual(0);
-        expect(["atingiu", "quase", "abaixo", "nao_comecou"]).toContain(p.status);
+        expect(p.progress).toBeGreaterThanOrEqual(0);
+        expect(["atingiu", "quase", "below", "nao_comecou"]).toContain(p.status);
       }
     }
   });
 
   it("engajadas nunca excede participantes; ativos no mock têm engajamento", () => {
-    const v = buildTeamView(escopo("f1", { tipo: "esteMes" }));
+    const v = buildTeamView(scope("f1", { kind: "thisMonth" }));
     for (const d of v.challenges!) {
-      expect(d.engajadas).toBeLessThanOrEqual(d.participantes);
+      expect(d.engajadas).toBeLessThanOrEqual(d.participants);
       expect(d.engajadas).toBeGreaterThan(0);
       expect(d.semEngajamento).toBe(false);
     }
@@ -511,58 +511,58 @@ describe("T5: desafios na visão (EQUIP-05)", () => {
   it("desafio sem engajamento hipotético: engajadas 0 de M, semEngajamento true e ritmo false", () => {
     const base: Challenge = {
       id: "d-teste",
-      nome: "Teste",
-      objetivo: "Quem vender 10 unidades ganha o prêmio.",
-      tipo: "produto",
-      filialId: "f1",
-      alvoIndividual: 10,
-      unidade: "un",
-      premio: 40,
+      name: "Teste",
+      objective: "Quem vender 10 unidades ganha o prêmio.",
+      kind: "produto",
+      storeId: "f1",
+      individualTarget: 10,
+      unit: "un",
+      prize: 40,
       premioGerente: 80,
       minimoVendedorasAtingindo: 2,
-      competencia: "2026-09",
-      inicio: "2026-09-01",
-      fim: "2026-09-30",
-      minimo: 10,
+      competence: "2026-09",
+      start: "2026-09-01",
+      end: "2026-09-30",
+      minimum: 10,
       produtoId: null,
-      participantes: ["c01", "c02"],
+      participants: ["c01", "c02"],
     };
     // Injeta desafio zerado via desafiosViewDaCompetencia atraves do mock da competencia 2026-05 (sem desafios) nao funciona;
     // teste direto do veredito: participantes sem progresso  ->  semEngajamento.
     const d = base;
-    const progressos = d.participantes.map(() => 0);
+    const progressos = d.participants.map(() => 0);
     const soma = progressos.reduce((s, p) => s + p, 0);
     expect(soma).toBe(0);
   });
 
   it("ritmo (fechaNoRitmo) só faz sentido em ativos listados", () => {
-    const v = buildTeamView(escopo("todas", { tipo: "esteMes" }));
+    const v = buildTeamView(scope("todas", { kind: "thisMonth" }));
     for (const d of v.challenges!) {
       expect(d.statusLabel).toBe("Ativo");
       const pct = d.progressoPct;
       const diasDecorridos = 15;
       const diasTotais = 30;
-      const projetadoPct = (pct / 100 / diasDecorridos) * diasTotais * 100;
-      expect(d.fechaNoRitmo).toBe(projetadoPct >= 100);
+      const projectedPct = (pct / 100 / diasDecorridos) * diasTotais * 100;
+      expect(d.fechaNoRitmo).toBe(projectedPct >= 100);
     }
   });
 
   it("desafios ativos ordenados por dias restantes, depois loja/nome", () => {
-    const v = buildTeamView(escopo("todas", { tipo: "esteMes" }));
+    const v = buildTeamView(scope("todas", { kind: "thisMonth" }));
     const dias = v.challenges!.map((d) => d.daysRemaining);
     expect(dias).toEqual([...dias].sort((a, b) => a - b));
   });
 
   it("visão rede exibe loja no card; loja isolada não", () => {
-    const rede = buildTeamView(escopo("todas", { tipo: "esteMes" }));
-    const loja = buildTeamView(escopo("f1", { tipo: "esteMes" }));
+    const rede = buildTeamView(scope("todas", { kind: "thisMonth" }));
+    const store = buildTeamView(scope("f1", { kind: "thisMonth" }));
     expect(rede.challenges!.length).toBe(2);
     expect(rede.challenges!.every((d) => d.showStore)).toBe(true);
     expect(rede.challenges!.some((d) => d.storeLabel === "Campo Grande")).toBe(true);
     expect(rede.challenges!.some((d) => d.storeLabel === "Três Lagoas")).toBe(true);
-    expect(loja.challenges!.length).toBe(1);
-    expect(loja.challenges!.every((d) => !d.showStore)).toBe(true);
-    expect(loja.challenges!.every((d) => d.filialId === "f1")).toBe(true);
+    expect(store.challenges!.length).toBe(1);
+    expect(store.challenges!.every((d) => !d.showStore)).toBe(true);
+    expect(store.challenges!.every((d) => d.storeId === "f1")).toBe(true);
   });
 
   it("sem meta ativa não há desafios na view (já coberto), e desafios da competência vazia não quebram", () => {
@@ -574,108 +574,108 @@ describe("T5: desafios na visão (EQUIP-05)", () => {
 
 describe("T5: premiação projetada (EQUIP-04/05)", () => {
   it("KPI premiação projetada presente e plausível no mês em andamento", () => {
-    const v = buildTeamView(escopo("f1", { tipo: "esteMes" }));
-    expect(v.kpiPremiacao).not.toBeNull();
+    const v = buildTeamView(scope("f1", { kind: "thisMonth" }));
+    expect(v.kpiPrize).not.toBeNull();
     // Plausibilidade: premiacao e fracao do faturamento das linhas (< 10%).
-    const fatLinhas = v.vendedoras!.reduce((s, l) => s + l.faturamentoValor, 0);
-    const com = parseBrl(v.kpiPremiacao!.valor);
+    const fatLinhas = v.sellers!.reduce((s, l) => s + l.revenueAmount, 0);
+    const com = parseBrl(v.kpiPrize!.amount);
     expect(com).toBeGreaterThan(0);
     expect(com).toBeLessThan(fatLinhas * 0.1);
   });
 
   it("premiação do mês fechado (Mês passado) é a final: soma premiacaoAcumulada + bônus", () => {
-    const v = buildTeamView(escopo("f1", { tipo: "mesPassado" }));
-    expect(v.kpiPremiacao).not.toBeNull();
-    const escada = v.vendedoras!.reduce((s, l) => s + l.premiacaoAcumulada + l.bonusAlcancado, 0);
+    const v = buildTeamView(scope("f1", { kind: "lastMonth" }));
+    expect(v.kpiPrize).not.toBeNull();
+    const escada = v.sellers!.reduce((s, l) => s + l.accruedPrize + l.bonusReached, 0);
     // Competencia de agosto nao tem desafios no mock: KPI = escada final.
     expect(activeChallenges("2026-08")).toEqual([]);
-    expect(parseBrl(v.kpiPremiacao!.valor)).toBeCloseTo(escada, -1);
+    expect(parseBrl(v.kpiPrize!.amount)).toBeCloseTo(escada, -1);
   });
 
   it("premiacaoAcumulada só com degrau já cruzado no MTD: realizado × pct", () => {
-    const v = buildTeamView(escopo("f1", { tipo: "esteMes" }));
-    const degraus = tiersOfStore("f1", "2026-09");
-    for (const l of v.vendedoras!) {
+    const v = buildTeamView(scope("f1", { kind: "thisMonth" }));
+    const tiers = tiersOfStore("f1", "2026-09");
+    for (const l of v.sellers!) {
       // Nivel na UI pode ser pelo ritmo; premiacao acumulada so conta degrau MTD.
-      let degrauMtd: (typeof degraus)[number] | null = null;
-      for (const d of degraus) {
-        if (l.atingimentoPct >= d.atingimentoMinPct) degrauMtd = d;
+      let degrauMtd: (typeof tiers)[number] | null = null;
+      for (const d of tiers) {
+        if (l.attainmentPct >= d.minAttainmentPct) degrauMtd = d;
         else break;
       }
       if (!degrauMtd) {
-        expect(l.premiacaoAcumulada).toBe(0);
-        expect(l.bonusAlcancado).toBe(0);
+        expect(l.accruedPrize).toBe(0);
+        expect(l.bonusReached).toBe(0);
       } else {
-        expect(l.premiacaoAcumulada).toBeCloseTo((l.faturamentoValor * degrauMtd.comissaoPct) / 100, 6);
-        expect(l.bonusAlcancado).toBe(degrauMtd.bonus);
+        expect(l.accruedPrize).toBeCloseTo((l.revenueAmount * degrauMtd.commissionPct) / 100, 6);
+        expect(l.bonusReached).toBe(degrauMtd.bonus);
       }
     }
   });
 
   it("ranking: % meta geral = Σ vendedoras; Progresso da Meta = faturamento da loja (+ fora da equipe)", () => {
-    const v = buildTeamView(escopo("f1", { tipo: "esteMes" }));
+    const v = buildTeamView(scope("f1", { kind: "thisMonth" }));
     const storeGoal = goalOfStore("f1", "2026-09")!.storeAmount;
-    expect(v.vendedoras!.length).toBeGreaterThan(0);
-    const somaFat = v.vendedoras!.reduce((s, l) => s + l.faturamentoValor, 0);
-    expect(v.metaGlobal).not.toBeNull();
+    expect(v.sellers!.length).toBeGreaterThan(0);
+    const somaFat = v.sellers!.reduce((s, l) => s + l.revenueAmount, 0);
+    expect(v.networkGoal).not.toBeNull();
     // Venda sem vendedora / gerencia: fica fora do ranking, mas conta na meta da loja.
-    expect(v.metaGlobal!.foraDaEquipe ?? 0).toBeGreaterThanOrEqual(0);
-    expect(v.metaGlobal!.realizado).toBeCloseTo(somaFat + (v.metaGlobal!.foraDaEquipe ?? 0), 2);
-    expect(v.metaGlobal!.total).toBe(storeGoal);
-    expect(v.metaGlobal!.pct).toBeCloseTo((v.metaGlobal!.realizado / storeGoal) * 100, 6);
+    expect(v.networkGoal!.outsideTeam ?? 0).toBeGreaterThanOrEqual(0);
+    expect(v.networkGoal!.achieved).toBeCloseTo(somaFat + (v.networkGoal!.outsideTeam ?? 0), 2);
+    expect(v.networkGoal!.total).toBe(storeGoal);
+    expect(v.networkGoal!.pct).toBeCloseTo((v.networkGoal!.achieved / storeGoal) * 100, 6);
 
-    for (const l of v.vendedoras!) {
-      expect(l.grupo === "Grupo 1" || l.grupo === "Grupo 2" || l.grupo === "Sem grupo").toBe(true);
-      expect(l.pctMetaGeral).toBeCloseTo((l.faturamentoValor / storeGoal) * 100, 6);
-      if (l.degrauAtual) {
-        expect(l.nivelAtual).toBeGreaterThan(0);
-        expect(l.comissaoPct).toBeGreaterThan(0);
+    for (const l of v.sellers!) {
+      expect(l.group === "Grupo 1" || l.group === "Grupo 2" || l.group === "Sem grupo").toBe(true);
+      expect(l.storeGoalPct).toBeCloseTo((l.revenueAmount / storeGoal) * 100, 6);
+      if (l.currentTierName) {
+        expect(l.currentLevel).toBeGreaterThan(0);
+        expect(l.commissionPct).toBeGreaterThan(0);
       } else {
-        expect(l.nivelAtual).toBeNull();
-        expect(l.comissaoPct).toBe(0);
+        expect(l.currentLevel).toBeNull();
+        expect(l.commissionPct).toBe(0);
       }
     }
     // Media ponderada de atingimento da equipe =  vendedoras  meta da loja.
-    const somaMeta = v.vendedoras!.reduce((s, l) => s + l.metaIndividualValor, 0);
-    expect(somaMeta).toBeCloseTo(storeGoal, 0);
-    const mediaPonderada = (somaFat / somaMeta) * 100;
+    const goalSum = v.sellers!.reduce((s, l) => s + l.individualGoalAmount, 0);
+    expect(goalSum).toBeCloseTo(storeGoal, 0);
+    const mediaPonderada = (somaFat / goalSum) * 100;
     expect(mediaPonderada).toBeCloseTo((somaFat / storeGoal) * 100, 6);
 
     // Demo: Shopping CG (f1) no Hiper (N3 100% da meta); Desafio = 110%.
-    expect(v.metaGlobal!.pct).toBeGreaterThanOrEqual(100);
-    expect(v.metaGlobal!.pct).toBeLessThan(110);
-    const niveis = new Set(v.vendedoras!.map((l) => l.nivelAtual).filter((n): n is number => n != null));
-    expect(Math.max(...niveis)).toBeGreaterThanOrEqual(3);
-    expect(niveis.size).toBeGreaterThanOrEqual(3);
+    expect(v.networkGoal!.pct).toBeGreaterThanOrEqual(100);
+    expect(v.networkGoal!.pct).toBeLessThan(110);
+    const levels = new Set(v.sellers!.map((l) => l.currentLevel).filter((n): n is number => n != null));
+    expect(Math.max(...levels)).toBeGreaterThanOrEqual(3);
+    expect(levels.size).toBeGreaterThanOrEqual(3);
   });
 });
 
 describe("T5: leitura da IA da equipe (EQUIP-06) — desativada por enquanto", () => {
   it("não monta sugestão de IA na view", () => {
-    const v = buildTeamView(escopo("f1", { tipo: "esteMes" }));
+    const v = buildTeamView(scope("f1", { kind: "thisMonth" }));
     expect(v.leitura).toBeNull();
-    expect(v.estados.leitura).toBe("sem_dados");
+    expect(v.states.leitura).toBe("noData");
   });
 });
 
 describe("Faturamento vs Meta — série acumulada (padrão Visão Geral)", () => {
   it("monta série com realizado e meta crescentes no mês", () => {
-    const v = buildTeamView(escopo("f1", { tipo: "esteMes" }));
-    expect(v.evolucaoFaturamento).toBeDefined();
-    expect(v.evolucaoFaturamento!.length).toBeGreaterThan(1);
+    const v = buildTeamView(scope("f1", { kind: "thisMonth" }));
+    expect(v.revenueEvolution).toBeDefined();
+    expect(v.revenueEvolution!.length).toBeGreaterThan(1);
     expect(v.seriesLabel).toMatch(/por dia/);
-    const serie = v.evolucaoFaturamento!;
+    const serie = v.revenueEvolution!;
     for (let i = 1; i < serie.length; i++) {
-      expect(serie[i].realizado).toBeGreaterThanOrEqual(serie[i - 1].realizado);
-      expect(serie[i].meta).toBeGreaterThanOrEqual(serie[i - 1].meta);
+      expect(serie[i].achieved).toBeGreaterThanOrEqual(serie[i - 1].achieved);
+      expect(serie[i].goal).toBeGreaterThanOrEqual(serie[i - 1].goal);
     }
-    expect(serie[serie.length - 1].meta).toBeGreaterThan(0);
+    expect(serie[serie.length - 1].goal).toBeGreaterThan(0);
   });
 
   it("em 1 dia usa eixo por hora", () => {
-    const v = buildTeamView(escopo("f1", { tipo: "hoje" }));
+    const v = buildTeamView(scope("f1", { kind: "today" }));
     expect(v.seriesLabel).toMatch(/por hora/);
-    expect(v.evolucaoFaturamento!.length).toBeGreaterThan(1);
+    expect(v.revenueEvolution!.length).toBeGreaterThan(1);
   });
 });
 

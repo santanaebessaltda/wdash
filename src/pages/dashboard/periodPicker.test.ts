@@ -3,14 +3,14 @@ import { managementScheduleWindow } from "./periodPicker";
 
 describe("managementScheduleWindow", () => {
   it("Este mês na Gestão vai até o fim do mês (inclui o que ainda vai começar)", () => {
-    expect(managementScheduleWindow({ tipo: "esteMes" }, "2026-10-07")).toEqual({
+    expect(managementScheduleWindow({ kind: "thisMonth" }, "2026-10-07")).toEqual({
       from: "2026-10-01",
       to: "2026-10-31",
     });
   });
 
   it("Hoje continua só o dia", () => {
-    expect(managementScheduleWindow({ tipo: "hoje" }, "2026-10-07")).toEqual({
+    expect(managementScheduleWindow({ kind: "today" }, "2026-10-07")).toEqual({
       from: "2026-10-07",
       to: "2026-10-07",
     });
@@ -18,7 +18,7 @@ describe("managementScheduleWindow", () => {
 
   it("Personalizado respeita fim futuro", () => {
     expect(
-      managementScheduleWindow({ tipo: "personalizado", inicio: "2026-10-01", fim: "2026-10-15" }, "2026-10-07"),
+      managementScheduleWindow({ kind: "custom", start: "2026-10-01", end: "2026-10-15" }, "2026-10-07"),
     ).toEqual({ from: "2026-10-01", to: "2026-10-15" });
   });
 });

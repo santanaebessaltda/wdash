@@ -29,17 +29,17 @@ import { useStockData } from "./useStockData";
 
 type StatusFiltro = "todos" | StockStatus;
 type BrandFiltro = "" | "WEPINK" | "WPINK";
-type SortKey = "nome" | "estoque" | "receber" | "totalGeral" | "custo" | "valor" | "status" | `local:${string}`;
+type SortKey = "name" | "estoque" | "receber" | "totalGeral" | "custo" | "valor" | "status" | `local:${string}`;
 
 const STATUS_BADGE: Record<StockStatus, { label: string; variant: StatusVariant }> = {
   negativo: { label: "Negativo", variant: "danger" },
-  aguardando: { label: "Aguardando transferência", variant: "warning" },
+  awaiting: { label: "Aguardando transferência", variant: "warning" },
   ok: { label: "Regular", variant: "success" },
 };
 
 /** "Transferir 71 de ESTOQUE para PONTO DE VENDA.", uma linha por transferencia ("LOJA X: transferir ..." quando ha varias lojas). */
 function transferTip(r: StockProductRow, multipleStores: boolean): string {
-  return r.lojas
+  return r.storeRows
     .flatMap((l) =>
       l.transferencias.map((t) => {
         const acao = `transferir ${qty(t.qtd)} de ${t.de} para ${t.para}.`;
@@ -50,23 +50,23 @@ function transferTip(r: StockProductRow, multipleStores: boolean): string {
 }
 
 /** Ordenar por Status: do maior para o menor = o mais grave primeiro. */
-const STATUS_PESO: Record<StockStatus, number> = { negativo: 2, aguardando: 1, ok: 0 };
+const STATUS_PESO: Record<StockStatus, number> = { negativo: 2, awaiting: 1, ok: 0 };
 
 export function InventoryPage() {
-  const { lojas, storeKey, escolher, view, loading, syncing, atualizadoTexto } = useStockData();
+  const { storeRows, storeKey, escolher, view, loading, syncing, atualizadoTexto } = useStockData();
   const [busca, setBusca] = useState("");
   const [statusSel, setStatus] = useState<StatusFiltro>("todos");
-  const [marca, setMarca] = useState<BrandFiltro>("");
+  const [brand, setMarca] = useState<BrandFiltro>("");
   const [categoria, setCategoria] = useState("");
-  const [sortKey, setSortKey] = useState<SortKey>("nome");
+  const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [page, setPage] = useState(1);
   const printing = usePrintMode();
   const showSkeleton = useMinSkeleton(loading);
-  const exportar = useExportPdf("Estoque", null, { periodo: false });
-  const multipleStores = lojas.length > 1;
-  const showBrand = lojas.some((s) => s.temWpink);
-  const marcaAtiva: BrandFiltro = showBrand ? marca : "";
+  const exportar = useExportPdf("Estoque", null, { period: false });
+  const multipleStores = storeRows.length > 1;
+  const showBrand = storeRows.some((s) => s.temWpink);
+  const activeBrand: BrandFiltro = showBrand ? brand : "";
 
   const comStatus = useMemo(() => (view?.rows ?? []).map((r) => ({ r, status: stockStatus(r) })), [view]);
   const contagem = (s: StockStatus) => comStatus.filter((x) => x.status === s).length;
@@ -82,46 +82,46 @@ export function InventoryPage() {
   const categorias = view?.categorias ?? [];
 
   const locais = useMemo(() => (view ? stockLocations(view.rows) : []), [view]);
-  const mostraTotal = locais.length !== 1;
+  const showsTotal = locais.length !== 1;
 
   const linhas = useMemo(() => {
     const q = busca.trim().toLowerCase();
     const out = comStatus.filter(
       ({ r, status: s }) =>
         (status === "todos" || s === status) &&
-        (!marcaAtiva || productBrand(r.codigo) === marcaAtiva) &&
+        (!activeBrand || productBrand(r.codigo) === activeBrand) &&
         (!categoria || r.categoria === categoria) &&
-        (!q || r.nome.toLowerCase().includes(q) || r.codigo.toLowerCase().includes(q)),
+        (!q || r.name.toLowerCase().includes(q) || r.codigo.toLowerCase().includes(q)),
     );
     const dir = sortDir === "asc" ? 1 : -1;
-    const valor = ({ r, status: s }: (typeof out)[number]): number =>
+    const amount = ({ r, status: s }: (typeof out)[number]): number =>
       sortKey === "status" ? STATUS_PESO[s] : sortKey.startsWith("local:") ? localQty(r, sortKey.slice(6)) : r.estoque;
     out.sort((a, b) => {
-      if (sortKey === "nome") return a.r.nome.localeCompare(b.r.nome, "pt-BR") * dir;
+      if (sortKey === "name") return a.r.name.localeCompare(b.r.name, "pt-BR") * dir;
       if (sortKey === "receber" || sortKey === "totalGeral") {
         const pick = (r: StockProductRow) => (sortKey === "receber" ? r.aReceber : r.totalGeral);
         const av = pick(a.r);
         const bv = pick(b.r);
-        if (av == null && bv == null) return a.r.nome.localeCompare(b.r.nome, "pt-BR");
+        if (av == null && bv == null) return a.r.name.localeCompare(b.r.name, "pt-BR");
         if (av == null) return 1;
         if (bv == null) return -1;
-        return (av - bv) * dir || a.r.nome.localeCompare(b.r.nome, "pt-BR");
+        return (av - bv) * dir || a.r.name.localeCompare(b.r.name, "pt-BR");
       }
       if (sortKey === "custo" || sortKey === "valor") {
         const pick = (r: StockProductRow) => (sortKey === "custo" ? stockCostAmount(r).unit : stockCostAmount(r).amount);
         const av = pick(a.r);
         const bv = pick(b.r);
-        if (av == null && bv == null) return a.r.nome.localeCompare(b.r.nome, "pt-BR");
+        if (av == null && bv == null) return a.r.name.localeCompare(b.r.name, "pt-BR");
         if (av == null) return 1;
         if (bv == null) return -1;
-        return (av - bv) * dir || a.r.nome.localeCompare(b.r.nome, "pt-BR");
+        return (av - bv) * dir || a.r.name.localeCompare(b.r.name, "pt-BR");
       }
-      return (valor(a) - valor(b)) * dir || a.r.nome.localeCompare(b.r.nome, "pt-BR");
+      return (amount(a) - amount(b)) * dir || a.r.name.localeCompare(b.r.name, "pt-BR");
     });
     return out;
-  }, [comStatus, busca, status, marcaAtiva, categoria, sortKey, sortDir]);
+  }, [comStatus, busca, status, activeBrand, categoria, sortKey, sortDir]);
 
-  useEffect(() => setPage(1), [busca, status, marcaAtiva, categoria, sortKey, sortDir, storeKey]);
+  useEffect(() => setPage(1), [busca, status, activeBrand, categoria, sortKey, sortDir, storeKey]);
 
   const totalPages = Math.max(1, Math.ceil(linhas.length / TABLE_PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
@@ -131,17 +131,17 @@ export function InventoryPage() {
     if (k === sortKey) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else {
       setSortKey(k);
-      setSortDir(k === "nome" ? "asc" : "desc");
+      setSortDir(k === "name" ? "asc" : "desc");
     }
   };
 
   const totais = useMemo(
     () => ({
-      locais: locais.map((nome) => linhas.reduce((s, { r }) => s + localQty(r, nome), 0)),
+      locais: locais.map((name) => linhas.reduce((s, { r }) => s + localQty(r, name), 0)),
       estoque: linhas.reduce((s, { r }) => s + r.estoque, 0),
       receber: linhas.every(({ r }) => r.aReceber == null) ? null : linhas.reduce((s, { r }) => s + (r.aReceber ?? 0), 0),
       totalGeral: linhas.every(({ r }) => r.totalGeral == null) ? null : linhas.reduce((s, { r }) => s + (r.totalGeral ?? 0), 0),
-      valor: linhas.reduce((s, { r }) => s + (stockCostAmount(r).amount ?? 0), 0),
+      amount: linhas.reduce((s, { r }) => s + (stockCostAmount(r).amount ?? 0), 0),
       temValor: linhas.some((x) => stockCostAmount(x.r).amount != null),
     }),
     [linhas, locais],
@@ -152,12 +152,12 @@ export function InventoryPage() {
   return (
     <div className="flex flex-col p-4 sm:p-6 print:p-0">
       <ReportHeader
-        periodo={false}
+        period={false}
         atualizado={atualizadoTexto}
         filtros={[
-          ...(status !== "todos" ? [{ label: "Status", valor: statusLabel }] : []),
-          ...(marcaAtiva ? [{ label: "Marca", valor: marcaAtiva }] : []),
-          ...(categoria ? [{ label: "Categoria", valor: categoria }] : []),
+          ...(status !== "todos" ? [{ label: "Status", amount: statusLabel }] : []),
+          ...(activeBrand ? [{ label: "Marca", amount: activeBrand }] : []),
+          ...(categoria ? [{ label: "Categoria", amount: categoria }] : []),
         ]}
       />
       <SectionHeader
@@ -171,7 +171,7 @@ export function InventoryPage() {
             {showBrand && (
               <HeaderFilter
                 label="Marca"
-                value={marca}
+                value={brand}
                 onChange={setMarca}
                 options={[
                   { value: "", label: "Todas as marcas" },
@@ -255,18 +255,18 @@ export function InventoryPage() {
                 <thead>
                   <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
                     <th className="w-11 whitespace-nowrap px-1 pb-3 text-center font-bold">#</th>
-                    <ThSort label="Produto" active={sortKey === "nome"} dir={sortDir} onClick={() => toggleSort("nome")} align="left" className="w-full px-1 pb-3" />
-                    {locais.map((nome) => (
+                    <ThSort label="Produto" active={sortKey === "name"} dir={sortDir} onClick={() => toggleSort("name")} align="left" className="w-full px-1 pb-3" />
+                    {locais.map((name) => (
                       <ThSort
-                        key={nome}
-                        label={nome}
-                        active={sortKey === `local:${nome}`}
+                        key={name}
+                        label={name}
+                        active={sortKey === `local:${name}`}
                         dir={sortDir}
-                        onClick={() => toggleSort(`local:${nome}`)}
+                        onClick={() => toggleSort(`local:${name}`)}
                         className="w-0 whitespace-nowrap px-4 pb-3"
                       />
                     ))}
-                    {mostraTotal && (
+                    {showsTotal && (
                       <ThSort label="Total" active={sortKey === "estoque"} dir={sortDir} onClick={() => toggleSort("estoque")} className="w-0 whitespace-nowrap px-4 pb-3" />
                     )}
                     <ThSort label="A receber" active={sortKey === "receber"} dir={sortDir} onClick={() => toggleSort("receber")} className="w-0 whitespace-nowrap px-4 pb-3" />
@@ -283,14 +283,14 @@ export function InventoryPage() {
                       <tr key={r.codigo} className="border-b border-line">
                         <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
                         <td className="px-1 py-3">
-                          <ProductNameCell nome={r.nome} idx={idx} sub={[r.codigo, r.categoria].filter(Boolean).join(" · ")} />
+                          <ProductNameCell name={r.name} idx={idx} sub={[r.codigo, r.categoria].filter(Boolean).join(" · ")} />
                         </td>
-                        {locais.map((nome) => (
-                          <td key={nome} className="whitespace-nowrap px-4 py-3 text-right">
-                            <Qty v={localQty(r, nome)} />
+                        {locais.map((name) => (
+                          <td key={name} className="whitespace-nowrap px-4 py-3 text-right">
+                            <Qty v={localQty(r, name)} />
                           </td>
                         ))}
-                        {mostraTotal && (
+                        {showsTotal && (
                           <td className="whitespace-nowrap px-4 py-3 text-right">
                             <Qty v={r.estoque} />
                           </td>
@@ -329,7 +329,7 @@ export function InventoryPage() {
                         <Qty v={v} total />
                       </td>
                     ))}
-                    {mostraTotal && (
+                    {showsTotal && (
                       <td className="whitespace-nowrap px-4 py-3 text-right">
                         <Qty v={totais.estoque} total />
                       </td>
@@ -342,7 +342,7 @@ export function InventoryPage() {
                     </td>
                     <td />
                     <td className="whitespace-nowrap py-3 pl-4 pr-8 text-right">
-                      <Money v={totais.temValor ? totais.valor : null} total />
+                      <Money v={totais.temValor ? totais.amount : null} total />
                     </td>
                     <td />
                   </tr>
@@ -386,7 +386,7 @@ function UnitCost({ r }: { r: StockProductRow }) {
 
 function StatusCell({ r, status, multipleStores }: { r: StockProductRow; status: StockStatus; multipleStores: boolean }) {
   const badge = <Badge variant={STATUS_BADGE[status].variant}>{STATUS_BADGE[status].label}</Badge>;
-  if (status !== "aguardando") return badge;
+  if (status !== "awaiting") return badge;
   const tip = transferTip(r, multipleStores);
   return (
     <>

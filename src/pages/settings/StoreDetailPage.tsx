@@ -45,7 +45,7 @@ export function StoreDetailPage() {
   if (showSkeleton || !store) {
     return (
       <div>
-        <DetailHeader nome={store?.fantasia ?? "Filial"} onBack={voltar} />
+        <DetailHeader name={store?.fantasia ?? "Filial"} onBack={voltar} />
         {showSkeleton ? (
           <StoreDetailSkeleton />
         ) : (
@@ -66,13 +66,13 @@ export function StoreDetailPage() {
   );
 }
 
-function DetailHeader({ nome, onBack }: { nome: string; onBack: () => void }) {
+function DetailHeader({ name, onBack }: { name: string; onBack: () => void }) {
   return (
     <div className="mb-5 flex flex-wrap items-center gap-3">
       <Button variant="secondary" size="sm" icon={<Icon d={icons.arrowLeft} size={14} />} onClick={onBack}>
         Voltar
       </Button>
-      <Breadcrumbs items={[{ label: "Filiais", to: paths.settings.stores }, { label: nome }]} />
+      <Breadcrumbs items={[{ label: "Filiais", to: paths.settings.stores }, { label: name }]} />
     </div>
   );
 }
@@ -90,7 +90,7 @@ function StoreDetailForm({
 }) {
   return (
     <div>
-      <DetailHeader nome={store.fantasia} onBack={onBack} />
+      <DetailHeader name={store.fantasia} onBack={onBack} />
       <div className="flex max-w-[720px] flex-col gap-5">
         <StoreHoursCard store={store} canEdit={canEdit} onSaved={onSaved} />
       </div>

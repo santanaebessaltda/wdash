@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Alert, Badge, Button, Card, DateRangePicker, Modal, Skeleton, useToast, QUICK_RANGES_CALENDARIO, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
+import { Alert, Badge, Button, Card, DateRangePicker, Modal, Skeleton, useToast, CALENDAR_QUICK_RANGES, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
 import { DayFace, DayMetrics, MonthCalendar, blankDayClass } from "@/components/wedash/MonthCalendar";
 import { DayChip, PlainKpi } from "@/pages/cash-close/CashClosePage";
 import { calendarTodayIso } from "@/data/wedash/clock";
@@ -41,23 +41,23 @@ function dayTitle(iso: string): string {
 
 function dayAmount(
   day: string,
-  hoje: string,
+  today: string,
   row: { soldCents: number; launchedCents: number | null } | undefined,
   sold: Record<string, number>,
 ): number | null {
-  if (day > hoje) return null;
-  if (day === hoje) return sold[day] != null && sold[day] > 0 ? sold[day] : null;
+  if (day > today) return null;
+  if (day === today) return sold[day] != null && sold[day] > 0 ? sold[day] : null;
   if (!row || row.soldCents <= 0) return null;
   return row.soldCents;
 }
 
-function dayStatus(soldCents: number, informedCents: number | null): { texto: string; cor: string } {
+function dayStatus(soldCents: number, informedCents: number | null): { text: string; cor: string } {
   const gap = informedGap(soldCents, informedCents);
-  if (gap === "missing" || informedCents == null) return { texto: "Não informado", cor: "bg-warn" };
-  const texto = `Informado ${money(informedCents)}`;
-  if (gap === "match") return { texto, cor: "bg-ok" };
-  if (gap === "over") return { texto, cor: "bg-warn" };
-  return { texto, cor: "bg-bad" };
+  if (gap === "missing" || informedCents == null) return { text: "Não informado", cor: "bg-warn" };
+  const text = `Informado ${money(informedCents)}`;
+  if (gap === "match") return { text, cor: "bg-ok" };
+  if (gap === "over") return { text, cor: "bg-warn" };
+  return { text, cor: "bg-bad" };
 }
 
 function rangeCells(from: string, to: string): Array<string | null> {
@@ -71,15 +71,15 @@ function rangeCells(from: string, to: string): Array<string | null> {
 export function SalesReportPage() {
   const navigate = useNavigate();
   const { show } = useToast();
-  const { session, lojas, loading: lojasLoading } = useScopedStores();
-  const { escopo } = useScope();
-  const escolher = pickOneStore(escopo.filialIds, session.stores.length);
+  const { session, storeRows, loading: lojasLoading } = useScopedStores();
+  const { scope } = useScope();
+  const escolher = pickOneStore(scope.storeIds, session.stores.length);
   const showStores = useMinSkeleton(lojasLoading);
-  const hoje = calendarTodayIso();
-  const [rangeFrom, setRangeFrom] = useState(() => startOfMonth(hoje));
-  const [rangeTo, setRangeTo] = useState(() => endOfMonth(hoje));
-  const [presetId, setPresetId] = useState<DatePresetId | null>("esteMes");
-  const [piso, setPiso] = useState(() => startOfMonth(hoje));
+  const today = calendarTodayIso();
+  const [rangeFrom, setRangeFrom] = useState(() => startOfMonth(today));
+  const [rangeTo, setRangeTo] = useState(() => endOfMonth(today));
+  const [presetId, setPresetId] = useState<DatePresetId | null>("thisMonth");
+  const [piso, setPiso] = useState(() => startOfMonth(today));
   const [sold, setSold] = useState<Record<string, number>>({});
   const [launched, setLaunched] = useState<Record<string, number>>({});
   const [account, setAccount] = useState<ShoppingAccount | null>(null);
@@ -91,9 +91,9 @@ export function SalesReportPage() {
   const [confirmar, setConfirmar] = useState(false);
   const [diaAberto, setDiaAberto] = useState<string | null>(null);
 
-  const loja = lojas[0];
-  const lojaRef = useRef(loja);
-  lojaRef.current = loja;
+  const store = storeRows[0];
+  const storeRef = useRef(store);
+  storeRef.current = store;
   const accountRef = useRef(account);
   accountRef.current = account;
   const launchedRef = useRef(launched);
@@ -102,15 +102,15 @@ export function SalesReportPage() {
   const to = rangeTo;
   const rangeRef = useRef({ from, to });
   rangeRef.current = { from, to };
-  const marcadosRef = useRef(marcados);
-  marcadosRef.current = marcados;
-  const faixa = loja ? `${loja.id}|${from}|${to}|${reloadKey}` : "";
-  const quiosque = loja?.pointType === "SHOPPING";
+  const markedRef = useRef(marcados);
+  markedRef.current = marcados;
+  const band = store ? `${store.id}|${from}|${to}|${reloadKey}` : "";
+  const quiosque = store?.pointType === "SHOPPING";
 
   useEffect(() => {
-    if (lojasLoading || escolher || !loja) return;
+    if (lojasLoading || escolher || !store) return;
     let stop = false;
-    void fetchSalesCoverage(session.tenantId, [loja.id]).then((coverage) => {
+    void fetchSalesCoverage(session.tenantId, [store.id]).then((coverage) => {
       if (stop || !coverage.from) return;
       const month = startOfMonth(coverage.from);
       setPiso(month);
@@ -123,23 +123,23 @@ export function SalesReportPage() {
     return () => {
       stop = true;
     };
-  }, [lojasLoading, escolher, loja, session.tenantId, reloadKey]);
+  }, [lojasLoading, escolher, store, session.tenantId, reloadKey]);
 
   useEffect(() => {
-    if (lojasLoading || escolher || !loja) return;
+    if (lojasLoading || escolher || !store) return;
     let cancel = false;
     setErro(false);
     void Promise.all([
-      fetchSalesDayAggs({ tenantId: session.tenantId, storeIds: [loja.id], from, to }),
-      fetchLaunchedDays(session.tenantId, loja.id, from, to),
-      fetchShoppingAccount(session.tenantId, loja.id),
+      fetchSalesDayAggs({ tenantId: session.tenantId, storeIds: [store.id], from, to }),
+      fetchLaunchedDays(session.tenantId, store.id, from, to),
+      fetchShoppingAccount(session.tenantId, store.id),
     ])
       .then(([days, launches, access]) => {
         if (cancel) return;
         setSold(sumSoldByDay(days));
         setLaunched(launches);
         setAccount(access);
-        setLoaded(faixa);
+        setLoaded(band);
       })
       .catch(() => {
         if (!cancel) setErro(true);
@@ -147,12 +147,12 @@ export function SalesReportPage() {
     return () => {
       cancel = true;
     };
-  }, [lojasLoading, escolher, loja, session.tenantId, from, to, faixa]);
+  }, [lojasLoading, escolher, store, session.tenantId, from, to, band]);
 
-  const pronto = loaded === faixa;
+  const pronto = loaded === band;
 
   const puxar = useCallback(async () => {
-    const atual = lojaRef.current;
+    const atual = storeRef.current;
     if (escolher || !atual) {
       show("Escolha uma filial para atualizar o informe de vendas.", "danger");
       return;
@@ -171,7 +171,7 @@ export function SalesReportPage() {
   }, [escolher, show]);
 
   const lancar = useCallback(async () => {
-    const atual = lojaRef.current;
+    const atual = storeRef.current;
     if (lancando || escolher || !atual) {
       if (escolher || !atual) show("Escolha uma filial para informar as vendas ao shopping.", "danger");
       return;
@@ -185,7 +185,7 @@ export function SalesReportPage() {
       return;
     }
     const jaLancado = new Set(Object.keys(launchedRef.current));
-    const dias = marcadosRef.current.filter((day) => day < hoje && !jaLancado.has(day));
+    const dias = markedRef.current.filter((day) => day < today && !jaLancado.has(day));
     if (dias.length === 0) {
       show(ALREADY_LAUNCHED, "success");
       return;
@@ -200,7 +200,7 @@ export function SalesReportPage() {
       setMarcados([]);
       show(result.message ?? "Vendas informadas ao shopping.", "success");
     }
-  }, [escolher, hoje, lancando, show]);
+  }, [escolher, today, lancando, show]);
 
   useScreenRefresh({
     label: "Atualizar vendas e valores informados",
@@ -217,19 +217,19 @@ export function SalesReportPage() {
     return () => window.removeEventListener(SALES_SYNCED_EVENT, onSynced);
   }, []);
 
-  const dias = useMemo(() => reportDays(eachDay(from, to), sold, launched, hoje), [from, to, sold, launched, hoje]);
-  const resumo = useMemo(() => monthReport(dias, hoje), [dias, hoje]);
+  const dias = useMemo(() => reportDays(eachDay(from, to), sold, launched, today), [from, to, sold, launched, today]);
+  const summary = useMemo(() => monthReport(dias, today), [dias, today]);
   const porDia = useMemo(() => new Map(dias.map((day) => [day.date, day])), [dias]);
   const cells = useMemo(() => rangeCells(from, to), [from, to]);
   const gestor = isGestor(session.role);
-  const paraLancar = marcados.filter((day) => day < hoje && launched[day] == null);
+  const paraLancar = marcados.filter((day) => day < today && launched[day] == null);
 
-  function aplicarIntervalo(inicio: Date, fim: Date, meta?: DateRangeChangeMeta) {
-    const nextFrom = dateToIso(inicio);
-    const nextTo = dateToIso(fim);
+  function aplicarIntervalo(start: Date, end: Date, goal?: DateRangeChangeMeta) {
+    const nextFrom = dateToIso(start);
+    const nextTo = dateToIso(end);
     setRangeFrom(nextFrom);
     setRangeTo(nextTo);
-    setPresetId(meta?.presetId ?? null);
+    setPresetId(goal?.presetId ?? null);
     setMarcados((atual) => atual.filter((day) => day >= nextFrom && day <= nextTo));
     setDiaAberto((atual) => (atual && atual >= nextFrom && atual <= nextTo ? atual : null));
   }
@@ -250,11 +250,11 @@ export function SalesReportPage() {
               <DateRangePicker
                 value={[isoToDate(from), isoToDate(to)]}
                 minDate={isoToDate(piso)}
-                maxDate={isoToDate(endOfMonth(hoje))}
-                quickRanges={QUICK_RANGES_CALENDARIO}
+                maxDate={isoToDate(endOfMonth(today))}
+                quickRanges={CALENDAR_QUICK_RANGES}
                 displayLabel={presetId ? periodLabels[presetId] : null}
                 activePresetId={presetId}
-                onChange={([inicio, fim], meta) => aplicarIntervalo(inicio, fim, meta)}
+                onChange={([start, end], goal) => aplicarIntervalo(start, end, goal)}
               />
               <Button onClick={() => setConfirmar(true)} disabled={lancando || paraLancar.length === 0}>
                 {lancando ? "Informando…" : paraLancar.length === 0 ? "Informar vendas" : paraLancar.length === 1 ? "Informar vendas · 1 dia" : `Informar vendas · ${paraLancar.length} dias`}
@@ -270,9 +270,9 @@ export function SalesReportPage() {
           <div className="max-w-[720px]">
             <SelectStoreCard />
           </div>
-        ) : showStores || (loja != null && !pronto) ? (
+        ) : showStores || (store != null && !pronto) ? (
           <Skeleton className="h-[520px] w-full rounded-[18px]" />
-        ) : lojas.length === 0 || !loja ? (
+        ) : storeRows.length === 0 || !store ? (
           <Card>
             <EmptyBlock icon="🧾" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
           </Card>
@@ -296,12 +296,12 @@ export function SalesReportPage() {
         ) : (
           <>
             <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <PlainKpi label="Vendido" value={money(resumo.soldCents)} color="var(--t0)" />
-              <PlainKpi label="Informado" value={money(resumo.launchedCents)} color="var(--t0)" />
+              <PlainKpi label="Vendido" value={money(summary.soldCents)} color="var(--t0)" />
+              <PlainKpi label="Informado" value={money(summary.launchedCents)} color="var(--t0)" />
               <PlainKpi
                 label="Diferença"
-                value={differenceAmount(resumo.differenceCents)}
-                color={differenceColor(resumo.differenceCents)}
+                value={differenceAmount(summary.differenceCents)}
+                color={differenceColor(summary.differenceCents)}
                 tooltip="Informado − vendido. Valor a mais pode aumentar o aluguel percentual; valor a menos pode gerar divergência na auditoria."
               />
             </div>
@@ -309,24 +309,24 @@ export function SalesReportPage() {
               {cells.map((day, i) => {
                 if (!day) return <div key={`vazio-${i}`} className={blankDayClass(i)} />;
                 const row = porDia.get(day);
-                const passado = day < hoje;
-                const hojeDia = day === hoje;
-                const vendido = dayAmount(day, hoje, row, sold);
-                const status = hojeDia ? { texto: "Em aberto", cor: "bg-acc" } : passado && row ? dayStatus(row.soldCents, row.launchedCents) : null;
+                const passado = day < today;
+                const todayDay = day === today;
+                const vendido = dayAmount(day, today, row, sold);
+                const status = todayDay ? { text: "Em aberto", cor: "bg-acc" } : passado && row ? dayStatus(row.soldCents, row.launchedCents) : null;
                 const pendente = passado && row != null && row.launchedCents == null;
                 return (
                   <DayFace
                     key={day}
                     index={i}
                     iso={day}
-                    today={hoje}
+                    today={today}
                     selected={marcados.includes(day)}
-                    openable={hojeDia || passado}
+                    openable={todayDay || passado}
                     openLabel={`Abrir ${dayTitle(day)}`}
                     onOpen={() => setDiaAberto(day)}
                     amount={vendido != null ? money(vendido) : null}
                     check={pendente ? { checked: marcados.includes(day), label: `Marcar ${dayTitle(day)}`, onToggle: () => toggleDia(day) } : null}
-                    badges={status ? <DayChip cor={status.cor}>{status.texto}</DayChip> : null}
+                    badges={status ? <DayChip cor={status.cor}>{status.text}</DayChip> : null}
                   />
                 );
               })}
@@ -336,9 +336,9 @@ export function SalesReportPage() {
       </div>
       <InformedDayModal
         day={diaAberto}
-        hoje={hoje}
-        sold={diaAberto == null ? null : diaAberto === hoje ? (sold[hoje] != null && sold[hoje] > 0 ? sold[hoje] : null) : (porDia.get(diaAberto)?.soldCents ?? 0)}
-        informed={diaAberto && diaAberto < hoje ? (porDia.get(diaAberto)?.launchedCents ?? null) : null}
+        today={today}
+        sold={diaAberto == null ? null : diaAberto === today ? (sold[today] != null && sold[today] > 0 ? sold[today] : null) : (porDia.get(diaAberto)?.soldCents ?? 0)}
+        informed={diaAberto && diaAberto < today ? (porDia.get(diaAberto)?.launchedCents ?? null) : null}
         onClose={() => setDiaAberto(null)}
       />
       <Modal
@@ -364,21 +364,21 @@ export function SalesReportPage() {
 
 function InformedDayModal({
   day,
-  hoje,
+  today,
   sold,
   informed,
   onClose,
 }: {
   day: string | null;
-  hoje: string;
+  today: string;
   sold: number | null;
   informed: number | null;
   onClose: () => void;
 }) {
-  const hojeDia = day === hoje;
-  const faltando = day != null && !hojeDia && informed == null;
-  const status = hojeDia ? "Em aberto" : faltando ? "Não informado" : "Informado";
-  const variant = hojeDia ? "accent" : faltando ? "warning" : "success";
+  const todayDay = day === today;
+  const faltando = day != null && !todayDay && informed == null;
+  const status = todayDay ? "Em aberto" : faltando ? "Não informado" : "Informado";
+  const variant = todayDay ? "accent" : faltando ? "warning" : "success";
   const diferenca = sold != null && informed != null ? informed - sold : null;
   return (
     <Modal
@@ -402,11 +402,11 @@ function InformedDayModal({
           <DayMetrics
             items={[
               { label: "Vendido", value: sold == null ? "—" : money(sold) },
-              { label: "Informado", value: hojeDia ? "—" : informed == null ? "Não informado" : money(informed) },
+              { label: "Informado", value: todayDay ? "—" : informed == null ? "Não informado" : money(informed) },
               { label: "Diferença", value: diferenca == null ? "—" : differenceAmount(diferenca), color: diferenca == null ? undefined : differenceColor(diferenca) },
             ]}
           />
-          {hojeDia ? <p className="text-[13px] leading-relaxed text-t2">Este dia ainda está em aberto. O valor será informado depois do fechamento.</p> : null}
+          {todayDay ? <p className="text-[13px] leading-relaxed text-t2">Este dia ainda está em aberto. O valor será informado depois do fechamento.</p> : null}
           {faltando ? <p className="text-[13px] leading-relaxed text-t2">Este dia ainda não foi informado ao shopping. Marque a caixa do calendário para enviar o valor, inclusive quando a venda é zero.</p> : null}
         </>
       ) : null}

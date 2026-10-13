@@ -76,7 +76,7 @@ const SOURCE_STYLE: Record<string, { icon: string; tint: string }> = {
   mapa_produtos: { icon: "\u{1F5C4}\uFE0E", tint: "var(--info)" },
   gerador: { icon: "\u2699\uFE0E", tint: "var(--acc)" },
   eventos: { icon: "\u{1F5D3}\uFE0E", tint: "var(--info)" },
-  vendedoras: { icon: "\u{1F5E3}\uFE0E", tint: "var(--acc)" },
+  sellers: { icon: "\u{1F5E3}\uFE0E", tint: "var(--acc)" },
   fechamento_caixa: { icon: "\u{1F5D3}\uFE0E", tint: "var(--acc)" },
   millennium_ocupado: { icon: "\u23F1\uFE0E", tint: "var(--warn)" },
 };
@@ -101,7 +101,7 @@ export function SyncLogsPage() {
   const canView = session.role === "OWNER" || session.role === "MANAGER" || session.role === "ADMIN_GLOBAL";
 
   const [catalogTick, setCatalogTick] = useState(0);
-  const lojas = useMemo(() => storesForSession(session.stores), [session.stores, catalogTick]);
+  const storeRows = useMemo(() => storesForSession(session.stores), [session.stores, catalogTick]);
   useEffect(() => {
     let cancelled = false;
     if (session.stores.length > 0) {
@@ -119,7 +119,7 @@ export function SyncLogsPage() {
   const [loading, setLoading] = useState(true);
   const showSkeleton = useMinSkeleton(loading);
   const [error, setError] = useState<string | null>(null);
-  const [detalhe, setDetalhe] = useState<SyncLogEntry | null>(null);
+  const [detail, setDetalhe] = useState<SyncLogEntry | null>(null);
   const { show } = useToast();
 
   const carregar = useCallback(async () => {
@@ -141,24 +141,24 @@ export function SyncLogsPage() {
     void carregar();
   }, [carregar]);
 
-  const lojaNome = useCallback(
+  const storeNameValue = useCallback(
     (e: SyncLogEntry) => {
       if (!e.storeId && !e.storeLabel) return "Todas as filiais";
-      const loja = lojas.find((s) => s.id === e.storeId);
-      return loja ? loja.fantasia : e.storeLabel ?? "—";
+      const store = storeRows.find((s) => s.id === e.storeId);
+      return store ? store.fantasia : e.storeLabel ?? "—";
     },
-    [lojas],
+    [storeRows],
   );
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
     if (!q) return logs;
     return logs.filter((e) =>
-      [syncLogSummary(e), syncLogExplanation(e), e.message, syncLogSourceLabel(e.source), lojaNome(e)].some((t) =>
+      [syncLogSummary(e), syncLogExplanation(e), e.message, syncLogSourceLabel(e.source), storeNameValue(e)].some((t) =>
         t.toLowerCase().includes(q),
       ),
     );
-  }, [logs, busca, lojaNome]);
+  }, [logs, busca, storeNameValue]);
 
   const events: TimelineEvent[] = filtrados.map((e) => {
     const hasStore = Boolean(e.storeId || e.storeLabel);
@@ -175,7 +175,7 @@ export function SyncLogsPage() {
           <LevelBadge level={e.level} />
         </button>
       ),
-      time: [rotina, fmtAgo(e.createdAt), hasStore ? lojaNome(e) : null, e.count > 1 ? `${e.count} ocorrências` : null]
+      time: [rotina, fmtAgo(e.createdAt), hasStore ? storeNameValue(e) : null, e.count > 1 ? `${e.count} ocorrências` : null]
         .filter(Boolean)
         .join(" · "),
       color: "transparent",
@@ -234,7 +234,7 @@ export function SyncLogsPage() {
       </Card>
 
       <Modal
-        open={detalhe != null}
+        open={detail != null}
         onClose={() => setDetalhe(null)}
         title="Detalhe do log"
         footer={
@@ -242,11 +242,11 @@ export function SyncLogsPage() {
             <Button variant="outline" onClick={() => setDetalhe(null)}>
               Fechar
             </Button>
-            {detalhe && (
+            {detail && (
               <Button
                 onClick={() => {
                   void navigator.clipboard
-                    .writeText(logParaSuporte(detalhe, lojaNome(detalhe)))
+                    .writeText(logParaSuporte(detail, storeNameValue(detail)))
                     .then(() => show("Detalhes copiados.", "success"))
                     .catch(() => show("Não foi possível copiar.", "danger"));
                 }}
@@ -257,7 +257,7 @@ export function SyncLogsPage() {
           </>
         }
       >
-        {detalhe && <LogDetail entry={detalhe} loja={lojaNome(detalhe)} />}
+        {detail && <LogDetail entry={detail} store={storeNameValue(detail)} />}
       </Modal>
     </div>
   );
@@ -279,7 +279,7 @@ function stackOf(e: SyncLogEntry): string | null {
   return typeof e.detail?.stack === "string" ? e.detail.stack : null;
 }
 
-function logParaSuporte(e: SyncLogEntry, loja: string): string {
+function logParaSuporte(e: SyncLogEntry, store: string): string {
   const w = workerInfo(e);
   const stack = stackOf(e);
   return [
@@ -289,7 +289,7 @@ function logParaSuporte(e: SyncLogEntry, loja: string): string {
     `quando: ${e.createdAt}`,
     `job: ${e.jobKind ?? "—"} (${e.jobId ?? "sem job_id"})`,
     `usuário ERP: ${erpUserOf(e) ?? "—"}`,
-    `loja: ${loja} (store_id ${e.storeId ?? "—"}, código ${e.storeLabel ?? "—"})`,
+    `loja: ${store} (store_id ${e.storeId ?? "—"}, código ${e.storeLabel ?? "—"})`,
     `dias: ${e.days.join(", ") || "—"}`,
     `ocorrências: ${e.count}`,
     `worker: ${w?.version ?? "—"} (iniciado ${w?.startedAt ?? "—"})`,
@@ -299,7 +299,7 @@ function logParaSuporte(e: SyncLogEntry, loja: string): string {
   ].join("\n");
 }
 
-function LogDetail({ entry, loja }: { entry: SyncLogEntry; loja: string }) {
+function LogDetail({ entry, store }: { entry: SyncLogEntry; store: string }) {
   const extra = Object.entries(entry.detail ?? {}).filter(([k]) => !DETAIL_KEYS_INTERNAS.has(k));
   const w = workerInfo(entry);
   const stack = stackOf(entry);
@@ -317,7 +317,7 @@ function LogDetail({ entry, loja }: { entry: SyncLogEntry; loja: string }) {
         label="Tipo de sincronização"
         value={entry.jobKind ? (SYNC_JOB_KIND_LABEL[entry.jobKind] ?? entry.jobKind) : "Sincronização"}
       />
-      <DetailRow label="Filial" value={loja} />
+      <DetailRow label="Filial" value={store} />
       {entry.days.length > 0 && <DetailRow label="Período afetado" value={fmtDays(entry.days)} />}
       <DetailRow
         label="Ocorrências"

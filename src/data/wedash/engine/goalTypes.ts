@@ -1,19 +1,19 @@
 /** Tipos da conta da meta (sem dependencias fora do motor). Money nos agregados = centavos inteiros. */
 
 export interface Tier {
-  nome: string;
-  atingimentoMinPct: number;
+  name: string;
+  minAttainmentPct: number;
   /** % da premiacao sobre o faturamento realizado neste degrau. */
-  comissaoPct: number;
+  commissionPct: number;
   /**
    * Bonus acumulado ao atingir este degrau.
    * Regra de produto: R$ 50 por nivel (1 -> 50, 2 -> 100, 3 -> 150, 4 -> 200).
    */
   bonus: number;
   /** Premiacao da gerencia (% sobre o faturamento total da loja) ao a loja chegar neste nivel; ausente = sem premiacao da gerencia. */
-  gerenciaPct?: number;
+  managerPct?: number;
   /** Bonus da gerencia (R$) ao a loja chegar neste nivel; soma com os niveis anteriores. */
-  gerenciaBonus?: number;
+  managerBonus?: number;
 }
 
 export type GoalType = "individual" | "grupo" | "geral";
@@ -59,84 +59,84 @@ export interface GoalTeamMember {
 }
 
 export interface SellerRow {
-  colaboradorId: string;
-  nome: string;
+  employeeId: string;
+  name: string;
   /** Filial da vendedora  -  necessaria na visao rede (coluna Shopping). */
-  filialId: string;
-  filialNome: string;
+  storeId: string;
+  storeName: string;
   /** Nome do grupo (Grupo 1/Grupo 2) ou "Sem grupo". */
-  grupo: string;
-  faturamentoValor: number;
-  faturamento: string;
-  atendimentos: number;
-  ticketValor: number;
+  group: string;
+  revenueAmount: number;
+  revenue: string;
+  salesCount: number;
+  ticketAmount: number;
   ticket: string;
-  paValor: number;
+  paAmount: number;
   pa: string;
-  diasTrabalhados: number;
-  tendencia: "subindo" | "estavel" | "caindo";
+  daysWorked: number;
+  trend: "up" | "flat" | "down";
   // Meta individual (so com meta ativa; sem meta ficam zerados e semMeta=true)
-  metaIndividualValor: number;
-  metaProporcional: boolean;
+  individualGoalAmount: number;
+  proportionalGoal: boolean;
   eligibleDays: number;
-  atingimentoPct: number;
-  barraPct: number;
+  attainmentPct: number;
+  barPct: number;
   /** Participacao no faturamento vs. meta da loja (valorLoja). */
-  pctMetaGeral: number;
+  storeGoalPct: number;
   /** Marcos da escada p/ barra segmentada: { nome, pct, bonus, pctPremiacao }. */
-  marcosEscada: { nome: string; pct: number; pctPremiacao: number; bonus: number }[];
-  degrauAtual: string | null;
+  ladderMarks: { name: string; pct: number; prizePct: number; bonus: number }[];
+  currentTierName: string | null;
   /** Indice 1-based do degrau atual (null = ainda sem nivel). */
-  nivelAtual: number | null;
-  proximoDegrau: { nome: string; faltaValor: number; pctPremiacao: number; bonus: number; atingMinPct: number } | null;
+  currentLevel: number | null;
+  nextTier: { name: string; gapAmount: number; prizePct: number; bonus: number; minAttainmentPct: number } | null;
   /** Premiacao acumulada da escada de metas (realizado x pct do degrau). */
-  premiacaoAcumulada: number;
+  accruedPrize: number;
   /** % de premiacao do degrau atual (0 se ainda nao entrou na escada). */
-  comissaoPct: number;
+  commissionPct: number;
   /** Premiacao projetada pelo ritmo: realizado escalado x pct do degrau projetado. */
-  premiacaoProjetadaIndividual: number | null;
+  projectedIndividualPrize: number | null;
   /** Atingimento projetado pelo ritmo da competencia (100 = fecha a meta). */
-  atingimentoProjetadoPct: number | null;
-  bonusAlcancado: number;
+  projectedAttainmentPct: number | null;
+  bonusReached: number;
   // Atencao  -  um ponto por vendedora, na ordem de prioridade do mockup.
-  atencao: { tipo: "pa" | "ritmo" | "preco"; texto: string; detalhe: string } | null;
-  semMeta: boolean;
+  attention: { kind: "pa" | "ritmo" | "preco"; text: string; detail: string } | null;
+  noGoal: boolean;
 }
 
 export interface NetworkGlobalGoal {
   /** Nome da meta ou "Setembro 2026". */
-  competTexto: string;
+  competenceText: string;
   /** Faturamento na competencia (loja ou rede)  -  total da loja, igual a Visao Geral. */
-  realizado: number;
+  achieved: number;
   /** Parte do realizado fora da equipe (venda sem vendedora, gerencia); 0 = tudo na equipe. */
-  foraDaEquipe?: number;
+  outsideTeam?: number;
   /** Meta da loja ou soma das metas da rede. */
   total: number;
   /** realizado / total x 100. */
   pct: number;
   /** Projecao pelo indice de desempenho acumulado (AD-021). */
-  projetadoPct: number;
+  projectedPct: number;
   /** Dias abertos da competencia a partir de hoje (incluindo hoje). */
   daysRemaining: number;
   /** Inicio da competencia (ISO). */
-  inicio: string;
+  start: string;
   /** Fim da competencia (ISO). */
-  fim: string;
+  end: string;
 }
 
 /** Card de uma meta ativa (Ao vivo / Equipe)  -  progresso + badges + escada. */
 export interface GoalCardView {
   id: string;
-  nome: string;
-  tipo: GoalType;
-  lojaNome: string;
-  marcas: GoalBrand[];
+  name: string;
+  kind: GoalType;
+  storeNameValue: string;
+  brands: GoalBrand[];
   qtdGrupos: number;
   qtdVendedoras: number;
   qtdNiveis: number;
-  degraus: Tier[];
-  faixa: NetworkGlobalGoal;
-  vendedoras: SellerRow[];
+  tiers: Tier[];
+  band: NetworkGlobalGoal;
+  sellers: SellerRow[];
 }
 
 export type SalesBrand = "WEPINK" | "WPINK" | "ALL";

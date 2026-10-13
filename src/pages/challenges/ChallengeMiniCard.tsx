@@ -8,16 +8,16 @@ import { FlameIcon, TrophyIcon } from "@/pages/dashboards/icons";
 export function ChallengeMiniCard({
   challenge: c,
   view,
-  lojaNome,
+  storeNameValue,
   onOpen,
 }: {
   challenge: ChallengeRecord;
   view: ChallengeView;
-  lojaNome?: string;
+  storeNameValue?: string;
   onOpen: () => void;
 }) {
   const destaque = challengeHeadline(c, view);
-  const premio = mainPrizeLabel(c);
+  const prize = mainPrizeLabel(c);
   return (
     <button
       type="button"
@@ -35,16 +35,16 @@ export function ChallengeMiniCard({
         </span>
         <span className="mt-0.5 block truncate text-[12px] text-t2">
           {shortDate(c.startsOn)} a {shortDate(c.endsOn)}
-          {lojaNome ? ` · ${lojaNome}` : ""}
+          {storeNameValue ? ` · ${storeNameValue}` : ""}
         </span>
         <span className="mt-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <span className="min-w-0 truncate text-[13px] text-t1">
             <HeadlineText headline={destaque} />
           </span>
-          {premio && (
+          {prize && (
             <span className="flex shrink-0 items-center gap-1 text-[12px] font-semibold text-t1">
               <TrophyIcon size={13} className="text-warn" />
-              {premio}
+              {prize}
             </span>
           )}
         </span>

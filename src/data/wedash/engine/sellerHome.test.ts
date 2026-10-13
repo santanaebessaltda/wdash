@@ -18,9 +18,9 @@ const goal: GoalRecord = {
   target: 10_000,
   tierMode: "INDIVIDUAL",
   tiers: [
-    { nome: "Meta", atingimentoMinPct: 100, comissaoPct: 1, bonus: 50 },
-    { nome: "Super", atingimentoMinPct: 120, comissaoPct: 2, bonus: 100 },
-    { nome: "Hiper", atingimentoMinPct: 150, comissaoPct: 3, bonus: 150 },
+    { name: "Meta", minAttainmentPct: 100, commissionPct: 1, bonus: 50 },
+    { name: "Super", minAttainmentPct: 120, commissionPct: 2, bonus: 100 },
+    { name: "Hiper", minAttainmentPct: 150, commissionPct: 3, bonus: 150 },
   ],
   groups: [
     { shiftId: "m", name: "M", pct: 60 },
@@ -74,8 +74,8 @@ describe("buildSellerHome", () => {
   it("active goal with the seller in a group: premiação, nível, falta, ganho e ranking", () => {
     const [store] = buildSellerHome(input()).stores;
     const g = store!.goal!;
-    expect(g.me).toMatchObject({ nivel: "Super", nivelNumero: 2, grupo: "M", premiacao: 72, bonus: 150 });
-    expect(g.me!.proximo).toMatchObject({ nome: "Hiper", numero: 3, falta: 900 });
+    expect(g.me).toMatchObject({ nivel: "Super", nivelNumero: 2, group: "M", prizeAmount: 72, bonus: 150 });
+    expect(g.me!.proximo).toMatchObject({ name: "Hiper", numero: 3, falta: 900 });
     expect(g.nextLevelGain).toBeCloseTo(186);
     expect(g.projectedPrize).toBeNull();
     expect(g.ranking.map((e) => [e.position, e.name, e.me])).toEqual([
@@ -173,7 +173,7 @@ describe("buildSellerHome", () => {
       ...goal,
       tierMode: "GENERAL",
       groups: [],
-      tiers: [{ nome: "Meta", atingimentoMinPct: 50, comissaoPct: 1, bonus: 0 }],
+      tiers: [{ name: "Meta", minAttainmentPct: 50, commissionPct: 1, bonus: 0 }],
     };
     const caixa: GoalTeamMember = { ...member(9, "CAIXA", null), salesPerson: false };
     const day = (reais: number, salesCount: number, itemCount: number): SalesDayAgg => ({
@@ -192,8 +192,8 @@ describe("buildSellerHome", () => {
     expect(ranking.every((r) => r.position === 1 && r.revenue === 2000 && r.sales === 2)).toBe(true);
     expect(ranking.map((r) => r.name)).toEqual(["ANA", "BIA", "CAU", "DUDA"]);
     expect(ranking.find((r) => r.me)?.name).toBe("ANA");
-    expect(out.stores[0]!.goal!.me!.atingimentoPct).toBeCloseTo(80);
-    expect(out.stores[0]!.goal!.me!.premiacao).toBeCloseTo(20);
+    expect(out.stores[0]!.goal!.me!.attainmentPct).toBeCloseTo(80);
+    expect(out.stores[0]!.goal!.me!.prizeAmount).toBeCloseTo(20);
   });
 
   it("myDays has only the seller's rows (by código or by the registered name), summed per store and day", () => {

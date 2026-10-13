@@ -14,7 +14,7 @@ import { useMinSkeleton } from "@/lib/useMinSkeleton";
 /** Lojas do escopo do StorePicker ("Todas" = todas as lojas da sessao), ja com custos e horario do banco. */
 export function useScopedStores() {
   const session = useActiveSession();
-  const { escopo } = useScope();
+  const { scope } = useScope();
   const [tick, setTick] = useState(0);
   const [loading, setLoading] = useState(true);
   const key = `${session.tenantId}|${storesKey(session.stores)}`;
@@ -39,12 +39,12 @@ export function useScopedStores() {
     };
   }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const lojas = useMemo(() => {
+  const storeRows = useMemo(() => {
     const todas = storesForSession(session.stores);
-    return escopo.filialIds.length === 0 ? todas : todas.filter((s) => escopo.filialIds.includes(s.id));
-  }, [session.stores, escopo.filialIds, tick]); // eslint-disable-line react-hooks/exhaustive-deps
+    return scope.storeIds.length === 0 ? todas : todas.filter((s) => scope.storeIds.includes(s.id));
+  }, [session.stores, scope.storeIds, tick]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { session, lojas, loading, refresh: () => setTick((n) => n + 1) };
+  return { session, storeRows, loading, refresh: () => setTick((n) => n + 1) };
 }
 
 export type SectionName = "Estoque" | "Gestão" | "Configurações";
@@ -113,8 +113,8 @@ export function SectionHeader({
 }
 
 /** "Todas" com mais de uma loja na sessão. Quem tem uma loja só segue vendo o conteúdo. */
-export function pickOneStore(filialIds: string[], sessionStoreCount: number): boolean {
-  return filialIds.length === 0 && sessionStoreCount > 1;
+export function pickOneStore(storeIds: string[], sessionStoreCount: number): boolean {
+  return storeIds.length === 0 && sessionStoreCount > 1;
 }
 
 /** Card vazio das telas que só fazem sentido com uma filial no seletor. */
@@ -139,7 +139,7 @@ export function StoreCardsPage({
   actions,
   loading,
   skeleton,
-  lojas,
+  storeRows,
   wide = false,
   oneStore = false,
   children,
@@ -151,17 +151,17 @@ export function StoreCardsPage({
   loading: boolean;
   /** Recebe quantos cards desenhar = lojas do StorePicker ("Todas" = todas as da sessao). */
   skeleton: (count: number) => ReactNode;
-  lojas: Store[];
+  storeRows: Store[];
   wide?: boolean;
   /** Com "Todas" e mais de uma loja, pede para escolher uma em vez de empilhar os cards. */
   oneStore?: boolean;
-  children: (loja: Store) => ReactNode;
+  children: (store: Store) => ReactNode;
 }) {
   const showSkeleton = useMinSkeleton(loading);
   const session = useActiveSession();
-  const { escopo } = useScope();
-  const escolher = oneStore && pickOneStore(escopo.filialIds, session.stores.length);
-  const skeletonCount = Math.max(1, escopo.filialIds.length || session.stores.length);
+  const { scope } = useScope();
+  const escolher = oneStore && pickOneStore(scope.storeIds, session.stores.length);
+  const skeletonCount = Math.max(1, scope.storeIds.length || session.stores.length);
   return (
     <div>
       <SectionHeader section={section} title={title} subtitle={subtitle} actions={actions} />
@@ -172,14 +172,14 @@ export function StoreCardsPage({
           </div>
         ) : showSkeleton ? (
           skeleton(skeletonCount)
-        ) : lojas.length === 0 ? (
+        ) : storeRows.length === 0 ? (
           <Card>
             <EmptyState framed={false} icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
           </Card>
         ) : (
           <div className={wide ? "flex flex-col gap-5" : "flex max-w-[720px] flex-col gap-5"}>
-            {lojas.map((loja) => (
-              <div key={loja.id}>{children(loja)}</div>
+            {storeRows.map((store) => (
+              <div key={store.id}>{children(store)}</div>
             ))}
           </div>
         )}

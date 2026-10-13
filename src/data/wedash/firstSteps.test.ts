@@ -13,7 +13,7 @@ const CUSTOS_OK: StoreCosts = {
   icmsStWepinkPct: 0,
 };
 
-const loja = (id: string, over: Partial<FirstStepsStore> = {}): FirstStepsStore => ({
+const store = (id: string, over: Partial<FirstStepsStore> = {}): FirstStepsStore => ({
   id,
   temWpink: false,
   pointType: "SHOPPING",
@@ -31,7 +31,7 @@ const vendedor = (shiftId: string | null, over: { active?: boolean; role?: strin
 
 function input(over: Partial<FirstStepsInput> = {}): FirstStepsInput {
   return {
-    stores: [loja("a")],
+    stores: [store("a")],
     sellersByStore: new Map([["a", [vendedor("g1")]]]),
     shiftIdsByStore: new Map([["a", ["g1"]]]),
     storesWithGoal: new Set(["a"]),
@@ -47,35 +47,35 @@ describe("buildFirstSteps", () => {
     const steps = buildFirstSteps(input());
     expect(steps.map((s) => s.id)).toEqual(["erp", "sellers", "hours", "groups", "franchise", "rent", "taxes", "goal", "challenge"]);
     expect(steps.every((s) => s.done)).toBe(true);
-    const vazio = buildFirstSteps(input({ stores: [loja("a", { custos: undefined, horas: defaultWeekHours() })] }));
+    const vazio = buildFirstSteps(input({ stores: [store("a", { custos: undefined, horas: defaultWeekHours() })] }));
     expect(vazio.find((s) => s.id === "erp")!.done).toBe(true);
     expect(vazio.find((s) => s.id === "sellers")!.done).toBe(true);
   });
 
   it("horário e custos: todas as lojas precisam estar configuradas", () => {
-    const i = input({ stores: [loja("a"), loja("b", { horas: defaultWeekHours() })] });
+    const i = input({ stores: [store("a"), store("b", { horas: defaultWeekHours() })] });
     expect(passo(i, "hours")).toMatchObject({ done: false, detail: "Falta em 1 de 2 lojas" });
-    expect(passo(input({ stores: [loja("a", { horas: defaultWeekHours() })] }), "hours").detail).toBeUndefined();
+    expect(passo(input({ stores: [store("a", { horas: defaultWeekHours() })] }), "hours").detail).toBeUndefined();
   });
 
   it("franquia exige WPINK só se a loja vende WPINK", () => {
-    expect(passo(input({ stores: [loja("a", { temWpink: true })] }), "franchise").done).toBe(false);
+    expect(passo(input({ stores: [store("a", { temWpink: true })] }), "franchise").done).toBe(false);
     const wpink = { ...CUSTOS_OK, royaltiesWpinkPct: 5, marketingWpinkPct: 2 };
-    expect(passo(input({ stores: [loja("a", { temWpink: true, custos: wpink })] }), "franchise").done).toBe(true);
+    expect(passo(input({ stores: [store("a", { temWpink: true, custos: wpink })] }), "franchise").done).toBe(true);
   });
 
   it("aluguel: shopping pode ter só o percentual; rua precisa do aluguel mensal", () => {
     const soPct = { ...CUSTOS_OK, rentMin: null, rentWepinkPct: 8, rentWpinkPct: 8 };
-    expect(passo(input({ stores: [loja("a", { custos: soPct })] }), "rent").done).toBe(true);
-    expect(passo(input({ stores: [loja("a", { custos: soPct, pointType: "RUA" })] }), "rent").done).toBe(false);
+    expect(passo(input({ stores: [store("a", { custos: soPct })] }), "rent").done).toBe(true);
+    expect(passo(input({ stores: [store("a", { custos: soPct, pointType: "RUA" })] }), "rent").done).toBe(false);
   });
 
   it("impostos: 0 preenchido conta; vazio não", () => {
     expect(passo(input(), "taxes").done).toBe(true);
-    expect(passo(input({ stores: [loja("a", { custos: { ...CUSTOS_OK, icmsStWepinkPct: null } })] }), "taxes").done).toBe(false);
-    expect(passo(input({ stores: [loja("a", { temWpink: true })] }), "taxes").done).toBe(false);
+    expect(passo(input({ stores: [store("a", { custos: { ...CUSTOS_OK, icmsStWepinkPct: null } })] }), "taxes").done).toBe(false);
+    expect(passo(input({ stores: [store("a", { temWpink: true })] }), "taxes").done).toBe(false);
     const wpink = { ...CUSTOS_OK, icmsWpinkPct: 0, icmsStWpinkPct: 0 };
-    expect(passo(input({ stores: [loja("a", { temWpink: true, custos: wpink })] }), "taxes").done).toBe(true);
+    expect(passo(input({ stores: [store("a", { temWpink: true, custos: wpink })] }), "taxes").done).toBe(true);
   });
 
   it("grupos: conta vendedores ativos sem grupo; gerência e desligados não contam", () => {
@@ -85,22 +85,22 @@ describe("buildFirstSteps", () => {
       ]),
     });
     expect(passo(i, "groups")).toMatchObject({ done: false, detail: "2 vendedores sem grupo", needsGroups: false });
-    const semGrupos = input({ shiftIdsByStore: new Map() });
-    expect(passo(semGrupos, "groups")).toMatchObject({ done: false, detail: "1 vendedor sem grupo", needsGroups: true });
+    const withoutGroups = input({ shiftIdsByStore: new Map() });
+    expect(passo(withoutGroups, "groups")).toMatchObject({ done: false, detail: "1 vendedor sem grupo", needsGroups: true });
   });
 
   it("grupos, meta e desafio ignoram loja sem equipe de vendas", () => {
-    const i = input({ stores: [loja("a"), loja("parada")] });
+    const i = input({ stores: [store("a"), store("parada")] });
     expect(passo(i, "groups").done).toBe(true);
     expect(passo(i, "goal").done).toBe(true);
-    expect(passo(input({ stores: [loja("a"), loja("b")], sellersByStore: new Map([["a", [vendedor("g1")]], ["b", [vendedor(null)]]]) }), "goal")).toMatchObject({
+    expect(passo(input({ stores: [store("a"), store("b")], sellersByStore: new Map([["a", [vendedor("g1")]], ["b", [vendedor(null)]]]) }), "goal")).toMatchObject({
       done: false,
       detail: "Falta em 1 de 2 lojas",
     });
   });
 
   it("uma loja no filtro conta só o que falta nela", () => {
-    const stores = [loja("a"), loja("b", { horas: defaultWeekHours() })];
+    const stores = [store("a"), store("b", { horas: defaultWeekHours() })];
     const rede = input({ stores });
     expect(passo(rede, "hours")).toMatchObject({ done: false, detail: "Falta em 1 de 2 lojas" });
     expect(storesForFirstStepsView(stores, []).map((s) => s.id)).toEqual(["a", "b"]);

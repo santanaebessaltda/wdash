@@ -101,12 +101,12 @@ describe("challengeStanding", () => {
     expect(standing.result).toBe("2,00");
     expect(standing.won).toBe(false);
     expect(standing.gap).toBe("O P.A. só vale no fim do desafio");
-    const fim = challengeStanding(
+    const end = challengeStanding(
       { ...base, mode: "MINIMUM", metric: "PA", target: 1.5, minSales: 1, endsOn: "2026-09-10" },
       { today: "2026-09-15", employeeId: 1, team, sellerDays: [day(1, 10, 20, 50_000)] },
     );
-    expect(fim.won).toBe(true);
-    expect(fim.gap).toBeNull();
+    expect(end.won).toBe(true);
+    expect(end.gap).toBeNull();
   });
 
   it("asks for the remaining sales before the person can take part", () => {

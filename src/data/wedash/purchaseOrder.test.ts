@@ -137,19 +137,19 @@ describe("buildPurchaseOrderView", () => {
       { "BSPPAR-ATH-001": 15 },
     );
     expect(v.rows.map((r) => r.code)).toEqual(["BSPPAR-ATH-001", "WP014", "X1", "SEM"]);
-    expect(v.rows[1]).toMatchObject({ bloqueado: false, podePedir: false, minimo: 24, saldo: 8, aPedir: null, noPedido: false });
-    expect(v.rows[2]).toMatchObject({ bloqueado: true, podePedir: false, minimo: 12, saldo: 4, aPedir: null, noPedido: false });
+    expect(v.rows[1]).toMatchObject({ bloqueado: false, podePedir: false, minimum: 24, saldo: 8, aPedir: null, noPedido: false });
+    expect(v.rows[2]).toMatchObject({ bloqueado: true, podePedir: false, minimum: 12, saldo: 4, aPedir: null, noPedido: false });
     expect(v.rows[3]).toMatchObject({ podePedir: false, saldo: 3, aPedir: null, noPedido: false });
     expect(purchaseOrderFileRows(v).map((r) => r[0])).toEqual(["BSPPAR-ATH-001"]);
     expect(v.rows[0]).toMatchObject({
       code: "BSPPAR-ATH-001",
-      nome: "BODY SPLASH PARIS 200ML",
+      name: "BODY SPLASH PARIS 200ML",
       saldo: 1,
       pedidosAbertos: 1,
       total: 2,
       vendidos30: 15,
       multipla: 24,
-      minimo: 72,
+      minimum: 72,
     });
   });
 
@@ -212,7 +212,7 @@ describe("buildPurchaseOrderView", () => {
       todayIso: TODAY,
     });
     expect(v.rows).toHaveLength(1);
-    expect(v.rows[0]).toMatchObject({ bloqueado: true, novo: false, minimo: 24, aPedir: null, noPedido: false });
+    expect(v.rows[0]).toMatchObject({ bloqueado: true, novo: false, minimum: 24, aPedir: null, noPedido: false });
     expect(v.contagens.semMinimo).toBe(0);
     expect(purchaseOrderFileRows(v)).toEqual([]);
   });
@@ -226,7 +226,7 @@ describe("buildPurchaseOrderView", () => {
     expect(v.rows[0].variasVariantes).toBe(true);
     expect(v.rows[0].aPedir).toBeNull();
     expect(v.rows[0].noPedido).toBe(false);
-    expect(v.resumo).toEqual({ produtos: 0, itens: 0 });
+    expect(v.summary).toEqual({ produtos: 0, itens: 0 });
   });
 
   it("uma variante bloqueada não conta como variante elegível", () => {
@@ -246,9 +246,9 @@ describe("buildPurchaseOrderView", () => {
       stock({ code: "C", total: 0, position: 2, registeredAt: "2026-10-01" }),
     ];
     const mins = { A: 72, B: 24 };
-    expect(view(rows, mins, 1).resumo).toEqual({ produtos: 1, itens: 72 });
+    expect(view(rows, mins, 1).summary).toEqual({ produtos: 1, itens: 72 });
     const dobrado = view(rows, mins, 2);
-    expect(dobrado.resumo).toEqual({ produtos: 2, itens: 144 + 24 });
+    expect(dobrado.summary).toEqual({ produtos: 2, itens: 144 + 24 });
     expect(dobrado.contagens).toEqual({ noPedido: 2, semMinimo: 1, novos: 1 });
   });
 });

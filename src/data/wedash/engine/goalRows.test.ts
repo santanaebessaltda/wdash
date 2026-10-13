@@ -34,8 +34,8 @@ describe("goalFromRow", () => {
     expect(goal.target).toBe(150000);
     expect(goal.tierMode).toBe("GROUP");
     expect(goal.tiers).toEqual([
-      { nome: "Meta", atingimentoMinPct: 100, comissaoPct: 1, bonus: 0 },
-      { nome: "Super", atingimentoMinPct: 120, comissaoPct: 2, bonus: 50, gerenciaPct: 0.5, gerenciaBonus: 200 },
+      { name: "Meta", minAttainmentPct: 100, commissionPct: 1, bonus: 0 },
+      { name: "Super", minAttainmentPct: 120, commissionPct: 2, bonus: 50, managerPct: 0.5, managerBonus: 200 },
     ]);
     expect(goal.groups).toEqual([
       { shiftId: "sh1", name: "MANHÃ", pct: 60 },

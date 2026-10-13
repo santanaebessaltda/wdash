@@ -45,11 +45,11 @@ type LinhaRank = SellerRow & { posicao: number };
 function SellerCell({ l }: { l: LinhaRank }) {
   return (
     <div className="flex min-w-0 items-center gap-2.5">
-      <Avatar name={l.nome} size="sm" />
+      <Avatar name={l.name} size="sm" />
       <div className="min-w-0">
-        <p className="truncate text-[13px] font-bold text-t0">{l.nome}</p>
+        <p className="truncate text-[13px] font-bold text-t0">{l.name}</p>
         <p className="truncate text-[11px] text-t2">
-          {l.grupo} · {shortStoreName(l.filialNome)}
+          {l.group} · {shortStoreName(l.storeName)}
         </p>
       </div>
     </div>
@@ -59,81 +59,81 @@ function SellerCell({ l }: { l: LinhaRank }) {
 function RevenueCell({ l }: { l: LinhaRank }) {
   return (
     <div>
-      <p className="font-mono text-[12.5px] font-bold text-t0">{l.faturamento}</p>
+      <p className="font-mono text-[12.5px] font-bold text-t0">{l.revenue}</p>
       <p className="text-[11px] text-t2">
-        {num(l.atendimentos, 0)} {l.atendimentos === 1 ? "venda" : "vendas"}
+        {num(l.salesCount, 0)} {l.salesCount === 1 ? "venda" : "vendas"}
       </p>
     </div>
   );
 }
 
 function IndividualPctCell({ l }: { l: LinhaRank }) {
-  if (l.semMeta) return <span className="text-t2">—</span>;
-  const escala = Math.max(...l.marcosEscada.map((m) => m.pct), 100);
+  if (l.noGoal) return <span className="text-t2">—</span>;
+  const escala = Math.max(...l.ladderMarks.map((m) => m.pct), 100);
   return (
     <div className="w-[88px]">
-      <p className="font-mono text-[12.5px] font-bold text-t0">{num(l.atingimentoPct, 0)}%</p>
+      <p className="font-mono text-[12.5px] font-bold text-t0">{num(l.attainmentPct, 0)}%</p>
       <div className="mt-1">
-        <ProgressBar value={Math.min(100, (l.atingimentoPct / escala) * 100)} height={5} />
+        <ProgressBar value={Math.min(100, (l.attainmentPct / escala) * 100)} height={5} />
       </div>
     </div>
   );
 }
 
 function LevelCell({ l }: { l: LinhaRank }) {
-  if (l.semMeta || !l.degrauAtual || l.nivelAtual == null) return <span className="text-t2">—</span>;
-  const pctRef = l.atingimentoProjetadoPct ?? l.atingimentoPct;
+  if (l.noGoal || !l.currentTierName || l.currentLevel == null) return <span className="text-t2">—</span>;
+  const pctRef = l.projectedAttainmentPct ?? l.attainmentPct;
   return (
     <Badge variant={pctRef >= 100 ? "success" : "warning"}>
-      N{l.nivelAtual} · {l.degrauAtual}
+      N{l.currentLevel} · {l.currentTierName}
     </Badge>
   );
 }
 
 function NextCell({ l }: { l: LinhaRank }) {
-  if (l.semMeta) return <span className="text-t2">—</span>;
-  if (!l.proximoDegrau) {
+  if (l.noGoal) return <span className="text-t2">—</span>;
+  if (!l.nextTier) {
     return <p className="text-[12.5px] font-bold text-ok">Último nível</p>;
   }
   return (
     <div>
-      <p className="font-mono text-[12.5px] font-bold text-t0">{brl(l.proximoDegrau.faltaValor)}</p>
-      <p className="text-[11px] text-t2">para {l.proximoDegrau.nome}</p>
+      <p className="font-mono text-[12.5px] font-bold text-t0">{brl(l.nextTier.gapAmount)}</p>
+      <p className="text-[11px] text-t2">para {l.nextTier.name}</p>
     </div>
   );
 }
 
 function PrizeCell({ l }: { l: LinhaRank }) {
-  if (l.semMeta) return <span className="text-t2">—</span>;
-  const valor = l.premiacaoAcumulada + l.bonusAlcancado;
-  if (valor <= 0 && l.comissaoPct <= 0) return <span className="text-t2">—</span>;
+  if (l.noGoal) return <span className="text-t2">—</span>;
+  const amount = l.accruedPrize + l.bonusReached;
+  if (amount <= 0 && l.commissionPct <= 0) return <span className="text-t2">—</span>;
   return (
     <div className="text-right">
-      <p className="font-mono text-[12.5px] font-bold text-ok">{brlCent(valor)}</p>
-      {l.comissaoPct > 0 ? (
+      <p className="font-mono text-[12.5px] font-bold text-ok">{brlCent(amount)}</p>
+      {l.commissionPct > 0 ? (
         <p className="text-[11px] text-t2">
-          {num(l.comissaoPct, 1)}%
-          {l.bonusAlcancado > 0 ? ` · +${brlCent(l.bonusAlcancado)} de bônus` : ""}
+          {num(l.commissionPct, 1)}%
+          {l.bonusReached > 0 ? ` · +${brlCent(l.bonusReached)} de bônus` : ""}
         </p>
       ) : null}
     </div>
   );
 }
 
-function SellerMobileCard({ l, metaAtiva, encerrada = false }: { l: LinhaRank; metaAtiva: boolean; encerrada?: boolean }) {
+function SellerMobileCard({ l, activeGoal, encerrada = false }: { l: LinhaRank; activeGoal: boolean; encerrada?: boolean }) {
   return (
     <div className="rounded-xl border border-line bg-bg-inset p-3.5">
       <div className="mb-3 flex items-center gap-2.5">
         <span className="w-7 shrink-0 text-[12.5px] font-extrabold text-t2">{l.posicao}º</span>
-        <Avatar name={l.nome} size="md" />
+        <Avatar name={l.name} size="md" />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[13.5px] font-bold text-t0">{l.nome}</p>
+          <p className="truncate text-[13.5px] font-bold text-t0">{l.name}</p>
           <p className="truncate text-[11.5px] text-t2">
-            {l.grupo} · {shortStoreName(l.filialNome)}
+            {l.group} · {shortStoreName(l.storeName)}
           </p>
         </div>
       </div>
-      {metaAtiva ? (
+      {activeGoal ? (
         <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 border-t border-line pt-2.5 text-[12px]">
           <div>
             <p className="text-[10.5px] font-bold uppercase tracking-wide text-t2">Faturamento</p>
@@ -161,9 +161,9 @@ function SellerMobileCard({ l, metaAtiva, encerrada = false }: { l: LinhaRank; m
       ) : (
         <div className="flex items-center justify-between border-t border-line pt-2.5">
           <span className="text-xs text-t2">
-            {num(l.atendimentos, 0)} vendas · Ticket {l.ticket}
+            {num(l.salesCount, 0)} vendas · Ticket {l.ticket}
           </span>
-          <span className="font-mono text-[13px] font-extrabold text-t0">{l.faturamento}</span>
+          <span className="font-mono text-[13px] font-extrabold text-t0">{l.revenue}</span>
         </div>
       )}
     </div>
@@ -172,22 +172,22 @@ function SellerMobileCard({ l, metaAtiva, encerrada = false }: { l: LinhaRank; m
 
 export function SellersBlock({
   lista,
-  metaAtiva,
+  activeGoal,
   encerrada = false,
-  grupo = false,
+  group = false,
   geral = false,
 }: {
   lista: SellerRow[];
-  metaAtiva: boolean;
+  activeGoal: boolean;
   /** Meta encerrada: sem "Falta para o proximo nivel". */
   encerrada?: boolean;
   /** Meta no modo Grupo: a meta e o % da linha sao do grupo da pessoa. */
-  grupo?: boolean;
+  group?: boolean;
   /** Meta no modo Geral: a meta e o % da linha sao da loja. */
   geral?: boolean;
 }) {
-  const metaHeader = geral ? "Meta da filial" : grupo ? "Meta do grupo" : "Meta individual";
-  const pctHeader = geral ? "Atingimento da filial" : grupo ? "% da meta do grupo" : "% da meta individual";
+  const goalHeader = geral ? "Meta da filial" : group ? "Meta do grupo" : "Meta individual";
+  const pctHeader = geral ? "Atingimento da filial" : group ? "% da meta do grupo" : "% da meta individual";
   const ranked: LinhaRank[] = lista.map((l, i) => ({ ...l, posicao: i + 1 }));
 
   const colunas: DataTableColumn<LinhaRank>[] = [
@@ -203,32 +203,32 @@ export function SellersBlock({
       key: "vendedora",
       header: "Nome",
       sortable: true,
-      sortValue: (l) => l.nome,
+      sortValue: (l) => l.name,
       render: (l) => <SellerCell l={l} />,
     },
     {
       key: "faturamento",
       header: "Faturamento",
       sortable: true,
-      sortValue: (l) => l.faturamentoValor,
+      sortValue: (l) => l.revenueAmount,
       render: (l) => <RevenueCell l={l} />,
     },
-    ...(metaAtiva
+    ...(activeGoal
       ? ([
           {
             key: "meta",
-            header: metaHeader,
+            header: goalHeader,
             hideBelow: "md",
             sortable: true,
-            sortValue: (l: LinhaRank) => (l.semMeta ? null : l.metaIndividualValor),
+            sortValue: (l: LinhaRank) => (l.noGoal ? null : l.individualGoalAmount),
             render: (l: LinhaRank) =>
-              l.semMeta ? <span className="text-t2">—</span> : <span className="font-mono text-[12.5px] font-bold text-t0">{brl(l.metaIndividualValor)}</span>,
+              l.noGoal ? <span className="text-t2">—</span> : <span className="font-mono text-[12.5px] font-bold text-t0">{brl(l.individualGoalAmount)}</span>,
           },
           {
             key: "pctIndiv",
             header: pctHeader,
             sortable: true,
-            sortValue: (l: LinhaRank) => (l.semMeta ? null : l.atingimentoPct),
+            sortValue: (l: LinhaRank) => (l.noGoal ? null : l.attainmentPct),
             render: (l: LinhaRank) => <IndividualPctCell l={l} />,
           },
           {
@@ -236,16 +236,16 @@ export function SellersBlock({
             header: "% da meta da filial",
             hideBelow: "lg",
             sortable: true,
-            sortValue: (l: LinhaRank) => (l.semMeta ? null : l.pctMetaGeral),
+            sortValue: (l: LinhaRank) => (l.noGoal ? null : l.storeGoalPct),
             render: (l: LinhaRank) =>
-              l.semMeta ? <span className="text-t2">—</span> : <span className="font-mono text-[12.5px] font-bold text-t0">{num(l.pctMetaGeral, 1)}%</span>,
+              l.noGoal ? <span className="text-t2">—</span> : <span className="font-mono text-[12.5px] font-bold text-t0">{num(l.storeGoalPct, 1)}%</span>,
           },
           {
             key: "nivel",
             header: "Nível",
             hideBelow: "md",
             sortable: true,
-            sortValue: (l: LinhaRank) => l.nivelAtual ?? 0,
+            sortValue: (l: LinhaRank) => l.currentLevel ?? 0,
             render: (l: LinhaRank) => <LevelCell l={l} />,
           },
           ...(encerrada ? [] : [{
@@ -253,7 +253,7 @@ export function SellersBlock({
             header: "Falta para o próximo nível",
             hideBelow: "lg",
             sortable: true,
-            sortValue: (l: LinhaRank) => l.proximoDegrau?.faltaValor ?? null,
+            sortValue: (l: LinhaRank) => l.nextTier?.gapAmount ?? null,
             render: (l: LinhaRank) => <NextCell l={l} />,
           }]),
           {
@@ -261,7 +261,7 @@ export function SellersBlock({
             header: "Premiação",
             align: "right",
             sortable: true,
-            sortValue: (l: LinhaRank) => (l.semMeta ? null : l.premiacaoAcumulada + l.bonusAlcancado),
+            sortValue: (l: LinhaRank) => (l.noGoal ? null : l.accruedPrize + l.bonusReached),
             render: (l: LinhaRank) => <PrizeCell l={l} />,
           },
         ] as DataTableColumn<LinhaRank>[])
@@ -272,7 +272,7 @@ export function SellersBlock({
             hideBelow: "sm",
             align: "right",
             sortable: true,
-            sortValue: (l: LinhaRank) => l.ticketValor,
+            sortValue: (l: LinhaRank) => l.ticketAmount,
             render: (l: LinhaRank) => <span className="font-mono text-[12.5px] text-t1">{l.ticket}</span>,
           },
           {
@@ -281,7 +281,7 @@ export function SellersBlock({
             hideBelow: "sm",
             align: "right",
             sortable: true,
-            sortValue: (l: LinhaRank) => l.paValor,
+            sortValue: (l: LinhaRank) => l.paAmount,
             render: (l: LinhaRank) => <span className="font-mono text-[12.5px] text-t1">{l.pa}</span>,
           },
         ] as DataTableColumn<LinhaRank>[])),
@@ -293,14 +293,14 @@ export function SellersBlock({
         <DataTable
           columns={colunas}
           data={ranked}
-          rowKey={(l) => `${l.filialId}-${l.colaboradorId}`}
+          rowKey={(l) => `${l.storeId}-${l.employeeId}`}
           paginate="pessoas"
           emptyMessage="Nenhuma pessoa da equipe participa desta meta."
         />
       </div>
       <div className="flex flex-col gap-2.5 p-3.5 md:hidden">
         {ranked.map((l) => (
-          <SellerMobileCard key={`${l.filialId}-${l.colaboradorId}`} l={l} metaAtiva={metaAtiva} encerrada={encerrada} />
+          <SellerMobileCard key={`${l.storeId}-${l.employeeId}`} l={l} activeGoal={activeGoal} encerrada={encerrada} />
         ))}
       </div>
     </>
@@ -311,21 +311,21 @@ export function SellersBlock({
 export function SellersCard({
   estado,
   lista,
-  metaAtiva,
+  activeGoal,
   embedded = false,
   title = "Escada de premiação",
   help = "Mostra o nível atual, quanto falta para o próximo e a premiação estimada de cada pessoa da equipe.",
   aside,
   encerrada = false,
-  grupo = false,
+  group = false,
   geral = false,
 }: {
   estado: BlockStateTipo;
   lista: SellerRow[] | null;
-  metaAtiva: boolean;
+  activeGoal: boolean;
   encerrada?: boolean;
   /** Meta no modo Grupo (colunas "Meta do grupo" / "% da meta do grupo"). */
-  grupo?: boolean;
+  group?: boolean;
   /** Meta no modo Geral (colunas "Meta da loja" / "Atingimento da loja"). */
   geral?: boolean;
   /** Sem Card externo  -  bloco continuo apos a projecao (GoalCard). */
@@ -338,7 +338,7 @@ export function SellersCard({
   const tabela =
     lista && lista.length > 0 ? (
       <div className="max-h-[min(520px,70vh)] overflow-x-auto overflow-y-auto pr-1">
-        <SellersBlock lista={lista} metaAtiva={metaAtiva} encerrada={encerrada} grupo={grupo} geral={geral} />
+        <SellersBlock lista={lista} activeGoal={activeGoal} encerrada={encerrada} group={group} geral={geral} />
       </div>
     ) : (
       <div className={embedded ? "py-2" : "p-5"}>
@@ -370,13 +370,13 @@ export function SellersCard({
  * Projecao so depois de 50% do periodo da meta (inicio -> fim).
  * Antes disso o ritmo ainda oscila demais para cravar fechamento.
  */
-export function goalShowsProjection(inicio: string, fim: string, hojeIso: string = TODAY_ISO): boolean {
-  if (hojeIso < inicio) return false;
-  if (hojeIso >= fim) return true;
-  const total = eachDay(inicio, fim).length;
+export function goalShowsProjection(start: string, end: string, todayIso: string = TODAY_ISO): boolean {
+  if (todayIso < start) return false;
+  if (todayIso >= end) return true;
+  const total = eachDay(start, end).length;
   if (total <= 0) return false;
-  const decorridos = eachDay(inicio, hojeIso).length;
-  return decorridos / total >= 0.5;
+  const elapsedOpenDays = eachDay(start, todayIso).length;
+  return elapsedOpenDays / total >= 0.5;
 }
 
 /**
@@ -384,31 +384,31 @@ export function goalShowsProjection(inicio: string, fim: string, hojeIso: string
  * R$ realizado/meta  |  %  |  barra com marcos da escada (Meta -> Desafio).
  */
 export function GoalProgressBar({
-  meta,
+  goal,
   embedded = false,
   hideTitle = false,
-  degraus = defaultTiers,
-  hojeIso,
+  tiers = defaultTiers,
+  todayIso,
   soBarra = false,
 }: {
-  meta: NetworkGlobalGoal;
+  goal: NetworkGlobalGoal;
   embedded?: boolean;
   /** So a barra com os niveis (os numeros ficam no resumo, como no detalhe da meta). */
   soBarra?: boolean;
   /** Quando o titulo da meta ja esta no GoalCard. */
   hideTitle?: boolean;
   /** Degraus desta meta (default = escada padrao). */
-  degraus?: { nome: string; atingimentoMinPct: number; comissaoPct: number }[];
+  tiers?: { name: string; minAttainmentPct: number; commissionPct: number }[];
   /** Dia de hoje (dados reais); sem ele usa o relogio da fixture. */
-  hojeIso?: string;
+  todayIso?: string;
 }) {
-  const mostraProjecao = !soBarra && goalShowsProjection(meta.inicio, meta.fim, hojeIso);
-  const fecha = meta.projetadoPct >= 100;
-  const escalaMax = Math.max(...degraus.map((d) => d.atingimentoMinPct), 100);
-  const fillPct = Math.min(100, (meta.pct / escalaMax) * 100);
-  const corBarra = progressColor(meta.pct);
-  const corPct = progressTextClass(meta.pct);
-  const rotuloProjecao = `Projeção: ${num(meta.projetadoPct, 0)}%`;
+  const showsProjection = !soBarra && goalShowsProjection(goal.start, goal.end, todayIso);
+  const fecha = goal.projectedPct >= 100;
+  const escalaMax = Math.max(...tiers.map((d) => d.minAttainmentPct), 100);
+  const fillPct = Math.min(100, (goal.pct / escalaMax) * 100);
+  const corBarra = progressColor(goal.pct);
+  const corPct = progressTextClass(goal.pct);
+  const projectionLabel = `Projeção: ${num(goal.projectedPct, 0)}%`;
 
   const body = (
     <>
@@ -417,10 +417,10 @@ export function GoalProgressBar({
       <div className={cn("mb-4 flex flex-wrap items-start justify-between gap-2", hideTitle && "mb-3")}>
         {!hideTitle && (
           <div className="flex min-w-0 items-center gap-1.5">
-            <CardTitle>{mostraProjecao ? "Projeção da meta" : "Progresso da meta"}</CardTitle>
+            <CardTitle>{showsProjection ? "Projeção da meta" : "Progresso da meta"}</CardTitle>
             <TipHelp
               label={
-                mostraProjecao
+                showsProjection
                   ? "Projeção de atingimento ao final da meta. Aparece depois de metade do período."
                   : "A projeção de fechamento aparece depois que 50% do período da meta já passou — assim o ritmo fica mais confiável."
               }
@@ -428,35 +428,35 @@ export function GoalProgressBar({
           </div>
         )}
         <div className={cn("flex flex-wrap items-center gap-1.5", hideTitle ? "w-full justify-between sm:justify-end" : "justify-end")}>
-          {mostraProjecao && (
+          {showsProjection && (
             <Tooltip label="Projeção de atingimento ao final da meta. Aparece depois de metade do período.">
               <span className="inline-flex cursor-help">
-                <Badge variant={fecha ? "success" : "warning"}>{rotuloProjecao}</Badge>
+                <Badge variant={fecha ? "success" : "warning"}>{projectionLabel}</Badge>
               </span>
             </Tooltip>
           )}
           <Badge variant="neutral" className="gap-1">
             <ClockIcon />
-            {meta.daysRemaining <= 0
+            {goal.daysRemaining <= 0
               ? "Encerrada"
-              : meta.daysRemaining === 1
+              : goal.daysRemaining === 1
                 ? "Último dia"
-                : `${meta.daysRemaining} dias restantes`}
+                : `${goal.daysRemaining} dias restantes`}
           </Badge>
         </div>
       </div>
 
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <p className="text-[18px] font-extrabold tracking-tight text-t0 sm:text-[20px]">
-          <span className="font-mono">{brl(meta.realizado)}</span>
+          <span className="font-mono">{brl(goal.achieved)}</span>
           <span className="mx-1.5 text-[14px] font-semibold text-t2">/</span>
-          <span className="font-mono text-[14px] font-bold text-t2 sm:text-[15px]">{brl(meta.total)}</span>
+          <span className="font-mono text-[14px] font-bold text-t2 sm:text-[15px]">{brl(goal.total)}</span>
         </p>
-        <p className={`font-mono text-[26px] font-extrabold leading-none sm:text-[28px] ${corPct}`}>{num(meta.pct, 1)}%</p>
+        <p className={`font-mono text-[26px] font-extrabold leading-none sm:text-[28px] ${corPct}`}>{num(goal.pct, 1)}%</p>
       </div>
-      {meta.foraDaEquipe ? (
+      {goal.outsideTeam ? (
         <p className="mt-1 text-[12px] text-t2">
-          Inclui <span className="font-mono">{brl(meta.foraDaEquipe)}</span> de vendas sem vendedor identificado ou realizadas pela gerência, fora do ranking.
+          Inclui <span className="font-mono">{brl(goal.outsideTeam)}</span> de vendas sem vendedor identificado ou realizadas pela gerência, fora do ranking.
         </p>
       ) : null}
       </>
@@ -472,24 +472,24 @@ export function GoalProgressBar({
         const LABEL_MIN_PX = 140;
         const GAP_PX = 10;
         let menorFrac = 1;
-        for (let i = 1; i < degraus.length; i++) {
-          const frac = (degraus[i].atingimentoMinPct - degraus[i - 1].atingimentoMinPct) / escalaMax;
+        for (let i = 1; i < tiers.length; i++) {
+          const frac = (tiers[i].minAttainmentPct - tiers[i - 1].minAttainmentPct) / escalaMax;
           if (frac > 0 && frac < menorFrac) menorFrac = frac;
         }
         // Com N3 a esquerda do tick e N4 a direita da faixa, o vao = frac * W.
-        const trackMinW = degraus.length > 1 ? Math.ceil((LABEL_MIN_PX + GAP_PX) / menorFrac) : 280;
+        const trackMinW = tiers.length > 1 ? Math.ceil((LABEL_MIN_PX + GAP_PX) / menorFrac) : 280;
 
         return (
           <div className={cn("min-w-0 overflow-x-auto overscroll-x-contain touch-pan-x", !soBarra && "mt-4")}>
             <div className="w-full" style={{ minWidth: trackMinW }}>
               <div className="relative h-3 w-full overflow-hidden rounded-full" style={{ background: "var(--bg-3)" }}>
                 <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${fillPct}%`, background: corBarra }} />
-                {degraus.map((d) => {
-                  const left = (d.atingimentoMinPct / escalaMax) * 100;
-                  const atingido = meta.pct >= d.atingimentoMinPct;
+                {tiers.map((d) => {
+                  const left = (d.minAttainmentPct / escalaMax) * 100;
+                  const atingido = goal.pct >= d.minAttainmentPct;
                   return (
                     <span
-                      key={`tick-${d.nome}`}
+                      key={`tick-${d.name}`}
                       className="absolute top-0 bottom-0 w-0.5 -translate-x-1/2"
                       style={{ left: `${left}%`, background: atingido ? "var(--t0)" : "var(--t2)", opacity: atingido ? 0.55 : 0.35 }}
                     />
@@ -498,18 +498,18 @@ export function GoalProgressBar({
               </div>
 
               <div className="relative mt-2 h-7 w-full">
-                {degraus.map((d, i) => {
-                  const left = (d.atingimentoMinPct / escalaMax) * 100;
-                  const atingido = meta.pct >= d.atingimentoMinPct;
-                  const isLast = i === degraus.length - 1;
-                  const proximo = degraus[i + 1];
-                  const gapPts = proximo ? proximo.atingimentoMinPct - d.atingimentoMinPct : Infinity;
+                {tiers.map((d, i) => {
+                  const left = (d.minAttainmentPct / escalaMax) * 100;
+                  const atingido = goal.pct >= d.minAttainmentPct;
+                  const isLast = i === tiers.length - 1;
+                  const proximo = tiers[i + 1];
+                  const gapPts = proximo ? proximo.minAttainmentPct - d.minAttainmentPct : Infinity;
                   // Intervalo apertado: texto termina no tick (nao centra), liberando o vao ate o N4.
                   const ancoraDireitaNoTick = !isLast && gapPts <= 15;
-                  const rotuloCurto = d.nome.replace(/^Goal\s+/i, "");
+                  const shortLabel = d.name.replace(/^Goal\s+/i, "");
                   return (
                     <p
-                      key={d.nome}
+                      key={d.name}
                       className={cn(
                         "absolute top-0 whitespace-nowrap text-[10px] font-bold leading-tight",
                         isLast && "right-0 text-right",
@@ -518,10 +518,10 @@ export function GoalProgressBar({
                         atingido ? "text-acc" : "text-t2",
                       )}
                       style={isLast ? undefined : { left: `${left}%` }}
-                      title={`N${i + 1} · ${d.nome} · ${num(d.comissaoPct, 1)}%`}
+                      title={`N${i + 1} · ${d.name} · ${num(d.commissionPct, 1)}%`}
                     >
-                      N{i + 1} · {rotuloCurto}
-                      <span className="font-semibold opacity-75"> ({num(d.comissaoPct, 1)}%)</span>
+                      N{i + 1} · {shortLabel}
+                      <span className="font-semibold opacity-75"> ({num(d.commissionPct, 1)}%)</span>
                     </p>
                   );
                 })}
@@ -530,9 +530,9 @@ export function GoalProgressBar({
           </div>
         );
       })()}
-      {soBarra && meta.foraDaEquipe ? (
+      {soBarra && goal.outsideTeam ? (
         <p className="mt-1 text-[12px] text-t2">
-          Inclui <span className="font-mono">{brl(meta.foraDaEquipe)}</span> de vendas sem vendedor identificado ou realizadas pela gerência, fora do ranking.
+          Inclui <span className="font-mono">{brl(goal.outsideTeam)}</span> de vendas sem vendedor identificado ou realizadas pela gerência, fora do ranking.
         </p>
       ) : null}
     </>
@@ -625,31 +625,31 @@ function LevelsIcon() {
 
 export function GoalCard({
   card,
-  metaAtiva,
-  hojeIso,
+  activeGoal,
+  todayIso,
   onOpen,
 }: {
   card: GoalCardView;
-  metaAtiva: boolean;
-  hojeIso?: string;
+  activeGoal: boolean;
+  todayIso?: string;
   /** Clique no resumo abre o detalhe. A escada não navega. */
   onOpen?: () => void;
 }) {
-  const tipoLabel = card.tipo === "individual" ? "Individual" : card.tipo === "geral" ? "Geral" : "Grupo";
-  const resumo = (
+  const tipoLabel = card.kind === "individual" ? "Individual" : card.kind === "geral" ? "Geral" : "Grupo";
+  const summary = (
     <>
-      <CardTitle>{card.nome}</CardTitle>
+      <CardTitle>{card.name}</CardTitle>
 
       <div className="mt-2.5 flex flex-wrap gap-1.5">
         <Badge variant="neutral" className="gap-1">
-          {card.tipo === "individual" ? <IndividualTypeIcon /> : <GroupTypeIcon />}
+          {card.kind === "individual" ? <IndividualTypeIcon /> : <GroupTypeIcon />}
           {tipoLabel}
         </Badge>
         <Badge variant="neutral" className="gap-1">
           <StoreIcon />
-          {card.lojaNome}
+          {card.storeNameValue}
         </Badge>
-        {card.marcas.map((m) => (
+        {card.brands.map((m) => (
           <Badge key={m} variant="neutral" className="gap-1">
             <BrandIcon />
             {m}
@@ -672,7 +672,7 @@ export function GoalCard({
       </div>
 
       <div className="mt-4">
-        <GoalProgressBar meta={card.faixa} embedded hideTitle degraus={card.degraus} hojeIso={hojeIso} />
+        <GoalProgressBar goal={card.band} embedded hideTitle tiers={card.tiers} todayIso={todayIso} />
       </div>
     </>
   );
@@ -689,22 +689,22 @@ export function GoalCard({
               onOpen();
             }
           }}
-          aria-label={`Ver detalhe da meta ${card.nome}`}
+          aria-label={`Ver detalhe da meta ${card.name}`}
           className="cursor-pointer rounded-[10px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc"
         >
-          {resumo}
+          {summary}
         </div>
       ) : (
-        resumo
+        summary
       )}
 
       <SellersCard
         embedded
-        estado={card.vendedoras.length > 0 ? "disponivel" : "sem_dados"}
-        lista={card.vendedoras}
-        metaAtiva={metaAtiva}
-        grupo={card.tipo === "grupo"}
-        geral={card.tipo === "geral"}
+        estado={card.sellers.length > 0 ? "available" : "noData"}
+        lista={card.sellers}
+        activeGoal={activeGoal}
+        group={card.kind === "grupo"}
+        geral={card.kind === "geral"}
       />
     </Card>
   );

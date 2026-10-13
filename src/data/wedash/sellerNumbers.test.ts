@@ -10,12 +10,12 @@ const dia = (day: string, revenue: number, sales: number, items: number | null, 
 
 describe("sellerNumbers", () => {
   it("Hoje não tem comparativo (AC 3)", () => {
-    const n = sellerNumbers([dia(TODAY, 200, 2, 4)], { from: "2026-10-01", to: TODAY }, TODAY, "hoje");
-    expect(n.faturamento).toEqual({ value: 200 });
+    const n = sellerNumbers([dia(TODAY, 200, 2, 4)], { from: "2026-10-01", to: TODAY }, TODAY, "today");
+    expect(n.revenue).toEqual({ value: 200 });
     expect(n.vendas).toEqual({ value: 2 });
     expect(n.ticket.value).toBe(100);
     expect(n.pa.value).toBe(2);
-    expect(n.faturamento.delta).toBeUndefined();
+    expect(n.revenue.delta).toBeUndefined();
   });
 
   it("Mês compara com o mesmo recorte até ontem nos dois lados (AC 3)", () => {
@@ -26,10 +26,10 @@ describe("sellerNumbers", () => {
       dia("2026-10-03", 500, 5, 10),
       dia(TODAY, 900, 9, 18),
     ];
-    const n = sellerNumbers(days, { from: "2026-10-01", to: TODAY }, TODAY, "mes");
+    const n = sellerNumbers(days, { from: "2026-10-01", to: TODAY }, TODAY, "month");
     // Hoje fica de fora dos dois lados: 01 - 03/10 x os 4 dias anteriores ate 29/09.
-    expect(n.faturamento.value).toBe(900);
-    expect(n.faturamento.delta?.anterior).toBeTruthy();
+    expect(n.revenue.value).toBe(900);
+    expect(n.revenue.delta?.anterior).toBeTruthy();
     expect(n.vendas.value).toBe(9);
   });
 
@@ -38,16 +38,16 @@ describe("sellerNumbers", () => {
       [dia("2026-10-01", 100, 1, 2), dia("2026-10-02", 200, 2, null)],
       { from: "2026-10-01", to: "2026-10-31" },
       TODAY,
-      "mes",
+      "month",
     );
     expect(n.pa.value).toBeNull();
     expect(n.pa.delta).toBeUndefined();
-    expect(n.faturamento.value).toBe(300);
+    expect(n.revenue.value).toBe(300);
   });
 
   it("sem vendas mostra zero e nenhum badge (AC 5)", () => {
-    const n = sellerNumbers([], { from: "2026-10-01", to: TODAY }, TODAY, "mes");
-    expect(n.faturamento).toEqual({ value: 0 });
+    const n = sellerNumbers([], { from: "2026-10-01", to: TODAY }, TODAY, "month");
+    expect(n.revenue).toEqual({ value: 0 });
     expect(n.vendas).toEqual({ value: 0 });
     expect(n.ticket).toEqual({ value: 0 });
     expect(n.pa).toEqual({ value: 0 });
@@ -58,9 +58,9 @@ describe("sellerNumbers", () => {
       [dia("2026-10-02", 100, 1, 2, "s1"), dia("2026-10-02", 300, 3, 6, "s2")],
       { from: "2026-10-01", to: "2026-10-31" },
       TODAY,
-      "mes",
+      "month",
     );
-    expect(n.faturamento.value).toBe(400);
+    expect(n.revenue.value).toBe(400);
     expect(n.vendas.value).toBe(4);
     expect(n.pa.value).toBe(2);
   });
@@ -70,9 +70,9 @@ describe("sellerNumbers", () => {
       [dia("2026-09-01", 100, 1, 2), dia("2026-09-02", 200, 2, 4), dia("2026-08-30", 50, 1, 2)],
       { from: "2026-09-01", to: "2026-09-02" },
       TODAY,
-      "mes",
+      "month",
     );
-    expect(n.faturamento.value).toBe(300);
-    expect(n.faturamento.delta).toBeDefined();
+    expect(n.revenue.value).toBe(300);
+    expect(n.revenue.delta).toBeDefined();
   });
 });

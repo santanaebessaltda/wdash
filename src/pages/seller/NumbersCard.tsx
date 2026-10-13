@@ -50,11 +50,11 @@ export function NumbersCard({
   period: { from: string; to: string };
   today: string;
 }) {
-  const [mode, setMode] = useState<NumbersMode>("mes");
+  const [mode, setMode] = useState<NumbersMode>("month");
   const n = sellerNumbers(days, period, today, mode);
   const pa = n.pa.value == null ? "—" : num(n.pa.value, 2);
-  const cards: { label: string; value: string; delta?: (typeof n.faturamento)["delta"]; tooltip?: string }[] = [
-    { label: "Faturamento", value: brlCent(n.faturamento.value ?? 0), delta: n.faturamento.delta },
+  const cards: { label: string; value: string; delta?: (typeof n.revenue)["delta"]; tooltip?: string }[] = [
+    { label: "Faturamento", value: brlCent(n.revenue.value ?? 0), delta: n.revenue.delta },
     { label: "Nº de vendas", value: num(n.vendas.value ?? 0, 0), delta: n.vendas.delta },
     { label: "Ticket médio", value: brlCent(n.ticket.value ?? 0), delta: n.ticket.delta },
     {
@@ -70,8 +70,8 @@ export function NumbersCard({
         <h2 className="text-[15px] font-bold text-t0">Seus números</h2>
         <Segmented
           options={[
-            { value: "hoje", label: "Hoje" },
-            { value: "mes", label: "Este mês" },
+            { value: "today", label: "Hoje" },
+            { value: "month", label: "Este mês" },
           ]}
           value={mode}
           onChange={(v) => v && setMode(v)}

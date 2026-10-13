@@ -160,7 +160,7 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
   };
 
   const now = new Date();
-  const lojas = storesForSession(session.stores).filter((s) => storeIds.length === 0 || storeIds.includes(s.id));
+  const storeRows = storesForSession(session.stores).filter((s) => storeIds.length === 0 || storeIds.includes(s.id));
   if (!pode || !canForce) return null;
 
   // telaGen re-renderiza quando a tela assume ou solta o botão.
@@ -168,7 +168,7 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
   const proprio = tela != null && !tela.sales;
   const ocupado = telaBusy || (!proprio && refreshing);
 
-  const algumaAberta = lojas.some((s) => storePhase(s.horas, now, s.fuso) === "open");
+  const algumaAberta = storeRows.some((s) => storePhase(s.horas, now, s.fuso) === "open");
   const atrasado =
     !proprio &&
     loaded &&

@@ -10,12 +10,12 @@ export interface Store {
   id: string;
   millenniumBranch: number;
   codFilial: string;
-  nome: string;
+  name: string;
   fantasia: string;
   cnpj: string;
   cidade: string;
   uf: string;
-  tipo: "M" | "F";
+  kind: "M" | "F";
   pointType: PointType;
   temWpink: boolean;
   fuso: string;
@@ -148,12 +148,12 @@ export const stores: Store[] = [
     id: "f1",
     millenniumBranch: 8,
     codFilial: "00008",
-    nome: "ESSENCIA PERFUMARIA CG SHOPPING",
+    name: "ESSENCIA PERFUMARIA CG SHOPPING",
     fantasia: "Shopping Campo Grande",
     cnpj: "45.812.330/0001-19",
     cidade: "Campo Grande",
     uf: "MS",
-    tipo: "M",
+    kind: "M",
     pointType: "SHOPPING",
     temWpink: false,
     fuso: "America/Campo_Grande",
@@ -172,12 +172,12 @@ export const stores: Store[] = [
     id: "f2",
     millenniumBranch: 10,
     codFilial: "00010",
-    nome: "ESSENCIA PERFUMARIA TRES LAGOAS",
+    name: "ESSENCIA PERFUMARIA TRES LAGOAS",
     fantasia: "Shopping Três Lagoas",
     cnpj: "45.812.330/0002-08",
     cidade: "Três Lagoas",
     uf: "MS",
-    tipo: "F",
+    kind: "F",
     pointType: "RUA",
     temWpink: true,
     fuso: "America/Campo_Grande",
@@ -229,12 +229,12 @@ export function storeIdsFromErp(
         id,
         millenniumBranch: e.storeId,
         codFilial: e.code ?? String(e.storeId).padStart(5, "0"),
-        nome: e.name ?? e.tradeName ?? id,
+        name: e.name ?? e.tradeName ?? id,
         fantasia: e.tradeName ?? e.name ?? id,
         cnpj: formatCnpjDisplay(e.taxId ?? ""),
         cidade: e.city ?? "",
         uf: e.state ?? "",
-        tipo: e.type ?? "F",
+        kind: e.type ?? "F",
         pointType: "RUA",
         temWpink: Boolean(e.hasWpink),
         fuso: "America/Sao_Paulo",
@@ -358,12 +358,12 @@ function rowToStore(r: {
     id: r.id,
     millenniumBranch: r.millennium_store_id,
     codFilial: r.code || String(r.millennium_store_id).padStart(5, "0"),
-    nome: r.name || r.trade_name || r.code || r.id,
+    name: r.name || r.trade_name || r.code || r.id,
     fantasia: r.trade_name || r.name || r.code || r.id,
     cnpj: formatCnpjDisplay(r.tax_id ?? ""),
     cidade: "",
     uf: "",
-    tipo: "F",
+    kind: "F",
     pointType: r.point_type === "STREET" ? "RUA" : "SHOPPING",
     temWpink: Boolean(r.has_wpink),
     fuso: r.timezone || "America/Campo_Grande",
@@ -399,8 +399,8 @@ const STORE_POINT_TYPE_COLUMN = "point_type";
  * Filtro de marca so faz sentido se alguma loja do escopo tem WPINK.
  * `filialIds` vazio = rede (usa sessionStoreIds).
  */
-export function scopeShowsBrandPicker(filialIds: string[], sessionStoreIds: string[]): boolean {
-  const ids = filialIds.length > 0 ? filialIds : sessionStoreIds;
+export function scopeShowsBrandPicker(storeIds: string[], sessionStoreIds: string[]): boolean {
+  const ids = storeIds.length > 0 ? storeIds : sessionStoreIds;
   if (ids.length === 0) return false;
   const byId = new Map(storesForSession(sessionStoreIds).map((s) => [s.id, s]));
   return ids.some((id) => byId.get(id)?.temWpink === true);
@@ -925,76 +925,76 @@ type DayHoursJson = { open: string; close: string } | null;
 
 export interface Grupo {
   id: string;
-  filialId: string;
-  nome: string;
+  storeId: string;
+  name: string;
   horaInicio: number;
   horaFim: number;
 }
 
-export const grupos: Grupo[] = [
-  { id: "t-f1-manha", filialId: "f1", nome: "Grupo 1", horaInicio: 0, horaFim: 16 },
-  { id: "t-f1-tarde", filialId: "f1", nome: "Grupo 2", horaInicio: 16, horaFim: 24 },
-  { id: "t-f2-manha", filialId: "f2", nome: "Grupo 1", horaInicio: 0, horaFim: 13 },
-  { id: "t-f2-tarde", filialId: "f2", nome: "Grupo 2", horaInicio: 13, horaFim: 24 },
+export const groups: Grupo[] = [
+  { id: "t-f1-manha", storeId: "f1", name: "Grupo 1", horaInicio: 0, horaFim: 16 },
+  { id: "t-f1-tarde", storeId: "f1", name: "Grupo 2", horaInicio: 16, horaFim: 24 },
+  { id: "t-f2-manha", storeId: "f2", name: "Grupo 1", horaInicio: 0, horaFim: 13 },
+  { id: "t-f2-tarde", storeId: "f2", name: "Grupo 2", horaInicio: 13, horaFim: 24 },
 ];
 
 export interface Tarefa {
   id: string;
-  filialId: string;
+  storeId: string;
   grupoId: string;
-  titulo: string;
+  title: string;
   ordem: number;
 }
 
 export const tarefas: Tarefa[] = [
-  { id: "tf1", filialId: "f1", grupoId: "t-f1-manha", titulo: "Abrir caixa e conferir fundo de troco", ordem: 1 },
-  { id: "tf2", filialId: "f1", grupoId: "t-f1-manha", titulo: "Reposição da vitrine de perfumaria", ordem: 2 },
-  { id: "tf3", filialId: "f1", grupoId: "t-f1-manha", titulo: "Testar provadores e repor blotters", ordem: 3 },
-  { id: "tf4", filialId: "f1", grupoId: "t-f1-manha", titulo: "Conferir etiquetas de preço da promoção", ordem: 4 },
-  { id: "tf5", filialId: "f1", grupoId: "t-f1-manha", titulo: "Limpeza das prateleiras de body splash", ordem: 5 },
-  { id: "tf6", filialId: "f1", grupoId: "t-f1-tarde", titulo: "Passagem de grupo: caixa e pendências", ordem: 1 },
-  { id: "tf7", filialId: "f1", grupoId: "t-f1-tarde", titulo: "Reposição de estoque na loja", ordem: 2 },
-  { id: "tf8", filialId: "f1", grupoId: "t-f1-tarde", titulo: "Organizar kits de presente", ordem: 3 },
-  { id: "tf9", filialId: "f1", grupoId: "t-f1-tarde", titulo: "Fechamento de caixa e sangria", ordem: 4 },
-  { id: "tf10", filialId: "f2", grupoId: "t-f2-manha", titulo: "Abrir loja e conferir fundo de troco", ordem: 1 },
-  { id: "tf11", filialId: "f2", grupoId: "t-f2-manha", titulo: "Conferir vitrine externa", ordem: 2 },
-  { id: "tf12", filialId: "f2", grupoId: "t-f2-manha", titulo: "Repor suplementos WPINK no expositor", ordem: 3 },
-  { id: "tf13", filialId: "f2", grupoId: "t-f2-manha", titulo: "Registrar temperatura do estoque", ordem: 4 },
-  { id: "tf14", filialId: "f2", grupoId: "t-f2-tarde", titulo: "Passagem de grupo", ordem: 1 },
-  { id: "tf15", filialId: "f2", grupoId: "t-f2-tarde", titulo: "Reposição de perfumaria", ordem: 2 },
-  { id: "tf16", filialId: "f2", grupoId: "t-f2-tarde", titulo: "Fechamento de caixa", ordem: 3 },
+  { id: "tf1", storeId: "f1", grupoId: "t-f1-manha", title: "Abrir caixa e conferir fundo de troco", ordem: 1 },
+  { id: "tf2", storeId: "f1", grupoId: "t-f1-manha", title: "Reposição da vitrine de perfumaria", ordem: 2 },
+  { id: "tf3", storeId: "f1", grupoId: "t-f1-manha", title: "Testar provadores e repor blotters", ordem: 3 },
+  { id: "tf4", storeId: "f1", grupoId: "t-f1-manha", title: "Conferir etiquetas de preço da promoção", ordem: 4 },
+  { id: "tf5", storeId: "f1", grupoId: "t-f1-manha", title: "Limpeza das prateleiras de body splash", ordem: 5 },
+  { id: "tf6", storeId: "f1", grupoId: "t-f1-tarde", title: "Passagem de grupo: caixa e pendências", ordem: 1 },
+  { id: "tf7", storeId: "f1", grupoId: "t-f1-tarde", title: "Reposição de estoque na loja", ordem: 2 },
+  { id: "tf8", storeId: "f1", grupoId: "t-f1-tarde", title: "Organizar kits de presente", ordem: 3 },
+  { id: "tf9", storeId: "f1", grupoId: "t-f1-tarde", title: "Fechamento de caixa e sangria", ordem: 4 },
+  { id: "tf10", storeId: "f2", grupoId: "t-f2-manha", title: "Abrir loja e conferir fundo de troco", ordem: 1 },
+  { id: "tf11", storeId: "f2", grupoId: "t-f2-manha", title: "Conferir vitrine externa", ordem: 2 },
+  { id: "tf12", storeId: "f2", grupoId: "t-f2-manha", title: "Repor suplementos WPINK no expositor", ordem: 3 },
+  { id: "tf13", storeId: "f2", grupoId: "t-f2-manha", title: "Registrar temperatura do estoque", ordem: 4 },
+  { id: "tf14", storeId: "f2", grupoId: "t-f2-tarde", title: "Passagem de grupo", ordem: 1 },
+  { id: "tf15", storeId: "f2", grupoId: "t-f2-tarde", title: "Reposição de perfumaria", ordem: 2 },
+  { id: "tf16", storeId: "f2", grupoId: "t-f2-tarde", title: "Fechamento de caixa", ordem: 3 },
 ];
 
 export interface Categoria {
   id: number;
-  nome: string;
-  divisao: Division;
+  name: string;
+  division: Division;
   /** CMV como fracao do preco de venda (custo de fabrica com imposto). */
   cmvPct: number;
 }
 
 /** Categorias por TIPO do ERP, agrupadas por id. */
 export const categorias: Categoria[] = [
-  { id: 1, nome: "Perfumaria", divisao: "WEPINK", cmvPct: 0.3 },
-  { id: 2, nome: "Body Splash", divisao: "WEPINK", cmvPct: 0.27 },
-  { id: 3, nome: "Body Cream", divisao: "WEPINK", cmvPct: 0.31 },
-  { id: 4, nome: "Hair", divisao: "WEPINK", cmvPct: 0.34 },
-  { id: 5, nome: "Skincare", divisao: "WEPINK", cmvPct: 0.36 },
-  { id: 6, nome: "Make", divisao: "WEPINK", cmvPct: 0.38 },
-  { id: 7, nome: "Kits e presentes", divisao: "WEPINK", cmvPct: 0.33 },
-  { id: 8, nome: "Suplementos", divisao: "WPINK", cmvPct: 0.42 },
+  { id: 1, name: "Perfumaria", division: "WEPINK", cmvPct: 0.3 },
+  { id: 2, name: "Body Splash", division: "WEPINK", cmvPct: 0.27 },
+  { id: 3, name: "Body Cream", division: "WEPINK", cmvPct: 0.31 },
+  { id: 4, name: "Hair", division: "WEPINK", cmvPct: 0.34 },
+  { id: 5, name: "Skincare", division: "WEPINK", cmvPct: 0.36 },
+  { id: 6, name: "Make", division: "WEPINK", cmvPct: 0.38 },
+  { id: 7, name: "Kits e presentes", division: "WEPINK", cmvPct: 0.33 },
+  { id: 8, name: "Suplementos", division: "WPINK", cmvPct: 0.42 },
 ];
 
 export const paymentMethods = ["Pix", "Cartão de crédito", "Cartão de débito", "Dinheiro"] as const;
 export type PaymentMethod = (typeof paymentMethods)[number];
 
 export interface StoreConfig {
-  filialId: string;
+  storeId: string;
   impostoSobreCustoPct: number;
   margemMinimaPct: number | null;
 }
 
 export const storeConfigs: StoreConfig[] = [
-  { filialId: "f1", impostoSobreCustoPct: 4, margemMinimaPct: 55 },
-  { filialId: "f2", impostoSobreCustoPct: 4, margemMinimaPct: null },
+  { storeId: "f1", impostoSobreCustoPct: 4, margemMinimaPct: 55 },
+  { storeId: "f2", impostoSobreCustoPct: 4, margemMinimaPct: null },
 ];

@@ -8,7 +8,7 @@ import { sessionFromUser, type Session } from "@/session/session";
 import { paths } from "@/router/paths";
 
 export const MENSAGEM_LOGIN = "E-mail ou senha incorretos.";
-export const MENSAGEM_SENHA_GENERICA = "Não foi possível salvar sua senha. Tente novamente.";
+export const GENERIC_PASSWORD_MESSAGE = "Não foi possível salvar sua senha. Tente novamente.";
 export const MENSAGEM_OTP_INVALIDO = "Código inválido ou expirado. Solicite um novo código.";
 export const MENSAGEM_OTP_GENERICA = "Não foi possível verificar o código. Tente novamente.";
 export const MENSAGEM_SESSAO_EXPIRADA = "Sua sessão expirou. Entre novamente.";
@@ -25,7 +25,7 @@ export function normalizeRecoveryOtp(raw: string): string {
 
 /** Traduz erros do Supabase Auth (ingles) para copy PT da tela Nova senha. */
 export function passwordAuthError(error: { code?: string; message?: string } | null): string {
-  if (!error) return MENSAGEM_SENHA_GENERICA;
+  if (!error) return GENERIC_PASSWORD_MESSAGE;
   const code = (error.code ?? "").toLowerCase();
   const msg = (error.message ?? "").toLowerCase();
 
@@ -39,10 +39,10 @@ export function passwordAuthError(error: { code?: string; message?: string } | n
     return MENSAGEM_OTP_INVALIDO;
   }
   if (msg.includes("rate limit") || code.includes("over_request")) {
-    return MENSAGEM_SENHA_GENERICA;
+    return GENERIC_PASSWORD_MESSAGE;
   }
   // Nunca exibir ingles cru na UI.
-  return MENSAGEM_SENHA_GENERICA;
+  return GENERIC_PASSWORD_MESSAGE;
 }
 
 /** Traduz erros do Auth na etapa de OTP (recovery). */
@@ -226,7 +226,7 @@ export async function resetPasswordWithOtp(
   const verified = await verifyRecoveryOtp(email, otp);
   if (!verified.ok) return verified;
   const updated = await updatePassword(novaSenha);
-  if (!updated.ok) return { ok: false, error: updated.error ?? MENSAGEM_SENHA_GENERICA };
+  if (!updated.ok) return { ok: false, error: updated.error ?? GENERIC_PASSWORD_MESSAGE };
   return { ok: true };
 }
 
@@ -499,7 +499,7 @@ export async function changeMyPassword(email: string, atual: string, nova: strin
   if (error) {
     const msg = passwordAuthError(error);
     if (msg === MENSAGEM_OTP_INVALIDO) return { ok: false, error: MENSAGEM_SESSAO_EXPIRADA };
-    if (msg === MENSAGEM_SENHA_GENERICA) return { ok: false, error: "Não foi possível alterar sua senha. Tente novamente." };
+    if (msg === GENERIC_PASSWORD_MESSAGE) return { ok: false, error: "Não foi possível alterar sua senha. Tente novamente." };
     return { ok: false, error: msg };
   }
   return { ok: true };

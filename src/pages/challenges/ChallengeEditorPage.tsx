@@ -105,21 +105,21 @@ export default function ChallengeEditorPage() {
   const location = useLocation();
   const session = useActiveSession();
   const toast = useToast();
-  const titulo = id ? "Editar desafio" : "Novo desafio";
+  const title = id ? "Editar desafio" : "Novo desafio";
   const voltarPara = challengeBackPath(location.state);
   const voltar = () =>
     navigate(id ? paths.management.challengeDetail(id) : voltarPara, id ? { state: location.state } : undefined);
 
-  const { escopo } = useScope();
-  const lojas = useMemo(() => storesForSession(session.stores), [session.stores]);
-  const lojaFiltro = escopo.filialIds[0];
+  const { scope } = useScope();
+  const storeRows = useMemo(() => storesForSession(session.stores), [session.stores]);
+  const storeFilter = scope.storeIds[0];
   const [form, setForm] = useState<ChallengeForm>(() =>
-    emptyChallengeForm(copyForStore ? "" : lojaFiltro ?? (lojas.length === 1 ? lojas[0]!.id : "")),
+    emptyChallengeForm(copyForStore ? "" : storeFilter ?? (storeRows.length === 1 ? storeRows[0]!.id : "")),
   );
   const set = (patch: Partial<ChallengeForm>) => setForm((f) => ({ ...f, ...patch }));
   useEffect(() => {
-    if (!id && !copyForStore && lojaFiltro) setForm((f) => ({ ...f, storeId: lojaFiltro }));
-  }, [id, lojaFiltro, copyForStore]);
+    if (!id && !copyForStore && storeFilter) setForm((f) => ({ ...f, storeId: storeFilter }));
+  }, [id, storeFilter, copyForStore]);
   useReturnWhenStoreChanges(id ? form.storeId || undefined : undefined, voltarPara);
 
   const sourceId = id ?? copyId;
@@ -128,19 +128,19 @@ export default function ChallengeEditorPage() {
   const [copiedFrom, setCopiedFrom] = useState<string | null>(null);
   const [copiedForStore, setCopiedForStore] = useState(false);
   const [sourceStoreId, setSourceStoreId] = useState<string | null>(null);
-  const lojasDestino = useMemo(
-    () => (copyForStore && sourceStoreId ? lojas.filter((l) => l.id !== sourceStoreId) : lojas),
-    [copyForStore, sourceStoreId, lojas],
+  const targetStores = useMemo(
+    () => (copyForStore && sourceStoreId ? storeRows.filter((l) => l.id !== sourceStoreId) : storeRows),
+    [copyForStore, sourceStoreId, storeRows],
   );
   /** Loja ja definida (StorePicker numa loja, usuario de 1 loja ou edicao): combo aparece bloqueado. Copia para outra loja deixa livre. */
-  const lojaFixa = copyForStore
-    ? lojasDestino.length === 1
-    : Boolean(id) || Boolean(lojaFiltro) || lojas.length === 1;
-  const lojaHint = id
+  const fixedStore = copyForStore
+    ? targetStores.length === 1
+    : Boolean(id) || Boolean(storeFilter) || storeRows.length === 1;
+  const storeHint = id
     ? "A filial não pode ser alterada depois que o desafio é criado."
     : copyForStore
       ? "Escolha a filial de destino."
-      : lojaFiltro && lojas.length > 1
+      : storeFilter && storeRows.length > 1
         ? "Para escolher outra filial, selecione Todas as filiais no filtro do topo."
         : undefined;
   useEffect(() => {
@@ -153,15 +153,15 @@ export default function ChallengeEditorPage() {
       else if (copyId) {
         if (copyForStore) {
           setSourceStoreId(c.storeId);
-          const outras = lojas.filter((l) => l.id !== c.storeId);
+          const outras = storeRows.filter((l) => l.id !== c.storeId);
           const destino =
-            lojaFiltro && lojaFiltro !== c.storeId ? lojaFiltro : outras.length === 1 ? outras[0]!.id : "";
+            storeFilter && storeFilter !== c.storeId ? storeFilter : outras.length === 1 ? outras[0]!.id : "";
           setForm({ ...challengeToForm(copyChallengeToStore(c)), storeId: destino });
           setCopiedFrom(c.name);
           setCopiedForStore(true);
         } else {
           setSourceStoreId(null);
-          setForm({ ...challengeToForm(copyChallenge(c)), storeId: lojaFiltro ?? c.storeId });
+          setForm({ ...challengeToForm(copyChallenge(c)), storeId: storeFilter ?? c.storeId });
           setCopiedFrom(c.name);
           setCopiedForStore(false);
         }
@@ -222,11 +222,11 @@ export default function ChallengeEditorPage() {
           Voltar
         </Button>
         <Breadcrumbs
-          items={[{ label: "Gestão" }, { label: "Desafios", to: paths.management.challenges }, { label: titulo }]}
+          items={[{ label: "Gestão" }, { label: "Desafios", to: paths.management.challenges }, { label: title }]}
         />
       </div>
       <div className="mb-5">
-        <h1 className="text-[22px] font-extrabold tracking-tight text-t0">{titulo}</h1>
+        <h1 className="text-[22px] font-extrabold tracking-tight text-t0">{title}</h1>
         {copiedFrom && (
           <p className="mt-1 text-[13px] text-t2">
             Cópia de <span className="font-semibold text-t1">{copiedFrom}</span>
@@ -267,7 +267,7 @@ export default function ChallengeEditorPage() {
   }
 
   const usaVendas = usesMinSales(form.metric);
-  const usaEscopo = usesScope(form.metric);
+  const metricUsesScope = usesScope(form.metric);
   const indice = isIndexMetric(form.metric);
   const modo = form.mode;
   const podio = modo === "CONTEST" ? form.prizes.slice(0, MAX_PODIUM) : form.prizes.slice(0, 1);
@@ -309,19 +309,19 @@ export default function ChallengeEditorPage() {
               />
             </FormField>
           </div>
-          <FormField label="Filial" required error={errors.storeId} hint={lojaHint}>
+          <FormField label="Filial" required error={errors.storeId} hint={storeHint}>
             <Select
               value={form.storeId}
               onChange={(e) => set({ storeId: e.target.value })}
-              disabled={lojaFixa}
+              disabled={fixedStore}
               className={cn(
                 !form.storeId && "text-t2",
-                lojaFixa && "cursor-not-allowed opacity-60",
+                fixedStore && "cursor-not-allowed opacity-60",
                 errors.storeId && "border-bad!",
               )}
             >
               {!form.storeId && <option value="">Selecione a loja</option>}
-              {lojasDestino.map((l) => (
+              {targetStores.map((l) => (
                 <option key={l.id} value={l.id}>
                   {l.fantasia} · Filial {l.codFilial}
                 </option>
@@ -350,7 +350,7 @@ export default function ChallengeEditorPage() {
             />
             <p className="mt-1.5 text-[11.5px] text-t2">{METRIC_HELP[form.metric]}</p>
           </FormField>
-          {usaEscopo && (
+          {metricUsesScope && (
             <FormField label="O que conta" required>
               <Segmented<ChallengeScope>
                 options={[
@@ -363,7 +363,7 @@ export default function ChallengeEditorPage() {
               {form.scope !== "ALL" && <p className="mt-1.5 text-[11.5px] text-t2">{SCOPE_HELP[form.scope]}</p>}
             </FormField>
           )}
-          {usaEscopo && form.scope === "PRODUCTS" && (
+          {metricUsesScope && form.scope === "PRODUCTS" && (
             <ProductPicker
               catalog={catalog}
               selected={form.products}
@@ -371,7 +371,7 @@ export default function ChallengeEditorPage() {
               error={errors.products}
             />
           )}
-          {usaEscopo && form.scope === "CATEGORIES" && (
+          {metricUsesScope && form.scope === "CATEGORIES" && (
             <CategoryPicker
               catalog={catalog}
               selected={form.categories}
@@ -607,14 +607,14 @@ function PickerShell({ label, error, children }: { label: string; error?: string
 const TAGS_VISIVEIS = 12;
 
 /** Parte do nome que bate com a busca, na cor primaria. */
-function destacar(nome: string, q: string): ReactNode {
-  const i = q ? semAcento(nome).indexOf(q) : -1;
-  if (i < 0) return nome;
+function destacar(name: string, q: string): ReactNode {
+  const i = q ? semAcento(name).indexOf(q) : -1;
+  if (i < 0) return name;
   return (
     <>
-      {nome.slice(0, i)}
-      <span className="text-acc">{nome.slice(i, i + q.length)}</span>
-      {nome.slice(i + q.length)}
+      {name.slice(0, i)}
+      <span className="text-acc">{name.slice(i, i + q.length)}</span>
+      {name.slice(i + q.length)}
     </>
   );
 }

@@ -94,7 +94,7 @@ const input = (over: Partial<ChallengeAggInput> = {}): ChallengeAggInput => ({
 const build = (c: ChallengeRecord, aggs: ChallengeAggInput, today = "2026-10-08") =>
   buildChallengeView({ challenge: c, aggs, today });
 
-const byName = (v: ReturnType<typeof build>) => Object.fromEntries(v.participantes.map((p) => [p.nome, p]));
+const byName = (v: ReturnType<typeof build>) => Object.fromEntries(v.participants.map((p) => [p.name, p]));
 
 describe("buildChallengeView — participantes e resultado", () => {
   it("Produtos: soma só os produtos escolhidos, por pessoa (gerador → cadastro)", () => {
@@ -106,7 +106,7 @@ describe("buildChallengeView — participantes e resultado", () => {
     expect(p.ANA.resultado).toBe(5);
     expect(p.BIA.resultado).toBe(1);
     expect(p.CAROL.resultado).toBe(0);
-    expect(v.participantes).toHaveLength(3);
+    expect(v.participants).toHaveLength(3);
   });
 
   it("Categorias: soma os itens cujo tipo no catálogo está entre os escolhidos", () => {
@@ -142,9 +142,9 @@ describe("buildChallengeView — participantes e resultado", () => {
     const qtd = byName(build(challenge({ scope: "ALL", products: [] }), aggs));
     expect(qtd.ANA.resultado).toBe(27);
     expect(qtd.BIA.resultado).toBe(6);
-    const valor = byName(build(challenge({ metric: "VALUE", scope: "ALL", products: [] }), aggs));
-    expect(valor.ANA.resultado).toBe(1323);
-    expect(valor.BIA.resultado).toBe(300);
+    const amount = byName(build(challenge({ metric: "VALUE", scope: "ALL", products: [] }), aggs));
+    expect(amount.ANA.resultado).toBe(1323);
+    expect(amount.BIA.resultado).toBe(300);
   });
 
   it("Quantidade de tudo sem itens gravados em algum dia com venda = \"—\" e não concorre", () => {
@@ -198,7 +198,7 @@ describe("buildChallengeView — participantes e resultado", () => {
     );
     expect(byName(v).ANA.resultado).toBeNull();
     expect(byName(v).BIA.resultado).toBeNull();
-    expect(v.participantes.some((x) => x.vencedor)).toBe(false);
+    expect(v.participants.some((x) => x.vencedor)).toBe(false);
   });
 
   it("Índice: gerência pelo índice da equipe × o mesmo nº de dias antes do desafio (em andamento, até ontem)", () => {
@@ -241,8 +241,8 @@ describe("buildChallengeView — participantes e resultado", () => {
   });
 
   it("performanceIndex: na média da equipe = 100", () => {
-    expect(performanceIndex({ faturamento: 90_000, vendas: 10, itens: 17.5 }, { faturamentoMedio: 90_000, ticket: 9_000, pa: 1.75 })).toBeCloseTo(100);
-    expect(performanceIndex({ faturamento: 0, vendas: 0, itens: 0 }, { faturamentoMedio: 1, ticket: 1, pa: 1 })).toBe(0);
+    expect(performanceIndex({ revenue: 90_000, vendas: 10, itens: 17.5 }, { faturamentoMedio: 90_000, ticket: 9_000, pa: 1.75 })).toBeCloseTo(100);
+    expect(performanceIndex({ revenue: 0, vendas: 0, itens: 0 }, { faturamentoMedio: 1, ticket: 1, pa: 1 })).toBe(0);
   });
 
   it("P.A. sem itens gravados em algum dia com venda = \"—\" e não concorre", () => {
@@ -257,14 +257,14 @@ describe("buildChallengeView — participantes e resultado", () => {
     expect(p.BIA.posicao).toBe(1);
     expect(p.BIA.vencedor).toBe(false);
     expect(p.BIA.falta).toBe("O P.A. só vale no fim do desafio");
-    const fim = byName(
+    const end = byName(
       build(
         challenge({ metric: "PA", products: [], minSales: 1 }),
         input({ sellerDays: [sellerDay(1, 10, 20, 100_000), sellerDay(1, 4, 0, 30_000, { day: "2026-10-07" }), sellerDay(2, 5, 7, 40_000)] }),
         "2026-10-12",
       ),
     );
-    expect(fim.BIA.vencedor).toBe(true);
+    expect(end.BIA.vencedor).toBe(true);
   });
 
   it("pessoa desligada que vendeu continua na tabela; quem não é da equipe e não vendeu fica de fora", () => {
@@ -275,7 +275,7 @@ describe("buildChallengeView — participantes e resultado", () => {
         sellerProducts: [item(1004, "BS1", 2)],
       }),
     );
-    expect(v.participantes.map((p) => p.nome).sort()).toEqual(["ANA", "BIA", "CAROL", "DORA"]);
+    expect(v.participants.map((p) => p.name).sort()).toEqual(["ANA", "BIA", "CAROL", "DORA"]);
     expect(byName(v).DORA.resultado).toBe(2);
   });
 
@@ -299,15 +299,15 @@ describe("buildChallengeView — participantes e resultado", () => {
   });
 
   it("loja sem equipe e sem vendas = nenhum participante", () => {
-    expect(build(challenge(), input({ team: [] })).participantes).toEqual([]);
+    expect(build(challenge(), input({ team: [] })).participants).toEqual([]);
   });
 
   it("A começar: participantes sem resultado e prazo \"Começa em DD/MM\"", () => {
     const v = build(challenge(), input({ sellerProducts: [item(1001, "BS1", 3)] }), "2026-10-01");
     expect(v.status).toBe("upcoming");
     expect(v.prazo).toBe("Começa em 05/10");
-    expect(v.participantes.every((p) => p.resultado == null && !p.vencedor && p.falta == null)).toBe(true);
-    expect(v.participantes.map((p) => p.nome)).toEqual(["ANA", "BIA", "CAROL"]);
+    expect(v.participants.every((p) => p.resultado == null && !p.vencedor && p.falta == null)).toBe(true);
+    expect(v.participants.map((p) => p.name)).toEqual(["ANA", "BIA", "CAROL"]);
   });
 });
 
@@ -319,10 +319,10 @@ describe("buildChallengeView — Disputa e Mínimo", () => {
     );
     const p = byName(v);
     expect([p.ANA.posicao, p.BIA.posicao, p.CAROL.posicao]).toEqual([1, 1, 3]);
-    expect(p.ANA.premio).toEqual({ kind: "MONEY", amount: 100 });
-    expect(p.BIA.premio).toEqual({ kind: "MONEY", amount: 100 });
+    expect(p.ANA.prize).toEqual({ kind: "MONEY", amount: 100 });
+    expect(p.BIA.prize).toEqual({ kind: "MONEY", amount: 100 });
     expect(p.CAROL.vencedor).toBe(false);
-    expect(v.participantes.map((x) => x.nome)).toEqual(["ANA", "BIA", "CAROL"]);
+    expect(v.participants.map((x) => x.name)).toEqual(["ANA", "BIA", "CAROL"]);
   });
 
   it("Disputa só com prêmio do 1º: o 2º lugar não leva nada", () => {
@@ -330,7 +330,7 @@ describe("buildChallengeView — Disputa e Mínimo", () => {
     expect(p.ANA.vencedor).toBe(true);
     expect(p.BIA.posicao).toBe(2);
     expect(p.BIA.vencedor).toBe(false);
-    expect(p.BIA.premio).toBeNull();
+    expect(p.BIA.prize).toBeNull();
   });
 
   it("Mínimo: todas que atingem levam o mesmo prêmio; abaixo do alvo não", () => {
@@ -340,14 +340,14 @@ describe("buildChallengeView — Disputa e Mínimo", () => {
     );
     const p = byName(v);
     expect([p.ANA.vencedor, p.BIA.vencedor, p.CAROL.vencedor]).toEqual([true, true, false]);
-    expect(p.ANA.premio).toEqual({ kind: "ITEM", label: "Combo KFC" });
-    expect(v.participantes.map((x) => x.nome)).toEqual(["BIA", "ANA", "CAROL"]);
-    expect(v.participantes.every((x) => x.posicao == null)).toBe(true);
+    expect(p.ANA.prize).toEqual({ kind: "ITEM", label: "Combo KFC" });
+    expect(v.participants.map((x) => x.name)).toEqual(["BIA", "ANA", "CAROL"]);
+    expect(v.participants.every((x) => x.posicao == null)).toBe(true);
   });
 
   it("Disputa: resultado zero nunca vence", () => {
     const v = build(challenge(), input({ sellerProducts: [] }));
-    expect(v.participantes.every((p) => !p.vencedor && p.posicao == null)).toBe(true);
+    expect(v.participants.every((p) => !p.vencedor && p.posicao == null)).toBe(true);
   });
 
   it("Disputa: abaixo do piso não leva prêmio mesmo em 1º", () => {
@@ -377,26 +377,26 @@ describe("buildChallengeView — Disputa e Mínimo", () => {
     expect(andamento.ANA.falta).toBe("Faltam 2 vendas para participar");
     expect(andamento.BIA.resultado).toBe(1.9);
     expect(andamento.BIA.vencedor).toBe(false);
-    expect(andamento.BIA.premio).toBeNull();
+    expect(andamento.BIA.prize).toBeNull();
     expect(andamento.BIA.falta).toBe("O P.A. só vale no fim do desafio");
     expect(build(c, aggs).atingiram).toBe(0);
 
-    const fim = byName(build(c, aggs, "2026-10-12"));
-    expect(fim.ANA.vencedor).toBe(false);
-    expect(fim.BIA.vencedor).toBe(true);
-    expect(fim.BIA.premio).toEqual({ kind: "MONEY", amount: 50 });
+    const end = byName(build(c, aggs, "2026-10-12"));
+    expect(end.ANA.vencedor).toBe(false);
+    expect(end.BIA.vencedor).toBe(true);
+    expect(end.BIA.prize).toEqual({ kind: "MONEY", amount: 50 });
     expect(build(c, aggs, "2026-10-12").atingiram).toBe(1);
   });
 
   it("falta em andamento: Mínimo → para o alvo; Disputa → para a posição de cima ou para o piso", () => {
-    const minimo = byName(
+    const minimum = byName(
       build(
         challenge({ mode: "MINIMUM", target: 15, prizes: [{ kind: "ITEM", label: "Pizza" }] }),
         input({ sellerProducts: [item(1001, "BS1", 12), item(1002, "BS1", 14)] }),
       ),
     );
-    expect(minimo.ANA.falta).toBe("Faltam 3 itens para o mínimo");
-    expect(minimo.BIA.falta).toBe("Falta 1 item para o mínimo");
+    expect(minimum.ANA.falta).toBe("Faltam 3 itens para o mínimo");
+    expect(minimum.BIA.falta).toBe("Falta 1 item para o mínimo");
 
     const disputa = byName(build(challenge(), input({ sellerProducts: [item(1001, "BS1", 10), item(1002, "BS1", 7)] })));
     expect(disputa.ANA.falta).toBeNull();
@@ -417,7 +417,7 @@ describe("buildChallengeView — Disputa e Mínimo", () => {
 
   it("encerrado não mostra o que falta", () => {
     const v = build(challenge(), input({ sellerProducts: [item(1001, "BS1", 10), item(1002, "BS1", 7)] }), "2026-10-15");
-    expect(v.participantes.every((p) => p.falta == null)).toBe(true);
+    expect(v.participants.every((p) => p.falta == null)).toBe(true);
   });
 });
 
@@ -432,7 +432,7 @@ describe("buildChallengeView — gerência, incompleto e status", () => {
         managerTarget,
       });
     const aggs = input({ sellerProducts: [item(1001, "BS1", 5), item(1002, "BS1", 4)] });
-    expect(build(c(3), aggs).gerencia).toEqual({ resultado: 3, alvo: 3, periodoAnterior: null, atingiu: true, premio: { kind: "ITEM", label: "Spa" } });
+    expect(build(c(3), aggs).gerencia).toEqual({ resultado: 3, alvo: 3, periodoAnterior: null, atingiu: true, prize: { kind: "ITEM", label: "Spa" } });
     const v = build(c(4), aggs);
     expect(v.gerencia).toMatchObject({ resultado: 3, alvo: 4, atingiu: false });
     expect(v.atingiram).toBe(2);
@@ -494,8 +494,8 @@ describe("buildChallengeView — gerência, incompleto e status", () => {
     const c = challenge();
     expect(build(c, input(), "2026-10-08").prazo).toBe("4 dias restantes");
     expect(build(c, input(), "2026-10-11").prazo).toBe("Último dia");
-    const fim = build(c, input(), "2026-10-12");
-    expect([fim.status, fim.prazo, fim.emFechamento]).toEqual(["ended", "Encerrado", true]);
+    const end = build(c, input(), "2026-10-12");
+    expect([end.status, end.prazo, end.emFechamento]).toEqual(["ended", "Encerrado", true]);
     expect(build(c, input(), "2026-10-13").emFechamento).toBe(false);
   });
 });
@@ -510,7 +510,7 @@ describe("fechamento, card e duplicar", () => {
     });
     const v = build(c, input({ sellerProducts: [item(1001, "BS1", 5), item(1002, "BS1", 5), item(1003, "BS1", 2)] }), "2026-10-15");
     const pay = challengePayout(v);
-    expect(pay.vencedores.map((w) => [w.nome, w.colocacao, prizeLabel(w.premio)])).toEqual([
+    expect(pay.vencedores.map((w) => [w.name, w.colocacao, prizeLabel(w.prize)])).toEqual([
       ["ANA", "1º lugar", "R$\u00a0100,00"],
       ["BIA", "1º lugar", "R$\u00a0100,00"],
     ]);
@@ -536,11 +536,11 @@ describe("fechamento, card e duplicar", () => {
     const disputa = build(challenge(), input({ sellerProducts: [item(1001, "BS1", 5), item(1002, "BS1", 5)] }));
     expect(challengeCardSummary(disputa)).toEqual({ lider: "ANA e BIA", atingiram: null });
     expect(challengeCardSummary(build(challenge(), input()))).toEqual({ lider: null, atingiram: null });
-    const minimo = build(
+    const minimum = build(
       challenge({ mode: "MINIMUM", target: 3, prizes: [{ kind: "ITEM", label: "Pizza" }] }),
       input({ sellerProducts: [item(1001, "BS1", 5)] }),
     );
-    expect(challengeCardSummary(minimo)).toEqual({ lider: null, atingiram: 1 });
+    expect(challengeCardSummary(minimum)).toEqual({ lider: null, atingiram: 1 });
   });
 
   it("duplicar: período seguinte com a mesma duração e nome \"(cópia)\"", () => {

@@ -30,7 +30,7 @@ export function StoresSettingsPage() {
   const toast = useToast();
   const [loading, setLoading] = useState(true);
   const showSkeleton = useMinSkeleton(loading);
-  const [lojas, setLojas] = useState<Store[]>([]);
+  const [storeRows, setLojas] = useState<Store[]>([]);
   const [sellers, setSellers] = useState<Map<string, StoreSeller[]>>(new Map());
   const [savingId, setSavingId] = useState<string | null>(null);
 
@@ -51,38 +51,38 @@ export function StoresSettingsPage() {
   }, [session?.tenantId, session?.membershipId]);
 
   useEffect(() => {
-    if (!session || lojas.length === 0) return;
+    if (!session || storeRows.length === 0) return;
     let cancelled = false;
-    void fetchStoreSellers(session.tenantId, lojas.map((s) => s.id)).then((m) => {
+    void fetchStoreSellers(session.tenantId, storeRows.map((s) => s.id)).then((m) => {
       if (!cancelled) setSellers(m);
     });
     return () => {
       cancelled = true;
     };
-  }, [session?.tenantId, lojas]);
+  }, [session?.tenantId, storeRows]);
 
   if (!session) return null;
 
-  async function alternar(loja: Store, active: boolean) {
+  async function alternar(store: Store, active: boolean) {
     if (!session || savingId) return;
-    setSavingId(loja.id);
-    const res = await setStoreActive(loja.id, active);
+    setSavingId(store.id);
+    const res = await setStoreActive(store.id, active);
     setSavingId(null);
     if (!res.ok) {
       toast.show(res.error, "danger");
       return;
     }
-    setLojas((rows) => rows.map((s) => (s.id === loja.id ? { ...s, active } : s)));
-    const ativas = active ? [...session.stores, loja.id] : session.stores.filter((id) => id !== loja.id);
+    setLojas((rows) => rows.map((s) => (s.id === store.id ? { ...s, active } : s)));
+    const ativas = active ? [...session.stores, store.id] : session.stores.filter((id) => id !== store.id);
     update({ stores: [...new Set(ativas)] });
     if (active) void hydrateSessionStores(session.tenantId, [...new Set(ativas)]);
     if (!active) {
       try {
-        if (sessionStorage.getItem(STORE_STORAGE_KEY) === loja.id) sessionStorage.setItem(STORE_STORAGE_KEY, "");
+        if (sessionStorage.getItem(STORE_STORAGE_KEY) === store.id) sessionStorage.setItem(STORE_STORAGE_KEY, "");
       } catch {
         /* ignore */
       }
-      if ((params.get("store") ?? params.get("filial")) === loja.id) {
+      if ((params.get("store") ?? params.get("filial")) === store.id) {
         const next = new URLSearchParams(params);
         next.delete("store");
         next.delete("filial");
@@ -93,10 +93,10 @@ export function StoresSettingsPage() {
   }
 
   if (showSkeleton) {
-    return <CardGridSkeleton count={Math.max(1, lojas.length || session.stores.length)} />;
+    return <CardGridSkeleton count={Math.max(1, storeRows.length || session.stores.length)} />;
   }
 
-  if (lojas.length === 0) {
+  if (storeRows.length === 0) {
     return <span className="block py-6 text-center text-[12px] text-t2">Nenhuma filial disponível.</span>;
   }
 
@@ -104,8 +104,8 @@ export function StoresSettingsPage() {
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {lojas.map((s) => {
-        const equipe = (sellers.get(s.id) ?? []).filter(isActiveSalesPerson);
+      {storeRows.map((s) => {
+        const team = (sellers.get(s.id) ?? []).filter(isActiveSalesPerson);
         const desativada = s.active === false;
         const abrir = () => navigate(paths.settings.storeDetail(s.id));
         return (
@@ -136,12 +136,12 @@ export function StoresSettingsPage() {
               </span>
             </div>
             <div className="flex min-h-8 items-center justify-between gap-3">
-              {equipe.length > 0 ? (
-                <AvatarGroup names={equipe.map((v) => v.name)} max={4} />
+              {team.length > 0 ? (
+                <AvatarGroup names={team.map((v) => v.name)} max={4} />
               ) : (
                 <span className="text-xs text-t2">Ninguém ativo na equipe</span>
               )}
-              <span className="shrink-0 text-xs font-semibold text-t2">{equipe.length} na equipe</span>
+              <span className="shrink-0 text-xs font-semibold text-t2">{team.length} na equipe</span>
             </div>
             {podeAlternar ? (
               <div

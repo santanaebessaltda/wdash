@@ -67,21 +67,21 @@ type GoalsData = { goals: GoalRecord[]; dayAggs: SalesDayAgg[]; sellerAggs: Sale
 const GOALS_VAZIO: GoalsData = { goals: [], dayAggs: [], sellerAggs: [], team: [] };
 
 /** Metas das lojas do filtro que cruzam o periodo; vendas do inicio de cada meta ate hoje (igual ao detalhe da meta). */
-async function fetchGoalsData(tenantId: string, escopo: Scope, sessionStores: string[]): Promise<GoalsData> {
-  const hoje = calendarTodayIso();
-  const periodo = resolvePeriod(escopo.periodo, hoje);
-  const storeIds = escopo.filialIds.length > 0 ? escopo.filialIds : storesForSession(sessionStores).map((s) => s.id);
-  const goals = await fetchGoals({ tenantId, storeIds, from: periodo.inicio, to: periodo.fim });
+async function fetchGoalsData(tenantId: string, scope: Scope, sessionStores: string[]): Promise<GoalsData> {
+  const today = calendarTodayIso();
+  const period = resolvePeriod(scope.period, today);
+  const storeIds = scope.storeIds.length > 0 ? scope.storeIds : storesForSession(sessionStores).map((s) => s.id);
+  const goals = await fetchGoals({ tenantId, storeIds, from: period.start, to: period.end });
   if (goals.length === 0) return GOALS_VAZIO;
-  const lojas = [...new Set(goals.map((g) => g.storeId))];
+  const storeRows = [...new Set(goals.map((g) => g.storeId))];
   const from = goals.reduce((m, g) => (g.startsOn < m ? g.startsOn : m), goals[0]!.startsOn);
-  const fim = goals.reduce((m, g) => (g.endsOn > m ? g.endsOn : m), goals[0]!.endsOn);
-  const to = fim < hoje ? fim : hoje;
-  const query = { tenantId, storeIds: lojas, from, to };
+  const end = goals.reduce((m, g) => (g.endsOn > m ? g.endsOn : m), goals[0]!.endsOn);
+  const to = end < today ? end : today;
+  const query = { tenantId, storeIds: storeRows, from, to };
   const [dayAggs, sellerAggs, team] = await Promise.all([
     from <= to ? fetchSalesDayAggs({ ...query, brand: "ALL" }) : Promise.resolve([]),
     from <= to ? fetchSalesSellerDayAggs(query) : Promise.resolve([]),
-    fetchGoalTeam(tenantId, lojas),
+    fetchGoalTeam(tenantId, storeRows),
   ]);
   return { goals, dayAggs, sellerAggs, team };
 }
@@ -90,13 +90,13 @@ type ChallengesData = { challenges: ChallengeRecord[]; aggs: ChallengeAggInput }
 const CHALLENGES_VAZIO: ChallengesData = { challenges: [], aggs: emptyChallengeAggInput() };
 
 /** Desafios das lojas do filtro cujo periodo cruza o filtro da tela (em andamento, a comecar e encerrados). */
-async function fetchPeriodChallenges(tenantId: string, escopo: Scope, sessionStores: string[]): Promise<ChallengesData> {
-  const hoje = calendarTodayIso();
-  const periodo = resolvePeriod(escopo.periodo, hoje);
-  const storeIds = escopo.filialIds.length > 0 ? escopo.filialIds : storesForSession(sessionStores).map((s) => s.id);
-  const challenges = await fetchChallenges({ tenantId, storeIds, from: periodo.inicio, to: periodo.fim });
+async function fetchPeriodChallenges(tenantId: string, scope: Scope, sessionStores: string[]): Promise<ChallengesData> {
+  const today = calendarTodayIso();
+  const period = resolvePeriod(scope.period, today);
+  const storeIds = scope.storeIds.length > 0 ? scope.storeIds : storesForSession(sessionStores).map((s) => s.id);
+  const challenges = await fetchChallenges({ tenantId, storeIds, from: period.start, to: period.end });
   if (challenges.length === 0) return CHALLENGES_VAZIO;
-  return { challenges, aggs: await fetchChallengeInput({ tenantId, challenges, today: hoje }) };
+  return { challenges, aggs: await fetchChallengeInput({ tenantId, challenges, today: today }) };
 }
 
 const IconFat = () => (
@@ -136,9 +136,9 @@ const KPI_COLORS = [
 const CORES_TURNO = ["var(--acc)", "var(--info)", "var(--ok)", "var(--warn)", "var(--bad)"];
 /** Fatia neutra (sem turno / fora da equipe)  -  nao compete com as demais. */
 const COR_NEUTRA = "color-mix(in srgb, var(--t2) 40%, transparent)";
-const PODE_CONFIGURAR_LOJA = new Set(["OWNER", "MANAGER", "ADMIN_GLOBAL"]);
+const CAN_CONFIGURE_STORE = new Set(["OWNER", "MANAGER", "ADMIN_GLOBAL"]);
 
-type SortKey = "nome" | "faturamento" | "vendas" | "averageTicket" | "pa" | "participacaoPct" | "variacaoPct";
+type SortKey = "name" | "revenue" | "vendas" | "averageTicket" | "pa" | "participacaoPct" | "variacaoPct";
 
 const TipHelp = ({ label }: { label: string }) => (
   <Tooltip label={label}>
@@ -166,16 +166,16 @@ function Variacao({ v }: { v: number | null }) {
 }
 
 /** "Manha  |  09:00 - 15:00"  ->  nome + horario. */
-function partesTurno(turno?: string): { nome: string; horario?: string } {
-  if (!turno) return { nome: TEAM_SEM_TURNO };
-  const [nome, horario] = turno.split(" · ");
-  return { nome: nome ?? turno, horario };
+function partesTurno(turno?: string): { name: string; horario?: string } {
+  if (!turno) return { name: TEAM_SEM_TURNO };
+  const [name, horario] = turno.split(" · ");
+  return { name: name ?? turno, horario };
 }
 
 /** Loja principal (+N)  -  so com mais de 1 loja no escopo. */
-function storesLabel(lojas: string[]): string | null {
-  if (lojas.length === 0) return null;
-  return lojas.length > 1 ? `${lojas[0]} · +${lojas.length - 1}` : lojas[0]!;
+function storesLabel(storeRows: string[]): string | null {
+  if (storeRows.length === 0) return null;
+  return storeRows.length > 1 ? `${storeRows[0]} · +${storeRows.length - 1}` : storeRows[0]!;
 }
 
 /**
@@ -187,15 +187,15 @@ export function TeamPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const abaParam = searchParams.get("tab") ?? searchParams.get("aba");
-  const abaDesempenho = abaParam === "challenges" || abaParam === "desafios" ? "challenges" : abaParam === "goals" || abaParam === "metas" ? "goals" : "ranking";
-  const { escopo, mudar } = useScope();
+  const tab = searchParams.get("tab");
+  const performanceTab = tab === "challenges" || tab === "goals" ? tab : "ranking";
+  const { scope, setScope } = useScope();
   const [aggs, setAggs] = useState<TeamAggInput>({ dayAggs: [] });
   const [coverageFrom, setCoverageFrom] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
   const showSkeleton = useMinSkeleton(loading);
   const [busca, setBusca] = useState("");
-  const [sortKey, setSortKey] = useState<SortKey>("faturamento");
+  const [sortKey, setSortKey] = useState<SortKey>("revenue");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(1);
   const [turnoSel, setTurnoSel] = useState<string | null>(null);
@@ -215,10 +215,10 @@ export function TeamPage() {
     const gen = ++reloadGen.current;
     try {
       const [next, cov, metas, desafios] = await Promise.all([
-        fetchTeamAggInput(session.tenantId, escopo),
-        fetchSalesCoverage(session.tenantId, escopo.filialIds),
-        fetchGoalsData(session.tenantId, escopo, session.stores),
-        fetchPeriodChallenges(session.tenantId, escopo, session.stores).catch((e: unknown) => {
+        fetchTeamAggInput(session.tenantId, scope),
+        fetchSalesCoverage(session.tenantId, scope.storeIds),
+        fetchGoalsData(session.tenantId, scope, session.stores),
+        fetchPeriodChallenges(session.tenantId, scope, session.stores).catch((e: unknown) => {
           console.error("Team challenges:", e);
           return CHALLENGES_VAZIO;
         }),
@@ -232,7 +232,7 @@ export function TeamPage() {
       if (gen !== reloadGen.current) return;
       console.error("Team reload:", e);
     }
-  }, [escopo, session.tenantId, session.stores]);
+  }, [scope, session.tenantId, session.stores]);
 
   useEffect(() => {
     void reload().finally(() => setLoading(false));
@@ -245,37 +245,37 @@ export function TeamPage() {
   }, [reload]);
 
   const view = useMemo(
-    () => buildTeamDashboardView(escopo, aggs, { turno: turnoSel }),
+    () => buildTeamDashboardView(scope, aggs, { turno: turnoSel }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [escopo, aggs, storesTick, turnoSel],
+    [scope, aggs, storesTick, turnoSel],
   );
 
-  const hojeIso = calendarTodayIso();
-  const metaCards = useMemo(() => {
+  const todayIso = calendarTodayIso();
+  const goalCards = useMemo(() => {
     const storeName = new Map(storesForSession(session.stores).map((s) => [s.id, s.fantasia]));
     const ordem = { active: 0, upcoming: 1, ended: 2 } as const;
     return [...goalsData.goals]
-      .sort((a, b) => ordem[goalStatus(a, hojeIso)] - ordem[goalStatus(b, hojeIso)] || b.startsOn.localeCompare(a.startsOn))
+      .sort((a, b) => ordem[goalStatus(a, todayIso)] - ordem[goalStatus(b, todayIso)] || b.startsOn.localeCompare(a.startsOn))
       .map((goal) =>
         buildGoalCardView({
           goal,
-          lojaNome: storeName.get(goal.storeId) ?? "Filial",
+          storeNameValue: storeName.get(goal.storeId) ?? "Filial",
           dayAggs: goalsData.dayAggs,
           sellerDayAggs: goalsData.sellerAggs,
           team: goalsData.team,
-          today: hojeIso,
+          today: todayIso,
         }),
       );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [goalsData, session.stores, hojeIso, storesTick]);
+  }, [goalsData, session.stores, todayIso, storesTick]);
 
   const desafioCards = useMemo(() => {
     const storeName = new Map(storesForSession(session.stores).map((s) => [s.id, s.fantasia]));
     return challengesData.challenges
       .map((challenge) => ({
         challenge,
-        view: buildChallengeView({ challenge, aggs: challengesData.aggs, today: hojeIso }),
-        lojaNome: storeName.get(challenge.storeId),
+        view: buildChallengeView({ challenge, aggs: challengesData.aggs, today: todayIso }),
+        storeNameValue: storeName.get(challenge.storeId),
       }))
       .sort(
         (a, b) =>
@@ -285,41 +285,41 @@ export function TeamPage() {
             : a.challenge.endsOn.localeCompare(b.challenge.endsOn)) ||
           a.challenge.name.localeCompare(b.challenge.name, "pt-BR"),
       );
-  }, [challengesData, session.stores, hojeIso]);
-  const showChallengeStore = escopo.filialIds.length === 0 && storesForSession(session.stores).length > 1;
+  }, [challengesData, session.stores, todayIso]);
+  const showChallengeStore = scope.storeIds.length === 0 && storesForSession(session.stores).length > 1;
 
-  const niveisMeta = useMemo(
+  const goalLevels = useMemo(
     () =>
       sellerGoalLevels({
         goals: goalsData.goals,
         dayAggs: goalsData.dayAggs,
         sellerDayAggs: goalsData.sellerAggs,
         team: goalsData.team,
-        today: hojeIso,
+        today: todayIso,
       }),
-    [goalsData, hojeIso],
+    [goalsData, todayIso],
   );
-  const temColunaMeta = goalsData.goals.length > 0;
+  const hasGoalColumn = goalsData.goals.length > 0;
 
-  const dateRange = useMemo(() => dateRangeFromPeriod(escopo.periodo), [escopo.periodo]);
-  const periodoAtual = resolvePeriod(escopo.periodo, calendarTodayIso());
+  const dateRange = useMemo(() => dateRangeFromPeriod(scope.period), [scope.period]);
+  const currentPeriod = resolvePeriod(scope.period, calendarTodayIso());
   const monthFill = useMonthFill();
   const deepHistoryFill = useDeepHistoryFill();
-  function onDateChange(r: DateRange, meta?: DateRangeChangeMeta) {
-    mudar(applyPeriodDateChange(escopo, r, meta));
+  function onDateChange(r: DateRange, goal?: DateRangeChangeMeta) {
+    setScope(applyPeriodDateChange(scope, r, goal));
   }
 
   const linhasTabela = useMemo(() => {
     let lista = view.pessoas;
     const q = busca.trim().toLowerCase();
-    if (q) lista = lista.filter((p) => p.nome.toLowerCase().includes(q));
+    if (q) lista = lista.filter((p) => p.name.toLowerCase().includes(q));
     const dir = sortDir === "asc" ? 1 : -1;
     return [...lista].sort((a, b) => {
-      if (sortKey === "nome") return a.nome.localeCompare(b.nome, "pt-BR") * dir;
+      if (sortKey === "name") return a.name.localeCompare(b.name, "pt-BR") * dir;
       const va = a[sortKey];
       const vb = b[sortKey];
       // Sem dado (" - ") sempre no fim, nas duas direcoes.
-      if (va == null && vb == null) return b.faturamento - a.faturamento;
+      if (va == null && vb == null) return b.revenue - a.revenue;
       if (va == null) return 1;
       if (vb == null) return -1;
       return (va - vb) * dir;
@@ -327,16 +327,16 @@ export function TeamPage() {
   }, [view.pessoas, busca, sortKey, sortDir]);
 
   const totalTabela = useMemo(() => {
-    const faturamento = linhasTabela.reduce((s, p) => s + p.faturamento, 0);
+    const revenue = linhasTabela.reduce((s, p) => s + p.revenue, 0);
     const vendas = linhasTabela.reduce((s, p) => s + p.vendas, 0);
     const itens = linhasTabela.reduce((s, p) => s + p.itens, 0);
     const completo = linhasTabela.every((p) => p.pa != null || p.vendas === 0);
     const fatCmp = linhasTabela.reduce((s, p) => s + p.faturamentoCmp, 0);
     const fatAnt = linhasTabela.reduce((s, p) => s + p.faturamentoAnt, 0);
     return {
-      faturamento,
+      revenue,
       vendas,
-      averageTicket: vendas > 0 ? faturamento / vendas : 0,
+      averageTicket: vendas > 0 ? revenue / vendas : 0,
       pa: completo && vendas > 0 ? itens / vendas : null,
       participacaoPct: linhasTabela.reduce((s, p) => s + p.participacaoPct, 0),
       variacaoPct: fatCmp > 0 && fatAnt > 0 ? ((fatCmp - fatAnt) / fatAnt) * 100 : null,
@@ -350,41 +350,41 @@ export function TeamPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [busca, sortKey, sortDir, escopo, turnoSel]);
+  }, [busca, sortKey, sortDir, scope, turnoSel]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setSortKey(key);
-      setSortDir(key === "nome" ? "asc" : "desc");
+      setSortDir(key === "name" ? "asc" : "desc");
     }
   }
 
   const exportar = useExportPdf("Equipe", view.turnoFiltro);
-  const { abrir: abrirPessoa, modal: pessoaModal } = useTeamMemberDetail({ escopo, data: aggs, turno: view.turnoFiltro, niveisMeta });
+  const { abrir: abrirPessoa, modal: pessoaModal } = useTeamMemberDetail({ scope, data: aggs, turno: view.turnoFiltro, goalLevels });
   const teclaAbre = (p: TeamMemberRow) => (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      abrirPessoa(p.key, p.nome);
+      abrirPessoa(p.key, p.name);
     }
   };
   const tipVariacao = `Faturamento ${comparedWithTip(view.vsVariacao).replace(/^Em/, "em").replace(/\.$/, "")}.`;
   const tipVariacaoTotal = `Faturamento total das pessoas do filtro ${comparedWithTip(view.vsVariacao).replace(/^Em/, "em").replace(/\.$/, "")}.`;
-  const temVendasEquipe = view.pessoas.length > 0;
-  const podeConfigurar = PODE_CONFIGURAR_LOJA.has(session.role);
+  const hasTeamSales = view.pessoas.length > 0;
+  const podeConfigurar = CAN_CONFIGURE_STORE.has(session.role);
   const rankPorKey = new Map(view.pessoas.map((p, i) => [p.key, i]));
   const podio: RankingRow[] = view.pessoas.slice(0, 3).map((p, i) => ({
     posicao: i + 1,
-    colaboradorId: p.key,
-    nome: p.nome,
+    employeeId: p.key,
+    name: p.name,
     vendas: p.vendas,
-    faturamento: p.faturamento,
+    revenue: p.revenue,
   }));
 
   return (
     <div className="flex flex-col p-4 sm:p-6 print:p-0">
-      <ReportHeader filtros={view.turnosDisponiveis.length > 0 ? [{ label: "Grupo", valor: view.turnoFiltro ?? "Todos os grupos" }] : []} />
+      <ReportHeader filtros={view.availableShifts.length > 0 ? [{ label: "Grupo", amount: view.turnoFiltro ?? "Todos os grupos" }] : []} />
       <PageHeader
         crumbs={[{ label: "Dashboard", to: "/dashboard/visao-geral" }, { label: "Equipe" }]}
         title="Equipe"
@@ -395,16 +395,16 @@ export function TeamPage() {
               <DateRangePicker
                 value={dateRange}
                 onChange={onDateChange}
-                displayLabel={periodDisplayLabel(escopo.periodo)}
-                activePresetId={periodActivePresetId(escopo.periodo)}
+                displayLabel={periodDisplayLabel(scope.period)}
+                activePresetId={periodActivePresetId(scope.period)}
                 minDate={pickerMinDate(coverageFrom, monthFill)}
               />
-              {view.turnosDisponiveis.length > 0 && (
+              {view.availableShifts.length > 0 && (
                 <HeaderFilter
                   label="Grupo"
                   value={view.turnoFiltro ?? ""}
                   onChange={(v) => setTurnoSel(v || null)}
-                  options={[{ value: "", label: "Todos os grupos" }, ...view.turnosDisponiveis.map((t) => ({ value: t, label: t }))]}
+                  options={[{ value: "", label: "Todos os grupos" }, ...view.availableShifts.map((t) => ({ value: t, label: t }))]}
                 />
               )}
               <Button variant="primary" onClick={exportar}>
@@ -417,12 +417,12 @@ export function TeamPage() {
 
       <ErpStatusNotice />
       <InitialSyncNotice />
-      <MonthFillNotice fill={monthFill} inicio={periodoAtual.inicio} fim={periodoAtual.fim} />
+      <MonthFillNotice fill={monthFill} start={currentPeriod.start} end={currentPeriod.end} />
       <DeepHistoryNotice
         fill={deepHistoryFill}
         monthFill={monthFill}
-        inicio={periodoAtual.inicio}
-        fim={periodoAtual.fim}
+        start={currentPeriod.start}
+        end={currentPeriod.end}
       />
       <StoreHoursNotice />
 
@@ -438,7 +438,7 @@ export function TeamPage() {
                 <StatCard
                   key={kpi.label}
                   label={kpi.label}
-                  value={kpi.valor}
+                  value={kpi.amount}
                   icon={<Icon />}
                   iconColor={c.iconColor}
                   iconBg={c.iconBg}
@@ -456,7 +456,7 @@ export function TeamPage() {
               <CardHeader>
                 <CardTitle>Faturamento por grupo</CardTitle>
               </CardHeader>
-              {!temVendasEquipe ? (
+              {!hasTeamSales ? (
                 <EmptyBlock />
               ) : !view.turnosConfigurados ? (
                 <EmptyBlock
@@ -473,29 +473,29 @@ export function TeamPage() {
                 />
               ) : (
                 (() => {
-                  const total = view.turnos.reduce((s, t) => s + t.faturamento, 0) || 1;
+                  const total = view.turnos.reduce((s, t) => s + t.revenue, 0) || 1;
                   let corIdx = 0;
-                  const cores = view.turnos.map((t) => (t.nome === TEAM_SEM_TURNO ? COR_NEUTRA : CORES_TURNO[corIdx++ % CORES_TURNO.length]!));
+                  const cores = view.turnos.map((t) => (t.name === TEAM_SEM_TURNO ? COR_NEUTRA : CORES_TURNO[corIdx++ % CORES_TURNO.length]!));
                   return (
                     <div className="flex flex-1 flex-col justify-center px-4 pb-4">
                       <div className="mx-auto my-2">
                         <DonutChart
-                          segments={view.turnos.map((t, i) => ({ label: partesTurno(t.nome === TEAM_SEM_TURNO ? undefined : t.nome).nome, value: t.faturamento, color: cores[i]! }))}
+                          segments={view.turnos.map((t, i) => ({ label: partesTurno(t.name === TEAM_SEM_TURNO ? undefined : t.name).name, value: t.revenue, color: cores[i]! }))}
                           centerLabel="Total"
                           centerValue={brlCent(total)}
                         />
                       </div>
                       <div className="mt-2 flex flex-col gap-2.5">
                         {view.turnos.map((t, i) => {
-                          const pct = Math.round((t.faturamento / total) * 100);
-                          const pt = partesTurno(t.nome === TEAM_SEM_TURNO ? undefined : t.nome);
+                          const pct = Math.round((t.revenue / total) * 100);
+                          const pt = partesTurno(t.name === TEAM_SEM_TURNO ? undefined : t.name);
                           return (
-                            <div key={t.nome} className="flex items-start gap-2.5">
+                            <div key={t.name} className="flex items-start gap-2.5">
                               <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: cores[i] }} />
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-baseline gap-2">
-                                  <span className="min-w-0 truncate text-[12.5px] font-semibold text-t1">{pt.nome}</span>
-                                  <span className="ml-auto shrink-0 font-mono text-[12.5px] font-bold text-t0">{brlCent(t.faturamento)}</span>
+                                  <span className="min-w-0 truncate text-[12.5px] font-semibold text-t1">{pt.name}</span>
+                                  <span className="ml-auto shrink-0 font-mono text-[12.5px] font-bold text-t0">{brlCent(t.revenue)}</span>
                                   <span className="min-w-[32px] shrink-0 text-right text-[11.5px] font-semibold text-t2">{pct}%</span>
                                 </div>
                                 <p className="mt-0.5 text-[11.5px] text-t2">
@@ -525,36 +525,36 @@ export function TeamPage() {
                 <EmptyBlock />
               ) : (
                 (() => {
-                  const { equipe, fora, total, turno } = view.composicao;
+                  const { team, fora, total, turno } = view.composicao;
                   const fatias = (
                     turno != null && view.turnoFiltro
                       ? [
-                          { nome: view.turnoFiltro, valor: turno, cor: "var(--acc)" },
-                          { nome: "Demais da equipe", valor: Math.max(0, equipe - turno), cor: "var(--info)" },
-                          { nome: "Sem vendedor identificado ou gerência", valor: fora, cor: COR_NEUTRA },
+                          { name: view.turnoFiltro, amount: turno, cor: "var(--acc)" },
+                          { name: "Demais da equipe", amount: Math.max(0, team - turno), cor: "var(--info)" },
+                          { name: "Sem vendedor identificado ou gerência", amount: fora, cor: COR_NEUTRA },
                         ]
                       : [
-                          { nome: "Equipe de vendas", valor: equipe, cor: "var(--acc)" },
-                          { nome: "Sem vendedor identificado ou gerência", valor: fora, cor: COR_NEUTRA },
+                          { name: "Equipe de vendas", amount: team, cor: "var(--acc)" },
+                          { name: "Sem vendedor identificado ou gerência", amount: fora, cor: COR_NEUTRA },
                         ]
-                  ).filter((f) => f.valor > 0);
+                  ).filter((f) => f.amount > 0);
                   return (
                     <div className="flex flex-1 flex-col justify-center px-4 pb-4">
                       <div className="mx-auto my-2">
                         <DonutChart
-                          segments={fatias.map((f) => ({ label: labelUpper(f.nome), value: f.valor, color: f.cor }))}
+                          segments={fatias.map((f) => ({ label: labelUpper(f.name), value: f.amount, color: f.cor }))}
                           centerLabel="Total"
                           centerValue={brlCent(total)}
                         />
                       </div>
                       <div className="mt-2 flex flex-col gap-2">
                         {fatias.map((f) => (
-                          <div key={f.nome} className="flex items-center gap-2.5">
+                          <div key={f.name} className="flex items-center gap-2.5">
                             <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: f.cor }} />
-                            <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-t1">{labelUpper(f.nome)}</span>
-                            <span className="shrink-0 font-mono text-[12.5px] font-bold text-t0">{brlCent(f.valor)}</span>
+                            <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-t1">{labelUpper(f.name)}</span>
+                            <span className="shrink-0 font-mono text-[12.5px] font-bold text-t0">{brlCent(f.amount)}</span>
                             <span className="min-w-[32px] shrink-0 text-right text-[11.5px] font-semibold text-t2">
-                              {Math.round((f.valor / total) * 100)}%
+                              {Math.round((f.amount / total) * 100)}%
                             </span>
                           </div>
                         ))}
@@ -573,31 +573,31 @@ export function TeamPage() {
               <TipHelp label={"Acompanhe ranking, desafios e metas da equipe no período.\n\nVendas sem vendedor identificado ou realizadas pela gerência não entram no ranking."} />
             </div>
             {printing ? (
-              !temVendasEquipe ? <EmptyBlock /> : abaRanking()
+              !hasTeamSales ? <EmptyBlock /> : abaRanking()
             ) : (
             <Tabs
               variant="accent"
-              defaultKey={abaDesempenho}
+              defaultKey={performanceTab}
               items={[
                 {
                   key: "ranking",
                   label: "Ranking",
                   icon: <TrophyIcon size={14} />,
-                  content: !temVendasEquipe ? <EmptyBlock /> : abaRanking(),
+                  content: !hasTeamSales ? <EmptyBlock /> : abaRanking(),
                 },
                 {
                   key: "goals",
                   label: "Metas",
                   icon: <TargetIcon size={14} />,
                   content:
-                    metaCards.length > 0 ? (
+                    goalCards.length > 0 ? (
                       <div className="flex flex-col gap-4">
-                        {metaCards.map((card) => (
+                        {goalCards.map((card) => (
                           <GoalCard
                             key={card.id}
                             card={card}
-                            metaAtiva
-                            hojeIso={hojeIso}
+                            activeGoal
+                            todayIso={todayIso}
                             onOpen={() => navigate(paths.goalDetail(card.id), { state: { from: teamGoalsReturn(location.search) } })}
                           />
                         ))}
@@ -622,12 +622,12 @@ export function TeamPage() {
                   content:
                     desafioCards.length > 0 ? (
                       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                        {desafioCards.map(({ challenge, view: desafio, lojaNome }) => (
+                        {desafioCards.map(({ challenge, view: desafio, storeNameValue }) => (
                           <ChallengeMiniCard
                             key={challenge.id}
                             challenge={challenge}
                             view={desafio}
-                            lojaNome={showChallengeStore ? lojaNome : undefined}
+                            storeNameValue={showChallengeStore ? storeNameValue : undefined}
                             onOpen={() => navigate(paths.management.challengeDetail(challenge.id), { state: { from: "team" } })}
                           />
                         ))}
@@ -659,7 +659,7 @@ export function TeamPage() {
   function abaRanking() {
     return (
       <div className="flex flex-col">
-        <RankingBlock ranking={podio} formatValor={brlCent} onSelect={(r) => abrirPessoa(r.colaboradorId, r.nome)} />
+        <RankingBlock ranking={podio} formatValor={brlCent} onSelect={(r) => abrirPessoa(r.employeeId, r.name)} />
 
         <div className="mt-6 mb-4 flex flex-wrap items-center gap-2 sm:justify-end print:hidden">
           <input
@@ -672,59 +672,59 @@ export function TeamPage() {
         </div>
 
         {linhasTabela.length === 0 ? (
-          <SemResultado temDados={temVendasEquipe} onLimpar={() => setBusca("")} />
+          <SemResultado temDados={hasTeamSales} onLimpar={() => setBusca("")} />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
                   <th className="px-1 pb-3 text-left font-bold">#</th>
-                  <ThSort label="Nome" active={sortKey === "nome"} dir={sortDir} onClick={() => toggleSort("nome")} align="left" className="px-1 pb-3" />
+                  <ThSort label="Nome" active={sortKey === "name"} dir={sortDir} onClick={() => toggleSort("name")} align="left" className="px-1 pb-3" />
                   <th className="px-1 pb-3 text-left font-bold">Grupo</th>
-                  <ThSort label="Faturamento" active={sortKey === "faturamento"} dir={sortDir} onClick={() => toggleSort("faturamento")} className="px-1 pb-3" />
+                  <ThSort label="Faturamento" active={sortKey === "revenue"} dir={sortDir} onClick={() => toggleSort("revenue")} className="px-1 pb-3" />
                   <ThSort label="Nº de vendas" active={sortKey === "vendas"} dir={sortDir} onClick={() => toggleSort("vendas")} className="px-1 pb-3" />
                   <ThSort label="Ticket médio" active={sortKey === "averageTicket"} dir={sortDir} onClick={() => toggleSort("averageTicket")} className="px-1 pb-3" />
                   <ThSort label="P.A." active={sortKey === "pa"} dir={sortDir} onClick={() => toggleSort("pa")} className="px-1 pb-3" />
                   <ThSort label="Participação" active={sortKey === "participacaoPct"} dir={sortDir} onClick={() => toggleSort("participacaoPct")} className="px-1 pb-3" />
                   <ThSort label="Variação" active={sortKey === "variacaoPct"} dir={sortDir} onClick={() => toggleSort("variacaoPct")} className="px-1 pb-3" />
-                  {temColunaMeta && <th className="pb-3 pl-5 pr-1 text-left font-bold">Nível da meta</th>}
+                  {hasGoalColumn && <th className="pb-3 pl-5 pr-1 text-left font-bold">Nível da meta</th>}
                 </tr>
               </thead>
               <tbody>
                 {pageRows.map((p) => {
                   const rank = rankPorKey.get(p.key) ?? 0;
                   const turno = partesTurno(p.turno);
-                  const loja = view.multiLoja ? storesLabel(p.lojas) : null;
+                  const store = view.multiLoja ? storesLabel(p.storeRows) : null;
                   return (
                     <tr
                       key={p.key}
                       tabIndex={0}
-                      onClick={() => abrirPessoa(p.key, p.nome)}
+                      onClick={() => abrirPessoa(p.key, p.name)}
                       onKeyDown={teclaAbre(p)}
                       className="cursor-pointer border-b border-line transition-colors hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none"
                     >
                       <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{rank + 1}</td>
                       <td className="px-1 py-3">
                         <div className="flex min-w-0 items-center gap-2.5">
-                          <AvatarIniciais nome={p.nome} idx={rank} />
+                          <AvatarIniciais name={p.name} idx={rank} />
                           <div className="min-w-0">
-                            <p className="truncate text-[13px] font-bold text-t0">{p.nome}</p>
-                            {loja &&
-                              (p.lojas.length > 1 ? (
-                                <Tooltip label={p.lojas.slice(1).join(" · ")}>
-                                  <p className="truncate text-[11px] text-t2">{loja}</p>
+                            <p className="truncate text-[13px] font-bold text-t0">{p.name}</p>
+                            {store &&
+                              (p.storeRows.length > 1 ? (
+                                <Tooltip label={p.storeRows.slice(1).join(" · ")}>
+                                  <p className="truncate text-[11px] text-t2">{store}</p>
                                 </Tooltip>
                               ) : (
-                                <p className="truncate text-[11px] text-t2">{loja}</p>
+                                <p className="truncate text-[11px] text-t2">{store}</p>
                               ))}
                           </div>
                         </div>
                       </td>
                       <td className="px-1 py-3">
-                        <p className={cn("text-[12.5px] font-semibold", p.turno ? "text-t1" : "text-t2")}>{turno.nome}</p>
+                        <p className={cn("text-[12.5px] font-semibold", p.turno ? "text-t1" : "text-t2")}>{turno.name}</p>
                         {turno.horario && <p className="text-[11px] text-t2">{turno.horario}</p>}
                       </td>
-                      <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.faturamento)}</td>
+                      <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.revenue)}</td>
                       <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(p.vendas)}</td>
                       <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.averageTicket)}</td>
                       <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", p.pa == null ? "text-t2" : "text-t0")}>{paFmt(p.pa)}</td>
@@ -736,7 +736,7 @@ export function TeamPage() {
                           </span>
                         </Tooltip>
                       </td>
-                      {temColunaMeta && <GoalLevelCell nivel={niveisMeta.get(p.key)} completo={!printing} />}
+                      {hasGoalColumn && <GoalLevelCell nivel={goalLevels.get(p.key)} completo={!printing} />}
                     </tr>
                   );
                 })}
@@ -751,7 +751,7 @@ export function TeamPage() {
                       {num(linhasTabela.length)} {linhasTabela.length === 1 ? "pessoa" : "pessoas"}
                     </span>
                   </td>
-                  <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{brlCent(totalTabela.faturamento)}</td>
+                  <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{brlCent(totalTabela.revenue)}</td>
                   <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{num(totalTabela.vendas)}</td>
                   <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{brlCent(totalTabela.averageTicket)}</td>
                   <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", totalTabela.pa == null ? "text-t2" : "text-t0")}>
@@ -765,7 +765,7 @@ export function TeamPage() {
                       </span>
                     </Tooltip>
                   </td>
-                  {temColunaMeta && <td />}
+                  {hasGoalColumn && <td />}
                 </tr>
               </tbody>
             </table>
@@ -790,7 +790,7 @@ function GoalLevelCell({ nivel, completo }: { nivel?: SellerGoalLevel; completo:
   if (!nivel) return <td className="py-3 pl-5 pr-1 text-[13px] text-t2">—</td>;
   return (
     <td className="py-3 pl-5 pr-1 align-middle">
-      <GoalLevelSummary pct={nivel.atingimentoPct} nivel={nivel.nivel} nivelNumero={nivel.nivelNumero} marcos={nivel.marcos} completo={completo} />
+      <GoalLevelSummary pct={nivel.attainmentPct} nivel={nivel.nivel} nivelNumero={nivel.nivelNumero} marcos={nivel.marcos} completo={completo} />
     </td>
   );
 }

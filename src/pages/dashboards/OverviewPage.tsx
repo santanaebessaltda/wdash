@@ -62,7 +62,7 @@ import {
   periodActivePresetId,
   periodDisplayLabel,
 } from "@/pages/dashboard/periodPicker";
-type TopProdSort = "nome" | "itens" | "faturamento" | "lucro" | "variacao";
+type TopProdSort = "name" | "itens" | "faturamento" | "lucro" | "variacao";
 
 /** Ouro / prata / bronze  -  mesmo padrao do Sales leaderboard (Vela). */
 const RANK_MEDAL = ["#f7b84e", "#c7cdd6", "#d99a5c"];
@@ -97,9 +97,9 @@ const IconTicket = () => (
 const KPI_ICONS = [IconFat, IconCmv, IconVendas, IconTicket];
 
 /** Cores fixas para as lojas no donut e barras do Ranking de Lojas. */
-const CORES_LOJAS = ["var(--acc)", "var(--info)", "var(--ok)", "var(--warn)", "var(--bad)"];
+const STORE_COLORS = ["var(--acc)", "var(--info)", "var(--ok)", "var(--warn)", "var(--bad)"];
 /** Fatia neutra "Demais lojas" (1 loja no StorePicker)  -  nao compete com a cor da loja. */
-const COR_DEMAIS_LOJAS = "color-mix(in srgb, var(--t2) 40%, transparent)";
+const OTHER_STORES_COLOR = "color-mix(in srgb, var(--t2) 40%, transparent)";
 
 /** Cores distintas para cada KPI card (hero). */
 const KPI_COLORS = [
@@ -116,10 +116,10 @@ const KPI_COLORS = [
  */
 function BadgeVsAnterior({
   delta,
-  metrica,
+  metric,
 }: {
   delta?: { value: string; positive: boolean; vs?: string; diff?: string; anterior?: string };
-  metrica?: string;
+  metric?: string;
 }) {
   if (!delta) return null;
   const badge = (
@@ -128,7 +128,7 @@ function BadgeVsAnterior({
       {delta.value}
     </Badge>
   );
-  const tip = deltaTip(delta, metrica);
+  const tip = deltaTip(delta, metric);
   return tip ? <Tooltip label={tip}>{badge}</Tooltip> : badge;
 }
 
@@ -141,7 +141,7 @@ function welcomeTitle(name: string): string {
 export default function OverviewPage() {
   const session = useActiveSession();
   const navigate = useNavigate();
-  const { escopo, mudar } = useScope();
+  const { scope, setScope } = useScope();
   const [dayAggs, setDayAggs] = useState<SalesDayAgg[]>([]);
   const [hourAggs, setHourAggs] = useState<SalesHourAgg[]>([]);
   const [categoryDayAggs, setCategoryDayAggs] = useState<SalesCategoryDayAgg[]>([]);
@@ -177,22 +177,22 @@ export default function OverviewPage() {
 
   const reloadAggs = useCallback(async () => {
     const gen = ++reloadGen.current;
-    const periodo = resolvePeriod(escopo.periodo, calendarTodayIso());
-    const ant = previousPeriod(periodo);
-    const singleDay = periodo.inicio === periodo.fim;
-    const goalDays = goalHistoryDayRange(periodo.inicio);
-    const hoje = calendarTodayIso();
+    const period = resolvePeriod(scope.period, calendarTodayIso());
+    const ant = previousPeriod(period);
+    const singleDay = period.start === period.end;
+    const goalDays = goalHistoryDayRange(period.start);
+    const today = calendarTodayIso();
     const goalStoreIds =
-      escopo.filialIds.length > 0 ? escopo.filialIds : storesForSession(session.stores).map((s) => s.id);
-    const goalsP = fetchGoals({ tenantId: session.tenantId, storeIds: goalStoreIds, from: periodo.inicio, to: periodo.fim });
+      scope.storeIds.length > 0 ? scope.storeIds : storesForSession(session.stores).map((s) => s.id);
+    const goalsP = fetchGoals({ tenantId: session.tenantId, storeIds: goalStoreIds, from: period.start, to: period.end });
     // Atingimento da meta = do inicio de cada meta ate hoje (pode sair do periodo da tela).
     // Nivel de meta no Destaques da equipe = mesma janela, por pessoa.
     const vazio = { days: [] as SalesDayAgg[], sellers: [] as SalesSellerDayAgg[], team: [] as GoalTeamMember[] };
     const goalDataP = goalsP.then(async (gs) => {
       if (gs.length === 0) return vazio;
       const from = gs.reduce((m, g) => (g.startsOn < m ? g.startsOn : m), gs[0]!.startsOn);
-      const fim = gs.reduce((m, g) => (g.endsOn > m ? g.endsOn : m), gs[0]!.endsOn);
-      const to = fim < hoje ? fim : hoje;
+      const end = gs.reduce((m, g) => (g.endsOn > m ? g.endsOn : m), gs[0]!.endsOn);
+      const to = end < today ? end : today;
       if (from > to) return vazio;
       const storeIds = [...new Set(gs.map((g) => g.storeId))];
       const [days, sellers, team] = await Promise.all([
@@ -208,59 +208,59 @@ export default function OverviewPage() {
           tenantId: session.tenantId,
           // Sempre a rede: Ranking precisa do total/participacao mesmo com 1 loja no StorePicker.
           storeIds: [],
-          from: periodo.inicio,
-          to: periodo.fim,
+          from: period.start,
+          to: period.end,
           brand: null,
         }),
         singleDay
           ? fetchSalesHourAggs({
               tenantId: session.tenantId,
-              storeIds: escopo.filialIds,
-              day: periodo.inicio,
+              storeIds: scope.storeIds,
+              day: period.start,
               brand: null,
             })
           : Promise.resolve([] as SalesHourAgg[]),
         fetchSalesCategoryDayAggs({
           tenantId: session.tenantId,
-          storeIds: escopo.filialIds,
-          from: periodo.inicio,
-          to: periodo.fim,
+          storeIds: scope.storeIds,
+          from: period.start,
+          to: period.end,
           brand: null,
         }),
         fetchSalesCategoryCatalog({
           tenantId: session.tenantId,
-          storeIds: escopo.filialIds,
+          storeIds: scope.storeIds,
           brand: null,
         }),
         fetchSalesPaymentDayAggs({
           tenantId: session.tenantId,
-          storeIds: escopo.filialIds,
-          from: periodo.inicio,
-          to: periodo.fim,
+          storeIds: scope.storeIds,
+          from: period.start,
+          to: period.end,
         }),
         fetchSalesSellerDayAggs({
           tenantId: session.tenantId,
-          storeIds: escopo.filialIds,
-          from: periodo.inicio,
-          to: periodo.fim,
+          storeIds: scope.storeIds,
+          from: period.start,
+          to: period.end,
         }),
         fetchSalesProductDayAggs({
           tenantId: session.tenantId,
-          storeIds: escopo.filialIds,
-          from: ant.inicio < periodo.inicio ? ant.inicio : periodo.inicio,
-          to: periodo.fim,
+          storeIds: scope.storeIds,
+          from: ant.start < period.start ? ant.start : period.start,
+          to: period.end,
         }),
         fetchSalesProductCostDayAggs({
           tenantId: session.tenantId,
-          storeIds: escopo.filialIds,
-          from: periodo.inicio,
-          to: periodo.fim,
+          storeIds: scope.storeIds,
+          from: period.start,
+          to: period.end,
         }),
         fetchSyncWatermark(session.tenantId).catch(() => null),
-        fetchSalesCoverage(session.tenantId, escopo.filialIds),
+        fetchSalesCoverage(session.tenantId, scope.storeIds),
         fetchSalesDayAggs({
           tenantId: session.tenantId,
-          storeIds: escopo.filialIds,
+          storeIds: scope.storeIds,
           from: goalDays.from,
           to: goalDays.to,
           brand: "ALL",
@@ -268,23 +268,23 @@ export default function OverviewPage() {
         singleDay
           ? fetchSalesHourAggs({
               tenantId: session.tenantId,
-              storeIds: escopo.filialIds,
-              day: goalHistorySameWeekdays(periodo.inicio),
+              storeIds: scope.storeIds,
+              day: goalHistorySameWeekdays(period.start),
               brand: "ALL",
             })
           : Promise.resolve([] as SalesHourAgg[]),
         fetchSalesDayAggs({
           tenantId: session.tenantId,
-          storeIds: escopo.filialIds,
-          from: ant.inicio,
-          to: ant.fim,
+          storeIds: scope.storeIds,
+          from: ant.start,
+          to: ant.end,
           brand: null,
         }),
-        periodo.terminaHoje
+        period.endsToday
           ? fetchSalesHourAggs({
               tenantId: session.tenantId,
-              storeIds: escopo.filialIds,
-              day: ant.fim,
+              storeIds: scope.storeIds,
+              day: ant.end,
               brand: null,
             })
           : Promise.resolve([] as SalesHourAgg[]),
@@ -316,7 +316,7 @@ export default function OverviewPage() {
       if (gen !== reloadGen.current) return;
       console.error("Overview reloadAggs:", e);
     }
-  }, [escopo, session.tenantId, session.stores]);
+  }, [scope, session.tenantId, session.stores]);
 
   useEffect(() => {
     const onSynced = () => void reloadAggs();
@@ -354,16 +354,16 @@ export default function OverviewPage() {
   // Enquanto o historico ainda cresce (HISTORY), repolha cobertura do picker.
   useEffect(() => {
     const id = window.setInterval(() => {
-      void fetchSalesCoverage(session.tenantId, escopo.filialIds).then((cov) => {
+      void fetchSalesCoverage(session.tenantId, scope.storeIds).then((cov) => {
         setCoverageFrom(cov.from ? isoToDate(cov.from) : null);
       });
     }, 30_000);
     return () => window.clearInterval(id);
-  }, [session.tenantId, escopo.filialIds]);
+  }, [session.tenantId, scope.storeIds]);
 
   const view = useMemo(
     () =>
-      buildOverviewView(escopo, {
+      buildOverviewView(scope, {
         dayAggs,
         hourAggs,
         categoryDayAggs,
@@ -383,27 +383,27 @@ export default function OverviewPage() {
         goalTeam,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [escopo, dayAggs, hourAggs, categoryDayAggs, categoryCatalog, paymentDayAggs, sellerDayAggs, sellerShifts, productDayAggs, productCostDayAggs, goalHistoryDayAggs, goalHistoryHourAggs, prevDayAggs, prevHourAggs, goals, goalDayAggs, goalSellerDayAggs, goalTeam, storesTick],
+    [scope, dayAggs, hourAggs, categoryDayAggs, categoryCatalog, paymentDayAggs, sellerDayAggs, sellerShifts, productDayAggs, productCostDayAggs, goalHistoryDayAggs, goalHistoryHourAggs, prevDayAggs, prevHourAggs, goals, goalDayAggs, goalSellerDayAggs, goalTeam, storesTick],
   );
 
   // A metrica escolhe quais entram (sempre os maiores); a direcao so reordena esses.
   // "Produto" (nome) reordena o Top por faturamento.
   const topProdutosOrdenados = useMemo(() => {
     type P = (typeof view.topProdutos)[number];
-    const metrica = (p: P) =>
+    const metric = (p: P) =>
       topProdSort === "itens"
         ? (p.itens ?? 0)
         : topProdSort === "lucro"
           ? (p.lucro ?? -Infinity)
           : topProdSort === "variacao"
             ? (p.trend ?? -Infinity)
-            : p.valor;
+            : p.amount;
     const top = [...view.topProdutos]
-      .sort((a, b) => metrica(b) - metrica(a) || b.valor - a.valor)
+      .sort((a, b) => metric(b) - metric(a) || b.amount - a.amount)
       .slice(0, TOP_CARD_SIZE);
-    if (topProdSort === "nome") {
+    if (topProdSort === "name") {
       const dir = topProdDir === "asc" ? 1 : -1;
-      return top.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR") * dir);
+      return top.sort((a, b) => a.name.localeCompare(b.name, "pt-BR") * dir);
     }
     return topProdDir === "asc" ? top.reverse() : top;
   }, [view.topProdutos, topProdSort, topProdDir]);
@@ -413,26 +413,26 @@ export default function OverviewPage() {
       setTopProdDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setTopProdSort(key);
-      setTopProdDir(key === "nome" ? "asc" : "desc");
+      setTopProdDir(key === "name" ? "asc" : "desc");
     }
   }
 
   // Resolve o DateRange a partir do escopo  -  sempre mostra algo selecionado.
-  const dateRange = useMemo(() => dateRangeFromPeriod(escopo.periodo), [escopo.periodo]);
-  const periodoAtual = resolvePeriod(escopo.periodo, calendarTodayIso());
+  const dateRange = useMemo(() => dateRangeFromPeriod(scope.period), [scope.period]);
+  const currentPeriod = resolvePeriod(scope.period, calendarTodayIso());
   const monthFill = useMonthFill();
   const deepHistoryFill = useDeepHistoryFill();
   const printing = usePrintMode();
   const exportar = useExportPdf("Visão geral");
-  const firstSteps = useFirstSteps(escopo.filialIds);
-  const { abrir: abrirDetalhe, modal: detalheModal } = useProductDetail({ escopo, tenantId: session.tenantId });
-  const niveisMeta = useMemo(
-    () => new Map(view.topSellers.flatMap((v) => (v.key && v.meta ? [[v.key, v.meta] as const] : []))),
+  const firstSteps = useFirstSteps(scope.storeIds);
+  const { abrir: abrirDetalhe, modal: detalheModal } = useProductDetail({ scope, tenantId: session.tenantId });
+  const goalLevels = useMemo(
+    () => new Map(view.topSellers.flatMap((v) => (v.key && v.goal ? [[v.key, v.goal] as const] : []))),
     [view.topSellers],
   );
-  const { abrir: abrirPessoa, modal: pessoaModal } = useTeamMemberDetail({ escopo, tenantId: session.tenantId, niveisMeta });
-  function onDateChange(r: DateRange, meta?: DateRangeChangeMeta) {
-    mudar(applyPeriodDateChange(escopo, r, meta));
+  const { abrir: abrirPessoa, modal: pessoaModal } = useTeamMemberDetail({ scope, tenantId: session.tenantId, goalLevels });
+  function onDateChange(r: DateRange, goal?: DateRangeChangeMeta) {
+    setScope(applyPeriodDateChange(scope, r, goal));
   }
 
   return (
@@ -448,8 +448,8 @@ export default function OverviewPage() {
               <DateRangePicker
                 value={dateRange}
                 onChange={onDateChange}
-                displayLabel={periodDisplayLabel(escopo.periodo)}
-                activePresetId={periodActivePresetId(escopo.periodo)}
+                displayLabel={periodDisplayLabel(scope.period)}
+                activePresetId={periodActivePresetId(scope.period)}
                 minDate={pickerMinDate(coverageFrom, monthFill)}
               />
               <Button variant="primary" onClick={exportar}>
@@ -462,12 +462,12 @@ export default function OverviewPage() {
 
       <ErpStatusNotice />
       <InitialSyncNotice />
-      <MonthFillNotice fill={monthFill} inicio={periodoAtual.inicio} fim={periodoAtual.fim} />
+      <MonthFillNotice fill={monthFill} start={currentPeriod.start} end={currentPeriod.end} />
       <DeepHistoryNotice
         fill={deepHistoryFill}
         monthFill={monthFill}
-        inicio={periodoAtual.inicio}
-        fim={periodoAtual.fim}
+        start={currentPeriod.start}
+        end={currentPeriod.end}
       />
       {/* O horario de funcionamento ja e um dos primeiros passos. */}
       {firstSteps.status === "hidden" && <StoreHoursNotice />}
@@ -476,7 +476,7 @@ export default function OverviewPage() {
       )}
 
       {showSkeleton ? (
-        <OverviewSkeleton weekdays={periodoAtual.inicio !== periodoAtual.fim} />
+        <OverviewSkeleton weekdays={currentPeriod.start !== currentPeriod.end} />
       ) : (
       <>
 
@@ -490,16 +490,16 @@ export default function OverviewPage() {
       {/* Linha: Atingimento da Meta + Faturamento vs Meta */}
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.6fr]">
         {(() => {
-          const meta = view.gauges.find((g) => g.nome === "Meta") ?? view.gauges[0];
-          const fatAcum = view.evolucao[view.evolucao.length - 1]?.realizado ?? 0;
-          const pct = meta ? Math.round(meta.pct) : 0;
-          const realizado = meta?.realizado ?? fatAcum;
-          const alvo = meta?.alvo ?? 0;
-          const faltamValor = meta ? Math.max(0, meta.alvo - meta.realizado) : 0;
-          const metaEncerrada = view.projecaoFechamento === "Meta encerrada";
+          const goal = view.gauges.find((g) => g.name === "Meta") ?? view.gauges[0];
+          const fatAcum = view.evolucao[view.evolucao.length - 1]?.achieved ?? 0;
+          const pct = goal ? Math.round(goal.pct) : 0;
+          const achieved = goal?.achieved ?? fatAcum;
+          const alvo = goal?.alvo ?? 0;
+          const faltamValor = goal ? Math.max(0, goal.alvo - goal.achieved) : 0;
+          const closedGoal = view.projecaoFechamento === "Meta encerrada";
           const projecaoValor =
-            meta && !metaEncerrada ? (view.projecaoFechamento?.replace(/^Projeção:\s*/i, "") ?? "—") : "—";
-          if (!meta) {
+            goal && !closedGoal ? (view.projecaoFechamento?.replace(/^Projeção:\s*/i, "") ?? "—") : "—";
+          if (!goal) {
             return (
               <Card className="flex flex-col">
                 <div className="mb-4">
@@ -522,7 +522,7 @@ export default function OverviewPage() {
             <Card>
               <div className="mb-4">
                 <CardTitle>Atingimento da meta</CardTitle>
-                {view.metaDescricao && <p className="mt-0.5 text-[11px] font-semibold text-t2">{view.metaDescricao}</p>}
+                {view.goalDescription && <p className="mt-0.5 text-[11px] font-semibold text-t2">{view.goalDescription}</p>}
               </div>
               <div className="relative mx-auto mb-4 h-[150px] w-[150px]">
                 <RadialProgress value={pct} size={150} stroke={15} trackColor="var(--bg-inset)" label="da meta" />
@@ -530,25 +530,25 @@ export default function OverviewPage() {
               <div className="flex flex-col gap-2.5">
                 <div className="flex justify-between">
                   <span className="text-[12.5px] text-t2">Realizado</span>
-                  <span className="text-[13px] font-bold text-t0">{brlCent(realizado)}</span>
+                  <span className="text-[13px] font-bold text-t0">{brlCent(achieved)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[12.5px] text-t2">Meta</span>
-                  <span className={`text-[13px] font-bold ${meta && pct < 100 ? "text-warn" : meta ? "text-ok" : "text-t2"}`}>
-                    {meta ? brlCent(alvo) : "—"}
+                  <span className={`text-[13px] font-bold ${goal && pct < 100 ? "text-warn" : goal ? "text-ok" : "text-t2"}`}>
+                    {goal ? brlCent(alvo) : "—"}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[12.5px] text-t2">Faltam</span>
-                  <span className={`text-[13px] font-bold ${meta && faltamValor > 0 ? "text-warn" : meta ? "text-ok" : "text-t2"}`}>
-                    {!meta ? "—" : faltamValor <= 0 ? "Meta atingida" : brlCent(faltamValor)}
+                  <span className={`text-[13px] font-bold ${goal && faltamValor > 0 ? "text-warn" : goal ? "text-ok" : "text-t2"}`}>
+                    {!goal ? "—" : faltamValor <= 0 ? "Meta atingida" : brlCent(faltamValor)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[12.5px] text-t2">Projeção</span>
                   <span className="text-right">
-                    <span className={`block text-[13px] font-bold ${meta && !metaEncerrada ? "text-t0" : "text-t2"}`}>{projecaoValor}</span>
-                    {metaEncerrada && <span className="block text-[11px] font-semibold text-t2">Meta encerrada</span>}
+                    <span className={`block text-[13px] font-bold ${goal && !closedGoal ? "text-t0" : "text-t2"}`}>{projecaoValor}</span>
+                    {closedGoal && <span className="block text-[11px] font-semibold text-t2">Meta encerrada</span>}
                   </span>
                 </div>
               </div>
@@ -568,7 +568,7 @@ export default function OverviewPage() {
                 </Tooltip>
               </div>
               {view.gauges.length > 0 &&
-                (view.evolucao[view.evolucao.length - 1]?.realizado ?? 0) + (view.evolucao[view.evolucao.length - 1]?.meta ?? 0) > 0 && (
+                (view.evolucao[view.evolucao.length - 1]?.achieved ?? 0) + (view.evolucao[view.evolucao.length - 1]?.goal ?? 0) > 0 && (
               <>
               <p className="mt-0.5 text-[11px] font-semibold text-t2">{view.seriesLabel}</p>
               <div className="mt-2.5 flex flex-wrap gap-5">
@@ -577,7 +577,7 @@ export default function OverviewPage() {
                     <span className="h-2.5 w-2.5 rounded-[3px] bg-[var(--ok)]" />Realizado
                   </span>
                   <p className="mt-0.5 font-mono text-base font-extrabold text-t0">
-                    {brlCent(view.evolucao[view.evolucao.length - 1]?.realizado ?? 0)}
+                    {brlCent(view.evolucao[view.evolucao.length - 1]?.achieved ?? 0)}
                   </p>
                 </div>
                 <div>
@@ -585,14 +585,14 @@ export default function OverviewPage() {
                     <span className="h-2.5 w-2.5 rounded-[3px] bg-[var(--warn)]" />Meta
                   </span>
                   <p className="mt-0.5 font-mono text-base font-extrabold text-t0">
-                    {brlCent(view.evolucao[view.evolucao.length - 1]?.meta ?? 0)}
+                    {brlCent(view.evolucao[view.evolucao.length - 1]?.goal ?? 0)}
                   </p>
                 </div>
               </div>
               </>
               )}
             </div>
-            {view.gauges.length > 0 && <BadgeVsAnterior delta={view.deltaFaturamento} />}
+            {view.gauges.length > 0 && <BadgeVsAnterior delta={view.revenueDelta} />}
           </div>
           {(() => {
             if (view.gauges.length === 0) {
@@ -615,20 +615,20 @@ export default function OverviewPage() {
                 const prev = view.evolucao[i - 1];
                 return {
                   ...e,
-                  realizado: e.realizado - (prev?.realizado ?? 0),
-                  meta: e.meta - (prev?.meta ?? 0),
+                  achieved: e.achieved - (prev?.achieved ?? 0),
+                  goal: e.goal - (prev?.goal ?? 0),
                 };
               })
               .filter((e) => !e.ancora);
-            if (serie.every((e) => e.realizado === 0 && e.meta === 0)) {
+            if (serie.every((e) => e.achieved === 0 && e.goal === 0)) {
               return <EmptyBlock />;
             }
             return (
               <AreaLineChart
-                data={serie.map((e) => (e.futuro ? null : e.realizado))}
-                compareData={serie.map((e) => e.meta)}
+                data={serie.map((e) => (e.futuro ? null : e.achieved))}
+                compareData={serie.map((e) => e.goal)}
                 labels={serie.map((e) => e.label)}
-                tooltipLabels={serie.map((e) => e.faixa)}
+                tooltipLabels={serie.map((e) => e.band)}
                 color="var(--ok)"
                 compareColor="var(--warn)"
                 formatValue={brlCent}
@@ -653,22 +653,22 @@ export default function OverviewPage() {
                 </Tooltip>
               </div>
             </div>
-            <BadgeVsAnterior delta={view.deltaFaturamento} metrica="Faturamento total" />
+            <BadgeVsAnterior delta={view.revenueDelta} metric="Faturamento total" />
           </div>
-          {view.categoriaVsMeta.filter((c) => c.realizado > 0).length === 0 ? (
+          {view.categoryVsGoal.filter((c) => c.achieved > 0).length === 0 ? (
             <EmptyBlock />
           ) : (
             <BarChart
-              data={view.categoriaVsMeta
-                .filter((c) => c.realizado > 0)
+              data={view.categoryVsGoal
+                .filter((c) => c.achieved > 0)
                 .map((c) => ({
                   label: c.categoria,
-                  value: c.realizado,
+                  value: c.achieved,
                 }))}
               height={220}
               color="var(--acc)"
               formatValue={brlCent}
-              onSelect={(d) => abrirDetalhe({ tipo: "categoria", nome: d.label })}
+              onSelect={(d) => abrirDetalhe({ kind: "categoria", name: d.label })}
             />
           )}
         </Card>
@@ -684,14 +684,14 @@ export default function OverviewPage() {
                     </span>
                   </Tooltip>
                 </div>
-                {!view.diaVsMeta.every((d) => d.realizado === 0 && d.meta === 0) && (
+                {!view.diaVsMeta.every((d) => d.achieved === 0 && d.goal === 0) && (
                 <div className="mt-2.5 flex flex-wrap gap-5">
                   <div>
                     <span className="flex items-center gap-1.5 text-xs font-semibold text-t1">
                       <span className="h-2.5 w-2.5 rounded-[3px] bg-[var(--info)]" />Realizado
                     </span>
                     <p className="mt-0.5 font-mono text-base font-extrabold text-t0">
-                      {brlCent(view.diaVsMeta.reduce((s, d) => s + d.realizado, 0))}
+                      {brlCent(view.diaVsMeta.reduce((s, d) => s + d.achieved, 0))}
                     </p>
                   </div>
                   <div>
@@ -703,22 +703,22 @@ export default function OverviewPage() {
                       Meta
                     </span>
                     <p className="mt-0.5 font-mono text-base font-extrabold text-t0">
-                      {brlCent(view.diaVsMeta.reduce((s, d) => s + d.meta, 0))}
+                      {brlCent(view.diaVsMeta.reduce((s, d) => s + d.goal, 0))}
                     </p>
                   </div>
                 </div>
                 )}
               </div>
-              <BadgeVsAnterior delta={view.deltaFaturamento} metrica="Faturamento total" />
+              <BadgeVsAnterior delta={view.revenueDelta} metric="Faturamento total" />
             </div>
-            {view.diaVsMeta.every((d) => d.realizado === 0 && d.meta === 0) ? (
+            {view.diaVsMeta.every((d) => d.achieved === 0 && d.goal === 0) ? (
               <EmptyBlock />
             ) : (
             <BarChart
               data={view.diaVsMeta.map((d) => ({
                 label: d.dia,
-                value: d.realizado,
-                goal: d.meta > 0 ? d.meta : undefined,
+                value: d.achieved,
+                goal: d.goal > 0 ? d.goal : undefined,
               }))}
               height={220}
               color="var(--info)"
@@ -735,7 +735,7 @@ export default function OverviewPage() {
         <Card className="flex flex-col">
           <CardHeader className="items-center">
             <CardTitle>Ranking de filiais</CardTitle>
-            {escopo.filialIds.length === 1 && view.storesRanking.length > 0 && (view.rankingRedeTotal ?? 0) > 0 && (
+            {scope.storeIds.length === 1 && view.storesRanking.length > 0 && (view.rankingRedeTotal ?? 0) > 0 && (
               <Badge variant="accent">
                 Rede: {brlCent(view.rankingRedeTotal ?? 0)}
               </Badge>
@@ -746,25 +746,25 @@ export default function OverviewPage() {
           ) : (
             (() => {
               const totalRede =
-                (view.rankingRedeTotal ?? view.storesRanking.reduce((s, l) => s + l.valor, 0)) || 1;
-              const singleStore = escopo.filialIds.length === 1;
-              const storeAmount = view.storesRanking[0]?.valor ?? 0;
+                (view.rankingRedeTotal ?? view.storesRanking.reduce((s, l) => s + l.amount, 0)) || 1;
+              const singleStore = scope.storeIds.length === 1;
+              const storeAmount = view.storesRanking[0]?.amount ?? 0;
               const valorDemais = singleStore ? Math.max(0, totalRede - storeAmount) : 0;
               // 1 loja: fatia da loja x "Demais lojas" (resto da rede)  -  mostra o peso real na rede.
               const demais: (typeof view.storesRanking)[number] | null =
                 singleStore && valorDemais > 0
                   ? {
-                      nome: `Demais filiais${view.otherStoresRanking ? ` (${view.otherStoresRanking})` : ""}`,
-                      valor: valorDemais,
+                      name: `Demais filiais${view.otherStoresRanking ? ` (${view.otherStoresRanking})` : ""}`,
+                      amount: valorDemais,
                     }
                   : null;
               const donutSegments = [
                 ...view.storesRanking.map((l, i) => ({
-                  label: l.nome,
-                  value: l.valor,
-                  color: CORES_LOJAS[i % CORES_LOJAS.length],
+                  label: l.name,
+                  value: l.amount,
+                  color: STORE_COLORS[i % STORE_COLORS.length],
                 })),
-                ...(demais ? [{ label: demais.nome, value: demais.valor, color: COR_DEMAIS_LOJAS }] : []),
+                ...(demais ? [{ label: demais.name, value: demais.amount, color: OTHER_STORES_COLOR }] : []),
               ];
               return (
                 <>
@@ -782,21 +782,21 @@ export default function OverviewPage() {
                     />
                   </div>
                   <div className="mt-4 flex flex-col gap-3">
-                    {[...view.storesRanking, ...(demais ? [demais] : [])].map((loja, idx) => {
+                    {[...view.storesRanking, ...(demais ? [demais] : [])].map((store, idx) => {
                       const pctRede = Math.round(
-                        loja.pctRede ?? (totalRede > 0 ? (loja.valor / totalRede) * 100 : 0),
+                        store.pctRede ?? (totalRede > 0 ? (store.amount / totalRede) * 100 : 0),
                       );
                       const pctBar = Math.min(100, Math.max(0, pctRede));
-                      const cor = loja === demais ? COR_DEMAIS_LOJAS : CORES_LOJAS[idx % CORES_LOJAS.length];
+                      const cor = store === demais ? OTHER_STORES_COLOR : STORE_COLORS[idx % STORE_COLORS.length];
                       return (
-                        <div key={"id" in loja && loja.id ? String(loja.id) : `${loja.nome}-${idx}`} className="min-w-0 rounded-xl bg-bg-inset p-3">
+                        <div key={"id" in store && store.id ? String(store.id) : `${store.name}-${idx}`} className="min-w-0 rounded-xl bg-bg-inset p-3">
                           <div className="mb-1.5 flex min-w-0 items-baseline gap-2">
                             <span className="flex min-w-0 flex-1 items-center gap-2 text-[13px] font-bold text-t0">
                               <span className="h-2.5 w-2.5 shrink-0 rounded-[4px]" style={{ background: cor }} />
-                              <span className="min-w-0 truncate uppercase" title={loja.nome}>{loja.nome}</span>
+                              <span className="min-w-0 truncate uppercase" title={store.name}>{store.name}</span>
                             </span>
                             <span className="shrink-0 font-mono text-[13px] font-extrabold tabular-nums text-t0">
-                              {brlCent(loja.valor)}
+                              {brlCent(store.amount)}
                             </span>
                           </div>
                           <div className="mb-1.5 h-1.5 overflow-hidden rounded-full bg-bg-2">
@@ -871,13 +871,13 @@ export default function OverviewPage() {
           ) : (
           <div className="flex flex-col gap-1 px-2 pb-3">
             {view.topSellers.map((v, idx) => {
-              const hasMeta = v.meta != null || v.pctMeta != null;
-              const pct = v.meta?.atingimentoPct ?? v.pctMeta ?? 0;
+              const hasGoal = v.goal != null || v.goalPct != null;
+              const pct = v.goal?.attainmentPct ?? v.goalPct ?? 0;
               const key = v.key;
-              const abrir = key ? () => abrirPessoa(key, v.nome) : undefined;
+              const abrir = key ? () => abrirPessoa(key, v.name) : undefined;
               return (
                 <div
-                  key={v.nome}
+                  key={v.name}
                   role={abrir ? "button" : undefined}
                   tabIndex={abrir ? 0 : undefined}
                   onClick={abrir}
@@ -898,14 +898,14 @@ export default function OverviewPage() {
                   >
                     {idx + 1}
                   </span>
-                  <Avatar name={v.nome} size="sm" />
+                  <Avatar name={v.name} size="sm" />
                   <div className="min-w-0 flex-1">
                     <div className="mb-1 flex items-baseline justify-between gap-2">
-                      <span className="min-w-0 truncate text-[13px] font-bold text-t0">{v.nome}</span>
-                      <span className="shrink-0 font-mono text-[13px] font-extrabold text-ok">{brlCent(v.valor)}</span>
+                      <span className="min-w-0 truncate text-[13px] font-bold text-t0">{v.name}</span>
+                      <span className="shrink-0 font-mono text-[13px] font-extrabold text-ok">{brlCent(v.amount)}</span>
                     </div>
-                    {!v.meta && hasMeta && <ProgressBar value={Math.min(100, pct)} height={5} />}
-                    <div className={`flex flex-wrap items-center gap-x-1.5 text-[11px] text-t2 ${hasMeta && !v.meta ? "mt-0.5" : ""}`}>
+                    {!v.goal && hasGoal && <ProgressBar value={Math.min(100, pct)} height={5} />}
+                    <div className={`flex flex-wrap items-center gap-x-1.5 text-[11px] text-t2 ${hasGoal && !v.goal ? "mt-0.5" : ""}`}>
                       <span>{v.sub?.split("·")[0]?.trim() ?? ""}</span>
                       {v.averageTicket != null && v.averageTicket > 0 && (
                         <>
@@ -919,20 +919,20 @@ export default function OverviewPage() {
                           <span>P.A. {num(v.pa, 2)}</span>
                         </>
                       )}
-                      {hasMeta && !v.meta && (
+                      {hasGoal && !v.goal && (
                         <>
                           <span>·</span>
                           <span className={pct >= 100 ? "font-semibold text-ok" : ""}>{Math.round(pct)}% da meta</span>
                         </>
                       )}
                     </div>
-                    {v.meta && (
+                    {v.goal && (
                       <div className="mt-2">
                         <GoalLevelSummary
                           pct={pct}
-                          nivel={v.meta.nivel}
-                          nivelNumero={v.meta.nivelNumero}
-                          marcos={v.meta.marcos}
+                          nivel={v.goal.nivel}
+                          nivelNumero={v.goal.nivelNumero}
+                          marcos={v.goal.marcos}
                           completo={!printing}
                           rolagem
                         />
@@ -962,9 +962,9 @@ export default function OverviewPage() {
                   <th className="px-1 pb-3 text-left font-bold">#</th>
                   <ThSort
                     label="Produto"
-                    active={topProdSort === "nome"}
+                    active={topProdSort === "name"}
                     dir={topProdDir}
-                    onClick={() => toggleTopProdSort("nome")}
+                    onClick={() => toggleTopProdSort("name")}
                     align="left"
                     className="px-1 pb-3"
                   />
@@ -1001,10 +1001,10 @@ export default function OverviewPage() {
               <tbody>
                 {topProdutosOrdenados.map((p, idx) => {
                   const chave = p.chave;
-                  const abrir = chave ? () => abrirDetalhe({ tipo: "produto", chave, nome: p.nome }) : undefined;
+                  const abrir = chave ? () => abrirDetalhe({ kind: "produto", chave, name: p.name }) : undefined;
                   return (
                     <tr
-                      key={p.nome}
+                      key={p.name}
                       tabIndex={abrir ? 0 : undefined}
                       onClick={abrir}
                       onKeyDown={(e) => {
@@ -1020,10 +1020,10 @@ export default function OverviewPage() {
                     >
                       <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
                       <td className="px-1 py-3">
-                        <ProductNameCell nome={p.nome} idx={idx} sub={p.categoria} upper />
+                        <ProductNameCell name={p.name} idx={idx} sub={p.categoria} upper />
                       </td>
                       <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{p.itens != null ? p.itens.toLocaleString("pt-BR") : (p.sub?.replace(" itens", "") ?? "—")}</td>
-                      <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.valor)}</td>
+                      <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.amount)}</td>
                       <td
                         className={cn(
                           "px-1 py-3 text-right font-mono text-[13px] font-bold",
@@ -1058,7 +1058,7 @@ function KpiCard({ kpi, Icon, colorIdx = 0 }: { kpi: OverviewKpi; Icon: () => Re
   return (
     <StatCard
       label={kpi.label}
-      value={kpi.valor}
+      value={kpi.amount}
       icon={<Icon />}
       iconColor={c.iconColor}
       iconBg={c.iconBg}

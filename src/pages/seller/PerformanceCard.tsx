@@ -49,10 +49,10 @@ export function PerformanceCard({ store }: { store: SellerHomeStore }) {
   const challenges = store.challenges ?? [];
   const podium: RankingRow[] = ranking.slice(0, 3).map((r) => ({
     posicao: r.position,
-    colaboradorId: r.me ? "me" : `p${r.position}-${r.name}`,
-    nome: r.me ? "VOCÊ" : r.name,
+    employeeId: r.me ? "me" : `p${r.position}-${r.name}`,
+    name: r.me ? "VOCÊ" : r.name,
     vendas: r.sales,
-    faturamento: r.revenue,
+    revenue: r.revenue,
   }));
   const rest = ranking.slice(3);
   return (

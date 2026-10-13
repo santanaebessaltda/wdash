@@ -26,10 +26,10 @@ function sellerCountLabel(count: number): string {
 
 /** Horário válido e nome único na filial. `null` quando pode salvar. */
 function groupProblem(name: string, start: string, end: string, shifts: StoreShift[], exceptId?: string): string | null {
-  const nome = shiftName(name);
-  if (!nome) return "Dê um nome para o grupo.";
-  if (shifts.some((s) => s.id !== exceptId && s.name.toLocaleLowerCase("pt-BR") === nome.toLocaleLowerCase("pt-BR"))) {
-    return `Já existe um grupo chamado “${nome}”.`;
+  const trimmed = shiftName(name);
+  if (!trimmed) return "Dê um nome para o grupo.";
+  if (shifts.some((s) => s.id !== exceptId && s.name.toLocaleLowerCase("pt-BR") === trimmed.toLocaleLowerCase("pt-BR"))) {
+    return `Já existe um grupo chamado “${trimmed}”.`;
   }
   if (start >= end) return "O horário de início deve ser anterior ao horário de fim.";
   return null;

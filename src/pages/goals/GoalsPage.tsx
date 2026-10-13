@@ -44,13 +44,13 @@ function maxPickerDate(today: string): Date {
 export default function GoalsPage() {
   const navigate = useNavigate();
   const { show } = useToast();
-  const { session, lojas, loading: lojasLoading } = useScopedStores();
-  const { escopo, mudar } = useScope();
+  const { session, storeRows, loading: lojasLoading } = useScopedStores();
+  const { scope, setScope } = useScope();
   const today = calendarTodayIso();
-  const janela = useMemo(() => managementScheduleWindow(escopo.periodo, today), [escopo.periodo, today]);
-  const storeIds = useMemo(() => lojas.map((l) => l.id), [lojas]);
+  const janela = useMemo(() => managementScheduleWindow(scope.period, today), [scope.period, today]);
+  const storeIds = useMemo(() => storeRows.map((l) => l.id), [storeRows]);
   const storeKey = storeIds.join(",");
-  const escolher = pickOneStore(escopo.filialIds, session.stores.length);
+  const escolher = pickOneStore(scope.storeIds, session.stores.length);
 
   const [data, setData] = useState<Loaded | null>(null);
   const [loading, setLoading] = useState(true);
@@ -109,24 +109,24 @@ export default function GoalsPage() {
 
   const cards = useMemo(() => {
     if (!data) return [];
-    const byId = new Map(lojas.map((l) => [l.id, l]));
+    const byId = new Map(storeRows.map((l) => [l.id, l]));
     return data.goals
       .map((g) => ({
         summary: buildGoalSummary(g, data.dayAggs, today),
-        loja: byId.get(g.storeId),
-        equipe: goalTeamNames(g.storeId, data.team),
+        store: byId.get(g.storeId),
+        team: goalTeamNames(g.storeId, data.team),
       }))
       .sort(
         (a, b) =>
           STATUS_ORDER[a.summary.status] - STATUS_ORDER[b.summary.status] ||
           b.summary.goal.startsOn.localeCompare(a.summary.goal.startsOn) ||
-          (a.loja?.fantasia ?? "").localeCompare(b.loja?.fantasia ?? "", "pt-BR"),
+          (a.store?.fantasia ?? "").localeCompare(b.store?.fantasia ?? "", "pt-BR"),
       );
-  }, [data, lojas, today]);
+  }, [data, storeRows, today]);
 
-  const dateRange = useMemo(() => dateRangeFromManagementPeriod(escopo.periodo), [escopo.periodo]);
-  function onDateChange(r: DateRange, meta?: DateRangeChangeMeta) {
-    mudar(applyPeriodDateChange(escopo, r, meta));
+  const dateRange = useMemo(() => dateRangeFromManagementPeriod(scope.period), [scope.period]);
+  function onDateChange(r: DateRange, goal?: DateRangeChangeMeta) {
+    setScope(applyPeriodDateChange(scope, r, goal));
   }
 
   async function excluir() {
@@ -154,8 +154,8 @@ export default function GoalsPage() {
             <DateRangePicker
               value={dateRange}
               onChange={onDateChange}
-              displayLabel={periodDisplayLabel(escopo.periodo)}
-              activePresetId={periodActivePresetId(escopo.periodo)}
+              displayLabel={periodDisplayLabel(scope.period)}
+              activePresetId={periodActivePresetId(scope.period)}
               maxDate={maxPickerDate(today)}
             />
             <Button icon={<Icon d={icons.plus} size={14} />} onClick={() => navigate(paths.goalNew)}>
@@ -187,13 +187,13 @@ export default function GoalsPage() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {cards.map(({ summary, loja, equipe }) => (
+            {cards.map(({ summary, store, team }) => (
               <GoalCard
                 key={summary.goal.id}
                 summary={summary}
-                loja={loja}
-                mostraLoja={lojas.length > 1}
-                equipe={equipe}
+                store={store}
+                mostraLoja={storeRows.length > 1}
+                team={team}
                 onDetail={() => navigate(paths.goalDetail(summary.goal.id))}
                 onCopy={() => setDuplicar(summary.goal)}
                 onDelete={() => setConfirmar(summary.goal)}
@@ -245,33 +245,33 @@ export default function GoalsPage() {
 
 function GoalCard({
   summary,
-  loja,
+  store,
   mostraLoja,
-  equipe,
+  team,
   onDetail,
   onCopy,
   onDelete,
 }: {
   summary: GoalSummary;
-  loja: Store | undefined;
+  store: Store | undefined;
   mostraLoja: boolean;
-  equipe: string[];
+  team: string[];
   onDetail: () => void;
   onCopy: () => void;
   onDelete: () => void;
 }) {
-  const { goal: g, status, realizado, pct, projetadoPct, daysRemaining, nivelAtual, nivelNumero } = summary;
-  const periodo = `${fullDate(g.startsOn)} a ${fullDate(g.endsOn)}`;
+  const { goal: g, status, achieved, pct, projectedPct, daysRemaining, currentLevel, nivelNumero } = summary;
+  const period = `${fullDate(g.startsOn)} a ${fullDate(g.endsOn)}`;
   const prazo = prazoRestante(daysRemaining);
   const rodape =
     status === "active"
-      ? projetadoPct != null
-        ? `Projeção: ${num(projetadoPct, 0)}% · ${prazo.toLowerCase()}`
+      ? projectedPct != null
+        ? `Projeção: ${num(projectedPct, 0)}% · ${prazo.toLowerCase()}`
         : prazo
       : status === "upcoming"
         ? `Começa em ${fullDate(g.startsOn)}`
-        : nivelAtual
-          ? `Nível final: N${nivelNumero} · ${nivelAtual}`
+        : currentLevel
+          ? `Nível final: N${nivelNumero} · ${currentLevel}`
           : "Nenhum nível atingido";
 
   const acao = (fn: () => void) => (e: MouseEvent) => {
@@ -301,8 +301,8 @@ function GoalCard({
         <div className="min-w-0 flex-1">
           <p className="truncate text-[15px] font-bold text-t0">{g.name}</p>
           <p className="mt-0.5 truncate text-[12.5px] text-t2">
-            {periodo}
-            {mostraLoja && loja ? ` · ${loja.fantasia}` : ""}
+            {period}
+            {mostraLoja && store ? ` · ${store.fantasia}` : ""}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5 self-start">
@@ -333,7 +333,7 @@ function GoalCard({
         {status === "upcoming" ? (
           <span className="font-mono text-[13px] font-extrabold text-t0">{brlCent(g.target)}</span>
         ) : (
-          <span className="font-mono text-[13px] font-extrabold text-ok">{brlCent(realizado)}</span>
+          <span className="font-mono text-[13px] font-extrabold text-ok">{brlCent(achieved)}</span>
         )}
         <span className="text-right text-[11.5px] text-t2">
           {status === "upcoming" ? (
@@ -358,11 +358,11 @@ function GoalCard({
           <Badge variant="neutral">
             {g.tiers.length} {g.tiers.length === 1 ? "nível" : "níveis"}
           </Badge>
-          <Badge variant="neutral">{equipe.length} na equipe</Badge>
+          <Badge variant="neutral">{team.length} na equipe</Badge>
         </div>
-        {equipe.length > 0 && (
+        {team.length > 0 && (
           <div className="shrink-0">
-            <AvatarGroup names={equipe} max={3} />
+            <AvatarGroup names={team} max={3} />
           </div>
         )}
       </div>

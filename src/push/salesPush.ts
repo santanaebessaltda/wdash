@@ -82,7 +82,7 @@ export function watchSalesPush(tenantId: string): () => void {
     const data = event.data as { type?: string; subscription?: ChavesPush } | null;
     if (data?.type === "wedash:notification-open") renovar(true);
     if (data?.type === "wedash:push-subscription" && data.subscription) {
-      void salvarInscricao(tenantId, data.subscription);
+      void saveEnrollment(tenantId, data.subscription);
     }
   };
   renovar(true);
@@ -121,10 +121,10 @@ async function fazerGravacao(tenantId: string, renovar: boolean): Promise<void> 
       userVisibleOnly: true,
       applicationServerKey: chave() as BufferSource,
     }));
-  await salvarInscricao(tenantId, inscricao.toJSON());
+  await saveEnrollment(tenantId, inscricao.toJSON());
 }
 
-async function salvarInscricao(tenantId: string, json: ChavesPush): Promise<void> {
+async function saveEnrollment(tenantId: string, json: ChavesPush): Promise<void> {
   if (!inscricaoValida(json)) return;
   const sb = getSupabase();
   if (!sb) return;

@@ -19,36 +19,36 @@ import { cn } from "@/lib/cn";
 export interface LadderStep {
   label: string;
   /** Valor alvo do degrau em R$ (ex.: 190000 para Meta, 216000 para Super). */
-  valor: number;
+  amount: number;
 }
 
 export function CommissionLadder({
-  degraus,
-  realizado,
+  tiers,
+  achieved,
   formatValue = (v: number) => String(v),
   className,
 }: {
-  degraus: LadderStep[];
-  realizado: number;
+  tiers: LadderStep[];
+  achieved: number;
   formatValue?: (v: number) => string;
   className?: string;
 }) {
   // Ordena os degraus do menor pro maior (Meta  ->  Super  ->  Hiper).
-  const ordenados = [...degraus].sort((a, b) => a.valor - b.valor);
+  const ordenados = [...tiers].sort((a, b) => a.amount - b.amount);
   // Degrau atual: o ultimo cujo valor foi atingido (realizado >= valor).
-  const indiceAtual = ordenados.reduce((acc, d, i) => (realizado >= d.valor ? i : acc), -1);
+  const indiceAtual = ordenados.reduce((acc, d, i) => (achieved >= d.amount ? i : acc), -1);
 
   return (
     <div className={cn("flex flex-col gap-4", className)}>
-      {ordenados.map((degrau, i) => {
-        const pct = Math.min(100, (realizado / degrau.valor) * 100);
-        const atingido = realizado >= degrau.valor;
+      {ordenados.map((tier, i) => {
+        const pct = Math.min(100, (achieved / tier.amount) * 100);
+        const atingido = achieved >= tier.amount;
         const ehAtual = i === indiceAtual;
         return (
-          <div key={degrau.label} className="flex flex-col gap-1.5">
+          <div key={tier.label} className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className={cn("text-[13px] font-bold", atingido ? "text-ok" : "text-t0")}>{degrau.label}</span>
+                <span className={cn("text-[13px] font-bold", atingido ? "text-ok" : "text-t0")}>{tier.label}</span>
                 {ehAtual && !atingido && (
                   <Badge variant="info" dot>
                     Em andamento
@@ -61,14 +61,14 @@ export function CommissionLadder({
                 )}
               </div>
               <span className="text-[12px] font-semibold text-t1">
-                {formatValue(realizado)} / {formatValue(degrau.valor)}
+                {formatValue(achieved)} / {formatValue(tier.amount)}
               </span>
             </div>
             <ProgressBar value={pct} height={10} />
             <span className="text-[11px] text-t2">
               {atingido
-                ? `✓ ${degrau.label} batida!`
-                : `Faltam ${formatValue(Math.max(0, degrau.valor - realizado))} (${pct.toFixed(1)}%)`}
+                ? `✓ ${tier.label} batida!`
+                : `Faltam ${formatValue(Math.max(0, tier.amount - achieved))} (${pct.toFixed(1)}%)`}
             </span>
           </div>
         );

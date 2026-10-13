@@ -11,8 +11,8 @@ describe("DiaVendasStore", () => {
       const dias = s.dias(f.id, "2026-06-01", TODAY_ISO);
       expect(dias.length).toBe(eachDay("2026-06-01", TODAY_ISO).length);
       for (const d of dias) {
-        expect(d.filialId).toBe(f.id);
-        expect(d.total.faturamento).toBeGreaterThanOrEqual(0);
+        expect(d.storeId).toBe(f.id);
+        expect(d.total.revenue).toBeGreaterThanOrEqual(0);
       }
     }
   });
@@ -45,7 +45,7 @@ describe("agregadoDoDia: recorte por divisão", () => {
   it("com divisão retorna apenas a fatia estimada da divisão", () => {
     const d = salesDay("f1", "2026-09-08")!;
     const ag = dayAggregate(d, "WEPINK");
-    expect(ag.faturamento).toBe(d.porDivisao["WEPINK"].faturamento);
+    expect(ag.revenue).toBe(d.byDivision["WEPINK"].revenue);
     // A fatia e estimada pela fracao de faturamento (mock); pode diferir em 1
     // do total por arredondamento. Aqui asseveramos que coincide com a fatia
     // registrada, nao que seja  total (o gerador existente permite excedente).
@@ -58,20 +58,20 @@ describe("agregadoDoDia: recorte por hora (horaMax)", () => {
     const d = s.dia("f1", "2026-09-08")!;
     const cheio = dayAggregate(d, null);
     const ate10 = dayAggregate(d, null, 10);
-    expect(ate10.atendimentos).toBeLessThanOrEqual(cheio.atendimentos);
+    expect(ate10.salesCount).toBeLessThanOrEqual(cheio.salesCount);
     // Horas com indice > 10 nao entram.
-    const em11 = d.porHora[11] ?? { faturamento: 0, atendimentos: 0, itens: 0 };
-    expect(ate10.faturamento).toBeLessThanOrEqual(cheio.faturamento - em11.faturamento);
+    const em11 = d.porHora[11] ?? { revenue: 0, salesCount: 0, itens: 0 };
+    expect(ate10.revenue).toBeLessThanOrEqual(cheio.revenue - em11.revenue);
   });
 });
 
 describe("somarAgregados", () => {
   it("soma corretamente múltiplos agregados", () => {
-    const a = { faturamento: 100, atendimentos: 10, itens: 20 };
-    const b = { faturamento: 50, atendimentos: 20, itens: 30 };
-    expect(sumAggregates([a, b])).toEqual({ faturamento: 150, atendimentos: 30, itens: 50 });
+    const a = { revenue: 100, salesCount: 10, itens: 20 };
+    const b = { revenue: 50, salesCount: 20, itens: 30 };
+    expect(sumAggregates([a, b])).toEqual({ revenue: 150, salesCount: 30, itens: 50 });
   });
   it("soma vazia é zero", () => {
-    expect(sumAggregates([])).toEqual({ faturamento: 0, atendimentos: 0, itens: 0 });
+    expect(sumAggregates([])).toEqual({ revenue: 0, salesCount: 0, itens: 0 });
   });
 });

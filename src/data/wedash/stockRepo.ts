@@ -91,8 +91,8 @@ function locationsUpper(raw: Record<string, number | string>): Record<string, nu
   const out: Record<string, number> = {};
   for (const [k, v] of Object.entries(raw)) {
     const upper = k.trim().toUpperCase();
-    const nome = upper === "QUIOSQUE" ? STOCK_SALES_LOCATION : upper || "ESTOQUE";
-    out[nome] = (out[nome] ?? 0) + (Number(v) || 0);
+    const name = upper === "QUIOSQUE" ? STOCK_SALES_LOCATION : upper || "ESTOQUE";
+    out[name] = (out[name] ?? 0) + (Number(v) || 0);
   }
   return out;
 }

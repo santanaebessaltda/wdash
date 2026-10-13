@@ -251,14 +251,14 @@ export function chipsHaveGap(chips: CloseChip[]): boolean {
   return chips.some((chip) => chip.label !== "Falta assumida" && !chipEspera(chip.key) && !chipFechado(chip.key));
 }
 
-export type CloseDayFace = "vazio" | "pendente" | "diferenca" | "fechado";
+export type CloseDayFace = "empty" | "pending" | "difference" | "closed";
 
 /** Diferença ganha da marca Pendente. Sem diferença, o dia a caminho fica Pendente. */
 export function closeDayFace(input: { awaiting: boolean; hasLines: boolean; hasGap: boolean }): CloseDayFace {
-  if (input.hasGap) return "diferenca";
-  if (input.awaiting) return "pendente";
-  if (input.hasLines) return "fechado";
-  return "vazio";
+  if (input.hasGap) return "difference";
+  if (input.awaiting) return "pending";
+  if (input.hasLines) return "closed";
+  return "empty";
 }
 
 export type MonthCloseSummary = {

@@ -12,13 +12,13 @@ const goal: GoalRecord = {
   target: 10_000,
   tierMode: "INDIVIDUAL",
   tiers: [
-    { nome: "Meta", atingimentoMinPct: 100, comissaoPct: 1, bonus: 50 },
-    { nome: "Super", atingimentoMinPct: 120, comissaoPct: 2, bonus: 100 },
-    { nome: "Hiper", atingimentoMinPct: 150, comissaoPct: 3, bonus: 150 },
+    { name: "Meta", minAttainmentPct: 100, commissionPct: 1, bonus: 50 },
+    { name: "Super", minAttainmentPct: 120, commissionPct: 2, bonus: 100 },
+    { name: "Hiper", minAttainmentPct: 150, commissionPct: 3, bonus: 150 },
   ],
   groups: [],
 };
-const grupo: GoalRecord = { ...goal, tierMode: "GROUP" };
+const group: GoalRecord = { ...goal, tierMode: "GROUP" };
 
 const member = (employeeId: number, name: string): GoalTeamMember => ({
   storeId: "s1",
@@ -53,7 +53,7 @@ const UNIFORM = [1, 1, 1, 1, 1, 1, 1];
 describe("nextLevelGain", () => {
   it("premiação no próximo nível sobre as vendas atuais − premiação agora + bônus do próximo nível", () => {
     const level = levelOf(goal, [ANA], [sale(1, 10_500)]);
-    expect(level.premiacao).toBeCloseTo(105);
+    expect(level.prizeAmount).toBeCloseTo(105);
     expect(nextLevelGain(level, 1)).toBeCloseTo(205);
   });
 
@@ -66,8 +66,8 @@ describe("nextLevelGain", () => {
   });
 
   it("modo Grupo: premiação do grupo dividida pelas pessoas do grupo", () => {
-    const level = levelOf(grupo, [ANA, BIA], [sale(1, 6_000), sale(2, 4_500)]);
-    expect(level.premiacao).toBeCloseTo(52.5);
+    const level = levelOf(group, [ANA, BIA], [sale(1, 6_000), sale(2, 4_500)]);
+    expect(level.prizeAmount).toBeCloseTo(52.5);
     expect(nextLevelGain(level, 2)).toBeCloseTo(152.5);
   });
 });
@@ -88,7 +88,7 @@ describe("projectedPrize", () => {
   });
 
   it("modo Grupo: projeta o vendido do grupo e dá a parte da pessoa", () => {
-    const g = levelOf(grupo, [ANA, BIA], [sale(1, 4_000), sale(2, 3_000)]);
-    expect(projectedPrize(grupo, g, { today: "2026-09-16", weights: UNIFORM, soldUntilYesterday: 7_000, groupSize: 2 })).toBeCloseTo(290);
+    const g = levelOf(group, [ANA, BIA], [sale(1, 4_000), sale(2, 3_000)]);
+    expect(projectedPrize(group, g, { today: "2026-09-16", weights: UNIFORM, soldUntilYesterday: 7_000, groupSize: 2 })).toBeCloseTo(290);
   });
 });

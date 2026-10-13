@@ -8,16 +8,16 @@ export type { GoalGroup, GoalRecord, GoalTeamMember } from "./engine/goalTypes";
 /** Demo sem Supabase: metas fixture (lojas f1/f2), so a meta principal de cada mes. */
 function fixtureRecords(): GoalRecord[] {
   return fixtureGoals
-    .filter((g) => g.marcas.length !== 1)
+    .filter((g) => g.brands.length !== 1)
     .map((g) => ({
       id: g.id,
-      storeId: g.filialId,
-      name: g.nome,
-      startsOn: `${g.competencia}-01`,
-      endsOn: endOfMonth(`${g.competencia}-01`),
+      storeId: g.storeId,
+      name: g.name,
+      startsOn: `${g.competence}-01`,
+      endsOn: endOfMonth(`${g.competence}-01`),
       target: g.storeAmount,
-      tierMode: g.tipo === "individual" ? "INDIVIDUAL" : "GROUP",
-      tiers: g.degraus,
+      tierMode: g.kind === "individual" ? "INDIVIDUAL" : "GROUP",
+      tiers: g.tiers,
       groups: [],
     }));
 }
@@ -43,12 +43,12 @@ export async function saveGoal(
     target_cents: Math.round(g.target * 100),
     tier_mode: g.tierMode,
     tiers: g.tiers.map((t) => ({
-      name: t.nome,
-      minPct: t.atingimentoMinPct,
-      commissionPct: t.comissaoPct,
+      name: t.name,
+      minPct: t.minAttainmentPct,
+      commissionPct: t.commissionPct,
       bonusCents: Math.round(t.bonus * 100),
-      ...(t.gerenciaPct != null
-        ? { managerCommissionPct: t.gerenciaPct, managerBonusCents: Math.round((t.gerenciaBonus ?? 0) * 100) }
+      ...(t.managerPct != null
+        ? { managerCommissionPct: t.managerPct, managerBonusCents: Math.round((t.managerBonus ?? 0) * 100) }
         : {}),
     })),
     groups: g.groups.map((x) => ({ shiftId: x.shiftId, name: x.name, pct: x.pct })),

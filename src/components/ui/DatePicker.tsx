@@ -9,11 +9,11 @@ import { calendarTodayIso } from "@/data/wedash/clock";
  * Um clique no dia escolhe e fecha. Painel em portal, alinhado a esquerda do campo.
  */
 
-const DOW_PT = ["D", "S", "T", "Q", "Q", "S", "S"];
-const MESES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+const WEEKDAY_INITIALS = ["D", "S", "T", "Q", "Q", "S", "S"];
+const MONTHS_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 const PANEL_WIDTH = 320;
 
-function zeraHora(d: Date): Date {
+function startOfCalendarDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
@@ -47,12 +47,12 @@ export function DatePicker({
   className?: string;
   "aria-label"?: string;
 }) {
-  const hoje = useMemo(() => isoToDate(calendarTodayIso()), []);
-  const min = useMemo(() => (minDate ? zeraHora(minDate) : null), [minDate]);
-  const max = useMemo(() => (maxDate ? zeraHora(maxDate) : null), [maxDate]);
+  const today = useMemo(() => isoToDate(calendarTodayIso()), []);
+  const min = useMemo(() => (minDate ? startOfCalendarDay(minDate) : null), [minDate]);
+  const max = useMemo(() => (maxDate ? startOfCalendarDay(maxDate) : null), [maxDate]);
   const [open, setOpen] = useState(false);
   const [viewMonth, setViewMonth] = useState<Date>(() => {
-    const base = value ?? min ?? hoje;
+    const base = value ?? min ?? today;
     return new Date(base.getFullYear(), base.getMonth(), 1);
   });
   const [panelPos, setPanelPos] = useState<{ top: number; left: number; maxHeight: number } | null>(null);
@@ -61,7 +61,7 @@ export function DatePicker({
 
   useEffect(() => {
     if (!open) return;
-    const base = value ?? (min && min > hoje ? min : hoje);
+    const base = value ?? (min && min > today ? min : today);
     setViewMonth(new Date(base.getFullYear(), base.getMonth(), 1));
   }, [open]); // value lido so no momento do open
 
@@ -140,7 +140,7 @@ export function DatePicker({
                 </svg>
               </button>
               <span className="text-sm font-bold text-t0">
-                {MESES_PT[viewMonth.getMonth()]} {viewMonth.getFullYear()}
+                {MONTHS_PT[viewMonth.getMonth()]} {viewMonth.getFullYear()}
               </span>
               <button
                 type="button"
@@ -156,7 +156,7 @@ export function DatePicker({
             </div>
 
             <div className="mb-1.5 grid grid-cols-7 gap-1">
-              {DOW_PT.map((d, i) => (
+              {WEEKDAY_INITIALS.map((d, i) => (
                 <span key={`${d}-${i}`} className="py-1 text-center text-[10.5px] font-bold text-t2">
                   {d}
                 </span>

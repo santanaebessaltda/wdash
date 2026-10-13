@@ -32,7 +32,7 @@ export const CHALLENGE_METRIC_LABEL: Record<ChallengeMetric, string> = {
 };
 
 /** Pesos do Indice de desempenho (somam 1). */
-export const INDEX_WEIGHTS = { faturamento: 0.5, ticket: 0.25, pa: 0.25 } as const;
+export const INDEX_WEIGHTS = { revenue: 0.5, ticket: 0.25, pa: 0.25 } as const;
 
 export interface IndexTeamBase {
   /** Faturamento medio por pessoa (so quem vendeu). */
@@ -44,32 +44,32 @@ export interface IndexTeamBase {
 }
 
 /** Medias simples entre quem vendeu  ->  a media dos indices dessas pessoas e exatamente 100. */
-export function indexTeamBase(pessoas: { faturamento: number; vendas: number; itens: number }[]): IndexTeamBase | null {
+export function indexTeamBase(pessoas: { revenue: number; vendas: number; itens: number }[]): IndexTeamBase | null {
   const comVenda = pessoas.filter((p) => p.vendas > 0);
   if (comVenda.length === 0) return null;
   const media = (f: (p: (typeof comVenda)[number]) => number) => comVenda.reduce((s, p) => s + f(p), 0) / comVenda.length;
   return {
-    faturamentoMedio: media((p) => p.faturamento),
-    ticket: media((p) => p.faturamento / p.vendas),
+    faturamentoMedio: media((p) => p.revenue),
+    ticket: media((p) => p.revenue / p.vendas),
     pa: media((p) => p.itens / p.vendas),
   };
 }
 
 /** Faturamento em R$ ou centavos  -  so precisa ser a mesma unidade da base. */
-export function performanceIndex(p: { faturamento: number; vendas: number; itens: number }, base: IndexTeamBase): number {
+export function performanceIndex(p: { revenue: number; vendas: number; itens: number }, base: IndexTeamBase): number {
   if (p.vendas <= 0) return 0;
   const parte = (v: number, ref: number) => (ref > 0 ? v / ref : 0);
   const w = INDEX_WEIGHTS;
   return (
     100 *
-    (w.faturamento * parte(p.faturamento, base.faturamentoMedio) +
-      w.ticket * parte(p.faturamento / p.vendas, base.ticket) +
+    (w.revenue * parte(p.revenue, base.faturamentoMedio) +
+      w.ticket * parte(p.revenue / p.vendas, base.ticket) +
       w.pa * parte(p.itens / p.vendas, base.pa))
   );
 }
 
 export interface IndexPersonTotals {
-  faturamento: number;
+  revenue: number;
   vendas: number;
   itens: number;
   semItens: boolean;
@@ -88,7 +88,7 @@ export function teamIndex(atual: IndexPersonTotals[], anterior: IndexPersonTotal
   const w = INDEX_WEIGHTS;
   return (
     100 *
-    (w.faturamento * parte(a.faturamentoMedio, b.faturamentoMedio) +
+    (w.revenue * parte(a.faturamentoMedio, b.faturamentoMedio) +
       w.ticket * parte(a.ticket, b.ticket) +
       w.pa * parte(a.pa, b.pa))
   );
@@ -107,8 +107,8 @@ export const CHALLENGE_MODE_LABEL: Record<ChallengeMode, string> = {
 
 export interface ChallengeParticipant {
   key: string;
-  nome: string;
-  grupo: string | null;
+  name: string;
+  group: string | null;
   /** null = a comecar ou P.A. sem itens gravados (" - "). */
   resultado: number | null;
   vendas: number;
@@ -116,7 +116,7 @@ export interface ChallengeParticipant {
   posicao: number | null;
   /** Disputa: venceu  |  Minimo: atingiu. */
   vencedor: boolean;
-  premio: ChallengePrize | null;
+  prize: ChallengePrize | null;
   /** So em andamento. */
   falta: string | null;
 }
@@ -128,7 +128,7 @@ export interface ChallengeManagerResult {
   /** So no Indice: periodo anterior inteiro usado na comparacao. */
   periodoAnterior: { from: string; to: string } | null;
   atingiu: boolean;
-  premio: ChallengePrize;
+  prize: ChallengePrize;
 }
 
 export interface ChallengeView {
@@ -137,7 +137,7 @@ export interface ChallengeView {
   prazo: string;
   /** Encerrado ontem: o ultimo dia fecha na madrugada e ainda pode mudar. */
   emFechamento: boolean;
-  participantes: ChallengeParticipant[];
+  participants: ChallengeParticipant[];
   /** Minimo: quantas pessoas atingiram. */
   atingiram: number;
   gerencia: ChallengeManagerResult | null;
@@ -148,8 +148,8 @@ export interface ChallengeView {
 const usesMinSales = (m: ChallengeMetric) => m === "PA" || m === "TICKET" || m === "INDEX";
 const round2 = (v: number) => Math.round(v * 100) / 100;
 
-function daysBetween(inicio: string, fim: string): number {
-  return Math.round((isoToDate(fim).getTime() - isoToDate(inicio).getTime()) / 86_400_000) + 1;
+function daysBetween(start: string, end: string): number {
+  return Math.round((isoToDate(end).getTime() - isoToDate(start).getTime()) / 86_400_000) + 1;
 }
 
 /** 12 itens  |  1 item  |  7,5 itens  |  1,85  |  R$ 92,30  |  112,4 (indice) */
@@ -181,8 +181,8 @@ const faltaVendas = (n: number) => (n === 1 ? "Falta 1 venda para participar" : 
 
 interface Acc {
   key: string;
-  nome: string;
-  grupo: string | null;
+  name: string;
+  group: string | null;
   /** Itens e R$ dos produtos/categorias escolhidos. */
   itens: number;
   valorCents: number;
@@ -200,7 +200,7 @@ export function buildChallengeView(args: {
   const { challenge: c, aggs, today } = args;
   const status = goalStatus(c, today);
   const ate = c.endsOn < today ? c.endsOn : today;
-  const noPeriodo = (r: { storeId: string; day: string }) => r.storeId === c.storeId && r.day >= c.startsOn && r.day <= ate;
+  const inPeriod = (r: { storeId: string; day: string }) => r.storeId === c.storeId && r.day >= c.startsOn && r.day <= ate;
 
   const team = aggs.team.filter((m) => m.storeId === c.storeId);
   const porCodigo = new Map(team.map((m) => [m.employeeId, m]));
@@ -216,8 +216,8 @@ export function buildChallengeView(args: {
     if (!a) {
       a = {
         key,
-        nome: collaboratorName(membro?.name ?? (sellerName || sellerKey)),
-        grupo: membro?.shiftName ?? null,
+        name: collaboratorName(membro?.name ?? (sellerName || sellerKey)),
+        group: membro?.shiftName ?? null,
         itens: 0,
         valorCents: 0,
         vendas: 0,
@@ -245,7 +245,7 @@ export function buildChallengeView(args: {
       const conta = (code: string) =>
         c.scope === "PRODUCTS" ? codigos.has(code) : tipos.has(aggs.typeByCode.get(code) ?? Number.NaN);
       for (const r of aggs.sellerProducts) {
-        if (!noPeriodo(r)) continue;
+        if (!inPeriod(r)) continue;
         const membro = porGerador.get(r.sellerGeradorId) ?? porNome.get(r.sellerKey);
         const a = acc(membro, r.sellerKey, r.sellerName);
         if (conta(r.productCode)) {
@@ -255,7 +255,7 @@ export function buildChallengeView(args: {
       }
     }
     for (const r of aggs.sellerDays) {
-      if (!noPeriodo(r)) continue;
+      if (!inPeriod(r)) continue;
       const a = acc(membroDoDia(r), r.sellerKey, r.sellerName);
       a.vendas += r.salesCount;
       a.faturamentoCents += r.revenueCents;
@@ -266,14 +266,14 @@ export function buildChallengeView(args: {
 
   const indexBase: IndexTeamBase | null = [...accs.values()].some((a) => a.vendas > 0 && a.semItens)
     ? null
-    : indexTeamBase([...accs.values()].map((a) => ({ faturamento: a.faturamentoCents, vendas: a.vendas, itens: a.itensVendas })));
+    : indexTeamBase([...accs.values()].map((a) => ({ revenue: a.faturamentoCents, vendas: a.vendas, itens: a.itensVendas })));
 
   const resultadoDe = (a: Acc): number | null => {
     if (status === "upcoming") return null;
     if (c.metric === "INDEX") {
       if (a.vendas <= 0) return 0;
       return indexBase
-        ? round2(performanceIndex({ faturamento: a.faturamentoCents, vendas: a.vendas, itens: a.itensVendas }, indexBase))
+        ? round2(performanceIndex({ revenue: a.faturamentoCents, vendas: a.vendas, itens: a.itensVendas }, indexBase))
         : null;
     }
     if (c.metric === "QUANTITY") return porProduto ? a.itens : a.semItens ? null : a.itensVendas;
@@ -300,22 +300,22 @@ export function buildChallengeView(args: {
 
   const valoresAcima = base
     .filter((x) => concorre(x) && posicaoDe.has(x.a.key))
-    .map((x) => ({ valor: x.resultado!, posicao: posicaoDe.get(x.a.key)! }));
+    .map((x) => ({ amount: x.resultado!, posicao: posicaoDe.get(x.a.key)! }));
 
   // P.A. oscila ate o ultimo dia: ninguem "atinge" enquanto o desafio esta aberto.
   const paEmAndamento = c.metric === "PA" && status === "active";
 
-  const participantes: ChallengeParticipant[] = base.map(({ a, resultado }) => {
+  const participants: ChallengeParticipant[] = base.map(({ a, resultado }) => {
     const posicao = posicaoDe.get(a.key) ?? null;
     let vencedor = false;
-    let premio: ChallengePrize | null = null;
+    let prize: ChallengePrize | null = null;
     if (status !== "upcoming" && !paEmAndamento) {
       if (c.mode === "CONTEST") {
         vencedor = posicao != null && posicao <= c.prizes.length && alcancaAlvo(resultado);
-        premio = vencedor ? (c.prizes[posicao! - 1] ?? null) : null;
+        prize = vencedor ? (c.prizes[posicao! - 1] ?? null) : null;
       } else {
         vencedor = alcancaAlvo(resultado) && a.vendas >= minVendas && c.target != null;
-        premio = vencedor ? (c.prizes[0] ?? null) : null;
+        prize = vencedor ? (c.prizes[0] ?? null) : null;
       }
     }
 
@@ -330,16 +330,16 @@ export function buildChallengeView(args: {
         falta = `${faltaLabel(c.metric, c.target - resultado)} para o mínimo`;
       } else {
         const acima = valoresAcima
-          .filter((v) => v.valor > resultado + 1e-9)
-          .sort((x, y) => x.valor - y.valor)[0];
-        if (acima) falta = `${faltaLabel(c.metric, acima.valor - resultado)} para o ${acima.posicao}º lugar`;
+          .filter((v) => v.amount > resultado + 1e-9)
+          .sort((x, y) => x.amount - y.amount)[0];
+        if (acima) falta = `${faltaLabel(c.metric, acima.amount - resultado)} para o ${acima.posicao}º lugar`;
       }
     }
 
-    return { key: a.key, nome: a.nome, grupo: a.grupo, resultado, vendas: a.vendas, posicao, vencedor, premio, falta };
+    return { key: a.key, name: a.name, group: a.group, resultado, vendas: a.vendas, posicao, vencedor, prize, falta };
   });
 
-  participantes.sort((x, y) => {
+  participants.sort((x, y) => {
     if (status !== "upcoming") {
       if (c.mode === "CONTEST") {
         const px = x.posicao ?? Number.POSITIVE_INFINITY;
@@ -350,12 +350,12 @@ export function buildChallengeView(args: {
       const ry = y.resultado ?? Number.NEGATIVE_INFINITY;
       if (rx !== ry) return ry - rx;
     }
-    return x.nome.localeCompare(y.nome, "pt-BR");
+    return x.name.localeCompare(y.name, "pt-BR");
   });
 
   let gerencia: ChallengeManagerResult | null = null;
-  const metaGerencia = c.managerTarget;
-  if (c.managerPrize && metaGerencia != null && c.metric === "INDEX") {
+  const managerGoal = c.managerTarget;
+  if (c.managerPrize && managerGoal != null && c.metric === "INDEX") {
     const janelas = managerIndexWindows(c, today);
     const pessoasNa = (j: DayRange) => {
       const m = new Map<string, IndexPersonTotals>();
@@ -364,8 +364,8 @@ export function buildChallengeView(args: {
         const membro = membroDoDia(r);
         const key = membro ? `e:${membro.employeeId}` : r.sellerKey ? `n:${r.sellerKey}` : null;
         if (!key) continue;
-        const p = m.get(key) ?? { faturamento: 0, vendas: 0, itens: 0, semItens: false };
-        p.faturamento += r.revenueCents;
+        const p = m.get(key) ?? { revenue: 0, vendas: 0, itens: 0, semItens: false };
+        p.revenue += r.revenueCents;
         p.vendas += r.salesCount;
         p.itens += r.itemCount ?? 0;
         if (r.salesCount > 0 && !(r.itemCount && r.itemCount > 0)) p.semItens = true;
@@ -380,12 +380,12 @@ export function buildChallengeView(args: {
     const resultado = indice == null ? null : round2(indice);
     gerencia = {
       resultado,
-      alvo: metaGerencia,
+      alvo: managerGoal,
       periodoAnterior: janelas.anterior,
-      atingiu: resultado != null && resultado >= metaGerencia - 1e-9,
-      premio: c.managerPrize,
+      atingiu: resultado != null && resultado >= managerGoal - 1e-9,
+      prize: c.managerPrize,
     };
-  } else if (c.managerPrize && metaGerencia != null) {
+  } else if (c.managerPrize && managerGoal != null) {
     let resultado: number | null = null;
     if (status !== "upcoming") {
       const todos = [...accs.values()];
@@ -409,16 +409,16 @@ export function buildChallengeView(args: {
     }
     gerencia = {
       resultado,
-      alvo: metaGerencia,
+      alvo: managerGoal,
       periodoAnterior: null,
-      atingiu: (c.metric !== "PA" || status === "ended") && resultado != null && resultado > 0 && resultado >= metaGerencia - 1e-9,
-      premio: c.managerPrize,
+      atingiu: (c.metric !== "PA" || status === "ended") && resultado != null && resultado > 0 && resultado >= managerGoal - 1e-9,
+      prize: c.managerPrize,
     };
   }
 
   const diasIncompletos: string[] = [];
   if (porProduto && status !== "upcoming") {
-    const comItens = new Set(aggs.sellerProducts.filter(noPeriodo).map((r) => r.day));
+    const comItens = new Set(aggs.sellerProducts.filter(inPeriod).map((r) => r.day));
     for (const day of eachDay(c.startsOn, ate)) {
       if (aggs.storeSaleDays.has(`${c.storeId}|${day}`) && !comItens.has(day)) diasIncompletos.push(day);
     }
@@ -436,19 +436,19 @@ export function buildChallengeView(args: {
     status,
     prazo,
     emFechamento: status === "ended" && today <= addDays(c.endsOn, 1),
-    participantes,
-    atingiram: c.mode === "MINIMUM" ? participantes.filter((p) => p.vencedor).length : 0,
+    participants,
+    atingiram: c.mode === "MINIMUM" ? participants.filter((p) => p.vencedor).length : 0,
     gerencia,
     diasIncompletos,
   };
 }
 
 export interface ChallengeWinner {
-  nome: string;
-  grupo: string | null;
+  name: string;
+  group: string | null;
   /** "1 lugar"  |  "Atingiu" */
   colocacao: string;
-  premio: ChallengePrize;
+  prize: ChallengePrize;
 }
 
 export interface ChallengePayout {
@@ -461,16 +461,16 @@ export interface ChallengePayout {
 }
 
 export function challengePayout(view: ChallengeView): ChallengePayout {
-  const vencedores: ChallengeWinner[] = view.participantes
-    .filter((p) => p.vencedor && p.premio)
+  const vencedores: ChallengeWinner[] = view.participants
+    .filter((p) => p.vencedor && p.prize)
     .map((p) => ({
-      nome: p.nome,
-      grupo: p.grupo,
+      name: p.name,
+      group: p.group,
       colocacao: p.posicao != null ? `${p.posicao}º lugar` : "Atingiu",
-      premio: p.premio!,
+      prize: p.prize!,
     }));
-  const gerencia = view.gerencia?.atingiu ? view.gerencia.premio : null;
-  const premios = [...vencedores.map((w) => w.premio), ...(gerencia ? [gerencia] : [])];
+  const gerencia = view.gerencia?.atingiu ? view.gerencia.prize : null;
+  const premios = [...vencedores.map((w) => w.prize), ...(gerencia ? [gerencia] : [])];
   return {
     vencedores,
     gerencia,
@@ -487,7 +487,7 @@ function juntarNomes(nomes: string[]): string {
 /** Resumo do card da listagem: lider(es) na Disputa  |  quantas atingiram no Minimo. */
 export function challengeCardSummary(view: ChallengeView): { lider: string | null; atingiram: number | null } {
   if (view.mode === "MINIMUM") return { lider: null, atingiram: view.status === "upcoming" ? null : view.atingiram };
-  const lideres = view.participantes.filter((p) => p.posicao === 1).map((p) => p.nome);
+  const lideres = view.participants.filter((p) => p.posicao === 1).map((p) => p.name);
   return { lider: lideres.length > 0 ? juntarNomes(lideres) : null, atingiram: null };
 }
 

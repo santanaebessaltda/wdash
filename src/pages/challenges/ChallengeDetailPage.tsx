@@ -68,8 +68,8 @@ const ORDINAL = ["1º", "2º", "3º"];
 /** "  |  meta de 2,00"  |  Indice: "  |  indice da equipe de 105,0". */
 function managerGoalText(c: ChallengeRecord): string {
   if (c.managerTarget == null) return "";
-  const valor = metricValueLabel(c.metric, c.managerTarget);
-  return isIndexMetric(c.metric) ? ` · índice da equipe de ${valor}` : ` · meta de ${valor}`;
+  const amount = metricValueLabel(c.metric, c.managerTarget);
+  return isIndexMetric(c.metric) ? ` · índice da equipe de ${amount}` : ` · meta de ${amount}`;
 }
 
 /** Gestao > Desafios > detalhe  -  resumo e participantes; encerrado = fechamento com quem ganhou o que. */
@@ -83,7 +83,7 @@ export default function ChallengeDetailPage() {
   const [reload, setReload] = useState(0);
   const [duplicarAberto, setDuplicarAberto] = useState(false);
   const hasOtherStores = storesForSession(session.stores).length > 1;
-  const daEquipe = (location.state as { from?: string } | null)?.from === "team";
+  const fromTeam = (location.state as { from?: string } | null)?.from === "team";
   const voltarPara = challengeBackPath(location.state);
   useReturnWhenStoreChanges(data?.challenge?.storeId, voltarPara);
 
@@ -107,7 +107,7 @@ export default function ChallengeDetailPage() {
 
   const showSkeleton = useMinSkeleton(data === null);
   const challenge = data?.challenge ?? null;
-  const loja = useMemo(
+  const store = useMemo(
     () => (challenge ? storesForSession(session.stores).find((s) => s.id === challenge.storeId) : undefined),
     [challenge, session.stores],
   );
@@ -117,18 +117,18 @@ export default function ChallengeDetailPage() {
   );
 
   const voltar = () => navigate(voltarPara);
-  const periodo = challenge ? `${fullDate(challenge.startsOn)} a ${fullDate(challenge.endsOn)}` : "";
+  const period = challenge ? `${fullDate(challenge.startsOn)} a ${fullDate(challenge.endsOn)}` : "";
 
   return (
     <div>
-      {challenge && view?.status === "ended" && <PayoutReportHeader challenge={challenge} lojaNome={loja?.fantasia} />}
+      {challenge && view?.status === "ended" && <PayoutReportHeader challenge={challenge} storeNameValue={store?.fantasia} />}
       <div className="mb-5 flex flex-wrap items-center gap-3 print:hidden">
         <Button variant="secondary" size="sm" icon={<Icon d={icons.arrowLeft} size={14} />} onClick={voltar}>
           Voltar
         </Button>
         <Breadcrumbs
           items={
-            daEquipe
+            fromTeam
               ? [{ label: "Dashboard", to: paths.overview }, { label: "Equipe", to: voltarPara }, { label: challenge?.name ?? "Detalhe" }]
               : [{ label: "Gestão" }, { label: "Desafios", to: paths.management.challenges }, { label: challenge?.name ?? "Detalhe" }]
           }
@@ -172,14 +172,14 @@ export default function ChallengeDetailPage() {
             description="O desafio pode ter sido excluído ou não pertencer às suas filiais."
             action={
               <Button size="sm" variant="outline" onClick={voltar}>
-                {daEquipe ? "Voltar para Equipe" : "Voltar para Desafios"}
+                {fromTeam ? "Voltar para Equipe" : "Voltar para Desafios"}
               </Button>
             }
           />
         </Card>
       ) : (
         <>
-          <ChallengeHero challenge={challenge} view={view} lojaNome={loja?.fantasia} />
+          <ChallengeHero challenge={challenge} view={view} storeNameValue={store?.fantasia} />
 
           {view.diasIncompletos.length > 0 && (
             <div className="mb-5 print:hidden">
@@ -194,7 +194,7 @@ export default function ChallengeDetailPage() {
             <ChallengePayoutCard
               challenge={challenge}
               view={view}
-              onExport={() => exportPdf(["Fechamento do desafio", loja?.fantasia ?? "", challenge.name, periodo])}
+              onExport={() => exportPdf(["Fechamento do desafio", store?.fantasia ?? "", challenge.name, period])}
             />
           )}
           <ParticipantsCard challenge={challenge} view={view} />
@@ -225,7 +225,7 @@ function itemsText(c: ChallengeRecord): string | null {
   return `${nomes.slice(0, 2).join(" · ")} · +${nomes.length - 2}`;
 }
 
-function ChallengeHero({ challenge: c, view, lojaNome }: { challenge: ChallengeRecord; view: ChallengeView; lojaNome?: string }) {
+function ChallengeHero({ challenge: c, view, storeNameValue }: { challenge: ChallengeRecord; view: ChallengeView; storeNameValue?: string }) {
   const destaque = challengeHeadline(c, view);
   const itens = itemsText(c);
   const usaVendas = usesMinSales(c.metric);
@@ -258,7 +258,7 @@ function ChallengeHero({ challenge: c, view, lojaNome }: { challenge: ChallengeR
           </div>
           <p className="flex flex-wrap items-center gap-x-1.5 text-[13.5px] leading-relaxed text-t1">
             {fullDate(c.startsOn)} a {fullDate(c.endsOn)}
-            {lojaNome ? ` · ${lojaNome}` : ""} · {CHALLENGE_MODE_LABEL[c.mode]}
+            {storeNameValue ? ` · ${storeNameValue}` : ""} · {CHALLENGE_MODE_LABEL[c.mode]}
             <TipHelp label={CHALLENGE_MODE_HELP[c.mode]} />
           </p>
         </div>
@@ -280,7 +280,7 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
   const disputa = c.mode === "CONTEST";
   const aComecar = view.status === "upcoming";
   const usaVendas = usesMinSales(c.metric);
-  const n = view.participantes.length;
+  const n = view.participants.length;
 
   return (
     <Card className="mb-5 min-w-0 print:hidden">
@@ -316,7 +316,7 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
           </p>
           <p className="text-t1">
             <span className="text-t2">Prêmio: </span>
-            <span className="font-bold">{prizeLabel(view.gerencia.premio)}</span>
+            <span className="font-bold">{prizeLabel(view.gerencia.prize)}</span>
           </p>
           <Badge variant={view.gerencia.atingiu ? "success" : "neutral"}>
             {view.gerencia.atingiu ? "Atingiu" : view.status === "ended" ? "Não atingiu" : "Ainda não atingiu"}
@@ -340,12 +340,12 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
               </tr>
             </thead>
             <tbody>
-              {view.participantes.map((p) => (
+              {view.participants.map((p) => (
                 <tr key={p.key} className="border-b border-line last:border-b-0">
                   {disputa && <td className="py-2.5 pr-3 font-mono font-bold text-t2">{p.posicao ?? "—"}</td>}
                   <td className="py-2.5 pr-3">
-                    <p className="font-bold text-t0">{p.nome}</p>
-                    {p.grupo && <p className="text-[11px] text-t2">{p.grupo}</p>}
+                    <p className="font-bold text-t0">{p.name}</p>
+                    {p.group && <p className="text-[11px] text-t2">{p.group}</p>}
                   </td>
                   <td className="py-2.5 pr-3 text-right font-mono font-bold text-t0">
                     {aComecar ? "—" : p.resultado != null ? metricValueLabel(c.metric, p.resultado) : <SemItens indice={isIndexMetric(c.metric)} />}
@@ -358,8 +358,8 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
                       <span className="text-t2">{p.falta ?? "—"}</span>
                     )}
                   </td>
-                  <td className={`py-2.5 text-right font-semibold ${p.vencedor && p.premio ? "text-t0" : "text-t2"}`}>
-                    {p.vencedor && p.premio ? prizeLabel(p.premio) : "—"}
+                  <td className={`py-2.5 text-right font-semibold ${p.vencedor && p.prize ? "text-t0" : "text-t2"}`}>
+                    {p.vencedor && p.prize ? prizeLabel(p.prize) : "—"}
                   </td>
                 </tr>
               ))}
@@ -377,7 +377,7 @@ const SemItens = ({ indice }: { indice: boolean }) => (
   </Tooltip>
 );
 
-function PayoutReportHeader({ challenge: c, lojaNome }: { challenge: ChallengeRecord; lojaNome?: string }) {
+function PayoutReportHeader({ challenge: c, storeNameValue }: { challenge: ChallengeRecord; storeNameValue?: string }) {
   const agora = new Date();
   const geradoEm = `${agora.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })} às ${agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}`;
   return (
@@ -387,10 +387,10 @@ function PayoutReportHeader({ challenge: c, lojaNome }: { challenge: ChallengeRe
         <p className="text-right text-[11px] leading-5 text-t2">Gerado em {geradoEm}</p>
       </div>
       <div className="mt-3 flex flex-wrap gap-x-8 gap-y-1 text-[12.5px]">
-        {lojaNome && (
+        {storeNameValue && (
           <p>
             <span className="text-t2">Loja: </span>
-            <span className="font-bold uppercase text-t0">{lojaNome}</span>
+            <span className="font-bold uppercase text-t0">{storeNameValue}</span>
           </p>
         )}
         <p>
@@ -414,9 +414,9 @@ function ChallengePayoutCard({ challenge: c, view, onExport }: { challenge: Chal
   const fimMais1 = isoToDate(c.endsOn);
   fimMais1.setDate(fimMais1.getDate() + 1);
   const linhas = [
-    ...payout.vencedores.map((w, i) => ({ key: `p${i}`, nome: w.nome, sub: w.grupo, colocacao: w.colocacao, premio: w.premio })),
+    ...payout.vencedores.map((w, i) => ({ key: `p${i}`, name: w.name, sub: w.group, colocacao: w.colocacao, prize: w.prize })),
     ...(payout.gerencia
-      ? [{ key: "gerencia", nome: "GERÊNCIA", sub: "Resultado da equipe", colocacao: "Atingiu", premio: payout.gerencia }]
+      ? [{ key: "gerencia", name: "GERÊNCIA", sub: "Resultado da equipe", colocacao: "Atingiu", prize: payout.gerencia }]
       : []),
   ];
   const especie = contarEspecie(payout.especie);
@@ -478,14 +478,14 @@ function ChallengePayoutCard({ challenge: c, view, onExport }: { challenge: Chal
                 {linhas.map((r) => (
                   <tr key={r.key} className={`border-b border-line ${r.key === "gerencia" ? "bg-bg-inset" : ""}`}>
                     <td className="py-2.5 pr-3">
-                      <p className="font-bold text-t0">{r.nome}</p>
+                      <p className="font-bold text-t0">{r.name}</p>
                       {r.sub && <p className="text-[11px] text-t2">{r.sub}</p>}
                     </td>
                     <td className="py-2.5 pr-3 font-semibold text-acc">{r.colocacao}</td>
                     <td
-                      className={`py-2.5 text-right font-extrabold ${r.premio.kind === "MONEY" ? "font-mono text-ok" : "text-t0"}`}
+                      className={`py-2.5 text-right font-extrabold ${r.prize.kind === "MONEY" ? "font-mono text-ok" : "text-t0"}`}
                     >
-                      {prizeLabel(r.premio)}
+                      {prizeLabel(r.prize)}
                     </td>
                   </tr>
                 ))}
@@ -510,5 +510,5 @@ function ChallengePayoutCard({ challenge: c, view, onExport }: { challenge: Chal
 function contarEspecie(itens: string[]): string[] {
   const contagem = new Map<string, number>();
   for (const i of itens) contagem.set(i, (contagem.get(i) ?? 0) + 1);
-  return [...contagem].map(([nome, n]) => (n > 1 ? `${n}× ${nome}` : nome));
+  return [...contagem].map(([name, n]) => (n > 1 ? `${n}× ${name}` : name));
 }

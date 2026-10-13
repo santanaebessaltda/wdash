@@ -15,8 +15,8 @@ export function Avisos({ itens }: { itens: string[] }) {
 }
 
 /** Leitura da IA no topo da visao. So renderiza quando ha algo a dizer. */
-export function LeituraIA({ texto }: { texto: string | null }) {
-  if (!texto) return null;
+export function AiReading({ text }: { text: string | null }) {
+  if (!text) return null;
   return (
     <Card padding="sm" className="relative overflow-hidden">
       <div className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(120% 120% at 0% 0%, var(--acc-soft), transparent 55%)" }} />
@@ -28,7 +28,7 @@ export function LeituraIA({ texto }: { texto: string | null }) {
         </span>
         <div className="min-w-0">
           <p className="text-[10.5px] font-bold uppercase tracking-wider text-t2">Leitura</p>
-          <p className="mt-0.5 text-[13.5px] leading-relaxed text-t0">{texto}</p>
+          <p className="mt-0.5 text-[13.5px] leading-relaxed text-t0">{text}</p>
         </div>
       </div>
     </Card>

@@ -363,10 +363,10 @@ export function managerIndexWindows(
 ): { anterior: DayRange; atual: DayRange | null; comparado: DayRange | null } {
   const dur = eachDay(c.startsOn, c.endsOn).length;
   const anterior = { from: addDays(c.startsOn, -dur), to: addDays(c.startsOn, -1) };
-  const fim = c.endsOn < today ? c.endsOn : addDays(today, -1);
-  if (fim < c.startsOn) return { anterior, atual: null, comparado: null };
-  const dias = eachDay(c.startsOn, fim).length;
-  return { anterior, atual: { from: c.startsOn, to: fim }, comparado: { from: anterior.from, to: addDays(anterior.from, dias - 1) } };
+  const end = c.endsOn < today ? c.endsOn : addDays(today, -1);
+  if (end < c.startsOn) return { anterior, atual: null, comparado: null };
+  const dias = eachDay(c.startsOn, end).length;
+  return { anterior, atual: { from: c.startsOn, to: end }, comparado: { from: anterior.from, to: addDays(anterior.from, dias - 1) } };
 }
 
 /** Dados que a conta do desafio precisa (lidos 1x para todos os desafios da tela). */
@@ -427,9 +427,9 @@ export async function fetchChallengeInput(q: {
   const { fetchGoalTeam } = await import("./goalsRepo");
   const storeIds = [...new Set(q.challenges.map((c) => c.storeId))];
   // Indice com premio da gerencia compara a equipe com o mesmo n de dias antes do desafio.
-  const inicio = (c: ChallengeRecord) =>
+  const start = (c: ChallengeRecord) =>
     isIndexMetric(c.metric) && c.managerPrize ? managerIndexWindows(c, q.today).anterior.from : c.startsOn;
-  const from = q.challenges.reduce((m, c) => (inicio(c) < m ? inicio(c) : m), inicio(q.challenges[0]));
+  const from = q.challenges.reduce((m, c) => (start(c) < m ? start(c) : m), start(q.challenges[0]));
   const maxEnd = q.challenges.reduce((m, c) => (c.endsOn > m ? c.endsOn : m), q.challenges[0].endsOn);
   const to = maxEnd < q.today ? maxEnd : q.today;
   const needsItems = q.challenges.some((c) => usesScope(c.metric) && c.scope !== "ALL");

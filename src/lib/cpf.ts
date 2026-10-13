@@ -18,7 +18,7 @@ export function mascararCpf(v: string): string {
   return out;
 }
 
-function calcularDigito(base: string, pesoInicial: number): number {
+function checkDigit(base: string, pesoInicial: number): number {
   let soma = 0;
   for (let i = 0; i < base.length; i++) soma += Number(base[i]) * (pesoInicial - i);
   const resto = (soma * 10) % 11;
@@ -30,14 +30,14 @@ export function cpfValido(v: string): boolean {
   const d = somenteDigitos(v);
   if (d.length !== 11) return false;
   if (/^(\d)\1{10}$/.test(d)) return false;
-  const d1 = calcularDigito(d.slice(0, 9), 10);
-  const d2 = calcularDigito(d.slice(0, 10), 11);
+  const d1 = checkDigit(d.slice(0, 9), 10);
+  const d2 = checkDigit(d.slice(0, 10), 11);
   return d1 === Number(d[9]) && d2 === Number(d[10]);
 }
 
 /** Gera um CPF valido a partir dos 9 primeiros digitos (uso em mocks). */
 export function cpfDeBase(base9: string): string {
-  const d1 = calcularDigito(base9, 10);
-  const d2 = calcularDigito(base9 + d1, 11);
+  const d1 = checkDigit(base9, 10);
+  const d2 = checkDigit(base9 + d1, 11);
   return `${base9}${d1}${d2}`;
 }

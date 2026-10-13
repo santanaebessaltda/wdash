@@ -3,7 +3,7 @@ import { categorias } from "./stores";
 
 export interface ProductSummary {
   codProduto: string;
-  nome: string;
+  name: string;
   receita: number;
   itens: number;
   margem: number;
@@ -35,28 +35,28 @@ function prng(seed: number) {
 }
 
 /** Distribui a receita e a margem da categoria entre produtos, de forma deterministica. */
-export function productsOfCategory(categoriaId: number, escopo: string, receita: number, margem: number, itens: number): ProductSummary[] {
+export function productsOfCategory(categoriaId: number, scope: string, receita: number, margem: number, itens: number): ProductSummary[] {
   const cat = categorias.find((c) => c.id === categoriaId);
   const nomes = NOMES[categoriaId] ?? [];
   if (!cat || nomes.length === 0) return [];
-  const r = prng(categoriaId * 7919 + escopo.length * 31);
+  const r = prng(categoriaId * 7919 + scope.length * 31);
   const pesos = nomes.map((_, i) => Math.pow(0.72, i) * (0.8 + r() * 0.4));
   const soma = pesos.reduce((s, x) => s + x, 0);
   return nomes
-    .map((nome, i) => {
+    .map((name, i) => {
       const fr = pesos[i] / soma;
       const rec = Math.round(receita * fr);
       const mg = Math.round(margem * fr * (0.9 + r() * 0.2));
       const cobertura = r() < 0.12 ? null : Math.round(6 + r() * 90);
       return {
         codProduto: `${categoriaId}${String(i + 1).padStart(3, "0")}`,
-        nome,
+        name,
         receita: rec,
         itens: Math.round(itens * fr),
         margem: mg,
         margemPct: rec > 0 ? (mg / rec) * 100 : 0,
         coberturaDias: cobertura,
-        bloqueadoCompra: nome.includes("Wedrop") || r() < 0.08,
+        bloqueadoCompra: name.includes("Wedrop") || r() < 0.08,
       };
     })
     .sort((a, b) => b.receita - a.receita);

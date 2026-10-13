@@ -47,7 +47,7 @@ export const TipHelp = ({ label }: { label: string }) => (
 );
 
 /** Badge de delta  -  so % no chip; base do comparativo no tooltip (igual StatCard). */
-export function BadgeVsAnterior({ delta, metrica }: { delta?: Delta; metrica?: string }) {
+export function BadgeVsAnterior({ delta, metric }: { delta?: Delta; metric?: string }) {
   if (!delta) return null;
   const badge = (
     <Badge variant={delta.positive ? "success" : "danger"}>
@@ -55,7 +55,7 @@ export function BadgeVsAnterior({ delta, metrica }: { delta?: Delta; metrica?: s
       {delta.value}
     </Badge>
   );
-  const tip = deltaTip(delta, metrica);
+  const tip = deltaTip(delta, metric);
   return tip ? <Tooltip label={tip}>{badge}</Tooltip> : badge;
 }
 
@@ -65,16 +65,16 @@ export const moneyOrDash = (v: number | null) => (v == null ? "—" : brlCent(v)
 /* ---------- Dados ---------- */
 
 /** Tudo o que a tela Produtos le  -  tambem usado pelo detalhe aberto de outras telas. */
-export async function fetchProductsAggInput(tenantId: string, escopo: Scope): Promise<ProductsAggInput> {
-  const periodo = resolvePeriod(escopo.periodo, calendarTodayIso());
-  const range = financeFetchRange(escopo);
-  const prodRange = productsFetchRange(escopo);
-  const storeIds = escopo.filialIds;
+export async function fetchProductsAggInput(tenantId: string, scope: Scope): Promise<ProductsAggInput> {
+  const period = resolvePeriod(scope.period, calendarTodayIso());
+  const range = financeFetchRange(scope);
+  const prodRange = productsFetchRange(scope);
+  const storeIds = scope.storeIds;
   const [dayAggs, hourAggs, prevHourAggs, categoryDayAggs, productDayAggs, productCostDayAggs, catalogDescriptions, catalogTypes] =
     await Promise.all([
       fetchSalesDayAggs({ tenantId, storeIds, from: range.from, to: range.to, brand: null }),
-      periodo.inicio === periodo.fim
-        ? fetchSalesHourAggs({ tenantId, storeIds, day: periodo.inicio, brand: null })
+      period.start === period.end
+        ? fetchSalesHourAggs({ tenantId, storeIds, day: period.start, brand: null })
         : Promise.resolve([] as SalesHourAgg[]),
       range.prevHourDay
         ? fetchSalesHourAggs({ tenantId, storeIds, day: range.prevHourDay, brand: null })
@@ -95,31 +95,31 @@ export interface ProductsDetailData {
 
 /** O que abrir no detalhe  -  por chave, para outras telas abrirem sem ter as linhas da tela Produtos. */
 export type ProductSelection =
-  | { tipo: "produto"; chave: string; nome: string }
-  | { tipo: "linha"; nome: string }
-  | { tipo: "categoria"; nome: string; categoriaId?: number }
-  | { tipo: "classe"; classe: AbcClass };
+  | { kind: "produto"; chave: string; name: string }
+  | { kind: "linha"; name: string }
+  | { kind: "categoria"; name: string; categoriaId?: number }
+  | { kind: "classe"; classe: AbcClass };
 
-const nomeSelecao = (s: ProductSelection) => (s.tipo === "classe" ? `Classe ${s.classe}` : s.nome);
+const nomeSelecao = (s: ProductSelection) => (s.kind === "classe" ? `Classe ${s.classe}` : s.name);
 
-function montarDetalhe(escopo: Scope, { aggs, view }: ProductsDetailData, s: ProductSelection): ProductDetail | null {
-  switch (s.tipo) {
+function buildDetail(scope: Scope, { aggs, view }: ProductsDetailData, s: ProductSelection): ProductDetail | null {
+  switch (s.kind) {
     case "produto": {
       const row = view.produtos.find((p) => p.chave === s.chave);
-      return row ? buildProductDetail(escopo, aggs, row) : null;
+      return row ? buildProductDetail(scope, aggs, row) : null;
     }
     case "linha": {
-      const row = view.linhas.find((l) => l.nome === s.nome);
-      return row ? buildProductLineDetail(escopo, aggs, row) : null;
+      const row = view.linhas.find((l) => l.name === s.name);
+      return row ? buildProductLineDetail(scope, aggs, row) : null;
     }
     case "categoria": {
       const row = view.curvaAbcCategorias.itens.find((c) =>
-        s.categoriaId != null ? c.categoriaId === s.categoriaId : c.nome === s.nome,
+        s.categoriaId != null ? c.categoriaId === s.categoriaId : c.name === s.name,
       );
-      return row ? buildCategoryDetail(escopo, aggs, row) : null;
+      return row ? buildCategoryDetail(scope, aggs, row) : null;
     }
     case "classe":
-      return buildAbcClassDetail(escopo, aggs, view, s.classe);
+      return buildAbcClassDetail(scope, aggs, view, s.classe);
   }
 }
 
@@ -128,11 +128,11 @@ function montarDetalhe(escopo: Scope, { aggs, view }: ProductsDetailData, s: Pro
  * Com `data` usa os dados da tela; sem `data` busca os dados de Produtos so ao abrir.
  */
 export function useProductDetail({
-  escopo,
+  scope,
   data,
   tenantId,
 }: {
-  escopo: Scope;
+  scope: Scope;
   data?: ProductsDetailData;
   tenantId?: string;
 }): { abrir: (s: ProductSelection) => void; modal: ReactNode } {
@@ -143,7 +143,7 @@ export function useProductDetail({
 
   useEffect(() => {
     setPilha([]);
-  }, [escopo]);
+  }, [scope]);
 
   // Custos/impostos das lojas chegam depois do 1 render  ->  recalcula.
   const [storesTick, setStoresTick] = useState(0);
@@ -153,30 +153,30 @@ export function useProductDetail({
     return () => window.removeEventListener("wedash:stores", onStores);
   }, []);
 
-  const lazy = useLazyProductsData(escopo, tenantId, !data && topo != null);
+  const lazy = useLazyProductsData(scope, tenantId, !data && topo != null);
   const fonte = data ?? lazy;
 
-  const detalhe = useMemo(
-    () => (topo && fonte ? montarDetalhe(escopo, fonte, topo) : null),
+  const detail = useMemo(
+    () => (topo && fonte ? buildDetail(scope, fonte, topo) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [topo, fonte, escopo, storesTick],
+    [topo, fonte, scope, storesTick],
   );
 
   const modal = (
     <ProductDetailModal
       open={topo != null}
       loading={topo != null && !fonte}
-      titulo={topo ? nomeSelecao(topo) : undefined}
-      detalhe={detalhe}
-      periodo={resolvePeriod(escopo.periodo, calendarTodayIso()).rotulo}
+      title={topo ? nomeSelecao(topo) : undefined}
+      detail={detail}
+      period={resolvePeriod(scope.period, calendarTodayIso()).label}
       onClose={() => setPilha([])}
       onProduto={(chave) => {
         const row = fonte?.view.produtos.find((p) => p.chave === chave);
-        if (row) empilhar({ tipo: "produto", chave, nome: row.nome });
+        if (row) empilhar({ kind: "produto", chave, name: row.name });
       }}
       onCategoria={(id) => {
         const row = fonte?.view.curvaAbcCategorias.itens.find((c) => c.categoriaId === id);
-        if (row) empilhar({ tipo: "categoria", categoriaId: id, nome: row.nome });
+        if (row) empilhar({ kind: "categoria", categoriaId: id, name: row.name });
       }}
       voltarPara={pilha.length > 1 ? nomeSelecao(pilha[pilha.length - 2]) : undefined}
       onVoltar={() => setPilha((p) => p.slice(0, -1))}
@@ -187,53 +187,53 @@ export function useProductDetail({
 }
 
 /** Busca os dados de Produtos na 1 abertura; mantem ate mudar o filtro ou chegar venda nova. */
-function useLazyProductsData(escopo: Scope, tenantId: string | undefined, enabled: boolean): ProductsDetailData | null {
+function useLazyProductsData(scope: Scope, tenantId: string | undefined, enabled: boolean): ProductsDetailData | null {
   const [data, setData] = useState<ProductsDetailData | null>(null);
   const gen = useRef(0);
 
   useEffect(() => {
     gen.current++;
     setData(null);
-  }, [escopo, tenantId]);
+  }, [scope, tenantId]);
 
   useEffect(() => {
     if (!enabled || !tenantId) return;
     const onSynced = () => {
       const g = ++gen.current;
-      fetchProductsAggInput(tenantId, escopo)
+      fetchProductsAggInput(tenantId, scope)
         .then((aggs) => {
-          if (g === gen.current) setData({ aggs, view: buildProductsView(escopo, aggs) });
+          if (g === gen.current) setData({ aggs, view: buildProductsView(scope, aggs) });
         })
         .catch((e) => console.error("Product detail load:", e));
     };
     window.addEventListener(SALES_SYNCED_EVENT, onSynced);
     return () => window.removeEventListener(SALES_SYNCED_EVENT, onSynced);
-  }, [enabled, tenantId, escopo]);
+  }, [enabled, tenantId, scope]);
 
   useEffect(() => {
     if (!enabled || !tenantId || data) return;
     const g = ++gen.current;
-    fetchProductsAggInput(tenantId, escopo)
+    fetchProductsAggInput(tenantId, scope)
       .then((aggs) => {
-        if (g === gen.current) setData({ aggs, view: buildProductsView(escopo, aggs) });
+        if (g === gen.current) setData({ aggs, view: buildProductsView(scope, aggs) });
       })
       .catch((e) => {
         console.error("Product detail load:", e);
         if (g !== gen.current) return;
         const vazio: ProductsAggInput = { dayAggs: [] };
-        setData({ aggs: vazio, view: buildProductsView(escopo, vazio) });
+        setData({ aggs: vazio, view: buildProductsView(scope, vazio) });
       });
-  }, [enabled, tenantId, data, escopo]);
+  }, [enabled, tenantId, data, scope]);
 
   return data;
 }
 
 /* ---------- Modal ---------- */
 
-type TopSort = "nome" | "itens" | "faturamento" | "lucro" | "margem";
+type TopSort = "name" | "itens" | "faturamento" | "lucro" | "margem";
 
-const valorDoSort = (r: { itens: number; faturamento: number; lucro: number | null; margemPct: number | null }, sort: TopSort) =>
-  sort === "itens" ? r.itens : sort === "lucro" ? r.lucro : sort === "margem" ? r.margemPct : r.faturamento;
+const valorDoSort = (r: { itens: number; revenue: number; lucro: number | null; margemPct: number | null }, sort: TopSort) =>
+  sort === "itens" ? r.itens : sort === "lucro" ? r.lucro : sort === "margem" ? r.margemPct : r.revenue;
 
 function ProfitCell({ v }: { v: number | null }) {
   return (
@@ -243,15 +243,15 @@ function ProfitCell({ v }: { v: number | null }) {
   );
 }
 
-export function MetricaDetalhe({
+export function MetricDetail({
   label,
-  valor,
+  amount,
   delta,
   destaque,
   tip,
 }: {
   label: string;
-  valor: string;
+  amount: string;
   delta?: Delta;
   destaque?: boolean;
   tip?: string;
@@ -262,8 +262,8 @@ export function MetricaDetalhe({
         {label}
         {tip && <TipHelp label={tip} />}
       </p>
-      <p className={cn("mt-1 font-mono text-[15px] font-extrabold tabular-nums", valor === "—" ? "text-t2" : destaque ? "text-ok" : "text-t0")}>
-        {valor}
+      <p className={cn("mt-1 font-mono text-[15px] font-extrabold tabular-nums", amount === "—" ? "text-t2" : destaque ? "text-ok" : "text-t0")}>
+        {amount}
       </p>
       {delta && (
         <div className="mt-1.5">
@@ -281,20 +281,20 @@ function ProdutosDoGrupo({ produtos, onProduto }: { produtos: ProductDetailItem[
   const linhas = useMemo(() => {
     const d = dir === "asc" ? 1 : -1;
     return [...produtos].sort((a, b) => {
-      if (sort === "nome") return a.nome.localeCompare(b.nome, "pt-BR") * d;
+      if (sort === "name") return a.name.localeCompare(b.name, "pt-BR") * d;
       const va = valorDoSort(a, sort);
       const vb = valorDoSort(b, sort);
-      if (va == null && vb == null) return b.faturamento - a.faturamento;
+      if (va == null && vb == null) return b.revenue - a.revenue;
       if (va == null) return 1;
       if (vb == null) return -1;
-      return (va - vb) * d || b.faturamento - a.faturamento;
+      return (va - vb) * d || b.revenue - a.revenue;
     });
   }, [produtos, sort, dir]);
   const alternar = (k: TopSort) => {
     if (sort === k) setDir((x) => (x === "asc" ? "desc" : "asc"));
     else {
       setSort(k);
-      setDir(k === "nome" ? "asc" : "desc");
+      setDir(k === "name" ? "asc" : "desc");
     }
   };
   return (
@@ -303,7 +303,7 @@ function ProdutosDoGrupo({ produtos, onProduto }: { produtos: ProductDetailItem[
         <thead>
           <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
             <th className="px-1 pb-3 text-left font-bold">#</th>
-            <ThSort label="Produto" active={sort === "nome"} dir={dir} onClick={() => alternar("nome")} align="left" className="px-1 pb-3" />
+            <ThSort label="Produto" active={sort === "name"} dir={dir} onClick={() => alternar("name")} align="left" className="px-1 pb-3" />
             <ThSort label="Itens vendidos" active={sort === "itens"} dir={dir} onClick={() => alternar("itens")} className="px-1 pb-3" />
             <ThSort label="Faturamento" active={sort === "faturamento"} dir={dir} onClick={() => alternar("faturamento")} className="px-1 pb-3" />
             <ThSort label="Lucro bruto" active={sort === "lucro"} dir={dir} onClick={() => alternar("lucro")} className="px-1 pb-3" />
@@ -326,10 +326,10 @@ function ProdutosDoGrupo({ produtos, onProduto }: { produtos: ProductDetailItem[
             >
               <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
               <td className="px-1 py-3">
-                <ProductNameCell nome={p.nome} idx={idx} sub={p.codigo} />
+                <ProductNameCell name={p.name} idx={idx} sub={p.codigo} />
               </td>
               <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(p.itens)}</td>
-              <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.faturamento)}</td>
+              <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.revenue)}</td>
               <ProfitCell v={p.lucro} />
               <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", p.margemPct == null ? "text-t2" : "text-ok")}>
                 {pctFmt(p.margemPct)}
@@ -355,20 +355,20 @@ function CategoriasDaClasse({
   const linhas = useMemo(() => {
     const d = dir === "asc" ? 1 : -1;
     return [...categorias].sort((a, b) => {
-      if (sort === "nome") return a.nome.localeCompare(b.nome, "pt-BR") * d;
+      if (sort === "name") return a.name.localeCompare(b.name, "pt-BR") * d;
       const va = valorDoSort(a, sort);
       const vb = valorDoSort(b, sort);
-      if (va == null && vb == null) return b.faturamento - a.faturamento;
+      if (va == null && vb == null) return b.revenue - a.revenue;
       if (va == null) return 1;
       if (vb == null) return -1;
-      return (va - vb) * d || b.faturamento - a.faturamento;
+      return (va - vb) * d || b.revenue - a.revenue;
     });
   }, [categorias, sort, dir]);
   const alternar = (k: TopSort) => {
     if (sort === k) setDir((x) => (x === "asc" ? "desc" : "asc"));
     else {
       setSort(k);
-      setDir(k === "nome" ? "asc" : "desc");
+      setDir(k === "name" ? "asc" : "desc");
     }
   };
   return (
@@ -377,7 +377,7 @@ function CategoriasDaClasse({
         <thead>
           <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
             <th className="px-1 pb-3 text-left font-bold">#</th>
-            <ThSort label="Categoria" active={sort === "nome"} dir={dir} onClick={() => alternar("nome")} align="left" className="px-1 pb-3" />
+            <ThSort label="Categoria" active={sort === "name"} dir={dir} onClick={() => alternar("name")} align="left" className="px-1 pb-3" />
             <ThSort label="Itens vendidos" active={sort === "itens"} dir={dir} onClick={() => alternar("itens")} className="px-1 pb-3" />
             <ThSort label="Faturamento" active={sort === "faturamento"} dir={dir} onClick={() => alternar("faturamento")} className="px-1 pb-3" />
             <ThSort label="Lucro bruto" active={sort === "lucro"} dir={dir} onClick={() => alternar("lucro")} className="px-1 pb-3" />
@@ -406,10 +406,10 @@ function CategoriasDaClasse({
             >
               <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
               <td className="px-1 py-3">
-                <ProductNameCell nome={c.nome} idx={idx} />
+                <ProductNameCell name={c.name} idx={idx} />
               </td>
               <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(c.itens)}</td>
-              <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(c.faturamento)}</td>
+              <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(c.revenue)}</td>
               <ProfitCell v={c.lucro} />
               <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", c.margemPct == null ? "text-t2" : "text-ok")}>
                 {pctFmt(c.margemPct)}
@@ -443,9 +443,9 @@ export function DetalheSkeleton() {
 function ProductDetailModal({
   open,
   loading,
-  titulo,
-  detalhe,
-  periodo,
+  title,
+  detail,
+  period,
   onClose,
   onProduto,
   onCategoria,
@@ -454,9 +454,9 @@ function ProductDetailModal({
 }: {
   open: boolean;
   loading: boolean;
-  titulo?: string;
-  detalhe: ProductDetail | null;
-  periodo: string;
+  title?: string;
+  detail: ProductDetail | null;
+  period: string;
   onClose: () => void;
   onProduto: (chave: string) => void;
   onCategoria: (categoriaId: number) => void;
@@ -464,26 +464,26 @@ function ProductDetailModal({
   voltarPara?: string;
   onVoltar: () => void;
 }) {
-  const cmp = detalhe?.comparativo;
-  const tipo = detalhe?.tipo ?? "produto";
-  const artigo = { produto: "do produto", linha: "da linha", categoria: "da categoria", classe: "da classe" }[tipo];
+  const cmp = detail?.comparativo;
+  const kind = detail?.kind ?? "produto";
+  const artigo = { produto: "do produto", linha: "da linha", categoria: "da categoria", classe: "da classe" }[kind];
   const plural = (n: number, s: string) => `${n} ${s}${n === 1 ? "" : "s"}`;
-  const subtitulo = !detalhe
+  const subtitle = !detail
     ? ""
-    : tipo === "linha"
-      ? ["Linha de produto", plural(detalhe.produtos.length, "produto"), periodo].join(" · ")
-      : tipo === "categoria"
-        ? ["Categoria", detalhe.classe ? `Classe ${detalhe.classe}` : "", plural(detalhe.produtos.length, "produto"), periodo]
+    : kind === "linha"
+      ? ["Linha de produto", plural(detail.produtos.length, "produto"), period].join(" · ")
+      : kind === "categoria"
+        ? ["Categoria", detail.classe ? `Classe ${detail.classe}` : "", plural(detail.produtos.length, "produto"), period]
             .filter(Boolean)
             .join(" · ")
-        : tipo === "classe"
-          ? ["Curva ABC", plural(detalhe.categorias.length, "categoria"), periodo].join(" · ")
-          : [detalhe.codigo, periodo].filter(Boolean).join(" · ");
+        : kind === "classe"
+          ? ["Curva ABC", plural(detail.categorias.length, "categoria"), period].join(" · ")
+          : [detail.codigo, period].filter(Boolean).join(" · ");
   return (
-    <Modal open={open} onClose={onClose} title={detalhe?.nome ?? titulo} size="lg">
+    <Modal open={open} onClose={onClose} title={detail?.name ?? title} size="lg">
       {loading ? (
         <DetalheSkeleton />
-      ) : !detalhe ? (
+      ) : !detail ? (
         <div className="flex min-h-[220px] flex-col">
           <EmptyBlock />
         </div>
@@ -495,40 +495,40 @@ function ProductDetailModal({
                 ← Voltar para {voltarPara}
               </button>
             )}
-            <p className="text-[12px] font-semibold text-t2">{subtitulo}</p>
+            <p className="text-[12px] font-semibold text-t2">{subtitle}</p>
           </div>
 
           <div>
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-              <MetricaDetalhe label="Faturamento" valor={brlCent(detalhe.faturamento)} delta={cmp?.faturamento} />
-              <MetricaDetalhe label="Itens vendidos" valor={num(detalhe.itens)} delta={cmp?.itens} />
-              <MetricaDetalhe label="Preço médio" valor={brlCent(detalhe.precoMedio)} />
-              <MetricaDetalhe
+              <MetricDetail label="Faturamento" amount={brlCent(detail.revenue)} delta={cmp?.revenue} />
+              <MetricDetail label="Itens vendidos" amount={num(detail.itens)} delta={cmp?.itens} />
+              <MetricDetail label="Preço médio" amount={brlCent(detail.precoMedio)} />
+              <MetricDetail
                 label="Participação"
-                valor={pctFmt(detalhe.participacaoPct)}
+                amount={pctFmt(detail.participacaoPct)}
                 tip={`Participação ${artigo} no faturamento de todos os produtos do período.`}
               />
-              <MetricaDetalhe label="CMV" valor={moneyOrDash(detalhe.cmv)} />
-              <MetricaDetalhe label="Lucro bruto" valor={moneyOrDash(detalhe.lucro)} destaque />
-              <MetricaDetalhe label="Margem" valor={pctFmt(detalhe.margemPct)} delta={cmp?.margem} />
+              <MetricDetail label="CMV" amount={moneyOrDash(detail.cmv)} />
+              <MetricDetail label="Lucro bruto" amount={moneyOrDash(detail.lucro)} destaque />
+              <MetricDetail label="Margem" amount={pctFmt(detail.margemPct)} delta={cmp?.margem} />
             </div>
             <p className="mt-2.5 text-[11.5px] text-t2">
               {cmp
                 ? `Variação ${comparedWithTip(cmp.vs).replace(/^Em/, "em")}`
                 : `Sem vendas ${artigo} no período anterior para comparar.`}
-              {detalhe.cmv == null && " CMV, lucro e margem ficam indisponíveis quando faltam dados de custo no período."}
+              {detail.cmv == null && " CMV, lucro e margem ficam indisponíveis quando faltam dados de custo no período."}
             </p>
           </div>
 
-          {detalhe.serie && (
+          {detail.serie && (
             <section>
               <h4 className="mb-2 text-[13px] font-bold text-t0">
-                Faturamento {detalhe.serieGranularidade === "mes" ? "por mês" : "por dia"}
+                Faturamento {detail.seriesGranularity === "month" ? "por mês" : "por dia"}
               </h4>
               <AreaLineChart
-                data={detalhe.serie.map((d) => d.faturamento)}
-                labels={detalhe.serie.map((d) => d.label)}
-                tooltipLabels={detalhe.serie.map((d) => d.detail ?? d.label)}
+                data={detail.serie.map((d) => d.revenue)}
+                labels={detail.serie.map((d) => d.label)}
+                tooltipLabels={detail.serie.map((d) => d.detail ?? d.label)}
                 formatValue={brlCent}
                 height={200}
                 showAxisLabels
@@ -536,33 +536,33 @@ function ProductDetailModal({
             </section>
           )}
 
-          {(tipo === "linha" || tipo === "categoria") && detalhe.produtos.length > 0 && (
+          {(kind === "linha" || kind === "categoria") && detail.produtos.length > 0 && (
             <section>
               <h4 className="text-[13px] font-bold text-t0">Produtos {artigo}</h4>
-              {detalhe.tipos.length > 0 && <p className="mt-0.5 text-[11.5px] text-t2">{detalhe.tipos.join(" · ")}</p>}
-              <ProdutosDoGrupo key={`${tipo}-${detalhe.chave}`} produtos={detalhe.produtos} onProduto={onProduto} />
+              {detail.tipos.length > 0 && <p className="mt-0.5 text-[11.5px] text-t2">{detail.tipos.join(" · ")}</p>}
+              <ProdutosDoGrupo key={`${kind}-${detail.chave}`} produtos={detail.produtos} onProduto={onProduto} />
             </section>
           )}
 
-          {tipo === "classe" && detalhe.categorias.length > 0 && (
+          {kind === "classe" && detail.categorias.length > 0 && (
             <section>
               <h4 className="text-[13px] font-bold text-t0">Categorias da classe</h4>
-              <CategoriasDaClasse key={detalhe.chave} categorias={detalhe.categorias} onCategoria={onCategoria} />
+              <CategoriasDaClasse key={detail.chave} categorias={detail.categorias} onCategoria={onCategoria} />
             </section>
           )}
 
-          {detalhe.lojas.length > 0 && (
+          {detail.storeRows.length > 0 && (
             <section>
               <h4 className="mb-3 text-[13px] font-bold text-t0">Vendas por loja</h4>
               <div className="flex flex-col gap-3">
-                {detalhe.lojas.map((l) => (
-                  <div key={l.filialId}>
+                {detail.storeRows.map((l) => (
+                  <div key={l.storeId}>
                     <div className="mb-1.5 flex items-baseline gap-2">
-                      <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-t1">{l.nome}</span>
+                      <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-t1">{l.name}</span>
                       <span className="shrink-0 text-[11.5px] text-t2">
                         {num(l.itens)} ite{l.itens === 1 ? "m" : "ns"}
                       </span>
-                      <span className="shrink-0 font-mono text-[12.5px] font-bold text-t0">{brlCent(l.faturamento)}</span>
+                      <span className="shrink-0 font-mono text-[12.5px] font-bold text-t0">{brlCent(l.revenue)}</span>
                       <span className="min-w-[40px] shrink-0 text-right text-[11.5px] font-semibold text-t2">{pctFmt(l.pct, 0)}</span>
                     </div>
                     <ProgressBar value={l.pct} color="var(--acc)" height={6} />

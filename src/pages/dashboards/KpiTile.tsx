@@ -24,8 +24,8 @@ export interface KpiTileProps {
 }
 
 /** Subtitulo que quebra em duas linhas no mobile (uma por trecho, separado por "  |  " no texto de origem) e volta a ficar numa linha so a partir do sm, onde cabe. Reserva a altura da segunda linha mesmo quando nao ha, pra tiles vizinhos nao ficarem com alturas diferentes. */
-export function KpiSubtitulo({ texto }: { texto: string }) {
-  const [primeira, segunda] = texto.split(" · ");
+export function KpiSubtitle({ text }: { text: string }) {
+  const [primeira, segunda] = text.split(" · ");
   return (
     <div className="mt-1 min-h-[2.4em] text-[11.5px] leading-snug text-t2">
       <span className="block sm:inline">{primeira}</span>
@@ -57,7 +57,7 @@ export function KpiTile({ label, value, icon, tint, delta, sub, subDuasLinhas, t
         </span>
         {delta && (
           <span
-            title={`${delta.value} ${delta.positive ? "acima" : "abaixo"}${delta.vs ? ` de ${delta.vs}` : " do período comparado"}`}
+            title={`${delta.value} ${delta.positive ? "acima" : "below"}${delta.vs ? ` de ${delta.vs}` : " do período comparado"}`}
             className={cn(
               "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold",
               delta.positive ? "text-ok bg-ok-soft" : "text-bad bg-bad-soft",
@@ -78,7 +78,7 @@ export function KpiTile({ label, value, icon, tint, delta, sub, subDuasLinhas, t
         )}
       </div>
       <AnimatedNumber value={value} className="mt-1.5 block truncate text-2xl font-extrabold tracking-tight text-t0" />
-      {sub && (subDuasLinhas ? <KpiSubtitulo texto={sub} /> : <p className="mt-0.5 truncate text-[11.5px] text-t2">{sub}</p>)}
+      {sub && (subDuasLinhas ? <KpiSubtitle text={sub} /> : <p className="mt-0.5 truncate text-[11.5px] text-t2">{sub}</p>)}
       {sparkline && <div className="mt-3 h-9">{sparkline}</div>}
     </Card>
   );

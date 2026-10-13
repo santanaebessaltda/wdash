@@ -23,7 +23,7 @@ function passos(): string {
 /** Quem recusou o aviso do sistema não recebe outro pedido. Este aviso mostra como ligar de novo. */
 export function PushRecover() {
   const session = useActiveSession();
-  const [aberto, setAberto] = useState(false);
+  const [open, setAberto] = useState(false);
   const [ainda, setAinda] = useState(false);
   const [tentando, setTentando] = useState(false);
 
@@ -62,7 +62,7 @@ export function PushRecover() {
 
   return (
     <Modal
-      open={aberto}
+      open={open}
       onClose={dispensar}
       size="sm"
       title="Avisos desativados"

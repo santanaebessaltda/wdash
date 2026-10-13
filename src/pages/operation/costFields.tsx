@@ -27,14 +27,14 @@ function toText(fields: CostField[], c: StoreCosts): Record<string, string> {
 }
 
 /** Estado de edicao dos campos de uma loja (texto, alterado, validacao e gravacao). */
-export function useCostFields(loja: Store, fields: CostField[]) {
-  const [saved, setSaved] = useState(() => toText(fields, loja.custos ?? EMPTY_STORE_COSTS));
+export function useCostFields(store: Store, fields: CostField[]) {
+  const [saved, setSaved] = useState(() => toText(fields, store.custos ?? EMPTY_STORE_COSTS));
   const [txt, setTxt] = useState(saved);
   const dirty = fields.some((f) => txt[f.key] !== saved[f.key]);
 
   /** null = algum campo invalido (% fora de 0 - 100 ou R$ negativo). */
   function merged(): StoreCosts | null {
-    let c = loja.custos ?? EMPTY_STORE_COSTS;
+    let c = store.custos ?? EMPTY_STORE_COSTS;
     for (const f of fields) {
       const v = parseNum(txt[f.key] ?? "");
       if (Number.isNaN(v) || (v != null && (v < 0 || (f.unit === "%" && v > 100)))) return null;
@@ -65,7 +65,7 @@ export type CostFieldSection = { title: string; hint?: string; keys: string[] };
 
 /** Card da loja com campos de custo e Resetar/Salvar proprios. */
 export function CostFieldsCard({
-  loja,
+  store,
   fields,
   title,
   intro,
@@ -73,7 +73,7 @@ export function CostFieldsCard({
   footer,
   onSaved,
 }: {
-  loja: Store;
+  store: Store;
   fields: CostField[];
   title: string;
   intro?: ReactNode;
@@ -82,14 +82,14 @@ export function CostFieldsCard({
   onSaved: () => void;
 }) {
   const { show } = useToast();
-  const form = useCostFields(loja, fields);
+  const form = useCostFields(store, fields);
   const [saving, setSaving] = useState(false);
 
   async function save() {
     const custos = form.merged();
     if (!custos) return show(INVALID_COSTS_MSG, "danger");
     setSaving(true);
-    const r = await updateStoreCosts(loja.id, custos);
+    const r = await updateStoreCosts(store.id, custos);
     setSaving(false);
     if (!r.ok) return show(SAVE_ERROR_MSG, "danger");
     form.markSaved(custos);

@@ -29,9 +29,9 @@ export interface FirstStepsInput {
  * "Todas as lojas" avalia a rede. Uma loja no StorePicker mostra so o que falta nela
  * (o card so some de vez quando todas as lojas da sessao estao prontas).
  */
-export function storesForFirstStepsView<T extends { id: string }>(stores: T[], filialIds: string[]): T[] {
-  if (filialIds.length !== 1) return stores;
-  const one = stores.filter((s) => s.id === filialIds[0]);
+export function storesForFirstStepsView<T extends { id: string }>(stores: T[], storeIds: string[]): T[] {
+  if (storeIds.length !== 1) return stores;
+  const one = stores.filter((s) => s.id === storeIds[0]);
   return one.length === 1 ? one : stores;
 }
 
@@ -69,21 +69,21 @@ export function buildFirstSteps(input: FirstStepsInput): FirstStep[] {
   };
 
   // Grupos, meta e desafio so nas lojas com equipe de vendas (loja parada nao precisa).
-  const equipe = (id: string) => (input.sellersByStore.get(id) ?? []).filter(isActiveSalesPerson);
-  const comEquipe = stores.filter((s) => equipe(s.id).length > 0);
-  const lojasPessoas = comEquipe.length > 0 ? comEquipe : stores;
+  const team = (id: string) => (input.sellersByStore.get(id) ?? []).filter(isActiveSalesPerson);
+  const withTeam = stores.filter((s) => team(s.id).length > 0);
+  const storePeople = withTeam.length > 0 ? withTeam : stores;
 
   let semGrupo = 0;
   let lojaSemGrupos = false;
-  for (const s of comEquipe) {
-    const grupos = input.shiftIdsByStore.get(s.id) ?? [];
-    if (grupos.length === 0) lojaSemGrupos = true;
-    semGrupo += equipe(s.id).filter((p) => !p.shiftId || !grupos.includes(p.shiftId)).length;
+  for (const s of withTeam) {
+    const groups = input.shiftIdsByStore.get(s.id) ?? [];
+    if (groups.length === 0) lojaSemGrupos = true;
+    semGrupo += team(s.id).filter((p) => !p.shiftId || !groups.includes(p.shiftId)).length;
   }
 
   const criados = (set: Set<string>) => {
-    const faltam = lojasPessoas.filter((s) => !set.has(s.id)).length;
-    return { done: faltam === 0, detail: missingStoreLabel(faltam, lojasPessoas.length) };
+    const faltam = storePeople.filter((s) => !set.has(s.id)).length;
+    return { done: faltam === 0, detail: missingStoreLabel(faltam, storePeople.length) };
   };
 
   return [

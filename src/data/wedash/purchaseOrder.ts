@@ -27,7 +27,7 @@ export type PurchaseStockRow = {
 
 export type PurchaseOrderRow = {
   code: string;
-  nome: string;
+  name: string;
   variantes: PurchaseStockRow[];
   position: number;
   saldo: number;
@@ -35,7 +35,7 @@ export type PurchaseOrderRow = {
   total: number;
   vendidos30: number;
   multipla: number;
-  minimo: number | null;
+  minimum: number | null;
   novo: boolean;
   variasVariantes: boolean;
   /** Bloqueado para compra: aparece na lista, minimo so leitura, fora do arquivo. */
@@ -53,7 +53,7 @@ export type PurchaseOrderView = {
   rows: PurchaseOrderRow[];
   contagens: { noPedido: number; semMinimo: number; novos: number };
   /** Produtos e itens que vao para o arquivo no multiplicador atual. */
-  resumo: { produtos: number; itens: number };
+  summary: { produtos: number; itens: number };
 };
 
 export type PurchaseFilter = "todos" | "pedido" | "semMinimo" | "novos";
@@ -138,13 +138,13 @@ export function buildPurchaseOrderView(input: {
     const totalPedido = elegiveis.reduce((s, v) => s + v.total, 0);
     const total = soma((v) => v.total);
     const multipla = first.multiple ?? 0;
-    const minimo = input.mins.get(code) ?? null;
+    const minimum = input.mins.get(code) ?? null;
     const variasVariantes = variantes.length > 1;
-    const aPedir = podePedir && minimo ? purchaseQuantity(totalPedido, minimo, multipla, input.factor) : null;
+    const aPedir = podePedir && minimum ? purchaseQuantity(totalPedido, minimum, multipla, input.factor) : null;
     const custo = input.costs?.get(code);
     return {
       code,
-      nome: first.description,
+      name: first.description,
       variantes,
       position: first.position,
       saldo: soma((v) => v.balance),
@@ -152,7 +152,7 @@ export function buildPurchaseOrderView(input: {
       total,
       vendidos30: input.sold30.get(code) ?? 0,
       multipla,
-      minimo,
+      minimum,
       novo:
         !bloqueado &&
         (isNewProduct(variantes.find((v) => v.registeredAt)?.registeredAt ?? null, input.todayIso) ||
@@ -171,10 +171,10 @@ export function buildPurchaseOrderView(input: {
     rows,
     contagens: {
       noPedido: noPedido.length,
-      semMinimo: rows.filter((r) => r.podePedir && !r.minimo).length,
+      semMinimo: rows.filter((r) => r.podePedir && !r.minimum).length,
       novos: rows.filter((r) => r.novo).length,
     },
-    resumo: { produtos: noPedido.length, itens: noPedido.reduce((s, r) => s + (r.aPedir ?? 0), 0) },
+    summary: { produtos: noPedido.length, itens: noPedido.reduce((s, r) => s + (r.aPedir ?? 0), 0) },
   };
 }
 
@@ -228,9 +228,9 @@ export function filterPurchaseRows(rows: PurchaseOrderRow[], opts: { busca: stri
   const q = fold(opts.busca.trim());
   return rows.filter((r) => {
     if (opts.filtro === "pedido" && !r.noPedido) return false;
-    if (opts.filtro === "semMinimo" && (!r.podePedir || r.minimo)) return false;
+    if (opts.filtro === "semMinimo" && (!r.podePedir || r.minimum)) return false;
     if (opts.filtro === "novos" && !r.novo) return false;
-    return !q || fold(r.nome).includes(q) || fold(r.code).includes(q);
+    return !q || fold(r.name).includes(q) || fold(r.code).includes(q);
   });
 }
 

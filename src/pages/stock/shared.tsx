@@ -18,14 +18,14 @@ export const pctRate = (v: number) => `${num(v, v % 1 === 0 ? 0 : 2)}%`;
 export const qty = (v: number) => num(v, v % 1 === 0 ? 0 : 3);
 
 /** Saldo do produto num local de estoque, somando as lojas do filtro. */
-export function localQty(r: StockProductRow, nome: string): number {
-  return r.lojas.reduce((s, l) => s + (l.locais.find((x) => x.nome === nome)?.qtd ?? 0), 0);
+export function localQty(r: StockProductRow, name: string): number {
+  return r.storeRows.reduce((s, l) => s + (l.locais.find((x) => x.name === name)?.qtd ?? 0), 0);
 }
 
 /** Locais de estoque com saldo em algum produto, na ordem da hierarquia: Estoque, os demais em ordem alfabetica, Ponto de venda. */
 export function stockLocations(rows: StockProductRow[]): string[] {
   const nomes = new Set<string>();
-  for (const r of rows) for (const l of r.lojas) for (const x of l.locais) nomes.add(x.nome);
+  for (const r of rows) for (const l of r.storeRows) for (const x of l.locais) nomes.add(x.name);
   const ordem = (n: string) => (n === "ESTOQUE" ? 0 : n === STOCK_SALES_LOCATION ? 2 : 1);
   return [...nomes].sort((a, b) => ordem(a) - ordem(b) || a.localeCompare(b, "pt-BR"));
 }
