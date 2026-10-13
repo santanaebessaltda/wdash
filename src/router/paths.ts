@@ -69,6 +69,8 @@ export const paths = {
     /** Calendário do fechamento de caixa. A adquirente fica em Configurações. */
     cashClose: "/management/cash-close",
     sangria: "/management/sangria",
+    /** Calendário do informe de vendas no shopping. */
+    salesReport: "/management/sales-report",
   },
   /** Configurações da filial. Vendedores fica em Gestão; a URL antiga de grupos abre essa tela. */
   operation: {
@@ -81,6 +83,8 @@ export const paths = {
     productsTaxes: "/operation/products-and-taxes",
     /** Stone de cada loja. Não fica em Integrações: a chave é da loja, não da empresa. */
     acquirers: "/operation/acquirers",
+    /** Painel do shopping de cada quiosque. A senha é da filial. */
+    shopping: "/operation/shopping",
     /** URL antiga. Abre Vendedores, onde o grupo é criado e administrado. */
     groups: "/operation/groups",
     sellers: "/operation/sellers",

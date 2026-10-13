@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { formatAllosAmount, informedLaunchValues, monthReport, type SalesWindow } from "./shoppingReport";
+import {
+  fillAllosWeek,
+  forceLaunchAllowed,
+  informedWeekIds,
+  formatAllosAmount,
+  informedLaunchValues,
+  monthReport,
+  parseAllosForm,
+  reportDays,
+  shoppingAccountView,
+  sumSoldByDay,
+  type SalesWindow,
+} from "./shoppingReport";
 
 const today = "2026-10-13";
 
@@ -67,5 +79,110 @@ describe("formatAllosAmount", () => {
   it("uses the shopping form's thousands and decimal marks", () => {
     expect(formatAllosAmount(675680)).toBe("6.756,80");
     expect(formatAllosAmount(0)).toBe("0,00");
+  });
+});
+
+describe("reportDays", () => {
+  it("counts a past day without a launch as blank and leaves today out", () => {
+    const days = reportDays(
+      ["2026-10-11", "2026-10-12", "2026-10-13"],
+      sumSoldByDay([
+        { day: "2026-10-11", revenueCents: 6000 },
+        { day: "2026-10-11", revenueCents: 4000 },
+        { day: "2026-10-12", revenueCents: 5000 },
+      ]),
+      { "2026-10-11": 12000 },
+      today,
+    );
+    expect(monthReport(days, today)).toEqual({
+      soldCents: 15000,
+      launchedCents: 12000,
+      differenceCents: -3000,
+      blankDays: 1,
+    });
+    expect(days.find((day) => day.date === "2026-10-13")).toBeUndefined();
+  });
+});
+
+describe("forceLaunchAllowed", () => {
+  it("blocks a street store, a kiosk without access, and Argo", () => {
+    expect(forceLaunchAllowed({ kiosk: false, administrator: "allos" })).toEqual({
+      ok: false,
+      message: "O informe de vendas vale para quiosque em shopping.",
+    });
+    expect(forceLaunchAllowed({ kiosk: true, administrator: null })).toEqual({
+      ok: false,
+      message: "O Gestor ainda não configurou o shopping desta filial.",
+    });
+    expect(forceLaunchAllowed({ kiosk: true, administrator: "argo" })).toEqual({
+      ok: false,
+      message: "O envio da Argo ainda não está disponível. Nada foi alterado no shopping.",
+    });
+    expect(forceLaunchAllowed({ kiosk: true, administrator: "allos" })).toEqual({ ok: true });
+  });
+});
+
+describe("shoppingAccountView", () => {
+  it("drops the saved password", () => {
+    const view = shoppingAccountView({
+      store_id: "loja",
+      administrator: "allos",
+      base_url: "https://app3.intranetmall.com/shopping",
+      username: "LUCF019",
+      secret_ciphertext: "segredo-cifrado",
+    });
+    expect(view).toEqual({
+      storeId: "loja",
+      administrator: "allos",
+      baseUrl: "https://app3.intranetmall.com/shopping",
+      username: "LUCF019",
+      lastRunAt: null,
+      lastError: "",
+    });
+    expect(JSON.stringify(view)).not.toContain("segredo");
+  });
+});
+
+describe("informedWeekIds", () => {
+  it("reads the Informada week and skips Online", () => {
+    const html = `
+      <h2>Informada</h2>
+      <a href="vendas_alterar.asp?IDSEMANA=9291">Informar vendas</a>
+      <h2>Online</h2>
+      <a href="vendas_alterar.asp?IDSEMANA=9300">Informar vendas</a>
+    `;
+    expect(informedWeekIds(html)).toEqual(["9291"]);
+  });
+});
+
+describe("fillAllosWeek", () => {
+  it("fills only the blank past day and sends the filled day again", () => {
+    const html = `
+      <input name="data_cadastra" value="2026-10-11">
+      <input name="venda0" value="">
+      <input name="data_cadastra" value="2026-10-12">
+      <input name="venda1" value="80,00">
+      <input name="data_cadastra" value="2026-10-13">
+      <input name="venda2" value="">
+      <input name="data_cadastra" value="2026-10-14">
+      <input name="venda3" value="">
+      <input name="data_cadastra" value="2026-10-15">
+      <input name="venda4" value="">
+      <input name="data_cadastra" value="2026-10-16">
+      <input name="venda5" value="">
+      <input name="data_cadastra" value="2026-10-17">
+      <input name="venda6" value="">
+      <input name="idsemana" value="9291">
+      <input name="dias" value="7">
+    `;
+    const parsed = parseAllosForm(html);
+    expect(parsed).not.toBeNull();
+    const filled = fillAllosWeek(parsed!, { "2026-10-11": 10000, "2026-10-12": 9000 }, today);
+    expect(filled.days.map((day) => day.cents)).toEqual([10000, 8000, null, null, null, null, null]);
+    expect(filled.body).toContain("venda0=100,00");
+    expect(filled.body).toContain("venda1=80,00");
+    expect(filled.body).toContain("venda2=");
+    expect(filled.body).not.toContain("venda2=0,00");
+    expect(filled.body).toContain("idsemana=9291");
   });
 });

@@ -38,6 +38,7 @@ A madrugada informa as vendas brutas dos quiosques no painel do shopping e a tel
 
 - Gestão > Informe de vendas, `/management/sales-report`, depois de Sangrias. Gestor e Gerente.
 - Calendário do mês, no padrão de Fechamento e Sangrias.
+- O Atualizar do topo, nesta tela, força o mesmo lançamento da madrugada. Loja de rua, filial sem acesso e Argo não chamam o painel.
 - KPIs dos dias anteriores a hoje: Vendido, Lançado, Diferença (lançado menos vendido).
 - Diferença positiva: aluguel percentual a mais. Negativa: risco de multa. Dia passado sem lançamento conta como zero lançado.
 

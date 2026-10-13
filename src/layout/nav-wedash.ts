@@ -31,7 +31,7 @@ const estoque: NavSingle = {
 /** Equipe  |  Metas  |  Desafios  |  Fechamento  |  Sangrias  |  Pedido de compra (Gestor e Gerente). */
 const gestao: NavGroup = {
   label: "Gestão",
-  description: "Administre a equipe, as metas, os desafios, o fechamento, as sangrias e o pedido de compra.",
+  description: "Administre a equipe, as metas, os desafios, o fechamento, as sangrias, o informe de vendas e o pedido de compra.",
   icon: ICONE.gestao,
   items: [
     { label: "Equipe", to: paths.operation.sellers },
@@ -39,6 +39,7 @@ const gestao: NavGroup = {
     { label: "Desafios", to: paths.management.challenges },
     { label: "Fechamento", to: paths.management.cashClose },
     { label: "Sangrias", to: paths.management.sangria },
+    { label: "Informe de vendas", to: paths.management.salesReport },
     { label: "Pedido de compra", to: paths.stock.purchaseOrder },
   ],
 };
@@ -52,6 +53,7 @@ const custos: NavGroup = {
     { label: "Filial", to: paths.operation.filial },
     { label: "Produtos e impostos", to: paths.operation.productsTaxes },
     { label: "Adquirentes", to: paths.operation.acquirers },
+    { label: "Shopping", to: paths.operation.shopping },
   ],
 };
 

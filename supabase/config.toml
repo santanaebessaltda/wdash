@@ -11,6 +11,12 @@ verify_jwt = true
 [functions.stone-credential-persist]
 verify_jwt = true
 
+[functions.shopping-credential-persist]
+verify_jwt = true
+
+[functions.shopping-report-run]
+verify_jwt = true
+
 [functions.erp-sync-enqueue]
 verify_jwt = true
 

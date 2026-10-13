@@ -62,12 +62,14 @@ const SECTION_PAGES: Record<SectionName, Array<() => Promise<unknown>>> = {
     () => import("@/pages/management/ChallengesPage"),
     () => import("@/pages/cash-close/CashClosePage"),
     () => import("@/pages/management/SangriaPage"),
+    () => import("@/pages/management/SalesReportPage"),
     () => import("@/pages/stock/PurchaseOrderPage"),
   ],
   Configurações: [
     () => import("@/pages/operation/FilialPage"),
     () => import("@/pages/operation/ProductsTaxesPage"),
     () => import("@/pages/cash-close/AcquirersPage"),
+    () => import("@/pages/operation/ShoppingPage"),
   ],
 };
 

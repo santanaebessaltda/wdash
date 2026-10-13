@@ -9,6 +9,7 @@ const ChallengeDetailPage = lazyPage(() => import("../challenges/ChallengeDetail
 const ChallengeEditorPage = lazyPage(() => import("../challenges/ChallengeEditorPage"), "default");
 const CashClosePage = lazyPage(() => import("../cash-close/CashClosePage"), "CashClosePage");
 const SangriaPage = lazyPage(() => import("./SangriaPage"), "SangriaPage");
+const SalesReportPage = lazyPage(() => import("./SalesReportPage"), "SalesReportPage");
 
 /** Gestao  -  Gestor e Gerente (Metas fica em `paths.goals`). */
 export const managementRoutes: RouteObject[] = [
@@ -19,6 +20,7 @@ export const managementRoutes: RouteObject[] = [
       { path: paths.management.staff, element: <Navigate to={paths.operation.sellers} replace /> },
       { path: paths.management.cashClose, element: <CashClosePage /> },
       { path: paths.management.sangria, element: <SangriaPage /> },
+      { path: paths.management.salesReport, element: <SalesReportPage /> },
       { path: paths.management.challenges, element: <ChallengesPage /> },
       { path: paths.management.challengeNew, element: <ChallengeEditorPage /> },
       { path: `${paths.management.challenges}/:id`, element: <ChallengeDetailPage /> },

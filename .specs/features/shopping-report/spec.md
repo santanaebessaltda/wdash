@@ -73,6 +73,9 @@ O gestor lança, à mão, as vendas brutas de cada quiosque no painel do shoppin
 2. The system SHALL compute Diferença as lançado minus vendido, in cents.
 3. WHEN a past day has no launch THEN the system SHALL count its lançado as 0 and mark the day blank.
 4. The system SHALL show the screen as Informe de vendas at /management/sales-report for Gestor and Gerente.
+5. WHEN the person uses Atualizar on Informe de vendas THEN the system SHALL run the same fill as the dawn routine for the selected kiosk.
+6. IF the store is not a kiosk, or the shopping access is not saved THEN the system SHALL not call the mall.
+7. IF the mall save fails THEN the system SHALL keep the stored shopping values.
 
 **Independent Test**: Mês com um dia vendido a R$ 100,00 e lançado a R$ 120,00, e outro vendido a R$ 50,00 sem lançamento. Vendido R$ 150,00, lançado R$ 120,00, diferença R$ 30,00 a menos.
 
@@ -107,8 +110,8 @@ O gestor lança, à mão, as vendas brutas de cada quiosque no painel do shoppin
 | Requirement ID | Story | Phase | Status |
 | --- | --- | --- | --- |
 | SHOP-01 | P1: Cobrir os dias vazios | Execute | Implementing |
-| SHOP-02 | P1: Ver vendido e lançado | Execute | Pending |
-| SHOP-03 | P1: Acesso do shopping por filial | Execute | Pending |
+| SHOP-02 | P1: Ver vendido e lançado | Execute | Implementing |
+| SHOP-03 | P1: Acesso do shopping por filial | Execute | Implementing |
 
 **Coverage:** 3 total, 0 mapped to tasks, 3 unmapped
 
