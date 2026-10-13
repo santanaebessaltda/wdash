@@ -46,10 +46,11 @@ function corDaDiferenca(cents: number): string {
 
 function statusDoDia(soldCents: number, informedCents: number | null): { texto: string; cor: string } {
   const gap = informedGap(soldCents, informedCents);
-  if (gap === "missing") return { texto: "Não informado", cor: "bg-chip-gray" };
-  if (gap === "match") return { texto: "Conferido", cor: "bg-ok" };
-  if (gap === "over") return { texto: `${money(informedCents! - soldCents)} a mais`, cor: "bg-warn" };
-  return { texto: `${money(soldCents - informedCents!)} a menos`, cor: "bg-bad" };
+  if (gap === "missing" || informedCents == null) return { texto: "Não informado", cor: "bg-chip-gray" };
+  const texto = `Informado ${money(informedCents)}`;
+  if (gap === "match") return { texto, cor: "bg-ok" };
+  if (gap === "over") return { texto, cor: "bg-warn" };
+  return { texto, cor: "bg-bad" };
 }
 
 function celulasDoIntervalo(from: string, to: string): Array<string | null> {
@@ -398,7 +399,7 @@ function DiaCelula({
           />
         ) : null}
       </span>
-      {passado && vendido != null ? <p className="mt-1 truncate text-[12px] font-bold text-t0">{money(vendido)}</p> : null}
+      {passado && vendido != null ? <ChipDia cor="bg-chip-gray">{`Vendido ${money(vendido)}`}</ChipDia> : null}
       {hojeDia ? <p className="mt-1 truncate text-[12px] font-bold text-t0">{money(vendido ?? 0)}</p> : null}
       {status ? <ChipDia cor={status.cor}>{status.texto}</ChipDia> : null}
       {hojeDia ? <p className="mt-1 text-[11px] font-semibold text-t2">Em aberto</p> : null}

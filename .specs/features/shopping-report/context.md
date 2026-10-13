@@ -45,15 +45,15 @@ A madrugada informa as vendas brutas dos quiosques no painel do shopping e a tel
 - KPIs dos dias anteriores a hoje: Vendido, Informado, Diferença (informado menos vendido), sempre em reais. Diferença zero é R$ 0,00 em cor neutra. A mais é âmbar. A menos é vermelho.
 - Vendido é o total da filial (marca ALL). WEPINK e WPINK não somam de novo.
 - Abrir o informe só lê o que já está gravado. A Allos entra pelo job da madrugada ou pelo botão Informar vendas. O Atualizar abre o login num navegador no sincronizador só para ler. Um POST só com usuário e senha é recusado.
-- Dia passado sem valor gravado aparece como Não informado. Zero gravado, com vendido zero, é Conferido.
-- Cada dia passado mostra o vendido e um status: Conferido, Não informado, a mais ou a menos. Hoje mostra o faturamento e Em aberto. O futuro fica vazio.
+- Dia passado sem valor gravado aparece como Não informado. Zero gravado aparece como Informado R$ 0,00.
+- Cada dia passado mostra Vendido e Informado. Informado verde quando bate com o vendido, âmbar quando está acima e vermelho quando está abaixo. Hoje mostra o faturamento e Em aberto. O futuro fica vazio.
 - O Informar vendas não abre o navegador se nenhum dia marcado está sem valor. Dois cliques seguem na mesma máquina.
 - Diferença a mais: aluguel percentual a mais. A menos: risco de divergência na auditoria. No total, dia sem valor informado conta como zero. No dia, não vira R$ 0,00 informado.
 
 ### Agent's Discretion
 
 - Onde cifrar a senha, desde que o padrão seja o da chave da adquirente.
-- O texto curto do dia no calendário ficou definido: o vendido e um status (Conferido, Não informado, a mais ou a menos).
+- O texto curto do dia no calendário ficou definido: Vendido R$ X e Informado R$ X, ou Não informado.
 
 ### Declined / Undiscussed Gray Areas → Assumptions
 
