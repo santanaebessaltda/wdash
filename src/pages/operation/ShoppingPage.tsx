@@ -115,7 +115,24 @@ export function ShoppingPage() {
           </Card>
         ) : (
           <Card>
-            <div className="flex max-w-[420px] flex-col gap-3.5">
+            <div className="mb-4 flex items-center gap-3">
+              <span className="flex h-[46px] w-[46px] shrink-0 items-center justify-center overflow-hidden rounded-[13px] border border-line bg-bg-inset">
+                {administrator === "allos" ? (
+                  <img src="/allos.png" alt="Allos" className="h-full w-full object-contain p-1.5" />
+                ) : (
+                  <span className="text-[11px] font-bold text-t1">Argo</span>
+                )}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[14.5px] font-bold text-t0">{administrator === "allos" ? "Allos" : "Argo"}</p>
+                <p className="mt-0.5 text-[11.5px] text-t2">Informe de vendas</p>
+              </div>
+              <span className={`flex items-center gap-1.5 text-xs font-bold ${salvo ? "text-ok" : "text-t2"}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${salvo ? "bg-ok" : "bg-t2"}`} />
+                {salvo ? "Conectado" : "Não configurado"}
+              </span>
+            </div>
+            <div className="flex max-w-[420px] flex-col gap-3.5 border-t border-line pt-4">
               <FormField label="Administradora" required>
                 <Select value={administrator} onChange={(e) => setAdministrator(e.target.value === "argo" ? "argo" : "allos")} disabled={busy} {...noAutofill}>
                   <option value="allos">Allos</option>
