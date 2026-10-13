@@ -259,12 +259,12 @@ function StoneModal({
           <div className="relative">
             <Input
               type="text"
-              value={conectado ? "••••••••" : secret}
+              value={secret}
               onChange={(e) => setSecret(e.target.value)}
-              placeholder="Digite a chave secreta"
+              placeholder={conectado ? "Chave já cadastrada" : "Digite a chave secreta"}
               style={secretStyle(mostrarChave && !conectado)}
               disabled={travado}
-              className="pr-12"
+              className={conectado ? undefined : "pr-12"}
               {...noAutofill}
             />
             {!conectado && (

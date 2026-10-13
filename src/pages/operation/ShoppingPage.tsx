@@ -8,8 +8,6 @@ import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { SHOPPING_MENU_EVENT } from "@/layout/useShoppingMenu";
 import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
 
-const SENHA_SALVA = "••••••••";
-
 /** Configurações > Shopping. O card da Allos abre a modal, no mesmo desenho de Adquirentes. */
 export function ShoppingPage() {
   const { show } = useToast();
@@ -182,7 +180,6 @@ function AllosModal({
     });
   }
 
-  const senhaSalva = conectado && password === "";
   const podeConectar =
     !busy && baseUrl.trim().startsWith("https://") && username.trim().length > 0 && (password.trim().length > 0 || conectado) && (conectado || autorizo);
 
@@ -204,7 +201,7 @@ function AllosModal({
     >
       <div className="flex flex-col gap-3.5">
         <p className="text-[13.5px] leading-relaxed text-t1">
-          Informe a URL, o usuário e a senha do painel da Allos desta filial. A WDash protege esses dados e os usa somente para informar vendas ao shopping.
+          Informe os dados de acesso ao painel da Allos desta filial. A WDash protege esses dados e os usa somente para informar as vendas ao shopping.
         </p>
         <FormField label="URL do painel" required hint="Informe apenas o endereço principal, sem caminho adicional.">
           <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://clube.allos.com.br" disabled={busy} {...noAutofill} />
@@ -212,19 +209,23 @@ function AllosModal({
         <FormField label="Usuário" required>
           <Input value={username} onChange={(e) => setUsername(e.target.value)} disabled={busy} {...noAutofill} />
         </FormField>
-        <FormField label="Senha" required={!conectado}>
+        <FormField
+          label="Senha"
+          required={!conectado}
+          hint={conectado ? "Digite uma nova senha somente se quiser alterar a atual." : undefined}
+        >
           <div className="relative">
             <Input
               type="text"
-              value={senhaSalva ? SENHA_SALVA : password}
-              onChange={(e) => setPassword(senhaSalva ? e.target.value.replaceAll("•", "") : e.target.value)}
-              placeholder="Digite a senha"
-              style={secretStyle(mostrarSenha && !senhaSalva)}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={conectado ? "Senha já cadastrada" : "Digite a senha"}
+              style={secretStyle(mostrarSenha && password.length > 0)}
               disabled={busy}
-              className="pr-12"
+              className={!conectado || password.length > 0 ? "pr-12" : undefined}
               {...noAutofill}
             />
-            {!senhaSalva ? (
+            {!conectado || password.length > 0 ? (
             <button
               type="button"
               onClick={() => setMostrarSenha((atual) => !atual)}
@@ -246,9 +247,7 @@ function AllosModal({
             ) : null}
           </div>
         </FormField>
-        {conectado ? (
-          <p className="text-[12.5px] leading-relaxed text-t2">Deixe em branco para manter a senha atual.</p>
-        ) : (
+        {!conectado && (
           <Checkbox
             label="Autorizo a WDash a usar este acesso para informar as vendas desta filial ao shopping."
             checked={autorizo}

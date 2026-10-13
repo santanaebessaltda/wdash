@@ -18,7 +18,7 @@ A madrugada informa as vendas brutas dos quiosques no painel do shopping e a tel
 
 - Allos e Argo são os tipos. O mesmo tipo usa o mesmo lançamento. Mudam URL, usuário e senha.
 - Card em Configurações, `/operation/shopping`, só Gestor. Uma filial por vez, como Adquirentes. O item só aparece com um quiosque selecionado.
-- Na tela, só o card da Allos. A modal mostra URL e usuário já salvos; a senha fica mascarada. A URL é o endereço do painel, sem barra no final. Conectar só grava o acesso: não testa o login e não lança as vendas. O card da Argo entra junto com o envio dela.
+- Na tela, só o card da Allos. A modal mostra URL e usuário já salvos. A senha não volta no campo: ele fica vazio, com o texto Senha já cadastrada, e só muda se a pessoa digitar outra. A URL é o endereço do painel, sem barra no final. Conectar só grava o acesso: não testa o login e não lança as vendas. O card da Argo entra junto com o envio dela.
 - Informe de vendas só aparece nesse quiosque quando a Allos está salva.
 - Loja de rua não entra.
 

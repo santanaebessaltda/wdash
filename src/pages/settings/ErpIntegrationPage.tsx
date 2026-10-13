@@ -339,20 +339,20 @@ function MillenniumModal({
               disabled={travado}
             />
           </FormField>
-          <FormField label="Senha do Millennium" required>
+          <FormField label="Senha do Millennium" required={!conectado}>
             <div className="relative">
               <Input
                 type="text"
-                value={conectado ? "••••••••" : senha}
+                value={senha}
                 onChange={(e) => {
                   setSenha(e.target.value);
                   descartarPendente();
                 }}
-                placeholder="Digite a senha"
+                placeholder={conectado ? "Senha já cadastrada" : "Digite a senha"}
                 {...noAutofill}
                 style={secretStyle(mostrarSenha && !conectado)}
                 disabled={travado}
-                className="pr-12"
+                className={conectado ? undefined : "pr-12"}
               />
               {!conectado && (
                 <button
