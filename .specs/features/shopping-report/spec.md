@@ -97,7 +97,7 @@ O gestor lança, à mão, as vendas brutas de cada quiosque no painel do shoppin
 
 **Acceptance Criteria**:
 
-1. WHERE the store type is quiosque em shopping the system SHALL show an Allos card at /operation/shopping that opens a modal with URL, user and password.
+1. WHERE the store type is quiosque em shopping the system SHALL show an Intranet Mall card at /settings/shopping that opens a modal with slug, user and password.
 2. WHEN the selected store is not one kiosk THEN the system SHALL keep Shopping in the menu and SHALL show that the screen is only for a shopping kiosk.
 3. The system SHALL allow only the Gestor to save that card.
 4. The system SHALL keep the password unreadable after it is saved.

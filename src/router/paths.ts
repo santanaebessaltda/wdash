@@ -75,19 +75,19 @@ export const paths = {
     /** Calendário do informe de vendas no shopping. */
     salesReport: "/management/sales-report",
   },
-  /** Configurações da filial. Vendedores fica em Gestão; a URL antiga de grupos abre essa tela. */
+  /** Configurações da filial em `/settings`. Custos, loja e equipe são URLs antigas. */
   operation: {
     costs: "/operation/costs",
     store: "/operation/store",
     franchise: "/operation/franchise",
     rent: "/operation/rent",
     /** Tipo, horário, franquia e aluguel. */
-    branch: "/operation/branch",
-    productsTaxes: "/operation/products-and-taxes",
+    branch: "/settings/branch",
+    productsTaxes: "/settings/products-and-taxes",
     /** Stone de cada loja. Não fica em Integrações: a chave é da loja, não da empresa. */
-    acquirers: "/operation/acquirers",
+    acquirers: "/settings/acquirers",
     /** Painel do shopping de cada quiosque. A senha é da filial. */
-    shopping: "/operation/shopping",
+    shopping: "/settings/shopping",
     /** URL antiga. Abre Gestão > Equipe, onde o grupo é criado e administrado. */
     groups: "/operation/groups",
     sellers: "/operation/sellers",
@@ -126,6 +126,10 @@ export const paths = {
     syncing: "/sincronizando",
     cashDrop: "/management/sangria",
     branch: "/operation/filial",
+    operationBranch: "/operation/branch",
+    operationProductsTaxes: "/operation/products-and-taxes",
+    operationAcquirers: "/operation/acquirers",
+    operationShopping: "/operation/shopping",
     team: "/dashboard/equipe",
     teamRoot: "/equipe",
     shifts: "/dashboard/turnos",
