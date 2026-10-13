@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, FormField, Input, Select, Skeleton, useToast } from "@/components/ui";
+import { Button, Card, Checkbox, FormField, Input, Modal, Skeleton, useToast } from "@/components/ui";
 import { fetchShoppingAccount, saveShoppingAccount, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
-import type { ShoppingAdministrator } from "@/data/wedash/shoppingReport";
 import { noAutofill, secretStyle } from "@/lib/noAutofill";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { useScope } from "@/pages/dashboard/useScope";
@@ -11,7 +10,7 @@ import { SHOPPING_MENU_EVENT, useShoppingMenu } from "@/layout/useShoppingMenu";
 import { paths } from "@/router/paths";
 import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
 
-/** Configurações > Shopping. URL, usuário e senha do quiosque. A senha não volta depois de salva. */
+/** Configurações > Shopping. O card da Allos abre a modal, no mesmo desenho de Adquirentes. */
 export function ShoppingPage() {
   const navigate = useNavigate();
   const menu = useShoppingMenu();
@@ -23,12 +22,7 @@ export function ShoppingPage() {
   const loja = lojas[0];
   const [account, setAccount] = useState<ShoppingAccount | null>(null);
   const [loading, setLoading] = useState(true);
-  const [administrator, setAdministrator] = useState<ShoppingAdministrator>("allos");
-  const [baseUrl, setBaseUrl] = useState("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [mostrarSenha, setMostrarSenha] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [aberto, setAberto] = useState(false);
 
   useEffect(() => {
     if (lojasLoading || escolher || !loja || loja.pointType !== "SHOPPING") {
@@ -39,13 +33,7 @@ export function ShoppingPage() {
     setLoading(true);
     void fetchShoppingAccount(session.tenantId, loja.id)
       .then((access) => {
-        if (cancel) return;
-        setAccount(access);
-        setAdministrator(access?.administrator ?? "allos");
-        setBaseUrl(access?.baseUrl ?? "");
-        setUsername(access?.username ?? "");
-        setPassword("");
-        setMostrarSenha(false);
+        if (!cancel) setAccount(access?.administrator === "allos" ? access : null);
       })
       .catch(() => {
         if (!cancel) show("Não foi possível carregar o shopping desta filial. Tente novamente.", "danger");
@@ -65,31 +53,10 @@ export function ShoppingPage() {
     navigate(paths.operation.filial, { replace: true });
   }, [menu.ready, menu.settings, navigate]);
 
-  async function salvar() {
-    if (!loja) return;
-    setBusy(true);
-    const result = await saveShoppingAccount({ storeId: loja.id, administrator, baseUrl, username, password });
-    setBusy(false);
-    if (!result.ok) {
-      show(result.message, "danger");
-      return;
-    }
-    setPassword("");
-    setMostrarSenha(false);
-    setAccount({
-      storeId: loja.id,
-      administrator,
-      baseUrl: baseUrl.trim().replace(/\/$/, ""),
-      username: username.trim(),
-      lastRunAt: account?.lastRunAt ?? null,
-      lastError: account?.lastError ?? "",
-    });
-    window.dispatchEvent(new Event(SHOPPING_MENU_EVENT));
-    show("Shopping salvo.", "success");
-  }
-
-  const salvo = account != null;
-  const podeSalvar = !busy && baseUrl.trim().startsWith("https://") && username.trim().length > 0 && (password.trim().length > 0 || salvo);
+  const conectado = account != null;
+  const estado = conectado ? "Conectado" : "Não configurado";
+  const tom = conectado ? "text-ok" : "text-t2";
+  const dot = conectado ? "bg-ok" : "bg-t2";
 
   if (menu.ready && !menu.settings) return null;
 
@@ -98,85 +65,204 @@ export function ShoppingPage() {
       <SectionHeader
         section="Configurações"
         title="Shopping"
-        subtitle="Guarde a administradora, a URL e o acesso de cada quiosque."
+        subtitle="Conecte a Allos desta filial para informar as vendas no shopping."
       />
-      <div className="mt-6 max-w-[720px] pb-8">
-        {escolher ? (
+      {escolher ? (
+        <div className="mt-6 max-w-[720px]">
           <SelectStoreCard />
-        ) : showSkeleton || (loading && loja?.pointType === "SHOPPING") ? (
-          <Skeleton className="h-[360px] w-full rounded-[18px]" />
-        ) : !loja ? (
-          <Card>
-            <EmptyBlock icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
-          </Card>
-        ) : loja.pointType !== "SHOPPING" ? (
-          <Card>
-            <EmptyBlock icon="🏬" title="Loja de rua" description="O informe de vendas vale para quiosque em shopping." />
-          </Card>
-        ) : (
-          <Card>
-            <div className="mb-4 flex items-center gap-3">
-              <span className="flex h-[46px] w-[46px] shrink-0 items-center justify-center overflow-hidden rounded-[13px] border border-line bg-bg-inset">
-                {administrator === "allos" ? (
-                  <img src="/allos.png" alt="Allos" className="h-full w-full object-contain p-1.5" />
-                ) : (
-                  <span className="text-[11px] font-bold text-t1">Argo</span>
-                )}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-[14.5px] font-bold text-t0">{administrator === "allos" ? "Allos" : "Argo"}</p>
-                <p className="mt-0.5 text-[11.5px] text-t2">Informe de vendas</p>
-              </div>
-              <span className={`flex items-center gap-1.5 text-xs font-bold ${salvo ? "text-ok" : "text-t2"}`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${salvo ? "bg-ok" : "bg-t2"}`} />
-                {salvo ? "Conectado" : "Não configurado"}
-              </span>
-            </div>
-            <div className="flex max-w-[420px] flex-col gap-3.5 border-t border-line pt-4">
-              <FormField label="Administradora" required>
-                <Select value={administrator} onChange={(e) => setAdministrator(e.target.value === "argo" ? "argo" : "allos")} disabled={busy} {...noAutofill}>
-                  <option value="allos">Allos</option>
-                  <option value="argo">Argo</option>
-                </Select>
-              </FormField>
-              <FormField label="URL" required>
-                <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://" disabled={busy} {...noAutofill} />
-              </FormField>
-              <FormField label="Usuário" required>
-                <Input value={username} onChange={(e) => setUsername(e.target.value)} disabled={busy} {...noAutofill} />
-              </FormField>
-              <FormField label="Senha" required={!salvo}>
-                <div className="relative">
-                  <Input
-                    type="text"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder={salvo ? "Senha já salva" : "Digite a senha"}
-                    style={secretStyle(mostrarSenha)}
-                    disabled={busy}
-                    className="pr-12"
-                    {...noAutofill}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setMostrarSenha((atual) => !atual)}
-                    aria-label={mostrarSenha ? "Ocultar senha" : "Mostrar senha"}
-                    disabled={busy}
-                    className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-t2 hover:bg-bg-3 hover:text-t0"
-                  >
-                    {mostrarSenha ? "Ocultar" : "Ver"}
-                  </button>
+        </div>
+      ) : (
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {showSkeleton || (loading && loja?.pointType === "SHOPPING") ? (
+            <Card>
+              <div className="mb-3.5 flex items-center gap-3" aria-busy="true" aria-label="Carregando shopping…">
+                <Skeleton className="h-[46px] w-[46px] rounded-[13px]" />
+                <div className="flex-1">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="mt-2 h-3 w-40" />
                 </div>
-              </FormField>
-              <div>
-                <Button onClick={() => void salvar()} disabled={!podeSalvar}>
-                  {busy ? "Salvando…" : "Salvar"}
+              </div>
+              <div className="flex items-center justify-between border-t border-line pt-3">
+                <Skeleton className="h-3.5 w-24" />
+                <Skeleton className="h-8 w-24 rounded-[var(--radius-vela-sm)]" />
+              </div>
+            </Card>
+          ) : !loja ? (
+            <Card>
+              <EmptyBlock icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
+            </Card>
+          ) : loja.pointType !== "SHOPPING" ? (
+            <Card>
+              <EmptyBlock icon="🏬" title="Loja de rua" description="O informe de vendas vale para quiosque em shopping." />
+            </Card>
+          ) : (
+            <Card>
+              <div className="mb-3.5 flex items-center gap-3">
+                <span className="flex h-[46px] w-[46px] shrink-0 items-center justify-center overflow-hidden rounded-[13px] border border-line bg-bg-inset">
+                  <img src="/allos.png" alt="Allos" className="h-full w-full object-contain p-1.5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[14.5px] font-bold text-t0">Allos</p>
+                  <p className="mt-0.5 text-[11.5px] text-t2">Informe de vendas</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between border-t border-line pt-3">
+                <span className={`flex items-center gap-1.5 text-xs font-bold ${tom}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+                  {estado}
+                </span>
+                <Button size="sm" onClick={() => setAberto(true)} disabled={!loja}>
+                  {conectado ? "Gerenciar" : "Conectar"}
                 </Button>
               </div>
-            </div>
-          </Card>
+            </Card>
+          )}
+        </div>
+      )}
+      {loja && loja.pointType === "SHOPPING" ? (
+        <AllosModal
+          open={aberto}
+          account={account}
+          storeId={loja.id}
+          onClose={() => setAberto(false)}
+          onSaved={(next) => {
+            setAccount(next);
+            window.dispatchEvent(new Event(SHOPPING_MENU_EVENT));
+            show(account ? "Allos atualizada." : "Allos conectada.", "success");
+            setAberto(false);
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function AllosModal({
+  open,
+  account,
+  storeId,
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  account: ShoppingAccount | null;
+  storeId: string;
+  onClose: () => void;
+  onSaved: (account: ShoppingAccount) => void;
+}) {
+  const { show } = useToast();
+  const conectado = account != null;
+  const [baseUrl, setBaseUrl] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [autorizo, setAutorizo] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setBaseUrl(account?.baseUrl ?? "");
+    setUsername(account?.username ?? "");
+    setPassword("");
+    setMostrarSenha(false);
+    setAutorizo(false);
+  }, [open, account]);
+
+  function fechar() {
+    if (busy) return;
+    onClose();
+  }
+
+  async function conectar() {
+    setBusy(true);
+    const result = await saveShoppingAccount({ storeId, administrator: "allos", baseUrl, username, password });
+    setBusy(false);
+    if (!result.ok) {
+      show(result.message, "danger");
+      return;
+    }
+    onSaved({
+      storeId,
+      administrator: "allos",
+      baseUrl: baseUrl.trim().replace(/\/$/, ""),
+      username: username.trim(),
+      lastRunAt: account?.lastRunAt ?? null,
+      lastError: account?.lastError ?? "",
+    });
+  }
+
+  const podeConectar =
+    !busy && baseUrl.trim().startsWith("https://") && username.trim().length > 0 && (password.trim().length > 0 || conectado) && (conectado || autorizo);
+
+  return (
+    <Modal
+      open={open}
+      onClose={fechar}
+      title="Allos"
+      footer={
+        <>
+          <Button variant="outline" onClick={fechar} disabled={busy}>
+            Cancelar
+          </Button>
+          <Button onClick={() => void conectar()} disabled={!podeConectar}>
+            {busy ? (conectado ? "Salvando…" : "Conectando…") : conectado ? "Salvar" : "Conectar"}
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-3.5">
+        <p className="text-[13.5px] leading-relaxed text-t1">
+          Informe a URL, o usuário e a senha do painel desta filial. A WDash protege a senha e a usa somente para informar as vendas.
+        </p>
+        <FormField label="URL" required>
+          <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://" disabled={busy} {...noAutofill} />
+        </FormField>
+        <FormField label="Usuário" required>
+          <Input value={username} onChange={(e) => setUsername(e.target.value)} disabled={busy} {...noAutofill} />
+        </FormField>
+        <FormField label="Senha" required={!conectado}>
+          <div className="relative">
+            <Input
+              type="text"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={conectado ? "Senha já salva" : "Digite a senha"}
+              style={secretStyle(mostrarSenha)}
+              disabled={busy}
+              className="pr-12"
+              {...noAutofill}
+            />
+            <button
+              type="button"
+              onClick={() => setMostrarSenha((atual) => !atual)}
+              aria-label={mostrarSenha ? "Ocultar senha" : "Mostrar senha"}
+              disabled={busy}
+              className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-t2 hover:bg-bg-3 hover:text-t0"
+            >
+              {mostrarSenha ? (
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22" />
+                </svg>
+              ) : (
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              )}
+            </button>
+          </div>
+        </FormField>
+        {conectado ? (
+          <p className="text-[12.5px] leading-relaxed text-t2">Deixe a senha em branco para manter a que já está salva.</p>
+        ) : (
+          <Checkbox
+            label="Autorizo a WDash a usar este acesso para informar as vendas desta filial no shopping."
+            checked={autorizo}
+            onChange={(e) => setAutorizo(e.target.checked)}
+            disabled={busy}
+          />
         )}
       </div>
-    </div>
+    </Modal>
   );
 }

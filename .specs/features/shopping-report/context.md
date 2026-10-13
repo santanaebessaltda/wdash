@@ -18,7 +18,8 @@ A madrugada informa as vendas brutas dos quiosques no painel do shopping e a tel
 
 - Allos e Argo são os tipos. O mesmo tipo usa o mesmo lançamento. Mudam URL, usuário e senha.
 - Card em Configurações, `/operation/shopping`, só Gestor. Uma filial por vez, como Adquirentes. O item só aparece com um quiosque selecionado.
-- Informe de vendas só aparece nesse quiosque quando a Allos está salva. Argo fica no card e ainda não abre o informe.
+- Na tela, só o card da Allos. A modal guarda URL, usuário e senha. O card da Argo entra junto com o envio dela.
+- Informe de vendas só aparece nesse quiosque quando a Allos está salva.
 - Loja de rua não entra.
 
 ### Allos
@@ -63,5 +64,5 @@ A madrugada informa as vendas brutas dos quiosques no painel do shopping e a tel
 
 ## Deferred Ideas
 
-- Conector da Argo, quando houver os curls.
+- Card e conector da Argo, quando houver os curls.
 - Linha Online, se um dia ela representar outra venda.
