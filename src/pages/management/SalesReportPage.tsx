@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { Alert, Button, Card, Skeleton, useToast } from "@/components/ui";
 import { ChipDia, monthNavBtn, PlainKpi, SeletorMesAno, Seta } from "@/pages/cash-close/CashClosePage";
@@ -29,6 +30,21 @@ const WEEK = [
 
 const money = (cents: number) => brlCent(cents / 100);
 
+const MESES_PT = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
+function valorDiferenca(cents: number): string {
+  const abs = brlCent(Math.abs(cents) / 100);
+  if (cents < 0) return `−${abs}`;
+  if (cents > 0) return `+${abs}`;
+  return abs;
+}
+
+function corDaDiferenca(cents: number): string {
+  if (cents > 0) return "var(--ok)";
+  if (cents < 0) return "var(--bad)";
+  return "var(--t0)";
+}
+
 function somarMes(iso: string, meses: number): string {
   const d = deIso(inicioDoMes(iso));
   d.setMonth(d.getMonth() + meses);
@@ -46,22 +62,24 @@ function celulasDoMes(iso: string): Array<string | null> {
   return cells;
 }
 
-function textoDiferenca(cents: number): string {
-  if (cents > 0) return `A mais ${money(cents)}`;
-  if (cents < 0) return `A menos ${money(Math.abs(cents))}`;
-  return "Igual";
-}
-
-function rotuloPeriodo(from: string, to: string): string {
+function rotuloPeriodo(from: string, to: string, hoje: string): string {
   const inicio = deIso(from);
   const fim = deIso(to);
-  const mes = fim.toLocaleDateString("pt-BR", { month: "long" });
+  const mesFim = MESES_PT[fim.getMonth()];
+  const ano = fim.getFullYear() === deIso(hoje).getFullYear() ? "" : ` de ${fim.getFullYear()}`;
   if (inicio.getMonth() === fim.getMonth() && inicio.getFullYear() === fim.getFullYear()) {
-    if (from === to) return `${inicio.getDate()} de ${mes}`;
-    return `${inicio.getDate()} a ${fim.getDate()} de ${mes}`;
+    if (from === to) return `${inicio.getDate()} de ${mesFim}${ano}`;
+    return `${inicio.getDate()} a ${fim.getDate()} de ${mesFim}${ano}`;
   }
-  const mesInicio = inicio.toLocaleDateString("pt-BR", { month: "long" });
-  return `${inicio.getDate()} de ${mesInicio} a ${fim.getDate()} de ${mes}`;
+  const mesInicio = MESES_PT[inicio.getMonth()];
+  return `${inicio.getDate()} de ${mesInicio} a ${fim.getDate()} de ${mesFim}${ano}`;
+}
+
+function celulasDoPeriodo(from: string, to: string): Array<string | null> {
+  const cells: Array<string | null> = Array.from({ length: deIso(from).getDay() }, () => null);
+  for (let day = from; day <= to; day = somarDias(day, 1)) cells.push(day);
+  while (cells.length % 7 !== 0) cells.push(null);
+  return cells;
 }
 
 const filtroBtn = "rounded-lg px-3 py-1.5 text-[12.5px] font-bold transition-colors";
@@ -100,7 +118,6 @@ export function SalesReportPage() {
   monthRef.current = { from, to };
   const podeAvancar = somarMes(anchor, 1) <= hoje;
   const podeVoltar = somarMes(anchor, -1) >= piso;
-  const cells = useMemo(() => celulasDoMes(anchor), [anchor]);
   const faixa = loja ? `${loja.id}|${from}|${reloadKey}` : "";
   const quiosque = loja?.pointType === "SHOPPING";
 
@@ -191,6 +208,10 @@ export function SalesReportPage() {
   );
   const resumo = useMemo(() => monthReport(diasVisiveis, hoje), [diasVisiveis, hoje]);
   const porDia = useMemo(() => new Map(dias.map((day) => [day.date, day])), [dias]);
+  const cells = useMemo(
+    () => (granularity === "week" && bloco ? celulasDoPeriodo(bloco.from, bloco.to) : celulasDoMes(anchor)),
+    [granularity, bloco, anchor],
+  );
   const gestor = isGestor(session.role);
   const primeiro = allosPeriods(piso, fimDoMes(piso))[0];
   const ultimo = allosPeriods(inicioDoMes(hoje), fimDoMes(hoje)).at(-1);
@@ -244,7 +265,20 @@ export function SalesReportPage() {
                   Semanal
                 </button>
               </div>
-              <SeletorMesAno iso={anchor} hoje={hoje} minIso={piso} onChange={irParaMes} />
+              {granularity === "month" ? (
+                <SeletorMesAno iso={anchor} hoje={hoje} minIso={piso} onChange={irParaMes} />
+              ) : (
+                <SeletorPeriodo
+                  period={bloco}
+                  hoje={hoje}
+                  piso={piso}
+                  onChange={(inicio) => {
+                    setWeekFrom(inicio);
+                    const mes = inicioDoMes(inicio);
+                    setAnchor(mes === inicioDoMes(hoje) ? hoje : mes);
+                  }}
+                />
+              )}
               {granularity === "month" ? (
                 <>
                   <button type="button" aria-label="Mês anterior" className={monthNavBtn} disabled={!podeVoltar} onClick={() => irParaMes(somarMes(anchor, -1))}>
@@ -256,7 +290,6 @@ export function SalesReportPage() {
                 </>
               ) : (
                 <>
-                  <span className="text-[13px] font-bold text-t0">{bloco ? rotuloPeriodo(bloco.from, bloco.to) : ""}</span>
                   <button type="button" aria-label="Período anterior" className={monthNavBtn} disabled={!podeVoltarPeriodo} onClick={() => irPeriodo(-1)}>
                     <Seta dir="anterior" />
                   </button>
@@ -302,8 +335,8 @@ export function SalesReportPage() {
               <PlainKpi label="Lançado" value={money(resumo.launchedCents)} color="var(--t0)" />
               <PlainKpi
                 label="Diferença"
-                value={textoDiferenca(resumo.differenceCents)}
-                color={resumo.differenceCents === 0 ? "var(--ok)" : "var(--bad)"}
+                value={valorDiferenca(resumo.differenceCents)}
+                color={corDaDiferenca(resumo.differenceCents)}
                 tooltip="Lançado menos vendido. Positivo é aluguel percentual a mais. Negativo é risco de multa. Dia passado sem lançamento conta como zero."
               />
             </div>
@@ -319,15 +352,7 @@ export function SalesReportPage() {
                 </div>
                 <div className="grid grid-cols-7">
                   {cells.map((day, i) => (
-                    <DiaCelula
-                      key={day ?? `vazio-${i}`}
-                      index={i}
-                      day={day}
-                      hoje={hoje}
-                      marcado={granularity === "month" || (bloco != null && day != null && day >= bloco.from && day <= bloco.to)}
-                      destaque={granularity === "week" && bloco != null && day != null && day >= bloco.from && day <= bloco.to}
-                      row={day ? porDia.get(day) : undefined}
-                    />
+                    <DiaCelula key={day ?? `vazio-${i}`} index={i} day={day} hoje={hoje} row={day ? porDia.get(day) : undefined} />
                   ))}
                 </div>
               </div>
@@ -343,23 +368,17 @@ function DiaCelula({
   index,
   day,
   hoje,
-  marcado,
-  destaque,
   row,
 }: {
   index: number;
   day: string | null;
   hoje: string;
-  marcado: boolean;
-  destaque: boolean;
   row?: { soldCents: number; launchedCents: number | null };
 }) {
   const borda = cn(
     "flex min-h-[108px] w-full min-w-0 flex-col items-stretch justify-start border-b border-r border-line p-1.5 text-left sm:min-h-[132px] sm:p-2",
     (index + 1) % 7 === 0 && "border-r-0",
     !day && "bg-bg-1/30",
-    destaque && "bg-acc-soft",
-    day && !marcado && "opacity-40",
   );
   if (!day) return <div className={borda} />;
   const futuro = day >= hoje;
@@ -381,6 +400,137 @@ function DiaCelula({
           <ChipDia cor={igual ? "bg-ok" : "bg-bad"}>{`Lançado ${money(lancado)}`}</ChipDia>
         </>
       ) : null}
+    </div>
+  );
+}
+
+/** No Semanal, o campo lista os blocos da Allos e o rótulo é o intervalo, como 11 a 17 de Outubro. */
+function SeletorPeriodo({
+  period,
+  hoje,
+  piso,
+  onChange,
+}: {
+  period?: { from: string; to: string };
+  hoje: string;
+  piso: string;
+  onChange: (from: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [vista, setVista] = useState(() => inicioDoMes(period?.from ?? hoje));
+  const [panelPos, setPanelPos] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const rotulo = period ? rotuloPeriodo(period.from, period.to, hoje) : "";
+  const periodos = allosPeriods(inicioDoMes(vista), fimDoMes(vista));
+  const titulo = `${MESES_PT[deIso(vista).getMonth()]} de ${deIso(vista).getFullYear()}`;
+  const podeMesAnt = somarMes(vista, -1) >= piso;
+  const podeMesProx = somarMes(vista, 1) <= inicioDoMes(hoje);
+  const navBtn = (ok: boolean) =>
+    cn("flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-line text-t1", ok ? "hover:bg-bg-3" : "cursor-not-allowed opacity-40");
+
+  useEffect(() => {
+    if (!open || !period) return;
+    setVista(inicioDoMes(period.from));
+  }, [open, period]);
+
+  useEffect(() => {
+    function onClick(e: MouseEvent) {
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  useEffect(() => {
+    if (!open || !triggerRef.current) {
+      setPanelPos(null);
+      return;
+    }
+    function colocar() {
+      if (!triggerRef.current) return;
+      const rect = triggerRef.current.getBoundingClientRect();
+      const margem = 12;
+      const width = Math.min(window.innerWidth - margem * 2, 280);
+      let left = rect.right - width;
+      if (left < margem) left = margem;
+      const top = Math.min(rect.bottom + 8, window.innerHeight - margem - 80);
+      setPanelPos({ top, left, width, maxHeight: Math.max(200, window.innerHeight - top - margem) });
+    }
+    colocar();
+    window.addEventListener("resize", colocar);
+    window.addEventListener("scroll", colocar, true);
+    return () => {
+      window.removeEventListener("resize", colocar);
+      window.removeEventListener("scroll", colocar, true);
+    };
+  }, [open]);
+
+  const painel =
+    open && panelPos
+      ? createPortal(
+          <div
+            ref={panelRef}
+            style={{ top: panelPos.top, left: panelPos.left, width: panelPos.width, maxHeight: panelPos.maxHeight }}
+            className="fixed z-[80] overflow-y-auto rounded-[14px] border border-line bg-bg-2 p-4 shadow-[var(--shadow-vela)]"
+          >
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <button type="button" disabled={!podeMesAnt} aria-label="Mês anterior" className={navBtn(podeMesAnt)} onClick={() => setVista((atual) => somarMes(atual, -1))}>
+                <Seta dir="anterior" />
+              </button>
+              <span className="truncate text-sm font-bold text-t0">{titulo}</span>
+              <button type="button" disabled={!podeMesProx} aria-label="Próximo mês" className={navBtn(podeMesProx)} onClick={() => setVista((atual) => somarMes(atual, 1))}>
+                <Seta dir="proximo" />
+              </button>
+            </div>
+            <div className="flex flex-col gap-1">
+              {periodos.map((item) => {
+                const ativo = period?.from === item.from;
+                const bloqueado = item.to < piso || inicioDoMes(item.from) > inicioDoMes(hoje);
+                return (
+                  <button
+                    key={item.from}
+                    type="button"
+                    disabled={bloqueado}
+                    onClick={() => {
+                      onChange(item.from);
+                      setOpen(false);
+                    }}
+                    className={cn(
+                      "h-9 rounded-[9px] px-2 text-left text-[12.5px] font-semibold transition-colors",
+                      bloqueado ? "cursor-not-allowed text-t2 opacity-30" : ativo ? "bg-acc text-white" : "text-t1 hover:bg-bg-3",
+                    )}
+                  >
+                    {rotuloPeriodo(item.from, item.to, hoje)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>,
+          document.body,
+        )
+      : null;
+
+  return (
+    <div ref={triggerRef} className="relative inline-flex">
+      <button
+        type="button"
+        aria-label={`Período: ${rotulo}`}
+        onClick={() => setOpen((atual) => !atual)}
+        className={cn(
+          "flex h-10 min-w-0 items-center gap-2.5 rounded-[var(--radius-vela-sm)] border bg-bg-3 px-3.5 text-left transition-colors",
+          open ? "border-acc" : "border-line hover:border-acc",
+        )}
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={open ? "var(--acc)" : "var(--t2)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+          <rect x="3" y="4" width="18" height="18" rx="2" />
+          <path d="M16 2v4M8 2v4M3 10h18" />
+        </svg>
+        <span className="truncate text-[13.5px] font-semibold text-t0">{rotulo}</span>
+      </button>
+      {painel}
     </div>
   );
 }

@@ -69,7 +69,7 @@ O gestor lança, à mão, as vendas brutas de cada quiosque no painel do shoppin
 
 **Acceptance Criteria**:
 
-1. WHEN the month is open THEN the system SHALL show Vendido, Lançado and Diferença for days before today.
+1. WHEN the month is open THEN the system SHALL show Vendido, Lançado and Diferença for days before today, as currency. WHEN the difference is zero THEN the system SHALL show R$ 0,00.
 2. The system SHALL compute Diferença as lançado minus vendido, in cents.
 3. WHEN a past day has no launch THEN the system SHALL count its lançado as 0 and mark the day blank.
 4. The system SHALL show the screen as Informe de vendas at /management/sales-report for Gestor and Gerente.
@@ -82,7 +82,7 @@ O gestor lança, à mão, as vendas brutas de cada quiosque no painel do shoppin
 11. WHEN a past day is on the calendar THEN the system SHALL show a Vendido badge and a Lançado badge. The Lançado badge SHALL be green when the two amounts are equal and red when they differ.
 12. IF the mall answers that the login was not accepted THEN the system SHALL keep the stored shopping values and SHALL NOT call the mall again only because the report was opened.
 13. WHEN the mall login requires the browser verification THEN the system SHALL open that login page in a browser session before posting the password.
-14. WHEN the person selects Semanal THEN the system SHALL show Vendido, Lançado and Diferença for the closed days of the selected mall period. WHEN the person selects Mensal THEN the system SHALL show those amounts for the closed days of the month.
+14. WHEN the person selects Semanal THEN the system SHALL show Vendido, Lançado and Diferença for the closed days of the selected mall period, SHALL show only those days on the calendar, and SHALL list the mall periods in the period control with the selected range, such as 11 a 17 de Outubro. WHEN the person selects Mensal THEN the system SHALL show those amounts for the closed days of the month.
 15. WHEN every closed day of the open month already has a stored launch THEN the system SHALL NOT open the mall browser.
 
 **Independent Test**: Mês com um dia vendido a R$ 100,00 e lançado a R$ 120,00, e outro vendido a R$ 50,00 sem lançamento. Vendido R$ 150,00, lançado R$ 120,00, diferença R$ 30,00 a menos.

@@ -40,14 +40,14 @@ A madrugada informa as vendas brutas dos quiosques no painel do shopping e a tel
 
 - Gestão > Informe de vendas, `/management/sales-report`, depois de Sangrias. Gestor e Gerente. O item fica no menu. Loja de rua e quiosque sem Allos mostram empty state, sem esconder o item.
 - Configurações > Shopping fica no menu do Gestor. Fora de quiosque, a tela mostra que vale para quiosque em shopping.
-- Calendário do mês, no padrão de Fechamento e Sangrias. O cabeçalho tem Mensal e Semanal, no controle do calendário. Mensal soma o mês. Semanal soma o bloco da Allos selecionado (domingo a sábado, cortado no mês).
+- Calendário do mês, no padrão de Fechamento e Sangrias. O cabeçalho tem Mensal e Semanal. Mensal soma o mês e usa o seletor de mês. Semanal soma o bloco da Allos selecionado (domingo a sábado, cortado no mês). O campo mostra o intervalo, como 11 a 17 de Outubro, e a lista abre os blocos daquele mês. O calendário mostra só esses dias.
 - O Atualizar do topo, nesta tela, não pede as vendas de hoje no Millennium. Abre a Allos só se o mês ainda tiver dia passado sem lançamento. Loja de rua, filial sem acesso e Argo não chamam o painel. O filtro Semanal não muda essa trava.
-- KPIs dos dias anteriores a hoje: Vendido, Lançado, Diferença (lançado menos vendido). Os números seguem Mensal ou Semanal.
+- KPIs dos dias anteriores a hoje: Vendido, Lançado, Diferença (lançado menos vendido), sempre em reais. Diferença zero é R$ 0,00. Os números seguem Mensal ou Semanal.
 - Vendido é o total da filial (marca ALL). WEPINK e WPINK não somam de novo.
 - Abrir o informe só lê o que já está gravado. A Allos entra pelo job da madrugada ou pelo Atualizar do topo, o mesmo botão de Fechamento e Sangrias. O clique abre o login num navegador no sincronizador e reusa essa sessão, com o mesmo identificador do navegador. Um POST só com usuário e senha é recusado.
 - Dia passado sem lançamento gravado conta como zero no KPI e no badge.
 - Cada dia passado mostra o badge Vendido e o badge Lançado. Lançado verde quando os dois são iguais, vermelho quando diferem.
-- No Semanal, o calendário marca o bloco selecionado. O bloco aberto só entra nos números com os dias já fechados.
+- No Semanal, as setas trocam o bloco e o calendário passa a mostrar só os dias dele. O bloco aberto só entra nos números com os dias já fechados.
 - O Atualizar não abre o navegador se todo dia passado do mês já tem lançamento gravado. Dois cliques seguidos esperam na mesma máquina; o segundo não abre de novo se o primeiro já cobriu o mês.
 - Diferença positiva: aluguel percentual a mais. Negativa: risco de multa. Dia passado sem lançamento conta como zero lançado.
 
