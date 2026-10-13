@@ -335,7 +335,7 @@ export function SangriaPage() {
         const next = linhasForaAbertas.map((line) => ({ ...line, kind: "deposit" as const }));
         await saveSangriaLines(next);
         setLines((atual) => atual.map((row) => next.find((n) => n.id === row.id) ?? row));
-        show("Sangrias marcadas como a cobrar.", "success");
+        show("Sangrias marcadas como a receber.", "success");
       } else {
         const motivo = motivoLote.trim();
         const next = linhasBoletoAbertas.map((line) => ({ ...line, kind: "purchase" as const, note: line.note.trim() || motivo }));
@@ -479,7 +479,7 @@ function chipsDoDia(tot: SangriaAmounts, recebido: boolean, aberto: boolean): Ar
     chips.push(
       recebido
         ? { cor: "bg-ok", texto: `Recebido ${money(tot.boletoCents)}` }
-        : { cor: "bg-warn", texto: `A cobrar ${money(tot.boletoCents)}` },
+        : { cor: "bg-warn", texto: `A receber ${money(tot.boletoCents)}` },
     );
   }
   if (tot.foraCents > 0) chips.push({ cor: "bg-info", texto: `Fora ${money(tot.foraCents)}` });
@@ -546,7 +546,7 @@ function campoParaCentavos(txt: string): number | null {
 
 function ResumoMes({ aCobrar, recebido, fora, falta }: { aCobrar: number; recebido: number; fora: number; falta: number }) {
   const cards = [
-    { label: "A cobrar", value: money(aCobrar), color: "var(--t0)", tooltip: "Valor que ainda entra no próximo boleto." },
+    { label: "A receber", value: money(aCobrar), color: "var(--t0)", tooltip: "Valor das sangrias que ainda precisa ser repassado pela filial." },
     { label: "Recebido", value: money(recebido), color: "var(--t0)", tooltip: "Valor já recebido." },
     { label: "Fora do boleto", value: money(fora), color: "var(--t0)", tooltip: "Valor destinado a compras, fornecedores, premiações ou outros pagamentos." },
     { label: "Falta", value: money(falta), color: "var(--t0)", tooltip: "Valor da sangria que deveria estar no caixa e não foi encontrado." },
@@ -613,7 +613,7 @@ function DiaModal({
   );
   const metricas = [
     preview.totalCents > 0 ? { label: "Sangrias", value: money(preview.totalCents), tom: "text-t0" } : null,
-    preview.boletoCents > 0 ? { label: travado ? "Recebido" : "A cobrar", value: money(preview.boletoCents), tom: "text-t0" } : null,
+    preview.boletoCents > 0 ? { label: travado ? "Recebido" : "A receber", value: money(preview.boletoCents), tom: "text-t0" } : null,
     preview.foraCents > 0 ? { label: "Fora do boleto", value: money(preview.foraCents), tom: "text-t0" } : null,
     preview.faltaCents > 0 ? { label: "Falta", value: money(preview.faltaCents), tom: "text-bad" } : null,
   ].filter((item): item is { label: string; value: string; tom: string } => item != null);
@@ -689,7 +689,7 @@ function DiaModal({
           : day === hoje
             ? { variant: "accent" as const, texto: "Em aberto" }
             : preview.boletoCents > 0
-              ? { variant: "warning" as const, texto: "A cobrar" }
+              ? { variant: "warning" as const, texto: "A receber" }
               : null;
         return (
           <>
@@ -750,7 +750,7 @@ function DiaModal({
                     ) : (
                       <Segmented
                         options={[
-                          { value: "deposit", label: "A cobrar" },
+                          { value: "deposit", label: "A receber" },
                           { value: "purchase", label: "Fora do boleto" },
                         ]}
                         value={line.kind}
@@ -801,8 +801,8 @@ function DiaModal({
     >
       <p className="text-[13.5px] text-t1">
         {diasRecebimento <= 1
-          ? "O valor voltará para A cobrar."
-          : `Este recebimento inclui ${diasRecebimento} dias. Ao desfazer, os valores de todos eles voltarão para A cobrar.`}
+          ? "O valor voltará para A receber."
+          : `Este recebimento inclui ${diasRecebimento} dias. Ao desfazer, os valores de todos eles voltarão para A receber.`}
       </p>
     </Modal>
     </>
@@ -844,7 +844,7 @@ function MarcarComo({
       ? [
           {
             label: "Desfazer recebimento",
-            description: "Devolve o valor recebido para A cobrar.",
+            description: "Devolve o valor recebido para A receber.",
             onClick: onDesfazer,
           },
           { divider: true, label: "" },
@@ -853,17 +853,17 @@ function MarcarComo({
     {
       label: "Recebido",
       description: recebidoOk
-        ? "Registra como recebido o valor a cobrar dos dias selecionados."
+        ? "Registra como recebido o valor a receber dos dias selecionados."
         : tudoRecebido
           ? "Estes dias já foram recebidos."
-          : "Não há valor a cobrar nos dias selecionados.",
+          : "Não há valor a receber nos dias selecionados.",
       disabled: !recebidoOk,
       onClick: onRecebido,
     },
     {
-      label: "A cobrar",
+      label: "A receber",
       description: cobrarOk
-        ? "Faz as sangrias dos dias selecionados voltarem para o próximo boleto."
+        ? "Devolve as sangrias dos dias selecionados para A receber."
         : tudoRecebido
           ? "Desfaça o recebimento para alterar estes dias."
           : "Não há sangrias fora do boleto nos dias selecionados.",
@@ -876,7 +876,7 @@ function MarcarComo({
         ? "Retira do boleto as sangrias dos dias selecionados."
         : tudoRecebido
           ? "Desfaça o recebimento para alterar estes dias."
-          : "Não há sangrias a cobrar nos dias selecionados.",
+          : "Não há sangrias a receber nos dias selecionados.",
       disabled: !foraOk,
       onClick: onFora,
     },
@@ -890,7 +890,7 @@ function MarcarComo({
   return (
     <div className="flex flex-col items-start gap-1.5 lg:flex-row lg:items-center">
       <Dropdown portal align="right" menuClassName="w-[320px]" trigger={<Button>{rotulo}</Button>} items={itens} />
-      <span className="text-[13px] font-semibold text-t1">{money(valor)} a cobrar</span>
+      <span className="text-[13px] font-semibold text-t1">{money(valor)} a receber</span>
     </div>
   );
 }
@@ -936,7 +936,7 @@ function AcaoModal({
     acao === "recebido"
       ? `Marcar ${money(valor)} como recebido?`
       : acao === "aCobrar"
-        ? "Marcar como A cobrar?"
+        ? "Marcar como A receber?"
         : acao === "fora"
           ? "Fora do boleto"
           : acao === "falta"
@@ -948,7 +948,7 @@ function AcaoModal({
     acao === "recebido"
       ? "Marcar como recebido"
       : acao === "aCobrar"
-        ? "Marcar como A cobrar"
+        ? "Marcar como A receber"
         : acao === "fora"
           ? "Marcar como fora do boleto"
           : acao === "desfazer"
@@ -973,10 +973,10 @@ function AcaoModal({
       {acao === "desfazer" ? (
         <p className="text-[13.5px] text-t1">
           {recebimentos > 1
-            ? `${recebimentos} recebimentos serão desfeitos. Os valores voltam para A cobrar.`
+            ? `${recebimentos} recebimentos serão desfeitos. Os valores voltam para A receber.`
             : diasDesfazer <= 1
-              ? "O valor voltará para A cobrar."
-              : `Este recebimento inclui ${diasDesfazer} dias. Ao desfazer, os valores de todos eles voltarão para A cobrar.`}
+              ? "O valor voltará para A receber."
+              : `Este recebimento inclui ${diasDesfazer} dias. Ao desfazer, os valores de todos eles voltarão para A receber.`}
         </p>
       ) : null}
       {acao === "recebido" ? (
@@ -985,15 +985,15 @@ function AcaoModal({
       {acao === "aCobrar" ? (
         <p className="text-[13.5px] text-t1">
           {faltaNoRecebido
-            ? "As sangrias fora do boleto voltarão a entrar no boleto. Os dias já recebidos não mudam."
-            : "As sangrias dos dias selecionados voltarão a entrar no boleto."}
+            ? "As sangrias fora do boleto voltarão para A receber. Os dias já recebidos não mudam."
+            : "As sangrias dos dias selecionados voltarão para A receber."}
         </p>
       ) : null}
       {acao === "fora" ? (
         <div>
           <p className="text-[13.5px] text-t1">
             {foraNoRecebido
-              ? "As sangrias a cobrar dos dias selecionados ficarão fora do boleto. Os dias já recebidos não mudam."
+              ? "As sangrias a receber dos dias selecionados ficarão fora do boleto. Os dias já recebidos não mudam."
               : "Todas as sangrias dos dias selecionados ficarão fora do boleto."}
           </p>
           <p className="mt-3 text-[12.5px] font-bold text-t0">Motivo</p>
