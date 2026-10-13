@@ -9,6 +9,7 @@ import { fillAllosWeek, forceLaunchAllowed, informedStoredValues, informedWeekId
 
 const KEEP = "Não foi possível lançar no shopping. Os valores já informados foram mantidos.";
 const READ_FAIL = "Não foi possível ler o que já está no shopping. Nada foi alterado.";
+const LOGIN_FAIL = "A Allos não deixou a WDash entrar. O painel exige uma verificação que só acontece no navegador. Nada foi alterado no shopping.";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -148,6 +149,7 @@ async function openAllos(
   form.set(fields.password, password);
   const logged = await browse(jar, `${base}/db/autentica.asp`, { method: "POST", body: form.toString(), headers: { "Content-Type": "application/x-www-form-urlencoded" } });
   if (!logged || challenge(logged)) return { ok: false, message: fail };
+  if (/n[aã]o foi poss[ií]vel efetuar o seu login/i.test(logged)) return { ok: false, message: LOGIN_FAIL };
   const list = await browse(jar, `${base}/loja/vendas-s4/vendas.asp`);
   if (!list || challenge(list)) return { ok: false, message: fail };
   const weekIds = informedWeekIds(list);

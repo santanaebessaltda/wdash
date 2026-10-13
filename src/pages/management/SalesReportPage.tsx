@@ -4,7 +4,7 @@ import { Alert, Card, Skeleton, useToast } from "@/components/ui";
 import { ChipDia, monthNavBtn, PlainKpi, SeletorMesAno, Seta } from "@/pages/cash-close/CashClosePage";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { fetchSalesCoverage, fetchSalesDayAggs } from "@/data/wedash/salesRepo";
-import { fetchLaunchedDays, fetchShoppingAccount, requestShoppingLaunch, requestShoppingRead, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
+import { fetchLaunchedDays, fetchShoppingAccount, requestShoppingLaunch, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
 import { forceLaunchAllowed, monthReport, reportDays, sumSoldByDay } from "@/data/wedash/shoppingReport";
 import { brlCent, deIso, fimDoMes, inicioDoMes, intervaloDias, somarDias } from "@/lib/format";
 import { cn } from "@/lib/cn";
@@ -70,8 +70,6 @@ export function SalesReportPage() {
   const [loaded, setLoaded] = useState("");
   const [erro, setErro] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
-  const [lendo, setLendo] = useState(false);
-  const leitura = useRef("");
 
   const loja = lojas[0];
   const lojaRef = useRef(loja);
@@ -161,33 +159,6 @@ export function SalesReportPage() {
   const porDia = useMemo(() => new Map(dias.map((day) => [day.date, day])), [dias]);
   const semLeitura = dias.length > 0 && dias.every((day) => day.launchedCents == null);
 
-  useEffect(() => {
-    if (!pronto || !loja || account?.administrator !== "allos") return;
-    const chave = loja.id;
-    if (leitura.current === chave) return;
-    leitura.current = chave;
-    let cancel = false;
-    setLendo(true);
-    void requestShoppingRead(loja.id)
-      .then((result) => {
-        if (cancel) return;
-        if (!result.ok) {
-          show(result.message, "danger");
-          return;
-        }
-        setReloadKey((n) => n + 1);
-      })
-      .catch(() => {
-        if (!cancel) show("Não foi possível ler o que já está no shopping. Nada foi alterado.", "danger");
-      })
-      .finally(() => {
-        if (!cancel) setLendo(false);
-      });
-    return () => {
-      cancel = true;
-    };
-  }, [pronto, loja, account?.administrator, show]);
-
   function irParaMes(alvo: string) {
     const mes = inicioDoMes(alvo);
     if (mes < piso || mes > inicioDoMes(hoje)) return;
@@ -237,10 +208,10 @@ export function SalesReportPage() {
           <>
             <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
               <PlainKpi label="Vendido" value={money(resumo.soldCents)} color="var(--t0)" />
-              <PlainKpi label="Lançado" value={lendo && semLeitura ? "Lendo…" : semLeitura ? "—" : money(resumo.launchedCents)} color="var(--t0)" />
+              <PlainKpi label="Lançado" value={semLeitura ? "—" : money(resumo.launchedCents)} color="var(--t0)" />
               <PlainKpi
                 label="Diferença"
-                value={lendo && semLeitura ? "Lendo…" : semLeitura ? "Ainda não lido" : textoDiferenca(resumo.differenceCents)}
+                value={semLeitura ? "Ainda não lido" : textoDiferenca(resumo.differenceCents)}
                 color={semLeitura ? "var(--t2)" : resumo.differenceCents === 0 ? "var(--ok)" : "var(--bad)"}
                 tooltip="Lançado menos vendido. Positivo é aluguel percentual a mais. Negativo é risco de multa. Dia passado sem lançamento conta como zero."
               />

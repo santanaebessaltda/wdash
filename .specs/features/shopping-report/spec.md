@@ -80,7 +80,7 @@ O gestor lança, à mão, as vendas brutas de cada quiosque no painel do shoppin
 9. IF the mall save fails THEN the system SHALL keep the stored shopping values.
 10. WHERE the day has a brand ALL row THEN the system SHALL use that row as Vendido and SHALL NOT add WEPINK or WPINK on top of it.
 11. WHEN a past day is on the calendar THEN the system SHALL show a Vendido badge and a Lançado badge. The Lançado badge SHALL be green when the two amounts are equal and red when they differ.
-12. WHEN Informe de vendas opens for a kiosk with Allos saved THEN the system SHALL read the informed values already in the mall and SHALL NOT post a sale during that read.
+12. IF the mall answers that the login was not accepted THEN the system SHALL keep the stored shopping values and SHALL NOT call the mall again only because the report was opened.
 
 **Independent Test**: Mês com um dia vendido a R$ 100,00 e lançado a R$ 120,00, e outro vendido a R$ 50,00 sem lançamento. Vendido R$ 150,00, lançado R$ 120,00, diferença R$ 30,00 a menos.
 
