@@ -7,7 +7,7 @@ import { corsHeaders, serve } from "../_shared/cors.ts";
 import { canAccessStore, loadStaffCaller } from "../_shared/staffAuth.ts";
 import { forceLaunchAllowed } from "../_shared/shoppingFill.ts";
 
-const KEEP = "Não foi possível lançar no shopping. Os valores já informados foram mantidos.";
+const KEEP = "Não foi possível informar as vendas ao shopping. Os valores já informados foram mantidos.";
 const OFF = "O lançamento no shopping ainda não está ligado neste ambiente. Nada foi alterado.";
 
 function json(body: unknown, status = 200) {

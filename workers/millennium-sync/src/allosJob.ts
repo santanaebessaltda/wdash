@@ -4,8 +4,8 @@ import { allosBrowserCookies, chromePath } from "./allosBrowser.ts";
 import { postAllosWeeks, readAllosWeeks } from "./allosFill.ts";
 import { decryptPassword } from "./decrypt.ts";
 
-const KEEP = "Não foi possível lançar no shopping. Os valores já informados foram mantidos.";
-const LOGIN_FAIL = "A Allos não deixou a WDash entrar. O painel exige uma verificação que só acontece no navegador. Nada foi alterado no shopping.";
+const KEEP = "Não foi possível informar as vendas ao shopping. Os valores já informados foram mantidos.";
+const LOGIN_FAIL = "Não foi possível acessar a Allos porque o painel solicitou uma verificação no navegador. Nada foi alterado.";
 
 let tail: Promise<unknown> = Promise.resolve();
 
@@ -92,7 +92,7 @@ async function runShoppingNow(
     if (pending.length === 0) return { ok: true, message: ALREADY_LAUNCHED };
     if (selected.length > 0) only = new Set(pending);
   }
-  let message = read ? "Não foi possível ler o que já está no shopping. Nada foi alterado." : KEEP;
+  let message = read ? "Não foi possível ler os valores informados no shopping. Nada foi alterado." : KEEP;
   try {
     const password = await decryptPassword(String(account?.secret_ciphertext ?? ""), erpSecret);
     const baseUrl = String(account?.base_url ?? "");
@@ -129,7 +129,7 @@ async function runShoppingNow(
     }
   } catch (error) {
     console.warn(`Allos: ${error instanceof Error ? error.message : "falha"}`);
-    message = read ? "Não foi possível ler o que já está no shopping. Nada foi alterado." : KEEP;
+    message = read ? "Não foi possível ler os valores informados no shopping. Nada foi alterado." : KEEP;
   }
   await sb.from("store_shopping").update({ last_run_at: new Date().toISOString(), last_error: message }).eq("store_id", storeId);
   return { ok: false, message };

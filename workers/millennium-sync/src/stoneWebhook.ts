@@ -103,7 +103,7 @@ export function startStoneWebhook(opts: {
           const record = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
           const storeId = typeof record.storeId === "string" ? record.storeId : "";
           if (!storeId) {
-            sendJson(res, { ok: false, message: "Não foi possível lançar no shopping. Os valores já informados foram mantidos." });
+            sendJson(res, { ok: false, message: "Não foi possível informar as vendas ao shopping. Os valores já informados foram mantidos." });
             return;
           }
           const result = await opts.onShopping?.({

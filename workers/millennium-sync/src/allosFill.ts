@@ -7,9 +7,9 @@ import {
 } from "../../../src/data/wedash/shoppingReport.ts";
 import { seedCookieJar } from "./allosAuth.ts";
 
-const KEEP = "Não foi possível lançar no shopping. Os valores já informados foram mantidos.";
-const READ_FAIL = "Não foi possível ler o que já está no shopping. Nada foi alterado.";
-const LOGIN_FAIL = "A Allos não deixou a WDash entrar. O painel exige uma verificação que só acontece no navegador. Nada foi alterado no shopping.";
+const KEEP = "Não foi possível informar as vendas ao shopping. Os valores já informados foram mantidos.";
+const READ_FAIL = "Não foi possível ler os valores informados no shopping. Nada foi alterado.";
+const LOGIN_FAIL = "Não foi possível acessar a Allos porque o painel solicitou uma verificação no navegador. Nada foi alterado.";
 
 export type AllosResult = { ok: true; days: LaunchValue[] } | { ok: false; message: string };
 

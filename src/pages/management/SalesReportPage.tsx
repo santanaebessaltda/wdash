@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Alert, Button, Card, DateRangePicker, Skeleton, useToast, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
+import { Alert, Button, Card, DateRangePicker, Modal, Skeleton, useToast, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
 import { ChipDia, PlainKpi } from "@/pages/cash-close/CashClosePage";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { periodLabels } from "@/data/wedash/dashboard";
 import { fetchSalesCoverage, fetchSalesDayAggs } from "@/data/wedash/salesRepo";
 import { fetchLaunchedDays, fetchShoppingAccount, requestShoppingLaunch, requestShoppingRead, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
-import { ALREADY_LAUNCHED, forceLaunchAllowed, monthReport, reportDays, sumSoldByDay } from "@/data/wedash/shoppingReport";
+import { ALREADY_LAUNCHED, forceLaunchAllowed, informedGap, monthReport, reportDays, sumSoldByDay } from "@/data/wedash/shoppingReport";
 import { brlCent, deIso, fimDoMes, inicioDoMes, intervaloDias, paraIso, somarDias } from "@/lib/format";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { cn } from "@/lib/cn";
@@ -39,9 +39,17 @@ function valorDiferenca(cents: number): string {
 }
 
 function corDaDiferenca(cents: number): string {
-  if (cents > 0) return "var(--ok)";
+  if (cents > 0) return "var(--warn)";
   if (cents < 0) return "var(--bad)";
   return "var(--t0)";
+}
+
+function statusDoDia(soldCents: number, informedCents: number | null): { texto: string; cor: string } {
+  const gap = informedGap(soldCents, informedCents);
+  if (gap === "missing") return { texto: "Não informado", cor: "bg-chip-gray" };
+  if (gap === "match") return { texto: "Conferido", cor: "bg-ok" };
+  if (gap === "over") return { texto: `${money(informedCents! - soldCents)} a mais`, cor: "bg-warn" };
+  return { texto: `${money(soldCents - informedCents!)} a menos`, cor: "bg-bad" };
 }
 
 function celulasDoIntervalo(from: string, to: string): Array<string | null> {
@@ -72,6 +80,7 @@ export function SalesReportPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [marcados, setMarcados] = useState<string[]>([]);
   const [lancando, setLancando] = useState(false);
+  const [confirmar, setConfirmar] = useState(false);
 
   const loja = lojas[0];
   const lojaRef = useRef(loja);
@@ -136,7 +145,7 @@ export function SalesReportPage() {
   const puxar = useCallback(async () => {
     const atual = lojaRef.current;
     if (escolher || !atual) {
-      show("Escolha uma filial para ler o shopping.", "danger");
+      show("Escolha uma filial para atualizar o informe de vendas.", "danger");
       return;
     }
     const gate = forceLaunchAllowed({
@@ -155,7 +164,7 @@ export function SalesReportPage() {
   const lancar = useCallback(async () => {
     const atual = lojaRef.current;
     if (lancando || escolher || !atual) {
-      if (escolher || !atual) show("Escolha uma filial para lançar no shopping.", "danger");
+      if (escolher || !atual) show("Escolha uma filial para informar as vendas ao shopping.", "danger");
       return;
     }
     const gate = forceLaunchAllowed({
@@ -180,13 +189,13 @@ export function SalesReportPage() {
     if (!result.ok) show(result.message, "danger");
     else {
       setMarcados([]);
-      show(result.message ?? "Vendas lançadas no shopping.", "success");
+      show(result.message ?? "Vendas informadas ao shopping.", "success");
     }
   }, [escolher, hoje, lancando, show]);
 
   useScreenRefresh({
-    label: "Atualizar vendas e lançamentos",
-    tip: "Busca as vendas de hoje e lê o que já está lançado no shopping. Não lança venda.",
+    label: "Atualizar vendas e valores informados",
+    tip: "Busca as vendas de hoje no Millennium e lê os valores já informados ao shopping.",
     status: refreshMomentTitle(pronto ? (account?.lastRunAt ?? null) : undefined),
     busyLabel: "Lendo o shopping…",
     sales: true,
@@ -224,7 +233,7 @@ export function SalesReportPage() {
       <SectionHeader
         section="Gestão"
         title="Informe de vendas"
-        subtitle="Compare o que a filial vendeu com o que foi lançado no shopping."
+        subtitle="Compare o faturamento da filial com os valores informados ao shopping."
         actions={
           <HeaderFilters>
             <div className="flex flex-wrap items-center gap-2">
@@ -236,8 +245,8 @@ export function SalesReportPage() {
                 activePresetId={presetId}
                 onChange={([inicio, fim], meta) => aplicarIntervalo(inicio, fim, meta)}
               />
-              <Button onClick={() => void lancar()} disabled={lancando || paraLancar.length === 0}>
-                {lancando ? "Lançando…" : paraLancar.length === 0 ? "Lançar" : paraLancar.length === 1 ? "Lançar · 1 dia" : `Lançar · ${paraLancar.length} dias`}
+              <Button onClick={() => setConfirmar(true)} disabled={lancando || paraLancar.length === 0}>
+                {lancando ? "Informando…" : paraLancar.length === 0 ? "Informar vendas" : paraLancar.length === 1 ? "Informar vendas · 1 dia" : `Informar vendas · ${paraLancar.length} dias`}
               </Button>
             </div>
           </HeaderFilters>
@@ -258,27 +267,31 @@ export function SalesReportPage() {
           </Card>
         ) : !quiosque ? (
           <Card>
-            <EmptyBlock icon="🏬" title="Quiosque em shopping" description="Esta tela vale para filial que é quiosque em shopping." />
+            <EmptyBlock icon="🏬" title="Informe de vendas indisponível" description="Esta tela está disponível apenas para filiais do tipo Quiosque em shopping." />
+          </Card>
+        ) : account?.administrator === "argo" ? (
+          <Card>
+            <EmptyBlock icon="🏬" title="Argo ainda não disponível" description="A integração com a Argo ainda não está disponível na WDash." />
           </Card>
         ) : account?.administrator !== "allos" ? (
           <Card>
             <EmptyBlock
               icon="🏬"
-              title="Allos não conectada"
-              description={gestor ? "Conecte a administradora desta filial para informar as vendas no shopping." : "O Gestor ainda não conectou a administradora desta filial."}
-              action={gestor ? <Button onClick={() => navigate(paths.operation.shopping)}>Conectar a Allos</Button> : undefined}
+              title="Administradora não configurada"
+              description={gestor ? "Configure a administradora desta filial para informar as vendas ao shopping." : "O Gestor ainda não configurou a administradora desta filial."}
+              action={gestor ? <Button onClick={() => navigate(paths.operation.shopping)}>Configurar shopping</Button> : undefined}
             />
           </Card>
         ) : (
           <>
             <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
               <PlainKpi label="Vendido" value={money(resumo.soldCents)} color="var(--t0)" />
-              <PlainKpi label="Lançado" value={money(resumo.launchedCents)} color="var(--t0)" />
+              <PlainKpi label="Informado" value={money(resumo.launchedCents)} color="var(--t0)" />
               <PlainKpi
                 label="Diferença"
                 value={valorDiferenca(resumo.differenceCents)}
                 color={corDaDiferenca(resumo.differenceCents)}
-                tooltip="Lançado menos vendido. Positivo é aluguel percentual a mais. Negativo é risco de multa. Dia passado sem lançamento conta como zero."
+                tooltip="Informado − vendido. Valor a mais pode aumentar o aluguel percentual; valor a menos pode gerar divergência na auditoria."
               />
             </div>
             <div className="overflow-x-auto rounded-[18px] border border-line bg-bg-2 shadow-[var(--shadow-vela)]">
@@ -292,7 +305,9 @@ export function SalesReportPage() {
                   ))}
                 </div>
                 <div className="grid grid-cols-7">
-                  {cells.map((day, i) => (
+                  {cells.map((day, i) => {
+                    const row = day ? porDia.get(day) : undefined;
+                    return (
                     <DiaCelula
                       key={day ?? `vazio-${i}`}
                       index={i}
@@ -300,15 +315,34 @@ export function SalesReportPage() {
                       hoje={hoje}
                       marcado={day != null && marcados.includes(day)}
                       onToggle={toggleDia}
-                      row={day ? porDia.get(day) : undefined}
+                      vendido={row ? row.soldCents : day === hoje ? (sold[day] ?? 0) : null}
+                      informado={row ? row.launchedCents : null}
                     />
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
           </>
         )}
       </div>
+      <Modal
+        open={confirmar}
+        onClose={() => { if (!lancando) setConfirmar(false); }}
+        title="Informar vendas ao shopping?"
+        size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setConfirmar(false)} disabled={lancando}>Cancelar</Button>
+            <Button onClick={() => { setConfirmar(false); void lancar(); }} disabled={lancando || paraLancar.length === 0}>Informar vendas</Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-2 text-[13.5px] leading-relaxed text-t1">
+          <p>{paraLancar.length === 1 ? "O valor vendido em 1 dia será informado ao shopping." : `Os valores vendidos em ${paraLancar.length} dias serão informados ao shopping.`}</p>
+          <p className="text-t2">Dias que já têm valor informado não serão alterados.</p>
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -319,14 +353,16 @@ function DiaCelula({
   hoje,
   marcado,
   onToggle,
-  row,
+  vendido,
+  informado,
 }: {
   index: number;
   day: string | null;
   hoje: string;
   marcado: boolean;
   onToggle: (day: string) => void;
-  row?: { soldCents: number; launchedCents: number | null };
+  vendido: number | null;
+  informado: number | null;
 }) {
   const borda = cn(
     "relative flex min-h-[108px] w-full min-w-0 flex-col items-stretch justify-start border-b border-r border-line p-1.5 text-left sm:min-h-[132px] sm:p-2",
@@ -336,8 +372,9 @@ function DiaCelula({
   );
   if (!day) return <div className={borda} />;
   const passado = day < hoje;
-  const lancado = row?.launchedCents ?? 0;
-  const igual = row != null && lancado === row.soldCents;
+  const hojeDia = day === hoje;
+  const pendente = passado && informedGap(vendido ?? 0, informado) === "missing";
+  const status = passado && vendido != null ? statusDoDia(vendido, informado) : null;
   return (
     <div className={borda}>
       {marcado ? <span aria-hidden className="pointer-events-none absolute inset-0 z-10 border border-acc" /> : null}
@@ -345,12 +382,12 @@ function DiaCelula({
         <span
           className={cn(
             "inline-flex h-6 w-6 shrink-0 items-center justify-center self-start rounded-full text-[12px] font-bold",
-            day === hoje ? "bg-acc text-white" : passado ? "text-t1" : "text-t2",
+            hojeDia ? "bg-acc text-white" : passado ? "text-t1" : "text-t2",
           )}
         >
           {deIso(day).getDate()}
         </span>
-        {passado ? (
+        {pendente ? (
           <input
             type="checkbox"
             aria-label={`Marcar ${deIso(day).getDate()}`}
@@ -361,12 +398,10 @@ function DiaCelula({
           />
         ) : null}
       </span>
-      {row ? (
-        <>
-          <ChipDia cor="bg-chip-gray">{`Vendido ${money(row.soldCents)}`}</ChipDia>
-          <ChipDia cor={igual ? "bg-ok" : "bg-bad"}>{`Lançado ${money(lancado)}`}</ChipDia>
-        </>
-      ) : null}
+      {passado && vendido != null ? <p className="mt-1 truncate text-[12px] font-bold text-t0">{money(vendido)}</p> : null}
+      {hojeDia ? <p className="mt-1 truncate text-[12px] font-bold text-t0">{money(vendido ?? 0)}</p> : null}
+      {status ? <ChipDia cor={status.cor}>{status.texto}</ChipDia> : null}
+      {hojeDia ? <p className="mt-1 text-[11px] font-semibold text-t2">Em aberto</p> : null}
     </div>
   );
 }

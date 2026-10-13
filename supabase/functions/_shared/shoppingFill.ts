@@ -74,10 +74,10 @@ export function forceLaunchAllowed(input: {
   kiosk: boolean;
   administrator: ShoppingAdministrator | null;
 }): { ok: true } | { ok: false; message: string } {
-  if (!input.kiosk) return { ok: false, message: "O informe de vendas vale para quiosque em shopping." };
-  if (input.administrator == null) return { ok: false, message: "O Gestor ainda não configurou o shopping desta filial." };
+  if (!input.kiosk) return { ok: false, message: "Esta tela está disponível apenas para filiais do tipo Quiosque em shopping." };
+  if (input.administrator == null) return { ok: false, message: "O Gestor ainda não configurou a administradora desta filial." };
   if (input.administrator === "argo") {
-    return { ok: false, message: "O envio da Argo ainda não está disponível. Nada foi alterado no shopping." };
+    return { ok: false, message: "A integração com a Argo ainda não está disponível na WDash." };
   }
   return { ok: true };
 }

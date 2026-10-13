@@ -9,6 +9,7 @@ import {
   informedStoredValues,
   ALREADY_LAUNCHED,
   allosPeriods,
+  informedGap,
   monthReport,
   periodReports,
   unlaunchedDays,
@@ -173,6 +174,15 @@ describe("reportDays", () => {
   });
 });
 
+describe("informedGap", () => {
+  it("keeps a missing day apart from a stored zero", () => {
+    expect(informedGap(0, null)).toBe("missing");
+    expect(informedGap(0, 0)).toBe("match");
+    expect(informedGap(10000, 12000)).toBe("over");
+    expect(informedGap(10000, 8000)).toBe("under");
+  });
+});
+
 describe("shoppingMenu", () => {
   it("keeps the report and the shopping settings in the menu", () => {
     expect(shoppingMenu()).toEqual({ settings: true, report: true });
@@ -183,15 +193,15 @@ describe("forceLaunchAllowed", () => {
   it("blocks a street store, a kiosk without access, and Argo", () => {
     expect(forceLaunchAllowed({ kiosk: false, administrator: "allos" })).toEqual({
       ok: false,
-      message: "O informe de vendas vale para quiosque em shopping.",
+      message: "Esta tela está disponível apenas para filiais do tipo Quiosque em shopping.",
     });
     expect(forceLaunchAllowed({ kiosk: true, administrator: null })).toEqual({
       ok: false,
-      message: "O Gestor ainda não configurou o shopping desta filial.",
+      message: "O Gestor ainda não configurou a administradora desta filial.",
     });
     expect(forceLaunchAllowed({ kiosk: true, administrator: "argo" })).toEqual({
       ok: false,
-      message: "O envio da Argo ainda não está disponível. Nada foi alterado no shopping.",
+      message: "A integração com a Argo ainda não está disponível na WDash.",
     });
     expect(forceLaunchAllowed({ kiosk: true, administrator: "allos" })).toEqual({ ok: true });
   });

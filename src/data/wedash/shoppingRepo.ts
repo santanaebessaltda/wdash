@@ -4,7 +4,7 @@ export type ShoppingAccount = NonNullable<ReturnType<typeof shoppingAccountView>
 
 export type ShoppingLaunchResult = { ok: true; message?: string } | { ok: false; message: string };
 
-const FAIL = "Não foi possível lançar no shopping. Os valores já informados foram mantidos.";
+const FAIL = "Não foi possível informar as vendas ao shopping. Os valores já informados foram mantidos.";
 const SAVE_FAIL = "Não foi possível salvar o acesso do shopping. Tente novamente.";
 
 /** Acesso da filial. A senha não vem nesta leitura. */
@@ -56,7 +56,7 @@ export async function saveShoppingAccount(input: {
   return { ok: true };
 }
 
-const READ_FAIL = "Não foi possível ler o que já está no shopping. Nada foi alterado.";
+const READ_FAIL = "Não foi possível ler os valores informados no shopping. Nada foi alterado.";
 
 /** Lê a linha Informada já salva. Não envia venda. */
 export async function requestShoppingRead(storeId: string): Promise<ShoppingLaunchResult> {

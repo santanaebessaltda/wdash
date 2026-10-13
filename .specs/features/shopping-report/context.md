@@ -39,22 +39,21 @@ A madrugada informa as vendas brutas dos quiosques no painel do shopping e a tel
 ### Tela
 
 - Gestão > Informe de vendas, `/management/sales-report`, depois de Sangrias. Gestor e Gerente. O item fica no menu. Loja de rua e quiosque sem Allos mostram empty state, sem esconder o item.
-- Configurações > Shopping fica no menu do Gestor. Fora de quiosque, a tela mostra que vale para quiosque em shopping.
+- Configurações > Shopping fica no menu do Gestor. Fora de quiosque, a tela mostra que está disponível apenas para Quiosque em shopping. O card da Allos fica Configurado ou Não configurado: salvar o acesso não testa o login.
 - Calendário no padrão de Fechamento e Sangrias. O campo de período é o mesmo das outras telas: Hoje, Ontem, Esta semana, Este mês, Este trimestre, Este semestre e Este ano. Ao abrir, o período é Este mês, do dia 1 até hoje, e o calendário mostra só esses dias. Os totais seguem os dias fechados do intervalo.
-- O Atualizar do topo busca as vendas de hoje e abre a Allos só para ler o que já está lançado. Não grava venda. O botão Lançar, na tela, envia só os dias passados marcados que ainda não têm lançamento. Loja de rua, filial sem acesso e Argo não chamam o painel.
-- KPIs dos dias anteriores a hoje: Vendido, Lançado, Diferença (lançado menos vendido), sempre em reais. Diferença zero é R$ 0,00. Os números seguem Mensal ou Semanal.
+- O Atualizar do topo busca as vendas de hoje no Millennium e lê os valores já informados ao shopping. Não informa venda nova. O botão Informar vendas pede confirmação e envia só os dias passados marcados que ainda não têm valor. A caixa só aparece nesses dias. Loja de rua, filial sem acesso e Argo não chamam o painel.
+- KPIs dos dias anteriores a hoje: Vendido, Informado, Diferença (informado menos vendido), sempre em reais. Diferença zero é R$ 0,00 em cor neutra. A mais é âmbar. A menos é vermelho.
 - Vendido é o total da filial (marca ALL). WEPINK e WPINK não somam de novo.
-- Abrir o informe só lê o que já está gravado. A Allos entra pelo job da madrugada ou pelo Atualizar do topo, o mesmo botão de Fechamento e Sangrias. O clique abre o login num navegador no sincronizador e reusa essa sessão, com o mesmo identificador do navegador. Um POST só com usuário e senha é recusado.
-- Dia passado sem lançamento gravado conta como zero no KPI e no badge.
-- Cada dia passado mostra o badge Vendido e o badge Lançado. Lançado verde quando os dois são iguais, vermelho quando diferem.
-- O calendário mostra só os dias do intervalo. O dia de hoje e o futuro seguem vazios.
-- O Atualizar não abre o navegador se todo dia passado do mês já tem lançamento gravado. Dois cliques seguidos esperam na mesma máquina; o segundo não abre de novo se o primeiro já cobriu o mês.
-- Diferença positiva: aluguel percentual a mais. Negativa: risco de multa. Dia passado sem lançamento conta como zero lançado.
+- Abrir o informe só lê o que já está gravado. A Allos entra pelo job da madrugada ou pelo botão Informar vendas. O Atualizar abre o login num navegador no sincronizador só para ler. Um POST só com usuário e senha é recusado.
+- Dia passado sem valor gravado aparece como Não informado. Zero gravado, com vendido zero, é Conferido.
+- Cada dia passado mostra o vendido e um status: Conferido, Não informado, a mais ou a menos. Hoje mostra o faturamento e Em aberto. O futuro fica vazio.
+- O Informar vendas não abre o navegador se nenhum dia marcado está sem valor. Dois cliques seguem na mesma máquina.
+- Diferença a mais: aluguel percentual a mais. A menos: risco de divergência na auditoria. No total, dia sem valor informado conta como zero. No dia, não vira R$ 0,00 informado.
 
 ### Agent's Discretion
 
 - Onde cifrar a senha, desde que o padrão seja o da chave da adquirente.
-- O texto curto do dia no calendário ficou definido: badge Vendido e badge Lançado.
+- O texto curto do dia no calendário ficou definido: o vendido e um status (Conferido, Não informado, a mais ou a menos).
 
 ### Declined / Undiscussed Gray Areas → Assumptions
 

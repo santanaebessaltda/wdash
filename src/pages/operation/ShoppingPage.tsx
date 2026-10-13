@@ -47,7 +47,7 @@ export function ShoppingPage() {
   }, [lojasLoading, escolher, loja, session.tenantId]);
 
   const conectado = account != null;
-  const estado = conectado ? "Conectado" : "Não configurado";
+  const estado = conectado ? "Configurado" : "Não configurado";
   const tom = conectado ? "text-ok" : "text-t2";
   const dot = conectado ? "bg-ok" : "bg-t2";
 
@@ -56,7 +56,7 @@ export function ShoppingPage() {
       <SectionHeader
         section="Configurações"
         title="Shopping"
-        subtitle="Conecte a Allos desta filial para informar as vendas no shopping."
+        subtitle="Configure o acesso à administradora do shopping desta filial."
       />
       {escolher ? (
         <div className="mt-6 max-w-[720px]">
@@ -84,7 +84,7 @@ export function ShoppingPage() {
             </Card>
           ) : loja.pointType !== "SHOPPING" ? (
             <Card>
-              <EmptyBlock icon="🏬" title="Quiosque em shopping" description="Esta tela vale para filial que é quiosque em shopping." />
+              <EmptyBlock icon="🏬" title="Shopping indisponível" description="Esta tela está disponível apenas para filiais do tipo Quiosque em shopping." />
             </Card>
           ) : (
             <Card>
@@ -103,7 +103,7 @@ export function ShoppingPage() {
                   {estado}
                 </span>
                 <Button size="sm" onClick={() => setAberto(true)} disabled={!loja}>
-                  {conectado ? "Gerenciar" : "Conectar"}
+                  {conectado ? "Gerenciar" : "Configurar"}
                 </Button>
               </div>
             </Card>
@@ -119,7 +119,7 @@ export function ShoppingPage() {
           onSaved={(next) => {
             setAccount(next);
             window.dispatchEvent(new Event(SHOPPING_MENU_EVENT));
-            show(account ? "Allos atualizada." : "Allos conectada.", "success");
+            show(account ? "Alterações salvas." : "Acesso da Allos configurado.", "success");
             setAberto(false);
           }}
         />
@@ -197,16 +197,16 @@ function AllosModal({
             Cancelar
           </Button>
           <Button onClick={() => void conectar()} disabled={!podeConectar}>
-            {busy ? (conectado ? "Salvando…" : "Conectando…") : conectado ? "Salvar" : "Conectar"}
+            {busy ? "Salvando…" : conectado ? "Salvar alterações" : "Salvar acesso"}
           </Button>
         </>
       }
     >
       <div className="flex flex-col gap-3.5">
         <p className="text-[13.5px] leading-relaxed text-t1">
-          Informe a URL, o usuário e a senha do painel desta filial. A WDash protege a senha e a usa somente para informar as vendas.
+          Informe a URL, o usuário e a senha do painel da Allos desta filial. A WDash protege esses dados e os usa somente para informar vendas ao shopping.
         </p>
-        <FormField label="URL" required hint="Sem caminho e sem barra no final. Ex.: https://clube.allos.com.br">
+        <FormField label="URL do painel" required hint="Informe apenas o endereço principal, sem caminho adicional.">
           <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://clube.allos.com.br" disabled={busy} {...noAutofill} />
         </FormField>
         <FormField label="Usuário" required>
@@ -247,10 +247,10 @@ function AllosModal({
           </div>
         </FormField>
         {conectado ? (
-          <p className="text-[12.5px] leading-relaxed text-t2">A senha já salva aparece mascarada. Digite outra só se quiser trocar.</p>
+          <p className="text-[12.5px] leading-relaxed text-t2">Deixe em branco para manter a senha atual.</p>
         ) : (
           <Checkbox
-            label="Autorizo a WDash a usar este acesso para informar as vendas desta filial no shopping."
+            label="Autorizo a WDash a usar este acesso para informar as vendas desta filial ao shopping."
             checked={autorizo}
             onChange={(e) => setAutorizo(e.target.checked)}
             disabled={busy}

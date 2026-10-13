@@ -69,23 +69,23 @@ O gestor lança, à mão, as vendas brutas de cada quiosque no painel do shoppin
 
 **Acceptance Criteria**:
 
-1. WHEN the month is open THEN the system SHALL show Vendido, Lançado and Diferença for days before today, as currency. WHEN the difference is zero THEN the system SHALL show R$ 0,00.
-2. The system SHALL compute Diferença as lançado minus vendido, in cents.
-3. WHEN a past day has no launch THEN the system SHALL count its lançado as 0 and mark the day blank.
+1. WHEN the month is open THEN the system SHALL show Vendido, Informado and Diferença for days before today, as currency. WHEN the difference is zero THEN the system SHALL show R$ 0,00 in a neutral color. WHEN Informado is above Vendido THEN the system SHALL show the difference in amber. WHEN Informado is below Vendido THEN the system SHALL show the difference in red.
+2. The system SHALL compute Diferença as informado minus vendido, in cents.
+3. WHEN a past day has no stored informed value THEN the system SHALL show Não informado and SHALL NOT present that day as informed R$ 0,00. The Informado total SHALL treat that day as zero until a value is stored.
 4. The system SHALL show the screen as Informe de vendas at /management/sales-report for Gestor and Gerente.
 5. WHEN the selected store is not a kiosk THEN the system SHALL keep Informe de vendas in the menu and SHALL show that the screen is only for a shopping kiosk.
-6. WHEN the selected kiosk has no Allos access THEN the system SHALL keep Informe de vendas in the menu and SHALL show that the administrator is not connected.
+6. WHEN the selected kiosk has no Allos access THEN the system SHALL keep Informe de vendas in the menu and SHALL show that the administrator is not configured. WHEN the stored administrator is Argo THEN the system SHALL show that Argo is not available.
 7. WHEN the person uses Atualizar on Informe de vendas THEN the system SHALL sync today's sales and SHALL read the launched amounts already stored in the mall. The system SHALL NOT post a launch from that button.
 8. IF the store is not a kiosk, or the shopping access is not saved THEN the system SHALL not call the mall.
 9. IF the mall save fails THEN the system SHALL keep the stored shopping values.
 10. WHERE the day has a brand ALL row THEN the system SHALL use that row as Vendido and SHALL NOT add WEPINK or WPINK on top of it.
-11. WHEN a past day is on the calendar THEN the system SHALL show a Vendido badge and a Lançado badge. The Lançado badge SHALL be green when the two amounts are equal and red when they differ.
+11. WHEN a past day is on the calendar THEN the system SHALL show the sold amount and one status: Conferido when the informed amount equals sold, Não informado when no informed value is stored, the surplus in amber when informed is higher, and the shortage in red when informed is lower. A stored zero SHALL count as Conferido when sold is also zero. The system SHALL show a checkbox only on a past day that has no stored informed value.
 12. IF the mall answers that the login was not accepted THEN the system SHALL keep the stored shopping values and SHALL NOT call the mall again only because the report was opened.
 13. WHEN the mall login requires the browser verification THEN the system SHALL open that login page in a browser session before posting the password.
-14. WHEN the report is open THEN the period control SHALL offer Hoje, Ontem, Esta semana, Este mês, Este trimestre, Este semestre and Este ano, SHALL default to Este mês from the first day of the month through today, and the calendar SHALL show only the days inside that range. Vendido, Lançado and Diferença SHALL follow the closed days of that range.
-15. WHEN the person launches selected days THEN the system SHALL post only the selected past days that have no stored launch. WHEN none of those days is pending THEN the system SHALL NOT open the mall browser.
+14. WHEN the report is open THEN the period control SHALL offer Hoje, Ontem, Esta semana, Este mês, Este trimestre, Este semestre and Este ano, SHALL default to Este mês from the first day of the month through today, and the calendar SHALL show only the days inside that range. Vendido, Informado and Diferença SHALL follow the closed days of that range.
+15. WHEN the person confirms Informar vendas THEN the system SHALL post only the selected past days that have no stored informed value. WHEN none of those days is pending THEN the system SHALL NOT open the mall browser.
 
-**Independent Test**: Mês com um dia vendido a R$ 100,00 e lançado a R$ 120,00, e outro vendido a R$ 50,00 sem lançamento. Vendido R$ 150,00, lançado R$ 120,00, diferença R$ 30,00 a menos.
+**Independent Test**: Mês com um dia vendido a R$ 100,00 e informado a R$ 120,00, e outro vendido a R$ 50,00 sem valor informado. Vendido R$ 150,00, informado R$ 120,00, diferença R$ 30,00 a menos. O dia sem valor mostra Não informado, não R$ 0,00 informado.
 
 ---
 
@@ -129,5 +129,5 @@ O gestor lança, à mão, as vendas brutas de cada quiosque no painel do shoppin
 ## Success Criteria
 
 - [ ] Nenhum dia passado vazio permanece vazio depois de uma madrugada bem-sucedida.
-- [ ] A diferença do mês é lançado menos vendido, e dia sem lançamento conta como falta.
+- [ ] A diferença do mês é informado menos vendido. Dia sem valor informado não aparece como R$ 0,00 informado.
 - [ ] Um valor já presente no shopping não é substituído.

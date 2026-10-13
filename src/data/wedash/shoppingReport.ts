@@ -88,7 +88,7 @@ export function allosPeriods(from: string, to: string): Array<{ from: string; to
   return periods;
 }
 
-export const ALREADY_LAUNCHED = "Os dias passados deste mês já estão lançados. O shopping não foi aberto.";
+export const ALREADY_LAUNCHED = "Os dias passados deste período já estão informados. O shopping não foi aberto.";
 
 /** Dias anteriores a hoje, no mês, que ainda não têm lançamento gravado. */
 export function unlaunchedDays(from: string, to: string, today: string, launched: ReadonlySet<string>): string[] {
@@ -139,10 +139,10 @@ export function forceLaunchAllowed(input: {
   kiosk: boolean;
   administrator: ShoppingAdministrator | null;
 }): { ok: true } | { ok: false; message: string } {
-  if (!input.kiosk) return { ok: false, message: "O informe de vendas vale para quiosque em shopping." };
-  if (input.administrator == null) return { ok: false, message: "O Gestor ainda não configurou o shopping desta filial." };
+  if (!input.kiosk) return { ok: false, message: "Esta tela está disponível apenas para filiais do tipo Quiosque em shopping." };
+  if (input.administrator == null) return { ok: false, message: "O Gestor ainda não configurou a administradora desta filial." };
   if (input.administrator === "argo") {
-    return { ok: false, message: "O envio da Argo ainda não está disponível. Nada foi alterado no shopping." };
+    return { ok: false, message: "A integração com a Argo ainda não está disponível na WDash." };
   }
   return { ok: true };
 }
@@ -169,6 +169,14 @@ export function informedStoredValues(fields: AllosField[], today: string): Launc
     if (!isClosedDay(field.date, today)) return [];
     return [{ date: field.date, cents: field.fieldCents ?? 0 }];
   });
+}
+
+/** Dia passado sem valor gravado não é zero informado. Zero gravado é um valor real. */
+export function informedGap(soldCents: number, informedCents: number | null): "missing" | "match" | "over" | "under" {
+  if (informedCents == null) return "missing";
+  const gap = informedCents - soldCents;
+  if (gap === 0) return "match";
+  return gap > 0 ? "over" : "under";
 }
 
 /** Dias do mês anteriores a hoje. Sem lançamento gravado, o dia conta como em branco. */
