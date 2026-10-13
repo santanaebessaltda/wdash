@@ -12,7 +12,7 @@ describe("formatSalesPush", () => {
     expect(plain(text?.body)).toBe("LOJAWEPINK.CENTRO.CAMPOGRANDE · R$ 3.450,00 hoje");
   });
 
-  it("várias filiais: hoje da rede e cada filial, da que mais vendeu no intervalo para a que menos vendeu", () => {
+  it("várias filiais: hoje da rede e cada filial, da que mais vendeu no dia para a que menos vendeu", () => {
     const text = formatSalesPush([
       { name: "QUIOSQUESHOPPINGTRESLAGOAS", deltaCents: 35840, todayCents: 167660 },
       { name: "SB EMPREENDIMENTOS", deltaCents: 80400, todayCents: 312400 },
@@ -31,7 +31,7 @@ describe("formatSalesPush", () => {
     );
   });
 
-  it("filial sem venda no intervalo continua na lista, sem o sinal de mais", () => {
+  it("filial sem venda no intervalo continua na lista, no lugar do acumulado do dia", () => {
     const text = formatSalesPush([
       { name: "CENTRO", deltaCents: 50000, todayCents: 250000 },
       { name: "RUA", deltaCents: 0, todayCents: 300000 },
@@ -41,8 +41,8 @@ describe("formatSalesPush", () => {
     expect(plain(text?.body)).toBe(
       [
         "Hoje · R$ 7.850,00",
-        "CENTRO · +R$ 500,00 · R$ 2.500,00",
         "RUA · R$ 0,00 · R$ 3.000,00",
+        "CENTRO · +R$ 500,00 · R$ 2.500,00",
         "SHOPPING · R$ 0,00 · R$ 2.350,00",
       ].join("\n"),
     );
