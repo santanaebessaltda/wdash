@@ -29,7 +29,8 @@ import {
 } from "@/data/wedash/cashCloseRepo";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import {
-  cashShortageCents,
+  dayShortageCents,
+  netCloseDiff,
   withdrawalDraftFrom,
   withdrawalPeople,
   withdrawalSave,
@@ -664,7 +665,7 @@ export function CashClosePage() {
 
   const analise = useMemo(() => {
     if (marksKey !== faixaKey) return null;
-    const porDia = new Map<string, { systemCents: number; realCents: number; diffCents: number; hasMillennium: boolean; hasLines: boolean; pending: boolean }>();
+    const porDia = new Map<string, { systemCents: number; realCents: number; diffCents: number; withdrawalCents: number; hasMillennium: boolean; hasLines: boolean; pending: boolean }>();
     const rows: Array<{ day: string; systemCents: number; realCents: number; diffCents: number; pending: boolean }> = [];
     for (const mark of marks) {
       const day = mark.day.slice(0, 10);
@@ -676,19 +677,22 @@ export function CashClosePage() {
       });
       const gap = closeDayGap(lines);
       const semReal = dayWithoutReal(lines);
+      const retirada = (review?.withdrawals ?? []).reduce((sum, row) => sum + row.cents, 0);
+      const diffCents = netCloseDiff(gap.diffCents, retirada);
       if (day < hoje) {
         rows.push({
           day,
           systemCents: gap.comparedSystemCents,
           realCents: gap.realCents,
-          diffCents: gap.diffCents,
+          diffCents,
           pending: semReal,
         });
       }
-      const atual = porDia.get(day) ?? { systemCents: 0, realCents: 0, diffCents: 0, hasMillennium: false, hasLines: false, pending: false };
+      const atual = porDia.get(day) ?? { systemCents: 0, realCents: 0, diffCents: 0, withdrawalCents: 0, hasMillennium: false, hasLines: false, pending: false };
       atual.systemCents += gap.systemCents;
       atual.realCents += gap.realCents;
-      atual.diffCents += gap.diffCents;
+      atual.diffCents += diffCents;
+      atual.withdrawalCents += retirada;
       atual.hasMillennium = atual.hasMillennium || mark.snap.millennium.length > 0;
       atual.hasLines = atual.hasLines || lines.length > 0;
       atual.pending = atual.pending || semReal;
@@ -697,13 +701,13 @@ export function CashClosePage() {
     return { resumo: monthCloseSummary(rows), porDia };
   }, [marks, reviews, marksKey, faixaKey, hoje]);
 
-  function faceDoDia(day: string): { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number; aguardando?: boolean } {
+  function faceDoDia(day: string): { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number; withdrawalCents: number; aguardando?: boolean } {
     const info = analise?.porDia.get(day);
-    if (day === hoje) return { kind: "hoje", totalCents: soldToday?.cents ?? 0, diffCents: 0, aguardando: soldToday == null };
-    if (info?.pending) return { kind: "pendente", totalCents: info.systemCents, diffCents: 0 };
-    if (!info || (info.systemCents === 0 && info.realCents === 0)) return { kind: "zero", totalCents: 0, diffCents: 0 };
-    if (!info.hasMillennium && !info.hasLines) return { kind: "vazio", totalCents: 0, diffCents: 0 };
-    return { kind: "total", totalCents: info.realCents, diffCents: info.diffCents };
+    if (day === hoje) return { kind: "hoje", totalCents: soldToday?.cents ?? 0, diffCents: 0, withdrawalCents: 0, aguardando: soldToday == null };
+    if (info?.pending) return { kind: "pendente", totalCents: info.systemCents, diffCents: 0, withdrawalCents: 0 };
+    if (!info || (info.systemCents === 0 && info.realCents === 0)) return { kind: "zero", totalCents: 0, diffCents: 0, withdrawalCents: 0 };
+    if (!info.hasMillennium && !info.hasLines) return { kind: "vazio", totalCents: 0, diffCents: 0, withdrawalCents: 0 };
+    return { kind: "total", totalCents: info.realCents, diffCents: info.diffCents, withdrawalCents: info.withdrawalCents };
   }
 
   function abrirDia(iso: string) {
@@ -867,9 +871,12 @@ function chipDaDiferenca(cents: number): { cor: string; texto: string } {
   return { cor: "bg-chip-gray", texto: "Sem diferença" };
 }
 
-function dicaDoDia(face: { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number }): string | undefined {
-  if (face.kind !== "total" || face.diffCents === 0) return undefined;
-  return chipDaDiferenca(face.diffCents).texto;
+function dicaDoDia(face: { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number; withdrawalCents: number }): string | undefined {
+  if (face.kind !== "total") return undefined;
+  const partes: string[] = [];
+  if (face.diffCents !== 0) partes.push(chipDaDiferenca(face.diffCents).texto);
+  if (face.withdrawalCents > 0) partes.push(`Retirada ${brlCent(face.withdrawalCents / 100)}`);
+  return partes.length > 0 ? partes.join(" · ") : undefined;
 }
 
 function Mes({
@@ -880,7 +887,7 @@ function Mes({
 }: {
   hoje: string;
   cells: Array<string | null>;
-  faceDoDia: (day: string) => { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number; aguardando?: boolean };
+  faceDoDia: (day: string) => { kind: "vazio" | "zero" | "pendente" | "hoje" | "total"; totalCents: number; diffCents: number; withdrawalCents: number; aguardando?: boolean };
   onOpen: (iso: string) => void;
 }) {
   return (
@@ -906,7 +913,6 @@ function Mes({
           const futuro = day > hoje;
           const mostraTotal = face?.kind === "pendente" || face?.kind === "total" || (face?.kind === "hoje" && !face.aguardando);
           const dica = face ? dicaDoDia(face) : undefined;
-          const chip = face?.kind === "total" ? chipDaDiferenca(face.diffCents) : null;
           const miolo = (
             <>
               <NumeroDia iso={day} hoje={hoje} />
@@ -917,7 +923,12 @@ function Mes({
                   </p>
                   {face.kind === "pendente" && <ChipDia cor="bg-warn">Pendente</ChipDia>}
                   {face.kind === "hoje" && <ChipDia cor="bg-acc">Em aberto</ChipDia>}
-                  {chip && <ChipDia cor={chip.cor}>{chip.texto}</ChipDia>}
+                  {face.kind === "total" && (face.diffCents !== 0 || face.withdrawalCents === 0) && (
+                    <ChipDia cor={chipDaDiferenca(face.diffCents).cor}>{chipDaDiferenca(face.diffCents).texto}</ChipDia>
+                  )}
+                  {face.kind === "total" && face.withdrawalCents > 0 && (
+                    <ChipDia cor="bg-info">{`Retirada ${brlCent(face.withdrawalCents / 100)}`}</ChipDia>
+                  )}
                 </div>
               )}
             </>
@@ -1053,7 +1064,7 @@ function DiaModal({
         (withdrawalDrafts[loja.id]?.rows ?? []).map((row) => row.sellerId),
       );
       const retiro = withdrawalSave({
-        shortageCents: cashShortageCents(linesWithDraft(linhas, draft)),
+        shortageCents: dayShortageCents(closeDayGap(linesWithDraft(linhas, draft)).diffCents),
         enabled: withdrawalDrafts[loja.id]?.enabled ?? false,
         rows: withdrawalDrafts[loja.id]?.rows ?? [],
         parseCents: fieldToCents,
@@ -1180,7 +1191,7 @@ function DiaModal({
                 />
                 <EmployeeWithdrawal
                   gestor={gestor}
-                  shortageCents={cashShortageCents(linhas)}
+                  shortageCents={dayShortageCents(conta.diffCents)}
                   people={people}
                   draft={withdrawalDrafts[loja.id] ?? { enabled: false, rows: [] }}
                   onChange={(next) => setWithdrawalDrafts((atual) => ({ ...atual, [loja.id]: next }))}

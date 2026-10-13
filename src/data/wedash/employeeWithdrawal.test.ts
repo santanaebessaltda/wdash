@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  cashShortageCents,
+  dayShortageCents,
+  netCloseDiff,
   parseWithdrawalRows,
   withdrawalDraftFrom,
   withdrawalPeople,
@@ -29,15 +30,21 @@ function save(input: {
 }
 
 describe("retirada de funcionários", () => {
-  it("mede só a quebra em dinheiro", () => {
-    expect(
-      cashShortageCents([
-        { key: "cash", systemCents: 10000, typedCents: 6500 },
-        { key: "pix", systemCents: 8000, typedCents: 9000 },
-      ]),
-    ).toBe(3500);
-    expect(cashShortageCents([{ key: "cash", systemCents: 1000, typedCents: 1000 }])).toBe(0);
-    expect(cashShortageCents([{ key: "cash", systemCents: 1000, typedCents: 1400 }])).toBe(0);
+  it("abate a retirada da quebra do dia, mesmo acima do dinheiro", () => {
+    const day = -88492;
+    expect(dayShortageCents(day)).toBe(88492);
+    expect(dayShortageCents(1200)).toBe(0);
+    const saved = save({
+      shortageCents: dayShortageCents(day),
+      rows: [
+        { sellerId: "ana", amount: "50000" },
+        { sellerId: "bia", amount: "30802" },
+      ],
+    });
+    expect(saved.ok).toBe(true);
+    expect(netCloseDiff(day, 80802)).toBe(-7690);
+    expect(netCloseDiff(day, 90000)).toBe(0);
+    expect(netCloseDiff(5000, 1000)).toBe(5000);
   });
 
   it("parte a quebra entre retirada e quebra de caixa", () => {
@@ -68,14 +75,14 @@ describe("retirada de funcionários", () => {
     expect(withdrawalPreview(800, [800]).breakCents).toBe(0);
   });
 
-  it("recusa a soma acima da quebra em dinheiro", () => {
+  it("recusa a soma acima da quebra de caixa", () => {
     expect(save({ shortageCents: 1000, rows: [{ sellerId: "ana", amount: "1001" }] })).toEqual({
       ok: false,
-      message: "A retirada passa da quebra em dinheiro.",
+      message: "A retirada passa da quebra de caixa.",
     });
   });
 
-  it("ignora a opção desligada e o dia sem quebra em dinheiro", () => {
+  it("ignora a opção desligada e o dia sem quebra", () => {
     expect(save({ shortageCents: 1000, enabled: false, rows: [{ sellerId: "ana", amount: "400" }] })).toEqual({
       ok: true,
       lines: [],

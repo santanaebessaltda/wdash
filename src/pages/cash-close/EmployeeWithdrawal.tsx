@@ -58,7 +58,7 @@ export function EmployeeWithdrawal({
         label="Retirada de funcionários"
       />
       <p className="mt-1.5 text-[12.5px] leading-relaxed text-t2">
-        Descontada no holerite do mês seguinte. O que sobrar da quebra em dinheiro continua quebra de caixa.
+        Descontada no holerite do mês seguinte. O que sobrar continua quebra de caixa.
       </p>
       {draft.enabled && (
         <div className="mt-3 flex flex-col gap-2">
@@ -175,7 +175,7 @@ function Split({
   return (
     <p className={`mt-2 text-[12.5px] ${preview.overflow ? "font-bold text-bad" : "text-t2"}`}>
       {preview.overflow
-        ? "A retirada passa da quebra em dinheiro."
+        ? "A retirada passa da quebra de caixa."
         : `Retirada ${brlCent(preview.withdrawalCents / 100)} · Quebra de caixa ${brlCent(preview.breakCents / 100)}`}
     </p>
   );

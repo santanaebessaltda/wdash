@@ -20,12 +20,15 @@ export type WithdrawalPerson = {
   active: boolean;
 };
 
-/** Quebra em dinheiro do dia. Zero quando o caixa não falta. */
-export function cashShortageCents(lines: { key: string; systemCents: number; typedCents: number }[]): number {
-  const cash = lines.find((line) => line.key === "cash");
-  if (!cash) return 0;
-  const diff = cash.typedCents - cash.systemCents;
-  return diff < 0 ? -diff : 0;
+/** Quebra do dia (total real − Millennium). Zero quando o dia não falta. */
+export function dayShortageCents(diffCents: number): number {
+  return diffCents < 0 ? -diffCents : 0;
+}
+
+/** A retirada abate a quebra. O que passa dela não vira sobra. */
+export function netCloseDiff(diffCents: number, withdrawalCents: number): number {
+  if (withdrawalCents <= 0 || diffCents >= 0) return diffCents;
+  return Math.min(0, diffCents + withdrawalCents);
 }
 
 /** Ativos da loja, mais quem já tem retirada gravada mesmo tendo saído. */
@@ -111,6 +114,6 @@ export function withdrawalSave(input: {
     lines.push({ sellerId, cents: Math.round(cents) });
   }
   const total = lines.reduce((sum, line) => sum + line.cents, 0);
-  if (total > input.shortageCents) return { ok: false, message: "A retirada passa da quebra em dinheiro." };
+  if (total > input.shortageCents) return { ok: false, message: "A retirada passa da quebra de caixa." };
   return { ok: true, lines };
 }
