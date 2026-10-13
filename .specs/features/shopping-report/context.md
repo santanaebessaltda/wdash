@@ -46,7 +46,7 @@ A madrugada informa as vendas brutas dos quiosques no painel do shopping e a tel
 - Vendido é o total da filial (marca ALL). WEPINK e WPINK não somam de novo.
 - Abrir o informe só lê o que já está gravado. A Allos entra pelo job da madrugada ou pelo botão Informar vendas. O Atualizar abre o login num navegador no sincronizador só para ler. Um POST só com usuário e senha é recusado.
 - Dia passado sem valor gravado aparece como Não informado. Zero gravado aparece como Informado R$ 0,00.
-- Cada dia passado mostra Vendido e Informado. Informado verde quando bate com o vendido, âmbar quando está acima e vermelho quando está abaixo. Hoje mostra o faturamento e o chip Em aberto na cor primary, mesmo sem lançamento. O futuro fica vazio.
+- Cada dia passado com venda mostra o valor, sem a palavra Vendido, e o chip Informado. Informado verde quando bate com o vendido, âmbar quando está acima e vermelho quando está abaixo. Sem valor gravado, o dia mostra Não informado, em amarelo, com caixa, inclusive quando a venda é zero. Depois do envio, zero gravado aparece como Informado R$ 0,00. Hoje mostra o valor quando já houver venda, e o chip Em aberto na cor primary mesmo sem lançamento. O dia atual e o dia passado abrem uma modal só de consulta. O futuro fica vazio e sem clique.
 - O Informar vendas não abre o navegador se nenhum dia marcado está sem valor. Dois cliques seguem na mesma máquina.
 - Diferença a mais: aluguel percentual a mais. A menos: risco de divergência na auditoria. No total, dia sem valor informado conta como zero. No dia, não vira R$ 0,00 informado.
 

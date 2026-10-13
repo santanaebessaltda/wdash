@@ -1,6 +1,7 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Alert, Badge, Button, Card, DateRangePicker, Modal, Skeleton, Tooltip, useToast, QUICK_RANGES_CALENDARIO, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
+import { DayFace, DayMetrics, MonthCalendar, blankDayClass } from "@/components/wedash/MonthCalendar";
 import { EmployeeWithdrawal } from "@/pages/cash-close/EmployeeWithdrawal";
 import { monthCloseSpanFor, monthsTouched } from "@/data/wedash/cashCloseMonth";
 import {
@@ -50,15 +51,6 @@ import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { parseNum, SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
 import { HeaderFilters } from "@/pages/stock/shared";
 
-const DIAS = [
-  { longo: "Domingo", curto: "D" },
-  { longo: "Segunda-feira", curto: "S" },
-  { longo: "Terça-feira", curto: "T" },
-  { longo: "Quarta-feira", curto: "Q" },
-  { longo: "Quinta-feira", curto: "Q" },
-  { longo: "Sexta-feira", curto: "S" },
-  { longo: "Sábado", curto: "S" },
-];
 
 const money = (cents: number | null) => (cents == null ? "—" : brlCent(cents / 100));
 
@@ -219,20 +211,6 @@ function CloseTable({
         </table>
       </div>
     </>
-  );
-}
-
-function NumeroDia({ iso, hoje }: { iso: string; hoje: string }) {
-  const futuro = iso > hoje;
-  return (
-    <span
-      className={cn(
-        "inline-flex h-6 w-6 shrink-0 items-center justify-center self-start rounded-full text-[12px] font-bold",
-        iso === hoje ? "bg-acc text-white" : futuro ? "text-t2" : "text-t1",
-      )}
-    >
-      {deIso(iso).getDate()}
-    </span>
   );
 }
 
@@ -571,9 +549,9 @@ export function CashClosePage() {
 
   useScreenRefresh({
     label: "Atualizar vendas e fechamento",
-    tip: "Busca as vendas de hoje e os fechamentos do mês deste período.",
+    tip: "Busca as vendas de hoje e os fechamentos do período.",
     status: refreshMomentTitle(watermark ? watermark.toISOString() : watermark),
-    busyLabel: "Buscando vendas e fechamentos…",
+    busyLabel: "Atualizando…",
     sales: true,
     run: () => pedirFechamento(),
   });
@@ -735,7 +713,7 @@ export function CashClosePage() {
       <SectionHeader
         section="Gestão"
         title="Fechamento"
-        subtitle="Compare o Millennium com o total real e acompanhe sobras, quebras e pendências do mês."
+        subtitle="Compare o Millennium com o total real e acompanhe diferenças e pendências."
         actions={
           <HeaderFilters>
             <DateRangePicker
@@ -760,7 +738,7 @@ export function CashClosePage() {
           <Skeleton className="h-[520px] w-full rounded-[18px]" />
         ) : lojas.length === 0 ? (
           <Card>
-            <EmptyBlock icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
+            <EmptyBlock icon="📒" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
           </Card>
         ) : (
           <>
@@ -891,41 +869,27 @@ function Mes({
   onOpen: (iso: string) => void;
 }) {
   return (
-    <div className="overflow-x-auto rounded-[18px] border border-line bg-bg-2 shadow-[var(--shadow-vela)]">
-      <div className="min-w-[760px]">
-        <div className="grid grid-cols-7">
-          {DIAS.map((d, i) => (
-            <div key={i} className="border-b border-line px-1 py-3 text-center text-[10px] font-bold leading-tight text-t2 sm:text-[11px]">
-              <span className="hidden sm:inline">{d.longo}</span>
-              <span className="sm:hidden uppercase">{d.curto}</span>
-            </div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7">
-        {cells.map((day, i) => {
-          const face = day && day <= hoje ? faceDoDia(day) : null;
-          const borda = cn(
-            "flex min-h-[84px] w-full min-w-0 flex-col items-stretch justify-start border-b border-r border-line p-1.5 text-left sm:min-h-[110px] sm:p-2",
-            (i + 1) % 7 === 0 && "border-r-0",
-            !day && "bg-bg-1/30",
-          );
-          if (!day) return <div key={`vazio-${i}`} className={borda} />;
-          const futuro = day > hoje;
-          const mostraTotal = face?.kind === "pendente" || face?.kind === "total" || (face?.kind === "hoje" && !face.aguardando);
-          const dica = face ? dicaDoDia(face) : undefined;
-          const miolo = (
-            <>
-              <NumeroDia iso={day} hoje={hoje} />
-              {face?.kind === "hoje" && face.aguardando ? (
-                <div className="mt-1.5 w-full min-w-0">
-                  <ChipDia cor="bg-acc">Em aberto</ChipDia>
-                </div>
-              ) : null}
-              {mostraTotal && face && (
-                <div className="mt-1.5 w-full min-w-0">
-                  <p className="whitespace-nowrap font-mono text-[12px] font-extrabold text-t1 sm:text-[13px]">
-                    {brlCent(face.totalCents / 100)}
-                  </p>
+    <MonthCalendar>
+      {cells.map((day, i) => {
+        if (!day) return <div key={`vazio-${i}`} className={blankDayClass(i)} />;
+        const face = day <= hoje ? faceDoDia(day) : null;
+        const mostraTotal = face?.kind === "pendente" || face?.kind === "total" || (face?.kind === "hoje" && !face.aguardando);
+        const dica = face ? dicaDoDia(face) : undefined;
+        const aberto = Boolean(face && face.kind !== "zero" && face.kind !== "vazio");
+        return (
+          <DayFace
+            key={day}
+            index={i}
+            iso={day}
+            today={hoje}
+            openable={aberto}
+            openLabel={`Abrir ${tituloDia(day)}`}
+            title={dica}
+            onOpen={() => onOpen(day)}
+            amount={mostraTotal && face ? brlCent(face.totalCents / 100) : null}
+            badges={
+              face?.kind === "hoje" || face?.kind === "pendente" || face?.kind === "total" ? (
+                <>
                   {face.kind === "pendente" && <ChipDia cor="bg-warn">{`Pendente ${brlCent(face.totalCents / 100)}`}</ChipDia>}
                   {face.kind === "hoje" && <ChipDia cor="bg-acc">Em aberto</ChipDia>}
                   {face.kind === "total" && (face.diffCents !== 0 || face.withdrawalCents === 0) && (
@@ -934,20 +898,13 @@ function Mes({
                   {face.kind === "total" && face.withdrawalCents > 0 && (
                     <ChipDia cor="bg-info">{`Retirada ${brlCent(face.withdrawalCents / 100)}`}</ChipDia>
                   )}
-                </div>
-              )}
-            </>
-          );
-          if (futuro || face?.kind === "zero") return <div key={day} className={borda}>{miolo}</div>;
-          return (
-            <button key={day} type="button" title={dica} className={cn(borda, "hover:bg-bg-3")} onClick={() => onOpen(day)}>
-              {miolo}
-            </button>
-          );
-        })}
-        </div>
-      </div>
-    </div>
+                </>
+              ) : null
+            }
+          />
+        );
+      })}
+    </MonthCalendar>
   );
 }
 
@@ -1144,12 +1101,16 @@ function DiaModal({
         <Skeleton className="h-40 w-full" />
       ) : !fechado ? (
         <div className="flex flex-col gap-4">
-          {lojas.map((loja) => (
-            <p key={loja.id} className="text-[13px] leading-relaxed text-t2">
-              {lojas.length > 1 ? <span className="mb-1 block font-bold text-t0">{loja.fantasia}</span> : null}
-              Vendido hoje: {soldByStore ? brlCent((soldByStore[loja.id] ?? 0) / 100) : "…"}. Este dia ainda não fechou. Amanhã o valor passa a ser o do fechamento de caixa.
-            </p>
-          ))}
+          {lojas.map((loja) => {
+            const cents = soldByStore && loja.id in soldByStore ? soldByStore[loja.id] : null;
+            return (
+              <div key={loja.id}>
+                {lojas.length > 1 ? <p className="mb-2 text-[13px] font-bold text-t0">{loja.fantasia}</p> : null}
+                <DayMetrics items={[{ label: "Vendido hoje", value: cents == null ? "—" : brlCent(cents / 100) }]} />
+                <p className="text-[13px] leading-relaxed text-t2">Este dia ainda está em aberto. A diferença será calculada após o fechamento.</p>
+              </div>
+            );
+          })}
         </div>
       ) : comDados.length === 0 ? (
         <p className="text-[13.5px] leading-relaxed text-t1">Ainda não há fechamento neste dia.</p>

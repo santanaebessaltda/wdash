@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Alert, Button, Card, DateRangePicker, Modal, Skeleton, useToast, QUICK_RANGES_CALENDARIO, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
+import { Alert, Badge, Button, Card, DateRangePicker, Modal, Skeleton, useToast, QUICK_RANGES_CALENDARIO, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
+import { DayFace, DayMetrics, MonthCalendar, blankDayClass } from "@/components/wedash/MonthCalendar";
 import { ChipDia, PlainKpi } from "@/pages/cash-close/CashClosePage";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { periodLabels } from "@/data/wedash/dashboard";
 import { fetchSalesCoverage, fetchSalesDayAggs } from "@/data/wedash/salesRepo";
 import { fetchLaunchedDays, fetchShoppingAccount, requestShoppingLaunch, requestShoppingRead, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
 import { ALREADY_LAUNCHED, forceLaunchAllowed, informedGap, monthReport, reportDays, sumSoldByDay } from "@/data/wedash/shoppingReport";
-import { brlCent, deIso, fimDoMes, inicioDoMes, intervaloDias, paraIso, somarDias } from "@/lib/format";
+import { brlCent, dataExtenso, deIso, fimDoMes, inicioDoMes, intervaloDias, paraIso, somarDias } from "@/lib/format";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
-import { cn } from "@/lib/cn";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { useScope } from "@/pages/dashboard/useScope";
@@ -18,16 +18,6 @@ import { paths } from "@/router/paths";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
 import { HeaderFilters } from "@/pages/stock/shared";
-
-const WEEK = [
-  { longo: "Domingo", curto: "D" },
-  { longo: "Segunda-feira", curto: "S" },
-  { longo: "Terça-feira", curto: "T" },
-  { longo: "Quarta-feira", curto: "Q" },
-  { longo: "Quinta-feira", curto: "Q" },
-  { longo: "Sexta-feira", curto: "S" },
-  { longo: "Sábado", curto: "S" },
-];
 
 const money = (cents: number) => brlCent(cents / 100);
 
@@ -44,9 +34,26 @@ function corDaDiferenca(cents: number): string {
   return "var(--t0)";
 }
 
+function tituloDia(iso: string): string {
+  const s = dataExtenso(iso);
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function valorDoDia(
+  day: string,
+  hoje: string,
+  row: { soldCents: number; launchedCents: number | null } | undefined,
+  sold: Record<string, number>,
+): number | null {
+  if (day > hoje) return null;
+  if (day === hoje) return sold[day] != null && sold[day] > 0 ? sold[day] : null;
+  if (!row || row.soldCents <= 0) return null;
+  return row.soldCents;
+}
+
 function statusDoDia(soldCents: number, informedCents: number | null): { texto: string; cor: string } {
   const gap = informedGap(soldCents, informedCents);
-  if (gap === "missing" || informedCents == null) return { texto: "Não informado", cor: "bg-chip-gray" };
+  if (gap === "missing" || informedCents == null) return { texto: "Não informado", cor: "bg-warn" };
   const texto = `Informado ${money(informedCents)}`;
   if (gap === "match") return { texto, cor: "bg-ok" };
   if (gap === "over") return { texto, cor: "bg-warn" };
@@ -82,6 +89,7 @@ export function SalesReportPage() {
   const [marcados, setMarcados] = useState<string[]>([]);
   const [lancando, setLancando] = useState(false);
   const [confirmar, setConfirmar] = useState(false);
+  const [diaAberto, setDiaAberto] = useState<string | null>(null);
 
   const loja = lojas[0];
   const lojaRef = useRef(loja);
@@ -196,9 +204,9 @@ export function SalesReportPage() {
 
   useScreenRefresh({
     label: "Atualizar vendas e valores informados",
-    tip: "Busca as vendas de hoje no Millennium e lê os valores já informados ao shopping.",
+    tip: "Busca as vendas de hoje e lê os valores informados ao shopping.",
     status: refreshMomentTitle(pronto ? (account?.lastRunAt ?? null) : undefined),
-    busyLabel: "Lendo o shopping…",
+    busyLabel: "Atualizando…",
     sales: true,
     run: () => puxar(),
   });
@@ -223,6 +231,7 @@ export function SalesReportPage() {
     setRangeTo(nextTo);
     setPresetId(meta?.presetId ?? null);
     setMarcados((atual) => atual.filter((day) => day >= nextFrom && day <= nextTo));
+    setDiaAberto((atual) => (atual && atual >= nextFrom && atual <= nextTo ? atual : null));
   }
 
   function toggleDia(day: string) {
@@ -296,38 +305,42 @@ export function SalesReportPage() {
                 tooltip="Informado − vendido. Valor a mais pode aumentar o aluguel percentual; valor a menos pode gerar divergência na auditoria."
               />
             </div>
-            <div className="overflow-x-auto rounded-[18px] border border-line bg-bg-2 shadow-[var(--shadow-vela)]">
-              <div className="min-w-[980px]">
-                <div className="grid grid-cols-7">
-                  {WEEK.map((d, i) => (
-                    <div key={i} className="border-b border-line px-1 py-3 text-center text-[10px] font-bold leading-tight text-t2 sm:text-[11px]">
-                      <span className="hidden sm:inline">{d.longo}</span>
-                      <span className="sm:hidden uppercase">{d.curto}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="grid grid-cols-7">
-                  {cells.map((day, i) => {
-                    const row = day ? porDia.get(day) : undefined;
-                    return (
-                    <DiaCelula
-                      key={day ?? `vazio-${i}`}
-                      index={i}
-                      day={day}
-                      hoje={hoje}
-                      marcado={day != null && marcados.includes(day)}
-                      onToggle={toggleDia}
-                      vendido={row ? row.soldCents : day === hoje ? (sold[day] ?? 0) : null}
-                      informado={row ? row.launchedCents : null}
-                    />
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
+            <MonthCalendar>
+              {cells.map((day, i) => {
+                if (!day) return <div key={`vazio-${i}`} className={blankDayClass(i)} />;
+                const row = porDia.get(day);
+                const passado = day < hoje;
+                const hojeDia = day === hoje;
+                const vendido = valorDoDia(day, hoje, row, sold);
+                const status = hojeDia ? { texto: "Em aberto", cor: "bg-acc" } : passado && row ? statusDoDia(row.soldCents, row.launchedCents) : null;
+                const pendente = passado && row != null && row.launchedCents == null;
+                return (
+                  <DayFace
+                    key={day}
+                    index={i}
+                    iso={day}
+                    today={hoje}
+                    selected={marcados.includes(day)}
+                    openable={hojeDia || passado}
+                    openLabel={`Abrir ${tituloDia(day)}`}
+                    onOpen={() => setDiaAberto(day)}
+                    amount={vendido != null ? money(vendido) : null}
+                    check={pendente ? { checked: marcados.includes(day), label: `Marcar ${tituloDia(day)}`, onToggle: () => toggleDia(day) } : null}
+                    badges={status ? <ChipDia cor={status.cor}>{status.texto}</ChipDia> : null}
+                  />
+                );
+              })}
+            </MonthCalendar>
           </>
         )}
       </div>
+      <DiaInforme
+        day={diaAberto}
+        hoje={hoje}
+        sold={diaAberto == null ? null : diaAberto === hoje ? (sold[hoje] != null && sold[hoje] > 0 ? sold[hoje] : null) : (porDia.get(diaAberto)?.soldCents ?? 0)}
+        informed={diaAberto && diaAberto < hoje ? (porDia.get(diaAberto)?.launchedCents ?? null) : null}
+        onClose={() => setDiaAberto(null)}
+      />
       <Modal
         open={confirmar}
         onClose={() => { if (!lancando) setConfirmar(false); }}
@@ -349,64 +362,54 @@ export function SalesReportPage() {
   );
 }
 
-function DiaCelula({
-  index,
+function DiaInforme({
   day,
   hoje,
-  marcado,
-  onToggle,
-  vendido,
-  informado,
+  sold,
+  informed,
+  onClose,
 }: {
-  index: number;
   day: string | null;
   hoje: string;
-  marcado: boolean;
-  onToggle: (day: string) => void;
-  vendido: number | null;
-  informado: number | null;
+  sold: number | null;
+  informed: number | null;
+  onClose: () => void;
 }) {
-  const borda = cn(
-    "relative flex min-h-[108px] w-full min-w-0 flex-col items-stretch justify-start border-b border-r border-line p-1.5 text-left sm:min-h-[132px] sm:p-2",
-    (index + 1) % 7 === 0 && "border-r-0",
-    !day && "bg-bg-1/30",
-    marcado && "bg-acc-soft/40",
-  );
-  if (!day) return <div className={borda} />;
-  const passado = day < hoje;
   const hojeDia = day === hoje;
-  const pendente = passado && informedGap(vendido ?? 0, informado) === "missing";
-  const status = passado && vendido != null ? statusDoDia(vendido, informado) : null;
+  const faltando = day != null && !hojeDia && informed == null;
+  const status = hojeDia ? "Em aberto" : faltando ? "Não informado" : "Informado";
+  const variant = hojeDia ? "accent" : faltando ? "warning" : "success";
+  const diferenca = sold != null && informed != null ? informed - sold : null;
   return (
-    <div className={borda}>
-      {marcado ? <span aria-hidden className="pointer-events-none absolute inset-0 z-10 border border-acc" /> : null}
-      <span className="flex w-full items-start justify-between gap-1">
-        <span
-          className={cn(
-            "inline-flex h-6 w-6 shrink-0 items-center justify-center self-start rounded-full text-[12px] font-bold",
-            hojeDia ? "bg-acc text-white" : passado ? "text-t1" : "text-t2",
-          )}
-        >
-          {deIso(day).getDate()}
-        </span>
-        {pendente ? (
-          <input
-            type="checkbox"
-            aria-label={`Marcar ${deIso(day).getDate()}`}
-            checked={marcado}
-            className="mt-0.5 h-4 w-4 shrink-0"
-            style={{ accentColor: "var(--acc)" }}
-            onChange={() => onToggle(day)}
+    <Modal
+      open={day != null}
+      onClose={onClose}
+      size="lg"
+      title={
+        day ? (
+          <>
+            <span>{tituloDia(day)}</span>
+            <Badge variant={variant}>{status}</Badge>
+          </>
+        ) : (
+          ""
+        )
+      }
+      footer={<Button variant="outline" onClick={onClose}>Voltar</Button>}
+    >
+      {day ? (
+        <>
+          <DayMetrics
+            items={[
+              { label: "Vendido", value: sold == null ? "—" : money(sold) },
+              { label: "Informado", value: hojeDia ? "—" : informed == null ? "Não informado" : money(informed) },
+              { label: "Diferença", value: diferenca == null ? "—" : valorDiferenca(diferenca), color: diferenca == null ? undefined : corDaDiferenca(diferenca) },
+            ]}
           />
-        ) : null}
-      </span>
-      {(passado || hojeDia) ? (
-        <p className="mt-1.5 whitespace-nowrap font-mono text-[12px] font-extrabold text-t1 sm:text-[13px]">
-          {`Vendido ${money(vendido ?? 0)}`}
-        </p>
+          {hojeDia ? <p className="text-[13px] leading-relaxed text-t2">Este dia ainda está em aberto. O valor será informado depois do fechamento.</p> : null}
+          {faltando ? <p className="text-[13px] leading-relaxed text-t2">Este dia ainda não foi informado ao shopping. Marque a caixa do calendário para enviar o valor, inclusive quando a venda é zero.</p> : null}
+        </>
       ) : null}
-      {status ? <ChipDia cor={status.cor}>{status.texto}</ChipDia> : null}
-      {hojeDia ? <ChipDia cor="bg-acc">Em aberto</ChipDia> : null}
-    </div>
+    </Modal>
   );
 }

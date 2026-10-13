@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Card, DateRangePicker, Dropdown, Modal, Segmented, Skeleton, useToast, QUICK_RANGES_CALENDARIO, type DatePresetId, type DateRangeChangeMeta, type DropdownItem } from "@/components/ui";
+import { Alert, Button, Card, DateRangePicker, Dropdown, Modal, Segmented, Skeleton, useToast, QUICK_RANGES_CALENDARIO, Badge, type DatePresetId, type DateRangeChangeMeta, type DropdownItem } from "@/components/ui";
+import { DayFace, MonthCalendar, blankDayClass } from "@/components/wedash/MonthCalendar";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { periodLabels } from "@/data/wedash/dashboard";
 import { fetchLatestCashCloseError, fetchNavMonthFloor, fetchOpenCashCloseJob, requestSangriaMonth } from "@/data/wedash/cashCloseRepo";
@@ -29,15 +30,6 @@ import { monthsTouched, sangriaMonthSpan } from "@/data/wedash/cashCloseMonth";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { HeaderFilters } from "@/pages/stock/shared";
 
-const WEEK = [
-  { longo: "Domingo", curto: "D" },
-  { longo: "Segunda-feira", curto: "S" },
-  { longo: "Terça-feira", curto: "T" },
-  { longo: "Quarta-feira", curto: "Q" },
-  { longo: "Quinta-feira", curto: "Q" },
-  { longo: "Sexta-feira", curto: "S" },
-  { longo: "Sábado", curto: "S" },
-];
 const money = (cents: number) => brlCent(cents / 100);
 
 type AcaoLote = "recebido" | "aCobrar" | "fora" | "falta" | "desfazer";
@@ -174,9 +166,9 @@ export function SangriaPage() {
 
   useScreenRefresh({
     label: "Atualizar vendas e sangrias",
-    tip: "Busca as vendas de hoje e as sangrias do mês deste período.",
+    tip: "Busca as vendas de hoje e as sangrias do período.",
     status: refreshMomentTitle(watermark ? watermark.toISOString() : watermark),
-    busyLabel: "Buscando vendas e sangrias…",
+    busyLabel: "Atualizando…",
     sales: true,
     run: () => pedir(),
   });
@@ -230,8 +222,8 @@ export function SangriaPage() {
   const depositado = useMemo(() => depositBoleto(lines, deposits.map((d) => d.day), faltaPorDia), [lines, deposits, faltaPorDia]);
   const diasAbertos = useMemo(() => marcados.filter((day) => !taken.has(day)), [marcados, taken]);
   const diasRecebiveis = useMemo(
-    () => diasAbertos.filter((day) => dayAmounts(porDia.get(day) ?? [], faltaPorDia.get(day) ?? 0).boletoCents > 0),
-    [diasAbertos, porDia, faltaPorDia],
+    () => diasAbertos.filter((day) => day < hoje && dayAmounts(porDia.get(day) ?? [], faltaPorDia.get(day) ?? 0).boletoCents > 0),
+    [diasAbertos, porDia, faltaPorDia, hoje],
   );
   const valorACobrar = depositBoleto(lines, diasRecebiveis, faltaPorDia);
   const linhasForaAbertas = useMemo(
@@ -373,7 +365,7 @@ export function SangriaPage() {
       <SectionHeader
         section="Gestão"
         title="Sangrias"
-        subtitle="Confira as sangrias, defina o que entra no boleto e acompanhe os valores recebidos."
+        subtitle="Confira as sangrias, defina o que entra no boleto e acompanhe os recebimentos."
         actions={
           <HeaderFilters>
             <DateRangePicker
@@ -399,39 +391,27 @@ export function SangriaPage() {
           <Skeleton className="h-[520px] w-full rounded-[18px]" />
         ) : lojas.length === 0 || !loja ? (
           <Card>
-            <EmptyBlock icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
+            <EmptyBlock icon="💵" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
           </Card>
         ) : (
           <>
             <ResumoMes aCobrar={aberto} recebido={depositado} fora={mes.foraCents} falta={mes.faltaCents} />
-            <div className="overflow-x-auto rounded-[18px] border border-line bg-bg-2 shadow-[var(--shadow-vela)]">
-              <div className="min-w-[760px]">
-                <div className="grid grid-cols-7">
-                  {WEEK.map((d, i) => (
-                    <div key={i} className="border-b border-line px-1 py-3 text-center text-[10px] font-bold leading-tight text-t2 sm:text-[11px]">
-                      <span className="hidden sm:inline">{d.longo}</span>
-                      <span className="sm:hidden uppercase">{d.curto}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="grid grid-cols-7">
-                  {cells.map((day, i) => (
-                    <DiaCelula
-                      key={day ?? `vazio-${i}`}
-                      index={i}
-                      day={day}
-                      hoje={hoje}
-                      rows={day ? (porDia.get(day) ?? []) : []}
-                      depositado={day ? taken.has(day) : false}
-                      marcado={day ? marcados.includes(day) : false}
-                      faltaCents={day ? (faltaPorDia.get(day) ?? 0) : 0}
-                      onOpen={setDia}
-                      onToggle={toggleDia}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
+            <MonthCalendar>
+              {cells.map((day, i) => (
+                <DiaCelula
+                  key={day ?? `vazio-${i}`}
+                  index={i}
+                  day={day}
+                  hoje={hoje}
+                  rows={day ? (porDia.get(day) ?? []) : []}
+                  depositado={day ? taken.has(day) : false}
+                  marcado={day ? marcados.includes(day) : false}
+                  faltaCents={day ? (faltaPorDia.get(day) ?? 0) : 0}
+                  onOpen={setDia}
+                  onToggle={toggleDia}
+                />
+              ))}
+            </MonthCalendar>
           </>
         )}
       </div>
@@ -439,6 +419,7 @@ export function SangriaPage() {
         <DiaModal
           key={`${loja.id}|${dia}`}
           day={dia}
+          hoje={hoje}
           rows={porDia.get(dia) ?? []}
           shortage={shortages.find((s) => s.day === dia)}
           deposit={deposits.find((d) => d.day === dia)}
@@ -527,69 +508,27 @@ function DiaCelula({
   onOpen: (day: string) => void;
   onToggle: (day: string) => void;
 }) {
+  if (!day) return <div className={blankDayClass(index)} />;
   const tot = dayAmounts(rows, faltaCents);
-  const futuro = day != null && day > hoje;
-  const abre = day != null && !futuro && (rows.length > 0 || depositado || faltaCents > 0);
+  const futuro = day > hoje;
+  const temAcao = !futuro && (rows.length > 0 || faltaCents > 0 || depositado);
   const partes = rows.length > 0 || faltaCents > 0 ? chipsDoDia(tot, depositado, day === hoje) : [];
   const chips = day === hoje ? [{ cor: "bg-acc", texto: "Em aberto" }, ...partes] : partes;
-  const borda = cn(
-    "relative flex h-full min-h-[84px] w-full min-w-0 flex-col items-stretch justify-start border-b border-r border-line p-1.5 text-left sm:min-h-[110px] sm:p-2",
-    (index + 1) % 7 === 0 && "border-r-0",
-    !day && "bg-bg-1/30",
-    marcado && "bg-acc-soft/40",
-  );
-  const marca = marcado ? <span aria-hidden className="pointer-events-none absolute inset-0 z-10 border border-acc" /> : null;
-  const miolo = day ? (
-    <>
-      <span className="flex w-full items-start justify-between gap-1">
-        <NumeroDia iso={day} hoje={hoje} />
-        {!futuro && (rows.length > 0 || faltaCents > 0) ? (
-          <input
-            type="checkbox"
-            aria-label={`Marcar ${tituloDia(day)}`}
-            checked={marcado}
-            className="mt-0.5 h-4 w-4 shrink-0"
-            style={{ accentColor: "var(--acc)" }}
-            onClick={(e) => e.stopPropagation()}
-            onChange={() => onToggle(day)}
-          />
-        ) : null}
-      </span>
-      {rows.length > 0 || chips.length > 0 ? (
-        <div className="mt-1.5 w-full min-w-0">
-          {rows.length > 0 ? (
-            <p className="whitespace-nowrap font-mono text-[12px] font-extrabold text-t1 sm:text-[13px]">
-              {money(tot.totalCents)}
-            </p>
-          ) : null}
-          {chips.map((chip) => (
-            <ChipDia key={chip.texto} cor={chip.cor}>{chip.texto}</ChipDia>
-          ))}
-        </div>
-      ) : null}
-    </>
-  ) : null;
-  if (!day) return <div className={borda} />;
-  if (!abre) return <div className={borda}>{marca}{miolo}</div>;
   return (
-    <button type="button" className={cn(borda, marcado ? "hover:bg-acc-soft/40" : "hover:bg-bg-3")} onClick={() => onOpen(day)}>
-      {marca}
-      {miolo}
-    </button>
-  );
-}
-
-function NumeroDia({ iso, hoje }: { iso: string; hoje: string }) {
-  const futuro = iso > hoje;
-  return (
-    <span
-      className={cn(
-        "inline-flex h-6 w-6 shrink-0 items-center justify-center self-start rounded-full text-[12px] font-bold",
-        iso === hoje ? "bg-acc text-white" : futuro ? "text-t2" : "text-t1",
-      )}
-    >
-      {deIso(iso).getDate()}
-    </span>
+    <DayFace
+      index={index}
+      iso={day}
+      today={hoje}
+      selected={marcado}
+      openable={day === hoje || temAcao}
+      openLabel={`Abrir ${tituloDia(day)}`}
+      onOpen={() => onOpen(day)}
+      amount={rows.length > 0 ? money(tot.totalCents) : null}
+      check={temAcao ? { checked: marcado, label: `Marcar ${tituloDia(day)}`, onToggle: () => onToggle(day) } : null}
+      badges={chips.length > 0 ? chips.map((chip) => (
+        <ChipDia key={chip.texto} cor={chip.cor}>{chip.texto}</ChipDia>
+      )) : null}
+    />
   );
 }
 
@@ -637,6 +576,7 @@ function MetricasDia({ itens }: { itens: Array<{ label: string; value: string; t
 
 function DiaModal({
   day,
+  hoje,
   rows,
   shortage,
   deposit,
@@ -647,6 +587,7 @@ function DiaModal({
   onUndo,
 }: {
   day: string;
+  hoje: string;
   rows: SangriaLineRow[];
   shortage?: SangriaShortageRow;
   deposit?: SangriaDepositDay;
@@ -742,7 +683,21 @@ function DiaModal({
         if (!salvando && !desfazendo) onClose();
       }}
       size="lg"
-      title={tituloDia(day)}
+      title={(() => {
+        const selo = deposit
+          ? { variant: "success" as const, texto: "Recebido" }
+          : day === hoje
+            ? { variant: "accent" as const, texto: "Em aberto" }
+            : preview.boletoCents > 0
+              ? { variant: "warning" as const, texto: "A cobrar" }
+              : null;
+        return (
+          <>
+            <span>{tituloDia(day)}</span>
+            {selo ? <Badge variant={selo.variant}>{selo.texto}</Badge> : null}
+          </>
+        );
+      })()}
       footer={
         consulta ? (
           <Button variant="outline" onClick={onClose}>
