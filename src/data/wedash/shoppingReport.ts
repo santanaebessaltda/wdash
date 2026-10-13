@@ -126,9 +126,38 @@ function nextIso(iso: string): string {
 
 export type ShoppingAdministrator = "allos" | "argo";
 
+/** O host não muda. O slug é o trecho da filial, como shoppingcampogrande4. */
+export const INTRANET_MALL_ORIGIN = "https://app3.intranetmall.com";
+
+const INTRANET_MALL_SLUG = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/;
+
+/** Aceita o slug ou a URL inteira do painel e devolve só o slug. */
+export function intranetMallSlug(value: string): string | null {
+  const raw = value.trim().replace(/^\/+|\/+$/g, "");
+  if (!raw) return null;
+  if (INTRANET_MALL_SLUG.test(raw)) return raw;
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "https:" || url.hostname !== "app3.intranetmall.com" || url.search || url.hash) return null;
+  const parts = url.pathname.split("/").filter(Boolean);
+  if (parts.length !== 1 || !INTRANET_MALL_SLUG.test(parts[0])) return null;
+  return parts[0];
+}
+
+/** URL gravada. Sem barra no final. */
+export function intranetMallBaseUrl(value: string): string | null {
+  const slug = intranetMallSlug(value);
+  if (!slug) return null;
+  return `${INTRANET_MALL_ORIGIN}/${slug}`;
+}
+
 /**
  * Informe de vendas e Shopping ficam no menu.
- * A tela explica quando a filial não é quiosque ou ainda não tem Allos.
+ * A tela explica quando a filial não é quiosque ou ainda não tem Intranet Mall.
  */
 export function shoppingMenu(): { settings: boolean; report: boolean } {
   return { settings: true, report: true };

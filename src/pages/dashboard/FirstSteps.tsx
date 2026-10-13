@@ -101,8 +101,8 @@ function stepAction(step: FirstStep): { label: string; to: string } | null {
       return { label: "Configurar funcionamento", to: paths.operation.branch };
     case "groups":
       return step.needsGroups
-        ? { label: "Criar grupos", to: paths.operation.sellers }
-        : { label: "Vincular vendedores", to: paths.operation.sellers };
+        ? { label: "Criar grupos", to: paths.management.team }
+        : { label: "Vincular vendedores", to: paths.management.team };
     case "franchise":
       return { label: "Configurar franquia", to: paths.operation.branch };
     case "rent":
@@ -176,19 +176,19 @@ export function FirstStepsCard({ steps, doneCount, tenantId }: { steps: FirstSte
         <div className="mt-3 flex flex-col gap-2 animate-vela-fade">
           {steps.map((step) => {
             const action = step.done ? null : stepAction(step);
-            const proximo = step.id === nextId;
+            const next = step.id === nextId;
             return (
               <div
                 key={step.id}
                 className={cn(
                   "flex items-center gap-3 rounded-2xl border border-line bg-bg-2 px-4 py-3.5 shadow-[var(--shadow-vela)] hover:border-line-2",
-                  proximo && "border-l-[3px] border-l-acc",
+                  next && "border-l-[3px] border-l-acc",
                 )}
               >
                 <span
                   className={cn(
                     "flex h-5 w-5 shrink-0 items-center justify-center rounded-[7px] border-2",
-                    step.done ? "border-ok bg-ok" : proximo ? "border-acc" : "border-line-2",
+                    step.done ? "border-ok bg-ok" : next ? "border-acc" : "border-line-2",
                   )}
                 >
                   {step.done && <CheckIcon />}
@@ -200,12 +200,12 @@ export function FirstStepsCard({ steps, doneCount, tenantId }: { steps: FirstSte
                     {step.detail && <span className="text-[11px] font-bold text-warn">{step.detail}</span>}
                   </div>
                 </div>
-                {proximo && action && (
+                {next && action && (
                   <Button size="sm" className="shrink-0" onClick={() => navigate(action.to)}>
                     {action.label}
                   </Button>
                 )}
-                {!proximo && action && (
+                {!next && action && (
                   <button
                     type="button"
                     onClick={() => navigate(action.to)}

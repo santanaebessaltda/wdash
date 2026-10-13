@@ -6,7 +6,7 @@ import { isGestor } from "./nav-wedash";
 import { paths } from "@/router/paths";
 import { accessLabel, useSession, useActiveSession } from "@/session/SessionProvider";
 import {
-  stores as filiaisFixture,
+  stores as branchesFixture,
   storesForSession,
   hydrateSessionStores,
   type Store,
@@ -22,19 +22,19 @@ const ICON_USUARIOS =
   "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8";
 const ICON_LOGS = "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8";
 const ICON_SAIR = "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9";
-const ICON_AVISOS = "M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0";
+const ICON_NOTICES = "M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0";
 
 /** Telas cujo conteúdo muda com o Atualizar do topo. Nas outras o botão fica oculto. */
 function showsRefresh(pathname: string): boolean {
   if (pathname === paths.dashboard || pathname.startsWith(`${paths.dashboard}/`)) return true;
-  if (pathname === paths.stock.inventory || pathname === paths.stock.purchaseOrder) return true;
-  if (pathname === paths.management.cashClose || pathname === paths.management.cashDrop || pathname === paths.management.salesReport || pathname === paths.operation.sellers) return true;
+  if (pathname === paths.stock.inventory || pathname === paths.management.purchaseOrder) return true;
+  if (pathname === paths.management.cashClose || pathname === paths.management.cashDrop || pathname === paths.management.salesReport || pathname === paths.management.team) return true;
   if (pathname === paths.goals) return true;
-  const goal = pathname.match(/^\/goals\/([^/]+)$/);
+  const goal = pathname.match(/^\/management\/goals\/([^/]+)$/);
   if (goal && goal[1] !== "new") return true;
   if (pathname === paths.management.challenges) return true;
-  const desafio = pathname.match(/^\/management\/challenges\/([^/]+)$/);
-  return desafio != null && desafio[1] !== "new";
+  const challenge = pathname.match(/^\/management\/challenges\/([^/]+)$/);
+  return challenge != null && challenge[1] !== "new";
 }
 
 function MenuIcon({ d }: { d: string }) {
@@ -52,9 +52,9 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
   const location = useLocation();
   const { scope, setScope } = useScope();
 
-  const [listaLojas, setListaLojas] = useState<Store[]>(() => {
+  const [listStores, setListStores] = useState<Store[]>(() => {
     const hit = storesForSession(session.stores);
-    return hit.length > 0 ? hit : filiaisFixture;
+    return hit.length > 0 ? hit : branchesFixture;
   });
 
   useEffect(() => {
@@ -66,14 +66,14 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
     let cancelled = false;
     void (async () => {
       if (session.stores.length === 0) {
-        if (!cancelled) setListaLojas([]);
+        if (!cancelled) setListStores([]);
         return;
       }
       const hit = storesForSession(session.stores);
       const loaded = await hydrateSessionStores(session.tenantId, session.stores);
       if (cancelled) return;
-      if (loaded.length > 0) setListaLojas(loaded);
-      else if (hit.length > 0) setListaLojas(hit);
+      if (loaded.length > 0) setListStores(loaded);
+      else if (hit.length > 0) setListStores(hit);
       // Nao cai no mock f1/f2 se a sessao tem UUIDs  -  isso quebrava o seletor.
     })();
     return () => {
@@ -90,6 +90,7 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
     location.pathname.startsWith(paths.live.root + "/") ||
     location.pathname === paths.goals ||
     location.pathname.startsWith(paths.goals + "/") ||
+    location.pathname === paths.stock.inventory ||
     location.pathname.startsWith("/stock/") ||
     location.pathname.startsWith("/management/") ||
     location.pathname.startsWith("/operation/") ||
@@ -100,7 +101,7 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
   const conta: DropdownItem[] = [
     ...(session.role === "SELLER"
       ? []
-      : [{ label: "Notificações", icon: <MenuIcon d={ICON_AVISOS} />, onClick: () => navigate(paths.settings.notifications) }]),
+      : [{ label: "Notificações", icon: <MenuIcon d={ICON_NOTICES} />, onClick: () => navigate(paths.settings.notifications) }]),
     ...(isGestor(session.role)
       ? [
           { label: "Integrações", icon: <MenuIcon d={ICON_INTEGRACOES} />, onClick: () => navigate(paths.settings.erp) },
@@ -130,7 +131,7 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
 
       {showsStorePicker && (
         <div className="min-w-0 flex-1 sm:max-w-sm">
-          <StorePicker scope={scope} onChange={setScope} minhas={listaLojas} />
+          <StorePicker scope={scope} onChange={setScope} minhas={listStores} />
         </div>
       )}
 

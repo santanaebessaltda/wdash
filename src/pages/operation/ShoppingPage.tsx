@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Button, Card, Checkbox, FormField, Input, Modal, Skeleton, useToast } from "@/components/ui";
+import { INTRANET_MALL_ORIGIN, intranetMallBaseUrl, intranetMallSlug } from "@/data/wedash/shoppingReport";
 import { fetchShoppingAccount, saveShoppingAccount, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
+import { cn } from "@/lib/cn";
 import { noAutofill, secretStyle } from "@/lib/noAutofill";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { useScope } from "@/pages/dashboard/useScope";
@@ -8,20 +10,20 @@ import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { SHOPPING_MENU_EVENT } from "@/layout/useShoppingMenu";
 import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
 
-/** Configurações > Shopping. O card da Allos abre a modal, no mesmo desenho de Adquirentes. */
+/** Configurações > Shopping. O card da Intranet Mall abre a modal, no mesmo desenho de Adquirentes. */
 export function ShoppingPage() {
   const { show } = useToast();
-  const { session, storeRows, loading: lojasLoading } = useScopedStores();
+  const { session, storeRows, loading: storesLoading } = useScopedStores();
   const { scope } = useScope();
   const escolher = pickOneStore(scope.storeIds, session.stores.length);
-  const showSkeleton = useMinSkeleton(lojasLoading);
+  const showSkeleton = useMinSkeleton(storesLoading);
   const store = storeRows[0];
   const [account, setAccount] = useState<ShoppingAccount | null>(null);
   const [loading, setLoading] = useState(true);
-  const [open, setAberto] = useState(false);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (lojasLoading || escolher || !store || store.pointType !== "SHOPPING") {
+    if (storesLoading || escolher || !store || store.pointType !== "SHOPPING") {
       setLoading(false);
       return;
     }
@@ -42,7 +44,7 @@ export function ShoppingPage() {
     };
     // show do toast muda de identidade; a carga segue a filial.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lojasLoading, escolher, store, session.tenantId]);
+  }, [storesLoading, escolher, store, session.tenantId]);
 
   const conectado = account != null;
   const estado = conectado ? "Configurado" : "Não configurado";
@@ -88,10 +90,10 @@ export function ShoppingPage() {
             <Card>
               <div className="mb-3.5 flex items-center gap-3">
                 <span className="flex h-[46px] w-[46px] shrink-0 items-center justify-center overflow-hidden rounded-[13px] border border-line bg-bg-inset">
-                  <img src="/allos.png" alt="Allos" className="h-full w-full object-contain p-1.5" />
+                  <img src="/intranet.png" alt="Intranet Mall" className="h-full w-full object-contain p-1.5" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[14.5px] font-bold text-t0">Allos</p>
+                  <p className="text-[14.5px] font-bold text-t0">Intranet Mall</p>
                   <p className="mt-0.5 text-[11.5px] text-t2">Informe de vendas</p>
                 </div>
               </div>
@@ -100,7 +102,7 @@ export function ShoppingPage() {
                   <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
                   {estado}
                 </span>
-                <Button size="sm" onClick={() => setAberto(true)} disabled={!store}>
+                <Button size="sm" onClick={() => setOpen(true)} disabled={!store}>
                   {conectado ? "Gerenciar" : "Configurar"}
                 </Button>
               </div>
@@ -109,16 +111,16 @@ export function ShoppingPage() {
         </div>
       )}
       {store && store.pointType === "SHOPPING" ? (
-        <AllosModal
+        <IntranetMallModal
           open={open}
           account={account}
           storeId={store.id}
-          onClose={() => setAberto(false)}
+          onClose={() => setOpen(false)}
           onSaved={(next) => {
             setAccount(next);
             window.dispatchEvent(new Event(SHOPPING_MENU_EVENT));
-            show(account ? "Alterações salvas." : "Acesso da Allos configurado.", "success");
-            setAberto(false);
+            show(account ? "Alterações salvas." : "Acesso da Intranet Mall configurado.", "success");
+            setOpen(false);
           }}
         />
       ) : null}
@@ -126,7 +128,15 @@ export function ShoppingPage() {
   );
 }
 
-function AllosModal({
+function slugFieldValue(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed.includes("://") || trimmed.toLowerCase().includes("intranetmall.com")) {
+    return intranetMallSlug(trimmed) ?? trimmed.replace(/^https?:\/\//i, "").replace(/^app3\.intranetmall\.com\/?/i, "").replace(/\/+$/, "");
+  }
+  return value.replace(/\s/g, "").replace(/^\/+|\/+$/g, "");
+}
+
+function IntranetMallModal({
   open,
   account,
   storeId,
@@ -141,16 +151,17 @@ function AllosModal({
 }) {
   const { show } = useToast();
   const conectado = account != null;
-  const [baseUrl, setBaseUrl] = useState("");
+  const [slug, setSlug] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [autorizo, setAutorizo] = useState(false);
   const [busy, setBusy] = useState(false);
+  const baseUrl = intranetMallBaseUrl(slug);
 
   useEffect(() => {
     if (!open) return;
-    setBaseUrl(account?.baseUrl ?? "");
+    setSlug(account ? (intranetMallSlug(account.baseUrl) ?? "") : "");
     setUsername(account?.username ?? "");
     setPassword("");
     setMostrarSenha(false);
@@ -164,6 +175,10 @@ function AllosModal({
 
   async function conectar() {
     setBusy(true);
+    if (!baseUrl) {
+      setBusy(false);
+      return;
+    }
     const result = await saveShoppingAccount({ storeId, administrator: "allos", baseUrl, username, password });
     setBusy(false);
     if (!result.ok) {
@@ -173,27 +188,28 @@ function AllosModal({
     onSaved({
       storeId,
       administrator: "allos",
-      baseUrl: baseUrl.trim().replace(/\/$/, ""),
+      baseUrl,
       username: username.trim(),
       lastRunAt: account?.lastRunAt ?? null,
       lastError: account?.lastError ?? "",
     });
   }
 
-  const podeConectar =
-    !busy && baseUrl.trim().startsWith("https://") && username.trim().length > 0 && (password.trim().length > 0 || conectado) && (conectado || autorizo);
+  const slugErro = slug.length > 0 && !baseUrl ? "Use o slug da filial, como shoppingcampogrande4." : undefined;
+  const canConectar =
+    !busy && baseUrl != null && username.trim().length > 0 && (password.trim().length > 0 || conectado) && (conectado || autorizo);
 
   return (
     <Modal
       open={open}
       onClose={fechar}
-      title="Allos"
+      title="Intranet Mall"
       footer={
         <>
           <Button variant="outline" onClick={fechar} disabled={busy}>
             Cancelar
           </Button>
-          <Button onClick={() => void conectar()} disabled={!podeConectar}>
+          <Button onClick={() => void conectar()} disabled={!canConectar}>
             {busy ? "Salvando…" : conectado ? "Salvar alterações" : "Salvar acesso"}
           </Button>
         </>
@@ -201,10 +217,27 @@ function AllosModal({
     >
       <div className="flex flex-col gap-3.5">
         <p className="text-[13.5px] leading-relaxed text-t1">
-          Informe os dados de acesso ao painel da Allos desta filial. A WDash protege esses dados e os usa somente para informar as vendas ao shopping.
+          Informe o slug e o acesso da Intranet Mall desta filial. A WDash protege esses dados e os usa somente para informar as vendas ao shopping.
         </p>
-        <FormField label="URL do painel" required hint="Informe apenas o endereço principal, sem caminho adicional.">
-          <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://clube.allos.com.br" disabled={busy} {...noAutofill} />
+        <FormField
+          label="Slug"
+          required
+          error={slugErro}
+          hint="Abra a Intranet Mall no navegador e copie o trecho do endereço depois de intranetmall.com/. Em https://app3.intranetmall.com/shoppingcampogrande4/ o slug é shoppingcampogrande4."
+        >
+          <div className={cn("flex flex-col overflow-hidden rounded-[var(--radius-vela-md)] border bg-bg-inset focus-within:border-acc sm:h-[42px] sm:flex-row", slugErro ? "border-bad" : "border-line")}>
+            <span className="flex shrink-0 items-center border-b border-line bg-bg-3 px-3 py-2 text-[12px] text-t2 sm:border-b-0 sm:border-r sm:py-0">
+              {INTRANET_MALL_ORIGIN.replace("https://", "")}/
+            </span>
+            <input
+              value={slug}
+              onChange={(e) => setSlug(slugFieldValue(e.target.value))}
+              placeholder="shoppingcampogrande4"
+              disabled={busy}
+              className="h-[42px] min-w-0 flex-1 bg-transparent px-3 text-[13px] text-t0 outline-none placeholder:text-t2"
+              {...noAutofill}
+            />
+          </div>
         </FormField>
         <FormField label="Usuário" required>
           <Input value={username} onChange={(e) => setUsername(e.target.value)} disabled={busy} {...noAutofill} />
@@ -228,7 +261,7 @@ function AllosModal({
             {!conectado || password.length > 0 ? (
             <button
               type="button"
-              onClick={() => setMostrarSenha((atual) => !atual)}
+              onClick={() => setMostrarSenha((current) => !current)}
               aria-label={mostrarSenha ? "Ocultar senha" : "Mostrar senha"}
               disabled={busy}
               className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-t2 hover:bg-bg-3 hover:text-t0"

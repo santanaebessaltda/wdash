@@ -1,6 +1,7 @@
 import { Navigate, type RouteObject } from "react-router-dom";
 import { lazyPage } from "@/lib/lazyPage";
 import { paths } from "@/router/paths";
+import { RedirectTo } from "@/router/RedirectTo";
 import { RequireRole } from "@/session/RequireSession";
 import { GESTOR_ROLES } from "@/layout/nav-wedash";
 
@@ -8,15 +9,14 @@ const BranchPage = lazyPage(() => import("./BranchPage"), "BranchPage");
 const ProductsTaxesPage = lazyPage(() => import("./ProductsTaxesPage"), "ProductsTaxesPage");
 const AcquirersPage = lazyPage(() => import("../cash-close/AcquirersPage"), "AcquirersPage");
 const ShoppingPage = lazyPage(() => import("./ShoppingPage"), "ShoppingPage");
-const StaffPage = lazyPage(() => import("../management/StaffPage"), "StaffPage");
 
-/** Vendedores: Gestor e Gerente. Configurações: só Gestor. */
+/** Equipe ficou em Gestão. Configurações: só Gestor. */
 export const operationRoutes: RouteObject[] = [
   {
     element: <RequireRole roles={["OWNER", "MANAGER", "ADMIN_GLOBAL"]} />,
     children: [
-      { path: paths.operation.groups, element: <Navigate to={paths.operation.sellers} replace /> },
-      { path: paths.operation.sellers, element: <StaffPage /> },
+      { path: paths.operation.groups, element: <RedirectTo to={paths.management.team} /> },
+      { path: paths.operation.sellers, element: <RedirectTo to={paths.management.team} /> },
     ],
   },
   {

@@ -9,7 +9,7 @@ import { seedCookieJar } from "./allosAuth.ts";
 
 const KEEP = "Não foi possível informar as vendas ao shopping. Os valores já informados foram mantidos.";
 const READ_FAIL = "Não foi possível ler os valores informados no shopping. Nada foi alterado.";
-const LOGIN_FAIL = "Não foi possível acessar a Allos porque o painel solicitou uma verificação no navegador. Nada foi alterado.";
+const LOGIN_FAIL = "Não foi possível acessar a Intranet Mall porque o painel solicitou uma verificação no navegador. Nada foi alterado.";
 
 export type AllosResult = { ok: true; days: LaunchValue[] } | { ok: false; message: string };
 

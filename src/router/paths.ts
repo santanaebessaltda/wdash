@@ -38,24 +38,27 @@ export const paths = {
   products: "/dashboard/products",
   groups: "/dashboard/groups",
   team: "/dashboard/team",
-  /** CRUD de metas (fora do Dashboard). */
-  goals: "/goals",
-  goalNew: "/goals/new",
-  goalDetail: (id: string) => `/goals/${id}`,
-  goalEdit: (id: string) => `/goals/${id}/edit`,
+  /** CRUD de metas, dentro de Gestão. `/goals` redireciona. */
+  goals: "/management/goals",
+  goalNew: "/management/goals/new",
+  goalDetail: (id: string) => `/management/goals/${id}`,
+  goalEdit: (id: string) => `/management/goals/${id}/edit`,
   /** Nova meta preenchida com a configuracao de outra (periodo seguinte). */
-  goalCopy: (id: string) => `/goals/new?copy=${encodeURIComponent(id)}`,
+  goalCopy: (id: string) => `/management/goals/new?copy=${encodeURIComponent(id)}`,
   /** Nova meta com a mesma configuracao e datas, para escolher outra loja. */
-  goalCopyStore: (id: string) => `/goals/new?copy=${encodeURIComponent(id)}&for=store`,
-  /** Estoque: saldo por local + pedido de compra. `saleTables` e `products` = URLs antigas (redirecionam). */
+  goalCopyStore: (id: string) => `/management/goals/new?copy=${encodeURIComponent(id)}&for=store`,
+  /** Estoque: saldo em `/stock`. Pedido de compra fica em Gestão. URLs antigas redirecionam. */
   stock: {
-    inventory: "/stock/inventory",
+    inventory: "/stock",
+    legacyInventory: "/stock/inventory",
     purchaseOrder: "/stock/purchase-order",
     saleTables: "/stock/sale-tables",
     products: "/stock/products",
   },
-  /** Gestao: operacao e equipe (Metas fica em `goals`). */
+  /** Gestao: todas as telas do grupo ficam em `/management`. */
   management: {
+    team: "/management/team",
+    purchaseOrder: "/management/purchase-order",
     challenges: "/management/challenges",
     challengeNew: "/management/challenges/new",
     challengeDetail: (id: string) => `/management/challenges/${id}`,
@@ -85,7 +88,7 @@ export const paths = {
     acquirers: "/operation/acquirers",
     /** Painel do shopping de cada quiosque. A senha é da filial. */
     shopping: "/operation/shopping",
-    /** URL antiga. Abre Vendedores, onde o grupo é criado e administrado. */
+    /** URL antiga. Abre Gestão > Equipe, onde o grupo é criado e administrado. */
     groups: "/operation/groups",
     sellers: "/operation/sellers",
   },
@@ -128,6 +131,8 @@ export const paths = {
     shifts: "/dashboard/turnos",
     store: "/loja",
     goals: "/metas",
+    /** Metas antes de entrar em `/management/goals`. */
+    goalsRoot: "/goals",
     goalsInSettings: "/configuracoes/metas",
     live: {
       root: "/ao-vivo",

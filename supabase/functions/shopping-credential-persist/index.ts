@@ -6,6 +6,29 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeaders, serve } from "../_shared/cors.ts";
 import { canAccessStore, GESTOR_ROLES, loadStaffCaller } from "../_shared/staffAuth.ts";
 
+const INTRANET_MALL_SLUG = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/;
+
+/** Mesma regra de intranetMallBaseUrl em shoppingReport.ts. Só o slug da filial entra na URL. */
+function intranetMallBaseUrl(value: string): string | null {
+  const raw = value.trim().replace(/^\/+|\/+$/g, "");
+  if (!raw) return null;
+  const slug = INTRANET_MALL_SLUG.test(raw) ? raw : slugFromIntranetMallUrl(raw);
+  return slug ? `https://app3.intranetmall.com/${slug}` : null;
+}
+
+function slugFromIntranetMallUrl(value: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "https:" || url.hostname !== "app3.intranetmall.com" || url.search || url.hash) return null;
+  const parts = url.pathname.split("/").filter(Boolean);
+  if (parts.length !== 1 || !INTRANET_MALL_SLUG.test(parts[0])) return null;
+  return parts[0];
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -58,10 +81,10 @@ serve(async (req) => {
 
   const storeId = typeof body.storeId === "string" ? body.storeId : "";
   const administrator = body.administrator === "allos" || body.administrator === "argo" ? body.administrator : "";
-  const baseUrl = typeof body.baseUrl === "string" ? body.baseUrl.trim() : "";
+  const baseUrl = intranetMallBaseUrl(typeof body.baseUrl === "string" ? body.baseUrl : "");
   const username = typeof body.username === "string" ? body.username.trim() : "";
   const password = typeof body.password === "string" ? body.password : "";
-  if (!storeId || !administrator || !baseUrl.startsWith("https://") || !username) return json({ error: "invalid_input" }, 400);
+  if (!storeId || !administrator || !baseUrl || !username) return json({ error: "invalid_input" }, 400);
   if (!canAccessStore(caller.role, caller.memberStoreIds, storeId)) return json({ error: "forbidden" }, 403);
 
   const { data: store, error: storeErr } = await admin
@@ -82,7 +105,7 @@ serve(async (req) => {
       store_id: storeId,
       tenant_id: caller.tenantId,
       administrator,
-      base_url: baseUrl.replace(/\/$/, ""),
+      base_url: baseUrl,
       username,
       secret_ciphertext: ciphertext,
     },

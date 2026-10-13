@@ -203,7 +203,7 @@ export async function notifyStockLow(
       tenantId: args.tenantId,
       stores: announced.map((store) => ({ id: store.id, name: store.name, timezone: store.timezone })),
       pref: "stock",
-      url: "/stock/purchase-order",
+      url: "/management/purchase-order",
       text: (stores) => formatStockPush(stores.flatMap((store) => {
         const alert = byId.get(store.id);
         return alert ? [{ name: alert.name, products: alert.products }] : [];

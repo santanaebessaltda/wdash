@@ -142,7 +142,7 @@ export async function notifyStoreGoals(
     tenantId: args.tenantId,
     stores: args.stores,
     pref: "storeGoal",
-    url: "/goals",
+    url: "/management/goals",
     text: (stores) => {
       const ids = new Set(stores.map((store) => store.id));
       return formatStoreGoalPush(crossed.filter((row) => ids.has(row.storeId)));

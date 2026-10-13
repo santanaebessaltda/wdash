@@ -104,8 +104,8 @@ async function main() {
   );
   console.log(
     shoppingToken
-      ? "  Allos                    : navegador nesta máquina"
-      : "  Allos                    : sem ALLOS_RUN_TOKEN — o Atualizar não entra",
+      ? "  Intranet Mall            : navegador nesta máquina"
+      : "  Intranet Mall            : sem ALLOS_RUN_TOKEN — o Atualizar não entra",
   );
   if (webhookToken && webhookUrl) {
     const listening = webhook.listening

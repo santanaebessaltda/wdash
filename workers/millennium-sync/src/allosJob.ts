@@ -5,7 +5,7 @@ import { postAllosWeeks, readAllosWeeks } from "./allosFill.ts";
 import { decryptPassword } from "./decrypt.ts";
 
 const KEEP = "Não foi possível informar as vendas ao shopping. Os valores já informados foram mantidos.";
-const LOGIN_FAIL = "Não foi possível acessar a Allos porque o painel solicitou uma verificação no navegador. Nada foi alterado.";
+const LOGIN_FAIL = "Não foi possível acessar a Intranet Mall porque o painel solicitou uma verificação no navegador. Nada foi alterado.";
 
 let tail: Promise<unknown> = Promise.resolve();
 

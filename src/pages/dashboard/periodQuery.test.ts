@@ -17,7 +17,7 @@ describe("periodo na URL", () => {
   });
 
   it("sai das telas sem o campo e mantém a filial", () => {
-    expect(routeShowsPeriod(paths.operation.sellers)).toBe(false);
+    expect(routeShowsPeriod(paths.management.team)).toBe(false);
     expect(routeShowsPeriod(paths.stock.inventory)).toBe(false);
     expect(routeShowsPeriod(paths.goalNew)).toBe(false);
     expect(routeShowsPeriod(paths.goalDetail("abc"))).toBe(false);

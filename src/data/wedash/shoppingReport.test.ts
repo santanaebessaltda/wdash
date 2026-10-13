@@ -10,6 +10,8 @@ import {
   ALREADY_LAUNCHED,
   allosPeriods,
   informedGap,
+  intranetMallBaseUrl,
+  intranetMallSlug,
   monthReport,
   periodReports,
   unlaunchedDays,
@@ -204,6 +206,22 @@ describe("forceLaunchAllowed", () => {
       message: "A integração com a Argo ainda não está disponível na WDash.",
     });
     expect(forceLaunchAllowed({ kiosk: true, administrator: "allos" })).toEqual({ ok: true });
+  });
+});
+
+describe("intranetMallSlug", () => {
+  it("keeps the branch slug and builds the panel url", () => {
+    expect(intranetMallSlug("shoppingcampogrande4")).toBe("shoppingcampogrande4");
+    expect(intranetMallSlug("shoppingcampogrande4/")).toBe("shoppingcampogrande4");
+    expect(intranetMallSlug("https://app3.intranetmall.com/shoppingcampogrande4/")).toBe("shoppingcampogrande4");
+    expect(intranetMallBaseUrl("shoppingcampogrande4")).toBe("https://app3.intranetmall.com/shoppingcampogrande4");
+  });
+
+  it("rejects a full address that is not the branch slug", () => {
+    expect(intranetMallSlug("https://clube.allos.com.br")).toBeNull();
+    expect(intranetMallSlug("https://app3.intranetmall.com/shoppingcampogrande4/loja")).toBeNull();
+    expect(intranetMallSlug("shopping campo")).toBeNull();
+    expect(intranetMallBaseUrl("")).toBeNull();
   });
 });
 

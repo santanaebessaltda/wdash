@@ -3,7 +3,7 @@ import { padBottom, padTop } from "@/lib/safeArea";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/cn";
 import { isNavGroup, type NavEntry } from "./nav-config";
-import { applyShoppingMenu, navDoPapel } from "./nav-wedash";
+import { applyShoppingMenu, navOfPapel } from "./nav-wedash";
 import { useShoppingMenu } from "./useShoppingMenu";
 import { WedashBrand } from "@/components/wedash/WedashBrand";
 import { searchForRoute } from "@/pages/dashboard/periodQuery";
@@ -40,7 +40,7 @@ function GroupIcon({ d }: { d: string }) {
 }
 
 /** Mantém `?filial=` ao trocar de tela. `periodo` só segue se o destino tem o campo. */
-function comBusca(to: string, search: string) {
+function withSearch(to: string, search: string) {
   const q = searchForRoute(to, search);
   return q ? `${to}${q}` : to;
 }
@@ -50,7 +50,7 @@ export function SidebarContent({ collapsed = false, onNavigate }: { collapsed?: 
   const session = useActiveSession();
   const { settings, report } = useShoppingMenu();
   const entries = useMemo(
-    () => applyShoppingMenu(navDoPapel(session.role), { settings, report }),
+    () => applyShoppingMenu(navOfPapel(session.role), { settings, report }),
     [session.role, settings, report],
   );
   const [openGroup, setOpenGroup] = useState<string | null>(() => owningGroupLabel(entries, location.pathname));
@@ -64,7 +64,7 @@ export function SidebarContent({ collapsed = false, onNavigate }: { collapsed?: 
     setOpenGroup((prev) => (prev === label ? null : label));
   }
 
-  const busca = location.search;
+  const search = location.search;
 
   return (
     <div className="pad-base flex h-full flex-col" style={padBottom("0px")}>
@@ -80,7 +80,7 @@ export function SidebarContent({ collapsed = false, onNavigate }: { collapsed?: 
             return (
               <NavLink
                 key={entry.label}
-                to={comBusca(entry.to, busca)}
+                to={withSearch(entry.to, search)}
                 onClick={onNavigate}
                 title={collapsed ? entry.label : undefined}
                 className={({ isActive }) => cn(linkBase, collapsed && "justify-center", (isActive || entry.activePaths?.includes(location.pathname)) && linkActive)}
@@ -104,7 +104,7 @@ export function SidebarContent({ collapsed = false, onNavigate }: { collapsed?: 
               {!collapsed && open && (
                 <div className="ml-[21px] mt-1 flex flex-col gap-0.5 border-l border-line pl-4">
                   {entry.items.map((item) => (
-                    <NavLink key={item.to} to={comBusca(item.to, busca)} end onClick={onNavigate} className={({ isActive }) => cn("flex items-center gap-2.5 rounded-[9px] px-2.5 py-2 text-[12.5px] font-medium text-t1 hover:bg-bg-3 hover:text-t0", isActive && linkActive)}>
+                    <NavLink key={item.to} to={withSearch(item.to, search)} end onClick={onNavigate} className={({ isActive }) => cn("flex items-center gap-2.5 rounded-[9px] px-2.5 py-2 text-[12.5px] font-medium text-t1 hover:bg-bg-3 hover:text-t0", isActive && linkActive)}>
                       <span className={cn("h-[5px] w-[5px] shrink-0 rounded-full", !item.dot && "bg-t2")} style={item.dot ? { background: item.dot } : undefined} />
                       <span className="flex-1 truncate">{item.label}</span>
                     </NavLink>
