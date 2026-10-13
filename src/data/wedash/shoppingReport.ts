@@ -66,6 +66,52 @@ export function monthReport(days: ClosedDay[], today: string): MonthReport {
   };
 }
 
+export type PeriodReport = {
+  from: string;
+  to: string;
+  soldCents: number;
+  launchedCents: number;
+  differenceCents: number;
+};
+
+/** Semana da Allos: domingo a sábado, cortada no mês. */
+export function allosPeriods(from: string, to: string): Array<{ from: string; to: string }> {
+  const periods: Array<{ from: string; to: string }> = [];
+  let start = from;
+  for (let day = from; day <= to; day = nextIso(day)) {
+    if (weekday(day) === 6 || day === to) {
+      periods.push({ from: start, to: day });
+      start = nextIso(day);
+    }
+  }
+  return periods;
+}
+
+/** Uma linha por bloco da Allos. Só entram dias anteriores a hoje. */
+export function periodReports(days: ClosedDay[], monthFrom: string, monthTo: string): PeriodReport[] {
+  return allosPeriods(monthFrom, monthTo).flatMap((period) => {
+    const inside = days.filter((day) => day.date >= period.from && day.date <= period.to);
+    if (inside.length === 0) return [];
+    const soldCents = inside.reduce((sum, day) => sum + day.soldCents, 0);
+    const launchedCents = inside.reduce((sum, day) => sum + (day.launchedCents ?? 0), 0);
+    return [{ from: period.from, to: period.to, soldCents, launchedCents, differenceCents: launchedCents - soldCents }];
+  });
+}
+
+function weekday(iso: string): number {
+  const [year, month, day] = iso.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+}
+
+function nextIso(iso: string): string {
+  const [year, month, day] = iso.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + 1);
+  const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(date.getUTCDate()).padStart(2, "0");
+  return `${date.getUTCFullYear()}-${mm}-${dd}`;
+}
+
 export type ShoppingAdministrator = "allos" | "argo";
 
 /**

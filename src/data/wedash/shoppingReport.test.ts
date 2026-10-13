@@ -7,7 +7,9 @@ import {
   formatAllosAmount,
   informedLaunchValues,
   informedStoredValues,
+  allosPeriods,
   monthReport,
+  periodReports,
   parseAllosForm,
   reportDays,
   shoppingAccountView,
@@ -74,6 +76,29 @@ describe("monthReport", () => {
       differenceCents: -3000,
       blankDays: 1,
     });
+  });
+});
+
+describe("periodReports", () => {
+  it("splits the month into Allos weeks and sums only closed days", () => {
+    expect(allosPeriods("2026-10-01", "2026-10-31")).toEqual([
+      { from: "2026-10-01", to: "2026-10-03" },
+      { from: "2026-10-04", to: "2026-10-10" },
+      { from: "2026-10-11", to: "2026-10-17" },
+      { from: "2026-10-18", to: "2026-10-24" },
+      { from: "2026-10-25", to: "2026-10-31" },
+    ]);
+    const days = reportDays(
+      ["2026-10-01", "2026-10-03", "2026-10-04", "2026-10-11", "2026-10-12", "2026-10-13"],
+      { "2026-10-01": 1000, "2026-10-03": 2000, "2026-10-04": 4000, "2026-10-11": 8000, "2026-10-12": 500 },
+      { "2026-10-01": 1000, "2026-10-04": 3000 },
+      today,
+    );
+    expect(periodReports(days, "2026-10-01", "2026-10-31")).toEqual([
+      { from: "2026-10-01", to: "2026-10-03", soldCents: 3000, launchedCents: 1000, differenceCents: -2000 },
+      { from: "2026-10-04", to: "2026-10-10", soldCents: 4000, launchedCents: 3000, differenceCents: -1000 },
+      { from: "2026-10-11", to: "2026-10-17", soldCents: 8500, launchedCents: 0, differenceCents: -8500 },
+    ]);
   });
 });
 

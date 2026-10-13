@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Alert, Card, Skeleton, useToast } from "@/components/ui";
+import { Alert, Card, CardSubtitle, CardTitle, DataTable, Skeleton, useToast, type DataTableColumn } from "@/components/ui";
 import { ChipDia, monthNavBtn, PlainKpi, SeletorMesAno, Seta } from "@/pages/cash-close/CashClosePage";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { fetchSalesCoverage, fetchSalesDayAggs } from "@/data/wedash/salesRepo";
 import { fetchLaunchedDays, fetchShoppingAccount, requestShoppingLaunch, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
-import { forceLaunchAllowed, monthReport, reportDays, sumSoldByDay } from "@/data/wedash/shoppingReport";
+import { forceLaunchAllowed, monthReport, periodReports, reportDays, sumSoldByDay, type PeriodReport } from "@/data/wedash/shoppingReport";
 import { brlCent, deIso, fimDoMes, inicioDoMes, intervaloDias, somarDias } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
@@ -50,6 +50,43 @@ function textoDiferenca(cents: number): string {
   if (cents > 0) return `A mais ${money(cents)}`;
   if (cents < 0) return `A menos ${money(Math.abs(cents))}`;
   return "Igual";
+}
+
+function rotuloPeriodo(from: string, to: string): string {
+  const inicio = deIso(from);
+  const fim = deIso(to);
+  const mes = fim.toLocaleDateString("pt-BR", { month: "long" });
+  if (inicio.getMonth() === fim.getMonth() && inicio.getFullYear() === fim.getFullYear()) {
+    if (from === to) return `${inicio.getDate()} de ${mes}`;
+    return `${inicio.getDate()} a ${fim.getDate()} de ${mes}`;
+  }
+  const mesInicio = inicio.toLocaleDateString("pt-BR", { month: "long" });
+  return `${inicio.getDate()} de ${mesInicio} a ${fim.getDate()} de ${mes}`;
+}
+
+function colunasPeriodo(hoje: string): DataTableColumn<PeriodReport>[] {
+  return [
+    {
+      key: "period",
+      header: "Período",
+      render: (row) => (
+        <div>
+          <div className="font-semibold">{rotuloPeriodo(row.from, row.to)}</div>
+          {row.to >= hoje ? <div className="mt-0.5 text-xs text-t2">Só os dias já fechados</div> : null}
+        </div>
+      ),
+    },
+    { key: "sold", header: "Vendido", align: "right", render: (row) => money(row.soldCents) },
+    { key: "launched", header: "Lançado", align: "right", render: (row) => money(row.launchedCents) },
+    {
+      key: "difference",
+      header: "Diferença",
+      align: "right",
+      render: (row) => (
+        <span style={{ color: row.differenceCents === 0 ? "var(--ok)" : "var(--bad)" }}>{textoDiferenca(row.differenceCents)}</span>
+      ),
+    },
+  ];
 }
 
 /** Gestão > Informe de vendas. Calendário do que foi informado no shopping. */
@@ -156,6 +193,8 @@ export function SalesReportPage() {
 
   const dias = useMemo(() => reportDays(intervaloDias(from, to), sold, launched, hoje), [from, to, sold, launched, hoje]);
   const resumo = useMemo(() => monthReport(dias, hoje), [dias, hoje]);
+  const periodos = useMemo(() => periodReports(dias, from, to), [dias, from, to]);
+  const colunas = useMemo(() => colunasPeriodo(hoje), [hoje]);
   const porDia = useMemo(() => new Map(dias.map((day) => [day.date, day])), [dias]);
 
   function irParaMes(alvo: string) {
@@ -214,6 +253,11 @@ export function SalesReportPage() {
                 color={resumo.differenceCents === 0 ? "var(--ok)" : "var(--bad)"}
                 tooltip="Lançado menos vendido. Positivo é aluguel percentual a mais. Negativo é risco de multa. Dia passado sem lançamento conta como zero."
               />
+            </div>
+            <div className="mb-4">
+              <CardTitle>Por período</CardTitle>
+              <CardSubtitle>Cada linha é um bloco da Allos. Vendido é o total da Millennium nesses dias.</CardSubtitle>
+              <DataTable className="mt-3" columns={colunas} data={periodos} rowKey={(row) => row.from} emptyMessage="Nenhum período fechado neste mês." />
             </div>
             <div className="overflow-x-auto rounded-[18px] border border-line bg-bg-2 shadow-[var(--shadow-vela)]">
               <div className="min-w-[980px]">
