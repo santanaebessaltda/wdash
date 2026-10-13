@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   fillAllosWeek,
   forceLaunchAllowed,
+  shoppingMenu,
   informedWeekIds,
   formatAllosAmount,
   informedLaunchValues,
@@ -101,6 +102,15 @@ describe("reportDays", () => {
       blankDays: 1,
     });
     expect(days.find((day) => day.date === "2026-10-13")).toBeUndefined();
+  });
+});
+
+describe("shoppingMenu", () => {
+  it("shows settings on a kiosk and the report only when Allos is saved", () => {
+    expect(shoppingMenu({ kiosk: false, administrator: "allos" })).toEqual({ settings: false, report: false });
+    expect(shoppingMenu({ kiosk: true, administrator: null })).toEqual({ settings: true, report: false });
+    expect(shoppingMenu({ kiosk: true, administrator: "argo" })).toEqual({ settings: true, report: false });
+    expect(shoppingMenu({ kiosk: true, administrator: "allos" })).toEqual({ settings: true, report: true });
   });
 });
 

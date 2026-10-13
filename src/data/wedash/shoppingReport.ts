@@ -68,6 +68,18 @@ export function monthReport(days: ClosedDay[], today: string): MonthReport {
 
 export type ShoppingAdministrator = "allos" | "argo";
 
+/**
+ * Menu do shopping da filial selecionada.
+ * Configuração só no quiosque. Informe de vendas só com Allos, a integração que lança hoje.
+ */
+export function shoppingMenu(input: {
+  kiosk: boolean;
+  administrator: ShoppingAdministrator | null;
+}): { settings: boolean; report: boolean } {
+  if (!input.kiosk) return { settings: false, report: false };
+  return { settings: true, report: input.administrator === "allos" };
+}
+
 /** O Atualizar desta tela só chama o shopping quando a filial é quiosque e o acesso está salvo. */
 export function forceLaunchAllowed(input: {
   kiosk: boolean;

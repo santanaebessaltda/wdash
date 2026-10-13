@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button, Card, FormField, Input, Select, Skeleton, useToast } from "@/components/ui";
 import { fetchShoppingAccount, saveShoppingAccount, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
 import type { ShoppingAdministrator } from "@/data/wedash/shoppingReport";
@@ -6,10 +7,14 @@ import { noAutofill, secretStyle } from "@/lib/noAutofill";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { useScope } from "@/pages/dashboard/useScope";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
+import { SHOPPING_MENU_EVENT, useShoppingMenu } from "@/layout/useShoppingMenu";
+import { paths } from "@/router/paths";
 import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
 
 /** Configurações > Shopping. URL, usuário e senha do quiosque. A senha não volta depois de salva. */
 export function ShoppingPage() {
+  const navigate = useNavigate();
+  const menu = useShoppingMenu();
   const { show } = useToast();
   const { session, lojas, loading: lojasLoading } = useScopedStores();
   const { escopo } = useScope();
@@ -55,6 +60,11 @@ export function ShoppingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lojasLoading, escolher, loja, session.tenantId]);
 
+  useEffect(() => {
+    if (!menu.ready || menu.settings) return;
+    navigate(paths.operation.filial, { replace: true });
+  }, [menu.ready, menu.settings, navigate]);
+
   async function salvar() {
     if (!loja) return;
     setBusy(true);
@@ -74,11 +84,14 @@ export function ShoppingPage() {
       lastRunAt: account?.lastRunAt ?? null,
       lastError: account?.lastError ?? "",
     });
+    window.dispatchEvent(new Event(SHOPPING_MENU_EVENT));
     show("Shopping salvo.", "success");
   }
 
   const salvo = account != null;
   const podeSalvar = !busy && baseUrl.trim().startsWith("https://") && username.trim().length > 0 && (password.trim().length > 0 || salvo);
+
+  if (menu.ready && !menu.settings) return null;
 
   return (
     <div>

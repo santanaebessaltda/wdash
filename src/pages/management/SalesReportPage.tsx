@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Alert, Card, Skeleton, useToast } from "@/components/ui";
 import { ChipDia, monthNavBtn, PlainKpi, SeletorMesAno, Seta } from "@/pages/cash-close/CashClosePage";
 import { calendarTodayIso } from "@/data/wedash/clock";
@@ -10,6 +11,8 @@ import { cn } from "@/lib/cn";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { useScope } from "@/pages/dashboard/useScope";
+import { useShoppingMenu } from "@/layout/useShoppingMenu";
+import { paths } from "@/router/paths";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
 import { HeaderFilters } from "@/pages/stock/shared";
@@ -51,6 +54,8 @@ function textoDiferenca(cents: number): string {
 
 /** Gestão > Informe de vendas. Calendário do que foi informado no shopping. */
 export function SalesReportPage() {
+  const navigate = useNavigate();
+  const menu = useShoppingMenu();
   const { show } = useToast();
   const { session, lojas, loading: lojasLoading } = useScopedStores();
   const { escopo } = useScope();
@@ -119,6 +124,11 @@ export function SalesReportPage() {
 
   const pronto = loaded === faixa;
 
+  useEffect(() => {
+    if (!menu.ready || menu.report) return;
+    navigate(paths.management.sangria, { replace: true });
+  }, [menu.ready, menu.report, navigate]);
+
   const pedir = useCallback(async () => {
     const atual = lojaRef.current;
     if (escolher || !atual) return;
@@ -153,6 +163,8 @@ export function SalesReportPage() {
     if (mes < piso || mes > inicioDoMes(hoje)) return;
     setAnchor(mes === inicioDoMes(hoje) ? hoje : mes);
   }
+
+  if (menu.ready && !menu.report) return null;
 
   return (
     <div>

@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { isNavGroup } from "./nav-config";
-import { navDoPapel } from "./nav-wedash";
+import { applyShoppingMenu, navDoPapel } from "./nav-wedash";
+import { useShoppingMenu } from "./useShoppingMenu";
 import { searchForRoute } from "@/pages/dashboard/periodQuery";
 import { useActiveSession } from "@/session/SessionProvider";
 
@@ -18,10 +19,11 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const navigate = useNavigate();
   const location = useLocation();
   const session = useActiveSession();
+  const { settings, report } = useShoppingMenu();
 
   const flatItems = useMemo<FlatItem[]>(
-    () => navDoPapel(session.role).flatMap((entry) => (isNavGroup(entry) ? entry.items.map((i) => ({ label: i.label, to: i.to, group: entry.label })) : [{ label: entry.label, to: entry.to, group: "Principal" }])),
-    [session.role],
+    () => applyShoppingMenu(navDoPapel(session.role), { settings, report }).flatMap((entry) => (isNavGroup(entry) ? entry.items.map((i) => ({ label: i.label, to: i.to, group: entry.label })) : [{ label: entry.label, to: entry.to, group: "Principal" }])),
+    [session.role, settings, report],
   );
 
   const results = useMemo(() => {

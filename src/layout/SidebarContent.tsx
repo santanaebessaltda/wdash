@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { padBase, padTopo } from "@/lib/safeArea";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/cn";
 import { isNavGroup, type NavEntry } from "./nav-config";
-import { navDoPapel } from "./nav-wedash";
+import { applyShoppingMenu, navDoPapel } from "./nav-wedash";
+import { useShoppingMenu } from "./useShoppingMenu";
 import { WedashBrand } from "@/components/wedash/WedashBrand";
 import { searchForRoute } from "@/pages/dashboard/periodQuery";
 import { useActiveSession } from "@/session/SessionProvider";
@@ -47,7 +48,11 @@ function comBusca(to: string, search: string) {
 export function SidebarContent({ collapsed = false, onNavigate }: { collapsed?: boolean; onNavigate?: () => void }) {
   const location = useLocation();
   const session = useActiveSession();
-  const entries = navDoPapel(session.role);
+  const { settings, report } = useShoppingMenu();
+  const entries = useMemo(
+    () => applyShoppingMenu(navDoPapel(session.role), { settings, report }),
+    [session.role, settings, report],
+  );
   const [openGroup, setOpenGroup] = useState<string | null>(() => owningGroupLabel(entries, location.pathname));
 
   useEffect(() => {

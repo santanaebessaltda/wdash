@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button, Card, CardHeader, CardTitle, EmptyState, FormField, Input, PageHeader, Select, TabNav } from "@/components/ui";
 import { costTabs, managementTabs } from "@/layout/nav-wedash";
+import { useShoppingMenu } from "@/layout/useShoppingMenu";
+import { paths } from "@/router/paths";
 import { halfHourOptions } from "@/data/wedash/storeHours";
 import { useActiveSession } from "@/session/SessionProvider";
 import { storesKey } from "@/session/session";
@@ -87,10 +89,15 @@ export function SectionHeader({
   actions?: ReactNode;
   notices?: ReactNode;
 }) {
+  const menu = useShoppingMenu();
   useEffect(() => {
     for (const load of SECTION_PAGES[section]) void load().catch(() => {});
   }, [section]);
-  const tabs = SECTION_TABS[section];
+  const tabs = SECTION_TABS[section].filter((tab) => {
+    if (tab.to === paths.operation.shopping) return menu.settings;
+    if (tab.to === paths.management.salesReport) return menu.report;
+    return true;
+  });
   return (
     <>
       <PageHeader

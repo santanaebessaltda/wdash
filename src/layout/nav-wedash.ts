@@ -1,6 +1,6 @@
 import { paths } from "@/router/paths";
 import type { Role } from "@/data/wedash/team";
-import type { NavEntry, NavGroup, NavSingle } from "./nav-config";
+import { isNavGroup, type NavEntry, type NavGroup, type NavSingle } from "./nav-config";
 
 const ICONE = {
   dashboard: "M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z",
@@ -56,6 +56,21 @@ const custos: NavGroup = {
     { label: "Shopping", to: paths.operation.shopping },
   ],
 };
+
+/** Tira Shopping e Informe de vendas quando a filial selecionada não entra na regra. */
+export function applyShoppingMenu(entries: NavEntry[], menu: { settings: boolean; report: boolean }): NavEntry[] {
+  return entries.map((entry) => {
+    if (!isNavGroup(entry)) return entry;
+    return {
+      ...entry,
+      items: entry.items.filter((item) => {
+        if (item.to === paths.operation.shopping) return menu.settings;
+        if (item.to === paths.management.salesReport) return menu.report;
+        return true;
+      }),
+    };
+  });
+}
 
 /** Abas das telas de cada grupo = os mesmos itens do menu. */
 export const managementTabs = gestao.items.map(({ label, to }) => ({ label, to }));

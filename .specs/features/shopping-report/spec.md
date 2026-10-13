@@ -73,9 +73,11 @@ O gestor lança, à mão, as vendas brutas de cada quiosque no painel do shoppin
 2. The system SHALL compute Diferença as lançado minus vendido, in cents.
 3. WHEN a past day has no launch THEN the system SHALL count its lançado as 0 and mark the day blank.
 4. The system SHALL show the screen as Informe de vendas at /management/sales-report for Gestor and Gerente.
-5. WHEN the person uses Atualizar on Informe de vendas THEN the system SHALL run the same fill as the dawn routine for the selected kiosk.
-6. IF the store is not a kiosk, or the shopping access is not saved THEN the system SHALL not call the mall.
-7. IF the mall save fails THEN the system SHALL keep the stored shopping values.
+5. WHEN the selected store is not one kiosk, or that kiosk has no Allos access THEN the system SHALL hide Informe de vendas.
+6. WHEN the selected kiosk has Allos saved THEN the system SHALL show Informe de vendas.
+7. WHEN the person uses Atualizar on Informe de vendas THEN the system SHALL run the same fill as the dawn routine for the selected kiosk.
+8. IF the store is not a kiosk, or the shopping access is not saved THEN the system SHALL not call the mall.
+9. IF the mall save fails THEN the system SHALL keep the stored shopping values.
 
 **Independent Test**: Mês com um dia vendido a R$ 100,00 e lançado a R$ 120,00, e outro vendido a R$ 50,00 sem lançamento. Vendido R$ 150,00, lançado R$ 120,00, diferença R$ 30,00 a menos.
 
@@ -90,8 +92,9 @@ O gestor lança, à mão, as vendas brutas de cada quiosque no painel do shoppin
 **Acceptance Criteria**:
 
 1. WHERE the store type is quiosque em shopping the system SHALL show a card at /operation/shopping with administrator Allos or Argo, URL, user and password.
-2. The system SHALL allow only the Gestor to save that card.
-3. The system SHALL keep the password unreadable after it is saved.
+2. WHEN the selected store is not one kiosk THEN the system SHALL hide Shopping.
+3. The system SHALL allow only the Gestor to save that card.
+4. The system SHALL keep the password unreadable after it is saved.
 
 **Independent Test**: Salvar Allos, uma URL e um usuário numa filial quiosque. A senha não volta em claro. Loja de rua não mostra o card.
 
