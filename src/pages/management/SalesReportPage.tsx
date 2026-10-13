@@ -264,20 +264,20 @@ export function SalesReportPage() {
           <Skeleton className="h-[520px] w-full rounded-[18px]" />
         ) : lojas.length === 0 || !loja ? (
           <Card>
-            <EmptyBlock icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
+            <EmptyBlock icon="🧾" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
           </Card>
         ) : !quiosque ? (
           <Card>
-            <EmptyBlock icon="🏬" title="Informe de vendas indisponível" description="Esta tela está disponível apenas para filiais do tipo Quiosque em shopping." />
+            <EmptyBlock icon="🧾" title="Informe de vendas indisponível" description="Esta tela está disponível apenas para filiais do tipo Quiosque em shopping." />
           </Card>
         ) : account?.administrator === "argo" ? (
           <Card>
-            <EmptyBlock icon="🏬" title="Argo ainda não disponível" description="A integração com a Argo ainda não está disponível na WDash." />
+            <EmptyBlock icon="🧾" title="Argo ainda não disponível" description="A integração com a Argo ainda não está disponível na WDash." />
           </Card>
         ) : account?.administrator !== "allos" ? (
           <Card>
             <EmptyBlock
-              icon="🏬"
+              icon="🧾"
               title="Administradora não configurada"
               description={gestor ? "Configure a administradora desta filial para informar as vendas ao shopping." : "O Gestor ainda não configurou a administradora desta filial."}
               action={gestor ? <Button onClick={() => navigate(paths.operation.shopping)}>Configurar shopping</Button> : undefined}
@@ -399,8 +399,11 @@ function DiaCelula({
           />
         ) : null}
       </span>
-      {passado && vendido != null ? <ChipDia cor="bg-chip-gray">{`Vendido ${money(vendido)}`}</ChipDia> : null}
-      {hojeDia ? <p className="mt-1 truncate text-[12px] font-bold text-t0">{money(vendido ?? 0)}</p> : null}
+      {(passado || hojeDia) ? (
+        <p className="mt-1.5 whitespace-nowrap font-mono text-[12px] font-extrabold text-t1 sm:text-[13px]">
+          {`Vendido ${money(vendido ?? 0)}`}
+        </p>
+      ) : null}
       {status ? <ChipDia cor={status.cor}>{status.texto}</ChipDia> : null}
       {hojeDia ? <p className="mt-1 text-[11px] font-semibold text-t2">Em aberto</p> : null}
     </div>

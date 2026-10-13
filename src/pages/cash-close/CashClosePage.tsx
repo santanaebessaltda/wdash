@@ -917,10 +917,10 @@ function Mes({
               <NumeroDia iso={day} hoje={hoje} />
               {mostraTotal && face && (
                 <div className="mt-1.5 w-full min-w-0">
-                  <p className={cn("whitespace-nowrap font-mono text-[12px] font-extrabold sm:text-[13px]", day === hoje ? "text-acc" : "text-t1")}>
+                  <p className="whitespace-nowrap font-mono text-[12px] font-extrabold text-t1 sm:text-[13px]">
                     {brlCent(face.totalCents / 100)}
                   </p>
-                  {face.kind === "pendente" && <ChipDia cor="bg-warn">Pendente</ChipDia>}
+                  {face.kind === "pendente" && <ChipDia cor="bg-warn">{`Pendente ${brlCent(face.totalCents / 100)}`}</ChipDia>}
                   {face.kind === "hoje" && <ChipDia cor="bg-acc">Em aberto</ChipDia>}
                   {face.kind === "total" && (face.diffCents !== 0 || face.withdrawalCents === 0) && (
                     <ChipDia cor={chipDaDiferenca(face.diffCents).cor}>{chipDaDiferenca(face.diffCents).texto}</ChipDia>
