@@ -1,4 +1,5 @@
 import { calendarTodayIso } from "./clock";
+import { parseWithdrawalRows, type WithdrawalLine } from "./employeeWithdrawal";
 import { shiftName } from "./engine/format";
 import { cashCloseJobMatches, monthCloseSpanFor, navMonthFloor, sangriaMonthSpan, type CashCloseJobPart } from "./cashCloseMonth";
 import { assembleMonthMarks, captureBucket, paidPixCents, type CashCloseBucket, type CashCloseMillLine, type CloseAmountMap } from "./cashCloseView";
@@ -316,6 +317,7 @@ export type CashCloseReview = {
   shortageScope: ShortageScopeSaved;
   shortageSellers: string[];
   shortageGroup: string;
+  withdrawals: WithdrawalLine[];
 };
 
 function sellerList(value: unknown): string[] {
@@ -332,15 +334,26 @@ export async function fetchCashCloseReviews(tenantId: string, storeIds: string[]
   const { getSupabase } = await import("@/lib/supabase");
   const sb = getSupabase();
   if (!sb || storeIds.length === 0 || from > to) return [];
-  const { data, error } = await sb
-    .from("cash_close_review")
-    .select("store_id, day, cash_typed_cents, justification, waive, typed_cents, acquirer_cents, shortage_scope, shortage_sellers, shortage_group")
-    .eq("tenant_id", tenantId)
-    .in("store_id", storeIds)
-    .gte("day", from)
-    .lte("day", to);
+  const cols = "store_id, day, cash_typed_cents, justification, waive, typed_cents, acquirer_cents, shortage_scope, shortage_sellers, shortage_group";
+  const query = (select: string) =>
+    sb.from("cash_close_review").select(select).eq("tenant_id", tenantId).in("store_id", storeIds).gte("day", from).lte("day", to);
+  let { data, error } = await query(`${cols}, withdrawals`);
+  if (error?.code === "42703") ({ data, error } = await query(cols));
   if (error) throw new Error(error.message);
-  return (data ?? []).map((row) => ({
+  const rows = (data ?? []) as unknown as Array<{
+    store_id: string;
+    day: string;
+    cash_typed_cents: number | null;
+    justification: string | null;
+    waive: boolean | null;
+    typed_cents: unknown;
+    acquirer_cents: unknown;
+    shortage_scope: unknown;
+    shortage_sellers: unknown;
+    shortage_group: string | null;
+    withdrawals?: unknown;
+  }>;
+  return rows.map((row) => ({
     storeId: String(row.store_id),
     day: String(row.day),
     cashTypedCents: row.cash_typed_cents == null ? null : Number(row.cash_typed_cents),
@@ -351,6 +364,7 @@ export async function fetchCashCloseReviews(tenantId: string, storeIds: string[]
     shortageScope: scopeOf(row.shortage_scope),
     shortageSellers: sellerList(row.shortage_sellers),
     shortageGroup: String(row.shortage_group ?? ""),
+    withdrawals: parseWithdrawalRows(row.withdrawals),
   }));
 }
 
@@ -366,6 +380,7 @@ export async function saveCashCloseReview(input: {
   shortageScope: ShortageScopeSaved;
   shortageSellers: string[];
   shortageGroup: string;
+  withdrawals: WithdrawalLine[];
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const { getSupabase } = await import("@/lib/supabase");
   const sb = getSupabase();
@@ -383,6 +398,7 @@ export async function saveCashCloseReview(input: {
       shortage_scope: input.shortageScope,
       shortage_sellers: input.shortageSellers,
       shortage_group: input.shortageGroup,
+      withdrawals: input.withdrawals,
     },
     { onConflict: "tenant_id,store_id,day" },
   );

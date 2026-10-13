@@ -1,6 +1,7 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Alert, Badge, Button, Card, Modal, Skeleton, Tooltip, useToast } from "@/components/ui";
+import { EmployeeWithdrawal } from "@/pages/cash-close/EmployeeWithdrawal";
 import { monthCloseSpanFor } from "@/data/wedash/cashCloseMonth";
 import {
   applyCloseReview,
@@ -27,8 +28,15 @@ import {
   type CashCloseSnapshot,
 } from "@/data/wedash/cashCloseRepo";
 import { calendarTodayIso } from "@/data/wedash/clock";
+import {
+  cashShortageCents,
+  withdrawalDraftFrom,
+  withdrawalPeople,
+  withdrawalSave,
+  type WithdrawalDraft,
+} from "@/data/wedash/employeeWithdrawal";
 import { fetchSalesDayAggs, fetchSyncWatermark } from "@/data/wedash/salesRepo";
-import type { Store } from "@/data/wedash/stores";
+import { fetchStoreSellers, type Store, type StoreSeller } from "@/data/wedash/stores";
 import { isGestor } from "@/layout/nav-wedash";
 import { cn } from "@/lib/cn";
 import { brlCent, dataExtenso, deIso, fimDoMes, inicioDoMes, paraIso, somarDias, labelUpper } from "@/lib/format";
@@ -461,6 +469,7 @@ export function CashClosePage() {
   const [marks, setMarks] = useState<CashCloseDayMark[]>([]);
   const [marksKey, setMarksKey] = useState("");
   const [reviews, setReviews] = useState<CashCloseReview[]>([]);
+  const [sellersByStore, setSellersByStore] = useState<Map<string, StoreSeller[]>>(new Map());
   const [diaAberto, setDiaAberto] = useState<string | null>(null);
   const [dias, setDias] = useState<Record<string, CashCloseSnapshot>>({});
   const [diaKey, setDiaKey] = useState("");
@@ -484,6 +493,16 @@ export function CashClosePage() {
   const faixaKey = `${storeKey}|${from}|${to}|${reloadKey}`;
 
   const lojaId = lojas[0]?.id ?? "";
+  useEffect(() => {
+    if (lojasLoading || escolher || lojas.length === 0) return;
+    let stop = false;
+    void fetchStoreSellers(session.tenantId, lojas.map((loja) => loja.id)).then((map) => {
+      if (!stop) setSellersByStore(map);
+    });
+    return () => {
+      stop = true;
+    };
+  }, [lojasLoading, escolher, session.tenantId, lojas]);
   useEffect(() => {
     if (lojasLoading || escolher || !lojaId) return;
     let stop = false;
@@ -760,6 +779,7 @@ export function CashClosePage() {
         fechado={diaAberto != null && diaAberto < hoje}
         tenantId={session.tenantId}
         soldByStore={soldToday?.byStore ?? null}
+        sellersByStore={sellersByStore}
         onClose={() => setDiaAberto(null)}
         onSaved={(next) => {
           setReviews((atual) => {
@@ -925,6 +945,7 @@ function DiaModal({
   fechado,
   tenantId,
   soldByStore,
+  sellersByStore,
   onClose,
   onSaved,
 }: {
@@ -937,16 +958,19 @@ function DiaModal({
   fechado: boolean;
   tenantId: string;
   soldByStore: Record<string, number> | null;
+  sellersByStore: Map<string, StoreSeller[]>;
   onClose: () => void;
   onSaved: (review: CashCloseReview) => void;
 }) {
   const { show } = useToast();
   const [drafts, setDrafts] = useState<Record<string, CloseDraft>>({});
+  const [withdrawalDrafts, setWithdrawalDrafts] = useState<Record<string, WithdrawalDraft>>({});
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!day || !pronto) return;
     const next: Record<string, CloseDraft> = {};
+    const nextWithdrawals: Record<string, WithdrawalDraft> = {};
     for (const loja of lojas) {
       const snap = snaps[loja.id];
       if (!snap) continue;
@@ -961,8 +985,10 @@ function DiaModal({
         acquirer[line.key] = shown == null ? "" : centsToField(shown);
       }
       next[loja.id] = { typed, acquirer };
+      nextWithdrawals[loja.id] = withdrawalDraftFrom(review?.withdrawals ?? [], centsToField);
     }
     setDrafts(next);
+    setWithdrawalDrafts(nextWithdrawals);
   }, [day, pronto, lojas, snaps, reviews]);
 
   const comDados = day
@@ -1022,6 +1048,22 @@ function DiaModal({
         return;
       }
       const review = reviews.find((item) => item.storeId === loja.id && item.day === day);
+      const people = withdrawalPeople(
+        (sellersByStore.get(loja.id) ?? []).map((seller) => ({ id: seller.id, name: seller.name, active: seller.active })),
+        (withdrawalDrafts[loja.id]?.rows ?? []).map((row) => row.sellerId),
+      );
+      const retiro = withdrawalSave({
+        shortageCents: cashShortageCents(linesWithDraft(linhas, draft)),
+        enabled: withdrawalDrafts[loja.id]?.enabled ?? false,
+        rows: withdrawalDrafts[loja.id]?.rows ?? [],
+        parseCents: fieldToCents,
+        names: new Map(people.map((person) => [person.id, person.name])),
+      });
+      if (!retiro.ok) {
+        setBusy(false);
+        show(retiro.message, "danger");
+        return;
+      }
       const saved: CashCloseReview = {
         storeId: loja.id,
         day,
@@ -1033,6 +1075,7 @@ function DiaModal({
         shortageScope: review?.shortageScope ?? "",
         shortageSellers: review?.shortageSellers ?? [],
         shortageGroup: review?.shortageGroup ?? "",
+        withdrawals: retiro.lines,
       };
       const r = await saveCashCloseReview({ tenantId, ...saved });
       if (!r.ok) {
@@ -1104,6 +1147,10 @@ function DiaModal({
             const draft = drafts[loja.id];
             const linhas = linesWithDraft(view.lines, draft);
             const conta = closeDayGap(linhas);
+            const people = withdrawalPeople(
+              (sellersByStore.get(loja.id) ?? []).map((seller) => ({ id: seller.id, name: seller.name, active: seller.active })),
+              (withdrawalDrafts[loja.id]?.rows ?? []).map((row) => row.sellerId),
+            );
             return (
               <section key={loja.id}>
                 {lojas.length > 1 && <p className="mb-3 text-[13px] font-bold text-t0">{loja.fantasia}</p>}
@@ -1130,6 +1177,14 @@ function DiaModal({
                       [loja.id]: { ...(atual[loja.id] ?? draft!), acquirer: { ...(atual[loja.id]?.acquirer ?? {}), [key]: value } },
                     }))
                   }
+                />
+                <EmployeeWithdrawal
+                  gestor={gestor}
+                  shortageCents={cashShortageCents(linhas)}
+                  people={people}
+                  draft={withdrawalDrafts[loja.id] ?? { enabled: false, rows: [] }}
+                  onChange={(next) => setWithdrawalDrafts((atual) => ({ ...atual, [loja.id]: next }))}
+                  toCents={fieldToCents}
                 />
               </section>
             );
