@@ -491,14 +491,16 @@ export function SangriaPage() {
   );
 }
 
-function chipsDoDia(tot: SangriaAmounts, recebido: boolean): Array<{ cor: string; texto: string }> {
+function chipsDoDia(tot: SangriaAmounts, recebido: boolean, aberto: boolean): Array<{ cor: string; texto: string }> {
   if (tot.totalCents <= 0 && tot.faltaCents <= 0) return [];
   const chips: Array<{ cor: string; texto: string }> = [];
   if (tot.boletoCents > 0) {
     chips.push(
-      recebido
-        ? { cor: "bg-ok", texto: `Recebido ${money(tot.boletoCents)}` }
-        : { cor: "bg-acc", texto: `A cobrar ${money(tot.boletoCents)}` },
+      aberto && !recebido
+        ? { cor: "bg-acc", texto: "Em aberto" }
+        : recebido
+          ? { cor: "bg-ok", texto: `Recebido ${money(tot.boletoCents)}` }
+          : { cor: "bg-warn", texto: `A cobrar ${money(tot.boletoCents)}` },
     );
   }
   if (tot.foraCents > 0) chips.push({ cor: "bg-info", texto: `Fora ${money(tot.foraCents)}` });
@@ -530,7 +532,7 @@ function DiaCelula({
   const tot = dayAmounts(rows, faltaCents);
   const futuro = day != null && day > hoje;
   const abre = day != null && !futuro && (rows.length > 0 || depositado || faltaCents > 0);
-  const chips = rows.length > 0 || faltaCents > 0 ? chipsDoDia(tot, depositado) : [];
+  const chips = rows.length > 0 || faltaCents > 0 ? chipsDoDia(tot, depositado, day === hoje) : [];
   const borda = cn(
     "relative flex h-full min-h-[84px] w-full min-w-0 flex-col items-stretch justify-start border-b border-r border-line p-1.5 text-left sm:min-h-[110px] sm:p-2",
     (index + 1) % 7 === 0 && "border-r-0",
@@ -557,7 +559,7 @@ function DiaCelula({
       {rows.length > 0 || chips.length > 0 ? (
         <div className="mt-1.5 w-full min-w-0">
           {rows.length > 0 ? (
-            <p className={cn("whitespace-nowrap font-mono text-[12px] font-extrabold sm:text-[13px]", day === hoje ? "text-acc" : "text-t1")}>
+            <p className="whitespace-nowrap font-mono text-[12px] font-extrabold text-t1 sm:text-[13px]">
               {money(tot.totalCents)}
             </p>
           ) : null}
