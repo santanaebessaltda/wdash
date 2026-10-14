@@ -244,8 +244,8 @@ O gestor manda holerite e documentos parecidos para cada colaborador assinar. Ho
 | Requirement ID | Story | Phase | Status |
 | --- | --- | --- | --- |
 | DOCS-01 | P1: Cadastro para achar o destinatário | Design | In Design |
-| DOCS-02 | P1: Cortar o PDF e revisar | Design | In Design |
-| DOCS-03 | P1: Disparar pelo Assina AI | Design | In Design |
+| DOCS-02 | P1: Cortar o PDF e revisar | Execute | Implemented |
+| DOCS-03 | P1: Disparar pelo Assina AI | Execute | Implemented |
 | DOCS-04 | P1: Pasta do colaborador | Design | In Design |
 | DOCS-05 | P1: Cobrar pelo lote | Design | In Design |
 | DOCS-06 | P1: Receber o status e guardar o PDF | Design | In Design |

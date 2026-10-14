@@ -159,9 +159,9 @@ T6 → T7
 
 **Done when**:
 
-- [ ] Confirm skips a row that already has an envelope
-- [ ] A missing token, deadline, contact, or file over 5 MB does not call create
-- [ ] Gate check passes: `npm run build`
+- [x] Confirm skips a row that already has an envelope
+- [x] A missing token, deadline, contact, or file over 5 MB does not call create
+- [x] Gate check passes: `npm run build`
 
 **Tests**: none
 **Gate**: build
