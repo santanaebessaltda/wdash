@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Badge, Button, Card, DataTable, EmptyState, Modal, type DataTableColumn } from "@/components/ui";
+import { Badge, Button, Card, DataTable, EmptyState, type DataTableColumn } from "@/components/ui";
 import { monthFolder, resendVisible } from "@/data/wedash/documentSplit";
 import type { BatchRow, DocumentRow, PersonRow } from "@/data/wedash/documentsRepo";
 import { openDocument, resendDocument } from "@/data/wedash/documentsRepo";
@@ -19,7 +19,6 @@ export function DocumentsPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [sent, setSent] = useState<string | null>(null);
   const [attaching, setAttaching] = useState(false);
-  const [creatingFolder, setCreatingFolder] = useState(false);
 
   const storeName = useMemo(() => new Map(stores.map((store) => [store.id, store.name])), [stores]);
   const personName = useMemo(() => new Map(people.map((person) => [person.id, person.name])), [people]);
@@ -64,50 +63,18 @@ export function DocumentsPage() {
 
   const title = sectionTitle(mode, allStores, crumb, storeName, personName);
 
-  function openFolder(personId: string, folderYear: string, folderMonth: string) {
-    const person = people.find((item) => item.id === personId);
-    if (!person) return;
-    setMode("browse");
-    setCrumb(allStores ? [person.storeId, person.id, folderYear, folderMonth] : [person.id, folderYear, folderMonth]);
-    setQuery("");
-    setCreatingFolder(false);
-  }
-
   return (
     <DocumentsFrame
       title="Documentos"
       subtitle={allStores ? "Filial, colaborador, ano e mês" : "Colaborador, ano e mês"}
       actions={
-        attaching ? undefined : (
-          <>
-            <Button variant="secondary" icon={<FolderGlyph size={15} />} onClick={() => setCreatingFolder(true)}>
-              Nova pasta
-            </Button>
-            <Button icon={<FileGlyph size={15} />} onClick={() => { setSent(null); setAttaching(true); }}>
-              Anexar documento
-            </Button>
-          </>
-        )
+        <Button icon={<FileGlyph size={15} />} onClick={() => { setSent(null); setAttaching(true); }}>
+          Anexar documento
+        </Button>
       }
     >
       {sent && <p className="mb-3 text-[13px] text-ok">{sent}</p>}
       {notice && <p className="mb-3 text-[13px] text-bad">{notice}</p>}
-      {attaching ? (
-        <AttachWizard
-          storeId={storeId}
-          people={people}
-          documents={documents}
-          onReload={reload}
-          onClose={() => setAttaching(false)}
-          onDone={(message) => {
-            setAttaching(false);
-            setNotice(message);
-            setSent(message ? null : "Documentos enviados.");
-            setMode("home");
-          }}
-        />
-      ) : (
-        <>
       {mode === "home" && (
         <>
           <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -172,10 +139,20 @@ export function DocumentsPage() {
       <p className="mt-3 text-[12.5px] text-t2">
         {mode === "browse" ? `${visibleFolders.length} itens` : `${visibleFiles.length} documentos`}
       </p>
-        </>
-      )}
-      {creatingFolder && (
-        <NewFolderModal people={people} onClose={() => setCreatingFolder(false)} onOpen={openFolder} />
+      {attaching && (
+        <AttachWizard
+          storeId={storeId}
+          people={people}
+          documents={documents}
+          onReload={reload}
+          onClose={() => setAttaching(false)}
+          onDone={(message) => {
+            setAttaching(false);
+            setNotice(message);
+            setSent(message ? null : "Documentos enviados.");
+            setMode("home");
+          }}
+        />
       )}
     </DocumentsFrame>
   );
@@ -193,60 +170,6 @@ function ThinKpi({ label, value, sub, tint, icon }: { label: string; value: numb
         <p className="truncate text-[11.5px] text-t2">{sub}</p>
       </div>
     </Card>
-  );
-}
-
-function NewFolderModal({
-  people,
-  onClose,
-  onOpen,
-}: {
-  people: PersonRow[];
-  onClose: () => void;
-  onOpen: (personId: string, year: string, month: string) => void;
-}) {
-  const [personId, setPersonId] = useState(people[0]?.id ?? "");
-  const [year, setYear] = useState(String(new Date().getFullYear()));
-  const [month, setMonth] = useState(String(new Date().getMonth() + 1));
-  return (
-    <Modal
-      open
-      title="Nova pasta"
-      onClose={onClose}
-      footer={
-        <Button onClick={() => personId && onOpen(personId, year, monthFolder(Number(month)))} disabled={!personId}>
-          Abrir pasta
-        </Button>
-      }
-    >
-      <div className="grid gap-3">
-        <label className="text-xs font-semibold text-t1">
-          Colaborador
-          <select className="mt-1 w-full rounded-lg border border-line bg-bg-inset px-2 py-2 text-sm" value={personId} onChange={(event) => setPersonId(event.target.value)}>
-            {people.map((person) => (
-              <option key={person.id} value={person.id}>
-                {person.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-xs font-semibold text-t1">
-          Ano
-          <input className="mt-1 w-full rounded-lg border border-line bg-bg-inset px-2 py-2 text-sm" value={year} onChange={(event) => setYear(event.target.value)} />
-        </label>
-        <label className="text-xs font-semibold text-t1">
-          Mês
-          <select className="mt-1 w-full rounded-lg border border-line bg-bg-inset px-2 py-2 text-sm" value={month} onChange={(event) => setMonth(event.target.value)}>
-            {Array.from({ length: 12 }, (_, index) => (
-              <option key={index + 1} value={index + 1}>
-                {monthFolder(index + 1)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <p className="text-xs text-t2">A pasta é do colaborador. O PDF entra nela quando o CPF dele está no arquivo.</p>
-      </div>
-    </Modal>
   );
 }
 

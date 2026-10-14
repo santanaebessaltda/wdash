@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Button, Card, CardHeader, CardTitle, ProgressBar, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
+import { Button, Card, CardHeader, CardTitle, Modal, ProgressBar, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { DOCUMENT_CATEGORIES, DOCUMENT_COPY, DOCUMENT_LIMITS, monthFolder } from "@/data/wedash/documentSplit";
 import {
@@ -102,9 +102,9 @@ export function AttachWizard({
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <Modal open size="xl" title="Anexar documento" onClose={() => { if (!processing && !sending) onClose(); }}>
       <WizardSteps steps={STEPS} current={step} />
-      <Card padding="lg">
+      <div>
         {processing ? (
           <Processing />
         ) : step === 1 ? (
@@ -171,8 +171,8 @@ export function AttachWizard({
             }}
           />
         )}
-      </Card>
-    </div>
+      </div>
+    </Modal>
   );
 }
 
