@@ -131,9 +131,9 @@ T6 → T7
 
 **Done when**:
 
-- [ ] A rejected token is not stored and the response is "Token inválido."
-- [ ] The card uses `/assinaai.png` and does not show the token again
-- [ ] Gate check passes: `npm run build`
+- [x] A rejected token is not stored and the response is "Token inválido."
+- [x] The card uses `/assinaai.png` and does not show the token again
+- [x] Gate check passes: `npm run build`
 
 **Tests**: none
 **Gate**: build

@@ -250,7 +250,7 @@ O gestor manda holerite e documentos parecidos para cada colaborador assinar. Ho
 | DOCS-05 | P1: Cobrar pelo lote | Design | In Design |
 | DOCS-06 | P1: Receber o status e guardar o PDF | Design | In Design |
 | DOCS-07 | P1: Reenviar o link | Design | In Design |
-| DOCS-08 | P1: Conectar o Assina AI uma vez | Design | In Design |
+| DOCS-08 | P1: Conectar o Assina AI uma vez | Execute | Implemented |
 
 **Coverage:** 8 total, 0 mapped to tasks, 8 unmapped
 
