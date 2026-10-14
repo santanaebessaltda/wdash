@@ -9,7 +9,7 @@ Implement these tasks with the `tlc-spec-driven` skill: **activate it by name an
 ---
 
 **Design**: `.specs/features/document-signing/design.md`
-**Status**: In Progress
+**Status**: Done
 
 ---
 
@@ -239,9 +239,9 @@ T6 → T7
 
 **Done when**:
 
-- [ ] The item is outside Gestão and outside Configurações
-- [ ] Gerente and Vendedor do not see it
-- [ ] Gate check passes: `npm run build`
+- [x] The item is outside Gestão and outside Configurações
+- [x] Gerente and Vendedor do not see it
+- [x] Gate check passes: `npm run build`
 
 **Tests**: none
 **Gate**: build

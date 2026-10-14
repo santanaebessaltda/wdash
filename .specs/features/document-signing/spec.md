@@ -246,13 +246,13 @@ O gestor manda holerite e documentos parecidos para cada colaborador assinar. Ho
 | DOCS-01 | P1: Cadastro para achar o destinatário | Execute | Implemented |
 | DOCS-02 | P1: Cortar o PDF e revisar | Execute | Implemented |
 | DOCS-03 | P1: Disparar pelo Assina AI | Execute | Implemented |
-| DOCS-04 | P1: Pasta do colaborador | Design | In Design |
+| DOCS-04 | P1: Pasta do colaborador | Execute | Implemented |
 | DOCS-05 | P1: Cobrar pelo lote | Execute | Implemented |
 | DOCS-06 | P1: Receber o status e guardar o PDF | Execute | Implemented |
 | DOCS-07 | P1: Reenviar o link | Execute | Implemented |
 | DOCS-08 | P1: Conectar o Assina AI uma vez | Execute | Implemented |
 
-**Coverage:** 8 total, 0 mapped to tasks, 8 unmapped
+**Coverage:** 8 total, 8 mapped to tasks, 0 unmapped
 
 ---
 
