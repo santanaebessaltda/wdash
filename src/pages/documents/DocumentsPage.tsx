@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Badge, Button, Card, DataTable, EmptyState, type DataTableColumn } from "@/components/ui";
+import { paths } from "@/router/paths";
 import { monthFolder, resendVisible } from "@/data/wedash/documentSplit";
 import type { BatchRow, DocumentRow, PersonRow } from "@/data/wedash/documentsRepo";
 import { openDocument, resendDocument } from "@/data/wedash/documentsRepo";
-import { AttachWizard } from "./AttachWizard";
 import { DocumentsFrame, FileGlyph, FolderGlyph, Glyph, STATUS_LABEL, SearchGlyph, badgeVariant, formatBytes } from "./frame";
 import { useDocuments } from "./useDocuments";
 
@@ -12,13 +13,14 @@ type Mode = "home" | "pending" | "month" | "browse";
 type FolderEntry = { key: string; label: string; detail: string; fileId?: string };
 
 export function DocumentsPage() {
-  const { storeId, allStores, batches, documents, people, stores, reload } = useDocuments();
+  const { allStores, batches, documents, people, stores, reload } = useDocuments();
+  const navigate = useNavigate();
+  const flash = (useLocation().state ?? null) as { documentNotice?: string | null; documentSent?: string | null } | null;
   const [mode, setMode] = useState<Mode>("home");
   const [crumb, setCrumb] = useState<string[]>([]);
   const [query, setQuery] = useState("");
-  const [notice, setNotice] = useState<string | null>(null);
-  const [sent, setSent] = useState<string | null>(null);
-  const [attaching, setAttaching] = useState(false);
+  const [notice, setNotice] = useState<string | null>(flash?.documentNotice ?? null);
+  const [sent] = useState<string | null>(flash?.documentSent ?? null);
 
   const storeName = useMemo(() => new Map(stores.map((store) => [store.id, store.name])), [stores]);
   const personName = useMemo(() => new Map(people.map((person) => [person.id, person.name])), [people]);
@@ -68,9 +70,7 @@ export function DocumentsPage() {
       title="Documentos"
       subtitle={allStores ? "Filial, colaborador, ano e mês" : "Colaborador, ano e mês"}
       actions={
-        <Button icon={<FileGlyph size={15} />} onClick={() => { setSent(null); setAttaching(true); }}>
-          Anexar documento
-        </Button>
+        <Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>
       }
     >
       {sent && <p className="mb-3 text-[13px] text-ok">{sent}</p>}
@@ -139,21 +139,6 @@ export function DocumentsPage() {
       <p className="mt-3 text-[12.5px] text-t2">
         {mode === "browse" ? `${visibleFolders.length} itens` : `${visibleFiles.length} documentos`}
       </p>
-      {attaching && (
-        <AttachWizard
-          storeId={storeId}
-          people={people}
-          documents={documents}
-          onReload={reload}
-          onClose={() => setAttaching(false)}
-          onDone={(message) => {
-            setAttaching(false);
-            setNotice(message);
-            setSent(message ? null : "Documentos enviados.");
-            setMode("home");
-          }}
-        />
-      )}
     </DocumentsFrame>
   );
 }

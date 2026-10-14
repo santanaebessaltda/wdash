@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Button, Card, CardHeader, CardTitle, Modal, ProgressBar, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
+import { useNavigate } from "react-router-dom";
+import { Breadcrumbs, Button, Card, CardHeader, CardTitle, ProgressBar, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
+import { paths } from "@/router/paths";
+import { Icon, icons } from "@/pages/users/Icons";
+import { useDocuments } from "./useDocuments";
 import { cn } from "@/lib/cn";
 import { DOCUMENT_CATEGORIES, DOCUMENT_COPY, DOCUMENT_LIMITS, monthFolder } from "@/data/wedash/documentSplit";
 import {
@@ -101,8 +105,20 @@ export function AttachWizard({
     }
   }
 
+  function leave() {
+    if (processing || sending) return;
+    onClose();
+  }
+
   return (
-    <Modal open size="xl" title="Anexar documento" onClose={() => { if (!processing && !sending) onClose(); }}>
+    <div>
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        <Button variant="secondary" size="sm" icon={<Icon d={icons.arrowLeft} size={14} />} disabled={processing || sending} onClick={leave}>
+          Voltar
+        </Button>
+        <Breadcrumbs items={[{ label: "Documentos", to: paths.documents }, { label: "Anexar documento" }]} />
+      </div>
+      <div className="mx-auto max-w-3xl">
       <WizardSteps steps={STEPS} current={step} />
       <div>
         {processing ? (
@@ -124,7 +140,7 @@ export function AttachWizard({
               setBatchId("");
             }}
             onError={setError}
-            onCancel={onClose}
+            onCancel={leave}
             onNext={() => void split()}
           />
         ) : step === 2 ? (
@@ -172,7 +188,27 @@ export function AttachWizard({
           />
         )}
       </div>
-    </Modal>
+      </div>
+    </div>
+  );
+}
+
+export function AttachPage() {
+  const navigate = useNavigate();
+  const { storeId, people, documents, reload } = useDocuments();
+  return (
+    <AttachWizard
+      storeId={storeId}
+      people={people}
+      documents={documents}
+      onReload={reload}
+      onClose={() => navigate(paths.documents)}
+      onDone={(message) =>
+        navigate(paths.documents, {
+          state: { documentNotice: message, documentSent: message ? null : "Documentos enviados." },
+        })
+      }
+    />
   );
 }
 

@@ -6,12 +6,14 @@ import { RequireRole } from "@/session/RequireSession";
 import { OWNER_ROLES } from "@/layout/nav-wedash";
 
 const DocumentsPage = lazyPage(() => import("./DocumentsPage"), "DocumentsPage");
+const AttachPage = lazyPage(() => import("./AttachWizard"), "AttachPage");
 
 export const documentRoutes: RouteObject[] = [
   {
     element: <RequireRole roles={OWNER_ROLES} />,
     children: [
       { path: paths.documents, element: <DocumentsPage /> },
+      { path: paths.documentAttach, element: <AttachPage /> },
       { path: paths.documentBatches, element: <RedirectTo to={paths.documents} /> },
     ],
   },
