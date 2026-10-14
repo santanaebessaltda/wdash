@@ -1,10 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { groupComUnit } from "../../../src/data/wedash/groupCom.ts";
-import { ALREADY_LAUNCHED, forceLaunchAllowed, sumSoldByDay, unlaunchedDays, type LaunchValue } from "../../../src/data/wedash/shoppingReport.ts";
+import { ALREADY_LAUNCHED, forceLaunchAllowed, shoppingNightDue, shoppingSendsSales, sumSoldByDay, type LaunchValue } from "../../../src/data/wedash/shoppingReport.ts";
 import { allosBrowserCookies, chromePath } from "./allosBrowser.ts";
 import { postAllosWeeks, readAllosWeeks } from "./allosFill.ts";
 import { decryptPassword } from "./decrypt.ts";
 import { postGroupCom, readGroupCom } from "./groupComFill.ts";
+import { addDaysIso, CLOSE_WINDOW_HOURS, closeHour, dailyCloseEnabled, hourInTz, isCloseWindow, ymdInTz } from "./runSyncJob.ts";
 
 const KEEP = "Não foi possível informar as vendas ao shopping. Os valores já informados foram mantidos.";
 const LOGIN_FAIL = "Não foi possível acessar a Intranet Mall porque o painel solicitou uma verificação no navegador. Nada foi alterado.";
@@ -84,15 +85,10 @@ async function runShoppingNow(
   const span = chosenMonth(today, month);
   const selected = chosenDays(month?.days);
   let only: ReadonlySet<string> | undefined;
-  if (!read) {
-    const { data: stored, error: storedError } = await sb.from("shopping_day").select("day").eq("store_id", storeId).gte("day", span.from).lte("day", span.to);
-    if (storedError) return { ok: false, message: KEEP };
-    const launched = new Set((stored ?? []).map((row) => String(row.day).slice(0, 10)));
-    const pending = selected.length > 0
-      ? selected.filter((day) => day >= span.from && day <= span.to && day < today)
-      : unlaunchedDays(span.from, span.to, today, launched);
+  if (!read && selected.length > 0) {
+    const pending = selected.filter((day) => day >= span.from && day <= span.to && day < today);
     if (pending.length === 0) return { ok: true, message: ALREADY_LAUNCHED };
-    if (selected.length > 0) only = new Set(pending);
+    only = new Set(pending);
   }
   let message = read ? "Não foi possível ler os valores informados no shopping. Nada foi alterado." : KEEP;
   try {
@@ -153,4 +149,53 @@ async function runShoppingNow(
   }
   await sb.from("store_shopping").update({ last_run_at: new Date().toISOString(), last_error: message }).eq("store_id", storeId);
   return { ok: false, message };
+}
+
+/**
+ * Uma vez por filial, na janela do fechamento, depois que o dia anterior fechou.
+ * Sem dias marcados: preenche só o passado vazio, inclusive janelas anteriores.
+ */
+export async function runDueShoppingLaunches(sb: SupabaseClient, erpSecret: string, now = new Date()): Promise<number> {
+  if (!dailyCloseEnabled()) return 0;
+  const { data: accounts, error } = await sb
+    .from("store_shopping")
+    .select("store_id, administrator, last_run_at")
+    .in("administrator", ["allos", "groupcom"]);
+  if (error) throw error;
+  const rows = (accounts ?? []).filter((row) => shoppingSendsSales(row.administrator as string));
+  if (rows.length === 0) return 0;
+  const { data: stores, error: storeError } = await sb
+    .from("store")
+    .select("id, code, timezone, last_closed_day, point_type, active")
+    .in("id", rows.map((row) => row.store_id as string));
+  if (storeError) throw storeError;
+  const byId = new Map((stores ?? []).map((store) => [store.id as string, store]));
+  const startHour = closeHour();
+  let ran = 0;
+  for (const account of rows) {
+    const store = byId.get(account.store_id as string);
+    if (!store || store.active === false || store.point_type !== "MALL") continue;
+    const timeZone = (store.timezone as string | null) || "America/Campo_Grande";
+    const today = ymdInTz(now, timeZone);
+    const yesterday = addDaysIso(today, -1);
+    const lastClosed = store.last_closed_day ? String(store.last_closed_day).slice(0, 10) : null;
+    const lastRun = account.last_run_at ? new Date(String(account.last_run_at)) : null;
+    const lastRunOk = lastRun != null && !Number.isNaN(lastRun.getTime());
+    const due = shoppingNightDue({
+      sendsSales: true,
+      yesterdayClosed: lastClosed != null && lastClosed >= yesterday,
+      inCloseWindow: isCloseWindow(hourInTz(now, timeZone), startHour),
+      lastRunDay: lastRunOk ? ymdInTz(lastRun, timeZone) : null,
+      lastRunHour: lastRunOk ? hourInTz(lastRun, timeZone) : null,
+      today,
+      windowStartHour: startHour,
+      windowHours: CLOSE_WINDOW_HOURS,
+    });
+    if (!due) continue;
+    ran += 1;
+    const result = await runShoppingStore(sb, erpSecret, account.store_id as string, false);
+    if (!result.ok) console.warn(`Informe de vendas [${String(store.code ?? account.store_id)}]: ${result.message}`);
+  }
+  if (ran > 0) console.log(`Informe de vendas: ${ran} filial(is) na madrugada`);
+  return ran;
 }

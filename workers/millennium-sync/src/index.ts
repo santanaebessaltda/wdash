@@ -23,7 +23,7 @@ import { startStoneWebhook } from "./stoneWebhook.ts";
 import { assertSyncConfig, autoRefreshEnabled, deepHistorySpan, describeSpan, onboardingSpan } from "./syncConfig.ts";
 import { isWorkerPaused } from "./workerPause.ts";
 import { acquireWorkerLock, releaseWorkerLock } from "./workerLock.ts";
-import { runShoppingStore } from "./allosJob.ts";
+import { runDueShoppingLaunches, runShoppingStore } from "./allosJob.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -138,6 +138,9 @@ async function main() {
     `  Fechamento da madrugada  : ${dailyCloseEnabled() ? `a partir das ${closeHour()}h` : "desligado"} (CLOSE_HOUR)`,
   );
   console.log(
+    `  Informe de vendas        : ${dailyCloseEnabled() ? "na mesma janela, depois que o dia fechou" : "desligado"}`,
+  );
+  console.log(
     `  Histórico antigo         : ${deep === "off" ? "desligado" : `${describeSpan(deep)}, até a inauguração, na madrugada`} (DEEP_HISTORY)`,
   );
   console.log("  Dias perdidos            : recuperados no próximo Atualizar ou fechamento da madrugada");
@@ -168,6 +171,7 @@ async function main() {
     try {
       const queued = await enqueueDueCloseJobs(sb);
       const catchUp = await enqueueDueCashCloseCatchUp(sb);
+      await runDueShoppingLaunches(sb, erpSecret);
       return queued + catchUp;
     } catch (e) {
       console.warn(`Fechamento: varredura falhou: ${e instanceof Error ? e.message : String(e)}`);

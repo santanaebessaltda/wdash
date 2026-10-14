@@ -192,6 +192,26 @@ export function shoppingSendsSales(administrator: string | null | undefined): bo
   return administrator === "allos" || administrator === "groupcom";
 }
 
+/**
+ * A madrugada informa uma vez, na janela do fechamento, depois que o dia anterior fechou.
+ * Um lançamento manual fora dessa janela não conta como a passagem da noite.
+ */
+export function shoppingNightDue(input: {
+  sendsSales: boolean;
+  yesterdayClosed: boolean;
+  inCloseWindow: boolean;
+  lastRunDay: string | null;
+  lastRunHour: number | null;
+  today: string;
+  windowStartHour: number;
+  windowHours: number;
+}): boolean {
+  if (!input.sendsSales || !input.yesterdayClosed || !input.inCloseWindow) return false;
+  if (input.lastRunDay !== input.today || input.lastRunHour == null) return true;
+  const hoursAfterStart = (input.lastRunHour - input.windowStartHour + 24) % 24;
+  return hoursAfterStart >= input.windowHours;
+}
+
 /** Nome da administradora na tela. Cada filial guarda uma só. */
 export function shoppingAdministratorName(administrator: ShoppingAdministrator): string {
   if (administrator === "groupcom") return "Group COM";

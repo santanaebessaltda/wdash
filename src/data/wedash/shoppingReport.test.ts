@@ -19,6 +19,7 @@ import {
   parseAllosForm,
   reportDays,
   shoppingAccountView,
+  shoppingNightDue,
   sumSoldByDay,
   type SalesWindow,
 } from "./shoppingReport";
@@ -105,6 +106,29 @@ describe("periodReports", () => {
       { from: "2026-10-04", to: "2026-10-10", soldCents: 4000, launchedCents: 3000, differenceCents: -1000 },
       { from: "2026-10-11", to: "2026-10-17", soldCents: 8500, launchedCents: 0, differenceCents: -8500 },
     ]);
+  });
+});
+
+describe("shoppingNightDue", () => {
+  const open = {
+    sendsSales: true,
+    yesterdayClosed: true,
+    inCloseWindow: true,
+    lastRunDay: null as string | null,
+    lastRunHour: null as number | null,
+    today: "2026-10-14",
+    windowStartHour: 3,
+    windowHours: 6,
+  };
+
+  it("runs once in the close window after yesterday closed", () => {
+    expect(shoppingNightDue(open)).toBe(true);
+    expect(shoppingNightDue({ ...open, yesterdayClosed: false })).toBe(false);
+    expect(shoppingNightDue({ ...open, inCloseWindow: false })).toBe(false);
+    expect(shoppingNightDue({ ...open, sendsSales: false })).toBe(false);
+    expect(shoppingNightDue({ ...open, lastRunDay: "2026-10-14", lastRunHour: 3 })).toBe(false);
+    expect(shoppingNightDue({ ...open, lastRunDay: "2026-10-13", lastRunHour: 16 })).toBe(true);
+    expect(shoppingNightDue({ ...open, lastRunDay: "2026-10-14", lastRunHour: 10 })).toBe(true);
   });
 });
 
