@@ -41,7 +41,7 @@ export function DocumentsPage() {
       : mode === "month"
         ? thisMonth
         : mode === "home"
-          ? [...documents].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 12)
+          ? [...documents].filter((doc) => doc.envelopeId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 12)
           : [];
 
   const folders = mode === "browse" ? folderEntries({ allStores, crumb, documents, batches, people, stores }) : [];
