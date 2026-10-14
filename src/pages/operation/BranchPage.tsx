@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Button, Card, Modal, Segmented, useToast } from "@/components/ui";
-import { clearShoppingAccount, fetchShoppingAccount, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
-import { ShoppingIntegration } from "./ShoppingPage";
+import { Card, Segmented, useToast } from "@/components/ui";
+import { fetchShoppingAccount, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
+import { ShoppingAdministrator } from "./ShoppingPage";
 import { StoreCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { updateStoreCosts, type PointType, type Store } from "@/data/wedash/stores";
 import { CostFieldsCard, INVALID_COSTS_MSG, pctField, useCostFields, type CostField, type CostFieldSection } from "./costFields";
@@ -33,19 +33,6 @@ const POINT_OPTIONS: { value: PointType; label: string }[] = [
   { value: "SHOPPING", label: "Quiosque em shopping" },
   { value: "STREET", label: "Loja de rua" },
 ];
-
-const MALL_OPTIONS = [
-  { value: "allos", label: "Intranet Mall" },
-  { value: "groupcom", label: "Group COM" },
-  { value: "other", label: "Outros" },
-] as const;
-
-type MallChoice = (typeof MALL_OPTIONS)[number]["value"];
-
-function mallChoice(account: ShoppingAccount | null): MallChoice {
-  if (account?.administrator === "allos" || account?.administrator === "groupcom") return account.administrator;
-  return "other";
-}
 
 const RENT_HINT: Record<PointType, string[]> = {
   SHOPPING: [
@@ -111,9 +98,8 @@ function BranchCards({ store, tenantId, onSaved }: { store: Store; tenantId: str
   const [point, setPoint] = useState<PointType>(store.pointType);
   const [presetStamp, setPresetStamp] = useState(0);
   const [account, setAccount] = useState<ShoppingAccount | null>(null);
-  const [choice, setChoice] = useState<MallChoice>("other");
-  const [confirmOther, setConfirmOther] = useState(false);
-  const [removing, setRemoving] = useState(false);
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const accountReady = loadedFor === store.id;
 
   useEffect(() => {
     let cancel = false;
@@ -121,10 +107,13 @@ function BranchCards({ store, tenantId, onSaved }: { store: Store; tenantId: str
       .then((access) => {
         if (cancel) return;
         setAccount(access);
-        setChoice(mallChoice(access));
+        setLoadedFor(store.id);
       })
       .catch(() => {
-        if (!cancel) show("Não foi possível carregar a administradora desta filial. Tente novamente.", "danger");
+        if (cancel) return;
+        setAccount(null);
+        setLoadedFor(store.id);
+        show("Não foi possível carregar a administradora desta filial. Tente novamente.", "danger");
       });
     return () => {
       cancel = true;
@@ -139,29 +128,6 @@ function BranchCards({ store, tenantId, onSaved }: { store: Store; tenantId: str
     setPresetStamp((n) => n + 1);
   }
 
-  function escolherMall(next: MallChoice) {
-    if (next === choice) return;
-    if (next === "other" && account) {
-      setConfirmOther(true);
-      return;
-    }
-    setChoice(next);
-  }
-
-  async function remover() {
-    setRemoving(true);
-    const result = await clearShoppingAccount(store.id);
-    setRemoving(false);
-    if (!result.ok) {
-      show(result.message, "danger");
-      return;
-    }
-    setAccount(null);
-    setChoice("other");
-    setConfirmOther(false);
-    show("Acesso da administradora removido.", "success");
-  }
-
   return (
     <div className="flex flex-col gap-5">
       <Card>
@@ -169,44 +135,18 @@ function BranchCards({ store, tenantId, onSaved }: { store: Store; tenantId: str
         <p className="mb-3 text-[12.5px] text-t2">O tipo da filial define o horário sugerido e as opções de aluguel.</p>
         <p className="mb-1.5 text-[12.5px] font-bold text-t0">Tipo de filial</p>
         <Segmented options={POINT_OPTIONS} value={point} onChange={(v) => v && escolher(v)} />
-        {point === "SHOPPING" ? (
-          <>
-            <p className="mb-1.5 mt-4 text-[12.5px] font-bold text-t0">Administradora</p>
-            <p className="mb-3 text-[12.5px] text-t2">Escolha a administradora responsável pelo informe de vendas. Em Outros, a WDash não envia vendas ao shopping.</p>
-            <Segmented options={[...MALL_OPTIONS]} value={choice} onChange={(v) => v && escolherMall(v)} />
-          </>
-        ) : null}
       </Card>
-      {point === "SHOPPING" && (choice === "allos" || choice === "groupcom") ? (
-        <ShoppingIntegration
+      {point === "SHOPPING" ? (
+        <ShoppingAdministrator
           storeId={store.id}
-          choice={choice}
-          account={account}
+          account={accountReady ? account : null}
+          loading={!accountReady}
           onAccount={(next) => {
             setAccount(next);
-            setChoice(mallChoice(next));
+            setLoadedFor(store.id);
           }}
         />
       ) : null}
-      <Modal
-        open={confirmOther}
-        onClose={() => {
-          if (!removing) setConfirmOther(false);
-        }}
-        title="Remover acesso da administradora?"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setConfirmOther(false)} disabled={removing}>
-              Cancelar
-            </Button>
-            <Button onClick={() => void remover()} disabled={removing}>
-              {removing ? "Removendo…" : "Remover acesso"}
-            </Button>
-          </>
-        }
-      >
-        <p className="text-[13.5px] leading-relaxed text-t1">Ao escolher Outros, a WDash deixará de informar vendas ao shopping e o acesso salvo desta filial será removido.</p>
-      </Modal>
       <StoreHoursCard store={store} canEdit onSaved={onSaved} pointType={point} presetStamp={presetStamp} />
       <CostFieldsCard
         store={store}

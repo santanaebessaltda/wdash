@@ -1,25 +1,29 @@
-import { useEffect, useState } from "react";
-import { Button, Checkbox, FormField, Input, Modal, useToast } from "@/components/ui";
+import { useLayoutEffect, useState, type MutableRefObject } from "react";
+import { Button, Checkbox, FormField, Input, useToast } from "@/components/ui";
 import { groupComBaseUrl, groupComSlug, type GroupComUnit } from "@/data/wedash/groupCom";
 import { listGroupComUnits, saveShoppingAccount, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
 import { cn } from "@/lib/cn";
 import { noAutofill, secretStyle } from "@/lib/noAutofill";
 
-/** Modal do card Group COM. A busca das unidades não grava a senha. */
+export type ShoppingFormBar = { busy: boolean; canSave: boolean; label: string };
+
+/** Campos do Group COM na modal da administradora. A busca das unidades não grava a senha. */
 export function GroupComModal({
-  open,
   account,
   replacedName,
   storeId,
-  onClose,
   onSaved,
+  onSwitch,
+  onBar,
+  saveRef,
 }: {
-  open: boolean;
   account: ShoppingAccount | null;
   replacedName: string | null;
   storeId: string;
-  onClose: () => void;
   onSaved: (account: ShoppingAccount) => void;
+  onSwitch?: () => void;
+  onBar: (bar: ShoppingFormBar) => void;
+  saveRef: MutableRefObject<() => void>;
 }) {
   const { show } = useToast();
   const conectado = account != null;
@@ -34,8 +38,7 @@ export function GroupComModal({
   const [selected, setSelected] = useState<GroupComUnit | null>(null);
   const baseUrl = groupComBaseUrl(slug);
 
-  useEffect(() => {
-    if (!open) return;
+  useLayoutEffect(() => {
     setSlug(account ? (groupComSlug(account.baseUrl) ?? "") : "");
     setEmail(account?.username ?? "");
     setPassword("");
@@ -44,12 +47,7 @@ export function GroupComModal({
     setTask(null);
     setUnits(account?.unit ? [account.unit] : []);
     setSelected(account?.unit ?? null);
-  }, [open, account]);
-
-  function close() {
-    if (busy) return;
-    onClose();
-  }
+  }, [account]);
 
   async function buscar() {
     if (!baseUrl) return;
@@ -94,29 +92,23 @@ export function GroupComModal({
   const slugError = slug.length > 0 && !baseUrl ? "Informe o identificador do portal, como treslagoasapp." : undefined;
   const canBuscar = !busy && baseUrl != null && email.trim().includes("@") && password.trim().length > 0;
   const canConectar = !busy && baseUrl != null && email.trim().includes("@") && selected != null && (password.trim().length > 0 || conectado) && (conectado || autorizo);
+  const label = task === "save" ? "Salvando…" : conectado ? "Salvar alterações" : "Salvar acesso";
+
+  saveRef.current = () => void conectar();
+
+  useLayoutEffect(() => {
+    onBar({ busy, canSave: canConectar, label });
+  }, [busy, canConectar, label, onBar]);
+
+  useLayoutEffect(() => () => onBar({ busy: false, canSave: false, label: "Salvar acesso" }), [onBar]);
 
   return (
-    <Modal
-      open={open}
-      onClose={close}
-      title="Group COM"
-      footer={
-        <>
-          <Button variant="outline" onClick={close} disabled={busy}>
-            Cancelar
-          </Button>
-          <Button onClick={() => void conectar()} disabled={!canConectar}>
-            {task === "save" ? "Salvando…" : conectado ? "Salvar alterações" : "Salvar acesso"}
-          </Button>
-        </>
-      }
-    >
       <div className="flex flex-col gap-3.5">
         <p className="text-[13.5px] leading-relaxed text-t1">
           Informe os dados de acesso do Group COM e escolha a unidade desta filial. A WDash protege esses dados e os usa somente para informar as vendas ao shopping.
         </p>
         {replacedName ? (
-          <p className="text-[13px] leading-relaxed text-t1">Ao salvar, o acesso da {replacedName} será substituído pelo do Group COM.</p>
+          <p className="text-[13px] leading-relaxed text-t1">Ao salvar, o acesso {replacedName} será substituído pelo do Group COM.</p>
         ) : null}
         <FormField
           label="Identificador do portal"
@@ -213,8 +205,14 @@ export function GroupComModal({
             disabled={busy}
           />
         ) : null}
+        {onSwitch ? (
+          <div className="border-t border-line pt-3">
+            <button type="button" onClick={onSwitch} disabled={busy} className="text-[13px] font-bold text-acc hover:underline disabled:opacity-50">
+              Trocar administradora
+            </button>
+          </div>
+        ) : null}
       </div>
-    </Modal>
   );
 }
 
