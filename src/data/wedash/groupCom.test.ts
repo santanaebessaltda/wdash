@@ -4,6 +4,7 @@ import {
   encryptGroupComField,
   fillGroupComPeriod,
   groupComAcceptsLaunch,
+  groupComMovementEpoch,
   groupComBaseUrl,
   groupComBillingObject,
   groupComDay,
@@ -52,6 +53,22 @@ describe("fillGroupComPeriod", () => {
       { date: "2026-10-02", cents: 918131 },
     ]);
     expect(groupComMovementsMatch(filled.movimentos, filled.movimentos, SAO_PAULO)).toBe(true);
+  });
+
+  it("creates the empty week and fills only the selected past day", () => {
+    const start = 1_791_194_400_000;
+    const end = 1_791_712_800_000;
+    expect(groupComMovementEpoch(start, "2026-10-05", SAO_PAULO)).toBe(start);
+    expect(groupComMovementEpoch(start, "2026-10-11", SAO_PAULO)).toBe(end);
+    const filled = fillGroupComPeriod([], { "2026-10-05": 150050 }, "2026-10-13", SAO_PAULO, new Set(["2026-10-05"]), {
+      startEpoch: start,
+      endEpoch: end,
+    });
+    expect(filled.changed).toBe(true);
+    expect(filled.movimentos).toHaveLength(7);
+    expect(filled.movimentos[0]).toMatchObject({ dataMovimento: start, valorVenda: 1500.5 });
+    expect(filled.movimentos[1]?.valorVenda).toBeNull();
+    expect(filled.days).toEqual([{ date: "2026-10-05", cents: 150050 }]);
   });
 
   it("leaves today empty and ignores days outside the selection", () => {

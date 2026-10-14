@@ -53,7 +53,6 @@ const costs: NavGroup = {
     { label: "Filial", to: paths.operation.branch },
     { label: "Produtos e impostos", to: paths.operation.productsTaxes },
     { label: "Adquirentes", to: paths.operation.acquirers },
-    { label: "Shopping", to: paths.operation.shopping },
   ],
 };
 

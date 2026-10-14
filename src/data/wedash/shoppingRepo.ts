@@ -60,6 +60,16 @@ export async function saveShoppingAccount(input: {
 
 const UNITS_FAIL = "Não foi possível entrar no Group COM. Confira o e-mail e a senha.";
 
+/** Tira a administradora desta filial. Cada filial fica com uma só. */
+export async function clearShoppingAccount(storeId: string): Promise<ShoppingLaunchResult> {
+  const { getSupabase } = await import("@/lib/supabase");
+  const sb = getSupabase();
+  if (!sb) return { ok: false, message: SAVE_FAIL };
+  const { data, error } = await sb.functions.invoke("shopping-credential-persist", { body: { storeId, clear: true } });
+  if (error || !data?.ok) return { ok: false, message: SAVE_FAIL };
+  return { ok: true };
+}
+
 /** Entra no Group COM e devolve as unidades. Não grava o acesso. */
 export async function listGroupComUnits(input: {
   storeId: string;

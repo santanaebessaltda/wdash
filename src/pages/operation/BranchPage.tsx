@@ -1,5 +1,7 @@
-import { useState } from "react";
-import { Card, Segmented, useToast } from "@/components/ui";
+import { useEffect, useState } from "react";
+import { Button, Card, Modal, Segmented, useToast } from "@/components/ui";
+import { clearShoppingAccount, fetchShoppingAccount, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
+import { ShoppingIntegration } from "./ShoppingPage";
 import { StoreCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { updateStoreCosts, type PointType, type Store } from "@/data/wedash/stores";
 import { CostFieldsCard, INVALID_COSTS_MSG, pctField, useCostFields, type CostField, type CostFieldSection } from "./costFields";
@@ -31,6 +33,19 @@ const POINT_OPTIONS: { value: PointType; label: string }[] = [
   { value: "SHOPPING", label: "Quiosque em shopping" },
   { value: "STREET", label: "Loja de rua" },
 ];
+
+const MALL_OPTIONS = [
+  { value: "allos", label: "Intranet Mall" },
+  { value: "groupcom", label: "Group COM" },
+  { value: "other", label: "Outros" },
+] as const;
+
+type MallChoice = (typeof MALL_OPTIONS)[number]["value"];
+
+function mallChoice(account: ShoppingAccount | null): MallChoice {
+  if (account?.administrator === "allos" || account?.administrator === "groupcom") return account.administrator;
+  return "other";
+}
 
 const RENT_HINT: Record<PointType, string[]> = {
   SHOPPING: [
@@ -75,30 +90,76 @@ function franchiseSections(store: Store): CostFieldSection[] {
 
 /** Configurações > Filial. Tipo, funcionamento, franquia e aluguel da unidade. */
 export function BranchPage() {
-  const { storeRows, loading, refresh } = useScopedStores();
+  const { session, storeRows, loading, refresh } = useScopedStores();
   return (
     <StoreCardsPage
       section="Configurações"
       title="Filial"
-      subtitle="Configure o tipo, o funcionamento, a franquia e o aluguel de cada filial."
+      subtitle="Configure o tipo, a administradora, o funcionamento, a franquia e o aluguel de cada filial."
       loading={loading}
       skeleton={(n) => <StoreCardsSkeleton count={n} title schedule sections={2} />}
       storeRows={storeRows}
       oneStore
     >
-      {(store) => <BranchCards store={store} onSaved={refresh} />}
+      {(store) => <BranchCards store={store} tenantId={session.tenantId} onSaved={refresh} />}
     </StoreCardsPage>
   );
 }
 
-function BranchCards({ store, onSaved }: { store: Store; onSaved: () => void }) {
+function BranchCards({ store, tenantId, onSaved }: { store: Store; tenantId: string; onSaved: () => void }) {
+  const { show } = useToast();
   const [point, setPoint] = useState<PointType>(store.pointType);
   const [presetStamp, setPresetStamp] = useState(0);
+  const [account, setAccount] = useState<ShoppingAccount | null>(null);
+  const [choice, setChoice] = useState<MallChoice>("other");
+  const [confirmOther, setConfirmOther] = useState(false);
+  const [removing, setRemoving] = useState(false);
+
+  useEffect(() => {
+    let cancel = false;
+    void fetchShoppingAccount(tenantId, store.id)
+      .then((access) => {
+        if (cancel) return;
+        setAccount(access);
+        setChoice(mallChoice(access));
+      })
+      .catch(() => {
+        if (!cancel) show("Não foi possível carregar a administradora desta filial. Tente novamente.", "danger");
+      });
+    return () => {
+      cancel = true;
+    };
+    // show do toast muda de identidade; a carga segue a filial.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId, store.id]);
 
   function escolher(next: PointType) {
     if (next === point) return;
     setPoint(next);
     setPresetStamp((n) => n + 1);
+  }
+
+  function escolherMall(next: MallChoice) {
+    if (next === choice) return;
+    if (next === "other" && account) {
+      setConfirmOther(true);
+      return;
+    }
+    setChoice(next);
+  }
+
+  async function remover() {
+    setRemoving(true);
+    const result = await clearShoppingAccount(store.id);
+    setRemoving(false);
+    if (!result.ok) {
+      show(result.message, "danger");
+      return;
+    }
+    setAccount(null);
+    setChoice("other");
+    setConfirmOther(false);
+    show("Acesso da administradora removido.", "success");
   }
 
   return (
@@ -108,7 +169,44 @@ function BranchCards({ store, onSaved }: { store: Store; onSaved: () => void }) 
         <p className="mb-3 text-[12.5px] text-t2">O tipo da filial define o horário sugerido e as opções de aluguel.</p>
         <p className="mb-1.5 text-[12.5px] font-bold text-t0">Tipo de filial</p>
         <Segmented options={POINT_OPTIONS} value={point} onChange={(v) => v && escolher(v)} />
+        {point === "SHOPPING" ? (
+          <>
+            <p className="mb-1.5 mt-4 text-[12.5px] font-bold text-t0">Administradora</p>
+            <p className="mb-3 text-[12.5px] text-t2">Cada filial integra com uma administradora. Outros não envia o informe de vendas.</p>
+            <Segmented options={[...MALL_OPTIONS]} value={choice} onChange={(v) => v && escolherMall(v)} />
+          </>
+        ) : null}
       </Card>
+      {point === "SHOPPING" && (choice === "allos" || choice === "groupcom") ? (
+        <ShoppingIntegration
+          storeId={store.id}
+          choice={choice}
+          account={account}
+          onAccount={(next) => {
+            setAccount(next);
+            setChoice(mallChoice(next));
+          }}
+        />
+      ) : null}
+      <Modal
+        open={confirmOther}
+        onClose={() => {
+          if (!removing) setConfirmOther(false);
+        }}
+        title="Remover a administradora?"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setConfirmOther(false)} disabled={removing}>
+              Cancelar
+            </Button>
+            <Button onClick={() => void remover()} disabled={removing}>
+              {removing ? "Removendo…" : "Remover acesso"}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-[13.5px] leading-relaxed text-t1">Outros não envia venda. O acesso salvo desta filial será removido.</p>
+      </Modal>
       <StoreHoursCard store={store} canEdit onSaved={onSaved} pointType={point} presetStamp={presetStamp} />
       <CostFieldsCard
         store={store}

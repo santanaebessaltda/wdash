@@ -290,7 +290,7 @@ export function SalesReportPage() {
               icon="🧾"
               title="Administradora não configurada"
               description={owner ? "Configure a administradora desta filial para informar as vendas ao shopping." : "O Gestor ainda não configurou a administradora desta filial."}
-              action={owner ? <Button onClick={() => navigate(paths.operation.shopping)}>Configurar shopping</Button> : undefined}
+              action={owner ? <Button onClick={() => navigate(paths.operation.branch)}>Configurar na filial</Button> : undefined}
             />
           </Card>
         ) : (

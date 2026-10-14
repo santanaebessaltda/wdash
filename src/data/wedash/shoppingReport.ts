@@ -160,11 +160,10 @@ export function intranetMallBaseUrl(value: string): string | null {
 }
 
 /**
- * Informe de vendas e Shopping ficam no menu.
- * A tela explica quando a filial não é quiosque ou ainda não tem Intranet Mall.
+ * Informe de vendas fica no menu. A administradora é escolhida em Filial.
  */
 export function shoppingMenu(): { settings: boolean; report: boolean } {
-  return { settings: true, report: true };
+  return { settings: false, report: true };
 }
 
 /** O Atualizar desta tela só chama o shopping quando a filial é quiosque e o acesso está salvo. */

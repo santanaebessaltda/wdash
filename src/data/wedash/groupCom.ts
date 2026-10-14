@@ -91,9 +91,17 @@ export function groupComAcceptsLaunch(limitEpoch: number, today: string, timeZon
   return groupComDay(limitEpoch, timeZone) >= today;
 }
 
+/** Instante do dia dentro da competência. O painel soma um dia a partir do início. */
+export function groupComMovementEpoch(startEpoch: number, date: string, timeZone: string): number | null {
+  const start = groupComDay(startEpoch, timeZone);
+  if (date < start) return null;
+  const epoch = startEpoch + calendarOffset(start, date) * 86_400_000;
+  return groupComDay(epoch, timeZone) === date ? epoch : null;
+}
+
 /**
  * Preenche só o dia passado vazio. Dia com valor permanece. Hoje e o futuro seguem como estão.
- * O corpo reenvia o período inteiro para não apagar o que já estava lançado.
+ * Sem movimento na competência, o dia entra no corpo. O período inteiro é reenviado.
  */
 export function fillGroupComPeriod(
   movements: GroupComMovement[],
@@ -101,17 +109,27 @@ export function fillGroupComPeriod(
   today: string,
   timeZone: string,
   only?: ReadonlySet<string>,
+  span?: { startEpoch: number; endEpoch: number },
 ): { changed: boolean; movimentos: GroupComMovement[]; days: Array<{ date: string; cents: number | null }> } {
   let changed = false;
-  const movimentos = movements.map((movement) => {
-    const date = groupComDay(movement.dataMovimento, timeZone);
-    const existing = moneyCents(movement.valorVenda);
-    const next = { ...movement };
+  const byDate = new Map(movements.map((movement) => [groupComDay(movement.dataMovimento, timeZone), movement]));
+  const dates = span ? periodDates(span.startEpoch, span.endEpoch, timeZone) : [...byDate.keys()].sort();
+  const movimentos = dates.flatMap((date) => {
+    const current = byDate.get(date);
+    const dataMovimento = current?.dataMovimento ?? (span ? groupComMovementEpoch(span.startEpoch, date, timeZone) : null);
+    if (dataMovimento == null) return [];
+    const existing = moneyCents(current?.valorVenda ?? null);
+    const next: GroupComMovement = {
+      dataMovimento,
+      valorVenda: current?.valorVenda ?? null,
+      valorDevolucao: current?.valorDevolucao ?? null,
+      quantidadeVendas: current?.quantidadeVendas ?? null,
+    };
     if (date < today && existing == null && (!only || only.has(date))) {
       next.valorVenda = (soldCentsByDay[date] ?? 0) / 100;
       changed = true;
     }
-    return next;
+    return [next];
   });
   const days = movimentos.flatMap((movement) => {
     const date = groupComDay(movement.dataMovimento, timeZone);
@@ -138,6 +156,24 @@ export async function encryptGroupComField(plain: string): Promise<string> {
 export async function decryptGroupComField(payload: string): Promise<string> {
   const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: loginIv() }, await loginKey(), bytesFromBase64(payload) as BufferSource);
   return new TextDecoder().decode(decrypted);
+}
+
+function calendarOffset(from: string, to: string): number {
+  const start = Date.parse(`${from}T12:00:00Z`);
+  const end = Date.parse(`${to}T12:00:00Z`);
+  return Math.round((end - start) / 86_400_000);
+}
+
+function addCalendarDay(date: string): string {
+  return new Date(Date.parse(`${date}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+}
+
+function periodDates(startEpoch: number, endEpoch: number, timeZone: string): string[] {
+  const start = groupComDay(startEpoch, timeZone);
+  const end = groupComDay(endEpoch, timeZone);
+  const dates: string[] = [];
+  for (let date = start; date <= end; date = addCalendarDay(date)) dates.push(date);
+  return dates;
 }
 
 function positiveId(value: unknown): number | null {

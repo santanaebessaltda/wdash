@@ -12,6 +12,7 @@ import {
 import type { LaunchValue } from "../../../src/data/wedash/shoppingReport.ts";
 
 const KEEP = "Não foi possível informar as vendas ao shopping. Os valores já informados foram mantidos.";
+const MISSING = "O Group COM não recebeu os dias marcados. Os valores já informados foram mantidos.";
 const READ_FAIL = "Não foi possível ler os valores informados no shopping. Nada foi alterado.";
 const LOGIN_FAIL = "Não foi possível acessar o Group COM. Nada foi alterado.";
 const CHECK_FAIL = "O Group COM pediu uma verificação extra. Nada foi alterado.";
@@ -74,13 +75,17 @@ async function syncGroupCom(
     }
     const start = groupComDay(period.dataInicio, unit.timeZone);
     const end = groupComDay(period.dataFim, unit.timeZone);
-    const filled = fillGroupComPeriod(current, await sold(start, end), today, unit.timeZone, only);
+    const filled = fillGroupComPeriod(current, await sold(start, end), today, unit.timeZone, only, {
+      startEpoch: period.dataInicio,
+      endEpoch: period.dataFim,
+    });
     keepInformed(filled.movimentos, today, unit.timeZone, remembered);
     if (!filled.changed) continue;
     const saved = await saveMovements(session.headers, unit, period.idGIMCompetencia, objectId, filled.movimentos);
     const echoed = saved ? await movements(session.headers, unit, period.idGIMCompetencia, objectId) : null;
     if (!echoed || !sameMovements(filled.movimentos, echoed)) return { ok: false, message: KEEP };
   }
+  if (!read && only && [...only].some((day) => !remembered.has(day))) return { ok: false, message: MISSING };
   return { ok: true, days: [...remembered.entries()].map(([date, cents]) => ({ date, cents })) };
 }
 
@@ -93,12 +98,11 @@ function keepInformed(rows: GroupComMovement[], today: string, timeZone: string,
 }
 
 function sameMovements(sent: GroupComMovement[], echoed: GroupComMovement[]): boolean {
-  if (sent.length !== echoed.length) return false;
-  return sent.every((row, index) => {
-    const other = echoed[index];
+  const byEpoch = new Map(echoed.map((row) => [row.dataMovimento, row.valorVenda == null ? null : Math.round(row.valorVenda * 100)]));
+  return sent.every((row) => {
     const left = row.valorVenda == null ? null : Math.round(row.valorVenda * 100);
-    const right = other?.valorVenda == null ? null : Math.round(other.valorVenda * 100);
-    return other != null && row.dataMovimento === other.dataMovimento && left === right;
+    if (left == null) return true;
+    return byEpoch.get(row.dataMovimento) === left;
   });
 }
 

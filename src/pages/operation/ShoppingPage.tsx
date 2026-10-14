@@ -1,145 +1,69 @@
 import { useEffect, useState } from "react";
-import { Button, Card, Checkbox, FormField, Input, Modal, Skeleton, useToast } from "@/components/ui";
+import { Button, Card, Checkbox, FormField, Input, Modal, useToast } from "@/components/ui";
 import { INTRANET_MALL_ORIGIN, intranetMallBaseUrl, intranetMallSlug, shoppingAdministratorName } from "@/data/wedash/shoppingReport";
-import { fetchShoppingAccount, saveShoppingAccount, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
+import { saveShoppingAccount, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
 import { cn } from "@/lib/cn";
 import { noAutofill, secretStyle } from "@/lib/noAutofill";
-import { useMinSkeleton } from "@/lib/useMinSkeleton";
-import { useScope } from "@/pages/dashboard/useScope";
-import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { SHOPPING_MENU_EVENT } from "@/layout/useShoppingMenu";
 import { GroupComModal } from "@/pages/operation/GroupComModal";
-import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
 
-/** Configurações > Shopping. O card da Intranet Mall abre a modal, no mesmo desenho de Adquirentes. */
-export function ShoppingPage() {
+/** Card da administradora escolhida na Filial. Salvar outra substitui a atual. */
+export function ShoppingIntegration({
+  storeId,
+  choice,
+  account,
+  onAccount,
+}: {
+  storeId: string;
+  choice: "allos" | "groupcom";
+  account: ShoppingAccount | null;
+  onAccount: (account: ShoppingAccount) => void;
+}) {
   const { show } = useToast();
-  const { session, storeRows, loading: storesLoading } = useScopedStores();
-  const { scope } = useScope();
-  const escolher = pickOneStore(scope.storeIds, session.stores.length);
-  const showSkeleton = useMinSkeleton(storesLoading);
-  const store = storeRows[0];
-  const [account, setAccount] = useState<ShoppingAccount | null>(null);
-  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
-  const [groupOpen, setGroupOpen] = useState(false);
-
-  useEffect(() => {
-    if (storesLoading || escolher || !store || store.pointType !== "SHOPPING") {
-      setLoading(false);
-      return;
-    }
-    let cancel = false;
-    setLoading(true);
-    void fetchShoppingAccount(session.tenantId, store.id)
-      .then((access) => {
-        if (!cancel) setAccount(access);
-      })
-      .catch(() => {
-        if (!cancel) show("Não foi possível carregar o shopping desta filial. Tente novamente.", "danger");
-      })
-      .finally(() => {
-        if (!cancel) setLoading(false);
-      });
-    return () => {
-      cancel = true;
-    };
-    // show do toast muda de identidade; a carga segue a filial.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storesLoading, escolher, store, session.tenantId]);
-
-  const intranet = account?.administrator === "allos" ? account : null;
-  const group = account?.administrator === "groupcom" ? account : null;
+  const active = account?.administrator === choice ? account : null;
+  const replacedName = account != null && account.administrator !== choice ? shoppingAdministratorName(account.administrator) : null;
+  const group = choice === "groupcom";
 
   return (
-    <div>
-      <SectionHeader
-        section="Configurações"
-        title="Shopping"
-        subtitle="Configure a administradora desta filial. Cada filial integra com uma só."
+    <>
+      <ShoppingCard
+        logo={group ? "/group-com.png" : "/intranet.png"}
+        name={group ? "Group COM" : "Intranet Mall"}
+        detail={group && active?.unit ? [active.unit.floor, active.unit.code].filter(Boolean).join(" / ") : "Informe de vendas"}
+        connected={active != null}
+        onOpen={() => setOpen(true)}
       />
-      {escolher ? (
-        <div className="mt-6 max-w-[720px]">
-          <SelectStoreCard />
-        </div>
-      ) : (
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {showSkeleton || (loading && store?.pointType === "SHOPPING") ? (
-            <>
-              <CardSkeleton />
-              <CardSkeleton />
-            </>
-          ) : !store ? (
-            <Card>
-              <EmptyBlock icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
-            </Card>
-          ) : store.pointType !== "SHOPPING" ? (
-            <Card>
-              <EmptyBlock icon="🏬" title="Shopping indisponível" description="Esta tela está disponível apenas para filiais do tipo Quiosque em shopping." />
-            </Card>
-          ) : (
-            <>
-              <ShoppingCard logo="/intranet.png" name="Intranet Mall" detail="Informe de vendas" connected={intranet != null} onOpen={() => setOpen(true)} />
-              <ShoppingCard
-                logo="/group-com.png"
-                name="Group COM"
-                detail={group?.unit ? [group.unit.floor, group.unit.code].filter(Boolean).join(" / ") : "Informe de vendas"}
-                connected={group != null}
-                onOpen={() => setGroupOpen(true)}
-              />
-            </>
-          )}
-        </div>
-      )}
-      {store && store.pointType === "SHOPPING" ? (
-        <>
-        <IntranetMallModal
+      {group ? (
+        <GroupComModal
           open={open}
-          account={intranet}
-          replacedName={group != null ? "Group COM" : null}
-          storeId={store.id}
+          account={active}
+          replacedName={replacedName}
+          storeId={storeId}
           onClose={() => setOpen(false)}
           onSaved={(next) => {
-            setAccount(next);
+            onAccount(next);
             window.dispatchEvent(new Event(SHOPPING_MENU_EVENT));
-            show(intranet ? "Alterações salvas." : "Acesso da Intranet Mall configurado.", "success");
+            show(active ? "Alterações salvas." : "Acesso do Group COM configurado.", "success");
             setOpen(false);
           }}
         />
-        <GroupComModal
-          open={groupOpen}
-          account={group}
-          replacedName={account != null && account.administrator !== "groupcom" ? shoppingAdministratorName(account.administrator) : null}
-          storeId={store.id}
-          onClose={() => setGroupOpen(false)}
+      ) : (
+        <IntranetMallModal
+          open={open}
+          account={active}
+          replacedName={replacedName}
+          storeId={storeId}
+          onClose={() => setOpen(false)}
           onSaved={(next) => {
-            setAccount(next);
+            onAccount(next);
             window.dispatchEvent(new Event(SHOPPING_MENU_EVENT));
-            show(group ? "Alterações salvas." : "Acesso do Group COM configurado.", "success");
-            setGroupOpen(false);
+            show(active ? "Alterações salvas." : "Acesso da Intranet Mall configurado.", "success");
+            setOpen(false);
           }}
         />
-        </>
-      ) : null}
-    </div>
-  );
-}
-
-function CardSkeleton() {
-  return (
-    <Card>
-      <div className="mb-3.5 flex items-center gap-3" aria-busy="true" aria-label="Carregando shopping…">
-        <Skeleton className="h-[46px] w-[46px] rounded-[13px]" />
-        <div className="flex-1">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="mt-2 h-3 w-40" />
-        </div>
-      </div>
-      <div className="flex items-center justify-between border-t border-line pt-3">
-        <Skeleton className="h-3.5 w-24" />
-        <Skeleton className="h-8 w-24 rounded-[var(--radius-vela-sm)]" />
-      </div>
-    </Card>
+      )}
+    </>
   );
 }
 

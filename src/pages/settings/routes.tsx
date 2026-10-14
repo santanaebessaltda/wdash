@@ -17,7 +17,6 @@ const NotificationsPage = lazyPage(() => import("./NotificationsPage"), "Notific
 const BranchPage = lazyPage(() => import("../operation/BranchPage"), "BranchPage");
 const ProductsTaxesPage = lazyPage(() => import("../operation/ProductsTaxesPage"), "ProductsTaxesPage");
 const AcquirersPage = lazyPage(() => import("../cash-close/AcquirersPage"), "AcquirersPage");
-const ShoppingPage = lazyPage(() => import("../operation/ShoppingPage"), "ShoppingPage");
 /**
  * WDash: /settings  ->  Lojas; /settings/stores | /settings/erp com TabNav + sidebar.
  * Vela template: /settings/:tab (general, company, ...) no SettingsPage.
@@ -49,7 +48,7 @@ export const settingsRoutes: RouteObject[] = [
       { path: paths.operation.branch, element: <BranchPage /> },
       { path: paths.operation.productsTaxes, element: <ProductsTaxesPage /> },
       { path: paths.operation.acquirers, element: <AcquirersPage /> },
-      { path: paths.operation.shopping, element: <ShoppingPage /> },
+      { path: paths.operation.shopping, element: <Navigate to={paths.operation.branch} replace /> },
     ],
   },
   { path: paths.settings.tab(":tab"), element: <SettingsPage /> },

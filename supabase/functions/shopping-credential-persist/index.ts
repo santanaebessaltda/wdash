@@ -73,7 +73,7 @@ serve(async (req) => {
   const caller = await loadStaffCaller(admin, userData.user.id, OWNER_ROLES);
   if (!caller) return json({ error: "forbidden" }, 403);
 
-  let body: { storeId?: unknown; administrator?: unknown; baseUrl?: unknown; username?: unknown; password?: unknown; listUnits?: unknown; unit?: unknown };
+  let body: { storeId?: unknown; administrator?: unknown; baseUrl?: unknown; username?: unknown; password?: unknown; listUnits?: unknown; unit?: unknown; clear?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -81,13 +81,14 @@ serve(async (req) => {
   }
 
   const storeId = typeof body.storeId === "string" ? body.storeId : "";
+  const clear = body.clear === true;
   const listUnits = body.listUnits === true;
   const requested = body.administrator === "allos" || body.administrator === "argo" || body.administrator === "groupcom" ? body.administrator : "";
   const administrator = listUnits ? "groupcom" : requested;
   const baseUrl = administrator === "groupcom" ? groupComBaseUrl(typeof body.baseUrl === "string" ? body.baseUrl : "") : intranetMallBaseUrl(typeof body.baseUrl === "string" ? body.baseUrl : "");
   const username = typeof body.username === "string" ? body.username.trim() : "";
   const password = typeof body.password === "string" ? body.password : "";
-  if (!storeId || !administrator || !baseUrl || !username) return json({ error: "invalid_input" }, 400);
+  if (!storeId || (!clear && (!administrator || !baseUrl || !username))) return json({ error: "invalid_input" }, 400);
   if (!canAccessStore(caller.role, caller.memberStoreIds, storeId)) return json({ error: "forbidden" }, 403);
 
   const { data: store, error: storeErr } = await admin
@@ -97,6 +98,12 @@ serve(async (req) => {
     .eq("tenant_id", caller.tenantId)
     .maybeSingle();
   if (storeErr || !store || store.point_type !== "MALL") return json({ error: "invalid_store" }, 400);
+
+  if (clear) {
+    const { error } = await admin.from("store_shopping").delete().eq("store_id", storeId).eq("tenant_id", caller.tenantId);
+    if (error) return json({ error: "persist_failed" }, 500);
+    return json({ ok: true });
+  }
 
   if (listUnits) {
     if (!password.trim()) return json({ error: "secret_required" }, 400);

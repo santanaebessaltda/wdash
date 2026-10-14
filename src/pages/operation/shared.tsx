@@ -71,7 +71,6 @@ const SECTION_PAGES: Record<SectionName, Array<() => Promise<unknown>>> = {
     () => import("@/pages/operation/BranchPage"),
     () => import("@/pages/operation/ProductsTaxesPage"),
     () => import("@/pages/cash-close/AcquirersPage"),
-    () => import("@/pages/operation/ShoppingPage"),
   ],
 };
 

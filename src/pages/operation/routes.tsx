@@ -24,7 +24,7 @@ export const operationRoutes: RouteObject[] = [
       { path: paths.operation.rent, element: <RedirectTo to={paths.operation.branch} /> },
       { path: paths.legacy.operationProductsTaxes, element: <RedirectTo to={paths.operation.productsTaxes} /> },
       { path: paths.legacy.operationAcquirers, element: <RedirectTo to={paths.operation.acquirers} /> },
-      { path: paths.legacy.operationShopping, element: <RedirectTo to={paths.operation.shopping} /> },
+      { path: paths.legacy.operationShopping, element: <RedirectTo to={paths.operation.branch} /> },
     ],
   },
 ];
