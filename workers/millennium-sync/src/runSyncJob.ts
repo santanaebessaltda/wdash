@@ -1452,6 +1452,19 @@ export function closeWindow(todayIso: string, previousClosed: boolean): { from: 
   return { from: previousClosed ? to : addDaysIso(todayIso, -2), to };
 }
 
+/**
+ * O job que fecha as vendas de ontem. Sangria, fechamento de caixa e carga de histórico
+ * também usam CLOSE e não contam como esse fechamento.
+ */
+export function countsAsSalesClose(payload: { part?: unknown; cashOnly?: unknown; deep?: unknown; fillUntil?: unknown } | null | undefined): boolean {
+  if (!payload) return false;
+  if (payload.part != null) return false;
+  if (payload.cashOnly === true) return false;
+  if (payload.deep === true) return false;
+  if (payload.fillUntil != null) return false;
+  return true;
+}
+
 /** Limite do HISTORY manual (`scripts/history-months.ts`), em meses antes do atual. */
 export const HISTORY_CAP_MONTHS = 24;
 

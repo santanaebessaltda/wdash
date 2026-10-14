@@ -3,6 +3,7 @@ import {
   chunkByCalendarMonths,
   closeHour,
   closeWindow,
+  countsAsSalesClose,
   collapseDaysToWindows,
   dailyCloseEnabled,
   daysNeedingHeavySync,
@@ -120,6 +121,15 @@ function makeDeps(overrides: Partial<SyncJobDeps> = {}): SyncJobDeps & {
 }
 
 describe("fechamento noturno (CLOSE)", () => {
+  it("sangria and cash close do not count as yesterday's sales close", () => {
+    expect(countsAsSalesClose({ from: "2026-10-13", to: "2026-10-13", storeIds: ["s1"] })).toBe(true);
+    expect(countsAsSalesClose({ from: "2026-10-01", to: "2026-10-13", cashOnly: true, part: "sangria" })).toBe(false);
+    expect(countsAsSalesClose({ from: "2026-10-13", to: "2026-10-13", cashOnly: true, part: "close" })).toBe(false);
+    expect(countsAsSalesClose({ from: "2026-09-01", to: "2026-09-30", deep: true })).toBe(false);
+    expect(countsAsSalesClose({ from: "2026-10-13", to: "2026-10-13", fillUntil: "2026-09-01" })).toBe(false);
+    expect(countsAsSalesClose(null)).toBe(false);
+  });
+
   it("closeWindow = ontem; + anteontem se a noite anterior não fechou", () => {
     expect(closeWindow("2026-09-24", true)).toEqual({ from: "2026-09-23", to: "2026-09-23" });
     expect(closeWindow("2026-09-24", false)).toEqual({ from: "2026-09-22", to: "2026-09-23" });

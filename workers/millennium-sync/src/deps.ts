@@ -46,6 +46,7 @@ import {
   addDaysIso,
   closeHour,
   closeWindow,
+  countsAsSalesClose,
   dailyCloseEnabled,
   hourInTz,
   isCloseWindow,
@@ -1467,9 +1468,10 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
 }
 
 /**
- * Fechamento de ontem (CLOSE), 1x por integracao por dia, so na janela da madrugada
+ * Fechamento das vendas de ontem (CLOSE), 1x por integracao por dia, so na janela da madrugada
  * (CLOSE_HOUR ... +CLOSE_WINDOW_HOURS, fuso da 1 loja). Cobre anteontem tambem se a noite anterior
- * nao fechou. Nao enfileira com onboarding aberto nem com SEED pendente (a carga ja cobre ontem).
+ * nao fechou. Sangria e fechamento de caixa nao contam como esse fechamento. Nao enfileira com
+ * onboarding aberto nem com SEED pendente (a carga ja cobre ontem).
  */
 export async function enqueueDueCloseJobs(sb: SupabaseClient, now = new Date()): Promise<number> {
   if (!dailyCloseEnabled()) return 0;
@@ -1498,15 +1500,14 @@ export async function enqueueDueCloseJobs(sb: SupabaseClient, now = new Date()):
     const today = ymdInTz(now, tz);
     const yesterday = addDaysIso(today, -1);
 
-    const { data: already } = await sb
+    const { data: sameDay, error: sameDayErr } = await sb
       .from("sync_job")
-      .select("id")
+      .select("payload")
       .eq("credential_id", credentialId)
       .eq("kind", "CLOSE")
-      .eq("payload->>to", yesterday)
-      .limit(1)
-      .maybeSingle();
-    if (already) continue;
+      .eq("payload->>to", yesterday);
+    if (sameDayErr) throw sameDayErr;
+    if ((sameDay ?? []).some((row) => countsAsSalesClose(row.payload as { part?: unknown; cashOnly?: unknown; deep?: unknown; fillUntil?: unknown } | null))) continue;
 
     const { data: onboarding } = await sb
       .from("membership")
@@ -1547,16 +1548,20 @@ export async function enqueueDueCloseJobs(sb: SupabaseClient, now = new Date()):
       .select("status, payload")
       .eq("credential_id", credentialId)
       .eq("kind", "CLOSE")
+      .is("payload->>part", null)
       .is("payload->>fillUntil", null)
       .is("payload->>deepDone", null)
       .order("created_at", { ascending: false })
       .limit(5);
     if (prevErr) throw prevErr;
     const dayBefore = addDaysIso(today, -2);
+    const salesCloses = (prevCloses ?? []).filter((row) =>
+      countsAsSalesClose(row.payload as { part?: unknown; cashOnly?: unknown; deep?: unknown; fillUntil?: unknown } | null),
+    );
     const previousClosed =
-      (prevCloses ?? []).length === 0 ||
-      (prevCloses ?? []).some(
-        (r) => r.status === "SUCCEEDED" && (r.payload as { to?: string } | null)?.to === dayBefore,
+      salesCloses.length === 0 ||
+      salesCloses.some(
+        (row) => row.status === "SUCCEEDED" && (row.payload as { to?: string } | null)?.to === dayBefore,
       );
 
     // Loja sem base = ontem (+ anteontem se a noite anterior falhou); com base = desde o dia seguinte
