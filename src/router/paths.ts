@@ -39,6 +39,7 @@ export const paths = {
   groups: "/dashboard/groups",
   team: "/dashboard/team",
   documents: "/documents",
+  documentBatches: "/documents/batches",
   /** CRUD de metas, dentro de Gestão. `/goals` redireciona. */
   goals: "/management/goals",
   goalNew: "/management/goals/new",

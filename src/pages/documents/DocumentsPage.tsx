@@ -1,219 +1,167 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Badge,
-  Button,
-  Card,
-  DataTable,
-  EmptyState,
-  Modal,
-  PageHeader,
-  ProgressBar,
-  Segmented,
-  type DataTableColumn,
-} from "@/components/ui";
-import { useActiveSession } from "@/session/SessionProvider";
-import { useScope } from "@/pages/dashboard/useScope";
-import {
-  assignDocument,
-  confirmBatch,
-  loadDocuments,
-  openDocument,
-  prepareFiles,
-  resendDocument,
-  saveEmployeeContact,
-  type BatchRow,
-  type DocumentRow,
-  type PersonRow,
-} from "@/data/wedash/documentsRepo";
-import { DOCUMENT_CATEGORIES, DOCUMENT_COPY, batchLabel, monthFolder, resendVisible, signedCount } from "@/data/wedash/documentSplit";
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { Badge, Button, DataTable, EmptyState, StatCard, type DataTableColumn } from "@/components/ui";
+import { paths } from "@/router/paths";
+import { monthFolder } from "@/data/wedash/documentSplit";
+import type { BatchRow, DocumentRow, PersonRow } from "@/data/wedash/documentsRepo";
+import { openDocument } from "@/data/wedash/documentsRepo";
+import { DocumentsFrame, FileGlyph, FolderGlyph, STATUS_LABEL, badgeVariant, formatBytes } from "./frame";
+import { useDocuments } from "./useDocuments";
 
-type View = "folders" | "batches";
+type Mode = "home" | "pending" | "month" | "browse";
 
-const STATUS_LABEL: Record<DocumentRow["status"], string> = {
-  UNASSIGNED: "Pendente",
-  PENDING: "Pendente",
-  SIGNED: "Assinado",
-  DECLINED: "Recusado",
-  EXPIRED: "Expirado",
-};
-
-function badgeVariant(status: DocumentRow["status"]) {
-  if (status === "SIGNED") return "success" as const;
-  if (status === "DECLINED") return "danger" as const;
-  if (status === "EXPIRED") return "warning" as const;
-  return "neutral" as const;
-}
+type FolderEntry = { key: string; label: string; detail: string; fileId?: string };
 
 export function DocumentsPage() {
-  const session = useActiveSession();
-  const { scope } = useScope();
-  const storeId = scope.storeIds.length === 1 ? scope.storeIds[0] : null;
-  const [view, setView] = useState<View>("folders");
-  const [batches, setBatches] = useState<BatchRow[]>([]);
-  const [documents, setDocuments] = useState<DocumentRow[]>([]);
-  const [people, setPeople] = useState<PersonRow[]>([]);
-  const [stores, setStores] = useState<{ id: string; name: string }[]>([]);
-  const [openBatch, setOpenBatch] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
+  const { allStores, batches, documents, people, stores } = useDocuments();
+  const [mode, setMode] = useState<Mode>("home");
   const [crumb, setCrumb] = useState<string[]>([]);
+  const [query, setQuery] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
-
-  const reload = useCallback(async () => {
-    const data = await loadDocuments(session.tenantId, storeId);
-    setBatches(data.batches);
-    setDocuments(data.documents);
-    setPeople(data.people);
-    setStores(data.stores);
-  }, [session.tenantId, storeId]);
-
-  useEffect(() => {
-    void reload();
-  }, [reload]);
 
   const storeName = useMemo(() => new Map(stores.map((store) => [store.id, store.name])), [stores]);
   const personName = useMemo(() => new Map(people.map((person) => [person.id, person.name])), [people]);
+  const batchOf = useMemo(() => new Map(batches.map((batch) => [batch.id, batch])), [batches]);
+
+  const pending = documents.filter((doc) => doc.status === "PENDING" || doc.status === "UNASSIGNED");
+  const signed = documents.filter((doc) => doc.status === "SIGNED");
+  const now = new Date();
+  const thisMonth = documents.filter((doc) => {
+    const batch = batchOf.get(doc.batchId);
+    return batch?.month === now.getMonth() + 1 && batch.year === now.getFullYear();
+  });
+  const missingContact = people.filter((person) => !person.email && !person.whatsapp).length;
+
+  const listed =
+    mode === "pending"
+      ? pending
+      : mode === "month"
+        ? thisMonth
+        : mode === "home"
+          ? [...documents].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 12)
+          : [];
+
+  const folders = mode === "browse" ? folderEntries({ allStores, crumb, documents, batches, people, stores }) : [];
+  const needle = query.trim().toLowerCase();
+  const visibleFiles = listed.filter((doc) => !needle || doc.fileName.toLowerCase().includes(needle) || (personName.get(doc.sellerId ?? "") ?? "").toLowerCase().includes(needle));
+  const visibleFolders = folders.filter((entry) => !needle || entry.label.toLowerCase().includes(needle));
+
+  function goHome() {
+    setMode("home");
+    setCrumb([]);
+    setQuery("");
+  }
+
+  function goBack() {
+    if (mode === "browse" && crumb.length > 0) {
+      setCrumb(crumb.slice(0, -1));
+      return;
+    }
+    goHome();
+  }
+
+  const title = sectionTitle(mode, allStores, crumb, storeName, personName);
 
   return (
-    <div>
-      <PageHeader
-        title="Documentos"
-        subtitle={storeId ? "Pasta do colaborador nesta filial" : "Pasta por filial, colaborador, ano e mês"}
-        actions={
-          <>
-            <Segmented
-              options={[
-                { value: "folders", label: "Pastas" },
-                { value: "batches", label: "Lotes" },
-              ]}
-              value={view}
-              onChange={(value) => value && setView(value)}
-            />
-            <Button onClick={() => setCreating(true)}>Novo lote</Button>
-          </>
-        }
-      />
+    <DocumentsFrame title="Pastas" subtitle={allStores ? "Filial, colaborador, ano e mês" : "Colaborador, ano e mês"}>
       {notice && <p className="mb-3 text-[13px] text-bad">{notice}</p>}
-      {view === "folders" ? (
-        <FolderBrowser
-          allStores={!storeId}
-          crumb={crumb}
-          onCrumb={setCrumb}
-          documents={documents}
-          batches={batches}
-          people={people}
-          stores={stores}
-          storeName={storeName}
-          personName={personName}
-          onOpen={async (id) => {
-            const url = await openDocument(id);
-            window.open(url, "_blank", "noopener");
-          }}
-        />
-      ) : (
-        <BatchList
-          batches={batches}
-          documents={documents}
-          people={people}
-          openBatch={openBatch}
-          onOpen={setOpenBatch}
-          onResend={async (id) => {
-            try {
-              await resendDocument(id);
-              setNotice(null);
-            } catch (error) {
-              setNotice(error instanceof Error ? error.message : "Não foi possível reenviar.");
-            }
-          }}
-          onAssign={async (documentId, sellerId) => {
-            await assignDocument(documentId, sellerId);
-            await reload();
-          }}
-          onSaveContact={async (input) => {
-            await saveEmployeeContact(input);
-            await reload();
-          }}
-          onConfirm={async (input) => {
-            await confirmBatch(input);
-            await reload();
-          }}
-        />
+      {mode === "home" && (
+        <>
+          <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <StatCard label="Pendentes" value={pending.length} sub="Ainda não assinados" icon={<FileGlyph />} iconColor="var(--warn)" iconBg="var(--warn-soft)" />
+            <StatCard label="Assinados" value={signed.length} sub="Guardados na pasta" icon={<FileGlyph />} iconColor="var(--ok)" iconBg="var(--ok-soft)" />
+            <StatCard label="Sem contato" value={missingContact} sub="Sem WhatsApp e sem e-mail" icon={<FolderGlyph />} iconColor="var(--bad)" iconBg="var(--bad-soft)" />
+          </div>
+          <p className="mb-3 text-xs font-bold uppercase tracking-wide text-t2">Atalhos</p>
+          <div className="mb-5 grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
+            <Shortcut label="Pendentes" count={`${pending.length} arquivos`} onClick={() => { setMode("pending"); setQuery(""); }} />
+            <Shortcut label="Este mês" count={`${thisMonth.length} arquivos`} onClick={() => { setMode("month"); setQuery(""); }} />
+            <Shortcut
+              label={allStores ? "Filiais" : "Colaboradores"}
+              count={allStores ? `${stores.length} filiais` : `${people.length} pessoas`}
+              onClick={() => { setMode("browse"); setCrumb([]); setQuery(""); }}
+            />
+          </div>
+        </>
       )}
-      {creating && (
-        <NewBatchModal
-          people={people}
-          onClose={() => setCreating(false)}
-          onCreated={async (message) => {
-            setCreating(false);
-            setNotice(message);
-            setView("batches");
-            await reload();
-          }}
-          storeId={storeId}
-        />
-      )}
-    </div>
-  );
-}
 
-function FolderBrowser({
-  allStores,
-  crumb,
-  onCrumb,
-  documents,
-  batches,
-  people,
-  stores,
-  storeName,
-  personName,
-  onOpen,
-}: {
-  allStores: boolean;
-  crumb: string[];
-  onCrumb: (next: string[]) => void;
-  documents: DocumentRow[];
-  batches: BatchRow[];
-  people: PersonRow[];
-  stores: { id: string; name: string }[];
-  storeName: Map<string, string>;
-  personName: Map<string, string>;
-  onOpen: (id: string) => Promise<void>;
-}) {
-  const entries = folderEntries({ allStores, crumb, documents, batches, people, stores, storeName, personName });
-  return (
-    <Card>
-      <div className="mb-3 flex flex-wrap gap-2 text-[13px] text-t1">
-        <button type="button" className="font-semibold text-acc" onClick={() => onCrumb([])}>
-          Documentos
-        </button>
-        {crumb.map((part, index) => (
-          <button key={part} type="button" onClick={() => onCrumb(crumb.slice(0, index + 1))}>
-            / {labelOf(part, storeName, personName)}
-          </button>
-        ))}
-      </div>
-      {entries.length === 0 ? (
-        <EmptyState framed={false} title="Pasta vazia" description="Nenhum arquivo neste nível." />
-      ) : (
-        <div className="grid gap-2">
-          {entries.map((entry) =>
-            entry.fileId ? (
-              <button key={entry.fileId} type="button" className="rounded-xl border border-line px-3 py-2 text-left text-[13px] font-semibold" onClick={() => void onOpen(entry.fileId!)}>
-                {entry.label}
-              </button>
-            ) : (
-              <button key={entry.key} type="button" className="rounded-xl border border-line px-3 py-2 text-left text-[13px] font-semibold" onClick={() => onCrumb([...crumb, entry.key])}>
-                {entry.label}
-              </button>
-            ),
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          {mode !== "home" && (
+            <Button size="sm" variant="outline" onClick={goBack}>
+              Voltar
+            </Button>
           )}
+          <h3 className="truncate text-[15px] font-bold text-t0">{title}</h3>
         </div>
+        <div className="flex h-[34px] items-center gap-2 rounded-[10px] border border-line bg-bg-inset px-3">
+          <FileGlyph size={13} />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Buscar arquivos…"
+            className="w-28 bg-transparent text-[12.5px] text-t0 outline-none placeholder:text-t2 sm:w-40"
+          />
+        </div>
+      </div>
+
+      {mode === "browse" ? (
+        visibleFolders.length === 0 ? (
+          <EmptyState title="Pasta vazia" description="Nenhum arquivo neste nível." />
+        ) : (
+          <FolderTable
+            rows={visibleFolders}
+            onOpenFolder={(key) => setCrumb([...crumb, key])}
+            onOpenFile={(id) => void openFile(id, setNotice)}
+          />
+        )
+      ) : visibleFiles.length === 0 ? (
+        <EmptyState
+          title="Nenhum arquivo"
+          description="O envio fica em Lotes. O PDF pronto aparece na pasta do colaborador."
+          action={<Link to={paths.documentBatches} className="text-[13px] font-bold text-acc">Ir para Lotes</Link>}
+        />
+      ) : (
+        <FileTable rows={visibleFiles} people={people} batches={batchOf} onOpen={(id) => void openFile(id, setNotice)} />
       )}
-    </Card>
+      <p className="mt-3 text-[12.5px] text-t2">
+        {mode === "browse" ? `${visibleFolders.length} itens` : `${visibleFiles.length} arquivos`}
+      </p>
+    </DocumentsFrame>
   );
 }
 
-function labelOf(part: string, storeName: Map<string, string>, personName: Map<string, string>) {
-  return storeName.get(part) ?? personName.get(part) ?? part;
+function Shortcut({ label, count, onClick }: { label: string; count: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="flex items-center gap-3 rounded-2xl border border-line bg-bg-2 p-4 text-left hover:border-line-2 hover:bg-bg-3">
+      <span className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[11px] bg-acc-soft text-acc">
+        <FolderGlyph />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[13px] font-bold text-t0">{label}</span>
+        <span className="mt-0.5 block text-[11.5px] text-t2">{count}</span>
+      </span>
+    </button>
+  );
+}
+
+async function openFile(id: string, setNotice: (message: string | null) => void) {
+  try {
+    const url = await openDocument(id);
+    setNotice(null);
+    window.open(url, "_blank", "noopener");
+  } catch (error) {
+    setNotice(error instanceof Error ? error.message : "O arquivo ainda não está disponível.");
+  }
+}
+
+function sectionTitle(mode: Mode, allStores: boolean, crumb: string[], storeName: Map<string, string>, personName: Map<string, string>) {
+  if (mode === "pending") return "Pendentes";
+  if (mode === "month") return `Este mês · ${monthFolder(new Date().getMonth() + 1)}`;
+  if (mode === "home") return "Arquivos recentes";
+  if (crumb.length === 0) return allStores ? "Filiais" : "Colaboradores";
+  const last = crumb[crumb.length - 1];
+  return storeName.get(last) ?? personName.get(last) ?? last;
 }
 
 function folderEntries(input: {
@@ -223,331 +171,111 @@ function folderEntries(input: {
   batches: BatchRow[];
   people: PersonRow[];
   stores: { id: string; name: string }[];
-  storeName: Map<string, string>;
-  personName: Map<string, string>;
-}): { key: string; label: string; fileId?: string }[] {
+}): FolderEntry[] {
   const { allStores, crumb, documents, batches, people, stores } = input;
   const yearOf = (doc: DocumentRow) => String(batches.find((batch) => batch.id === doc.batchId)?.year ?? "");
   const monthOf = (doc: DocumentRow) => monthFolder(batches.find((batch) => batch.id === doc.batchId)?.month ?? 0);
-  if (crumb.length === 0 && allStores) return stores.map((store) => ({ key: store.id, label: store.name }));
+  if (crumb.length === 0 && allStores) {
+    return stores.map((store) => ({
+      key: store.id,
+      label: store.name,
+      detail: `${people.filter((person) => person.storeId === store.id).length} colaboradores`,
+    }));
+  }
   const storeKey = allStores ? crumb[0] : null;
   const depth = allStores ? crumb.length - 1 : crumb.length;
   const peopleHere = people.filter((person) => !storeKey || person.storeId === storeKey);
-  if (depth === 0) return peopleHere.map((person) => ({ key: person.id, label: person.name }));
+  if (depth === 0) {
+    return peopleHere.map((person) => ({
+      key: person.id,
+      label: person.name,
+      detail: `${documents.filter((doc) => doc.sellerId === person.id).length} arquivos`,
+    }));
+  }
   const sellerId = allStores ? crumb[1] : crumb[0];
   const docs = documents.filter((doc) => doc.sellerId === sellerId);
-  if (depth === 1) return [...new Set(docs.map(yearOf))].filter(Boolean).map((year) => ({ key: year, label: year }));
+  if (depth === 1) {
+    return [...new Set(docs.map(yearOf))].filter(Boolean).map((year) => ({
+      key: year,
+      label: year,
+      detail: `${docs.filter((doc) => yearOf(doc) === year).length} arquivos`,
+    }));
+  }
   const year = allStores ? crumb[2] : crumb[1];
   if (depth === 2) {
-    return [...new Set(docs.filter((doc) => yearOf(doc) === year).map(monthOf))].filter(Boolean).map((month) => ({ key: month, label: month }));
+    return [...new Set(docs.filter((doc) => yearOf(doc) === year).map(monthOf))].filter(Boolean).map((month) => ({
+      key: month,
+      label: month,
+      detail: "Pasta",
+    }));
   }
   const month = allStores ? crumb[3] : crumb[2];
-  return docs.filter((doc) => yearOf(doc) === year && monthOf(doc) === month).map((doc) => ({ key: doc.id, label: doc.fileName, fileId: doc.id }));
+  return docs
+    .filter((doc) => yearOf(doc) === year && monthOf(doc) === month)
+    .map((doc) => ({ key: doc.id, label: doc.fileName, detail: STATUS_LABEL[doc.status], fileId: doc.id }));
 }
 
-function BatchList({
+function FolderTable({ rows, onOpenFolder, onOpenFile }: { rows: FolderEntry[]; onOpenFolder: (key: string) => void; onOpenFile: (id: string) => void }) {
+  const columns: DataTableColumn<FolderEntry>[] = [
+    {
+      key: "name",
+      header: "Nome",
+      render: (row) => (
+        <button type="button" className="flex min-w-0 items-center gap-2.5 text-left" onClick={() => (row.fileId ? onOpenFile(row.fileId) : onOpenFolder(row.key))}>
+          <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] bg-acc-soft text-acc">
+            {row.fileId ? <FileGlyph /> : <FolderGlyph />}
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-[13px] font-bold text-t0">{row.label}</span>
+            <span className="mt-px block text-[11px] text-t2">{row.fileId ? "PDF" : "Pasta"}</span>
+          </span>
+        </button>
+      ),
+    },
+    { key: "detail", header: "Conteúdo", render: (row) => <span className="text-[12.5px] text-t1">{row.detail}</span> },
+  ];
+  return <DataTable columns={columns} data={rows} rowKey={(row) => row.key} />;
+}
+
+function FileTable({
+  rows,
+  people,
   batches,
-  documents,
-  people,
-  openBatch,
   onOpen,
-  onResend,
-  onAssign,
-  onSaveContact,
-  onConfirm,
 }: {
-  batches: BatchRow[];
-  documents: DocumentRow[];
+  rows: DocumentRow[];
   people: PersonRow[];
-  openBatch: string | null;
-  onOpen: (id: string | null) => void;
-  onResend: (id: string) => Promise<void>;
-  onAssign: (documentId: string, sellerId: string) => Promise<void>;
-  onSaveContact: (input: { sellerId: string; cpf: string; email: string; whatsapp: string }) => Promise<void>;
-  onConfirm: (input: { batchId: string; channel: "EMAIL" | "WHATSAPP"; deadline: string; reminder: string }) => Promise<void>;
+  batches: Map<string, BatchRow>;
+  onOpen: (id: string) => void;
 }) {
-  if (batches.length === 0) return <EmptyState title="Nenhum lote" description="Envie um PDF para começar." />;
-  return (
-    <div className="grid gap-3">
-      {batches.map((batch) => {
-        const rows = documents.filter((doc) => doc.batchId === batch.id);
-        const statuses = rows.map((row) => (row.status === "UNASSIGNED" ? "PENDING" : row.status));
-        const signed = signedCount(statuses);
-        const total = rows.length;
-        const columns: DataTableColumn<DocumentRow>[] = [
-          { key: "person", header: "Colaborador", render: (row) => people.find((person) => person.id === row.sellerId)?.name ?? "Escolha o colaborador" },
-          { key: "file", header: "Documento", render: (row) => row.fileName },
-          { key: "status", header: "Status", render: (row) => <Badge variant={badgeVariant(row.status)}>{row.sellerId ? STATUS_LABEL[row.status] : "Escolha o colaborador"}</Badge> },
-          {
-            key: "act",
-            header: "",
-            render: (row) =>
-              resendVisible(row.status) && row.envelopeId ? (
-                <Button size="sm" variant="outline" onClick={() => void onResend(row.id)}>
-                  Reenviar
-                </Button>
-              ) : !row.sellerId ? (
-                <select className="rounded-lg border border-line bg-bg-inset px-2 py-1 text-xs" defaultValue="" onChange={(event) => event.target.value && void onAssign(row.id, event.target.value)}>
-                  <option value="">Escolher</option>
-                  {people.map((person) => (
-                    <option key={person.id} value={person.id}>
-                      {person.name}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <ContactEditor
-                  key={row.sellerId}
-                  person={people.find((person) => person.id === row.sellerId) ?? null}
-                  error={row.error}
-                  locked={Boolean(row.envelopeId)}
-                  onSave={(input) => onSaveContact({ sellerId: row.sellerId!, ...input })}
-                />
-              ),
-          },
-        ];
-        return (
-          <Card key={batch.id}>
-            <button type="button" className="w-full text-left" onClick={() => onOpen(openBatch === batch.id ? null : batch.id)}>
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <p className="text-[14px] font-bold text-t0">
-                  {batch.category} · {monthFolder(batch.month)}/{batch.year}
-                </p>
-                <Badge variant={batchLabel(statuses) === "Assinado" ? "success" : "neutral"}>{batchLabel(statuses)}</Badge>
-              </div>
-              <p className="mb-2 text-xs text-t2">
-                {signed} de {total}
-              </p>
-              <ProgressBar value={total ? (signed / total) * 100 : 0} />
-            </button>
-            {openBatch === batch.id && (
-              <div className="mt-4 grid gap-3">
-                {rows.some((row) => !row.envelopeId) && (
-                  <SendReady
-                    channel={batch.channel ?? "WHATSAPP"}
-                    deadline={batch.deadline ?? ""}
-                    onSend={(input) => onConfirm({ batchId: batch.id, ...input })}
-                  />
-                )}
-                <DataTable columns={columns} data={rows} rowKey={(row) => row.id} />
-              </div>
-            )}
-          </Card>
-        );
-      })}
-    </div>
-  );
-}
-
-function ContactEditor({
-  person,
-  error,
-  locked,
-  onSave,
-}: {
-  person: PersonRow | null;
-  error: string | null;
-  locked: boolean;
-  onSave: (input: { cpf: string; email: string; whatsapp: string }) => Promise<void>;
-}) {
-  const [cpf, setCpf] = useState(person?.cpf ?? "");
-  const [email, setEmail] = useState(person?.email ?? "");
-  const [whatsapp, setWhatsapp] = useState(person?.whatsapp ?? "");
-  const [localError, setLocalError] = useState<string | null>(null);
-  if (!person || locked) return <span className="text-xs text-t2">{error ?? ""}</span>;
-  return (
-    <form
-      className="grid gap-1"
-      onSubmit={(event) => {
-        event.preventDefault();
-        setLocalError(null);
-        void onSave({ cpf, email, whatsapp }).catch((reason) => setLocalError(reason instanceof Error ? reason.message : DOCUMENT_COPY.badCpf));
-      }}
-    >
-      {(error || localError) && <span className="text-xs text-bad">{localError || error}</span>}
-      <div className="flex flex-wrap gap-1">
-        <input className="w-28 rounded-lg border border-line bg-bg-inset px-2 py-1 text-xs" value={cpf} placeholder="CPF" onChange={(event) => setCpf(event.target.value)} />
-        <input className="w-36 rounded-lg border border-line bg-bg-inset px-2 py-1 text-xs" value={email} placeholder="E-mail" onChange={(event) => setEmail(event.target.value)} />
-        <input className="w-28 rounded-lg border border-line bg-bg-inset px-2 py-1 text-xs" value={whatsapp} placeholder="WhatsApp" onChange={(event) => setWhatsapp(event.target.value)} />
-        <Button size="sm" variant="outline" type="submit">
-          Salvar
-        </Button>
-      </div>
-    </form>
-  );
-}
-
-function SendReady({
-  channel,
-  deadline,
-  onSend,
-}: {
-  channel: "EMAIL" | "WHATSAPP";
-  deadline: string;
-  onSend: (input: { channel: "EMAIL" | "WHATSAPP"; deadline: string; reminder: string }) => Promise<void>;
-}) {
-  const [nextChannel, setChannel] = useState(channel);
-  const [nextDeadline, setDeadline] = useState(deadline.slice(0, 10));
-  const [reminder, setReminder] = useState("EVERY_3_DAYS");
-  const [error, setError] = useState<string | null>(null);
-  return (
-    <form
-      className="flex flex-wrap items-end gap-2"
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (!nextDeadline) {
-          setError(DOCUMENT_COPY.deadline);
-          return;
-        }
-        setError(null);
-        void onSend({ channel: nextChannel, deadline: nextDeadline, reminder }).catch((reason) =>
-          setError(reason instanceof Error ? reason.message : "Não foi possível enviar."),
-        );
-      }}
-    >
-      <label className="text-xs font-semibold text-t1">
-        Canal
-        <select className="mt-1 block rounded-lg border border-line bg-bg-inset px-2 py-1 text-sm" value={nextChannel} onChange={(event) => setChannel(event.target.value as "EMAIL" | "WHATSAPP")}>
-          <option value="WHATSAPP">WhatsApp</option>
-          <option value="EMAIL">E-mail</option>
-        </select>
-      </label>
-      <label className="text-xs font-semibold text-t1">
-        Data limite
-        <input type="date" className="mt-1 block rounded-lg border border-line bg-bg-inset px-2 py-1 text-sm" value={nextDeadline} onChange={(event) => setDeadline(event.target.value)} />
-      </label>
-      <label className="text-xs font-semibold text-t1">
-        Lembrete
-        <select className="mt-1 block rounded-lg border border-line bg-bg-inset px-2 py-1 text-sm" value={reminder} onChange={(event) => setReminder(event.target.value)}>
-          <option value="EVERY_DAY">Todo dia</option>
-          <option value="EVERY_3_DAYS">A cada 3 dias</option>
-          <option value="EVERY_WEEK">Toda semana</option>
-          <option value="NEVER">Nunca</option>
-        </select>
-      </label>
-      <Button size="sm" type="submit">
-        Enviar prontos
-      </Button>
-      {error && <span className="text-xs text-bad">{error}</span>}
-    </form>
-  );
-}
-
-function NewBatchModal({
-  people,
-  storeId,
-  onClose,
-  onCreated,
-}: {
-  people: PersonRow[];
-  storeId: string | null;
-  onClose: () => void;
-  onCreated: (message: string | null) => Promise<void>;
-}) {
-  const [month, setMonth] = useState(String(new Date().getMonth() + 1));
-  const [year, setYear] = useState(String(new Date().getFullYear()));
-  const [category, setCategory] = useState<string>(DOCUMENT_CATEGORIES[0]);
-  const [unify, setUnify] = useState(true);
-  const [channel, setChannel] = useState<"WHATSAPP" | "EMAIL">("WHATSAPP");
-  const [deadline, setDeadline] = useState("");
-  const [reminder, setReminder] = useState("EVERY_3_DAYS");
-  const [files, setFiles] = useState<File[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function submit() {
-    if (!deadline) {
-      setError(DOCUMENT_COPY.deadline);
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      const prepared = await prepareFiles({
-        storeId,
-        month: Number(month),
-        year: Number(year),
-        category,
-        unify,
-        files,
-      });
-      await confirmBatch({ batchId: prepared.batchId, channel, deadline, reminder });
-      const refused = prepared.refused.map((item) => `${item.name}: ${item.message}`).join(" ");
-      await onCreated(refused || null);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Não foi possível enviar.");
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Modal
-      open
-      size="lg"
-      title="Novo lote"
-      onClose={onClose}
-      footer={
-        <Button onClick={() => void submit()} disabled={busy || files.length === 0}>
-          {busy ? "Enviando…" : "Continuar"}
-        </Button>
-      }
-    >
-      <div className="grid gap-3">
-        <label className="text-xs font-semibold text-t1">
-          Mês
-          <select className="mt-1 w-full rounded-lg border border-line bg-bg-inset px-2 py-2 text-sm" value={month} onChange={(event) => setMonth(event.target.value)}>
-            {Array.from({ length: 12 }, (_, index) => (
-              <option key={index + 1} value={index + 1}>
-                {monthFolder(index + 1)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-xs font-semibold text-t1">
-          Ano
-          <input className="mt-1 w-full rounded-lg border border-line bg-bg-inset px-2 py-2 text-sm" value={year} onChange={(event) => setYear(event.target.value)} />
-        </label>
-        <label className="text-xs font-semibold text-t1">
-          Categoria
-          <select className="mt-1 w-full rounded-lg border border-line bg-bg-inset px-2 py-2 text-sm" value={category} onChange={(event) => setCategory(event.target.value)}>
-            {DOCUMENT_CATEGORIES.map((item) => (
-              <option key={item}>{item}</option>
-            ))}
-          </select>
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={unify} onChange={(event) => setUnify(event.target.checked)} />
-          Unificar páginas do mesmo CPF
-        </label>
-        <label className="text-xs font-semibold text-t1">
-          Canal
-          <select className="mt-1 w-full rounded-lg border border-line bg-bg-inset px-2 py-2 text-sm" value={channel} onChange={(event) => setChannel(event.target.value as "WHATSAPP" | "EMAIL")}>
-            <option value="WHATSAPP">WhatsApp</option>
-            <option value="EMAIL">E-mail</option>
-          </select>
-        </label>
-        <label className="text-xs font-semibold text-t1">
-          Data limite
-          <input type="date" className="mt-1 w-full rounded-lg border border-line bg-bg-inset px-2 py-2 text-sm" value={deadline} onChange={(event) => setDeadline(event.target.value)} />
-        </label>
-        <label className="text-xs font-semibold text-t1">
-          Lembrete
-          <select className="mt-1 w-full rounded-lg border border-line bg-bg-inset px-2 py-2 text-sm" value={reminder} onChange={(event) => setReminder(event.target.value)}>
-            <option value="EVERY_DAY">Todo dia</option>
-            <option value="EVERY_3_DAYS">A cada 3 dias</option>
-            <option value="EVERY_WEEK">Toda semana</option>
-            <option value="NEVER">Nunca</option>
-          </select>
-        </label>
-        <input
-          type="file"
-          accept="application/pdf"
-          multiple
-          onChange={(event) => setFiles([...(event.target.files ?? [])])}
-        />
-        {error && <p className="text-sm text-bad">{error}</p>}
-        <p className="text-xs text-t2">{people.length} colaboradores nesta visão.</p>
-      </div>
-    </Modal>
-  );
+  const columns: DataTableColumn<DocumentRow>[] = [
+    {
+      key: "name",
+      header: "Nome",
+      render: (row) => (
+        <button type="button" className="flex min-w-0 items-center gap-2.5 text-left" onClick={() => onOpen(row.id)}>
+          <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] bg-acc-soft text-acc">
+            <FileGlyph />
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-[13px] font-bold text-t0">{row.fileName}</span>
+            <span className="mt-px block text-[11px] text-t2">{batches.get(row.batchId)?.category ?? "PDF"}</span>
+          </span>
+        </button>
+      ),
+    },
+    {
+      key: "owner",
+      header: "Colaborador",
+      hideBelow: "md",
+      render: (row) => <span className="text-[12.5px] text-t1">{people.find((person) => person.id === row.sellerId)?.name ?? "Escolha o colaborador"}</span>,
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (row) => <Badge variant={badgeVariant(row.status)}>{row.sellerId ? STATUS_LABEL[row.status] : "Escolha o colaborador"}</Badge>,
+    },
+    { key: "size", header: "Tamanho", hideBelow: "sm", render: (row) => <span className="font-mono text-[12.5px] font-semibold text-t0">{formatBytes(row.sizeBytes)}</span> },
+  ];
+  return <DataTable columns={columns} data={rows} rowKey={(row) => row.id} />;
 }

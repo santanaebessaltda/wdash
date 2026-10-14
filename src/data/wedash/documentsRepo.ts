@@ -10,6 +10,8 @@ export type DocumentRow = {
   fileName: string;
   error: string | null;
   envelopeId: string | null;
+  sizeBytes: number;
+  createdAt: string;
 };
 
 export type BatchRow = {
@@ -79,7 +81,7 @@ export async function loadDocuments(tenantId: string, storeId: string | null): P
   if (!sb) return { batches: [], documents: [], people: [], stores: [] };
   const [batches, documents, people, stores] = await Promise.all([
     sb.from("document_batch").select("id, store_id, month, year, category, channel, deadline, created_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }),
-    sb.from("employee_document").select("id, batch_id, store_id, seller_id, status, file_name, error, envelope_id").eq("tenant_id", tenantId),
+    sb.from("employee_document").select("id, batch_id, store_id, seller_id, status, file_name, error, envelope_id, size_bytes, created_at").eq("tenant_id", tenantId),
     sb.from("store_seller").select("id, store_id, name, cpf, email, whatsapp").eq("tenant_id", tenantId).eq("in_erp", true).order("name").limit(2000),
     sb.from("store").select("id, name").eq("tenant_id", tenantId).order("name"),
   ]);
@@ -117,6 +119,8 @@ function mapDoc(row: Record<string, unknown>): DocumentRow {
     fileName: String(row.file_name),
     error: (row.error as string | null) ?? null,
     envelopeId: (row.envelope_id as string | null) ?? null,
+    sizeBytes: Number(row.size_bytes ?? 0),
+    createdAt: String(row.created_at ?? ""),
   };
 }
 
