@@ -7,7 +7,7 @@ export async function upsertCashDropLines(
   args: { tenantId: string; storeId: string; lines: ParsedCashDrop[] },
 ): Promise<void> {
   if (args.lines.length === 0) return;
-  const ids = args.lines.map((line) => line.erpLancamento);
+  const ids = args.lines.map((line) => line.erpEntry);
   const { data, error } = await sb
     .from("sangria_line")
     .select("erp_lancamento, note, erp_note, kind")
@@ -21,11 +21,11 @@ export async function upsertCashDropLines(
     ]),
   );
   const rows = args.lines.map((line) => {
-    const prev = saved.get(line.erpLancamento);
+    const prev = saved.get(line.erpEntry);
     return {
       tenant_id: args.tenantId,
       store_id: args.storeId,
-      erp_lancamento: line.erpLancamento,
+      erp_lancamento: line.erpEntry,
       day: line.day,
       amount_cents: line.amountCents,
       document: line.document,

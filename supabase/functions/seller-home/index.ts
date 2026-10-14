@@ -222,7 +222,7 @@ serve(async (req) => {
       sellerProducts = productRows.map((r) => ({
         storeId: String(r.store_id),
         day: String(r.day),
-        sellerGeneratorId: Number(r.seller_generator_id),
+        sellerGeneratorId: Number(r.seller_gerador_id),
         sellerKey: String(r.seller_key ?? ""),
         sellerName: String(r.seller_name ?? ""),
         productCode: String(r.product_code ?? "").trim(),

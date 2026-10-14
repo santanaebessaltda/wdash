@@ -401,7 +401,7 @@ type SellerProductRow = {
   tenant_id: string;
   store_id: string;
   day: string;
-  seller_generator_id: number;
+  seller_gerador_id: number;
   seller_key: string;
   seller_name: string;
   product_code: string;
@@ -463,7 +463,7 @@ export async function fetchChallengeInput(q: {
             tenantId: r.tenant_id,
             storeId: r.store_id,
             day: r.day,
-            sellerGeneratorId: Number(r.seller_generator_id),
+            sellerGeneratorId: Number(r.seller_gerador_id),
             sellerKey: String(r.seller_key ?? ""),
             sellerName: String(r.seller_name ?? ""),
             productCode: String(r.product_code ?? "").trim(),

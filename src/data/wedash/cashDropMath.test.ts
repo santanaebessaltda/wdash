@@ -61,8 +61,8 @@ describe("sangria", () => {
   it("lê o lançamento do Millennium", () => {
     const rows = parseCashDropList({
       value: [
-        { ENTRY: 13224037, DATA_ISSUEDATE: "2026-08-02T03:00:00.000Z", AMOUNT_PAGO: -4.5, N_DOCUMENTO: "AV248488", OBS: "SANGRIA CANETA 4,50" },
-        { ENTRY: null },
+        { LANCAMENTO: 13224037, DATA_EMISSAO: "2026-08-02T03:00:00.000Z", VALOR_PAGO: -4.5, N_DOCUMENTO: "AV248488", OBS: "SANGRIA CANETA 4,50" },
+        { LANCAMENTO: null },
       ],
     });
     expect(rows).toEqual([

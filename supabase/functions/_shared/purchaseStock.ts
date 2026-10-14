@@ -61,13 +61,13 @@ export function parsePurchaseStock(payload: unknown): PurchaseStockRow[] {
   let position = 0;
   for (const raw of rowsOf(payload)) {
     if (!raw || typeof raw !== "object") continue;
-    const code = asStr(raw.CODE_PRODUCT);
+    const code = asStr(raw.COD_PRODUTO);
     if (!code) continue;
     const color = asStr(raw.COR);
     const print = asStr(raw.ESTAMPA);
     const size = asStr(raw.TAMANHO);
     const balance = asNum(raw.SALDO) ?? 0;
-    const openOrder = asNum(raw.QUANTITY_ORDER) ?? 0;
+    const openOrder = asNum(raw.QUANTIDADE_PEDIDO) ?? 0;
     const total = asNum(raw.TOTAL) ?? balance + openOrder;
     const key = [code, color, print, size].join("\u0000");
     const prev = out.get(key);
@@ -77,7 +77,7 @@ export function parsePurchaseStock(payload: unknown): PurchaseStockRow[] {
       prev.total += total;
       continue;
     }
-    const multiple = asNum(raw.QUANTITY_MULTIPLA);
+    const multiple = asNum(raw.QUANTIDADE_MULTIPLA);
     out.set(key, {
       code,
       color,
@@ -88,8 +88,8 @@ export function parsePurchaseStock(payload: unknown): PurchaseStockRow[] {
       openOrder,
       total,
       multiple: multiple != null && multiple > 0 ? multiple : null,
-      blocked: raw.BLOCKED_PURCHASE === true,
-      registeredAt: brDate(raw.DATA_REGISTRATION),
+      blocked: raw.BLOQUEADO_COMPRA === true,
+      registeredAt: brDate(raw.DATA_CADASTRO),
       position: position++,
     });
   }

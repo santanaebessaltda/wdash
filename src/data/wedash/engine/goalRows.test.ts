@@ -81,7 +81,7 @@ describe("teamMemberFromRow", () => {
   const base = {
     store_id: "s010",
     millennium_employee_id: 61643,
-    millennium_generator_id: 66161,
+    millennium_gerador_id: 66161,
     name: "  Gabriela   Souza ",
     name_keys: ["GABRIELA SOUZA"],
     active: true,
@@ -112,7 +112,7 @@ describe("teamMemberFromRow", () => {
   it("handles missing gerador, keys and shift", () => {
     const m = teamMemberFromRow({
       ...base,
-      millennium_generator_id: null,
+      millennium_gerador_id: null,
       name_keys: null,
       shift_id: null,
       store_shift: null,
@@ -135,7 +135,7 @@ describe("sellerDayFromRow", () => {
         seller_key: "GABRIELA SOUZA",
         seller_name: "Gabriela Souza",
         seller_employee_id: null,
-        seller_generator_id: 66161,
+        seller_gerador_id: 66161,
         brand: "ALL",
         revenue_cents: 12345,
         sales_count: 3,
@@ -164,7 +164,7 @@ describe("sellerDayFromRow", () => {
       seller_key: "NORTE.SUL",
       seller_name: "",
       seller_employee_id: 40587,
-      seller_generator_id: null,
+      seller_gerador_id: null,
       brand: "ALL",
       revenue_cents: 100,
       sales_count: 1,

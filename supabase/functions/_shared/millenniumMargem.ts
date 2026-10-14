@@ -48,7 +48,7 @@ export async function fetchMarginUnitCosts(
       "X-HTTP-Method": "GET",
       "X-IdentifierCase": "upper",
     },
-    body: JSON.stringify({ BRANCH: millenniumStoreId, DESC: null, DATAI: dayBound(from), DATAF: dayBound(to), KIND: null }),
+    body: JSON.stringify({ FILIAL: millenniumStoreId, DESC: null, DATAI: dayBound(from), DATAF: dayBound(to), TIPO: null }),
     signal: AbortSignal.timeout(120_000),
   });
   const text = await res.text();

@@ -65,7 +65,7 @@ export function goalFromRow(r: GoalRow): GoalRecord {
 export type GoalTeamRow = {
   store_id: string;
   millennium_employee_id: number;
-  millennium_generator_id: number | null;
+  millennium_gerador_id: number | null;
   name: string;
   name_keys: string[] | null;
   active: boolean;
@@ -79,7 +79,7 @@ export function teamMemberFromRow(r: GoalTeamRow): GoalTeamMember {
   return {
     storeId: r.store_id,
     employeeId: r.millennium_employee_id,
-    generatorId: r.millennium_generator_id == null ? null : Number(r.millennium_generator_id),
+    generatorId: r.millennium_gerador_id == null ? null : Number(r.millennium_gerador_id),
     name: collaboratorName(r.name),
     nameKeys: r.name_keys ?? [],
     salesPerson: r.active && (r.erp_role == null || r.erp_role === SELLER_ROLE),
@@ -95,7 +95,7 @@ export type SellerDayRow = {
   seller_key: string;
   seller_name: string;
   seller_employee_id: number | null;
-  seller_generator_id: number | null;
+  seller_gerador_id: number | null;
   brand: SalesBrand;
   revenue_cents: number;
   sales_count: number;
@@ -110,7 +110,7 @@ export function sellerDayFromRow(r: SellerDayRow): SalesSellerDayAgg {
     sellerKey: String(r.seller_key ?? ""),
     sellerName: collaboratorName(String(r.seller_name ?? "") || String(r.seller_key ?? "")),
     sellerEmployeeId: r.seller_employee_id == null ? null : Number(r.seller_employee_id),
-    sellerGeneratorId: r.seller_generator_id == null ? null : Number(r.seller_generator_id),
+    sellerGeneratorId: r.seller_gerador_id == null ? null : Number(r.seller_gerador_id),
     brand: r.brand,
     revenueCents: Number(r.revenue_cents) || 0,
     salesCount: Number(r.sales_count) || 0,

@@ -96,8 +96,8 @@ export async function fetchProductsOfType(session: string, typeId: number): Prom
   });
   const out: CatalogProduct[] = [];
   for (const o of rowsOf(payload)) {
-    const id = asInt(o.PRODUCT_PRODUCT_PRODUCT ?? o.produto_produto_produto);
-    const code = asStr(o.PRODUCT_PRODUCT_CODE_PRODUCT ?? o.produto_produto_cod_produto);
+    const id = asInt(o.PRODUTO_PRODUTO_PRODUTO ?? o.produto_produto_produto);
+    const code = asStr(o.PRODUTO_PRODUTO_COD_PRODUTO ?? o.produto_produto_cod_produto);
     if (id == null || !code) continue;
     out.push({ erpProductId: id, code, description: asStr(o.PRODUTO_PRODUTO_DESCRICAO1 ?? o.produto_produto_descricao1), typeId });
   }
@@ -170,12 +170,12 @@ export async function fetchCostTablePrices(session: string, tableId: number): Pr
   const payload = await report(
     session,
     PRODUCT_DIVISION_CATALOG_GUID,
-    { TABLE_DE_COST: tableId, BRANCH_GERADOR_GERADOR: "", PRODUCT_DIVISION_DIVISION: null },
+    { TABELA_DE_CUSTO: tableId, FILIAL_GERADOR_GERADOR: "", PRODUTO_DIVISAO_DIVISAO: null },
     `tabela de custo ${tableId}`,
   );
   const out = new Map<string, number>();
   for (const r of rowsOf(payload)) {
-    const code = asStr(r.PRODUCT_PRODUCT_CODE_PRODUCT);
+    const code = asStr(r.PRODUTO_PRODUTO_COD_PRODUTO);
     const unit = asNum(r.F_3814918930);
     if (!code || unit == null || unit <= 0) continue;
     const cents = Math.round(unit * 100);
@@ -195,16 +195,16 @@ export async function fetchSaleTables(session: string): Promise<SaleTable[]> {
   const payload = await lookup(session, "tabela_venda.TABELA", 501, {
     SCRIPT: null,
     DATASOURCE: null,
-    TABLE_SALE_TABLE: null,
+    TABELA_VENDA_TABELA: null,
     _DETAILS: true,
     PARAM_6: null,
     PARAM_7: null,
   });
   const out: SaleTable[] = [];
   for (const r of rowsOf(payload)) {
-    const id = asNum(r.TABLE_SALE_TABLE);
+    const id = asNum(r.TABELA_VENDA_TABELA);
     if (id == null || id <= 0) continue;
-    out.push({ tableId: id, code: asStr(r.TABLE_SALE_CODE), description: asStr(r.TABLE_SALE_DESCRIPTION) });
+    out.push({ tableId: id, code: asStr(r.TABELA_VENDA_CODIGO), description: asStr(r.TABELA_VENDA_DESCRICAO) });
   }
   return out;
 }
@@ -217,14 +217,14 @@ export async function fetchSalePrices(session: string, costTableId: number, sale
   const payload = await report(
     session,
     SALE_PRICE_CATALOG_GUID,
-    { TABLE_DE_COST: costTableId, TABLE_DE_SALE: saleTableId, PRODUCT_DIVISION_DIVISION: null },
+    { TABELA_DE_CUSTO: costTableId, TABELA_DE_VENDA: saleTableId, PRODUTO_DIVISAO_DIVISAO: null },
     `tabela de venda ${saleTableId}`,
   );
   const out = new Map<string, number>();
   for (const r of rowsOf(payload)) {
-    const code = asStr(r.PRODUCT_PRODUCT_CODE_PRODUCT);
+    const code = asStr(r.PRODUTO_PRODUTO_COD_PRODUTO);
     const price = asNum(r.F_3554079995);
-    const blocked = r.PRODUCT_PRODUCT_BLOQUEIA_SALE === true || asStr(r.PRODUCT_PRODUCT_BLOQUEIA_SALE).toUpperCase() === "S";
+    const blocked = r.PRODUTO_PRODUTO_BLOQUEIA_VENDA === true || asStr(r.PRODUTO_PRODUTO_BLOQUEIA_VENDA).toUpperCase() === "S";
     if (!code || price == null || price <= 0 || blocked) continue;
     const cents = Math.round(price * 100);
     if (cents > (out.get(code) ?? 0)) out.set(code, cents);
@@ -252,14 +252,14 @@ export async function fetchStoreStock(session: string, millenniumStoreId: number
         "X-HTTP-Method": "GET",
         "X-IdentifierCase": "upper",
       },
-      body: JSON.stringify({ BRANCH: millenniumStoreId }),
+      body: JSON.stringify({ FILIAL: millenniumStoreId }),
       signal: AbortSignal.timeout(120_000),
     },
     `estoque filial ${millenniumStoreId}`,
   );
   const out = new Map<string, StoreStockItem>();
   for (const r of rowsOf(payload)) {
-    const code = asStr(r.CODE_PRODUCT);
+    const code = asStr(r.COD_PRODUTO);
     const qty = asNum(r.SALDO) ?? 0;
     if (!code) continue;
     const item = out.get(code) ?? { total: 0, locations: {} };
@@ -285,7 +285,7 @@ export async function fetchPurchaseStock(session: string, millenniumStoreId: num
         "X-HTTP-Method": "GET",
         "X-IdentifierCase": "upper",
       },
-      body: JSON.stringify({ BRANCH: millenniumStoreId, DESC: null, KIND: null, DATAI: null, DATAF: null }),
+      body: JSON.stringify({ FILIAL: millenniumStoreId, DESC: null, TIPO: null, DATAI: null, DATAF: null }),
       signal: AbortSignal.timeout(120_000),
     },
     `saldo atual e futuro filial ${millenniumStoreId}`,

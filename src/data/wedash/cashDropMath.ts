@@ -60,9 +60,9 @@ export function parseCashDropList(payload: unknown): ParsedCashDrop[] {
   for (const raw of listOf(payload)) {
     if (!raw || typeof raw !== "object") continue;
     const row = raw as Record<string, unknown>;
-    const erpEntry = asNum(row.ENTRY);
-    const iso = asStr(row.DATA_ISSUEDATE);
-    const brl = asNum(row.AMOUNT_PAGO) ?? asNum(row.AMOUNT_INICIAL);
+    const erpEntry = asNum(row.LANCAMENTO);
+    const iso = asStr(row.DATA_EMISSAO);
+    const brl = asNum(row.VALOR_PAGO) ?? asNum(row.VALOR_INICIAL);
     if (erpEntry == null || iso.length < 10 || brl == null) continue;
     out.push({
       erpEntry,

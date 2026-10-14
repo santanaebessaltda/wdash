@@ -88,12 +88,12 @@ function parseList(payload: unknown): ListRow[] {
   for (const raw of extractList(payload)) {
     if (!raw || typeof raw !== "object") continue;
     const o = raw as Record<string, unknown>;
-    const employeeId = asNum(o.EMPLOYEE);
-    const name = titleName(asStr(o.NAME));
+    const employeeId = asNum(o.FUNCIONARIO);
+    const name = titleName(asStr(o.NOME));
     if (employeeId == null || !name) continue;
     out.push({
       employeeId,
-      code: asStr(o.CODE_EMPLOYEE),
+      code: asStr(o.COD_FUNCIONARIO),
       name,
       login: asStr(o.LOGIN) || null,
       role: asStr(o.CARGO).toUpperCase(),
@@ -115,7 +115,7 @@ function parseFlags(payload: unknown): ErpSellerFlags {
     desativado: asBool(gerador?.DESATIVADO),
     inativo: asBool(o.INATIVO),
     afastado: asBool(o.AFASTADO),
-    naoMostrarNoEvento: asBool(o.NOT_SHOW_NO_EVENTO),
+    naoMostrarNoEvento: asBool(o.NAO_MOSTRAR_NO_EVENTO),
   };
 }
 
@@ -151,12 +151,12 @@ export async function fetchStoreSellers(session: string, millenniumStoreId: numb
   const list = parseList(
     await post("millenium.FUNCIONARIOS.Lista?$top=500", session, {
       ORDEM: 1,
-      FIELD: 1,
-      FILTER: 2,
-      AMOUNT_FILTER: null,
-      AMOUNT_1: null,
-      AMOUNT_2: null,
-      BRANCH: millenniumStoreId,
+      CAMPO: 1,
+      FILTRO: 2,
+      VALOR_FILTRO: null,
+      VALOR_1: null,
+      VALOR_2: null,
+      FILIAL: millenniumStoreId,
       CARGO: null,
       RESPONSAVEL: null,
     }),
@@ -168,7 +168,7 @@ export async function fetchStoreSellers(session: string, millenniumStoreId: numb
     while (next < list.length) {
       const i = next++;
       const row = list[i]!;
-      const consulta = await post("millenium.FUNCIONARIOS.Consulta", session, { EMPLOYEE: row.employeeId });
+      const consulta = await post("millenium.FUNCIONARIOS.Consulta", session, { FUNCIONARIO: row.employeeId });
       const flags = parseFlags(consulta);
       const active = !(flags.desativado || flags.inativo || flags.afastado || flags.naoMostrarNoEvento);
       out[i] = { ...row, flags, active, geradorId: parseGerador(consulta) };

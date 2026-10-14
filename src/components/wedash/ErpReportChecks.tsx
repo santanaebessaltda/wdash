@@ -21,8 +21,8 @@ export function ErpReportChecks({ reports, username }: { reports: ErpReportCheck
         </ul>
       }
     >
-      Peça ao administrador do Millennium to liberar os relatórios below to o usuário{" "}
-      <span className="font-bold">{username || "informado"}</span>. After, teste a conexão again.
+      Peça ao administrador do Millennium para liberar os relatórios abaixo para o usuário{" "}
+      <span className="font-bold">{username || "informado"}</span>. Depois, teste a conexão novamente.
     </Alert>
   );
 }
