@@ -125,8 +125,10 @@ export function fillGroupComPeriod(
       valorDevolucao: current?.valorDevolucao ?? null,
       quantidadeVendas: current?.quantidadeVendas ?? null,
     };
-    if (date < today && existing == null && (!only || only.has(date))) {
-      next.valorVenda = (soldCentsByDay[date] ?? 0) / 100;
+    const soldCents = soldCentsByDay[date] ?? 0;
+    const correcting = only?.has(date) === true && existing != null && existing !== soldCents;
+    if (date < today && (existing == null || correcting) && (!only || only.has(date))) {
+      next.valorVenda = soldCents / 100;
       changed = true;
     }
     return [next];

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canResendDay,
   fillAllosWeek,
   forceLaunchAllowed,
   shoppingMenu,
@@ -114,6 +115,11 @@ describe("unlaunchedDays", () => {
     expect(unlaunchedDays("2026-10-01", "2026-10-31", today, new Set(["2026-10-01"]))).toContain("2026-10-05");
     expect(unlaunchedDays("2026-10-01", "2026-10-31", "2026-10-01", new Set())).toEqual([]);
     expect(ALREADY_LAUNCHED).toContain("não foi aberto");
+    expect(canResendDay("2026-10-05", "2026-10-13", 1000, null)).toBe(true);
+    expect(canResendDay("2026-10-05", "2026-10-13", 1000, 800)).toBe(true);
+    expect(canResendDay("2026-10-05", "2026-10-13", 1000, 1200)).toBe(true);
+    expect(canResendDay("2026-10-05", "2026-10-13", 1000, 1000)).toBe(false);
+    expect(canResendDay("2026-10-13", "2026-10-13", 1000, null)).toBe(false);
   });
 });
 
@@ -326,5 +332,23 @@ describe("fillAllosWeek", () => {
     expect(filled.body).toContain("venda0=100,00");
     expect(filled.body).toContain("venda1=");
     expect(filled.body).not.toContain("venda1=90,00");
+  });
+
+  it("replaces a different informed value when that day is selected", () => {
+    const html = `
+      <input name="data_cadastra" value="2026-10-11">
+      <input name="venda0" value="80,00">
+      <input name="data_cadastra" value="2026-10-12">
+      <input name="venda1" value="90,00">
+      <input name="idsemana" value="9291">
+      <input name="dias" value="2">
+    `;
+    const parsed = parseAllosForm(html);
+    const kept = fillAllosWeek(parsed!, { "2026-10-11": 10000, "2026-10-12": 9000 }, "2026-10-15");
+    expect(kept.days.map((day) => day.cents)).toEqual([8000, 9000]);
+    const replaced = fillAllosWeek(parsed!, { "2026-10-11": 10000, "2026-10-12": 9000 }, "2026-10-15", new Set(["2026-10-11"]));
+    expect(replaced.days.map((day) => day.cents)).toEqual([10000, 9000]);
+    expect(replaced.body).toContain("venda0=100,00");
+    expect(replaced.body).toContain("venda1=90,00");
   });
 });

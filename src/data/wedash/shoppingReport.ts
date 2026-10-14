@@ -51,9 +51,17 @@ export function informedLaunchValues(windows: SalesWindow[], today: string): Lau
 
 function launchCents(day: InformedDay, today: string, only?: ReadonlySet<string>): number | null {
   if (!isClosedDay(day.date, today)) return null;
-  if (day.fieldCents != null) return day.fieldCents;
-  if (only && !only.has(day.date)) return null;
+  const selected = only == null || only.has(day.date);
+  if (!selected) return day.fieldCents;
+  if (day.fieldCents != null && !(only?.has(day.date) && day.fieldCents !== day.soldCents)) return day.fieldCents;
   return day.soldCents;
+}
+
+/** Dia passado ainda vazio, ou informado com valor diferente do vendido. */
+export function canResendDay(date: string, today: string, soldCents: number, informedCents: number | null): boolean {
+  if (date >= today) return false;
+  if (informedCents == null) return true;
+  return informedCents !== soldCents;
 }
 
 /** KPIs do mês: só dias anteriores a hoje. Dia sem lançamento conta como 0. */

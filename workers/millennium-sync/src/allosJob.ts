@@ -89,7 +89,7 @@ async function runShoppingNow(
     if (storedError) return { ok: false, message: KEEP };
     const launched = new Set((stored ?? []).map((row) => String(row.day).slice(0, 10)));
     const pending = selected.length > 0
-      ? selected.filter((day) => day >= span.from && day <= span.to && day < today && !launched.has(day))
+      ? selected.filter((day) => day >= span.from && day <= span.to && day < today)
       : unlaunchedDays(span.from, span.to, today, launched);
     if (pending.length === 0) return { ok: true, message: ALREADY_LAUNCHED };
     if (selected.length > 0) only = new Set(pending);

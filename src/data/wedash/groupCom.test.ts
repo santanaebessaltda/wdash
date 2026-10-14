@@ -71,12 +71,22 @@ describe("fillGroupComPeriod", () => {
     expect(filled.days).toEqual([{ date: "2026-10-05", cents: 150050 }]);
   });
 
+  it("replaces a different value only when that day is selected", () => {
+    const kept = fillGroupComPeriod(movements, { "2026-10-01": 100 }, "2026-10-03", SAO_PAULO, new Set(["2026-10-02"]));
+    expect(kept.movimentos[0]?.valorVenda).toBe(7589.21);
+    const replaced = fillGroupComPeriod(movements, { "2026-10-01": 100 }, "2026-10-03", SAO_PAULO, new Set(["2026-10-01"]));
+    expect(replaced.changed).toBe(true);
+    expect(replaced.movimentos[0]?.valorVenda).toBe(1);
+    expect(replaced.movimentos[1]?.valorVenda).toBeNull();
+  });
+
   it("leaves today empty and ignores days outside the selection", () => {
     const today = fillGroupComPeriod(movements, { "2026-10-02": 100 }, "2026-10-02", SAO_PAULO);
     expect(today.changed).toBe(false);
     expect(today.movimentos[1]?.valorVenda).toBeNull();
-    const selected = fillGroupComPeriod(movements, { "2026-10-02": 100 }, "2026-10-04", SAO_PAULO, new Set(["2026-10-01"]));
+    const selected = fillGroupComPeriod(movements, { "2026-10-01": 758921, "2026-10-02": 100 }, "2026-10-04", SAO_PAULO, new Set(["2026-10-01"]));
     expect(selected.changed).toBe(false);
+    expect(selected.movimentos[0]?.valorVenda).toBe(7589.21);
     expect(selected.movimentos[1]?.valorVenda).toBeNull();
   });
 });

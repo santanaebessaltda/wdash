@@ -7,7 +7,7 @@ import { calendarTodayIso } from "@/data/wedash/clock";
 import { periodLabels } from "@/data/wedash/dashboard";
 import { fetchSalesCoverage, fetchSalesDayAggs } from "@/data/wedash/salesRepo";
 import { fetchLaunchedDays, fetchShoppingAccount, requestShoppingLaunch, requestShoppingRead, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
-import { ALREADY_LAUNCHED, forceLaunchAllowed, informedGap, monthReport, reportDays, shoppingSendsSales, sumSoldByDay } from "@/data/wedash/shoppingReport";
+import { ALREADY_LAUNCHED, canResendDay, forceLaunchAllowed, informedGap, monthReport, reportDays, shoppingSendsSales, sumSoldByDay } from "@/data/wedash/shoppingReport";
 import { brlCent, longDate, isoToDate, endOfMonth, startOfMonth, eachDay, dateToIso, addDays } from "@/lib/format";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
@@ -98,6 +98,8 @@ export function SalesReportPage() {
   accountRef.current = account;
   const launchedRef = useRef(launched);
   launchedRef.current = launched;
+  const soldRef = useRef(sold);
+  soldRef.current = sold;
   const from = rangeFrom;
   const to = rangeTo;
   const rangeRef = useRef({ from, to });
@@ -184,8 +186,7 @@ export function SalesReportPage() {
       show(gate.message, "danger");
       return;
     }
-    const alreadyLancado = new Set(Object.keys(launchedRef.current));
-    const days = markedRef.current.filter((day) => day < today && !alreadyLancado.has(day));
+    const days = markedRef.current.filter((day) => canResendDay(day, today, soldRef.current[day] ?? 0, launchedRef.current[day] ?? null));
     if (days.length === 0) {
       show(ALREADY_LAUNCHED, "success");
       return;
@@ -222,7 +223,8 @@ export function SalesReportPage() {
   const byDay = useMemo(() => new Map(days.map((day) => [day.date, day])), [days]);
   const cells = useMemo(() => rangeCells(from, to), [from, to]);
   const owner = isOwner(session.role);
-  const toLancar = marcados.filter((day) => day < today && launched[day] == null);
+  const toLancar = marcados.filter((day) => canResendDay(day, today, sold[day] ?? 0, launched[day] ?? null));
+  const toCorrigir = toLancar.filter((day) => launched[day] != null);
 
   function applyInterval(start: Date, end: Date, goal?: DateRangeChangeMeta) {
     const nextFrom = dateToIso(start);
@@ -313,7 +315,8 @@ export function SalesReportPage() {
                 const todayDay = day === today;
                 const amount = dayAmount(day, today, row, sold);
                 const status = todayDay ? { text: "Em aberto", color: "bg-acc" } : past && row ? dayStatus(row.soldCents, row.launchedCents) : null;
-                const pending = past && row != null && row.launchedCents == null;
+                const pending = row != null && canResendDay(day, today, row.soldCents, row.launchedCents);
+                const correcting = pending && row.launchedCents != null;
                 return (
                   <DayFace
                     key={day}
@@ -325,7 +328,7 @@ export function SalesReportPage() {
                     openLabel={`Abrir ${dayTitle(day)}`}
                     onOpen={() => setDayOpen(day)}
                     amount={amount != null ? money(amount) : null}
-                    check={pending ? { checked: marcados.includes(day), label: `Marcar ${dayTitle(day)}`, onToggle: () => toggleDay(day) } : null}
+                    check={pending ? { checked: marcados.includes(day), label: `${correcting ? "Corrigir" : "Marcar"} ${dayTitle(day)}`, onToggle: () => toggleDay(day) } : null}
                     badges={status ? <DayChip color={status.color}>{status.text}</DayChip> : null}
                   />
                 );
@@ -355,7 +358,11 @@ export function SalesReportPage() {
       >
         <div className="flex flex-col gap-2 text-[13.5px] leading-relaxed text-t1">
           <p>{toLancar.length === 1 ? "O valor vendido em 1 dia será informado ao shopping." : `Os valores vendidos em ${toLancar.length} dias serão informados ao shopping.`}</p>
-          <p className="text-t2">Dias que já têm valor informado não serão alterados.</p>
+          {toCorrigir.length > 0 ? (
+            <p className="text-t2">{toCorrigir.length === 1 ? "1 dia já informado com valor diferente será substituído pelo vendido." : `${toCorrigir.length} dias já informados com valor diferente serão substituídos pelo vendido.`}</p>
+          ) : (
+            <p className="text-t2">Dias que já têm o valor certo não serão alterados.</p>
+          )}
         </div>
       </Modal>
     </div>
@@ -377,6 +384,7 @@ function InformedDayModal({
 }) {
   const todayDay = day === today;
   const faltando = day != null && !todayDay && informed == null;
+  const diferente = day != null && !todayDay && informed != null && sold != null && informed !== sold;
   const status = todayDay ? "Em aberto" : faltando ? "Não informado" : "Informado";
   const variant = todayDay ? "accent" : faltando ? "warning" : "success";
   const difference = sold != null && informed != null ? informed - sold : null;
@@ -408,6 +416,7 @@ function InformedDayModal({
           />
           {todayDay ? <p className="text-[13px] leading-relaxed text-t2">Este dia ainda está em aberto. O valor será informado depois do fechamento.</p> : null}
           {faltando ? <p className="text-[13px] leading-relaxed text-t2">Este dia ainda não foi informado ao shopping. Marque a caixa do calendário para enviar o valor, inclusive quando a venda é zero.</p> : null}
+          {diferente ? <p className="text-[13px] leading-relaxed text-t2">O valor informado é diferente do vendido. Marque a caixa do calendário para enviar o valor vendido de novo.</p> : null}
         </>
       ) : null}
     </Modal>
