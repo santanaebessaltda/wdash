@@ -24,13 +24,16 @@ export function ShoppingIntegration({
   const active = account?.administrator === choice ? account : null;
   const replacedName = account != null && account.administrator !== choice ? shoppingAdministratorName(account.administrator) : null;
   const group = choice === "groupcom";
+  const unitLine = active?.unit ? [active.unit.floor, active.unit.code].filter(Boolean).join(" · ") : "";
+  const mallId = active ? intranetMallSlug(active.baseUrl) : null;
+  const detail = group ? unitLine || "Informe de vendas" : mallId ? `Informe de vendas · ${mallId}` : "Informe de vendas";
 
   return (
     <>
       <ShoppingCard
         logo={group ? "/group-com.png" : "/intranet.png"}
         name={group ? "Group COM" : "Intranet Mall"}
-        detail={group && active?.unit ? [active.unit.floor, active.unit.code].filter(Boolean).join(" / ") : "Informe de vendas"}
+        detail={detail}
         connected={active != null}
         onOpen={() => setOpen(true)}
       />
@@ -165,7 +168,7 @@ function IntranetMallModal({
     });
   }
 
-  const slugError = slug.length > 0 && !baseUrl ? "Use o slug da filial, como shoppingcampogrande4." : undefined;
+  const slugError = slug.length > 0 && !baseUrl ? "Informe o identificador da filial, como shoppingcampogrande4." : undefined;
   const canConectar =
     !busy && baseUrl != null && username.trim().length > 0 && (password.trim().length > 0 || conectado) && (conectado || autorizo);
 
@@ -187,16 +190,16 @@ function IntranetMallModal({
     >
       <div className="flex flex-col gap-3.5">
         <p className="text-[13.5px] leading-relaxed text-t1">
-          Informe o slug e o acesso da Intranet Mall desta filial. A WDash protege esses dados e os usa somente para informar as vendas ao shopping.
+          Informe os dados de acesso da Intranet Mall desta filial. A WDash protege esses dados e os usa somente para informar as vendas ao shopping.
         </p>
         {replacedName ? (
-          <p className="text-[13px] leading-relaxed text-t1">Salvar aqui substitui o acesso da {replacedName} desta filial. Cada filial integra com uma administradora.</p>
+          <p className="text-[13px] leading-relaxed text-t1">Ao salvar, o acesso do {replacedName} será substituído pelo da Intranet Mall.</p>
         ) : null}
         <FormField
-          label="Slug"
+          label="Identificador da filial"
           required
           error={slugError}
-          hint="Abra a Intranet Mall no navegador e copie o trecho do endereço depois de intranetmall.com/. Em https://app3.intranetmall.com/shoppingcampogrande4/ o slug é shoppingcampogrande4."
+          hint="É o trecho do endereço depois de intranetmall.com/. Em https://app3.intranetmall.com/shoppingcampogrande4/, o identificador é shoppingcampogrande4."
         >
           <div className={cn("flex flex-col overflow-hidden rounded-[var(--radius-vela-md)] border bg-bg-inset focus-within:border-acc sm:h-[42px] sm:flex-row", slugError ? "border-bad" : "border-line")}>
             <span className="flex shrink-0 items-center border-b border-line bg-bg-3 px-3 py-2 text-[12px] text-t2 sm:border-b-0 sm:border-r sm:py-0">

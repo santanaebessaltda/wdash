@@ -88,7 +88,7 @@ export async function listGroupComUnits(input: {
     const unit = groupComUnit(row);
     return unit ? [unit] : [];
   });
-  if (units.length === 0) return { ok: false, message: "Nenhuma unidade de lojista encontrada nesse Group COM." };
+  if (units.length === 0) return { ok: false, message: "Nenhuma unidade de lojista encontrada neste Group COM." };
   return { ok: true, units };
 }
 

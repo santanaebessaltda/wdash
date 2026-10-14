@@ -95,7 +95,7 @@ export function BranchPage() {
     <StoreCardsPage
       section="Configurações"
       title="Filial"
-      subtitle="Configure o tipo, a administradora, o funcionamento, a franquia e o aluguel de cada filial."
+      subtitle="Configure o tipo, a administradora, o funcionamento e os custos desta filial."
       loading={loading}
       skeleton={(n) => <StoreCardsSkeleton count={n} title schedule sections={2} />}
       storeRows={storeRows}
@@ -172,7 +172,7 @@ function BranchCards({ store, tenantId, onSaved }: { store: Store; tenantId: str
         {point === "SHOPPING" ? (
           <>
             <p className="mb-1.5 mt-4 text-[12.5px] font-bold text-t0">Administradora</p>
-            <p className="mb-3 text-[12.5px] text-t2">Cada filial integra com uma administradora. Outros não envia o informe de vendas.</p>
+            <p className="mb-3 text-[12.5px] text-t2">Escolha a administradora responsável pelo informe de vendas. Em Outros, a WDash não envia vendas ao shopping.</p>
             <Segmented options={[...MALL_OPTIONS]} value={choice} onChange={(v) => v && escolherMall(v)} />
           </>
         ) : null}
@@ -193,7 +193,7 @@ function BranchCards({ store, tenantId, onSaved }: { store: Store; tenantId: str
         onClose={() => {
           if (!removing) setConfirmOther(false);
         }}
-        title="Remover a administradora?"
+        title="Remover acesso da administradora?"
         footer={
           <>
             <Button variant="outline" onClick={() => setConfirmOther(false)} disabled={removing}>
@@ -205,7 +205,7 @@ function BranchCards({ store, tenantId, onSaved }: { store: Store; tenantId: str
           </>
         }
       >
-        <p className="text-[13.5px] leading-relaxed text-t1">Outros não envia venda. O acesso salvo desta filial será removido.</p>
+        <p className="text-[13.5px] leading-relaxed text-t1">Ao escolher Outros, a WDash deixará de informar vendas ao shopping e o acesso salvo desta filial será removido.</p>
       </Modal>
       <StoreHoursCard store={store} canEdit onSaved={onSaved} pointType={point} presetStamp={presetStamp} />
       <CostFieldsCard

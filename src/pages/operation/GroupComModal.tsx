@@ -91,7 +91,7 @@ export function GroupComModal({
     });
   }
 
-  const slugError = slug.length > 0 && !baseUrl ? "Use o slug do portal, como treslagoasapp." : undefined;
+  const slugError = slug.length > 0 && !baseUrl ? "Informe o identificador do portal, como treslagoasapp." : undefined;
   const canBuscar = !busy && baseUrl != null && email.trim().includes("@") && password.trim().length > 0;
   const canConectar = !busy && baseUrl != null && email.trim().includes("@") && selected != null && (password.trim().length > 0 || conectado) && (conectado || autorizo);
 
@@ -113,16 +113,16 @@ export function GroupComModal({
     >
       <div className="flex flex-col gap-3.5">
         <p className="text-[13.5px] leading-relaxed text-t1">
-          Informe o slug, o e-mail e a senha do Group COM. Depois escolha a unidade desta filial. A WDash protege esses dados e os usa somente para informar as vendas ao shopping.
+          Informe os dados de acesso do Group COM e escolha a unidade desta filial. A WDash protege esses dados e os usa somente para informar as vendas ao shopping.
         </p>
         {replacedName ? (
-          <p className="text-[13px] leading-relaxed text-t1">Salvar aqui substitui o acesso da {replacedName} desta filial. Cada filial integra com uma administradora.</p>
+          <p className="text-[13px] leading-relaxed text-t1">Ao salvar, o acesso da {replacedName} será substituído pelo do Group COM.</p>
         ) : null}
         <FormField
-          label="Slug"
+          label="Identificador do portal"
           required
           error={slugError}
-          hint="Abra o Group COM no navegador e copie o trecho do endereço antes de .com21.com.br. Em https://treslagoasapp.com21.com.br/ o slug é treslagoasapp."
+          hint="É o trecho do endereço antes de .com21.com.br. Em https://treslagoasapp.com21.com.br/, o identificador é treslagoasapp."
         >
           <div className={cn("flex flex-col overflow-hidden rounded-[var(--radius-vela-md)] border bg-bg-inset focus-within:border-acc sm:h-[42px] sm:flex-row", slugError ? "border-bad" : "border-line")}>
             <span className="flex shrink-0 items-center border-b border-line bg-bg-3 px-3 py-2 text-[12px] text-t2 sm:border-b-0 sm:border-r sm:py-0">https://</span>
@@ -144,7 +144,7 @@ export function GroupComModal({
         <FormField label="E-mail" required>
           <Input value={email} onChange={(event) => setEmail(event.target.value.trim())} disabled={busy} inputMode="email" {...noAutofill} />
         </FormField>
-        <FormField label="Senha" required={!conectado} hint={conectado ? "Digite a senha para buscar as unidades ou para alterar a senha salva." : undefined}>
+        <FormField label="Senha" required={!conectado} hint={conectado ? "Digite a senha para buscar as unidades ou para alterar a senha cadastrada." : undefined}>
           <div className="relative">
             <Input
               type="text"
@@ -186,7 +186,7 @@ export function GroupComModal({
             </Button>
           </div>
           {units.length === 0 ? (
-            <p className="text-[12.5px] leading-relaxed text-t2">Busque as unidades e escolha a loja desta filial, como 74376-Q0024.</p>
+            <p className="text-[12.5px] leading-relaxed text-t2">Busque as unidades e selecione a correspondente a esta filial.</p>
           ) : (
             units.map((unit) => {
               const active = selected?.contractId === unit.contractId;
@@ -199,7 +199,7 @@ export function GroupComModal({
                   className={cn("rounded-[var(--radius-vela-md)] border px-3 py-2 text-left", active ? "border-acc bg-acc-soft" : "border-line hover:bg-bg-3")}
                 >
                   <span className="block text-[13px] font-bold text-t0">{unit.mall}</span>
-                  <span className="block text-[12px] text-t2">{[unit.floor, unit.code].filter(Boolean).join(" / ")}</span>
+                  <span className="block text-[12px] text-t2">{[unit.floor, unit.code].filter(Boolean).join(" · ")}</span>
                 </button>
               );
             })

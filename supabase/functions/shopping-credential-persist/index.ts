@@ -109,7 +109,7 @@ serve(async (req) => {
     if (!password.trim()) return json({ error: "secret_required" }, 400);
     const listed = await listGroupComUnits(baseUrl, username, password);
     if (!listed.ok) {
-      const message = listed.error === "no_units" ? "Nenhuma unidade de lojista encontrada nesse Group COM." : "Não foi possível entrar no Group COM. Confira o e-mail e a senha.";
+      const message = listed.error === "no_units" ? "Nenhuma unidade de lojista encontrada neste Group COM." : "Não foi possível entrar no Group COM. Confira o e-mail e a senha.";
       return json({ ok: false, message });
     }
     return json({ ok: true, units: listed.units });
@@ -150,18 +150,18 @@ async function chosenUnit(
   stored: unknown,
 ): Promise<{ ok: true; unit: GroupComUnit } | { ok: false; message: string }> {
   const wanted = contractId(submitted) ?? contractId(stored);
-  if (!wanted) return { ok: false, message: "Escolha a unidade dessa filial no Group COM." };
+  if (!wanted) return { ok: false, message: "Escolha a unidade desta filial no Group COM." };
   if (!password.trim()) {
     const current = sameContract(stored, wanted) ? asUnit(stored) : null;
-    return current ? { ok: true, unit: current } : { ok: false, message: "Escolha a unidade dessa filial no Group COM." };
+    return current ? { ok: true, unit: current } : { ok: false, message: "Escolha a unidade desta filial no Group COM." };
   }
   const listed = await listGroupComUnits(baseUrl, username, password);
   if (!listed.ok) {
-    const message = listed.error === "no_units" ? "Nenhuma unidade de lojista encontrada nesse Group COM." : "Não foi possível entrar no Group COM. Confira o e-mail e a senha.";
+    const message = listed.error === "no_units" ? "Nenhuma unidade de lojista encontrada neste Group COM." : "Não foi possível entrar no Group COM. Confira o e-mail e a senha.";
     return { ok: false, message };
   }
   const unit = listed.units.find((item) => item.contractId === wanted);
-  return unit ? { ok: true, unit } : { ok: false, message: "Escolha a unidade dessa filial no Group COM." };
+  return unit ? { ok: true, unit } : { ok: false, message: "Escolha a unidade desta filial no Group COM." };
 }
 
 function contractId(value: unknown): number | null {
