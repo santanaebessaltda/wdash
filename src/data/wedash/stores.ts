@@ -659,6 +659,30 @@ export async function updateStoreCostTable(
   }
 }
 
+/** Persiste o tipo da filial (Configurações > Filial). Quiosque grava MALL. */
+export async function updateStorePointType(
+  storeId: string,
+  pointType: PointType,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const { getSupabase } = await import("@/lib/supabase");
+    const sb = getSupabase();
+    if (!sb) return { ok: false, error: "Supabase não configurado" };
+
+    const { error } = await sb
+      .from("store")
+      .update({ point_type: pointType === "STREET" ? "STREET" : "MALL" })
+      .eq("id", storeId);
+    if (error) return { ok: false, error: error.message };
+
+    const existing = allStores().find((s) => s.id === storeId);
+    if (existing) registerExtraStore({ ...existing, pointType });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 /** Persiste custos da operacao da loja (Configuracoes > Lojas > Custos). */
 export async function updateStoreCosts(
   storeId: string,

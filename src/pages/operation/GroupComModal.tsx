@@ -13,7 +13,6 @@ export function GroupComModal({
   replacedName,
   storeId,
   onSaved,
-  onSwitch,
   onBar,
   saveRef,
 }: {
@@ -21,7 +20,6 @@ export function GroupComModal({
   replacedName: string | null;
   storeId: string;
   onSaved: (account: ShoppingAccount) => void;
-  onSwitch?: () => void;
   onBar: (bar: ShoppingFormBar) => void;
   saveRef: MutableRefObject<() => void>;
 }) {
@@ -204,13 +202,6 @@ export function GroupComModal({
             onChange={(event) => setAutorizo(event.target.checked)}
             disabled={busy}
           />
-        ) : null}
-        {onSwitch ? (
-          <div className="border-t border-line pt-3">
-            <button type="button" onClick={onSwitch} disabled={busy} className="text-[13px] font-bold text-acc hover:underline disabled:opacity-50">
-              Trocar administradora
-            </button>
-          </div>
         ) : null}
       </div>
   );

@@ -200,7 +200,7 @@ export const SAVE_ERROR_MSG = "Não foi possível salvar as alterações. Tente 
 
 export function FormActions({ dirty, saving, onReset }: { dirty: boolean; saving: boolean; onReset: () => void }) {
   return (
-    <div className="flex gap-2.5 pt-1">
+    <div className="flex justify-end gap-2.5 pt-1">
       <Button variant="outline" type="button" onClick={onReset} disabled={!dirty || saving}>
         Resetar
       </Button>

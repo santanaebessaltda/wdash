@@ -33,7 +33,7 @@ export function StoreScheduleForm({
   store: Store;
   canEdit: boolean;
   onSaved: () => void;
-  /** Tipo escolhido na Filial. Grava junto com o horário. */
+  /** Tipo escolhido na Filial. Só sugere o horário; quem grava o tipo é o card Filial. */
   pointType?: PointType;
   /** Incrementa quando a pessoa troca o tipo, para preencher o padrão. */
   presetStamp?: number;
@@ -67,7 +67,7 @@ export function StoreScheduleForm({
       return;
     }
     setSaving(true);
-    const r = await updateStoreSchedule({ storeId: store.id, timezone, hours, pointType: type }).catch(() => ({ ok: false as const }));
+    const r = await updateStoreSchedule({ storeId: store.id, timezone, hours }).catch(() => ({ ok: false as const }));
     setSaving(false);
     if (!r.ok) {
       show(SAVE_ERROR_MSG, "danger");
@@ -110,7 +110,7 @@ export function StoreScheduleForm({
   }
 
   function applyPreset() {
-    setHours(presetWeekHours(store.pointType));
+    setHours(presetWeekHours(type));
   }
 
   const copySource = DOWS.find((d) => hours[d] != null);

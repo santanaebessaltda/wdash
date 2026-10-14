@@ -3,7 +3,7 @@ import { Card, Segmented, useToast } from "@/components/ui";
 import { fetchShoppingAccount, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
 import { ShoppingAdministrator } from "./ShoppingPage";
 import { StoreCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
-import { updateStoreCosts, type PointType, type Store } from "@/data/wedash/stores";
+import { updateStoreCosts, updateStorePointType, type PointType, type Store } from "@/data/wedash/stores";
 import { CostFieldsCard, INVALID_COSTS_MSG, pctField, useCostFields, type CostField, type CostFieldSection } from "./costFields";
 import { StoreHoursCard } from "./StoreSchedule";
 import { CostCardTitle, FormActions, NumberField, SAVE_ERROR_MSG, StoreCardsPage, parseNum, useScopedStores } from "./shared";
@@ -96,7 +96,9 @@ export function BranchPage() {
 function BranchCards({ store, tenantId, onSaved }: { store: Store; tenantId: string; onSaved: () => void }) {
   const { show } = useToast();
   const [point, setPoint] = useState<PointType>(store.pointType);
+  const [savingPoint, setSavingPoint] = useState(false);
   const [presetStamp, setPresetStamp] = useState(0);
+  const pointDirty = point !== store.pointType;
   const [account, setAccount] = useState<ShoppingAccount | null>(null);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const accountReady = loadedFor === store.id;
@@ -123,18 +125,48 @@ function BranchCards({ store, tenantId, onSaved }: { store: Store; tenantId: str
   }, [tenantId, store.id]);
 
   function escolher(next: PointType) {
-    if (next === point) return;
+    if (next === point || savingPoint) return;
     setPoint(next);
     setPresetStamp((n) => n + 1);
+  }
+
+  function resetarTipo() {
+    if (!pointDirty || savingPoint) return;
+    setPoint(store.pointType);
+    setPresetStamp((n) => n + 1);
+  }
+
+  async function salvarTipo() {
+    if (!pointDirty || savingPoint) return;
+    setSavingPoint(true);
+    const result = await updateStorePointType(store.id, point);
+    setSavingPoint(false);
+    if (!result.ok) {
+      show(SAVE_ERROR_MSG, "danger");
+      return;
+    }
+    onSaved();
+    show("Alterações salvas.", "success");
   }
 
   return (
     <div className="flex flex-col gap-5">
       <Card>
         <CostCardTitle title="Filial" />
-        <p className="mb-3 text-[12.5px] text-t2">O tipo da filial define o horário sugerido e as opções de aluguel.</p>
-        <p className="mb-1.5 text-[12.5px] font-bold text-t0">Tipo de filial</p>
-        <Segmented options={POINT_OPTIONS} value={point} onChange={(v) => v && escolher(v)} />
+        <form
+          className="flex flex-col gap-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void salvarTipo();
+          }}
+        >
+          <p className="text-[12.5px] text-t2">O tipo da filial define o horário sugerido e as opções de aluguel.</p>
+          <div>
+            <p className="mb-1.5 text-[12.5px] font-bold text-t0">Tipo de filial</p>
+            <Segmented options={POINT_OPTIONS} value={point} onChange={(v) => v && escolher(v)} />
+          </div>
+          <FormActions dirty={pointDirty} saving={savingPoint} onReset={resetarTipo} />
+        </form>
       </Card>
       {point === "SHOPPING" ? (
         <ShoppingAdministrator
@@ -170,14 +202,13 @@ function RentCard({ store, point, onSaved }: { store: Store; point: PointType; o
   const fields = street ? [monthly] : RENT_FIELDS;
   const pctSaved = parseNum(form.saved[RENT_PCT.key] ?? "");
   const removePct = street && pctSaved != null && pctSaved > 0;
-  const typeDirty = point !== store.pointType;
 
   async function save() {
     const merged = form.merged();
     if (!merged) return show(INVALID_COSTS_MSG, "danger");
     const costs = street ? RENT_PCT.set(merged, null) : merged;
     setSaving(true);
-    const r = await updateStoreCosts(store.id, costs, point);
+    const r = await updateStoreCosts(store.id, costs);
     setSaving(false);
     if (!r.ok) return show(SAVE_ERROR_MSG, "danger");
     form.markSaved(costs);
@@ -220,7 +251,7 @@ function RentCard({ store, point, onSaved }: { store: Store; point: PointType; o
             />
           ))}
         </div>
-        <FormActions dirty={form.dirty || typeDirty} saving={saving} onReset={form.reset} />
+        <FormActions dirty={form.dirty} saving={saving} onReset={form.reset} />
       </form>
     </Card>
   );
