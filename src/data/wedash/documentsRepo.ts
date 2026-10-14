@@ -27,7 +27,7 @@ export type BatchRow = {
 
 export type PersonRow = { id: string; storeId: string; name: string; cpf: string | null; email: string | null; whatsapp: string | null };
 
-type Invoke = { message?: string; error?: string; status?: string; batchId?: string; path?: string; token?: string; url?: string; refused?: { name: string; message: string }[] };
+type Invoke = { message?: string; error?: string; status?: string; batchId?: string; path?: string; token?: string; url?: string; refused?: { name: string; message: string }[]; results?: { id: string; error: string | null }[] };
 
 async function readInvoke(fn: string, body: Record<string, unknown>): Promise<Invoke> {
   const sb = getSupabase();

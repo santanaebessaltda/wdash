@@ -1,11 +1,10 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { Badge, Button, DataTable, EmptyState, StatCard, type DataTableColumn } from "@/components/ui";
-import { paths } from "@/router/paths";
-import { monthFolder } from "@/data/wedash/documentSplit";
+import { Badge, Button, Card, DataTable, EmptyState, Modal, type DataTableColumn } from "@/components/ui";
+import { monthFolder, resendVisible } from "@/data/wedash/documentSplit";
 import type { BatchRow, DocumentRow, PersonRow } from "@/data/wedash/documentsRepo";
-import { openDocument } from "@/data/wedash/documentsRepo";
-import { DocumentsFrame, FileGlyph, FolderGlyph, STATUS_LABEL, badgeVariant, formatBytes } from "./frame";
+import { openDocument, resendDocument } from "@/data/wedash/documentsRepo";
+import { AttachWizard } from "./AttachWizard";
+import { DocumentsFrame, FileGlyph, FolderGlyph, Glyph, STATUS_LABEL, SearchGlyph, badgeVariant, formatBytes } from "./frame";
 import { useDocuments } from "./useDocuments";
 
 type Mode = "home" | "pending" | "month" | "browse";
@@ -13,11 +12,14 @@ type Mode = "home" | "pending" | "month" | "browse";
 type FolderEntry = { key: string; label: string; detail: string; fileId?: string };
 
 export function DocumentsPage() {
-  const { allStores, batches, documents, people, stores } = useDocuments();
+  const { storeId, allStores, batches, documents, people, stores, reload } = useDocuments();
   const [mode, setMode] = useState<Mode>("home");
   const [crumb, setCrumb] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
+  const [sent, setSent] = useState<string | null>(null);
+  const [attaching, setAttaching] = useState(false);
+  const [creatingFolder, setCreatingFolder] = useState(false);
 
   const storeName = useMemo(() => new Map(stores.map((store) => [store.id, store.name])), [stores]);
   const personName = useMemo(() => new Map(people.map((person) => [person.id, person.name])), [people]);
@@ -62,20 +64,61 @@ export function DocumentsPage() {
 
   const title = sectionTitle(mode, allStores, crumb, storeName, personName);
 
+  function openFolder(personId: string, folderYear: string, folderMonth: string) {
+    const person = people.find((item) => item.id === personId);
+    if (!person) return;
+    setMode("browse");
+    setCrumb(allStores ? [person.storeId, person.id, folderYear, folderMonth] : [person.id, folderYear, folderMonth]);
+    setQuery("");
+    setCreatingFolder(false);
+  }
+
   return (
-    <DocumentsFrame title="Pastas" subtitle={allStores ? "Filial, colaborador, ano e mês" : "Colaborador, ano e mês"}>
+    <DocumentsFrame
+      title="Documentos"
+      subtitle={allStores ? "Filial, colaborador, ano e mês" : "Colaborador, ano e mês"}
+      actions={
+        attaching ? undefined : (
+          <>
+            <Button variant="secondary" icon={<FolderGlyph size={15} />} onClick={() => setCreatingFolder(true)}>
+              Nova pasta
+            </Button>
+            <Button icon={<FileGlyph size={15} />} onClick={() => { setSent(null); setAttaching(true); }}>
+              Anexar documento
+            </Button>
+          </>
+        )
+      }
+    >
+      {sent && <p className="mb-3 text-[13px] text-ok">{sent}</p>}
       {notice && <p className="mb-3 text-[13px] text-bad">{notice}</p>}
+      {attaching ? (
+        <AttachWizard
+          storeId={storeId}
+          people={people}
+          documents={documents}
+          onReload={reload}
+          onClose={() => setAttaching(false)}
+          onDone={(message) => {
+            setAttaching(false);
+            setNotice(message);
+            setSent(message ? null : "Documentos enviados.");
+            setMode("home");
+          }}
+        />
+      ) : (
+        <>
       {mode === "home" && (
         <>
           <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <StatCard label="Pendentes" value={pending.length} sub="Ainda não assinados" icon={<FileGlyph />} iconColor="var(--warn)" iconBg="var(--warn-soft)" />
-            <StatCard label="Assinados" value={signed.length} sub="Guardados na pasta" icon={<FileGlyph />} iconColor="var(--ok)" iconBg="var(--ok-soft)" />
-            <StatCard label="Sem contato" value={missingContact} sub="Sem WhatsApp e sem e-mail" icon={<FolderGlyph />} iconColor="var(--bad)" iconBg="var(--bad-soft)" />
+            <ThinKpi label="Pendentes" value={pending.length} sub="Ainda não assinados" tint="var(--warn)" icon="M12 8v4l3 2M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20" />
+            <ThinKpi label="Assinados" value={signed.length} sub="Guardados na pasta" tint="var(--ok)" icon="M20 6 9 17l-5-5" />
+            <ThinKpi label="Sem contato" value={missingContact} sub="Sem WhatsApp e sem e-mail" tint="var(--bad)" icon="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8" />
           </div>
           <p className="mb-3 text-xs font-bold uppercase tracking-wide text-t2">Atalhos</p>
           <div className="mb-5 grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
-            <Shortcut label="Pendentes" count={`${pending.length} arquivos`} onClick={() => { setMode("pending"); setQuery(""); }} />
-            <Shortcut label="Este mês" count={`${thisMonth.length} arquivos`} onClick={() => { setMode("month"); setQuery(""); }} />
+            <Shortcut label="Pendentes" count={`${pending.length} documentos`} onClick={() => { setMode("pending"); setQuery(""); }} />
+            <Shortcut label="Este mês" count={`${thisMonth.length} documentos`} onClick={() => { setMode("month"); setQuery(""); }} />
             <Shortcut
               label={allStores ? "Filiais" : "Colaboradores"}
               count={allStores ? `${stores.length} filiais` : `${people.length} pessoas`}
@@ -95,11 +138,11 @@ export function DocumentsPage() {
           <h3 className="truncate text-[15px] font-bold text-t0">{title}</h3>
         </div>
         <div className="flex h-[34px] items-center gap-2 rounded-[10px] border border-line bg-bg-inset px-3">
-          <FileGlyph size={13} />
+          <SearchGlyph />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar arquivos…"
+            placeholder="Buscar documentos"
             className="w-28 bg-transparent text-[12.5px] text-t0 outline-none placeholder:text-t2 sm:w-40"
           />
         </div>
@@ -107,7 +150,7 @@ export function DocumentsPage() {
 
       {mode === "browse" ? (
         visibleFolders.length === 0 ? (
-          <EmptyState title="Pasta vazia" description="Nenhum arquivo neste nível." />
+          <EmptyState title="Nenhum documento" description="Esta pasta ainda não tem arquivo. Anexe um PDF para ele cair aqui." />
         ) : (
           <FolderTable
             rows={visibleFolders}
@@ -116,18 +159,94 @@ export function DocumentsPage() {
           />
         )
       ) : visibleFiles.length === 0 ? (
-        <EmptyState
-          title="Nenhum arquivo"
-          description="O envio fica em Lotes. O PDF pronto aparece na pasta do colaborador."
-          action={<Link to={paths.documentBatches} className="text-[13px] font-bold text-acc">Ir para Lotes</Link>}
-        />
+        <EmptyState title="Nenhum documento" description="Anexe um PDF. O arquivo pronto aparece na pasta do colaborador." />
       ) : (
-        <FileTable rows={visibleFiles} people={people} batches={batchOf} onOpen={(id) => void openFile(id, setNotice)} />
+        <FileTable
+          rows={visibleFiles}
+          people={people}
+          batches={batchOf}
+          onOpen={(id) => void openFile(id, setNotice)}
+          onResend={(id) => void resendFile(id, setNotice, reload)}
+        />
       )}
       <p className="mt-3 text-[12.5px] text-t2">
-        {mode === "browse" ? `${visibleFolders.length} itens` : `${visibleFiles.length} arquivos`}
+        {mode === "browse" ? `${visibleFolders.length} itens` : `${visibleFiles.length} documentos`}
       </p>
+        </>
+      )}
+      {creatingFolder && (
+        <NewFolderModal people={people} onClose={() => setCreatingFolder(false)} onOpen={openFolder} />
+      )}
     </DocumentsFrame>
+  );
+}
+
+function ThinKpi({ label, value, sub, tint, icon }: { label: string; value: number; sub: string; tint: string; icon: string }) {
+  return (
+    <Card className="flex items-center gap-4">
+      <span className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[13px]" style={{ background: `color-mix(in srgb, ${tint} 16%, transparent)`, color: tint }}>
+        <Glyph d={icon} />
+      </span>
+      <div className="min-w-0">
+        <p className="text-xs font-semibold text-t2">{label}</p>
+        <p className="mt-1 text-xl font-extrabold text-t0">{value}</p>
+        <p className="truncate text-[11.5px] text-t2">{sub}</p>
+      </div>
+    </Card>
+  );
+}
+
+function NewFolderModal({
+  people,
+  onClose,
+  onOpen,
+}: {
+  people: PersonRow[];
+  onClose: () => void;
+  onOpen: (personId: string, year: string, month: string) => void;
+}) {
+  const [personId, setPersonId] = useState(people[0]?.id ?? "");
+  const [year, setYear] = useState(String(new Date().getFullYear()));
+  const [month, setMonth] = useState(String(new Date().getMonth() + 1));
+  return (
+    <Modal
+      open
+      title="Nova pasta"
+      onClose={onClose}
+      footer={
+        <Button onClick={() => personId && onOpen(personId, year, monthFolder(Number(month)))} disabled={!personId}>
+          Abrir pasta
+        </Button>
+      }
+    >
+      <div className="grid gap-3">
+        <label className="text-xs font-semibold text-t1">
+          Colaborador
+          <select className="mt-1 w-full rounded-lg border border-line bg-bg-inset px-2 py-2 text-sm" value={personId} onChange={(event) => setPersonId(event.target.value)}>
+            {people.map((person) => (
+              <option key={person.id} value={person.id}>
+                {person.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-xs font-semibold text-t1">
+          Ano
+          <input className="mt-1 w-full rounded-lg border border-line bg-bg-inset px-2 py-2 text-sm" value={year} onChange={(event) => setYear(event.target.value)} />
+        </label>
+        <label className="text-xs font-semibold text-t1">
+          Mês
+          <select className="mt-1 w-full rounded-lg border border-line bg-bg-inset px-2 py-2 text-sm" value={month} onChange={(event) => setMonth(event.target.value)}>
+            {Array.from({ length: 12 }, (_, index) => (
+              <option key={index + 1} value={index + 1}>
+                {monthFolder(index + 1)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="text-xs text-t2">A pasta é do colaborador. O PDF entra nela quando o CPF dele está no arquivo.</p>
+      </div>
+    </Modal>
   );
 }
 
@@ -145,6 +264,16 @@ function Shortcut({ label, count, onClick }: { label: string; count: string; onC
   );
 }
 
+async function resendFile(id: string, setNotice: (message: string | null) => void, reload: () => Promise<void>) {
+  try {
+    await resendDocument(id);
+    setNotice(null);
+    await reload();
+  } catch (error) {
+    setNotice(error instanceof Error ? error.message : "Não foi possível reenviar.");
+  }
+}
+
 async function openFile(id: string, setNotice: (message: string | null) => void) {
   try {
     const url = await openDocument(id);
@@ -158,7 +287,7 @@ async function openFile(id: string, setNotice: (message: string | null) => void)
 function sectionTitle(mode: Mode, allStores: boolean, crumb: string[], storeName: Map<string, string>, personName: Map<string, string>) {
   if (mode === "pending") return "Pendentes";
   if (mode === "month") return `Este mês · ${monthFolder(new Date().getMonth() + 1)}`;
-  if (mode === "home") return "Arquivos recentes";
+  if (mode === "home") return "Documentos recentes";
   if (crumb.length === 0) return allStores ? "Filiais" : "Colaboradores";
   const last = crumb[crumb.length - 1];
   return storeName.get(last) ?? personName.get(last) ?? last;
@@ -189,7 +318,7 @@ function folderEntries(input: {
     return peopleHere.map((person) => ({
       key: person.id,
       label: person.name,
-      detail: `${documents.filter((doc) => doc.sellerId === person.id).length} arquivos`,
+      detail: `${documents.filter((doc) => doc.sellerId === person.id).length} documentos`,
     }));
   }
   const sellerId = allStores ? crumb[1] : crumb[0];
@@ -198,7 +327,7 @@ function folderEntries(input: {
     return [...new Set(docs.map(yearOf))].filter(Boolean).map((year) => ({
       key: year,
       label: year,
-      detail: `${docs.filter((doc) => yearOf(doc) === year).length} arquivos`,
+      detail: `${docs.filter((doc) => yearOf(doc) === year).length} documentos`,
     }));
   }
   const year = allStores ? crumb[2] : crumb[1];
@@ -206,7 +335,7 @@ function folderEntries(input: {
     return [...new Set(docs.filter((doc) => yearOf(doc) === year).map(monthOf))].filter(Boolean).map((month) => ({
       key: month,
       label: month,
-      detail: "Pasta",
+      detail: "Mês",
     }));
   }
   const month = allStores ? crumb[3] : crumb[2];
@@ -242,11 +371,13 @@ function FileTable({
   people,
   batches,
   onOpen,
+  onResend,
 }: {
   rows: DocumentRow[];
   people: PersonRow[];
   batches: Map<string, BatchRow>;
   onOpen: (id: string) => void;
+  onResend: (id: string) => void;
 }) {
   const columns: DataTableColumn<DocumentRow>[] = [
     {
@@ -276,6 +407,16 @@ function FileTable({
       render: (row) => <Badge variant={badgeVariant(row.status)}>{row.sellerId ? STATUS_LABEL[row.status] : "Escolha o colaborador"}</Badge>,
     },
     { key: "size", header: "Tamanho", hideBelow: "sm", render: (row) => <span className="font-mono text-[12.5px] font-semibold text-t0">{formatBytes(row.sizeBytes)}</span> },
+    {
+      key: "resend",
+      header: "",
+      render: (row) =>
+        resendVisible(row.status) && row.envelopeId ? (
+          <Button size="sm" variant="outline" onClick={() => onResend(row.id)}>
+            Reenviar
+          </Button>
+        ) : null,
+    },
   ];
   return <DataTable columns={columns} data={rows} rowKey={(row) => row.id} />;
 }
