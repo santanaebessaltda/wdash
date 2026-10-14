@@ -185,10 +185,10 @@ T6 → T7
 
 **Done when**:
 
-- [ ] A repeated event id does not change the row
-- [ ] An unknown envelope is ignored
-- [ ] Assinado does not move backward
-- [ ] Gate check passes: `npm run build`
+- [x] A repeated event id does not change the row
+- [x] An unknown envelope is ignored
+- [x] Assinado does not move backward
+- [x] Gate check passes: `npm run build`
 
 **Tests**: none
 **Gate**: build

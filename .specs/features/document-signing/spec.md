@@ -248,7 +248,7 @@ O gestor manda holerite e documentos parecidos para cada colaborador assinar. Ho
 | DOCS-03 | P1: Disparar pelo Assina AI | Execute | Implemented |
 | DOCS-04 | P1: Pasta do colaborador | Design | In Design |
 | DOCS-05 | P1: Cobrar pelo lote | Design | In Design |
-| DOCS-06 | P1: Receber o status e guardar o PDF | Design | In Design |
+| DOCS-06 | P1: Receber o status e guardar o PDF | Execute | Implemented |
 | DOCS-07 | P1: Reenviar o link | Design | In Design |
 | DOCS-08 | P1: Conectar o Assina AI uma vez | Execute | Implemented |
 
