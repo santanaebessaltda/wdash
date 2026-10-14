@@ -56,7 +56,6 @@ function dayStatus(soldCents: number, informedCents: number | null): { text: str
   if (gap === "missing" || informedCents == null) return { text: "Não informado", color: "bg-warn" };
   const text = `Informado ${money(informedCents)}`;
   if (gap === "match") return { text, color: "bg-ok" };
-  if (gap === "over") return { text, color: "bg-warn" };
   return { text, color: "bg-bad" };
 }
 
@@ -292,7 +291,7 @@ export function SalesReportPage() {
               icon="🧾"
               title="Administradora não configurada"
               description={owner ? "Configure a administradora desta filial para informar as vendas ao shopping." : "O Gestor ainda não configurou a administradora desta filial."}
-              action={owner ? <Button onClick={() => navigate(paths.operation.branch)}>Configurar na filial</Button> : undefined}
+              action={owner ? <Button onClick={() => navigate(paths.operation.branch)}>Configurar administradora</Button> : undefined}
             />
           </Card>
         ) : (
@@ -386,7 +385,7 @@ function InformedDayModal({
   const faltando = day != null && !todayDay && informed == null;
   const diferente = day != null && !todayDay && informed != null && sold != null && informed !== sold;
   const status = todayDay ? "Em aberto" : faltando ? "Não informado" : "Informado";
-  const variant = todayDay ? "accent" : faltando ? "warning" : "success";
+  const variant = todayDay ? "accent" : faltando ? "warning" : diferente ? "danger" : "success";
   const difference = sold != null && informed != null ? informed - sold : null;
   return (
     <Modal
