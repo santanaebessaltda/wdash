@@ -36,12 +36,16 @@ export async function assinaCreateEnvelope(
   fileName: string,
   envelope: unknown,
 ): Promise<{ ok: true; body: AssinaEnvelope } | { ok: false; status: number }> {
-  const form = new FormData();
-  form.append("file", new Blob([file]), fileName);
-  form.append("envelope", JSON.stringify(envelope));
-  const res = await call(token, "/envelopes/create", { method: "POST", body: form });
-  if (!res.ok) return { ok: false, status: res.status };
-  return { ok: true, body: (await res.json()) as AssinaEnvelope };
+  try {
+    const form = new FormData();
+    form.append("file", new Blob([file]), fileName);
+    form.append("envelope", JSON.stringify(envelope));
+    const res = await call(token, "/envelopes/create", { method: "POST", body: form });
+    if (!res.ok) return { ok: false, status: res.status };
+    return { ok: true, body: (await res.json()) as AssinaEnvelope };
+  } catch {
+    return { ok: false, status: 0 };
+  }
 }
 
 export async function assinaResend(
@@ -50,11 +54,15 @@ export async function assinaResend(
   recipientId: string,
   body: { senderType: "EMAIL" | "WHATSAPP"; email?: string; phone?: string },
 ): Promise<boolean> {
-  const res = await call(token, `/envelopes/resend-signer-link/${envelopeId}/${recipientId}`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-  return res.ok;
+  try {
+    const res = await call(token, `/envelopes/resend-signer-link/${envelopeId}/${recipientId}`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 export function recipientIdOf(body: AssinaEnvelope): string | null {

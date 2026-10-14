@@ -32,12 +32,16 @@ export async function syncEnvelope(admin: SupabaseClient, token: string, envelop
   if (next === "SIGNED" && !row.signed_storage_path) {
     const url = signedUrlOf(remote);
     if (url) {
-      const file = await fetch(url);
-      if (file.ok) {
-        const bytes = new Uint8Array(await file.arrayBuffer());
-        const path = `${row.tenant_id}/${row.id}-signed.pdf`;
-        const up = await admin.storage.from(BUCKET).upload(path, bytes, { contentType: "application/pdf", upsert: true });
-        if (!up.error) patch.signed_storage_path = path;
+      try {
+        const file = await fetch(url);
+        if (file.ok) {
+          const bytes = new Uint8Array(await file.arrayBuffer());
+          const path = `${row.tenant_id}/${row.id}-signed.pdf`;
+          const up = await admin.storage.from(BUCKET).upload(path, bytes, { contentType: "application/pdf", upsert: true });
+          if (!up.error) patch.signed_storage_path = path;
+        }
+      } catch {
+        /* Assinado fica. A URL temporária não é gravada. */
       }
     }
   }

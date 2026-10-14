@@ -135,7 +135,7 @@ async function prepare(admin: SupabaseClient, tenantId: string, body: Body) {
     byCpf.set(seller.cpf as string, list);
   }
 
-  const takenInLoop = new Map<string, string[]>();
+  const held: { bytes: Uint8Array; texts: string[] }[] = [];
   for (const source of sources as { path?: string; name?: string }[]) {
     const path = String(source.path ?? "");
     const name = String(source.name ?? "arquivo.pdf");
@@ -168,9 +168,14 @@ async function prepare(admin: SupabaseClient, tenantId: string, body: Body) {
       continue;
     }
     accepted += 1;
-    const pages = read.texts.map((text, index) => ({ sourceIndex: 0, pageNumber: index + 1, text }));
-    const groups = groupPages(pages, batch.unify !== false);
-    for (const group of groups) {
+    held.push({ bytes, texts: read.texts });
+  }
+
+  const pages = held.flatMap((file, sourceIndex) => file.texts.map((text, index) => ({ sourceIndex, pageNumber: index + 1, text })));
+  const groups = groupPages(pages, batch.unify !== false);
+  const sourceBytes = held.map((file) => file.bytes);
+  const takenInLoop = new Map<string, string[]>();
+  for (const group of groups) {
       const matches = group.cpf ? (byCpf.get(group.cpf) ?? []) : [];
       const sellerId = assignSeller(matches);
       const storeId = matches.length === 1 ? matches[0].storeId : (batch.store_id as string | null);
@@ -178,7 +183,7 @@ async function prepare(admin: SupabaseClient, tenantId: string, body: Body) {
       const taken = [...(await takenNames(admin, sellerId, batch)), ...(takenInLoop.get(key) ?? [])];
       const docName = fileName(batch.category as string, taken);
       takenInLoop.set(key, [...(takenInLoop.get(key) ?? []), docName]);
-      const pdf = await buildPdf([bytes], group.pages);
+      const pdf = await buildPdf(sourceBytes, group.pages);
       const docId = crypto.randomUUID();
       const storagePath = `${tenantId}/${batchId}/${docId}.pdf`;
       const up = await admin.storage.from(BUCKET).upload(storagePath, pdf, { contentType: "application/pdf" });
@@ -200,7 +205,6 @@ async function prepare(admin: SupabaseClient, tenantId: string, body: Body) {
       });
       if (error) refused.push({ name: docName, message: "Não foi possível guardar o PDF." });
       else created.push(docId);
-    }
   }
   return json({ batchId, created, refused });
 }
@@ -264,6 +268,7 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
   const { data: docs } = await admin.from("employee_document").select("*").eq("batch_id", batch.id);
   const results: { id: string; error: string | null }[] = [];
   for (const doc of docs ?? []) {
+    try {
     const block = confirmBlock({ deadline, hasToken: Boolean(token), sizeBytes: doc.size_bytes as number });
     let seller: { name: string; email: string | null; whatsapp: string | null; cpf: string | null } | null = null;
     if (doc.seller_id) {
@@ -311,7 +316,11 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
       folderId: null,
     });
     if (!created.ok || !created.body.id) {
-      const message = created.ok ? "A Assina AI não devolveu o envelope." : `Assina AI respondeu ${created.status}.`;
+      const message = created.ok
+        ? "A Assina AI não devolveu o envelope."
+        : created.status
+          ? `Assina AI respondeu ${created.status}.`
+          : "Não foi possível falar com o Assina AI.";
       await admin.from("employee_document").update({ error: message }).eq("id", doc.id);
       results.push({ id: doc.id as string, error: message });
       continue;
@@ -326,6 +335,11 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
       })
       .eq("id", doc.id);
     results.push({ id: doc.id as string, error: null });
+    } catch {
+      const message = "Não foi possível falar com o Assina AI.";
+      await admin.from("employee_document").update({ error: message }).eq("id", doc.id);
+      results.push({ id: doc.id as string, error: message });
+    }
   }
   return json({ results });
 }

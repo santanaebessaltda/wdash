@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  DOCUMENT_CATEGORIES,
   DOCUMENT_COPY,
   applyEnvelopeStatus,
   assignSeller,
@@ -57,6 +58,21 @@ describe("saveEmail", () => {
   });
 });
 
+describe("categories", () => {
+  it("accepts only the payroll categories", () => {
+    expect([...DOCUMENT_CATEGORIES]).toEqual([
+      "Holerite",
+      "Espelho de ponto",
+      "Adiantamento salarial",
+      "Vale transporte",
+      "Vale alimentação / refeição",
+      "Participação nos lucros (PLR)",
+      "Informe de rendimentos",
+      "Outros",
+    ]);
+  });
+});
+
 describe("groupPages", () => {
   const pages = [
     { sourceIndex: 0, pageNumber: 1, text: `Holerite ${VALID}` },
@@ -76,6 +92,26 @@ describe("groupPages", () => {
       },
       { cpf: "39053344705", pages: [{ sourceIndex: 1, pageNumber: 1 }] },
       { cpf: null, pages: [{ sourceIndex: 1, pageNumber: 2 }] },
+    ]);
+  });
+
+  it("builds one PDF when the same CPF appears in two source files", () => {
+    expect(
+      groupPages(
+        [
+          { sourceIndex: 0, pageNumber: 1, text: `Holerite ${VALID}` },
+          { sourceIndex: 1, pageNumber: 3, text: `Outro ${VALID}` },
+        ],
+        true,
+      ),
+    ).toEqual([
+      {
+        cpf: VALID_DIGITS,
+        pages: [
+          { sourceIndex: 0, pageNumber: 1 },
+          { sourceIndex: 1, pageNumber: 3 },
+        ],
+      },
     ]);
   });
 

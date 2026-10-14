@@ -81,7 +81,7 @@ T6 → T7
 - [x] Unify groups pages by CPF. Unify off keeps one page per group.
 - [x] Batch is Assinado only when every document is Assinado.
 - [x] Gate check passes: `npx vitest run src/data/wedash/documentSplit.test.ts`
-- [x] Test count: 18 tests pass
+- [x] Test count: 20 tests pass
 
 **Tests**: unit
 **Gate**: quick
