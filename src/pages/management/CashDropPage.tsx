@@ -523,7 +523,7 @@ function DayCell({
       openable={day === today || hasAction}
       openLabel={`Abrir ${dayTitle(day)}`}
       onOpen={() => onOpen(day)}
-      amount={rows.length > 0 ? money(total.totalCents) : null}
+      amount={rows.length > 0 || day === today ? money(total.totalCents) : null}
       check={hasAction ? { checked: marcado, label: `Marcar ${dayTitle(day)}`, onToggle: () => onToggle(day) } : null}
       badges={chips.length > 0 ? chips.map((chip) => (
         <DayChip key={chip.text} color={chip.color}>{chip.text}</DayChip>
