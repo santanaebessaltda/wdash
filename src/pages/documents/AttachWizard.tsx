@@ -1,5 +1,5 @@
-import { useRef, useState, type ReactNode } from "react";
-import { Button, Card, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Button, Card, CardHeader, CardTitle, ProgressBar, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { DOCUMENT_CATEGORIES, DOCUMENT_COPY, DOCUMENT_LIMITS, monthFolder } from "@/data/wedash/documentSplit";
 import {
@@ -10,7 +10,7 @@ import {
   type DocumentRow,
   type PersonRow,
 } from "@/data/wedash/documentsRepo";
-import { FileGlyph, STATUS_LABEL, formatBytes } from "./frame";
+import { STATUS_LABEL, formatBytes } from "./frame";
 
 const STEPS = [
   { num: 1, label: "Upload" },
@@ -190,6 +190,92 @@ function Processing() {
   );
 }
 
+function fileKey(file: File) {
+  return `${file.name}-${file.size}-${file.lastModified}`;
+}
+
+function AttachedFiles({ files, onRemove }: { files: File[]; onRemove: (file: File) => void }) {
+  const [progress, setProgress] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setProgress((current) => {
+        const next: Record<string, number> = {};
+        let changed = false;
+        for (const file of files) {
+          const value = current[fileKey(file)] ?? 0;
+          const updated = Math.min(100, value + (value === 0 ? 24 : 19));
+          next[fileKey(file)] = updated;
+          if (updated !== value) changed = true;
+        }
+        return changed ? next : current;
+      });
+    }, 90);
+    return () => window.clearInterval(timer);
+  }, [files]);
+
+  const ready = files.filter((file) => (progress[fileKey(file)] ?? 0) >= 100).length;
+
+  return (
+    <Card className="mt-4">
+      <CardHeader>
+        <CardTitle>Documentos anexados</CardTitle>
+        <span className="text-[12.5px] text-t2">
+          {ready} de {files.length} prontos
+        </span>
+      </CardHeader>
+      <div className="flex flex-col gap-3.5">
+        {files.map((file) => {
+          const pct = progress[fileKey(file)] ?? 0;
+          const done = pct >= 100;
+          return (
+            <div key={fileKey(file)} className="flex items-center gap-3.5 rounded-xl border border-line bg-bg-inset p-3.5">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: "var(--bad-soft)", color: "var(--bad)" }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <path d="M14 2v6h6" />
+                </svg>
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="mb-1.5 flex items-center justify-between gap-2">
+                  <span className="truncate text-[13.5px] font-bold text-t0">{file.name}</span>
+                  <span className="shrink-0 text-xs text-t2">{formatBytes(file.size)}</span>
+                </div>
+                {done ? (
+                  <div className="flex items-center gap-1.5">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                    <span className="text-[11.5px] font-semibold text-ok">Anexo pronto</span>
+                  </div>
+                ) : (
+                  <>
+                    <ProgressBar value={pct} height={5} />
+                    <div className="mt-1 flex justify-between text-[11px] text-t2">
+                      <span>{pct}%</span>
+                      <span>{Math.max(1, Math.round((100 - pct) / 30))}s restantes</span>
+                    </div>
+                  </>
+                )}
+              </div>
+              <button
+                type="button"
+                aria-label="Remover"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-line text-t2 hover:border-bad hover:text-bad"
+                onClick={() => onRemove(file)}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
 function UploadStep({
   month,
   year,
@@ -309,29 +395,7 @@ function UploadStep({
           }}
         />
       </div>
-      {files.length > 0 && (
-        <div className="mt-4 flex flex-col gap-2">
-          {files.map((file) => (
-            <div key={`${file.name}-${file.size}`} className="flex items-center gap-3 rounded-xl border border-line bg-bg-inset p-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-acc-soft text-acc">
-                <FileGlyph />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[13.5px] font-bold text-t0">{file.name}</p>
-                <p className="text-[11.5px] text-t2">{formatBytes(file.size)}</p>
-              </div>
-              <button
-                type="button"
-                className="flex h-7 w-7 items-center justify-center rounded-lg border border-line text-t2 hover:border-bad hover:text-bad"
-                aria-label="Remover"
-                onClick={() => onFiles(files.filter((item) => item !== file))}
-              >
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+      {files.length > 0 && <AttachedFiles files={files} onRemove={(file) => onFiles(files.filter((item) => item !== file))} />}
       {error && <p className="mt-3 text-sm text-bad">{error}</p>}
       <div className="mt-4">
         <WizardNav previousLabel="Cancelar" nextLabel="Continuar" onPrevious={onCancel} onNext={onNext} nextDisabled={files.length === 0} />
