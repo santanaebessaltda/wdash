@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Badge, Button, Card, DataTable, EmptyState, Segmented, type DataTableColumn } from "@/components/ui";
+import { Badge, Button, Card, DataTable, EmptyState, Segmented, Tooltip, type DataTableColumn } from "@/components/ui";
 import { paths } from "@/router/paths";
 import { folderTitle, monthFolder, resendVisible } from "@/data/wedash/documentSplit";
 import type { BatchRow, DocumentRow, PersonRow } from "@/data/wedash/documentsRepo";
@@ -22,7 +22,8 @@ export function DocumentsPage() {
   const [query, setQuery] = useState("");
   const [peopleFilter, setPeopleFilter] = useState<PeopleFilter>("active");
   const [notice, setNotice] = useState<string | null>(flash?.documentNotice ?? null);
-  const [sent] = useState<string | null>(flash?.documentSent ?? null);
+  const [sent, setSent] = useState<string | null>(flash?.documentSent ?? null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
 
   const storeName = useMemo(() => new Map(stores.map((store) => [store.id, store.name])), [stores]);
   const personName = useMemo(() => new Map(people.map((person) => [person.id, person.name])), [people]);
@@ -78,7 +79,7 @@ export function DocumentsPage() {
   return (
     <DocumentsFrame
       title="Documentos"
-      subtitle={allStores ? "Filial, colaborador, ano e mês" : "Colaborador, ano e mês"}
+      subtitle={allStores ? "Encontre documentos por filial, colaborador, ano e mês e acompanhe as assinaturas." : "Encontre documentos por colaborador, ano e mês e acompanhe as assinaturas."}
       actions={
         <Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>
       }
@@ -88,17 +89,17 @@ export function DocumentsPage() {
       {mode === "home" && (
         <>
           <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <ThinKpi label="Pendentes" value={pending.length} sub="Ainda não assinados" tint="var(--warn)" icon="M12 8v4l3 2M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20" />
-            <ThinKpi label="Assinados" value={signed.length} sub="Guardados na pasta" tint="var(--ok)" icon="M20 6 9 17l-5-5" />
-            <ThinKpi label="Sem contato" value={missingContact} sub="Sem WhatsApp e sem e-mail" tint="var(--bad)" icon="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8" />
+            <ThinKpi label="Pendentes" value={pending.length} sub="Aguardando assinatura" tint="var(--warn)" icon="M12 8v4l3 2M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20" />
+            <ThinKpi label="Assinados" value={signed.length} sub="Documentos assinados" tint="var(--ok)" icon="M20 6 9 17l-5-5" />
+            <ThinKpi label="Sem contato" value={missingContact} sub="Colaboradores sem e-mail e WhatsApp" hint="Conta os colaboradores sem nenhum contato disponível para envio." tint="var(--bad)" icon="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8" />
           </div>
           <p className="mb-3 text-xs font-bold uppercase tracking-wide text-t2">Atalhos</p>
           <div className="mb-5 grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
-            <Shortcut label="Pendentes" count={`${pending.length} documentos`} onClick={() => { setMode("pending"); setQuery(""); }} />
-            <Shortcut label="Este mês" count={`${thisMonth.length} documentos`} onClick={() => { setMode("month"); setQuery(""); }} />
+            <Shortcut label="Pendentes" count={qty(pending.length, "documento", "documentos")} onClick={() => { setMode("pending"); setQuery(""); }} />
+            <Shortcut label="Este mês" count={qty(thisMonth.length, "documento", "documentos")} onClick={() => { setMode("month"); setQuery(""); }} />
             <Shortcut
               label={allStores ? "Filiais" : "Colaboradores"}
-              count={allStores ? `${stores.length} filiais` : `${listedPeople.length} pessoas`}
+              count={allStores ? qty(stores.length, "filial", "filiais") : qty(listedPeople.length, "pessoa", "pessoas")}
               onClick={() => { setMode("browse"); setCrumb([]); setQuery(""); }}
             />
           </div>
@@ -141,7 +142,7 @@ export function DocumentsPage() {
 
       {mode === "browse" ? (
         visibleFolders.length === 0 ? (
-          <EmptyState title="Nenhum documento" description="Esta pasta ainda não tem arquivo. Anexe um PDF para ele cair aqui." />
+          <EmptyState title="Nenhum documento" description="Esta pasta ainda não tem documentos." action={<Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>} />
         ) : (
           <FolderTable
             rows={visibleFolders}
@@ -150,31 +151,44 @@ export function DocumentsPage() {
           />
         )
       ) : visibleFiles.length === 0 ? (
-        <EmptyState title="Nenhum documento" description="Anexe um PDF. O arquivo pronto aparece na pasta do colaborador." />
+        <EmptyState title="Nenhum documento" description="Anexe um PDF para começar." action={<Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>} />
       ) : (
         <FileTable
           rows={visibleFiles}
           people={people}
           batches={batchOf}
           onOpen={(id) => void openFile(id, setNotice)}
-          onResend={(id) => void resendFile(id, setNotice, reload)}
+          onResend={(id) => void resendFile(id, setNotice, setSent, setResendingId, reload)}
+          resendingId={resendingId}
         />
       )}
       <p className="mt-3 text-[12.5px] text-t2">
-        {mode === "browse" ? `${visibleFolders.length} itens` : `${visibleFiles.length} documentos`}
+        {mode === "browse" ? qty(visibleFolders.length, "item", "itens") : qty(visibleFiles.length, "documento", "documentos")}
       </p>
     </DocumentsFrame>
   );
 }
 
-function ThinKpi({ label, value, sub, tint, icon }: { label: string; value: number; sub: string; tint: string; icon: string }) {
+function qty(count: number, singular: string, plural: string) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function ThinKpi({ label, value, sub, hint, tint, icon }: { label: string; value: number; sub: string; hint?: string; tint: string; icon: string }) {
   return (
     <Card className="flex items-center gap-4">
       <span className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[13px]" style={{ background: `color-mix(in srgb, ${tint} 16%, transparent)`, color: tint }}>
         <Glyph d={icon} />
       </span>
       <div className="min-w-0">
-        <p className="text-xs font-semibold text-t2">{label}</p>
+        <p className="text-xs font-semibold text-t2">
+          {hint ? (
+            <Tooltip label={hint} side="bottom">
+              <span className="cursor-help underline decoration-dotted underline-offset-2">{label}</span>
+            </Tooltip>
+          ) : (
+            label
+          )}
+        </p>
         <p className="mt-1 text-xl font-extrabold text-t0">{value}</p>
         <p className="truncate text-[11.5px] text-t2">{sub}</p>
       </div>
@@ -196,13 +210,24 @@ function Shortcut({ label, count, onClick }: { label: string; count: string; onC
   );
 }
 
-async function resendFile(id: string, setNotice: (message: string | null) => void, reload: () => Promise<void>) {
+async function resendFile(
+  id: string,
+  setNotice: (message: string | null) => void,
+  setSent: (message: string | null) => void,
+  setResendingId: (id: string | null) => void,
+  reload: () => Promise<void>,
+) {
+  setResendingId(id);
+  setNotice(null);
+  setSent(null);
   try {
     await resendDocument(id);
-    setNotice(null);
+    setSent("Documento reenviado.");
     await reload();
-  } catch (error) {
-    setNotice(error instanceof Error ? error.message : "Não foi possível reenviar.");
+  } catch {
+    setNotice("Não foi possível reenviar o documento. Tente novamente.");
+  } finally {
+    setResendingId(null);
   }
 }
 
@@ -240,7 +265,7 @@ function folderEntries(input: {
     return stores.map((store) => ({
       key: store.id,
       label: store.name,
-      detail: `${people.filter((person) => person.storeId === store.id).length} colaboradores`,
+      detail: qty(people.filter((person) => person.storeId === store.id).length, "colaborador", "colaboradores"),
     }));
   }
   const storeKey = allStores ? crumb[0] : null;
@@ -250,7 +275,7 @@ function folderEntries(input: {
     return peopleHere.map((person) => ({
       key: person.id,
       label: person.name,
-      detail: `${documents.filter((doc) => doc.sellerId === person.id).length} documentos`,
+      detail: qty(documents.filter((doc) => doc.sellerId === person.id).length, "documento", "documentos"),
     }));
   }
   const sellerId = allStores ? crumb[1] : crumb[0];
@@ -259,7 +284,7 @@ function folderEntries(input: {
     return [...new Set(docs.map(yearOf))].filter(Boolean).map((year) => ({
       key: year,
       label: year,
-      detail: `${docs.filter((doc) => yearOf(doc) === year).length} documentos`,
+      detail: qty(docs.filter((doc) => yearOf(doc) === year).length, "documento", "documentos"),
     }));
   }
   const year = allStores ? crumb[2] : crumb[1];
@@ -304,12 +329,14 @@ function FileTable({
   batches,
   onOpen,
   onResend,
+  resendingId,
 }: {
   rows: DocumentRow[];
   people: PersonRow[];
   batches: Map<string, BatchRow>;
   onOpen: (id: string) => void;
   onResend: (id: string) => void;
+  resendingId: string | null;
 }) {
   const columns: DataTableColumn<DocumentRow>[] = [
     {
@@ -344,8 +371,8 @@ function FileTable({
       header: "",
       render: (row) =>
         resendVisible(row.status) && row.envelopeId ? (
-          <Button size="sm" variant="outline" onClick={() => onResend(row.id)}>
-            Reenviar
+          <Button size="sm" variant="outline" disabled={resendingId === row.id} onClick={() => onResend(row.id)}>
+            {resendingId === row.id ? "Reenviando…" : "Reenviar"}
           </Button>
         ) : null,
     },

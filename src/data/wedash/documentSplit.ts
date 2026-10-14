@@ -4,8 +4,8 @@ export const DOCUMENT_CATEGORIES = [
   "Holerite",
   "Espelho de ponto",
   "Adiantamento salarial",
-  "Vale transporte",
-  "Vale alimentação / refeição",
+  "Vale-transporte",
+  "Vale-alimentação / refeição",
   "Participação nos lucros (PLR)",
   "Informe de rendimentos",
   "Outros",
@@ -14,18 +14,18 @@ export const DOCUMENT_CATEGORIES = [
 export type DocumentCategory = (typeof DOCUMENT_CATEGORIES)[number];
 
 export const DOCUMENT_COPY = {
-  scanned: "Arquivo escaneado não é aceito. Envie o PDF gerado pelo sistema de folha.",
-  tooMany: "O lote aceita até 5 PDFs.",
-  tooBigSource: "Cada PDF de origem aceita até 15 MB e 1.000 páginas.",
-  notPdf: "Envie apenas PDF.",
-  noWhatsapp: "Sem WhatsApp neste cadastro.",
-  noEmail: "Sem e-mail neste cadastro.",
-  overEnvelope: "O PDF passa de 5 MB. Separe o arquivo.",
+  scanned: "Este PDF é escaneado. Envie o arquivo digital gerado pelo sistema de folha.",
+  tooMany: "Você pode anexar até 5 PDFs por vez.",
+  tooBigSource: "Cada PDF pode ter até 15 MB e 1.000 páginas.",
+  notPdf: "Envie apenas arquivos PDF.",
+  noWhatsapp: "Informe o WhatsApp para enviar este documento.",
+  noEmail: "Informe o e-mail para enviar este documento.",
+  overEnvelope: "O PDF passa de 5 MB depois da separação. Separe o arquivo e tente novamente.",
   noToken: "A conexão com o Assina AI ainda não foi configurada. Acesse Conta › Integrações para conectar.",
   badToken: "Token inválido.",
-  badCpf: "CPF inválido.",
-  badWhatsapp: "WhatsApp inválido.",
-  badEmail: "E-mail inválido.",
+  badCpf: "Informe um CPF válido.",
+  badWhatsapp: "Informe um WhatsApp válido com DDD.",
+  badEmail: "Informe um e-mail válido.",
 } as const;
 
 export const DOCUMENT_LIMITS = {
@@ -153,7 +153,7 @@ export function customDocumentName(raw: string): { ok: true; name: string } | { 
   const name = raw.trim().replace(/\.pdf$/i, "").replace(/\s+/g, " ");
   if (!name) return { ok: false, message: "Informe o nome do documento." };
   if (name.length > 80) return { ok: false, message: "O nome do documento aceita até 80 caracteres." };
-  if (/[\\/:*?"<>|]/.test(name)) return { ok: false, message: "O nome do documento não aceita \\ / : * ? \" < > |." };
+  if (/[\\/:*?"<>|]/.test(name)) return { ok: false, message: "O nome do documento não pode conter \\ / : * ? \" < > |." };
   return { ok: true, name };
 }
 

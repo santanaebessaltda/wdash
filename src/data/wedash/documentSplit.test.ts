@@ -37,7 +37,7 @@ describe("saveCpf", () => {
 
   it("rejects a CPF whose check digits fail", () => {
     expect(saveCpf("529.982.247-26")).toEqual({ ok: false, message: DOCUMENT_COPY.badCpf });
-    expect(saveCpf("123")).toEqual({ ok: false, message: "CPF inválido." });
+    expect(saveCpf("123")).toEqual({ ok: false, message: "Informe um CPF válido." });
   });
 });
 
@@ -49,7 +49,7 @@ describe("saveWhatsapp", () => {
   });
 
   it("rejects a number that is not 10 or 11 digits", () => {
-    expect(saveWhatsapp("123")).toEqual({ ok: false, message: "WhatsApp inválido." });
+    expect(saveWhatsapp("123")).toEqual({ ok: false, message: "Informe um WhatsApp válido com DDD." });
   });
 });
 
@@ -57,7 +57,7 @@ describe("saveEmail", () => {
   it("keeps an empty e-mail and rejects text without @", () => {
     expect(saveEmail("")).toEqual({ ok: true, email: null });
     expect(saveEmail("ana@loja.com")).toEqual({ ok: true, email: "ana@loja.com" });
-    expect(saveEmail("ana-loja.com")).toEqual({ ok: false, message: "E-mail inválido." });
+    expect(saveEmail("ana-loja.com")).toEqual({ ok: false, message: "Informe um e-mail válido." });
   });
 });
 
@@ -67,8 +67,8 @@ describe("categories", () => {
       "Holerite",
       "Espelho de ponto",
       "Adiantamento salarial",
-      "Vale transporte",
-      "Vale alimentação / refeição",
+      "Vale-transporte",
+      "Vale-alimentação / refeição",
       "Participação nos lucros (PLR)",
       "Informe de rendimentos",
       "Outros",
@@ -193,10 +193,10 @@ describe("sourceRefusal", () => {
   const ok = { mime: "application/pdf", bytes: 1000, pages: 2, hasText: true, alreadyAccepted: 0 };
 
   it("refuses a file that is not a PDF, a sixth file, an oversized file, or a scan", () => {
-    expect(sourceRefusal({ ...ok, mime: "image/png" })).toBe("Envie apenas PDF.");
-    expect(sourceRefusal({ ...ok, alreadyAccepted: 5 })).toBe("O lote aceita até 5 PDFs.");
-    expect(sourceRefusal({ ...ok, bytes: 15 * 1024 * 1024 + 1 })).toBe("Cada PDF de origem aceita até 15 MB e 1.000 páginas.");
-    expect(sourceRefusal({ ...ok, pages: 1001 })).toBe("Cada PDF de origem aceita até 15 MB e 1.000 páginas.");
+    expect(sourceRefusal({ ...ok, mime: "image/png" })).toBe("Envie apenas arquivos PDF.");
+    expect(sourceRefusal({ ...ok, alreadyAccepted: 5 })).toBe("Você pode anexar até 5 PDFs por vez.");
+    expect(sourceRefusal({ ...ok, bytes: 15 * 1024 * 1024 + 1 })).toBe("Cada PDF pode ter até 15 MB e 1.000 páginas.");
+    expect(sourceRefusal({ ...ok, pages: 1001 })).toBe("Cada PDF pode ter até 15 MB e 1.000 páginas.");
     expect(sourceRefusal({ ...ok, hasText: false })).toBe(DOCUMENT_COPY.scanned);
     expect(sourceRefusal(ok)).toBeNull();
   });
@@ -207,15 +207,15 @@ describe("confirm and resend", () => {
     expect(confirmBlock({ deadline: "2026-11-13", hasToken: false, sizeBytes: 10 })).toBe(DOCUMENT_COPY.noToken);
     expect(confirmBlock({ deadline: null, hasToken: true, sizeBytes: 10 })).toBeNull();
     expect(confirmBlock({ deadline: "2026-11-13", hasToken: true, sizeBytes: 5 * 1024 * 1024 + 1 })).toBe(DOCUMENT_COPY.overEnvelope);
-    expect(channelBlock("WHATSAPP", { email: "a@b.com", whatsapp: null })).toBe("Sem WhatsApp neste cadastro.");
-    expect(channelBlock("EMAIL", { email: null, whatsapp: "11987654321" })).toBe("Sem e-mail neste cadastro.");
+    expect(channelBlock("WHATSAPP", { email: "a@b.com", whatsapp: null })).toBe("Informe o WhatsApp para enviar este documento.");
+    expect(channelBlock("EMAIL", { email: null, whatsapp: "11987654321" })).toBe("Informe o e-mail para enviar este documento.");
     expect(confirmBlock({ deadline: "2026-11-13", hasToken: true, sizeBytes: 10 })).toBeNull();
   });
 
   it("does not create a second envelope and does not resend a signed row", () => {
     expect(shouldSend({ envelopeId: "env", sellerId: "ana", block: null })).toBe(false);
     expect(shouldSend({ envelopeId: null, sellerId: null, block: null })).toBe(false);
-    expect(shouldSend({ envelopeId: null, sellerId: "ana", block: "Sem e-mail neste cadastro." })).toBe(false);
+    expect(shouldSend({ envelopeId: null, sellerId: "ana", block: "Informe o e-mail para enviar este documento." })).toBe(false);
     expect(shouldSend({ envelopeId: null, sellerId: "ana", block: null })).toBe(true);
     expect(resendVisible("PENDING")).toBe(true);
     expect(resendVisible("SIGNED")).toBe(false);

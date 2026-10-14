@@ -322,10 +322,10 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
     });
     if (!created.ok || !created.body.id) {
       const message = created.ok
-        ? "A Assina AI não devolveu o envelope."
+        ? "O Assina AI não devolveu a confirmação do envio."
         : created.status
-          ? `Assina AI respondeu ${created.status}.`
-          : "Não foi possível falar com o Assina AI.";
+          ? "Não foi possível iniciar a assinatura deste documento."
+          : "Não foi possível conectar ao Assina AI.";
       await admin.from("employee_document").update({ error: message }).eq("id", doc.id);
       results.push({ id: doc.id as string, error: message });
       continue;
@@ -341,7 +341,7 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
       .eq("id", doc.id);
     results.push({ id: doc.id as string, error: null });
     } catch {
-      const message = "Não foi possível falar com o Assina AI.";
+      const message = "Não foi possível conectar ao Assina AI.";
       await admin.from("employee_document").update({ error: message }).eq("id", doc.id);
       results.push({ id: doc.id as string, error: message });
     }

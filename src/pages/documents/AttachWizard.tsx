@@ -110,14 +110,14 @@ export function AttachWizard({
       await onReload();
       const failed = (sent.results ?? []).filter((item) => item.error);
       if (failed.length > 0) {
-        setError("Quem está sem contato ou com erro não foi enviado. Ajuste a linha e envie de novo.");
+        setError("Alguns documentos não foram enviados. Corrija os documentos com erro ou sem contato e envie novamente. Os documentos já enviados não serão duplicados.");
         setSending(false);
         return;
       }
       const refusedText = refused.map((item) => `${item.name}: ${item.message}`).join(" ");
       onDone(refusedText || null);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Não foi possível enviar.");
+      setError(reason instanceof Error ? reason.message : "Não foi possível enviar os documentos. Tente novamente.");
       setSending(false);
     }
   }
@@ -230,16 +230,10 @@ function personReady(person: PersonRow | undefined, channel: "WHATSAPP" | "EMAIL
   return channel === "WHATSAPP" ? Boolean(person.whatsapp) : Boolean(person.email);
 }
 
-const READ_LINES = ["Lendo o texto de cada página", "Procurando o CPF", "Juntando as páginas do mesmo colaborador"];
+const READ_LINES = ["Lendo as páginas…", "Identificando os colaboradores…", "Separando os documentos…"];
 
 function Processing({ status }: { status: PrepareStatus }) {
-  const [dots, setDots] = useState(1);
   const [readIndex, setReadIndex] = useState(0);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setDots((current) => (current % 3) + 1), 420);
-    return () => window.clearInterval(timer);
-  }, []);
 
   useEffect(() => {
     if (status.phase !== "read") return;
@@ -250,22 +244,21 @@ function Processing({ status }: { status: PrepareStatus }) {
 
   const label =
     status.phase === "upload"
-      ? `Enviando ${status.name}${status.total > 1 ? ` (${status.index} de ${status.total})` : ""}`
+      ? status.total > 1
+        ? `Enviando ${status.name} · ${status.index} de ${status.total}`
+        : `Enviando ${status.name}…`
       : status.phase === "review"
-        ? "Abrindo a revisão"
+        ? "Preparando a revisão…"
         : READ_LINES[readIndex];
 
   return (
     <div className="flex flex-col items-center py-10 text-center">
       <Spinner size={28} />
-      <h3 className="mt-4 text-lg font-bold text-t0">Separando os PDFs</h3>
+      <h3 className="mt-4 text-lg font-bold text-t0">Preparando os documentos</h3>
       <p className="mt-2 min-h-5 text-[13.5px] text-t1" aria-live="polite">
-        <span>{label}</span>
-        <span className="inline-block w-4 text-left" aria-hidden="true">
-          {".".repeat(dots)}
-        </span>
+        {label}
       </p>
-      <p className="mt-1 text-[12.5px] text-t2">Nada é enviado nesta etapa.</p>
+      <p className="mt-1 text-[12.5px] text-t2">Nenhum documento é enviado para assinatura nesta etapa.</p>
     </div>
   );
 }
@@ -331,16 +324,13 @@ function AttachedFiles({ files, onRemove }: { files: File[]; onRemove: (file: Fi
                 ) : (
                   <>
                     <ProgressBar value={pct} height={5} />
-                    <div className="mt-1 flex justify-between text-[11px] text-t2">
-                      <span>{pct}%</span>
-                      <span>{Math.max(1, Math.round((100 - pct) / 30))}s restantes</span>
-                    </div>
+                    <p className="mt-1 text-[11px] text-t2">{pct}%</p>
                   </>
                 )}
               </div>
               <button
                 type="button"
-                aria-label="Remover"
+                aria-label={`Remover ${file.name}`}
                 className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-line text-t2 hover:border-bad hover:text-bad"
                 onClick={() => onRemove(file)}
               >
@@ -415,7 +405,7 @@ function UploadStep({
 
   return (
     <>
-      <WizardCardHeader title="Anexar documentos" subtitle="Até 5 PDFs. Páginas do mesmo CPF, no mesmo arquivo ou em arquivos diferentes, viram um documento só." />
+      <WizardCardHeader title="Anexar documentos" subtitle="Envie até 5 PDFs. A WDash identifica o CPF em cada página e reúne as páginas do mesmo colaborador em um único documento." />
       <div className="grid gap-3 sm:grid-cols-3">
         <FormField label="Mês">
           <select className={controlClass} value={month} onChange={(event) => onMonth(event.target.value)}>
@@ -439,7 +429,7 @@ function UploadStep({
       </div>
       {category === "Outros" && (
         <div className="mt-3">
-          <FormField label="Nome do documento" hint="Na pasta fica este nome. No envio e no download entra também a pessoa, o mês e o ano.">
+          <FormField label="Nome do documento" hint="Este nome será usado na pasta e no arquivo enviado ao colaborador.">
             <input className={controlClass} value={customName} placeholder="Ex.: Termo de férias" onChange={(event) => onCustomName(event.target.value)} />
           </FormField>
         </div>
@@ -464,7 +454,7 @@ function UploadStep({
           </svg>
         </div>
         <h3 className="text-[17px] font-bold text-t0">Arraste e solte os PDFs aqui</h3>
-        <p className="mt-2 text-[13.5px] text-t2">ou clique para selecionar, até 5 arquivos</p>
+        <p className="mt-2 text-[13.5px] text-t2">ou clique para selecionar até 5 arquivos</p>
         <p className="mt-1 text-[12px] text-t2">PDF · até 15 MB e 1.000 páginas por arquivo</p>
         <input
           ref={inputRef}
@@ -510,9 +500,9 @@ function SettingsStep({
 }) {
   return (
     <>
-      <WizardCardHeader title="Configurações de envio" subtitle="O link sai por WhatsApp ou e-mail. A assinatura fica no centro de cada página." />
+      <WizardCardHeader title="Configurar envio" subtitle="Escolha como o colaborador receberá o link para assinatura." />
       <div className="grid gap-3 sm:grid-cols-2">
-        <FormField label="Canal">
+        <FormField label="Canal de envio">
           <select className={controlClass} value={channel} onChange={(event) => onChannel(event.target.value as "WHATSAPP" | "EMAIL")}>
             <option value="WHATSAPP">WhatsApp</option>
             <option value="EMAIL">E-mail</option>
@@ -526,7 +516,7 @@ function SettingsStep({
             <option value="NEVER">Nunca</option>
           </select>
         </FormField>
-        <FormField label="Data limite" optional>
+        <FormField label="Data limite" optional hint="Depois desta data, o documento ficará expirado se ainda não tiver sido assinado.">
           <input type="date" className={controlClass} value={deadline} onChange={(event) => onDeadline(event.target.value)} />
         </FormField>
       </div>
@@ -573,11 +563,13 @@ function ReviewStep({
 }) {
   return (
     <>
-      <WizardCardHeader title="Revisar e enviar" subtitle={`${category} · ${monthFolder(month)}/${year}. Quem estiver sem contato pode ser preenchido aqui.`} />
+      <h3 className="text-lg font-bold text-t0">Revisar e enviar</h3>
+      <p className="mt-1 text-[13.5px] text-t2">{category} · {monthFolder(month)}/{year}</p>
+      <p className="mt-1 mb-6 text-[13.5px] text-t2">Confira os colaboradores e os contatos antes de enviar.</p>
       <div className="mb-4 grid grid-cols-3 gap-3">
         <Summary label="Documentos" value={String(rows.length)} />
         <Summary label="Prontos" value={String(ready)} />
-        <Summary label="Sem cadastro" value={String(missing)} />
+        <Summary label="Sem contato" value={String(missing)} />
       </div>
       {refused.length > 0 && (
         <p className="mb-3 text-[13px] text-bad">{refused.map((item) => `${item.name}: ${item.message}`).join(" ")}</p>
@@ -586,7 +578,12 @@ function ReviewStep({
         {rows.map((row) => (
           <ReviewRow key={`${row.id}:${row.sellerId ?? ""}`} row={row} people={people} channel={channel} onAssign={onAssign} onSave={onSave} />
         ))}
-        {rows.length === 0 && <p className="text-sm text-t2">Nenhuma página ficou neste envio.</p>}
+        {rows.length === 0 && (
+          <div>
+            <p className="text-sm font-bold text-t0">Nenhum documento pronto para envio</p>
+            <p className="mt-1 text-sm text-t2">Revise os arquivos recusados ou identifique os colaboradores para continuar.</p>
+          </div>
+        )}
       </div>
       {error && <p className="mt-3 text-sm text-bad">{error}</p>}
       <div className="mt-4">
@@ -615,15 +612,25 @@ function ReviewRow({
   const [whatsapp, setWhatsapp] = useState(person?.whatsapp ?? "");
   const [localError, setLocalError] = useState<string | null>(null);
   const needsContact = person ? (channel === "WHATSAPP" ? !person.whatsapp : !person.email) : true;
+  const alreadySent = Boolean(row.envelopeId);
+  const statusText = alreadySent
+    ? STATUS_LABEL[row.status]
+    : !person
+      ? "Colaborador não identificado"
+      : needsContact
+        ? channel === "WHATSAPP"
+          ? DOCUMENT_COPY.noWhatsapp
+          : DOCUMENT_COPY.noEmail
+        : "Pronto para enviar";
 
   return (
     <div className="rounded-xl border border-line p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="truncate text-[13px] font-bold text-t0">{folderTitle(row.fileName)}</p>
-        <span className="text-[11px] font-semibold text-t2">{person ? STATUS_LABEL[row.status] : "Escolha o colaborador"}</span>
+        <span className={cn("text-right text-[11px] font-semibold", alreadySent ? "text-t2" : person && !needsContact ? "text-ok" : "text-bad")}>{statusText}</span>
       </div>
       {!person ? (
-        <select className="w-full rounded-lg border border-line bg-bg-inset px-2 py-2 text-sm" defaultValue="" onChange={(event) => event.target.value && void onAssign(row.id, event.target.value)}>
+        <select className={controlClass} defaultValue="" onChange={(event) => event.target.value && void onAssign(row.id, event.target.value)}>
           <option value="">Escolher colaborador</option>
           {people.map((item) => (
             <option key={item.id} value={item.id}>
@@ -642,12 +649,18 @@ function ReviewRow({
         >
           <p className="text-[13px] font-bold text-t0">{person.name}</p>
           <div className="grid gap-2 sm:grid-cols-3">
-            <input className={controlClass} value={cpf} placeholder="CPF" onChange={(event) => setCpf(event.target.value)} />
-            <input className={cn(controlClass, channel === "EMAIL" && !email ? "border-bad" : "border-line")} value={email} placeholder="E-mail" onChange={(event) => setEmail(event.target.value)} />
-            <input className={cn(controlClass, channel === "WHATSAPP" && !whatsapp ? "border-bad" : "border-line")} value={whatsapp} placeholder="WhatsApp" onChange={(event) => setWhatsapp(event.target.value)} />
+            <FormField label="CPF">
+              <input className={controlClass} value={cpf} onChange={(event) => setCpf(event.target.value)} />
+            </FormField>
+            <FormField label="E-mail">
+              <input className={cn(controlClass, channel === "EMAIL" && !email ? "border-bad" : "border-line")} value={email} onChange={(event) => setEmail(event.target.value)} />
+            </FormField>
+            <FormField label="WhatsApp">
+              <input className={cn(controlClass, channel === "WHATSAPP" && !whatsapp ? "border-bad" : "border-line")} value={whatsapp} onChange={(event) => setWhatsapp(event.target.value)} />
+            </FormField>
           </div>
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs text-bad">{localError || (needsContact ? (channel === "WHATSAPP" ? DOCUMENT_COPY.noWhatsapp : DOCUMENT_COPY.noEmail) : row.error ?? "")}</span>
+            <span className="text-xs text-bad">{localError || (needsContact ? "" : row.error ?? "")}</span>
             <Button size="sm" variant="outline" type="submit">
               Salvar
             </Button>
