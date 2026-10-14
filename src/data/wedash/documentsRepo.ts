@@ -137,6 +137,11 @@ function mapPerson(row: Record<string, unknown>): PersonRow {
   };
 }
 
+export type PrepareStatus =
+  | { phase: "upload"; index: number; total: number; name: string }
+  | { phase: "read" }
+  | { phase: "review" };
+
 export async function prepareFiles(input: {
   storeId: string | null;
   month: number;
@@ -145,12 +150,15 @@ export async function prepareFiles(input: {
   title?: string;
   unify: boolean;
   files: File[];
+  onProgress?: (status: PrepareStatus) => void;
 }): Promise<{ batchId: string; refused: { name: string; message: string }[] }> {
   const sb = getSupabase();
   if (!sb) throw new Error("Supabase não configurado.");
   let batchId = "";
   const sources: { path: string; name: string }[] = [];
-  for (const file of input.files) {
+  for (let index = 0; index < input.files.length; index += 1) {
+    const file = input.files[index];
+    input.onProgress?.({ phase: "upload", index: index + 1, total: input.files.length, name: file.name });
     const slot = await call({
       action: "upload",
       batchId,
@@ -166,6 +174,7 @@ export async function prepareFiles(input: {
     if (up.error) throw new Error(up.error.message);
     sources.push({ path: slot.path, name: file.name });
   }
+  input.onProgress?.({ phase: "read" });
   const prepared = await call({ action: "prepare", batchId, sources, title: input.title });
   return { batchId, refused: prepared.refused ?? [] };
 }

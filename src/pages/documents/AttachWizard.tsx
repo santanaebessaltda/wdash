@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { Breadcrumbs, Button, Card, CardHeader, CardTitle, ProgressBar, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
+import { Spinner } from "@/components/ui/Skeleton";
 import { paths } from "@/router/paths";
 import { Icon, icons } from "@/pages/users/Icons";
 import { useDocuments } from "./useDocuments";
@@ -13,6 +14,7 @@ import {
   saveEmployeeContact,
   type DocumentRow,
   type PersonRow,
+  type PrepareStatus,
 } from "@/data/wedash/documentsRepo";
 import { STATUS_LABEL, formatBytes } from "./frame";
 
@@ -49,6 +51,7 @@ export function AttachWizard({
   const [batchId, setBatchId] = useState("");
   const [refused, setRefused] = useState<{ name: string; message: string }[]>([]);
   const [processing, setProcessing] = useState(false);
+  const [progress, setProgress] = useState<PrepareStatus>({ phase: "upload", index: 1, total: 1, name: "PDF" });
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
@@ -71,6 +74,7 @@ export function AttachWizard({
       return;
     }
     setProcessing(true);
+    setProgress({ phase: "upload", index: 1, total: files.length, name: files[0]?.name ?? "PDF" });
     setError(null);
     try {
       const prepared = await prepareFiles({
@@ -81,9 +85,11 @@ export function AttachWizard({
         title: named && named.ok ? named.name : undefined,
         unify: true,
         files,
+        onProgress: setProgress,
       });
       setBatchId(prepared.batchId);
       setRefused(prepared.refused);
+      setProgress({ phase: "review" });
       await onReload();
       setStep(2);
     } catch (reason) {
@@ -135,7 +141,7 @@ export function AttachWizard({
       <WizardSteps steps={STEPS} current={step} />
       <div>
         {processing ? (
-          <Processing />
+          <Processing key={progress.phase} status={progress} />
         ) : step === 1 ? (
           <UploadStep
             month={month}
@@ -230,11 +236,42 @@ function personReady(person: PersonRow | undefined, channel: "WHATSAPP" | "EMAIL
   return channel === "WHATSAPP" ? Boolean(person.whatsapp) : Boolean(person.email);
 }
 
-function Processing() {
+const READ_LINES = ["Lendo o texto de cada página", "Procurando o CPF", "Juntando as páginas do mesmo colaborador"];
+
+function Processing({ status }: { status: PrepareStatus }) {
+  const [dots, setDots] = useState(1);
+  const [readIndex, setReadIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setDots((current) => (current % 3) + 1), 420);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (status.phase !== "read") return;
+    setReadIndex(0);
+    const timer = window.setInterval(() => setReadIndex((current) => Math.min(current + 1, READ_LINES.length - 1)), 2200);
+    return () => window.clearInterval(timer);
+  }, [status.phase]);
+
+  const label =
+    status.phase === "upload"
+      ? `Enviando ${status.name}${status.total > 1 ? ` (${status.index} de ${status.total})` : ""}`
+      : status.phase === "review"
+        ? "Abrindo a revisão"
+        : READ_LINES[readIndex];
+
   return (
-    <div className="py-8 text-center">
-      <h3 className="text-lg font-bold text-t0">Separando os PDFs</h3>
-      <p className="mt-2 text-[13.5px] text-t2">Lendo o texto e o CPF de cada página. Nada é enviado nesta etapa.</p>
+    <div className="flex flex-col items-center py-10 text-center">
+      <Spinner size={28} />
+      <h3 className="mt-4 text-lg font-bold text-t0">Separando os PDFs</h3>
+      <p className="mt-2 min-h-5 text-[13.5px] text-t1" aria-live="polite">
+        <span>{label}</span>
+        <span className="inline-block w-4 text-left" aria-hidden="true">
+          {".".repeat(dots)}
+        </span>
+      </p>
+      <p className="mt-1 text-[12.5px] text-t2">Nada é enviado nesta etapa.</p>
     </div>
   );
 }
