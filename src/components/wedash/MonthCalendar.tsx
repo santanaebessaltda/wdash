@@ -12,8 +12,9 @@ const WEEK = [
   { longo: "Sábado", curto: "S" },
 ];
 
+/* Altura pelo conteúdo. h-full travava a linha já medida e o badge vazava no dia de baixo depois de Fora/Falta. */
 const cell =
-  "relative flex h-full min-h-[84px] w-full min-w-0 flex-col items-stretch justify-start border-b border-r border-line p-1.5 text-left sm:min-h-[110px] sm:p-2";
+  "relative flex min-h-[84px] w-full min-w-0 flex-col items-stretch justify-start border-b border-r border-line p-1.5 text-left sm:min-h-[110px] sm:p-2";
 
 /** Grade do mês usada em Fechamento, Sangrias e Informe de vendas. */
 export function MonthCalendar({ children }: { children: ReactNode }) {
@@ -28,7 +29,7 @@ export function MonthCalendar({ children }: { children: ReactNode }) {
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-7">{children}</div>
+        <div className="grid auto-rows-[minmax(84px,max-content)] grid-cols-7 sm:auto-rows-[minmax(110px,max-content)]">{children}</div>
       </div>
     </div>
   );
@@ -79,7 +80,7 @@ export function DayFace({
       {openable ? (
         <button type="button" className="absolute inset-0 z-0" aria-label={openLabel} onClick={onOpen} />
       ) : null}
-      <div className={cn("relative z-10 flex min-h-0 w-full flex-1 flex-col", openable && "pointer-events-none")}>
+      <div className={cn("relative z-10 flex w-full min-w-0 flex-col", openable && "pointer-events-none")}>
         <span className="flex w-full items-start justify-between gap-1">
           <span
             className={cn(
