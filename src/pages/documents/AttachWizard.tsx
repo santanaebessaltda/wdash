@@ -41,7 +41,6 @@ export function AttachWizard({
   const [month, setMonth] = useState(String(new Date().getMonth() + 1));
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [category, setCategory] = useState<string>(DOCUMENT_CATEGORIES[0]);
-  const [unify, setUnify] = useState(true);
   const [files, setFiles] = useState<File[]>([]);
   const [channel, setChannel] = useState<"WHATSAPP" | "EMAIL">("WHATSAPP");
   const [reminder, setReminder] = useState("EVERY_3_DAYS");
@@ -68,7 +67,7 @@ export function AttachWizard({
     setProcessing(true);
     setError(null);
     try {
-      const prepared = await prepareFiles({ storeId, month: Number(month), year: Number(year), category, unify, files });
+      const prepared = await prepareFiles({ storeId, month: Number(month), year: Number(year), category, unify: true, files });
       setBatchId(prepared.batchId);
       setRefused(prepared.refused);
       await onReload();
@@ -128,13 +127,11 @@ export function AttachWizard({
             month={month}
             year={year}
             category={category}
-            unify={unify}
             files={files}
             error={error}
             onMonth={setMonth}
             onYear={setYear}
             onCategory={setCategory}
-            onUnify={setUnify}
             onFiles={(next) => {
               setFiles(next);
               setBatchId("");
@@ -316,13 +313,11 @@ function UploadStep({
   month,
   year,
   category,
-  unify,
   files,
   error,
   onMonth,
   onYear,
   onCategory,
-  onUnify,
   onFiles,
   onError,
   onCancel,
@@ -331,13 +326,11 @@ function UploadStep({
   month: string;
   year: string;
   category: string;
-  unify: boolean;
   files: File[];
   error: string | null;
   onMonth: (value: string) => void;
   onYear: (value: string) => void;
   onCategory: (value: string) => void;
-  onUnify: (value: boolean) => void;
   onFiles: (files: File[]) => void;
   onError: (message: string | null) => void;
   onCancel: () => void;
@@ -371,7 +364,7 @@ function UploadStep({
 
   return (
     <>
-      <WizardCardHeader title="Anexar documentos" subtitle="Até 5 PDFs. O mesmo CPF vira um documento só quando a unificação está ligada." />
+      <WizardCardHeader title="Anexar documentos" subtitle="Até 5 PDFs. Páginas do mesmo CPF, no mesmo arquivo ou em arquivos diferentes, viram um documento só." />
       <div className="grid gap-3 sm:grid-cols-3">
         <Field label="Mês">
           <select className="mt-1 w-full rounded-lg border border-line bg-bg-inset px-2 py-2 text-sm" value={month} onChange={(event) => onMonth(event.target.value)}>
@@ -393,10 +386,6 @@ function UploadStep({
           </select>
         </Field>
       </div>
-      <label className="mt-4 flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={unify} onChange={(event) => onUnify(event.target.checked)} />
-        Unificar páginas do mesmo CPF
-      </label>
       <div
         onDragOver={(event) => {
           event.preventDefault();

@@ -26,10 +26,11 @@ export function DocumentsPage() {
   const personName = useMemo(() => new Map(people.map((person) => [person.id, person.name])), [people]);
   const batchOf = useMemo(() => new Map(batches.map((batch) => [batch.id, batch])), [batches]);
 
-  const pending = documents.filter((doc) => doc.status === "PENDING" || doc.status === "UNASSIGNED");
-  const signed = documents.filter((doc) => doc.status === "SIGNED");
+  const sentDocuments = documents.filter((doc) => doc.envelopeId);
+  const pending = sentDocuments.filter((doc) => doc.status === "PENDING");
+  const signed = sentDocuments.filter((doc) => doc.status === "SIGNED");
   const now = new Date();
-  const thisMonth = documents.filter((doc) => {
+  const thisMonth = sentDocuments.filter((doc) => {
     const batch = batchOf.get(doc.batchId);
     return batch?.month === now.getMonth() + 1 && batch.year === now.getFullYear();
   });
@@ -41,10 +42,10 @@ export function DocumentsPage() {
       : mode === "month"
         ? thisMonth
         : mode === "home"
-          ? [...documents].filter((doc) => doc.envelopeId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 12)
+          ? [...sentDocuments].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 12)
           : [];
 
-  const folders = mode === "browse" ? folderEntries({ allStores, crumb, documents, batches, people, stores }) : [];
+  const folders = mode === "browse" ? folderEntries({ allStores, crumb, documents: sentDocuments, batches, people, stores }) : [];
   const needle = query.trim().toLowerCase();
   const visibleFiles = listed.filter((doc) => !needle || doc.fileName.toLowerCase().includes(needle) || (personName.get(doc.sellerId ?? "") ?? "").toLowerCase().includes(needle));
   const visibleFolders = folders.filter((entry) => !needle || entry.label.toLowerCase().includes(needle));
