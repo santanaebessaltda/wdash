@@ -105,9 +105,9 @@ T6 → T7
 
 **Done when**:
 
-- [ ] `store_seller.cpf` exists and the seller sync payload does not write it
-- [ ] Authenticated users can select documents of their tenant and cannot write them
-- [ ] Gate check passes: `npm run build`
+- [x] `store_seller.cpf` exists and the seller sync payload does not write it
+- [x] Authenticated users can select documents of their tenant and cannot write them
+- [x] Gate check passes: `npm run build`
 
 **Tests**: none
 **Gate**: build
