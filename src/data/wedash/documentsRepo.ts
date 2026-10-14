@@ -25,7 +25,7 @@ export type BatchRow = {
   createdAt: string;
 };
 
-export type PersonRow = { id: string; storeId: string; name: string; cpf: string | null; email: string | null; whatsapp: string | null };
+export type PersonRow = { id: string; storeId: string; name: string; cpf: string | null; email: string | null; whatsapp: string | null; active: boolean; inErp: boolean };
 
 type Invoke = { message?: string; error?: string; status?: string; batchId?: string; path?: string; token?: string; url?: string; refused?: { name: string; message: string }[]; results?: { id: string; error: string | null }[] };
 
@@ -82,7 +82,7 @@ export async function loadDocuments(tenantId: string, storeId: string | null): P
   const [batches, documents, people, stores] = await Promise.all([
     sb.from("document_batch").select("id, store_id, month, year, category, channel, deadline, created_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }),
     sb.from("employee_document").select("id, batch_id, store_id, seller_id, status, file_name, error, envelope_id, size_bytes, created_at").eq("tenant_id", tenantId),
-    sb.from("store_seller").select("id, store_id, name, cpf, email, whatsapp").eq("tenant_id", tenantId).eq("in_erp", true).order("name").limit(2000),
+    sb.from("store_seller").select("id, store_id, name, cpf, email, whatsapp, active, in_erp").eq("tenant_id", tenantId).order("name").limit(2000),
     sb.from("store").select("id, name").eq("tenant_id", tenantId).order("name"),
   ]);
   const inStore = (id: string | null) => !storeId || id === storeId;
@@ -132,6 +132,8 @@ function mapPerson(row: Record<string, unknown>): PersonRow {
     cpf: (row.cpf as string | null) ?? null,
     email: (row.email as string | null) ?? null,
     whatsapp: (row.whatsapp as string | null) ?? null,
+    active: row.active !== false,
+    inErp: row.in_erp !== false,
   };
 }
 
@@ -140,6 +142,7 @@ export async function prepareFiles(input: {
   month: number;
   year: number;
   category: string;
+  title?: string;
   unify: boolean;
   files: File[];
 }): Promise<{ batchId: string; refused: { name: string; message: string }[] }> {
@@ -163,7 +166,7 @@ export async function prepareFiles(input: {
     if (up.error) throw new Error(up.error.message);
     sources.push({ path: slot.path, name: file.name });
   }
-  const prepared = await call({ action: "prepare", batchId, sources });
+  const prepared = await call({ action: "prepare", batchId, sources, title: input.title });
   return { batchId, refused: prepared.refused ?? [] };
 }
 

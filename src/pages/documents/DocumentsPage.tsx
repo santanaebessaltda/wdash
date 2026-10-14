@@ -1,14 +1,15 @@
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Badge, Button, Card, DataTable, EmptyState, type DataTableColumn } from "@/components/ui";
+import { Badge, Button, Card, DataTable, EmptyState, Segmented, type DataTableColumn } from "@/components/ui";
 import { paths } from "@/router/paths";
-import { monthFolder, resendVisible } from "@/data/wedash/documentSplit";
+import { folderTitle, monthFolder, resendVisible } from "@/data/wedash/documentSplit";
 import type { BatchRow, DocumentRow, PersonRow } from "@/data/wedash/documentsRepo";
 import { openDocument, resendDocument } from "@/data/wedash/documentsRepo";
 import { DocumentsFrame, FileGlyph, FolderGlyph, Glyph, STATUS_LABEL, SearchGlyph, badgeVariant, formatBytes } from "./frame";
 import { useDocuments } from "./useDocuments";
 
 type Mode = "home" | "pending" | "month" | "browse";
+type PeopleFilter = "active" | "all" | "inactive";
 
 type FolderEntry = { key: string; label: string; detail: string; fileId?: string };
 
@@ -19,6 +20,7 @@ export function DocumentsPage() {
   const [mode, setMode] = useState<Mode>("home");
   const [crumb, setCrumb] = useState<string[]>([]);
   const [query, setQuery] = useState("");
+  const [peopleFilter, setPeopleFilter] = useState<PeopleFilter>("active");
   const [notice, setNotice] = useState<string | null>(flash?.documentNotice ?? null);
   const [sent] = useState<string | null>(flash?.documentSent ?? null);
 
@@ -45,7 +47,14 @@ export function DocumentsPage() {
           ? [...sentDocuments].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 12)
           : [];
 
-  const folders = mode === "browse" ? folderEntries({ allStores, crumb, documents: sentDocuments, batches, people, stores }) : [];
+  const listedPeople = people.filter((person) => {
+    const working = person.active && person.inErp;
+    if (peopleFilter === "active") return working;
+    if (peopleFilter === "inactive") return !working;
+    return true;
+  });
+  const atPeople = mode === "browse" && (allStores ? crumb.length === 1 : crumb.length === 0);
+  const folders = mode === "browse" ? folderEntries({ allStores, crumb, documents: sentDocuments, batches, people: listedPeople, stores }) : [];
   const needle = query.trim().toLowerCase();
   const visibleFiles = listed.filter((doc) => !needle || doc.fileName.toLowerCase().includes(needle) || (personName.get(doc.sellerId ?? "") ?? "").toLowerCase().includes(needle));
   const visibleFolders = folders.filter((entry) => !needle || entry.label.toLowerCase().includes(needle));
@@ -89,7 +98,7 @@ export function DocumentsPage() {
             <Shortcut label="Este mês" count={`${thisMonth.length} documentos`} onClick={() => { setMode("month"); setQuery(""); }} />
             <Shortcut
               label={allStores ? "Filiais" : "Colaboradores"}
-              count={allStores ? `${stores.length} filiais` : `${people.length} pessoas`}
+              count={allStores ? `${stores.length} filiais` : `${listedPeople.length} pessoas`}
               onClick={() => { setMode("browse"); setCrumb([]); setQuery(""); }}
             />
           </div>
@@ -115,6 +124,20 @@ export function DocumentsPage() {
           />
         </div>
       </div>
+
+      {atPeople && (
+        <div className="mb-4">
+          <Segmented
+            options={[
+              { value: "active", label: "Ativos" },
+              { value: "all", label: "Todos" },
+              { value: "inactive", label: "Desativados" },
+            ]}
+            value={peopleFilter}
+            onChange={(value) => value && setPeopleFilter(value)}
+          />
+        </div>
+      )}
 
       {mode === "browse" ? (
         visibleFolders.length === 0 ? (
@@ -250,7 +273,7 @@ function folderEntries(input: {
   const month = allStores ? crumb[3] : crumb[2];
   return docs
     .filter((doc) => yearOf(doc) === year && monthOf(doc) === month)
-    .map((doc) => ({ key: doc.id, label: doc.fileName, detail: STATUS_LABEL[doc.status], fileId: doc.id }));
+    .map((doc) => ({ key: doc.id, label: folderTitle(doc.fileName), detail: STATUS_LABEL[doc.status], fileId: doc.id }));
 }
 
 function FolderTable({ rows, onOpenFolder, onOpenFile }: { rows: FolderEntry[]; onOpenFolder: (key: string) => void; onOpenFile: (id: string) => void }) {
@@ -298,7 +321,7 @@ function FileTable({
             <FileGlyph />
           </span>
           <span className="min-w-0">
-            <span className="block truncate text-[13px] font-bold text-t0">{row.fileName}</span>
+            <span className="block truncate text-[13px] font-bold text-t0">{folderTitle(row.fileName)}</span>
             <span className="mt-px block text-[11px] text-t2">{batches.get(row.batchId)?.category ?? "PDF"}</span>
           </span>
         </button>

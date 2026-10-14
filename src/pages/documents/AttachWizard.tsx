@@ -5,7 +5,7 @@ import { paths } from "@/router/paths";
 import { Icon, icons } from "@/pages/users/Icons";
 import { useDocuments } from "./useDocuments";
 import { cn } from "@/lib/cn";
-import { DOCUMENT_CATEGORIES, DOCUMENT_COPY, DOCUMENT_LIMITS, monthFolder } from "@/data/wedash/documentSplit";
+import { DOCUMENT_CATEGORIES, DOCUMENT_COPY, DOCUMENT_LIMITS, customDocumentName, folderTitle, monthFolder } from "@/data/wedash/documentSplit";
 import {
   assignDocument,
   confirmBatch,
@@ -41,6 +41,7 @@ export function AttachWizard({
   const [month, setMonth] = useState(String(new Date().getMonth() + 1));
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [category, setCategory] = useState<string>(DOCUMENT_CATEGORIES[0]);
+  const [customName, setCustomName] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [channel, setChannel] = useState<"WHATSAPP" | "EMAIL">("WHATSAPP");
   const [reminder, setReminder] = useState("EVERY_3_DAYS");
@@ -64,10 +65,23 @@ export function AttachWizard({
       setError("Anexe pelo menos um PDF.");
       return;
     }
+    const named = category === "Outros" ? customDocumentName(customName) : null;
+    if (named && !named.ok) {
+      setError(named.message);
+      return;
+    }
     setProcessing(true);
     setError(null);
     try {
-      const prepared = await prepareFiles({ storeId, month: Number(month), year: Number(year), category, unify: true, files });
+      const prepared = await prepareFiles({
+        storeId,
+        month: Number(month),
+        year: Number(year),
+        category,
+        title: named && named.ok ? named.name : undefined,
+        unify: true,
+        files,
+      });
       setBatchId(prepared.batchId);
       setRefused(prepared.refused);
       await onReload();
@@ -127,11 +141,13 @@ export function AttachWizard({
             month={month}
             year={year}
             category={category}
+            customName={customName}
             files={files}
             error={error}
             onMonth={setMonth}
             onYear={setYear}
             onCategory={setCategory}
+            onCustomName={setCustomName}
             onFiles={(next) => {
               setFiles(next);
               setBatchId("");
@@ -313,11 +329,13 @@ function UploadStep({
   month,
   year,
   category,
+  customName,
   files,
   error,
   onMonth,
   onYear,
   onCategory,
+  onCustomName,
   onFiles,
   onError,
   onCancel,
@@ -326,11 +344,13 @@ function UploadStep({
   month: string;
   year: string;
   category: string;
+  customName: string;
   files: File[];
   error: string | null;
   onMonth: (value: string) => void;
   onYear: (value: string) => void;
   onCategory: (value: string) => void;
+  onCustomName: (value: string) => void;
   onFiles: (files: File[]) => void;
   onError: (message: string | null) => void;
   onCancel: () => void;
@@ -386,6 +406,17 @@ function UploadStep({
           </select>
         </Field>
       </div>
+      {category === "Outros" && (
+        <Field label="Nome do documento">
+          <input
+            className="mt-1 w-full rounded-lg border border-line bg-bg-inset px-2 py-2 text-sm"
+            value={customName}
+            placeholder="Ex.: Termo de férias"
+            onChange={(event) => onCustomName(event.target.value)}
+          />
+          <span className="mt-1 block font-normal text-t2">Na pasta fica este nome. No envio e no download entra também a pessoa, o mês e o ano.</span>
+        </Field>
+      )}
       <div
         onDragOver={(event) => {
           event.preventDefault();
@@ -561,7 +592,7 @@ function ReviewRow({
   return (
     <div className="rounded-xl border border-line p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="truncate text-[13px] font-bold text-t0">{row.fileName}</p>
+        <p className="truncate text-[13px] font-bold text-t0">{folderTitle(row.fileName)}</p>
         <span className="text-[11px] font-semibold text-t2">{person ? STATUS_LABEL[row.status] : "Escolha o colaborador"}</span>
       </div>
       {!person ? (

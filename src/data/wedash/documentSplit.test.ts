@@ -8,9 +8,12 @@ import {
   channelBlock,
   confirmBlock,
   cpfDigits,
+  customDocumentName,
+  deliveryFileName,
   fileName,
   firstCpf,
   folderSegments,
+  folderTitle,
   groupPages,
   resendVisible,
   saveCpf,
@@ -143,6 +146,19 @@ describe("fileName", () => {
     expect(fileName("Holerite", [])).toBe("Holerite.pdf");
     expect(fileName("Holerite", ["Holerite.pdf"])).toBe("Holerite (2).pdf");
     expect(fileName("Holerite", ["Holerite.pdf", "Holerite (2).pdf"])).toBe("Holerite (3).pdf");
+  });
+});
+
+describe("deliveryFileName", () => {
+  it("keeps the short name in the folder and adds the person, month and year for the file that leaves", () => {
+    expect(folderTitle("Holerite.pdf")).toBe("Holerite");
+    expect(deliveryFileName("Holerite.pdf", "Maria Eduarda", 10, 2026)).toBe("Holerite-Maria-Eduarda-Outubro-2026.pdf");
+    expect(deliveryFileName("Termo de férias.pdf", "Maria Eduarda", 10, 2026)).toBe("Termo de férias-Maria-Eduarda-Outubro-2026.pdf");
+  });
+
+  it("accepts a custom name for Outros and rejects an empty one", () => {
+    expect(customDocumentName("  Termo de férias.pdf ")).toEqual({ ok: true, name: "Termo de férias" });
+    expect(customDocumentName("   ").ok).toBe(false);
   });
 });
 

@@ -144,6 +144,30 @@ export function fileName(category: string, taken: string[]): string {
   return `${category} (${n}).pdf`;
 }
 
+/** Nome curto da pasta, sem a extensão. */
+export function folderTitle(fileName: string): string {
+  return fileName.replace(/\.pdf$/i, "");
+}
+
+/** Nome livre de Outros. A pasta mostra este texto; o envio acrescenta a pessoa, o mês e o ano. */
+export function customDocumentName(raw: string): { ok: true; name: string } | { ok: false; message: string } {
+  const name = raw.trim().replace(/\.pdf$/i, "").replace(/\s+/g, " ");
+  if (!name) return { ok: false, message: "Informe o nome do documento." };
+  if (name.length > 80) return { ok: false, message: "O nome do documento aceita até 80 caracteres." };
+  if (/[\\/:*?"<>|]/.test(name)) return { ok: false, message: "O nome do documento não aceita \\ / : * ? \" < > |." };
+  return { ok: true, name };
+}
+
+function personFileToken(name: string): string {
+  const token = name.trim().replace(/\s+/g, "-").replace(/[\\/:*?"<>|]/g, "");
+  return token || "Colaborador";
+}
+
+/** Nome que sai no envio e no download: Holerite-Maria-Eduarda-Outubro-2026.pdf */
+export function deliveryFileName(storedName: string, personName: string, month: number, year: number): string {
+  return `${folderTitle(storedName)}-${personFileToken(personName)}-${monthFolder(month)}-${year}.pdf`;
+}
+
 export function monthFolder(month: number): string {
   return MONTHS[month] ?? "";
 }

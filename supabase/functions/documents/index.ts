@@ -13,6 +13,8 @@ import {
   assignSeller,
   channelBlock,
   confirmBlock,
+  customDocumentName,
+  deliveryFileName,
   fileName,
   groupPages,
   resendVisible,
@@ -174,6 +176,8 @@ async function prepare(admin: SupabaseClient, tenantId: string, body: Body) {
   const pages = held.flatMap((file, sourceIndex) => file.texts.map((text, index) => ({ sourceIndex, pageNumber: index + 1, text })));
   const groups = groupPages(pages, batch.unify !== false);
   const sourceBytes = held.map((file) => file.bytes);
+  const label = batch.category === "Outros" ? customDocumentName(String(body.title ?? "")) : { ok: true as const, name: String(batch.category) };
+  if (!label.ok) return json({ message: label.message }, 422);
   const takenInLoop = new Map<string, string[]>();
   for (const group of groups) {
       const matches = group.cpf ? (byCpf.get(group.cpf) ?? []) : [];
@@ -181,7 +185,7 @@ async function prepare(admin: SupabaseClient, tenantId: string, body: Body) {
       const storeId = matches.length === 1 ? matches[0].storeId : (batch.store_id as string | null);
       const key = sellerId ?? "none";
       const taken = [...(await takenNames(admin, sellerId, batch)), ...(takenInLoop.get(key) ?? [])];
-      const docName = fileName(batch.category as string, taken);
+      const docName = fileName(label.name, taken);
       takenInLoop.set(key, [...(takenInLoop.get(key) ?? []), docName]);
       const pdf = await buildPdf(sourceBytes, group.pages);
       const docId = crypto.randomUUID();
@@ -289,7 +293,8 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
       continue;
     }
     const bytes = new Uint8Array(await file.data.arrayBuffer());
-    const created = await assinaCreateEnvelope(token, bytes, doc.file_name as string, {
+    const sentName = deliveryFileName(doc.file_name as string, seller.name, Number(batch.month), Number(batch.year));
+    const created = await assinaCreateEnvelope(token, bytes, sentName, {
       signatures: [
         {
           recipient: {
@@ -306,7 +311,7 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
         },
       ],
       documentSendConfig: {
-        documentName: doc.file_name,
+        documentName: sentName,
         customEmailMessage: "",
         signatureDeadline: `${deadline}T23:59:59.000Z`,
         sendReminders: reminder,
@@ -380,7 +385,14 @@ async function openFile(admin: SupabaseClient, tenantId: string, secret: string,
     }
   }
   if (!path) return json({ error: "missing_file" }, 404);
-  const signed = await admin.storage.from(BUCKET).createSignedUrl(path, 60 * 10);
+  const batch = await ownedBatch(admin, tenantId, doc.batch_id as string);
+  const { data: seller } = doc.seller_id
+    ? await admin.from("store_seller").select("name").eq("id", doc.seller_id).maybeSingle()
+    : { data: null };
+  const download = seller?.name && batch
+    ? deliveryFileName(doc.file_name as string, seller.name as string, Number(batch.month), Number(batch.year))
+    : (doc.file_name as string);
+  const signed = await admin.storage.from(BUCKET).createSignedUrl(path, 60 * 10, { download });
   if (signed.error || !signed.data) return json({ error: "missing_file" }, 404);
   return json({ url: signed.data.signedUrl });
 }
