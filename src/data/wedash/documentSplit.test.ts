@@ -203,9 +203,9 @@ describe("sourceRefusal", () => {
 });
 
 describe("confirm and resend", () => {
-  it("blocks confirm without a token, a deadline, a contact, or a PDF over 5 MB", () => {
+  it("blocks confirm without a token, a contact, or a PDF over 5 MB", () => {
     expect(confirmBlock({ deadline: "2026-11-13", hasToken: false, sizeBytes: 10 })).toBe(DOCUMENT_COPY.noToken);
-    expect(confirmBlock({ deadline: null, hasToken: true, sizeBytes: 10 })).toBe("Informe a data limite.");
+    expect(confirmBlock({ deadline: null, hasToken: true, sizeBytes: 10 })).toBeNull();
     expect(confirmBlock({ deadline: "2026-11-13", hasToken: true, sizeBytes: 5 * 1024 * 1024 + 1 })).toBe(DOCUMENT_COPY.overEnvelope);
     expect(channelBlock("WHATSAPP", { email: "a@b.com", whatsapp: null })).toBe("Sem WhatsApp neste cadastro.");
     expect(channelBlock("EMAIL", { email: null, whatsapp: "11987654321" })).toBe("Sem e-mail neste cadastro.");

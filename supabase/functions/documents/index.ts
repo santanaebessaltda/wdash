@@ -313,7 +313,7 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
       documentSendConfig: {
         documentName: sentName,
         customEmailMessage: "",
-        signatureDeadline: `${deadline}T23:59:59.000Z`,
+        ...(deadline ? { signatureDeadline: `${deadline}T23:59:59.000Z` } : {}),
         sendReminders: reminder,
         observers: [],
       },

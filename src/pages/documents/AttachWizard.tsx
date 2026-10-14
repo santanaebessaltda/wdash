@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Breadcrumbs, Button, Card, CardHeader, CardTitle, ProgressBar, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
+import { Breadcrumbs, Button, Card, CardHeader, CardTitle, FormField, ProgressBar, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
 import { Spinner } from "@/components/ui/Skeleton";
 import { paths } from "@/router/paths";
 import { Icon, icons } from "@/pages/users/Icons";
@@ -17,6 +17,9 @@ import {
   type PrepareStatus,
 } from "@/data/wedash/documentsRepo";
 import { STATUS_LABEL, formatBytes } from "./frame";
+
+const controlClass =
+  "h-[42px] w-full rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3.5 text-[13px] text-t0 outline-none transition-colors focus:border-acc";
 
 const STEPS = [
   { num: 1, label: "Upload" },
@@ -100,11 +103,6 @@ export function AttachWizard({
   }
 
   async function send() {
-    if (!deadline) {
-      setError(DOCUMENT_COPY.deadline);
-      setStep(2);
-      return;
-    }
     setSending(true);
     setError(null);
     try {
@@ -173,10 +171,6 @@ export function AttachWizard({
             onDeadline={setDeadline}
             onBack={() => setStep(1)}
             onNext={() => {
-              if (!deadline) {
-                setError(DOCUMENT_COPY.deadline);
-                return;
-              }
               setError(null);
               setStep(3);
             }}
@@ -423,36 +417,32 @@ function UploadStep({
     <>
       <WizardCardHeader title="Anexar documentos" subtitle="Até 5 PDFs. Páginas do mesmo CPF, no mesmo arquivo ou em arquivos diferentes, viram um documento só." />
       <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Mês">
-          <select className="mt-1 w-full rounded-lg border border-line bg-bg-inset px-2 py-2 text-sm" value={month} onChange={(event) => onMonth(event.target.value)}>
+        <FormField label="Mês">
+          <select className={controlClass} value={month} onChange={(event) => onMonth(event.target.value)}>
             {Array.from({ length: 12 }, (_, index) => (
               <option key={index + 1} value={index + 1}>
                 {monthFolder(index + 1)}
               </option>
             ))}
           </select>
-        </Field>
-        <Field label="Ano">
-          <input className="mt-1 w-full rounded-lg border border-line bg-bg-inset px-2 py-2 text-sm" value={year} onChange={(event) => onYear(event.target.value)} />
-        </Field>
-        <Field label="Tipo do documento">
-          <select className="mt-1 w-full rounded-lg border border-line bg-bg-inset px-2 py-2 text-sm" value={category} onChange={(event) => onCategory(event.target.value)}>
+        </FormField>
+        <FormField label="Ano">
+          <input className={controlClass} value={year} onChange={(event) => onYear(event.target.value)} />
+        </FormField>
+        <FormField label="Tipo do documento">
+          <select className={controlClass} value={category} onChange={(event) => onCategory(event.target.value)}>
             {DOCUMENT_CATEGORIES.map((item) => (
               <option key={item}>{item}</option>
             ))}
           </select>
-        </Field>
+        </FormField>
       </div>
       {category === "Outros" && (
-        <Field label="Nome do documento">
-          <input
-            className="mt-1 w-full rounded-lg border border-line bg-bg-inset px-2 py-2 text-sm"
-            value={customName}
-            placeholder="Ex.: Termo de férias"
-            onChange={(event) => onCustomName(event.target.value)}
-          />
-          <span className="mt-1 block font-normal text-t2">Na pasta fica este nome. No envio e no download entra também a pessoa, o mês e o ano.</span>
-        </Field>
+        <div className="mt-3">
+          <FormField label="Nome do documento" hint="Na pasta fica este nome. No envio e no download entra também a pessoa, o mês e o ano.">
+            <input className={controlClass} value={customName} placeholder="Ex.: Termo de férias" onChange={(event) => onCustomName(event.target.value)} />
+          </FormField>
+        </div>
       )}
       <div
         onDragOver={(event) => {
@@ -522,23 +512,23 @@ function SettingsStep({
     <>
       <WizardCardHeader title="Configurações de envio" subtitle="O link sai por WhatsApp ou e-mail. A assinatura fica no centro de cada página." />
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Canal">
-          <select className="mt-1 w-full rounded-lg border border-line bg-bg-inset px-2 py-2 text-sm" value={channel} onChange={(event) => onChannel(event.target.value as "WHATSAPP" | "EMAIL")}>
+        <FormField label="Canal">
+          <select className={controlClass} value={channel} onChange={(event) => onChannel(event.target.value as "WHATSAPP" | "EMAIL")}>
             <option value="WHATSAPP">WhatsApp</option>
             <option value="EMAIL">E-mail</option>
           </select>
-        </Field>
-        <Field label="Lembrete">
-          <select className="mt-1 w-full rounded-lg border border-line bg-bg-inset px-2 py-2 text-sm" value={reminder} onChange={(event) => onReminder(event.target.value)}>
+        </FormField>
+        <FormField label="Lembrete">
+          <select className={controlClass} value={reminder} onChange={(event) => onReminder(event.target.value)}>
             <option value="EVERY_DAY">Todo dia</option>
             <option value="EVERY_3_DAYS">A cada 3 dias</option>
             <option value="EVERY_WEEK">Toda semana</option>
             <option value="NEVER">Nunca</option>
           </select>
-        </Field>
-        <Field label="Data limite">
-          <input type="date" className="mt-1 w-full rounded-lg border border-line bg-bg-inset px-2 py-2 text-sm" value={deadline} onChange={(event) => onDeadline(event.target.value)} />
-        </Field>
+        </FormField>
+        <FormField label="Data limite" optional>
+          <input type="date" className={controlClass} value={deadline} onChange={(event) => onDeadline(event.target.value)} />
+        </FormField>
       </div>
       {error && <p className="mt-3 text-sm text-bad">{error}</p>}
       <div className="mt-4">
@@ -650,11 +640,11 @@ function ReviewRow({
             void onSave({ sellerId: person.id, cpf, email, whatsapp }).catch((reason) => setLocalError(reason instanceof Error ? reason.message : DOCUMENT_COPY.badCpf));
           }}
         >
-          <p className="text-[13px] font-semibold text-t1">{person.name}</p>
+          <p className="text-[13px] font-bold text-t0">{person.name}</p>
           <div className="grid gap-2 sm:grid-cols-3">
-            <input className="rounded-lg border border-line bg-bg-inset px-2 py-2 text-sm" value={cpf} placeholder="CPF" onChange={(event) => setCpf(event.target.value)} />
-            <input className={cn("rounded-lg border bg-bg-inset px-2 py-2 text-sm", channel === "EMAIL" && !email ? "border-bad" : "border-line")} value={email} placeholder="E-mail" onChange={(event) => setEmail(event.target.value)} />
-            <input className={cn("rounded-lg border bg-bg-inset px-2 py-2 text-sm", channel === "WHATSAPP" && !whatsapp ? "border-bad" : "border-line")} value={whatsapp} placeholder="WhatsApp" onChange={(event) => setWhatsapp(event.target.value)} />
+            <input className={controlClass} value={cpf} placeholder="CPF" onChange={(event) => setCpf(event.target.value)} />
+            <input className={cn(controlClass, channel === "EMAIL" && !email ? "border-bad" : "border-line")} value={email} placeholder="E-mail" onChange={(event) => setEmail(event.target.value)} />
+            <input className={cn(controlClass, channel === "WHATSAPP" && !whatsapp ? "border-bad" : "border-line")} value={whatsapp} placeholder="WhatsApp" onChange={(event) => setWhatsapp(event.target.value)} />
           </div>
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs text-bad">{localError || (needsContact ? (channel === "WHATSAPP" ? DOCUMENT_COPY.noWhatsapp : DOCUMENT_COPY.noEmail) : row.error ?? "")}</span>
@@ -677,11 +667,3 @@ function Summary({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <label className="text-xs font-semibold text-t1">
-      {label}
-      {children}
-    </label>
-  );
-}

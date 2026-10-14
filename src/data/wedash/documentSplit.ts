@@ -20,8 +20,7 @@ export const DOCUMENT_COPY = {
   notPdf: "Envie apenas PDF.",
   noWhatsapp: "Sem WhatsApp neste cadastro.",
   noEmail: "Sem e-mail neste cadastro.",
-  deadline: "Informe a data limite.",
-  overEnvelope: "O PDF passa de 5 MB. Desligue a unificação ou separe o arquivo.",
+  overEnvelope: "O PDF passa de 5 MB. Separe o arquivo.",
   noToken: "A conexão com o Assina AI ainda não foi configurada. Acesse Conta › Integrações para conectar.",
   badToken: "Token inválido.",
   badCpf: "CPF inválido.",
@@ -216,7 +215,6 @@ export function channelBlock(
 
 export function confirmBlock(input: { deadline: string | null; hasToken: boolean; sizeBytes: number }): string | null {
   if (!input.hasToken) return DOCUMENT_COPY.noToken;
-  if (!input.deadline) return DOCUMENT_COPY.deadline;
   if (input.sizeBytes > DOCUMENT_LIMITS.maxEnvelopeBytes) return DOCUMENT_COPY.overEnvelope;
   return null;
 }
