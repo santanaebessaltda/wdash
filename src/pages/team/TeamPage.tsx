@@ -21,7 +21,7 @@ import { GoalLevelSummary } from "@/components/wedash/GoalLevelsBar";
 import { AvatarIniciais } from "@/components/wedash/InitialsAvatar";
 import type { SalesDayAgg, SalesSellerDayAgg } from "@/data/wedash/salesTypes";
 import { storesForSession } from "@/data/wedash/stores";
-import { teamGoalsReturn } from "@/pages/goals/backPath";
+import { teamChallengesReturn, teamGoalsReturn } from "@/pages/goals/backPath";
 import { GoalCard } from "./blocks";
 import {
   emptyChallengeAggInput,
@@ -628,7 +628,11 @@ export function TeamPage() {
                             challenge={challenge}
                             view={challengeView}
                             storeNameValue={showChallengeStore ? storeNameValue : undefined}
-                            onOpen={() => navigate(paths.management.challengeDetail(challenge.id), { state: { from: "team" } })}
+                            onOpen={() =>
+                              navigate(paths.management.challengeDetail(challenge.id), {
+                                state: { from: teamChallengesReturn(location.search) },
+                              })
+                            }
                           />
                         ))}
                       </div>

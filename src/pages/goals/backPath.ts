@@ -7,9 +7,18 @@ export function goalBackPath(state: unknown): string {
   return paths.goals;
 }
 
+function teamTabReturn(search: string, tab: "goals" | "challenges"): string {
+  const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+  params.set("tab", tab);
+  return `${paths.team}?${params.toString()}`;
+}
+
 /** Equipe, aba Metas, com a query da tela de onde saiu (filial e período). */
 export function teamGoalsReturn(search: string): string {
-  const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
-  params.set("tab", "goals");
-  return `${paths.team}?${params.toString()}`;
+  return teamTabReturn(search, "goals");
+}
+
+/** Equipe, aba Desafios, com a query da tela de onde saiu (filial e período). */
+export function teamChallengesReturn(search: string): string {
+  return teamTabReturn(search, "challenges");
 }

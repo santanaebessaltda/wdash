@@ -90,7 +90,8 @@ function periodFromUrl(params: URLSearchParams): SavedPeriod | null {
  */
 export function useScope() {
   const session = useActiveSession();
-  const { pathname } = useLocation();
+  const location = useLocation();
+  const { pathname } = location;
   const showsPeriod = routeShowsPeriod(pathname);
   const [params, setParams] = useSearchParams();
   const [catalogTick, setCatalogTick] = useState(0);
@@ -197,8 +198,9 @@ export function useScope() {
     }
 
     if (!dirty) return;
-    setParams(p, { replace: true });
-  }, [showsPeriod, params, scope.storeIds, showBrandPicker, setParams]);
+    // Sem o state, o replace apaga a origem e o Voltar do detalhe cai na lista.
+    setParams(p, { replace: true, state: location.state });
+  }, [showsPeriod, params, scope.storeIds, showBrandPicker, setParams, location.state]);
 
   function setScope(e: Scope) {
     const p = new URLSearchParams();
@@ -221,7 +223,7 @@ export function useScope() {
     savePeriod({ kind: e.period.kind, from: e.period.start, to: e.period.end });
     const keepBrand = scopeShowsBrandPicker(e.storeIds, session.stores);
     if (keepBrand && e.division) p.set("brand", e.division);
-    setParams(p, { replace: true });
+    setParams(p, { replace: true, state: location.state });
   }
 
   return { scope, setScope, showBrandPicker };

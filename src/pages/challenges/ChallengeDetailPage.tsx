@@ -83,8 +83,8 @@ export default function ChallengeDetailPage() {
   const [reload, setReload] = useState(0);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
   const hasOtherStores = storesForSession(session.stores).length > 1;
-  const fromTeam = (location.state as { from?: string } | null)?.from === "team";
   const backTo = challengeBackPath(location.state);
+  const fromTeam = backTo.startsWith(paths.team);
   useReturnWhenStoreChanges(data?.challenge?.storeId, backTo);
 
   useEffect(() => {
