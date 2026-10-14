@@ -212,10 +212,10 @@ T6 → T7
 
 **Done when**:
 
-- [ ] One store opens at the employee. All stores open at the store.
-- [ ] The batch bar is signed count over document count
-- [ ] Resend is hidden unless the row is Pendente
-- [ ] Gate check passes: `npm run build`
+- [x] One store opens at the employee. All stores open at the store.
+- [x] The batch bar is signed count over document count
+- [x] Resend is hidden unless the row is Pendente
+- [x] Gate check passes: `npm run build`
 
 **Tests**: none
 **Gate**: build
