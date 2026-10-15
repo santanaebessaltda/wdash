@@ -110,9 +110,9 @@ T6 -> T7
 
 **Done when**:
 
-- [ ] The migration adds the three columns without rewriting existing rows
-- [ ] `document_batch.channel` stays in place and is no longer required for send
-- [ ] Gate check passes: `npm run lint` and `npm run build`
+- [x] The migration adds the three columns without rewriting existing rows
+- [x] `document_batch.channel` stays in place and is no longer required for send
+- [x] Gate check passes: `npm run lint` and `npm run build`
 
 **Tests**: none
 **Gate**: build
