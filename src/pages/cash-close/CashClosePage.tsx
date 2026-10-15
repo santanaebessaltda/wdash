@@ -12,6 +12,7 @@ import {
   dayWithoutReal,
   monthCloseSummary,
   realCentsOf,
+  withCashWithdrawal,
   withOnlinePix,
   type CashCloseBucket,
   type CashCloseLine,
@@ -34,7 +35,6 @@ import { calendarTodayIso } from "@/data/wedash/clock";
 import { periodLabels } from "@/data/wedash/dashboard";
 import {
   dayShortageCents,
-  netCloseDiff,
   withdrawalDraftFrom,
   withdrawalPeople,
   withdrawalSave,
@@ -205,6 +205,11 @@ function CloseTable({
                         {online > 0 && (
                           <span className="mt-0.5 max-w-[220px] text-right text-[11px] leading-tight text-t2">
                             Adquirente {money(row.stoneCents)} · PIX online {money(online)}
+                          </span>
+                        )}
+                        {row.key === "cash" && (row.withdrawalCents ?? 0) > 0 && (
+                          <span className="mt-0.5 max-w-[220px] text-right text-[11px] leading-tight text-t2">
+                            Digitado {money(row.typedCents)} · Retirada {money(row.withdrawalCents ?? 0)}
                           </span>
                         )}
                       </div>
@@ -692,7 +697,7 @@ export function CashClosePage() {
       const gap = closeDayGap(lines);
       const withoutReal = dayWithoutReal(lines);
       const retirada = (review?.withdrawals ?? []).reduce((sum, row) => sum + row.cents, 0);
-      const diffCents = netCloseDiff(gap.diffCents, retirada);
+      const diffCents = gap.diffCents;
       if (day < today) {
         rows.push({
           day,
@@ -1176,7 +1181,11 @@ function DayModal({
             const view = buildCashCloseView(snap);
             const cash = view.lines.find((l) => l.key === "cash");
             const draft = drafts[store.id];
-            const lines = linesWithDraft(view.lines, draft);
+            const retirada = (withdrawalDrafts[store.id]?.enabled ? withdrawalDrafts[store.id]?.rows ?? [] : []).reduce((sum, row) => {
+              const cents = fieldToCents(row.amount);
+              return cents != null && cents > 0 ? sum + cents : sum;
+            }, 0);
+            const lines = withCashWithdrawal(linesWithDraft(view.lines, draft), retirada);
             const conta = closeDayGap(lines);
             const people = withdrawalPeople(
               (sellersByStore.get(store.id) ?? []).map((seller) => ({ id: seller.id, name: seller.name, active: seller.active })),
@@ -1237,7 +1246,7 @@ function DayModal({
                 )}
                 <EmployeeWithdrawal
                   owner={owner}
-                  shortageCents={dayShortageCents(conta.diffCents)}
+                  typedCents={lines.find((line) => line.key === "cash")?.typedCents ?? 0}
                   people={people}
                   draft={withdrawalDrafts[store.id] ?? { enabled: false, rows: [] }}
                   onChange={(next) => setWithdrawalDrafts((current) => ({ ...current, [store.id]: next }))}

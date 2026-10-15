@@ -348,4 +348,24 @@ describe("resumo do fechamento", () => {
     expect(realCentsOf(pix!)).toBe(5000);
     expect(closeDayGap(lines).diffCents).toBe(5000);
   });
+
+  it("soma a retirada de funcionário no total real do dinheiro", () => {
+    const lines = applyCloseReview(
+      buildCashCloseView({
+        millennium: [{ paymentMethod: "DINHEIRO", openingCents: 0, cashDropCents: null, closingCents: 100000, typedCents: 80000 }],
+        card: null,
+        pixCents: null,
+        pixRequested: false,
+      }).lines,
+      {
+        cashTypedCents: null,
+        waive: false,
+        withdrawals: [{ sellerId: "ana", cents: 20000 }],
+      },
+    );
+    const cash = lines.find((line) => line.key === "cash");
+    expect(cash).toMatchObject({ typedCents: 80000, withdrawalCents: 20000 });
+    expect(realCentsOf(cash!)).toBe(100000);
+    expect(closeDayGap(lines).diffCents).toBe(0);
+  });
 });

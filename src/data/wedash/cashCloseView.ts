@@ -1,3 +1,4 @@
+import type { WithdrawalLine } from "./employeeWithdrawal";
 import { onlinePixTotal, type OnlinePixLine } from "./onlinePix";
 
 export type CashCloseBucket = "cash" | "credit" | "debit" | "pix" | "other";
@@ -19,6 +20,8 @@ export type CashCloseLine = {
   stoneCents: number | null;
   /** PIX online do extrato, somado à adquirente. */
   manualPixCents?: number;
+  /** Retirada de funcionário lançada em dinheiro, somada ao valor digitado. */
+  withdrawalCents?: number;
   openingCents: number | null;
   cashDropCents: number | null;
 };
@@ -79,6 +82,7 @@ export type CashReview = {
   typedCents?: CloseAmountMap;
   acquirerCents?: CloseAmountMap;
   onlinePix?: OnlinePixLine[];
+  withdrawals?: WithdrawalLine[];
 };
 
 /** Troca o dinheiro digitado pelo valor que o gestor gravou. */
@@ -121,7 +125,29 @@ export function withOnlinePix(lines: CashCloseLine[], cents: number, stoneCentsW
   return lines.map((line) => (line.key === "pix" ? { ...line, manualPixCents: cents } : line));
 }
 
-/** Aplica o ajuste na linha já somada. O total real gravado pelo gestor substitui o arquivo. O PIX online soma com ele. */
+/** Coloca a retirada de funcionário na linha do dinheiro. Sem linha, cria uma. */
+export function withCashWithdrawal(lines: CashCloseLine[], cents: number): CashCloseLine[] {
+  const cash = lines.find((line) => line.key === "cash");
+  if (!cash) {
+    if (cents <= 0) return lines;
+    const created: CashCloseLine = {
+      key: "cash",
+      label: LABEL.cash,
+      systemCents: 0,
+      typedCents: 0,
+      stoneCents: null,
+      withdrawalCents: cents,
+      openingCents: null,
+      cashDropCents: null,
+    };
+    const all = [...lines, created];
+    return ORDER.filter((key) => all.some((line) => line.key === key)).map((key) => all.find((line) => line.key === key)!);
+  }
+  if ((cash.withdrawalCents ?? 0) === cents) return lines;
+  return lines.map((line) => (line.key === "cash" ? { ...line, withdrawalCents: cents } : line));
+}
+
+/** Aplica o ajuste na linha já somada. O total real gravado pelo gestor substitui o arquivo. O PIX online soma com ele. A retirada soma no dinheiro. */
 export function applyCloseReview(
   lines: CashCloseLine[],
   review: CashReview | null,
@@ -138,7 +164,9 @@ export function applyCloseReview(
   });
   const online = onlinePixTotal(review.onlinePix ?? []);
   const pix = mapped.find((line) => line.key === "pix");
-  return withOnlinePix(mapped, online, pix ? null : (review.acquirerCents?.pix ?? null));
+  const withPix = withOnlinePix(mapped, online, pix ? null : (review.acquirerCents?.pix ?? null));
+  const withdrawn = (review.withdrawals ?? []).reduce((sum, row) => sum + row.cents, 0);
+  return withCashWithdrawal(withPix, withdrawn);
 }
 
 /** Barras do calendário: falta, sobra, arquivo a caminho, ou o dia fechado sem diferença. */
@@ -158,7 +186,7 @@ export function cashCloseChips(input: {
   if (lines.length === 0 && !view.pixPending && !input.cardPending) return [];
   const chips: CloseChip[] = [];
   for (const line of lines) {
-    const cashBox = line.typedCents - line.systemCents;
+    const cashBox = (line.key === "cash" ? (realCentsOf(line) ?? line.typedCents) : line.typedCents) - line.systemCents;
     if (cashBox !== 0) {
       chips.push({
         key: `${line.key}-caixa`,
@@ -215,9 +243,9 @@ export function paidPixCents(rows: Array<{ status: string; paidCents: number }>)
   return total;
 }
 
-/** Total real da forma. No dinheiro, é o valor digitado. No Pix, a adquirente mais o PIX online. Sem adquirente, não há total real. */
+/** Total real da forma. No dinheiro, o valor digitado mais a retirada de funcionário. No Pix, a adquirente mais o PIX online. Sem adquirente, não há total real. */
 export function realCentsOf(line: CashCloseLine): number | null {
-  if (line.key === "cash") return line.typedCents;
+  if (line.key === "cash") return line.typedCents + (line.withdrawalCents ?? 0);
   if (line.stoneCents == null) return null;
   if (line.key !== "pix") return line.stoneCents;
   return line.stoneCents + (line.manualPixCents ?? 0);
