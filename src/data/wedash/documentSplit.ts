@@ -527,6 +527,33 @@ export function documentIssue(
   return null;
 }
 
+/** Rótulo curto da preparação. O status de assinatura só existe depois do envio. */
+export function preparationSituation(
+  person: { cpf: string | null; email: string | null; whatsapp: string | null } | null,
+  draft: DocumentDraft,
+  pageCount: number,
+  signers: { id: string; name: string; email: string | null }[] = [],
+  people: { id: string; name: string; email: string | null; whatsapp: string | null; cpf?: string | null }[] = [],
+  envelopeId: string | null = null,
+): "Pronto" | "Sem colaborador" | "Contato incompleto" | "Sem marcação" | "Já enviado" | "Precisa de correção" {
+  if (envelopeId) return "Já enviado";
+  const issue = documentIssue(person, draft, pageCount, signers, people);
+  if (!issue) return "Pronto";
+  if (issue === "Escolha o colaborador.") return "Sem colaborador";
+  if (issue === DOCUMENT_COPY.missingPage) return "Sem marcação";
+  if (
+    issue === "Falta contato no cadastro." ||
+    issue.startsWith("Informe ") ||
+    issue === "O signatário adicional precisa ser um usuário com e-mail." ||
+    issue === DOCUMENT_COPY.badCpf ||
+    issue === DOCUMENT_COPY.badEmail ||
+    issue === DOCUMENT_COPY.badWhatsapp
+  ) {
+    return "Contato incompleto";
+  }
+  return "Precisa de correção";
+}
+
 export function applicableMarks(marks: SignatureMark[], pageCount: number): SignatureMark[] {
   return marks.filter(
     (mark) => (mark.element === "SIGNATURE" || mark.element === "RUBRIC") && mark.pageNumber >= 1 && mark.pageNumber <= pageCount,

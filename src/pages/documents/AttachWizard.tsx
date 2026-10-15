@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Breadcrumbs, Button, Card, CardHeader, CardTitle, FormField, ProgressBar, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
+import { Breadcrumbs, Button, Card, CardHeader, CardTitle, FormField, Modal, ProgressBar, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
 import { Spinner } from "@/components/ui/Skeleton";
 import { paths } from "@/router/paths";
 import { Icon, icons } from "@/pages/users/Icons";
@@ -13,7 +13,9 @@ import {
   customDocumentName,
   extraSignersFrom,
   fieldAfterDrop,
+  folderTitle,
   monthFolder,
+  preparationSituation,
   remainingPages,
   resolveDrafts,
   sellerMarks,
@@ -38,7 +40,8 @@ const controlClass =
 
 const STEPS = [
   { num: 1, label: "Anexar" },
-  { num: 2, label: "Destinatários" },
+  { num: 2, label: "Preparar" },
+  { num: 3, label: "Revisar" },
 ];
 
 export function AttachWizard({
@@ -54,7 +57,7 @@ export function AttachWizard({
   documents: DocumentRow[];
   onReload: () => Promise<void>;
   onClose: () => void;
-  onDone: (message: string | null) => void;
+  onDone: (notice: string | null, sent?: string | null) => void;
 }) {
   const [step, setStep] = useState(1);
   const [month, setMonth] = useState(String(new Date().getMonth() + 1));
@@ -70,7 +73,9 @@ export function AttachWizard({
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState<PrepareStatus>({ phase: "upload", index: 1, total: 1, name: "PDF" });
   const [error, setError] = useState<string | null>(null);
+  const [sentNote, setSentNote] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [confirmSend, setConfirmSend] = useState(false);
   const [signers, setSigners] = useState<{ id: string; name: string; email: string }[]>([]);
 
   useEffect(() => {
@@ -94,11 +99,11 @@ export function AttachWizard({
   const rowKey = rows.map((row) => `${row.id}:${row.pageCount}`).join("|");
 
   useEffect(() => {
-    if (step !== 2) {
-      openAtStart.current = true;
-      return;
-    }
-    if (!openAtStart.current || rows.length === 0) return;
+    if (step === 1) openAtStart.current = true;
+  }, [step]);
+
+  useEffect(() => {
+    if (step !== 2 || !openAtStart.current || rows.length === 0) return;
     openAtStart.current = false;
     setActiveId(rows[0].id);
   }, [step, rows]);
@@ -161,6 +166,7 @@ export function AttachWizard({
   async function send() {
     setSending(true);
     setError(null);
+    setSentNote(null);
     try {
       const resolved = resolveDrafts(
         rows.map((row) => ({ id: row.id, pageCount: row.pageCount })),
@@ -187,7 +193,18 @@ export function AttachWizard({
       await onReload();
       const failed = (sent.results ?? []).filter((item) => item.error);
       if (failed.length > 0) {
-        setError("Alguns documentos não foram enviados. Corrija os documentos com erro ou sem contato e envie novamente. Os documentos já enviados não serão duplicados.");
+        setError("Alguns documentos não foram enviados. Corrija os documentos com erro e envie novamente. Os documentos já enviados não serão duplicados.");
+        setSending(false);
+        setConfirmSend(false);
+        return;
+      }
+      const heldBack = situations(rows, drafts, people, signers).filter((item) => item.situation !== "Pronto" && item.situation !== "Já enviado").length;
+      const sentCount = situations(rows, drafts, people, signers).filter((item) => item.situation === "Pronto").length;
+      setConfirmSend(false);
+      if (heldBack > 0) {
+        setSentNote(
+          `${sentCount} ${sentCount === 1 ? "documento enviado" : "documentos enviados"}. ${heldBack} ${heldBack === 1 ? "ficou de fora porque precisa" : "ficaram de fora porque precisam"} de correção.`,
+        );
         setSending(false);
         return;
       }
@@ -212,7 +229,7 @@ export function AttachWizard({
         </Button>
         <Breadcrumbs items={[{ label: "Documentos", to: paths.documents }, { label: "Anexar documento" }]} />
       </div>
-      <div className={cn("mx-auto", step === 2 ? "max-w-6xl" : "max-w-3xl")}>
+      <div className={cn("mx-auto", step === 2 ? "max-w-6xl" : step === 3 ? "max-w-4xl" : "max-w-3xl")}>
       <WizardSteps steps={STEPS} current={step} />
       <div>
         {processing ? (
@@ -237,7 +254,7 @@ export function AttachWizard({
             onCancel={leave}
             onNext={() => void split()}
           />
-        ) : (
+        ) : step === 2 ? (
           <DocumentReview
             rows={rows}
             people={people}
@@ -298,11 +315,51 @@ export function AttachWizard({
               await onReload();
             }}
             onBack={() => setStep(1)}
-            onSend={() => void send()}
+            onReview={() => setStep(3)}
+          />
+        ) : (
+          <SendReview
+            rows={rows}
+            people={people}
+            drafts={drafts}
+            signers={signers}
+            error={error}
+            sentNote={sentNote}
+            sending={sending}
+            onBack={() => setStep(2)}
+            onOpen={(id) => {
+              setActiveId(id);
+              setStep(2);
+            }}
+            onSend={() => {
+              const pending = situations(rows, drafts, people, signers).filter((item) => item.situation !== "Pronto" && item.situation !== "Já enviado").length;
+              if (pending > 0) {
+                setConfirmSend(true);
+                return;
+              }
+              void send();
+            }}
           />
         )}
       </div>
       </div>
+      <Modal
+        open={confirmSend}
+        onClose={() => setConfirmSend(false)}
+        title="Enviar só o que está pronto"
+        footer={
+          <>
+            <Button variant="outline" disabled={sending} onClick={() => setConfirmSend(false)}>
+              Cancelar
+            </Button>
+            <Button disabled={sending} onClick={() => void send()}>
+              {sending ? "Enviando…" : sendLabel(situations(rows, drafts, people, signers).filter((item) => item.situation === "Pronto").length)}
+            </Button>
+          </>
+        }
+      >
+        <ConfirmCopy rows={rows} drafts={drafts} people={people} signers={signers} />
+      </Modal>
     </div>
   );
 }
@@ -317,15 +374,149 @@ export function AttachPage() {
       documents={documents}
       onReload={reload}
       onClose={() => navigate(paths.documents)}
-      onDone={(message) =>
+      onDone={(notice, sent) =>
         navigate(paths.documents, {
-          state: { documentNotice: message, documentSent: message ? null : "Documentos enviados." },
+          state: { documentNotice: notice, documentSent: sent ?? (notice ? null : "Documentos enviados.") },
         })
       }
     />
   );
 }
 
+
+function sendLabel(count: number) {
+  if (count <= 0) return "Enviar documentos";
+  return count === 1 ? "Enviar 1 documento" : `Enviar ${count} documentos`;
+}
+
+function situations(
+  rows: DocumentRow[],
+  drafts: Record<string, DocumentDraft | undefined>,
+  people: PersonRow[],
+  signers: { id: string; name: string; email: string }[],
+) {
+  const resolved = resolveDrafts(
+    rows.map((row) => ({ id: row.id, pageCount: row.pageCount })),
+    drafts,
+  );
+  return rows.map((row, index) => {
+    const person = people.find((item) => item.id === row.sellerId) ?? null;
+    const situation = preparationSituation(person, resolved[index], row.pageCount, signers, people, row.envelopeId);
+    return {
+      row,
+      person,
+      situation: situation === "Pronto" && !drafts[row.id] && index > 0 ? "Conferir marcação" : situation,
+    };
+  });
+}
+
+function ConfirmCopy({
+  rows,
+  drafts,
+  people,
+  signers,
+}: {
+  rows: DocumentRow[];
+  drafts: Record<string, DocumentDraft | undefined>;
+  people: PersonRow[];
+  signers: { id: string; name: string; email: string }[];
+}) {
+  const items = situations(rows, drafts, people, signers);
+  const ready = items.filter((item) => item.situation === "Pronto").length;
+  const held = items.filter((item) => item.situation !== "Pronto" && item.situation !== "Já enviado").length;
+  return (
+    <p className="text-[13.5px] text-t1">
+      {ready === 1 ? "1 documento será enviado para assinatura." : `${ready} documentos serão enviados para assinatura.`}{" "}
+      {held === 1
+        ? "Outro documento não será enviado porque precisa de correção."
+        : `Outros ${held} não serão enviados porque precisam de correção.`}
+    </p>
+  );
+}
+
+function SendReview({
+  rows,
+  people,
+  drafts,
+  signers,
+  error,
+  sentNote,
+  sending,
+  onBack,
+  onOpen,
+  onSend,
+}: {
+  rows: DocumentRow[];
+  people: PersonRow[];
+  drafts: Record<string, DocumentDraft | undefined>;
+  signers: { id: string; name: string; email: string }[];
+  error: string | null;
+  sentNote: string | null;
+  sending: boolean;
+  onBack: () => void;
+  onOpen: (id: string) => void;
+  onSend: () => void;
+}) {
+  const items = situations(rows, drafts, people, signers);
+  const ready = items.filter((item) => item.situation === "Pronto").length;
+  const attention = items.filter((item) => item.situation !== "Pronto" && item.situation !== "Já enviado").length;
+  const sent = items.filter((item) => item.situation === "Já enviado").length;
+  return (
+    <>
+      <WizardCardHeader
+        title="Revisar envio"
+        subtitle="Confira quem recebe cada documento. O envio leva só os que estão prontos."
+      />
+      {items.length === 0 ? (
+        <div>
+          <p className="text-sm font-bold text-t0">Nenhum documento pronto para envio.</p>
+          <p className="mt-1 text-sm text-t2">Corrija as pendências para continuar.</p>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-line">
+          <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_auto_auto] gap-3 border-b border-line px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-t2">
+            <span>Documento</span>
+            <span>Colaborador</span>
+            <span>Situação</span>
+            <span />
+          </div>
+          {items.map((item) => (
+            <div key={item.row.id} className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_auto_auto] items-center gap-3 border-b border-line px-3 py-2.5 last:border-b-0">
+              <span className="truncate text-[13px] font-bold text-t0">{folderTitle(item.row.fileName)}</span>
+              <span className="truncate text-[13px] text-t1">{item.person?.name ?? "Sem colaborador"}</span>
+              <span className={cn("text-[12.5px] font-bold", item.situation === "Pronto" ? "text-ok" : item.situation === "Já enviado" ? "text-t2" : "text-warn")}>
+                {item.situation}
+              </span>
+              <Button type="button" size="sm" variant="outline" onClick={() => onOpen(item.row.id)}>
+                Revisar
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="mt-4 grid grid-cols-3 gap-3">
+        <SummaryTile label="Prontos" value={String(ready)} />
+        <SummaryTile label="Precisam de atenção" value={String(attention)} />
+        <SummaryTile label="Já enviados" value={String(sent)} />
+      </div>
+      {ready === 0 && items.length > 0 && <p className="mt-3 text-sm text-t2">Nenhum documento pronto para envio. Corrija as pendências para continuar.</p>}
+      {sentNote && <p className="mt-3 text-sm text-ok">{sentNote}</p>}
+      {error && <p className="mt-3 text-sm text-bad">{error}</p>}
+      <div className="mt-4">
+        <WizardNav previousLabel="Voltar" nextLabel={sending ? "Enviando…" : sendLabel(ready)} hideNextIcon previousDisabled={sending} nextDisabled={sending || ready === 0} onPrevious={onBack} onNext={onSend} />
+      </div>
+    </>
+  );
+}
+
+function SummaryTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-line px-3 py-2">
+      <p className="text-[11px] font-bold uppercase tracking-wide text-t2">{label}</p>
+      <p className="mt-1 text-xl font-extrabold text-t0">{value}</p>
+    </div>
+  );
+}
 
 const READ_LINES = ["Lendo as páginas…", "Identificando os colaboradores…", "Separando os documentos…"];
 

@@ -257,19 +257,21 @@ Objetos em `documents/{tenantId}/{batchId}/{documentId}.pdf` e `.../{documentId}
 
 ## Envio no preview (2026-10-15)
 
-O corte do PDF não muda. Depois de Anexar, uma etapa só abre o documento, empilha as páginas e manda o envelope.
+O corte do PDF não muda. Anexar separa os arquivos. Preparar abre o documento e empilha as páginas. Revisar lista o lote e manda o envelope.
 
 ```mermaid
 graph TD
-    A[1 Anexar] --> B[2 Destinatários]
+    A[1 Anexar] --> B[2 Preparar]
     B --> C[Páginas empilhadas]
-    B --> D[Prazo, lembrete e signatário deste documento]
-    B --> E[envelopes/create]
+    B --> D[Colaborador, prazo, lembrete e marcas deste documento]
+    B --> R[3 Revisar]
+    R --> E[envelopes/create]
     D --> F[O próximo documento herda o último valor]
 ```
 
 1. **Anexar** continua: até 5 PDFs, corte por CPF, unificar sempre.
-2. **Destinatários** mostra o PDF do documento atual. Mais de uma página fica uma embaixo da outra. Ao lado: colaborador, canal, contato que ainda falta, signatário extra, lembrete e data limite. A assinatura se arrasta na página. Anterior e Próximo trocam de documento. O documento que ainda não foi aberto recebe prazo, lembrete, signatário extra e posição do anterior. O canal continua WhatsApp até a pessoa mudar naquele documento. Enviar fica nesta etapa.
+2. **Preparar** mostra o PDF do documento atual. Mais de uma página fica uma embaixo da outra. Ao lado: colaborador do documento, canal, contato, signatários, lembrete e data limite. A assinatura se arrasta na página. Anterior e Próximo trocam de documento. O documento que ainda não foi aberto recebe prazo, lembrete e posição do anterior. O canal continua WhatsApp até a pessoa mudar naquele documento.
+3. **Revisar** lista documento, colaborador e situação. Revisar volta ao PDF daquela linha. Enviar manda só os prontos e, se houver pendência, pede confirmação do que fica de fora.
 
 Cada envelope usa o prazo, o lembrete e o signatário extra da própria linha. `employee_document.deadline`, `reminder` e `extra_signer` guardam isso. O lote deixa de ser a fonte quando a linha traz o valor.
 
@@ -290,4 +292,4 @@ O navegador desenha a página com `pdfjs-dist` só nesse passo. O repo não tem 
 | `save-contact` exige CPF e regrava e-mail e WhatsApp juntos | `supabase/functions/documents/index.ts:249` | Preencher só o WhatsApp apaga o e-mail ou recusa a ficha sem CPF | O save desta etapa grava só o campo visível e o CPF quando ele foi pedido. Campo oculto não é enviado. |
 | Nome do `element` da rubrica | coleção do Assina AI não confirmou o valor | Um valor recusado faz o create falhar | A tela envia `RUBRIC` ao lado de `SIGNATURE`. Se o Assina recusar o envelope, o nome troca neste ponto só. |
 | `recipientIdOf` lê a primeira signature | `supabase/functions/_shared/assinaApi.ts:68` | O reenvio pode pegar o extra se a API devolver o extra primeiro | Gravar o id do destinatário com `routingOrder` 1. O reenvio segue nesse id. |
-| PDF grande no navegador | `pdfjs` no passo Destinatários | Várias páginas pesam se forem desenhadas juntas | Desenha só as páginas do documento aberto, uma embaixo da outra, não os cinco PDFs do lote. |
+| PDF grande no navegador | `pdfjs` no passo Preparar | Várias páginas pesam se forem desenhadas juntas | Desenha só as páginas do documento aberto, uma embaixo da outra, não os cinco PDFs do lote. |

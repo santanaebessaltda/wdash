@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { getDocument, GlobalWorkerOptions, type PDFDocumentLoadingTask, type RenderTask } from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-import { Button, FormField, WizardCardHeader, WizardNav, useToast } from "@/components/ui";
+import { Button, FormField, WizardCardHeader, WizardNav } from "@/components/ui";
 import { Spinner } from "@/components/ui/Skeleton";
 import {
   DOCUMENT_COPY,
@@ -39,7 +39,7 @@ export function DocumentReview({
   onDrop,
   onSave,
   onBack,
-  onSend,
+  onReview,
 }: {
   rows: DocumentRow[];
   people: PersonRow[];
@@ -55,13 +55,17 @@ export function DocumentReview({
   onDrop: (documentId: string, pageNumber: number) => Promise<void>;
   onSave: (input: { sellerId: string; cpf?: string; email?: string; whatsapp?: string }) => Promise<void>;
   onBack: () => void;
-  onSend: () => void;
+  onReview: () => void;
 }) {
   const resolved = resolveDrafts(
     rows.map((row) => ({ id: row.id, pageCount: row.pageCount })),
     drafts,
   );
-  const ready = rows.filter((row, index) => !row.envelopeId && !documentIssue(people.find((item) => item.id === row.sellerId) ?? null, resolved[index], row.pageCount, signers, people)).length;
+  const ready = rows.filter((row, index) => {
+    if (row.envelopeId) return false;
+    if (documentIssue(people.find((item) => item.id === row.sellerId) ?? null, resolved[index], row.pageCount, signers, people)) return false;
+    return Boolean(drafts[row.id]) || index === 0;
+  }).length;
   const openRows = rows.filter((row) => !row.envelopeId).length;
   const index = Math.max(0, rows.findIndex((row) => row.id === activeId));
   const row = rows[index];
@@ -70,8 +74,8 @@ export function DocumentReview({
   return (
     <>
       <WizardCardHeader
-        title="Destinatários"
-        subtitle="A página mostra quem recebe. Clique nela para marcar assinatura ou rubrica. O documento seguinte repete o último prazo, lembrete e as marcas."
+        title="Preparar documentos"
+        subtitle="Vincule o colaborador, posicione as marcações e confira o contato do canal escolhido."
       />
       {rows.length === 0 ? (
         <div className="mt-4">
@@ -103,17 +107,17 @@ export function DocumentReview({
       <div className="mt-4 grid grid-cols-3 gap-3">
         <Summary label="Documentos" value={String(rows.length)} />
         <Summary label="Prontos" value={String(ready)} />
-        <Summary label="Sem contato" value={String(openRows - ready)} />
+        <Summary label="Precisam de atenção" value={String(openRows - ready)} />
       </div>
       {error && <p className="mt-3 text-sm text-bad">{error}</p>}
       <div className="mt-4">
         <WizardNav
           hideNextIcon
           previousDisabled={sending}
-          nextDisabled={sending || ready === 0}
+          nextDisabled={sending}
           onPrevious={onBack}
-          onNext={onSend}
-          nextLabel={sending ? "Enviando…" : "Enviar"}
+          onNext={onReview}
+          nextLabel="Revisar envio"
         />
       </div>
     </>
@@ -169,23 +173,10 @@ function ReviewBody({
       });
       return;
     }
-    if (value.startsWith("seller:")) {
-      const sellerId = value.slice("seller:".length);
-      const keepsOwner = draft.fields.some((item) => item.id !== field.id && item.signerId === "seller");
-      if (field.signerId === "seller" && !keepsOwner) {
-        if (sellerId !== row.sellerId) void onAssign(row.id, sellerId);
-        return;
-      }
-      onDraft({
-        ...draft,
-        fields: draft.fields.map((item) => (item.id === field.id ? { ...item, signerId: sellerId === row.sellerId ? "seller" : value } : item)),
-      });
-      if (!row.sellerId) void onAssign(row.id, sellerId);
-      return;
-    }
+    const signerId = value.startsWith("seller:") && value.slice("seller:".length) === row.sellerId ? "seller" : value;
     onDraft({
       ...draft,
-      fields: draft.fields.map((item) => (item.id === field.id ? { ...item, signerId: value } : item)),
+      fields: draft.fields.map((item) => (item.id === field.id ? { ...item, signerId } : item)),
     });
   }
 
@@ -204,7 +195,7 @@ function ReviewBody({
             const named = people.find((personItem) => personItem.id === item.sellerId);
             return (
               <option key={item.id} value={item.id}>
-                {itemIndex + 1}. {folderTitle(item.fileName)} · {named?.name ?? "Sem assinador"}
+                {itemIndex + 1}. {folderTitle(item.fileName)} · {named?.name ?? "Sem colaborador"}
               </option>
             );
           })}
@@ -219,6 +210,7 @@ function ReviewBody({
           <p className={cn("mb-3 text-[13px] text-t2", person && "mt-1")}>
             {folderTitle(row.fileName)} · {row.pageCount === 1 ? "1 página" : `${row.pageCount} páginas`}
           </p>
+          {!locked && <p className="mb-3 text-[13px] text-t1">Clique no documento para posicionar uma assinatura ou rubrica.</p>}
           <StackedPages
             documentId={row.id}
             pageCount={row.pageCount}
@@ -237,7 +229,16 @@ function ReviewBody({
           {row.envelopeId ? (
             <p className="text-[13px] text-t2">{STATUS_LABEL[row.status]}</p>
           ) : (
-            <DraftFields person={person} draft={draft} people={people} issue={issue} onDraft={onDraft} onSave={onSave} />
+            <DraftFields
+              person={person}
+              draft={draft}
+              people={people}
+              signers={signers}
+              issue={issue}
+              onAssign={(sellerId) => onAssign(row.id, sellerId)}
+              onDraft={onDraft}
+              onSave={onSave}
+            />
           )}
         </aside>
       </div>
@@ -249,14 +250,18 @@ function DraftFields({
   person,
   draft,
   people,
+  signers,
   issue,
+  onAssign,
   onDraft,
   onSave,
 }: {
   person: PersonRow | null;
   draft: DocumentDraft;
   people: PersonRow[];
+  signers: { id: string; name: string; email: string }[];
   issue: string | null;
+  onAssign: (sellerId: string) => Promise<void>;
   onDraft: (draft: DocumentDraft) => void;
   onSave: (input: { sellerId: string; cpf?: string; email?: string; whatsapp?: string }) => Promise<void>;
 }) {
@@ -264,8 +269,57 @@ function DraftFields({
     (item) => item.id !== person?.id && draft.fields.some((field) => field.signerId === `seller:${item.id}`),
   );
   const guests = (draft.guests ?? []).filter((guest) => draft.fields.some((field) => field.signerId === `guest:${guest.id}`));
+  const listed = new Set<string>();
+  const marks: { key: string; name: string; role: "Principal" | "Adicional" }[] = [];
+  for (const field of draft.fields) {
+    if (listed.has(field.signerId)) continue;
+    listed.add(field.signerId);
+    if (field.signerId === "seller") {
+      marks.push({ key: field.id, name: person?.name ?? "Sem colaborador", role: "Principal" });
+      continue;
+    }
+    if (field.signerId.startsWith("seller:")) {
+      const named = people.find((item) => item.id === field.signerId.slice("seller:".length));
+      marks.push({ key: field.signerId, name: named?.name ?? "Colaborador", role: "Adicional" });
+      continue;
+    }
+    if (field.signerId.startsWith("user:")) {
+      const named = signers.find((item) => item.id === field.signerId.slice("user:".length));
+      marks.push({ key: field.signerId, name: named?.name ?? "Usuário", role: "Adicional" });
+      continue;
+    }
+    if (field.signerId.startsWith("guest:")) {
+      const named = (draft.guests ?? []).find((item) => item.id === field.signerId.slice("guest:".length));
+      marks.push({ key: field.signerId, name: named?.name || "Outra pessoa", role: "Adicional" });
+    }
+  }
   return (
     <>
+      <FormField label="Colaborador do documento">
+        <select className={controlClass} value={person?.id ?? ""} onChange={(event) => event.target.value && void onAssign(event.target.value)}>
+          <option value="">Sem colaborador</option>
+          {people.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
+        </select>
+      </FormField>
+      <div>
+        <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Signatários</p>
+        {marks.length === 0 ? (
+          <p className="mt-1 text-[13px] text-t2">Nenhuma marcação neste documento.</p>
+        ) : (
+          <ul className="mt-1 grid gap-1">
+            {marks.map((item) => (
+              <li key={item.key} className="flex items-center justify-between gap-2 text-[13px]">
+                <span className="min-w-0 truncate text-t0">{item.name}</span>
+                <span className="shrink-0 text-[11px] font-bold uppercase tracking-wide text-t2">{item.role}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
       <FormField label="Canal">
         <ChannelSelect value={draft.channel} onChange={(channel) => onDraft({ ...draft, channel })} />
       </FormField>
@@ -394,19 +448,11 @@ function StackedPages({
   onDrop: (pageNumber: number) => Promise<void>;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
-  const hinted = useRef(false);
-  const { show } = useToast();
   const [url, setUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dropping, setDropping] = useState<number | null>(null);
   const pages = Array.from({ length: Math.max(1, pageCount) }, (_, index) => index + 1);
-
-  useEffect(() => {
-    if (loading || error || hinted.current) return;
-    hinted.current = true;
-    show("Clique na página para adicionar a marcação.");
-  }, [loading, error, show]);
 
   useEffect(() => {
     let cancelled = false;

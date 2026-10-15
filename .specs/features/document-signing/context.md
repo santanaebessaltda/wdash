@@ -76,7 +76,7 @@ O gestor envia PDFs digitais para assinatura, organizados por colaborador. Um PD
 
 **Gathered:** 2026-10-15. Substitui o canal único do lote e a marca fixa no centro de cada página.
 
-- O wizard fica em dois passos: Anexar e Destinatários. Destinatários abre o PDF, preenche o colaborador e posiciona a assinatura. A revisão separada saiu.
+- O wizard fica em três passos: Anexar, Preparar e Revisar. Preparar abre o PDF, vincula o colaborador do documento e posiciona as marcações. Revisar lista o lote e só então envia.
 - Cada documento escolhe o próprio canal, ao lado da página. Quem não tem WhatsApp pode ir por e-mail, e o contrário, no mesmo lote. O canal não é copiado para o documento seguinte.
 - CPF, e-mail e WhatsApp só são pedidos uma vez. Se a ficha já tem o CPF e o contato do canal escolhido, a tela não mostra campo: o envio usa o cadastro. O campo some depois de gravar, inclusive no próximo lote. O que for preenchido grava em `store_seller` e o sync do Millennium não reescreve. Trocar o canal só pede o contato daquele canal se a ficha ainda não tiver.
 - A ação do destinatário é só assinar (`SIGN`). Autenticação continua assinatura na tela (`DEFAULT_SIGN`), sem seletor.
@@ -84,7 +84,8 @@ O gestor envia PDFs digitais para assinatura, organizados por colaborador. Um PD
 - O signatário extra é opcional e vale para aquele documento. Na marcação a pessoa escolhe um colaborador pelo nome, um usuário ativo ou outra pessoa que não está em nenhuma das duas listas. A outra pessoa leva nome e contato só naquele envio, sem virar colaborador nem usuário. O documento seguinte herda as marcações. O painel mostra canal, lembrete, prazo e o contato: se faltar, preenche; se já existir, aparece e pode ser alterado.
 - Prazo e lembrete são de cada documento. O documento seguinte abre com o último valor. Data limite vazia não bloqueia o envio.
 - A posição da assinatura também passa para o documento seguinte. Se a página marcada não existe nesse PDF, a marca fica na última página que ele tem, no mesmo ponto.
-- Enviar continua na etapa Destinatários e pula a linha que já tem envelope.
+- O colaborador do documento é o campo do painel. Trocar a pessoa de uma marcação não muda esse vínculo. A marcação do colaborador é a principal; as outras são adicionais.
+- Enviar fica na etapa Revisar. O botão diz quantos documentos vão. Se outros ainda precisam de correção, a tela confirma o que fica de fora. A linha que já tem envelope não é enviada de novo.
 - Cada página do documento pode ser apagada antes do envio, com a lixeira. Apagar a última página tira o documento do lote. Documento que já tem envelope não perde página.
 
 ### Agent's Discretion

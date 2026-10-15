@@ -338,12 +338,17 @@ function FileTable({
       key: "owner",
       header: "Colaborador",
       hideBelow: "md",
-      render: (row) => <span className="text-[12.5px] text-t1">{people.find((person) => person.id === row.sellerId)?.name ?? "Escolha o colaborador"}</span>,
+      render: (row) => <span className="text-[12.5px] text-t1">{people.find((person) => person.id === row.sellerId)?.name ?? "Sem colaborador"}</span>,
     },
     {
       key: "status",
       header: "Status",
-      render: (row) => <Badge variant={badgeVariant(row.status)}>{row.sellerId ? STATUS_LABEL[row.status] : "Escolha o colaborador"}</Badge>,
+      render: (row) =>
+        row.envelopeId ? (
+          <Badge variant={badgeVariant(row.status)}>{STATUS_LABEL[row.status]}</Badge>
+        ) : (
+          <span className="text-[12.5px] text-t2">Em preparação</span>
+        ),
     },
     { key: "size", header: "Tamanho", hideBelow: "sm", render: (row) => <span className="font-mono text-[12.5px] font-semibold text-t0">{formatBytes(row.sizeBytes)}</span> },
     {
