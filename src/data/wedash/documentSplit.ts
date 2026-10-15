@@ -346,6 +346,95 @@ export function defaultSignatureMark(pageCount: number): SignatureMark {
   return { pageNumber: Math.max(1, pageCount), x: 50, y: 50, element: "SIGNATURE" };
 }
 
+export type Reminder = "EVERY_DAY" | "EVERY_3_DAYS" | "EVERY_WEEK" | "NEVER";
+
+export type DocumentDraft = {
+  channel: SendChannel;
+  mark: SignatureMark;
+  deadline: string;
+  reminder: Reminder;
+  extra: ExtraSigner | null;
+};
+
+export function asReminder(value: unknown): Reminder | null {
+  if (value === "EVERY_DAY" || value === "EVERY_3_DAYS" || value === "EVERY_WEEK" || value === "NEVER") return value;
+  return null;
+}
+
+/** A marca fica numa página que o documento ainda tem. */
+export function clampMark(mark: SignatureMark, pageCount: number): SignatureMark {
+  const pages = Math.max(1, Math.floor(pageCount) || 1);
+  const pageNumber = Math.min(pages, Math.max(1, Math.floor(mark.pageNumber) || 1));
+  return { pageNumber, x: mark.x, y: mark.y, element: "SIGNATURE" };
+}
+
+export function defaultDraft(pageCount: number): DocumentDraft {
+  return {
+    channel: "WHATSAPP",
+    mark: defaultSignatureMark(pageCount),
+    deadline: "",
+    reminder: "EVERY_3_DAYS",
+    extra: null,
+  };
+}
+
+/** Prazo, lembrete, signatário extra e posição passam para o documento seguinte. O canal não. */
+export function carryDraft(previous: DocumentDraft, pageCount: number): DocumentDraft {
+  const extraMark = previous.extra?.marks[0];
+  return {
+    channel: "WHATSAPP",
+    mark: clampMark(previous.mark, pageCount),
+    deadline: previous.deadline,
+    reminder: previous.reminder,
+    extra: previous.extra
+      ? {
+          ...previous.extra,
+          marks: [clampMark(extraMark ?? { ...defaultSignatureMark(pageCount), y: 72 }, pageCount)],
+        }
+      : null,
+  };
+}
+
+/** Documento já ajustado fica como está. O que ainda não foi aberto herda o anterior. */
+export function resolveDrafts(
+  rows: { id: string; pageCount: number }[],
+  drafts: Record<string, DocumentDraft | undefined>,
+): DocumentDraft[] {
+  let last = defaultDraft(rows[0]?.pageCount ?? 1);
+  return rows.map((row) => {
+    const own = drafts[row.id];
+    const next = own
+      ? {
+          ...own,
+          mark: clampMark(own.mark, row.pageCount),
+          extra: own.extra
+            ? {
+                ...own.extra,
+                marks: [clampMark(own.extra.marks[0] ?? { ...defaultSignatureMark(row.pageCount), y: 72 }, row.pageCount)],
+              }
+            : null,
+        }
+      : carryDraft(last, row.pageCount);
+    last = next;
+    return next;
+  });
+}
+
+export function documentIssue(
+  person: { cpf: string | null; email: string | null; whatsapp: string | null } | null,
+  draft: DocumentDraft,
+  pageCount: number,
+): string | null {
+  if (!person) return "Escolha o colaborador.";
+  const ask = contactFieldsToAsk(person, draft.channel);
+  if (ask.cpf || ask.email || ask.whatsapp) return "Falta contato no cadastro.";
+  const place = placementWarning([draft.mark], pageCount);
+  if (place) return place;
+  if (!draft.extra) return null;
+  if (!draft.extra.name.trim()) return "Informe o nome do signatário.";
+  return channelBlock(draft.extra.channel, { email: draft.extra.email, whatsapp: draft.extra.whatsapp });
+}
+
 export function applicableMarks(marks: SignatureMark[], pageCount: number): SignatureMark[] {
   return marks.filter((mark) => mark.element === "SIGNATURE" && mark.pageNumber >= 1 && mark.pageNumber <= pageCount);
 }

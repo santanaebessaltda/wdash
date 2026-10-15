@@ -197,7 +197,14 @@ export async function confirmBatch(input: {
   batchId: string;
   deadline: string;
   reminder: string;
-  documents: { id: string; channel: "EMAIL" | "WHATSAPP"; marks: { pageNumber: number; x: number; y: number; element: "SIGNATURE" }[] }[];
+  documents: {
+    id: string;
+    channel: "EMAIL" | "WHATSAPP";
+    marks: { pageNumber: number; x: number; y: number; element: "SIGNATURE" }[];
+    deadline?: string;
+    reminder?: string;
+    extraSigner?: { name: string; channel: "EMAIL" | "WHATSAPP"; email: string | null; whatsapp: string | null; marks: { pageNumber: number; x: number; y: number; element: "SIGNATURE" }[] } | null;
+  }[];
   extraSigner: { name: string; channel: "EMAIL" | "WHATSAPP"; email: string | null; whatsapp: string | null; marks: { pageNumber: number; x: number; y: number; element: "SIGNATURE" }[] } | null;
 }) {
   return call({ action: "confirm", ...input });

@@ -5,6 +5,7 @@ import {
   applyEnvelopeStatus,
   assignSeller,
   batchLabel,
+  carryDraft,
   channelBlock,
   collaboratorRecipientId,
   confirmBlock,
@@ -12,8 +13,10 @@ import {
   contactPatch,
   cpfDigits,
   customDocumentName,
+  defaultDraft,
   defaultSignatureMark,
   deliveryFileName,
+  documentIssue,
   envelopeSignatures,
   fileName,
   firstCpf,
@@ -24,6 +27,7 @@ import {
   placementWarning,
   remainingPages,
   replicateSetup,
+  resolveDrafts,
   resendVisible,
   saveCpf,
   saveEmail,
@@ -380,5 +384,63 @@ describe("envelope recipients", () => {
     ).toBe("ana");
     expect(collaboratorRecipientId([{ id: "only" }])).toBe("only");
     expect(collaboratorRecipientId([])).toBeNull();
+  });
+});
+
+describe("carryDraft", () => {
+  const previous = {
+    channel: "EMAIL" as const,
+    mark: { pageNumber: 4, x: 12, y: 30, element: "SIGNATURE" as const },
+    deadline: "2026-11-01",
+    reminder: "EVERY_WEEK" as const,
+    extra: {
+      name: "Bruno",
+      channel: "WHATSAPP" as const,
+      email: null,
+      whatsapp: "21988887777",
+      marks: [{ pageNumber: 4, x: 12, y: 70, element: "SIGNATURE" as const }],
+    },
+  };
+
+  it("carries deadline, reminder, extra signer and position onto the pages the next document has", () => {
+    const next = carryDraft(previous, 2);
+    expect(next.channel).toBe("WHATSAPP");
+    expect(next.deadline).toBe("2026-11-01");
+    expect(next.reminder).toBe("EVERY_WEEK");
+    expect(next.mark).toEqual({ pageNumber: 2, x: 12, y: 30, element: "SIGNATURE" });
+    expect(next.extra?.name).toBe("Bruno");
+    expect(next.extra?.channel).toBe("WHATSAPP");
+    expect(next.extra?.marks[0]).toEqual({ pageNumber: 2, x: 12, y: 70, element: "SIGNATURE" });
+    expect(next.extra).not.toBe(previous.extra);
+  });
+
+  it("keeps a document already set and carries that version to the one after it", () => {
+    const saved = { ...defaultDraft(1), deadline: "2026-12-01", channel: "EMAIL" as const };
+    const resolved = resolveDrafts(
+      [
+        { id: "a", pageCount: 1 },
+        { id: "b", pageCount: 1 },
+        { id: "c", pageCount: 1 },
+      ],
+      { a: previous, b: saved },
+    );
+    expect(resolved[0].deadline).toBe("2026-11-01");
+    expect(resolved[1]).toMatchObject({ deadline: "2026-12-01", channel: "EMAIL", extra: null });
+    expect(resolved[2].deadline).toBe("2026-12-01");
+    expect(resolved[2].channel).toBe("WHATSAPP");
+    expect(resolved[2].extra).toBeNull();
+  });
+
+  it("asks for a collaborator, a missing contact, or the extra signer name before send", () => {
+    const draft = defaultDraft(1);
+    expect(documentIssue(null, draft, 1)).toBe("Escolha o colaborador.");
+    expect(documentIssue({ cpf: VALID_DIGITS, email: null, whatsapp: null }, draft, 1)).toBe("Falta contato no cadastro.");
+    expect(
+      documentIssue(
+        { cpf: VALID_DIGITS, email: "ana@loja.com", whatsapp: "11987654321" },
+        { ...draft, extra: { name: "  ", channel: "EMAIL", email: null, whatsapp: null, marks: [draft.mark] } },
+        1,
+      ),
+    ).toBe("Informe o nome do signatário.");
   });
 });

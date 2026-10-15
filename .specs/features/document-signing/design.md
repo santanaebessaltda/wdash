@@ -255,28 +255,23 @@ Objetos em `documents/{tenantId}/{batchId}/{documentId}.pdf` e `.../{documentId}
 
 ---
 
-## Envio com destinatários e marcas (2026-10-15)
+## Envio no preview (2026-10-15)
 
-O corte do PDF não muda. Muda o wizard depois do anexo e o corpo do `envelopes/create`.
+O corte do PDF não muda. Depois de Anexar, uma etapa só abre o documento, empilha as páginas e manda o envelope.
 
 ```mermaid
 graph TD
     A[1 Anexar] --> B[2 Destinatários]
-    B --> C[3 Assinaturas]
-    C --> D[4 Revisão]
-    B --> E[store_seller CPF e contato do canal]
-    C --> F[Marcas em porcentagem da página]
-    D --> G[envelopes/create]
-    G --> H[Colaborador routingOrder 1]
-    G --> I[Signatário extra do lote routingOrder 2]
+    B --> C[Páginas empilhadas]
+    B --> D[Prazo, lembrete e signatário deste documento]
+    B --> E[envelopes/create]
+    D --> F[O próximo documento herda o último valor]
 ```
 
-### Passos
+1. **Anexar** continua: até 5 PDFs, corte por CPF, unificar sempre.
+2. **Destinatários** mostra o PDF do documento atual. Mais de uma página fica uma embaixo da outra. Ao lado: colaborador, canal, contato que ainda falta, signatário extra, lembrete e data limite. A assinatura se arrasta na página. Anterior e Próximo trocam de documento. O documento que ainda não foi aberto recebe prazo, lembrete, signatário extra e posição do anterior. O canal continua WhatsApp até a pessoa mudar naquele documento. Enviar fica nesta etapa.
 
-1. **Anexar** continua como está: até 5 PDFs, corte por CPF, unificar sempre.
-2. **Destinatários.** Uma linha por documento. Canal WhatsApp ou e-mail. Se a ficha já tem CPF e o contato desse canal, a linha não pede nada: nome e canal, e o envio lê o cadastro. O campo de contato só aparece quando aquele canal está vazio; o CPF só aparece quando a ficha não tem. Gravou, não pede de novo. Prazo e lembrete uma vez, no topo, para o lote. Signatário extra opcional: nome, canal e o contato desse canal. Botão Replicar na linha: a pessoa marca os outros colaboradores e copia o canal. O contato de cada um não é copiado.
-3. **Assinaturas.** Um PDF de amostra, uma página por vez, setas para trocar de página. A marca de assinar começa no centro da última página e pode ser arrastada. Rubrica é um interruptor; começa desligado. A posição do signatário extra também é marcada nesse PDF e vale para o lote. Replicar aqui copia as marcas do colaborador para os colaboradores marcados. Se o destino não tiver a página, a linha fica sem aquela marca e a revisão avisa.
-4. **Revisão.** Só leitura. Cada linha mostra pessoa, canal e "Assinatura na página N". Se houver rubrica, "Rubrica na página N". O signatário extra aparece uma vez, acima da lista. Enviar grava o contato que ainda estava só na tela e cria o envelope. Linha com envelope não é enviada de novo.
+Cada envelope usa o prazo, o lembrete e o signatário extra da própria linha. `employee_document.deadline`, `reminder` e `extra_signer` guardam isso. O lote deixa de ser a fonte quando a linha traz o valor.
 
 ### O que o envelope passa a levar
 
@@ -284,7 +279,7 @@ Os dois destinatários usam `action: "SIGN"` e `authenticationType: "DEFAULT_SIG
 
 ### Dados
 
-`employee_document.channel` guarda `EMAIL` ou `WHATSAPP`. `employee_document.marks` guarda as marcas do colaborador. `document_batch.extra_signer` guarda nome, canal, contato e marcas do extra. `document_batch.channel` deixa de mandar no envio. Prazo e lembrete continuam no lote.
+`employee_document.channel` guarda `EMAIL` ou `WHATSAPP`. `employee_document.marks` guarda a marca do colaborador. `employee_document.extra_signer`, `deadline` e `reminder` guardam o que vale para aquele documento. `document_batch.channel` deixa de mandar no envio.
 
 O navegador desenha a página com `pdfjs-dist` só nesse passo. O repo não tem render de PDF no cliente; `pdf-lib` e `unpdf` ficam na função e não pintam a página.
 
@@ -295,4 +290,4 @@ O navegador desenha a página com `pdfjs-dist` só nesse passo. O repo não tem 
 | `save-contact` exige CPF e regrava e-mail e WhatsApp juntos | `supabase/functions/documents/index.ts:249` | Preencher só o WhatsApp apaga o e-mail ou recusa a ficha sem CPF | O save desta etapa grava só o campo visível e o CPF quando ele foi pedido. Campo oculto não é enviado. |
 | Nome do `element` da rubrica | coleção do Assina AI não relida nesta sessão | Um valor inventado faz o create falhar | A rubrica fica na tela desligada até o nome constar na coleção. Sem isso, o envelope sai só com `SIGNATURE`. |
 | `recipientIdOf` lê a primeira signature | `supabase/functions/_shared/assinaApi.ts:68` | O reenvio pode pegar o extra se a API devolver o extra primeiro | Gravar o id do destinatário com `routingOrder` 1. O reenvio segue nesse id. |
-| PDF grande no navegador | não há `pdfjs` no app | A página de amostra pode pesar | Renderiza uma página por vez, no documento escolhido, não os cinco PDFs juntos. |
+| PDF grande no navegador | `pdfjs` no passo Destinatários | Várias páginas pesam se forem desenhadas juntas | Desenha só as páginas do documento aberto, uma embaixo da outra, não os cinco PDFs do lote. |

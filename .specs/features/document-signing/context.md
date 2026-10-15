@@ -76,19 +76,20 @@ O gestor envia PDFs digitais para assinatura, organizados por colaborador. Um PD
 
 **Gathered:** 2026-10-15. Substitui o canal único do lote e a marca fixa no centro de cada página.
 
-- O wizard fica em quatro passos: Anexar, Destinatários, Assinaturas, Revisão.
-- Cada documento escolhe o próprio canal, na mesma linha do colaborador. Quem não tem WhatsApp pode ir por e-mail, e o contrário, no mesmo lote.
-- CPF, e-mail e WhatsApp só são pedidos uma vez. Se a ficha já tem o CPF e o contato do canal escolhido, a linha não mostra campo: o envio usa o cadastro. O campo some depois de gravar, inclusive no próximo lote. O que for preenchido grava em `store_seller` e o sync do Millennium não reescreve. Trocar o canal só pede o contato daquele canal se a ficha ainda não tiver.
+- O wizard fica em dois passos: Anexar e Destinatários. Destinatários abre o PDF, preenche o colaborador e posiciona a assinatura. A revisão separada saiu.
+- Cada documento escolhe o próprio canal, ao lado da página. Quem não tem WhatsApp pode ir por e-mail, e o contrário, no mesmo lote. O canal não é copiado para o documento seguinte.
+- CPF, e-mail e WhatsApp só são pedidos uma vez. Se a ficha já tem o CPF e o contato do canal escolhido, a tela não mostra campo: o envio usa o cadastro. O campo some depois de gravar, inclusive no próximo lote. O que for preenchido grava em `store_seller` e o sync do Millennium não reescreve. Trocar o canal só pede o contato daquele canal se a ficha ainda não tiver.
 - A ação do destinatário é só assinar (`SIGN`). Autenticação continua assinatura na tela (`DEFAULT_SIGN`), sem seletor.
-- A marca de assinar começa no centro da última página. A pessoa arrasta. Rubrica é opcional e começa desligada. O nome do `element` da rubrica na API ainda não está confirmado; a tela não envia rubrica até esse nome existir na coleção.
-- Um signatário extra, opcional, vale para o lote inteiro. Também só assina. Nome, canal e contato são definidos uma vez. A posição dele, definida no PDF de amostra, vale para todos os documentos do lote. Ele não vira ficha de colaborador.
-- Replicar copia, para os colaboradores marcados, o canal e as marcas daquele documento. Não copia CPF, e-mail nem WhatsApp da pessoa. Não mexe no signatário extra, porque ele já é do lote.
-- A revisão só confere: documento, pessoa, canal e página da marca. Não edita. Enviar continua pulando linha que já tem envelope.
-- No passo Destinatários, cada página do documento separado pode ser apagada antes do envio. Apagar a última página tira o documento do lote. Documento que já tem envelope não perde página.
+- A marca de assinar começa no centro da última página. A pessoa arrasta na página aberta. Se o documento tem mais de uma página, elas ficam uma embaixo da outra, sem navegação de página. Rubrica continua de fora até o nome do `element` existir na API.
+- O signatário extra é opcional e vale para aquele documento. Também só assina. Ele não vira ficha de colaborador. O documento seguinte abre com o último nome, canal, contato e posição; a pessoa altera se quiser.
+- Prazo e lembrete são de cada documento. O documento seguinte abre com o último valor. Data limite vazia não bloqueia o envio.
+- A posição da assinatura também passa para o documento seguinte. Se a página marcada não existe nesse PDF, a marca fica na última página que ele tem, no mesmo ponto.
+- Enviar continua na etapa Destinatários e pula a linha que já tem envelope.
+- Cada página do documento pode ser apagada antes do envio, com a lixeira. Apagar a última página tira o documento do lote. Documento que já tem envelope não perde página.
 
 ### Agent's Discretion
 
-- Prazo e lembrete ficam no passo Destinatários, uma vez para o lote.
+- Prazo e lembrete ficam no documento, e o seguinte herda o último valor.
 - A marca inicial é o centro da última página, não o centro de todas.
 - Reenviar continua o link do colaborador, não o do signatário extra.
 

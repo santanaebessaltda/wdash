@@ -10,6 +10,7 @@ import { loadCompanyToken } from "../_shared/assinaSync.ts";
 import {
   DOCUMENT_CATEGORIES,
   DOCUMENT_COPY,
+  asReminder,
   assignSeller,
   channelBlock,
   collaboratorRecipientId,
@@ -326,9 +327,7 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
   if (!batch) return json({ error: "not_found" }, 404);
   const fallbackChannel = asChannel(body.channel);
   const deadline = typeof body.deadline === "string" && body.deadline ? body.deadline : null;
-  const reminder = ["EVERY_DAY", "EVERY_3_DAYS", "EVERY_WEEK", "NEVER"].includes(String(body.reminder))
-    ? String(body.reminder)
-    : "EVERY_3_DAYS";
+  const reminder = asReminder(body.reminder) ?? "EVERY_3_DAYS";
   const token = await loadCompanyToken(admin, tenantId, secret);
   const batchPatch: { deadline: string | null; reminder: string; extra_signer?: ExtraSigner | null } = { deadline, reminder };
   if ("extraSigner" in body) batchPatch.extra_signer = body.extraSigner == null ? null : storedExtra(body.extraSigner);
@@ -340,7 +339,14 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
       const id = typeof row.id === "string" ? row.id : "";
       const channel = asChannel(row.channel);
       if (!id || !channel) continue;
-      await admin.from("employee_document").update({ channel, marks: storedMarks(row.marks) }).eq("id", id).eq("batch_id", batch.id);
+      const patch: Record<string, unknown> = { channel, marks: storedMarks(row.marks) };
+      if ("deadline" in row) patch.deadline = typeof row.deadline === "string" && row.deadline ? row.deadline.slice(0, 10) : null;
+      if ("reminder" in row) patch.reminder = asReminder(row.reminder);
+      if ("extraSigner" in row) {
+        const provided = row.extraSigner;
+        patch.extra_signer = provided == null ? null : (storedExtra(provided) ?? provided);
+      }
+      await admin.from("employee_document").update(patch).eq("id", id).eq("batch_id", batch.id);
     }
   }
   const storedBatch = await ownedBatch(admin, tenantId, batch.id as string);
@@ -354,7 +360,11 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
     const pageCount = Number(doc.page_count) || 1;
     const savedMarks = storedMarks(doc.marks);
     const marks = savedMarks.length > 0 ? savedMarks : [defaultSignatureMark(pageCount)];
-    const block = confirmBlock({ deadline, hasToken: Boolean(token), sizeBytes: doc.size_bytes as number });
+    const docDeadline = typeof doc.deadline === "string" && doc.deadline ? String(doc.deadline).slice(0, 10) : deadline;
+    const docReminder = asReminder(doc.reminder) ?? reminder;
+    const parsedDocExtra = storedExtra(doc.extra_signer);
+    const extraInvalid = doc.extra_signer != null && !parsedDocExtra ? "Informe o nome do signatário." : null;
+    const block = confirmBlock({ deadline: docDeadline, hasToken: Boolean(token), sizeBytes: doc.size_bytes as number });
     let seller: { name: string; email: string | null; whatsapp: string | null; cpf: string | null } | null = null;
     if (doc.seller_id) {
       const { data } = await admin.from("store_seller").select("name, email, whatsapp, cpf").eq("id", doc.seller_id).maybeSingle();
@@ -363,12 +373,13 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
     const missingChannel = channel ? null : "Escolha WhatsApp ou e-mail.";
     const contactBlock = channel ? channelBlock(channel, { email: seller?.email ?? null, whatsapp: seller?.whatsapp ?? null }) : null;
     const placeBlock = savedMarks.length > 0 ? placementWarning(savedMarks, pageCount) : null;
-    const extraForDoc = extra
-      ? { ...extra, marks: extra.marks.length > 0 ? extra.marks : [defaultSignatureMark(pageCount)] }
+    const chosenExtra = doc.extra_signer != null ? parsedDocExtra : extra;
+    const extraForDoc = chosenExtra
+      ? { ...chosenExtra, marks: chosenExtra.marks.length > 0 ? chosenExtra.marks : [defaultSignatureMark(pageCount)] }
       : null;
     const extraContact = extraForDoc ? channelBlock(extraForDoc.channel, { email: extraForDoc.email, whatsapp: extraForDoc.whatsapp }) : null;
-    const extraPlace = extra && extra.marks.length > 0 ? placementWarning(extra.marks, pageCount) : null;
-    const rowBlock = block ?? missingChannel ?? (doc.seller_id ? contactBlock : null) ?? placeBlock ?? extraContact ?? extraPlace;
+    const extraPlace = chosenExtra && chosenExtra.marks.length > 0 ? placementWarning(chosenExtra.marks, pageCount) : null;
+    const rowBlock = block ?? missingChannel ?? (doc.seller_id ? contactBlock : null) ?? placeBlock ?? extraInvalid ?? extraContact ?? extraPlace;
     if (!shouldSend({ envelopeId: (doc.envelope_id as string | null) ?? null, sellerId: (doc.seller_id as string | null) ?? null, block: rowBlock })) {
       if (rowBlock && !doc.envelope_id) await admin.from("employee_document").update({ error: rowBlock }).eq("id", doc.id);
       results.push({ id: doc.id as string, error: doc.envelope_id ? null : rowBlock });
@@ -387,8 +398,8 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
       documentSendConfig: {
         documentName: sentName,
         customEmailMessage: "",
-        ...(deadline ? { signatureDeadline: `${deadline}T23:59:59.000Z` } : {}),
-        sendReminders: reminder,
+        ...(docDeadline ? { signatureDeadline: `${docDeadline}T23:59:59.000Z` } : {}),
+        sendReminders: docReminder,
         observers: [],
       },
       status: "SENT_FOR_SIGNATURE",
