@@ -231,6 +231,10 @@ export async function dropDocumentPage(documentId: string, pageNumber: number) {
   await call({ action: "drop-page", documentId, pageNumber });
 }
 
+export async function deleteDocument(documentId: string) {
+  await call({ action: "delete", documentId });
+}
+
 export async function assignDocument(documentId: string, sellerId: string) {
   await call({ action: "assign", documentId, sellerId });
 }

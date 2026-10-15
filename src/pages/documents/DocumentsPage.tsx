@@ -4,7 +4,7 @@ import { Badge, Button, Card, DataTable, EmptyState, Segmented, type DataTableCo
 import { cn } from "@/lib/cn";
 import { QuickStat } from "@/pages/dashboards/QuickStat";
 import { paths } from "@/router/paths";
-import { folderTitle, monthFolder, resendVisible, DOCUMENT_CATEGORIES } from "@/data/wedash/documentSplit";
+import { displayTitle, monthFolder, resendVisible, DOCUMENT_CATEGORIES } from "@/data/wedash/documentSplit";
 import type { BatchRow, DocumentRow, PersonRow } from "@/data/wedash/documentsRepo";
 import { openDocument, resendDocument } from "@/data/wedash/documentsRepo";
 import { DocumentsFrame, FileGlyph, FolderGlyph, Glyph, STATUS_LABEL, SearchGlyph, badgeVariant } from "./frame";
@@ -54,7 +54,7 @@ export function DocumentsPage() {
   function matchesText(doc: DocumentRow) {
     if (!needle) return true;
     const person = (personName.get(doc.sellerId ?? "") ?? "").toLowerCase();
-    return folderTitle(doc.fileName).toLowerCase().includes(needle) || doc.fileName.toLowerCase().includes(needle) || person.includes(needle);
+    return displayTitle(doc.fileName).toLowerCase().includes(needle) || doc.fileName.toLowerCase().includes(needle) || person.includes(needle);
   }
 
   function matchesFilters(doc: DocumentRow) {
@@ -371,7 +371,7 @@ function folderEntries(input: {
   const month = allStores ? crumb[3] : crumb[2];
   return docs
     .filter((doc) => yearOf(doc) === year && monthOf(doc) === month)
-    .map((doc) => ({ key: doc.id, label: folderTitle(doc.fileName), detail: STATUS_LABEL[doc.status], fileId: doc.id }));
+    .map((doc) => ({ key: doc.id, label: displayTitle(doc.fileName), detail: STATUS_LABEL[doc.status], fileId: doc.id }));
 }
 
 function FolderTable({ rows, onOpenFolder, onOpenFile }: { rows: FolderEntry[]; onOpenFolder: (key: string) => void; onOpenFile: (id: string) => void }) {
@@ -438,7 +438,7 @@ function FileTable({
               <FileGlyph />
             </span>
             <span className="min-w-0">
-              <span className="block truncate text-[13px] font-bold text-t0">{folderTitle(row.fileName)}</span>
+              <span className="block truncate text-[13px] font-bold text-t0">{displayTitle(row.fileName)}</span>
               <span className="mt-px block text-[11px] text-t2">{period}</span>
             </span>
           </span>

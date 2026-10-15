@@ -118,6 +118,7 @@ serve(async (req) => {
   if (action === "prepare") return prepare(admin, caller.tenantId, body);
   if (action === "assign") return assign(admin, caller.tenantId, body);
   if (action === "drop-page") return dropPage(admin, caller.tenantId, body);
+  if (action === "delete") return removeDocument(admin, caller.tenantId, body);
   if (action === "save-contact") return saveContact(admin, caller.tenantId, body);
   if (action === "confirm") return confirm(admin, caller.tenantId, erpSecret, body);
   if (action === "resend") return resend(admin, caller.tenantId, erpSecret, body);
@@ -288,6 +289,17 @@ async function assign(admin: SupabaseClient, tenantId: string, body: Body) {
   return json({ ok: true });
 }
 
+async function removeDocument(admin: SupabaseClient, tenantId: string, body: Body) {
+  const documentId = String(body.documentId ?? "");
+  const { data: doc } = await admin.from("employee_document").select("id, envelope_id, storage_path").eq("id", documentId).eq("tenant_id", tenantId).maybeSingle();
+  if (!doc) return json({ error: "not_found" }, 404);
+  if (doc.envelope_id) return json({ message: DOCUMENT_COPY.alreadySent }, 422);
+  await admin.storage.from(BUCKET).remove([doc.storage_path as string]);
+  const { error } = await admin.from("employee_document").delete().eq("id", documentId).eq("tenant_id", tenantId);
+  if (error) return json({ error: "persist" }, 500);
+  return json({ ok: true });
+}
+
 async function dropPage(admin: SupabaseClient, tenantId: string, body: Body) {
   const documentId = String(body.documentId ?? "");
   const pageNumber = Number(body.pageNumber);
@@ -404,8 +416,9 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
       .find((item) => item) ?? null;
     const rowBlock = block ?? missingChannel ?? (doc.seller_id ? contactBlock : null) ?? placeBlock ?? extraInvalid ?? extraContact ?? extraPlace;
     if (!shouldSend({ envelopeId: (doc.envelope_id as string | null) ?? null, sellerId: (doc.seller_id as string | null) ?? null, block: rowBlock })) {
-      if (rowBlock && !doc.envelope_id) await admin.from("employee_document").update({ error: rowBlock }).eq("id", doc.id);
-      results.push({ id: doc.id as string, error: doc.envelope_id ? null : rowBlock });
+      const quiet = !doc.seller_id || Boolean(doc.envelope_id);
+      if (!quiet && rowBlock) await admin.from("employee_document").update({ error: rowBlock }).eq("id", doc.id);
+      results.push({ id: doc.id as string, error: quiet ? null : rowBlock });
       continue;
     }
     const file = await admin.storage.from(BUCKET).download(doc.storage_path as string);

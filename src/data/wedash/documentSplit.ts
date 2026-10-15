@@ -145,9 +145,14 @@ export function fileName(category: string, taken: string[]): string {
   return `${category} (${n}).pdf`;
 }
 
-/** Nome curto da pasta, sem a extensão. */
+/** Nome curto da pasta, sem a extensão. O índice "(2)" fica só no arquivo. */
 export function folderTitle(fileName: string): string {
   return fileName.replace(/\.pdf$/i, "");
+}
+
+/** Nome que a tela mostra. Holerite (2) aparece como Holerite. */
+export function displayTitle(fileName: string): string {
+  return folderTitle(fileName).replace(/ \(\d+\)$/, "");
 }
 
 /** Nome livre de Outros. A pasta mostra este texto; o envio acrescenta a pessoa, o mês e o ano. */
@@ -322,6 +327,19 @@ export function contactPatch(input: { cpf?: string; email?: string; whatsapp?: s
     patch.whatsapp = saved.whatsapp;
   }
   return { ok: true, patch };
+}
+
+export type ContactEdit = { cpf: string; email: string; whatsapp: string };
+
+/** O que a pessoa digitou vale na preparação. A gravação fica para o envio. */
+export function applyContactEdit<T extends { id: string; cpf: string | null; email: string | null; whatsapp: string | null }>(
+  person: T | null,
+  edits: Record<string, ContactEdit>,
+): T | null {
+  if (!person) return null;
+  const edit = edits[person.id];
+  if (!edit) return person;
+  return { ...person, cpf: edit.cpf, email: edit.email, whatsapp: edit.whatsapp };
 }
 
 /** Copia canal e marcas. CPF, e-mail e WhatsApp ficam de fora. */
@@ -545,6 +563,18 @@ export function documentIssue(
   if (!person) return "Escolha o colaborador.";
   const ask = contactFieldsToAsk(person, draft.channel);
   if (ask.cpf || ask.email || ask.whatsapp) return "Falta contato no cadastro.";
+  const cpf = saveCpf(person.cpf ?? "");
+  if (!cpf.ok) return cpf.message;
+  if (draft.channel === "EMAIL") {
+    const saved = saveEmail(person.email ?? "");
+    if (!saved.ok) return saved.message;
+    if (!saved.email) return "Informe o e-mail de quem vai assinar.";
+  }
+  if (draft.channel === "WHATSAPP") {
+    const saved = saveWhatsapp(person.whatsapp ?? "");
+    if (!saved.ok) return saved.message;
+    if (!saved.whatsapp) return "Informe o WhatsApp de quem vai assinar.";
+  }
   if (draft.fields.some((field) => !field.signerId)) return "Escolha quem assina esta marcação.";
   const place = placementWarning(sellerMarks(draft.fields), pageCount);
   if (place) return place;

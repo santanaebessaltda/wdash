@@ -8,12 +8,14 @@ import {
   DOCUMENT_LIMITS,
   contactFieldsToAsk,
   documentIssue,
-  folderTitle,
+  displayTitle,
   preparationSituation,
   resolveDrafts,
+  saveCpf,
   saveEmail,
   saveWhatsapp,
   signerContactKey,
+  type ContactEdit,
   type DocumentDraft,
   type FieldMark,
   type GuestSigner,
@@ -45,7 +47,7 @@ export function DocumentReview({
   onDraft,
   onAssign,
   onDrop,
-  onSave,
+  onContact,
   onBack,
   onReview,
   period,
@@ -65,7 +67,7 @@ export function DocumentReview({
   onDraft: (id: string, draft: DocumentDraft) => void;
   onAssign: (documentId: string, sellerId: string) => Promise<void>;
   onDrop: (documentId: string, pageNumber: number) => Promise<void>;
-  onSave: (input: { sellerId: string; cpf?: string; email?: string; whatsapp?: string }) => Promise<void>;
+  onContact: (sellerId: string, contact: ContactEdit) => void;
   onBack: () => void;
   onReview: () => void;
   period: string;
@@ -138,7 +140,7 @@ export function DocumentReview({
           onDraft={(next) => onDraft(row.id, next)}
           onAssign={onAssign}
           onDrop={onDrop}
-          onSave={onSave}
+          onContact={onContact}
         />
       ) : (
         <div className="flex justify-center py-10">
@@ -191,7 +193,7 @@ function ReviewBody({
   onDraft,
   onAssign,
   onDrop,
-  onSave,
+  onContact,
 }: {
   row: DocumentRow;
   draft: DocumentDraft;
@@ -208,7 +210,7 @@ function ReviewBody({
   onDraft: (draft: DocumentDraft) => void;
   onAssign: (documentId: string, sellerId: string) => Promise<void>;
   onDrop: (documentId: string, pageNumber: number) => Promise<void>;
-  onSave: (input: { sellerId: string; cpf?: string; email?: string; whatsapp?: string }) => Promise<void>;
+  onContact: (sellerId: string, contact: ContactEdit) => void;
 }) {
   const person = people.find((item) => item.id === row.sellerId) ?? null;
   const issue = row.envelopeId ? null : documentIssue(person, draft, row.pageCount, signers, people, row.sizeBytes);
@@ -265,12 +267,13 @@ function ReviewBody({
       addGuest(field, contact);
       return;
     }
-    if (people.some((item) => item.id === value)) {
+    if (value === "seller" || people.some((item) => item.id === value)) {
+      const personId = value === "seller" ? row.sellerId : value;
       onDraft({
         ...draft,
         fields: draft.fields.map((item) => (item.id === field.id ? { ...item, signerId: "seller" } : item)),
       });
-      if (value !== row.sellerId) void onAssign(row.id, value);
+      if (personId && personId !== row.sellerId) void onAssign(row.id, personId);
       return;
     }
     onDraft({
@@ -282,18 +285,7 @@ function ReviewBody({
 
   function placeMark(mark: SignatureMark) {
     const id = crypto.randomUUID();
-    const hasCollaborator = draft.fields.some((field) => field.signerId === "seller" || field.signerId === "");
-    if (!hasCollaborator) {
-      onDraft({ ...draft, fields: [...draft.fields, { ...mark, id, signerId: "seller" }] });
-      setSelectedId(id);
-      return;
-    }
-    const guest: GuestSigner = { id: crypto.randomUUID(), name: "", email: "", whatsapp: "" };
-    onDraft({
-      ...draft,
-      guests: [...(draft.guests ?? []), guest],
-      fields: [...draft.fields, { ...mark, id, signerId: `guest:${guest.id}` }],
-    });
+    onDraft({ ...draft, fields: [...draft.fields, { ...mark, id, signerId: row.sellerId ? "" : "seller" }] });
     setSelectedId(id);
   }
 
@@ -348,7 +340,7 @@ function ReviewBody({
               selectedId={selectedId}
               onSelect={setSelectedId}
               onDraft={onDraft}
-              onSave={onSave}
+              onContact={onContact}
             />
           )}
         </aside>
@@ -364,6 +356,15 @@ function channelContactsReady(
   signers: { id: string; email: string }[],
 ) {
   if (!person || channelGap(person, draft.channel)) return false;
+  if (!saveCpf(person.cpf ?? "").ok) return false;
+  if (draft.channel === "EMAIL") {
+    const saved = saveEmail(person.email ?? "");
+    if (!saved.ok || !saved.email) return false;
+  }
+  if (draft.channel === "WHATSAPP") {
+    const saved = saveWhatsapp(person.whatsapp ?? "");
+    if (!saved.ok || !saved.whatsapp) return false;
+  }
   const seen = new Set<string>();
   for (const field of draft.fields) {
     if (!field.signerId || field.signerId === "seller" || seen.has(field.signerId)) continue;
@@ -390,13 +391,11 @@ function channelContactsReady(
   return true;
 }
 
-function documentTitle(rows: DocumentRow[], item: DocumentRow, people: PersonRow[]) {
-  const title = folderTitle(item.fileName);
+function documentTitle(_rows: DocumentRow[], item: DocumentRow, people: PersonRow[]) {
+  const title = displayTitle(item.fileName);
   const named = people.find((person) => person.id === item.sellerId);
   if (named) return `${title} · ${named.name}`;
-  const same = rows.filter((row) => !row.sellerId && folderTitle(row.fileName) === title);
-  if (same.length < 2) return title;
-  return `${title} (${same.findIndex((row) => row.id === item.id) + 1})`;
+  return title;
 }
 
 function DocumentSwitcher({
@@ -546,7 +545,7 @@ function DraftFields({
   selectedId,
   onSelect,
   onDraft,
-  onSave,
+  onContact,
 }: {
   person: PersonRow | null;
   draft: DocumentDraft;
@@ -558,7 +557,7 @@ function DraftFields({
   selectedId: string | null;
   onSelect: (id: string) => void;
   onDraft: (draft: DocumentDraft) => void;
-  onSave: (input: { sellerId: string; cpf?: string; email?: string; whatsapp?: string }) => Promise<void>;
+  onContact: (sellerId: string, contact: ContactEdit) => void;
 }) {
   const [openKey, setOpenKey] = useState<string | null>(null);
   const groups = signerGroups(draft, person, people, signers);
@@ -613,7 +612,9 @@ function DraftFields({
                           {field.element === "RUBRIC" ? "Rubrica" : "Assinatura"} · Página {field.pageNumber}
                         </button>
                       ))}
-                      {group.person && <ContactEditor key={`${group.person.id}:${group.person.cpf ?? ""}:${group.person.email ?? ""}:${group.person.whatsapp ?? ""}`} person={group.person} onSave={onSave} />}
+                      {group.person && (
+                        <ContactEditor person={group.person} onContact={onContact} />
+                      )}
                       {group.guest && (
                         <GuestEditor guest={group.guest} onChange={(next) => onDraft({ ...draft, guests: (draft.guests ?? []).map((item) => (item.id === group.guest?.id ? next : item)) })} />
                       )}
@@ -632,17 +633,6 @@ function DraftFields({
           <FormField label="Canal">
             <ChannelSelect value={draft.channel} onChange={(channel) => onDraft({ ...draft, channel })} />
           </FormField>
-          <FormField label="Lembrete">
-            <select className={controlClass} value={draft.reminder} onChange={(event) => onDraft({ ...draft, reminder: event.target.value as DocumentDraft["reminder"] })}>
-              <option value="EVERY_DAY">Todo dia</option>
-              <option value="EVERY_3_DAYS">A cada 3 dias</option>
-              <option value="EVERY_WEEK">Toda semana</option>
-              <option value="NEVER">Nunca</option>
-            </select>
-          </FormField>
-          <FormField label="Data limite" optional hint="Depois desta data, o documento fica expirado se ainda não tiver sido assinado.">
-            <input type="date" className={controlClass} value={draft.deadline} onChange={(event) => onDraft({ ...draft, deadline: event.target.value })} />
-          </FormField>
         </div>
       </section>
       <section className="rounded-xl border border-line p-3">
@@ -653,7 +643,7 @@ function DraftFields({
           <CheckRow ok={contactsValid} label="Contatos do canal válidos" />
           <CheckRow ok={sizeValid} label="Tamanho do PDF válido" />
         </ul>
-        {issue && issue !== "Escolha o colaborador." && issue !== "Falta contato no cadastro." && issue !== DOCUMENT_COPY.overEnvelope && <p className="mt-2 text-xs text-bad">{issue}</p>}
+        {issue && issue !== "Escolha o colaborador." && issue !== "Falta contato no cadastro." && issue !== DOCUMENT_COPY.badCpf && issue !== DOCUMENT_COPY.badEmail && issue !== DOCUMENT_COPY.badWhatsapp && issue !== DOCUMENT_COPY.overEnvelope && <p className="mt-2 text-xs text-bad">{issue}</p>}
         {!sizeValid && <p className="mt-2 text-xs text-bad">{DOCUMENT_COPY.overEnvelope}</p>}
       </section>
     </>
@@ -689,7 +679,7 @@ function SignerOptions({
   if (collaborator) {
     return (
       <>
-        {!sellerId && <option value="">Selecionar colaborador</option>}
+        <option value="">Selecionar colaborador</option>
         {people.map((person) => (
           <option key={person.id} value={person.id}>
             {person.name}
@@ -701,6 +691,12 @@ function SignerOptions({
   const known = new Set((guests ?? []).filter((guest) => guest.name.trim()).map((guest) => signerContactKey(guest)));
   return (
     <>
+      <option value="">Selecionar signatário</option>
+      {people.map((person) => (
+        <option key={person.id} value={person.id === sellerId ? "seller" : person.id}>
+          {person.name}
+        </option>
+      ))}
       {guests.map((guest) => (
         <option key={guest.id} value={`guest:${guest.id}`}>
           {guest.name.trim() || "Nova pessoa"}
@@ -718,48 +714,41 @@ function SignerOptions({
   );
 }
 
-function ContactEditor({
-  person,
-  onSave,
-}: {
-  person: PersonRow;
-  onSave: (input: { sellerId: string; cpf?: string; email?: string; whatsapp?: string }) => Promise<void>;
-}) {
-  const [cpf, setCpf] = useState(person.cpf ?? "");
-  const [email, setEmail] = useState(person.email ?? "");
-  const [whatsapp, setWhatsapp] = useState(person.whatsapp ?? "");
-  const [localError, setLocalError] = useState<string | null>(null);
-  const dirty = cpf !== (person.cpf ?? "") || email !== (person.email ?? "") || whatsapp !== (person.whatsapp ?? "");
-
+function ContactEditor({ person, onContact }: { person: PersonRow; onContact: (sellerId: string, contact: ContactEdit) => void }) {
+  const hint = contactHint(person);
+  function change(next: ContactEdit) {
+    onContact(person.id, next);
+  }
   return (
-    <form
-      className="grid gap-2"
-      onSubmit={(event) => {
-        event.preventDefault();
-        setLocalError(null);
-        void onSave({ sellerId: person.id, cpf, email, whatsapp }).catch((reason) =>
-          setLocalError(reason instanceof Error ? reason.message : DOCUMENT_COPY.badCpf),
-        );
-      }}
-    >
-      <p className="text-[13px] font-bold text-t0">{person.name}</p>
+    <div className="grid gap-2">
       <FormField label="CPF">
-        <input className={controlClass} value={cpf} onChange={(event) => setCpf(event.target.value)} />
+        <input className={controlClass} value={person.cpf ?? ""} onChange={(event) => change({ cpf: event.target.value, email: person.email ?? "", whatsapp: person.whatsapp ?? "" })} />
       </FormField>
       <FormField label="E-mail">
-        <input className={controlClass} value={email} onChange={(event) => setEmail(event.target.value)} />
+        <input className={controlClass} value={person.email ?? ""} onChange={(event) => change({ cpf: person.cpf ?? "", email: event.target.value, whatsapp: person.whatsapp ?? "" })} />
       </FormField>
       <FormField label="WhatsApp">
-        <input className={controlClass} value={whatsapp} onChange={(event) => setWhatsapp(event.target.value)} />
+        <input className={controlClass} value={person.whatsapp ?? ""} onChange={(event) => change({ cpf: person.cpf ?? "", email: person.email ?? "", whatsapp: event.target.value })} />
       </FormField>
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs text-bad">{localError}</span>
-        <Button size="sm" variant="outline" type="submit" disabled={!dirty}>
-          Salvar
-        </Button>
-      </div>
-    </form>
+      {hint && <p className="text-xs text-bad">{hint}</p>}
+    </div>
   );
+}
+
+function contactHint(person: { cpf: string | null; email: string | null; whatsapp: string | null }) {
+  if (person.cpf?.trim()) {
+    const saved = saveCpf(person.cpf);
+    if (!saved.ok) return saved.message;
+  }
+  if (person.email?.trim()) {
+    const saved = saveEmail(person.email);
+    if (!saved.ok) return saved.message;
+  }
+  if (person.whatsapp?.trim()) {
+    const saved = saveWhatsapp(person.whatsapp);
+    if (!saved.ok) return saved.message;
+  }
+  return null;
 }
 
 function GuestEditor({ guest, onChange }: { guest: GuestSigner; onChange: (guest: GuestSigner) => void }) {
@@ -1086,7 +1075,7 @@ function MarkCard({
         <div className="grid gap-1.5 p-1.5">
           <select
             className="h-8 min-w-0 rounded-[var(--radius-vela-sm)] border border-line bg-bg-inset px-2 text-xs font-bold text-t0 outline-none focus:border-acc"
-            value={field.signerId === "seller" ? (sellerId ?? "") : field.signerId}
+            value={sellerId ? (field.signerId === "seller" ? "seller" : field.signerId) : field.signerId === "seller" ? "" : field.signerId}
             disabled={disabled}
             onChange={(event) => onPick(event.target.value)}
           >
@@ -1095,7 +1084,7 @@ function MarkCard({
               sellerId={sellerId}
               guests={guests}
               history={history}
-              collaborator={field.signerId === "seller" || field.signerId === ""}
+              collaborator={!sellerId}
               allowNew={!guests.some((guest) => field.signerId === `guest:${guest.id}` && !guest.name.trim())}
             />
           </select>

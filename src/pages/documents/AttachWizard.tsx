@@ -10,15 +10,18 @@ import {
   DOCUMENT_CATEGORIES,
   DOCUMENT_COPY,
   DOCUMENT_LIMITS,
+  applyContactEdit,
+  contactPatch,
   customDocumentName,
+  displayTitle,
   extraSignersFrom,
   fieldAfterDrop,
-  folderTitle,
   monthFolder,
   preparationSituation,
   remainingPages,
   resolveDrafts,
   sellerMarks,
+  type ContactEdit,
   type DocumentDraft,
   type SignerContact,
 } from "@/data/wedash/documentSplit";
@@ -26,6 +29,7 @@ import {
   assignDocument,
   confirmBatch,
   dropDocumentPage,
+  deleteDocument,
   prepareFiles,
   saveEmployeeContact,
   type DocumentRow,
@@ -85,7 +89,12 @@ export function AttachWizard({
   const [sending, setSending] = useState(false);
   const [confirmSend, setConfirmSend] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [contactEdits, setContactEdits] = useState<Record<string, ContactEdit>>({});
   const signers = NO_USERS;
+  const shownPeople = useMemo(
+    () => people.map((person) => applyContactEdit(person, contactEdits) ?? person),
+    [people, contactEdits],
+  );
 
   const rows = useMemo(
     () =>
@@ -183,6 +192,31 @@ export function AttachWizard({
         rows.map((row) => ({ id: row.id, pageCount: row.pageCount })),
         drafts,
       );
+      const readySellers = new Set(
+        situations(rows, drafts, shownPeople, signers, opened)
+          .filter((item) => item.situation === "Pronto" && item.row.sellerId)
+          .map((item) => item.row.sellerId as string),
+      );
+      for (const sellerId of readySellers) {
+        const edit = contactEdits[sellerId];
+        const person = people.find((item) => item.id === sellerId);
+        if (!edit || !person) continue;
+        const next = contactPatch({ cpf: edit.cpf, email: edit.email, whatsapp: edit.whatsapp });
+        if (!next.ok) throw new Error(next.message);
+        if (next.patch.cpf === person.cpf && (next.patch.email ?? null) === person.email && (next.patch.whatsapp ?? null) === person.whatsapp) continue;
+        await saveEmployeeContact({ sellerId, cpf: edit.cpf, email: edit.email, whatsapp: edit.whatsapp });
+      }
+      if (readySellers.size > 0) {
+        setContactEdits((current) => {
+          const next = { ...current };
+          for (const id of readySellers) delete next[id];
+          return next;
+        });
+        await onReload();
+      }
+      const before = situations(rows, drafts, shownPeople, signers, opened);
+      const readyIds = new Set(before.filter((item) => item.situation === "Pronto").map((item) => item.row.id));
+      const heldBack = before.filter((item) => item.situation !== "Pronto" && item.situation !== "Já enviado").length;
       const sent = await confirmBatch({
         batchId,
         deadline: "",
@@ -194,7 +228,7 @@ export function AttachWizard({
           deadline: resolved[index].deadline,
           reminder: resolved[index].reminder,
           extraSigners: extraSignersFrom(resolved[index].fields, signers, row.pageCount, {
-            people,
+            people: shownPeople,
             guests: resolved[index].guests,
             channel: resolved[index].channel,
           }),
@@ -202,20 +236,20 @@ export function AttachWizard({
         extraSigner: null,
       });
       await onReload();
-      const failed = (sent.results ?? []).filter((item) => item.error);
-      if (failed.length > 0) {
-        setError("Alguns documentos não foram enviados. Corrija os documentos com erro e envie novamente. Os documentos já enviados não serão duplicados.");
+      const failed = (sent.results ?? []).filter((item) => item.error && readyIds.has(item.id));
+      const sentCount = readyIds.size - failed.length;
+      if (failed.length > 0 && sentCount === 0) {
+        setError(failed.length === 1 && failed[0].error ? failed[0].error : "Os documentos prontos não foram enviados. Tente novamente.");
         setSending(false);
         setConfirmSend(false);
         return;
       }
-      const heldBack = situations(rows, drafts, people, signers, opened).filter((item) => item.situation !== "Pronto" && item.situation !== "Já enviado").length;
-      const sentCount = situations(rows, drafts, people, signers, opened).filter((item) => item.situation === "Pronto").length;
       setConfirmSend(false);
-      if (heldBack > 0) {
+      if (heldBack > 0 || failed.length > 0) {
         setSentNote(
           `${sentCount} ${sentCount === 1 ? "documento enviado" : "documentos enviados"}. ${heldBack} ${heldBack === 1 ? "ficou de fora porque precisa" : "ficaram de fora porque precisam"} de correção.`,
         );
+        setError(failed.length > 0 ? "Alguns documentos prontos não foram enviados. Os que ficaram de fora por pendência não entram neste envio." : null);
         setSending(false);
         return;
       }
@@ -274,7 +308,7 @@ export function AttachWizard({
         ) : step === 2 ? (
           <DocumentReview
             rows={rows}
-            people={people}
+            people={shownPeople}
             drafts={drafts}
             signers={signers}
             history={history}
@@ -331,10 +365,7 @@ export function AttachWizard({
               }
               await onReload();
             }}
-            onSave={async (input) => {
-              await saveEmployeeContact(input);
-              await onReload();
-            }}
+            onContact={(sellerId, contact) => setContactEdits((current) => ({ ...current, [sellerId]: contact }))}
             onBack={() => setStep(1)}
             onReview={() => setStep(3)}
             period={`${monthFolder(Number(month))}/${year}`}
@@ -344,7 +375,7 @@ export function AttachWizard({
         ) : (
           <SendReview
             rows={rows}
-            people={people}
+            people={shownPeople}
             drafts={drafts}
             signers={signers}
             opened={opened}
@@ -357,12 +388,31 @@ export function AttachWizard({
               setStep(2);
             }}
             onSend={() => {
-              const pending = situations(rows, drafts, people, signers, opened).filter((item) => item.situation !== "Pronto" && item.situation !== "Já enviado").length;
+              const pending = situations(rows, drafts, shownPeople, signers, opened).filter((item) => item.situation !== "Pronto" && item.situation !== "Já enviado").length;
               if (pending > 0) {
                 setConfirmSend(true);
                 return;
               }
               void send();
+            }}
+            onRemove={async (id) => {
+              await deleteDocument(id);
+              setDrafts((current) => {
+                const next = { ...current };
+                delete next[id];
+                return next;
+              });
+              setOpened((current) => {
+                const next = { ...current };
+                delete next[id];
+                return next;
+              });
+              setActiveId((current) => {
+                if (current !== id) return current;
+                const index = rows.findIndex((row) => row.id === id);
+                return rows[index + 1]?.id ?? rows[index - 1]?.id ?? "";
+              });
+              await onReload();
             }}
             onApply={(ids, deadline, reminder) => {
               setDrafts((current) => {
@@ -393,12 +443,12 @@ export function AttachWizard({
               Cancelar
             </Button>
             <Button disabled={sending} onClick={() => void send()}>
-              {sending ? "Enviando…" : sendLabel(situations(rows, drafts, people, signers, opened).filter((item) => item.situation === "Pronto").length)}
+              {sending ? "Enviando…" : sendLabel(situations(rows, drafts, shownPeople, signers, opened).filter((item) => item.situation === "Pronto").length)}
             </Button>
           </>
         }
       >
-        <ConfirmCopy rows={rows} drafts={drafts} people={people} signers={signers} opened={opened} />
+        <ConfirmCopy rows={rows} drafts={drafts} people={shownPeople} signers={signers} opened={opened} />
       </Modal>
       <Modal
         open={confirmLeave}
@@ -508,6 +558,7 @@ function SendReview({
   onBack,
   onOpen,
   onSend,
+  onRemove,
   onApply,
 }: {
   rows: DocumentRow[];
@@ -521,6 +572,7 @@ function SendReview({
   onBack: () => void;
   onOpen: (id: string) => void;
   onSend: () => void;
+  onRemove: (id: string) => Promise<void>;
   onApply: (ids: string[], deadline: string, reminder: DocumentDraft["reminder"]) => void;
 }) {
   const items = situations(rows, drafts, people, signers, opened);
@@ -530,6 +582,8 @@ function SendReview({
   const [picked, setPicked] = useState<string[]>([]);
   const [deadline, setDeadline] = useState("");
   const [reminder, setReminder] = useState<DocumentDraft["reminder"]>("EVERY_3_DAYS");
+  const [removeId, setRemoveId] = useState<string | null>(null);
+  const [removing, setRemoving] = useState(false);
   const openIds = items.filter((item) => item.situation !== "Já enviado").map((item) => item.row.id);
   return (
     <>
@@ -557,25 +611,34 @@ function SendReview({
                 <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-t2">{title}</p>
                 <div className="overflow-hidden rounded-xl border border-line">
                   {group.map((item) => (
-                    <div key={item.row.id} className="grid grid-cols-[auto_minmax(0,1.2fr)_minmax(0,1fr)_auto_auto] items-center gap-3 border-b border-line px-3 py-2.5 last:border-b-0">
+                    <div key={item.row.id} className="grid grid-cols-[auto_minmax(0,1.4fr)_minmax(0,1fr)_auto_auto] items-center gap-3 border-b border-line px-3 py-2.5 last:border-b-0">
                       <input
                         type="checkbox"
-                        aria-label={`Selecionar ${folderTitle(item.row.fileName)}`}
+                        aria-label={`Selecionar ${displayTitle(item.row.fileName)}`}
                         disabled={item.situation === "Já enviado"}
                         checked={picked.includes(item.row.id)}
                         onChange={(event) => setPicked((current) => (event.target.checked ? [...current, item.row.id] : current.filter((id) => id !== item.row.id)))}
                       />
                       <span className="min-w-0">
-                        <span className="block truncate text-[13px] font-bold text-t0">{folderTitle(item.row.fileName)}</span>
+                        <span className="block truncate text-[13px] font-bold text-t0">{displayTitle(item.row.fileName)}</span>
                         <span className="mt-0.5 block truncate text-[11.5px] text-t2">{scheduleLine(item.draft)}</span>
                       </span>
                       <span className="truncate text-[13px] text-t1">{item.person?.name ?? "Sem colaborador"}</span>
-                      <span className={cn("text-[12.5px] font-bold", item.situation === "Pronto" ? "text-ok" : item.situation === "Já enviado" ? "text-t2" : "text-warn")}>
-                        {item.situation}
-                      </span>
                       <Button type="button" size="sm" variant="outline" onClick={() => onOpen(item.row.id)}>
                         {item.situation === "Pronto" || item.situation === "Já enviado" ? "Revisar" : "Corrigir"}
                       </Button>
+                      {item.situation === "Já enviado" ? (
+                        <span className="w-8" />
+                      ) : (
+                        <button
+                          type="button"
+                          className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-vela-sm)] text-t2 hover:bg-bad-soft hover:text-bad"
+                          aria-label="Excluir documento"
+                          onClick={() => setRemoveId(item.row.id)}
+                        >
+                          <Icon d={icons.trash} size={15} />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -588,10 +651,10 @@ function SendReview({
         <SummaryTile label="Precisam de atenção" value={String(attention)} />
         <SummaryTile label="Já enviados" value={String(sent)} />
       </div>
-      {openIds.length > 1 && (
+      {openIds.length > 0 && (
         <div className="mt-4 rounded-xl border border-line p-3">
-          <p className="text-[13px] font-bold text-t0">Aplicar lembrete e prazo aos selecionados</p>
-          <p className="mt-1 text-[12.5px] text-t2">Contatos e canais não mudam.</p>
+          <p className="text-[13px] font-bold text-t0">Lembrete e data limite</p>
+          <p className="mt-1 text-[12.5px] text-t2">Vale para os documentos marcados. Sem marcação, vale para todos os que ainda não foram enviados. Contatos e canais não mudam.</p>
           <div className="mt-3 flex flex-wrap items-end gap-2">
             <label className="grid min-w-[160px] flex-1 gap-1 text-[12px] font-bold text-t2">
               Lembrete
@@ -606,7 +669,7 @@ function SendReview({
               Data limite
               <input type="date" className={controlClass} value={deadline} onChange={(event) => setDeadline(event.target.value)} />
             </label>
-            <Button type="button" variant="outline" disabled={picked.length === 0} onClick={() => onApply(picked, deadline, reminder)}>
+            <Button type="button" variant="outline" onClick={() => onApply(picked.length > 0 ? picked : openIds, deadline, reminder)}>
               Aplicar
             </Button>
           </div>
@@ -618,6 +681,41 @@ function SendReview({
       <div className="mt-4">
         <WizardNav previousLabel="Voltar" nextLabel={sending ? "Enviando…" : sendLabel(ready)} hideNextIcon previousDisabled={sending} nextDisabled={sending || ready === 0} onPrevious={onBack} onNext={onSend} />
       </div>
+      <Modal
+        open={removeId != null}
+        onClose={() => {
+          if (!removing) setRemoveId(null);
+        }}
+        title="Excluir documento"
+        footer={
+          <>
+            <Button variant="outline" disabled={removing} onClick={() => setRemoveId(null)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="danger"
+              disabled={removing || !removeId}
+              onClick={() => {
+                if (!removeId) return;
+                const id = removeId;
+                setRemoving(true);
+                void onRemove(id).then(
+                  () => {
+                    setRemoveId(null);
+                    setRemoving(false);
+                    setPicked((current) => current.filter((item) => item !== id));
+                  },
+                  () => setRemoving(false),
+                );
+              }}
+            >
+              {removing ? "Excluindo…" : "Excluir"}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-[13.5px] text-t1">Este documento sai do lote. Os outros permanecem.</p>
+      </Modal>
     </>
   );
 }

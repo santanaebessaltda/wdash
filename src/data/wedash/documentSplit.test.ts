@@ -23,6 +23,7 @@ import {
   firstCpf,
   folderSegments,
   folderTitle,
+  displayTitle,
   groupPages,
   markAfterDrop,
   placementWarning,
@@ -161,6 +162,8 @@ describe("fileName", () => {
     expect(fileName("Holerite", [])).toBe("Holerite.pdf");
     expect(fileName("Holerite", ["Holerite.pdf"])).toBe("Holerite (2).pdf");
     expect(fileName("Holerite", ["Holerite.pdf", "Holerite (2).pdf"])).toBe("Holerite (3).pdf");
+    expect(displayTitle("Holerite (12).pdf")).toBe("Holerite");
+    expect(displayTitle("Holerite.pdf")).toBe("Holerite");
   });
 });
 
