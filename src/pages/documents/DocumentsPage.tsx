@@ -140,10 +140,10 @@ export function DocumentsPage() {
     try {
       await cancelDocument(id);
       setDeleteId(null);
-      show("Assinatura cancelada.", "success");
+      show("Documento excluído.", "success");
       await reload();
     } catch (error) {
-      show(error instanceof Error ? error.message : "Não foi possível cancelar a assinatura. Tente novamente.", "danger");
+      show(error instanceof Error ? error.message : "Não foi possível excluir o documento. Tente novamente.", "danger");
     } finally {
       setActing(false);
     }
@@ -333,18 +333,18 @@ export function DocumentsPage() {
         onClose={() => {
           if (!acting) setDeleteId(null);
         }}
-        title="Cancelar assinatura?"
+        title="Excluir documento?"
         footer={
           <>
-            <Button variant="outline" disabled={acting} onClick={() => setDeleteId(null)}>Voltar</Button>
+            <Button variant="outline" disabled={acting} onClick={() => setDeleteId(null)}>Cancelar</Button>
             <Button variant="danger" disabled={acting || !deleteId} onClick={() => deleteId && void apagar(deleteId)}>
-              {acting ? "Cancelando…" : "Cancelar assinatura"}
+              {acting ? "Excluindo…" : "Excluir documento"}
             </Button>
           </>
         }
       >
         <div className="grid gap-2">
-          <p className="text-[13.5px] text-t1">A assinatura será cancelada no Assina AI e o documento ficará como Recusado. O PDF continuará disponível na pasta.</p>
+          <p className="text-[13.5px] text-t1">Este documento será removido da WDash e a assinatura será cancelada no Assina AI. Esta ação não pode ser desfeita.</p>
           {deleteId && extraSignerCount(documents.find((item) => item.id === deleteId)?.extraSigner) > 0 ? (
             <p className="text-[13.5px] text-t1">A assinatura de todos os signatários deste documento será cancelada.</p>
           ) : null}
@@ -708,7 +708,7 @@ function RowMenu({
     { label: "Copiar link", onClick: onCopy, disabled: busy },
     { label: "Mover", onClick: onMove, disabled: busy },
     { label: "", divider: true },
-    { label: "Cancelar assinatura", onClick: onDelete, danger: true, disabled: busy },
+    { label: "Excluir documento", onClick: onDelete, danger: true, disabled: busy },
   ];
   return (
     <span className="flex justify-end">

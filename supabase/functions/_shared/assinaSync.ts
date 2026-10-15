@@ -19,10 +19,11 @@ export async function loadCompanyToken(
 export async function syncEnvelope(admin: SupabaseClient, token: string, envelopeId: string): Promise<boolean> {
   const { data: row } = await admin
     .from("employee_document")
-    .select("id, tenant_id, status, signed_storage_path")
+    .select("id, tenant_id, status, signed_storage_path, removed_at")
     .eq("envelope_id", envelopeId)
     .maybeSingle();
   if (!row) return false;
+  if (row.removed_at) return true;
 
   const remote = await assinaGetEnvelope(token, envelopeId);
   if (!remote?.status) return true;

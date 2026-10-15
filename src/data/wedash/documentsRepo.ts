@@ -99,10 +99,10 @@ export async function loadDocuments(tenantId: string, storeId: string | null): P
   if (!sb) return { batches: [], documents: [], people: [], stores: [], history: [] };
   const [batches, documents, people, stores, sentExtras] = await Promise.all([
     sb.from("document_batch").select("id, store_id, month, year, category, channel, deadline, created_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }),
-    sb.from("employee_document").select("id, batch_id, store_id, seller_id, status, file_name, error, envelope_id, size_bytes, page_count, created_at, sent_at, extra_signer").eq("tenant_id", tenantId).order("created_at"),
+    sb.from("employee_document").select("id, batch_id, store_id, seller_id, status, file_name, error, envelope_id, size_bytes, page_count, created_at, sent_at, extra_signer").eq("tenant_id", tenantId).is("removed_at", null).order("created_at"),
     sb.from("store_seller").select("id, store_id, name, cpf, email, whatsapp, active, in_erp").eq("tenant_id", tenantId).order("name").limit(2000),
     sb.from("store").select("id, name").eq("tenant_id", tenantId).order("name"),
-    sb.from("employee_document").select("extra_signer, sent_at").eq("tenant_id", tenantId).not("envelope_id", "is", null).order("sent_at", { ascending: false }).limit(80),
+    sb.from("employee_document").select("extra_signer, sent_at").eq("tenant_id", tenantId).is("removed_at", null).not("envelope_id", "is", null).order("sent_at", { ascending: false }).limit(80),
   ]);
   const inStore = (id: string | null) => !storeId || id === storeId;
   return {

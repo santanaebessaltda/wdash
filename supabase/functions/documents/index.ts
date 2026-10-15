@@ -396,6 +396,7 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
   const { data: docs } = await admin.from("employee_document").select("*").eq("batch_id", batch.id);
   const results: { id: string; error: string | null }[] = [];
   for (const doc of docs ?? []) {
+    if (doc.removed_at) continue;
     try {
     const channel = asChannel(doc.channel) ?? fallbackChannel;
     const pageCount = Number(doc.page_count) || 1;
@@ -490,7 +491,7 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
 
 async function resend(admin: SupabaseClient, tenantId: string, secret: string, body: Body) {
   const { data: doc } = await admin.from("employee_document").select("*").eq("id", String(body.documentId ?? "")).eq("tenant_id", tenantId).maybeSingle();
-  if (!doc || !resendVisible(doc.status as DocStatus) || !doc.envelope_id || !doc.recipient_id) return json({ error: "not_found" }, 404);
+  if (!doc || doc.removed_at || !resendVisible(doc.status as DocStatus) || !doc.envelope_id || !doc.recipient_id) return json({ error: "not_found" }, 404);
   const batch = await ownedBatch(admin, tenantId, doc.batch_id as string);
   const channel = asChannel(doc.channel) ?? asChannel(batch?.channel);
   if (!batch || !channel) return json({ error: "not_found" }, 404);
@@ -511,8 +512,8 @@ async function resend(admin: SupabaseClient, tenantId: string, secret: string, b
 }
 
 async function copyLink(admin: SupabaseClient, tenantId: string, secret: string, body: Body) {
-  const { data: doc } = await admin.from("employee_document").select("status, envelope_id, recipient_id").eq("id", String(body.documentId ?? "")).eq("tenant_id", tenantId).maybeSingle();
-  if (!doc || !resendVisible(doc.status as DocStatus) || !doc.envelope_id || !doc.recipient_id) return json({ message: "Não foi possível copiar o link. Tente novamente." }, 404);
+  const { data: doc } = await admin.from("employee_document").select("status, envelope_id, recipient_id, removed_at").eq("id", String(body.documentId ?? "")).eq("tenant_id", tenantId).maybeSingle();
+  if (!doc || doc.removed_at || !resendVisible(doc.status as DocStatus) || !doc.envelope_id || !doc.recipient_id) return json({ message: "Não foi possível copiar o link. Tente novamente." }, 404);
   const token = await loadCompanyToken(admin, tenantId, secret);
   if (!token) return json({ message: DOCUMENT_COPY.noToken }, 422);
   const url = await assinaSignerLink(token, doc.envelope_id as string, doc.recipient_id as string);
@@ -521,13 +522,14 @@ async function copyLink(admin: SupabaseClient, tenantId: string, secret: string,
 }
 
 async function cancelDocument(admin: SupabaseClient, tenantId: string, secret: string, body: Body) {
-  const { data: doc } = await admin.from("employee_document").select("id, status, envelope_id").eq("id", String(body.documentId ?? "")).eq("tenant_id", tenantId).maybeSingle();
-  if (!doc || !resendVisible(doc.status as DocStatus) || !doc.envelope_id) return json({ message: "Não foi possível cancelar a assinatura. Tente novamente." }, 404);
+  const { data: doc } = await admin.from("employee_document").select("id, status, envelope_id, removed_at").eq("id", String(body.documentId ?? "")).eq("tenant_id", tenantId).maybeSingle();
+  if (!doc || doc.removed_at || !resendVisible(doc.status as DocStatus) || !doc.envelope_id) return json({ message: "Não foi possível excluir o documento. Tente novamente." }, 404);
   const token = await loadCompanyToken(admin, tenantId, secret);
   if (!token) return json({ message: DOCUMENT_COPY.noToken }, 422);
   const ok = await assinaCancelEnvelope(token, doc.envelope_id as string);
-  if (!ok) return json({ message: "Não foi possível cancelar a assinatura. Tente novamente." }, 502);
-  await admin.from("employee_document").update({ status: "DECLINED", error: null }).eq("id", doc.id);
+  if (!ok) return json({ message: "Não foi possível excluir o documento. Tente novamente." }, 502);
+  const { error } = await admin.from("employee_document").update({ removed_at: new Date().toISOString(), error: null }).eq("id", doc.id);
+  if (error) return json({ message: "Não foi possível excluir o documento. Tente novamente." }, 500);
   return json({ ok: true });
 }
 
@@ -536,8 +538,8 @@ async function moveDocument(admin: SupabaseClient, tenantId: string, body: Body)
   const sellerId = String(body.sellerId ?? "");
   const month = Number(body.month);
   const year = Number(body.year);
-  const { data: doc } = await admin.from("employee_document").select("id, batch_id, status, envelope_id").eq("id", documentId).eq("tenant_id", tenantId).maybeSingle();
-  if (!doc || !resendVisible(doc.status as DocStatus) || !doc.envelope_id) return json({ message: "Só um documento pendente pode ser movido." }, 422);
+  const { data: doc } = await admin.from("employee_document").select("id, batch_id, status, envelope_id, removed_at").eq("id", documentId).eq("tenant_id", tenantId).maybeSingle();
+  if (!doc || doc.removed_at || !resendVisible(doc.status as DocStatus) || !doc.envelope_id) return json({ message: "Só um documento pendente pode ser movido." }, 422);
   const { data: seller } = await admin.from("store_seller").select("id, store_id").eq("id", sellerId).eq("tenant_id", tenantId).maybeSingle();
   const { data: batch } = await admin.from("document_batch").select("category, unify").eq("id", doc.batch_id).eq("tenant_id", tenantId).maybeSingle();
   if (!seller || !batch) return json({ message: "Não foi possível mover o documento. Tente novamente." }, 404);
@@ -569,7 +571,7 @@ async function moveDocument(admin: SupabaseClient, tenantId: string, body: Body)
 
 async function openFile(admin: SupabaseClient, tenantId: string, secret: string, body: Body) {
   const { data: doc } = await admin.from("employee_document").select("*").eq("id", String(body.documentId ?? "")).eq("tenant_id", tenantId).maybeSingle();
-  if (!doc) return json({ error: "not_found" }, 404);
+  if (!doc || doc.removed_at) return json({ message: "O arquivo ainda não está disponível." }, 404);
   let path = (doc.status === "SIGNED" ? doc.signed_storage_path : doc.storage_path) as string | null;
   if (doc.status === "SIGNED" && !path && doc.envelope_id) {
     const token = await loadCompanyToken(admin, tenantId, secret);
