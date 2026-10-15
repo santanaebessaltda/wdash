@@ -33,13 +33,12 @@ export function DocumentsPage() {
   const sentDocuments = documents.filter((doc) => doc.envelopeId);
   const pending = sentDocuments.filter((doc) => doc.status === "PENDING");
   const signed = sentDocuments.filter((doc) => doc.status === "SIGNED");
+  const expired = sentDocuments.filter((doc) => doc.status === "EXPIRED");
   const now = new Date();
   const thisMonth = sentDocuments.filter((doc) => {
     const batch = batchOf.get(doc.batchId);
     return batch?.month === now.getMonth() + 1 && batch.year === now.getFullYear();
   });
-  const missingContact = people.filter((person) => !person.email && !person.whatsapp).length;
-
   const listed =
     mode === "pending"
       ? pending
@@ -93,12 +92,11 @@ export function DocumentsPage() {
             <QuickStat label="Pendentes" value={String(pending.length)} sub="Aguardando assinatura" tint="warn" icon={<Glyph d="M12 8v4l3 2M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20" />} />
             <QuickStat label="Assinados" value={String(signed.length)} sub="Documentos assinados" tint="ok" icon={<Glyph d="M20 6 9 17l-5-5" />} />
             <QuickStat
-              label="Sem contato"
-              value={String(missingContact)}
-              sub="Colaboradores sem e-mail e WhatsApp"
-              tooltip="Conta os colaboradores sem nenhum contato disponível para envio."
+              label="Expirados"
+              value={String(expired.length)}
+              sub="Passou da data limite"
               tint="bad"
-              icon={<Glyph d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8" />}
+              icon={<Glyph d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20M12 6v6M4.9 4.9l14.2 14.2" />}
             />
           </div>
           <p className="mb-3 text-xs font-bold uppercase tracking-wide text-t2">Atalhos</p>
