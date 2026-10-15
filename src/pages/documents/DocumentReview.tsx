@@ -108,6 +108,7 @@ export function DocumentReview({
       {error && <p className="mt-3 text-sm text-bad">{error}</p>}
       <div className="mt-4">
         <WizardNav
+          hideNextIcon
           previousDisabled={sending}
           nextDisabled={sending || ready === 0}
           onPrevious={onBack}
@@ -191,11 +192,11 @@ function ReviewBody({
   return (
     <div className="mt-4">
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <Button type="button" size="sm" variant="secondary" disabled={!previous || sending} onClick={() => previous && onFocus(previous.id)}>
+        <Button type="button" variant="secondary" disabled={!previous || sending} onClick={() => previous && onFocus(previous.id)}>
           Anterior
         </Button>
         <select
-          className={cn(controlClass, "min-w-0 flex-1")}
+          className="h-10 min-w-0 flex-1 rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3.5 text-[13px] text-t0 outline-none transition-colors focus:border-acc"
           value={row.id}
           onChange={(event) => onFocus(event.target.value)}
         >
@@ -203,12 +204,12 @@ function ReviewBody({
             const named = people.find((personItem) => personItem.id === item.sellerId);
             return (
               <option key={item.id} value={item.id}>
-                {itemIndex + 1}. {folderTitle(item.fileName)} · {named?.name ?? "Sem colaborador"}
+                {itemIndex + 1}. {folderTitle(item.fileName)} · {named?.name ?? "Sem assinador"}
               </option>
             );
           })}
         </select>
-        <Button type="button" size="sm" variant="secondary" disabled={!next || sending} onClick={() => next && onFocus(next.id)}>
+        <Button type="button" variant="secondary" disabled={!next || sending} onClick={() => next && onFocus(next.id)}>
           Próximo
         </Button>
       </div>

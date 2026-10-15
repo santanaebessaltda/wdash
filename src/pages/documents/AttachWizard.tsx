@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Breadcrumbs, Button, Card, CardHeader, CardTitle, FormField, ProgressBar, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
 import { Spinner } from "@/components/ui/Skeleton";
@@ -64,6 +64,7 @@ export function AttachWizard({
   const [files, setFiles] = useState<File[]>([]);
   const [drafts, setDrafts] = useState<Record<string, DocumentDraft | undefined>>({});
   const [activeId, setActiveId] = useState("");
+  const openAtStart = useRef(true);
   const [batchId, setBatchId] = useState("");
   const [refused, setRefused] = useState<{ name: string; message: string }[]>([]);
   const [processing, setProcessing] = useState(false);
@@ -83,8 +84,24 @@ export function AttachWizard({
     });
   }, []);
 
-  const rows = documents.filter((doc) => doc.batchId === batchId);
+  const rows = useMemo(
+    () =>
+      documents
+        .filter((doc) => doc.batchId === batchId)
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id)),
+    [documents, batchId],
+  );
   const rowKey = rows.map((row) => `${row.id}:${row.pageCount}`).join("|");
+
+  useEffect(() => {
+    if (step !== 2) {
+      openAtStart.current = true;
+      return;
+    }
+    if (!openAtStart.current || rows.length === 0) return;
+    openAtStart.current = false;
+    setActiveId(rows[0].id);
+  }, [step, rows]);
 
   useEffect(() => {
     if (step !== 2 || rows.length === 0) return;

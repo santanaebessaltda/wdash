@@ -82,7 +82,7 @@ export async function loadDocuments(tenantId: string, storeId: string | null): P
   if (!sb) return { batches: [], documents: [], people: [], stores: [] };
   const [batches, documents, people, stores] = await Promise.all([
     sb.from("document_batch").select("id, store_id, month, year, category, channel, deadline, created_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }),
-    sb.from("employee_document").select("id, batch_id, store_id, seller_id, status, file_name, error, envelope_id, size_bytes, page_count, created_at").eq("tenant_id", tenantId),
+    sb.from("employee_document").select("id, batch_id, store_id, seller_id, status, file_name, error, envelope_id, size_bytes, page_count, created_at").eq("tenant_id", tenantId).order("created_at"),
     sb.from("store_seller").select("id, store_id, name, cpf, email, whatsapp, active, in_erp").eq("tenant_id", tenantId).order("name").limit(2000),
     sb.from("store").select("id, name").eq("tenant_id", tenantId).order("name"),
   ]);
