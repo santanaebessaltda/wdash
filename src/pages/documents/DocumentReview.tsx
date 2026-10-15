@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { getDocument, GlobalWorkerOptions, type PDFDocumentLoadingTask, type RenderTask } from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-import { Button, FormField, WizardCardHeader, WizardNav } from "@/components/ui";
+import { Button, FormField, WizardCardHeader, WizardNav, useToast } from "@/components/ui";
 import { Spinner } from "@/components/ui/Skeleton";
 import {
   DOCUMENT_COPY,
@@ -393,11 +393,19 @@ function StackedPages({
   onDrop: (pageNumber: number) => Promise<void>;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const hinted = useRef(false);
+  const { show } = useToast();
   const [url, setUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dropping, setDropping] = useState<number | null>(null);
   const pages = Array.from({ length: Math.max(1, pageCount) }, (_, index) => index + 1);
+
+  useEffect(() => {
+    if (loading || error || hinted.current) return;
+    hinted.current = true;
+    show("Clique na página para adicionar a marcação.");
+  }, [loading, error, show]);
 
   useEffect(() => {
     let cancelled = false;
@@ -471,14 +479,13 @@ function StackedPages({
   }
 
   return (
-    <div ref={hostRef} className="relative overflow-auto rounded-xl border border-line bg-bg-inset px-4 py-6">
+    <div ref={hostRef} className={cn("relative overflow-auto rounded-xl border border-line bg-bg-inset px-4 py-6", loading && "min-h-[560px]")}>
       {loading && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-bg-inset/80">
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-bg-inset">
           <Spinner size={22} />
         </div>
       )}
-      <p className="mb-4 text-center text-[12.5px] text-t2">Clique na página para adicionar a marcação.</p>
-      <div className="mx-auto flex w-fit max-w-full flex-col gap-6">
+      <div className={cn("mx-auto flex w-fit max-w-full flex-col gap-6", loading && "invisible")}>
         {pages.map((page) => (
           <section key={page} className="w-fit max-w-full">
             <div className="mb-2 flex items-center justify-between gap-2">
@@ -504,7 +511,7 @@ function StackedPages({
             >
               <canvas data-page={page} className="block h-auto max-w-full bg-white" />
               {fields
-                .filter((field) => field.pageNumber === page)
+                .filter((field) => field.pageNumber === page && !loading)
                 .map((field) => (
                   <MarkCard
                     key={field.id}
@@ -580,12 +587,19 @@ function MarkCard({
       onClick={(event) => event.stopPropagation()}
       onPointerDown={(event) => {
         if (disabled || event.button !== 0) return;
-        if ((event.target as HTMLElement).closest("select, button")) return;
+        if (!(event.target as HTMLElement).closest("[data-drag]")) return;
         event.currentTarget.setPointerCapture(event.pointerId);
       }}
       onPointerMove={move}
     >
       <div className="rounded-[var(--radius-vela-md)] border border-line bg-bg-2 p-1.5 text-t0 shadow-[0_12px_28px_-16px_rgba(0,0,0,0.55)]">
+        <div
+          data-drag
+          aria-label="Arrastar marcação"
+          className="mb-1 flex h-7 cursor-grab items-center justify-center rounded-[8px] text-t2 hover:bg-bg-3 active:cursor-grabbing"
+        >
+          <GripIcon />
+        </div>
         <div className="flex items-center gap-1">
           <select
             className="h-8 min-w-0 flex-1 rounded-[var(--radius-vela-sm)] border border-line bg-bg-inset px-2 text-xs font-bold text-t0 outline-none focus:border-acc"
@@ -658,6 +672,19 @@ function MarkCard({
         </div>
       </div>
     </div>
+  );
+}
+
+function GripIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <circle cx="9" cy="6" r="1.5" />
+      <circle cx="15" cy="6" r="1.5" />
+      <circle cx="9" cy="12" r="1.5" />
+      <circle cx="15" cy="12" r="1.5" />
+      <circle cx="9" cy="18" r="1.5" />
+      <circle cx="15" cy="18" r="1.5" />
+    </svg>
   );
 }
 

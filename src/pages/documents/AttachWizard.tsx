@@ -549,7 +549,7 @@ function UploadStep({
       {files.length > 0 && <AttachedFiles files={files} onRemove={(file) => onFiles(files.filter((item) => item !== file))} />}
       {error && <p className="mt-3 text-sm text-bad">{error}</p>}
       <div className="mt-4">
-        <WizardNav previousLabel="Cancelar" nextLabel="Continuar" onPrevious={onCancel} onNext={onNext} nextDisabled={files.length === 0} />
+        <WizardNav previousLabel="Cancelar" nextLabel="Continuar" hideNextIcon onPrevious={onCancel} onNext={onNext} nextDisabled={files.length === 0} />
       </div>
     </>
   );

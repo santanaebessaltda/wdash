@@ -74,6 +74,7 @@ export function WizardNav({
   nextDisabled,
   hidePrevious,
   nextType = "button",
+  hideNextIcon = false,
 }: {
   onPrevious?: () => void;
   onNext?: () => void;
@@ -83,6 +84,7 @@ export function WizardNav({
   nextDisabled?: boolean;
   hidePrevious?: boolean;
   nextType?: "button" | "submit";
+  hideNextIcon?: boolean;
 }) {
   return (
     <div className="flex items-center justify-between pt-2">
@@ -93,7 +95,7 @@ export function WizardNav({
           {previousLabel}
         </Button>
       )}
-      <Button type={nextType} onClick={onNext} disabled={nextDisabled} iconRight={iconNext}>
+      <Button type={nextType} onClick={onNext} disabled={nextDisabled} iconRight={hideNextIcon ? undefined : iconNext}>
         {nextLabel}
       </Button>
     </div>
