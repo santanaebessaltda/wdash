@@ -28,7 +28,7 @@ O gestor envia PDFs digitais para assinatura, organizados por colaborador. Um PD
 
 - O colaborador é o funcionário do Millennium já gravado em `store_seller`. A lista é a da loja, não só quem vende.
 - CPF entra nesse cadastro. E-mail e WhatsApp já existem na tabela e são preenchidos no WDash.
-- O canal do lote é WhatsApp ou e-mail. Quem não tem o contato daquele canal fica na revisão.
+- O canal do lote era WhatsApp ou e-mail para todo mundo. Em 2026-10-15 isso passou a ser por documento. Ver "Destinatários e marcas".
 
 ### Pastas
 
@@ -50,7 +50,7 @@ O gestor envia PDFs digitais para assinatura, organizados por colaborador. Um PD
 
 ### Envio
 
-- Revisão antes de confirmar. Canal, prazo e lembrete são do lote.
+- Revisão antes de confirmar. Prazo e lembrete continuam do lote. O canal deixou de ser do lote em 2026-10-15.
 - Lembrete padrão: a cada 3 dias (`EVERY_3_DAYS`).
 - Autenticação: assinatura na tela (`DEFAULT_SIGN`).
 - Os 4 últimos dígitos do CPF para abrir o arquivo não existem na API publicada. Ficam de fora.
@@ -69,6 +69,32 @@ O gestor envia PDFs digitais para assinatura, organizados por colaborador. Um PD
 - Quem usa a tela no v1 é o gestor. O colaborador não entra no WDash para assinar. O link sai pelo Assina AI.
 - A conexão é um card Assina AI em Conta › Integrações, com `/assinaai.png`. Um token para a empresa, não por filial.
 - Documentos fica no menu do Gestor, fora de Gestão e fora de Configurações, em `/documents`.
+
+---
+
+## Destinatários e marcas
+
+**Gathered:** 2026-10-15. Substitui o canal único do lote e a marca fixa no centro de cada página.
+
+- O wizard fica em quatro passos: Anexar, Destinatários, Assinaturas, Revisão.
+- Cada documento escolhe o próprio canal, na mesma linha do colaborador. Quem não tem WhatsApp pode ir por e-mail, e o contrário, no mesmo lote.
+- CPF, e-mail e WhatsApp só são pedidos uma vez. Se a ficha já tem o CPF e o contato do canal escolhido, a linha não mostra campo: o envio usa o cadastro. O campo some depois de gravar, inclusive no próximo lote. O que for preenchido grava em `store_seller` e o sync do Millennium não reescreve. Trocar o canal só pede o contato daquele canal se a ficha ainda não tiver.
+- A ação do destinatário é só assinar (`SIGN`). Autenticação continua assinatura na tela (`DEFAULT_SIGN`), sem seletor.
+- A marca de assinar começa no centro da última página. A pessoa arrasta. Rubrica é opcional e começa desligada. O nome do `element` da rubrica na API ainda não está confirmado; a tela não envia rubrica até esse nome existir na coleção.
+- Um signatário extra, opcional, vale para o lote inteiro. Também só assina. Nome, canal e contato são definidos uma vez. A posição dele, definida no PDF de amostra, vale para todos os documentos do lote. Ele não vira ficha de colaborador.
+- Replicar copia, para os colaboradores marcados, o canal e as marcas daquele documento. Não copia CPF, e-mail nem WhatsApp da pessoa. Não mexe no signatário extra, porque ele já é do lote.
+- A revisão só confere: documento, pessoa, canal e página da marca. Não edita. Enviar continua pulando linha que já tem envelope.
+
+### Agent's Discretion
+
+- Prazo e lembrete ficam no passo Destinatários, uma vez para o lote.
+- A marca inicial é o centro da última página, não o centro de todas.
+- Reenviar continua o link do colaborador, não o do signatário extra.
+
+### Declined / Undiscussed Gray Areas → Assumptions
+
+- Reconhecer, Testemunhar, Revisar, Aprovar, checkbox, data e texto ficam de fora. O dono pediu só assinar e, às vezes, rubrica.
+- Sem seletor de país no telefone. O WhatsApp segue 10 ou 11 dígitos, como a ficha já grava.
 
 ---
 

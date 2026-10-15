@@ -9,7 +9,7 @@ Implement these tasks with the `tlc-spec-driven` skill: **activate it by name an
 ---
 
 **Design**: `.specs/features/document-signing/design.md`
-**Status**: In Progress
+**Status**: Done
 
 ---
 
@@ -246,11 +246,11 @@ T6 -> T7
 
 **Done when**:
 
-- [ ] Revisão does not edit CPF, e-mail, or WhatsApp
-- [ ] Each row shows the channel and the signature page
-- [ ] The extra signer is shown once above the list
-- [ ] Send skips a row that already has an envelope
-- [ ] Gate check passes: `npm run lint` and `npm run build`
+- [x] Revisão does not edit CPF, e-mail, or WhatsApp
+- [x] Each row shows the channel and the signature page
+- [x] The extra signer is shown once above the list
+- [x] Send skips a row that already has an envelope
+- [x] Gate check passes: `npm run lint` and `npm run build`
 
 **Tests**: none
 **Gate**: build

@@ -15,6 +15,7 @@ import {
   folderTitle,
   monthFolder,
   defaultSignatureMark,
+  placementWarning,
   replicateSetup,
   type SendChannel,
   type SignatureMark,
@@ -90,8 +91,12 @@ export function AttachWizard({
   }
   const sample = rows.find((row) => row.id === sampleId) ?? rows[0];
   const shownExtra = extraOn && sample ? (extraMark ?? { ...defaultSignatureMark(sample.pageCount), y: 72 }) : null;
-  const ready = rows.filter((row) => personReady(people.find((person) => person.id === row.sellerId), channelOf(row.id)));
-  const missing = rows.length - ready.length;
+  const ready = rows.filter((row) => {
+    if (row.envelopeId) return false;
+    const person = people.find((item) => item.id === row.sellerId);
+    return personReady(person, channelOf(row.id)) && !placementWarning([markOf(row)], row.pageCount);
+  });
+  const missing = rows.filter((row) => !row.envelopeId).length - ready.length;
 
   async function split() {
     if (batchId) {
@@ -311,6 +316,12 @@ export function AttachWizard({
             month={Number(month)}
             year={year}
             channelOf={channelOf}
+            markOf={markOf}
+            extra={
+              extraOn && shownExtra
+                ? { name: extraName.trim(), channel: extraChannel, pageNumber: shownExtra.pageNumber }
+                : null
+            }
             rows={rows}
             ready={ready.length}
             missing={missing}
@@ -843,6 +854,8 @@ function ReviewStep({
   month,
   year,
   channelOf,
+  markOf,
+  extra,
   rows,
   ready,
   missing,
@@ -858,6 +871,8 @@ function ReviewStep({
   month: number;
   year: string;
   channelOf: (id: string) => SendChannel;
+  markOf: (row: DocumentRow) => SignatureMark;
+  extra: { name: string; channel: SendChannel; pageNumber: number } | null;
   rows: DocumentRow[];
   ready: number;
   missing: number;
@@ -873,7 +888,12 @@ function ReviewStep({
     <>
       <h3 className="text-lg font-bold text-t0">Revisar e enviar</h3>
       <p className="mt-1 text-[13.5px] text-t2">{category} · {monthFolder(month)}/{year}</p>
-      <p className="mt-1 mb-6 text-[13.5px] text-t2">Confira os colaboradores e os contatos antes de enviar.</p>
+      <p className="mt-1 mb-6 text-[13.5px] text-t2">Confira quem recebe cada documento e em qual página está a assinatura.</p>
+      {extra && (
+        <p className="mb-4 text-[13px] text-t1">
+          Signatário extra: {extra.name || "Sem nome"} · {extra.channel === "WHATSAPP" ? "WhatsApp" : "E-mail"} · assinatura na página {extra.pageNumber}
+        </p>
+      )}
       <div className="mb-4 grid grid-cols-3 gap-3">
         <Summary label="Documentos" value={String(rows.length)} />
         <Summary label="Prontos" value={String(ready)} />
@@ -884,7 +904,7 @@ function ReviewStep({
       )}
       <div className="flex flex-col gap-3">
         {rows.map((row) => (
-          <ReviewRow key={`${row.id}:${row.sellerId ?? ""}`} row={row} people={people} channel={channelOf(row.id)} onAssign={onAssign} />
+          <ReviewRow key={`${row.id}:${row.sellerId ?? ""}`} row={row} people={people} channel={channelOf(row.id)} mark={markOf(row)} onAssign={onAssign} />
         ))}
         {rows.length === 0 && (
           <div>
@@ -905,23 +925,26 @@ function ReviewRow({
   row,
   people,
   channel,
+  mark,
   onAssign,
 }: {
   row: DocumentRow;
   people: PersonRow[];
   channel: SendChannel;
+  mark: SignatureMark;
   onAssign: (documentId: string, sellerId: string) => Promise<void>;
 }) {
   const person = people.find((item) => item.id === row.sellerId) ?? null;
   const ready = personReady(person ?? undefined, channel);
   const alreadySent = Boolean(row.envelopeId);
-  const statusText = alreadySent ? STATUS_LABEL[row.status] : !person ? "Colaborador não identificado" : ready ? "Pronto para enviar" : "Falta contato no cadastro";
+  const pageWarn = placementWarning([mark], row.pageCount);
+  const statusText = alreadySent ? STATUS_LABEL[row.status] : !person ? "Colaborador não identificado" : pageWarn ?? (ready ? "Pronto para enviar" : "Falta contato no cadastro");
 
   return (
     <div className="rounded-xl border border-line p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="truncate text-[13px] font-bold text-t0">{folderTitle(row.fileName)}</p>
-        <span className={cn("text-right text-[11px] font-semibold", alreadySent ? "text-t2" : ready ? "text-ok" : "text-bad")}>{statusText}</span>
+        <span className={cn("text-right text-[11px] font-semibold", alreadySent ? "text-t2" : ready && !pageWarn ? "text-ok" : "text-bad")}>{statusText}</span>
       </div>
       {!person ? (
         <select className={controlClass} defaultValue="" onChange={(event) => event.target.value && void onAssign(row.id, event.target.value)}>
@@ -934,7 +957,7 @@ function ReviewRow({
         </select>
       ) : (
         <p className="text-[13px] text-t1">
-          {person.name} · {channel === "WHATSAPP" ? "WhatsApp" : "E-mail"}
+          {person.name} · {channel === "WHATSAPP" ? "WhatsApp" : "E-mail"} · assinatura na página {mark.pageNumber}
         </p>
       )}
     </div>

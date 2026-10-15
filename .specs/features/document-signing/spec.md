@@ -39,7 +39,10 @@ O gestor manda holerite e documentos parecidos para cada colaborador assinar. Ho
 | Limite do lote | Até 5 PDFs. Cada origem até 15 MB e 1.000 páginas | É o teto da tela de referência. O envelope enviado continua no teto da API, 5 MB. | n |
 | Prazo | Obrigatório no lote. Sem data padrão | O contexto pôs o prazo no lote e não definiu um deslocamento. | n |
 | Lembrete | `EVERY_3_DAYS`, trocável por `EVERY_DAY`, `EVERY_WEEK` ou `NEVER` | São os valores da API. O padrão foi fechado no contexto. | y |
-| Assinatura | `DEFAULT_SIGN`, elemento `SIGNATURE` em 50% da largura e 50% da altura, em toda página | O contexto pediu assinatura na tela, no centro de cada página. | y |
+| Assinatura | `DEFAULT_SIGN` e ação `SIGN`. A marca `SIGNATURE` começa no centro da última página e pode ser arrastada. Rubrica é opcional e só entra quando o `element` da API estiver confirmado | O dono fechou em 2026-10-15: só assinar, com rubrica às vezes, posição no PDF. | y |
+| Canal | Cada documento escolhe WhatsApp ou e-mail. A linha mostra só o contato desse canal, e o CPF só se a ficha não tiver | Quem não tem WhatsApp segue de e-mail no mesmo lote. | y |
+| Signatário extra | Um por lote, opcional, também com ação `SIGN`. A posição definida no PDF de amostra vale para todos os documentos | O dono concordou com um signatário do lote, não um por documento. | y |
+| Replicar | Copia canal e marcas para os colaboradores marcados. Não copia o contato da pessoa nem o signatário extra | O extra já é do lote. O contato é da ficha de cada um. | y |
 | Unificação | Ligada por padrão. Desligada, cada página vira um envelope | O contexto pediu um PDF por CPF, com a opção de desligar. | y |
 | Confirmar de novo | Linha que já tem envelope não é enviada outra vez | Evita documento duplicado se o gestor confirma o que ainda estava bloqueado. | n |
 | Assinado não volta | Status Assinado não regressa | Um webhook atrasado não pode reabrir cobrança de quem já assinou. | n |
