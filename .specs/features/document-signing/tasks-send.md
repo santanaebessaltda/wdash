@@ -190,11 +190,11 @@ T6 -> T7
 
 **Done when**:
 
-- [ ] A complete profile shows the name and the channel and no contact fields
-- [ ] Filling a missing field saves it and the field does not come back
-- [ ] Deadline and reminder stay once for the batch
-- [ ] The extra signer form is optional and shared by the batch
-- [ ] Gate check passes: `npm run lint` and `npm run build`
+- [x] A complete profile shows the name and the channel and no contact fields
+- [x] Filling a missing field saves it and the field does not come back
+- [x] Deadline and reminder stay once for the batch
+- [x] The extra signer form is optional and shared by the batch
+- [x] Gate check passes: `npm run lint` and `npm run build`
 
 **Tests**: none
 **Gate**: build

@@ -332,7 +332,10 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
     const missingChannel = channel ? null : "Escolha WhatsApp ou e-mail.";
     const contactBlock = channel ? channelBlock(channel, { email: seller?.email ?? null, whatsapp: seller?.whatsapp ?? null }) : null;
     const placeBlock = savedMarks.length > 0 ? placementWarning(savedMarks, pageCount) : null;
-    const extraContact = extra ? channelBlock(extra.channel, { email: extra.email, whatsapp: extra.whatsapp }) : null;
+    const extraForDoc = extra
+      ? { ...extra, marks: extra.marks.length > 0 ? extra.marks : [defaultSignatureMark(pageCount)] }
+      : null;
+    const extraContact = extraForDoc ? channelBlock(extraForDoc.channel, { email: extraForDoc.email, whatsapp: extraForDoc.whatsapp }) : null;
     const extraPlace = extra && extra.marks.length > 0 ? placementWarning(extra.marks, pageCount) : null;
     const rowBlock = block ?? missingChannel ?? (doc.seller_id ? contactBlock : null) ?? placeBlock ?? extraContact ?? extraPlace;
     if (!shouldSend({ envelopeId: (doc.envelope_id as string | null) ?? null, sellerId: (doc.seller_id as string | null) ?? null, block: rowBlock })) {
@@ -349,7 +352,7 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
     const bytes = new Uint8Array(await file.data.arrayBuffer());
     const sentName = deliveryFileName(doc.file_name as string, seller.name, Number(batch.month), Number(batch.year));
     const created = await assinaCreateEnvelope(token, bytes, sentName, {
-      signatures: envelopeSignatures({ seller, channel, marks, pageCount, extra }),
+      signatures: envelopeSignatures({ seller, channel, marks, pageCount, extra: extraForDoc }),
       documentSendConfig: {
         documentName: sentName,
         customEmailMessage: "",

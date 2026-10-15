@@ -11,6 +11,7 @@ export type DocumentRow = {
   error: string | null;
   envelopeId: string | null;
   sizeBytes: number;
+  pageCount: number;
   createdAt: string;
 };
 
@@ -81,7 +82,7 @@ export async function loadDocuments(tenantId: string, storeId: string | null): P
   if (!sb) return { batches: [], documents: [], people: [], stores: [] };
   const [batches, documents, people, stores] = await Promise.all([
     sb.from("document_batch").select("id, store_id, month, year, category, channel, deadline, created_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }),
-    sb.from("employee_document").select("id, batch_id, store_id, seller_id, status, file_name, error, envelope_id, size_bytes, created_at").eq("tenant_id", tenantId),
+    sb.from("employee_document").select("id, batch_id, store_id, seller_id, status, file_name, error, envelope_id, size_bytes, page_count, created_at").eq("tenant_id", tenantId),
     sb.from("store_seller").select("id, store_id, name, cpf, email, whatsapp, active, in_erp").eq("tenant_id", tenantId).order("name").limit(2000),
     sb.from("store").select("id, name").eq("tenant_id", tenantId).order("name"),
   ]);
@@ -120,6 +121,7 @@ function mapDoc(row: Record<string, unknown>): DocumentRow {
     error: (row.error as string | null) ?? null,
     envelopeId: (row.envelope_id as string | null) ?? null,
     sizeBytes: Number(row.size_bytes ?? 0),
+    pageCount: Number(row.page_count ?? 1),
     createdAt: String(row.created_at ?? ""),
   };
 }
@@ -183,11 +185,17 @@ export async function assignDocument(documentId: string, sellerId: string) {
   await call({ action: "assign", documentId, sellerId });
 }
 
-export async function saveEmployeeContact(input: { sellerId: string; cpf: string; email: string; whatsapp: string }) {
+export async function saveEmployeeContact(input: { sellerId: string; cpf?: string; email?: string; whatsapp?: string }) {
   await call({ action: "save-contact", ...input });
 }
 
-export async function confirmBatch(input: { batchId: string; channel: "EMAIL" | "WHATSAPP"; deadline: string; reminder: string }) {
+export async function confirmBatch(input: {
+  batchId: string;
+  deadline: string;
+  reminder: string;
+  documents: { id: string; channel: "EMAIL" | "WHATSAPP"; marks: { pageNumber: number; x: number; y: number; element: "SIGNATURE" }[] }[];
+  extraSigner: { name: string; channel: "EMAIL" | "WHATSAPP"; email: string | null; whatsapp: string | null; marks: { pageNumber: number; x: number; y: number; element: "SIGNATURE" }[] } | null;
+}) {
   return call({ action: "confirm", ...input });
 }
 

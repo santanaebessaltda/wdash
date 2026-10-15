@@ -6,7 +6,18 @@ import { paths } from "@/router/paths";
 import { Icon, icons } from "@/pages/users/Icons";
 import { useDocuments } from "./useDocuments";
 import { cn } from "@/lib/cn";
-import { DOCUMENT_CATEGORIES, DOCUMENT_COPY, DOCUMENT_LIMITS, customDocumentName, folderTitle, monthFolder } from "@/data/wedash/documentSplit";
+import {
+  DOCUMENT_CATEGORIES,
+  DOCUMENT_COPY,
+  DOCUMENT_LIMITS,
+  contactFieldsToAsk,
+  customDocumentName,
+  folderTitle,
+  monthFolder,
+  defaultSignatureMark,
+  replicateSetup,
+  type SendChannel,
+} from "@/data/wedash/documentSplit";
 import {
   assignDocument,
   confirmBatch,
@@ -22,8 +33,8 @@ const controlClass =
   "h-[42px] w-full rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3.5 text-[13px] text-t0 outline-none transition-colors focus:border-acc";
 
 const STEPS = [
-  { num: 1, label: "Upload" },
-  { num: 2, label: "Envio" },
+  { num: 1, label: "Anexar" },
+  { num: 2, label: "Destinatários" },
   { num: 3, label: "Revisão" },
 ];
 
@@ -48,9 +59,15 @@ export function AttachWizard({
   const [category, setCategory] = useState<string>(DOCUMENT_CATEGORIES[0]);
   const [customName, setCustomName] = useState("");
   const [files, setFiles] = useState<File[]>([]);
-  const [channel, setChannel] = useState<"WHATSAPP" | "EMAIL">("WHATSAPP");
+  const [channels, setChannels] = useState<Record<string, SendChannel>>({});
+  const [picked, setPicked] = useState<Record<string, boolean>>({});
   const [reminder, setReminder] = useState("EVERY_3_DAYS");
   const [deadline, setDeadline] = useState("");
+  const [extraOn, setExtraOn] = useState(false);
+  const [extraName, setExtraName] = useState("");
+  const [extraChannel, setExtraChannel] = useState<SendChannel>("EMAIL");
+  const [extraEmail, setExtraEmail] = useState("");
+  const [extraWhatsapp, setExtraWhatsapp] = useState("");
   const [batchId, setBatchId] = useState("");
   const [refused, setRefused] = useState<{ name: string; message: string }[]>([]);
   const [processing, setProcessing] = useState(false);
@@ -59,7 +76,10 @@ export function AttachWizard({
   const [sending, setSending] = useState(false);
 
   const rows = documents.filter((doc) => doc.batchId === batchId);
-  const ready = rows.filter((row) => personReady(people.find((person) => person.id === row.sellerId), channel));
+  function channelOf(id: string): SendChannel {
+    return channels[id] ?? "WHATSAPP";
+  }
+  const ready = rows.filter((row) => personReady(people.find((person) => person.id === row.sellerId), channelOf(row.id)));
   const missing = rows.length - ready.length;
 
   async function split() {
@@ -106,7 +126,15 @@ export function AttachWizard({
     setSending(true);
     setError(null);
     try {
-      const sent = await confirmBatch({ batchId, channel, deadline, reminder });
+      const sent = await confirmBatch({
+        batchId,
+        deadline,
+        reminder,
+        documents: rows.map((row) => ({ id: row.id, channel: channelOf(row.id), marks: [defaultSignatureMark(row.pageCount)] })),
+        extraSigner: extraOn
+          ? { name: extraName.trim(), channel: extraChannel, email: extraEmail.trim() || null, whatsapp: extraWhatsapp.trim() || null, marks: [] }
+          : null,
+      });
       await onReload();
       const failed = (sent.results ?? []).filter((item) => item.error);
       if (failed.length > 0) {
@@ -161,16 +189,60 @@ export function AttachWizard({
             onNext={() => void split()}
           />
         ) : step === 2 ? (
-          <SettingsStep
-            channel={channel}
+          <RecipientsStep
+            rows={rows}
+            people={people}
             reminder={reminder}
             deadline={deadline}
+            extraOn={extraOn}
+            extraName={extraName}
+            extraChannel={extraChannel}
+            extraEmail={extraEmail}
+            extraWhatsapp={extraWhatsapp}
+            channelOf={channelOf}
+            picked={picked}
             error={error}
-            onChannel={setChannel}
             onReminder={setReminder}
             onDeadline={setDeadline}
+            onExtraOn={setExtraOn}
+            onExtraName={setExtraName}
+            onExtraChannel={setExtraChannel}
+            onExtraEmail={setExtraEmail}
+            onExtraWhatsapp={setExtraWhatsapp}
+            onChannel={(id, value) => setChannels((current) => ({ ...current, [id]: value }))}
+            onPick={(id, value) => setPicked((current) => ({ ...current, [id]: value }))}
+            onReplicate={(sourceId) => {
+              const copy = replicateSetup({ channel: channelOf(sourceId), marks: [] });
+              setChannels((current) => {
+                const next = { ...current };
+                for (const row of rows) {
+                  if (row.id !== sourceId && picked[row.id]) next[row.id] = copy.channel;
+                }
+                return next;
+              });
+            }}
+            onAssign={async (documentId, sellerId) => {
+              await assignDocument(documentId, sellerId);
+              await onReload();
+            }}
+            onSave={async (input) => {
+              await saveEmployeeContact(input);
+              await onReload();
+            }}
             onBack={() => setStep(1)}
             onNext={() => {
+              if (extraOn && !extraName.trim()) {
+                setError("Informe o nome do signatário.");
+                return;
+              }
+              if (extraOn && extraChannel === "EMAIL" && !extraEmail.trim()) {
+                setError(DOCUMENT_COPY.noEmail);
+                return;
+              }
+              if (extraOn && extraChannel === "WHATSAPP" && !extraWhatsapp.trim()) {
+                setError(DOCUMENT_COPY.noWhatsapp);
+                return;
+              }
               setError(null);
               setStep(3);
             }}
@@ -180,7 +252,7 @@ export function AttachWizard({
             category={category}
             month={Number(month)}
             year={year}
-            channel={channel}
+            channelOf={channelOf}
             rows={rows}
             ready={ready.length}
             missing={missing}
@@ -192,10 +264,6 @@ export function AttachWizard({
             onSend={() => void send()}
             onAssign={async (documentId, sellerId) => {
               await assignDocument(documentId, sellerId);
-              await onReload();
-            }}
-            onSave={async (input) => {
-              await saveEmployeeContact(input);
               await onReload();
             }}
           />
@@ -225,9 +293,10 @@ export function AttachPage() {
   );
 }
 
-function personReady(person: PersonRow | undefined, channel: "WHATSAPP" | "EMAIL") {
+function personReady(person: PersonRow | undefined, channel: SendChannel) {
   if (!person) return false;
-  return channel === "WHATSAPP" ? Boolean(person.whatsapp) : Boolean(person.email);
+  const ask = contactFieldsToAsk(person, channel);
+  return !ask.cpf && !ask.email && !ask.whatsapp;
 }
 
 const READ_LINES = ["Lendo as páginas…", "Identificando os colaboradores…", "Separando os documentos…"];
@@ -477,37 +546,74 @@ function UploadStep({
   );
 }
 
-function SettingsStep({
-  channel,
+function ChannelSelect({ value, onChange }: { value: SendChannel; onChange: (value: SendChannel) => void }) {
+  return (
+    <select className={controlClass} value={value} onChange={(event) => onChange(event.target.value as SendChannel)}>
+      <option value="WHATSAPP">WhatsApp</option>
+      <option value="EMAIL">E-mail</option>
+    </select>
+  );
+}
+
+function RecipientsStep({
+  rows,
+  people,
   reminder,
   deadline,
+  extraOn,
+  extraName,
+  extraChannel,
+  extraEmail,
+  extraWhatsapp,
+  channelOf,
+  picked,
   error,
-  onChannel,
   onReminder,
   onDeadline,
+  onExtraOn,
+  onExtraName,
+  onExtraChannel,
+  onExtraEmail,
+  onExtraWhatsapp,
+  onChannel,
+  onPick,
+  onReplicate,
+  onAssign,
+  onSave,
   onBack,
   onNext,
 }: {
-  channel: "WHATSAPP" | "EMAIL";
+  rows: DocumentRow[];
+  people: PersonRow[];
   reminder: string;
   deadline: string;
+  extraOn: boolean;
+  extraName: string;
+  extraChannel: SendChannel;
+  extraEmail: string;
+  extraWhatsapp: string;
+  channelOf: (id: string) => SendChannel;
+  picked: Record<string, boolean>;
   error: string | null;
-  onChannel: (value: "WHATSAPP" | "EMAIL") => void;
   onReminder: (value: string) => void;
   onDeadline: (value: string) => void;
+  onExtraOn: (value: boolean) => void;
+  onExtraName: (value: string) => void;
+  onExtraChannel: (value: SendChannel) => void;
+  onExtraEmail: (value: string) => void;
+  onExtraWhatsapp: (value: string) => void;
+  onChannel: (id: string, value: SendChannel) => void;
+  onPick: (id: string, value: boolean) => void;
+  onReplicate: (sourceId: string) => void;
+  onAssign: (documentId: string, sellerId: string) => Promise<void>;
+  onSave: (input: { sellerId: string; cpf?: string; email?: string; whatsapp?: string }) => Promise<void>;
   onBack: () => void;
   onNext: () => void;
 }) {
   return (
     <>
-      <WizardCardHeader title="Configurar envio" subtitle="Escolha como o colaborador receberá o link para assinatura." />
+      <WizardCardHeader title="Destinatários" subtitle="Cada documento escolhe o canal. O cadastro só é pedido quando ainda falta o contato." />
       <div className="grid gap-3 sm:grid-cols-2">
-        <FormField label="Canal de envio">
-          <select className={controlClass} value={channel} onChange={(event) => onChannel(event.target.value as "WHATSAPP" | "EMAIL")}>
-            <option value="WHATSAPP">WhatsApp</option>
-            <option value="EMAIL">E-mail</option>
-          </select>
-        </FormField>
         <FormField label="Lembrete">
           <select className={controlClass} value={reminder} onChange={(event) => onReminder(event.target.value)}>
             <option value="EVERY_DAY">Todo dia</option>
@@ -520,6 +626,48 @@ function SettingsStep({
           <input type="date" className={controlClass} value={deadline} onChange={(event) => onDeadline(event.target.value)} />
         </FormField>
       </div>
+      <div className="mt-4 rounded-xl border border-line p-3">
+        <label className="flex items-center gap-2 text-[13px] font-bold text-t0">
+          <input type="checkbox" checked={extraOn} onChange={(event) => onExtraOn(event.target.checked)} />
+          Adicionar um signatário neste envio
+        </label>
+        {extraOn && (
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <FormField label="Nome">
+              <input className={controlClass} value={extraName} onChange={(event) => onExtraName(event.target.value)} />
+            </FormField>
+            <FormField label="Canal">
+              <ChannelSelect value={extraChannel} onChange={onExtraChannel} />
+            </FormField>
+            {extraChannel === "EMAIL" ? (
+              <FormField label="E-mail">
+                <input className={controlClass} value={extraEmail} onChange={(event) => onExtraEmail(event.target.value)} />
+              </FormField>
+            ) : (
+              <FormField label="WhatsApp">
+                <input className={controlClass} value={extraWhatsapp} onChange={(event) => onExtraWhatsapp(event.target.value)} />
+              </FormField>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="mt-4 flex flex-col gap-3">
+        {rows.map((row) => (
+          <RecipientRow
+            key={`${row.id}:${row.sellerId ?? ""}`}
+            row={row}
+            people={people}
+            channel={channelOf(row.id)}
+            picked={Boolean(picked[row.id])}
+            canReplicate={rows.some((item) => item.id !== row.id && picked[item.id])}
+            onChannel={(value) => onChannel(row.id, value)}
+            onPick={(value) => onPick(row.id, value)}
+            onReplicate={() => onReplicate(row.id)}
+            onAssign={onAssign}
+            onSave={onSave}
+          />
+        ))}
+      </div>
       {error && <p className="mt-3 text-sm text-bad">{error}</p>}
       <div className="mt-4">
         <WizardNav onPrevious={onBack} onNext={onNext} nextLabel="Revisar" />
@@ -528,11 +676,115 @@ function SettingsStep({
   );
 }
 
+function RecipientRow({
+  row,
+  people,
+  channel,
+  picked,
+  canReplicate,
+  onChannel,
+  onPick,
+  onReplicate,
+  onAssign,
+  onSave,
+}: {
+  row: DocumentRow;
+  people: PersonRow[];
+  channel: SendChannel;
+  picked: boolean;
+  canReplicate: boolean;
+  onChannel: (value: SendChannel) => void;
+  onPick: (value: boolean) => void;
+  onReplicate: () => void;
+  onAssign: (documentId: string, sellerId: string) => Promise<void>;
+  onSave: (input: { sellerId: string; cpf?: string; email?: string; whatsapp?: string }) => Promise<void>;
+}) {
+  const person = people.find((item) => item.id === row.sellerId) ?? null;
+  const ask = person ? contactFieldsToAsk(person, channel) : null;
+  const [cpf, setCpf] = useState("");
+  const [email, setEmail] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [localError, setLocalError] = useState<string | null>(null);
+  const alreadySent = Boolean(row.envelopeId);
+
+  return (
+    <div className="rounded-xl border border-line p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <label className="flex min-w-0 items-center gap-2">
+          <input type="checkbox" checked={picked} disabled={alreadySent} onChange={(event) => onPick(event.target.checked)} />
+          <span className="truncate text-[13px] font-bold text-t0">{folderTitle(row.fileName)}</span>
+        </label>
+        <Button size="sm" variant="outline" type="button" disabled={!canReplicate || alreadySent} onClick={onReplicate}>
+          Replicar
+        </Button>
+      </div>
+      {alreadySent ? (
+        <p className="text-[13px] text-t2">{STATUS_LABEL[row.status]}</p>
+      ) : !person ? (
+        <select className={controlClass} defaultValue="" onChange={(event) => event.target.value && void onAssign(row.id, event.target.value)}>
+          <option value="">Escolher colaborador</option>
+          {people.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <form
+          className="grid gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!ask || (!ask.cpf && !ask.email && !ask.whatsapp)) return;
+            setLocalError(null);
+            const input: { sellerId: string; cpf?: string; email?: string; whatsapp?: string } = { sellerId: person.id };
+            if (ask.cpf) input.cpf = cpf;
+            if (ask.email) input.email = email;
+            if (ask.whatsapp) input.whatsapp = whatsapp;
+            void onSave(input).catch((reason) => setLocalError(reason instanceof Error ? reason.message : DOCUMENT_COPY.badCpf));
+          }}
+        >
+          <p className="text-[13px] font-bold text-t0">{person.name}</p>
+          <FormField label="Canal">
+            <ChannelSelect value={channel} onChange={onChannel} />
+          </FormField>
+          {ask && (ask.cpf || ask.email || ask.whatsapp) && (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {ask.cpf && (
+                <FormField label="CPF">
+                  <input className={controlClass} value={cpf} onChange={(event) => setCpf(event.target.value)} />
+                </FormField>
+              )}
+              {ask.email && (
+                <FormField label="E-mail">
+                  <input className={controlClass} value={email} onChange={(event) => setEmail(event.target.value)} />
+                </FormField>
+              )}
+              {ask.whatsapp && (
+                <FormField label="WhatsApp">
+                  <input className={controlClass} value={whatsapp} onChange={(event) => setWhatsapp(event.target.value)} />
+                </FormField>
+              )}
+            </div>
+          )}
+          {ask && (ask.cpf || ask.email || ask.whatsapp) && (
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-bad">{localError}</span>
+              <Button size="sm" variant="outline" type="submit">
+                Salvar
+              </Button>
+            </div>
+          )}
+        </form>
+      )}
+    </div>
+  );
+}
+
 function ReviewStep({
   category,
   month,
   year,
-  channel,
+  channelOf,
   rows,
   ready,
   missing,
@@ -543,12 +795,11 @@ function ReviewStep({
   onBack,
   onSend,
   onAssign,
-  onSave,
 }: {
   category: string;
   month: number;
   year: string;
-  channel: "WHATSAPP" | "EMAIL";
+  channelOf: (id: string) => SendChannel;
   rows: DocumentRow[];
   ready: number;
   missing: number;
@@ -559,7 +810,6 @@ function ReviewStep({
   onBack: () => void;
   onSend: () => void;
   onAssign: (documentId: string, sellerId: string) => Promise<void>;
-  onSave: (input: { sellerId: string; cpf: string; email: string; whatsapp: string }) => Promise<void>;
 }) {
   return (
     <>
@@ -576,7 +826,7 @@ function ReviewStep({
       )}
       <div className="flex flex-col gap-3">
         {rows.map((row) => (
-          <ReviewRow key={`${row.id}:${row.sellerId ?? ""}`} row={row} people={people} channel={channel} onAssign={onAssign} onSave={onSave} />
+          <ReviewRow key={`${row.id}:${row.sellerId ?? ""}`} row={row} people={people} channel={channelOf(row.id)} onAssign={onAssign} />
         ))}
         {rows.length === 0 && (
           <div>
@@ -598,36 +848,22 @@ function ReviewRow({
   people,
   channel,
   onAssign,
-  onSave,
 }: {
   row: DocumentRow;
   people: PersonRow[];
-  channel: "WHATSAPP" | "EMAIL";
+  channel: SendChannel;
   onAssign: (documentId: string, sellerId: string) => Promise<void>;
-  onSave: (input: { sellerId: string; cpf: string; email: string; whatsapp: string }) => Promise<void>;
 }) {
   const person = people.find((item) => item.id === row.sellerId) ?? null;
-  const [cpf, setCpf] = useState(person?.cpf ?? "");
-  const [email, setEmail] = useState(person?.email ?? "");
-  const [whatsapp, setWhatsapp] = useState(person?.whatsapp ?? "");
-  const [localError, setLocalError] = useState<string | null>(null);
-  const needsContact = person ? (channel === "WHATSAPP" ? !person.whatsapp : !person.email) : true;
+  const ready = personReady(person ?? undefined, channel);
   const alreadySent = Boolean(row.envelopeId);
-  const statusText = alreadySent
-    ? STATUS_LABEL[row.status]
-    : !person
-      ? "Colaborador não identificado"
-      : needsContact
-        ? channel === "WHATSAPP"
-          ? DOCUMENT_COPY.noWhatsapp
-          : DOCUMENT_COPY.noEmail
-        : "Pronto para enviar";
+  const statusText = alreadySent ? STATUS_LABEL[row.status] : !person ? "Colaborador não identificado" : ready ? "Pronto para enviar" : "Falta contato no cadastro";
 
   return (
     <div className="rounded-xl border border-line p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="truncate text-[13px] font-bold text-t0">{folderTitle(row.fileName)}</p>
-        <span className={cn("text-right text-[11px] font-semibold", alreadySent ? "text-t2" : person && !needsContact ? "text-ok" : "text-bad")}>{statusText}</span>
+        <span className={cn("text-right text-[11px] font-semibold", alreadySent ? "text-t2" : ready ? "text-ok" : "text-bad")}>{statusText}</span>
       </div>
       {!person ? (
         <select className={controlClass} defaultValue="" onChange={(event) => event.target.value && void onAssign(row.id, event.target.value)}>
@@ -639,33 +875,9 @@ function ReviewRow({
           ))}
         </select>
       ) : (
-        <form
-          className="grid gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            setLocalError(null);
-            void onSave({ sellerId: person.id, cpf, email, whatsapp }).catch((reason) => setLocalError(reason instanceof Error ? reason.message : DOCUMENT_COPY.badCpf));
-          }}
-        >
-          <p className="text-[13px] font-bold text-t0">{person.name}</p>
-          <div className="grid gap-2 sm:grid-cols-3">
-            <FormField label="CPF">
-              <input className={controlClass} value={cpf} onChange={(event) => setCpf(event.target.value)} />
-            </FormField>
-            <FormField label="E-mail">
-              <input className={cn(controlClass, channel === "EMAIL" && !email ? "border-bad" : "border-line")} value={email} onChange={(event) => setEmail(event.target.value)} />
-            </FormField>
-            <FormField label="WhatsApp">
-              <input className={cn(controlClass, channel === "WHATSAPP" && !whatsapp ? "border-bad" : "border-line")} value={whatsapp} onChange={(event) => setWhatsapp(event.target.value)} />
-            </FormField>
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-xs text-bad">{localError || (needsContact ? "" : row.error ?? "")}</span>
-            <Button size="sm" variant="outline" type="submit">
-              Salvar
-            </Button>
-          </div>
-        </form>
+        <p className="text-[13px] text-t1">
+          {person.name} · {channel === "WHATSAPP" ? "WhatsApp" : "E-mail"}
+        </p>
       )}
     </div>
   );
