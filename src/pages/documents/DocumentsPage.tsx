@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Badge, Button, Card, DataTable, EmptyState, Segmented, type DataTableColumn } from "@/components/ui";
+import { Badge, Button, DataTable, Dropdown, EmptyState, FormField, Modal, Segmented, Card, type DataTableColumn, type DropdownItem } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { QuickStat } from "@/pages/dashboards/QuickStat";
+import { Icon, icons } from "@/pages/users/Icons";
 import { paths } from "@/router/paths";
 import { displayTitle, monthFolder, resendVisible, DOCUMENT_CATEGORIES } from "@/data/wedash/documentSplit";
 import type { BatchRow, DocumentRow, PersonRow } from "@/data/wedash/documentsRepo";
-import { openDocument, resendDocument } from "@/data/wedash/documentsRepo";
+import { cancelDocument, copyDocumentLink, moveDocument, openDocument, resendDocument } from "@/data/wedash/documentsRepo";
 import { DocumentsFrame, FileGlyph, FolderGlyph, Glyph, STATUS_LABEL, SearchGlyph, badgeVariant } from "./frame";
 import { useDocuments } from "./useDocuments";
 
@@ -14,6 +15,8 @@ type Mode = "home" | "pending" | "month" | "browse";
 type PeopleFilter = "active" | "all" | "inactive";
 
 type FolderEntry = { key: string; label: string; detail: string; fileId?: string };
+
+const fieldClass = "h-10 w-full rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3 text-[13px] text-t0";
 
 export function DocumentsPage() {
   const { allStores, batches, documents, people, stores, reload } = useDocuments();
@@ -29,6 +32,12 @@ export function DocumentsPage() {
   const [notice, setNotice] = useState<string | null>(flash?.documentNotice ?? null);
   const [sent, setSent] = useState<string | null>(null);
   const [resendingId, setResendingId] = useState<string | null>(null);
+  const [moveId, setMoveId] = useState<string | null>(null);
+  const [moveSeller, setMoveSeller] = useState("");
+  const [moveMonth, setMoveMonth] = useState("1");
+  const [moveYear, setMoveYear] = useState(String(new Date().getFullYear()));
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [acting, setActing] = useState(false);
 
   const storeName = useMemo(() => new Map(stores.map((store) => [store.id, store.name])), [stores]);
   const personName = useMemo(() => new Map(people.map((person) => [person.id, person.name])), [people]);
@@ -96,6 +105,68 @@ export function DocumentsPage() {
       return;
     }
     goHome();
+  }
+
+  function openMove(id: string) {
+    const doc = documents.find((item) => item.id === id);
+    const batch = doc ? batchOf.get(doc.batchId) : undefined;
+    setMoveSeller(doc?.sellerId ?? "");
+    setMoveMonth(String(batch?.month ?? new Date().getMonth() + 1));
+    setMoveYear(String(batch?.year ?? new Date().getFullYear()));
+    setMoveId(id);
+  }
+
+  async function copyLink(id: string) {
+    setActing(true);
+    setNotice(null);
+    setSent(null);
+    try {
+      const url = await copyDocumentLink(id);
+      await navigator.clipboard.writeText(url);
+      setSent("Link copiado.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Não foi possível copiar o link.");
+    } finally {
+      setActing(false);
+    }
+  }
+
+  async function apagar(id: string) {
+    setActing(true);
+    setNotice(null);
+    setSent(null);
+    try {
+      await cancelDocument(id);
+      setDeleteId(null);
+      setSent("Documento apagado. A assinatura foi cancelada.");
+      await reload();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Não foi possível apagar o documento. Tente novamente.");
+    } finally {
+      setActing(false);
+    }
+  }
+
+  async function mover() {
+    if (!moveId || !moveSeller) return;
+    const year = Number(moveYear);
+    if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+      setNotice("Informe um ano válido.");
+      return;
+    }
+    setActing(true);
+    setNotice(null);
+    setSent(null);
+    try {
+      await moveDocument({ documentId: moveId, sellerId: moveSeller, month: Number(moveMonth), year });
+      setMoveId(null);
+      setSent("Documento movido.");
+      await reload();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Não foi possível mover o documento.");
+    } finally {
+      setActing(false);
+    }
   }
 
   const title = sectionTitle(mode, allStores, crumb, storeName, personName);
@@ -221,8 +292,14 @@ export function DocumentsPage() {
         ) : (
           <FolderTable
             rows={visibleFolders}
+            documents={documents}
             onOpenFolder={(key) => setCrumb([...crumb, key])}
             onOpenFile={(id) => void openFile(id, setNotice)}
+            onResend={(id) => void resendFile(id, setNotice, setSent, setResendingId, reload)}
+            onCopy={(id) => void copyLink(id)}
+            onMove={openMove}
+            onDelete={setDeleteId}
+            busy={acting || resendingId != null}
           />
         )
       ) : visibleFiles.length === 0 ? (
@@ -243,12 +320,72 @@ export function DocumentsPage() {
           showStore={allStores}
           onDownload={(id) => void openFile(id, setNotice)}
           onResend={(id) => void resendFile(id, setNotice, setSent, setResendingId, reload)}
+          onCopy={(id) => void copyLink(id)}
+          onMove={openMove}
+          onDelete={setDeleteId}
+          busy={acting || resendingId != null}
           resendingId={resendingId}
         />
       )}
       <p className="mt-3 text-[12.5px] text-t2">
         {mode === "browse" && !searching ? qty(visibleFolders.length, "item", "itens") : qty(visibleFiles.length, "documento", "documentos")}
       </p>
+      <Modal
+        open={deleteId != null}
+        onClose={() => {
+          if (!acting) setDeleteId(null);
+        }}
+        title="Apagar documento"
+        footer={
+          <>
+            <Button variant="outline" disabled={acting} onClick={() => setDeleteId(null)}>Cancelar</Button>
+            <Button variant="danger" disabled={acting || !deleteId} onClick={() => deleteId && void apagar(deleteId)}>
+              {acting ? "Apagando…" : "Apagar"}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-[13.5px] text-t1">A assinatura é cancelada no Assina AI. O documento sai de Pendentes e fica como Recusado. O PDF continua na pasta.</p>
+      </Modal>
+      <Modal
+        open={moveId != null}
+        onClose={() => {
+          if (!acting) setMoveId(null);
+        }}
+        title="Mover documento"
+        footer={
+          <>
+            <Button variant="outline" disabled={acting} onClick={() => setMoveId(null)}>Cancelar</Button>
+            <Button disabled={acting || !moveSeller} onClick={() => void mover()}>{acting ? "Movendo…" : "Mover"}</Button>
+          </>
+        }
+      >
+        <div className="grid gap-3">
+          <p className="text-[13.5px] text-t1">O arquivo muda de colaborador, mês ou ano. A assinatura no Assina AI continua a mesma.</p>
+          <FormField label="Colaborador">
+            <select className={fieldClass} value={moveSeller} onChange={(event) => setMoveSeller(event.target.value)}>
+              <option value="">Selecione</option>
+              {people.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {allStores ? `${person.name} · ${storeName.get(person.storeId) ?? ""}` : person.name}
+                </option>
+              ))}
+            </select>
+          </FormField>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <FormField label="Mês">
+              <select className={fieldClass} value={moveMonth} onChange={(event) => setMoveMonth(event.target.value)}>
+                {Array.from({ length: 12 }, (_, index) => (
+                  <option key={index + 1} value={index + 1}>{monthFolder(index + 1)}</option>
+                ))}
+              </select>
+            </FormField>
+            <FormField label="Ano">
+              <input className={fieldClass} value={moveYear} onChange={(event) => setMoveYear(event.target.value)} />
+            </FormField>
+          </div>
+        </div>
+      </Modal>
     </DocumentsFrame>
   );
 }
@@ -366,7 +503,27 @@ function folderEntries(input: {
     .map((doc) => ({ key: doc.id, label: displayTitle(doc.fileName), detail: STATUS_LABEL[doc.status], fileId: doc.id }));
 }
 
-function FolderTable({ rows, onOpenFolder, onOpenFile }: { rows: FolderEntry[]; onOpenFolder: (key: string) => void; onOpenFile: (id: string) => void }) {
+function FolderTable({
+  rows,
+  documents,
+  onOpenFolder,
+  onOpenFile,
+  onResend,
+  onCopy,
+  onMove,
+  onDelete,
+  busy,
+}: {
+  rows: FolderEntry[];
+  documents: DocumentRow[];
+  onOpenFolder: (key: string) => void;
+  onOpenFile: (id: string) => void;
+  onResend: (id: string) => void;
+  onCopy: (id: string) => void;
+  onMove: (id: string) => void;
+  onDelete: (id: string) => void;
+  busy: boolean;
+}) {
   const columns: DataTableColumn<FolderEntry>[] = [
     {
       key: "name",
@@ -387,12 +544,26 @@ function FolderTable({ rows, onOpenFolder, onOpenFile }: { rows: FolderEntry[]; 
     {
       key: "download",
       header: "",
-      render: (row) =>
-        row.fileId ? (
+      render: (row) => {
+        const doc = row.fileId ? documents.find((item) => item.id === row.fileId) : undefined;
+        if (doc && pendingMenu(doc)) {
+          return (
+            <RowMenu
+              busy={busy}
+              onDownload={() => onOpenFile(doc.id)}
+              onResend={() => onResend(doc.id)}
+              onCopy={() => onCopy(doc.id)}
+              onMove={() => onMove(doc.id)}
+              onDelete={() => onDelete(doc.id)}
+            />
+          );
+        }
+        return row.fileId ? (
           <Button size="sm" variant="outline" onClick={() => onOpenFile(row.fileId!)}>
             Baixar PDF
           </Button>
-        ) : null,
+        ) : null;
+      },
     },
   ];
   return <DataTable columns={columns} data={rows} rowKey={(row) => row.key} />;
@@ -406,6 +577,10 @@ function FileTable({
   showStore,
   onDownload,
   onResend,
+  onCopy,
+  onMove,
+  onDelete,
+  busy,
   resendingId,
 }: {
   rows: DocumentRow[];
@@ -415,6 +590,10 @@ function FileTable({
   showStore: boolean;
   onDownload: (id: string) => void;
   onResend: (id: string) => void;
+  onCopy: (id: string) => void;
+  onMove: (id: string) => void;
+  onDelete: (id: string) => void;
+  busy: boolean;
   resendingId: string | null;
 }) {
   const columns: DataTableColumn<DocumentRow>[] = [
@@ -472,21 +651,69 @@ function FileTable({
     {
       key: "actions",
       header: "",
-      render: (row) => (
-        <span className="flex flex-wrap justify-end gap-2">
-          <Button size="sm" variant="outline" onClick={() => onDownload(row.id)}>
-            Baixar PDF
-          </Button>
-          {resendVisible(row.status) && row.envelopeId ? (
-            <Button size="sm" variant="outline" disabled={resendingId === row.id} onClick={() => onResend(row.id)}>
-              {resendingId === row.id ? "Reenviando…" : "Reenviar"}
+      render: (row) =>
+        pendingMenu(row) ? (
+          <RowMenu
+            busy={busy || resendingId === row.id}
+            onDownload={() => onDownload(row.id)}
+            onResend={() => onResend(row.id)}
+            onCopy={() => onCopy(row.id)}
+            onMove={() => onMove(row.id)}
+            onDelete={() => onDelete(row.id)}
+          />
+        ) : (
+          <span className="flex justify-end">
+            <Button size="sm" variant="outline" onClick={() => onDownload(row.id)}>
+              Baixar PDF
             </Button>
-          ) : null}
-        </span>
-      ),
+          </span>
+        ),
     },
   ];
   return <DataTable columns={columns} data={rows} rowKey={(row) => row.id} />;
+}
+
+function pendingMenu(row: DocumentRow) {
+  return resendVisible(row.status) && Boolean(row.envelopeId);
+}
+
+function RowMenu({
+  busy,
+  onDownload,
+  onResend,
+  onCopy,
+  onMove,
+  onDelete,
+}: {
+  busy: boolean;
+  onDownload: () => void;
+  onResend: () => void;
+  onCopy: () => void;
+  onMove: () => void;
+  onDelete: () => void;
+}) {
+  const items: DropdownItem[] = [
+    { label: "Baixar PDF", onClick: onDownload, disabled: busy },
+    { label: "Reenviar link", onClick: onResend, disabled: busy },
+    { label: "Copiar link", onClick: onCopy, disabled: busy },
+    { label: "Mover", onClick: onMove, disabled: busy },
+    { label: "", divider: true },
+    { label: "Apagar", onClick: onDelete, danger: true, disabled: busy },
+  ];
+  return (
+    <span className="flex justify-end">
+      <Dropdown
+        align="right"
+        portal
+        items={items}
+        trigger={
+          <button type="button" aria-label="Ações do documento" disabled={busy} className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] text-t1 hover:bg-bg-3 disabled:opacity-50">
+            <Icon d={icons.dots} size={16} />
+          </button>
+        }
+      />
+    </span>
+  );
 }
 
 function formatDay(iso: string | null) {

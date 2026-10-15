@@ -11,7 +11,7 @@ export type AssinaEnvelope = {
 async function call(token: string, path: string, init?: RequestInit): Promise<Response> {
   const headers = new Headers(init?.headers);
   headers.set("Authorization", `Bearer ${token}`);
-  if (!headers.has("Content-Type") && !(init?.body instanceof FormData)) headers.set("Content-Type", "application/json");
+  if (!headers.has("Content-Type") && init?.body != null && !(init.body instanceof FormData)) headers.set("Content-Type", "application/json");
   return fetch(`${BASE}${path}`, { ...init, headers });
 }
 
@@ -72,6 +72,26 @@ export async function assinaCreateEnvelope(
     return { ok: true, body: (await res.json()) as AssinaEnvelope };
   } catch {
     return { ok: false, status: 0, message: null };
+  }
+}
+
+export async function assinaSignerLink(token: string, envelopeId: string, recipientId: string): Promise<string | null> {
+  try {
+    const res = await call(token, `/envelopes/refresh-token-signer-email-link/${envelopeId}/${recipientId}`);
+    if (!res.ok) return null;
+    const text = (await res.text()).trim().replace(/^"|"$/g, "");
+    return text.startsWith("http") ? text : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function assinaCancelEnvelope(token: string, envelopeId: string): Promise<boolean> {
+  try {
+    const res = await call(token, `/envelopes/soft-delete/${envelopeId}`, { method: "DELETE" });
+    return res.ok;
+  } catch {
+    return false;
   }
 }
 

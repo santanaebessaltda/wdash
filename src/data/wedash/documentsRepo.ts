@@ -267,6 +267,20 @@ export async function resendDocument(documentId: string) {
   if (data.message) throw new Error(data.message);
 }
 
+export async function copyDocumentLink(documentId: string): Promise<string> {
+  const data = await call({ action: "copy-link", documentId });
+  if (!data.url) throw new Error("Não foi possível copiar o link.");
+  return data.url;
+}
+
+export async function cancelDocument(documentId: string) {
+  await call({ action: "cancel", documentId });
+}
+
+export async function moveDocument(input: { documentId: string; sellerId: string; month: number; year: number }) {
+  await call({ action: "move", ...input });
+}
+
 export async function openDocument(documentId: string): Promise<string> {
   const data = await call({ action: "open", documentId });
   if (!data.url) throw new Error("O arquivo ainda não está disponível.");

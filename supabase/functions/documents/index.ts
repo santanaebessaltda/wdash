@@ -5,7 +5,7 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
 import { corsHeaders, serve } from "../_shared/cors.ts";
 import { OWNER_ROLES, loadStaffCaller } from "../_shared/staffAuth.ts";
 import { buildPdf, readPdfPages, withoutPage } from "../_shared/pdfPages.ts";
-import { assinaCreateEnvelope, assinaResend } from "../_shared/assinaApi.ts";
+import { assinaCancelEnvelope, assinaCreateEnvelope, assinaResend, assinaSignerLink } from "../_shared/assinaApi.ts";
 import { loadCompanyToken } from "../_shared/assinaSync.ts";
 import {
   DOCUMENT_CATEGORIES,
@@ -124,6 +124,9 @@ serve(async (req) => {
   if (action === "save-contact") return saveContact(admin, caller.tenantId, body);
   if (action === "confirm") return confirm(admin, caller.tenantId, erpSecret, body);
   if (action === "resend") return resend(admin, caller.tenantId, erpSecret, body);
+  if (action === "copy-link") return copyLink(admin, caller.tenantId, erpSecret, body);
+  if (action === "cancel") return cancelDocument(admin, caller.tenantId, erpSecret, body);
+  if (action === "move") return moveDocument(admin, caller.tenantId, body);
   if (action === "open") return openFile(admin, caller.tenantId, erpSecret, body);
   return json({ error: "unknown_action" }, 400);
 });
@@ -504,6 +507,62 @@ async function resend(admin: SupabaseClient, tenantId: string, secret: string, b
     return json({ message: "Não foi possível reenviar." }, 502);
   }
   await admin.from("employee_document").update({ error: null }).eq("id", doc.id);
+  return json({ ok: true });
+}
+
+async function copyLink(admin: SupabaseClient, tenantId: string, secret: string, body: Body) {
+  const { data: doc } = await admin.from("employee_document").select("status, envelope_id, recipient_id").eq("id", String(body.documentId ?? "")).eq("tenant_id", tenantId).maybeSingle();
+  if (!doc || !resendVisible(doc.status as DocStatus) || !doc.envelope_id || !doc.recipient_id) return json({ message: "Não foi possível copiar o link." }, 404);
+  const token = await loadCompanyToken(admin, tenantId, secret);
+  if (!token) return json({ message: DOCUMENT_COPY.noToken }, 422);
+  const url = await assinaSignerLink(token, doc.envelope_id as string, doc.recipient_id as string);
+  if (!url) return json({ message: "Não foi possível copiar o link." }, 502);
+  return json({ url });
+}
+
+async function cancelDocument(admin: SupabaseClient, tenantId: string, secret: string, body: Body) {
+  const { data: doc } = await admin.from("employee_document").select("id, status, envelope_id").eq("id", String(body.documentId ?? "")).eq("tenant_id", tenantId).maybeSingle();
+  if (!doc || !resendVisible(doc.status as DocStatus) || !doc.envelope_id) return json({ message: "Não foi possível apagar o documento." }, 404);
+  const token = await loadCompanyToken(admin, tenantId, secret);
+  if (!token) return json({ message: DOCUMENT_COPY.noToken }, 422);
+  const ok = await assinaCancelEnvelope(token, doc.envelope_id as string);
+  if (!ok) return json({ message: "Não foi possível apagar o documento. Tente novamente." }, 502);
+  await admin.from("employee_document").update({ status: "DECLINED", error: null }).eq("id", doc.id);
+  return json({ ok: true });
+}
+
+async function moveDocument(admin: SupabaseClient, tenantId: string, body: Body) {
+  const documentId = String(body.documentId ?? "");
+  const sellerId = String(body.sellerId ?? "");
+  const month = Number(body.month);
+  const year = Number(body.year);
+  const { data: doc } = await admin.from("employee_document").select("id, batch_id, status, envelope_id").eq("id", documentId).eq("tenant_id", tenantId).maybeSingle();
+  if (!doc || !resendVisible(doc.status as DocStatus) || !doc.envelope_id) return json({ message: "Só um documento pendente pode ser movido." }, 422);
+  const { data: seller } = await admin.from("store_seller").select("id, store_id").eq("id", sellerId).eq("tenant_id", tenantId).maybeSingle();
+  const { data: batch } = await admin.from("document_batch").select("category, unify").eq("id", doc.batch_id).eq("tenant_id", tenantId).maybeSingle();
+  if (!seller || !batch) return json({ error: "not_found" }, 404);
+  if (!Number.isInteger(month) || month < 1 || month > 12 || !Number.isInteger(year) || year < 2000 || year > 2100) return json({ error: "invalid_batch" }, 400);
+  const { data: found } = await admin
+    .from("document_batch")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("store_id", seller.store_id)
+    .eq("month", month)
+    .eq("year", year)
+    .eq("category", batch.category)
+    .limit(1);
+  let batchId = found?.[0]?.id as string | undefined;
+  if (!batchId) {
+    const { data: created, error } = await admin
+      .from("document_batch")
+      .insert({ tenant_id: tenantId, store_id: seller.store_id, month, year, category: batch.category, unify: batch.unify })
+      .select("id")
+      .single();
+    if (error || !created) return json({ error: "persist" }, 500);
+    batchId = created.id as string;
+  }
+  const { error } = await admin.from("employee_document").update({ batch_id: batchId, seller_id: sellerId, store_id: seller.store_id, error: null }).eq("id", documentId);
+  if (error) return json({ error: "persist" }, 500);
   return json({ ok: true });
 }
 
