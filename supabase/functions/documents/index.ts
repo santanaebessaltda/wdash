@@ -496,15 +496,15 @@ async function resend(admin: SupabaseClient, tenantId: string, secret: string, b
   if (!batch || !channel) return json({ error: "not_found" }, 404);
   const token = await loadCompanyToken(admin, tenantId, secret);
   const { data: seller } = await admin.from("store_seller").select("email, whatsapp").eq("id", doc.seller_id).maybeSingle();
-  if (!token || !seller) return json({ message: "Não foi possível reenviar." }, 502);
+  if (!token || !seller) return json({ message: "Não foi possível reenviar o link. Tente novamente." }, 502);
   const ok = await assinaResend(token, doc.envelope_id as string, doc.recipient_id as string, {
     senderType: channel,
     email: channel === "EMAIL" ? (seller.email as string) : undefined,
     phone: channel === "WHATSAPP" ? (seller.whatsapp as string) : undefined,
   });
   if (!ok) {
-    await admin.from("employee_document").update({ error: "Não foi possível reenviar." }).eq("id", doc.id);
-    return json({ message: "Não foi possível reenviar." }, 502);
+    await admin.from("employee_document").update({ error: "Não foi possível reenviar o link. Tente novamente." }).eq("id", doc.id);
+    return json({ message: "Não foi possível reenviar o link. Tente novamente." }, 502);
   }
   await admin.from("employee_document").update({ error: null }).eq("id", doc.id);
   return json({ ok: true });
@@ -512,21 +512,21 @@ async function resend(admin: SupabaseClient, tenantId: string, secret: string, b
 
 async function copyLink(admin: SupabaseClient, tenantId: string, secret: string, body: Body) {
   const { data: doc } = await admin.from("employee_document").select("status, envelope_id, recipient_id").eq("id", String(body.documentId ?? "")).eq("tenant_id", tenantId).maybeSingle();
-  if (!doc || !resendVisible(doc.status as DocStatus) || !doc.envelope_id || !doc.recipient_id) return json({ message: "Não foi possível copiar o link." }, 404);
+  if (!doc || !resendVisible(doc.status as DocStatus) || !doc.envelope_id || !doc.recipient_id) return json({ message: "Não foi possível copiar o link. Tente novamente." }, 404);
   const token = await loadCompanyToken(admin, tenantId, secret);
   if (!token) return json({ message: DOCUMENT_COPY.noToken }, 422);
   const url = await assinaSignerLink(token, doc.envelope_id as string, doc.recipient_id as string);
-  if (!url) return json({ message: "Não foi possível copiar o link." }, 502);
+  if (!url) return json({ message: "Não foi possível copiar o link. Tente novamente." }, 502);
   return json({ url });
 }
 
 async function cancelDocument(admin: SupabaseClient, tenantId: string, secret: string, body: Body) {
   const { data: doc } = await admin.from("employee_document").select("id, status, envelope_id").eq("id", String(body.documentId ?? "")).eq("tenant_id", tenantId).maybeSingle();
-  if (!doc || !resendVisible(doc.status as DocStatus) || !doc.envelope_id) return json({ message: "Não foi possível apagar o documento." }, 404);
+  if (!doc || !resendVisible(doc.status as DocStatus) || !doc.envelope_id) return json({ message: "Não foi possível cancelar a assinatura. Tente novamente." }, 404);
   const token = await loadCompanyToken(admin, tenantId, secret);
   if (!token) return json({ message: DOCUMENT_COPY.noToken }, 422);
   const ok = await assinaCancelEnvelope(token, doc.envelope_id as string);
-  if (!ok) return json({ message: "Não foi possível apagar o documento. Tente novamente." }, 502);
+  if (!ok) return json({ message: "Não foi possível cancelar a assinatura. Tente novamente." }, 502);
   await admin.from("employee_document").update({ status: "DECLINED", error: null }).eq("id", doc.id);
   return json({ ok: true });
 }
@@ -540,8 +540,9 @@ async function moveDocument(admin: SupabaseClient, tenantId: string, body: Body)
   if (!doc || !resendVisible(doc.status as DocStatus) || !doc.envelope_id) return json({ message: "Só um documento pendente pode ser movido." }, 422);
   const { data: seller } = await admin.from("store_seller").select("id, store_id").eq("id", sellerId).eq("tenant_id", tenantId).maybeSingle();
   const { data: batch } = await admin.from("document_batch").select("category, unify").eq("id", doc.batch_id).eq("tenant_id", tenantId).maybeSingle();
-  if (!seller || !batch) return json({ error: "not_found" }, 404);
-  if (!Number.isInteger(month) || month < 1 || month > 12 || !Number.isInteger(year) || year < 2000 || year > 2100) return json({ error: "invalid_batch" }, 400);
+  if (!seller || !batch) return json({ message: "Não foi possível mover o documento. Tente novamente." }, 404);
+  if (!Number.isInteger(month) || month < 1 || month > 12) return json({ message: "Não foi possível mover o documento. Tente novamente." }, 400);
+  if (!Number.isInteger(year) || year < 2000 || year > 2100) return json({ message: "Informe um ano válido." }, 400);
   const { data: found } = await admin
     .from("document_batch")
     .select("id")
@@ -558,11 +559,11 @@ async function moveDocument(admin: SupabaseClient, tenantId: string, body: Body)
       .insert({ tenant_id: tenantId, store_id: seller.store_id, month, year, category: batch.category, unify: batch.unify })
       .select("id")
       .single();
-    if (error || !created) return json({ error: "persist" }, 500);
+    if (error || !created) return json({ message: "Não foi possível mover o documento. Tente novamente." }, 500);
     batchId = created.id as string;
   }
   const { error } = await admin.from("employee_document").update({ batch_id: batchId, seller_id: sellerId, store_id: seller.store_id, error: null }).eq("id", documentId);
-  if (error) return json({ error: "persist" }, 500);
+  if (error) return json({ message: "Não foi possível mover o documento. Tente novamente." }, 500);
   return json({ ok: true });
 }
 

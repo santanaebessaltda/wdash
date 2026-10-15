@@ -125,7 +125,7 @@ export function DocumentsPage() {
       await navigator.clipboard.writeText(url);
       setSent("Link copiado.");
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Não foi possível copiar o link.");
+      setNotice(error instanceof Error ? error.message : "Não foi possível copiar o link. Tente novamente.");
     } finally {
       setActing(false);
     }
@@ -138,10 +138,10 @@ export function DocumentsPage() {
     try {
       await cancelDocument(id);
       setDeleteId(null);
-      setSent("Documento apagado. A assinatura foi cancelada.");
+      setSent("Assinatura cancelada.");
       await reload();
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Não foi possível apagar o documento. Tente novamente.");
+      setNotice(error instanceof Error ? error.message : "Não foi possível cancelar a assinatura. Tente novamente.");
     } finally {
       setActing(false);
     }
@@ -163,7 +163,7 @@ export function DocumentsPage() {
       setSent("Documento movido.");
       await reload();
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Não foi possível mover o documento.");
+      setNotice(error instanceof Error ? error.message : "Não foi possível mover o documento. Tente novamente.");
     } finally {
       setActing(false);
     }
@@ -335,17 +335,22 @@ export function DocumentsPage() {
         onClose={() => {
           if (!acting) setDeleteId(null);
         }}
-        title="Apagar documento"
+        title="Cancelar assinatura?"
         footer={
           <>
-            <Button variant="outline" disabled={acting} onClick={() => setDeleteId(null)}>Cancelar</Button>
+            <Button variant="outline" disabled={acting} onClick={() => setDeleteId(null)}>Voltar</Button>
             <Button variant="danger" disabled={acting || !deleteId} onClick={() => deleteId && void apagar(deleteId)}>
-              {acting ? "Apagando…" : "Apagar"}
+              {acting ? "Cancelando…" : "Cancelar assinatura"}
             </Button>
           </>
         }
       >
-        <p className="text-[13.5px] text-t1">A assinatura é cancelada no Assina AI. O documento sai de Pendentes e fica como Recusado. O PDF continua na pasta.</p>
+        <div className="grid gap-2">
+          <p className="text-[13.5px] text-t1">A assinatura será cancelada no Assina AI e o documento ficará como Recusado. O PDF continuará disponível na pasta.</p>
+          {deleteId && extraSignerCount(documents.find((item) => item.id === deleteId)?.extraSigner) > 0 ? (
+            <p className="text-[13.5px] text-t1">A assinatura de todos os signatários deste documento será cancelada.</p>
+          ) : null}
+        </div>
       </Modal>
       <Modal
         open={moveId != null}
@@ -361,7 +366,7 @@ export function DocumentsPage() {
         }
       >
         <div className="grid gap-3">
-          <p className="text-[13.5px] text-t1">O arquivo muda de colaborador, mês ou ano. A assinatura no Assina AI continua a mesma.</p>
+          <p className="text-[13.5px] text-t1">Altere o colaborador, o mês ou o ano deste documento. A assinatura em andamento não será alterada.</p>
           <FormField label="Colaborador">
             <select className={fieldClass} value={moveSeller} onChange={(event) => setMoveSeller(event.target.value)}>
               <option value="">Selecione</option>
@@ -423,7 +428,7 @@ async function resendFile(
     setSent("Link reenviado.");
     await reload();
   } catch {
-    setNotice("Não foi possível reenviar o documento. Tente novamente.");
+    setNotice("Não foi possível reenviar o link. Tente novamente.");
   } finally {
     setResendingId(null);
   }
@@ -673,6 +678,11 @@ function FileTable({
   return <DataTable columns={columns} data={rows} rowKey={(row) => row.id} />;
 }
 
+function extraSignerCount(value: unknown) {
+  const items = Array.isArray(value) ? value : value && typeof value === "object" ? [value] : [];
+  return items.filter((item) => item && typeof item === "object" && typeof (item as { name?: unknown }).name === "string" && (item as { name: string }).name.trim()).length;
+}
+
 function pendingMenu(row: DocumentRow) {
   return resendVisible(row.status) && Boolean(row.envelopeId);
 }
@@ -698,7 +708,7 @@ function RowMenu({
     { label: "Copiar link", onClick: onCopy, disabled: busy },
     { label: "Mover", onClick: onMove, disabled: busy },
     { label: "", divider: true },
-    { label: "Apagar", onClick: onDelete, danger: true, disabled: busy },
+    { label: "Cancelar assinatura", onClick: onDelete, danger: true, disabled: busy },
   ];
   return (
     <span className="flex justify-end">

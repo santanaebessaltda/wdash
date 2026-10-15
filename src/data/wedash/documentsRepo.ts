@@ -14,6 +14,7 @@ export type DocumentRow = {
   pageCount: number;
   createdAt: string;
   sentAt: string | null;
+  extraSigner: unknown;
 };
 
 export type BatchRow = {
@@ -98,7 +99,7 @@ export async function loadDocuments(tenantId: string, storeId: string | null): P
   if (!sb) return { batches: [], documents: [], people: [], stores: [], history: [] };
   const [batches, documents, people, stores, sentExtras] = await Promise.all([
     sb.from("document_batch").select("id, store_id, month, year, category, channel, deadline, created_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }),
-    sb.from("employee_document").select("id, batch_id, store_id, seller_id, status, file_name, error, envelope_id, size_bytes, page_count, created_at, sent_at").eq("tenant_id", tenantId).order("created_at"),
+    sb.from("employee_document").select("id, batch_id, store_id, seller_id, status, file_name, error, envelope_id, size_bytes, page_count, created_at, sent_at, extra_signer").eq("tenant_id", tenantId).order("created_at"),
     sb.from("store_seller").select("id, store_id, name, cpf, email, whatsapp, active, in_erp").eq("tenant_id", tenantId).order("name").limit(2000),
     sb.from("store").select("id, name").eq("tenant_id", tenantId).order("name"),
     sb.from("employee_document").select("extra_signer, sent_at").eq("tenant_id", tenantId).not("envelope_id", "is", null).order("sent_at", { ascending: false }).limit(80),
@@ -147,6 +148,7 @@ function mapDoc(row: Record<string, unknown>): DocumentRow {
     pageCount: Number(row.page_count ?? 1),
     createdAt: String(row.created_at ?? ""),
     sentAt: (row.sent_at as string | null) ?? null,
+    extraSigner: row.extra_signer ?? null,
   };
 }
 
@@ -269,7 +271,7 @@ export async function resendDocument(documentId: string) {
 
 export async function copyDocumentLink(documentId: string): Promise<string> {
   const data = await call({ action: "copy-link", documentId });
-  if (!data.url) throw new Error("Não foi possível copiar o link.");
+  if (!data.url) throw new Error("Não foi possível copiar o link. Tente novamente.");
   return data.url;
 }
 
