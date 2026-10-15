@@ -6,15 +6,22 @@ import {
   assignSeller,
   batchLabel,
   channelBlock,
+  collaboratorRecipientId,
   confirmBlock,
+  contactFieldsToAsk,
+  contactPatch,
   cpfDigits,
   customDocumentName,
+  defaultSignatureMark,
   deliveryFileName,
+  envelopeSignatures,
   fileName,
   firstCpf,
   folderSegments,
   folderTitle,
   groupPages,
+  placementWarning,
+  replicateSetup,
   resendVisible,
   saveCpf,
   saveEmail,
@@ -238,5 +245,129 @@ describe("confirm and resend", () => {
       { pageNumber: 1, x: 50, y: 50, element: "SIGNATURE" },
       { pageNumber: 2, x: 50, y: 50, element: "SIGNATURE" },
     ]);
+  });
+});
+
+const PROFILE = { cpf: VALID_DIGITS, email: "ana@loja.com", whatsapp: "11987654321" };
+
+describe("contact fields", () => {
+  it("asks for nothing when the profile already has the CPF and the channel contact", () => {
+    expect(contactFieldsToAsk(PROFILE, "EMAIL")).toEqual({ cpf: false, email: false, whatsapp: false });
+    expect(contactFieldsToAsk(PROFILE, "WHATSAPP")).toEqual({ cpf: false, email: false, whatsapp: false });
+    expect(contactFieldsToAsk({ cpf: "  ", email: "", whatsapp: null }, "EMAIL")).toEqual({
+      cpf: true,
+      email: true,
+      whatsapp: false,
+    });
+  });
+
+  it("shows only the contact of the chosen channel, and the CPF only when it is missing", () => {
+    expect(contactFieldsToAsk({ cpf: null, email: "ana@loja.com", whatsapp: null }, "WHATSAPP")).toEqual({
+      cpf: true,
+      email: false,
+      whatsapp: true,
+    });
+    expect(contactFieldsToAsk({ cpf: VALID_DIGITS, email: null, whatsapp: "11987654321" }, "EMAIL")).toEqual({
+      cpf: false,
+      email: true,
+      whatsapp: false,
+    });
+  });
+
+  it("patches only the keys that were shown", () => {
+    expect(contactPatch({ whatsapp: "(11) 98765-4321" })).toEqual({ ok: true, patch: { whatsapp: "11987654321" } });
+    expect(contactPatch({})).toEqual({ ok: true, patch: {} });
+    expect(contactPatch({ cpf: "123.456.789-00" })).toEqual({ ok: false, message: DOCUMENT_COPY.badCpf });
+  });
+});
+
+describe("replicate and marks", () => {
+  it("copies the channel and the marks and leaves the person's contact behind", () => {
+    const source = {
+      channel: "WHATSAPP" as const,
+      marks: [{ pageNumber: 2, x: 10, y: 80, element: "SIGNATURE" as const }],
+      cpf: VALID_DIGITS,
+      email: "ana@loja.com",
+      whatsapp: "11987654321",
+    };
+    const copy = replicateSetup(source);
+    expect(copy).toEqual({ channel: "WHATSAPP", marks: source.marks });
+    expect(copy).not.toHaveProperty("cpf");
+    expect(copy).not.toHaveProperty("email");
+    expect(copy).not.toHaveProperty("whatsapp");
+    copy.marks[0].x = 1;
+    expect(source.marks[0].x).toBe(10);
+  });
+
+  it("starts the signature at the center of the last page and drops a mark on a missing page", () => {
+    expect(defaultSignatureMark(4)).toEqual({ pageNumber: 4, x: 50, y: 50, element: "SIGNATURE" });
+    expect(defaultSignatureMark(0)).toEqual({ pageNumber: 1, x: 50, y: 50, element: "SIGNATURE" });
+    const marks = [{ pageNumber: 4, x: 50, y: 50, element: "SIGNATURE" as const }];
+    expect(placementWarning(marks, 2)).toBe(DOCUMENT_COPY.missingPage);
+    expect(placementWarning(marks, 4)).toBeNull();
+  });
+});
+
+describe("envelope recipients", () => {
+  const seller = { name: "Ana Lima", cpf: VALID_DIGITS, email: "ana@loja.com", whatsapp: "11987654321" };
+  const mark = { pageNumber: 2, x: 40, y: 70, element: "SIGNATURE" as const };
+
+  it("puts the collaborator first and the extra signer second, both as SIGN", () => {
+    const signatures = envelopeSignatures({
+      seller,
+      channel: "EMAIL",
+      marks: [mark, { pageNumber: 9, x: 1, y: 1, element: "SIGNATURE" }],
+      pageCount: 2,
+      extra: { name: "  Bruno  ", channel: "WHATSAPP", email: "bruno@loja.com", whatsapp: "21988887777", marks: [mark] },
+    });
+    expect(signatures).toEqual([
+      {
+        recipient: {
+          name: "Ana Lima",
+          email: "ana@loja.com",
+          phone: "",
+          cpf: VALID,
+          routingOrder: 1,
+          action: "SIGN",
+          senderType: "EMAIL",
+          authenticationType: "DEFAULT_SIGN",
+          signaturePositions: [mark],
+        },
+      },
+      {
+        recipient: {
+          name: "Bruno",
+          email: "",
+          phone: "21988887777",
+          cpf: "",
+          routingOrder: 2,
+          action: "SIGN",
+          senderType: "WHATSAPP",
+          authenticationType: "DEFAULT_SIGN",
+          signaturePositions: [mark],
+        },
+      },
+    ]);
+  });
+
+  it("omits a blank extra signer and keeps the collaborator id when the extra signer is listed first", () => {
+    expect(envelopeSignatures({ seller, channel: "WHATSAPP", marks: [mark], pageCount: 2, extra: null })).toHaveLength(1);
+    expect(
+      envelopeSignatures({
+        seller,
+        channel: "WHATSAPP",
+        marks: [mark],
+        pageCount: 2,
+        extra: { name: "   ", channel: "EMAIL", email: "bruno@loja.com", whatsapp: null, marks: [mark] },
+      }),
+    ).toHaveLength(1);
+    expect(
+      collaboratorRecipientId([
+        { routingOrder: 2, recipient: { id: "extra" } },
+        { routingOrder: 1, recipient: { id: "ana" } },
+      ]),
+    ).toBe("ana");
+    expect(collaboratorRecipientId([{ id: "only" }])).toBe("only");
+    expect(collaboratorRecipientId([])).toBeNull();
   });
 });

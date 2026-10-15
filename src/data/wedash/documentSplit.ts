@@ -26,6 +26,7 @@ export const DOCUMENT_COPY = {
   badCpf: "Informe um CPF válido.",
   badWhatsapp: "Informe um WhatsApp válido com DDD.",
   badEmail: "Informe um e-mail válido.",
+  missingPage: "Este PDF não tem a página da assinatura. Posicione a marca de novo.",
 } as const;
 
 export const DOCUMENT_LIMITS = {
@@ -243,4 +244,150 @@ export function signaturePositions(pageCount: number): Array<{ pageNumber: numbe
     y: 50,
     element: "SIGNATURE",
   }));
+}
+
+export type SendChannel = "EMAIL" | "WHATSAPP";
+
+export type SignatureMark = {
+  pageNumber: number;
+  x: number;
+  y: number;
+  element: "SIGNATURE";
+};
+
+export type ExtraSigner = {
+  name: string;
+  channel: SendChannel;
+  email: string | null;
+  whatsapp: string | null;
+  marks: SignatureMark[];
+};
+
+export type EnvelopeRecipient = {
+  name: string;
+  email: string;
+  phone: string;
+  cpf: string;
+  routingOrder: number;
+  action: "SIGN";
+  senderType: SendChannel;
+  authenticationType: "DEFAULT_SIGN";
+  signaturePositions: SignatureMark[];
+};
+
+function present(value: string | null | undefined): boolean {
+  return Boolean(value?.trim());
+}
+
+function maskCpf(digits: string): string {
+  return digits.replace(/\D/g, "").replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+}
+
+/** Campos que ainda faltam no cadastro. Um valor já salvo não volta a ser pedido. */
+export function contactFieldsToAsk(
+  profile: { cpf: string | null; email: string | null; whatsapp: string | null },
+  channel: SendChannel,
+): { cpf: boolean; email: boolean; whatsapp: boolean } {
+  return {
+    cpf: !present(profile.cpf),
+    email: channel === "EMAIL" && !present(profile.email),
+    whatsapp: channel === "WHATSAPP" && !present(profile.whatsapp),
+  };
+}
+
+/** Grava só as chaves recebidas. O canal escondido não entra no patch. */
+export function contactPatch(input: { cpf?: string; email?: string; whatsapp?: string }):
+  | { ok: true; patch: { cpf?: string; email?: string | null; whatsapp?: string | null } }
+  | { ok: false; message: string } {
+  const patch: { cpf?: string; email?: string | null; whatsapp?: string | null } = {};
+  if (input.cpf !== undefined) {
+    const saved = saveCpf(input.cpf);
+    if (!saved.ok) return saved;
+    patch.cpf = saved.cpf;
+  }
+  if (input.email !== undefined) {
+    const saved = saveEmail(input.email);
+    if (!saved.ok) return saved;
+    patch.email = saved.email;
+  }
+  if (input.whatsapp !== undefined) {
+    const saved = saveWhatsapp(input.whatsapp);
+    if (!saved.ok) return saved;
+    patch.whatsapp = saved.whatsapp;
+  }
+  return { ok: true, patch };
+}
+
+/** Copia canal e marcas. CPF, e-mail e WhatsApp ficam de fora. */
+export function replicateSetup(source: { channel: SendChannel; marks: SignatureMark[] }): { channel: SendChannel; marks: SignatureMark[] } {
+  return {
+    channel: source.channel,
+    marks: source.marks.map((mark) => ({ ...mark })),
+  };
+}
+
+/** Uma assinatura no centro da última página. */
+export function defaultSignatureMark(pageCount: number): SignatureMark {
+  return { pageNumber: Math.max(1, pageCount), x: 50, y: 50, element: "SIGNATURE" };
+}
+
+export function applicableMarks(marks: SignatureMark[], pageCount: number): SignatureMark[] {
+  return marks.filter((mark) => mark.element === "SIGNATURE" && mark.pageNumber >= 1 && mark.pageNumber <= pageCount);
+}
+
+export function placementWarning(marks: SignatureMark[], pageCount: number): string | null {
+  return applicableMarks(marks, pageCount).length > 0 ? null : DOCUMENT_COPY.missingPage;
+}
+
+function recipientOf(
+  person: { name: string; cpf: string | null; email: string | null; whatsapp: string | null },
+  channel: SendChannel,
+  marks: SignatureMark[],
+  routingOrder: number,
+): { recipient: EnvelopeRecipient } {
+  return {
+    recipient: {
+      name: person.name,
+      email: channel === "EMAIL" ? (person.email ?? "") : "",
+      phone: channel === "WHATSAPP" ? (person.whatsapp ?? "") : "",
+      cpf: person.cpf ? maskCpf(person.cpf) : "",
+      routingOrder,
+      action: "SIGN",
+      senderType: channel,
+      authenticationType: "DEFAULT_SIGN",
+      signaturePositions: marks,
+    },
+  };
+}
+
+/** Colaborador na ordem 1. Signatário extra, quando tem nome, na ordem 2. */
+export function envelopeSignatures(input: {
+  seller: { name: string; cpf: string | null; email: string | null; whatsapp: string | null };
+  channel: SendChannel;
+  marks: SignatureMark[];
+  pageCount: number;
+  extra: ExtraSigner | null;
+}): Array<{ recipient: EnvelopeRecipient }> {
+  const signatures = [recipientOf(input.seller, input.channel, applicableMarks(input.marks, input.pageCount), 1)];
+  const extra = input.extra;
+  if (extra && present(extra.name)) {
+    signatures.push(
+      recipientOf(
+        { name: extra.name.trim(), cpf: null, email: extra.email, whatsapp: extra.whatsapp },
+        extra.channel,
+        applicableMarks(extra.marks, input.pageCount),
+        2,
+      ),
+    );
+  }
+  return signatures;
+}
+
+/** O reenvio usa o colaborador, mesmo quando a resposta lista o signatário extra primeiro. */
+export function collaboratorRecipientId(
+  signatures: Array<{ id?: string; routingOrder?: number; recipient?: { id?: string; routingOrder?: number } }> | null | undefined,
+): string | null {
+  if (!signatures?.length) return null;
+  const match = signatures.find((item) => (item.routingOrder ?? item.recipient?.routingOrder) === 1) ?? signatures[0];
+  return match.recipient?.id ?? match.id ?? null;
 }
