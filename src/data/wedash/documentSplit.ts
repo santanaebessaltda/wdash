@@ -254,6 +254,30 @@ export function signaturePositions(pageCount: number): Array<{ pageNumber: numbe
 
 export type SendChannel = "EMAIL" | "WHATSAPP";
 
+/** O que o Assina pede antes da assinatura. `DEFAULT_SIGN` é a assinatura na tela. */
+export type AuthenticationType = "DEFAULT_SIGN" | "SELFIE" | "DOCUMENT_AND_SELFIE" | "SMS" | "ICP_BRASIL";
+
+export const AUTHENTICATIONS: { id: AuthenticationType; label: string; detail: string; credits: number }[] = [
+  { id: "DEFAULT_SIGN", label: "Assinatura na tela (padrão)", detail: "Padrão Assina AI", credits: 0 },
+  { id: "SELFIE", label: "Exigir foto selfie", detail: "Com reconhecimento facial", credits: 0 },
+  { id: "DOCUMENT_AND_SELFIE", label: "Exigir documento com foto + selfie", detail: "Com reconhecimento facial", credits: 0 },
+  { id: "SMS", label: "Envio de código por SMS", detail: "Autenticação por SMS", credits: 1 },
+  { id: "ICP_BRASIL", label: "Exigir certificado ICP-Brasil A1 ou A3", detail: "Conhecido como e-CPF ou e-CNPJ", credits: 1 },
+];
+
+export function asAuthentication(value: unknown): AuthenticationType {
+  return AUTHENTICATIONS.some((item) => item.id === value) ? (value as AuthenticationType) : "DEFAULT_SIGN";
+}
+
+/** WhatsApp gasta 1 crédito por signatário. E-mail não gasta. */
+export function channelCredits(channel: SendChannel): number {
+  return channel === "WHATSAPP" ? 1 : 0;
+}
+
+export function signerCredits(channel: SendChannel, authentication: AuthenticationType): number {
+  return channelCredits(channel) + (AUTHENTICATIONS.find((item) => item.id === authentication)?.credits ?? 0);
+}
+
 export type MarkElement = "SIGNATURE" | "RUBRIC";
 
 export type SignatureMark = {
@@ -272,6 +296,7 @@ export type ExtraSigner = {
   email: string | null;
   whatsapp: string | null;
   marks: SignatureMark[];
+  authentication?: AuthenticationType;
 };
 
 export type EnvelopeRecipient = {
@@ -282,7 +307,7 @@ export type EnvelopeRecipient = {
   routingOrder: number;
   action: "SIGN";
   senderType: SendChannel;
-  authenticationType: "DEFAULT_SIGN";
+  authenticationType: AuthenticationType;
   signaturePositions: SignatureMark[];
 };
 
@@ -378,10 +403,22 @@ export type GuestSigner = {
   name: string;
   email: string;
   whatsapp: string;
+  channel?: SendChannel;
+  authentication?: AuthenticationType;
 };
+
+/** Canal e autenticação de uma pessoa de fora. Sem escolha, WhatsApp e assinatura na tela. */
+export function guestChannel(guest: { channel?: SendChannel } | null | undefined): SendChannel {
+  return guest?.channel === "EMAIL" ? "EMAIL" : "WHATSAPP";
+}
+
+export function guestAuthentication(guest: { authentication?: AuthenticationType } | null | undefined): AuthenticationType {
+  return asAuthentication(guest?.authentication);
+}
 
 export type DocumentDraft = {
   channel: SendChannel;
+  authentication?: AuthenticationType;
   fields: FieldMark[];
   guests: GuestSigner[];
   deadline: string;
@@ -403,6 +440,7 @@ export function clampMark(mark: SignatureMark, pageCount: number): SignatureMark
 export function defaultDraft(pageCount: number): DocumentDraft {
   return {
     channel: "WHATSAPP",
+    authentication: "DEFAULT_SIGN",
     fields: [{ ...defaultSignatureMark(pageCount), id: "seller-mark", signerId: "seller" }],
     guests: [],
     deadline: "",
@@ -425,6 +463,7 @@ export function carryDraft(previous: DocumentDraft, pageCount: number): Document
   const fields = previous.fields.length > 0 ? previous.fields : defaultDraft(pageCount).fields;
   return {
     channel: "WHATSAPP",
+    authentication: "DEFAULT_SIGN",
     fields: fields.map((field) => clampField(field, pageCount)),
     guests: (previous.guests ?? []).map((guest) => ({ ...guest })),
     deadline: previous.deadline,
@@ -501,7 +540,7 @@ export function signerHistory(rows: { sentAt: string | null; extra: unknown }[],
   return history;
 }
 
-/** Usuário sai no e-mail da conta. Outro colaborador e uma pessoa de fora saem no canal do documento. */
+/** Usuário sai no e-mail da conta. Cada pessoa de fora sai no canal dela. */
 export function extraSignersFrom(
   fields: FieldMark[],
   signers: { id: string; name: string; email: string | null }[],
@@ -524,7 +563,7 @@ export function extraSignersFrom(
     if (key.startsWith("user:")) {
       const signer = signers.find((item) => item.id === key.slice("user:".length));
       if (!signer?.name.trim() || !signer.email) continue;
-      extras.push({ name: signer.name.trim(), channel: "EMAIL", email: signer.email, whatsapp: null, marks });
+      extras.push({ name: signer.name.trim(), channel: "EMAIL", email: signer.email, whatsapp: null, marks, authentication: "DEFAULT_SIGN" });
     } else if (key.startsWith("seller:")) {
       const person = scope.people?.find((item) => item.id === key.slice("seller:".length));
       if (!person?.name.trim()) continue;
@@ -534,6 +573,7 @@ export function extraSignersFrom(
         email: person.email,
         whatsapp: person.whatsapp,
         marks,
+        authentication: "DEFAULT_SIGN",
       });
     } else if (key.startsWith("guest:")) {
       const guest = scope.guests?.find((item) => item.id === key.slice("guest:".length));
@@ -542,10 +582,11 @@ export function extraSignersFrom(
       const whatsapp = saveWhatsapp(guest.whatsapp);
       extras.push({
         name: guest.name.trim(),
-        channel,
+        channel: guestChannel(guest),
         email: email.ok ? email.email : null,
         whatsapp: whatsapp.ok ? whatsapp.whatsapp : null,
         marks,
+        authentication: guestAuthentication(guest),
       });
     }
   }
@@ -575,6 +616,8 @@ export function documentIssue(
     if (!saved.ok) return saved.message;
     if (!saved.whatsapp) return "Informe o WhatsApp de quem vai assinar.";
   }
+  const sms = smsPhoneGap(person.whatsapp, asAuthentication(draft.authentication));
+  if (sms) return sms;
   if (draft.fields.some((field) => !field.signerId)) return "Escolha quem assina esta marcação.";
   const place = placementWarning(sellerMarks(draft.fields), pageCount);
   if (place) return place;
@@ -591,16 +634,19 @@ export function documentIssue(
     } else if (field.signerId.startsWith("guest:")) {
       const guest = (draft.guests ?? []).find((item) => item.id === field.signerId.slice("guest:".length));
       if (!guest?.name.trim()) return "Informe o nome de quem vai assinar.";
-      if (draft.channel === "EMAIL") {
+      const guestSend = guestChannel(guest);
+      if (guestSend === "EMAIL") {
         const saved = saveEmail(guest.email);
         if (!saved.ok) return saved.message;
         if (!saved.email) return "Informe o e-mail de quem vai assinar.";
       }
-      if (draft.channel === "WHATSAPP") {
+      if (guestSend === "WHATSAPP") {
         const saved = saveWhatsapp(guest.whatsapp);
         if (!saved.ok) return saved.message;
         if (!saved.whatsapp) return "Informe o WhatsApp de quem vai assinar.";
       }
+      const guestSms = smsPhoneGap(guest.whatsapp, guestAuthentication(guest));
+      if (guestSms) return guestSms;
     }
   }
   if (sizeBytes > DOCUMENT_LIMITS.maxEnvelopeBytes) return DOCUMENT_COPY.overEnvelope;
@@ -645,22 +691,31 @@ export function placementWarning(marks: SignatureMark[], pageCount: number): str
   return applicableMarks(marks, pageCount).length > 0 ? null : DOCUMENT_COPY.missingPage;
 }
 
+function smsPhoneGap(whatsapp: string | null | undefined, authentication: AuthenticationType): string | null {
+  if (authentication !== "SMS") return null;
+  const saved = saveWhatsapp(whatsapp ?? "");
+  if (!saved.ok) return saved.message;
+  if (!saved.whatsapp) return "Informe o WhatsApp para o código por SMS.";
+  return null;
+}
+
 function recipientOf(
   person: { name: string; cpf: string | null; email: string | null; whatsapp: string | null },
   channel: SendChannel,
   marks: SignatureMark[],
   routingOrder: number,
+  authentication: AuthenticationType,
 ): { recipient: EnvelopeRecipient } {
   return {
     recipient: {
       name: person.name,
       email: channel === "EMAIL" ? (person.email ?? "") : "",
-      phone: channel === "WHATSAPP" ? (person.whatsapp ?? "") : "",
+      phone: channel === "WHATSAPP" || authentication === "SMS" ? (person.whatsapp ?? "") : "",
       cpf: person.cpf ? maskCpf(person.cpf) : "",
       routingOrder,
       action: "SIGN",
       senderType: channel,
-      authenticationType: "DEFAULT_SIGN",
+      authenticationType: authentication,
       signaturePositions: marks,
     },
   };
@@ -670,12 +725,15 @@ function recipientOf(
 export function envelopeSignatures(input: {
   seller: { name: string; cpf: string | null; email: string | null; whatsapp: string | null };
   channel: SendChannel;
+  authentication?: AuthenticationType;
   marks: SignatureMark[];
   pageCount: number;
   extras?: ExtraSigner[] | null;
   extra?: ExtraSigner | null;
 }): Array<{ recipient: EnvelopeRecipient }> {
-  const signatures = [recipientOf(input.seller, input.channel, applicableMarks(input.marks, input.pageCount), 1)];
+  const signatures = [
+    recipientOf(input.seller, input.channel, applicableMarks(input.marks, input.pageCount), 1, asAuthentication(input.authentication)),
+  ];
   const extras = input.extras ?? (input.extra ? [input.extra] : []);
   let order = 2;
   for (const extra of extras) {
@@ -686,6 +744,7 @@ export function envelopeSignatures(input: {
         extra.channel,
         applicableMarks(extra.marks, input.pageCount),
         order,
+        asAuthentication(extra.authentication),
       ),
     );
     order += 1;

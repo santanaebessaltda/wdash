@@ -13,8 +13,12 @@ import {
   applyContactEdit,
   contactPatch,
   customDocumentName,
+  asAuthentication,
   displayTitle,
   extraSignersFrom,
+  guestAuthentication,
+  guestChannel,
+  signerCredits,
   fieldAfterDrop,
   monthFolder,
   preparationSituation,
@@ -224,6 +228,7 @@ export function AttachWizard({
         documents: rows.map((row, index) => ({
           id: row.id,
           channel: resolved[index].channel,
+          authentication: asAuthentication(resolved[index].authentication),
           marks: sellerMarks(resolved[index].fields),
           deadline: resolved[index].deadline,
           reminder: resolved[index].reminder,
@@ -721,11 +726,23 @@ function SendReview({
 }
 
 function scheduleLine(draft: DocumentDraft) {
-  const channel = draft.channel === "EMAIL" ? "E-mail" : "WhatsApp";
+  const people = new Map<string, { channel: "EMAIL" | "WHATSAPP"; authentication: ReturnType<typeof asAuthentication> }>();
+  for (const field of draft.fields) {
+    if (field.signerId.startsWith("guest:")) {
+      const guest = (draft.guests ?? []).find((item) => item.id === field.signerId.slice("guest:".length));
+      people.set(field.signerId, { channel: guestChannel(guest), authentication: guestAuthentication(guest) });
+    } else if (field.signerId === "seller" || field.signerId === "") {
+      people.set("seller", { channel: draft.channel, authentication: asAuthentication(draft.authentication) });
+    }
+  }
+  if (people.size === 0) people.set("seller", { channel: draft.channel, authentication: asAuthentication(draft.authentication) });
+  const labels = [...new Set([...people.values()].map((item) => (item.channel === "EMAIL" ? "E-mail" : "WhatsApp")))];
+  const credits = [...people.values()].reduce((sum, item) => sum + signerCredits(item.channel, item.authentication), 0);
   const reminder =
     draft.reminder === "EVERY_DAY" ? "Todo dia" : draft.reminder === "EVERY_WEEK" ? "Toda semana" : draft.reminder === "NEVER" ? "Sem lembrete" : "A cada 3 dias";
   const deadline = draft.deadline ? draft.deadline.split("-").reverse().join("/") : "Sem prazo";
-  return `${channel} · ${reminder} · ${deadline}`;
+  const credit = credits > 0 ? `${credits} ${credits === 1 ? "crédito" : "créditos"} · ` : "";
+  return `${labels.join(" e ")} · ${credit}${reminder} · ${deadline}`;
 }
 
 function SummaryTile({ label, value }: { label: string; value: string }) {

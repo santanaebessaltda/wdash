@@ -368,6 +368,19 @@ describe("envelope recipients", () => {
         },
       },
     ]);
+    const mixed = envelopeSignatures({
+      seller,
+      channel: "EMAIL",
+      authentication: "DEFAULT_SIGN",
+      marks: [mark],
+      pageCount: 2,
+      extra: { name: "Bruno", channel: "WHATSAPP", email: null, whatsapp: "21988887777", marks: [mark], authentication: "SMS" },
+    });
+    expect(mixed[0].recipient.senderType).toBe("EMAIL");
+    expect(mixed[0].recipient.authenticationType).toBe("DEFAULT_SIGN");
+    expect(mixed[1].recipient.senderType).toBe("WHATSAPP");
+    expect(mixed[1].recipient.authenticationType).toBe("SMS");
+    expect(mixed[1].recipient.phone).toBe("21988887777");
   });
 
   it("omits a blank extra signer and keeps the collaborator id when the extra signer is listed first", () => {

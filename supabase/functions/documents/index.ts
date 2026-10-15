@@ -10,6 +10,7 @@ import { loadCompanyToken } from "../_shared/assinaSync.ts";
 import {
   DOCUMENT_CATEGORIES,
   DOCUMENT_COPY,
+  asAuthentication,
   asReminder,
   assignSeller,
   channelBlock,
@@ -70,6 +71,7 @@ function storedExtra(value: unknown): ExtraSigner | null {
     email: typeof raw.email === "string" ? raw.email : null,
     whatsapp: typeof raw.whatsapp === "string" ? raw.whatsapp : null,
     marks: storedMarks(raw.marks),
+    authentication: asAuthentication(raw.authentication),
   };
 }
 
@@ -356,6 +358,7 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
   const batchPatch: { deadline: string | null; reminder: string; extra_signer?: ExtraSigner | null } = { deadline, reminder };
   if ("extraSigner" in body) batchPatch.extra_signer = body.extraSigner == null ? null : storedExtra(body.extraSigner);
   await admin.from("document_batch").update(batchPatch).eq("id", batch.id);
+  const authenticationById = new Map<string, ReturnType<typeof asAuthentication>>();
   if (Array.isArray(body.documents)) {
     for (const item of body.documents) {
       if (!item || typeof item !== "object") continue;
@@ -363,6 +366,7 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
       const id = typeof row.id === "string" ? row.id : "";
       const channel = asChannel(row.channel);
       if (!id || !channel) continue;
+      authenticationById.set(id, asAuthentication(row.authentication));
       const patch: Record<string, unknown> = { channel, marks: storedMarks(row.marks) };
       if ("deadline" in row) patch.deadline = typeof row.deadline === "string" && row.deadline ? row.deadline.slice(0, 10) : null;
       if ("reminder" in row) patch.reminder = asReminder(row.reminder);
@@ -430,7 +434,14 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
     const bytes = new Uint8Array(await file.data.arrayBuffer());
     const sentName = deliveryFileName(doc.file_name as string, seller.name, Number(batch.month), Number(batch.year));
     const created = await assinaCreateEnvelope(token, bytes, sentName, {
-      signatures: envelopeSignatures({ seller, channel, marks, pageCount, extras: extraForDocs }),
+      signatures: envelopeSignatures({
+        seller,
+        channel,
+        authentication: authenticationById.get(doc.id as string) ?? "DEFAULT_SIGN",
+        marks,
+        pageCount,
+        extras: extraForDocs,
+      }),
       documentSendConfig: {
         documentName: sentName,
         customEmailMessage: "",

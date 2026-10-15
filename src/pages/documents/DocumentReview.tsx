@@ -4,11 +4,15 @@ import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { Alert, Button, FormField, Modal, Tooltip, WizardCardHeader, WizardNav } from "@/components/ui";
 import { Spinner } from "@/components/ui/Skeleton";
 import {
+  AUTHENTICATIONS,
   DOCUMENT_COPY,
   DOCUMENT_LIMITS,
+  asAuthentication,
   contactFieldsToAsk,
   documentIssue,
   displayTitle,
+  guestAuthentication,
+  guestChannel,
   preparationSituation,
   resolveDrafts,
   saveCpf,
@@ -16,6 +20,8 @@ import {
   saveWhatsapp,
   signerContactKey,
   type ContactEdit,
+  signerCredits,
+  type AuthenticationType,
   type DocumentDraft,
   type FieldMark,
   type GuestSigner,
@@ -238,6 +244,8 @@ function ReviewBody({
       name: contact?.name ?? "",
       email: contact?.email ?? "",
       whatsapp: contact?.whatsapp ?? "",
+      channel: "WHATSAPP",
+      authentication: "DEFAULT_SIGN",
     };
     onDraft({
       ...draft,
@@ -361,7 +369,7 @@ function channelContactsReady(
     const saved = saveEmail(person.email ?? "");
     if (!saved.ok || !saved.email) return false;
   }
-  if (draft.channel === "WHATSAPP") {
+  if (draft.channel === "WHATSAPP" || asAuthentication(draft.authentication) === "SMS") {
     const saved = saveWhatsapp(person.whatsapp ?? "");
     if (!saved.ok || !saved.whatsapp) return false;
   }
@@ -378,11 +386,12 @@ function channelContactsReady(
     } else if (field.signerId.startsWith("guest:")) {
       const guest = (draft.guests ?? []).find((item) => item.id === field.signerId.slice("guest:".length));
       if (!guest?.name.trim()) return false;
-      if (draft.channel === "WHATSAPP") {
+      const send = guestChannel(guest);
+      if (send === "WHATSAPP" || guestAuthentication(guest) === "SMS") {
         const saved = saveWhatsapp(guest.whatsapp);
         if (!saved.ok || !saved.whatsapp) return false;
       }
-      if (draft.channel === "EMAIL") {
+      if (send === "EMAIL") {
         const saved = saveEmail(guest.email);
         if (!saved.ok || !saved.email) return false;
       }
@@ -506,31 +515,32 @@ function signerGroups(draft: DocumentDraft, person: PersonRow | null, people: Pe
   return order.map((key) => {
     const marks = map.get(key) ?? [];
     if (key === "none") {
-      return { key, name: "Sem signatário", role: null as "Principal" | "Adicional" | null, origin: "", pending: "Escolha quem assina", marks, person: null, guest: null, userEmail: null };
+      return { key, name: "Sem signatário", role: null as "Principal" | "Adicional" | null, origin: "", pending: "Escolha quem assina", marks, person: null, guest: null, userEmail: null, channel: null as SendChannel | null, authentication: null as AuthenticationType | null };
     }
     if (key === "seller" && !person) {
-      return { key, name: "Colaborador do documento", role: null, origin: "Colaborador", pending: "Sem colaborador", marks, person: null, guest: null, userEmail: null };
+      return { key, name: "Colaborador do documento", role: null, origin: "Colaborador", pending: "Sem colaborador", marks, person: null, guest: null, userEmail: null, channel: draft.channel, authentication: asAuthentication(draft.authentication) };
     }
     if (key === "seller" && person) {
-      return { key, name: person.name, role: "Principal" as const, origin: "Colaborador", pending: channelGap(person, draft.channel), marks, person, guest: null, userEmail: null };
+      return { key, name: person.name, role: "Principal" as const, origin: "Colaborador", pending: channelGap(person, draft.channel), marks, person, guest: null, userEmail: null, channel: draft.channel, authentication: asAuthentication(draft.authentication) };
     }
     if (key.startsWith("seller:")) {
       const named = people.find((item) => item.id === key.slice("seller:".length)) ?? null;
-      return { key, name: named?.name ?? "Colaborador", role: "Adicional" as const, origin: "Colaborador", pending: named ? channelGap(named, draft.channel) : "Sem contato", marks, person: named, guest: null, userEmail: null };
+      return { key, name: named?.name ?? "Colaborador", role: "Adicional" as const, origin: "Colaborador", pending: named ? channelGap(named, draft.channel) : "Sem contato", marks, person: named, guest: null, userEmail: null, channel: draft.channel, authentication: asAuthentication(draft.authentication) };
     }
     if (key.startsWith("user:")) {
       const named = signers.find((item) => item.id === key.slice("user:".length));
-      return { key, name: named?.name ?? "Usuário", role: "Adicional" as const, origin: "Usuário", pending: named?.email ? null : "Sem e-mail", marks, person: null, guest: null, userEmail: named?.email ?? null };
+      return { key, name: named?.name ?? "Usuário", role: "Adicional" as const, origin: "Usuário", pending: named?.email ? null : "Sem e-mail", marks, person: null, guest: null, userEmail: named?.email ?? null, channel: "EMAIL" as const, authentication: "DEFAULT_SIGN" as const };
     }
     const guest = (draft.guests ?? []).find((item) => item.id === key.slice("guest:".length)) ?? null;
+    const channel = guestChannel(guest);
     const pending = !guest?.name.trim()
       ? "Informe o nome"
-      : draft.channel === "WHATSAPP" && !guest.whatsapp.trim()
+      : channel === "WHATSAPP" && !guest.whatsapp.trim()
         ? "Sem WhatsApp"
-        : draft.channel === "EMAIL" && !guest.email.trim()
+        : channel === "EMAIL" && !guest.email.trim()
           ? "Sem e-mail"
           : null;
-    return { key, name: guest?.name.trim() || "Outra pessoa", role: "Adicional" as const, origin: "Outra pessoa", pending, marks, person: null, guest, userEmail: null };
+    return { key, name: guest?.name.trim() || "Outra pessoa", role: "Adicional" as const, origin: "Outra pessoa", pending, marks, person: null, guest, userEmail: null, channel, authentication: guestAuthentication(guest) };
   });
 }
 
@@ -596,6 +606,7 @@ function DraftFields({
                         {group.role ? `${group.role} · ` : ""}
                         {group.origin ? `${group.origin} · ` : ""}
                         {group.marks.length} {group.marks.length === 1 ? "marcação" : "marcações"}
+                        {group.channel && group.authentication ? ` · ${deliveryCaption(group.channel, group.authentication)}` : ""}
                       </span>
                     </span>
                     <span className="shrink-0 text-[11px] font-bold text-warn">{group.pending}</span>
@@ -612,6 +623,32 @@ function DraftFields({
                           {field.element === "RUBRIC" ? "Rubrica" : "Assinatura"} · Página {field.pageNumber}
                         </button>
                       ))}
+                      {(group.key === "seller" || group.guest) && group.channel && group.authentication && (
+                        <DeliveryFields
+                          channel={group.channel}
+                          authentication={group.authentication}
+                          onChannel={(channel) => {
+                            if (!group.guest) {
+                              onDraft({ ...draft, channel });
+                              return;
+                            }
+                            onDraft({
+                              ...draft,
+                              guests: (draft.guests ?? []).map((item) => (item.id === group.guest?.id ? { ...item, channel } : item)),
+                            });
+                          }}
+                          onAuthentication={(authentication) => {
+                            if (!group.guest) {
+                              onDraft({ ...draft, authentication });
+                              return;
+                            }
+                            onDraft({
+                              ...draft,
+                              guests: (draft.guests ?? []).map((item) => (item.id === group.guest?.id ? { ...item, authentication } : item)),
+                            });
+                          }}
+                        />
+                      )}
                       {group.person && (
                         <ContactEditor person={group.person} onContact={onContact} />
                       )}
@@ -626,14 +663,6 @@ function DraftFields({
             })}
           </ul>
         )}
-      </section>
-      <section className="rounded-xl border border-line p-3">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Configurações de envio</p>
-        <div className="mt-2 grid gap-3">
-          <FormField label="Canal">
-            <ChannelSelect value={draft.channel} onChange={(channel) => onDraft({ ...draft, channel })} />
-          </FormField>
-        </div>
       </section>
       <section className="rounded-xl border border-line p-3">
         <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Situação do documento</p>
@@ -768,12 +797,51 @@ function GuestEditor({ guest, onChange }: { guest: GuestSigner; onChange: (guest
   );
 }
 
-function ChannelSelect({ value, onChange }: { value: SendChannel; onChange: (value: SendChannel) => void }) {
+function deliveryCaption(channel: SendChannel, authentication: AuthenticationType) {
+  const auth = AUTHENTICATIONS.find((item) => item.id === authentication)?.label ?? "Assinatura na tela";
+  const credits = signerCredits(channel, authentication);
+  const credit = credits > 0 ? ` · ${credits} ${credits === 1 ? "crédito" : "créditos"}` : "";
+  return `${channel === "EMAIL" ? "E-mail" : "WhatsApp"} · ${auth}${credit}`;
+}
+
+function DeliveryFields({
+  channel,
+  authentication,
+  onChannel,
+  onAuthentication,
+}: {
+  channel: SendChannel;
+  authentication: AuthenticationType;
+  onChannel: (channel: SendChannel) => void;
+  onAuthentication: (authentication: AuthenticationType) => void;
+}) {
+  const credits = signerCredits(channel, authentication);
+  const detail = AUTHENTICATIONS.find((item) => item.id === authentication)?.detail;
   return (
-    <select className={controlClass} value={value} onChange={(event) => onChange(event.target.value as SendChannel)}>
-      <option value="WHATSAPP">WhatsApp</option>
-      <option value="EMAIL">E-mail</option>
-    </select>
+    <div className="grid gap-2">
+      <FormField label="Canal">
+        <select className={controlClass} value={channel} onChange={(event) => onChannel(event.target.value as SendChannel)}>
+          <option value="WHATSAPP">WhatsApp · 1 crédito</option>
+          <option value="EMAIL">E-mail</option>
+        </select>
+      </FormField>
+      <FormField label="Autenticação">
+        <select className={controlClass} value={authentication} onChange={(event) => onAuthentication(asAuthentication(event.target.value))}>
+          {AUTHENTICATIONS.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.label}
+              {item.credits > 0 ? ` · ${item.credits} crédito` : ""}
+            </option>
+          ))}
+        </select>
+      </FormField>
+      {detail && <p className="text-[11.5px] text-t2">{detail}</p>}
+      {credits > 0 && (
+        <p className="text-[11.5px] text-t2">
+          {credits === 1 ? "Este signatário consome 1 crédito no Assina AI." : `Este signatário consome ${credits} créditos no Assina AI.`}
+        </p>
+      )}
+    </div>
   );
 }
 

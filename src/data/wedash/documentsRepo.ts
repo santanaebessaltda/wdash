@@ -250,6 +250,7 @@ export async function confirmBatch(input: {
   documents: {
     id: string;
     channel: "EMAIL" | "WHATSAPP";
+    authentication?: string;
     marks: { pageNumber: number; x: number; y: number; element: "SIGNATURE" | "RUBRIC" }[];
     deadline?: string;
     reminder?: string;
