@@ -261,7 +261,7 @@ export function ManageGroupsModal({
                     type="button"
                     aria-label={`Editar ${shiftName(shift.name)}`}
                     onClick={() => setEditing(shift)}
-                    className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-line text-acc transition-colors hover:bg-acc-soft"
+                    className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-line text-t1 transition-colors hover:bg-bg-3 hover:text-t0"
                   >
                     <Icon d={icons.pencil} size={14} />
                   </button>

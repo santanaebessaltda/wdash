@@ -311,7 +311,7 @@ function GoalCard({
               type="button"
               onClick={action(onCopy)}
               aria-label="Duplicar meta"
-              className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-line text-acc transition-colors hover:bg-acc-soft"
+              className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-line text-t1 transition-colors hover:bg-bg-3 hover:text-t0"
             >
               <IconCopy width={14} height={14} />
             </button>
