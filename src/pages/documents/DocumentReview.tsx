@@ -13,6 +13,8 @@ import {
   displayTitle,
   documentPersonKey,
   findDocumentPerson,
+  markChoiceValue,
+  markSignerId,
   signingPeople,
   guestAuthentication,
   guestChannel,
@@ -299,12 +301,11 @@ function ReviewBody({
       return;
     }
     if (value === "seller" || people.some((item) => item.id === value)) {
-      const personId = value === "seller" ? ownerKey : value;
       saveDraft({
         ...draft,
-        fields: draft.fields.map((item) => (item.id === field.id ? { ...item, signerId: "seller" } : item)),
+        guests: guestsWithoutEmpty(field.signerId, field.id),
+        fields: draft.fields.map((item) => (item.id === field.id ? { ...item, signerId: markSignerId(value, ownerKey) } : item)),
       });
-      if (personId && personId !== ownerKey) void onAssign(row.id, personId);
       return;
     }
     saveDraft({
@@ -1200,7 +1201,7 @@ function MarkCard({
         <div className="grid gap-1.5 p-1.5">
           <select
             className="h-8 min-w-0 rounded-[var(--radius-vela-sm)] border border-line bg-bg-inset px-2 text-xs font-bold text-t0 outline-none focus:border-acc"
-            value={ownerKey ? (field.signerId === "seller" ? "seller" : field.signerId) : field.signerId === "seller" ? "" : field.signerId}
+            value={markChoiceValue(field.signerId, ownerKey)}
             disabled={disabled}
             onChange={(event) => onPick(event.target.value)}
           >

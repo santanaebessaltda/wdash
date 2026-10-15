@@ -18,6 +18,8 @@ import {
   deliveryFileName,
   documentPeople,
   documentPersonKey,
+  markChoiceValue,
+  markSignerId,
   signingPeople,
   documentIssue,
   findDocumentPerson,
@@ -572,6 +574,18 @@ describe("documentPeople", () => {
       ["centro"],
     );
     expect(people).toEqual([expect.objectContaining({ name: "Paula", active: false, source: "user" })]);
+  });
+});
+
+describe("markSignerId", () => {
+  it("keeps another person on the card that changed", () => {
+    expect(markSignerId("seller", "ana")).toBe("seller");
+    expect(markSignerId("ana", "ana")).toBe("seller");
+    expect(markSignerId("gestor", "ana")).toBe("seller:gestor");
+    expect(markChoiceValue("seller", "ana")).toBe("seller");
+    expect(markChoiceValue("seller:gestor", "ana")).toBe("gestor");
+    expect(markChoiceValue("seller", null)).toBe("");
+    expect(markChoiceValue("guest:1", "ana")).toBe("guest:1");
   });
 });
 

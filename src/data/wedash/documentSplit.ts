@@ -615,6 +615,22 @@ export function clampMark(mark: SignatureMark, pageCount: number): SignatureMark
   return { pageNumber, x: mark.x, y: mark.y, element: mark.element === "RUBRIC" ? "RUBRIC" : "SIGNATURE" };
 }
 
+/** O colaborador do documento fica em "seller". Outra pessoa da lista fica só neste card. */
+export function markSignerId(choice: string, ownerId: string | null): string {
+  if (choice === "seller" || (ownerId != null && choice === ownerId)) return "seller";
+  return `seller:${choice}`;
+}
+
+/** Valor do seletor do card a partir do signatário gravado. */
+export function markChoiceValue(signerId: string, ownerId: string | null): string {
+  if (signerId === "seller") return ownerId ? "seller" : "";
+  if (signerId.startsWith("seller:")) {
+    const id = signerId.slice("seller:".length);
+    return ownerId != null && id === ownerId ? "seller" : id;
+  }
+  return signerId;
+}
+
 export function defaultDraft(pageCount: number): DocumentDraft {
   return {
     channel: "WHATSAPP",
