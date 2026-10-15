@@ -78,6 +78,7 @@ export function AttachWizard({
   const [category, setCategory] = useState<string>(DOCUMENT_CATEGORIES[0]);
   const [customName, setCustomName] = useState("");
   const [files, setFiles] = useState<File[]>([]);
+  const [fileProgress, setFileProgress] = useState<Record<string, number>>({});
   const [drafts, setDrafts] = useState<Record<string, DocumentDraft | undefined>>({});
   const [opened, setOpened] = useState<Record<string, true>>({});
   const [activeId, setActiveId] = useState("");
@@ -243,8 +244,9 @@ export function AttachWizard({
       await onReload();
       const failed = (sent.results ?? []).filter((item) => item.error && readyIds.has(item.id));
       const sentCount = readyIds.size - failed.length;
+      const reason = [...new Set(failed.map((item) => item.error).filter((item): item is string => Boolean(item)))].join(" ");
       if (failed.length > 0 && sentCount === 0) {
-        setError(failed.length === 1 && failed[0].error ? failed[0].error : "Os documentos prontos não foram enviados. Tente novamente.");
+        setError(reason || "Os documentos prontos não foram enviados. Tente novamente.");
         setSending(false);
         setConfirmSend(false);
         return;
@@ -254,7 +256,7 @@ export function AttachWizard({
         setSentNote(
           `${sentCount} ${sentCount === 1 ? "documento enviado" : "documentos enviados"}. ${heldBack} ${heldBack === 1 ? "ficou de fora porque precisa" : "ficaram de fora porque precisam"} de correção.`,
         );
-        setError(failed.length > 0 ? "Alguns documentos prontos não foram enviados. Os que ficaram de fora por pendência não entram neste envio." : null);
+        setError(failed.length > 0 ? reason || "Alguns documentos prontos não foram enviados. Os que ficaram de fora por pendência não entram neste envio." : null);
         setSending(false);
         return;
       }
@@ -295,6 +297,8 @@ export function AttachWizard({
             category={category}
             customName={customName}
             files={files}
+            fileProgress={fileProgress}
+            onFileProgress={setFileProgress}
             outcomes={outcomes}
             error={error}
             onMonth={setMonth}
@@ -822,12 +826,20 @@ function fileKey(file: File) {
   return `${file.name}-${file.size}-${file.lastModified}`;
 }
 
-function AttachedFiles({ files, onRemove }: { files: File[]; onRemove: (file: File) => void }) {
-  const [progress, setProgress] = useState<Record<string, number>>({});
-
+function AttachedFiles({
+  files,
+  progress,
+  onProgress,
+  onRemove,
+}: {
+  files: File[];
+  progress: Record<string, number>;
+  onProgress: (value: Record<string, number> | ((current: Record<string, number>) => Record<string, number>)) => void;
+  onRemove: (file: File) => void;
+}) {
   useEffect(() => {
     const timer = window.setInterval(() => {
-      setProgress((current) => {
+      onProgress((current) => {
         const next: Record<string, number> = {};
         let changed = false;
         for (const file of files) {
@@ -840,7 +852,7 @@ function AttachedFiles({ files, onRemove }: { files: File[]; onRemove: (file: Fi
       });
     }, 90);
     return () => window.clearInterval(timer);
-  }, [files]);
+  }, [files, onProgress]);
 
   const ready = files.filter((file) => (progress[fileKey(file)] ?? 0) >= 100).length;
 
@@ -905,6 +917,8 @@ function UploadStep({
   category,
   customName,
   files,
+  fileProgress,
+  onFileProgress,
   outcomes,
   error,
   onMonth,
@@ -921,6 +935,8 @@ function UploadStep({
   category: string;
   customName: string;
   files: File[];
+  fileProgress: Record<string, number>;
+  onFileProgress: (value: Record<string, number> | ((current: Record<string, number>) => Record<string, number>)) => void;
   outcomes: PrepareFile[];
   error: string | null;
   onMonth: (value: string) => void;
@@ -1023,7 +1039,14 @@ function UploadStep({
           }}
         />
       </div>
-      {files.length > 0 && <AttachedFiles files={files} onRemove={(file) => onFiles(files.filter((item) => item !== file))} />}
+      {files.length > 0 && (
+        <AttachedFiles
+          files={files}
+          progress={fileProgress}
+          onProgress={onFileProgress}
+          onRemove={(file) => onFiles(files.filter((item) => item !== file))}
+        />
+      )}
       {outcomes.length > 0 && (
         <div className="mt-3 overflow-hidden rounded-xl border border-line">
           {outcomes.map((item) => (

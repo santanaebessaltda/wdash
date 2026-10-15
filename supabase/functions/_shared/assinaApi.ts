@@ -9,14 +9,10 @@ export type AssinaEnvelope = {
 };
 
 async function call(token: string, path: string, init?: RequestInit): Promise<Response> {
-  return fetch(`${BASE}${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ...(init?.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
-      ...init?.headers,
-    },
-  });
+  const headers = new Headers(init?.headers);
+  headers.set("Authorization", `Bearer ${token}`);
+  if (!headers.has("Content-Type") && !(init?.body instanceof FormData)) headers.set("Content-Type", "application/json");
+  return fetch(`${BASE}${path}`, { ...init, headers });
 }
 
 export async function assinaTokenWorks(token: string): Promise<boolean> {
@@ -41,6 +37,24 @@ async function failureMessage(res: Response): Promise<string | null> {
   }
 }
 
+/** O create exige multipart: o PDF como application/pdf e o envelope como application/json. */
+function envelopeBody(file: Uint8Array, fileName: string, envelope: unknown): { body: Uint8Array; contentType: string } {
+  const boundary = `----wdash${crypto.randomUUID().replace(/-/g, "")}`;
+  const enc = new TextEncoder();
+  const safeName = fileName.replace(/[\r\n"]/g, "_") || "documento.pdf";
+  const head = enc.encode(
+    `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${safeName}"\r\nContent-Type: application/pdf\r\n\r\n`,
+  );
+  const tail = enc.encode(
+    `\r\n--${boundary}\r\nContent-Disposition: form-data; name="envelope"\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(envelope)}\r\n--${boundary}--\r\n`,
+  );
+  const body = new Uint8Array(head.length + file.length + tail.length);
+  body.set(head, 0);
+  body.set(file, head.length);
+  body.set(tail, head.length + file.length);
+  return { body, contentType: `multipart/form-data; boundary=${boundary}` };
+}
+
 export async function assinaCreateEnvelope(
   token: string,
   file: Uint8Array,
@@ -48,10 +62,12 @@ export async function assinaCreateEnvelope(
   envelope: unknown,
 ): Promise<{ ok: true; body: AssinaEnvelope } | { ok: false; status: number; message: string | null }> {
   try {
-    const form = new FormData();
-    form.append("file", new Blob([file]), fileName);
-    form.append("envelope", JSON.stringify(envelope));
-    const res = await call(token, "/envelopes/create", { method: "POST", body: form });
+    const packed = envelopeBody(file, fileName, envelope);
+    const res = await call(token, "/envelopes/create", {
+      method: "POST",
+      body: packed.body,
+      headers: { "Content-Type": packed.contentType },
+    });
     if (!res.ok) return { ok: false, status: res.status, message: await failureMessage(res) };
     return { ok: true, body: (await res.json()) as AssinaEnvelope };
   } catch {
