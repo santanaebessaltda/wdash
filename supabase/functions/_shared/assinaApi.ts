@@ -30,21 +30,32 @@ export async function assinaGetEnvelope(token: string, envelopeId: string): Prom
   return (await res.json()) as AssinaEnvelope;
 }
 
+async function failureMessage(res: Response): Promise<string | null> {
+  try {
+    const body = (await res.json()) as { message?: unknown; error?: unknown };
+    const message = typeof body.message === "string" ? body.message : typeof body.error === "string" ? body.error : "";
+    const text = message.trim();
+    return text && text.length <= 240 ? text : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function assinaCreateEnvelope(
   token: string,
   file: Uint8Array,
   fileName: string,
   envelope: unknown,
-): Promise<{ ok: true; body: AssinaEnvelope } | { ok: false; status: number }> {
+): Promise<{ ok: true; body: AssinaEnvelope } | { ok: false; status: number; message: string | null }> {
   try {
     const form = new FormData();
     form.append("file", new Blob([file]), fileName);
     form.append("envelope", JSON.stringify(envelope));
     const res = await call(token, "/envelopes/create", { method: "POST", body: form });
-    if (!res.ok) return { ok: false, status: res.status };
+    if (!res.ok) return { ok: false, status: res.status, message: await failureMessage(res) };
     return { ok: true, body: (await res.json()) as AssinaEnvelope };
   } catch {
-    return { ok: false, status: 0 };
+    return { ok: false, status: 0, message: null };
   }
 }
 

@@ -47,13 +47,13 @@ export function DocumentReview({
   history,
   activeId,
   refused,
-  error,
   sending,
   onFocus,
   onDraft,
   onAssign,
   onDrop,
   onContact,
+  onRemove,
   onBack,
   onReview,
   period,
@@ -67,13 +67,13 @@ export function DocumentReview({
   history: SignerContact[];
   activeId: string;
   refused: { name: string; message: string }[];
-  error: string | null;
   sending: boolean;
   onFocus: (id: string) => void;
   onDraft: (id: string, draft: DocumentDraft) => void;
   onAssign: (documentId: string, sellerId: string) => Promise<void>;
   onDrop: (documentId: string, pageNumber: number) => Promise<void>;
   onContact: (sellerId: string, contact: ContactEdit) => void;
+  onRemove: (id: string) => Promise<void>;
   onBack: () => void;
   onReview: () => void;
   period: string;
@@ -147,6 +147,7 @@ export function DocumentReview({
           onAssign={onAssign}
           onDrop={onDrop}
           onContact={onContact}
+          onRemove={() => onRemove(row.id)}
         />
       ) : (
         <div className="flex justify-center py-10">
@@ -168,12 +169,14 @@ export function DocumentReview({
         <Summary label="Prontos" value={String(ready)} />
         <Summary label="Precisam de atenção" value={String(openRows - ready)} />
       </div>
-      {error && <p className="mt-3 text-sm text-bad">{error}</p>}
+      {openRows > 0 && ready !== openRows && (
+        <p className="mt-3 text-sm text-t2">Conclua ou exclua os documentos pendentes para revisar o envio.</p>
+      )}
       <div className="mt-4">
         <WizardNav
           hideNextIcon
           previousDisabled={sending}
-          nextDisabled={sending}
+          nextDisabled={sending || openRows === 0 || ready !== openRows}
           onPrevious={onBack}
           onNext={onReview}
           nextLabel="Revisar envio"
@@ -200,6 +203,7 @@ function ReviewBody({
   onAssign,
   onDrop,
   onContact,
+  onRemove,
 }: {
   row: DocumentRow;
   draft: DocumentDraft;
@@ -217,6 +221,7 @@ function ReviewBody({
   onAssign: (documentId: string, sellerId: string) => Promise<void>;
   onDrop: (documentId: string, pageNumber: number) => Promise<void>;
   onContact: (sellerId: string, contact: ContactEdit) => void;
+  onRemove: () => Promise<void>;
 }) {
   const person = people.find((item) => item.id === row.sellerId) ?? null;
   const issue = row.envelopeId ? null : documentIssue(person, draft, row.pageCount, signers, people, row.sizeBytes);
@@ -224,9 +229,16 @@ function ReviewBody({
   const next = index < total - 1 ? rows[index + 1] : null;
   const locked = Boolean(row.envelopeId) || sending;
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [removing, setRemoving] = useState(false);
+
+  function saveDraft(next: DocumentDraft) {
+    onDraft(next);
+    if (!next.fields.some((field) => field.signerId === "seller") && row.sellerId) void onAssign(row.id, "");
+  }
 
   function changeFields(fields: FieldMark[]) {
-    onDraft({ ...draft, fields });
+    saveDraft({ ...draft, fields });
   }
 
   function guestsWithoutEmpty(signerId: string, exceptFieldId: string) {
@@ -247,7 +259,7 @@ function ReviewBody({
       channel: "WHATSAPP",
       authentication: "DEFAULT_SIGN",
     };
-    onDraft({
+    saveDraft({
       ...draft,
       guests: [...guestsWithoutEmpty(assignTo.signerId, assignTo.id), guest],
       fields: draft.fields.map((item) => (item.id === assignTo.id ? { ...item, signerId: `guest:${guest.id}` } : item)),
@@ -265,7 +277,7 @@ function ReviewBody({
       if (!contact) return;
       const existing = (draft.guests ?? []).find((guest) => signerContactKey(guest) === signerContactKey(contact));
       if (existing) {
-        onDraft({
+        saveDraft({
           ...draft,
           guests: guestsWithoutEmpty(field.signerId, field.id),
           fields: draft.fields.map((item) => (item.id === field.id ? { ...item, signerId: `guest:${existing.id}` } : item)),
@@ -277,14 +289,14 @@ function ReviewBody({
     }
     if (value === "seller" || people.some((item) => item.id === value)) {
       const personId = value === "seller" ? row.sellerId : value;
-      onDraft({
+      saveDraft({
         ...draft,
         fields: draft.fields.map((item) => (item.id === field.id ? { ...item, signerId: "seller" } : item)),
       });
       if (personId && personId !== row.sellerId) void onAssign(row.id, personId);
       return;
     }
-    onDraft({
+    saveDraft({
       ...draft,
       guests: guestsWithoutEmpty(field.signerId, field.id),
       fields: draft.fields.map((item) => (item.id === field.id ? { ...item, signerId: value } : item)),
@@ -293,7 +305,7 @@ function ReviewBody({
 
   function placeMark(mark: SignatureMark) {
     const id = crypto.randomUUID();
-    onDraft({ ...draft, fields: [...draft.fields, { ...mark, id, signerId: row.sellerId ? "" : "seller" }] });
+    saveDraft({ ...draft, fields: [...draft.fields, { ...mark, id, signerId: row.sellerId ? "" : "seller" }] });
     setSelectedId(id);
   }
 
@@ -310,9 +322,23 @@ function ReviewBody({
       </div>
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div>
-          <p className="mb-2 text-[13px] text-t2">
-            {documentTitle(rows, row, people)} · {period} · {row.pageCount === 1 ? "1 página" : `${row.pageCount} páginas`}
-          </p>
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <p className="min-w-0 truncate text-[13px] text-t2">
+              {documentTitle(rows, row, people)} · {period} · {row.pageCount === 1 ? "1 página" : `${row.pageCount} páginas`}
+            </p>
+            {!locked && (
+              <Tooltip label="Excluir documento">
+                <button
+                  type="button"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] border border-line text-bad transition-colors hover:bg-bad-soft"
+                  aria-label="Excluir documento"
+                  onClick={() => setConfirmRemove(true)}
+                >
+                  <Icon d={icons.trash} size={14} />
+                </button>
+              </Tooltip>
+            )}
+          </div>
           {!locked && (
             <Alert className="mb-3" title="Clique no documento para adicionar uma assinatura ou rubrica." />
           )}
@@ -353,6 +379,38 @@ function ReviewBody({
           )}
         </aside>
       </div>
+      <Modal
+        open={confirmRemove}
+        onClose={() => {
+          if (!removing) setConfirmRemove(false);
+        }}
+        title="Excluir documento"
+        footer={
+          <>
+            <Button variant="outline" disabled={removing} onClick={() => setConfirmRemove(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="danger"
+              disabled={removing}
+              onClick={() => {
+                setRemoving(true);
+                void onRemove().then(
+                  () => {
+                    setConfirmRemove(false);
+                    setRemoving(false);
+                  },
+                  () => setRemoving(false),
+                );
+              }}
+            >
+              {removing ? "Excluindo…" : "Excluir"}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-[13.5px] text-t1">Este documento sai do lote. Os outros permanecem.</p>
+      </Modal>
     </div>
   );
 }
@@ -577,9 +635,9 @@ function DraftFields({
     setOpenKey(field.signerId || "none");
   }, [draft.fields, selectedId]);
 
+  const ownerMarked = draft.fields.some((field) => field.signerId === "seller" && field.pageNumber >= 1 && field.pageNumber <= pageCount);
   const marksValid =
-    Boolean(person) &&
-    draft.fields.some((field) => field.signerId === "seller" && field.pageNumber >= 1 && field.pageNumber <= pageCount) &&
+    ownerMarked &&
     !draft.fields.some((field) => !field.signerId || field.pageNumber < 1 || field.pageNumber > pageCount);
   const contactsValid = channelContactsReady(person, draft, people, signers);
   const sizeValid = sizeBytes <= DOCUMENT_LIMITS.maxEnvelopeBytes;
@@ -667,12 +725,12 @@ function DraftFields({
       <section className="rounded-xl border border-line p-3">
         <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Situação do documento</p>
         <ul className="mt-2 grid gap-1.5">
-          <CheckRow ok={Boolean(person)} label="Colaborador identificado" />
+          <CheckRow ok={Boolean(person) && ownerMarked} label="Colaborador identificado" />
           <CheckRow ok={marksValid} label="Marcações válidas" />
           <CheckRow ok={contactsValid} label="Contatos do canal válidos" />
           <CheckRow ok={sizeValid} label="Tamanho do PDF válido" />
         </ul>
-        {issue && issue !== "Escolha o colaborador." && issue !== "Falta contato no cadastro." && issue !== DOCUMENT_COPY.badCpf && issue !== DOCUMENT_COPY.badEmail && issue !== DOCUMENT_COPY.badWhatsapp && issue !== DOCUMENT_COPY.overEnvelope && <p className="mt-2 text-xs text-bad">{issue}</p>}
+        {issue && !["Escolha o colaborador.", "Falta contato no cadastro.", "Escolha quem assina esta marcação.", DOCUMENT_COPY.badCpf, DOCUMENT_COPY.badEmail, DOCUMENT_COPY.badWhatsapp, DOCUMENT_COPY.overEnvelope, DOCUMENT_COPY.missingPage].includes(issue) && <p className="mt-2 text-xs text-bad">{issue}</p>}
         {!sizeValid && <p className="mt-2 text-xs text-bad">{DOCUMENT_COPY.overEnvelope}</p>}
       </section>
     </>

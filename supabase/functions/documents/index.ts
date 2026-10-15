@@ -285,6 +285,10 @@ async function assign(admin: SupabaseClient, tenantId: string, body: Body) {
   const sellerId = String(body.sellerId ?? "");
   const { data: doc } = await admin.from("employee_document").select("id, envelope_id").eq("id", documentId).eq("tenant_id", tenantId).maybeSingle();
   if (!doc || doc.envelope_id) return json({ error: "not_found" }, 404);
+  if (!sellerId) {
+    await admin.from("employee_document").update({ seller_id: null, store_id: null, status: "UNASSIGNED", error: null }).eq("id", documentId);
+    return json({ ok: true });
+  }
   const { data: seller } = await admin.from("store_seller").select("id, store_id").eq("id", sellerId).eq("tenant_id", tenantId).maybeSingle();
   if (!seller) return json({ error: "not_found" }, 404);
   await admin.from("employee_document").update({ seller_id: sellerId, store_id: seller.store_id, error: null }).eq("id", documentId);
@@ -455,9 +459,7 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
     if (!created.ok || !created.body.id) {
       const message = created.ok
         ? "O Assina AI não devolveu a confirmação do envio."
-        : created.status
-          ? "Não foi possível iniciar a assinatura deste documento."
-          : "Não foi possível conectar ao Assina AI.";
+        : created.message ?? (created.status ? "Não foi possível iniciar a assinatura deste documento." : "Não foi possível conectar ao Assina AI.");
       await admin.from("employee_document").update({ error: message }).eq("id", doc.id);
       results.push({ id: doc.id as string, error: message });
       continue;

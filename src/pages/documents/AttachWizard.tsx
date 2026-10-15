@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Breadcrumbs, Button, Card, CardHeader, CardTitle, FormField, Modal, ProgressBar, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
+import { Alert, Breadcrumbs, Button, Card, CardHeader, CardTitle, FormField, Modal, ProgressBar, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
 import { Spinner } from "@/components/ui/Skeleton";
 import { paths } from "@/router/paths";
 import { Icon, icons } from "@/pages/users/Icons";
@@ -283,7 +283,7 @@ export function AttachWizard({
         </Button>
         <Breadcrumbs items={[{ label: "Documentos", to: paths.documents }, { label: "Anexar documento" }]} />
       </div>
-      <div className={cn("mx-auto", step === 2 ? "max-w-6xl" : step === 3 ? "max-w-4xl" : "max-w-3xl")}>
+      <div className={cn("mx-auto pb-10", step === 2 ? "max-w-6xl" : step === 3 ? "max-w-4xl" : "max-w-3xl")}>
       <WizardSteps steps={STEPS} current={step} />
       <div>
         {processing ? (
@@ -319,7 +319,6 @@ export function AttachWizard({
             history={history}
             activeId={activeId}
             refused={refused}
-            error={error}
             sending={sending}
             onFocus={(id) => {
               setActiveId(id);
@@ -371,8 +370,30 @@ export function AttachWizard({
               await onReload();
             }}
             onContact={(sellerId, contact) => setContactEdits((current) => ({ ...current, [sellerId]: contact }))}
+            onRemove={async (id) => {
+              await deleteDocument(id);
+              setDrafts((current) => {
+                const next = { ...current };
+                delete next[id];
+                return next;
+              });
+              setOpened((current) => {
+                const next = { ...current };
+                delete next[id];
+                return next;
+              });
+              setActiveId((current) => {
+                if (current !== id) return current;
+                const index = rows.findIndex((row) => row.id === id);
+                return rows[index + 1]?.id ?? rows[index - 1]?.id ?? "";
+              });
+              await onReload();
+            }}
             onBack={() => setStep(1)}
-            onReview={() => setStep(3)}
+            onReview={() => {
+              setError(null);
+              setStep(3);
+            }}
             period={`${monthFolder(Number(month))}/${year}`}
             analyzed={analyzed}
             opened={opened}
@@ -387,7 +408,11 @@ export function AttachWizard({
             error={error}
             sentNote={sentNote}
             sending={sending}
-            onBack={() => setStep(2)}
+            onBack={() => {
+              setError(null);
+              setSentNote(null);
+              setStep(2);
+            }}
             onOpen={(id) => {
               setActiveId(id);
               setStep(2);
@@ -584,7 +609,6 @@ function SendReview({
   const ready = items.filter((item) => item.situation === "Pronto").length;
   const attention = items.filter((item) => item.situation !== "Pronto" && item.situation !== "Já enviado").length;
   const sent = items.filter((item) => item.situation === "Já enviado").length;
-  const [picked, setPicked] = useState<string[]>([]);
   const [deadline, setDeadline] = useState("");
   const [reminder, setReminder] = useState<DocumentDraft["reminder"]>("EVERY_3_DAYS");
   const [removeId, setRemoveId] = useState<string | null>(null);
@@ -616,14 +640,7 @@ function SendReview({
                 <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-t2">{title}</p>
                 <div className="overflow-hidden rounded-xl border border-line">
                   {group.map((item) => (
-                    <div key={item.row.id} className="grid grid-cols-[auto_minmax(0,1.4fr)_minmax(0,1fr)_auto_auto] items-center gap-3 border-b border-line px-3 py-2.5 last:border-b-0">
-                      <input
-                        type="checkbox"
-                        aria-label={`Selecionar ${displayTitle(item.row.fileName)}`}
-                        disabled={item.situation === "Já enviado"}
-                        checked={picked.includes(item.row.id)}
-                        onChange={(event) => setPicked((current) => (event.target.checked ? [...current, item.row.id] : current.filter((id) => id !== item.row.id)))}
-                      />
+                    <div key={item.row.id} className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_auto] items-center gap-3 border-b border-line px-3 py-2.5 last:border-b-0">
                       <span className="min-w-0">
                         <span className="block truncate text-[13px] font-bold text-t0">{displayTitle(item.row.fileName)}</span>
                         <span className="mt-0.5 block truncate text-[11.5px] text-t2">{scheduleLine(item.draft)}</span>
@@ -637,11 +654,11 @@ function SendReview({
                       ) : (
                         <button
                           type="button"
-                          className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-vela-sm)] text-t2 hover:bg-bad-soft hover:text-bad"
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] border border-line text-bad transition-colors hover:bg-bad-soft"
                           aria-label="Excluir documento"
                           onClick={() => setRemoveId(item.row.id)}
                         >
-                          <Icon d={icons.trash} size={15} />
+                          <Icon d={icons.trash} size={14} />
                         </button>
                       )}
                     </div>
@@ -659,7 +676,7 @@ function SendReview({
       {openIds.length > 0 && (
         <div className="mt-4 rounded-xl border border-line p-3">
           <p className="text-[13px] font-bold text-t0">Lembrete e data limite</p>
-          <p className="mt-1 text-[12.5px] text-t2">Vale para os documentos marcados. Sem marcação, vale para todos os que ainda não foram enviados. Contatos e canais não mudam.</p>
+          <p className="mt-1 text-[12.5px] text-t2">Vale para todos os documentos que ainda não foram enviados. Contatos e canais não mudam.</p>
           <div className="mt-3 flex flex-wrap items-end gap-2">
             <label className="grid min-w-[160px] flex-1 gap-1 text-[12px] font-bold text-t2">
               Lembrete
@@ -674,15 +691,14 @@ function SendReview({
               Data limite
               <input type="date" className={controlClass} value={deadline} onChange={(event) => setDeadline(event.target.value)} />
             </label>
-            <Button type="button" variant="outline" onClick={() => onApply(picked.length > 0 ? picked : openIds, deadline, reminder)}>
+            <Button type="button" variant="outline" onClick={() => onApply(openIds, deadline, reminder)}>
               Aplicar
             </Button>
           </div>
         </div>
       )}
-      {ready === 0 && items.length > 0 && <p className="mt-3 text-sm text-t2">Nenhum documento pronto para envio. Corrija as pendências para continuar.</p>}
-      {sentNote && <p className="mt-3 text-sm text-ok">{sentNote}</p>}
-      {error && <p className="mt-3 text-sm text-bad">{error}</p>}
+      {sentNote && <Alert className="mt-4" variant="success" title={sentNote} />}
+      {error && <Alert className="mt-4" variant="danger" title={error} />}
       <div className="mt-4">
         <WizardNav previousLabel="Voltar" nextLabel={sending ? "Enviando…" : sendLabel(ready)} hideNextIcon previousDisabled={sending} nextDisabled={sending || ready === 0} onPrevious={onBack} onNext={onSend} />
       </div>
@@ -708,7 +724,6 @@ function SendReview({
                   () => {
                     setRemoveId(null);
                     setRemoving(false);
-                    setPicked((current) => current.filter((item) => item !== id));
                   },
                   () => setRemoving(false),
                 );
