@@ -91,7 +91,8 @@ O gestor envia PDFs digitais para assinatura, organizados por colaborador. Um PD
 - A navegação é um controle só: anterior, "Documento N de T" com a lista, e próximo. Marca herdada só fica pronta depois que aquele PDF é aberto. O painel separa signatários, configurações de envio e a situação. A situação usa ícone de check ou X. Falta de contato aparece nesse ícone, sem a frase "Falta contato no cadastro."
 - Excluir a única página pede confirmação, porque o documento sai do lote. A marcação que estava na página excluída deixa de valer.
 - Na revisão ficam o lembrete e a data limite. Sem documento marcado, valem para todos os que ainda não foram enviados. Contato e canal não mudam. A lista não repete o status do grupo. O nome na tela é a categoria, sem o índice "(2)" gravado no arquivo. A lixeira tira do lote um documento que ainda não foi enviado.
-- Os indicadores de enviados, pendentes e assinados são só leitura. Atalhos, busca e pastas continuam abrindo a lista. A ação do arquivo é Baixar PDF. Reenviar link só aparece em pendente.
+- Os indicadores Enviados, Pendentes e Assinados são só leitura. A busca é por documento ou colaborador. Atalhos e pastas abrem a lista. A ação do arquivo é Baixar PDF. Reenviar só aparece em pendente.
+- Na preparação o documento está Pronto, Precisa de atenção ou Já enviado. O motivo da pendência é Sem colaborador, Contato incompleto, Falta marcação ou Revisar marcação.
 - Cada página do documento pode ser apagada antes do envio, com a lixeira. Apagar a última página tira o documento do lote. Documento que já tem envelope não perde página.
 
 ### Agent's Discretion

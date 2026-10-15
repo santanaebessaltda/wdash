@@ -258,11 +258,11 @@ export type SendChannel = "EMAIL" | "WHATSAPP";
 export type AuthenticationType = "DEFAULT_SIGN" | "SELFIE" | "DOCUMENT_AND_SELFIE" | "SMS" | "ICP_BRASIL";
 
 export const AUTHENTICATIONS: { id: AuthenticationType; label: string; detail: string; credits: number }[] = [
-  { id: "DEFAULT_SIGN", label: "Assinatura na tela (padrão)", detail: "Padrão Assina AI", credits: 0 },
-  { id: "SELFIE", label: "Exigir foto selfie", detail: "Com reconhecimento facial", credits: 0 },
-  { id: "DOCUMENT_AND_SELFIE", label: "Exigir documento com foto + selfie", detail: "Com reconhecimento facial", credits: 0 },
-  { id: "SMS", label: "Envio de código por SMS", detail: "Autenticação por SMS", credits: 1 },
-  { id: "ICP_BRASIL", label: "Exigir certificado ICP-Brasil A1 ou A3", detail: "Conhecido como e-CPF ou e-CNPJ", credits: 1 },
+  { id: "DEFAULT_SIGN", label: "Assinatura na tela", detail: "Padrão Assina AI", credits: 0 },
+  { id: "SELFIE", label: "Selfie", detail: "Reconhecimento facial", credits: 0 },
+  { id: "DOCUMENT_AND_SELFIE", label: "Documento + selfie", detail: "Reconhecimento facial", credits: 0 },
+  { id: "SMS", label: "Código por SMS", detail: "Autenticação por SMS", credits: 1 },
+  { id: "ICP_BRASIL", label: "Certificado ICP-Brasil", detail: "e-CPF ou e-CNPJ", credits: 1 },
 ];
 
 export function asAuthentication(value: unknown): AuthenticationType {
@@ -653,7 +653,10 @@ export function documentIssue(
   return null;
 }
 
-/** Rótulo curto da preparação. O status de assinatura só existe depois do envio. */
+export type PreparationStatus = "Pronto" | "Precisa de atenção" | "Já enviado";
+export type PreparationReason = "Sem colaborador" | "Contato incompleto" | "Falta marcação" | "Revisar marcação";
+
+/** Status da preparação. O motivo da pendência fica em `preparationReason`. */
 export function preparationSituation(
   person: { cpf: string | null; email: string | null; whatsapp: string | null } | null,
   draft: DocumentDraft,
@@ -662,15 +665,31 @@ export function preparationSituation(
   people: { id: string; name: string; email: string | null; whatsapp: string | null; cpf?: string | null }[] = [],
   envelopeId: string | null = null,
   sizeBytes = 0,
-): "Pronto" | "Sem colaborador" | "Contato incompleto" | "Falta marcação" | "Já enviado" | "Precisa de correção" {
+): PreparationStatus {
   if (envelopeId) return "Já enviado";
+  return documentIssue(person, draft, pageCount, signers, people, sizeBytes) ? "Precisa de atenção" : "Pronto";
+}
+
+/** Motivo quando o documento precisa de atenção. Documento herdado e ainda não aberto usa "Revisar marcação". */
+export function preparationReason(
+  person: { cpf: string | null; email: string | null; whatsapp: string | null } | null,
+  draft: DocumentDraft,
+  pageCount: number,
+  signers: { id: string; name: string; email: string | null }[] = [],
+  people: { id: string; name: string; email: string | null; whatsapp: string | null; cpf?: string | null }[] = [],
+  envelopeId: string | null = null,
+  sizeBytes = 0,
+  reviewed = true,
+): PreparationReason | null {
+  const status = preparationSituation(person, draft, pageCount, signers, people, envelopeId, sizeBytes);
+  if (status === "Pronto" && !reviewed) return "Revisar marcação";
+  if (status !== "Precisa de atenção") return null;
   const issue = documentIssue(person, draft, pageCount, signers, people, sizeBytes);
-  if (!issue) return "Pronto";
   if (issue === "Escolha o colaborador.") return "Sem colaborador";
   if (issue === DOCUMENT_COPY.missingPage || issue === "Escolha quem assina esta marcação.") return "Falta marcação";
   if (
     issue === "Falta contato no cadastro." ||
-    issue.startsWith("Informe ") ||
+    issue?.startsWith("Informe ") ||
     issue === "O signatário adicional precisa ser um usuário com e-mail." ||
     issue === DOCUMENT_COPY.badCpf ||
     issue === DOCUMENT_COPY.badEmail ||
@@ -678,7 +697,12 @@ export function preparationSituation(
   ) {
     return "Contato incompleto";
   }
-  return "Precisa de correção";
+  return null;
+}
+
+export function preparationCaption(status: PreparationStatus, reason: PreparationReason | null): string {
+  if (status === "Pronto" && reason === "Revisar marcação") return "Precisa de atenção · Revisar marcação";
+  return reason ? `${status} · ${reason}` : status;
 }
 
 export function applicableMarks(marks: SignatureMark[], pageCount: number): SignatureMark[] {

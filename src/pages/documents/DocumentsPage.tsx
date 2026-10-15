@@ -112,9 +112,9 @@ export function DocumentsPage() {
       {notice && <p className="mb-3 text-[13px] text-bad">{notice}</p>}
       {mode === "home" && (
         <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <QuickStat label="Documentos enviados" value={String(sentDocuments.length)} sub="Já foram para assinatura" tint="acc" icon={<Glyph d="M22 2 11 13M22 2 15 22 11 13 2 9 22 2" />} />
-          <QuickStat label="Documentos pendentes" value={String(pending.length)} sub="Aguardando assinatura" tint="warn" icon={<Glyph d="M12 8v4l3 2M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20" />} />
-          <QuickStat label="Documentos assinados" value={String(signed.length)} sub="Assinatura concluída" tint="ok" icon={<Glyph d="M20 6 9 17l-5-5" />} />
+          <QuickStat label="Enviados" value={String(sentDocuments.length)} sub="Enviados para assinatura" tint="acc" icon={<Glyph d="M22 2 11 13M22 2 15 22 11 13 2 9 22 2" />} />
+          <QuickStat label="Pendentes" value={String(pending.length)} sub="Aguardando assinatura" tint="warn" icon={<Glyph d="M12 8v4l3 2M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20" />} />
+          <QuickStat label="Assinados" value={String(signed.length)} sub="Assinatura concluída" tint="ok" icon={<Glyph d="M20 6 9 17l-5-5" />} />
         </div>
       )}
       <p className="mb-3 text-xs font-bold uppercase tracking-wide text-t2">Atalhos</p>
@@ -143,8 +143,8 @@ export function DocumentsPage() {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar documentos"
-            className="w-28 bg-transparent text-[12.5px] text-t0 outline-none placeholder:text-t2 sm:w-40"
+            placeholder="Buscar por documento ou colaborador"
+            className="w-40 bg-transparent text-[12.5px] text-t0 outline-none placeholder:text-t2 sm:w-72"
           />
         </div>
       </div>
@@ -479,7 +479,7 @@ function FileTable({
           </Button>
           {resendVisible(row.status) && row.envelopeId ? (
             <Button size="sm" variant="outline" disabled={resendingId === row.id} onClick={() => onResend(row.id)}>
-              {resendingId === row.id ? "Reenviando…" : "Reenviar link"}
+              {resendingId === row.id ? "Reenviando…" : "Reenviar"}
             </Button>
           ) : null}
         </span>

@@ -21,6 +21,7 @@ import {
   signerCredits,
   fieldAfterDrop,
   monthFolder,
+  preparationReason,
   preparationSituation,
   remainingPages,
   resolveDrafts,
@@ -254,7 +255,7 @@ export function AttachWizard({
       setConfirmSend(false);
       if (heldBack > 0 || failed.length > 0) {
         setSentNote(
-          `${sentCount} ${sentCount === 1 ? "documento enviado" : "documentos enviados"}. ${heldBack} ${heldBack === 1 ? "ficou de fora porque precisa" : "ficaram de fora porque precisam"} de correção.`,
+          `${sentCount} ${sentCount === 1 ? "documento enviado" : "documentos enviados"}. ${heldBack} ${heldBack === 1 ? "ficou de fora porque precisa" : "ficaram de fora porque precisam"} de atenção.`,
         );
         setError(failed.length > 0 ? reason || "Alguns documentos prontos não foram enviados. Os que ficaram de fora por pendência não entram neste envio." : null);
         setSending(false);
@@ -540,12 +541,16 @@ function situations(
   );
   return rows.map((row, index) => {
     const person = people.find((item) => item.id === row.sellerId) ?? null;
+    const reviewed = Boolean(opened[row.id]) || index === 0;
     const situation = preparationSituation(person, resolved[index], row.pageCount, signers, people, row.envelopeId, row.sizeBytes);
+    const reason = preparationReason(person, resolved[index], row.pageCount, signers, people, row.envelopeId, row.sizeBytes, reviewed);
+    const shown = situation === "Pronto" && reason ? "Precisa de atenção" : situation;
     return {
       row,
       person,
       draft: resolved[index],
-      situation: situation === "Pronto" && !opened[row.id] && index > 0 ? "Conferir marcação" : situation,
+      situation: shown,
+      reason,
     };
   });
 }
@@ -570,8 +575,8 @@ function ConfirmCopy({
     <p className="text-[13.5px] text-t1">
       {ready === 1 ? "1 documento será enviado para assinatura." : `${ready} documentos serão enviados para assinatura.`}{" "}
       {held === 1
-        ? "Outro documento não será enviado porque precisa de correção."
-        : `Outros ${held} não serão enviados porque precisam de correção.`}
+        ? "Outro documento não será enviado porque precisa de atenção."
+        : `Outros ${held} não serão enviados porque precisam de atenção.`}
     </p>
   );
 }
@@ -618,7 +623,7 @@ function SendReview({
     <>
       <WizardCardHeader
         title="Revisar envio"
-        subtitle="Confira quem recebe cada documento. O envio leva só os que estão prontos."
+        subtitle="Confira os documentos, signatários e formas de envio antes de continuar."
       />
       {items.length === 0 ? (
         <div>
@@ -630,7 +635,7 @@ function SendReview({
           {(
             [
               ["Prontos para envio", items.filter((item) => item.situation === "Pronto")],
-              ["Precisam de correção", items.filter((item) => item.situation !== "Pronto" && item.situation !== "Já enviado")],
+              ["Precisam de atenção", items.filter((item) => item.situation !== "Pronto" && item.situation !== "Já enviado")],
               ["Já enviados", items.filter((item) => item.situation === "Já enviado")],
             ] as const
           )
@@ -643,7 +648,9 @@ function SendReview({
                     <div key={item.row.id} className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_auto] items-center gap-3 border-b border-line px-3 py-2.5 last:border-b-0">
                       <span className="min-w-0">
                         <span className="block truncate text-[13px] font-bold text-t0">{displayTitle(item.row.fileName)}</span>
-                        <span className="mt-0.5 block truncate text-[11.5px] text-t2">{scheduleLine(item.draft)}</span>
+                        {item.reason && <span className="mt-0.5 block truncate text-[11.5px] text-t2">{item.reason}</span>}
+                        <span className="mt-0.5 block truncate text-[11.5px] text-t2">{scheduleDelivery(item.draft)}</span>
+                        <span className="block truncate text-[11.5px] text-t2">{scheduleWhen(item.draft)}</span>
                       </span>
                       <span className="truncate text-[13px] text-t1">{item.person?.name ?? "Sem colaborador"}</span>
                       <Button type="button" size="sm" variant="outline" onClick={() => onOpen(item.row.id)}>
@@ -675,8 +682,8 @@ function SendReview({
       </div>
       {openIds.length > 0 && (
         <div className="mt-4 rounded-xl border border-line p-3">
-          <p className="text-[13px] font-bold text-t0">Lembrete e data limite</p>
-          <p className="mt-1 text-[12.5px] text-t2">Vale para todos os documentos que ainda não foram enviados. Contatos e canais não mudam.</p>
+          <p className="text-[13px] font-bold text-t0">Lembretes e prazo</p>
+          <p className="mt-1 text-[12.5px] text-t2">Estas configurações serão aplicadas aos documentos que ainda não foram enviados.</p>
           <div className="mt-3 flex flex-wrap items-end gap-2">
             <label className="grid min-w-[160px] flex-1 gap-1 text-[12px] font-bold text-t2">
               Lembrete
@@ -740,7 +747,22 @@ function SendReview({
   );
 }
 
-function scheduleLine(draft: DocumentDraft) {
+function scheduleDelivery(draft: DocumentDraft) {
+  const people = schedulePeople(draft);
+  const labels = [...new Set([...people.values()].map((item) => (item.channel === "EMAIL" ? "E-mail" : "WhatsApp")))];
+  const credits = [...people.values()].reduce((sum, item) => sum + signerCredits(item.channel, item.authentication), 0);
+  const credit = credits > 0 ? ` · ${credits} ${credits === 1 ? "crédito" : "créditos"}` : "";
+  return `${labels.join(" + ")}${credit}`;
+}
+
+function scheduleWhen(draft: DocumentDraft) {
+  const reminder =
+    draft.reminder === "EVERY_DAY" ? "Todo dia" : draft.reminder === "EVERY_WEEK" ? "Toda semana" : draft.reminder === "NEVER" ? "Sem lembrete" : "A cada 3 dias";
+  const deadline = draft.deadline ? draft.deadline.split("-").reverse().join("/") : "Sem prazo";
+  return `${reminder} · ${deadline}`;
+}
+
+function schedulePeople(draft: DocumentDraft) {
   const people = new Map<string, { channel: "EMAIL" | "WHATSAPP"; authentication: ReturnType<typeof asAuthentication> }>();
   for (const field of draft.fields) {
     if (field.signerId.startsWith("guest:")) {
@@ -751,13 +773,7 @@ function scheduleLine(draft: DocumentDraft) {
     }
   }
   if (people.size === 0) people.set("seller", { channel: draft.channel, authentication: asAuthentication(draft.authentication) });
-  const labels = [...new Set([...people.values()].map((item) => (item.channel === "EMAIL" ? "E-mail" : "WhatsApp")))];
-  const credits = [...people.values()].reduce((sum, item) => sum + signerCredits(item.channel, item.authentication), 0);
-  const reminder =
-    draft.reminder === "EVERY_DAY" ? "Todo dia" : draft.reminder === "EVERY_WEEK" ? "Toda semana" : draft.reminder === "NEVER" ? "Sem lembrete" : "A cada 3 dias";
-  const deadline = draft.deadline ? draft.deadline.split("-").reverse().join("/") : "Sem prazo";
-  const credit = credits > 0 ? `${credits} ${credits === 1 ? "crédito" : "créditos"} · ` : "";
-  return `${labels.join(" e ")} · ${credit}${reminder} · ${deadline}`;
+  return people;
 }
 
 function SummaryTile({ label, value }: { label: string; value: string }) {

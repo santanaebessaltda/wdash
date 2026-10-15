@@ -13,6 +13,8 @@ import {
   displayTitle,
   guestAuthentication,
   guestChannel,
+  preparationCaption,
+  preparationReason,
   preparationSituation,
   resolveDrafts,
   saveCpf,
@@ -98,15 +100,16 @@ export function DocumentReview({
   const situationOf = (item: DocumentRow, itemIndex: number) => {
     const person = people.find((candidate) => candidate.id === item.sellerId) ?? null;
     const situation = preparationSituation(person, resolved[itemIndex], item.pageCount, signers, people, item.envelopeId, item.sizeBytes);
-    if (situation === "Pronto" && !opened[item.id] && itemIndex > 0) return "Conferir marcação";
-    return situation;
+    const reviewed = Boolean(opened[item.id]) || itemIndex === 0;
+    const reason = preparationReason(person, resolved[itemIndex], item.pageCount, signers, people, item.envelopeId, item.sizeBytes, reviewed);
+    return preparationCaption(situation, reason);
   };
 
   return (
     <>
       <WizardCardHeader
         title="Preparar documentos"
-        subtitle="Vincule o colaborador, posicione as marcações e confira o contato do canal escolhido."
+        subtitle="Vincule o colaborador, defina os signatários e posicione as marcações de assinatura."
       />
       {analyzed && rows.length > 0 && (
         <p className="mt-3 text-[13px] text-t2">
@@ -340,7 +343,7 @@ function ReviewBody({
             )}
           </div>
           {!locked && (
-            <Alert className="mb-3" title="Clique no documento para adicionar uma assinatura ou rubrica." />
+            <Alert className="mb-3" title="Clique no documento para posicionar uma assinatura ou rubrica." />
           )}
           <StackedPages
             documentId={row.id}
@@ -647,10 +650,10 @@ function DraftFields({
       <section className="rounded-xl border border-line p-3">
         <div className="flex items-center justify-between gap-2">
           <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Signatários</p>
-          <span className="text-[11px] font-bold text-t2">{groups.length} {groups.length === 1 ? "pessoa" : "pessoas"}</span>
+          <span className="text-[11px] font-bold text-t2">{groups.length === 1 ? "1 signatário" : `${groups.length} signatários`}</span>
         </div>
         {groups.length === 0 ? (
-          <p className="mt-2 text-[13px] text-t2">Clique no documento para adicionar uma marcação.</p>
+          <p className="mt-2 text-[13px] text-t2">Nenhuma marcação adicionada.</p>
         ) : (
           <ul className="mt-2 grid gap-2">
             {groups.map((group) => {
@@ -727,7 +730,7 @@ function DraftFields({
         <ul className="mt-2 grid gap-1.5">
           <CheckRow ok={Boolean(person) && ownerMarked} label="Colaborador identificado" />
           <CheckRow ok={marksValid} label="Marcações válidas" />
-          <CheckRow ok={contactsValid} label="Contatos do canal válidos" />
+          <CheckRow ok={contactsValid} label="Contato para envio válido" />
           <CheckRow ok={sizeValid} label="Tamanho do PDF válido" />
         </ul>
         {issue && !["Escolha o colaborador.", "Falta contato no cadastro.", "Escolha quem assina esta marcação.", DOCUMENT_COPY.badCpf, DOCUMENT_COPY.badEmail, DOCUMENT_COPY.badWhatsapp, DOCUMENT_COPY.overEnvelope, DOCUMENT_COPY.missingPage].includes(issue) && <p className="mt-2 text-xs text-bad">{issue}</p>}
@@ -778,7 +781,7 @@ function SignerOptions({
   const known = new Set((guests ?? []).filter((guest) => guest.name.trim()).map((guest) => signerContactKey(guest)));
   return (
     <>
-      <option value="">Selecionar signatário</option>
+      <option value="">Signatário</option>
       {people.map((person) => (
         <option key={person.id} value={person.id === sellerId ? "seller" : person.id}>
           {person.name}
@@ -896,7 +899,7 @@ function DeliveryFields({
       {detail && <p className="text-[11.5px] text-t2">{detail}</p>}
       {credits > 0 && (
         <p className="text-[11.5px] text-t2">
-          {credits === 1 ? "Este signatário consome 1 crédito no Assina AI." : `Este signatário consome ${credits} créditos no Assina AI.`}
+          {credits === 1 ? "Este signatário usa 1 crédito do Assina AI." : `Este signatário usa ${credits} créditos do Assina AI.`}
         </p>
       )}
     </div>
