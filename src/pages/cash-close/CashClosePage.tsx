@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Alert, Badge, Button, Card, DateRangePicker, Modal, Skeleton, Tooltip, useToast, CALENDAR_QUICK_RANGES, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
 import { DayFace, DayMetrics, MonthCalendar, blankDayClass } from "@/components/wedash/MonthCalendar";
 import { EmployeeWithdrawal } from "@/pages/cash-close/EmployeeWithdrawal";
+import { OnlinePix } from "@/pages/cash-close/OnlinePix";
 import { monthCloseSpanFor, monthsTouched } from "@/data/wedash/cashCloseMonth";
 import {
   applyCloseReview,
@@ -11,6 +12,7 @@ import {
   dayWithoutReal,
   monthCloseSummary,
   realCentsOf,
+  withOnlinePix,
   type CashCloseBucket,
   type CashCloseLine,
   type MonthCloseSummary,
@@ -38,6 +40,14 @@ import {
   withdrawalSave,
   type WithdrawalDraft,
 } from "@/data/wedash/employeeWithdrawal";
+import {
+  onlinePixDraftFrom,
+  onlinePixPreviewCents,
+  onlinePixSave,
+  onlinePixTotal,
+  pixAcquirerCents,
+  type OnlinePixDraftRow,
+} from "@/data/wedash/onlinePix";
 import { fetchSalesDayAggs, fetchSyncWatermark } from "@/data/wedash/salesRepo";
 import { fetchStoreSellers, type Store, type StoreSeller } from "@/data/wedash/stores";
 import { isOwner } from "@/layout/nav-wedash";
@@ -106,22 +116,31 @@ function fieldToCents(txt: string): number | null {
 
 function linesWithDraft(lines: CashCloseLine[], draft: CloseDraft | undefined): CashCloseLine[] {
   if (!draft) return lines;
-  return lines.map((line) => {
+  const online = onlinePixPreviewCents(draft.onlinePix, fieldToCents);
+  const mapped = lines.map((line) => {
     const next = { ...line };
     const typed = fieldToCents(draft.typed[line.key] ?? "");
     if (typed != null) next.typedCents = typed;
     if (line.key !== "cash") {
       const raw = draft.acquirer[line.key] ?? "";
       const real = fieldToCents(raw);
-      if (raw.trim() && real != null && !(line.stoneCents == null && real === 0)) next.stoneCents = real;
+      if (line.key === "pix") next.stoneCents = pixAcquirerCents(line.stoneCents, real, raw.trim() === "", online);
+      else if (raw.trim() && real != null && !(line.stoneCents == null && real === 0)) next.stoneCents = real;
     }
     return next;
   });
+  const pix = mapped.find((line) => line.key === "pix");
+  const rawPix = draft.acquirer.pix ?? "";
+  const stoneWhenNew = pix
+    ? null
+    : pixAcquirerCents(null, fieldToCents(rawPix), rawPix.trim() === "", online);
+  return withOnlinePix(mapped, online, stoneWhenNew);
 }
 
 type CloseDraft = {
   typed: Partial<Record<CashCloseBucket, string>>;
   acquirer: Partial<Record<CashCloseBucket, string>>;
+  onlinePix: OnlinePixDraftRow[];
 };
 
 function CloseTable({
@@ -131,6 +150,7 @@ function CloseTable({
   closed,
   draft,
   onAcquirer,
+  pixOnline,
 }: {
   lines: CashCloseLine[];
   pixPending: boolean;
@@ -138,6 +158,7 @@ function CloseTable({
   closed: boolean;
   draft?: CloseDraft;
   onAcquirer?: (key: CashCloseBucket, value: string) => void;
+  pixOnline: boolean;
 }) {
   if (lines.length === 0) return null;
   const field =
@@ -170,14 +191,23 @@ function CloseTable({
             {lines.map((row) => {
               const real = realCentsOf(row);
               const diff = real == null ? null : real - row.systemCents;
+              const online = row.manualPixCents ?? 0;
+              const pixLocked = row.key === "pix" && (pixOnline || online > 0);
               const acqTxt = draft?.acquirer[row.key] ?? (row.stoneCents == null ? "" : centsToField(row.stoneCents));
               return (
                 <tr key={row.key} className="border-b border-line">
                   <td className="px-3 py-3 text-t0">{labelUpper(row.label)}</td>
                   <td className="px-3 py-3 text-right font-mono text-[13px] font-bold text-t0">{money(row.systemCents)}</td>
                   <td className="px-3 py-2.5 text-right">
-                    {row.key === "cash" || !(owner && draft && onAcquirer) ? (
-                      <span className="font-mono text-[13px] font-bold text-t0">{real == null ? "—" : money(real)}</span>
+                    {row.key === "cash" || pixLocked || !(owner && draft && onAcquirer) ? (
+                      <div className="flex flex-col items-end">
+                        <span className="font-mono text-[13px] font-bold text-t0">{real == null ? "—" : money(real)}</span>
+                        {online > 0 && (
+                          <span className="mt-0.5 max-w-[220px] text-right text-[11px] leading-tight text-t2">
+                            Adquirente {money(row.stoneCents)} · PIX online {money(online)}
+                          </span>
+                        )}
+                      </div>
                     ) : (
                       <input
                         value={acqTxt}
@@ -957,7 +987,7 @@ function DayModal({
         const shown = manual ?? line.stoneCents;
         acquirer[line.key] = shown == null ? "" : centsToField(shown);
       }
-      next[store.id] = { typed, acquirer };
+      next[store.id] = { typed, acquirer, onlinePix: onlinePixDraftFrom(review?.onlinePix ?? [], centsToField) };
       nextWithdrawals[store.id] = withdrawalDraftFrom(review?.withdrawals ?? [], centsToField);
     }
     setDrafts(next);
@@ -996,6 +1026,13 @@ function DayModal({
       const lines = buildCashCloseView(snap).lines;
       const typedCents: CashCloseReview["typedCents"] = {};
       const acquirerCents: CashCloseReview["acquirerCents"] = {};
+      const onlineSaved = onlinePixSave({ rows: draft.onlinePix ?? [], parseCents: fieldToCents });
+      if (!onlineSaved.ok) {
+        setBusy(false);
+        show(onlineSaved.message, "danger");
+        return;
+      }
+      const onlineCents = onlinePixTotal(onlineSaved.lines);
       let invalid = false;
       for (const line of lines) {
         const typedRaw = draft.typed[line.key] ?? "";
@@ -1014,7 +1051,23 @@ function DayModal({
           show(`O total real para ${line.label} não é válido.`, "danger");
           break;
         }
+        if (line.key === "pix") {
+          const decided = pixAcquirerCents(line.stoneCents, real, raw.trim() === "", onlineCents);
+          if (decided != null && decided !== line.stoneCents) acquirerCents.pix = decided;
+          continue;
+        }
         if (real != null && real !== line.stoneCents && !(line.stoneCents == null && real === 0)) acquirerCents[line.key] = real;
+      }
+      if (!invalid && !lines.some((line) => line.key === "pix")) {
+        const raw = draft.acquirer.pix ?? "";
+        const real = fieldToCents(raw);
+        if (raw.trim() && real == null) {
+          invalid = true;
+          show("O total real para Pix não é válido.", "danger");
+        } else {
+          const decided = pixAcquirerCents(null, real, raw.trim() === "", onlineCents);
+          if (decided != null) acquirerCents.pix = decided;
+        }
       }
       if (invalid) {
         setBusy(false);
@@ -1049,6 +1102,7 @@ function DayModal({
         shortageSellers: review?.shortageSellers ?? [],
         shortageGroup: review?.shortageGroup ?? "",
         withdrawals: retiro.lines,
+        onlinePix: onlineSaved.lines,
       };
       const r = await saveCashCloseReview({ tenantId, ...saved });
       if (!r.ok) {
@@ -1148,6 +1202,7 @@ function DayModal({
                   owner={owner}
                   closed={closed}
                   draft={draft}
+                  pixOnline={(draft?.onlinePix.length ?? 0) > 0}
                   onAcquirer={(key, value) =>
                     setDrafts((current) => ({
                       ...current,
@@ -1155,6 +1210,31 @@ function DayModal({
                     }))
                   }
                 />
+                {draft && (
+                  <OnlinePix
+                    owner={owner}
+                    rows={draft.onlinePix}
+                    acquirerText={draft.acquirer.pix ?? ""}
+                    acquirerCents={lines.find((line) => line.key === "pix")?.stoneCents ?? null}
+                    pixPending={view.pixPending}
+                    onRows={(rows) =>
+                      setDrafts((current) => ({
+                        ...current,
+                        [store.id]: { ...(current[store.id] ?? draft), onlinePix: rows },
+                      }))
+                    }
+                    onAcquirer={(value) =>
+                      setDrafts((current) => ({
+                        ...current,
+                        [store.id]: {
+                          ...(current[store.id] ?? draft),
+                          acquirer: { ...(current[store.id]?.acquirer ?? draft.acquirer), pix: value },
+                        },
+                      }))
+                    }
+                    toCents={fieldToCents}
+                  />
+                )}
                 <EmployeeWithdrawal
                   owner={owner}
                   shortageCents={dayShortageCents(conta.diffCents)}

@@ -1,3 +1,5 @@
+import { onlinePixTotal, type OnlinePixLine } from "./onlinePix";
+
 export type CashCloseBucket = "cash" | "credit" | "debit" | "pix" | "other";
 
 export type CashCloseMillLine = {
@@ -13,8 +15,10 @@ export type CashCloseLine = {
   label: string;
   systemCents: number;
   typedCents: number;
-  /** null = o arquivo da Stone deste dia ainda não chegou. */
+  /** null = o arquivo da adquirente deste dia ainda não chegou. */
   stoneCents: number | null;
+  /** PIX online do extrato, somado à adquirente. */
+  manualPixCents?: number;
   openingCents: number | null;
   cashDropCents: number | null;
 };
@@ -74,6 +78,7 @@ export type CashReview = {
   waive: boolean;
   typedCents?: CloseAmountMap;
   acquirerCents?: CloseAmountMap;
+  onlinePix?: OnlinePixLine[];
 };
 
 /** Troca o dinheiro digitado pelo valor que o gestor gravou. */
@@ -94,14 +99,36 @@ function typedOverride(review: CashReview, key: CashCloseBucket): number | null 
   return null;
 }
 
-/** Aplica o ajuste na linha já somada. O total real gravado pelo gestor substitui o arquivo. */
+/** Coloca o PIX online na linha do Pix. Sem linha, cria uma com a adquirente informada. */
+export function withOnlinePix(lines: CashCloseLine[], cents: number, stoneCentsWhenNew: number | null = null): CashCloseLine[] {
+  const pix = lines.find((line) => line.key === "pix");
+  if (!pix) {
+    if (cents <= 0) return lines;
+    const created: CashCloseLine = {
+      key: "pix",
+      label: LABEL.pix,
+      systemCents: 0,
+      typedCents: 0,
+      stoneCents: stoneCentsWhenNew,
+      manualPixCents: cents,
+      openingCents: null,
+      cashDropCents: null,
+    };
+    const all = [...lines, created];
+    return ORDER.filter((key) => all.some((line) => line.key === key)).map((key) => all.find((line) => line.key === key)!);
+  }
+  if ((pix.manualPixCents ?? 0) === cents) return lines;
+  return lines.map((line) => (line.key === "pix" ? { ...line, manualPixCents: cents } : line));
+}
+
+/** Aplica o ajuste na linha já somada. O total real gravado pelo gestor substitui o arquivo. O PIX online soma com ele. */
 export function applyCloseReview(
   lines: CashCloseLine[],
   review: CashReview | null,
   _flags: { cardPending?: boolean; pixRequested?: boolean } = {},
 ): CashCloseLine[] {
   if (!review) return lines;
-  return lines.map((line) => {
+  const mapped = lines.map((line) => {
     const next = { ...line };
     const typed = typedOverride(review, line.key);
     if (typed != null) next.typedCents = typed;
@@ -109,6 +136,9 @@ export function applyCloseReview(
     if (manual != null) next.stoneCents = manual;
     return next;
   });
+  const online = onlinePixTotal(review.onlinePix ?? []);
+  const pix = mapped.find((line) => line.key === "pix");
+  return withOnlinePix(mapped, online, pix ? null : (review.acquirerCents?.pix ?? null));
 }
 
 /** Barras do calendário: falta, sobra, arquivo a caminho, ou o dia fechado sem diferença. */
@@ -136,13 +166,14 @@ export function cashCloseChips(input: {
         tone: cashBox < 0 ? "bad" : "ok",
       });
     }
-    if (line.stoneCents != null) {
-      const stone = line.stoneCents - line.systemCents;
-      if (stone !== 0) {
+    const real = line.key === "cash" ? null : realCentsOf(line);
+    if (real != null) {
+      const gap = real - line.systemCents;
+      if (gap !== 0) {
         chips.push({
           key: `${line.key}-stone`,
-          label: `Total real · ${CHIP_LABEL[line.key]}: ${signedMoney(stone)}`,
-          tone: stone < 0 ? "bad" : "ok",
+          label: `Total real · ${CHIP_LABEL[line.key]}: ${signedMoney(gap)}`,
+          tone: gap < 0 ? "bad" : "ok",
         });
       }
     }
@@ -184,10 +215,12 @@ export function paidPixCents(rows: Array<{ status: string; paidCents: number }>)
   return total;
 }
 
-/** Total real da forma. No dinheiro, é o valor digitado. Sem arquivo, não há total real. */
+/** Total real da forma. No dinheiro, é o valor digitado. No Pix, a adquirente mais o PIX online. Sem adquirente, não há total real. */
 export function realCentsOf(line: CashCloseLine): number | null {
   if (line.key === "cash") return line.typedCents;
-  return line.stoneCents;
+  if (line.stoneCents == null) return null;
+  if (line.key !== "pix") return line.stoneCents;
+  return line.stoneCents + (line.manualPixCents ?? 0);
 }
 
 /** Sobra ou quebra do dia: total real − Millennium. Forma sem total real não entra na diferença. */

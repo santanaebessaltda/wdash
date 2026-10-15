@@ -1,5 +1,6 @@
 import { calendarTodayIso } from "./clock";
 import { parseWithdrawalRows, type WithdrawalLine } from "./employeeWithdrawal";
+import { parseOnlinePix, type OnlinePixLine } from "./onlinePix";
 import { shiftName } from "./engine/format";
 import { cashCloseJobMatches, monthCloseSpanFor, navMonthFloor, cashDropMonthSpan, type CashCloseJobPart } from "./cashCloseMonth";
 import { assembleMonthMarks, captureBucket, paidPixCents, type CashCloseBucket, type CashCloseMillLine, type CloseAmountMap } from "./cashCloseView";
@@ -318,6 +319,7 @@ export type CashCloseReview = {
   shortageSellers: string[];
   shortageGroup: string;
   withdrawals: WithdrawalLine[];
+  onlinePix: OnlinePixLine[];
 };
 
 function sellerList(value: unknown): string[] {
@@ -337,7 +339,8 @@ export async function fetchCashCloseReviews(tenantId: string, storeIds: string[]
   const cols = "store_id, day, cash_typed_cents, justification, waive, typed_cents, acquirer_cents, shortage_scope, shortage_sellers, shortage_group";
   const query = (select: string) =>
     sb.from("cash_close_review").select(select).eq("tenant_id", tenantId).in("store_id", storeIds).gte("day", from).lte("day", to);
-  let { data, error } = await query(`${cols}, withdrawals`);
+  let { data, error } = await query(`${cols}, withdrawals, online_pix`);
+  if (error?.code === "42703") ({ data, error } = await query(`${cols}, withdrawals`));
   if (error?.code === "42703") ({ data, error } = await query(cols));
   if (error) throw new Error(error.message);
   const rows = (data ?? []) as unknown as Array<{
@@ -352,6 +355,7 @@ export async function fetchCashCloseReviews(tenantId: string, storeIds: string[]
     shortage_sellers: unknown;
     shortage_group: string | null;
     withdrawals?: unknown;
+    online_pix?: unknown;
   }>;
   return rows.map((row) => ({
     storeId: String(row.store_id),
@@ -365,6 +369,7 @@ export async function fetchCashCloseReviews(tenantId: string, storeIds: string[]
     shortageSellers: sellerList(row.shortage_sellers),
     shortageGroup: String(row.shortage_group ?? ""),
     withdrawals: parseWithdrawalRows(row.withdrawals),
+    onlinePix: parseOnlinePix(row.online_pix),
   }));
 }
 
@@ -381,6 +386,7 @@ export async function saveCashCloseReview(input: {
   shortageSellers: string[];
   shortageGroup: string;
   withdrawals: WithdrawalLine[];
+  onlinePix: OnlinePixLine[];
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const { getSupabase } = await import("@/lib/supabase");
   const sb = getSupabase();
@@ -399,6 +405,7 @@ export async function saveCashCloseReview(input: {
       shortage_sellers: input.shortageSellers,
       shortage_group: input.shortageGroup,
       withdrawals: input.withdrawals,
+      online_pix: input.onlinePix,
     },
     { onConflict: "tenant_id,store_id,day" },
   );

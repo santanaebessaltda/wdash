@@ -284,4 +284,68 @@ describe("resumo do fechamento", () => {
       pendingDays: 1,
     });
   });
+
+  it("soma o PIX online à adquirente e mantém os dois valores", () => {
+    const lines = applyCloseReview(
+      buildCashCloseView({
+        millennium: [{ paymentMethod: "PIX", openingCents: 0, cashDropCents: null, closingCents: 150000, typedCents: 0 }],
+        card: null,
+        pixCents: 100000,
+        pixRequested: false,
+      }).lines,
+      {
+        cashTypedCents: null,
+        waive: false,
+        onlinePix: [
+          { id: "a", cents: 40000, note: "Maria" },
+          { id: "b", cents: 10000, note: "" },
+        ],
+      },
+    );
+    const pix = lines.find((line) => line.key === "pix");
+    expect(pix).toMatchObject({ stoneCents: 100000, manualPixCents: 50000 });
+    expect(realCentsOf(pix!)).toBe(150000);
+    expect(closeDayGap(lines).diffCents).toBe(0);
+  });
+
+  it("guarda o PIX online sem fechar o dia enquanto a adquirente não chegou", () => {
+    const lines = applyCloseReview(
+      buildCashCloseView({
+        millennium: [{ paymentMethod: "PIX", openingCents: 0, cashDropCents: null, closingCents: 150000, typedCents: 0 }],
+        card: null,
+        pixCents: null,
+        pixRequested: true,
+      }).lines,
+      {
+        cashTypedCents: null,
+        waive: false,
+        onlinePix: [{ id: "a", cents: 50000, note: "" }],
+      },
+    );
+    expect(lines.find((line) => line.key === "pix")).toMatchObject({ stoneCents: null, manualPixCents: 50000 });
+    expect(realCentsOf(lines[0]!)).toBeNull();
+    expect(dayWithoutReal(lines)).toBe(true);
+    expect(closeDayGap(lines)).toMatchObject({ comparedSystemCents: 0, realCents: 0, diffCents: 0 });
+  });
+
+  it("com adquirente zero, o total real do Pix é só o PIX online", () => {
+    const lines = applyCloseReview(
+      buildCashCloseView({
+        millennium: [{ paymentMethod: "DINHEIRO", openingCents: 0, cashDropCents: null, closingCents: 1000, typedCents: 1000 }],
+        card: null,
+        pixCents: null,
+        pixRequested: false,
+      }).lines,
+      {
+        cashTypedCents: null,
+        waive: false,
+        acquirerCents: { pix: 0 },
+        onlinePix: [{ id: "a", cents: 5000, note: "Extrato" }],
+      },
+    );
+    const pix = lines.find((line) => line.key === "pix");
+    expect(pix).toMatchObject({ systemCents: 0, stoneCents: 0, manualPixCents: 5000 });
+    expect(realCentsOf(pix!)).toBe(5000);
+    expect(closeDayGap(lines).diffCents).toBe(5000);
+  });
 });
