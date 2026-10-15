@@ -2,12 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Avatar, Badge, Button, Card, DataTable, Dropdown, EmptyState, FormField, Input, Modal, Segmented, Skeleton, useToast, type DataTableColumn, type DropdownItem } from "@/components/ui";
 import { SegmentedSkeleton, StoreCardsSkeleton, TeamTableSkeleton } from "@/components/wedash/LoadingSkeletons";
 import {
-  branchRoleLabel,
   fetchLatestSellerSyncedAt,
   fetchStoreSellers,
   fetchStoreShifts,
-  isActiveSalesPerson,
+  isBranchSalesPerson,
   isBranchTeamMember,
+  teamRoleLabel,
   saveSellerContact,
   saveStoreShift,
   setSellerShift,
@@ -112,6 +112,7 @@ export function StaffPage() {
           open={manageOpen}
           tenantId={session.tenantId}
           storeId={singleStore.id}
+          branch={singleStore}
           onClose={() => setManageOpen(false)}
           onChanged={() => setGroupsTick((n) => n + 1)}
         />
@@ -176,7 +177,8 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
     };
   }, [tenantId, store.id, groupsTick]);
 
-  const ativos = useMemo(() => team.filter(isBranchTeamMember), [team]);
+  const salesPerson = (seller: StoreSeller) => isBranchSalesPerson(seller, store);
+  const ativos = useMemo(() => team.filter((seller) => isBranchTeamMember(seller, store)), [team, store]);
   const desligados = useMemo(() => team.filter((s) => !s.active), [team]);
   const rows = tab === "ativos" ? ativos : desligados;
 
@@ -263,14 +265,14 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
 
   const columns = useMemo<DataTableColumn<StoreSeller>[]>(
     () => [
-      ...SELLER_COLUMNS,
+      ...sellerColumns(store),
       {
         key: "access",
         header: "Acesso",
         sortable: true,
-        sortValue: (v) => (access == null || !isActiveSalesPerson(v) ? null : accessLabel(access.get(v.id) ?? "NONE")),
+        sortValue: (v) => (access == null || !salesPerson(v) ? null : accessLabel(access.get(v.id) ?? "NONE")),
         render: (v) => {
-          if (!isActiveSalesPerson(v)) return <span className="text-t2">—</span>;
+          if (!salesPerson(v)) return <span className="text-t2">—</span>;
           return <AccessBadge state={access == null ? "loading" : (access.get(v.id) ?? "NONE")} />;
         },
       },
@@ -278,9 +280,9 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
         key: "shift",
         header: "Grupo",
         sortable: true,
-        sortValue: (v) => (isActiveSalesPerson(v) ? groupLabel(v.id in shiftOf ? shiftOf[v.id] : v.shiftId, shifts) : null),
+        sortValue: (v) => (salesPerson(v) ? groupLabel(v.id in shiftOf ? shiftOf[v.id] : v.shiftId, shifts) : null),
         render: (v) => {
-          if (!isActiveSalesPerson(v)) return <span className="text-t2">—</span>;
+          if (!salesPerson(v)) return <span className="text-t2">—</span>;
           const current = v.id in shiftOf ? shiftOf[v.id] : v.shiftId;
           return <span className="text-[13px] text-t1">{groupLabel(current, shifts)}</span>;
         },
@@ -292,7 +294,7 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
         render: (v) => (
           <RowMenu
             items={rowActions({
-              state: isActiveSalesPerson(v) ? (access == null ? null : (access.get(v.id) ?? "NONE")) : null,
+              state: salesPerson(v) ? (access == null ? null : (access.get(v.id) ?? "NONE")) : null,
               grouped: hasSalesGroup(v.id in shiftOf ? shiftOf[v.id] : v.shiftId),
               onEdit: () => setEditing({ ...v, shiftId: (v.id in shiftOf ? shiftOf[v.id] : v.shiftId) ?? null }),
               onInvite: () => setInviting(v),
@@ -308,7 +310,7 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [shifts, shiftOf, savingIds, access],
+    [shifts, shiftOf, savingIds, access, store],
   );
 
   const withoutTeam = loaded && team.length === 0;
@@ -346,14 +348,14 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
             withoutTeam
               ? "Use Atualizar equipe no topo para buscar a equipe desta filial no Millennium."
               : tab === "ativos"
-                ? "Não há vendedores, operadores de caixa ou gerentes ativos nesta filial no momento."
+                ? "Não há vendedores, operadores de caixa ou usuários da filial ativos nesta filial no momento."
                 : "Pessoas desligadas no Millennium aparecem aqui."
           }
         />
       ) : (
         <DataTable
           className="rounded-none! border-x-0! border-b-0! bg-transparent!"
-          columns={tab === "ativos" ? columns : [...SELLER_COLUMNS, columns[columns.length - 1]!]}
+          columns={tab === "ativos" ? columns : [...sellerColumns(store), columns[columns.length - 1]!]}
           data={rows}
           rowKey={(v) => v.id}
           paginate="pessoas"
@@ -397,6 +399,7 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
       </Modal>
       <SellerEditor
         seller={editing}
+        store={store}
         shifts={shifts}
         pendingShift={pendingShift}
         onClose={() => setEditing(null)}
@@ -486,6 +489,7 @@ type SellerDraft = { cpf: string | null; email: string | null; whatsapp: string 
 
 function SellerEditor({
   seller,
+  store,
   shifts,
   pendingShift,
   onClose,
@@ -493,13 +497,14 @@ function SellerEditor({
   onSave,
 }: {
   seller: StoreSeller | null;
+  store: Store;
   shifts: StoreShift[];
   pendingShift: { sellerId: string; shiftId: string } | null;
   onClose: () => void;
   onCreateGroup: () => void;
   onSave: (seller: StoreSeller, draft: SellerDraft) => Promise<boolean>;
 }) {
-  const sales = seller ? isActiveSalesPerson(seller) : false;
+  const sales = seller ? isBranchSalesPerson(seller, store) : false;
   const [cpf, setCpf] = useState(mascararCpf(seller?.cpf ?? ""));
   const [email, setEmail] = useState(seller?.email ?? "");
   const [whatsapp, setWhatsapp] = useState(maskWhatsapp(seller?.whatsapp ?? ""));
@@ -617,7 +622,8 @@ function groupLabel(shiftId: string | null | undefined, shifts: StoreShift[]): s
   return shift ? shiftName(shift.name) : "Sem grupo";
 }
 
-const SELLER_COLUMNS: DataTableColumn<StoreSeller>[] = [
+function sellerColumns(store: Store): DataTableColumn<StoreSeller>[] {
+  return [
   {
     key: "seller",
     header: "Nome",
@@ -634,8 +640,8 @@ const SELLER_COLUMNS: DataTableColumn<StoreSeller>[] = [
     key: "role",
     header: "Cargo",
     sortable: true,
-    sortValue: (v) => branchRoleLabel(v.role),
-    render: (v) => <span className="text-t1">{branchRoleLabel(v.role)}</span>,
+    sortValue: (v) => teamRoleLabel(v, store),
+    render: (v) => <span className="text-t1">{teamRoleLabel(v, store)}</span>,
   },
   {
     key: "code",
@@ -651,6 +657,7 @@ const SELLER_COLUMNS: DataTableColumn<StoreSeller>[] = [
     sortValue: (v) => (v.active ? "Ativo" : "Desligado"),
     render: (v) => (v.active ? <Badge variant="neutral">Ativo</Badge> : <Badge variant="neutral">Desligado</Badge>),
   },
-];
+  ];
+}
 
 export default StaffPage;

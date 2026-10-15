@@ -745,17 +745,47 @@ export interface StoreSeller {
 
 export { SELLER_ROLE };
 
-/** Na equipe de vendas agora: ativo com cargo VENDEDOR (gerencia / conta de freelancer fica fora do ranking). */
+/** Código numérico do Millennium, sem zeros à esquerda. "00386" e 386 viram "386". */
+export function millenniumCodeKey(value: string | number | null | undefined): string | null {
+  if (value == null) return null;
+  const digits = String(value).replace(/\D/g, "").replace(/^0+/, "");
+  return digits || null;
+}
+
+/** Usuário da filial: o código da pessoa no Millennium é o código da filial. */
+export function isBranchUser(
+  sellerCode: string | null | undefined,
+  branch: { branchCode: string; millenniumBranch: number },
+): boolean {
+  const seller = millenniumCodeKey(sellerCode);
+  if (!seller) return false;
+  return seller === millenniumCodeKey(branch.branchCode) || seller === millenniumCodeKey(branch.millenniumBranch);
+}
+
+/** Na equipe de vendas agora: ativo com cargo VENDEDOR (gerência / conta de freelancer fica fora do ranking). */
 export function isActiveSalesPerson(s: Pick<StoreSeller, "active" | "role">): boolean {
   return s.active && (s.role == null || s.role === SELLER_ROLE);
 }
 
-/** Cargos que a tela Gestão > Equipe lista. O ranking continua só com `isActiveSalesPerson`. */
+/** Vendedor na tela Equipe, sem o usuário da filial. */
+export function isBranchSalesPerson(
+  s: Pick<StoreSeller, "active" | "role" | "code">,
+  branch: { branchCode: string; millenniumBranch: number },
+): boolean {
+  return isActiveSalesPerson(s) && !isBranchUser(s.code, branch);
+}
+
+/** Cargos que a tela Equipe lista. O ranking continua só com `isActiveSalesPerson`. */
 const BRANCH_TEAM_ROLES = new Set<string>([SELLER_ROLE, "GERENCIA", "OPERADOR DE CAIXA"]);
 
-/** Ativo na lista da filial: vendedor, operador de caixa ou gerência. Cargo null (legado, ainda não sincronizado) conta como vendedor. */
-export function isBranchTeamMember(s: Pick<StoreSeller, "active" | "role">): boolean {
-  return s.active && (s.role == null || BRANCH_TEAM_ROLES.has(s.role));
+/** Ativo na lista da filial: vendedor, operador de caixa, gerência, ou o usuário da filial. Cargo null conta como vendedor. */
+export function isBranchTeamMember(
+  s: Pick<StoreSeller, "active" | "role"> & { code?: string | null },
+  branch?: { branchCode: string; millenniumBranch: number },
+): boolean {
+  if (!s.active) return false;
+  if (s.role == null || BRANCH_TEAM_ROLES.has(s.role)) return true;
+  return branch != null && isBranchUser(s.code, branch);
 }
 
 /** Rótulo do cargo do Millennium na tela Equipe. */
@@ -766,6 +796,15 @@ export function branchRoleLabel(role: string | null): string {
   if (role === "OPERADOR DE CAIXA") return "Operador de caixa";
   if (role === "INDEFINIDO") return "Sem cargo";
   return role;
+}
+
+/** Cargo na Equipe. O código igual ao da filial aparece como Usuário da filial, qualquer que seja o cargo do Millennium. */
+export function teamRoleLabel(
+  seller: Pick<StoreSeller, "role" | "code">,
+  branch: { branchCode: string; millenniumBranch: number },
+): string {
+  if (isBranchUser(seller.code, branch)) return "Usuário da filial";
+  return branchRoleLabel(seller.role);
 }
 
 /**

@@ -4,7 +4,7 @@ import {
   deleteStoreShift,
   fetchStoreSellers,
   fetchStoreShifts,
-  isActiveSalesPerson,
+  isBranchSalesPerson,
   saveStoreShift,
   type StoreShift,
 } from "@/data/wedash/stores";
@@ -121,12 +121,14 @@ export function ManageGroupsModal({
   open,
   tenantId,
   storeId,
+  branch,
   onClose,
   onChanged,
 }: {
   open: boolean;
   tenantId: string;
   storeId: string;
+  branch: { branchCode: string; millenniumBranch: number };
   onClose: () => void;
   onChanged: () => void;
 }) {
@@ -148,7 +150,7 @@ export function ManageGroupsModal({
       if (cancelled) return;
       const count = new Map<string, number>();
       for (const seller of sellers.get(storeId) ?? []) {
-        if (seller.shiftId && isActiveSalesPerson(seller)) count.set(seller.shiftId, (count.get(seller.shiftId) ?? 0) + 1);
+        if (seller.shiftId && isBranchSalesPerson(seller, branch)) count.set(seller.shiftId, (count.get(seller.shiftId) ?? 0) + 1);
       }
       setCounts(count);
       setShifts(list);
@@ -157,7 +159,7 @@ export function ManageGroupsModal({
     return () => {
       cancelled = true;
     };
-  }, [open, tenantId, storeId, tick]);
+  }, [open, tenantId, storeId, branch, tick]);
 
   function refresh() {
     setTick((n) => n + 1);
