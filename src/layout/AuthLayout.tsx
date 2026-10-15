@@ -7,7 +7,7 @@ import { PageLoader } from "./PageLoader";
 export function AuthLayout() {
   return (
     <div className="tela-cheia w-full bg-bg-0 text-t0">
-      <Suspense fallback={<PageLoader />}>
+      <Suspense fallback={<PageLoader variant="auth" />}>
         <Outlet />
       </Suspense>
     </div>

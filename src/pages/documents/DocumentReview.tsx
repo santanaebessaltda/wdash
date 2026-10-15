@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { getDocument, GlobalWorkerOptions, type PDFDocumentLoadingTask, type RenderTask } from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { Alert, Button, FormField, Modal, Tooltip, WizardCardHeader, WizardNav } from "@/components/ui";
-import { Spinner } from "@/components/ui/Skeleton";
+import { Skeleton } from "@/components/ui/Skeleton";
 import {
   AUTHENTICATIONS,
   DOCUMENT_COPY,
@@ -157,8 +157,9 @@ export function DocumentReview({
           onRemove={() => onRemove(row.id)}
         />
       ) : (
-        <div className="flex justify-center py-10">
-          <Spinner size={22} />
+        <div className="mt-4" aria-busy="true" aria-label="Carregando">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="mt-3 h-[420px] w-full rounded-xl" />
         </div>
       )}
       {refused.length > 0 && (
@@ -1023,8 +1024,8 @@ function StackedPages({
   return (
     <div ref={hostRef} className={cn("relative overflow-auto rounded-xl border border-line bg-bg-inset px-4 py-6", loading && "min-h-[560px]")}>
       {loading && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center bg-bg-inset">
-          <Spinner size={22} />
+        <div className="absolute inset-0 z-20 bg-bg-inset px-4 py-6" aria-busy="true" aria-label="Carregando">
+          <Skeleton className="mx-auto h-[520px] w-full max-w-[640px]" />
         </div>
       )}
       <div className={cn("mx-auto flex w-fit max-w-full flex-col gap-6", loading && "invisible")}>

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Alert, Breadcrumbs, Button, Card, CardHeader, CardTitle, FormField, Modal, ProgressBar, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
-import { Spinner } from "@/components/ui/Skeleton";
 import { paths } from "@/router/paths";
 import { Icon, icons } from "@/pages/users/Icons";
 import { useDocuments } from "./useDocuments";
@@ -790,14 +789,32 @@ function SummaryTile({ label, value }: { label: string; value: string }) {
 
 const READ_LINES = ["Lendo as páginas…", "Identificando as pessoas…", "Separando os documentos…"];
 
+function preparePercent(status: PrepareStatus, readIndex: number, creep: number): number {
+  if (status.phase === "review") return 100;
+  if (status.phase === "upload") {
+    const total = Math.max(status.total, 1);
+    return Math.min(45, Math.max(4, Math.round(((status.index - 0.35) / total) * 45)));
+  }
+  const stage = 48 + ((readIndex + 1) / READ_LINES.length) * 24;
+  return Math.min(96, Math.round(Math.max(stage, creep)));
+}
+
 function Processing({ status }: { status: PrepareStatus }) {
   const [readIndex, setReadIndex] = useState(0);
+  const [creep, setCreep] = useState(48);
 
   useEffect(() => {
-    if (status.phase !== "read") return;
-    setReadIndex(0);
-    const timer = window.setInterval(() => setReadIndex((current) => Math.min(current + 1, READ_LINES.length - 1)), 2200);
-    return () => window.clearInterval(timer);
+    if (status.phase !== "read") {
+      setReadIndex(0);
+      setCreep(48);
+      return;
+    }
+    const lines = window.setInterval(() => setReadIndex((current) => Math.min(current + 1, READ_LINES.length - 1)), 2200);
+    const bar = window.setInterval(() => setCreep((current) => (current >= 96 ? current : current + 1)), 450);
+    return () => {
+      window.clearInterval(lines);
+      window.clearInterval(bar);
+    };
   }, [status.phase]);
 
   const label =
@@ -808,15 +825,19 @@ function Processing({ status }: { status: PrepareStatus }) {
       : status.phase === "review"
         ? "Preparando a revisão…"
         : READ_LINES[readIndex];
+  const percent = preparePercent(status, readIndex, creep);
 
   return (
     <div className="flex flex-col items-center py-10 text-center">
-      <Spinner size={28} />
-      <h3 className="mt-4 text-lg font-bold text-t0">Preparando os documentos</h3>
+      <h3 className="text-lg font-bold text-t0">Preparando os documentos</h3>
       <p className="mt-2 min-h-5 text-[13.5px] text-t1" aria-live="polite">
         {label}
       </p>
-      <p className="mt-1 text-[12.5px] text-t2">Nenhum documento é enviado para assinatura nesta etapa.</p>
+      <div className="mt-4 w-full max-w-lg text-left" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100} aria-label={label}>
+        <ProgressBar value={percent} color="var(--acc)" height={8} />
+        <p className="mt-1.5 text-right text-[11.5px] font-semibold text-t2">{percent}%</p>
+      </div>
+      <p className="mt-3 text-[12.5px] text-t2">Nenhum documento é enviado para assinatura nesta etapa.</p>
       {status.files.length > 0 && (
         <div className="mt-5 w-full max-w-lg overflow-hidden rounded-xl border border-line text-left">
           <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-b border-line px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-t2">
