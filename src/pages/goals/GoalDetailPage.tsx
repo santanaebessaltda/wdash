@@ -58,7 +58,7 @@ const MODO_LABEL: Record<GoalRecord["tierMode"], string> = {
   GENERAL: "Premiação geral",
 };
 
-/** Gestao > Metas > detalhe  -  resumo, niveis com o progresso e equipe; meta encerrada = fechamento da premiacao. */
+/** Performance > Metas > detalhe — resumo, niveis com o progresso e equipe; meta encerrada = fechamento da premiacao. */
 export default function GoalDetailPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
@@ -133,7 +133,7 @@ export default function GoalDetailPage() {
           items={
             fromTeam
               ? [{ label: "Dashboard", to: paths.overview }, { label: "Equipe", to: backTo }, { label: goal?.name ?? "Detalhe" }]
-              : [{ label: "Gestão" }, { label: "Metas", to: paths.goals }, { label: goal?.name ?? "Detalhe" }]
+              : [{ label: "Performance" }, { label: "Metas", to: paths.goals }, { label: goal?.name ?? "Detalhe" }]
           }
         />
         {goal && !showSkeleton && (

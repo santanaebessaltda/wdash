@@ -46,7 +46,7 @@ function dayTitle(iso: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-/** Gestão > Sangrias. Calendário do mês e o recebimento dos dias em aberto. */
+/** Financeiro > Sangrias. Calendário do mês e o recebimento dos dias em aberto. */
 export function CashDropPage() {
   const { show } = useToast();
   const { session, storeRows, loading: storesLoading } = useScopedStores();
@@ -363,7 +363,7 @@ export function CashDropPage() {
   return (
     <div>
       <SectionHeader
-        section="Gestão"
+        section="Financeiro"
         title="Sangrias"
         subtitle="Confira as sangrias, defina o que entra no boleto e acompanhe os recebimentos."
         actions={

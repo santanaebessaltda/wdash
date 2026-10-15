@@ -4,7 +4,7 @@ import { RedirectTo } from "@/router/RedirectTo";
 import { RequireRole } from "@/session/RequireSession";
 import { OWNER_ROLES } from "@/layout/nav-wedash";
 
-/** URLs antigas. Configurações abre em `/settings`. Equipe abre em Gestão. */
+/** URLs antigas. Configurações abre em `/settings`. Equipe abre na tela Equipe. */
 export const operationRoutes: RouteObject[] = [
   {
     element: <RequireRole roles={["OWNER", "MANAGER", "ADMIN_GLOBAL"]} />,
@@ -24,7 +24,7 @@ export const operationRoutes: RouteObject[] = [
       { path: paths.operation.rent, element: <RedirectTo to={paths.operation.branch} /> },
       { path: paths.legacy.operationProductsTaxes, element: <RedirectTo to={paths.operation.productsTaxes} /> },
       { path: paths.legacy.operationAcquirers, element: <RedirectTo to={paths.operation.acquirers} /> },
-      { path: paths.legacy.operationShopping, element: <RedirectTo to={paths.operation.branch} /> },
+      { path: paths.legacy.operationShopping, element: <RedirectTo to={paths.operation.shopping} /> },
     ],
   },
 ];

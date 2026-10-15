@@ -72,7 +72,7 @@ function managerGoalText(c: ChallengeRecord): string {
   return isIndexMetric(c.metric) ? ` · índice da equipe de ${amount}` : ` · meta de ${amount}`;
 }
 
-/** Gestao > Desafios > detalhe  -  resumo e participantes; encerrado = fechamento com quem ganhou o que. */
+/** Performance > Desafios > detalhe — resumo e participantes; encerrado = fechamento com quem ganhou o que. */
 export default function ChallengeDetailPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
@@ -130,7 +130,7 @@ export default function ChallengeDetailPage() {
           items={
             fromTeam
               ? [{ label: "Dashboard", to: paths.overview }, { label: "Equipe", to: backTo }, { label: challenge?.name ?? "Detalhe" }]
-              : [{ label: "Gestão" }, { label: "Desafios", to: paths.management.challenges }, { label: challenge?.name ?? "Detalhe" }]
+              : [{ label: "Performance" }, { label: "Desafios", to: paths.management.challenges }, { label: challenge?.name ?? "Detalhe" }]
           }
         />
         {challenge && !showSkeleton && (

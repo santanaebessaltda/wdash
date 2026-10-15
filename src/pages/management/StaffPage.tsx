@@ -36,7 +36,7 @@ import {
 } from "@/data/wedash/sellerAccess";
 import { ACCESS_LABEL, hasSalesGroup, type AccessState } from "@/data/wedash/engine/sellerAccess";
 
-/** Gestão > Equipe. Pessoas da filial no Millennium; grupo e acesso à WDash só do vendedor. */
+/** Equipe. Pessoas da filial no Millennium; grupo e acesso à WDash só do vendedor. */
 export function StaffPage() {
   const { session, storeRows, loading } = useScopedStores();
   const { show } = useToast();
@@ -88,7 +88,7 @@ export function StaffPage() {
   return (
     <>
       <StoreCardsPage
-        section="Gestão"
+        section="Equipe"
         title="Equipe"
         subtitle="Acompanhe a equipe da filial e gerencie o cadastro, os grupos e os acessos."
         actions={

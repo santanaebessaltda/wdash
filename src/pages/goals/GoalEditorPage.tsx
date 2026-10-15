@@ -260,7 +260,7 @@ const DEFAULT_TIERS = () => [
   newTier(3, "180", "3"),
 ];
 
-/** Gestao > Metas > criar / editar  -  informacoes gerais a esquerda; grupos, premiacao progressiva e simulacao em 3 cards. */
+/** Performance > Metas > criar / editar — informacoes gerais a esquerda; grupos, premiacao progressiva e simulacao em 3 cards. */
 export default function GoalEditorPage() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
@@ -499,7 +499,7 @@ export default function GoalEditorPage() {
         </Button>
         <Breadcrumbs
           items={[
-            { label: "Gestão" },
+            { label: "Performance" },
             { label: "Metas", to: paths.goals },
             { label: title },
           ]}
@@ -912,7 +912,7 @@ function GroupsEditor({
   );
 }
 
-/** Meta from cada group e as pessoas dele (o group from cada pessoa e definido em Gestao > Equipe). */
+/** Meta de cada grupo e as pessoas dele (o grupo de cada pessoa é definido em Equipe). */
 function GroupsSimulation({
   groups,
   team,
@@ -996,7 +996,7 @@ function GroupsSimulation({
               {withoutGroup.map((p) => personRow(p, null))}
               <p className="mt-1 text-[11.5px] text-warn">
                 {withoutGroup.length === 1 ? "Fica" : "Ficam"} fora da distribuição
-                por grupos. Defina o grupo em Gestão &gt; Equipe.
+                por grupos. Defina o grupo em Equipe.
               </p>
             </div>
           )}

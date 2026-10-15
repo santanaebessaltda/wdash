@@ -22,8 +22,12 @@ export const goalRoutes: RouteObject[] = [
     children: [
       { path: paths.goals, element: <GoalsPage /> },
       { path: paths.goalNew, element: <GoalEditorPage /> },
-      { path: `${paths.goals}/:id`, element: <GoalDetailPage /> },
       { path: `${paths.goals}/:id/edit`, element: <GoalEditorPage /> },
+      { path: `${paths.goals}/:id`, element: <GoalDetailPage /> },
+      { path: paths.legacy.management.goals, element: <RedirectTo to={paths.goals} /> },
+      { path: `${paths.legacy.management.goals}/new`, element: <RedirectTo to={paths.goalNew} /> },
+      { path: `${paths.legacy.management.goals}/:id/edit`, element: <LegacyGoalRedirect edit /> },
+      { path: `${paths.legacy.management.goals}/:id`, element: <LegacyGoalRedirect /> },
       { path: paths.legacy.goalsRoot, element: <RedirectTo to={paths.goals} /> },
       { path: `${paths.legacy.goalsRoot}/new`, element: <RedirectTo to={paths.goalNew} /> },
       { path: `${paths.legacy.goalsRoot}/:id/edit`, element: <LegacyGoalRedirect edit /> },

@@ -1,5 +1,5 @@
 /**
- * Pedido de compra (Gestão > Pedido de compra), mesma regra da planilha do dono.
+ * Pedido de compra, mesma regra da planilha do dono.
  * Fonte = Saldo Atual e Futuro do Millennium (ESTOQUEEMCOMPRA): Total = saldo + pedidos em aberto.
  * Na lista = todo o Saldo Atual e Futuro, para o rodape bater com o Millennium.
  * Elegivel para o arquivo = codigo sem "WP", nao bloqueado e multipla > 0.

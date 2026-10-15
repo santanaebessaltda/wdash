@@ -55,7 +55,7 @@ function maxPickerDate(today: string): Date {
   return isoToDate(endOfMonth(dateToIso(new Date(d.getFullYear(), d.getMonth() + 12, 1))));
 }
 
-/** Gestao > Desafios  -  1 card por desafio (lojas do StorePicker x periodo do filtro). */
+/** Performance > Desafios — 1 card por desafio (lojas do StorePicker x periodo do filtro). */
 export function ChallengesPage() {
   const navigate = useNavigate();
   const { show } = useToast();
@@ -150,7 +150,7 @@ export function ChallengesPage() {
   return (
     <div>
       <SectionHeader
-        section="Gestão"
+        section="Performance"
         title="Desafios"
         subtitle="Crie desafios de curto prazo para engajar a equipe e acompanhar resultados."
         actions={

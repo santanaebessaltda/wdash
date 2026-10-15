@@ -114,7 +114,7 @@ export async function notifyCashClose(
     tenantId: args.tenantId,
     stores: args.stores,
     pref: "cashClose",
-    url: "/cash-close",
+    url: "/finance/cash-close",
     text: (stores) => {
       const ids = new Set(stores.map((store) => store.id));
       return formatCashClosePush(args.day, rows.filter((row) => ids.has(row.id)));

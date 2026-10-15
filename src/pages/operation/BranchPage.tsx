@@ -1,7 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Card, Segmented, useToast } from "@/components/ui";
-import { fetchShoppingAccount, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
-import { ShoppingAdministrator } from "./ShoppingPage";
 import { StoreCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { updateStoreCosts, updateStorePointType, type PointType, type Store } from "@/data/wedash/stores";
 import { CostFieldsCard, INVALID_COSTS_MSG, pctField, useCostFields, type CostField, type CostFieldSection } from "./costFields";
@@ -77,52 +75,28 @@ function franchiseSections(store: Store): CostFieldSection[] {
 
 /** Configurações > Filial. Tipo, funcionamento, franquia e aluguel da unidade. */
 export function BranchPage() {
-  const { session, storeRows, loading, refresh } = useScopedStores();
+  const { storeRows, loading, refresh } = useScopedStores();
   return (
     <StoreCardsPage
       section="Configurações"
       title="Filial"
-      subtitle="Configure o tipo, a administradora, o funcionamento e os custos desta filial."
+      subtitle="Configure o tipo, o funcionamento e os custos desta filial."
       loading={loading}
       skeleton={(n) => <StoreCardsSkeleton count={n} title schedule sections={2} />}
       storeRows={storeRows}
       oneStore
     >
-      {(store) => <BranchCards store={store} tenantId={session.tenantId} onSaved={refresh} />}
+      {(store) => <BranchCards store={store} onSaved={refresh} />}
     </StoreCardsPage>
   );
 }
 
-function BranchCards({ store, tenantId, onSaved }: { store: Store; tenantId: string; onSaved: () => void }) {
+function BranchCards({ store, onSaved }: { store: Store; onSaved: () => void }) {
   const { show } = useToast();
   const [point, setPoint] = useState<PointType>(store.pointType);
   const [savingPoint, setSavingPoint] = useState(false);
   const [presetStamp, setPresetStamp] = useState(0);
   const pointDirty = point !== store.pointType;
-  const [account, setAccount] = useState<ShoppingAccount | null>(null);
-  const [loadedFor, setLoadedFor] = useState<string | null>(null);
-  const accountReady = loadedFor === store.id;
-
-  useEffect(() => {
-    let cancel = false;
-    void fetchShoppingAccount(tenantId, store.id)
-      .then((access) => {
-        if (cancel) return;
-        setAccount(access);
-        setLoadedFor(store.id);
-      })
-      .catch(() => {
-        if (cancel) return;
-        setAccount(null);
-        setLoadedFor(store.id);
-        show("Não foi possível carregar a administradora desta filial. Tente novamente.", "danger");
-      });
-    return () => {
-      cancel = true;
-    };
-    // show do toast muda de identidade; a carga segue a filial.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId, store.id]);
 
   function escolher(next: PointType) {
     if (next === point || savingPoint) return;
@@ -168,17 +142,6 @@ function BranchCards({ store, tenantId, onSaved }: { store: Store; tenantId: str
           <FormActions dirty={pointDirty} saving={savingPoint} onReset={resetarTipo} />
         </form>
       </Card>
-      {point === "SHOPPING" ? (
-        <ShoppingAdministrator
-          storeId={store.id}
-          account={accountReady ? account : null}
-          loading={!accountReady}
-          onAccount={(next) => {
-            setAccount(next);
-            setLoadedFor(store.id);
-          }}
-        />
-      ) : null}
       <StoreHoursCard store={store} canEdit onSaved={onSaved} pointType={point} presetStamp={presetStamp} />
       <CostFieldsCard
         store={store}

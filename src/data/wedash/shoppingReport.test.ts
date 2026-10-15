@@ -217,7 +217,7 @@ describe("informedGap", () => {
 
 describe("shoppingMenu", () => {
   it("keeps the sales report in the menu", () => {
-    expect(shoppingMenu()).toEqual({ settings: false, report: true });
+    expect(shoppingMenu()).toEqual({ settings: true, report: true });
   });
 });
 

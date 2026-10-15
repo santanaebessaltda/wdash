@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState, type MutableRefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MutableRefObject } from "react";
 import { Button, Card, Checkbox, FormField, Input, Modal, Skeleton, useToast } from "@/components/ui";
 import {
   INTRANET_MALL_ORIGIN,
@@ -7,33 +7,29 @@ import {
   shoppingAdministratorName,
   type ShoppingAdministrator as MallAdministrator,
 } from "@/data/wedash/shoppingReport";
-import { clearShoppingAccount, saveShoppingAccount, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
+import { clearShoppingAccount, fetchShoppingAccount, saveShoppingAccount, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
 import { cn } from "@/lib/cn";
 import { noAutofill, secretStyle } from "@/lib/noAutofill";
+import { isOwner } from "@/layout/nav-wedash";
 import { SHOPPING_MENU_EVENT } from "@/layout/useShoppingMenu";
-import { PlusIcon } from "@/pages/utility/icons";
+import { useMinSkeleton } from "@/lib/useMinSkeleton";
+import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
+import { useScope } from "@/pages/dashboard/useScope";
 import { GroupComModal, type ShoppingFormBar } from "@/pages/operation/GroupComModal";
-import { CostCardTitle } from "./shared";
+import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "./shared";
 
 const IDLE_BAR: ShoppingFormBar = { busy: false, canSave: false, label: "Salvar acesso" };
 
-type MallStep = "pick" | MallAdministrator | "other";
+type MallStep = "allos" | "groupcom";
 
-const CHOICES: { id: Exclude<MallStep, "pick" | "argo">; name: string; detail: string; logo: string | null }[] = [
-  { id: "allos", name: "Intranet Mall", detail: "Informe de vendas", logo: "/intranet.png" },
-  { id: "groupcom", name: "Group COM", detail: "Informe de vendas", logo: "/group-com.png" },
-  { id: "other", name: "Outros", detail: "Sem integração automática com a WDash", logo: null },
+const PROVIDERS: { id: MallStep; name: string; logo: string }[] = [
+  { id: "allos", name: "Intranet Mall", logo: "/intranet.png" },
+  { id: "groupcom", name: "Group COM", logo: "/group-com.png" },
 ];
 
 function accessPhrase(administrator: MallAdministrator): string {
   const name = shoppingAdministratorName(administrator);
   return administrator === "groupcom" ? `do ${name}` : `da ${name}`;
-}
-
-function mallLogo(administrator: MallAdministrator): string | null {
-  if (administrator === "allos") return "/intranet.png";
-  if (administrator === "groupcom") return "/group-com.png";
-  return null;
 }
 
 function mallDetail(account: ShoppingAccount): string {
@@ -46,134 +42,168 @@ function mallDetail(account: ShoppingAccount): string {
   return slug ? `Informe de vendas · ${slug}` : "Informe de vendas";
 }
 
-function stepTitle(step: MallStep): string {
-  if (step === "pick") return "Adicionar administradora";
-  if (step === "other") return "Outros";
-  return shoppingAdministratorName(step);
-}
-
-/** Card da administradora no quiosque. No máximo uma. A escolha fica na modal. */
-export function ShoppingAdministrator({
-  storeId,
-  account,
-  loading,
-  onAccount,
-}: {
-  storeId: string;
-  account: ShoppingAccount | null;
-  loading: boolean;
-  onAccount: (account: ShoppingAccount | null) => void;
-}) {
+/** Configurações > Administradora. Um card por administradora; a filial usa uma só. */
+export function ShoppingSettingsPage() {
   const { show } = useToast();
-  const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<MallStep>("pick");
-  const [removeOpen, setRemoveOpen] = useState(false);
-  const [removing, setRemoving] = useState(false);
+  const { session, storeRows, loading: storesLoading } = useScopedStores();
+  const { scope } = useScope();
+  const escolher = pickOneStore(scope.storeIds, session.stores.length);
+  const showSkeleton = useMinSkeleton(storesLoading);
+  const store = storeRows.length === 1 ? storeRows[0] : null;
+  const [account, setAccount] = useState<ShoppingAccount | null>(null);
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const [open, setOpen] = useState<MallStep | null>(null);
+  const canEdit = isOwner(session.role);
+  const accountReady = store != null && loadedFor === store.id;
 
-  function abrir(next: MallStep) {
-    setStep(next);
-    setOpen(true);
-  }
+  useEffect(() => {
+    if (!store || store.pointType !== "SHOPPING") return;
+    let cancel = false;
+    void fetchShoppingAccount(session.tenantId, store.id)
+      .then((access) => {
+        if (cancel) return;
+        setAccount(access);
+        setLoadedFor(store.id);
+      })
+      .catch(() => {
+        if (cancel) return;
+        setAccount(null);
+        setLoadedFor(store.id);
+        show("Não foi possível carregar a administradora desta filial. Tente novamente.", "danger");
+      });
+    return () => {
+      cancel = true;
+    };
+    // show do toast muda de identidade; a carga segue a filial.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.tenantId, store?.id, store?.pointType]);
 
-  async function remover() {
-    setRemoving(true);
-    const result = await clearShoppingAccount(storeId);
-    setRemoving(false);
-    if (!result.ok) {
-      show(result.message, "danger");
-      return;
-    }
-    onAccount(null);
-    window.dispatchEvent(new Event(SHOPPING_MENU_EVENT));
-    show("Acesso da administradora removido.", "success");
-    setRemoveOpen(false);
-    setOpen(false);
-  }
+  const street = store?.pointType === "STREET";
 
   return (
-    <>
-      <Card>
-        <CostCardTitle title="Administradora do shopping" />
-        <p className="mb-4 text-[12.5px] text-t2">Configure a administradora responsável pelo informe de vendas desta filial.</p>
-        {loading ? (
-          <Skeleton className="h-[62px] w-full rounded-[13px]" />
-        ) : (
-          <div className="flex flex-col gap-2.5">
-            {account ? (
-              <div className="flex flex-wrap items-center gap-3.5 rounded-[13px] border border-line bg-bg-inset px-4 py-3.5">
-                <MallMark logo={mallLogo(account.administrator)} />
-                <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-bold text-t0">{shoppingAdministratorName(account.administrator)}</p>
-                  <p className="mt-0.5 truncate text-[11.5px] text-t2">{mallDetail(account)}</p>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => abrir(account.administrator)} disabled={removing}>
-                  Editar
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setRemoveOpen(true)} disabled={removing}>
-                  Remover
-                </Button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => abrir("pick")}
-                className="flex h-[42px] items-center justify-center gap-1.5 rounded-xl border border-dashed border-line text-[13px] font-semibold text-t2 hover:border-acc hover:text-acc"
-              >
-                <PlusIcon size={15} />
-                Adicionar administradora
-              </button>
-            )}
-          </div>
-        )}
-      </Card>
-      <AdministratorModal
-        open={open}
-        step={step}
-        storeId={storeId}
-        account={account}
-        onStep={setStep}
-        onClose={() => setOpen(false)}
-        onAccount={onAccount}
+    <div>
+      <SectionHeader
+        section="Configurações"
+        title="Administradora"
+        subtitle="Configure a administradora desta filial para informar as vendas ao shopping. Cada filial usa uma só."
       />
-      <Modal
-        open={removeOpen}
-        onClose={() => {
-          if (!removing) setRemoveOpen(false);
-        }}
-        title="Remover administradora?"
-        size="sm"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setRemoveOpen(false)} disabled={removing}>
-              Cancelar
-            </Button>
-            <Button variant="danger" onClick={() => void remover()} disabled={removing}>
-              {removing ? "Removendo…" : "Remover"}
-            </Button>
-          </>
-        }
-      >
-        <p className="text-[13.5px] leading-relaxed text-t1">
-          O acesso {account ? accessPhrase(account.administrator) : "salvo"} será removido. A WDash deixará de informar vendas ao shopping.
-        </p>
-      </Modal>
-    </>
+      {escolher || showSkeleton ? (
+        escolher ? (
+          <div className="mt-6 max-w-[720px]">
+            <SelectStoreCard />
+          </div>
+        ) : (
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {PROVIDERS.map((provider) => (
+              <ProviderSkeleton key={provider.id} />
+            ))}
+          </div>
+        )
+      ) : !store ? (
+        <Card className="mt-6">
+          <EmptyBlock icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
+        </Card>
+      ) : street ? (
+        <Card className="mt-6">
+          <EmptyBlock
+            icon="🏬"
+            title="Administradora indisponível"
+            description="Esta configuração está disponível apenas para filiais do tipo Quiosque em shopping."
+          />
+        </Card>
+      ) : (
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {!accountReady
+            ? PROVIDERS.map((provider) => <ProviderSkeleton key={provider.id} />)
+            : PROVIDERS.map((provider) => {
+                const active = account?.administrator === provider.id ? account : null;
+                return (
+                  <ProviderCard
+                    key={provider.id}
+                    name={provider.name}
+                    logo={provider.logo}
+                    detail={active ? mallDetail(active) : "Informe de vendas"}
+                    connected={active != null}
+                    disabled={!canEdit}
+                    onOpen={() => setOpen(provider.id)}
+                  />
+                );
+              })}
+        </div>
+      )}
+      {store && open ? (
+        <AdministratorModal
+          open
+          step={open}
+          storeId={store.id}
+          account={account}
+          onClose={() => setOpen(null)}
+          onAccount={(next) => {
+            setAccount(next);
+            setLoadedFor(store.id);
+          }}
+        />
+      ) : null}
+    </div>
   );
 }
 
-function MallMark({ logo }: { logo: string | null }) {
+function ProviderSkeleton() {
   return (
-    <span className="flex h-[30px] w-11 shrink-0 items-center justify-center overflow-hidden rounded-md border border-line bg-bg-2">
-      {logo ? (
-        <img src={logo} alt="" className="h-full w-full object-contain p-1" />
-      ) : (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-t2" aria-hidden>
-          <path d="M3 21h18" />
-          <path d="M5 21V7l7-4 7 4v14" />
-          <path d="M9 21v-6h6v6" />
-        </svg>
-      )}
-    </span>
+    <Card>
+      <div className="mb-3.5 flex items-center gap-3" aria-busy="true" aria-label="Carregando administradora…">
+        <Skeleton className="h-[46px] w-[46px] rounded-[13px]" />
+        <div className="flex-1">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="mt-2 h-3 w-40" />
+        </div>
+      </div>
+      <div className="flex items-center justify-between border-t border-line pt-3">
+        <Skeleton className="h-3.5 w-24" />
+        <Skeleton className="h-8 w-24 rounded-[var(--radius-vela-sm)]" />
+      </div>
+    </Card>
+  );
+}
+
+function ProviderCard({
+  name,
+  logo,
+  detail,
+  connected,
+  disabled,
+  onOpen,
+}: {
+  name: string;
+  logo: string;
+  detail: string;
+  connected: boolean;
+  disabled: boolean;
+  onOpen: () => void;
+}) {
+  const tone = connected ? "text-ok" : "text-t2";
+  const dot = connected ? "bg-ok" : "bg-t2";
+  return (
+    <Card>
+      <div className="mb-3.5 flex items-center gap-3">
+        <span className="flex h-[46px] w-[46px] shrink-0 items-center justify-center overflow-hidden rounded-[13px] border border-line bg-bg-inset">
+          <img src={logo} alt={name} className="h-full w-full object-contain p-1.5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[14.5px] font-bold text-t0">{name}</p>
+          <p className="mt-0.5 truncate text-[11.5px] text-t2">{detail}</p>
+        </div>
+      </div>
+      <div className="flex items-center justify-between border-t border-line pt-3">
+        <span className={`flex items-center gap-1.5 text-xs font-bold ${tone}`}>
+          <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+          {connected ? "Configurado" : "Não configurado"}
+        </span>
+        <Button size="sm" onClick={onOpen} disabled={disabled}>
+          {connected ? "Gerenciar" : "Configurar"}
+        </Button>
+      </div>
+    </Card>
   );
 }
 
@@ -182,7 +212,6 @@ function AdministratorModal({
   step,
   storeId,
   account,
-  onStep,
   onClose,
   onAccount,
 }: {
@@ -190,7 +219,6 @@ function AdministratorModal({
   step: MallStep;
   storeId: string;
   account: ShoppingAccount | null;
-  onStep: (step: MallStep) => void;
   onClose: () => void;
   onAccount: (account: ShoppingAccount | null) => void;
 }) {
@@ -202,10 +230,10 @@ function AdministratorModal({
     setBar((current) => (current.busy === next.busy && current.canSave === next.canSave && current.label === next.label ? current : next));
   }, []);
 
+  const [removeOpen, setRemoveOpen] = useState(false);
   const locked = bar.busy || removing;
-  const fromPicker = step !== "pick" && account?.administrator !== step;
   const formAccount = account && account.administrator === step ? account : null;
-  const replaced = account && (step === "allos" || step === "groupcom") && account.administrator !== step ? accessPhrase(account.administrator) : null;
+  const replaced = account && account.administrator !== step ? accessPhrase(account.administrator) : null;
 
   function close() {
     if (locked) return;
@@ -232,6 +260,7 @@ function AdministratorModal({
     onAccount(null);
     window.dispatchEvent(new Event(SHOPPING_MENU_EVENT));
     show("Acesso da administradora removido.", "success");
+    setRemoveOpen(false);
     onClose();
   }
 
@@ -240,81 +269,51 @@ function AdministratorModal({
       <Modal
         open={open}
         onClose={close}
-        title={stepTitle(step)}
+        title={shoppingAdministratorName(step)}
         footer={
           <>
-            {fromPicker ? (
-              <Button variant="ghost" className="mr-auto" onClick={() => onStep("pick")} disabled={locked}>
-                Voltar
+            {formAccount ? (
+              <Button variant="outline" className="mr-auto" onClick={() => setRemoveOpen(true)} disabled={locked}>
+                Remover
               </Button>
             ) : null}
             <Button variant="outline" onClick={close} disabled={locked}>
               Cancelar
             </Button>
-            {step === "allos" || step === "groupcom" ? (
-              <Button onClick={() => saveRef.current()} disabled={!bar.canSave}>
-                {bar.label}
-              </Button>
-            ) : null}
-            {step === "other" && account ? (
-              <Button onClick={() => void remover()} disabled={locked}>
-                {removing ? "Removendo…" : "Remover acesso"}
-              </Button>
-            ) : null}
-            {step === "other" && !account ? (
-              <Button
-                onClick={() => {
-                  show("Esta filial ficará sem informe automático de vendas.", "info");
-                  onClose();
-                }}
-                disabled={locked}
-              >
-                Concluir
-              </Button>
-            ) : null}
+            <Button onClick={() => saveRef.current()} disabled={!bar.canSave}>
+              {bar.label}
+            </Button>
           </>
         }
       >
-        {step === "pick" ? (
-          <div className="flex flex-col gap-2.5">
-            <p className="mb-1 text-[13.5px] leading-relaxed text-t1">Selecione a administradora desta filial.</p>
-            {CHOICES.map((choice) => (
-              <button
-                key={choice.id}
-                type="button"
-                onClick={() => onStep(choice.id)}
-                className="flex w-full items-center gap-3 rounded-[13px] border border-line bg-bg-inset px-3.5 py-3 text-left hover:border-line-2 hover:bg-bg-3"
-              >
-                <MallMark logo={choice.logo} />
-                <span className="min-w-0">
-                  <span className="block text-[13.5px] font-bold text-t0">{choice.name}</span>
-                  <span className="mt-0.5 block text-[12px] text-t2">{choice.detail}</span>
-                </span>
-              </button>
-            ))}
-          </div>
-        ) : null}
-        {step === "other" ? (
-          <div className="flex flex-col gap-3">
-            <p className="text-[13.5px] leading-relaxed text-t1">Sem integração automática com a WDash.</p>
-            {account ? (
-              <p className="text-[13.5px] leading-relaxed text-t1">
-                O acesso atual {accessPhrase(account.administrator)} será removido. A WDash deixará de informar vendas ao shopping.
-              </p>
-            ) : (
-              <p className="text-[13.5px] leading-relaxed text-t1">O informe de vendas desta filial não será enviado ao shopping.</p>
-            )}
-          </div>
-        ) : null}
-        {step === "argo" ? (
-          <p className="text-[13.5px] leading-relaxed text-t1">A integração com a Argo ainda não está disponível na WDash.</p>
-        ) : null}
         {open && step === "allos" ? (
           <IntranetMallForm account={formAccount} replacedName={replaced} storeId={storeId} onSaved={saved} onBar={onBar} saveRef={saveRef} />
         ) : null}
         {open && step === "groupcom" ? (
           <GroupComModal account={formAccount} replacedName={replaced} storeId={storeId} onSaved={saved} onBar={onBar} saveRef={saveRef} />
         ) : null}
+      </Modal>
+      <Modal
+        open={removeOpen}
+        onClose={() => {
+          if (!removing) setRemoveOpen(false);
+        }}
+        title="Remover administradora?"
+        size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setRemoveOpen(false)} disabled={removing}>
+              Cancelar
+            </Button>
+            <Button variant="danger" onClick={() => void remover()} disabled={removing}>
+              {removing ? "Removendo…" : "Remover"}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-[13.5px] leading-relaxed text-t1">
+          O acesso {account ? accessPhrase(account.administrator) : "salvo"} será removido. A WDash deixará de informar vendas ao shopping.
+        </p>
       </Modal>
     </>
   );

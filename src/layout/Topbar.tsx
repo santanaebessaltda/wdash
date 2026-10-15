@@ -24,17 +24,25 @@ const ICON_LOGS = "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14
 const ICON_SAIR = "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9";
 const ICON_NOTICES = "M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0";
 
+function covers(pathname: string, base: string): boolean {
+  return pathname === base || pathname.startsWith(`${base}/`);
+}
+
+/** Detalhe de meta ou desafio (`/…/:id`), sem a tela de criar. */
+function isRecord(pathname: string, base: string): boolean {
+  const prefix = `${base}/`;
+  if (!pathname.startsWith(prefix)) return false;
+  const id = pathname.slice(prefix.length);
+  return id.length > 0 && !id.includes("/") && id !== "new";
+}
+
 /** Telas cujo conteúdo muda com o Atualizar do topo. Nas outras o botão fica oculto. */
 function showsRefresh(pathname: string): boolean {
-  if (pathname === paths.dashboard || pathname.startsWith(`${paths.dashboard}/`)) return true;
+  if (covers(pathname, paths.dashboard)) return true;
   if (pathname === paths.stock.inventory || pathname === paths.management.purchaseOrder) return true;
   if (pathname === paths.management.cashClose || pathname === paths.management.cashDrop || pathname === paths.management.salesReport || pathname === paths.management.team) return true;
-  if (pathname === paths.goals) return true;
-  const goal = pathname.match(/^\/management\/goals\/([^/]+)$/);
-  if (goal && goal[1] !== "new") return true;
-  if (pathname === paths.management.challenges) return true;
-  const challenge = pathname.match(/^\/management\/challenges\/([^/]+)$/);
-  return challenge != null && challenge[1] !== "new";
+  if (pathname === paths.goals || isRecord(pathname, paths.goals)) return true;
+  return pathname === paths.management.challenges || isRecord(pathname, paths.management.challenges);
 }
 
 function MenuIcon({ d }: { d: string }) {
@@ -88,11 +96,15 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
     location.pathname.startsWith(paths.dashboard + "/") ||
     location.pathname === paths.live.root ||
     location.pathname.startsWith(paths.live.root + "/") ||
-    location.pathname === paths.goals ||
-    location.pathname.startsWith(paths.goals + "/") ||
+    covers(location.pathname, paths.goals) ||
+    covers(location.pathname, paths.management.challenges) ||
     location.pathname === paths.stock.inventory ||
     location.pathname.startsWith("/stock/") ||
-    location.pathname.startsWith("/management/") ||
+    covers(location.pathname, paths.management.team) ||
+    covers(location.pathname, paths.management.purchaseOrder) ||
+    covers(location.pathname, paths.management.cashClose) ||
+    covers(location.pathname, paths.management.cashDrop) ||
+    covers(location.pathname, paths.management.salesReport) ||
     location.pathname.startsWith("/operation/") ||
     location.pathname === paths.documents ||
     location.pathname.startsWith(paths.documents + "/") ||

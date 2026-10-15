@@ -11,9 +11,11 @@ const ICON = {
   ranking: "M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4a2 2 0 0 0 0 4h3M17 6h3a2 2 0 0 1 0 4h-3",
   /** Ondas de transmissao  -  "ao vivo" / tempo real (nao raio). */
   live: "M4.9 19.1C1 15.2 1 8.8 4.9 4.9M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5M19.1 4.9C23 8.8 23 15.1 19.1 19M9.5 12a2.5 2.5 0 1 0 5 0 2.5 2.5 0 1 0-5 0",
-  /** ClipboardList  -  metas, desafios, fechamento, sangrias e pedido. */
-  management:
+  /** ClipboardList — pedido de compra. */
+  order:
     "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M9 2h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zM12 11h4M12 16h4M8 11h.01M8 16h.01",
+  /** Cifrão — fechamento, sangrias e informe. */
+  finance: "M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6",
   /** Caixa  -  estoque. */
   stock: "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16zM3.27 6.96 12 12.01l8.73-5.05M12 22.08V12",
   documents: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h8",
@@ -36,23 +38,44 @@ const stock: NavSingle = {
   to: paths.stock.inventory,
 };
 
-/** Equipe  |  Metas  |  Desafios  |  Fechamento  |  Sangrias  |  Pedido de compra (Gestor e Gerente). */
-const management: NavGroup = {
-  label: "Gestão",
-  description: "Administre a equipe, as metas, os desafios, o fechamento, as sangrias, o informe de vendas e o pedido de compra.",
-  icon: ICON.management,
+/** Pessoas da filial. Página direta, sem submenu. */
+const team: NavSingle = {
+  label: "Equipe",
+  icon: ICON.team,
+  to: paths.management.team,
+};
+
+/** Metas e desafios. */
+const performance: NavGroup = {
+  label: "Performance",
+  description: "Administre as metas e os desafios da equipe.",
+  icon: ICON.ranking,
   items: [
-    { label: "Equipe", to: paths.management.team },
     { label: "Metas", to: paths.goals },
     { label: "Desafios", to: paths.management.challenges },
-    { label: "Fechamento", to: paths.management.cashClose },
-    { label: "Sangrias", to: paths.management.cashDrop },
-    { label: "Informe de vendas", to: paths.management.salesReport },
-    { label: "Pedido de compra", to: paths.management.purchaseOrder },
   ],
 };
 
-/** Filial  |  Produtos e impostos  |  Adquirentes (só Gestor). */
+/** Fechamento, sangrias e informe. A análise de margem continua em Dashboard > Financeiro. */
+const finance: NavGroup = {
+  label: "Financeiro",
+  description: "Acompanhe o fechamento, as sangrias e o informe de vendas.",
+  icon: ICON.finance,
+  items: [
+    { label: "Fechamento", to: paths.management.cashClose },
+    { label: "Sangrias", to: paths.management.cashDrop },
+    { label: "Informe de vendas", to: paths.management.salesReport },
+  ],
+};
+
+/** Saldo do pedido. Página direta, sem submenu. */
+const purchaseOrder: NavSingle = {
+  label: "Pedido de compra",
+  icon: ICON.order,
+  to: paths.management.purchaseOrder,
+};
+
+/** Filial  |  Produtos e impostos  |  Adquirentes  |  Administradora (só Gestor). */
 const costs: NavGroup = {
   label: "Configurações",
   description: "Configure os dados, custos, impostos e integrações de cada filial.",
@@ -61,6 +84,7 @@ const costs: NavGroup = {
     { label: "Filial", to: paths.operation.branch },
     { label: "Produtos e impostos", to: paths.operation.productsTaxes },
     { label: "Adquirentes", to: paths.operation.acquirers },
+    { label: "Administradora", to: paths.operation.shopping },
   ],
 };
 
@@ -80,7 +104,8 @@ export function applyShoppingMenu(entries: NavEntry[], menu: { settings: boolean
 }
 
 /** Abas das telas de cada grupo = os mesmos itens do menu. */
-export const managementTabs = management.items.map(({ label, to }) => ({ label, to }));
+export const performanceTabs = performance.items.map(({ label, to }) => ({ label, to }));
+export const financeTabs = finance.items.map(({ label, to }) => ({ label, to }));
 export const costTabs = costs.items.map(({ label, to }) => ({ label, to }));
 
 const navOwner: NavEntry[] = [
@@ -96,11 +121,14 @@ const navOwner: NavEntry[] = [
   },
   stock,
   documents,
-  management,
+  team,
+  performance,
+  finance,
+  purchaseOrder,
   costs,
 ];
 
-/** Gerente: sem Financeiro e sem Configurações. */
+/** Gerente: sem a análise financeira do Dashboard, sem Documentos e sem Configurações. */
 const navManager: NavEntry[] = [
   {
     label: "Dashboard",
@@ -112,7 +140,10 @@ const navManager: NavEntry[] = [
     ],
   },
   stock,
-  management,
+  team,
+  performance,
+  finance,
+  purchaseOrder,
 ];
 
 /** Telas so do Gestor (Financeiro, Configuracoes, Usuarios, Integracoes, Logs). */

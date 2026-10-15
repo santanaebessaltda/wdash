@@ -429,7 +429,7 @@ export function MonthStep({ dir }: { dir: "anterior" | "proximo" }) {
   );
 }
 
-/** Gestão > Fechamento. Calendário do mês, no desenho do Vela. */
+/** Financeiro > Fechamento. Calendário do mês, no desenho do Vela. */
 export function CashClosePage() {
   const { show } = useToast();
   const { session, storeRows, loading: storesLoading } = useScopedStores();
@@ -711,7 +711,7 @@ export function CashClosePage() {
   return (
     <div>
       <SectionHeader
-        section="Gestão"
+        section="Financeiro"
         title="Fechamento"
         subtitle="Compare o Millennium com o total real e acompanhe diferenças e pendências."
         actions={

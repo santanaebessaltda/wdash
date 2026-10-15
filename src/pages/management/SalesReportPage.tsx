@@ -66,7 +66,7 @@ function rangeCells(from: string, to: string): Array<string | null> {
   return cells;
 }
 
-/** Gestão > Informe de vendas. Calendário do que foi informado no shopping. */
+/** Financeiro > Informe de vendas. Calendário do que foi informado no shopping. */
 export function SalesReportPage() {
   const navigate = useNavigate();
   const { show } = useToast();
@@ -242,7 +242,7 @@ export function SalesReportPage() {
   return (
     <div>
       <SectionHeader
-        section="Gestão"
+        section="Financeiro"
         title="Informe de vendas"
         subtitle="Compare o faturamento da filial com os valores informados ao shopping."
         actions={
@@ -291,7 +291,7 @@ export function SalesReportPage() {
               icon="🧾"
               title="Administradora não configurada"
               description={owner ? "Configure a administradora desta filial para informar as vendas ao shopping." : "O Gestor ainda não configurou a administradora desta filial."}
-              action={owner ? <Button onClick={() => navigate(paths.operation.branch)}>Configurar administradora</Button> : undefined}
+              action={owner ? <Button onClick={() => navigate(paths.operation.shopping)}>Configurar administradora</Button> : undefined}
             />
           </Card>
         ) : (

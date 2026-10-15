@@ -40,7 +40,7 @@ function maxPickerDate(today: string): Date {
   return isoToDate(endOfMonth(dateToIso(new Date(d.getFullYear(), d.getMonth() + 12, 1))));
 }
 
-/** Gestao > Metas  -  1 card por meta (loja do StorePicker x periodo do filtro). */
+/** Performance > Metas — 1 card por meta (loja do StorePicker x periodo do filtro). */
 export default function GoalsPage() {
   const navigate = useNavigate();
   const { show } = useToast();
@@ -146,7 +146,7 @@ export default function GoalsPage() {
   return (
     <div>
       <SectionHeader
-        section="Gestão"
+        section="Performance"
         title="Metas"
         subtitle="Gerencie metas, distribuição da equipe e níveis de premiação."
         actions={

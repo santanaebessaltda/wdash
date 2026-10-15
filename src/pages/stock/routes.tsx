@@ -6,7 +6,7 @@ import { RequireRole } from "@/session/RequireSession";
 
 const InventoryPage = lazyPage(() => import("./InventoryPage"), "InventoryPage");
 
-/** Estoque  -  Gestor e Gerente. O pedido de compra fica em Gestão. */
+/** Estoque — Gestor e Gerente. O pedido de compra é item direto do menu. */
 export const stockRoutes: RouteObject[] = [
   {
     element: <RequireRole roles={["OWNER", "MANAGER", "ADMIN_GLOBAL"]} />,

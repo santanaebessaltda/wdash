@@ -95,7 +95,7 @@ const withoutAcento = (s: string) =>
     .replace(/[\u0300-\u036f]/g, "")
     .toLocaleUpperCase("pt-BR");
 
-/** Gestao > Desafios  -  criar, editar e duplicar (`?copy=`). */
+/** Performance > Desafios — criar, editar e duplicar (`?copy=`). */
 export default function ChallengeEditorPage() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
@@ -222,7 +222,7 @@ export default function ChallengeEditorPage() {
           Voltar
         </Button>
         <Breadcrumbs
-          items={[{ label: "Gestão" }, { label: "Desafios", to: paths.management.challenges }, { label: title }]}
+          items={[{ label: "Performance" }, { label: "Desafios", to: paths.management.challenges }, { label: title }]}
         />
       </div>
       <div className="mb-5">

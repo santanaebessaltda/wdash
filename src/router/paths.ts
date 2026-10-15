@@ -41,16 +41,16 @@ export const paths = {
   documents: "/documents",
   documentBatches: "/documents/batches",
   documentAttach: "/documents/attach",
-  /** CRUD de metas, dentro de Gestão. `/goals` redireciona. */
-  goals: "/management/goals",
-  goalNew: "/management/goals/new",
-  goalDetail: (id: string) => `/management/goals/${id}`,
-  goalEdit: (id: string) => `/management/goals/${id}/edit`,
+  /** Performance > Metas. `/goals`, `/metas` e `/management/goals` redirecionam. */
+  goals: "/performance/goals",
+  goalNew: "/performance/goals/new",
+  goalDetail: (id: string) => `/performance/goals/${id}`,
+  goalEdit: (id: string) => `/performance/goals/${id}/edit`,
   /** Nova meta preenchida com a configuracao de outra (periodo seguinte). */
-  goalCopy: (id: string) => `/management/goals/new?copy=${encodeURIComponent(id)}`,
+  goalCopy: (id: string) => `/performance/goals/new?copy=${encodeURIComponent(id)}`,
   /** Nova meta com a mesma configuracao e datas, para escolher outra loja. */
-  goalCopyStore: (id: string) => `/management/goals/new?copy=${encodeURIComponent(id)}&for=store`,
-  /** Estoque: saldo em `/stock`. Pedido de compra fica em Gestão. URLs antigas redirecionam. */
+  goalCopyStore: (id: string) => `/performance/goals/new?copy=${encodeURIComponent(id)}&for=store`,
+  /** Estoque: saldo em `/stock`. Pedido de compra é `/purchase-order`. URLs antigas redirecionam. */
   stock: {
     inventory: "/stock",
     legacyInventory: "/stock/inventory",
@@ -58,25 +58,24 @@ export const paths = {
     saleTables: "/stock/sale-tables",
     products: "/stock/products",
   },
-  /** Gestao: todas as telas do grupo ficam em `/management`. */
+  /** Telas fora do Dashboard, no prefixo do grupo do menu. */
   management: {
-    team: "/management/team",
-    purchaseOrder: "/management/purchase-order",
-    challenges: "/management/challenges",
-    challengeNew: "/management/challenges/new",
-    challengeDetail: (id: string) => `/management/challenges/${id}`,
-    challengeEdit: (id: string) => `/management/challenges/${id}/edit`,
+    /** Equipe da filial. O Dashboard > Equipe fica em `/dashboard/team`. */
+    team: "/team",
+    purchaseOrder: "/purchase-order",
+    challenges: "/performance/challenges",
+    challengeNew: "/performance/challenges/new",
+    challengeDetail: (id: string) => `/performance/challenges/${id}`,
+    challengeEdit: (id: string) => `/performance/challenges/${id}/edit`,
     /** Novo desafio preenchido com a configuracao de outro (periodo seguinte). */
-    challengeCopy: (id: string) => `/management/challenges/new?copy=${encodeURIComponent(id)}`,
+    challengeCopy: (id: string) => `/performance/challenges/new?copy=${encodeURIComponent(id)}`,
     /** Novo desafio com a mesma configuracao e datas, para escolher outra loja. */
-    challengeCopyStore: (id: string) => `/management/challenges/new?copy=${encodeURIComponent(id)}&for=store`,
-    shifts: "/management/shifts",
-    staff: "/management/staff",
+    challengeCopyStore: (id: string) => `/performance/challenges/new?copy=${encodeURIComponent(id)}&for=store`,
     /** Calendário do fechamento de caixa. A adquirente fica em Configurações. */
-    cashClose: "/management/cash-close",
-    cashDrop: "/management/cash-drop",
+    cashClose: "/finance/cash-close",
+    cashDrop: "/finance/cash-drop",
     /** Calendário do informe de vendas no shopping. */
-    salesReport: "/management/sales-report",
+    salesReport: "/finance/sales-report",
   },
   /** Configurações da filial em `/settings`. Custos, loja e equipe são URLs antigas. */
   operation: {
@@ -91,7 +90,7 @@ export const paths = {
     acquirers: "/settings/acquirers",
     /** Painel do shopping de cada quiosque. A senha é da filial. */
     shopping: "/settings/shopping",
-    /** URL antiga. Abre Gestão > Equipe, onde o grupo é criado e administrado. */
+    /** URL antiga. Abre Equipe, onde o grupo é criado e administrado. */
     groups: "/operation/groups",
     sellers: "/operation/sellers",
   },
@@ -128,6 +127,18 @@ export const paths = {
     groups: "/dashboard/grupos",
     syncing: "/sincronizando",
     cashDrop: "/management/sangria",
+    /** Prefixo antigo do grupo Gestão. Cada tela abre no endereço do menu atual. */
+    management: {
+      team: "/management/team",
+      staff: "/management/staff",
+      shifts: "/management/shifts",
+      goals: "/management/goals",
+      challenges: "/management/challenges",
+      purchaseOrder: "/management/purchase-order",
+      cashClose: "/management/cash-close",
+      cashDrop: "/management/cash-drop",
+      salesReport: "/management/sales-report",
+    },
     branch: "/operation/filial",
     operationBranch: "/operation/branch",
     operationProductsTaxes: "/operation/products-and-taxes",
@@ -138,7 +149,7 @@ export const paths = {
     shifts: "/dashboard/turnos",
     store: "/loja",
     goals: "/metas",
-    /** Metas antes de entrar em `/management/goals`. */
+    /** Metas antes de entrar em `/performance/goals`. */
     goalsRoot: "/goals",
     goalsInSettings: "/configuracoes/metas",
     live: {

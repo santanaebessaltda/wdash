@@ -168,10 +168,11 @@ export function intranetMallBaseUrl(value: string): string | null {
 }
 
 /**
- * Informe de vendas fica no menu. A administradora é escolhida em Filial.
+ * Informe de vendas e a aba Administradora ficam no menu.
+ * Loja de rua abre a aba e vê o vazio.
  */
 export function shoppingMenu(): { settings: boolean; report: boolean } {
-  return { settings: false, report: true };
+  return { settings: true, report: true };
 }
 
 /** O Atualizar desta tela só chama o shopping quando a filial é quiosque e o acesso está salvo. */
