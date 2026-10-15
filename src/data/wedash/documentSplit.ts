@@ -8,6 +8,8 @@ export const DOCUMENT_CATEGORIES = [
   "Vale-alimentação / refeição",
   "Participação nos lucros (PLR)",
   "Informe de rendimentos",
+  "Admissão",
+  "Rescisão",
   "Outros",
 ] as const;
 

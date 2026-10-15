@@ -36,7 +36,7 @@ O gestor envia PDFs digitais para assinatura, organizados por colaborador. Um PD
 - Com uma filial no topo: Colaborador › Ano › Mês.
 - Com todas as filiais: Filial › Colaborador › Ano › Mês. A filial é a da ficha do funcionário.
 - O arquivo se chama pela categoria.
-- Categorias: Holerite, Espelho de ponto, Adiantamento salarial, Vale transporte, Vale alimentação / refeição, Participação nos lucros (PLR), Informe de rendimentos, Outros.
+- Categorias: Holerite, Espelho de ponto, Adiantamento salarial, Vale-transporte, Vale-alimentação / refeição, Participação nos lucros (PLR), Informe de rendimentos, Admissão, Rescisão, Outros. Nomes já gravados continuam como foram salvos.
 - Dois arquivos da mesma categoria no mesmo mês ganham sufixo `(2)`, `(3)`. Sem pasta extra de categoria.
 
 ### Lote, status e cobrança
