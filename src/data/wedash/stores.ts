@@ -762,9 +762,9 @@ export function isBranchTeamMember(s: Pick<StoreSeller, "active" | "role">): boo
 export function branchRoleLabel(role: string | null): string {
   if (role == null || role === SELLER_ROLE) return "Vendedor";
   if (role === "") return "Sem cargo";
-  if (role === "GERENCIA") return "Gerência";
+  if (role === "GERENCIA") return "Gerente";
   if (role === "OPERADOR DE CAIXA") return "Operador de caixa";
-  if (role === "INDEFINIDO") return "Indefinido";
+  if (role === "INDEFINIDO") return "Sem cargo";
   return role;
 }
 

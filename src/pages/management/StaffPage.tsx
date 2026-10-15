@@ -90,7 +90,7 @@ export function StaffPage() {
       <StoreCardsPage
         section="Equipe"
         title="Equipe"
-        subtitle="Acompanhe a equipe da filial e gerencie o cadastro, os grupos e os acessos."
+        subtitle="Acompanhe a equipe da filial e gerencie cadastros, grupos e acessos."
         actions={
           singleStore ? (
             <Button type="button" onClick={() => setManageOpen(true)}>
@@ -345,7 +345,7 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
             withoutTeam
               ? "Use Atualizar equipe no topo para buscar a equipe desta filial no Millennium."
               : tab === "ativos"
-                ? "Não há vendedores, operadores de caixa ou gerência ativos nesta filial no momento."
+                ? "Não há vendedores, operadores de caixa ou gerentes ativos nesta filial no momento."
                 : "Pessoas desligadas no Millennium aparecem aqui."
           }
         />
@@ -448,7 +448,7 @@ function rowActions(input: {
   onReactivate: () => void;
   onRemove: () => void;
 }): DropdownItem[] {
-  const edit: DropdownItem = { label: "Editar funcionário", onClick: input.onEdit };
+  const edit: DropdownItem = { label: "Editar cadastro", onClick: input.onEdit };
   if (!input.state) return [edit];
   const exclude: DropdownItem = { label: "Excluir acesso", onClick: input.onRemove, danger: true };
   const access: DropdownItem[] =
@@ -573,9 +573,18 @@ function SellerEditor({
         <div className="flex flex-col gap-3">
           <p className="text-[12.5px] text-t2">
             {sales
-              ? "CPF, e-mail, WhatsApp e grupo ficam na WDash. A atualização do Millennium não altera esses dados."
-              : "CPF, e-mail e WhatsApp ficam na WDash. A atualização do Millennium não altera esses dados."}
+              ? "CPF, e-mail, WhatsApp e grupo são salvos na WDash. A atualização do Millennium não altera esses dados."
+              : "CPF, e-mail e WhatsApp são salvos na WDash. A atualização do Millennium não altera esses dados."}
           </p>
+          <FormField label="CPF" optional>
+            <Input value={cpf} onChange={(event) => setCpf(event.target.value)} placeholder="000.000.000-00" inputMode="numeric" />
+          </FormField>
+          <FormField label="E-mail" optional>
+            <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="nome@email.com" />
+          </FormField>
+          <FormField label="WhatsApp" optional>
+            <Input value={whatsapp} onChange={(event) => setWhatsapp(event.target.value)} placeholder="(11) 99999-9999" inputMode="tel" />
+          </FormField>
           {sales && (
             <FormField label="Grupo">
               <select className="h-[42px] w-full rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3.5 text-[13px] text-t0 outline-none focus:border-acc" value={shiftId ?? ""} onChange={(event) => setShiftId(event.target.value || null)}>
@@ -587,19 +596,10 @@ function SellerEditor({
                 ))}
               </select>
               <button type="button" className="mt-2 text-[12.5px] font-semibold text-acc" onClick={onCreateGroup}>
-                Criar grupo
+                + Criar grupo
               </button>
             </FormField>
           )}
-          <FormField label="CPF" optional>
-            <Input value={cpf} onChange={(event) => setCpf(event.target.value)} placeholder="000.000.000-00" inputMode="numeric" />
-          </FormField>
-          <FormField label="E-mail" optional>
-            <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="nome@email.com" />
-          </FormField>
-          <FormField label="WhatsApp" optional>
-            <Input value={whatsapp} onChange={(event) => setWhatsapp(event.target.value)} placeholder="(11) 99999-9999" inputMode="tel" />
-          </FormField>
           {error && <p className="text-sm text-bad">{error}</p>}
         </div>
       )}
@@ -648,7 +648,7 @@ const SELLER_COLUMNS: DataTableColumn<StoreSeller>[] = [
     header: "Status",
     sortable: true,
     sortValue: (v) => (v.active ? "Ativo" : "Desligado"),
-    render: (v) => (v.active ? <Badge variant="success">Ativo</Badge> : <Badge variant="neutral">Desligado</Badge>),
+    render: (v) => (v.active ? <Badge variant="neutral">Ativo</Badge> : <Badge variant="neutral">Desligado</Badge>),
   },
 ];
 

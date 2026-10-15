@@ -30,9 +30,9 @@ describe("branchRoleLabel", () => {
   it("names the three branch roles in Portuguese", () => {
     expect(branchRoleLabel("VENDEDOR")).toBe("Vendedor");
     expect(branchRoleLabel(null)).toBe("Vendedor");
-    expect(branchRoleLabel("GERENCIA")).toBe("Gerência");
+    expect(branchRoleLabel("GERENCIA")).toBe("Gerente");
     expect(branchRoleLabel("OPERADOR DE CAIXA")).toBe("Operador de caixa");
     expect(branchRoleLabel("")).toBe("Sem cargo");
-    expect(branchRoleLabel("INDEFINIDO")).toBe("Indefinido");
+    expect(branchRoleLabel("INDEFINIDO")).toBe("Sem cargo");
   });
 });
