@@ -396,6 +396,7 @@ describe("carryDraft", () => {
     ],
     deadline: "2026-11-01",
     reminder: "EVERY_WEEK" as const,
+    guests: [],
   };
 
   it("carries deadline, reminder, user marks and position onto the pages the next document has", () => {
@@ -439,5 +440,11 @@ describe("carryDraft", () => {
         [],
       ),
     ).toBe("O signatário adicional precisa ser um usuário com e-mail.");
+    const guest = {
+      ...draft,
+      guests: [{ id: "g1", name: "", email: "", whatsapp: "" }],
+      fields: [...draft.fields, { id: "guest-mark", pageNumber: 1, x: 20, y: 80, element: "SIGNATURE" as const, signerId: "guest:g1" }],
+    };
+    expect(documentIssue({ cpf: VALID_DIGITS, email: "ana@loja.com", whatsapp: "11987654321" }, guest, 1)).toBe("Informe o nome de quem vai assinar.");
   });
 });

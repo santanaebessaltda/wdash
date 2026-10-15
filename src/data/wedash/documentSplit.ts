@@ -353,9 +353,18 @@ export function defaultSignatureMark(pageCount: number): SignatureMark {
 
 export type Reminder = "EVERY_DAY" | "EVERY_3_DAYS" | "EVERY_WEEK" | "NEVER";
 
+/** Pessoa que assina só este envio. Não vira colaborador nem usuário. */
+export type GuestSigner = {
+  id: string;
+  name: string;
+  email: string;
+  whatsapp: string;
+};
+
 export type DocumentDraft = {
   channel: SendChannel;
   fields: FieldMark[];
+  guests: GuestSigner[];
   deadline: string;
   reminder: Reminder;
 };
@@ -376,6 +385,7 @@ export function defaultDraft(pageCount: number): DocumentDraft {
   return {
     channel: "WHATSAPP",
     fields: [{ ...defaultSignatureMark(pageCount), id: "seller-mark", signerId: "seller" }],
+    guests: [],
     deadline: "",
     reminder: "EVERY_3_DAYS",
   };
@@ -396,6 +406,7 @@ export function carryDraft(previous: DocumentDraft, pageCount: number): Document
   return {
     channel: "WHATSAPP",
     fields: fields.map((field) => clampField(field, pageCount)),
+    guests: (previous.guests ?? []).map((guest) => ({ ...guest })),
     deadline: previous.deadline,
     reminder: previous.reminder,
   };
@@ -410,7 +421,11 @@ export function resolveDrafts(
   return rows.map((row) => {
     const own = drafts[row.id];
     const next = own
-      ? { ...own, fields: (own.fields.length > 0 ? own.fields : defaultDraft(row.pageCount).fields).map((field) => clampField(field, row.pageCount)) }
+      ? {
+          ...own,
+          guests: own.guests ?? [],
+          fields: (own.fields.length > 0 ? own.fields : defaultDraft(row.pageCount).fields).map((field) => clampField(field, row.pageCount)),
+        }
       : carryDraft(last, row.pageCount);
     last = next;
     return next;
@@ -421,22 +436,53 @@ export function sellerMarks(fields: FieldMark[]): FieldMark[] {
   return fields.filter((field) => field.signerId === "seller");
 }
 
-/** Cada usuário marcado vira um signatário extra, no e-mail da conta. */
+/** Usuário sai no e-mail da conta. Outro colaborador e uma pessoa de fora saem no canal do documento. */
 export function extraSignersFrom(
   fields: FieldMark[],
   signers: { id: string; name: string; email: string | null }[],
   pageCount: number,
+  scope: {
+    people?: { id: string; name: string; email: string | null; whatsapp: string | null }[];
+    guests?: GuestSigner[];
+    channel?: SendChannel;
+  } = {},
 ): ExtraSigner[] {
-  const keys = [...new Set(fields.map((field) => field.signerId).filter((id) => id.startsWith("user:")))];
+  const channel = scope.channel ?? "WHATSAPP";
   const extras: ExtraSigner[] = [];
+  const keys = [...new Set(fields.map((field) => field.signerId))];
   for (const key of keys) {
-    const signer = signers.find((item) => item.id === key.slice("user:".length));
     const marks = applicableMarks(
       fields.filter((field) => field.signerId === key),
       pageCount,
     );
-    if (!signer?.name.trim() || !signer.email || marks.length === 0) continue;
-    extras.push({ name: signer.name.trim(), channel: "EMAIL", email: signer.email, whatsapp: null, marks });
+    if (marks.length === 0) continue;
+    if (key.startsWith("user:")) {
+      const signer = signers.find((item) => item.id === key.slice("user:".length));
+      if (!signer?.name.trim() || !signer.email) continue;
+      extras.push({ name: signer.name.trim(), channel: "EMAIL", email: signer.email, whatsapp: null, marks });
+    } else if (key.startsWith("seller:")) {
+      const person = scope.people?.find((item) => item.id === key.slice("seller:".length));
+      if (!person?.name.trim()) continue;
+      extras.push({
+        name: person.name.trim(),
+        channel,
+        email: person.email,
+        whatsapp: person.whatsapp,
+        marks,
+      });
+    } else if (key.startsWith("guest:")) {
+      const guest = scope.guests?.find((item) => item.id === key.slice("guest:".length));
+      if (!guest?.name.trim()) continue;
+      const email = saveEmail(guest.email);
+      const whatsapp = saveWhatsapp(guest.whatsapp);
+      extras.push({
+        name: guest.name.trim(),
+        channel,
+        email: email.ok ? email.email : null,
+        whatsapp: whatsapp.ok ? whatsapp.whatsapp : null,
+        marks,
+      });
+    }
   }
   return extras;
 }
@@ -446,16 +492,37 @@ export function documentIssue(
   draft: DocumentDraft,
   pageCount: number,
   signers: { id: string; name: string; email: string | null }[] = [],
+  people: { id: string; name: string; email: string | null; whatsapp: string | null; cpf?: string | null }[] = [],
 ): string | null {
   if (!person) return "Escolha o colaborador.";
   const ask = contactFieldsToAsk(person, draft.channel);
   if (ask.cpf || ask.email || ask.whatsapp) return "Falta contato no cadastro.";
   const place = placementWarning(sellerMarks(draft.fields), pageCount);
-  if (place) return place ?? "Marque a assinatura do colaborador.";
+  if (place) return place;
   for (const field of draft.fields) {
-    if (!field.signerId.startsWith("user:")) continue;
-    const signer = signers.find((item) => item.id === field.signerId.slice("user:".length));
-    if (!signer?.name.trim() || !signer.email) return "O signatário adicional precisa ser um usuário com e-mail.";
+    if (field.signerId.startsWith("user:")) {
+      const signer = signers.find((item) => item.id === field.signerId.slice("user:".length));
+      if (!signer?.name.trim() || !signer.email) return "O signatário adicional precisa ser um usuário com e-mail.";
+    } else if (field.signerId.startsWith("seller:")) {
+      const other = people.find((item) => item.id === field.signerId.slice("seller:".length));
+      const missing = other
+        ? contactFieldsToAsk({ cpf: other.cpf ?? null, email: other.email, whatsapp: other.whatsapp }, draft.channel)
+        : null;
+      if (!other?.name.trim() || !missing || missing.cpf || missing.email || missing.whatsapp) return "Falta contato no cadastro.";
+    } else if (field.signerId.startsWith("guest:")) {
+      const guest = (draft.guests ?? []).find((item) => item.id === field.signerId.slice("guest:".length));
+      if (!guest?.name.trim()) return "Informe o nome de quem vai assinar.";
+      if (draft.channel === "EMAIL") {
+        const saved = saveEmail(guest.email);
+        if (!saved.ok) return saved.message;
+        if (!saved.email) return "Informe o e-mail de quem vai assinar.";
+      }
+      if (draft.channel === "WHATSAPP") {
+        const saved = saveWhatsapp(guest.whatsapp);
+        if (!saved.ok) return saved.message;
+        if (!saved.whatsapp) return "Informe o WhatsApp de quem vai assinar.";
+      }
+    }
   }
   return null;
 }

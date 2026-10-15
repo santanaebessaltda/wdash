@@ -159,7 +159,11 @@ export function AttachWizard({
           marks: sellerMarks(resolved[index].fields),
           deadline: resolved[index].deadline,
           reminder: resolved[index].reminder,
-          extraSigners: extraSignersFrom(resolved[index].fields, signers, row.pageCount),
+          extraSigners: extraSignersFrom(resolved[index].fields, signers, row.pageCount, {
+            people,
+            guests: resolved[index].guests,
+            channel: resolved[index].channel,
+          }),
         })),
         extraSigner: null,
       });

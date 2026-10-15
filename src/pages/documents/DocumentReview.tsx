@@ -5,12 +5,12 @@ import { Button, FormField, WizardCardHeader, WizardNav } from "@/components/ui"
 import { Spinner } from "@/components/ui/Skeleton";
 import {
   DOCUMENT_COPY,
-  contactFieldsToAsk,
   documentIssue,
   folderTitle,
   resolveDrafts,
   type DocumentDraft,
   type FieldMark,
+  type GuestSigner,
   type SendChannel,
   type SignatureMark,
 } from "@/data/wedash/documentSplit";
@@ -61,7 +61,7 @@ export function DocumentReview({
     rows.map((row) => ({ id: row.id, pageCount: row.pageCount })),
     drafts,
   );
-  const ready = rows.filter((row, index) => !row.envelopeId && !documentIssue(people.find((item) => item.id === row.sellerId) ?? null, resolved[index], row.pageCount, signers)).length;
+  const ready = rows.filter((row, index) => !row.envelopeId && !documentIssue(people.find((item) => item.id === row.sellerId) ?? null, resolved[index], row.pageCount, signers, people)).length;
   const openRows = rows.filter((row) => !row.envelopeId).length;
   const index = Math.max(0, rows.findIndex((row) => row.id === activeId));
   const row = rows[index];
@@ -149,13 +149,43 @@ function ReviewBody({
   onSave: (input: { sellerId: string; cpf?: string; email?: string; whatsapp?: string }) => Promise<void>;
 }) {
   const person = people.find((item) => item.id === row.sellerId) ?? null;
-  const issue = row.envelopeId ? null : documentIssue(person, draft, row.pageCount, signers);
+  const issue = row.envelopeId ? null : documentIssue(person, draft, row.pageCount, signers, people);
   const previous = index > 0 ? rows[index - 1] : null;
   const next = index < total - 1 ? rows[index + 1] : null;
   const locked = Boolean(row.envelopeId) || sending;
 
   function changeFields(fields: FieldMark[]) {
     onDraft({ ...draft, fields });
+  }
+
+  function pickSigner(field: FieldMark, value: string) {
+    if (value === "__guest__") {
+      const guest: GuestSigner = { id: crypto.randomUUID(), name: "", email: "", whatsapp: "" };
+      onDraft({
+        ...draft,
+        guests: [...(draft.guests ?? []), guest],
+        fields: draft.fields.map((item) => (item.id === field.id ? { ...item, signerId: `guest:${guest.id}` } : item)),
+      });
+      return;
+    }
+    if (value.startsWith("seller:")) {
+      const sellerId = value.slice("seller:".length);
+      const keepsOwner = draft.fields.some((item) => item.id !== field.id && item.signerId === "seller");
+      if (field.signerId === "seller" && !keepsOwner) {
+        if (sellerId !== row.sellerId) void onAssign(row.id, sellerId);
+        return;
+      }
+      onDraft({
+        ...draft,
+        fields: draft.fields.map((item) => (item.id === field.id ? { ...item, signerId: sellerId === row.sellerId ? "seller" : value } : item)),
+      });
+      if (!row.sellerId) void onAssign(row.id, sellerId);
+      return;
+    }
+    onDraft({
+      ...draft,
+      fields: draft.fields.map((item) => (item.id === field.id ? { ...item, signerId: value } : item)),
+    });
   }
 
   return (
@@ -184,18 +214,21 @@ function ReviewBody({
       </div>
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div>
-          <h3 className="text-lg font-bold text-t0">{person?.name ?? "Colaborador não identificado"}</h3>
-          <p className="mt-1 mb-3 text-[13px] text-t2">
+          {person && <h3 className="text-lg font-bold text-t0">{person.name}</h3>}
+          <p className={cn("mb-3 text-[13px] text-t2", person && "mt-1")}>
             {folderTitle(row.fileName)} · {row.pageCount === 1 ? "1 página" : `${row.pageCount} páginas`}
           </p>
           <StackedPages
             documentId={row.id}
             pageCount={row.pageCount}
             fields={draft.fields}
-            personName={person?.name ?? "Colaborador"}
+            people={people}
+            sellerId={row.sellerId}
+            guests={draft.guests ?? []}
             signers={signers}
             disabled={locked}
             onChange={changeFields}
+            onPick={pickSigner}
             onDrop={(pageNumber) => onDrop(row.id, pageNumber)}
           />
         </div>
@@ -203,7 +236,7 @@ function ReviewBody({
           {row.envelopeId ? (
             <p className="text-[13px] text-t2">{STATUS_LABEL[row.status]}</p>
           ) : (
-            <DraftFields person={person} draft={draft} people={people} row={row} issue={issue} onDraft={onDraft} onAssign={onAssign} onSave={onSave} />
+            <DraftFields person={person} draft={draft} people={people} issue={issue} onDraft={onDraft} onSave={onSave} />
           )}
         </aside>
       </div>
@@ -215,45 +248,39 @@ function DraftFields({
   person,
   draft,
   people,
-  row,
   issue,
   onDraft,
-  onAssign,
   onSave,
 }: {
   person: PersonRow | null;
   draft: DocumentDraft;
   people: PersonRow[];
-  row: DocumentRow;
   issue: string | null;
   onDraft: (draft: DocumentDraft) => void;
-  onAssign: (documentId: string, sellerId: string) => Promise<void>;
   onSave: (input: { sellerId: string; cpf?: string; email?: string; whatsapp?: string }) => Promise<void>;
 }) {
-  const ask = person ? contactFieldsToAsk(person, draft.channel) : null;
+  const extras = people.filter(
+    (item) => item.id !== person?.id && draft.fields.some((field) => field.signerId === `seller:${item.id}`),
+  );
+  const guests = (draft.guests ?? []).filter((guest) => draft.fields.some((field) => field.signerId === `guest:${guest.id}`));
   return (
     <>
-      {!person ? (
-        <FormField label="Colaborador">
-          <select className={controlClass} defaultValue="" onChange={(event) => event.target.value && void onAssign(row.id, event.target.value)}>
-            <option value="">Escolher colaborador</option>
-            {people.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-        </FormField>
-      ) : (
-        <p className="text-[13px] font-bold text-t0">{person.name}</p>
-      )}
       <FormField label="Canal">
         <ChannelSelect value={draft.channel} onChange={(channel) => onDraft({ ...draft, channel })} />
       </FormField>
-      {person && ask && (ask.cpf || ask.email || ask.whatsapp) && (
-        <ContactForm key={`${person.id}:${draft.channel}`} personId={person.id} ask={ask} onSave={onSave} />
+      {person && (
+        <ContactEditor key={`${person.id}:${person.cpf ?? ""}:${person.email ?? ""}:${person.whatsapp ?? ""}`} person={person} onSave={onSave} />
       )}
-      <p className="text-[12.5px] text-t2">O signatário adicional se escolhe na marcação, pela lista de usuários.</p>
+      {extras.map((item) => (
+        <ContactEditor key={`${item.id}:${item.cpf ?? ""}:${item.email ?? ""}:${item.whatsapp ?? ""}`} person={item} onSave={onSave} />
+      ))}
+      {guests.map((guest) => (
+        <GuestEditor
+          key={guest.id}
+          guest={guest}
+          onChange={(next) => onDraft({ ...draft, guests: (draft.guests ?? []).map((item) => (item.id === guest.id ? next : item)) })}
+        />
+      ))}
       <FormField label="Lembrete">
         <select className={controlClass} value={draft.reminder} onChange={(event) => onDraft({ ...draft, reminder: event.target.value as DocumentDraft["reminder"] })}>
           <option value="EVERY_DAY">Todo dia</option>
@@ -265,24 +292,23 @@ function DraftFields({
       <FormField label="Data limite" optional hint="Depois desta data, o documento fica expirado se ainda não tiver sido assinado.">
         <input type="date" className={controlClass} value={draft.deadline} onChange={(event) => onDraft({ ...draft, deadline: event.target.value })} />
       </FormField>
-      {issue && <p className="text-xs text-bad">{issue}</p>}
+      {issue && issue !== "Escolha o colaborador." && <p className="text-xs text-bad">{issue}</p>}
     </>
   );
 }
 
-function ContactForm({
-  personId,
-  ask,
+function ContactEditor({
+  person,
   onSave,
 }: {
-  personId: string;
-  ask: { cpf: boolean; email: boolean; whatsapp: boolean };
+  person: PersonRow;
   onSave: (input: { sellerId: string; cpf?: string; email?: string; whatsapp?: string }) => Promise<void>;
 }) {
-  const [cpf, setCpf] = useState("");
-  const [email, setEmail] = useState("");
-  const [whatsapp, setWhatsapp] = useState("");
+  const [cpf, setCpf] = useState(person.cpf ?? "");
+  const [email, setEmail] = useState(person.email ?? "");
+  const [whatsapp, setWhatsapp] = useState(person.whatsapp ?? "");
   const [localError, setLocalError] = useState<string | null>(null);
+  const dirty = cpf !== (person.cpf ?? "") || email !== (person.email ?? "") || whatsapp !== (person.whatsapp ?? "");
 
   return (
     <form
@@ -290,35 +316,45 @@ function ContactForm({
       onSubmit={(event) => {
         event.preventDefault();
         setLocalError(null);
-        const input: { sellerId: string; cpf?: string; email?: string; whatsapp?: string } = { sellerId: personId };
-        if (ask.cpf) input.cpf = cpf;
-        if (ask.email) input.email = email;
-        if (ask.whatsapp) input.whatsapp = whatsapp;
-        void onSave(input).catch((reason) => setLocalError(reason instanceof Error ? reason.message : DOCUMENT_COPY.badCpf));
+        void onSave({ sellerId: person.id, cpf, email, whatsapp }).catch((reason) =>
+          setLocalError(reason instanceof Error ? reason.message : DOCUMENT_COPY.badCpf),
+        );
       }}
     >
-      {ask.cpf && (
-        <FormField label="CPF">
-          <input className={controlClass} value={cpf} onChange={(event) => setCpf(event.target.value)} />
-        </FormField>
-      )}
-      {ask.email && (
-        <FormField label="E-mail">
-          <input className={controlClass} value={email} onChange={(event) => setEmail(event.target.value)} />
-        </FormField>
-      )}
-      {ask.whatsapp && (
-        <FormField label="WhatsApp">
-          <input className={controlClass} value={whatsapp} onChange={(event) => setWhatsapp(event.target.value)} />
-        </FormField>
-      )}
+      <p className="text-[13px] font-bold text-t0">{person.name}</p>
+      <FormField label="CPF">
+        <input className={controlClass} value={cpf} onChange={(event) => setCpf(event.target.value)} />
+      </FormField>
+      <FormField label="E-mail">
+        <input className={controlClass} value={email} onChange={(event) => setEmail(event.target.value)} />
+      </FormField>
+      <FormField label="WhatsApp">
+        <input className={controlClass} value={whatsapp} onChange={(event) => setWhatsapp(event.target.value)} />
+      </FormField>
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs text-bad">{localError}</span>
-        <Button size="sm" variant="outline" type="submit">
+        <Button size="sm" variant="outline" type="submit" disabled={!dirty}>
           Salvar
         </Button>
       </div>
     </form>
+  );
+}
+
+function GuestEditor({ guest, onChange }: { guest: GuestSigner; onChange: (guest: GuestSigner) => void }) {
+  return (
+    <div className="grid gap-2">
+      <p className="text-[13px] font-bold text-t0">Outra pessoa</p>
+      <FormField label="Nome">
+        <input className={controlClass} value={guest.name} onChange={(event) => onChange({ ...guest, name: event.target.value })} />
+      </FormField>
+      <FormField label="E-mail">
+        <input className={controlClass} value={guest.email} onChange={(event) => onChange({ ...guest, email: event.target.value })} />
+      </FormField>
+      <FormField label="WhatsApp">
+        <input className={controlClass} value={guest.whatsapp} onChange={(event) => onChange({ ...guest, whatsapp: event.target.value })} />
+      </FormField>
+    </div>
   );
 }
 
@@ -335,19 +371,25 @@ function StackedPages({
   documentId,
   pageCount,
   fields,
-  personName,
+  people,
+  sellerId,
+  guests,
   signers,
   disabled,
   onChange,
+  onPick,
   onDrop,
 }: {
   documentId: string;
   pageCount: number;
   fields: FieldMark[];
-  personName: string;
+  people: PersonRow[];
+  sellerId: string | null;
+  guests: GuestSigner[];
   signers: { id: string; name: string; email: string }[];
   disabled: boolean;
   onChange: (fields: FieldMark[]) => void;
+  onPick: (field: FieldMark, value: string) => void;
   onDrop: (pageNumber: number) => Promise<void>;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -467,10 +509,13 @@ function StackedPages({
                   <MarkCard
                     key={field.id}
                     field={field}
-                    personName={personName}
+                    people={people}
+                    sellerId={sellerId}
+                    guests={guests}
                     signers={signers}
                     disabled={disabled}
                     onChange={(next) => onChange(fields.map((item) => (item.id === field.id ? next : item)))}
+                    onPick={(value) => onPick(field, value)}
                     onDuplicate={() =>
                       onChange([
                         ...fields,
@@ -498,18 +543,24 @@ function pointAt(element: HTMLElement, clientX: number, clientY: number, pageNum
 
 function MarkCard({
   field,
-  personName,
+  people,
+  sellerId,
+  guests,
   signers,
   disabled,
   onChange,
+  onPick,
   onDuplicate,
   onRemove,
 }: {
   field: FieldMark;
-  personName: string;
+  people: PersonRow[];
+  sellerId: string | null;
+  guests: GuestSigner[];
   signers: { id: string; name: string }[];
   disabled: boolean;
   onChange: (field: FieldMark) => void;
+  onPick: (value: string) => void;
   onDuplicate: () => void;
   onRemove: () => void;
 }) {
@@ -538,12 +589,23 @@ function MarkCard({
         <div className="flex items-center gap-1">
           <select
             className="h-8 min-w-0 flex-1 rounded-md border border-neutral-200 bg-white px-2 text-[12px] font-bold"
-            value={field.signerId}
+            value={field.signerId === "seller" ? (sellerId ? `seller:${sellerId}` : "") : field.signerId}
             disabled={disabled}
-            onChange={(event) => onChange({ ...field, signerId: event.target.value })}
+            onChange={(event) => onPick(event.target.value)}
           >
-            <optgroup label="Colaborador">
-              <option value="seller">{personName}</option>
+            {field.signerId === "seller" && !sellerId && <option value="">Selecionar</option>}
+            <optgroup label="Colaboradores">
+              {people.length === 0 ? (
+                <option value="" disabled>
+                  Nenhum colaborador
+                </option>
+              ) : (
+                people.map((person) => (
+                  <option key={person.id} value={`seller:${person.id}`}>
+                    {person.name}
+                  </option>
+                ))
+              )}
             </optgroup>
             <optgroup label="Usuários">
               {signers.length === 0 ? (
@@ -557,6 +619,14 @@ function MarkCard({
                   </option>
                 ))
               )}
+            </optgroup>
+            <optgroup label="Outra pessoa">
+              {guests.map((guest) => (
+                <option key={guest.id} value={`guest:${guest.id}`}>
+                  {guest.name.trim() || "Outra pessoa"}
+                </option>
+              ))}
+              <option value="__guest__">Adicionar outra pessoa</option>
             </optgroup>
           </select>
           <IconButton label="Duplicar marcação" disabled={disabled} onClick={onDuplicate}>
