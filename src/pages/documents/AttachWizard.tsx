@@ -20,6 +20,7 @@ import {
   resolveDrafts,
   sellerMarks,
   type DocumentDraft,
+  type SignerContact,
 } from "@/data/wedash/documentSplit";
 import {
   assignDocument,
@@ -34,7 +35,8 @@ import {
 } from "@/data/wedash/documentsRepo";
 import { formatBytes } from "./frame";
 import { DocumentReview } from "./DocumentReview";
-import { fetchSystemUsers } from "@/data/wedash/systemUsers";
+
+const NO_USERS: { id: string; name: string; email: string }[] = [];
 
 const controlClass =
   "h-[42px] w-full rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3.5 text-[13px] text-t0 outline-none transition-colors focus:border-acc";
@@ -49,6 +51,7 @@ export function AttachWizard({
   storeId,
   people,
   documents,
+  history,
   onReload,
   onClose,
   onDone,
@@ -56,6 +59,7 @@ export function AttachWizard({
   storeId: string | null;
   people: PersonRow[];
   documents: DocumentRow[];
+  history: SignerContact[];
   onReload: () => Promise<void>;
   onClose: () => void;
   onDone: (notice: string | null, sent?: string | null) => void;
@@ -81,18 +85,7 @@ export function AttachWizard({
   const [sending, setSending] = useState(false);
   const [confirmSend, setConfirmSend] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
-  const [signers, setSigners] = useState<{ id: string; name: string; email: string }[]>([]);
-
-  useEffect(() => {
-    void fetchSystemUsers().then((result) => {
-      if (!result.ok) return;
-      setSigners(
-        result.data.members
-          .filter((member) => member.status === "ACTIVE" && member.email)
-          .map((member) => ({ id: member.membershipId, name: member.name || member.email, email: member.email })),
-      );
-    });
-  }, []);
+  const signers = NO_USERS;
 
   const rows = useMemo(
     () =>
@@ -284,6 +277,7 @@ export function AttachWizard({
             people={people}
             drafts={drafts}
             signers={signers}
+            history={history}
             activeId={activeId}
             refused={refused}
             error={error}
@@ -429,12 +423,13 @@ export function AttachWizard({
 
 export function AttachPage() {
   const navigate = useNavigate();
-  const { storeId, people, documents, reload } = useDocuments();
+  const { storeId, people, documents, history, reload } = useDocuments();
   return (
     <AttachWizard
       storeId={storeId}
       people={people}
       documents={documents}
+      history={history}
       onReload={reload}
       onClose={() => navigate(paths.documents)}
       onDone={(notice, sent) =>

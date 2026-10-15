@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useScope } from "@/pages/dashboard/useScope";
 import { useActiveSession } from "@/session/SessionProvider";
 import { loadDocuments, type BatchRow, type DocumentRow, type PersonRow } from "@/data/wedash/documentsRepo";
+import type { SignerContact } from "@/data/wedash/documentSplit";
 
 export function useDocuments() {
   const session = useActiveSession();
@@ -11,6 +12,7 @@ export function useDocuments() {
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [people, setPeople] = useState<PersonRow[]>([]);
   const [stores, setStores] = useState<{ id: string; name: string }[]>([]);
+  const [history, setHistory] = useState<SignerContact[]>([]);
 
   const reload = useCallback(async () => {
     const data = await loadDocuments(session.tenantId, storeId);
@@ -18,11 +20,12 @@ export function useDocuments() {
     setDocuments(data.documents);
     setPeople(data.people);
     setStores(data.stores);
+    setHistory(data.history);
   }, [session.tenantId, storeId]);
 
   useEffect(() => {
     void reload();
   }, [reload]);
 
-  return { storeId, allStores: storeId == null, batches, documents, people, stores, reload };
+  return { storeId, allStores: storeId == null, batches, documents, people, stores, history, reload };
 }

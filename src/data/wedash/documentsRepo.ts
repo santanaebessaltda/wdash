@@ -1,5 +1,5 @@
 import { getSupabase } from "@/lib/supabase";
-import { DOCUMENT_COPY } from "./documentSplit";
+import { DOCUMENT_COPY, signerHistory, type SignerContact } from "./documentSplit";
 
 export type DocumentRow = {
   id: string;
@@ -92,14 +92,16 @@ export async function loadDocuments(tenantId: string, storeId: string | null): P
   documents: DocumentRow[];
   people: PersonRow[];
   stores: { id: string; name: string }[];
+  history: SignerContact[];
 }> {
   const sb = getSupabase();
-  if (!sb) return { batches: [], documents: [], people: [], stores: [] };
-  const [batches, documents, people, stores] = await Promise.all([
+  if (!sb) return { batches: [], documents: [], people: [], stores: [], history: [] };
+  const [batches, documents, people, stores, sentExtras] = await Promise.all([
     sb.from("document_batch").select("id, store_id, month, year, category, channel, deadline, created_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }),
     sb.from("employee_document").select("id, batch_id, store_id, seller_id, status, file_name, error, envelope_id, size_bytes, page_count, created_at, sent_at").eq("tenant_id", tenantId).order("created_at"),
     sb.from("store_seller").select("id, store_id, name, cpf, email, whatsapp, active, in_erp").eq("tenant_id", tenantId).order("name").limit(2000),
     sb.from("store").select("id, name").eq("tenant_id", tenantId).order("name"),
+    sb.from("employee_document").select("extra_signer, sent_at").eq("tenant_id", tenantId).not("envelope_id", "is", null).order("sent_at", { ascending: false }).limit(80),
   ]);
   const inStore = (id: string | null) => !storeId || id === storeId;
   return {
@@ -109,6 +111,12 @@ export async function loadDocuments(tenantId: string, storeId: string | null): P
     documents: ((documents.data ?? []) as Record<string, unknown>[]).filter((row) => inStore((row.store_id as string | null) ?? storeId)).map(mapDoc),
     people: ((people.data ?? []) as Record<string, unknown>[]).filter((row) => inStore(row.store_id as string)).map(mapPerson),
     stores: ((stores.data ?? []) as { id: string; name: string }[]).filter((row) => inStore(row.id)),
+    history: signerHistory(
+      ((sentExtras.data ?? []) as { extra_signer: unknown; sent_at: string | null }[]).map((row) => ({
+        sentAt: row.sent_at,
+        extra: row.extra_signer,
+      })),
+    ),
   };
 }
 

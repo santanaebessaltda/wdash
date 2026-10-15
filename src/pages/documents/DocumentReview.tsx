@@ -13,11 +13,13 @@ import {
   resolveDrafts,
   saveEmail,
   saveWhatsapp,
+  signerContactKey,
   type DocumentDraft,
   type FieldMark,
   type GuestSigner,
   type SendChannel,
   type SignatureMark,
+  type SignerContact,
 } from "@/data/wedash/documentSplit";
 import { openDocument, type DocumentRow, type PersonRow } from "@/data/wedash/documentsRepo";
 import { Icon, icons } from "@/pages/users/Icons";
@@ -34,6 +36,7 @@ export function DocumentReview({
   people,
   drafts,
   signers,
+  history,
   activeId,
   refused,
   error,
@@ -53,6 +56,7 @@ export function DocumentReview({
   people: PersonRow[];
   drafts: Record<string, DocumentDraft | undefined>;
   signers: { id: string; name: string; email: string }[];
+  history: SignerContact[];
   activeId: string;
   refused: { name: string; message: string }[];
   error: string | null;
@@ -123,6 +127,7 @@ export function DocumentReview({
           draft={draft}
           people={people}
           signers={signers}
+          history={history}
           index={index}
           total={rows.length}
           rows={rows}
@@ -175,6 +180,7 @@ function ReviewBody({
   draft,
   people,
   signers,
+  history,
   index,
   total,
   rows,
@@ -191,6 +197,7 @@ function ReviewBody({
   draft: DocumentDraft;
   people: PersonRow[];
   signers: { id: string; name: string; email: string }[];
+  history: SignerContact[];
   index: number;
   total: number;
   rows: DocumentRow[];
@@ -214,14 +221,28 @@ function ReviewBody({
     onDraft({ ...draft, fields });
   }
 
-  function addGuest(assignTo?: FieldMark) {
-    const guest: GuestSigner = { id: crypto.randomUUID(), name: "", email: "", whatsapp: "" };
-    const signerId = `guest:${guest.id}`;
+  function guestsWithoutEmpty(signerId: string, exceptFieldId: string) {
+    if (!signerId.startsWith("guest:")) return draft.guests ?? [];
+    const guestId = signerId.slice("guest:".length);
+    const stillUsed = draft.fields.some((field) => field.id !== exceptFieldId && field.signerId === signerId);
+    const guest = (draft.guests ?? []).find((item) => item.id === guestId);
+    if (stillUsed || guest?.name.trim()) return draft.guests ?? [];
+    return (draft.guests ?? []).filter((item) => item.id !== guestId);
+  }
+
+  function addGuest(assignTo: FieldMark, contact?: SignerContact) {
+    const guest: GuestSigner = {
+      id: crypto.randomUUID(),
+      name: contact?.name ?? "",
+      email: contact?.email ?? "",
+      whatsapp: contact?.whatsapp ?? "",
+    };
     onDraft({
       ...draft,
-      guests: [...(draft.guests ?? []), guest],
-      fields: assignTo ? draft.fields.map((item) => (item.id === assignTo.id ? { ...item, signerId } : item)) : draft.fields,
+      guests: [...guestsWithoutEmpty(assignTo.signerId, assignTo.id), guest],
+      fields: draft.fields.map((item) => (item.id === assignTo.id ? { ...item, signerId: `guest:${guest.id}` } : item)),
     });
+    setSelectedId(assignTo.id);
   }
 
   function pickSigner(field: FieldMark, value: string) {
@@ -229,11 +250,51 @@ function ReviewBody({
       addGuest(field);
       return;
     }
-    const signerId = value.startsWith("seller:") && value.slice("seller:".length) === row.sellerId ? "seller" : value;
+    if (value.startsWith("history:")) {
+      const contact = history[Number(value.slice("history:".length))];
+      if (!contact) return;
+      const existing = (draft.guests ?? []).find((guest) => signerContactKey(guest) === signerContactKey(contact));
+      if (existing) {
+        onDraft({
+          ...draft,
+          guests: guestsWithoutEmpty(field.signerId, field.id),
+          fields: draft.fields.map((item) => (item.id === field.id ? { ...item, signerId: `guest:${existing.id}` } : item)),
+        });
+        return;
+      }
+      addGuest(field, contact);
+      return;
+    }
+    if (people.some((item) => item.id === value)) {
+      onDraft({
+        ...draft,
+        fields: draft.fields.map((item) => (item.id === field.id ? { ...item, signerId: "seller" } : item)),
+      });
+      if (value !== row.sellerId) void onAssign(row.id, value);
+      return;
+    }
     onDraft({
       ...draft,
-      fields: draft.fields.map((item) => (item.id === field.id ? { ...item, signerId } : item)),
+      guests: guestsWithoutEmpty(field.signerId, field.id),
+      fields: draft.fields.map((item) => (item.id === field.id ? { ...item, signerId: value } : item)),
     });
+  }
+
+  function placeMark(mark: SignatureMark) {
+    const id = crypto.randomUUID();
+    const hasCollaborator = draft.fields.some((field) => field.signerId === "seller" || field.signerId === "");
+    if (!hasCollaborator) {
+      onDraft({ ...draft, fields: [...draft.fields, { ...mark, id, signerId: "seller" }] });
+      setSelectedId(id);
+      return;
+    }
+    const guest: GuestSigner = { id: crypto.randomUUID(), name: "", email: "", whatsapp: "" };
+    onDraft({
+      ...draft,
+      guests: [...(draft.guests ?? []), guest],
+      fields: [...draft.fields, { ...mark, id, signerId: `guest:${guest.id}` }],
+    });
+    setSelectedId(id);
   }
 
   return (
@@ -262,12 +323,13 @@ function ReviewBody({
             people={people}
             sellerId={row.sellerId}
             guests={draft.guests ?? []}
-            signers={signers}
+            history={history}
             disabled={locked}
             selectedId={selectedId}
             onSelect={setSelectedId}
             onChange={changeFields}
             onPick={pickSigner}
+            onPlace={placeMark}
             onDrop={(pageNumber) => onDrop(row.id, pageNumber)}
           />
         </div>
@@ -285,7 +347,6 @@ function ReviewBody({
               sizeBytes={row.sizeBytes}
               selectedId={selectedId}
               onSelect={setSelectedId}
-              onAssign={(sellerId) => onAssign(row.id, sellerId)}
               onDraft={onDraft}
               onSave={onSave}
             />
@@ -484,7 +545,6 @@ function DraftFields({
   sizeBytes,
   selectedId,
   onSelect,
-  onAssign,
   onDraft,
   onSave,
 }: {
@@ -497,7 +557,6 @@ function DraftFields({
   sizeBytes: number;
   selectedId: string | null;
   onSelect: (id: string) => void;
-  onAssign: (sellerId: string) => Promise<void>;
   onDraft: (draft: DocumentDraft) => void;
   onSave: (input: { sellerId: string; cpf?: string; email?: string; whatsapp?: string }) => Promise<void>;
 }) {
@@ -518,20 +577,6 @@ function DraftFields({
 
   return (
     <>
-      <section className="rounded-xl border border-line p-3">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Colaborador do documento</p>
-        <div className="mt-2">
-          <select className={controlClass} value={person?.id ?? ""} onChange={(event) => event.target.value && void onAssign(event.target.value)}>
-            <option value="">Selecionar colaborador</option>
-            {people.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        {!person && <p className="mt-2 text-[12.5px] text-t2">Vincule o colaborador a quem este documento pertence.</p>}
-      </section>
       <section className="rounded-xl border border-line p-3">
         <div className="flex items-center justify-between gap-2">
           <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Signatários</p>
@@ -608,7 +653,7 @@ function DraftFields({
           <CheckRow ok={contactsValid} label="Contatos do canal válidos" />
           <CheckRow ok={sizeValid} label="Tamanho do PDF válido" />
         </ul>
-        {issue && issue !== "Escolha o colaborador." && issue !== DOCUMENT_COPY.overEnvelope && <p className="mt-2 text-xs text-bad">{issue}</p>}
+        {issue && issue !== "Escolha o colaborador." && issue !== "Falta contato no cadastro." && issue !== DOCUMENT_COPY.overEnvelope && <p className="mt-2 text-xs text-bad">{issue}</p>}
         {!sizeValid && <p className="mt-2 text-xs text-bad">{DOCUMENT_COPY.overEnvelope}</p>}
       </section>
     </>
@@ -619,7 +664,9 @@ function CheckRow({ ok, label }: { ok: boolean; label: string }) {
   return (
     <li className="flex items-center justify-between gap-2 text-[13px]">
       <span className="text-t1">{label}</span>
-      <span className={cn("text-[12px] font-bold", ok ? "text-ok" : "text-bad")}>{ok ? "Ok" : "Pendente"}</span>
+      <span className={cn("flex shrink-0", ok ? "text-ok" : "text-bad")} role="img" aria-label={ok ? "Ok" : "Pendente"}>
+        <Icon d={ok ? icons.check : icons.x} size={16} />
+      </span>
     </li>
   );
 }
@@ -628,49 +675,45 @@ function SignerOptions({
   people,
   sellerId,
   guests,
-  signers,
+  history,
+  collaborator,
+  allowNew = true,
 }: {
   people: PersonRow[];
   sellerId: string | null;
   guests: GuestSigner[];
-  signers: { id: string; name: string }[];
+  history: SignerContact[];
+  collaborator: boolean;
+  allowNew?: boolean;
 }) {
-  return (
-    <>
-      <optgroup label="Colaboradores">
-        {people.length === 0 ? (
-          <option value="" disabled>
-            Nenhum colaborador
-          </option>
-        ) : (
-          people.map((person) => (
-            <option key={person.id} value={person.id === sellerId ? "seller" : `seller:${person.id}`}>
-              {person.name}
-            </option>
-          ))
-        )}
-      </optgroup>
-      <optgroup label="Usuários">
-        {signers.length === 0 ? (
-          <option value="" disabled>
-            Nenhum usuário ativo
-          </option>
-        ) : (
-          signers.map((signer) => (
-            <option key={signer.id} value={`user:${signer.id}`}>
-              {signer.name}
-            </option>
-          ))
-        )}
-      </optgroup>
-      <optgroup label="Outra pessoa">
-        {guests.map((guest) => (
-          <option key={guest.id} value={`guest:${guest.id}`}>
-            {guest.name.trim() || "Outra pessoa"}
+  if (collaborator) {
+    return (
+      <>
+        {!sellerId && <option value="">Selecionar colaborador</option>}
+        {people.map((person) => (
+          <option key={person.id} value={person.id}>
+            {person.name}
           </option>
         ))}
-        <option value="__guest__">Adicionar outra pessoa</option>
-      </optgroup>
+      </>
+    );
+  }
+  const known = new Set((guests ?? []).filter((guest) => guest.name.trim()).map((guest) => signerContactKey(guest)));
+  return (
+    <>
+      {guests.map((guest) => (
+        <option key={guest.id} value={`guest:${guest.id}`}>
+          {guest.name.trim() || "Nova pessoa"}
+        </option>
+      ))}
+      {history.map((contact, index) =>
+        known.has(signerContactKey(contact)) ? null : (
+          <option key={signerContactKey(contact)} value={`history:${index}`}>
+            {contact.name}
+          </option>
+        ),
+      )}
+      {allowNew && <option value="__guest__">Nova pessoa</option>}
     </>
   );
 }
@@ -722,7 +765,7 @@ function ContactEditor({
 function GuestEditor({ guest, onChange }: { guest: GuestSigner; onChange: (guest: GuestSigner) => void }) {
   return (
     <div className="grid gap-2">
-      <p className="text-[13px] font-bold text-t0">Outra pessoa</p>
+      <p className="text-[13px] font-bold text-t0">Contato deste envio</p>
       <FormField label="Nome">
         <input className={controlClass} value={guest.name} onChange={(event) => onChange({ ...guest, name: event.target.value })} />
       </FormField>
@@ -752,12 +795,13 @@ function StackedPages({
   people,
   sellerId,
   guests,
-  signers,
+  history,
   disabled,
   selectedId,
   onSelect,
   onChange,
   onPick,
+  onPlace,
   onDrop,
 }: {
   documentId: string;
@@ -766,12 +810,13 @@ function StackedPages({
   people: PersonRow[];
   sellerId: string | null;
   guests: GuestSigner[];
-  signers: { id: string; name: string; email: string }[];
+  history: SignerContact[];
   disabled: boolean;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onChange: (fields: FieldMark[]) => void;
   onPick: (field: FieldMark, value: string) => void;
+  onPlace: (mark: SignatureMark) => void;
   onDrop: (pageNumber: number) => Promise<void>;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -891,10 +936,7 @@ function StackedPages({
               className="relative w-fit max-w-full bg-white shadow-lg"
               onClick={(event) => {
                 if (disabled || (event.target as HTMLElement).closest("[data-mark]")) return;
-                const added = pointAt(event.currentTarget, event.clientX, event.clientY, page, "SIGNATURE");
-                const id = crypto.randomUUID();
-                onChange([...fields, { ...added, id, signerId: sellerId ? "seller" : "" }]);
-                onSelect(id);
+                onPlace(pointAt(event.currentTarget, event.clientX, event.clientY, page, "SIGNATURE"));
               }}
             >
               <canvas data-page={page} className="block h-auto max-w-full bg-white" />
@@ -907,7 +949,7 @@ function StackedPages({
                     people={people}
                     sellerId={sellerId}
                     guests={guests}
-                    signers={signers}
+                    history={history}
                     disabled={disabled}
                     selected={selectedId === field.id}
                     onSelect={() => onSelect(field.id)}
@@ -967,7 +1009,7 @@ function MarkCard({
   people,
   sellerId,
   guests,
-  signers,
+  history,
   disabled,
   selected,
   onSelect,
@@ -980,7 +1022,7 @@ function MarkCard({
   people: PersonRow[];
   sellerId: string | null;
   guests: GuestSigner[];
-  signers: { id: string; name: string }[];
+  history: SignerContact[];
   disabled: boolean;
   selected: boolean;
   onSelect: () => void;
@@ -1044,12 +1086,18 @@ function MarkCard({
         <div className="grid gap-1.5 p-1.5">
           <select
             className="h-8 min-w-0 rounded-[var(--radius-vela-sm)] border border-line bg-bg-inset px-2 text-xs font-bold text-t0 outline-none focus:border-acc"
-            value={field.signerId === "seller" ? (sellerId ? "seller" : "") : field.signerId}
+            value={field.signerId === "seller" ? (sellerId ?? "") : field.signerId}
             disabled={disabled}
             onChange={(event) => onPick(event.target.value)}
           >
-            {!field.signerId || (field.signerId === "seller" && !sellerId) ? <option value="">Selecionar</option> : null}
-            <SignerOptions people={people} sellerId={sellerId} guests={guests} signers={signers} />
+            <SignerOptions
+              people={people}
+              sellerId={sellerId}
+              guests={guests}
+              history={history}
+              collaborator={field.signerId === "seller" || field.signerId === ""}
+              allowNew={!guests.some((guest) => field.signerId === `guest:${guest.id}` && !guest.name.trim())}
+            />
           </select>
           <div className="flex gap-1">
             <Button type="button" size="sm" className="flex-1" disabled={disabled} variant={field.element === "SIGNATURE" ? "primary" : "secondary"} onClick={() => onChange({ ...field, element: "SIGNATURE" })}>

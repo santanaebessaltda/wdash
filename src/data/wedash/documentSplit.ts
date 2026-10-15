@@ -438,6 +438,51 @@ export function sellerMarks(fields: FieldMark[]): FieldMark[] {
   return fields.filter((field) => field.signerId === "seller");
 }
 
+/** Contato de quem assinou sem ser colaborador. Serve para reutilizar no próximo envio. */
+export type SignerContact = { name: string; email: string; whatsapp: string };
+
+export function signerContactKey(contact: SignerContact): string {
+  const phone = contact.whatsapp.replace(/\D/g, "");
+  if (phone) return `w:${phone}`;
+  const email = contact.email.trim().toLowerCase();
+  if (email) return `e:${email}`;
+  return `n:${contact.name.trim().toLowerCase()}`;
+}
+
+function readSignerContacts(value: unknown): SignerContact[] {
+  const list = Array.isArray(value) ? value : value && typeof value === "object" ? [value] : [];
+  const contacts: SignerContact[] = [];
+  for (const item of list) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as { name?: unknown; email?: unknown; whatsapp?: unknown };
+    const name = typeof row.name === "string" ? row.name.trim() : "";
+    if (!name) continue;
+    contacts.push({
+      name,
+      email: typeof row.email === "string" ? row.email.trim() : "",
+      whatsapp: typeof row.whatsapp === "string" ? row.whatsapp.trim() : "",
+    });
+  }
+  return contacts;
+}
+
+/** Últimos contatos de fora, do envio mais recente para o mais antigo. */
+export function signerHistory(rows: { sentAt: string | null; extra: unknown }[], limit = 8): SignerContact[] {
+  const ordered = [...rows].sort((a, b) => (b.sentAt ?? "").localeCompare(a.sentAt ?? ""));
+  const seen = new Set<string>();
+  const history: SignerContact[] = [];
+  for (const row of ordered) {
+    for (const contact of readSignerContacts(row.extra)) {
+      const key = signerContactKey(contact);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      history.push(contact);
+      if (history.length >= limit) return history;
+    }
+  }
+  return history;
+}
+
 /** Usuário sai no e-mail da conta. Outro colaborador e uma pessoa de fora saem no canal do documento. */
 export function extraSignersFrom(
   fields: FieldMark[],

@@ -36,6 +36,7 @@ import {
   shouldSend,
   signaturePositions,
   signedCount,
+  signerHistory,
   sourceRefusal,
 } from "./documentSplit";
 
@@ -454,5 +455,15 @@ describe("carryDraft", () => {
     expect(preparationSituation(null, draft, 1)).toBe("Sem colaborador");
     expect(preparationSituation({ cpf: VALID_DIGITS, email: "ana@loja.com", whatsapp: "11987654321" }, draft, 1)).toBe("Pronto");
     expect(preparationSituation({ cpf: VALID_DIGITS, email: "ana@loja.com", whatsapp: "11987654321" }, draft, 1, [], [], "env")).toBe("Já enviado");
+  });
+});
+
+describe("signerHistory", () => {
+  it("keeps the latest external contacts and skips a repeated phone", () => {
+    const history = signerHistory([
+      { sentAt: "2026-10-01T00:00:00.000Z", extra: { name: "Bruno", email: "bruno@loja.com", whatsapp: "11999990000" } },
+      { sentAt: "2026-10-02T00:00:00.000Z", extra: [{ name: "Bruno Lima", email: "", whatsapp: "(11) 99999-0000" }, { name: "Carla", email: "carla@loja.com", whatsapp: "" }] },
+    ]);
+    expect(history.map((item) => item.name)).toEqual(["Bruno Lima", "Carla"]);
   });
 });
