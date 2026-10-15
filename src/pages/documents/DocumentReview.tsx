@@ -608,7 +608,7 @@ function signerGroups(draft: DocumentDraft, person: PersonRow | null, people: Pe
         : channel === "EMAIL" && !guest.email.trim()
           ? "Sem e-mail"
           : null;
-    return { key, name: guest?.name.trim() || "Nova pessoa", role: "Adicional" as const, origin: "Nova pessoa", pending, marks, person: null, guest, userEmail: null, channel, authentication: guestAuthentication(guest) };
+    return { key, name: guest?.name.trim() || "Outra pessoa", role: "Adicional" as const, origin: "Outra pessoa", pending, marks, person: null, guest, userEmail: null, channel, authentication: guestAuthentication(guest) };
   });
 }
 
@@ -773,32 +773,28 @@ function SignerOptions({
   collaborator: boolean;
   allowNew?: boolean;
 }) {
-  const option = (person: PersonRow) => (
-    <option key={person.id} value={!collaborator && person.id === ownerKey ? "seller" : person.id}>
-      {person.roleLabel ? `${person.name} · ${person.roleLabel}` : person.name}
-    </option>
-  );
-  const groups = people.length > 0 ? <optgroup label="Equipe">{people.map(option)}</optgroup> : null;
   const known = new Set((guests ?? []).filter((guest) => guest.name.trim()).map((guest) => signerContactKey(guest)));
   return (
     <>
       <option value="">{collaborator ? "Selecionar pessoa" : "Signatário"}</option>
-      {groups}
-      <optgroup label="Nova pessoa">
-        {guests.map((guest) => (
-          <option key={guest.id} value={`guest:${guest.id}`}>
-            {guest.name.trim() || "Nova pessoa"}
+      {people.map((person) => (
+        <option key={person.id} value={!collaborator && person.id === ownerKey ? "seller" : person.id}>
+          {person.roleLabel ? `${person.name} · ${person.roleLabel}` : person.name}
+        </option>
+      ))}
+      {guests.map((guest) => (
+        <option key={guest.id} value={`guest:${guest.id}`}>
+          {guest.name.trim() || "Outra pessoa"}
+        </option>
+      ))}
+      {history.map((contact, index) =>
+        known.has(signerContactKey(contact)) ? null : (
+          <option key={signerContactKey(contact)} value={`history:${index}`}>
+            {contact.name}
           </option>
-        ))}
-        {history.map((contact, index) =>
-          known.has(signerContactKey(contact)) ? null : (
-            <option key={signerContactKey(contact)} value={`history:${index}`}>
-              {contact.name}
-            </option>
-          ),
-        )}
-        {allowNew && <option value="__guest__">Nova pessoa</option>}
-      </optgroup>
+        ),
+      )}
+      {allowNew && <option value="__guest__">Outra pessoa</option>}
     </>
   );
 }

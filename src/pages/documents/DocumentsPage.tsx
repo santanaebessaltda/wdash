@@ -89,7 +89,7 @@ export function DocumentsPage() {
 
   const listedPeople = people.filter((person) => {
     const seller = person.source === "team" && person.roleLabel === "Vendedor";
-    const leader = person.roleLabel === "Gerente" || person.roleLabel === "Gestor";
+    const leader = person.roleLabel === "Gerente" || person.roleLabel === "Gestor" || person.roleLabel === "Usuário da filial";
     if (!seller && !leader) return false;
     const working = leader ? person.active : person.active && person.inErp;
     if (peopleFilter === "active") return working;
@@ -389,7 +389,7 @@ export function DocumentsPage() {
           <FormField label="Pessoa">
             <select className={fieldClass} value={moveSeller} onChange={(event) => setMoveSeller(event.target.value)}>
               <option value="">Selecione</option>
-              <PersonChoices people={signingPeople(people, null)} allStores={allStores} storeName={storeName} group="Equipe" />
+              <PersonChoices people={signingPeople(people, null)} allStores={allStores} storeName={storeName} />
             </select>
           </FormField>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -418,22 +418,19 @@ function PersonChoices({
   people,
   allStores,
   storeName,
-  group,
 }: {
   people: PersonRow[];
   allStores: boolean;
   storeName: Map<string, string>;
-  group: string;
 }) {
-  if (people.length === 0) return null;
   return (
-    <optgroup label={group}>
+    <>
       {people.map((person) => (
         <option key={person.id} value={person.id}>
           {allStores && person.roleLabel === "Vendedor" ? `${person.name} · ${person.roleLabel} · ${storeName.get(person.storeId) ?? ""}` : `${person.name} · ${person.roleLabel}`}
         </option>
       ))}
-    </optgroup>
+    </>
   );
 }
 

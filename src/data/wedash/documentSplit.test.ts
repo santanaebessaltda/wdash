@@ -588,8 +588,14 @@ describe("signingPeople", () => {
       identityId: "id-romeu",
     };
     const gestorNorte = { ...gestorCentro, id: "user:id-romeu:norte", storeId: "norte" };
-    const list = signingPeople([centro, cashier, inactive, managerCentro, managerNorte, gestorCentro, gestorNorte], null);
-    expect(list.map((item) => `${item.name} · ${item.roleLabel}`)).toEqual(["Ana Paula · Gerente", "Maria Silva · Vendedor", "Romeu Fernandes · Gestor"]);
+    const branchUser = person("seller-filial", "centro", "Camila Rocha", "Usuário da filial", null, null);
+    const list = signingPeople([centro, cashier, inactive, managerCentro, managerNorte, gestorCentro, gestorNorte, branchUser], null);
+    expect(list.map((item) => `${item.name} · ${item.roleLabel}`)).toEqual([
+      "Ana Paula · Gerente",
+      "Camila Rocha · Usuário da filial",
+      "Maria Silva · Vendedor",
+      "Romeu Fernandes · Gestor",
+    ]);
   });
 
   it("limits the list to the document branch", () => {

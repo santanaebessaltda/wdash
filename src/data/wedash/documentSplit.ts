@@ -231,7 +231,7 @@ function isActiveSeller(person: DocumentPerson): boolean {
 }
 
 function isLeader(person: DocumentPerson): boolean {
-  return person.roleLabel === "Gerente" || person.roleLabel === "Gestor";
+  return person.roleLabel === "Gerente" || person.roleLabel === "Gestor" || person.roleLabel === "Usuário da filial";
 }
 
 function personIsOn(person: DocumentPerson): boolean {
@@ -239,7 +239,7 @@ function personIsOn(person: DocumentPerson): boolean {
 }
 
 /**
- * Vendedores e, na mesma lista, gerente e gestor.
+ * Vendedores, gerente, gestor e o usuário da filial, na mesma lista.
  * No seletor, gerente e gestor aparecem uma vez. Na pasta, `collapseBranches` falso mantém a pessoa em cada filial.
  */
 export function signingPeople(

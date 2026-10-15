@@ -1,5 +1,5 @@
 import { getSupabase } from "@/lib/supabase";
-import { branchRoleLabel } from "./stores";
+import { branchRoleLabel, isBranchUser } from "./stores";
 import { DOCUMENT_COPY, parsePersonRef, signerHistory, type DocumentPerson, type SignerContact } from "./documentSplit";
 
 export type DocumentRow = {
@@ -102,18 +102,20 @@ export async function loadDocuments(tenantId: string, storeId: string | null): P
   const [batches, documents, people, stores, sentExtras] = await Promise.all([
     sb.from("document_batch").select("id, store_id, month, year, category, channel, deadline, created_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }),
     sb.from("employee_document").select("id, batch_id, store_id, seller_id, identity_id, status, file_name, error, envelope_id, size_bytes, page_count, created_at, sent_at, extra_signer").eq("tenant_id", tenantId).is("removed_at", null).order("created_at"),
-    sb.from("store_seller").select("id, store_id, name, cpf, email, whatsapp, active, in_erp, erp_role, membership_id").eq("tenant_id", tenantId).order("name").limit(2000),
-    sb.from("store").select("id, name").eq("tenant_id", tenantId).order("name"),
+    sb.from("store_seller").select("id, store_id, name, cpf, email, whatsapp, active, in_erp, erp_role, membership_id, code").eq("tenant_id", tenantId).order("name").limit(2000),
+    sb.from("store").select("id, name, code, millennium_store_id").eq("tenant_id", tenantId).order("name"),
     sb.from("employee_document").select("extra_signer, sent_at").eq("tenant_id", tenantId).is("removed_at", null).not("envelope_id", "is", null).order("sent_at", { ascending: false }).limit(80),
   ]);
   const inStore = (id: string | null) => !storeId || id === storeId;
+  const storeRows = ((stores.data ?? []) as { id: string; name: string; code: string | null; millennium_store_id: number | null }[]).filter((row) => inStore(row.id));
+  const branches = new Map(storeRows.map((row) => [row.id, branchOf(row)]));
   return {
     batches: ((batches.data ?? []) as Record<string, unknown>[])
       .filter((row) => inStore(row.store_id as string | null))
       .map(mapBatch),
     documents: ((documents.data ?? []) as Record<string, unknown>[]).filter((row) => inStore((row.store_id as string | null) ?? storeId)).map(mapDoc),
-    people: ((people.data ?? []) as Record<string, unknown>[]).filter((row) => inStore(row.store_id as string)).map(mapPerson),
-    stores: ((stores.data ?? []) as { id: string; name: string }[]).filter((row) => inStore(row.id)),
+    people: ((people.data ?? []) as Record<string, unknown>[]).filter((row) => inStore(row.store_id as string)).map((row) => mapPerson(row, branches.get(String(row.store_id)) ?? null)),
+    stores: storeRows.map((row) => ({ id: row.id, name: row.name })),
     history: signerHistory(
       ((sentExtras.data ?? []) as { extra_signer: unknown; sent_at: string | null }[]).map((row) => ({
         sentAt: row.sent_at,
@@ -155,7 +157,16 @@ function mapDoc(row: Record<string, unknown>): DocumentRow {
   };
 }
 
-function mapPerson(row: Record<string, unknown>): PersonRow {
+function branchOf(row: { code: string | null; millennium_store_id: number | null }): { branchCode: string; millenniumBranch: number } | null {
+  if (row.millennium_store_id == null) return null;
+  const millenniumBranch = Number(row.millennium_store_id);
+  if (!Number.isFinite(millenniumBranch)) return null;
+  return { branchCode: row.code || String(millenniumBranch).padStart(5, "0"), millenniumBranch };
+}
+
+function mapPerson(row: Record<string, unknown>, branch: { branchCode: string; millenniumBranch: number } | null): PersonRow {
+  const role = (row.erp_role as string | null) ?? null;
+  const code = (row.code as string | null) ?? null;
   return {
     id: String(row.id),
     storeId: String(row.store_id),
@@ -166,7 +177,7 @@ function mapPerson(row: Record<string, unknown>): PersonRow {
     active: row.active !== false,
     inErp: row.in_erp !== false,
     source: "team",
-    roleLabel: branchRoleLabel((row.erp_role as string | null) ?? null),
+    roleLabel: branch && isBranchUser(code, branch) ? "Usuário da filial" : branchRoleLabel(role),
     identityId: null,
     membershipId: (row.membership_id as string | null) ?? null,
   };
