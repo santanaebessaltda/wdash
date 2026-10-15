@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Badge, Button, Card, DataTable, EmptyState, Segmented, Tooltip, type DataTableColumn } from "@/components/ui";
+import { Badge, Button, DataTable, EmptyState, Segmented, type DataTableColumn } from "@/components/ui";
+import { QuickStat } from "@/pages/dashboards/QuickStat";
 import { paths } from "@/router/paths";
 import { folderTitle, monthFolder, resendVisible } from "@/data/wedash/documentSplit";
 import type { BatchRow, DocumentRow, PersonRow } from "@/data/wedash/documentsRepo";
@@ -88,10 +89,17 @@ export function DocumentsPage() {
       {notice && <p className="mb-3 text-[13px] text-bad">{notice}</p>}
       {mode === "home" && (
         <>
-          <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <ThinKpi label="Pendentes" value={pending.length} sub="Aguardando assinatura" tint="var(--warn)" icon="M12 8v4l3 2M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20" />
-            <ThinKpi label="Assinados" value={signed.length} sub="Documentos assinados" tint="var(--ok)" icon="M20 6 9 17l-5-5" />
-            <ThinKpi label="Sem contato" value={missingContact} sub="Colaboradores sem e-mail e WhatsApp" hint="Conta os colaboradores sem nenhum contato disponível para envio." tint="var(--bad)" icon="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8" />
+          <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <QuickStat label="Pendentes" value={String(pending.length)} sub="Aguardando assinatura" tint="warn" icon={<Glyph d="M12 8v4l3 2M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20" />} />
+            <QuickStat label="Assinados" value={String(signed.length)} sub="Documentos assinados" tint="ok" icon={<Glyph d="M20 6 9 17l-5-5" />} />
+            <QuickStat
+              label="Sem contato"
+              value={String(missingContact)}
+              sub="Colaboradores sem e-mail e WhatsApp"
+              tooltip="Conta os colaboradores sem nenhum contato disponível para envio."
+              tint="bad"
+              icon={<Glyph d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8" />}
+            />
           </div>
           <p className="mb-3 text-xs font-bold uppercase tracking-wide text-t2">Atalhos</p>
           <div className="mb-5 grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
@@ -171,29 +179,6 @@ export function DocumentsPage() {
 
 function qty(count: number, singular: string, plural: string) {
   return `${count} ${count === 1 ? singular : plural}`;
-}
-
-function ThinKpi({ label, value, sub, hint, tint, icon }: { label: string; value: number; sub: string; hint?: string; tint: string; icon: string }) {
-  return (
-    <Card className="flex items-center gap-4">
-      <span className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[13px]" style={{ background: `color-mix(in srgb, ${tint} 16%, transparent)`, color: tint }}>
-        <Glyph d={icon} />
-      </span>
-      <div className="min-w-0">
-        <p className="text-xs font-semibold text-t2">
-          {hint ? (
-            <Tooltip label={hint} side="bottom">
-              <span className="cursor-help underline decoration-dotted underline-offset-2">{label}</span>
-            </Tooltip>
-          ) : (
-            label
-          )}
-        </p>
-        <p className="mt-1 text-xl font-extrabold text-t0">{value}</p>
-        <p className="truncate text-[11.5px] text-t2">{sub}</p>
-      </div>
-    </Card>
-  );
 }
 
 function Shortcut({ label, count, onClick }: { label: string; count: string; onClick: () => void }) {
