@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { getDocument, GlobalWorkerOptions, type PDFDocumentLoadingTask, type RenderTask } from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-import { Button, FormField, Modal, Tooltip, WizardCardHeader, WizardNav } from "@/components/ui";
+import { Alert, Button, FormField, Modal, Tooltip, WizardCardHeader, WizardNav } from "@/components/ui";
 import { Spinner } from "@/components/ui/Skeleton";
 import {
   DOCUMENT_COPY,
@@ -249,16 +249,12 @@ function ReviewBody({
       </div>
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div>
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <p className="text-[13px] text-t2">
-              {documentTitle(rows, row, people)} · {period} · {row.pageCount === 1 ? "1 página" : `${row.pageCount} páginas`}
-            </p>
-            <Tooltip label="Clique no documento para adicionar uma assinatura ou rubrica.">
-              <button type="button" aria-label="Ajuda da marcação" className="flex h-7 w-7 items-center justify-center rounded-full border border-line text-[12px] font-bold text-t2 hover:bg-bg-3 hover:text-t0">
-                ?
-              </button>
-            </Tooltip>
-          </div>
+          <p className="mb-2 text-[13px] text-t2">
+            {documentTitle(rows, row, people)} · {period} · {row.pageCount === 1 ? "1 página" : `${row.pageCount} páginas`}
+          </p>
+          {!locked && (
+            <Alert className="mb-3" title="Clique no documento para adicionar uma assinatura ou rubrica." />
+          )}
           <StackedPages
             documentId={row.id}
             pageCount={row.pageCount}

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Breadcrumbs, Button, Card, CardHeader, CardTitle, FormField, Modal, ProgressBar, WizardCardHeader, WizardNav, WizardSteps, useToast } from "@/components/ui";
+import { Breadcrumbs, Button, Card, CardHeader, CardTitle, FormField, Modal, ProgressBar, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
 import { Spinner } from "@/components/ui/Skeleton";
 import { paths } from "@/router/paths";
 import { Icon, icons } from "@/pages/users/Icons";
@@ -81,8 +81,6 @@ export function AttachWizard({
   const [sending, setSending] = useState(false);
   const [confirmSend, setConfirmSend] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
-  const hinted = useRef(false);
-  const { show } = useToast();
   const [signers, setSigners] = useState<{ id: string; name: string; email: string }[]>([]);
 
   useEffect(() => {
@@ -108,12 +106,6 @@ export function AttachWizard({
   useEffect(() => {
     if (step === 1) openAtStart.current = true;
   }, [step]);
-
-  useEffect(() => {
-    if (step !== 2 || hinted.current) return;
-    hinted.current = true;
-    show("Clique no documento para adicionar uma assinatura ou rubrica.");
-  }, [step, show]);
 
   useEffect(() => {
     if (step !== 2 || !activeId) return;
