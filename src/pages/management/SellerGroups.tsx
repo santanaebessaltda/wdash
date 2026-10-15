@@ -256,10 +256,15 @@ export function ManageGroupsModal({
                     {shift.start}–{shift.end} · {sellerCountLabel(counts.get(shift.id) ?? 0)}
                   </p>
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(shift)}>
-                    Editar
-                  </Button>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <button
+                    type="button"
+                    aria-label={`Editar ${shiftName(shift.name)}`}
+                    onClick={() => setEditing(shift)}
+                    className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-line text-acc transition-colors hover:bg-acc-soft"
+                  >
+                    <Icon d={icons.pencil} size={14} />
+                  </button>
                   <button
                     type="button"
                     aria-label={`Excluir ${shiftName(shift.name)}`}
@@ -267,9 +272,9 @@ export function ManageGroupsModal({
                       if ((counts.get(shift.id) ?? 0) > 0) setRemoving(shift);
                       else void remove(shift);
                     }}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-t2 hover:bg-bg-3 hover:text-bad"
+                    className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-line text-bad transition-colors hover:bg-bad-soft"
                   >
-                    <Icon d={icons.trash} size={16} />
+                    <Icon d={icons.trash} size={14} />
                   </button>
                 </div>
               </li>

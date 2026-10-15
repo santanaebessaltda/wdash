@@ -790,9 +790,9 @@ function RemoveButton({
       onClick={onClick}
       disabled={disabled}
       aria-label="Remover"
-      className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-vela-md)] text-t2 transition-colors hover:bg-bad-soft hover:text-bad disabled:pointer-events-none disabled:opacity-40"
+      className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] border border-line text-bad transition-colors hover:bg-bad-soft disabled:pointer-events-none disabled:opacity-40"
     >
-      <Icon d={icons.trash} size={15} />
+      <Icon d={icons.trash} size={14} />
     </button>
   );
 }

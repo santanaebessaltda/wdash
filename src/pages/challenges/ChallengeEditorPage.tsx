@@ -445,9 +445,9 @@ export default function ChallengeEditorPage() {
                     type="button"
                     onClick={() => set({ prizes: form.prizes.slice(0, i) })}
                     aria-label={`Remover ${i + 1}º lugar`}
-                    className="mt-10 grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-vela-md)] text-t2 transition-colors hover:bg-bad-soft hover:text-bad"
+                    className="mt-10 grid h-8 w-8 shrink-0 place-items-center rounded-[9px] border border-line text-bad transition-colors hover:bg-bad-soft"
                   >
-                    <Icon d={icons.trash} size={15} />
+                    <Icon d={icons.trash} size={14} />
                   </button>
                 )}
               </div>

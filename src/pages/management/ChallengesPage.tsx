@@ -305,9 +305,9 @@ function ChallengeCard({
               type="button"
               onClick={action(onCopy)}
               aria-label="Duplicar desafio"
-              className="flex h-7 w-7 items-center justify-center rounded-lg border border-line text-t2 transition-colors hover:border-acc hover:text-acc"
+              className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-line text-acc transition-colors hover:bg-acc-soft"
             >
-              <IconCopy width={12} height={12} />
+              <IconCopy width={14} height={14} />
             </button>
           </Tooltip>
           <Tooltip label="Excluir desafio">
@@ -315,9 +315,9 @@ function ChallengeCard({
               type="button"
               onClick={action(onDelete)}
               aria-label="Excluir desafio"
-              className="flex h-7 w-7 items-center justify-center rounded-lg border border-line text-t2 transition-colors hover:border-bad hover:text-bad"
+              className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-line text-bad transition-colors hover:bg-bad-soft"
             >
-              <IconTrash width={12} height={12} />
+              <IconTrash width={14} height={14} />
             </button>
           </Tooltip>
         </div>
