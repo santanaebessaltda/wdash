@@ -54,7 +54,7 @@ function storedMarks(value: unknown): SignatureMark[] {
     const x = Number(mark.x);
     const y = Number(mark.y);
     if (!Number.isInteger(pageNumber) || !Number.isFinite(x) || !Number.isFinite(y)) return [];
-    return [{ pageNumber, x, y, element: "SIGNATURE" as const }];
+    return [{ pageNumber, x, y, element: mark.element === "RUBRIC" ? ("RUBRIC" as const) : ("SIGNATURE" as const) }];
   });
 }
 
@@ -71,6 +71,17 @@ function storedExtra(value: unknown): ExtraSigner | null {
     whatsapp: typeof raw.whatsapp === "string" ? raw.whatsapp : null,
     marks: storedMarks(raw.marks),
   };
+}
+
+function storedExtras(value: unknown): ExtraSigner[] | null {
+  if (value == null) return [];
+  if (Array.isArray(value)) {
+    const parsed = value.map((item) => storedExtra(item));
+    if (parsed.some((item) => !item)) return null;
+    return parsed.filter((item): item is ExtraSigner => Boolean(item));
+  }
+  const one = storedExtra(value);
+  return one ? [one] : null;
 }
 
 type Body = Record<string, unknown>;
@@ -342,9 +353,15 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
       const patch: Record<string, unknown> = { channel, marks: storedMarks(row.marks) };
       if ("deadline" in row) patch.deadline = typeof row.deadline === "string" && row.deadline ? row.deadline.slice(0, 10) : null;
       if ("reminder" in row) patch.reminder = asReminder(row.reminder);
-      if ("extraSigner" in row) {
-        const provided = row.extraSigner;
-        patch.extra_signer = provided == null ? null : (storedExtra(provided) ?? provided);
+      if ("extraSigner" in row || "extraSigners" in row) {
+        const provided = "extraSigners" in row ? row.extraSigners : row.extraSigner;
+        if (provided == null) patch.extra_signer = null;
+        else if (Array.isArray(provided)) {
+          patch.extra_signer = provided.flatMap((item) => {
+            const parsed = storedExtra(item);
+            return parsed ? [parsed] : [];
+          });
+        } else patch.extra_signer = storedExtra(provided) ?? provided;
       }
       await admin.from("employee_document").update(patch).eq("id", id).eq("batch_id", batch.id);
     }
@@ -362,8 +379,8 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
     const marks = savedMarks.length > 0 ? savedMarks : [defaultSignatureMark(pageCount)];
     const docDeadline = typeof doc.deadline === "string" && doc.deadline ? String(doc.deadline).slice(0, 10) : deadline;
     const docReminder = asReminder(doc.reminder) ?? reminder;
-    const parsedDocExtra = storedExtra(doc.extra_signer);
-    const extraInvalid = doc.extra_signer != null && !parsedDocExtra ? "Informe o nome do signatário." : null;
+    const parsedDocExtra = storedExtras(doc.extra_signer);
+    const extraInvalid = doc.extra_signer != null && parsedDocExtra == null ? "Informe o nome do signatário." : null;
     const block = confirmBlock({ deadline: docDeadline, hasToken: Boolean(token), sizeBytes: doc.size_bytes as number });
     let seller: { name: string; email: string | null; whatsapp: string | null; cpf: string | null } | null = null;
     if (doc.seller_id) {
@@ -373,12 +390,17 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
     const missingChannel = channel ? null : "Escolha WhatsApp ou e-mail.";
     const contactBlock = channel ? channelBlock(channel, { email: seller?.email ?? null, whatsapp: seller?.whatsapp ?? null }) : null;
     const placeBlock = savedMarks.length > 0 ? placementWarning(savedMarks, pageCount) : null;
-    const chosenExtra = doc.extra_signer != null ? parsedDocExtra : extra;
-    const extraForDoc = chosenExtra
-      ? { ...chosenExtra, marks: chosenExtra.marks.length > 0 ? chosenExtra.marks : [defaultSignatureMark(pageCount)] }
-      : null;
-    const extraContact = extraForDoc ? channelBlock(extraForDoc.channel, { email: extraForDoc.email, whatsapp: extraForDoc.whatsapp }) : null;
-    const extraPlace = chosenExtra && chosenExtra.marks.length > 0 ? placementWarning(chosenExtra.marks, pageCount) : null;
+    const chosenExtras = doc.extra_signer != null ? (parsedDocExtra ?? []) : extra ? [extra] : [];
+    const extraForDocs = chosenExtras.map((item) => ({
+      ...item,
+      marks: item.marks.length > 0 ? item.marks : [defaultSignatureMark(pageCount)],
+    }));
+    const extraContact = extraForDocs
+      .map((item) => channelBlock(item.channel, { email: item.email, whatsapp: item.whatsapp }))
+      .find((item) => item) ?? null;
+    const extraPlace = chosenExtras
+      .map((item) => (item.marks.length > 0 ? placementWarning(item.marks, pageCount) : null))
+      .find((item) => item) ?? null;
     const rowBlock = block ?? missingChannel ?? (doc.seller_id ? contactBlock : null) ?? placeBlock ?? extraInvalid ?? extraContact ?? extraPlace;
     if (!shouldSend({ envelopeId: (doc.envelope_id as string | null) ?? null, sellerId: (doc.seller_id as string | null) ?? null, block: rowBlock })) {
       if (rowBlock && !doc.envelope_id) await admin.from("employee_document").update({ error: rowBlock }).eq("id", doc.id);
@@ -394,7 +416,7 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
     const bytes = new Uint8Array(await file.data.arrayBuffer());
     const sentName = deliveryFileName(doc.file_name as string, seller.name, Number(batch.month), Number(batch.year));
     const created = await assinaCreateEnvelope(token, bytes, sentName, {
-      signatures: envelopeSignatures({ seller, channel, marks, pageCount, extra: extraForDoc }),
+      signatures: envelopeSignatures({ seller, channel, marks, pageCount, extras: extraForDocs }),
       documentSendConfig: {
         documentName: sentName,
         customEmailMessage: "",

@@ -11,10 +11,12 @@ import {
   DOCUMENT_COPY,
   DOCUMENT_LIMITS,
   customDocumentName,
-  markAfterDrop,
+  extraSignersFrom,
+  fieldAfterDrop,
   monthFolder,
   remainingPages,
   resolveDrafts,
+  sellerMarks,
   type DocumentDraft,
 } from "@/data/wedash/documentSplit";
 import {
@@ -29,6 +31,7 @@ import {
 } from "@/data/wedash/documentsRepo";
 import { formatBytes } from "./frame";
 import { DocumentReview } from "./DocumentReview";
+import { fetchSystemUsers } from "@/data/wedash/systemUsers";
 
 const controlClass =
   "h-[42px] w-full rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3.5 text-[13px] text-t0 outline-none transition-colors focus:border-acc";
@@ -67,6 +70,18 @@ export function AttachWizard({
   const [progress, setProgress] = useState<PrepareStatus>({ phase: "upload", index: 1, total: 1, name: "PDF" });
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [signers, setSigners] = useState<{ id: string; name: string; email: string }[]>([]);
+
+  useEffect(() => {
+    void fetchSystemUsers().then((result) => {
+      if (!result.ok) return;
+      setSigners(
+        result.data.members
+          .filter((member) => member.status === "ACTIVE" && member.email)
+          .map((member) => ({ id: member.membershipId, name: member.name || member.email, email: member.email })),
+      );
+    });
+  }, []);
 
   const rows = documents.filter((doc) => doc.batchId === batchId);
   const rowKey = rows.map((row) => `${row.id}:${row.pageCount}`).join("|");
@@ -141,10 +156,10 @@ export function AttachWizard({
         documents: rows.map((row, index) => ({
           id: row.id,
           channel: resolved[index].channel,
-          marks: [resolved[index].mark],
+          marks: sellerMarks(resolved[index].fields),
           deadline: resolved[index].deadline,
           reminder: resolved[index].reminder,
-          extraSigner: resolved[index].extra,
+          extraSigners: extraSignersFrom(resolved[index].fields, signers, row.pageCount),
         })),
         extraSigner: null,
       });
@@ -206,6 +221,7 @@ export function AttachWizard({
             rows={rows}
             people={people}
             drafts={drafts}
+            signers={signers}
             activeId={activeId}
             refused={refused}
             error={error}
@@ -245,10 +261,7 @@ export function AttachWizard({
                   ...current,
                   [documentId]: {
                     ...draft,
-                    mark: markAfterDrop(draft.mark, pageNumber, nextCount),
-                    extra: draft.extra
-                      ? { ...draft.extra, marks: draft.extra.marks.map((mark) => markAfterDrop(mark, pageNumber, nextCount)) }
-                      : null,
+                    fields: draft.fields.map((field) => fieldAfterDrop(field, pageNumber, nextCount)),
                   },
                 };
               });

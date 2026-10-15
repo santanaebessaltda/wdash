@@ -288,6 +288,6 @@ O navegador desenha a página com `pdfjs-dist` só nesse passo. O repo não tem 
 | Concern | Location | Impact | Mitigation |
 | --- | --- | --- | --- |
 | `save-contact` exige CPF e regrava e-mail e WhatsApp juntos | `supabase/functions/documents/index.ts:249` | Preencher só o WhatsApp apaga o e-mail ou recusa a ficha sem CPF | O save desta etapa grava só o campo visível e o CPF quando ele foi pedido. Campo oculto não é enviado. |
-| Nome do `element` da rubrica | coleção do Assina AI não relida nesta sessão | Um valor inventado faz o create falhar | A rubrica fica na tela desligada até o nome constar na coleção. Sem isso, o envelope sai só com `SIGNATURE`. |
+| Nome do `element` da rubrica | coleção do Assina AI não confirmou o valor | Um valor recusado faz o create falhar | A tela envia `RUBRIC` ao lado de `SIGNATURE`. Se o Assina recusar o envelope, o nome troca neste ponto só. |
 | `recipientIdOf` lê a primeira signature | `supabase/functions/_shared/assinaApi.ts:68` | O reenvio pode pegar o extra se a API devolver o extra primeiro | Gravar o id do destinatário com `routingOrder` 1. O reenvio segue nesse id. |
 | PDF grande no navegador | `pdfjs` no passo Destinatários | Várias páginas pesam se forem desenhadas juntas | Desenha só as páginas do documento aberto, uma embaixo da outra, não os cinco PDFs do lote. |

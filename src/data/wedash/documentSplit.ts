@@ -249,12 +249,17 @@ export function signaturePositions(pageCount: number): Array<{ pageNumber: numbe
 
 export type SendChannel = "EMAIL" | "WHATSAPP";
 
+export type MarkElement = "SIGNATURE" | "RUBRIC";
+
 export type SignatureMark = {
   pageNumber: number;
   x: number;
   y: number;
-  element: "SIGNATURE";
+  element: MarkElement;
 };
+
+/** `seller` é o colaborador do documento. `user:` é alguém da lista de usuários. */
+export type FieldMark = SignatureMark & { id: string; signerId: string };
 
 export type ExtraSigner = {
   name: string;
@@ -350,10 +355,9 @@ export type Reminder = "EVERY_DAY" | "EVERY_3_DAYS" | "EVERY_WEEK" | "NEVER";
 
 export type DocumentDraft = {
   channel: SendChannel;
-  mark: SignatureMark;
+  fields: FieldMark[];
   deadline: string;
   reminder: Reminder;
-  extra: ExtraSigner | null;
 };
 
 export function asReminder(value: unknown): Reminder | null {
@@ -365,33 +369,35 @@ export function asReminder(value: unknown): Reminder | null {
 export function clampMark(mark: SignatureMark, pageCount: number): SignatureMark {
   const pages = Math.max(1, Math.floor(pageCount) || 1);
   const pageNumber = Math.min(pages, Math.max(1, Math.floor(mark.pageNumber) || 1));
-  return { pageNumber, x: mark.x, y: mark.y, element: "SIGNATURE" };
+  return { pageNumber, x: mark.x, y: mark.y, element: mark.element === "RUBRIC" ? "RUBRIC" : "SIGNATURE" };
 }
 
 export function defaultDraft(pageCount: number): DocumentDraft {
   return {
     channel: "WHATSAPP",
-    mark: defaultSignatureMark(pageCount),
+    fields: [{ ...defaultSignatureMark(pageCount), id: "seller-mark", signerId: "seller" }],
     deadline: "",
     reminder: "EVERY_3_DAYS",
-    extra: null,
   };
 }
 
-/** Prazo, lembrete, signatário extra e posição passam para o documento seguinte. O canal não. */
+export function fieldAfterDrop(field: FieldMark, removedPage: number, nextPageCount: number): FieldMark {
+  const next = markAfterDrop(field, removedPage, nextPageCount);
+  return { ...field, pageNumber: next.pageNumber, x: next.x, y: next.y, element: next.element };
+}
+
+function clampField(field: FieldMark, pageCount: number): FieldMark {
+  return { ...clampMark(field, pageCount), id: field.id, signerId: field.signerId };
+}
+
+/** Prazo, lembrete, marcas e signatários de usuário passam para o documento seguinte. O canal não. */
 export function carryDraft(previous: DocumentDraft, pageCount: number): DocumentDraft {
-  const extraMark = previous.extra?.marks[0];
+  const fields = previous.fields.length > 0 ? previous.fields : defaultDraft(pageCount).fields;
   return {
     channel: "WHATSAPP",
-    mark: clampMark(previous.mark, pageCount),
+    fields: fields.map((field) => clampField(field, pageCount)),
     deadline: previous.deadline,
     reminder: previous.reminder,
-    extra: previous.extra
-      ? {
-          ...previous.extra,
-          marks: [clampMark(extraMark ?? { ...defaultSignatureMark(pageCount), y: 72 }, pageCount)],
-        }
-      : null,
   };
 }
 
@@ -404,39 +410,60 @@ export function resolveDrafts(
   return rows.map((row) => {
     const own = drafts[row.id];
     const next = own
-      ? {
-          ...own,
-          mark: clampMark(own.mark, row.pageCount),
-          extra: own.extra
-            ? {
-                ...own.extra,
-                marks: [clampMark(own.extra.marks[0] ?? { ...defaultSignatureMark(row.pageCount), y: 72 }, row.pageCount)],
-              }
-            : null,
-        }
+      ? { ...own, fields: (own.fields.length > 0 ? own.fields : defaultDraft(row.pageCount).fields).map((field) => clampField(field, row.pageCount)) }
       : carryDraft(last, row.pageCount);
     last = next;
     return next;
   });
 }
 
+export function sellerMarks(fields: FieldMark[]): FieldMark[] {
+  return fields.filter((field) => field.signerId === "seller");
+}
+
+/** Cada usuário marcado vira um signatário extra, no e-mail da conta. */
+export function extraSignersFrom(
+  fields: FieldMark[],
+  signers: { id: string; name: string; email: string | null }[],
+  pageCount: number,
+): ExtraSigner[] {
+  const keys = [...new Set(fields.map((field) => field.signerId).filter((id) => id.startsWith("user:")))];
+  const extras: ExtraSigner[] = [];
+  for (const key of keys) {
+    const signer = signers.find((item) => item.id === key.slice("user:".length));
+    const marks = applicableMarks(
+      fields.filter((field) => field.signerId === key),
+      pageCount,
+    );
+    if (!signer?.name.trim() || !signer.email || marks.length === 0) continue;
+    extras.push({ name: signer.name.trim(), channel: "EMAIL", email: signer.email, whatsapp: null, marks });
+  }
+  return extras;
+}
+
 export function documentIssue(
   person: { cpf: string | null; email: string | null; whatsapp: string | null } | null,
   draft: DocumentDraft,
   pageCount: number,
+  signers: { id: string; name: string; email: string | null }[] = [],
 ): string | null {
   if (!person) return "Escolha o colaborador.";
   const ask = contactFieldsToAsk(person, draft.channel);
   if (ask.cpf || ask.email || ask.whatsapp) return "Falta contato no cadastro.";
-  const place = placementWarning([draft.mark], pageCount);
-  if (place) return place;
-  if (!draft.extra) return null;
-  if (!draft.extra.name.trim()) return "Informe o nome do signatário.";
-  return channelBlock(draft.extra.channel, { email: draft.extra.email, whatsapp: draft.extra.whatsapp });
+  const place = placementWarning(sellerMarks(draft.fields), pageCount);
+  if (place) return place ?? "Marque a assinatura do colaborador.";
+  for (const field of draft.fields) {
+    if (!field.signerId.startsWith("user:")) continue;
+    const signer = signers.find((item) => item.id === field.signerId.slice("user:".length));
+    if (!signer?.name.trim() || !signer.email) return "O signatário adicional precisa ser um usuário com e-mail.";
+  }
+  return null;
 }
 
 export function applicableMarks(marks: SignatureMark[], pageCount: number): SignatureMark[] {
-  return marks.filter((mark) => mark.element === "SIGNATURE" && mark.pageNumber >= 1 && mark.pageNumber <= pageCount);
+  return marks.filter(
+    (mark) => (mark.element === "SIGNATURE" || mark.element === "RUBRIC") && mark.pageNumber >= 1 && mark.pageNumber <= pageCount,
+  );
 }
 
 export function placementWarning(marks: SignatureMark[], pageCount: number): string | null {
@@ -464,25 +491,29 @@ function recipientOf(
   };
 }
 
-/** Colaborador na ordem 1. Signatário extra, quando tem nome, na ordem 2. */
+/** Colaborador na ordem 1. Cada signatário extra, quando tem nome, nas ordens seguintes. */
 export function envelopeSignatures(input: {
   seller: { name: string; cpf: string | null; email: string | null; whatsapp: string | null };
   channel: SendChannel;
   marks: SignatureMark[];
   pageCount: number;
-  extra: ExtraSigner | null;
+  extras?: ExtraSigner[] | null;
+  extra?: ExtraSigner | null;
 }): Array<{ recipient: EnvelopeRecipient }> {
   const signatures = [recipientOf(input.seller, input.channel, applicableMarks(input.marks, input.pageCount), 1)];
-  const extra = input.extra;
-  if (extra && present(extra.name)) {
+  const extras = input.extras ?? (input.extra ? [input.extra] : []);
+  let order = 2;
+  for (const extra of extras) {
+    if (!present(extra.name)) continue;
     signatures.push(
       recipientOf(
         { name: extra.name.trim(), cpf: null, email: extra.email, whatsapp: extra.whatsapp },
         extra.channel,
         applicableMarks(extra.marks, input.pageCount),
-        2,
+        order,
       ),
     );
+    order += 1;
   }
   return signatures;
 }

@@ -390,28 +390,22 @@ describe("envelope recipients", () => {
 describe("carryDraft", () => {
   const previous = {
     channel: "EMAIL" as const,
-    mark: { pageNumber: 4, x: 12, y: 30, element: "SIGNATURE" as const },
+    fields: [
+      { id: "seller-mark", pageNumber: 4, x: 12, y: 30, element: "SIGNATURE" as const, signerId: "seller" },
+      { id: "user-mark", pageNumber: 4, x: 12, y: 70, element: "RUBRIC" as const, signerId: "user:bruno" },
+    ],
     deadline: "2026-11-01",
     reminder: "EVERY_WEEK" as const,
-    extra: {
-      name: "Bruno",
-      channel: "WHATSAPP" as const,
-      email: null,
-      whatsapp: "21988887777",
-      marks: [{ pageNumber: 4, x: 12, y: 70, element: "SIGNATURE" as const }],
-    },
   };
 
-  it("carries deadline, reminder, extra signer and position onto the pages the next document has", () => {
+  it("carries deadline, reminder, user marks and position onto the pages the next document has", () => {
     const next = carryDraft(previous, 2);
     expect(next.channel).toBe("WHATSAPP");
     expect(next.deadline).toBe("2026-11-01");
     expect(next.reminder).toBe("EVERY_WEEK");
-    expect(next.mark).toEqual({ pageNumber: 2, x: 12, y: 30, element: "SIGNATURE" });
-    expect(next.extra?.name).toBe("Bruno");
-    expect(next.extra?.channel).toBe("WHATSAPP");
-    expect(next.extra?.marks[0]).toEqual({ pageNumber: 2, x: 12, y: 70, element: "SIGNATURE" });
-    expect(next.extra).not.toBe(previous.extra);
+    expect(next.fields[0]).toEqual({ id: "seller-mark", pageNumber: 2, x: 12, y: 30, element: "SIGNATURE", signerId: "seller" });
+    expect(next.fields[1]).toMatchObject({ pageNumber: 2, element: "RUBRIC", signerId: "user:bruno" });
+    expect(next.fields).not.toBe(previous.fields);
   });
 
   it("keeps a document already set and carries that version to the one after it", () => {
@@ -425,22 +419,25 @@ describe("carryDraft", () => {
       { a: previous, b: saved },
     );
     expect(resolved[0].deadline).toBe("2026-11-01");
-    expect(resolved[1]).toMatchObject({ deadline: "2026-12-01", channel: "EMAIL", extra: null });
+    expect(resolved[0].fields).toHaveLength(2);
+    expect(resolved[1]).toMatchObject({ deadline: "2026-12-01", channel: "EMAIL" });
+    expect(resolved[1].fields.every((field) => field.signerId === "seller")).toBe(true);
     expect(resolved[2].deadline).toBe("2026-12-01");
     expect(resolved[2].channel).toBe("WHATSAPP");
-    expect(resolved[2].extra).toBeNull();
+    expect(resolved[2].fields.every((field) => field.signerId === "seller")).toBe(true);
   });
 
-  it("asks for a collaborator, a missing contact, or the extra signer name before send", () => {
+  it("asks for a collaborator, a missing contact, or a user with e-mail before send", () => {
     const draft = defaultDraft(1);
     expect(documentIssue(null, draft, 1)).toBe("Escolha o colaborador.");
     expect(documentIssue({ cpf: VALID_DIGITS, email: null, whatsapp: null }, draft, 1)).toBe("Falta contato no cadastro.");
     expect(
       documentIssue(
         { cpf: VALID_DIGITS, email: "ana@loja.com", whatsapp: "11987654321" },
-        { ...draft, extra: { name: "  ", channel: "EMAIL", email: null, whatsapp: null, marks: [draft.mark] } },
+        { ...draft, fields: [...draft.fields, { id: "extra", pageNumber: 1, x: 20, y: 20, element: "SIGNATURE", signerId: "user:missing" }] },
         1,
+        [],
       ),
-    ).toBe("Informe o nome do signatário.");
+    ).toBe("O signatário adicional precisa ser um usuário com e-mail.");
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { getDocument, GlobalWorkerOptions, type PDFDocumentLoadingTask, type RenderTask } from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { Button, FormField, WizardCardHeader, WizardNav } from "@/components/ui";
@@ -10,6 +10,7 @@ import {
   folderTitle,
   resolveDrafts,
   type DocumentDraft,
+  type FieldMark,
   type SendChannel,
   type SignatureMark,
 } from "@/data/wedash/documentSplit";
@@ -23,17 +24,11 @@ GlobalWorkerOptions.workerSrc = pdfWorker;
 const controlClass =
   "h-[42px] w-full rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3.5 text-[13px] text-t0 outline-none transition-colors focus:border-acc";
 
-function pointOn(event: PointerEvent<HTMLDivElement>, pageNumber: number): SignatureMark {
-  const box = event.currentTarget.getBoundingClientRect();
-  const x = Math.min(100, Math.max(0, ((event.clientX - box.left) / box.width) * 100));
-  const y = Math.min(100, Math.max(0, ((event.clientY - box.top) / box.height) * 100));
-  return { pageNumber, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, element: "SIGNATURE" };
-}
-
 export function DocumentReview({
   rows,
   people,
   drafts,
+  signers,
   activeId,
   refused,
   error,
@@ -49,6 +44,7 @@ export function DocumentReview({
   rows: DocumentRow[];
   people: PersonRow[];
   drafts: Record<string, DocumentDraft | undefined>;
+  signers: { id: string; name: string; email: string }[];
   activeId: string;
   refused: { name: string; message: string }[];
   error: string | null;
@@ -65,7 +61,7 @@ export function DocumentReview({
     rows.map((row) => ({ id: row.id, pageCount: row.pageCount })),
     drafts,
   );
-  const ready = rows.filter((row, index) => !row.envelopeId && !documentIssue(people.find((item) => item.id === row.sellerId) ?? null, resolved[index], row.pageCount)).length;
+  const ready = rows.filter((row, index) => !row.envelopeId && !documentIssue(people.find((item) => item.id === row.sellerId) ?? null, resolved[index], row.pageCount, signers)).length;
   const openRows = rows.filter((row) => !row.envelopeId).length;
   const index = Math.max(0, rows.findIndex((row) => row.id === activeId));
   const row = rows[index];
@@ -75,7 +71,7 @@ export function DocumentReview({
     <>
       <WizardCardHeader
         title="Destinatários"
-        subtitle="A página mostra quem recebe. Prazo, lembrete, signatário extra e posição passam para o documento seguinte."
+        subtitle="A página mostra quem recebe. Clique nela para marcar assinatura ou rubrica. O documento seguinte repete o último prazo, lembrete e as marcas."
       />
       {rows.length === 0 ? (
         <div className="mt-4">
@@ -83,10 +79,11 @@ export function DocumentReview({
           <p className="mt-1 text-sm text-t2">Revise os arquivos recusados ou volte e anexe outro PDF.</p>
         </div>
       ) : row && draft ? (
-        <ReviewBody
+          <ReviewBody
           row={row}
           draft={draft}
           people={people}
+          signers={signers}
           index={index}
           total={rows.length}
           rows={rows}
@@ -126,6 +123,7 @@ function ReviewBody({
   row,
   draft,
   people,
+  signers,
   index,
   total,
   rows,
@@ -139,6 +137,7 @@ function ReviewBody({
   row: DocumentRow;
   draft: DocumentDraft;
   people: PersonRow[];
+  signers: { id: string; name: string; email: string }[];
   index: number;
   total: number;
   rows: DocumentRow[];
@@ -150,14 +149,14 @@ function ReviewBody({
   onSave: (input: { sellerId: string; cpf?: string; email?: string; whatsapp?: string }) => Promise<void>;
 }) {
   const person = people.find((item) => item.id === row.sellerId) ?? null;
-  const issue = row.envelopeId ? null : documentIssue(person, draft, row.pageCount);
-  const [placing, setPlacing] = useState<"person" | "extra">("person");
+  const issue = row.envelopeId ? null : documentIssue(person, draft, row.pageCount, signers);
   const previous = index > 0 ? rows[index - 1] : null;
   const next = index < total - 1 ? rows[index + 1] : null;
+  const locked = Boolean(row.envelopeId) || sending;
 
-  useEffect(() => {
-    if (!draft.extra) setPlacing("person");
-  }, [draft.extra]);
+  function changeFields(fields: FieldMark[]) {
+    onDraft({ ...draft, fields });
+  }
 
   return (
     <div className="mt-4">
@@ -192,13 +191,11 @@ function ReviewBody({
           <StackedPages
             documentId={row.id}
             pageCount={row.pageCount}
-            mark={draft.mark}
-            extraMark={draft.extra?.marks[0] ?? null}
-            disabled={Boolean(row.envelopeId) || sending}
-            onPlace={(mark) => {
-              if (placing === "extra" && draft.extra) onDraft({ ...draft, extra: { ...draft.extra, marks: [mark] } });
-              else onDraft({ ...draft, mark });
-            }}
+            fields={draft.fields}
+            personName={person?.name ?? "Colaborador"}
+            signers={signers}
+            disabled={locked}
+            onChange={changeFields}
             onDrop={(pageNumber) => onDrop(row.id, pageNumber)}
           />
         </div>
@@ -206,7 +203,7 @@ function ReviewBody({
           {row.envelopeId ? (
             <p className="text-[13px] text-t2">{STATUS_LABEL[row.status]}</p>
           ) : (
-            <DraftFields person={person} draft={draft} people={people} row={row} issue={issue} onDraft={onDraft} onAssign={onAssign} onSave={onSave} onPlacing={setPlacing} placing={placing} />
+            <DraftFields person={person} draft={draft} people={people} row={row} issue={issue} onDraft={onDraft} onAssign={onAssign} onSave={onSave} />
           )}
         </aside>
       </div>
@@ -220,22 +217,18 @@ function DraftFields({
   people,
   row,
   issue,
-  placing,
   onDraft,
   onAssign,
   onSave,
-  onPlacing,
 }: {
   person: PersonRow | null;
   draft: DocumentDraft;
   people: PersonRow[];
   row: DocumentRow;
   issue: string | null;
-  placing: "person" | "extra";
   onDraft: (draft: DocumentDraft) => void;
   onAssign: (documentId: string, sellerId: string) => Promise<void>;
   onSave: (input: { sellerId: string; cpf?: string; email?: string; whatsapp?: string }) => Promise<void>;
-  onPlacing: (placing: "person" | "extra") => void;
 }) {
   const ask = person ? contactFieldsToAsk(person, draft.channel) : null;
   return (
@@ -260,68 +253,7 @@ function DraftFields({
       {person && ask && (ask.cpf || ask.email || ask.whatsapp) && (
         <ContactForm key={`${person.id}:${draft.channel}`} personId={person.id} ask={ask} onSave={onSave} />
       )}
-      <label className="flex items-center gap-2 text-[13px] font-bold text-t0">
-        <input
-          type="checkbox"
-          checked={Boolean(draft.extra)}
-          onChange={(event) => {
-            if (!event.target.checked) {
-              onDraft({ ...draft, extra: null });
-              return;
-            }
-            onDraft({
-              ...draft,
-              extra: {
-                name: "",
-                channel: "EMAIL",
-                email: null,
-                whatsapp: null,
-                marks: [{ ...draft.mark, y: 72 }],
-              },
-            });
-            onPlacing("extra");
-          }}
-        />
-        Signatário extra
-      </label>
-      {draft.extra && (
-        <div className="grid gap-2">
-          <FormField label="Nome">
-            <input className={controlClass} value={draft.extra.name} onChange={(event) => onDraft({ ...draft, extra: { ...draft.extra!, name: event.target.value } })} />
-          </FormField>
-          <FormField label="Canal do signatário">
-            <ChannelSelect
-              value={draft.extra.channel}
-              onChange={(channel) => onDraft({ ...draft, extra: { ...draft.extra!, channel } })}
-            />
-          </FormField>
-          {draft.extra.channel === "EMAIL" ? (
-            <FormField label="E-mail">
-              <input
-                className={controlClass}
-                value={draft.extra.email ?? ""}
-                onChange={(event) => onDraft({ ...draft, extra: { ...draft.extra!, email: event.target.value || null } })}
-              />
-            </FormField>
-          ) : (
-            <FormField label="WhatsApp">
-              <input
-                className={controlClass}
-                value={draft.extra.whatsapp ?? ""}
-                onChange={(event) => onDraft({ ...draft, extra: { ...draft.extra!, whatsapp: event.target.value || null } })}
-              />
-            </FormField>
-          )}
-          <div className="flex gap-2">
-            <Button type="button" size="sm" variant={placing === "person" ? "primary" : "outline"} onClick={() => onPlacing("person")}>
-              Assinatura
-            </Button>
-            <Button type="button" size="sm" variant={placing === "extra" ? "primary" : "outline"} onClick={() => onPlacing("extra")}>
-              Signatário extra
-            </Button>
-          </div>
-        </div>
-      )}
+      <p className="text-[12.5px] text-t2">O signatário adicional se escolhe na marcação, pela lista de usuários.</p>
       <FormField label="Lembrete">
         <select className={controlClass} value={draft.reminder} onChange={(event) => onDraft({ ...draft, reminder: event.target.value as DocumentDraft["reminder"] })}>
           <option value="EVERY_DAY">Todo dia</option>
@@ -402,18 +334,20 @@ function ChannelSelect({ value, onChange }: { value: SendChannel; onChange: (val
 function StackedPages({
   documentId,
   pageCount,
-  mark,
-  extraMark,
+  fields,
+  personName,
+  signers,
   disabled,
-  onPlace,
+  onChange,
   onDrop,
 }: {
   documentId: string;
   pageCount: number;
-  mark: SignatureMark;
-  extraMark: SignatureMark | null;
+  fields: FieldMark[];
+  personName: string;
+  signers: { id: string; name: string; email: string }[];
   disabled: boolean;
-  onPlace: (mark: SignatureMark) => void;
+  onChange: (fields: FieldMark[]) => void;
   onDrop: (pageNumber: number) => Promise<void>;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -461,9 +395,15 @@ function StackedPages({
           if (!canvas) continue;
           const pdfPage = await pdf.getPage(pageNumber);
           if (cancelled) return;
-          const viewport = pdfPage.getViewport({ scale: 1.2 });
+          const natural = pdfPage.getViewport({ scale: 1 });
+          const displayWidth = Math.min(720, natural.width);
+          const viewport = pdfPage.getViewport({ scale: (displayWidth / natural.width) * (window.devicePixelRatio || 1) });
           canvas.width = viewport.width;
           canvas.height = viewport.height;
+          canvas.style.width = `${displayWidth}px`;
+          canvas.style.maxWidth = "100%";
+          canvas.style.height = "auto";
+          canvas.style.aspectRatio = `${natural.width} / ${natural.height}`;
           const task = pdfPage.render({ canvas, viewport });
           renders.push(task);
           await task.promise;
@@ -489,60 +429,192 @@ function StackedPages({
   }
 
   return (
-    <div ref={hostRef} className="relative flex flex-col gap-4">
+    <div ref={hostRef} className="relative overflow-auto rounded-xl bg-[#3c4043] px-4 py-6">
       {loading && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-bg-inset/80">
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#3c4043]/80">
           <Spinner size={22} />
         </div>
       )}
-      {pages.map((page) => (
-        <section key={page} className="rounded-xl border border-line bg-bg-inset p-3">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="text-[12.5px] font-bold text-t1">Página {page}</span>
-            <button
-              type="button"
-              className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-line text-bad transition-colors hover:bg-bad-soft disabled:opacity-50"
-              aria-label={pages.length === 1 ? "Apagar documento" : `Apagar página ${page}`}
-              disabled={disabled || dropping != null}
-              onClick={() => drop(page)}
+      <p className="mb-4 text-center text-[12.5px] text-white/80">Clique na página para adicionar a marcação.</p>
+      <div className="mx-auto flex w-fit max-w-full flex-col gap-6">
+        {pages.map((page) => (
+          <section key={page} className="w-fit max-w-full">
+            <div className="mb-2 flex items-center justify-between gap-2 text-white/80">
+              <span className="text-[12.5px] font-bold">Página {page}</span>
+              <button
+                type="button"
+                className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-white/20 text-white transition-colors hover:bg-white/10 disabled:opacity-50"
+                aria-label={pages.length === 1 ? "Apagar documento" : `Apagar página ${page}`}
+                disabled={disabled || dropping != null}
+                onClick={() => drop(page)}
+              >
+                <Icon d={icons.trash} size={14} />
+              </button>
+            </div>
+            <div
+              data-page-box
+              className="relative w-fit max-w-full bg-white shadow-lg"
+              onClick={(event) => {
+                if (disabled || (event.target as HTMLElement).closest("[data-mark]")) return;
+                const added = pointAt(event.currentTarget, event.clientX, event.clientY, page);
+                onChange([...fields, { ...added, id: crypto.randomUUID(), signerId: "seller" }]);
+              }}
             >
-              <Icon d={icons.trash} size={14} />
-            </button>
-          </div>
-          <div
-            className="relative mx-auto w-full max-w-3xl"
-            onPointerDown={(event) => {
-              if (disabled || event.button !== 0) return;
-              event.currentTarget.setPointerCapture(event.pointerId);
-              onPlace(pointOn(event, page));
-            }}
-            onPointerMove={(event) => {
-              if (disabled || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
-              onPlace(pointOn(event, page));
-            }}
-          >
-            <canvas data-page={page} className="block h-auto w-full bg-white" />
-            {mark.pageNumber === page && <MarkBadge label="Assinar" mark={mark} tone="acc" />}
-            {extraMark && extraMark.pageNumber === page && <MarkBadge label="Signatário" mark={extraMark} tone="warn" />}
-          </div>
-        </section>
-      ))}
-      {error && <p className="text-sm text-bad">{error}</p>}
+              <canvas data-page={page} className="block h-auto max-w-full bg-white" />
+              {fields
+                .filter((field) => field.pageNumber === page)
+                .map((field) => (
+                  <MarkCard
+                    key={field.id}
+                    field={field}
+                    personName={personName}
+                    signers={signers}
+                    disabled={disabled}
+                    onChange={(next) => onChange(fields.map((item) => (item.id === field.id ? next : item)))}
+                    onDuplicate={() =>
+                      onChange([
+                        ...fields,
+                        { ...field, id: crypto.randomUUID(), y: Math.min(92, Math.round((field.y + 8) * 10) / 10) },
+                      ])
+                    }
+                    onRemove={() => onChange(fields.filter((item) => item.id !== field.id))}
+                  />
+                ))}
+            </div>
+          </section>
+        ))}
+      </div>
+      {error && <p className="mt-3 text-sm text-white">{error}</p>}
     </div>
   );
 }
 
-function MarkBadge({ label, mark, tone }: { label: string; mark: SignatureMark; tone: "acc" | "warn" }) {
+function pointAt(element: HTMLElement, clientX: number, clientY: number, pageNumber: number): SignatureMark {
+  const box = element.getBoundingClientRect();
+  const x = Math.min(100, Math.max(0, ((clientX - box.left) / box.width) * 100));
+  const y = Math.min(100, Math.max(0, ((clientY - box.top) / box.height) * 100));
+  return { pageNumber, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, element: "SIGNATURE" };
+}
+
+function MarkCard({
+  field,
+  personName,
+  signers,
+  disabled,
+  onChange,
+  onDuplicate,
+  onRemove,
+}: {
+  field: FieldMark;
+  personName: string;
+  signers: { id: string; name: string }[];
+  disabled: boolean;
+  onChange: (field: FieldMark) => void;
+  onDuplicate: () => void;
+  onRemove: () => void;
+}) {
+  function move(event: PointerEvent<HTMLDivElement>) {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    const page = event.currentTarget.closest("[data-page-box]");
+    if (!(page instanceof HTMLElement)) return;
+    const next = pointAt(page, event.clientX, event.clientY, field.pageNumber);
+    onChange({ ...field, x: next.x, y: next.y });
+  }
+
   return (
-    <span
-      className={cn(
-        "pointer-events-none absolute rounded-md border px-2 py-1 text-[11px] font-bold",
-        tone === "acc" ? "border-acc bg-acc-soft text-acc" : "border-warn bg-warn-soft text-warn",
-      )}
-      style={{ left: `${mark.x}%`, top: `${mark.y}%`, transform: "translate(-50%, -50%)" }}
+    <div
+      data-mark
+      className="absolute z-20 w-[232px]"
+      style={{ left: `${field.x}%`, top: `${field.y}%`, transform: "translate(-50%, -115%)" }}
+      onClick={(event) => event.stopPropagation()}
+      onPointerDown={(event) => {
+        if (disabled || event.button !== 0) return;
+        if ((event.target as HTMLElement).closest("select, button")) return;
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }}
+      onPointerMove={move}
     >
-      {label}
-    </span>
+      <div className="rounded-xl border border-neutral-200 bg-white p-1.5 text-neutral-900 shadow-lg">
+        <div className="flex items-center gap-1">
+          <select
+            className="h-8 min-w-0 flex-1 rounded-md border border-neutral-200 bg-white px-2 text-[12px] font-bold"
+            value={field.signerId}
+            disabled={disabled}
+            onChange={(event) => onChange({ ...field, signerId: event.target.value })}
+          >
+            <optgroup label="Colaborador">
+              <option value="seller">{personName}</option>
+            </optgroup>
+            <optgroup label="Usuários">
+              {signers.length === 0 ? (
+                <option value="" disabled>
+                  Nenhum usuário ativo
+                </option>
+              ) : (
+                signers.map((signer) => (
+                  <option key={signer.id} value={`user:${signer.id}`}>
+                    {signer.name}
+                  </option>
+                ))
+              )}
+            </optgroup>
+          </select>
+          <IconButton label="Duplicar marcação" disabled={disabled} onClick={onDuplicate}>
+            <CopyIcon />
+          </IconButton>
+          <IconButton label="Apagar marcação" disabled={disabled} onClick={onRemove}>
+            <Icon d={icons.trash} size={14} />
+          </IconButton>
+        </div>
+        <div className="mt-1.5 flex gap-1">
+          <TypeButton active={field.element === "SIGNATURE"} disabled={disabled} onClick={() => onChange({ ...field, element: "SIGNATURE" })}>
+            Assinatura
+          </TypeButton>
+          <TypeButton active={field.element === "RUBRIC"} disabled={disabled} onClick={() => onChange({ ...field, element: "RUBRIC" })}>
+            Rubrica
+          </TypeButton>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TypeButton({ active, disabled, onClick, children }: { active: boolean; disabled: boolean; onClick: () => void; children: string }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        "h-7 flex-1 rounded-md text-[11px] font-bold",
+        active ? "bg-neutral-900 text-white" : "border border-neutral-200 text-neutral-600",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function IconButton({ label, disabled, onClick, children }: { label: string; disabled: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 disabled:opacity-50"
+    >
+      {children}
+    </button>
+  );
+}
+
+function CopyIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="13" height="13" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
   );
 }
 
