@@ -132,7 +132,9 @@ export function groupPages(pages: Array<PageRef & { text: string }>, unify: bool
       groups.push(created);
     }
   }
-  return groups;
+  if (byCpf.size !== 1 || groups.every((group) => group.cpf != null)) return groups;
+  const cpf = [...byCpf.keys()][0];
+  return [{ cpf, pages: pages.map((page) => ({ sourceIndex: page.sourceIndex, pageNumber: page.pageNumber })) }];
 }
 
 export function assignSeller(matches: { id: string }[]): string | null {
@@ -599,9 +601,20 @@ export type DocumentDraft = {
   authentication?: AuthenticationType;
   fields: FieldMark[];
   guests: GuestSigner[];
+  /** Canal e autenticação de cada signatário adicional da lista. A chave é o id da marcação. */
+  deliveries?: Record<string, { channel: SendChannel; authentication: AuthenticationType }>;
   deadline: string;
   reminder: Reminder;
 };
+
+/** Canal e autenticação de um signatário da lista que não é a pessoa do documento. */
+export function signerDelivery(draft: Pick<DocumentDraft, "deliveries">, signerId: string): { channel: SendChannel; authentication: AuthenticationType } {
+  const saved = draft.deliveries?.[signerId];
+  return {
+    channel: saved?.channel === "EMAIL" ? "EMAIL" : "WHATSAPP",
+    authentication: asAuthentication(saved?.authentication),
+  };
+}
 
 export function asReminder(value: unknown): Reminder | null {
   if (value === "EVERY_DAY" || value === "EVERY_3_DAYS" || value === "EVERY_WEEK" || value === "NEVER") return value;
@@ -660,6 +673,7 @@ export function carryDraft(previous: DocumentDraft, pageCount: number): Document
     authentication: "DEFAULT_SIGN",
     fields: fields.map((field) => clampField(field, pageCount)),
     guests: (previous.guests ?? []).map((guest) => ({ ...guest })),
+    deliveries: previous.deliveries ? { ...previous.deliveries } : undefined,
     deadline: previous.deadline,
     reminder: previous.reminder,
   };
@@ -743,9 +757,9 @@ export function extraSignersFrom(
     people?: { id: string; name: string; email: string | null; whatsapp: string | null }[];
     guests?: GuestSigner[];
     channel?: SendChannel;
+    deliveries?: DocumentDraft["deliveries"];
   } = {},
 ): ExtraSigner[] {
-  const channel = scope.channel ?? "WHATSAPP";
   const extras: ExtraSigner[] = [];
   const keys = [...new Set(fields.map((field) => field.signerId))];
   for (const key of keys) {
@@ -761,13 +775,14 @@ export function extraSignersFrom(
     } else if (key.startsWith("seller:")) {
       const person = scope.people?.find((item) => item.id === key.slice("seller:".length));
       if (!person?.name.trim()) continue;
+      const delivery = signerDelivery({ deliveries: scope.deliveries }, key);
       extras.push({
         name: person.name.trim(),
-        channel,
+        channel: delivery.channel,
         email: person.email,
         whatsapp: person.whatsapp,
         marks,
-        authentication: "DEFAULT_SIGN",
+        authentication: delivery.authentication,
       });
     } else if (key.startsWith("guest:")) {
       const guest = scope.guests?.find((item) => item.id === key.slice("guest:".length));
@@ -821,10 +836,13 @@ export function documentIssue(
       if (!signer?.name.trim() || !signer.email) return "O signatário adicional precisa ser um usuário com e-mail.";
     } else if (field.signerId.startsWith("seller:")) {
       const other = people.find((item) => item.id === field.signerId.slice("seller:".length));
+      const delivery = signerDelivery(draft, field.signerId);
       const missing = other
-        ? contactFieldsToAsk({ cpf: other.cpf ?? null, email: other.email, whatsapp: other.whatsapp }, draft.channel)
+        ? contactFieldsToAsk({ cpf: other.cpf ?? null, email: other.email, whatsapp: other.whatsapp }, delivery.channel)
         : null;
       if (!other?.name.trim() || !missing || missing.cpf || missing.email || missing.whatsapp) return "Falta contato no cadastro.";
+      const extraSms = smsPhoneGap(other.whatsapp, delivery.authentication);
+      if (extraSms) return extraSms;
     } else if (field.signerId.startsWith("guest:")) {
       const guest = (draft.guests ?? []).find((item) => item.id === field.signerId.slice("guest:".length));
       if (!guest?.name.trim()) return "Informe o nome de quem vai assinar.";

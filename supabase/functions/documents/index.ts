@@ -228,6 +228,7 @@ async function prepare(admin: SupabaseClient, tenantId: string, body: Body) {
   }
 
   const pages = held.flatMap((file, sourceIndex) => file.texts.map((text, index) => ({ sourceIndex, pageNumber: index + 1, text })));
+  // Um único CPF no lote leva as páginas sem CPF para o mesmo documento.
   const groups = groupPages(pages, batch.unify !== false);
   const sourceBytes = held.map((file) => file.bytes);
   const label = batch.category === "Outros" ? customDocumentName(String(body.title ?? "")) : { ok: true as const, name: String(batch.category) };

@@ -15,6 +15,7 @@ import {
   findDocumentPerson,
   markChoiceValue,
   markSignerId,
+  signerDelivery,
   signingPeople,
   guestAuthentication,
   guestChannel,
@@ -449,7 +450,12 @@ function channelContactsReady(
     seen.add(field.signerId);
     if (field.signerId.startsWith("seller:")) {
       const other = people.find((item) => item.id === field.signerId.slice("seller:".length));
-      if (!other || channelGap(other, draft.channel)) return false;
+      const delivery = signerDelivery(draft, field.signerId);
+      if (!other || channelGap(other, delivery.channel)) return false;
+      if (delivery.authentication === "SMS") {
+        const saved = saveWhatsapp(other.whatsapp ?? "");
+        if (!saved.ok || !saved.whatsapp) return false;
+      }
     } else if (field.signerId.startsWith("user:")) {
       const user = signers.find((item) => item.id === field.signerId.slice("user:".length));
       if (!user?.email.trim()) return false;
@@ -595,7 +601,8 @@ function signerGroups(draft: DocumentDraft, person: PersonRow | null, people: Pe
     }
     if (key.startsWith("seller:")) {
       const named = people.find((item) => item.id === key.slice("seller:".length)) ?? null;
-      return { key, name: named?.name ?? "Pessoa", role: "Adicional" as const, origin: named?.roleLabel ?? "", pending: named ? channelGap(named, draft.channel) : "Sem contato", marks, person: named, guest: null, userEmail: null, channel: draft.channel, authentication: asAuthentication(draft.authentication) };
+      const delivery = signerDelivery(draft, key);
+      return { key, name: named?.name ?? "Pessoa", role: "Adicional" as const, origin: named?.roleLabel ?? "", pending: named ? channelGap(named, delivery.channel) : "Sem contato", marks, person: named, guest: null, userEmail: null, channel: delivery.channel, authentication: delivery.authentication };
     }
     if (key.startsWith("user:")) {
       const named = signers.find((item) => item.id === key.slice("user:".length));
@@ -693,29 +700,43 @@ function DraftFields({
                           {field.element === "RUBRIC" ? "Rubrica" : "Assinatura"} · Página {field.pageNumber}
                         </button>
                       ))}
-                      {(group.key === "seller" || group.guest) && group.channel && group.authentication && (
+                      {(group.key === "seller" || group.key.startsWith("seller:") || group.guest) && group.channel && group.authentication && (
                         <DeliveryFields
                           channel={group.channel}
                           authentication={group.authentication}
                           onChannel={(channel) => {
-                            if (!group.guest) {
-                              onDraft({ ...draft, channel });
+                            if (group.guest) {
+                              onDraft({
+                                ...draft,
+                                guests: (draft.guests ?? []).map((item) => (item.id === group.guest?.id ? { ...item, channel } : item)),
+                              });
                               return;
                             }
-                            onDraft({
-                              ...draft,
-                              guests: (draft.guests ?? []).map((item) => (item.id === group.guest?.id ? { ...item, channel } : item)),
-                            });
+                            if (group.key.startsWith("seller:")) {
+                              onDraft({
+                                ...draft,
+                                deliveries: { ...draft.deliveries, [group.key]: { channel, authentication: group.authentication ?? "DEFAULT_SIGN" } },
+                              });
+                              return;
+                            }
+                            onDraft({ ...draft, channel });
                           }}
                           onAuthentication={(authentication) => {
-                            if (!group.guest) {
-                              onDraft({ ...draft, authentication });
+                            if (group.guest) {
+                              onDraft({
+                                ...draft,
+                                guests: (draft.guests ?? []).map((item) => (item.id === group.guest?.id ? { ...item, authentication } : item)),
+                              });
                               return;
                             }
-                            onDraft({
-                              ...draft,
-                              guests: (draft.guests ?? []).map((item) => (item.id === group.guest?.id ? { ...item, authentication } : item)),
-                            });
+                            if (group.key.startsWith("seller:")) {
+                              onDraft({
+                                ...draft,
+                                deliveries: { ...draft.deliveries, [group.key]: { channel: group.channel ?? "WHATSAPP", authentication } },
+                              });
+                              return;
+                            }
+                            onDraft({ ...draft, authentication });
                           }}
                         />
                       )}

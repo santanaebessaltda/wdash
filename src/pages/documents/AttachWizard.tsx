@@ -27,6 +27,7 @@ import {
   parsePersonRef,
   resolveDrafts,
   sellerMarks,
+  signerDelivery,
   type ContactEdit,
   type DocumentDraft,
   type SignerContact,
@@ -246,6 +247,7 @@ export function AttachWizard({
             people: shownPeople,
             guests: resolved[index].guests,
             channel: resolved[index].channel,
+            deliveries: resolved[index].deliveries,
           }),
         })),
         extraSigner: null,
@@ -770,6 +772,8 @@ function schedulePeople(draft: DocumentDraft) {
     if (field.signerId.startsWith("guest:")) {
       const guest = (draft.guests ?? []).find((item) => item.id === field.signerId.slice("guest:".length));
       people.set(field.signerId, { channel: guestChannel(guest), authentication: guestAuthentication(guest) });
+    } else if (field.signerId.startsWith("seller:")) {
+      people.set(field.signerId, signerDelivery(draft, field.signerId));
     } else if (field.signerId === "seller" || field.signerId === "") {
       people.set("seller", { channel: draft.channel, authentication: asAuthentication(draft.authentication) });
     }

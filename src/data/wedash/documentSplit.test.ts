@@ -126,6 +126,28 @@ describe("groupPages", () => {
     ]);
   });
 
+  it("joins pages without a CPF when the batch has one collaborator", () => {
+    expect(
+      groupPages(
+        [
+          { sourceIndex: 0, pageNumber: 1, text: "Contrato sem documento" },
+          { sourceIndex: 1, pageNumber: 1, text: `Holerite ${VALID}` },
+          { sourceIndex: 2, pageNumber: 1, text: "Ficha sem documento" },
+        ],
+        true,
+      ),
+    ).toEqual([
+      {
+        cpf: VALID_DIGITS,
+        pages: [
+          { sourceIndex: 0, pageNumber: 1 },
+          { sourceIndex: 1, pageNumber: 1 },
+          { sourceIndex: 2, pageNumber: 1 },
+        ],
+      },
+    ]);
+  });
+
   it("builds one PDF when the same CPF appears in two source files", () => {
     expect(
       groupPages(
