@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Avatar, Badge, Button, Card, DataTable, Dropdown, EmptyState, Modal, Segmented, Skeleton, Tooltip, useToast, type DataTableColumn, type DropdownItem } from "@/components/ui";
+import { Avatar, Badge, Button, Card, DataTable, Dropdown, EmptyState, FormField, Input, Modal, Segmented, Skeleton, useToast, type DataTableColumn, type DropdownItem } from "@/components/ui";
 import { SegmentedSkeleton, StoreCardsSkeleton, TeamTableSkeleton } from "@/components/wedash/LoadingSkeletons";
 import {
   branchRoleLabel,
@@ -8,6 +8,7 @@ import {
   fetchStoreShifts,
   isActiveSalesPerson,
   isBranchTeamMember,
+  saveSellerContact,
   saveStoreShift,
   setSellerShift,
   syncStoreSellersNow,
@@ -16,9 +17,11 @@ import {
   type StoreShift,
 } from "@/data/wedash/stores";
 import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
+import { saveCpf, saveEmail, saveWhatsapp } from "@/data/wedash/documentSplit";
+import { normalizeEmail, validEmail } from "@/data/wedash/engine/sellerAccess";
 import { shiftName } from "@/lib/format";
 import { InviteSellerModal } from "@/pages/management/InviteSellerModal";
-import { GroupFormModal, GroupPicker, ManageGroupsModal, groupProblem, nextGroupWindow } from "@/pages/management/SellerGroups";
+import { GroupFormModal, ManageGroupsModal, groupProblem, nextGroupWindow } from "@/pages/management/SellerGroups";
 import { CostCardTitle, SAVE_ERROR_MSG, StoreCardsPage, useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
 import {
@@ -87,7 +90,7 @@ export function StaffPage() {
       <StoreCardsPage
         section="Gestão"
         title="Equipe"
-        subtitle="Acompanhe a equipe da filial e gerencie grupos e acessos dos vendedores."
+        subtitle="Acompanhe a equipe da filial e gerencie o cadastro, os grupos e os acessos."
         actions={
           singleStore ? (
             <Button type="button" onClick={() => setManageOpen(true)}>
@@ -127,6 +130,8 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const [access, setAccess] = useState<Map<string, AccessState> | null>(null);
   const [inviting, setInviting] = useState<StoreSeller | null>(null);
+  const [editing, setEditing] = useState<StoreSeller | null>(null);
+  const [pendingShift, setPendingShift] = useState<{ sellerId: string; shiftId: string } | null>(null);
   const [removing, setRemoving] = useState<StoreSeller | null>(null);
   const [removingBusy, setRemovingBusy] = useState(false);
   const [creating, setCreating] = useState<{ sellerId: string; start: string; end: string } | null>(null);
@@ -209,7 +214,10 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
     }
     setShifts(await fetchStoreShifts(tenantId, store.id));
     const assigned = await changeShift(creating.sellerId, saved.id);
-    if (assigned) show("Grupo criado.", "success");
+    if (!assigned) return false;
+    setPendingShift({ sellerId: creating.sellerId, shiftId: saved.id });
+    setTeam((list) => list.map((person) => (person.id === creating.sellerId ? { ...person, shiftId: saved.id } : person)));
+    show("Grupo criado.", "success");
     return true;
   }
 
@@ -231,6 +239,27 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
     }
   }
 
+  async function saveProfile(seller: StoreSeller, draft: SellerDraft): Promise<boolean> {
+    const saved = await saveSellerContact(seller.id, { cpf: draft.cpf, email: draft.email, whatsapp: draft.whatsapp });
+    if (!saved.ok) {
+      show("Não foi possível salvar o cadastro. Tente novamente.", "danger");
+      return false;
+    }
+    setTeam((list) =>
+      list.map((person) =>
+        person.id === seller.id ? { ...person, cpf: draft.cpf, email: draft.email, whatsapp: draft.whatsapp } : person,
+      ),
+    );
+    const currentShift = seller.id in shiftOf ? shiftOf[seller.id] : seller.shiftId;
+    if (draft.sales && draft.shiftId !== (currentShift ?? null)) {
+      const shifted = await changeShift(seller.id, draft.shiftId);
+      if (!shifted) return false;
+      setTeam((list) => list.map((person) => (person.id === seller.id ? { ...person, shiftId: draft.shiftId } : person)));
+    }
+    show("Cadastro salvo.", "success");
+    return true;
+  }
+
   const columns = useMemo<DataTableColumn<StoreSeller>[]>(
     () => [
       ...SELLER_COLUMNS,
@@ -241,14 +270,7 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
         sortValue: (v) => (access == null || !isActiveSalesPerson(v) ? null : accessLabel(access.get(v.id) ?? "NONE")),
         render: (v) => {
           if (!isActiveSalesPerson(v)) return <span className="text-t2">—</span>;
-          const group = v.id in shiftOf ? shiftOf[v.id] : v.shiftId;
-          return (
-            <AccessCell
-              state={access == null ? "loading" : (access.get(v.id) ?? "NONE")}
-              grouped={hasSalesGroup(group) && !savingIds.has(v.id)}
-              onInvite={() => setInviting(v)}
-            />
-          );
+          return <AccessBadge state={access == null ? "loading" : (access.get(v.id) ?? "NONE")} />;
         },
       },
       {
@@ -259,16 +281,7 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
         render: (v) => {
           if (!isActiveSalesPerson(v)) return <span className="text-t2">—</span>;
           const current = v.id in shiftOf ? shiftOf[v.id] : v.shiftId;
-          return (
-            <GroupPicker
-              sellerName={v.name}
-              shifts={shifts}
-              value={current ?? null}
-              disabled={savingIds.has(v.id)}
-              onChange={(shiftId) => void changeShift(v.id, shiftId)}
-              onCreate={() => setCreating({ sellerId: v.id, ...nextGroupWindow(shifts) })}
-            />
-          );
+          return <span className="text-[13px] text-t1">{groupLabel(current, shifts)}</span>;
         },
       },
       {
@@ -276,14 +289,19 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
         header: "",
         align: "right",
         render: (v) => (
-          <AccessMenu
-            state={isActiveSalesPerson(v) ? (access?.get(v.id) ?? null) : null}
-            onCopy={() => void copyLink(v.id)}
-            onResend={() => void runAccess(v.id, resendSellerInvite, "Convite reenviado.")}
-            onRevoke={() => void runAccess(v.id, revokeSellerInvite, "Convite cancelado.")}
-            onSuspend={() => void runAccess(v.id, suspendSeller, "Acesso suspenso.")}
-            onReactivate={() => void runAccess(v.id, reactivateSeller, "Acesso reativado.")}
-            onRemove={() => setRemoving(v)}
+          <RowMenu
+            items={rowActions({
+              state: isActiveSalesPerson(v) ? (access == null ? null : (access.get(v.id) ?? "NONE")) : null,
+              grouped: hasSalesGroup(v.id in shiftOf ? shiftOf[v.id] : v.shiftId),
+              onEdit: () => setEditing({ ...v, shiftId: (v.id in shiftOf ? shiftOf[v.id] : v.shiftId) ?? null }),
+              onInvite: () => setInviting(v),
+              onCopy: () => void copyLink(v.id),
+              onResend: () => void runAccess(v.id, resendSellerInvite, "Convite reenviado."),
+              onRevoke: () => void runAccess(v.id, revokeSellerInvite, "Convite cancelado."),
+              onSuspend: () => void runAccess(v.id, suspendSeller, "Acesso suspenso."),
+              onReactivate: () => void runAccess(v.id, reactivateSeller, "Acesso reativado."),
+              onRemove: () => setRemoving(v),
+            })}
           />
         ),
       },
@@ -334,7 +352,7 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
       ) : (
         <DataTable
           className="rounded-none! border-x-0! border-b-0! bg-transparent!"
-          columns={tab === "ativos" ? columns : SELLER_COLUMNS}
+          columns={tab === "ativos" ? columns : [...SELLER_COLUMNS, columns[columns.length - 1]!]}
           data={rows}
           rowKey={(v) => v.id}
           paginate="pessoas"
@@ -376,6 +394,14 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
           </p>
         )}
       </Modal>
+      <SellerEditor
+        seller={editing}
+        shifts={shifts}
+        pendingShift={pendingShift}
+        onClose={() => setEditing(null)}
+        onCreateGroup={() => editing && setCreating({ sellerId: editing.id, ...nextGroupWindow(shifts) })}
+        onSave={(seller, draft) => saveProfile(seller, draft)}
+      />
       <GroupFormModal
         open={creating != null}
         title="Criar grupo"
@@ -404,55 +430,50 @@ const ACCESS_BADGE: Record<AccessState, { variant: "neutral" | "warning" | "succ
   SUSPENDED: { variant: "danger", label: ACCESS_LABEL.SUSPENDED },
 };
 
-function AccessCell({ state, grouped, onInvite }: { state: AccessState | "loading"; grouped: boolean; onInvite: () => void }) {
-  if (state === "loading") return <Skeleton className="h-8 w-24 rounded-[var(--radius-vela-sm)]" />;
-  if (state === "NONE") {
-    const button = (
-      <Button type="button" size="sm" onClick={onInvite} disabled={!grouped}>
-        Convidar
-      </Button>
-    );
-    if (grouped) return button;
-    return <Tooltip label="Vincule o vendedor a um grupo antes de convidar.">{button}</Tooltip>;
-  }
-  const b = ACCESS_BADGE[state];
-  return <Badge variant={b.variant}>{b.label}</Badge>;
+function AccessBadge({ state }: { state: AccessState | "loading" }) {
+  if (state === "loading") return <Skeleton className="h-6 w-24 rounded-[var(--radius-vela-sm)]" />;
+  const badge = ACCESS_BADGE[state];
+  return <Badge variant={badge.variant}>{badge.label}</Badge>;
 }
 
-function AccessMenu({
-  state,
-  onCopy,
-  onResend,
-  onRevoke,
-  onSuspend,
-  onReactivate,
-  onRemove,
-}: {
+function rowActions(input: {
   state: AccessState | null;
+  grouped: boolean;
+  onEdit: () => void;
+  onInvite: () => void;
   onCopy: () => void;
   onResend: () => void;
   onRevoke: () => void;
   onSuspend: () => void;
   onReactivate: () => void;
   onRemove: () => void;
-}) {
-  if (!state || state === "NONE") return null;
-  const exclude: DropdownItem = { label: "Excluir acesso", onClick: onRemove, danger: true };
-  const items: DropdownItem[] =
-    state === "PENDING" ? [
-        { label: "Copiar link", onClick: onCopy },
-        { label: "Reenviar convite", onClick: onResend },
-        { label: "Cancelar convite", onClick: onRevoke, danger: true },
-      ]
-    : state === "ACTIVE" ? [{ label: "Suspender acesso", onClick: onSuspend }, exclude]
-    : [{ label: "Reativar acesso", onClick: onReactivate }, exclude];
+}): DropdownItem[] {
+  const edit: DropdownItem = { label: "Editar funcionário", onClick: input.onEdit };
+  if (!input.state) return [edit];
+  const exclude: DropdownItem = { label: "Excluir acesso", onClick: input.onRemove, danger: true };
+  const access: DropdownItem[] =
+    input.state === "NONE"
+      ? [{ label: "Convidar", onClick: input.onInvite, disabled: !input.grouped, description: input.grouped ? undefined : "Vincule o vendedor a um grupo antes de convidar." }]
+      : input.state === "PENDING"
+        ? [
+            { label: "Copiar link", onClick: input.onCopy },
+            { label: "Reenviar convite", onClick: input.onResend },
+            { label: "Cancelar convite", onClick: input.onRevoke, danger: true },
+          ]
+        : input.state === "ACTIVE"
+          ? [{ label: "Suspender acesso", onClick: input.onSuspend }, exclude]
+          : [{ label: "Reativar acesso", onClick: input.onReactivate }, exclude];
+  return [edit, { label: "", divider: true }, ...access];
+}
+
+function RowMenu({ items }: { items: DropdownItem[] }) {
   return (
     <Dropdown
       align="right"
       portal
       items={items}
       trigger={
-        <button type="button" aria-label="Ações do acesso" className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] text-t1 hover:bg-bg-3">
+        <button type="button" aria-label="Ações" className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] text-t1 hover:bg-bg-3">
           <Icon d={icons.dots} size={16} />
         </button>
       }
@@ -460,8 +481,134 @@ function AccessMenu({
   );
 }
 
+type SellerDraft = { cpf: string | null; email: string | null; whatsapp: string | null; shiftId: string | null; sales: boolean };
+
+function SellerEditor({
+  seller,
+  shifts,
+  pendingShift,
+  onClose,
+  onCreateGroup,
+  onSave,
+}: {
+  seller: StoreSeller | null;
+  shifts: StoreShift[];
+  pendingShift: { sellerId: string; shiftId: string } | null;
+  onClose: () => void;
+  onCreateGroup: () => void;
+  onSave: (seller: StoreSeller, draft: SellerDraft) => Promise<boolean>;
+}) {
+  const sales = seller ? isActiveSalesPerson(seller) : false;
+  const [cpf, setCpf] = useState(seller?.cpf ?? "");
+  const [email, setEmail] = useState(seller?.email ?? "");
+  const [whatsapp, setWhatsapp] = useState(seller?.whatsapp ?? "");
+  const [shiftId, setShiftId] = useState<string | null>(seller?.shiftId ?? null);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setCpf(seller?.cpf ?? "");
+    setEmail(seller?.email ?? "");
+    setWhatsapp(seller?.whatsapp ?? "");
+    setShiftId(seller?.shiftId ?? null);
+    setError(null);
+    setSaving(false);
+  }, [seller]);
+
+  useEffect(() => {
+    if (seller && pendingShift?.sellerId === seller.id) setShiftId(pendingShift.shiftId);
+  }, [pendingShift, seller]);
+
+  async function save() {
+    if (!seller) return;
+    const parsedCpf = cpf.trim() ? saveCpf(cpf) : { ok: true as const, cpf: null };
+    if (!parsedCpf.ok) {
+      setError(parsedCpf.message);
+      return;
+    }
+    const mail = email.trim() ? normalizeEmail(email) : "";
+    if (mail && !validEmail(mail)) {
+      setError("Informe um e-mail válido.");
+      return;
+    }
+    const parsedMail = saveEmail(mail);
+    if (!parsedMail.ok) {
+      setError(parsedMail.message);
+      return;
+    }
+    const parsedPhone = saveWhatsapp(whatsapp);
+    if (!parsedPhone.ok) {
+      setError(parsedPhone.message);
+      return;
+    }
+    setSaving(true);
+    const ok = await onSave(seller, {
+      cpf: parsedCpf.cpf,
+      email: parsedMail.email,
+      whatsapp: parsedPhone.whatsapp,
+      shiftId,
+      sales,
+    });
+    setSaving(false);
+    if (ok) onClose();
+  }
+
+  return (
+    <Modal
+      open={seller != null}
+      onClose={() => !saving && onClose()}
+      title={seller ? `Editar ${seller.name}` : ""}
+      footer={
+        <>
+          <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button type="button" onClick={() => void save()} disabled={saving}>
+            {saving ? "Salvando…" : "Salvar"}
+          </Button>
+        </>
+      }
+    >
+      {seller && (
+        <div className="flex flex-col gap-3">
+          <p className="text-[12.5px] text-t2">
+            {sales
+              ? "CPF, e-mail, WhatsApp e grupo ficam na WDash. A atualização do Millennium não altera esses dados."
+              : "CPF, e-mail e WhatsApp ficam na WDash. A atualização do Millennium não altera esses dados."}
+          </p>
+          {sales && (
+            <FormField label="Grupo">
+              <select className="h-[42px] w-full rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3.5 text-[13px] text-t0 outline-none focus:border-acc" value={shiftId ?? ""} onChange={(event) => setShiftId(event.target.value || null)}>
+                <option value="">Sem grupo</option>
+                {shifts.map((shift) => (
+                  <option key={shift.id} value={shift.id}>
+                    {shiftName(shift.name)}
+                  </option>
+                ))}
+              </select>
+              <button type="button" className="mt-2 text-[12.5px] font-semibold text-acc" onClick={onCreateGroup}>
+                Criar grupo
+              </button>
+            </FormField>
+          )}
+          <FormField label="CPF" optional>
+            <Input value={cpf} onChange={(event) => setCpf(event.target.value)} placeholder="000.000.000-00" inputMode="numeric" />
+          </FormField>
+          <FormField label="E-mail" optional>
+            <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="nome@email.com" />
+          </FormField>
+          <FormField label="WhatsApp" optional>
+            <Input value={whatsapp} onChange={(event) => setWhatsapp(event.target.value)} placeholder="(11) 99999-9999" inputMode="tel" />
+          </FormField>
+          {error && <p className="text-sm text-bad">{error}</p>}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 function accessLabel(state: AccessState): string {
-  return state === "NONE" ? "Convidar" : ACCESS_LABEL[state];
+  return ACCESS_LABEL[state];
 }
 
 function groupLabel(shiftId: string | null | undefined, shifts: StoreShift[]): string {

@@ -4,7 +4,7 @@ import { inviteSeller, copySellerInviteLink } from "@/data/wedash/sellerAccess";
 import { normalizeEmail, validEmail } from "@/data/wedash/engine/sellerAccess";
 
 /**
- * Convite de acesso do vendedor. O e-mail vem preenchido do cadastro do Millennium.
+ * Convite de acesso do vendedor. O e-mail vem preenchido da ficha da WDash.
  * Depois de enviar, oferece o mesmo link do e-mail para copiar.
  */
 export function InviteSellerModal({

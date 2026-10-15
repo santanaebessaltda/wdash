@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from "react";
-import { Button, Dropdown, EmptyState, FormField, Input, Modal, Skeleton, useToast, type DropdownItem } from "@/components/ui";
+import { Button, EmptyState, FormField, Input, Modal, Skeleton, useToast } from "@/components/ui";
 import {
   deleteStoreShift,
   fetchStoreSellers,
@@ -33,57 +33,6 @@ function groupProblem(name: string, start: string, end: string, shifts: StoreShi
   }
   if (start >= end) return "O horário de início deve ser anterior ao horário de fim.";
   return null;
-}
-
-export function GroupPicker({
-  sellerName,
-  shifts,
-  value,
-  disabled,
-  onChange,
-  onCreate,
-}: {
-  sellerName: string;
-  shifts: StoreShift[];
-  value: string | null;
-  disabled?: boolean;
-  onChange: (shiftId: string | null) => void;
-  onCreate: () => void;
-}) {
-  const current = shifts.find((s) => s.id === value);
-  const items: DropdownItem[] = [
-    ...shifts.map((s) => ({
-      label: shiftName(s.name),
-      active: s.id === value,
-      onClick: () => onChange(s.id),
-    })),
-    { label: "Sem grupo", active: !value, onClick: () => onChange(null) },
-    { label: "", divider: true },
-    { label: "+ Criar grupo", highlight: true, onClick: onCreate },
-  ];
-  return (
-    <div className={disabled ? "pointer-events-none opacity-50" : undefined}>
-      <Dropdown
-        align="left"
-        portal
-        menuClassName="max-h-72 overflow-y-auto"
-        items={items}
-        trigger={
-          <button
-            type="button"
-            disabled={disabled}
-            aria-label={`Grupo de ${sellerName}`}
-            className="inline-flex h-9 min-w-[132px] max-w-[200px] items-center justify-between gap-2 rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-2.5 text-[13px] font-medium text-t0"
-          >
-            <span className={current ? "truncate" : "truncate text-t2"}>{current ? shiftName(current.name) : "Sem grupo"}</span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-t2">
-              <path d="m6 9 6 6 6-6" />
-            </svg>
-          </button>
-        }
-      />
-    </div>
-  );
 }
 
 export function GroupFormModal({
