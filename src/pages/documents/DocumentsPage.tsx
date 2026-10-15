@@ -10,7 +10,7 @@ import { openDocument, resendDocument } from "@/data/wedash/documentsRepo";
 import { DocumentsFrame, FileGlyph, FolderGlyph, Glyph, STATUS_LABEL, SearchGlyph, badgeVariant } from "./frame";
 import { useDocuments } from "./useDocuments";
 
-type Mode = "home" | "pending" | "month" | "sent" | "signed" | "browse";
+type Mode = "home" | "pending" | "month" | "browse";
 type PeopleFilter = "active" | "all" | "inactive";
 
 type FolderEntry = { key: string; label: string; detail: string; fileId?: string };
@@ -66,7 +66,7 @@ export function DocumentsPage() {
   }
 
   const pool =
-    mode === "pending" ? pending : mode === "signed" ? signed : mode === "month" ? thisMonth : mode === "sent" ? sentDocuments : mode === "home" ? recent : [];
+    mode === "pending" ? pending : mode === "month" ? thisMonth : mode === "home" ? recent : [];
   const libraryDocs = sentDocuments.filter((doc) => (mode === "home" ? true : matchesFilters(doc)));
   const visibleFiles = searching ? libraryDocs.filter(matchesText) : pool.filter((doc) => mode === "home" || matchesFilters(doc));
   const narrowed = searching || periodFilter || typeFilter || statusFilter;
@@ -112,15 +112,9 @@ export function DocumentsPage() {
       {notice && <p className="mb-3 text-[13px] text-bad">{notice}</p>}
       {mode === "home" && (
         <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <button type="button" className="text-left" onClick={() => { setMode("sent"); setQuery(""); }}>
-            <QuickStat label="Documentos enviados" value={String(sentDocuments.length)} sub="Já foram para assinatura" tint="acc" icon={<Glyph d="M22 2 11 13M22 2 15 22 11 13 2 9 22 2" />} />
-          </button>
-          <button type="button" className="text-left" onClick={() => { setMode("pending"); setQuery(""); }}>
-            <QuickStat label="Documentos pendentes" value={String(pending.length)} sub="Aguardando assinatura" tint="warn" icon={<Glyph d="M12 8v4l3 2M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20" />} />
-          </button>
-          <button type="button" className="text-left" onClick={() => { setMode("signed"); setQuery(""); }}>
-            <QuickStat label="Documentos assinados" value={String(signed.length)} sub="Assinatura concluída" tint="ok" icon={<Glyph d="M20 6 9 17l-5-5" />} />
-          </button>
+          <QuickStat label="Documentos enviados" value={String(sentDocuments.length)} sub="Já foram para assinatura" tint="acc" icon={<Glyph d="M22 2 11 13M22 2 15 22 11 13 2 9 22 2" />} />
+          <QuickStat label="Documentos pendentes" value={String(pending.length)} sub="Aguardando assinatura" tint="warn" icon={<Glyph d="M12 8v4l3 2M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20" />} />
+          <QuickStat label="Documentos assinados" value={String(signed.length)} sub="Assinatura concluída" tint="ok" icon={<Glyph d="M20 6 9 17l-5-5" />} />
         </div>
       )}
       <p className="mb-3 text-xs font-bold uppercase tracking-wide text-t2">Atalhos</p>
@@ -310,8 +304,6 @@ async function openFile(id: string, setNotice: (message: string | null) => void)
 
 function sectionTitle(mode: Mode, allStores: boolean, crumb: string[], storeName: Map<string, string>, personName: Map<string, string>) {
   if (mode === "pending") return "Pendentes";
-  if (mode === "signed") return "Assinados";
-  if (mode === "sent") return "Enviados";
   if (mode === "month") return `Este mês · ${monthFolder(new Date().getMonth() + 1)}`;
   if (mode === "home") return "Documentos recentes";
   if (crumb.length === 0) return allStores ? "Filiais" : "Colaboradores";
