@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Badge, Button, DataTable, Dropdown, EmptyState, FormField, Modal, Segmented, Card, type DataTableColumn, type DropdownItem } from "@/components/ui";
+import { Badge, Button, DataTable, Dropdown, EmptyState, FormField, Modal, Segmented, Card, useToast, type DataTableColumn, type DropdownItem } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { QuickStat } from "@/pages/dashboards/QuickStat";
 import { Icon, icons } from "@/pages/users/Icons";
@@ -21,7 +21,9 @@ const fieldClass = "h-10 w-full rounded-[var(--radius-vela-md)] border border-li
 export function DocumentsPage() {
   const { allStores, batches, documents, people, stores, reload } = useDocuments();
   const navigate = useNavigate();
+  const { show } = useToast();
   const flash = (useLocation().state ?? null) as { documentNotice?: string | null } | null;
+  const flashed = useRef(false);
   const [mode, setMode] = useState<Mode>("home");
   const [crumb, setCrumb] = useState<string[]>([]);
   const [query, setQuery] = useState("");
@@ -29,8 +31,6 @@ export function DocumentsPage() {
   const [typeFilter, setTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [peopleFilter, setPeopleFilter] = useState<PeopleFilter>("active");
-  const [notice, setNotice] = useState<string | null>(flash?.documentNotice ?? null);
-  const [sent, setSent] = useState<string | null>(null);
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [moveId, setMoveId] = useState<string | null>(null);
   const [moveSeller, setMoveSeller] = useState("");
@@ -38,6 +38,12 @@ export function DocumentsPage() {
   const [moveYear, setMoveYear] = useState(String(new Date().getFullYear()));
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [acting, setActing] = useState(false);
+
+  useEffect(() => {
+    if (flashed.current || !flash?.documentNotice) return;
+    flashed.current = true;
+    show(flash.documentNotice, "danger");
+  }, [flash, show]);
 
   const storeName = useMemo(() => new Map(stores.map((store) => [store.id, store.name])), [stores]);
   const personName = useMemo(() => new Map(people.map((person) => [person.id, person.name])), [people]);
@@ -118,14 +124,12 @@ export function DocumentsPage() {
 
   async function copyLink(id: string) {
     setActing(true);
-    setNotice(null);
-    setSent(null);
     try {
       const url = await copyDocumentLink(id);
       await navigator.clipboard.writeText(url);
-      setSent("Link copiado.");
+      show("Link copiado.", "success");
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Não foi possível copiar o link. Tente novamente.");
+      show(error instanceof Error ? error.message : "Não foi possível copiar o link. Tente novamente.", "danger");
     } finally {
       setActing(false);
     }
@@ -133,15 +137,13 @@ export function DocumentsPage() {
 
   async function apagar(id: string) {
     setActing(true);
-    setNotice(null);
-    setSent(null);
     try {
       await cancelDocument(id);
       setDeleteId(null);
-      setSent("Assinatura cancelada.");
+      show("Assinatura cancelada.", "success");
       await reload();
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Não foi possível cancelar a assinatura. Tente novamente.");
+      show(error instanceof Error ? error.message : "Não foi possível cancelar a assinatura. Tente novamente.", "danger");
     } finally {
       setActing(false);
     }
@@ -151,19 +153,17 @@ export function DocumentsPage() {
     if (!moveId || !moveSeller) return;
     const year = Number(moveYear);
     if (!Number.isInteger(year) || year < 2000 || year > 2100) {
-      setNotice("Informe um ano válido.");
+      show("Informe um ano válido.", "danger");
       return;
     }
     setActing(true);
-    setNotice(null);
-    setSent(null);
     try {
       await moveDocument({ documentId: moveId, sellerId: moveSeller, month: Number(moveMonth), year });
       setMoveId(null);
-      setSent("Documento movido.");
+      show("Documento movido.", "success");
       await reload();
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Não foi possível mover o documento. Tente novamente.");
+      show(error instanceof Error ? error.message : "Não foi possível mover o documento. Tente novamente.", "danger");
     } finally {
       setActing(false);
     }
@@ -179,8 +179,6 @@ export function DocumentsPage() {
         <Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>
       }
     >
-      {sent && <p className="mb-3 text-[13px] text-ok">{sent}</p>}
-      {notice && <p className="mb-3 text-[13px] text-bad">{notice}</p>}
       {mode === "home" && (
         <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <QuickStat label="Enviados" value={String(sentDocuments.length)} sub="Enviados para assinatura" tint="acc" icon={<Glyph d="M22 2 11 13M22 2 15 22 11 13 2 9 22 2" />} />
@@ -294,8 +292,8 @@ export function DocumentsPage() {
             rows={visibleFolders}
             documents={documents}
             onOpenFolder={(key) => setCrumb([...crumb, key])}
-            onOpenFile={(id) => void openFile(id, setNotice)}
-            onResend={(id) => void resendFile(id, setNotice, setSent, setResendingId, reload)}
+            onOpenFile={(id) => void openFile(id, show)}
+            onResend={(id) => void resendFile(id, show, setResendingId, reload)}
             onCopy={(id) => void copyLink(id)}
             onMove={openMove}
             onDelete={setDeleteId}
@@ -318,8 +316,8 @@ export function DocumentsPage() {
           batches={batchOf}
           stores={storeName}
           showStore={allStores}
-          onDownload={(id) => void openFile(id, setNotice)}
-          onResend={(id) => void resendFile(id, setNotice, setSent, setResendingId, reload)}
+          onDownload={(id) => void openFile(id, show)}
+          onResend={(id) => void resendFile(id, show, setResendingId, reload)}
           onCopy={(id) => void copyLink(id)}
           onMove={openMove}
           onDelete={setDeleteId}
@@ -415,32 +413,34 @@ function Shortcut({ label, count, active, onClick }: { label: string; count: str
 
 async function resendFile(
   id: string,
-  setNotice: (message: string | null) => void,
-  setSent: (message: string | null) => void,
+  show: (message: string, variant: "success" | "danger") => void,
   setResendingId: (id: string | null) => void,
   reload: () => Promise<void>,
 ) {
   setResendingId(id);
-  setNotice(null);
-  setSent(null);
   try {
     await resendDocument(id);
-    setSent("Link reenviado.");
+    show("Link reenviado.", "success");
     await reload();
   } catch {
-    setNotice("Não foi possível reenviar o link. Tente novamente.");
+    show("Não foi possível reenviar o link. Tente novamente.", "danger");
   } finally {
     setResendingId(null);
   }
 }
 
-async function openFile(id: string, setNotice: (message: string | null) => void) {
+async function openFile(id: string, show: (message: string, variant: "success" | "danger") => void) {
   try {
     const url = await openDocument(id);
-    setNotice(null);
-    window.open(url, "_blank", "noopener");
+    const opened = window.open(url, "_blank");
+    if (opened) opened.opener = null;
+    if (!opened) {
+      show("Não foi possível baixar o PDF. Tente novamente.", "danger");
+      return;
+    }
+    show("Download iniciado.", "success");
   } catch (error) {
-    setNotice(error instanceof Error ? error.message : "O arquivo ainda não está disponível.");
+    show(error instanceof Error ? error.message : "O arquivo ainda não está disponível.", "danger");
   }
 }
 
