@@ -232,7 +232,8 @@ function ReviewBody({
 }) {
   const ownerKey = documentPersonKey(row);
   const person = people.find((item) => item.id === ownerKey) ?? null;
-  const branchPeople = signingPeople(people, row.storeId);
+  const choices = signingPeople(people, row.storeId);
+  const branchPeople = person && !choices.some((item) => item.id === person.id) ? [person, ...choices] : choices;
   const issue = row.envelopeId ? null : documentIssue(person, draft, row.pageCount, signers, people, row.sizeBytes);
   const previous = index > 0 ? rows[index - 1] : null;
   const next = index < total - 1 ? rows[index + 1] : null;
@@ -314,7 +315,7 @@ function ReviewBody({
 
   function placeMark(mark: SignatureMark) {
     const id = crypto.randomUUID();
-    saveDraft({ ...draft, fields: [...draft.fields, { ...mark, id, signerId: ownerKey ? "" : "seller" }] });
+    saveDraft({ ...draft, fields: [...draft.fields, { ...mark, id, signerId: ownerKey ? "seller" : "" }] });
     setSelectedId(id);
   }
 
