@@ -13,14 +13,12 @@ import {
   assignSeller,
   channelBlock,
   confirmBlock,
+  contactPatch,
   customDocumentName,
   deliveryFileName,
   fileName,
   groupPages,
   resendVisible,
-  saveCpf,
-  saveEmail,
-  saveWhatsapp,
   shouldSend,
   signaturePositions,
   sourceRefusal,
@@ -246,15 +244,16 @@ async function saveContact(admin: SupabaseClient, tenantId: string, body: Body) 
   const sellerId = String(body.sellerId ?? "");
   const { data: seller } = await admin.from("store_seller").select("id").eq("id", sellerId).eq("tenant_id", tenantId).maybeSingle();
   if (!seller) return json({ error: "not_found" }, 404);
-  const cpf = saveCpf(String(body.cpf ?? ""));
-  if (!cpf.ok) return json({ message: cpf.message }, 422);
-  const email = saveEmail(String(body.email ?? ""));
-  if (!email.ok) return json({ message: email.message }, 422);
-  const whatsapp = saveWhatsapp(String(body.whatsapp ?? ""));
-  if (!whatsapp.ok) return json({ message: whatsapp.message }, 422);
-  const { error } = await admin.from("store_seller").update({ cpf: cpf.cpf, email: email.email, whatsapp: whatsapp.whatsapp }).eq("id", sellerId);
+  const input: { cpf?: string; email?: string; whatsapp?: string } = {};
+  if ("cpf" in body) input.cpf = String(body.cpf ?? "");
+  if ("email" in body) input.email = String(body.email ?? "");
+  if ("whatsapp" in body) input.whatsapp = String(body.whatsapp ?? "");
+  const saved = contactPatch(input);
+  if (!saved.ok) return json({ message: saved.message }, 422);
+  if (Object.keys(saved.patch).length === 0) return json({ ok: true });
+  const { error } = await admin.from("store_seller").update(saved.patch).eq("id", sellerId);
   if (error) return json({ error: "persist" }, 500);
-  return json({ ok: true, cpf: cpf.cpf, email: email.email, whatsapp: whatsapp.whatsapp });
+  return json({ ok: true, ...saved.patch });
 }
 
 async function confirm(admin: SupabaseClient, tenantId: string, secret: string, body: Body) {

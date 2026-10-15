@@ -136,9 +136,9 @@ T6 -> T7
 
 **Done when**:
 
-- [ ] A WhatsApp-only patch writes `whatsapp` and leaves `email` and `cpf` untouched
-- [ ] An invalid CPF still returns the existing bad-CPF message
-- [ ] Gate check passes: `npm run lint` and `npm run build`
+- [x] A WhatsApp-only patch writes `whatsapp` and leaves `email` and `cpf` untouched
+- [x] An invalid CPF still returns the existing bad-CPF message
+- [x] Gate check passes: `npm run lint` and `npm run build`
 
 **Tests**: none
 **Gate**: build
