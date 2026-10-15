@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Badge, Button, DataTable, EmptyState, Segmented, type DataTableColumn } from "@/components/ui";
+import { Badge, Button, Card, DataTable, EmptyState, Segmented, type DataTableColumn } from "@/components/ui";
 import { QuickStat } from "@/pages/dashboards/QuickStat";
 import { paths } from "@/router/paths";
 import { folderTitle, monthFolder, resendVisible } from "@/data/wedash/documentSplit";
@@ -33,7 +33,6 @@ export function DocumentsPage() {
   const sentDocuments = documents.filter((doc) => doc.envelopeId);
   const pending = sentDocuments.filter((doc) => doc.status === "PENDING");
   const signed = sentDocuments.filter((doc) => doc.status === "SIGNED");
-  const expired = sentDocuments.filter((doc) => doc.status === "EXPIRED");
   const now = new Date();
   const thisMonth = sentDocuments.filter((doc) => {
     const batch = batchOf.get(doc.batchId);
@@ -89,15 +88,9 @@ export function DocumentsPage() {
       {mode === "home" && (
         <>
           <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <QuickStat label="Pendentes" value={String(pending.length)} sub="Aguardando assinatura" tint="warn" icon={<Glyph d="M12 8v4l3 2M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20" />} />
-            <QuickStat label="Assinados" value={String(signed.length)} sub="Documentos assinados" tint="ok" icon={<Glyph d="M20 6 9 17l-5-5" />} />
-            <QuickStat
-              label="Expirados"
-              value={String(expired.length)}
-              sub="Passou da data limite"
-              tint="bad"
-              icon={<Glyph d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20M12 6v6M4.9 4.9l14.2 14.2" />}
-            />
+            <QuickStat label="Documentos enviados" value={String(sentDocuments.length)} sub="Já foram para assinatura" tint="acc" icon={<Glyph d="M22 2 11 13M22 2 15 22 11 13 2 9 22 2" />} />
+            <QuickStat label="Documentos pendentes" value={String(pending.length)} sub="Aguardando assinatura" tint="warn" icon={<Glyph d="M12 8v4l3 2M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20" />} />
+            <QuickStat label="Documentos assinados" value={String(signed.length)} sub="Assinatura concluída" tint="ok" icon={<Glyph d="M20 6 9 17l-5-5" />} />
           </div>
           <p className="mb-3 text-xs font-bold uppercase tracking-wide text-t2">Atalhos</p>
           <div className="mb-5 grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
@@ -148,7 +141,9 @@ export function DocumentsPage() {
 
       {mode === "browse" ? (
         visibleFolders.length === 0 ? (
-          <EmptyState title="Nenhum documento" description="Esta pasta ainda não tem documentos." action={<Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>} />
+          <Card padding="none">
+            <EmptyState framed={false} title="Nenhum documento" description="Esta pasta ainda não tem documentos." action={<Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>} />
+          </Card>
         ) : (
           <FolderTable
             rows={visibleFolders}
@@ -157,7 +152,9 @@ export function DocumentsPage() {
           />
         )
       ) : visibleFiles.length === 0 ? (
-        <EmptyState title="Nenhum documento" description="Anexe um PDF para começar." action={<Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>} />
+        <Card padding="none">
+          <EmptyState framed={false} title="Nenhum documento" description="Anexe um PDF para começar." action={<Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>} />
+        </Card>
       ) : (
         <FileTable
           rows={visibleFiles}
