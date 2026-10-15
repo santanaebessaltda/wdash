@@ -16,7 +16,12 @@ import {
   defaultDraft,
   defaultSignatureMark,
   deliveryFileName,
+  documentPeople,
+  documentPersonKey,
   documentIssue,
+  findDocumentPerson,
+  parsePersonRef,
+  personMatchesQuery,
   preparationReason,
   preparationSituation,
   envelopeSignatures,
@@ -497,3 +502,133 @@ describe("signerHistory", () => {
     expect(history.map((item) => item.name)).toEqual(["Bruno Lima", "Carla"]);
   });
 });
+
+describe("documentPeople", () => {
+  const team = [
+    person("seller-maria", "centro", "Maria Silva", "Vendedor", VALID_DIGITS, "maria@loja.com"),
+    person("seller-ana", "centro", "Ana Paula Souza", "Gerente", "39053344705", "ana@loja.com"),
+  ];
+
+  it("adds a gestor linked to the branch and keeps the same person in each branch", () => {
+    const people = documentPeople(
+      team,
+      [user("mem-romeu", "id-romeu", "Romeu Fernandes", "OWNER", [], "romeu@wedash.app")],
+      ["centro", "norte"],
+    );
+    expect(people.filter((item) => item.storeId === "centro").map((item) => item.name)).toEqual([
+      "Ana Paula Souza",
+      "Maria Silva",
+      "Romeu Fernandes",
+    ]);
+    expect(people.filter((item) => item.name === "Romeu Fernandes").map((item) => item.storeId)).toEqual(["centro", "norte"]);
+    expect(people.find((item) => item.name === "Romeu Fernandes")?.roleLabel).toBe("Gestor");
+  });
+
+  it("shows a gerente only in the branches linked on Usuários", () => {
+    const people = documentPeople(
+      team,
+      [user("mem-ana-user", "id-carla", "Carla Lima", "MANAGER", ["norte"], "carla@wedash.app")],
+      ["centro", "norte"],
+    );
+    expect(people.filter((item) => item.name === "Carla Lima").map((item) => item.storeId)).toEqual(["norte"]);
+    expect(people.find((item) => item.name === "Carla Lima")?.roleLabel).toBe("Gerente");
+  });
+
+  it("keeps one person when the same CPF or e-mail exists in both sources", () => {
+    const duplicated = documentPeople(
+      team,
+      [user("mem-ana", "id-ana", "Ana Paula Souza", "MANAGER", ["centro", "norte"], "ana@loja.com", "39053344705")],
+      ["centro", "norte"],
+    );
+    expect(duplicated.filter((item) => item.storeId === "centro" && item.name === "Ana Paula Souza")).toEqual([
+      expect.objectContaining({ id: "seller-ana", source: "team" }),
+    ]);
+    expect(duplicated.find((item) => item.storeId === "norte" && item.name === "Ana Paula Souza")?.source).toBe("user");
+    const byEmail = documentPeople(
+      team,
+      [user("mem-ana", "id-ana", "Ana Paula Souza", "MANAGER", ["centro"], "ANA@loja.com", null)],
+      ["centro"],
+    );
+    expect(byEmail.filter((item) => item.storeId === "centro")).toHaveLength(2);
+  });
+
+  it("does not merge two people who only share a name", () => {
+    const people = documentPeople(
+      team,
+      [user("mem-other", "id-other", "Ana Paula Souza", "MANAGER", ["centro"], "outra@wedash.app", "11144477735")],
+      ["centro"],
+    );
+    expect(people.filter((item) => item.name === "Ana Paula Souza")).toHaveLength(2);
+  });
+
+  it("treats a suspended user as inactive and skips a pending invite", () => {
+    const people = documentPeople(
+      [],
+      [
+        { ...user("mem-off", "id-off", "Paula", "MANAGER", ["centro"], "paula@wedash.app"), status: "SUSPENDED" },
+        { ...user("mem-wait", "id-wait", "", "MANAGER", ["centro"], "convite@wedash.app"), status: "ACTIVE" },
+      ],
+      ["centro"],
+    );
+    expect(people).toEqual([expect.objectContaining({ name: "Paula", active: false, source: "user" })]);
+  });
+});
+
+describe("document person key", () => {
+  it("keeps a millennium document on the seller and a user document on the branch", () => {
+    expect(documentPersonKey({ sellerId: "seller-ana", identityId: null, storeId: "centro" })).toBe("seller-ana");
+    expect(documentPersonKey({ sellerId: null, identityId: "id-romeu", storeId: "norte" })).toBe("user:id-romeu:norte");
+    expect(parsePersonRef("user:id-romeu:norte")).toEqual({ sellerId: "", identityId: "id-romeu", storeId: "norte" });
+    expect(parsePersonRef("seller-ana")).toEqual({ sellerId: "seller-ana", identityId: "", storeId: "" });
+    expect(findDocumentPerson([{ id: "user:id-romeu:norte" }], { sellerId: null, identityId: "id-romeu", storeId: "norte" })?.id).toBe(
+      "user:id-romeu:norte",
+    );
+  });
+
+  it("matches name, cpf and e-mail", () => {
+    const person = { name: "Ana Paula", cpf: VALID_DIGITS, email: "ana@loja.com" };
+    expect(personMatchesQuery(person, "paula")).toBe(true);
+    expect(personMatchesQuery(person, "529.982")).toBe(true);
+    expect(personMatchesQuery(person, "ana@loja")).toBe(true);
+    expect(personMatchesQuery(person, "xyz")).toBe(false);
+  });
+});
+
+function person(id: string, storeId: string, name: string, roleLabel: string, cpf: string | null, email: string | null) {
+  return {
+    id,
+    storeId,
+    name,
+    cpf,
+    email,
+    whatsapp: null,
+    active: true,
+    inErp: true,
+    source: "team" as const,
+    roleLabel,
+    identityId: null,
+    membershipId: null,
+  };
+}
+
+function user(
+  membershipId: string,
+  identityId: string,
+  name: string,
+  role: "OWNER" | "MANAGER",
+  storeIds: string[],
+  email: string,
+  cpf: string | null = null,
+) {
+  return {
+    membershipId,
+    identityId,
+    name,
+    email,
+    cpf,
+    whatsapp: null,
+    role,
+    status: "ACTIVE" as const,
+    storeIds,
+  };
+}

@@ -189,6 +189,7 @@ async function prepare(admin: SupabaseClient, tenantId: string, body: Body) {
     list.push({ id: seller.id as string, storeId: seller.store_id as string });
     byCpf.set(seller.cpf as string, list);
   }
+  const usersByCpf = await activeUsersByCpf(admin, tenantId);
 
   const held: { bytes: Uint8Array; texts: string[] }[] = [];
   for (const source of sources as { path?: string; name?: string }[]) {
@@ -235,9 +236,18 @@ async function prepare(admin: SupabaseClient, tenantId: string, body: Body) {
   for (const group of groups) {
       const matches = group.cpf ? (byCpf.get(group.cpf) ?? []) : [];
       const sellerId = assignSeller(matches);
-      const storeId = matches.length === 1 ? matches[0].storeId : (batch.store_id as string | null);
-      const key = sellerId ?? "none";
-      const taken = [...(await takenNames(admin, sellerId, batch)), ...(takenInLoop.get(key) ?? [])];
+      let identityId: string | null = null;
+      let storeId = matches.length === 1 ? matches[0].storeId : (batch.store_id as string | null);
+      if (!sellerId && matches.length === 0 && group.cpf && batch.store_id) {
+        const user = usersByCpf.get(group.cpf);
+        const linked = user != null && (user.storeIds.length === 0 || user.storeIds.includes(batch.store_id as string));
+        if (user && linked) {
+          identityId = user.identityId;
+          storeId = batch.store_id as string;
+        }
+      }
+      const key = sellerId ?? (identityId ? `user:${identityId}` : "none");
+      const taken = [...(await takenNames(admin, { sellerId, identityId }, batch)), ...(takenInLoop.get(key) ?? [])];
       const docName = fileName(label.name, taken);
       takenInLoop.set(key, [...(takenInLoop.get(key) ?? []), docName]);
       const pdf = await buildPdf(sourceBytes, group.pages);
@@ -254,6 +264,7 @@ async function prepare(admin: SupabaseClient, tenantId: string, body: Body) {
         tenant_id: tenantId,
         store_id: storeId,
         seller_id: sellerId,
+        identity_id: identityId,
         status: "UNASSIGNED",
         storage_path: storagePath,
         file_name: docName,
@@ -269,10 +280,10 @@ async function prepare(admin: SupabaseClient, tenantId: string, body: Body) {
 
 async function takenNames(
   admin: SupabaseClient,
-  sellerId: string | null,
+  person: { sellerId: string | null; identityId: string | null },
   batch: { month: number; year: number; category: string },
 ): Promise<string[]> {
-  if (!sellerId) return [];
+  if (!person.sellerId && !person.identityId) return [];
   const { data: batches } = await admin
     .from("document_batch")
     .select("id")
@@ -281,22 +292,88 @@ async function takenNames(
     .eq("category", batch.category);
   const ids = (batches ?? []).map((row) => row.id as string);
   if (ids.length === 0) return [];
-  const { data } = await admin.from("employee_document").select("file_name").eq("seller_id", sellerId).in("batch_id", ids);
+  const query = admin.from("employee_document").select("file_name").in("batch_id", ids);
+  const { data } = person.sellerId
+    ? await query.eq("seller_id", person.sellerId)
+    : await query.eq("identity_id", person.identityId);
   return (data ?? []).map((row) => row.file_name as string);
+}
+
+function storeLinks(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => (item && typeof item === "object" && typeof (item as { store_id?: unknown }).store_id === "string" ? [(item as { store_id: string }).store_id] : []));
+  }
+  if (value && typeof value === "object" && typeof (value as { store_id?: unknown }).store_id === "string") return [(value as { store_id: string }).store_id];
+  return [];
+}
+
+function oneRow<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+async function userOnStore(admin: SupabaseClient, tenantId: string, identityId: string, storeId: string): Promise<boolean> {
+  if (!identityId || !storeId) return false;
+  const { data: store } = await admin.from("store").select("id").eq("id", storeId).eq("tenant_id", tenantId).maybeSingle();
+  if (!store) return false;
+  const { data } = await admin
+    .from("membership")
+    .select("id, membership_store (store_id)")
+    .eq("tenant_id", tenantId)
+    .eq("identity_id", identityId)
+    .in("role", ["OWNER", "MANAGER"])
+    .in("status", ["ACTIVE", "SUSPENDED"])
+    .maybeSingle();
+  if (!data) return false;
+  const links = storeLinks(data.membership_store);
+  return links.length === 0 || links.includes(storeId);
+}
+
+async function loadRecipient(
+  admin: SupabaseClient,
+  tenantId: string,
+  doc: { seller_id: string | null; identity_id: string | null },
+): Promise<{ name: string; email: string | null; whatsapp: string | null; cpf: string | null } | null> {
+  if (doc.seller_id) {
+    const { data } = await admin.from("store_seller").select("name, email, whatsapp, cpf").eq("id", doc.seller_id).eq("tenant_id", tenantId).maybeSingle();
+    return data;
+  }
+  if (!doc.identity_id) return null;
+  const { data } = await admin
+    .from("membership")
+    .select("identity:identity_id (name, email, cpf, whatsapp)")
+    .eq("tenant_id", tenantId)
+    .eq("identity_id", doc.identity_id)
+    .in("role", ["OWNER", "MANAGER"])
+    .in("status", ["ACTIVE", "SUSPENDED"])
+    .limit(1)
+    .maybeSingle();
+  const ident = oneRow(data?.identity as { name: string; email: string | null; cpf: string | null; whatsapp: string | null } | { name: string; email: string | null; cpf: string | null; whatsapp: string | null }[] | null);
+  if (!ident?.name) return null;
+  return { name: ident.name, email: ident.email, whatsapp: ident.whatsapp, cpf: ident.cpf };
 }
 
 async function assign(admin: SupabaseClient, tenantId: string, body: Body) {
   const documentId = String(body.documentId ?? "");
   const sellerId = String(body.sellerId ?? "");
-  const { data: doc } = await admin.from("employee_document").select("id, envelope_id").eq("id", documentId).eq("tenant_id", tenantId).maybeSingle();
+  const identityId = String(body.identityId ?? "");
+  const requestedStore = String(body.storeId ?? "");
+  const { data: doc } = await admin.from("employee_document").select("id, envelope_id, batch_id").eq("id", documentId).eq("tenant_id", tenantId).maybeSingle();
   if (!doc || doc.envelope_id) return json({ error: "not_found" }, 404);
-  if (!sellerId) {
-    await admin.from("employee_document").update({ seller_id: null, store_id: null, status: "UNASSIGNED", error: null }).eq("id", documentId);
+  if (!sellerId && !identityId) {
+    await admin.from("employee_document").update({ seller_id: null, identity_id: null, store_id: null, status: "UNASSIGNED", error: null }).eq("id", documentId);
+    return json({ ok: true });
+  }
+  if (identityId) {
+    const { data: batch } = await admin.from("document_batch").select("store_id").eq("id", doc.batch_id).eq("tenant_id", tenantId).maybeSingle();
+    const storeId = (batch?.store_id as string | null) || requestedStore;
+    if (!storeId || !(await userOnStore(admin, tenantId, identityId, storeId))) return json({ error: "not_found" }, 404);
+    await admin.from("employee_document").update({ seller_id: null, identity_id: identityId, store_id: storeId, error: null }).eq("id", documentId);
     return json({ ok: true });
   }
   const { data: seller } = await admin.from("store_seller").select("id, store_id").eq("id", sellerId).eq("tenant_id", tenantId).maybeSingle();
   if (!seller) return json({ error: "not_found" }, 404);
-  await admin.from("employee_document").update({ seller_id: sellerId, store_id: seller.store_id, error: null }).eq("id", documentId);
+  await admin.from("employee_document").update({ seller_id: sellerId, identity_id: null, store_id: seller.store_id, error: null }).eq("id", documentId);
   return json({ ok: true });
 }
 
@@ -341,16 +418,46 @@ async function dropPage(admin: SupabaseClient, tenantId: string, body: Body) {
   return json({ ok: true, removed: false, pageCount: pageCount - 1 });
 }
 
+async function activeUsersByCpf(admin: SupabaseClient, tenantId: string): Promise<Map<string, { identityId: string; storeIds: string[] }>> {
+  const { data } = await admin
+    .from("membership")
+    .select("identity_id, identity:identity_id (cpf), membership_store (store_id)")
+    .eq("tenant_id", tenantId)
+    .in("role", ["OWNER", "MANAGER"])
+    .eq("status", "ACTIVE");
+  const map = new Map<string, { identityId: string; storeIds: string[] }>();
+  for (const row of data ?? []) {
+    const ident = oneRow(row.identity as { cpf: string | null } | { cpf: string | null }[] | null);
+    const cpf = (ident?.cpf ?? "").replace(/\D/g, "");
+    if (cpf.length !== 11) continue;
+    map.set(cpf, { identityId: row.identity_id as string, storeIds: storeLinks(row.membership_store) });
+  }
+  return map;
+}
+
 async function saveContact(admin: SupabaseClient, tenantId: string, body: Body) {
   const sellerId = String(body.sellerId ?? "");
-  const { data: seller } = await admin.from("store_seller").select("id").eq("id", sellerId).eq("tenant_id", tenantId).maybeSingle();
-  if (!seller) return json({ error: "not_found" }, 404);
+  const identityId = String(body.identityId ?? "");
   const input: { cpf?: string; email?: string; whatsapp?: string } = {};
   if ("cpf" in body) input.cpf = String(body.cpf ?? "");
   if ("email" in body) input.email = String(body.email ?? "");
   if ("whatsapp" in body) input.whatsapp = String(body.whatsapp ?? "");
   const saved = contactPatch(input);
   if (!saved.ok) return json({ message: saved.message }, 422);
+  if (identityId) {
+    const { data: member } = await admin.from("membership").select("id").eq("tenant_id", tenantId).eq("identity_id", identityId).in("role", ["OWNER", "MANAGER"]).maybeSingle();
+    if (!member) return json({ error: "not_found" }, 404);
+    if (Object.keys(saved.patch).length === 0) return json({ ok: true });
+    const patch: { cpf?: string; email?: string | null; whatsapp?: string | null } = {};
+    if (saved.patch.cpf !== undefined) patch.cpf = saved.patch.cpf;
+    if (saved.patch.email !== undefined) patch.email = saved.patch.email;
+    if (saved.patch.whatsapp !== undefined) patch.whatsapp = saved.patch.whatsapp;
+    const { error } = await admin.from("identity").update(patch).eq("id", identityId);
+    if (error) return json({ message: "Não foi possível salvar o contato." }, 422);
+    return json({ ok: true, ...patch });
+  }
+  const { data: seller } = await admin.from("store_seller").select("id").eq("id", sellerId).eq("tenant_id", tenantId).maybeSingle();
+  if (!seller) return json({ error: "not_found" }, 404);
   if (Object.keys(saved.patch).length === 0) return json({ ok: true });
   const { error } = await admin.from("store_seller").update(saved.patch).eq("id", sellerId);
   if (error) return json({ error: "persist" }, 500);
@@ -409,11 +516,8 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
     const parsedDocExtra = storedExtras(doc.extra_signer);
     const extraInvalid = doc.extra_signer != null && parsedDocExtra == null ? "Informe o nome do signatário." : null;
     const block = confirmBlock({ deadline: null, hasToken: Boolean(token), sizeBytes: doc.size_bytes as number });
-    let seller: { name: string; email: string | null; whatsapp: string | null; cpf: string | null } | null = null;
-    if (doc.seller_id) {
-      const { data } = await admin.from("store_seller").select("name, email, whatsapp, cpf").eq("id", doc.seller_id).maybeSingle();
-      seller = data;
-    }
+    const seller = await loadRecipient(admin, tenantId, { seller_id: (doc.seller_id as string | null) ?? null, identity_id: (doc.identity_id as string | null) ?? null });
+    const personId = (doc.seller_id as string | null) ?? (doc.identity_id as string | null);
     const missingChannel = channel ? null : "Escolha WhatsApp ou e-mail.";
     const contactBlock = channel ? channelBlock(channel, { email: seller?.email ?? null, whatsapp: seller?.whatsapp ?? null }) : null;
     const placeBlock = savedMarks.length > 0 ? placementWarning(savedMarks, pageCount) : null;
@@ -428,9 +532,9 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
     const extraPlace = chosenExtras
       .map((item) => (item.marks.length > 0 ? placementWarning(item.marks, pageCount) : null))
       .find((item) => item) ?? null;
-    const rowBlock = block ?? missingChannel ?? (doc.seller_id ? contactBlock : null) ?? placeBlock ?? extraInvalid ?? extraContact ?? extraPlace;
-    if (!shouldSend({ envelopeId: (doc.envelope_id as string | null) ?? null, sellerId: (doc.seller_id as string | null) ?? null, block: rowBlock })) {
-      const quiet = !doc.seller_id || Boolean(doc.envelope_id);
+    const rowBlock = block ?? missingChannel ?? (personId ? contactBlock : null) ?? placeBlock ?? extraInvalid ?? extraContact ?? extraPlace;
+    if (!shouldSend({ envelopeId: (doc.envelope_id as string | null) ?? null, sellerId: personId, block: rowBlock })) {
+      const quiet = !personId || Boolean(doc.envelope_id);
       if (!quiet && rowBlock) await admin.from("employee_document").update({ error: rowBlock }).eq("id", doc.id);
       results.push({ id: doc.id as string, error: quiet ? null : rowBlock });
       continue;
@@ -499,7 +603,7 @@ async function resend(admin: SupabaseClient, tenantId: string, secret: string, b
   const channel = asChannel(doc.channel) ?? asChannel(batch?.channel);
   if (!batch || !channel) return json({ error: "not_found" }, 404);
   const token = await loadCompanyToken(admin, tenantId, secret);
-  const { data: seller } = await admin.from("store_seller").select("email, whatsapp").eq("id", doc.seller_id).maybeSingle();
+  const seller = await loadRecipient(admin, tenantId, { seller_id: (doc.seller_id as string | null) ?? null, identity_id: (doc.identity_id as string | null) ?? null });
   if (!token || !seller) return json({ message: "Não foi possível reenviar o link. Tente novamente." }, 502);
   const ok = await assinaResend(token, doc.envelope_id as string, doc.recipient_id as string, {
     senderType: channel,
@@ -539,20 +643,30 @@ async function cancelDocument(admin: SupabaseClient, tenantId: string, secret: s
 async function moveDocument(admin: SupabaseClient, tenantId: string, body: Body) {
   const documentId = String(body.documentId ?? "");
   const sellerId = String(body.sellerId ?? "");
+  const identityId = String(body.identityId ?? "");
+  const requestedStore = String(body.storeId ?? "");
   const month = Number(body.month);
   const year = Number(body.year);
   const { data: doc } = await admin.from("employee_document").select("id, batch_id, status, envelope_id, removed_at").eq("id", documentId).eq("tenant_id", tenantId).maybeSingle();
   if (!doc || doc.removed_at || !resendVisible(doc.status as DocStatus) || !doc.envelope_id) return json({ message: "Só um documento pendente pode ser movido." }, 422);
-  const { data: seller } = await admin.from("store_seller").select("id, store_id").eq("id", sellerId).eq("tenant_id", tenantId).maybeSingle();
   const { data: batch } = await admin.from("document_batch").select("category, unify").eq("id", doc.batch_id).eq("tenant_id", tenantId).maybeSingle();
-  if (!seller || !batch) return json({ message: "Não foi possível mover o documento. Tente novamente." }, 404);
+  let targetStore = "";
+  if (identityId) {
+    if (!(await userOnStore(admin, tenantId, identityId, requestedStore))) return json({ message: "Não foi possível mover o documento. Tente novamente." }, 404);
+    targetStore = requestedStore;
+  } else {
+    const { data: seller } = await admin.from("store_seller").select("id, store_id").eq("id", sellerId).eq("tenant_id", tenantId).maybeSingle();
+    if (!seller) return json({ message: "Não foi possível mover o documento. Tente novamente." }, 404);
+    targetStore = seller.store_id as string;
+  }
+  if (!batch) return json({ message: "Não foi possível mover o documento. Tente novamente." }, 404);
   if (!Number.isInteger(month) || month < 1 || month > 12) return json({ message: "Não foi possível mover o documento. Tente novamente." }, 400);
   if (!Number.isInteger(year) || year < 2000 || year > 2100) return json({ message: "Informe um ano válido." }, 400);
   const { data: found } = await admin
     .from("document_batch")
     .select("id")
     .eq("tenant_id", tenantId)
-    .eq("store_id", seller.store_id)
+    .eq("store_id", targetStore)
     .eq("month", month)
     .eq("year", year)
     .eq("category", batch.category)
@@ -561,13 +675,19 @@ async function moveDocument(admin: SupabaseClient, tenantId: string, body: Body)
   if (!batchId) {
     const { data: created, error } = await admin
       .from("document_batch")
-      .insert({ tenant_id: tenantId, store_id: seller.store_id, month, year, category: batch.category, unify: batch.unify })
+      .insert({ tenant_id: tenantId, store_id: targetStore, month, year, category: batch.category, unify: batch.unify })
       .select("id")
       .single();
     if (error || !created) return json({ message: "Não foi possível mover o documento. Tente novamente." }, 500);
     batchId = created.id as string;
   }
-  const { error } = await admin.from("employee_document").update({ batch_id: batchId, seller_id: sellerId, store_id: seller.store_id, error: null }).eq("id", documentId);
+  const { error } = await admin.from("employee_document").update({
+    batch_id: batchId,
+    seller_id: identityId ? null : sellerId,
+    identity_id: identityId || null,
+    store_id: targetStore,
+    error: null,
+  }).eq("id", documentId);
   if (error) return json({ message: "Não foi possível mover o documento. Tente novamente." }, 500);
   return json({ ok: true });
 }
@@ -587,9 +707,7 @@ async function openFile(admin: SupabaseClient, tenantId: string, secret: string,
   }
   if (!path) return json({ error: "missing_file" }, 404);
   const batch = await ownedBatch(admin, tenantId, doc.batch_id as string);
-  const { data: seller } = doc.seller_id
-    ? await admin.from("store_seller").select("name").eq("id", doc.seller_id).maybeSingle()
-    : { data: null };
+  const seller = await loadRecipient(admin, tenantId, { seller_id: (doc.seller_id as string | null) ?? null, identity_id: (doc.identity_id as string | null) ?? null });
   const download = seller?.name && batch
     ? deliveryFileName(doc.file_name as string, seller.name as string, Number(batch.month), Number(batch.year))
     : (doc.file_name as string);

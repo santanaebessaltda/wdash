@@ -11,6 +11,8 @@ import {
   contactFieldsToAsk,
   documentIssue,
   displayTitle,
+  documentPersonKey,
+  findDocumentPerson,
   guestAuthentication,
   guestChannel,
   preparationCaption,
@@ -89,17 +91,17 @@ export function DocumentReview({
   );
   const ready = rows.filter((row, index) => {
     if (row.envelopeId) return false;
-    if (documentIssue(people.find((item) => item.id === row.sellerId) ?? null, resolved[index], row.pageCount, signers, people, row.sizeBytes)) return false;
+    if (documentIssue(findDocumentPerson(people, row), resolved[index], row.pageCount, signers, people, row.sizeBytes)) return false;
     return Boolean(opened[row.id]) || index === 0;
   }).length;
   const openRows = rows.filter((row) => !row.envelopeId).length;
   const index = Math.max(0, rows.findIndex((row) => row.id === activeId));
   const row = rows[index];
   const draft = row ? drafts[row.id] : undefined;
-  const unidentified = rows.filter((item) => !item.sellerId && !item.envelopeId).length;
+  const unidentified = rows.filter((item) => !documentPersonKey(item) && !item.envelopeId).length;
   const attention = openRows - ready;
   const situationOf = (item: DocumentRow, itemIndex: number) => {
-    const person = people.find((candidate) => candidate.id === item.sellerId) ?? null;
+    const person = findDocumentPerson(people, item);
     const situation = preparationSituation(person, resolved[itemIndex], item.pageCount, signers, people, item.envelopeId, item.sizeBytes);
     const reviewed = Boolean(opened[item.id]) || itemIndex === 0;
     const reason = preparationReason(person, resolved[itemIndex], item.pageCount, signers, people, item.envelopeId, item.sizeBytes, reviewed);
@@ -110,14 +112,14 @@ export function DocumentReview({
     <>
       <WizardCardHeader
         title="Preparar documentos"
-        subtitle="Vincule o colaborador, defina os signatários e posicione as marcações de assinatura."
+        subtitle="Vincule a pessoa, defina os signatários e posicione as marcações de assinatura."
       />
       {analyzed && rows.length > 0 && (
         <p className="mt-3 text-[13px] text-t2">
           {analyzed.files} {analyzed.files === 1 ? "arquivo analisado" : "arquivos analisados"} · {rows.length}{" "}
           {rows.length === 1 ? "documento separado" : "documentos separados"}
           {unidentified > 0 && unidentified === attention
-            ? ` · ${unidentified} sem colaborador identificado`
+            ? ` · ${unidentified} sem pessoa identificada`
             : attention > 0
               ? ` · ${attention} ${attention === 1 ? "precisa" : "precisam"} de atenção`
               : ""}
@@ -227,7 +229,9 @@ function ReviewBody({
   onContact: (sellerId: string, contact: ContactEdit) => void;
   onRemove: () => Promise<void>;
 }) {
-  const person = people.find((item) => item.id === row.sellerId) ?? null;
+  const ownerKey = documentPersonKey(row);
+  const person = people.find((item) => item.id === ownerKey) ?? null;
+  const branchPeople = people.filter((item) => !row.storeId || item.storeId === row.storeId);
   const issue = row.envelopeId ? null : documentIssue(person, draft, row.pageCount, signers, people, row.sizeBytes);
   const previous = index > 0 ? rows[index - 1] : null;
   const next = index < total - 1 ? rows[index + 1] : null;
@@ -238,7 +242,7 @@ function ReviewBody({
 
   function saveDraft(next: DocumentDraft) {
     onDraft(next);
-    if (!next.fields.some((field) => field.signerId === "seller") && row.sellerId) void onAssign(row.id, "");
+    if (!next.fields.some((field) => field.signerId === "seller") && ownerKey) void onAssign(row.id, "");
   }
 
   function changeFields(fields: FieldMark[]) {
@@ -292,12 +296,12 @@ function ReviewBody({
       return;
     }
     if (value === "seller" || people.some((item) => item.id === value)) {
-      const personId = value === "seller" ? row.sellerId : value;
+      const personId = value === "seller" ? ownerKey : value;
       saveDraft({
         ...draft,
         fields: draft.fields.map((item) => (item.id === field.id ? { ...item, signerId: "seller" } : item)),
       });
-      if (personId && personId !== row.sellerId) void onAssign(row.id, personId);
+      if (personId && personId !== ownerKey) void onAssign(row.id, personId);
       return;
     }
     saveDraft({
@@ -309,7 +313,7 @@ function ReviewBody({
 
   function placeMark(mark: SignatureMark) {
     const id = crypto.randomUUID();
-    saveDraft({ ...draft, fields: [...draft.fields, { ...mark, id, signerId: row.sellerId ? "" : "seller" }] });
+    saveDraft({ ...draft, fields: [...draft.fields, { ...mark, id, signerId: ownerKey ? "" : "seller" }] });
     setSelectedId(id);
   }
 
@@ -350,8 +354,8 @@ function ReviewBody({
             documentId={row.id}
             pageCount={row.pageCount}
             fields={draft.fields}
-            people={people}
-            sellerId={row.sellerId}
+            people={branchPeople}
+            ownerKey={ownerKey}
             guests={draft.guests ?? []}
             history={history}
             disabled={locked}
@@ -464,7 +468,7 @@ function channelContactsReady(
 
 function documentTitle(_rows: DocumentRow[], item: DocumentRow, people: PersonRow[]) {
   const title = displayTitle(item.fileName);
-  const named = people.find((person) => person.id === item.sellerId);
+  const named = findDocumentPerson(people, item);
   if (named) return `${title} · ${named.name}`;
   return title;
 }
@@ -580,14 +584,14 @@ function signerGroups(draft: DocumentDraft, person: PersonRow | null, people: Pe
       return { key, name: "Sem signatário", role: null as "Principal" | "Adicional" | null, origin: "", pending: "Escolha quem assina", marks, person: null, guest: null, userEmail: null, channel: null as SendChannel | null, authentication: null as AuthenticationType | null };
     }
     if (key === "seller" && !person) {
-      return { key, name: "Colaborador do documento", role: null, origin: "Colaborador", pending: "Sem colaborador", marks, person: null, guest: null, userEmail: null, channel: draft.channel, authentication: asAuthentication(draft.authentication) };
+      return { key, name: "Pessoa do documento", role: null, origin: "", pending: "Sem pessoa", marks, person: null, guest: null, userEmail: null, channel: draft.channel, authentication: asAuthentication(draft.authentication) };
     }
     if (key === "seller" && person) {
-      return { key, name: person.name, role: "Principal" as const, origin: "Colaborador", pending: channelGap(person, draft.channel), marks, person, guest: null, userEmail: null, channel: draft.channel, authentication: asAuthentication(draft.authentication) };
+      return { key, name: person.name, role: "Principal" as const, origin: person.roleLabel, pending: channelGap(person, draft.channel), marks, person, guest: null, userEmail: null, channel: draft.channel, authentication: asAuthentication(draft.authentication) };
     }
     if (key.startsWith("seller:")) {
       const named = people.find((item) => item.id === key.slice("seller:".length)) ?? null;
-      return { key, name: named?.name ?? "Colaborador", role: "Adicional" as const, origin: "Colaborador", pending: named ? channelGap(named, draft.channel) : "Sem contato", marks, person: named, guest: null, userEmail: null, channel: draft.channel, authentication: asAuthentication(draft.authentication) };
+      return { key, name: named?.name ?? "Pessoa", role: "Adicional" as const, origin: named?.roleLabel ?? "", pending: named ? channelGap(named, draft.channel) : "Sem contato", marks, person: named, guest: null, userEmail: null, channel: draft.channel, authentication: asAuthentication(draft.authentication) };
     }
     if (key.startsWith("user:")) {
       const named = signers.find((item) => item.id === key.slice("user:".length));
@@ -602,7 +606,7 @@ function signerGroups(draft: DocumentDraft, person: PersonRow | null, people: Pe
         : channel === "EMAIL" && !guest.email.trim()
           ? "Sem e-mail"
           : null;
-    return { key, name: guest?.name.trim() || "Outra pessoa", role: "Adicional" as const, origin: "Outra pessoa", pending, marks, person: null, guest, userEmail: null, channel, authentication: guestAuthentication(guest) };
+    return { key, name: guest?.name.trim() || "Nova pessoa", role: "Adicional" as const, origin: "Nova pessoa", pending, marks, person: null, guest, userEmail: null, channel, authentication: guestAuthentication(guest) };
   });
 }
 
@@ -729,7 +733,7 @@ function DraftFields({
       <section className="rounded-xl border border-line p-3">
         <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Situação do documento</p>
         <ul className="mt-2 grid gap-1.5">
-          <CheckRow ok={Boolean(person) && ownerMarked} label="Colaborador identificado" />
+          <CheckRow ok={Boolean(person) && ownerMarked} label="Pessoa identificada" />
           <CheckRow ok={marksValid} label="Marcações válidas" />
           <CheckRow ok={contactsValid} label="Contato para envio válido" />
           <CheckRow ok={sizeValid} label="Tamanho do PDF válido" />
@@ -754,53 +758,52 @@ function CheckRow({ ok, label }: { ok: boolean; label: string }) {
 
 function SignerOptions({
   people,
-  sellerId,
+  ownerKey,
   guests,
   history,
   collaborator,
   allowNew = true,
 }: {
   people: PersonRow[];
-  sellerId: string | null;
+  ownerKey: string | null;
   guests: GuestSigner[];
   history: SignerContact[];
   collaborator: boolean;
   allowNew?: boolean;
 }) {
-  if (collaborator) {
-    return (
-      <>
-        <option value="">Selecionar colaborador</option>
-        {people.map((person) => (
-          <option key={person.id} value={person.id}>
-            {person.name}
-          </option>
-        ))}
-      </>
-    );
-  }
+  const team = people.filter((person) => person.source !== "user");
+  const users = people.filter((person) => person.source === "user");
+  const option = (person: PersonRow) => (
+    <option key={person.id} value={!collaborator && person.id === ownerKey ? "seller" : person.id}>
+      {person.roleLabel ? `${person.name} · ${person.roleLabel}` : person.name}
+    </option>
+  );
+  const groups = (
+    <>
+      {team.length > 0 && <optgroup label="Equipe">{team.map(option)}</optgroup>}
+      {users.length > 0 && <optgroup label="Usuários da WDash">{users.map(option)}</optgroup>}
+    </>
+  );
   const known = new Set((guests ?? []).filter((guest) => guest.name.trim()).map((guest) => signerContactKey(guest)));
   return (
     <>
-      <option value="">Signatário</option>
-      {people.map((person) => (
-        <option key={person.id} value={person.id === sellerId ? "seller" : person.id}>
-          {person.name}
-        </option>
-      ))}
-      {guests.map((guest) => (
-        <option key={guest.id} value={`guest:${guest.id}`}>
-          {guest.name.trim() || "Nova pessoa"}
-        </option>
-      ))}
-      {history.map((contact, index) =>
-        known.has(signerContactKey(contact)) ? null : (
-          <option key={signerContactKey(contact)} value={`history:${index}`}>
-            {contact.name}
+      <option value="">{collaborator ? "Selecionar pessoa" : "Signatário"}</option>
+      {groups}
+      <optgroup label="Nova pessoa">
+        {guests.map((guest) => (
+          <option key={guest.id} value={`guest:${guest.id}`}>
+            {guest.name.trim() || "Nova pessoa"}
           </option>
-        ),
-      )}
-      {allowNew && <option value="__guest__">Nova pessoa</option>}
+        ))}
+        {history.map((contact, index) =>
+          known.has(signerContactKey(contact)) ? null : (
+            <option key={signerContactKey(contact)} value={`history:${index}`}>
+              {contact.name}
+            </option>
+          ),
+        )}
+        {allowNew && <option value="__guest__">Nova pessoa</option>}
+      </optgroup>
     </>
   );
 }
@@ -912,7 +915,7 @@ function StackedPages({
   pageCount,
   fields,
   people,
-  sellerId,
+  ownerKey,
   guests,
   history,
   disabled,
@@ -927,7 +930,7 @@ function StackedPages({
   pageCount: number;
   fields: FieldMark[];
   people: PersonRow[];
-  sellerId: string | null;
+  ownerKey: string | null;
   guests: GuestSigner[];
   history: SignerContact[];
   disabled: boolean;
@@ -1066,7 +1069,7 @@ function StackedPages({
                     key={field.id}
                     field={field}
                     people={people}
-                    sellerId={sellerId}
+                    ownerKey={ownerKey}
                     guests={guests}
                     history={history}
                     disabled={disabled}
@@ -1126,7 +1129,7 @@ function shiftedCopy(field: FieldMark): { x: number; y: number } {
 function MarkCard({
   field,
   people,
-  sellerId,
+  ownerKey,
   guests,
   history,
   disabled,
@@ -1139,7 +1142,7 @@ function MarkCard({
 }: {
   field: FieldMark;
   people: PersonRow[];
-  sellerId: string | null;
+  ownerKey: string | null;
   guests: GuestSigner[];
   history: SignerContact[];
   disabled: boolean;
@@ -1205,16 +1208,16 @@ function MarkCard({
         <div className="grid gap-1.5 p-1.5">
           <select
             className="h-8 min-w-0 rounded-[var(--radius-vela-sm)] border border-line bg-bg-inset px-2 text-xs font-bold text-t0 outline-none focus:border-acc"
-            value={sellerId ? (field.signerId === "seller" ? "seller" : field.signerId) : field.signerId === "seller" ? "" : field.signerId}
+            value={ownerKey ? (field.signerId === "seller" ? "seller" : field.signerId) : field.signerId === "seller" ? "" : field.signerId}
             disabled={disabled}
             onChange={(event) => onPick(event.target.value)}
           >
             <SignerOptions
               people={people}
-              sellerId={sellerId}
+              ownerKey={ownerKey}
               guests={guests}
               history={history}
-              collaborator={!sellerId}
+              collaborator={!ownerKey}
               allowNew={!guests.some((guest) => field.signerId === `guest:${guest.id}` && !guest.name.trim())}
             />
           </select>

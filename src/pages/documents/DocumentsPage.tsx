@@ -5,7 +5,7 @@ import { cn } from "@/lib/cn";
 import { QuickStat } from "@/pages/dashboards/QuickStat";
 import { Icon, icons } from "@/pages/users/Icons";
 import { paths } from "@/router/paths";
-import { displayTitle, monthFolder, resendVisible, DOCUMENT_CATEGORIES } from "@/data/wedash/documentSplit";
+import { displayTitle, documentPersonKey, findDocumentPerson, monthFolder, personMatchesQuery, resendVisible, DOCUMENT_CATEGORIES } from "@/data/wedash/documentSplit";
 import type { BatchRow, DocumentRow, PersonRow } from "@/data/wedash/documentsRepo";
 import { cancelDocument, copyDocumentLink, moveDocument, openDocument, resendDocument } from "@/data/wedash/documentsRepo";
 import { DocumentsFrame, FileGlyph, FolderGlyph, Glyph, STATUS_LABEL, SearchGlyph, badgeVariant } from "./frame";
@@ -14,7 +14,7 @@ import { useDocuments } from "./useDocuments";
 type Mode = "home" | "pending" | "month" | "browse";
 type PeopleFilter = "active" | "all" | "inactive";
 
-type FolderEntry = { key: string; label: string; detail: string; fileId?: string };
+type FolderEntry = { key: string; label: string; detail: string; caption?: string; fileId?: string };
 
 const fieldClass = "h-10 w-full rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3 text-[13px] text-t0";
 
@@ -68,8 +68,9 @@ export function DocumentsPage() {
 
   function matchesText(doc: DocumentRow) {
     if (!needle) return true;
-    const person = (personName.get(doc.sellerId ?? "") ?? "").toLowerCase();
-    return displayTitle(doc.fileName).toLowerCase().includes(needle) || doc.fileName.toLowerCase().includes(needle) || person.includes(needle);
+    const person = findDocumentPerson(people, doc);
+    const titled = displayTitle(doc.fileName).toLowerCase().includes(needle) || doc.fileName.toLowerCase().includes(needle);
+    return titled || (person != null && personMatchesQuery(person, needle));
   }
 
   function matchesFilters(doc: DocumentRow) {
@@ -93,8 +94,17 @@ export function DocumentsPage() {
     return true;
   });
   const atPeople = mode === "browse" && (allStores ? crumb.length === 1 : crumb.length === 0);
+  const peopleSearch = atPeople && query.trim().length > 0;
   const folders = mode === "browse" ? folderEntries({ allStores, crumb, documents: libraryDocs, batches, people: listedPeople, stores }) : [];
-  const visibleFolders = searching ? [] : folders;
+  const visibleFolders = peopleSearch
+    ? folders.filter((folder) => {
+        const person = listedPeople.find((item) => item.id === folder.key);
+        return person != null && personMatchesQuery(person, query);
+      })
+    : searching
+      ? []
+      : folders;
+  const peopleHere = people.filter((person) => !allStores || crumb[0] == null || person.storeId === crumb[0]);
 
   function goHome() {
     setMode("home");
@@ -116,7 +126,7 @@ export function DocumentsPage() {
   function openMove(id: string) {
     const doc = documents.find((item) => item.id === id);
     const batch = doc ? batchOf.get(doc.batchId) : undefined;
-    setMoveSeller(doc?.sellerId ?? "");
+    setMoveSeller(doc ? documentPersonKey(doc) ?? "" : "");
     setMoveMonth(String(batch?.month ?? new Date().getMonth() + 1));
     setMoveYear(String(batch?.year ?? new Date().getFullYear()));
     setMoveId(id);
@@ -158,7 +168,7 @@ export function DocumentsPage() {
     }
     setActing(true);
     try {
-      await moveDocument({ documentId: moveId, sellerId: moveSeller, month: Number(moveMonth), year });
+      await moveDocument({ documentId: moveId, personId: moveSeller, month: Number(moveMonth), year });
       setMoveId(null);
       show("Documento movido.", "success");
       await reload();
@@ -174,7 +184,7 @@ export function DocumentsPage() {
   return (
     <DocumentsFrame
       title="Documentos"
-      subtitle={allStores ? "Encontre documentos por filial, colaborador, ano e mês e acompanhe as assinaturas." : "Encontre documentos por colaborador, ano e mês e acompanhe as assinaturas."}
+      subtitle={allStores ? "Encontre documentos por filial, pessoa, ano e mês e acompanhe as assinaturas." : "Encontre documentos por pessoa, ano e mês e acompanhe as assinaturas."}
       actions={
         <Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>
       }
@@ -191,7 +201,7 @@ export function DocumentsPage() {
         <Shortcut label="Pendentes" active={mode === "pending"} count={qty(pending.length, "documento", "documentos")} onClick={() => { setMode("pending"); setQuery(""); }} />
         <Shortcut label="Este mês" active={mode === "month"} count={qty(thisMonth.length, "documento", "documentos")} onClick={() => { setMode("month"); setQuery(""); }} />
         <Shortcut
-          label={allStores ? "Filiais" : "Colaboradores"}
+          label={allStores ? "Filiais" : "Pessoas"}
           active={mode === "browse"}
           count={allStores ? qty(stores.length, "filial", "filiais") : qty(listedPeople.length, "pessoa", "pessoas")}
           onClick={() => { setMode("browse"); setCrumb([]); setQuery(""); }}
@@ -212,7 +222,7 @@ export function DocumentsPage() {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar por documento ou colaborador"
+            placeholder="Buscar por documento, nome, CPF ou e-mail"
             className="w-40 bg-transparent text-[12.5px] text-t0 outline-none placeholder:text-t2 sm:w-72"
           />
         </div>
@@ -282,10 +292,18 @@ export function DocumentsPage() {
         </div>
       )}
 
-      {mode === "browse" && !searching ? (
+      {mode === "browse" && (!searching || peopleSearch) ? (
         visibleFolders.length === 0 ? (
           <Card padding="none">
-            <EmptyState framed={false} title="Esta pasta ainda não tem documentos." action={<Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>} />
+            {atPeople ? (
+              <EmptyState
+                framed={false}
+                title={peopleSearch ? "Nenhuma pessoa encontrada" : "Nenhuma pessoa disponível"}
+                description={peopleSearch ? "Tente outro nome, CPF ou e-mail." : peopleHere.length === 0 ? "Não há pessoas vinculadas a esta filial." : "Não há pessoas neste filtro."}
+              />
+            ) : (
+              <EmptyState framed={false} title="Esta pasta ainda não tem documentos." action={<Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>} />
+            )}
           </Card>
         ) : (
           <FolderTable
@@ -326,7 +344,7 @@ export function DocumentsPage() {
         />
       )}
       <p className="mt-3 text-[12.5px] text-t2">
-        {mode === "browse" && !searching ? qty(visibleFolders.length, "item", "itens") : qty(visibleFiles.length, "documento", "documentos")}
+        {mode === "browse" && (!searching || peopleSearch) ? qty(visibleFolders.length, "item", "itens") : qty(visibleFiles.length, "documento", "documentos")}
       </p>
       <Modal
         open={deleteId != null}
@@ -364,15 +382,12 @@ export function DocumentsPage() {
         }
       >
         <div className="grid gap-3">
-          <p className="text-[13.5px] text-t1">Altere o colaborador, o mês ou o ano deste documento. A assinatura em andamento não será alterada.</p>
-          <FormField label="Colaborador">
+          <p className="text-[13.5px] text-t1">Altere a pessoa, o mês ou o ano deste documento. A assinatura em andamento não será alterada.</p>
+          <FormField label="Pessoa">
             <select className={fieldClass} value={moveSeller} onChange={(event) => setMoveSeller(event.target.value)}>
               <option value="">Selecione</option>
-              {people.map((person) => (
-                <option key={person.id} value={person.id}>
-                  {allStores ? `${person.name} · ${storeName.get(person.storeId) ?? ""}` : person.name}
-                </option>
-              ))}
+              <PersonChoices people={people.filter((person) => person.source !== "user")} allStores={allStores} storeName={storeName} group="Equipe" />
+              <PersonChoices people={people.filter((person) => person.source === "user")} allStores={allStores} storeName={storeName} group="Usuários da WDash" />
             </select>
           </FormField>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -395,6 +410,29 @@ export function DocumentsPage() {
 
 function qty(count: number, singular: string, plural: string) {
   return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function PersonChoices({
+  people,
+  allStores,
+  storeName,
+  group,
+}: {
+  people: PersonRow[];
+  allStores: boolean;
+  storeName: Map<string, string>;
+  group: string;
+}) {
+  if (people.length === 0) return null;
+  return (
+    <optgroup label={group}>
+      {people.map((person) => (
+        <option key={person.id} value={person.id}>
+          {allStores ? `${person.name} · ${person.roleLabel} · ${storeName.get(person.storeId) ?? ""}` : `${person.name} · ${person.roleLabel}`}
+        </option>
+      ))}
+    </optgroup>
+  );
 }
 
 function Shortcut({ label, count, active, onClick }: { label: string; count: string; active?: boolean; onClick: () => void }) {
@@ -448,7 +486,7 @@ function sectionTitle(mode: Mode, allStores: boolean, crumb: string[], storeName
   if (mode === "pending") return "Pendentes";
   if (mode === "month") return `Este mês · ${monthFolder(new Date().getMonth() + 1)}`;
   if (mode === "home") return "Documentos recentes";
-  if (crumb.length === 0) return allStores ? "Filiais" : "Colaboradores";
+  if (crumb.length === 0) return allStores ? "Filiais" : "Pessoas";
   const last = crumb[crumb.length - 1];
   return crumbLabel(last, storeName, personName);
 }
@@ -472,7 +510,7 @@ function folderEntries(input: {
     return stores.map((store) => ({
       key: store.id,
       label: store.name,
-      detail: qty(people.filter((person) => person.storeId === store.id).length, "colaborador", "colaboradores"),
+      detail: qty(people.filter((person) => person.storeId === store.id).length, "pessoa", "pessoas"),
     }));
   }
   const storeKey = allStores ? crumb[0] : null;
@@ -482,11 +520,12 @@ function folderEntries(input: {
     return peopleHere.map((person) => ({
       key: person.id,
       label: person.name,
-      detail: qty(documents.filter((doc) => doc.sellerId === person.id).length, "documento", "documentos"),
+      caption: person.roleLabel,
+      detail: qty(documents.filter((doc) => documentPersonKey(doc) === person.id).length, "documento", "documentos"),
     }));
   }
   const sellerId = allStores ? crumb[1] : crumb[0];
-  const docs = documents.filter((doc) => doc.sellerId === sellerId);
+  const docs = documents.filter((doc) => documentPersonKey(doc) === sellerId);
   if (depth === 1) {
     return [...new Set(docs.map(yearOf))].filter(Boolean).map((year) => ({
       key: year,
@@ -540,7 +579,7 @@ function FolderTable({
           </span>
           <span className="min-w-0">
             <span className="block truncate text-[13px] font-bold text-t0">{row.label}</span>
-            <span className="mt-px block text-[11px] text-t2">{row.fileId ? "PDF" : "Pasta"}</span>
+            <span className="mt-px block text-[11px] text-t2">{row.fileId ? "PDF" : row.caption ?? "Pasta"}</span>
           </span>
         </button>
       ),
@@ -623,9 +662,9 @@ function FileTable({
     },
     {
       key: "owner",
-      header: "Colaborador",
+      header: "Pessoa",
       hideBelow: "md",
-      render: (row) => <span className="text-[12.5px] text-t1">{people.find((person) => person.id === row.sellerId)?.name ?? "Sem colaborador"}</span>,
+      render: (row) => <span className="text-[12.5px] text-t1">{findDocumentPerson(people, row)?.name ?? "Sem pessoa"}</span>,
     },
     ...(showStore
       ? [

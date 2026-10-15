@@ -32,9 +32,10 @@ O gestor envia PDFs digitais para assinatura, organizados por colaborador. Um PD
 
 ### Pastas
 
-- A árvore vive no WDash. A pasta do Assina AI é rasa e não espelha Colaborador › Ano › Mês. O envelope sai com `folderId` nulo.
-- Com uma filial no topo: Colaborador › Ano › Mês.
-- Com todas as filiais: Filial › Colaborador › Ano › Mês. A filial é a da ficha do funcionário.
+- A árvore vive no WDash. A pasta do Assina AI é rasa e não espelha Pessoa › Ano › Mês. O envelope sai com `folderId` nulo.
+- Com uma filial no topo: Pessoa › Ano › Mês.
+- Com todas as filiais: Filial › Pessoa › Ano › Mês. O documento fica na filial, mesmo quando a pessoa tem acesso a mais de uma.
+- A lista de pessoas em Documentos junta a equipe do Millennium com Gestores e Gerentes vinculados em Usuários. A mesma pessoa, pelo CPF ou pelo e-mail, aparece uma vez. Equipe e Usuários continuam cadastros separados. Quem só existe na WDash grava `employee_document.identity_id`; o colaborador do Millennium continua em `seller_id`.
 - O arquivo se chama pela categoria.
 - Categorias: Holerite, Espelho de ponto, Adiantamento salarial, Vale-transporte, Vale-alimentação / refeição, Participação nos lucros (PLR), Informe de rendimentos, Admissão, Rescisão, Outros. Nomes já gravados continuam como foram salvos.
 - Dois arquivos da mesma categoria no mesmo mês ganham sufixo `(2)`, `(3)`. Sem pasta extra de categoria.

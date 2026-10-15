@@ -15,6 +15,7 @@ import {
   customDocumentName,
   asAuthentication,
   displayTitle,
+  documentPersonKey,
   extraSignersFrom,
   guestAuthentication,
   guestChannel,
@@ -24,6 +25,7 @@ import {
   preparationReason,
   preparationSituation,
   remainingPages,
+  parsePersonRef,
   resolveDrafts,
   sellerMarks,
   type ContactEdit,
@@ -198,24 +200,31 @@ export function AttachWizard({
         rows.map((row) => ({ id: row.id, pageCount: row.pageCount })),
         drafts,
       );
-      const readySellers = new Set(
+      const readyPeople = new Set(
         situations(rows, drafts, shownPeople, signers, opened)
-          .filter((item) => item.situation === "Pronto" && item.row.sellerId)
-          .map((item) => item.row.sellerId as string),
+          .map((item) => (item.situation === "Pronto" ? documentPersonKey(item.row) : null))
+          .filter((id): id is string => Boolean(id)),
       );
-      for (const sellerId of readySellers) {
-        const edit = contactEdits[sellerId];
-        const person = people.find((item) => item.id === sellerId);
+      for (const personId of readyPeople) {
+        const edit = contactEdits[personId];
+        const person = people.find((item) => item.id === personId);
         if (!edit || !person) continue;
         const next = contactPatch({ cpf: edit.cpf, email: edit.email, whatsapp: edit.whatsapp });
         if (!next.ok) throw new Error(next.message);
         if (next.patch.cpf === person.cpf && (next.patch.email ?? null) === person.email && (next.patch.whatsapp ?? null) === person.whatsapp) continue;
-        await saveEmployeeContact({ sellerId, cpf: edit.cpf, email: edit.email, whatsapp: edit.whatsapp });
+        const ref = parsePersonRef(personId);
+        await saveEmployeeContact({
+          sellerId: ref.sellerId || undefined,
+          identityId: ref.identityId || undefined,
+          cpf: edit.cpf,
+          email: edit.email,
+          whatsapp: edit.whatsapp,
+        });
       }
-      if (readySellers.size > 0) {
+      if (readyPeople.size > 0) {
         setContactEdits((current) => {
           const next = { ...current };
-          for (const id of readySellers) delete next[id];
+          for (const id of readyPeople) delete next[id];
           return next;
         });
         await onReload();
@@ -540,7 +549,7 @@ function situations(
     drafts,
   );
   return rows.map((row, index) => {
-    const person = people.find((item) => item.id === row.sellerId) ?? null;
+    const person = people.find((item) => item.id === documentPersonKey(row)) ?? null;
     const reviewed = Boolean(opened[row.id]) || index === 0;
     const situation = preparationSituation(person, resolved[index], row.pageCount, signers, people, row.envelopeId, row.sizeBytes);
     const reason = preparationReason(person, resolved[index], row.pageCount, signers, people, row.envelopeId, row.sizeBytes, reviewed);
@@ -651,7 +660,7 @@ function SendReview({
                         <span className="mt-0.5 block truncate text-[11.5px] text-t2">{scheduleDelivery(item.draft)}</span>
                         <span className="block truncate text-[11.5px] text-t2">{scheduleWhen(item.draft)}</span>
                       </span>
-                      <span className="truncate text-[13px] text-t1">{item.person?.name ?? "Sem colaborador"}</span>
+                      <span className="truncate text-[13px] text-t1">{item.person?.name ?? "Sem pessoa"}</span>
                       <Button type="button" size="sm" variant="outline" onClick={() => onOpen(item.row.id)}>
                         {item.situation === "Pronto" || item.situation === "Já enviado" ? "Revisar" : "Corrigir"}
                       </Button>
@@ -779,7 +788,7 @@ function SummaryTile({ label, value }: { label: string; value: string }) {
   );
 }
 
-const READ_LINES = ["Lendo as páginas…", "Identificando os colaboradores…", "Separando os documentos…"];
+const READ_LINES = ["Lendo as páginas…", "Identificando as pessoas…", "Separando os documentos…"];
 
 function Processing({ status }: { status: PrepareStatus }) {
   const [readIndex, setReadIndex] = useState(0);
@@ -982,7 +991,7 @@ function UploadStep({
 
   return (
     <>
-      <WizardCardHeader title="Anexar documentos" subtitle="Envie até 5 PDFs. A WDash identifica o CPF em cada página e reúne as páginas do mesmo colaborador em um único documento." />
+      <WizardCardHeader title="Anexar documentos" subtitle="Envie até 5 PDFs. A WDash identifica o CPF em cada página e reúne as páginas da mesma pessoa em um único documento." />
       <div className="grid gap-3 sm:grid-cols-3">
         <FormField label="Mês">
           <select className={controlClass} value={month} onChange={(event) => onMonth(event.target.value)}>
@@ -1006,7 +1015,7 @@ function UploadStep({
       </div>
       {category === "Outros" && (
         <div className="mt-3">
-          <FormField label="Nome do documento" hint="Este nome será usado na pasta e no arquivo enviado ao colaborador.">
+          <FormField label="Nome do documento" hint="Este nome será usado na pasta e no arquivo enviado à pessoa.">
             <input className={controlClass} value={customName} placeholder="Ex.: Termo de férias" onChange={(event) => onCustomName(event.target.value)} />
           </FormField>
         </div>

@@ -1,11 +1,13 @@
 import { getSupabase } from "@/lib/supabase";
-import { DOCUMENT_COPY, signerHistory, type SignerContact } from "./documentSplit";
+import { branchRoleLabel } from "./stores";
+import { DOCUMENT_COPY, parsePersonRef, signerHistory, type DocumentPerson, type SignerContact } from "./documentSplit";
 
 export type DocumentRow = {
   id: string;
   batchId: string;
   storeId: string | null;
   sellerId: string | null;
+  identityId: string | null;
   status: "UNASSIGNED" | "PENDING" | "SIGNED" | "DECLINED" | "EXPIRED";
   fileName: string;
   error: string | null;
@@ -28,7 +30,7 @@ export type BatchRow = {
   createdAt: string;
 };
 
-export type PersonRow = { id: string; storeId: string; name: string; cpf: string | null; email: string | null; whatsapp: string | null; active: boolean; inErp: boolean };
+export type PersonRow = DocumentPerson;
 
 type Invoke = {
   message?: string;
@@ -99,8 +101,8 @@ export async function loadDocuments(tenantId: string, storeId: string | null): P
   if (!sb) return { batches: [], documents: [], people: [], stores: [], history: [] };
   const [batches, documents, people, stores, sentExtras] = await Promise.all([
     sb.from("document_batch").select("id, store_id, month, year, category, channel, deadline, created_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }),
-    sb.from("employee_document").select("id, batch_id, store_id, seller_id, status, file_name, error, envelope_id, size_bytes, page_count, created_at, sent_at, extra_signer").eq("tenant_id", tenantId).is("removed_at", null).order("created_at"),
-    sb.from("store_seller").select("id, store_id, name, cpf, email, whatsapp, active, in_erp").eq("tenant_id", tenantId).order("name").limit(2000),
+    sb.from("employee_document").select("id, batch_id, store_id, seller_id, identity_id, status, file_name, error, envelope_id, size_bytes, page_count, created_at, sent_at, extra_signer").eq("tenant_id", tenantId).is("removed_at", null).order("created_at"),
+    sb.from("store_seller").select("id, store_id, name, cpf, email, whatsapp, active, in_erp, erp_role, membership_id").eq("tenant_id", tenantId).order("name").limit(2000),
     sb.from("store").select("id, name").eq("tenant_id", tenantId).order("name"),
     sb.from("employee_document").select("extra_signer, sent_at").eq("tenant_id", tenantId).is("removed_at", null).not("envelope_id", "is", null).order("sent_at", { ascending: false }).limit(80),
   ]);
@@ -140,6 +142,7 @@ function mapDoc(row: Record<string, unknown>): DocumentRow {
     batchId: String(row.batch_id),
     storeId: (row.store_id as string | null) ?? null,
     sellerId: (row.seller_id as string | null) ?? null,
+    identityId: (row.identity_id as string | null) ?? null,
     status: row.status as DocumentRow["status"],
     fileName: String(row.file_name),
     error: (row.error as string | null) ?? null,
@@ -162,6 +165,10 @@ function mapPerson(row: Record<string, unknown>): PersonRow {
     whatsapp: (row.whatsapp as string | null) ?? null,
     active: row.active !== false,
     inErp: row.in_erp !== false,
+    source: "team",
+    roleLabel: branchRoleLabel((row.erp_role as string | null) ?? null),
+    identityId: null,
+    membershipId: (row.membership_id as string | null) ?? null,
   };
 }
 
@@ -237,11 +244,12 @@ export async function deleteDocument(documentId: string) {
   await call({ action: "delete", documentId });
 }
 
-export async function assignDocument(documentId: string, sellerId: string) {
-  await call({ action: "assign", documentId, sellerId });
+export async function assignDocument(documentId: string, personId: string) {
+  const person = parsePersonRef(personId);
+  await call({ action: "assign", documentId, sellerId: person.sellerId, identityId: person.identityId, storeId: person.storeId });
 }
 
-export async function saveEmployeeContact(input: { sellerId: string; cpf?: string; email?: string; whatsapp?: string }) {
+export async function saveEmployeeContact(input: { sellerId?: string; identityId?: string; cpf?: string; email?: string; whatsapp?: string }) {
   await call({ action: "save-contact", ...input });
 }
 
@@ -279,8 +287,17 @@ export async function cancelDocument(documentId: string) {
   await call({ action: "cancel", documentId });
 }
 
-export async function moveDocument(input: { documentId: string; sellerId: string; month: number; year: number }) {
-  await call({ action: "move", ...input });
+export async function moveDocument(input: { documentId: string; personId: string; month: number; year: number }) {
+  const person = parsePersonRef(input.personId);
+  await call({
+    action: "move",
+    documentId: input.documentId,
+    sellerId: person.sellerId,
+    identityId: person.identityId,
+    storeId: person.storeId,
+    month: input.month,
+    year: input.year,
+  });
 }
 
 export async function openDocument(documentId: string): Promise<string> {

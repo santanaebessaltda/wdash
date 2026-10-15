@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useScope } from "@/pages/dashboard/useScope";
 import { useActiveSession } from "@/session/SessionProvider";
 import { loadDocuments, type BatchRow, type DocumentRow, type PersonRow } from "@/data/wedash/documentsRepo";
-import type { SignerContact } from "@/data/wedash/documentSplit";
+import { documentPeople, type BranchUser, type SignerContact } from "@/data/wedash/documentSplit";
+import { fetchSystemUsers, type SystemUser } from "@/data/wedash/systemUsers";
 
 export function useDocuments() {
   const session = useActiveSession();
@@ -15,10 +16,10 @@ export function useDocuments() {
   const [history, setHistory] = useState<SignerContact[]>([]);
 
   const reload = useCallback(async () => {
-    const data = await loadDocuments(session.tenantId, storeId);
+    const [data, users] = await Promise.all([loadDocuments(session.tenantId, storeId), fetchSystemUsers()]);
     setBatches(data.batches);
     setDocuments(data.documents);
-    setPeople(data.people);
+    setPeople(documentPeople(data.people, users.ok ? branchUsers(users.data.members) : [], data.stores.map((store) => store.id)));
     setStores(data.stores);
     setHistory(data.history);
   }, [session.tenantId, storeId]);
@@ -28,4 +29,23 @@ export function useDocuments() {
   }, [reload]);
 
   return { storeId, allStores: storeId == null, batches, documents, people, stores, history, reload };
+}
+
+function branchUsers(members: SystemUser[]): BranchUser[] {
+  return members.flatMap((member) => {
+    if (member.role !== "OWNER" && member.role !== "MANAGER") return [];
+    if (member.status !== "ACTIVE" && member.status !== "SUSPENDED") return [];
+    if (!member.identityId || !member.name.trim()) return [];
+    return [{
+      membershipId: member.membershipId,
+      identityId: member.identityId,
+      name: member.name,
+      email: member.email,
+      cpf: member.cpf ?? null,
+      whatsapp: member.whatsapp ?? null,
+      role: member.role,
+      status: member.status,
+      storeIds: member.storeIds,
+    }];
+  });
 }

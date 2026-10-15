@@ -139,6 +139,116 @@ export function assignSeller(matches: { id: string }[]): string | null {
   return matches.length === 1 ? matches[0].id : null;
 }
 
+/** Pessoa que pode receber documento: equipe da filial ou usuário da WDash vinculado a ela. */
+export type DocumentPerson = {
+  id: string;
+  storeId: string;
+  name: string;
+  cpf: string | null;
+  email: string | null;
+  whatsapp: string | null;
+  active: boolean;
+  inErp: boolean;
+  source: "team" | "user";
+  roleLabel: string;
+  identityId: string | null;
+  membershipId: string | null;
+};
+
+/** Gestor ou Gerente da tela Usuários. `storeIds` vazio significa todas as filiais. */
+export type BranchUser = {
+  membershipId: string;
+  identityId: string;
+  name: string;
+  email: string | null;
+  cpf: string | null;
+  whatsapp: string | null;
+  role: "OWNER" | "MANAGER";
+  status: "ACTIVE" | "SUSPENDED";
+  storeIds: string[];
+};
+
+function contactDigits(value: string | null): string {
+  return (value ?? "").replace(/\D/g, "");
+}
+
+function sameBranchPerson(person: DocumentPerson, user: BranchUser): boolean {
+  if (person.membershipId && person.membershipId === user.membershipId) return true;
+  const personCpf = contactDigits(person.cpf);
+  const userCpf = contactDigits(user.cpf);
+  if (personCpf.length === 11 && personCpf === userCpf) return true;
+  const personEmail = (person.email ?? "").trim().toLowerCase();
+  const userEmail = (user.email ?? "").trim().toLowerCase();
+  return Boolean(personEmail && userEmail && personEmail === userEmail);
+}
+
+/** Equipe da filial mais usuários vinculados que ainda não apareceram na equipe. */
+export function documentPeople(team: DocumentPerson[], users: BranchUser[], storeIds: string[]): DocumentPerson[] {
+  const stores = [...new Set(storeIds)];
+  const extra: DocumentPerson[] = [];
+  for (const user of users) {
+    if (user.role !== "OWNER" && user.role !== "MANAGER") continue;
+    if (user.status !== "ACTIVE" && user.status !== "SUSPENDED") continue;
+    const name = user.name.trim();
+    if (!name || !user.identityId) continue;
+    const linked = user.storeIds.length === 0 ? stores : user.storeIds.filter((id) => stores.includes(id));
+    for (const storeId of linked) {
+      const here = team.filter((person) => person.storeId === storeId);
+      if (here.some((person) => sameBranchPerson(person, user))) continue;
+      extra.push({
+        id: `user:${user.identityId}:${storeId}`,
+        storeId,
+        name,
+        cpf: user.cpf,
+        email: user.email,
+        whatsapp: user.whatsapp,
+        active: user.status === "ACTIVE",
+        inErp: true,
+        source: "user",
+        roleLabel: user.role === "OWNER" ? "Gestor" : "Gerente",
+        identityId: user.identityId,
+        membershipId: user.membershipId,
+      });
+    }
+  }
+  return [...team, ...extra].sort((left, right) => left.name.localeCompare(right.name, "pt"));
+}
+
+/** Chave da pasta. Colaborador usa o id do Millennium; usuário da WDash leva a filial junto. */
+export function documentPersonKey(doc: { sellerId: string | null; identityId?: string | null; storeId?: string | null }): string | null {
+  if (doc.sellerId) return doc.sellerId;
+  if (!doc.identityId) return null;
+  return doc.storeId ? `user:${doc.identityId}:${doc.storeId}` : `user:${doc.identityId}`;
+}
+
+export function parsePersonRef(personId: string): { sellerId: string; identityId: string; storeId: string } {
+  if (!personId.startsWith("user:")) return { sellerId: personId, identityId: "", storeId: "" };
+  const rest = personId.slice("user:".length);
+  const split = rest.indexOf(":");
+  if (split < 0) return { sellerId: "", identityId: rest, storeId: "" };
+  return { sellerId: "", identityId: rest.slice(0, split), storeId: rest.slice(split + 1) };
+}
+
+export function findDocumentPerson<T extends { id: string }>(
+  people: T[],
+  doc: { sellerId: string | null; identityId?: string | null; storeId?: string | null },
+): T | null {
+  const key = documentPersonKey(doc);
+  if (!key) return null;
+  return people.find((person) => person.id === key) ?? null;
+}
+
+/** Busca da pasta de pessoas: nome, CPF ou e-mail. Nome parecido sozinho não une cadastros. */
+export function personMatchesQuery(person: { name: string; cpf: string | null; email: string | null }, query: string): boolean {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return true;
+  if (person.name.toLowerCase().includes(needle)) return true;
+  if ((person.email ?? "").toLowerCase().includes(needle)) return true;
+  const digits = contactDigits(needle);
+  const cpf = contactDigits(person.cpf);
+  return digits.length >= 3 && cpf.includes(digits);
+}
+
 export function fileName(category: string, taken: string[]): string {
   const base = `${category}.pdf`;
   if (!taken.includes(base)) return base;

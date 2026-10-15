@@ -18,6 +18,9 @@ export interface SystemUser {
   isSelf: boolean;
   /** Vazio = todas as lojas (inclui lojas novas). */
   storeIds: string[];
+  identityId?: string;
+  cpf?: string | null;
+  whatsapp?: string | null;
   invitedAt: string | null;
   lastSignInAt: string | null;
   acceptedAt: string | null;
