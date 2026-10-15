@@ -1,15 +1,16 @@
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Badge, Button, Card, DataTable, EmptyState, Segmented, type DataTableColumn } from "@/components/ui";
+import { cn } from "@/lib/cn";
 import { QuickStat } from "@/pages/dashboards/QuickStat";
 import { paths } from "@/router/paths";
-import { folderTitle, monthFolder, resendVisible } from "@/data/wedash/documentSplit";
+import { folderTitle, monthFolder, resendVisible, DOCUMENT_CATEGORIES } from "@/data/wedash/documentSplit";
 import type { BatchRow, DocumentRow, PersonRow } from "@/data/wedash/documentsRepo";
 import { openDocument, resendDocument } from "@/data/wedash/documentsRepo";
-import { DocumentsFrame, FileGlyph, FolderGlyph, Glyph, STATUS_LABEL, SearchGlyph, badgeVariant, formatBytes } from "./frame";
+import { DocumentsFrame, FileGlyph, FolderGlyph, Glyph, STATUS_LABEL, SearchGlyph, badgeVariant } from "./frame";
 import { useDocuments } from "./useDocuments";
 
-type Mode = "home" | "pending" | "month" | "browse";
+type Mode = "home" | "pending" | "month" | "sent" | "signed" | "browse";
 type PeopleFilter = "active" | "all" | "inactive";
 
 type FolderEntry = { key: string; label: string; detail: string; fileId?: string };
@@ -21,6 +22,9 @@ export function DocumentsPage() {
   const [mode, setMode] = useState<Mode>("home");
   const [crumb, setCrumb] = useState<string[]>([]);
   const [query, setQuery] = useState("");
+  const [periodFilter, setPeriodFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [peopleFilter, setPeopleFilter] = useState<PeopleFilter>("active");
   const [notice, setNotice] = useState<string | null>(flash?.documentNotice ?? null);
   const [sent, setSent] = useState<string | null>(flash?.documentSent ?? null);
@@ -38,14 +42,34 @@ export function DocumentsPage() {
     const batch = batchOf.get(doc.batchId);
     return batch?.month === now.getMonth() + 1 && batch.year === now.getFullYear();
   });
-  const listed =
-    mode === "pending"
-      ? pending
-      : mode === "month"
-        ? thisMonth
-        : mode === "home"
-          ? [...sentDocuments].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 12)
-          : [];
+  const recent = [...sentDocuments].sort((a, b) => (b.sentAt ?? b.createdAt).localeCompare(a.sentAt ?? a.createdAt)).slice(0, 12);
+  const periods = [...new Set(sentDocuments.map((doc) => {
+    const batch = batchOf.get(doc.batchId);
+    return batch ? `${batch.year}-${batch.month}` : "";
+  }).filter(Boolean))].sort();
+
+  const needle = query.trim().toLowerCase();
+  const searching = needle.length > 0;
+
+  function matchesText(doc: DocumentRow) {
+    if (!needle) return true;
+    const person = (personName.get(doc.sellerId ?? "") ?? "").toLowerCase();
+    return folderTitle(doc.fileName).toLowerCase().includes(needle) || doc.fileName.toLowerCase().includes(needle) || person.includes(needle);
+  }
+
+  function matchesFilters(doc: DocumentRow) {
+    const batch = batchOf.get(doc.batchId);
+    if (typeFilter && batch?.category !== typeFilter) return false;
+    if (statusFilter && doc.status !== statusFilter) return false;
+    if (periodFilter && `${batch?.year}-${batch?.month}` !== periodFilter) return false;
+    return true;
+  }
+
+  const pool =
+    mode === "pending" ? pending : mode === "signed" ? signed : mode === "month" ? thisMonth : mode === "sent" ? sentDocuments : mode === "home" ? recent : [];
+  const libraryDocs = sentDocuments.filter((doc) => (mode === "home" ? true : matchesFilters(doc)));
+  const visibleFiles = searching ? libraryDocs.filter(matchesText) : pool.filter((doc) => mode === "home" || matchesFilters(doc));
+  const narrowed = searching || periodFilter || typeFilter || statusFilter;
 
   const listedPeople = people.filter((person) => {
     const working = person.active && person.inErp;
@@ -54,15 +78,16 @@ export function DocumentsPage() {
     return true;
   });
   const atPeople = mode === "browse" && (allStores ? crumb.length === 1 : crumb.length === 0);
-  const folders = mode === "browse" ? folderEntries({ allStores, crumb, documents: sentDocuments, batches, people: listedPeople, stores }) : [];
-  const needle = query.trim().toLowerCase();
-  const visibleFiles = listed.filter((doc) => !needle || doc.fileName.toLowerCase().includes(needle) || (personName.get(doc.sellerId ?? "") ?? "").toLowerCase().includes(needle));
-  const visibleFolders = folders.filter((entry) => !needle || entry.label.toLowerCase().includes(needle));
+  const folders = mode === "browse" ? folderEntries({ allStores, crumb, documents: libraryDocs, batches, people: listedPeople, stores }) : [];
+  const visibleFolders = searching ? [] : folders;
 
   function goHome() {
     setMode("home");
     setCrumb([]);
     setQuery("");
+    setPeriodFilter("");
+    setTypeFilter("");
+    setStatusFilter("");
   }
 
   function goBack() {
@@ -86,24 +111,29 @@ export function DocumentsPage() {
       {sent && <p className="mb-3 text-[13px] text-ok">{sent}</p>}
       {notice && <p className="mb-3 text-[13px] text-bad">{notice}</p>}
       {mode === "home" && (
-        <>
-          <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <button type="button" className="text-left" onClick={() => { setMode("sent"); setQuery(""); }}>
             <QuickStat label="Documentos enviados" value={String(sentDocuments.length)} sub="Já foram para assinatura" tint="acc" icon={<Glyph d="M22 2 11 13M22 2 15 22 11 13 2 9 22 2" />} />
+          </button>
+          <button type="button" className="text-left" onClick={() => { setMode("pending"); setQuery(""); }}>
             <QuickStat label="Documentos pendentes" value={String(pending.length)} sub="Aguardando assinatura" tint="warn" icon={<Glyph d="M12 8v4l3 2M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20" />} />
+          </button>
+          <button type="button" className="text-left" onClick={() => { setMode("signed"); setQuery(""); }}>
             <QuickStat label="Documentos assinados" value={String(signed.length)} sub="Assinatura concluída" tint="ok" icon={<Glyph d="M20 6 9 17l-5-5" />} />
-          </div>
-          <p className="mb-3 text-xs font-bold uppercase tracking-wide text-t2">Atalhos</p>
-          <div className="mb-5 grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
-            <Shortcut label="Pendentes" count={qty(pending.length, "documento", "documentos")} onClick={() => { setMode("pending"); setQuery(""); }} />
-            <Shortcut label="Este mês" count={qty(thisMonth.length, "documento", "documentos")} onClick={() => { setMode("month"); setQuery(""); }} />
-            <Shortcut
-              label={allStores ? "Filiais" : "Colaboradores"}
-              count={allStores ? qty(stores.length, "filial", "filiais") : qty(listedPeople.length, "pessoa", "pessoas")}
-              onClick={() => { setMode("browse"); setCrumb([]); setQuery(""); }}
-            />
-          </div>
-        </>
+          </button>
+        </div>
       )}
+      <p className="mb-3 text-xs font-bold uppercase tracking-wide text-t2">Atalhos</p>
+      <div className="mb-5 grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
+        <Shortcut label="Pendentes" active={mode === "pending"} count={qty(pending.length, "documento", "documentos")} onClick={() => { setMode("pending"); setQuery(""); }} />
+        <Shortcut label="Este mês" active={mode === "month"} count={qty(thisMonth.length, "documento", "documentos")} onClick={() => { setMode("month"); setQuery(""); }} />
+        <Shortcut
+          label={allStores ? "Filiais" : "Colaboradores"}
+          active={mode === "browse"}
+          count={allStores ? qty(stores.length, "filial", "filiais") : qty(listedPeople.length, "pessoa", "pessoas")}
+          onClick={() => { setMode("browse"); setCrumb([]); setQuery(""); }}
+        />
+      </div>
 
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
@@ -125,6 +155,56 @@ export function DocumentsPage() {
         </div>
       </div>
 
+      {mode === "browse" && crumb.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-1 text-[12.5px] text-t2">
+          <button type="button" className="font-bold text-t1 hover:text-t0" onClick={goHome}>
+            Documentos
+          </button>
+          {crumb.map((key, index) => (
+            <span key={`${key}-${index}`} className="flex items-center gap-1">
+              <span>/</span>
+              {index < crumb.length - 1 ? (
+                <button type="button" className="font-bold text-t1 hover:text-t0" onClick={() => setCrumb(crumb.slice(0, index + 1))}>
+                  {crumbLabel(key, storeName, personName)}
+                </button>
+              ) : (
+                <span className="font-bold text-t0">{crumbLabel(key, storeName, personName)}</span>
+              )}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {mode !== "home" && (
+        <div className="mb-4 flex flex-wrap gap-2">
+          <select className="h-10 rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3 text-[13px] text-t0" value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)}>
+            <option value="">Período</option>
+            {periods.map((key) => {
+              const [year, month] = key.split("-");
+              return (
+                <option key={key} value={key}>
+                  {monthFolder(Number(month))}/{year}
+                </option>
+              );
+            })}
+          </select>
+          <select className="h-10 rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3 text-[13px] text-t0" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
+            <option value="">Tipo</option>
+            {DOCUMENT_CATEGORIES.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+          <select className="h-10 rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3 text-[13px] text-t0" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+            <option value="">Situação</option>
+            <option value="PENDING">Pendente</option>
+            <option value="SIGNED">Assinado</option>
+            <option value="DECLINED">Recusado</option>
+            <option value="EXPIRED">Expirado</option>
+          </select>
+        </div>
+      )}
       {atPeople && (
         <div className="mb-4">
           <Segmented
@@ -139,10 +219,10 @@ export function DocumentsPage() {
         </div>
       )}
 
-      {mode === "browse" ? (
+      {mode === "browse" && !searching ? (
         visibleFolders.length === 0 ? (
           <Card padding="none">
-            <EmptyState framed={false} title="Nenhum documento" description="Esta pasta ainda não tem documentos." action={<Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>} />
+            <EmptyState framed={false} title="Esta pasta ainda não tem documentos." action={<Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>} />
           </Card>
         ) : (
           <FolderTable
@@ -153,20 +233,27 @@ export function DocumentsPage() {
         )
       ) : visibleFiles.length === 0 ? (
         <Card padding="none">
-          <EmptyState framed={false} title="Nenhum documento" description="Anexe um PDF para começar." action={<Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>} />
+          <EmptyState
+            framed={false}
+            title={narrowed ? "Nenhum documento encontrado." : "Nenhum documento"}
+            description={narrowed ? "Tente outro termo ou ajuste os filtros." : "Anexe um PDF para começar."}
+            action={narrowed ? undefined : <Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>}
+          />
         </Card>
       ) : (
         <FileTable
           rows={visibleFiles}
           people={people}
           batches={batchOf}
-          onOpen={(id) => void openFile(id, setNotice)}
+          stores={storeName}
+          showStore={allStores}
+          onDownload={(id) => void openFile(id, setNotice)}
           onResend={(id) => void resendFile(id, setNotice, setSent, setResendingId, reload)}
           resendingId={resendingId}
         />
       )}
       <p className="mt-3 text-[12.5px] text-t2">
-        {mode === "browse" ? qty(visibleFolders.length, "item", "itens") : qty(visibleFiles.length, "documento", "documentos")}
+        {mode === "browse" && !searching ? qty(visibleFolders.length, "item", "itens") : qty(visibleFiles.length, "documento", "documentos")}
       </p>
     </DocumentsFrame>
   );
@@ -176,9 +263,9 @@ function qty(count: number, singular: string, plural: string) {
   return `${count} ${count === 1 ? singular : plural}`;
 }
 
-function Shortcut({ label, count, onClick }: { label: string; count: string; onClick: () => void }) {
+function Shortcut({ label, count, active, onClick }: { label: string; count: string; active?: boolean; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="flex items-center gap-3 rounded-2xl border border-line bg-bg-2 p-4 text-left hover:border-line-2 hover:bg-bg-3">
+    <button type="button" onClick={onClick} className={cn("flex items-center gap-3 rounded-2xl border bg-bg-2 p-4 text-left hover:border-line-2 hover:bg-bg-3", active ? "border-acc" : "border-line")}>
       <span className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[11px] bg-acc-soft text-acc">
         <FolderGlyph />
       </span>
@@ -202,7 +289,7 @@ async function resendFile(
   setSent(null);
   try {
     await resendDocument(id);
-    setSent("Documento reenviado.");
+    setSent("Link reenviado.");
     await reload();
   } catch {
     setNotice("Não foi possível reenviar o documento. Tente novamente.");
@@ -223,11 +310,17 @@ async function openFile(id: string, setNotice: (message: string | null) => void)
 
 function sectionTitle(mode: Mode, allStores: boolean, crumb: string[], storeName: Map<string, string>, personName: Map<string, string>) {
   if (mode === "pending") return "Pendentes";
+  if (mode === "signed") return "Assinados";
+  if (mode === "sent") return "Enviados";
   if (mode === "month") return `Este mês · ${monthFolder(new Date().getMonth() + 1)}`;
   if (mode === "home") return "Documentos recentes";
   if (crumb.length === 0) return allStores ? "Filiais" : "Colaboradores";
   const last = crumb[crumb.length - 1];
-  return storeName.get(last) ?? personName.get(last) ?? last;
+  return crumbLabel(last, storeName, personName);
+}
+
+function crumbLabel(key: string, storeName: Map<string, string>, personName: Map<string, string>) {
+  return storeName.get(key) ?? personName.get(key) ?? key;
 }
 
 function folderEntries(input: {
@@ -272,7 +365,7 @@ function folderEntries(input: {
     return [...new Set(docs.filter((doc) => yearOf(doc) === year).map(monthOf))].filter(Boolean).map((month) => ({
       key: month,
       label: month,
-      detail: "Mês",
+      detail: qty(docs.filter((doc) => yearOf(doc) === year && monthOf(doc) === month).length, "documento", "documentos"),
     }));
   }
   const month = allStores ? crumb[3] : crumb[2];
@@ -287,7 +380,7 @@ function FolderTable({ rows, onOpenFolder, onOpenFile }: { rows: FolderEntry[]; 
       key: "name",
       header: "Nome",
       render: (row) => (
-        <button type="button" className="flex min-w-0 items-center gap-2.5 text-left" onClick={() => (row.fileId ? onOpenFile(row.fileId) : onOpenFolder(row.key))}>
+        <button type="button" className="flex min-w-0 items-center gap-2.5 text-left" onClick={() => !row.fileId && onOpenFolder(row.key)}>
           <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] bg-acc-soft text-acc">
             {row.fileId ? <FileGlyph /> : <FolderGlyph />}
           </span>
@@ -299,6 +392,16 @@ function FolderTable({ rows, onOpenFolder, onOpenFile }: { rows: FolderEntry[]; 
       ),
     },
     { key: "detail", header: "Conteúdo", render: (row) => <span className="text-[12.5px] text-t1">{row.detail}</span> },
+    {
+      key: "download",
+      header: "",
+      render: (row) =>
+        row.fileId ? (
+          <Button size="sm" variant="outline" onClick={() => onOpenFile(row.fileId!)}>
+            Baixar PDF
+          </Button>
+        ) : null,
+    },
   ];
   return <DataTable columns={columns} data={rows} rowKey={(row) => row.key} />;
 }
@@ -307,32 +410,40 @@ function FileTable({
   rows,
   people,
   batches,
-  onOpen,
+  stores,
+  showStore,
+  onDownload,
   onResend,
   resendingId,
 }: {
   rows: DocumentRow[];
   people: PersonRow[];
   batches: Map<string, BatchRow>;
-  onOpen: (id: string) => void;
+  stores: Map<string, string>;
+  showStore: boolean;
+  onDownload: (id: string) => void;
   onResend: (id: string) => void;
   resendingId: string | null;
 }) {
   const columns: DataTableColumn<DocumentRow>[] = [
     {
       key: "name",
-      header: "Nome",
-      render: (row) => (
-        <button type="button" className="flex min-w-0 items-center gap-2.5 text-left" onClick={() => onOpen(row.id)}>
-          <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] bg-acc-soft text-acc">
-            <FileGlyph />
+      header: "Documento",
+      render: (row) => {
+        const batch = batches.get(row.batchId);
+        const period = batch ? `${monthFolder(batch.month)}/${batch.year}` : "PDF";
+        return (
+          <span className="flex min-w-0 items-center gap-2.5 text-left">
+            <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] bg-acc-soft text-acc">
+              <FileGlyph />
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-[13px] font-bold text-t0">{folderTitle(row.fileName)}</span>
+              <span className="mt-px block text-[11px] text-t2">{period}</span>
+            </span>
           </span>
-          <span className="min-w-0">
-            <span className="block truncate text-[13px] font-bold text-t0">{folderTitle(row.fileName)}</span>
-            <span className="mt-px block text-[11px] text-t2">{batches.get(row.batchId)?.category ?? "PDF"}</span>
-          </span>
-        </button>
-      ),
+        );
+      },
     },
     {
       key: "owner",
@@ -340,6 +451,16 @@ function FileTable({
       hideBelow: "md",
       render: (row) => <span className="text-[12.5px] text-t1">{people.find((person) => person.id === row.sellerId)?.name ?? "Sem colaborador"}</span>,
     },
+    ...(showStore
+      ? [
+          {
+            key: "store",
+            header: "Filial",
+            hideBelow: "lg" as const,
+            render: (row: DocumentRow) => <span className="text-[12.5px] text-t1">{stores.get(row.storeId ?? "") ?? "—"}</span>,
+          },
+        ]
+      : []),
     {
       key: "status",
       header: "Status",
@@ -350,17 +471,35 @@ function FileTable({
           <span className="text-[12.5px] text-t2">Em preparação</span>
         ),
     },
-    { key: "size", header: "Tamanho", hideBelow: "sm", render: (row) => <span className="font-mono text-[12.5px] font-semibold text-t0">{formatBytes(row.sizeBytes)}</span> },
     {
-      key: "resend",
+      key: "sent",
+      header: "Enviado em",
+      hideBelow: "sm",
+      render: (row) => <span className="text-[12.5px] text-t1">{formatDay(row.sentAt)}</span>,
+    },
+    {
+      key: "actions",
       header: "",
-      render: (row) =>
-        resendVisible(row.status) && row.envelopeId ? (
-          <Button size="sm" variant="outline" disabled={resendingId === row.id} onClick={() => onResend(row.id)}>
-            {resendingId === row.id ? "Reenviando…" : "Reenviar"}
+      render: (row) => (
+        <span className="flex flex-wrap justify-end gap-2">
+          <Button size="sm" variant="outline" onClick={() => onDownload(row.id)}>
+            Baixar PDF
           </Button>
-        ) : null,
+          {resendVisible(row.status) && row.envelopeId ? (
+            <Button size="sm" variant="outline" disabled={resendingId === row.id} onClick={() => onResend(row.id)}>
+              {resendingId === row.id ? "Reenviando…" : "Reenviar link"}
+            </Button>
+          ) : null}
+        </span>
+      ),
     },
   ];
   return <DataTable columns={columns} data={rows} rowKey={(row) => row.id} />;
+}
+
+function formatDay(iso: string | null) {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("pt-BR");
 }

@@ -255,7 +255,8 @@ async function prepare(admin: SupabaseClient, tenantId: string, body: Body) {
       if (error) refused.push({ name: docName, message: "Não foi possível guardar o PDF." });
       else created.push(docId);
   }
-  return json({ batchId, created, refused });
+  const merged = groups.filter((group) => new Set(group.pages.map((page) => page.sourceIndex)).size > 1).length;
+  return json({ batchId, created, refused, merged });
 }
 
 async function takenNames(
@@ -444,6 +445,7 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
         channel,
         envelope_id: created.body.id,
         recipient_id: collaboratorRecipientId(created.body.signatures),
+        sent_at: new Date().toISOString(),
         error: null,
       })
       .eq("id", doc.id);

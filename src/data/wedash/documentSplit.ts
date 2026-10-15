@@ -340,10 +340,11 @@ export function remainingPages(pageCount: number, pageNumber: number): number | 
 }
 
 /** A marca acompanha as páginas que sobraram. Se a página dela saiu, volta ao centro da última. */
-export function markAfterDrop(mark: SignatureMark, removedPage: number, nextPageCount: number): SignatureMark {
-  if (mark.pageNumber === removedPage) return defaultSignatureMark(nextPageCount);
-  if (mark.pageNumber > removedPage) return { ...mark, pageNumber: mark.pageNumber - 1 };
-  return mark;
+export function markAfterDrop(mark: SignatureMark, removedPage: number, nextPageCount: number): SignatureMark | null {
+  if (mark.pageNumber === removedPage) return null;
+  const pageNumber = mark.pageNumber > removedPage ? mark.pageNumber - 1 : mark.pageNumber;
+  if (pageNumber < 1 || pageNumber > nextPageCount) return null;
+  return { ...mark, pageNumber };
 }
 
 /** Uma assinatura no centro da última página. */
@@ -391,8 +392,9 @@ export function defaultDraft(pageCount: number): DocumentDraft {
   };
 }
 
-export function fieldAfterDrop(field: FieldMark, removedPage: number, nextPageCount: number): FieldMark {
+export function fieldAfterDrop(field: FieldMark, removedPage: number, nextPageCount: number): FieldMark | null {
   const next = markAfterDrop(field, removedPage, nextPageCount);
+  if (!next) return null;
   return { ...field, pageNumber: next.pageNumber, x: next.x, y: next.y, element: next.element };
 }
 

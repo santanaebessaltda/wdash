@@ -320,7 +320,7 @@ describe("replicate and marks", () => {
     expect(remainingPages(10, 11)).toBe(10);
     const mark = { pageNumber: 8, x: 20, y: 30, element: "SIGNATURE" as const };
     expect(markAfterDrop(mark, 2, 9)).toEqual({ pageNumber: 7, x: 20, y: 30, element: "SIGNATURE" });
-    expect(markAfterDrop(mark, 8, 9)).toEqual(defaultSignatureMark(9));
+    expect(markAfterDrop(mark, 8, 9)).toBeNull();
   });
 });
 

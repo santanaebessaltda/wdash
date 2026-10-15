@@ -13,6 +13,7 @@ export type DocumentRow = {
   sizeBytes: number;
   pageCount: number;
   createdAt: string;
+  sentAt: string | null;
 };
 
 export type BatchRow = {
@@ -28,7 +29,21 @@ export type BatchRow = {
 
 export type PersonRow = { id: string; storeId: string; name: string; cpf: string | null; email: string | null; whatsapp: string | null; active: boolean; inErp: boolean };
 
-type Invoke = { message?: string; error?: string; status?: string; batchId?: string; path?: string; token?: string; url?: string; refused?: { name: string; message: string }[]; results?: { id: string; error: string | null }[] };
+type Invoke = {
+  message?: string;
+  error?: string;
+  status?: string;
+  batchId?: string;
+  path?: string;
+  token?: string;
+  url?: string;
+  created?: string[];
+  merged?: number;
+  refused?: { name: string; message: string }[];
+  results?: { id: string; error: string | null }[];
+};
+
+export type PrepareFile = { name: string; situation: string; detail?: string };
 
 async function readInvoke(fn: string, body: Record<string, unknown>): Promise<Invoke> {
   const sb = getSupabase();
@@ -82,7 +97,7 @@ export async function loadDocuments(tenantId: string, storeId: string | null): P
   if (!sb) return { batches: [], documents: [], people: [], stores: [] };
   const [batches, documents, people, stores] = await Promise.all([
     sb.from("document_batch").select("id, store_id, month, year, category, channel, deadline, created_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }),
-    sb.from("employee_document").select("id, batch_id, store_id, seller_id, status, file_name, error, envelope_id, size_bytes, page_count, created_at").eq("tenant_id", tenantId).order("created_at"),
+    sb.from("employee_document").select("id, batch_id, store_id, seller_id, status, file_name, error, envelope_id, size_bytes, page_count, created_at, sent_at").eq("tenant_id", tenantId).order("created_at"),
     sb.from("store_seller").select("id, store_id, name, cpf, email, whatsapp, active, in_erp").eq("tenant_id", tenantId).order("name").limit(2000),
     sb.from("store").select("id, name").eq("tenant_id", tenantId).order("name"),
   ]);
@@ -123,6 +138,7 @@ function mapDoc(row: Record<string, unknown>): DocumentRow {
     sizeBytes: Number(row.size_bytes ?? 0),
     pageCount: Number(row.page_count ?? 1),
     createdAt: String(row.created_at ?? ""),
+    sentAt: (row.sent_at as string | null) ?? null,
   };
 }
 
@@ -140,9 +156,9 @@ function mapPerson(row: Record<string, unknown>): PersonRow {
 }
 
 export type PrepareStatus =
-  | { phase: "upload"; index: number; total: number; name: string }
-  | { phase: "read" }
-  | { phase: "review" };
+  | { phase: "upload"; index: number; total: number; name: string; files: PrepareFile[] }
+  | { phase: "read"; files: PrepareFile[] }
+  | { phase: "review"; files: PrepareFile[] };
 
 export async function prepareFiles(input: {
   storeId: string | null;
@@ -153,14 +169,23 @@ export async function prepareFiles(input: {
   unify: boolean;
   files: File[];
   onProgress?: (status: PrepareStatus) => void;
-}): Promise<{ batchId: string; refused: { name: string; message: string }[] }> {
+}): Promise<{ batchId: string; refused: { name: string; message: string }[]; created: string[]; merged: number; files: PrepareFile[] }> {
   const sb = getSupabase();
   if (!sb) throw new Error("Supabase não configurado.");
   let batchId = "";
   const sources: { path: string; name: string }[] = [];
   for (let index = 0; index < input.files.length; index += 1) {
     const file = input.files[index];
-    input.onProgress?.({ phase: "upload", index: index + 1, total: input.files.length, name: file.name });
+    input.onProgress?.({
+      phase: "upload",
+      index: index + 1,
+      total: input.files.length,
+      name: file.name,
+      files: input.files.map((item, itemIndex) => ({
+        name: item.name,
+        situation: itemIndex < index ? "Enviado" : itemIndex === index ? "Enviando" : "Aguardando",
+      })),
+    });
     const slot = await call({
       action: "upload",
       batchId,
@@ -176,9 +201,22 @@ export async function prepareFiles(input: {
     if (up.error) throw new Error(up.error.message);
     sources.push({ path: slot.path, name: file.name });
   }
-  input.onProgress?.({ phase: "read" });
+  input.onProgress?.({
+    phase: "read",
+    files: input.files.map((file) => ({ name: file.name, situation: "Processando" })),
+  });
   const prepared = await call({ action: "prepare", batchId, sources, title: input.title });
-  return { batchId, refused: prepared.refused ?? [] };
+  const refused = prepared.refused ?? [];
+  const used = new Set<number>();
+  const files = input.files.map((file) => {
+    const index = refused.findIndex((item, itemIndex) => item.name === file.name && !used.has(itemIndex));
+    if (index < 0) return { name: file.name, situation: "Processado" };
+    used.add(index);
+    const message = refused[index].message;
+    if (message === DOCUMENT_COPY.scanned) return { name: file.name, situation: "PDF escaneado", detail: "Envie um PDF digital com texto selecionável." };
+    return { name: file.name, situation: "Recusado", detail: message };
+  });
+  return { batchId, refused, created: prepared.created ?? [], merged: prepared.merged ?? 0, files };
 }
 
 export async function dropDocumentPage(documentId: string, pageNumber: number) {

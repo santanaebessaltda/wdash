@@ -29,6 +29,7 @@ import {
   saveEmployeeContact,
   type DocumentRow,
   type PersonRow,
+  type PrepareFile,
   type PrepareStatus,
 } from "@/data/wedash/documentsRepo";
 import { formatBytes } from "./frame";
@@ -66,12 +67,15 @@ export function AttachWizard({
   const [customName, setCustomName] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [drafts, setDrafts] = useState<Record<string, DocumentDraft | undefined>>({});
+  const [opened, setOpened] = useState<Record<string, true>>({});
   const [activeId, setActiveId] = useState("");
   const openAtStart = useRef(true);
   const [batchId, setBatchId] = useState("");
   const [refused, setRefused] = useState<{ name: string; message: string }[]>([]);
   const [processing, setProcessing] = useState(false);
-  const [progress, setProgress] = useState<PrepareStatus>({ phase: "upload", index: 1, total: 1, name: "PDF" });
+  const [progress, setProgress] = useState<PrepareStatus>({ phase: "upload", index: 1, total: 1, name: "PDF", files: [] });
+  const [analyzed, setAnalyzed] = useState<{ files: number; merged: number } | null>(null);
+  const [outcomes, setOutcomes] = useState<PrepareFile[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [sentNote, setSentNote] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -101,6 +105,11 @@ export function AttachWizard({
   useEffect(() => {
     if (step === 1) openAtStart.current = true;
   }, [step]);
+
+  useEffect(() => {
+    if (step !== 2 || !activeId) return;
+    setOpened((current) => (current[activeId] ? current : { ...current, [activeId]: true }));
+  }, [step, activeId]);
 
   useEffect(() => {
     if (step !== 2 || !openAtStart.current || rows.length === 0) return;
@@ -138,7 +147,7 @@ export function AttachWizard({
       return;
     }
     setProcessing(true);
-    setProgress({ phase: "upload", index: 1, total: files.length, name: files[0]?.name ?? "PDF" });
+    setProgress({ phase: "upload", index: 1, total: files.length, name: files[0]?.name ?? "PDF", files: [] });
     setError(null);
     try {
       const prepared = await prepareFiles({
@@ -151,9 +160,17 @@ export function AttachWizard({
         files,
         onProgress: setProgress,
       });
-      setBatchId(prepared.batchId);
       setRefused(prepared.refused);
-      setProgress({ phase: "review" });
+      setProgress({ phase: "review", files: prepared.files });
+      if (prepared.created.length === 0) {
+        setBatchId("");
+        setOutcomes(prepared.files);
+        setError("Nenhum arquivo pôde ser separado. Remova os recusados e continue com os PDFs válidos.");
+        return;
+      }
+      setBatchId(prepared.batchId);
+      setAnalyzed({ files: files.length, merged: prepared.merged });
+      setOutcomes([]);
       await onReload();
       setStep(2);
     } catch (reason) {
@@ -198,8 +215,8 @@ export function AttachWizard({
         setConfirmSend(false);
         return;
       }
-      const heldBack = situations(rows, drafts, people, signers).filter((item) => item.situation !== "Pronto" && item.situation !== "Já enviado").length;
-      const sentCount = situations(rows, drafts, people, signers).filter((item) => item.situation === "Pronto").length;
+      const heldBack = situations(rows, drafts, people, signers, opened).filter((item) => item.situation !== "Pronto" && item.situation !== "Já enviado").length;
+      const sentCount = situations(rows, drafts, people, signers, opened).filter((item) => item.situation === "Pronto").length;
       setConfirmSend(false);
       if (heldBack > 0) {
         setSentNote(
@@ -241,6 +258,7 @@ export function AttachWizard({
             category={category}
             customName={customName}
             files={files}
+            outcomes={outcomes}
             error={error}
             onMonth={setMonth}
             onYear={setYear}
@@ -249,6 +267,7 @@ export function AttachWizard({
             onFiles={(next) => {
               setFiles(next);
               setBatchId("");
+              setOutcomes([]);
             }}
             onError={setError}
             onCancel={leave}
@@ -299,7 +318,10 @@ export function AttachWizard({
                   ...current,
                   [documentId]: {
                     ...draft,
-                    fields: draft.fields.map((field) => fieldAfterDrop(field, pageNumber, nextCount)),
+                    fields: draft.fields.flatMap((field) => {
+                      const next = fieldAfterDrop(field, pageNumber, nextCount);
+                      return next ? [next] : [];
+                    }),
                   },
                 };
               });
@@ -316,6 +338,9 @@ export function AttachWizard({
             }}
             onBack={() => setStep(1)}
             onReview={() => setStep(3)}
+            period={`${monthFolder(Number(month))}/${year}`}
+            analyzed={analyzed}
+            opened={opened}
           />
         ) : (
           <SendReview
@@ -323,6 +348,7 @@ export function AttachWizard({
             people={people}
             drafts={drafts}
             signers={signers}
+            opened={opened}
             error={error}
             sentNote={sentNote}
             sending={sending}
@@ -332,12 +358,27 @@ export function AttachWizard({
               setStep(2);
             }}
             onSend={() => {
-              const pending = situations(rows, drafts, people, signers).filter((item) => item.situation !== "Pronto" && item.situation !== "Já enviado").length;
+              const pending = situations(rows, drafts, people, signers, opened).filter((item) => item.situation !== "Pronto" && item.situation !== "Já enviado").length;
               if (pending > 0) {
                 setConfirmSend(true);
                 return;
               }
               void send();
+            }}
+            onApply={(ids, deadline, reminder) => {
+              setDrafts((current) => {
+                const resolved = resolveDrafts(
+                  rows.map((row) => ({ id: row.id, pageCount: row.pageCount })),
+                  current,
+                );
+                const next = { ...current };
+                for (const id of ids) {
+                  const index = rows.findIndex((row) => row.id === id);
+                  if (index < 0) continue;
+                  next[id] = { ...(current[id] ?? resolved[index]), deadline, reminder };
+                }
+                return next;
+              });
             }}
           />
         )}
@@ -353,12 +394,12 @@ export function AttachWizard({
               Cancelar
             </Button>
             <Button disabled={sending} onClick={() => void send()}>
-              {sending ? "Enviando…" : sendLabel(situations(rows, drafts, people, signers).filter((item) => item.situation === "Pronto").length)}
+              {sending ? "Enviando…" : sendLabel(situations(rows, drafts, people, signers, opened).filter((item) => item.situation === "Pronto").length)}
             </Button>
           </>
         }
       >
-        <ConfirmCopy rows={rows} drafts={drafts} people={people} signers={signers} />
+        <ConfirmCopy rows={rows} drafts={drafts} people={people} signers={signers} opened={opened} />
       </Modal>
     </div>
   );
@@ -394,6 +435,7 @@ function situations(
   drafts: Record<string, DocumentDraft | undefined>,
   people: PersonRow[],
   signers: { id: string; name: string; email: string }[],
+  opened: Record<string, true>,
 ) {
   const resolved = resolveDrafts(
     rows.map((row) => ({ id: row.id, pageCount: row.pageCount })),
@@ -405,7 +447,8 @@ function situations(
     return {
       row,
       person,
-      situation: situation === "Pronto" && !drafts[row.id] && index > 0 ? "Conferir marcação" : situation,
+      draft: resolved[index],
+      situation: situation === "Pronto" && !opened[row.id] && index > 0 ? "Conferir marcação" : situation,
     };
   });
 }
@@ -415,13 +458,15 @@ function ConfirmCopy({
   drafts,
   people,
   signers,
+  opened,
 }: {
   rows: DocumentRow[];
   drafts: Record<string, DocumentDraft | undefined>;
   people: PersonRow[];
   signers: { id: string; name: string; email: string }[];
+  opened: Record<string, true>;
 }) {
-  const items = situations(rows, drafts, people, signers);
+  const items = situations(rows, drafts, people, signers, opened);
   const ready = items.filter((item) => item.situation === "Pronto").length;
   const held = items.filter((item) => item.situation !== "Pronto" && item.situation !== "Já enviado").length;
   return (
@@ -439,28 +484,36 @@ function SendReview({
   people,
   drafts,
   signers,
+  opened,
   error,
   sentNote,
   sending,
   onBack,
   onOpen,
   onSend,
+  onApply,
 }: {
   rows: DocumentRow[];
   people: PersonRow[];
   drafts: Record<string, DocumentDraft | undefined>;
   signers: { id: string; name: string; email: string }[];
+  opened: Record<string, true>;
   error: string | null;
   sentNote: string | null;
   sending: boolean;
   onBack: () => void;
   onOpen: (id: string) => void;
   onSend: () => void;
+  onApply: (ids: string[], deadline: string, reminder: DocumentDraft["reminder"]) => void;
 }) {
-  const items = situations(rows, drafts, people, signers);
+  const items = situations(rows, drafts, people, signers, opened);
   const ready = items.filter((item) => item.situation === "Pronto").length;
   const attention = items.filter((item) => item.situation !== "Pronto" && item.situation !== "Já enviado").length;
   const sent = items.filter((item) => item.situation === "Já enviado").length;
+  const [picked, setPicked] = useState<string[]>([]);
+  const [deadline, setDeadline] = useState("");
+  const [reminder, setReminder] = useState<DocumentDraft["reminder"]>("EVERY_3_DAYS");
+  const openIds = items.filter((item) => item.situation !== "Já enviado").map((item) => item.row.id);
   return (
     <>
       <WizardCardHeader
@@ -474,15 +527,31 @@ function SendReview({
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-line">
-          <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_auto_auto] gap-3 border-b border-line px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-t2">
+          <div className="grid grid-cols-[auto_minmax(0,1.2fr)_minmax(0,1fr)_auto_auto] gap-3 border-b border-line px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-t2">
+            <input
+              type="checkbox"
+              aria-label="Selecionar documentos em aberto"
+              checked={openIds.length > 0 && openIds.every((id) => picked.includes(id))}
+              onChange={(event) => setPicked(event.target.checked ? openIds : [])}
+            />
             <span>Documento</span>
             <span>Colaborador</span>
             <span>Situação</span>
             <span />
           </div>
           {items.map((item) => (
-            <div key={item.row.id} className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_auto_auto] items-center gap-3 border-b border-line px-3 py-2.5 last:border-b-0">
-              <span className="truncate text-[13px] font-bold text-t0">{folderTitle(item.row.fileName)}</span>
+            <div key={item.row.id} className="grid grid-cols-[auto_minmax(0,1.2fr)_minmax(0,1fr)_auto_auto] items-center gap-3 border-b border-line px-3 py-2.5 last:border-b-0">
+              <input
+                type="checkbox"
+                aria-label={`Selecionar ${folderTitle(item.row.fileName)}`}
+                disabled={item.situation === "Já enviado"}
+                checked={picked.includes(item.row.id)}
+                onChange={(event) => setPicked((current) => (event.target.checked ? [...current, item.row.id] : current.filter((id) => id !== item.row.id)))}
+              />
+              <span className="min-w-0">
+                <span className="block truncate text-[13px] font-bold text-t0">{folderTitle(item.row.fileName)}</span>
+                <span className="mt-0.5 block truncate text-[11.5px] text-t2">{scheduleLine(item.draft)}</span>
+              </span>
               <span className="truncate text-[13px] text-t1">{item.person?.name ?? "Sem colaborador"}</span>
               <span className={cn("text-[12.5px] font-bold", item.situation === "Pronto" ? "text-ok" : item.situation === "Já enviado" ? "text-t2" : "text-warn")}>
                 {item.situation}
@@ -499,6 +568,30 @@ function SendReview({
         <SummaryTile label="Precisam de atenção" value={String(attention)} />
         <SummaryTile label="Já enviados" value={String(sent)} />
       </div>
+      {openIds.length > 1 && (
+        <div className="mt-4 rounded-xl border border-line p-3">
+          <p className="text-[13px] font-bold text-t0">Aplicar lembrete e prazo aos selecionados</p>
+          <p className="mt-1 text-[12.5px] text-t2">Contatos e canais não mudam.</p>
+          <div className="mt-3 flex flex-wrap items-end gap-2">
+            <label className="grid min-w-[160px] flex-1 gap-1 text-[12px] font-bold text-t2">
+              Lembrete
+              <select className={controlClass} value={reminder} onChange={(event) => setReminder(event.target.value as DocumentDraft["reminder"])}>
+                <option value="EVERY_DAY">Todo dia</option>
+                <option value="EVERY_3_DAYS">A cada 3 dias</option>
+                <option value="EVERY_WEEK">Toda semana</option>
+                <option value="NEVER">Nunca</option>
+              </select>
+            </label>
+            <label className="grid min-w-[160px] flex-1 gap-1 text-[12px] font-bold text-t2">
+              Data limite
+              <input type="date" className={controlClass} value={deadline} onChange={(event) => setDeadline(event.target.value)} />
+            </label>
+            <Button type="button" variant="outline" disabled={picked.length === 0} onClick={() => onApply(picked, deadline, reminder)}>
+              Aplicar
+            </Button>
+          </div>
+        </div>
+      )}
       {ready === 0 && items.length > 0 && <p className="mt-3 text-sm text-t2">Nenhum documento pronto para envio. Corrija as pendências para continuar.</p>}
       {sentNote && <p className="mt-3 text-sm text-ok">{sentNote}</p>}
       {error && <p className="mt-3 text-sm text-bad">{error}</p>}
@@ -507,6 +600,14 @@ function SendReview({
       </div>
     </>
   );
+}
+
+function scheduleLine(draft: DocumentDraft) {
+  const channel = draft.channel === "EMAIL" ? "E-mail" : "WhatsApp";
+  const reminder =
+    draft.reminder === "EVERY_DAY" ? "Todo dia" : draft.reminder === "EVERY_WEEK" ? "Toda semana" : draft.reminder === "NEVER" ? "Sem lembrete" : "A cada 3 dias";
+  const deadline = draft.deadline ? draft.deadline.split("-").reverse().join("/") : "Sem prazo";
+  return `${channel} · ${reminder} · ${deadline}`;
 }
 
 function SummaryTile({ label, value }: { label: string; value: string }) {
@@ -547,6 +648,22 @@ function Processing({ status }: { status: PrepareStatus }) {
         {label}
       </p>
       <p className="mt-1 text-[12.5px] text-t2">Nenhum documento é enviado para assinatura nesta etapa.</p>
+      {status.files.length > 0 && (
+        <div className="mt-5 w-full max-w-lg overflow-hidden rounded-xl border border-line text-left">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-b border-line px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-t2">
+            <span>Arquivo</span>
+            <span>Situação</span>
+          </div>
+          {status.files.map((file) => (
+            <div key={file.name} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-line px-3 py-2 last:border-b-0">
+              <span className="truncate text-[13px] font-bold text-t0">{file.name}</span>
+              <span className={cn("text-[12.5px] font-bold", file.situation === "Processado" ? "text-ok" : file.situation === "Recusado" || file.situation === "PDF escaneado" ? "text-bad" : "text-t1")}>
+                {file.detail ?? file.situation}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -638,6 +755,7 @@ function UploadStep({
   category,
   customName,
   files,
+  outcomes,
   error,
   onMonth,
   onYear,
@@ -653,6 +771,7 @@ function UploadStep({
   category: string;
   customName: string;
   files: File[];
+  outcomes: PrepareFile[];
   error: string | null;
   onMonth: (value: string) => void;
   onYear: (value: string) => void;
@@ -755,6 +874,16 @@ function UploadStep({
         />
       </div>
       {files.length > 0 && <AttachedFiles files={files} onRemove={(file) => onFiles(files.filter((item) => item !== file))} />}
+      {outcomes.length > 0 && (
+        <div className="mt-3 overflow-hidden rounded-xl border border-line">
+          {outcomes.map((item) => (
+            <div key={item.name} className="flex items-start justify-between gap-3 border-b border-line px-3 py-2 last:border-b-0">
+              <span className="truncate text-[13px] font-bold text-t0">{item.name}</span>
+              <span className={cn("text-right text-[12.5px]", item.situation === "Processado" ? "text-ok" : "text-bad")}>{item.detail ?? item.situation}</span>
+            </div>
+          ))}
+        </div>
+      )}
       {error && <p className="mt-3 text-sm text-bad">{error}</p>}
       <div className="mt-4">
         <WizardNav previousLabel="Cancelar" nextLabel="Continuar" hideNextIcon onPrevious={onCancel} onNext={onNext} nextDisabled={files.length === 0} />

@@ -86,6 +86,11 @@ O gestor envia PDFs digitais para assinatura, organizados por colaborador. Um PD
 - A posição da assinatura também passa para o documento seguinte. Se a página marcada não existe nesse PDF, a marca fica na última página que ele tem, no mesmo ponto.
 - O colaborador do documento é o campo do painel. Trocar a pessoa de uma marcação não muda esse vínculo. A marcação do colaborador é a principal; as outras são adicionais.
 - Enviar fica na etapa Revisar. O botão diz quantos documentos vão. Se outros ainda precisam de correção, a tela confirma o que fica de fora. A linha que já tem envelope não é enviada de novo.
+- A barra acima do PDF escolhe o signatário e se a próxima marcação é assinatura ou rubrica. O card continua permitindo alterar, arrastar, duplicar e excluir. A cópia nasce dentro da página e selecionada.
+- A navegação mostra "Documento N de T" e a situação de cada arquivo. Marca herdada só fica pronta depois que aquele PDF é aberto.
+- Excluir a única página pede confirmação, porque o documento sai do lote. A marcação que estava na página excluída deixa de valer.
+- Na revisão dá para aplicar lembrete e prazo aos documentos selecionados. Contato e canal não mudam.
+- A Home abre listas ao clicar nos indicadores. A busca encontra colaborador e documento. A ação do arquivo é Baixar PDF. Reenviar link só aparece em pendente.
 - Cada página do documento pode ser apagada antes do envio, com a lixeira. Apagar a última página tira o documento do lote. Documento que já tem envelope não perde página.
 
 ### Agent's Discretion
