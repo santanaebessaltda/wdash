@@ -5,10 +5,14 @@ import { Button, FormField, Modal, Tooltip, WizardCardHeader, WizardNav } from "
 import { Spinner } from "@/components/ui/Skeleton";
 import {
   DOCUMENT_COPY,
+  DOCUMENT_LIMITS,
+  contactFieldsToAsk,
   documentIssue,
   folderTitle,
   preparationSituation,
   resolveDrafts,
+  saveEmail,
+  saveWhatsapp,
   type DocumentDraft,
   type FieldMark,
   type GuestSigner,
@@ -70,7 +74,7 @@ export function DocumentReview({
   );
   const ready = rows.filter((row, index) => {
     if (row.envelopeId) return false;
-    if (documentIssue(people.find((item) => item.id === row.sellerId) ?? null, resolved[index], row.pageCount, signers, people)) return false;
+    if (documentIssue(people.find((item) => item.id === row.sellerId) ?? null, resolved[index], row.pageCount, signers, people, row.sizeBytes)) return false;
     return Boolean(opened[row.id]) || index === 0;
   }).length;
   const openRows = rows.filter((row) => !row.envelopeId).length;
@@ -78,10 +82,10 @@ export function DocumentReview({
   const row = rows[index];
   const draft = row ? drafts[row.id] : undefined;
   const unidentified = rows.filter((item) => !item.sellerId && !item.envelopeId).length;
-  const [listOpen, setListOpen] = useState(false);
+  const attention = openRows - ready;
   const situationOf = (item: DocumentRow, itemIndex: number) => {
     const person = people.find((candidate) => candidate.id === item.sellerId) ?? null;
-    const situation = preparationSituation(person, resolved[itemIndex], item.pageCount, signers, people, item.envelopeId);
+    const situation = preparationSituation(person, resolved[itemIndex], item.pageCount, signers, people, item.envelopeId, item.sizeBytes);
     if (situation === "Pronto" && !opened[item.id] && itemIndex > 0) return "Conferir marcação";
     return situation;
   };
@@ -93,23 +97,20 @@ export function DocumentReview({
         subtitle="Vincule o colaborador, posicione as marcações e confira o contato do canal escolhido."
       />
       {analyzed && rows.length > 0 && (
-        <div className="mt-4 rounded-xl border border-line bg-bg-2 px-3 py-2.5">
-          <p className="text-[13px] text-t1">
-            {analyzed.files} {analyzed.files === 1 ? "arquivo analisado" : "arquivos analisados"}. {rows.length}{" "}
-            {rows.length === 1 ? "documento preparado" : "documentos preparados"}. {unidentified}{" "}
-            {unidentified === 1 ? "precisa" : "precisam"} de identificação.
-          </p>
-          {analyzed.merged > 0 && (
-            <p className="mt-1 text-[13px] text-t1">
-              {analyzed.merged === 1
-                ? "1 documento reuniu páginas de arquivos diferentes."
-                : `${analyzed.merged} documentos reuniram páginas de arquivos diferentes.`}
-            </p>
-          )}
-          <Button type="button" size="sm" variant="outline" className="mt-2" onClick={() => setListOpen(true)}>
-            Ver documentos
-          </Button>
-        </div>
+        <p className="mt-3 text-[13px] text-t2">
+          {analyzed.files} {analyzed.files === 1 ? "arquivo analisado" : "arquivos analisados"} · {rows.length}{" "}
+          {rows.length === 1 ? "documento separado" : "documentos separados"}
+          {unidentified > 0 && unidentified === attention
+            ? ` · ${unidentified} sem colaborador identificado`
+            : attention > 0
+              ? ` · ${attention} ${attention === 1 ? "precisa" : "precisam"} de atenção`
+              : ""}
+          {analyzed.merged > 0
+            ? analyzed.merged === 1
+              ? ". 1 documento reuniu páginas de arquivos diferentes."
+              : `. ${analyzed.merged} documentos reuniram páginas de arquivos diferentes.`
+            : "."}
+        </p>
       )}
       {rows.length === 0 ? (
         <div className="mt-4">
@@ -126,7 +127,6 @@ export function DocumentReview({
           total={rows.length}
           rows={rows}
           period={period}
-          listOpen={listOpen}
           situationOf={situationOf}
           sending={sending}
           onFocus={onFocus}
@@ -179,7 +179,6 @@ function ReviewBody({
   total,
   rows,
   period,
-  listOpen,
   situationOf,
   sending,
   onFocus,
@@ -196,7 +195,6 @@ function ReviewBody({
   total: number;
   rows: DocumentRow[];
   period: string;
-  listOpen: boolean;
   situationOf: (item: DocumentRow, itemIndex: number) => string;
   sending: boolean;
   onFocus: (id: string) => void;
@@ -206,12 +204,10 @@ function ReviewBody({
   onSave: (input: { sellerId: string; cpf?: string; email?: string; whatsapp?: string }) => Promise<void>;
 }) {
   const person = people.find((item) => item.id === row.sellerId) ?? null;
-  const issue = row.envelopeId ? null : documentIssue(person, draft, row.pageCount, signers, people);
+  const issue = row.envelopeId ? null : documentIssue(person, draft, row.pageCount, signers, people, row.sizeBytes);
   const previous = index > 0 ? rows[index - 1] : null;
   const next = index < total - 1 ? rows[index + 1] : null;
   const locked = Boolean(row.envelopeId) || sending;
-  const [tool, setTool] = useState<SignatureMark["element"]>("SIGNATURE");
-  const [activeSigner, setActiveSigner] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   function changeFields(fields: FieldMark[]) {
@@ -226,7 +222,6 @@ function ReviewBody({
       guests: [...(draft.guests ?? []), guest],
       fields: assignTo ? draft.fields.map((item) => (item.id === assignTo.id ? { ...item, signerId } : item)) : draft.fields,
     });
-    setActiveSigner(signerId);
   }
 
   function pickSigner(field: FieldMark, value: string) {
@@ -239,90 +234,31 @@ function ReviewBody({
       ...draft,
       fields: draft.fields.map((item) => (item.id === field.id ? { ...item, signerId } : item)),
     });
-    setActiveSigner(signerId);
-  }
-
-  function chooseToolSigner(value: string) {
-    if (value === "__guest__") {
-      addGuest();
-      return;
-    }
-    setActiveSigner(value);
   }
 
   return (
-    <div className="mt-4">
-      <div className="mb-1 flex items-baseline justify-between gap-3">
-        <p className="text-[13px] font-bold text-t0">Documento {index + 1} de {total}</p>
-        <p className="truncate text-[12.5px] text-t2">{folderTitle(row.fileName)} · {period}</p>
-      </div>
+    <div className="mt-3">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <Button type="button" variant="secondary" disabled={!previous || sending} onClick={() => previous && onFocus(previous.id)}>
           Anterior
         </Button>
-        <select
-          className="h-10 min-w-0 flex-1 rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3.5 text-[13px] text-t0 outline-none transition-colors focus:border-acc"
-          value={row.id}
-          onChange={(event) => onFocus(event.target.value)}
-        >
-          {rows.map((item, itemIndex) => {
-            const named = people.find((personItem) => personItem.id === item.sellerId);
-            return (
-              <option key={item.id} value={item.id}>
-                {itemIndex + 1}. {named?.name ?? "Sem colaborador"} · {situationOf(item, itemIndex)}
-              </option>
-            );
-          })}
-        </select>
+        <DocumentSwitcher rows={rows} people={people} index={index} situationOf={situationOf} onFocus={onFocus} />
         <Button type="button" variant="secondary" disabled={!next || sending} onClick={() => next && onFocus(next.id)}>
           Próximo
         </Button>
       </div>
-      {listOpen && (
-        <div className="mb-3 overflow-hidden rounded-xl border border-line">
-          {rows.map((item, itemIndex) => {
-            const named = people.find((personItem) => personItem.id === item.sellerId);
-            return (
-              <button
-                key={item.id}
-                type="button"
-                className={cn("flex w-full items-center justify-between gap-3 border-b border-line px-3 py-2 text-left last:border-b-0 hover:bg-bg-3", item.id === row.id && "bg-bg-inset")}
-                onClick={() => onFocus(item.id)}
-              >
-                <span className="truncate text-[13px] font-bold text-t0">{itemIndex + 1}. {folderTitle(item.fileName)} · {named?.name ?? "Sem colaborador"}</span>
-                <span className="shrink-0 text-[12px] font-bold text-t2">{situationOf(item, itemIndex)}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div>
-          {person && <h3 className="text-lg font-bold text-t0">{person.name}</h3>}
-          <p className={cn("mb-3 text-[13px] text-t2", person && "mt-1")}>
-            {folderTitle(row.fileName)} · {row.pageCount === 1 ? "1 página" : `${row.pageCount} páginas`}
-          </p>
-          {!locked && (
-            <>
-              <p className="mb-2 text-[13px] text-t1">Clique no documento para posicionar uma assinatura ou rubrica.</p>
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <select
-                  className="h-10 min-w-[180px] flex-1 rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3 text-[13px] text-t0 outline-none focus:border-acc"
-                  value={activeSigner}
-                  onChange={(event) => chooseToolSigner(event.target.value)}
-                >
-                  <option value="">Signatário da próxima marcação</option>
-                  <SignerOptions people={people} sellerId={row.sellerId} guests={draft.guests ?? []} signers={signers} />
-                </select>
-                <Button type="button" size="sm" variant={tool === "SIGNATURE" ? "primary" : "secondary"} onClick={() => setTool("SIGNATURE")}>
-                  Assinatura
-                </Button>
-                <Button type="button" size="sm" variant={tool === "RUBRIC" ? "primary" : "secondary"} onClick={() => setTool("RUBRIC")}>
-                  Rubrica
-                </Button>
-              </div>
-            </>
-          )}
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="text-[13px] text-t2">
+              {documentTitle(rows, row, people)} · {period} · {row.pageCount === 1 ? "1 página" : `${row.pageCount} páginas`}
+            </p>
+            <Tooltip label="Clique no documento para adicionar uma assinatura ou rubrica.">
+              <button type="button" aria-label="Ajuda da marcação" className="flex h-7 w-7 items-center justify-center rounded-full border border-line text-[12px] font-bold text-t2 hover:bg-bg-3 hover:text-t0">
+                ?
+              </button>
+            </Tooltip>
+          </div>
           <StackedPages
             documentId={row.id}
             pageCount={row.pageCount}
@@ -332,8 +268,6 @@ function ReviewBody({
             guests={draft.guests ?? []}
             signers={signers}
             disabled={locked}
-            tool={tool}
-            activeSigner={activeSigner}
             selectedId={selectedId}
             onSelect={setSelectedId}
             onChange={changeFields}
@@ -341,7 +275,7 @@ function ReviewBody({
             onDrop={(pageNumber) => onDrop(row.id, pageNumber)}
           />
         </div>
-        <aside className="flex flex-col gap-3 rounded-xl border border-line p-3 lg:sticky lg:top-4">
+        <aside className="flex max-h-[calc(100vh-6rem)] flex-col gap-3 overflow-y-auto rounded-xl border border-line p-3 lg:sticky lg:top-4">
           {row.envelopeId ? (
             <p className="text-[13px] text-t2">{STATUS_LABEL[row.status]}</p>
           ) : (
@@ -351,6 +285,10 @@ function ReviewBody({
               people={people}
               signers={signers}
               issue={issue}
+              pageCount={row.pageCount}
+              sizeBytes={row.sizeBytes}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
               onAssign={(sellerId) => onAssign(row.id, sellerId)}
               onDraft={onDraft}
               onSave={onSave}
@@ -362,12 +300,194 @@ function ReviewBody({
   );
 }
 
+function channelContactsReady(
+  person: PersonRow | null,
+  draft: DocumentDraft,
+  people: PersonRow[],
+  signers: { id: string; email: string }[],
+) {
+  if (!person || channelGap(person, draft.channel)) return false;
+  const seen = new Set<string>();
+  for (const field of draft.fields) {
+    if (!field.signerId || field.signerId === "seller" || seen.has(field.signerId)) continue;
+    seen.add(field.signerId);
+    if (field.signerId.startsWith("seller:")) {
+      const other = people.find((item) => item.id === field.signerId.slice("seller:".length));
+      if (!other || channelGap(other, draft.channel)) return false;
+    } else if (field.signerId.startsWith("user:")) {
+      const user = signers.find((item) => item.id === field.signerId.slice("user:".length));
+      if (!user?.email.trim()) return false;
+    } else if (field.signerId.startsWith("guest:")) {
+      const guest = (draft.guests ?? []).find((item) => item.id === field.signerId.slice("guest:".length));
+      if (!guest?.name.trim()) return false;
+      if (draft.channel === "WHATSAPP") {
+        const saved = saveWhatsapp(guest.whatsapp);
+        if (!saved.ok || !saved.whatsapp) return false;
+      }
+      if (draft.channel === "EMAIL") {
+        const saved = saveEmail(guest.email);
+        if (!saved.ok || !saved.email) return false;
+      }
+    }
+  }
+  return true;
+}
+
+function documentTitle(rows: DocumentRow[], item: DocumentRow, people: PersonRow[]) {
+  const title = folderTitle(item.fileName);
+  const named = people.find((person) => person.id === item.sellerId);
+  if (named) return `${title} · ${named.name}`;
+  const same = rows.filter((row) => !row.sellerId && folderTitle(row.fileName) === title);
+  if (same.length < 2) return title;
+  return `${title} (${same.findIndex((row) => row.id === item.id) + 1})`;
+}
+
+function DocumentSwitcher({
+  rows,
+  people,
+  index,
+  situationOf,
+  onFocus,
+}: {
+  rows: DocumentRow[];
+  people: PersonRow[];
+  index: number;
+  situationOf: (item: DocumentRow, itemIndex: number) => string;
+  onFocus: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  const row = rows[index];
+  useEffect(() => {
+    if (!open) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    function onPointer(event: MouseEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
+    }
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onPointer);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onPointer);
+    };
+  }, [open]);
+  if (!row) return null;
+  const needle = query.trim().toLowerCase();
+  const visible = rows
+    .map((item, itemIndex) => ({ item, itemIndex }))
+    .filter(({ item, itemIndex }) => {
+      if (!needle) return true;
+      return documentTitle(rows, item, people).toLowerCase().includes(needle) || situationOf(item, itemIndex).toLowerCase().includes(needle);
+    });
+  return (
+    <div ref={ref} className="relative min-w-0 flex-1">
+      <button
+        type="button"
+        aria-expanded={open}
+        className="flex h-10 w-full min-w-0 items-center rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3 text-left outline-none focus:border-acc"
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span className="min-w-0">
+          <span className="block truncate text-[13px] font-bold text-t0">Documento {index + 1} de {rows.length} · {documentTitle(rows, row, people)}</span>
+        </span>
+      </button>
+      {open && (
+        <div className="absolute left-0 right-0 z-30 mt-1 overflow-hidden rounded-xl border border-line bg-bg-2 shadow-[var(--shadow-vela)]">
+          {rows.length > 8 && (
+            <input
+              autoFocus
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Buscar documento"
+              className="h-10 w-full border-b border-line bg-bg-inset px-3 text-[13px] text-t0 outline-none"
+            />
+          )}
+          <div className="max-h-64 overflow-y-auto">
+            {visible.map(({ item, itemIndex }) => (
+              <button
+                key={item.id}
+                type="button"
+                className={cn("flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-bg-3 focus:bg-bg-3", item.id === row.id && "bg-bg-inset")}
+                onClick={() => {
+                  onFocus(item.id);
+                  setOpen(false);
+                  setQuery("");
+                }}
+              >
+                <span className="truncate text-[13px] font-bold text-t0">{documentTitle(rows, item, people)}</span>
+                <span className="shrink-0 text-[12px] font-bold text-t2">{situationOf(item, itemIndex)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function channelGap(person: { cpf: string | null; email: string | null; whatsapp: string | null }, channel: DocumentDraft["channel"]) {
+  const ask = contactFieldsToAsk(person, channel);
+  if (channel === "WHATSAPP" && (ask.whatsapp || ask.cpf)) return ask.whatsapp ? "Sem WhatsApp" : "Sem CPF";
+  if (channel === "EMAIL" && (ask.email || ask.cpf)) return ask.email ? "Sem e-mail" : "Sem CPF";
+  if (ask.cpf) return "Sem CPF";
+  return null;
+}
+
+function signerGroups(draft: DocumentDraft, person: PersonRow | null, people: PersonRow[], signers: { id: string; name: string; email: string }[]) {
+  const order: string[] = [];
+  const map = new Map<string, FieldMark[]>();
+  for (const field of draft.fields) {
+    const key = field.signerId || "none";
+    if (!map.has(key)) {
+      order.push(key);
+      map.set(key, []);
+    }
+    map.get(key)?.push(field);
+  }
+  return order.map((key) => {
+    const marks = map.get(key) ?? [];
+    if (key === "none") {
+      return { key, name: "Sem signatário", role: null as "Principal" | "Adicional" | null, origin: "", pending: "Escolha quem assina", marks, person: null, guest: null, userEmail: null };
+    }
+    if (key === "seller" && !person) {
+      return { key, name: "Colaborador do documento", role: null, origin: "Colaborador", pending: "Sem colaborador", marks, person: null, guest: null, userEmail: null };
+    }
+    if (key === "seller" && person) {
+      return { key, name: person.name, role: "Principal" as const, origin: "Colaborador", pending: channelGap(person, draft.channel), marks, person, guest: null, userEmail: null };
+    }
+    if (key.startsWith("seller:")) {
+      const named = people.find((item) => item.id === key.slice("seller:".length)) ?? null;
+      return { key, name: named?.name ?? "Colaborador", role: "Adicional" as const, origin: "Colaborador", pending: named ? channelGap(named, draft.channel) : "Sem contato", marks, person: named, guest: null, userEmail: null };
+    }
+    if (key.startsWith("user:")) {
+      const named = signers.find((item) => item.id === key.slice("user:".length));
+      return { key, name: named?.name ?? "Usuário", role: "Adicional" as const, origin: "Usuário", pending: named?.email ? null : "Sem e-mail", marks, person: null, guest: null, userEmail: named?.email ?? null };
+    }
+    const guest = (draft.guests ?? []).find((item) => item.id === key.slice("guest:".length)) ?? null;
+    const pending = !guest?.name.trim()
+      ? "Informe o nome"
+      : draft.channel === "WHATSAPP" && !guest.whatsapp.trim()
+        ? "Sem WhatsApp"
+        : draft.channel === "EMAIL" && !guest.email.trim()
+          ? "Sem e-mail"
+          : null;
+    return { key, name: guest?.name.trim() || "Outra pessoa", role: "Adicional" as const, origin: "Outra pessoa", pending, marks, person: null, guest, userEmail: null };
+  });
+}
+
 function DraftFields({
   person,
   draft,
   people,
   signers,
   issue,
+  pageCount,
+  sizeBytes,
+  selectedId,
+  onSelect,
   onAssign,
   onDraft,
   onSave,
@@ -377,124 +497,135 @@ function DraftFields({
   people: PersonRow[];
   signers: { id: string; name: string; email: string }[];
   issue: string | null;
+  pageCount: number;
+  sizeBytes: number;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
   onAssign: (sellerId: string) => Promise<void>;
   onDraft: (draft: DocumentDraft) => void;
   onSave: (input: { sellerId: string; cpf?: string; email?: string; whatsapp?: string }) => Promise<void>;
 }) {
-  const extras = people.filter(
-    (item) => item.id !== person?.id && draft.fields.some((field) => field.signerId === `seller:${item.id}`),
-  );
-  const guests = (draft.guests ?? []).filter((guest) => draft.fields.some((field) => field.signerId === `guest:${guest.id}`));
-  const listed = new Set<string>();
-  const marks: { key: string; name: string; role: "Principal" | "Adicional" }[] = [];
-  for (const field of draft.fields) {
-    if (listed.has(field.signerId)) continue;
-    listed.add(field.signerId);
-    if (field.signerId === "seller") {
-      marks.push({ key: field.id, name: person?.name ?? "Sem colaborador", role: "Principal" });
-      continue;
-    }
-    if (field.signerId.startsWith("seller:")) {
-      const named = people.find((item) => item.id === field.signerId.slice("seller:".length));
-      marks.push({ key: field.signerId, name: named?.name ?? "Colaborador", role: "Adicional" });
-      continue;
-    }
-    if (field.signerId.startsWith("user:")) {
-      const named = signers.find((item) => item.id === field.signerId.slice("user:".length));
-      marks.push({ key: field.signerId, name: named?.name ?? "Usuário", role: "Adicional" });
-      continue;
-    }
-    if (field.signerId.startsWith("guest:")) {
-      const named = (draft.guests ?? []).find((item) => item.id === field.signerId.slice("guest:".length));
-      marks.push({ key: field.signerId, name: named?.name || "Outra pessoa", role: "Adicional" });
-    }
-  }
+  const [openKey, setOpenKey] = useState<string | null>(null);
+  const groups = signerGroups(draft, person, people, signers);
+  useEffect(() => {
+    const field = draft.fields.find((item) => item.id === selectedId);
+    if (!field) return;
+    setOpenKey(field.signerId || "none");
+  }, [draft.fields, selectedId]);
+
+  const marksValid =
+    Boolean(person) &&
+    draft.fields.some((field) => field.signerId === "seller" && field.pageNumber >= 1 && field.pageNumber <= pageCount) &&
+    !draft.fields.some((field) => !field.signerId || field.pageNumber < 1 || field.pageNumber > pageCount);
+  const contactsValid = channelContactsReady(person, draft, people, signers);
+  const sizeValid = sizeBytes <= DOCUMENT_LIMITS.maxEnvelopeBytes;
+
   return (
     <>
-      <FormField label="Colaborador do documento">
-        <select className={controlClass} value={person?.id ?? ""} onChange={(event) => event.target.value && void onAssign(event.target.value)}>
-          <option value="">Sem colaborador</option>
-          {people.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name}
-            </option>
-          ))}
-        </select>
-      </FormField>
-      <div>
-        <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Signatários</p>
-        {marks.length === 0 ? (
-          <p className="mt-1 text-[13px] text-t2">Nenhuma marcação neste documento.</p>
-        ) : (
-          <ul className="mt-1 grid gap-1">
-            {marks.map((item) => (
-              <li key={item.key} className="flex items-center justify-between gap-2 text-[13px]">
-                <span className="min-w-0 truncate text-t0">{item.name}</span>
-                <span className="shrink-0 text-[11px] font-bold uppercase tracking-wide text-t2">{item.role}</span>
-              </li>
+      <section className="rounded-xl border border-line p-3">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Colaborador do documento</p>
+        <div className="mt-2">
+          <select className={controlClass} value={person?.id ?? ""} onChange={(event) => event.target.value && void onAssign(event.target.value)}>
+            <option value="">Selecionar colaborador</option>
+            {people.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
             ))}
+          </select>
+        </div>
+        {!person && <p className="mt-2 text-[12.5px] text-t2">Vincule o colaborador a quem este documento pertence.</p>}
+      </section>
+      <section className="rounded-xl border border-line p-3">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Signatários</p>
+          <span className="text-[11px] font-bold text-t2">{groups.length} {groups.length === 1 ? "pessoa" : "pessoas"}</span>
+        </div>
+        {groups.length === 0 ? (
+          <p className="mt-2 text-[13px] text-t2">Clique no documento para adicionar uma marcação.</p>
+        ) : (
+          <ul className="mt-2 grid gap-2">
+            {groups.map((group) => {
+              const open = openKey === group.key;
+              return (
+                <li key={group.key} className="rounded-lg border border-line">
+                  <button type="button" className="flex w-full items-center justify-between gap-2 px-2.5 py-2 text-left hover:bg-bg-3" onClick={() => setOpenKey(open ? null : group.key)}>
+                    <span className="min-w-0">
+                      <span className="block truncate text-[13px] font-bold text-t0">{group.name}</span>
+                      <span className="block text-[11px] text-t2">
+                        {group.role ? `${group.role} · ` : ""}
+                        {group.origin ? `${group.origin} · ` : ""}
+                        {group.marks.length} {group.marks.length === 1 ? "marcação" : "marcações"}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-[11px] font-bold text-warn">{group.pending}</span>
+                  </button>
+                  {open && (
+                    <div className="grid gap-2 border-t border-line px-2.5 py-2">
+                      {group.marks.map((field) => (
+                        <button
+                          key={field.id}
+                          type="button"
+                          className={cn("rounded-md px-2 py-1 text-left text-[12.5px] hover:bg-bg-3", selectedId === field.id ? "bg-bg-inset font-bold text-t0" : "text-t1")}
+                          onClick={() => onSelect(field.id)}
+                        >
+                          {field.element === "RUBRIC" ? "Rubrica" : "Assinatura"} · Página {field.pageNumber}
+                        </button>
+                      ))}
+                      {group.person && <ContactEditor key={`${group.person.id}:${group.person.cpf ?? ""}:${group.person.email ?? ""}:${group.person.whatsapp ?? ""}`} person={group.person} onSave={onSave} />}
+                      {group.guest && (
+                        <GuestEditor guest={group.guest} onChange={(next) => onDraft({ ...draft, guests: (draft.guests ?? []).map((item) => (item.id === group.guest?.id ? next : item)) })} />
+                      )}
+                      {group.userEmail && <p className="text-[12.5px] text-t2">E-mail da conta: {group.userEmail}</p>}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
-      </div>
-      <div>
-        <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Assinaturas</p>
-        {draft.fields.length === 0 ? (
-          <p className="mt-1 text-[13px] text-t2">Nenhuma marcação neste documento.</p>
-        ) : (
-          <ul className="mt-1 grid gap-1">
-            {draft.fields.map((field) => (
-              <li key={field.id} className="text-[13px] text-t1">
-                {field.element === "RUBRIC" ? "Rubrica" : "Assinatura"} · Página {field.pageNumber} · {signerName(field, person, people, signers, draft.guests ?? [])}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-      <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Configurações de envio</p>
-      <FormField label="Canal">
-        <ChannelSelect value={draft.channel} onChange={(channel) => onDraft({ ...draft, channel })} />
-      </FormField>
-      {person && (
-        <ContactEditor key={`${person.id}:${person.cpf ?? ""}:${person.email ?? ""}:${person.whatsapp ?? ""}`} person={person} onSave={onSave} />
-      )}
-      {extras.map((item) => (
-        <ContactEditor key={`${item.id}:${item.cpf ?? ""}:${item.email ?? ""}:${item.whatsapp ?? ""}`} person={item} onSave={onSave} />
-      ))}
-      {guests.map((guest) => (
-        <GuestEditor
-          key={guest.id}
-          guest={guest}
-          onChange={(next) => onDraft({ ...draft, guests: (draft.guests ?? []).map((item) => (item.id === guest.id ? next : item)) })}
-        />
-      ))}
-      <FormField label="Lembrete">
-        <select className={controlClass} value={draft.reminder} onChange={(event) => onDraft({ ...draft, reminder: event.target.value as DocumentDraft["reminder"] })}>
-          <option value="EVERY_DAY">Todo dia</option>
-          <option value="EVERY_3_DAYS">A cada 3 dias</option>
-          <option value="EVERY_WEEK">Toda semana</option>
-          <option value="NEVER">Nunca</option>
-        </select>
-      </FormField>
-      <FormField label="Data limite" optional hint="Depois desta data, o documento fica expirado se ainda não tiver sido assinado.">
-        <input type="date" className={controlClass} value={draft.deadline} onChange={(event) => onDraft({ ...draft, deadline: event.target.value })} />
-      </FormField>
-      {issue && issue !== "Escolha o colaborador." && <p className="text-xs text-bad">{issue}</p>}
+      </section>
+      <section className="rounded-xl border border-line p-3">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Configurações de envio</p>
+        <div className="mt-2 grid gap-3">
+          <FormField label="Canal">
+            <ChannelSelect value={draft.channel} onChange={(channel) => onDraft({ ...draft, channel })} />
+          </FormField>
+          <FormField label="Lembrete">
+            <select className={controlClass} value={draft.reminder} onChange={(event) => onDraft({ ...draft, reminder: event.target.value as DocumentDraft["reminder"] })}>
+              <option value="EVERY_DAY">Todo dia</option>
+              <option value="EVERY_3_DAYS">A cada 3 dias</option>
+              <option value="EVERY_WEEK">Toda semana</option>
+              <option value="NEVER">Nunca</option>
+            </select>
+          </FormField>
+          <FormField label="Data limite" optional hint="Depois desta data, o documento fica expirado se ainda não tiver sido assinado.">
+            <input type="date" className={controlClass} value={draft.deadline} onChange={(event) => onDraft({ ...draft, deadline: event.target.value })} />
+          </FormField>
+        </div>
+      </section>
+      <section className="rounded-xl border border-line p-3">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Situação do documento</p>
+        <ul className="mt-2 grid gap-1.5">
+          <CheckRow ok={Boolean(person)} label="Colaborador identificado" />
+          <CheckRow ok={marksValid} label="Marcações válidas" />
+          <CheckRow ok={contactsValid} label="Contatos do canal válidos" />
+          <CheckRow ok={sizeValid} label="Tamanho do PDF válido" />
+        </ul>
+        {issue && issue !== "Escolha o colaborador." && issue !== DOCUMENT_COPY.overEnvelope && <p className="mt-2 text-xs text-bad">{issue}</p>}
+        {!sizeValid && <p className="mt-2 text-xs text-bad">{DOCUMENT_COPY.overEnvelope}</p>}
+      </section>
     </>
   );
 }
 
-function signerName(
-  field: FieldMark,
-  person: PersonRow | null,
-  people: PersonRow[],
-  signers: { id: string; name: string }[],
-  guests: GuestSigner[],
-) {
-  if (field.signerId === "seller") return person?.name ?? "Sem colaborador";
-  if (field.signerId.startsWith("seller:")) return people.find((item) => item.id === field.signerId.slice("seller:".length))?.name ?? "Colaborador";
-  if (field.signerId.startsWith("user:")) return signers.find((item) => item.id === field.signerId.slice("user:".length))?.name ?? "Usuário";
-  if (field.signerId.startsWith("guest:")) return guests.find((item) => item.id === field.signerId.slice("guest:".length))?.name.trim() || "Outra pessoa";
-  return "Signatário";
+function CheckRow({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <li className="flex items-center justify-between gap-2 text-[13px]">
+      <span className="text-t1">{label}</span>
+      <span className={cn("text-[12px] font-bold", ok ? "text-ok" : "text-bad")}>{ok ? "Ok" : "Pendente"}</span>
+    </li>
+  );
 }
 
 function SignerOptions({
@@ -627,8 +758,6 @@ function StackedPages({
   guests,
   signers,
   disabled,
-  tool,
-  activeSigner,
   selectedId,
   onSelect,
   onChange,
@@ -643,8 +772,6 @@ function StackedPages({
   guests: GuestSigner[];
   signers: { id: string; name: string; email: string }[];
   disabled: boolean;
-  tool: SignatureMark["element"];
-  activeSigner: string;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onChange: (fields: FieldMark[]) => void;
@@ -768,9 +895,9 @@ function StackedPages({
               className="relative w-fit max-w-full bg-white shadow-lg"
               onClick={(event) => {
                 if (disabled || (event.target as HTMLElement).closest("[data-mark]")) return;
-                const added = pointAt(event.currentTarget, event.clientX, event.clientY, page, tool);
+                const added = pointAt(event.currentTarget, event.clientX, event.clientY, page, "SIGNATURE");
                 const id = crypto.randomUUID();
-                onChange([...fields, { ...added, id, signerId: activeSigner || "seller" }]);
+                onChange([...fields, { ...added, id, signerId: sellerId ? "seller" : "" }]);
                 onSelect(id);
               }}
             >
@@ -786,8 +913,8 @@ function StackedPages({
                     guests={guests}
                     signers={signers}
                     disabled={disabled}
-                    highlighted={sameSigner(field.signerId, activeSigner, sellerId)}
                     selected={selectedId === field.id}
+                    onSelect={() => onSelect(field.id)}
                     onChange={(next) => onChange(fields.map((item) => (item.id === field.id ? next : item)))}
                     onPick={(value) => onPick(field, value)}
                     onDuplicate={() => {
@@ -839,13 +966,6 @@ function shiftedCopy(field: FieldMark): { x: number; y: number } {
   return { x: Math.max(0, Math.round((field.x - 8) * 10) / 10), y: Math.min(field.y, 92) };
 }
 
-function sameSigner(signerId: string, activeSigner: string, sellerId: string | null) {
-  if (!activeSigner) return false;
-  if (signerId === activeSigner) return true;
-  const owner = sellerId ? `seller:${sellerId}` : "";
-  return (signerId === "seller" && (activeSigner === "seller" || activeSigner === owner)) || (activeSigner === "seller" && signerId === owner);
-}
-
 function MarkCard({
   field,
   people,
@@ -853,8 +973,8 @@ function MarkCard({
   guests,
   signers,
   disabled,
-  highlighted,
   selected,
+  onSelect,
   onChange,
   onPick,
   onDuplicate,
@@ -866,19 +986,29 @@ function MarkCard({
   guests: GuestSigner[];
   signers: { id: string; name: string }[];
   disabled: boolean;
-  highlighted: boolean;
   selected: boolean;
+  onSelect: () => void;
   onChange: (field: FieldMark) => void;
   onPick: (value: string) => void;
   onDuplicate: () => void;
   onRemove: () => void;
 }) {
+  const drag = useRef<{ pointerId: number; originX: number; originY: number; startX: number; startY: number; moved: boolean } | null>(null);
+
   function move(event: PointerEvent<HTMLDivElement>) {
-    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    const state = drag.current;
+    if (!state || state.pointerId !== event.pointerId) return;
+    const dx = event.clientX - state.startX;
+    const dy = event.clientY - state.startY;
+    if (!state.moved && Math.hypot(dx, dy) < 4) return;
+    state.moved = true;
     const page = event.currentTarget.closest("[data-page-box]");
     if (!(page instanceof HTMLElement)) return;
-    const next = pointAt(page, event.clientX, event.clientY, field.pageNumber, field.element);
-    onChange({ ...field, x: next.x, y: next.y });
+    const box = page.getBoundingClientRect();
+    if (box.width <= 0 || box.height <= 0) return;
+    const x = Math.min(100, Math.max(0, state.originX + (dx / box.width) * 100));
+    const y = Math.min(100, Math.max(0, state.originY + (dy / box.height) * 100));
+    onChange({ ...field, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 });
   }
 
   return (
@@ -888,13 +1018,26 @@ function MarkCard({
       style={{ left: `${field.x}%`, top: `${field.y}%`, transform: "translate(-50%, -115%)" }}
       onClick={(event) => event.stopPropagation()}
       onPointerDown={(event) => {
-        if (disabled || event.button !== 0) return;
-        if (!(event.target as HTMLElement).closest("[data-drag]")) return;
+        if (event.button !== 0) return;
+        onSelect();
+        if (disabled || !(event.target as HTMLElement).closest("[data-drag]")) return;
+        event.stopPropagation();
+        drag.current = {
+          pointerId: event.pointerId,
+          originX: field.x,
+          originY: field.y,
+          startX: event.clientX,
+          startY: event.clientY,
+          moved: false,
+        };
         event.currentTarget.setPointerCapture(event.pointerId);
       }}
       onPointerMove={move}
+      onPointerUp={() => {
+        drag.current = null;
+      }}
     >
-      <div className={cn("rounded-[var(--radius-vela-md)] border bg-bg-2 text-t0 shadow-[0_12px_28px_-16px_rgba(0,0,0,0.55)]", highlighted || selected ? "border-acc" : "border-line")}>
+      <div className={cn("rounded-[var(--radius-vela-md)] border bg-bg-2 text-t0 shadow-[0_12px_28px_-16px_rgba(0,0,0,0.55)]", selected ? "border-acc" : "border-line")}>
         <div
           data-drag
           aria-label="Arrastar marcação"
@@ -909,7 +1052,7 @@ function MarkCard({
             disabled={disabled}
             onChange={(event) => onPick(event.target.value)}
           >
-            {field.signerId === "seller" && !sellerId && <option value="">Selecionar</option>}
+            {!field.signerId || (field.signerId === "seller" && !sellerId) ? <option value="">Selecionar</option> : null}
             <SignerOptions people={people} sellerId={sellerId} guests={guests} signers={signers} />
           </select>
           <div className="flex gap-1">

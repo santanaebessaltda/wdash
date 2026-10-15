@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Breadcrumbs, Button, Card, CardHeader, CardTitle, FormField, Modal, ProgressBar, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
+import { Breadcrumbs, Button, Card, CardHeader, CardTitle, FormField, Modal, ProgressBar, WizardCardHeader, WizardNav, WizardSteps, useToast } from "@/components/ui";
 import { Spinner } from "@/components/ui/Skeleton";
 import { paths } from "@/router/paths";
 import { Icon, icons } from "@/pages/users/Icons";
@@ -80,6 +80,9 @@ export function AttachWizard({
   const [sentNote, setSentNote] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [confirmSend, setConfirmSend] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const hinted = useRef(false);
+  const { show } = useToast();
   const [signers, setSigners] = useState<{ id: string; name: string; email: string }[]>([]);
 
   useEffect(() => {
@@ -105,6 +108,12 @@ export function AttachWizard({
   useEffect(() => {
     if (step === 1) openAtStart.current = true;
   }, [step]);
+
+  useEffect(() => {
+    if (step !== 2 || hinted.current) return;
+    hinted.current = true;
+    show("Clique no documento para adicionar uma assinatura ou rubrica.");
+  }, [step, show]);
 
   useEffect(() => {
     if (step !== 2 || !activeId) return;
@@ -235,6 +244,10 @@ export function AttachWizard({
 
   function leave() {
     if (processing || sending) return;
+    if (step > 1 || files.length > 0) {
+      setConfirmLeave(true);
+      return;
+    }
     onClose();
   }
 
@@ -401,6 +414,23 @@ export function AttachWizard({
       >
         <ConfirmCopy rows={rows} drafts={drafts} people={people} signers={signers} opened={opened} />
       </Modal>
+      <Modal
+        open={confirmLeave}
+        onClose={() => setConfirmLeave(false)}
+        title="Sair da preparação"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setConfirmLeave(false)}>
+              Continuar
+            </Button>
+            <Button variant="danger" onClick={onClose}>
+              Sair
+            </Button>
+          </>
+        }
+      >
+        <p className="text-[13.5px] text-t1">As marcações desta preparação serão perdidas. Contatos já salvos no cadastro permanecem.</p>
+      </Modal>
     </div>
   );
 }
@@ -443,7 +473,7 @@ function situations(
   );
   return rows.map((row, index) => {
     const person = people.find((item) => item.id === row.sellerId) ?? null;
-    const situation = preparationSituation(person, resolved[index], row.pageCount, signers, people, row.envelopeId);
+    const situation = preparationSituation(person, resolved[index], row.pageCount, signers, people, row.envelopeId, row.sizeBytes);
     return {
       row,
       person,
@@ -526,41 +556,44 @@ function SendReview({
           <p className="mt-1 text-sm text-t2">Corrija as pendências para continuar.</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-line">
-          <div className="grid grid-cols-[auto_minmax(0,1.2fr)_minmax(0,1fr)_auto_auto] gap-3 border-b border-line px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-t2">
-            <input
-              type="checkbox"
-              aria-label="Selecionar documentos em aberto"
-              checked={openIds.length > 0 && openIds.every((id) => picked.includes(id))}
-              onChange={(event) => setPicked(event.target.checked ? openIds : [])}
-            />
-            <span>Documento</span>
-            <span>Colaborador</span>
-            <span>Situação</span>
-            <span />
-          </div>
-          {items.map((item) => (
-            <div key={item.row.id} className="grid grid-cols-[auto_minmax(0,1.2fr)_minmax(0,1fr)_auto_auto] items-center gap-3 border-b border-line px-3 py-2.5 last:border-b-0">
-              <input
-                type="checkbox"
-                aria-label={`Selecionar ${folderTitle(item.row.fileName)}`}
-                disabled={item.situation === "Já enviado"}
-                checked={picked.includes(item.row.id)}
-                onChange={(event) => setPicked((current) => (event.target.checked ? [...current, item.row.id] : current.filter((id) => id !== item.row.id)))}
-              />
-              <span className="min-w-0">
-                <span className="block truncate text-[13px] font-bold text-t0">{folderTitle(item.row.fileName)}</span>
-                <span className="mt-0.5 block truncate text-[11.5px] text-t2">{scheduleLine(item.draft)}</span>
-              </span>
-              <span className="truncate text-[13px] text-t1">{item.person?.name ?? "Sem colaborador"}</span>
-              <span className={cn("text-[12.5px] font-bold", item.situation === "Pronto" ? "text-ok" : item.situation === "Já enviado" ? "text-t2" : "text-warn")}>
-                {item.situation}
-              </span>
-              <Button type="button" size="sm" variant="outline" onClick={() => onOpen(item.row.id)}>
-                Revisar
-              </Button>
-            </div>
-          ))}
+        <div className="grid gap-4">
+          {(
+            [
+              ["Prontos para envio", items.filter((item) => item.situation === "Pronto")],
+              ["Precisam de correção", items.filter((item) => item.situation !== "Pronto" && item.situation !== "Já enviado")],
+              ["Já enviados", items.filter((item) => item.situation === "Já enviado")],
+            ] as const
+          )
+            .filter(([, group]) => group.length > 0)
+            .map(([title, group]) => (
+              <section key={title}>
+                <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-t2">{title}</p>
+                <div className="overflow-hidden rounded-xl border border-line">
+                  {group.map((item) => (
+                    <div key={item.row.id} className="grid grid-cols-[auto_minmax(0,1.2fr)_minmax(0,1fr)_auto_auto] items-center gap-3 border-b border-line px-3 py-2.5 last:border-b-0">
+                      <input
+                        type="checkbox"
+                        aria-label={`Selecionar ${folderTitle(item.row.fileName)}`}
+                        disabled={item.situation === "Já enviado"}
+                        checked={picked.includes(item.row.id)}
+                        onChange={(event) => setPicked((current) => (event.target.checked ? [...current, item.row.id] : current.filter((id) => id !== item.row.id)))}
+                      />
+                      <span className="min-w-0">
+                        <span className="block truncate text-[13px] font-bold text-t0">{folderTitle(item.row.fileName)}</span>
+                        <span className="mt-0.5 block truncate text-[11.5px] text-t2">{scheduleLine(item.draft)}</span>
+                      </span>
+                      <span className="truncate text-[13px] text-t1">{item.person?.name ?? "Sem colaborador"}</span>
+                      <span className={cn("text-[12.5px] font-bold", item.situation === "Pronto" ? "text-ok" : item.situation === "Já enviado" ? "text-t2" : "text-warn")}>
+                        {item.situation}
+                      </span>
+                      <Button type="button" size="sm" variant="outline" onClick={() => onOpen(item.row.id)}>
+                        {item.situation === "Pronto" || item.situation === "Já enviado" ? "Revisar" : "Corrigir"}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ))}
         </div>
       )}
       <div className="mt-4 grid grid-cols-3 gap-3">

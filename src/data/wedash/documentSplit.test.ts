@@ -447,6 +447,10 @@ describe("carryDraft", () => {
       fields: [...draft.fields, { id: "guest-mark", pageNumber: 1, x: 20, y: 80, element: "SIGNATURE" as const, signerId: "guest:g1" }],
     };
     expect(documentIssue({ cpf: VALID_DIGITS, email: "ana@loja.com", whatsapp: "11987654321" }, guest, 1)).toBe("Informe o nome de quem vai assinar.");
+    const blank = { ...draft, fields: [{ ...draft.fields[0], signerId: "" }] };
+    expect(documentIssue({ cpf: VALID_DIGITS, email: "ana@loja.com", whatsapp: "11987654321" }, blank, 1)).toBe("Escolha quem assina esta marcação.");
+    expect(preparationSituation({ cpf: VALID_DIGITS, email: "ana@loja.com", whatsapp: "11987654321" }, blank, 1)).toBe("Falta marcação");
+    expect(documentIssue({ cpf: VALID_DIGITS, email: "ana@loja.com", whatsapp: "11987654321" }, draft, 1, [], [], 5 * 1024 * 1024 + 1)).toBe("O PDF passa de 5 MB depois da separação. Separe o arquivo e tente novamente.");
     expect(preparationSituation(null, draft, 1)).toBe("Sem colaborador");
     expect(preparationSituation({ cpf: VALID_DIGITS, email: "ana@loja.com", whatsapp: "11987654321" }, draft, 1)).toBe("Pronto");
     expect(preparationSituation({ cpf: VALID_DIGITS, email: "ana@loja.com", whatsapp: "11987654321" }, draft, 1, [], [], "env")).toBe("Já enviado");

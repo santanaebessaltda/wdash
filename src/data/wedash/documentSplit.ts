@@ -495,10 +495,12 @@ export function documentIssue(
   pageCount: number,
   signers: { id: string; name: string; email: string | null }[] = [],
   people: { id: string; name: string; email: string | null; whatsapp: string | null; cpf?: string | null }[] = [],
+  sizeBytes = 0,
 ): string | null {
   if (!person) return "Escolha o colaborador.";
   const ask = contactFieldsToAsk(person, draft.channel);
   if (ask.cpf || ask.email || ask.whatsapp) return "Falta contato no cadastro.";
+  if (draft.fields.some((field) => !field.signerId)) return "Escolha quem assina esta marcação.";
   const place = placementWarning(sellerMarks(draft.fields), pageCount);
   if (place) return place;
   for (const field of draft.fields) {
@@ -526,6 +528,7 @@ export function documentIssue(
       }
     }
   }
+  if (sizeBytes > DOCUMENT_LIMITS.maxEnvelopeBytes) return DOCUMENT_COPY.overEnvelope;
   return null;
 }
 
@@ -537,12 +540,13 @@ export function preparationSituation(
   signers: { id: string; name: string; email: string | null }[] = [],
   people: { id: string; name: string; email: string | null; whatsapp: string | null; cpf?: string | null }[] = [],
   envelopeId: string | null = null,
-): "Pronto" | "Sem colaborador" | "Contato incompleto" | "Sem marcação" | "Já enviado" | "Precisa de correção" {
+  sizeBytes = 0,
+): "Pronto" | "Sem colaborador" | "Contato incompleto" | "Falta marcação" | "Já enviado" | "Precisa de correção" {
   if (envelopeId) return "Já enviado";
-  const issue = documentIssue(person, draft, pageCount, signers, people);
+  const issue = documentIssue(person, draft, pageCount, signers, people, sizeBytes);
   if (!issue) return "Pronto";
   if (issue === "Escolha o colaborador.") return "Sem colaborador";
-  if (issue === DOCUMENT_COPY.missingPage) return "Sem marcação";
+  if (issue === DOCUMENT_COPY.missingPage || issue === "Escolha quem assina esta marcação.") return "Falta marcação";
   if (
     issue === "Falta contato no cadastro." ||
     issue.startsWith("Informe ") ||
