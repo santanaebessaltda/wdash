@@ -17,6 +17,7 @@ import {
   defaultSignatureMark,
   replicateSetup,
   type SendChannel,
+  type SignatureMark,
 } from "@/data/wedash/documentSplit";
 import {
   assignDocument,
@@ -28,6 +29,7 @@ import {
   type PrepareStatus,
 } from "@/data/wedash/documentsRepo";
 import { STATUS_LABEL, formatBytes } from "./frame";
+import { SignaturePlacement } from "./SignaturePlacement";
 
 const controlClass =
   "h-[42px] w-full rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3.5 text-[13px] text-t0 outline-none transition-colors focus:border-acc";
@@ -35,7 +37,8 @@ const controlClass =
 const STEPS = [
   { num: 1, label: "Anexar" },
   { num: 2, label: "Destinatários" },
-  { num: 3, label: "Revisão" },
+  { num: 3, label: "Assinaturas" },
+  { num: 4, label: "Revisão" },
 ];
 
 export function AttachWizard({
@@ -60,6 +63,9 @@ export function AttachWizard({
   const [customName, setCustomName] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [channels, setChannels] = useState<Record<string, SendChannel>>({});
+  const [marks, setMarks] = useState<Record<string, SignatureMark>>({});
+  const [sampleId, setSampleId] = useState("");
+  const [extraMark, setExtraMark] = useState<SignatureMark | null>(null);
   const [picked, setPicked] = useState<Record<string, boolean>>({});
   const [reminder, setReminder] = useState("EVERY_3_DAYS");
   const [deadline, setDeadline] = useState("");
@@ -79,6 +85,11 @@ export function AttachWizard({
   function channelOf(id: string): SendChannel {
     return channels[id] ?? "WHATSAPP";
   }
+  function markOf(row: DocumentRow): SignatureMark {
+    return marks[row.id] ?? defaultSignatureMark(row.pageCount);
+  }
+  const sample = rows.find((row) => row.id === sampleId) ?? rows[0];
+  const shownExtra = extraOn && sample ? (extraMark ?? { ...defaultSignatureMark(sample.pageCount), y: 72 }) : null;
   const ready = rows.filter((row) => personReady(people.find((person) => person.id === row.sellerId), channelOf(row.id)));
   const missing = rows.length - ready.length;
 
@@ -130,9 +141,9 @@ export function AttachWizard({
         batchId,
         deadline,
         reminder,
-        documents: rows.map((row) => ({ id: row.id, channel: channelOf(row.id), marks: [defaultSignatureMark(row.pageCount)] })),
-        extraSigner: extraOn
-          ? { name: extraName.trim(), channel: extraChannel, email: extraEmail.trim() || null, whatsapp: extraWhatsapp.trim() || null, marks: [] }
+        documents: rows.map((row) => ({ id: row.id, channel: channelOf(row.id), marks: [markOf(row)] })),
+        extraSigner: extraOn && shownExtra
+          ? { name: extraName.trim(), channel: extraChannel, email: extraEmail.trim() || null, whatsapp: extraWhatsapp.trim() || null, marks: [shownExtra] }
           : null,
       });
       await onReload();
@@ -212,11 +223,21 @@ export function AttachWizard({
             onChannel={(id, value) => setChannels((current) => ({ ...current, [id]: value }))}
             onPick={(id, value) => setPicked((current) => ({ ...current, [id]: value }))}
             onReplicate={(sourceId) => {
-              const copy = replicateSetup({ channel: channelOf(sourceId), marks: [] });
+              const source = rows.find((row) => row.id === sourceId);
+              const copy = replicateSetup({ channel: channelOf(sourceId), marks: source ? [markOf(source)] : [] });
               setChannels((current) => {
                 const next = { ...current };
                 for (const row of rows) {
                   if (row.id !== sourceId && picked[row.id]) next[row.id] = copy.channel;
+                }
+                return next;
+              });
+              const copied = copy.marks[0];
+              if (!copied) return;
+              setMarks((current) => {
+                const next = { ...current };
+                for (const row of rows) {
+                  if (row.id !== sourceId && picked[row.id]) next[row.id] = { ...copied };
                 }
                 return next;
               });
@@ -247,6 +268,43 @@ export function AttachWizard({
               setStep(3);
             }}
           />
+        ) : step === 3 && sample ? (
+          <SignaturePlacement
+            rows={rows}
+            people={people}
+            sampleId={sample.id}
+            mark={markOf(sample)}
+            extraMark={shownExtra}
+            picked={picked}
+            onSample={setSampleId}
+            onMark={(next) => setMarks((current) => ({ ...current, [sample.id]: next }))}
+            onExtraMark={setExtraMark}
+            onPick={(id, value) => setPicked((current) => ({ ...current, [id]: value }))}
+            onReplicate={() => {
+              const copy = replicateSetup({ channel: channelOf(sample.id), marks: [markOf(sample)] });
+              setChannels((current) => {
+                const next = { ...current };
+                for (const row of rows) {
+                  if (row.id !== sample.id && picked[row.id]) next[row.id] = copy.channel;
+                }
+                return next;
+              });
+              const copied = copy.marks[0];
+              if (!copied) return;
+              setMarks((current) => {
+                const next = { ...current };
+                for (const row of rows) {
+                  if (row.id !== sample.id && picked[row.id]) next[row.id] = { ...copied };
+                }
+                return next;
+              });
+            }}
+            onBack={() => setStep(2)}
+            onNext={() => {
+              setError(null);
+              setStep(4);
+            }}
+          />
         ) : (
           <ReviewStep
             category={category}
@@ -260,7 +318,7 @@ export function AttachWizard({
             people={people}
             error={error}
             sending={sending}
-            onBack={() => setStep(2)}
+            onBack={() => setStep(3)}
             onSend={() => void send()}
             onAssign={async (documentId, sellerId) => {
               await assignDocument(documentId, sellerId);
@@ -670,7 +728,7 @@ function RecipientsStep({
       </div>
       {error && <p className="mt-3 text-sm text-bad">{error}</p>}
       <div className="mt-4">
-        <WizardNav onPrevious={onBack} onNext={onNext} nextLabel="Revisar" />
+        <WizardNav onPrevious={onBack} onNext={onNext} nextLabel="Assinaturas" />
       </div>
     </>
   );

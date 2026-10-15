@@ -218,11 +218,11 @@ T6 -> T7
 
 **Done when**:
 
-- [ ] The mark starts at the center of the last page
-- [ ] Dragging updates x and y as percentages
-- [ ] Replicate copies marks and does not copy the person's contact
-- [ ] Rubrica is not sent
-- [ ] Gate check passes: `npm run lint` and `npm run build`
+- [x] The mark starts at the center of the last page
+- [x] Dragging updates x and y as percentages
+- [x] Replicate copies marks and does not copy the person's contact
+- [x] Rubrica is not sent
+- [x] Gate check passes: `npm run lint` and `npm run build`
 
 **Tests**: none
 **Gate**: build
