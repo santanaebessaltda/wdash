@@ -496,9 +496,7 @@ function AttachedFiles({ files, onRemove }: { files: File[]; onRemove: (file: Fi
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] border border-line text-bad transition-colors hover:bg-bad-soft"
                 onClick={() => onRemove(file)}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
+                <Icon d={icons.trash} size={14} />
               </button>
             </div>
           );
