@@ -18,7 +18,7 @@ type FolderEntry = { key: string; label: string; detail: string; fileId?: string
 export function DocumentsPage() {
   const { allStores, batches, documents, people, stores, reload } = useDocuments();
   const navigate = useNavigate();
-  const flash = (useLocation().state ?? null) as { documentNotice?: string | null; documentSent?: string | null } | null;
+  const flash = (useLocation().state ?? null) as { documentNotice?: string | null } | null;
   const [mode, setMode] = useState<Mode>("home");
   const [crumb, setCrumb] = useState<string[]>([]);
   const [query, setQuery] = useState("");
@@ -27,7 +27,7 @@ export function DocumentsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [peopleFilter, setPeopleFilter] = useState<PeopleFilter>("active");
   const [notice, setNotice] = useState<string | null>(flash?.documentNotice ?? null);
-  const [sent, setSent] = useState<string | null>(flash?.documentSent ?? null);
+  const [sent, setSent] = useState<string | null>(null);
   const [resendingId, setResendingId] = useState<string | null>(null);
 
   const storeName = useMemo(() => new Map(stores.map((store) => [store.id, store.name])), [stores]);

@@ -70,7 +70,7 @@ export function AttachWizard({
   history: SignerContact[];
   onReload: () => Promise<void>;
   onClose: () => void;
-  onDone: (notice: string | null, sent?: string | null) => void;
+  onDone: (notice: string | null) => void;
 }) {
   const [step, setStep] = useState(1);
   const [month, setMonth] = useState(String(new Date().getMonth() + 1));
@@ -516,11 +516,7 @@ export function AttachPage() {
       history={history}
       onReload={reload}
       onClose={() => navigate(paths.documents)}
-      onDone={(notice, sent) =>
-        navigate(paths.documents, {
-          state: { documentNotice: notice, documentSent: sent ?? (notice ? null : "Documentos enviados.") },
-        })
-      }
+      onDone={(notice) => navigate(paths.documents, { state: notice ? { documentNotice: notice } : undefined })}
     />
   );
 }
