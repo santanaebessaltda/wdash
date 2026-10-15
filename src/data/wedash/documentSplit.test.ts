@@ -18,6 +18,7 @@ import {
   deliveryFileName,
   documentPeople,
   documentPersonKey,
+  signingPeople,
   documentIssue,
   findDocumentPerson,
   parsePersonRef,
@@ -571,6 +572,31 @@ describe("documentPeople", () => {
       ["centro"],
     );
     expect(people).toEqual([expect.objectContaining({ name: "Paula", active: false, source: "user" })]);
+  });
+});
+
+describe("signingPeople", () => {
+  it("keeps active sellers and shows a manager once even when she belongs to two branches", () => {
+    const centro = person("seller-maria", "centro", "Maria Silva", "Vendedor", VALID_DIGITS, "maria@loja.com");
+    const cashier = { ...person("seller-joao", "centro", "João Santos", "Operador de caixa", null, null), active: true };
+    const inactive = { ...person("seller-off", "centro", "Pedro", "Vendedor", null, null), active: false };
+    const managerCentro = person("seller-ana", "centro", "Ana Paula", "Gerente", "39053344705", "ana@loja.com");
+    const managerNorte = { ...managerCentro, id: "seller-ana-norte", storeId: "norte" };
+    const gestorCentro = {
+      ...person("user:id-romeu:centro", "centro", "Romeu Fernandes", "Gestor", null, "romeu@wedash.app"),
+      source: "user" as const,
+      identityId: "id-romeu",
+    };
+    const gestorNorte = { ...gestorCentro, id: "user:id-romeu:norte", storeId: "norte" };
+    const list = signingPeople([centro, cashier, inactive, managerCentro, managerNorte, gestorCentro, gestorNorte], null);
+    expect(list.map((item) => `${item.name} · ${item.roleLabel}`)).toEqual(["Ana Paula · Gerente", "Maria Silva · Vendedor", "Romeu Fernandes · Gestor"]);
+  });
+
+  it("limits the list to the document branch", () => {
+    const centro = person("seller-maria", "centro", "Maria Silva", "Vendedor", VALID_DIGITS, "maria@loja.com");
+    const norte = person("seller-carla", "norte", "Carla Lima", "Vendedor", null, "carla@loja.com");
+    const manager = person("seller-ana", "norte", "Ana Paula", "Gerente", "39053344705", "ana@loja.com");
+    expect(signingPeople([centro, norte, manager], "centro").map((item) => item.name)).toEqual(["Maria Silva"]);
   });
 });
 

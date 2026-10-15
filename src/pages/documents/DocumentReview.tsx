@@ -13,6 +13,7 @@ import {
   displayTitle,
   documentPersonKey,
   findDocumentPerson,
+  signingPeople,
   guestAuthentication,
   guestChannel,
   preparationCaption,
@@ -231,7 +232,7 @@ function ReviewBody({
 }) {
   const ownerKey = documentPersonKey(row);
   const person = people.find((item) => item.id === ownerKey) ?? null;
-  const branchPeople = people.filter((item) => !row.storeId || item.storeId === row.storeId);
+  const branchPeople = signingPeople(people, row.storeId);
   const issue = row.envelopeId ? null : documentIssue(person, draft, row.pageCount, signers, people, row.sizeBytes);
   const previous = index > 0 ? rows[index - 1] : null;
   const next = index < total - 1 ? rows[index + 1] : null;
@@ -771,19 +772,12 @@ function SignerOptions({
   collaborator: boolean;
   allowNew?: boolean;
 }) {
-  const team = people.filter((person) => person.source !== "user");
-  const users = people.filter((person) => person.source === "user");
   const option = (person: PersonRow) => (
     <option key={person.id} value={!collaborator && person.id === ownerKey ? "seller" : person.id}>
       {person.roleLabel ? `${person.name} · ${person.roleLabel}` : person.name}
     </option>
   );
-  const groups = (
-    <>
-      {team.length > 0 && <optgroup label="Equipe">{team.map(option)}</optgroup>}
-      {users.length > 0 && <optgroup label="Usuários da WDash">{users.map(option)}</optgroup>}
-    </>
-  );
+  const groups = people.length > 0 ? <optgroup label="Equipe">{people.map(option)}</optgroup> : null;
   const known = new Set((guests ?? []).filter((guest) => guest.name.trim()).map((guest) => signerContactKey(guest)));
   return (
     <>

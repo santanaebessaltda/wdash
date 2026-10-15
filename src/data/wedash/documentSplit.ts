@@ -214,6 +214,66 @@ export function documentPeople(team: DocumentPerson[], users: BranchUser[], stor
   return [...team, ...extra].sort((left, right) => left.name.localeCompare(right.name, "pt"));
 }
 
+function personMatchKeys(person: DocumentPerson): string[] {
+  const keys = new Set<string>();
+  if (person.identityId) keys.add(`identity:${person.identityId}`);
+  if (person.membershipId) keys.add(`membership:${person.membershipId}`);
+  const cpf = contactDigits(person.cpf);
+  if (cpf.length === 11) keys.add(`cpf:${cpf}`);
+  const email = (person.email ?? "").trim().toLowerCase();
+  if (email) keys.add(`email:${email}`);
+  if (keys.size === 0) keys.add(`row:${person.id}`);
+  return [...keys];
+}
+
+function isActiveSeller(person: DocumentPerson): boolean {
+  return person.source === "team" && person.roleLabel === "Vendedor";
+}
+
+function isLeader(person: DocumentPerson): boolean {
+  return person.roleLabel === "Gerente" || person.roleLabel === "Gestor";
+}
+
+function personIsOn(person: DocumentPerson): boolean {
+  return isLeader(person) ? person.active : person.active && person.inErp;
+}
+
+/**
+ * Vendedores e, na mesma lista, gerente e gestor.
+ * No seletor, gerente e gestor aparecem uma vez. Na pasta, `collapseBranches` falso mantém a pessoa em cada filial.
+ */
+export function signingPeople(
+  people: DocumentPerson[],
+  storeId: string | null = null,
+  mode: "active" | "inactive" | "all" = "active",
+  collapseBranches = true,
+): DocumentPerson[] {
+  const visible = people.filter((person) => {
+    if (!isActiveSeller(person) && !isLeader(person)) return false;
+    if (storeId && person.storeId !== storeId) return false;
+    const on = personIsOn(person);
+    if (mode === "active") return on;
+    if (mode === "inactive") return !on;
+    return true;
+  });
+  const sellers = visible.filter(isActiveSeller);
+  const leaders = visible.filter(isLeader);
+  const ordered = [...leaders].sort((left, right) => {
+    if (storeId && left.storeId !== right.storeId) return Number(right.storeId === storeId) - Number(left.storeId === storeId);
+    if (left.source !== right.source) return left.source === "team" ? -1 : 1;
+    return 0;
+  });
+  const seen = new Set<string>();
+  const unique: DocumentPerson[] = [];
+  for (const person of ordered) {
+    const keys = personMatchKeys(person).map((key) => (collapseBranches ? key : `${person.storeId}:${key}`));
+    if (keys.some((key) => seen.has(key))) continue;
+    for (const key of keys) seen.add(key);
+    unique.push(person);
+  }
+  return [...sellers, ...unique].sort((left, right) => left.name.localeCompare(right.name, "pt") || left.roleLabel.localeCompare(right.roleLabel, "pt"));
+}
+
 /** Chave da pasta. Colaborador usa o id do Millennium; usuário da WDash leva a filial junto. */
 export function documentPersonKey(doc: { sellerId: string | null; identityId?: string | null; storeId?: string | null }): string | null {
   if (doc.sellerId) return doc.sellerId;

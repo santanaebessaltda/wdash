@@ -36,6 +36,7 @@ O gestor envia PDFs digitais para assinatura, organizados por colaborador. Um PD
 - Com uma filial no topo: Pessoa › Ano › Mês.
 - Com todas as filiais: Filial › Pessoa › Ano › Mês. O documento fica na filial, mesmo quando a pessoa tem acesso a mais de uma.
 - A lista de pessoas em Documentos junta a equipe do Millennium com Gestores e Gerentes vinculados em Usuários. A mesma pessoa, pelo CPF ou pelo e-mail, aparece uma vez. Equipe e Usuários continuam cadastros separados. Quem só existe na WDash grava `employee_document.identity_id`; o colaborador do Millennium continua em `seller_id`.
+- A lista Equipe mostra só vendedores ativos, com gerente e gestor na mesma lista. Gerente e gestor não se repetem por filial nesse seletor. A pasta da filial continua com a pessoa naquela unidade.
 - O arquivo se chama pela categoria.
 - Categorias: Holerite, Espelho de ponto, Adiantamento salarial, Vale-transporte, Vale-alimentação / refeição, Participação nos lucros (PLR), Informe de rendimentos, Admissão, Rescisão, Outros. Nomes já gravados continuam como foram salvos.
 - Dois arquivos da mesma categoria no mesmo mês ganham sufixo `(2)`, `(3)`. Sem pasta extra de categoria.

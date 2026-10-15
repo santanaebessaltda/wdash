@@ -5,7 +5,7 @@ import { cn } from "@/lib/cn";
 import { QuickStat } from "@/pages/dashboards/QuickStat";
 import { Icon, icons } from "@/pages/users/Icons";
 import { paths } from "@/router/paths";
-import { displayTitle, documentPersonKey, findDocumentPerson, monthFolder, personMatchesQuery, resendVisible, DOCUMENT_CATEGORIES } from "@/data/wedash/documentSplit";
+import { displayTitle, documentPersonKey, findDocumentPerson, monthFolder, personMatchesQuery, resendVisible, signingPeople, DOCUMENT_CATEGORIES } from "@/data/wedash/documentSplit";
 import type { BatchRow, DocumentRow, PersonRow } from "@/data/wedash/documentsRepo";
 import { cancelDocument, copyDocumentLink, moveDocument, openDocument, resendDocument } from "@/data/wedash/documentsRepo";
 import { DocumentsFrame, FileGlyph, FolderGlyph, Glyph, STATUS_LABEL, SearchGlyph, badgeVariant } from "./frame";
@@ -88,7 +88,10 @@ export function DocumentsPage() {
   const narrowed = searching || periodFilter || typeFilter || statusFilter;
 
   const listedPeople = people.filter((person) => {
-    const working = person.active && person.inErp;
+    const seller = person.source === "team" && person.roleLabel === "Vendedor";
+    const leader = person.roleLabel === "Gerente" || person.roleLabel === "Gestor";
+    if (!seller && !leader) return false;
+    const working = leader ? person.active : person.active && person.inErp;
     if (peopleFilter === "active") return working;
     if (peopleFilter === "inactive") return !working;
     return true;
@@ -104,7 +107,7 @@ export function DocumentsPage() {
     : searching
       ? []
       : folders;
-  const peopleHere = people.filter((person) => !allStores || crumb[0] == null || person.storeId === crumb[0]);
+  const peopleHere = listedPeople.filter((person) => !allStores || crumb[0] == null || person.storeId === crumb[0]);
 
   function goHome() {
     setMode("home");
@@ -386,8 +389,7 @@ export function DocumentsPage() {
           <FormField label="Pessoa">
             <select className={fieldClass} value={moveSeller} onChange={(event) => setMoveSeller(event.target.value)}>
               <option value="">Selecione</option>
-              <PersonChoices people={people.filter((person) => person.source !== "user")} allStores={allStores} storeName={storeName} group="Equipe" />
-              <PersonChoices people={people.filter((person) => person.source === "user")} allStores={allStores} storeName={storeName} group="Usuários da WDash" />
+              <PersonChoices people={signingPeople(people, null)} allStores={allStores} storeName={storeName} group="Equipe" />
             </select>
           </FormField>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -428,7 +430,7 @@ function PersonChoices({
     <optgroup label={group}>
       {people.map((person) => (
         <option key={person.id} value={person.id}>
-          {allStores ? `${person.name} · ${person.roleLabel} · ${storeName.get(person.storeId) ?? ""}` : `${person.name} · ${person.roleLabel}`}
+          {allStores && person.roleLabel === "Vendedor" ? `${person.name} · ${person.roleLabel} · ${storeName.get(person.storeId) ?? ""}` : `${person.name} · ${person.roleLabel}`}
         </option>
       ))}
     </optgroup>
