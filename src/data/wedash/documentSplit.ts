@@ -174,6 +174,12 @@ export function deliveryFileName(storedName: string, personName: string, month: 
   return `${folderTitle(storedName)}-${personFileToken(personName)}-${monthFolder(month)}-${year}.pdf`;
 }
 
+/** Fim do 30º dia depois do envio, em UTC. 15/10 vira 14/11 às 23:59:59.000Z. */
+export function signatureDeadlineAt(sentAt: Date): string {
+  const end = new Date(Date.UTC(sentAt.getUTCFullYear(), sentAt.getUTCMonth(), sentAt.getUTCDate() + 30, 23, 59, 59));
+  return end.toISOString();
+}
+
 export function monthFolder(month: number): string {
   return MONTHS[month] ?? "";
 }

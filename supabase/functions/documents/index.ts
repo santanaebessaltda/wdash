@@ -20,6 +20,7 @@ import {
   customDocumentName,
   defaultSignatureMark,
   deliveryFileName,
+  signatureDeadlineAt,
   envelopeSignatures,
   fileName,
   groupPages,
@@ -402,11 +403,11 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
     const pageCount = Number(doc.page_count) || 1;
     const savedMarks = storedMarks(doc.marks);
     const marks = savedMarks.length > 0 ? savedMarks : [defaultSignatureMark(pageCount)];
-    const docDeadline = typeof doc.deadline === "string" && doc.deadline ? String(doc.deadline).slice(0, 10) : deadline;
     const docReminder = asReminder(doc.reminder) ?? reminder;
+    const signatureDeadline = signatureDeadlineAt(new Date());
     const parsedDocExtra = storedExtras(doc.extra_signer);
     const extraInvalid = doc.extra_signer != null && parsedDocExtra == null ? "Informe o nome do signatário." : null;
-    const block = confirmBlock({ deadline: docDeadline, hasToken: Boolean(token), sizeBytes: doc.size_bytes as number });
+    const block = confirmBlock({ deadline: null, hasToken: Boolean(token), sizeBytes: doc.size_bytes as number });
     let seller: { name: string; email: string | null; whatsapp: string | null; cpf: string | null } | null = null;
     if (doc.seller_id) {
       const { data } = await admin.from("store_seller").select("name, email, whatsapp, cpf").eq("id", doc.seller_id).maybeSingle();
@@ -453,7 +454,7 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
       documentSendConfig: {
         documentName: sentName,
         customEmailMessage: "",
-        ...(docDeadline ? { signatureDeadline: `${docDeadline}T23:59:59.000Z` } : {}),
+        signatureDeadline,
         sendReminders: docReminder,
         observers: [],
       },
@@ -476,6 +477,7 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
         envelope_id: created.body.id,
         recipient_id: collaboratorRecipientId(created.body.signatures),
         sent_at: new Date().toISOString(),
+        deadline: signatureDeadline.slice(0, 10),
         error: null,
       })
       .eq("id", doc.id);

@@ -614,7 +614,6 @@ function SendReview({
   const ready = items.filter((item) => item.situation === "Pronto").length;
   const attention = items.filter((item) => item.situation !== "Pronto" && item.situation !== "Já enviado").length;
   const sent = items.filter((item) => item.situation === "Já enviado").length;
-  const [deadline, setDeadline] = useState("");
   const [reminder, setReminder] = useState<DocumentDraft["reminder"]>("EVERY_3_DAYS");
   const [removeId, setRemoveId] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
@@ -683,7 +682,7 @@ function SendReview({
       {openIds.length > 0 && (
         <div className="mt-4 rounded-xl border border-line p-3">
           <p className="text-[13px] font-bold text-t0">Lembretes e prazo</p>
-          <p className="mt-1 text-[12.5px] text-t2">Estas configurações serão aplicadas aos documentos que ainda não foram enviados.</p>
+          <p className="mt-1 text-[12.5px] text-t2">O lembrete vale para os documentos que ainda não foram enviados. O prazo de assinatura é de 30 dias a partir do envio.</p>
           <div className="mt-3 flex flex-wrap items-end gap-2">
             <label className="grid min-w-[160px] flex-1 gap-1 text-[12px] font-bold text-t2">
               Lembrete
@@ -694,11 +693,7 @@ function SendReview({
                 <option value="NEVER">Nunca</option>
               </select>
             </label>
-            <label className="grid min-w-[160px] flex-1 gap-1 text-[12px] font-bold text-t2">
-              Data limite
-              <input type="date" className={controlClass} value={deadline} onChange={(event) => setDeadline(event.target.value)} />
-            </label>
-            <Button type="button" variant="outline" onClick={() => onApply(openIds, deadline, reminder)}>
+            <Button type="button" variant="outline" onClick={() => onApply(openIds, "", reminder)}>
               Aplicar
             </Button>
           </div>
@@ -758,8 +753,7 @@ function scheduleDelivery(draft: DocumentDraft) {
 function scheduleWhen(draft: DocumentDraft) {
   const reminder =
     draft.reminder === "EVERY_DAY" ? "Todo dia" : draft.reminder === "EVERY_WEEK" ? "Toda semana" : draft.reminder === "NEVER" ? "Sem lembrete" : "A cada 3 dias";
-  const deadline = draft.deadline ? draft.deadline.split("-").reverse().join("/") : "Sem prazo";
-  return `${reminder} · ${deadline}`;
+  return `${reminder} · 30 dias`;
 }
 
 function schedulePeople(draft: DocumentDraft) {

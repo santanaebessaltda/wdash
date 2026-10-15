@@ -36,6 +36,7 @@ import {
   saveEmail,
   saveWhatsapp,
   shouldSend,
+  signatureDeadlineAt,
   signaturePositions,
   signedCount,
   signerHistory,
@@ -178,6 +179,13 @@ describe("deliveryFileName", () => {
   it("accepts a custom name for Outros and rejects an empty one", () => {
     expect(customDocumentName("  Termo de férias.pdf ")).toEqual({ ok: true, name: "Termo de férias" });
     expect(customDocumentName("   ").ok).toBe(false);
+  });
+});
+
+describe("signatureDeadlineAt", () => {
+  it("ends thirty days after the send date", () => {
+    expect(signatureDeadlineAt(new Date("2026-10-15T17:12:48.000Z"))).toBe("2026-11-14T23:59:59.000Z");
+    expect(signatureDeadlineAt(new Date("2026-12-15T03:00:00.000Z"))).toBe("2027-01-14T23:59:59.000Z");
   });
 });
 
