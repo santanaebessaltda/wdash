@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { getDocument, GlobalWorkerOptions, type PDFDocumentLoadingTask, type RenderTask } from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { Button, FormField, WizardCardHeader, WizardNav } from "@/components/ui";
@@ -438,7 +438,7 @@ function StackedPages({
           const pdfPage = await pdf.getPage(pageNumber);
           if (cancelled) return;
           const natural = pdfPage.getViewport({ scale: 1 });
-          const displayWidth = Math.min(720, natural.width);
+          const displayWidth = Math.min(960, Math.max(natural.width, 840));
           const viewport = pdfPage.getViewport({ scale: (displayWidth / natural.width) * (window.devicePixelRatio || 1) });
           canvas.width = viewport.width;
           canvas.height = viewport.height;
@@ -471,21 +471,21 @@ function StackedPages({
   }
 
   return (
-    <div ref={hostRef} className="relative overflow-auto rounded-xl bg-[#3c4043] px-4 py-6">
+    <div ref={hostRef} className="relative overflow-auto rounded-xl border border-line bg-bg-inset px-4 py-6">
       {loading && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#3c4043]/80">
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-bg-inset/80">
           <Spinner size={22} />
         </div>
       )}
-      <p className="mb-4 text-center text-[12.5px] text-white/80">Clique na página para adicionar a marcação.</p>
+      <p className="mb-4 text-center text-[12.5px] text-t2">Clique na página para adicionar a marcação.</p>
       <div className="mx-auto flex w-fit max-w-full flex-col gap-6">
         {pages.map((page) => (
           <section key={page} className="w-fit max-w-full">
-            <div className="mb-2 flex items-center justify-between gap-2 text-white/80">
-              <span className="text-[12.5px] font-bold">Página {page}</span>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="text-[12.5px] font-bold text-t1">Página {page}</span>
               <button
                 type="button"
-                className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-white/20 text-white transition-colors hover:bg-white/10 disabled:opacity-50"
+                className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-line text-bad transition-colors hover:bg-bad-soft disabled:opacity-50"
                 aria-label={pages.length === 1 ? "Apagar documento" : `Apagar página ${page}`}
                 disabled={disabled || dropping != null}
                 onClick={() => drop(page)}
@@ -529,7 +529,7 @@ function StackedPages({
           </section>
         ))}
       </div>
-      {error && <p className="mt-3 text-sm text-white">{error}</p>}
+      {error && <p className="mt-3 text-sm text-bad">{error}</p>}
     </div>
   );
 }
@@ -575,7 +575,7 @@ function MarkCard({
   return (
     <div
       data-mark
-      className="absolute z-20 w-[232px]"
+      className="absolute z-20 w-[280px]"
       style={{ left: `${field.x}%`, top: `${field.y}%`, transform: "translate(-50%, -115%)" }}
       onClick={(event) => event.stopPropagation()}
       onPointerDown={(event) => {
@@ -585,10 +585,10 @@ function MarkCard({
       }}
       onPointerMove={move}
     >
-      <div className="rounded-xl border border-neutral-200 bg-white p-1.5 text-neutral-900 shadow-lg">
+      <div className="rounded-[var(--radius-vela-md)] border border-line bg-bg-2 p-1.5 text-t0 shadow-[0_12px_28px_-16px_rgba(0,0,0,0.55)]">
         <div className="flex items-center gap-1">
           <select
-            className="h-8 min-w-0 flex-1 rounded-md border border-neutral-200 bg-white px-2 text-[12px] font-bold"
+            className="h-8 min-w-0 flex-1 rounded-[var(--radius-vela-sm)] border border-line bg-bg-inset px-2 text-xs font-bold text-t0 outline-none focus:border-acc"
             value={field.signerId === "seller" ? (sellerId ? `seller:${sellerId}` : "") : field.signerId}
             disabled={disabled}
             onChange={(event) => onPick(event.target.value)}
@@ -629,53 +629,35 @@ function MarkCard({
               <option value="__guest__">Adicionar outra pessoa</option>
             </optgroup>
           </select>
-          <IconButton label="Duplicar marcação" disabled={disabled} onClick={onDuplicate}>
+          <button
+            type="button"
+            aria-label="Duplicar marcação"
+            disabled={disabled}
+            onClick={onDuplicate}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] border border-line text-t1 transition-colors hover:bg-bg-3 disabled:opacity-50"
+          >
             <CopyIcon />
-          </IconButton>
-          <IconButton label="Apagar marcação" disabled={disabled} onClick={onRemove}>
+          </button>
+          <button
+            type="button"
+            aria-label="Apagar marcação"
+            disabled={disabled}
+            onClick={onRemove}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] border border-line text-bad transition-colors hover:bg-bad-soft disabled:opacity-50"
+          >
             <Icon d={icons.trash} size={14} />
-          </IconButton>
+          </button>
         </div>
         <div className="mt-1.5 flex gap-1">
-          <TypeButton active={field.element === "SIGNATURE"} disabled={disabled} onClick={() => onChange({ ...field, element: "SIGNATURE" })}>
+          <Button type="button" size="sm" className="flex-1" disabled={disabled} variant={field.element === "SIGNATURE" ? "primary" : "secondary"} onClick={() => onChange({ ...field, element: "SIGNATURE" })}>
             Assinatura
-          </TypeButton>
-          <TypeButton active={field.element === "RUBRIC"} disabled={disabled} onClick={() => onChange({ ...field, element: "RUBRIC" })}>
+          </Button>
+          <Button type="button" size="sm" className="flex-1" disabled={disabled} variant={field.element === "RUBRIC" ? "primary" : "secondary"} onClick={() => onChange({ ...field, element: "RUBRIC" })}>
             Rubrica
-          </TypeButton>
+          </Button>
         </div>
       </div>
     </div>
-  );
-}
-
-function TypeButton({ active, disabled, onClick, children }: { active: boolean; disabled: boolean; onClick: () => void; children: string }) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className={cn(
-        "h-7 flex-1 rounded-md text-[11px] font-bold",
-        active ? "bg-neutral-900 text-white" : "border border-neutral-200 text-neutral-600",
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
-function IconButton({ label, disabled, onClick, children }: { label: string; disabled: boolean; onClick: () => void; children: ReactNode }) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      disabled={disabled}
-      onClick={onClick}
-      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 disabled:opacity-50"
-    >
-      {children}
-    </button>
   );
 }
 
