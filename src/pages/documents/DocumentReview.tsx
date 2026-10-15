@@ -34,6 +34,7 @@ import {
 import { openDocument, type DocumentRow, type PersonRow } from "@/data/wedash/documentsRepo";
 import { Icon, icons } from "@/pages/users/Icons";
 import { cn } from "@/lib/cn";
+import { mascararCpf, maskWhatsapp } from "@/lib/cpf";
 import { STATUS_LABEL } from "./frame";
 
 GlobalWorkerOptions.workerSrc = pdfWorker;
@@ -812,13 +813,13 @@ function ContactEditor({ person, onContact }: { person: PersonRow; onContact: (s
   return (
     <div className="grid gap-2">
       <FormField label="CPF">
-        <input className={controlClass} value={person.cpf ?? ""} onChange={(event) => change({ cpf: event.target.value, email: person.email ?? "", whatsapp: person.whatsapp ?? "" })} />
+        <input className={controlClass} value={mascararCpf(person.cpf ?? "")} inputMode="numeric" placeholder="000.000.000-00" onChange={(event) => change({ cpf: mascararCpf(event.target.value), email: person.email ?? "", whatsapp: person.whatsapp ?? "" })} />
       </FormField>
       <FormField label="E-mail">
-        <input className={controlClass} value={person.email ?? ""} onChange={(event) => change({ cpf: person.cpf ?? "", email: event.target.value, whatsapp: person.whatsapp ?? "" })} />
+        <input className={controlClass} value={person.email ?? ""} placeholder="nome@email.com" onChange={(event) => change({ cpf: person.cpf ?? "", email: event.target.value, whatsapp: person.whatsapp ?? "" })} />
       </FormField>
       <FormField label="WhatsApp">
-        <input className={controlClass} value={person.whatsapp ?? ""} onChange={(event) => change({ cpf: person.cpf ?? "", email: person.email ?? "", whatsapp: event.target.value })} />
+        <input className={controlClass} value={maskWhatsapp(person.whatsapp ?? "")} inputMode="tel" placeholder="(11) 99999-9999" onChange={(event) => change({ cpf: person.cpf ?? "", email: person.email ?? "", whatsapp: maskWhatsapp(event.target.value) })} />
       </FormField>
       {hint && <p className="text-xs text-bad">{hint}</p>}
     </div>
@@ -852,7 +853,7 @@ function GuestEditor({ guest, onChange }: { guest: GuestSigner; onChange: (guest
         <input className={controlClass} value={guest.email} onChange={(event) => onChange({ ...guest, email: event.target.value })} />
       </FormField>
       <FormField label="WhatsApp">
-        <input className={controlClass} value={guest.whatsapp} onChange={(event) => onChange({ ...guest, whatsapp: event.target.value })} />
+        <input className={controlClass} value={maskWhatsapp(guest.whatsapp)} inputMode="tel" placeholder="(11) 99999-9999" onChange={(event) => onChange({ ...guest, whatsapp: maskWhatsapp(event.target.value) })} />
       </FormField>
     </div>
   );

@@ -18,6 +18,19 @@ export function mascararCpf(v: string): string {
   return out;
 }
 
+/** 67981642846 -> (67) 98164-2846. Com 10 dígitos, (11) 3265-4321. */
+export function maskWhatsapp(value: string): string {
+  const digits = onlyDigitos(value).slice(0, 11);
+  if (!digits) return "";
+  const area = digits.slice(0, 2);
+  const rest = digits.slice(2);
+  if (!rest) return `(${area}`;
+  const splitAt = digits.length > 10 ? 5 : 4;
+  const head = rest.slice(0, splitAt);
+  const tail = rest.slice(splitAt);
+  return tail ? `(${area}) ${head}-${tail}` : `(${area}) ${head}`;
+}
+
 function checkDigit(base: string, weightInicial: number): number {
   let sum = 0;
   for (let i = 0; i < base.length; i++) sum += Number(base[i]) * (weightInicial - i);

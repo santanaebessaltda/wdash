@@ -20,6 +20,7 @@ import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRe
 import { saveCpf, saveEmail, saveWhatsapp } from "@/data/wedash/documentSplit";
 import { normalizeEmail, validEmail } from "@/data/wedash/engine/sellerAccess";
 import { shiftName } from "@/lib/format";
+import { mascararCpf, maskWhatsapp } from "@/lib/cpf";
 import { InviteSellerModal } from "@/pages/management/InviteSellerModal";
 import { GroupFormModal, ManageGroupsModal, groupProblem, nextGroupWindow } from "@/pages/management/SellerGroups";
 import { CostCardTitle, SAVE_ERROR_MSG, StoreCardsPage, useScopedStores } from "@/pages/operation/shared";
@@ -499,17 +500,17 @@ function SellerEditor({
   onSave: (seller: StoreSeller, draft: SellerDraft) => Promise<boolean>;
 }) {
   const sales = seller ? isActiveSalesPerson(seller) : false;
-  const [cpf, setCpf] = useState(seller?.cpf ?? "");
+  const [cpf, setCpf] = useState(mascararCpf(seller?.cpf ?? ""));
   const [email, setEmail] = useState(seller?.email ?? "");
-  const [whatsapp, setWhatsapp] = useState(seller?.whatsapp ?? "");
+  const [whatsapp, setWhatsapp] = useState(maskWhatsapp(seller?.whatsapp ?? ""));
   const [shiftId, setShiftId] = useState<string | null>(seller?.shiftId ?? null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setCpf(seller?.cpf ?? "");
+    setCpf(mascararCpf(seller?.cpf ?? ""));
     setEmail(seller?.email ?? "");
-    setWhatsapp(seller?.whatsapp ?? "");
+    setWhatsapp(maskWhatsapp(seller?.whatsapp ?? ""));
     setShiftId(seller?.shiftId ?? null);
     setError(null);
     setSaving(false);
@@ -577,13 +578,13 @@ function SellerEditor({
               : "CPF, e-mail e WhatsApp são salvos na WDash. A atualização do Millennium não altera esses dados."}
           </p>
           <FormField label="CPF" optional>
-            <Input value={cpf} onChange={(event) => setCpf(event.target.value)} placeholder="000.000.000-00" inputMode="numeric" />
+            <Input value={cpf} onChange={(event) => setCpf(mascararCpf(event.target.value))} placeholder="000.000.000-00" inputMode="numeric" />
           </FormField>
           <FormField label="E-mail" optional>
             <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="nome@email.com" />
           </FormField>
           <FormField label="WhatsApp" optional>
-            <Input value={whatsapp} onChange={(event) => setWhatsapp(event.target.value)} placeholder="(11) 99999-9999" inputMode="tel" />
+            <Input value={whatsapp} onChange={(event) => setWhatsapp(maskWhatsapp(event.target.value))} placeholder="(11) 99999-9999" inputMode="tel" />
           </FormField>
           {sales && (
             <FormField label="Grupo">
