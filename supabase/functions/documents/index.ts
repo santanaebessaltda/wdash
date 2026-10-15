@@ -5,24 +5,30 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
 import { corsHeaders, serve } from "../_shared/cors.ts";
 import { OWNER_ROLES, loadStaffCaller } from "../_shared/staffAuth.ts";
 import { buildPdf, readPdfPages } from "../_shared/pdfPages.ts";
-import { assinaCreateEnvelope, assinaResend, recipientIdOf } from "../_shared/assinaApi.ts";
+import { assinaCreateEnvelope, assinaResend } from "../_shared/assinaApi.ts";
 import { loadCompanyToken } from "../_shared/assinaSync.ts";
 import {
   DOCUMENT_CATEGORIES,
   DOCUMENT_COPY,
   assignSeller,
   channelBlock,
+  collaboratorRecipientId,
   confirmBlock,
   contactPatch,
   customDocumentName,
+  defaultSignatureMark,
   deliveryFileName,
+  envelopeSignatures,
   fileName,
   groupPages,
+  placementWarning,
   resendVisible,
   shouldSend,
-  signaturePositions,
   sourceRefusal,
   type DocStatus,
+  type ExtraSigner,
+  type SendChannel,
+  type SignatureMark,
 } from "../../../src/data/wedash/documentSplit.ts";
 
 const BUCKET = "documents";
@@ -34,8 +40,36 @@ function json(body: unknown, status = 200) {
   });
 }
 
-function maskCpf(digits: string): string {
-  return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+function asChannel(value: unknown): SendChannel | null {
+  return value === "EMAIL" || value === "WHATSAPP" ? value : null;
+}
+
+function storedMarks(value: unknown): SignatureMark[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const mark = item as Record<string, unknown>;
+    const pageNumber = Number(mark.pageNumber);
+    const x = Number(mark.x);
+    const y = Number(mark.y);
+    if (!Number.isInteger(pageNumber) || !Number.isFinite(x) || !Number.isFinite(y)) return [];
+    return [{ pageNumber, x, y, element: "SIGNATURE" as const }];
+  });
+}
+
+function storedExtra(value: unknown): ExtraSigner | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const raw = value as Record<string, unknown>;
+  const channel = asChannel(raw.channel);
+  const name = typeof raw.name === "string" ? raw.name : "";
+  if (!channel || !name.trim()) return null;
+  return {
+    name,
+    channel,
+    email: typeof raw.email === "string" ? raw.email : null,
+    whatsapp: typeof raw.whatsapp === "string" ? raw.whatsapp : null,
+    marks: storedMarks(raw.marks),
+  };
 }
 
 type Body = Record<string, unknown>;
@@ -259,27 +293,48 @@ async function saveContact(admin: SupabaseClient, tenantId: string, body: Body) 
 async function confirm(admin: SupabaseClient, tenantId: string, secret: string, body: Body) {
   const batch = await ownedBatch(admin, tenantId, String(body.batchId ?? ""));
   if (!batch) return json({ error: "not_found" }, 404);
-  const channel = body.channel === "WHATSAPP" ? "WHATSAPP" : body.channel === "EMAIL" ? "EMAIL" : null;
+  const fallbackChannel = asChannel(body.channel);
   const deadline = typeof body.deadline === "string" && body.deadline ? body.deadline : null;
   const reminder = ["EVERY_DAY", "EVERY_3_DAYS", "EVERY_WEEK", "NEVER"].includes(String(body.reminder))
     ? String(body.reminder)
     : "EVERY_3_DAYS";
-  if (!channel) return json({ message: "Escolha WhatsApp ou e-mail." }, 422);
   const token = await loadCompanyToken(admin, tenantId, secret);
-  await admin.from("document_batch").update({ channel, deadline, reminder }).eq("id", batch.id);
+  const batchPatch: { deadline: string | null; reminder: string; extra_signer?: ExtraSigner | null } = { deadline, reminder };
+  if ("extraSigner" in body) batchPatch.extra_signer = body.extraSigner == null ? null : storedExtra(body.extraSigner);
+  await admin.from("document_batch").update(batchPatch).eq("id", batch.id);
+  if (Array.isArray(body.documents)) {
+    for (const item of body.documents) {
+      if (!item || typeof item !== "object") continue;
+      const row = item as Record<string, unknown>;
+      const id = typeof row.id === "string" ? row.id : "";
+      const channel = asChannel(row.channel);
+      if (!id || !channel) continue;
+      await admin.from("employee_document").update({ channel, marks: storedMarks(row.marks) }).eq("id", id).eq("batch_id", batch.id);
+    }
+  }
+  const storedBatch = await ownedBatch(admin, tenantId, batch.id as string);
+  const extra = storedExtra(storedBatch?.extra_signer);
 
   const { data: docs } = await admin.from("employee_document").select("*").eq("batch_id", batch.id);
   const results: { id: string; error: string | null }[] = [];
   for (const doc of docs ?? []) {
     try {
+    const channel = asChannel(doc.channel) ?? fallbackChannel;
+    const pageCount = Number(doc.page_count) || 1;
+    const savedMarks = storedMarks(doc.marks);
+    const marks = savedMarks.length > 0 ? savedMarks : [defaultSignatureMark(pageCount)];
     const block = confirmBlock({ deadline, hasToken: Boolean(token), sizeBytes: doc.size_bytes as number });
     let seller: { name: string; email: string | null; whatsapp: string | null; cpf: string | null } | null = null;
     if (doc.seller_id) {
       const { data } = await admin.from("store_seller").select("name, email, whatsapp, cpf").eq("id", doc.seller_id).maybeSingle();
       seller = data;
     }
-    const contactBlock = channelBlock(channel, { email: seller?.email ?? null, whatsapp: seller?.whatsapp ?? null });
-    const rowBlock = block ?? (doc.seller_id ? contactBlock : null);
+    const missingChannel = channel ? null : "Escolha WhatsApp ou e-mail.";
+    const contactBlock = channel ? channelBlock(channel, { email: seller?.email ?? null, whatsapp: seller?.whatsapp ?? null }) : null;
+    const placeBlock = savedMarks.length > 0 ? placementWarning(savedMarks, pageCount) : null;
+    const extraContact = extra ? channelBlock(extra.channel, { email: extra.email, whatsapp: extra.whatsapp }) : null;
+    const extraPlace = extra && extra.marks.length > 0 ? placementWarning(extra.marks, pageCount) : null;
+    const rowBlock = block ?? missingChannel ?? (doc.seller_id ? contactBlock : null) ?? placeBlock ?? extraContact ?? extraPlace;
     if (!shouldSend({ envelopeId: (doc.envelope_id as string | null) ?? null, sellerId: (doc.seller_id as string | null) ?? null, block: rowBlock })) {
       if (rowBlock && !doc.envelope_id) await admin.from("employee_document").update({ error: rowBlock }).eq("id", doc.id);
       results.push({ id: doc.id as string, error: doc.envelope_id ? null : rowBlock });
@@ -294,21 +349,7 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
     const bytes = new Uint8Array(await file.data.arrayBuffer());
     const sentName = deliveryFileName(doc.file_name as string, seller.name, Number(batch.month), Number(batch.year));
     const created = await assinaCreateEnvelope(token, bytes, sentName, {
-      signatures: [
-        {
-          recipient: {
-            name: seller.name,
-            email: channel === "EMAIL" ? seller.email : "",
-            phone: channel === "WHATSAPP" ? seller.whatsapp : "",
-            cpf: seller.cpf ? maskCpf(seller.cpf) : "",
-            routingOrder: 1,
-            action: "SIGN",
-            senderType: channel,
-            authenticationType: "DEFAULT_SIGN",
-            signaturePositions: signaturePositions(doc.page_count as number),
-          },
-        },
-      ],
+      signatures: envelopeSignatures({ seller, channel, marks, pageCount, extra }),
       documentSendConfig: {
         documentName: sentName,
         customEmailMessage: "",
@@ -333,8 +374,9 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
       .from("employee_document")
       .update({
         status: "PENDING",
+        channel,
         envelope_id: created.body.id,
-        recipient_id: recipientIdOf(created.body),
+        recipient_id: collaboratorRecipientId(created.body.signatures),
         error: null,
       })
       .eq("id", doc.id);
@@ -352,11 +394,11 @@ async function resend(admin: SupabaseClient, tenantId: string, secret: string, b
   const { data: doc } = await admin.from("employee_document").select("*").eq("id", String(body.documentId ?? "")).eq("tenant_id", tenantId).maybeSingle();
   if (!doc || !resendVisible(doc.status as DocStatus) || !doc.envelope_id || !doc.recipient_id) return json({ error: "not_found" }, 404);
   const batch = await ownedBatch(admin, tenantId, doc.batch_id as string);
-  if (!batch?.channel) return json({ error: "not_found" }, 404);
+  const channel = asChannel(doc.channel) ?? asChannel(batch?.channel);
+  if (!batch || !channel) return json({ error: "not_found" }, 404);
   const token = await loadCompanyToken(admin, tenantId, secret);
   const { data: seller } = await admin.from("store_seller").select("email, whatsapp").eq("id", doc.seller_id).maybeSingle();
   if (!token || !seller) return json({ message: "Não foi possível reenviar." }, 502);
-  const channel = batch.channel as "EMAIL" | "WHATSAPP";
   const ok = await assinaResend(token, doc.envelope_id as string, doc.recipient_id as string, {
     senderType: channel,
     email: channel === "EMAIL" ? (seller.email as string) : undefined,

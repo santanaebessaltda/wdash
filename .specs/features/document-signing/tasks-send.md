@@ -162,11 +162,11 @@ T6 -> T7
 
 **Done when**:
 
-- [ ] Each document sends with its own channel
-- [ ] Marks are the stored ones, not the center of every page
-- [ ] `recipient_id` stored is the collaborator, routingOrder 1
-- [ ] A row that already has an envelope is skipped
-- [ ] Gate check passes: `npm run lint` and `npm run build`
+- [x] Each document sends with its own channel
+- [x] Marks are the stored ones, not the center of every page
+- [x] `recipient_id` stored is the collaborator, routingOrder 1
+- [x] A row that already has an envelope is skipped
+- [x] Gate check passes: `npm run lint` and `npm run build`
 
 **Tests**: none
 **Gate**: build
