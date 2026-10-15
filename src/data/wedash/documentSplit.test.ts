@@ -20,7 +20,9 @@ import {
   folderSegments,
   folderTitle,
   groupPages,
+  markAfterDrop,
   placementWarning,
+  remainingPages,
   replicateSetup,
   resendVisible,
   saveCpf,
@@ -305,6 +307,15 @@ describe("replicate and marks", () => {
     const marks = [{ pageNumber: 4, x: 50, y: 50, element: "SIGNATURE" as const }];
     expect(placementWarning(marks, 2)).toBe(DOCUMENT_COPY.missingPage);
     expect(placementWarning(marks, 4)).toBeNull();
+  });
+
+  it("drops one page and removes the document when that page was the last one", () => {
+    expect(remainingPages(10, 3)).toBe(9);
+    expect(remainingPages(1, 1)).toBeNull();
+    expect(remainingPages(10, 11)).toBe(10);
+    const mark = { pageNumber: 8, x: 20, y: 30, element: "SIGNATURE" as const };
+    expect(markAfterDrop(mark, 2, 9)).toEqual({ pageNumber: 7, x: 20, y: 30, element: "SIGNATURE" });
+    expect(markAfterDrop(mark, 8, 9)).toEqual(defaultSignatureMark(9));
   });
 });
 

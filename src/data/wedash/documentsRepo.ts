@@ -181,6 +181,10 @@ export async function prepareFiles(input: {
   return { batchId, refused: prepared.refused ?? [] };
 }
 
+export async function dropDocumentPage(documentId: string, pageNumber: number) {
+  await call({ action: "drop-page", documentId, pageNumber });
+}
+
 export async function assignDocument(documentId: string, sellerId: string) {
   await call({ action: "assign", documentId, sellerId });
 }

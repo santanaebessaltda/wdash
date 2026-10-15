@@ -84,6 +84,7 @@ O gestor envia PDFs digitais para assinatura, organizados por colaborador. Um PD
 - Um signatário extra, opcional, vale para o lote inteiro. Também só assina. Nome, canal e contato são definidos uma vez. A posição dele, definida no PDF de amostra, vale para todos os documentos do lote. Ele não vira ficha de colaborador.
 - Replicar copia, para os colaboradores marcados, o canal e as marcas daquele documento. Não copia CPF, e-mail nem WhatsApp da pessoa. Não mexe no signatário extra, porque ele já é do lote.
 - A revisão só confere: documento, pessoa, canal e página da marca. Não edita. Enviar continua pulando linha que já tem envelope.
+- No passo Destinatários, cada página do documento separado pode ser apagada antes do envio. Apagar a última página tira o documento do lote. Documento que já tem envelope não perde página.
 
 ### Agent's Discretion
 

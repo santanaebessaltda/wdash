@@ -27,6 +27,7 @@ export const DOCUMENT_COPY = {
   badWhatsapp: "Informe um WhatsApp válido com DDD.",
   badEmail: "Informe um e-mail válido.",
   missingPage: "Este PDF não tem a página da assinatura. Posicione a marca de novo.",
+  alreadySent: "Este documento já foi enviado.",
 } as const;
 
 export const DOCUMENT_LIMITS = {
@@ -324,6 +325,20 @@ export function replicateSetup(source: { channel: SendChannel; marks: SignatureM
     channel: source.channel,
     marks: source.marks.map((mark) => ({ ...mark })),
   };
+}
+
+/** null quando a página apagada era a única e o documento sai do envio. */
+export function remainingPages(pageCount: number, pageNumber: number): number | null {
+  if (!Number.isInteger(pageCount) || pageCount < 1) return null;
+  if (!Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > pageCount) return pageCount;
+  return pageCount === 1 ? null : pageCount - 1;
+}
+
+/** A marca acompanha as páginas que sobraram. Se a página dela saiu, volta ao centro da última. */
+export function markAfterDrop(mark: SignatureMark, removedPage: number, nextPageCount: number): SignatureMark {
+  if (mark.pageNumber === removedPage) return defaultSignatureMark(nextPageCount);
+  if (mark.pageNumber > removedPage) return { ...mark, pageNumber: mark.pageNumber - 1 };
+  return mark;
 }
 
 /** Uma assinatura no centro da última página. */

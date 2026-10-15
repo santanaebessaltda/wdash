@@ -13,9 +13,11 @@ import {
   contactFieldsToAsk,
   customDocumentName,
   folderTitle,
+  markAfterDrop,
   monthFolder,
   defaultSignatureMark,
   placementWarning,
+  remainingPages,
   replicateSetup,
   type SendChannel,
   type SignatureMark,
@@ -23,6 +25,7 @@ import {
 import {
   assignDocument,
   confirmBatch,
+  dropDocumentPage,
   prepareFiles,
   saveEmployeeContact,
   type DocumentRow,
@@ -249,6 +252,27 @@ export function AttachWizard({
             }}
             onAssign={async (documentId, sellerId) => {
               await assignDocument(documentId, sellerId);
+              await onReload();
+            }}
+            onDrop={async (documentId, pageNumber) => {
+              const row = rows.find((item) => item.id === documentId);
+              if (!row) return;
+              await dropDocumentPage(documentId, pageNumber);
+              const nextCount = remainingPages(row.pageCount, pageNumber);
+              setMarks((current) => {
+                const mark = current[documentId];
+                if (!mark) return current;
+                if (nextCount == null) {
+                  const next = { ...current };
+                  delete next[documentId];
+                  return next;
+                }
+                return { ...current, [documentId]: markAfterDrop(mark, pageNumber, nextCount) };
+              });
+              if (sample?.id === documentId) {
+                if (nextCount == null) setSampleId("");
+                else if (extraMark) setExtraMark(markAfterDrop(extraMark, pageNumber, nextCount));
+              }
               await onReload();
             }}
             onSave={async (input) => {
@@ -648,6 +672,7 @@ function RecipientsStep({
   onPick,
   onReplicate,
   onAssign,
+  onDrop,
   onSave,
   onBack,
   onNext,
@@ -675,13 +700,14 @@ function RecipientsStep({
   onPick: (id: string, value: boolean) => void;
   onReplicate: (sourceId: string) => void;
   onAssign: (documentId: string, sellerId: string) => Promise<void>;
+  onDrop: (documentId: string, pageNumber: number) => Promise<void>;
   onSave: (input: { sellerId: string; cpf?: string; email?: string; whatsapp?: string }) => Promise<void>;
   onBack: () => void;
   onNext: () => void;
 }) {
   return (
     <>
-      <WizardCardHeader title="Destinatários" subtitle="Cada documento escolhe o canal. O cadastro só é pedido quando ainda falta o contato." />
+      <WizardCardHeader title="Destinatários" subtitle="Cada documento escolhe o canal. Apague as páginas que não vão para o colaborador." />
       <div className="grid gap-3 sm:grid-cols-2">
         <FormField label="Lembrete">
           <select className={controlClass} value={reminder} onChange={(event) => onReminder(event.target.value)}>
@@ -733,6 +759,7 @@ function RecipientsStep({
             onPick={(value) => onPick(row.id, value)}
             onReplicate={() => onReplicate(row.id)}
             onAssign={onAssign}
+            onDrop={onDrop}
             onSave={onSave}
           />
         ))}
@@ -755,6 +782,7 @@ function RecipientRow({
   onPick,
   onReplicate,
   onAssign,
+  onDrop,
   onSave,
 }: {
   row: DocumentRow;
@@ -766,6 +794,7 @@ function RecipientRow({
   onPick: (value: boolean) => void;
   onReplicate: () => void;
   onAssign: (documentId: string, sellerId: string) => Promise<void>;
+  onDrop: (documentId: string, pageNumber: number) => Promise<void>;
   onSave: (input: { sellerId: string; cpf?: string; email?: string; whatsapp?: string }) => Promise<void>;
 }) {
   const person = people.find((item) => item.id === row.sellerId) ?? null;
@@ -774,7 +803,17 @@ function RecipientRow({
   const [email, setEmail] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
+  const [dropping, setDropping] = useState<number | null>(null);
   const alreadySent = Boolean(row.envelopeId);
+  const pages = Array.from({ length: Math.max(0, row.pageCount) }, (_, index) => index + 1);
+
+  function drop(pageNumber: number) {
+    setDropping(pageNumber);
+    setLocalError(null);
+    void onDrop(row.id, pageNumber)
+      .catch((reason) => setLocalError(reason instanceof Error ? reason.message : "Não foi possível apagar esta página."))
+      .finally(() => setDropping(null));
+  }
 
   return (
     <div className="rounded-xl border border-line p-3">
@@ -845,6 +884,25 @@ function RecipientRow({
           )}
         </form>
       )}
+      {!alreadySent && pages.length > 0 && (
+        <div className="mt-3 flex flex-col gap-1.5">
+          {pages.map((page) => (
+            <div key={page} className="flex items-center justify-between gap-2 rounded-lg border border-line px-2.5 py-1.5">
+              <span className="text-[12.5px] text-t1">Página {page}</span>
+              <button
+                type="button"
+                className="text-[12px] font-semibold text-bad disabled:opacity-50"
+                aria-label={pages.length === 1 ? "Apagar documento" : `Apagar página ${page}`}
+                disabled={dropping != null}
+                onClick={() => drop(page)}
+              >
+                {dropping === page ? "Apagando…" : "Apagar"}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {localError && !(ask && (ask.cpf || ask.email || ask.whatsapp)) && <p className="mt-2 text-xs text-bad">{localError}</p>}
     </div>
   );
 }

@@ -4,7 +4,7 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeaders, serve } from "../_shared/cors.ts";
 import { OWNER_ROLES, loadStaffCaller } from "../_shared/staffAuth.ts";
-import { buildPdf, readPdfPages } from "../_shared/pdfPages.ts";
+import { buildPdf, readPdfPages, withoutPage } from "../_shared/pdfPages.ts";
 import { assinaCreateEnvelope, assinaResend } from "../_shared/assinaApi.ts";
 import { loadCompanyToken } from "../_shared/assinaSync.ts";
 import {
@@ -105,6 +105,7 @@ serve(async (req) => {
   if (action === "upload") return uploadSlot(admin, caller.tenantId, body);
   if (action === "prepare") return prepare(admin, caller.tenantId, body);
   if (action === "assign") return assign(admin, caller.tenantId, body);
+  if (action === "drop-page") return dropPage(admin, caller.tenantId, body);
   if (action === "save-contact") return saveContact(admin, caller.tenantId, body);
   if (action === "confirm") return confirm(admin, caller.tenantId, erpSecret, body);
   if (action === "resend") return resend(admin, caller.tenantId, erpSecret, body);
@@ -272,6 +273,36 @@ async function assign(admin: SupabaseClient, tenantId: string, body: Body) {
   if (!seller) return json({ error: "not_found" }, 404);
   await admin.from("employee_document").update({ seller_id: sellerId, store_id: seller.store_id, error: null }).eq("id", documentId);
   return json({ ok: true });
+}
+
+async function dropPage(admin: SupabaseClient, tenantId: string, body: Body) {
+  const documentId = String(body.documentId ?? "");
+  const pageNumber = Number(body.pageNumber);
+  const { data: doc } = await admin.from("employee_document").select("id, envelope_id, storage_path, page_count").eq("id", documentId).eq("tenant_id", tenantId).maybeSingle();
+  if (!doc) return json({ error: "not_found" }, 404);
+  if (doc.envelope_id) return json({ message: DOCUMENT_COPY.alreadySent }, 422);
+  const pageCount = Number(doc.page_count) || 1;
+  if (!Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > pageCount) return json({ error: "invalid_page" }, 400);
+  const path = doc.storage_path as string;
+  if (pageCount === 1) {
+    await admin.storage.from(BUCKET).remove([path]);
+    const { error } = await admin.from("employee_document").delete().eq("id", documentId).eq("tenant_id", tenantId);
+    if (error) return json({ error: "persist" }, 500);
+    return json({ ok: true, removed: true });
+  }
+  const file = await admin.storage.from(BUCKET).download(path);
+  if (file.error || !file.data) return json({ message: "Não foi possível ler o PDF." }, 422);
+  let pdf: Uint8Array;
+  try {
+    pdf = await withoutPage(new Uint8Array(await file.data.arrayBuffer()), pageNumber);
+  } catch {
+    return json({ message: "Não foi possível apagar esta página." }, 422);
+  }
+  const up = await admin.storage.from(BUCKET).upload(path, pdf, { contentType: "application/pdf", upsert: true });
+  if (up.error) return json({ error: "persist" }, 500);
+  const { error } = await admin.from("employee_document").update({ page_count: pageCount - 1, size_bytes: pdf.byteLength, error: null }).eq("id", documentId);
+  if (error) return json({ error: "persist" }, 500);
+  return json({ ok: true, removed: false, pageCount: pageCount - 1 });
 }
 
 async function saveContact(admin: SupabaseClient, tenantId: string, body: Body) {

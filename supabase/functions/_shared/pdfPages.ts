@@ -23,3 +23,10 @@ export async function buildPdf(
   }
   return out.save();
 }
+
+/** Tira uma página (1-based) e devolve o PDF que sobrou. */
+export async function withoutPage(bytes: Uint8Array, pageNumber: number): Promise<Uint8Array> {
+  const pdf = await PDFDocument.load(bytes);
+  pdf.removePage(pageNumber - 1);
+  return pdf.save();
+}
