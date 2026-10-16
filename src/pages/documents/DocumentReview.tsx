@@ -16,6 +16,7 @@ import {
   markChoiceValue,
   markSignerId,
   nextMarkSigner,
+  settleDocumentSigners,
   signerDelivery,
   signingPeople,
   guestAuthentication,
@@ -241,11 +242,41 @@ function ReviewBody({
   onContact: (sellerId: string, contact: ContactEdit) => void;
   onRemove: () => Promise<void>;
 }) {
-  const ownerKey = documentPersonKey(row);
+  const storedOwner = documentPersonKey(row);
+  const pendingOwner = useRef<string | null>(null);
+  const assignStarted = useRef<string | null>(null);
+  const seenRow = useRef(row.id);
+  if (seenRow.current !== row.id) {
+    seenRow.current = row.id;
+    pendingOwner.current = null;
+    assignStarted.current = null;
+  }
+  if (storedOwner) pendingOwner.current = null;
+  const settled = settleDocumentSigners(draft, storedOwner ?? pendingOwner.current);
+  const ownerKey = settled.ownerId;
   const person = people.find((item) => item.id === ownerKey) ?? null;
+  const view = settled.draft;
   const choices = signingPeople(people, branchId !== undefined ? branchId : row.storeId);
   const branchPeople = person && !choices.some((item) => item.id === person.id) ? [person, ...choices] : choices;
-  const issue = row.envelopeId ? null : documentIssue(person, draft, row.pageCount, signers, people, row.sizeBytes);
+  const issue = row.envelopeId ? null : documentIssue(person, view, row.pageCount, signers, people, row.sizeBytes);
+
+  useEffect(() => {
+    if (row.envelopeId) return;
+    const owner = documentPersonKey(row);
+    const next = settleDocumentSigners(draft, owner ?? pendingOwner.current);
+    const assignId = owner ? null : next.ownerId;
+    if (assignId && assignStarted.current !== `${row.id}:${assignId}`) {
+      const assignKey = `${row.id}:${assignId}`;
+      assignStarted.current = assignKey;
+      pendingOwner.current = assignId;
+      void onAssign(row.id, assignId).catch(() => undefined);
+    }
+    const sameFields =
+      next.draft.fields.length === draft.fields.length &&
+      next.draft.fields.every((field, index) => field.signerId === draft.fields[index]?.signerId);
+    const sameDelivery = next.draft.channel === draft.channel && asAuthentication(next.draft.authentication) === asAuthentication(draft.authentication);
+    if (!sameFields || !sameDelivery) onDraft(next.draft);
+  }, [draft, onAssign, onDraft, row]);
   const previous = index > 0 ? rows[index - 1] : null;
   const next = index < total - 1 ? rows[index + 1] : null;
   const locked = Boolean(row.envelopeId) || sending;
@@ -254,21 +285,20 @@ function ReviewBody({
   const [removing, setRemoving] = useState(false);
 
   function saveDraft(next: DocumentDraft) {
-    onDraft(next);
-    if (!next.fields.some((field) => field.signerId === "seller") && ownerKey) void onAssign(row.id, "");
+    onDraft(settleDocumentSigners(next, ownerKey).draft);
   }
 
   function changeFields(fields: FieldMark[]) {
-    saveDraft({ ...draft, fields });
+    saveDraft({ ...view, fields });
   }
 
   function guestsWithoutEmpty(signerId: string, exceptFieldId: string) {
-    if (!signerId.startsWith("guest:")) return draft.guests ?? [];
+    if (!signerId.startsWith("guest:")) return view.guests ?? [];
     const guestId = signerId.slice("guest:".length);
-    const stillUsed = draft.fields.some((field) => field.id !== exceptFieldId && field.signerId === signerId);
-    const guest = (draft.guests ?? []).find((item) => item.id === guestId);
-    if (stillUsed || guest?.name.trim()) return draft.guests ?? [];
-    return (draft.guests ?? []).filter((item) => item.id !== guestId);
+    const stillUsed = view.fields.some((field) => field.id !== exceptFieldId && field.signerId === signerId);
+    const guest = (view.guests ?? []).find((item) => item.id === guestId);
+    if (stillUsed || guest?.name.trim()) return view.guests ?? [];
+    return (view.guests ?? []).filter((item) => item.id !== guestId);
   }
 
   function addGuest(assignTo: FieldMark, contact?: SignerContact) {
@@ -281,9 +311,9 @@ function ReviewBody({
       authentication: "DEFAULT_SIGN",
     };
     saveDraft({
-      ...draft,
+      ...view,
       guests: [...guestsWithoutEmpty(assignTo.signerId, assignTo.id), guest],
-      fields: draft.fields.map((item) => (item.id === assignTo.id ? { ...item, signerId: `guest:${guest.id}` } : item)),
+      fields: view.fields.map((item) => (item.id === assignTo.id ? { ...item, signerId: `guest:${guest.id}` } : item)),
     });
     setSelectedId(assignTo.id);
   }
@@ -296,12 +326,12 @@ function ReviewBody({
     if (value.startsWith("history:")) {
       const contact = history[Number(value.slice("history:".length))];
       if (!contact) return;
-      const existing = (draft.guests ?? []).find((guest) => signerContactKey(guest) === signerContactKey(contact));
+      const existing = (view.guests ?? []).find((guest) => signerContactKey(guest) === signerContactKey(contact));
       if (existing) {
         saveDraft({
-          ...draft,
+          ...view,
           guests: guestsWithoutEmpty(field.signerId, field.id),
-          fields: draft.fields.map((item) => (item.id === field.id ? { ...item, signerId: `guest:${existing.id}` } : item)),
+          fields: view.fields.map((item) => (item.id === field.id ? { ...item, signerId: `guest:${existing.id}` } : item)),
         });
         return;
       }
@@ -310,22 +340,22 @@ function ReviewBody({
     }
     if (value === "seller" || people.some((item) => item.id === value)) {
       saveDraft({
-        ...draft,
+        ...view,
         guests: guestsWithoutEmpty(field.signerId, field.id),
-        fields: draft.fields.map((item) => (item.id === field.id ? { ...item, signerId: markSignerId(value, ownerKey) } : item)),
+        fields: view.fields.map((item) => (item.id === field.id ? { ...item, signerId: markSignerId(value, ownerKey) } : item)),
       });
       return;
     }
     saveDraft({
-      ...draft,
+      ...view,
       guests: guestsWithoutEmpty(field.signerId, field.id),
-      fields: draft.fields.map((item) => (item.id === field.id ? { ...item, signerId: value } : item)),
+      fields: view.fields.map((item) => (item.id === field.id ? { ...item, signerId: value } : item)),
     });
   }
 
   function placeMark(mark: SignatureMark) {
     const id = crypto.randomUUID();
-    saveDraft({ ...draft, fields: [...draft.fields, { ...mark, id, signerId: nextMarkSigner(draft.fields, ownerKey) }] });
+    saveDraft({ ...view, fields: [...view.fields, { ...mark, id, signerId: nextMarkSigner(view.fields, ownerKey) }] });
     setSelectedId(id);
   }
 
@@ -365,10 +395,10 @@ function ReviewBody({
           <StackedPages
             documentId={row.id}
             pageCount={row.pageCount}
-            fields={draft.fields}
+            fields={view.fields}
             people={branchPeople}
             ownerKey={ownerKey}
-            guests={draft.guests ?? []}
+            guests={view.guests ?? []}
             history={history}
             disabled={locked}
             selectedId={selectedId}
@@ -385,7 +415,7 @@ function ReviewBody({
           ) : (
             <DraftFields
               person={person}
-              draft={draft}
+              draft={view}
               people={people}
               signers={signers}
               issue={issue}
@@ -770,7 +800,7 @@ function DraftFields({
           <CheckRow ok={contactsValid} label="Contato para envio válido" />
           <CheckRow ok={sizeValid} label="Tamanho do PDF válido" />
         </ul>
-        {issue && !["Escolha o colaborador.", "Falta contato no cadastro.", "Escolha quem assina esta marcação.", DOCUMENT_COPY.badCpf, DOCUMENT_COPY.badEmail, DOCUMENT_COPY.badWhatsapp, DOCUMENT_COPY.overEnvelope, DOCUMENT_COPY.missingPage].includes(issue) && <p className="mt-2 text-xs text-bad">{issue}</p>}
+        {issue && <p className="mt-2 text-xs text-bad">{issue}</p>}
         {!sizeValid && <p className="mt-2 text-xs text-bad">{DOCUMENT_COPY.overEnvelope}</p>}
       </section>
     </>
@@ -1218,17 +1248,20 @@ function MarkCard({
         drag.current = null;
       }}
     >
-      <div className={cn("rounded-[var(--radius-vela-md)] border bg-bg-2 text-t0 shadow-[0_12px_28px_-16px_rgba(0,0,0,0.55)]", selected ? "border-acc" : "border-line")}>
+      <div
+        className={cn("rounded-[var(--radius-vela-md)] border text-[#241848] shadow-[0_12px_28px_-16px_rgba(76,48,180,0.55)]", selected ? "border-acc" : "border-acc/80")}
+        style={{ backgroundColor: "color-mix(in srgb, var(--acc) 34%, transparent)" }}
+      >
         <div
           data-drag
           aria-label="Arrastar marcação"
-          className="flex h-7 cursor-grab items-center justify-center rounded-t-[8px] text-t2 hover:bg-bg-3 active:cursor-grabbing"
+          className="flex h-7 cursor-grab items-center justify-center rounded-t-[8px] text-[#241848] active:cursor-grabbing"
         >
           <GripIcon />
         </div>
         <div className="grid gap-1.5 p-1.5">
           <select
-            className="h-8 min-w-0 rounded-[var(--radius-vela-sm)] border border-line bg-bg-inset px-2 text-xs font-bold text-t0 outline-none focus:border-acc"
+            className="h-8 min-w-0 rounded-[var(--radius-vela-sm)] border border-acc/50 bg-transparent px-2 text-xs font-bold text-[#241848] outline-none focus:border-acc"
             value={markChoiceValue(field.signerId, ownerKey)}
             disabled={disabled}
             onChange={(event) => onPick(event.target.value)}
@@ -1251,14 +1284,14 @@ function MarkCard({
             </Button>
           </div>
         </div>
-        <div className="flex items-center justify-end gap-1 border-t border-line px-1.5 py-1">
+        <div className="flex items-center justify-end gap-1 border-t border-acc/30 px-1.5 py-1">
           <Tooltip label="Duplicar marcação">
             <button
               type="button"
               aria-label="Duplicar marcação"
               disabled={disabled}
               onClick={onDuplicate}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] border border-line text-t1 transition-colors hover:bg-bg-3 disabled:opacity-50"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] border border-acc/40 text-[#241848] transition-colors hover:bg-white/40 disabled:opacity-50"
             >
               <CopyIcon />
             </button>
@@ -1269,7 +1302,7 @@ function MarkCard({
               aria-label="Excluir marcação"
               disabled={disabled}
               onClick={onRemove}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] border border-line text-bad transition-colors hover:bg-bad-soft disabled:opacity-50"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] border border-acc/40 text-bad transition-colors hover:bg-white/40 disabled:opacity-50"
             >
               <Icon d={icons.trash} size={14} />
             </button>

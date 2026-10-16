@@ -17,6 +17,7 @@ import {
   defaultDraft,
   defaultSignatureMark,
   nextMarkSigner,
+  settleDocumentSigners,
   deliveryFileName,
   documentPeople,
   documentPersonKey,
@@ -534,6 +535,23 @@ describe("carryDraft", () => {
     expect(nextMarkSigner([seller, extra, seller], "ana")).toBe("guest:g1");
     expect(nextMarkSigner([seller, extra, third], "ana")).toBe("seller");
     expect(nextMarkSigner([seller, extra, third, seller], "ana")).toBe("guest:g1");
+  });
+
+  it("turns the first person on the marks into the document collaborator", () => {
+    const base = defaultDraft(1);
+    const maria = { id: "m", pageNumber: 1, x: 10, y: 10, element: "SIGNATURE" as const, signerId: "seller:maria" };
+    const petania = { id: "p", pageNumber: 1, x: 20, y: 20, element: "SIGNATURE" as const, signerId: "seller:petania" };
+    const open = settleDocumentSigners({ ...base, fields: [maria, petania] }, null);
+    expect(open.assignId).toBe("maria");
+    expect(open.ownerId).toBe("maria");
+    expect(open.draft.fields.map((field) => field.signerId)).toEqual(["seller", "seller:petania"]);
+    const kept = settleDocumentSigners(open.draft, "maria");
+    expect(kept.assignId).toBeNull();
+    expect(kept.draft.fields.map((field) => field.signerId)).toEqual(["seller", "seller:petania"]);
+    const prefixed = settleDocumentSigners({ ...base, fields: [{ ...maria, signerId: "seller:ana" }, petania] }, "ana");
+    expect(prefixed.assignId).toBeNull();
+    expect(prefixed.ownerId).toBe("ana");
+    expect(prefixed.draft.fields.map((field) => field.signerId)).toEqual(["seller", "seller:petania"]);
   });
 
   it("asks for a collaborator, a missing contact, or a user with e-mail before send", () => {

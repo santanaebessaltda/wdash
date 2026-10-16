@@ -11,6 +11,7 @@ import {
   DOCUMENT_LIMITS,
   applyContactEdit,
   contactPatch,
+  cpfDigits,
   customDocumentName,
   asAuthentication,
   displayTitle,
@@ -99,6 +100,9 @@ export function AttachWizard({
   const [confirmSend, setConfirmSend] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [contactEdits, setContactEdits] = useState<Record<string, ContactEdit>>({});
+  const peopleRef = useRef(people);
+  const contactSave = useRef<{ timer: ReturnType<typeof setTimeout> | null; token: number }>({ timer: null, token: 0 });
+  peopleRef.current = people;
   const signers = NO_USERS;
   const shownPeople = useMemo(
     () => people.map((person) => applyContactEdit(person, contactEdits) ?? person),
@@ -182,6 +186,46 @@ export function AttachWizard({
     });
     if (id !== activeId) setActiveId(id);
   }, [step, rowKey, activeId]);
+
+  useEffect(() => {
+    const pending = contactSave.current;
+    return () => {
+      if (pending.timer) clearTimeout(pending.timer);
+    };
+  }, []);
+
+  function queueContactSave(sellerId: string, contact: ContactEdit) {
+    setContactEdits((current) => ({ ...current, [sellerId]: contact }));
+    if (contactSave.current.timer) clearTimeout(contactSave.current.timer);
+    const token = contactSave.current.token + 1;
+    contactSave.current.token = token;
+    contactSave.current.timer = setTimeout(() => {
+      void persistContact(sellerId, contact, token);
+    }, 700);
+  }
+
+  async function persistContact(sellerId: string, contact: ContactEdit, token: number) {
+    const next = contactPatch({ cpf: contact.cpf, email: contact.email, whatsapp: contact.whatsapp });
+    if (!next.ok || contactSave.current.token !== token) return;
+    const person = peopleRef.current.find((item) => item.id === sellerId);
+    const sameCpf = (next.patch.cpf ?? "") === (cpfDigits(person?.cpf ?? "") ?? "");
+    const sameEmail = (next.patch.email ?? null) === (person?.email ?? null);
+    const samePhone = (next.patch.whatsapp ?? null) === (person?.whatsapp ?? null);
+    if (person && sameCpf && sameEmail && samePhone) return;
+    try {
+      const ref = parsePersonRef(sellerId);
+      await saveEmployeeContact({
+        sellerId: ref.sellerId || undefined,
+        identityId: ref.identityId || undefined,
+        cpf: contact.cpf,
+        email: contact.email,
+        whatsapp: contact.whatsapp,
+      });
+    } catch (reason) {
+      if (contactSave.current.token !== token) return;
+      setError(reason instanceof Error ? reason.message : "Não foi possível salvar o contato.");
+    }
+  }
 
   async function split() {
     if (batchId) {
@@ -391,8 +435,13 @@ export function AttachWizard({
             }}
             onDraft={(id, draft) => setDrafts((current) => ({ ...current, [id]: draft }))}
             onAssign={async (documentId, sellerId) => {
-              await assignDocument(documentId, sellerId);
-              await onReload();
+              try {
+                await assignDocument(documentId, sellerId);
+                await onReload();
+              } catch (reason) {
+                setError(reason instanceof Error ? reason.message : "Não foi possível vincular o colaborador.");
+                throw reason;
+              }
             }}
             onDrop={async (documentId, pageNumber) => {
               const row = rows.find((item) => item.id === documentId);
@@ -425,7 +474,7 @@ export function AttachWizard({
               }
               await onReload();
             }}
-            onContact={(sellerId, contact) => setContactEdits((current) => ({ ...current, [sellerId]: contact }))}
+            onContact={queueContactSave}
             onRemove={async (id) => {
               await deleteDocument(id);
               setDrafts((current) => {

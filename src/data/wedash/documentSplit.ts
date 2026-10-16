@@ -680,6 +680,40 @@ export function markSignerId(choice: string, ownerId: string | null): string {
   return `seller:${choice}`;
 }
 
+function firstListedSigner(fields: FieldMark[]): string | null {
+  const first = fields.find((field) => field.signerId.startsWith("seller:"));
+  const id = first?.signerId.slice("seller:".length) ?? "";
+  return id || null;
+}
+
+/**
+ * Sem colaborador no documento, a primeira pessoa marcada na lista vira esse colaborador.
+ * As marcas dela deixam de ser adicionais e passam a contar na situação e no envio.
+ */
+export function settleDocumentSigners(
+  draft: DocumentDraft,
+  ownerKey: string | null,
+): { draft: DocumentDraft; ownerId: string | null; assignId: string | null } {
+  const ownerId = ownerKey || firstListedSigner(draft.fields);
+  if (!ownerId) return { draft, ownerId: null, assignId: null };
+  const prefix = `seller:${ownerId}`;
+  const listed = draft.fields.some((field) => field.signerId === prefix);
+  const delivery = listed ? signerDelivery(draft, prefix) : null;
+  let changed = false;
+  const fields = draft.fields.map((field) => {
+    if (field.signerId !== prefix) return field;
+    changed = true;
+    return { ...field, signerId: "seller" };
+  });
+  const channel = delivery?.channel ?? draft.channel;
+  const authentication = delivery?.authentication ?? asAuthentication(draft.authentication);
+  const next =
+    changed || channel !== draft.channel || authentication !== asAuthentication(draft.authentication)
+      ? { ...draft, fields, channel, authentication }
+      : draft;
+  return { draft: next, ownerId, assignId: ownerKey ? null : ownerId };
+}
+
 /** Valor do seletor do card a partir do signatário gravado. */
 export function markChoiceValue(signerId: string, ownerId: string | null): string {
   if (signerId === "seller") return ownerId ? "seller" : "";
