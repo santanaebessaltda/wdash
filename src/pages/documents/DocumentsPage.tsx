@@ -404,6 +404,10 @@ function qty(count: number, singular: string, plural: string) {
   return `${count} ${count === 1 ? singular : plural}`;
 }
 
+function shout(value: string | null | undefined) {
+  return (value ?? "").toLocaleUpperCase("pt-BR");
+}
+
 function PersonChoices({
   people,
   allStores,
@@ -417,7 +421,7 @@ function PersonChoices({
     <>
       {people.map((person) => (
         <option key={person.id} value={person.id}>
-          {allStores && (person.roleLabel === "Vendedor" || person.roleLabel === "Usuário da filial") ? `${person.name} · ${person.roleLabel} · ${storeName.get(person.storeId) ?? ""}` : `${person.name} · ${person.roleLabel}`}
+          {allStores && (person.roleLabel === "Vendedor" || person.roleLabel === "Usuário da filial") ? `${shout(person.name)} · ${person.roleLabel} · ${shout(storeName.get(person.storeId))}` : `${shout(person.name)} · ${person.roleLabel}`}
         </option>
       ))}
     </>
@@ -462,9 +466,10 @@ function crumbLabel(key: string, storeName: Map<string, string>, storeCnpj: Map<
   const name = storeName.get(key);
   if (name) {
     const cnpj = storeCnpj.get(key);
-    return cnpj ? `${name} · ${cnpj}` : name;
+    return cnpj ? `${shout(name)} · ${cnpj}` : shout(name);
   }
-  return personName.get(key) ?? key;
+  const person = personName.get(key);
+  return person ? shout(person) : key;
 }
 
 function personLeft(person: PersonRow) {
@@ -493,7 +498,7 @@ function folderEntries(input: {
       const count = documents.filter((doc) => doc.storeId === store.id).length;
       return {
         key: store.id,
-        label: store.name,
+        label: shout(store.name),
         cnpj: store.cnpj,
         count,
         detail: qty(people.filter((person) => person.storeId === store.id).length, "pessoa", "pessoas"),
@@ -509,7 +514,7 @@ function folderEntries(input: {
       const inactive = personLeft(person);
       return {
         key: person.id,
-        label: person.name,
+        label: shout(person.name),
         caption: inactive ? "Desativada" : person.roleLabel,
         inactive,
         count,
@@ -538,7 +543,7 @@ function folderEntries(input: {
     .map((doc) => {
       const fraction = signerFraction(signersOf(doc, people));
       const detail = fraction && doc.envelopeId ? `${fraction.done} de ${fraction.total}` : STATUS_LABEL[doc.status];
-      return { key: doc.id, label: displayTitle(doc.fileName), detail, fileId: doc.id };
+      return { key: doc.id, label: shout(displayTitle(doc.fileName)), detail, fileId: doc.id };
     });
 }
 
@@ -599,8 +604,8 @@ function searchTargets(input: {
     put({
       key: path.join("/"),
       path,
-      label: person.name,
-      caption: [inactive ? "Desativada" : person.roleLabel, allStores ? store?.name : undefined].filter(Boolean).join(" · "),
+      label: shout(person.name),
+      caption: [inactive ? "Desativada" : person.roleLabel, allStores ? shout(store?.name) : undefined].filter(Boolean).join(" · "),
       inactive,
       detail: qty(documents.filter((doc) => documentPersonKey(doc) === person.id).length, "documento", "documentos"),
     });
@@ -630,20 +635,20 @@ function searchTargets(input: {
     if (monthHit && year) {
       const path = allStores && doc.storeId ? [doc.storeId, personId, year, month] : [personId, year, month];
       const count = documents.filter((item) => documentPersonKey(item) === personId && String(batches.get(item.batchId)?.year ?? "") === year && monthFolder(batches.get(item.batchId)?.month ?? 0) === month).length;
-      put({ key: path.join("/"), path, label: month, caption: [person?.name, year].filter(Boolean).join(" · "), detail: qty(count, "documento", "documentos") });
+      put({ key: path.join("/"), path, label: month, caption: [shout(person?.name), year].filter(Boolean).join(" · "), detail: qty(count, "documento", "documentos") });
       continue;
     }
     if (yearHit) {
       const path = allStores && doc.storeId ? [doc.storeId, personId, year] : [personId, year];
       const count = documents.filter((item) => documentPersonKey(item) === personId && String(batches.get(item.batchId)?.year ?? "") === year).length;
-      put({ key: path.join("/"), path, label: year, caption: [person?.name, allStores ? store?.name : undefined].filter(Boolean).join(" · "), detail: qty(count, "documento", "documentos") });
+      put({ key: path.join("/"), path, label: year, caption: [shout(person?.name), allStores ? shout(store?.name) : undefined].filter(Boolean).join(" · "), detail: qty(count, "documento", "documentos") });
       continue;
     }
     if (storeHit && allStores && doc.storeId && store) {
       put({
         key: doc.storeId,
         path: [doc.storeId],
-        label: store.name,
+        label: shout(store.name),
         cnpj: store.cnpj,
         detail: qty(people.filter((item) => item.storeId === store.id).length, "pessoa", "pessoas"),
       });
@@ -704,13 +709,13 @@ function DocumentTable({
       key: "document",
       header: "Documento",
       sortable: true,
-      sortValue: (row) => displayTitle(row.fileName),
+      sortValue: (row) => shout(displayTitle(row.fileName)),
       render: (row) => (
         <span className="flex min-w-0 items-center gap-2.5">
           <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] bg-acc-soft text-acc">
             <FileGlyph />
           </span>
-          <span className="truncate text-[13px] font-bold text-t0">{displayTitle(row.fileName)}</span>
+          <span className="truncate text-[13px] font-bold text-t0">{shout(displayTitle(row.fileName))}</span>
         </span>
       ),
     },
@@ -720,8 +725,8 @@ function DocumentTable({
       key: "person",
       header: "Pessoa",
       sortable: true,
-      sortValue: (row) => findDocumentPerson(people, row)?.name ?? "",
-      render: (row) => <span className="text-[13px] text-t0">{findDocumentPerson(people, row)?.name ?? "Sem pessoa"}</span>,
+      sortValue: (row) => shout(findDocumentPerson(people, row)?.name),
+      render: (row) => <span className="text-[13px] text-t0">{findDocumentPerson(people, row)?.name ? shout(findDocumentPerson(people, row)?.name) : "Sem pessoa"}</span>,
     });
   }
   if (showStore) {
@@ -730,8 +735,8 @@ function DocumentTable({
       header: "Filial",
       hideBelow: "md",
       sortable: true,
-      sortValue: (row) => (row.storeId ? storeName.get(row.storeId) ?? "" : ""),
-      render: (row) => <span className="text-[13px] text-t1">{row.storeId ? storeName.get(row.storeId) ?? "—" : "—"}</span>,
+      sortValue: (row) => (row.storeId ? shout(storeName.get(row.storeId)) : ""),
+      render: (row) => <span className="text-[13px] text-t1">{row.storeId ? shout(storeName.get(row.storeId)) || "—" : "—"}</span>,
     });
   }
   columns.push(
@@ -845,8 +850,8 @@ function SignaturesModal({
       {doc ? (
         <div className="grid gap-4">
           <div>
-            <p className="text-[14px] font-bold text-t0">{displayTitle(doc.fileName)}</p>
-            <p className="mt-0.5 text-[12.5px] text-t2">{period ? `${person} · ${period}` : person}</p>
+            <p className="text-[14px] font-bold text-t0">{shout(displayTitle(doc.fileName))}</p>
+            <p className="mt-0.5 text-[12.5px] text-t2">{period ? `${person === "Sem pessoa" ? person : shout(person)} · ${period}` : person === "Sem pessoa" ? person : shout(person)}</p>
             {fraction ? <p className="mt-3 text-[13px] text-t1">{signatureProgressDetail(fraction.done, fraction.total)}</p> : null}
           </div>
           <div className="grid divide-y divide-line rounded-[var(--radius-vela-md)] border border-line">
@@ -860,7 +865,7 @@ function SignaturesModal({
                   <span className="flex min-w-0 items-start gap-2">
                     <SignerMark status={signer.status} />
                     <span className="min-w-0">
-                      <span className="block truncate text-[13px] font-bold text-t0">{signer.name}</span>
+                      <span className="block truncate text-[13px] font-bold text-t0">{shout(signer.name)}</span>
                       <span className="mt-0.5 block text-[12px] text-t2">{signerState(signer.status)}</span>
                       {pending && (channel || contact) ? (
                         <span className="mt-0.5 block truncate text-[12px] text-t1">{[channel, contact].filter(Boolean).join(" · ")}</span>
