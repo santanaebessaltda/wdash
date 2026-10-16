@@ -107,6 +107,16 @@ export type SellerShiftRef = {
   end: string;
 };
 
+/** Foto de perfil ligada ao cadastro (store_seller → conta WDash). Sem foto = ausente. */
+export type SellerAvatarRef = {
+  storeId: string;
+  employeeId: number | null;
+  generatorId: number | null;
+  /** Nomes normalizados (mesma chave de `sellerKey`). */
+  nameKeys: string[];
+  avatarUrl: string;
+};
+
 /** Daily cost by COD_PRODUTO (RELATORIOMARGEM) — sales_product_cost_day_agg. */
 export type SalesProductCostDayAgg = {
   tenantId: string;

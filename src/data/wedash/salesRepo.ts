@@ -30,6 +30,7 @@ import type {
   SalesProductDayAgg,
   SalesProductCostDayAgg,
   SalesSellerDayAgg,
+  SellerAvatarRef,
   SellerShiftRef,
 } from "./salesTypes";
 
@@ -499,6 +500,40 @@ export async function fetchSellerShifts(
       name: shiftName(r.store_shift.name),
       start: String(r.store_shift.start_time).slice(0, 5),
       end: String(r.store_shift.end_time).slice(0, 5),
+    });
+  }
+  return out;
+}
+
+/** Foto de perfil de quem tem acesso WDash. Vazio se a função ainda não existe ou ninguém tem foto. */
+export async function fetchSellerAvatars(
+  tenantId: string,
+  clientOverride?: SalesQueryClient,
+): Promise<SellerAvatarRef[]> {
+  const client = clientOrNull(clientOverride);
+  if (!client) return [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (client as any).rpc("seller_avatar_urls", { p_tenant_id: tenantId });
+  if (error) {
+    console.warn("fetchSellerAvatars:", error.message);
+    return [];
+  }
+  const out: SellerAvatarRef[] = [];
+  for (const r of (data ?? []) as {
+    store_id: string;
+    employee_id: number | null;
+    generator_id: number | null;
+    name_keys: string[] | null;
+    avatar_url: string | null;
+  }[]) {
+    const avatarUrl = r.avatar_url?.trim();
+    if (!avatarUrl) continue;
+    out.push({
+      storeId: r.store_id,
+      employeeId: r.employee_id == null ? null : Number(r.employee_id),
+      generatorId: r.generator_id == null ? null : Number(r.generator_id),
+      nameKeys: r.name_keys ?? [],
+      avatarUrl,
     });
   }
   return out;

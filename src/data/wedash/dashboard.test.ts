@@ -835,6 +835,31 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
     ]);
   });
 
+  it("topVendedoras: foto pelo código, gerador ou nome; sem foto fica sem URL", () => {
+    const base = { tenantId: "t1", brand: "ALL" as const, day: "2026-09-10", storeId: "f1", salesCount: 1 };
+    const photo = { storeId: "f1", employeeId: null, generatorId: null, nameKeys: [] as string[] };
+    const v = buildOverviewView(scope("f1"), {
+      dayAggs: [{ ...base, revenueCents: 600_00 }],
+      sellerDayAggs: [
+        { ...base, sellerKey: "ANA", sellerName: "Ana", sellerEmployeeId: 7, revenueCents: 300_00 },
+        { ...base, sellerKey: "BIA", sellerName: "Bia", sellerGeneratorId: 55, revenueCents: 200_00 },
+        { ...base, sellerKey: "CARLA", sellerName: "Carla", revenueCents: 150_00 },
+        { ...base, sellerKey: "DORA", sellerName: "Dora", revenueCents: 100_00 },
+      ],
+      sellerAvatars: [
+        { ...photo, employeeId: 7, avatarUrl: "https://cdn/ana.jpg" },
+        { ...photo, generatorId: 55, avatarUrl: "https://cdn/bia.jpg" },
+        { ...photo, nameKeys: ["CARLA"], avatarUrl: "https://cdn/carla.jpg" },
+      ],
+    });
+    expect(v.topSellers.map((s) => s.avatarUrl)).toEqual([
+      "https://cdn/ana.jpg",
+      "https://cdn/bia.jpg",
+      "https://cdn/carla.jpg",
+      undefined,
+    ]);
+  });
+
   it("fills rankingLojas from dayAggs by store", () => {
     const v = buildOverviewView(scope("todas"), {
       dayAggs: [

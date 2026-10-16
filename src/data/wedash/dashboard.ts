@@ -3385,6 +3385,29 @@ function sellerShiftResolver(shifts: import("./salesTypes").SellerShiftRef[] = [
   };
 }
 
+/** Foto da pessoa: codigo da funcionaria, gerador, depois nome. Sem foto = iniciais no avatar. */
+function sellerAvatarResolver(avatars: import("./salesTypes").SellerAvatarRef[] = []) {
+  const byFunc = new Map<number, string>();
+  const byGenerator = new Map<number, string>();
+  const byName = new Map<string, string>();
+  for (const a of avatars) {
+    if (a.employeeId != null) byFunc.set(a.employeeId, a.avatarUrl);
+    if (a.generatorId != null) byGenerator.set(a.generatorId, a.avatarUrl);
+    for (const k of a.nameKeys) byName.set(`${a.storeId}|${k}`, a.avatarUrl);
+  }
+  return (p: { employeeId: number | null; generatorId: number | null; sellerKeys: Set<string>; storeRows: string[] }): string | undefined => {
+    if (p.employeeId != null && byFunc.has(p.employeeId)) return byFunc.get(p.employeeId);
+    if (p.generatorId != null && byGenerator.has(p.generatorId)) return byGenerator.get(p.generatorId);
+    for (const store of p.storeRows) {
+      for (const k of p.sellerKeys) {
+        const n = byName.get(`${store}|${k}`);
+        if (n) return n;
+      }
+    }
+    return undefined;
+  };
+}
+
 /* ================================================================
  * TELA EQUIPE  -  camada de dados (agregados reais do sync)
  * ================================================================ */
@@ -3853,6 +3876,8 @@ export interface TopSeller extends TopItem {
   storeRows: string[];
   /** Turno cadastrado em Configuracoes > Lojas ("Manha  |  09:00 - 15:00"); ausente = sem turno. */
   shift?: string;
+  /** Foto de perfil da conta WDash; ausente = iniciais no avatar. */
+  avatarUrl?: string;
   /** Nivel na meta (Gestao > Metas) do inicio dela ate hoje; ausente = pessoa sem meta. */
   goal?: import("./goalView").SellerGoalLevel;
 }
@@ -3906,6 +3931,8 @@ export type OverviewAggInput = {
   sellerDayAggs?: import("./salesTypes").SalesSellerDayAgg[];
   /** Turno de cada funcionaria (store_seller.shift_id)  -  popover do Destaques da equipe. */
   sellerShifts?: import("./salesTypes").SellerShiftRef[];
+  /** Foto de perfil de quem tem conta WDash (codigo, gerador ou nome). */
+  sellerAvatars?: import("./salesTypes").SellerAvatarRef[];
   /** Top produtos ({E7A5C5C7})  -  brand=ALL. Pode incluir dias do periodo anterior p/ variacao. */
   productDayAggs?: import("./salesTypes").SalesProductDayAgg[];
   /** CMV por produto do periodo (RELATORIOMARGEM)  -  lucro bruto do Top produtos. */
@@ -4696,6 +4723,7 @@ export function buildOverviewViewFromAggs(scope: Scope, input: OverviewAggInput)
       .filter((n): n is string => Boolean(n));
 
   const shiftOf = sellerShiftResolver(input.sellerShifts);
+  const avatarOf = sellerAvatarResolver(input.sellerAvatars);
   const sellerShift = (v: VendAcc): string | undefined =>
     shiftOf({
       employeeId: v.employeeId,
@@ -4726,6 +4754,12 @@ export function buildOverviewViewFromAggs(scope: Scope, input: OverviewAggInput)
         ...(!v.withoutItems && v.sales > 0 ? { pa: v.items / v.sales } : {}),
         storeRows: storesForSeller(v),
         shift: sellerShift(v),
+        avatarUrl: avatarOf({
+          employeeId: v.employeeId,
+          generatorId: v.generatorId,
+          sellerKeys: v.sellerKeys,
+          storeRows: [...v.revenueByStore.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id),
+        }),
         ...(goal ? { goal } : {}),
       };
     });

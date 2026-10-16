@@ -2,7 +2,7 @@ import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { paths } from "@/router/paths";
 import { ProductNameCell } from "@/components/wedash/ProductNameCell";
-import { Badge, Card, CardHeader, CardTitle, RadialProgress, StatCard, DateRangePicker, PageHeader, Button, ThSort, type SortDir } from "@/components/ui";
+import { Avatar, Badge, Card, CardHeader, CardTitle, RadialProgress, StatCard, DateRangePicker, PageHeader, Button, ThSort, type SortDir } from "@/components/ui";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { AreaLineChart, BarChart, DonutChart } from "@/components/charts";
 import { useScope } from "@/pages/dashboard/useScope";
@@ -17,6 +17,7 @@ import {
   fetchSalesProductDayAggs,
   fetchSalesProductCostDayAggs,
   fetchSalesCoverage,
+  fetchSellerAvatars,
   fetchSellerShifts,
   fetchSyncWatermark,
 } from "@/data/wedash/salesRepo";
@@ -29,6 +30,7 @@ import type {
   SalesSellerDayAgg,
   SalesProductDayAgg,
   SalesProductCostDayAgg,
+  SellerAvatarRef,
   SellerShiftRef,
 } from "@/data/wedash/salesTypes";
 import { brlCent, isoToDate, labelUpper, num, deltaTip, titleName } from "@/lib/format";
@@ -146,6 +148,7 @@ export default function OverviewPage() {
   const [paymentDayAggs, setPaymentDayAggs] = useState<SalesPaymentDayAgg[]>([]);
   const [sellerDayAggs, setSellerDayAggs] = useState<SalesSellerDayAgg[]>([]);
   const [sellerShifts, setSellerShifts] = useState<SellerShiftRef[]>([]);
+  const [sellerAvatars, setSellerAvatars] = useState<SellerAvatarRef[]>([]);
   const [productDayAggs, setProductDayAggs] = useState<SalesProductDayAgg[]>([]);
   const [productCostDayAggs, setProductCostDayAggs] = useState<SalesProductCostDayAgg[]>([]);
   const [loading, setLoading] = useState(true);
@@ -202,7 +205,7 @@ export default function OverviewPage() {
       return { days, sellers, team };
     });
     try {
-      const [days, hours, cats, catalog, payments, sellers, products, productCosts, wm, cov, goalHistDays, goalHistHours, prevDays, prevHours, shifts, goalsLoaded, goalAggs] = await Promise.all([
+      const [days, hours, cats, catalog, payments, sellers, products, productCosts, wm, cov, goalHistDays, goalHistHours, prevDays, prevHours, shifts, avatars, goalsLoaded, goalAggs] = await Promise.all([
         fetchSalesDayAggs({
           tenantId: session.tenantId,
           // Sempre a rede: Ranking precisa do total/participacao mesmo com 1 loja no StorePicker.
@@ -288,6 +291,7 @@ export default function OverviewPage() {
             })
           : Promise.resolve([] as SalesHourAgg[]),
         fetchSellerShifts(session.tenantId),
+        fetchSellerAvatars(session.tenantId),
         goalsP,
         goalDataP,
       ]);
@@ -307,6 +311,7 @@ export default function OverviewPage() {
       setPaymentDayAggs(payments);
       setSellerDayAggs(sellers);
       setSellerShifts(shifts);
+      setSellerAvatars(avatars);
       setProductDayAggs(products);
       setProductCostDayAggs(productCosts);
       setWatermark(wm);
@@ -370,6 +375,7 @@ export default function OverviewPage() {
         paymentDayAggs,
         sellerDayAggs,
         sellerShifts,
+        sellerAvatars,
         productDayAggs,
         productCostDayAggs,
         goalHistoryDayAggs,
@@ -382,7 +388,7 @@ export default function OverviewPage() {
         goalTeam,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [scope, dayAggs, hourAggs, categoryDayAggs, categoryCatalog, paymentDayAggs, sellerDayAggs, sellerShifts, productDayAggs, productCostDayAggs, goalHistoryDayAggs, goalHistoryHourAggs, prevDayAggs, prevHourAggs, goals, goalDayAggs, goalSellerDayAggs, goalTeam, storesTick],
+    [scope, dayAggs, hourAggs, categoryDayAggs, categoryCatalog, paymentDayAggs, sellerDayAggs, sellerShifts, sellerAvatars, productDayAggs, productCostDayAggs, goalHistoryDayAggs, goalHistoryHourAggs, prevDayAggs, prevHourAggs, goals, goalDayAggs, goalSellerDayAggs, goalTeam, storesTick],
   );
 
   // A metrica escolhe quais entram (sempre os maiores); a direcao so reordena esses.
@@ -964,7 +970,10 @@ export default function OverviewPage() {
                     >
                       <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
                       <td className="px-1 py-3">
-                        <ProductNameCell name={v.name} idx={idx} />
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <Avatar name={v.name} src={v.avatarUrl} size="sm" />
+                          <p className="min-w-0 truncate text-[13px] font-bold text-t0">{v.name}</p>
+                        </div>
                       </td>
                       <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(v.amount)}</td>
                       <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(v.sales ?? 0)}</td>

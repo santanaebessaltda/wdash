@@ -196,6 +196,7 @@ function TopTableSkeleton({
   rows = 10,
   search = false,
   variation = false,
+  round = false,
   className,
 }: {
   titleW?: string;
@@ -203,6 +204,8 @@ function TopTableSkeleton({
   /** Busca no lugar do badge "Top 10" (Desempenho por produto). */
   search?: boolean;
   variation?: boolean;
+  /** Avatar redondo (Destaques da equipe). Produto fica no quadrado de iniciais. */
+  round?: boolean;
   className?: string;
 }) {
   return (
@@ -225,7 +228,7 @@ function TopTableSkeleton({
           {Array.from({ length: rows }, (_, i) => (
             <div key={i} className="flex items-center gap-3 border-b border-line px-1 py-3 last:border-b-0">
               <Skeleton className="h-3 w-3" />
-              <Skeleton className="h-9 w-9 shrink-0 rounded-[11px]" />
+              <Skeleton className={cn("h-9 w-9 shrink-0", round ? "rounded-full" : "rounded-[11px]")} />
               <div className="min-w-0 flex-1">
                 <Skeleton className="h-3.5 w-3/5" />
                 <Skeleton className="mt-1.5 h-2.5 w-16" />
@@ -319,7 +322,7 @@ export function OverviewSkeleton({ weekdays = true }: { weekdays?: boolean }) {
         <DonutCardSkeleton />
       </div>
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <TopTableSkeleton titleW="w-40" variation />
+        <TopTableSkeleton titleW="w-40" variation round />
         <TopTableSkeleton variation />
       </div>
     </Busy>
