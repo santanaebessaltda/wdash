@@ -2,7 +2,7 @@ import { weekHoursConfigured } from "./storeHours";
 import { fetchStoreSellers, isActiveSalesPerson, type Store, type StoreSeller } from "./stores";
 
 /** Primeiros passos (Visao geral, so Gestor): configuracoes que deixam custos, margens, metas e premiacao corretos. */
-export type FirstStepId = "erp" | "sellers" | "hours" | "groups" | "franchise" | "rent" | "taxes" | "goal" | "challenge";
+export type FirstStepId = "erp" | "sellers" | "hours" | "groups" | "franchise" | "rent" | "goal" | "challenge";
 
 export interface FirstStep {
   id: FirstStepId;
@@ -52,17 +52,6 @@ function rentOk(s: FirstStepsStore): boolean {
   if (!c) return false;
   if (c.rentMin != null) return true;
   return s.pointType === "SHOPPING" && c.rentWepinkPct != null;
-}
-
-/** ICMS ou ICMS ST da marca. 0 informado conta; os dois vazios não. Empresa que só paga ST deixa o outro em branco. */
-function brandTaxesOk(icms: number | null | undefined, icmsSt: number | null | undefined): boolean {
-  return icms != null || icmsSt != null;
-}
-
-function taxesOk(s: FirstStepsStore): boolean {
-  const c = s.costs;
-  if (!c || !brandTaxesOk(c.icmsWepinkPct, c.icmsStWepinkPct)) return false;
-  return !s.hasWpink || brandTaxesOk(c.icmsWpinkPct, c.icmsStWpinkPct);
 }
 
 export function buildFirstSteps(input: FirstStepsInput): FirstStep[] {
@@ -129,12 +118,6 @@ export function buildFirstSteps(input: FirstStepsInput): FirstStep[] {
       title: "Informar o aluguel",
       description: "O aluguel entra nos custos da operação e afeta o resultado operacional.",
       ...byStore(rentOk),
-    },
-    {
-      id: "taxes",
-      title: "Informar os impostos",
-      description: "ICMS e ICMS ST de cada marca entram no cálculo do lucro bruto e da margem.",
-      ...byStore(taxesOk),
     },
     {
       id: "goal",

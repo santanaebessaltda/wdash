@@ -9,8 +9,6 @@ const COSTS_OK: StoreCosts = {
   royaltiesWepinkPct: 5,
   marketingWepinkPct: 2,
   rentMin: 8000,
-  icmsWepinkPct: 0,
-  icmsStWepinkPct: 0,
 };
 
 const store = (id: string, over: Partial<FirstStepsStore> = {}): FirstStepsStore => ({
@@ -58,9 +56,9 @@ describe("firstStepsCardStatus", () => {
 });
 
 describe("buildFirstSteps", () => {
-  it("tudo configurado = 9 passos concluídos, Millennium e vendedores sempre concluídos", () => {
+  it("tudo configurado = 8 passos concluídos, Millennium e vendedores sempre concluídos", () => {
     const steps = buildFirstSteps(input());
-    expect(steps.map((s) => s.id)).toEqual(["erp", "sellers", "hours", "groups", "franchise", "rent", "taxes", "goal", "challenge"]);
+    expect(steps.map((s) => s.id)).toEqual(["erp", "sellers", "hours", "groups", "franchise", "rent", "goal", "challenge"]);
     expect(steps.every((s) => s.done)).toBe(true);
     const empty = buildFirstSteps(input({ stores: [store("a", { costs: undefined, hours: defaultWeekHours() })] }));
     expect(empty.find((s) => s.id === "erp")!.done).toBe(true);
@@ -83,18 +81,6 @@ describe("buildFirstSteps", () => {
     const soPct = { ...COSTS_OK, rentMin: null, rentWepinkPct: 8, rentWpinkPct: 8 };
     expect(step(input({ stores: [store("a", { costs: soPct })] }), "rent").done).toBe(true);
     expect(step(input({ stores: [store("a", { costs: soPct, pointType: "STREET" })] }), "rent").done).toBe(false);
-  });
-
-  it("impostos: ICMS ou ICMS ST basta; 0 conta e os dois vazios não", () => {
-    expect(step(input(), "taxes").done).toBe(true);
-    expect(step(input({ stores: [store("a", { costs: { ...COSTS_OK, icmsStWepinkPct: null } })] }), "taxes").done).toBe(true);
-    expect(step(input({ stores: [store("a", { costs: { ...COSTS_OK, icmsWepinkPct: null } })] }), "taxes").done).toBe(true);
-    expect(step(input({ stores: [store("a", { costs: { ...COSTS_OK, icmsWepinkPct: null, icmsStWepinkPct: null } })] }), "taxes").done).toBe(false);
-    expect(step(input({ stores: [store("a", { hasWpink: true })] }), "taxes").done).toBe(false);
-    const soSt = { ...COSTS_OK, icmsWepinkPct: null, icmsWpinkPct: null, icmsStWpinkPct: 4 };
-    expect(step(input({ stores: [store("a", { hasWpink: true, costs: soSt })] }), "taxes").done).toBe(true);
-    const semWpink = { ...COSTS_OK, icmsWpinkPct: null, icmsStWpinkPct: null };
-    expect(step(input({ stores: [store("a", { hasWpink: true, costs: semWpink })] }), "taxes").done).toBe(false);
   });
 
   it("grupos: conta vendedores ativos sem grupo; gerência e desligados não contam", () => {

@@ -115,8 +115,6 @@ function stepAction(step: FirstStep): { label: string; to: string } | null {
       return { label: "Configurar franquia", to: paths.operation.branch };
     case "rent":
       return { label: "Configurar aluguel", to: paths.operation.branch };
-    case "taxes":
-      return { label: "Configurar impostos", to: paths.operation.productsTaxes };
     case "goal":
       return { label: "Criar meta", to: paths.goalNew };
     case "challenge":
