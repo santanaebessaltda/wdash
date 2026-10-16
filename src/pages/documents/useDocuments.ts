@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useScope } from "@/pages/dashboard/useScope";
 import { useActiveSession } from "@/session/SessionProvider";
-import { loadDocuments, refreshPendingSigners, type BatchRow, type DocumentRow, type PersonRow } from "@/data/wedash/documentsRepo";
+import { loadDocuments, refreshPendingSigners, type BatchRow, type DocumentRow, type DocumentStore, type PersonRow } from "@/data/wedash/documentsRepo";
 import { documentPeople, type BranchUser, type SignerContact } from "@/data/wedash/documentSplit";
 import { fetchSystemUsers, type SystemUser } from "@/data/wedash/systemUsers";
 
@@ -12,7 +12,7 @@ export function useDocuments() {
   const [batches, setBatches] = useState<BatchRow[]>([]);
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [people, setPeople] = useState<PersonRow[]>([]);
-  const [stores, setStores] = useState<{ id: string; name: string }[]>([]);
+  const [stores, setStores] = useState<DocumentStore[]>([]);
   const [history, setHistory] = useState<SignerContact[]>([]);
   const [loading, setLoading] = useState(true);
   const generation = useRef(0);

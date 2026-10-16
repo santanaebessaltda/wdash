@@ -18,7 +18,7 @@ type LibraryView = "folders" | "documents";
 
 const STATUS_ORDER = ["Pendente", "Em andamento", "Recusado", "Expirado", "Assinado", "Já assinado", "Arquivado"];
 
-type FolderEntry = { key: string; label: string; detail: string; caption?: string; fileId?: string; count?: number; inactive?: boolean };
+type FolderEntry = { key: string; label: string; detail: string; caption?: string; cnpj?: string; path?: string[]; fileId?: string; count?: number; inactive?: boolean };
 
 const fieldClass = "h-10 w-full rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3 text-[13px] text-t0";
 
@@ -49,6 +49,7 @@ export function DocumentsPage() {
   }, [flash, show]);
 
   const storeName = useMemo(() => new Map(stores.map((store) => [store.id, store.name])), [stores]);
+  const storeCnpj = useMemo(() => new Map(stores.map((store) => [store.id, store.cnpj])), [stores]);
   const personName = useMemo(() => new Map(people.map((person) => [person.id, person.name])), [people]);
   const batchOf = useMemo(() => new Map(batches.map((batch) => [batch.id, batch])), [batches]);
 
@@ -83,6 +84,9 @@ export function DocumentsPage() {
 
   const textDocs = needle ? scopedDocuments.filter((doc) => matchesQuery(doc, atPeople || atBranches)) : scopedDocuments;
   const documentRows = scopedDocuments.filter((doc) => matchesQuery(doc, true));
+  const folderSearch = needle && view === "folders" && !atFiles
+    ? searchTargets({ query, allStores, crumb, documents: scopedDocuments, batches: batchOf, people: listedPeople, stores })
+    : null;
   const folders = folderEntries({ allStores, crumb, documents: needle ? textDocs : scopedDocuments, batches, people: listedPeople, stores });
   const visibleFolders = folders.filter((folder) => folderVisible(folder));
 
@@ -116,7 +120,6 @@ export function DocumentsPage() {
     ? textDocs.filter((doc) => documentPersonKey(doc) === (allStores ? crumb[1] : crumb[0]) && String(batchOf.get(doc.batchId)?.year ?? "") === (allStores ? crumb[2] : crumb[1]) && monthFolder(batchOf.get(doc.batchId)?.month ?? 0) === (allStores ? crumb[3] : crumb[2]))
     : [];
   const peopleHere = listedPeople.filter((person) => !allStores || crumb[0] == null || person.storeId === crumb[0]);
-  const showingDocuments = view === "documents" || atFiles;
 
   function goRoot() {
     setCrumb([]);
@@ -129,7 +132,8 @@ export function DocumentsPage() {
   }
 
   function openFolder(key: string) {
-    setCrumb([...crumb, key]);
+    const found = folderSearch?.folders.find((folder) => folder.key === key);
+    setCrumb(found?.path ?? [...crumb, key]);
     setQuery("");
   }
 
@@ -137,7 +141,7 @@ export function DocumentsPage() {
     { label: "Documentos", onClick: goRoot as (() => void) | null },
     ...(allStores ? [{ label: "Filiais", onClick: goRoot as (() => void) | null }] : []),
     ...crumb.map((key, index) => ({
-      label: crumbLabel(key, storeName, personName),
+      label: crumbLabel(key, storeName, storeCnpj, personName),
       onClick: index === crumb.length - 1 ? null : () => {
         setCrumb(crumb.slice(0, index + 1));
         setQuery("");
@@ -265,12 +269,23 @@ export function DocumentsPage() {
         </nav>
       )}
       <Card className="flex w-full flex-col">
-        <CardTitle className="mb-4">{showingDocuments ? "Documentos" : "Pastas"}</CardTitle>
+        <CardTitle className="mb-4">{view === "documents" || atFiles || (folderSearch != null && folderSearch.files.length > 0 && folderSearch.folders.length === 0) ? "Documentos" : "Pastas"}</CardTitle>
         {view === "documents" ? (
           documentRows.length === 0 ? (
             <EmptyState framed={false} title={needle ? "Nenhum documento encontrado." : "Nenhum documento neste filtro."} description={needle ? "Tente outro termo." : peopleFilter === "inactive" ? "Não há documentos de pessoas desligadas." : undefined} />
           ) : (
             <DocumentTable rows={documentRows} people={people} showPerson showStore={allStores} storeName={storeName} busy={acting || resendingId != null} onDownload={(id) => void openFile(id, show)} onOpenSignatures={setSignaturesId} onMove={openMove} onDelete={setDeleteId} />
+          )
+        ) : folderSearch ? (
+          folderSearch.folders.length === 0 && folderSearch.files.length === 0 ? (
+            <EmptyState framed={false} title="Nenhum resultado para esta busca." description="Tente outro nome ou documento." />
+          ) : (
+            <div className="flex flex-col gap-4">
+              {folderSearch.folders.length > 0 ? <FolderList rows={folderSearch.folders} onOpen={openFolder} /> : null}
+              {folderSearch.files.length > 0 ? (
+                <DocumentTable rows={folderSearch.files} people={people} showPerson={allStores ? crumb.length < 2 : crumb.length < 1} showStore={allStores && crumb.length < 1} storeName={storeName} busy={acting || resendingId != null} onDownload={(id) => void openFile(id, show)} onOpenSignatures={setSignaturesId} onMove={openMove} onDelete={setDeleteId} />
+              ) : null}
+            </div>
           )
         ) : atFiles ? (
           visibleFiles.length === 0 ? (
@@ -425,8 +440,13 @@ async function openFile(id: string, show: (message: string, variant: "success" |
   }
 }
 
-function crumbLabel(key: string, storeName: Map<string, string>, personName: Map<string, string>) {
-  return storeName.get(key) ?? personName.get(key) ?? key;
+function crumbLabel(key: string, storeName: Map<string, string>, storeCnpj: Map<string, string>, personName: Map<string, string>) {
+  const name = storeName.get(key);
+  if (name) {
+    const cnpj = storeCnpj.get(key);
+    return cnpj ? `${name} · ${cnpj}` : name;
+  }
+  return personName.get(key) ?? key;
 }
 
 function personLeft(person: PersonRow) {
@@ -445,7 +465,7 @@ function folderEntries(input: {
   documents: DocumentRow[];
   batches: BatchRow[];
   people: PersonRow[];
-  stores: { id: string; name: string }[];
+  stores: { id: string; name: string; cnpj: string }[];
 }): FolderEntry[] {
   const { allStores, crumb, documents, batches, people, stores } = input;
   const yearOf = (doc: DocumentRow) => String(batches.find((batch) => batch.id === doc.batchId)?.year ?? "");
@@ -456,6 +476,7 @@ function folderEntries(input: {
       return {
         key: store.id,
         label: store.name,
+        cnpj: store.cnpj,
         count,
         detail: qty(people.filter((person) => person.storeId === store.id).length, "pessoa", "pessoas"),
       };
@@ -512,6 +533,108 @@ function signersOf(doc: DocumentRow, people: PersonRow[]) {
   return [{ name, order: 1, recipientId: null, channel: null, status }];
 }
 
+function folderSubtitle(row: FolderEntry) {
+  if (row.cnpj) return [row.cnpj, row.detail].filter(Boolean).join(" · ");
+  if (row.inactive && row.caption) return `${row.caption} · ${row.detail}`;
+  return row.caption || row.detail;
+}
+
+function searchTargets(input: {
+  query: string;
+  allStores: boolean;
+  crumb: string[];
+  documents: DocumentRow[];
+  batches: Map<string, BatchRow>;
+  people: PersonRow[];
+  stores: { id: string; name: string; cnpj: string }[];
+}): { folders: FolderEntry[]; files: DocumentRow[] } {
+  const { query, allStores, crumb, documents, batches, people, stores } = input;
+  const needle = query.trim().toLowerCase();
+  const digits = needle.replace(/\D/g, "");
+  const folders = new Map<string, FolderEntry>();
+  const files: DocumentRow[] = [];
+
+  function inside(doc: DocumentRow | null, person: PersonRow | null) {
+    if (crumb.length === 0) return true;
+    const storeId = doc?.storeId ?? person?.storeId ?? "";
+    if (allStores && crumb[0] !== storeId) return false;
+    const personAt = allStores ? 1 : 0;
+    if (crumb.length > personAt && crumb[personAt] !== (doc ? documentPersonKey(doc) : person?.id)) return false;
+    if (!doc) return crumb.length <= personAt;
+    const batch = batches.get(doc.batchId);
+    const yearAt = allStores ? 2 : 1;
+    if (crumb.length > yearAt && crumb[yearAt] !== String(batch?.year ?? "")) return false;
+    const monthAt = allStores ? 3 : 2;
+    if (crumb.length > monthAt && crumb[monthAt] !== monthFolder(batch?.month ?? 0)) return false;
+    return true;
+  }
+
+  function put(entry: FolderEntry) {
+    if (!folders.has(entry.key)) folders.set(entry.key, entry);
+  }
+
+  for (const person of people) {
+    if (!personMatchesQuery(person, query) || !inside(null, person)) continue;
+    const store = stores.find((item) => item.id === person.storeId);
+    const path = allStores ? [person.storeId, person.id] : [person.id];
+    const inactive = personLeft(person);
+    put({
+      key: path.join("/"),
+      path,
+      label: person.name,
+      caption: [inactive ? "Desativada" : person.roleLabel, allStores ? store?.name : undefined].filter(Boolean).join(" · "),
+      inactive,
+      detail: qty(documents.filter((doc) => documentPersonKey(doc) === person.id).length, "documento", "documentos"),
+    });
+  }
+
+  for (const doc of documents) {
+    if (!inside(doc, null)) continue;
+    const batch = batches.get(doc.batchId);
+    const year = String(batch?.year ?? "");
+    const month = monthFolder(batch?.month ?? 0);
+    const person = findDocumentPerson(people, doc);
+    const store = stores.find((item) => item.id === (doc.storeId ?? ""));
+    const title = displayTitle(doc.fileName).toLowerCase();
+    const category = categoryLabel(batch?.category ?? "").toLowerCase();
+    const status = (partialEnvelopeLabel(doc.status, signersOf(doc, people)) ?? STATUS_LABEL[doc.status]).toLowerCase();
+    const titleHit = title.includes(needle) || doc.fileName.toLowerCase().includes(needle) || category.includes(needle) || status.includes(needle);
+    const personHit = person != null && personMatchesQuery(person, query);
+    const monthHit = month.toLowerCase().includes(needle);
+    const yearHit = year.toLowerCase().includes(needle);
+    const storeHit = store != null && (store.name.toLowerCase().includes(needle) || (digits.length >= 3 && store.cnpj.replace(/\D/g, "").includes(digits)));
+    const personId = documentPersonKey(doc);
+    if (titleHit) {
+      if (!personHit) files.push(doc);
+      continue;
+    }
+    if (personHit || !personId) continue;
+    if (monthHit && year) {
+      const path = allStores && doc.storeId ? [doc.storeId, personId, year, month] : [personId, year, month];
+      const count = documents.filter((item) => documentPersonKey(item) === personId && String(batches.get(item.batchId)?.year ?? "") === year && monthFolder(batches.get(item.batchId)?.month ?? 0) === month).length;
+      put({ key: path.join("/"), path, label: month, caption: [person?.name, year].filter(Boolean).join(" · "), detail: qty(count, "documento", "documentos") });
+      continue;
+    }
+    if (yearHit) {
+      const path = allStores && doc.storeId ? [doc.storeId, personId, year] : [personId, year];
+      const count = documents.filter((item) => documentPersonKey(item) === personId && String(batches.get(item.batchId)?.year ?? "") === year).length;
+      put({ key: path.join("/"), path, label: year, caption: [person?.name, allStores ? store?.name : undefined].filter(Boolean).join(" · "), detail: qty(count, "documento", "documentos") });
+      continue;
+    }
+    if (storeHit && allStores && doc.storeId && store) {
+      put({
+        key: doc.storeId,
+        path: [doc.storeId],
+        label: store.name,
+        cnpj: store.cnpj,
+        detail: qty(people.filter((item) => item.storeId === store.id).length, "pessoa", "pessoas"),
+      });
+    }
+  }
+
+  return { folders: [...folders.values()], files };
+}
+
 function statusOrder(label: string) {
   const index = STATUS_ORDER.indexOf(label);
   return String(index < 0 ? STATUS_ORDER.length : index).padStart(2, "0");
@@ -527,7 +650,7 @@ function FolderList({ rows, onOpen }: { rows: FolderEntry[]; onOpen: (key: strin
           </span>
           <span className="min-w-0">
             <span className="block truncate text-[13px] font-bold text-t0">{row.label}</span>
-            <span className="mt-0.5 block truncate text-[11.5px] text-t2">{row.inactive ? `${row.caption} · ${row.detail}` : row.caption ?? row.detail}</span>
+            <span className="mt-0.5 block truncate text-[11.5px] text-t2">{folderSubtitle(row)}</span>
           </span>
         </button>
       ))}

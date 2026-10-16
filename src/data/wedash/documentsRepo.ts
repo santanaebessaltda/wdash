@@ -1,6 +1,8 @@
 import { getSupabase } from "@/lib/supabase";
-import { branchRoleLabel, isBranchUser } from "./stores";
+import { branchRoleLabel, formatCnpjDisplay, isBranchUser } from "./stores";
 import { DOCUMENT_COPY, parsePersonRef, parseSignerProgress, signerHistory, type DocumentPerson, type SignerContact, type SignerProgress } from "./documentSplit";
+
+export type DocumentStore = { id: string; name: string; cnpj: string };
 
 export type DocumentRow = {
   id: string;
@@ -95,7 +97,7 @@ export async function loadDocuments(tenantId: string, storeId: string | null): P
   batches: BatchRow[];
   documents: DocumentRow[];
   people: PersonRow[];
-  stores: { id: string; name: string }[];
+  stores: DocumentStore[];
   history: SignerContact[];
 }> {
   const sb = getSupabase();
@@ -105,14 +107,14 @@ export async function loadDocuments(tenantId: string, storeId: string | null): P
     sb.from("document_batch").select("id, store_id, month, year, category, channel, deadline, created_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }),
     sb.from("employee_document").select(documentColumns).eq("tenant_id", tenantId).is("removed_at", null).order("created_at"),
     sb.from("store_seller").select("id, store_id, name, cpf, email, whatsapp, active, in_erp, erp_role, membership_id, code").eq("tenant_id", tenantId).order("name").limit(2000),
-    sb.from("store").select("id, name, code, millennium_store_id").eq("tenant_id", tenantId).order("name"),
+    sb.from("store").select("id, name, code, millennium_store_id, tax_id").eq("tenant_id", tenantId).order("name"),
     sb.from("employee_document").select("extra_signer, sent_at").eq("tenant_id", tenantId).is("removed_at", null).not("envelope_id", "is", null).order("sent_at", { ascending: false }).limit(80),
   ]);
   const listed = documents.error
     ? await sb.from("employee_document").select(documentColumns.replace(", signers", "")).eq("tenant_id", tenantId).is("removed_at", null).order("created_at")
     : documents;
   const inStore = (id: string | null) => !storeId || id === storeId;
-  const storeRows = ((stores.data ?? []) as { id: string; name: string; code: string | null; millennium_store_id: number | null }[]).filter((row) => inStore(row.id));
+  const storeRows = ((stores.data ?? []) as { id: string; name: string; code: string | null; millennium_store_id: number | null; tax_id: string | null }[]).filter((row) => inStore(row.id));
   const branches = new Map(storeRows.map((row) => [row.id, branchOf(row)]));
   return {
     batches: ((batches.data ?? []) as Record<string, unknown>[])
@@ -120,7 +122,7 @@ export async function loadDocuments(tenantId: string, storeId: string | null): P
       .map(mapBatch),
     documents: ((listed.data ?? []) as Record<string, unknown>[]).filter((row) => inStore((row.store_id as string | null) ?? storeId)).map(mapDoc),
     people: ((people.data ?? []) as Record<string, unknown>[]).filter((row) => inStore(row.store_id as string)).map((row) => mapPerson(row, branches.get(String(row.store_id)) ?? null)),
-    stores: storeRows.map((row) => ({ id: row.id, name: row.name })),
+    stores: storeRows.map((row) => ({ id: row.id, name: row.name, cnpj: formatCnpjDisplay(row.tax_id ?? "") })),
     history: signerHistory(
       ((sentExtras.data ?? []) as { extra_signer: unknown; sent_at: string | null }[]).map((row) => ({
         sentAt: row.sent_at,
