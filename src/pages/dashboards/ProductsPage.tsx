@@ -439,9 +439,9 @@ export default function ProductsPage() {
 
       <div className="mt-4 grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
         <Card className="flex flex-col">
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-            <div className="flex items-center gap-1.5">
-              <CardTitle>Desempenho por linha de produto</CardTitle>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <CardTitle className="truncate">Desempenho por linha de produto</CardTitle>
               <TipHelp label={"Agrupa produtos da mesma linha, mesmo quando existem em diferentes tipos, como colônia, body splash, body cream ou roll-on.\n\nExemplo: Obsessed, Obsessed Deluxe e Obsessed Intense pertencem à linha OBSESSED.\n\nQuando aparecer “—”, faltam dados de custo para calcular o CMV, o lucro bruto ou a margem."} />
             </div>
             {view.lines.length > 0 && (
@@ -451,7 +451,7 @@ export default function ProductsPage() {
                   placeholder="Buscar por linha…"
                   value={lineSearch}
                   onChange={(e) => setLineSearch(e.target.value)}
-                  className={cn(filterInputClass, "sm:w-56")}
+                  className={cn(filterInputClass, "w-40 shrink-0 sm:w-44")}
                 />
               </div>
             )}
@@ -508,13 +508,7 @@ export default function ProductsPage() {
                       <ProductNameCell
                         name={l.name}
                         idx={idx}
-                        sub={
-                          <Tooltip label={l.kinds.join(" · ")}>
-                            <p className="truncate text-[11px] text-t2">
-                              {l.products} produto{l.products === 1 ? "" : "s"} · {l.kinds.length} tipo{l.kinds.length === 1 ? "" : "s"}
-                            </p>
-                          </Tooltip>
-                        }
+                        sub={`${l.products} produto${l.products === 1 ? "" : "s"} · ${l.kinds.length} tipo${l.kinds.length === 1 ? "" : "s"}`}
                       />
                     </td>
                     <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(l.items)}</td>
@@ -579,9 +573,9 @@ export default function ProductsPage() {
         </Card>
 
         <Card className="flex flex-col">
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-          <div className="flex items-center gap-1.5">
-            <CardTitle>Desempenho por produto</CardTitle>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <CardTitle className="truncate">Desempenho por produto</CardTitle>
             <TipHelp label={tipCmvProduct} />
           </div>
           {view.products.length > 0 && (
@@ -591,7 +585,7 @@ export default function ProductsPage() {
               placeholder="Buscar por produto ou código…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className={cn(filterInputClass, "sm:w-56")}
+              className={cn(filterInputClass, "w-40 shrink-0 sm:w-44")}
             />
           </div>
           )}
