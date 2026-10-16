@@ -24,6 +24,10 @@ import {
   documentPersonKey,
   markChoiceValue,
   markSignerId,
+  archivePeople,
+  archiveRefusal,
+  inLibrary,
+  isFiledStatus,
   signingPeople,
   documentIssue,
   findDocumentPerson,
@@ -295,6 +299,33 @@ describe("sourceRefusal", () => {
     expect(sourceRefusal({ ...ok, pages: 1001 })).toBe("Cada PDF pode ter até 15 MB e 1.000 páginas.");
     expect(sourceRefusal({ ...ok, hasText: false })).toBe(DOCUMENT_COPY.scanned);
     expect(sourceRefusal(ok)).toBeNull();
+  });
+});
+
+describe("archiveRefusal", () => {
+  const ok = { mime: "application/pdf", bytes: 1000, pages: 2, alreadyAccepted: 0 };
+
+  it("keeps a scanned PDF and refuses a file that is not a PDF", () => {
+    expect(archiveRefusal(ok)).toBeNull();
+    expect(archiveRefusal({ ...ok, pages: 1 })).toBeNull();
+    expect(archiveRefusal({ ...ok, mime: "image/png" })).toBe("Envie apenas arquivos PDF.");
+    expect(archiveRefusal({ ...ok, pages: 0 })).toBe("Envie apenas arquivos PDF.");
+    expect(archiveRefusal({ ...ok, alreadyAccepted: 5 })).toBe("Você pode anexar até 5 PDFs por vez.");
+    expect(archiveRefusal({ ...ok, bytes: 15 * 1024 * 1024 + 1 })).toBe("Cada PDF pode ter até 15 MB e 1.000 páginas.");
+  });
+});
+
+describe("library membership", () => {
+  it("shows a sent document and a filed document, and hides an unsent draft", () => {
+    expect(inLibrary({ envelopeId: "env", status: "PENDING" })).toBe(true);
+    expect(inLibrary({ envelopeId: null, status: "ARCHIVED" })).toBe(true);
+    expect(inLibrary({ envelopeId: null, status: "EXTERNAL_SIGNED" })).toBe(true);
+    expect(inLibrary({ envelopeId: null, status: "UNASSIGNED" })).toBe(false);
+    expect(isFiledStatus("ARCHIVED")).toBe(true);
+    expect(isFiledStatus("EXTERNAL_SIGNED")).toBe(true);
+    expect(isFiledStatus("SIGNED")).toBe(false);
+    expect(applyEnvelopeStatus("ARCHIVED", "COMPLETED")).toBe("ARCHIVED");
+    expect(applyEnvelopeStatus("EXTERNAL_SIGNED", "DECLINED")).toBe("EXTERNAL_SIGNED");
   });
 });
 
@@ -709,6 +740,16 @@ describe("signingPeople", () => {
     const norte = person("seller-carla", "norte", "Carla Lima", "Vendedor", null, "carla@loja.com");
     const manager = person("seller-ana", "norte", "Ana Paula", "Gerente", "39053344705", "ana@loja.com");
     expect(signingPeople([centro, norte, manager], "centro").map((item) => item.name)).toEqual(["Maria Silva"]);
+  });
+
+  it("adds the branch user to the folder list and still leaves the cashier out", () => {
+    const centro = person("seller-maria", "centro", "Maria Silva", "Vendedor", VALID_DIGITS, "maria@loja.com");
+    const inactive = { ...person("seller-off", "centro", "Pedro", "Vendedor", null, null), active: false };
+    const cashier = person("seller-joao", "centro", "João Santos", "Operador de caixa", null, null);
+    const branchUser = person("seller-filial", "centro", "Camila Rocha", "Usuário da filial", null, null);
+    const list = archivePeople([centro, inactive, cashier, branchUser], "centro");
+    expect(list.map((item) => item.name)).toEqual(["Camila Rocha", "Maria Silva", "Pedro"]);
+    expect(signingPeople([centro, inactive, cashier, branchUser], "centro").map((item) => item.name)).toEqual(["Maria Silva"]);
   });
 });
 

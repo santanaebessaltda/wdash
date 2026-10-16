@@ -69,7 +69,7 @@ const MONTHS = [
   "Dezembro",
 ];
 
-export type DocStatus = "UNASSIGNED" | "PENDING" | "SIGNED" | "DECLINED" | "EXPIRED";
+export type DocStatus = "UNASSIGNED" | "PENDING" | "SIGNED" | "DECLINED" | "EXPIRED" | "ARCHIVED" | "EXTERNAL_SIGNED";
 
 export type PageRef = { sourceIndex: number; pageNumber: number };
 
@@ -313,6 +313,26 @@ export function signingPeople(
   return [...sellers, ...unique].sort((left, right) => left.name.localeCompare(right.name, "pt") || left.roleLabel.localeCompare(right.roleLabel, "pt"));
 }
 
+/** Quem pode guardar um PDF na pasta: a lista de assinatura, mais o usuário da filial. Inclui quem já saiu, para o documento rescisório. */
+export function archivePeople(people: DocumentPerson[], storeId: string | null = null): DocumentPerson[] {
+  const signers = signingPeople(people, storeId, "all", true);
+  const branches = people.filter((person) => {
+    if (person.roleLabel !== "Usuário da filial") return false;
+    if (storeId && person.storeId !== storeId) return false;
+    return true;
+  });
+  return [...signers, ...branches].sort((left, right) => left.name.localeCompare(right.name, "pt") || left.roleLabel.localeCompare(right.roleLabel, "pt"));
+}
+
+export function isFiledStatus(status: DocStatus): boolean {
+  return status === "ARCHIVED" || status === "EXTERNAL_SIGNED";
+}
+
+/** A biblioteca mostra o que foi enviado para assinatura e o que foi só guardado. Rascunho sem envelope fica de fora. */
+export function inLibrary(doc: { envelopeId: string | null; status: DocStatus }): boolean {
+  return doc.envelopeId != null || isFiledStatus(doc.status);
+}
+
 /** Chave da pasta. Colaborador usa o id do Millennium; usuário da WDash leva a filial junto. */
 export function documentPersonKey(doc: { sellerId: string | null; identityId?: string | null; storeId?: string | null }): string | null {
   if (doc.sellerId) return doc.sellerId;
@@ -428,6 +448,15 @@ export function sourceRefusal(input: {
   return null;
 }
 
+/** Guardar documento aceita PDF escaneado. O limite de tamanho e de páginas é o mesmo do anexo. */
+export function archiveRefusal(input: { mime: string; bytes: number; pages: number; alreadyAccepted: number }): string | null {
+  if (input.mime !== "application/pdf") return DOCUMENT_COPY.notPdf;
+  if (input.alreadyAccepted >= DOCUMENT_LIMITS.maxFiles) return DOCUMENT_COPY.tooMany;
+  if (input.pages < 1) return DOCUMENT_COPY.notPdf;
+  if (input.bytes > DOCUMENT_LIMITS.maxSourceBytes || input.pages > DOCUMENT_LIMITS.maxPages) return DOCUMENT_COPY.tooBigSource;
+  return null;
+}
+
 export function channelBlock(
   channel: "EMAIL" | "WHATSAPP",
   contact: { email: string | null; whatsapp: string | null },
@@ -452,6 +481,7 @@ export function resendVisible(status: DocStatus): boolean {
 }
 
 export function applyEnvelopeStatus(current: DocStatus, envelopeStatus: string): DocStatus {
+  if (isFiledStatus(current)) return current;
   if (current === "SIGNED") return "SIGNED";
   if (envelopeStatus === "COMPLETED") return "SIGNED";
   if (envelopeStatus === "DECLINED" || envelopeStatus === "CANCELED") return "DECLINED";

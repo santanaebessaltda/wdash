@@ -8,7 +8,7 @@ export type DocumentRow = {
   storeId: string | null;
   sellerId: string | null;
   identityId: string | null;
-  status: "UNASSIGNED" | "PENDING" | "SIGNED" | "DECLINED" | "EXPIRED";
+  status: "UNASSIGNED" | "PENDING" | "SIGNED" | "DECLINED" | "EXPIRED" | "ARCHIVED" | "EXTERNAL_SIGNED";
   fileName: string;
   error: string | null;
   envelopeId: string | null;
@@ -245,6 +245,50 @@ export async function prepareFiles(input: {
     return { name: file.name, situation: "Recusado", detail: message };
   });
   return { batchId, refused, created: prepared.created ?? [], merged: prepared.merged ?? 0, files };
+}
+
+export async function storeFiles(input: {
+  storeId: string;
+  personId: string;
+  month: number;
+  year: number;
+  category: string;
+  title?: string;
+  situation: "ARCHIVED" | "EXTERNAL_SIGNED";
+  files: File[];
+}): Promise<{ created: string[]; refused: { name: string; message: string }[] }> {
+  const sb = getSupabase();
+  if (!sb) throw new Error("Supabase não configurado.");
+  let batchId = "";
+  const sources: { path: string; name: string }[] = [];
+  for (const file of input.files) {
+    const slot = await call({
+      action: "upload",
+      batchId,
+      storeId: input.storeId,
+      month: input.month,
+      year: input.year,
+      category: input.category,
+      unify: false,
+    });
+    if (!slot.path || !slot.token || !slot.batchId) throw new Error(slot.message ?? "Não foi possível abrir o upload.");
+    batchId = slot.batchId;
+    const up = await sb.storage.from("documents").uploadToSignedUrl(slot.path, slot.token, file);
+    if (up.error) throw new Error("Não foi possível guardar o documento. Tente novamente.");
+    sources.push({ path: slot.path, name: file.name });
+  }
+  const person = parsePersonRef(input.personId);
+  const stored = await call({
+    action: "store",
+    batchId,
+    sources,
+    title: input.title,
+    situation: input.situation,
+    sellerId: person.sellerId,
+    identityId: person.identityId,
+    storeId: person.storeId || input.storeId,
+  });
+  return { created: stored.created ?? [], refused: stored.refused ?? [] };
 }
 
 /** Relê o CPF dos documentos desta preparação na equipe da filial escolhida. */

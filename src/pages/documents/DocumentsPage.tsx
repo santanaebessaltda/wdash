@@ -5,9 +5,11 @@ import { cn } from "@/lib/cn";
 import { QuickStat } from "@/pages/dashboards/QuickStat";
 import { Icon, icons } from "@/pages/users/Icons";
 import { paths } from "@/router/paths";
-import { displayTitle, documentPersonKey, findDocumentPerson, monthFolder, personMatchesQuery, resendVisible, sameCategory, signingPeople, DOCUMENT_CATEGORIES } from "@/data/wedash/documentSplit";
+import { archivePeople, displayTitle, documentPersonKey, findDocumentPerson, inLibrary, isFiledStatus, monthFolder, personMatchesQuery, resendVisible, sameCategory, signingPeople, DOCUMENT_CATEGORIES } from "@/data/wedash/documentSplit";
 import type { BatchRow, DocumentRow, PersonRow } from "@/data/wedash/documentsRepo";
 import { cancelDocument, copyDocumentLink, moveDocument, openDocument, resendDocument } from "@/data/wedash/documentsRepo";
+import { DocumentsSkeleton } from "@/components/wedash/LoadingSkeletons";
+import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { DocumentsFrame, FileGlyph, FolderGlyph, Glyph, STATUS_LABEL, SearchGlyph, badgeVariant } from "./frame";
 import { useDocuments } from "./useDocuments";
 
@@ -19,7 +21,8 @@ type FolderEntry = { key: string; label: string; detail: string; caption?: strin
 const fieldClass = "h-10 w-full rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3 text-[13px] text-t0";
 
 export function DocumentsPage() {
-  const { allStores, batches, documents, people, stores, reload } = useDocuments();
+  const { allStores, batches, documents, people, stores, loading, reload } = useDocuments();
+  const showSkeleton = useMinSkeleton(loading);
   const navigate = useNavigate();
   const { show } = useToast();
   const flash = (useLocation().state ?? null) as { documentNotice?: string | null } | null;
@@ -50,15 +53,16 @@ export function DocumentsPage() {
   const batchOf = useMemo(() => new Map(batches.map((batch) => [batch.id, batch])), [batches]);
 
   const sentDocuments = documents.filter((doc) => doc.envelopeId);
+  const libraryDocuments = documents.filter((doc) => inLibrary(doc));
   const pending = sentDocuments.filter((doc) => doc.status === "PENDING");
   const signed = sentDocuments.filter((doc) => doc.status === "SIGNED");
   const now = new Date();
-  const thisMonth = sentDocuments.filter((doc) => {
+  const thisMonth = libraryDocuments.filter((doc) => {
     const batch = batchOf.get(doc.batchId);
     return batch?.month === now.getMonth() + 1 && batch.year === now.getFullYear();
   });
-  const recent = [...sentDocuments].sort((a, b) => (b.sentAt ?? b.createdAt).localeCompare(a.sentAt ?? a.createdAt)).slice(0, 12);
-  const periods = [...new Set(sentDocuments.map((doc) => {
+  const recent = [...libraryDocuments].sort((a, b) => (b.sentAt ?? b.createdAt).localeCompare(a.sentAt ?? a.createdAt)).slice(0, 12);
+  const periods = [...new Set(libraryDocuments.map((doc) => {
     const batch = batchOf.get(doc.batchId);
     return batch ? `${batch.year}-${batch.month}` : "";
   }).filter(Boolean))].sort();
@@ -83,7 +87,7 @@ export function DocumentsPage() {
 
   const pool =
     mode === "pending" ? pending : mode === "month" ? thisMonth : mode === "home" ? recent : [];
-  const libraryDocs = sentDocuments.filter((doc) => (mode === "home" ? true : matchesFilters(doc)));
+  const libraryDocs = libraryDocuments.filter((doc) => (mode === "home" ? true : matchesFilters(doc)));
   const visibleFiles = searching ? libraryDocs.filter(matchesText) : pool.filter((doc) => mode === "home" || matchesFilters(doc));
   const narrowed = searching || periodFilter || typeFilter || statusFilter;
 
@@ -192,6 +196,10 @@ export function DocumentsPage() {
         <Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>
       }
     >
+      {showSkeleton ? (
+        <DocumentsSkeleton allStores={allStores} />
+      ) : (
+      <>
       {mode === "home" && (
         <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <QuickStat label="Enviados" value={String(sentDocuments.length)} sub="Enviados para assinatura" tint="acc" icon={<Glyph d="M22 2 11 13M22 2 15 22 11 13 2 9 22 2" />} />
@@ -278,6 +286,8 @@ export function DocumentsPage() {
             <option value="SIGNED">Assinado</option>
             <option value="DECLINED">Recusado</option>
             <option value="EXPIRED">Expirado</option>
+            <option value="ARCHIVED">Arquivado</option>
+            <option value="EXTERNAL_SIGNED">Já assinado</option>
           </select>
         </div>
       )}
@@ -350,6 +360,8 @@ export function DocumentsPage() {
       <p className="mt-3 text-[12.5px] text-t2">
         {mode === "browse" && (!searching || peopleSearch) ? qty(visibleFolders.length, "item", "itens") : qty(visibleFiles.length, "documento", "documentos")}
       </p>
+      </>
+      )}
       <Modal
         open={deleteId != null}
         onClose={() => {
@@ -366,10 +378,16 @@ export function DocumentsPage() {
         }
       >
         <div className="grid gap-2">
-          <p className="text-[13.5px] text-t1">Este documento será removido da WDash e a assinatura em andamento será cancelada no Assina AI.</p>
-          {deleteId && extraSignerCount(documents.find((item) => item.id === deleteId)?.extraSigner) > 0 ? (
-            <p className="text-[13.5px] text-t1">A assinatura de todos os signatários deste documento será cancelada.</p>
-          ) : null}
+          {deleteId && isFiledStatus(documents.find((item) => item.id === deleteId)?.status ?? "PENDING") ? (
+            <p className="text-[13.5px] text-t1">Este documento será removido da pasta na WDash. Não há assinatura no Assina AI para cancelar.</p>
+          ) : (
+            <>
+              <p className="text-[13.5px] text-t1">Este documento será removido da WDash e a assinatura em andamento será cancelada no Assina AI.</p>
+              {deleteId && extraSignerCount(documents.find((item) => item.id === deleteId)?.extraSigner) > 0 ? (
+                <p className="text-[13.5px] text-t1">A assinatura de todos os signatários deste documento será cancelada.</p>
+              ) : null}
+            </>
+          )}
         </div>
       </Modal>
       <Modal
@@ -386,12 +404,25 @@ export function DocumentsPage() {
         }
       >
         <div className="grid gap-3">
-          <p className="text-[13.5px] text-t1">Altere a pessoa, o mês ou o ano deste documento. A assinatura em andamento não será alterada.</p>
-          <p className="text-[13.5px] text-t1">Somente este documento será movido. Os demais documentos do mesmo envio permanecem onde estão.</p>
+          {moveId && isFiledStatus(documents.find((item) => item.id === moveId)?.status ?? "PENDING") ? (
+            <>
+              <p className="text-[13.5px] text-t1">Altere a pessoa, o mês ou o ano deste documento.</p>
+              <p className="text-[13.5px] text-t1">Somente este documento será movido. Os demais documentos permanecem onde estão.</p>
+            </>
+          ) : (
+            <>
+              <p className="text-[13.5px] text-t1">Altere a pessoa, o mês ou o ano deste documento. A assinatura em andamento não será alterada.</p>
+              <p className="text-[13.5px] text-t1">Somente este documento será movido. Os demais documentos do mesmo envio permanecem onde estão.</p>
+            </>
+          )}
           <FormField label="Pessoa">
             <select className={fieldClass} value={moveSeller} onChange={(event) => setMoveSeller(event.target.value)}>
               <option value="">Selecione</option>
-              <PersonChoices people={signingPeople(people, null)} allStores={allStores} storeName={storeName} />
+              <PersonChoices
+                people={moveId && isFiledStatus(documents.find((item) => item.id === moveId)?.status ?? "PENDING") ? archivePeople(people, null) : signingPeople(people, null)}
+                allStores={allStores}
+                storeName={storeName}
+              />
             </select>
           </FormField>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -429,7 +460,7 @@ function PersonChoices({
     <>
       {people.map((person) => (
         <option key={person.id} value={person.id}>
-          {allStores && person.roleLabel === "Vendedor" ? `${person.name} · ${person.roleLabel} · ${storeName.get(person.storeId) ?? ""}` : `${person.name} · ${person.roleLabel}`}
+          {allStores && (person.roleLabel === "Vendedor" || person.roleLabel === "Usuário da filial") ? `${person.name} · ${person.roleLabel} · ${storeName.get(person.storeId) ?? ""}` : `${person.name} · ${person.roleLabel}`}
         </option>
       ))}
     </>
@@ -593,11 +624,12 @@ function FolderTable({
       header: "",
       render: (row) => {
         const doc = row.fileId ? documents.find((item) => item.id === row.fileId) : undefined;
-        if (doc && pendingMenu(doc)) {
+        if (doc && (pendingMenu(doc) || isFiledStatus(doc.status))) {
           return (
             <span className="flex items-center justify-end gap-2">
               {resendingId === doc.id && <span className="text-[12px] font-bold text-t2">Reenviando…</span>}
               <RowMenu
+                kind={isFiledStatus(doc.status) ? "filed" : "pending"}
                 busy={busy}
                 onDownload={() => onOpenFile(doc.id)}
                 onResend={() => onResend(doc.id)}
@@ -686,7 +718,7 @@ function FileTable({
       key: "status",
       header: "Status",
       render: (row) =>
-        row.envelopeId ? (
+        row.envelopeId || isFiledStatus(row.status) ? (
           <Badge variant={badgeVariant(row.status)}>{STATUS_LABEL[row.status]}</Badge>
         ) : (
           <span className="text-[12.5px] text-t2">Em preparação</span>
@@ -696,16 +728,17 @@ function FileTable({
       key: "sent",
       header: "Enviado em",
       hideBelow: "sm",
-      render: (row) => <span className="text-[12.5px] text-t1">{formatDay(row.sentAt)}</span>,
+      render: (row) => <span className="text-[12.5px] text-t1">{formatDay(isFiledStatus(row.status) ? row.createdAt : row.sentAt)}</span>,
     },
     {
       key: "actions",
       header: "",
       render: (row) =>
-        pendingMenu(row) ? (
+        pendingMenu(row) || isFiledStatus(row.status) ? (
           <span className="flex items-center justify-end gap-2">
             {resendingId === row.id && <span className="text-[12px] font-bold text-t2">Reenviando…</span>}
             <RowMenu
+              kind={isFiledStatus(row.status) ? "filed" : "pending"}
               busy={busy || resendingId === row.id}
               onDownload={() => onDownload(row.id)}
               onResend={() => onResend(row.id)}
@@ -736,6 +769,7 @@ function pendingMenu(row: DocumentRow) {
 }
 
 function RowMenu({
+  kind,
   busy,
   onDownload,
   onResend,
@@ -743,6 +777,7 @@ function RowMenu({
   onMove,
   onDelete,
 }: {
+  kind: "pending" | "filed";
   busy: boolean;
   onDownload: () => void;
   onResend: () => void;
@@ -752,8 +787,12 @@ function RowMenu({
 }) {
   const items: DropdownItem[] = [
     { label: "Baixar PDF", onClick: onDownload, disabled: busy },
-    { label: "Reenviar link", onClick: onResend, disabled: busy },
-    { label: "Copiar link", onClick: onCopy, disabled: busy },
+    ...(kind === "pending"
+      ? [
+          { label: "Reenviar link", onClick: onResend, disabled: busy },
+          { label: "Copiar link", onClick: onCopy, disabled: busy },
+        ]
+      : []),
     { label: "Mover", onClick: onMove, disabled: busy },
     { label: "", divider: true },
     { label: "Excluir documento", onClick: onDelete, danger: true, disabled: busy },

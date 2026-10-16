@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useScope } from "@/pages/dashboard/useScope";
 import { useActiveSession } from "@/session/SessionProvider";
 import { loadDocuments, type BatchRow, type DocumentRow, type PersonRow } from "@/data/wedash/documentsRepo";
@@ -14,21 +14,32 @@ export function useDocuments() {
   const [people, setPeople] = useState<PersonRow[]>([]);
   const [stores, setStores] = useState<{ id: string; name: string }[]>([]);
   const [history, setHistory] = useState<SignerContact[]>([]);
+  const [loading, setLoading] = useState(true);
+  const generation = useRef(0);
 
   const reload = useCallback(async () => {
-    const [data, users] = await Promise.all([loadDocuments(session.tenantId, storeId), fetchSystemUsers()]);
-    setBatches(data.batches);
-    setDocuments(data.documents);
-    setPeople(documentPeople(data.people, users.ok ? branchUsers(users.data.members) : [], data.stores.map((store) => store.id)));
-    setStores(data.stores);
-    setHistory(data.history);
+    const gen = ++generation.current;
+    try {
+      const [data, users] = await Promise.all([loadDocuments(session.tenantId, storeId), fetchSystemUsers()]);
+      if (gen !== generation.current) return;
+      setBatches(data.batches);
+      setDocuments(data.documents);
+      setPeople(documentPeople(data.people, users.ok ? branchUsers(users.data.members) : [], data.stores.map((store) => store.id)));
+      setStores(data.stores);
+      setHistory(data.history);
+    } catch {
+      /* a próxima leitura substitui; a tela não fica presa no skeleton */
+    } finally {
+      if (gen === generation.current) setLoading(false);
+    }
   }, [session.tenantId, storeId]);
 
   useEffect(() => {
+    setLoading(true);
     void reload();
   }, [reload]);
 
-  return { storeId, allStores: storeId == null, batches, documents, people, stores, history, reload };
+  return { storeId, allStores: storeId == null, batches, documents, people, stores, history, loading, reload };
 }
 
 function branchUsers(members: SystemUser[]): BranchUser[] {

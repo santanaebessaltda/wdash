@@ -10,6 +10,8 @@ import { loadCompanyToken } from "../_shared/assinaSync.ts";
 import {
   DOCUMENT_CATEGORIES,
   DOCUMENT_COPY,
+  archiveRefusal,
+  isFiledStatus,
   asAuthentication,
   asReminder,
   assignSeller,
@@ -120,6 +122,7 @@ serve(async (req) => {
   const action = String(body.action ?? "");
   if (action === "upload") return uploadSlot(admin, caller.tenantId, body);
   if (action === "prepare") return prepare(admin, caller.tenantId, body);
+  if (action === "store") return storeDocuments(admin, caller.tenantId, body);
   if (action === "rematch") return rematch(admin, caller.tenantId, body);
   if (action === "assign") return assign(admin, caller.tenantId, body);
   if (action === "drop-page") return dropPage(admin, caller.tenantId, body);
@@ -279,6 +282,84 @@ async function prepare(admin: SupabaseClient, tenantId: string, body: Body) {
   }
   const merged = groups.filter((group) => new Set(group.pages.map((page) => page.sourceIndex)).size > 1).length;
   return json({ batchId, created, refused, merged });
+}
+
+/** Guarda o PDF na pasta da pessoa, sem envelope e sem Assina AI. */
+async function storeDocuments(admin: SupabaseClient, tenantId: string, body: Body) {
+  const batchId = String(body.batchId ?? "");
+  const batch = await ownedBatch(admin, tenantId, batchId);
+  if (!batch?.store_id) return json({ message: "Escolha a filial." }, 400);
+  const situation = body.situation === "EXTERNAL_SIGNED" ? "EXTERNAL_SIGNED" : body.situation === "ARCHIVED" ? "ARCHIVED" : "";
+  if (!situation) return json({ message: "Não foi possível guardar o documento. Tente novamente." }, 400);
+  const sellerId = String(body.sellerId ?? "");
+  const identityId = String(body.identityId ?? "");
+  const storeId = batch.store_id as string;
+  if (identityId) {
+    if (!(await userOnStore(admin, tenantId, identityId, storeId))) return json({ message: "Escolha a pessoa." }, 404);
+  } else if (sellerId) {
+    const { data: seller } = await admin.from("store_seller").select("id").eq("id", sellerId).eq("tenant_id", tenantId).eq("store_id", storeId).maybeSingle();
+    if (!seller) return json({ message: "Escolha a pessoa." }, 404);
+  } else return json({ message: "Escolha a pessoa." }, 400);
+
+  const label = batch.category === "Outros" ? customDocumentName(String(body.title ?? "")) : { ok: true as const, name: String(batch.category) };
+  if (!label.ok) return json({ message: label.message }, 422);
+  const sources = Array.isArray(body.sources) ? body.sources : [];
+  const refused: { name: string; message: string }[] = [];
+  const created: string[] = [];
+  let accepted = 0;
+  const taken = [...(await takenNames(admin, { sellerId: identityId ? null : sellerId, identityId: identityId || null }, batch))];
+  for (const source of sources as { path?: string; name?: string }[]) {
+    const path = String(source.path ?? "");
+    const name = String(source.name ?? "arquivo.pdf");
+    if (!path.startsWith(`${tenantId}/${batchId}/`)) {
+      refused.push({ name, message: DOCUMENT_COPY.notPdf });
+      continue;
+    }
+    const downloaded = await admin.storage.from(BUCKET).download(path);
+    if (downloaded.error || !downloaded.data) {
+      refused.push({ name, message: DOCUMENT_COPY.notPdf });
+      continue;
+    }
+    const bytes = new Uint8Array(await downloaded.data.arrayBuffer());
+    let read;
+    try {
+      read = await readPdfPages(bytes);
+    } catch {
+      refused.push({ name, message: DOCUMENT_COPY.notPdf });
+      continue;
+    }
+    const reason = archiveRefusal({ mime: "application/pdf", bytes: bytes.byteLength, pages: read.pageCount, alreadyAccepted: accepted });
+    if (reason) {
+      refused.push({ name, message: reason });
+      continue;
+    }
+    accepted += 1;
+    const docName = fileName(label.name, taken);
+    taken.push(docName);
+    const docId = crypto.randomUUID();
+    const storagePath = `${tenantId}/${batchId}/${docId}.pdf`;
+    const up = await admin.storage.from(BUCKET).upload(storagePath, bytes, { contentType: "application/pdf" });
+    if (up.error) {
+      refused.push({ name, message: "Não foi possível guardar o documento. Tente novamente." });
+      continue;
+    }
+    const { error } = await admin.from("employee_document").insert({
+      id: docId,
+      batch_id: batchId,
+      tenant_id: tenantId,
+      store_id: storeId,
+      seller_id: identityId ? null : sellerId,
+      identity_id: identityId || null,
+      status: situation,
+      storage_path: storagePath,
+      file_name: docName,
+      page_count: read.pageCount,
+      size_bytes: bytes.byteLength,
+    });
+    if (error) refused.push({ name, message: "Não foi possível guardar o documento. Tente novamente." });
+    else created.push(docId);
+  }
+  return json({ created, refused });
 }
 
 /** Filial trocada no meio da preparação: relê o CPF e tenta a equipe da filial nova. O PDF e as marcações ficam. */
@@ -675,7 +756,13 @@ async function copyLink(admin: SupabaseClient, tenantId: string, secret: string,
 
 async function cancelDocument(admin: SupabaseClient, tenantId: string, secret: string, body: Body) {
   const { data: doc } = await admin.from("employee_document").select("id, status, envelope_id, removed_at").eq("id", String(body.documentId ?? "")).eq("tenant_id", tenantId).maybeSingle();
-  if (!doc || doc.removed_at || !resendVisible(doc.status as DocStatus) || !doc.envelope_id) return json({ message: "Não foi possível excluir o documento. Tente novamente." }, 404);
+  if (!doc || doc.removed_at) return json({ message: "Não foi possível excluir o documento. Tente novamente." }, 404);
+  if (isFiledStatus(doc.status as DocStatus) && !doc.envelope_id) {
+    const { error } = await admin.from("employee_document").update({ removed_at: new Date().toISOString(), error: null }).eq("id", doc.id);
+    if (error) return json({ message: "Não foi possível excluir o documento. Tente novamente." }, 500);
+    return json({ ok: true });
+  }
+  if (!resendVisible(doc.status as DocStatus) || !doc.envelope_id) return json({ message: "Não foi possível excluir o documento. Tente novamente." }, 404);
   const token = await loadCompanyToken(admin, tenantId, secret);
   if (!token) return json({ message: DOCUMENT_COPY.noToken }, 422);
   const ok = await assinaCancelEnvelope(token, doc.envelope_id as string);
@@ -693,7 +780,9 @@ async function moveDocument(admin: SupabaseClient, tenantId: string, body: Body)
   const month = Number(body.month);
   const year = Number(body.year);
   const { data: doc } = await admin.from("employee_document").select("id, batch_id, status, envelope_id, removed_at").eq("id", documentId).eq("tenant_id", tenantId).maybeSingle();
-  if (!doc || doc.removed_at || !resendVisible(doc.status as DocStatus) || !doc.envelope_id) return json({ message: "Só um documento pendente pode ser movido." }, 422);
+  const filed = doc != null && isFiledStatus(doc.status as DocStatus) && !doc.envelope_id;
+  const pendingSignature = doc != null && resendVisible(doc.status as DocStatus) && Boolean(doc.envelope_id);
+  if (!doc || doc.removed_at || (!filed && !pendingSignature)) return json({ message: "Não foi possível mover o documento. Tente novamente." }, 422);
   const { data: batch } = await admin.from("document_batch").select("category, unify").eq("id", doc.batch_id).eq("tenant_id", tenantId).maybeSingle();
   let targetStore = "";
   if (identityId) {

@@ -48,6 +48,7 @@ import {
 } from "@/data/wedash/documentsRepo";
 import { formatBytes } from "./frame";
 import { DocumentReview } from "./DocumentReview";
+import { PathChoice, StoreDocument } from "./StoreDocument";
 
 const NO_USERS: { id: string; name: string; email: string }[] = [];
 
@@ -68,6 +69,7 @@ export function AttachWizard({
   onReload,
   onClose,
   onDone,
+  onBack,
 }: {
   storeId: string | null;
   people: PersonRow[];
@@ -76,6 +78,7 @@ export function AttachWizard({
   onReload: () => Promise<void>;
   onClose: () => void;
   onDone: (notice: string | null) => void;
+  onBack?: () => void;
 }) {
   const [step, setStep] = useState(1);
   const [month, setMonth] = useState(String(new Date().getMonth() + 1));
@@ -367,7 +370,8 @@ export function AttachWizard({
       setConfirmLeave(true);
       return;
     }
-    onClose();
+    if (onBack) onBack();
+    else onClose();
   }
 
   return (
@@ -606,18 +610,28 @@ export function AttachWizard({
 
 export function AttachPage() {
   const navigate = useNavigate();
-  const { storeId, people, documents, history, reload } = useDocuments();
-  return (
-    <AttachWizard
-      storeId={storeId}
-      people={people}
-      documents={documents}
-      history={history}
-      onReload={reload}
-      onClose={() => navigate(paths.documents)}
-      onDone={(notice) => navigate(paths.documents, { state: notice ? { documentNotice: notice } : undefined })}
-    />
-  );
+  const { storeId, people, documents, history, stores, reload } = useDocuments();
+  const [path, setPath] = useState<"choose" | "sign" | "file">("choose");
+  const close = () => navigate(paths.documents);
+  const done = (notice: string | null) => navigate(paths.documents, { state: notice ? { documentNotice: notice } : undefined });
+  if (path === "sign") {
+    return (
+      <AttachWizard
+        storeId={storeId}
+        people={people}
+        documents={documents}
+        history={history}
+        onReload={reload}
+        onClose={close}
+        onDone={done}
+        onBack={() => setPath("choose")}
+      />
+    );
+  }
+  if (path === "file") {
+    return <StoreDocument storeId={storeId} people={people} stores={stores} onDone={() => done(null)} onBack={() => setPath("choose")} />;
+  }
+  return <PathChoice onClose={close} onSign={() => setPath("sign")} onFile={() => setPath("file")} />;
 }
 
 

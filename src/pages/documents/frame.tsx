@@ -9,6 +9,8 @@ export const STATUS_LABEL: Record<DocumentRow["status"], string> = {
   SIGNED: "Assinado",
   DECLINED: "Recusado",
   EXPIRED: "Expirado",
+  ARCHIVED: "Arquivado",
+  EXTERNAL_SIGNED: "Já assinado",
 };
 
 export function badgeVariant(status: DocumentRow["status"]) {
