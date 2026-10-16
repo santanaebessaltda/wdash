@@ -197,7 +197,7 @@ function ProviderCard({
       <div className="flex items-center justify-between border-t border-line pt-3">
         <span className={`flex items-center gap-1.5 text-xs font-bold ${tone}`}>
           <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
-          {connected ? "Conectado" : "Não configurado"}
+          {connected ? "Conectado" : "Desconectado"}
         </span>
         <Button size="sm" onClick={onOpen} disabled={disabled}>
           {connected ? "Gerenciar" : "Conectar"}

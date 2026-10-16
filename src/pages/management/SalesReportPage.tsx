@@ -290,7 +290,7 @@ export function SalesReportPage() {
           <Card>
             <EmptyBlock
               icon="🧾"
-              title="Administradora não configurada"
+              title="Administradora desconectada"
               description={owner ? "Conecte a administradora desta filial para informar as vendas ao shopping." : "O Gestor ainda não conectou a administradora desta filial."}
               action={owner ? <Button onClick={() => navigate(paths.operation.shopping)}>Conectar administradora</Button> : undefined}
             />

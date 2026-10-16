@@ -54,7 +54,7 @@ export function AssinaCard() {
           <div className="flex items-center justify-between border-t border-line pt-3">
             <span className={`flex items-center gap-1.5 text-xs font-bold ${status === "connected" ? "text-ok" : "text-t2"}`}>
               <span className={`h-1.5 w-1.5 rounded-full ${status === "connected" ? "bg-ok" : "bg-t2"}`} />
-              {status === "connected" ? "Conectado" : "Não configurado"}
+              {status === "connected" ? "Conectado" : "Desconectado"}
             </span>
             <Button size="sm" variant={status === "connected" ? "outline" : "primary"} onClick={() => setOpen(true)} disabled={!canEdit}>
               {status === "connected" ? "Gerenciar" : "Conectar"}

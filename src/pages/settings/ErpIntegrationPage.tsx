@@ -45,7 +45,7 @@ const LINK_STATE_UI: Record<ErpLinkState, { label: string; cls: string; dot: str
   connected: { label: "Conectado", cls: "text-ok", dot: "bg-ok" },
   paused: { label: "Desconectado", cls: "text-t2", dot: "bg-t2" },
   password: { label: "Senha inválida", cls: "text-bad", dot: "bg-bad" },
-  disconnected: { label: "Não configurado", cls: "text-t2", dot: "bg-t2" },
+  disconnected: { label: "Desconectado", cls: "text-t2", dot: "bg-t2" },
 };
 
 const ERROR_CREDENCIAL: Record<Extract<ErpCredentialChangeResult, { ok: false }>["reason"], string> = {

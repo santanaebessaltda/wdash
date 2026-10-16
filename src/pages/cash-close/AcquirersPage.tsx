@@ -44,7 +44,7 @@ export function AcquirersPage() {
   }, [storesLoading, reload]);
 
   const conectadas = links.length;
-  const status = conectadas === 0 ? "Não configurado" : conectadas === storeRows.length ? "Conectado" : "Parcial";
+  const status = conectadas === 0 ? "Desconectado" : conectadas === storeRows.length ? "Conectado" : "Parcial";
   const tone = conectadas === 0 ? "text-t2" : conectadas === storeRows.length ? "text-ok" : "text-warn";
   const dot = conectadas === 0 ? "bg-t2" : conectadas === storeRows.length ? "bg-ok" : "bg-warn";
 
