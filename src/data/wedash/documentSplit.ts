@@ -8,10 +8,24 @@ export const DOCUMENT_CATEGORIES = [
   "Vale-alimentação / refeição",
   "Participação nos lucros (PLR)",
   "Informe de rendimentos",
-  "Admissão",
-  "Rescisão",
+  "Documentos admissionais",
+  "Documentos rescisórios",
   "Outros",
 ] as const;
+
+/** Nomes antigos continuam nos lotes já gravados e aparecem com o nome novo. */
+const LEGACY_CATEGORY: Record<string, string> = {
+  "Admissão": "Documentos admissionais",
+  "Rescisão": "Documentos rescisórios",
+};
+
+export function categoryLabel(category: string): string {
+  return LEGACY_CATEGORY[category] ?? category;
+}
+
+export function sameCategory(stored: string, selected: string): boolean {
+  return categoryLabel(stored) === categoryLabel(selected);
+}
 
 export type DocumentCategory = (typeof DOCUMENT_CATEGORIES)[number];
 
@@ -889,7 +903,7 @@ export function documentIssue(
   people: { id: string; name: string; email: string | null; whatsapp: string | null; cpf?: string | null }[] = [],
   sizeBytes = 0,
 ): string | null {
-  if (!person) return "Escolha o colaborador.";
+  if (!person) return "Escolha a pessoa.";
   const ask = contactFieldsToAsk(person, draft.channel);
   if (ask.cpf || ask.email || ask.whatsapp) return "Falta contato no cadastro.";
   const cpf = saveCpf(person.cpf ?? "");
@@ -945,7 +959,7 @@ export function documentIssue(
 }
 
 export type PreparationStatus = "Pronto" | "Precisa de atenção" | "Já enviado";
-export type PreparationReason = "Sem colaborador" | "Contato incompleto" | "Falta marcação" | "Revisar marcação";
+export type PreparationReason = "Sem pessoa" | "Contato incompleto" | "Falta marcação" | "Revisar marcação";
 
 /** Status da preparação. O motivo da pendência fica em `preparationReason`. */
 export function preparationSituation(
@@ -976,7 +990,7 @@ export function preparationReason(
   if (status === "Pronto" && !reviewed) return "Revisar marcação";
   if (status !== "Precisa de atenção") return null;
   const issue = documentIssue(person, draft, pageCount, signers, people, sizeBytes);
-  if (issue === "Escolha o colaborador.") return "Sem colaborador";
+  if (issue === "Escolha a pessoa.") return "Sem pessoa";
   if (issue === DOCUMENT_COPY.missingPage || issue === "Escolha quem assina esta marcação.") return "Falta marcação";
   if (
     issue === "Falta contato no cadastro." ||

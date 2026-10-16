@@ -143,8 +143,8 @@ async function uploadSlot(admin: SupabaseClient, tenantId: string, body: Body) {
   const month = Number(body.month);
   const year = Number(body.year);
   const category = String(body.category ?? "");
-  // A lista compartilhada inclui Admissão e Rescisão.
-  if (!DOCUMENT_CATEGORIES.includes(category as (typeof DOCUMENT_CATEGORIES)[number]) || month < 1 || month > 12 || !year) {
+  const known = DOCUMENT_CATEGORIES.includes(category as (typeof DOCUMENT_CATEGORIES)[number]) || category === "Admissão" || category === "Rescisão";
+  if (!known || month < 1 || month > 12 || !year) {
     return json({ error: "invalid_batch" }, 400);
   }
   let batchId = typeof body.batchId === "string" ? body.batchId : "";

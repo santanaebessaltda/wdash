@@ -348,10 +348,8 @@ export function AttachWizard({
       }
       setConfirmSend(false);
       if (heldBack > 0 || failed.length > 0) {
-        setSentNote(
-          `${sentCount} ${sentCount === 1 ? "documento enviado" : "documentos enviados"}. ${heldBack} ${heldBack === 1 ? "ficou de fora porque precisa" : "ficaram de fora porque precisam"} de atenção.`,
-        );
-        setError(failed.length > 0 ? reason || "Alguns documentos prontos não foram enviados. Os que ficaram de fora por pendência não entram neste envio." : null);
+        setSentNote("partial");
+        setError(failed.length > 0 ? reason || "Não foi possível enviar os documentos prontos. Tente novamente." : null);
         setSending(false);
         return;
       }
@@ -439,7 +437,7 @@ export function AttachWizard({
                 await assignDocument(documentId, sellerId);
                 await onReload();
               } catch (reason) {
-                setError(reason instanceof Error ? reason.message : "Não foi possível vincular o colaborador.");
+                setError(reason instanceof Error ? reason.message : "Não foi possível vincular a pessoa.");
                 throw reason;
               }
             }}
@@ -588,11 +586,11 @@ export function AttachWizard({
       <Modal
         open={confirmLeave}
         onClose={() => setConfirmLeave(false)}
-        title="Sair da preparação"
+        title="Sair da preparação?"
         footer={
           <>
             <Button variant="outline" onClick={() => setConfirmLeave(false)}>
-              Continuar
+              Continuar preparando
             </Button>
             <Button variant="danger" onClick={onClose}>
               Sair
@@ -600,7 +598,7 @@ export function AttachWizard({
           </>
         }
       >
-        <p className="text-[13.5px] text-t1">As marcações desta preparação serão perdidas. Contatos já salvos no cadastro permanecem.</p>
+        <p className="text-[13.5px] text-t1">As marcações e configurações deste envio serão perdidas. Os contatos já salvos no cadastro serão mantidos.</p>
       </Modal>
     </div>
   );
@@ -761,7 +759,7 @@ function SendReview({
                         <button
                           type="button"
                           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] border border-line text-bad transition-colors hover:bg-bad-soft"
-                          aria-label="Excluir documento"
+                          aria-label="Remover do lote"
                           onClick={() => setRemoveId(item.row.id)}
                         >
                           <Icon d={icons.trash} size={14} />
@@ -781,8 +779,9 @@ function SendReview({
       </div>
       {openIds.length > 0 && (
         <div className="mt-4 rounded-xl border border-line p-3">
-          <p className="text-[13px] font-bold text-t0">Lembretes e prazo</p>
-          <p className="mt-1 text-[12.5px] text-t2">O lembrete vale para os documentos que ainda não foram enviados. O prazo de assinatura é de 30 dias a partir do envio.</p>
+          <p className="text-[13px] font-bold text-t0">Lembretes</p>
+          <p className="mt-1 text-[12.5px] text-t2">Estas configurações serão aplicadas aos documentos que ainda não foram enviados.</p>
+          <p className="mt-1 text-[12.5px] text-t2">O prazo para assinatura é de 30 dias a partir do envio.</p>
           <div className="mt-3 flex flex-wrap items-end gap-2">
             <label className="grid min-w-[160px] flex-1 gap-1 text-[12px] font-bold text-t2">
               Lembrete
@@ -799,7 +798,11 @@ function SendReview({
           </div>
         </div>
       )}
-      {sentNote && <Alert className="mt-4" variant="success" title={sentNote} />}
+      {sentNote && (
+        <Alert className="mt-4" title="Alguns documentos não foram enviados">
+          Revise os documentos com pendência e tente novamente. Os que já foram enviados não serão duplicados.
+        </Alert>
+      )}
       {error && <Alert className="mt-4" variant="danger" title={error} />}
       <div className="mt-4">
         <WizardNav previousLabel="Voltar" nextLabel={sending ? "Enviando…" : sendLabel(ready)} hideNextIcon previousDisabled={sending} nextDisabled={sending || ready === 0} onPrevious={onBack} onNext={onSend} />
@@ -809,7 +812,7 @@ function SendReview({
         onClose={() => {
           if (!removing) setRemoveId(null);
         }}
-        title="Excluir documento"
+        title="Remover do lote"
         footer={
           <>
             <Button variant="outline" disabled={removing} onClick={() => setRemoveId(null)}>
@@ -831,12 +834,12 @@ function SendReview({
                 );
               }}
             >
-              {removing ? "Excluindo…" : "Excluir"}
+              {removing ? "Removendo…" : "Remover do lote"}
             </Button>
           </>
         }
       >
-        <p className="text-[13.5px] text-t1">Este documento sai do lote. Os outros permanecem.</p>
+        <p className="text-[13.5px] text-t1">Este documento sai desta preparação. Nada é cancelado no Assina AI, porque ele ainda não foi enviado. Os outros documentos permanecem.</p>
       </Modal>
     </>
   );
@@ -851,9 +854,9 @@ function scheduleDelivery(draft: DocumentDraft) {
 }
 
 function scheduleWhen(draft: DocumentDraft) {
-  const reminder =
-    draft.reminder === "EVERY_DAY" ? "Todo dia" : draft.reminder === "EVERY_WEEK" ? "Toda semana" : draft.reminder === "NEVER" ? "Sem lembrete" : "A cada 3 dias";
-  return `${reminder} · 30 dias`;
+  if (draft.reminder === "NEVER") return "Sem lembrete";
+  const reminder = draft.reminder === "EVERY_DAY" ? "todo dia" : draft.reminder === "EVERY_WEEK" ? "toda semana" : "a cada 3 dias";
+  return `Lembrete ${reminder}`;
 }
 
 function schedulePeople(draft: DocumentDraft) {

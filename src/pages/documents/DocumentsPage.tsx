@@ -5,7 +5,7 @@ import { cn } from "@/lib/cn";
 import { QuickStat } from "@/pages/dashboards/QuickStat";
 import { Icon, icons } from "@/pages/users/Icons";
 import { paths } from "@/router/paths";
-import { displayTitle, documentPersonKey, findDocumentPerson, monthFolder, personMatchesQuery, resendVisible, signingPeople, DOCUMENT_CATEGORIES } from "@/data/wedash/documentSplit";
+import { displayTitle, documentPersonKey, findDocumentPerson, monthFolder, personMatchesQuery, resendVisible, sameCategory, signingPeople, DOCUMENT_CATEGORIES } from "@/data/wedash/documentSplit";
 import type { BatchRow, DocumentRow, PersonRow } from "@/data/wedash/documentsRepo";
 import { cancelDocument, copyDocumentLink, moveDocument, openDocument, resendDocument } from "@/data/wedash/documentsRepo";
 import { DocumentsFrame, FileGlyph, FolderGlyph, Glyph, STATUS_LABEL, SearchGlyph, badgeVariant } from "./frame";
@@ -75,7 +75,7 @@ export function DocumentsPage() {
 
   function matchesFilters(doc: DocumentRow) {
     const batch = batchOf.get(doc.batchId);
-    if (typeFilter && batch?.category !== typeFilter) return false;
+    if (typeFilter && !sameCategory(batch?.category ?? "", typeFilter)) return false;
     if (statusFilter && doc.status !== statusFilter) return false;
     if (periodFilter && `${batch?.year}-${batch?.month}` !== periodFilter) return false;
     return true;
@@ -225,7 +225,7 @@ export function DocumentsPage() {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar por documento, nome, CPF ou e-mail"
+            placeholder="Buscar por documento ou pessoa"
             className="w-40 bg-transparent text-[12.5px] text-t0 outline-none placeholder:text-t2 sm:w-72"
           />
         </div>
@@ -319,6 +319,7 @@ export function DocumentsPage() {
             onMove={openMove}
             onDelete={setDeleteId}
             busy={acting || resendingId != null}
+            resendingId={resendingId}
           />
         )
       ) : visibleFiles.length === 0 ? (
@@ -365,7 +366,7 @@ export function DocumentsPage() {
         }
       >
         <div className="grid gap-2">
-          <p className="text-[13.5px] text-t1">Este documento será removido da WDash e a assinatura será cancelada no Assina AI. Esta ação não pode ser desfeita.</p>
+          <p className="text-[13.5px] text-t1">Este documento será removido da WDash e a assinatura em andamento será cancelada no Assina AI.</p>
           {deleteId && extraSignerCount(documents.find((item) => item.id === deleteId)?.extraSigner) > 0 ? (
             <p className="text-[13.5px] text-t1">A assinatura de todos os signatários deste documento será cancelada.</p>
           ) : null}
@@ -386,6 +387,7 @@ export function DocumentsPage() {
       >
         <div className="grid gap-3">
           <p className="text-[13.5px] text-t1">Altere a pessoa, o mês ou o ano deste documento. A assinatura em andamento não será alterada.</p>
+          <p className="text-[13.5px] text-t1">Somente este documento será movido. Os demais documentos do mesmo envio permanecem onde estão.</p>
           <FormField label="Pessoa">
             <select className={fieldClass} value={moveSeller} onChange={(event) => setMoveSeller(event.target.value)}>
               <option value="">Selecione</option>
@@ -556,6 +558,7 @@ function FolderTable({
   onMove,
   onDelete,
   busy,
+  resendingId,
 }: {
   rows: FolderEntry[];
   documents: DocumentRow[];
@@ -566,6 +569,7 @@ function FolderTable({
   onMove: (id: string) => void;
   onDelete: (id: string) => void;
   busy: boolean;
+  resendingId: string | null;
 }) {
   const columns: DataTableColumn<FolderEntry>[] = [
     {
@@ -591,14 +595,17 @@ function FolderTable({
         const doc = row.fileId ? documents.find((item) => item.id === row.fileId) : undefined;
         if (doc && pendingMenu(doc)) {
           return (
-            <RowMenu
-              busy={busy}
-              onDownload={() => onOpenFile(doc.id)}
-              onResend={() => onResend(doc.id)}
-              onCopy={() => onCopy(doc.id)}
-              onMove={() => onMove(doc.id)}
-              onDelete={() => onDelete(doc.id)}
-            />
+            <span className="flex items-center justify-end gap-2">
+              {resendingId === doc.id && <span className="text-[12px] font-bold text-t2">Reenviando…</span>}
+              <RowMenu
+                busy={busy}
+                onDownload={() => onOpenFile(doc.id)}
+                onResend={() => onResend(doc.id)}
+                onCopy={() => onCopy(doc.id)}
+                onMove={() => onMove(doc.id)}
+                onDelete={() => onDelete(doc.id)}
+              />
+            </span>
           );
         }
         return row.fileId ? (
@@ -696,14 +703,17 @@ function FileTable({
       header: "",
       render: (row) =>
         pendingMenu(row) ? (
-          <RowMenu
-            busy={busy || resendingId === row.id}
-            onDownload={() => onDownload(row.id)}
-            onResend={() => onResend(row.id)}
-            onCopy={() => onCopy(row.id)}
-            onMove={() => onMove(row.id)}
-            onDelete={() => onDelete(row.id)}
-          />
+          <span className="flex items-center justify-end gap-2">
+            {resendingId === row.id && <span className="text-[12px] font-bold text-t2">Reenviando…</span>}
+            <RowMenu
+              busy={busy || resendingId === row.id}
+              onDownload={() => onDownload(row.id)}
+              onResend={() => onResend(row.id)}
+              onCopy={() => onCopy(row.id)}
+              onMove={() => onMove(row.id)}
+              onDelete={() => onDelete(row.id)}
+            />
+          </span>
         ) : (
           <span className="flex justify-end">
             <Button size="sm" variant="outline" onClick={() => onDownload(row.id)}>

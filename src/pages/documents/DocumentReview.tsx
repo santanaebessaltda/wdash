@@ -187,7 +187,7 @@ export function DocumentReview({
         <Summary label="Precisam de atenção" value={String(openRows - ready)} />
       </div>
       {openRows > 0 && ready !== openRows && (
-        <p className="mt-3 text-sm text-t2">Conclua ou exclua os documentos pendentes para revisar o envio.</p>
+        <p className="mt-3 text-sm text-t2">Conclua ou exclua os documentos com pendência para revisar o envio.</p>
       )}
       <div className="mt-4">
         <WizardNav
@@ -377,11 +377,11 @@ function ReviewBody({
               {documentTitle(rows, row, people)} · {period} · {row.pageCount === 1 ? "1 página" : `${row.pageCount} páginas`}
             </p>
             {!locked && (
-              <Tooltip label="Excluir documento">
+              <Tooltip label="Remover do lote">
                 <button
                   type="button"
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] border border-line text-bad transition-colors hover:bg-bad-soft"
-                  aria-label="Excluir documento"
+                  aria-label="Remover do lote"
                   onClick={() => setConfirmRemove(true)}
                 >
                   <Icon d={icons.trash} size={14} />
@@ -434,7 +434,7 @@ function ReviewBody({
         onClose={() => {
           if (!removing) setConfirmRemove(false);
         }}
-        title="Excluir documento"
+        title="Remover do lote"
         footer={
           <>
             <Button variant="outline" disabled={removing} onClick={() => setConfirmRemove(false)}>
@@ -454,12 +454,12 @@ function ReviewBody({
                 );
               }}
             >
-              {removing ? "Excluindo…" : "Excluir"}
+              {removing ? "Removendo…" : "Remover do lote"}
             </Button>
           </>
         }
       >
-        <p className="text-[13.5px] text-t1">Este documento sai do lote. Os outros permanecem.</p>
+        <p className="text-[13.5px] text-t1">Este documento sai desta preparação. Nada é cancelado no Assina AI, porque ele ainda não foi enviado. Os outros documentos permanecem.</p>
       </Modal>
     </div>
   );
@@ -628,13 +628,13 @@ function signerGroups(draft: DocumentDraft, person: PersonRow | null, people: Pe
   return order.map((key) => {
     const marks = map.get(key) ?? [];
     if (key === "none") {
-      return { key, name: "Sem signatário", role: null as "Principal" | "Adicional" | null, origin: "", pending: "Escolha quem assina", marks, person: null, guest: null, userEmail: null, channel: null as SendChannel | null, authentication: null as AuthenticationType | null };
+      return { key, name: "Sem signatário", role: null as "Pessoa" | "Adicional" | null, origin: "", pending: "Escolha quem assina", marks, person: null, guest: null, userEmail: null, channel: null as SendChannel | null, authentication: null as AuthenticationType | null };
     }
     if (key === "seller" && !person) {
       return { key, name: "Pessoa do documento", role: null, origin: "", pending: "Sem pessoa", marks, person: null, guest: null, userEmail: null, channel: draft.channel, authentication: asAuthentication(draft.authentication) };
     }
     if (key === "seller" && person) {
-      return { key, name: person.name, role: "Principal" as const, origin: person.roleLabel, pending: channelGap(person, draft.channel), marks, person, guest: null, userEmail: null, channel: draft.channel, authentication: asAuthentication(draft.authentication) };
+      return { key, name: person.name, role: "Pessoa" as const, origin: person.roleLabel, pending: channelGap(person, draft.channel), marks, person, guest: null, userEmail: null, channel: draft.channel, authentication: asAuthentication(draft.authentication) };
     }
     if (key.startsWith("seller:")) {
       const named = people.find((item) => item.id === key.slice("seller:".length)) ?? null;
@@ -1151,12 +1151,12 @@ function StackedPages({
               Cancelar
             </Button>
             <Button variant="danger" disabled={dropping != null} onClick={() => confirmPage != null && drop(confirmPage)}>
-              Excluir documento
+              Remover do lote
             </Button>
           </>
         }
       >
-        <p className="text-[13.5px] text-t1">Esta é a única página do documento. Ao excluí-la, o documento também será removido do lote.</p>
+        <p className="text-[13.5px] text-t1">Esta é a única página. Ao excluí-la, o documento sai desta preparação. Nada é cancelado no Assina AI.</p>
       </Modal>
     </div>
   );

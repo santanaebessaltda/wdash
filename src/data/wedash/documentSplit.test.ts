@@ -13,6 +13,7 @@ import {
   contactFieldsToAsk,
   contactPatch,
   cpfDigits,
+  categoryLabel,
   customDocumentName,
   defaultDraft,
   defaultSignatureMark,
@@ -42,6 +43,7 @@ import {
   remainingPages,
   replicateSetup,
   resolveDrafts,
+  sameCategory,
   resendVisible,
   saveCpf,
   saveEmail,
@@ -100,10 +102,13 @@ describe("categories", () => {
       "Vale-alimentação / refeição",
       "Participação nos lucros (PLR)",
       "Informe de rendimentos",
-      "Admissão",
-      "Rescisão",
+      "Documentos admissionais",
+      "Documentos rescisórios",
       "Outros",
     ]);
+    expect(categoryLabel("Admissão")).toBe("Documentos admissionais");
+    expect(categoryLabel("Rescisão")).toBe("Documentos rescisórios");
+    expect(sameCategory("Admissão", "Documentos admissionais")).toBe(true);
   });
 });
 
@@ -559,7 +564,7 @@ describe("carryDraft", () => {
       ...defaultDraft(1),
       fields: [{ id: "seller-mark", pageNumber: 1, x: 50, y: 50, element: "SIGNATURE" as const, signerId: "seller" }],
     };
-    expect(documentIssue(null, draft, 1)).toBe("Escolha o colaborador.");
+    expect(documentIssue(null, draft, 1)).toBe("Escolha a pessoa.");
     expect(documentIssue({ cpf: VALID_DIGITS, email: null, whatsapp: null }, draft, 1)).toBe("Falta contato no cadastro.");
     expect(
       documentIssue(
@@ -581,7 +586,7 @@ describe("carryDraft", () => {
     expect(preparationReason({ cpf: VALID_DIGITS, email: "ana@loja.com", whatsapp: "11987654321" }, blank, 1)).toBe("Falta marcação");
     expect(documentIssue({ cpf: VALID_DIGITS, email: "ana@loja.com", whatsapp: "11987654321" }, draft, 1, [], [], 5 * 1024 * 1024 + 1)).toBe("O PDF passa de 5 MB depois da separação. Separe o arquivo e tente novamente.");
     expect(preparationSituation(null, draft, 1)).toBe("Precisa de atenção");
-    expect(preparationReason(null, draft, 1)).toBe("Sem colaborador");
+    expect(preparationReason(null, draft, 1)).toBe("Sem pessoa");
     expect(preparationReason({ cpf: VALID_DIGITS, email: "ana@loja.com", whatsapp: "11987654321" }, draft, 1, [], [], null, 0, false)).toBe("Revisar marcação");
     expect(preparationSituation({ cpf: VALID_DIGITS, email: "ana@loja.com", whatsapp: "11987654321" }, draft, 1)).toBe("Pronto");
     expect(preparationSituation({ cpf: VALID_DIGITS, email: "ana@loja.com", whatsapp: "11987654321" }, draft, 1, [], [], "env")).toBe("Já enviado");
