@@ -946,29 +946,27 @@ export function StoreCardsSkeleton({
   );
 }
 
-/** Documentos: busca, filtros e a grade da biblioteca. */
+/** Documentos: card da biblioteca com as pastas. */
 export function DocumentsSkeleton() {
   return (
     <Busy>
-      <div className="mb-3 flex flex-col gap-2 lg:flex-row">
-        <Skeleton className="h-[34px] w-full flex-1 rounded-[10px]" />
-        <Skeleton className="h-[34px] w-28 rounded-[10px]" />
-        <Skeleton className="h-[34px] w-32 rounded-[10px]" />
-      </div>
-      <div className="mb-4 flex gap-2">
-        {Array.from({ length: 4 }, (_, index) => (
-          <Skeleton key={index} className="h-7 w-24 rounded-full" />
-        ))}
-      </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-        {Array.from({ length: 8 }, (_, index) => (
-          <div key={index} className="flex min-h-[132px] flex-col items-center justify-center rounded-2xl border border-line bg-bg-2 px-3 py-4">
-            <Skeleton className="h-8 w-8 rounded-[10px]" />
-            <Skeleton className="mt-2 h-3.5 w-24" />
-            <Skeleton className="mt-1.5 h-3 w-16" />
+      <Card className="w-full">
+        <div className="mb-4 flex items-center justify-between gap-3 border-b border-line pb-4">
+          <div>
+            <Skeleton className="h-3.5 w-16" />
+            <Skeleton className="mt-1.5 h-3 w-20" />
           </div>
-        ))}
-      </div>
+          <Skeleton className="h-[34px] w-40 rounded-[10px] sm:w-72" />
+        </div>
+        <div className="flex flex-wrap justify-center gap-8 py-6">
+          {Array.from({ length: 8 }, (_, index) => (
+            <div key={index} className="flex w-[104px] flex-col items-center">
+              <Skeleton className="h-11 w-14 rounded-md" />
+              <Skeleton className="mt-2 h-3 w-16" />
+            </div>
+          ))}
+        </div>
+      </Card>
     </Busy>
   );
 }
