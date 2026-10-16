@@ -111,7 +111,7 @@ export function ShoppingSettingsPage() {
       />
       {escolher || showSkeleton ? (
         escolher ? (
-          <div className="mt-6 max-w-[720px]">
+          <div className="mt-6">
             <SelectStoreCard />
           </div>
         ) : (

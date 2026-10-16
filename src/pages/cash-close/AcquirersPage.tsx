@@ -119,7 +119,7 @@ export function AcquirersPage() {
         subtitle="Conecte a adquirente desta filial para buscar fechamentos de cartão e Pix."
       />
       {escolher ? (
-        <div className="mt-6 max-w-[720px]">
+        <div className="mt-6">
           <SelectStoreCard />
         </div>
       ) : showSkeleton || (loading && rows.length === 0 && storeRows.length > 0) ? (
