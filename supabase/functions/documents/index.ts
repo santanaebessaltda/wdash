@@ -5,7 +5,7 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
 import { corsHeaders, serve } from "../_shared/cors.ts";
 import { OWNER_ROLES, loadStaffCaller } from "../_shared/staffAuth.ts";
 import { buildPdf, readPdfPages, withoutPage } from "../_shared/pdfPages.ts";
-import { assinaCancelEnvelope, assinaCreateEnvelope, assinaResend, assinaSignerLink } from "../_shared/assinaApi.ts";
+import { assinaCancelEnvelope, assinaCreateEnvelope, assinaGetEnvelope, assinaResend, assinaSignerLink } from "../_shared/assinaApi.ts";
 import { loadCompanyToken, syncEnvelope } from "../_shared/assinaSync.ts";
 import {
   DOCUMENT_CATEGORIES,
@@ -786,16 +786,48 @@ async function resend(admin: SupabaseClient, tenantId: string, secret: string, b
   return json({ ok: true });
 }
 
+function pushId(ids: string[], value: string | null | undefined) {
+  const id = typeof value === "string" ? value.trim() : "";
+  if (id && !ids.includes(id)) ids.push(id);
+}
+
 async function copyLink(admin: SupabaseClient, tenantId: string, secret: string, body: Body) {
-  const { data: doc } = await admin.from("employee_document").select("status, envelope_id, recipient_id, signers, removed_at").eq("id", String(body.documentId ?? "")).eq("tenant_id", tenantId).maybeSingle();
+  const { data: doc } = await admin.from("employee_document").select("status, envelope_id, recipient_id, channel, signers, removed_at").eq("id", String(body.documentId ?? "")).eq("tenant_id", tenantId).maybeSingle();
   if (!doc || doc.removed_at || !resendVisible(doc.status as DocStatus) || !doc.envelope_id) return json({ message: "Não foi possível copiar o link. Tente novamente." }, 404);
-  const target = signerTarget(doc, String(body.recipientId ?? ""), false);
-  if (!target?.recipientId) return json({ message: "Não foi possível copiar o link. Tente novamente." }, 404);
+  const requested = String(body.recipientId ?? "");
+  const order = Number(body.order);
+  const target = signerTarget(doc, requested, false);
+  const stored = parseSignerProgress(doc.signers);
+  const byOrder = Number.isInteger(order) && order > 0 ? stored.find((item) => item.order === order) : null;
   const token = await loadCompanyToken(admin, tenantId, secret);
   if (!token) return json({ message: DOCUMENT_COPY.noToken }, 422);
-  const url = await assinaSignerLink(token, doc.envelope_id as string, target.recipientId);
-  if (!url) return json({ message: "Não foi possível copiar o link. Tente novamente." }, 502);
-  return json({ url });
+  const channel = target?.channel ?? byOrder?.channel ?? (doc.channel === "EMAIL" || doc.channel === "WHATSAPP" ? doc.channel : null);
+  const ids: string[] = [];
+  pushId(ids, target?.recipientId ?? requested);
+  const envelopeId = doc.envelope_id as string;
+  const tried = ids.length;
+  for (const id of ids) {
+    const url = await assinaSignerLink(token, envelopeId, id, channel);
+    if (url) return json({ url });
+  }
+  const envelope = await assinaGetEnvelope(token, envelopeId);
+  const matched = (envelope?.signatures ?? []).filter((item) => {
+    const itemOrder = item.routingOrder ?? item.recipient?.routingOrder;
+    if (requested && (item.recipient?.id === requested || item.id === requested)) return true;
+    if (Number.isInteger(order) && order > 0 && itemOrder === order) return true;
+    if (!requested && target?.recipientId && (item.recipient?.id === target.recipientId || item.id === target.recipientId)) return true;
+    return false;
+  });
+  for (const item of matched) {
+    pushId(ids, item.recipient?.id);
+    pushId(ids, item.id);
+  }
+  if (ids.length === tried) return json({ message: "Não foi possível copiar o link. Tente novamente." }, 404);
+  for (const id of ids.slice(tried)) {
+    const url = await assinaSignerLink(token, envelopeId, id, channel);
+    if (url) return json({ url });
+  }
+  return json({ message: "Não foi possível copiar o link. Tente novamente." }, 502);
 }
 
 async function cancelDocument(admin: SupabaseClient, tenantId: string, secret: string, body: Body) {

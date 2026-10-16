@@ -22,6 +22,24 @@ type FolderEntry = { key: string; label: string; detail: string; caption?: strin
 
 const fieldClass = "h-10 w-full rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3 text-[13px] text-t0";
 
+async function writeClipboard(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return;
+  } catch {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.left = "-9999px";
+    document.body.appendChild(area);
+    area.select();
+    const copied = document.execCommand("copy");
+    area.remove();
+    if (!copied) throw new Error("Não foi possível copiar o link. Tente novamente.");
+  }
+}
+
 export function DocumentsPage() {
   const { allStores, batches, documents, people, stores, loading, reload } = useDocuments();
   const showSkeleton = useMinSkeleton(loading);
@@ -158,11 +176,11 @@ export function DocumentsPage() {
     setMoveId(id);
   }
 
-  async function copyLink(id: string, recipientId?: string) {
+  async function copyLink(id: string, recipientId?: string, order?: number) {
     setActing(true);
     try {
-      const url = await copyDocumentLink(id, recipientId);
-      await navigator.clipboard.writeText(url);
+      const url = await copyDocumentLink(id, recipientId, order);
+      await writeClipboard(url);
       show("Link copiado.", "success");
     } catch (error) {
       show(error instanceof Error ? error.message : "Não foi possível copiar o link. Tente novamente.", "danger");
@@ -222,7 +240,7 @@ export function DocumentsPage() {
               { value: "inactive", label: "Desligados" },
             ]}
           />
-          <div className="flex w-full shrink-0 gap-1 rounded-[11px] border border-line bg-bg-2 p-1 sm:w-auto" role="group" aria-label="Visualização">
+          <div className="flex gap-1 rounded-[11px] border border-line bg-bg-2 p-1" role="group" aria-label="Visualização">
             {(
               [
                 ["folders", "Pastas"],
@@ -234,7 +252,7 @@ export function DocumentsPage() {
                 type="button"
                 aria-pressed={view === value}
                 onClick={() => setView(value)}
-                className={cn("flex-1 whitespace-nowrap rounded-lg px-3 py-1.5 text-[12.5px] font-bold transition-colors sm:flex-none", view === value ? "bg-acc text-white" : "text-t1 hover:text-t0")}
+                className={cn("rounded-lg px-3 py-1.5 text-[12.5px] font-bold transition-colors", view === value ? "bg-acc text-white" : "text-t1 hover:text-t0")}
               >
                 {label}
               </button>
@@ -314,7 +332,7 @@ export function DocumentsPage() {
         busy={acting || resendingId != null}
         resending={resendingId != null}
         onClose={() => setSignaturesId(null)}
-        onCopy={(id, recipientId) => void copyLink(id, recipientId)}
+        onCopy={(id, recipientId, order) => void copyLink(id, recipientId, order)}
         onResend={(id, recipientId) => void resendFile(id, recipientId, show, setResendingId, reload)}
       />
       <Modal
@@ -809,7 +827,7 @@ function SignaturesModal({
   busy: boolean;
   resending: boolean;
   onClose: () => void;
-  onCopy: (id: string, recipientId?: string) => void;
+  onCopy: (id: string, recipientId?: string, order?: number) => void;
   onResend: (id: string, recipientId?: string) => void;
 }) {
   const signers = doc ? signersOf(doc, people) : [];
@@ -851,7 +869,7 @@ function SignaturesModal({
                   </span>
                   {pending && ownLink ? (
                     <span className="flex flex-wrap gap-2 pl-6">
-                      <Button size="sm" variant="outline" disabled={busy} onClick={() => onCopy(doc.id, signer.recipientId ?? undefined)}>Copiar link</Button>
+                      <Button size="sm" variant="outline" disabled={busy} onClick={() => onCopy(doc.id, signer.recipientId ?? undefined, signer.order)}>Copiar link</Button>
                       {signer.channel || signer.order === 1 ? (
                         <Button size="sm" disabled={busy} onClick={() => onResend(doc.id, signer.recipientId ?? undefined)}>
                           {resending ? "Reenviando…" : "Reenviar"}

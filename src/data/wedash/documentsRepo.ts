@@ -345,8 +345,8 @@ export async function resendDocument(documentId: string, recipientId?: string) {
   if (data.message) throw new Error(data.message);
 }
 
-export async function copyDocumentLink(documentId: string, recipientId?: string): Promise<string> {
-  const data = await call({ action: "copy-link", documentId, recipientId });
+export async function copyDocumentLink(documentId: string, recipientId?: string, order?: number): Promise<string> {
+  const data = await call({ action: "copy-link", documentId, recipientId, order });
   if (!data.url) throw new Error("Não foi possível copiar o link. Tente novamente.");
   return data.url;
 }

@@ -80,12 +80,64 @@ export async function assinaCreateEnvelope(
   }
 }
 
-export async function assinaSignerLink(token: string, envelopeId: string, recipientId: string): Promise<string | null> {
+function httpUrl(value: string): string | null {
+  const trimmed = value.trim().replace(/^"|"$/g, "");
+  return /^https?:\/\/\S+$/.test(trimmed) ? trimmed : null;
+}
+
+function urlIn(value: unknown, depth = 0): string | null {
+  if (depth > 4 || value == null) return null;
+  if (typeof value === "string") {
+    const direct = httpUrl(value);
+    if (direct) return direct;
+    const trimmed = value.trim();
+    if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return null;
+    try {
+      return urlIn(JSON.parse(trimmed), depth + 1);
+    } catch {
+      return null;
+    }
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = urlIn(item, depth + 1);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (typeof value === "object") {
+    for (const item of Object.values(value)) {
+      const found = urlIn(item, depth + 1);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+async function readSignerLink(token: string, path: string, method: "GET" | "POST"): Promise<{ url: string | null; ok: boolean }> {
+  const res = await call(token, path, method === "POST" ? { method: "POST" } : undefined);
+  const text = await res.text();
+  const url = res.ok ? urlIn(text) ?? httpUrl(res.headers.get("location") ?? "") : null;
+  return { url, ok: res.ok };
+}
+
+export async function assinaSignerLink(
+  token: string,
+  envelopeId: string,
+  recipientId: string,
+  channel?: "EMAIL" | "WHATSAPP" | null,
+): Promise<string | null> {
+  const paths = [`/envelopes/refresh-token-signer-email-link/${envelopeId}/${recipientId}`];
+  if (channel === "WHATSAPP") paths.push(`/envelopes/refresh-token-signer-whatsapp-link/${envelopeId}/${recipientId}`);
   try {
-    const res = await call(token, `/envelopes/refresh-token-signer-email-link/${envelopeId}/${recipientId}`);
-    if (!res.ok) return null;
-    const text = (await res.text()).trim().replace(/^"|"$/g, "");
-    return text.startsWith("http") ? text : null;
+    for (const path of paths) {
+      const got = await readSignerLink(token, path, "GET");
+      if (got.url) return got.url;
+      if (got.ok) continue;
+      const posted = await readSignerLink(token, path, "POST");
+      if (posted.url) return posted.url;
+    }
+    return null;
   } catch {
     return null;
   }
