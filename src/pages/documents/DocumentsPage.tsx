@@ -86,10 +86,13 @@ export function DocumentsPage() {
     return true;
   }
 
-  const pool =
-    mode === "pending" ? pending : mode === "month" ? thisMonth : mode === "home" ? recent : [];
-  const libraryDocs = libraryDocuments.filter((doc) => (mode === "home" ? true : matchesFilters(doc)));
-  const visibleFiles = searching ? libraryDocs.filter(matchesText) : pool.filter((doc) => mode === "home" || matchesFilters(doc));
+  const pool = mode === "pending" ? pending : mode === "month" ? thisMonth : mode === "home" ? recent : [];
+  const atPeople = mode === "browse" && (allStores ? crumb.length === 1 : crumb.length === 0);
+  const atBranches = mode === "browse" && allStores && crumb.length === 0;
+  const showDocFilters = mode === "pending" || mode === "month" || (mode === "browse" && !atPeople && !atBranches);
+  const libraryDocs = libraryDocuments.filter((doc) => mode === "home" || atPeople || atBranches || matchesFilters(doc));
+  const filePool = mode === "home" && searching ? libraryDocuments : pool;
+  const visibleFiles = filePool.filter((doc) => matchesText(doc) && (mode === "home" || matchesFilters(doc)));
   const narrowed = searching || periodFilter || typeFilter || statusFilter;
 
   const listedPeople = people.filter((person) => {
@@ -101,17 +104,16 @@ export function DocumentsPage() {
     if (peopleFilter === "inactive") return !working;
     return true;
   });
-  const atPeople = mode === "browse" && (allStores ? crumb.length === 1 : crumb.length === 0);
-  const peopleSearch = atPeople && query.trim().length > 0;
+  const peopleSearch = atPeople && needle.length > 0;
   const folders = mode === "browse" ? folderEntries({ allStores, crumb, documents: libraryDocs, batches, people: listedPeople, stores }) : [];
-  const visibleFolders = peopleSearch
-    ? folders.filter((folder) => {
-        const person = listedPeople.find((item) => item.id === folder.key);
-        return person != null && personMatchesQuery(person, query);
-      })
-    : searching
-      ? []
-      : folders;
+  const visibleFolders = folders.filter((folder) => {
+    if (!needle) return true;
+    if (atPeople) {
+      const person = listedPeople.find((item) => item.id === folder.key);
+      return person != null && personMatchesQuery(person, query);
+    }
+    return folder.label.toLowerCase().includes(needle);
+  });
   const peopleHere = listedPeople.filter((person) => !allStores || crumb[0] == null || person.storeId === crumb[0]);
 
   function goHome() {
@@ -123,12 +125,18 @@ export function DocumentsPage() {
     setStatusFilter("");
   }
 
-  function goBack() {
-    if (mode === "browse" && crumb.length > 0) {
-      setCrumb(crumb.slice(0, -1));
-      return;
-    }
-    goHome();
+  function enter(next: Mode) {
+    setMode(next);
+    setCrumb([]);
+    setQuery("");
+    setPeriodFilter("");
+    setTypeFilter("");
+    setStatusFilter("");
+  }
+
+  function openFolder(key: string) {
+    setCrumb([...crumb, key]);
+    setQuery("");
   }
 
   function openMove(id: string) {
@@ -188,6 +196,26 @@ export function DocumentsPage() {
   }
 
   const title = sectionTitle(mode, allStores, crumb, storeName, personName);
+  const searchPlaceholder = atPeople ? "Buscar por nome, CPF ou e-mail" : "Buscar por documento ou pessoa";
+  const trail = navigationTrail({
+    mode,
+    allStores,
+    crumb,
+    storeName,
+    personName,
+    onHome: goHome,
+    onRoot: () => {
+      setCrumb([]);
+      setQuery("");
+      setPeriodFilter("");
+      setTypeFilter("");
+      setStatusFilter("");
+    },
+    onCrumb: (index) => {
+      setCrumb(crumb.slice(0, index + 1));
+      setQuery("");
+    },
+  });
 
   return (
     <DocumentsFrame
@@ -202,65 +230,62 @@ export function DocumentsPage() {
       ) : (
       <>
       {mode === "home" && (
-        <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <QuickStat label="Enviados" value={String(sentDocuments.length)} sub="Enviados para assinatura" tint="acc" icon={<Glyph d="M22 2 11 13M22 2 15 22 11 13 2 9 22 2" />} />
-          <QuickStat label="Pendentes" value={String(pending.length)} sub="Aguardando assinatura" tint="warn" icon={<Glyph d="M12 8v4l3 2M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20" />} />
-          <QuickStat label="Assinados" value={String(signed.length)} sub="Assinatura concluída" tint="ok" icon={<Glyph d="M20 6 9 17l-5-5" />} />
-        </div>
+        <>
+          <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <QuickStat label="Enviados" value={String(sentDocuments.length)} sub="Enviados para assinatura" tint="acc" icon={<Glyph d="M22 2 11 13M22 2 15 22 11 13 2 9 22 2" />} />
+            <QuickStat label="Pendentes" value={String(pending.length)} sub="Aguardando assinatura" tint="warn" icon={<Glyph d="M12 8v4l3 2M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20" />} />
+            <QuickStat label="Assinados" value={String(signed.length)} sub="Assinatura concluída" tint="ok" icon={<Glyph d="M20 6 9 17l-5-5" />} />
+          </div>
+          <p className="mb-3 text-xs font-bold uppercase tracking-wide text-t2">Atalhos</p>
+          <div className="mb-5 grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
+            <Shortcut label="Pendentes" count={qty(pending.length, "documento", "documentos")} onClick={() => enter("pending")} />
+            <Shortcut label="Este mês" count={qty(thisMonth.length, "documento", "documentos")} onClick={() => enter("month")} />
+            <Shortcut
+              label={allStores ? "Filiais" : "Pessoas"}
+              count={allStores ? qty(stores.length, "filial", "filiais") : qty(listedPeople.length, "pessoa", "pessoas")}
+              onClick={() => enter("browse")}
+            />
+          </div>
+        </>
       )}
-      <p className="mb-3 text-xs font-bold uppercase tracking-wide text-t2">Atalhos</p>
-      <div className="mb-5 grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
-        <Shortcut label="Pendentes" active={mode === "pending"} count={qty(pending.length, "documento", "documentos")} onClick={() => { setMode("pending"); setQuery(""); }} />
-        <Shortcut label="Este mês" active={mode === "month"} count={qty(thisMonth.length, "documento", "documentos")} onClick={() => { setMode("month"); setQuery(""); }} />
-        <Shortcut
-          label={allStores ? "Filiais" : "Pessoas"}
-          active={mode === "browse"}
-          count={allStores ? qty(stores.length, "filial", "filiais") : qty(listedPeople.length, "pessoa", "pessoas")}
-          onClick={() => { setMode("browse"); setCrumb([]); setQuery(""); }}
-        />
-      </div>
 
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          {mode !== "home" && (
-            <Button size="sm" variant="outline" onClick={goBack}>
-              Voltar
-            </Button>
-          )}
-          <h3 className="truncate text-[15px] font-bold text-t0">{title}</h3>
-        </div>
-        <div className="flex h-[34px] items-center gap-2 rounded-[10px] border border-line bg-bg-inset px-3">
-          <SearchGlyph />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar por documento ou pessoa"
-            className="w-40 bg-transparent text-[12.5px] text-t0 outline-none placeholder:text-t2 sm:w-72"
-          />
-        </div>
-      </div>
-
-      {mode === "browse" && crumb.length > 0 && (
-        <div className="mb-3 flex flex-wrap items-center gap-1 text-[12.5px] text-t2">
-          <button type="button" className="font-bold text-t1 hover:text-t0" onClick={goHome}>
-            Documentos
-          </button>
-          {crumb.map((key, index) => (
-            <span key={`${key}-${index}`} className="flex items-center gap-1">
-              <span>/</span>
-              {index < crumb.length - 1 ? (
-                <button type="button" className="font-bold text-t1 hover:text-t0" onClick={() => setCrumb(crumb.slice(0, index + 1))}>
-                  {crumbLabel(key, storeName, personName)}
+      {trail.length > 0 && (
+        <nav className="mb-3 flex flex-wrap items-center gap-1 text-[12.5px] text-t2" aria-label="Caminho">
+          {trail.map((item, index) => (
+            <span key={`${item.label}-${index}`} className="flex items-center gap-1">
+              {index > 0 && <span>/</span>}
+              {item.onClick ? (
+                <button type="button" className="font-bold text-t1 hover:text-t0" onClick={item.onClick}>
+                  {item.label}
                 </button>
               ) : (
-                <span className="font-bold text-t0">{crumbLabel(key, storeName, personName)}</span>
+                <span className="font-bold text-t0">{item.label}</span>
               )}
             </span>
           ))}
+        </nav>
+      )}
+
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h3 className="truncate text-[15px] font-bold text-t0">{title}</h3>
+        {mode === "home" && <SearchBox value={query} onChange={setQuery} placeholder={searchPlaceholder} />}
+      </div>
+
+      {atPeople && (
+        <div className="mb-4">
+          <Segmented
+            options={[
+              { value: "active", label: "Ativos" },
+              { value: "all", label: "Todos" },
+              { value: "inactive", label: "Desativados" },
+            ]}
+            value={peopleFilter}
+            onChange={(value) => value && setPeopleFilter(value)}
+          />
         </div>
       )}
 
-      {mode !== "home" && (
+      {showDocFilters && (
         <div className="mb-4 flex flex-wrap gap-2">
           <select className="h-10 rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3 text-[13px] text-t0" value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)}>
             <option value="">Período</option>
@@ -292,21 +317,14 @@ export function DocumentsPage() {
           </select>
         </div>
       )}
-      {atPeople && (
+
+      {mode !== "home" && (
         <div className="mb-4">
-          <Segmented
-            options={[
-              { value: "active", label: "Ativos" },
-              { value: "all", label: "Todos" },
-              { value: "inactive", label: "Desativados" },
-            ]}
-            value={peopleFilter}
-            onChange={(value) => value && setPeopleFilter(value)}
-          />
+          <SearchBox value={query} onChange={setQuery} placeholder={searchPlaceholder} wide />
         </div>
       )}
 
-      {mode === "browse" && (!searching || peopleSearch) ? (
+      {mode === "browse" ? (
         visibleFolders.length === 0 ? (
           <Card padding="none">
             {atPeople ? (
@@ -315,15 +333,18 @@ export function DocumentsPage() {
                 title={peopleSearch ? "Nenhuma pessoa encontrada" : "Nenhuma pessoa disponível"}
                 description={peopleSearch ? "Tente outro nome, CPF ou e-mail." : peopleHere.length === 0 ? "Não há pessoas vinculadas a esta filial." : "Não há pessoas neste filtro."}
               />
+            ) : atBranches && needle ? (
+              <EmptyState framed={false} title="Nenhuma filial encontrada" description="Tente outro nome." />
             ) : (
-              <EmptyState framed={false} title="Esta pasta ainda não tem documentos." action={<Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>} />
+              <EmptyState framed={false} title={needle ? "Nenhum documento encontrado." : "Esta pasta ainda não tem documentos."} action={needle ? undefined : <Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>} />
             )}
           </Card>
         ) : (
           <FolderTable
+            layout={atPeople ? "people" : "folders"}
             rows={visibleFolders}
             documents={documents}
-            onOpenFolder={(key) => setCrumb([...crumb, key])}
+            onOpenFolder={openFolder}
             onOpenFile={(id) => void openFile(id, show)}
             onOpenSignatures={setSignaturesId}
             onMove={openMove}
@@ -355,7 +376,15 @@ export function DocumentsPage() {
         />
       )}
       <p className="mt-3 text-[12.5px] text-t2">
-        {mode === "browse" && (!searching || peopleSearch) ? qty(visibleFolders.length, "item", "itens") : qty(visibleFiles.length, "documento", "documentos")}
+        {mode === "browse"
+          ? atPeople
+            ? qty(visibleFolders.length, "pessoa", "pessoas")
+            : atBranches
+              ? qty(visibleFolders.length, "filial", "filiais")
+              : visibleFolders.some((row) => row.fileId)
+                ? qty(visibleFolders.length, "documento", "documentos")
+                : qty(visibleFolders.length, "item", "itens")
+          : qty(visibleFiles.length, "documento", "documentos")}
       </p>
       </>
       )}
@@ -524,7 +553,7 @@ async function openFile(id: string, show: (message: string, variant: "success" |
 
 function sectionTitle(mode: Mode, allStores: boolean, crumb: string[], storeName: Map<string, string>, personName: Map<string, string>) {
   if (mode === "pending") return "Pendentes";
-  if (mode === "month") return `Este mês · ${monthFolder(new Date().getMonth() + 1)}`;
+  if (mode === "month") return "Este mês";
   if (mode === "home") return "Documentos recentes";
   if (crumb.length === 0) return allStores ? "Filiais" : "Pessoas";
   const last = crumb[crumb.length - 1];
@@ -533,6 +562,43 @@ function sectionTitle(mode: Mode, allStores: boolean, crumb: string[], storeName
 
 function crumbLabel(key: string, storeName: Map<string, string>, personName: Map<string, string>) {
   return storeName.get(key) ?? personName.get(key) ?? key;
+}
+
+function navigationTrail(input: {
+  mode: Mode;
+  allStores: boolean;
+  crumb: string[];
+  storeName: Map<string, string>;
+  personName: Map<string, string>;
+  onHome: () => void;
+  onRoot: () => void;
+  onCrumb: (index: number) => void;
+}): { label: string; onClick: (() => void) | null }[] {
+  const { mode, allStores, crumb, storeName, personName, onHome, onRoot, onCrumb } = input;
+  if (mode === "home") return [];
+  const items: { label: string; onClick: (() => void) | null }[] = [{ label: "Documentos", onClick: onHome }];
+  if (mode === "pending") return [...items, { label: "Pendentes", onClick: null }];
+  if (mode === "month") return [...items, { label: "Este mês", onClick: null }];
+  items.push({ label: allStores ? "Filiais" : "Pessoas", onClick: crumb.length > 0 ? onRoot : null });
+  crumb.forEach((key, index) => {
+    const last = index === crumb.length - 1;
+    items.push({ label: crumbLabel(key, storeName, personName), onClick: last ? null : () => onCrumb(index) });
+  });
+  return items;
+}
+
+function SearchBox({ value, onChange, placeholder, wide }: { value: string; onChange: (value: string) => void; placeholder: string; wide?: boolean }) {
+  return (
+    <div className={cn("flex h-[34px] items-center gap-2 rounded-[10px] border border-line bg-bg-inset px-3", wide && "w-full max-w-xl")}>
+      <SearchGlyph />
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className={cn("bg-transparent text-[12.5px] text-t0 outline-none placeholder:text-t2", wide ? "min-w-0 flex-1" : "w-40 sm:w-72")}
+      />
+    </div>
+  );
 }
 
 function folderEntries(input: {
@@ -601,6 +667,7 @@ function signersOf(doc: DocumentRow, people: PersonRow[]) {
 }
 
 function FolderTable({
+  layout,
   rows,
   documents,
   onOpenFolder,
@@ -610,6 +677,7 @@ function FolderTable({
   onDelete,
   busy,
 }: {
+  layout: "people" | "folders";
   rows: FolderEntry[];
   documents: DocumentRow[];
   onOpenFolder: (key: string) => void;
@@ -619,50 +687,59 @@ function FolderTable({
   onDelete: (id: string) => void;
   busy: boolean;
 }) {
-  const columns: DataTableColumn<FolderEntry>[] = [
-    {
-      key: "name",
-      header: "Nome",
-      render: (row) => (
-        <button type="button" className="flex min-w-0 items-center gap-2.5 text-left" onClick={() => !row.fileId && onOpenFolder(row.key)}>
-          <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] bg-acc-soft text-acc">
-            {row.fileId ? <FileGlyph /> : <FolderGlyph />}
+  const nameColumn: DataTableColumn<FolderEntry> = {
+    key: "name",
+    header: "Nome",
+    render: (row) => (
+      <button type="button" className="flex min-w-0 items-center gap-2.5 text-left" onClick={() => !row.fileId && onOpenFolder(row.key)}>
+        <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] bg-acc-soft text-acc">
+          {row.fileId ? <FileGlyph /> : <FolderGlyph />}
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate text-[13px] font-bold text-t0">{row.label}</span>
+          {layout === "folders" ? <span className="mt-px block text-[11px] text-t2">{row.fileId ? "PDF" : row.caption ?? "Pasta"}</span> : null}
+        </span>
+      </button>
+    ),
+  };
+  const actions: DataTableColumn<FolderEntry> = {
+    key: "download",
+    header: "",
+    render: (row) => {
+      const doc = row.fileId ? documents.find((item) => item.id === row.fileId) : undefined;
+      if (doc && (pendingMenu(doc) || isFiledStatus(doc.status))) {
+        return (
+          <span className="flex items-center justify-end gap-2">
+            <RowMenu
+              kind={isFiledStatus(doc.status) ? "filed" : "pending"}
+              busy={busy}
+              onDownload={() => onOpenFile(doc.id)}
+              onSignatures={() => onOpenSignatures(doc.id)}
+              onMove={() => onMove(doc.id)}
+              onDelete={() => onDelete(doc.id)}
+            />
           </span>
-          <span className="min-w-0">
-            <span className="block truncate text-[13px] font-bold text-t0">{row.label}</span>
-            <span className="mt-px block text-[11px] text-t2">{row.fileId ? "PDF" : row.caption ?? "Pasta"}</span>
-          </span>
-        </button>
-      ),
+        );
+      }
+      return row.fileId ? (
+        <Button size="sm" variant="outline" onClick={() => onOpenFile(row.fileId!)}>
+          Baixar PDF
+        </Button>
+      ) : null;
     },
-    { key: "detail", header: "Conteúdo", render: (row) => <span className="text-[12.5px] text-t1">{row.detail}</span> },
-    {
-      key: "download",
-      header: "",
-      render: (row) => {
-        const doc = row.fileId ? documents.find((item) => item.id === row.fileId) : undefined;
-        if (doc && (pendingMenu(doc) || isFiledStatus(doc.status))) {
-          return (
-            <span className="flex items-center justify-end gap-2">
-              <RowMenu
-                kind={isFiledStatus(doc.status) ? "filed" : "pending"}
-                busy={busy}
-                onDownload={() => onOpenFile(doc.id)}
-                onSignatures={() => onOpenSignatures(doc.id)}
-                onMove={() => onMove(doc.id)}
-                onDelete={() => onDelete(doc.id)}
-              />
-            </span>
-          );
-        }
-        return row.fileId ? (
-          <Button size="sm" variant="outline" onClick={() => onOpenFile(row.fileId!)}>
-            Baixar PDF
-          </Button>
-        ) : null;
-      },
-    },
-  ];
+  };
+  const columns: DataTableColumn<FolderEntry>[] = layout === "people"
+    ? [
+        nameColumn,
+        { key: "role", header: "Cargo", hideBelow: "sm", render: (row) => <span className="text-[12.5px] text-t1">{row.caption ?? "—"}</span> },
+        { key: "detail", header: "Documentos", render: (row) => <span className="text-[12.5px] text-t1">{row.detail}</span> },
+        actions,
+      ]
+    : [
+        nameColumn,
+        { key: "detail", header: "Conteúdo", render: (row) => <span className="text-[12.5px] text-t1">{row.detail}</span> },
+        actions,
+      ];
   return <DataTable columns={columns} data={rows} rowKey={(row) => row.key} />;
 }
 
