@@ -1,8 +1,8 @@
 import { weekHoursConfigured } from "./storeHours";
 import { fetchStoreSellers, isActiveSalesPerson, type Store, type StoreSeller } from "./stores";
 
-/** Primeiros passos (Visao geral, so Gestor): configuracoes que deixam custos, margens, metas e premiacao corretos. */
-export type FirstStepId = "erp" | "sellers" | "hours" | "groups" | "franchise" | "rent" | "goal" | "challenge";
+/** Primeiros passos (Visao geral, so Gestor): configuracoes que o dashboard precisa para custos, horarios e equipe. */
+export type FirstStepId = "erp" | "sellers" | "hours" | "groups" | "franchise" | "rent";
 
 export interface FirstStep {
   id: FirstStepId;
@@ -21,8 +21,6 @@ export interface FirstStepsInput {
   stores: FirstStepsStore[];
   sellersByStore: Map<string, Pick<StoreSeller, "active" | "role" | "shiftId">[]>;
   shiftIdsByStore: Map<string, string[]>;
-  storesWithGoal: Set<string>;
-  storesWithChallenge: Set<string>;
 }
 
 /**
@@ -62,10 +60,9 @@ export function buildFirstSteps(input: FirstStepsInput): FirstStep[] {
     return { done: missing === 0, detail: missingStoreLabel(missing, total) };
   };
 
-  // Grupos, meta e desafio so nas lojas com equipe de vendas (loja parada nao precisa).
+  // Grupos so nas lojas com equipe de vendas (loja parada nao precisa).
   const team = (id: string) => (input.sellersByStore.get(id) ?? []).filter(isActiveSalesPerson);
   const withTeam = stores.filter((s) => team(s.id).length > 0);
-  const storePeople = withTeam.length > 0 ? withTeam : stores;
 
   let withoutGroup = 0;
   let storeWithoutGroups = false;
@@ -74,11 +71,6 @@ export function buildFirstSteps(input: FirstStepsInput): FirstStep[] {
     if (groups.length === 0) storeWithoutGroups = true;
     withoutGroup += team(s.id).filter((p) => !p.shiftId || !groups.includes(p.shiftId)).length;
   }
-
-  const criados = (set: Set<string>) => {
-    const missing = storePeople.filter((s) => !set.has(s.id)).length;
-    return { done: missing === 0, detail: missingStoreLabel(missing, storePeople.length) };
-  };
 
   return [
     {
@@ -119,18 +111,6 @@ export function buildFirstSteps(input: FirstStepsInput): FirstStep[] {
       description: "O aluguel entra nos custos da operação e afeta o resultado operacional.",
       ...byStore(rentOk),
     },
-    {
-      id: "goal",
-      title: "Criar uma meta",
-      description: "Acompanhe o atingimento, a projeção e a premiação da equipe.",
-      ...criados(input.storesWithGoal),
-    },
-    {
-      id: "challenge",
-      title: "Criar um desafio",
-      description: "Engaje a equipe com desafios de curto prazo e prêmios.",
-      ...criados(input.storesWithChallenge),
-    },
   ];
 }
 
@@ -161,32 +141,24 @@ async function client() {
 
 const doneKey = (tenantId: string) => `wedash.firstSteps.done:${tenantId}`;
 
-/** Grupos, metas e desafios das lojas (so o necessario para marcar os passos). */
+/** Grupos das lojas (so o necessario para marcar os passos). */
 export async function fetchFirstStepsData(tenantId: string, storeIds: string[]): Promise<FirstStepsData> {
   const out: FirstStepsData = {
     sellersByStore: new Map(),
     shiftIdsByStore: new Map(),
-    storesWithGoal: new Set(),
-    storesWithChallenge: new Set(),
   };
   if (storeIds.length === 0) return out;
   const sb = await client();
   if (!sb) return out;
-  const byStore = (table: string, cols: string) =>
-    sb.from(table).select(cols).eq("tenant_id", tenantId).in("store_id", storeIds).limit(5000);
-  const [sellers, shifts, goals, challenges] = await Promise.all([
+  const [sellers, shifts] = await Promise.all([
     fetchStoreSellers(tenantId, storeIds),
-    byStore("store_shift", "id, store_id"),
-    byStore("goal", "store_id"),
-    byStore("challenge", "store_id"),
+    sb.from("store_shift").select("id, store_id").eq("tenant_id", tenantId).in("store_id", storeIds).limit(5000),
   ]);
   out.sellersByStore = sellers;
   for (const r of (shifts.data ?? []) as unknown as { id: string; store_id: string }[]) {
     out.shiftIdsByStore.set(r.store_id, [...(out.shiftIdsByStore.get(r.store_id) ?? []), r.id]);
   }
-  for (const r of (goals.data ?? []) as unknown as { store_id: string }[]) out.storesWithGoal.add(r.store_id);
-  for (const r of (challenges.data ?? []) as unknown as { store_id: string }[]) out.storesWithChallenge.add(r.store_id);
-  for (const e of [shifts.error, goals.error, challenges.error]) if (e) console.warn("fetchFirstStepsData:", e.message);
+  if (shifts.error) console.warn("fetchFirstStepsData:", shifts.error.message);
   return out;
 }
 

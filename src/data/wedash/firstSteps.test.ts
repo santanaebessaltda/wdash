@@ -32,8 +32,6 @@ function input(over: Partial<FirstStepsInput> = {}): FirstStepsInput {
     stores: [store("a")],
     sellersByStore: new Map([["a", [seller("g1")]]]),
     shiftIdsByStore: new Map([["a", ["g1"]]]),
-    storesWithGoal: new Set(["a"]),
-    storesWithChallenge: new Set(["a"]),
     ...over,
   };
 }
@@ -56,9 +54,9 @@ describe("firstStepsCardStatus", () => {
 });
 
 describe("buildFirstSteps", () => {
-  it("tudo configurado = 8 passos concluídos, Millennium e vendedores sempre concluídos", () => {
+  it("tudo configurado = 6 passos concluídos, Millennium e vendedores sempre concluídos", () => {
     const steps = buildFirstSteps(input());
-    expect(steps.map((s) => s.id)).toEqual(["erp", "sellers", "hours", "groups", "franchise", "rent", "goal", "challenge"]);
+    expect(steps.map((s) => s.id)).toEqual(["erp", "sellers", "hours", "groups", "franchise", "rent"]);
     expect(steps.every((s) => s.done)).toBe(true);
     const empty = buildFirstSteps(input({ stores: [store("a", { costs: undefined, hours: defaultWeekHours() })] }));
     expect(empty.find((s) => s.id === "erp")!.done).toBe(true);
@@ -94,14 +92,10 @@ describe("buildFirstSteps", () => {
     expect(step(withoutGroups, "groups")).toMatchObject({ done: false, detail: "1 vendedor sem grupo", needsGroups: true });
   });
 
-  it("grupos, meta e desafio ignoram loja sem equipe de vendas", () => {
+  it("grupos ignora loja sem equipe de vendas", () => {
     const i = input({ stores: [store("a"), store("parada")] });
     expect(step(i, "groups").done).toBe(true);
-    expect(step(i, "goal").done).toBe(true);
-    expect(step(input({ stores: [store("a"), store("b")], sellersByStore: new Map([["a", [seller("g1")]], ["b", [seller(null)]]]) }), "goal")).toMatchObject({
-      done: false,
-      detail: "Falta em 1 de 2 filiais",
-    });
+    expect(step(input({ sellersByStore: new Map() }), "groups").done).toBe(true);
   });
 
   it("uma loja no filtro conta só o que falta nela", () => {
@@ -116,16 +110,7 @@ describe("buildFirstSteps", () => {
       stores: storesForFirstStepsView(stores, ["b"]),
       sellersByStore: new Map([["b", [seller("g1")]]]),
       shiftIdsByStore: new Map([["b", ["g1"]]]),
-      storesWithGoal: new Set(["b"]),
-      storesWithChallenge: new Set(["b"]),
     });
     expect(buildFirstSteps(soB).filter((s) => !s.done).map((s) => s.id)).toEqual(["hours"]);
-  });
-
-  it("sem equipe em nenhuma loja: meta e desafio valem para todas as lojas", () => {
-    const i = input({ sellersByStore: new Map(), storesWithGoal: new Set(), storesWithChallenge: new Set(["a"]) });
-    expect(step(i, "groups").done).toBe(true);
-    expect(step(i, "goal").done).toBe(false);
-    expect(step(i, "challenge").done).toBe(true);
   });
 });
