@@ -145,8 +145,8 @@ function BranchCards({
   }
 
   return (
-    <Card padding="none" className="divide-y divide-line">
-      <div className="p-5">
+    <div className="flex flex-col gap-4">
+      <Card>
         <BlockTitle title="Filial" />
         <form
           className="flex flex-col gap-4"
@@ -162,28 +162,23 @@ function BranchCards({
           </div>
           <FormActions dirty={pointDirty} saving={savingPoint} onReset={resetarTipo} />
         </form>
-      </div>
-      <div className="p-5">
-        <StoreHoursCard store={store} canEdit onSaved={onSaved} pointType={point} presetStamp={presetStamp} plain />
-      </div>
-      <div className="p-5">
-        <CostFieldsCard
-          store={store}
-          title="Royalties e marketing"
-          tip={FRANCHISE_TIP}
-          fields={franchiseFields(store)}
-          sections={franchiseSections(store)}
-          onSaved={onSaved}
-          plain
-        />
-      </div>
-      <div className="p-5">
+      </Card>
+      <StoreHoursCard store={store} canEdit onSaved={onSaved} pointType={point} presetStamp={presetStamp} />
+      <CostFieldsCard
+        store={store}
+        title="Royalties e marketing"
+        tip={FRANCHISE_TIP}
+        fields={franchiseFields(store)}
+        sections={franchiseSections(store)}
+        onSaved={onSaved}
+      />
+      <Card>
         <RentCard store={store} point={point} onSaved={onSaved} />
-      </div>
-      <div className="p-5">
+      </Card>
+      <Card>
         <CostTableCard store={store} tables={tables} tablesLoading={tablesLoading} tablesError={tablesError} onSaved={onSaved} />
-      </div>
-    </Card>
+      </Card>
+    </div>
   );
 }
 
