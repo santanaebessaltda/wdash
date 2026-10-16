@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Card, useToast } from "@/components/ui";
 import { EMPTY_STORE_COSTS, updateStoreCosts, type Store, type StoreCosts } from "@/data/wedash/stores";
-import { CostCardTitle, FormActions, NumberField, SAVE_ERROR_MSG, numText, parseNum } from "./shared";
+import { BlockTitle, FormActions, NumberField, SAVE_ERROR_MSG, numText, parseNum } from "./shared";
 
 /** Campo de custo da loja: le e grava um pedaco de `store.custos`. */
 export type CostField = {
@@ -68,17 +68,22 @@ export function CostFieldsCard({
   store,
   fields,
   title,
+  tip,
   intro,
   sections,
   footer,
+  plain = false,
   onSaved,
 }: {
   store: Store;
   fields: CostField[];
   title: string;
+  tip?: string;
   intro?: ReactNode;
   sections?: CostFieldSection[];
   footer?: ReactNode;
+  /** Sem o card: a página de Configurações agrupa as seções num card só. */
+  plain?: boolean;
   onSaved: () => void;
 }) {
   const { show } = useToast();
@@ -112,9 +117,9 @@ export function CostFieldsCard({
     </div>
   );
 
-  return (
-    <Card>
-      <CostCardTitle title={title} />
+  const body = (
+    <>
+      <BlockTitle title={title} tip={tip} />
       <form
         className="flex flex-col gap-4"
         onSubmit={(e) => {
@@ -139,6 +144,8 @@ export function CostFieldsCard({
         {footer}
         <FormActions dirty={form.dirty} saving={saving} onReset={form.reset} />
       </form>
-    </Card>
+    </>
   );
+
+  return plain ? body : <Card>{body}</Card>;
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Button, Card, CardHeader, CardTitle, EmptyState, FormField, Input, PageHeader, Select, TabNav } from "@/components/ui";
+import { Button, Card, CardHeader, CardTitle, EmptyState, FormField, Input, PageHeader, Select, TabNav, Tooltip } from "@/components/ui";
 import { financeTabs, integrationTabs, performanceTabs } from "@/layout/nav-wedash";
 import { useShoppingMenu } from "@/layout/useShoppingMenu";
 import { paths } from "@/router/paths";
@@ -194,6 +194,26 @@ export function StoreCardsPage({
   );
 }
 
+export function TipHelp({ label }: { label: string }) {
+  return (
+    <Tooltip label={label}>
+      <span className="inline-flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full bg-bg-inset text-[10px] font-semibold text-t2 transition-colors hover:text-t1">
+        ?
+      </span>
+    </Tooltip>
+  );
+}
+
+/** Título da seção, com a regra de cálculo no ?. */
+export function BlockTitle({ title, tip }: { title: string; tip?: string }) {
+  return (
+    <div className="mb-4 flex items-center gap-1.5">
+      <CardTitle>{title}</CardTitle>
+      {tip ? <TipHelp label={tip} /> : null}
+    </div>
+  );
+}
+
 /** Titulo do card, sem repetir a loja do seletor. */
 export function CostCardTitle({ title, className }: { title: string; className?: string }) {
   return (
@@ -263,7 +283,14 @@ export function NumberField({
 }) {
   return (
     <FormField label={label} hint={hint}>
-      <NumberInput value={value} onChange={onChange} disabled={disabled} unit={unit} aria-label={label} />
+      <NumberInput
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        unit={unit}
+        placeholder={unit === "%" ? "0,00" : undefined}
+        aria-label={label}
+      />
     </FormField>
   );
 }
@@ -277,6 +304,7 @@ export function NumberInput({
   invalid = false,
   autoFocus,
   className,
+  placeholder,
   "aria-label": ariaLabel,
 }: {
   value: string;
@@ -289,6 +317,7 @@ export function NumberInput({
   invalid?: boolean;
   autoFocus?: boolean;
   className?: string;
+  placeholder?: string;
   "aria-label"?: string;
 }) {
   const money = unit === "R$";
@@ -296,7 +325,7 @@ export function NumberInput({
     <div className={cn("relative", className)}>
       <Input
         inputMode={money ? "numeric" : "decimal"}
-        placeholder={money ? "0,00" : "0"}
+        placeholder={placeholder ?? (money ? "0,00" : "0")}
         value={value}
         disabled={disabled}
         autoFocus={autoFocus}

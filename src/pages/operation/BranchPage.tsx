@@ -5,12 +5,11 @@ import { fetchCostTables, updateStoreCostTable, updateStoreCosts, updateStorePoi
 import { syncProductsNow } from "@/data/wedash/productCatalog";
 import { CostFieldsCard, INVALID_COSTS_MSG, pctField, useCostFields, type CostField, type CostFieldSection } from "./costFields";
 import { StoreHoursCard } from "./StoreSchedule";
-import { CostCardTitle, FormActions, NumberField, SAVE_ERROR_MSG, StoreCardsPage, parseNum, useScopedStores } from "./shared";
+import { BlockTitle, FormActions, NumberField, SAVE_ERROR_MSG, StoreCardsPage, parseNum, useScopedStores } from "./shared";
 
 const RENT_MIN: CostField = {
   key: "rentMin",
-  label: "Aluguel",
-  hint: "Valor mensal.",
+  label: "Aluguel mensal",
   unit: "R$",
   get: (c) => c.rentMin,
   set: (c, v) => ({ ...c, rentMin: v }),
@@ -20,7 +19,6 @@ const RENT_MIN: CostField = {
 const RENT_PCT: CostField = {
   key: "rentPct",
   label: "Aluguel percentual",
-  hint: "Percentual sobre o faturamento total.",
   unit: "%",
   get: (c) => c.rentWepinkPct ?? c.rentWpinkPct,
   set: (c, v) => ({ ...c, rentWepinkPct: v, rentWpinkPct: v }),
@@ -33,44 +31,29 @@ const POINT_OPTIONS: { value: PointType; label: string }[] = [
   { value: "STREET", label: "Loja de rua" },
 ];
 
-const RENT_HINT: Record<PointType, string[]> = {
-  SHOPPING: [
-    "A WDash considera o maior valor entre o aluguel mensal e o aluguel percentual. Quando o percentual for maior, somente o valor excedente é acrescentado ao aluguel mensal.",
-    "Exemplo: com aluguel mensal de R$ 10.000,00 e aluguel percentual de 10% sobre R$ 120.000,00 de faturamento, o aluguel considerado será de R$ 12.000,00. Os R$ 2.000,00 adicionais correspondem ao aluguel percentual excedente.",
-    "No mês em andamento, a comparação considera o aluguel mensal proporcional aos dias já passados.",
-  ],
-  STREET: ["Na loja de rua, a WDash considera somente o aluguel mensal."],
-};
+const RENT_TIP =
+  "A WDash considera o maior valor entre o aluguel mensal e o percentual sobre o faturamento.\n\nEx.: aluguel de R$ 10.000 e 10% sobre R$ 120.000 resulta em R$ 12.000.";
 
-const FRANCHISE_INTRO =
-  "Esses percentuais entram nos custos da operação e são considerados no cálculo do resultado operacional no Financeiro. Campos vazios são considerados 0%.";
+const FRANCHISE_TIP =
+  "Os percentuais são calculados sobre o faturamento de cada marca e entram no resultado operacional. Campos vazios são considerados 0%.";
+
+const COST_TABLE_TIP =
+  "Sem uma tabela definida, a WDash escolhe automaticamente a que mais se aproxima dos custos da filial. Ao escolher uma tabela, ela passa a ser usada como referência do CMV.";
+
+const COST_TABLE_SYNC_ERROR = "Não foi possível atualizar a tabela de custo no Millennium. Nada foi alterado.";
 
 function franchiseFields(store: Store): CostField[] {
   return [
-    pctField("royaltiesWepinkPct", "Royalties WEPINK"),
-    pctField("marketingWepinkPct", "Taxa de marketing WEPINK"),
-    ...(store.hasWpink
-      ? [pctField("royaltiesWpinkPct", "Royalties WPINK"), pctField("marketingWpinkPct", "Taxa de marketing WPINK")]
-      : []),
+    pctField("royaltiesWepinkPct", "Royalties"),
+    pctField("marketingWepinkPct", "Taxa de marketing"),
+    ...(store.hasWpink ? [pctField("royaltiesWpinkPct", "Royalties"), pctField("marketingWpinkPct", "Taxa de marketing")] : []),
   ];
 }
 
 function franchiseSections(store: Store): CostFieldSection[] {
   return [
-    {
-      title: "WEPINK",
-      hint: "Royalties e taxa de marketing são calculados sobre o faturamento WEPINK.",
-      keys: ["royaltiesWepinkPct", "marketingWepinkPct"],
-    },
-    ...(store.hasWpink
-      ? [
-          {
-            title: "WPINK",
-            hint: "Royalties e taxa de marketing são calculados sobre o faturamento WPINK.",
-            keys: ["royaltiesWpinkPct", "marketingWpinkPct"],
-          },
-        ]
-      : []),
+    { title: "WEPINK", keys: ["royaltiesWepinkPct", "marketingWepinkPct"] },
+    ...(store.hasWpink ? [{ title: "WPINK", keys: ["royaltiesWpinkPct", "marketingWpinkPct"] }] : []),
   ];
 }
 
@@ -98,7 +81,7 @@ export function BranchPage() {
     <StoreCardsPage
       section="Configurações"
       title="Configurações"
-      subtitle="Configure o tipo, o funcionamento, os custos e a tabela de custo desta filial."
+      subtitle="Configure os dados operacionais e os custos desta filial."
       loading={loading}
       skeleton={(n) => <StoreCardsSkeleton count={n} title schedule sections={2} fields={1} />}
       storeRows={storeRows}
@@ -162,9 +145,9 @@ function BranchCards({
   }
 
   return (
-    <div className="flex flex-col gap-5">
-      <Card>
-        <CostCardTitle title="Filial" />
+    <Card padding="none" className="divide-y divide-line">
+      <div className="p-5">
+        <BlockTitle title="Filial" />
         <form
           className="flex flex-col gap-4"
           onSubmit={(e) => {
@@ -172,26 +155,35 @@ function BranchCards({
             void salvarTipo();
           }}
         >
-          <p className="text-[12.5px] text-t2">O tipo da filial define o horário sugerido e as opções de aluguel.</p>
+          <p className="text-[12.5px] text-t2">O tipo da filial define o horário padrão e as opções de aluguel.</p>
           <div>
             <p className="mb-1.5 text-[12.5px] font-bold text-t0">Tipo de filial</p>
             <Segmented options={POINT_OPTIONS} value={point} onChange={(v) => v && escolher(v)} />
           </div>
           <FormActions dirty={pointDirty} saving={savingPoint} onReset={resetarTipo} />
         </form>
-      </Card>
-      <StoreHoursCard store={store} canEdit onSaved={onSaved} pointType={point} presetStamp={presetStamp} />
-      <CostFieldsCard
-        store={store}
-        title="Royalties e taxa de marketing"
-        fields={franchiseFields(store)}
-        intro={FRANCHISE_INTRO}
-        sections={franchiseSections(store)}
-        onSaved={onSaved}
-      />
-      <RentCard store={store} point={point} onSaved={onSaved} />
-      <CostTableCard store={store} tables={tables} tablesLoading={tablesLoading} tablesError={tablesError} onSaved={onSaved} />
-    </div>
+      </div>
+      <div className="p-5">
+        <StoreHoursCard store={store} canEdit onSaved={onSaved} pointType={point} presetStamp={presetStamp} plain />
+      </div>
+      <div className="p-5">
+        <CostFieldsCard
+          store={store}
+          title="Royalties e marketing"
+          tip={FRANCHISE_TIP}
+          fields={franchiseFields(store)}
+          sections={franchiseSections(store)}
+          onSaved={onSaved}
+          plain
+        />
+      </div>
+      <div className="p-5">
+        <RentCard store={store} point={point} onSaved={onSaved} />
+      </div>
+      <div className="p-5">
+        <CostTableCard store={store} tables={tables} tablesLoading={tablesLoading} tablesError={tablesError} onSaved={onSaved} />
+      </div>
+    </Card>
   );
 }
 
@@ -221,7 +213,7 @@ function CostTableCard({
       const prices = await syncProductsNow({ scope: "table", tableId: table });
       if (!prices.ok) {
         setSaving(false);
-        return show(prices.message, "danger");
+        return show(COST_TABLE_SYNC_ERROR, "danger");
       }
     }
     const r = await updateStoreCostTable(store.id, table);
@@ -232,9 +224,11 @@ function CostTableCard({
     show("Alterações salvas.", "success");
   }
 
+  const noTables = !tablesLoading && !tablesError && tables.length === 0 && table == null;
+
   return (
-    <Card>
-      <CostCardTitle title="Custo dos produtos" />
+    <>
+      <BlockTitle title="Custo dos produtos" tip={COST_TABLE_TIP} />
       <form
         className="flex flex-col gap-4"
         onSubmit={(e) => {
@@ -242,13 +236,10 @@ function CostTableCard({
           void save();
         }}
       >
-        <FormField
-          label="Tabela de custo dos produtos"
-          hint="Usada quando um produto vendido chega do Millennium sem custo. Enquanto nenhuma tabela for escolhida manualmente, a WDash seleciona automaticamente a que mais se aproxima dos custos da filial."
-        >
+        <FormField label="Tabela de custo" hint="Usada quando uma venda chega sem custo do produto.">
           <Select
             value={tablesLoading || table == null ? "" : String(table)}
-            disabled={tablesLoading}
+            disabled={tablesLoading || noTables}
             onChange={(e) => setTable(e.target.value ? Number(e.target.value) : null)}
           >
             <option value="">{tablesLoading ? "Buscando tabelas no Millennium…" : "Nenhuma tabela"}</option>
@@ -262,12 +253,13 @@ function CostTableCard({
             ))}
           </Select>
         </FormField>
+        {noTables && <p className="text-[12.5px] text-t2">Nenhuma tabela de custo disponível.</p>}
         {tablesError && (
           <p className="text-[12.5px] font-semibold text-bad">Não foi possível buscar as tabelas de custo. Tente novamente.</p>
         )}
         <FormActions dirty={tableDirty} saving={saving} onReset={() => setTable(savedTable)} />
       </form>
-    </Card>
+    </>
   );
 }
 
@@ -276,8 +268,7 @@ function RentCard({ store, point, onSaved }: { store: Store; point: PointType; o
   const form = useCostFields(store, RENT_FIELDS);
   const [saving, setSaving] = useState(false);
   const street = point === "STREET";
-  const monthly = street ? { ...RENT_MIN, label: "Aluguel mensal" } : RENT_MIN;
-  const fields = street ? [monthly] : RENT_FIELDS;
+  const fields = street ? [RENT_MIN] : RENT_FIELDS;
   const pctSaved = parseNum(form.saved[RENT_PCT.key] ?? "");
   const removePct = street && pctSaved != null && pctSaved > 0;
 
@@ -295,8 +286,8 @@ function RentCard({ store, point, onSaved }: { store: Store; point: PointType; o
   }
 
   return (
-    <Card>
-      <CostCardTitle title="Aluguel" />
+    <>
+      <BlockTitle title="Aluguel" tip={street ? undefined : RENT_TIP} />
       <form
         className="flex flex-col gap-4"
         onSubmit={(e) => {
@@ -304,19 +295,9 @@ function RentCard({ store, point, onSaved }: { store: Store; point: PointType; o
           void save();
         }}
       >
-        <p className="text-[12.5px] text-t2">
-          Esses valores entram nos custos da operação e são considerados no cálculo do resultado operacional no Financeiro. Campos vazios são considerados 0.
-        </p>
         {removePct && (
           <p className="text-[12px] font-semibold text-warn">O aluguel percentual será removido ao salvar as alterações.</p>
         )}
-        <div className="flex flex-col gap-1">
-          {RENT_HINT[point].map((t) => (
-            <p key={t} className="text-[11.5px] text-t2">
-              {t}
-            </p>
-          ))}
-        </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {fields.map((f) => (
             <NumberField
@@ -331,7 +312,7 @@ function RentCard({ store, point, onSaved }: { store: Store; point: PointType; o
         </div>
         <FormActions dirty={form.dirty} saving={saving} onReset={form.reset} />
       </form>
-    </Card>
+    </>
   );
 }
 

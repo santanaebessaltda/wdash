@@ -3,7 +3,6 @@ import { Alert, Card, FormField, Select, Switch, useToast } from "@/components/u
 import { updateStoreSchedule, type PointType, type Store } from "@/data/wedash/stores";
 import {
   DOW_LABELS,
-  PRESET_HOURS_HINT,
   STORE_TIMEZONES,
   canonicalStoreTimezone,
   parseWeekHours,
@@ -13,7 +12,7 @@ import {
   type StoreWeekHours,
 } from "@/data/wedash/storeHours";
 import { cn } from "@/lib/cn";
-import { CostCardTitle, FormActions, SAVE_ERROR_MSG, TimeSelect } from "./shared";
+import { BlockTitle, FormActions, SAVE_ERROR_MSG, TimeSelect } from "./shared";
 
 const DOWS: Dow[] = [0, 1, 2, 3, 4, 5, 6];
 
@@ -54,7 +53,6 @@ export function StoreScheduleForm({
     setHours(presetWeekHours(type));
   }, [presetStamp, type]);
   const dirty = timezone !== saved.timezone || JSON.stringify(hours) !== JSON.stringify(saved.hours);
-  const showingPreset = !weekHoursConfigured(saved.hours);
   const preset = presetWeekHours(type);
 
   async function save() {
@@ -63,7 +61,7 @@ export function StoreScheduleForm({
       return day != null && day.open >= day.close;
     });
     if (invalid != null) {
-      show(`${DOW_LABELS[invalid]}: o horário de abertura deve ser anterior ao horário de fechamento.`, "danger");
+      show("O horário de abertura deve ser anterior ao horário de fechamento.", "danger");
       return;
     }
     setSaving(true);
@@ -140,7 +138,7 @@ export function StoreScheduleForm({
         </Select>
       </FormField>
 
-      <FormField label="Dias e horários" hint={showingPreset ? PRESET_HOURS_HINT[type] : undefined}>
+      <FormField label="Horários da semana">
         <div>
           {DOWS.map((d) => {
             const day = hours[d];
@@ -182,7 +180,7 @@ export function StoreScheduleForm({
                     onClick={() => copyToAll(d)}
                     className="mb-1 pl-[96px] text-left text-[12.5px] font-semibold text-acc hover:underline sm:pl-[228px]"
                   >
-                    Copiar horário para os outros dias abertos
+                    Copiar horário
                   </button>
                 )}
               </Fragment>
@@ -195,7 +193,7 @@ export function StoreScheduleForm({
             onClick={applyPreset}
             className="mt-2 text-left text-[12.5px] font-semibold text-acc hover:underline"
           >
-            Preencher com horário padrão
+            Usar horário padrão
           </button>
         )}
       </FormField>
@@ -204,30 +202,35 @@ export function StoreScheduleForm({
   );
 }
 
-/** Card de fuso + horário. A Filial e o detalhe da loja usam o mesmo bloco. */
+const HOURS_TIP = "O horário é usado nas atualizações automáticas, nos gráficos por hora e na distribuição da meta do dia.";
+
+/** Fuso + horário. A Configurações e o detalhe da filial usam o mesmo bloco. */
 export function StoreHoursCard({
   store,
   canEdit,
   onSaved,
   pointType,
   presetStamp,
+  plain = false,
 }: {
   store: Store;
   canEdit: boolean;
   onSaved: () => void;
   pointType?: PointType;
   presetStamp?: number;
+  /** Sem o card: a página de Configurações agrupa as seções num card só. */
+  plain?: boolean;
 }) {
-  return (
-    <Card>
-      <CostCardTitle title="Funcionamento" />
-      <p className="mb-4 text-[12.5px] text-t2">Defina o fuso horário e os dias e horários de funcionamento desta filial.</p>
+  const body = (
+    <>
+      <BlockTitle title="Funcionamento" tip={HOURS_TIP} />
       {!weekHoursConfigured(store.hours) && (
-        <Alert variant="warning" className="mb-4" title="Horário de funcionamento não configurado">
-          Sem o horário configurado, as vendas desta filial só são atualizadas pelo botão Atualizar.
+        <Alert variant="warning" className="mb-4" title="Horário não configurado">
+          As vendas serão atualizadas apenas pelo botão Atualizar enquanto não houver horário definido.
         </Alert>
       )}
       <StoreScheduleForm store={store} canEdit={canEdit} onSaved={onSaved} pointType={pointType} presetStamp={presetStamp} />
-    </Card>
+    </>
   );
+  return plain ? body : <Card>{body}</Card>;
 }
