@@ -322,8 +322,8 @@ export function OverviewSkeleton({ weekdays = true }: { weekdays?: boolean }) {
         <DonutCardSkeleton />
       </div>
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <TopTableSkeleton titleW="w-40" variation round />
-        <TopTableSkeleton variation />
+        <TopTableSkeleton titleW="w-40" rows={3} variation round />
+        <TopTableSkeleton rows={5} variation />
       </div>
     </Busy>
   );

@@ -546,7 +546,7 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
     expect(v.topProducts[0]?.items).toBe(2);
   });
 
-  it("topProdutos traz o ranking completo (tela corta o Top 10 pela métrica escolhida)", () => {
+  it("topProdutos traz o ranking completo (a tela corta o Top pela métrica escolhida)", () => {
     const day = "2026-09-23";
     // 6 produtos: o 6 em faturamento e o 1 em quantidade.
     const productDayAggs = [

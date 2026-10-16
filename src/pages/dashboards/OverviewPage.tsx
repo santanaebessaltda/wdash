@@ -6,7 +6,7 @@ import { Avatar, Badge, Card, CardHeader, CardTitle, RadialProgress, StatCard, D
 import { Tooltip } from "@/components/ui/Tooltip";
 import { AreaLineChart, BarChart, DonutChart } from "@/components/charts";
 import { useScope } from "@/pages/dashboard/useScope";
-import { buildOverviewView, resolvePeriod, previousPeriod, TOP_CARD_SIZE, type OverviewKpi } from "@/data/wedash/dashboard";
+import { buildOverviewView, resolvePeriod, previousPeriod, OVERVIEW_PRODUCTS_TOP, OVERVIEW_TEAM_TOP, type OverviewKpi } from "@/data/wedash/dashboard";
 import {
   fetchSalesDayAggs,
   fetchSalesHourAggs,
@@ -405,7 +405,7 @@ export default function OverviewPage() {
             : p.amount;
     const top = [...view.topProducts]
       .sort((a, b) => metric(b) - metric(a) || b.amount - a.amount)
-      .slice(0, TOP_CARD_SIZE);
+      .slice(0, OVERVIEW_PRODUCTS_TOP);
     if (topProdSort === "name") {
       const dir = topProdDir === "asc" ? 1 : -1;
       return top.sort((a, b) => a.name.localeCompare(b.name, "pt-BR") * dir);
@@ -436,7 +436,7 @@ export default function OverviewPage() {
             : v.amount;
     const top = [...view.topSellers]
       .sort((a, b) => metric(b) - metric(a) || b.amount - a.amount)
-      .slice(0, TOP_CARD_SIZE);
+      .slice(0, OVERVIEW_TEAM_TOP);
     if (teamSort === "name") {
       const dir = teamDir === "asc" ? 1 : -1;
       return top.sort((a, b) => a.name.localeCompare(b.name, "pt-BR") * dir);
@@ -899,7 +899,7 @@ export default function OverviewPage() {
           <CardHeader>
             <div className="flex w-full items-center justify-between gap-1.5">
               <CardTitle>Destaques da equipe</CardTitle>
-              <Badge variant="accent">Top {TOP_CARD_SIZE}</Badge>
+              <Badge variant="accent">Top {OVERVIEW_TEAM_TOP}</Badge>
             </div>
           </CardHeader>
           {topSellersOrdenados.length === 0 ? (
@@ -999,7 +999,7 @@ export default function OverviewPage() {
           <CardHeader>
             <div className="flex w-full items-center justify-between gap-1.5">
               <CardTitle>Top produtos</CardTitle>
-              <Badge variant="accent">Top {TOP_CARD_SIZE}</Badge>
+              <Badge variant="accent">Top {OVERVIEW_PRODUCTS_TOP}</Badge>
             </div>
           </CardHeader>
           {topProductsOrdenados.length === 0 ? (

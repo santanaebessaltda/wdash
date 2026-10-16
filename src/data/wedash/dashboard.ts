@@ -22,8 +22,14 @@ import type { TintKey } from "@/pages/dashboards/icons";
 import { buildStoreInsight } from "./insight";
 import { brandFromProductCode } from "./costTableFill";
 
-/** Linhas dos cards de ranking: Destaques da equipe, Top produtos e Top linhas. */
+/** Linhas dos cards de ranking na tela Produtos: Top produtos e Top linhas. */
 export const TOP_CARD_SIZE = 10;
+
+/** Destaques da equipe na Visão geral. */
+export const OVERVIEW_TEAM_TOP = 3;
+
+/** Top produtos na Visão geral. */
+export const OVERVIEW_PRODUCTS_TOP = 5;
 
 export type PeriodType =
   | "today"
