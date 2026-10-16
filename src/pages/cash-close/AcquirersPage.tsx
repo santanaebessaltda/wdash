@@ -143,9 +143,6 @@ export function AcquirersPage() {
         <ConnectionCard
           title="Adquirente"
           hint={hint}
-          connectLabel="Conectar adquirente"
-          connectDisabled={!canEdit || storeRows.length === 0 || blocked}
-          onConnect={() => setPicker(true)}
           rows={rows.map((row) => ({
             key: `${row.kind}-${row.storeId}`,
             name: row.name,

@@ -148,9 +148,6 @@ export function ShoppingSettingsPage() {
         <ConnectionCard
           title="Administradora"
           hint={`Esta filial já usa o acesso ${accessPhrase(account.administrator)}. Desconecte para trocar.`}
-          connectLabel="Conectar administradora"
-          connectDisabled
-          onConnect={() => setPicker(true)}
           rows={[
             {
               key: account.administrator,

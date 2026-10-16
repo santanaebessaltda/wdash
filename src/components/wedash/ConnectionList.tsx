@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { Button, Card, CardTitle, Skeleton } from "@/components/ui";
-import { PlusIcon } from "@/pages/utility/icons";
 
 export type ConnectionRow = {
   key: string;
@@ -10,30 +9,11 @@ export type ConnectionRow = {
   onDisconnect: () => void;
 };
 
-/** Lista de uma conexão, no formato das API Keys. O botão fica bloqueado enquanto houver uma linha. */
-export function ConnectionCard({
-  title,
-  hint,
-  connectLabel,
-  connectDisabled,
-  onConnect,
-  rows,
-}: {
-  title: string;
-  hint: string;
-  connectLabel: string;
-  connectDisabled: boolean;
-  onConnect: () => void;
-  rows: ConnectionRow[];
-}) {
+/** Lista da conexão já feita. O botão Conectar fica só no vazio. */
+export function ConnectionCard({ title, hint, rows }: { title: string; hint: string; rows: ConnectionRow[] }) {
   return (
     <Card className="mt-6">
-      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-3">
-        <CardTitle>{title}</CardTitle>
-        <Button icon={<PlusIcon size={14} />} onClick={onConnect} disabled={connectDisabled}>
-          {connectLabel}
-        </Button>
-      </div>
+      <CardTitle className="mb-1.5">{title}</CardTitle>
       <p className="mb-4.5 text-[12.5px] text-t2">{hint}</p>
       <div className="flex flex-col gap-2.5">
         {rows.map((row) => (
@@ -56,10 +36,7 @@ export function ConnectionCard({
 export function ConnectionSkeleton({ label }: { label: string }) {
   return (
     <Card className="mt-6" aria-busy="true" aria-label={label}>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <Skeleton className="h-4 w-28" />
-        <Skeleton className="h-9 w-44 rounded-[var(--radius-vela-sm)]" />
-      </div>
+      <Skeleton className="mb-4 h-4 w-28" />
       <Skeleton className="mb-4 h-3 w-72 max-w-full" />
       <div className="flex items-center gap-3 rounded-[13px] border border-line px-4 py-3.5">
         <Skeleton className="h-[38px] w-[38px] rounded-[11px]" />
