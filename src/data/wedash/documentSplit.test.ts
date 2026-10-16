@@ -15,6 +15,7 @@ import {
   nextSignerStatus,
   progressForEnvelope,
   signerCaption,
+  visibleSigners,
   contactFieldsToAsk,
   contactPatch,
   cpfDigits,
@@ -565,6 +566,28 @@ describe("signer progress", () => {
       extras: [],
     });
     expect(next).toEqual([{ name: "Maria Eduarda", order: 1, recipientId: "maria", channel: "WHATSAPP", status: "SIGNED" }]);
+  });
+
+  it("shows the person and the extra as pending when the envelope progress is still empty", () => {
+    const signers = visibleSigners({
+      signers: [],
+      personName: "Petania Chimenes Valim",
+      extras: { name: "Maria Eduarda Bessa", channel: "WHATSAPP" },
+    });
+    expect(signerCaption(signers)).toBe("Petania Chimenes Valim pendente · Maria Eduarda Bessa pendente");
+  });
+
+  it("keeps a stored signature when the extra is already listed", () => {
+    const signers = visibleSigners({
+      signers: [
+        { name: "Petania Chimenes Valim", order: 1, recipientId: "petania", channel: "WHATSAPP", status: "SIGNED" },
+        { name: "Maria Eduarda Bessa", order: 2, recipientId: "maria", channel: "WHATSAPP", status: "PENDING" },
+      ],
+      personName: "Petania Chimenes Valim",
+      extras: { name: "Maria Eduarda Bessa", channel: "WHATSAPP" },
+    });
+    expect(signerCaption(signers)).toBe("Petania Chimenes Valim assinou · Maria Eduarda Bessa pendente");
+    expect(signers[1]?.recipientId).toBe("maria");
   });
 });
 

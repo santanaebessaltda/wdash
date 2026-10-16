@@ -5,7 +5,7 @@ import { cn } from "@/lib/cn";
 import { QuickStat } from "@/pages/dashboards/QuickStat";
 import { Icon, icons } from "@/pages/users/Icons";
 import { paths } from "@/router/paths";
-import { archivePeople, displayTitle, documentPersonKey, findDocumentPerson, inLibrary, isFiledStatus, monthFolder, personMatchesQuery, resendVisible, sameCategory, signerCaption, signingPeople, DOCUMENT_CATEGORIES, type SignerProgress } from "@/data/wedash/documentSplit";
+import { archivePeople, displayTitle, documentPersonKey, findDocumentPerson, inLibrary, isFiledStatus, monthFolder, personMatchesQuery, resendVisible, sameCategory, signerCaption, signingPeople, visibleSigners, DOCUMENT_CATEGORIES, type SignerProgress } from "@/data/wedash/documentSplit";
 import type { BatchRow, DocumentRow, PersonRow } from "@/data/wedash/documentsRepo";
 import { cancelDocument, copyDocumentLink, moveDocument, openDocument, resendDocument } from "@/data/wedash/documentsRepo";
 import { DocumentsSkeleton } from "@/components/wedash/LoadingSkeletons";
@@ -322,6 +322,7 @@ export function DocumentsPage() {
           <FolderTable
             rows={visibleFolders}
             documents={documents}
+            people={people}
             onOpenFolder={(key) => setCrumb([...crumb, key])}
             onOpenFile={(id) => void openFile(id, show)}
             onResend={(id, recipientId) => void resendFile(id, recipientId, show, setResendingId, reload)}
@@ -577,12 +578,17 @@ function folderEntries(input: {
   const month = allStores ? crumb[3] : crumb[2];
   return docs
     .filter((doc) => yearOf(doc) === year && monthOf(doc) === month)
-    .map((doc) => ({ key: doc.id, label: displayTitle(doc.fileName), detail: signerCaption(doc.signers) ?? STATUS_LABEL[doc.status], fileId: doc.id }));
+    .map((doc) => ({ key: doc.id, label: displayTitle(doc.fileName), detail: signerCaption(signersOf(doc, people)) ?? STATUS_LABEL[doc.status], fileId: doc.id }));
+}
+
+function signersOf(doc: DocumentRow, people: PersonRow[]) {
+  return visibleSigners({ signers: doc.signers, personName: findDocumentPerson(people, doc)?.name ?? null, extras: doc.extraSigner });
 }
 
 function FolderTable({
   rows,
   documents,
+  people,
   onOpenFolder,
   onOpenFile,
   onResend,
@@ -594,6 +600,7 @@ function FolderTable({
 }: {
   rows: FolderEntry[];
   documents: DocumentRow[];
+  people: PersonRow[];
   onOpenFolder: (key: string) => void;
   onOpenFile: (id: string) => void;
   onResend: (id: string, recipientId?: string) => void;
@@ -631,7 +638,7 @@ function FolderTable({
               {resendingId === doc.id && <span className="text-[12px] font-bold text-t2">Reenviando…</span>}
               <RowMenu
                 kind={isFiledStatus(doc.status) ? "filed" : "pending"}
-                signers={doc.signers}
+                signers={signersOf(doc, people)}
                 busy={busy}
                 onDownload={() => onOpenFile(doc.id)}
                 onResend={(recipientId) => onResend(doc.id, recipientId)}
@@ -719,7 +726,7 @@ function FileTable({
     {
       key: "status",
       header: "Status",
-      render: (row) => <DocumentStatus row={row} />,
+      render: (row) => <DocumentStatus row={row} people={people} />,
     },
     {
       key: "sent",
@@ -736,7 +743,7 @@ function FileTable({
             {resendingId === row.id && <span className="text-[12px] font-bold text-t2">Reenviando…</span>}
             <RowMenu
               kind={isFiledStatus(row.status) ? "filed" : "pending"}
-              signers={row.signers}
+              signers={signersOf(row, people)}
               busy={busy || resendingId === row.id}
               onDownload={() => onDownload(row.id)}
               onResend={(recipientId) => onResend(row.id, recipientId)}
@@ -766,11 +773,11 @@ function pendingMenu(row: DocumentRow) {
   return resendVisible(row.status) && Boolean(row.envelopeId);
 }
 
-function DocumentStatus({ row }: { row: DocumentRow }) {
+function DocumentStatus({ row, people }: { row: DocumentRow; people: PersonRow[] }) {
   if (!row.envelopeId && !isFiledStatus(row.status)) return <span className="text-[12.5px] text-t2">Em preparação</span>;
-  const caption = signerCaption(row.signers);
+  const caption = signerCaption(signersOf(row, people));
   return (
-    <span className="flex min-w-0 flex-col gap-1">
+    <span className="flex min-w-0 flex-col items-start gap-1">
       <Badge variant={badgeVariant(row.status)}>{STATUS_LABEL[row.status]}</Badge>
       {caption ? <span className="text-[12px] text-t1">{caption}</span> : null}
     </span>

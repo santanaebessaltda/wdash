@@ -1271,3 +1271,40 @@ export function signerCaption(signers: SignerProgress[]): string | null {
   if (signers.length < 2) return null;
   return signers.map((signer) => `${signer.name} ${signer.status === "SIGNED" ? "assinou" : signer.status === "DECLINED" ? "recusou" : "pendente"}`).join(" · ");
 }
+
+function namedExtras(value: unknown): { name: string; channel: SendChannel | null }[] {
+  const list = Array.isArray(value) ? value : value ? [value] : [];
+  return list.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const raw = item as Record<string, unknown>;
+    const name = typeof raw.name === "string" ? raw.name.trim() : "";
+    const channel = raw.channel === "EMAIL" || raw.channel === "WHATSAPP" ? raw.channel : null;
+    return name ? [{ name, channel }] : [];
+  });
+}
+
+/** Quem a linha mostra. O andamento gravado vence; sem ele, a pessoa e os extras do envio entram como pendentes. */
+export function visibleSigners(input: { signers: SignerProgress[]; personName: string | null; extras: unknown }): SignerProgress[] {
+  const stored = input.signers;
+  const known: SignerProgress[] = [];
+  const seen = new Set<string>();
+  const push = (name: string, channel: SendChannel | null) => {
+    const trimmed = name.trim();
+    const key = trimmed.toLowerCase();
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    known.push({ name: trimmed, order: known.length + 1, recipientId: null, channel, status: "PENDING" });
+  };
+  push(input.personName ?? "", null);
+  for (const extra of namedExtras(input.extras)) push(extra.name, extra.channel);
+  if (stored.length >= 2 && stored.length >= known.length) return stored;
+  if (known.length < 2) return stored;
+  return known.map((person) => {
+    const match =
+      stored.find((item) => item.order === person.order && item.name.trim().toLowerCase() === person.name.trim().toLowerCase()) ??
+      stored.find((item) => item.name.trim().toLowerCase() === person.name.trim().toLowerCase()) ??
+      stored.find((item) => item.order === person.order);
+    if (!match) return person;
+    return { ...person, recipientId: match.recipientId, channel: match.channel ?? person.channel, status: match.status };
+  });
+}
