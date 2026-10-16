@@ -21,9 +21,6 @@ import { brl, brlCent, fullDate, shortDate, dayAxisLabel, dayPointDetail, isoToD
 import type { TintKey } from "@/pages/dashboards/icons";
 import { buildStoreInsight } from "./insight";
 
-/** Linhas dos cards de ranking na tela Produtos: Top produtos e Top linhas. */
-export const TOP_CARD_SIZE = 10;
-
 /** Destaques da equipe na Visão geral. */
 export const OVERVIEW_TEAM_TOP = 3;
 
@@ -2623,6 +2620,9 @@ export interface ProductLineRow {
   /** null = algum produto da linha sem custo gravado. */
   marginPct: number | null;
   variationPct: number | null;
+  /** Faturamento nos dois lados do comparativo — variação do total da linha. */
+  revenueCmp: number;
+  revenuePrev: number;
   /** Chaves (`ProductItemRow.chave`) de todos os produtos da linha  -  abre o detalhe. */
   rowKeys: string[];
 }
@@ -2902,6 +2902,8 @@ export function buildProductsView(scope: Scope, input: ProductsAggInput = { dayA
       profit: l.withoutCost ? null : l.profit,
       marginPct: l.withoutCost ? null : divSeguro(l.profit, l.revenue) * 100,
       variationPct: l.revenuePrev > 0 && l.revenueCmp > 0 ? ((l.revenueCmp - l.revenuePrev) / l.revenuePrev) * 100 : null,
+      revenueCmp: l.revenueCmp,
+      revenuePrev: l.revenuePrev,
       rowKeys: l.rowKeys,
     }))
     .sort((a, b) => b.revenue - a.revenue || a.name.localeCompare(b.name, "pt-BR"));

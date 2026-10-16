@@ -355,10 +355,9 @@ export function ProductsSkeleton() {
         <DonutCardSkeleton rows={3} withSub lg />
       </div>
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <TopTableSkeleton titleW="w-44" />
-        <TopTableSkeleton variation />
+        <TopTableSkeleton titleW="w-56" rows={8} search variation />
+        <TopTableSkeleton titleW="w-44" rows={8} search variation />
       </div>
-      <TopTableSkeleton titleW="w-44" rows={8} search variation className="mt-4" />
     </Busy>
   );
 }

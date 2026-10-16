@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
-import { Badge, Card, CardHeader, CardTitle, StatCard, DateRangePicker, PageHeader, Button, Pagination, ThSort, type SortDir } from "@/components/ui";
+import { Card, CardTitle, StatCard, DateRangePicker, PageHeader, Button, Pagination, ThSort, type SortDir } from "@/components/ui";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { TABLE_PAGE_SIZE } from "@/lib/usePagedRows";
 import { BarChart, DonutChart } from "@/components/charts";
@@ -7,9 +7,7 @@ import { scopeFilterKey, useScope } from "@/pages/dashboard/useScope";
 import {
   buildProductsView,
   resolvePeriod,
-  TOP_CARD_SIZE,
   type AbcClass,
-  type ProductItemRow,
   type ProductLineRow,
   type ProductsAggInput,
   type ProductsKpi,
@@ -87,7 +85,10 @@ const KPI_COLORS = [
 ];
 
 type SortKey = "name" | "revenue" | "items" | "cmv" | "profit" | "marginPct" | "variationPct";
-type TopProdSort = "name" | "items" | "revenue" | "profit" | "margin";
+
+function lineCmv(line: ProductLineRow): number | null {
+  return line.profit == null ? null : line.revenue - line.profit;
+}
 
 const COLORS_ABC: Record<AbcClass, string> = {
   A: "var(--bad)",
@@ -121,11 +122,11 @@ export default function ProductsPage() {
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("revenue");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [topProdSort, setTopProdSort] = useState<TopProdSort>("revenue");
-  const [topProdDir, setTopProdDir] = useState<SortDir>("desc");
-  const [topLineSort, setTopLineSort] = useState<TopProdSort>("revenue");
-  const [topLineDir, setTopLineDir] = useState<SortDir>("desc");
+  const [lineSearch, setLineSearch] = useState("");
+  const [lineSortKey, setLineSortKey] = useState<SortKey>("revenue");
+  const [lineSortDir, setLineSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(1);
+  const [linePage, setLinePage] = useState(1);
   const printing = usePrintMode();
   const exportValue = useExportPdf("Produtos");
   // Catalogo de lojas (custos) hidratado depois do 1 render  ->  recalcula.
@@ -181,61 +182,6 @@ export default function ProductsPage() {
     setScope(applyPeriodDateChange(scope, r, goal));
   }
 
-  // A metrica escolhe quais entram (sempre os maiores); a direcao so reordena esses.
-  // "Produto" (nome) reordena o Top por faturamento.
-  const topProducts = useMemo(() => {
-    const metric = (p: ProductItemRow) =>
-      topProdSort === "items"
-        ? p.items
-        : topProdSort === "profit"
-          ? (p.profit ?? -Infinity)
-          : topProdSort === "margin"
-            ? (p.marginPct ?? -Infinity)
-            : p.revenue;
-    const top = [...view.products].sort((a, b) => metric(b) - metric(a) || b.revenue - a.revenue).slice(0, TOP_CARD_SIZE);
-    if (topProdSort === "name") {
-      const dir = topProdDir === "asc" ? 1 : -1;
-      return top.sort((a, b) => a.name.localeCompare(b.name, "pt-BR") * dir);
-    }
-    return topProdDir === "asc" ? top.reverse() : top;
-  }, [view.products, topProdSort, topProdDir]);
-
-  function toggleTopProdSort(key: TopProdSort) {
-    if (topProdSort === key) {
-      setTopProdDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setTopProdSort(key);
-      setTopProdDir(key === "name" ? "asc" : "desc");
-    }
-  }
-
-  // Mesma regra do Top produtos: a metrica escolhe as linhas; a direcao so reordena.
-  const topLines = useMemo(() => {
-    const metric = (l: ProductLineRow) =>
-      topLineSort === "items"
-        ? l.items
-        : topLineSort === "profit"
-          ? (l.profit ?? -Infinity)
-          : topLineSort === "margin"
-            ? (l.marginPct ?? -Infinity)
-            : l.revenue;
-    const top = [...view.lines].sort((a, b) => metric(b) - metric(a) || b.revenue - a.revenue).slice(0, TOP_CARD_SIZE);
-    if (topLineSort === "name") {
-      const dir = topLineDir === "asc" ? 1 : -1;
-      return top.sort((a, b) => a.name.localeCompare(b.name, "pt-BR") * dir);
-    }
-    return topLineDir === "asc" ? top.reverse() : top;
-  }, [view.lines, topLineSort, topLineDir]);
-
-  function toggleTopLineSort(key: TopProdSort) {
-    if (topLineSort === key) {
-      setTopLineDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setTopLineSort(key);
-      setTopLineDir(key === "name" ? "asc" : "desc");
-    }
-  }
-
   const tableLines = useMemo(() => {
     let list = view.products;
     const q = search.trim().toLowerCase();
@@ -271,14 +217,55 @@ export default function ProductsPage() {
     };
   }, [tableLines]);
 
+  const lineRows = useMemo(() => {
+    let list = view.lines;
+    const q = lineSearch.trim().toLowerCase();
+    if (q) list = list.filter((l) => l.name.toLowerCase().includes(q));
+    const dir = lineSortDir === "asc" ? 1 : -1;
+    return [...list].sort((a, b) => {
+      if (lineSortKey === "name") return a.name.localeCompare(b.name, "pt-BR") * dir;
+      const va = lineSortKey === "cmv" ? lineCmv(a) : a[lineSortKey];
+      const vb = lineSortKey === "cmv" ? lineCmv(b) : b[lineSortKey];
+      if (va == null && vb == null) return b.revenue - a.revenue;
+      if (va == null) return 1;
+      if (vb == null) return -1;
+      return (va - vb) * dir;
+    });
+  }, [view.lines, lineSearch, lineSortKey, lineSortDir]);
+
+  const lineTotal = useMemo(() => {
+    const revenue = lineRows.reduce((s, l) => s + l.revenue, 0);
+    const items = lineRows.reduce((s, l) => s + l.items, 0);
+    const complete = lineRows.length > 0 && lineRows.every((l) => l.profit != null);
+    const cmv = complete ? lineRows.reduce((s, l) => s + (lineCmv(l) ?? 0), 0) : null;
+    const profit = complete ? lineRows.reduce((s, l) => s + (l.profit ?? 0), 0) : null;
+    const revenueCmp = lineRows.reduce((s, l) => s + l.revenueCmp, 0);
+    const revenuePrev = lineRows.reduce((s, l) => s + l.revenuePrev, 0);
+    return {
+      revenue,
+      items,
+      cmv,
+      profit,
+      variationPct: revenueCmp > 0 && revenuePrev > 0 ? ((revenueCmp - revenuePrev) / revenuePrev) * 100 : null,
+      marginPct: profit != null && revenue > 0 ? (profit / revenue) * 100 : null,
+    };
+  }, [lineRows]);
+
   const pageSize = TABLE_PAGE_SIZE;
   const totalPages = Math.max(1, Math.ceil(tableLines.length / pageSize));
   const pageSafe = Math.min(page, totalPages);
   const pageRows = printing ? tableLines : tableLines.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
+  const lineTotalPages = Math.max(1, Math.ceil(lineRows.length / pageSize));
+  const linePageSafe = Math.min(linePage, lineTotalPages);
+  const linePageRows = printing ? lineRows : lineRows.slice((linePageSafe - 1) * pageSize, linePageSafe * pageSize);
 
   useEffect(() => {
     setPage(1);
   }, [search, sortKey, sortDir, scope]);
+
+  useEffect(() => {
+    setLinePage(1);
+  }, [lineSearch, lineSortKey, lineSortDir, scope]);
 
   const detailData = useMemo(() => ({ aggs, view }), [aggs, view]);
   const { open, modal: detailModal } = useProductDetail({ scope, data: detailData });
@@ -292,9 +279,20 @@ export default function ProductsPage() {
     }
   }
 
+  function toggleLineSort(key: SortKey) {
+    if (lineSortKey === key) {
+      setLineSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setLineSortKey(key);
+      setLineSortDir(key === "name" ? "asc" : "desc");
+    }
+  }
+
   const totalCategories = view.categories.reduce((s, c) => s + c.revenue, 0);
   const tipVariation = `Faturamento do produto ${comparedWithTip(view.vsVariation).replace(/^Em/, "em").replace(/\.$/, "")}.`;
   const tipVariationTotal = `Faturamento total dos produtos do filtro ${comparedWithTip(view.vsVariation).replace(/^Em/, "em")}`;
+  const tipVariationLine = `Faturamento da linha ${comparedWithTip(view.vsVariation).replace(/^Em/, "em").replace(/\.$/, "")}.`;
+  const tipVariationLineTotal = `Faturamento total das linhas do filtro ${comparedWithTip(view.vsVariation).replace(/^Em/, "em")}`;
   const tipCmvProduct = view.hasCostProduct
     ? "Acompanhe faturamento, CMV, lucro bruto e margem de cada produto no período.\n\nQuando aparecer “—”, faltam dados de custo para calcular o indicador corretamente."
     : "O CMV por produto não está disponível para este período.";
@@ -439,32 +437,60 @@ export default function ProductsPage() {
         </Card>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
         <Card className="flex flex-col">
-          <CardHeader>
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <div className="flex items-center gap-1.5">
-              <CardTitle>Top linhas de produto</CardTitle>
-              <TipHelp label={"Agrupa produtos da mesma linha, mesmo quando existem em diferentes tipos, como colônia, body splash, body cream ou roll-on.\n\nExemplo: Obsessed, Obsessed Deluxe e Obsessed Intense pertencem à linha OBSESSED."} />
+              <CardTitle>Desempenho por linha de produto</CardTitle>
+              <TipHelp label={"Agrupa produtos da mesma linha, mesmo quando existem em diferentes tipos, como colônia, body splash, body cream ou roll-on.\n\nExemplo: Obsessed, Obsessed Deluxe e Obsessed Intense pertencem à linha OBSESSED.\n\nQuando aparecer “—”, faltam dados de custo para calcular o CMV, o lucro bruto ou a margem."} />
             </div>
-            <Badge variant="accent">Top {TOP_CARD_SIZE}</Badge>
-          </CardHeader>
-          {topLines.length === 0 ? (
-            <EmptyBlock />
+            {view.lines.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 print:hidden">
+                <input
+                  type="search"
+                  placeholder="Buscar por linha…"
+                  value={lineSearch}
+                  onChange={(e) => setLineSearch(e.target.value)}
+                  className={cn(filterInputClass, "sm:w-56")}
+                />
+              </div>
+            )}
+          </div>
+          {lineRows.length === 0 ? (
+            view.lines.length === 0 ? (
+              <EmptyBlock />
+            ) : (
+              <EmptyBlock
+                icon="🔍"
+                title="Nenhuma linha encontrada"
+                description="Tente buscar por outro nome."
+                action={
+                  <Button variant="outline" size="sm" onClick={() => setLineSearch("")}>
+                    Limpar busca
+                  </Button>
+                }
+              />
+            )
           ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[600px] border-collapse text-sm">
+            <table className="w-full min-w-[820px] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
                   <th className="px-1 pb-3 text-left font-bold">#</th>
-                  <ThSort label="Linha" active={topLineSort === "name"} dir={topLineDir} onClick={() => toggleTopLineSort("name")} align="left" className="px-1 pb-3" />
-                  <ThSort label="Itens vendidos" active={topLineSort === "items"} dir={topLineDir} onClick={() => toggleTopLineSort("items")} className="px-1 pb-3" />
-                  <ThSort label="Faturamento" active={topLineSort === "revenue"} dir={topLineDir} onClick={() => toggleTopLineSort("revenue")} className="px-1 pb-3" />
-                  <ThSort label="Lucro bruto" active={topLineSort === "profit"} dir={topLineDir} onClick={() => toggleTopLineSort("profit")} className="px-1 pb-3" />
-                  <ThSort label="Margem" active={topLineSort === "margin"} dir={topLineDir} onClick={() => toggleTopLineSort("margin")} className="px-1 pb-3" />
+                  <ThSort label="Linha" active={lineSortKey === "name"} dir={lineSortDir} onClick={() => toggleLineSort("name")} align="left" className="px-1 pb-3" />
+                  <ThSort label="Itens vendidos" active={lineSortKey === "items"} dir={lineSortDir} onClick={() => toggleLineSort("items")} className="px-1 pb-3" />
+                  <ThSort label="Faturamento" active={lineSortKey === "revenue"} dir={lineSortDir} onClick={() => toggleLineSort("revenue")} className="px-1 pb-3" />
+                  <ThSort label="CMV" active={lineSortKey === "cmv"} dir={lineSortDir} onClick={() => toggleLineSort("cmv")} className="px-1 pb-3" />
+                  <ThSort label="Lucro bruto" active={lineSortKey === "profit"} dir={lineSortDir} onClick={() => toggleLineSort("profit")} className="px-1 pb-3" />
+                  <ThSort label="Margem" active={lineSortKey === "marginPct"} dir={lineSortDir} onClick={() => toggleLineSort("marginPct")} className="px-1 pb-3" />
+                  <ThSort label="Variação" active={lineSortKey === "variationPct"} dir={lineSortDir} onClick={() => toggleLineSort("variationPct")} className="px-1 pb-3" />
                 </tr>
               </thead>
               <tbody>
-                {topLines.map((l, idx) => (
+                {linePageRows.map((l, i) => {
+                  const idx = printing ? i : (linePageSafe - 1) * pageSize + i;
+                  const cmv = lineCmv(l);
+                  return (
                   <tr
                     key={l.name}
                     tabIndex={0}
@@ -475,7 +501,7 @@ export default function ProductsPage() {
                         open({ kind: "line", name: l.name });
                       }
                     }}
-                    className="cursor-pointer border-b border-line transition-colors last:border-b-0 hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none"
+                    className="cursor-pointer border-b border-line transition-colors hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none"
                   >
                     <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
                     <td className="px-1 py-3">
@@ -493,73 +519,66 @@ export default function ProductsPage() {
                     </td>
                     <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(l.items)}</td>
                     <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(l.revenue)}</td>
+                    <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", cmv == null ? "text-t2" : "text-t0")}>{moneyOrDash(cmv)}</td>
                     <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", colorProfit(l.profit))}>{moneyOrDash(l.profit)}</td>
                     <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", l.marginPct == null ? "text-t2" : "text-ok")}>
                       {pctFmt(l.marginPct)}
                     </td>
+                    <td className="px-1 py-3 text-right font-mono text-[13px]">
+                      <Tooltip label={tipVariationLine}>
+                        <span>
+                          <Variation v={l.variationPct} />
+                        </span>
+                      </Tooltip>
+                    </td>
                   </tr>
-                ))}
+                  );
+                })}
+                <tr className="bg-bg-inset">
+                  <td />
+                  <td className="px-1 py-3 text-[13px] font-extrabold text-t0">
+                    <span className="inline-flex items-center gap-1">
+                      Total do filtro
+                      <TipHelp label="Soma todas as linhas encontradas no filtro, inclusive as que não aparecem nesta página." />
+                    </span>
+                    <span className="mt-0.5 block text-[11px] font-semibold text-t2">
+                      {num(lineRows.length)} linha{lineRows.length === 1 ? "" : "s"}
+                    </span>
+                  </td>
+                  <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{num(lineTotal.items)}</td>
+                  <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{brlCent(lineTotal.revenue)}</td>
+                  <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", lineTotal.cmv == null ? "text-t2" : "text-t0")}>
+                    {moneyOrDash(lineTotal.cmv)}
+                  </td>
+                  <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", colorProfit(lineTotal.profit))}>
+                    {moneyOrDash(lineTotal.profit)}
+                  </td>
+                  <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", lineTotal.marginPct == null ? "text-t2" : "text-ok")}>
+                    {pctFmt(lineTotal.marginPct)}
+                  </td>
+                  <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold">
+                    <Tooltip label={tipVariationLineTotal}>
+                      <span>
+                        <Variation v={lineTotal.variationPct} />
+                      </span>
+                    </Tooltip>
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>
+          )}
+          {lineRows.length > 0 && (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
+              <span className="text-[12.5px] text-t2">
+                Mostrando {linePageRows.length} de {num(lineRows.length)} linhas
+              </span>
+              {lineTotalPages > 1 && <Pagination page={linePageSafe} totalPages={lineTotalPages} onChange={setLinePage} />}
+            </div>
           )}
         </Card>
 
         <Card className="flex flex-col">
-          <CardHeader>
-            <CardTitle>Top produtos</CardTitle>
-            <Badge variant="accent">Top {TOP_CARD_SIZE}</Badge>
-          </CardHeader>
-          {topProducts.length === 0 ? (
-            <EmptyBlock />
-          ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[600px] border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
-                  <th className="px-1 pb-3 text-left font-bold">#</th>
-                  <ThSort label="Produto" active={topProdSort === "name"} dir={topProdDir} onClick={() => toggleTopProdSort("name")} align="left" className="px-1 pb-3" />
-                  <ThSort label="Itens vendidos" active={topProdSort === "items"} dir={topProdDir} onClick={() => toggleTopProdSort("items")} className="px-1 pb-3" />
-                  <ThSort label="Faturamento" active={topProdSort === "revenue"} dir={topProdDir} onClick={() => toggleTopProdSort("revenue")} className="px-1 pb-3" />
-                  <ThSort label="Lucro bruto" active={topProdSort === "profit"} dir={topProdDir} onClick={() => toggleTopProdSort("profit")} className="px-1 pb-3" />
-                  <ThSort label="Margem" active={topProdSort === "margin"} dir={topProdDir} onClick={() => toggleTopProdSort("margin")} className="px-1 pb-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {topProducts.map((p, idx) => (
-                  <tr
-                    key={p.rowKey}
-                    tabIndex={0}
-                    onClick={() => open({ kind: "product", rowKey: p.rowKey, name: p.name })}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        open({ kind: "product", rowKey: p.rowKey, name: p.name });
-                      }
-                    }}
-                    className="cursor-pointer border-b border-line transition-colors last:border-b-0 hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none"
-                  >
-                    <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
-                    <td className="px-1 py-3">
-                      <ProductNameCell name={p.name} idx={idx} sub={p.code} />
-                    </td>
-                    <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(p.items)}</td>
-                    <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.revenue)}</td>
-                    <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", colorProfit(p.profit))}>{moneyOrDash(p.profit)}</td>
-                    <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", p.marginPct == null ? "text-t2" : "text-ok")}>
-                      {pctFmt(p.marginPct)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          )}
-        </Card>
-      </div>
-
-      {/* Desempenho por produto  -  mesma lista do Top produtos; clique abre o detalhe */}
-      <Card className="mt-4 flex flex-col">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div className="flex items-center gap-1.5">
             <CardTitle>Desempenho por produto</CardTitle>
@@ -688,7 +707,8 @@ export default function ProductsPage() {
             {totalPages > 1 && <Pagination page={pageSafe} totalPages={totalPages} onChange={setPage} />}
           </div>
         )}
-      </Card>
+        </Card>
+      </div>
       </>
       )}
 
