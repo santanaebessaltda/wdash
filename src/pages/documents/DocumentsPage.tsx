@@ -2,10 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Badge, Button, DataTable, Dropdown, EmptyState, FormField, Modal, Card, CardTitle, useToast, type DataTableColumn, type DropdownItem } from "@/components/ui";
 import { cn } from "@/lib/cn";
-import { HeaderFilter } from "@/pages/dashboard/HeaderFilter";
+import { HeaderFilter, HeaderSearch } from "@/pages/dashboard/HeaderFilter";
 import { Icon, icons } from "@/pages/users/Icons";
 import { paths } from "@/router/paths";
-import { archivePeople, displayTitle, documentPersonKey, findDocumentPerson, folderPeople, inLibrary, isFiledStatus, monthFolder, partialEnvelopeLabel, resendVisible, signatureProgressDetail, signerFraction, signingPeople, visibleSigners, type SignerProgress } from "@/data/wedash/documentSplit";
+import { archivePeople, categoryLabel, displayTitle, documentPersonKey, findDocumentPerson, folderPeople, inLibrary, isFiledStatus, monthFolder, partialEnvelopeLabel, personMatchesQuery, resendVisible, signatureProgressDetail, signerFraction, signingPeople, visibleSigners, type SignerProgress } from "@/data/wedash/documentSplit";
 import type { BatchRow, DocumentRow, PersonRow } from "@/data/wedash/documentsRepo";
 import { cancelDocument, copyDocumentLink, moveDocument, openDocument, resendDocument } from "@/data/wedash/documentsRepo";
 import { DocumentsSkeleton } from "@/components/wedash/LoadingSkeletons";
@@ -30,6 +30,7 @@ export function DocumentsPage() {
   const flash = (useLocation().state ?? null) as { documentNotice?: string | null } | null;
   const flashed = useRef(false);
   const [crumb, setCrumb] = useState<string[]>([]);
+  const [query, setQuery] = useState("");
   const [peopleFilter, setPeopleFilter] = useState<PeopleFilter>("all");
   const [view, setView] = useState<LibraryView>("folders");
   const [resendingId, setResendingId] = useState<string | null>(null);
@@ -52,6 +53,8 @@ export function DocumentsPage() {
   const batchOf = useMemo(() => new Map(batches.map((batch) => [batch.id, batch])), [batches]);
 
   const libraryDocuments = documents.filter((doc) => inLibrary(doc));
+  const needle = query.trim().toLowerCase();
+  const atBranches = allStores && crumb.length === 0;
   const atPeople = allStores ? crumb.length === 1 : crumb.length === 0;
   const atFiles = allStores ? crumb.length >= 4 : crumb.length >= 3;
   const listedPeople = folderPeople(people, peopleFilter);
@@ -61,23 +64,73 @@ export function DocumentsPage() {
     if (!key) return peopleFilter === "all";
     return allowedPeople.has(key);
   });
-  const folders = folderEntries({ allStores, crumb, documents: scopedDocuments, batches, people: listedPeople, stores });
+
+  function matchesQuery(doc: DocumentRow, includePerson: boolean) {
+    if (!needle) return true;
+    const batch = batchOf.get(doc.batchId);
+    const title = displayTitle(doc.fileName).toLowerCase();
+    const category = categoryLabel(batch?.category ?? "").toLowerCase();
+    const year = String(batch?.year ?? "");
+    const month = monthFolder(batch?.month ?? 0).toLowerCase();
+    const person = findDocumentPerson(people, doc);
+    const text = title.includes(needle) || doc.fileName.toLowerCase().includes(needle) || category.includes(needle) || year.includes(needle) || month.includes(needle) || statusLabel(doc).toLowerCase().includes(needle);
+    return text || (includePerson && person != null && personMatchesQuery(person, query));
+  }
+
+  function statusLabel(doc: DocumentRow) {
+    return partialEnvelopeLabel(doc.status, signersOf(doc, people)) ?? STATUS_LABEL[doc.status];
+  }
+
+  const textDocs = needle ? scopedDocuments.filter((doc) => matchesQuery(doc, atPeople || atBranches)) : scopedDocuments;
+  const documentRows = scopedDocuments.filter((doc) => matchesQuery(doc, true));
+  const folders = folderEntries({ allStores, crumb, documents: needle ? textDocs : scopedDocuments, batches, people: listedPeople, stores });
+  const visibleFolders = folders.filter((folder) => folderVisible(folder));
+
+  function folderVisible(folder: FolderEntry) {
+    if (atPeople || atBranches) {
+      const matched = textDocs.filter((doc) => (atBranches ? doc.storeId === folder.key : documentPersonKey(doc) === folder.key)).length;
+      if (needle && matched > 0) return true;
+      if (!needle) return true;
+      if (atPeople) {
+        const person = listedPeople.find((item) => item.id === folder.key);
+        return person != null && personMatchesQuery(person, query);
+      }
+      return folder.label.toLowerCase().includes(needle);
+    }
+    if (!needle) return true;
+    if (folder.label.toLowerCase().includes(needle)) return true;
+    return textDocs.some((doc) => docInFolder(doc, folder.key));
+  }
+
+  function docInFolder(doc: DocumentRow, key: string) {
+    const batch = batchOf.get(doc.batchId);
+    const sellerId = allStores ? crumb[1] : crumb[0];
+    if (documentPersonKey(doc) !== sellerId) return false;
+    const depth = allStores ? crumb.length - 1 : crumb.length;
+    if (depth === 1) return String(batch?.year ?? "") === key;
+    const year = allStores ? crumb[2] : crumb[1];
+    return String(batch?.year ?? "") === year && monthFolder(batch?.month ?? 0) === key;
+  }
+
   const visibleFiles = atFiles
-    ? scopedDocuments.filter((doc) => documentPersonKey(doc) === (allStores ? crumb[1] : crumb[0]) && String(batchOf.get(doc.batchId)?.year ?? "") === (allStores ? crumb[2] : crumb[1]) && monthFolder(batchOf.get(doc.batchId)?.month ?? 0) === (allStores ? crumb[3] : crumb[2]))
+    ? textDocs.filter((doc) => documentPersonKey(doc) === (allStores ? crumb[1] : crumb[0]) && String(batchOf.get(doc.batchId)?.year ?? "") === (allStores ? crumb[2] : crumb[1]) && monthFolder(batchOf.get(doc.batchId)?.month ?? 0) === (allStores ? crumb[3] : crumb[2]))
     : [];
   const peopleHere = listedPeople.filter((person) => !allStores || crumb[0] == null || person.storeId === crumb[0]);
   const showingDocuments = view === "documents" || atFiles;
 
   function goRoot() {
     setCrumb([]);
+    setQuery("");
   }
 
   function goUp() {
     setCrumb((current) => current.slice(0, -1));
+    setQuery("");
   }
 
   function openFolder(key: string) {
     setCrumb([...crumb, key]);
+    setQuery("");
   }
 
   const trail = crumb.length === 0 ? [] : [
@@ -85,7 +138,10 @@ export function DocumentsPage() {
     ...(allStores ? [{ label: "Filiais", onClick: goRoot as (() => void) | null }] : []),
     ...crumb.map((key, index) => ({
       label: crumbLabel(key, storeName, personName),
-      onClick: index === crumb.length - 1 ? null : () => setCrumb(crumb.slice(0, index + 1)),
+      onClick: index === crumb.length - 1 ? null : () => {
+        setCrumb(crumb.slice(0, index + 1));
+        setQuery("");
+      },
     })),
   ];
 
@@ -151,6 +207,7 @@ export function DocumentsPage() {
       subtitle="Organize documentos da equipe e acompanhe as assinaturas."
       actions={
         <>
+          <HeaderSearch value={query} onChange={setQuery} placeholder="Buscar documentos ou pessoas" width={260} />
           <HeaderFilter
             label="Status"
             value={peopleFilter}
@@ -210,25 +267,27 @@ export function DocumentsPage() {
       <Card className="flex w-full flex-col">
         <CardTitle className="mb-4">{showingDocuments ? "Documentos" : "Pastas"}</CardTitle>
         {view === "documents" ? (
-          scopedDocuments.length === 0 ? (
-            <EmptyState framed={false} title="Nenhum documento neste filtro." description={peopleFilter === "inactive" ? "Não há documentos de pessoas desligadas." : undefined} />
+          documentRows.length === 0 ? (
+            <EmptyState framed={false} title={needle ? "Nenhum documento encontrado." : "Nenhum documento neste filtro."} description={needle ? "Tente outro termo." : peopleFilter === "inactive" ? "Não há documentos de pessoas desligadas." : undefined} />
           ) : (
-            <DocumentTable rows={scopedDocuments} people={people} showPerson showStore={allStores} storeName={storeName} busy={acting || resendingId != null} onDownload={(id) => void openFile(id, show)} onOpenSignatures={setSignaturesId} onMove={openMove} onDelete={setDeleteId} />
+            <DocumentTable rows={documentRows} people={people} showPerson showStore={allStores} storeName={storeName} busy={acting || resendingId != null} onDownload={(id) => void openFile(id, show)} onOpenSignatures={setSignaturesId} onMove={openMove} onDelete={setDeleteId} />
           )
         ) : atFiles ? (
           visibleFiles.length === 0 ? (
-            <EmptyState framed={false} title="Esta pasta ainda não tem documentos." action={<Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>} />
+            <EmptyState framed={false} title={needle ? "Nenhum documento encontrado." : "Esta pasta ainda não tem documentos."} description={needle ? "Tente outro termo." : undefined} action={needle ? undefined : <Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>} />
           ) : (
             <DocumentTable rows={visibleFiles} people={people} showPerson={false} showStore={false} storeName={storeName} busy={acting || resendingId != null} onDownload={(id) => void openFile(id, show)} onOpenSignatures={setSignaturesId} onMove={openMove} onDelete={setDeleteId} />
           )
-        ) : folders.length === 0 ? (
+        ) : visibleFolders.length === 0 ? (
           atPeople ? (
-            <EmptyState framed={false} title={peopleFilter === "inactive" ? "Nenhuma pessoa desligada" : "Nenhuma pessoa disponível"} description={peopleHere.length === 0 ? "Não há pessoas vinculadas a esta filial." : "Não há pessoas neste filtro."} />
+            <EmptyState framed={false} title={needle ? "Nenhuma pessoa encontrada" : peopleFilter === "inactive" ? "Nenhuma pessoa desligada" : "Nenhuma pessoa disponível"} description={needle ? "Tente outro nome, CPF ou e-mail." : peopleHere.length === 0 ? "Não há pessoas vinculadas a esta filial." : "Não há pessoas neste filtro."} />
+          ) : atBranches && needle ? (
+            <EmptyState framed={false} title="Nenhuma filial encontrada" description="Tente outro nome." />
           ) : (
-            <EmptyState framed={false} title="Esta pasta ainda não tem documentos." action={<Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>} />
+            <EmptyState framed={false} title={needle ? "Nenhum documento encontrado." : "Esta pasta ainda não tem documentos."} description={needle ? "Tente outro termo." : undefined} action={needle ? undefined : <Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>} />
           )
         ) : (
-          <FolderList rows={folders} onOpen={openFolder} />
+          <FolderList rows={visibleFolders} onOpen={openFolder} />
         )}
       </Card>
       </>
