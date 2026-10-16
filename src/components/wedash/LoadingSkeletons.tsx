@@ -190,34 +190,7 @@ function StoreRankingSkeleton() {
   );
 }
 
-/** Destaques da equipe: posicao + avatar + nome/valor + linha de detalhe. */
-function TeamHighlightsSkeleton() {
-  return (
-    <Card>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <Title className="w-40" />
-        <Pill className="w-12" />
-      </div>
-      <div className="flex flex-col gap-4 px-4 pb-4">
-        {Array.from({ length: 10 }, (_, i) => (
-          <div key={i} className="flex items-center gap-3">
-            <Skeleton className="h-3 w-5 shrink-0" />
-            <Skeleton className="h-8 w-8 shrink-0 rounded-full" />
-            <div className="min-w-0 flex-1">
-              <div className="mb-1.5 flex items-center justify-between gap-2">
-                <Skeleton className="h-3.5 w-32" />
-                <Skeleton className="h-3.5 w-20" />
-              </div>
-              <Skeleton className="h-2.5 w-3/5" />
-            </div>
-          </div>
-        ))}
-      </div>
-    </Card>
-  );
-}
-
-/** Top produtos / Top linhas: # + avatar de iniciais + nome/codigo + 3 colunas numericas. */
+/** Top produtos, Top linhas e Destaques da equipe: # + avatar + nome + colunas numericas. */
 function TopTableSkeleton({
   titleW = "w-32",
   rows = 10,
@@ -346,7 +319,7 @@ export function OverviewSkeleton({ weekdays = true }: { weekdays?: boolean }) {
         <DonutCardSkeleton />
       </div>
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <TeamHighlightsSkeleton />
+        <TopTableSkeleton titleW="w-40" variation />
         <TopTableSkeleton variation />
       </div>
     </Busy>

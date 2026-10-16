@@ -750,12 +750,13 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
     expect(v.topSellers[0]?.name).toBe("Ana Silva");
     expect(v.topSellers[0]?.amount).toBe(150);
     expect(v.topSellers[0]?.averageTicket).toBe(75);
+    expect(v.topSellers[0]?.sales).toBe(2);
     expect(v.topSellers[0]?.goalPct).toBeUndefined();
     expect(v.topSellers[0]?.sub).toBe("2 vendas");
     expect(v.topSellers[1]?.name).toBe("Carla");
   });
 
-  it("topVendedoras corta no Top 10", () => {
+  it("topVendedoras devolve o ranking completo, do maior faturamento para o menor", () => {
     const sellerDayAggs = Array.from({ length: 12 }, (_, i) => ({
       tenantId: "t1",
       storeId: "f1",
@@ -767,9 +768,10 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
       salesCount: 1,
     }));
     const v = buildOverviewView(scope("f1"), { dayAggs: [], sellerDayAggs });
-    expect(v.topSellers).toHaveLength(10);
+    expect(v.topSellers).toHaveLength(12);
     expect(v.topSellers[0]?.name).toBe("Pessoa 0");
-    expect(v.topSellers.some((s) => s.name === "Pessoa 11")).toBe(false);
+    expect(v.topSellers[11]?.name).toBe("Pessoa 11");
+    expect(v.topSellers[0]?.sales).toBe(1);
   });
 
   it("topVendedoras junta a mesma funcionária (código do ERP) mesmo com nome trocado", () => {

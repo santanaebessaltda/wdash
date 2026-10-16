@@ -1,9 +1,8 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { paths } from "@/router/paths";
-import { GoalLevelSummary } from "@/components/wedash/GoalLevelsBar";
 import { ProductNameCell } from "@/components/wedash/ProductNameCell";
-import { Avatar, Badge, Card, CardHeader, CardTitle, ProgressBar, RadialProgress, StatCard, DateRangePicker, PageHeader, Button, ThSort, type SortDir } from "@/components/ui";
+import { Badge, Card, CardHeader, CardTitle, RadialProgress, StatCard, DateRangePicker, PageHeader, Button, ThSort, type SortDir } from "@/components/ui";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { AreaLineChart, BarChart, DonutChart } from "@/components/charts";
 import { useScope } from "@/pages/dashboard/useScope";
@@ -63,9 +62,7 @@ import {
   periodDisplayLabel,
 } from "@/pages/dashboard/periodPicker";
 type TopProdSort = "name" | "items" | "revenue" | "profit" | "variation";
-
-/** Ouro / prata / bronze  -  mesmo padrao do Sales leaderboard (Vela). */
-const RANK_MEDAL = ["#f7b84e", "#c7cdd6", "#d99a5c"];
+type TeamSort = "name" | "revenue" | "sales" | "averageTicket" | "pa";
 
 const IconRevenue = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -172,6 +169,8 @@ export default function OverviewPage() {
   }, []);
   const [topProdSort, setTopProdSort] = useState<TopProdSort>("revenue");
   const [topProdDir, setTopProdDir] = useState<SortDir>("desc");
+  const [teamSort, setTeamSort] = useState<TeamSort>("revenue");
+  const [teamDir, setTeamDir] = useState<SortDir>("desc");
   /** So a leitura mais recente aplica setState (evita corrida stale sobrescrever pos-FORCE). */
   const reloadGen = useRef(0);
 
@@ -186,7 +185,7 @@ export default function OverviewPage() {
       scope.storeIds.length > 0 ? scope.storeIds : storesForSession(session.stores).map((s) => s.id);
     const goalsP = fetchGoals({ tenantId: session.tenantId, storeIds: goalStoreIds, from: period.start, to: period.end });
     // Atingimento da meta = do inicio de cada meta ate hoje (pode sair do periodo da tela).
-    // Nivel de meta no Destaques da equipe = mesma janela, por pessoa.
+    // Secao Meta do detalhe da pessoa = mesma janela, por pessoa.
     const empty = { days: [] as SalesDayAgg[], sellers: [] as SalesSellerDayAgg[], team: [] as GoalTeamMember[] };
     const goalDataP = goalsP.then(async (gs) => {
       if (gs.length === 0) return empty;
@@ -414,6 +413,37 @@ export default function OverviewPage() {
     } else {
       setTopProdSort(key);
       setTopProdDir(key === "name" ? "asc" : "desc");
+    }
+  }
+
+  // Mesma regra do Top produtos: a metrica escolhe o Top N; a direcao so reordena.
+  // "Nome" reordena o Top por faturamento.
+  const topSellersOrdenados = useMemo(() => {
+    type S = (typeof view.topSellers)[number];
+    const metric = (v: S) =>
+      teamSort === "sales"
+        ? (v.sales ?? 0)
+        : teamSort === "averageTicket"
+          ? (v.averageTicket ?? 0)
+          : teamSort === "pa"
+            ? (v.pa ?? -Infinity)
+            : v.amount;
+    const top = [...view.topSellers]
+      .sort((a, b) => metric(b) - metric(a) || b.amount - a.amount)
+      .slice(0, TOP_CARD_SIZE);
+    if (teamSort === "name") {
+      const dir = teamDir === "asc" ? 1 : -1;
+      return top.sort((a, b) => a.name.localeCompare(b.name, "pt-BR") * dir);
+    }
+    return teamDir === "asc" ? top.reverse() : top;
+  }, [view.topSellers, teamSort, teamDir]);
+
+  function toggleTeamSort(key: TeamSort) {
+    if (teamSort === key) {
+      setTeamDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setTeamSort(key);
+      setTeamDir(key === "name" ? "asc" : "desc");
     }
   }
 
@@ -866,82 +896,93 @@ export default function OverviewPage() {
               <Badge variant="accent">Top {TOP_CARD_SIZE}</Badge>
             </div>
           </CardHeader>
-          {view.topSellers.length === 0 ? (
+          {topSellersOrdenados.length === 0 ? (
             <EmptyBlock />
           ) : (
-          <div className="flex flex-col gap-1 px-2 pb-3">
-            {view.topSellers.map((v, idx) => {
-              const hasGoal = v.goal != null || v.goalPct != null;
-              const pct = v.goal?.attainmentPct ?? v.goalPct ?? 0;
-              const key = v.key;
-              const open = key ? () => openPerson(key, v.name) : undefined;
-              return (
-                <div
-                  key={v.name}
-                  role={open ? "button" : undefined}
-                  tabIndex={open ? 0 : undefined}
-                  onClick={open}
-                  onKeyDown={(e) => {
-                    if (open && (e.key === "Enter" || e.key === " ")) {
-                      e.preventDefault();
-                      open();
-                    }
-                  }}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-2 py-1.5",
-                    open && "cursor-pointer transition-colors hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none",
-                  )}
-                >
-                  <span
-                    className="w-5 shrink-0 text-center text-[13px] font-extrabold"
-                    style={{ color: RANK_MEDAL[idx] ?? "var(--t2)" }}
-                  >
-                    {idx + 1}
-                  </span>
-                  <Avatar name={v.name} size="sm" />
-                  <div className="min-w-0 flex-1">
-                    <div className="mb-1 flex items-baseline justify-between gap-2">
-                      <span className="min-w-0 truncate text-[13px] font-bold text-t0">{v.name}</span>
-                      <span className="shrink-0 font-mono text-[13px] font-extrabold text-ok">{brlCent(v.amount)}</span>
-                    </div>
-                    {!v.goal && hasGoal && <ProgressBar value={Math.min(100, pct)} height={5} />}
-                    <div className={`flex flex-wrap items-center gap-x-1.5 text-[11px] text-t2 ${hasGoal && !v.goal ? "mt-0.5" : ""}`}>
-                      <span>{v.sub?.split("·")[0]?.trim() ?? ""}</span>
-                      {v.averageTicket != null && v.averageTicket > 0 && (
-                        <>
-                          <span>·</span>
-                          <span>Ticket médio {brlCent(v.averageTicket)}</span>
-                        </>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
+                  <th className="px-1 pb-3 text-left font-bold">#</th>
+                  <ThSort
+                    label="Nome"
+                    active={teamSort === "name"}
+                    dir={teamDir}
+                    onClick={() => toggleTeamSort("name")}
+                    align="left"
+                    className="px-1 pb-3"
+                  />
+                  <ThSort
+                    label="Faturamento"
+                    active={teamSort === "revenue"}
+                    dir={teamDir}
+                    onClick={() => toggleTeamSort("revenue")}
+                    className="px-1 pb-3"
+                  />
+                  <ThSort
+                    label="Nº de vendas"
+                    active={teamSort === "sales"}
+                    dir={teamDir}
+                    onClick={() => toggleTeamSort("sales")}
+                    className="px-1 pb-3"
+                  />
+                  <ThSort
+                    label="Ticket médio"
+                    active={teamSort === "averageTicket"}
+                    dir={teamDir}
+                    onClick={() => toggleTeamSort("averageTicket")}
+                    className="px-1 pb-3"
+                  />
+                  <ThSort
+                    label="P.A."
+                    active={teamSort === "pa"}
+                    dir={teamDir}
+                    onClick={() => toggleTeamSort("pa")}
+                    className="px-1 pb-3"
+                  />
+                </tr>
+              </thead>
+              <tbody>
+                {topSellersOrdenados.map((v, idx) => {
+                  const key = v.key;
+                  const open = key ? () => openPerson(key, v.name) : undefined;
+                  return (
+                    <tr
+                      key={key ?? v.name}
+                      tabIndex={open ? 0 : undefined}
+                      onClick={open}
+                      onKeyDown={(e) => {
+                        if (open && (e.key === "Enter" || e.key === " ")) {
+                          e.preventDefault();
+                          open();
+                        }
+                      }}
+                      className={cn(
+                        "border-b border-line last:border-b-0",
+                        open && "cursor-pointer transition-colors hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none",
                       )}
-                      {v.pa != null && (
-                        <>
-                          <span>·</span>
-                          <span>P.A. {num(v.pa, 2)}</span>
-                        </>
-                      )}
-                      {hasGoal && !v.goal && (
-                        <>
-                          <span>·</span>
-                          <span className={pct >= 100 ? "font-semibold text-ok" : ""}>{Math.round(pct)}% da meta</span>
-                        </>
-                      )}
-                    </div>
-                    {v.goal && (
-                      <div className="mt-2">
-                        <GoalLevelSummary
-                          pct={pct}
-                          level={v.goal.level}
-                          levelNumber={v.goal.levelNumber}
-                          marcos={v.goal.marcos}
-                          complete={!printing}
-                          rolagem
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                    >
+                      <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
+                      <td className="px-1 py-3">
+                        <ProductNameCell name={v.name} idx={idx} />
+                      </td>
+                      <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(v.amount)}</td>
+                      <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(v.sales ?? 0)}</td>
+                      <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(v.averageTicket ?? 0)}</td>
+                      <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", v.pa == null ? "text-t2" : "text-t0")}>
+                        {v.pa == null ? (
+                          <Tooltip label="O P.A. não está disponível para este período.">
+                            <span>—</span>
+                          </Tooltip>
+                        ) : (
+                          num(v.pa, 2)
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
           )}
         </Card>

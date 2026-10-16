@@ -3843,6 +3843,8 @@ export interface TopSeller extends TopItem {
   /** Mesma chave do `TeamMemberRow.key`  -  abre o detalhe da pessoa. */
   key?: string;
   sub?: string;
+  /** Nº de vendas no periodo. */
+  sales?: number;
   averageTicket?: number;
   goalPct?: number;
   /** Itens por venda; ausente se algum dia com venda nao tem itens gravados (nada estimado). */
@@ -3877,6 +3879,7 @@ export interface OverviewView {
   dayVsMeta: DayVsGoal[];
   evolution: EvolutionPoint[];
   paymentMethods: PaymentMethodRevenue[];
+  /** Ranking completo (maior faturamento primeiro). A tela escolhe a metrica e corta o Top N. */
   topSellers: TopSeller[];
   /** Ranking completo (maior faturamento primeiro)  -  a tela escolhe a metrica e corta o Top N.
    *  `chave` = mesma do `ProductItemRow` (abre o detalhe do produto). */
@@ -3919,7 +3922,7 @@ export type OverviewAggInput = {
   goals?: import("./goalsRepo").GoalRecord[];
   /** Faturamento do inicio das metas ate hoje (card Atingimento da meta, que ignora o filtro de periodo). */
   goalDayAggs?: import("./salesTypes").SalesDayAgg[];
-  /** Vendas por pessoa do inicio das metas ate hoje (nivel de meta no Destaques da equipe). */
+  /** Vendas por pessoa do inicio das metas ate hoje (secao Meta do detalhe da pessoa). */
   goalSellerDayAggs?: import("./salesTypes").SalesSellerDayAgg[];
   /** Equipe das lojas com meta (grupo de cada pessoa na meta). */
   goalTeam?: import("./goalsRepo").GoalTeamMember[];
@@ -4708,9 +4711,9 @@ export function buildOverviewViewFromAggs(scope: Scope, input: OverviewAggInput)
     team: input.goalTeam ?? [],
     today: todayIso,
   });
+  // Ranking completo. A tela escolhe a metrica e corta o Top N (igual ao Top produtos).
   const topSellers: TopSeller[] = [...vendMap.entries()]
     .sort((a, b) => b[1].revenue - a[1].revenue)
-    .slice(0, TOP_CARD_SIZE)
     .map(([key, v]) => {
       const goal = goalLevels.get(key);
       return {
@@ -4718,6 +4721,7 @@ export function buildOverviewViewFromAggs(scope: Scope, input: OverviewAggInput)
         name: v.name,
         amount: v.revenue,
         sub: `${v.sales} venda${v.sales === 1 ? "" : "s"}`,
+        sales: v.sales,
         averageTicket: v.sales > 0 ? v.revenue / v.sales : 0,
         ...(!v.withoutItems && v.sales > 0 ? { pa: v.items / v.sales } : {}),
         storeRows: storesForSeller(v),
@@ -5138,11 +5142,11 @@ export function buildOverviewView(scope: Scope, aggs?: OverviewAggInput | null):
   const individualGoal = storeGoalTotal / sellerCount;
   const topSellers: TopSeller[] = [...vendMap.values()]
     .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, TOP_CARD_SIZE)
     .map((v) => ({
       name: v.name,
       amount: v.revenue,
       sub: `${v.sales} vendas · ${individualGoal > 0 ? Math.round((v.revenue / individualGoal) * 100) : 0}% da meta`,
+      sales: v.sales,
       averageTicket: v.sales > 0 ? v.revenue / v.sales : 0,
       goalPct: individualGoal > 0 ? Math.min(100, (v.revenue / individualGoal) * 100) : 0,
       ...(v.sales > 0 ? { pa: v.items / v.sales } : {}),
