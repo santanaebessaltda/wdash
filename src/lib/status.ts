@@ -25,7 +25,9 @@ const PRODUCT_STATUS: Record<string, StatusVariant> = {
   recebido: "success",
   informado: "success",
   conectado: "success",
+  conectada: "success",
   configurado: "success",
+  configurada: "success",
   concluído: "success",
   concluido: "success",
 

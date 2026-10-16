@@ -1,10 +1,13 @@
 import type { ReactNode } from "react";
-import { Button, Card, CardTitle, Skeleton } from "@/components/ui";
+import { Badge, Button, Card, CardTitle, Skeleton } from "@/components/ui";
+import { statusBadgeVariant } from "@/lib/status";
 
 export type ConnectionRow = {
   key: string;
   name: string;
   detail: string;
+  /** Conectada na adquirente; Configurada na administradora. */
+  status?: string;
   mark: ReactNode;
   onDisconnect: () => void;
 };
@@ -20,7 +23,10 @@ export function ConnectionCard({ title, hint, rows }: { title: string; hint: str
           <div key={row.key} className="flex flex-col gap-3 rounded-[13px] border border-line bg-bg-inset px-4 py-3.5 sm:flex-row sm:items-center">
             <Mark>{row.mark}</Mark>
             <div className="min-w-0 flex-1">
-              <p className="text-[13.5px] font-bold text-t0">{row.name}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-[13.5px] font-bold text-t0">{row.name}</p>
+                {row.status ? <Badge variant={statusBadgeVariant(row.status)}>{row.status}</Badge> : null}
+              </div>
               <p className="mt-0.5 truncate text-xs text-t2">{row.detail}</p>
             </div>
             <Button variant="outline" size="sm" onClick={row.onDisconnect}>

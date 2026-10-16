@@ -107,7 +107,7 @@ export function ShoppingSettingsPage() {
       <SectionHeader
         section="Integrações"
         title="Administradora"
-        subtitle="Conecte a administradora desta filial para informar as vendas ao shopping. Cada filial usa uma só."
+        subtitle="Conecte a administradora desta filial para informar as vendas ao shopping."
       />
       {escolher || showSkeleton ? (
         escolher ? (
@@ -136,7 +136,7 @@ export function ShoppingSettingsPage() {
           <EmptyBlock
             icon="🏬"
             title="Nenhuma administradora conectada"
-            description="Conecte a administradora desta filial para informar as vendas ao shopping."
+            description="Conecte a administradora responsável pelo informe de vendas desta filial."
             action={
               <Button size="sm" onClick={() => setPicker(true)} disabled={!canEdit}>
                 Conectar administradora
@@ -147,12 +147,13 @@ export function ShoppingSettingsPage() {
       ) : (
         <ConnectionCard
           title="Administradora"
-          hint={`Esta filial já usa o acesso ${accessPhrase(account.administrator)}. Desconecte para trocar.`}
+          hint={`Esta filial já está conectada à ${connectedName}. Desconecte para trocar.`}
           rows={[
             {
               key: account.administrator,
               name: connectedName,
               detail: mallDetail(account),
+              status: account.administrator === "argo" ? undefined : "Configurada",
               mark: provider ? (
                 <img src={provider.logo} alt="" className="h-full w-full object-contain p-1.5" />
               ) : (
@@ -194,7 +195,7 @@ export function ShoppingSettingsPage() {
         onClose={() => {
           if (!removing) setConfirm(false);
         }}
-        title={account ? (account.administrator === "groupcom" ? "Desconectar o Group COM?" : `Desconectar a ${connectedName}?`) : "Desconectar?"}
+        title={account ? `Desconectar ${connectedName}?` : "Desconectar?"}
         size="sm"
         footer={
           <>
@@ -208,7 +209,7 @@ export function ShoppingSettingsPage() {
         }
       >
         <p className="text-[13.5px] leading-relaxed text-t1">
-          A WDash deixa de informar as vendas desta filial ao shopping. Os informes já gravados permanecem.
+          A WDash deixará de informar as vendas desta filial ao shopping. Os valores já informados serão mantidos.
         </p>
       </Modal>
       {store && open ? (
@@ -404,7 +405,7 @@ function IntranetMallForm({
     });
   }
 
-  const slugError = slug.length > 0 && !baseUrl ? "Informe o identificador da filial, como shoppingcampogrande4." : undefined;
+  const slugError = slug.length > 0 && !baseUrl ? "Informe o identificador da filial, como shoppingexemplo." : undefined;
   const canConectar = !busy && baseUrl != null && username.trim().length > 0 && (password.trim().length > 0 || conectado) && (conectado || autorizo);
   const label = busy ? (conectado ? "Salvando…" : "Conectando…") : conectado ? "Salvar alterações" : "Conectar";
   saveRef.current = () => void conectar();
@@ -427,7 +428,7 @@ function IntranetMallForm({
         label="Identificador da filial"
         required
         error={slugError}
-        hint="É o trecho do endereço depois de intranetmall.com/. Em https://app3.intranetmall.com/shoppingcampogrande4/, o identificador é shoppingcampogrande4."
+        hint="É o trecho do endereço depois de intranetmall.com/. Em app3.intranetmall.com/shoppingexemplo/, o identificador é shoppingexemplo."
       >
         <div className={cn("flex flex-col overflow-hidden rounded-[var(--radius-vela-md)] border bg-bg-inset focus-within:border-acc sm:h-[42px] sm:flex-row", slugError ? "border-bad" : "border-line")}>
           <span className="flex shrink-0 items-center border-b border-line bg-bg-3 px-3 py-2 text-[12px] text-t2 sm:border-b-0 sm:border-r sm:py-0">
@@ -436,7 +437,7 @@ function IntranetMallForm({
           <input
             value={slug}
             onChange={(e) => setSlug(slugFieldValue(e.target.value))}
-            placeholder="shoppingcampogrande4"
+            placeholder="shoppingexemplo"
             disabled={busy}
             className="h-[42px] min-w-0 flex-1 bg-transparent px-3 text-[13px] text-t0 outline-none placeholder:text-t2"
             {...noAutofill}

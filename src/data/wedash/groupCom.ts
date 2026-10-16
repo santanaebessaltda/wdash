@@ -1,4 +1,4 @@
-/** Group COM. O slug é o portal, como treslagoasapp em https://treslagoasapp.com21.com.br/. */
+/** Group COM. O slug é o portal, como shoppingexemplo em https://shoppingexemplo.com21.com.br/. */
 
 export const GROUP_COM_API = "https://appc.com21.com.br";
 

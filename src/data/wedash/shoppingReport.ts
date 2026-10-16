@@ -138,7 +138,7 @@ export type ShoppingAdministrator = "allos" | "argo" | "groupcom";
 
 export type { GroupComUnit };
 
-/** O host não muda. O slug é o trecho da filial, como shoppingcampogrande4. */
+/** O host não muda. O slug é o trecho da filial, como shoppingexemplo. */
 export const INTRANET_MALL_ORIGIN = "https://app3.intranetmall.com";
 
 const INTRANET_MALL_SLUG = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/;

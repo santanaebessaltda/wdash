@@ -92,12 +92,10 @@ export function AcquirersPage() {
       detail: `Estabelecimento ${link.establishmentCode}`,
     })),
   ];
-  const blocked = rows.length > 0;
-  const hint = blocked
-    ? rows.length === 1
+  const hint =
+    rows.length === 1
       ? `Esta filial já está conectada à ${rows[0]!.name}. Desconecte para trocar.`
-      : "Desconecte a adquirente atual para conectar outra."
-    : "Cada filial usa uma adquirente para buscar os fechamentos de cartão e Pix.";
+      : "Desconecte a adquirente atual para conectar outra.";
 
   async function disconnect() {
     if (!pending) return;
@@ -118,7 +116,7 @@ export function AcquirersPage() {
       <SectionHeader
         section="Integrações"
         title="Adquirentes"
-        subtitle="Conecte a adquirente desta filial para buscar os fechamentos de cartão e Pix na WDash."
+        subtitle="Conecte a adquirente desta filial para buscar fechamentos de cartão e Pix."
       />
       {escolher ? (
         <div className="mt-6 max-w-[720px]">
@@ -126,12 +124,16 @@ export function AcquirersPage() {
         </div>
       ) : showSkeleton || (loading && rows.length === 0 && storeRows.length > 0) ? (
         <ConnectionSkeleton label="Carregando adquirentes…" />
+      ) : storeRows.length === 0 ? (
+        <Card className="mt-6">
+          <EmptyBlock icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
+        </Card>
       ) : rows.length === 0 ? (
         <Card className="mt-6 flex min-h-[280px] flex-col">
           <EmptyBlock
             icon="💳"
             title="Nenhuma adquirente conectada"
-            description="Conecte a adquirente desta filial para buscar os fechamentos de cartão e Pix."
+            description="Conecte uma adquirente para buscar os fechamentos de cartão e Pix desta filial."
             action={
               <Button size="sm" onClick={() => setPicker(true)} disabled={!canEdit || storeRows.length === 0}>
                 Conectar adquirente
@@ -147,6 +149,7 @@ export function AcquirersPage() {
             key: `${row.kind}-${row.storeId}`,
             name: row.name,
             detail: row.detail,
+            status: "Conectada",
             mark: row.kind === "stone" ? <StoneMark /> : <CieloMark />,
             onDisconnect: () => setPending(row),
           }))}
@@ -202,7 +205,7 @@ export function AcquirersPage() {
         onClose={() => {
           if (!disconnecting) setPending(null);
         }}
-        title={pending ? `Desconectar a ${pending.name}?` : "Desconectar?"}
+        title={pending ? `Desconectar ${pending.name}?` : "Desconectar?"}
         size="sm"
         footer={
           <>
@@ -216,7 +219,7 @@ export function AcquirersPage() {
         }
       >
         <p className="text-[13.5px] leading-relaxed text-t1">
-          A WDash deixa de buscar os fechamentos de cartão e Pix desta filial. Os fechamentos já gravados permanecem.
+          A WDash deixará de buscar os fechamentos de cartão e Pix desta filial. Os fechamentos já salvos serão mantidos.
         </p>
       </Modal>
     </div>
@@ -300,7 +303,7 @@ function StoneModal({
 
   async function conectar() {
     if (cieloStoreIds.includes(storeId)) {
-      show("Esta filial já usa a Cielo. Desconecte a Cielo antes de conectar a Stone.", "danger");
+      show("Esta filial já está conectada à Cielo. Desconecte a Cielo para continuar.", "danger");
       return;
     }
     setBusy(true);
@@ -354,17 +357,17 @@ function StoneModal({
       <div className="flex flex-col gap-3.5">
         {conectado ? (
           <p className="text-[13.5px] leading-relaxed text-t1">
-            A WDash está conectada à Stone desta loja. Os fechamentos de cartão e Pix são buscados automaticamente
+            A WDash está conectada à Stone desta filial. Os fechamentos de cartão e Pix são buscados automaticamente
             enquanto a conexão estiver ativa.
           </p>
         ) : (
           <>
             <p className="text-[13.5px] leading-relaxed text-t1">
-              Informe o Stone Code e a chave secreta desta loja. A WDash protege esses dados e os usa somente para acessar
-              as informações da Stone.
+              Informe os dados de acesso da Stone desta filial. A WDash protege esses dados e os usa somente para buscar os
+              fechamentos.
             </p>
             <p className="text-[13.5px] leading-relaxed text-t1">
-              Ao conectar, buscamos os fechamentos disponíveis deste mês, do dia 1 até ontem.
+              Ao conectar, a WDash busca os fechamentos disponíveis deste mês, do dia 1 até ontem.
             </p>
           </>
         )}
@@ -372,7 +375,7 @@ function StoneModal({
           <FormField label="Filial" required>
             <Select value={storeId} onChange={(e) => setStoreId(e.target.value)} disabled={busy} {...noAutofill}>
               <option value="" disabled>
-                Selecione a loja
+                Selecione a filial
               </option>
               {storeRows.map((l) => (
                 <option key={l.id} value={l.id}>
@@ -437,13 +440,13 @@ function StoneModal({
             <div>
               <p className="font-semibold text-t0">Desconexão</p>
               <p className="mt-0.5 text-t2">
-                Ao desconectar, a WDash deixa de buscar automaticamente os fechamentos de cartão e Pix desta loja.
+                Ao desconectar, a WDash deixa de buscar automaticamente os fechamentos de cartão e Pix desta filial.
               </p>
             </div>
           </div>
         ) : (
           <Checkbox
-            label="Autorizo a WDash a usar este acesso para buscar os fechamentos de cartão e Pix."
+            label="Autorizo a WDash a usar este acesso para buscar os fechamentos de cartão e Pix desta filial."
             checked={autorizo}
             onChange={(e) => setAutorizo(e.target.checked)}
             disabled={busy}
@@ -484,7 +487,9 @@ function CieloModal({
   const [clientSecret, setClientSecret] = useState("");
   const [hmac, setHmac] = useState("");
   const [cert, setCert] = useState("");
+  const [certName, setCertName] = useState("");
   const [privateKey, setPrivateKey] = useState("");
+  const [privateKeyName, setPrivateKeyName] = useState("");
   const [showSecret, setShowSecret] = useState(false);
   const [autorizo, setAutorizo] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -503,7 +508,9 @@ function CieloModal({
     setClientSecret("");
     setHmac("");
     setCert("");
+    setCertName("");
     setPrivateKey("");
+    setPrivateKeyName("");
     setShowSecret(false);
     setAutorizo(false);
   }, [link?.establishmentCode, account?.merchantCode, account?.clientId, storeId]);
@@ -515,7 +522,7 @@ function CieloModal({
 
   async function conectar() {
     if (stoneStoreIds.includes(storeId)) {
-      show("Esta filial já usa a Stone. Desconecte a Stone antes de conectar a Cielo.", "danger");
+      show("Esta filial já está conectada à Stone. Desconecte a Stone para continuar.", "danger");
       return;
     }
     setBusy(true);
@@ -537,7 +544,9 @@ function CieloModal({
     setClientSecret("");
     setHmac("");
     setCert("");
+    setCertName("");
     setPrivateKey("");
+    setPrivateKeyName("");
     await onSaved(storeId);
   }
 
@@ -589,26 +598,26 @@ function CieloModal({
       <div className="flex flex-col gap-3.5">
         {conectado ? (
           <p className="text-[13.5px] leading-relaxed text-t1">
-            A WDash está conectada à Cielo desta loja. Os fechamentos de cartão e Pix são buscados automaticamente
+            A WDash está conectada à Cielo desta filial. Os fechamentos de cartão e Pix são buscados automaticamente
             enquanto a conexão estiver ativa.
           </p>
         ) : hasAccount ? (
           <>
             <p className="text-[13.5px] leading-relaxed text-t1">
-              O acesso Cielo desta empresa já está cadastrado. Informe o estabelecimento desta filial.
+              O acesso da Cielo já está cadastrado. Informe o estabelecimento desta filial.
             </p>
             <p className="text-[13.5px] leading-relaxed text-t1">
-              Ao conectar, buscamos os fechamentos disponíveis deste mês, do dia 1 até ontem.
+              Ao conectar, a WDash busca os fechamentos disponíveis deste mês, do dia 1 até ontem.
             </p>
           </>
         ) : (
           <>
             <p className="text-[13.5px] leading-relaxed text-t1">
-              Informe o acesso Cielo desta empresa e o estabelecimento desta filial. O certificado e as chaves ficam
-              protegidos e servem para todas as filiais.
+              Informe os dados de acesso da Cielo e o estabelecimento desta filial. O acesso será usado pelas filiais
+              conectadas à mesma conta.
             </p>
             <p className="text-[13.5px] leading-relaxed text-t1">
-              Ao conectar, buscamos os fechamentos disponíveis deste mês, do dia 1 até ontem.
+              Ao conectar, a WDash busca os fechamentos disponíveis deste mês, do dia 1 até ontem.
             </p>
           </>
         )}
@@ -616,7 +625,7 @@ function CieloModal({
           <FormField label="Filial" required>
             <Select value={storeId} onChange={(e) => setStoreId(e.target.value)} disabled={busy} {...noAutofill}>
               <option value="" disabled>
-                Selecione a loja
+                Selecione a filial
               </option>
               {storeRows.map((l) => (
                 <option key={l.id} value={l.id}>
@@ -678,12 +687,41 @@ function CieloModal({
                   disabled={busy}
                   className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-t2 hover:bg-bg-3 hover:text-t0"
                 >
-                  {showSecret ? "ocultar" : "ver"}
+                  {showSecret ? (
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22" />
+                    </svg>
+                  ) : (
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
                 </button>
               </div>
             </FormField>
-            <CieloFile label="Certificado" required={!hasAccount} fileName={cert ? "arquivo selecionado" : ""} disabled={busy} onPick={setCert} />
-            <CieloFile label="Chave privada" required={!hasAccount} fileName={privateKey ? "arquivo selecionado" : ""} disabled={busy} onPick={setPrivateKey} />
+            <CieloFile
+              label="Certificado"
+              required={!hasAccount}
+              fileName={certName}
+              emptyLabel="Já cadastrado"
+              disabled={busy}
+              onPick={(value, name) => {
+                setCert(value);
+                setCertName(name);
+              }}
+            />
+            <CieloFile
+              label="Chave privada"
+              required={!hasAccount}
+              fileName={privateKeyName}
+              emptyLabel="Já cadastrada"
+              disabled={busy}
+              onPick={(value, name) => {
+                setPrivateKey(value);
+                setPrivateKeyName(name);
+              }}
+            />
           </>
         )}
         <FormField label="Estabelecimento" required>
@@ -705,14 +743,14 @@ function CieloModal({
             <div>
               <p className="font-semibold text-t0">Desconexão</p>
               <p className="mt-0.5 text-t2">
-                Ao desconectar, a WDash deixa de buscar automaticamente os fechamentos de cartão e Pix desta loja. O
+                Ao desconectar, a WDash deixa de buscar automaticamente os fechamentos de cartão e Pix desta filial. O
                 acesso da empresa permanece para as outras filiais.
               </p>
             </div>
           </div>
         ) : (
           <Checkbox
-            label="Autorizo a WDash a buscar os fechamentos de cartão e Pix desta filial na Cielo."
+            label="Autorizo a WDash a usar este acesso para buscar os fechamentos de cartão e Pix desta filial."
             checked={autorizo}
             onChange={(e) => setAutorizo(e.target.checked)}
             disabled={busy}
@@ -727,19 +765,21 @@ function CieloFile({
   label,
   required,
   fileName,
+  emptyLabel,
   disabled,
   onPick,
 }: {
   label: string;
   required: boolean;
   fileName: string;
+  emptyLabel: string;
   disabled: boolean;
-  onPick: (value: string) => void;
+  onPick: (value: string, fileName: string) => void;
 }) {
   return (
     <FormField label={label} required={required}>
       <label className="flex cursor-pointer items-center justify-between gap-3 rounded-[var(--radius-vela-sm)] border border-line bg-bg px-3 py-2 text-[13px] text-t1">
-        <span className="truncate">{fileName || (required ? "Escolher arquivo" : "Já cadastrado")}</span>
+        <span className="truncate">{fileName || (required ? "Escolher arquivo" : emptyLabel)}</span>
         <input
           type="file"
           className="sr-only"
@@ -748,7 +788,7 @@ function CieloFile({
             const file = e.target.files?.[0];
             e.target.value = "";
             if (!file) return;
-            void readCredentialFile(file).then(onPick);
+            void readCredentialFile(file).then((value) => onPick(value, file.name));
           }}
         />
       </label>

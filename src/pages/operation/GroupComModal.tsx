@@ -87,7 +87,7 @@ export function GroupComModal({
     });
   }
 
-  const slugError = slug.length > 0 && !baseUrl ? "Informe o identificador do portal, como treslagoasapp." : undefined;
+  const slugError = slug.length > 0 && !baseUrl ? "Informe o identificador do portal, como shoppingexemplo." : undefined;
   const canBuscar = !busy && baseUrl != null && email.trim().includes("@") && password.trim().length > 0;
   const canConectar = !busy && baseUrl != null && email.trim().includes("@") && selected != null && (password.trim().length > 0 || conectado) && (conectado || autorizo);
   const label = task === "save" ? (conectado ? "Salvando…" : "Conectando…") : conectado ? "Salvar alterações" : "Conectar";
@@ -112,7 +112,7 @@ export function GroupComModal({
           label="Identificador do portal"
           required
           error={slugError}
-          hint="É o trecho do endereço antes de .com21.com.br. Em https://treslagoasapp.com21.com.br/, o identificador é treslagoasapp."
+          hint="É o trecho do endereço antes de .com21.com.br. Em shoppingexemplo.com21.com.br, o identificador é shoppingexemplo."
         >
           <div className={cn("flex flex-col overflow-hidden rounded-[var(--radius-vela-md)] border bg-bg-inset focus-within:border-acc sm:h-[42px] sm:flex-row", slugError ? "border-bad" : "border-line")}>
             <span className="flex shrink-0 items-center border-b border-line bg-bg-3 px-3 py-2 text-[12px] text-t2 sm:border-b-0 sm:border-r sm:py-0">https://</span>
@@ -123,7 +123,7 @@ export function GroupComModal({
                 setUnits([]);
                 setSelected(null);
               }}
-              placeholder="treslagoasapp"
+              placeholder="shoppingexemplo"
               disabled={busy}
               className="h-[42px] min-w-0 flex-1 bg-transparent px-3 text-[13px] text-t0 outline-none placeholder:text-t2"
               {...noAutofill}
