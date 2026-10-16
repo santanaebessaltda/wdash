@@ -3424,6 +3424,7 @@ export interface TeamMemberRow {
   key: string;
   name: string;
   /** Lojas onde vendeu no periodo, da que mais faturou para a que menos. */
+  storeIds: string[];
   storeRows: string[];
   /** "Manha  |  09:00 - 15:00"; ausente = sem turno definido. */
   shift?: string;
@@ -3606,6 +3607,7 @@ export function buildTeamDashboardView(
     .map(({ key, a, storeIdList, shift }) => ({
       key,
       name: a.name,
+      storeIds: storeIdList,
       storeRows: storeIdList.map((id) => storeName.get(id)).filter((n): n is string => Boolean(n)),
       shift,
       revenue: a.current.revenue,

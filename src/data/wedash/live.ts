@@ -5,6 +5,8 @@ export interface RankingRow {
   name: string;
   /** Nome real quando o rótulo do pódio é "VOCÊ". A foto e as iniciais usam este nome. */
   avatarName?: string;
+  /** Loja da pessoa, para achar a foto pelo nome. */
+  storeId?: string;
   sales: number;
   revenue: number;
 }

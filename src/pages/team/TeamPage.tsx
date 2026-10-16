@@ -378,6 +378,7 @@ export function TeamPage() {
     position: i + 1,
     employeeId: p.key,
     name: p.name,
+    storeId: p.storeIds[0],
     sales: p.sales,
     revenue: p.revenue,
   }));
@@ -710,7 +711,7 @@ export function TeamPage() {
                       <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{rank + 1}</td>
                       <td className="px-1 py-3">
                         <div className="flex min-w-0 items-center gap-2.5">
-                          <PersonAvatar name={p.name} employeeId={p.key} size="sm" />
+                          <PersonAvatar name={p.name} employeeId={p.key} storeId={p.storeIds[0]} size="sm" />
                           <div className="min-w-0">
                             <p className="truncate text-[13px] font-bold text-t0">{p.name}</p>
                             {store &&

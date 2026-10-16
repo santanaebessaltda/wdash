@@ -19,6 +19,7 @@ import { fetchSalesDayAggs, fetchSalesSellerDayAggs } from "@/data/wedash/salesR
 import type { SalesDayAgg, SalesSellerDayAgg } from "@/data/wedash/salesTypes";
 import { storesForSession } from "@/data/wedash/stores";
 import type { GoalCardView } from "@/data/wedash/teamViews";
+import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { WedashBrand } from "@/components/wedash/WedashBrand";
 import { brlCent, fullDate, shortDate, isoToDate, num, dateToIso, shiftName } from "@/lib/format";
 import { statusBadgeVariant } from "@/lib/status";
@@ -459,6 +460,7 @@ function PayoutReportHeader({ goal, storeNameValue }: { goal: GoalRecord; storeN
 type PayoutRow = {
   key: string;
   name: string;
+  storeId: string | null;
   sub: string | null;
   level: string | null;
   revenue: number;
@@ -491,6 +493,7 @@ function GoalPayoutCard({
     .map((v) => ({
       key: v.employeeId || v.name,
       name: v.name,
+      storeId: v.storeId,
       sub: goal.groups.length > 0 ? v.group : null,
       level: v.currentLevel ? `N${v.currentLevel} · ${v.currentTierName}` : null,
       revenue: v.revenueAmount,
@@ -504,6 +507,7 @@ function GoalPayoutCard({
     ? {
         key: "gerencia",
         name: "GERÊNCIA",
+        storeId: null,
         sub: "Faturamento total da filial",
         level: management.levelNumber ? `N${management.levelNumber} · ${management.level}` : null,
         revenue: card.band.achieved,
@@ -577,8 +581,13 @@ function GoalPayoutCard({
               {lines.map((r) => (
                 <tr key={r.key} className={`border-b border-line ${r.key === "gerencia" ? "bg-bg-inset" : ""}`}>
                   <td className="py-2.5 pr-3">
-                    <p className="font-bold text-t0">{r.name}</p>
-                    {r.sub && <p className="text-[11px] text-t2">{r.sub}</p>}
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <PersonAvatar name={r.name} employeeId={r.key === "gerencia" ? null : r.key} storeId={r.storeId} size="sm" />
+                      <div className="min-w-0">
+                        <p className="truncate font-bold text-t0">{r.name}</p>
+                        {r.sub && <p className="truncate text-[11px] text-t2">{r.sub}</p>}
+                      </div>
+                    </div>
                   </td>
                   <td className={`py-2.5 pr-3 font-semibold ${r.level ? "text-acc" : "text-t2"}`}>{r.level ?? "Abaixo do 1º nível"}</td>
                   <td className="py-2.5 pr-3 text-right font-mono font-bold text-t1">{brlCent(r.revenue)}</td>

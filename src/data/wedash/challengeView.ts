@@ -444,6 +444,8 @@ export function buildChallengeView(args: {
 }
 
 export interface ChallengeWinner {
+  /** `e:código` ou `n:nome` — mesma chave do participante, para a foto. */
+  key: string;
   name: string;
   group: string | null;
   /** "1 lugar"  |  "Atingiu" */
@@ -464,6 +466,7 @@ export function challengePayout(view: ChallengeView): ChallengePayout {
   const vencedores: ChallengeWinner[] = view.participants
     .filter((p) => p.winner && p.prize)
     .map((p) => ({
+      key: p.key,
       name: p.name,
       group: p.group,
       rank: p.position != null ? `${p.position}º lugar` : "Atingiu",

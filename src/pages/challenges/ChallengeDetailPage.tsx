@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Alert, Badge, Breadcrumbs, Button, Card, CardTitle } from "@/components/ui";
+import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { DuplicateChoiceModal } from "@/components/wedash/DuplicateChoiceModal";
 import { ChallengeDetailSkeleton } from "@/components/wedash/LoadingSkeletons";
@@ -344,8 +345,7 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
                 <tr key={p.key} className="border-b border-line last:border-b-0">
                   {disputa && <td className="py-2.5 pr-3 font-mono font-bold text-t2">{p.position ?? "—"}</td>}
                   <td className="py-2.5 pr-3">
-                    <p className="font-bold text-t0">{p.name}</p>
-                    {p.group && <p className="text-[11px] text-t2">{p.group}</p>}
+                    <PersonName name={p.name} employeeId={p.key} storeId={c.storeId} sub={p.group} />
                   </td>
                   <td className="py-2.5 pr-3 text-right font-mono font-bold text-t0">
                     {aComecar ? "—" : p.result != null ? metricValueLabel(c.metric, p.result) : <WithoutItems index={isIndexMetric(c.metric)} />}
@@ -414,9 +414,16 @@ function ChallengePayoutCard({ challenge: c, view, onExport }: { challenge: Chal
   const endMais1 = isoToDate(c.endsOn);
   endMais1.setDate(endMais1.getDate() + 1);
   const lines = [
-    ...payout.vencedores.map((w, i) => ({ key: `p${i}`, name: w.name, sub: w.group, rank: w.rank, prize: w.prize })),
+    ...payout.vencedores.map((w) => ({
+      key: w.key,
+      name: w.name,
+      sub: w.group,
+      rank: w.rank,
+      prize: w.prize,
+      employeeId: w.key,
+    })),
     ...(payout.management
-      ? [{ key: "gerencia", name: "GERÊNCIA", sub: "Resultado da equipe", rank: "Atingiu", prize: payout.management }]
+      ? [{ key: "gerencia", name: "GERÊNCIA", sub: "Resultado da equipe", rank: "Atingiu", prize: payout.management, employeeId: null as string | null }]
       : []),
   ];
   const especie = countEspecie(payout.especie);
@@ -478,8 +485,7 @@ function ChallengePayoutCard({ challenge: c, view, onExport }: { challenge: Chal
                 {lines.map((r) => (
                   <tr key={r.key} className={`border-b border-line ${r.key === "gerencia" ? "bg-bg-inset" : ""}`}>
                     <td className="py-2.5 pr-3">
-                      <p className="font-bold text-t0">{r.name}</p>
-                      {r.sub && <p className="text-[11px] text-t2">{r.sub}</p>}
+                      <PersonName name={r.name} employeeId={r.employeeId} storeId={r.key === "gerencia" ? null : c.storeId} sub={r.sub} />
                     </td>
                     <td className="py-2.5 pr-3 font-semibold text-acc">{r.rank}</td>
                     <td
@@ -503,6 +509,28 @@ function ChallengePayoutCard({ challenge: c, view, onExport }: { challenge: Chal
         </>
       )}
     </Card>
+  );
+}
+
+function PersonName({
+  name,
+  employeeId,
+  storeId,
+  sub,
+}: {
+  name: string;
+  employeeId?: string | null;
+  storeId?: string | null;
+  sub?: string | null;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-2.5">
+      <PersonAvatar name={name} employeeId={employeeId} storeId={storeId} size="sm" />
+      <div className="min-w-0">
+        <p className="truncate font-bold text-t0">{name}</p>
+        {sub ? <p className="truncate text-[11px] text-t2">{sub}</p> : null}
+      </div>
+    </div>
   );
 }
 

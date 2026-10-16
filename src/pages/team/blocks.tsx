@@ -664,7 +664,7 @@ export function GoalCard({
         ) : null}
         <Badge variant="neutral" className="gap-1">
           <SellersIcon />
-          {card.qtySellers} inValue team
+          {card.qtySellers} na equipe
         </Badge>
         <Badge variant="neutral" className="gap-1">
           <LevelsIcon />

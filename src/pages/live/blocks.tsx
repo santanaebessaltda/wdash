@@ -121,7 +121,7 @@ export function RankingBlock({
                   boxShadow: `0 0 0 3px ${medal.color}${isOuro ? `, ${medal.glow}` : ""}`,
                 }}
               >
-                <PersonAvatar size={isOuro ? "2xl" : "xl"} name={l.avatarName ?? l.name} employeeId={l.employeeId} />
+                <PersonAvatar size={isOuro ? "2xl" : "xl"} name={l.avatarName ?? l.name} employeeId={l.employeeId} storeId={l.storeId} />
               </span>
               <MedalhaBadge pos={pos} />
             </div>
