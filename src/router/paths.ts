@@ -83,7 +83,7 @@ export const paths = {
     /** Tipo, horário, franquia e aluguel. */
     branch: "/settings/branch",
     productsTaxes: "/settings/products-and-taxes",
-    /** Stone de cada loja. Não fica em Integrações: a chave é da loja, não da empresa. */
+    /** Stone de cada loja. Fica em Integrações: a chave é da filial, não do ERP da conta. */
     acquirers: "/settings/acquirers",
     /** Painel do shopping de cada quiosque. A senha é da filial. */
     shopping: "/settings/shopping",

@@ -17,7 +17,8 @@ import { TopbarRefresh } from "./TopbarRefresh";
 import { refreshSalesPush } from "@/push/salesPush";
 
 const ICON_PERFIL = "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8";
-const ICON_INTEGRACOES = "M12 22v-5M9 8V2M15 8V2M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8z";
+/** Lucide Database — conexão com o sistema de origem. */
+const ICON_ERP = "M3 5a9 3 0 0 0 18 0a9 3 0 0 0-18 0M3 5v14a9 3 0 0 0 18 0V5M3 12a9 3 0 0 0 18 0";
 const ICON_USUARIOS =
   "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8";
 const ICON_LOGS = "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8";
@@ -109,14 +110,14 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
     location.pathname.startsWith(paths.settings.root) ||
     location.pathname === paths.profile);
 
-  // Menu do avatar: Meu perfil, Notificações (gestor e gerente), e no Gestor Integrações, Usuários e Logs.
+  // Menu do avatar: Meu perfil, Notificações (gestor e gerente), e no Gestor ERP, Usuários e Logs.
   const conta: DropdownItem[] = [
     ...(session.role === "SELLER"
       ? []
       : [{ label: "Notificações", icon: <MenuIcon d={ICON_NOTICES} />, onClick: () => navigate(paths.settings.notifications) }]),
     ...(isOwner(session.role)
       ? [
-          { label: "Integrações", icon: <MenuIcon d={ICON_INTEGRACOES} />, onClick: () => navigate(paths.settings.erp) },
+          { label: "ERP", icon: <MenuIcon d={ICON_ERP} />, onClick: () => navigate(paths.settings.erp) },
           { label: "Usuários", icon: <MenuIcon d={ICON_USUARIOS} />, onClick: () => navigate(paths.settings.users) },
           { label: "Logs", icon: <MenuIcon d={ICON_LOGS} />, onClick: () => navigate(paths.settings.logs) },
         ]

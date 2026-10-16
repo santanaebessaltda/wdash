@@ -8,7 +8,7 @@ import { isOwner } from "@/layout/nav-wedash";
 const TABS = [
   { label: "Meu perfil", to: paths.profile },
   { label: "Notificações", to: paths.settings.notifications },
-  { label: "Integrações", to: paths.settings.erp },
+  { label: "ERP", to: paths.settings.erp },
   { label: "Usuários", to: paths.settings.users },
   { label: "Logs", to: paths.settings.logs },
 ];
@@ -32,8 +32,8 @@ const META: Record<string, { title: string; subtitle: string }> = {
     subtitle: "Veja as filiais deste acesso e o funcionamento de cada uma.",
   },
   [paths.settings.erp]: {
-    title: "Integrações",
-    subtitle: "Gerencie as conexões da WDash com seus sistemas.",
+    title: "ERP",
+    subtitle: "Conecte o Millennium, de onde vêm as vendas e o cadastro.",
   },
   [paths.settings.users]: {
     title: "Usuários",
@@ -47,7 +47,7 @@ const META: Record<string, { title: string; subtitle: string }> = {
 
 /**
  * Shell de Conta (menu do avatar)  -  mesmo padrao Vela (TabNav).
- * Gestor: Meu perfil, Notificações, Integrações, Usuários e Logs.
+ * Gestor: Meu perfil, Notificações, ERP, Usuários e Logs.
  * Gerente: Meu perfil e Notificações. Lojas (só por URL) fica sem abas.
  */
 export function WedashSettingsLayout() {

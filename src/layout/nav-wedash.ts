@@ -16,11 +16,12 @@ const ICON = {
     "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M9 2h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zM12 11h4M12 16h4M8 11h.01M8 16h.01",
   /** Cifrão — fechamento, sangrias e informe. */
   finance: "M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6",
+  /** Lucide Plug — adquirente e administradora. */
+  plug: "M12 22v-5M9 8V2M15 8V2M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8z",
+  /** Lucide SlidersHorizontal — dados da filial. */
+  sliders: "M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4",
   /** Caixa  -  estoque. */
   stock: "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16zM3.27 6.96 12 12.01l8.73-5.05M12 22.08V12",
-  /** Engrenagem. */
-  gear:
-    "M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6",
 };
 
 /** Saldo por local. Página direta, sem submenu. */
@@ -67,16 +68,25 @@ const purchaseOrder: NavSingle = {
   to: paths.management.purchaseOrder,
 };
 
-/** Filial  |  Produtos e impostos  |  Adquirentes  |  Administradora (só Gestor). */
-const costs: NavGroup = {
+/** Adquirente e administradora da filial (só Gestor). */
+const integrations: NavGroup = {
+  label: "Integrações",
+  description: "Conecte a adquirente e a administradora de cada filial.",
+  icon: ICON.plug,
+  items: [
+    { label: "Adquirentes", to: paths.operation.acquirers },
+    { label: "Administradora", to: paths.operation.shopping },
+  ],
+};
+
+/** Dados e impostos da filial (só Gestor). */
+const settings: NavGroup = {
   label: "Configurações",
-  description: "Configure os dados, custos, impostos e integrações de cada filial.",
-  icon: ICON.gear,
+  description: "Configure os dados e os impostos de cada filial.",
+  icon: ICON.sliders,
   items: [
     { label: "Filial", to: paths.operation.branch },
     { label: "Produtos e impostos", to: paths.operation.productsTaxes },
-    { label: "Adquirentes", to: paths.operation.acquirers },
-    { label: "Administradora", to: paths.operation.shopping },
   ],
 };
 
@@ -98,7 +108,8 @@ export function applyShoppingMenu(entries: NavEntry[], menu: { settings: boolean
 /** Abas das telas de cada grupo = os mesmos itens do menu. */
 export const performanceTabs = performance.items.map(({ label, to }) => ({ label, to }));
 export const financeTabs = finance.items.map(({ label, to }) => ({ label, to }));
-export const costTabs = costs.items.map(({ label, to }) => ({ label, to }));
+export const integrationTabs = integrations.items.map(({ label, to }) => ({ label, to }));
+export const settingsTabs = settings.items.map(({ label, to }) => ({ label, to }));
 
 const navOwner: NavEntry[] = [
   {
@@ -116,10 +127,11 @@ const navOwner: NavEntry[] = [
   performance,
   finance,
   purchaseOrder,
-  costs,
+  integrations,
+  settings,
 ];
 
-/** Gerente: sem a análise financeira do Dashboard e sem Configurações. */
+/** Gerente: sem a análise financeira do Dashboard, sem Integrações e sem Configurações. */
 const navManager: NavEntry[] = [
   {
     label: "Dashboard",
@@ -137,7 +149,7 @@ const navManager: NavEntry[] = [
   purchaseOrder,
 ];
 
-/** Telas so do Gestor (Financeiro, Configuracoes, Usuarios, Integracoes, Logs). */
+/** Telas só do Gestor (análise financeira, Integrações, Configurações, ERP, Usuários, Logs). */
 export const OWNER_ROLES: Role[] = ["OWNER", "ADMIN_GLOBAL"];
 
 export function isOwner(role: Role): boolean {

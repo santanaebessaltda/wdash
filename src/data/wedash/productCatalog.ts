@@ -9,13 +9,13 @@ async function client() {
 }
 
 const SYNC_PRODUCTS_ERRORS: Record<string, string> = {
-  credential_missing: "Não foi possível acessar o Millennium. Verifique os dados da integração em Conta › Integrações.",
-  credential_invalid: "Não foi possível acessar o Millennium. Verifique os dados da integração em Conta › Integrações.",
-  integration_paused: "A conexão com o Millennium está desconectada. Acesse Conta › Integrações para conectar novamente.",
+  credential_missing: "Não foi possível acessar o Millennium. Verifique os dados da integração em Conta › ERP.",
+  credential_invalid: "Não foi possível acessar o Millennium. Verifique os dados da integração em Conta › ERP.",
+  integration_paused: "A conexão com o Millennium está desconectada. Acesse Conta › ERP para conectar novamente.",
   erp_busy: "Este usuário do Millennium está conectado em outro local. Encerre a outra sessão e tente novamente.",
   busy: "Os custos já estão sendo atualizados. Tente novamente em alguns minutos.",
   forbidden: "Você não tem permissão para atualizar os custos.",
-  invalid_table: "Esta tabela de custo não está mais disponível. Atualize os cadastros em Conta › Integrações e escolha outra tabela.",
+  invalid_table: "Esta tabela de custo não está mais disponível. Atualize os cadastros em Conta › ERP e escolha outra tabela.",
   invalid_period: "Período inválido.",
 };
 

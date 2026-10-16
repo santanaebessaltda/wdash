@@ -929,9 +929,9 @@ export async function setSellerShift(sellerId: string, shiftId: string | null): 
 }
 
 const SYNC_SELLERS_ERRORS: Record<string, string> = {
-  credential_missing: "A conexão com o Millennium ainda não foi configurada. Acesse Conta › Integrações para conectar.",
-  credential_invalid: "Não foi possível acessar o Millennium. Verifique os dados da integração em Conta › Integrações.",
-  integration_paused: "A conexão com o Millennium está desconectada. Acesse Conta › Integrações para conectar novamente.",
+  credential_missing: "A conexão com o Millennium ainda não foi configurada. Acesse Conta › ERP para conectar.",
+  credential_invalid: "Não foi possível acessar o Millennium. Verifique os dados da integração em Conta › ERP.",
+  integration_paused: "A conexão com o Millennium está desconectada. Acesse Conta › ERP para conectar novamente.",
   erp_busy: "Este usuário do Millennium está conectado em outro local. Encerre a outra sessão e tente novamente.",
   forbidden: "Você não tem permissão para atualizar a equipe.",
 };

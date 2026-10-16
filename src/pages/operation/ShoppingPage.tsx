@@ -42,7 +42,7 @@ function mallDetail(account: ShoppingAccount): string {
   return slug ? `Informe de vendas · ${slug}` : "Informe de vendas";
 }
 
-/** Configurações > Administradora. Um card por administradora; a filial usa uma só. */
+/** Integrações > Administradora. Um card por administradora; a filial usa uma só. */
 export function ShoppingSettingsPage() {
   const { show } = useToast();
   const { session, storeRows, loading: storesLoading } = useScopedStores();
@@ -83,7 +83,7 @@ export function ShoppingSettingsPage() {
   return (
     <div>
       <SectionHeader
-        section="Configurações"
+        section="Integrações"
         title="Administradora"
         subtitle="Conecte a administradora desta filial para informar as vendas ao shopping. Cada filial usa uma só."
       />

@@ -20,7 +20,7 @@ import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
 import { useScope } from "@/pages/dashboard/useScope";
 
-/** Configurações > Adquirentes. A chave é da loja, no mesmo desenho do Millennium. */
+/** Integrações > Adquirentes. A chave é da loja, no mesmo desenho do Millennium. */
 export function AcquirersPage() {
   const { show } = useToast();
   const { session, storeRows, loading: storesLoading } = useScopedStores();
@@ -71,7 +71,7 @@ export function AcquirersPage() {
   return (
     <div>
       <SectionHeader
-        section="Configurações"
+        section="Integrações"
         title="Adquirentes"
         subtitle="Conecte as adquirentes desta filial para buscar os fechamentos de cartão e Pix na WDash."
       />

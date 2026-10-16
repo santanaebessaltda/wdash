@@ -77,7 +77,7 @@ Princípios do Dashboard:
 
 ### 2. FORA DO DASHBOARD — operacional / ações
 
-**Menu lateral (2026-10-14, decisão do dono).** Cada área fica no próprio item, para o menu crescer sem um submenu único.
+**Menu lateral (2026-10-16, decisão do dono).** Separado por intenção. Ícones: Integrações = Plug, Configurações = SlidersHorizontal.
 
 Gestor, nesta ordem:
 - **Dashboard** — Visão geral · Financeiro (análise) · Produtos · Equipe
@@ -86,9 +86,12 @@ Gestor, nesta ordem:
 - **Performance** — Metas · Desafios
 - **Financeiro** — Fechamento · Sangrias · Informe de vendas
 - **Pedido de compra**
-- **Configurações** — Filial · Produtos e impostos · Adquirentes · Administradora
+- **Integrações** — Adquirentes · Administradora
+- **Configurações** — Filial · Produtos e impostos
 
-Gerente vê o mesmo, sem a análise financeira do Dashboard e sem Configurações. Vendedor continua só no Início. As abas do cabeçalho repetem os itens do grupo; item direto não tem aba.
+Gerente vê o mesmo, sem a análise financeira do Dashboard, sem Integrações e sem Configurações. Vendedor continua só no Início. As abas do cabeçalho repetem os itens do grupo; item direto não tem aba.
+
+**Menu do avatar:** Meu perfil · Notificações · ERP (ícone Database, só Gestor) · Usuários (só Gestor) · Logs (só Gestor) · Sair. ERP é a conexão com o Millennium. Integrações do menu lateral é adquirente e administradora da filial.
 
 URLs (inglês; o endereço antigo redireciona):
 - Dashboard — `/dashboard/overview` · `/dashboard/finance` · `/dashboard/products` · `/dashboard/team`
@@ -97,7 +100,8 @@ URLs (inglês; o endereço antigo redireciona):
 - Performance — `/performance/goals` · `/performance/challenges`
 - Financeiro — `/finance/cash-close` · `/finance/cash-drop` · `/finance/sales-report`
 - Pedido de compra — `/purchase-order`
-- Configurações — `/settings/branch` · `/settings/products-and-taxes` · `/settings/acquirers` · `/settings/shopping`
+- Integrações — `/settings/acquirers` · `/settings/shopping`
+- Configurações — `/settings/branch` · `/settings/products-and-taxes`
 
 `/management/*`, `/goals`, `/metas`, `/stock/purchase-order` e `/cash-close` abrem o endereço novo.
 

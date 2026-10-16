@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button, Card, CardHeader, CardTitle, EmptyState, FormField, Input, PageHeader, Select, TabNav } from "@/components/ui";
-import { costTabs, financeTabs, performanceTabs } from "@/layout/nav-wedash";
+import { financeTabs, integrationTabs, performanceTabs, settingsTabs } from "@/layout/nav-wedash";
 import { useShoppingMenu } from "@/layout/useShoppingMenu";
 import { paths } from "@/router/paths";
 import { halfHourOptions } from "@/data/wedash/storeHours";
@@ -47,7 +47,14 @@ export function useScopedStores() {
   return { session, storeRows, loading, refresh: () => setTick((n) => n + 1) };
 }
 
-export type SectionName = "Estoque" | "Equipe" | "Performance" | "Financeiro" | "Pedido de compra" | "Configurações";
+export type SectionName =
+  | "Estoque"
+  | "Equipe"
+  | "Performance"
+  | "Financeiro"
+  | "Pedido de compra"
+  | "Integrações"
+  | "Configurações";
 
 const SECTION_TABS: Record<SectionName, Array<{ label: string; to: string; end?: boolean }>> = {
   Estoque: [],
@@ -55,7 +62,8 @@ const SECTION_TABS: Record<SectionName, Array<{ label: string; to: string; end?:
   Performance: performanceTabs,
   Financeiro: financeTabs,
   "Pedido de compra": [],
-  Configurações: costTabs,
+  Integrações: integrationTabs,
+  Configurações: settingsTabs,
 };
 
 /** Codigo das outras abas da secao  -  baixado junto para a troca de aba nao esperar o download. */
@@ -69,12 +77,8 @@ const SECTION_PAGES: Record<SectionName, Array<() => Promise<unknown>>> = {
     () => import("@/pages/management/SalesReportPage"),
   ],
   "Pedido de compra": [() => import("@/pages/stock/PurchaseOrderPage")],
-  Configurações: [
-    () => import("@/pages/operation/BranchPage"),
-    () => import("@/pages/operation/ProductsTaxesPage"),
-    () => import("@/pages/cash-close/AcquirersPage"),
-    () => import("@/pages/operation/ShoppingPage"),
-  ],
+  Integrações: [() => import("@/pages/cash-close/AcquirersPage"), () => import("@/pages/operation/ShoppingPage")],
+  Configurações: [() => import("@/pages/operation/BranchPage"), () => import("@/pages/operation/ProductsTaxesPage")],
 };
 
 /** Cabecalho da secao (breadcrumb + abas do grupo do menu). */
