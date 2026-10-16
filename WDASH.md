@@ -77,7 +77,7 @@ Princípios do Dashboard:
 
 ### 2. FORA DO DASHBOARD — operacional / ações
 
-**Menu lateral (2026-10-16, decisão do dono).** Separado por intenção. Ícones: Integrações = Plug, Configurações = SlidersHorizontal.
+**Menu lateral (2026-10-16, decisão do dono).** Separado por intenção. Ícones: Integrações = Plug, Configurações = engrenagem.
 
 Gestor, nesta ordem:
 - **Dashboard** — Visão geral · Financeiro (análise) · Produtos · Equipe
