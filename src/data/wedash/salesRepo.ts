@@ -785,14 +785,25 @@ export async function requestForceRefresh(opts: {
 > {
   const sb = getSupabase();
   if (!sb) return { ok: false, error: "supabase_unavailable" };
-  const { data, error } = await sb.functions.invoke("erp-sync-enqueue", {
-    body: {
-      action: "force",
-      from: opts.from,
-      to: opts.to,
-      ...(opts.storeIds && opts.storeIds.length > 0 ? { storeIds: opts.storeIds } : {}),
-    },
-  });
+  let data: unknown;
+  let error: { message?: string; context?: Response } | null = null;
+  try {
+    const invoked = await withTimeout(
+      sb.functions.invoke("erp-sync-enqueue", {
+        body: {
+          action: "force",
+          from: opts.from,
+          to: opts.to,
+          ...(opts.storeIds && opts.storeIds.length > 0 ? { storeIds: opts.storeIds } : {}),
+        },
+      }),
+      FORCE_ENQUEUE_MS,
+    );
+    data = invoked.data;
+    error = invoked.error;
+  } catch {
+    return { ok: false, error: "enqueue_timeout" };
+  }
 
   // Em non-2xx o invoke preenche `error` e as vezes deixa `data` vazio  - 
   // o JSON real (rate_limited etc.) vem em error.context.
@@ -841,8 +852,36 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("timeout")), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 /** Uma leitura que não volta não pode segurar o botão para sempre. */
 const SYNC_JOB_READ_MS = 10_000;
+/** O clique que enfileira o Atualizar. Sem resposta, o botão solta. */
+const FORCE_ENQUEUE_MS = 30_000;
+/**
+ * Job ainda na fila (sincronizador sem pegar). Mesmo limite do aviso da carga inicial.
+ * Job já em andamento segue até o teto de 12 min.
+ */
+export const FORCE_QUEUE_WAIT_MS = 90_000;
+
+/** `true` quando o Atualizar segue QUEUED tempo demais para o botão continuar girando. */
+export function forceQueueTimedOut(status: string, queuedForMs: number, limitMs = FORCE_QUEUE_WAIT_MS): boolean {
+  return status === "QUEUED" && queuedForMs >= limitMs;
+}
 
 type SyncJobRow = { status: string; error: string | null; created_at?: string | null };
 
@@ -888,7 +927,7 @@ function finishedSyncJob(row: SyncJobRow): SyncJobWaitResult | null {
 export type SyncJobWaitResult =
   | { status: "SUCCEEDED" }
   | { status: "FAILED"; error: string | null }
-  | { status: "TIMEOUT" }
+  | { status: "TIMEOUT"; reason?: "queued" }
   | { status: "CANCELLED" };
 
 /** Uma leitura do status  -  usado ao voltar da aba (nao piscar "Atualizando..." se ja terminou). */
@@ -906,6 +945,7 @@ export async function peekSyncJob(jobId: string): Promise<SyncJobWaitResult | nu
 /**
  * Espera o sync_job chegar em SUCCEEDED/FAILED (poll).
  * FORCE pode demorar (Lista + DetMov); default 12 min.
+ * Na fila sem o sincronizador pegar (`QUEUED`) solta em `FORCE_QUEUE_WAIT_MS`.
  * `onStatus` recebe QUEUED/RUNNING a cada poll (UI: Na fila... / Atualizando...).
  */
 export async function waitForSyncJob(
@@ -924,12 +964,14 @@ export async function waitForSyncJob(
   const started = Date.now();
   let lastReported: string | null = null;
   let missing = 0;
+  /** Desde quando este job está QUEUED. RUNNING zera — o teto de 12 min cobre o trabalho. */
+  let queuedAt: number | null = null;
 
   while (Date.now() - started < timeoutMs) {
     if (opts?.signal?.aborted) return { status: "CANCELLED" };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const row = await readSyncJobRow(
-      (sb.from("sync_job") as any).select("status, error").eq("id", jobId).maybeSingle(),
+      (sb.from("sync_job") as any).select("status, error, created_at").eq("id", jobId).maybeSingle(),
     );
     if (opts?.signal?.aborted) return { status: "CANCELLED" };
     if (row === "miss") {
@@ -939,6 +981,13 @@ export async function waitForSyncJob(
       if (missing >= 3) return { status: "TIMEOUT" };
     } else {
       missing = 0;
+      if (row.status === "QUEUED") {
+        const createdMs = row.created_at ? new Date(row.created_at).getTime() : Number.NaN;
+        queuedAt ??= Number.isFinite(createdMs) ? createdMs : Date.now();
+      } else queuedAt = null;
+      if (queuedAt != null && forceQueueTimedOut("QUEUED", Date.now() - queuedAt)) {
+        return { status: "TIMEOUT", reason: "queued" };
+      }
       if (row.status && row.status !== lastReported) {
         lastReported = row.status;
         opts?.onStatus?.(row.status);
@@ -962,6 +1011,7 @@ export async function waitForLatestForceJob(
   const pollMs = opts?.pollMs ?? 2_000;
   const started = Date.now();
   const sinceMs = opts?.sinceIso ? new Date(opts.sinceIso).getTime() : 0;
+  let queuedAt: number | null = started;
 
   while (Date.now() - started < timeoutMs) {
     if (opts?.signal?.aborted) return { status: "CANCELLED" };
@@ -978,10 +1028,16 @@ export async function waitForLatestForceJob(
     if (opts?.signal?.aborted) return { status: "CANCELLED" };
     if (read && read !== "miss") {
       const createdMs = read.created_at ? new Date(read.created_at).getTime() : 0;
-      if (!sinceMs || createdMs >= sinceMs - 5_000) {
+      const ours = !sinceMs || createdMs >= sinceMs - 5_000;
+      if (ours) {
+        if (read.status === "RUNNING") queuedAt = null;
+        else if (read.status === "QUEUED") queuedAt ??= Date.now();
         const done = finishedSyncJob(read);
         if (done) return done;
       }
+    }
+    if (queuedAt != null && forceQueueTimedOut("QUEUED", Date.now() - queuedAt)) {
+      return { status: "TIMEOUT", reason: "queued" };
     }
     await sleep(pollMs);
   }

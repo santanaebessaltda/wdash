@@ -5,6 +5,7 @@ import {
   fetchSalesDayAggs,
   fetchSalesHourAggs,
   fetchSyncWatermark,
+  forceQueueTimedOut,
   monthFillProgress,
   seedCoverageWindow,
   type SalesQueryClient,
@@ -277,5 +278,16 @@ describe("excludeNonSalesPeople", () => {
     const rows = [row({})];
     const empty = { employeeIds: new Set<number>(), generatorIds: new Set<number>(), storeNameKeys: new Set<string>() };
     expect(excludeNonSalesPeople(rows, empty)).toBe(rows);
+  });
+});
+
+describe("forceQueueTimedOut", () => {
+  it("solta o Atualizar quando o job segue na fila por 90s", () => {
+    expect(forceQueueTimedOut("QUEUED", 89_999)).toBe(false);
+    expect(forceQueueTimedOut("QUEUED", 90_000)).toBe(true);
+  });
+
+  it("job em andamento não usa o limite da fila", () => {
+    expect(forceQueueTimedOut("RUNNING", 120_000)).toBe(false);
   });
 });

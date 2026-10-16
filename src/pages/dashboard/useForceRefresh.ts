@@ -26,6 +26,12 @@ export const SALES_SYNCED_EVENT = "wedash:sales-synced";
 export const FORCE_REFRESH_CLICK_EVENT = "wedash:force-refresh-click";
 
 const DISCONNECTED_MSG = "O Millennium está desconectado. As vendas só podem ser atualizadas depois que a integração for conectada novamente.";
+/** Teto do giro do botão, igual ao da espera do job. Uma Promise que não volta não deixa "Atualizando…" preso. */
+const BUTTON_MAX_MS = 12 * 60 * 1000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export type ForceRefreshState = {
   canForce: boolean;
@@ -86,12 +92,17 @@ export function useForceRefresh({
         setForceError("Não foi possível atualizar as vendas. Tente novamente em alguns minutos.");
         console.warn("FORCE job failed:", wait.error);
       } else if (wait.status === "TIMEOUT") {
-        setForceError("A atualização está demorando mais que o normal. Os dados podem aparecer em instantes.");
+        setForceError(
+          wait.reason === "queued"
+            ? "O sincronizador não respondeu. Tente novamente em alguns minutos."
+            : "A atualização está demorando mais que o normal. Os dados podem aparecer em instantes.",
+        );
       } else if (wait.status === "SUCCEEDED") {
         setForceAtMap(recordForceAt(session.tenantId, ids, new Date()));
       }
+      if (wait.status !== "SUCCEEDED") setRefreshing(false);
       try {
-        await reload();
+        await Promise.race([reload(), sleep(15_000)]);
       } finally {
         setRefreshing(false);
         if (wait.status === "SUCCEEDED") setForceDoneAt(Date.now());
@@ -183,31 +194,50 @@ export function useForceRefresh({
     }
     setRefreshing(true);
     setForceError(null);
-    window.dispatchEvent(new Event(FORCE_REFRESH_CLICK_EVENT));
-    const enqueuedAt = new Date();
-    const today = calendarTodayIso();
-    const result = await requestForceRefresh({ from: today, to: today, storeIds });
-    if (!result.ok) {
-      if (result.error === "rate_limited") {
-        const at = lastForceAtFromRetryAfter(result.retryAfterSec ?? 300);
-        setForceAtMap(recordForceAt(session.tenantId, storeIds, at));
-        setForceError(null);
-      } else if (result.error === "forbidden") {
-        setForceError("Você não tem permissão para atualizar as vendas.");
-      } else if (result.error === "integration_paused") {
-        setForceError(DISCONNECTED_MSG);
-      } else if (result.error === "credential_missing" || result.error === "credential_invalid") {
-        setForceError("Não foi possível acessar o Millennium. Verifique os dados da integração.");
-      } else {
-        setForceError("Não foi possível iniciar a atualização. Tente novamente.");
-        console.warn("requestForceRefresh:", result.error);
-      }
+    let dropped = false;
+    const watchdog = window.setTimeout(() => {
+      dropped = true;
+      waitAbort.current?.abort();
+      clearPendingForce(session.tenantId);
       setRefreshing(false);
-      return;
+      setForceError("A atualização está demorando mais que o normal. Os dados podem aparecer em instantes.");
+    }, BUTTON_MAX_MS);
+    try {
+      window.dispatchEvent(new Event(FORCE_REFRESH_CLICK_EVENT));
+      const enqueuedAt = new Date();
+      const today = calendarTodayIso();
+      const result = await requestForceRefresh({ from: today, to: today, storeIds });
+      if (dropped) return;
+      if (!result.ok) {
+        if (result.error === "rate_limited") {
+          const at = lastForceAtFromRetryAfter(result.retryAfterSec ?? 300);
+          setForceAtMap(recordForceAt(session.tenantId, storeIds, at));
+          setForceError(null);
+        } else if (result.error === "forbidden") {
+          setForceError("Você não tem permissão para atualizar as vendas.");
+        } else if (result.error === "integration_paused") {
+          setForceError(DISCONNECTED_MSG);
+        } else if (result.error === "credential_missing" || result.error === "credential_invalid") {
+          setForceError("Não foi possível acessar o Millennium. Verifique os dados da integração.");
+        } else {
+          setForceError("Não foi possível iniciar a atualização. Tente novamente.");
+          console.warn("requestForceRefresh:", result.error);
+        }
+        setRefreshing(false);
+        return;
+      }
+      const pending = { jobId: result.jobId, storeIds, enqueuedAt: enqueuedAt.toISOString() };
+      writePendingForce(session.tenantId, pending);
+      await resumeOrWaitForce(pending, true);
+    } catch (e) {
+      if (!dropped) {
+        console.warn("forcarUpdate:", e);
+        setForceError("Não foi possível iniciar a atualização. Tente novamente.");
+        setRefreshing(false);
+      }
+    } finally {
+      window.clearTimeout(watchdog);
     }
-    const pending = { jobId: result.jobId, storeIds, enqueuedAt: enqueuedAt.toISOString() };
-    writePendingForce(session.tenantId, pending);
-    await resumeOrWaitForce(pending, true);
   }, [canForce, refreshing, forceCooldownSec, disconnected, storeIds, session.tenantId, resumeOrWaitForce]);
 
   return { canForce, refreshing, forceError, forceDoneAt, forceCooldownSec, forcarUpdate };
