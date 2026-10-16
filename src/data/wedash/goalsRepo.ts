@@ -128,14 +128,16 @@ export async function fetchGoalTeam(tenantId: string, storeIds: string[]): Promi
   const { getSupabase } = await import("@/lib/supabase");
   const sb = getSupabase();
   if (!sb) return [];
-  const { data, error } = await sb
-    .from("store_seller")
-    .select(
-      "store_id, millennium_employee_id, millennium_gerador_id, name, name_keys, active, erp_role, shift_id, store_shift(name)",
-    )
-    .eq("tenant_id", tenantId)
-    .in("store_id", storeIds)
-    .limit(2000);
+  const withTenure =
+    "store_id, millennium_employee_id, millennium_gerador_id, name, name_keys, active, erp_role, admitted_on, departed_on, shift_id, store_shift(name)";
+  const withoutTenure =
+    "store_id, millennium_employee_id, millennium_gerador_id, name, name_keys, active, erp_role, shift_id, store_shift(name)";
+  let { data, error } = await sb.from("store_seller").select(withTenure).eq("tenant_id", tenantId).in("store_id", storeIds).limit(2000);
+  if (error) {
+    const again = await sb.from("store_seller").select(withoutTenure).eq("tenant_id", tenantId).in("store_id", storeIds).limit(2000);
+    data = again.data as typeof data;
+    error = again.error;
+  }
   if (error) {
     console.warn("fetchGoalTeam:", error.message);
     return [];

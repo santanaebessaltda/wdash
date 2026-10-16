@@ -53,6 +53,10 @@ export interface GoalTeamMember {
   nameKeys: string[];
   /** Ativo com cargo VENDEDOR = na equipe de vendas agora. */
   salesPerson: boolean;
+  /** DATA_ADMISSAO. Ausente ou null = desde o início do período. */
+  admittedOn?: string | null;
+  /** Dia em que a WDash viu o desligamento. Ausente ou null = sem saída gravada. */
+  departedOn?: string | null;
   /** Grupo da pessoa (Gestao > Vendedores). */
   shiftId: string | null;
   shiftName: string | null;
@@ -79,6 +83,8 @@ export interface SellerRow {
   individualGoalAmount: number;
   proportionalGoal: boolean;
   eligibleDays: number;
+  /** Dias do período da meta, para o rótulo "N de M dias". */
+  periodDays: number;
   attainmentPct: number;
   barPct: number;
   /** Participacao no faturamento vs. meta da loja (valorLoja). */

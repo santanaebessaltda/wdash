@@ -13,7 +13,7 @@ import { fetchSalesLista } from "./millenniumSales.ts";
 import { fetchBranchGeneratorMap, fetchBrandRevenueReport } from "./millenniumBrandReport.ts";
 import { fetchConsultaDetMov, type DetMovLine } from "./millenniumDetMov.ts";
 import type { CouponBrand } from "./brandSplitFromDetalhe.ts";
-import { fetchStoreSellers, type ErpSeller } from "./millenniumSellers.ts";
+import { departedOnForSync, fetchStoreSellers, todayInSaoPaulo, type ErpSeller } from "./millenniumSellers.ts";
 import { fetchErpStores } from "./millenniumStores.ts";
 import { mergeNameKeys, type KnownSeller } from "./sellerLinker.ts";
 import { fetchRelatorioMargem } from "./millenniumMargem.ts";
@@ -785,7 +785,7 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
     async loadSellerDirectory(tenantId) {
       const { data, error } = await sb
         .from("store_seller")
-        .select("store_id, millennium_employee_id, millennium_gerador_id, name_keys, erp_role")
+        .select("store_id, millennium_employee_id, millennium_gerador_id, name_keys, erp_role, admitted_on")
         .eq("tenant_id", tenantId)
         .limit(5000);
       if (error) throw error;
@@ -795,6 +795,7 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
         nameKeys: (r.name_keys as string[] | null) ?? [],
         geradorId: r.millennium_gerador_id == null ? null : Number(r.millennium_gerador_id),
         role: (r.erp_role as string | null) ?? null,
+        admittedOn: (r.admitted_on as string | null) ?? null,
       }));
       return { sellers };
     },
@@ -803,12 +804,26 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
       const now = new Date().toISOString();
       const { data: existing, error: exErr } = await sb
         .from("store_seller")
-        .select("millennium_employee_id, name_keys")
+        .select("millennium_employee_id, name_keys, active, departed_on")
         .eq("store_id", args.storeId);
       if (exErr) throw exErr;
       const prevKeys = new Map(
         (existing ?? []).map((r) => [Number(r.millennium_employee_id), (r.name_keys as string[] | null) ?? []]),
       );
+      const prevState = new Map(
+        (existing ?? []).map((r) => [
+          Number(r.millennium_employee_id),
+          { active: Boolean(r.active), departedOn: (r.departed_on as string | null) ?? null },
+        ]),
+      );
+      const today = todayInSaoPaulo();
+      const tenure = (s: ErpSeller) => {
+        const departed = departedOnForSync(prevState.get(s.employeeId), s.active, today);
+        return {
+          ...(s.admittedOn !== undefined ? { admitted_on: s.admittedOn } : {}),
+          ...(departed !== undefined ? { departed_on: departed } : {}),
+        };
+      };
       const base = (s: ErpSeller) => ({
         tenant_id: args.tenantId,
         store_id: args.storeId,
@@ -829,8 +844,9 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
           active: s.active,
           erp_flags: s.flags,
           ...(s.geradorId != null ? { millennium_gerador_id: s.geradorId } : {}),
+          ...tenure(s),
         }));
-      const listOnly = args.sellers.filter((s) => s.active == null).map(base);
+      const listOnly = args.sellers.filter((s) => s.active == null).map((s) => ({ ...base(s), ...tenure(s) }));
       for (const payload of [consulted.filter((p) => "millennium_gerador_id" in p), consulted.filter((p) => !("millennium_gerador_id" in p)), listOnly]) {
         if (payload.length === 0) continue;
         const { error } = await sb
@@ -863,7 +879,7 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
 
       const { data: rows, error: rowsErr } = await sb
         .from("store_seller")
-        .select("millennium_employee_id, millennium_gerador_id, name_keys, erp_role")
+        .select("millennium_employee_id, millennium_gerador_id, name_keys, erp_role, admitted_on")
         .eq("store_id", args.storeId);
       if (rowsErr) throw rowsErr;
       return (rows ?? []).map(
@@ -873,6 +889,7 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
           nameKeys: (r.name_keys as string[] | null) ?? [],
           geradorId: r.millennium_gerador_id == null ? null : Number(r.millennium_gerador_id),
           role: (r.erp_role as string | null) ?? null,
+          admittedOn: (r.admitted_on as string | null) ?? null,
         }),
       );
     },

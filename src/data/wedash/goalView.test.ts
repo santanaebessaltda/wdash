@@ -262,4 +262,92 @@ describe("goalView", () => {
     expect(levels.get("e:2")!.next).toMatchObject({ name: "Meta", number: 1, gap: 500, commissionPct: 1 });
     expect(levels.get("e:2")!.prizeAmount).toBe(0);
   });
+
+  it("individual: quem entra no meio leva a parte vezes os dias; quem já estava não sobe", () => {
+    const card = buildGoalCardView({
+      goal,
+      storeNameValue: "LOJA",
+      dayAggs: [day("s1", "2026-09-05", 3000), day("s1", "2026-09-20", 1000)],
+      sellerDayAggs: [seller("2026-09-05", "ANA", 3000, 1), seller("2026-09-20", "BIA", 1000, 2)],
+      team: [
+        { storeId: "s1", employeeId: 1, name: "ANA", nameKeys: ["ANA"], salesPerson: true, shiftId: null, shiftName: null },
+        { storeId: "s1", employeeId: 2, name: "BIA", nameKeys: ["BIA"], salesPerson: true, shiftId: null, shiftName: null, admittedOn: "2026-09-16" },
+      ],
+      today: "2026-09-30",
+    });
+    const by = new Map(card.sellers.map((l) => [l.name, l]));
+    expect(by.get("ANA")!.individualGoalAmount).toBeCloseTo(5000);
+    expect(by.get("ANA")!.proportionalGoal).toBe(false);
+    expect(by.get("ANA")!.accruedPrize).toBeCloseTo(30);
+    expect(by.get("BIA")!.individualGoalAmount).toBeCloseTo(2500);
+    expect(by.get("BIA")!.eligibleDays).toBe(15);
+    expect(by.get("BIA")!.periodDays).toBe(30);
+    expect(by.get("BIA")!.proportionalGoal).toBe(true);
+  });
+
+  it("geral: cada dia se divide só entre quem já estava", () => {
+    const card = buildGoalCardView({
+      goal: { ...goal, tierMode: "GENERAL", groups: [] },
+      storeNameValue: "LOJA",
+      dayAggs: [day("s1", "2026-09-05", 6000), day("s1", "2026-09-20", 3000)],
+      sellerDayAggs: [seller("2026-09-05", "ANA", 6000, 1), seller("2026-09-20", "BIA", 1500, 2)],
+      team: [
+        { storeId: "s1", employeeId: 1, name: "ANA", nameKeys: ["ANA"], salesPerson: true, shiftId: null, shiftName: null },
+        { storeId: "s1", employeeId: 2, name: "BIA", nameKeys: ["BIA"], salesPerson: true, shiftId: null, shiftName: null, admittedOn: "2026-09-16" },
+      ],
+      today: "2026-09-30",
+    });
+    const by = new Map(card.sellers.map((l) => [l.name, l]));
+    expect(by.get("ANA")!.revenueAmount).toBeCloseTo(7500);
+    expect(by.get("BIA")!.revenueAmount).toBeCloseTo(1500);
+    expect(by.get("ANA")!.accruedPrize).toBeCloseTo(75);
+    expect(by.get("BIA")!.accruedPrize).toBeCloseTo(15);
+    expect(by.get("ANA")!.attainmentPct).toBeCloseTo(90);
+    expect(by.get("BIA")!.individualGoalAmount).toBe(10_000);
+  });
+
+  it("grupo: a meta do grupo fica inteira e a premiação pesa pelos dias", () => {
+    const card = buildGoalCardView({
+      goal: {
+        ...goal,
+        target: 8_000,
+        tierMode: "GROUP",
+        tiers: [{ name: "Meta", minAttainmentPct: 50, commissionPct: 1, bonus: 30 }],
+      },
+      storeNameValue: "LOJA",
+      dayAggs: [day("s1", "2026-09-20", 4000)],
+      sellerDayAggs: [seller("2026-09-20", "ANA", 3000, 1), seller("2026-09-20", "BIA", 1000, 2)],
+      team: [
+        { storeId: "s1", employeeId: 1, name: "ANA", nameKeys: ["ANA"], salesPerson: true, shiftId: null, shiftName: null },
+        { storeId: "s1", employeeId: 2, name: "BIA", nameKeys: ["BIA"], salesPerson: true, shiftId: null, shiftName: null, admittedOn: "2026-09-16" },
+      ],
+      today: "2026-09-30",
+    });
+    const by = new Map(card.sellers.map((l) => [l.name, l]));
+    expect(by.get("ANA")!.individualGoalAmount).toBe(8_000);
+    expect(by.get("ANA")!.accruedPrize).toBeCloseTo(40 * (30 / 45));
+    expect(by.get("BIA")!.accruedPrize).toBeCloseTo(40 * (15 / 45));
+    expect(by.get("ANA")!.bonusReached).toBeCloseTo(30);
+    expect(by.get("BIA")!.bonusReached).toBeCloseTo(15);
+  });
+
+  it("desligada no meio fecha nos dias em que vendeu; inativa sem venda fica de fora", () => {
+    const card = buildGoalCardView({
+      goal,
+      storeNameValue: "LOJA",
+      dayAggs: [day("s1", "2026-09-10", 1000)],
+      sellerDayAggs: [seller("2026-09-10", "BIA", 1000, 2)],
+      team: [
+        { storeId: "s1", employeeId: 1, name: "ANA", nameKeys: ["ANA"], salesPerson: true, shiftId: null, shiftName: null },
+        { storeId: "s1", employeeId: 2, name: "BIA", nameKeys: ["BIA"], salesPerson: false, shiftId: null, shiftName: null },
+        { storeId: "s1", employeeId: 3, name: "CAU", nameKeys: ["CAU"], salesPerson: false, shiftId: null, shiftName: null, departedOn: "2026-08-31" },
+      ],
+      today: "2026-09-30",
+    });
+    const by = new Map(card.sellers.map((l) => [l.name, l]));
+    expect(by.has("CAU")).toBe(false);
+    expect(by.get("BIA")!.eligibleDays).toBe(10);
+    expect(by.get("BIA")!.individualGoalAmount).toBeCloseTo((10_000 / 2) * (10 / 30));
+    expect(by.get("ANA")!.individualGoalAmount).toBeCloseTo(5000);
+  });
 });

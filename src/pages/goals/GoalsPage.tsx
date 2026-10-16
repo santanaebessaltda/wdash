@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge, Button, Card, DateRangePicker, Modal, ProgressBar, progressTextClass, useToast } from "@/components/ui";
 import { PersonAvatarGroup } from "@/components/wedash/PersonAvatar";
+import { SetupGuide } from "@/components/wedash/SetupGuide";
 import { Tooltip } from "@/components/ui/Tooltip";
 import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePicker";
 import { DuplicateChoiceModal } from "@/components/wedash/DuplicateChoiceModal";
@@ -162,6 +163,7 @@ export default function GoalsPage() {
               activePresetId={periodActivePresetId(scope.period)}
               maxDate={maxPickerDate(today)}
             />
+            <SetupGuide screen="goals" />
             <Button icon={<Icon d={icons.plus} size={14} />} onClick={() => navigate(paths.goalNew)}>
               Nova meta
             </Button>

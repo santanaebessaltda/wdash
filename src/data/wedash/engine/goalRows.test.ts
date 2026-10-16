@@ -98,6 +98,8 @@ describe("teamMemberFromRow", () => {
       name: "GABRIELA SOUZA",
       nameKeys: ["GABRIELA SOUZA"],
       salesPerson: true,
+      admittedOn: null,
+      departedOn: null,
       shiftId: "sh1",
       shiftName: "MANHÃ",
     });

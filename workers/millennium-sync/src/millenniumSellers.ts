@@ -25,6 +25,8 @@ export type ErpSeller = {
   role: string;
   /** null = nao consultada neste sync (ja tinha gerador e o cargo nao mudou)  -  status fica o do banco. */
   active: boolean | null;
+  /** undefined = nao consultada. null = consultada e o ERP nao tem data. */
+  admittedOn?: string | null;
   flags: ErpSellerFlags | null;
   /** GERADORES[0].GERADOR do Consulta  -  codigo que vem nas vendas do relatorio de cupom. */
   geradorId: number | null;
@@ -112,6 +114,46 @@ export function parseFuncionarioGerador(payload: unknown): number | null {
   return id != null && id > 0 ? id : null;
 }
 
+/** DATA_ADMISSAO no fuso de Brasília. null = campo vazio. */
+export function parseAdmissionDate(payload: unknown): string | null {
+  const raw = consultaRecord(payload).o.DATA_ADMISSAO;
+  if (raw == null || raw === "") return null;
+  const ms = Date.parse(String(raw));
+  if (Number.isNaN(ms)) return null;
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(ms));
+}
+
+export function todayInSaoPaulo(now = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
+
+/**
+ * Dia de saída gravado na sincronização. undefined = não mexe na coluna.
+ * Ativa de novo limpa. A primeira vez que sai de ativa para inativa grava `today`.
+ * Quem já estava inativa não ganha uma data inventada.
+ */
+export function departedOnForSync(
+  prev: { active: boolean; departedOn: string | null } | undefined,
+  active: boolean | null,
+  today: string,
+): string | null | undefined {
+  if (active == null) return undefined;
+  if (active) return null;
+  if (prev?.departedOn) return prev.departedOn;
+  if (prev?.active === true) return today;
+  return null;
+}
+
 export function isSellerActive(f: ErpSellerFlags): boolean {
   return !(f.desativado || f.inativo || f.afastado || f.naoMostrarNoEvento);
 }
@@ -147,8 +189,8 @@ export async function fetchStoreSellers(params: {
   millenniumStoreId: number;
   /** Consultas em paralelo (default 5; carga inicial usa 1). */
   concurrency?: number;
-  /** Cadastradas com gerador  ->  cargo salvo (null = sem cargo salvo, consulta). */
-  known?: ReadonlyMap<number, string | null>;
+  /** Cadastradas com gerador e cargo. Vendedora ativa sem admissão é consultada de novo. */
+  known?: ReadonlyMap<number, { role: string | null; admittedOn: string | null }>;
   baseUrl?: string;
   fetchImpl?: typeof fetch;
 }): Promise<ErpSeller[]> {
@@ -177,8 +219,10 @@ export async function fetchStoreSellers(params: {
   const out: (ErpSeller | null)[] = new Array(lista.length).fill(null);
   const toConsult: number[] = [];
   lista.forEach((row, i) => {
-    const savedRole = params.known?.get(row.employeeId);
-    if (savedRole != null && savedRole === row.role) out[i] = { ...row, active: null, flags: null, geradorId: null };
+    const saved = params.known?.get(row.employeeId);
+    const sameRole = saved != null && saved.role === row.role;
+    const needsAdmission = row.role === SELLER_ROLE && (saved?.admittedOn ?? null) == null;
+    if (sameRole && !needsAdmission) out[i] = { ...row, active: null, flags: null, geradorId: null };
     else toConsult.push(i);
   });
   let next = 0;
@@ -194,7 +238,13 @@ export async function fetchStoreSellers(params: {
         fetchImpl,
       );
       const flags = parseFuncionarioFlags(consulta);
-      out[i] = { ...row, flags, active: isSellerActive(flags), geradorId: parseFuncionarioGerador(consulta) };
+      out[i] = {
+        ...row,
+        flags,
+        active: isSellerActive(flags),
+        geradorId: parseFuncionarioGerador(consulta),
+        admittedOn: parseAdmissionDate(consulta),
+      };
     }
   };
   const limit = Math.max(1, params.concurrency ?? CONSULTA_CONCURRENCY);

@@ -1,4 +1,5 @@
 import { brlCent, isoToDate, endOfMonth, eachDay, num, dateToIso, addDays } from "./format.ts";
+import { presenceDays } from "./presence.ts";
 import type {
   GoalCardView,
   GoalRecord,
@@ -63,7 +64,7 @@ export function nextGoalPeriod(startsOn: string, endsOn: string): { startsOn: st
 }
 
 const MONTHS = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
-const MONTH_NO_NAME = /(janeiro|fevereiro|mar[çc]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)(\s+(?:from\s+)?|\s*\/\s*)?(\d{4})?/giu;
+const MONTH_NO_NAME = /(janeiro|fevereiro|mar[çc]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)(\s+(?:de\s+)?|\s*\/\s*)?(\d{4})?/giu;
 
 /** Nome da copia: o mes do name (um so) vira o mes do novo period, mantendo maiusculas; senao "{nome} (copia)". */
 export function copyGoalName(name: string, newStartsOn: string): string {
@@ -291,22 +292,31 @@ export function goalTeamNames(storeId: string, team: GoalTeamMember[]): string[]
     .sort((a, b) => a.localeCompare(b, "pt-BR"));
 }
 
+type DayBits = { revenue: number; sales: number; items: number };
+
 type Acc = {
   key: string;
   name: string;
   employeeId: number | null;
+  byDay: Map<string, DayBits>;
+};
+
+type Person = Acc & {
   revenue: number;
   sales: number;
   items: number;
   days: Set<string>;
+  presence: Set<string>;
 };
 
 /**
  * Detalhe da meta no formato do card de meta da Equipe (faixa + escada por pessoa).
  * Pessoas = equipe de vendas ativa da loja  quem vendeu no periodo (ex-vendedoras incluidas).
  * Meta do grupo = meta x % do grupo (sem grupos = a meta inteira para a equipe toda). Pessoa fora dos grupos da meta = sem meta.
- * INDIVIDUAL: meta do grupo  pessoas, premiacao sobre as proprias vendas. GROUP: o grupo sobe pela soma das vendas e a
- * premiacao e dividida igualmente. Bonus soma os niveis alcancados (bateu o 2 = bonus do 1 + do 2), para cada pessoa.
+ * INDIVIDUAL: meta do grupo ÷ pessoas, premiacao sobre as proprias vendas. Quem entrou ou saiu no meio fica com essa
+ * parte vezes os dias presentes; quem ficou o periodo inteiro nao aumenta a meta para cobrir os dias dela.
+ * GROUP: o grupo sobe pela soma e a meta do grupo nao encolhe; a premiacao e o bonus pesam pelos dias presentes.
+ * GENERAL: a loja sobe pelo total; cada dia se divide so entre quem estava naquele dia. Sem data de admissao = periodo cheio.
  */
 export function buildGoalCardView(input: {
   goal: GoalRecord;
@@ -331,7 +341,7 @@ export function buildGoalCardView(input: {
   const acc = (key: string, name: string, employeeId: number | null): Acc => {
     let a = accs.get(key);
     if (!a) {
-      a = { key, name, employeeId, revenue: 0, sales: 0, items: 0, days: new Set() };
+      a = { key, name, employeeId, byDay: new Map() };
       accs.set(key, a);
     }
     return a;
@@ -344,22 +354,55 @@ export function buildGoalCardView(input: {
       const employeeId = member?.employeeId ?? r.sellerEmployeeId ?? null;
       const key = employeeId != null ? `e:${employeeId}` : `n:${r.sellerKey}`;
       const a = acc(key, member?.name ?? r.sellerName, employeeId);
-      a.revenue += r.revenueCents / 100;
-      a.sales += r.salesCount;
-      a.items += r.itemCount ?? 0;
-      if (r.revenueCents > 0) a.days.add(r.day);
+      const cur = a.byDay.get(r.day) ?? { revenue: 0, sales: 0, items: 0 };
+      cur.revenue += r.revenueCents / 100;
+      cur.sales += r.salesCount;
+      cur.items += r.itemCount ?? 0;
+      a.byDay.set(r.day, cur);
     }
   }
   for (const m of team) if (m.salesPerson) acc(`e:${m.employeeId}`, m.name, m.employeeId);
 
-  const people = [...accs.values()];
+  const period = eachDay(g.startsOn, g.endsOn);
+  const people: Person[] = [];
+  for (const a of accs.values()) {
+    const member = a.employeeId != null ? byCode.get(a.employeeId) : undefined;
+    let lastSale: string | null = null;
+    for (const [day, bits] of a.byDay) {
+      if ((bits.revenue > 0 || bits.sales > 0) && (!lastSale || day > lastSale)) lastSale = day;
+    }
+    const window = presenceDays(
+      g.startsOn,
+      g.endsOn,
+      {
+        admittedOn: member?.admittedOn ?? null,
+        departedOn: member?.departedOn ?? null,
+        active: member ? member.salesPerson : true,
+      },
+      lastSale,
+    );
+    if (window.length === 0) continue;
+    const presence = new Set(window);
+    let revenue = 0;
+    let sales = 0;
+    let items = 0;
+    const days = new Set<string>();
+    for (const [day, bits] of a.byDay) {
+      if (!presence.has(day)) continue;
+      revenue += bits.revenue;
+      sales += bits.sales;
+      items += bits.items;
+      if (bits.revenue > 0) days.add(day);
+    }
+    people.push({ ...a, revenue, sales, items, days, presence });
+  }
   const n = people.length;
   const general = g.tierMode === "GENERAL";
   const individual = g.tierMode === "INDIVIDUAL";
   const branchSales = status === "upcoming" ? { sales: 0, items: 0 as number | null } : storeSales(g, input.dayAggs);
   const scale = Math.max(100, ...g.tiers.map((t) => t.minAttainmentPct));
   const marcos = g.tiers.map((t) => ({ name: t.name, pct: t.minAttainmentPct, prizePct: t.commissionPct, bonus: t.bonus }));
-  const periodDays = eachDay(g.startsOn, g.endsOn).length;
+  const periodDays = period.length;
   const teamTotal = people.reduce((s, p) => s + p.revenue, 0);
 
   // Sem grupos de distribuicao = um grupo so, com a equipe toda e a meta inteira.
@@ -369,27 +412,56 @@ export function buildGoalCardView(input: {
   const groupGoal = new Map<string, number>(
     groups.length > 0 ? groups.map((x) => [x.shiftId, (g.target * x.pct) / 100]) : [[ALL, g.target]],
   );
-  const groupOf = (p: Acc): string | null => {
+  const groupOf = (p: Person): string | null => {
     if (groups.length === 0) return ALL;
     const sid = p.employeeId != null ? byCode.get(p.employeeId)?.shiftId : null;
     return sid && groupGoal.has(sid) ? sid : null;
   };
   const membersGroup = new Map<string, number>();
   const salesGroup = new Map<string, number>();
+  const weightGroup = new Map<string, number>();
   for (const p of people) {
     const k = groupOf(p);
     if (!k) continue;
     membersGroup.set(k, (membersGroup.get(k) ?? 0) + 1);
     salesGroup.set(k, (salesGroup.get(k) ?? 0) + p.revenue);
+    weightGroup.set(k, (weightGroup.get(k) ?? 0) + p.presence.size);
+  }
+
+  const storeDay = new Map<string, { revenue: number; sales: number }>();
+  if (general && status !== "upcoming") {
+    for (const a of input.dayAggs) {
+      if (a.brand !== "ALL" || a.storeId !== g.storeId || a.day < g.startsOn || a.day > g.endsOn) continue;
+      const cur = storeDay.get(a.day) ?? { revenue: 0, sales: 0 };
+      cur.revenue += a.revenueCents / 100;
+      cur.sales += a.salesCount;
+      storeDay.set(a.day, cur);
+    }
+  }
+  const dailyShare = new Map<string, { revenue: number; sales: number }>();
+  if (general) {
+    for (const [day, store] of storeDay) {
+      const present = people.filter((p) => p.presence.has(day));
+      if (present.length === 0) continue;
+      for (const p of present) {
+        const cur = dailyShare.get(p.key) ?? { revenue: 0, sales: 0 };
+        cur.revenue += store.revenue / present.length;
+        cur.sales += store.sales / present.length;
+        dailyShare.set(p.key, cur);
+      }
+    }
   }
 
   const sellers: SellerRow[] = people.map((p) => {
-    // Individual: meta do grupo  pessoas, sobre as proprias vendas.
-    // Grupo: o grupo sobe junto pela soma das vendas; premiacao dividida igualmente entre as pessoas.
+    // Individual: parte cheia = meta do grupo ÷ pessoas. Parcial = essa parte × dias presentes ÷ dias do período.
+    // Grupo: meta do grupo inteira; a premiacao pesa pelos dias. Geral: cada dia se divide entre quem estava.
     const k = groupOf(p);
     const members = k ? (membersGroup.get(k) ?? 0) : 0;
     const goalRecord = k ? (groupGoal.get(k) ?? 0) : 0;
-    const individualGoal = members > 0 ? (individual ? goalRecord / members : goalRecord) : 0;
+    const fraction = periodDays > 0 ? p.presence.size / periodDays : 1;
+    const fullShare = members > 0 ? (individual ? goalRecord / members : goalRecord) : 0;
+    const individualGoal = individual ? fullShare * fraction : fullShare;
+    const share = dailyShare.get(p.key);
     const base = general ? achieved : individual ? p.revenue : k ? (salesGroup.get(k) ?? 0) : 0;
     const ating = individualGoal > 0 ? (base / individualGoal) * 100 : 0;
     let idx = -1;
@@ -398,13 +470,17 @@ export function buildGoalCardView(input: {
     });
     const tier = idx >= 0 ? g.tiers[idx] : null;
     const following = idx + 1 < g.tiers.length ? g.tiers[idx + 1] : null;
-    const prizeAmount = tier && individualGoal > 0 ? (base * tier.commissionPct) / 100 / (individual ? 1 : members) : 0;
-    const bonus = individualGoal > 0 ? g.tiers.slice(0, idx + 1).reduce((s, t) => s + t.bonus, 0) : 0;
+    const weights = k ? (weightGroup.get(k) ?? 0) : 0;
+    const weight = !individual && !general && weights > 0 ? p.presence.size / weights : 1;
+    const prizeBase = general ? (share?.revenue ?? 0) : base;
+    const prizeAmount = tier && individualGoal > 0 ? ((prizeBase * tier.commissionPct) / 100) * weight : 0;
+    const fullBonus = individualGoal > 0 ? g.tiers.slice(0, idx + 1).reduce((s, t) => s + t.bonus, 0) : 0;
+    const bonus = individual ? fullBonus : fullBonus * fraction;
     const member = p.employeeId != null ? byCode.get(p.employeeId) : undefined;
-    // Geral: cada pessoa vê a parte igual da filial (caixa e venda sem vendedor entram no bolo).
+    // Geral: faturamento e vendas sao a parte dos dias em que a pessoa estava. Ticket e P.A. continuam os da filial.
     const parte = general && n > 0;
-    const revenueToShow = parte ? achieved / n : p.revenue;
-    const salesToShow = parte ? branchSales.sales / n : p.sales;
+    const revenueToShow = parte ? (share?.revenue ?? 0) : p.revenue;
+    const salesToShow = parte ? (share?.sales ?? 0) : p.sales;
     const ticket = salesToShow > 0 ? revenueToShow / salesToShow : 0;
     const pa = parte
       ? (branchSales.items == null || branchSales.sales <= 0 ? 0 : branchSales.items / branchSales.sales)
@@ -425,8 +501,9 @@ export function buildGoalCardView(input: {
       daysWorked: p.days.size,
       trend: "flat",
       individualGoalAmount: individualGoal,
-      proportionalGoal: false,
-      eligibleDays: periodDays,
+      proportionalGoal: p.presence.size < periodDays,
+      eligibleDays: p.presence.size,
+      periodDays,
       attainmentPct: ating,
       barPct: Math.min(100, (ating / scale) * 100),
       storeGoalPct: g.target > 0 ? ((parte ? achieved : p.revenue) / g.target) * 100 : 0,

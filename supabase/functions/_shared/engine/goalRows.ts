@@ -70,6 +70,8 @@ export type GoalTeamRow = {
   name_keys: string[] | null;
   active: boolean;
   erp_role: string | null;
+  admitted_on?: string | null;
+  departed_on?: string | null;
   shift_id: string | null;
   store_shift: { name: string } | { name: string }[] | null;
 };
@@ -83,6 +85,8 @@ export function teamMemberFromRow(r: GoalTeamRow): GoalTeamMember {
     name: collaboratorName(r.name),
     nameKeys: r.name_keys ?? [],
     salesPerson: r.active && (r.erp_role == null || r.erp_role === SELLER_ROLE),
+    admittedOn: r.admitted_on ?? null,
+    departedOn: r.departed_on ?? null,
     shiftId: r.shift_id,
     shiftName: shift?.name ? shiftName(shift.name) : null,
   };

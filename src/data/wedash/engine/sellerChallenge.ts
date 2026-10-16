@@ -3,9 +3,10 @@
  * A conta e a mesma de `buildChallengeView` (posicao, minimo, vendas minimas).
  * O pacote da tela Inicio leva so a linha da propria pessoa.
  */
-import { brlCent, num } from "./format.ts";
+import { brlCent, eachDay, num } from "./format.ts";
 import type { GoalTeamMember, SalesSellerDayAgg } from "./goalTypes.ts";
 import { goalStatus } from "./goalView.ts";
+import { presenceDays, scaledMinimum } from "./presence.ts";
 
 export type SellerChallengeMetric = "QUANTITY" | "VALUE" | "PA" | "TICKET" | "INDEX";
 export type SellerChallengeScope = "PRODUCTS" | "CATEGORIES" | "ALL";
@@ -225,6 +226,42 @@ export function challengeStanding(
   const byName = new Map<string, GoalTeamMember>();
   for (const m of team) for (const k of m.nameKeys) if (!byName.has(k)) byName.set(k, m);
 
+  const periodDays = eachDay(challenge.startsOn, challenge.endsOn).length;
+  const lastSale = new Map<number, string>();
+  for (const r of input.sellerDays) {
+    if (!inPeriod(r) || r.sellerEmployeeId == null || (r.revenueCents <= 0 && r.salesCount <= 0)) continue;
+    const prev = lastSale.get(r.sellerEmployeeId);
+    if (!prev || r.day > prev) lastSale.set(r.sellerEmployeeId, r.day);
+  }
+  for (const r of input.products ?? []) {
+    if (!inPeriod(r) || r.itemCount <= 0) continue;
+    const member = byGenerator.get(r.sellerGeneratorId) ?? byName.get(r.sellerKey);
+    if (!member) continue;
+    const prev = lastSale.get(member.employeeId);
+    if (!prev || r.day > prev) lastSale.set(member.employeeId, r.day);
+  }
+  const presenceOf = new Map<number, Set<string>>();
+  for (const m of team) {
+    presenceOf.set(
+      m.employeeId,
+      new Set(
+        presenceDays(
+          challenge.startsOn,
+          challenge.endsOn,
+          { admittedOn: m.admittedOn ?? null, departedOn: m.departedOn ?? null, active: m.salesPerson },
+          lastSale.get(m.employeeId) ?? null,
+        ),
+      ),
+    );
+  }
+  const onRoster = (member: GoalTeamMember | undefined, day: string) =>
+    !member || (presenceOf.get(member.employeeId)?.has(day) ?? false);
+  const mineMember = byCode.get(input.employeeId);
+  const personalTarget =
+    challenge.mode === "MINIMUM" && target != null
+      ? scaledMinimum(target, presenceOf.get(input.employeeId)?.size ?? (mineMember ? 0 : periodDays), periodDays)
+      : target;
+
   const accs = new Map<string, Acc>();
   const acc = (member: GoalTeamMember | undefined, sellerKey: string): Acc => {
     const key = member ? `e:${member.employeeId}` : `n:${sellerKey}`;
@@ -235,7 +272,7 @@ export function challengeStanding(
     }
     return row;
   };
-  for (const m of team) if (m.salesPerson) acc(m, "");
+  for (const m of team) if ((presenceOf.get(m.employeeId)?.size ?? 0) > 0) acc(m, "");
 
   const byProduct = usesScope(metric) && scope !== "ALL";
   if (byProduct) {
@@ -246,6 +283,7 @@ export function challengeStanding(
     for (const r of input.products ?? []) {
       if (!inPeriod(r) || !conta(r.productCode)) continue;
       const member = byGenerator.get(r.sellerGeneratorId) ?? byName.get(r.sellerKey);
+      if (!onRoster(member, r.day)) continue;
       const row = acc(member, r.sellerKey);
       row.items += r.itemCount;
       row.amountCents += r.revenueCents;
@@ -257,6 +295,7 @@ export function challengeStanding(
       (r.sellerEmployeeId != null ? byCode.get(r.sellerEmployeeId) : undefined) ??
       (r.sellerGeneratorId != null ? byGenerator.get(r.sellerGeneratorId) : undefined) ??
       byName.get(r.sellerKey);
+    if (!onRoster(member, r.day)) continue;
     const row = acc(member, r.sellerKey);
     row.sales += r.salesCount;
     row.revenueCents += r.revenueCents;
@@ -297,7 +336,7 @@ export function challengeStanding(
   const minSales = usesMinSales(metric) && challenge.minSales != null ? Math.max(1, challenge.minSales) : 0;
   const base = [...accs.values()].map((a) => ({ a, result: resultOf(a) }));
   const concorre = (x: { a: Acc; result: number | null }) => x.result != null && x.result > 0 && x.a.sales >= minSales;
-  const alcancaTarget = (v: number | null) => v != null && v > 0 && (target == null || v >= target - 1e-9);
+  const alcancaTarget = (v: number | null) => v != null && v > 0 && (personalTarget == null || v >= personalTarget - 1e-9);
   const positionOf = new Map<string, number>();
   if (challenge.mode === "CONTEST") {
     const pool = base.filter(concorre).sort((x, y) => (y.result ?? 0) - (x.result ?? 0));
@@ -332,11 +371,11 @@ export function challengeStanding(
       progressPct = bar(mine.sales, minSales);
     } else if (fechaNoEnd && alcancaTarget(result) && (challenge.mode === "MINIMUM" || (position != null && position <= prizeCount))) {
       gap = "O P.A. só vale no fim do desafio";
-      progressPct = target != null ? bar(result, target) : null;
+      progressPct = personalTarget != null ? bar(result, personalTarget) : null;
     } else if (challenge.mode === "MINIMUM") {
-      if (!won && target != null) {
-        gap = `${gapAmount(metric, target - result)} para o mínimo`;
-        progressPct = bar(result, target);
+      if (!won && personalTarget != null) {
+        gap = `${gapAmount(metric, personalTarget - result)} para o mínimo`;
+        progressPct = bar(result, personalTarget);
       }
     } else if (target != null && result < target - 1e-9) {
       gap = `${gapAmount(metric, target - result)} para o mínimo`;

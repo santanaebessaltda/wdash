@@ -501,6 +501,7 @@ function sellersView(storeId: string, period: ResolvedPeriod, activeGoal: boolea
       individualGoalAmount: personGoal?.amount ?? 0,
       proportionalGoal: personGoal?.proportional ?? false,
       eligibleDays: personGoal?.eligibleDays ?? 0,
+      periodDays: personGoal?.openDaysInMonth ?? 0,
       attainmentPct: personGoal && personGoal.amount > 0 ? (revenue / personGoal.amount) * 100 : 0,
       barPct:
         personGoal && personGoal.amount > 0

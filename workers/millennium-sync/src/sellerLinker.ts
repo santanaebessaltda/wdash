@@ -19,6 +19,8 @@ export type KnownSeller = {
   geradorId?: number | null;
   /** CARGO salvo (null = ainda sem cargo). */
   role?: string | null;
+  /** Data de admissão já gravada. Ausente = ainda não consultada. */
+  admittedOn?: string | null;
 };
 
 export type SellerResolution = { employeeId: number } | { ambiguous: true } | null;
@@ -142,7 +144,7 @@ export function createSellerLinker(opts: {
         const savedRoles = new Map(
           sellers
             .filter((s) => s.storeId === store.id && s.geradorId != null)
-            .map((s) => [s.employeeId, s.role ?? null] as const),
+            .map((s) => [s.employeeId, { role: s.role ?? null, admittedOn: s.admittedOn ?? null }] as const),
         );
         const erp = await fetchStoreSellers({
           session,

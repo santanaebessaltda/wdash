@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, Card, DataTable, Dropdown, EmptyState, FormField, Input, Modal, Segmented, Skeleton, useToast, type DataTableColumn, type DropdownItem } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
+import { SetupGuide } from "@/components/wedash/SetupGuide";
 import { SegmentedSkeleton, StoreCardsSkeleton, TeamTableSkeleton } from "@/components/wedash/LoadingSkeletons";
 import {
   fetchLatestSellerSyncedAt,
@@ -95,11 +96,14 @@ export function StaffPage() {
         title="Equipe"
         subtitle="Acompanhe a equipe da filial e gerencie cadastros, grupos e acessos."
         actions={
-          singleStore ? (
-            <Button type="button" onClick={() => setManageOpen(true)}>
-              Gerenciar grupos
-            </Button>
-          ) : undefined
+          <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
+            <SetupGuide screen="staff" />
+            {singleStore ? (
+              <Button type="button" onClick={() => setManageOpen(true)}>
+                Gerenciar grupos
+              </Button>
+            ) : null}
+          </div>
         }
         loading={loading}
         skeleton={(n) => <StoreCardsSkeleton count={n} title team wide />}

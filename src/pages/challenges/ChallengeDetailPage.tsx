@@ -345,7 +345,12 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
                 <tr key={p.key} className="border-b border-line last:border-b-0">
                   {disputa && <td className="py-2.5 pr-3 font-mono font-bold text-t2">{p.position ?? "—"}</td>}
                   <td className="py-2.5 pr-3">
-                    <PersonName name={p.name} employeeId={p.key} storeId={c.storeId} sub={p.group} />
+                    <PersonName
+                      name={p.name}
+                      employeeId={p.key}
+                      storeId={c.storeId}
+                      sub={[p.group, p.eligibleDays < p.periodDays ? `${p.eligibleDays} de ${p.periodDays} dias` : null].filter(Boolean).join(" · ") || null}
+                    />
                   </td>
                   <td className="py-2.5 pr-3 text-right font-mono font-bold text-t0">
                     {aComecar ? "—" : p.result != null ? metricValueLabel(c.metric, p.result) : <WithoutItems index={isIndexMetric(c.metric)} />}

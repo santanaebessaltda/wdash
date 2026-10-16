@@ -267,6 +267,37 @@ describe("buildChallengeView — participantes e resultado", () => {
     expect(end.BIA.winner).toBe(true);
   });
 
+  it("mínimo proporcional aos dias presentes; disputa continua pelo valor bruto", () => {
+    const days = [
+      sellerDay(1, 1, 30, 1, { day: "2026-10-06" }),
+      sellerDay(2, 1, 30, 1, { day: "2026-10-09" }),
+    ];
+    const minimum = build(
+      challenge({ mode: "MINIMUM", metric: "QUANTITY", scope: "ALL", products: [], target: 70, prizes: [{ kind: "MONEY", amount: 50 }] }),
+      input({
+        team: [member(1, "ANA"), member(2, "BIA", { admittedOn: "2026-10-09" })],
+        sellerDays: days,
+      }),
+      "2026-10-12",
+    );
+    const p = byName(minimum);
+    expect(p.ANA.winner).toBe(false);
+    expect(p.BIA.winner).toBe(true);
+    expect(p.BIA.eligibleDays).toBe(3);
+    expect(p.BIA.periodDays).toBe(7);
+    const contest = build(
+      challenge({ mode: "CONTEST", metric: "QUANTITY", scope: "ALL", products: [], target: null }),
+      input({
+        team: [member(1, "ANA"), member(2, "BIA", { admittedOn: "2026-10-09" })],
+        sellerDays: days,
+      }),
+      "2026-10-12",
+    );
+    expect(byName(contest).ANA.result).toBe(30);
+    expect(byName(contest).BIA.result).toBe(30);
+    expect(byName(contest).ANA.position).toBe(1);
+  });
+
   it("pessoa desligada que vendeu continua na tabela; quem não é da equipe e não vendeu fica de fora", () => {
     const v = build(
       challenge(),

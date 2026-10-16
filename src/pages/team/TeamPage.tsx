@@ -19,6 +19,7 @@ import { fetchGoals, fetchGoalTeam, type GoalRecord, type GoalTeamMember } from 
 import { buildGoalCardView, goalStatus, sellerGoalLevels, type SellerGoalLevel } from "@/data/wedash/goalView";
 import { GoalLevelSummary } from "@/components/wedash/GoalLevelsBar";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
+import { SetupGuide } from "@/components/wedash/SetupGuide";
 import type { SalesDayAgg, SalesSellerDayAgg } from "@/data/wedash/salesTypes";
 import { storesForSession } from "@/data/wedash/stores";
 import { teamChallengesReturn, teamGoalsReturn } from "@/pages/goals/backPath";
@@ -408,6 +409,7 @@ export function TeamPage() {
                   options={[{ value: "", label: "Todos os grupos" }, ...view.availableShifts.map((t) => ({ value: t, label: t }))]}
                 />
               )}
+              <SetupGuide screen="team" />
               <Button variant="primary" onClick={exportValue}>
                 Exportar
               </Button>

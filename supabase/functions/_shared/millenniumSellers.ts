@@ -25,6 +25,8 @@ export type ErpSeller = {
   flags: ErpSellerFlags;
   /** GERADORES[0].GERADOR do Consulta  -  codigo que vem nas vendas do relatorio de cupom. */
   geradorId: number | null;
+  /** DATA_ADMISSAO. null = o ERP não tem data. */
+  admittedOn: string | null;
 };
 
 type ListRow = { employeeId: number; code: string; name: string; login: string | null; role: string };
@@ -124,6 +126,40 @@ function parseGerador(payload: unknown): number | null {
   return id != null && id > 0 ? id : null;
 }
 
+export function parseAdmissionDate(payload: unknown): string | null {
+  const raw = consultaRecord(payload).o.DATA_ADMISSAO;
+  if (raw == null || raw === "") return null;
+  const ms = Date.parse(String(raw));
+  if (Number.isNaN(ms)) return null;
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(ms));
+}
+
+export function todayInSaoPaulo(now = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
+
+export function departedOnForSync(
+  prev: { active: boolean; departedOn: string | null } | undefined,
+  active: boolean | null,
+  today: string,
+): string | null | undefined {
+  if (active == null) return undefined;
+  if (active) return null;
+  if (prev?.departedOn) return prev.departedOn;
+  if (prev?.active === true) return today;
+  return null;
+}
+
 async function post(path: string, session: string, body: unknown): Promise<unknown> {
   const res = await fetch(`${baseUrl()}/${path}`, {
     method: "POST",
@@ -171,7 +207,7 @@ export async function fetchStoreSellers(session: string, millenniumStoreId: numb
       const consulta = await post("millenium.FUNCIONARIOS.Consulta", session, { FUNCIONARIO: row.employeeId });
       const flags = parseFlags(consulta);
       const active = !(flags.desativado || flags.inativo || flags.afastado || flags.naoMostrarNoEvento);
-      out[i] = { ...row, flags, active, geradorId: parseGerador(consulta) };
+      out[i] = { ...row, flags, active, geradorId: parseGerador(consulta), admittedOn: parseAdmissionDate(consulta) };
     }
   };
   await Promise.all(Array.from({ length: Math.min(CONSULTA_CONCURRENCY, list.length) }, worker));

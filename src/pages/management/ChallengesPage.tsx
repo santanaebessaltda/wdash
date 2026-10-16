@@ -4,6 +4,7 @@ import { Badge, Button, Card, DateRangePicker, Modal, useToast } from "@/compone
 import { Tooltip } from "@/components/ui/Tooltip";
 import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePicker";
 import { DuplicateChoiceModal } from "@/components/wedash/DuplicateChoiceModal";
+import { SetupGuide } from "@/components/wedash/SetupGuide";
 import { ChallengeCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import {
   deleteChallenge,
@@ -162,6 +163,7 @@ export function ChallengesPage() {
               activePresetId={periodActivePresetId(scope.period)}
               maxDate={maxPickerDate(today)}
             />
+            <SetupGuide screen="challenges" />
             <Button icon={<Icon d={icons.plus} size={14} />} onClick={() => navigate(paths.management.challengeNew)}>
               Novo desafio
             </Button>

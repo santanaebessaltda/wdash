@@ -324,7 +324,14 @@ export function SellersBlock({
             sortable: true,
             sortValue: (l: LineRank) => (l.noGoal ? null : l.individualGoalAmount),
             render: (l: LineRank) =>
-              l.noGoal ? <span className="text-t2">—</span> : <span className="font-mono text-[12.5px] font-bold text-t0">{brl(l.individualGoalAmount)}</span>,
+              l.noGoal ? (
+                <span className="text-t2">—</span>
+              ) : (
+                <span className="inline-flex flex-col items-end">
+                  <span className="font-mono text-[12.5px] font-bold text-t0">{brl(l.individualGoalAmount)}</span>
+                  {l.proportionalGoal ? <span className="text-[11px] text-t2">{l.eligibleDays} de {l.periodDays} dias</span> : null}
+                </span>
+              ),
           },
           {
             key: "pctIndiv",

@@ -7,9 +7,11 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
 import { corsHeaders, serve } from "../_shared/cors.ts";
 import { loginMillennium } from "../_shared/millennium.ts";
 import {
+  departedOnForSync,
   fetchStoreSellers,
   mergeNameKeys,
   MillenniumHttpError,
+  todayInSaoPaulo,
   type ErpSeller,
 } from "../_shared/millenniumSellers.ts";
 import { canAccessStore, loadStaffCaller } from "../_shared/staffAuth.ts";
@@ -44,12 +46,19 @@ async function saveSellers(
   const now = new Date().toISOString();
   const { data: existing, error: exErr } = await admin
     .from("store_seller")
-    .select("millennium_employee_id, name_keys")
+    .select("millennium_employee_id, name_keys, active, departed_on")
     .eq("store_id", storeId);
   if (exErr) throw exErr;
   const prevKeys = new Map(
     (existing ?? []).map((r) => [Number(r.millennium_employee_id), (r.name_keys as string[] | null) ?? []]),
   );
+  const prevState = new Map(
+    (existing ?? []).map((r) => [
+      Number(r.millennium_employee_id),
+      { active: Boolean(r.active), departedOn: (r.departed_on as string | null) ?? null },
+    ]),
+  );
+  const today = todayInSaoPaulo();
   if (sellers.length > 0) {
     const { error } = await admin.from("store_seller").upsert(
       sellers.map((s) => ({
@@ -64,6 +73,8 @@ async function saveSellers(
         active: s.active,
         erp_flags: s.flags,
         millennium_gerador_id: s.geradorId,
+        admitted_on: s.admittedOn,
+        departed_on: departedOnForSync(prevState.get(s.employeeId), s.active, today) ?? null,
         in_erp: true,
         synced_at: now,
       })),

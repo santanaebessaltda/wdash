@@ -184,7 +184,7 @@ serve(async (req) => {
       ),
       allPages(
         admin.from("store_seller")
-          .select("store_id, millennium_employee_id, millennium_gerador_id, name, name_keys, active, erp_role, shift_id, store_shift(name)")
+          .select("store_id, millennium_employee_id, millennium_gerador_id, name, name_keys, active, erp_role, admitted_on, departed_on, shift_id, store_shift(name)")
           .eq("tenant_id", membership.tenant_id).in("store_id", storeIds).order("name"),
       ),
       allPages(

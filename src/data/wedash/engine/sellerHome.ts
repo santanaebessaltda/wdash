@@ -1,6 +1,6 @@
 /** Pacote da tela Inicio do vendedor. No modo Geral, numeros e podio sao a parte igual da filial. Nos outros modos, o podio e a venda de cada pessoa. */
 import { brlCent, collaboratorName, startOfMonth, addDays } from "./format.ts";
-import type { GoalRecord, GoalTeamMember, SalesDayAgg, SalesSellerDayAgg } from "./goalTypes.ts";
+import type { GoalCardView, GoalRecord, GoalTeamMember, SalesDayAgg, SalesSellerDayAgg, SellerRow } from "./goalTypes.ts";
 import { buildGoalCardView, goalStatus, sellerGoalLevels, type SellerGoalLevel } from "./goalView.ts";
 import { weekdayWeights, type StoreWeekHours } from "./goalWeights.ts";
 import { buildSellerRanking, groupSize, type SellerRankingEntry } from "./sellerRanking.ts";
@@ -257,6 +257,15 @@ function storeChallenges(input: SellerHomeInput, s: SellerHomeInput["stores"][nu
     .sort((a, b) => order[a.status] - order[b.status] || a.endsOn.localeCompare(b.endsOn) || a.name.localeCompare(b.name, "pt-BR"));
 }
 
+/** 1 no individual. Nos outros modos, soma dos dias do grupo ÷ dias da pessoa (igual vira o tamanho do grupo). */
+function prizeDivisor(view: GoalCardView, row: SellerRow): number {
+  if (view.kind === "individual") return 1;
+  const peers = view.sellers.filter((r) => !r.noGoal && (view.kind === "geral" || r.group === row.group));
+  const sum = peers.reduce((s, r) => s + r.eligibleDays, 0);
+  if (row.eligibleDays > 0 && sum > 0) return sum / row.eligibleDays;
+  return groupSize(view, row);
+}
+
 function buildStore(input: SellerHomeInput, s: SellerHomeInput["stores"][number]): SellerHomeStore {
   const base = {
     storeId: s.storeId,
@@ -273,7 +282,7 @@ function buildStore(input: SellerHomeInput, s: SellerHomeInput["stores"][number]
   const view = buildGoalCardView(viewInput);
   const me = sellerGoalLevels({ goals: [goal], dayAggs: input.dayAggs, sellerDayAggs: input.sellerDayAggs, team: input.team, today: input.today }).get(meKey) ?? null;
   const row = view.sellers.find((r) => r.employeeId === meKey);
-  const size = row ? groupSize(view, row) : 1;
+  const size = row ? prizeDivisor(view, row) : 1;
   let projected: number | null = null;
   if (me) {
     const yesterday = buildGoalCardView({

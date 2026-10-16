@@ -3,6 +3,8 @@ import {
   fetchStoreSellers,
   isSellerActive,
   isStoreSeller,
+  departedOnForSync,
+  parseAdmissionDate,
   parseFuncionarioFlags,
   parseFuncionarioGerador,
   parseFuncionariosLista,
@@ -30,6 +32,7 @@ function consulta(flags: {
         INATIVO: flags.inativo ?? false,
         AFASTADO: flags.afastado ?? false,
         NAO_MOSTRAR_NO_EVENTO: flags.naoMostrar ?? false,
+        DATA_ADMISSAO: "2026-05-01T03:00:00.000Z",
         GERADORES: [{ DESATIVADO: flags.desativado ?? false, GERADOR: flags.gerador ?? null }],
       },
     ],
@@ -115,8 +118,8 @@ describe("fetchStoreSellers", () => {
       session: "s",
       millenniumStoreId: 8,
       known: new Map([
-        [40585, "VENDEDOR"],
-        [20656, "VENDEDOR"],
+        [40585, { role: "VENDEDOR", admittedOn: "2026-01-01" }],
+        [20656, { role: "VENDEDOR", admittedOn: "2026-01-01" }],
       ]),
       baseUrl: "http://erp.test/api",
       fetchImpl: fetchImpl as unknown as typeof fetch,
@@ -126,6 +129,21 @@ describe("fetchStoreSellers", () => {
       [40585, null, null],
       [20656, false, 20657],
     ]);
+  });
+});
+
+describe("datas", () => {
+  it("lê a admissão em Brasília e ignora vazio", () => {
+    expect(parseAdmissionDate(consulta({}))).toBe("2026-05-01");
+    expect(parseAdmissionDate({ value: [{ DATA_ADMISSAO: null }] })).toBeNull();
+  });
+
+  it("grava a saída só na passagem de ativa para inativa", () => {
+    expect(departedOnForSync({ active: true, departedOn: null }, false, "2026-10-16")).toBe("2026-10-16");
+    expect(departedOnForSync({ active: false, departedOn: "2026-10-10" }, false, "2026-10-16")).toBe("2026-10-10");
+    expect(departedOnForSync({ active: false, departedOn: null }, false, "2026-10-16")).toBeNull();
+    expect(departedOnForSync({ active: false, departedOn: "2026-10-10" }, true, "2026-10-16")).toBeNull();
+    expect(departedOnForSync(undefined, null, "2026-10-16")).toBeUndefined();
   });
 });
 
