@@ -1,7 +1,5 @@
 -- Documentos saiu. Some o que só existia para a assinatura.
-delete from storage.objects where bucket_id = 'documents';
-delete from storage.buckets where id = 'documents';
-
+-- Os PDFs saem pela API de storage no deploy; apagar storage.objects direto é recusado.
 drop table if exists public.employee_document;
 drop table if exists public.document_batch;
 drop table if exists public.document_event;

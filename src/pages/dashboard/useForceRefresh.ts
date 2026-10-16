@@ -77,15 +77,16 @@ export function useForceRefresh({
 
   const applyForceWaitResult = useCallback(
     async (wait: Awaited<ReturnType<typeof waitForSyncJob>>, ids: string[]) => {
+      if (wait.status === "CANCELLED") {
+        setRefreshing(false);
+        return;
+      }
       clearPendingForce(session.tenantId);
       if (wait.status === "FAILED") {
         setForceError("Não foi possível atualizar as vendas. Tente novamente em alguns minutos.");
         console.warn("FORCE job failed:", wait.error);
       } else if (wait.status === "TIMEOUT") {
         setForceError("A atualização está demorando mais que o normal. Os dados podem aparecer em instantes.");
-      } else if (wait.status === "CANCELLED") {
-        setRefreshing(false);
-        return;
       } else if (wait.status === "SUCCEEDED") {
         setForceAtMap(recordForceAt(session.tenantId, ids, new Date()));
       }
@@ -145,6 +146,12 @@ export function useForceRefresh({
     waitAbort.current?.abort();
     clearPendingForce(session.tenantId);
   }, [disconnected, session.tenantId]);
+
+  useEffect(() => {
+    return () => {
+      waitAbort.current?.abort();
+    };
+  }, []);
 
   // Reabre o PWA no meio do FORCE  ->  mantem "Atualizando..." ate o job terminar.
   useEffect(() => {

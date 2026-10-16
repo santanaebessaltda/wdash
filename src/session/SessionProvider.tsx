@@ -12,6 +12,7 @@ import {
   sessionFromPersistedAuth,
 } from "@/session/authApi";
 import { accessLabel, roleLabel, sessionFromUser, storesKey, type Session } from "@/session/session";
+import { clearAllPendingForce } from "@/data/wedash/syncUi";
 import { clearSavedPeriod } from "@/session/periodStorage";
 import { requestPermissionAfterLogin, watchSalesPush } from "@/push/salesPush";
 
@@ -282,6 +283,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(() => {
     // Nao desconecta Millennium  -  so Configuracoes > Integracao ERP.
     clearSavedPeriod();
+    clearAllPendingForce();
     setSession(null);
     save(null);
     void logoutAuth();

@@ -237,3 +237,17 @@ export function clearPendingForce(tenantId: string): void {
     /* ignore */
   }
 }
+
+/** Saiu da conta: o Atualizar guardado neste aparelho não volta no próximo login. */
+export function clearAllPendingForce(): void {
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (key?.startsWith("wedash.forcePending.")) keys.push(key);
+    }
+    for (const key of keys) localStorage.removeItem(key);
+  } catch {
+    /* ignore */
+  }
+}

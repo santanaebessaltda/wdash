@@ -9,6 +9,7 @@ import {
   formatSyncWatermarkLabel,
   lastForceAtFromRetryAfter,
   clearPendingForce,
+  clearAllPendingForce,
   readPendingForce,
   writePendingForce,
 } from "./syncUi";
@@ -142,6 +143,10 @@ describe("pending FORCE (Atualizando persiste ao fechar PWA)", () => {
       removeItem: (k: string) => {
         mem.delete(k);
       },
+      key: (i: number) => [...mem.keys()][i] ?? null,
+      get length() {
+        return mem.size;
+      },
     });
   });
   afterEach(() => {
@@ -160,5 +165,15 @@ describe("pending FORCE (Atualizando persiste ao fechar PWA)", () => {
     clearPendingForce("t1");
     expect(readPendingForce("t1")).toBeNull();
     expect(mem.has(key)).toBe(false);
+  });
+
+  it("logout clears every pending refresh", () => {
+    writePendingForce("t1", { jobId: "a", storeIds: [], enqueuedAt: "2026-09-23T14:00:00.000Z" });
+    writePendingForce("t2", { jobId: "b", storeIds: ["s1"], enqueuedAt: "2026-09-23T14:00:00.000Z" });
+    mem.set("wedash.other", "keep");
+    clearAllPendingForce();
+    expect(readPendingForce("t1")).toBeNull();
+    expect(readPendingForce("t2")).toBeNull();
+    expect(mem.get("wedash.other")).toBe("keep");
   });
 });

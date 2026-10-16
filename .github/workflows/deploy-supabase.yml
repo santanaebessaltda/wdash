@@ -39,6 +39,27 @@ jobs:
       - name: Push database
         run: supabase db push --yes
 
+      - name: Remove document files
+        run: |
+          set -euo pipefail
+          keys=$(curl -fsS "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_ID}/api-keys?reveal=true" \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}")
+          service=$(KEYS_JSON="$keys" node --input-type=module -e 'const rows=JSON.parse(process.env.KEYS_JSON); const row=rows.find((item)=>item.name==="service_role"); if(!row?.api_key?.startsWith("eyJ")) process.exit(2); process.stdout.write(row.api_key);')
+          echo "::add-mask::$service"
+          base="https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/bucket/documents"
+          empty=$(curl -s -o /tmp/storage-empty.txt -w "%{http_code}" -X POST "$base/empty" \
+            -H "Authorization: Bearer ${service}" -H "apikey: ${service}")
+          if [ "$empty" != "200" ] && [ "$empty" != "404" ]; then
+            echo "failed to empty documents bucket (${empty})"
+            exit 1
+          fi
+          code=$(curl -s -o /tmp/storage-bucket.txt -w "%{http_code}" -X DELETE "$base" \
+            -H "Authorization: Bearer ${service}" -H "apikey: ${service}")
+          if [ "$code" != "200" ] && [ "$code" != "404" ]; then
+            echo "failed to delete documents bucket (${code})"
+            exit 1
+          fi
+
       - name: Remove document functions
         run: |
           for name in documents assina-webhook assina-credential-persist; do

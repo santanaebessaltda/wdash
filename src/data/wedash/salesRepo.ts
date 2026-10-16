@@ -841,6 +841,50 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Uma leitura que não volta não pode segurar o botão para sempre. */
+const SYNC_JOB_READ_MS = 10_000;
+
+type SyncJobRow = { status: string; error: string | null; created_at?: string | null };
+
+async function readSyncJobRow(
+  query: PromiseLike<{
+    data: { status?: string; error?: string | null; created_at?: string | null } | null;
+    error: { message?: string } | null;
+  }>,
+): Promise<SyncJobRow | null | "miss"> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<"miss">((resolve) => {
+    timer = setTimeout(() => resolve("miss"), SYNC_JOB_READ_MS);
+  });
+  try {
+    const result = await Promise.race([Promise.resolve(query), timeout]);
+    if (result === "miss") return "miss";
+    if (result.error) {
+      console.warn("sync job:", result.error.message ?? result.error);
+      return "miss";
+    }
+    if (!result.data) return null;
+    return {
+      status: String(result.data.status ?? ""),
+      error: result.data.error ?? null,
+      created_at: result.data.created_at ?? null,
+    };
+  } catch (e) {
+    console.warn("sync job:", e instanceof Error ? e.message : e);
+    return "miss";
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+function finishedSyncJob(row: SyncJobRow): SyncJobWaitResult | null {
+  if (row.status === "SUCCEEDED") return { status: "SUCCEEDED" };
+  if (row.status === "FAILED" || row.status === "CANCELLED") {
+    return { status: "FAILED", error: row.error };
+  }
+  return null;
+}
+
 export type SyncJobWaitResult =
   | { status: "SUCCEEDED" }
   | { status: "FAILED"; error: string | null }
@@ -852,23 +896,11 @@ export async function peekSyncJob(jobId: string): Promise<SyncJobWaitResult | nu
   const sb = getSupabase();
   if (!sb) return { status: "FAILED", error: "supabase_unavailable" };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (sb.from("sync_job") as any)
-    .select("status, error")
-    .eq("id", jobId)
-    .maybeSingle();
-  if (error) {
-    console.warn("peekSyncJob:", error.message ?? error);
-    return null;
-  }
-  if (!data) return null;
-  const row = data as { status?: string; error?: string | null };
-  const st = String(row.status ?? "");
-  if (st === "SUCCEEDED") return { status: "SUCCEEDED" };
-  if (st === "FAILED" || st === "CANCELLED") {
-    return { status: "FAILED", error: row.error ?? null };
-  }
-  // QUEUED / RUNNING / desconhecido  -  ainda em andamento
-  return null;
+  const row = await readSyncJobRow(
+    (sb.from("sync_job") as any).select("status, error").eq("id", jobId).maybeSingle(),
+  );
+  if (row === "miss" || row == null) return null;
+  return finishedSyncJob(row);
 }
 
 /**
@@ -891,27 +923,28 @@ export async function waitForSyncJob(
   const pollMs = opts?.pollMs ?? 1_000;
   const started = Date.now();
   let lastReported: string | null = null;
+  let missing = 0;
 
   while (Date.now() - started < timeoutMs) {
     if (opts?.signal?.aborted) return { status: "CANCELLED" };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (sb.from("sync_job") as any)
-      .select("status, error")
-      .eq("id", jobId)
-      .maybeSingle();
-    if (error) {
-      console.warn("waitForSyncJob:", error.message ?? error);
-    } else if (data) {
-      const row = data as { status?: string; error?: string | null };
-      const st = String(row.status ?? "");
-      if (st && st !== lastReported) {
-        lastReported = st;
-        opts?.onStatus?.(st);
+    const row = await readSyncJobRow(
+      (sb.from("sync_job") as any).select("status, error").eq("id", jobId).maybeSingle(),
+    );
+    if (opts?.signal?.aborted) return { status: "CANCELLED" };
+    if (row === "miss") {
+      missing = 0;
+    } else if (row == null) {
+      missing += 1;
+      if (missing >= 3) return { status: "TIMEOUT" };
+    } else {
+      missing = 0;
+      if (row.status && row.status !== lastReported) {
+        lastReported = row.status;
+        opts?.onStatus?.(row.status);
       }
-      if (st === "SUCCEEDED") return { status: "SUCCEEDED" };
-      if (st === "FAILED" || st === "CANCELLED") {
-        return { status: "FAILED", error: row.error ?? null };
-      }
+      const done = finishedSyncJob(row);
+      if (done) return done;
     }
     await sleep(pollMs);
   }
@@ -933,28 +966,21 @@ export async function waitForLatestForceJob(
   while (Date.now() - started < timeoutMs) {
     if (opts?.signal?.aborted) return { status: "CANCELLED" };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (sb.from("sync_job") as any)
-      .select("id, status, error, created_at")
-      .eq("tenant_id", tenantId)
-      .eq("kind", "FORCE")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (error) {
-      console.warn("waitForLatestForceJob:", error.message ?? error);
-    } else if (data) {
-      const row = data as {
-        status?: string;
-        error?: string | null;
-        created_at?: string | null;
-      };
-      const created = row.created_at ? new Date(row.created_at).getTime() : 0;
-      if (!sinceMs || created >= sinceMs - 5_000) {
-        const st = String(row.status ?? "");
-        if (st === "SUCCEEDED") return { status: "SUCCEEDED" };
-        if (st === "FAILED" || st === "CANCELLED") {
-          return { status: "FAILED", error: row.error ?? null };
-        }
+    const read = await readSyncJobRow(
+      (sb.from("sync_job") as any)
+        .select("status, error, created_at")
+        .eq("tenant_id", tenantId)
+        .eq("kind", "FORCE")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    );
+    if (opts?.signal?.aborted) return { status: "CANCELLED" };
+    if (read && read !== "miss") {
+      const createdMs = read.created_at ? new Date(read.created_at).getTime() : 0;
+      if (!sinceMs || createdMs >= sinceMs - 5_000) {
+        const done = finishedSyncJob(read);
+        if (done) return done;
       }
     }
     await sleep(pollMs);
