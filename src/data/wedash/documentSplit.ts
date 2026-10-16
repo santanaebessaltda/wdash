@@ -1111,11 +1111,163 @@ export function envelopeSignatures(input: {
   return signatures;
 }
 
-/** O reenvio usa o colaborador, mesmo quando a resposta lista o signatário extra primeiro. */
+/** O recipient gravado no documento é o da pessoa, mesmo quando a resposta lista o extra primeiro. */
 export function collaboratorRecipientId(
   signatures: Array<{ id?: string; routingOrder?: number; recipient?: { id?: string; routingOrder?: number } }> | null | undefined,
 ): string | null {
   if (!signatures?.length) return null;
   const match = signatures.find((item) => (item.routingOrder ?? item.recipient?.routingOrder) === 1) ?? signatures[0];
   return match.recipient?.id ?? match.id ?? null;
+}
+
+export type SignerState = "PENDING" | "SIGNED" | "DECLINED";
+
+export type SignerProgress = {
+  name: string;
+  order: number;
+  recipientId: string | null;
+  channel: SendChannel | null;
+  status: SignerState;
+};
+
+export type RemoteSignature = {
+  id?: string | null;
+  status?: string | null;
+  routingOrder?: number | null;
+  recipient?: { id?: string | null; name?: string | null; routingOrder?: number | null; status?: string | null } | null;
+};
+
+function signatureOrder(item: RemoteSignature): number | null {
+  const order = item.routingOrder ?? item.recipient?.routingOrder;
+  return typeof order === "number" && Number.isInteger(order) ? order : null;
+}
+
+/** Assinado não volta. Sem status na assinatura, o envelope concluído fecha todo mundo. */
+export function nextSignerStatus(current: SignerState, raw: string | null | undefined, envelopeStatus: string): SignerState {
+  if (current === "SIGNED") return "SIGNED";
+  const value = (raw ?? "").trim().toUpperCase();
+  if (value === "SIGNED" || value === "COMPLETED") return "SIGNED";
+  if (value === "DECLINED" || value === "REJECTED" || value === "CANCELED" || value === "CANCELLED") return "DECLINED";
+  if (!value && envelopeStatus === "COMPLETED") return "SIGNED";
+  if (value === "PENDING" || value === "SENT" || value === "SENT_FOR_SIGNATURE" || value === "VIEWED" || value === "WAITING") return "PENDING";
+  return current;
+}
+
+export function parseSignerProgress(value: unknown): SignerProgress[] {
+  if (!Array.isArray(value)) return [];
+  const rows: SignerProgress[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const raw = item as Record<string, unknown>;
+    const name = typeof raw.name === "string" ? raw.name.trim() : "";
+    if (!name) continue;
+    const order = Number(raw.order);
+    const channel = raw.channel === "EMAIL" || raw.channel === "WHATSAPP" ? raw.channel : null;
+    const status: SignerState = raw.status === "SIGNED" || raw.status === "DECLINED" ? raw.status : "PENDING";
+    rows.push({
+      name,
+      order: Number.isInteger(order) && order > 0 ? order : rows.length + 1,
+      recipientId: typeof raw.recipientId === "string" && raw.recipientId ? raw.recipientId : null,
+      channel,
+      status,
+    });
+  }
+  return rows.sort((left, right) => left.order - right.order);
+}
+
+function takeSignature(signatures: RemoteSignature[], taken: Set<number>, predicate: (item: RemoteSignature) => boolean): RemoteSignature | null {
+  const index = signatures.findIndex((item, itemIndex) => !taken.has(itemIndex) && predicate(item));
+  if (index < 0) return null;
+  taken.add(index);
+  return signatures[index];
+}
+
+export function mergeSignerProgress(signers: SignerProgress[], envelopeStatus: string, signatures: RemoteSignature[] | null | undefined): SignerProgress[] {
+  const remote = signatures ?? [];
+  const taken = new Set<number>();
+  return signers.map((signer) => {
+    const found =
+      takeSignature(remote, taken, (item) => signatureOrder(item) === signer.order) ??
+      (signer.recipientId ? takeSignature(remote, taken, (item) => item.recipient?.id === signer.recipientId) : null) ??
+      takeSignature(remote, taken, (item) => (item.recipient?.name ?? "").trim().toLowerCase() === signer.name.trim().toLowerCase());
+    return {
+      ...signer,
+      recipientId: found?.recipient?.id || signer.recipientId,
+      status: nextSignerStatus(signer.status, found?.status ?? found?.recipient?.status, envelopeStatus),
+    };
+  });
+}
+
+export function signersFromEnvelope(signatures: RemoteSignature[] | null | undefined, envelopeStatus: string): SignerProgress[] {
+  return (signatures ?? [])
+    .map((item, index) => {
+      const order = signatureOrder(item) ?? index + 1;
+      return {
+        name: item.recipient?.name?.trim() || `Signatário ${order}`,
+        order,
+        recipientId: item.recipient?.id ?? null,
+        channel: null,
+        status: nextSignerStatus("PENDING", item.status ?? item.recipient?.status, envelopeStatus),
+      };
+    })
+    .sort((left, right) => left.order - right.order);
+}
+
+function extraChannels(value: unknown): { name: string; channel: SendChannel }[] {
+  const list = Array.isArray(value) ? value : value ? [value] : [];
+  return list.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const raw = item as Record<string, unknown>;
+    const name = typeof raw.name === "string" ? raw.name.trim() : "";
+    const channel = raw.channel === "EMAIL" || raw.channel === "WHATSAPP" ? raw.channel : null;
+    return name && channel ? [{ name, channel }] : [];
+  });
+}
+
+function withSignerChannels(signers: SignerProgress[], ownerChannel: SendChannel | null, extras: { name: string; channel: SendChannel }[]): SignerProgress[] {
+  return signers.map((signer) => {
+    if (signer.channel) return signer;
+    if (signer.order === 1 && ownerChannel) return { ...signer, channel: ownerChannel };
+    const extra = extras.find((item) => item.name.trim().toLowerCase() === signer.name.trim().toLowerCase());
+    return extra ? { ...signer, channel: extra.channel } : signer;
+  });
+}
+
+/** O que a biblioteca mostra. Quem já estava gravado conserva o nome; o envelope só atualiza o andamento. */
+export function progressForEnvelope(input: {
+  stored: unknown;
+  envelopeStatus: string;
+  signatures: RemoteSignature[] | null | undefined;
+  ownerChannel: SendChannel | null;
+  extras: unknown;
+}): SignerProgress[] {
+  const extras = extraChannels(input.extras);
+  const stored = parseSignerProgress(input.stored);
+  const base = stored.length > 0 ? mergeSignerProgress(stored, input.envelopeStatus, input.signatures) : signersFromEnvelope(input.signatures, input.envelopeStatus);
+  return withSignerChannels(base, input.ownerChannel, extras);
+}
+
+export function initialSigners(input: {
+  ownerName: string;
+  ownerChannel: SendChannel;
+  extras: { name: string; channel: SendChannel }[];
+  signatures: RemoteSignature[] | null | undefined;
+}): SignerProgress[] {
+  const signers: SignerProgress[] = [
+    { name: input.ownerName.trim(), order: 1, recipientId: null, channel: input.ownerChannel, status: "PENDING" },
+    ...input.extras.flatMap((extra): SignerProgress[] => {
+      const name = extra.name.trim();
+      return name ? [{ name, order: 0, recipientId: null, channel: extra.channel, status: "PENDING" }] : [];
+    }),
+  ];
+  return mergeSignerProgress(
+    signers.map((signer, index) => ({ ...signer, order: index + 1 })),
+    "SENT_FOR_SIGNATURE",
+    input.signatures,
+  );
+}
+
+export function signerCaption(signers: SignerProgress[]): string | null {
+  if (signers.length < 2) return null;
+  return signers.map((signer) => `${signer.name} ${signer.status === "SIGNED" ? "assinou" : signer.status === "DECLINED" ? "recusou" : "pendente"}`).join(" · ");
 }

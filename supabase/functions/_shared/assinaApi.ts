@@ -4,7 +4,12 @@ const BASE = "https://api.assinaai.com/api/v1";
 export type AssinaEnvelope = {
   id?: string;
   status?: string;
-  signatures?: Array<{ id?: string; recipient?: { id?: string } }>;
+  signatures?: Array<{
+    id?: string;
+    status?: string;
+    routingOrder?: number;
+    recipient?: { id?: string; name?: string; routingOrder?: number; status?: string };
+  }>;
   file?: { s3TempFileName?: string; signedDocumentUrl?: string; documentUrl?: string };
 };
 

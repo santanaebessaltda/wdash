@@ -10,6 +10,11 @@ import {
   channelBlock,
   collaboratorRecipientId,
   confirmBlock,
+  initialSigners,
+  mergeSignerProgress,
+  nextSignerStatus,
+  progressForEnvelope,
+  signerCaption,
   contactFieldsToAsk,
   contactPatch,
   cpfDigits,
@@ -511,6 +516,55 @@ describe("envelope recipients", () => {
     ).toBe("ana");
     expect(collaboratorRecipientId([{ id: "only" }])).toBe("only");
     expect(collaboratorRecipientId([])).toBeNull();
+  });
+});
+
+describe("signer progress", () => {
+  it("keeps each signer and attaches the recipient even when the extra is listed first", () => {
+    const signers = initialSigners({
+      ownerName: "Maria Eduarda",
+      ownerChannel: "WHATSAPP",
+      extras: [{ name: "Petania", channel: "EMAIL" }],
+      signatures: [
+        { routingOrder: 2, recipient: { id: "petania", name: "Petania" } },
+        { routingOrder: 1, status: "PENDING", recipient: { id: "maria", name: "Maria Eduarda" } },
+      ],
+    });
+    expect(signers).toEqual([
+      { name: "Maria Eduarda", order: 1, recipientId: "maria", channel: "WHATSAPP", status: "PENDING" },
+      { name: "Petania", order: 2, recipientId: "petania", channel: "EMAIL", status: "PENDING" },
+    ]);
+    expect(signerCaption(signers)).toBe("Maria Eduarda pendente · Petania pendente");
+  });
+
+  it("marks only the signer the envelope says has signed", () => {
+    const current = initialSigners({
+      ownerName: "Maria Eduarda",
+      ownerChannel: "WHATSAPP",
+      extras: [{ name: "Petania", channel: "EMAIL" }],
+      signatures: [
+        { routingOrder: 1, recipient: { id: "maria" } },
+        { routingOrder: 2, recipient: { id: "petania" } },
+      ],
+    });
+    const next = mergeSignerProgress(current, "PARTIALLY_SIGNED", [
+      { routingOrder: 2, status: "PENDING", recipient: { id: "petania" } },
+      { routingOrder: 1, status: "SIGNED", recipient: { id: "maria" } },
+    ]);
+    expect(next.map((item) => item.status)).toEqual(["SIGNED", "PENDING"]);
+    expect(signerCaption(next)).toBe("Maria Eduarda assinou · Petania pendente");
+    expect(nextSignerStatus("SIGNED", "", "PARTIALLY_SIGNED")).toBe("SIGNED");
+  });
+
+  it("closes every signer when the envelope is completed and keeps a stored name", () => {
+    const next = progressForEnvelope({
+      stored: [{ name: "Maria Eduarda", order: 1, recipientId: "maria", channel: "WHATSAPP", status: "PENDING" }],
+      envelopeStatus: "COMPLETED",
+      signatures: [{ routingOrder: 1, recipient: { id: "maria", name: "Outro nome" } }],
+      ownerChannel: "WHATSAPP",
+      extras: [],
+    });
+    expect(next).toEqual([{ name: "Maria Eduarda", order: 1, recipientId: "maria", channel: "WHATSAPP", status: "SIGNED" }]);
   });
 });
 

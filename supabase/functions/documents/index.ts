@@ -6,7 +6,7 @@ import { corsHeaders, serve } from "../_shared/cors.ts";
 import { OWNER_ROLES, loadStaffCaller } from "../_shared/staffAuth.ts";
 import { buildPdf, readPdfPages, withoutPage } from "../_shared/pdfPages.ts";
 import { assinaCancelEnvelope, assinaCreateEnvelope, assinaResend, assinaSignerLink } from "../_shared/assinaApi.ts";
-import { loadCompanyToken } from "../_shared/assinaSync.ts";
+import { loadCompanyToken, syncEnvelope } from "../_shared/assinaSync.ts";
 import {
   DOCUMENT_CATEGORIES,
   DOCUMENT_COPY,
@@ -26,6 +26,8 @@ import {
   fileName,
   firstCpf,
   groupPages,
+  initialSigners,
+  parseSignerProgress,
   rematchAssignment,
   placementWarning,
   resendVisible,
@@ -134,6 +136,7 @@ serve(async (req) => {
   if (action === "cancel") return cancelDocument(admin, caller.tenantId, erpSecret, body);
   if (action === "move") return moveDocument(admin, caller.tenantId, body);
   if (action === "open") return openFile(admin, caller.tenantId, erpSecret, body);
+  if (action === "sync-pending") return syncPending(admin, caller.tenantId, erpSecret);
   return json({ error: "unknown_action" }, 400);
 });
 
@@ -707,6 +710,12 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
         channel,
         envelope_id: created.body.id,
         recipient_id: collaboratorRecipientId(created.body.signatures),
+        signers: initialSigners({
+          ownerName: seller.name,
+          ownerChannel: channel,
+          extras: extraForDocs.map((item) => ({ name: item.name, channel: item.channel })),
+          signatures: created.body.signatures ?? [],
+        }),
         sent_at: new Date().toISOString(),
         deadline: signatureDeadline.slice(0, 10),
         error: null,
@@ -722,19 +731,52 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
   return json({ results });
 }
 
+async function signerTarget(doc: { recipient_id?: string | null; channel?: string | null; signers?: unknown }, requested: string, pendingOnly: boolean) {
+  const signers = parseSignerProgress(doc.signers);
+  const channelOf = (value: string | null | undefined) => (value === "EMAIL" || value === "WHATSAPP" ? value : null);
+  if (requested) {
+    const match = signers.find((item) => item.recipientId === requested);
+    if (!match?.recipientId) return doc.recipient_id === requested ? { recipientId: requested, channel: channelOf(doc.channel) } : null;
+    if (pendingOnly && match.status !== "PENDING") return null;
+    return { recipientId: match.recipientId, channel: match.channel ?? channelOf(doc.channel) };
+  }
+  const owner = signers.find((item) => item.order === 1 && item.recipientId);
+  return {
+    recipientId: owner?.recipientId ?? (typeof doc.recipient_id === "string" ? doc.recipient_id : ""),
+    channel: owner?.channel ?? channelOf(doc.channel),
+  };
+}
+
+async function signerContact(
+  admin: SupabaseClient,
+  tenantId: string,
+  doc: { seller_id?: string | null; identity_id?: string | null; recipient_id?: string | null; signers?: unknown; extra_signer?: unknown },
+  recipientId: string,
+): Promise<{ email: string | null; whatsapp: string | null } | null> {
+  const signers = parseSignerProgress(doc.signers);
+  const match = signers.find((item) => item.recipientId === recipientId);
+  const ownerId = signers.find((item) => item.order === 1)?.recipientId ?? doc.recipient_id;
+  if (!match || match.order === 1 || recipientId === ownerId) {
+    return loadRecipient(admin, tenantId, { seller_id: (doc.seller_id as string | null) ?? null, identity_id: (doc.identity_id as string | null) ?? null });
+  }
+  const extra = (storedExtras(doc.extra_signer) ?? []).find((item) => item.name.trim().toLowerCase() === match.name.trim().toLowerCase());
+  return extra ? { email: extra.email, whatsapp: extra.whatsapp } : null;
+}
+
 async function resend(admin: SupabaseClient, tenantId: string, secret: string, body: Body) {
   const { data: doc } = await admin.from("employee_document").select("*").eq("id", String(body.documentId ?? "")).eq("tenant_id", tenantId).maybeSingle();
-  if (!doc || doc.removed_at || !resendVisible(doc.status as DocStatus) || !doc.envelope_id || !doc.recipient_id) return json({ error: "not_found" }, 404);
+  if (!doc || doc.removed_at || !resendVisible(doc.status as DocStatus) || !doc.envelope_id) return json({ error: "not_found" }, 404);
+  const target = signerTarget(doc, String(body.recipientId ?? ""), true);
+  if (!target?.recipientId || !target.channel) return json({ message: "Não foi possível reenviar o link. Tente novamente." }, 404);
   const batch = await ownedBatch(admin, tenantId, doc.batch_id as string);
-  const channel = asChannel(doc.channel) ?? asChannel(batch?.channel);
-  if (!batch || !channel) return json({ error: "not_found" }, 404);
+  if (!batch) return json({ error: "not_found" }, 404);
   const token = await loadCompanyToken(admin, tenantId, secret);
-  const seller = await loadRecipient(admin, tenantId, { seller_id: (doc.seller_id as string | null) ?? null, identity_id: (doc.identity_id as string | null) ?? null });
+  const seller = await signerContact(admin, tenantId, doc, target.recipientId);
   if (!token || !seller) return json({ message: "Não foi possível reenviar o link. Tente novamente." }, 502);
-  const ok = await assinaResend(token, doc.envelope_id as string, doc.recipient_id as string, {
-    senderType: channel,
-    email: channel === "EMAIL" ? (seller.email as string) : undefined,
-    phone: channel === "WHATSAPP" ? (seller.whatsapp as string) : undefined,
+  const ok = await assinaResend(token, doc.envelope_id as string, target.recipientId, {
+    senderType: target.channel,
+    email: target.channel === "EMAIL" ? seller.email ?? undefined : undefined,
+    phone: target.channel === "WHATSAPP" ? seller.whatsapp ?? undefined : undefined,
   });
   if (!ok) {
     await admin.from("employee_document").update({ error: "Não foi possível reenviar o link. Tente novamente." }).eq("id", doc.id);
@@ -745,11 +787,13 @@ async function resend(admin: SupabaseClient, tenantId: string, secret: string, b
 }
 
 async function copyLink(admin: SupabaseClient, tenantId: string, secret: string, body: Body) {
-  const { data: doc } = await admin.from("employee_document").select("status, envelope_id, recipient_id, removed_at").eq("id", String(body.documentId ?? "")).eq("tenant_id", tenantId).maybeSingle();
-  if (!doc || doc.removed_at || !resendVisible(doc.status as DocStatus) || !doc.envelope_id || !doc.recipient_id) return json({ message: "Não foi possível copiar o link. Tente novamente." }, 404);
+  const { data: doc } = await admin.from("employee_document").select("status, envelope_id, recipient_id, signers, removed_at").eq("id", String(body.documentId ?? "")).eq("tenant_id", tenantId).maybeSingle();
+  if (!doc || doc.removed_at || !resendVisible(doc.status as DocStatus) || !doc.envelope_id) return json({ message: "Não foi possível copiar o link. Tente novamente." }, 404);
+  const target = signerTarget(doc, String(body.recipientId ?? ""), false);
+  if (!target?.recipientId) return json({ message: "Não foi possível copiar o link. Tente novamente." }, 404);
   const token = await loadCompanyToken(admin, tenantId, secret);
   if (!token) return json({ message: DOCUMENT_COPY.noToken }, 422);
-  const url = await assinaSignerLink(token, doc.envelope_id as string, doc.recipient_id as string);
+  const url = await assinaSignerLink(token, doc.envelope_id as string, target.recipientId);
   if (!url) return json({ message: "Não foi possível copiar o link. Tente novamente." }, 502);
   return json({ url });
 }
@@ -824,6 +868,29 @@ async function moveDocument(admin: SupabaseClient, tenantId: string, body: Body)
   }).eq("id", documentId);
   if (error) return json({ message: "Não foi possível mover o documento. Tente novamente." }, 500);
   return json({ ok: true });
+}
+
+async function syncPending(admin: SupabaseClient, tenantId: string, secret: string) {
+  const token = await loadCompanyToken(admin, tenantId, secret);
+  if (!token) return json({ updated: 0 });
+  const { data } = await admin
+    .from("employee_document")
+    .select("envelope_id")
+    .eq("tenant_id", tenantId)
+    .eq("status", "PENDING")
+    .not("envelope_id", "is", null)
+    .is("removed_at", null)
+    .order("sent_at", { ascending: false })
+    .limit(40);
+  for (const row of data ?? []) {
+    if (!row.envelope_id) continue;
+    try {
+      await syncEnvelope(admin, token, row.envelope_id as string);
+    } catch {
+      /* o próximo documento segue */
+    }
+  }
+  return json({ updated: (data ?? []).length });
 }
 
 async function openFile(admin: SupabaseClient, tenantId: string, secret: string, body: Body) {

@@ -1,6 +1,6 @@
 /** Atualiza um documento a partir do GET do envelope. O webhook só chama isto. */
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { applyEnvelopeStatus, type DocStatus } from "../../../src/data/wedash/documentSplit.ts";
+import { applyEnvelopeStatus, progressForEnvelope, type DocStatus, type SendChannel } from "../../../src/data/wedash/documentSplit.ts";
 import { assinaGetEnvelope, signedUrlOf } from "./assinaApi.ts";
 import { decryptSecret } from "./secretBox.ts";
 
@@ -19,7 +19,7 @@ export async function loadCompanyToken(
 export async function syncEnvelope(admin: SupabaseClient, token: string, envelopeId: string): Promise<boolean> {
   const { data: row } = await admin
     .from("employee_document")
-    .select("id, tenant_id, status, signed_storage_path, removed_at")
+    .select("id, tenant_id, status, signed_storage_path, removed_at, signers, extra_signer, channel")
     .eq("envelope_id", envelopeId)
     .maybeSingle();
   if (!row) return false;
@@ -29,7 +29,15 @@ export async function syncEnvelope(admin: SupabaseClient, token: string, envelop
   if (!remote?.status) return true;
 
   const next = applyEnvelopeStatus(row.status as DocStatus, remote.status);
-  const patch: { status: string; signed_storage_path?: string } = { status: next };
+  const ownerChannel = row.channel === "EMAIL" || row.channel === "WHATSAPP" ? (row.channel as SendChannel) : null;
+  const signers = progressForEnvelope({
+    stored: row.signers,
+    envelopeStatus: remote.status,
+    signatures: remote.signatures ?? [],
+    ownerChannel,
+    extras: row.extra_signer,
+  });
+  const patch: { status: string; signers: typeof signers; signed_storage_path?: string } = { status: next, signers };
   if (next === "SIGNED" && !row.signed_storage_path) {
     const url = signedUrlOf(remote);
     if (url) {

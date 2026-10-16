@@ -5,7 +5,7 @@ import { cn } from "@/lib/cn";
 import { QuickStat } from "@/pages/dashboards/QuickStat";
 import { Icon, icons } from "@/pages/users/Icons";
 import { paths } from "@/router/paths";
-import { archivePeople, displayTitle, documentPersonKey, findDocumentPerson, inLibrary, isFiledStatus, monthFolder, personMatchesQuery, resendVisible, sameCategory, signingPeople, DOCUMENT_CATEGORIES } from "@/data/wedash/documentSplit";
+import { archivePeople, displayTitle, documentPersonKey, findDocumentPerson, inLibrary, isFiledStatus, monthFolder, personMatchesQuery, resendVisible, sameCategory, signerCaption, signingPeople, DOCUMENT_CATEGORIES, type SignerProgress } from "@/data/wedash/documentSplit";
 import type { BatchRow, DocumentRow, PersonRow } from "@/data/wedash/documentsRepo";
 import { cancelDocument, copyDocumentLink, moveDocument, openDocument, resendDocument } from "@/data/wedash/documentsRepo";
 import { DocumentsSkeleton } from "@/components/wedash/LoadingSkeletons";
@@ -139,10 +139,10 @@ export function DocumentsPage() {
     setMoveId(id);
   }
 
-  async function copyLink(id: string) {
+  async function copyLink(id: string, recipientId?: string) {
     setActing(true);
     try {
-      const url = await copyDocumentLink(id);
+      const url = await copyDocumentLink(id, recipientId);
       await navigator.clipboard.writeText(url);
       show("Link copiado.", "success");
     } catch (error) {
@@ -324,8 +324,8 @@ export function DocumentsPage() {
             documents={documents}
             onOpenFolder={(key) => setCrumb([...crumb, key])}
             onOpenFile={(id) => void openFile(id, show)}
-            onResend={(id) => void resendFile(id, show, setResendingId, reload)}
-            onCopy={(id) => void copyLink(id)}
+            onResend={(id, recipientId) => void resendFile(id, recipientId, show, setResendingId, reload)}
+            onCopy={(id, recipientId) => void copyLink(id, recipientId)}
             onMove={openMove}
             onDelete={setDeleteId}
             busy={acting || resendingId != null}
@@ -349,8 +349,8 @@ export function DocumentsPage() {
           stores={storeName}
           showStore={allStores}
           onDownload={(id) => void openFile(id, show)}
-          onResend={(id) => void resendFile(id, show, setResendingId, reload)}
-          onCopy={(id) => void copyLink(id)}
+          onResend={(id, recipientId) => void resendFile(id, recipientId, show, setResendingId, reload)}
+          onCopy={(id, recipientId) => void copyLink(id, recipientId)}
           onMove={openMove}
           onDelete={setDeleteId}
           busy={acting || resendingId != null}
@@ -483,13 +483,14 @@ function Shortcut({ label, count, active, onClick }: { label: string; count: str
 
 async function resendFile(
   id: string,
+  recipientId: string | undefined,
   show: (message: string, variant: "success" | "danger") => void,
   setResendingId: (id: string | null) => void,
   reload: () => Promise<void>,
 ) {
   setResendingId(id);
   try {
-    await resendDocument(id);
+    await resendDocument(id, recipientId);
     show("Link reenviado.", "success");
     await reload();
   } catch {
@@ -576,7 +577,7 @@ function folderEntries(input: {
   const month = allStores ? crumb[3] : crumb[2];
   return docs
     .filter((doc) => yearOf(doc) === year && monthOf(doc) === month)
-    .map((doc) => ({ key: doc.id, label: displayTitle(doc.fileName), detail: STATUS_LABEL[doc.status], fileId: doc.id }));
+    .map((doc) => ({ key: doc.id, label: displayTitle(doc.fileName), detail: signerCaption(doc.signers) ?? STATUS_LABEL[doc.status], fileId: doc.id }));
 }
 
 function FolderTable({
@@ -595,8 +596,8 @@ function FolderTable({
   documents: DocumentRow[];
   onOpenFolder: (key: string) => void;
   onOpenFile: (id: string) => void;
-  onResend: (id: string) => void;
-  onCopy: (id: string) => void;
+  onResend: (id: string, recipientId?: string) => void;
+  onCopy: (id: string, recipientId?: string) => void;
   onMove: (id: string) => void;
   onDelete: (id: string) => void;
   busy: boolean;
@@ -630,10 +631,11 @@ function FolderTable({
               {resendingId === doc.id && <span className="text-[12px] font-bold text-t2">Reenviando…</span>}
               <RowMenu
                 kind={isFiledStatus(doc.status) ? "filed" : "pending"}
+                signers={doc.signers}
                 busy={busy}
                 onDownload={() => onOpenFile(doc.id)}
-                onResend={() => onResend(doc.id)}
-                onCopy={() => onCopy(doc.id)}
+                onResend={(recipientId) => onResend(doc.id, recipientId)}
+                onCopy={(recipientId) => onCopy(doc.id, recipientId)}
                 onMove={() => onMove(doc.id)}
                 onDelete={() => onDelete(doc.id)}
               />
@@ -671,8 +673,8 @@ function FileTable({
   stores: Map<string, string>;
   showStore: boolean;
   onDownload: (id: string) => void;
-  onResend: (id: string) => void;
-  onCopy: (id: string) => void;
+  onResend: (id: string, recipientId?: string) => void;
+  onCopy: (id: string, recipientId?: string) => void;
   onMove: (id: string) => void;
   onDelete: (id: string) => void;
   busy: boolean;
@@ -717,12 +719,7 @@ function FileTable({
     {
       key: "status",
       header: "Status",
-      render: (row) =>
-        row.envelopeId || isFiledStatus(row.status) ? (
-          <Badge variant={badgeVariant(row.status)}>{STATUS_LABEL[row.status]}</Badge>
-        ) : (
-          <span className="text-[12.5px] text-t2">Em preparação</span>
-        ),
+      render: (row) => <DocumentStatus row={row} />,
     },
     {
       key: "sent",
@@ -739,10 +736,11 @@ function FileTable({
             {resendingId === row.id && <span className="text-[12px] font-bold text-t2">Reenviando…</span>}
             <RowMenu
               kind={isFiledStatus(row.status) ? "filed" : "pending"}
+              signers={row.signers}
               busy={busy || resendingId === row.id}
               onDownload={() => onDownload(row.id)}
-              onResend={() => onResend(row.id)}
-              onCopy={() => onCopy(row.id)}
+              onResend={(recipientId) => onResend(row.id, recipientId)}
+              onCopy={(recipientId) => onCopy(row.id, recipientId)}
               onMove={() => onMove(row.id)}
               onDelete={() => onDelete(row.id)}
             />
@@ -768,8 +766,20 @@ function pendingMenu(row: DocumentRow) {
   return resendVisible(row.status) && Boolean(row.envelopeId);
 }
 
+function DocumentStatus({ row }: { row: DocumentRow }) {
+  if (!row.envelopeId && !isFiledStatus(row.status)) return <span className="text-[12.5px] text-t2">Em preparação</span>;
+  const caption = signerCaption(row.signers);
+  return (
+    <span className="flex min-w-0 flex-col gap-1">
+      <Badge variant={badgeVariant(row.status)}>{STATUS_LABEL[row.status]}</Badge>
+      {caption ? <span className="text-[12px] text-t1">{caption}</span> : null}
+    </span>
+  );
+}
+
 function RowMenu({
   kind,
+  signers,
   busy,
   onDownload,
   onResend,
@@ -778,21 +788,30 @@ function RowMenu({
   onDelete,
 }: {
   kind: "pending" | "filed";
+  signers: SignerProgress[];
   busy: boolean;
   onDownload: () => void;
-  onResend: () => void;
-  onCopy: () => void;
+  onResend: (recipientId?: string) => void;
+  onCopy: (recipientId?: string) => void;
   onMove: () => void;
   onDelete: () => void;
 }) {
+  const linked = signers.filter((signer) => signer.recipientId);
+  const individual = kind === "pending" && linked.length > 1;
+  const linkItems: DropdownItem[] = individual
+    ? linked.flatMap((signer) => [
+        ...(signer.status === "PENDING" && signer.channel
+          ? [{ label: `Reenviar link · ${signer.name}`, onClick: () => onResend(signer.recipientId ?? undefined), disabled: busy }]
+          : []),
+        { label: `Copiar link · ${signer.name}`, onClick: () => onCopy(signer.recipientId ?? undefined), disabled: busy },
+      ])
+    : [
+        { label: "Reenviar link", onClick: () => onResend(linked[0]?.recipientId ?? undefined), disabled: busy },
+        { label: "Copiar link", onClick: () => onCopy(linked[0]?.recipientId ?? undefined), disabled: busy },
+      ];
   const items: DropdownItem[] = [
     { label: "Baixar PDF", onClick: onDownload, disabled: busy },
-    ...(kind === "pending"
-      ? [
-          { label: "Reenviar link", onClick: onResend, disabled: busy },
-          { label: "Copiar link", onClick: onCopy, disabled: busy },
-        ]
-      : []),
+    ...(kind === "pending" ? linkItems : []),
     { label: "Mover", onClick: onMove, disabled: busy },
     { label: "", divider: true },
     { label: "Excluir documento", onClick: onDelete, danger: true, disabled: busy },

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useScope } from "@/pages/dashboard/useScope";
 import { useActiveSession } from "@/session/SessionProvider";
-import { loadDocuments, type BatchRow, type DocumentRow, type PersonRow } from "@/data/wedash/documentsRepo";
+import { loadDocuments, refreshPendingSigners, type BatchRow, type DocumentRow, type PersonRow } from "@/data/wedash/documentsRepo";
 import { documentPeople, type BranchUser, type SignerContact } from "@/data/wedash/documentSplit";
 import { fetchSystemUsers, type SystemUser } from "@/data/wedash/systemUsers";
 
@@ -38,6 +38,20 @@ export function useDocuments() {
     setLoading(true);
     void reload();
   }, [reload]);
+
+  useEffect(() => {
+    if (loading) return;
+    let live = true;
+    void refreshPendingSigners().then(
+      () => {
+        if (live) return reload();
+      },
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [loading, reload]);
 
   return { storeId, allStores: storeId == null, batches, documents, people, stores, history, loading, reload };
 }
