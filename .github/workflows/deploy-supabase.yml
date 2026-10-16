@@ -39,5 +39,17 @@ jobs:
       - name: Push database
         run: supabase db push --yes
 
+      - name: Remove document functions
+        run: |
+          for name in documents assina-webhook assina-credential-persist; do
+            code=$(curl -s -o /tmp/fn-delete.txt -w "%{http_code}" -X DELETE \
+              "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_ID}/functions/${name}" \
+              -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}")
+            if [ "$code" != "200" ] && [ "$code" != "404" ]; then
+              echo "failed to delete ${name} (${code})"
+              exit 1
+            fi
+          done
+
       - name: Deploy Edge Functions
         run: supabase functions deploy
