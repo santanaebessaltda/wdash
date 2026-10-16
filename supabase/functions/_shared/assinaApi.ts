@@ -174,6 +174,23 @@ export function recipientIdOf(body: AssinaEnvelope): string | null {
   return first?.recipient?.id ?? first?.id ?? null;
 }
 
+/** Só o PDF concluído do Assina. documentUrl e o arquivo temporário são o original, sem o certificado. */
 export function signedUrlOf(body: AssinaEnvelope): string | null {
-  return body.file?.signedDocumentUrl ?? body.file?.s3TempFileName ?? body.file?.documentUrl ?? null;
+  const url = body.file?.signedDocumentUrl?.trim() ?? "";
+  return url.startsWith("http://") || url.startsWith("https://") ? url : null;
+}
+
+export async function downloadSignedPdf(token: string, url: string): Promise<Uint8Array | null> {
+  const attempts: Array<HeadersInit | undefined> = [undefined, { Authorization: `Bearer ${token}` }];
+  for (const headers of attempts) {
+    try {
+      const res = await fetch(url, headers ? { headers } : undefined);
+      if (!res.ok) continue;
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      if (bytes.length >= 4 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) return bytes;
+    } catch {
+      /* a próxima tentativa usa o token, se a URL exigir */
+    }
+  }
+  return null;
 }

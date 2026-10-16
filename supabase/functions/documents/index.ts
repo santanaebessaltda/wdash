@@ -928,23 +928,26 @@ async function syncPending(admin: SupabaseClient, tenantId: string, secret: stri
 async function openFile(admin: SupabaseClient, tenantId: string, secret: string, body: Body) {
   const { data: doc } = await admin.from("employee_document").select("*").eq("id", String(body.documentId ?? "")).eq("tenant_id", tenantId).maybeSingle();
   if (!doc || doc.removed_at) return json({ message: "O arquivo ainda não está disponível." }, 404);
-  let path = (doc.status === "SIGNED" ? doc.signed_storage_path : doc.storage_path) as string | null;
-  if (doc.status === "SIGNED" && !path && doc.envelope_id) {
+  if (doc.envelope_id && !isFiledStatus(doc.status as DocStatus)) {
     const token = await loadCompanyToken(admin, tenantId, secret);
     if (token) {
-      const { syncEnvelope } = await import("../_shared/assinaSync.ts");
       await syncEnvelope(admin, token, doc.envelope_id as string);
-      const again = await admin.from("employee_document").select("signed_storage_path").eq("id", doc.id).maybeSingle();
-      path = (again.data?.signed_storage_path as string | null) ?? null;
+      const again = await admin.from("employee_document").select("status, signed_storage_path").eq("id", doc.id).maybeSingle();
+      if (again.data) {
+        doc.status = again.data.status;
+        doc.signed_storage_path = again.data.signed_storage_path;
+      }
     }
   }
-  if (!path) return json({ error: "missing_file" }, 404);
+  const signed = doc.status === "SIGNED";
+  const path = (signed ? doc.signed_storage_path : doc.storage_path) as string | null;
+  if (!path) return json({ message: signed ? "O PDF assinado ainda não está disponível." : "O arquivo ainda não está disponível." }, 404);
   const batch = await ownedBatch(admin, tenantId, doc.batch_id as string);
   const seller = await loadRecipient(admin, tenantId, { seller_id: (doc.seller_id as string | null) ?? null, identity_id: (doc.identity_id as string | null) ?? null });
   const download = seller?.name && batch
     ? deliveryFileName(doc.file_name as string, seller.name as string, Number(batch.month), Number(batch.year))
     : (doc.file_name as string);
-  const signed = await admin.storage.from(BUCKET).createSignedUrl(path, 60 * 10, { download });
-  if (signed.error || !signed.data) return json({ error: "missing_file" }, 404);
-  return json({ url: signed.data.signedUrl });
+  const link = await admin.storage.from(BUCKET).createSignedUrl(path, 60 * 10, { download });
+  if (link.error || !link.data) return json({ error: "missing_file" }, 404);
+  return json({ url: link.data.signedUrl });
 }

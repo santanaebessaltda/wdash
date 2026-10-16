@@ -1,7 +1,7 @@
 /** Atualiza um documento a partir do GET do envelope. O webhook só chama isto. */
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { applyEnvelopeStatus, progressForEnvelope, type DocStatus, type SendChannel } from "../../../src/data/wedash/documentSplit.ts";
-import { assinaGetEnvelope, signedUrlOf } from "./assinaApi.ts";
+import { assinaGetEnvelope, downloadSignedPdf, signedUrlOf } from "./assinaApi.ts";
 import { decryptSecret } from "./secretBox.ts";
 
 const BUCKET = "documents";
@@ -38,19 +38,14 @@ export async function syncEnvelope(admin: SupabaseClient, token: string, envelop
     extras: row.extra_signer,
   });
   const patch: { status: string; signers: typeof signers; signed_storage_path?: string } = { status: next, signers };
-  if (next === "SIGNED" && !row.signed_storage_path) {
+  if (next === "SIGNED") {
     const url = signedUrlOf(remote);
     if (url) {
-      try {
-        const file = await fetch(url);
-        if (file.ok) {
-          const bytes = new Uint8Array(await file.arrayBuffer());
-          const path = `${row.tenant_id}/${row.id}-signed.pdf`;
-          const up = await admin.storage.from(BUCKET).upload(path, bytes, { contentType: "application/pdf", upsert: true });
-          if (!up.error) patch.signed_storage_path = path;
-        }
-      } catch {
-        /* Assinado fica. A URL temporária não é gravada. */
+      const bytes = await downloadSignedPdf(token, url);
+      if (bytes) {
+        const path = `${row.tenant_id}/${row.id}-signed.pdf`;
+        const up = await admin.storage.from(BUCKET).upload(path, bytes, { contentType: "application/pdf", upsert: true });
+        if (!up.error) patch.signed_storage_path = path;
       }
     }
   }
