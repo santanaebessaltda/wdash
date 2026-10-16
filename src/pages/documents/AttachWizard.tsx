@@ -38,6 +38,7 @@ import {
   dropDocumentPage,
   deleteDocument,
   prepareFiles,
+  rematchBatch,
   saveEmployeeContact,
   type DocumentRow,
   type PersonRow,
@@ -104,18 +105,57 @@ export function AttachWizard({
     [people, contactEdits],
   );
 
-  const rows = useMemo(
+  const liveRows = useMemo(
     () =>
       documents
         .filter((doc) => doc.batchId === batchId)
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id)),
     [documents, batchId],
   );
+  const [pinned, setPinned] = useState<DocumentRow[] | null>(null);
+  const rows = liveRows.length > 0 ? liveRows : (pinned ?? liveRows);
+  const liveRef = useRef(liveRows);
+  const batchRef = useRef(batchId);
+  const stepRef = useRef(step);
+  const reloadRef = useRef(onReload);
+  const storeRef = useRef(storeId);
+  liveRef.current = liveRows;
+  batchRef.current = batchId;
+  stepRef.current = step;
+  reloadRef.current = onReload;
   const rowKey = rows.map((row) => `${row.id}:${row.pageCount}`).join("|");
 
   useEffect(() => {
     if (step === 1) openAtStart.current = true;
   }, [step]);
+
+  useEffect(() => {
+    if (storeRef.current === storeId) return;
+    const previous = storeRef.current;
+    storeRef.current = storeId;
+    const batch = batchRef.current;
+    if (!batch || stepRef.current < 2 || !storeId) {
+      setPinned(null);
+      return;
+    }
+    const snapshot = liveRef.current.filter((row) => row.batchId === batch);
+    if (snapshot.length > 0) setPinned(snapshot);
+    let cancel = false;
+    void (async () => {
+      try {
+        await rematchBatch(batch, storeId);
+        if (cancel) return;
+        await reloadRef.current();
+        if (!cancel) setPinned(null);
+      } catch (reason) {
+        if (!cancel) setError(reason instanceof Error ? reason.message : "Não foi possível atualizar a equipe desta filial.");
+      }
+    })();
+    return () => {
+      cancel = true;
+      storeRef.current = previous;
+    };
+  }, [storeId]);
 
   useEffect(() => {
     if (step !== 2 || !activeId) return;
@@ -329,6 +369,7 @@ export function AttachWizard({
           <DocumentReview
             rows={rows}
             people={shownPeople}
+            branchId={storeId}
             drafts={drafts}
             signers={signers}
             history={history}

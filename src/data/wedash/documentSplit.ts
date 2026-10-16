@@ -141,6 +141,29 @@ export function assignSeller(matches: { id: string }[]): string | null {
   return matches.length === 1 ? matches[0].id : null;
 }
 
+/**
+ * Troca de filial no meio da preparação: o documento continua na filial nova.
+ * CPF com um único cadastro nessa filial vincula a pessoa. Sem match, ou com mais de um, fica sem pessoa.
+ */
+export function rematchAssignment(
+  cpf: string | null,
+  sellers: { id: string; cpf: string | null }[],
+  users: { identityId: string; cpf: string | null; storeIds: string[] }[],
+  storeId: string,
+): { sellerId: string | null; identityId: string | null; storeId: string } {
+  const digits = (cpf ?? "").replace(/\D/g, "");
+  const matches = digits.length === 11 ? sellers.filter((seller) => (seller.cpf ?? "").replace(/\D/g, "") === digits) : [];
+  const sellerId = assignSeller(matches);
+  if (sellerId) return { sellerId, identityId: null, storeId };
+  if (digits.length === 11) {
+    const user = users.find((item) => (item.cpf ?? "").replace(/\D/g, "") === digits);
+    if (user && (user.storeIds.length === 0 || user.storeIds.includes(storeId))) {
+      return { sellerId: null, identityId: user.identityId, storeId };
+    }
+  }
+  return { sellerId: null, identityId: null, storeId };
+}
+
 /** Pessoa que pode receber documento: equipe da filial ou usuário da WDash vinculado a ela. */
 export type DocumentPerson = {
   id: string;

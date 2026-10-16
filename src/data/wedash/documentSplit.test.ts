@@ -4,6 +4,7 @@ import {
   DOCUMENT_COPY,
   applyEnvelopeStatus,
   assignSeller,
+  rematchAssignment,
   batchLabel,
   carryDraft,
   channelBlock,
@@ -188,6 +189,35 @@ describe("assignSeller", () => {
   it("leaves the page unassigned when nobody or more than one employee matches", () => {
     expect(assignSeller([])).toBeNull();
     expect(assignSeller([{ id: "ana" }, { id: "bia" }])).toBeNull();
+  });
+});
+
+describe("rematchAssignment", () => {
+  const sellers = [
+    { id: "ana", cpf: "39053344705" },
+    { id: "bia", cpf: "15350946056" },
+  ];
+
+  it("links the only employee of the new branch with that CPF", () => {
+    expect(rematchAssignment("390.533.447-05", sellers, [], "store-b")).toEqual({
+      sellerId: "ana",
+      identityId: null,
+      storeId: "store-b",
+    });
+  });
+
+  it("keeps the document on the new branch when nobody matches", () => {
+    expect(rematchAssignment("11144477735", sellers, [], "store-b")).toEqual({
+      sellerId: null,
+      identityId: null,
+      storeId: "store-b",
+    });
+  });
+
+  it("does not pick a person when two employees share the CPF", () => {
+    expect(
+      rematchAssignment("39053344705", [sellers[0], { id: "ana-2", cpf: "39053344705" }], [], "store-b"),
+    ).toEqual({ sellerId: null, identityId: null, storeId: "store-b" });
   });
 });
 

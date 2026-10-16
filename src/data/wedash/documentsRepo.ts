@@ -247,6 +247,11 @@ export async function prepareFiles(input: {
   return { batchId, refused, created: prepared.created ?? [], merged: prepared.merged ?? 0, files };
 }
 
+/** Relê o CPF dos documentos desta preparação na equipe da filial escolhida. */
+export async function rematchBatch(batchId: string, storeId: string) {
+  await call({ action: "rematch", batchId, storeId });
+}
+
 export async function dropDocumentPage(documentId: string, pageNumber: number) {
   await call({ action: "drop-page", documentId, pageNumber });
 }

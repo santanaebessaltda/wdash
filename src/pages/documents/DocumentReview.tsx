@@ -51,6 +51,7 @@ const controlClass =
 export function DocumentReview({
   rows,
   people,
+  branchId,
   drafts,
   signers,
   history,
@@ -71,6 +72,8 @@ export function DocumentReview({
 }: {
   rows: DocumentRow[];
   people: PersonRow[];
+  /** Filial do seletor. Null = todas. A lista de pessoas segue esta filial, não a do documento. */
+  branchId?: string | null;
   drafts: Record<string, DocumentDraft | undefined>;
   signers: { id: string; name: string; email: string }[];
   history: SignerContact[];
@@ -144,6 +147,7 @@ export function DocumentReview({
           row={row}
           draft={draft}
           people={people}
+          branchId={branchId}
           signers={signers}
           history={history}
           index={index}
@@ -201,6 +205,7 @@ function ReviewBody({
   row,
   draft,
   people,
+  branchId,
   signers,
   history,
   index,
@@ -219,6 +224,7 @@ function ReviewBody({
   row: DocumentRow;
   draft: DocumentDraft;
   people: PersonRow[];
+  branchId?: string | null;
   signers: { id: string; name: string; email: string }[];
   history: SignerContact[];
   index: number;
@@ -236,7 +242,7 @@ function ReviewBody({
 }) {
   const ownerKey = documentPersonKey(row);
   const person = people.find((item) => item.id === ownerKey) ?? null;
-  const choices = signingPeople(people, row.storeId);
+  const choices = signingPeople(people, branchId !== undefined ? branchId : row.storeId);
   const branchPeople = person && !choices.some((item) => item.id === person.id) ? [person, ...choices] : choices;
   const issue = row.envelopeId ? null : documentIssue(person, draft, row.pageCount, signers, people, row.sizeBytes);
   const previous = index > 0 ? rows[index - 1] : null;

@@ -23,7 +23,9 @@ import {
   signatureDeadlineAt,
   envelopeSignatures,
   fileName,
+  firstCpf,
   groupPages,
+  rematchAssignment,
   placementWarning,
   resendVisible,
   shouldSend,
@@ -119,6 +121,7 @@ serve(async (req) => {
   const action = String(body.action ?? "");
   if (action === "upload") return uploadSlot(admin, caller.tenantId, body);
   if (action === "prepare") return prepare(admin, caller.tenantId, body);
+  if (action === "rematch") return rematch(admin, caller.tenantId, body);
   if (action === "assign") return assign(admin, caller.tenantId, body);
   if (action === "drop-page") return dropPage(admin, caller.tenantId, body);
   if (action === "delete") return removeDocument(admin, caller.tenantId, body);
@@ -277,6 +280,54 @@ async function prepare(admin: SupabaseClient, tenantId: string, body: Body) {
   }
   const merged = groups.filter((group) => new Set(group.pages.map((page) => page.sourceIndex)).size > 1).length;
   return json({ batchId, created, refused, merged });
+}
+
+/** Filial trocada no meio da preparação: relê o CPF e tenta a equipe da filial nova. O PDF e as marcações ficam. */
+async function rematch(admin: SupabaseClient, tenantId: string, body: Body) {
+  const batchId = String(body.batchId ?? "");
+  const storeId = String(body.storeId ?? "");
+  if (!batchId || !storeId) return json({ error: "invalid_batch" }, 400);
+  const batch = await ownedBatch(admin, tenantId, batchId);
+  if (!batch) return json({ error: "not_found" }, 404);
+  const { data: store } = await admin.from("store").select("id").eq("id", storeId).eq("tenant_id", tenantId).maybeSingle();
+  if (!store) return json({ error: "not_found" }, 404);
+
+  const { data: docs } = await admin
+    .from("employee_document")
+    .select("id, storage_path, envelope_id")
+    .eq("tenant_id", tenantId)
+    .eq("batch_id", batchId)
+    .is("removed_at", null);
+  const { data: sellers } = await admin.from("store_seller").select("id, cpf").eq("tenant_id", tenantId).eq("store_id", storeId).eq("in_erp", true);
+  const usersByCpf = await activeUsersByCpf(admin, tenantId);
+  const users = [...usersByCpf.entries()].map(([cpf, user]) => ({ identityId: user.identityId, cpf, storeIds: user.storeIds }));
+  const team = (sellers ?? []).map((seller) => ({ id: seller.id as string, cpf: (seller.cpf as string | null) ?? null }));
+
+  for (const doc of docs ?? []) {
+    if (doc.envelope_id) continue;
+    let cpf: string | null = null;
+    const path = String(doc.storage_path ?? "");
+    if (path) {
+      const downloaded = await admin.storage.from(BUCKET).download(path);
+      if (downloaded.data) {
+        try {
+          const read = await readPdfPages(new Uint8Array(await downloaded.data.arrayBuffer()));
+          cpf = read.texts.map((text) => firstCpf(text)).find((item) => item != null) ?? null;
+        } catch {
+          cpf = null;
+        }
+      }
+    }
+    const next = rematchAssignment(cpf, team, users, storeId);
+    const { error } = await admin
+      .from("employee_document")
+      .update({ seller_id: next.sellerId, identity_id: next.identityId, store_id: next.storeId, error: null })
+      .eq("id", doc.id as string)
+      .eq("tenant_id", tenantId);
+    if (error) return json({ message: "Não foi possível atualizar a equipe desta filial." }, 422);
+  }
+  await admin.from("document_batch").update({ store_id: storeId }).eq("id", batchId).eq("tenant_id", tenantId);
+  return json({ ok: true });
 }
 
 async function takenNames(
