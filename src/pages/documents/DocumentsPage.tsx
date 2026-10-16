@@ -519,7 +519,7 @@ function statusOrder(label: string) {
 
 function FolderList({ rows, onOpen }: { rows: FolderEntry[]; onOpen: (key: string) => void }) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
       {rows.map((row) => (
         <button key={row.key} type="button" onClick={() => onOpen(row.key)} className="flex min-w-0 items-center gap-3 rounded-2xl border border-line bg-bg-2 p-4 text-left hover:border-line-2 hover:bg-bg-3">
           <span className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[11px] bg-acc-soft text-acc">
