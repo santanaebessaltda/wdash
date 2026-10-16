@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Button, Checkbox, FormField, Input, Modal, Select, useToast } from "@/components/ui";
+import { Button, Card, Checkbox, FormField, Input, Modal, Select, useToast } from "@/components/ui";
 import { ConnectionCard, ConnectionSkeleton, PickerRow } from "@/components/wedash/ConnectionList";
 import {
   disconnectCieloLink,
@@ -18,6 +18,7 @@ import type { Store } from "@/data/wedash/stores";
 import { isOwner } from "@/layout/nav-wedash";
 import { noAutofill, secretStyle } from "@/lib/noAutofill";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
+import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
 import { useScope } from "@/pages/dashboard/useScope";
 
@@ -125,6 +126,19 @@ export function AcquirersPage() {
         </div>
       ) : showSkeleton || (loading && rows.length === 0 && storeRows.length > 0) ? (
         <ConnectionSkeleton label="Carregando adquirentes…" />
+      ) : rows.length === 0 ? (
+        <Card className="mt-6 flex min-h-[280px] flex-col">
+          <EmptyBlock
+            icon="💳"
+            title="Nenhuma adquirente conectada"
+            description="Conecte a adquirente desta filial para buscar os fechamentos de cartão e Pix."
+            action={
+              <Button size="sm" onClick={() => setPicker(true)} disabled={!canEdit || storeRows.length === 0}>
+                Conectar adquirente
+              </Button>
+            }
+          />
+        </Card>
       ) : (
         <ConnectionCard
           title="Adquirente"
@@ -132,7 +146,6 @@ export function AcquirersPage() {
           connectLabel="Conectar adquirente"
           connectDisabled={!canEdit || storeRows.length === 0 || blocked}
           onConnect={() => setPicker(true)}
-          empty="Nenhuma adquirente conectada."
           rows={rows.map((row) => ({
             key: `${row.kind}-${row.storeId}`,
             name: row.name,

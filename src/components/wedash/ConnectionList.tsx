@@ -17,7 +17,6 @@ export function ConnectionCard({
   connectLabel,
   connectDisabled,
   onConnect,
-  empty,
   rows,
 }: {
   title: string;
@@ -25,7 +24,6 @@ export function ConnectionCard({
   connectLabel: string;
   connectDisabled: boolean;
   onConnect: () => void;
-  empty: string;
   rows: ConnectionRow[];
 }) {
   return (
@@ -37,24 +35,20 @@ export function ConnectionCard({
         </Button>
       </div>
       <p className="mb-4.5 text-[12.5px] text-t2">{hint}</p>
-      {rows.length === 0 ? (
-        <p className="text-[13px] text-t2">{empty}</p>
-      ) : (
-        <div className="flex flex-col gap-2.5">
-          {rows.map((row) => (
-            <div key={row.key} className="flex flex-col gap-3 rounded-[13px] border border-line bg-bg-inset px-4 py-3.5 sm:flex-row sm:items-center">
-              <Mark>{row.mark}</Mark>
-              <div className="min-w-0 flex-1">
-                <p className="text-[13.5px] font-bold text-t0">{row.name}</p>
-                <p className="mt-0.5 truncate text-xs text-t2">{row.detail}</p>
-              </div>
-              <Button variant="outline" size="sm" onClick={row.onDisconnect}>
-                Desconectar
-              </Button>
+      <div className="flex flex-col gap-2.5">
+        {rows.map((row) => (
+          <div key={row.key} className="flex flex-col gap-3 rounded-[13px] border border-line bg-bg-inset px-4 py-3.5 sm:flex-row sm:items-center">
+            <Mark>{row.mark}</Mark>
+            <div className="min-w-0 flex-1">
+              <p className="text-[13.5px] font-bold text-t0">{row.name}</p>
+              <p className="mt-0.5 truncate text-xs text-t2">{row.detail}</p>
             </div>
-          ))}
-        </div>
-      )}
+            <Button variant="outline" size="sm" onClick={row.onDisconnect}>
+              Desconectar
+            </Button>
+          </div>
+        ))}
+      </div>
     </Card>
   );
 }

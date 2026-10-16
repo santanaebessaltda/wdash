@@ -131,35 +131,39 @@ export function ShoppingSettingsPage() {
         </Card>
       ) : !accountReady ? (
         <ConnectionSkeleton label="Carregando administradora…" />
+      ) : !account ? (
+        <Card className="mt-6 flex min-h-[280px] flex-col">
+          <EmptyBlock
+            icon="🏬"
+            title="Nenhuma administradora conectada"
+            description="Conecte a administradora desta filial para informar as vendas ao shopping."
+            action={
+              <Button size="sm" onClick={() => setPicker(true)} disabled={!canEdit}>
+                Conectar administradora
+              </Button>
+            }
+          />
+        </Card>
       ) : (
         <ConnectionCard
           title="Administradora"
-          hint={
-            account
-              ? `Esta filial já usa o acesso ${accessPhrase(account.administrator)}. Desconecte para trocar.`
-              : "Cada filial usa uma administradora para informar as vendas ao shopping."
-          }
+          hint={`Esta filial já usa o acesso ${accessPhrase(account.administrator)}. Desconecte para trocar.`}
           connectLabel="Conectar administradora"
-          connectDisabled={!canEdit || account != null}
+          connectDisabled
           onConnect={() => setPicker(true)}
-          empty="Nenhuma administradora conectada."
-          rows={
-            account
-              ? [
-                  {
-                    key: account.administrator,
-                    name: connectedName,
-                    detail: mallDetail(account),
-                    mark: provider ? (
-                      <img src={provider.logo} alt="" className="h-full w-full object-contain p-1.5" />
-                    ) : (
-                      <span className="text-[11px] font-bold text-t0">{connectedName}</span>
-                    ),
-                    onDisconnect: () => setConfirm(true),
-                  },
-                ]
-              : []
-          }
+          rows={[
+            {
+              key: account.administrator,
+              name: connectedName,
+              detail: mallDetail(account),
+              mark: provider ? (
+                <img src={provider.logo} alt="" className="h-full w-full object-contain p-1.5" />
+              ) : (
+                <span className="text-[11px] font-bold text-t0">{connectedName}</span>
+              ),
+              onDisconnect: () => setConfirm(true),
+            },
+          ]}
         />
       )}
       <Modal
