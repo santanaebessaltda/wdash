@@ -27,10 +27,10 @@ import { TargetIcon } from "@/pages/dashboards/icons";
 import { IconCopy, IconTrash } from "@/pages/ecommerce/icons";
 import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
+import { statusBadgeVariant } from "@/lib/status";
 import { paths } from "@/router/paths";
 
 const STATUS_ORDER: Record<GoalStatus, number> = { active: 0, upcoming: 1, ended: 2 };
-const STATUS_VARIANT: Record<GoalStatus, "success" | "info" | "neutral"> = { active: "success", upcoming: "info", ended: "neutral" };
 
 type Loaded = { goals: GoalRecord[]; dayAggs: SalesDayAgg[]; team: GoalTeamMember[] };
 
@@ -353,7 +353,7 @@ function GoalCard({
       <div className="flex-1" />
       <div className="mt-4 flex items-center justify-between gap-3">
         <div className="flex min-w-0 flex-wrap gap-1.5">
-          <Badge variant={STATUS_VARIANT[status]}>{GOAL_STATUS_LABEL[status]}</Badge>
+          <Badge variant={statusBadgeVariant(GOAL_STATUS_LABEL[status])}>{GOAL_STATUS_LABEL[status]}</Badge>
           <Badge variant="neutral">{g.tierMode === "INDIVIDUAL" ? "Individual" : g.tierMode === "GENERAL" ? "Geral" : "Grupo"}</Badge>
           <Badge variant="neutral">
             {g.tiers.length} {g.tiers.length === 1 ? "nível" : "níveis"}

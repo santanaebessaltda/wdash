@@ -21,6 +21,7 @@ import { storesForSession } from "@/data/wedash/stores";
 import type { GoalCardView } from "@/data/wedash/teamViews";
 import { WedashBrand } from "@/components/wedash/WedashBrand";
 import { brlCent, fullDate, shortDate, isoToDate, num, dateToIso, shiftName } from "@/lib/format";
+import { statusBadgeVariant } from "@/lib/status";
 import { exportPdf } from "@/lib/printMode";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
@@ -284,7 +285,7 @@ function GoalHero({
         <div className="min-w-[220px] flex-1">
           <div className="mb-1.5 flex flex-wrap items-center gap-2.5">
             <h1 className="text-xl font-extrabold text-t0 sm:text-[22px]">{goal.name}</h1>
-            <Badge variant={status === "active" ? "success" : status === "upcoming" ? "info" : "neutral"}>{GOAL_STATUS_LABEL[status]}</Badge>
+            <Badge variant={statusBadgeVariant(GOAL_STATUS_LABEL[status])}>{GOAL_STATUS_LABEL[status]}</Badge>
           </div>
           <p className="flex flex-wrap items-center gap-x-1.5 text-[13.5px] leading-relaxed text-t1">
             {fullDate(goal.startsOn)} a {fullDate(goal.endsOn)}
@@ -534,7 +535,7 @@ function GoalPayoutCard({
                 label={`O último dia da meta será fechado na madrugada de ${shortDate(dateToIso(endMais1))}. Vendas incluídas ou canceladas até lá ainda podem alterar os valores.`}
               >
                 <span className="inline-flex cursor-help">
-                  <Badge variant="warning">Fechamento em andamento</Badge>
+                  <Badge variant={statusBadgeVariant("Fechamento em andamento")}>Fechamento em andamento</Badge>
                 </span>
               </Tooltip>
             )}

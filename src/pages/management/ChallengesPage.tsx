@@ -23,10 +23,10 @@ import {
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { storesForSession, type Store } from "@/data/wedash/stores";
 import { fullDate, isoToDate, endOfMonth, dateToIso } from "@/lib/format";
+import { statusBadgeVariant } from "@/lib/status";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import {
   CHALLENGE_STATUS_ORDER,
-  CHALLENGE_STATUS_VARIANT,
   challengeHeadline,
   HeadlineText,
   mainPrizeLabel,
@@ -338,7 +338,7 @@ function ChallengeCard({
 
       <div className="flex-1" />
       <div className="mt-4 flex flex-wrap gap-1.5">
-        <Badge variant={CHALLENGE_STATUS_VARIANT[view.status]}>{CHALLENGE_STATUS_LABEL[view.status]}</Badge>
+        <Badge variant={statusBadgeVariant(CHALLENGE_STATUS_LABEL[view.status])}>{CHALLENGE_STATUS_LABEL[view.status]}</Badge>
         <Badge variant="neutral">{CHALLENGE_METRIC_LABEL[c.metric]}</Badge>
         <Badge variant="neutral">{CHALLENGE_MODE_LABEL[c.mode]}</Badge>
       </div>

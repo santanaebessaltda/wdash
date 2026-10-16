@@ -9,6 +9,7 @@ import { fetchSalesCoverage, fetchSalesDayAggs } from "@/data/wedash/salesRepo";
 import { fetchLaunchedDays, fetchShoppingAccount, requestShoppingLaunch, requestShoppingRead, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
 import { ALREADY_LAUNCHED, canResendDay, forceLaunchAllowed, informedGap, monthReport, reportDays, shoppingSendsSales, sumSoldByDay } from "@/data/wedash/shoppingReport";
 import { brlCent, longDate, isoToDate, endOfMonth, startOfMonth, eachDay, dateToIso, addDays } from "@/lib/format";
+import { statusBadgeVariant } from "@/lib/status";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
@@ -385,7 +386,7 @@ function InformedDayModal({
   const faltando = day != null && !todayDay && informed == null;
   const diferente = day != null && !todayDay && informed != null && sold != null && informed !== sold;
   const status = todayDay ? "Em aberto" : faltando ? "Não informado" : "Informado";
-  const variant = todayDay ? "accent" : faltando ? "warning" : diferente ? "danger" : "success";
+  const variant = diferente ? "danger" : statusBadgeVariant(status);
   const difference = sold != null && informed != null ? informed - sold : null;
   return (
     <Modal

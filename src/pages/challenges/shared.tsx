@@ -9,11 +9,6 @@ import {
 } from "@/data/wedash/challengeView";
 
 export const CHALLENGE_STATUS_ORDER: Record<ChallengeStatus, number> = { active: 0, upcoming: 1, ended: 2 };
-export const CHALLENGE_STATUS_VARIANT: Record<ChallengeStatus, "success" | "info" | "neutral"> = {
-  active: "success",
-  upcoming: "info",
-  ended: "neutral",
-};
 
 export const CHALLENGE_MODE_HELP: Record<ChallengeRecord["mode"], string> = {
   CONTEST:

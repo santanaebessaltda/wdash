@@ -19,6 +19,7 @@ import {
   useToast,
 } from "@/components/ui";
 import { UsersTableSkeleton } from "@/components/wedash/LoadingSkeletons";
+import { statusBadgeVariant } from "@/lib/status";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { Icon, icons } from "@/pages/users/Icons";
 import { accessLabel, roleLabel } from "@/session/session";
@@ -205,7 +206,10 @@ export function SystemUsersPage() {
     {
       key: "status",
       header: "Status",
-      render: (u) => <Badge variant={u.status === "ACTIVE" ? "success" : "danger"}>{u.status === "ACTIVE" ? "Ativo" : "Suspenso"}</Badge>,
+      render: (u) => {
+        const label = u.status === "ACTIVE" ? "Ativo" : "Suspenso";
+        return <Badge variant={statusBadgeVariant(label)}>{label}</Badge>;
+      },
     },
     {
       key: "last",

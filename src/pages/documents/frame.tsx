@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { PageHeader } from "@/components/ui";
 import type { DocumentRow } from "@/data/wedash/documentsRepo";
+import { statusBadgeVariant } from "@/lib/status";
 
 export const STATUS_LABEL: Record<DocumentRow["status"], string> = {
   UNASSIGNED: "Pendente",
@@ -11,10 +12,7 @@ export const STATUS_LABEL: Record<DocumentRow["status"], string> = {
 };
 
 export function badgeVariant(status: DocumentRow["status"]) {
-  if (status === "SIGNED") return "success" as const;
-  if (status === "DECLINED") return "danger" as const;
-  if (status === "EXPIRED") return "warning" as const;
-  return "neutral" as const;
+  return statusBadgeVariant(STATUS_LABEL[status]);
 }
 
 export function DocumentsFrame({ title, subtitle, actions, children }: { title: string; subtitle: string; actions?: ReactNode; children: ReactNode }) {

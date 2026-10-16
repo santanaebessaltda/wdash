@@ -36,6 +36,7 @@ import {
   type SellerAccessRow,
 } from "@/data/wedash/sellerAccess";
 import { ACCESS_LABEL, hasSalesGroup, type AccessState } from "@/data/wedash/engine/sellerAccess";
+import { statusBadgeVariant } from "@/lib/status";
 
 /** Equipe. Pessoas da filial no Millennium; grupo e acesso à WDash só do vendedor. */
 export function StaffPage() {
@@ -427,17 +428,17 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
   );
 }
 
-const ACCESS_BADGE: Record<AccessState, { variant: "neutral" | "warning" | "success" | "danger"; label: string }> = {
-  NONE: { variant: "neutral", label: ACCESS_LABEL.NONE },
-  PENDING: { variant: "warning", label: ACCESS_LABEL.PENDING },
-  ACTIVE: { variant: "success", label: ACCESS_LABEL.ACTIVE },
-  SUSPENDED: { variant: "danger", label: ACCESS_LABEL.SUSPENDED },
+const ACCESS_BADGE: Record<AccessState, string> = {
+  NONE: ACCESS_LABEL.NONE,
+  PENDING: ACCESS_LABEL.PENDING,
+  ACTIVE: ACCESS_LABEL.ACTIVE,
+  SUSPENDED: ACCESS_LABEL.SUSPENDED,
 };
 
 function AccessBadge({ state }: { state: AccessState | "loading" }) {
   if (state === "loading") return <Skeleton className="h-6 w-24 rounded-[var(--radius-vela-sm)]" />;
-  const badge = ACCESS_BADGE[state];
-  return <Badge variant={badge.variant}>{badge.label}</Badge>;
+  const label = ACCESS_BADGE[state];
+  return <Badge variant={statusBadgeVariant(label)}>{label}</Badge>;
 }
 
 function rowActions(input: {
@@ -655,7 +656,10 @@ function sellerColumns(store: Store): DataTableColumn<StoreSeller>[] {
     header: "Status",
     sortable: true,
     sortValue: (v) => (v.active ? "Ativo" : "Desligado"),
-    render: (v) => (v.active ? <Badge variant="neutral">Ativo</Badge> : <Badge variant="neutral">Desligado</Badge>),
+    render: (v) => {
+      const label = v.active ? "Ativo" : "Desligado";
+      return <Badge variant={statusBadgeVariant(label)}>{label}</Badge>;
+    },
   },
   ];
 }

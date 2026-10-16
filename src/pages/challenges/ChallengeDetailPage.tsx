@@ -28,11 +28,11 @@ import {
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { storesForSession } from "@/data/wedash/stores";
 import { brlCent, fullDate, shortDate, isoToDate, num, dateToIso } from "@/lib/format";
+import { statusBadgeVariant } from "@/lib/status";
 import { exportPdf } from "@/lib/printMode";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import {
   CHALLENGE_MODE_HELP,
-  CHALLENGE_STATUS_VARIANT,
   challengeBackPath,
   challengeCriterion,
   challengeHeadline,
@@ -254,7 +254,7 @@ function ChallengeHero({ challenge: c, view, storeNameValue }: { challenge: Chal
         <div className="min-w-[220px] flex-1">
           <div className="mb-1.5 flex flex-wrap items-center gap-2.5">
             <h1 className="text-xl font-extrabold text-t0 sm:text-[22px]">{c.name}</h1>
-            <Badge variant={CHALLENGE_STATUS_VARIANT[view.status]}>{CHALLENGE_STATUS_LABEL[view.status]}</Badge>
+            <Badge variant={statusBadgeVariant(CHALLENGE_STATUS_LABEL[view.status])}>{CHALLENGE_STATUS_LABEL[view.status]}</Badge>
           </div>
           <p className="flex flex-wrap items-center gap-x-1.5 text-[13.5px] leading-relaxed text-t1">
             {fullDate(c.startsOn)} a {fullDate(c.endsOn)}
@@ -432,7 +432,7 @@ function ChallengePayoutCard({ challenge: c, view, onExport }: { challenge: Chal
                 label={`O último dia do desafio será fechado na madrugada de ${shortDate(dateToIso(endMais1))}. Vendas incluídas ou canceladas até lá ainda podem alterar o resultado.`}
               >
                 <span className="inline-flex cursor-help">
-                  <Badge variant="warning">Fechamento em andamento</Badge>
+                  <Badge variant={statusBadgeVariant("Fechamento em andamento")}>Fechamento em andamento</Badge>
                 </span>
               </Tooltip>
             )}

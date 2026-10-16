@@ -15,3 +15,54 @@ export function statusVariant(status: string): StatusVariant {
   if (INFO.includes(s)) return "info";
   return "neutral";
 }
+
+/** Mesma palavra de status, mesma cor, em qualquer tela do produto. */
+const PRODUCT_STATUS: Record<string, StatusVariant> = {
+  ativo: "success",
+  "em andamento": "success",
+  regular: "success",
+  fechado: "success",
+  assinado: "success",
+  recebido: "success",
+  informado: "success",
+  conectado: "success",
+  configurado: "success",
+  concluído: "success",
+  concluido: "success",
+
+  pendente: "warning",
+  "convite pendente": "warning",
+  "a receber": "warning",
+  "aguardando transferência": "warning",
+  "aguardando transferencia": "warning",
+  expirado: "warning",
+  "fechamento em andamento": "warning",
+  aviso: "warning",
+  "não informado": "warning",
+  "nao informado": "warning",
+
+  suspenso: "danger",
+  recusado: "danger",
+  negativo: "danger",
+  erro: "danger",
+
+  desligado: "neutral",
+  desativada: "neutral",
+  "sem acesso": "neutral",
+  encerrada: "neutral",
+  encerrado: "neutral",
+  "não configurado": "neutral",
+  "nao configurado": "neutral",
+  desconectado: "neutral",
+
+  "a começar": "info",
+  "a comecar": "info",
+
+  "em aberto": "accent",
+};
+
+/** Cor do badge de status do produto. Rótulo desconhecido cai no mapa em inglês. */
+export function statusBadgeVariant(label: string): StatusVariant {
+  const key = label.trim().toLowerCase();
+  return PRODUCT_STATUS[key] ?? statusVariant(key);
+}

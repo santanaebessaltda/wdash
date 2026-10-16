@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Badge, Button, Card, CardTitle, ThSort, type SortDir } from "@/components/ui";
-import type { StatusVariant } from "@/lib/status";
+import { statusBadgeVariant } from "@/lib/status";
 import { StockProductsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { ProductNameCell } from "@/components/wedash/ProductNameCell";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -31,10 +31,10 @@ type StatusFilter = "todos" | StockStatus;
 type BrandFilter = "" | "WEPINK" | "WPINK";
 type SortKey = "name" | "estoque" | "receber" | "totalGeral" | "custo" | "valor" | "status" | `local:${string}`;
 
-const STATUS_BADGE: Record<StockStatus, { label: string; variant: StatusVariant }> = {
-  negative: { label: "Negativo", variant: "danger" },
-  awaiting: { label: "Aguardando transferência", variant: "warning" },
-  ok: { label: "Regular", variant: "success" },
+const STATUS_BADGE: Record<StockStatus, { label: string }> = {
+  negative: { label: "Negativo" },
+  awaiting: { label: "Aguardando transferência" },
+  ok: { label: "Regular" },
 };
 
 /** "Transferir 71 de ESTOQUE para PONTO DE VENDA.", uma linha por transferencia ("LOJA X: transferir ..." quando ha varias lojas). */
@@ -385,7 +385,7 @@ function UnitCost({ r }: { r: StockProductRow }) {
 }
 
 function StatusCell({ r, status, multipleStores }: { r: StockProductRow; status: StockStatus; multipleStores: boolean }) {
-  const badge = <Badge variant={STATUS_BADGE[status].variant}>{STATUS_BADGE[status].label}</Badge>;
+  const badge = <Badge variant={statusBadgeVariant(STATUS_BADGE[status].label)}>{STATUS_BADGE[status].label}</Badge>;
   if (status !== "awaiting") return badge;
   const tip = transferTip(r, multipleStores);
   return (

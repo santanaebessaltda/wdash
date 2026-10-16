@@ -18,6 +18,7 @@ import {
   type CashDropShortageRow,
 } from "@/data/wedash/cashDropRepo";
 import { dayAmounts, depositBoleto, sumAmounts, type CashDropAmounts } from "@/data/wedash/cashDropMath";
+import { statusBadgeVariant } from "@/lib/status";
 import { brlCent, longDate, isoToDate, endOfMonth, startOfMonth, dateToIso, addDays } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
@@ -685,16 +686,16 @@ function DayModal({
       size="lg"
       title={(() => {
         const selo = deposit
-          ? { variant: "success" as const, text: "Recebido" }
+          ? "Recebido"
           : day === today
-            ? { variant: "accent" as const, text: "Em aberto" }
+            ? "Em aberto"
             : preview.boletoCents > 0
-              ? { variant: "warning" as const, text: "A receber" }
+              ? "A receber"
               : null;
         return (
           <>
             <span>{dayTitle(day)}</span>
-            {selo ? <Badge variant={selo.variant}>{selo.text}</Badge> : null}
+            {selo ? <Badge variant={statusBadgeVariant(selo)}>{selo}</Badge> : null}
           </>
         );
       })()}

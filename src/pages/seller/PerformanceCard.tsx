@@ -2,6 +2,7 @@ import { Avatar, Badge, Card, CardTitle, ProgressBar, Tabs } from "@/components/
 import { brlCent, num } from "@/data/wedash/engine/format";
 import type { SellerChallenge, SellerHomeStore } from "@/data/wedash/engine/sellerHome";
 import { shortDate } from "@/lib/format";
+import { statusBadgeVariant } from "@/lib/status";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { FlameIcon, TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
 import { RankingBlock } from "@/pages/live/blocks";
@@ -40,7 +41,6 @@ function ChallengeProgress({ challenge: c }: { challenge: SellerChallenge }) {
 }
 
 const STATUS_LABEL = { active: "Em andamento", upcoming: "A começar", ended: "Encerrado" } as const;
-const STATUS_VARIANT = { active: "success", upcoming: "info", ended: "neutral" } as const;
 
 /** O mesmo card da Equipe: Ranking (podio do mes), Desafios e Meta. Na meta Geral o ranking some: a parte e igual para todos. */
 export function PerformanceCard({ store }: { store: SellerHomeStore }) {
@@ -114,7 +114,7 @@ export function PerformanceCard({ store }: { store: SellerHomeStore }) {
                     <li key={c.id} className="rounded-xl border border-line bg-bg-2 p-4">
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
                         <p className="text-[14px] font-bold text-t0">{c.name}</p>
-                        <Badge variant={STATUS_VARIANT[c.status]}>{STATUS_LABEL[c.status]}</Badge>
+                        <Badge variant={statusBadgeVariant(STATUS_LABEL[c.status])}>{STATUS_LABEL[c.status]}</Badge>
                       </div>
                       <p className="mt-0.5 text-[12px] text-t2">
                         {shortDate(c.startsOn)} a {shortDate(c.endsOn)}

@@ -1,6 +1,7 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Alert, Badge, Button, Card, DateRangePicker, Modal, Skeleton, Tooltip, useToast, CALENDAR_QUICK_RANGES, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
+import { statusBadgeVariant } from "@/lib/status";
 import { DayFace, DayMetrics, MonthCalendar, blankDayClass } from "@/components/wedash/MonthCalendar";
 import { EmployeeWithdrawal } from "@/pages/cash-close/EmployeeWithdrawal";
 import { OnlinePix } from "@/pages/cash-close/OnlinePix";
@@ -1133,7 +1134,7 @@ function DayModal({
           <>
             <span>{dayTitle(day)}</span>
             {(!closed || pronto) && (
-              <Badge variant={!closed ? "accent" : dayPending ? "warning" : "success"}>
+              <Badge variant={statusBadgeVariant(!closed ? "Em aberto" : dayPending ? "Pendente" : "Fechado")}>
                 {!closed ? "Em aberto" : dayPending ? "Pendente" : "Fechado"}
               </Badge>
             )}

@@ -13,6 +13,7 @@ import {
   type Store,
   type StoreSeller,
 } from "@/data/wedash/stores";
+import { statusBadgeVariant } from "@/lib/status";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { StoreIcon } from "@/pages/dashboards/icons";
 import { paths } from "@/router/paths";
@@ -132,7 +133,7 @@ export function StoresSettingsPage() {
               </div>
               <span className="flex shrink-0 flex-col items-end gap-1 self-start">
                 <Badge variant="accent">Filial {s.branchCode}</Badge>
-                {deactivated ? <Badge variant="neutral">Desativada</Badge> : null}
+                {deactivated ? <Badge variant={statusBadgeVariant("Desativada")}>Desativada</Badge> : null}
               </span>
             </div>
             <div className="flex min-h-8 items-center justify-between gap-3">
