@@ -3,7 +3,7 @@ import { parseWithdrawalRows, type WithdrawalLine } from "./employeeWithdrawal";
 import { parseOnlinePix, type OnlinePixLine } from "./onlinePix";
 import { shiftName } from "./engine/format";
 import { cashCloseJobMatches, monthCloseSpanFor, navMonthFloor, cashDropMonthSpan, type CashCloseJobPart } from "./cashCloseMonth";
-import { assembleMonthMarks, captureBucket, paidPixCents, type CashCloseBucket, type CashCloseMillLine, type CloseAmountMap } from "./cashCloseView";
+import { assembleMonthMarks, captureBucket, paidPixCents, rowsForAcquirer, type CashCloseBucket, type CashCloseMillLine, type CloseAmountMap } from "./cashCloseView";
 
 export type CashCloseSnapshot = {
   millennium: CashCloseMillLine[];
@@ -15,11 +15,13 @@ export type CashCloseSnapshot = {
 
 const EMPTY: CashCloseSnapshot = { millennium: [], card: null, pixCents: null, pixRequested: false, cardPending: false };
 
-/** Fechamento de um dia: valor digitado, cartão Stone e PIX Stone. */
+/** Fechamento de um dia: valor digitado e o arquivo da adquirente da filial (Stone ou Cielo). */
 export async function fetchCashCloseSnapshot(tenantId: string, storeId: string, day: string): Promise<CashCloseSnapshot> {
   const { getSupabase } = await import("@/lib/supabase");
   const sb = getSupabase();
   if (!sb) return EMPTY;
+  const link = await sb.from("store_cielo").select("store_id").eq("tenant_id", tenantId).eq("store_id", storeId).maybeSingle();
+  const cielo = !link.error && Boolean(link.data);
   const [mill, captures, pix, files] = await Promise.all([
     sb
       .from("cash_close_day")
@@ -27,9 +29,15 @@ export async function fetchCashCloseSnapshot(tenantId: string, storeId: string, 
       .eq("tenant_id", tenantId)
       .eq("store_id", storeId)
       .eq("day", day),
-    sb.from("stone_capture").select("account_type, payment_method, captured_cents").eq("tenant_id", tenantId).eq("store_id", storeId).eq("day", day),
-    sb.from("stone_pix").select("status, paid_cents").eq("tenant_id", tenantId).eq("store_id", storeId).eq("day", day),
-    sb.from("stone_day_file").select("kind, status").eq("tenant_id", tenantId).eq("store_id", storeId).eq("day", day),
+    cielo
+      ? sb.from("cielo_capture").select("payment_method, captured_cents").eq("tenant_id", tenantId).eq("store_id", storeId).eq("day", day)
+      : sb.from("stone_capture").select("account_type, payment_method, captured_cents").eq("tenant_id", tenantId).eq("store_id", storeId).eq("day", day),
+    cielo
+      ? sb.from("cielo_pix").select("paid_cents").eq("tenant_id", tenantId).eq("store_id", storeId).eq("day", day)
+      : sb.from("stone_pix").select("status, paid_cents").eq("tenant_id", tenantId).eq("store_id", storeId).eq("day", day),
+    cielo
+      ? sb.from("cielo_day_file").select("kind, status").eq("tenant_id", tenantId).eq("store_id", storeId).eq("day", day)
+      : sb.from("stone_day_file").select("kind, status").eq("tenant_id", tenantId).eq("store_id", storeId).eq("day", day),
   ]);
   if (mill.error || captures.error || pix.error || files.error) {
     throw new Error(mill.error?.message || captures.error?.message || pix.error?.message || files.error?.message);
@@ -44,14 +52,15 @@ export async function fetchCashCloseSnapshot(tenantId: string, storeId: string, 
   let otherCents = 0;
   for (const row of captures.data ?? []) {
     const cents = Number(row.captured_cents) || 0;
-    const bucket = captureBucket(row.account_type == null ? null : Number(row.account_type), String(row.payment_method ?? ""));
+    const accountType = "account_type" in row && row.account_type != null ? Number(row.account_type) : null;
+    const bucket = captureBucket(accountType, String(row.payment_method ?? ""));
     if (bucket === "credit") creditCents += cents;
     else if (bucket === "debit") debitCents += cents;
     else otherCents += cents;
   }
-  const pixCents = paidPixCents(
-    (pix.data ?? []).map((row) => ({ status: String(row.status ?? ""), paidCents: Number(row.paid_cents) || 0 })),
-  );
+  const pixCents = cielo
+    ? (pix.data ?? []).reduce((sum, row) => sum + (Number(row.paid_cents) || 0), 0)
+    : paidPixCents((pix.data ?? []).map((row) => ({ status: String("status" in row ? row.status ?? "" : ""), paidCents: Number(row.paid_cents) || 0 })));
   return {
     millennium: (mill.data ?? []).map((r) => ({
       paymentMethod: String(r.payment_method ?? ""),
@@ -102,6 +111,78 @@ export async function saveStoneLink(input: {
   if (!sb) return { ok: false, message: "Não foi possível conectar à WDash. Verifique sua conexão e tente novamente." };
   const { data, error } = await sb.functions.invoke("stone-credential-persist", { body: input });
   if (error || !data?.ok) return { ok: false, message: "Não foi possível conectar a Stone. Tente novamente." };
+  return { ok: true };
+}
+
+export type CieloLink = {
+  storeId: string;
+  establishmentCode: string;
+};
+
+export type CieloAccount = {
+  merchantCode: string;
+  clientId: string;
+};
+
+/** Matriz e client ID da empresa. Certificado e chaves não saem do banco. */
+export async function fetchCieloAccount(tenantId: string): Promise<CieloAccount | null> {
+  const { getSupabase } = await import("@/lib/supabase");
+  const sb = getSupabase();
+  if (!sb) return null;
+  const { data, error } = await sb.from("tenant_cielo").select("merchant_code, client_id").eq("tenant_id", tenantId).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return { merchantCode: String(data.merchant_code), clientId: String(data.client_id) };
+}
+
+/** Estabelecimento Cielo das lojas. */
+export async function fetchCieloLinks(tenantId: string, storeIds: string[]): Promise<CieloLink[]> {
+  const { getSupabase } = await import("@/lib/supabase");
+  const sb = getSupabase();
+  if (!sb || storeIds.length === 0) return [];
+  const { data, error } = await sb
+    .from("store_cielo")
+    .select("store_id, establishment_code")
+    .eq("tenant_id", tenantId)
+    .in("store_id", storeIds);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => ({
+    storeId: String(r.store_id),
+    establishmentCode: String(r.establishment_code),
+  }));
+}
+
+export async function saveCieloLink(input: {
+  storeId: string;
+  establishmentCode: string;
+  merchantCode?: string;
+  clientId?: string;
+  clientSecret?: string;
+  hmac?: string;
+  cert?: string;
+  privateKey?: string;
+}): Promise<{ ok: true } | { ok: false; message: string }> {
+  const { getSupabase } = await import("@/lib/supabase");
+  const sb = getSupabase();
+  if (!sb) return { ok: false, message: "Não foi possível conectar à WDash. Verifique sua conexão e tente novamente." };
+  const { data, error } = await sb.functions.invoke("cielo-link-persist", { body: input });
+  if (error || !data?.ok) {
+    return { ok: false, message: typeof data?.message === "string" ? data.message : "Não foi possível conectar a Cielo. Tente novamente." };
+  }
+  return { ok: true };
+}
+
+/** Tira a loja da Cielo. Os fechamentos já gravados ficam. */
+export async function disconnectCieloLink(storeId: string): Promise<{ ok: true } | { ok: false; message: string }> {
+  const { getSupabase } = await import("@/lib/supabase");
+  const sb = getSupabase();
+  if (!sb) return { ok: false, message: "Não foi possível conectar à WDash. Verifique sua conexão e tente novamente." };
+  const { data, error } = await sb.functions.invoke("cielo-link-persist", {
+    body: { storeId, disconnect: true },
+  });
+  if (error || !data?.ok) {
+    return { ok: false, message: typeof data?.message === "string" ? data.message : "Não foi possível desconectar a Cielo. Tente novamente." };
+  }
   return { ok: true };
 }
 
@@ -159,6 +240,9 @@ export async function fetchCashCloseMonthMarks(
     .lte("day", to)
     .order("day", { ascending: true })
     .order("payment_method", { ascending: true });
+  const linkRes = await sb.from("store_cielo").select("store_id").eq("tenant_id", tenantId).in("store_id", storeIds);
+  const cieloIds = linkRes.error ? [] : (linkRes.data ?? []).map((row) => String(row.store_id));
+  const cieloSet = new Set(cieloIds);
   const fileQuery = sb
     .from("stone_day_file")
     .select("store_id, day, kind, status")
@@ -186,12 +270,61 @@ export async function fetchCashCloseMonthMarks(
     .lte("day", to)
     .order("day", { ascending: true })
     .order("event_id", { ascending: true });
-  const [mill, files, captures, pix] = await Promise.all([
+  const cieloFileQuery = sb
+    .from("cielo_day_file")
+    .select("store_id, day, kind, status")
+    .eq("tenant_id", tenantId)
+    .in("store_id", cieloIds.length > 0 ? cieloIds : storeIds)
+    .gte("day", from)
+    .lte("day", to)
+    .order("day", { ascending: true })
+    .order("kind", { ascending: true });
+  const cieloCaptureQuery = sb
+    .from("cielo_capture")
+    .select("store_id, day, payment_method, captured_cents")
+    .eq("tenant_id", tenantId)
+    .in("store_id", cieloIds.length > 0 ? cieloIds : storeIds)
+    .gte("day", from)
+    .lte("day", to)
+    .order("day", { ascending: true })
+    .order("acquirer_key", { ascending: true });
+  const cieloPixQuery = sb
+    .from("cielo_pix")
+    .select("store_id, day, paid_cents")
+    .eq("tenant_id", tenantId)
+    .in("store_id", cieloIds.length > 0 ? cieloIds : storeIds)
+    .gte("day", from)
+    .lte("day", to)
+    .order("day", { ascending: true })
+    .order("pix_id", { ascending: true });
+  const [mill, files, captures, pix, cieloFiles, cieloCaptures, cieloPix] = await Promise.all([
     eachPage(millQuery),
     eachPage(fileQuery),
     eachPage(captureQuery),
     eachPage(pixQuery),
+    cieloIds.length > 0 ? eachPage(cieloFileQuery) : Promise.resolve([]),
+    cieloIds.length > 0 ? eachPage(cieloCaptureQuery) : Promise.resolve([]),
+    cieloIds.length > 0 ? eachPage(cieloPixQuery) : Promise.resolve([]),
   ]);
+  const stoneFiles = files.map((row) => ({
+    storeId: String(row.store_id),
+    day: String(row.day),
+    kind: String(row.kind ?? ""),
+    status: String(row.status ?? ""),
+  }));
+  const stoneCaptures = captures.map((row) => ({
+    storeId: String(row.store_id),
+    day: String(row.day),
+    accountType: row.account_type == null ? null : Number(row.account_type),
+    paymentMethod: String(row.payment_method ?? ""),
+    capturedCents: Number(row.captured_cents) || 0,
+  }));
+  const stonePix = pix.map((row) => ({
+    storeId: String(row.store_id),
+    day: String(row.day),
+    status: String(row.status ?? ""),
+    paidCents: Number(row.paid_cents) || 0,
+  }));
   return assembleMonthMarks({
     millennium: mill.map((row) => ({
       storeId: String(row.store_id),
@@ -202,25 +335,37 @@ export async function fetchCashCloseMonthMarks(
       closingCents: Number(row.closing_cents) || 0,
       typedCents: Number(row.typed_cents) || 0,
     })),
-    files: files.map((row) => ({
-      storeId: String(row.store_id),
-      day: String(row.day),
-      kind: String(row.kind ?? ""),
-      status: String(row.status ?? ""),
-    })),
-    captures: captures.map((row) => ({
-      storeId: String(row.store_id),
-      day: String(row.day),
-      accountType: row.account_type == null ? null : Number(row.account_type),
-      paymentMethod: String(row.payment_method ?? ""),
-      capturedCents: Number(row.captured_cents) || 0,
-    })),
-    pix: pix.map((row) => ({
-      storeId: String(row.store_id),
-      day: String(row.day),
-      status: String(row.status ?? ""),
-      paidCents: Number(row.paid_cents) || 0,
-    })),
+    files: rowsForAcquirer(
+      stoneFiles,
+      cieloFiles.map((row) => ({
+        storeId: String(row.store_id),
+        day: String(row.day),
+        kind: String(row.kind ?? ""),
+        status: String(row.status ?? ""),
+      })),
+      cieloSet,
+    ),
+    captures: rowsForAcquirer(
+      stoneCaptures,
+      cieloCaptures.map((row) => ({
+        storeId: String(row.store_id),
+        day: String(row.day),
+        accountType: null,
+        paymentMethod: String(row.payment_method ?? ""),
+        capturedCents: Number(row.captured_cents) || 0,
+      })),
+      cieloSet,
+    ),
+    pix: rowsForAcquirer(
+      stonePix,
+      cieloPix.map((row) => ({
+        storeId: String(row.store_id),
+        day: String(row.day),
+        status: "paid",
+        paidCents: Number(row.paid_cents) || 0,
+      })),
+      cieloSet,
+    ),
   }).map((mark) => ({
     storeId: mark.storeId,
     day: mark.day,

@@ -11,6 +11,9 @@ verify_jwt = true
 [functions.stone-credential-persist]
 verify_jwt = true
 
+[functions.cielo-link-persist]
+verify_jwt = true
+
 [functions.shopping-credential-persist]
 verify_jwt = true
 

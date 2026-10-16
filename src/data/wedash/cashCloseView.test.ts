@@ -3,6 +3,7 @@ import {
   applyCashReview,
   applyCloseReview,
   assembleMonthMarks,
+  rowsForAcquirer,
   buildCashCloseView,
   captureBucket,
   cashCloseChips,
@@ -367,5 +368,19 @@ describe("resumo do fechamento", () => {
     expect(cash).toMatchObject({ typedCents: 80000, withdrawalCents: 20000 });
     expect(realCentsOf(cash!)).toBe(100000);
     expect(closeDayGap(lines).diffCents).toBe(0);
+  });
+});
+
+describe("rowsForAcquirer", () => {
+  it("usa o arquivo da Cielo na filial conectada e mantém a Stone nas outras", () => {
+    const stone = [
+      { storeId: "a", day: "2026-10-01" },
+      { storeId: "b", day: "2026-10-01" },
+    ];
+    const cielo = [{ storeId: "b", day: "2026-10-02" }];
+    expect(rowsForAcquirer(stone, cielo, new Set(["b"]))).toEqual([
+      { storeId: "a", day: "2026-10-01" },
+      { storeId: "b", day: "2026-10-02" },
+    ]);
   });
 });

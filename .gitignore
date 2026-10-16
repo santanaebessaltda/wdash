@@ -44,3 +44,6 @@ workers/millennium-sync/.millennium-worker.lock
 # Cloudflare Wrangler
 .wrangler
 .vitest/
+
+# Collection da Cielo. O header X-Signature da request pode ser a chave HMAC.
+extc-serv-edi-link-external.postman_collection.json

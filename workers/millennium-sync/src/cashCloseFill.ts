@@ -5,6 +5,7 @@ import { stoneFileReady } from "../../../src/data/wedash/stoneClock.ts";
 import { decryptPassword } from "./decrypt.ts";
 import { fetchStoneConciliation } from "./stoneConciliation.ts";
 import { replaceCaptures } from "./stoneCloseScan.ts";
+import { pullCieloClose } from "./cieloIngest.ts";
 import { markStoneFile } from "./stoneIngest.ts";
 import { PIX_INTEGER_CENTS_AFTER, STONE_PIX_RETRY_MS, registerStoneWebhook, requestStonePixFile } from "./stonePix.ts";
 import {
@@ -315,6 +316,14 @@ export async function runCashCloseFillJob(
           }
         }
       }
+    }
+  }
+  if (part !== "sangria") {
+    try {
+      await pullCieloClose(sb, { tenantId: job.tenantId, stores: chosen, from, to, now, erpSecret }, problems);
+    } catch (e) {
+      console.warn(`AVISO Cielo: ${e instanceof Error ? e.message : String(e)}`);
+      problems.push("Não foi possível buscar os arquivos da Cielo.");
     }
   }
   return finish(problems[0], chosen.length);

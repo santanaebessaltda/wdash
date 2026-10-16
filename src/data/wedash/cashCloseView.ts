@@ -467,6 +467,19 @@ export type MonthCloseMark = {
   cardPending: boolean;
 };
 
+/** Filial Cielo não mistura arquivo da Stone. As demais ficam na Stone. */
+export function rowsForAcquirer<T extends { storeId: string }>(
+  stone: T[],
+  cielo: T[],
+  cieloStoreIds: ReadonlySet<string>,
+): T[] {
+  if (cieloStoreIds.size === 0) return stone;
+  return [
+    ...stone.filter((row) => !cieloStoreIds.has(row.storeId)),
+    ...cielo.filter((row) => cieloStoreIds.has(row.storeId)),
+  ];
+}
+
 /** Um fechamento por loja e dia. Cartão e Pix recebidos entram mesmo quando a soma é zero. */
 export function assembleMonthMarks(input: {
   millennium: MonthMarkMillRow[];

@@ -90,6 +90,9 @@ serve(async (req) => {
     .maybeSingle();
   if (storeErr || !store) return json({ error: "invalid_store" }, 400);
 
+  const cielo = await admin.from("store_cielo").select("store_id").eq("store_id", storeId).maybeSingle();
+  if (!cielo.error && cielo.data) return json({ error: "cielo_connected" }, 409);
+
   const { data: existing } = await admin
     .from("store_stone")
     .select("secret_ciphertext")

@@ -19,6 +19,7 @@ primary_region = "gru"
 
 # O mesmo processo escuta o aviso do PIX. STONE_WEBHOOK_TOKEN e
 # STONE_WEBHOOK_PUBLIC_URL ficam no secret do Fly, não aqui.
+# O acesso Cielo de cada empresa fica cifrado em tenant_cielo, não neste app.
 [http_service]
   internal_port = 8080
   force_https = true
