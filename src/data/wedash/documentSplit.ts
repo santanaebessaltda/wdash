@@ -314,8 +314,8 @@ export function signingPeople(
 }
 
 /**
- * Pastas de Documentos: vendedor, gerente, gestor e usuário da filial.
- * O operador de caixa fica de fora. Desativado inclui quem o Millennium deixou sem cargo.
+ * Pastas de Documentos: vendedor, gerente e gestor.
+ * Operador de caixa e usuário da filial ficam de fora, em qualquer filial. Desativado inclui quem o Millennium deixou sem cargo.
  */
 export function folderPeople(people: DocumentPerson[], mode: "active" | "inactive" | "all" = "active"): DocumentPerson[] {
   return people
@@ -324,26 +324,19 @@ export function folderPeople(people: DocumentPerson[], mode: "active" | "inactiv
 }
 
 function matchesFolder(person: DocumentPerson, mode: "active" | "inactive" | "all"): boolean {
-  if (person.roleLabel === "Operador de caixa") return false;
-  const branchUser = person.roleLabel === "Usuário da filial";
+  if (person.roleLabel === "Operador de caixa" || person.roleLabel === "Usuário da filial") return false;
   const seller = person.source === "team" && person.roleLabel === "Vendedor";
   const leader = person.roleLabel === "Gerente" || person.roleLabel === "Gestor";
-  const on = leader ? person.active : seller ? person.active && person.inErp : branchUser ? person.active : false;
+  const on = leader ? person.active : seller ? person.active && person.inErp : false;
   if (mode === "active") return on;
   if (on) return mode === "all";
-  if (seller || leader || branchUser) return true;
+  if (seller || leader) return true;
   return person.source === "team" && !person.active;
 }
 
-/** Quem pode guardar um PDF na pasta: a lista de assinatura, mais o usuário da filial. Inclui quem já saiu, para o documento rescisório. */
+/** Quem pode guardar um PDF na pasta: a mesma lista de quem assina, inclusive quem já saiu, para o documento rescisório. */
 export function archivePeople(people: DocumentPerson[], storeId: string | null = null): DocumentPerson[] {
-  const signers = signingPeople(people, storeId, "all", true);
-  const branches = people.filter((person) => {
-    if (person.roleLabel !== "Usuário da filial") return false;
-    if (storeId && person.storeId !== storeId) return false;
-    return true;
-  });
-  return [...signers, ...branches].sort((left, right) => left.name.localeCompare(right.name, "pt") || left.roleLabel.localeCompare(right.roleLabel, "pt"));
+  return signingPeople(people, storeId, "all", true);
 }
 
 export function isFiledStatus(status: DocStatus): boolean {
