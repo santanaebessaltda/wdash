@@ -946,85 +946,28 @@ export function StoreCardsSkeleton({
   );
 }
 
-/** Documentos: três indicadores, atalhos, busca e a tabela da biblioteca. */
-export function DocumentsSkeleton({ allStores = false }: { allStores?: boolean }) {
-  const cells = allStores ? 6 : 5;
+/** Documentos: busca, filtros e a grade da biblioteca. */
+export function DocumentsSkeleton() {
   return (
     <Busy>
-      <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {Array.from({ length: 3 }, (_, index) => (
-          <Card key={index} padding="sm" className="flex items-center gap-3.5">
-            <Skeleton className="h-10 w-10 shrink-0 rounded-[12px]" />
-            <div className="min-w-0">
-              <Skeleton className="h-3 w-16" />
-              <Skeleton className="mt-2 h-5 w-8" />
-              <Skeleton className="mt-1.5 h-3 w-32" />
-            </div>
-          </Card>
+      <div className="mb-3 flex flex-col gap-2 lg:flex-row">
+        <Skeleton className="h-[34px] w-full flex-1 rounded-[10px]" />
+        <Skeleton className="h-[34px] w-28 rounded-[10px]" />
+        <Skeleton className="h-[34px] w-32 rounded-[10px]" />
+      </div>
+      <div className="mb-4 flex gap-2">
+        {Array.from({ length: 4 }, (_, index) => (
+          <Skeleton key={index} className="h-7 w-24 rounded-full" />
         ))}
       </div>
-      <Skeleton className="mb-3 h-3 w-14" />
-      <div className="mb-5 grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
-        {Array.from({ length: 3 }, (_, index) => (
-          <div key={index} className="flex items-center gap-3 rounded-2xl border border-line bg-bg-2 p-4">
-            <Skeleton className="h-[38px] w-[38px] shrink-0 rounded-[11px]" />
-            <div>
-              <Skeleton className="h-3.5 w-20" />
-              <Skeleton className="mt-1.5 h-3 w-24" />
-            </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        {Array.from({ length: 8 }, (_, index) => (
+          <div key={index} className="flex min-h-[132px] flex-col items-center justify-center rounded-2xl border border-line bg-bg-2 px-3 py-4">
+            <Skeleton className="h-8 w-8 rounded-[10px]" />
+            <Skeleton className="mt-2 h-3.5 w-24" />
+            <Skeleton className="mt-1.5 h-3 w-16" />
           </div>
         ))}
-      </div>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <Skeleton className="h-4 w-24" />
-        <Skeleton className="h-[34px] w-40 rounded-[10px] sm:w-72" />
-      </div>
-      <div className="overflow-hidden rounded-[var(--radius-vela-lg)] border border-line bg-bg-2">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] border-collapse">
-            <thead>
-              <tr className="border-b border-line">
-                {Array.from({ length: cells }, (_, index) => (
-                  <th key={index} className="px-4 py-3 text-left">
-                    {index < cells - 1 && <Skeleton className="h-2.5 w-16" />}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {Array.from({ length: 6 }, (_, row) => (
-                <tr key={row} className="border-b border-line last:border-b-0">
-                  <td className="px-4 py-3.5">
-                    <div className="flex items-center gap-2.5">
-                      <Skeleton className="h-[34px] w-[34px] shrink-0 rounded-[10px]" />
-                      <div>
-                        <Skeleton className="h-3.5 w-32" />
-                        <Skeleton className="mt-1.5 h-3 w-16" />
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <Skeleton className="h-3 w-28" />
-                  </td>
-                  {allStores && (
-                    <td className="px-4 py-3.5">
-                      <Skeleton className="h-3 w-24" />
-                    </td>
-                  )}
-                  <td className="px-4 py-3.5">
-                    <Skeleton className="h-5 w-16 rounded-full" />
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <Skeleton className="h-3 w-16" />
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <Skeleton className="ml-auto h-7 w-7 rounded-lg" />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </div>
     </Busy>
   );

@@ -314,8 +314,8 @@ export function signingPeople(
 }
 
 /**
- * Pastas de Documentos: vendedor, gerente e gestor.
- * O usuário da filial e o operador de caixa ficam de fora. Desativado inclui quem o Millennium deixou sem cargo.
+ * Pastas de Documentos: vendedor, gerente, gestor e usuário da filial.
+ * O operador de caixa fica de fora. Desativado inclui quem o Millennium deixou sem cargo.
  */
 export function folderPeople(people: DocumentPerson[], mode: "active" | "inactive" | "all" = "active"): DocumentPerson[] {
   return people
@@ -324,13 +324,14 @@ export function folderPeople(people: DocumentPerson[], mode: "active" | "inactiv
 }
 
 function matchesFolder(person: DocumentPerson, mode: "active" | "inactive" | "all"): boolean {
-  if (person.roleLabel === "Usuário da filial" || person.roleLabel === "Operador de caixa") return false;
+  if (person.roleLabel === "Operador de caixa") return false;
+  const branchUser = person.roleLabel === "Usuário da filial";
   const seller = person.source === "team" && person.roleLabel === "Vendedor";
   const leader = person.roleLabel === "Gerente" || person.roleLabel === "Gestor";
-  const on = leader ? person.active : seller && person.active && person.inErp;
+  const on = leader ? person.active : seller ? person.active && person.inErp : branchUser ? person.active : false;
   if (mode === "active") return on;
   if (on) return mode === "all";
-  if (seller || leader) return true;
+  if (seller || leader || branchUser) return true;
   return person.source === "team" && !person.active;
 }
 

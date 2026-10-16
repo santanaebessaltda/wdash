@@ -840,7 +840,7 @@ describe("signingPeople", () => {
 });
 
 describe("folderPeople", () => {
-  it("hides the branch user and keeps a deactivated person whose role became Sem cargo", () => {
+  it("keeps the branch user folder and a deactivated person whose role became Sem cargo", () => {
     const seller = person("seller-maria", "centro", "Maria Silva", "Vendedor", VALID_DIGITS, "maria@loja.com");
     const rewritten = { ...person("seller-off", "centro", "Pedro Alves", "Sem cargo", null, null), active: false };
     const stillSeller = { ...person("seller-old", "centro", "Lívia Costa", "Vendedor", null, null), active: false, inErp: false };
@@ -848,9 +848,9 @@ describe("folderPeople", () => {
     const branchUser = person("seller-filial", "centro", "Camila Rocha", "Usuário da filial", null, null);
     const manager = person("seller-ana", "centro", "Ana Paula", "Gerente", "39053344705", "ana@loja.com");
     const people = [seller, rewritten, stillSeller, cashier, branchUser, manager];
-    expect(folderPeople(people, "active").map((item) => item.name)).toEqual(["Ana Paula", "Maria Silva"]);
+    expect(folderPeople(people, "active").map((item) => item.name)).toEqual(["Ana Paula", "Camila Rocha", "Maria Silva"]);
     expect(folderPeople(people, "inactive").map((item) => item.name)).toEqual(["Lívia Costa", "Pedro Alves"]);
-    expect(folderPeople(people, "all").map((item) => item.name)).toEqual(["Ana Paula", "Lívia Costa", "Maria Silva", "Pedro Alves"]);
+    expect(folderPeople(people, "all").map((item) => item.name)).toEqual(["Ana Paula", "Camila Rocha", "Lívia Costa", "Maria Silva", "Pedro Alves"]);
   });
 });
 
