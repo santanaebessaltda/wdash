@@ -3,29 +3,19 @@ import { Button, Modal } from "@/components/ui";
 
 export type SetupGuideScreen = "team" | "staff" | "goals" | "challenges";
 
-const SCREEN_LEAD: Record<SetupGuideScreen, { title: string; body: string }> = {
-  team: {
-    title: "Nesta tela",
-    body: "O ranking e o pódio mostram quem vende. Entra quem está ativo no Millennium com cargo Vendedor. Gerência, operador de caixa e o usuário da filial aparecem em Gestão > Equipe, mas não competem aqui.",
-  },
-  staff: {
-    title: "Nesta tela",
-    body: "A lista é o que a WDash leu no Millennium desta filial. Atualizar equipe busca de novo. Grupo e convite de acesso são da WDash: o cargo no Millennium não cria login.",
-  },
-  goals: {
-    title: "Nesta tela",
-    body: "A meta usa a mesma equipe de vendas. Quem está ativo com cargo Vendedor entra sozinho. Quem entra ou sai no meio do período participa só nos dias em que esteve na equipe.",
-  },
-  challenges: {
-    title: "Nesta tela",
-    body: "O desafio usa a mesma equipe de vendas. Quem está ativo com cargo Vendedor entra sozinho. No modo Quem atingir o mínimo, a marca acompanha os dias em que a pessoa esteve. Em Quem fizer mais, vale a venda do período, sem ratear.",
-  },
+const SCREEN_LEAD: Record<SetupGuideScreen, string> = {
+  team: "O ranking e o pódio mostram somente quem vende. Participa quem estiver ativo no Millennium com cargo Vendedor. Gerência, operador de caixa e usuário da filial aparecem em Gestão > Equipe, mas não competem no ranking.",
+  staff:
+    "A lista mostra a equipe que a WDash leu no Millennium para esta filial. Use Atualizar equipe para buscar alterações feitas no Millennium. O grupo e o acesso à WDash são configurados aqui. O cargo do Millennium não cria acesso.",
+  goals:
+    "A meta usa a mesma equipe de vendas do ranking. Quem estiver ativo com cargo Vendedor participa automaticamente. Quem entrar ou sair durante o período participa somente nos dias em que fez parte da equipe.",
+  challenges:
+    "O desafio usa a mesma equipe de vendas. Quem estiver ativo com cargo Vendedor participa automaticamente. A regra para quem entra ou sai durante o período depende do tipo de desafio.",
 };
 
 /** Manual de como o funcionário do Millennium entra na equipe, na meta e no desafio. */
 export function SetupGuide({ screen }: { screen: SetupGuideScreen }) {
   const [open, setOpen] = useState(false);
-  const lead = SCREEN_LEAD[screen];
   return (
     <>
       <Button type="button" variant="outline" className="print:hidden" onClick={() => setOpen(true)}>
@@ -43,66 +33,104 @@ export function SetupGuide({ screen }: { screen: SetupGuideScreen }) {
         }
       >
         <div className="flex flex-col gap-5">
-          <Block title={lead.title}>
-            <p>{lead.body}</p>
-          </Block>
-
-          <Block title="Para competir na WDash">
-            <p>No Millennium, deixe a pessoa neste padrão. Depois use Atualizar equipe para a WDash ler de novo.</p>
+          <Block title="Para participar na WDash">
+            <p>No Millennium, configure a pessoa desta forma:</p>
             <ul className="mt-2 list-disc space-y-1.5 pl-4">
-              <Item>Cargo Vendedor.</Item>
-              <Item>Inativo, Afastado e Não mostrar no evento desmarcados.</Item>
-              <Item>O gerador da pessoa ativo. É o código que liga a venda a ela.</Item>
-              <Item>Data de admissão preenchida. Sem ela, a meta e o mínimo do desafio usam o período inteiro.</Item>
-              <Item>A pessoa cadastrada na filial certa.</Item>
+              <Line label="Cargo" value="Vendedor" />
+              <Line label="Inativo" value="desmarcado" />
+              <Line label="Afastado" value="desmarcado" />
+              <Line label="Não mostrar no evento" value="desmarcado" />
+              <Line label="Gerador" value="ativo" />
+              <Line label="Data de admissão" value="preenchida" />
+              <Line label="Filial" value="a filial correta" />
             </ul>
+            <p className="mt-2">Depois, use Atualizar equipe para a WDash buscar as alterações no Millennium.</p>
+            <Sub title="Gerador">
+              <p>O gerador é o código que vincula as vendas à pessoa. Mesmo que o nome mude no Millennium, as vendas continuam ligadas ao mesmo código.</p>
+            </Sub>
+            <Sub title="Data de admissão">
+              <p>Define quando a pessoa começa a participar das metas e dos desafios. Se estiver vazia, a WDash considera o período inteiro.</p>
+            </Sub>
           </Block>
 
           <Block title="Para desligar">
-            <p>
-              Desative o funcionário no Millennium. Qualquer um destes tira a pessoa da equipe ativa: Inativo, Afastado, Não mostrar no evento ou gerador desativado. O Millennium troca o cargo de Vendedor para indefinido, e a WDash mostra a pessoa em Desligados.
-            </p>
+            <p>Desative a pessoa no Millennium. Qualquer uma destas condições faz a WDash considerá-la desligada:</p>
+            <ul className="mt-2 list-disc space-y-1.5 pl-4">
+              <Line label="Inativo" value="marcado" />
+              <Line label="Afastado" value="marcado" />
+              <Line label="Não mostrar no evento" value="marcado" />
+              <Line label="Gerador" value="desativado" />
+            </ul>
             <p className="mt-2">
-              Ela sai do ranking. Na meta e no desafio daquele período, fica só até o dia da saída: a meta fecha proporcional e ela para de dividir a premiação. Quem já estava desligado e não vendeu no período não entra.
+              Se o Millennium trocar o cargo de Vendedor para Indefinido, a pessoa também passa a aparecer em Desligados. Depois, use Atualizar equipe.
             </p>
+            <Sub title="O que acontece depois">
+              <ul className="list-disc space-y-1.5 pl-4">
+                <Item>A pessoa deixa de participar do ranking.</Item>
+                <Item>Em metas e desafios de um período já iniciado, ela participa somente até o dia da saída.</Item>
+                <Item>Quem já estava desligado antes do período e não teve vendas não entra na disputa.</Item>
+              </ul>
+            </Sub>
           </Block>
 
           <Block title="O que a WDash lê no Millennium">
             <div className="mt-1">
-              <Field name="Cargo" detail="Vendedor entra no ranking, na meta e no desafio. Gerência e operador de caixa aparecem na equipe da filial e ficam de fora da disputa." />
-              <Field name="Inativo" detail="Marcado, a pessoa fica desligada." />
-              <Field name="Afastado" detail="Marcado, a pessoa fica desligada." />
-              <Field name="Não mostrar no evento" detail="Marcado, a pessoa fica desligada." />
-              <Field name="Gerador" detail="Desativado, a pessoa fica desligada. Ativo, este código amarra a venda à pessoa, mesmo se o nome mudar." />
-              <Field name="Data de admissão" detail="Dia em que a pessoa começa a participar da meta e do mínimo do desafio. Vazio, vale o período inteiro." />
-              <Field name="Filial" detail="A pessoa só entra na equipe da filial em que está cadastrada." />
+              <Field name="Cargo">
+                <Role name="Vendedor" detail="Participa do ranking, das metas e dos desafios." />
+                <Role name="Gerência" detail="Aparece na equipe, mas não participa da disputa." />
+                <Role name="Operador de caixa" detail="Aparece na equipe, mas não participa da disputa." />
+                <Role name="Usuário da filial" detail="Aparece na equipe quando é o usuário geral da operação, mas não participa da disputa." />
+              </Field>
+              <Field name="Inativo">Quando marcado, a pessoa fica desligada na WDash.</Field>
+              <Field name="Afastado">Quando marcado, a pessoa fica desligada na WDash.</Field>
+              <Field name="Não mostrar no evento">Quando marcado, a pessoa fica desligada na WDash.</Field>
+              <Field name="Gerador">Desativado, a pessoa fica desligada. Ativo, o código vincula as vendas à pessoa.</Field>
+              <Field name="Data de admissão">Primeiro dia em que a pessoa participa da meta e do mínimo dos desafios. Vazio, vale o período inteiro.</Field>
+              <Field name="Filial">A pessoa pertence à filial em que está cadastrada no Millennium.</Field>
             </div>
           </Block>
 
-          <Block title="O que se configura aqui, não no Millennium">
-            <ul className="list-disc space-y-1.5 pl-4">
-              <Item>Grupo da meta, como manhã ou tarde. Sem grupo, a pessoa fica de fora quando a meta divide por grupo.</Item>
-              <Item>Convite de acesso à WDash. Só o vendedor recebe. Gerência e operador de caixa não entram por aqui.</Item>
-              <Item>Premiação da gerência na meta e no desafio. É uma regra da loja, não uma pessoa do cadastro.</Item>
-            </ul>
+          <Block title="O que é configurado na WDash">
+            <p>Estas informações não vêm do Millennium.</p>
+            <Sub title="Grupo">
+              <p>Define o grupo do vendedor, como Manhã ou Tarde. Sem grupo, o vendedor fica de fora das regras que dependem da divisão por grupo.</p>
+            </Sub>
+            <Sub title="Acesso à WDash">
+              <p>Somente vendedores recebem convite por esta tela. Gerência, operador de caixa e usuário da filial não recebem acesso por este fluxo.</p>
+            </Sub>
+            <Sub title="Premiação da gerência">
+              <p>A premiação da gerência em metas e desafios é uma regra da filial. Não depende de uma pessoa cadastrada no Millennium.</p>
+            </Sub>
+          </Block>
+
+          <Block title="Nesta tela">
+            <p>{SCREEN_LEAD[screen]}</p>
           </Block>
 
           {screen === "goals" && (
-            <Block title="Como a meta divide">
-              <ul className="list-disc space-y-1.5 pl-4">
-                <Item>Individual: a meta da filial, ou do grupo, divide pelas pessoas. Cada uma sobe pelas próprias vendas. Quem chegou ou saiu no meio leva só a parte dos dias em que esteve. A meta de quem ficou o período inteiro não sobe para cobrir a falta.</Item>
-                <Item>Grupo: a meta do grupo continua a do período. A premiação pesa pelos dias em que cada pessoa esteve.</Item>
-                <Item>Geral: a filial sobe pelo total vendido. Cada dia se divide só entre quem estava naquele dia.</Item>
-              </ul>
+            <Block title="Como a meta é dividida">
+              <Sub title="Individual">
+                <p>
+                  A meta da filial ou do grupo é dividida entre os vendedores participantes. Cada um avança com as próprias vendas. Quem entrar ou sair no meio do período recebe somente a parcela dos dias em que participou. A meta dos demais não aumenta para compensar essa diferença.
+                </p>
+              </Sub>
+              <Sub title="Grupo">
+                <p>A meta total do grupo permanece a mesma durante o período. A premiação de cada vendedor considera os dias em que ele fez parte do grupo.</p>
+              </Sub>
+              <Sub title="Geral">
+                <p>A filial avança pelo total vendido. A parcela de cada dia considera somente os vendedores que faziam parte da equipe naquele dia.</p>
+              </Sub>
             </Block>
           )}
 
           {screen === "challenges" && (
             <Block title="Como o desafio conta">
-              <ul className="list-disc space-y-1.5 pl-4">
-                <Item>Quem atingir o mínimo: a marca diminui na mesma proporção dos dias em que a pessoa esteve na equipe.</Item>
-                <Item>Quem fizer mais: compara a venda de cada um, sem dividir pelo número de dias.</Item>
-              </ul>
+              <Sub title="Quem atingir o mínimo">
+                <p>O mínimo é ajustado proporcionalmente aos dias em que o vendedor participou da equipe.</p>
+              </Sub>
+              <Sub title="Quem fizer mais">
+                <p>Compara o resultado de cada vendedor no período. Não há ajuste pelo número de dias em que a pessoa participou.</p>
+              </Sub>
             </Block>
           )}
         </div>
@@ -120,15 +148,40 @@ function Block({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
+function Sub({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="mt-3 flex flex-col gap-1">
+      <h5 className="font-semibold text-t0">{title}</h5>
+      {children}
+    </div>
+  );
+}
+
 function Item({ children }: { children: ReactNode }) {
   return <li className="leading-snug">{children}</li>;
 }
 
-function Field({ name, detail }: { name: string; detail: string }) {
+function Line({ label, value }: { label: string; value: string }) {
   return (
-    <div className="grid gap-0.5 border-t border-line py-2.5 first:border-t-0 sm:grid-cols-[11.5rem_1fr] sm:gap-4">
+    <li className="leading-snug">
+      <span className="font-semibold text-t0">{label}:</span> {value}
+    </li>
+  );
+}
+
+function Role({ name, detail }: { name: string; detail: string }) {
+  return (
+    <p className="leading-snug">
+      <span className="font-semibold text-t0">{name}.</span> {detail}
+    </p>
+  );
+}
+
+function Field({ name, children }: { name: string; children: ReactNode }) {
+  return (
+    <div className="grid gap-1 border-t border-line py-2.5 first:border-t-0 sm:grid-cols-[11.5rem_1fr] sm:gap-4">
       <p className="font-semibold text-t0">{name}</p>
-      <p>{detail}</p>
+      <div className="flex flex-col gap-1">{children}</div>
     </div>
   );
 }
