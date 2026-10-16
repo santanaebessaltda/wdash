@@ -6,6 +6,7 @@ import {
   completeFirstSteps,
   fetchFirstStepsData,
   fetchFirstStepsDone,
+  firstStepsCardStatus,
   storesForFirstStepsView,
   type FirstStep,
   type FirstStepsData,
@@ -20,8 +21,8 @@ import { useActiveSession } from "@/session/SessionProvider";
 export type FirstStepsStatus = "loading" | "hidden" | "visible";
 
 /**
- * Primeiros passos da empresa (so Gestor). Os passos se marcam sozinhos pelos dados ja salvos;
- * ao chegar a 100% grava no banco e o card nao volta mais.
+ * Primeiros passos da empresa (so Gestor). Os passos se marcam sozinhos pelos dados ja salvos.
+ * Lista em 100% tira o card na hora. Quando todas as filiais fecham, grava no banco e nao volta mais.
  */
 export function useFirstSteps(storeIds: string[] = []) {
   const session = useActiveSession();
@@ -91,7 +92,14 @@ export function useFirstSteps(storeIds: string[] = []) {
     });
   }, [allDone, doneFlag, session.tenantId, show]);
 
-  const status: FirstStepsStatus = !owner || doneFlag === true || allDone ? "hidden" : data == null ? "loading" : "visible";
+  const viewDone = steps.length > 0 && doneCount === steps.length;
+  const status: FirstStepsStatus = firstStepsCardStatus({
+    owner,
+    savedDone: doneFlag,
+    loaded: data != null,
+    viewDone,
+    companyDone: allDone,
+  });
   return { status, steps, doneCount, pendingCount, tenantId: session.tenantId };
 }
 

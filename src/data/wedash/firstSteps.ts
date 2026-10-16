@@ -54,10 +54,15 @@ function rentOk(s: FirstStepsStore): boolean {
   return s.pointType === "SHOPPING" && c.rentWepinkPct != null;
 }
 
+/** ICMS ou ICMS ST da marca. 0 informado conta; os dois vazios não. Empresa que só paga ST deixa o outro em branco. */
+function brandTaxesOk(icms: number | null | undefined, icmsSt: number | null | undefined): boolean {
+  return icms != null || icmsSt != null;
+}
+
 function taxesOk(s: FirstStepsStore): boolean {
   const c = s.costs;
-  if (!c || c.icmsWepinkPct == null || c.icmsStWepinkPct == null) return false;
-  return !s.hasWpink || (c.icmsWpinkPct != null && c.icmsStWpinkPct != null);
+  if (!c || !brandTaxesOk(c.icmsWepinkPct, c.icmsStWepinkPct)) return false;
+  return !s.hasWpink || brandTaxesOk(c.icmsWpinkPct, c.icmsStWpinkPct);
 }
 
 export function buildFirstSteps(input: FirstStepsInput): FirstStep[] {
@@ -144,6 +149,24 @@ export function buildFirstSteps(input: FirstStepsInput): FirstStep[] {
       ...criados(input.storesWithChallenge),
     },
   ];
+}
+
+export type FirstStepsCardStatus = "loading" | "hidden" | "visible";
+
+/**
+ * O card sai da tela quando a lista visível está 100%.
+ * A empresa só fica concluída de vez (`savedDone` / `companyDone`) quando todas as filiais estão prontas.
+ */
+export function firstStepsCardStatus(input: {
+  owner: boolean;
+  savedDone: boolean | null;
+  loaded: boolean;
+  viewDone: boolean;
+  companyDone: boolean;
+}): FirstStepsCardStatus {
+  if (!input.owner || input.savedDone === true || input.companyDone || (input.loaded && input.viewDone)) return "hidden";
+  if (!input.loaded) return "loading";
+  return "visible";
 }
 
 export type FirstStepsData = Omit<FirstStepsInput, "stores">;

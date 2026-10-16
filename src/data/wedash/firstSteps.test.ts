@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildFirstSteps, storesForFirstStepsView, type FirstStepsInput, type FirstStepsStore } from "./firstSteps";
+import { buildFirstSteps, firstStepsCardStatus, storesForFirstStepsView, type FirstStepsInput, type FirstStepsStore } from "./firstSteps";
 import { EMPTY_STORE_COSTS, SELLER_ROLE, type StoreCosts } from "./stores";
 import { defaultWeekHours } from "./storeHours";
 
@@ -42,6 +42,21 @@ function input(over: Partial<FirstStepsInput> = {}): FirstStepsInput {
 
 const step = (i: FirstStepsInput, id: string) => buildFirstSteps(i).find((s) => s.id === id)!;
 
+describe("firstStepsCardStatus", () => {
+  it("some quando a lista da tela ou a empresa está 100%", () => {
+    expect(firstStepsCardStatus({ owner: true, savedDone: false, loaded: true, viewDone: true, companyDone: false })).toBe("hidden");
+    expect(firstStepsCardStatus({ owner: true, savedDone: false, loaded: true, viewDone: false, companyDone: true })).toBe("hidden");
+    expect(firstStepsCardStatus({ owner: true, savedDone: true, loaded: false, viewDone: false, companyDone: false })).toBe("hidden");
+    expect(firstStepsCardStatus({ owner: false, savedDone: false, loaded: true, viewDone: false, companyDone: false })).toBe("hidden");
+  });
+
+  it("enquanto carrega não mostra; com passo pendente mostra", () => {
+    expect(firstStepsCardStatus({ owner: true, savedDone: false, loaded: false, viewDone: false, companyDone: false })).toBe("loading");
+    expect(firstStepsCardStatus({ owner: true, savedDone: null, loaded: false, viewDone: false, companyDone: false })).toBe("loading");
+    expect(firstStepsCardStatus({ owner: true, savedDone: false, loaded: true, viewDone: false, companyDone: false })).toBe("visible");
+  });
+});
+
 describe("buildFirstSteps", () => {
   it("tudo configurado = 9 passos concluídos, Millennium e vendedores sempre concluídos", () => {
     const steps = buildFirstSteps(input());
@@ -70,12 +85,16 @@ describe("buildFirstSteps", () => {
     expect(step(input({ stores: [store("a", { costs: soPct, pointType: "STREET" })] }), "rent").done).toBe(false);
   });
 
-  it("impostos: 0 preenchido conta; vazio não", () => {
+  it("impostos: ICMS ou ICMS ST basta; 0 conta e os dois vazios não", () => {
     expect(step(input(), "taxes").done).toBe(true);
-    expect(step(input({ stores: [store("a", { costs: { ...COSTS_OK, icmsStWepinkPct: null } })] }), "taxes").done).toBe(false);
+    expect(step(input({ stores: [store("a", { costs: { ...COSTS_OK, icmsStWepinkPct: null } })] }), "taxes").done).toBe(true);
+    expect(step(input({ stores: [store("a", { costs: { ...COSTS_OK, icmsWepinkPct: null } })] }), "taxes").done).toBe(true);
+    expect(step(input({ stores: [store("a", { costs: { ...COSTS_OK, icmsWepinkPct: null, icmsStWepinkPct: null } })] }), "taxes").done).toBe(false);
     expect(step(input({ stores: [store("a", { hasWpink: true })] }), "taxes").done).toBe(false);
-    const wpink = { ...COSTS_OK, icmsWpinkPct: 0, icmsStWpinkPct: 0 };
-    expect(step(input({ stores: [store("a", { hasWpink: true, costs: wpink })] }), "taxes").done).toBe(true);
+    const soSt = { ...COSTS_OK, icmsWepinkPct: null, icmsWpinkPct: null, icmsStWpinkPct: 4 };
+    expect(step(input({ stores: [store("a", { hasWpink: true, costs: soSt })] }), "taxes").done).toBe(true);
+    const semWpink = { ...COSTS_OK, icmsWpinkPct: null, icmsStWpinkPct: null };
+    expect(step(input({ stores: [store("a", { hasWpink: true, costs: semWpink })] }), "taxes").done).toBe(false);
   });
 
   it("grupos: conta vendedores ativos sem grupo; gerência e desligados não contam", () => {
