@@ -1273,8 +1273,13 @@ export function signerCaption(signers: SignerProgress[]): string | null {
 }
 
 export function signerFraction(signers: SignerProgress[]): { done: number; total: number } | null {
-  if (signers.length < 2) return null;
+  if (signers.length < 1) return null;
   return { done: signers.filter((item) => item.status === "SIGNED").length, total: signers.length };
+}
+
+export function signatureProgressDetail(done: number, total: number): string {
+  const word = total === 1 ? "assinatura concluída" : "assinaturas concluídas";
+  return `${done} de ${total} ${word}`;
 }
 
 /** O envelope segue aberto, mas alguém já assinou. O Assina chama isso de Em andamento. */

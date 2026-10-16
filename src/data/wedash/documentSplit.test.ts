@@ -16,6 +16,7 @@ import {
   progressForEnvelope,
   signerCaption,
   signerFraction,
+  signatureProgressDetail,
   partialEnvelopeLabel,
   visibleSigners,
   contactFieldsToAsk,
@@ -592,6 +593,7 @@ describe("signer progress", () => {
     expect(signers[1]?.recipientId).toBe("maria");
     expect(partialEnvelopeLabel("PENDING", signers)).toBe("Em andamento");
     expect(signerFraction(signers)).toEqual({ done: 1, total: 2 });
+    expect(signatureProgressDetail(1, 2)).toBe("1 de 2 assinaturas concluídas");
     expect(partialEnvelopeLabel("PENDING", signers.map((item) => ({ ...item, status: "PENDING" })))).toBeNull();
     expect(partialEnvelopeLabel("SIGNED", signers)).toBeNull();
   });

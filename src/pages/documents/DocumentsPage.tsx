@@ -5,7 +5,7 @@ import { cn } from "@/lib/cn";
 import { QuickStat } from "@/pages/dashboards/QuickStat";
 import { Icon, icons } from "@/pages/users/Icons";
 import { paths } from "@/router/paths";
-import { archivePeople, displayTitle, documentPersonKey, findDocumentPerson, inLibrary, isFiledStatus, monthFolder, partialEnvelopeLabel, personMatchesQuery, resendVisible, sameCategory, signerCaption, signerFraction, signingPeople, visibleSigners, DOCUMENT_CATEGORIES, type SignerProgress } from "@/data/wedash/documentSplit";
+import { archivePeople, displayTitle, documentPersonKey, findDocumentPerson, inLibrary, isFiledStatus, monthFolder, partialEnvelopeLabel, personMatchesQuery, resendVisible, sameCategory, signatureProgressDetail, signerFraction, signingPeople, visibleSigners, DOCUMENT_CATEGORIES, type SignerProgress } from "@/data/wedash/documentSplit";
 import type { BatchRow, DocumentRow, PersonRow } from "@/data/wedash/documentsRepo";
 import { cancelDocument, copyDocumentLink, moveDocument, openDocument, resendDocument } from "@/data/wedash/documentsRepo";
 import { DocumentsSkeleton } from "@/components/wedash/LoadingSkeletons";
@@ -40,6 +40,7 @@ export function DocumentsPage() {
   const [moveMonth, setMoveMonth] = useState("1");
   const [moveYear, setMoveYear] = useState(String(new Date().getFullYear()));
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [signaturesId, setSignaturesId] = useState<string | null>(null);
   const [acting, setActing] = useState(false);
 
   useEffect(() => {
@@ -322,15 +323,12 @@ export function DocumentsPage() {
           <FolderTable
             rows={visibleFolders}
             documents={documents}
-            people={people}
             onOpenFolder={(key) => setCrumb([...crumb, key])}
             onOpenFile={(id) => void openFile(id, show)}
-            onResend={(id, recipientId) => void resendFile(id, recipientId, show, setResendingId, reload)}
-            onCopy={(id, recipientId) => void copyLink(id, recipientId)}
+            onOpenSignatures={setSignaturesId}
             onMove={openMove}
             onDelete={setDeleteId}
             busy={acting || resendingId != null}
-            resendingId={resendingId}
           />
         )
       ) : visibleFiles.length === 0 ? (
@@ -350,12 +348,10 @@ export function DocumentsPage() {
           stores={storeName}
           showStore={allStores}
           onDownload={(id) => void openFile(id, show)}
-          onResend={(id, recipientId) => void resendFile(id, recipientId, show, setResendingId, reload)}
-          onCopy={(id, recipientId) => void copyLink(id, recipientId)}
+          onOpenSignatures={setSignaturesId}
           onMove={openMove}
           onDelete={setDeleteId}
           busy={acting || resendingId != null}
-          resendingId={resendingId}
         />
       )}
       <p className="mt-3 text-[12.5px] text-t2">
@@ -363,6 +359,16 @@ export function DocumentsPage() {
       </p>
       </>
       )}
+      <SignaturesModal
+        doc={documents.find((item) => item.id === signaturesId) ?? null}
+        people={people}
+        batches={batchOf}
+        busy={acting || resendingId != null}
+        resending={resendingId != null}
+        onClose={() => setSignaturesId(null)}
+        onCopy={(id, recipientId) => void copyLink(id, recipientId)}
+        onResend={(id, recipientId) => void resendFile(id, recipientId, show, setResendingId, reload)}
+      />
       <Modal
         open={deleteId != null}
         onClose={() => {
@@ -578,37 +584,40 @@ function folderEntries(input: {
   const month = allStores ? crumb[3] : crumb[2];
   return docs
     .filter((doc) => yearOf(doc) === year && monthOf(doc) === month)
-    .map((doc) => ({ key: doc.id, label: displayTitle(doc.fileName), detail: signerCaption(signersOf(doc, people)) ?? STATUS_LABEL[doc.status], fileId: doc.id }));
+    .map((doc) => {
+      const fraction = signerFraction(signersOf(doc, people));
+      const detail = fraction && doc.envelopeId ? `${fraction.done} de ${fraction.total}` : STATUS_LABEL[doc.status];
+      return { key: doc.id, label: displayTitle(doc.fileName), detail, fileId: doc.id };
+    });
 }
 
 function signersOf(doc: DocumentRow, people: PersonRow[]) {
-  return visibleSigners({ signers: doc.signers, personName: findDocumentPerson(people, doc)?.name ?? null, extras: doc.extraSigner });
+  const listed = visibleSigners({ signers: doc.signers, personName: findDocumentPerson(people, doc)?.name ?? null, extras: doc.extraSigner });
+  if (listed.length > 0 || !doc.envelopeId) return listed;
+  const name = findDocumentPerson(people, doc)?.name.trim() ?? "";
+  if (!name) return [];
+  const status: SignerProgress["status"] = doc.status === "SIGNED" ? "SIGNED" : doc.status === "DECLINED" ? "DECLINED" : "PENDING";
+  return [{ name, order: 1, recipientId: null, channel: null, status }];
 }
 
 function FolderTable({
   rows,
   documents,
-  people,
   onOpenFolder,
   onOpenFile,
-  onResend,
-  onCopy,
+  onOpenSignatures,
   onMove,
   onDelete,
   busy,
-  resendingId,
 }: {
   rows: FolderEntry[];
   documents: DocumentRow[];
-  people: PersonRow[];
   onOpenFolder: (key: string) => void;
   onOpenFile: (id: string) => void;
-  onResend: (id: string, recipientId?: string) => void;
-  onCopy: (id: string, recipientId?: string) => void;
+  onOpenSignatures: (id: string) => void;
   onMove: (id: string) => void;
   onDelete: (id: string) => void;
   busy: boolean;
-  resendingId: string | null;
 }) {
   const columns: DataTableColumn<FolderEntry>[] = [
     {
@@ -635,14 +644,11 @@ function FolderTable({
         if (doc && (pendingMenu(doc) || isFiledStatus(doc.status))) {
           return (
             <span className="flex items-center justify-end gap-2">
-              {resendingId === doc.id && <span className="text-[12px] font-bold text-t2">Reenviando…</span>}
               <RowMenu
                 kind={isFiledStatus(doc.status) ? "filed" : "pending"}
-                signers={signersOf(doc, people)}
                 busy={busy}
                 onDownload={() => onOpenFile(doc.id)}
-                onResend={(recipientId) => onResend(doc.id, recipientId)}
-                onCopy={(recipientId) => onCopy(doc.id, recipientId)}
+                onSignatures={() => onOpenSignatures(doc.id)}
                 onMove={() => onMove(doc.id)}
                 onDelete={() => onDelete(doc.id)}
               />
@@ -667,12 +673,10 @@ function FileTable({
   stores,
   showStore,
   onDownload,
-  onResend,
-  onCopy,
+  onOpenSignatures,
   onMove,
   onDelete,
   busy,
-  resendingId,
 }: {
   rows: DocumentRow[];
   people: PersonRow[];
@@ -680,12 +684,10 @@ function FileTable({
   stores: Map<string, string>;
   showStore: boolean;
   onDownload: (id: string) => void;
-  onResend: (id: string, recipientId?: string) => void;
-  onCopy: (id: string, recipientId?: string) => void;
+  onOpenSignatures: (id: string) => void;
   onMove: (id: string) => void;
   onDelete: (id: string) => void;
   busy: boolean;
-  resendingId: string | null;
 }) {
   const columns: DataTableColumn<DocumentRow>[] = [
     {
@@ -724,6 +726,12 @@ function FileTable({
         ]
       : []),
     {
+      key: "signatures",
+      header: "Assinaturas",
+      hideBelow: "sm",
+      render: (row) => <SignatureCount row={row} people={people} onOpen={onOpenSignatures} />,
+    },
+    {
       key: "status",
       header: "Status",
       render: (row) => <DocumentStatus row={row} people={people} />,
@@ -739,15 +747,12 @@ function FileTable({
       header: "",
       render: (row) =>
         pendingMenu(row) || isFiledStatus(row.status) ? (
-          <span className="flex items-center justify-end gap-2">
-            {resendingId === row.id && <span className="text-[12px] font-bold text-t2">Reenviando…</span>}
+          <span className="flex items-center justify-end">
             <RowMenu
               kind={isFiledStatus(row.status) ? "filed" : "pending"}
-              signers={signersOf(row, people)}
-              busy={busy || resendingId === row.id}
+              busy={busy}
               onDownload={() => onDownload(row.id)}
-              onResend={(recipientId) => onResend(row.id, recipientId)}
-              onCopy={(recipientId) => onCopy(row.id, recipientId)}
+              onSignatures={() => onOpenSignatures(row.id)}
               onMove={() => onMove(row.id)}
               onDelete={() => onDelete(row.id)}
             />
@@ -775,52 +780,105 @@ function pendingMenu(row: DocumentRow) {
 
 function DocumentStatus({ row, people }: { row: DocumentRow; people: PersonRow[] }) {
   if (!row.envelopeId && !isFiledStatus(row.status)) return <span className="text-[12.5px] text-t2">Em preparação</span>;
-  const signers = signersOf(row, people);
+  const partial = partialEnvelopeLabel(row.status, signersOf(row, people));
+  return <Badge variant={partial ? "warning" : badgeVariant(row.status)}>{partial ?? STATUS_LABEL[row.status]}</Badge>;
+}
+
+function SignatureCount({ row, people, onOpen }: { row: DocumentRow; people: PersonRow[]; onOpen: (id: string) => void }) {
+  if (!row.envelopeId || isFiledStatus(row.status)) return <span className="text-[12.5px] text-t2">—</span>;
+  const fraction = signerFraction(signersOf(row, people));
+  if (!fraction) return <span className="text-[12.5px] text-t2">—</span>;
+  return (
+    <button type="button" className="text-[13px] font-semibold text-t0 underline-offset-2 hover:text-acc hover:underline" onClick={() => onOpen(row.id)}>
+      {fraction.done} de {fraction.total}
+    </button>
+  );
+}
+
+function SignaturesModal({
+  doc,
+  people,
+  batches,
+  busy,
+  resending,
+  onClose,
+  onCopy,
+  onResend,
+}: {
+  doc: DocumentRow | null;
+  people: PersonRow[];
+  batches: Map<string, BatchRow>;
+  busy: boolean;
+  resending: boolean;
+  onClose: () => void;
+  onCopy: (id: string, recipientId?: string) => void;
+  onResend: (id: string, recipientId?: string) => void;
+}) {
+  const signers = doc ? signersOf(doc, people) : [];
   const fraction = signerFraction(signers);
-  const partial = partialEnvelopeLabel(row.status, signers);
+  const person = doc ? findDocumentPerson(people, doc)?.name ?? "Sem pessoa" : "";
+  const batch = doc ? batches.get(doc.batchId) : undefined;
+  const period = batch ? `${monthFolder(batch.month)}/${batch.year}` : "";
   return (
-    <span className="flex min-w-0 flex-col items-start gap-2">
-      <Badge variant={partial ? "warning" : badgeVariant(row.status)}>{partial ?? STATUS_LABEL[row.status]}</Badge>
-      {fraction ? (
-        <span className="flex min-w-0 flex-col gap-1.5">
-          <SignerTrack done={fraction.done} total={fraction.total} />
-          {signers.map((signer) => (
-            <SignerLine key={`${signer.order}-${signer.name}`} signer={signer} contact={signerContact(signer, row, people)} />
-          ))}
-        </span>
+    <Modal
+      open={doc != null}
+      onClose={onClose}
+      title="Assinaturas"
+      footer={<Button variant="outline" onClick={onClose}>Fechar</Button>}
+    >
+      {doc ? (
+        <div className="grid gap-4">
+          <div>
+            <p className="text-[14px] font-bold text-t0">{displayTitle(doc.fileName)}</p>
+            <p className="mt-0.5 text-[12.5px] text-t2">{period ? `${person} · ${period}` : person}</p>
+            {fraction ? <p className="mt-3 text-[13px] text-t1">{signatureProgressDetail(fraction.done, fraction.total)}</p> : null}
+          </div>
+          <div className="grid divide-y divide-line rounded-[var(--radius-vela-md)] border border-line">
+            {signers.map((signer) => {
+              const pending = signer.status === "PENDING";
+              const ownLink = Boolean(signer.recipientId) || signer.order === 1;
+              const contact = signerContact(signer, doc, people);
+              const channel = signer.channel === "EMAIL" ? "E-mail" : signer.channel === "WHATSAPP" ? "WhatsApp" : null;
+              return (
+                <div key={`${signer.order}-${signer.name}`} className="grid gap-2 px-3 py-3">
+                  <span className="flex min-w-0 items-start gap-2">
+                    <SignerMark status={signer.status} />
+                    <span className="min-w-0">
+                      <span className="block truncate text-[13px] font-bold text-t0">{signer.name}</span>
+                      <span className="mt-0.5 block text-[12px] text-t2">{signerState(signer.status)}</span>
+                      {pending && (channel || contact) ? (
+                        <span className="mt-0.5 block truncate text-[12px] text-t1">{[channel, contact].filter(Boolean).join(" · ")}</span>
+                      ) : null}
+                    </span>
+                  </span>
+                  {pending && ownLink ? (
+                    <span className="flex flex-wrap gap-2 pl-6">
+                      <Button size="sm" variant="outline" disabled={busy} onClick={() => onCopy(doc.id, signer.recipientId ?? undefined)}>Copiar link</Button>
+                      {signer.channel || signer.order === 1 ? (
+                        <Button size="sm" disabled={busy} onClick={() => onResend(doc.id, signer.recipientId ?? undefined)}>
+                          {resending ? "Reenviando…" : "Reenviar link"}
+                        </Button>
+                      ) : null}
+                    </span>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       ) : null}
-    </span>
+    </Modal>
   );
 }
 
-function SignerTrack({ done, total }: { done: number; total: number }) {
-  const width = total > 0 ? Math.round((done / total) * 100) : 0;
-  return (
-    <span className="flex items-center gap-2">
-      <span className="h-1.5 w-[88px] overflow-hidden rounded-full bg-bg-3" aria-hidden>
-        <span className={cn("block h-full rounded-full", done >= total ? "bg-ok" : "bg-warn")} style={{ width: `${width}%` }} />
-      </span>
-      <span className="text-[11px] font-bold tabular-nums text-t2">
-        {done}/{total}
-      </span>
-    </span>
-  );
+function signerState(status: SignerProgress["status"]) {
+  if (status === "SIGNED") return "Assinado";
+  if (status === "DECLINED") return "Recusou";
+  return "Aguardando assinatura";
 }
 
-function SignerLine({ signer, contact }: { signer: SignerProgress; contact: string | null }) {
-  const state = signer.status === "SIGNED" ? "assinou" : signer.status === "DECLINED" ? "recusou" : "pendente";
-  return (
-    <span className="flex min-w-0 items-start gap-1.5">
-      <SignerMark status={signer.status} label={state} />
-      <span className="min-w-0">
-        <span className="block truncate text-[12.5px] font-semibold text-t0">{signer.name}</span>
-        {contact ? <span className="block truncate text-[11px] text-t2">{contact}</span> : null}
-      </span>
-    </span>
-  );
-}
-
-function SignerMark({ status, label }: { status: SignerProgress["status"]; label: string }) {
+function SignerMark({ status }: { status: SignerProgress["status"] }) {
+  const label = signerState(status);
   if (status === "SIGNED") {
     return (
       <span className="mt-0.5 text-ok" aria-label={label}>
@@ -879,39 +937,22 @@ function contactLabel(value: string): string {
 
 function RowMenu({
   kind,
-  signers,
   busy,
   onDownload,
-  onResend,
-  onCopy,
+  onSignatures,
   onMove,
   onDelete,
 }: {
   kind: "pending" | "filed";
-  signers: SignerProgress[];
   busy: boolean;
   onDownload: () => void;
-  onResend: (recipientId?: string) => void;
-  onCopy: (recipientId?: string) => void;
+  onSignatures: () => void;
   onMove: () => void;
   onDelete: () => void;
 }) {
-  const linked = signers.filter((signer) => signer.recipientId);
-  const individual = kind === "pending" && linked.length > 1;
-  const linkItems: DropdownItem[] = individual
-    ? linked.flatMap((signer) => [
-        ...(signer.status === "PENDING" && signer.channel
-          ? [{ label: `Reenviar link · ${signer.name}`, onClick: () => onResend(signer.recipientId ?? undefined), disabled: busy }]
-          : []),
-        { label: `Copiar link · ${signer.name}`, onClick: () => onCopy(signer.recipientId ?? undefined), disabled: busy },
-      ])
-    : [
-        { label: "Reenviar link", onClick: () => onResend(linked[0]?.recipientId ?? undefined), disabled: busy },
-        { label: "Copiar link", onClick: () => onCopy(linked[0]?.recipientId ?? undefined), disabled: busy },
-      ];
   const items: DropdownItem[] = [
     { label: "Baixar PDF", onClick: onDownload, disabled: busy },
-    ...(kind === "pending" ? linkItems : []),
+    ...(kind === "pending" ? [{ label: "Ver assinaturas", onClick: onSignatures, disabled: busy }] : []),
     { label: "Mover", onClick: onMove, disabled: busy },
     { label: "", divider: true },
     { label: "Excluir documento", onClick: onDelete, danger: true, disabled: busy },
