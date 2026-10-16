@@ -5,7 +5,7 @@ import { cn } from "@/lib/cn";
 import { QuickStat } from "@/pages/dashboards/QuickStat";
 import { Icon, icons } from "@/pages/users/Icons";
 import { paths } from "@/router/paths";
-import { archivePeople, displayTitle, documentPersonKey, findDocumentPerson, inLibrary, isFiledStatus, monthFolder, personMatchesQuery, resendVisible, sameCategory, signerCaption, signingPeople, visibleSigners, DOCUMENT_CATEGORIES, type SignerProgress } from "@/data/wedash/documentSplit";
+import { archivePeople, displayTitle, documentPersonKey, findDocumentPerson, inLibrary, isFiledStatus, monthFolder, partialEnvelopeLabel, personMatchesQuery, resendVisible, sameCategory, signerCaption, signingPeople, visibleSigners, DOCUMENT_CATEGORIES, type SignerProgress } from "@/data/wedash/documentSplit";
 import type { BatchRow, DocumentRow, PersonRow } from "@/data/wedash/documentsRepo";
 import { cancelDocument, copyDocumentLink, moveDocument, openDocument, resendDocument } from "@/data/wedash/documentsRepo";
 import { DocumentsSkeleton } from "@/components/wedash/LoadingSkeletons";
@@ -775,10 +775,12 @@ function pendingMenu(row: DocumentRow) {
 
 function DocumentStatus({ row, people }: { row: DocumentRow; people: PersonRow[] }) {
   if (!row.envelopeId && !isFiledStatus(row.status)) return <span className="text-[12.5px] text-t2">Em preparação</span>;
-  const caption = signerCaption(signersOf(row, people));
+  const signers = signersOf(row, people);
+  const caption = signerCaption(signers);
+  const partial = partialEnvelopeLabel(row.status, signers);
   return (
     <span className="flex min-w-0 flex-col items-start gap-1">
-      <Badge variant={badgeVariant(row.status)}>{STATUS_LABEL[row.status]}</Badge>
+      <Badge variant={partial ? "warning" : badgeVariant(row.status)}>{partial ?? STATUS_LABEL[row.status]}</Badge>
       {caption ? <span className="text-[12px] text-t1">{caption}</span> : null}
     </span>
   );

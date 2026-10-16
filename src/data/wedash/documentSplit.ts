@@ -1272,6 +1272,14 @@ export function signerCaption(signers: SignerProgress[]): string | null {
   return signers.map((signer) => `${signer.name} ${signer.status === "SIGNED" ? "assinou" : signer.status === "DECLINED" ? "recusou" : "pendente"}`).join(" · ");
 }
 
+/** O envelope segue aberto, mas alguém já assinou. O Assina chama isso de Em andamento. */
+export function partialEnvelopeLabel(status: DocStatus, signers: SignerProgress[]): string | null {
+  if (status !== "PENDING") return null;
+  const signed = signers.filter((item) => item.status === "SIGNED").length;
+  if (signed < 1 || signed >= signers.length) return null;
+  return "Em andamento";
+}
+
 function namedExtras(value: unknown): { name: string; channel: SendChannel | null }[] {
   const list = Array.isArray(value) ? value : value ? [value] : [];
   return list.flatMap((item) => {
