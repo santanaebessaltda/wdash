@@ -18,7 +18,7 @@ import { useScope } from "@/pages/dashboard/useScope";
 import { GroupComModal, type ShoppingFormBar } from "@/pages/operation/GroupComModal";
 import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "./shared";
 
-const IDLE_BAR: ShoppingFormBar = { busy: false, canSave: false, label: "Salvar acesso" };
+const IDLE_BAR: ShoppingFormBar = { busy: false, canSave: false, label: "Conectar" };
 
 type MallStep = "allos" | "groupcom";
 
@@ -85,7 +85,7 @@ export function ShoppingSettingsPage() {
       <SectionHeader
         section="Configurações"
         title="Administradora"
-        subtitle="Configure a administradora desta filial para informar as vendas ao shopping. Cada filial usa uma só."
+        subtitle="Conecte a administradora desta filial para informar as vendas ao shopping. Cada filial usa uma só."
       />
       {escolher || showSkeleton ? (
         escolher ? (
@@ -197,10 +197,10 @@ function ProviderCard({
       <div className="flex items-center justify-between border-t border-line pt-3">
         <span className={`flex items-center gap-1.5 text-xs font-bold ${tone}`}>
           <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
-          {connected ? "Configurado" : "Não configurado"}
+          {connected ? "Conectado" : "Não configurado"}
         </span>
         <Button size="sm" onClick={onOpen} disabled={disabled}>
-          {connected ? "Gerenciar" : "Configurar"}
+          {connected ? "Gerenciar" : "Conectar"}
         </Button>
       </div>
     </Card>
@@ -385,7 +385,7 @@ function IntranetMallForm({
 
   const slugError = slug.length > 0 && !baseUrl ? "Informe o identificador da filial, como shoppingcampogrande4." : undefined;
   const canConectar = !busy && baseUrl != null && username.trim().length > 0 && (password.trim().length > 0 || conectado) && (conectado || autorizo);
-  const label = busy ? "Salvando…" : conectado ? "Salvar alterações" : "Salvar acesso";
+  const label = busy ? (conectado ? "Salvando…" : "Conectando…") : conectado ? "Salvar alterações" : "Conectar";
   saveRef.current = () => void conectar();
 
   useLayoutEffect(() => {
@@ -400,7 +400,7 @@ function IntranetMallForm({
         Informe os dados de acesso da Intranet Mall desta filial. A WDash protege esses dados e os usa somente para informar as vendas ao shopping.
       </p>
       {replacedName ? (
-        <p className="text-[13px] leading-relaxed text-t1">Ao salvar, o acesso {replacedName} será substituído pelo da Intranet Mall.</p>
+        <p className="text-[13px] leading-relaxed text-t1">Ao conectar, o acesso {replacedName} será substituído pelo da Intranet Mall.</p>
       ) : null}
       <FormField
         label="Identificador da filial"

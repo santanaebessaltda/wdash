@@ -291,8 +291,8 @@ export function SalesReportPage() {
             <EmptyBlock
               icon="🧾"
               title="Administradora não configurada"
-              description={owner ? "Configure a administradora desta filial para informar as vendas ao shopping." : "O Gestor ainda não configurou a administradora desta filial."}
-              action={owner ? <Button onClick={() => navigate(paths.operation.shopping)}>Configurar administradora</Button> : undefined}
+              description={owner ? "Conecte a administradora desta filial para informar as vendas ao shopping." : "O Gestor ainda não conectou a administradora desta filial."}
+              action={owner ? <Button onClick={() => navigate(paths.operation.shopping)}>Conectar administradora</Button> : undefined}
             />
           </Card>
         ) : (

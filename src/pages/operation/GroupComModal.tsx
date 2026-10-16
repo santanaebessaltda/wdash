@@ -90,7 +90,7 @@ export function GroupComModal({
   const slugError = slug.length > 0 && !baseUrl ? "Informe o identificador do portal, como treslagoasapp." : undefined;
   const canBuscar = !busy && baseUrl != null && email.trim().includes("@") && password.trim().length > 0;
   const canConectar = !busy && baseUrl != null && email.trim().includes("@") && selected != null && (password.trim().length > 0 || conectado) && (conectado || autorizo);
-  const label = task === "save" ? "Salvando…" : conectado ? "Salvar alterações" : "Salvar acesso";
+  const label = task === "save" ? (conectado ? "Salvando…" : "Conectando…") : conectado ? "Salvar alterações" : "Conectar";
 
   saveRef.current = () => void conectar();
 
@@ -98,7 +98,7 @@ export function GroupComModal({
     onBar({ busy, canSave: canConectar, label });
   }, [busy, canConectar, label, onBar]);
 
-  useLayoutEffect(() => () => onBar({ busy: false, canSave: false, label: "Salvar acesso" }), [onBar]);
+  useLayoutEffect(() => () => onBar({ busy: false, canSave: false, label: "Conectar" }), [onBar]);
 
   return (
       <div className="flex flex-col gap-3.5">
@@ -106,7 +106,7 @@ export function GroupComModal({
           Informe os dados de acesso do Group COM e escolha a unidade desta filial. A WDash protege esses dados e os usa somente para informar as vendas ao shopping.
         </p>
         {replacedName ? (
-          <p className="text-[13px] leading-relaxed text-t1">Ao salvar, o acesso {replacedName} será substituído pelo do Group COM.</p>
+          <p className="text-[13px] leading-relaxed text-t1">Ao conectar, o acesso {replacedName} será substituído pelo do Group COM.</p>
         ) : null}
         <FormField
           label="Identificador do portal"

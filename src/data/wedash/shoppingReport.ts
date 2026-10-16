@@ -181,7 +181,7 @@ export function forceLaunchAllowed(input: {
   administrator: ShoppingAdministrator | null;
 }): { ok: true } | { ok: false; message: string } {
   if (!input.kiosk) return { ok: false, message: "Esta tela está disponível apenas para filiais do tipo Quiosque em shopping." };
-  if (input.administrator == null) return { ok: false, message: "O Gestor ainda não configurou a administradora desta filial." };
+  if (input.administrator == null) return { ok: false, message: "O Gestor ainda não conectou a administradora desta filial." };
   if (input.administrator === "argo") {
     return { ok: false, message: "A integração com a Argo ainda não está disponível na WDash." };
   }

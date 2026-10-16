@@ -229,7 +229,7 @@ describe("forceLaunchAllowed", () => {
     });
     expect(forceLaunchAllowed({ kiosk: true, administrator: null })).toEqual({
       ok: false,
-      message: "O Gestor ainda não configurou a administradora desta filial.",
+      message: "O Gestor ainda não conectou a administradora desta filial.",
     });
     expect(forceLaunchAllowed({ kiosk: true, administrator: "argo" })).toEqual({
       ok: false,
