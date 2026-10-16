@@ -48,7 +48,6 @@ import {
 } from "@/data/wedash/documentsRepo";
 import { formatBytes } from "./frame";
 import { DocumentReview } from "./DocumentReview";
-import { PathChoice, StoreDocument } from "./StoreDocument";
 
 const NO_USERS: { id: string; name: string; email: string }[] = [];
 
@@ -610,28 +609,20 @@ export function AttachWizard({
 
 export function AttachPage() {
   const navigate = useNavigate();
-  const { storeId, people, documents, history, stores, reload } = useDocuments();
-  const [path, setPath] = useState<"choose" | "sign" | "file">("choose");
+  const { storeId, people, documents, history, reload } = useDocuments();
   const close = () => navigate(paths.documents);
   const done = (notice: string | null) => navigate(paths.documents, { state: notice ? { documentNotice: notice } : undefined });
-  if (path === "sign") {
-    return (
-      <AttachWizard
-        storeId={storeId}
-        people={people}
-        documents={documents}
-        history={history}
-        onReload={reload}
-        onClose={close}
-        onDone={done}
-        onBack={() => setPath("choose")}
-      />
-    );
-  }
-  if (path === "file") {
-    return <StoreDocument storeId={storeId} people={people} stores={stores} onDone={() => done(null)} onBack={() => setPath("choose")} />;
-  }
-  return <PathChoice onClose={close} onSign={() => setPath("sign")} onFile={() => setPath("file")} />;
+  return (
+    <AttachWizard
+      storeId={storeId}
+      people={people}
+      documents={documents}
+      history={history}
+      onReload={reload}
+      onClose={close}
+      onDone={done}
+    />
+  );
 }
 
 

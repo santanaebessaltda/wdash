@@ -218,7 +218,7 @@ export function DocumentsPage() {
               { value: "inactive", label: "Desligados" },
             ]}
           />
-          <div className="flex gap-1 rounded-[11px] border border-line bg-bg-2 p-1" role="group" aria-label="Visualização">
+          <div className="flex w-full shrink-0 gap-1 rounded-[11px] border border-line bg-bg-2 p-1 sm:w-auto" role="group" aria-label="Visualização">
             {(
               [
                 ["folders", "Pastas"],
@@ -230,7 +230,7 @@ export function DocumentsPage() {
                 type="button"
                 aria-pressed={view === value}
                 onClick={() => setView(value)}
-                className={cn("rounded-lg px-3 py-1.5 text-[12.5px] font-bold transition-colors", view === value ? "bg-acc text-white" : "text-t1 hover:text-t0")}
+                className={cn("flex-1 whitespace-nowrap rounded-lg px-3 py-1.5 text-[12.5px] font-bold transition-colors sm:flex-none", view === value ? "bg-acc text-white" : "text-t1 hover:text-t0")}
               >
                 {label}
               </button>
