@@ -950,19 +950,16 @@ export function StoreCardsSkeleton({
 export function DocumentsSkeleton() {
   return (
     <Busy>
-      <Card className="w-full">
-        <div className="mb-4 flex items-center justify-between gap-3 border-b border-line pb-4">
-          <div>
-            <Skeleton className="h-3.5 w-16" />
-            <Skeleton className="mt-1.5 h-3 w-20" />
-          </div>
-          <Skeleton className="h-[34px] w-40 rounded-[10px] sm:w-72" />
-        </div>
-        <div className="flex flex-wrap justify-center gap-8 py-6">
+      <Card className="flex w-full flex-col">
+        <Skeleton className="mb-4 h-4 w-16" />
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: 8 }, (_, index) => (
-            <div key={index} className="flex w-[104px] flex-col items-center">
-              <Skeleton className="h-11 w-14 rounded-md" />
-              <Skeleton className="mt-2 h-3 w-16" />
+            <div key={index} className="flex items-center gap-3 rounded-2xl border border-line p-4">
+              <Skeleton className="h-[38px] w-[38px] shrink-0 rounded-[11px]" />
+              <div className="min-w-0">
+                <Skeleton className="h-3.5 w-28" />
+                <Skeleton className="mt-1.5 h-3 w-20" />
+              </div>
             </div>
           ))}
         </div>

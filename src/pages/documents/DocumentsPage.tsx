@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Badge, Button, Dropdown, EmptyState, FormField, Modal, Card, useToast, type DropdownItem } from "@/components/ui";
+import { Badge, Button, Dropdown, EmptyState, FormField, Modal, Card, CardTitle, useToast, type DropdownItem } from "@/components/ui";
 import { cn } from "@/lib/cn";
+import { HeaderSearch } from "@/pages/dashboard/HeaderFilter";
 import { Icon, icons } from "@/pages/users/Icons";
 import { paths } from "@/router/paths";
 import { archivePeople, categoryLabel, displayTitle, documentPersonKey, findDocumentPerson, folderPeople, inLibrary, isFiledStatus, monthFolder, partialEnvelopeLabel, personMatchesQuery, resendVisible, signatureProgressDetail, signerFraction, signingPeople, visibleSigners, type SignerProgress } from "@/data/wedash/documentSplit";
@@ -9,7 +10,7 @@ import type { BatchRow, DocumentRow, PersonRow } from "@/data/wedash/documentsRe
 import { cancelDocument, copyDocumentLink, moveDocument, openDocument, resendDocument } from "@/data/wedash/documentsRepo";
 import { DocumentsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
-import { DocumentsFrame, FileGlyph, STATUS_LABEL, SearchGlyph, badgeVariant } from "./frame";
+import { DocumentsFrame, FileGlyph, FolderGlyph, STATUS_LABEL, badgeVariant } from "./frame";
 import { useDocuments } from "./useDocuments";
 
 type PeopleFilter = "active" | "all" | "inactive";
@@ -52,9 +53,6 @@ export function DocumentsPage() {
   const atBranches = allStores && crumb.length === 0;
   const atPeople = allStores ? crumb.length === 1 : crumb.length === 0;
   const atFiles = allStores ? crumb.length >= 4 : crumb.length >= 3;
-  const everyone = folderPeople(people, "all");
-  const activeCount = folderPeople(people, "active").length;
-  const inactiveCount = folderPeople(people, "inactive").length;
 
   function statusLabel(doc: DocumentRow) {
     return partialEnvelopeLabel(doc.status, signersOf(doc, people)) ?? STATUS_LABEL[doc.status];
@@ -195,12 +193,13 @@ export function DocumentsPage() {
       subtitle="Organize documentos da equipe e acompanhe as assinaturas."
       actions={
         <>
+          <HeaderSearch value={query} onChange={setQuery} placeholder="Buscar documentos ou pessoas" width={260} />
           <div className="flex gap-1 rounded-[11px] border border-line bg-bg-2 p-1" role="group" aria-label="Status da pessoa">
             {(
               [
-                ["all", `Todos (${everyone.length})`],
-                ["active", `Ativos (${activeCount})`],
-                ["inactive", `Desligados (${inactiveCount})`],
+                ["all", "Todos"],
+                ["active", "Ativos"],
+                ["inactive", "Desligados"],
               ] as [PeopleFilter, string][]
             ).map(([value, label]) => (
               <button
@@ -242,16 +241,8 @@ export function DocumentsPage() {
           ))}
         </nav>
       )}
-      <Card className="w-full">
-        <div className="mb-4 flex flex-col gap-3 border-b border-line pb-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-[13px] font-bold text-t0">{atFiles ? "Documentos" : "Pastas"}</p>
-            <p className="text-[12px] text-t2">
-              {atFiles ? qty(visibleFiles.length, "documento", "documentos") : atPeople ? qty(visibleFolders.length, "pessoa", "pessoas") : atBranches ? qty(visibleFolders.length, "filial", "filiais") : qty(visibleFolders.length, "pasta", "pastas")}
-            </p>
-          </div>
-          <SearchBox value={query} onChange={setQuery} placeholder="Buscar documentos ou pessoas" />
-        </div>
+      <Card className="flex w-full flex-col">
+        <CardTitle className="mb-4">{atFiles ? "Documentos" : "Pastas"}</CardTitle>
         {atFiles ? (
           visibleFiles.length === 0 ? (
             <EmptyState framed={false} title={needle ? "Nenhum documento encontrado." : "Esta pasta ainda não tem documentos."} description={needle ? "Tente outro termo." : undefined} action={needle ? undefined : <Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>} />
@@ -419,20 +410,6 @@ function monthRank(name: string) {
   return ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"].indexOf(name);
 }
 
-function SearchBox({ value, onChange, placeholder, wide }: { value: string; onChange: (value: string) => void; placeholder: string; wide?: boolean }) {
-  return (
-    <div className={cn("flex h-[34px] items-center gap-2 rounded-[10px] border border-line bg-bg-inset px-3", wide && "w-full min-w-0 flex-1")}>
-      <SearchGlyph />
-      <input
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        className={cn("bg-transparent text-[12.5px] text-t0 outline-none placeholder:text-t2", wide ? "min-w-0 flex-1" : "w-40 sm:w-72")}
-      />
-    </div>
-  );
-}
-
 function folderEntries(input: {
   allStores: boolean;
   crumb: string[];
@@ -508,24 +485,19 @@ function signersOf(doc: DocumentRow, people: PersonRow[]) {
 
 function FolderGrid({ rows, onOpen }: { rows: FolderEntry[]; onOpen: (key: string) => void }) {
   return (
-    <div className="flex flex-wrap justify-center gap-x-8 gap-y-6 py-6">
+    <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
       {rows.map((row) => (
-        <button key={row.key} type="button" onClick={() => onOpen(row.key)} className="flex w-[104px] flex-col items-center gap-1.5 rounded-xl px-2 py-2 text-center hover:bg-bg-3">
-          <FilledFolder />
-          <span className="line-clamp-2 w-full text-[12.5px] font-semibold leading-tight text-t0">{row.label}</span>
-          <span className="line-clamp-2 w-full text-[11px] leading-tight text-t2">{row.inactive ? `${row.caption} · ${row.detail}` : row.caption ?? row.detail}</span>
+        <button key={row.key} type="button" onClick={() => onOpen(row.key)} className="flex min-w-0 items-center gap-3 rounded-2xl border border-line bg-bg-2 p-4 text-left hover:border-line-2 hover:bg-bg-3">
+          <span className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[11px] bg-acc-soft text-acc">
+            <FolderGlyph size={19} />
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-[13px] font-bold text-t0">{row.label}</span>
+            <span className="mt-0.5 block truncate text-[11.5px] text-t2">{row.inactive ? `${row.caption} · ${row.detail}` : row.caption ?? row.detail}</span>
+          </span>
         </button>
       ))}
     </div>
-  );
-}
-
-function FilledFolder() {
-  return (
-    <svg width="56" height="44" viewBox="0 0 56 44" aria-hidden="true">
-      <path fill="#F6C445" d="M6 10.5A5.5 5.5 0 0 1 11.5 5H22l3.4 3.4H44.5A5.5 5.5 0 0 1 50 13.9v2.1H6v-5.5Z" />
-      <path fill="#F0B429" d="M4 16.5A4.5 4.5 0 0 1 8.5 12h39A4.5 4.5 0 0 1 52 16.5v19A4.5 4.5 0 0 1 47.5 40h-39A4.5 4.5 0 0 1 4 35.5v-19Z" />
-    </svg>
   );
 }
 
