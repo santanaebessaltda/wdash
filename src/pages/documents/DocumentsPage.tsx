@@ -5,7 +5,7 @@ import { cn } from "@/lib/cn";
 import { QuickStat } from "@/pages/dashboards/QuickStat";
 import { Icon, icons } from "@/pages/users/Icons";
 import { paths } from "@/router/paths";
-import { archivePeople, displayTitle, documentPersonKey, findDocumentPerson, inLibrary, isFiledStatus, monthFolder, partialEnvelopeLabel, personMatchesQuery, resendVisible, sameCategory, signatureProgressDetail, signerFraction, signingPeople, visibleSigners, DOCUMENT_CATEGORIES, type SignerProgress } from "@/data/wedash/documentSplit";
+import { archivePeople, displayTitle, documentPersonKey, findDocumentPerson, folderPeople, inLibrary, isFiledStatus, monthFolder, partialEnvelopeLabel, personMatchesQuery, resendVisible, sameCategory, signatureProgressDetail, signerFraction, signingPeople, visibleSigners, DOCUMENT_CATEGORIES, type SignerProgress } from "@/data/wedash/documentSplit";
 import type { BatchRow, DocumentRow, PersonRow } from "@/data/wedash/documentsRepo";
 import { cancelDocument, copyDocumentLink, moveDocument, openDocument, resendDocument } from "@/data/wedash/documentsRepo";
 import { DocumentsSkeleton } from "@/components/wedash/LoadingSkeletons";
@@ -95,15 +95,7 @@ export function DocumentsPage() {
   const visibleFiles = filePool.filter((doc) => matchesText(doc) && (mode === "home" || matchesFilters(doc)));
   const narrowed = searching || periodFilter || typeFilter || statusFilter;
 
-  const listedPeople = people.filter((person) => {
-    const seller = person.source === "team" && person.roleLabel === "Vendedor";
-    const leader = person.roleLabel === "Gerente" || person.roleLabel === "Gestor" || person.roleLabel === "Usuário da filial";
-    if (!seller && !leader) return false;
-    const working = leader ? person.active : person.active && person.inErp;
-    if (peopleFilter === "active") return working;
-    if (peopleFilter === "inactive") return !working;
-    return true;
-  });
+  const listedPeople = folderPeople(people, peopleFilter);
   const peopleSearch = atPeople && needle.length > 0;
   const folders = mode === "browse" ? folderEntries({ allStores, crumb, documents: libraryDocs, batches, people: listedPeople, stores }) : [];
   const visibleFolders = folders.filter((folder) => {
@@ -242,7 +234,7 @@ export function DocumentsPage() {
             <Shortcut label="Este mês" count={qty(thisMonth.length, "documento", "documentos")} onClick={() => enter("month")} />
             <Shortcut
               label={allStores ? "Filiais" : "Pessoas"}
-              count={allStores ? qty(stores.length, "filial", "filiais") : qty(listedPeople.length, "pessoa", "pessoas")}
+              count={allStores ? qty(stores.length, "filial", "filiais") : qty(folderPeople(people, "active").length, "pessoa", "pessoas")}
               onClick={() => enter("browse")}
             />
           </div>
