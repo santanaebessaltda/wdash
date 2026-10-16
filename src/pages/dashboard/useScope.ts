@@ -42,6 +42,13 @@ function saveBranch(id: string) {
 
 const DEFAULT_PERIOD: PeriodType = "today";
 
+/** Filial, período e marca. Só muda quando o filtro da tela muda. */
+export function scopeFilterKey(scope: Scope): string {
+  const ids = [...scope.storeIds].sort().join(",");
+  const { kind, start, end } = scope.period;
+  return `${ids}|${kind}|${start ?? ""}|${end ?? ""}|${scope.division ?? ""}`;
+}
+
 type SavedPeriod = { kind: PeriodType; from?: string; to?: string };
 
 function readSavedPeriod(): SavedPeriod | null {

@@ -4,7 +4,7 @@ import { paths } from "@/router/paths";
 import { Card, CardHeader, CardTitle, StatCard, DateRangePicker, PageHeader, Button, DataTable, Badge, type DataTableColumn } from "@/components/ui";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { AreaLineChart, DonutChart } from "@/components/charts";
-import { useScope } from "@/pages/dashboard/useScope";
+import { scopeFilterKey, useScope } from "@/pages/dashboard/useScope";
 import {
   buildFinanceView,
   financeFetchRange,
@@ -38,7 +38,7 @@ import { ErpStatusNotice } from "@/pages/dashboard/ErpStatusNotice";
 import { ReportHeader, useExportPdf } from "@/pages/dashboard/ReportHeader";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { FinanceSkeleton } from "@/components/wedash/LoadingSkeletons";
-import { useMinSkeleton } from "@/lib/useMinSkeleton";
+import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
 import { brlCent, isoToDate, labelUpper, deltaTip } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { QuickStat } from "@/pages/dashboards/QuickStat";
@@ -186,8 +186,8 @@ export default function FinancePage() {
   const { scope, setScope } = useScope();
   const [aggs, setAggs] = useState<FinanceAggInput>({ dayAggs: [] });
   const [coverageFrom, setCoverageFrom] = useState<Date | null>(null);
-  const [loading, setLoading] = useState(true);
-  const showSkeleton = useMinSkeleton(loading);
+  const filterKey = scopeFilterKey(scope);
+  const { pending, showSkeleton, settle } = useFilterSkeleton(filterKey);
   // Catalogo de lojas (horario/custos) hidratado depois do 1 render  ->  recalcula.
   const [storesTick, setStoresTick] = useState(0);
   useEffect(() => {
@@ -200,6 +200,7 @@ export default function FinancePage() {
   const reloadGen = useRef(0);
   const reload = useCallback(async () => {
     const gen = ++reloadGen.current;
+    const key = filterKey;
     const period = resolvePeriod(scope.period, calendarTodayIso());
     const range = financeFetchRange(scope);
     const costRange = productsFetchRange(scope);
@@ -225,14 +226,16 @@ export default function FinancePage() {
       if (gen !== reloadGen.current) return;
       setAggs({ dayAggs, hourAggs, prevHourAggs, paymentDayAggs, productCostDayAggs, productNames });
       setCoverageFrom(cov.from ? isoToDate(cov.from) : null);
+      settle(key);
     } catch (e) {
       if (gen !== reloadGen.current) return;
       console.error("Finance reload:", e);
+      settle(key);
     }
-  }, [scope, session.tenantId]);
+  }, [scope, session.tenantId, filterKey, settle]);
 
   useEffect(() => {
-    void reload().finally(() => setLoading(false));
+    void reload();
   }, [reload]);
 
   useEffect(() => {
@@ -292,7 +295,7 @@ export default function FinancePage() {
         end={currentPeriod.end}
       />
       <StoreHoursNotice />
-      {!loading && (
+      {!pending && (
         <ProductsWithoutCostNotice
           products={view.productsWithoutCost}
           storeIds={scope.storeIds}

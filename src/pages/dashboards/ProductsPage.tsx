@@ -3,7 +3,7 @@ import { Badge, Card, CardHeader, CardTitle, StatCard, DateRangePicker, PageHead
 import { Tooltip } from "@/components/ui/Tooltip";
 import { TABLE_PAGE_SIZE } from "@/lib/usePagedRows";
 import { BarChart, DonutChart } from "@/components/charts";
-import { useScope } from "@/pages/dashboard/useScope";
+import { scopeFilterKey, useScope } from "@/pages/dashboard/useScope";
 import {
   buildProductsView,
   resolvePeriod,
@@ -39,7 +39,7 @@ import { usePrintMode } from "@/lib/printMode";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { ProductsWithoutCostNotice } from "@/pages/dashboard/ProductsWithoutCostNotice";
 import { ProductsSkeleton } from "@/components/wedash/LoadingSkeletons";
-import { useMinSkeleton } from "@/lib/useMinSkeleton";
+import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
 import { brlCent, isoToDate, num, comparedWithTip } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePicker";
@@ -116,8 +116,8 @@ export default function ProductsPage() {
   const { scope, setScope } = useScope();
   const [aggs, setAggs] = useState<ProductsAggInput>({ dayAggs: [] });
   const [coverageFrom, setCoverageFrom] = useState<Date | null>(null);
-  const [loading, setLoading] = useState(true);
-  const showSkeleton = useMinSkeleton(loading);
+  const filterKey = scopeFilterKey(scope);
+  const { pending, showSkeleton, settle } = useFilterSkeleton(filterKey);
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("revenue");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -140,6 +140,7 @@ export default function ProductsPage() {
   const reloadGen = useRef(0);
   const reload = useCallback(async () => {
     const gen = ++reloadGen.current;
+    const key = filterKey;
     try {
       const [next, cov] = await Promise.all([
         fetchProductsAggInput(session.tenantId, scope),
@@ -148,14 +149,16 @@ export default function ProductsPage() {
       if (gen !== reloadGen.current) return;
       setAggs(next);
       setCoverageFrom(cov.from ? isoToDate(cov.from) : null);
+      settle(key);
     } catch (e) {
       if (gen !== reloadGen.current) return;
       console.error("Products reload:", e);
+      settle(key);
     }
-  }, [scope, session.tenantId]);
+  }, [scope, session.tenantId, filterKey, settle]);
 
   useEffect(() => {
-    void reload().finally(() => setLoading(false));
+    void reload();
   }, [reload]);
 
   useEffect(() => {
@@ -331,7 +334,7 @@ export default function ProductsPage() {
         end={currentPeriod.end}
       />
       <StoreHoursNotice />
-      {!loading && (
+      {!pending && (
         <ProductsWithoutCostNotice
           products={view.productsWithoutCost}
           storeIds={scope.storeIds}

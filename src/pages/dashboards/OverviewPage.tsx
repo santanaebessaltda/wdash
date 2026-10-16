@@ -5,7 +5,7 @@ import { ProductNameCell } from "@/components/wedash/ProductNameCell";
 import { Avatar, Badge, Card, CardHeader, CardTitle, RadialProgress, StatCard, DateRangePicker, PageHeader, Button, ThSort, type SortDir } from "@/components/ui";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { AreaLineChart, BarChart, DonutChart } from "@/components/charts";
-import { useScope } from "@/pages/dashboard/useScope";
+import { scopeFilterKey, useScope } from "@/pages/dashboard/useScope";
 import { buildOverviewView, resolvePeriod, previousPeriod, OVERVIEW_PRODUCTS_TOP, OVERVIEW_TEAM_TOP, type OverviewKpi } from "@/data/wedash/dashboard";
 import {
   fetchSalesDayAggs,
@@ -52,7 +52,7 @@ import { useProductDetail } from "@/pages/dashboard/ProductDetail";
 import { useTeamMemberDetail } from "@/pages/dashboard/TeamMemberDetail";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { OverviewSkeleton } from "@/components/wedash/LoadingSkeletons";
-import { useMinSkeleton } from "@/lib/useMinSkeleton";
+import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { goalHistoryDayRange, goalHistorySameWeekdays } from "@/data/wedash/goalCurve";
 import { fetchGoals, fetchGoalTeam, type GoalRecord, type GoalTeamMember } from "@/data/wedash/goalsRepo";
@@ -151,8 +151,8 @@ export default function OverviewPage() {
   const [sellerAvatars, setSellerAvatars] = useState<SellerAvatarRef[]>([]);
   const [productDayAggs, setProductDayAggs] = useState<SalesProductDayAgg[]>([]);
   const [productCostDayAggs, setProductCostDayAggs] = useState<SalesProductCostDayAgg[]>([]);
-  const [loading, setLoading] = useState(true);
-  const showSkeleton = useMinSkeleton(loading);
+  const filterKey = scopeFilterKey(scope);
+  const { showSkeleton, settle } = useFilterSkeleton(filterKey);
   const [watermark, setWatermark] = useState<Date | null>(null);
   const [coverageFrom, setCoverageFrom] = useState<Date | null>(null);
   const [goalHistoryDayAggs, setGoalHistoryDayAggs] = useState<SalesDayAgg[]>([]);
@@ -179,6 +179,7 @@ export default function OverviewPage() {
 
   const reloadAggs = useCallback(async () => {
     const gen = ++reloadGen.current;
+    const key = filterKey;
     const period = resolvePeriod(scope.period, calendarTodayIso());
     const prev = previousPeriod(period);
     const singleDay = period.start === period.end;
@@ -316,11 +317,13 @@ export default function OverviewPage() {
       setProductCostDayAggs(productCosts);
       setWatermark(wm);
       setCoverageFrom(cov.from ? isoToDate(cov.from) : null);
+      settle(key);
     } catch (e) {
       if (gen !== reloadGen.current) return;
       console.error("Overview reloadAggs:", e);
+      settle(key);
     }
-  }, [scope, session.tenantId, session.stores]);
+  }, [scope, session.tenantId, session.stores, filterKey, settle]);
 
   useEffect(() => {
     const onSynced = () => void reloadAggs();
@@ -328,22 +331,10 @@ export default function OverviewPage() {
     return () => window.removeEventListener(SALES_SYNCED_EVENT, onSynced);
   }, [reloadAggs]);
 
-  // So a 1 carga usa `loading` (desabilita o botao). Re-fetch de escopo/aba
-  // atualiza os dados em silencio  -  senao o Atualizar "pisca" (disabled:opacity-50).
-  const hasLoadedOnce = useRef(false);
+  // Filial e período ligam o skeleton no mesmo render (useFilterSkeleton).
+  // Venda nova e a hidratação do catálogo recarregam em silêncio.
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      if (!hasLoadedOnce.current) setLoading(true);
-      await reloadAggs();
-      if (!cancelled) {
-        hasLoadedOnce.current = true;
-        setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    void reloadAggs();
   }, [reloadAggs]);
 
   // Enquanto o primeiro sync nao grava watermark, repolha (SEED pode demorar).

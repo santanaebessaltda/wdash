@@ -5,7 +5,7 @@ import { HeaderFilter } from "@/pages/dashboard/HeaderFilter";
 import { Button, Card, CardHeader, CardTitle, DateRangePicker, PageHeader, Pagination, StatCard, Tabs, ThSort, type SortDir } from "@/components/ui";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { DonutChart } from "@/components/charts";
-import { useScope } from "@/pages/dashboard/useScope";
+import { scopeFilterKey, useScope } from "@/pages/dashboard/useScope";
 import {
   buildTeamDashboardView,
   resolvePeriod,
@@ -49,7 +49,7 @@ import { ReportHeader, useExportPdf } from "@/pages/dashboard/ReportHeader";
 import { usePrintMode } from "@/lib/printMode";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { TeamSkeleton } from "@/components/wedash/LoadingSkeletons";
-import { useMinSkeleton } from "@/lib/useMinSkeleton";
+import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
 import { FlameIcon, TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
 import { RankingBlock } from "@/pages/live/blocks";
 import type { RankingRow } from "@/data/wedash/live";
@@ -193,8 +193,8 @@ export function TeamPage() {
   const { scope, setScope } = useScope();
   const [aggs, setAggs] = useState<TeamAggInput>({ dayAggs: [] });
   const [coverageFrom, setCoverageFrom] = useState<Date | null>(null);
-  const [loading, setLoading] = useState(true);
-  const showSkeleton = useMinSkeleton(loading);
+  const filterKey = scopeFilterKey(scope);
+  const { pending, showSkeleton, settle } = useFilterSkeleton(filterKey);
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("revenue");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -214,6 +214,7 @@ export function TeamPage() {
   const reloadGen = useRef(0);
   const reload = useCallback(async () => {
     const gen = ++reloadGen.current;
+    const key = filterKey;
     try {
       const [next, cov, goals, challenges] = await Promise.all([
         fetchTeamAggInput(session.tenantId, scope),
@@ -229,14 +230,16 @@ export function TeamPage() {
       setCoverageFrom(cov.from ? isoToDate(cov.from) : null);
       setGoalsData(goals);
       setChallengesData(challenges);
+      settle(key);
     } catch (e) {
       if (gen !== reloadGen.current) return;
       console.error("Team reload:", e);
+      settle(key);
     }
-  }, [scope, session.tenantId, session.stores]);
+  }, [scope, session.tenantId, session.stores, filterKey, settle]);
 
   useEffect(() => {
-    void reload().finally(() => setLoading(false));
+    void reload();
   }, [reload]);
 
   useEffect(() => {
@@ -401,7 +404,7 @@ export function TeamPage() {
                 activePresetId={periodActivePresetId(scope.period)}
                 minDate={pickerMinDate(coverageFrom, monthFill)}
               />
-              {view.availableShifts.length > 0 && (
+              {!pending && view.availableShifts.length > 0 && (
                 <HeaderFilter
                   label="Grupo"
                   value={view.shiftFilter ?? ""}
