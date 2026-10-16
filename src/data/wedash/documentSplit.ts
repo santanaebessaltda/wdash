@@ -598,6 +598,29 @@ export function defaultSignatureMark(pageCount: number): SignatureMark {
   return { pageNumber: Math.max(1, pageCount), x: 50, y: 50, element: "SIGNATURE" };
 }
 
+/** Signatários na ordem em que cada um apareceu pela primeira vez. */
+export function signerRotation(fields: { signerId: string }[]): string[] {
+  const order: string[] = [];
+  for (const field of fields) {
+    if (!field.signerId || order.includes(field.signerId)) continue;
+    order.push(field.signerId);
+  }
+  return order;
+}
+
+/**
+ * Com um signatário, a marcação nova é dele.
+ * Com dois ou mais, o clique seguinte pega o próximo da ordem e, no fim, volta ao primeiro.
+ */
+export function nextMarkSigner(fields: { signerId: string }[], ownerKey: string | null): string {
+  const order = signerRotation(fields);
+  if (order.length < 2) return ownerKey ? "seller" : (order[0] ?? "");
+  const last = fields[fields.length - 1]?.signerId ?? "";
+  const index = order.indexOf(last);
+  if (index < 0) return order[0] ?? "";
+  return order[(index + 1) % order.length] ?? "";
+}
+
 export type Reminder = "EVERY_DAY" | "EVERY_3_DAYS" | "EVERY_WEEK" | "NEVER";
 
 /** Pessoa que assina só este envio. Não vira colaborador nem usuário. */
@@ -667,11 +690,11 @@ export function markChoiceValue(signerId: string, ownerId: string | null): strin
   return signerId;
 }
 
-export function defaultDraft(pageCount: number): DocumentDraft {
+export function defaultDraft(_pageCount: number): DocumentDraft {
   return {
     channel: "WHATSAPP",
     authentication: "DEFAULT_SIGN",
-    fields: [{ ...defaultSignatureMark(pageCount), id: "seller-mark", signerId: "seller" }],
+    fields: [],
     guests: [],
     deadline: "",
     reminder: "EVERY_3_DAYS",
@@ -690,11 +713,10 @@ function clampField(field: FieldMark, pageCount: number): FieldMark {
 
 /** Prazo, lembrete, marcas e signatários de usuário passam para o documento seguinte. O canal não. */
 export function carryDraft(previous: DocumentDraft, pageCount: number): DocumentDraft {
-  const fields = previous.fields.length > 0 ? previous.fields : defaultDraft(pageCount).fields;
   return {
     channel: "WHATSAPP",
     authentication: "DEFAULT_SIGN",
-    fields: fields.map((field) => clampField(field, pageCount)),
+    fields: previous.fields.map((field) => clampField(field, pageCount)),
     guests: (previous.guests ?? []).map((guest) => ({ ...guest })),
     deliveries: previous.deliveries ? { ...previous.deliveries } : undefined,
     deadline: previous.deadline,
@@ -714,7 +736,7 @@ export function resolveDrafts(
       ? {
           ...own,
           guests: own.guests ?? [],
-          fields: (own.fields.length > 0 ? own.fields : defaultDraft(row.pageCount).fields).map((field) => clampField(field, row.pageCount)),
+          fields: own.fields.map((field) => clampField(field, row.pageCount)),
         }
       : carryDraft(last, row.pageCount);
     last = next;

@@ -18,7 +18,6 @@ import {
   confirmBlock,
   contactPatch,
   customDocumentName,
-  defaultSignatureMark,
   deliveryFileName,
   signatureDeadlineAt,
   envelopeSignatures,
@@ -561,8 +560,7 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
     try {
     const channel = asChannel(doc.channel) ?? fallbackChannel;
     const pageCount = Number(doc.page_count) || 1;
-    const savedMarks = storedMarks(doc.marks);
-    const marks = savedMarks.length > 0 ? savedMarks : [defaultSignatureMark(pageCount)];
+    const marks = storedMarks(doc.marks);
     const docReminder = asReminder(doc.reminder) ?? reminder;
     const signatureDeadline = signatureDeadlineAt(new Date());
     const parsedDocExtra = storedExtras(doc.extra_signer);
@@ -572,18 +570,13 @@ async function confirm(admin: SupabaseClient, tenantId: string, secret: string, 
     const personId = (doc.seller_id as string | null) ?? (doc.identity_id as string | null);
     const missingChannel = channel ? null : "Escolha WhatsApp ou e-mail.";
     const contactBlock = channel ? channelBlock(channel, { email: seller?.email ?? null, whatsapp: seller?.whatsapp ?? null }) : null;
-    const placeBlock = savedMarks.length > 0 ? placementWarning(savedMarks, pageCount) : null;
+    const placeBlock = placementWarning(marks, pageCount);
     const chosenExtras = doc.extra_signer != null ? (parsedDocExtra ?? []) : extra ? [extra] : [];
-    const extraForDocs = chosenExtras.map((item) => ({
-      ...item,
-      marks: item.marks.length > 0 ? item.marks : [defaultSignatureMark(pageCount)],
-    }));
+    const extraForDocs = chosenExtras;
     const extraContact = extraForDocs
       .map((item) => channelBlock(item.channel, { email: item.email, whatsapp: item.whatsapp }))
       .find((item) => item) ?? null;
-    const extraPlace = chosenExtras
-      .map((item) => (item.marks.length > 0 ? placementWarning(item.marks, pageCount) : null))
-      .find((item) => item) ?? null;
+    const extraPlace = chosenExtras.map((item) => placementWarning(item.marks, pageCount)).find((item) => item) ?? null;
     const rowBlock = block ?? missingChannel ?? (personId ? contactBlock : null) ?? placeBlock ?? extraInvalid ?? extraContact ?? extraPlace;
     if (!shouldSend({ envelopeId: (doc.envelope_id as string | null) ?? null, sellerId: personId, block: rowBlock })) {
       const quiet = !personId || Boolean(doc.envelope_id);

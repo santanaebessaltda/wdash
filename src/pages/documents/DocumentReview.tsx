@@ -15,6 +15,7 @@ import {
   findDocumentPerson,
   markChoiceValue,
   markSignerId,
+  nextMarkSigner,
   signerDelivery,
   signingPeople,
   guestAuthentication,
@@ -324,7 +325,7 @@ function ReviewBody({
 
   function placeMark(mark: SignatureMark) {
     const id = crypto.randomUUID();
-    saveDraft({ ...draft, fields: [...draft.fields, { ...mark, id, signerId: ownerKey ? "seller" : "" }] });
+    saveDraft({ ...draft, fields: [...draft.fields, { ...mark, id, signerId: nextMarkSigner(draft.fields, ownerKey) }] });
     setSelectedId(id);
   }
 

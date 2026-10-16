@@ -16,6 +16,7 @@ import {
   customDocumentName,
   defaultDraft,
   defaultSignatureMark,
+  nextMarkSigner,
   deliveryFileName,
   documentPeople,
   documentPersonKey,
@@ -511,14 +512,35 @@ describe("carryDraft", () => {
     expect(resolved[0].deadline).toBe("2026-11-01");
     expect(resolved[0].fields).toHaveLength(2);
     expect(resolved[1]).toMatchObject({ deadline: "2026-12-01", channel: "EMAIL" });
-    expect(resolved[1].fields.every((field) => field.signerId === "seller")).toBe(true);
+    expect(resolved[1].fields).toEqual([]);
     expect(resolved[2].deadline).toBe("2026-12-01");
     expect(resolved[2].channel).toBe("WHATSAPP");
-    expect(resolved[2].fields.every((field) => field.signerId === "seller")).toBe(true);
+    expect(resolved[2].fields).toEqual([]);
+  });
+
+  it("starts without a mark and keeps an empty document empty", () => {
+    expect(defaultDraft(4).fields).toEqual([]);
+    expect(resolveDrafts([{ id: "a", pageCount: 4 }], {})[0].fields).toEqual([]);
+    expect(carryDraft({ ...previous, fields: [] }, 3).fields).toEqual([]);
+  });
+
+  it("rotates the next mark through the signers already placed", () => {
+    const seller = { signerId: "seller" };
+    const extra = { signerId: "guest:g1" };
+    const third = { signerId: "guest:g2" };
+    expect(nextMarkSigner([], "ana")).toBe("seller");
+    expect(nextMarkSigner([seller], "ana")).toBe("seller");
+    expect(nextMarkSigner([seller, extra], "ana")).toBe("seller");
+    expect(nextMarkSigner([seller, extra, seller], "ana")).toBe("guest:g1");
+    expect(nextMarkSigner([seller, extra, third], "ana")).toBe("seller");
+    expect(nextMarkSigner([seller, extra, third, seller], "ana")).toBe("guest:g1");
   });
 
   it("asks for a collaborator, a missing contact, or a user with e-mail before send", () => {
-    const draft = defaultDraft(1);
+    const draft = {
+      ...defaultDraft(1),
+      fields: [{ id: "seller-mark", pageNumber: 1, x: 50, y: 50, element: "SIGNATURE" as const, signerId: "seller" }],
+    };
     expect(documentIssue(null, draft, 1)).toBe("Escolha o colaborador.");
     expect(documentIssue({ cpf: VALID_DIGITS, email: null, whatsapp: null }, draft, 1)).toBe("Falta contato no cadastro.");
     expect(
