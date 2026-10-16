@@ -952,8 +952,8 @@ export function DocumentsSkeleton() {
     <Busy>
       <Card className="flex w-full flex-col">
         <Skeleton className="mb-4 h-4 w-16" />
-        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
-          {Array.from({ length: 8 }, (_, index) => (
+        <div className="flex flex-col gap-2">
+          {Array.from({ length: 6 }, (_, index) => (
             <div key={index} className="flex items-center gap-3 rounded-2xl border border-line p-4">
               <Skeleton className="h-[38px] w-[38px] shrink-0 rounded-[11px]" />
               <div className="min-w-0">

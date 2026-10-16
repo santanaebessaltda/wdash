@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Badge, Button, Dropdown, EmptyState, FormField, Modal, Card, CardTitle, useToast, type DropdownItem } from "@/components/ui";
+import { Badge, Button, DataTable, Dropdown, EmptyState, FormField, Modal, Card, CardTitle, useToast, type DataTableColumn, type DropdownItem } from "@/components/ui";
 import { cn } from "@/lib/cn";
-import { HeaderSearch } from "@/pages/dashboard/HeaderFilter";
+import { HeaderFilter } from "@/pages/dashboard/HeaderFilter";
 import { Icon, icons } from "@/pages/users/Icons";
 import { paths } from "@/router/paths";
-import { archivePeople, categoryLabel, displayTitle, documentPersonKey, findDocumentPerson, folderPeople, inLibrary, isFiledStatus, monthFolder, partialEnvelopeLabel, personMatchesQuery, resendVisible, signatureProgressDetail, signerFraction, signingPeople, visibleSigners, type SignerProgress } from "@/data/wedash/documentSplit";
+import { archivePeople, displayTitle, documentPersonKey, findDocumentPerson, folderPeople, inLibrary, isFiledStatus, monthFolder, partialEnvelopeLabel, resendVisible, signatureProgressDetail, signerFraction, signingPeople, visibleSigners, type SignerProgress } from "@/data/wedash/documentSplit";
 import type { BatchRow, DocumentRow, PersonRow } from "@/data/wedash/documentsRepo";
 import { cancelDocument, copyDocumentLink, moveDocument, openDocument, resendDocument } from "@/data/wedash/documentsRepo";
 import { DocumentsSkeleton } from "@/components/wedash/LoadingSkeletons";
@@ -14,6 +14,9 @@ import { DocumentsFrame, FileGlyph, FolderGlyph, STATUS_LABEL, badgeVariant } fr
 import { useDocuments } from "./useDocuments";
 
 type PeopleFilter = "active" | "all" | "inactive";
+type LibraryView = "folders" | "documents";
+
+const STATUS_ORDER = ["Pendente", "Em andamento", "Recusado", "Expirado", "Assinado", "Já assinado", "Arquivado"];
 
 type FolderEntry = { key: string; label: string; detail: string; caption?: string; fileId?: string; count?: number; inactive?: boolean };
 
@@ -27,8 +30,8 @@ export function DocumentsPage() {
   const flash = (useLocation().state ?? null) as { documentNotice?: string | null } | null;
   const flashed = useRef(false);
   const [crumb, setCrumb] = useState<string[]>([]);
-  const [query, setQuery] = useState("");
   const [peopleFilter, setPeopleFilter] = useState<PeopleFilter>("all");
+  const [view, setView] = useState<LibraryView>("folders");
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [moveId, setMoveId] = useState<string | null>(null);
   const [moveSeller, setMoveSeller] = useState("");
@@ -49,74 +52,32 @@ export function DocumentsPage() {
   const batchOf = useMemo(() => new Map(batches.map((batch) => [batch.id, batch])), [batches]);
 
   const libraryDocuments = documents.filter((doc) => inLibrary(doc));
-  const needle = query.trim().toLowerCase();
-  const atBranches = allStores && crumb.length === 0;
   const atPeople = allStores ? crumb.length === 1 : crumb.length === 0;
   const atFiles = allStores ? crumb.length >= 4 : crumb.length >= 3;
-
-  function statusLabel(doc: DocumentRow) {
-    return partialEnvelopeLabel(doc.status, signersOf(doc, people)) ?? STATUS_LABEL[doc.status];
-  }
-
-  function matchesQuery(doc: DocumentRow) {
-    if (!needle) return true;
-    const batch = batchOf.get(doc.batchId);
-    const title = displayTitle(doc.fileName).toLowerCase();
-    const category = categoryLabel(batch?.category ?? "").toLowerCase();
-    const year = String(batch?.year ?? "");
-    const month = monthFolder(batch?.month ?? 0).toLowerCase();
-    const person = findDocumentPerson(people, doc);
-    return title.includes(needle) || doc.fileName.toLowerCase().includes(needle) || category.includes(needle) || year.includes(needle) || month.includes(needle) || statusLabel(doc).toLowerCase().includes(needle) || (atBranches || atPeople ? person != null && personMatchesQuery(person, query) : false);
-  }
-
   const listedPeople = folderPeople(people, peopleFilter);
-  const textDocs = needle ? libraryDocuments.filter(matchesQuery) : libraryDocuments;
-  const folders = folderEntries({ allStores, crumb, documents: needle ? textDocs : libraryDocuments, batches, people: listedPeople, stores });
-  const visibleFolders = folders.filter((folder) => folderVisible(folder));
-
-  function folderVisible(folder: FolderEntry) {
-    if (atPeople || atBranches) {
-      const matched = textDocs.filter((doc) => (atBranches ? doc.storeId === folder.key : documentPersonKey(doc) === folder.key)).length;
-      if (needle && matched > 0) return true;
-      if (!needle) return true;
-      if (atPeople) {
-        const person = listedPeople.find((item) => item.id === folder.key);
-        return person != null && personMatchesQuery(person, query);
-      }
-      return folder.label.toLowerCase().includes(needle);
-    }
-    if (!needle) return true;
-    if (folder.label.toLowerCase().includes(needle)) return true;
-    return textDocs.some((doc) => docInFolder(doc, folder.key));
-  }
-
-  function docInFolder(doc: DocumentRow, key: string) {
-    const batch = batchOf.get(doc.batchId);
-    const sellerId = allStores ? crumb[1] : crumb[0];
-    if (documentPersonKey(doc) !== sellerId) return false;
-    const depth = allStores ? crumb.length - 1 : crumb.length;
-    if (depth === 1) return String(batch?.year ?? "") === key;
-    const year = allStores ? crumb[2] : crumb[1];
-    return String(batch?.year ?? "") === year && monthFolder(batch?.month ?? 0) === key;
-  }
+  const allowedPeople = new Set(listedPeople.map((person) => person.id));
+  const scopedDocuments = libraryDocuments.filter((doc) => {
+    const key = documentPersonKey(doc);
+    if (!key) return peopleFilter === "all";
+    return allowedPeople.has(key);
+  });
+  const folders = folderEntries({ allStores, crumb, documents: scopedDocuments, batches, people: listedPeople, stores });
   const visibleFiles = atFiles
-    ? textDocs.filter((doc) => documentPersonKey(doc) === (allStores ? crumb[1] : crumb[0]) && String(batchOf.get(doc.batchId)?.year ?? "") === (allStores ? crumb[2] : crumb[1]) && monthFolder(batchOf.get(doc.batchId)?.month ?? 0) === (allStores ? crumb[3] : crumb[2]))
+    ? scopedDocuments.filter((doc) => documentPersonKey(doc) === (allStores ? crumb[1] : crumb[0]) && String(batchOf.get(doc.batchId)?.year ?? "") === (allStores ? crumb[2] : crumb[1]) && monthFolder(batchOf.get(doc.batchId)?.month ?? 0) === (allStores ? crumb[3] : crumb[2]))
     : [];
   const peopleHere = listedPeople.filter((person) => !allStores || crumb[0] == null || person.storeId === crumb[0]);
+  const showingDocuments = view === "documents" || atFiles;
 
   function goRoot() {
     setCrumb([]);
-    setQuery("");
   }
 
   function goUp() {
     setCrumb((current) => current.slice(0, -1));
-    setQuery("");
   }
 
   function openFolder(key: string) {
     setCrumb([...crumb, key]);
-    setQuery("");
   }
 
   const trail = crumb.length === 0 ? [] : [
@@ -124,10 +85,7 @@ export function DocumentsPage() {
     ...(allStores ? [{ label: "Filiais", onClick: goRoot as (() => void) | null }] : []),
     ...crumb.map((key, index) => ({
       label: crumbLabel(key, storeName, personName),
-      onClick: index === crumb.length - 1 ? null : () => {
-        setCrumb(crumb.slice(0, index + 1));
-        setQuery("");
-      },
+      onClick: index === crumb.length - 1 ? null : () => setCrumb(crumb.slice(0, index + 1)),
     })),
   ];
 
@@ -193,21 +151,29 @@ export function DocumentsPage() {
       subtitle="Organize documentos da equipe e acompanhe as assinaturas."
       actions={
         <>
-          <HeaderSearch value={query} onChange={setQuery} placeholder="Buscar documentos ou pessoas" width={260} />
-          <div className="flex gap-1 rounded-[11px] border border-line bg-bg-2 p-1" role="group" aria-label="Status da pessoa">
+          <HeaderFilter
+            label="Status"
+            value={peopleFilter}
+            onChange={setPeopleFilter}
+            options={[
+              { value: "all", label: "Todos os status" },
+              { value: "active", label: "Ativos" },
+              { value: "inactive", label: "Desligados" },
+            ]}
+          />
+          <div className="flex gap-1 rounded-[11px] border border-line bg-bg-2 p-1" role="group" aria-label="Visualização">
             {(
               [
-                ["all", "Todos"],
-                ["active", "Ativos"],
-                ["inactive", "Desligados"],
-              ] as [PeopleFilter, string][]
+                ["folders", "Pastas"],
+                ["documents", "Documentos"],
+              ] as [LibraryView, string][]
             ).map(([value, label]) => (
               <button
                 key={value}
                 type="button"
-                aria-pressed={peopleFilter === value}
-                onClick={() => setPeopleFilter(value)}
-                className={cn("rounded-lg px-3 py-1.5 text-[12.5px] font-bold transition-colors", peopleFilter === value ? "bg-acc text-white" : "text-t1 hover:text-t0")}
+                aria-pressed={view === value}
+                onClick={() => setView(value)}
+                className={cn("rounded-lg px-3 py-1.5 text-[12.5px] font-bold transition-colors", view === value ? "bg-acc text-white" : "text-t1 hover:text-t0")}
               >
                 {label}
               </button>
@@ -221,13 +187,13 @@ export function DocumentsPage() {
         <DocumentsSkeleton />
       ) : (
       <>
-      {crumb.length > 0 && (
+      {view === "folders" && crumb.length > 0 && (
         <button type="button" onClick={goUp} className="mb-2 inline-flex items-center gap-1 text-[13px] font-bold text-t1 sm:hidden">
           <Icon d={icons.arrowLeft} size={14} />
           Voltar
         </button>
       )}
-      {trail.length > 0 && (
+      {view === "folders" && trail.length > 0 && (
         <nav className="mb-4 flex flex-wrap items-center gap-1 text-[12.5px] text-t2" aria-label="Caminho">
           {trail.map((item, index) => (
             <span key={`${item.label}-${index}`} className="flex items-center gap-1">
@@ -242,23 +208,27 @@ export function DocumentsPage() {
         </nav>
       )}
       <Card className="flex w-full flex-col">
-        <CardTitle className="mb-4">{atFiles ? "Documentos" : "Pastas"}</CardTitle>
-        {atFiles ? (
-          visibleFiles.length === 0 ? (
-            <EmptyState framed={false} title={needle ? "Nenhum documento encontrado." : "Esta pasta ainda não tem documentos."} description={needle ? "Tente outro termo." : undefined} action={needle ? undefined : <Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>} />
+        <CardTitle className="mb-4">{showingDocuments ? "Documentos" : "Pastas"}</CardTitle>
+        {view === "documents" ? (
+          scopedDocuments.length === 0 ? (
+            <EmptyState framed={false} title="Nenhum documento neste filtro." description={peopleFilter === "inactive" ? "Não há documentos de pessoas desligadas." : undefined} />
           ) : (
-            <FileGrid rows={visibleFiles} people={people} busy={acting || resendingId != null} onDownload={(id) => void openFile(id, show)} onOpenSignatures={setSignaturesId} onMove={openMove} onDelete={setDeleteId} />
+            <DocumentTable rows={scopedDocuments} people={people} showPerson showStore={allStores} storeName={storeName} busy={acting || resendingId != null} onDownload={(id) => void openFile(id, show)} onOpenSignatures={setSignaturesId} onMove={openMove} onDelete={setDeleteId} />
           )
-        ) : visibleFolders.length === 0 ? (
-          atPeople ? (
-            <EmptyState framed={false} title={needle ? "Nenhuma pessoa encontrada" : peopleFilter === "inactive" ? "Nenhuma pessoa desligada" : "Nenhuma pessoa disponível"} description={needle ? "Tente outro nome, CPF ou e-mail." : peopleHere.length === 0 ? "Não há pessoas vinculadas a esta filial." : "Não há pessoas neste filtro."} />
-          ) : atBranches && needle ? (
-            <EmptyState framed={false} title="Nenhuma filial encontrada" description="Tente outro nome." />
+        ) : atFiles ? (
+          visibleFiles.length === 0 ? (
+            <EmptyState framed={false} title="Esta pasta ainda não tem documentos." action={<Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>} />
           ) : (
-            <EmptyState framed={false} title={needle ? "Nenhum documento encontrado." : "Esta pasta ainda não tem documentos."} description={needle ? "Tente outro termo." : undefined} action={needle ? undefined : <Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>} />
+            <DocumentTable rows={visibleFiles} people={people} showPerson={false} showStore={false} storeName={storeName} busy={acting || resendingId != null} onDownload={(id) => void openFile(id, show)} onOpenSignatures={setSignaturesId} onMove={openMove} onDelete={setDeleteId} />
+          )
+        ) : folders.length === 0 ? (
+          atPeople ? (
+            <EmptyState framed={false} title={peopleFilter === "inactive" ? "Nenhuma pessoa desligada" : "Nenhuma pessoa disponível"} description={peopleHere.length === 0 ? "Não há pessoas vinculadas a esta filial." : "Não há pessoas neste filtro."} />
+          ) : (
+            <EmptyState framed={false} title="Esta pasta ainda não tem documentos." action={<Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>} />
           )
         ) : (
-          <FolderGrid rows={visibleFolders} onOpen={openFolder} />
+          <FolderList rows={folders} onOpen={openFolder} />
         )}
       </Card>
       </>
@@ -483,9 +453,14 @@ function signersOf(doc: DocumentRow, people: PersonRow[]) {
   return [{ name, order: 1, recipientId: null, channel: null, status }];
 }
 
-function FolderGrid({ rows, onOpen }: { rows: FolderEntry[]; onOpen: (key: string) => void }) {
+function statusOrder(label: string) {
+  const index = STATUS_ORDER.indexOf(label);
+  return String(index < 0 ? STATUS_ORDER.length : index).padStart(2, "0");
+}
+
+function FolderList({ rows, onOpen }: { rows: FolderEntry[]; onOpen: (key: string) => void }) {
   return (
-    <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="flex flex-col gap-2">
       {rows.map((row) => (
         <button key={row.key} type="button" onClick={() => onOpen(row.key)} className="flex min-w-0 items-center gap-3 rounded-2xl border border-line bg-bg-2 p-4 text-left hover:border-line-2 hover:bg-bg-3">
           <span className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[11px] bg-acc-soft text-acc">
@@ -501,9 +476,12 @@ function FolderGrid({ rows, onOpen }: { rows: FolderEntry[]; onOpen: (key: strin
   );
 }
 
-function FileGrid({
+function DocumentTable({
   rows,
   people,
+  showPerson,
+  showStore,
+  storeName,
   busy,
   onDownload,
   onOpenSignatures,
@@ -512,39 +490,103 @@ function FileGrid({
 }: {
   rows: DocumentRow[];
   people: PersonRow[];
+  showPerson: boolean;
+  showStore: boolean;
+  storeName: Map<string, string>;
   busy: boolean;
   onDownload: (id: string) => void;
   onOpenSignatures: (id: string) => void;
   onMove: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
+  const columns: DataTableColumn<DocumentRow>[] = [
+    {
+      key: "document",
+      header: "Documento",
+      sortable: true,
+      sortValue: (row) => displayTitle(row.fileName),
+      render: (row) => (
+        <span className="flex min-w-0 items-center gap-2.5">
+          <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] bg-acc-soft text-acc">
+            <FileGlyph />
+          </span>
+          <span className="truncate text-[13px] font-bold text-t0">{displayTitle(row.fileName)}</span>
+        </span>
+      ),
+    },
+  ];
+  if (showPerson) {
+    columns.push({
+      key: "person",
+      header: "Pessoa",
+      sortable: true,
+      sortValue: (row) => findDocumentPerson(people, row)?.name ?? "",
+      render: (row) => <span className="text-[13px] text-t0">{findDocumentPerson(people, row)?.name ?? "Sem pessoa"}</span>,
+    });
+  }
+  if (showStore) {
+    columns.push({
+      key: "store",
+      header: "Filial",
+      hideBelow: "md",
+      sortable: true,
+      sortValue: (row) => (row.storeId ? storeName.get(row.storeId) ?? "" : ""),
+      render: (row) => <span className="text-[13px] text-t1">{row.storeId ? storeName.get(row.storeId) ?? "—" : "—"}</span>,
+    });
+  }
+  columns.push(
+    {
+      key: "signatures",
+      header: "Assinaturas",
+      sortable: true,
+      sortValue: (row) => {
+        const fraction = signerFraction(signersOf(row, people));
+        if (!row.envelopeId || isFiledStatus(row.status) || !fraction || fraction.total === 0) return null;
+        return fraction.done / fraction.total;
+      },
+      render: (row) => <SignatureCount row={row} people={people} onOpen={onOpenSignatures} />,
+    },
+    {
+      key: "status",
+      header: "Status",
+      sortable: true,
+      sortValue: (row) => statusOrder(partialEnvelopeLabel(row.status, signersOf(row, people)) ?? STATUS_LABEL[row.status]),
+      render: (row) => <DocumentStatus row={row} people={people} />,
+    },
+    {
+      key: "sent",
+      header: "Enviado em",
+      hideBelow: "sm",
+      sortable: true,
+      sortValue: (row) => {
+        const time = new Date(row.sentAt ?? row.createdAt).getTime();
+        return Number.isNaN(time) ? null : time;
+      },
+      render: (row) => <span className="text-[12.5px] text-t2">{formatDay(row.sentAt ?? row.createdAt)}</span>,
+    },
+    {
+      key: "actions",
+      header: "",
+      align: "right",
+      width: "52px",
+      render: (row) =>
+        pendingMenu(row) || isFiledStatus(row.status) || row.envelopeId ? (
+          <RowMenu kind={isFiledStatus(row.status) ? "filed" : "pending"} busy={busy} onDownload={() => onDownload(row.id)} onSignatures={() => onOpenSignatures(row.id)} onMove={() => onMove(row.id)} onDelete={() => onDelete(row.id)} />
+        ) : (
+          <Button size="sm" variant="outline" onClick={() => onDownload(row.id)}>Baixar PDF</Button>
+        ),
+    },
+  );
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-      {rows.map((row) => (
-        <div key={row.id} className="rounded-2xl border border-line bg-bg-2 p-4">
-          <div className="flex items-start justify-between gap-2">
-            <span className="flex min-w-0 items-center gap-2.5">
-              <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] bg-acc-soft text-acc">
-                <FileGlyph />
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-[13px] font-bold text-t0">{displayTitle(row.fileName)}</span>
-                <span className="mt-0.5 block text-[11.5px] text-t2">{formatDay(row.sentAt ?? row.createdAt)}</span>
-              </span>
-            </span>
-            {pendingMenu(row) || isFiledStatus(row.status) || row.envelopeId ? (
-              <RowMenu kind={isFiledStatus(row.status) ? "filed" : "pending"} busy={busy} onDownload={() => onDownload(row.id)} onSignatures={() => onOpenSignatures(row.id)} onMove={() => onMove(row.id)} onDelete={() => onDelete(row.id)} />
-            ) : (
-              <Button size="sm" variant="outline" onClick={() => onDownload(row.id)}>Baixar PDF</Button>
-            )}
-          </div>
-          <div className="mt-3 flex items-center justify-between gap-2">
-            <DocumentStatus row={row} people={people} />
-            <SignatureCount row={row} people={people} onOpen={onOpenSignatures} />
-          </div>
-        </div>
-      ))}
-    </div>
+    <DataTable
+      columns={columns}
+      data={rows}
+      rowKey={(row) => row.id}
+      defaultSortKey="status"
+      defaultSortDir="asc"
+      paginate="documentos"
+      className="!rounded-none !border-0 !bg-transparent shadow-none"
+    />
   );
 }
 
