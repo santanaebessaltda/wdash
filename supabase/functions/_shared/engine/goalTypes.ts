@@ -158,10 +158,7 @@ export type SalesDayAgg = {
   /** Distinct COD_OPERACAO count. */
   salesCount: number;
   itemCount: number;
-  /**
-   * CMV em centavos (RELATORIOMARGEM  CUSTO_TOTAL). brand=ALL na v1.
-   * TODO(Configuracoes>Custos): x (1 + imposto_sobre_custo_pct).
-   */
+  /** CMV em centavos (RELATORIOMARGEM CUSTO_TOTAL). brand=ALL na v1. */
   cmvCents?: number;
 };
 

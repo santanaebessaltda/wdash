@@ -145,7 +145,7 @@ export function useProductDetail({
     setPilha([]);
   }, [scope]);
 
-  // Custos/impostos das lojas chegam depois do 1 render  ->  recalcula.
+  // Custos das lojas chegam depois do 1 render  ->  recalcula.
   const [storesTick, setStoresTick] = useState(0);
   useEffect(() => {
     const onStores = () => setStoresTick((n) => n + 1);

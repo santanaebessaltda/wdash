@@ -20,7 +20,6 @@ import { dayAggregate, salesDay, salesDays, storeOpen, dayWeight, sumAggregates,
 import { brl, brlCent, fullDate, shortDate, dayAxisLabel, dayPointDetail, isoToDate, delta as fmtDelta, hourSpan, endOfMonth, shortHour, startOfMonth, eachDay, labelUpper, monthYear, shortMonth, pct, addDays } from "@/lib/format";
 import type { TintKey } from "@/pages/dashboards/icons";
 import { buildStoreInsight } from "./insight";
-import { brandFromProductCode } from "./costTableFill";
 
 /** Linhas dos cards de ranking na tela Produtos: Top produtos e Top linhas. */
 export const TOP_CARD_SIZE = 10;
@@ -164,12 +163,12 @@ export interface StoreSummaryView {
 const DAYS_WEEK = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
 const TIP_CMV = "Custo das mercadorias vendidas no período.";
 const TIP_CMV_INDISPONIVEL = "O CMV não está disponível para este período.";
-const TIP_PROFIT_GROSS = "Valor que permanece após descontar do faturamento o CMV e os impostos considerados pela operação.";
-const TIP_MARGIN = "Percentual do faturamento que permanece como lucro bruto após CMV e impostos.";
+const TIP_PROFIT_GROSS = "Valor que permanece após descontar o CMV do faturamento.";
+const TIP_MARGIN = "Percentual do faturamento que permanece como lucro bruto após o CMV.";
 const TIP_CMV_WPINK = "Custo das mercadorias WPINK vendidas no período.";
 const TIP_CMV_WPINK_INDISPONIVEL = "O CMV WPINK não está disponível para este período.";
-const TIP_PROFIT_GROSS_WPINK = "Valor que permanece do faturamento WPINK após descontar CMV e impostos.";
-const TIP_MARGIN_WPINK = "Percentual do faturamento WPINK que permanece como lucro bruto após CMV e impostos.";
+const TIP_PROFIT_GROSS_WPINK = "Valor que permanece do faturamento WPINK após descontar o CMV.";
+const TIP_MARGIN_WPINK = "Percentual do faturamento WPINK que permanece como lucro bruto após o CMV.";
 const DAY_WEEK_PAST = [
   "o domingo passado",
   "a segunda-feira passada",
@@ -2017,7 +2016,7 @@ type FinMonthly = {
   /** Quanto falta para o % chegar no minimo: max(0, minimo  aluguel %), por loja no periodo. */
   rentMin: number;
 };
-type FinLine = FinMoney & FinCosts & FinMonthly & { icms: number; icmsSt: number };
+type FinLine = FinMoney & FinCosts & FinMonthly;
 
 const FIN_ZERO: FinMoney = { rev: 0, cmv: 0, sales: 0, items: 0 };
 const FIN_LINE_ZERO: FinLine = {
@@ -2032,13 +2031,11 @@ const FIN_LINE_ZERO: FinLine = {
   others: 0,
   rentMinBase: 0,
   rentMin: 0,
-  icms: 0,
-  icmsSt: 0,
 };
 
-/** Lucro bruto = Faturamento  CMV  impostos (ICMS sobre o faturamento, ICMS ST sobre o CMV). */
+/** Lucro bruto = faturamento − CMV. */
 function finProfit(l: FinLine): number {
-  return l.rev - l.cmv - l.icms - l.icmsSt;
+  return l.rev - l.cmv;
 }
 
 function finAdd<T extends Record<string, number>>(a: T, b: T): T {
@@ -2075,21 +2072,7 @@ function storeCostRates(f: Store) {
     royaltiesWpinkPct: c?.royaltiesWpinkPct ?? 0,
     mktWepinkPct: c?.marketingWepinkPct ?? 0,
     mktWpinkPct: c?.marketingWpinkPct ?? 0,
-    icmsWepinkPct: f.costs?.icmsWepinkPct ?? 0,
-    icmsWpinkPct: f.costs?.icmsWpinkPct ?? 0,
-    icmsStWepinkPct: f.costs?.icmsStWepinkPct ?? 0,
-    icmsStWpinkPct: f.costs?.icmsStWpinkPct ?? 0,
   };
-}
-
-function productTaxAmount(
-  taxa: { icmsWepinkPct: number; icmsWpinkPct: number; icmsStWepinkPct: number; icmsStWpinkPct: number },
-  code: string,
-  revenue: number,
-  cmv: number,
-): number {
-  const wpink = brandFromProductCode(code) === "WPINK";
-  return (revenue * (wpink ? taxa.icmsWpinkPct : taxa.icmsWepinkPct) + cmv * (wpink ? taxa.icmsStWpinkPct : taxa.icmsStWepinkPct)) / 100;
 }
 
 /** Financeiro a partir dos agregados do sync (sem fixture). Custos % por marca; aluguel fixo rateado por dia/hora. */
@@ -2134,8 +2117,6 @@ export function buildFinanceViewFromAggs(scope: Scope, input: FinanceAggInput): 
     const c = storeCostRates(f);
     const w = incluiWepink ? wepink.rev : 0;
     const p = incluiWpink ? wpink.rev : 0;
-    const cmvW = incluiWepink ? wepink.cmv : 0;
-    const cmvP = incluiWpink ? wpink.cmv : 0;
     const daysMonth = daysInMonth(iso.slice(0, 7));
     const rentPct = (w * c.rentWepinkPct + p * c.rentWpinkPct) / 100;
     const rentMinBase = c.rentMin / daysMonth;
@@ -2151,8 +2132,6 @@ export function buildFinanceViewFromAggs(scope: Scope, input: FinanceAggInput): 
       others: 0,
       rentMinBase,
       rentMin: Math.max(0, rentMinBase - rentPct),
-      icms: (w * c.icmsWepinkPct + p * c.icmsWpinkPct) / 100,
-      icmsSt: (cmvW * c.icmsStWepinkPct + cmvP * c.icmsStWpinkPct) / 100,
     };
   }
 
@@ -2248,7 +2227,6 @@ export function buildFinanceViewFromAggs(scope: Scope, input: FinanceAggInput): 
   const prevLine = previous ?? FIN_LINE_ZERO;
 
   const profitCurrent = finProfit(current);
-  const taxesCurrent = current.icms + current.icmsSt;
   const marginCurrent = divSeguro(profitCurrent, current.rev) * 100;
   const hasCmv = current.cmv > 0;
   // CMV nao existe por hora: terminando hoje, CMV/lucro/margem/resultado comparam sem o dia de hoje nos dois lados.
@@ -2278,7 +2256,6 @@ export function buildFinanceViewFromAggs(scope: Scope, input: FinanceAggInput): 
     {
       label: "Lucro bruto",
       value: hasCmv ? brlCent(profitCurrent) : "—",
-      sub: hasCmv && taxesCurrent > 0 ? `Impostos: ${brlCent(taxesCurrent)}` : undefined,
       delta: cmvComparavel ? kpiDelta(profitCurrentCmp, profitPreviousCmp, vsCmv) : undefined,
       tooltip: TIP_PROFIT_GROSS,
     },
@@ -2325,8 +2302,6 @@ export function buildFinanceViewFromAggs(scope: Scope, input: FinanceAggInput): 
           mktWepink: m.rev * day.mktWepink * costRatio,
           mktWpink: m.rev * day.mktWpink * costRatio,
           variaveis: m.rev * day.variaveis * costRatio,
-          icms: m.rev * day.icms * costRatio,
-          icmsSt: m.rev * day.icmsSt * costRatio,
         }));
       }
     }
@@ -2789,15 +2764,6 @@ export function buildProductsView(scope: Scope, input: ProductsAggInput = { dayA
   }
   const salesMargin = productDaySaleMap((input.productCostDayAggs ?? []).filter((r) => storeById.has(r.storeId)));
   const salesUsed = new Set<string>();
-  const storeCosts = new Map<string, ReturnType<typeof storeCostRates>>();
-  const storeCost = (storeId: string) => {
-    let c = storeCosts.get(storeId);
-    if (!c) {
-      c = storeCostRates(storeById.get(storeId)!);
-      storeCosts.set(storeId, c);
-    }
-    return c;
-  };
 
   type ProdAcc = {
     name: string;
@@ -2805,7 +2771,6 @@ export function buildProductsView(scope: Scope, input: ProductsAggInput = { dayA
     revenue: number;
     items: number;
     cmv: number;
-    taxes: number;
     withoutCost: boolean;
     revenueCmp: number;
     revenuePrev: number;
@@ -2822,7 +2787,6 @@ export function buildProductsView(scope: Scope, input: ProductsAggInput = { dayA
       revenue: 0,
       items: 0,
       cmv: 0,
-      taxes: 0,
       withoutCost: false,
       revenueCmp: 0,
       revenuePrev: 0,
@@ -2839,8 +2803,6 @@ export function buildProductsView(scope: Scope, input: ProductsAggInput = { dayA
     if (inCurrent(r.day)) {
       acc.revenue += v;
       acc.items += r.itemCount;
-      const taxa = storeCost(r.storeId);
-      acc.taxes += productTaxAmount(taxa, code, v, 0);
       if (v > 0) {
         const k = costKey(r.storeId, r.day, code);
         const cmv = code ? costs.get(k) : undefined;
@@ -2848,7 +2810,6 @@ export function buildProductsView(scope: Scope, input: ProductsAggInput = { dayA
         else if (!costsUsed.has(k)) {
           costsUsed.add(k);
           acc.cmv += cmv;
-          acc.taxes += productTaxAmount(taxa, code, 0, cmv);
         }
       }
     }
@@ -2862,7 +2823,7 @@ export function buildProductsView(scope: Scope, input: ProductsAggInput = { dayA
     .filter(([, p]) => p.revenue > 0)
     .map(([key, p]) => {
       const cmv = p.withoutCost ? null : p.cmv;
-      const profit = cmv == null ? null : p.revenue - cmv - p.taxes;
+      const profit = cmv == null ? null : p.revenue - cmv;
       return {
         rowKey: key,
         code: key.startsWith("#") ? "" : key,
@@ -2925,7 +2886,7 @@ export function buildProductsView(scope: Scope, input: ProductsAggInput = { dayA
       acc.products += 1;
       acc.kinds.set(l.kind, (acc.kinds.get(l.kind) ?? 0) + p.revenue);
       if (p.withoutCost) acc.withoutCost = true;
-      else acc.profit += p.revenue - p.cmv - p.taxes;
+      else acc.profit += p.revenue - p.cmv;
     }
     lineAcc.set(l.line, acc);
   }
@@ -3040,7 +3001,7 @@ type ItemsDetail = Omit<ProductDetail, "kind" | "rowKey" | "code" | "name" | "pa
 /** Mesma chave do `buildProductsView`: `COD_PRODUTO` ou `#productId`. */
 const productRowKey = (r: { productCode: string; productId: number }) => r.productCode.trim() || `#${r.productId}`;
 
-/** Detalhe de um conjunto de produtos  -  mesmas regras de custo/impostos do `buildProductsView`. */
+/** Detalhe de um conjunto de produtos — mesmas regras de custo do `buildProductsView`. */
 function buildItemsDetail(
   scope: Scope,
   input: ProductsAggInput,
@@ -3074,21 +3035,11 @@ function buildItemsDetail(
   const salesMargin = productDaySaleMap(
     (input.productCostDayAggs ?? []).filter((r) => storeById.has(r.storeId) && rowKeys.has(r.productCode.trim())),
   );
-  const taxas = new Map<string, ReturnType<typeof storeCostRates>>();
-  const storeRate = (storeId: string) => {
-    let t = taxas.get(storeId);
-    if (!t) {
-      t = storeCostRates(storeById.get(storeId)!);
-      taxas.set(storeId, t);
-    }
-    return t;
-  };
 
   const acumular = (no: (d: string) => boolean, rowKey?: string) => {
     let revenue = 0;
     let items = 0;
     let cmv = 0;
-    let taxes = 0;
     let withoutCost = false;
     const used = new Set<string>();
     const salesUsed = new Set<string>();
@@ -3098,9 +3049,7 @@ function buildItemsDetail(
       if (v == null) continue;
       revenue += v;
       items += r.itemCount;
-      const taxa = storeRate(r.storeId);
       const code = r.productCode.trim();
-      taxes += productTaxAmount(taxa, code, v, 0);
       if (v > 0) {
         const k = costKey(r.storeId, r.day, code);
         const c = code ? costs.get(k) : undefined;
@@ -3108,11 +3057,10 @@ function buildItemsDetail(
         else if (!used.has(k)) {
           used.add(k);
           cmv += c;
-          taxes += productTaxAmount(taxa, code, 0, c);
         }
       }
     }
-    const profit = withoutCost ? null : revenue - cmv - taxes;
+    const profit = withoutCost ? null : revenue - cmv;
     return {
       revenue,
       items,
@@ -3983,8 +3931,7 @@ function wpinkRows<R extends import("./salesTypes").SalesDayAgg>(
 }
 
 /** Totais WPINK; `null` = dado incompleto em algum dia com venda WPINK (nada e estimado). */
-/** `impostos` = ICMS (faturamento) + ICMS ST (CMV) das lojas; 0 sem configuracao. */
-type WpinkTotals = { revenue: number; cmv: number | null; sales: number | null; items: number | null; taxes: number };
+type WpinkTotals = { revenue: number; cmv: number | null; sales: number | null; items: number | null };
 
 type WpinkScope = { has(storeId: string): boolean; get?(storeId: string): Store | undefined };
 
@@ -3997,25 +3944,19 @@ function wpinkTotals(
 ): WpinkTotals {
   const w = wpinkRows(rows.filter((d) => inScope.has(d.storeId) && d.day >= from && d.day <= to), costDays);
   const s = w.rows.reduce(
-    (acc, d) => {
-      const c = inScope.get?.(d.storeId)?.costs;
-      const cmv = d.cmvCents ?? 0;
-      return {
-        rev: acc.rev + d.revenueCents,
-        cmv: acc.cmv + cmv,
-        sales: acc.sales + d.salesCount,
-        items: acc.items + d.itemCount,
-        tax: acc.tax + (d.revenueCents * (c?.icmsWpinkPct ?? 0) + cmv * (c?.icmsStWpinkPct ?? 0)) / 100,
-      };
-    },
-    { rev: 0, cmv: 0, sales: 0, items: 0, tax: 0 },
+    (acc, d) => ({
+      rev: acc.rev + d.revenueCents,
+      cmv: acc.cmv + (d.cmvCents ?? 0),
+      sales: acc.sales + d.salesCount,
+      items: acc.items + d.itemCount,
+    }),
+    { rev: 0, cmv: 0, sales: 0, items: 0 },
   );
   return {
     revenue: s.rev / 100,
     cmv: w.cmvIncomplete ? null : s.cmv / 100,
     sales: w.salesIncomplete ? null : s.sales,
     items: w.salesIncomplete ? null : s.items,
-    taxes: s.tax / 100,
   };
 }
 
@@ -4047,7 +3988,6 @@ function wpinkPrevTotals(
     cmv: null,
     sales: cheios.sales == null ? null : cheios.sales + salesHour,
     items: cheios.items == null ? null : cheios.items + itemsHour,
-    taxes: 0,
   };
 }
 
@@ -4066,14 +4006,14 @@ function buildFinanceWpinkKpis(p: {
   const hasComp = previous != null && previous.revenue > 0 && current.revenue > 0;
   const vs = hasComp ? p.vsLabel : undefined;
   const cmv = current.cmv != null && current.revenue > 0 ? current.cmv : null;
-  const profit = cmv != null ? current.revenue - cmv - current.taxes : 0;
+  const profit = cmv != null ? current.revenue - cmv : 0;
   const margin = divSeguro(profit, current.revenue) * 100;
   const c = p.cmvCompare;
   const cmvA = c.current.cmv != null && c.current.cmv > 0 && c.current.revenue > 0 ? c.current.cmv : null;
   const cmvB = c.previous.cmv != null && c.previous.cmv > 0 && c.previous.revenue > 0 ? c.previous.cmv : null;
   const cmvComp = hasComp && cmv != null && cmvA != null && cmvB != null;
-  const profitA = cmvA != null ? c.current.revenue - cmvA - c.current.taxes : 0;
-  const profitB = cmvB != null ? c.previous.revenue - cmvB - c.previous.taxes : 0;
+  const profitA = cmvA != null ? c.current.revenue - cmvA : 0;
+  const profitB = cmvB != null ? c.previous.revenue - cmvB : 0;
   const marginA = divSeguro(profitA, c.current.revenue) * 100;
   const marginB = divSeguro(profitB, c.previous.revenue) * 100;
   return [
@@ -4095,7 +4035,6 @@ function buildFinanceWpinkKpis(p: {
     {
       label: "Lucro bruto WPINK",
       amount: cmv != null ? brlCent(profit) : "—",
-      sub: cmv != null && current.taxes > 0 ? `Impostos: ${brlCent(current.taxes)}` : undefined,
       tooltip: TIP_PROFIT_GROSS_WPINK,
       tint: "ok",
       delta: cmvComp ? kpiDelta(profitA, profitB, c.vsLabel) : undefined,
@@ -4773,7 +4712,7 @@ export function buildOverviewViewFromAggs(scope: Scope, input: OverviewAggInput)
     });
 
   // Top produtos  -  agrupado por `COD_PRODUTO` (igual a tela Produtos); variacao vs periodo anterior.
-  // Lucro bruto = faturamento  CMV (RELATORIOMARGEM)  ICMS  ICMS ST da loja; sem custo num dia = null.
+  // Lucro bruto = faturamento − CMV (RELATORIOMARGEM). Sem custo num dia = null.
   const prevPeriod = previousPeriod(period);
   const storeById = new Map(fs.map((f) => [f.id, f]));
   const costKey = (storeId: string, day: string, code: string) => `${storeId}|${day}|${code}`;
@@ -4783,23 +4722,12 @@ export function buildOverviewViewFromAggs(scope: Scope, input: OverviewAggInput)
     const k = costKey(r.storeId, r.day, r.productCode.trim());
     costs.set(k, (costs.get(k) ?? 0) + r.cmvCents / 100);
   }
-  const taxas = new Map<string, ReturnType<typeof storeCostRates>>();
-  const storeRate = (storeId: string) => {
-    const f = storeById.get(storeId);
-    if (!f) return null;
-    let t = taxas.get(storeId);
-    if (!t) {
-      t = storeCostRates(f);
-      taxas.set(storeId, t);
-    }
-    return t;
-  };
   const costsUsed = new Set<string>();
   const salesMargin = productDaySaleMap(input.productCostDayAggs);
   const salesUsed = new Set<string>();
   const prodMap = new Map<
     string,
-    { name: string; code: string; revenue: number; items: number; cmv: number; taxes: number; withoutCost: boolean }
+    { name: string; code: string; revenue: number; items: number; cmv: number; withoutCost: boolean }
   >();
   const prodMapPrev = new Map<string, number>();
   for (const row of input.productDayAggs ?? []) {
@@ -4808,25 +4736,20 @@ export function buildOverviewViewFromAggs(scope: Scope, input: OverviewAggInput)
     const v = productDaySaleBrl(row, salesMargin, salesUsed);
     if (v == null) continue;
     if (row.day >= period.start && row.day <= period.end) {
-      const acc = prodMap.get(key) ?? { name: row.productName, code: "", revenue: 0, items: 0, cmv: 0, taxes: 0, withoutCost: false };
+      const acc = prodMap.get(key) ?? { name: row.productName, code: "", revenue: 0, items: 0, cmv: 0, withoutCost: false };
       acc.revenue += v;
       acc.items += row.itemCount;
       if (row.productName) acc.name = row.productName;
       const code = row.productCode?.trim() ?? "";
       if (code) acc.code = code;
-      const taxa = storeRate(row.storeId);
-      if (!taxa) acc.withoutCost = true;
-      else {
-        acc.taxes += productTaxAmount(taxa, code, v, 0);
-        if (v > 0) {
-          const k = costKey(row.storeId, row.day, code);
-          const cmv = code ? costs.get(k) : undefined;
-          if (cmv == null) acc.withoutCost = true;
-          else if (!costsUsed.has(k)) {
-            costsUsed.add(k);
-            acc.cmv += cmv;
-            acc.taxes += productTaxAmount(taxa, code, 0, cmv);
-          }
+      if (!storeById.has(row.storeId)) acc.withoutCost = true;
+      else if (v > 0) {
+        const k = costKey(row.storeId, row.day, code);
+        const cmv = code ? costs.get(k) : undefined;
+        if (cmv == null) acc.withoutCost = true;
+        else if (!costsUsed.has(k)) {
+          costsUsed.add(k);
+          acc.cmv += cmv;
         }
       }
       prodMap.set(key, acc);
@@ -4846,7 +4769,7 @@ export function buildOverviewViewFromAggs(scope: Scope, input: OverviewAggInput)
         sub: `${p.items} itens`,
         items: p.items,
         trend: trendPct,
-        profit: p.withoutCost ? null : p.revenue - p.cmv - p.taxes,
+        profit: p.withoutCost ? null : p.revenue - p.cmv,
       };
     });
 

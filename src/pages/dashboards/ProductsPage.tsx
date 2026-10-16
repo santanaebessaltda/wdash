@@ -128,7 +128,7 @@ export default function ProductsPage() {
   const [page, setPage] = useState(1);
   const printing = usePrintMode();
   const exportValue = useExportPdf("Produtos");
-  // Catalogo de lojas (custos/impostos) hidratado depois do 1 render  ->  recalcula.
+  // Catalogo de lojas (custos) hidratado depois do 1 render  ->  recalcula.
   const [storesTick, setStoresTick] = useState(0);
   useEffect(() => {
     const onStores = () => setStoresTick((n) => n + 1);

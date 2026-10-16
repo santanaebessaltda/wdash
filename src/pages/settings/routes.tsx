@@ -15,7 +15,6 @@ const SystemUsersPage = lazyPage(() => import("./SystemUsersPage"), "SystemUsers
 const MyProfilePage = lazyPage(() => import("./MyProfilePage"), "MyProfilePage");
 const NotificationsPage = lazyPage(() => import("./NotificationsPage"), "NotificationsPage");
 const BranchPage = lazyPage(() => import("../operation/BranchPage"), "BranchPage");
-const ProductsTaxesPage = lazyPage(() => import("../operation/ProductsTaxesPage"), "ProductsTaxesPage");
 const AcquirersPage = lazyPage(() => import("../cash-close/AcquirersPage"), "AcquirersPage");
 const ShoppingSettingsPage = lazyPage(() => import("../operation/ShoppingPage"), "ShoppingSettingsPage");
 /**
@@ -47,7 +46,7 @@ export const settingsRoutes: RouteObject[] = [
     element: <RequireRole roles={OWNER_ROLES} />,
     children: [
       { path: paths.operation.branch, element: <BranchPage /> },
-      { path: paths.operation.productsTaxes, element: <ProductsTaxesPage /> },
+      { path: paths.operation.productsTaxes, element: <Navigate to={paths.operation.branch} replace /> },
       { path: paths.operation.acquirers, element: <AcquirersPage /> },
       { path: paths.operation.shopping, element: <ShoppingSettingsPage /> },
     ],

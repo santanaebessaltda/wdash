@@ -1,9 +1,9 @@
 /**
  * Estoque (saldo por local, transferencia, em falta) e Tabelas de venda (custo, despesas sobre a venda e lucro por peca), por loja.
- * Custo de aquisicao = custo da tabela de custo da loja + ICMS ST (% do custo).
- * Despesas sobre a venda = ICMS + royalties + taxa de marketing (da marca do produto) + aluguel percentual
- * (so Shopping)  -  todas em % do preco. Lucro por peca = preco  despesas  custo de aquisicao.
- * Preco minimo = custo de aquisicao  (1  %): o menor preco que nao da prejuizo.
+ * Custo de aquisicao = custo da tabela de custo da loja.
+ * Despesas sobre a venda = royalties + taxa de marketing (da marca do produto) + aluguel percentual
+ * (so Shopping), todas em % do preco. Lucro por peca = preco − despesas − custo de aquisicao.
+ * Preco minimo = custo de aquisicao ÷ (1 − %): o menor preco que nao da prejuizo.
  */
 import type { Store } from "./stores";
 
@@ -32,13 +32,10 @@ export type CostLine = { label: string; pct: number; amount: number };
 export type PriceComposition = {
   price: number | null;
   cost: number | null;
-  icmsStPct: number;
-  icmsSt: number | null;
   costAquisicao: number | null;
   /** Despesas sobre a venda (so as > 0%); valor = % x preco. */
   despesas: CostLine[];
   pctTotal: number;
-  taxes: number | null;
   franchiseRent: number | null;
   costTotal: number | null;
   profit: number | null;
@@ -57,7 +54,6 @@ export function saleCostPcts(store: Store, code: string): CostLine[] {
   const wpink = productBrand(code) === "WPINK";
   const rent = store.pointType === "SHOPPING" ? (c?.rentWepinkPct ?? c?.rentWpinkPct ?? 0) : 0;
   const lines: CostLine[] = [
-    { label: "ICMS", pct: (wpink ? c?.icmsWpinkPct : c?.icmsWepinkPct) ?? 0, amount: 0 },
     { label: "Royalties", pct: (wpink ? c?.royaltiesWpinkPct : c?.royaltiesWepinkPct) ?? 0, amount: 0 },
     { label: "Taxa de marketing", pct: (wpink ? c?.marketingWpinkPct : c?.marketingWepinkPct) ?? 0, amount: 0 },
     { label: "Aluguel percentual", pct: rent, amount: 0 },
@@ -68,27 +64,19 @@ export function saleCostPcts(store: Store, code: string): CostLine[] {
 export function composePrice(store: Store, code: string, priceCents: number | null, costCents: number | null): PriceComposition {
   const price = priceCents == null ? null : priceCents / 100;
   const cost = costCents == null ? null : costCents / 100;
-  const wpink = productBrand(code) === "WPINK";
-  const icmsStPct = (wpink ? store.costs?.icmsStWpinkPct : store.costs?.icmsStWepinkPct) ?? 0;
-  const icmsSt = cost == null ? null : (cost * icmsStPct) / 100;
-  const costAquisicao = cost == null ? null : cost + (icmsSt ?? 0);
+  const costAquisicao = cost;
   const pcts = saleCostPcts(store, code);
   const pctTotal = pcts.reduce((s, l) => s + l.pct, 0);
   const despesas = pcts.map((l) => ({ ...l, amount: price == null ? 0 : (price * l.pct) / 100 }));
-  const icms = despesas.find((l) => l.label === "ICMS")?.amount ?? 0;
-  const franchiseRent = price == null ? null : despesas.filter((l) => l.label !== "ICMS").reduce((s, l) => s + l.amount, 0);
-  const taxes = cost == null ? null : (icmsSt ?? 0) + (price == null ? 0 : icms);
-  const costTotal = costAquisicao == null || price == null ? null : costAquisicao + icms + (franchiseRent ?? 0);
+  const franchiseRent = price == null ? null : despesas.reduce((s, l) => s + l.amount, 0);
+  const costTotal = costAquisicao == null || price == null ? null : costAquisicao + (franchiseRent ?? 0);
   const profit = costTotal == null || price == null ? null : price - costTotal;
   return {
     price,
     cost,
-    icmsStPct,
-    icmsSt,
     costAquisicao,
     despesas,
     pctTotal,
-    taxes,
     franchiseRent,
     costTotal,
     profit,
@@ -159,7 +147,6 @@ export type StockProductRow = {
   /** Pecas a transferir entre locais de estoque, somando as lojas do filtro. */
   transfer: number;
   cost: number | null;
-  taxes: number | null;
   franchiseRent: number | null;
   costTotal: number | null;
   price: number | null;
@@ -322,7 +309,6 @@ export function buildStockProductsView(input: StockInput): StockProductsView {
       totalGeral: aReceive == null ? null : stock + aReceive,
       transfer: storeRows.reduce((s, l) => s + l.transferencias.reduce((t, x) => t + x.qty, 0), 0),
       cost: pick((c) => c.cost),
-      taxes: pick((c) => c.taxes),
       franchiseRent: pick((c) => c.franchiseRent),
       costTotal: pick((c) => c.costTotal),
       price: priceCents == null ? null : priceCents / 100,

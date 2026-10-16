@@ -779,7 +779,7 @@ async function saveProductCosts(
   }
 }
 
-/** CMV via RELATORIOMARGEM  -  1 chamada por dia (imposto% = 0). Soft-fail. */
+/** CMV via RELATORIOMARGEM — 1 chamada por dia. Soft-fail. */
 async function syncCmvForRange(
   deps: SyncJobDeps,
   args: {

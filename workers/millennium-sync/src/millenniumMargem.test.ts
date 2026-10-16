@@ -55,7 +55,7 @@ describe("parseRelatorioMargemPayload", () => {
     expect(lines[1].custoTotal).toBe(20);
   });
 
-  it("sums CMV cents from CUSTO_TOTAL (imposto 0)", () => {
+  it("sums CMV cents from CUSTO_TOTAL", () => {
     const lines = parseRelatorioMargemPayload([
       { COD_PRODUTO: "a", QTDE_VENDIDA: 1, CUSTO_FRANQUIAS: 10, CUSTO_TOTAL: 10 },
       { COD_PRODUTO: "b", QTDE_VENDIDA: 2, CUSTO_FRANQUIAS: 5.5, CUSTO_TOTAL: 11 },

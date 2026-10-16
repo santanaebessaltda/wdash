@@ -1,7 +1,8 @@
-import { useState } from "react";
-import { Card, Segmented, useToast } from "@/components/ui";
+import { useEffect, useState } from "react";
+import { Card, FormField, Segmented, Select, useToast } from "@/components/ui";
 import { StoreCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
-import { updateStoreCosts, updateStorePointType, type PointType, type Store } from "@/data/wedash/stores";
+import { fetchCostTables, updateStoreCostTable, updateStoreCosts, updateStorePointType, type CostTable, type PointType, type Store } from "@/data/wedash/stores";
+import { syncProductsNow } from "@/data/wedash/productCatalog";
 import { CostFieldsCard, INVALID_COSTS_MSG, pctField, useCostFields, type CostField, type CostFieldSection } from "./costFields";
 import { StoreHoursCard } from "./StoreSchedule";
 import { CostCardTitle, FormActions, NumberField, SAVE_ERROR_MSG, StoreCardsPage, parseNum, useScopedStores } from "./shared";
@@ -73,25 +74,62 @@ function franchiseSections(store: Store): CostFieldSection[] {
   ];
 }
 
-/** Configurações > Filial. Tipo, funcionamento, franquia e aluguel da unidade. */
+/** Configurações. Tipo, funcionamento, custos e tabela de custo da filial. */
 export function BranchPage() {
   const { storeRows, loading, refresh } = useScopedStores();
+  const [tables, setTables] = useState<CostTable[]>([]);
+  const [tablesLoading, setTablesLoading] = useState(true);
+  const [tablesError, setTablesError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchCostTables().then((list) => {
+      if (cancelled) return;
+      setTablesError(list == null);
+      setTables(list ?? []);
+      setTablesLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <StoreCardsPage
       section="Configurações"
-      title="Filial"
-      subtitle="Configure o tipo, o funcionamento e os custos desta filial."
+      title="Configurações"
+      subtitle="Configure o tipo, o funcionamento, os custos e a tabela de custo desta filial."
       loading={loading}
-      skeleton={(n) => <StoreCardsSkeleton count={n} title schedule sections={2} />}
+      skeleton={(n) => <StoreCardsSkeleton count={n} title schedule sections={2} fields={1} />}
       storeRows={storeRows}
       oneStore
     >
-      {(store) => <BranchCards store={store} onSaved={refresh} />}
+      {(store) => (
+        <BranchCards
+          store={store}
+          tables={tables}
+          tablesLoading={tablesLoading}
+          tablesError={tablesError}
+          onSaved={refresh}
+        />
+      )}
     </StoreCardsPage>
   );
 }
 
-function BranchCards({ store, onSaved }: { store: Store; onSaved: () => void }) {
+function BranchCards({
+  store,
+  tables,
+  tablesLoading,
+  tablesError,
+  onSaved,
+}: {
+  store: Store;
+  tables: CostTable[];
+  tablesLoading: boolean;
+  tablesError: boolean;
+  onSaved: () => void;
+}) {
   const { show } = useToast();
   const [point, setPoint] = useState<PointType>(store.pointType);
   const [savingPoint, setSavingPoint] = useState(false);
@@ -152,7 +190,84 @@ function BranchCards({ store, onSaved }: { store: Store; onSaved: () => void }) 
         onSaved={onSaved}
       />
       <RentCard store={store} point={point} onSaved={onSaved} />
+      <CostTableCard store={store} tables={tables} tablesLoading={tablesLoading} tablesError={tablesError} onSaved={onSaved} />
     </div>
+  );
+}
+
+function CostTableCard({
+  store,
+  tables,
+  tablesLoading,
+  tablesError,
+  onSaved,
+}: {
+  store: Store;
+  tables: CostTable[];
+  tablesLoading: boolean;
+  tablesError: boolean;
+  onSaved: () => void;
+}) {
+  const { show } = useToast();
+  const [savedTable, setSavedTable] = useState<number | null>(store.costTableId ?? null);
+  const [table, setTable] = useState<number | null>(savedTable);
+  const [saving, setSaving] = useState(false);
+  const tableDirty = table !== savedTable;
+
+  /** Tabela nova busca os precos no Millennium antes; falhou = nada e gravado. */
+  async function save() {
+    setSaving(true);
+    if (table != null) {
+      const prices = await syncProductsNow({ scope: "table", tableId: table });
+      if (!prices.ok) {
+        setSaving(false);
+        return show(prices.message, "danger");
+      }
+    }
+    const r = await updateStoreCostTable(store.id, table);
+    setSaving(false);
+    if (!r.ok) return show(SAVE_ERROR_MSG, "danger");
+    setSavedTable(table);
+    onSaved();
+    show("Alterações salvas.", "success");
+  }
+
+  return (
+    <Card>
+      <CostCardTitle title="Custo dos produtos" />
+      <form
+        className="flex flex-col gap-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void save();
+        }}
+      >
+        <FormField
+          label="Tabela de custo dos produtos"
+          hint="Usada quando um produto vendido chega do Millennium sem custo. Enquanto nenhuma tabela for escolhida manualmente, a WDash seleciona automaticamente a que mais se aproxima dos custos da filial."
+        >
+          <Select
+            value={tablesLoading || table == null ? "" : String(table)}
+            disabled={tablesLoading}
+            onChange={(e) => setTable(e.target.value ? Number(e.target.value) : null)}
+          >
+            <option value="">{tablesLoading ? "Buscando tabelas no Millennium…" : "Nenhuma tabela"}</option>
+            {!tablesLoading && table != null && !tables.some((t) => t.id === table) && (
+              <option value={String(table)}>Tabela {table} · indisponível</option>
+            )}
+            {tables.map((t) => (
+              <option key={t.id} value={String(t.id)}>
+                {`Tabela ${t.code || t.id}`}
+              </option>
+            ))}
+          </Select>
+        </FormField>
+        {tablesError && (
+          <p className="text-[12.5px] font-semibold text-bad">Não foi possível buscar as tabelas de custo. Tente novamente.</p>
+        )}
+        <FormActions dirty={tableDirty} saving={saving} onReset={() => setTable(savedTable)} />
+      </form>
+    </Card>
   );
 }
 

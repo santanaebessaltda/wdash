@@ -4,9 +4,8 @@
  * ERP UI / path: **FRANQUIAS > RELATORIOS > RELATORIOMARGEM**
  * API: MILLENIUM!FRANQUIAS.RELATORIOS.RELATORIOMARGEM
  *
- * CMV v1 =  CUSTO_TOTAL (= CUSTO_FRANQUIAS x QTDE_VENDIDA), imposto% = 0.
+ * CMV = CUSTO_TOTAL (= CUSTO_FRANQUIAS x QTDE_VENDIDA).
  * Marca = COD_PRODUTO WP*  ->  WPINK; senao WEPINK (TOTALVENDA). Substitui TOTAL VENDA POR DIA.
- * TODO(Configuracoes>Custos): aplicar imposto_sobre_custo_pct por loja.
  */
 import type { SalesDayAgg, SalesProductCostDayAgg } from "../../../src/data/wedash/salesTypes.ts";
 import { millenniumBaseUrl } from "./millenniumAuth.ts";
@@ -105,7 +104,7 @@ export function parseRelatorioMargemPayload(payload: unknown): MargemLine[] {
   return out;
 }
 
-/** Soma CMV do periodo em centavos (imposto% = 0 nesta versao). */
+/** Soma CMV do periodo em centavos (CUSTO_TOTAL). */
 export function cmvCentsFromMargemLines(lines: MargemLine[]): number {
   let reais = 0;
   for (const line of lines) {

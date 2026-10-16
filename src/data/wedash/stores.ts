@@ -52,12 +52,6 @@ export interface StoreCosts {
   rentWpinkPct: number | null;
   /** Aluguel R$/mes: o % do faturamento so soma o que passar dele (aluguel do mes = maior entre os dois). */
   rentMin: number | null;
-  /** ICMS % sobre o faturamento da marca. */
-  icmsWepinkPct: number | null;
-  icmsWpinkPct: number | null;
-  /** ICMS ST % sobre o CMV da marca. */
-  icmsStWepinkPct: number | null;
-  icmsStWpinkPct: number | null;
 }
 
 export const EMPTY_STORE_COSTS: StoreCosts = {
@@ -68,10 +62,6 @@ export const EMPTY_STORE_COSTS: StoreCosts = {
   rentWepinkPct: null,
   rentWpinkPct: null,
   rentMin: null,
-  icmsWepinkPct: null,
-  icmsWpinkPct: null,
-  icmsStWepinkPct: null,
-  icmsStWpinkPct: null,
 };
 
 /** Campos obrigatorios da loja (WPINK so se a loja vende WPINK). */
@@ -342,12 +332,6 @@ function rowToStore(r: {
   rent_wpink_pct?: number | string | null;
   rent_min_cents?: number | string | null;
   point_type?: string | null;
-  icms_pct?: number | string | null;
-  icms_st_pct?: number | string | null;
-  icms_wepink_pct?: number | string | null;
-  icms_wpink_pct?: number | string | null;
-  icms_st_wepink_pct?: number | string | null;
-  icms_st_wpink_pct?: number | string | null;
   cost_table_id?: number | string | null;
   active?: boolean | null;
 }): Store {
@@ -377,10 +361,6 @@ function rowToStore(r: {
       rentWepinkPct: num(r.rent_wepink_pct),
       rentWpinkPct: num(r.rent_wpink_pct),
       rentMin: rentCents == null ? null : rentCents / 100,
-      icmsWepinkPct: r.icms_wepink_pct !== undefined ? num(r.icms_wepink_pct) : num(r.icms_pct),
-      icmsWpinkPct: r.icms_wpink_pct !== undefined ? num(r.icms_wpink_pct) : num(r.icms_pct),
-      icmsStWepinkPct: r.icms_st_wepink_pct !== undefined ? num(r.icms_st_wepink_pct) : num(r.icms_st_pct),
-      icmsStWpinkPct: r.icms_st_wpink_pct !== undefined ? num(r.icms_st_wpink_pct) : num(r.icms_st_pct),
     },
     costTableId: num(r.cost_table_id),
     active: r.active !== false,
@@ -389,9 +369,6 @@ function rowToStore(r: {
 
 const STORE_COST_COLUMNS =
   "royalties_wepink_pct, royalties_wpink_pct, marketing_wepink_pct, marketing_wpink_pct, rent_wepink_pct, rent_wpink_pct, rent_min_cents";
-const STORE_TAX_COLUMNS =
-  "icms_wepink_pct, icms_wpink_pct, icms_st_wepink_pct, icms_st_wpink_pct, icms_pct, icms_st_pct";
-const STORE_TAX_LEGACY_COLUMNS = "icms_pct, icms_st_pct";
 const STORE_COST_TABLE_COLUMN = "cost_table_id";
 const STORE_POINT_TYPE_COLUMN = "point_type";
 
@@ -437,16 +414,10 @@ export async function hydrateSessionStores(tenantId: string, sessionStoreIds: st
         .order("code");
 
     let { data, error } = await query(
-      `${baseCols}, ${STORE_COST_COLUMNS}, ${STORE_TAX_COLUMNS}, ${STORE_COST_TABLE_COLUMN}, ${STORE_POINT_TYPE_COLUMN}`,
+      `${baseCols}, ${STORE_COST_COLUMNS}, ${STORE_COST_TABLE_COLUMN}, ${STORE_POINT_TYPE_COLUMN}`,
     );
-    // Banco sem as migrations de impostos/custos: segue sem eles em vez de cair no mock.
-    if (error?.code === "42703")
-      ({ data, error } = await query(`${baseCols}, ${STORE_COST_COLUMNS}, ${STORE_TAX_COLUMNS}, ${STORE_COST_TABLE_COLUMN}`));
-    if (error?.code === "42703") ({ data, error } = await query(`${baseCols}, ${STORE_COST_COLUMNS}, ${STORE_TAX_COLUMNS}`));
-    if (error?.code === "42703")
-      ({ data, error } = await query(
-        `${baseCols}, ${STORE_COST_COLUMNS}, ${STORE_TAX_LEGACY_COLUMNS}, ${STORE_COST_TABLE_COLUMN}, ${STORE_POINT_TYPE_COLUMN}`,
-      ));
+    // Banco sem as migrations de custos: segue sem eles em vez de cair no mock.
+    if (error?.code === "42703") ({ data, error } = await query(`${baseCols}, ${STORE_COST_COLUMNS}, ${STORE_COST_TABLE_COLUMN}`));
     if (error?.code === "42703") ({ data, error } = await query(`${baseCols}, ${STORE_COST_COLUMNS}`));
     if (error?.code === "42703") ({ data, error } = await query(baseCols));
     if (error || !data?.length) {
@@ -486,33 +457,11 @@ async function selectStoreRows(
     if (opts.ids) q = q.in("id", opts.ids);
     return q;
   };
-  const full =
-    STORE_BASE_COLUMNS +
-    ", " +
-    STORE_COST_COLUMNS +
-    ", " +
-    STORE_TAX_COLUMNS +
-    ", " +
-    STORE_COST_TABLE_COLUMN +
-    ", " +
-    STORE_POINT_TYPE_COLUMN;
-  const withTable = STORE_BASE_COLUMNS + ", " + STORE_COST_COLUMNS + ", " + STORE_TAX_COLUMNS + ", " + STORE_COST_TABLE_COLUMN;
-  const withTax = STORE_BASE_COLUMNS + ", " + STORE_COST_COLUMNS + ", " + STORE_TAX_COLUMNS;
-  const withLegacyTax =
-    STORE_BASE_COLUMNS +
-    ", " +
-    STORE_COST_COLUMNS +
-    ", " +
-    STORE_TAX_LEGACY_COLUMNS +
-    ", " +
-    STORE_COST_TABLE_COLUMN +
-    ", " +
-    STORE_POINT_TYPE_COLUMN;
+  const full = STORE_BASE_COLUMNS + ", " + STORE_COST_COLUMNS + ", " + STORE_COST_TABLE_COLUMN + ", " + STORE_POINT_TYPE_COLUMN;
+  const withTable = STORE_BASE_COLUMNS + ", " + STORE_COST_COLUMNS + ", " + STORE_COST_TABLE_COLUMN;
   const withCost = STORE_BASE_COLUMNS + ", " + STORE_COST_COLUMNS;
   let { data, error } = await run(full);
   if (error?.code === "42703") ({ data, error } = await run(withTable));
-  if (error?.code === "42703") ({ data, error } = await run(withTax));
-  if (error?.code === "42703") ({ data, error } = await run(withLegacyTax));
   if (error?.code === "42703") ({ data, error } = await run(withCost));
   if (error?.code === "42703") ({ data, error } = await run(STORE_BASE_COLUMNS));
   if (error) {
@@ -635,7 +584,7 @@ export async function fetchCostTables(): Promise<CostTable[] | null> {
   }
 }
 
-/** Tabela de custo da loja (Configuracoes > Lojas > Custo dos produtos). Gravar fixa a escolha (a deteccao automatica nao mexe mais). */
+/** Tabela de custo da filial (Configurações > Custo dos produtos). Gravar fixa a escolha (a detecção automática não mexe mais). */
 export async function updateStoreCostTable(
   storeId: string,
   costTableId: number | null,
@@ -704,10 +653,6 @@ export async function updateStoreCosts(
         rent_wepink_pct: costs.rentWepinkPct,
         rent_wpink_pct: costs.rentWpinkPct,
         rent_min_cents: costs.rentMin == null ? null : Math.round(costs.rentMin * 100),
-        icms_wepink_pct: costs.icmsWepinkPct,
-        icms_wpink_pct: costs.icmsWpinkPct,
-        icms_st_wepink_pct: costs.icmsStWepinkPct,
-        icms_st_wpink_pct: costs.icmsStWpinkPct,
         ...(pointType ? { point_type: pointType === "STREET" ? "STREET" : "MALL" } : {}),
       })
       .eq("id", storeId);
@@ -1031,7 +976,7 @@ export interface Category {
   id: number;
   name: string;
   division: Division;
-  /** CMV como fracao do preco de venda (custo de fabrica com imposto). */
+  /** CMV como fração do preço de venda (custo de fábrica). */
   cmvPct: number;
 }
 

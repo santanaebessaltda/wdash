@@ -23,10 +23,6 @@ const store = (over: Partial<Store> & Pick<Store, "id">): Store =>
     costTableId: 104,
     costs: {
       ...EMPTY_STORE_COSTS,
-      icmsWepinkPct: 10,
-      icmsWpinkPct: 10,
-      icmsStWepinkPct: 20,
-      icmsStWpinkPct: 20,
       royaltiesWepinkPct: 5,
       royaltiesWpinkPct: 3,
       marketingWepinkPct: 2,
@@ -37,49 +33,31 @@ const store = (over: Partial<Store> & Pick<Store, "id">): Store =>
   }) as Store;
 
 describe("composePrice", () => {
-  it("custo + ICMS ST sobre o custo; ICMS, franquia e aluguel sobre o preço", () => {
+  it("custo da tabela; franquia e aluguel sobre o preço", () => {
     const c = composePrice(store({ id: "a" }), "BSP-001", 10000, 3000);
-    expect(c.icmsSt).toBeCloseTo(6);
-    expect(c.costAquisicao).toBeCloseTo(36);
-    expect(c.pctTotal).toBe(25);
-    expect(c.taxes).toBeCloseTo(16);
+    expect(c.costAquisicao).toBeCloseTo(30);
+    expect(c.despesas.map((d) => d.label)).toEqual(["Royalties", "Taxa de marketing", "Aluguel percentual"]);
+    expect(c.pctTotal).toBe(15);
     expect(c.franchiseRent).toBeCloseTo(15);
-    expect(c.costTotal).toBeCloseTo(61);
-    expect(c.profit).toBeCloseTo(39);
-    expect(c.marginPct).toBeCloseTo(39);
-    expect(c.priceMinimum).toBeCloseTo(48);
+    expect(c.costTotal).toBeCloseTo(45);
+    expect(c.profit).toBeCloseTo(55);
+    expect(c.marginPct).toBeCloseTo(55);
+    expect(c.priceMinimum).toBeCloseTo(30 / 0.85);
   });
 
   it("loja de rua ignora o aluguel percentual; WP* usa royalties WPINK", () => {
     const c = composePrice(store({ id: "a", pointType: "STREET" }), "WP014", 10000, 3000);
-    expect(c.despesas.map((d) => d.label)).toEqual(["ICMS", "Royalties"]);
-    expect(c.pctTotal).toBe(13);
+    expect(c.despesas.map((d) => d.label)).toEqual(["Royalties"]);
+    expect(c.pctTotal).toBe(3);
     expect(productBrand("WP014")).toBe("WPINK");
     expect(productBrand("BSPPAR-ATH-001")).toBe("WEPINK");
-  });
-
-  it("produto WP usa o ICMS e o ICMS ST da WPINK", () => {
-    const base = store({ id: "a" });
-    const c = composePrice(
-      store({
-        id: "a",
-        costs: { ...base.costs!, icmsWepinkPct: 10, icmsWpinkPct: 4, icmsStWepinkPct: 20, icmsStWpinkPct: 8 },
-      }),
-      "WP014",
-      10000,
-      3000,
-    );
-    expect(c.despesas.find((d) => d.label === "ICMS")?.pct).toBe(4);
-    expect(c.icmsStPct).toBe(8);
-    const wepink = composePrice(store({ id: "a", costs: { ...base.costs!, icmsWepinkPct: 10, icmsWpinkPct: 4 } }), "BSP-001", 10000, 3000);
-    expect(wepink.despesas.find((d) => d.label === "ICMS")?.pct).toBe(10);
   });
 
   it("sem custo = sem lucro; sem preço = sem custo total", () => {
     expect(composePrice(store({ id: "a" }), "X", 10000, null).profit).toBeNull();
     const withoutPrice = composePrice(store({ id: "a" }), "X", null, 3000);
     expect(withoutPrice.costTotal).toBeNull();
-    expect(withoutPrice.priceMinimum).toBeCloseTo(48);
+    expect(withoutPrice.priceMinimum).toBeCloseTo(30 / 0.85);
   });
 });
 

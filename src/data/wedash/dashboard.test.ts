@@ -1569,54 +1569,6 @@ describe("buildFinanceView com agregados reais", () => {
     expect(v.productsWithoutCost).toEqual([{ code: "WP014", name: "WP ULTRA - WP", items: 3, revenue: 140 }]);
   });
 
-  it("impostos da loja saem antes do Lucro bruto: ICMS sobre o faturamento, ICMS ST sobre o CMV", () => {
-    const store = stores.find((s) => s.id === "f1")!;
-    const before = store.costs;
-    store.costs = { ...EMPTY_STORE_COSTS, icmsWepinkPct: 10, icmsWpinkPct: 10, icmsStWepinkPct: 20, icmsStWpinkPct: 20 };
-    try {
-      const v = buildFinanceView(
-        { storeIds: ["f1"], period: { kind: "custom", start: "2026-08-10", end: "2026-08-10" }, division: null },
-        { dayAggs: [day("2026-08-10", 200, 80)] },
-      );
-      const profit = v.kpis.find((k) => k.label === "Lucro bruto");
-      // 200  80  ICMS 20 (10% de 200)  ICMS ST 16 (20% de 80)
-      expect(profit?.value).toMatch(/^R\$\s84,00$/);
-      expect(profit?.sub).toMatch(/^Impostos: R\$\s36,00$/);
-      expect(v.franchiseFixedCosts[0]).toMatchObject({ label: "Lucro bruto", amount: 84 });
-      // Sem royalties/marketing/aluguel configurados: resultado = lucro bruto.
-      expect(v.franchiseFixedCosts.find((l) => l.isResult)?.amount).toBeCloseTo(84);
-    } finally {
-      store.costs = before;
-    }
-  });
-
-  it("ICMS e ICMS ST usam o percentual de cada marca", () => {
-    const store = stores.find((s) => s.id === "f1")!;
-    const before = store.costs;
-    store.costs = {
-      ...EMPTY_STORE_COSTS,
-      icmsWepinkPct: 10,
-      icmsWpinkPct: 4,
-      icmsStWepinkPct: 20,
-      icmsStWpinkPct: 5,
-    };
-    const brand = (brand: "ALL" | "WEPINK" | "WPINK", rev: number, cmv: number) => ({
-      ...day("2026-08-10", rev, cmv),
-      brand,
-    });
-    try {
-      const v = buildFinanceView(
-        { storeIds: ["f1"], period: { kind: "custom", start: "2026-08-10", end: "2026-08-10" }, division: null },
-        { dayAggs: [brand("ALL", 1000, 400), brand("WEPINK", 800, 300), brand("WPINK", 200, 100)] },
-      );
-      // ICMS 80 + 8 = 88; ICMS ST 60 + 5 = 65; lucro 1000  400  153 = 447
-      const profit = v.kpis.find((k) => k.label === "Lucro bruto");
-      expect(profit?.value).toMatch(/^R\$\s447,00$/);
-    } finally {
-      store.costs = before;
-    }
-  });
-
   describe("aluguel do mês = maior entre o aluguel e o % (mostra o aluguel + o excedente do %)", () => {
     // Agosto = 31 dias; recorte 10 - 11/08 = 2 dias com R$ 300 de faturamento e R$ 180 de lucro bruto.
     const run = (rentMin: number | null, pct: number | null, pointType: "SHOPPING" | "STREET" = "SHOPPING") => {
@@ -1763,24 +1715,6 @@ describe("buildProductsView com agregados reais", () => {
     expect(obsessed?.marginPct).toBeCloseTo(60);
     expect(vf).toMatchObject({ name: "VF", revenue: 120, marginPct: null });
     expect(v.withoutLineRevenue).toBe(30);
-  });
-
-  it("lucro do produto desconta ICMS (faturamento) e ICMS ST (CMV) da loja", () => {
-    const store = stores.find((s) => s.id === "f1")!;
-    const before = store.costs;
-    store.costs = { ...EMPTY_STORE_COSTS, icmsWepinkPct: 10, icmsWpinkPct: 10, icmsStWepinkPct: 20, icmsStWpinkPct: 20 };
-    try {
-      const v = buildProductsView(esc, {
-        dayAggs: [day("2026-08-10", 200, 80)],
-        productDayAggs: [prod("2026-08-10", 1, "A1", 200, 4)],
-        productCostDayAggs: [cost("2026-08-10", "A1", 80)],
-      });
-      // 200  80  20  16
-      expect(v.products[0]?.profit).toBeCloseTo(84);
-      expect(v.products[0]?.marginPct).toBeCloseTo(42);
-    } finally {
-      store.costs = before;
-    }
   });
 
   it("usa a venda da margem quando o cupom veio abaixo do CMV", () => {
