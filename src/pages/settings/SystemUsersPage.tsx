@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
-  Avatar,
   Badge,
   Button,
   Card,
@@ -19,6 +18,7 @@ import {
   useToast,
 } from "@/components/ui";
 import { UsersTableSkeleton } from "@/components/wedash/LoadingSkeletons";
+import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { statusBadgeVariant } from "@/lib/status";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { Icon, icons } from "@/pages/users/Icons";
@@ -148,7 +148,7 @@ export function SystemUsersPage() {
     sortValue: (u) => displayName(u).toLowerCase(),
     render: (u) => (
       <div className="flex min-w-0 items-center gap-3">
-        <Avatar name={displayName(u)} size="sm" />
+        <PersonAvatar name={displayName(u)} membershipId={u.membershipId} src={u.avatarUrl} size="sm" />
         <div className="min-w-0">
           <p className="flex items-center gap-2 truncate text-[13px] font-bold text-t0">
             <span className="truncate">{displayName(u)}</span>
@@ -180,7 +180,7 @@ export function SystemUsersPage() {
     sortValue: (u) => u.email.toLowerCase(),
     render: (u) => (
       <div className="flex min-w-0 items-center gap-3">
-        <Avatar name={u.email} size="sm" />
+        <PersonAvatar name={u.email} membershipId={u.membershipId} src={u.avatarUrl} size="sm" />
         <span className="truncate text-[13px] font-bold text-t0">{u.email}</span>
       </div>
     ),

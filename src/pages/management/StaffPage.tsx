@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Avatar, Badge, Button, Card, DataTable, Dropdown, EmptyState, FormField, Input, Modal, Segmented, Skeleton, useToast, type DataTableColumn, type DropdownItem } from "@/components/ui";
+import { Badge, Button, Card, DataTable, Dropdown, EmptyState, FormField, Input, Modal, Segmented, Skeleton, useToast, type DataTableColumn, type DropdownItem } from "@/components/ui";
+import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { SegmentedSkeleton, StoreCardsSkeleton, TeamTableSkeleton } from "@/components/wedash/LoadingSkeletons";
 import {
   fetchLatestSellerSyncedAt,
@@ -632,7 +633,7 @@ function sellerColumns(store: Store): DataTableColumn<StoreSeller>[] {
     sortValue: (v) => v.name,
     render: (v) => (
       <div className="flex min-w-0 items-center gap-3">
-        <Avatar name={v.name} />
+        <PersonAvatar name={v.name} employeeId={v.code} />
         <span className="truncate text-[13.5px] font-bold text-t0">{v.name}</span>
       </div>
     ),

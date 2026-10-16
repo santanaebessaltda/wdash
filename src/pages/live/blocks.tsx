@@ -1,4 +1,5 @@
-import { Avatar, EmptyState } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
+import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { brlK, num } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import type { RankingRow } from "@/data/wedash/live";
@@ -120,7 +121,7 @@ export function RankingBlock({
                   boxShadow: `0 0 0 3px ${medal.color}${isOuro ? `, ${medal.glow}` : ""}`,
                 }}
               >
-                <Avatar size={isOuro ? "2xl" : "xl"} name={l.name} />
+                <PersonAvatar size={isOuro ? "2xl" : "xl"} name={l.avatarName ?? l.name} employeeId={l.employeeId} />
               </span>
               <MedalhaBadge pos={pos} />
             </div>

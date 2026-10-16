@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import {
   Alert,
-  Avatar,
   Breadcrumbs,
   Button,
   Card,
@@ -934,7 +934,7 @@ function GroupsSimulation({
       key={`${p.storeId}:${p.employeeId}`}
       className="flex items-center gap-2.5 py-1"
     >
-      <Avatar name={p.name} size="sm" />
+      <PersonAvatar name={p.name} employeeId={p.employeeId} storeId={p.storeId} size="sm" />
       <p className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-t0">
         {p.name}
       </p>
@@ -1499,7 +1499,7 @@ function Simulation({
               <div className="flex flex-col">
                 {membersOf(g.key).map((p) => (
                   <div key={`${p.storeId}:${p.employeeId}`} className="flex items-center gap-2.5 py-1">
-                    <Avatar name={p.name} size="sm" />
+                    <PersonAvatar name={p.name} employeeId={p.employeeId} storeId={p.storeId} size="sm" />
                     <p className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-t0">{p.name}</p>
                     {individual && g.base != null && (
                       <span className="shrink-0 font-mono text-[12px] text-t1">{brlCent(g.base)}</span>

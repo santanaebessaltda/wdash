@@ -24,6 +24,8 @@ export interface SystemUser {
   invitedAt: string | null;
   lastSignInAt: string | null;
   acceptedAt: string | null;
+  /** Foto da conta. Sem foto, a tela mostra as iniciais. */
+  avatarUrl?: string | null;
 }
 
 export interface SystemUserStore {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { AvatarGroup, Badge, Card } from "@/components/ui";
+import { Badge, Card } from "@/components/ui";
+import { PersonAvatarGroup } from "@/components/wedash/PersonAvatar";
 import { Switch } from "@/components/ui/form";
 import { useToast } from "@/components/ui/Toast";
 import { CardGridSkeleton } from "@/components/wedash/LoadingSkeletons";
@@ -138,7 +139,7 @@ export function StoresSettingsPage() {
             </div>
             <div className="flex min-h-8 items-center justify-between gap-3">
               {team.length > 0 ? (
-                <AvatarGroup names={team.map((v) => v.name)} max={4} />
+                <PersonAvatarGroup people={team.map((v) => ({ name: v.name, employeeId: v.code }))} max={4} />
               ) : (
                 <span className="text-xs text-t2">Ninguém ativo na equipe</span>
               )}

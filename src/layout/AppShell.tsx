@@ -9,6 +9,7 @@ import { PageLoader } from "./PageLoader";
 import { fetchThemePreference, saveThemePreference, touchLastSeen } from "@/session/authApi";
 import { installPrintMode } from "@/lib/printMode";
 import { storedThemePreference, useTheme } from "@/theme/ThemeProvider";
+import { ProfilePhotosProvider } from "@/components/wedash/PersonAvatar";
 import { PushRecover } from "@/push/PushRecover";
 import { isNotificationOpen, reloadSalesAfterOpen } from "@/push/resumeSales";
 
@@ -101,11 +102,13 @@ export function AppShell() {
           <Topbar onOpenMobileNav={() => setMobileNavOpen(true)} collapsed={collapsed} onToggleCollapse={() => setCollapsed((c) => !c)} />
         </div>
         <main ref={mainRef} className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-3.5 pt-5 sm:px-6 sm:pt-6 print:overflow-visible print:p-0">
-          <Suspense fallback={<PageLoader />}>
-            <div key={location.pathname} className="pad-base vela-page-enter print:pb-0" style={padBottom("0px")}>
-              <Outlet />
-            </div>
-          </Suspense>
+          <ProfilePhotosProvider>
+            <Suspense fallback={<PageLoader />}>
+              <div key={location.pathname} className="pad-base vela-page-enter print:pb-0" style={padBottom("0px")}>
+                <Outlet />
+              </div>
+            </Suspense>
+          </ProfilePhotosProvider>
         </main>
       </div>
 

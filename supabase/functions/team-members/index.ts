@@ -283,7 +283,7 @@ serve(async (req) => {
     const [{ data: rows, error }, { data: storeRows }] = await Promise.all([
       admin
         .from("membership")
-        .select("id, role, status, is_owner, accepted_at, created_at, identity:identity_id (id, auth_user_id, name, email, cpf, whatsapp, last_seen_at), membership_store (store_id)")
+        .select("id, role, status, is_owner, accepted_at, created_at, identity:identity_id (id, auth_user_id, name, email, cpf, whatsapp, avatar_url, last_seen_at), membership_store (store_id)")
         .eq("tenant_id", tenantId)
         .in("role", ROLES)
         .in("status", ["PENDING", "ACTIVE", "SUSPENDED"])
@@ -300,6 +300,7 @@ serve(async (req) => {
           email: string;
           cpf: string | null;
           whatsapp: string | null;
+          avatar_url: string | null;
           last_seen_at: string | null;
         };
         const { data: au } = await admin.auth.admin.getUserById(ident.auth_user_id);
@@ -318,6 +319,7 @@ serve(async (req) => {
           invitedAt: au.user?.invited_at ?? r.created_at,
           lastSignInAt: latest(ident.last_seen_at, au.user?.last_sign_in_at ?? null),
           acceptedAt: r.accepted_at,
+          avatarUrl: ident.avatar_url?.trim() || null,
         };
       }),
     );

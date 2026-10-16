@@ -90,13 +90,21 @@ export function Avatar({ name, src, size = "md", status, className, ring }: Avat
   );
 }
 
-export function AvatarGroup({ names, max = 4 }: { names: string[]; max?: number }) {
-  const shown = names.slice(0, max);
-  const rest = names.length - shown.length;
+export function AvatarGroup({
+  names,
+  people,
+  max = 4,
+}: {
+  names?: string[];
+  people?: { name: string; src?: string | null }[];
+  max?: number;
+}) {
+  const shown = (people ?? (names ?? []).map((name) => ({ name, src: undefined }))).slice(0, max);
+  const rest = (people?.length ?? names?.length ?? 0) - shown.length;
   return (
     <div className="flex items-center">
-      {shown.map((n, i) => (
-        <Avatar key={n + i} name={n} size="sm" ring className={i > 0 ? "-ml-2" : ""} />
+      {shown.map((p, i) => (
+        <Avatar key={p.name + i} name={p.name} src={p.src} size="sm" ring className={i > 0 ? "-ml-2" : ""} />
       ))}
       {rest > 0 && (
         <span className="-ml-2 flex h-8 w-8 items-center justify-center rounded-full bg-bg-3 text-[11px] font-bold text-t1 ring-2 ring-bg-2">

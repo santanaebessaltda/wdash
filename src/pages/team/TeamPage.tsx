@@ -18,7 +18,7 @@ import { fetchSalesCoverage, fetchSalesDayAggs, fetchSalesSellerDayAggs } from "
 import { fetchGoals, fetchGoalTeam, type GoalRecord, type GoalTeamMember } from "@/data/wedash/goalsRepo";
 import { buildGoalCardView, goalStatus, sellerGoalLevels, type SellerGoalLevel } from "@/data/wedash/goalView";
 import { GoalLevelSummary } from "@/components/wedash/GoalLevelsBar";
-import { AvatarIniciais } from "@/components/wedash/InitialsAvatar";
+import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import type { SalesDayAgg, SalesSellerDayAgg } from "@/data/wedash/salesTypes";
 import { storesForSession } from "@/data/wedash/stores";
 import { teamChallengesReturn, teamGoalsReturn } from "@/pages/goals/backPath";
@@ -710,7 +710,7 @@ export function TeamPage() {
                       <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{rank + 1}</td>
                       <td className="px-1 py-3">
                         <div className="flex min-w-0 items-center gap-2.5">
-                          <AvatarIniciais name={p.name} idx={rank} />
+                          <PersonAvatar name={p.name} employeeId={p.key} size="sm" />
                           <div className="min-w-0">
                             <p className="truncate text-[13px] font-bold text-t0">{p.name}</p>
                             {store &&

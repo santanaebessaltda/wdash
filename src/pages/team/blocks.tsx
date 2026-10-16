@@ -4,7 +4,8 @@
  * Badge, Avatar, EmptyState e o padrao BlockState compartilhado.
  */
 import type { ReactNode } from "react";
-import { Avatar, Badge, Card, CardTitle, DataTable, EmptyState, ProgressBar, progressColor, progressTextClass, type DataTableColumn } from "@/components/ui";
+import { Badge, Card, CardTitle, DataTable, EmptyState, ProgressBar, progressColor, progressTextClass, type DataTableColumn } from "@/components/ui";
+import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { brl, brlCent, eachDay, num } from "@/lib/format";
 import type { BlockState as BlockStateKind } from "@/data/wedash/dashboard";
@@ -45,7 +46,7 @@ type LineRank = SellerRow & { position: number };
 function SellerCell({ l }: { l: LineRank }) {
   return (
     <div className="flex min-w-0 items-center gap-2.5">
-      <Avatar name={l.name} size="sm" />
+      <PersonAvatar name={l.name} employeeId={l.employeeId} storeId={l.storeId} size="sm" />
       <div className="min-w-0">
         <p className="truncate text-[13px] font-bold text-t0">{l.name}</p>
         <p className="truncate text-[11px] text-t2">
@@ -125,7 +126,7 @@ function SellerMobileCard({ l, activeGoal, closed = false }: { l: LineRank; acti
     <div className="rounded-xl border border-line bg-bg-inset p-3.5">
       <div className="mb-3 flex items-center gap-2.5">
         <span className="w-7 shrink-0 text-[12.5px] font-extrabold text-t2">{l.position}º</span>
-        <Avatar name={l.name} size="md" />
+        <PersonAvatar name={l.name} employeeId={l.employeeId} storeId={l.storeId} size="md" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-[13.5px] font-bold text-t0">{l.name}</p>
           <p className="truncate text-[11.5px] text-t2">

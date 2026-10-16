@@ -44,6 +44,7 @@ export interface SellerHomeStore {
 /** Uma linha do podio do mes. `revenue` em reais. */
 export interface MonthRankingEntry {
   position: number;
+  employeeId: number;
   name: string;
   revenue: number;
   sales: number;
@@ -190,6 +191,7 @@ function monthRanking(input: SellerHomeInput, s: SellerHomeInput["stores"][numbe
     const ordered = [...team].sort((a, b) => collaboratorName(a.name).localeCompare(collaboratorName(b.name), "pt-BR"));
     return ordered.map((m) => ({
       position: 1,
+      employeeId: m.employeeId,
       name: collaboratorName(m.name),
       revenue: total.revenue / n,
       sales: total.sales / n,
@@ -201,13 +203,13 @@ function monthRanking(input: SellerHomeInput, s: SellerHomeInput["stores"][numbe
   const inGroup = (m: GoalTeamMember) =>
     m.storeId === s.storeId && m.salesPerson && (group == null || m.shiftId === group.shiftId);
   const byEmployee = new Map<number, GoalTeamMember>();
-  const totals = new Map<string, { name: string; revenue: number; sales: number; me: boolean }>();
+  const totals = new Map<string, { employeeId: number; name: string; revenue: number; sales: number; me: boolean }>();
   for (const m of input.team) {
     if (!inGroup(m) || m.employeeId == null) continue;
     byEmployee.set(m.employeeId, m);
     const name = collaboratorName(m.name);
     if (!name) continue;
-    totals.set(`e:${m.employeeId}`, { name, revenue: 0, sales: 0, me: m.employeeId === s.employeeId });
+    totals.set(`e:${m.employeeId}`, { employeeId: m.employeeId, name, revenue: 0, sales: 0, me: m.employeeId === s.employeeId });
   }
   for (const r of input.sellerDayAggs) {
     if (r.storeId !== s.storeId || r.day < from || r.day > input.today || r.sellerEmployeeId == null) continue;

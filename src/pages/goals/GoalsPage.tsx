@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { AvatarGroup, Badge, Button, Card, DateRangePicker, Modal, ProgressBar, progressTextClass, useToast } from "@/components/ui";
+import { Badge, Button, Card, DateRangePicker, Modal, ProgressBar, progressTextClass, useToast } from "@/components/ui";
+import { PersonAvatarGroup } from "@/components/wedash/PersonAvatar";
 import { Tooltip } from "@/components/ui/Tooltip";
 import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePicker";
 import { DuplicateChoiceModal } from "@/components/wedash/DuplicateChoiceModal";
 import { GoalCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { calendarTodayIso } from "@/data/wedash/clock";
-import { buildGoalSummary, GOAL_STATUS_LABEL, goalTeamNames, prazoRemaining, type GoalStatus, type GoalSummary } from "@/data/wedash/goalView";
+import { buildGoalSummary, GOAL_STATUS_LABEL, prazoRemaining, type GoalStatus, type GoalSummary } from "@/data/wedash/goalView";
 import { deleteGoal, fetchGoalTeam, fetchGoals, type GoalRecord, type GoalTeamMember } from "@/data/wedash/goalsRepo";
 import { fetchSalesDayAggs } from "@/data/wedash/salesRepo";
 import type { SalesDayAgg } from "@/data/wedash/salesTypes";
@@ -114,7 +115,10 @@ export default function GoalsPage() {
       .map((g) => ({
         summary: buildGoalSummary(g, data.dayAggs, today),
         store: byId.get(g.storeId),
-        team: goalTeamNames(g.storeId, data.team),
+        team: data.team
+          .filter((m) => m.storeId === g.storeId && m.salesPerson)
+          .map((m) => ({ name: m.name, employeeId: m.employeeId, storeId: m.storeId }))
+          .sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
       }))
       .sort(
         (a, b) =>
@@ -255,7 +259,7 @@ function GoalCard({
   summary: GoalSummary;
   store: Store | undefined;
   showsStore: boolean;
-  team: string[];
+  team: { name: string; employeeId: number; storeId: string }[];
   onDetail: () => void;
   onCopy: () => void;
   onDelete: () => void;
@@ -362,7 +366,7 @@ function GoalCard({
         </div>
         {team.length > 0 && (
           <div className="shrink-0">
-            <AvatarGroup names={team} max={3} />
+            <PersonAvatarGroup people={team} max={3} />
           </div>
         )}
       </div>
