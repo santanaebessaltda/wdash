@@ -38,9 +38,6 @@ export const paths = {
   products: "/dashboard/products",
   groups: "/dashboard/groups",
   team: "/dashboard/team",
-  documents: "/documents",
-  documentBatches: "/documents/batches",
-  documentAttach: "/documents/attach",
   /** Performance > Metas. `/goals`, `/metas` e `/management/goals` redirecionam. */
   goals: "/performance/goals",
   goalNew: "/performance/goals/new",

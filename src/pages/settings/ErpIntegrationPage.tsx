@@ -30,7 +30,6 @@ import {
 } from "@/data/wedash/erp";
 import { ErpReportChecks } from "@/components/wedash/ErpReportChecks";
 import { noAutofill, secretStyle } from "@/lib/noAutofill";
-import { AssinaCard } from "./AssinaCard";
 
 type ErpLinkState = "disconnected" | "paused" | "connected" | "password";
 
@@ -130,7 +129,6 @@ export function ErpIntegrationPage() {
             </div>
           )}
         </Card>
-        <AssinaCard />
       </div>
 
       <MillenniumModal

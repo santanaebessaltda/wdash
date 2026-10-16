@@ -283,7 +283,7 @@ serve(async (req) => {
     const [{ data: rows, error }, { data: storeRows }] = await Promise.all([
       admin
         .from("membership")
-        .select("id, role, status, is_owner, accepted_at, created_at, identity:identity_id (id, auth_user_id, name, email, cpf, whatsapp, avatar_url, last_seen_at), membership_store (store_id)")
+        .select("id, role, status, is_owner, accepted_at, created_at, identity:identity_id (id, auth_user_id, name, email, avatar_url, last_seen_at), membership_store (store_id)")
         .eq("tenant_id", tenantId)
         .in("role", ROLES)
         .in("status", ["PENDING", "ACTIVE", "SUSPENDED"])
@@ -298,8 +298,6 @@ serve(async (req) => {
           auth_user_id: string;
           name: string;
           email: string;
-          cpf: string | null;
-          whatsapp: string | null;
           avatar_url: string | null;
           last_seen_at: string | null;
         };
@@ -309,8 +307,6 @@ serve(async (req) => {
           identityId: ident.id,
           name: ident.name,
           email: ident.email,
-          cpf: ident.cpf ?? null,
-          whatsapp: ident.whatsapp ?? null,
           role: r.role,
           status: r.status,
           isOwner: r.is_owner,

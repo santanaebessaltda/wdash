@@ -735,12 +735,8 @@ export interface StoreSeller {
   syncedAt: string;
   /** Grupo (store_shift.id) definido na WDash; null = sem grupo. */
   shiftId: string | null;
-  /** CPF só dígitos, preenchido na WDash. */
-  cpf: string | null;
-  /** E-mail preenchido na WDash. Também preenche o convite de acesso. */
+  /** E-mail do convite de acesso, quando já foi informado. */
   email: string | null;
-  /** WhatsApp só dígitos, preenchido na WDash. */
-  whatsapp: string | null;
 }
 
 export { SELLER_ROLE };
@@ -828,10 +824,8 @@ export async function fetchStoreSellers(tenantId: string, storeIds: string[]): P
       .order("active", { ascending: false })
       .order("name")
       .limit(2000);
-  const base = "id, store_id, name, code, active, erp_role, synced_at, email, whatsapp";
-  let { data, error } = await query(`${base}, shift_id, cpf`);
-  // Coluna nova ainda não aplicada: lista o que o banco já tem.
-  if (error?.code === "42703") ({ data, error } = await query(`${base}, shift_id`));
+  const base = "id, store_id, name, code, active, erp_role, synced_at, email";
+  let { data, error } = await query(`${base}, shift_id`);
   if (error?.code === "42703") ({ data, error } = await query(base));
   if (error) {
     console.warn("fetchStoreSellers:", error.message);
@@ -846,9 +840,7 @@ export async function fetchStoreSellers(tenantId: string, storeIds: string[]): P
     erp_role: string | null;
     synced_at: string;
     shift_id?: string | null;
-    cpf?: string | null;
     email?: string | null;
-    whatsapp?: string | null;
   };
   for (const r of (data ?? []) as unknown as Row[]) {
     const list = out.get(r.store_id) ?? [];
@@ -860,9 +852,7 @@ export async function fetchStoreSellers(tenantId: string, storeIds: string[]): P
       role: r.erp_role ?? null,
       syncedAt: r.synced_at,
       shiftId: r.shift_id ?? null,
-      cpf: r.cpf ?? null,
       email: r.email ?? null,
-      whatsapp: r.whatsapp ?? null,
     });
     out.set(r.store_id, list);
   }
@@ -927,18 +917,6 @@ export async function deleteStoreShift(id: string): Promise<WriteResult> {
   const sb = getSupabase();
   if (!sb) return { ok: false, error: "Supabase não configurado" };
   const { error } = await sb.from("store_shift").delete().eq("id", id);
-  return error ? { ok: false, error: error.message } : { ok: true };
-}
-
-/** CPF, e-mail e WhatsApp da ficha. O sync do Millennium não reescreve estas colunas. */
-export async function saveSellerContact(
-  sellerId: string,
-  contact: { cpf: string | null; email: string | null; whatsapp: string | null },
-): Promise<WriteResult> {
-  const { getSupabase } = await import("@/lib/supabase");
-  const sb = getSupabase();
-  if (!sb) return { ok: false, error: "Supabase não configurado" };
-  const { error } = await sb.from("store_seller").update(contact).eq("id", sellerId);
   return error ? { ok: false, error: error.message } : { ok: true };
 }
 

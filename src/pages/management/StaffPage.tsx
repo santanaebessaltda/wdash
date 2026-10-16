@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Badge, Button, Card, DataTable, Dropdown, EmptyState, FormField, Input, Modal, Segmented, Skeleton, useToast, type DataTableColumn, type DropdownItem } from "@/components/ui";
+import { Badge, Button, Card, DataTable, Dropdown, EmptyState, FormField, Modal, Segmented, Skeleton, useToast, type DataTableColumn, type DropdownItem } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { SetupGuide } from "@/components/wedash/SetupGuide";
 import { SegmentedSkeleton, StoreCardsSkeleton, TeamTableSkeleton } from "@/components/wedash/LoadingSkeletons";
@@ -10,7 +10,6 @@ import {
   isBranchSalesPerson,
   isBranchTeamMember,
   teamRoleLabel,
-  saveSellerContact,
   saveStoreShift,
   setSellerShift,
   syncStoreSellersNow,
@@ -19,10 +18,7 @@ import {
   type StoreShift,
 } from "@/data/wedash/stores";
 import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
-import { saveCpf, saveEmail, saveWhatsapp } from "@/data/wedash/documentSplit";
-import { normalizeEmail, validEmail } from "@/data/wedash/engine/sellerAccess";
 import { shiftName } from "@/lib/format";
-import { mascararCpf, maskWhatsapp } from "@/lib/cpf";
 import { InviteSellerModal } from "@/pages/management/InviteSellerModal";
 import { GroupFormModal, ManageGroupsModal, groupProblem, nextGroupWindow } from "@/pages/management/SellerGroups";
 import { CostCardTitle, SAVE_ERROR_MSG, StoreCardsPage, useScopedStores } from "@/pages/operation/shared";
@@ -249,16 +245,6 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
   }
 
   async function saveProfile(seller: StoreSeller, draft: SellerDraft): Promise<boolean> {
-    const saved = await saveSellerContact(seller.id, { cpf: draft.cpf, email: draft.email, whatsapp: draft.whatsapp });
-    if (!saved.ok) {
-      show("Não foi possível salvar o cadastro. Tente novamente.", "danger");
-      return false;
-    }
-    setTeam((list) =>
-      list.map((person) =>
-        person.id === seller.id ? { ...person, cpf: draft.cpf, email: draft.email, whatsapp: draft.whatsapp } : person,
-      ),
-    );
     const currentShift = seller.id in shiftOf ? shiftOf[seller.id] : seller.shiftId;
     if (draft.sales && draft.shiftId !== (currentShift ?? null)) {
       const shifted = await changeShift(seller.id, draft.shiftId);
@@ -297,22 +283,23 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
         key: "actions",
         header: "",
         align: "right",
-        render: (v) => (
-          <RowMenu
-            items={rowActions({
-              state: salesPerson(v) ? (access == null ? null : (access.get(v.id) ?? "NONE")) : null,
-              grouped: hasSalesGroup(v.id in shiftOf ? shiftOf[v.id] : v.shiftId),
-              onEdit: () => setEditing({ ...v, shiftId: (v.id in shiftOf ? shiftOf[v.id] : v.shiftId) ?? null }),
-              onInvite: () => setInviting(v),
-              onCopy: () => void copyLink(v.id),
-              onResend: () => void runAccess(v.id, resendSellerInvite, "Convite reenviado."),
-              onRevoke: () => void runAccess(v.id, revokeSellerInvite, "Convite cancelado."),
-              onSuspend: () => void runAccess(v.id, suspendSeller, "Acesso suspenso."),
-              onReactivate: () => void runAccess(v.id, reactivateSeller, "Acesso reativado."),
-              onRemove: () => setRemoving(v),
-            })}
-          />
-        ),
+        render: (v) => {
+          const items = rowActions({
+            sales: salesPerson(v),
+            state: salesPerson(v) ? (access == null ? null : (access.get(v.id) ?? "NONE")) : null,
+            grouped: hasSalesGroup(v.id in shiftOf ? shiftOf[v.id] : v.shiftId),
+            onEdit: () => setEditing({ ...v, shiftId: (v.id in shiftOf ? shiftOf[v.id] : v.shiftId) ?? null }),
+            onInvite: () => setInviting(v),
+            onCopy: () => void copyLink(v.id),
+            onResend: () => void runAccess(v.id, resendSellerInvite, "Convite reenviado."),
+            onRevoke: () => void runAccess(v.id, revokeSellerInvite, "Convite cancelado."),
+            onSuspend: () => void runAccess(v.id, suspendSeller, "Acesso suspenso."),
+            onReactivate: () => void runAccess(v.id, reactivateSeller, "Acesso reativado."),
+            onRemove: () => setRemoving(v),
+          });
+          if (items.length === 0) return null;
+          return <RowMenu items={items} />;
+        },
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -447,6 +434,7 @@ function AccessBadge({ state }: { state: AccessState | "loading" }) {
 }
 
 function rowActions(input: {
+  sales: boolean;
   state: AccessState | null;
   grouped: boolean;
   onEdit: () => void;
@@ -458,6 +446,7 @@ function rowActions(input: {
   onReactivate: () => void;
   onRemove: () => void;
 }): DropdownItem[] {
+  if (!input.sales) return [];
   const edit: DropdownItem = { label: "Editar cadastro", onClick: input.onEdit };
   if (!input.state) return [edit];
   const exclude: DropdownItem = { label: "Excluir acesso", onClick: input.onRemove, danger: true };
@@ -491,7 +480,7 @@ function RowMenu({ items }: { items: DropdownItem[] }) {
   );
 }
 
-type SellerDraft = { cpf: string | null; email: string | null; whatsapp: string | null; shiftId: string | null; sales: boolean };
+type SellerDraft = { shiftId: string | null; sales: boolean };
 
 function SellerEditor({
   seller,
@@ -511,19 +500,11 @@ function SellerEditor({
   onSave: (seller: StoreSeller, draft: SellerDraft) => Promise<boolean>;
 }) {
   const sales = seller ? isBranchSalesPerson(seller, store) : false;
-  const [cpf, setCpf] = useState(mascararCpf(seller?.cpf ?? ""));
-  const [email, setEmail] = useState(seller?.email ?? "");
-  const [whatsapp, setWhatsapp] = useState(maskWhatsapp(seller?.whatsapp ?? ""));
   const [shiftId, setShiftId] = useState<string | null>(seller?.shiftId ?? null);
-  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setCpf(mascararCpf(seller?.cpf ?? ""));
-    setEmail(seller?.email ?? "");
-    setWhatsapp(maskWhatsapp(seller?.whatsapp ?? ""));
     setShiftId(seller?.shiftId ?? null);
-    setError(null);
     setSaving(false);
   }, [seller]);
 
@@ -533,34 +514,8 @@ function SellerEditor({
 
   async function save() {
     if (!seller) return;
-    const parsedCpf = cpf.trim() ? saveCpf(cpf) : { ok: true as const, cpf: null };
-    if (!parsedCpf.ok) {
-      setError(parsedCpf.message);
-      return;
-    }
-    const mail = email.trim() ? normalizeEmail(email) : "";
-    if (mail && !validEmail(mail)) {
-      setError("Informe um e-mail válido.");
-      return;
-    }
-    const parsedMail = saveEmail(mail);
-    if (!parsedMail.ok) {
-      setError(parsedMail.message);
-      return;
-    }
-    const parsedPhone = saveWhatsapp(whatsapp);
-    if (!parsedPhone.ok) {
-      setError(parsedPhone.message);
-      return;
-    }
     setSaving(true);
-    const ok = await onSave(seller, {
-      cpf: parsedCpf.cpf,
-      email: parsedMail.email,
-      whatsapp: parsedPhone.whatsapp,
-      shiftId,
-      sales,
-    });
+    const ok = await onSave(seller, { shiftId, sales });
     setSaving(false);
     if (ok) onClose();
   }
@@ -583,20 +538,7 @@ function SellerEditor({
     >
       {seller && (
         <div className="flex flex-col gap-3">
-          <p className="text-[12.5px] text-t2">
-            {sales
-              ? "CPF, e-mail, WhatsApp e grupo são salvos na WDash. A atualização do Millennium não altera esses dados."
-              : "CPF, e-mail e WhatsApp são salvos na WDash. A atualização do Millennium não altera esses dados."}
-          </p>
-          <FormField label="CPF" optional>
-            <Input value={cpf} onChange={(event) => setCpf(mascararCpf(event.target.value))} placeholder="000.000.000-00" inputMode="numeric" />
-          </FormField>
-          <FormField label="E-mail" optional>
-            <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="nome@email.com" />
-          </FormField>
-          <FormField label="WhatsApp" optional>
-            <Input value={whatsapp} onChange={(event) => setWhatsapp(maskWhatsapp(event.target.value))} placeholder="(11) 99999-9999" inputMode="tel" />
-          </FormField>
+          <p className="text-[12.5px] text-t2">O grupo é salvo na WDash. A atualização do Millennium não altera esse dado.</p>
           {sales && (
             <FormField label="Grupo">
               <select className="h-[42px] w-full rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3.5 text-[13px] text-t0 outline-none focus:border-acc" value={shiftId ?? ""} onChange={(event) => setShiftId(event.target.value || null)}>
@@ -612,7 +554,6 @@ function SellerEditor({
               </button>
             </FormField>
           )}
-          {error && <p className="text-sm text-bad">{error}</p>}
         </div>
       )}
     </Modal>

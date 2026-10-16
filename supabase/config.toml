@@ -37,12 +37,3 @@ verify_jwt = true
 
 [functions.seller-home]
 verify_jwt = true
-
-[functions.assina-credential-persist]
-verify_jwt = true
-
-[functions.documents]
-verify_jwt = true
-
-[functions.assina-webhook]
-verify_jwt = false

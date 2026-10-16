@@ -106,8 +106,6 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
     covers(location.pathname, paths.management.cashDrop) ||
     covers(location.pathname, paths.management.salesReport) ||
     location.pathname.startsWith("/operation/") ||
-    location.pathname === paths.documents ||
-    location.pathname.startsWith(paths.documents + "/") ||
     location.pathname.startsWith(paths.settings.root) ||
     location.pathname === paths.profile);
 

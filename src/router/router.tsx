@@ -20,7 +20,6 @@ import { managementRoutes } from "@/pages/management/routes";
 import { cashCloseRoutes } from "@/pages/cash-close/routes";
 import { stockRoutes } from "@/pages/stock/routes";
 import { operationRoutes } from "@/pages/operation/routes";
-import { documentRoutes } from "@/pages/documents/routes";
 
 /* Template Vela (referencia, acessivel por URL) */
 import { dashboardsRoutes } from "@/pages/dashboards/routes";
@@ -92,7 +91,6 @@ const routeTree: RouteObject[] = [
           ...cashCloseRoutes,
           ...managementRoutes,
           ...operationRoutes,
-          ...documentRoutes,
           ...settingsRoutes,
           ...retiredRoutes,
           ...dashboardsRoutes,
