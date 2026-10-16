@@ -15,6 +15,7 @@ import {
   nextSignerStatus,
   progressForEnvelope,
   signerCaption,
+  signerFraction,
   partialEnvelopeLabel,
   visibleSigners,
   contactFieldsToAsk,
@@ -590,6 +591,7 @@ describe("signer progress", () => {
     expect(signerCaption(signers)).toBe("Petania Chimenes Valim assinou · Maria Eduarda Bessa pendente");
     expect(signers[1]?.recipientId).toBe("maria");
     expect(partialEnvelopeLabel("PENDING", signers)).toBe("Em andamento");
+    expect(signerFraction(signers)).toEqual({ done: 1, total: 2 });
     expect(partialEnvelopeLabel("PENDING", signers.map((item) => ({ ...item, status: "PENDING" })))).toBeNull();
     expect(partialEnvelopeLabel("SIGNED", signers)).toBeNull();
   });

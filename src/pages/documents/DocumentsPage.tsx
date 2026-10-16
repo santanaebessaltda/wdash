@@ -5,7 +5,7 @@ import { cn } from "@/lib/cn";
 import { QuickStat } from "@/pages/dashboards/QuickStat";
 import { Icon, icons } from "@/pages/users/Icons";
 import { paths } from "@/router/paths";
-import { archivePeople, displayTitle, documentPersonKey, findDocumentPerson, inLibrary, isFiledStatus, monthFolder, partialEnvelopeLabel, personMatchesQuery, resendVisible, sameCategory, signerCaption, signingPeople, visibleSigners, DOCUMENT_CATEGORIES, type SignerProgress } from "@/data/wedash/documentSplit";
+import { archivePeople, displayTitle, documentPersonKey, findDocumentPerson, inLibrary, isFiledStatus, monthFolder, partialEnvelopeLabel, personMatchesQuery, resendVisible, sameCategory, signerCaption, signerFraction, signingPeople, visibleSigners, DOCUMENT_CATEGORIES, type SignerProgress } from "@/data/wedash/documentSplit";
 import type { BatchRow, DocumentRow, PersonRow } from "@/data/wedash/documentsRepo";
 import { cancelDocument, copyDocumentLink, moveDocument, openDocument, resendDocument } from "@/data/wedash/documentsRepo";
 import { DocumentsSkeleton } from "@/components/wedash/LoadingSkeletons";
@@ -776,14 +776,105 @@ function pendingMenu(row: DocumentRow) {
 function DocumentStatus({ row, people }: { row: DocumentRow; people: PersonRow[] }) {
   if (!row.envelopeId && !isFiledStatus(row.status)) return <span className="text-[12.5px] text-t2">Em preparação</span>;
   const signers = signersOf(row, people);
-  const caption = signerCaption(signers);
+  const fraction = signerFraction(signers);
   const partial = partialEnvelopeLabel(row.status, signers);
   return (
-    <span className="flex min-w-0 flex-col items-start gap-1">
+    <span className="flex min-w-0 flex-col items-start gap-2">
       <Badge variant={partial ? "warning" : badgeVariant(row.status)}>{partial ?? STATUS_LABEL[row.status]}</Badge>
-      {caption ? <span className="text-[12px] text-t1">{caption}</span> : null}
+      {fraction ? (
+        <span className="flex min-w-0 flex-col gap-1.5">
+          <SignerTrack done={fraction.done} total={fraction.total} />
+          {signers.map((signer) => (
+            <SignerLine key={`${signer.order}-${signer.name}`} signer={signer} contact={signerContact(signer, row, people)} />
+          ))}
+        </span>
+      ) : null}
     </span>
   );
+}
+
+function SignerTrack({ done, total }: { done: number; total: number }) {
+  const width = total > 0 ? Math.round((done / total) * 100) : 0;
+  return (
+    <span className="flex items-center gap-2">
+      <span className="h-1.5 w-[88px] overflow-hidden rounded-full bg-bg-3" aria-hidden>
+        <span className={cn("block h-full rounded-full", done >= total ? "bg-ok" : "bg-warn")} style={{ width: `${width}%` }} />
+      </span>
+      <span className="text-[11px] font-bold tabular-nums text-t2">
+        {done}/{total}
+      </span>
+    </span>
+  );
+}
+
+function SignerLine({ signer, contact }: { signer: SignerProgress; contact: string | null }) {
+  const state = signer.status === "SIGNED" ? "assinou" : signer.status === "DECLINED" ? "recusou" : "pendente";
+  return (
+    <span className="flex min-w-0 items-start gap-1.5">
+      <SignerMark status={signer.status} label={state} />
+      <span className="min-w-0">
+        <span className="block truncate text-[12.5px] font-semibold text-t0">{signer.name}</span>
+        {contact ? <span className="block truncate text-[11px] text-t2">{contact}</span> : null}
+      </span>
+    </span>
+  );
+}
+
+function SignerMark({ status, label }: { status: SignerProgress["status"]; label: string }) {
+  if (status === "SIGNED") {
+    return (
+      <span className="mt-0.5 text-ok" aria-label={label}>
+        <Icon d={icons.check} size={14} />
+      </span>
+    );
+  }
+  if (status === "DECLINED") {
+    return (
+      <span className="mt-0.5 text-bad" aria-label={label}>
+        <Icon d={icons.x} size={14} />
+      </span>
+    );
+  }
+  return (
+    <svg className="mt-0.5 shrink-0 text-warn" width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-label={label}>
+      <circle cx="12" cy="12" r="8" />
+      <path d="M12 8v4.5l2.5 1.5" />
+    </svg>
+  );
+}
+
+function signerContact(signer: SignerProgress, row: DocumentRow, people: PersonRow[]): string | null {
+  const person = findDocumentPerson(people, row);
+  const extra = extraContacts(row.extraSigner).find((item) => item.name.toLowerCase() === signer.name.trim().toLowerCase());
+  const owner = signer.order === 1 || person?.name.trim().toLowerCase() === signer.name.trim().toLowerCase();
+  const email = (extra?.email || (owner ? person?.email : null) || "").trim();
+  const phone = (extra?.whatsapp || (owner ? person?.whatsapp : null) || "").trim();
+  const chosen = signer.channel === "EMAIL" ? email || phone : phone || email;
+  return chosen ? contactLabel(chosen) : null;
+}
+
+function extraContacts(value: unknown): { name: string; email: string | null; whatsapp: string | null }[] {
+  const list = Array.isArray(value) ? value : value ? [value] : [];
+  return list.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const raw = item as Record<string, unknown>;
+    const name = typeof raw.name === "string" ? raw.name.trim() : "";
+    if (!name) return [];
+    return [{
+      name,
+      email: typeof raw.email === "string" ? raw.email : null,
+      whatsapp: typeof raw.whatsapp === "string" ? raw.whatsapp : null,
+    }];
+  });
+}
+
+function contactLabel(value: string): string {
+  if (value.includes("@")) return value.trim();
+  const digits = value.replace(/\D/g, "");
+  const local = digits.startsWith("55") && digits.length > 11 ? digits.slice(2) : digits;
+  if (local.length === 11) return `(${local.slice(0, 2)}) ${local.slice(2, 7)}-${local.slice(7)}`;
+  if (local.length === 10) return `(${local.slice(0, 2)}) ${local.slice(2, 6)}-${local.slice(6)}`;
+  return value.trim();
 }
 
 function RowMenu({
