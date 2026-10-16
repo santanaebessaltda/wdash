@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MutableRefObject } from "react";
-import { Button, Card, Checkbox, FormField, Input, Modal, Skeleton, useToast } from "@/components/ui";
+import { Button, Card, Checkbox, FormField, Input, Modal, useToast } from "@/components/ui";
+import { ConnectionCard, ConnectionSkeleton, PickerRow } from "@/components/wedash/ConnectionList";
 import {
   INTRANET_MALL_ORIGIN,
   intranetMallBaseUrl,
@@ -52,7 +53,10 @@ export function ShoppingSettingsPage() {
   const store = storeRows.length === 1 ? storeRows[0] : null;
   const [account, setAccount] = useState<ShoppingAccount | null>(null);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const [picker, setPicker] = useState(false);
   const [open, setOpen] = useState<MallStep | null>(null);
+  const [confirm, setConfirm] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const canEdit = isOwner(session.role);
   const accountReady = store != null && loadedFor === store.id;
 
@@ -79,6 +83,24 @@ export function ShoppingSettingsPage() {
   }, [session.tenantId, store?.id, store?.pointType]);
 
   const street = store?.pointType === "STREET";
+  const provider = account ? PROVIDERS.find((item) => item.id === account.administrator) : null;
+  const connectedName = account ? shoppingAdministratorName(account.administrator) : "";
+
+  async function disconnect() {
+    if (!store) return;
+    setRemoving(true);
+    const result = await clearShoppingAccount(store.id);
+    setRemoving(false);
+    if (!result.ok) {
+      show(result.message, "danger");
+      return;
+    }
+    setAccount(null);
+    setLoadedFor(store.id);
+    window.dispatchEvent(new Event(SHOPPING_MENU_EVENT));
+    show("Administradora desconectada.", "success");
+    setConfirm(false);
+  }
 
   return (
     <div>
@@ -93,11 +115,7 @@ export function ShoppingSettingsPage() {
             <SelectStoreCard />
           </div>
         ) : (
-          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {PROVIDERS.map((provider) => (
-              <ProviderSkeleton key={provider.id} />
-            ))}
-          </div>
+          <ConnectionSkeleton label="Carregando administradora…" />
         )
       ) : !store ? (
         <Card className="mt-6">
@@ -111,26 +129,87 @@ export function ShoppingSettingsPage() {
             description="Esta configuração está disponível apenas para filiais do tipo Quiosque em shopping."
           />
         </Card>
+      ) : !accountReady ? (
+        <ConnectionSkeleton label="Carregando administradora…" />
       ) : (
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {!accountReady
-            ? PROVIDERS.map((provider) => <ProviderSkeleton key={provider.id} />)
-            : PROVIDERS.map((provider) => {
-                const active = account?.administrator === provider.id ? account : null;
-                return (
-                  <ProviderCard
-                    key={provider.id}
-                    name={provider.name}
-                    logo={provider.logo}
-                    detail={active ? mallDetail(active) : "Informe de vendas"}
-                    connected={active != null}
-                    disabled={!canEdit}
-                    onOpen={() => setOpen(provider.id)}
-                  />
-                );
-              })}
-        </div>
+        <ConnectionCard
+          title="Administradora"
+          hint={
+            account
+              ? `Esta filial já usa o acesso ${accessPhrase(account.administrator)}. Desconecte para trocar.`
+              : "Cada filial usa uma administradora para informar as vendas ao shopping."
+          }
+          connectLabel="Conectar administradora"
+          connectDisabled={!canEdit || account != null}
+          onConnect={() => setPicker(true)}
+          empty="Nenhuma administradora conectada."
+          rows={
+            account
+              ? [
+                  {
+                    key: account.administrator,
+                    name: connectedName,
+                    detail: mallDetail(account),
+                    mark: provider ? (
+                      <img src={provider.logo} alt="" className="h-full w-full object-contain p-1.5" />
+                    ) : (
+                      <span className="text-[11px] font-bold text-t0">{connectedName}</span>
+                    ),
+                    onDisconnect: () => setConfirm(true),
+                  },
+                ]
+              : []
+          }
+        />
       )}
+      <Modal
+        open={picker}
+        onClose={() => setPicker(false)}
+        title="Conectar administradora"
+        footer={
+          <Button variant="outline" onClick={() => setPicker(false)}>
+            Cancelar
+          </Button>
+        }
+      >
+        <p className="mb-3 text-[13.5px] leading-relaxed text-t1">Escolha a administradora desta filial.</p>
+        <div className="flex flex-col gap-2.5">
+          {PROVIDERS.map((item) => (
+            <PickerRow
+              key={item.id}
+              name={item.name}
+              detail="Informe de vendas"
+              mark={<img src={item.logo} alt="" className="h-full w-full object-contain p-1.5" />}
+              onClick={() => {
+                setPicker(false);
+                setOpen(item.id);
+              }}
+            />
+          ))}
+        </div>
+      </Modal>
+      <Modal
+        open={confirm}
+        onClose={() => {
+          if (!removing) setConfirm(false);
+        }}
+        title={account ? (account.administrator === "groupcom" ? "Desconectar o Group COM?" : `Desconectar a ${connectedName}?`) : "Desconectar?"}
+        size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setConfirm(false)} disabled={removing}>
+              Cancelar
+            </Button>
+            <Button variant="danger" onClick={() => void disconnect()} disabled={removing}>
+              {removing ? "Desconectando…" : "Desconectar"}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-[13.5px] leading-relaxed text-t1">
+          A WDash deixa de informar as vendas desta filial ao shopping. Os informes já gravados permanecem.
+        </p>
+      </Modal>
       {store && open ? (
         <AdministratorModal
           open
@@ -145,65 +224,6 @@ export function ShoppingSettingsPage() {
         />
       ) : null}
     </div>
-  );
-}
-
-function ProviderSkeleton() {
-  return (
-    <Card>
-      <div className="mb-3.5 flex items-center gap-3" aria-busy="true" aria-label="Carregando administradora…">
-        <Skeleton className="h-[46px] w-[46px] rounded-[13px]" />
-        <div className="flex-1">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="mt-2 h-3 w-40" />
-        </div>
-      </div>
-      <div className="flex items-center justify-between border-t border-line pt-3">
-        <Skeleton className="h-3.5 w-24" />
-        <Skeleton className="h-8 w-24 rounded-[var(--radius-vela-sm)]" />
-      </div>
-    </Card>
-  );
-}
-
-function ProviderCard({
-  name,
-  logo,
-  detail,
-  connected,
-  disabled,
-  onOpen,
-}: {
-  name: string;
-  logo: string;
-  detail: string;
-  connected: boolean;
-  disabled: boolean;
-  onOpen: () => void;
-}) {
-  const tone = connected ? "text-ok" : "text-t2";
-  const dot = connected ? "bg-ok" : "bg-t2";
-  return (
-    <Card>
-      <div className="mb-3.5 flex items-center gap-3">
-        <span className="flex h-[46px] w-[46px] shrink-0 items-center justify-center overflow-hidden rounded-[13px] border border-line bg-bg-inset">
-          <img src={logo} alt={name} className="h-full w-full object-contain p-1.5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[14.5px] font-bold text-t0">{name}</p>
-          <p className="mt-0.5 truncate text-[11.5px] text-t2">{detail}</p>
-        </div>
-      </div>
-      <div className="flex items-center justify-between border-t border-line pt-3">
-        <span className={`flex items-center gap-1.5 text-xs font-bold ${tone}`}>
-          <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
-          {connected ? "Conectado" : "Desconectado"}
-        </span>
-        <Button size="sm" onClick={onOpen} disabled={disabled}>
-          {connected ? "Gerenciar" : "Conectar"}
-        </Button>
-      </div>
-    </Card>
   );
 }
 

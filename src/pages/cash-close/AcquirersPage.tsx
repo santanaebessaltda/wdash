@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Button, Card, Checkbox, FormField, Input, Modal, Select, Skeleton, useToast } from "@/components/ui";
+import { useCallback, useEffect, useState } from "react";
+import { Button, Checkbox, FormField, Input, Modal, Select, useToast } from "@/components/ui";
+import { ConnectionCard, ConnectionSkeleton, PickerRow } from "@/components/wedash/ConnectionList";
 import {
   disconnectCieloLink,
   disconnectStoneLink,
@@ -20,7 +21,16 @@ import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
 import { useScope } from "@/pages/dashboard/useScope";
 
-/** Integrações > Adquirentes. A chave é da loja, no mesmo desenho do Millennium. */
+type AcquirerKind = "stone" | "cielo";
+
+type ActiveAcquirer = {
+  kind: AcquirerKind;
+  storeId: string;
+  name: string;
+  detail: string;
+};
+
+/** Integrações > Adquirentes. Uma adquirente por filial, no formato da lista de API Keys. */
 export function AcquirersPage() {
   const { show } = useToast();
   const { session, storeRows, loading: storesLoading } = useScopedStores();
@@ -31,8 +41,10 @@ export function AcquirersPage() {
   const [cieloLinks, setCieloLinks] = useState<CieloLink[]>([]);
   const [cieloAccount, setCieloAccount] = useState<CieloAccount | null>(null);
   const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(false);
-  const [cieloOpen, setCieloOpen] = useState(false);
+  const [picker, setPicker] = useState(false);
+  const [connectKind, setConnectKind] = useState<AcquirerKind | null>(null);
+  const [pending, setPending] = useState<ActiveAcquirer | null>(null);
+  const [disconnecting, setDisconnecting] = useState(false);
   const canEdit = isOwner(session.role);
 
   const reload = useCallback(async () => {
@@ -65,63 +77,91 @@ export function AcquirersPage() {
     void reload();
   }, [storesLoading, reload]);
 
-  const stoneStatus = linkStatus(links.length, storeRows.length);
-  const cieloStatus = linkStatus(cieloLinks.length, storeRows.length);
+  const rows: ActiveAcquirer[] = [
+    ...links.map((link) => ({
+      kind: "stone" as const,
+      storeId: link.storeId,
+      name: "Stone",
+      detail: `Stone Code ${link.stoneCode}`,
+    })),
+    ...cieloLinks.map((link) => ({
+      kind: "cielo" as const,
+      storeId: link.storeId,
+      name: "Cielo",
+      detail: `Estabelecimento ${link.establishmentCode}`,
+    })),
+  ];
+  const blocked = rows.length > 0;
+  const hint = blocked
+    ? rows.length === 1
+      ? `Esta filial já está conectada à ${rows[0]!.name}. Desconecte para trocar.`
+      : "Desconecte a adquirente atual para conectar outra."
+    : "Cada filial usa uma adquirente para buscar os fechamentos de cartão e Pix.";
+
+  async function disconnect() {
+    if (!pending) return;
+    setDisconnecting(true);
+    const result = pending.kind === "stone" ? await disconnectStoneLink(pending.storeId) : await disconnectCieloLink(pending.storeId);
+    setDisconnecting(false);
+    if (!result.ok) {
+      show(result.message, "danger");
+      return;
+    }
+    await reload();
+    show(pending.kind === "stone" ? "Stone desconectada." : "Cielo desconectada.", "success");
+    setPending(null);
+  }
 
   return (
     <div>
       <SectionHeader
         section="Integrações"
         title="Adquirentes"
-        subtitle="Conecte as adquirentes desta filial para buscar os fechamentos de cartão e Pix na WDash."
+        subtitle="Conecte a adquirente desta filial para buscar os fechamentos de cartão e Pix na WDash."
       />
       {escolher ? (
         <div className="mt-6 max-w-[720px]">
           <SelectStoreCard />
         </div>
+      ) : showSkeleton || (loading && rows.length === 0 && storeRows.length > 0) ? (
+        <ConnectionSkeleton label="Carregando adquirentes…" />
       ) : (
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {showSkeleton || (loading && links.length === 0 && cieloLinks.length === 0 && storeRows.length > 0) ? (
-          <>
-            <AcquirerSkeleton />
-            <AcquirerSkeleton />
-          </>
-        ) : (
-          <>
-            <AcquirerCard
-              name="Stone"
-              mark={<img src="/stone.png" alt="Stone" className="h-full w-full object-contain p-1.5" />}
-              status={stoneStatus}
-              count={links.length}
-              total={storeRows.length}
-              canEdit={canEdit && storeRows.length > 0}
-              onOpen={() => setOpen(true)}
-            />
-            <AcquirerCard
-              name="Cielo"
-              mark={<span className="text-[13px] font-bold tracking-tight text-t0">Cielo</span>}
-              status={cieloStatus}
-              count={cieloLinks.length}
-              total={storeRows.length}
-              canEdit={canEdit && storeRows.length > 0}
-              onOpen={() => setCieloOpen(true)}
-            />
-          </>
+        <ConnectionCard
+          title="Adquirente"
+          hint={hint}
+          connectLabel="Conectar adquirente"
+          connectDisabled={!canEdit || storeRows.length === 0 || blocked}
+          onConnect={() => setPicker(true)}
+          empty="Nenhuma adquirente conectada."
+          rows={rows.map((row) => ({
+            key: `${row.kind}-${row.storeId}`,
+            name: row.name,
+            detail: row.detail,
+            mark: row.kind === "stone" ? <StoneMark /> : <CieloMark />,
+            onDisconnect: () => setPending(row),
+          }))}
+        />
       )}
-      </div>
-      )}
+      <AcquirerPicker
+        open={picker}
+        onClose={() => setPicker(false)}
+        onPick={(kind) => {
+          setPicker(false);
+          setConnectKind(kind);
+        }}
+      />
       <StoneModal
-        open={open}
+        open={connectKind === "stone"}
         storeRows={storeRows}
         links={links}
         cieloStoreIds={cieloLinks.map((link) => link.storeId)}
-        onClose={() => setOpen(false)}
+        onClose={() => setConnectKind(null)}
         onSaved={async (storeId) => {
           await reload();
           const order = await requestMonthClose([storeId]);
           if (!order.ok) show(order.message, "danger");
           else show("Stone conectada. Buscando os fechamentos deste mês.", "success");
-          setOpen(false);
+          setConnectKind(null);
         }}
         onDisconnected={async () => {
           await reload();
@@ -129,89 +169,76 @@ export function AcquirersPage() {
         }}
       />
       <CieloModal
-        open={cieloOpen}
+        open={connectKind === "cielo"}
         storeRows={storeRows}
         links={cieloLinks}
         account={cieloAccount}
         stoneStoreIds={links.map((link) => link.storeId)}
-        onClose={() => setCieloOpen(false)}
+        onClose={() => setConnectKind(null)}
         onSaved={async (storeId) => {
           await reload();
           const order = await requestMonthClose([storeId]);
           if (!order.ok) show(order.message, "danger");
           else show("Cielo conectada. Buscando os fechamentos deste mês.", "success");
-          setCieloOpen(false);
+          setConnectKind(null);
         }}
         onDisconnected={async () => {
           await reload();
           show("Cielo desconectada.", "success");
         }}
       />
+      <Modal
+        open={pending != null}
+        onClose={() => {
+          if (!disconnecting) setPending(null);
+        }}
+        title={pending ? `Desconectar a ${pending.name}?` : "Desconectar?"}
+        size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setPending(null)} disabled={disconnecting}>
+              Cancelar
+            </Button>
+            <Button variant="danger" onClick={() => void disconnect()} disabled={disconnecting}>
+              {disconnecting ? "Desconectando…" : "Desconectar"}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-[13.5px] leading-relaxed text-t1">
+          A WDash deixa de buscar os fechamentos de cartão e Pix desta filial. Os fechamentos já gravados permanecem.
+        </p>
+      </Modal>
     </div>
   );
 }
 
-function linkStatus(connected: number, total: number): { label: string; tone: string; dot: string } {
-  if (connected === 0 || total === 0) return { label: "Desconectado", tone: "text-t2", dot: "bg-t2" };
-  if (connected === total) return { label: "Conectado", tone: "text-ok", dot: "bg-ok" };
-  return { label: `Parcial · ${connected} de ${total} filiais`, tone: "text-warn", dot: "bg-warn" };
+function StoneMark() {
+  return <img src="/stone.png" alt="" className="h-full w-full object-contain p-1.5" />;
 }
 
-function AcquirerSkeleton() {
-  return (
-    <Card>
-      <div className="mb-3.5 flex items-center gap-3" aria-busy="true" aria-label="Carregando adquirentes…">
-        <Skeleton className="h-[46px] w-[46px] rounded-[13px]" />
-        <div className="flex-1">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="mt-2 h-3 w-40" />
-        </div>
-      </div>
-      <div className="flex items-center justify-between border-t border-line pt-3">
-        <Skeleton className="h-3.5 w-24" />
-        <Skeleton className="h-8 w-24 rounded-[var(--radius-vela-sm)]" />
-      </div>
-    </Card>
-  );
+function CieloMark() {
+  return <span className="text-[13px] font-bold tracking-tight text-t0">Cielo</span>;
 }
 
-function AcquirerCard({
-  name,
-  mark,
-  status,
-  count,
-  canEdit,
-  onOpen,
-}: {
-  name: string;
-  mark: ReactNode;
-  status: { label: string; tone: string; dot: string };
-  count: number;
-  total: number;
-  canEdit: boolean;
-  onOpen: () => void;
-}) {
+function AcquirerPicker({ open, onClose, onPick }: { open: boolean; onClose: () => void; onPick: (kind: AcquirerKind) => void }) {
   return (
-    <Card>
-      <div className="mb-3.5 flex items-center gap-3">
-        <span className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[13px] border border-line bg-bg-inset">
-          {mark}
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[14.5px] font-bold text-t0">{name}</p>
-          <p className="mt-0.5 text-[11.5px] text-t2">Cartão e Pix</p>
-        </div>
-      </div>
-      <div className="flex items-center justify-between border-t border-line pt-3">
-        <span className={`flex items-center gap-1.5 text-xs font-bold ${status.tone}`}>
-          <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} />
-          {status.label}
-        </span>
-        <Button size="sm" onClick={onOpen} disabled={!canEdit}>
-          {count > 0 ? "Gerenciar" : "Conectar"}
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Conectar adquirente"
+      footer={
+        <Button variant="outline" onClick={onClose}>
+          Cancelar
         </Button>
+      }
+    >
+      <p className="mb-3 text-[13.5px] leading-relaxed text-t1">Escolha a adquirente desta filial.</p>
+      <div className="flex flex-col gap-2.5">
+        <PickerRow name="Stone" detail="Cartão e Pix" mark={<StoneMark />} onClick={() => onPick("stone")} />
+        <PickerRow name="Cielo" detail="Cartão e Pix" mark={<CieloMark />} onClick={() => onPick("cielo")} />
       </div>
-    </Card>
+    </Modal>
   );
 }
 
