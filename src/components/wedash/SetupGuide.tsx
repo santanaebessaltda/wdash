@@ -1,10 +1,9 @@
 import { useState, type ReactNode } from "react";
 import { Button, Modal } from "@/components/ui";
 
-export type SetupGuideScreen = "team" | "staff" | "goals" | "challenges";
+export type SetupGuideScreen = "staff" | "goals" | "challenges";
 
 const SCREEN_LEAD: Record<SetupGuideScreen, string> = {
-  team: "O ranking e o pódio mostram somente quem vende. Participa quem estiver ativo no Millennium com cargo Vendedor. Gerência, operador de caixa e usuário da filial aparecem em Gestão > Equipe, mas não competem no ranking.",
   staff:
     "A lista mostra a equipe que a WDash leu no Millennium para esta filial. Use Atualizar equipe para buscar alterações feitas no Millennium. O grupo e o acesso à WDash são configurados aqui. O cargo do Millennium não cria acesso.",
   goals:

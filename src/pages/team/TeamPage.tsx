@@ -16,10 +16,8 @@ import {
 } from "@/data/wedash/dashboard";
 import { fetchSalesCoverage, fetchSalesDayAggs, fetchSalesSellerDayAggs } from "@/data/wedash/salesRepo";
 import { fetchGoals, fetchGoalTeam, type GoalRecord, type GoalTeamMember } from "@/data/wedash/goalsRepo";
-import { buildGoalCardView, goalStatus, sellerGoalLevels, type SellerGoalLevel } from "@/data/wedash/goalView";
-import { GoalLevelSummary } from "@/components/wedash/GoalLevelsBar";
+import { buildGoalCardView, goalStatus, sellerGoalLevels } from "@/data/wedash/goalView";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
-import { SetupGuide } from "@/components/wedash/SetupGuide";
 import type { SalesDayAgg, SalesSellerDayAgg } from "@/data/wedash/salesTypes";
 import { storesForSession } from "@/data/wedash/stores";
 import { teamChallengesReturn, teamGoalsReturn } from "@/pages/goals/backPath";
@@ -303,7 +301,6 @@ export function TeamPage() {
       }),
     [goalsData, todayIso],
   );
-  const hasGoalColumn = goalsData.goals.length > 0;
 
   const dateRange = useMemo(() => dateRangeFromPeriod(scope.period), [scope.period]);
   const currentPeriod = resolvePeriod(scope.period, calendarTodayIso());
@@ -412,7 +409,6 @@ export function TeamPage() {
                   options={[{ value: "", label: "Todos os grupos" }, ...view.availableShifts.map((t) => ({ value: t, label: t }))]}
                 />
               )}
-              <SetupGuide screen="team" />
               <Button variant="primary" onClick={exportValue}>
                 Exportar
               </Button>
@@ -697,7 +693,6 @@ export function TeamPage() {
                   <ThSort label="P.A." active={sortKey === "pa"} dir={sortDir} onClick={() => toggleSort("pa")} className="px-1 pb-3" />
                   <ThSort label="Participação" active={sortKey === "participationPct"} dir={sortDir} onClick={() => toggleSort("participationPct")} className="px-1 pb-3" />
                   <ThSort label="Variação" active={sortKey === "variationPct"} dir={sortDir} onClick={() => toggleSort("variationPct")} className="px-1 pb-3" />
-                  {hasGoalColumn && <th className="pb-3 pl-5 pr-1 text-left font-bold">Nível da meta</th>}
                 </tr>
               </thead>
               <tbody>
@@ -746,7 +741,6 @@ export function TeamPage() {
                           </span>
                         </Tooltip>
                       </td>
-                      {hasGoalColumn && <GoalLevelCell level={goalLevels.get(p.key)} complete={!printing} />}
                     </tr>
                   );
                 })}
@@ -775,7 +769,6 @@ export function TeamPage() {
                       </span>
                     </Tooltip>
                   </td>
-                  {hasGoalColumn && <td />}
                 </tr>
               </tbody>
             </table>
@@ -793,16 +786,6 @@ export function TeamPage() {
       </div>
     );
   }
-}
-
-/** Barra da meta da pessoa com os niveis (N1  |  nome (premiacao %)); sem meta = " - ". */
-function GoalLevelCell({ level, complete }: { level?: SellerGoalLevel; complete: boolean }) {
-  if (!level) return <td className="py-3 pl-5 pr-1 text-[13px] text-t2">—</td>;
-  return (
-    <td className="py-3 pl-5 pr-1 align-middle">
-      <GoalLevelSummary pct={level.attainmentPct} level={level.level} levelNumber={level.levelNumber} marcos={level.marcos} complete={complete} />
-    </td>
-  );
 }
 
 function WithoutResult({ hasDados, onClear }: { hasDados: boolean; onClear: () => void }) {
