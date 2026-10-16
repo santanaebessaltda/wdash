@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Badge, Button, DataTable, Dropdown, EmptyState, FormField, Modal, Card, CardTitle, useToast, type DataTableColumn, type DropdownItem } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { HeaderFilter, HeaderSearch } from "@/pages/dashboard/HeaderFilter";
@@ -10,6 +10,7 @@ import type { BatchRow, DocumentRow, PersonRow } from "@/data/wedash/documentsRe
 import { cancelDocument, copyDocumentLink, moveDocument, openDocument, resendDocument } from "@/data/wedash/documentsRepo";
 import { DocumentsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
+import { HeaderFilters } from "@/pages/stock/shared";
 import { DocumentsFrame, FileGlyph, FolderGlyph, STATUS_LABEL, badgeVariant } from "./frame";
 import { useDocuments } from "./useDocuments";
 
@@ -44,13 +45,15 @@ export function DocumentsPage() {
   const { allStores, batches, documents, people, stores, loading, reload } = useDocuments();
   const showSkeleton = useMinSkeleton(loading);
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { show } = useToast();
-  const flash = (useLocation().state ?? null) as { documentNotice?: string | null } | null;
+  const flash = (location.state ?? null) as { documentNotice?: string | null } | null;
   const flashed = useRef(false);
-  const [crumb, setCrumb] = useState<string[]>([]);
+  const crumb = (searchParams.get("pasta") ?? "").split("/").filter(Boolean);
+  const view: LibraryView = searchParams.get("visao") === "documentos" ? "documents" : "folders";
   const [query, setQuery] = useState("");
   const [peopleFilter, setPeopleFilter] = useState<PeopleFilter>("all");
-  const [view, setView] = useState<LibraryView>("folders");
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [moveId, setMoveId] = useState<string | null>(null);
   const [moveSeller, setMoveSeller] = useState("");
@@ -139,20 +142,27 @@ export function DocumentsPage() {
     : [];
   const peopleHere = listedPeople.filter((person) => !allStores || crumb[0] == null || person.storeId === crumb[0]);
 
+  function place(nextCrumb: string[], nextView: LibraryView = view, clearQuery = true) {
+    const params = new URLSearchParams(searchParams);
+    if (nextCrumb.length > 0) params.set("pasta", nextCrumb.join("/"));
+    else params.delete("pasta");
+    if (nextView === "documents") params.set("visao", "documentos");
+    else params.delete("visao");
+    setSearchParams(params, { state: location.state });
+    if (clearQuery) setQuery("");
+  }
+
   function goRoot() {
-    setCrumb([]);
-    setQuery("");
+    place([]);
   }
 
   function goUp() {
-    setCrumb((current) => current.slice(0, -1));
-    setQuery("");
+    place(crumb.slice(0, -1));
   }
 
   function openFolder(key: string) {
     const found = folderSearch?.folders.find((folder) => folder.key === key);
-    setCrumb(found?.path ?? [...crumb, key]);
-    setQuery("");
+    place(found?.path ?? [...crumb, key]);
   }
 
   const trail = crumb.length === 0 ? [] : [
@@ -160,10 +170,7 @@ export function DocumentsPage() {
     ...(allStores ? [{ label: "Filiais", onClick: goRoot as (() => void) | null }] : []),
     ...crumb.map((key, index) => ({
       label: crumbLabel(key, storeName, storeCnpj, personName),
-      onClick: index === crumb.length - 1 ? null : () => {
-        setCrumb(crumb.slice(0, index + 1));
-        setQuery("");
-      },
+      onClick: index === crumb.length - 1 ? null : () => place(crumb.slice(0, index + 1)),
     })),
   ];
 
@@ -228,18 +235,8 @@ export function DocumentsPage() {
       title="Documentos"
       subtitle="Organize documentos da equipe e acompanhe as assinaturas."
       actions={
-        <>
+        <HeaderFilters>
           <HeaderSearch value={query} onChange={setQuery} placeholder="Buscar documentos ou pessoas" width={260} />
-          <HeaderFilter
-            label="Status"
-            value={peopleFilter}
-            onChange={setPeopleFilter}
-            options={[
-              { value: "all", label: "Todos os status" },
-              { value: "active", label: "Ativos" },
-              { value: "inactive", label: "Desligados" },
-            ]}
-          />
           <div className="flex gap-1 rounded-[11px] border border-line bg-bg-2 p-1" role="group" aria-label="Visualização">
             {(
               [
@@ -251,15 +248,25 @@ export function DocumentsPage() {
                 key={value}
                 type="button"
                 aria-pressed={view === value}
-                onClick={() => setView(value)}
+                onClick={() => place(crumb, value, false)}
                 className={cn("rounded-lg px-3 py-1.5 text-[12.5px] font-bold transition-colors", view === value ? "bg-acc text-white" : "text-t1 hover:text-t0")}
               >
                 {label}
               </button>
             ))}
           </div>
+          <HeaderFilter
+            label="Status"
+            value={peopleFilter}
+            onChange={setPeopleFilter}
+            options={[
+              { value: "all", label: "Todos os status" },
+              { value: "active", label: "Ativos" },
+              { value: "inactive", label: "Desligados" },
+            ]}
+          />
           <Button onClick={() => navigate(paths.documentAttach)}>Anexar documento</Button>
-        </>
+        </HeaderFilters>
       }
     >
       {showSkeleton ? (
