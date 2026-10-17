@@ -1,3 +1,4 @@
+import { parseRentSeasons, type RentSeason } from "./rentSeason";
 import { defaultWeekHours, effectiveWeekHours, openHourFloor, closeHourCeil, parseWeekHours, type StoreWeekHours } from "./storeHours";
 import { collaboratorName, shiftName } from "@/lib/format";
 import { SELLER_ROLE } from "./engine/goalRows";
@@ -52,6 +53,8 @@ export interface StoreCosts {
   rentWpinkPct: number | null;
   /** Aluguel R$/mes: o % do faturamento so soma o que passar dele (aluguel do mes = maior entre os dois). */
   rentMin: number | null;
+  /** Fator do mínimo em meses de sazonalidade. Vazio = todo mês vale 1×. */
+  rentSeasons: RentSeason[];
 }
 
 export const EMPTY_STORE_COSTS: StoreCosts = {
@@ -62,6 +65,7 @@ export const EMPTY_STORE_COSTS: StoreCosts = {
   rentWepinkPct: null,
   rentWpinkPct: null,
   rentMin: null,
+  rentSeasons: [],
 };
 
 /** Campos obrigatorios da loja (WPINK so se a loja vende WPINK). */
@@ -331,6 +335,7 @@ function rowToStore(r: {
   rent_wepink_pct?: number | string | null;
   rent_wpink_pct?: number | string | null;
   rent_min_cents?: number | string | null;
+  rent_seasons?: unknown;
   point_type?: string | null;
   cost_table_id?: number | string | null;
   active?: boolean | null;
@@ -361,6 +366,7 @@ function rowToStore(r: {
       rentWepinkPct: num(r.rent_wepink_pct),
       rentWpinkPct: num(r.rent_wpink_pct),
       rentMin: rentCents == null ? null : rentCents / 100,
+      rentSeasons: parseRentSeasons(r.rent_seasons),
     },
     costTableId: num(r.cost_table_id),
     active: r.active !== false,
@@ -368,7 +374,7 @@ function rowToStore(r: {
 }
 
 const STORE_COST_COLUMNS =
-  "royalties_wepink_pct, royalties_wpink_pct, marketing_wepink_pct, marketing_wpink_pct, rent_wepink_pct, rent_wpink_pct, rent_min_cents";
+  "royalties_wepink_pct, royalties_wpink_pct, marketing_wepink_pct, marketing_wpink_pct, rent_wepink_pct, rent_wpink_pct, rent_min_cents, rent_seasons";
 const STORE_COST_TABLE_COLUMN = "cost_table_id";
 const STORE_POINT_TYPE_COLUMN = "point_type";
 
@@ -653,6 +659,7 @@ export async function updateStoreCosts(
         rent_wepink_pct: costs.rentWepinkPct,
         rent_wpink_pct: costs.rentWpinkPct,
         rent_min_cents: costs.rentMin == null ? null : Math.round(costs.rentMin * 100),
+        rent_seasons: costs.rentSeasons ?? [],
         ...(pointType ? { point_type: pointType === "STREET" ? "STREET" : "MALL" } : {}),
       })
       .eq("id", storeId);

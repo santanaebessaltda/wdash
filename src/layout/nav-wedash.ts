@@ -79,11 +79,18 @@ const integrations: NavGroup = {
   ],
 };
 
-/** Dados da filial (só Gestor). Página direta, sem submenu. */
-const settings: NavSingle = {
+/** Dados da filial (só Gestor). */
+const settings: NavGroup = {
   label: "Configurações",
+  description: "Configure a filial, o funcionamento e os custos usados no resultado.",
   icon: ICON.gear,
-  to: paths.operation.branch,
+  items: [
+    { label: "Filial", to: paths.operation.branch },
+    { label: "Funcionamento", to: paths.operation.hours },
+    { label: "Royalties e marketing", to: paths.operation.royalties },
+    { label: "Aluguel", to: paths.operation.rentPage },
+    { label: "Custo dos produtos", to: paths.operation.productsTaxes },
+  ],
 };
 
 /** Tira Shopping e Informe de vendas quando a filial selecionada não entra na regra. */
@@ -105,6 +112,7 @@ export function applyShoppingMenu(entries: NavEntry[], menu: { settings: boolean
 export const performanceTabs = performance.items.map(({ label, to }) => ({ label, to }));
 export const financeTabs = finance.items.map(({ label, to }) => ({ label, to }));
 export const integrationTabs = integrations.items.map(({ label, to }) => ({ label, to }));
+export const settingsTabs = settings.items.map(({ label, to }) => ({ label, to }));
 
 const navOwner: NavEntry[] = [
   {

@@ -42,7 +42,7 @@ export function StoreHoursNotice() {
       variant="warning"
       className="mt-4"
       title={title}
-      action={<AlertLink onClick={() => navigate(paths.operation.branch)}>Configurar funcionamento</AlertLink>}
+      action={<AlertLink onClick={() => navigate(paths.operation.hours)}>Configurar funcionamento</AlertLink>}
     >
       {without.length === 1
         ? "As vendas dessa filial só são atualizadas pelo botão Atualizar até o horário ser configurado."

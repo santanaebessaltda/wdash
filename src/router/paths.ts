@@ -80,8 +80,11 @@ export const paths = {
     store: "/operation/store",
     franchise: "/operation/franchise",
     rent: "/operation/rent",
-    /** Tipo, horário, franquia e aluguel. */
+    /** Tipo da filial. */
     branch: "/settings/branch",
+    hours: "/settings/hours",
+    royalties: "/settings/royalties",
+    rentPage: "/settings/rent",
     productsTaxes: "/settings/products-and-taxes",
     /** Stone de cada loja. Fica em Integrações: a chave é da filial, não do ERP da conta. */
     acquirers: "/settings/acquirers",

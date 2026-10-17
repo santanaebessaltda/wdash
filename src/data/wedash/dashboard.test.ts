@@ -1625,6 +1625,22 @@ describe("buildFinanceView com agregados reais", () => {
       expect(total).toBeCloseTo(200);
     });
 
+    it("dezembro em 2× dobra o mínimo do recorte", () => {
+      const store = stores.find((s) => s.id === "f1")!;
+      const before = store.costs;
+      store.costs = { ...EMPTY_STORE_COSTS, rentMin: 3100, rentWepinkPct: 0, rentWpinkPct: 0, rentSeasons: [{ month: 12, yearMonth: null, factor: 2 }] };
+      try {
+        const v = buildFinanceView(
+          { storeIds: ["f1"], period: { kind: "custom", start: "2025-12-01", end: "2025-12-01" }, division: null },
+          { dayAggs: [day("2025-12-01", 100, 40)] },
+        );
+        const line = v.franchiseFixedCosts.find((l) => l.label === "Aluguel")?.amount;
+        expect(line).toBeCloseTo(200);
+      } finally {
+        store.costs = before;
+      }
+    });
+
     it("só %: linha Aluguel percentual com o valor inteiro", () => {
       const { line, total } = run(null, 10);
       expect(line("Aluguel")).toBeUndefined();

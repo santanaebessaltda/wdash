@@ -8,6 +8,7 @@
  * AD-048  -  KPIs com subtitulo so do proprio indicador; grafico compara
  * periodos no mesmo eixo (padrao Finance / Revenue vs expenses).
  */
+import { rentSeasonFactor } from "./rentSeason";
 import { categories, stores, productStores, tasks, groups, storeOperatingCostsConfigured, type Division, type Store } from "./stores";
 import { goalOfStore } from "./goals";
 import { productsOfCategory } from "./products";
@@ -1980,6 +1981,8 @@ export type FinanceAggInput = {
   productCostDayAggs?: import("./salesTypes").SalesProductCostDayAgg[];
   /** COD_PRODUTO  ->  descricao (catalogo), para o aviso de produtos sem custo. */
   productNames?: Record<string, string>;
+  /** Dia informado ao shopping, em centavos. Chave `loja|dia`. Sem a chave, o % usa o faturamento. */
+  informedCents?: Record<string, number>;
 };
 
 /** Produto vendido com custo R$ 0 no Millennium (CMV e margem ficam otimistas). */
@@ -2114,9 +2117,14 @@ export function buildFinanceViewFromAggs(scope: Scope, input: FinanceAggInput): 
     const c = storeCostRates(f);
     const w = incluiWepink ? wepink.rev : 0;
     const p = incluiWpink ? wpink.rev : 0;
-    const daysMonth = daysInMonth(iso.slice(0, 7));
-    const rentPct = (w * c.rentWepinkPct + p * c.rentWpinkPct) / 100;
-    const rentMinBase = c.rentMin / daysMonth;
+    const yearMonth = iso.slice(0, 7);
+    const daysMonth = daysInMonth(yearMonth);
+    const informed = input.informedCents?.[`${f.id}|${iso}`];
+    const rentPct =
+      f.pointType === "SHOPPING" && !division && informed != null
+        ? (informed / 100) * c.rentWepinkPct / 100
+        : (w * c.rentWepinkPct + p * c.rentWpinkPct) / 100;
+    const rentMinBase = (c.rentMin * rentSeasonFactor(f.costs?.rentSeasons, yearMonth)) / daysMonth;
     return {
       ...m,
       rentPct,

@@ -106,15 +106,15 @@ export function useFirstSteps(storeIds: string[] = []) {
 function stepAction(step: FirstStep): { label: string; to: string } | null {
   switch (step.id) {
     case "hours":
-      return { label: "Configurar funcionamento", to: paths.operation.branch };
+      return { label: "Configurar funcionamento", to: paths.operation.hours };
     case "groups":
       return step.needsGroups
         ? { label: "Criar grupos", to: paths.management.team }
         : { label: "Vincular vendedores", to: paths.management.team };
     case "franchise":
-      return { label: "Configurar franquia", to: paths.operation.branch };
+      return { label: "Configurar franquia", to: paths.operation.royalties };
     case "rent":
-      return { label: "Configurar aluguel", to: paths.operation.branch };
+      return { label: "Configurar aluguel", to: paths.operation.rentPage };
     default:
       return null;
   }

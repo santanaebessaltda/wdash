@@ -23,6 +23,7 @@ import {
   fetchSalesProductCostDayAggs,
   fetchProductNames,
 } from "@/data/wedash/salesRepo";
+import { fetchInformedCents } from "@/data/wedash/shoppingRepo";
 import { ProductsWithoutCostNotice } from "@/pages/dashboard/ProductsWithoutCostNotice";
 import type { SalesHourAgg } from "@/data/wedash/salesTypes";
 import { calendarTodayIso } from "@/data/wedash/clock";
@@ -206,7 +207,7 @@ export default function FinancePage() {
     const costRange = productsFetchRange(scope);
     const storeIds = scope.storeIds;
     try {
-      const [dayAggs, hourAggs, prevHourAggs, paymentDayAggs, productCostDayAggs, cov] = await Promise.all([
+      const [dayAggs, hourAggs, prevHourAggs, paymentDayAggs, productCostDayAggs, cov, informedCents] = await Promise.all([
         fetchSalesDayAggs({ tenantId: session.tenantId, storeIds, from: range.from, to: range.to, brand: null }),
         period.start === period.end
           ? fetchSalesHourAggs({ tenantId: session.tenantId, storeIds, day: period.start, brand: null })
@@ -217,6 +218,7 @@ export default function FinancePage() {
         fetchSalesPaymentDayAggs({ tenantId: session.tenantId, storeIds, from: period.start, to: period.end }),
         fetchSalesProductCostDayAggs({ tenantId: session.tenantId, storeIds, from: costRange.from, to: costRange.to }),
         fetchSalesCoverage(session.tenantId, storeIds),
+        fetchInformedCents(session.tenantId, storeIds, range.from, range.to).catch(() => ({})),
       ]);
       const productNames = await fetchProductNames(
         productCostDayAggs
@@ -224,7 +226,7 @@ export default function FinancePage() {
           .map((r) => r.productCode),
       );
       if (gen !== reloadGen.current) return;
-      setAggs({ dayAggs, hourAggs, prevHourAggs, paymentDayAggs, productCostDayAggs, productNames });
+      setAggs({ dayAggs, hourAggs, prevHourAggs, paymentDayAggs, productCostDayAggs, productNames, informedCents });
       setCoverageFrom(cov.from ? isoToDate(cov.from) : null);
       settle(key);
     } catch (e) {
@@ -489,7 +491,7 @@ export default function FinancePage() {
               title="Custos não configurados"
               description="Configure franquia e aluguel para acompanhar o resultado operacional."
               action={
-                <Button size="sm" onClick={() => navigate(paths.operation.branch)}>
+                <Button size="sm" onClick={() => navigate(paths.operation.royalties)}>
                   Configurar custos
                 </Button>
               }

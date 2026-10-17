@@ -13,7 +13,11 @@ export type CostField = {
   set: (c: StoreCosts, v: number | null) => StoreCosts;
 };
 
-export const pctField = (key: keyof StoreCosts, label: string, hint?: string): CostField => ({
+type CostNumberKey = {
+  [K in keyof StoreCosts]: StoreCosts[K] extends number | null ? K : never;
+}[keyof StoreCosts];
+
+export const pctField = (key: CostNumberKey, label: string, hint?: string): CostField => ({
   key,
   label,
   hint,

@@ -24,6 +24,25 @@ export async function fetchShoppingAccount(tenantId: string, storeId: string): P
   return shoppingAccountView(data);
 }
 
+/** Dias informados das filiais. A chave é `loja|dia`, em centavos. */
+export async function fetchInformedCents(tenantId: string, storeIds: string[], from: string, to: string): Promise<Record<string, number>> {
+  const { getSupabase } = await import("@/lib/supabase");
+  const sb = getSupabase();
+  if (!sb) return {};
+  let query = sb
+    .from("shopping_day")
+    .select("store_id, day, launched_cents")
+    .eq("tenant_id", tenantId)
+    .gte("day", from)
+    .lte("day", to);
+  if (storeIds.length > 0) query = query.in("store_id", storeIds);
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  const out: Record<string, number> = {};
+  for (const row of data ?? []) out[`${row.store_id}|${String(row.day).slice(0, 10)}`] = Number(row.launched_cents) || 0;
+  return out;
+}
+
 /** Dias que o shopping aceitou. A chave é a data. */
 export async function fetchLaunchedDays(tenantId: string, storeId: string, from: string, to: string): Promise<Record<string, number>> {
   const { getSupabase } = await import("@/lib/supabase");

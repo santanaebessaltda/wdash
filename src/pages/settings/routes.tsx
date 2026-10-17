@@ -46,7 +46,10 @@ export const settingsRoutes: RouteObject[] = [
     element: <RequireRole roles={OWNER_ROLES} />,
     children: [
       { path: paths.operation.branch, element: <BranchPage /> },
-      { path: paths.operation.productsTaxes, element: <Navigate to={paths.operation.branch} replace /> },
+      { path: paths.operation.hours, element: <BranchPage /> },
+      { path: paths.operation.royalties, element: <BranchPage /> },
+      { path: paths.operation.rentPage, element: <BranchPage /> },
+      { path: paths.operation.productsTaxes, element: <BranchPage /> },
       { path: paths.operation.acquirers, element: <AcquirersPage /> },
       { path: paths.operation.shopping, element: <ShoppingSettingsPage /> },
     ],
