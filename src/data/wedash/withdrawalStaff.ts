@@ -1,5 +1,5 @@
 import { type WithdrawalPerson } from "@/data/wedash/employeeWithdrawal";
-import { titleName } from "@/lib/format";
+import { collaboratorName } from "@/lib/format";
 import { getSupabase } from "@/lib/supabase";
 
 /** Gestores e gerentes ativos da tela Usuários. Convite sem nome fica de fora. */
@@ -15,7 +15,7 @@ export async function fetchWithdrawalStaff(tenantId: string): Promise<Withdrawal
   const people: WithdrawalPerson[] = [];
   for (const row of (data ?? []) as { id?: string | null; name?: string | null }[]) {
     const id = row.id?.trim() ?? "";
-    const name = titleName(row.name);
+    const name = collaboratorName(row.name);
     if (!id || !name) continue;
     people.push({ id, name, active: true });
   }
