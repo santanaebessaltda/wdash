@@ -51,7 +51,7 @@ import {
   type OnlinePixDraftRow,
 } from "@/data/wedash/onlinePix";
 import { fetchSalesDayAggs, fetchSyncWatermark } from "@/data/wedash/salesRepo";
-import { fetchStoreSellers, storesForSession, type Store, type StoreSeller } from "@/data/wedash/stores";
+import { fetchStoreSellers, isBranchUser, storesForSession, type Store, type StoreSeller } from "@/data/wedash/stores";
 import { fetchWithdrawalStaff } from "@/data/wedash/withdrawalStaff";
 import { isOwner } from "@/layout/nav-wedash";
 import { cn } from "@/lib/cn";
@@ -507,7 +507,13 @@ export function CashClosePage() {
   const bandKey = `${storeKey}|${from}|${to}|${reloadKey}`;
 
   const storeIdValue = storeRows[0]?.id ?? "";
-  const sellerStoresKey = useMemo(() => storesForSession(session.stores).map((store) => store.id).join(","), [session.stores]);
+  const sessionStores = useMemo(() => storesForSession(session.stores), [session.stores]);
+  const sellerStoresKey = useMemo(() => sessionStores.map((store) => store.id).join(","), [sessionStores]);
+  const branches = useMemo(() => {
+    const map = new Map<string, { branchCode: string; millenniumBranch: number }>();
+    for (const store of sessionStores) map.set(store.id, { branchCode: store.branchCode, millenniumBranch: store.millenniumBranch });
+    return map;
+  }, [sessionStores]);
   useEffect(() => {
     if (storesLoading || !sellerStoresKey) return;
     let stop = false;
@@ -812,6 +818,7 @@ export function CashClosePage() {
         tenantId={session.tenantId}
         soldByStore={soldToday?.byStore ?? null}
         sellersByStore={sellersByStore}
+        branches={branches}
         withdrawalStaff={withdrawalStaff}
         onClose={() => setDayOpen(null)}
         onSaved={(next) => {
@@ -961,16 +968,23 @@ function Month({
 
 function withdrawalChoices(
   sellersByStore: Map<string, StoreSeller[]>,
+  branches: Map<string, { branchCode: string; millenniumBranch: number }>,
   staff: WithdrawalPerson[],
   storeId: string,
   savedIds: string[],
 ) {
+  const saved = new Set(savedIds);
   return mergeWithdrawalPeople(
     [
-      ...[...sellersByStore.entries()].map(([id, sellers]) => ({
-        storeId: id,
-        people: sellers.map((seller) => ({ id: seller.id, name: seller.name, active: seller.active })),
-      })),
+      ...[...sellersByStore.entries()].map(([id, sellers]) => {
+        const branch = branches.get(id);
+        return {
+          storeId: id,
+          people: sellers
+            .filter((seller) => saved.has(seller.id) || !branch || !isBranchUser(seller.code, branch))
+            .map((seller) => ({ id: seller.id, name: seller.name, active: seller.active })),
+        };
+      }),
       { storeId: "", people: staff },
     ],
     savedIds,
@@ -989,6 +1003,7 @@ function DayModal({
   tenantId,
   soldByStore,
   sellersByStore,
+  branches,
   withdrawalStaff,
   onClose,
   onSaved,
@@ -1003,6 +1018,7 @@ function DayModal({
   tenantId: string;
   soldByStore: Record<string, number> | null;
   sellersByStore: Map<string, StoreSeller[]>;
+  branches: Map<string, { branchCode: string; millenniumBranch: number }>;
   withdrawalStaff: WithdrawalPerson[];
   onClose: () => void;
   onSaved: (review: CashCloseReview) => void;
@@ -1118,6 +1134,7 @@ function DayModal({
       const review = reviews.find((item) => item.storeId === store.id && item.day === day);
       const people = withdrawalChoices(
         sellersByStore,
+        branches,
         withdrawalStaff,
         store.id,
         (withdrawalDrafts[store.id]?.rows ?? []).map((row) => row.sellerId),
@@ -1228,6 +1245,7 @@ function DayModal({
             const conta = closeDayGap(lines);
             const people = withdrawalChoices(
               sellersByStore,
+              branches,
               withdrawalStaff,
               store.id,
               (withdrawalDrafts[store.id]?.rows ?? []).map((row) => row.sellerId),
