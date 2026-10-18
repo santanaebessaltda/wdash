@@ -36,8 +36,8 @@ import { calendarTodayIso } from "@/data/wedash/clock";
 import { periodLabels } from "@/data/wedash/dashboard";
 import {
   dayShortageCents,
+  mergeWithdrawalPeople,
   withdrawalDraftFrom,
-  withdrawalPeople,
   withdrawalSave,
   type WithdrawalDraft,
 } from "@/data/wedash/employeeWithdrawal";
@@ -50,7 +50,7 @@ import {
   type OnlinePixDraftRow,
 } from "@/data/wedash/onlinePix";
 import { fetchSalesDayAggs, fetchSyncWatermark } from "@/data/wedash/salesRepo";
-import { fetchStoreSellers, type Store, type StoreSeller } from "@/data/wedash/stores";
+import { fetchStoreSellers, storesForSession, type Store, type StoreSeller } from "@/data/wedash/stores";
 import { isOwner } from "@/layout/nav-wedash";
 import { cn } from "@/lib/cn";
 import { brlCent, longDate, isoToDate, endOfMonth, startOfMonth, dateToIso, addDays, labelUpper } from "@/lib/format";
@@ -504,16 +504,17 @@ export function CashClosePage() {
   const bandKey = `${storeKey}|${from}|${to}|${reloadKey}`;
 
   const storeIdValue = storeRows[0]?.id ?? "";
+  const sellerStoresKey = useMemo(() => storesForSession(session.stores).map((store) => store.id).join(","), [session.stores]);
   useEffect(() => {
-    if (storesLoading || escolher || storeRows.length === 0) return;
+    if (storesLoading || !sellerStoresKey) return;
     let stop = false;
-    void fetchStoreSellers(session.tenantId, storeRows.map((store) => store.id)).then((map) => {
+    void fetchStoreSellers(session.tenantId, sellerStoresKey.split(",")).then((map) => {
       if (!stop) setSellersByStore(map);
     });
     return () => {
       stop = true;
     };
-  }, [storesLoading, escolher, session.tenantId, storeRows]);
+  }, [storesLoading, session.tenantId, sellerStoresKey]);
   useEffect(() => {
     if (storesLoading || escolher || !storeIdValue) return;
     let stop = false;
@@ -944,6 +945,17 @@ function Month({
   );
 }
 
+function withdrawalChoices(sellersByStore: Map<string, StoreSeller[]>, storeId: string, savedIds: string[]) {
+  return mergeWithdrawalPeople(
+    [...sellersByStore.entries()].map(([id, sellers]) => ({
+      storeId: id,
+      people: sellers.map((seller) => ({ id: seller.id, name: seller.name, active: seller.active })),
+    })),
+    savedIds,
+    storeId,
+  );
+}
+
 function DayModal({
   day,
   storeRows,
@@ -1080,8 +1092,9 @@ function DayModal({
         return;
       }
       const review = reviews.find((item) => item.storeId === store.id && item.day === day);
-      const people = withdrawalPeople(
-        (sellersByStore.get(store.id) ?? []).map((seller) => ({ id: seller.id, name: seller.name, active: seller.active })),
+      const people = withdrawalChoices(
+        sellersByStore,
+        store.id,
         (withdrawalDrafts[store.id]?.rows ?? []).map((row) => row.sellerId),
       );
       const retiro = withdrawalSave({
@@ -1089,7 +1102,7 @@ function DayModal({
         enabled: withdrawalDrafts[store.id]?.enabled ?? false,
         rows: withdrawalDrafts[store.id]?.rows ?? [],
         parseCents: fieldToCents,
-        names: new Map(people.map((person) => [person.id, person.name])),
+        names: people.names,
       });
       if (!retiro.ok) {
         setBusy(false);
@@ -1188,8 +1201,9 @@ function DayModal({
             }, 0);
             const lines = withCashWithdrawal(linesWithDraft(view.lines, draft), retirada);
             const conta = closeDayGap(lines);
-            const people = withdrawalPeople(
-              (sellersByStore.get(store.id) ?? []).map((seller) => ({ id: seller.id, name: seller.name, active: seller.active })),
+            const people = withdrawalChoices(
+              sellersByStore,
+              store.id,
               (withdrawalDrafts[store.id]?.rows ?? []).map((row) => row.sellerId),
             );
             return (
@@ -1248,7 +1262,9 @@ function DayModal({
                 <EmployeeWithdrawal
                   owner={owner}
                   typedCents={lines.find((line) => line.key === "cash")?.typedCents ?? 0}
-                  people={people}
+                  people={people.people}
+                  names={people.names}
+                  canonicalId={people.canonicalId}
                   draft={withdrawalDrafts[store.id] ?? { enabled: false, rows: [] }}
                   onChange={(next) => setWithdrawalDrafts((current) => ({ ...current, [store.id]: next }))}
                   toCents={fieldToCents}

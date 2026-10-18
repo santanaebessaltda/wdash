@@ -4,6 +4,7 @@ import {
   netCloseDiff,
   parseWithdrawalRows,
   withdrawalDraftFrom,
+  mergeWithdrawalPeople,
   withdrawalPeople,
   withdrawalPreview,
   withdrawalSave,
@@ -141,6 +142,47 @@ describe("retirada de funcionários", () => {
       ["old"],
     );
     expect(people.map((person) => person.id)).toEqual(["ana", "old", "gerente"]);
+  });
+
+  it("junta o mesmo nome de todas as filiais e prefere a loja do fechamento", () => {
+    const merged = mergeWithdrawalPeople(
+      [
+        {
+          storeId: "loja-a",
+          people: [
+            { id: "ana-a", name: "Ana", active: true },
+            { id: "saiu", name: "Carla", active: false },
+          ],
+        },
+        {
+          storeId: "loja-b",
+          people: [
+            { id: "ana-b", name: "ANA", active: true },
+            { id: "bia-b", name: "Bia", active: true },
+            { id: "old", name: "Dani", active: false },
+          ],
+        },
+      ],
+      ["old"],
+      "loja-a",
+    );
+    expect(merged.people.map((person) => person.id)).toEqual(["ana-a", "bia-b", "old"]);
+    expect(merged.canonicalId("ana-b")).toBe("ana-a");
+    expect(merged.names.get("ana-b")).toBe("Ana");
+    expect(merged.canonicalId("old")).toBe("old");
+  });
+
+  it("mantém o id já gravado quando a pessoa também existe em outra filial", () => {
+    const merged = mergeWithdrawalPeople(
+      [
+        { storeId: "loja-a", people: [{ id: "ana-a", name: "Ana", active: true }] },
+        { storeId: "loja-b", people: [{ id: "ana-b", name: "Ana", active: true }] },
+      ],
+      ["ana-b"],
+      "loja-a",
+    );
+    expect(merged.people.map((person) => person.id)).toEqual(["ana-b"]);
+    expect(merged.canonicalId("ana-a")).toBe("ana-b");
   });
 
   it("reabre o rascunho a partir do que foi gravado", () => {

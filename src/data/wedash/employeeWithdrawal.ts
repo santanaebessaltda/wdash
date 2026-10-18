@@ -31,6 +31,81 @@ export function netCloseDiff(diffCents: number, withdrawalCents: number): number
   return diffCents + withdrawalCents;
 }
 
+const personKey = (name: string) =>
+  name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLocaleUpperCase("pt-BR");
+
+export type MergedWithdrawalPeople = {
+  people: WithdrawalPerson[];
+  names: Map<string, string>;
+  canonicalId: (id: string) => string;
+};
+
+/**
+ * Junta os ativos de todas as filiais. O mesmo nome entra uma vez:
+ * vale o id já gravado na retirada, senão o da loja do fechamento.
+ */
+export function mergeWithdrawalPeople(
+  byStore: { storeId: string; people: WithdrawalPerson[] }[],
+  savedIds: string[],
+  preferStoreId: string,
+): MergedWithdrawalPeople {
+  const saved = new Set(savedIds.filter((id) => id.trim().length > 0));
+  const groups = new Map<string, { storeId: string; person: WithdrawalPerson }[]>();
+  const known = new Set<string>();
+  for (const store of byStore) {
+    for (const person of store.people) {
+      if (!person.id || known.has(person.id)) continue;
+      if (!person.active && !saved.has(person.id)) continue;
+      known.add(person.id);
+      const key = personKey(person.name);
+      const list = groups.get(key) ?? [];
+      list.push({ storeId: store.storeId, person });
+      groups.set(key, list);
+    }
+  }
+
+  const canonical = new Map<string, string>();
+  const names = new Map<string, string>();
+  const people: WithdrawalPerson[] = [];
+  for (const group of groups.values()) {
+    const chosen =
+      group.find((row) => saved.has(row.person.id)) ??
+      group.find((row) => row.storeId === preferStoreId && row.person.active) ??
+      group.find((row) => row.storeId === preferStoreId) ??
+      group.find((row) => row.person.active) ??
+      group[0];
+    if (!chosen) continue;
+    people.push({
+      id: chosen.person.id,
+      name: chosen.person.name,
+      active: group.some((row) => row.person.active),
+    });
+    for (const row of group) {
+      canonical.set(row.person.id, chosen.person.id);
+      names.set(row.person.id, chosen.person.name);
+    }
+  }
+  for (const id of saved) {
+    if (known.has(id)) continue;
+    known.add(id);
+    const name = "Funcionário fora do cadastro";
+    people.push({ id, name, active: false });
+    canonical.set(id, id);
+    names.set(id, name);
+  }
+  people.sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  return {
+    people,
+    names,
+    canonicalId: (id) => canonical.get(id) ?? id,
+  };
+}
+
 /** Ativos da loja, mais quem já tem retirada gravada mesmo tendo saído. */
 export function withdrawalPeople(sellers: WithdrawalPerson[], savedIds: string[]): WithdrawalPerson[] {
   const saved = new Set(savedIds.filter((id) => id.trim().length > 0));
