@@ -72,22 +72,18 @@ export function BarChart({
       : "";
 
   return (
-    <div className="w-full overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
-      <div
-        className="relative box-border w-full"
-        style={{
-          minWidth: Math.max(minW, 280),
-          height,
-        }}
-      >
-        <div className="relative flex h-full w-full items-stretch" style={{ gap: gapPx }}>
+    <div className="w-full min-w-0 touch-pan-x overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
+      {/* w-max: a largura da rolagem e o conteudo. Com so width 100% + min-width, o WebKit
+          no celular corta a ultima barra — ela so aparece no overscroll (arrastar e segurar). */}
+      <div className="flex h-full w-max items-stretch" style={{ minWidth: "100%", height }}>
+        <div className="relative flex h-full min-w-0 flex-1 items-stretch" style={{ gap: gapPx, minWidth: Math.max(minW, 280) }}>
           {data.map((d, i) => (
             <Col
               key={d.label}
               type={onSelect ? "button" : undefined}
               onClick={onSelect ? () => onSelect(d, i) : undefined}
               className={
-                "relative z-[1] flex min-w-0 flex-col items-center gap-2" +
+                "relative z-[1] box-border flex min-w-0 flex-col items-center gap-2 overflow-hidden border-0 bg-transparent p-0" +
                 (onSelect ? " cursor-pointer rounded-[8px] transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-acc" : "")
               }
               style={{ flex: `1 0 ${colW}px`, minWidth: colW }}
@@ -156,6 +152,8 @@ export function BarChart({
             </svg>
           )}
         </div>
+        {/* Folga real (nao padding): entra na largura rolavel, a ultima barra para antes da borda. */}
+        <div className="w-3 shrink-0" aria-hidden />
       </div>
     </div>
   );

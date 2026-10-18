@@ -366,19 +366,15 @@ export default function ProductsPage() {
           {view.categories.length === 0 ? (
             <EmptyBlock />
           ) : (
-            <div className="overflow-x-auto">
-              <div className="min-w-[420px]">
-                <BarChart
-                  data={view.categories.map((c) => ({ label: c.name, value: c.revenue }))}
-                  height={220}
-                  formatValue={brlCent}
-                  onSelect={(_, i) => {
-                    const c = view.categories[i];
-                    if (c) open({ kind: "category", categoryId: c.categoryId, name: c.name });
-                  }}
-                />
-              </div>
-            </div>
+            <BarChart
+              data={view.categories.map((c) => ({ label: c.name, value: c.revenue }))}
+              height={220}
+              formatValue={brlCent}
+              onSelect={(_, i) => {
+                const c = view.categories[i];
+                if (c) open({ kind: "category", categoryId: c.categoryId, name: c.name });
+              }}
+            />
           )}
         </Card>
 
