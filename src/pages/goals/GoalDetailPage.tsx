@@ -353,13 +353,12 @@ function GoalTiersCard({
           {goal.tiers.map((t, i) => {
             bonusAcum += t.bonus;
             const alcancaram = participants.filter((v) => (v.currentLevel ?? 0) >= i + 1).length;
-            const feito = alcancaram > 0;
+            const feito = participants.length > 0 && alcancaram === participants.length;
             const partes = [`A partir de ${num(t.minAttainmentPct, 0)}% da meta`];
             if (t.bonus > 0) {
               partes.push(`bônus de ${brlCent(t.bonus)}`);
               if (bonusAcum > t.bonus) partes.push(`bônus acumulado de ${brlCent(bonusAcum)}`);
             }
-            if (participants.length > 0) partes.push(`${alcancaram} de ${participants.length} ${participants.length === 1 ? "pessoa" : "pessoas"}`);
             let lineManagement: string | null = null;
             if (t.managerPct != null) {
               const bonusGer = t.managerBonus ?? 0;
@@ -388,6 +387,21 @@ function GoalTiersCard({
                   <p className="mt-0.5 text-[11.5px] text-t2">{partes.join(" · ")}</p>
                   {lineManagement && <p className="mt-0.5 text-[11.5px] text-t2">{lineManagement}</p>}
                 </div>
+                {participants.length > 0 && (
+                  <div
+                    className={`shrink-0 rounded-lg px-3 py-1.5 text-center ${feito ? "bg-ok-soft" : alcancaram > 0 ? "bg-acc-soft" : "bg-bg-3"}`}
+                  >
+                    <p
+                      className={`font-mono text-[20px] font-extrabold leading-none ${feito ? "text-ok" : alcancaram > 0 ? "text-acc" : "text-t2"}`}
+                    >
+                      {alcancaram}
+                      <span className="text-[13px] font-bold text-t2">/{participants.length}</span>
+                    </p>
+                    <p className="mt-1 text-[10.5px] font-bold uppercase tracking-wide text-t1">
+                      {participants.length === 1 ? "pessoa" : "pessoas"}
+                    </p>
+                  </div>
+                )}
                 <div className="shrink-0 text-right">
                   <p className={`font-mono text-[13px] font-extrabold ${feito ? "text-ok" : "text-t1"}`}>{num(t.commissionPct, 1)}%</p>
                   <p className="text-[10.5px] text-t2">de premiação</p>
