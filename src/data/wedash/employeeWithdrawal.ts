@@ -46,8 +46,8 @@ export type MergedWithdrawalPeople = {
 };
 
 /**
- * Junta os ativos de todas as filiais. O mesmo nome entra uma vez:
- * vale o id já gravado na retirada, senão o da loja do fechamento.
+ * Junta os ativos de todas as filiais com gestores e gerentes.
+ * O mesmo nome entra uma vez: vale o id já gravado, senão o da loja do fechamento.
  */
 export function mergeWithdrawalPeople(
   byStore: { storeId: string; people: WithdrawalPerson[] }[],

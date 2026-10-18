@@ -40,6 +40,7 @@ import {
   withdrawalDraftFrom,
   withdrawalSave,
   type WithdrawalDraft,
+  type WithdrawalPerson,
 } from "@/data/wedash/employeeWithdrawal";
 import {
   onlinePixDraftFrom,
@@ -51,6 +52,7 @@ import {
 } from "@/data/wedash/onlinePix";
 import { fetchSalesDayAggs, fetchSyncWatermark } from "@/data/wedash/salesRepo";
 import { fetchStoreSellers, storesForSession, type Store, type StoreSeller } from "@/data/wedash/stores";
+import { fetchWithdrawalStaff } from "@/data/wedash/withdrawalStaff";
 import { isOwner } from "@/layout/nav-wedash";
 import { cn } from "@/lib/cn";
 import { brlCent, longDate, isoToDate, endOfMonth, startOfMonth, dateToIso, addDays, labelUpper } from "@/lib/format";
@@ -481,6 +483,7 @@ export function CashClosePage() {
   const [marksKey, setMarksKey] = useState("");
   const [reviews, setReviews] = useState<CashCloseReview[]>([]);
   const [sellersByStore, setSellersByStore] = useState<Map<string, StoreSeller[]>>(new Map());
+  const [withdrawalStaff, setWithdrawalStaff] = useState<WithdrawalPerson[]>([]);
   const [dayOpen, setDayOpen] = useState<string | null>(null);
   const [days, setDays] = useState<Record<string, CashCloseSnapshot>>({});
   const [dayKey, setDayKey] = useState("");
@@ -515,6 +518,16 @@ export function CashClosePage() {
       stop = true;
     };
   }, [storesLoading, session.tenantId, sellerStoresKey]);
+  useEffect(() => {
+    if (storesLoading) return;
+    let stop = false;
+    void fetchWithdrawalStaff(session.tenantId).then((people) => {
+      if (!stop) setWithdrawalStaff(people);
+    });
+    return () => {
+      stop = true;
+    };
+  }, [storesLoading, session.tenantId]);
   useEffect(() => {
     if (storesLoading || escolher || !storeIdValue) return;
     let stop = false;
@@ -799,6 +812,7 @@ export function CashClosePage() {
         tenantId={session.tenantId}
         soldByStore={soldToday?.byStore ?? null}
         sellersByStore={sellersByStore}
+        withdrawalStaff={withdrawalStaff}
         onClose={() => setDayOpen(null)}
         onSaved={(next) => {
           setReviews((current) => {
@@ -945,12 +959,20 @@ function Month({
   );
 }
 
-function withdrawalChoices(sellersByStore: Map<string, StoreSeller[]>, storeId: string, savedIds: string[]) {
+function withdrawalChoices(
+  sellersByStore: Map<string, StoreSeller[]>,
+  staff: WithdrawalPerson[],
+  storeId: string,
+  savedIds: string[],
+) {
   return mergeWithdrawalPeople(
-    [...sellersByStore.entries()].map(([id, sellers]) => ({
-      storeId: id,
-      people: sellers.map((seller) => ({ id: seller.id, name: seller.name, active: seller.active })),
-    })),
+    [
+      ...[...sellersByStore.entries()].map(([id, sellers]) => ({
+        storeId: id,
+        people: sellers.map((seller) => ({ id: seller.id, name: seller.name, active: seller.active })),
+      })),
+      { storeId: "", people: staff },
+    ],
     savedIds,
     storeId,
   );
@@ -967,6 +989,7 @@ function DayModal({
   tenantId,
   soldByStore,
   sellersByStore,
+  withdrawalStaff,
   onClose,
   onSaved,
 }: {
@@ -980,6 +1003,7 @@ function DayModal({
   tenantId: string;
   soldByStore: Record<string, number> | null;
   sellersByStore: Map<string, StoreSeller[]>;
+  withdrawalStaff: WithdrawalPerson[];
   onClose: () => void;
   onSaved: (review: CashCloseReview) => void;
 }) {
@@ -1094,6 +1118,7 @@ function DayModal({
       const review = reviews.find((item) => item.storeId === store.id && item.day === day);
       const people = withdrawalChoices(
         sellersByStore,
+        withdrawalStaff,
         store.id,
         (withdrawalDrafts[store.id]?.rows ?? []).map((row) => row.sellerId),
       );
@@ -1203,6 +1228,7 @@ function DayModal({
             const conta = closeDayGap(lines);
             const people = withdrawalChoices(
               sellersByStore,
+              withdrawalStaff,
               store.id,
               (withdrawalDrafts[store.id]?.rows ?? []).map((row) => row.sellerId),
             );

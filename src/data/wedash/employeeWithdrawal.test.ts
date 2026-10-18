@@ -172,6 +172,26 @@ describe("retirada de funcionários", () => {
     expect(merged.canonicalId("old")).toBe("old");
   });
 
+  it("inclui gestor e gerente e funde com quem já está na filial", () => {
+    const merged = mergeWithdrawalPeople(
+      [
+        { storeId: "loja-a", people: [{ id: "ana-a", name: "ANA", active: true }] },
+        {
+          storeId: "",
+          people: [
+            { id: "gestor", name: "Ana", active: true },
+            { id: "gerente", name: "Marcos Lima", active: true },
+          ],
+        },
+      ],
+      [],
+      "loja-a",
+    );
+    expect(merged.people.map((person) => person.id)).toEqual(["ana-a", "gerente"]);
+    expect(merged.canonicalId("gestor")).toBe("ana-a");
+    expect(merged.names.get("gerente")).toBe("Marcos Lima");
+  });
+
   it("mantém o id já gravado quando a pessoa também existe em outra filial", () => {
     const merged = mergeWithdrawalPeople(
       [
