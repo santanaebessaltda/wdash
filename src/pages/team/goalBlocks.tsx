@@ -499,6 +499,7 @@ export function GlobalGoalBand({
   tiers = defaultTiers,
   todayIso,
   soBarra = false,
+  individual = false,
 }: {
   goal: NetworkGlobalGoal;
   embedded?: boolean;
@@ -510,6 +511,8 @@ export function GlobalGoalBand({
   tiers?: { name: string; minAttainmentPct: number; commissionPct: number }[];
   /** Dia de hoje (dados reais); sem ele usa o relógio da fixture. */
   todayIso?: string;
+  /** Individual: o nível é de cada pessoa. A barra mostra só o faturamento da filial. */
+  individual?: boolean;
 }) {
   const showsProjection = !soBarra && goalUnlockedProjection(goal.start, goal.end, todayIso);
   const fecha = goal.projectedPct >= 100;
@@ -561,19 +564,25 @@ export function GlobalGoalBand({
           <span className="mx-1.5 text-[14px] font-semibold text-t2">/</span>
           <span className="font-mono text-[14px] font-bold text-t2 sm:text-[15px]">{brl(goal.total)}</span>
         </p>
-        <p className={`font-mono text-[26px] font-extrabold leading-none sm:text-[28px] ${colorPct}`}>{num(goal.pct, 1)}%</p>
+        {!individual && (
+          <p className={`font-mono text-[26px] font-extrabold leading-none sm:text-[28px] ${colorPct}`}>{num(goal.pct, 1)}%</p>
+        )}
       </div>
       {outsideRankingNote(goal) ? <p className="mt-1 text-[12px] text-t2">{outsideRankingNote(goal)}</p> : null}
       </>
       )}
 
-      {/*
-        Rótulos na mesma linha, alinhados à proporção da barra (mesmo % dos ticks).
-        Barra sem padding (alinha com o %). Quando dois degraus ficam perto
-        (ex.: Hiper→Desafio), o penúltimo ancora à direita do tick e o último
-        à direita da faixa; a largura mínima garante espaço em px entre eles.
-      */}
-      {(() => {
+      {individual ? (
+        <div className={cn(!soBarra && "mt-4")}>
+          <div className="relative h-3 w-full overflow-hidden rounded-full" style={{ background: "var(--bg-3)" }}>
+            <div
+              className="h-full rounded-full transition-[width] duration-500"
+              style={{ width: `${Math.min(100, Math.max(0, goal.pct))}%`, background: colorBarra }}
+            />
+          </div>
+          <p className="mt-2 text-[12px] text-t2">O nível é de cada pessoa. A barra mostra o faturamento da filial.</p>
+        </div>
+      ) : (() => {
         const LABEL_MIN_PX = 140;
         const GAP_PX = 10;
         let lowerFrac = 1;
@@ -770,7 +779,14 @@ export function GoalSummaryCard({
       </div>
 
       <div className="mt-4">
-        <GlobalGoalBand goal={card.band} embedded hideTitle tiers={card.tiers} todayIso={todayIso} />
+        <GlobalGoalBand
+          goal={card.band}
+          embedded
+          hideTitle
+          tiers={card.tiers}
+          todayIso={todayIso}
+          individual={card.kind === "individual"}
+        />
       </div>
 
       <SellersCard

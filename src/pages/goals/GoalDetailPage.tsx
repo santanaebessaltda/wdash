@@ -336,7 +336,14 @@ function GoalTiersCard({
       <div className="mb-4 flex items-center gap-1.5">
         <CardTitle>Níveis e premiação</CardTitle>
       </div>
-      <GlobalGoalBand goal={card.band} tiers={card.tiers} todayIso={today} embedded soBarra />
+      <GlobalGoalBand
+        goal={card.band}
+        tiers={card.tiers}
+        todayIso={today}
+        embedded
+        soBarra
+        individual={goal.tierMode === "INDIVIDUAL"}
+      />
       {goal.groups.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[12px]">
           <span className="mr-1 text-t2">Grupos:</span>
