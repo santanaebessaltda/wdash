@@ -360,25 +360,22 @@ function AccountLoad({
         <ProgressBar value={progressPct} color="var(--acc)" label="Vendas de hoje" />
       ) : null}
       {account.stores.length > 0 ? (
-        <ul className="max-h-64 divide-y divide-line overflow-y-auto">
+        <div className="flex flex-wrap gap-1.5">
           {account.stores.map((store) => {
-            const done = readyStores.has(store.id);
+            const done = trackingToday && readyStores.has(store.id);
+            const running = trackingToday && !done && seed === "running";
             return (
-              <li key={store.id} className="flex items-center gap-3 py-2">
-                <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-t0">{store.name}</span>
-                {trackingToday ? (
-                  done ? (
-                    <Badge variant="success">Concluído</Badge>
-                  ) : seed === "running" ? (
-                    <Spinner size={16} />
-                  ) : (
-                    <span className="text-[12px] text-t3">Na fila</span>
-                  )
-                ) : null}
-              </li>
+              <Badge
+                key={store.id}
+                variant={done ? "success" : "neutral"}
+                title={done ? "Concluído" : running ? "Buscando vendas de hoje" : trackingToday ? "Na fila" : undefined}
+              >
+                {store.name}
+                {running ? <Spinner size={12} /> : null}
+              </Badge>
             );
           })}
-        </ul>
+        </div>
       ) : (
         <p className="text-[12.5px] text-t2">Nenhuma filial vinculada a este acesso.</p>
       )}

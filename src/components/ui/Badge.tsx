@@ -18,12 +18,14 @@ export interface BadgeProps {
   status?: string;
   dot?: boolean;
   className?: string;
+  title?: string;
 }
 
-export function Badge({ children, variant, status, dot, className }: BadgeProps) {
+export function Badge({ children, variant, status, dot, className, title }: BadgeProps) {
   const resolved = variant ?? (status ? statusVariant(status) : "neutral");
   return (
     <span
+      title={title}
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold leading-none",
         variantClasses[resolved],
