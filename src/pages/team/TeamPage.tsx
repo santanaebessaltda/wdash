@@ -349,6 +349,7 @@ export function TeamPage() {
 
   // O pódio já mostra o 1º, 2º e 3º. A lista e a busca ficam só com o restante.
   const podiumKeys = useMemo(() => new Set(view.people.slice(0, 3).map((p) => p.key)), [view.people]);
+  const hasRankingList = view.people.length > 3;
   const listLines = useMemo(
     () => tableLines.filter((p) => !podiumKeys.has(p.key)),
     [tableLines, podiumKeys],
@@ -362,6 +363,10 @@ export function TeamPage() {
   useEffect(() => {
     setPage(1);
   }, [search, sortKey, sortDir, scope, shiftPicked]);
+
+  useEffect(() => {
+    if (!hasRankingList) setSearch("");
+  }, [hasRankingList]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -679,15 +684,17 @@ export function TeamPage() {
       <div className="flex flex-col">
         <RankingBlock ranking={podio} formatAmount={brlCent} onSelect={(r) => openPerson(r.employeeId, r.name)} />
 
-        <div className="mt-6 mb-4 flex flex-wrap items-center gap-2 sm:justify-end print:hidden">
-          <input
-            type="search"
-            placeholder="Buscar por nome…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className={cn(filterInputClass, "sm:w-56")}
-          />
-        </div>
+        {hasRankingList && (
+          <div className="mt-6 mb-4 flex flex-wrap items-center gap-2 sm:justify-end print:hidden">
+            <input
+              type="search"
+              placeholder="Buscar por nome…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className={cn(filterInputClass, "sm:w-56")}
+            />
+          </div>
+        )}
 
         {listLines.length === 0 ? (
           search.trim() ? (
