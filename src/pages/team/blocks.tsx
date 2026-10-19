@@ -458,9 +458,9 @@ export function GoalProgressBar({
 
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <p className="text-[18px] font-extrabold tracking-tight text-t0 sm:text-[20px]">
-          <span className="font-mono">{brl(goal.achieved)}</span>
+          <span className="font-mono">{brlCent(goal.achieved)}</span>
           <span className="mx-1.5 text-[14px] font-semibold text-t2">/</span>
-          <span className="font-mono text-[14px] font-bold text-t2 sm:text-[15px]">{brl(goal.total)}</span>
+          <span className="font-mono text-[14px] font-bold text-t2 sm:text-[15px]">{brlCent(goal.total)}</span>
         </p>
         <p className={`font-mono text-[26px] font-extrabold leading-none sm:text-[28px] ${colorPct}`}>{num(goal.pct, 1)}%</p>
       </div>
