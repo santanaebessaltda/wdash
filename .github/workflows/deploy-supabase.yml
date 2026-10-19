@@ -39,6 +39,9 @@ jobs:
       - name: Push database
         run: supabase db push --yes
 
+      - name: Deploy Edge Functions
+        run: supabase functions deploy
+
       - name: Remove document files
         run: |
           set -euo pipefail
@@ -49,14 +52,20 @@ jobs:
           base="https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/bucket/documents"
           empty=$(curl -s -o /tmp/storage-empty.txt -w "%{http_code}" -X POST "$base/empty" \
             -H "Authorization: Bearer ${service}" -H "apikey: ${service}")
-          if [ "$empty" != "200" ] && [ "$empty" != "404" ]; then
+          if [ "$empty" != "200" ] && [ "$empty" != "404" ] && [ "$empty" != "400" ]; then
             echo "failed to empty documents bucket (${empty})"
+            cat /tmp/storage-empty.txt
             exit 1
+          fi
+          if [ "$empty" = "400" ]; then
+            echo "documents bucket already gone (${empty})"
+            cat /tmp/storage-empty.txt
           fi
           code=$(curl -s -o /tmp/storage-bucket.txt -w "%{http_code}" -X DELETE "$base" \
             -H "Authorization: Bearer ${service}" -H "apikey: ${service}")
-          if [ "$code" != "200" ] && [ "$code" != "404" ]; then
+          if [ "$code" != "200" ] && [ "$code" != "404" ] && [ "$code" != "400" ]; then
             echo "failed to delete documents bucket (${code})"
+            cat /tmp/storage-bucket.txt
             exit 1
           fi
 
@@ -71,6 +80,3 @@ jobs:
               exit 1
             fi
           done
-
-      - name: Deploy Edge Functions
-        run: supabase functions deploy
