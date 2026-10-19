@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { padTop } from "@/lib/safeArea";
-import { Avatar, Dropdown, type DropdownItem } from "@/components/ui";
+import { Avatar, Dropdown, Tooltip, type DropdownItem } from "@/components/ui";
 import { isOwner } from "./nav-wedash";
 import { paths } from "@/router/paths";
 import { accessLabel, useSession, useActiveSession } from "@/session/SessionProvider";
@@ -13,6 +13,7 @@ import {
 } from "@/data/wedash/stores";
 import { StorePicker } from "@/pages/dashboard/StorePicker";
 import { useScope } from "@/pages/dashboard/useScope";
+import { searchForRoute } from "@/pages/dashboard/periodQuery";
 import { TopbarRefresh } from "./TopbarRefresh";
 import { refreshSalesPush } from "@/push/salesPush";
 
@@ -24,6 +25,8 @@ const ICON_USUARIOS =
 const ICON_LOGS = "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8";
 const ICON_SAIR = "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9";
 const ICON_NOTICES = "M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0";
+/** Lucide Share2 — abre o placar da filial neste notebook. */
+const ICON_SHARE = "M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13";
 
 function covers(pathname: string, base: string): boolean {
   return pathname === base || pathname.startsWith(`${base}/`);
@@ -60,6 +63,7 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
   const navigate = useNavigate();
   const location = useLocation();
   const { scope, setScope } = useScope();
+  const canOpenBoard = session.role === "OWNER" || session.role === "MANAGER" || session.role === "ADMIN_GLOBAL";
 
   const [listStores, setListStores] = useState<Store[]>(() => {
     const hit = storesForSession(session.stores);
@@ -147,6 +151,25 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
       )}
 
       <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2.5">
+        {canOpenBoard && showsRefresh(location.pathname) && (
+          <Tooltip label="Abrir o placar da filial" side="bottom">
+            <button
+              type="button"
+              aria-label="Abrir o placar da filial"
+              onClick={() => {
+                const params = new URLSearchParams(location.search.startsWith("?") ? location.search.slice(1) : location.search);
+                if (!params.get("store") && scope.storeIds.length === 1) params.set("store", scope.storeIds[0]!);
+                const search = params.toString() ? `?${params.toString()}` : "";
+                navigate(`${paths.board}${searchForRoute(paths.board, search)}`);
+              }}
+              className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-line text-t1 hover:bg-bg-3"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d={ICON_SHARE} />
+              </svg>
+            </button>
+          </Tooltip>
+        )}
         {showsRefresh(location.pathname) && <TopbarRefresh storeIds={scope.storeIds} />}
 
         <Dropdown

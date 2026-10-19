@@ -13,37 +13,40 @@ export function ChallengeMiniCard({
   view,
   storeNameValue,
   onOpen,
+  prominent = false,
 }: {
   challenge: ChallengeRecord;
   view: ChallengeView;
   storeNameValue?: string;
-  onOpen: () => void;
+  /** Sem isto o card fica só leitura, como no placar da loja. */
+  onOpen?: () => void;
+  /** Mesmo ícone e tamanho do card de desafio da Gestão. */
+  prominent?: boolean;
 }) {
   const destaque = challengeHeadline(c, view);
   const prize = mainPrizeLabel(c);
   const ended = view.status === "ended";
   const statusLabel = CHALLENGE_STATUS_LABEL[view.status];
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      aria-label={`Ver detalhe do desafio ${c.name}`}
-      className={cn(
-        "flex w-full cursor-pointer items-start gap-3.5 rounded-xl border border-line p-4 text-left transition-colors hover:border-line-2 focus-visible:border-acc focus-visible:outline-none",
-        ended ? "bg-bg-inset" : "bg-bg-2",
-      )}
-    >
+  const className = cn(
+    "flex w-full items-start gap-3.5 border border-line text-left",
+    prominent ? "rounded-2xl p-5 shadow-[var(--shadow-vela)]" : "rounded-xl p-4",
+    ended ? "bg-bg-inset" : "bg-bg-2",
+    onOpen && "cursor-pointer transition-colors hover:border-line-2 focus-visible:border-acc focus-visible:outline-none",
+  );
+  const body = (
+    <>
       <span
         className={cn(
-          "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+          "flex shrink-0 items-center justify-center",
+          prominent ? "h-[50px] w-[50px] rounded-[14px]" : "h-10 w-10 rounded-xl",
           ended ? "bg-bg-3 text-t2" : "bg-acc-soft text-acc",
         )}
       >
-        <FlameIcon size={18} />
+        <FlameIcon size={prominent ? 22 : 18} />
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex items-start justify-between gap-2">
-          <span className="min-w-0 truncate text-[14px] font-bold text-t0">{c.name}</span>
+          <span className={cn("min-w-0 truncate font-bold text-t0", prominent ? "text-[15px]" : "text-[14px]")}>{c.name}</span>
           <Badge variant={statusBadgeVariant(statusLabel)} className="shrink-0 uppercase">
             {statusLabel}
           </Badge>
@@ -65,6 +68,12 @@ export function ChallengeMiniCard({
           )}
         </span>
       </span>
+    </>
+  );
+  if (!onOpen) return <div className={className}>{body}</div>;
+  return (
+    <button type="button" onClick={onOpen} aria-label={`Ver detalhe do desafio ${c.name}`} className={className}>
+      {body}
     </button>
   );
 }

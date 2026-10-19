@@ -9,4 +9,6 @@ export interface RankingRow {
   storeId?: string;
   sales: number;
   revenue: number;
+  /** Nível da meta desta pessoa, no pódio. */
+  note?: string;
 }

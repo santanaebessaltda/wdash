@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Badge, Button, Card, CardTitle, EmptyState, ProgressBar } from "@/components/ui";
+import { Badge, Button, Card, CardTitle, EmptyState, ProgressBar, progressTextClass } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { RankingBlock } from "@/pages/live/blocks";
 import type { RankingRow } from "@/data/wedash/live";
@@ -9,7 +9,7 @@ import {
   type BoardMoment,
   type BoardSnapshot,
 } from "@/data/wedash/boardEvents";
-import { buildGoalCardView, buildGoalSummary, goalStatus } from "@/data/wedash/goalView";
+import { buildGoalCardView, buildGoalSummary, GOAL_STATUS_LABEL, goalStatus, prazoRemaining } from "@/data/wedash/goalView";
 import { fetchGoals, fetchGoalTeam, type GoalRecord, type GoalTeamMember } from "@/data/wedash/goalsRepo";
 import {
   emptyChallengeAggInput,
@@ -18,15 +18,16 @@ import {
   type ChallengeAggInput,
   type ChallengeRecord,
 } from "@/data/wedash/challengesRepo";
-import { buildChallengeView, type ChallengeParticipant, type ChallengeView } from "@/data/wedash/challengeView";
+import { buildChallengeView } from "@/data/wedash/challengeView";
 import { fetchNamedSellerDayAggs, fetchSalesDayAggs, fetchSalesSellerDayAggs, fetchSyncWatermark } from "@/data/wedash/salesRepo";
 import type { SalesDayAgg, SalesSellerDayAgg } from "@/data/wedash/salesTypes";
 import { buildTeamDashboardView, resolvePeriod, type Scope, type TeamAggInput, type TeamMemberRow } from "@/data/wedash/dashboard";
 import { fetchTeamAggInput } from "@/pages/dashboard/TeamMemberDetail";
 import { useScope } from "@/pages/dashboard/useScope";
 import { searchForRoute } from "@/pages/dashboard/periodQuery";
-import { GlobalGoalBand } from "@/pages/team/goalBlocks";
-import { mainPrizeLabel } from "@/pages/challenges/shared";
+import { ChallengeMiniCard } from "@/pages/challenges/ChallengeMiniCard";
+import { TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
+import { statusBadgeVariant } from "@/lib/status";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { goalWeightFrom } from "@/data/wedash/engine/goalProjection";
 import { defaultWeekHours, effectiveWeekHours } from "@/data/wedash/storeHours";
@@ -35,7 +36,7 @@ import { useActiveSession } from "@/session/SessionProvider";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { formatSyncWatermarkLabel } from "@/data/wedash/syncUi";
 import { paths } from "@/router/paths";
-import { brlCent, num } from "@/lib/format";
+import { brlCent, fullDate, num } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import overtakeUrl from "@/assets/sound/overtaking.wav";
 import firstPlaceUrl from "@/assets/sound/first-place.wav";
@@ -134,12 +135,12 @@ function levelLabel(levelNumber: number | null, name: string | null): string | n
   return `N${levelNumber} · ${name}`;
 }
 
-function challengePct(person: ChallengeParticipant, target: number | null, leader: number): number {
-  if (person.result == null) return 0;
-  const denom = target != null && target > 0 ? target : leader;
-  if (denom <= 0) return 0;
-  return Math.min(100, (person.result / denom) * 100);
-}
+type PersonLevel = {
+  levelNumber: number | null;
+  levelLabel: string | null;
+  name: string;
+  pct: number;
+};
 
 export function BoardPage() {
   const session = useActiveSession();
@@ -284,17 +285,25 @@ export function BoardPage() {
   }, [challengesData, today]);
 
   const levels = useMemo(() => {
-    const map = new Map<string, { levelNumber: number | null; levelLabel: string | null; name: string }>();
+    const byKey = new Map<string, PersonLevel>();
+    const byName = new Map<string, PersonLevel>();
     for (const seller of goalCard?.sellers ?? []) {
       if (seller.noGoal) continue;
-      map.set(seller.employeeId, {
+      const row: PersonLevel = {
         name: seller.name,
         levelNumber: seller.currentLevel,
         levelLabel: levelLabel(seller.currentLevel, seller.currentTierName),
-      });
+        pct: seller.attainmentPct,
+      };
+      byKey.set(seller.employeeId, row);
+      byName.set(seller.name.trim().toLocaleLowerCase("pt-BR"), row);
     }
-    return map;
+    return { byKey, byName };
   }, [goalCard]);
+
+  function personLevel(person: TeamMemberRow): PersonLevel | null {
+    return levels.byKey.get(person.key) ?? levels.byName.get(person.name.trim().toLocaleLowerCase("pt-BR")) ?? null;
+  }
 
   const snapshot = useMemo<BoardSnapshot | null>(() => {
     if (!view || !storeId) return null;
@@ -303,7 +312,7 @@ export function BoardPage() {
       : null;
     const storeLevel = activeGoal && activeGoal.tierMode !== "INDIVIDUAL" ? summary : null;
     const ranks = view.people.map((person, index) => ({ key: person.key, name: person.name, position: index + 1 }));
-    const levelRows = [...levels.entries()].map(([key, level]) => ({ key, ...level }));
+    const levelRows = [...levels.byKey.entries()].map(([key, level]) => ({ key, name: level.name, levelNumber: level.levelNumber, levelLabel: level.levelLabel }));
     const winners = challenges.flatMap(({ challenge, view: challengeView }) =>
       challengeView.participants
         .filter((person) => person.winner)
@@ -371,15 +380,22 @@ export function BoardPage() {
   }
 
   const names = view?.people.map((person) => person.name) ?? [];
-  const podium: RankingRow[] = (view?.people.slice(0, 3) ?? []).map((person, index) => ({
-    position: index + 1,
-    employeeId: person.key,
-    name: person.name,
-    storeId: person.storeIds[0],
-    sales: person.sales,
-    revenue: person.revenue,
-  }));
+  const podium: RankingRow[] = (view?.people.slice(0, 3) ?? []).map((person, index) => {
+    const level = personLevel(person);
+    return {
+      position: index + 1,
+      employeeId: person.key,
+      name: person.name,
+      storeId: person.storeIds[0],
+      sales: person.sales,
+      revenue: person.revenue,
+      note: level ? (level.levelLabel ?? "Sem nível") : undefined,
+    };
+  });
   const rest = view?.people.slice(3) ?? [];
+  const summary = activeGoal
+    ? buildGoalSummary(activeGoal, goalsData.dayAggs, today, effectiveWeekHours(store?.hours ?? defaultWeekHours()))
+    : null;
 
   if (!storeId) {
     return (
@@ -433,15 +449,45 @@ export function BoardPage() {
         </div>
       </header>
 
-      {goalCard && activeGoal ? (
-        <Card padding="lg">
-          <GlobalGoalBand
-            goal={goalCard.band}
-            tiers={activeGoal.tiers}
-            todayIso={today}
-            individual={activeGoal.tierMode === "INDIVIDUAL"}
-          />
-        </Card>
+      {goalCard && activeGoal && summary ? (
+        <div className="flex flex-col rounded-2xl border border-line bg-bg-2 p-5 shadow-[var(--shadow-vela)]">
+          <div className="mb-3.5 flex items-center gap-3.5">
+            <div className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-[14px] bg-acc-soft text-acc">
+              <TargetIcon size={22} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[15px] font-bold text-t0">{goalCard.name}</p>
+              <p className="mt-0.5 truncate text-[12.5px] text-t2">
+                {fullDate(activeGoal.startsOn)} a {fullDate(activeGoal.endsOn)}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="font-mono text-[13px] font-extrabold text-ok">{brlCent(summary.achieved)}</span>
+            <span className="text-right text-[11.5px] text-t2">
+              <span className={`font-mono font-bold ${progressTextClass(summary.pct)}`}>{num(summary.pct, 1)}%</span> de {brlCent(activeGoal.target)}
+            </span>
+          </div>
+          <div className="mt-2">
+            <ProgressBar value={summary.pct} height={5} />
+          </div>
+          <p className="mt-2 text-[11.5px] text-t2">
+            {summary.projectedPct != null
+              ? `Projeção: ${num(summary.projectedPct, 0)}% · ${prazoRemaining(summary.daysRemaining).toLowerCase()}`
+              : prazoRemaining(summary.daysRemaining)}
+          </p>
+          <div className="mt-4 flex flex-wrap gap-1.5">
+            <Badge variant={statusBadgeVariant(GOAL_STATUS_LABEL[summary.status])} className="uppercase">
+              {GOAL_STATUS_LABEL[summary.status]}
+            </Badge>
+            <Badge variant="neutral" className="uppercase">
+              {activeGoal.tierMode === "INDIVIDUAL" ? "Individual" : activeGoal.tierMode === "GENERAL" ? "Geral" : "Grupo"}
+            </Badge>
+            <Badge variant="neutral" className="uppercase">
+              {activeGoal.tiers.length} {activeGoal.tiers.length === 1 ? "nível" : "níveis"}
+            </Badge>
+          </div>
+        </div>
       ) : (
         <Card>
           <EmptyState
@@ -453,33 +499,44 @@ export function BoardPage() {
         </Card>
       )}
 
-      <div className={cn("grid min-h-0 flex-1 gap-4", challenges.length > 0 && "lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.8fr)]")}>
-        <Card padding="lg" className="min-w-0">
+      <Card padding="lg" className="min-w-0">
+        <div className="mb-1 flex items-center gap-2">
+          <TrophyIcon size={16} className="text-acc" />
           <CardTitle>Ranking</CardTitle>
-          {loading ? (
-            <p className="py-10 text-center text-sm text-t2">Carregando o ranking…</p>
-          ) : (
-            <>
-              <RankingBlock ranking={podium} formatAmount={brlCent} />
-              {rest.length > 0 && (
-                <ul className="mt-4 divide-y divide-line">
-                  {rest.map((person) => (
-                    <RankRow key={person.key} person={person} place={view!.people.indexOf(person) + 1} level={levels.get(person.key)?.levelLabel ?? null} hot={momentKey(current) === person.key} />
-                  ))}
-                </ul>
-              )}
-            </>
-          )}
-        </Card>
-
-        {challenges.length > 0 && (
-          <div className="flex min-w-0 flex-col gap-4">
-            {challenges.map(({ challenge, view: challengeView }) => (
-              <ChallengeColumn key={challenge.id} challenge={challenge} view={challengeView} hotKey={current?.kind === "challenge" ? current.key : null} />
-            ))}
-          </div>
+        </div>
+        {loading ? (
+          <p className="py-10 text-center text-sm text-t2">Carregando o ranking…</p>
+        ) : (
+          <>
+            <RankingBlock ranking={podium} formatAmount={brlCent} />
+            {rest.length > 0 && (
+              <ul className="mt-4 divide-y divide-line">
+                {rest.map((person) => {
+                  const level = personLevel(person);
+                  return (
+                    <RankRow
+                      key={person.key}
+                      person={person}
+                      place={view!.people.indexOf(person) + 1}
+                      level={level ? (level.levelLabel ?? "Sem nível") : null}
+                      pct={level?.pct ?? null}
+                      hot={momentKey(current) === person.key}
+                    />
+                  );
+                })}
+              </ul>
+            )}
+          </>
         )}
-      </div>
+      </Card>
+
+      {challenges.length > 0 && (
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          {challenges.map(({ challenge, view: challengeView }) => (
+            <ChallengeMiniCard key={challenge.id} challenge={challenge} view={challengeView} prominent />
+          ))}
+        </div>
+      )}
 
       {current && (
         <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center p-6">
@@ -500,11 +557,13 @@ function RankRow({
   person,
   place,
   level,
+  pct,
   hot,
 }: {
   person: TeamMemberRow;
   place: number;
   level: string | null;
+  pct: number | null;
   hot: boolean;
 }) {
   return (
@@ -513,53 +572,22 @@ function RankRow({
       <PersonAvatar name={person.name} employeeId={person.key} storeId={person.storeIds[0]} size="sm" />
       <div className="min-w-0 flex-1">
         <p className="truncate text-[14px] font-bold text-t0">{person.name}</p>
-        <p className="text-[12px] text-t2">
-          {person.sales} {person.sales === 1 ? "venda" : "vendas"}
-        </p>
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          {level ? <Badge variant="accent">{level}</Badge> : null}
+          <span className="text-[12px] text-t2">
+            {person.sales} {person.sales === 1 ? "venda" : "vendas"}
+          </span>
+          {pct != null && (
+            <span className="flex items-center gap-2">
+              <span className="font-mono text-[12px] font-bold text-t0">{num(pct, 0)}%</span>
+              <span className="w-16">
+                <ProgressBar value={Math.min(100, Math.max(0, pct))} height={5} />
+              </span>
+            </span>
+          )}
+        </div>
       </div>
-      {level ? <Badge variant="neutral">{level}</Badge> : <span className="text-[12px] text-t2">—</span>}
       <span className="shrink-0 font-mono text-[14px] font-bold text-t0">{brlCent(person.revenue)}</span>
     </li>
-  );
-}
-
-function ChallengeColumn({
-  challenge,
-  view,
-  hotKey,
-}: {
-  challenge: ChallengeRecord;
-  view: ChallengeView;
-  hotKey: string | null;
-}) {
-  const prize = mainPrizeLabel(challenge);
-  const leader = Math.max(0, ...view.participants.map((person) => person.result ?? 0));
-  return (
-    <Card padding="lg">
-      <div className="mb-3 flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <CardTitle>{challenge.name}</CardTitle>
-          {prize && <p className="mt-1 text-[12px] text-t2">Prêmio {prize}</p>}
-        </div>
-        <Badge variant="neutral">{view.prazo}</Badge>
-      </div>
-      <ul className="space-y-2.5">
-        {view.participants.map((person) => {
-          const pct = challengePct(person, challenge.target, leader);
-          return (
-            <li key={person.key} className={cn("flex items-center gap-2", hotKey === person.key && "rounded-lg bg-acc-soft px-1")}>
-              <span className="w-6 shrink-0 text-[12px] font-extrabold text-t2">{person.position == null ? "—" : `${person.position}º`}</span>
-              <span className="w-[88px] shrink-0 truncate text-[13px] font-semibold text-t0">{person.name.split(" ")[0]}</span>
-              <div className="min-w-0 flex-1">
-                <ProgressBar value={pct} height={6} />
-              </div>
-              <span className="w-16 shrink-0 text-right font-mono text-[11px] font-bold text-acc">
-                {person.result == null ? "—" : `${num(pct, 0)}%`}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-    </Card>
   );
 }

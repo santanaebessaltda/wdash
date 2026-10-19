@@ -1,4 +1,4 @@
-import { EmptyState } from "@/components/ui";
+import { Badge, EmptyState } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { brlK, num } from "@/lib/format";
 import { cn } from "@/lib/cn";
@@ -133,6 +133,11 @@ export function RankingBlock({
             <p className="mt-0.5 font-mono text-[13px] font-extrabold sm:text-[14px]" style={{ color: medal.color }}>
               {formatAmount(l.revenue)}
             </p>
+            {l.note ? (
+              <span className="mt-1.5 max-w-full">
+                <Badge variant="accent">{l.note}</Badge>
+              </span>
+            ) : null}
 
             <div
               className={cn(
