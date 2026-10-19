@@ -1,11 +1,12 @@
-import { useState, type ReactNode } from "react";
-import { Badge, Card, CardTitle, ProgressBar, progressTextClass } from "@/components/ui";
+import type { ReactNode } from "react";
+import { Badge, Card, CardTitle } from "@/components/ui";
 import { Tooltip } from "@/components/ui/Tooltip";
 import type { SellerHomeGoal, SellerHomeStore } from "@/data/wedash/engine/sellerHome";
+import type { NetworkGlobalGoal } from "@/data/wedash/teamViews";
 import { brlCent, num, shortDate } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
-import { goalShowsProjection } from "@/pages/team/blocks";
+import { GoalProgressBar } from "@/pages/team/blocks";
 import { Icon, icons } from "@/pages/users/Icons";
 
 type Me = NonNullable<SellerHomeGoal["me"]>;
@@ -98,7 +99,7 @@ export function PrizeCard({
           {!goal.me ? (
             <>
               <CardTitle>{goal.name}</CardTitle>
-              <p className="py-6 text-center text-[13.5px] text-t1">Você ainda não está em um grupo desta meta. Fale com a gerência da loja.</p>
+              <p className="py-6 text-center text-[13.5px] text-t1">Você ainda não participa de um grupo desta meta. Fale com a gerência.</p>
             </>
           ) : (
             <PrizeBody goal={goal} me={goal.me} today={today} through={through} closed={closed} />
@@ -109,30 +110,30 @@ export function PrizeCard({
   );
 }
 
-function prazoLabel(days: number): string {
-  if (days <= 0) return "Encerrada";
-  if (days === 1) return "Último dia";
-  return `${days} dias restantes`;
-}
-
 function PrizeBody({ goal, me, today, through, closed }: { goal: SellerHomeGoal; me: Me; today: string; through: string; closed: boolean }) {
-  const [showAllLevels, setShowAllLevels] = useState(false);
   const mode = MODE[me.modo];
   const level = me.levelNumber != null && me.level ? `N${me.levelNumber} · ${me.level}` : null;
   const current = me.levelNumber != null ? me.marcos[me.levelNumber - 1] : undefined;
   const total = me.prizeAmount + me.bonus;
-  const daysLeft = closed && me.end <= through ? 0 : me.daysRemaining;
-  const showsProjection = goalShowsProjection(me.start, me.end, today);
+  const band: NetworkGlobalGoal = {
+    competenceText: me.metaName,
+    achieved: me.achieved,
+    total: me.goalAmount,
+    pct: me.attainmentPct,
+    projectedPct: goal.projectedPct ?? 0,
+    daysRemaining: closed && me.end <= through ? 0 : me.daysRemaining,
+    start: me.start,
+    end: me.end,
+  };
+  const tiers = me.marcos.map((m) => ({ name: m.name, minAttainmentPct: m.pct, commissionPct: m.commissionPct }));
   const levels = me.marcos.map((marco, i) => ({
     marco,
     number: i + 1,
     bonusSoFar: me.marcos.slice(0, i + 1).reduce((sum, m) => sum + m.bonus, 0),
   }));
-  const preview = levels.filter((l) => (me.levelNumber == null ? l.number === 1 : l.number === me.levelNumber || l.number === me.levelNumber + 1));
-  const shownLevels = showAllLevels ? levels : preview;
   const nextGain =
     me.next == null
-      ? null
+      ? undefined
       : [
           goal.nextLevelGain != null && goal.nextLevelGain > 0 ? `${num(me.next.commissionPct, 1)}% de premiação` : "de premiação",
           me.next.bonus > 0 ? `+${brlCent(me.next.bonus)} de bônus` : "",
@@ -143,11 +144,8 @@ function PrizeBody({ goal, me, today, through, closed }: { goal: SellerHomeGoal;
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <CardTitle>
-            {goal.name}
-            {me.group ? ` · Grupo ${me.group}` : ""}
-          </CardTitle>
+        <CardTitle>{goal.name}</CardTitle>
+        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
           <Badge variant="neutral" className="gap-1 uppercase">
             <IconBadge>
               {me.modo === "individual" ? (
@@ -167,58 +165,41 @@ function PrizeBody({ goal, me, today, through, closed }: { goal: SellerHomeGoal;
             {mode.badge}
           </Badge>
           <TipHelp label={mode.help} />
-        </div>
-        <p className="mt-1 text-[13px] font-semibold text-t2">{prazoLabel(daysLeft)}</p>
-      </div>
-
-      <div>
-        <p className="text-[18px] font-extrabold tracking-tight text-t0 sm:text-[20px]">
-          <span className="font-mono">{brlCent(me.achieved)}</span>
-          <span className="mx-1.5 text-[14px] font-semibold text-t2">/</span>
-          <span className="font-mono text-[14px] font-bold text-t2 sm:text-[15px]">{brlCent(me.goalAmount)}</span>
-        </p>
-        <p className={`mt-1 font-mono text-[26px] font-extrabold leading-none sm:text-[28px] ${progressTextClass(me.attainmentPct)}`}>
-          {num(me.attainmentPct, 1)}%
-        </p>
-        <div className="mt-3">
-          <ProgressBar value={me.attainmentPct} height={12} />
+          {me.group ? (
+            <Badge variant="neutral" className="uppercase">
+              {me.group}
+            </Badge>
+          ) : null}
+          <Badge variant="neutral" className="gap-1 uppercase">
+            <IconBadge>
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+            </IconBadge>
+            {me.marcos.length} {me.marcos.length === 1 ? "nível" : "níveis"}
+          </Badge>
         </div>
       </div>
 
-      <div>
+      <GoalProgressBar goal={band} tiers={tiers} todayIso={today} embedded hideTitle individual={false} />
+
+      <div className={cn("grid grid-cols-2 gap-2.5", me.next ? "lg:grid-cols-4" : "lg:grid-cols-3")}>
+        <Tile
+          label="Premiação atual"
+          value={brlCent(total)}
+          valueClass={total > 0 ? "text-ok" : "text-t0"}
+          sub={level ? `${level}${current ? ` · ${num(current.commissionPct, 1)}%` : ""}` : "Ainda abaixo do 1º nível"}
+          tip={me.bonus > 0 ? `Inclui ${brlCent(me.bonus)} de bônus dos níveis alcançados.` : undefined}
+        />
         {me.next ? (
-          <p className="text-[15px] font-semibold leading-tight text-t1">
-            <span className="text-[20px] font-extrabold text-t0">Faltam {brlCent(me.next.gap)}</span> para {me.next.name}
-          </p>
+          <Tile label="Próximo nível" value={`N${me.next.number} · ${me.next.name}`} mono={false} sub={`Faltam ${brlCent(me.next.gap)}`} />
         ) : (
-          <p className="text-[15px] font-extrabold text-ok">Você chegou ao último nível.</p>
+          <Tile label="Próximo nível" value="Último nível" mono={false} valueClass="text-ok" sub="Você chegou ao último nível." />
         )}
-        <p className="mt-2 flex flex-wrap items-center gap-1 text-[13.5px] text-t1">
-          <span>
-            Premiação atual: <span className={cn("font-mono font-extrabold", total > 0 ? "text-ok" : "text-t0")}>{brlCent(total)}</span>
-          </span>
-          {me.bonus > 0 && <TipHelp label={`Inclui ${brlCent(me.bonus)} de bônus dos níveis alcançados.`} />}
-        </p>
-        <p className="mt-0.5 text-[12.5px] font-semibold text-t2">
-          {level ? `${level}${current ? ` · ${num(current.commissionPct, 1)}%` : ""}` : "Ainda abaixo do 1º nível"}
-        </p>
-      </div>
-
-      {showsProjection && goal.projectedPct != null && (
-        <p className="flex flex-wrap items-center gap-1.5 text-[12.5px] font-semibold text-t2">
-          Projeção de fechamento
-          <span className="font-mono font-bold text-t0">{num(goal.projectedPct, 0)}%</span>
-          <TipHelp label="Projeção de atingimento ao final da meta. Aparece depois de metade do período." />
-        </p>
-      )}
-
-      <div className={cn("grid grid-cols-1 gap-2.5", me.next && "sm:grid-cols-2")}>
         {me.next && (
           <Tile
             label="Premiação no próximo nível"
             value={goal.nextLevelGain != null && goal.nextLevelGain > 0 ? `+${brlCent(goal.nextLevelGain)}` : `${num(me.next.commissionPct, 1)}%`}
             valueClass={goal.nextLevelGain != null && goal.nextLevelGain > 0 ? "text-ok" : "text-t0"}
-            sub={nextGain ?? undefined}
+            sub={nextGain}
             tip="Quanto a premiação aumenta ao chegar neste nível, sobre as vendas de agora."
           />
         )}
@@ -234,7 +215,7 @@ function PrizeBody({ goal, me, today, through, closed }: { goal: SellerHomeGoal;
         <div>
           <CardTitle className="mb-3">Níveis e premiação</CardTitle>
           <div className="flex flex-col gap-2.5">
-            {shownLevels.map(({ marco, number, bonusSoFar }) => {
+            {levels.map(({ marco, number, bonusSoFar }) => {
               const reached = me.levelNumber != null && me.levelNumber >= number;
               const currentLevel = me.levelNumber === number;
               const parts = [`A partir de ${num(marco.pct, 0)}% da meta`];
@@ -277,16 +258,6 @@ function PrizeBody({ goal, me, today, through, closed }: { goal: SellerHomeGoal;
               );
             })}
           </div>
-          {levels.length > preview.length && (
-            <button
-              type="button"
-              className="mt-2 text-[12px] font-semibold text-t2 hover:text-t1"
-              aria-expanded={showAllLevels}
-              onClick={() => setShowAllLevels((v) => !v)}
-            >
-              {showAllLevels ? "Fechar níveis" : "Ver todos os níveis"}
-            </button>
-          )}
         </div>
       )}
 
