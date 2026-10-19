@@ -174,5 +174,10 @@ export async function readBoardShare(token: string, today: string): Promise<Publ
     return null;
   }
   if (!data) return null;
-  return mapBoardShare(data as Raw);
+  try {
+    return mapBoardShare(data as Raw);
+  } catch (caught) {
+    console.warn("readBoardShare:", caught instanceof Error ? caught.message : caught);
+    return null;
+  }
 }
