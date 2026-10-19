@@ -499,44 +499,53 @@ export function BoardPage() {
         </Card>
       )}
 
-      <Card padding="lg" className="min-w-0">
-        <div className="mb-1 flex items-center gap-2">
-          <TrophyIcon size={16} className="text-acc" />
-          <CardTitle>Ranking</CardTitle>
-        </div>
-        {loading ? (
-          <p className="py-10 text-center text-sm text-t2">Carregando o ranking…</p>
-        ) : (
-          <>
-            <RankingBlock ranking={podium} formatAmount={brlCent} />
-            {rest.length > 0 && (
-              <ul className="mt-4 divide-y divide-line">
-                {rest.map((person) => {
-                  const level = personLevel(person);
-                  return (
-                    <RankRow
-                      key={person.key}
-                      person={person}
-                      place={view!.people.indexOf(person) + 1}
-                      level={level ? (level.levelLabel ?? "Sem nível") : null}
-                      pct={level?.pct ?? null}
-                      hot={momentKey(current) === person.key}
-                    />
-                  );
-                })}
-              </ul>
-            )}
-          </>
-        )}
-      </Card>
+      <div className={cn("grid min-w-0 gap-4", challenges.length > 0 && "lg:grid-cols-[minmax(0,1.15fr)_minmax(300px,0.9fr)] lg:items-start")}>
+        <Card padding="lg" className="min-w-0">
+          <div className="mb-1 flex items-center gap-2">
+            <TrophyIcon size={16} className="text-acc" />
+            <CardTitle>Ranking</CardTitle>
+          </div>
+          {loading ? (
+            <p className="py-10 text-center text-sm text-t2">Carregando o ranking…</p>
+          ) : (
+            <>
+              <RankingBlock ranking={podium} formatAmount={brlCent} />
+              {rest.length > 0 && (
+                <ul className="mt-4 divide-y divide-line">
+                  {rest.map((person) => {
+                    const level = personLevel(person);
+                    return (
+                      <RankRow
+                        key={person.key}
+                        person={person}
+                        place={view!.people.indexOf(person) + 1}
+                        level={level ? (level.levelLabel ?? "Sem nível") : null}
+                        pct={level?.pct ?? null}
+                        hot={momentKey(current) === person.key}
+                      />
+                    );
+                  })}
+                </ul>
+              )}
+            </>
+          )}
+        </Card>
 
-      {challenges.length > 0 && (
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          {challenges.map(({ challenge, view: challengeView }) => (
-            <ChallengeMiniCard key={challenge.id} challenge={challenge} view={challengeView} prominent />
-          ))}
-        </div>
-      )}
+        {challenges.length > 0 && (
+          <div className="flex min-w-0 flex-col gap-3">
+            {challenges.map(({ challenge, view: challengeView }) => (
+              <ChallengeMiniCard
+                key={challenge.id}
+                challenge={challenge}
+                view={challengeView}
+                prominent
+                showPeople
+                hotKey={current?.kind === "challenge" ? current.key : null}
+              />
+            ))}
+          </div>
+        )}
+      </div>
 
       {current && (
         <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center p-6">

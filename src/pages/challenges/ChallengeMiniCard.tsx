@@ -1,8 +1,9 @@
-import { Badge } from "@/components/ui";
+import { Badge, ProgressBar } from "@/components/ui";
+import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import type { ChallengeRecord } from "@/data/wedash/challengesRepo";
-import { CHALLENGE_STATUS_LABEL, type ChallengeView } from "@/data/wedash/challengeView";
+import { CHALLENGE_STATUS_LABEL, metricValueLabel, type ChallengeView } from "@/data/wedash/challengeView";
 import { cn } from "@/lib/cn";
-import { shortDate } from "@/lib/format";
+import { num, shortDate } from "@/lib/format";
 import { statusBadgeVariant } from "@/lib/status";
 import { challengeHeadline, HeadlineText, mainPrizeLabel } from "@/pages/challenges/shared";
 import { FlameIcon, TrophyIcon } from "@/pages/dashboards/icons";
@@ -14,6 +15,8 @@ export function ChallengeMiniCard({
   storeNameValue,
   onOpen,
   prominent = false,
+  showPeople = false,
+  hotKey = null,
 }: {
   challenge: ChallengeRecord;
   view: ChallengeView;
@@ -22,11 +25,17 @@ export function ChallengeMiniCard({
   onOpen?: () => void;
   /** Mesmo ícone e tamanho do card de desafio da Gestão. */
   prominent?: boolean;
+  /** Lista o resultado de cada pessoa, como no detalhe do desafio. */
+  showPeople?: boolean;
+  hotKey?: string | null;
 }) {
   const destaque = challengeHeadline(c, view);
   const prize = mainPrizeLabel(c);
   const ended = view.status === "ended";
   const statusLabel = CHALLENGE_STATUS_LABEL[view.status];
+  const disputa = c.mode === "CONTEST";
+  const leader = Math.max(0, ...view.participants.map((person) => person.result ?? 0));
+  const TextTag = showPeople ? "div" : "span";
   const className = cn(
     "flex w-full items-start gap-3.5 border border-line text-left",
     prominent ? "rounded-2xl p-5 shadow-[var(--shadow-vela)]" : "rounded-xl p-4",
@@ -44,7 +53,7 @@ export function ChallengeMiniCard({
       >
         <FlameIcon size={prominent ? 22 : 18} />
       </span>
-      <span className="min-w-0 flex-1">
+      <TextTag className="min-w-0 flex-1">
         <span className="flex items-start justify-between gap-2">
           <span className={cn("min-w-0 truncate font-bold text-t0", prominent ? "text-[15px]" : "text-[14px]")}>{c.name}</span>
           <Badge variant={statusBadgeVariant(statusLabel)} className="shrink-0 uppercase">
@@ -67,7 +76,48 @@ export function ChallengeMiniCard({
             </span>
           )}
         </span>
-      </span>
+        {showPeople && (
+          <ul className="mt-3 space-y-2.5 border-t border-line pt-3">
+            {view.participants.length === 0 ? (
+              <li className="py-2 text-[12.5px] text-t2">Nenhuma pessoa no desafio.</li>
+            ) : (
+              view.participants.map((person) => {
+                const pct = challengeProgress(person.result, c.target, leader);
+                return (
+                  <li key={person.key} className={cn("flex items-center gap-2", hotKey === person.key && "rounded-lg bg-acc-soft px-1")}>
+                    {disputa && (
+                      <span className="w-6 shrink-0 text-[12px] font-extrabold text-t2">
+                        {person.position == null ? "—" : `${person.position}º`}
+                      </span>
+                    )}
+                    <PersonAvatar name={person.name} employeeId={person.key} storeId={c.storeId} size="sm" />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-baseline justify-between gap-2">
+                        <span className="min-w-0 truncate text-[13px] font-semibold text-t0">{person.name}</span>
+                        <span className="shrink-0 font-mono text-[12px] font-bold text-t0">
+                          {person.result == null ? "—" : metricValueLabel(c.metric, person.result)}
+                        </span>
+                      </span>
+                      <span className="mt-1 flex items-center gap-2">
+                        <span className="min-w-0 flex-1">
+                          <ProgressBar value={pct} height={5} color={person.winner ? "var(--ok)" : undefined} />
+                        </span>
+                        {person.winner ? (
+                          <Badge variant="success" className="shrink-0">
+                            {person.position != null ? `${person.position}º lugar` : "Atingiu"}
+                          </Badge>
+                        ) : (
+                          <span className="w-9 shrink-0 text-right font-mono text-[11px] font-bold text-t2">{num(pct, 0)}%</span>
+                        )}
+                      </span>
+                    </span>
+                  </li>
+                );
+              })
+            )}
+          </ul>
+        )}
+      </TextTag>
     </>
   );
   if (!onOpen) return <div className={className}>{body}</div>;
@@ -76,4 +126,12 @@ export function ChallengeMiniCard({
       {body}
     </button>
   );
+}
+
+/** Barra até a meta. Na disputa sem meta, a barra vai até quem está na frente. */
+function challengeProgress(result: number | null, target: number | null, leader: number): number {
+  if (result == null || result <= 0) return 0;
+  const goal = target != null && target > 0 ? target : leader;
+  if (goal <= 0) return 0;
+  return Math.min(100, (result / goal) * 100);
 }
