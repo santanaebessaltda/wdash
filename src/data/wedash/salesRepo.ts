@@ -452,45 +452,29 @@ function addOriginKeys(
   for (const k of row.name_keys ?? []) keys.storeNameKeys.add(`${row.store_id}|${k}`);
 }
 
-/** Separa usuário da filial e gerência. O usuário da filial com cargo VENDEDOR também sai do ranking. */
-export async function fetchSalesOrigins(client: SalesQueryClient, tenantId: string): Promise<SalesOriginIndex> {
+export type OriginSeller = {
+  id: string;
+  store_id: string;
+  code: string | null;
+  millennium_employee_id: number | null;
+  millennium_gerador_id: number | null;
+  name_keys: string[] | null;
+  active: boolean;
+  erp_role: string | null;
+};
+
+export type OriginStore = {
+  id: string;
+  code: string | null;
+  millennium_store_id: number;
+};
+
+/** Mesma separação da leitura autenticada: usuário da filial e quem não é vendedor. */
+export function salesOriginsFrom(sellers: OriginSeller[], stores: OriginStore[]): SalesOriginIndex {
   const branchUser = emptyOriginKeys();
   const management = emptyOriginKeys();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sellersQuery = await (client.from("store_seller") as any)
-    .select("id, store_id, code, millennium_employee_id, millennium_gerador_id, name_keys, active, erp_role")
-    .eq("tenant_id", tenantId)
-    .limit(5000);
-  if (sellersQuery.error) {
-    console.warn("fetchSalesOrigins:", sellersQuery.error.message);
-    return { branchUser, management };
-  }
-  const sellers = (sellersQuery.data ?? []) as {
-    id: string;
-    store_id: string;
-    code: string | null;
-    millennium_employee_id: number | null;
-    millennium_gerador_id: number | null;
-    name_keys: string[] | null;
-    active: boolean;
-    erp_role: string | null;
-  }[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const storeQuery = (cols: string) => (client.from("store") as any).select(cols).eq("tenant_id", tenantId);
-  let stores = await storeQuery("id, code, millennium_store_id, branch_user_chosen, branch_user_seller_id");
-  if (stores.error?.code === "42703") stores = await storeQuery("id, code, millennium_store_id");
-  if (stores.error) {
-    console.warn("fetchSalesOrigins:", stores.error.message);
-    return { branchUser, management };
-  }
   const branchByStore = new Map<string, string | null>();
-  for (const store of (stores.data ?? []) as {
-    id: string;
-    code: string | null;
-    millennium_store_id: number;
-    branch_user_chosen?: boolean | null;
-    branch_user_seller_id?: string | null;
-  }[]) {
+  for (const store of stores) {
     branchByStore.set(
       store.id,
       resolveBranchSellerId({
@@ -509,6 +493,31 @@ export async function fetchSalesOrigins(client: SalesQueryClient, tenantId: stri
     if (row.active && row.erp_role != null && row.erp_role !== "VENDEDOR") addOriginKeys(management, row);
   }
   return { branchUser, management };
+}
+
+/** Separa usuário da filial e gerência. O usuário da filial com cargo VENDEDOR também sai do ranking. */
+export async function fetchSalesOrigins(client: SalesQueryClient, tenantId: string): Promise<SalesOriginIndex> {
+  const branchUser = emptyOriginKeys();
+  const management = emptyOriginKeys();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sellersQuery = await (client.from("store_seller") as any)
+    .select("id, store_id, code, millennium_employee_id, millennium_gerador_id, name_keys, active, erp_role")
+    .eq("tenant_id", tenantId)
+    .limit(5000);
+  if (sellersQuery.error) {
+    console.warn("fetchSalesOrigins:", sellersQuery.error.message);
+    return { branchUser, management };
+  }
+  const sellers = (sellersQuery.data ?? []) as OriginSeller[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const storeQuery = (cols: string) => (client.from("store") as any).select(cols).eq("tenant_id", tenantId);
+  let stores = await storeQuery("id, code, millennium_store_id, branch_user_chosen, branch_user_seller_id");
+  if (stores.error?.code === "42703") stores = await storeQuery("id, code, millennium_store_id");
+  if (stores.error) {
+    console.warn("fetchSalesOrigins:", stores.error.message);
+    return { branchUser, management };
+  }
+  return salesOriginsFrom(sellers, (stores.data ?? []) as OriginStore[]);
 }
 
 export async function fetchNonSalesPeople(client: SalesQueryClient, tenantId: string): Promise<NonSalesPeople> {

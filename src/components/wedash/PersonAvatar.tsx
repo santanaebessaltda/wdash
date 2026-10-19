@@ -10,25 +10,27 @@ import { useSession } from "@/session/SessionProvider";
 
 const ProfilePhotosContext = createContext<ProfilePhotoRef[]>([]);
 
-/** Carrega as fotos da empresa uma vez. As telas leem daqui. */
-export function ProfilePhotosProvider({ children }: { children: ReactNode }) {
+/** Carrega as fotos da empresa uma vez. As telas leem daqui. `photos` trava a lista (placar público, sem sessão). */
+export function ProfilePhotosProvider({ children, photos: fixed }: { children: ReactNode; photos?: ProfilePhotoRef[] }) {
   const { session } = useSession();
-  const [photos, setPhotos] = useState<ProfilePhotoRef[]>([]);
+  const [loaded, setLoaded] = useState<ProfilePhotoRef[]>([]);
+  const locked = fixed != null;
   useEffect(() => {
+    if (locked) return;
     const tenantId = session?.tenantId;
     if (!tenantId) {
-      setPhotos([]);
+      setLoaded([]);
       return;
     }
     let cancel = false;
     void fetchProfilePhotos(tenantId).then((rows) => {
-      if (!cancel) setPhotos(rows);
+      if (!cancel) setLoaded(rows);
     });
     return () => {
       cancel = true;
     };
-  }, [session?.tenantId, session?.avatarUrl]);
-  return <ProfilePhotosContext.Provider value={photos}>{children}</ProfilePhotosContext.Provider>;
+  }, [locked, session?.tenantId, session?.avatarUrl]);
+  return <ProfilePhotosContext.Provider value={fixed ?? loaded}>{children}</ProfilePhotosContext.Provider>;
 }
 
 export function useProfilePhotos(): ProfilePhotoRef[] {

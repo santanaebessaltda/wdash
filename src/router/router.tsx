@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { Navigate, useRoutes, type RouteObject } from "react-router-dom";
 import { AppShell } from "@/layout/AppShell";
 import { AuthLayout } from "@/layout/AuthLayout";
@@ -45,6 +46,7 @@ import { miscRoutes } from "@/pages/misc/routes";
 import { authRoutes } from "@/pages/auth/routes";
 
 const CreateAccess = lazyPage(() => import("@/pages/access/CreateAccess"), "CreateAccess");
+const PublicBoardPage = lazyPage(() => import("@/pages/board/PublicBoardPage"), "PublicBoardPage");
 
 /** Raiz: sem sessao  ->  login; com sessao  ->  senha temp  ->  onboarding  ->  app. */
 function Raiz() {
@@ -116,6 +118,14 @@ const routeTree: RouteObject[] = [
         ],
       },
     ],
+  },
+  {
+    path: paths.boardShare(":token"),
+    element: (
+      <Suspense fallback={<div className="min-h-screen bg-bg-0" />}>
+        <PublicBoardPage />
+      </Suspense>
+    ),
   },
   { path: "*", element: <NotFound /> },
 ];

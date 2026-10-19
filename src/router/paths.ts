@@ -40,6 +40,8 @@ export const paths = {
   team: "/dashboard/team",
   /** Placar da filial, tela cheia, para o notebook da loja. */
   board: "/board",
+  /** Link público do placar. O token não é o id da filial. */
+  boardShare: (token: string) => `/board/s/${token}`,
   /** Performance > Metas. `/goals`, `/metas` e `/management/goals` redirecionam. */
   goals: "/performance/goals",
   goalNew: "/performance/goals/new",
