@@ -347,10 +347,19 @@ export function TeamPage() {
     };
   }, [tableLines]);
 
+  // No ranking padrão o pódio já mostra o 1º, 2º e 3º. A lista segue do 4º.
+  // Busca ou outra ordenação traz todo mundo, para achar quem está no pódio.
+  const podiumKeys = useMemo(() => new Set(view.people.slice(0, 3).map((p) => p.key)), [view.people]);
+  const rankingOrder = sortKey === "revenue" && sortDir === "desc" && !search.trim();
+  const listLines = useMemo(
+    () => (rankingOrder ? tableLines.filter((p) => !podiumKeys.has(p.key)) : tableLines),
+    [rankingOrder, tableLines, podiumKeys],
+  );
+
   const pageSize = TABLE_PAGE_SIZE;
-  const totalPages = Math.max(1, Math.ceil(tableLines.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(listLines.length / pageSize));
   const pageSafe = Math.min(page, totalPages);
-  const pageRows = printing ? tableLines : tableLines.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
+  const pageRows = printing ? listLines : listLines.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
 
   useEffect(() => {
     setPage(1);
@@ -682,8 +691,10 @@ export function TeamPage() {
           />
         </div>
 
-        {tableLines.length === 0 ? (
-          <WithoutResult hasDados={hasTeamSales} onClear={() => setSearch("")} />
+        {listLines.length === 0 ? (
+          search.trim() ? (
+            <WithoutResult hasDados={hasTeamSales} onClear={() => setSearch("")} />
+          ) : null
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] border-collapse text-sm">
@@ -754,7 +765,7 @@ export function TeamPage() {
                   <td className="px-1 py-3 text-[13px] font-extrabold text-t0" colSpan={2}>
                     <span className="inline-flex items-center gap-1">
                       Total do filtro
-                      <TipHelp label="Soma todas as pessoas encontradas no filtro, inclusive as que não aparecem nesta página." />
+                      <TipHelp label="Soma todas as pessoas encontradas no filtro, inclusive quem está no pódio e quem não aparece nesta página." />
                     </span>
                     <span className="mt-0.5 block text-[11px] font-semibold text-t2">
                       {num(tableLines.length)} {tableLines.length === 1 ? "pessoa" : "pessoas"}
@@ -780,10 +791,10 @@ export function TeamPage() {
           </div>
         )}
 
-        {tableLines.length > 0 && (
+        {listLines.length > 0 && (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
             <span className="text-[12.5px] text-t2">
-              Mostrando {pageRows.length} de {num(tableLines.length)} pessoas
+              Mostrando {pageRows.length} de {num(listLines.length)} pessoas
             </span>
             {totalPages > 1 && <Pagination page={pageSafe} totalPages={totalPages} onChange={setPage} />}
           </div>
