@@ -185,9 +185,8 @@ function IndividualPctCell({ l }: { l: LineRank }) {
 
 function LevelCell({ l }: { l: LineRank }) {
   if (l.noGoal || !l.currentTierName || l.currentLevel == null) return <span className="text-t2">—</span>;
-  const pctRef = l.projectedAttainmentPct ?? l.attainmentPct;
   return (
-    <Badge variant={pctRef >= 100 ? "success" : "warning"}>
+    <Badge variant="neutral">
       N{l.currentLevel} · {l.currentTierName}
     </Badge>
   );
