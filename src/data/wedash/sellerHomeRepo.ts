@@ -1,13 +1,23 @@
 import { getSupabase } from "@/lib/supabase";
-import type { SellerHomePayload } from "@/data/wedash/engine/sellerHome";
+import { startOfMonth } from "@/data/wedash/engine/format";
+import { sellerHistoryFloor, type SellerHomePayload } from "@/data/wedash/engine/sellerHome";
 
-/** Pacote da tela Inicio do vendedor (Edge `seller-home`). null = falhou. */
-export async function fetchSellerHome(): Promise<SellerHomePayload | null> {
+/** Pacote da tela Inicio do vendedor (Edge `seller-home`). null = falhou. `month` = "YYYY-MM". */
+export async function fetchSellerHome(month?: string | null): Promise<SellerHomePayload | null> {
   const sb = getSupabase();
   if (!sb) return null;
-  const { data, error } = await sb.functions.invoke("seller-home", { body: {} });
+  const body = month && /^\d{4}-\d{2}/.test(month) ? { month: month.slice(0, 7) } : {};
+  const { data, error } = await sb.functions.invoke("seller-home", { body });
   if (error) return null;
-  const res = data as (SellerHomePayload & { ok?: boolean }) | null;
-  if (!res?.ok) return null;
-  return res;
+  const res = data as (Partial<SellerHomePayload> & { ok?: boolean; today?: string }) | null;
+  if (!res?.ok || !res.today || !res.stores || !res.myDays || !res.numbersPeriod) return null;
+  return {
+    today: res.today,
+    month: res.month ?? startOfMonth(res.today),
+    historyFrom: res.historyFrom ?? sellerHistoryFloor(res.today),
+    name: res.name ?? "",
+    stores: res.stores,
+    myDays: res.myDays,
+    numbersPeriod: res.numbersPeriod,
+  };
 }

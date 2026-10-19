@@ -3,7 +3,7 @@ import type { GoalRecord, GoalTeamMember, SalesDayAgg, SalesSellerDayAgg } from 
 import { sellerGoalLevels } from "./goalView.ts";
 import type { StoreWeekHours } from "./goalWeights.ts";
 import { brlCent } from "./format.ts";
-import { buildSellerHome, type SellerHomeInput } from "./sellerHome.ts";
+import { buildSellerHome, sellerHistoryFloor, sellerHistoryFrom, type SellerHomeInput } from "./sellerHome.ts";
 
 const OPEN = { open: "10:00", close: "22:00" };
 const ALL_DAYS: StoreWeekHours = { 0: OPEN, 1: OPEN, 2: OPEN, 3: OPEN, 4: OPEN, 5: OPEN, 6: OPEN };
@@ -159,9 +159,24 @@ describe("buildSellerHome", () => {
     expect(store.goals[0]?.me?.marcos[0]).toMatchObject({ name: "Meta", bonus: 50 });
   });
 
-  it("goal ended yesterday: goal = null", () => {
-    const ended = { ...goal, startsOn: "2026-08-15", endsOn: "2026-09-14" };
+  it("a goal that ended inside the month stays, after the ones still running", () => {
+    const ended = { ...goal, id: "old", name: "Meta curta", endsOn: "2026-09-14" };
+    const store = buildSellerHome(input({ goals: [ended, goal] })).stores[0]!;
+    expect(store.goals.map((g) => g.name)).toEqual(["Meta setembro", "Meta curta"]);
+    expect(store.goals[1]?.me?.status).toBe("ended");
+  });
+
+  it("a goal that ended before this month stays out", () => {
+    const ended = { ...goal, startsOn: "2026-08-01", endsOn: "2026-08-31" };
     expect(buildSellerHome(input({ goals: [ended] })).stores[0]!.goal).toBeNull();
+  });
+
+  it("history opens at admission when that is inside the 24 loaded months", () => {
+    expect(sellerHistoryFloor("2026-10-19")).toBe("2024-11-01");
+    expect(sellerHistoryFrom("2026-10-19", ["2026-03-15"])).toBe("2026-03-01");
+    expect(sellerHistoryFrom("2026-10-19", ["2020-01-01"])).toBe("2024-11-01");
+    expect(sellerHistoryFrom("2026-10-19", [null])).toBe("2024-11-01");
+    expect(sellerHistoryFrom("2026-10-19", [])).toBe("2024-11-01");
   });
 
   it("two stores: one entry per store, each with its own goal", () => {

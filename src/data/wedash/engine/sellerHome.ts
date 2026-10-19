@@ -1,5 +1,5 @@
 /** Pacote da tela Inicio do vendedor. No modo Geral, numeros e podio sao a parte igual da filial. Nos outros modos, o podio e a venda de cada pessoa. */
-import { brlCent, collaboratorName, startOfMonth, addDays } from "./format.ts";
+import { addMonths, brlCent, collaboratorName, startOfMonth, addDays } from "./format.ts";
 import type { GoalCardView, GoalRecord, GoalTeamMember, SalesDayAgg, SalesSellerDayAgg, SellerRow } from "./goalTypes.ts";
 import { buildGoalCardView, goalStatus, sellerGoalLevels, type SellerGoalLevel } from "./goalView.ts";
 import { weekdayWeights, type StoreWeekHours } from "./goalWeights.ts";
@@ -16,7 +16,27 @@ import { nextLevelGain, projectedPrize } from "./sellerPrize.ts";
 /** Semanas de historico da loja antes da meta para o peso por dia da semana (as mesmas da curva da meta). */
 const HISTORY_WEEKS = 6;
 
-/** Uma meta ativa da loja, com a parte da pessoa. */
+/** Meses de venda que a integracao carrega (DEEP_HISTORY=24m), contando o mes atual. */
+export const SELLER_HISTORY_MONTHS = 24;
+
+/** Primeiro dia do mes mais antigo coberto pelo carregamento de 24 meses. */
+export function sellerHistoryFloor(today: string): string {
+  return addMonths(startOfMonth(today), -(SELLER_HISTORY_MONTHS - 1));
+}
+
+/**
+ * Primeiro mes que a pessoa pode abrir: o mais recente entre o piso de 24 meses
+ * e o mes da admissao. Sem data de admissao, fica so o piso.
+ */
+export function sellerHistoryFrom(today: string, admittedOn: Array<string | null>): string {
+  const floor = sellerHistoryFloor(today);
+  if (admittedOn.length === 0 || admittedOn.some((day) => !day)) return floor;
+  const joined = admittedOn.reduce((earliest, day) => (day! < earliest! ? day : earliest))!;
+  const admittedMonth = startOfMonth(joined);
+  return admittedMonth > floor ? admittedMonth : floor;
+}
+
+/** Uma meta que cruza o mes visto, com a parte da pessoa. */
 export interface SellerHomeGoal {
   id: string;
   name: string;
@@ -116,6 +136,10 @@ export interface SellerDay {
 
 export interface SellerHomePayload {
   today: string;
+  /** Primeiro dia do mes escolhido. */
+  month: string;
+  /** Primeiro dia do mes mais antigo que a pessoa pode abrir. */
+  historyFrom: string;
   name: string;
   stores: SellerHomeStore[];
   myDays: SellerDay[];
@@ -339,9 +363,13 @@ function buildHomeGoal(input: SellerHomeInput, s: SellerHomeInput["stores"][numb
 }
 
 function buildStore(input: SellerHomeInput, s: SellerHomeInput["stores"][number]): SellerHomeStore {
+  const monthStart = startOfMonth(input.today);
   const goals = input.goals
-    .filter((g) => g.storeId === s.storeId && goalStatus(g, input.today) === "active")
-    .sort((a, b) => a.startsOn.localeCompare(b.startsOn) || a.name.localeCompare(b.name, "pt-BR"))
+    .filter((g) => g.storeId === s.storeId && g.startsOn <= input.today && g.endsOn >= monthStart && goalStatus(g, input.today) !== "upcoming")
+    .sort((a, b) => {
+      const rank = (g: typeof a) => (goalStatus(g, input.today) === "active" ? 0 : 1);
+      return rank(a) - rank(b) || a.startsOn.localeCompare(b.startsOn) || a.name.localeCompare(b.name, "pt-BR");
+    })
     .map((g) => buildHomeGoal(input, s, g));
   return {
     storeId: s.storeId,

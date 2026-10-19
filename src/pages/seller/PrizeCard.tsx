@@ -75,7 +75,21 @@ function Tile({
 }
 
 /** Uma meta da pessoa, no card do gestor: selos, barra, projeção e a escada com bônus. */
-export function PrizeCard({ store, today, embedded = false }: { store: SellerHomeStore; today: string; embedded?: boolean }) {
+export function PrizeCard({
+  store,
+  today,
+  through,
+  closed = false,
+  embedded = false,
+}: {
+  store: SellerHomeStore;
+  today: string;
+  /** Último dia já carregado do mês visto. */
+  through: string;
+  /** Mês anterior ao corrente: meta encerrada até esse dia não mostra "Último dia". */
+  closed?: boolean;
+  embedded?: boolean;
+}) {
   const goals = store.goals;
   if (goals.length === 0) {
     const empty = <EmptyBlock icon="🎯" title="Meta não configurada" description="Quando a meta da filial for cadastrada, ela aparecerá aqui." />;
@@ -91,7 +105,7 @@ export function PrizeCard({ store, today, embedded = false }: { store: SellerHom
               <p className="py-6 text-center text-[13.5px] text-t1">Você ainda não está em um grupo desta meta. Fale com a gerência da loja.</p>
             </>
           ) : (
-            <PrizeBody goal={goal} me={goal.me} today={today} />
+            <PrizeBody goal={goal} me={goal.me} today={today} through={through} closed={closed} />
           )}
         </Card>
       ))}
@@ -99,7 +113,7 @@ export function PrizeCard({ store, today, embedded = false }: { store: SellerHom
   );
 }
 
-function PrizeBody({ goal, me, today }: { goal: SellerHomeGoal; me: Me; today: string }) {
+function PrizeBody({ goal, me, today, through, closed }: { goal: SellerHomeGoal; me: Me; today: string; through: string; closed: boolean }) {
   const mode = MODE[me.modo];
   const level = me.levelNumber != null && me.level ? `N${me.levelNumber} · ${me.level}` : null;
   const current = me.levelNumber != null ? me.marcos[me.levelNumber - 1] : undefined;
@@ -110,7 +124,7 @@ function PrizeBody({ goal, me, today }: { goal: SellerHomeGoal; me: Me; today: s
     total: me.goalAmount,
     pct: me.attainmentPct,
     projectedPct: goal.projectedPct ?? 0,
-    daysRemaining: me.daysRemaining,
+    daysRemaining: closed && me.end <= through ? 0 : me.daysRemaining,
     start: me.start,
     end: me.end,
   };

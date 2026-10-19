@@ -54,6 +54,12 @@ export function endOfMonth(iso: string): string {
   return dateToIso(new Date(d.getFullYear(), d.getMonth() + 1, 0));
 }
 
+/** Primeiro dia do mes deslocado. delta negativo volta no calendario. */
+export function addMonths(iso: string, delta: number): string {
+  const d = isoToDate(startOfMonth(iso));
+  return dateToIso(new Date(d.getFullYear(), d.getMonth() + delta, 1));
+}
+
 /** Lista de ISOs entre inicio e fim, inclusive. */
 export function eachDay(start: string, end: string): string[] {
   const out: string[] = [];

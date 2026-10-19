@@ -6,9 +6,9 @@
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeaders, serve } from "../_shared/cors.ts";
-import { buildSellerHome, type SellerChallengeInput, type SellerChallengePrize, type SellerHomeInput } from "../_shared/engine/sellerHome.ts";
+import { buildSellerHome, sellerHistoryFrom, type SellerChallengeInput, type SellerChallengePrize, type SellerHomeInput } from "../_shared/engine/sellerHome.ts";
 import type { SellerProductDay } from "../_shared/engine/sellerChallenge.ts";
-import { endOfMonth, startOfMonth, dateToIso, addDays } from "../_shared/engine/format.ts";
+import { addMonths, endOfMonth, startOfMonth, dateToIso, addDays } from "../_shared/engine/format.ts";
 import { resolveBranchSellerId } from "../_shared/engine/branchUser.ts";
 import { excludeNonSalesPeople, goalFromRow, sellerDayFromRow, teamMemberFromRow } from "../_shared/engine/goalRows.ts";
 import type { DayHours, Dow, StoreWeekHours } from "../_shared/engine/goalWeights.ts";
@@ -142,9 +142,19 @@ serve(async (req) => {
   const membership = memberships?.[0];
   if (!membership) return fail("not_linked", 403);
 
+  let requestedMonth: string | null = null;
+  try {
+    const body = await req.json();
+    if (body && typeof body === "object" && typeof body.month === "string" && /^\d{4}-\d{2}$/.test(body.month)) {
+      requestedMonth = `${body.month}-01`;
+    }
+  } catch {
+    requestedMonth = null;
+  }
+
   const { data: links } = await admin
     .from("store_seller")
-    .select("store_id, millennium_employee_id, store:store_id (trade_name, name, last_sync_at, hours)")
+    .select("store_id, millennium_employee_id, admitted_on, store:store_id (trade_name, name, last_sync_at, hours)")
     .eq("membership_id", membership.id)
     .eq("active", true)
     .eq("in_erp", true);
@@ -166,21 +176,30 @@ serve(async (req) => {
 
   const today = dateToIso(new Date());
   const storeIds = stores.map((s) => s.storeId);
-  const from = addDays(startOfMonth(addDays(today, -HISTORY_WEEKS * 7)), 0);
+  const historyFrom = sellerHistoryFrom(
+    today,
+    (links ?? []).map((l) => (l.admitted_on == null ? null : String(l.admitted_on))),
+  );
+  let monthStart = requestedMonth ? startOfMonth(requestedMonth) : startOfMonth(today);
+  if (monthStart < historyFrom) monthStart = historyFrom;
+  if (monthStart > startOfMonth(today)) monthStart = startOfMonth(today);
+  const monthEnd = endOfMonth(monthStart);
+  const asOf = monthStart === startOfMonth(today) ? today : monthEnd;
+  const weightFrom = addDays(startOfMonth(addDays(monthStart, -HISTORY_WEEKS * 7)), 0);
+  const previousMonth = addMonths(monthStart, -1);
+  const from = weightFrom < previousMonth ? weightFrom : previousMonth;
 
   try {
-    const monthStart = startOfMonth(today);
-    const monthEnd = endOfMonth(today);
     const [dayRows, sellerRows, teamRows, goalRows, challengeRows] = await Promise.all([
       allPages(
         admin.from("sales_day_agg").select("tenant_id, store_id, day, brand, revenue_cents, sales_count, item_count, cmv_cents")
-          .eq("tenant_id", membership.tenant_id).eq("brand", "ALL").in("store_id", storeIds).gte("day", from).lte("day", today)
+          .eq("tenant_id", membership.tenant_id).eq("brand", "ALL").in("store_id", storeIds).gte("day", from).lte("day", asOf)
           .order("day").order("store_id"),
       ),
       allPages(
         admin.from("sales_seller_day_agg")
           .select("tenant_id, store_id, day, seller_key, seller_name, seller_employee_id, seller_gerador_id, brand, revenue_cents, sales_count, item_count")
-          .eq("tenant_id", membership.tenant_id).eq("brand", "ALL").in("store_id", storeIds).gte("day", from).lte("day", today)
+          .eq("tenant_id", membership.tenant_id).eq("brand", "ALL").in("store_id", storeIds).gte("day", from).lte("day", asOf)
           .order("day").order("store_id"),
       ),
       allPages(
@@ -190,7 +209,7 @@ serve(async (req) => {
       ),
       allPages(
         admin.from("goal").select("id, store_id, name, starts_on, ends_on, target_cents, tier_mode, tiers, groups, spread_unidentified")
-          .eq("tenant_id", membership.tenant_id).in("store_id", storeIds).lte("starts_on", today).gte("ends_on", from)
+          .eq("tenant_id", membership.tenant_id).in("store_id", storeIds).lte("starts_on", asOf).gte("ends_on", monthStart)
           .order("starts_on", { ascending: false }),
       ),
       allPages(
@@ -207,7 +226,7 @@ serve(async (req) => {
     let productTypes: { code: string; typeId: number }[] = [];
     if (productChallenges.length > 0) {
       const productFrom = productChallenges.reduce((m: string, r) => (String(r.starts_on) < m ? String(r.starts_on) : m), String(productChallenges[0].starts_on));
-      const productTo = today < monthEnd ? today : monthEnd;
+      const productTo = asOf;
       const [productRows, typeRows] = await Promise.all([
         allPages(
           admin.from("sales_seller_product_day_agg")
@@ -264,7 +283,7 @@ serve(async (req) => {
       (r) => !nonSales.generatorIds.has(r.sellerGeneratorId) && !nonSales.storeNameKeys.has(`${r.storeId}|${r.sellerKey}`),
     );
     const input: SellerHomeInput = {
-      today,
+      today: asOf,
       stores,
       goals: goalRows.map(goalFromRow),
       dayAggs: dayRows.map((r) => ({
@@ -302,10 +321,12 @@ serve(async (req) => {
     return json({
       ok: true,
       today,
+      month: monthStart,
+      historyFrom,
       name: identity.name ?? "",
       stores: home.stores,
       myDays: home.myDays,
-      numbersPeriod: { from: monthStart, to: today },
+      numbersPeriod: { from: monthStart, to: asOf },
     });
   } catch (e) {
     console.warn("seller-home", e instanceof Error ? e.message : e);

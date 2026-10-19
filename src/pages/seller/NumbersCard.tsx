@@ -45,13 +45,17 @@ export function NumbersCard({
   days,
   period,
   today,
+  currentMonth = true,
 }: {
   days: SellerDay[];
   period: { from: string; to: string };
   today: string;
+  /** false no mês já fechado: "Hoje" só existe no mês corrente. */
+  currentMonth?: boolean;
 }) {
   const [mode, setMode] = useState<NumbersMode>("month");
-  const n = sellerNumbers(days, period, today, mode);
+  const effective: NumbersMode = currentMonth === false ? "month" : mode;
+  const n = sellerNumbers(days, period, today, effective);
   const pa = n.pa.value == null ? "—" : num(n.pa.value, 2);
   const cards: { label: string; value: string; delta?: (typeof n.revenue)["delta"]; tooltip?: string }[] = [
     { label: "Faturamento", value: brlCent(n.revenue.value ?? 0), delta: n.revenue.delta },
@@ -68,14 +72,16 @@ export function NumbersCard({
     <div>
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-[15px] font-bold text-t0">Seus números</h2>
-        <Segmented
-          options={[
-            { value: "today", label: "Hoje" },
-            { value: "month", label: "Este mês" },
-          ]}
-          value={mode}
-          onChange={(v) => v && setMode(v)}
-        />
+        {currentMonth !== false && (
+          <Segmented
+            options={[
+              { value: "today", label: "Hoje" },
+              { value: "month", label: "Este mês" },
+            ]}
+            value={mode}
+            onChange={(v) => v && setMode(v)}
+          />
+        )}
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((kpi, i) => {
