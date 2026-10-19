@@ -1578,6 +1578,8 @@ export type SyncJobDeps = {
     stores: Array<{ id: string; name: string; timezone: string }>;
     before: Map<string, number>;
     after: Map<string, number>;
+    /** Relógio da rodada. O intervalo de 1 hora conta os blocos de 30 min a partir daqui. */
+    now?: Date;
   }) => Promise<void>;
   /** Resumo do dinheiro no fechamento da madrugada. Um dia, sem carga de histórico. */
   notifyCashClose?: (args: {
@@ -3119,6 +3121,7 @@ async function runRefreshJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyncRe
         })),
         before: beforeToday,
         after,
+        now: at,
       });
     } catch (e) {
       console.warn(`  AVISO push de vendas não foi enviado: ${e instanceof Error ? e.message : String(e)}`);

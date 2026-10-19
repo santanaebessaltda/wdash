@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { formatCashClosePush } from "./cashClosePush.ts";
 import { formatStoreGoalPush, goalLevel } from "./goalPush.ts";
-import { formatSalesPush } from "./salesPush.ts";
+import { formatSalesPush, salesPeriodDelta, salesPushDue } from "./salesPush.ts";
 
 const plain = (value: string | undefined) => value?.replaceAll("\u00a0", " ");
 
@@ -65,6 +65,50 @@ describe("formatSalesPush", () => {
 
   it("sem filial no acesso não há texto", () => {
     expect(formatSalesPush([])).toBeNull();
+  });
+
+  it("1 hora sem venda nova diz a última hora", () => {
+    const text = formatSalesPush([{ name: "CENTRO", deltaCents: 0, todayCents: 200000 }], 60);
+    expect(plain(text?.title)).toBe("Sem vendas na última hora");
+    expect(plain(text?.body)).toBe("CENTRO · R$ 2.000,00 hoje");
+  });
+});
+
+describe("intervalo do push de vendas", () => {
+  const at = (iso: string) => new Date(iso);
+
+  it("30 min manda em toda rodada", () => {
+    expect(salesPushDue(30, at("2026-10-19T14:30:00Z"), at("2026-10-19T14:07:00Z"))).toBe(true);
+    expect(salesPushDue(60, at("2026-10-19T14:30:00Z"), null)).toBe(true);
+  });
+
+  it("1 hora espera o bloco seguinte e não repete no mesmo bloco", () => {
+    expect(salesPushDue(60, at("2026-10-19T14:30:00Z"), at("2026-10-19T14:07:00Z"))).toBe(false);
+    expect(salesPushDue(60, at("2026-10-19T15:02:00Z"), at("2026-10-19T14:07:00Z"))).toBe(true);
+    expect(salesPushDue(60, at("2026-10-19T15:10:00Z"), at("2026-10-19T15:02:00Z"))).toBe(false);
+  });
+
+  it("1 hora soma o que entrou desde o último aviso, inclusive a rodada pulada", () => {
+    expect(
+      salesPeriodDelta({
+        every: 60,
+        storeId: "centro",
+        day: "2026-10-19",
+        todayCents: 180000,
+        roundDelta: 30000,
+        baseline: { centro: { day: "2026-10-19", cents: 100000 } },
+      }),
+    ).toBe(80000);
+  });
+
+  it("30 min e o primeiro aviso do dia usam só o que esta rodada gravou", () => {
+    const baseline = { centro: { day: "2026-10-18", cents: 900000 } };
+    expect(
+      salesPeriodDelta({ every: 30, storeId: "centro", day: "2026-10-19", todayCents: 40000, roundDelta: 40000, baseline }),
+    ).toBe(40000);
+    expect(
+      salesPeriodDelta({ every: 60, storeId: "centro", day: "2026-10-19", todayCents: 40000, roundDelta: 40000, baseline }),
+    ).toBe(40000);
   });
 });
 

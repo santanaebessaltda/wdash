@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Card } from "@/components/ui";
+import { Card, Segmented } from "@/components/ui";
 import { getSupabase } from "@/lib/supabase";
 import { CheckIcon } from "@/pages/utility/icons";
 import { useActiveSession } from "@/session/SessionProvider";
@@ -10,8 +10,15 @@ type Prefs = Record<PrefKey, boolean>;
 
 const DEFAULTS: Prefs = { sales: true, cashClose: true, storeGoal: true, stock: true };
 
-const ROWS: Array<{ key: PrefKey; name: string; desc: string }> = [
-  { key: "sales", name: "Vendas do período", desc: "A cada 30 minutos, se alguma filial vendeu, o resumo mostra o que entrou no período e quanto cada filial já vendeu hoje. As filiais aparecem da que mais vendeu no dia para a que menos vendeu. Chega com o app aberto ou fechado." },
+type SalesEvery = 30 | 60;
+
+function salesDesc(every: SalesEvery): string {
+  const cadence = every === 60 ? "A cada 1 hora" : "A cada 30 minutos";
+  return `${cadence}, se alguma filial vendeu, o resumo mostra o que entrou no período e quanto cada filial já vendeu hoje. As filiais aparecem da que mais vendeu no dia para a que menos vendeu. Chega com o app aberto ou fechado.`;
+}
+
+const ROWS: Array<{ key: PrefKey; name: string; desc?: string }> = [
+  { key: "sales", name: "Vendas do período" },
   { key: "cashClose", name: "Fechamento", desc: "Receba um resumo do fechamento do dia, com faltas ou sobras em dinheiro e dias ainda sem total real." },
   { key: "storeGoal", name: "Meta da filial", desc: "Receba um aviso quando a filial atingir um novo nível da meta. Cada nível é avisado uma única vez." },
   { key: "stock", name: "Estoque abaixo do mínimo", desc: "Receba um aviso quando um produto ficar abaixo do mínimo definido para a filial." },
@@ -29,6 +36,7 @@ function Dot({ on }: { on: boolean }) {
 export function NotificationsPage() {
   const session = useActiveSession();
   const [prefs, setPrefs] = useState<Prefs>(DEFAULTS);
+  const [salesEvery, setSalesEvery] = useState<SalesEvery>(30);
   const [userId, setUserId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,7 +51,7 @@ export function NotificationsPage() {
       setUserId(uid);
       const { data, error } = await sb
         .from("notification_pref")
-        .select("sales, cash_close, store_goal, stock")
+        .select("sales, cash_close, store_goal, stock, sales_every_min")
         .eq("auth_user_id", uid)
         .eq("tenant_id", session.tenantId)
         .maybeSingle();
@@ -59,17 +67,19 @@ export function NotificationsPage() {
         storeGoal: Boolean(data.store_goal),
         stock: data.stock !== false,
       });
+      setSalesEvery(data.sales_every_min === 60 ? 60 : 30);
     })();
     return () => {
       live = false;
     };
   }, [session.tenantId]);
 
-  async function toggle(key: PrefKey) {
+  async function persist(next: Prefs, every: SalesEvery) {
     const sb = getSupabase();
     if (!sb || !userId) return;
-    const next = { ...prefs, [key]: !prefs[key] };
+    const prev = { prefs, every: salesEvery };
     setPrefs(next);
+    setSalesEvery(every);
     setError(null);
     const { error } = await sb.from("notification_pref").upsert(
       {
@@ -79,13 +89,24 @@ export function NotificationsPage() {
         cash_close: next.cashClose,
         store_goal: next.storeGoal,
         stock: next.stock,
+        sales_every_min: every,
       },
       { onConflict: "auth_user_id,tenant_id" },
     );
     if (error) {
-      setPrefs(prefs);
+      setPrefs(prev.prefs);
+      setSalesEvery(prev.every);
       setError("Não foi possível salvar as alterações. Tente novamente.");
     }
+  }
+
+  function toggle(key: PrefKey) {
+    void persist({ ...prefs, [key]: !prefs[key] }, salesEvery);
+  }
+
+  function changeEvery(every: SalesEvery) {
+    if (every === salesEvery) return;
+    void persist(prefs, every);
   }
 
   return (
@@ -100,7 +121,20 @@ export function NotificationsPage() {
         <div key={row.key} className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-line py-3.5 last:border-b-0">
           <div>
             <p className="text-[13.5px] font-bold text-t0">{row.name}</p>
-            <p className="mt-0.5 text-[11.5px] text-t2">{row.desc}</p>
+            <p className="mt-0.5 text-[11.5px] text-t2">{row.key === "sales" ? salesDesc(salesEvery) : row.desc}</p>
+            {row.key === "sales" && (
+              <Segmented
+                className="mt-2"
+                options={[
+                  { value: "30", label: "30 min" },
+                  { value: "60", label: "1 hora" },
+                ]}
+                value={salesEvery === 60 ? "60" : "30"}
+                onChange={(value) => {
+                  if (value === "30" || value === "60") changeEvery(value === "60" ? 60 : 30);
+                }}
+              />
+            )}
           </div>
           <span className="flex w-[50px] justify-center">
             <button type="button" aria-pressed={prefs[row.key]} aria-label={row.name} onClick={() => void toggle(row.key)}>
