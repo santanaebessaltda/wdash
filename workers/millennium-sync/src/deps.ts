@@ -1468,7 +1468,27 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
         .limit(1)
         .maybeSingle();
       if (error) throw error;
-      return data != null;
+      if (data) return true;
+      // Carga do mês cede o lugar para o SEED de outra conta da mesma empresa.
+      const { data: cred, error: credErr } = await sb
+        .from("erp_credential")
+        .select("tenant_id")
+        .eq("id", credentialId)
+        .maybeSingle();
+      if (credErr) throw credErr;
+      const tenantId = (cred as { tenant_id?: string } | null)?.tenant_id;
+      if (!tenantId) return false;
+      const { data: other, error: otherErr } = await sb
+        .from("sync_job")
+        .select("id")
+        .eq("tenant_id", tenantId)
+        .neq("credential_id", credentialId)
+        .eq("kind", "SEED")
+        .eq("status", "QUEUED")
+        .limit(1)
+        .maybeSingle();
+      if (otherErr) throw otherErr;
+      return other != null;
     },
 
     async markJobProgress({ jobId, day }) {

@@ -2857,7 +2857,7 @@ async function runDailyForceJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyn
     }
     if (closedMonth && dayIndex < days.length - 1 && (await priorityJobQueued(deps, job.credentialId))) {
       yieldedAt = day;
-      console.log(`  ${runLabel}: Atualizar na fila — pausa em ${day} e continua depois`);
+      console.log(`  ${runLabel}: sincronização prioritária na fila — pausa em ${day} e continua depois`);
       break;
     }
   }
@@ -2893,7 +2893,7 @@ async function runDailyForceJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyn
       totalDays: days.length,
       ms: nowMs() - tJob,
       timings: rangeTimings,
-      ...(yieldedAt ? { note: `Pausou em ${brDay(yieldedAt)} para o Atualizar; continua depois` } : {}),
+      ...(yieldedAt ? { note: `Pausou em ${brDay(yieldedAt)} para uma sincronização prioritária; continua depois` } : {}),
     });
   } else if (days.length > 1) {
     console.log(`OK ${runLabel} · ${daysOk} dias · ${storesDone} loja(s) · ${formatElapsed(tJob)} no total`);

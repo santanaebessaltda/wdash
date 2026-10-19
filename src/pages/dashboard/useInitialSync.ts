@@ -18,7 +18,8 @@ export function useInitialSync(): { sync: InitialSync | null; retry: () => Promi
 
   const check = useCallback(async () => {
     const next = await fetchInitialSync(tenantId);
-    const pending = prev.current?.phase === "queued" || prev.current?.phase === "running";
+    const phase = prev.current?.phase;
+    const pending = phase === "queued" || phase === "waiting" || phase === "running" || phase === "stuck";
     if (pending && !next) {
       window.dispatchEvent(new Event(SALES_SYNCED_EVENT));
       refreshMonthFill();

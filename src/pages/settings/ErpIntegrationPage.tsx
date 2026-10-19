@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  Alert,
+  Badge,
   Button,
   Card,
   Tooltip,
@@ -7,10 +9,14 @@ import {
   FormField,
   Input,
   Modal,
+  ProgressBar,
+  RadialProgress,
+  Spinner,
   useToast,
 } from "@/components/ui";
 import { ConnectionCard, ConnectionSkeleton } from "@/components/wedash/ConnectionList";
 import { ErpReportChecks } from "@/components/wedash/ErpReportChecks";
+import { calendarTodayIso } from "@/data/wedash/clock";
 import {
   connectErpAccount,
   fetchErpAccounts,
@@ -19,9 +25,13 @@ import {
   type ErpAccount,
   type ErpReportCheck,
 } from "@/data/wedash/erp";
+import { fetchErpAccountSync, type AccountSyncView } from "@/data/wedash/erpAccountSync";
+import { requestTodaySync } from "@/data/wedash/initialSync";
+import { fetchSeedDaysByStore, monthFillProgress } from "@/data/wedash/salesRepo";
 import { noAutofill, secretStyle } from "@/lib/noAutofill";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
+import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useSession, useActiveSession } from "@/session/SessionProvider";
 
 function accountStatus(account: ErpAccount): string {
@@ -62,8 +72,14 @@ export function ErpIntegrationPage() {
   const [pending, setPending] = useState<ErpAccount | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
   const [atualizando, setAtualizando] = useState(false);
+  const [syncLoaded, setSyncLoaded] = useState(false);
+  const [syncByAccount, setSyncByAccount] = useState<Map<string, AccountSyncView>>(new Map());
+  const [seededAccounts, setSeededAccounts] = useState<Set<string>>(new Set());
+  const [readyStores, setReadyStores] = useState<Set<string>>(new Set());
+  const [retryingId, setRetryingId] = useState<string | null>(null);
   const canEdit = session.role === "OWNER" || session.role === "MANAGER";
   const canRefresh = accounts.some((account) => account.status === "VALID" && !account.syncPaused) && session.role === "OWNER";
+  const syncing = [...syncByAccount.values()].some((view) => view.seed != null || view.fill != null);
 
   const reload = useCallback(async () => {
     const rows = await fetchErpAccounts(session.tenantId);
@@ -72,9 +88,33 @@ export function ErpIntegrationPage() {
     setLoading(false);
   }, [session.tenantId, show]);
 
+  const refreshSync = useCallback(async () => {
+    const today = calendarTodayIso();
+    const [state, days] = await Promise.all([
+      fetchErpAccountSync(session.tenantId),
+      fetchSeedDaysByStore(session.tenantId, today, today),
+    ]);
+    if (!state) return;
+    setSyncByAccount(state.views);
+    setSeededAccounts(state.seeded);
+    setSyncLoaded(true);
+    const ready = new Set<string>();
+    for (const [storeId, covered] of days) {
+      if (covered.size > 0) ready.add(storeId);
+    }
+    setReadyStores(ready);
+  }, [session.tenantId]);
+
   useEffect(() => {
     void reload();
-  }, [reload]);
+    void refreshSync();
+  }, [reload, refreshSync]);
+
+  useEffect(() => {
+    if (!syncing) return;
+    const id = window.setInterval(() => void refreshSync(), 3_000);
+    return () => window.clearInterval(id);
+  }, [syncing, refreshSync]);
 
   async function disconnect() {
     if (!pending) return;
@@ -89,6 +129,17 @@ export function ErpIntegrationPage() {
     } finally {
       setDisconnecting(false);
     }
+  }
+
+  async function retrySync(account: ErpAccount) {
+    setRetryingId(account.id);
+    const ok = await requestTodaySync(account.storeIds);
+    setRetryingId(null);
+    if (!ok) {
+      show("Não foi possível tentar de novo. Tente novamente.", "danger");
+      return;
+    }
+    await refreshSync();
   }
 
   async function refreshRecords() {
@@ -140,6 +191,16 @@ export function ErpIntegrationPage() {
               status: accountStatus(account),
               mark: <img src="/linx.png" alt="" className="h-[22px] w-[22px] object-contain" />,
               onDisconnect: () => setPending(account),
+              extra: (
+                <AccountLoad
+                  account={account}
+                  view={syncByAccount.get(account.id) ?? null}
+                  pendingStart={syncLoaded && !seededAccounts.has(account.id)}
+                  readyStores={readyStores}
+                  retrying={retryingId === account.id}
+                  onRetry={() => void retrySync(account)}
+                />
+              ),
             }))}
           />
         </>
@@ -152,6 +213,8 @@ export function ErpIntegrationPage() {
         onConnected={async (result) => {
           if (result.storeIds.length > 0) update({ stores: result.storeIds });
           await reload();
+          await refreshSync();
+          window.dispatchEvent(new Event(SALES_SYNCED_EVENT));
           const skipped = result.skipped.map((store) => store.name);
           if (result.added === 0 && skipped.length === 0) {
             show("Millennium conectado.", "success");
@@ -160,6 +223,8 @@ export function ErpIntegrationPage() {
               `Millennium conectado. ${skipped.length === 1 ? "1 filial já estava" : `${skipped.length} filiais já estavam`} em outra conta e não ${skipped.length === 1 ? "foi movida" : "foram movidas"}.`,
               "success",
             );
+          } else if (!result.queued) {
+            show("Millennium conectado, mas a carga não entrou na fila. Use Tentar novamente nesta tela.", "warning");
           } else {
             show("Millennium conectado. A carga dessas filiais entrou na fila.", "success");
           }
@@ -193,6 +258,134 @@ export function ErpIntegrationPage() {
   );
 }
 
+const IDLE_SYNC: AccountSyncView = { seed: null, busy: false, fill: null };
+
+/** Filiais da conta e o mesmo andamento do pós-onboarding (hoje + histórico). */
+function AccountLoad({
+  account,
+  view,
+  pendingStart,
+  readyStores,
+  retrying,
+  onRetry,
+}: {
+  account: ErpAccount;
+  view: AccountSyncView | null;
+  pendingStart: boolean;
+  readyStores: Set<string>;
+  retrying: boolean;
+  onRetry: () => void;
+}) {
+  const sync = view ?? IDLE_SYNC;
+  const seed = sync.seed;
+  const trackingToday = seed === "running" || seed === "queued" || seed === "waiting" || seed === "stuck";
+  const readyCount = account.stores.filter((store) => readyStores.has(store.id)).length;
+  const progressPct =
+    account.stores.length === 0 ? 0 : Math.min(99, Math.round((readyCount / account.stores.length) * 100));
+  const fill = sync.fill;
+  const fillProgress = fill ? monthFillProgress(fill, calendarTodayIso()) : null;
+  const fillPct = fillProgress ? Math.round((fillProgress.done / fillProgress.total) * 100) : 0;
+
+  return (
+    <div className="flex flex-col gap-3">
+      {seed === "running" || seed === "queued" || seed === "waiting" ? (
+        <Alert
+          variant="accent"
+          title={seed === "running" ? "Buscando as vendas de hoje" : "Sincronização na fila"}
+          icon={
+            <span className="mt-0.5 shrink-0">
+              <Spinner size={18} />
+            </span>
+          }
+        >
+          {seed === "running"
+            ? "As vendas aparecem automaticamente assim que a sincronização terminar."
+            : seed === "waiting"
+              ? "Há uma carga em andamento. Estas filiais entram assim que ela liberar o sincronizador."
+              : "A busca das vendas de hoje começa em instantes."}
+        </Alert>
+      ) : null}
+      {seed === "stuck" ? (
+        <Alert variant="warning" title="A sincronização está demorando mais que o normal">
+          Ainda não conseguimos iniciar a busca das vendas de hoje. Se continuar assim, fale com o suporte.
+        </Alert>
+      ) : null}
+      {seed === "failed" ? (
+        <Alert
+          variant="danger"
+          title="Não foi possível buscar as vendas de hoje"
+          action={
+            <Button size="sm" variant="outline" disabled={retrying} onClick={onRetry}>
+              {retrying ? "Tentando…" : "Tentar novamente"}
+            </Button>
+          }
+        >
+          {sync.busy
+            ? "Este usuário do Millennium está conectado em outro local. Encerre a outra sessão e tente novamente."
+            : "Não foi possível obter as vendas no Millennium. Tente novamente em instantes."}
+        </Alert>
+      ) : null}
+      {pendingStart && seed == null && !fill && account.stores.length > 0 ? (
+        <Alert
+          variant="warning"
+          title="A carga destas filiais ainda não começou"
+          action={
+            <Button size="sm" variant="outline" disabled={retrying} onClick={onRetry}>
+              {retrying ? "Tentando…" : "Tentar novamente"}
+            </Button>
+          }
+        >
+          O acesso está conectado, mas a busca das vendas de hoje não entrou na fila.
+        </Alert>
+      ) : null}
+      {fill ? (
+        <Alert
+          variant="accent"
+          className="items-center"
+          icon={
+            <span className="shrink-0">
+              <RadialProgress value={fillPct} size={44} stroke={4} color="var(--acc)" />
+            </span>
+          }
+          title={
+            <>
+              Carregando histórico de vendas · <span className="tabular-nums">{fillPct}%</span>
+            </>
+          }
+        >
+          Os dias anteriores entram automaticamente. Você pode continuar usando o painel.
+        </Alert>
+      ) : null}
+      {seed === "running" && account.stores.length > 0 ? (
+        <ProgressBar value={progressPct} color="var(--acc)" label="Vendas de hoje" />
+      ) : null}
+      {account.stores.length > 0 ? (
+        <ul className="max-h-64 divide-y divide-line overflow-y-auto">
+          {account.stores.map((store) => {
+            const done = readyStores.has(store.id);
+            return (
+              <li key={store.id} className="flex items-center gap-3 py-2">
+                <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-t0">{store.name}</span>
+                {trackingToday ? (
+                  done ? (
+                    <Badge variant="success">Concluído</Badge>
+                  ) : seed === "running" ? (
+                    <Spinner size={16} />
+                  ) : (
+                    <span className="text-[12px] text-t3">Na fila</span>
+                  )
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="text-[12.5px] text-t2">Nenhuma filial vinculada a este acesso.</p>
+      )}
+    </div>
+  );
+}
+
 function ConnectModal({
   open,
   canEdit,
@@ -202,7 +395,7 @@ function ConnectModal({
   open: boolean;
   canEdit: boolean;
   onClose: () => void;
-  onConnected: (result: { added: number; skipped: { storeId: number; name: string }[]; storeIds: string[] }) => Promise<void>;
+  onConnected: (result: { added: number; skipped: { storeId: number; name: string }[]; storeIds: string[]; queued: boolean }) => Promise<void>;
 }) {
   const session = useActiveSession();
   const { show } = useToast();

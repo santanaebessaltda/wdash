@@ -13,25 +13,29 @@ export function InitialSyncNotice() {
   const title =
     sync.phase === "running"
       ? "Buscando as vendas de hoje"
-      : sync.phase === "stuck"
-        ? "A sincronização está demorando mais que o normal"
-        : "Não foi possível buscar as vendas de hoje";
+      : sync.phase === "waiting"
+        ? "Sincronização na fila"
+        : sync.phase === "stuck"
+          ? "A sincronização está demorando mais que o normal"
+          : "Não foi possível buscar as vendas de hoje";
   const text =
     sync.phase === "running"
       ? "As vendas aparecerão automaticamente assim que a sincronização terminar."
-      : sync.phase === "stuck"
-        ? "Ainda não conseguimos iniciar a busca das vendas de hoje. Se continuar assim, fale com o suporte."
-        : sync.busy
-          ? "Este usuário do Millennium está conectado em outro local. Encerre a outra sessão e tente novamente."
-          : "Não foi possível obter as vendas no Millennium. Tente novamente em instantes.";
+      : sync.phase === "waiting"
+        ? "Há uma carga em andamento. As filiais novas entram assim que ela liberar o sincronizador."
+        : sync.phase === "stuck"
+          ? "Ainda não conseguimos iniciar a busca das vendas de hoje. Se continuar assim, fale com o suporte."
+          : sync.busy
+            ? "Este usuário do Millennium está conectado em outro local. Encerre a outra sessão e tente novamente."
+            : "Não foi possível obter as vendas no Millennium. Tente novamente em instantes.";
 
   return (
     <Alert
-      variant={sync.phase === "running" ? "accent" : sync.phase === "stuck" ? "warning" : "danger"}
+      variant={sync.phase === "running" || sync.phase === "waiting" ? "accent" : sync.phase === "stuck" ? "warning" : "danger"}
       className="mt-4"
       title={title}
       icon={
-        sync.phase === "running" ? (
+        sync.phase === "running" || sync.phase === "waiting" ? (
           <span className="mt-0.5 shrink-0">
             <Spinner size={18} />
           </span>

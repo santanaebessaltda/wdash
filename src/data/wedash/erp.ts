@@ -176,6 +176,11 @@ export type ErpIntegrationStatus = {
   autoRefreshEnabled: boolean;
 };
 
+export type ErpAccountStore = {
+  id: string;
+  name: string;
+};
+
 export type ErpAccount = {
   id: string;
   username: string;
@@ -184,6 +189,7 @@ export type ErpAccount = {
   dedicated: boolean;
   storeCount: number;
   storeIds: string[];
+  stores: ErpAccountStore[];
 };
 
 export type ErpConnectionState = "connected" | "disconnected" | "password" | "partial" | "unknown";
@@ -224,29 +230,36 @@ export async function fetchErpAccounts(tenantId: string): Promise<ErpAccount[] |
       .select("id, username, status, sync_paused, dedicated")
       .eq("tenant_id", tenantId)
       .order("created_at", { ascending: true }),
-    sb.from("store").select("id, credential_id").eq("tenant_id", tenantId).eq("active", true),
+    sb.from("store").select("id, credential_id, trade_name, name, code").eq("tenant_id", tenantId).eq("active", true),
   ]);
   if (credRes.error) {
     console.warn("fetchErpAccounts:", credRes.error.message);
     return null;
   }
-  const byCredential = new Map<string, string[]>();
-  for (const row of (storeRes.data ?? []) as { id?: string; credential_id?: string | null }[]) {
+  const byCredential = new Map<string, ErpAccountStore[]>();
+  for (const row of (storeRes.data ?? []) as {
+    id?: string;
+    credential_id?: string | null;
+    trade_name?: string | null;
+    name?: string | null;
+    code?: string | null;
+  }[]) {
     if (!row.credential_id || !row.id) continue;
     const list = byCredential.get(row.credential_id) ?? [];
-    list.push(row.id);
+    list.push({ id: row.id, name: (row.trade_name || row.name || row.code || "Filial").trim() });
     byCredential.set(row.credential_id, list);
   }
   return ((credRes.data ?? []) as CredentialListRow[]).map((row) => {
-    const storeIds = byCredential.get(row.id) ?? [];
+    const stores = (byCredential.get(row.id) ?? []).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
     return {
       id: row.id,
       username: row.username,
       status: row.status,
       syncPaused: Boolean(row.sync_paused),
       dedicated: Boolean(row.dedicated),
-      storeCount: storeIds.length,
-      storeIds,
+      storeCount: stores.length,
+      storeIds: stores.map((store) => store.id),
+      stores,
     };
   });
 }
@@ -463,7 +476,7 @@ export async function connectErpAccount(input: {
   password: string;
   dedicated: boolean;
 }): Promise<
-  | { ok: true; added: number; skipped: { storeId: number; name: string }[]; storeIds: string[] }
+  | { ok: true; added: number; skipped: { storeId: number; name: string }[]; storeIds: string[]; queued: boolean }
   | {
       ok: false;
       reason: ErpLoginFailReason | "no_stores" | "no_new_stores" | "persist";
@@ -497,15 +510,29 @@ export async function connectErpAccount(input: {
   }
   if (persisted.addedStoreIds.length > 0) {
     const sb = getSupabase();
+    if (!sb) {
+      return { ok: true, added: persisted.addedStoreIds.length, skipped: persisted.skipped, storeIds: persisted.storeIds, queued: true };
+    }
     try {
-      await sb?.functions.invoke("erp-sync-enqueue", {
+      const { error } = await sb.functions.invoke("erp-sync-enqueue", {
         body: { action: "seed", storeIds: persisted.addedStoreIds },
       });
+      if (error) {
+        console.warn("erp-sync-enqueue seed:", error instanceof Error ? error.message : error);
+        return { ok: true, added: persisted.addedStoreIds.length, skipped: persisted.skipped, storeIds: persisted.storeIds, queued: false };
+      }
     } catch (e) {
       console.warn("erp-sync-enqueue seed:", e);
+      return { ok: true, added: persisted.addedStoreIds.length, skipped: persisted.skipped, storeIds: persisted.storeIds, queued: false };
     }
   }
-  return { ok: true, added: persisted.addedStoreIds.length, skipped: persisted.skipped, storeIds: persisted.storeIds };
+  return {
+    ok: true,
+    added: persisted.addedStoreIds.length,
+    skipped: persisted.skipped,
+    storeIds: persisted.storeIds,
+    queued: persisted.addedStoreIds.length > 0,
+  };
 }
 
 /** Marca presenca WDash (heartbeat). Worker so synca com presenca recente. */
