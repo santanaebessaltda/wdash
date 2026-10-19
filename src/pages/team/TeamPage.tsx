@@ -33,6 +33,8 @@ import { ChallengeMiniCard } from "@/pages/challenges/ChallengeMiniCard";
 import { CHALLENGE_STATUS_ORDER } from "@/pages/challenges/shared";
 import { fetchTeamAggInput, useTeamMemberDetail } from "@/pages/dashboard/TeamMemberDetail";
 import { calendarTodayIso } from "@/data/wedash/clock";
+import { goalWeightFrom } from "@/data/wedash/engine/goalProjection";
+import { defaultWeekHours, effectiveWeekHours } from "@/data/wedash/storeHours";
 import { useActiveSession } from "@/session/SessionProvider";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useMonthFill } from "@/pages/dashboard/useMonthFill";
@@ -75,11 +77,12 @@ async function fetchGoalsData(tenantId: string, scope: Scope, sessionStores: str
   const from = goals.reduce((m, g) => (g.startsOn < m ? g.startsOn : m), goals[0]!.startsOn);
   const end = goals.reduce((m, g) => (g.endsOn > m ? g.endsOn : m), goals[0]!.endsOn);
   const to = end < today ? end : today;
-  const query = { tenantId, storeIds: storeRows, from, to };
+  const historyFrom = goalWeightFrom(from);
+  const people = from <= to;
   const [dayAggs, sellerAggs, namedAggs, team] = await Promise.all([
-    from <= to ? fetchSalesDayAggs({ ...query, brand: "ALL" }) : Promise.resolve([]),
-    from <= to ? fetchSalesSellerDayAggs(query) : Promise.resolve([]),
-    from <= to ? fetchNamedSellerDayAggs(query) : Promise.resolve([]),
+    historyFrom <= to ? fetchSalesDayAggs({ tenantId, storeIds: storeRows, from: historyFrom, to, brand: "ALL" }) : Promise.resolve([]),
+    people ? fetchSalesSellerDayAggs({ tenantId, storeIds: storeRows, from, to }) : Promise.resolve([]),
+    people ? fetchNamedSellerDayAggs({ tenantId, storeIds: storeRows, from, to }) : Promise.resolve([]),
     fetchGoalTeam(tenantId, storeRows),
   ]);
   return { goals, dayAggs, sellerAggs, namedAggs, team };
@@ -253,7 +256,9 @@ export function TeamPage() {
 
   const todayIso = calendarTodayIso();
   const goalCards = useMemo(() => {
-    const storeName = new Map(storesForSession(session.stores).map((s) => [s.id, s.tradeName]));
+    const stores = storesForSession(session.stores);
+    const storeName = new Map(stores.map((s) => [s.id, s.tradeName]));
+    const storeHours = new Map(stores.map((s) => [s.id, s.hours]));
     const order = { active: 0, upcoming: 1, ended: 2 } as const;
     return [...goalsData.goals]
       .sort((a, b) => order[goalStatus(a, todayIso)] - order[goalStatus(b, todayIso)] || b.startsOn.localeCompare(a.startsOn))
@@ -266,6 +271,7 @@ export function TeamPage() {
           namedSellerDayAggs: goalsData.namedAggs,
           team: goalsData.team,
           today: todayIso,
+          week: effectiveWeekHours(storeHours.get(goal.storeId) ?? defaultWeekHours()),
         }),
       );
     // eslint-disable-next-line react-hooks/exhaustive-deps

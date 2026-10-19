@@ -1,4 +1,6 @@
 import { brlCent, isoToDate, endOfMonth, eachDay, num, dateToIso, addDays } from "./format.ts";
+import { goalStoreClosing } from "./goalProjection.ts";
+import type { StoreWeekHours } from "./goalWeights.ts";
 import { presenceDays } from "./presence.ts";
 import type {
   GoalCardView,
@@ -105,11 +107,9 @@ function storeSales(g: GoalRecord, dayAggs: SalesDayAgg[]): { sales: number; ite
   return { sales, items: missing ? null : items };
 }
 
-/** Projecao linear pelo ritmo do periodo (so em andamento); encerrada = o realizado. */
-function projectedPct(pct: number, g: GoalRecord, today: string): number {
-  const f = shareElapsed(g, today);
-  if (f <= 0) return 0;
-  return pct / f;
+/** Vendas ALL da loja. O historico anterior ao inicio entra no peso dos dias da semana. */
+function storeDayAggs(g: GoalRecord, dayAggs: SalesDayAgg[]): SalesDayAgg[] {
+  return dayAggs.filter((a) => a.brand === "ALL" && a.storeId === g.storeId);
 }
 
 export interface GoalSummary {
@@ -117,7 +117,7 @@ export interface GoalSummary {
   status: GoalStatus;
   achieved: number;
   pct: number;
-  /** Projecao de fechamento (% da meta)  -  so em andamento e depois de 50% do periodo (igual ao detalhe). */
+  /** Projecao de fechamento (% da meta). null ate metade do peso da meta ter passado. A mesma conta do card Atingimento. */
   projectedPct: number | null;
   daysRemaining: number;
   /** Nivel da loja na escada pelo realizado (null = nenhum ainda). */
@@ -126,7 +126,7 @@ export interface GoalSummary {
   levelNumber: number | null;
 }
 
-export function buildGoalSummary(g: GoalRecord, dayAggs: SalesDayAgg[], today: string): GoalSummary {
+export function buildGoalSummary(g: GoalRecord, dayAggs: SalesDayAgg[], today: string, week?: StoreWeekHours): GoalSummary {
   const status = goalStatus(g, today);
   const achieved = status === "upcoming" ? 0 : goalRealized(g, dayAggs);
   const pct = g.target > 0 ? (achieved / g.target) * 100 : 0;
@@ -137,12 +137,13 @@ export function buildGoalSummary(g: GoalRecord, dayAggs: SalesDayAgg[], today: s
     level = t.name;
     levelNumber = i + 1;
   }
+  const closing = status === "active" ? goalStoreClosing(g, storeDayAggs(g, dayAggs), today, week) : null;
   return {
     goal: g,
     status,
     achieved,
     pct,
-    projectedPct: status === "active" && shareElapsed(g, today) >= 0.5 ? projectedPct(pct, g, today) : null,
+    projectedPct: closing?.pct ?? null,
     daysRemaining: daysRemaining(g, today),
     currentLevel: level,
     levelNumber,
@@ -372,6 +373,8 @@ export function buildGoalCardView(input: {
   namedSellerDayAggs?: SalesSellerDayAgg[];
   team: GoalTeamMember[];
   today: string;
+  /** Horario efetivo da loja. Com ele, a projecao usa o peso por dia da semana do card Atingimento. */
+  week?: StoreWeekHours;
 }): GoalCardView {
   const { goal: g, storeNameValue, today } = input;
   const status = goalStatus(g, today);
@@ -652,6 +655,7 @@ export function buildGoalCardView(input: {
   });
   sellers.sort((a, b) => b.revenueAmount - a.revenueAmount || a.name.localeCompare(b.name, "pt-BR"));
 
+  const closing = status === "active" ? goalStoreClosing(g, storeDayAggs(g, input.dayAggs), today, input.week) : null;
   const band: NetworkGlobalGoal = {
     competenceText: g.name,
     achieved,
@@ -666,7 +670,8 @@ export function buildGoalCardView(input: {
       : {}),
     total: g.target,
     pct,
-    projectedPct: status === "upcoming" ? 0 : projectedPct(pct, g, today),
+    projectedPct: status === "upcoming" ? 0 : (closing?.pct ?? pct),
+    projectionAmount: status === "ended" ? achieved : (closing?.amount ?? null),
     daysRemaining: status === "upcoming" ? daysBetween(g.startsOn, g.endsOn) : daysRemaining(g, today),
     start: g.startsOn,
     end: g.endsOn,

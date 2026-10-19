@@ -14,8 +14,9 @@ import { goalOfStore } from "./goals";
 import { productsOfCategory } from "./products";
 import { buildProductLineIndex } from "./productLines";
 import { NOW, UPDATED_AT, TODAY_ISO, CURRENT_HOUR, SYNC_INTERVAL_MIN, LAST_SYNC, calendarTodayIso, calendarCurrentHour } from "./clock";
-import { effectiveWeekHours, hourAxisRange, unionOpenWindow, type Dow } from "./storeHours";
+import { defaultWeekHours, effectiveWeekHours, hourAxisRange, unionOpenWindow, type Dow } from "./storeHours";
 import { hourShares, periodDailyGoal, weekdayWeights } from "./goalCurve";
+import { goalStoreClosing } from "./engine/goalProjection";
 import { sellerGoalLevels } from "./goalView";
 import { sellerOrigin } from "./engine/salesOrigin";
 import { dayAggregate, salesDay, salesDays, storeOpen, dayWeight, sumAggregates, type Aggregate } from "./sales";
@@ -3955,7 +3956,7 @@ export type OverviewAggInput = {
   prevHourAggs?: import("./salesTypes").SalesHourAgg[];
   /** Metas (Gestao > Metas) das lojas que cruzam o periodo. */
   goals?: import("./goalsRepo").GoalRecord[];
-  /** Faturamento do inicio das metas ate hoje (card Atingimento da meta, que ignora o filtro de periodo). */
+  /** Faturamento ALL do inicio das metas ate hoje, mais as 6 semanas anteriores (peso da projecao). O card ignora o filtro. */
   goalDayAggs?: import("./salesTypes").SalesDayAgg[];
   /** Vendas por pessoa do inicio das metas ate hoje (secao Meta do detalhe da pessoa). */
   goalSellerDayAggs?: import("./salesTypes").SalesSellerDayAgg[];
@@ -4468,26 +4469,28 @@ export function buildOverviewViewFromAggs(scope: Scope, input: OverviewAggInput)
   let achievedMeta = 0;
   let projected = 0;
   let projectionComplete = true;
+  const goalDayRows = preferAllBrand(input.goalDayAggs ?? []);
   for (const g of goalsInPeriod) {
     metaTotal += g.target;
     if (g.startsOn > todayIso) continue;
-    const weights = weekdayWeightsByStore.get(g.storeId) ?? [];
     let achieved = 0;
-    let achievedUntilYesterday = 0;
-    let esperadoUntilYesterday = 0;
     for (const iso of eachDay(g.startsOn, g.endsOn < todayIso ? g.endsOn : todayIso)) {
-      const v = soldByStoreDay.get(`${g.storeId}|${iso}`) ?? 0;
-      achieved += v;
-      if (iso < todayIso) {
-        achievedUntilYesterday += v;
-        esperadoUntilYesterday += periodDailyGoal(g.target, g.startsOn, g.endsOn, iso, weights);
-      }
+      achieved += soldByStoreDay.get(`${g.storeId}|${iso}`) ?? 0;
     }
     achievedMeta += achieved;
     if (g.endsOn < todayIso) projected += achieved;
-    // Projecao = ritmo dos dias fechados x meta; so depois de metade da meta esperada ter passado.
-    else if (esperadoUntilYesterday >= g.target / 2) projected += (achievedUntilYesterday / esperadoUntilYesterday) * g.target;
-    else projectionComplete = false;
+    else {
+      // Mesma conta do detalhe da meta: dias fechados x peso do dia da semana, historico antes do inicio.
+      const store = fs.find((f) => f.id === g.storeId);
+      const closing = goalStoreClosing(
+        g,
+        goalDayRows.filter((d) => d.storeId === g.storeId),
+        todayIso,
+        effectiveWeekHours(store?.hours ?? defaultWeekHours()),
+      );
+      if (closing) projected += closing.amount;
+      else projectionComplete = false;
+    }
   }
   const goalAttainment = metaTotal > 0 ? (achievedMeta / metaTotal) * 100 : 0;
   const missing = metaTotal > 0 ? Math.max(0, metaTotal - achievedMeta) : 0;

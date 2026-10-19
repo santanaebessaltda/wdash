@@ -5,6 +5,8 @@ import { Tooltip } from "@/components/ui/Tooltip";
 import { DuplicateChoiceModal } from "@/components/wedash/DuplicateChoiceModal";
 import { GoalDetailSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { calendarTodayIso } from "@/data/wedash/clock";
+import { goalWeightFrom } from "@/data/wedash/engine/goalProjection";
+import { effectiveWeekHours } from "@/data/wedash/storeHours";
 import {
   buildGoalCardView,
   GOAL_STATUS_LABEL,
@@ -29,7 +31,7 @@ import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useReturnWhenStoreChanges } from "@/pages/dashboard/useScope";
 import { TargetIcon } from "@/pages/dashboards/icons";
-import { SellersCard, GlobalGoalBand, goalUnlockedProjection } from "@/pages/team/goalBlocks";
+import { SellersCard, GlobalGoalBand } from "@/pages/team/goalBlocks";
 import { Icon, icons } from "@/pages/users/Icons";
 import { goalBackPath } from "@/pages/goals/backPath";
 import { paths } from "@/router/paths";
@@ -91,11 +93,13 @@ export default function GoalDetailPage() {
       let team: GoalTeamMember[] = [];
       if (goal) {
         const to = goal.endsOn < today ? goal.endsOn : today;
-        const query = { tenantId: session.tenantId, storeIds: [goal.storeId], from: goal.startsOn, to };
+        const historyFrom = goalWeightFrom(goal.startsOn);
+        const query = { tenantId: session.tenantId, storeIds: [goal.storeId] };
+        const people = goal.startsOn <= to;
         [dayAggs, sellerAggs, namedAggs, team] = await Promise.all([
-          goal.startsOn <= to ? fetchSalesDayAggs({ ...query, brand: "ALL" }) : Promise.resolve([]),
-          goal.startsOn <= to ? fetchSalesSellerDayAggs(query) : Promise.resolve([]),
-          goal.startsOn <= to ? fetchNamedSellerDayAggs(query) : Promise.resolve([]),
+          historyFrom <= to ? fetchSalesDayAggs({ ...query, from: historyFrom, to, brand: "ALL" }) : Promise.resolve([]),
+          people ? fetchSalesSellerDayAggs({ ...query, from: goal.startsOn, to }) : Promise.resolve([]),
+          people ? fetchNamedSellerDayAggs({ ...query, from: goal.startsOn, to }) : Promise.resolve([]),
           fetchGoalTeam(session.tenantId, [goal.storeId]),
         ]);
       }
@@ -120,6 +124,7 @@ export default function GoalDetailPage() {
       namedSellerDayAggs: data.namedAggs,
       team: data.team,
       today,
+      week: store ? effectiveWeekHours(store.hours) : undefined,
     });
   }, [data, store, today]);
 
@@ -183,7 +188,7 @@ export default function GoalDetailPage() {
         </Card>
       ) : (
         <>
-          <GoalHero goal={goal} card={card} status={status} storeNameValue={store?.tradeName} management={management} today={today} />
+          <GoalHero goal={goal} card={card} status={status} storeNameValue={store?.tradeName} management={management} />
 
           {status === "ended" ? (
             <>
@@ -229,20 +234,17 @@ function GoalHero({
   status,
   storeNameValue,
   management,
-  today,
 }: {
   goal: GoalRecord;
   card: GoalCardView;
   status: GoalStatus;
   storeNameValue?: string;
   management: GoalManagerPrize | null;
-  today: string;
 }) {
-  const { achieved, pct, projectedPct } = card.band;
+  const { achieved, pct, projectedPct, projectionAmount } = card.band;
   const prizeAmount =
     card.sellers.reduce((s, v) => s + v.accruedPrize + v.bonusReached, 0) + (management ? management.prizeAmount + management.bonus : 0);
   const missing = Math.max(0, goal.target - achieved);
-  const liberou = status === "active" && goalUnlockedProjection(goal.startsOn, goal.endsOn, today);
   const stats: { label: string; value: string; cls: string; sub?: string; subCls?: string; help?: string }[] = [
     { label: "Meta da filial", value: brlCent(goal.target), cls: "text-acc" },
     {
@@ -261,10 +263,10 @@ function GoalHero({
       ? [
           {
             label: "Projeção",
-            value: liberou ? brlCent((goal.target * projectedPct) / 100) : "—",
-            cls: !liberou ? "text-t2" : projectedPct >= 100 ? "text-ok" : "text-t0",
-            sub: liberou ? `${num(projectedPct, 0)}% da meta` : "Disponível após metade do período",
-            help: "Estimativa de faturamento até o fim da meta com base no ritmo de vendas até hoje. Disponível após metade do período.",
+            value: projectionAmount != null ? brlCent(projectionAmount) : "—",
+            cls: projectionAmount == null ? "text-t2" : projectedPct >= 100 ? "text-ok" : "text-t0",
+            sub: projectionAmount != null ? `${num(projectedPct, 0)}% da meta` : "Disponível após metade do período",
+            help: "Estimativa de fechamento pelo ritmo dos dias já fechados e pelo peso de cada dia da semana. A mesma conta do card Atingimento da meta.",
           },
         ]
       : []),

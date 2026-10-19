@@ -42,8 +42,11 @@ describe("rótulo do eixo por dia", () => {
   });
 });
 import { goalOfStore } from "./goals";
+import { buildGoalSummary } from "./goalView";
+import { effectiveWeekHours } from "./storeHours";
+import { brlCent } from "@/lib/format";
 import { EMPTY_STORE_COSTS, stores, storeById } from "./stores";
-import { TODAY_ISO } from "./clock";
+import { TODAY_ISO, calendarTodayIso } from "./clock";
 import { dayAggregate, salesDay, storeOpen, dayWeight } from "./sales";
 import { dayAxisLabel, dayPointDetail, endOfMonth, eachDay, addDays } from "@/lib/format";
 
@@ -1238,6 +1241,42 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
       );
       expect(v.gauges[0]).toMatchObject({ target: 170_000, achieved: 2_000 });
       expect(v.goalDescription).toMatch(/^1 de \d+ lojas com meta$/);
+    });
+
+    it("projeção do card é a mesma do detalhe da meta e ignora a venda de hoje", () => {
+      const today = calendarTodayIso();
+      const startsOn = addDays(today, -20);
+      const endsOn = addDays(today, 10);
+      const goal = {
+        id: "g",
+        storeId: "f1",
+        name: "Meta do período",
+        startsOn,
+        endsOn,
+        target: 31_000,
+        tierMode: "INDIVIDUAL" as const,
+        tiers: [],
+        groups: [],
+      };
+      const row = (day: string, brl: number) => ({
+        tenantId: "t1",
+        storeId: "f1",
+        day,
+        brand: "ALL" as const,
+        revenueCents: brl * 100,
+        salesCount: 1,
+        itemCount: 1,
+      });
+      const days = [row(addDays(startsOn, -3), 8_000), row(addDays(today, -10), 10_000), row(today, 500)];
+      const view = buildOverviewView(
+        { storeIds: ["f1"], period: { kind: "custom", start: today, end: today }, division: null },
+        { dayAggs: [row(today, 500)], goals: [goal], goalDayAggs: days },
+      );
+      const week = effectiveWeekHours(storeById("f1")!.hours);
+      const summary = buildGoalSummary(goal, days, today, week);
+      expect(summary.projectedPct).not.toBeNull();
+      expect(view.projectionClosing).toBe(brlCent((goal.target * summary.projectedPct!) / 100));
+      expect(buildGoalSummary(goal, days.filter((d) => d.day < today), today, week).projectedPct).toBeCloseTo(summary.projectedPct!);
     });
   });
 

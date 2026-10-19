@@ -104,9 +104,11 @@ describe("goalView", () => {
     expect(s.achieved).toBe(6000);
     expect(s.pct).toBeCloseTo(60);
     expect(s.currentLevel).toBe("Meta");
-    expect(s.projectedPct).toBeCloseTo(120);
+    // 15/09: 14 dias fechados de 30, ainda antes da metade. 16/09 libera: vendido ate ontem (6.000) x 30/15.
+    expect(s.projectedPct).toBeNull();
     expect(s.daysRemaining).toBe(16);
     expect(buildGoalSummary(goal, aggs, "2026-09-10").projectedPct).toBeNull();
+    expect(buildGoalSummary(goal, aggs, "2026-09-16").projectedPct).toBeCloseTo(120);
   });
 
   it("escada individual: meta ÷ pessoas (equipe ativa ∪ quem vendeu)", () => {

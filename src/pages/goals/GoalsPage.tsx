@@ -7,6 +7,8 @@ import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePi
 import { DuplicateChoiceModal } from "@/components/wedash/DuplicateChoiceModal";
 import { GoalCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { calendarTodayIso } from "@/data/wedash/clock";
+import { goalWeightFrom } from "@/data/wedash/engine/goalProjection";
+import { effectiveWeekHours } from "@/data/wedash/storeHours";
 import { buildGoalSummary, GOAL_STATUS_LABEL, prazoRemaining, type GoalStatus, type GoalSummary } from "@/data/wedash/goalView";
 import { deleteGoal, fetchGoalTeam, fetchGoals, type GoalRecord, type GoalTeamMember } from "@/data/wedash/goalsRepo";
 import { fetchSalesDayAggs } from "@/data/wedash/salesRepo";
@@ -88,9 +90,10 @@ export default function GoalsPage() {
         const from = goals.reduce((m, g) => (g.startsOn < m ? g.startsOn : m), goals[0].startsOn);
         const lastEnd = goals.reduce((m, g) => (g.endsOn > m ? g.endsOn : m), goals[0].endsOn);
         const to = lastEnd < today ? lastEnd : today;
+        const historyFrom = goalWeightFrom(from);
         [dayAggs, team] = await Promise.all([
-          from <= to
-            ? fetchSalesDayAggs({ tenantId: session.tenantId, storeIds: goalStores, from, to, brand: "ALL" })
+          historyFrom <= to
+            ? fetchSalesDayAggs({ tenantId: session.tenantId, storeIds: goalStores, from: historyFrom, to, brand: "ALL" })
             : Promise.resolve([]),
           fetchGoalTeam(session.tenantId, goalStores),
         ]);
@@ -112,14 +115,17 @@ export default function GoalsPage() {
     if (!data) return [];
     const byId = new Map(storeRows.map((l) => [l.id, l]));
     return data.goals
-      .map((g) => ({
-        summary: buildGoalSummary(g, data.dayAggs, today),
-        store: byId.get(g.storeId),
+      .map((g) => {
+        const store = byId.get(g.storeId);
+        return {
+        summary: buildGoalSummary(g, data.dayAggs, today, store ? effectiveWeekHours(store.hours) : undefined),
+        store,
         team: data.team
           .filter((m) => m.storeId === g.storeId && m.salesPerson)
           .map((m) => ({ name: m.name, employeeId: m.employeeId, storeId: m.storeId }))
           .sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
-      }))
+        };
+      })
       .sort(
         (a, b) =>
           STATUS_ORDER[a.summary.status] - STATUS_ORDER[b.summary.status] ||

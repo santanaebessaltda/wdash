@@ -413,7 +413,9 @@ export function GoalProgressBar({
   /** Individual: o nivel e de cada pessoa. A barra mostra so o faturamento da filial. */
   individual?: boolean;
 }) {
-  const showsProjection = !soBarra && goalShowsProjection(goal.start, goal.end, todayIso);
+  const showsProjection =
+    !soBarra &&
+    (goal.projectionAmount === null ? false : typeof goal.projectionAmount === "number" ? true : goalShowsProjection(goal.start, goal.end, todayIso));
   const scaleMax = Math.max(...tiers.map((d) => d.minAttainmentPct), 100);
   const fillPct = Math.min(100, (goal.pct / scaleMax) * 100);
   const colorBarra = progressColor(goal.pct);

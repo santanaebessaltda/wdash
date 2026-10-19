@@ -56,6 +56,7 @@ import { OverviewSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { goalHistoryDayRange, goalHistorySameWeekdays } from "@/data/wedash/goalCurve";
+import { goalWeightFrom } from "@/data/wedash/engine/goalProjection";
 import { fetchGoals, fetchGoalTeam, type GoalRecord, type GoalTeamMember } from "@/data/wedash/goalsRepo";
 import { storesForSession } from "@/data/wedash/stores";
 import {
@@ -198,12 +199,15 @@ export default function OverviewPage() {
       const from = gs.reduce((m, g) => (g.startsOn < m ? g.startsOn : m), gs[0]!.startsOn);
       const end = gs.reduce((m, g) => (g.endsOn > m ? g.endsOn : m), gs[0]!.endsOn);
       const to = end < today ? end : today;
-      if (from > to) return empty;
+      // 6 semanas antes do inicio: peso de cada dia da semana na projecao (a mesma do detalhe da meta).
+      const historyFrom = goalWeightFrom(from);
+      if (historyFrom > to) return empty;
       const storeIds = [...new Set(gs.map((g) => g.storeId))];
+      const people = from <= to;
       const [days, sellers, named, team] = await Promise.all([
-        fetchSalesDayAggs({ tenantId: session.tenantId, storeIds, from, to, brand: "ALL" }),
-        fetchSalesSellerDayAggs({ tenantId: session.tenantId, storeIds, from, to }),
-        fetchNamedSellerDayAggs({ tenantId: session.tenantId, storeIds, from, to }),
+        fetchSalesDayAggs({ tenantId: session.tenantId, storeIds, from: historyFrom, to, brand: "ALL" }),
+        people ? fetchSalesSellerDayAggs({ tenantId: session.tenantId, storeIds, from, to }) : Promise.resolve([]),
+        people ? fetchNamedSellerDayAggs({ tenantId: session.tenantId, storeIds, from, to }) : Promise.resolve([]),
         fetchGoalTeam(session.tenantId, storeIds),
       ]);
       return { days, sellers, named, team };

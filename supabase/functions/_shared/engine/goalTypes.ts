@@ -132,8 +132,13 @@ export interface NetworkGlobalGoal {
   total: number;
   /** realizado / total x 100. */
   pct: number;
-  /** Projecao pelo indice de desempenho acumulado (AD-021). */
+  /** Projecao de fechamento (% da meta). 0 quando ainda nao liberou. */
   projectedPct: number;
+  /**
+   * Projecao de fechamento em R$. null = ainda nao liberou.
+   * Ausente = faixa antiga (fixture), que decide pelo calendario.
+   */
+  projectionAmount?: number | null;
   /** Dias abertos da competencia a partir de hoje (incluindo hoje). */
   daysRemaining: number;
   /** Inicio da competencia (ISO). */
