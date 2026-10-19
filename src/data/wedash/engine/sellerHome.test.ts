@@ -117,6 +117,12 @@ describe("buildSellerHome", () => {
       [1, "ANA", 3600, 4, true],
       [2, "BIA", 3000, 2, false],
     ]);
+    expect(store.storeRanking.map((e) => [e.position, e.name, e.revenue, e.sales, e.me])).toEqual([
+      [1, "ANA", 3600, 4, true],
+      [2, "BIA", 3000, 2, false],
+      [3, "CAU", 2000, 2, false],
+      [4, "DUDA", 1000, 2, false],
+    ]);
     const withQuiet = buildSellerHome(input({ goals: [], team: [...team, member(5, "EVA", "m")] })).stores[0]!;
     expect(withQuiet.monthRanking.map((e) => [e.name, e.sales])).toEqual([
       ["ANA", 4],
@@ -192,6 +198,12 @@ describe("buildSellerHome", () => {
     expect(ranking.every((r) => r.position === 1 && r.revenue === 2000 && r.sales === 2)).toBe(true);
     expect(ranking.map((r) => r.name)).toEqual(["ANA", "BIA", "CAU", "DUDA"]);
     expect(ranking.find((r) => r.me)?.name).toBe("ANA");
+    expect(out.stores[0]!.storeRanking.map((r) => [r.position, r.name, r.revenue])).toEqual([
+      [1, "ANA", 3600],
+      [2, "BIA", 3000],
+      [3, "CAU", 2000],
+      [4, "DUDA", 1000],
+    ]);
     expect(out.stores[0]!.goal!.me!.attainmentPct).toBeCloseTo(80);
     expect(out.stores[0]!.goal!.me!.prizeAmount).toBeCloseTo(20);
   });

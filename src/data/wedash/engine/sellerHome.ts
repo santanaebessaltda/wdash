@@ -33,8 +33,10 @@ export interface SellerHomeStore {
     gapPp: number | null;
     abovePosition: number | null;
   };
-  /** Podio do mes no grupo da pessoa (dia 1 ate hoje), por faturamento, com ou sem meta. */
+  /** Podio do mes no grupo da pessoa (dia 1 ate hoje), por faturamento, com ou sem meta. Na meta Geral, a parte igual da filial. */
   monthRanking: MonthRankingEntry[];
+  /** Podio do mes da equipe de vendas da loja (dia 1 ate hoje), pela venda real de cada pessoa. */
+  storeRanking: MonthRankingEntry[];
   /** Nome do grupo da pessoa; null quando ela esta sem grupo. */
   groupName: string | null;
   /** Desafios da loja que cruzam o mes corrente. */
@@ -200,14 +202,23 @@ function monthRanking(input: SellerHomeInput, s: SellerHomeInput["stores"][numbe
       me: m.employeeId === s.employeeId,
     }));
   }
+  return salesRanking(input, s, "group");
+}
+
+/** Venda real do mes (dia 1 ate hoje). Grupo = colegas do mesmo grupo; loja = equipe de vendas da filial. */
+function salesRanking(
+  input: SellerHomeInput,
+  s: SellerHomeInput["stores"][number],
+  scope: "group" | "store",
+): MonthRankingEntry[] {
   const from = startOfMonth(input.today);
-  const group = sellerGroup(input, s);
-  const inGroup = (m: GoalTeamMember) =>
-    m.storeId === s.storeId && m.salesPerson && (group == null || m.shiftId === group.shiftId);
+  const group = scope === "group" ? sellerGroup(input, s) : null;
+  const inScope = (m: GoalTeamMember) =>
+    m.storeId === s.storeId && m.salesPerson && (scope === "store" || group == null || m.shiftId === group.shiftId);
   const byEmployee = new Map<number, GoalTeamMember>();
   const totals = new Map<string, { employeeId: number; name: string; revenue: number; sales: number; me: boolean }>();
   for (const m of input.team) {
-    if (!inGroup(m) || m.employeeId == null) continue;
+    if (!inScope(m) || m.employeeId == null) continue;
     byEmployee.set(m.employeeId, m);
     const name = collaboratorName(m.name);
     if (!name) continue;
@@ -274,6 +285,7 @@ function buildStore(input: SellerHomeInput, s: SellerHomeInput["stores"][number]
     storeName: s.storeName,
     lastSyncAt: s.lastSyncAt,
     monthRanking: monthRanking(input, s),
+    storeRanking: salesRanking(input, s, "store"),
     groupName: sellerGroup(input, s)?.name ?? null,
     challenges: storeChallenges(input, s),
   };
