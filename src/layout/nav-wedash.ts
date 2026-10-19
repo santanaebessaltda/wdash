@@ -16,6 +16,8 @@ const ICON = {
     "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M9 2h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zM12 11h4M12 16h4M8 11h.01M8 16h.01",
   /** Cifrão — fechamento, sangrias e informe. */
   finance: "M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6",
+  /** Lucide Wallet — carteira da vendedora. */
+  wallet: "M21 12V7H5a2 2 0 0 1 0-4h14v4M3 5v14a2 2 0 0 0 2 2h16v-5M18 12a2 2 0 0 0 0 4h4v-4z",
   /** Lucide Plug — adquirente e administradora. */
   plug: "M12 22v-5M9 8V2M15 8V2M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8z",
   /** Lucide Settings — engrenagem. */
@@ -162,7 +164,7 @@ export function isOwner(role: Role): boolean {
 
 const sellerNav: NavEntry[] = [
   { label: "Início", icon: ICON.dashboard, to: paths.seller.home },
-  { label: "Carteira", icon: ICON.finance, to: paths.seller.wallet },
+  { label: "Carteira", icon: ICON.wallet, to: paths.seller.wallet },
 ];
 
 export function navForRole(role: Role): NavEntry[] {
