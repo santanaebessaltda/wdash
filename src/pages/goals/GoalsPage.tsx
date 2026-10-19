@@ -28,7 +28,7 @@ import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useScope } from "@/pages/dashboard/useScope";
 import { TargetIcon } from "@/pages/dashboards/icons";
 import { IconCopy, IconTrash } from "@/pages/ecommerce/icons";
-import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
+import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
 import { statusBadgeVariant } from "@/lib/status";
 import { paths } from "@/router/paths";
@@ -43,7 +43,7 @@ function maxPickerDate(today: string): Date {
   return isoToDate(endOfMonth(dateToIso(new Date(d.getFullYear(), d.getMonth() + 12, 1))));
 }
 
-/** Performance > Metas — 1 card por meta (loja do StorePicker x periodo do filtro). */
+/** Performance > Metas — 1 card por meta das filiais do seletor, no período do filtro. */
 export default function GoalsPage() {
   const navigate = useNavigate();
   const { show } = useToast();
@@ -53,7 +53,6 @@ export default function GoalsPage() {
   const janela = useMemo(() => managementScheduleWindow(scope.period, today), [scope.period, today]);
   const storeIds = useMemo(() => storeRows.map((l) => l.id), [storeRows]);
   const storeKey = storeIds.join(",");
-  const escolher = pickOneStore(scope.storeIds, session.stores.length);
 
   const [data, setData] = useState<Loaded | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,10 +73,6 @@ export default function GoalsPage() {
 
   useEffect(() => {
     if (storesLoading) return;
-    if (escolher) {
-      setLoading(false);
-      return;
-    }
     let cancelled = false;
     (async () => {
       // Venda nova (SALES_SYNCED_EVENT) recarrega sem skeleton; so filtro novo mostra o skeleton.
@@ -107,7 +102,7 @@ export default function GoalsPage() {
     return () => {
       cancelled = true;
     };
-  }, [session.tenantId, storeKey, janela.from, janela.to, storesLoading, reload, escolher]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session.tenantId, storeKey, janela.from, janela.to, storesLoading, reload]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const showSkeleton = useMinSkeleton(loading || storesLoading);
 
@@ -176,11 +171,7 @@ export default function GoalsPage() {
       />
 
       <div className="mt-6">
-        {escolher ? (
-          <div className="max-w-[720px]">
-            <SelectStoreCard />
-          </div>
-        ) : showSkeleton ? (
+        {showSkeleton ? (
           <GoalCardsSkeleton count={3} />
         ) : cards.length === 0 ? (
           <Card className="flex min-h-[280px] flex-col">
