@@ -1,10 +1,13 @@
+import { Badge } from "@/components/ui";
 import type { ChallengeRecord } from "@/data/wedash/challengesRepo";
-import type { ChallengeView } from "@/data/wedash/challengeView";
+import { CHALLENGE_STATUS_LABEL, type ChallengeView } from "@/data/wedash/challengeView";
+import { cn } from "@/lib/cn";
 import { shortDate } from "@/lib/format";
+import { statusBadgeVariant } from "@/lib/status";
 import { challengeHeadline, HeadlineText, mainPrizeLabel } from "@/pages/challenges/shared";
 import { FlameIcon, TrophyIcon } from "@/pages/dashboards/icons";
 
-/** Desafio em andamento na aba Desafios da Equipe: so leitura, clique abre o detalhe. */
+/** Desafio na aba Desafios da Equipe: so leitura, clique abre o detalhe. */
 export function ChallengeMiniCard({
   challenge: c,
   view,
@@ -18,23 +21,36 @@ export function ChallengeMiniCard({
 }) {
   const destaque = challengeHeadline(c, view);
   const prize = mainPrizeLabel(c);
+  const ended = view.status === "ended";
+  const statusLabel = CHALLENGE_STATUS_LABEL[view.status];
   return (
     <button
       type="button"
       onClick={onOpen}
       aria-label={`Ver detalhe do desafio ${c.name}`}
-      className="flex w-full cursor-pointer items-start gap-3.5 rounded-xl border border-line bg-bg-2 p-4 text-left transition-colors hover:border-line-2 focus-visible:border-acc focus-visible:outline-none"
+      className={cn(
+        "flex w-full cursor-pointer items-start gap-3.5 rounded-xl border border-line p-4 text-left transition-colors hover:border-line-2 focus-visible:border-acc focus-visible:outline-none",
+        ended ? "bg-bg-inset" : "bg-bg-2",
+      )}
     >
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-acc-soft text-acc">
+      <span
+        className={cn(
+          "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+          ended ? "bg-bg-3 text-t2" : "bg-acc-soft text-acc",
+        )}
+      >
         <FlameIcon size={18} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-          <span className="truncate text-[14px] font-bold text-t0">{c.name}</span>
-          <span className="shrink-0 text-[11.5px] font-semibold text-t2">{view.prazo}</span>
+        <span className="flex items-start justify-between gap-2">
+          <span className="min-w-0 truncate text-[14px] font-bold text-t0">{c.name}</span>
+          <Badge variant={statusBadgeVariant(statusLabel)} className="shrink-0 uppercase">
+            {statusLabel}
+          </Badge>
         </span>
         <span className="mt-0.5 block truncate text-[12px] text-t2">
           {shortDate(c.startsOn)} a {shortDate(c.endsOn)}
+          {!ended ? ` · ${view.prazo}` : ""}
           {storeNameValue ? ` · ${storeNameValue}` : ""}
         </span>
         <span className="mt-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">

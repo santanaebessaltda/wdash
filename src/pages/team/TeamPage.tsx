@@ -28,7 +28,7 @@ import {
   type ChallengeAggInput,
   type ChallengeRecord,
 } from "@/data/wedash/challengesRepo";
-import { buildChallengeView } from "@/data/wedash/challengeView";
+import { buildChallengeView, type ChallengeStatus } from "@/data/wedash/challengeView";
 import { ChallengeMiniCard } from "@/pages/challenges/ChallengeMiniCard";
 import { CHALLENGE_STATUS_ORDER } from "@/pages/challenges/shared";
 import { fetchTeamAggInput, useTeamMemberDetail } from "@/pages/dashboard/TeamMemberDetail";
@@ -622,21 +622,7 @@ export function TeamPage() {
                   icon: <FlameIcon size={14} />,
                   content:
                     challengeCards.length > 0 ? (
-                      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                        {challengeCards.map(({ challenge, view: challengeView, storeNameValue }) => (
-                          <ChallengeMiniCard
-                            key={challenge.id}
-                            challenge={challenge}
-                            view={challengeView}
-                            storeNameValue={showChallengeStore ? storeNameValue : undefined}
-                            onOpen={() =>
-                              navigate(paths.management.challengeDetail(challenge.id), {
-                                state: { from: teamChallengesReturn(location.search) },
-                              })
-                            }
-                          />
-                        ))}
-                      </div>
+                      abaDesafios()
                     ) : (
                       <EmptyBlock
                         icon="🔥"
@@ -660,6 +646,44 @@ export function TeamPage() {
       {personModal}
     </div>
   );
+
+  function abaDesafios() {
+    const titles: Record<ChallengeStatus, string> = {
+      active: "Em andamento",
+      upcoming: "A começar",
+      ended: "Encerrados",
+    };
+    const present = (["active", "upcoming", "ended"] as const).filter((status) =>
+      challengeCards.some((card) => card.view.status === status),
+    );
+    const split = present.length > 1;
+    return (
+      <div className="flex flex-col gap-4">
+        {present.map((status) => (
+          <div key={status}>
+            {split && <p className="mb-2 text-[12px] font-bold uppercase tracking-wide text-t2">{titles[status]}</p>}
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              {challengeCards
+                .filter((card) => card.view.status === status)
+                .map(({ challenge, view: challengeView, storeNameValue }) => (
+                  <ChallengeMiniCard
+                    key={challenge.id}
+                    challenge={challenge}
+                    view={challengeView}
+                    storeNameValue={showChallengeStore ? storeNameValue : undefined}
+                    onOpen={() =>
+                      navigate(paths.management.challengeDetail(challenge.id), {
+                        state: { from: teamChallengesReturn(location.search) },
+                      })
+                    }
+                  />
+                ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   function abaRanking() {
     return (
