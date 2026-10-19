@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Alert, Button, Card, DateRangePicker, Dropdown, Modal, Segmented, Skeleton, useToast, CALENDAR_QUICK_RANGES, Badge, type DatePresetId, type DateRangeChangeMeta, type DropdownItem } from "@/components/ui";
 import { DayFace, MonthCalendar, blankDayClass } from "@/components/wedash/MonthCalendar";
 import { calendarTodayIso } from "@/data/wedash/clock";
@@ -23,9 +23,8 @@ import { brlCent, longDate, isoToDate, endOfMonth, startOfMonth, dateToIso, addD
 import { cn } from "@/lib/cn";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
-import { useScope } from "@/pages/dashboard/useScope";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
-import { NumberInput, SectionHeader, SelectStoreCard, parseNum, pickOneStore, useScopedStores } from "@/pages/operation/shared";
+import { NumberInput, SectionHeader, parseNum, useScopedStores } from "@/pages/operation/shared";
 import { DayChip, PlainKpi } from "@/pages/cash-close/CashClosePage";
 import { monthsTouched, cashDropMonthSpan } from "@/data/wedash/cashCloseMonth";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
@@ -34,6 +33,70 @@ import { HeaderFilters } from "@/pages/stock/shared";
 const money = (cents: number) => brlCent(cents / 100);
 
 type ActionBatch = "recebido" | "aCobrar" | "fora" | "falta" | "desfazer";
+type DropLine = CashDropLineRow & { storeId: string };
+type DropDeposit = CashDropDepositDay & { storeId: string };
+type DropShortage = CashDropShortageRow & { storeId: string };
+
+function storeTotals(
+  storeIds: string[],
+  lines: DropLine[],
+  deposits: DropDeposit[],
+  shortages: DropShortage[],
+  today: string,
+) {
+  let aCobrar = 0;
+  let recebido = 0;
+  let excluded = 0;
+  let gap = 0;
+  for (const storeId of storeIds) {
+    const storeLines = lines.filter((line) => line.storeId === storeId);
+    const gaps = new Map(shortages.filter((row) => row.storeId === storeId).map((row) => [row.day, row.amountCents]));
+    const takenDays = new Set(deposits.filter((row) => row.storeId === storeId).map((row) => row.day));
+    const days = new Set<string>([...storeLines.map((line) => line.day), ...gaps.keys()]);
+    const summed = sumAmounts([...days].map((day) => dayAmounts(storeLines.filter((line) => line.day === day), gaps.get(day) ?? 0)));
+    excluded += summed.excludedCents;
+    gap += summed.gapCents;
+    aCobrar += depositBoleto(storeLines, [...days].filter((day) => !takenDays.has(day) && day <= today), gaps);
+    recebido += depositBoleto(storeLines, [...takenDays], gaps);
+  }
+  return { aCobrar, recebido, excluded, gap };
+}
+
+function dayAcrossStores(
+  day: string,
+  today: string,
+  stores: Array<{ id: string }>,
+  lines: DropLine[],
+  deposits: DropDeposit[],
+  shortages: DropShortage[],
+) {
+  let total = 0;
+  let aReceber = 0;
+  let recebido = 0;
+  let excluded = 0;
+  let gap = 0;
+  let has = false;
+  for (const store of stores) {
+    const rows = lines.filter((line) => line.storeId === store.id && line.day === day);
+    const gapCents = shortages.find((row) => row.storeId === store.id && row.day === day)?.amountCents ?? 0;
+    const depositado = deposits.some((row) => row.storeId === store.id && row.day === day);
+    if (rows.length === 0 && gapCents === 0 && !depositado) continue;
+    has = true;
+    const amounts = dayAmounts(rows, gapCents);
+    total += amounts.totalCents;
+    excluded += amounts.excludedCents;
+    gap += amounts.gapCents;
+    if (depositado) recebido += amounts.boletoCents;
+    else aReceber += amounts.boletoCents;
+  }
+  const chips: Array<{ color: string; text: string }> = [];
+  if (day === today) chips.push({ color: "bg-acc", text: "Em aberto" });
+  if (day < today && aReceber > 0) chips.push({ color: "bg-warn", text: `A receber ${money(aReceber)}` });
+  if (day < today && recebido > 0) chips.push({ color: "bg-ok", text: `Recebido ${money(recebido)}` });
+  if (excluded > 0) chips.push({ color: "bg-info", text: `Fora ${money(excluded)}` });
+  if (gap > 0) chips.push({ color: "bg-bad", text: `Falta ${money(gap)}` });
+  return { total, chips, has };
+}
 
 function rangeCells(from: string, to: string): Array<string | null> {
   const cells: Array<string | null> = Array.from({ length: isoToDate(from).getDay() }, () => null);
@@ -51,17 +114,16 @@ function dayTitle(iso: string): string {
 export function CashDropPage() {
   const { show } = useToast();
   const { session, storeRows, loading: storesLoading } = useScopedStores();
-  const { scope } = useScope();
-  const escolher = pickOneStore(scope.storeIds, session.stores.length);
+  const manyStores = storeRows.length > 1;
   const showStores = useMinSkeleton(storesLoading);
   const today = calendarTodayIso();
   const [rangeFrom, setRangeFrom] = useState(() => startOfMonth(today));
   const [rangeTo, setRangeTo] = useState(() => endOfMonth(today));
   const [presetId, setPresetId] = useState<DatePresetId | null>("thisMonth");
   const [floor, setFloor] = useState(() => startOfMonth(today));
-  const [lines, setLines] = useState<CashDropLineRow[]>([]);
-  const [deposits, setDeposits] = useState<CashDropDepositDay[]>([]);
-  const [shortages, setShortages] = useState<CashDropShortageRow[]>([]);
+  const [lines, setLines] = useState<DropLine[]>([]);
+  const [deposits, setDeposits] = useState<DropDeposit[]>([]);
+  const [shortages, setShortages] = useState<DropShortage[]>([]);
   const [loaded, setLoaded] = useState("");
   const [error, setError] = useState(false);
   const [day, setDay] = useState<string | null>(null);
@@ -77,8 +139,9 @@ export function CashDropPage() {
   const [watermark, setWatermark] = useState<Date | null | undefined>(undefined);
 
   const store = storeRows[0];
-  const storeRef = useRef(store);
-  storeRef.current = store;
+  const storesRef = useRef(storeRows);
+  storesRef.current = storeRows;
+  const storeKey = storeRows.map((item) => item.id).join(",");
   const rangeFromRef = useRef(rangeFrom);
   rangeFromRef.current = rangeFrom;
   const rangeToRef = useRef(rangeTo);
@@ -86,22 +149,22 @@ export function CashDropPage() {
   const from = rangeFrom;
   const to = rangeTo;
   const cells = useMemo(() => rangeCells(from, to), [from, to]);
-  const band = store ? `${store.id}|${from}|${to}|${reloadKey}` : "";
+  const band = storeKey ? `${storeKey}|${from}|${to}|${reloadKey}` : "";
 
-  const storeIdValue = store?.id ?? "";
-  const storeSelection = escolher ? "" : storeIdValue;
-  const [storeView, setStoreView] = useState(storeSelection);
-  if (storeView !== storeSelection) {
-    setStoreView(storeSelection);
+  const [storeView, setStoreView] = useState(storeKey);
+  if (storeView !== storeKey) {
+    setStoreView(storeKey);
     setDay(null);
     setMarcados([]);
     setAction(null);
   }
   useEffect(() => {
-    if (storesLoading || escolher || !storeIdValue) return;
+    if (storesLoading || !storeKey) return;
     let stop = false;
-    void fetchNavMonthFloor("sangria_line", session.tenantId, storeIdValue, today).then((month) => {
-      if (stop) return;
+    const ids = storeKey.split(",");
+    void Promise.all(ids.map((id) => fetchNavMonthFloor("sangria_line", session.tenantId, id, today))).then((months) => {
+      if (stop || months.length === 0) return;
+      const month = months.reduce((earliest, item) => (item < earliest ? item : earliest));
       setFloor(month);
       setRangeFrom((current) => {
         if (current >= month) return current;
@@ -112,7 +175,7 @@ export function CashDropPage() {
     return () => {
       stop = true;
     };
-  }, [storesLoading, escolher, storeIdValue, session.tenantId, today, reloadKey]);
+  }, [storesLoading, storeKey, session.tenantId, today, reloadKey]);
 
   useEffect(() => {
     if (!syncing) return;
@@ -149,21 +212,21 @@ export function CashDropPage() {
   }, [session.tenantId, reloadKey]);
 
   const request = useCallback(async () => {
-    const current = storeRef.current;
-    if (escolher || !current) return;
+    const ids = storesRef.current.map((item) => item.id);
+    if (ids.length === 0) return;
     const months = monthsTouched(rangeFromRef.current, rangeToRef.current);
     const todayIso = calendarTodayIso();
     const withDay = months.filter((month) => cashDropMonthSpan(month, todayIso));
     const targets = withDay.length > 0 ? withDay : [months[0]];
     for (const month of targets) {
-      const r = await requestCashDropMonth([current.id], month);
+      const r = await requestCashDropMonth(ids, month);
       if (!r.ok) {
         show(r.message, "danger");
         return;
       }
     }
     setSyncing(true);
-  }, [escolher, show]);
+  }, [show]);
 
   useScreenRefresh({
     label: "Atualizar vendas e sangrias",
@@ -181,17 +244,27 @@ export function CashDropPage() {
   }, []);
 
   useEffect(() => {
-    if (storesLoading || escolher || !store) return;
+    if (storesLoading || storeRows.length === 0) return;
     let cancel = false;
     setError(false);
-    void fetchCashDropMonth(session.tenantId, store.id, from, to)
-      .then((res) => {
+    void Promise.all(
+      storeRows.map(async (item) => {
+        const res = await fetchCashDropMonth(session.tenantId, item.id, from, to);
+        return {
+          lines: res.lines.map((line) => ({ ...line, storeId: item.id })),
+          deposits: res.deposits.map((row) => ({ ...row, storeId: item.id })),
+          shortages: res.shortages.map((row) => ({ ...row, storeId: item.id })),
+        };
+      }),
+    )
+      .then((parts) => {
         if (cancel) return;
-        setLines(res.lines);
-        setDeposits(res.deposits);
-        setShortages(res.shortages);
+        const nextDeposits = parts.flatMap((part) => part.deposits);
+        setLines(parts.flatMap((part) => part.lines));
+        setDeposits(nextDeposits);
+        setShortages(parts.flatMap((part) => part.shortages));
         setLoaded(band);
-        setMarcados((current) => current.filter((day) => !res.deposits.some((d) => d.day === day)));
+        setMarcados((current) => current.filter((day) => !nextDeposits.some((row) => row.day === day)));
       })
       .catch(() => {
         if (!cancel) setError(true);
@@ -199,7 +272,7 @@ export function CashDropPage() {
     return () => {
       cancel = true;
     };
-  }, [storesLoading, escolher, store, session.tenantId, from, to, band]);
+  }, [storesLoading, storeRows, session.tenantId, from, to, band]);
 
   const taken = useMemo(() => new Set(deposits.map((d) => d.day)), [deposits]);
   const gapByDay = useMemo(() => new Map(shortages.map((s) => [s.day, s.amountCents])), [shortages]);
@@ -212,15 +285,12 @@ export function CashDropPage() {
     }
     return map;
   }, [lines]);
-  const month = useMemo(() => {
-    const days = new Set<string>([...byDay.keys(), ...gapByDay.keys()]);
-    return sumAmounts([...days].map((day) => dayAmounts(byDay.get(day) ?? [], gapByDay.get(day) ?? 0)));
-  }, [byDay, gapByDay]);
-  const open = useMemo(() => {
-    const days = [...byDay.keys()].filter((day) => !taken.has(day) && day <= today);
-    return depositBoleto(lines, days, gapByDay);
-  }, [byDay, taken, lines, today, gapByDay]);
-  const depositado = useMemo(() => depositBoleto(lines, deposits.map((d) => d.day), gapByDay), [lines, deposits, gapByDay]);
+  const monthCards = useMemo(
+    () => storeTotals(storeRows.map((item) => item.id), lines, deposits, shortages, today),
+    [storeRows, lines, deposits, shortages, today],
+  );
+  const open = monthCards.aCobrar;
+  const depositado = monthCards.recebido;
   const openDays = useMemo(() => marcados.filter((day) => !taken.has(day)), [marcados, taken]);
   const daysReceivables = useMemo(
     () => openDays.filter((day) => day < today && dayAmounts(byDay.get(day) ?? [], gapByDay.get(day) ?? 0).boletoCents > 0),
@@ -313,8 +383,8 @@ export function CashDropPage() {
         const text = cents === 0 ? "" : reasonGapBatch.trim();
         await saveCashDropShortage(session.tenantId, store.id, day, cents, text);
         setShortages((current) => {
-          const without = current.filter((s) => s.day !== day);
-          return cents === 0 ? without : [...without, { day, amountCents: cents, note: text }];
+          const without = current.filter((s) => !(s.storeId === store.id && s.day === day));
+          return cents === 0 ? without : [...without, { storeId: store.id, day, amountCents: cents, note: text }];
         });
         setAction(null);
         show(cents === 0 ? "Falta removida." : "Falta registrada.", "success");
@@ -378,17 +448,13 @@ export function CashDropPage() {
               activePresetId={presetId}
               onChange={([start, end], goal) => applyInterval(start, end, goal)}
             />
-            {!escolher && store ? <MarkAs days={marcados.length} label={markLabel} amount={amountToReceive} recebidoOk={daysReceivables.length > 0} excludedOk={linesBoletoAbertas.length > 0} cobrarOk={linesExcludedAbertas.length > 0} tudoRecebido={marcados.length > 0 && marcados.every((day) => taken.has(day))} canUndo={markedDeposits.length > 0} onRecebido={() => setAction("recebido")} onCobrar={() => setAction("aCobrar")} onExcluded={() => { setReasonBatch(""); setAction("fora"); }} onGap={openShortage} onUndo={() => void openUndo()} /> : null}
+            {!manyStores && store ? <MarkAs days={marcados.length} label={markLabel} amount={amountToReceive} recebidoOk={daysReceivables.length > 0} excludedOk={linesBoletoAbertas.length > 0} cobrarOk={linesExcludedAbertas.length > 0} tudoRecebido={marcados.length > 0 && marcados.every((day) => taken.has(day))} canUndo={markedDeposits.length > 0} onRecebido={() => setAction("recebido")} onCobrar={() => setAction("aCobrar")} onExcluded={() => { setReasonBatch(""); setAction("fora"); }} onGap={openShortage} onUndo={() => void openUndo()} /> : null}
           </HeaderFilters>
         }
       />
       <div className="mt-6 pb-8">
         {error ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar as sangrias. Tente novamente." /> : null}
-        {escolher ? (
-          <div className="max-w-[720px]">
-            <SelectStoreCard />
-          </div>
-        ) : showStores || (store != null && !pronto) ? (
+        {showStores || (storeRows.length > 0 && !pronto) ? (
           <Skeleton className="h-[520px] w-full rounded-[18px]" />
         ) : storeRows.length === 0 || !store ? (
           <Card>
@@ -396,22 +462,29 @@ export function CashDropPage() {
           </Card>
         ) : (
           <>
-            <MonthSummary aCobrar={open} recebido={depositado} excluded={month.excludedCents} gap={month.gapCents} />
+            <MonthSummary aCobrar={open} recebido={depositado} excluded={monthCards.excluded} gap={monthCards.gap} />
             <MonthCalendar>
-              {cells.map((day, i) => (
-                <DayCell
-                  key={day ?? `vazio-${i}`}
-                  index={i}
-                  day={day}
-                  today={today}
-                  rows={day ? (byDay.get(day) ?? []) : []}
-                  depositado={day ? taken.has(day) : false}
-                  marcado={day ? marcados.includes(day) : false}
-                  gapCents={day ? (gapByDay.get(day) ?? 0) : 0}
-                  onOpen={setDay}
-                  onToggle={toggleDay}
-                />
-              ))}
+              {cells.map((day, i) => {
+                const across = day && manyStores && day <= today ? dayAcrossStores(day, today, storeRows, lines, deposits, shortages) : null;
+                return (
+                  <DayCell
+                    key={day ?? `vazio-${i}`}
+                    index={i}
+                    day={day}
+                    today={today}
+                    rows={day ? (byDay.get(day) ?? []) : []}
+                    depositado={day ? taken.has(day) : false}
+                    marcado={day ? marcados.includes(day) : false}
+                    gapCents={day ? (gapByDay.get(day) ?? 0) : 0}
+                    chips={across?.chips}
+                    amountCents={across && (day === today || across.has) ? across.total : undefined}
+                    openable={across ? day === today || across.has : undefined}
+                    allowMark={!manyStores}
+                    onOpen={setDay}
+                    onToggle={toggleDay}
+                  />
+                );
+              })}
             </MonthCalendar>
           </>
         )}
@@ -428,16 +501,56 @@ export function CashDropPage() {
           storeId={store.id}
           onClose={() => setDay(null)}
           onSaved={(nextLines, nextShortage) => {
-            setLines((current) => current.map((row) => nextLines.find((n) => n.id === row.id) ?? row));
+            setLines((current) => current.map((row) => {
+              const next = nextLines.find((item) => item.id === row.id);
+              return next ? { ...next, storeId: row.storeId } : row;
+            }));
             setShortages((current) => {
-              const without = current.filter((s) => s.day !== day);
-              return nextShortage ? [...without, nextShortage] : without;
+              const without = current.filter((s) => !(s.storeId === store.id && s.day === day));
+              return nextShortage ? [...without, { ...nextShortage, storeId: store.id }] : without;
             });
           }}
           onUndo={async (depositId) => {
             try {
               await undoCashDropDeposit(depositId);
               setDeposits((current) => current.filter((d) => d.depositId !== depositId));
+              setDay(null);
+              setReloadKey((n) => n + 1);
+              show("Recebimento desfeito.", "success");
+            } catch {
+              show("Não foi possível desfazer o recebimento. Tente novamente.", "danger");
+              throw new Error("undo");
+            }
+          }}
+        />
+      ) : null}
+      {day && manyStores ? (
+        <StoresDayModal
+          day={day}
+          today={today}
+          blocks={storeRows.flatMap((item) => {
+            const rows = lines.filter((line) => line.storeId === item.id && line.day === day);
+            const shortage = shortages.find((row) => row.storeId === item.id && row.day === day);
+            const deposit = deposits.find((row) => row.storeId === item.id && row.day === day);
+            if (rows.length === 0 && !shortage && !deposit) return [];
+            return [{ storeId: item.id, storeName: item.tradeName, rows, shortage, deposit }];
+          })}
+          tenantId={session.tenantId}
+          onClose={() => setDay(null)}
+          onSaved={(storeId, nextLines, nextShortage) => {
+            setLines((current) => current.map((row) => {
+              const next = nextLines.find((item) => item.id === row.id);
+              return next ? { ...next, storeId: row.storeId } : row;
+            }));
+            setShortages((current) => {
+              const without = current.filter((row) => !(row.storeId === storeId && row.day === day));
+              return nextShortage ? [...without, { ...nextShortage, storeId }] : without;
+            });
+          }}
+          onUndo={async (depositId) => {
+            try {
+              await undoCashDropDeposit(depositId);
+              setDeposits((current) => current.filter((row) => row.depositId !== depositId));
               setDay(null);
               setReloadKey((n) => n + 1);
               show("Recebimento desfeito.", "success");
@@ -496,6 +609,10 @@ function DayCell({
   depositado,
   marcado,
   gapCents,
+  chips: chipOverride,
+  amountCents,
+  openable: openableOverride,
+  allowMark = true,
   onOpen,
   onToggle,
 }: {
@@ -506,6 +623,10 @@ function DayCell({
   depositado: boolean;
   marcado: boolean;
   gapCents: number;
+  chips?: Array<{ color: string; text: string }>;
+  amountCents?: number;
+  openable?: boolean;
+  allowMark?: boolean;
   onOpen: (day: string) => void;
   onToggle: (day: string) => void;
 }) {
@@ -514,18 +635,20 @@ function DayCell({
   const future = day > today;
   const hasAction = !future && (rows.length > 0 || gapCents > 0 || depositado);
   const partes = rows.length > 0 || gapCents > 0 ? dayChips(total, depositado, day === today) : [];
-  const chips = day === today ? [{ color: "bg-acc", text: "Em aberto" }, ...partes] : partes;
+  const chips = chipOverride ?? (day === today ? [{ color: "bg-acc", text: "Em aberto" }, ...partes] : partes);
+  const shown = amountCents ?? total.totalCents;
+  const canOpen = openableOverride ?? (day === today || hasAction);
   return (
     <DayFace
       index={index}
       iso={day}
       today={today}
-      selected={marcado}
-      openable={day === today || hasAction}
+      selected={allowMark && marcado}
+      openable={canOpen}
       openLabel={`Abrir ${dayTitle(day)}`}
       onOpen={() => onOpen(day)}
-      amount={rows.length > 0 || day === today ? money(total.totalCents) : null}
-      check={hasAction ? { checked: marcado, label: `Marcar ${dayTitle(day)}`, onToggle: () => onToggle(day) } : null}
+      amount={rows.length > 0 || day === today || amountCents != null ? money(shown) : null}
+      check={allowMark && hasAction ? { checked: marcado, label: `Marcar ${dayTitle(day)}`, onToggle: () => onToggle(day) } : null}
       badges={chips.length > 0 ? chips.map((chip) => (
         <DayChip key={chip.text} color={chip.color}>{chip.text}</DayChip>
       )) : null}
@@ -575,6 +698,81 @@ function DayFigures({ items }: { items: Array<{ label: string; value: string; to
   );
 }
 
+function DropShell({
+  embedded,
+  storeName,
+  title,
+  footer,
+  onClose,
+  children,
+}: {
+  embedded: boolean;
+  storeName?: string;
+  title: ReactNode;
+  footer: ReactNode;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  if (embedded) {
+    return (
+      <section className="border-t border-line pt-4 first:border-t-0 first:pt-0">
+        {storeName ? <p className="mb-3 text-[15px] font-bold text-t0">{storeName}</p> : null}
+        {children}
+        {footer ? <div className="mt-4 flex flex-wrap justify-end gap-2">{footer}</div> : null}
+      </section>
+    );
+  }
+  return (
+    <Modal open onClose={onClose} size="lg" title={title} footer={footer}>
+      {children}
+    </Modal>
+  );
+}
+
+function StoresDayModal({
+  day,
+  today,
+  blocks,
+  tenantId,
+  onClose,
+  onSaved,
+  onUndo,
+}: {
+  day: string;
+  today: string;
+  blocks: Array<{ storeId: string; storeName: string; rows: DropLine[]; shortage?: DropShortage; deposit?: DropDeposit }>;
+  tenantId: string;
+  onClose: () => void;
+  onSaved: (storeId: string, lines: CashDropLineRow[], shortage: CashDropShortageRow | null) => void;
+  onUndo: (depositId: string) => Promise<void>;
+}) {
+  return (
+    <Modal open onClose={onClose} size="lg" title={dayTitle(day)} footer={<Button variant="outline" onClick={onClose}>Voltar</Button>}>
+      {blocks.length === 0 ? (
+        <p className="text-[13.5px] text-t2">Nenhuma sangria neste dia.</p>
+      ) : (
+        blocks.map((block) => (
+          <DayModal
+            key={block.storeId}
+            embedded
+            storeName={block.storeName}
+            day={day}
+            today={today}
+            rows={block.rows}
+            shortage={block.shortage}
+            deposit={block.deposit}
+            tenantId={tenantId}
+            storeId={block.storeId}
+            onClose={onClose}
+            onSaved={(nextLines, nextShortage) => onSaved(block.storeId, nextLines, nextShortage)}
+            onUndo={onUndo}
+          />
+        ))
+      )}
+    </Modal>
+  );
+}
+
 function DayModal({
   day,
   today,
@@ -586,6 +784,8 @@ function DayModal({
   onClose,
   onSaved,
   onUndo,
+  embedded = false,
+  storeName,
 }: {
   day: string;
   today: string;
@@ -597,6 +797,8 @@ function DayModal({
   onClose: () => void;
   onSaved: (lines: CashDropLineRow[], shortage: CashDropShortageRow | null) => void;
   onUndo: (depositId: string) => Promise<void>;
+  embedded?: boolean;
+  storeName?: string;
 }) {
   const { show } = useToast();
   const [lines, setLines] = useState(rows);
@@ -646,7 +848,7 @@ function DayModal({
       if (changedGap) await saveCashDropShortage(tenantId, storeId, day, cents, text);
       onSaved(lines, cents === 0 ? null : { day, amountCents: cents, note: text });
       show("Sangrias atualizadas.", "success");
-      onClose();
+      if (!embedded) onClose();
     } catch {
       show("Não foi possível salvar a sangria. Tente novamente.", "danger");
     } finally {
@@ -676,50 +878,47 @@ function DayModal({
     }
   }
 
+  const selo = deposit ? "Recebido" : day === today ? "Em aberto" : preview.boletoCents > 0 ? "A receber" : null;
+  const title = (
+    <>
+      <span>{dayTitle(day)}</span>
+      {selo ? <Badge variant={statusBadgeVariant(selo)}>{selo}</Badge> : null}
+    </>
+  );
+  const footer = consulta ? (
+    embedded ? null : (
+      <Button variant="outline" onClick={onClose}>
+        Voltar
+      </Button>
+    )
+  ) : (
+    <>
+      {deposit ? (
+        <Button variant="outline" onClick={() => void openUndo()} disabled={salvando || desfazendo}>
+          Desfazer recebimento
+        </Button>
+      ) : null}
+      {embedded ? null : (
+        <Button variant="outline" onClick={onClose} disabled={salvando || desfazendo}>
+          Cancelar
+        </Button>
+      )}
+      <Button onClick={() => void save()} disabled={salvando || desfazendo}>
+        {salvando ? "Salvando…" : "Salvar"}
+      </Button>
+    </>
+  );
+
   return (
     <>
-    <Modal
-      open
+    <DropShell
+      embedded={embedded}
+      storeName={storeName}
+      title={title}
+      footer={footer}
       onClose={() => {
         if (!salvando && !desfazendo) onClose();
       }}
-      size="lg"
-      title={(() => {
-        const selo = deposit
-          ? "Recebido"
-          : day === today
-            ? "Em aberto"
-            : preview.boletoCents > 0
-              ? "A receber"
-              : null;
-        return (
-          <>
-            <span>{dayTitle(day)}</span>
-            {selo ? <Badge variant={statusBadgeVariant(selo)}>{selo}</Badge> : null}
-          </>
-        );
-      })()}
-      footer={
-        consulta ? (
-          <Button variant="outline" onClick={onClose}>
-            Voltar
-          </Button>
-        ) : (
-          <>
-            {deposit ? (
-              <Button variant="outline" onClick={() => void openUndo()} disabled={salvando || desfazendo}>
-                Desfazer recebimento
-              </Button>
-            ) : null}
-            <Button variant="outline" onClick={onClose} disabled={salvando || desfazendo}>
-              Cancelar
-            </Button>
-            <Button onClick={() => void save()} disabled={salvando || desfazendo}>
-              {salvando ? "Salvando…" : "Salvar"}
-            </Button>
-          </>
-        )
-      }
     >
       {rows.length === 0 ? (
         <p className="text-[13.5px] text-t2">Nenhuma sangria neste dia.</p>
@@ -782,7 +981,7 @@ function DayModal({
           </div>
         </>
       )}
-    </Modal>
+    </DropShell>
     <Modal
       open={confirmUndo}
       onClose={() => {

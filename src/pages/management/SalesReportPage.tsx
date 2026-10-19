@@ -1,23 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Alert, Badge, Button, Card, DateRangePicker, Modal, Skeleton, useToast, CALENDAR_QUICK_RANGES, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
+import { Alert, Badge, Button, Card, DataTable, DateRangePicker, Modal, Skeleton, useToast, CALENDAR_QUICK_RANGES, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
 import { DayFace, DayMetrics, MonthCalendar, blankDayClass } from "@/components/wedash/MonthCalendar";
 import { DayChip, PlainKpi } from "@/pages/cash-close/CashClosePage";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { periodLabels } from "@/data/wedash/dashboard";
 import { fetchSalesCoverage, fetchSalesDayAggs } from "@/data/wedash/salesRepo";
-import { fetchLaunchedDays, fetchShoppingAccount, requestShoppingLaunch, requestShoppingRead, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
+import { fetchInformedCents, fetchLaunchedDays, fetchShoppingAccount, requestShoppingLaunch, requestShoppingRead, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
 import { ALREADY_LAUNCHED, canResendDay, forceLaunchAllowed, informedGap, monthReport, reportDays, shoppingSendsSales, sumSoldByDay } from "@/data/wedash/shoppingReport";
 import { brlCent, longDate, isoToDate, endOfMonth, startOfMonth, eachDay, dateToIso, addDays } from "@/lib/format";
 import { statusBadgeVariant } from "@/lib/status";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
-import { useScope } from "@/pages/dashboard/useScope";
 import { isOwner } from "@/layout/nav-wedash";
 import { paths } from "@/router/paths";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
-import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
+import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { HeaderFilters } from "@/pages/stock/shared";
 
 const money = (cents: number) => brlCent(cents / 100);
@@ -60,6 +59,32 @@ function dayStatus(soldCents: number, informedCents: number | null): { text: str
   return { text, color: "bg-bad" };
 }
 
+type KioskLine = {
+  id: string;
+  name: string;
+  soldCents: number;
+  informedCents: number;
+  differenceCents: number;
+};
+
+function kioskPeriod(
+  storeId: string,
+  aggs: Array<{ storeId: string; day: string; revenueCents: number; brand?: string | null }>,
+  informed: Record<string, number>,
+  from: string,
+  to: string,
+  today: string,
+): Pick<KioskLine, "soldCents" | "informedCents" | "differenceCents"> {
+  const sold = sumSoldByDay(aggs.filter((row) => row.storeId === storeId));
+  let soldCents = 0;
+  let informedCents = 0;
+  for (let day = from; day <= to && day < today; day = addDays(day, 1)) {
+    soldCents += sold[day] ?? 0;
+    informedCents += informed[`${storeId}|${day}`] ?? 0;
+  }
+  return { soldCents, informedCents, differenceCents: informedCents - soldCents };
+}
+
 function rangeCells(from: string, to: string): Array<string | null> {
   const cells: Array<string | null> = Array.from({ length: isoToDate(from).getDay() }, () => null);
   for (let day = from; day <= to; day = addDays(day, 1)) cells.push(day);
@@ -67,13 +92,37 @@ function rangeCells(from: string, to: string): Array<string | null> {
   return cells;
 }
 
+function KioskTable({ rows }: { rows: KioskLine[] }) {
+  return (
+    <DataTable
+      columns={[
+        { key: "name", header: "Filial", render: (row) => row.name, sortable: true, sortValue: (row) => row.name },
+        { key: "sold", header: "Vendido", align: "right", render: (row) => money(row.soldCents), sortable: true, sortValue: (row) => row.soldCents },
+        { key: "informed", header: "Informado", align: "right", render: (row) => money(row.informedCents), sortable: true, sortValue: (row) => row.informedCents },
+        {
+          key: "difference",
+          header: "Diferença",
+          align: "right",
+          render: (row) => <span style={{ color: differenceColor(row.differenceCents) }}>{differenceAmount(row.differenceCents)}</span>,
+          sortable: true,
+          sortValue: (row) => row.differenceCents,
+        },
+      ]}
+      data={rows}
+      rowKey={(row) => row.id}
+      emptyMessage="Nenhum quiosque com informe de vendas neste acesso."
+      defaultSortKey="name"
+      paginate="filiais"
+    />
+  );
+}
+
 /** Financeiro > Informe de vendas. Calendário do que foi informado no shopping. */
 export function SalesReportPage() {
   const navigate = useNavigate();
   const { show } = useToast();
   const { session, storeRows, loading: storesLoading } = useScopedStores();
-  const { scope } = useScope();
-  const escolher = pickOneStore(scope.storeIds, session.stores.length);
+  const manyStores = storeRows.length > 1;
   const showStores = useMinSkeleton(storesLoading);
   const today = calendarTodayIso();
   const [rangeFrom, setRangeFrom] = useState(() => startOfMonth(today));
@@ -90,6 +139,8 @@ export function SalesReportPage() {
   const [lancando, setLancando] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [dayOpen, setDayOpen] = useState<string | null>(null);
+  const [kioskRows, setKioskRows] = useState<KioskLine[]>([]);
+  const [kioskLoaded, setKioskLoaded] = useState("");
 
   const store = storeRows[0];
   const storeRef = useRef(store);
@@ -106,13 +157,14 @@ export function SalesReportPage() {
   rangeRef.current = { from, to };
   const markedRef = useRef(marcados);
   markedRef.current = marcados;
-  const band = store ? `${store.id}|${from}|${to}|${reloadKey}` : "";
+  const storeKey = storeRows.map((item) => item.id).join(",");
+  const band = storeKey ? `${storeKey}|${from}|${to}|${reloadKey}` : "";
   const kiosk = store?.pointType === "SHOPPING";
 
   useEffect(() => {
-    if (storesLoading || escolher || !store) return;
+    if (storesLoading || storeRows.length === 0) return;
     let stop = false;
-    void fetchSalesCoverage(session.tenantId, [store.id]).then((coverage) => {
+    void fetchSalesCoverage(session.tenantId, storeRows.map((item) => item.id)).then((coverage) => {
       if (stop || !coverage.from) return;
       const month = startOfMonth(coverage.from);
       setFloor(month);
@@ -125,10 +177,10 @@ export function SalesReportPage() {
     return () => {
       stop = true;
     };
-  }, [storesLoading, escolher, store, session.tenantId, reloadKey]);
+  }, [storesLoading, storeRows, session.tenantId, reloadKey]);
 
   useEffect(() => {
-    if (storesLoading || escolher || !store) return;
+    if (storesLoading || manyStores || !store) return;
     let cancel = false;
     setError(false);
     void Promise.all([
@@ -149,16 +201,47 @@ export function SalesReportPage() {
     return () => {
       cancel = true;
     };
-  }, [storesLoading, escolher, store, session.tenantId, from, to, band]);
+  }, [storesLoading, manyStores, store, session.tenantId, from, to, band]);
+
+  useEffect(() => {
+    if (storesLoading || !manyStores) return;
+    let cancel = false;
+    setError(false);
+    const kiosks = storeRows.filter((item) => item.pointType === "SHOPPING");
+    void (async () => {
+      const accounts = await Promise.all(kiosks.map(async (item) => ({ item, account: await fetchShoppingAccount(session.tenantId, item.id) })));
+      if (cancel) return;
+      const sending = accounts.filter((row) => shoppingSendsSales(row.account?.administrator));
+      const ids = sending.map((row) => row.item.id);
+      if (ids.length === 0) {
+        setKioskRows([]);
+        setKioskLoaded(band);
+        return;
+      }
+      const [aggs, informed] = await Promise.all([
+        fetchSalesDayAggs({ tenantId: session.tenantId, storeIds: ids, from, to }),
+        fetchInformedCents(session.tenantId, ids, from, to),
+      ]);
+      if (cancel) return;
+      setKioskRows(
+        sending
+          .map(({ item }) => ({ id: item.id, name: item.tradeName, ...kioskPeriod(item.id, aggs, informed, from, to, today) }))
+          .sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
+      );
+      setKioskLoaded(band);
+    })().catch(() => {
+      if (!cancel) setError(true);
+    });
+    return () => {
+      cancel = true;
+    };
+  }, [storesLoading, manyStores, storeRows, session.tenantId, from, to, today, band]);
 
   const pronto = loaded === band;
 
   const puxar = useCallback(async () => {
     const current = storeRef.current;
-    if (escolher || !current) {
-      show("Escolha uma filial para atualizar o informe de vendas.", "danger");
-      return;
-    }
+    if (manyStores || !current) return;
     const gate = forceLaunchAllowed({
       kiosk: current.pointType === "SHOPPING",
       administrator: accountRef.current?.administrator ?? null,
@@ -170,14 +253,11 @@ export function SalesReportPage() {
     const result = await requestShoppingRead(current.id, { from, to });
     setReloadKey((n) => n + 1);
     if (!result.ok) show(result.message, "danger");
-  }, [escolher, from, show, to]);
+  }, [manyStores, from, show, to]);
 
   const lancar = useCallback(async () => {
     const current = storeRef.current;
-    if (lancando || escolher || !current) {
-      if (escolher || !current) show("Escolha uma filial para informar as vendas ao shopping.", "danger");
-      return;
-    }
+    if (lancando || manyStores || !current) return;
     const gate = forceLaunchAllowed({
       kiosk: current.pointType === "SHOPPING",
       administrator: accountRef.current?.administrator ?? null,
@@ -201,15 +281,21 @@ export function SalesReportPage() {
       setMarcados([]);
       show(result.message ?? "Vendas informadas ao shopping.", "success");
     }
-  }, [escolher, today, lancando, show]);
+  }, [manyStores, today, lancando, show]);
 
   useScreenRefresh({
     label: "Atualizar vendas e valores informados",
-    tip: "Busca as vendas de hoje e lê os valores informados ao shopping.",
+    tip: manyStores ? "Busca as vendas de hoje." : "Busca as vendas de hoje e lê os valores informados ao shopping.",
     status: refreshMomentTitle(pronto ? (account?.lastRunAt ?? null) : undefined),
     busyLabel: "Atualizando…",
     sales: true,
-    run: () => puxar(),
+    run: () => {
+      if (manyStores) {
+        setReloadKey((n) => n + 1);
+        return;
+      }
+      return puxar();
+    },
   });
 
   useEffect(() => {
@@ -258,26 +344,26 @@ export function SalesReportPage() {
                 activePresetId={presetId}
                 onChange={([start, end], goal) => applyInterval(start, end, goal)}
               />
-              <Button onClick={() => setConfirm(true)} disabled={lancando || toLancar.length === 0}>
-                {lancando ? "Informando…" : toLancar.length === 0 ? "Informar vendas" : toLancar.length === 1 ? "Informar vendas · 1 dia" : `Informar vendas · ${toLancar.length} dias`}
-              </Button>
+              {manyStores ? null : (
+                <Button onClick={() => setConfirm(true)} disabled={lancando || toLancar.length === 0}>
+                  {lancando ? "Informando…" : toLancar.length === 0 ? "Informar vendas" : toLancar.length === 1 ? "Informar vendas · 1 dia" : `Informar vendas · ${toLancar.length} dias`}
+                </Button>
+              )}
             </div>
           </HeaderFilters>
         }
       />
       <div className="mt-6 pb-8">
         {error ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar o informe de vendas. Tente novamente." /> : null}
-        {shoppingSendsSales(account?.administrator) && account?.lastError ? <Alert className="mb-4" variant="danger" title={account.lastError} /> : null}
-        {escolher ? (
-          <div className="max-w-[720px]">
-            <SelectStoreCard />
-          </div>
-        ) : showStores || (store != null && !pronto) ? (
+        {!manyStores && shoppingSendsSales(account?.administrator) && account?.lastError ? <Alert className="mb-4" variant="danger" title={account.lastError} /> : null}
+        {showStores || (storeRows.length > 0 && (manyStores ? kioskLoaded !== band : store != null && !pronto)) ? (
           <Skeleton className="h-[520px] w-full rounded-[18px]" />
-        ) : storeRows.length === 0 || !store ? (
+        ) : storeRows.length === 0 ? (
           <Card>
             <EmptyBlock icon="🧾" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
           </Card>
+        ) : manyStores ? (
+          <KioskTable rows={kioskRows} />
         ) : !kiosk ? (
           <Card>
             <EmptyBlock icon="🧾" title="Informe de vendas indisponível" description="Esta tela está disponível apenas para filiais do tipo Quiosque em shopping." />

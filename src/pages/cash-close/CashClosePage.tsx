@@ -57,10 +57,9 @@ import { cn } from "@/lib/cn";
 import { brlCent, longDate, isoToDate, endOfMonth, startOfMonth, dateToIso, addDays, labelUpper } from "@/lib/format";
 import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
-import { useScope } from "@/pages/dashboard/useScope";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
-import { parseNum, SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
+import { parseNum, SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { HeaderFilters } from "@/pages/stock/shared";
 
 
@@ -245,8 +244,7 @@ export { MonthStep, MonthYearPicker, monthNavBtn } from "./MonthYearPicker";
 export function CashClosePage() {
   const { show } = useToast();
   const { session, storeRows, loading: storesLoading } = useScopedStores();
-  const { scope } = useScope();
-  const escolher = pickOneStore(scope.storeIds, session.stores.length);
+  const manyStores = storeRows.length > 1;
   const showStores = useMinSkeleton(storesLoading);
   const today = calendarTodayIso();
   const [rangeFrom, setRangeFrom] = useState(() => startOfMonth(today));
@@ -280,7 +278,6 @@ export function CashClosePage() {
   const to = toGross < today ? toGross : today;
   const bandKey = `${storeKey}|${from}|${to}|${reloadKey}`;
 
-  const storeIdValue = storeRows[0]?.id ?? "";
   const sessionStores = useMemo(() => storesForSession(session.stores), [session.stores]);
   const sellerStoresKey = useMemo(() => sessionStores.map((store) => store.id).join(","), [sessionStores]);
   const branches = useMemo(() => {
@@ -309,10 +306,12 @@ export function CashClosePage() {
     };
   }, [storesLoading, session.tenantId]);
   useEffect(() => {
-    if (storesLoading || escolher || !storeIdValue) return;
+    if (storesLoading || !storeKey) return;
     let stop = false;
-    void fetchNavMonthFloor("cash_close_day", session.tenantId, storeIdValue, today).then((month) => {
-      if (stop) return;
+    const ids = storeKey.split(",");
+    void Promise.all(ids.map((id) => fetchNavMonthFloor("cash_close_day", session.tenantId, id, today))).then((months) => {
+      if (stop || months.length === 0) return;
+      const month = months.reduce((earliest, item) => (item < earliest ? item : earliest));
       setFloor(month);
       setRangeFrom((current) => {
         if (current >= month) return current;
@@ -323,7 +322,7 @@ export function CashClosePage() {
     return () => {
       stop = true;
     };
-  }, [storesLoading, escolher, storeIdValue, session.tenantId, today, reloadKey]);
+  }, [storesLoading, storeKey, session.tenantId, today, reloadKey]);
 
   useEffect(() => {
     if (!syncing) return;
@@ -360,7 +359,6 @@ export function CashClosePage() {
   }, [session.tenantId, reloadKey]);
 
   const requestClosing = useCallback(async () => {
-    if (escolher) return;
     const ids = storesRef.current.map((store) => store.id);
     if (ids.length === 0) return;
     const months = monthsTouched(rangeFromRef.current, rangeToRef.current);
@@ -375,7 +373,7 @@ export function CashClosePage() {
       }
     }
     setSyncing(true);
-  }, [show, escolher]);
+  }, [show]);
 
   useScreenRefresh({
     label: "Atualizar vendas e fechamento",
@@ -393,7 +391,7 @@ export function CashClosePage() {
   }, []);
 
   useEffect(() => {
-    if (storesLoading || escolher || storeRows.length === 0 || from > to) return;
+    if (storesLoading || storeRows.length === 0 || from > to) return;
     let cancelled = false;
     setError(false);
     const ids = storeRows.map((l) => l.id);
@@ -413,10 +411,10 @@ export function CashClosePage() {
     return () => {
       cancelled = true;
     };
-  }, [storesLoading, escolher, session.tenantId, storeRows, from, to, bandKey]);
+  }, [storesLoading, session.tenantId, storeRows, from, to, bandKey]);
 
   useEffect(() => {
-    if (storesLoading || escolher || storeRows.length === 0 || to < today) {
+    if (storesLoading || storeRows.length === 0 || to < today) {
       setSoldToday(null);
       return;
     }
@@ -446,10 +444,10 @@ export function CashClosePage() {
     return () => {
       stop = true;
     };
-  }, [storesLoading, escolher, storeRows, session.tenantId, today, to, reloadKey]);
+  }, [storesLoading, storeRows, session.tenantId, today, to, reloadKey]);
 
   useEffect(() => {
-    if (storesLoading || escolher || !dayOpen || storeRows.length === 0 || dayOpen > today) return;
+    if (storesLoading || !dayOpen || storeRows.length === 0 || dayOpen > today) return;
     let cancelled = false;
     setError(false);
     const key = `${storeKey}|${dayOpen}|${reloadKey}`;
@@ -475,11 +473,11 @@ export function CashClosePage() {
     return () => {
       cancelled = true;
     };
-  }, [storesLoading, escolher, dayOpen, session.tenantId, storeRows, today, storeKey, reloadKey]);
+  }, [storesLoading, dayOpen, session.tenantId, storeRows, today, storeKey, reloadKey]);
 
   const analysis = useMemo(() => {
     if (marksKey !== bandKey) return null;
-    const byDay = new Map<string, { systemCents: number; realCents: number; diffCents: number; withdrawalCents: number; hasMillennium: boolean; hasLines: boolean; pending: boolean }>();
+    const byDay = new Map<string, DayBucket>();
     const rows: Array<{ day: string; systemCents: number; realCents: number; diffCents: number; pending: boolean }> = [];
     for (const mark of marks) {
       const day = mark.day.slice(0, 10);
@@ -502,7 +500,7 @@ export function CashClosePage() {
           pending: withoutReal,
         });
       }
-      const current = byDay.get(day) ?? { systemCents: 0, realCents: 0, diffCents: 0, withdrawalCents: 0, hasMillennium: false, hasLines: false, pending: false };
+      const current = byDay.get(day) ?? emptyDayBucket();
       current.systemCents += gap.systemCents;
       current.realCents += gap.realCents;
       current.diffCents += diffCents;
@@ -510,18 +508,35 @@ export function CashClosePage() {
       current.hasMillennium = current.hasMillennium || mark.snap.millennium.length > 0;
       current.hasLines = current.hasLines || lines.length > 0;
       current.pending = current.pending || withoutReal;
+      if (day < today && withoutReal) current.pendingStores += 1;
+      if (day < today && !withoutReal) {
+        current.closedRealCents += gap.realCents;
+        if (diffCents !== 0) current.diffStores += 1;
+      }
       byDay.set(day, current);
     }
-    return { summary: monthCloseSummary(rows), byDay };
+    let diffDays = 0;
+    let closedRealCents = 0;
+    for (const [day, info] of byDay) {
+      if (day >= today) continue;
+      closedRealCents += info.closedRealCents;
+      if (info.diffStores > 0) diffDays += 1;
+    }
+    return { summary: monthCloseSummary(rows), byDay, diffDays, closedRealCents };
   }, [marks, reviews, marksKey, bandKey, today]);
 
-  function dayFace(day: string): { kind: "empty" | "zero" | "pending" | "today" | "total"; totalCents: number; diffCents: number; withdrawalCents: number; awaiting?: boolean } {
+  function dayFace(day: string): CalendarFace {
     const info = analysis?.byDay.get(day);
-    if (day === today) return { kind: "today", totalCents: soldToday?.cents ?? 0, diffCents: 0, withdrawalCents: 0, awaiting: soldToday == null };
-    if (info?.pending) return { kind: "pending", totalCents: info.systemCents, diffCents: 0, withdrawalCents: 0 };
-    if (!info || (info.systemCents === 0 && info.realCents === 0)) return { kind: "zero", totalCents: 0, diffCents: 0, withdrawalCents: 0 };
-    if (!info.hasMillennium && !info.hasLines) return { kind: "empty", totalCents: 0, diffCents: 0, withdrawalCents: 0 };
-    return { kind: "total", totalCents: info.realCents, diffCents: info.diffCents, withdrawalCents: info.withdrawalCents };
+    const counts = { diffStores: info?.diffStores ?? 0, pendingStores: info?.pendingStores ?? 0 };
+    if (day === today) return { kind: "today", totalCents: soldToday?.cents ?? 0, diffCents: 0, withdrawalCents: 0, awaiting: soldToday == null, ...counts };
+    if (!info || (info.systemCents === 0 && info.realCents === 0 && !info.pending)) return { kind: "zero", totalCents: 0, diffCents: 0, withdrawalCents: 0, ...counts };
+    if (!info.hasMillennium && !info.hasLines && !info.pending) return { kind: "empty", totalCents: 0, diffCents: 0, withdrawalCents: 0, ...counts };
+    if (manyStores) {
+      if (info.pending && info.closedRealCents === 0) return { kind: "pending", totalCents: info.systemCents, diffCents: 0, withdrawalCents: 0, ...counts };
+      return { kind: "total", totalCents: info.realCents, diffCents: 0, withdrawalCents: info.withdrawalCents, ...counts };
+    }
+    if (info.pending) return { kind: "pending", totalCents: info.systemCents, diffCents: 0, withdrawalCents: 0, ...counts };
+    return { kind: "total", totalCents: info.realCents, diffCents: info.diffCents, withdrawalCents: info.withdrawalCents, ...counts };
   }
 
   function openDay(iso: string) {
@@ -560,11 +575,7 @@ export function CashClosePage() {
       />
       <div className="mt-6 pb-6">
         {error ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar o fechamento. Tente novamente." /> : null}
-        {escolher ? (
-          <div className="max-w-[720px]">
-            <SelectStoreCard />
-          </div>
-        ) : showStores ? (
+        {showStores ? (
           <Skeleton className="h-[520px] w-full rounded-[18px]" />
         ) : storeRows.length === 0 ? (
           <Card>
@@ -573,11 +584,11 @@ export function CashClosePage() {
         ) : (
           <>
             {analysis ? (
-              <MonthSummary summary={analysis.summary} />
+              <MonthSummary summary={analysis.summary} many={manyStores} diffDays={analysis.diffDays} closedRealCents={analysis.closedRealCents} />
             ) : (
               <Skeleton className="mb-4 h-[88px] w-full rounded-[18px]" />
             )}
-            <Month today={today} cells={cells} dayFace={dayFace} onOpen={openDay} />
+            <Month today={today} cells={cells} dayFace={dayFace} onOpen={openDay} many={manyStores} />
           </>
         )}
       </div>
@@ -604,6 +615,48 @@ export function CashClosePage() {
       />
     </div>
   );
+}
+
+type DayBucket = {
+  systemCents: number;
+  realCents: number;
+  diffCents: number;
+  withdrawalCents: number;
+  hasMillennium: boolean;
+  hasLines: boolean;
+  pending: boolean;
+  diffStores: number;
+  pendingStores: number;
+  closedRealCents: number;
+};
+
+function emptyDayBucket(): DayBucket {
+  return {
+    systemCents: 0,
+    realCents: 0,
+    diffCents: 0,
+    withdrawalCents: 0,
+    hasMillennium: false,
+    hasLines: false,
+    pending: false,
+    diffStores: 0,
+    pendingStores: 0,
+    closedRealCents: 0,
+  };
+}
+
+type CalendarFace = {
+  kind: "empty" | "zero" | "pending" | "today" | "total";
+  totalCents: number;
+  diffCents: number;
+  withdrawalCents: number;
+  awaiting?: boolean;
+  diffStores: number;
+  pendingStores: number;
+};
+
+function filialAttention(count: number, singular: string, plural: string): string {
+  return count === 1 ? `1 filial ${singular}` : `${count} filiais ${plural}`;
 }
 
 function differenceHint(summary: MonthCloseSummary): string {
@@ -634,12 +687,28 @@ export function PlainKpi({ label, value, color, tooltip }: { label: string; valu
   );
 }
 
-function MonthSummary({ summary }: { summary: MonthCloseSummary }) {
-  const cards = [
-    { label: "Total real", value: brlCent(summary.realCents / 100), color: "var(--t0)" },
-    { label: "Diferença", value: dayTotal(summary.diffCents), color: differenceColor(summary.diffCents), tooltip: differenceHint(summary) },
-    { label: "Dias pendentes", value: String(summary.pendingDays), color: "var(--t0)" },
-  ];
+function MonthSummary({
+  summary,
+  many,
+  diffDays,
+  closedRealCents,
+}: {
+  summary: MonthCloseSummary;
+  many: boolean;
+  diffDays: number;
+  closedRealCents: number;
+}) {
+  const cards = many
+    ? [
+        { label: "Total real", value: brlCent(closedRealCents / 100), color: "var(--t0)" },
+        { label: "Dias com diferença", value: String(diffDays), color: "var(--t0)", tooltip: "Dias em que alguma filial fechou com sobra ou quebra." },
+        { label: "Dias pendentes", value: String(summary.pendingDays), color: "var(--t0)" },
+      ]
+    : [
+        { label: "Total real", value: brlCent(summary.realCents / 100), color: "var(--t0)" },
+        { label: "Diferença", value: dayTotal(summary.diffCents), color: differenceColor(summary.diffCents), tooltip: differenceHint(summary) },
+        { label: "Dias pendentes", value: String(summary.pendingDays), color: "var(--t0)" },
+      ];
   return (
     <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
       {cards.map((card) => (
@@ -681,7 +750,14 @@ function differenceChip(cents: number): { color: string; text: string } {
   return { color: "bg-chip-gray", text: "Sem diferença" };
 }
 
-function dayHint(face: { kind: "empty" | "zero" | "pending" | "today" | "total"; totalCents: number; diffCents: number; withdrawalCents: number }): string | undefined {
+function dayHint(face: CalendarFace, many: boolean): string | undefined {
+  if (many) {
+    const partes: string[] = [];
+    if (face.pendingStores > 0) partes.push(filialAttention(face.pendingStores, "pendente", "pendentes"));
+    if (face.diffStores > 0) partes.push(filialAttention(face.diffStores, "com diferença", "com diferença"));
+    if (face.withdrawalCents > 0) partes.push(`Retirada ${brlCent(face.withdrawalCents / 100)}`);
+    return partes.length > 0 ? partes.join(" · ") : undefined;
+  }
   if (face.kind !== "total") return undefined;
   const partes: string[] = [];
   if (face.diffCents !== 0) partes.push(differenceChip(face.diffCents).text);
@@ -694,11 +770,13 @@ function Month({
   cells,
   dayFace,
   onOpen,
+  many,
 }: {
   today: string;
   cells: Array<string | null>;
-  dayFace: (day: string) => { kind: "empty" | "zero" | "pending" | "today" | "total"; totalCents: number; diffCents: number; withdrawalCents: number; awaiting?: boolean };
+  dayFace: (day: string) => CalendarFace;
   onOpen: (iso: string) => void;
+  many: boolean;
 }) {
   return (
     <MonthCalendar>
@@ -706,7 +784,7 @@ function Month({
         if (!day) return <div key={`vazio-${i}`} className={blankDayClass(i)} />;
         const face = day <= today ? dayFace(day) : null;
         const showsTotal = face?.kind === "pending" || face?.kind === "total" || (face?.kind === "today" && !face.awaiting);
-        const hint = face ? dayHint(face) : undefined;
+        const hint = face ? dayHint(face, many) : undefined;
         const open = Boolean(face && face.kind !== "zero" && face.kind !== "empty");
         return (
           <DayFace
@@ -721,16 +799,29 @@ function Month({
             amount={showsTotal && face ? brlCent(face.totalCents / 100) : null}
             badges={
               face?.kind === "today" || face?.kind === "pending" || face?.kind === "total" ? (
-                <>
-                  {face.kind === "pending" && <DayChip color="bg-warn">{`Pendente ${brlCent(face.totalCents / 100)}`}</DayChip>}
-                  {face.kind === "today" && <DayChip color="bg-acc">Em aberto</DayChip>}
-                  {face.kind === "total" && (face.diffCents !== 0 || face.withdrawalCents === 0) && (
-                    <DayChip color={differenceChip(face.diffCents).color}>{differenceChip(face.diffCents).text}</DayChip>
-                  )}
-                  {face.kind === "total" && face.withdrawalCents > 0 && (
-                    <DayChip color="bg-info">{`Retirada ${brlCent(face.withdrawalCents / 100)}`}</DayChip>
-                  )}
-                </>
+                many ? (
+                  <>
+                    {face.pendingStores > 0 && <DayChip color="bg-warn">{filialAttention(face.pendingStores, "pendente", "pendentes")}</DayChip>}
+                    {face.kind === "today" && <DayChip color="bg-acc">Em aberto</DayChip>}
+                    {face.kind === "total" && face.diffStores > 0 && (
+                      <DayChip color="bg-warn">{filialAttention(face.diffStores, "com diferença", "com diferença")}</DayChip>
+                    )}
+                    {face.kind === "total" && face.withdrawalCents > 0 && (
+                      <DayChip color="bg-info">{`Retirada ${brlCent(face.withdrawalCents / 100)}`}</DayChip>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {face.kind === "pending" && <DayChip color="bg-warn">{`Pendente ${brlCent(face.totalCents / 100)}`}</DayChip>}
+                    {face.kind === "today" && <DayChip color="bg-acc">Em aberto</DayChip>}
+                    {face.kind === "total" && (face.diffCents !== 0 || face.withdrawalCents === 0) && (
+                      <DayChip color={differenceChip(face.diffCents).color}>{differenceChip(face.diffCents).text}</DayChip>
+                    )}
+                    {face.kind === "total" && face.withdrawalCents > 0 && (
+                      <DayChip color="bg-info">{`Retirada ${brlCent(face.withdrawalCents / 100)}`}</DayChip>
+                    )}
+                  </>
+                )
               ) : null
             }
           />
