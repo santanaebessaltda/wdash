@@ -2012,9 +2012,9 @@ type FinCosts = {
 type FinMonthly = {
   fixed: number;
   others: number;
-  /** Aluguel minimo rateado no periodo. */
+  /** Aluguel minimo do mes, inteiro (uma vez por loja x mes no recorte). */
   rentMinBase: number;
-  /** Quanto falta para o % chegar no minimo: max(0, minimo  aluguel %), por loja no periodo. */
+  /** Quanto falta para o % chegar no minimo: max(0, minimo do mes − aluguel %), por loja no periodo. */
   rentMin: number;
 };
 type FinLine = FinMoney & FinCosts & FinMonthly;
@@ -2076,7 +2076,7 @@ function storeCostRates(f: Store) {
   };
 }
 
-/** Financeiro a partir dos agregados do sync (sem fixture). Custos % por marca; aluguel fixo rateado por dia/hora. */
+/** Financeiro a partir dos agregados do sync (sem fixture). Custos % seguem o faturamento; o aluguel minimo entra inteiro no mes. */
 export function buildFinanceViewFromAggs(scope: Scope, input: FinanceAggInput): FinanceView {
   const today = calendarTodayIso();
   const period = resolvePeriod(scope.period, today);
@@ -2141,22 +2141,31 @@ export function buildFinanceViewFromAggs(scope: Scope, input: FinanceAggInput): 
     };
   }
 
-  /** Soma loja x mes: o aluguel do mes e o maior entre o minimo (rateado nos dias do recorte) e o %, nao dia a dia. */
-  function sumDays(days: string[]): FinLine {
+  /** Aluguel minimo cheio do mes (com temporada). Nao divide pelos dias do filtro. */
+  function fullRentMin(f: Store, yearMonth: string): number {
+    return storeCostRates(f).rentMin * rentSeasonFactor(f.costs?.rentSeasons, yearMonth);
+  }
+
+  /** Soma os dias de uma loja. O minimo entra uma vez por mes, inteiro, mesmo com o mes incompleto. */
+  function lineFor(f: Store, days: string[]): FinLine {
     const byMonth = new Map<string, string[]>();
     for (const iso of days) {
       const month = iso.slice(0, 7);
       byMonth.set(month, [...(byMonth.get(month) ?? []), iso]);
     }
     let acc = FIN_LINE_ZERO;
-    for (const f of fs) {
-      for (const daysMonth of byMonth.values()) {
-        let store = FIN_LINE_ZERO;
-        for (const iso of daysMonth) store = finAdd(store, storeDay(f, iso));
-        acc = finAdd(acc, { ...store, rentMin: Math.max(0, store.rentMinBase - store.rentPct) });
-      }
+    for (const [month, daysMonth] of byMonth) {
+      let store = FIN_LINE_ZERO;
+      for (const iso of daysMonth) store = finAdd(store, storeDay(f, iso));
+      const full = fullRentMin(f, month);
+      acc = finAdd(acc, { ...store, rentMinBase: full, rentMin: Math.max(0, full - store.rentPct) });
     }
     return acc;
+  }
+
+  /** Soma loja x mes: o aluguel do mes e o maior entre o minimo inteiro e o % do recorte, nao dia a dia. */
+  function sumDays(days: string[]): FinLine {
+    return fs.reduce((acc, f) => finAdd(acc, lineFor(f, days)), FIN_LINE_ZERO);
   }
 
   /** Horas de uma loja no filtro de marca; sem horaxmarca, usa ALL x participacao da marca no dia. */
@@ -2213,6 +2222,10 @@ export function buildFinanceViewFromAggs(scope: Scope, input: FinanceAggInput): 
       }
       const frac = day.rev > 0 ? rev / day.rev : 0;
       const escalado = finScale(day, frac);
+      const month = prev.end.slice(0, 7);
+      const earlierMonth = lineFor(f, daysPrev.slice(0, -1).filter((d) => d.startsWith(month)));
+      const full = fullRentMin(f, month);
+      const complement = Math.max(0, full - (earlierMonth.rentPct + escalado.rentPct));
       partial = finAdd(partial, {
         ...escalado,
         rev,
@@ -2220,9 +2233,10 @@ export function buildFinanceViewFromAggs(scope: Scope, input: FinanceAggInput): 
         items,
         fixed: day.fixed,
         others: day.others,
-        rentMinBase: day.rentMinBase,
-        rentMin: Math.max(0, day.rentMinBase - escalado.rentPct),
+        rentMinBase: earlierMonth.rentMinBase > 0 ? 0 : full,
+        rentMin: 0,
       });
+      partial = { ...partial, rentMin: partial.rentMin - earlierMonth.rentMin + complement };
     }
     previous = gapHour ? null : partial;
   }

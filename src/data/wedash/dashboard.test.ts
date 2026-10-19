@@ -1594,38 +1594,38 @@ describe("buildFinanceView com agregados reais", () => {
 
     it("loja de rua ignora o % gravado", () => {
       const { line, total } = run(310, 10, "STREET");
-      expect(line("Aluguel")).toBeCloseTo(20);
+      expect(line("Aluguel")).toBeCloseTo(310);
       expect(line("Aluguel percentual excedente")).toBeUndefined();
-      expect(total).toBeCloseTo(20);
+      expect(total).toBeCloseTo(310);
     });
 
-    it("% abaixo do aluguel: paga só o aluguel", () => {
-      // Aluguel 3.100/mes = 100/dia  ->  200 no recorte; 10% de 300 = 30.
+    it("% abaixo do aluguel: paga o aluguel do mês inteiro", () => {
+      // Aluguel 3.100 no mês, mesmo em 2 dias; 10% de 300 = 30, abaixo do mínimo.
       const { v, line, total, series } = run(3100, 10);
-      expect(line("Aluguel")).toBeCloseTo(200);
+      expect(line("Aluguel")).toBeCloseTo(3100);
       expect(line("Aluguel percentual excedente")).toBeUndefined();
-      expect(total).toBeCloseTo(200);
-      expect(series).toBeCloseTo(180 - 200);
+      expect(total).toBeCloseTo(3100);
+      expect(series).toBeCloseTo(180 - 3100);
       expect(v.costsConfigured).toBe(true);
     });
 
     it("% acima do aluguel: aluguel + só o excedente", () => {
-      // Aluguel 310/mes = 10/dia  ->  20 no recorte; 10% de 300 = 30  ->  excedente 10.
-      const { line, total, series } = run(310, 10);
+      // Aluguel 20 no mês; 10% de 300 = 30 → excedente 10.
+      const { line, total, series } = run(20, 10);
       expect(line("Aluguel")).toBeCloseTo(20);
       expect(line("Aluguel percentual excedente")).toBeCloseTo(10);
       expect(total).toBeCloseTo(30);
       expect(series).toBeCloseTo(180 - 30);
     });
 
-    it("loja de rua (sem %): só o aluguel", () => {
+    it("loja de rua (sem %): só o aluguel do mês", () => {
       const { line, total } = run(3100, null);
-      expect(line("Aluguel")).toBeCloseTo(200);
+      expect(line("Aluguel")).toBeCloseTo(3100);
       expect(line("Aluguel percentual excedente")).toBeUndefined();
-      expect(total).toBeCloseTo(200);
+      expect(total).toBeCloseTo(3100);
     });
 
-    it("dezembro em 2× dobra o mínimo do recorte", () => {
+    it("dezembro em 2× dobra o mínimo do mês", () => {
       const store = stores.find((s) => s.id === "f1")!;
       const before = store.costs;
       store.costs = { ...EMPTY_STORE_COSTS, rentMin: 3100, rentWepinkPct: 0, rentWpinkPct: 0, rentSeasons: [{ month: 12, yearMonth: null, factor: 2 }] };
@@ -1635,7 +1635,7 @@ describe("buildFinanceView com agregados reais", () => {
           { dayAggs: [day("2025-12-01", 100, 40)] },
         );
         const line = v.franchiseFixedCosts.find((l) => l.label === "Aluguel")?.amount;
-        expect(line).toBeCloseTo(200);
+        expect(line).toBeCloseTo(6200);
       } finally {
         store.costs = before;
       }
