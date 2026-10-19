@@ -20,6 +20,10 @@ export interface WalletGoalOpportunity {
   missedLevelLabel: string | null;
   missedPrizeCents: number;
   missedBonusCents: number;
+  /** Meta aberta: o percentual do último nível continua sobre o que ela vender. */
+  floor: boolean;
+  /** Já está no último nível. O upside fica zerado porque não há outro degrau; vender mais ainda aumenta a premiação. */
+  atLast: boolean;
   upsideCents: number;
 }
 
@@ -58,7 +62,7 @@ function resultCaption(metric: SellerChallengeMetric): string {
   return "Você vendeu";
 }
 
-/** Card da meta. O teto segue a regra final; o bloco do próximo nível é o ganho ao fechar a folga. */
+/** Card da meta. O valor é o mínimo ao chegar no último nível; o bloco seguinte é o ganho ao fechar a folga. */
 export function goalWalletOpportunity(input: {
   name: string;
   endsOn: string;
@@ -118,6 +122,8 @@ export function goalWalletOpportunity(input: {
     missedLevelLabel,
     missedPrizeCents,
     missedBonusCents,
+    floor: input.open,
+    atLast: input.open && ceiling.next == null,
     upsideCents: cents(ceiling.upside),
   };
 }

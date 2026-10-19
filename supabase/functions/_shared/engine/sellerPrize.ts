@@ -52,14 +52,15 @@ export interface GoalCeilingTier {
 }
 
 export interface GoalCeiling {
-  /** Reais que ainda dá para conquistar até o último nível. Zero se a meta fechou ou ela já está nele. */
+  /** Mínimo ainda a conquistar ao chegar no último nível, no piso dele. Zero se a meta fechou ou ela já está nele. Vender mais aumenta o percentual. */
   upside: number;
   /** Ganho ao fechar a folga do próximo nível (venda no piso desse nível), não o ritmo atual. */
   next: { name: string; number: number; gap: number; prizeGain: number; bonusGain: number } | null;
 }
 
 /**
- * Teto da meta aberta. O percentual do último nível substitui os anteriores; o bônus de cada nível acumula.
+ * Piso da meta aberta, não o teto. O percentual do último nível substitui os anteriores e vale sobre o que ela vender;
+ * vender além do piso aumenta a premiação. O bônus de cada nível acumula.
  * A parte dela sai da premiação que já tem; sem premiação, divide igual pelo tamanho do grupo.
  * O bônus segue a fração que ela já recebe; sem bônus ainda, conta o bônus inteiro.
  */

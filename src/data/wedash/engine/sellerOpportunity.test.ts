@@ -31,13 +31,15 @@ describe("goalWalletOpportunity", () => {
     tiers,
   };
 
-  it("guarda o teto em centavos e o próximo nível ao fechar a folga", () => {
+  it("guarda o mínimo do último nível e o próximo nível ao fechar a folga", () => {
     const card = goalWalletOpportunity(base);
     expect(card.state).toBe("guaranteed");
     expect(card.levelLabel).toBe("N1 · Meta");
     expect(card.prizeCents).toBe(10_500);
     expect(card.bonusCents).toBe(5_000);
     expect(card.upsideCents).toBe(59_500);
+    expect(card.floor).toBe(true);
+    expect(card.atLast).toBe(false);
     expect(card.next).toEqual({ label: "N2 · Super", gapCents: 150_000, prizeGainCents: 13_500, bonusGainCents: 10_000 });
     expect(card.missedPrizeCents).toBe(0);
   });
@@ -45,11 +47,21 @@ describe("goalWalletOpportunity", () => {
   it("meta encerrada sem premiação mostra o 1º nível e não soma no potencial", () => {
     const card = goalWalletOpportunity({ ...base, open: false, levelNumber: null, levelName: null, prizeReais: 0, bonusReais: 0, achieved: 4_000, currentPct: 0 });
     expect(card.state).toBe("missed");
+    expect(card.floor).toBe(false);
+    expect(card.atLast).toBe(false);
     expect(card.upsideCents).toBe(0);
     expect(card.next).toBeNull();
     expect(card.missedLevelLabel).toBe("N1 · Meta");
     expect(card.missedPrizeCents).toBe(10_000);
     expect(card.missedBonusCents).toBe(5_000);
+  });
+
+  it("no último nível o mínimo já está na premiação e vender mais continua aumentando", () => {
+    const card = goalWalletOpportunity({ ...base, levelNumber: 3, levelName: "Hiper", prizeReais: 480, bonusReais: 300, achieved: 16_000, currentPct: 3 });
+    expect(card.atLast).toBe(true);
+    expect(card.floor).toBe(true);
+    expect(card.upsideCents).toBe(0);
+    expect(card.next).toBeNull();
   });
 });
 

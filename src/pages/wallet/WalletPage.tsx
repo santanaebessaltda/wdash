@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Alert, Badge, Button, Card, CardTitle, DataTable, DateRangePicker, PageHeader, Skeleton, StatCard, CALENDAR_QUICK_RANGES, type DataTableColumn, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
+import { Alert, Badge, Button, Card, CardTitle, DataTable, DateRangePicker, PageHeader, Skeleton, StatCard, Tooltip, CALENDAR_QUICK_RANGES, type DataTableColumn, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { periodLabels } from "@/data/wedash/dashboard";
 import { monthsTouched } from "@/data/wedash/cashCloseMonth";
@@ -10,11 +10,13 @@ import { opportunitiesInRange, type WalletChallengeOpportunity, type WalletGoalO
 import { walletInRange, type WalletLine, type WalletMonth, type WalletPersonMonth } from "@/data/wedash/engine/wallet";
 import { loadBranchWallet, loadSellerWallet } from "@/data/wedash/walletLoad";
 import { effectiveWeekHours } from "@/data/wedash/storeHours";
+import { cn } from "@/lib/cn";
 import { brlCent, dateToIso, endOfMonth, fullDate, isoToDate } from "@/lib/format";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useScope } from "@/pages/dashboard/useScope";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
+import { CheckCircleIcon, FlameIcon, TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
 import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
 import { HeaderFilters } from "@/pages/stock/shared";
 
@@ -308,89 +310,130 @@ function balanceLines(person: WalletPersonMonth): WalletPersonMonth {
   };
 }
 
-function sellerSummary(guaranteed: number, upside: number): string | null {
-  if (guaranteed <= 0 && upside <= 0) return null;
-  if (upside <= 0) return `Você já garantiu ${money(guaranteed)} neste período.`;
-  if (guaranteed <= 0) return `Você ainda pode conquistar ${money(upside)} neste período.`;
-  return `Você já garantiu ${money(guaranteed)} e ainda pode conquistar mais ${money(upside)} neste período.`;
+const KPI_COLORS = [
+  { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" },
+  { iconColor: "var(--ok)", iconBg: "var(--ok-soft)" },
+  { iconColor: "var(--info)", iconBg: "rgba(59,130,246,0.12)" },
+];
+
+function WalletGlyph() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4M3 5v14a2 2 0 0 0 2 2h16v-5M18 12a2 2 0 0 0 0 4h4v-4z" />
+    </svg>
+  );
 }
 
-function MoneyLine({ label, value }: { label: string; value: string }) {
+function sellerSummary(guaranteed: number, upside: number, goals: WalletGoalOpportunity[]): string | null {
+  const belowLast = goals.some((goal) => goal.floor && !goal.atLast);
+  const atLast = goals.some((goal) => goal.atLast);
+  const potential = guaranteed + upside;
+  if (belowLast && upside > 0) {
+    return `Você já garantiu ${money(guaranteed)} e, se alcançar o último nível, passa a receber a partir de ${money(potential)}. Vender mais aumenta a premiação.`;
+  }
+  if (atLast && upside > 0 && guaranteed > 0) {
+    return `Você já garantiu ${money(guaranteed)} e ainda pode conquistar ${money(upside)} neste período. No último nível, vender mais aumenta a premiação.`;
+  }
+  if (atLast && guaranteed > 0) {
+    return `Você já garantiu ${money(guaranteed)}. No último nível, vender mais aumenta a premiação.`;
+  }
+  if (upside > 0 && guaranteed > 0) return `Você já garantiu ${money(guaranteed)} e ainda pode conquistar ${money(upside)} neste período.`;
+  if (upside > 0) return `Você ainda pode conquistar ${money(upside)} neste período.`;
+  if (guaranteed > 0) return `Você já garantiu ${money(guaranteed)} neste período.`;
+  return null;
+}
+
+function Tile({ label, value, sub, tip, mono = true, valueClass = "text-t0" }: { label: string; value: string; sub?: string; tip?: string; mono?: boolean; valueClass?: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 py-0.5">
-      <span className="text-[13px] text-t1">{label}</span>
-      <span className="font-mono text-[13.5px] font-bold text-t0">{value}</span>
+    <div className="min-w-0 rounded-xl border border-line bg-bg-inset p-3">
+      <p className="flex items-center gap-1 text-[11.5px] font-semibold text-t2">
+        {label}
+        {tip ? (
+          <Tooltip label={tip}>
+            <span className="inline-flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full bg-bg-3 text-[10px] font-semibold text-t2 transition-colors hover:text-t1">?</span>
+          </Tooltip>
+        ) : null}
+      </p>
+      <p className={cn("mt-1 text-[15px] font-extrabold leading-tight", mono && "font-mono tabular-nums", value === "—" ? "text-t2" : valueClass)}>{value}</p>
+      {sub ? <p className="mt-0.5 text-[12px] font-semibold leading-snug text-t1">{sub}</p> : null}
     </div>
   );
 }
 
 function GoalOpportunityCard({ item }: { item: WalletGoalOpportunity }) {
+  const ended = item.state === "missed";
   const badge = item.state === "guaranteed" ? { label: "Alcançado", variant: "success" as const } : item.state === "missed" ? { label: "Não alcançado", variant: "danger" as const } : { label: "Em andamento", variant: "warning" as const };
   const showMoney = item.state === "guaranteed" || item.prizeCents > 0 || item.bonusCents > 0;
   return (
-    <div className="rounded-xl border border-line px-4 py-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Meta</p>
-          <p className="text-[15px] font-bold text-t0">{item.name}</p>
-          {item.levelLabel ? <p className="mt-0.5 text-[13px] font-semibold text-t1">{item.levelLabel}</p> : null}
+    <div className={cn("flex items-start gap-3.5 rounded-xl border border-line p-4", ended ? "bg-bg-inset" : "bg-bg-2")}>
+      <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", ended ? "bg-bg-3 text-t2" : "bg-acc-soft text-acc")}>
+        <TargetIcon size={18} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-2">
+          <p className="min-w-0 truncate text-[14px] font-bold text-t0">{item.name}</p>
+          <Badge variant={badge.variant} className="shrink-0 uppercase">
+            {badge.label}
+          </Badge>
         </div>
-        <Badge variant={badge.variant}>{badge.label}</Badge>
+        {item.levelLabel ? <p className="mt-0.5 text-[12px] text-t2">{item.levelLabel}</p> : null}
+        {showMoney ? (
+          <div className="mt-3 grid grid-cols-2 gap-2.5">
+            <Tile label="Premiação" value={money(item.prizeCents)} valueClass={item.prizeCents > 0 ? "text-ok" : "text-t0"} />
+            <Tile label="Bônus" value={money(item.bonusCents)} valueClass={item.bonusCents > 0 ? "text-ok" : "text-t0"} />
+          </div>
+        ) : null}
+        {item.state === "missed" && (item.missedPrizeCents > 0 || item.missedBonusCents > 0) ? (
+          <div className="mt-3 grid grid-cols-2 gap-2.5">
+            <Tile label="Premiação" value={money(item.missedPrizeCents)} sub={item.missedLevelLabel ?? undefined} tip="Não entrou na carteira." />
+            <Tile label="Bônus" value={money(item.missedBonusCents)} tip="Não entrou na carteira." />
+          </div>
+        ) : null}
+        {item.next ? (
+          <div className="mt-2.5 grid grid-cols-2 gap-2.5">
+            <Tile label="Próximo nível" value={item.next.label} mono={false} sub={item.next.gapCents > 0 ? `Faltam ${money(item.next.gapCents)}` : undefined} />
+            <Tile
+              label="A partir deste nível"
+              value={item.next.prizeGainCents > 0 ? `+${money(item.next.prizeGainCents)}` : "—"}
+              valueClass={item.next.prizeGainCents > 0 ? "text-ok" : "text-t0"}
+              sub={item.next.bonusGainCents > 0 ? `+${money(item.next.bonusGainCents)} de bônus` : undefined}
+              tip="No piso deste nível. O percentual vale sobre o que você vender, então vender mais aumenta a premiação."
+            />
+          </div>
+        ) : null}
+        {item.atLast ? <p className="mt-2 text-[12.5px] font-semibold text-t1">Último nível. Vender mais aumenta a premiação.</p> : null}
       </div>
-      {showMoney ? (
-        <div className="mt-3">
-          <MoneyLine label="Premiação" value={money(item.prizeCents)} />
-          <MoneyLine label="Bônus" value={money(item.bonusCents)} />
-        </div>
-      ) : null}
-      {item.state === "missed" && (item.missedPrizeCents > 0 || item.missedBonusCents > 0) ? (
-        <div className="mt-3">
-          {item.missedLevelLabel ? <p className="text-[13px] font-semibold text-t1">{item.missedLevelLabel}</p> : null}
-          {item.missedPrizeCents > 0 ? <MoneyLine label="Premiação" value={money(item.missedPrizeCents)} /> : null}
-          {item.missedBonusCents > 0 ? <MoneyLine label="Bônus" value={money(item.missedBonusCents)} /> : null}
-        </div>
-      ) : null}
-      {item.next ? (
-        <div className="mt-3 border-t border-line pt-3">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Próximo nível</p>
-          <p className="mt-1 text-[14px] font-semibold text-t0">{item.next.label}</p>
-          {item.next.gapCents > 0 ? <p className="mt-1 text-[13px] text-t1">Faltam {money(item.next.gapCents)}</p> : null}
-          {item.next.prizeGainCents > 0 || item.next.bonusGainCents > 0 ? (
-            <div className="mt-2">
-              <p className="text-[12.5px] text-t2">Ao alcançar:</p>
-              {item.next.prizeGainCents > 0 ? <p className="text-[13.5px] font-semibold text-t0">+ {money(item.next.prizeGainCents)} de premiação</p> : null}
-              {item.next.bonusGainCents > 0 ? <p className="text-[13.5px] font-semibold text-t0">+ {money(item.next.bonusGainCents)} de bônus</p> : null}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
     </div>
   );
 }
 
 function ChallengeOpportunityCard({ item }: { item: WalletChallengeOpportunity }) {
+  const ended = item.state !== "open";
   return (
-    <div className="rounded-xl border border-line px-4 py-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Desafio</p>
-          <p className="text-[15px] font-bold text-t0">{item.name}</p>
+    <div className={cn("flex items-start gap-3.5 rounded-xl border border-line p-4", ended ? "bg-bg-inset" : "bg-bg-2")}>
+      <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", ended ? "bg-bg-3 text-t2" : "bg-acc-soft text-acc")}>
+        <FlameIcon size={18} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-2">
+          <p className="min-w-0 truncate text-[14px] font-bold text-t0">{item.name}</p>
+          <Badge variant={item.state === "open" ? "warning" : "neutral"} className="shrink-0 uppercase">
+            {item.state === "open" ? "Em andamento" : "Encerrado"}
+          </Badge>
         </div>
-        <Badge variant={item.state === "open" ? "warning" : "neutral"}>{item.state === "open" ? "Em andamento" : "Encerrado"}</Badge>
-      </div>
-      <div className="mt-3 flex flex-col gap-1">
-        {item.placeLabel ? <p className="text-[13.5px] font-semibold text-t0">{item.placeLabel}</p> : null}
-        {item.state === "missed" ? <p className="text-[13.5px] font-semibold text-bad">Não alcançado</p> : null}
+        {item.placeLabel ? <p className="mt-2 text-[13px] font-semibold text-t0">{item.placeLabel}</p> : null}
+        {item.state === "missed" ? <p className="mt-2 text-[13px] font-semibold text-bad">Não alcançado</p> : null}
         {item.resultLabel ? (
-          <p className="text-[13px] text-t1">
+          <p className="mt-2 text-[13px] text-t1">
             {item.resultCaption}: {item.resultLabel}
           </p>
         ) : null}
-        {item.targetLabel ? <p className="text-[13px] text-t1">Meta: {item.targetLabel}</p> : null}
-        {item.gapLabel ? <p className="text-[13px] font-semibold text-t0">{item.gapLabel}</p> : null}
+        {item.targetLabel ? <p className="mt-1 text-[13px] text-t1">Meta: {item.targetLabel}</p> : null}
+        {item.gapLabel ? <p className="mt-2 text-[12.5px] font-semibold text-t1">{item.gapLabel}</p> : null}
         {item.prizeLabel ? (
-          <p className="text-[13.5px] text-t0">
-            {item.state === "guaranteed" ? "Prêmio conquistado" : "Prêmio"}: <span className="font-mono font-bold">{item.prizeLabel}</span>
+          <p className="mt-2 flex items-center gap-1 text-[12px] text-t2">
+            <TrophyIcon size={13} />
+            {item.state === "guaranteed" ? "Prêmio conquistado" : "Prêmio"}: <span className="font-mono font-bold text-t0">{item.prizeLabel}</span>
           </p>
         ) : null}
       </div>
@@ -401,31 +444,27 @@ function ChallengeOpportunityCard({ item }: { item: WalletChallengeOpportunity }
 function SellerWallet({ wallet, opportunities }: { wallet: WalletMonth; opportunities: WalletOpportunity[] }) {
   const person = wallet.people[0];
   if (!person) return <EmptyBlock icon="👛" title="Nada neste período" description="Não há carteira para este acesso." />;
+  const goals = opportunities.filter((item): item is WalletGoalOpportunity => item.kind === "goal");
   const guaranteed = earningsOf(person);
   const upside = opportunities.reduce((total, item) => total + item.upsideCents, 0);
   const potential = guaranteed + upside;
-  const sentence = sellerSummary(guaranteed, upside);
-  const span = potential > 0 ? Math.max(0, Math.min(100, (guaranteed / potential) * 100)) : 0;
+  const belowLast = goals.some((goal) => goal.floor && !goal.atLast);
+  const atLast = goals.some((goal) => goal.atLast);
+  const sentence = sellerSummary(guaranteed, upside, goals);
+  const potentialSub = belowLast ? "A partir do último nível" : atLast ? "Vender mais aumenta a premiação" : upside > 0 ? "Se conquistar o que ainda está em disputa" : undefined;
+  const potentialTip = belowLast || atLast ? "O último nível paga um percentual sobre o que você vender. O valor é o mínimo ao chegar nele. Vender mais aumenta a premiação." : undefined;
   const movement = balanceLines(person);
+  const saldo = KPI_COLORS[0]!;
+  const ganhos = KPI_COLORS[1]!;
+  const potencial = KPI_COLORS[2]!;
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard label="Saldo atual" value={money(person.balanceCents)} sub={person.openPrize ? "Até agora" : undefined} valueClassName={balanceClass(person.balanceCents)} />
-        <StatCard label="Ganhos garantidos" value={money(guaranteed)} />
-        <StatCard label="Potencial do período" value={money(potential)} sub={upside > 0 ? "Se alcançar todas as premiações disponíveis" : undefined} />
+        <StatCard label="Saldo atual" value={money(person.balanceCents)} icon={<WalletGlyph />} iconColor={saldo.iconColor} iconBg={saldo.iconBg} sub={person.openPrize ? "Até agora" : undefined} valueClassName={balanceClass(person.balanceCents)} />
+        <StatCard label="Ganhos garantidos" value={money(guaranteed)} icon={<CheckCircleIcon size={20} />} iconColor={ganhos.iconColor} iconBg={ganhos.iconBg} />
+        <StatCard label="Potencial do período" value={money(potential)} icon={<TargetIcon size={20} />} iconColor={potencial.iconColor} iconBg={potencial.iconBg} sub={potentialSub} tooltip={potentialTip} />
       </div>
-      {sentence ? <p className="text-[14px] font-semibold text-t0">{sentence}</p> : null}
-      {upside > 0 ? (
-        <div>
-          <div className="flex items-baseline justify-between gap-3 text-[12.5px] text-t2">
-            <span>{money(guaranteed)} garantidos</span>
-            <span>{money(potential)} possíveis</span>
-          </div>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-bg-inset" role="img" aria-label={`${money(guaranteed)} garantidos de ${money(potential)} possíveis`}>
-            <div className="h-full rounded-full bg-ok" style={{ width: `${span}%` }} />
-          </div>
-        </div>
-      ) : null}
+      {sentence ? <p className="text-[13px] leading-snug text-t1">{sentence}</p> : null}
       <Card>
         <CardTitle>Suas oportunidades</CardTitle>
         <div className="mt-3">
