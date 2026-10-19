@@ -398,18 +398,11 @@ function GoalTiersCard({
                   {lineManagement && <p className="mt-0.5 text-[11.5px] text-t2">{lineManagement}</p>}
                 </div>
                 {participants.length > 0 && (
-                  <div
-                    className={`shrink-0 rounded-lg px-3 py-1.5 text-center ${feito ? "bg-ok-soft" : alcancaram > 0 ? "bg-acc-soft" : "bg-bg-3"}`}
-                  >
-                    <p
-                      className={`font-mono text-[20px] font-extrabold leading-none ${feito ? "text-ok" : alcancaram > 0 ? "text-acc" : "text-t2"}`}
-                    >
-                      {alcancaram}
-                      <span className="text-[13px] font-bold text-t2">/{participants.length}</span>
+                  <div className="shrink-0 text-right">
+                    <p className={`font-mono text-[13px] font-extrabold ${feito ? "text-ok" : alcancaram > 0 ? "text-t1" : "text-t2"}`}>
+                      {alcancaram} de {participants.length}
                     </p>
-                    <p className="mt-1 text-[10.5px] font-bold uppercase tracking-wide text-t1">
-                      {participants.length === 1 ? "pessoa" : "pessoas"}
-                    </p>
+                    <p className="text-[10.5px] text-t2">{participants.length === 1 ? "pessoa" : "pessoas"}</p>
                   </div>
                 )}
                 <div className="shrink-0 text-right">
