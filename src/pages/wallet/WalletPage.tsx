@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Alert, Badge, Button, Card, CardTitle, Checkbox, DataTable, DateRangePicker, Dropdown, Modal, PageHeader, Skeleton, StatCard, Tooltip, CALENDAR_QUICK_RANGES, type DataTableColumn, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
+import { Alert, Badge, Button, Card, CardTitle, Checkbox, DataTable, DateRangePicker, Dropdown, Modal, PageHeader, Segmented, Skeleton, StatCard, Tooltip, CALENDAR_QUICK_RANGES, type DataTableColumn, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
+import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { WedashBrand } from "@/components/wedash/WedashBrand";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { periodLabels } from "@/data/wedash/dashboard";
@@ -144,6 +145,18 @@ function LineList({ lines }: { lines: WalletLine[] }) {
   );
 }
 
+function MovementSection({ title, total, lines, empty }: { title: string; total: string; lines: WalletLine[]; empty: string }) {
+  return (
+    <section>
+      <div className="flex items-baseline justify-between gap-3 border-b border-line pb-2">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-t2">{title}</p>
+        <p className="font-mono text-[13.5px] font-bold text-t0">{total}</p>
+      </div>
+      {lines.length > 0 ? <LineList lines={lines} /> : <p className="py-3 text-[13px] text-t2">{empty}</p>}
+    </section>
+  );
+}
+
 function Statement({
   person,
   emptyTitle = "Nada neste mês",
@@ -153,46 +166,59 @@ function Statement({
   emptyTitle?: string;
   emptyDescription?: string;
 }) {
-  const gains = person.lines.filter(isGain);
-  const discounts = person.lines.filter((line) => !isGain(line));
   if (person.lines.length === 0) {
     return <EmptyBlock icon="👛" title={emptyTitle} description={emptyDescription} />;
   }
+  const gains = person.lines.filter(isGain);
+  const discounts = person.lines.filter((line) => !isGain(line));
+  const discountCents = discountsOf(person);
   return (
     <div className="flex flex-col gap-5">
-      {gains.length > 0 ? (
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Ganhos</p>
-          <LineList lines={gains} />
-        </div>
-      ) : null}
-      {discounts.length > 0 ? (
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Descontos</p>
-          <LineList lines={discounts} />
-        </div>
-      ) : null}
+      <MovementSection title="Ganhos" total={money(earningsOf(person))} lines={gains} empty="Nenhum ganho neste período." />
+      <MovementSection title="Descontos" total={discountCents > 0 ? minusMoney(discountCents) : money(0)} lines={discounts} empty="Nenhum desconto neste período." />
     </div>
   );
 }
 
-function PersonDialog({ person, storeName, onClose }: { person: WalletPersonMonth; storeName?: string; onClose: () => void }) {
+function PersonFigures({ person }: { person: WalletPersonMonth }) {
+  const open = person.openPrize || person.lines.some((line) => line.open);
+  const discountCents = discountsOf(person);
+  const cards = [
+    { label: "Saldo", value: money(person.balanceCents), tone: balanceClass(person.balanceCents), sub: open ? "Até agora" : null },
+    { label: "Ganhos", value: money(earningsOf(person)), tone: "text-t0", sub: null },
+    { label: "Descontos", value: discountCents > 0 ? minusMoney(discountCents) : money(0), tone: "text-t0", sub: null },
+  ];
+  return (
+    <div className="mb-5 grid grid-cols-1 gap-2 sm:grid-cols-3">
+      {cards.map((card) => (
+        <div key={card.label} className="min-w-0 rounded-[14px] border border-line bg-bg-1 px-3 py-3">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-t2">{card.label}</p>
+          <p className={cn("mt-1 truncate font-mono text-lg font-extrabold", card.tone)}>{card.value}</p>
+          {card.sub ? <p className="mt-0.5 text-[12px] text-t2">{card.sub}</p> : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PersonDialog({ person, storeId, storeName, onClose }: { person: WalletPersonMonth; storeId: string; storeName?: string; onClose: () => void }) {
   return (
     <Modal
       open
       onClose={onClose}
       size="lg"
       title={
-        <span className="min-w-0">
-          <span className="block truncate">{person.name}</span>
-          {storeName ? <span className="mt-0.5 block text-[12.5px] font-semibold text-t2">{storeName}</span> : null}
+        <span className="flex min-w-0 items-center gap-3">
+          <PersonAvatar name={person.name} storeId={storeId} size="md" />
+          <span className="min-w-0">
+            <span className="block truncate">{person.name}</span>
+            {storeName ? <span className="mt-0.5 block truncate text-[12.5px] font-semibold text-t2">{storeName}</span> : null}
+          </span>
         </span>
       }
     >
-      <p className="mb-4 text-[12.5px] text-t2">
-        Saldo: <span className={`font-bold ${balanceClass(person.balanceCents)}`}>{money(person.balanceCents)}</span>
-      </p>
-      <Statement person={person} />
+      <PersonFigures person={person} />
+      <Statement person={person} emptyTitle="Nada neste período" emptyDescription="Não há premiação, desafio, retirada ou quebra neste período." />
     </Modal>
   );
 }
@@ -249,7 +275,12 @@ function WalletBody({ rows, shortages, showStore }: { rows: PersonRow[]; shortag
         header: "Pessoa",
         sortable: true,
         sortValue: (row) => row.name,
-        render: (row) => <span className="font-semibold text-t0">{row.name}</span>,
+        render: (row) => (
+          <span className="flex min-w-0 items-center gap-2.5">
+            <PersonAvatar name={row.name} storeId={row.storeId} size="sm" />
+            <span className="truncate font-semibold text-t0">{row.name}</span>
+          </span>
+        ),
       },
       ...filial,
       { key: "earnings", header: "Ganhos", align: "right", sortable: true, sortValue: (row) => earningsOf(row), render: (row) => money(earningsOf(row)) },
@@ -285,7 +316,7 @@ function WalletBody({ rows, shortages, showStore }: { rows: PersonRow[]; shortag
         </div>
       </Card>
       <UnassignedShortage blocks={shortages} showStore={showStore} />
-      {person ? <PersonDialog person={person} storeName={showStore ? person.storeName : undefined} onClose={close} /> : null}
+      {person ? <PersonDialog person={person} storeId={person.storeId} storeName={showStore ? person.storeName : undefined} onClose={close} /> : null}
     </div>
   );
 }
@@ -687,10 +718,12 @@ function ExportMenu({
   onPdf: (ids: string[]) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [scope, setScope] = useState<"all" | "pick">("all");
   const [ids, setIds] = useState<string[]>([]);
   const many = stores.length > 1;
   function openStores() {
-    setIds(stores.map((store) => store.id));
+    setScope("all");
+    setIds([]);
     setOpen(true);
   }
 
@@ -717,7 +750,8 @@ function ExportMenu({
     );
   }
 
-  const allOn = ids.length === stores.length;
+  const chosen = scope === "all" ? stores.map((store) => store.id) : ids;
+  const pickedLabel = chosen.length === 1 ? "1 filial" : `${chosen.length} filiais`;
   return (
     <>
       <Button type="button" variant="primary" disabled={disabled} onClick={openStores}>
@@ -730,22 +764,36 @@ function ExportMenu({
         title="Exportar"
         footer={
           <>
-            <Button type="button" variant="outline" disabled={ids.length === 0} onClick={() => { onCsv(ids); setOpen(false); }}>
+            <Button type="button" variant="outline" disabled={chosen.length === 0} onClick={() => { onCsv(chosen); setOpen(false); }}>
               CSV
             </Button>
-            <Button type="button" variant="primary" disabled={ids.length === 0} onClick={() => { onPdf(ids); setOpen(false); }}>
+            <Button type="button" variant="primary" disabled={chosen.length === 0} onClick={() => { onPdf(chosen); setOpen(false); }}>
               PDF
             </Button>
           </>
         }
       >
-        <p className="mb-3 text-[13px] text-t1">Escolha as filiais. O arquivo usa o período desta tela.</p>
-        <div className="flex flex-col gap-2.5">
-          <Checkbox label="Todas" checked={allOn} onChange={() => setIds(allOn ? [] : stores.map((store) => store.id))} />
-          {stores.map((store) => (
-            <Checkbox key={store.id} label={storeLabel(store)} checked={ids.includes(store.id)} onChange={() => toggle(store.id)} />
-          ))}
-        </div>
+        <p className="mb-3 text-[13px] text-t1">Todas as filiais, ou só as que você marcar. O arquivo usa o período desta tela.</p>
+        <Segmented
+          options={[
+            { value: "all", label: "Todas" },
+            { value: "pick", label: "Escolher filiais" },
+          ]}
+          value={scope}
+          onChange={(next) => {
+            if (next) setScope(next);
+          }}
+        />
+        {scope === "pick" ? (
+          <div className="mt-3 flex max-h-64 flex-col gap-2.5 overflow-y-auto">
+            {stores.map((store) => (
+              <Checkbox key={store.id} label={storeLabel(store)} checked={ids.includes(store.id)} onChange={() => toggle(store.id)} />
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 text-[13px] text-t2">O arquivo inclui todas as filiais desta tela.</p>
+        )}
+        <p className="mt-3 text-[12.5px] font-semibold text-t2">{chosen.length === 0 ? "Marque ao menos uma filial." : pickedLabel}</p>
       </Modal>
     </>
   );
