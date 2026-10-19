@@ -11,6 +11,7 @@ import { brl, brlCent, eachDay, num } from "@/lib/format";
 import type { BlockState as BlockStateKind } from "@/data/wedash/dashboard";
 import { BlockState } from "@/pages/dashboard/BlockState";
 import type { GoalCardView, NetworkGlobalGoal, SellerRow } from "@/data/wedash/teamViews";
+import { outsideRankingNote } from "@/data/wedash/goalView";
 import { defaultTiers } from "@/data/wedash/goals";
 import { TODAY_ISO } from "@/data/wedash/clock";
 import { cn } from "@/lib/cn";
@@ -462,11 +463,7 @@ export function GoalProgressBar({
         </p>
         <p className={`font-mono text-[26px] font-extrabold leading-none sm:text-[28px] ${colorPct}`}>{num(goal.pct, 1)}%</p>
       </div>
-      {goal.outsideTeam ? (
-        <p className="mt-1 text-[12px] text-t2">
-          Inclui <span className="font-mono">{brl(goal.outsideTeam)}</span> de vendas sem vendedor identificado ou realizadas pela gerência, fora do ranking.
-        </p>
-      ) : null}
+      {outsideRankingNote(goal) ? <p className="mt-1 text-[12px] text-t2">{outsideRankingNote(goal)}</p> : null}
       </>
       )}
 
@@ -538,11 +535,7 @@ export function GoalProgressBar({
           </div>
         );
       })()}
-      {soBarra && goal.outsideTeam ? (
-        <p className="mt-1 text-[12px] text-t2">
-          Inclui <span className="font-mono">{brl(goal.outsideTeam)}</span> de vendas sem vendedor identificado ou realizadas pela gerência, fora do ranking.
-        </p>
-      ) : null}
+      {soBarra && outsideRankingNote(goal) ? <p className="mt-1 text-[12px] text-t2">{outsideRankingNote(goal)}</p> : null}
     </>
   );
 

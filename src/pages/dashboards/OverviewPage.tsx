@@ -13,6 +13,7 @@ import {
   fetchSalesCategoryDayAggs,
   fetchSalesCategoryCatalog,
   fetchSalesPaymentDayAggs,
+  fetchNamedSellerDayAggs,
   fetchSalesSellerDayAggs,
   fetchSalesProductDayAggs,
   fetchSalesProductCostDayAggs,
@@ -162,6 +163,7 @@ export default function OverviewPage() {
   const [goals, setGoals] = useState<GoalRecord[]>([]);
   const [goalDayAggs, setGoalDayAggs] = useState<SalesDayAgg[]>([]);
   const [goalSellerDayAggs, setGoalSellerDayAggs] = useState<SalesSellerDayAgg[]>([]);
+  const [goalNamedSellerDayAggs, setGoalNamedSellerDayAggs] = useState<SalesSellerDayAgg[]>([]);
   const [goalTeam, setGoalTeam] = useState<GoalTeamMember[]>([]);
   // Catalogo de lojas (horario/fuso) hidratado depois do 1 render  ->  recalcula eixos.
   const [storesTick, setStoresTick] = useState(0);
@@ -190,7 +192,7 @@ export default function OverviewPage() {
     const goalsP = fetchGoals({ tenantId: session.tenantId, storeIds: goalStoreIds, from: period.start, to: period.end });
     // Atingimento da meta = do inicio de cada meta ate hoje (pode sair do periodo da tela).
     // Secao Meta do detalhe da pessoa = mesma janela, por pessoa.
-    const empty = { days: [] as SalesDayAgg[], sellers: [] as SalesSellerDayAgg[], team: [] as GoalTeamMember[] };
+    const empty = { days: [] as SalesDayAgg[], sellers: [] as SalesSellerDayAgg[], named: [] as SalesSellerDayAgg[], team: [] as GoalTeamMember[] };
     const goalDataP = goalsP.then(async (gs) => {
       if (gs.length === 0) return empty;
       const from = gs.reduce((m, g) => (g.startsOn < m ? g.startsOn : m), gs[0]!.startsOn);
@@ -198,12 +200,13 @@ export default function OverviewPage() {
       const to = end < today ? end : today;
       if (from > to) return empty;
       const storeIds = [...new Set(gs.map((g) => g.storeId))];
-      const [days, sellers, team] = await Promise.all([
+      const [days, sellers, named, team] = await Promise.all([
         fetchSalesDayAggs({ tenantId: session.tenantId, storeIds, from, to, brand: "ALL" }),
         fetchSalesSellerDayAggs({ tenantId: session.tenantId, storeIds, from, to }),
+        fetchNamedSellerDayAggs({ tenantId: session.tenantId, storeIds, from, to }),
         fetchGoalTeam(session.tenantId, storeIds),
       ]);
-      return { days, sellers, team };
+      return { days, sellers, named, team };
     });
     try {
       const [days, hours, cats, catalog, payments, sellers, products, productCosts, wm, cov, goalHistDays, goalHistHours, prevDays, prevHours, shifts, avatars, goalsLoaded, goalAggs] = await Promise.all([
@@ -300,6 +303,7 @@ export default function OverviewPage() {
       setGoals(goalsLoaded);
       setGoalDayAggs(goalAggs.days);
       setGoalSellerDayAggs(goalAggs.sellers);
+      setGoalNamedSellerDayAggs(goalAggs.named);
       setGoalTeam(goalAggs.team);
       setDayAggs(days);
       setHourAggs(hours);
@@ -376,10 +380,11 @@ export default function OverviewPage() {
         goals,
         goalDayAggs,
         goalSellerDayAggs,
+        goalNamedSellerDayAggs,
         goalTeam,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [scope, dayAggs, hourAggs, categoryDayAggs, categoryCatalog, paymentDayAggs, sellerDayAggs, sellerShifts, sellerAvatars, productDayAggs, productCostDayAggs, goalHistoryDayAggs, goalHistoryHourAggs, prevDayAggs, prevHourAggs, goals, goalDayAggs, goalSellerDayAggs, goalTeam, storesTick],
+    [scope, dayAggs, hourAggs, categoryDayAggs, categoryCatalog, paymentDayAggs, sellerDayAggs, sellerShifts, sellerAvatars, productDayAggs, productCostDayAggs, goalHistoryDayAggs, goalHistoryHourAggs, prevDayAggs, prevHourAggs, goals, goalDayAggs, goalSellerDayAggs, goalNamedSellerDayAggs, goalTeam, storesTick],
   );
 
   // A metrica escolhe quais entram (sempre os maiores); a direcao so reordena esses.

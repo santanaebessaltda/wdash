@@ -34,6 +34,8 @@ export interface GoalRecord {
   tiers: Tier[];
   /** % da meta de cada grupo da loja (soma 100); vazio = sem grupos de distribuicao. */
   groups: GoalGroup[];
+  /** Individual e Grupo: rateia a venda sem vendedor identificado. Ausente = não rateia. O modo Geral ignora. */
+  spreadUnidentified?: boolean;
 }
 
 export interface GoalGroup {
@@ -51,8 +53,10 @@ export interface GoalTeamMember {
   name: string;
   /** Nomes normalizados ja vistos (liga venda gravada so pelo nome). */
   nameKeys: string[];
-  /** Ativo com cargo VENDEDOR = na equipe de vendas agora. */
+  /** Ativo com cargo VENDEDOR = na equipe de vendas agora. O usuário da filial fica false. */
   salesPerson: boolean;
+  /** Venda lançada no usuário da filial: fora do ranking e fora do rateio. */
+  branchUser?: boolean;
   /** DATA_ADMISSAO. Ausente ou null = desde o início do período. */
   admittedOn?: string | null;
   /** Dia em que a WDash viu o desligamento. Ausente ou null = sem saída gravada. */
@@ -114,8 +118,16 @@ export interface NetworkGlobalGoal {
   competenceText: string;
   /** Faturamento na competencia (loja ou rede)  -  total da loja, igual a Visao Geral. */
   achieved: number;
-  /** Parte do realizado fora da equipe (venda sem vendedora, gerencia); 0 = tudo na equipe. */
+  /** Parte do realizado fora do ranking; 0 = tudo na equipe. */
   outsideTeam?: number;
+  /** Venda sem vendedor que ficou fora do ranking. Ausente = o fora do ranking ainda não foi separado. */
+  outsideUnidentified?: number;
+  /** Venda do usuário da filial, fora do ranking. */
+  outsideBranchUser?: number;
+  /** Venda da gerência, fora do ranking. */
+  outsideManagement?: number;
+  /** Venda sem vendedor que a meta rateou entre os vendedores. */
+  unidentifiedSpread?: number;
   /** Meta da loja ou soma das metas da rede. */
   total: number;
   /** realizado / total x 100. */

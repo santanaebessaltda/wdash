@@ -8,8 +8,10 @@ import {
   fetchStoreShifts,
   isBranchSalesPerson,
   isBranchTeamMember,
+  isBranchUser,
   teamRoleLabel,
   saveStoreShift,
+  setBranchUser,
   setSellerShift,
   syncStoreSellersNow,
   type Store,
@@ -135,6 +137,8 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
   const [removing, setRemoving] = useState<StoreSeller | null>(null);
   const [removingBusy, setRemovingBusy] = useState(false);
   const [creating, setCreating] = useState<{ sellerId: string; start: string; end: string } | null>(null);
+  const [branchChoice, setBranchChoice] = useState<{ chosen: boolean; sellerId: string | null } | null>(null);
+  const [branchSaving, setBranchSaving] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -152,6 +156,10 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
       cancelled = true;
     };
   }, [tenantId, store.id, tick, reloadKey, groupsTick]);
+
+  useEffect(() => {
+    setBranchChoice(null);
+  }, [store.id, store.branchUserChosen, store.branchUserSellerId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -175,8 +183,25 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
     };
   }, [tenantId, store.id, groupsTick]);
 
-  const salesPerson = (seller: StoreSeller) => isBranchSalesPerson(seller, store);
-  const ativos = useMemo(() => team.filter((seller) => isBranchTeamMember(seller, store)), [team, store]);
+  const branchStore = branchChoice
+    ? { ...store, branchUserChosen: branchChoice.chosen, branchUserSellerId: branchChoice.sellerId }
+    : store;
+  const salesPerson = (seller: StoreSeller) => isBranchSalesPerson(seller, branchStore);
+  const suggestedBranch = useMemo(() => team.find((seller) => seller.active && isBranchUser(seller.code, store)) ?? null, [team, store]);
+  const branchValue = branchStore.branchUserChosen ? (branchStore.branchUserSellerId ?? "") : (suggestedBranch?.id ?? "");
+
+  async function pickBranchUser(sellerId: string) {
+    const next = sellerId || null;
+    const before = branchChoice;
+    setBranchChoice({ chosen: true, sellerId: next });
+    setBranchSaving(true);
+    const saved = await setBranchUser(store.id, next);
+    setBranchSaving(false);
+    if (saved.ok) return;
+    setBranchChoice(before);
+    show("Não foi possível salvar o usuário da filial. Tente novamente.", "danger");
+  }
+  const ativos = useMemo(() => team.filter((seller) => isBranchTeamMember(seller, branchStore)), [team, branchStore]);
   const desligados = useMemo(() => team.filter((s) => !s.active), [team]);
   const rows = tab === "ativos" ? ativos : desligados;
 
@@ -253,7 +278,7 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
 
   const columns = useMemo<DataTableColumn<StoreSeller>[]>(
     () => [
-      ...sellerColumns(store),
+      ...sellerColumns(branchStore),
       {
         key: "access",
         header: "Acesso",
@@ -299,7 +324,7 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [shifts, shiftOf, savingIds, access, store],
+    [shifts, shiftOf, savingIds, access, branchStore],
   );
 
   const withoutTeam = loaded && team.length === 0;
@@ -308,6 +333,32 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
     <Card padding="none">
       <div className="px-5 pt-5">
         <CostCardTitle title="Equipe da filial" />
+        {loaded && !withoutTeam && (
+          <div className="mt-4 max-w-md">
+            <FormField label="Usuário da filial">
+              <select
+                className="h-[42px] w-full rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3.5 text-[13px] text-t0 outline-none focus:border-acc"
+                value={branchValue}
+                disabled={branchSaving}
+                onChange={(event) => void pickBranchUser(event.target.value)}
+              >
+                <option value="">Nenhum</option>
+                {ativos.map((seller) => (
+                  <option key={seller.id} value={seller.id}>
+                    {seller.name}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1.5 text-[11.5px] text-t2">
+                {branchStore.branchUserChosen
+                  ? "A venda deste usuário fica fora do ranking e não entra no rateio."
+                  : suggestedBranch
+                    ? `Sugerido pelo código da filial: ${suggestedBranch.name}. A venda deste usuário fica fora do ranking e não entra no rateio.`
+                    : "Sem sugestão pelo código da filial. A venda deste usuário fica fora do ranking e não entra no rateio."}
+              </p>
+            </FormField>
+          </div>
+        )}
       </div>
       {!loaded ? (
         <div className="px-5 pb-4">

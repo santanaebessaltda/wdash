@@ -298,6 +298,7 @@ export default function GoalEditorPage() {
   const [tiers, setTiers] = useState<TierRow[]>(DEFAULT_TIERS);
   const [managerOn, setManagerOn] = useState(false);
   const [prizeMode, setPrizeMode] = useState<PrizeMode>("INDIVIDUAL");
+  const [spreadUnidentified, setSpreadUnidentified] = useState(false);
   /** % gravado de cada grupo (edicao); aplicado quando os grupos da loja carregam. */
   const savedGroups = useRef<GoalGroup[]>([]);
   const applySavedGroups = (rows: GroupRow[]): GroupRow[] =>
@@ -361,6 +362,7 @@ export default function GoalEditorPage() {
         setTarget(numText(g.target, "R$"));
       }
       setPrizeMode(g.tierMode);
+      setSpreadUnidentified(g.spreadUnidentified === true);
       if (g.tiers.length > 0) {
         setTiersOn(true);
         setTiers(
@@ -454,6 +456,7 @@ export default function GoalEditorPage() {
       endsOn: dateToIso(endsOn!),
       target: targetValue!,
       tierMode: prizeMode,
+      spreadUnidentified,
       tiers: tiersOn
         ? tiers.map((t, i) => ({
             name: t.name.trim() || `Nível ${i + 1}`,
@@ -620,6 +623,17 @@ export default function GoalEditorPage() {
               />
               <p className="mt-1.5 text-[11.5px] text-t2">{PRIZE_MODE_HELP[prizeMode]}</p>
             </FormField>
+            {prizeMode !== "GENERAL" && (
+              <div className="flex items-start justify-between gap-3 rounded-[var(--radius-vela-md)] bg-bg-inset px-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="text-[12.5px] font-bold text-t0">Vendas sem vendedor identificado</p>
+                  <p className="mt-0.5 text-[11.5px] text-t2">
+                    Ratear igualmente entre os vendedores que estavam naquele dia. O usuário da filial e a gerência ficam de fora.
+                  </p>
+                </div>
+                <Switch checked={spreadUnidentified} onChange={setSpreadUnidentified} />
+              </div>
+            )}
           </div>
         </Card>
 

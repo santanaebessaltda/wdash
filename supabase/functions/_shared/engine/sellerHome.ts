@@ -118,8 +118,10 @@ export interface SellerHomeInput {
   goals: GoalRecord[];
   /** Faturamento das lojas, das 6 semanas antes da meta ate hoje. */
   dayAggs: SalesDayAgg[];
-  /** Vendas por pessoa ja sem gerencia (`excludeNonSalesPeople`). */
+  /** Vendas por pessoa ja sem gerencia e sem o usuário da filial (`excludeNonSalesPeople`). */
   sellerDayAggs: SalesSellerDayAgg[];
+  /** Vendas com nome, para o rateio separar usuário da filial e gerência. */
+  namedSellerDayAggs?: SalesSellerDayAgg[];
   team: GoalTeamMember[];
   challenges?: SellerChallengeInput[];
   /** Itens por pessoa x produto, para desafios de produtos ou categorias. */
@@ -278,9 +280,24 @@ function buildStore(input: SellerHomeInput, s: SellerHomeInput["stores"][number]
   const goal = input.goals.find((g) => g.storeId === s.storeId && goalStatus(g, input.today) === "active");
   if (!goal) return { ...base, goal: null };
   const meKey = `e:${s.employeeId}`;
-  const viewInput = { goal, storeNameValue: s.storeName, dayAggs: input.dayAggs, sellerDayAggs: input.sellerDayAggs, team: input.team, today: input.today };
+  const viewInput = {
+    goal,
+    storeNameValue: s.storeName,
+    dayAggs: input.dayAggs,
+    sellerDayAggs: input.sellerDayAggs,
+    namedSellerDayAggs: input.namedSellerDayAggs,
+    team: input.team,
+    today: input.today,
+  };
   const view = buildGoalCardView(viewInput);
-  const me = sellerGoalLevels({ goals: [goal], dayAggs: input.dayAggs, sellerDayAggs: input.sellerDayAggs, team: input.team, today: input.today }).get(meKey) ?? null;
+  const me = sellerGoalLevels({
+    goals: [goal],
+    dayAggs: input.dayAggs,
+    sellerDayAggs: input.sellerDayAggs,
+    namedSellerDayAggs: input.namedSellerDayAggs,
+    team: input.team,
+    today: input.today,
+  }).get(meKey) ?? null;
   const row = view.sellers.find((r) => r.employeeId === meKey);
   const size = row ? prizeDivisor(view, row) : 1;
   let projected: number | null = null;

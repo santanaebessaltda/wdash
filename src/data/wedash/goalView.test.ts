@@ -350,4 +350,45 @@ describe("goalView", () => {
     expect(by.get("BIA")!.individualGoalAmount).toBeCloseTo((10_000 / 2) * (10 / 30));
     expect(by.get("ANA")!.individualGoalAmount).toBeCloseTo(5000);
   });
+
+  it("rateia só a venda sem vendedor e deixa usuário da filial e gerência de fora", () => {
+    const team: GoalTeamMember[] = [
+      { storeId: "s1", employeeId: 1, name: "ANA", nameKeys: ["ANA"], salesPerson: true, shiftId: null, shiftName: null },
+      { storeId: "s1", employeeId: 2, name: "BIA", nameKeys: ["BIA"], salesPerson: true, shiftId: null, shiftName: null },
+      { storeId: "s1", employeeId: 3, name: "LOJA", nameKeys: ["LOJA"], salesPerson: false, branchUser: true, shiftId: null, shiftName: null },
+      { storeId: "s1", employeeId: 4, name: "GER", nameKeys: ["GER"], salesPerson: false, shiftId: null, shiftName: null },
+    ];
+    const named = [
+      seller("2026-09-05", "ANA", 40, 1),
+      seller("2026-09-05", "LOJA", 20, 3),
+      seller("2026-09-05", "GER", 10, 4),
+    ];
+    const input = {
+      goal: { ...goal, spreadUnidentified: true, startsOn: "2026-09-05", endsOn: "2026-09-05" },
+      storeNameValue: "LOJA",
+      dayAggs: [day("s1", "2026-09-05", 100)],
+      sellerDayAggs: [seller("2026-09-05", "ANA", 40, 1)],
+      namedSellerDayAggs: named,
+      team,
+      today: "2026-09-05",
+    };
+    const card = buildGoalCardView(input);
+    const by = new Map(card.sellers.map((l) => [l.name, l]));
+    expect(by.has("LOJA")).toBe(false);
+    expect(by.has("GER")).toBe(false);
+    expect(by.get("ANA")!.revenueAmount).toBeCloseTo(55);
+    expect(by.get("BIA")!.revenueAmount).toBeCloseTo(15);
+    expect(card.band.outsideBranchUser).toBeCloseTo(20);
+    expect(card.band.outsideManagement).toBeCloseTo(10);
+    expect(card.band.outsideUnidentified).toBeCloseTo(0);
+    expect(card.band.unidentifiedSpread).toBeCloseTo(30);
+    expect(card.band.outsideTeam).toBeCloseTo(30);
+
+    const kept = buildGoalCardView({ ...input, goal: { ...input.goal, spreadUnidentified: false } });
+    const keptBy = new Map(kept.sellers.map((l) => [l.name, l]));
+    expect(keptBy.get("ANA")!.revenueAmount).toBeCloseTo(40);
+    expect(keptBy.get("BIA")!.revenueAmount).toBeCloseTo(0);
+    expect(kept.band.outsideUnidentified).toBeCloseTo(30);
+    expect(kept.band.outsideTeam).toBeCloseTo(60);
+  });
 });

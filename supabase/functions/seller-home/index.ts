@@ -9,6 +9,7 @@ import { corsHeaders, serve } from "../_shared/cors.ts";
 import { buildSellerHome, type SellerChallengeInput, type SellerChallengePrize, type SellerHomeInput } from "../_shared/engine/sellerHome.ts";
 import type { SellerProductDay } from "../_shared/engine/sellerChallenge.ts";
 import { endOfMonth, startOfMonth, dateToIso, addDays } from "../_shared/engine/format.ts";
+import { resolveBranchSellerId } from "../_shared/engine/branchUser.ts";
 import { excludeNonSalesPeople, goalFromRow, sellerDayFromRow, teamMemberFromRow } from "../_shared/engine/goalRows.ts";
 import type { DayHours, Dow, StoreWeekHours } from "../_shared/engine/goalWeights.ts";
 
@@ -184,11 +185,11 @@ serve(async (req) => {
       ),
       allPages(
         admin.from("store_seller")
-          .select("store_id, millennium_employee_id, millennium_gerador_id, name, name_keys, active, erp_role, admitted_on, departed_on, shift_id, store_shift(name)")
+          .select("id, store_id, code, millennium_employee_id, millennium_gerador_id, name, name_keys, active, erp_role, admitted_on, departed_on, shift_id, store_shift(name)")
           .eq("tenant_id", membership.tenant_id).in("store_id", storeIds).order("name"),
       ),
       allPages(
-        admin.from("goal").select("id, store_id, name, starts_on, ends_on, target_cents, tier_mode, tiers, groups")
+        admin.from("goal").select("id, store_id, name, starts_on, ends_on, target_cents, tier_mode, tiers, groups, spread_unidentified")
           .eq("tenant_id", membership.tenant_id).in("store_id", storeIds).lte("starts_on", today).gte("ends_on", from)
           .order("starts_on", { ascending: false }),
       ),
@@ -234,7 +235,28 @@ serve(async (req) => {
         .map((r) => ({ code: String(r.product_code), typeId: Number(r.type_id) }));
     }
 
-    const team = teamRows.map(teamMemberFromRow);
+    const branchStores = await allPages(
+      admin.from("store").select("id, code, millennium_store_id, branch_user_chosen, branch_user_seller_id").in("id", storeIds),
+    );
+    const branchSellerId = new Map<string, string | null>();
+    for (const store of branchStores) {
+      branchSellerId.set(
+        String(store.id),
+        resolveBranchSellerId({
+          chosen: store.branch_user_chosen === true,
+          chosenSellerId: store.branch_user_seller_id == null ? null : String(store.branch_user_seller_id),
+          sellers: teamRows.map((r) => ({ id: String(r.id), code: r.code == null ? null : String(r.code), storeId: String(r.store_id) })),
+          storeId: String(store.id),
+          branchCode: store.code == null ? String(store.millennium_store_id) : String(store.code),
+          millenniumBranch: Number(store.millennium_store_id),
+        }),
+      );
+    }
+    const team = teamRows.map((row) => {
+      const member = teamMemberFromRow(row);
+      if (branchSellerId.get(String(row.store_id)) !== String(row.id)) return member;
+      return { ...member, branchUser: true, salesPerson: false };
+    });
     const nonSales = {
       employeeIds: new Set(team.filter((m) => !m.salesPerson && m.employeeId != null).map((m) => m.employeeId as number)),
       generatorIds: new Set(team.filter((m) => !m.salesPerson && m.generatorId != null).map((m) => m.generatorId as number)),
@@ -253,6 +275,7 @@ serve(async (req) => {
         itemCount: Number(r.item_count) || 0, cmvCents: r.cmv_cents == null ? undefined : Number(r.cmv_cents),
       })),
       sellerDayAggs: excludeNonSalesPeople(sellerRows.map(sellerDayFromRow), nonSales),
+      namedSellerDayAggs: sellerRows.map(sellerDayFromRow),
       team,
       sellerProducts,
       productTypes,

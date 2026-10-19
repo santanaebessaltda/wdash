@@ -10,7 +10,9 @@ import {
   type TeamAggInput,
   type TeamMemberDetail,
 } from "@/data/wedash/dashboard";
-import { fetchSalesDayAggs, fetchSalesSellerDayAggs, fetchSellerShifts } from "@/data/wedash/salesRepo";
+import { excludeNonSalesPeople, fetchNamedSellerDayAggs, fetchSalesDayAggs, fetchSalesOrigins, fetchSalesSellerDayAggs, fetchSellerShifts } from "@/data/wedash/salesRepo";
+import { unionOriginKeys } from "@/data/wedash/engine/salesOrigin";
+import { getSupabase } from "@/lib/supabase";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
@@ -25,12 +27,16 @@ export async function fetchTeamAggInput(tenantId: string, scope: Scope): Promise
   const period = resolvePeriod(scope.period, calendarTodayIso());
   const range = productsFetchRange(scope);
   const storeIds = scope.storeIds;
-  const [dayAggs, sellerDayAggs, sellerShifts] = await Promise.all([
+  const client = getSupabase();
+  const sellerQuery = { tenantId, storeIds, from: range.from, to: range.to };
+  const [dayAggs, namedSellerDayAggs, origins, sellerShifts] = await Promise.all([
     fetchSalesDayAggs({ tenantId, storeIds, from: period.start, to: period.end, brand: null }),
-    fetchSalesSellerDayAggs({ tenantId, storeIds, from: range.from, to: range.to }),
+    fetchNamedSellerDayAggs(sellerQuery),
+    client ? fetchSalesOrigins(client, tenantId) : Promise.resolve(null),
     fetchSellerShifts(tenantId),
   ]);
-  return { dayAggs, sellerDayAggs, sellerShifts };
+  const sellerDayAggs = origins ? excludeNonSalesPeople(namedSellerDayAggs, unionOriginKeys(origins)) : await fetchSalesSellerDayAggs(sellerQuery);
+  return { dayAggs, sellerDayAggs, namedSellerDayAggs, ...(origins ? { origins } : {}), sellerShifts };
 }
 
 type Selection = { key: string; name: string };

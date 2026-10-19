@@ -185,6 +185,8 @@ export function sellerGoalLevels(input: {
   goals: GoalRecord[];
   dayAggs: SalesDayAgg[];
   sellerDayAggs: SalesSellerDayAgg[];
+  /** Vendas com nome, inclusive usuário da filial e gerência. Sem isto o rateio não separa essas origens. */
+  namedSellerDayAggs?: SalesSellerDayAgg[];
   team: GoalTeamMember[];
   today: string;
 }): Map<string, SellerGoalLevel> {
@@ -192,7 +194,15 @@ export function sellerGoalLevels(input: {
   for (const goal of input.goals) {
     const status = goalStatus(goal, input.today);
     if (status === "upcoming") continue;
-    const view = buildGoalCardView({ goal, storeNameValue: "", dayAggs: input.dayAggs, sellerDayAggs: input.sellerDayAggs, team: input.team, today: input.today });
+    const view = buildGoalCardView({
+      goal,
+      storeNameValue: "",
+      dayAggs: input.dayAggs,
+      sellerDayAggs: input.sellerDayAggs,
+      namedSellerDayAggs: input.namedSellerDayAggs,
+      team: input.team,
+      today: input.today,
+    });
     for (const r of view.sellers) {
       if (r.noGoal) continue;
       const current = best.get(r.employeeId);
@@ -318,11 +328,48 @@ type Person = Acc & {
  * GROUP: o grupo sobe pela soma e a meta do grupo nao encolhe; a premiacao e o bonus pesam pelos dias presentes.
  * GENERAL: a loja sobe pelo total; cada dia se divide so entre quem estava naquele dia. Sem data de admissao = periodo cheio.
  */
+/** Partes inteiras; o resto vai para as primeiras, para a soma fechar. */
+function splitEven(total: number, parts: number): number[] {
+  if (parts <= 0) return [];
+  const safe = Math.max(0, Math.floor(total));
+  const base = Math.floor(safe / parts);
+  let rest = safe - base * parts;
+  return Array.from({ length: parts }, () => base + (rest-- > 0 ? 1 : 0));
+}
+
+function joinPt(parts: string[]): string {
+  if (parts.length <= 1) return parts[0] ?? "";
+  return `${parts.slice(0, -1).join(", ")} e ${parts[parts.length - 1]}`;
+}
+
+/** Frase da faixa da meta. Sem a separação, mantém o texto único de antes. */
+export function outsideRankingNote(goal: NetworkGlobalGoal): string | null {
+  if (goal.outsideUnidentified == null) {
+    return goal.outsideTeam
+      ? `Inclui ${brlCent(goal.outsideTeam)} de vendas sem vendedor identificado ou realizadas pela gerência, fora do ranking.`
+      : null;
+  }
+  const unidentified = goal.outsideUnidentified ?? 0;
+  const branchUser = goal.outsideBranchUser ?? 0;
+  const management = goal.outsideManagement ?? 0;
+  const parts: string[] = [];
+  if (unidentified > 0) parts.push(`${brlCent(unidentified)} de vendas sem vendedor identificado`);
+  if (branchUser > 0) parts.push(`${brlCent(branchUser)} do usuário da filial`);
+  if (management > 0) parts.push(`${brlCent(management)} da gerência`);
+  const spread = goal.unidentifiedSpread ?? 0;
+  const chunks: string[] = [];
+  if (spread > 0) chunks.push(`${brlCent(spread)} de vendas sem vendedor identificado foram rateadas entre os vendedores.`);
+  if (parts.length > 0) chunks.push(`Inclui ${joinPt(parts)}, fora do ranking.`);
+  return chunks.length > 0 ? chunks.join(" ") : null;
+}
+
 export function buildGoalCardView(input: {
   goal: GoalRecord;
   storeNameValue: string;
   dayAggs: SalesDayAgg[];
   sellerDayAggs: SalesSellerDayAgg[];
+  /** Todas as vendas com vendedor, para separar sem vendedor, usuário da filial e gerência. */
+  namedSellerDayAggs?: SalesSellerDayAgg[];
   team: GoalTeamMember[];
   today: string;
 }): GoalCardView {
@@ -396,6 +443,81 @@ export function buildGoalCardView(input: {
     }
     people.push({ ...a, revenue, sales, items, days, presence });
   }
+
+  const named = input.namedSellerDayAggs;
+  let outsideUnidentified: number | undefined;
+  let outsideBranchUser: number | undefined;
+  let outsideManagement: number | undefined;
+  let unidentifiedSpread = 0;
+  if (named && status !== "upcoming") {
+    const bucketOf = (r: SalesSellerDayAgg): "branch" | "management" | "team" => {
+      const member = r.sellerEmployeeId != null ? byCode.get(r.sellerEmployeeId) : byName.get(r.sellerKey);
+      if (member?.branchUser) return "branch";
+      if (member && !member.salesPerson) return "management";
+      return "team";
+    };
+    const storeDayCents = new Map<string, { revenue: number; sales: number; items: number }>();
+    for (const a of input.dayAggs) {
+      if (a.brand !== "ALL" || a.storeId !== g.storeId || a.day < g.startsOn || a.day > g.endsOn) continue;
+      const cur = storeDayCents.get(a.day) ?? { revenue: 0, sales: 0, items: 0 };
+      cur.revenue += a.revenueCents;
+      cur.sales += a.salesCount;
+      cur.items += a.itemCount ?? 0;
+      storeDayCents.set(a.day, cur);
+    }
+    const namedDay = new Map<string, { revenue: number; sales: number; items: number }>();
+    let branchCents = 0;
+    let managementCents = 0;
+    for (const r of named) {
+      if (r.storeId !== g.storeId || r.day < g.startsOn || r.day > g.endsOn) continue;
+      const cur = namedDay.get(r.day) ?? { revenue: 0, sales: 0, items: 0 };
+      cur.revenue += r.revenueCents;
+      cur.sales += r.salesCount;
+      cur.items += r.itemCount ?? 0;
+      namedDay.set(r.day, cur);
+      const bucket = bucketOf(r);
+      if (bucket === "branch") branchCents += r.revenueCents;
+      else if (bucket === "management") managementCents += r.revenueCents;
+    }
+    const days = new Set([...storeDayCents.keys(), ...namedDay.keys()]);
+    let unidentifiedCents = 0;
+    const gaps: { day: string; revenue: number; sales: number; items: number }[] = [];
+    for (const day of days) {
+      const store = storeDayCents.get(day) ?? { revenue: 0, sales: 0, items: 0 };
+      const attributed = namedDay.get(day) ?? { revenue: 0, sales: 0, items: 0 };
+      const gap = {
+        day,
+        revenue: Math.max(0, store.revenue - attributed.revenue),
+        sales: Math.max(0, store.sales - attributed.sales),
+        items: Math.max(0, store.items - attributed.items),
+      };
+      unidentifiedCents += gap.revenue;
+      gaps.push(gap);
+    }
+    if (g.spreadUnidentified && g.tierMode !== "GENERAL") {
+      for (const gap of gaps) {
+        const present = people.filter((p) => p.presence.has(gap.day)).sort((a, b) => a.key.localeCompare(b.key));
+        if (present.length === 0) continue;
+        const revenue = splitEven(gap.revenue, present.length);
+        const sales = splitEven(gap.sales, present.length);
+        const items = splitEven(gap.items, present.length);
+        present.forEach((p, i) => {
+          const share = revenue[i] ?? 0;
+          unidentifiedSpread += share;
+          unidentifiedCents -= share;
+          p.revenue += share / 100;
+          p.sales += sales[i] ?? 0;
+          p.items += items[i] ?? 0;
+          if (share > 0) p.days.add(gap.day);
+        });
+      }
+    }
+    outsideUnidentified = unidentifiedCents / 100;
+    outsideBranchUser = branchCents / 100;
+    outsideManagement = managementCents / 100;
+    unidentifiedSpread /= 100;
+  }
+
   const n = people.length;
   const general = g.tierMode === "GENERAL";
   const individual = g.tierMode === "INDIVIDUAL";
@@ -534,6 +656,14 @@ export function buildGoalCardView(input: {
     competenceText: g.name,
     achieved,
     outsideTeam: general ? 0 : Math.max(0, achieved - teamTotal),
+    ...(outsideUnidentified != null
+      ? {
+          outsideUnidentified: general ? 0 : outsideUnidentified,
+          outsideBranchUser: general ? 0 : outsideBranchUser,
+          outsideManagement: general ? 0 : outsideManagement,
+          unidentifiedSpread: general ? 0 : unidentifiedSpread,
+        }
+      : {}),
     total: g.target,
     pct,
     projectedPct: status === "upcoming" ? 0 : projectedPct(pct, g, today),

@@ -14,7 +14,7 @@ import {
   type TeamAggInput,
   type TeamMemberRow,
 } from "@/data/wedash/dashboard";
-import { fetchSalesCoverage, fetchSalesDayAggs, fetchSalesSellerDayAggs } from "@/data/wedash/salesRepo";
+import { fetchNamedSellerDayAggs, fetchSalesCoverage, fetchSalesDayAggs, fetchSalesSellerDayAggs } from "@/data/wedash/salesRepo";
 import { fetchGoals, fetchGoalTeam, type GoalRecord, type GoalTeamMember } from "@/data/wedash/goalsRepo";
 import { buildGoalCardView, goalStatus, sellerGoalLevels } from "@/data/wedash/goalView";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
@@ -62,8 +62,8 @@ import {
   periodDisplayLabel,
 } from "@/pages/dashboard/periodPicker";
 
-type GoalsData = { goals: GoalRecord[]; dayAggs: SalesDayAgg[]; sellerAggs: SalesSellerDayAgg[]; team: GoalTeamMember[] };
-const GOALS_EMPTY: GoalsData = { goals: [], dayAggs: [], sellerAggs: [], team: [] };
+type GoalsData = { goals: GoalRecord[]; dayAggs: SalesDayAgg[]; sellerAggs: SalesSellerDayAgg[]; namedAggs: SalesSellerDayAgg[]; team: GoalTeamMember[] };
+const GOALS_EMPTY: GoalsData = { goals: [], dayAggs: [], sellerAggs: [], namedAggs: [], team: [] };
 
 /** Metas das lojas do filtro que cruzam o periodo; vendas do inicio de cada meta ate hoje (igual ao detalhe da meta). */
 async function fetchGoalsData(tenantId: string, scope: Scope, sessionStores: string[]): Promise<GoalsData> {
@@ -77,12 +77,13 @@ async function fetchGoalsData(tenantId: string, scope: Scope, sessionStores: str
   const end = goals.reduce((m, g) => (g.endsOn > m ? g.endsOn : m), goals[0]!.endsOn);
   const to = end < today ? end : today;
   const query = { tenantId, storeIds: storeRows, from, to };
-  const [dayAggs, sellerAggs, team] = await Promise.all([
+  const [dayAggs, sellerAggs, namedAggs, team] = await Promise.all([
     from <= to ? fetchSalesDayAggs({ ...query, brand: "ALL" }) : Promise.resolve([]),
     from <= to ? fetchSalesSellerDayAggs(query) : Promise.resolve([]),
+    from <= to ? fetchNamedSellerDayAggs(query) : Promise.resolve([]),
     fetchGoalTeam(tenantId, storeRows),
   ]);
-  return { goals, dayAggs, sellerAggs, team };
+  return { goals, dayAggs, sellerAggs, namedAggs, team };
 }
 
 type ChallengesData = { challenges: ChallengeRecord[]; aggs: ChallengeAggInput };
@@ -264,6 +265,7 @@ export function TeamPage() {
           storeNameValue: storeName.get(goal.storeId) ?? "Filial",
           dayAggs: goalsData.dayAggs,
           sellerDayAggs: goalsData.sellerAggs,
+          namedSellerDayAggs: goalsData.namedAggs,
           team: goalsData.team,
           today: todayIso,
         }),
@@ -296,6 +298,7 @@ export function TeamPage() {
         goals: goalsData.goals,
         dayAggs: goalsData.dayAggs,
         sellerDayAggs: goalsData.sellerAggs,
+        namedSellerDayAggs: goalsData.namedAggs,
         team: goalsData.team,
         today: todayIso,
       }),
@@ -520,25 +523,27 @@ export function TeamPage() {
               <CardHeader>
                 <div className="flex items-center gap-1.5">
                   <CardTitle>Composição do faturamento</CardTitle>
-                  <TipHelp label="Mostra quanto do faturamento foi atribuído à equipe e quanto veio de vendas sem vendedor identificado ou realizadas pela gerência." />
+                  <TipHelp label="Mostra quanto do faturamento foi atribuído à equipe, quanto ficou sem vendedor identificado, quanto foi lançado no usuário da filial e quanto foi da gerência." />
                 </div>
               </CardHeader>
               {view.composition.total <= 0 ? (
                 <EmptyBlock />
               ) : (
                 (() => {
-                  const { team, excluded, total, shift } = view.composition;
+                  const { team, unidentified, branchUser, management, total, shift } = view.composition;
+                  const fora = [
+                    { name: "Sem vendedor identificado", amount: unidentified, color: COLOR_NEUTRA },
+                    { name: "Usuário da filial", amount: branchUser, color: "var(--info)" },
+                    { name: "Gerência", amount: management, color: "var(--warn)" },
+                  ];
                   const fatias = (
                     shift != null && view.shiftFilter
                       ? [
                           { name: view.shiftFilter, amount: shift, color: "var(--acc)" },
-                          { name: "Demais da equipe", amount: Math.max(0, team - shift), color: "var(--info)" },
-                          { name: "Sem vendedor identificado ou gerência", amount: excluded, color: COLOR_NEUTRA },
+                          { name: "Demais da equipe", amount: Math.max(0, team - shift), color: "color-mix(in srgb, var(--acc) 45%, var(--info))" },
+                          ...fora,
                         ]
-                      : [
-                          { name: "Equipe de vendas", amount: team, color: "var(--acc)" },
-                          { name: "Sem vendedor identificado ou gerência", amount: excluded, color: COLOR_NEUTRA },
-                        ]
+                      : [{ name: "Equipe de vendas", amount: team, color: "var(--acc)" }, ...fora]
                   ).filter((f) => f.amount > 0);
                   return (
                     <div className="flex flex-1 flex-col justify-center px-4 pb-4">
@@ -572,7 +577,7 @@ export function TeamPage() {
           <Card className="mt-4 min-w-0 overflow-hidden" padding="lg">
             <div className="mb-4 flex items-center gap-1.5">
               <CardTitle>Desempenho da equipe</CardTitle>
-              <TipHelp label={"Acompanhe ranking, desafios e metas da equipe no período.\n\nVendas sem vendedor identificado ou realizadas pela gerência não entram no ranking."} />
+              <TipHelp label={"Acompanhe ranking, desafios e metas da equipe no período.\n\nVendas sem vendedor identificado, do usuário da filial ou realizadas pela gerência não entram no ranking. A meta pode ratear só a venda sem vendedor."} />
             </div>
             {printing ? (
               !hasTeamSales ? <EmptyBlock /> : abaRanking()

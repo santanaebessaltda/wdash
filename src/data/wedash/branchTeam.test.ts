@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { branchRoleLabel, isActiveSalesPerson, isBranchSalesPerson, isBranchTeamMember, isBranchUser, teamRoleLabel } from "./stores";
+import { branchRoleLabel, isActiveSalesPerson, isBranchSalesPerson, isBranchTeamMember, isBranchUser, isResolvedBranchUser, teamRoleLabel } from "./stores";
 
 const campoGrande = { branchCode: "00386", millenniumBranch: 386 };
 
@@ -70,5 +70,16 @@ describe("teamRoleLabel", () => {
     expect(teamRoleLabel({ role: "GERENCIA", code: "999" }, campoGrande)).toBe("Gerente");
     expect(teamRoleLabel({ role: "VENDEDOR", code: "10" }, campoGrande)).toBe("Vendedor");
     expect(teamRoleLabel({ role: "OPERADOR DE CAIXA", code: "665" }, campoGrande)).toBe("Operador de caixa");
+  });
+
+  it("uses the chosen person and leaves the code match as a seller", () => {
+    const chosen = { ...campoGrande, branchUserChosen: true, branchUserSellerId: "freelancer" };
+    const freelancer = { id: "freelancer", role: "VENDEDOR", code: "999" };
+    const codeMatch = { id: "real", role: "VENDEDOR", code: "386" };
+    expect(isResolvedBranchUser(freelancer, chosen)).toBe(true);
+    expect(isResolvedBranchUser(codeMatch, chosen)).toBe(false);
+    expect(teamRoleLabel(freelancer, chosen)).toBe("Usuário da filial");
+    expect(teamRoleLabel(codeMatch, chosen)).toBe("Vendedor");
+    expect(isResolvedBranchUser(codeMatch, { ...campoGrande, branchUserChosen: true, branchUserSellerId: null })).toBe(false);
   });
 });

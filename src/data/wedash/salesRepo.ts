@@ -1,11 +1,13 @@
 import { getSupabase } from "@/lib/supabase";
 import { shiftName } from "@/lib/format";
+import { resolveBranchSellerId } from "./engine/branchUser";
 import {
   excludeNonSalesPeople,
   sellerDayFromRow,
   type NonSalesPeople,
   type SellerDayRow,
 } from "./engine/goalRows";
+import { emptyOriginKeys, unionOriginKeys, type SalesOriginIndex } from "./engine/salesOrigin";
 import {
   applyFillToDayAggs,
   applyFillToProductCosts,
@@ -441,30 +443,87 @@ export async function fetchSalesPaymentDayAggs(
 
 export { excludeNonSalesPeople, type NonSalesPeople } from "./engine/goalRows";
 
-export async function fetchNonSalesPeople(client: SalesQueryClient, tenantId: string): Promise<NonSalesPeople> {
-  const out: NonSalesPeople = { employeeIds: new Set(), generatorIds: new Set(), storeNameKeys: new Set() };
+function addOriginKeys(
+  keys: NonSalesPeople,
+  row: { store_id: string; millennium_employee_id: number | null; millennium_gerador_id: number | null; name_keys: string[] | null },
+) {
+  if (row.millennium_employee_id != null) keys.employeeIds.add(Number(row.millennium_employee_id));
+  if (row.millennium_gerador_id != null) keys.generatorIds.add(Number(row.millennium_gerador_id));
+  for (const k of row.name_keys ?? []) keys.storeNameKeys.add(`${row.store_id}|${k}`);
+}
+
+/** Separa usuário da filial e gerência. O usuário da filial com cargo VENDEDOR também sai do ranking. */
+export async function fetchSalesOrigins(client: SalesQueryClient, tenantId: string): Promise<SalesOriginIndex> {
+  const branchUser = emptyOriginKeys();
+  const management = emptyOriginKeys();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (client.from("store_seller") as any)
-    .select("store_id, millennium_employee_id, millennium_gerador_id, name_keys")
+  const sellersQuery = await (client.from("store_seller") as any)
+    .select("id, store_id, code, millennium_employee_id, millennium_gerador_id, name_keys, active, erp_role")
     .eq("tenant_id", tenantId)
-    .eq("active", true)
-    .not("erp_role", "is", null)
-    .neq("erp_role", "VENDEDOR");
-  if (error) {
-    console.warn("fetchNonSalesPeople:", error.message);
-    return out;
+    .limit(5000);
+  if (sellersQuery.error) {
+    console.warn("fetchSalesOrigins:", sellersQuery.error.message);
+    return { branchUser, management };
   }
-  for (const r of (data ?? []) as {
+  const sellers = (sellersQuery.data ?? []) as {
+    id: string;
     store_id: string;
+    code: string | null;
     millennium_employee_id: number | null;
     millennium_gerador_id: number | null;
     name_keys: string[] | null;
-  }[]) {
-    if (r.millennium_employee_id != null) out.employeeIds.add(Number(r.millennium_employee_id));
-    if (r.millennium_gerador_id != null) out.generatorIds.add(Number(r.millennium_gerador_id));
-    for (const k of r.name_keys ?? []) out.storeNameKeys.add(`${r.store_id}|${k}`);
+    active: boolean;
+    erp_role: string | null;
+  }[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const storeQuery = (cols: string) => (client.from("store") as any).select(cols).eq("tenant_id", tenantId);
+  let stores = await storeQuery("id, code, millennium_store_id, branch_user_chosen, branch_user_seller_id");
+  if (stores.error?.code === "42703") stores = await storeQuery("id, code, millennium_store_id");
+  if (stores.error) {
+    console.warn("fetchSalesOrigins:", stores.error.message);
+    return { branchUser, management };
   }
-  return out;
+  const branchByStore = new Map<string, string | null>();
+  for (const store of (stores.data ?? []) as {
+    id: string;
+    code: string | null;
+    millennium_store_id: number;
+    branch_user_chosen?: boolean | null;
+    branch_user_seller_id?: string | null;
+  }[]) {
+    branchByStore.set(
+      store.id,
+      resolveBranchSellerId({
+        chosen: store.branch_user_chosen === true,
+        chosenSellerId: store.branch_user_seller_id ?? null,
+        sellers: sellers.map((s) => ({ id: s.id, code: s.code, storeId: s.store_id })),
+        storeId: store.id,
+        branchCode: store.code || String(store.millennium_store_id),
+        millenniumBranch: Number(store.millennium_store_id),
+      }),
+    );
+  }
+  for (const row of sellers) {
+    if (branchByStore.get(row.store_id) === row.id) {
+      addOriginKeys(branchUser, row);
+      continue;
+    }
+    if (row.active && row.erp_role != null && row.erp_role !== "VENDEDOR") addOriginKeys(management, row);
+  }
+  return { branchUser, management };
+}
+
+export async function fetchNonSalesPeople(client: SalesQueryClient, tenantId: string): Promise<NonSalesPeople> {
+  return unionOriginKeys(await fetchSalesOrigins(client, tenantId));
+}
+
+export async function fetchNamedSellerDayAggs(
+  query: SalesSellerDayQuery,
+  clientOverride?: SalesQueryClient,
+): Promise<SalesSellerDayAgg[]> {
+  const client = clientOrNull(clientOverride);
+  if (!client) return [];
+  return (await querySellerDayRows(client, query)).map(sellerDayFromRow);
 }
 
 /** Funcionarias com turno definido em Configuracoes > Lojas (vazio se a migration de turnos nao existir). */
@@ -539,14 +598,7 @@ export async function fetchSellerAvatars(
   return out;
 }
 
-/** Receita diaria por vendedora (VENDEDOR_MILLENNIUM / VENDAS.Lista), sem gerencia / conta de freelancer. */
-export async function fetchSalesSellerDayAggs(
-  query: SalesSellerDayQuery,
-  clientOverride?: SalesQueryClient,
-): Promise<SalesSellerDayAgg[]> {
-  const client = clientOrNull(clientOverride);
-  if (!client) return [];
-
+async function querySellerDayRows(client: SalesQueryClient, query: SalesSellerDayQuery): Promise<SellerDayRow[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let q: any = (client.from("sales_seller_day_agg") as any)
     .select(
@@ -558,13 +610,19 @@ export async function fetchSalesSellerDayAggs(
 
   if (query.storeIds.length > 0) q = q.in("store_id", query.storeIds);
 
-  const ordered = q
-    .order("day", { ascending: true })
-    .order("store_id")
-    .order("seller_key")
-    .order("brand");
+  const ordered = q.order("day", { ascending: true }).order("store_id").order("seller_key").order("brand");
+  return fetchAllPages<SellerDayRow>(ordered, "fetchSalesSellerDayAggs");
+}
+
+/** Receita diaria por vendedora, sem gerência, usuário da filial e outros cargos fora da equipe. */
+export async function fetchSalesSellerDayAggs(
+  query: SalesSellerDayQuery,
+  clientOverride?: SalesQueryClient,
+): Promise<SalesSellerDayAgg[]> {
+  const client = clientOrNull(clientOverride);
+  if (!client) return [];
   const [rows, nonSales] = await Promise.all([
-    fetchAllPages<SellerDayRow>(ordered, "fetchSalesSellerDayAggs"),
+    querySellerDayRows(client, query),
     fetchNonSalesPeople(client, query.tenantId),
   ]);
   return excludeNonSalesPeople(rows.map(sellerDayFromRow), nonSales);

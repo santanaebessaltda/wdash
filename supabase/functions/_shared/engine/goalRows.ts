@@ -46,6 +46,7 @@ export type GoalRow = {
   tier_mode: string;
   tiers: unknown;
   groups: unknown;
+  spread_unidentified?: boolean | null;
 };
 
 export function goalFromRow(r: GoalRow): GoalRecord {
@@ -59,6 +60,7 @@ export function goalFromRow(r: GoalRow): GoalRecord {
     tierMode: r.tier_mode === "GROUP" ? "GROUP" : r.tier_mode === "GENERAL" ? "GENERAL" : "INDIVIDUAL",
     tiers: parseTiers(r.tiers),
     groups: parseGroups(r.groups),
+    spreadUnidentified: r.spread_unidentified === true,
   };
 }
 

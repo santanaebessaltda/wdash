@@ -1,7 +1,10 @@
 import { parseRentSeasons, type RentSeason } from "./rentSeason";
 import { defaultWeekHours, effectiveWeekHours, openHourFloor, closeHourCeil, parseWeekHours, type StoreWeekHours } from "./storeHours";
 import { collaboratorName, shiftName } from "@/lib/format";
+import { isBranchUser, millenniumCodeKey, resolveBranchSellerId } from "./engine/branchUser";
 import { SELLER_ROLE } from "./engine/goalRows";
+
+export { isBranchUser, millenniumCodeKey, resolveBranchSellerId };
 
 export type PointType = "SHOPPING" | "STREET";
 export type Division = "WEPINK" | "WPINK";
@@ -34,6 +37,10 @@ export interface Store {
   costTableId?: number | null;
   /** false = desativada: some do seletor e da operacao. Ausente = em operacao. */
   active?: boolean;
+  /** true = a escolha abaixo vale (null = nenhum). Ausente ou false = código igual ao da filial. */
+  branchUserChosen?: boolean;
+  /** store_seller.id escolhido como usuário da filial. */
+  branchUserSellerId?: string | null;
 }
 
 /** Tabela de custo do Millennium (product_cost_table). */
@@ -339,6 +346,8 @@ function rowToStore(r: {
   point_type?: string | null;
   cost_table_id?: number | string | null;
   active?: boolean | null;
+  branch_user_chosen?: boolean | null;
+  branch_user_seller_id?: string | null;
 }): Store {
   const hours = parseWeekHours(r.hours);
   const num = (v: number | string | null | undefined) => (v == null || v === "" ? null : Number(v));
@@ -370,6 +379,8 @@ function rowToStore(r: {
     },
     costTableId: num(r.cost_table_id),
     active: r.active !== false,
+    branchUserChosen: r.branch_user_chosen === true,
+    branchUserSellerId: r.branch_user_seller_id ?? null,
   });
 }
 
@@ -377,6 +388,7 @@ const STORE_COST_COLUMNS =
   "royalties_wepink_pct, royalties_wpink_pct, marketing_wepink_pct, marketing_wpink_pct, rent_wepink_pct, rent_wpink_pct, rent_min_cents, rent_seasons";
 const STORE_COST_TABLE_COLUMN = "cost_table_id";
 const STORE_POINT_TYPE_COLUMN = "point_type";
+const STORE_BRANCH_USER_COLUMNS = "branch_user_chosen, branch_user_seller_id";
 
 /**
  * Filtro de marca so faz sentido se alguma loja do escopo tem WPINK.
@@ -420,8 +432,9 @@ export async function hydrateSessionStores(tenantId: string, sessionStoreIds: st
         .order("code");
 
     let { data, error } = await query(
-      `${baseCols}, ${STORE_COST_COLUMNS}, ${STORE_COST_TABLE_COLUMN}, ${STORE_POINT_TYPE_COLUMN}`,
+      `${baseCols}, ${STORE_COST_COLUMNS}, ${STORE_COST_TABLE_COLUMN}, ${STORE_POINT_TYPE_COLUMN}, ${STORE_BRANCH_USER_COLUMNS}`,
     );
+    if (error?.code === "42703") ({ data, error } = await query(`${baseCols}, ${STORE_COST_COLUMNS}, ${STORE_COST_TABLE_COLUMN}, ${STORE_POINT_TYPE_COLUMN}`));
     // Banco sem as migrations de custos: segue sem eles em vez de cair no mock.
     if (error?.code === "42703") ({ data, error } = await query(`${baseCols}, ${STORE_COST_COLUMNS}, ${STORE_COST_TABLE_COLUMN}`));
     if (error?.code === "42703") ({ data, error } = await query(`${baseCols}, ${STORE_COST_COLUMNS}`));
@@ -463,10 +476,14 @@ async function selectStoreRows(
     if (opts.ids) q = q.in("id", opts.ids);
     return q;
   };
-  const full = STORE_BASE_COLUMNS + ", " + STORE_COST_COLUMNS + ", " + STORE_COST_TABLE_COLUMN + ", " + STORE_POINT_TYPE_COLUMN;
+  const full =
+    STORE_BASE_COLUMNS + ", " + STORE_COST_COLUMNS + ", " + STORE_COST_TABLE_COLUMN + ", " + STORE_POINT_TYPE_COLUMN + ", " + STORE_BRANCH_USER_COLUMNS;
+  const withoutBranch =
+    STORE_BASE_COLUMNS + ", " + STORE_COST_COLUMNS + ", " + STORE_COST_TABLE_COLUMN + ", " + STORE_POINT_TYPE_COLUMN;
   const withTable = STORE_BASE_COLUMNS + ", " + STORE_COST_COLUMNS + ", " + STORE_COST_TABLE_COLUMN;
   const withCost = STORE_BASE_COLUMNS + ", " + STORE_COST_COLUMNS;
   let { data, error } = await run(full);
+  if (error?.code === "42703") ({ data, error } = await run(withoutBranch));
   if (error?.code === "42703") ({ data, error } = await run(withTable));
   if (error?.code === "42703") ({ data, error } = await run(withCost));
   if (error?.code === "42703") ({ data, error } = await run(STORE_BASE_COLUMNS));
@@ -693,21 +710,17 @@ export interface StoreSeller {
 
 export { SELLER_ROLE };
 
-/** Código numérico do Millennium, sem zeros à esquerda. "00386" e 386 viram "386". */
-export function millenniumCodeKey(value: string | number | null | undefined): string | null {
-  if (value == null) return null;
-  const digits = String(value).replace(/\D/g, "").replace(/^0+/, "");
-  return digits || null;
-}
+type BranchChoice = {
+  branchCode: string;
+  millenniumBranch: number;
+  branchUserChosen?: boolean;
+  branchUserSellerId?: string | null;
+};
 
-/** Usuário da filial: o código da pessoa no Millennium é o código da filial. */
-export function isBranchUser(
-  sellerCode: string | null | undefined,
-  branch: { branchCode: string; millenniumBranch: number },
-): boolean {
-  const seller = millenniumCodeKey(sellerCode);
-  if (!seller) return false;
-  return seller === millenniumCodeKey(branch.branchCode) || seller === millenniumCodeKey(branch.millenniumBranch);
+/** Pessoa marcada como usuário da filial: a escolha da WDash, ou o código igual ao da filial. */
+export function isResolvedBranchUser(seller: { id?: string; code: string | null }, branch: BranchChoice): boolean {
+  if (branch.branchUserChosen) return seller.id === branch.branchUserSellerId;
+  return isBranchUser(seller.code, branch);
 }
 
 /** Na equipe de vendas agora: ativo com cargo VENDEDOR (gerência / conta de freelancer fica fora do ranking). */
@@ -717,10 +730,10 @@ export function isActiveSalesPerson(s: Pick<StoreSeller, "active" | "role">): bo
 
 /** Vendedor na tela Equipe, sem o usuário da filial. */
 export function isBranchSalesPerson(
-  s: Pick<StoreSeller, "active" | "role" | "code">,
-  branch: { branchCode: string; millenniumBranch: number },
+  s: Pick<StoreSeller, "active" | "role" | "code"> & { id?: string },
+  branch: BranchChoice,
 ): boolean {
-  return isActiveSalesPerson(s) && !isBranchUser(s.code, branch);
+  return isActiveSalesPerson(s) && !isResolvedBranchUser(s, branch);
 }
 
 /** Cargos que a tela Equipe lista. O ranking continua só com `isActiveSalesPerson`. */
@@ -728,10 +741,11 @@ const BRANCH_TEAM_ROLES = new Set<string>([SELLER_ROLE, "GERENCIA", "OPERADOR DE
 
 /** Ativo na lista da filial: vendedor, operador de caixa, gerência, ou o usuário da filial. Cargo null conta como vendedor. */
 export function isBranchTeamMember(
-  s: Pick<StoreSeller, "active" | "role"> & { code?: string | null },
-  branch?: { branchCode: string; millenniumBranch: number },
+  s: Pick<StoreSeller, "active" | "role"> & { id?: string; code?: string | null },
+  branch?: BranchChoice,
 ): boolean {
   if (!s.active) return false;
+  if (branch?.branchUserChosen && s.id != null && s.id === branch.branchUserSellerId) return true;
   if (s.role == null || BRANCH_TEAM_ROLES.has(s.role)) return true;
   return branch != null && isBranchUser(s.code, branch);
 }
@@ -746,12 +760,12 @@ export function branchRoleLabel(role: string | null): string {
   return role;
 }
 
-/** Cargo na Equipe. O código igual ao da filial aparece como Usuário da filial, qualquer que seja o cargo do Millennium. */
+/** Cargo na Equipe. A escolha da filial, ou o código igual ao da filial, aparece como Usuário da filial. */
 export function teamRoleLabel(
-  seller: Pick<StoreSeller, "role" | "code">,
-  branch: { branchCode: string; millenniumBranch: number },
+  seller: Pick<StoreSeller, "role" | "code"> & { id?: string },
+  branch: BranchChoice,
 ): string {
-  if (isBranchUser(seller.code, branch)) return "Usuário da filial";
+  if (isResolvedBranchUser(seller, branch)) return "Usuário da filial";
   return branchRoleLabel(seller.role);
 }
 
@@ -869,6 +883,18 @@ export async function deleteStoreShift(id: string): Promise<WriteResult> {
   const sb = getSupabase();
   if (!sb) return { ok: false, error: "Supabase não configurado" };
   const { error } = await sb.from("store_shift").delete().eq("id", id);
+  return error ? { ok: false, error: error.message } : { ok: true };
+}
+
+/** Grava o usuário da filial. `sellerId` null = nenhum. A sugestão pelo código deixa de valer. */
+export async function setBranchUser(storeId: string, sellerId: string | null): Promise<WriteResult> {
+  const { getSupabase } = await import("@/lib/supabase");
+  const sb = getSupabase();
+  if (!sb) return { ok: false, error: "Supabase não configurado" };
+  const { error } = await sb
+    .from("store")
+    .update({ branch_user_chosen: true, branch_user_seller_id: sellerId })
+    .eq("id", storeId);
   return error ? { ok: false, error: error.message } : { ok: true };
 }
 

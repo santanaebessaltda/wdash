@@ -1,5 +1,6 @@
 import { endOfMonth } from "@/lib/format";
 import { goals as fixtureGoals } from "./goals";
+import { resolveBranchSellerId } from "./engine/branchUser";
 import { goalFromRow, teamMemberFromRow, type GoalRow, type GoalTeamRow } from "./engine/goalRows";
 import type { GoalRecord, GoalTeamMember } from "./engine/goalTypes";
 
@@ -22,7 +23,8 @@ function fixtureRecords(): GoalRecord[] {
     }));
 }
 
-const COLS = "id, store_id, name, starts_on, ends_on, target_cents, tier_mode, tiers, groups";
+const COLS = "id, store_id, name, starts_on, ends_on, target_cents, tier_mode, tiers, groups, spread_unidentified";
+const COLS_WITHOUT_SPREAD = "id, store_id, name, starts_on, ends_on, target_cents, tier_mode, tiers, groups";
 
 export type GoalInput = Omit<GoalRecord, "id">;
 
@@ -42,6 +44,7 @@ export async function saveGoal(
     ends_on: g.endsOn,
     target_cents: Math.round(g.target * 100),
     tier_mode: g.tierMode,
+    spread_unidentified: g.spreadUnidentified === true,
     tiers: g.tiers.map((t) => ({
       name: t.name,
       minPct: t.minAttainmentPct,
@@ -83,26 +86,30 @@ export async function fetchGoals(q: { tenantId: string; storeIds: string[]; from
       .filter((g) => q.storeIds.includes(g.storeId) && g.startsOn <= q.to && g.endsOn >= q.from)
       .sort((a, b) => b.startsOn.localeCompare(a.startsOn));
   }
-  const { data, error } = await sb
-    .from("goal")
-    .select(COLS)
-    .eq("tenant_id", q.tenantId)
-    .in("store_id", q.storeIds)
-    .lte("starts_on", q.to)
-    .gte("ends_on", q.from)
-    .order("starts_on", { ascending: false });
+  const run = (cols: string) =>
+    sb
+      .from("goal")
+      .select(cols)
+      .eq("tenant_id", q.tenantId)
+      .in("store_id", q.storeIds)
+      .lte("starts_on", q.to)
+      .gte("ends_on", q.from)
+      .order("starts_on", { ascending: false });
+  let { data, error } = await run(COLS);
+  if (error?.code === "42703") ({ data, error } = await run(COLS_WITHOUT_SPREAD));
   if (error) {
     console.warn("fetchGoals:", error.message);
     return [];
   }
-  return ((data ?? []) as GoalRow[]).map(goalFromRow);
+  return ((data ?? []) as unknown as GoalRow[]).map(goalFromRow);
 }
 
 export async function fetchGoal(tenantId: string, id: string): Promise<GoalRecord | null> {
   const { getSupabase } = await import("@/lib/supabase");
   const sb = getSupabase();
   if (!sb) return fixtureRecords().find((g) => g.id === id) ?? null;
-  const { data, error } = await sb.from("goal").select(COLS).eq("tenant_id", tenantId).eq("id", id).maybeSingle();
+  let { data, error } = await sb.from("goal").select(COLS).eq("tenant_id", tenantId).eq("id", id).maybeSingle();
+  if (error?.code === "42703") ({ data, error } = await sb.from("goal").select(COLS_WITHOUT_SPREAD).eq("tenant_id", tenantId).eq("id", id).maybeSingle());
   if (error) {
     console.warn("fetchGoal:", error.message);
     return null;
@@ -129,9 +136,9 @@ export async function fetchGoalTeam(tenantId: string, storeIds: string[]): Promi
   const sb = getSupabase();
   if (!sb) return [];
   const withTenure =
-    "store_id, millennium_employee_id, millennium_gerador_id, name, name_keys, active, erp_role, admitted_on, departed_on, shift_id, store_shift(name)";
+    "id, store_id, code, millennium_employee_id, millennium_gerador_id, name, name_keys, active, erp_role, admitted_on, departed_on, shift_id, store_shift(name)";
   const withoutTenure =
-    "store_id, millennium_employee_id, millennium_gerador_id, name, name_keys, active, erp_role, shift_id, store_shift(name)";
+    "id, store_id, code, millennium_employee_id, millennium_gerador_id, name, name_keys, active, erp_role, shift_id, store_shift(name)";
   let { data, error } = await sb.from("store_seller").select(withTenure).eq("tenant_id", tenantId).in("store_id", storeIds).limit(2000);
   if (error) {
     const again = await sb.from("store_seller").select(withoutTenure).eq("tenant_id", tenantId).in("store_id", storeIds).limit(2000);
@@ -142,5 +149,48 @@ export async function fetchGoalTeam(tenantId: string, storeIds: string[]): Promi
     console.warn("fetchGoalTeam:", error.message);
     return [];
   }
-  return ((data ?? []) as unknown as GoalTeamRow[]).map(teamMemberFromRow);
+  const rows = (data ?? []) as unknown as (GoalTeamRow & { id: string; code: string | null })[];
+  const members = rows.map(teamMemberFromRow);
+  return markBranchUsers(sb, tenantId, storeIds, rows, members);
+}
+
+async function markBranchUsers(
+  sb: NonNullable<Awaited<ReturnType<typeof import("@/lib/supabase").getSupabase>>>,
+  tenantId: string,
+  storeIds: string[],
+  rows: { id: string; store_id: string; code: string | null }[],
+  members: GoalTeamMember[],
+): Promise<GoalTeamMember[]> {
+  const full = "id, code, millennium_store_id, branch_user_chosen, branch_user_seller_id";
+  const plain = "id, code, millennium_store_id";
+  const first = await sb.from("store").select(full).eq("tenant_id", tenantId).in("id", storeIds);
+  const loaded = first.error?.code === "42703" ? await sb.from("store").select(plain).eq("tenant_id", tenantId).in("id", storeIds) : first;
+  if (loaded.error || !loaded.data) return members;
+  const stores = loaded.data as unknown as {
+    id: string;
+    code: string | null;
+    millennium_store_id: number;
+    branch_user_chosen?: boolean | null;
+    branch_user_seller_id?: string | null;
+  }[];
+  const sellers = rows.map((r) => ({ id: r.id, code: r.code, storeId: r.store_id }));
+  const branchId = new Map<string, string | null>();
+  for (const store of stores) {
+    branchId.set(
+      store.id,
+      resolveBranchSellerId({
+        chosen: store.branch_user_chosen === true,
+        chosenSellerId: store.branch_user_seller_id ?? null,
+        sellers,
+        storeId: store.id,
+        branchCode: store.code || String(store.millennium_store_id),
+        millenniumBranch: Number(store.millennium_store_id),
+      }),
+    );
+  }
+  return members.map((member, i) => {
+    const row = rows[i];
+    if (!row || branchId.get(row.store_id) !== row.id) return member;
+    return { ...member, branchUser: true, salesPerson: false };
+  });
 }

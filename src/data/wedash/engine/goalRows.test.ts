@@ -28,11 +28,13 @@ describe("goalFromRow", () => {
         { shiftId: "sh2", name: "TARDE", pct: 40 },
         { name: "SEM ID", pct: 10 },
       ],
+      spread_unidentified: true,
     });
     expect(goal.id).toBe("g1");
     expect(goal.storeId).toBe("s010");
     expect(goal.target).toBe(150000);
     expect(goal.tierMode).toBe("GROUP");
+    expect(goal.spreadUnidentified).toBe(true);
     expect(goal.tiers).toEqual([
       { name: "Meta", minAttainmentPct: 100, commissionPct: 1, bonus: 0 },
       { name: "Super", minAttainmentPct: 120, commissionPct: 2, bonus: 50, managerPct: 0.5, managerBonus: 200 },

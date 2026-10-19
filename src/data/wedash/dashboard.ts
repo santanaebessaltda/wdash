@@ -17,6 +17,7 @@ import { NOW, UPDATED_AT, TODAY_ISO, CURRENT_HOUR, SYNC_INTERVAL_MIN, LAST_SYNC,
 import { effectiveWeekHours, hourAxisRange, unionOpenWindow, type Dow } from "./storeHours";
 import { hourShares, periodDailyGoal, weekdayWeights } from "./goalCurve";
 import { sellerGoalLevels } from "./goalView";
+import { sellerOrigin } from "./engine/salesOrigin";
 import { dayAggregate, salesDay, salesDays, storeOpen, dayWeight, sumAggregates, type Aggregate } from "./sales";
 import { brl, brlCent, fullDate, shortDate, dayAxisLabel, dayPointDetail, isoToDate, delta as fmtDelta, hourSpan, endOfMonth, shortHour, startOfMonth, eachDay, labelUpper, monthYear, shortMonth, pct, addDays } from "@/lib/format";
 import type { TintKey } from "@/pages/dashboards/icons";
@@ -3426,8 +3427,17 @@ export interface TeamDashboardView {
   availableShifts: string[];
   /** Turno aplicado (null = todos; valor fora das opcoes vira null). */
   shiftFilter: string | null;
-  /** Faturamento das lojas = equipe + vendas sem vendedor identificado ou realizadas pela gerencia; `turno` = parte da equipe no turno filtrado. */
-  composition: { team: number; excluded: number; total: number; shift?: number };
+  /** Faturamento das lojas = equipe + sem vendedor + usuário da filial + gerência. `turno` = parte da equipe no turno filtrado. */
+  composition: {
+    team: number;
+    /** Soma do que ficou fora da equipe. */
+    excluded: number;
+    unidentified: number;
+    branchUser: number;
+    management: number;
+    total: number;
+    shift?: number;
+  };
   vsVariation: string;
   /** Mais de 1 loja no escopo  ->  mostra a loja de cada pessoa. */
   multiStore: boolean;
@@ -3436,6 +3446,9 @@ export interface TeamDashboardView {
 export type TeamAggInput = {
   dayAggs: import("./salesTypes").SalesDayAgg[];
   sellerDayAggs?: import("./salesTypes").SalesSellerDayAgg[];
+  /** Vendas com nome, para separar sem vendedor, usuário da filial e gerência. */
+  namedSellerDayAggs?: import("./salesTypes").SalesSellerDayAgg[];
+  origins?: import("./engine/salesOrigin").SalesOriginIndex;
   sellerShifts?: import("./salesTypes").SellerShiftRef[];
 };
 
@@ -3609,7 +3622,19 @@ export function buildTeamDashboardView(
   const storeCount = input.dayAggs
     .filter((r) => r.brand === "ALL" && storeIds.has(r.storeId) && inCurrent(r.day))
     .reduce((s, r) => s + r.revenueCents / 100, 0);
-  const excluded = Math.max(0, storeCount - teamTotal);
+  let branchUser = 0;
+  let management = 0;
+  if (input.namedSellerDayAggs && input.origins) {
+    for (const r of input.namedSellerDayAggs) {
+      if (!storeIds.has(r.storeId) || !inCurrent(r.day)) continue;
+      const origin = sellerOrigin(r, input.origins);
+      if (origin === "branchUser") branchUser += r.revenueCents / 100;
+      else if (origin === "management") management += r.revenueCents / 100;
+    }
+  }
+  const attributed = teamTotal + branchUser + management;
+  const unidentified = Math.max(0, storeCount - attributed);
+  const excluded = unidentified + branchUser + management;
 
   // Comparativos: so com venda no periodo atual (nunca 100%) e dado nos dois lados.
   const comparavel = totalCurrent.revenue > 0 && totalCmp.sales > 0 && totalPrev.sales > 0;
@@ -3626,7 +3651,7 @@ export function buildTeamDashboardView(
       amount: brlCent(totalCurrent.revenue),
       sub: n > 0 ? `${n} ${n === 1 ? "pessoa" : "pessoas"} · média de ${brlCent(totalCurrent.revenue / n)}` : undefined,
       delta: comparavel ? kpiDelta(totalCmp.revenue, totalPrev.revenue, vsCmp) : undefined,
-      tooltip: "Faturamento das vendas atribuídas à equipe. Não inclui vendas sem vendedor identificado ou realizadas pela gerência.",
+      tooltip: "Faturamento das vendas atribuídas à equipe. Não inclui vendas sem vendedor identificado, do usuário da filial ou realizadas pela gerência.",
     },
     {
       label: "Nº de vendas",
@@ -3660,6 +3685,9 @@ export function buildTeamDashboardView(
     composition: {
       team: teamTotal,
       excluded,
+      unidentified,
+      branchUser,
+      management,
       total: teamTotal + excluded,
       ...(shiftFilter ? { shift: totalCurrent.revenue } : {}),
     },
@@ -3917,6 +3945,8 @@ export type OverviewAggInput = {
   goalDayAggs?: import("./salesTypes").SalesDayAgg[];
   /** Vendas por pessoa do inicio das metas ate hoje (secao Meta do detalhe da pessoa). */
   goalSellerDayAggs?: import("./salesTypes").SalesSellerDayAgg[];
+  /** As mesmas vendas, com usuário da filial e gerência, para o rateio. */
+  goalNamedSellerDayAggs?: import("./salesTypes").SalesSellerDayAgg[];
   /** Equipe das lojas com meta (grupo de cada pessoa na meta). */
   goalTeam?: import("./goalsRepo").GoalTeamMember[];
 };
@@ -4693,6 +4723,7 @@ export function buildOverviewViewFromAggs(scope: Scope, input: OverviewAggInput)
     goals: goalsInPeriod,
     dayAggs: input.goalDayAggs ?? [],
     sellerDayAggs: input.goalSellerDayAggs ?? [],
+    namedSellerDayAggs: input.goalNamedSellerDayAggs,
     team: input.goalTeam ?? [],
     today: todayIso,
   });

@@ -15,7 +15,7 @@ import {
   type GoalStatus,
 } from "@/data/wedash/goalView";
 import { fetchGoal, fetchGoalTeam, type GoalRecord, type GoalTeamMember } from "@/data/wedash/goalsRepo";
-import { fetchSalesDayAggs, fetchSalesSellerDayAggs } from "@/data/wedash/salesRepo";
+import { fetchNamedSellerDayAggs, fetchSalesDayAggs, fetchSalesSellerDayAggs } from "@/data/wedash/salesRepo";
 import type { SalesDayAgg, SalesSellerDayAgg } from "@/data/wedash/salesTypes";
 import { storesForSession } from "@/data/wedash/stores";
 import type { GoalCardView } from "@/data/wedash/teamViews";
@@ -35,7 +35,7 @@ import { goalBackPath } from "@/pages/goals/backPath";
 import { paths } from "@/router/paths";
 import { useActiveSession } from "@/session/SessionProvider";
 
-type Loaded = { goal: GoalRecord | null; dayAggs: SalesDayAgg[]; sellerAggs: SalesSellerDayAgg[]; team: GoalTeamMember[] };
+type Loaded = { goal: GoalRecord | null; dayAggs: SalesDayAgg[]; sellerAggs: SalesSellerDayAgg[]; namedAggs: SalesSellerDayAgg[]; team: GoalTeamMember[] };
 
 const TipHelp = ({ label }: { label: string }) => (
   <Tooltip label={label}>
@@ -87,17 +87,19 @@ export default function GoalDetailPage() {
       const goal = await fetchGoal(session.tenantId, id);
       let dayAggs: SalesDayAgg[] = [];
       let sellerAggs: SalesSellerDayAgg[] = [];
+      let namedAggs: SalesSellerDayAgg[] = [];
       let team: GoalTeamMember[] = [];
       if (goal) {
         const to = goal.endsOn < today ? goal.endsOn : today;
         const query = { tenantId: session.tenantId, storeIds: [goal.storeId], from: goal.startsOn, to };
-        [dayAggs, sellerAggs, team] = await Promise.all([
+        [dayAggs, sellerAggs, namedAggs, team] = await Promise.all([
           goal.startsOn <= to ? fetchSalesDayAggs({ ...query, brand: "ALL" }) : Promise.resolve([]),
           goal.startsOn <= to ? fetchSalesSellerDayAggs(query) : Promise.resolve([]),
+          goal.startsOn <= to ? fetchNamedSellerDayAggs(query) : Promise.resolve([]),
           fetchGoalTeam(session.tenantId, [goal.storeId]),
         ]);
       }
-      if (!cancelled) setData({ goal, dayAggs, sellerAggs, team });
+      if (!cancelled) setData({ goal, dayAggs, sellerAggs, namedAggs, team });
     })();
     return () => {
       cancelled = true;
@@ -115,6 +117,7 @@ export default function GoalDetailPage() {
       storeNameValue: store?.tradeName ?? "Filial",
       dayAggs: data.dayAggs,
       sellerDayAggs: data.sellerAggs,
+      namedSellerDayAggs: data.namedAggs,
       team: data.team,
       today,
     });

@@ -1806,7 +1806,7 @@ describe("buildTeamDashboardView com agregados reais", () => {
       ["Manhã · 09:00–15:00", 300, 1],
       [TEAM_WITHOUT_SHIFT, 200, 1],
     ]);
-    expect(v.composition).toEqual({ team: 500, excluded: 100, total: 600 });
+    expect(v.composition).toEqual({ team: 500, excluded: 100, unidentified: 100, branchUser: 0, management: 0, total: 600 });
   });
 
   it("filtro de turno: KPIs e tabela só do turno; composição separa o turno do resto da equipe", () => {
@@ -1827,12 +1827,31 @@ describe("buildTeamDashboardView com agregados reais", () => {
     expect(v.kpis[0]?.amount).toMatch(/300,00$/);
     expect(v.kpis[0]?.delta).toMatchObject({ value: "200%", positive: true });
     expect(v.shifts).toHaveLength(2);
-    expect(v.composition).toEqual({ team: 500, excluded: 100, total: 600, shift: 300 });
+    expect(v.composition).toEqual({ team: 500, excluded: 100, unidentified: 100, branchUser: 0, management: 0, total: 600, shift: 300 });
 
     const withoutShift = buildTeamDashboardView(esc, input, { shift: TEAM_WITHOUT_SHIFT });
     expect(withoutShift.people.map((p) => p.name)).toEqual(["Bia"]);
     // Turno que nao existe no escopo = todos.
     expect(buildTeamDashboardView(esc, input, { shift: "Noite" }).shiftFilter).toBeNull();
+  });
+
+  it("separa sem vendedor, usuário da filial e gerência na composição", () => {
+    const origins = {
+      branchUser: { employeeIds: new Set([3]), generatorIds: new Set<number>(), storeNameKeys: new Set<string>() },
+      management: { employeeIds: new Set([4]), generatorIds: new Set<number>(), storeNameKeys: new Set<string>() },
+    };
+    const v = buildTeamDashboardView(esc, {
+      dayAggs: [day("2026-08-10", 100)],
+      sellerDayAggs: [vend("2026-08-10", "Ana", 40, 1, 1, { sellerEmployeeId: 1 })],
+      namedSellerDayAggs: [
+        vend("2026-08-10", "Ana", 40, 1, 1, { sellerEmployeeId: 1 }),
+        vend("2026-08-10", "Loja", 20, 1, 1, { sellerEmployeeId: 3 }),
+        vend("2026-08-10", "Ger", 10, 1, 1, { sellerEmployeeId: 4 }),
+      ],
+      origins,
+    });
+    expect(v.people.map((p) => p.name)).toEqual(["Ana"]);
+    expect(v.composition).toMatchObject({ team: 40, unidentified: 30, branchUser: 20, management: 10, excluded: 60, total: 100 });
   });
 
   it("sem venda no período: sem badge e sem pessoas", () => {
