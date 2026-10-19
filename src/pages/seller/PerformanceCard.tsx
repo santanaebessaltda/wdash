@@ -1,48 +1,14 @@
 import { useState } from "react";
-import { Badge, Card, CardTitle, ProgressBar, Segmented, Tabs } from "@/components/ui";
+import { Card, CardTitle, Segmented, Tabs } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { brlCent, num } from "@/data/wedash/engine/format";
-import type { MonthRankingEntry, SellerChallenge, SellerHomeStore } from "@/data/wedash/engine/sellerHome";
-import { shortDate } from "@/lib/format";
-import { statusBadgeVariant } from "@/lib/status";
+import type { MonthRankingEntry, SellerHomeStore } from "@/data/wedash/engine/sellerHome";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { FlameIcon, TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
 import { RankingBlock } from "@/pages/live/blocks";
 import type { RankingRow } from "@/data/wedash/live";
+import { SellerChallengeList } from "./ChallengeCard";
 import { PrizeCard } from "./PrizeCard";
-
-function placeLine(c: SellerChallenge): string | null {
-  if (c.status === "upcoming" || c.unavailable || c.result == null) return null;
-  if (c.won && c.position != null) return c.status === "ended" ? `Você ficou em ${c.position}º lugar` : `Você está em ${c.position}º lugar`;
-  if (c.won) return "Você atingiu o mínimo";
-  if (c.position != null) return `${c.position}º lugar`;
-  return null;
-}
-
-function ChallengeProgress({ challenge: c }: { challenge: SellerChallenge }) {
-  if (c.status === "upcoming") {
-    return <p className="mt-3 text-[13px] text-t2">Os resultados aparecerão quando o desafio começar.</p>;
-  }
-  if (c.unavailable) {
-    return (
-      <p className="mt-3 text-[13px] text-t2">
-        Resultado indisponível porque faltam dados de itens em pelo menos um dia com vendas.
-      </p>
-    );
-  }
-  const place = placeLine(c);
-  return (
-    <div className="mt-3 flex flex-col gap-1.5">
-      <p className="text-[12px] font-semibold text-t2">{c.metricLabel}</p>
-      <p className="font-mono text-[22px] font-extrabold leading-none text-t0">{c.result}</p>
-      {c.progressPct != null && <ProgressBar value={c.progressPct} color="var(--acc)" height={6} />}
-      {place && <p className={`text-[13px] font-semibold ${c.won ? "text-ok" : "text-t1"}`}>{place}</p>}
-      {c.gap && <p className="text-[13px] font-semibold text-t1">{c.gap}</p>}
-    </div>
-  );
-}
-
-const STATUS_LABEL = { active: "Em andamento", upcoming: "A começar", ended: "Encerrado" } as const;
 
 type RankingScope = "group" | "store";
 
@@ -144,35 +110,9 @@ export function PerformanceCard({ store, today, through, closed }: { store: Sell
             icon: <FlameIcon size={14} />,
             content:
               challenges.length === 0 ? (
-                <EmptyBlock icon="🔥" title="Desafio não configurado" description="Quando houver um desafio neste mês, ele aparecerá aqui." />
+                <EmptyBlock icon="🔥" title="Desafio não configurado" description="Quando houver um desafio neste período, ele aparecerá aqui." />
               ) : (
-                <ul className="flex flex-col gap-3">
-                  {challenges.map((c) => (
-                    <li key={c.id} className="rounded-xl border border-line bg-bg-2 p-4">
-                      <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <p className="text-[14px] font-bold text-t0">{c.name}</p>
-                        <Badge variant={statusBadgeVariant(STATUS_LABEL[c.status])}>{STATUS_LABEL[c.status]}</Badge>
-                      </div>
-                      <p className="mt-0.5 text-[12px] text-t2">
-                        {shortDate(c.startsOn)} a {shortDate(c.endsOn)}
-                      </p>
-                      {c.prize && <p className="mt-2 text-[13px] font-semibold text-t1">{c.prize}</p>}
-                      {c.rules.length > 0 && (
-                        <div className="mt-3 rounded-lg bg-bg-inset px-3 py-2.5">
-                          <p className="text-[11px] font-semibold uppercase tracking-wide text-t2">Como funciona</p>
-                          <ul className="mt-1.5 flex flex-col gap-1">
-                            {c.rules.map((rule) => (
-                              <li key={rule} className="text-[12.5px] leading-snug text-t1">
-                                {rule}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                      <ChallengeProgress challenge={c} />
-                    </li>
-                  ))}
-                </ul>
+                <SellerChallengeList challenges={challenges} today={today} through={through} closed={closed} />
               ),
           },
         ]}
