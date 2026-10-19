@@ -19,10 +19,12 @@ export interface StatCardProps {
   sub2?: string;
   /** Tooltip exibido ao passar o mouse no  ao lado do label. */
   tooltip?: string;
+  /** Substitui o tooltip padrão do badge de comparação. */
+  deltaTooltip?: string;
   className?: string;
 }
 
-export function StatCard({ label, value, icon, iconColor = "var(--acc)", iconBg = "var(--acc-soft)", delta, sparkline, sub, sub2, tooltip, className }: StatCardProps) {
+export function StatCard({ label, value, icon, iconColor = "var(--acc)", iconBg = "var(--acc-soft)", delta, sparkline, sub, sub2, tooltip, deltaTooltip, className }: StatCardProps) {
   return (
     <Card className={cn("min-w-0", className)}>
       <div className="flex items-center justify-between gap-2">
@@ -33,7 +35,7 @@ export function StatCard({ label, value, icon, iconColor = "var(--acc)", iconBg 
           {icon}
         </div>
         {delta && (() => {
-          const badgeLabel = deltaTip(delta);
+          const badgeLabel = deltaTooltip ?? deltaTip(delta);
           const badge = (
             <span
               className={cn(

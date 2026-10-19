@@ -26,7 +26,7 @@ function sellerHeadline(c: SellerChallenge, status: SellerChallenge["status"]): 
   if (c.won && c.position == null) return { label: null, value: "Você atingiu o mínimo" };
   if (c.position != null) {
     const result = c.result ? ` · ${c.result}` : "";
-    return { label: status === "ended" ? "Você ficou" : "Você está", value: `${c.position}º lugar${result}` };
+    return { label: null, value: `${c.position}º lugar${result}` };
   }
   if (c.result) return { label: c.metricLabel, value: c.result };
   return { label: null, value: "Sem resultado ainda" };
@@ -69,28 +69,26 @@ function SellerChallengeCard({
           {shortDate(c.startsOn)} a {shortDate(c.endsOn)}
           {prazo ? ` · ${prazo}` : ""}
         </p>
-        <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          <p className="min-w-0 text-[13px] text-t1">
-            <HeadlineText headline={sellerHeadline(c, status)} />
-          </p>
-          {c.prize && (
-            <p className="flex shrink-0 items-center gap-1 text-[12px] font-semibold text-t1">
-              <TrophyIcon size={13} className="text-warn" />
-              {c.prize}
-            </p>
-          )}
-        </div>
+        <p className="mt-2 min-w-0 text-[13px] text-t1">
+          <HeadlineText headline={sellerHeadline(c, status)} />
+        </p>
         {status !== "upcoming" && c.progressPct != null && (
           <div className="mt-2.5">
             <ProgressBar value={c.progressPct} color={c.won ? "var(--ok)" : "var(--acc)"} height={6} />
           </div>
         )}
         {status === "upcoming" ? (
-          <p className="mt-2 text-[12.5px] text-t2">Os resultados aparecerão quando o desafio começar.</p>
+          <p className="mt-2 text-[12.5px] text-t2">O resultado aparece quando o desafio começar.</p>
         ) : c.unavailable ? (
-          <p className="mt-2 text-[12.5px] text-t2">Faltam dados de itens em pelo menos um dia com vendas.</p>
+          <p className="mt-2 text-[12.5px] text-t2">Faltam dados de itens em parte do período.</p>
         ) : (
           c.gap && <p className="mt-2 text-[12.5px] font-semibold text-t1">{c.gap}</p>
+        )}
+        {c.prize && (
+          <p className="mt-2 flex items-center gap-1 text-[12px] text-t2">
+            <TrophyIcon size={13} />
+            {c.prize}
+          </p>
         )}
         {c.rules.length > 0 && (
           <div className="mt-2">
@@ -100,7 +98,7 @@ function SellerChallengeCard({
               aria-expanded={open}
               onClick={() => setOpen((v) => !v)}
             >
-              {open ? "Ocultar como funciona" : "Como funciona"}
+              {open ? "Fechar regras" : "Como funciona"}
             </button>
             {open && (
               <ul className="mt-1.5 flex flex-col gap-1">

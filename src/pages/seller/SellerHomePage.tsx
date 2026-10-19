@@ -73,7 +73,7 @@ export function SellerHomePage() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        title={firstName ? `Bem-vindo(a) de volta, ${firstName} 👋` : "Bem-vindo(a) de volta 👋"}
+        title={firstName ? `Olá, ${firstName} 👋` : "Olá 👋"}
         actions={
           <DateRangePicker
             value={dateRangeFromPeriod(period)}

@@ -31,6 +31,14 @@ const IconPa = () => (
 
 const KPI_ICONS = [IconRevenue, IconSales, IconTicket, IconPa];
 
+/** Comparação curta da tela do vendedor. O tooltip do gestor continua "Em relação a…". */
+function sellerDeltaTip(delta: { vs?: string; previous?: string }): string {
+  if (!delta.vs) return delta.previous ? `Período anterior: ${delta.previous}` : "";
+  const raw = delta.vs.replace(/^(os|o|a)\s+/i, "");
+  const label = raw.charAt(0).toUpperCase() + raw.slice(1);
+  return delta.previous ? `${label}: ${delta.previous}` : label;
+}
+
 /** Mesma paleta da Visao geral e do Financeiro. */
 const KPI_COLORS = [
   { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" },
@@ -54,13 +62,13 @@ export function NumbersCard({
   const pa = n.pa.value == null ? "—" : num(n.pa.value, 2);
   const cards: { label: string; value: string; delta?: (typeof n.revenue)["delta"]; tooltip?: string }[] = [
     { label: "Faturamento", value: brlCent(n.revenue.value ?? 0), delta: n.revenue.delta },
-    { label: "Nº de vendas", value: num(n.sales.value ?? 0, 0), delta: n.sales.delta },
+    { label: "Vendas", value: num(n.sales.value ?? 0, 0), delta: n.sales.delta },
     { label: "Ticket médio", value: brlCent(n.ticket.value ?? 0), delta: n.ticket.delta },
     {
       label: "P.A.",
       value: pa,
       delta: n.pa.delta,
-      tooltip: n.pa.value == null ? "O P.A. não está disponível para este período." : undefined,
+      tooltip: n.pa.value == null ? "Não há dados suficientes para calcular o P.A. neste período." : undefined,
     },
   ];
   return (
@@ -79,6 +87,7 @@ export function NumbersCard({
               iconColor={c.iconColor}
               iconBg={c.iconBg}
               delta={kpi.delta}
+              deltaTooltip={kpi.delta ? sellerDeltaTip(kpi.delta) : undefined}
               tooltip={kpi.tooltip}
             />
           );

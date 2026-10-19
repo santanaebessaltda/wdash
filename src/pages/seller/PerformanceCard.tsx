@@ -22,6 +22,8 @@ function RankingList({ ranking }: { ranking: MonthRankingEntry[] }) {
     revenue: r.revenue,
   }));
   const rest = ranking.slice(3);
+  const me = ranking.find((r) => r.me);
+  const onPodium = ranking.slice(0, 3).some((r) => r.me);
   return (
     <div>
       <RankingBlock ranking={podium} formatAmount={brlCent} />
@@ -41,6 +43,11 @@ function RankingList({ ranking }: { ranking: MonthRankingEntry[] }) {
             </li>
           ))}
         </ul>
+      )}
+      {me && !onPodium && (
+        <p className="mt-3 rounded-xl border border-acc bg-acc-soft px-3 py-2 text-[13px] font-extrabold text-acc">
+          {me.position}º · VOCÊ · {brlCent(me.revenue)}
+        </p>
       )}
     </div>
   );
@@ -67,10 +74,7 @@ export function PerformanceCard({ store, today, through, closed }: { store: Sell
             icon: <TrophyIcon size={14} />,
             content: (
               <div>
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-[12.5px] font-semibold text-t2">
-                    {scope === "group" && store.groupName ? `Grupo ${store.groupName}` : scope === "store" ? "Toda a loja" : "Sem grupo"}
-                  </p>
+                <div className="mb-3 flex flex-col items-start gap-1.5">
                   <Segmented
                     options={[
                       { value: "group", label: "Grupo" },
@@ -79,15 +83,18 @@ export function PerformanceCard({ store, today, through, closed }: { store: Sell
                     value={scope}
                     onChange={(v) => v && setScope(v)}
                   />
+                  <p className="text-[12px] font-semibold text-t2">
+                    {scope === "store" ? "Loja inteira" : store.groupName ? `Grupo ${store.groupName}` : "Sem grupo"}
+                  </p>
                 </div>
                 {ranking.length === 0 ? (
                   <EmptyBlock
                     icon="🏆"
-                    title={scope === "store" ? "Nenhum vendedor nesta loja" : "Nenhum vendedor neste grupo"}
+                    title={scope === "store" ? "Ninguém no ranking ainda" : "Ninguém neste grupo ainda"}
                     description={
                       scope === "store"
-                        ? "Quando houver vendedores nesta loja, o ranking aparecerá aqui."
-                        : "Quando houver vendedores vinculados a este grupo, o ranking aparecerá aqui."
+                        ? "O ranking aparece quando houver pessoas nesta loja."
+                        : "O ranking aparece quando houver pessoas neste grupo."
                     }
                   />
                 ) : (
