@@ -13,7 +13,7 @@ import { TABLE_PAGE_SIZE } from "@/lib/usePagedRows";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { ErpStatusNotice } from "@/pages/dashboard/ErpStatusNotice";
 import { ReportHeader, useExportPdf } from "@/pages/dashboard/ReportHeader";
-import { SectionHeader, SelectStoreCard } from "@/pages/operation/shared";
+import { SectionHeader } from "@/pages/operation/shared";
 import { HeaderFilter, HeaderSearch } from "@/pages/dashboard/HeaderFilter";
 import {
   ExportButton,
@@ -53,7 +53,7 @@ function transferTip(r: StockProductRow, multipleStores: boolean): string {
 const STATUS_WEIGHT: Record<StockStatus, number> = { negative: 2, awaiting: 1, ok: 0 };
 
 export function InventoryPage() {
-  const { storeRows, storeKey, escolher, view, loading, syncing, atualizadoText } = useStockData();
+  const { storeRows, storeKey, view, loading, syncing, atualizadoText } = useStockData();
   const [search, setSearch] = useState("");
   const [statusPicked, setStatus] = useState<StatusFilter>("todos");
   const [brand, setBrand] = useState<BrandFilter>("");
@@ -194,7 +194,7 @@ export function InventoryPage() {
         notices={
           <>
             <ErpStatusNotice dado="estoque" className="" />
-            {!escolher && !showSkeleton && view && nNegative > 0 && (
+            {!showSkeleton && view && nNegative > 0 && (
               <Alert
                 variant="warning"
                 title={nNegative === 1 ? "1 produto está com estoque negativo no Millennium" : `${nNegative} produtos estão com estoque negativo no Millennium`}
@@ -206,11 +206,7 @@ export function InventoryPage() {
         }
       />
 
-      {escolher ? (
-        <div className="max-w-[720px]">
-          <SelectStoreCard />
-        </div>
-      ) : showSkeleton || !view ? (
+      {showSkeleton || !view ? (
         <StockProductsSkeleton />
       ) : (
         <Card className="flex flex-col">

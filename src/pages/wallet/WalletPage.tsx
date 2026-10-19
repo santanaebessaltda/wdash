@@ -20,7 +20,8 @@ import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { CheckCircleIcon, FlameIcon, TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
 import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
-import type { Store } from "@/data/wedash/stores";
+import { fetchStoreSellers, type Store } from "@/data/wedash/stores";
+import { matchesCodeOrName } from "@/lib/personSearch";
 import { HeaderFilters } from "@/pages/stock/shared";
 
 const money = (cents: number) => brlCent(cents / 100);
@@ -274,13 +275,23 @@ function peopleValue(row: PersonRow, key: PeopleSort): number {
   return row.balanceCents;
 }
 
-function PeopleList({ rows, showStore, onOpen }: { rows: PersonRow[]; showStore: boolean; onOpen: (key: string) => void }) {
+function PeopleList({
+  rows,
+  showStore,
+  codes,
+  onOpen,
+}: {
+  rows: PersonRow[];
+  showStore: boolean;
+  codes: Map<string, string>;
+  onOpen: (key: string) => void;
+}) {
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<PeopleSort>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const sorted = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("pt-BR");
-    const list = query ? rows.filter((row) => row.name.toLocaleLowerCase("pt-BR").includes(query)) : rows;
+    const list = query ? rows.filter((row) => matchesCodeOrName(row.name, codes.get(rowKey(row)), query)) : rows;
     const dir = sortDir === "asc" ? 1 : -1;
     return [...list].sort((a, b) => {
       const cmp =
@@ -289,7 +300,7 @@ function PeopleList({ rows, showStore, onOpen }: { rows: PersonRow[]; showStore:
           : peopleValue(a, sortKey) - peopleValue(b, sortKey);
       return cmp * dir || a.name.localeCompare(b.name, "pt-BR");
     });
-  }, [rows, search, sortKey, sortDir]);
+  }, [rows, codes, search, sortKey, sortDir]);
   const { page, setPage, totalPages, pageRows } = usePagedRows(sorted, `${search}|${sortKey}|${sortDir}`);
   const total = useMemo(
     () => ({
@@ -319,7 +330,7 @@ function PeopleList({ rows, showStore, onOpen }: { rows: PersonRow[]; showStore:
       <div className="mb-4 flex flex-wrap items-center gap-2 sm:justify-end print:hidden">
         <input
           type="search"
-          placeholder="Buscar por nome…"
+          placeholder="Buscar por código ou nome…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className={cn(peopleSearchClass, "sm:w-56")}
@@ -329,7 +340,7 @@ function PeopleList({ rows, showStore, onOpen }: { rows: PersonRow[]; showStore:
         <EmptyBlock
           icon="🔍"
           title="Nenhuma pessoa encontrada"
-          description="Tente buscar por outro nome."
+          description="Tente outro código ou nome."
           action={
             <Button variant="outline" size="sm" onClick={() => setSearch("")}>
               Limpar busca
@@ -404,7 +415,17 @@ function PeopleList({ rows, showStore, onOpen }: { rows: PersonRow[]; showStore:
   );
 }
 
-function WalletBody({ rows, shortages, showStore }: { rows: PersonRow[]; shortages: ShortageBlock[]; showStore: boolean }) {
+function WalletBody({
+  rows,
+  shortages,
+  showStore,
+  codes,
+}: {
+  rows: PersonRow[];
+  shortages: ShortageBlock[];
+  showStore: boolean;
+  codes: Map<string, string>;
+}) {
   const [picked, setPicked] = useState<string | null>(null);
   const person = rows.find((row) => rowKey(row) === picked) ?? null;
   const close = useCallback(() => setPicked(null), []);
@@ -412,7 +433,7 @@ function WalletBody({ rows, shortages, showStore }: { rows: PersonRow[]; shortag
   return (
     <div className="flex flex-col gap-4">
       <Totals rows={rows} />
-      <PeopleList rows={rows} showStore={showStore} onOpen={setPicked} />
+      <PeopleList rows={rows} showStore={showStore} codes={codes} onOpen={setPicked} />
       <UnassignedShortage blocks={shortages} showStore={showStore} />
       {person ? <PersonDialog person={person} storeId={person.storeId} storeName={showStore ? person.storeName : undefined} onClose={close} /> : null}
     </div>
@@ -905,6 +926,7 @@ export function BranchWalletPage() {
   const [failed, setFailed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [printIds, setPrintIds] = useState<string[] | null>(null);
+  const [codes, setCodes] = useState<Map<string, string>>(() => new Map());
   const [pdfQueued, setPdfQueued] = useState(false);
   const printing = usePrintMode();
   const showSkeleton = useMinSkeleton(storesLoading || loading);
@@ -958,6 +980,29 @@ export function BranchWalletPage() {
     if (!storeKey) return;
     load();
   }, [load, storeKey]);
+
+  useEffect(() => {
+    const ids = storeKey ? storeKey.split(",") : [];
+    if (ids.length === 0) {
+      setCodes(new Map());
+      return;
+    }
+    let stop = false;
+    void fetchStoreSellers(session.tenantId, ids).then((map) => {
+      if (stop) return;
+      const next = new Map<string, string>();
+      for (const [storeId, people] of map) {
+        for (const person of people) {
+          const code = person.code?.trim();
+          if (code) next.set(`${storeId}:${person.id}`, code);
+        }
+      }
+      setCodes(next);
+    });
+    return () => {
+      stop = true;
+    };
+  }, [session.tenantId, storeKey]);
 
   useEffect(() => {
     const onSynced = () => load();
@@ -1035,7 +1080,7 @@ export function BranchWalletPage() {
             <EmptyBlock icon="👛" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
           </Card>
         ) : branches ? (
-          <WalletBody rows={rows} shortages={shortagesOf(visible)} showStore={showStore} />
+          <WalletBody rows={rows} shortages={shortagesOf(visible)} showStore={showStore} codes={codes} />
         ) : null}
       </div>
     </div>

@@ -18,6 +18,7 @@ import {
 } from "@/data/wedash/stores";
 import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { shiftName } from "@/lib/format";
+import { matchesCodeOrName } from "@/lib/personSearch";
 import { InviteSellerModal } from "@/pages/management/InviteSellerModal";
 import { GroupFormModal, ManageGroupsModal, groupProblem, nextGroupWindow } from "@/pages/management/SellerGroups";
 import { CostCardTitle, SAVE_ERROR_MSG, StoreCardsPage, useScopedStores } from "@/pages/operation/shared";
@@ -78,7 +79,7 @@ export function StaffPage() {
 
   useScreenRefresh({
     label: "Atualizar equipe",
-    tip: "Busca no Millennium a equipe desta filial.",
+    tip: storeRows.length > 1 ? "Busca no Millennium a equipe das filiais desta tela." : "Busca no Millennium a equipe desta filial.",
     status: refreshMomentTitle(sellerSyncAt),
     busyLabel: "Buscando equipe…",
     run: refreshTeam,
@@ -89,7 +90,11 @@ export function StaffPage() {
       <StoreCardsPage
         section="Equipe"
         title="Equipe"
-        subtitle="Acompanhe a equipe da filial e gerencie cadastros, grupos e acessos."
+        subtitle={
+          storeRows.length > 1
+            ? "Acompanhe a equipe das filiais e gerencie cadastros, grupos e acessos."
+            : "Acompanhe a equipe da filial e gerencie cadastros, grupos e acessos."
+        }
         actions={
           singleStore ? (
             <Button type="button" onClick={() => setManageOpen(true)}>
@@ -101,9 +106,16 @@ export function StaffPage() {
         skeleton={(n) => <StoreCardsSkeleton count={n} title team wide />}
         storeRows={storeRows}
         wide
-        oneStore
       >
-        {(store) => <StaffCard tenantId={session.tenantId} store={store} reloadKey={reloadKey} groupsTick={groupsTick} />}
+        {(store) => (
+          <StaffCard
+            tenantId={session.tenantId}
+            store={store}
+            reloadKey={reloadKey}
+            groupsTick={groupsTick}
+            showStore={storeRows.length > 1}
+          />
+        )}
       </StoreCardsPage>
       {singleStore && (
         <ManageGroupsModal
@@ -119,7 +131,19 @@ export function StaffPage() {
   );
 }
 
-function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: string; store: Store; reloadKey: number; groupsTick: number }) {
+function StaffCard({
+  tenantId,
+  store,
+  reloadKey,
+  groupsTick,
+  showStore,
+}: {
+  tenantId: string;
+  store: Store;
+  reloadKey: number;
+  groupsTick: number;
+  showStore: boolean;
+}) {
   const { show } = useToast();
   const [team, setTeam] = useState<StoreSeller[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -127,6 +151,7 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
   const [shifts, setShifts] = useState<StoreShift[]>([]);
   const [shiftOf, setShiftOf] = useState<Record<string, string | null>>({});
   const [tab, setTab] = useState<"ativos" | "desligados">("ativos");
+  const [search, setSearch] = useState("");
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const [access, setAccess] = useState<Map<string, AccessState> | null>(null);
   const [inviting, setInviting] = useState<StoreSeller | null>(null);
@@ -179,6 +204,10 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
   const ativos = useMemo(() => team.filter((seller) => isBranchTeamMember(seller, store)), [team, store]);
   const desligados = useMemo(() => team.filter((s) => !s.active), [team]);
   const rows = tab === "ativos" ? ativos : desligados;
+  const shown = useMemo(
+    () => rows.filter((person) => matchesCodeOrName(person.name, person.code, search)),
+    [rows, search],
+  );
 
   async function changeShift(sellerId: string, shiftId: string | null): Promise<boolean> {
     const before = shiftOf[sellerId];
@@ -307,14 +336,14 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
   return (
     <Card padding="none">
       <div className="px-5 pt-5">
-        <CostCardTitle title="Equipe da filial" />
+        <CostCardTitle title={showStore ? store.tradeName || store.name : "Equipe da filial"} />
       </div>
       {!loaded ? (
         <div className="px-5 pb-4">
           <SegmentedSkeleton widths={["w-24", "w-32"]} />
         </div>
       ) : !withoutTeam && (
-        <div className="px-5 pb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 pb-4">
           <Segmented
             options={[
               { value: "ativos", label: `Ativos (${ativos.length})` },
@@ -322,6 +351,13 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
             ]}
             value={tab}
             onChange={(v) => v && setTab(v)}
+          />
+          <input
+            type="search"
+            placeholder="Buscar por código ou nome…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-8 w-full rounded-[var(--radius-vela-sm)] border border-line bg-bg-3 px-3 text-xs font-semibold text-t0 transition-colors hover:border-acc focus:border-acc focus:outline-none print:hidden sm:w-56"
           />
         </div>
       )}
@@ -341,11 +377,24 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
                 : "Pessoas desligadas no Millennium aparecem aqui."
           }
         />
+      ) : shown.length === 0 ? (
+        <EmptyState
+          framed={false}
+          className="pt-4!"
+          icon="🔍"
+          title="Nenhuma pessoa encontrada"
+          description="Tente outro código ou nome."
+          action={
+            <Button type="button" variant="outline" size="sm" onClick={() => setSearch("")}>
+              Limpar busca
+            </Button>
+          }
+        />
       ) : (
         <DataTable
           className="rounded-none! border-x-0! border-b-0! bg-transparent!"
           columns={tab === "ativos" ? columns : [...sellerColumns(store), columns[columns.length - 1]!]}
-          data={rows}
+          data={shown}
           rowKey={(v) => v.id}
           paginate="pessoas"
         />

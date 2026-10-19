@@ -6,8 +6,7 @@ import { fetchCostPrices, fetchStockCatalog, fetchStoreStock, syncStockNow } fro
 import type { Store } from "@/data/wedash/stores";
 import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { fetchErpConnection } from "@/pages/dashboard/ErpStatusNotice";
-import { useScope } from "@/pages/dashboard/useScope";
-import { pickOneStore, useScopedStores } from "@/pages/operation/shared";
+import { useScopedStores } from "@/pages/operation/shared";
 
 const STOCK_MAX_AGE_MS = 30 * 60 * 1000;
 
@@ -43,8 +42,6 @@ async function loadAll(tenantId: string, storeRows: Store[]): Promise<StockLoade
 export function useStockData() {
   const { show } = useToast();
   const { session, storeRows, loading: storesLoading } = useScopedStores();
-  const { scope } = useScope();
-  const escolher = pickOneStore(scope.storeIds, session.stores.length);
   const storeKey = storeRows.map((s) => s.id).join(",");
   const [data, setData] = useState<StockLoaded | null>(null);
   const [loading, setLoading] = useState(true);
@@ -92,10 +89,6 @@ export function useStockData() {
 
   useEffect(() => {
     if (storesLoading) return;
-    if (escolher) {
-      setLoading(false);
-      return;
-    }
     let cancelled = false;
     setLoading(true);
     (async () => {
@@ -112,7 +105,7 @@ export function useStockData() {
     return () => {
       cancelled = true;
     };
-  }, [storeKey, storesLoading, reload, syncIfStale, escolher]);
+  }, [storeKey, storesLoading, reload, syncIfStale]);
 
   const dataRef = useRef(data);
   dataRef.current = data;
@@ -126,7 +119,6 @@ export function useStockData() {
     status: refreshMomentTitle(data ? oldestSync : undefined),
     busyLabel: "Buscando estoque…",
     run: async () => {
-      if (escolher) return;
       const current = dataRef.current;
       if (current) await syncIfStale(current, { force: true });
     },
@@ -159,7 +151,6 @@ export function useStockData() {
   return {
     storeRows,
     storeKey,
-    escolher,
     view,
     loading: loading || storesLoading,
     syncing,

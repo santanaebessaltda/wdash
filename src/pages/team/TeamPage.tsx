@@ -33,6 +33,7 @@ import { ChallengeMiniCard } from "@/pages/challenges/ChallengeMiniCard";
 import { CHALLENGE_STATUS_ORDER } from "@/pages/challenges/shared";
 import { fetchTeamAggInput, useTeamMemberDetail } from "@/pages/dashboard/TeamMemberDetail";
 import { calendarTodayIso } from "@/data/wedash/clock";
+import { matchesCodeOrName } from "@/lib/personSearch";
 import { goalWeightFrom } from "@/data/wedash/engine/goalProjection";
 import { defaultWeekHours, effectiveWeekHours } from "@/data/wedash/storeHours";
 import { useActiveSession } from "@/session/SessionProvider";
@@ -318,8 +319,8 @@ export function TeamPage() {
 
   const tableLines = useMemo(() => {
     let list = view.people;
-    const q = search.trim().toLowerCase();
-    if (q) list = list.filter((p) => p.name.toLowerCase().includes(q));
+    const q = search.trim();
+    if (q) list = list.filter((p) => matchesCodeOrName(p.name, p.key.startsWith("e:") ? p.key.slice(2) : "", q));
     const dir = sortDir === "asc" ? 1 : -1;
     return [...list].sort((a, b) => {
       if (sortKey === "name") return a.name.localeCompare(b.name, "pt-BR") * dir;
@@ -699,7 +700,7 @@ export function TeamPage() {
           <div className="mt-6 mb-4 flex flex-wrap items-center gap-2 sm:justify-end print:hidden">
             <input
               type="search"
-              placeholder="Buscar por nome…"
+              placeholder="Buscar por código ou nome…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className={cn(filterInputClass, "sm:w-56")}
@@ -826,7 +827,7 @@ function WithoutResult({ hasDados, onClear }: { hasDados: boolean; onClear: () =
     <EmptyBlock
       icon="🔍"
       title="Nenhuma pessoa encontrada"
-      description="Tente buscar por outro nome."
+      description="Tente outro código ou nome."
       action={
         <Button variant="outline" size="sm" onClick={onClear}>
           Limpar busca
