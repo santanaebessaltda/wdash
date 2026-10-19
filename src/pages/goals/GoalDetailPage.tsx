@@ -291,11 +291,18 @@ function GoalHero({
             <h1 className="text-xl font-extrabold text-t0 sm:text-[22px]">{goal.name}</h1>
             <Badge variant={statusBadgeVariant(GOAL_STATUS_LABEL[status])} className="uppercase">{GOAL_STATUS_LABEL[status]}</Badge>
           </div>
-          <p className="flex flex-wrap items-center gap-x-1.5 text-[13.5px] leading-relaxed text-t1">
-            {fullDate(goal.startsOn)} a {fullDate(goal.endsOn)}
-            {storeNameValue ? ` · ${storeNameValue}` : ""} · {MODO_LABEL[goal.tierMode]}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Badge variant="neutral" className="uppercase">
+              {fullDate(goal.startsOn)} a {fullDate(goal.endsOn)}
+            </Badge>
+            {storeNameValue ? (
+              <Badge variant="neutral" className="max-w-full min-w-0 uppercase">
+                <span className="truncate">{storeNameValue}</span>
+              </Badge>
+            ) : null}
+            <Badge variant="neutral" className="uppercase">{MODO_LABEL[goal.tierMode]}</Badge>
             <TipHelp label={AJUDA_MODO[goal.tierMode]} />
-          </p>
+          </div>
         </div>
       </div>
       <div className={`mt-5 grid grid-cols-2 gap-3.5 border-t border-line pt-4 sm:grid-cols-3 ${stats.length === 6 ? "lg:grid-cols-6" : "lg:grid-cols-5"}`}>
