@@ -104,6 +104,7 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
     covers(location.pathname, paths.management.team) ||
     covers(location.pathname, paths.management.purchaseOrder) ||
     covers(location.pathname, paths.management.cashClose) ||
+    covers(location.pathname, paths.management.wallet) ||
     covers(location.pathname, paths.management.cashDrop) ||
     covers(location.pathname, paths.management.salesReport) ||
     location.pathname.startsWith("/operation/") ||

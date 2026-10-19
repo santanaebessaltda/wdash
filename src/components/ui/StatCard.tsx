@@ -21,10 +21,12 @@ export interface StatCardProps {
   tooltip?: string;
   /** Substitui o tooltip padrão do badge de comparação. */
   deltaTooltip?: string;
+  /** Cor do valor. Sem isso, o número fica na cor padrão do texto. */
+  valueClassName?: string;
   className?: string;
 }
 
-export function StatCard({ label, value, icon, iconColor = "var(--acc)", iconBg = "var(--acc-soft)", delta, sparkline, sub, sub2, tooltip, deltaTooltip, className }: StatCardProps) {
+export function StatCard({ label, value, icon, iconColor = "var(--acc)", iconBg = "var(--acc-soft)", delta, sparkline, sub, sub2, tooltip, deltaTooltip, valueClassName, className }: StatCardProps) {
   return (
     <Card className={cn("min-w-0", className)}>
       <div className="flex items-center justify-between gap-2">
@@ -59,7 +61,7 @@ export function StatCard({ label, value, icon, iconColor = "var(--acc)", iconBg 
           </Tooltip>
         )}
       </div>
-      <AnimatedNumber value={value} className="mt-1 block truncate text-2xl font-extrabold text-t0" />
+      <AnimatedNumber value={value} className={cn("mt-1 block truncate text-2xl font-extrabold", valueClassName ?? "text-t0")} />
       {sub && <p className="mt-0.5 truncate text-[11px] text-t2">{sub}</p>}
       {sub2 && <p className="mt-0.5 truncate text-[11px] text-t2">{sub2}</p>}
       {sparkline && <div className="mt-3 h-9">{sparkline}</div>}

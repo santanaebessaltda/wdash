@@ -17,6 +17,13 @@ import { HeaderFilters } from "@/pages/stock/shared";
 
 const money = (cents: number) => brlCent(cents / 100);
 
+/** Positivo ainda tem valor a receber. Negativo já passou da premiação. Zero fica na cor do texto. */
+function balanceClass(cents: number): string {
+  if (cents > 0) return "text-ok";
+  if (cents < 0) return "text-bad";
+  return "text-t0";
+}
+
 function lineTitle(line: WalletLine): string {
   if (line.kind === "prize") return `Premiação · ${line.title}`;
   if (line.kind === "bonus") return `Bônus · ${line.title}`;
@@ -72,7 +79,7 @@ function Totals({ wallet, mine }: { wallet: WalletMonth; mine: boolean }) {
   const balance = sum((row) => row.balanceCents);
   const open = rows.some((row) => row.openPrize || row.lines.some((line) => line.open));
   const cards = [
-    { label: "Saldo", value: money(balance), sub: open ? "Até agora" : undefined },
+    { label: "Saldo", value: money(balance), sub: open ? "Até agora" : undefined, valueClassName: balanceClass(balance) },
     { label: "Premiação", value: money(sum((row) => row.prizeCents)) },
     { label: "Bônus", value: money(sum((row) => row.bonusCents)) },
     { label: "Desafios", value: money(sum((row) => row.challengeCents)) },
@@ -82,7 +89,14 @@ function Totals({ wallet, mine }: { wallet: WalletMonth; mine: boolean }) {
   return (
     <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${mine ? "lg:grid-cols-3" : "lg:grid-cols-3 xl:grid-cols-6"}`}>
       {cards.map((card) => (
-        <StatCard key={card.label} label={card.label} value={card.value} sub={card.sub} icon={<span className="text-[13px] font-bold">R$</span>} />
+        <StatCard
+          key={card.label}
+          label={card.label}
+          value={card.value}
+          sub={card.sub}
+          valueClassName={"valueClassName" in card ? card.valueClassName : undefined}
+          icon={<span className="text-[13px] font-bold">R$</span>}
+        />
       ))}
     </div>
   );
@@ -136,7 +150,14 @@ function WalletBody({ wallet, mine }: { wallet: WalletMonth; mine: boolean }) {
       { key: "challenge", header: "Desafios", align: "right", sortable: true, sortValue: (row) => row.challengeCents, render: (row) => money(row.challengeCents), hideBelow: "lg" },
       { key: "withdrawal", header: "Retiradas", align: "right", sortable: true, sortValue: (row) => row.withdrawalCents, render: (row) => money(row.withdrawalCents), hideBelow: "md" },
       { key: "shortage", header: "Quebra", align: "right", sortable: true, sortValue: (row) => row.shortageCents, render: (row) => money(row.shortageCents), hideBelow: "lg" },
-      { key: "balance", header: "Saldo", align: "right", sortable: true, sortValue: (row) => row.balanceCents, render: (row) => <span className="font-bold">{money(row.balanceCents)}</span> },
+      {
+        key: "balance",
+        header: "Saldo",
+        align: "right",
+        sortable: true,
+        sortValue: (row) => row.balanceCents,
+        render: (row) => <span className={`font-bold ${balanceClass(row.balanceCents)}`}>{money(row.balanceCents)}</span>,
+      },
     ],
     [],
   );
