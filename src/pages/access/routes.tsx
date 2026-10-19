@@ -1,8 +1,8 @@
 import { lazyPage } from "@/lib/lazyPage";
 import { Navigate, useParams, type RouteObject } from "react-router-dom";
 import { paths } from "@/router/paths";
+import { Login } from "./Login";
 
-const Login = lazyPage(() => import("./Login"), "Login");
 const Forgot = lazyPage(() => import("./Forgot"), "Forgot");
 const Reset = lazyPage(() => import("./Reset"), "Reset");
 const Invite = lazyPage(() => import("./Invite"), "Invite");
