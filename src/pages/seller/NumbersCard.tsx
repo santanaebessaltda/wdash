@@ -1,7 +1,6 @@
-import { useState } from "react";
-import { Segmented, StatCard } from "@/components/ui";
+import { StatCard } from "@/components/ui";
 import { brlCent, num } from "@/data/wedash/engine/format";
-import { sellerNumbers, type NumbersMode } from "@/data/wedash/sellerNumbers";
+import { sellerNumbers } from "@/data/wedash/sellerNumbers";
 import type { SellerDay } from "@/data/wedash/engine/sellerHome";
 
 const IconRevenue = () => (
@@ -40,22 +39,18 @@ const KPI_COLORS = [
   { iconColor: "var(--info)", iconBg: "rgba(59,130,246,0.12)" },
 ];
 
-/** Seus numeros: Hoje | Este mes, com faturamento, vendas, ticket e P.A. so do vendedor. */
+/** Faturamento, vendas, ticket e P.A. do vendedor no intervalo do seletor. */
 export function NumbersCard({
   days,
   period,
   today,
-  currentMonth = true,
 }: {
   days: SellerDay[];
   period: { from: string; to: string };
   today: string;
-  /** false no mês já fechado: "Hoje" só existe no mês corrente. */
-  currentMonth?: boolean;
 }) {
-  const [mode, setMode] = useState<NumbersMode>("month");
-  const effective: NumbersMode = currentMonth === false ? "month" : mode;
-  const n = sellerNumbers(days, period, today, effective);
+  const singleToday = period.from === today && period.to === today;
+  const n = sellerNumbers(days, period, today, singleToday ? "today" : "month");
   const pa = n.pa.value == null ? "—" : num(n.pa.value, 2);
   const cards: { label: string; value: string; delta?: (typeof n.revenue)["delta"]; tooltip?: string }[] = [
     { label: "Faturamento", value: brlCent(n.revenue.value ?? 0), delta: n.revenue.delta },
@@ -70,19 +65,7 @@ export function NumbersCard({
   ];
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-[15px] font-bold text-t0">Seus números</h2>
-        {currentMonth !== false && (
-          <Segmented
-            options={[
-              { value: "today", label: "Hoje" },
-              { value: "month", label: "Este mês" },
-            ]}
-            value={mode}
-            onChange={(v) => v && setMode(v)}
-          />
-        )}
-      </div>
+      <h2 className="mb-4 text-[15px] font-bold text-t0">Seus números</h2>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((kpi, i) => {
           const Icon = KPI_ICONS[i] ?? IconRevenue;

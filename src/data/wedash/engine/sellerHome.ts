@@ -1,5 +1,5 @@
 /** Pacote da tela Inicio do vendedor. No modo Geral, numeros e podio sao a parte igual da filial. Nos outros modos, o podio e a venda de cada pessoa. */
-import { addMonths, brlCent, collaboratorName, startOfMonth, addDays } from "./format.ts";
+import { addMonths, addDays, brlCent, collaboratorName, eachDay, startOfMonth } from "./format.ts";
 import type { GoalCardView, GoalRecord, GoalTeamMember, SalesDayAgg, SalesSellerDayAgg, SellerRow } from "./goalTypes.ts";
 import { buildGoalCardView, goalStatus, sellerGoalLevels, type SellerGoalLevel } from "./goalView.ts";
 import { weekdayWeights, type StoreWeekHours } from "./goalWeights.ts";
@@ -34,6 +34,14 @@ export function sellerHistoryFrom(today: string, admittedOn: Array<string | null
   const joined = admittedOn.reduce((earliest, day) => (day! < earliest! ? day : earliest))!;
   const admittedMonth = startOfMonth(joined);
   return admittedMonth > floor ? admittedMonth : floor;
+}
+
+/** Primeiro dia a buscar: o periodo anterior da comparacao e as 6 semanas de peso da meta. */
+export function sellerLoadFrom(rangeFrom: string, rangeTo: string): string {
+  const span = Math.max(1, eachDay(rangeFrom, rangeTo).length);
+  const comparisonFrom = addDays(rangeFrom, -Math.max(span, 7));
+  const weightFrom = addDays(startOfMonth(addDays(rangeFrom, -HISTORY_WEEKS * 7)), 0);
+  return comparisonFrom < weightFrom ? comparisonFrom : weightFrom;
 }
 
 /** Uma meta que cruza o mes visto, com a parte da pessoa. */
@@ -148,6 +156,8 @@ export interface SellerHomePayload {
 
 export interface SellerHomeInput {
   today: string;
+  /** Intervalo escolhido no seletor. Sem isso, o mes de `today` ate `today`. */
+  period?: { from: string; to: string };
   /** Lojas do vendedor com o codigo dele no Millennium; `week` = horario efetivo (sem horario = todos os dias abertos). */
   stores: { storeId: string; storeName: string; lastSyncAt: string | null; employeeId: number; week: StoreWeekHours }[];
   goals: GoalRecord[];
@@ -215,14 +225,22 @@ function sellerGroup(input: SellerHomeInput, s: SellerHomeInput["stores"][number
   return { shiftId: mine.shiftId, name: mine.shiftName };
 }
 
-/** No modo Geral, a equipe inteira com a mesma parte da filial. Senao, o grupo, do dia 1 ate hoje. */
+/** Intervalo do seletor. Sem periodo, o mes corrente ate o dia visto. */
+function viewed(input: SellerHomeInput): { from: string; to: string } {
+  const to = input.period?.to && input.period.to <= input.today ? input.period.to : input.today;
+  const from = input.period?.from ?? startOfMonth(to);
+  return from <= to ? { from, to } : { from: to, to };
+}
+
+/** No modo Geral, a equipe inteira com a mesma parte da filial. Senao, o grupo, no intervalo visto. */
 function monthRanking(input: SellerHomeInput, s: SellerHomeInput["stores"][number]): MonthRankingEntry[] {
   const geral = generalGoal(input, s.storeId);
   const team = salesTeam(input, s.storeId);
+  const range = viewed(input);
   if (geral && team.length > 0) {
-    const from = startOfMonth(input.today);
+    const from = range.from;
     const start = from > geral.startsOn ? from : geral.startsOn;
-    const end = input.today < geral.endsOn ? input.today : geral.endsOn;
+    const end = range.to < geral.endsOn ? range.to : geral.endsOn;
     const total = start <= end ? storeSlice(input, s.storeId, start, end) : { revenue: 0, sales: 0, items: 0 };
     const n = team.length;
     const ordered = [...team].sort((a, b) => collaboratorName(a.name).localeCompare(collaboratorName(b.name), "pt-BR"));
@@ -238,13 +256,14 @@ function monthRanking(input: SellerHomeInput, s: SellerHomeInput["stores"][numbe
   return salesRanking(input, s, "group");
 }
 
-/** Venda real do mes (dia 1 ate hoje). Grupo = colegas do mesmo grupo; loja = equipe de vendas da filial. */
+/** Venda real no intervalo visto. Grupo = colegas do mesmo grupo; loja = equipe de vendas da filial. */
 function salesRanking(
   input: SellerHomeInput,
   s: SellerHomeInput["stores"][number],
   scope: "group" | "store",
 ): MonthRankingEntry[] {
-  const from = startOfMonth(input.today);
+  const range = viewed(input);
+  const from = range.from;
   const group = scope === "group" ? sellerGroup(input, s) : null;
   const inScope = (m: GoalTeamMember) =>
     m.storeId === s.storeId && m.salesPerson && (scope === "store" || group == null || m.shiftId === group.shiftId);
@@ -258,7 +277,7 @@ function salesRanking(
     totals.set(`e:${m.employeeId}`, { employeeId: m.employeeId, name, revenue: 0, sales: 0, me: m.employeeId === s.employeeId });
   }
   for (const r of input.sellerDayAggs) {
-    if (r.storeId !== s.storeId || r.day < from || r.day > input.today || r.sellerEmployeeId == null) continue;
+    if (r.storeId !== s.storeId || r.day < from || r.day > range.to || r.sellerEmployeeId == null) continue;
     const member = byEmployee.get(r.sellerEmployeeId);
     if (!member) continue;
     const row = totals.get(`e:${r.sellerEmployeeId}`);
@@ -363,9 +382,9 @@ function buildHomeGoal(input: SellerHomeInput, s: SellerHomeInput["stores"][numb
 }
 
 function buildStore(input: SellerHomeInput, s: SellerHomeInput["stores"][number]): SellerHomeStore {
-  const monthStart = startOfMonth(input.today);
+  const range = viewed(input);
   const goals = input.goals
-    .filter((g) => g.storeId === s.storeId && g.startsOn <= input.today && g.endsOn >= monthStart && goalStatus(g, input.today) !== "upcoming")
+    .filter((g) => g.storeId === s.storeId && g.startsOn <= range.to && g.endsOn >= range.from && goalStatus(g, input.today) !== "upcoming")
     .sort((a, b) => {
       const rank = (g: typeof a) => (goalStatus(g, input.today) === "active" ? 0 : 1);
       return rank(a) - rank(b) || a.startsOn.localeCompare(b.startsOn) || a.name.localeCompare(b.name, "pt-BR");

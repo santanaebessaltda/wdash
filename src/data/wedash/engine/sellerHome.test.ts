@@ -3,7 +3,7 @@ import type { GoalRecord, GoalTeamMember, SalesDayAgg, SalesSellerDayAgg } from 
 import { sellerGoalLevels } from "./goalView.ts";
 import type { StoreWeekHours } from "./goalWeights.ts";
 import { brlCent } from "./format.ts";
-import { buildSellerHome, sellerHistoryFloor, sellerHistoryFrom, type SellerHomeInput } from "./sellerHome.ts";
+import { buildSellerHome, sellerHistoryFloor, sellerHistoryFrom, sellerLoadFrom, type SellerHomeInput } from "./sellerHome.ts";
 
 const OPEN = { open: "10:00", close: "22:00" };
 const ALL_DAYS: StoreWeekHours = { 0: OPEN, 1: OPEN, 2: OPEN, 3: OPEN, 4: OPEN, 5: OPEN, 6: OPEN };
@@ -171,12 +171,22 @@ describe("buildSellerHome", () => {
     expect(buildSellerHome(input({ goals: [ended] })).stores[0]!.goal).toBeNull();
   });
 
+  it("ranking follows the selected range", () => {
+    const store = buildSellerHome(input({ period: { from: "2026-09-15", to: "2026-09-15" } })).stores[0]!;
+    expect(store.monthRanking.map((e) => [e.name, e.revenue])).toEqual([
+      ["ANA", 1200],
+      ["BIA", 0],
+    ]);
+  });
+
   it("history opens at admission when that is inside the 24 loaded months", () => {
     expect(sellerHistoryFloor("2026-10-19")).toBe("2024-11-01");
     expect(sellerHistoryFrom("2026-10-19", ["2026-03-15"])).toBe("2026-03-01");
     expect(sellerHistoryFrom("2026-10-19", ["2020-01-01"])).toBe("2024-11-01");
     expect(sellerHistoryFrom("2026-10-19", [null])).toBe("2024-11-01");
     expect(sellerHistoryFrom("2026-10-19", [])).toBe("2024-11-01");
+    expect(sellerLoadFrom("2026-10-01", "2026-10-19") < "2026-09-01").toBe(true);
+    expect(sellerLoadFrom("2026-10-19", "2026-10-19") <= "2026-10-12").toBe(true);
   });
 
   it("two stores: one entry per store, each with its own goal", () => {
