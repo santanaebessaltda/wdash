@@ -1,22 +1,16 @@
-/** Regua de progresso: <50 bad  |  50 - 79 warn  |  80 ok. */
-export function progressColor(value: number): string {
-  const v = Math.min(100, Math.max(0, value));
-  if (v < 50) return "var(--bad)";
-  if (v < 80) return "var(--warn)";
-  return "var(--ok)";
+/** Cor da barra do Dash. O valor não troca a cor. */
+export function progressColor(_value: number): string {
+  return "var(--acc)";
 }
 
-/** Classe de texto alinhada a mesma regua (text-bad / text-warn / text-ok). */
-export function progressTextClass(value: number): string {
-  const v = Math.min(100, Math.max(0, value));
-  if (v < 50) return "text-bad";
-  if (v < 80) return "text-warn";
-  return "text-ok";
+/** Texto do percentual que acompanha a barra. Também não muda com o valor. */
+export function progressTextClass(_value: number): string {
+  return "text-acc";
 }
 
 export interface ProgressBarProps {
   value: number; // 0-100
-  /** Se omitido, usa a regua progressiva por valor. */
+  /** Se omitido, usa a cor primária. */
   color?: string;
   trackColor?: string;
   height?: number;
@@ -54,7 +48,7 @@ export function RadialProgress({
   value: number;
   size?: number;
   stroke?: number;
-  /** Se omitido, usa a regua progressiva por valor. */
+  /** Se omitido, usa a cor primária. */
   color?: string;
   trackColor?: string;
   /** Subtitulo abaixo do % (ex.: "da meta"). */
