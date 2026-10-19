@@ -72,7 +72,7 @@ export function BarChart({
       : "";
 
   return (
-    <div className="w-full min-w-0 touch-pan-x overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
+    <div className="my-auto w-full min-w-0 touch-pan-x overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
       {/* w-max: a largura da rolagem e o conteudo. Com so width 100% + min-width, o WebKit
           no celular corta a ultima barra — ela so aparece no overscroll (arrastar e segurar). */}
       <div className="flex h-full w-max items-stretch" style={{ minWidth: "100%", height }}>
