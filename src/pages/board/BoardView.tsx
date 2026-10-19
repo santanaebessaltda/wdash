@@ -6,16 +6,15 @@ import type { RankingRow } from "@/data/wedash/live";
 import { boardMoments, type BoardMoment, type BoardSnapshot } from "@/data/wedash/boardEvents";
 import { buildGoalCardView, buildGoalSummary, GOAL_STATUS_LABEL, goalStatus, prazoRemaining } from "@/data/wedash/goalView";
 import type { GoalRecord, GoalTeamMember } from "@/data/wedash/goalsRepo";
-import { buildChallengeView, metricValueLabel } from "@/data/wedash/challengeView";
+import { buildChallengeView } from "@/data/wedash/challengeView";
 import type { ChallengeAggInput, ChallengeRecord } from "@/data/wedash/challengesRepo";
 import { buildTeamDashboardView, type Scope, type TeamAggInput, type TeamMemberRow } from "@/data/wedash/dashboard";
 import { ChallengeMiniCard } from "@/pages/challenges/ChallengeMiniCard";
 import { TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
-import { statusBadgeVariant } from "@/lib/status";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import type { StoreWeekHours } from "@/data/wedash/storeHours";
 import { formatSyncWatermarkLabel } from "@/data/wedash/syncUi";
-import { brlCent, fullDate, num } from "@/lib/format";
+import { brlCent, num, shortDate } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import type { SalesDayAgg, SalesSellerDayAgg } from "@/data/wedash/salesTypes";
 import overtakeUrl from "@/assets/sound/overtaking.wav";
@@ -92,13 +91,13 @@ function firstName(name: string, names: string[]): string {
 }
 
 function momentText(moment: BoardMoment, names: string[]): string {
-  if (moment.kind === "first") return `${firstName(moment.name, names)} assumiu o 1º lugar.`;
+  if (moment.kind === "first") return `${firstName(moment.name, names)} assumiu a liderança!`;
   if (moment.kind === "overtake") {
-    return `${firstName(moment.name, names)} passou ${firstName(moment.passed, names)} e ficou em ${moment.position}º.`;
+    return `${firstName(moment.name, names)} passou ${firstName(moment.passed, names)} e agora está em ${moment.position}º!`;
   }
-  if (moment.kind === "level") return `${firstName(moment.name, names)} chegou em ${moment.level}.`;
-  if (moment.kind === "store-level") return `A loja chegou em ${moment.level}.`;
-  return `${firstName(moment.name, names)} bateu o desafio ${moment.challenge}.`;
+  if (moment.kind === "level") return `${firstName(moment.name, names)} chegou ao ${moment.level}!`;
+  if (moment.kind === "store-level") return `A loja chegou ao ${moment.level}!`;
+  return `${firstName(moment.name, names)} concluiu o desafio ${moment.challenge}!`;
 }
 
 function monthLabel(today: string): string {
@@ -370,10 +369,10 @@ export function BoardView({
       </header>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard           label="Faturamento do mês" value={brlCent(monthRevenue)} sub={`Hoje ${brlCent(todayTotals.revenue)}`} icon={<IconRevenue />} iconColor="var(--acc)" iconBg="var(--acc-soft)" />
-        <StatCard label="Vendas do mês" value={num(month.sales)} sub={`Hoje ${num(todayTotals.sales)}`} icon={<IconSales />} iconColor="var(--ok)" iconBg="var(--ok-soft)" />
+        <StatCard label="Faturamento" value={brlCent(monthRevenue)} sub={`Hoje ${brlCent(todayTotals.revenue)}`} icon={<IconRevenue />} iconColor="var(--acc)" iconBg="var(--acc-soft)" />
+        <StatCard label="Vendas" value={num(month.sales)} sub={`Hoje ${num(todayTotals.sales)}`} icon={<IconSales />} iconColor="var(--ok)" iconBg="var(--ok-soft)" />
         <StatCard
-          label="Meta mensal"
+          label="Meta"
           value={activeGoal ? brlCent(activeGoal.target) : "—"}
           sub={activeGoal ? (goalCard?.name ?? "Meta do mês") : "Não configurada"}
           icon={<TargetIcon size={20} />}
@@ -381,7 +380,7 @@ export function BoardView({
           iconBg="rgba(59,130,246,0.12)"
         />
         <StatCard
-          label="Atingimento"
+          label="Progresso da meta"
           value={summary ? `${num(summary.pct, 1)}%` : "—"}
           sub={
             !summary
@@ -407,7 +406,7 @@ export function BoardView({
             <div className="min-w-0 flex-1">
               <p className="truncate text-[15px] font-bold text-t0">{goalCard.name}</p>
               <p className="mt-0.5 truncate text-[12.5px] text-t2">
-                {fullDate(activeGoal.startsOn)} a {fullDate(activeGoal.endsOn)}
+                {shortDate(activeGoal.startsOn)} a {shortDate(activeGoal.endsOn)}
               </p>
             </div>
           </div>
@@ -422,20 +421,16 @@ export function BoardView({
           </div>
           <p className="mt-2 text-[11.5px] text-t2">
             {summary.projectedPct != null
-              ? `Projeção: ${num(summary.projectedPct, 0)}% · ${prazoRemaining(summary.daysRemaining).toLowerCase()}`
+              ? `Projeção ${num(summary.projectedPct, 0)}% · ${prazoRemaining(summary.daysRemaining).toLowerCase()}`
               : prazoRemaining(summary.daysRemaining)}
           </p>
-          <div className="mt-4 flex flex-wrap gap-1.5">
-            <Badge variant={statusBadgeVariant(GOAL_STATUS_LABEL[summary.status])} className="uppercase">
-              {GOAL_STATUS_LABEL[summary.status]}
-            </Badge>
-            <Badge variant="neutral" className="uppercase">
-              {activeGoal.tierMode === "INDIVIDUAL" ? "Individual" : activeGoal.tierMode === "GENERAL" ? "Geral" : "Grupo"}
-            </Badge>
-            <Badge variant="neutral" className="uppercase">
-              {activeGoal.tiers.length} {activeGoal.tiers.length === 1 ? "nível" : "níveis"}
-            </Badge>
-          </div>
+          <p className="mt-3 text-[10.5px] font-semibold uppercase tracking-wide text-t3">
+            {GOAL_STATUS_LABEL[summary.status]}
+            <span className="mx-1.5">·</span>
+            {activeGoal.tierMode === "INDIVIDUAL" ? "Individual" : activeGoal.tierMode === "GENERAL" ? "Geral" : "Grupo"}
+            <span className="mx-1.5">·</span>
+            {activeGoal.tiers.length} {activeGoal.tiers.length === 1 ? "nível" : "níveis"}
+          </p>
         </div>
       ) : (
         <Card>
@@ -455,61 +450,40 @@ export function BoardView({
             <>
               <RankingBlock ranking={podium} formatAmount={brlCent} />
               {(view?.people.length ?? 0) > 0 && (
-                <div className="mt-4 overflow-x-auto">
-                  <table className="w-full min-w-[760px] border-collapse text-[12.5px]">
+                <div className="mt-3 overflow-x-auto">
+                  <table className="w-full min-w-[520px] border-collapse text-[12px]">
                     <thead>
-                      <tr className="border-b border-line text-left text-[11px] font-bold uppercase tracking-wide text-t2">
-                        <th className="pb-2 pr-2">#</th>
-                        <th className="pb-2 pr-2">Pessoa</th>
-                        <th className="pb-2 pr-2 text-right">Vendas</th>
-                        <th className="pb-2 pr-2 text-right">Ticket médio</th>
-                        <th className="pb-2 pr-2 text-right">P.A.</th>
-                        <th className="pb-2 pr-2 text-right">Participação na meta</th>
-                        <th className="pb-2 pr-2">Desafios</th>
-                        <th className="pb-2 text-right">Faturamento</th>
+                      <tr className="border-b border-line text-left text-[10.5px] font-bold uppercase tracking-wide text-t3">
+                        <th className="pb-1.5 pr-2">#</th>
+                        <th className="pb-1.5 pr-2">Pessoa</th>
+                        <th className="pb-1.5 pr-2 text-right">Vendas</th>
+                        <th className="pb-1.5 pr-2 text-right">P.A.</th>
+                        <th className="pb-1.5 pr-2 text-right">Meta</th>
+                        <th className="pb-1.5 text-right">Faturamento</th>
                       </tr>
                     </thead>
                     <tbody>
                       {view!.people.map((person, index) => {
                         const level = personLevel(person);
+                        const individual = activeGoal?.tierMode === "INDIVIDUAL";
                         return (
                           <tr key={person.key} className={cn("border-b border-line last:border-b-0", momentKey(current) === person.key && "bg-acc-soft")}>
-                            <td className="py-2.5 pr-2 font-extrabold text-t2">{index + 1}º</td>
-                            <td className="py-2.5 pr-2">
+                            <td className="py-1.5 pr-2 font-bold text-t3">{index + 1}º</td>
+                            <td className="py-1.5 pr-2">
                               <span className="flex min-w-0 items-center gap-2">
                                 <PersonAvatar name={person.name} employeeId={person.key} storeId={person.storeIds[0] ?? storeId} size="sm" />
                                 <span className="min-w-0">
-                                  <span className="block truncate text-[13px] font-bold text-t0">{person.name}</span>
-                                  {level?.levelLabel ? <Badge variant="accent">{level.levelLabel}</Badge> : level ? <span className="text-[11px] text-t2">Sem nível</span> : null}
+                                  <span className="block truncate text-[12.5px] font-bold text-t0">{person.name}</span>
+                                  {level?.levelLabel ? <Badge variant="accent">{level.levelLabel}</Badge> : level ? <span className="text-[11px] text-t3">Sem nível</span> : null}
                                 </span>
                               </span>
                             </td>
-                            <td className="py-2.5 pr-2 text-right font-mono font-bold text-t0">{num(person.sales)}</td>
-                            <td className="py-2.5 pr-2 text-right font-mono font-bold text-t0">{brlCent(person.averageTicket)}</td>
-                            <td className="py-2.5 pr-2 text-right font-mono font-bold text-t0">{person.pa == null ? "—" : num(person.pa, 2)}</td>
-                            <td className="py-2.5 pr-2 text-right font-mono font-bold text-t0">{level ? `${num(level.storePct, 1)}%` : "—"}</td>
-                            <td className="py-2.5 pr-2">
-                              <span className="flex flex-col gap-0.5">
-                                {challenges.map(({ challenge, view: challengeView }) => {
-                                  const hit = challengeView.participants.find((item) => item.key === person.key);
-                                  if (!hit) return null;
-                                  const label = hit.winner
-                                    ? hit.position != null
-                                      ? `${hit.position}º`
-                                      : "Atingiu"
-                                    : hit.result == null
-                                      ? "—"
-                                      : metricValueLabel(challenge.metric, hit.result);
-                                  return (
-                                    <span key={challenge.id} className="truncate text-[11.5px] text-t1">
-                                      <span className="text-t2">{challenge.name}: </span>
-                                      <span className={cn("font-semibold", hit.winner && "text-ok")}>{label}</span>
-                                    </span>
-                                  );
-                                })}
-                              </span>
+                            <td className="py-1.5 pr-2 text-right font-mono font-bold text-t0">{num(person.sales)}</td>
+                            <td className="py-1.5 pr-2 text-right font-mono font-bold text-t0">{person.pa == null ? "—" : num(person.pa, 2)}</td>
+                            <td className="py-1.5 pr-2 text-right font-mono font-bold text-t0">
+                              {level ? (individual ? `${num(level.pct, 1)}%` : `${num(level.storePct, 1)}% da meta`) : "—"}
                             </td>
-                            <td className="py-2.5 text-right font-mono font-bold text-t0">{brlCent(person.revenue)}</td>
+                            <td className="py-1.5 text-right font-mono font-bold text-t0">{brlCent(person.revenue)}</td>
                           </tr>
                         );
                       })}
@@ -530,6 +504,7 @@ export function BoardView({
                 view={challengeView}
                 prominent
                 showPeople
+                floor
                 hotKey={current?.kind === "challenge" ? current.key : null}
               />
             ))}

@@ -83,7 +83,7 @@ export function BoardShareButton() {
           <p className="text-sm text-t2">Não foi possível gerar o link. Tente novamente.</p>
         ) : (
           <div className="flex flex-col gap-3">
-            <p className="text-sm text-t2">Qualquer pessoa com este link vê o placar desta filial, sem precisar entrar.</p>
+            <p className="text-sm text-t2">Qualquer pessoa com este link pode ver o placar desta filial sem fazer login.</p>
             <input
               readOnly
               value={url ?? ""}

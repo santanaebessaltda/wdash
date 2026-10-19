@@ -17,7 +17,7 @@ import { fetchSalesDayAggs, type SalesQueryClient } from "./salesRepo";
 
 describe("syncUi watermark label (SYNC-10)", () => {
   it("shows pending when never synced", () => {
-    expect(formatSyncWatermarkLabel(null)).toBe("Aguardando primeiro sync");
+    expect(formatSyncWatermarkLabel(null)).toBe("Aguardando primeira sincronização");
     expect(formatSyncWatermarkLabel(null, { loading: true })).toBe("Sincronizando dados…");
   });
 

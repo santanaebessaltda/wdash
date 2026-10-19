@@ -40,7 +40,7 @@ export function PublicBoardPage() {
   if (status !== "ready" || !pack) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-bg-0 p-6 text-center">
-        <p className="text-sm text-t2">{status === "missing" ? "Este link do placar não está disponível." : "Carregando o placar…"}</p>
+        <p className="text-sm text-t2">{status === "missing" ? "Este placar não está disponível." : "Carregando o placar…"}</p>
       </div>
     );
   }

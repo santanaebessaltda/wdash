@@ -5,7 +5,7 @@ import { CHALLENGE_STATUS_LABEL, metricValueLabel, type ChallengeView } from "@/
 import { cn } from "@/lib/cn";
 import { num, shortDate } from "@/lib/format";
 import { statusBadgeVariant } from "@/lib/status";
-import { challengeHeadline, HeadlineText, mainPrizeLabel } from "@/pages/challenges/shared";
+import { challengeHeadline, floorChallengeHeadline, HeadlineText, mainPrizeLabel } from "@/pages/challenges/shared";
 import { FlameIcon, TrophyIcon } from "@/pages/dashboards/icons";
 
 /** Desafio na aba Desafios da Equipe: so leitura, clique abre o detalhe. */
@@ -17,6 +17,7 @@ export function ChallengeMiniCard({
   prominent = false,
   showPeople = false,
   hotKey = null,
+  floor = false,
 }: {
   challenge: ChallengeRecord;
   view: ChallengeView;
@@ -28,8 +29,10 @@ export function ChallengeMiniCard({
   /** Lista o resultado de cada pessoa, como no detalhe do desafio. */
   showPeople?: boolean;
   hotKey?: string | null;
+  /** Texto corrido, para o placar da loja. */
+  floor?: boolean;
 }) {
-  const destaque = challengeHeadline(c, view);
+  const destaque = floor ? floorChallengeHeadline(c, view) : challengeHeadline(c, view);
   const prize = mainPrizeLabel(c);
   const ended = view.status === "ended";
   const statusLabel = CHALLENGE_STATUS_LABEL[view.status];

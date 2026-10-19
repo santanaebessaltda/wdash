@@ -40,7 +40,7 @@ export function formatSyncWatermarkLabel(
   opts: { loading?: boolean; now?: Date; timeZone?: string } = {},
 ): string {
   if (watermark == null) {
-    return opts.loading ? "Sincronizando dados…" : "Aguardando primeiro sync";
+    return opts.loading ? "Sincronizando dados…" : "Aguardando primeira sincronização";
   }
   return formatUpdatedAtLabel(watermark, opts);
 }

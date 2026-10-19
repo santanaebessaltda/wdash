@@ -59,6 +59,27 @@ export function challengeHeadline(c: ChallengeRecord, view: ChallengeView): Chal
   return { label, value: `${leader}${amount}` };
 }
 
+/** Frase do placar, para ler de longe. A Gestão continua com o rótulo "Líder:". */
+export function floorChallengeHeadline(c: ChallengeRecord, view: ChallengeView): ChallengeHeadline {
+  if (view.status === "upcoming") return challengeHeadline(c, view);
+  const ended = view.status === "ended";
+  if (c.mode === "MINIMUM") {
+    const n = view.reachedCount;
+    const target = c.target != null ? ` de ${metricValueLabel(c.metric, c.target)}` : "";
+    if (n === 0) return { label: null, value: ended ? "Ninguém atingiu o mínimo" : "Ninguém atingiu o mínimo ainda" };
+    if (n === 1) return { label: null, value: `1 pessoa já atingiu o mínimo${target}` };
+    return { label: null, value: `${n} pessoas já atingiram o mínimo${target}` };
+  }
+  const { leader } = challengeCardSummary(view);
+  const primeiros = view.participants.filter((person) => person.position === 1);
+  if (!leader || primeiros.length === 0 || (ended && !primeiros[0].winner)) {
+    return { label: null, value: ended ? "Nenhum vencedor" : "Ainda não há líder" };
+  }
+  const amount = primeiros[0].result != null ? metricValueLabel(c.metric, primeiros[0].result) : null;
+  const verb = primeiros.length > 1 ? "lideram" : "lidera";
+  return { label: null, value: amount ? `${leader} ${verb} com ${amount}` : `${leader} ${verb}` };
+}
+
 /** "Lider: ANA  |  12 itens" ou a frase inteira quando nao ha rotulo. */
 export function HeadlineText({ headline }: { headline: ChallengeHeadline }) {
   return headline.label ? (
