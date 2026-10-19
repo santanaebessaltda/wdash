@@ -1,6 +1,8 @@
 import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { padBottom } from "@/lib/safeArea";
 import { Outlet, useLocation } from "react-router-dom";
+import { paths } from "@/router/paths";
+import { cn } from "@/lib/cn";
 import { Sidebar } from "./Sidebar";
 import { MobileDrawer } from "./MobileDrawer";
 import { Topbar } from "./Topbar";
@@ -21,6 +23,7 @@ export function AppShell() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const location = useLocation();
+  const board = location.pathname === paths.board;
   const mainRef = useRef<HTMLElement>(null);
 
   // html/body com height 100% + overflow-x hidden fazem o <body> rolar (nao a janela nem o <main>):
@@ -92,19 +95,33 @@ export function AppShell() {
 
   return (
     <div className="tela-cheia flex w-full overflow-x-hidden bg-bg-0 text-t0 print:block print:overflow-visible print:bg-white">
-      <div className="contents print:hidden">
-        <Sidebar collapsed={collapsed} />
-        <MobileDrawer open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
-      </div>
+      {!board && (
+        <div className="contents print:hidden">
+          <Sidebar collapsed={collapsed} />
+          <MobileDrawer open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
+        </div>
+      )}
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col print:block">
-        <div className="contents print:hidden">
-          <Topbar onOpenMobileNav={() => setMobileNavOpen(true)} collapsed={collapsed} onToggleCollapse={() => setCollapsed((c) => !c)} />
-        </div>
-        <main ref={mainRef} className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-4 pt-5 sm:px-8 sm:pt-6 print:overflow-visible print:p-0">
+        {!board && (
+          <div className="contents print:hidden">
+            <Topbar onOpenMobileNav={() => setMobileNavOpen(true)} collapsed={collapsed} onToggleCollapse={() => setCollapsed((c) => !c)} />
+          </div>
+        )}
+        <main
+          ref={mainRef}
+          className={cn(
+            "flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto print:overflow-visible print:p-0",
+            board ? "p-0" : "px-4 pt-5 sm:px-8 sm:pt-6",
+          )}
+        >
           <ProfilePhotosProvider>
             <Suspense fallback={<PageLoader />}>
-              <div key={location.pathname} className="pad-base vela-page-enter print:pb-0" style={padBottom("32px")}>
+              <div
+                key={location.pathname}
+                className={cn("print:pb-0", board ? "flex min-h-full flex-1 flex-col" : "pad-base vela-page-enter")}
+                style={board ? undefined : padBottom("32px")}
+              >
                 <Outlet />
               </div>
             </Suspense>

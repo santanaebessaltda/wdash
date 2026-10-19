@@ -62,6 +62,7 @@ import {
   periodActivePresetId,
   periodDisplayLabel,
 } from "@/pages/dashboard/periodPicker";
+import { searchForRoute } from "@/pages/dashboard/periodQuery";
 
 type GoalsData = { goals: GoalRecord[]; dayAggs: SalesDayAgg[]; sellerAggs: SalesSellerDayAgg[]; namedAggs: SalesSellerDayAgg[]; team: GoalTeamMember[] };
 const GOALS_EMPTY: GoalsData = { goals: [], dayAggs: [], sellerAggs: [], namedAggs: [], team: [] };
@@ -420,6 +421,9 @@ export function TeamPage() {
                 activePresetId={periodActivePresetId(scope.period)}
                 minDate={pickerMinDate(coverageFrom, monthFill)}
               />
+              <Button variant="outline" onClick={() => navigate(`${paths.board}${searchForRoute(paths.board, location.search)}`)}>
+                Placar
+              </Button>
               <Button variant="primary" onClick={exportValue}>
                 Exportar
               </Button>

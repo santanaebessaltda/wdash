@@ -13,6 +13,7 @@ import { accessRoutes } from "@/pages/access/routes";
 import { onboardingRoutes, syncingRoutes } from "@/pages/onboarding/routes";
 import { dashboardRoutes } from "@/pages/dashboard/routes";
 import { teamRoutes } from "@/pages/team/routes";
+import { boardRoutes } from "@/pages/board/routes";
 import { goalRoutes } from "@/pages/goals/routes";
 import { liveRoutes } from "@/pages/live/routes";
 import { retiredRoutes } from "@/pages/coming-soon/routes";
@@ -85,6 +86,7 @@ const routeTree: RouteObject[] = [
         children: [
           ...dashboardRoutes,
           ...teamRoutes,
+          ...boardRoutes,
           ...liveRoutes,
           ...goalRoutes,
           ...stockRoutes,
