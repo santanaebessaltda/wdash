@@ -151,6 +151,14 @@ describe("buildSellerHome", () => {
     expect(store.challenges[1]!.rules.some((r) => r.startsWith("Prêmios:"))).toBe(true);
   });
 
+  it("two active goals in the same store become two cards, in start then name order", () => {
+    const brand: GoalRecord = { ...goal, id: "g2", name: "Meta marca" };
+    const store = buildSellerHome(input({ goals: [goal, brand] })).stores[0]!;
+    expect(store.goals.map((g) => g.name)).toEqual(["Meta marca", "Meta setembro"]);
+    expect(store.goal?.id).toBe("g2");
+    expect(store.goals[0]?.me?.marcos[0]).toMatchObject({ name: "Meta", bonus: 50 });
+  });
+
   it("goal ended yesterday: goal = null", () => {
     const ended = { ...goal, startsOn: "2026-08-15", endsOn: "2026-09-14" };
     expect(buildSellerHome(input({ goals: [ended] })).stores[0]!.goal).toBeNull();

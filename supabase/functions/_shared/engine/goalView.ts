@@ -155,7 +155,7 @@ export interface SellerGoalLevel {
   levelNumber: number | null;
   attainmentPct: number;
   /** Niveis da meta (cortes da barra). */
-  marcos: { name: string; pct: number; commissionPct: number }[];
+  marcos: { name: string; pct: number; commissionPct: number; bonus: number }[];
   metaName: string;
   start: string;
   end: string;
@@ -212,7 +212,7 @@ export function sellerGoalLevels(input: {
           level: r.currentTierName,
           levelNumber: r.currentLevel,
           attainmentPct: r.attainmentPct,
-          marcos: goal.tiers.map((t) => ({ name: t.name, pct: t.minAttainmentPct, commissionPct: t.commissionPct })),
+          marcos: goal.tiers.map((t) => ({ name: t.name, pct: t.minAttainmentPct, commissionPct: t.commissionPct, bonus: t.bonus })),
           metaName: goal.name,
           start: goal.startsOn,
           end: goal.endsOn,

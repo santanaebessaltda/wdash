@@ -16,23 +16,32 @@ import { nextLevelGain, projectedPrize } from "./sellerPrize.ts";
 /** Semanas de historico da loja antes da meta para o peso por dia da semana (as mesmas da curva da meta). */
 const HISTORY_WEEKS = 6;
 
+/** Uma meta ativa da loja, com a parte da pessoa. */
+export interface SellerHomeGoal {
+  id: string;
+  name: string;
+  startsOn: string;
+  endsOn: string;
+  mode: "individual" | "grupo" | "geral";
+  /** null = fora dos grupos da meta. */
+  me: SellerGoalLevel | null;
+  nextLevelGain: number | null;
+  projectedPrize: number | null;
+  /** Atingimento projetado no fim da meta (%). null antes de haver ritmo. */
+  projectedPct: number | null;
+  ranking: SellerRankingEntry[];
+  gapPp: number | null;
+  abovePosition: number | null;
+}
+
 export interface SellerHomeStore {
   storeId: string;
   storeName: string;
   lastSyncAt: string | null;
-  goal: null | {
-    name: string;
-    startsOn: string;
-    endsOn: string;
-    mode: "individual" | "grupo" | "geral";
-    /** null = fora dos grupos da meta. */
-    me: SellerGoalLevel | null;
-    nextLevelGain: number | null;
-    projectedPrize: number | null;
-    ranking: SellerRankingEntry[];
-    gapPp: number | null;
-    abovePosition: number | null;
-  };
+  /** Metas ativas da loja no mês, uma por card. Vazio = nenhuma. */
+  goals: SellerHomeGoal[];
+  /** Primeira meta ativa. O mesmo que `goals[0]`, null quando não há meta. */
+  goal: SellerHomeGoal | null;
   /** Podio do mes no grupo da pessoa (dia 1 ate hoje), por faturamento, com ou sem meta. Na meta Geral, a parte igual da filial. */
   monthRanking: MonthRankingEntry[];
   /** Podio do mes da equipe de vendas da loja (dia 1 ate hoje), pela venda real de cada pessoa. */
@@ -279,18 +288,7 @@ function prizeDivisor(view: GoalCardView, row: SellerRow): number {
   return groupSize(view, row);
 }
 
-function buildStore(input: SellerHomeInput, s: SellerHomeInput["stores"][number]): SellerHomeStore {
-  const base = {
-    storeId: s.storeId,
-    storeName: s.storeName,
-    lastSyncAt: s.lastSyncAt,
-    monthRanking: monthRanking(input, s),
-    storeRanking: salesRanking(input, s, "store"),
-    groupName: sellerGroup(input, s)?.name ?? null,
-    challenges: storeChallenges(input, s),
-  };
-  const goal = input.goals.find((g) => g.storeId === s.storeId && goalStatus(g, input.today) === "active");
-  if (!goal) return { ...base, goal: null };
+function buildHomeGoal(input: SellerHomeInput, s: SellerHomeInput["stores"][number], goal: GoalRecord): SellerHomeGoal {
   const meKey = `e:${s.employeeId}`;
   const viewInput = {
     goal,
@@ -325,19 +323,36 @@ function buildStore(input: SellerHomeInput, s: SellerHomeInput["stores"][number]
   }
   const ranking = buildSellerRanking(view, meKey);
   return {
-    ...base,
-    goal: {
-      name: goal.name,
-      startsOn: goal.startsOn,
-      endsOn: goal.endsOn,
-      mode: goal.tierMode === "INDIVIDUAL" ? "individual" : goal.tierMode === "GENERAL" ? "geral" : "grupo",
-      me,
-      nextLevelGain: me ? nextLevelGain(me, size) : null,
-      projectedPrize: projected,
-      ranking: ranking.entries,
-      gapPp: ranking.gapPp,
-      abovePosition: ranking.abovePosition,
-    },
+    id: goal.id,
+    name: goal.name,
+    startsOn: goal.startsOn,
+    endsOn: goal.endsOn,
+    mode: goal.tierMode === "INDIVIDUAL" ? "individual" : goal.tierMode === "GENERAL" ? "geral" : "grupo",
+    me,
+    nextLevelGain: me ? nextLevelGain(me, size) : null,
+    projectedPrize: projected,
+    projectedPct: row?.projectedAttainmentPct ?? null,
+    ranking: ranking.entries,
+    gapPp: ranking.gapPp,
+    abovePosition: ranking.abovePosition,
+  };
+}
+
+function buildStore(input: SellerHomeInput, s: SellerHomeInput["stores"][number]): SellerHomeStore {
+  const goals = input.goals
+    .filter((g) => g.storeId === s.storeId && goalStatus(g, input.today) === "active")
+    .sort((a, b) => a.startsOn.localeCompare(b.startsOn) || a.name.localeCompare(b.name, "pt-BR"))
+    .map((g) => buildHomeGoal(input, s, g));
+  return {
+    storeId: s.storeId,
+    storeName: s.storeName,
+    lastSyncAt: s.lastSyncAt,
+    monthRanking: monthRanking(input, s),
+    storeRanking: salesRanking(input, s, "store"),
+    groupName: sellerGroup(input, s)?.name ?? null,
+    challenges: storeChallenges(input, s),
+    goals,
+    goal: goals[0] ?? null,
   };
 }
 

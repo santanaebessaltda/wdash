@@ -81,8 +81,8 @@ function RankingList({ ranking }: { ranking: MonthRankingEntry[] }) {
 }
 
 /** O mesmo card da Equipe: Ranking (podio do mes), Desafios e Meta. Na meta Geral o ranking some: a parte e igual para todos. */
-export function PerformanceCard({ store }: { store: SellerHomeStore }) {
-  const geral = store.goal?.mode === "geral";
+export function PerformanceCard({ store, today }: { store: SellerHomeStore; today: string }) {
+  const geral = store.goals.some((g) => g.mode === "geral");
   const [scope, setScope] = useState<RankingScope>("group");
   const ranking = scope === "store" ? (store.storeRanking ?? []) : (store.monthRanking ?? []);
   const challenges = store.challenges ?? [];
@@ -136,7 +136,7 @@ export function PerformanceCard({ store }: { store: SellerHomeStore }) {
             key: "metas",
             label: "Metas",
             icon: <TargetIcon size={14} />,
-            content: <PrizeCard store={store} embedded />,
+            content: <PrizeCard store={store} today={today} embedded />,
           },
           {
             key: "desafios",

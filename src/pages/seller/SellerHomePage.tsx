@@ -71,7 +71,7 @@ export function SellerHomePage() {
         <>
           <NumbersCard days={home.myDays} period={home.numbersPeriod} today={home.today} />
           {home.stores.map((s) => (
-            <PerformanceCard key={s.storeId} store={s} />
+            <PerformanceCard key={s.storeId} store={s} today={home.today} />
           ))}
         </>
       )}

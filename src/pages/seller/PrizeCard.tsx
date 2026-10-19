@@ -1,36 +1,29 @@
-import { Badge, Card, CardTitle, progressTextClass } from "@/components/ui";
+import type { ReactNode } from "react";
+import { Badge, Card, CardTitle } from "@/components/ui";
 import { Tooltip } from "@/components/ui/Tooltip";
-import { GOAL_STATUS_LABEL, prazoRemaining } from "@/data/wedash/goalView";
+import type { SellerHomeGoal, SellerHomeStore } from "@/data/wedash/engine/sellerHome";
 import type { NetworkGlobalGoal } from "@/data/wedash/teamViews";
-import type { SellerHomeStore } from "@/data/wedash/engine/sellerHome";
-import { brlCent, fullDate, num, shortDate } from "@/lib/format";
+import { brlCent, num, shortDate } from "@/lib/format";
 import { cn } from "@/lib/cn";
-import { statusBadgeVariant } from "@/lib/status";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
-import { TargetIcon } from "@/pages/dashboards/icons";
 import { GoalProgressBar } from "@/pages/team/blocks";
 import { Icon, icons } from "@/pages/users/Icons";
 
-type Goal = NonNullable<SellerHomeStore["goal"]>;
-type Me = NonNullable<Goal["me"]>;
+type Me = NonNullable<SellerHomeGoal["me"]>;
 
 const MODE = {
   individual: {
-    badge: "Premiação individual",
-    sales: "Suas vendas na meta",
+    badge: "Individual",
     help: "Cada pessoa sobe de nível pela própria meta e recebe a premiação do nível sobre as próprias vendas. Os bônus dos níveis alcançados são acumulados.",
-    prize:
-      "Percentual do nível sobre tudo o que você vendeu na meta. Os bônus dos níveis alcançados entram na soma.",
+    prize: "Percentual do nível sobre tudo o que você vendeu na meta. Os bônus dos níveis alcançados entram na soma.",
   },
   grupo: {
-    badge: "Premiação por grupo",
-    sales: "Vendas do grupo",
+    badge: "Grupo",
     help: "O grupo sobe de nível pela soma das vendas. A premiação é dividida igualmente entre as pessoas do grupo, e o bônus de cada nível vale para cada pessoa. Os bônus dos níveis alcançados são acumulados.",
     prize: "Percentual do nível sobre as vendas do grupo, dividido igualmente entre as pessoas. Os bônus dos níveis alcançados entram na soma.",
   },
   geral: {
-    badge: "Premiação geral",
-    sales: "Vendas da filial",
+    badge: "Geral",
     help: "A filial sobe de nível pelo total vendido, inclusive a venda do caixa e a venda sem vendedor. A premiação é dividida igualmente e o bônus vale para cada pessoa.",
     prize: "Percentual do nível sobre o total vendido da filial, dividido igualmente entre as pessoas. Os bônus dos níveis alcançados entram na soma.",
   },
@@ -46,11 +39,10 @@ function TipHelp({ label }: { label: string }) {
   );
 }
 
-function ClockIcon() {
+function IconBadge({ children }: { children: ReactNode }) {
   return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v5l3 2" />
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      {children}
     </svg>
   );
 }
@@ -82,95 +74,92 @@ function Tile({
   );
 }
 
-/** Premiacao do vendedor numa loja, no mesmo desenho do resumo da meta do gestor. */
-export function PrizeCard({ store, embedded = false }: { store: SellerHomeStore; embedded?: boolean }) {
-  const goal = store.goal;
-  const body = (
-    <>
-      {!embedded && <h2 className="text-[15px] font-bold text-t0">{store.storeName}</h2>}
-      {!goal ? (
-        <EmptyBlock icon="🎯" title="Meta não configurada" description="Quando a meta da filial for cadastrada, ela aparecerá aqui." />
-      ) : !goal.me ? (
-        <p className="py-6 text-center text-[13.5px] text-t1">Você ainda não está em um grupo desta meta. Fale com a gerência da loja.</p>
-      ) : (
-        <PrizeBody goal={goal} me={goal.me} />
-      )}
-    </>
+/** Uma meta da pessoa, no card do gestor: selos, barra, projeção e a escada com bônus. */
+export function PrizeCard({ store, today, embedded = false }: { store: SellerHomeStore; today: string; embedded?: boolean }) {
+  const goals = store.goals;
+  if (goals.length === 0) {
+    const empty = <EmptyBlock icon="🎯" title="Meta não configurada" description="Quando a meta da filial for cadastrada, ela aparecerá aqui." />;
+    return embedded ? empty : <Card className="flex flex-col">{empty}</Card>;
+  }
+  return (
+    <div className="flex flex-col gap-4">
+      {goals.map((goal) => (
+        <Card key={goal.id} className="min-w-0 overflow-hidden" padding="lg">
+          {!goal.me ? (
+            <>
+              <CardTitle>{goal.name}</CardTitle>
+              <p className="py-6 text-center text-[13.5px] text-t1">Você ainda não está em um grupo desta meta. Fale com a gerência da loja.</p>
+            </>
+          ) : (
+            <PrizeBody goal={goal} me={goal.me} today={today} />
+          )}
+        </Card>
+      ))}
+    </div>
   );
-  if (embedded) return body;
-  return <Card className="flex flex-col">{body}</Card>;
 }
 
-function PrizeBody({ goal, me }: { goal: Goal; me: Me }) {
+function PrizeBody({ goal, me, today }: { goal: SellerHomeGoal; me: Me; today: string }) {
   const mode = MODE[me.modo];
   const level = me.levelNumber != null && me.level ? `N${me.levelNumber} · ${me.level}` : null;
   const current = me.levelNumber != null ? me.marcos[me.levelNumber - 1] : undefined;
   const total = me.prizeAmount + me.bonus;
-  const prazo = me.status === "active" ? prazoRemaining(me.daysRemaining) : GOAL_STATUS_LABEL[me.status];
   const band: NetworkGlobalGoal = {
     competenceText: me.metaName,
     achieved: me.achieved,
     total: me.goalAmount,
     pct: me.attainmentPct,
-    projectedPct: 0,
+    projectedPct: goal.projectedPct ?? 0,
     daysRemaining: me.daysRemaining,
     start: me.start,
     end: me.end,
   };
   const tiers = me.marcos.map((m) => ({ name: m.name, minAttainmentPct: m.pct, commissionPct: m.commissionPct }));
+  const levels = me.marcos.map((marco, i) => ({
+    marco,
+    number: i + 1,
+    bonusSoFar: me.marcos.slice(0, i + 1).reduce((sum, m) => sum + m.bonus, 0),
+  }));
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-start gap-3.5">
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-acc-soft text-acc">
-          <TargetIcon size={22} />
-        </span>
-        <div className="min-w-[180px] flex-1">
-          <div className="mb-1.5 flex flex-wrap items-center gap-2">
-            <h3 className="text-[18px] font-extrabold text-t0 sm:text-xl">{me.metaName}</h3>
-            <Badge variant={statusBadgeVariant(GOAL_STATUS_LABEL[me.status])} className="uppercase">
-              {GOAL_STATUS_LABEL[me.status]}
-            </Badge>
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Badge variant="neutral" className="gap-1 uppercase">
-              <ClockIcon />
-              {prazo}
-            </Badge>
+    <div className="flex flex-col gap-4">
+      <div>
+        <CardTitle>{goal.name}</CardTitle>
+        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+          <Badge variant="neutral" className="gap-1 uppercase">
+            <IconBadge>
+              {me.modo === "individual" ? (
+                <>
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </>
+              ) : (
+                <>
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </>
+              )}
+            </IconBadge>
+            {mode.badge}
+          </Badge>
+          <TipHelp label={mode.help} />
+          {me.group ? (
             <Badge variant="neutral" className="uppercase">
-              {fullDate(me.start)} a {fullDate(me.end)}
+              {me.group}
             </Badge>
-            <Badge variant="neutral" className="uppercase">
-              {mode.badge}
-            </Badge>
-            <TipHelp label={mode.help} />
-            {me.group ? (
-              <Badge variant="neutral" className="uppercase">
-                {me.group}
-              </Badge>
-            ) : null}
-          </div>
+          ) : null}
+          <Badge variant="neutral" className="gap-1 uppercase">
+            <IconBadge>
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+            </IconBadge>
+            {me.marcos.length} {me.marcos.length === 1 ? "nível" : "níveis"}
+          </Badge>
         </div>
       </div>
 
-      <div>
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-[18px] font-extrabold tracking-tight text-t0 sm:text-[20px]">
-              <span className="font-mono">{brlCent(me.achieved)}</span>
-              <span className="mx-1.5 text-[14px] font-semibold text-t2">/</span>
-              <span className="font-mono text-[14px] font-bold text-t2 sm:text-[15px]">{brlCent(me.goalAmount)}</span>
-            </p>
-            <p className="mt-1 text-[12px] text-t2">{mode.sales}</p>
-          </div>
-          <p className={`font-mono text-[26px] font-extrabold leading-none sm:text-[28px] ${progressTextClass(me.attainmentPct)}`}>
-            {num(me.attainmentPct, 1)}%
-          </p>
-        </div>
-        <div className="mt-4">
-          <GoalProgressBar goal={band} tiers={tiers} embedded soBarra individual={false} />
-        </div>
-      </div>
+      <GoalProgressBar goal={band} tiers={tiers} todayIso={today} embedded hideTitle individual={false} />
 
       <div className={cn("grid grid-cols-2 gap-2.5", me.next ? "lg:grid-cols-4" : "lg:grid-cols-3")}>
         <Tile
@@ -202,29 +191,33 @@ function PrizeBody({ goal, me }: { goal: Goal; me: Me }) {
           />
         )}
         <Tile
-          label="Projeção"
+          label="Projeção da premiação"
           value={goal.projectedPrize != null ? brlCent(goal.projectedPrize) : "—"}
           sub={goal.projectedPrize != null ? `Se mantiver o ritmo até ${shortDate(goal.endsOn)}` : "Disponível após metade do período"}
           tip="Estimativa da sua premiação no fim da meta, se o ritmo de vendas se mantiver. Aparece depois de metade do período."
         />
       </div>
 
-      {me.marcos.length > 0 && (
+      {levels.length > 0 && (
         <div>
           <CardTitle className="mb-3">Níveis e premiação</CardTitle>
           <div className="flex flex-col gap-2.5">
-            {me.marcos.map((marco, i) => {
-              const number = i + 1;
+            {levels.map(({ marco, number, bonusSoFar }) => {
               const reached = me.levelNumber != null && me.levelNumber >= number;
               const currentLevel = me.levelNumber === number;
+              const parts = [`A partir de ${num(marco.pct, 0)}% da meta`];
+              if (marco.bonus > 0) {
+                parts.push(`bônus de ${brlCent(marco.bonus)}`);
+                if (bonusSoFar > marco.bonus) parts.push(`bônus acumulado de ${brlCent(bonusSoFar)}`);
+              }
               return (
                 <div
-                  key={`${marco.name}-${i}`}
+                  key={`${marco.name}-${number}`}
                   className="flex items-center gap-3 rounded-xl border bg-bg-inset px-3.5 py-3"
                   style={{ borderColor: currentLevel ? "var(--acc)" : reached ? "var(--ok-soft)" : "var(--line)" }}
                 >
                   <span
-                    className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-bold text-white"
+                    className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-bold"
                     style={{
                       background: reached ? "var(--ok)" : "var(--bg-3)",
                       borderColor: reached ? "var(--ok)" : "var(--line-2)",
@@ -242,7 +235,7 @@ function PrizeBody({ goal, me }: { goal: Goal; me: Me }) {
                         </Badge>
                       )}
                     </p>
-                    <p className="mt-0.5 text-[11.5px] text-t2">A partir de {num(marco.pct, 0)}% da meta</p>
+                    <p className="mt-0.5 text-[11.5px] text-t2">{parts.join(" · ")}</p>
                   </div>
                   <div className="shrink-0 text-right">
                     <p className={cn("font-mono text-[13px] font-extrabold", reached ? "text-ok" : "text-t1")}>{num(marco.commissionPct, 1)}%</p>
