@@ -143,7 +143,8 @@ export async function loginWithEmail(email: string, password: string): Promise<A
 
   const session = await hydrateSessionFromAuth(data.user.id, e);
   if (!session || session === SELLER_SUSPENDED) {
-    await sb.auth.signOut();
+    // Só esta tentativa. O padrão global derrubaria o celular já logado.
+    await sb.auth.signOut({ scope: "local" });
     return {
       ok: false,
       error: session === SELLER_SUSPENDED ? "Seu acesso está suspenso. Fale com o responsável pelos acessos da WDash." : MESSAGE_LOGIN,
@@ -152,10 +153,11 @@ export async function loginWithEmail(email: string, password: string): Promise<A
   return { ok: true, session };
 }
 
+/** Sair deste aparelho. Computador e celular são sessões separadas. */
 export async function logoutAuth(): Promise<void> {
   clearRecovery();
   const sb = getSupabase();
-  if (sb) await sb.auth.signOut();
+  if (sb) await sb.auth.signOut({ scope: "local" });
 }
 
 /**
