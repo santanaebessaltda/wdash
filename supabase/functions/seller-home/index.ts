@@ -243,8 +243,6 @@ serve(async (req) => {
       branchSellerId.set(
         String(store.id),
         resolveBranchSellerId({
-          chosen: store.branch_user_chosen === true,
-          chosenSellerId: store.branch_user_seller_id == null ? null : String(store.branch_user_seller_id),
           sellers: teamRows.map((r) => ({ id: String(r.id), code: r.code == null ? null : String(r.code), storeId: String(r.store_id) })),
           storeId: String(store.id),
           branchCode: store.code == null ? String(store.millennium_store_id) : String(store.code),

@@ -1,4 +1,4 @@
-/** Usuário da filial: escolha da WDash, ou o código igual ao da filial quando ainda não houve escolha. */
+/** Usuário da filial: quem tem o código igual ao da filial no ERP. */
 
 export function millenniumCodeKey(value: string | number | null | undefined): string | null {
   if (value == null) return null;
@@ -17,23 +17,13 @@ export function isBranchUser(
 
 export type BranchSellerRef = { id: string; code: string | null; storeId: string };
 
-/**
- * Pessoa da filial que lança venda no usuário da loja.
- * `chosen` false = quem tem o código da filial. `chosen` true com id vazio = nenhum.
- */
+/** Pessoa da filial que lança venda no usuário da loja: código igual ao da filial. */
 export function resolveBranchSellerId(args: {
-  chosen: boolean;
-  chosenSellerId: string | null;
   sellers: BranchSellerRef[];
   storeId: string;
   branchCode: string;
   millenniumBranch: number;
 }): string | null {
-  const inStore = args.sellers.filter((s) => s.storeId === args.storeId);
-  if (args.chosen) {
-    if (!args.chosenSellerId) return null;
-    return inStore.some((s) => s.id === args.chosenSellerId) ? args.chosenSellerId : null;
-  }
   const branch = { branchCode: args.branchCode, millenniumBranch: args.millenniumBranch };
-  return inStore.find((s) => isBranchUser(s.code, branch))?.id ?? null;
+  return args.sellers.find((s) => s.storeId === args.storeId && isBranchUser(s.code, branch))?.id ?? null;
 }

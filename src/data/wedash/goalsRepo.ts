@@ -179,8 +179,6 @@ async function markBranchUsers(
     branchId.set(
       store.id,
       resolveBranchSellerId({
-        chosen: store.branch_user_chosen === true,
-        chosenSellerId: store.branch_user_seller_id ?? null,
         sellers,
         storeId: store.id,
         branchCode: store.code || String(store.millennium_store_id),

@@ -494,8 +494,6 @@ export async function fetchSalesOrigins(client: SalesQueryClient, tenantId: stri
     branchByStore.set(
       store.id,
       resolveBranchSellerId({
-        chosen: store.branch_user_chosen === true,
-        chosenSellerId: store.branch_user_seller_id ?? null,
         sellers: sellers.map((s) => ({ id: s.id, code: s.code, storeId: s.store_id })),
         storeId: store.id,
         branchCode: store.code || String(store.millennium_store_id),

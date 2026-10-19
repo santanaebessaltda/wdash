@@ -717,9 +717,8 @@ type BranchChoice = {
   branchUserSellerId?: string | null;
 };
 
-/** Pessoa marcada como usuário da filial: a escolha da WDash, ou o código igual ao da filial. */
+/** Pessoa marcada como usuário da filial: código igual ao da filial no ERP. */
 export function isResolvedBranchUser(seller: { id?: string; code: string | null }, branch: BranchChoice): boolean {
-  if (branch.branchUserChosen) return seller.id === branch.branchUserSellerId;
   return isBranchUser(seller.code, branch);
 }
 
@@ -745,7 +744,6 @@ export function isBranchTeamMember(
   branch?: BranchChoice,
 ): boolean {
   if (!s.active) return false;
-  if (branch?.branchUserChosen && s.id != null && s.id === branch.branchUserSellerId) return true;
   if (s.role == null || BRANCH_TEAM_ROLES.has(s.role)) return true;
   return branch != null && isBranchUser(s.code, branch);
 }
@@ -760,7 +758,7 @@ export function branchRoleLabel(role: string | null): string {
   return role;
 }
 
-/** Cargo na Equipe. A escolha da filial, ou o código igual ao da filial, aparece como Usuário da filial. */
+/** Cargo na Equipe. O código igual ao da filial aparece como Usuário da filial. */
 export function teamRoleLabel(
   seller: Pick<StoreSeller, "role" | "code"> & { id?: string },
   branch: BranchChoice,

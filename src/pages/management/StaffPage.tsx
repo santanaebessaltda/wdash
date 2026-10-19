@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Badge, Button, Card, DataTable, Dropdown, EmptyState, FormField, Modal, Segmented, Skeleton, Switch, useToast, type DataTableColumn, type DropdownItem } from "@/components/ui";
+import { Badge, Button, Card, DataTable, Dropdown, EmptyState, FormField, Modal, Segmented, Skeleton, useToast, type DataTableColumn, type DropdownItem } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { SegmentedSkeleton, StoreCardsSkeleton, TeamTableSkeleton } from "@/components/wedash/LoadingSkeletons";
 import {
@@ -8,10 +8,8 @@ import {
   fetchStoreShifts,
   isBranchSalesPerson,
   isBranchTeamMember,
-  isResolvedBranchUser,
   teamRoleLabel,
   saveStoreShift,
-  setBranchUser,
   setSellerShift,
   syncStoreSellersNow,
   type Store,
@@ -137,7 +135,6 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
   const [removing, setRemoving] = useState<StoreSeller | null>(null);
   const [removingBusy, setRemovingBusy] = useState(false);
   const [creating, setCreating] = useState<{ sellerId: string; start: string; end: string } | null>(null);
-  const [branchChoice, setBranchChoice] = useState<{ chosen: boolean; sellerId: string | null } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -155,10 +152,6 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
       cancelled = true;
     };
   }, [tenantId, store.id, tick, reloadKey, groupsTick]);
-
-  useEffect(() => {
-    setBranchChoice(null);
-  }, [store.id, store.branchUserChosen, store.branchUserSellerId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -182,11 +175,8 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
     };
   }, [tenantId, store.id, groupsTick]);
 
-  const branchStore = branchChoice
-    ? { ...store, branchUserChosen: branchChoice.chosen, branchUserSellerId: branchChoice.sellerId }
-    : store;
-  const salesPerson = (seller: StoreSeller) => isBranchSalesPerson(seller, branchStore);
-  const ativos = useMemo(() => team.filter((seller) => isBranchTeamMember(seller, branchStore)), [team, branchStore]);
+  const salesPerson = (seller: StoreSeller) => isBranchSalesPerson(seller, store);
+  const ativos = useMemo(() => team.filter((seller) => isBranchTeamMember(seller, store)), [team, store]);
   const desligados = useMemo(() => team.filter((s) => !s.active), [team]);
   const rows = tab === "ativos" ? ativos : desligados;
 
@@ -257,25 +247,13 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
       if (!shifted) return false;
       setTeam((list) => list.map((person) => (person.id === seller.id ? { ...person, shiftId: draft.shiftId } : person)));
     }
-    const wasBranch = isResolvedBranchUser(seller, branchStore);
-    if (draft.branchUser !== wasBranch) {
-      const before = branchChoice;
-      const next = draft.branchUser ? seller.id : null;
-      setBranchChoice({ chosen: true, sellerId: next });
-      const saved = await setBranchUser(store.id, next);
-      if (!saved.ok) {
-        setBranchChoice(before);
-        show("Não foi possível salvar o usuário da filial. Tente novamente.", "danger");
-        return false;
-      }
-    }
     show("Cadastro salvo.", "success");
     return true;
   }
 
   const columns = useMemo<DataTableColumn<StoreSeller>[]>(
     () => [
-      ...sellerColumns(branchStore),
+      ...sellerColumns(store),
       {
         key: "access",
         header: "Acesso",
@@ -321,7 +299,7 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [shifts, shiftOf, savingIds, access, branchStore],
+    [shifts, shiftOf, savingIds, access, store],
   );
 
   const withoutTeam = loaded && team.length === 0;
@@ -410,7 +388,7 @@ function StaffCard({ tenantId, store, reloadKey, groupsTick }: { tenantId: strin
       </Modal>
       <SellerEditor
         seller={editing}
-        store={branchStore}
+        store={store}
         shifts={shifts}
         pendingShift={pendingShift}
         onClose={() => setEditing(null)}
@@ -464,8 +442,8 @@ function rowActions(input: {
   onReactivate: () => void;
   onRemove: () => void;
 }): DropdownItem[] {
+  if (!input.sales) return [];
   const edit: DropdownItem = { label: "Editar cadastro", onClick: input.onEdit };
-  if (!input.sales) return [edit];
   if (!input.state) return [edit];
   const exclude: DropdownItem = { label: "Excluir acesso", onClick: input.onRemove, danger: true };
   const access: DropdownItem[] =
@@ -498,7 +476,7 @@ function RowMenu({ items }: { items: DropdownItem[] }) {
   );
 }
 
-type SellerDraft = { shiftId: string | null; sales: boolean; branchUser: boolean };
+type SellerDraft = { shiftId: string | null; sales: boolean };
 
 function SellerEditor({
   seller,
@@ -519,14 +497,12 @@ function SellerEditor({
 }) {
   const sales = seller ? isBranchSalesPerson(seller, store) : false;
   const [shiftId, setShiftId] = useState<string | null>(seller?.shiftId ?? null);
-  const [branchUser, setBranchUserOn] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setShiftId(seller?.shiftId ?? null);
-    setBranchUserOn(seller ? isResolvedBranchUser(seller, store) : false);
     setSaving(false);
-  }, [seller, store]);
+  }, [seller]);
 
   useEffect(() => {
     if (seller && pendingShift?.sellerId === seller.id) setShiftId(pendingShift.shiftId);
@@ -535,7 +511,7 @@ function SellerEditor({
   async function save() {
     if (!seller) return;
     setSaving(true);
-    const ok = await onSave(seller, { shiftId, sales, branchUser });
+    const ok = await onSave(seller, { shiftId, sales });
     setSaving(false);
     if (ok) onClose();
   }
@@ -558,10 +534,7 @@ function SellerEditor({
     >
       {seller && (
         <div className="flex flex-col gap-3">
-          <p className="text-[12.5px] text-t2">O grupo e o usuário da filial são salvos na WDash. A atualização do Millennium não altera esses dados.</p>
-          <FormField label="Usuário da filial" hint="A venda deste usuário fica fora do ranking e não entra no rateio. Só uma pessoa por filial.">
-            <Switch checked={branchUser} onChange={setBranchUserOn} />
-          </FormField>
+          <p className="text-[12.5px] text-t2">O grupo é salvo na WDash. A atualização do Millennium não altera esse dado.</p>
           {sales && (
             <FormField label="Grupo">
               <select className="h-[42px] w-full rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3.5 text-[13px] text-t0 outline-none focus:border-acc" value={shiftId ?? ""} onChange={(event) => setShiftId(event.target.value || null)}>

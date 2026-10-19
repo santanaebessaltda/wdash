@@ -72,14 +72,14 @@ describe("teamRoleLabel", () => {
     expect(teamRoleLabel({ role: "OPERADOR DE CAIXA", code: "665" }, campoGrande)).toBe("Operador de caixa");
   });
 
-  it("uses the chosen person and leaves the code match as a seller", () => {
+  it("keeps the ERP code match even when a manual choice was saved", () => {
     const chosen = { ...campoGrande, branchUserChosen: true, branchUserSellerId: "freelancer" };
     const freelancer = { id: "freelancer", role: "VENDEDOR", code: "999" };
     const codeMatch = { id: "real", role: "VENDEDOR", code: "386" };
-    expect(isResolvedBranchUser(freelancer, chosen)).toBe(true);
-    expect(isResolvedBranchUser(codeMatch, chosen)).toBe(false);
-    expect(teamRoleLabel(freelancer, chosen)).toBe("Usuário da filial");
-    expect(teamRoleLabel(codeMatch, chosen)).toBe("Vendedor");
-    expect(isResolvedBranchUser(codeMatch, { ...campoGrande, branchUserChosen: true, branchUserSellerId: null })).toBe(false);
+    expect(isResolvedBranchUser(freelancer, chosen)).toBe(false);
+    expect(isResolvedBranchUser(codeMatch, chosen)).toBe(true);
+    expect(teamRoleLabel(freelancer, chosen)).toBe("Vendedor");
+    expect(teamRoleLabel(codeMatch, chosen)).toBe("Usuário da filial");
+    expect(isResolvedBranchUser(codeMatch, { ...campoGrande, branchUserChosen: true, branchUserSellerId: null })).toBe(true);
   });
 });
