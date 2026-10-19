@@ -18,8 +18,8 @@ import { buildChallengeView } from "./challengeView";
 import { dayShortageCents, netCloseDiff } from "./employeeWithdrawal";
 import { goalWeightFrom } from "./engine/goalProjection";
 import type { StoreWeekHours } from "./engine/goalWeights";
-import { buildWalletMonth, type WalletCashDay, type WalletChallengeInput, type WalletGoalInput, type WalletMonth, type WalletPersonInput } from "./engine/wallet";
-import { buildGoalCardView, goalStatus } from "./goalView";
+import { buildWalletMonth, splitEqualCents, type WalletCashDay, type WalletChallengeInput, type WalletGoalInput, type WalletMonth, type WalletPersonInput } from "./engine/wallet";
+import { buildGoalCardView, goalManagerPrize, goalStatus } from "./goalView";
 import { fetchGoalTeam, fetchGoals } from "./goalsRepo";
 import { fetchNamedSellerDayAggs, fetchSalesDayAggs, fetchSalesSellerDayAggs } from "./salesRepo";
 import { shortageShares, suggestDayShortage, type ShortageScope } from "./shortageAssign";
@@ -49,11 +49,15 @@ function nameKey(name: string): string {
     .toLocaleUpperCase("pt-BR");
 }
 
+type RosterManager = { id: string; name: string; employeeId: number };
+
 type Roster = {
   people: WalletPersonInput[];
   byId: Map<string, string>;
   byEmployee: Map<string, string>;
   byName: Map<string, string>;
+  /** Ativas com cargo Gerência. O usuário da filial sai depois, quando a equipe chega. */
+  managers: RosterManager[];
 };
 
 function rememberName(index: Map<string, string>, name: string, personId: string) {
@@ -64,15 +68,17 @@ function rememberName(index: Map<string, string>, name: string, personId: string
 async function loadRoster(tenantId: string, storeId: string): Promise<Roster> {
   const sb = getSupabase();
   const people: WalletPersonInput[] = [];
+  const managers: RosterManager[] = [];
   const byId = new Map<string, string>();
   const byEmployee = new Map<string, string>();
   const byName = new Map<string, string>();
-  const add = (id: string, name: string, employeeId: number | null, nameKeys: string[]) => {
+  const add = (id: string, name: string, employeeId: number | null, nameKeys: string[], manager = false) => {
     if (!id || byId.has(id)) return;
     const label = collaboratorName(name) || "Funcionário fora do cadastro";
     byId.set(id, id);
     people.push({ id, name: label });
     if (employeeId != null) byEmployee.set(`e:${employeeId}`, id);
+    if (manager && employeeId != null) managers.push({ id, name: label, employeeId });
     rememberName(byName, label, id);
     for (const key of nameKeys) rememberName(byName, key, id);
   };
@@ -80,7 +86,7 @@ async function loadRoster(tenantId: string, storeId: string): Promise<Roster> {
   if (sb) {
     const { data, error } = await sb
       .from("store_seller")
-      .select("id, millennium_employee_id, name, name_keys")
+      .select("id, millennium_employee_id, name, name_keys, active, erp_role")
       .eq("tenant_id", tenantId)
       .eq("store_id", storeId)
       .limit(2000);
@@ -91,13 +97,22 @@ async function loadRoster(tenantId: string, storeId: string): Promise<Roster> {
         String(row.name ?? ""),
         row.millennium_employee_id == null ? null : Number(row.millennium_employee_id),
         Array.isArray(row.name_keys) ? row.name_keys.filter((key): key is string => typeof key === "string") : [],
+        row.active === true && row.erp_role === "GERENCIA" && row.millennium_employee_id != null,
       );
     }
   }
 
   const staff = await fetchWithdrawalStaff(tenantId);
   for (const person of staff) add(person.id, person.name, null, []);
-  return { people, byId, byEmployee, byName };
+  return { people, byId, byEmployee, byName, managers };
+}
+
+/** Gerência da filial, sem o usuário da loja. A parte de cada uma já chega pronta para a carteira. */
+function branchManagers(roster: Roster, team: { storeId: string; employeeId: number; branchUser?: boolean }[], storeId: string): RosterManager[] {
+  const branch = new Set(team.filter((member) => member.storeId === storeId && member.branchUser).map((member) => member.employeeId));
+  return roster.managers
+    .filter((person) => !branch.has(person.employeeId))
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR") || a.id.localeCompare(b.id));
 }
 
 function personFromKey(roster: Roster, key: string, name: string): string | null {
@@ -155,6 +170,7 @@ export async function loadBranchWallet(input: {
     fetchChallengeInput({ tenantId: input.tenantId, challenges: endingChallenges, today: input.today }),
   ]);
 
+  const managers = branchManagers(roster, team, input.storeId);
   const goalSlices: WalletGoalInput[] = endingGoals.map((goal) => {
     const card = buildGoalCardView({
       goal,
@@ -166,17 +182,28 @@ export async function loadBranchWallet(input: {
       today: input.today,
       week: input.week,
     });
-    const people = [];
+    const people = new Map<string, WalletGoalInput["people"][number]>();
     for (const seller of card.sellers) {
       const personId = personFromKey(roster, seller.employeeId, seller.name);
       if (!personId) continue;
-      people.push({
+      people.set(personId, {
         personId,
         prizeCents: reaisToCents(seller.accruedPrize),
         bonusCents: reaisToCents(seller.bonusReached),
       });
     }
-    return { name: goal.name, endsOn: goal.endsOn, open: goalStatus(goal, input.today) === "active", people };
+    const management = goalManagerPrize(goal, card.band.achieved);
+    if (management && managers.length > 0) {
+      const prizes = splitEqualCents(reaisToCents(management.prizeAmount), managers.length);
+      const bonuses = splitEqualCents(reaisToCents(management.bonus), managers.length);
+      managers.forEach((manager, index) => {
+        const row = people.get(manager.id) ?? { personId: manager.id, prizeCents: 0, bonusCents: 0 };
+        row.managementPrizeCents = prizes[index] ?? 0;
+        row.managementBonusCents = bonuses[index] ?? 0;
+        people.set(manager.id, row);
+      });
+    }
+    return { name: goal.name, endsOn: goal.endsOn, open: goalStatus(goal, input.today) === "active", people: [...people.values()] };
   });
 
   const challengeSlices: WalletChallengeInput[] = [];
@@ -198,6 +225,14 @@ export async function loadBranchWallet(input: {
         continue;
       }
       people.push({ personId, moneyCents: reaisToCents(participant.prize.amount), itemLabel: null });
+    }
+    const managerPrize = status === "active" ? null : view.management?.atingiu ? view.management.prize : null;
+    if (managerPrize?.kind === "MONEY" && managers.length > 0) {
+      const shares = splitEqualCents(reaisToCents(managerPrize.amount), managers.length);
+      managers.forEach((manager, index) => {
+        const share = shares[index] ?? 0;
+        if (share > 0) people.push({ personId: manager.id, moneyCents: share, itemLabel: null, management: true });
+      });
     }
     challengeSlices.push({ name: challenge.name, endsOn: challenge.endsOn, open: status === "active", people });
   }

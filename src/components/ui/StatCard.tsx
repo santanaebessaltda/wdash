@@ -8,7 +8,8 @@ import { deltaTip } from "@/lib/format";
 export interface StatCardProps {
   label: string;
   value: string | number;
-  icon: ReactNode;
+  /** Sem ícone, o card começa no rótulo. */
+  icon?: ReactNode;
   iconColor?: string;
   iconBg?: string;
   delta?: { value: string; positive: boolean; vs?: string; diff?: string; previous?: string };
@@ -29,13 +30,16 @@ export interface StatCardProps {
 export function StatCard({ label, value, icon, iconColor = "var(--acc)", iconBg = "var(--acc-soft)", delta, sparkline, sub, sub2, tooltip, deltaTooltip, valueClassName, className }: StatCardProps) {
   return (
     <Card className={cn("min-w-0", className)}>
-      <div className="flex items-center justify-between gap-2">
-        <div
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[13px]"
-          style={{ background: iconBg, color: iconColor }}
-        >
-          {icon}
-        </div>
+      {icon || delta ? (
+      <div className={cn("flex items-center gap-2", icon ? "justify-between" : "justify-end")}>
+        {icon ? (
+          <div
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[13px]"
+            style={{ background: iconBg, color: iconColor }}
+          >
+            {icon}
+          </div>
+        ) : null}
         {delta && (() => {
           const badgeLabel = deltaTooltip ?? deltaTip(delta);
           const badge = (
@@ -51,7 +55,8 @@ export function StatCard({ label, value, icon, iconColor = "var(--acc)", iconBg 
           return badgeLabel ? <Tooltip label={badgeLabel}>{badge}</Tooltip> : badge;
         })()}
       </div>
-      <div className="mt-4 flex items-center gap-1.5">
+      ) : null}
+      <div className={cn("flex items-center gap-1.5", icon || delta ? "mt-4" : "")}>
         <p className="truncate text-xs font-bold uppercase tracking-wide text-t1">{label}</p>
         {tooltip && (
           <Tooltip label={tooltip} side="bottom">

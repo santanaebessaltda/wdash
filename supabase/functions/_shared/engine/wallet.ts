@@ -1,6 +1,6 @@
 /** Carteira do mês: premiação, bônus, desafio, retirada e quebra. Valores em centavos. */
 
-export type WalletLineKind = "prize" | "bonus" | "challenge" | "withdrawal" | "shortage";
+export type WalletLineKind = "prize" | "bonus" | "management" | "managementBonus" | "challenge" | "withdrawal" | "shortage";
 
 export type WalletLine = {
   kind: WalletLineKind;
@@ -19,6 +19,8 @@ export type WalletPersonMonth = {
   name: string;
   prizeCents: number;
   bonusCents: number;
+  /** Premiação e bônus da gerência já repartidos para esta pessoa. */
+  managementCents: number;
   challengeCents: number;
   withdrawalCents: number;
   shortageCents: number;
@@ -34,6 +36,8 @@ export type WalletMonth = {
   people: WalletPersonMonth[];
   /** Quebra do mês sem pessoa, grupo ou equipe. Só na visão da filial. */
   unassignedShortageCents: number;
+  /** Dias dessa quebra, para abrir sob o aviso. */
+  unassignedShortageDays: { day: string; cents: number }[];
 };
 
 export type WalletPersonInput = { id: string; name: string };
@@ -42,15 +46,31 @@ export type WalletGoalInput = {
   name: string;
   endsOn: string;
   open: boolean;
-  people: { personId: string; prizeCents: number; bonusCents: number }[];
+  people: {
+    personId: string;
+    prizeCents: number;
+    bonusCents: number;
+    managementPrizeCents?: number;
+    managementBonusCents?: number;
+  }[];
 };
 
 export type WalletChallengeInput = {
   name: string;
   endsOn: string;
   open: boolean;
-  people: { personId: string; moneyCents: number; itemLabel: string | null }[];
+  people: { personId: string; moneyCents: number; itemLabel: string | null; management?: boolean }[];
 };
+
+/** Divide centavos em partes iguais. O resto fica nas primeiras partes. */
+export function splitEqualCents(total: number, count: number): number[] {
+  const amount = Math.max(0, Math.round(total));
+  if (count <= 0) return [];
+  if (amount <= 0) return Array.from({ length: count }, () => 0);
+  const base = Math.floor(amount / count);
+  const extra = amount % count;
+  return Array.from({ length: count }, (_, index) => base + (index < extra ? 1 : 0));
+}
 
 export type WalletCashDay = {
   day: string;
@@ -73,6 +93,7 @@ type Bucket = {
   name: string;
   prizeCents: number;
   bonusCents: number;
+  managementCents: number;
   challengeCents: number;
   withdrawalCents: number;
   shortageCents: number;
@@ -108,6 +129,7 @@ export function buildWalletMonth(input: {
         name: names.get(personId) ?? "Funcionário fora do cadastro",
         prizeCents: 0,
         bonusCents: 0,
+        managementCents: 0,
         challengeCents: 0,
         withdrawalCents: 0,
         shortageCents: 0,
@@ -136,6 +158,18 @@ export function buildWalletMonth(input: {
         row.openPrize = row.openPrize || goal.open;
         row.lines.push({ kind: "bonus", title: goal.name, day: null, cents: bonus, open: goal.open, note: null });
       }
+      const managementPrize = cents(person.managementPrizeCents ?? 0);
+      const managementBonus = cents(person.managementBonusCents ?? 0);
+      if (managementPrize > 0) {
+        row.managementCents += managementPrize;
+        row.openPrize = row.openPrize || goal.open;
+        row.lines.push({ kind: "management", title: goal.name, day: null, cents: managementPrize, open: goal.open, note: null });
+      }
+      if (managementBonus > 0) {
+        row.managementCents += managementBonus;
+        row.openPrize = row.openPrize || goal.open;
+        row.lines.push({ kind: "managementBonus", title: goal.name, day: null, cents: managementBonus, open: goal.open, note: null });
+      }
     }
   }
 
@@ -145,7 +179,16 @@ export function buildWalletMonth(input: {
       const row = bucket(person.personId);
       if (!row) continue;
       if (challenge.open) {
-        row.lines.push({ kind: "challenge", title: challenge.name, day: null, cents: 0, open: true, note: "Em andamento" });
+        if (!person.management) {
+          row.lines.push({ kind: "challenge", title: challenge.name, day: null, cents: 0, open: true, note: "Em andamento" });
+        }
+        continue;
+      }
+      if (person.management) {
+        const share = cents(person.moneyCents);
+        if (share <= 0) continue;
+        row.managementCents += share;
+        row.lines.push({ kind: "management", title: challenge.name, day: null, cents: share, open: false, note: null });
         continue;
       }
       const item = person.itemLabel?.trim() ?? "";
@@ -161,6 +204,7 @@ export function buildWalletMonth(input: {
   }
 
   let unassigned = 0;
+  const unassignedDays: { day: string; cents: number }[] = [];
   for (const day of input.days) {
     if (monthOf(day.day) !== month) continue;
     for (const line of day.withdrawals) {
@@ -179,7 +223,11 @@ export function buildWalletMonth(input: {
       row.shortageCents += amount;
       row.lines.push({ kind: "shortage", title: "", day: day.day, cents: amount, open: false, note: null });
     }
-    if (!input.onlyPersonId) unassigned += cents(day.unassignedShortageCents);
+    const leftover = cents(day.unassignedShortageCents);
+    if (!input.onlyPersonId && leftover > 0) {
+      unassigned += leftover;
+      unassignedDays.push({ day: day.day, cents: leftover });
+    }
   }
 
   const people = [...buckets.values()]
@@ -188,10 +236,11 @@ export function buildWalletMonth(input: {
       name: row.name,
       prizeCents: row.prizeCents,
       bonusCents: row.bonusCents,
+      managementCents: row.managementCents,
       challengeCents: row.challengeCents,
       withdrawalCents: row.withdrawalCents,
       shortageCents: row.shortageCents,
-      balanceCents: row.prizeCents + row.bonusCents + row.challengeCents - row.withdrawalCents - row.shortageCents,
+      balanceCents: row.prizeCents + row.bonusCents + row.managementCents + row.challengeCents - row.withdrawalCents - row.shortageCents,
       openPrize: row.openPrize,
       lines: row.lines,
     }))
@@ -204,6 +253,7 @@ export function buildWalletMonth(input: {
       name: names.get(input.onlyPersonId) ?? "Funcionário fora do cadastro",
       prizeCents: 0,
       bonusCents: 0,
+      managementCents: 0,
       challengeCents: 0,
       withdrawalCents: 0,
       shortageCents: 0,
@@ -213,5 +263,5 @@ export function buildWalletMonth(input: {
     });
   }
 
-  return { month, people, unassignedShortageCents: unassigned };
+  return { month, people, unassignedShortageCents: unassigned, unassignedShortageDays: unassignedDays };
 }

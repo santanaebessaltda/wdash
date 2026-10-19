@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Alert, Button, Card, CardTitle, DataTable, PageHeader, Skeleton, StatCard, type DataTableColumn } from "@/components/ui";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { addMonths, startOfMonth } from "@/data/wedash/engine/format";
@@ -27,9 +28,28 @@ function balanceClass(cents: number): string {
 function lineTitle(line: WalletLine): string {
   if (line.kind === "prize") return `Premiação · ${line.title}`;
   if (line.kind === "bonus") return `Bônus · ${line.title}`;
+  if (line.kind === "management") return `Premiação da gerência · ${line.title}`;
+  if (line.kind === "managementBonus") return `Bônus da gerência · ${line.title}`;
   if (line.kind === "challenge") return `Desafio · ${line.title}`;
   if (line.kind === "withdrawal") return `Retirada · ${line.day ? fullDate(line.day) : ""}`;
   return `Quebra de caixa · ${line.day ? fullDate(line.day) : ""}`;
+}
+
+function earningsOf(row: WalletPersonMonth): number {
+  return row.prizeCents + row.bonusCents + (row.managementCents || 0) + row.challengeCents;
+}
+
+function discountsOf(row: WalletPersonMonth): number {
+  return row.withdrawalCents + row.shortageCents;
+}
+
+function minusMoney(cents: number): string {
+  if (cents <= 0) return "—";
+  return `− ${money(cents)}`;
+}
+
+function isGain(line: WalletLine): boolean {
+  return line.kind === "prize" || line.kind === "bonus" || line.kind === "management" || line.kind === "managementBonus" || line.kind === "challenge";
 }
 
 function lineAmount(line: WalletLine): string {
@@ -79,39 +99,26 @@ function Totals({ wallet, mine }: { wallet: WalletMonth; mine: boolean }) {
   const balance = sum((row) => row.balanceCents);
   const open = rows.some((row) => row.openPrize || row.lines.some((line) => line.open));
   const cards = [
-    { label: "Saldo", value: money(balance), sub: open ? "Até agora" : undefined, valueClassName: balanceClass(balance) },
-    { label: "Premiação", value: money(sum((row) => row.prizeCents)) },
-    { label: "Bônus", value: money(sum((row) => row.bonusCents)) },
-    { label: "Desafios", value: money(sum((row) => row.challengeCents)) },
-    { label: "Retiradas", value: money(sum((row) => row.withdrawalCents)) },
-    { label: "Quebra de caixa", value: money(sum((row) => row.shortageCents)) },
+    { label: mine ? "Saldo" : "Saldo a pagar", value: money(balance), sub: open ? "Até agora" : undefined, valueClassName: balanceClass(balance) },
+    { label: "Ganhos", value: money(sum(earningsOf)) },
+    { label: "Descontos", value: money(sum(discountsOf)) },
   ];
   return (
-    <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${mine ? "lg:grid-cols-3" : "lg:grid-cols-3 xl:grid-cols-6"}`}>
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
       {cards.map((card) => (
-        <StatCard
-          key={card.label}
-          label={card.label}
-          value={card.value}
-          sub={card.sub}
-          valueClassName={"valueClassName" in card ? card.valueClassName : undefined}
-          icon={<span className="text-[13px] font-bold">R$</span>}
-        />
+        <StatCard key={card.label} label={card.label} value={card.value} sub={card.sub} valueClassName={card.valueClassName} />
       ))}
     </div>
   );
 }
 
-function Statement({ person }: { person: WalletPersonMonth }) {
-  if (person.lines.length === 0) {
-    return <EmptyBlock icon="👛" title="Nada neste mês" description="Não há premiação, desafio, retirada ou quebra neste mês." />;
-  }
+function LineList({ lines }: { lines: WalletLine[] }) {
   return (
-    <ul className="divide-y divide-line">
-      {person.lines.map((line, index) => {
+    <ul>
+      {lines.map((line, index) => {
         const note = lineNote(line);
         return (
-          <li key={`${line.kind}-${line.title}-${line.day ?? ""}-${index}`} className="flex items-start justify-between gap-4 py-3">
+          <li key={`${line.kind}-${line.title}-${line.day ?? ""}-${index}`} className="flex items-start justify-between gap-4 border-b border-line py-3 last:border-b-0">
             <div className="min-w-0">
               <p className="text-[14px] font-semibold text-t0">{lineTitle(line)}</p>
               {note ? <p className="mt-0.5 text-[12.5px] text-t2">{note}</p> : null}
@@ -124,9 +131,93 @@ function Statement({ person }: { person: WalletPersonMonth }) {
   );
 }
 
+function Statement({ person }: { person: WalletPersonMonth }) {
+  const gains = person.lines.filter(isGain);
+  const discounts = person.lines.filter((line) => !isGain(line));
+  if (person.lines.length === 0) {
+    return <EmptyBlock icon="👛" title="Nada neste mês" description="Não há premiação, desafio, retirada ou quebra neste mês." />;
+  }
+  return (
+    <div className="flex flex-col gap-5">
+      {gains.length > 0 ? (
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Ganhos</p>
+          <LineList lines={gains} />
+        </div>
+      ) : null}
+      {discounts.length > 0 ? (
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Descontos</p>
+          <LineList lines={discounts} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function PersonSheet({ person, onClose }: { person: WalletPersonMonth; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-label={person.name}>
+      <div className="absolute inset-0 bg-black/60 animate-vela-fade" onClick={onClose} />
+      <div className="absolute inset-x-0 bottom-0 flex max-h-[88vh] flex-col overflow-hidden rounded-t-[20px] border border-line bg-bg-2 shadow-[var(--shadow-vela)] animate-vela-pop lg:inset-y-0 lg:left-auto lg:right-0 lg:max-h-none lg:w-[420px] lg:rounded-none">
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-line px-5 py-4">
+          <div className="min-w-0">
+            <h3 className="truncate text-[16px] font-bold text-t0">{person.name}</h3>
+            <p className="mt-1 text-[12.5px] text-t2">
+              Saldo: <span className={`font-bold ${balanceClass(person.balanceCents)}`}>{money(person.balanceCents)}</span>
+            </p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Fechar" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-t1 hover:bg-bg-3 hover:text-t0">
+            ✕
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <Statement person={person} />
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function UnassignedShortage({ wallet }: { wallet: WalletMonth }) {
+  const [open, setOpen] = useState(false);
+  if (wallet.unassignedShortageCents <= 0) return null;
+  return (
+    <div className="rounded-[var(--radius-vela-lg)] border border-line bg-bg-2 px-4 py-3">
+      <button type="button" className="flex w-full items-start justify-between gap-3 text-left" onClick={() => setOpen((current) => !current)} aria-expanded={open}>
+        <span>
+          <span className="text-[13.5px] font-bold text-warn">Quebra sem destino · {money(wallet.unassignedShortageCents)}</span>
+          <span className="mt-0.5 block text-[12.5px] text-t2">Há valores de quebra que ainda não estão vinculados a uma pessoa, grupo ou equipe.</span>
+        </span>
+        <span className="shrink-0 text-[12px] font-bold text-t2">{open ? "Ocultar" : "Ver dias"}</span>
+      </button>
+      {open ? (
+        <ul className="mt-3 border-t border-line">
+          {wallet.unassignedShortageDays.map((day) => (
+            <li key={day.day} className="flex items-center justify-between gap-4 border-b border-line py-2.5 last:border-b-0">
+              <span className="text-[13.5px] text-t0">{fullDate(day.day)}</span>
+              <span className="font-mono text-[13.5px] font-bold text-t0">{money(day.cents)}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 function WalletBody({ wallet, mine }: { wallet: WalletMonth; mine: boolean }) {
   const [picked, setPicked] = useState<string | null>(null);
   const person = mine ? wallet.people[0] : wallet.people.find((row) => row.personId === picked) ?? null;
+  const close = useCallback(() => setPicked(null), []);
   const columns = useMemo<DataTableColumn<WalletPersonMonth>[]>(
     () => [
       {
@@ -136,11 +227,9 @@ function WalletBody({ wallet, mine }: { wallet: WalletMonth; mine: boolean }) {
         sortValue: (row) => row.name,
         render: (row) => <span className="font-semibold text-t0">{row.name}</span>,
       },
-      { key: "prize", header: "Premiação", align: "right", sortable: true, sortValue: (row) => row.prizeCents, render: (row) => money(row.prizeCents) },
-      { key: "bonus", header: "Bônus", align: "right", sortable: true, sortValue: (row) => row.bonusCents, render: (row) => money(row.bonusCents), hideBelow: "md" },
-      { key: "challenge", header: "Desafios", align: "right", sortable: true, sortValue: (row) => row.challengeCents, render: (row) => money(row.challengeCents), hideBelow: "lg" },
-      { key: "withdrawal", header: "Retiradas", align: "right", sortable: true, sortValue: (row) => row.withdrawalCents, render: (row) => money(row.withdrawalCents), hideBelow: "md" },
-      { key: "shortage", header: "Quebra", align: "right", sortable: true, sortValue: (row) => row.shortageCents, render: (row) => money(row.shortageCents), hideBelow: "lg" },
+      { key: "earnings", header: "Ganhos", align: "right", sortable: true, sortValue: (row) => earningsOf(row), render: (row) => money(earningsOf(row)) },
+      { key: "withdrawal", header: "Retiradas", align: "right", sortable: true, sortValue: (row) => row.withdrawalCents, render: (row) => minusMoney(row.withdrawalCents) },
+      { key: "shortage", header: "Quebra", align: "right", sortable: true, sortValue: (row) => row.shortageCents, render: (row) => minusMoney(row.shortageCents) },
       {
         key: "balance",
         header: "Saldo",
@@ -164,13 +253,6 @@ function WalletBody({ wallet, mine }: { wallet: WalletMonth; mine: boolean }) {
           </div>
         </Card>
       ) : null}
-      {!mine && wallet.unassignedShortageCents > 0 ? (
-        <Card>
-          <CardTitle>Quebra sem destino</CardTitle>
-          <p className="mt-2 text-[13.5px] text-t1">Dias com quebra que não apontam uma pessoa, um grupo ou a equipe.</p>
-          <p className="mt-2 font-mono text-[18px] font-bold text-t0">{money(wallet.unassignedShortageCents)}</p>
-        </Card>
-      ) : null}
       {!mine ? (
         <Card className="min-w-0">
           <CardTitle>Pessoas</CardTitle>
@@ -182,20 +264,14 @@ function WalletBody({ wallet, mine }: { wallet: WalletMonth; mine: boolean }) {
               defaultSortKey="name"
               defaultSortDir="asc"
               paginate="pessoas"
-              onRowClick={(row) => setPicked((current) => (current === row.personId ? null : row.personId))}
+              onRowClick={(row) => setPicked(row.personId)}
               empty={<EmptyBlock icon="👛" title="Nada neste mês" description="Não há premiação, desafio, retirada ou quebra neste mês." />}
             />
           </div>
-          {person ? (
-            <div className="mt-4 border-t border-line pt-4">
-              <p className="mb-1 text-[14px] font-bold text-t0">{person.name}</p>
-              <Statement person={person} />
-            </div>
-          ) : wallet.people.length > 0 ? (
-            <p className="mt-3 text-[12.5px] text-t2">Toque uma pessoa para ver o movimento do mês.</p>
-          ) : null}
         </Card>
       ) : null}
+      {!mine ? <UnassignedShortage wallet={wallet} /> : null}
+      {!mine && person ? <PersonSheet person={person} onClose={close} /> : null}
     </div>
   );
 }

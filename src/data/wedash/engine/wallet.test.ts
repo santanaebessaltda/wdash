@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildWalletMonth, type WalletCashDay, type WalletChallengeInput, type WalletGoalInput, type WalletPersonInput } from "./wallet";
+import { buildWalletMonth, splitEqualCents, type WalletCashDay, type WalletChallengeInput, type WalletGoalInput, type WalletPersonInput } from "./wallet";
 
 const people: WalletPersonInput[] = [
   { id: "ana", name: "ANA" },
@@ -114,6 +114,7 @@ describe("buildWalletMonth", () => {
     expect(ana?.shortageCents).toBe(1_000);
     expect(ana?.balanceCents).toBe(10_000 + 5_000 - 4_000 - 1_000);
     expect(view.unassignedShortageCents).toBe(250);
+    expect(view.unassignedShortageDays).toEqual([{ day: "2026-10-03", cents: 250 }]);
     expect(view.people.map((row) => row.personId)).toEqual(["ana", "bia"]);
   });
 
@@ -125,7 +126,28 @@ describe("buildWalletMonth", () => {
     });
     expect(view.people.map((row) => row.personId)).toEqual(["ana"]);
     expect(view.unassignedShortageCents).toBe(0);
+    expect(view.unassignedShortageDays).toEqual([]);
     expect(view.people[0].prizeCents).toBe(10_000);
+  });
+
+  it("adds the manager share already split to earnings and the balance", () => {
+    const view = month({
+      goals: [
+        goal({
+          people: [{ personId: "ana", prizeCents: 0, bonusCents: 0, managementPrizeCents: 6_000, managementBonusCents: 1_000 }],
+        }),
+      ],
+    });
+    const ana = view.people[0];
+    expect(ana.managementCents).toBe(7_000);
+    expect(ana.balanceCents).toBe(7_000);
+    expect(ana.prizeCents).toBe(0);
+    expect(ana.lines.map((line) => line.kind)).toEqual(["management", "managementBonus"]);
+  });
+
+  it("splits cents equally and leaves the remainder on the first shares", () => {
+    expect(splitEqualCents(1_000, 3)).toEqual([334, 333, 333]);
+    expect(splitEqualCents(0, 2)).toEqual([0, 0]);
   });
 
   it("keeps the seller row when the month is empty", () => {
