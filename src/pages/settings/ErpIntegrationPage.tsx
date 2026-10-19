@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Button,
   Card,
+  Tooltip,
   Checkbox,
   FormField,
   Input,
@@ -106,11 +107,11 @@ export function ErpIntegrationPage() {
         <Card className="flex min-h-[280px] flex-col">
           <EmptyBlock
             icon="🗄️"
-            title="Nenhum usuário Millennium conectado"
-            description="Conecte um usuário do Millennium para sincronizar vendas, custos, filiais e equipe."
+            title="Nenhum acesso conectado"
+            description="Conecte um acesso do Millennium para sincronizar vendas, produtos e cadastros."
             action={
               <Button size="sm" onClick={() => setConnectOpen(true)} disabled={!canEdit}>
-                Conectar usuário
+                Conectar acesso
               </Button>
             }
           />
@@ -119,17 +120,19 @@ export function ErpIntegrationPage() {
         <>
           <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
             {canRefresh ? (
-              <Button variant="outline" size="sm" onClick={() => void refreshRecords()} disabled={atualizando}>
-                {atualizando ? "Atualizando…" : "Atualizar cadastros"}
-              </Button>
+              <Tooltip label="Busca no Millennium as atualizações de produtos, equipe e demais cadastros." side="bottom">
+                <Button variant="outline" size="sm" onClick={() => void refreshRecords()} disabled={atualizando}>
+                  {atualizando ? "Atualizando…" : "Atualizar cadastros"}
+                </Button>
+              </Tooltip>
             ) : null}
             <Button size="sm" onClick={() => setConnectOpen(true)} disabled={!canEdit}>
-              Conectar usuário
+              Conectar acesso
             </Button>
           </div>
           <ConnectionCard
             title="Millennium"
-            hint="Cada filial fica em um usuário. Uma filial que já está em outra conta não é transferida."
+            hint="Cada acesso pode atender uma ou mais filiais. Filiais já vinculadas a outra conta permanecem nela."
             rows={accounts.map((account) => ({
               key: account.id,
               name: account.username,
@@ -182,8 +185,8 @@ export function ErpIntegrationPage() {
         }
       >
         <p className="text-[13.5px] leading-relaxed text-t1">
-          A conta <strong className="font-semibold text-t0">{pending?.username}</strong> para de sincronizar. As vendas
-          já gravadas permanecem. As outras contas não são afetadas.
+          O acesso <strong className="font-semibold text-t0">{pending?.username}</strong> para de sincronizar com o
+          Millennium. As vendas já gravadas permanecem. Os outros acessos não são afetados.
         </p>
       </Modal>
     </div>
@@ -254,7 +257,7 @@ function ConnectModal({
     <Modal
       open={open}
       onClose={close}
-      title="Millennium"
+      title="Conectar acesso do Millennium"
       footer={
         <>
           <Button variant="outline" onClick={close} disabled={busy}>
@@ -262,7 +265,7 @@ function ConnectModal({
           </Button>
           {canEdit ? (
             <Button onClick={() => void conectar()} disabled={!canConectar}>
-              {busy ? "Testando conexão…" : "Conectar"}
+              {busy ? "Conectando…" : "Conectar"}
             </Button>
           ) : null}
         </>
@@ -270,15 +273,15 @@ function ConnectModal({
     >
       <div className="flex flex-col gap-3.5">
         <p className="text-[13.5px] leading-relaxed text-t1">
-          Informe o usuário e a senha do Millennium. Antes de conectar, verificamos o acesso às lojas e aos relatórios
-          necessários. Filiais que já estão em outra conta continuam nela.
+          Informe o usuário e a senha do Millennium. Antes de conectar, a WDash verifica o acesso às filiais e aos dados
+          necessários para a sincronização. Filiais já vinculadas a outra conta permanecem nela.
         </p>
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
           <FormField label="Usuário do Millennium" required>
             <Input
               value={username}
               onChange={(e) => setUsername(e.target.value.toUpperCase())}
-              placeholder="Ex.: ESSENCIA.INTEGRACAO"
+              placeholder="Ex.: USUARIO.INTEGRACAO"
               {...noAutofill}
               className="uppercase"
               disabled={busy || !canEdit}
@@ -321,10 +324,10 @@ function ConnectModal({
           className="items-start"
           label={
             <span>
-              Este usuário será usado somente pela WDash
+              Este acesso será usado somente pela WDash
               <span className="mt-0.5 block text-xs text-t2">
-                O Millennium permite apenas uma sessão por usuário. Use um usuário exclusivo para evitar interrupções e
-                permitir que a WDash se reconecte automaticamente se a sessão cair.
+                O Millennium permite apenas uma sessão por usuário. Recomendamos um acesso exclusivo para evitar
+                interrupções e permitir a reconexão automática.
               </span>
             </span>
           }
@@ -333,7 +336,7 @@ function ConnectModal({
           disabled={busy || !canEdit}
         />
         <Checkbox
-          label="Autorizo a WDash a usar este acesso para realizar a sincronização."
+          label="Autorizo a WDash a usar este acesso para sincronizar dados com o Millennium."
           checked={autorizo}
           onChange={(e) => setAutorizo(e.target.checked)}
           disabled={busy || !canEdit}

@@ -33,7 +33,7 @@ const META: Record<string, { title: string; subtitle: string }> = {
   },
   [paths.settings.erp]: {
     title: "ERP",
-    subtitle: "Conecte um ou mais usuários do Millennium, de onde vêm as vendas e o cadastro.",
+    subtitle: "Conecte o Millennium para sincronizar vendas, produtos e cadastros com a WDash.",
   },
   [paths.settings.users]: {
     title: "Usuários",
