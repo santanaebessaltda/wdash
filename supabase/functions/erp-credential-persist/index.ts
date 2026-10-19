@@ -40,6 +40,40 @@ async function encryptPassword(plain: string, secret: string): Promise<string> {
   return `${b64(iv)}.${b64(cipher)}`;
 }
 
+/** Gestor com vínculo explícito (o onboarding gravou a primeira conta) também recebe as filiais novas. Vínculo vazio continua significando todas. */
+async function grantStoresToOwners(
+  admin: SupabaseClient,
+  tenantId: string,
+  storeIds: string[],
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (storeIds.length === 0) return { ok: true };
+  const { data: members, error: memberErr } = await admin
+    .from("membership")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("status", "ACTIVE")
+    .in("role", ["OWNER", "ADMIN_GLOBAL"]);
+  if (memberErr) return { ok: false, error: "membership_store_failed" };
+  for (const member of members ?? []) {
+    const membershipId = member.id as string;
+    const { data: links, error: linkErr } = await admin
+      .from("membership_store")
+      .select("store_id")
+      .eq("membership_id", membershipId);
+    if (linkErr) return { ok: false, error: "membership_store_failed" };
+    const linked = new Set((links ?? []).map((row) => row.store_id as string));
+    if (linked.size === 0) continue;
+    const missing = storeIds.filter((id) => !linked.has(id));
+    if (missing.length === 0) continue;
+    const { error } = await admin.from("membership_store").upsert(
+      missing.map((store_id) => ({ membership_id: membershipId, store_id })),
+      { onConflict: "membership_id,store_id" },
+    );
+    if (error) return { ok: false, error: "membership_store_failed" };
+  }
+  return { ok: true };
+}
+
 /** Apaga dados de sync do tenant (troca de usuario Millennium). */
 async function wipeTenantErpSync(
   admin: SupabaseClient,
@@ -291,21 +325,13 @@ serve(async (req) => {
   }
 
   if (adding) {
+    const granted = await grantStoresToOwners(admin, tenantId, addedStoreIds);
+    if (!granted.ok) return json({ error: granted.error }, 500);
     const { data: links } = await admin
       .from("membership_store")
       .select("store_id")
       .eq("membership_id", membershipId);
     const linked = (links ?? []).map((l) => l.store_id as string);
-    if (linked.length > 0 && addedStoreIds.length > 0) {
-      const { error: msErr } = await admin.from("membership_store").upsert(
-        addedStoreIds.map((store_id) => ({ membership_id: membershipId, store_id })),
-        { onConflict: "membership_id,store_id" },
-      );
-      if (msErr) {
-        console.error("membership_store insert", msErr);
-        return json({ error: "membership_store_failed" }, 500);
-      }
-    }
     const visible = linked.length === 0
       ? ((owned ?? []) as { id: string }[]).map((row) => row.id).concat(addedStoreIds)
       : [...new Set([...linked, ...addedStoreIds])];

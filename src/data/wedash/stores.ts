@@ -297,7 +297,10 @@ export function isOperationalStore(s: { active?: boolean }): boolean {
 }
 
 /**
- * Ids que o usuario enxerga no seletor. Vinculo vazio (exceto vendedor) = todas as lojas ativas.
+ * Ids que o usuario enxerga no seletor.
+ * Vinculo vazio (exceto vendedor) = todas as lojas ativas.
+ * Gestor vê todas as ativas mesmo com vínculo antigo: o onboarding gravou só as filiais
+ * da primeira conta, e uma conta Millennium nova não pode sumir do seletor.
  * Loja desativada fica de fora mesmo se ainda estiver no vinculo.
  */
 export function sessionStoreIds(input: {
@@ -306,7 +309,9 @@ export function sessionStoreIds(input: {
   role: string;
 }): string[] {
   const operational = input.tenantStores.filter((s) => s.active);
-  if (input.linkedIds.length === 0) {
+  const seesAll =
+    input.role === "OWNER" || input.role === "ADMIN_GLOBAL" || input.linkedIds.length === 0;
+  if (seesAll) {
     if (input.role === "SELLER") return [];
     return operational.map((s) => s.id);
   }
@@ -496,7 +501,8 @@ async function selectStoreRows(
 
 /**
  * Lojas da lista de Administracao, inclusive as desativadas.
- * Vinculo vazio = todas as lojas da empresa. Vinculo preenchido = so essas.
+ * Vinculo vazio = todas as lojas da empresa. Gestor vê todas, mesmo com vínculo antigo.
+ * Gerente com vínculo preenchido vê só essas.
  */
 export async function fetchManagedStores(tenantId: string, membershipId: string): Promise<Store[]> {
   try {
@@ -509,7 +515,12 @@ export async function fetchManagedStores(tenantId: string, membershipId: string)
       return [];
     }
     const ids = (links ?? []).map((r) => r.store_id as string);
-    const rows = await selectStoreRows(tenantId, ids.length > 0 ? { ids } : {});
+    let limited = ids.length > 0;
+    if (limited) {
+      const { data: memb } = await sb.from("membership").select("role").eq("id", membershipId).maybeSingle();
+      if (memb?.role === "OWNER" || memb?.role === "ADMIN_GLOBAL") limited = false;
+    }
+    const rows = await selectStoreRows(tenantId, limited ? { ids } : {});
     if (!rows) return [];
     return rows.map(rowToStore);
   } catch (e) {

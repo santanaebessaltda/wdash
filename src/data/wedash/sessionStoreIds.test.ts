@@ -12,6 +12,11 @@ describe("sessionStoreIds", () => {
     expect(sessionStoreIds({ linkedIds: [], tenantStores: storeRows, role: "OWNER" })).toEqual(["a", "c"]);
   });
 
+  it("gestor com vínculo antigo da primeira conta também vê a filial nova", () => {
+    expect(sessionStoreIds({ linkedIds: ["a"], tenantStores: storeRows, role: "OWNER" })).toEqual(["a", "c"]);
+    expect(sessionStoreIds({ linkedIds: ["a"], tenantStores: storeRows, role: "ADMIN_GLOBAL" })).toEqual(["a", "c"]);
+  });
+
   it("vínculo com loja desativada não a devolve", () => {
     expect(sessionStoreIds({ linkedIds: ["a", "b"], tenantStores: storeRows, role: "MANAGER" })).toEqual(["a"]);
   });
