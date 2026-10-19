@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Badge, Button, Card, CardTitle, DataTable, PageHeader, Skeleton, StatCard, type DataTableColumn } from "@/components/ui";
+import { Alert, Button, Card, CardTitle, DataTable, PageHeader, Skeleton, StatCard, type DataTableColumn } from "@/components/ui";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { addMonths, startOfMonth } from "@/data/wedash/engine/format";
 import { sellerHistoryFloor } from "@/data/wedash/engine/sellerHome";
@@ -134,16 +134,7 @@ function WalletBody({ wallet, mine }: { wallet: WalletMonth; mine: boolean }) {
         header: "Pessoa",
         sortable: true,
         sortValue: (row) => row.name,
-        render: (row) => (
-          <span className="font-semibold text-t0">
-            {row.name}
-            {row.openPrize || row.lines.some((line) => line.open) ? (
-              <Badge variant="warning" className="ml-2">
-                Até agora
-              </Badge>
-            ) : null}
-          </span>
-        ),
+        render: (row) => <span className="font-semibold text-t0">{row.name}</span>,
       },
       { key: "prize", header: "Premiação", align: "right", sortable: true, sortValue: (row) => row.prizeCents, render: (row) => money(row.prizeCents) },
       { key: "bonus", header: "Bônus", align: "right", sortable: true, sortValue: (row) => row.bonusCents, render: (row) => money(row.bonusCents), hideBelow: "md" },
