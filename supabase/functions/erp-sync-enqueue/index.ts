@@ -113,7 +113,7 @@ serve(async (req) => {
 
   // FORCE/RANGE: opcionalmente so as lojas do StorePicker (nao "Todas").
   if (
-    (kind === "FORCE" || kind === "FORCE_LIGHT" || kind === "RANGE" || kind === "CLOSE") &&
+    (kind === "FORCE" || kind === "FORCE_LIGHT" || kind === "RANGE" || kind === "CLOSE" || kind === "SEED") &&
     Array.isArray(body.storeIds) &&
     body.storeIds.length > 0
   ) {
@@ -145,17 +145,18 @@ serve(async (req) => {
     payload.storeIds = managerScope;
   }
 
-  const { data: credential, error: credErr } = await admin
+  const { data: credentials, error: credErr } = await admin
     .from("erp_credential")
     .select("id, status, sync_paused")
-    .eq("tenant_id", tenantId)
-    .maybeSingle();
-  if (credErr || !credential) return json({ error: "credential_missing" }, 400);
-  if (credential.status === "INVALID" || credential.status === "NOT_CONFIGURED") {
-    return json({ error: "credential_invalid" }, 400);
+    .eq("tenant_id", tenantId);
+  if (credErr || !credentials?.length) return json({ error: "credential_missing" }, 400);
+  const activeCredentials = credentials.filter(
+    (row) => row.status === "VALID" && !row.sync_paused,
+  );
+  if (activeCredentials.length === 0) {
+    const invalid = credentials.some((row) => row.status === "INVALID" || row.status === "NOT_CONFIGURED");
+    return json({ error: invalid ? "credential_invalid" : "integration_paused" }, invalid ? 400 : 409);
   }
-  // Desconectado: o worker nao pega jobs de integracao pausada  -  job ficaria QUEUED para sempre.
-  if (credential.sync_paused) return json({ error: "integration_paused" }, 409);
 
   if ((kind === "FORCE" || kind === "FORCE_LIGHT") && FORCE_COOLDOWN_MS > 0) {
     const windowMs = FORCE_COOLDOWN_MS;
@@ -256,6 +257,33 @@ serve(async (req) => {
     }
   }
 
+  const { data: storeRows, error: storeMapErr } = await admin
+    .from("store")
+    .select("id, credential_id")
+    .eq("tenant_id", tenantId)
+    .eq("active", true);
+  if (storeMapErr) return json({ error: "store_check_failed" }, 500);
+  const storesByCredential = new Map<string, string[]>();
+  for (const row of storeRows ?? []) {
+    const credentialId = row.credential_id as string | null;
+    if (!credentialId) continue;
+    const list = storesByCredential.get(credentialId) ?? [];
+    list.push(row.id as string);
+    storesByCredential.set(credentialId, list);
+  }
+
+  const requested = payload.storeIds ?? null;
+  const targets = activeCredentials
+    .map((row) => {
+      const owned = storesByCredential.get(row.id as string) ?? [];
+      const storeIds = requested ? owned.filter((id) => requested.includes(id)) : owned;
+      return { credentialId: row.id as string, storeIds };
+    })
+    .filter((row) => row.storeIds.length > 0);
+  if (targets.length === 0) {
+    return json({ error: requested ? "integration_paused" : "credential_missing" }, requested ? 409 : 400);
+  }
+
   // Avoid duplicate SEED/RANGE/REGISTRY while one is already queued/running.
   // CLOSE do botão só deduplica outro fechamento manual (cashOnly), não o da madrugada.
   if (kind === "CLOSE") {
@@ -275,36 +303,42 @@ serve(async (req) => {
       return existing === wanted;
     });
     if (hit) return json({ ok: true, job: { id: hit.id }, deduped: true });
-  } else if (kind === "SEED" || kind === "RANGE" || kind === "REGISTRY") {
-    const { data: open } = await admin
-      .from("sync_job")
-      .select("id")
-      .eq("tenant_id", tenantId)
-      .eq("kind", kind)
-      .in("status", ["QUEUED", "RUNNING"])
-      .limit(1)
-      .maybeSingle();
-    if (open) {
-      return json({ ok: true, job: open, deduped: true });
+  }
+
+  const jobs: { id: string; kind: string; status: string; created_at: string }[] = [];
+  for (const target of targets) {
+    if (kind === "SEED" || kind === "RANGE" || kind === "REGISTRY") {
+      const { data: open } = await admin
+        .from("sync_job")
+        .select("id, kind, status, created_at")
+        .eq("credential_id", target.credentialId)
+        .eq("kind", kind)
+        .in("status", ["QUEUED", "RUNNING"])
+        .limit(1)
+        .maybeSingle();
+      if (open) {
+        jobs.push(open as { id: string; kind: string; status: string; created_at: string });
+        continue;
+      }
     }
+    const jobPayload = { ...payload, storeIds: target.storeIds };
+    const { data: job, error: jobErr } = await admin
+      .from("sync_job")
+      .insert({
+        tenant_id: tenantId,
+        credential_id: target.credentialId,
+        kind,
+        status: "QUEUED",
+        payload: jobPayload,
+      })
+      .select("id, kind, status, created_at")
+      .single();
+    if (jobErr || !job) {
+      console.error("sync_job insert failed", jobErr);
+      return json({ error: "enqueue_failed" }, 500);
+    }
+    jobs.push(job);
   }
 
-  const { data: job, error: jobErr } = await admin
-    .from("sync_job")
-    .insert({
-      tenant_id: tenantId,
-      credential_id: credential.id,
-      kind,
-      status: "QUEUED",
-      payload,
-    })
-    .select("id, kind, status, created_at")
-    .single();
-
-  if (jobErr || !job) {
-    console.error("sync_job insert failed", jobErr);
-    return json({ error: "enqueue_failed" }, 500);
-  }
-
-  return json({ ok: true, job });
+  return json({ ok: true, job: jobs[0], jobs });
 });

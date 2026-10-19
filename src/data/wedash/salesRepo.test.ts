@@ -92,6 +92,24 @@ function mockClient(opts: {
             });
             return;
           }
+          if (table === "erp_credential") {
+            if (opts.watermarkError) {
+              resolve({ data: null, error: { message: opts.watermarkError } } as { data: unknown; error: null });
+              return;
+            }
+            resolve({
+              data: [
+                {
+                  last_light_sync_at: opts.watermark ?? null,
+                  last_success_at: null,
+                  status: "VALID",
+                  sync_paused: false,
+                },
+              ],
+              error: null,
+            });
+            return;
+          }
           if (table === "sales_hour_agg") {
             let rows = hours.filter((h) => h.tenantId === state.filters.tenant_id);
             if (state.filters.day) rows = rows.filter((h) => h.day === state.filters.day);

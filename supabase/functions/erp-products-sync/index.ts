@@ -340,25 +340,29 @@ serve(async (req) => {
   if (!membership) return json({ error: "forbidden" }, 403);
   const tenantId = membership.tenant_id as string;
 
-  const { data: cred } = await admin
+  const { data: credRows } = await admin
     .from("erp_credential")
     .select("id, username, password_ciphertext, status, sync_paused, millennium_session")
-    .eq("tenant_id", tenantId)
-    .maybeSingle();
-  if (!cred) return json({ ok: false, error: "credential_missing" });
-  if (cred.status === "INVALID" || cred.status === "NOT_CONFIGURED") {
-    return json({ ok: false, error: "credential_invalid" });
+    .eq("tenant_id", tenantId);
+  const credList = credRows ?? [];
+  const cred = credList.find((row) => row.status === "VALID" && !row.sync_paused) ?? null;
+  if (!cred) {
+    if (credList.length === 0) return json({ ok: false, error: "credential_missing" });
+    if (credList.some((row) => row.status === "INVALID" || row.status === "NOT_CONFIGURED")) {
+      return json({ ok: false, error: "credential_invalid" });
+    }
+    return json({ ok: false, error: "integration_paused" });
   }
-  if (cred.sync_paused) return json({ ok: false, error: "integration_paused" });
+  const activeCreds = credList.filter((row) => row.status === "VALID" && !row.sync_paused);
 
-  const login = async (): Promise<string | { error: string }> => {
+  const loginRow = async (row: (typeof activeCreds)[number]): Promise<string | { error: string }> => {
     let password: string;
     try {
-      password = await decryptPassword(cred.password_ciphertext as string, erpSecret);
+      password = await decryptPassword(row.password_ciphertext as string, erpSecret);
     } catch {
       return { error: "credential_invalid" };
     }
-    const r = await loginMillennium(cred.username as string, password);
+    const r = await loginMillennium(row.username as string, password);
     if (!r.ok)
       return {
         error: r.reason === "password" ? "credential_invalid" : r.reason === "busy" ? "erp_busy" : "erp_login_failed",
@@ -370,9 +374,10 @@ serve(async (req) => {
         millennium_session_at: new Date().toISOString(),
         millennium_session_by: "app",
       })
-      .eq("id", cred.id);
+      .eq("id", row.id);
     return r.session;
   };
+  const login = () => loginRow(cred);
 
   const owner = `app-${crypto.randomUUID()}`;
   const leased = scope !== "registry";
@@ -415,6 +420,34 @@ serve(async (req) => {
         return json({ ok: false, error: s.error });
       }
       result = await refresh(admin, s, tenantId, scope, tableId, costs);
+    }
+    if (scope === "registry") {
+      let stores = result.stores ?? 0;
+      for (const extra of activeCreds) {
+        if (extra.id === cred.id) continue;
+        let extraSession = (extra.millennium_session as string | null)?.trim() || "";
+        if (!extraSession) {
+          const opened = await loginRow(extra);
+          if (typeof opened !== "string") continue;
+          extraSession = opened;
+        }
+        try {
+          stores += await refreshStores(admin, extraSession, tenantId);
+        } catch (e) {
+          if (!(e instanceof MillenniumHttpError && e.status === 401)) {
+            console.error("erp-products-sync registry", e instanceof Error ? e.message : e);
+            continue;
+          }
+          const opened = await loginRow(extra);
+          if (typeof opened !== "string") continue;
+          try {
+            stores += await refreshStores(admin, opened, tenantId);
+          } catch (e2) {
+            console.error("erp-products-sync registry", e2 instanceof Error ? e2.message : e2);
+          }
+        }
+      }
+      result = { ...result, stores };
     }
     // p_ok=false + p_error=null libera sem mexer em refreshed_at (so a recarga do catalogo no worker atualiza).
     await release(null);

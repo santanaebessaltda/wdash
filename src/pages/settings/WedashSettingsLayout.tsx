@@ -33,7 +33,7 @@ const META: Record<string, { title: string; subtitle: string }> = {
   },
   [paths.settings.erp]: {
     title: "ERP",
-    subtitle: "Conecte o Millennium, de onde vêm as vendas e o cadastro.",
+    subtitle: "Conecte um ou mais usuários do Millennium, de onde vêm as vendas e o cadastro.",
   },
   [paths.settings.users]: {
     title: "Usuários",

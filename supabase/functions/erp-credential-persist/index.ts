@@ -102,6 +102,11 @@ serve(async (req) => {
      * Ausente = comportamento antigo (troca de usuario apaga tudo).
      */
     userChange?: { mode?: string; removeMillenniumStoreIds?: number[] };
+    /**
+     * Conta adicional (ERP com mais de um usuário Millennium):
+     * não apaga as outras contas. Filial que já existe fica na conta atual.
+     */
+    mode?: string;
   };
   try {
     body = await req.json();
@@ -144,21 +149,32 @@ serve(async (req) => {
     return json({ error: "forbidden" }, 403);
   }
 
-  const { data: existing } = await admin
+  const adding = body.mode === "add";
+
+  const { data: existingRows } = await admin
     .from("erp_credential")
     .select("id, username, millennium_session")
-    .eq("tenant_id", tenantId)
-    .maybeSingle();
+    .eq("tenant_id", tenantId);
+  const accounts = (existingRows ?? []) as { id: string; username?: string; millennium_session?: string | null }[];
+  const sameAccount = accounts.find((row) => String(row.username ?? "").trim().toUpperCase() === username) ?? null;
 
-  const prevUser = String((existing as { username?: string } | null)?.username ?? "")
+  const prevUser = String((sameAccount ?? accounts[0])?.username ?? "")
     .trim()
     .toUpperCase();
-  const usernameChanged = Boolean(prevUser && prevUser !== username);
+  const usernameChanged = !adding && Boolean(prevUser && prevUser !== username && accounts.length === 1);
   const keepOnChange = usernameChanged && body.userChange?.mode === "keep";
   // O teste de login ja gravou o token NOVO na credencial  -  nao deslogar ele.
-  const oldSessionRaw = (existing as { millennium_session?: string | null })?.millennium_session ?? null;
+  const oldSessionRaw = (sameAccount ?? accounts[0])?.millennium_session ?? null;
   const oldSession = oldSessionRaw && oldSessionRaw !== millenniumSession ? oldSessionRaw : null;
-  if (keepOnChange) {
+  if (adding) {
+    if (oldSession?.trim() && sameAccount) {
+      try {
+        await logoutMillennium(oldSession.trim());
+      } catch {
+        /* best-effort */
+      }
+    }
+  } else if (keepOnChange) {
     if (oldSession?.trim()) {
       try {
         await logoutMillennium(oldSession.trim());
@@ -205,7 +221,7 @@ serve(async (req) => {
 
   const { data: cred, error: credErr } = await admin
     .from("erp_credential")
-    .upsert(credRow, { onConflict: "tenant_id" })
+    .upsert(credRow, { onConflict: "tenant_id,username" })
     .select("id")
     .single();
   if (credErr || !cred) {
@@ -213,15 +229,32 @@ serve(async (req) => {
     return json({ error: "credential_upsert_failed" }, 500);
   }
 
+  const credentialId = cred.id as string;
+  const { data: owned } = await admin
+    .from("store")
+    .select("id, millennium_store_id")
+    .eq("tenant_id", tenantId);
+  const ownedByMillennium = new Map(
+    ((owned ?? []) as { id: string; millennium_store_id: number }[]).map((row) => [Number(row.millennium_store_id), row.id]),
+  );
+
+  const skipped: { storeId: number; name: string }[] = [];
   const storeIds: string[] = [];
+  const addedStoreIds: string[] = [];
   for (const s of stores) {
     const milleniumId = Number(s.storeId);
     if (!Number.isFinite(milleniumId)) continue;
+    const already = ownedByMillennium.get(milleniumId);
+    if (adding && already) {
+      skipped.push({ storeId: milleniumId, name: s.tradeName || s.name || String(milleniumId) });
+      continue;
+    }
     const { data: row, error: storeErr } = await admin
       .from("store")
       .upsert(
         {
           tenant_id: tenantId,
+          credential_id: credentialId,
           millennium_store_id: milleniumId,
           code: s.code ?? String(milleniumId),
           name: s.name ?? s.tradeName ?? String(milleniumId),
@@ -242,6 +275,49 @@ serve(async (req) => {
       return json({ error: "store_upsert_failed" }, 500);
     }
     storeIds.push(row.id as string);
+    if (adding && !already) addedStoreIds.push(row.id as string);
+  }
+
+  if (adding && !sameAccount && addedStoreIds.length === 0) {
+    if (millenniumSession) {
+      try {
+        await logoutMillennium(millenniumSession);
+      } catch {
+        /* best-effort */
+      }
+    }
+    await admin.from("erp_credential").delete().eq("id", credentialId);
+    return json({ ok: false, error: "no_new_stores", skipped });
+  }
+
+  if (adding) {
+    const { data: links } = await admin
+      .from("membership_store")
+      .select("store_id")
+      .eq("membership_id", membershipId);
+    const linked = (links ?? []).map((l) => l.store_id as string);
+    if (linked.length > 0 && addedStoreIds.length > 0) {
+      const { error: msErr } = await admin.from("membership_store").upsert(
+        addedStoreIds.map((store_id) => ({ membership_id: membershipId, store_id })),
+        { onConflict: "membership_id,store_id" },
+      );
+      if (msErr) {
+        console.error("membership_store insert", msErr);
+        return json({ error: "membership_store_failed" }, 500);
+      }
+    }
+    const visible = linked.length === 0
+      ? ((owned ?? []) as { id: string }[]).map((row) => row.id).concat(addedStoreIds)
+      : [...new Set([...linked, ...addedStoreIds])];
+    return json({
+      ok: true,
+      credentialId,
+      storeIds: visible,
+      addedStoreIds,
+      skipped,
+      lightIntervalMin: lightInterval,
+      wiped: false,
+    });
   }
 
   if (stores.length > 0) {

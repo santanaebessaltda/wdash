@@ -56,21 +56,32 @@ async function authedClients(req: Request) {
 
 async function loadCredential(
   admin: SupabaseClient,
-  opts: { tenantId?: string | null; username?: string },
+  opts: { tenantId?: string | null; username?: string; credentialId?: string },
 ): Promise<{ id: string; millennium_session: string | null } | null> {
+  if (opts.credentialId) {
+    const { data } = await admin
+      .from("erp_credential")
+      .select("id, millennium_session")
+      .eq("id", opts.credentialId)
+      .maybeSingle();
+    if (data) return data as { id: string; millennium_session: string | null };
+  }
+  // Login de um usuário não pode derrubar a sessão de outro da mesma empresa.
+  if (opts.username) {
+    let query = admin
+      .from("erp_credential")
+      .select("id, millennium_session")
+      .eq("username", opts.username.toUpperCase());
+    if (opts.tenantId) query = query.eq("tenant_id", opts.tenantId);
+    const { data } = await query.limit(1).maybeSingle();
+    if (data) return data as { id: string; millennium_session: string | null };
+    return null;
+  }
   if (opts.tenantId) {
     const { data } = await admin
       .from("erp_credential")
       .select("id, millennium_session")
       .eq("tenant_id", opts.tenantId)
-      .maybeSingle();
-    if (data) return data as { id: string; millennium_session: string | null };
-  }
-  if (opts.username) {
-    const { data } = await admin
-      .from("erp_credential")
-      .select("id, millennium_session")
-      .eq("username", opts.username.toUpperCase())
       .limit(1)
       .maybeSingle();
     if (data) return data as { id: string; millennium_session: string | null };
@@ -137,6 +148,7 @@ serve(async (req) => {
     usuario?: string;
     senha?: string;
     session?: string;
+    credentialId?: string;
     includeStores?: boolean;
     keepSession?: boolean;
     checkReports?: boolean;
@@ -160,26 +172,66 @@ serve(async (req) => {
     const session = String(body.session ?? "").trim();
     if (session) {
       await logoutMillennium(session);
+      if (tenantId) {
+        await admin
+          .from("erp_credential")
+          .update({
+            millennium_session: null,
+            millennium_session_at: null,
+            millennium_session_by: null,
+          })
+          .eq("tenant_id", tenantId)
+          .eq("millennium_session", session);
+      }
     }
-    if (tenantId) await releaseStored(admin, { tenantId });
     const r: SimpleOk = { ok: true };
     return json(r);
   }
 
   if (action === "release") {
-    const released = tenantId ? await releaseStored(admin, { tenantId }) : false;
+    const credentialId = String(body.credentialId ?? "").trim();
+    const released = credentialId
+      ? await releaseStored(admin, { credentialId })
+      : tenantId
+        ? await releaseStored(admin, { tenantId })
+        : false;
     const r: SimpleOk = { ok: true };
-    console.log("release", { tenantId, released });
+    console.log("release", { tenantId, credentialId, released });
     return json(r);
   }
 
   if (action === "pause") {
     if (!tenantId) return json({ error: "no_tenant" }, 400);
-    await releaseStored(admin, { tenantId });
-    await admin
-      .from("erp_credential")
-      .update({ sync_paused: true, wedash_present_at: null })
-      .eq("tenant_id", tenantId);
+    const credentialId = String(body.credentialId ?? "").trim();
+    if (credentialId) {
+      const { data: owned } = await admin
+        .from("erp_credential")
+        .select("id")
+        .eq("id", credentialId)
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
+      if (!owned) return json({ error: "credential_missing" }, 400);
+      await releaseStored(admin, { credentialId });
+      await admin.from("erp_credential").update({ sync_paused: true }).eq("id", credentialId);
+      await admin
+        .from("sync_job")
+        .update({
+          status: "FAILED",
+          error: "desconectado",
+          finished_at: new Date().toISOString(),
+        })
+        .eq("credential_id", credentialId)
+        .eq("status", "QUEUED");
+    } else {
+      const { data: rows } = await admin.from("erp_credential").select("id").eq("tenant_id", tenantId);
+      for (const row of rows ?? []) {
+        await releaseStored(admin, { credentialId: (row as { id: string }).id });
+      }
+      await admin
+        .from("erp_credential")
+        .update({ sync_paused: true, wedash_present_at: null })
+        .eq("tenant_id", tenantId);
+    }
     const r: SimpleOk = { ok: true, paused: true };
     return json(r);
   }
@@ -202,10 +254,7 @@ serve(async (req) => {
     if (!tenantId) return json({ error: "no_tenant" }, 400);
     await admin
       .from("erp_credential")
-      .update({
-        sync_paused: false,
-        wedash_present_at: new Date().toISOString(),
-      })
+      .update({ wedash_present_at: new Date().toISOString() })
       .eq("tenant_id", tenantId);
     const r: SimpleOk = { ok: true };
     return json(r);

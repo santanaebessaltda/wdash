@@ -5,7 +5,7 @@ import { useMediaQuery } from "@/lib/useMediaQuery";
 import { fetchSyncWatermark, salesChangedSince } from "@/data/wedash/salesRepo";
 import { canForceSyncRefresh, formatForceCooldownLabel } from "@/data/wedash/syncUi";
 import { AUTO_REFRESH_MIN, storePhase } from "@/data/wedash/autoRefresh";
-import { fetchErpIntegrationStatus, type ErpIntegrationStatus } from "@/data/wedash/erp";
+import { erpConnectionOf, fetchErpAccounts, type ErpConnectionState } from "@/data/wedash/erp";
 import { storesForSession } from "@/data/wedash/stores";
 import { useActiveSession } from "@/session/SessionProvider";
 import { readScreenRefresh, refreshMomentTitle, useScreenRefreshGeneration } from "@/pages/dashboard/screenRefresh";
@@ -27,7 +27,8 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
   const session = useActiveSession();
   const { show } = useToast();
   const can = canForceSyncRefresh(session.role);
-  const [erp, setErp] = useState<ErpIntegrationStatus | null>(null);
+  const [erpConnection, setErpConnection] = useState<ErpConnectionState>("unknown");
+  const storeKey = storeIds.join(",");
   const [watermark, setWatermark] = useState<Date | null>(null);
   const [loaded, setLoaded] = useState(false);
   const lastWatermark = useRef<number | null>(null);
@@ -41,7 +42,7 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
       try {
         const [wm, st] = await Promise.all([
           fetchSyncWatermark(session.tenantId),
-          fetchErpIntegrationStatus(session.tenantId),
+          fetchErpAccounts(session.tenantId),
         ]);
         const prev = lastWatermark.current;
         const stored = watermarkAfterRead(prev, wm);
@@ -50,7 +51,7 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
           changed = await salesChangedSince(session.tenantId, new Date(prev as number).toISOString());
         }
         lastWatermark.current = stored;
-        setErp(st);
+        setErpConnection(st ? erpConnectionOf(st, storeKey ? storeKey.split(",") : []) : "unknown");
         setWatermark(stored != null ? new Date(stored) : null);
         setLoaded(true);
         if (shouldRefreshScreen(prev, stored, changed)) {
@@ -62,7 +63,7 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
         return false;
       }
     },
-    [session.tenantId, can],
+    [session.tenantId, can, storeKey],
   );
 
   useEffect(() => {
@@ -111,7 +112,7 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
     window.dispatchEvent(new Event(SALES_SYNCED_EVENT));
   }, [loadWatermark]);
 
-  const disconnected = erp != null && (erp.status !== "VALID" || erp.syncPaused);
+  const disconnected = erpConnection === "disconnected" || erpConnection === "password";
   const { canForce, refreshing, forceError, forceDoneAt, forceCooldownSec, forcarUpdate } = useForceRefresh({
     storeIds,
     reload,
@@ -185,7 +186,7 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
   const tip = screen?.tip ?? salesTip;
   const busyLabel = screen?.busyLabel ?? "Buscando as vendas de hoje…";
   const disconnectTitle =
-    erp?.status === "INVALID" && !erp.syncPaused ? "A senha do Millennium não é mais válida" : "Millennium desconectado";
+    erpConnection === "password" ? "A senha do Millennium não é mais válida" : "Millennium desconectado";
   const idleTitle = screen ? screen.status : refreshMomentTitle(!loaded ? undefined : watermark ? watermark.toISOString() : null);
   const title = busy ? busyLabel : disconnected ? disconnectTitle : idleTitle;
   const tooltip = `${title}\n${tip}`;

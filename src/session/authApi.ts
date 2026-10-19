@@ -555,6 +555,8 @@ export type PersistErpInput = {
   millenniumSession?: string;
   /** Troca de usuario mantendo dados: remove so as lojas que o usuario novo nao enxerga. */
   userChange?: { mode: "keep"; removeMillenniumStoreIds: number[] };
+  /** Conta adicional: não apaga as outras. Filial já existente fica onde está. */
+  mode?: "add";
   /** Vazio no Step2 (so credencial); preenchido ao concluir lojas. */
   stores?: Array<{
     storeId: number;
@@ -568,8 +570,14 @@ export type PersistErpInput = {
 };
 
 export type PersistErpResult =
-  | { ok: true; storeIds: string[]; lightIntervalMin: number }
-  | { ok: false; error: string };
+  | {
+      ok: true;
+      storeIds: string[];
+      addedStoreIds: string[];
+      skipped: { storeId: number; name: string }[];
+      lightIntervalMin: number;
+    }
+  | { ok: false; error: string; skipped?: { storeId: number; name: string }[] };
 
 /**
  * Persiste erp_credential (senha cifrada no Edge) + store rows e remapeia membership_store.
@@ -584,6 +592,8 @@ export async function persistErpCredentialAndStores(
     return {
       ok: true,
       storeIds,
+      addedStoreIds: storeIds,
+      skipped: [],
       lightIntervalMin: 5,
     };
   }
@@ -600,6 +610,7 @@ export async function persistErpCredentialAndStores(
         ? { millenniumSession: input.millenniumSession }
         : {}),
       ...(input.userChange ? { userChange: input.userChange } : {}),
+      ...(input.mode ? { mode: input.mode } : {}),
     },
   });
 
@@ -611,17 +622,21 @@ export async function persistErpCredentialAndStores(
   const body = data as {
     ok?: boolean;
     storeIds?: string[];
+    addedStoreIds?: string[];
+    skipped?: { storeId: number; name: string }[];
     lightIntervalMin?: number;
     error?: string;
   } | null;
 
   if (!body?.ok || !Array.isArray(body.storeIds)) {
-    return { ok: false, error: body?.error ?? "persist_failed" };
+    return { ok: false, error: body?.error ?? "persist_failed", skipped: body?.skipped };
   }
 
   return {
     ok: true,
     storeIds: body.storeIds,
+    addedStoreIds: body.addedStoreIds ?? [],
+    skipped: body.skipped ?? [],
     lightIntervalMin: body.lightIntervalMin ?? 5,
   };
 }

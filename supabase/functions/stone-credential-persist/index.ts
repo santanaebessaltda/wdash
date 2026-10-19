@@ -119,19 +119,15 @@ serve(async (req) => {
 
 /** Do dia 1 do mês atual até ontem. O dia de hoje entra na madrugada seguinte. */
 async function enqueuePastClose(admin: ReturnType<typeof createClient>, tenantId: string, storeId: string): Promise<void> {
-  const { data: store } = await admin.from("store").select("timezone").eq("id", storeId).maybeSingle();
+  const { data: store } = await admin.from("store").select("timezone, credential_id").eq("id", storeId).maybeSingle();
   const tz = (store?.timezone as string | null) || "America/Sao_Paulo";
   const today = ymdInTimeZone(new Date(), tz);
   const to = shiftIso(today, -1);
   const from = `${today.slice(0, 8)}01`;
   if (to < from) return;
-  const { data: cred } = await admin
-    .from("erp_credential")
-    .select("id")
-    .eq("tenant_id", tenantId)
-    .eq("status", "VALID")
-    .limit(1)
-    .maybeSingle();
+  let credQuery = admin.from("erp_credential").select("id").eq("tenant_id", tenantId).eq("status", "VALID");
+  if (store?.credential_id) credQuery = credQuery.eq("id", store.credential_id as string);
+  const { data: cred } = await credQuery.limit(1).maybeSingle();
   if (!cred?.id) return;
   const { data: open } = await admin
     .from("sync_job")

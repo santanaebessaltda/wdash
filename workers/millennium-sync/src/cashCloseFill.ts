@@ -142,7 +142,7 @@ export async function runCashCloseFillJob(
       return finish(`login no Millennium falhou (${ensured.reason})`);
     }
     session = ensured.session;
-    stores = await deps.listStores(job.tenantId);
+    stores = await deps.listStores(job.tenantId, job.credentialId);
   } catch (e) {
     return finish(e instanceof Error ? e.message : String(e));
   }

@@ -7,7 +7,7 @@ import {
   type Announcement,
   type NotificationState,
 } from "@/data/wedash/notifications";
-import { fetchErpIntegrationStatus } from "@/data/wedash/erp";
+import { erpConnectionOf, fetchErpAccounts } from "@/data/wedash/erp";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 
 const POLL_MS = 60_000;
@@ -90,22 +90,29 @@ export function useNotifications(tenantId: string, role: string, canManageErp: b
     const [announcements, remote, erp] = await Promise.all([
       fetchAnnouncements(role),
       fetchNotificationState(tenantId, seed),
-      canManageErp && role !== "SELLER" ? fetchErpIntegrationStatus(tenantId).catch(() => null) : Promise.resolve(null),
+      canManageErp && role !== "SELLER" ? fetchErpAccounts(tenantId).catch(() => null) : Promise.resolve(null),
     ]);
     setItems(announcements);
     apply(remote);
     const next: NotificationAlert[] = [];
-    if (erp?.syncPaused) {
+    const connection = erp ? erpConnectionOf(erp, []) : "unknown";
+    if (connection === "disconnected") {
       next.push({
         id: "erp-paused",
         title: "Millennium desconectado",
         body: "As vendas não estão sendo atualizadas. Conecte novamente para retomar a sincronização.",
       });
-    } else if (erp?.status === "INVALID") {
+    } else if (connection === "password") {
       next.push({
         id: "erp-password",
         title: "A senha do Millennium não é mais válida",
         body: "Conecte novamente com a senha atual para retomar a sincronização.",
+      });
+    } else if (connection === "partial") {
+      next.push({
+        id: "erp-partial",
+        title: "Uma conta do Millennium está desconectada",
+        body: "Parte das filiais parou de atualizar. Conecte de novo a conta que caiu.",
       });
     }
     setAlerts(next);

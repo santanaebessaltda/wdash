@@ -170,13 +170,10 @@ async function enqueuePastClose(
   const to = new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, (d ?? 1) - 1)).toISOString().slice(0, 10);
   const from = `${today.slice(0, 8)}01`;
   if (to < from) return;
-  const { data: cred } = await admin
-    .from("erp_credential")
-    .select("id")
-    .eq("tenant_id", tenantId)
-    .eq("status", "VALID")
-    .limit(1)
-    .maybeSingle();
+  const { data: storeCred } = await admin.from("store").select("credential_id").eq("id", storeId).maybeSingle();
+  let credQuery = admin.from("erp_credential").select("id").eq("tenant_id", tenantId).eq("status", "VALID");
+  if (storeCred?.credential_id) credQuery = credQuery.eq("id", storeCred.credential_id as string);
+  const { data: cred } = await credQuery.limit(1).maybeSingle();
   if (!cred?.id) return;
   const { data: open } = await admin
     .from("sync_job")

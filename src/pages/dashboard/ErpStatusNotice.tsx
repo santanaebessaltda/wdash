@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Alert, AlertLink } from "@/components/ui";
-import { fetchErpIntegrationStatus, type ErpIntegrationStatus } from "@/data/wedash/erp";
+import { erpConnectionOf, fetchErpAccounts, type ErpConnectionState } from "@/data/wedash/erp";
+import { useScope } from "@/pages/dashboard/useScope";
 import { fetchSyncWatermark } from "@/data/wedash/salesRepo";
 import { isOwner } from "@/layout/nav-wedash";
 import { paths } from "@/router/paths";
 import { useActiveSession } from "@/session/SessionProvider";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 
-export type ErpConnection = "connected" | "disconnected" | "password" | "unknown";
+export type ErpConnection = ErpConnectionState;
 
 type ErpSnapshot = { connection: ErpConnection; lastSync: Date | null };
 
@@ -16,39 +17,38 @@ type ErpSnapshot = { connection: ErpConnection; lastSync: Date | null };
 const CACHE_MS = 5_000;
 const cache = new Map<string, { at: number; promise: Promise<ErpSnapshot> }>();
 
-function connectionOf(st: ErpIntegrationStatus | null): ErpConnection {
-  if (!st) return "unknown";
-  if (st.syncPaused) return "disconnected";
-  if (st.status === "INVALID") return "password";
-  return st.status === "VALID" ? "connected" : "disconnected";
-}
-
-function loadSnapshot(tenantId: string, force: boolean): Promise<ErpSnapshot> {
-  const hit = cache.get(tenantId);
+function loadSnapshot(tenantId: string, storeIds: string[], force: boolean): Promise<ErpSnapshot> {
+  const key = `${tenantId}:${storeIds.slice().sort().join(",")}`;
+  const hit = cache.get(key);
   if (!force && hit && Date.now() - hit.at < CACHE_MS) return hit.promise;
   const promise = Promise.all([
-    fetchErpIntegrationStatus(tenantId).catch(() => null),
+    fetchErpAccounts(tenantId).catch(() => null),
     fetchSyncWatermark(tenantId).catch(() => null),
-  ]).then(([st, wm]) => ({ connection: connectionOf(st), lastSync: wm }));
-  cache.set(tenantId, { at: Date.now(), promise });
+  ]).then(([accounts, wm]) => ({
+    connection: accounts ? erpConnectionOf(accounts, storeIds) : "unknown",
+    lastSync: wm,
+  }));
+  cache.set(key, { at: Date.now(), promise });
   return promise;
 }
 
 /** Status da integracao agora (mesmo cache do aviso)  -  para nao iniciar busca no Millennium com a integracao desligada. */
-export function fetchErpConnection(tenantId: string): Promise<ErpConnection> {
-  return loadSnapshot(tenantId, false).then((s) => s.connection);
+export function fetchErpConnection(tenantId: string, storeIds: string[] = []): Promise<ErpConnection> {
+  return loadSnapshot(tenantId, storeIds, false).then((s) => s.connection);
 }
 
 /** Status da integracao com o Millennium (rele ao voltar para o app e ao terminar uma sincronizacao). */
 export function useErpConnection(): ErpSnapshot {
   const session = useActiveSession();
+  const { scope } = useScope();
+  const storeKey = [...scope.storeIds].sort().join(",");
   const [snap, setSnap] = useState<ErpSnapshot>({ connection: "unknown", lastSync: null });
 
   const load = useCallback(
     (force: boolean) => {
-      void loadSnapshot(session.tenantId, force).then(setSnap);
+      void loadSnapshot(session.tenantId, storeKey ? storeKey.split(",") : [], force).then(setSnap);
     },
-    [session.tenantId],
+    [session.tenantId, storeKey],
   );
 
   useEffect(() => {
@@ -82,12 +82,19 @@ export function ErpStatusNotice({ dado = "sales", className = "mt-4" }: { dado?:
   const session = useActiveSession();
   const navigate = useNavigate();
   const { connection, lastSync } = useErpConnection();
-  if (connection !== "disconnected" && connection !== "password") return null;
+  if (connection !== "disconnected" && connection !== "password" && connection !== "partial") return null;
 
   const owner = isOwner(session.role);
-  const title = connection === "password" ? "A senha do Millennium não é mais válida" : "Millennium desconectado";
+  const title =
+    connection === "password"
+      ? "A senha do Millennium não é mais válida"
+      : connection === "partial"
+        ? "Uma conta do Millennium está desconectada"
+        : "Millennium desconectado";
   const text =
-    dado === "estoque"
+    connection === "partial"
+      ? "As filiais dessa conta pararam de atualizar. As outras contas continuam."
+      : dado === "estoque"
       ? "O estoque não está sendo atualizado. Os valores mostram a última atualização disponível."
       : lastSync
         ? `As vendas não estão sendo atualizadas desde ${since(lastSync)}. Os números mostram as vendas até esse momento.`

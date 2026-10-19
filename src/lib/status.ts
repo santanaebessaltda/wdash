@@ -55,6 +55,8 @@ const PRODUCT_STATUS: Record<string, StatusVariant> = {
   "não configurado": "neutral",
   "nao configurado": "neutral",
   desconectado: "neutral",
+  "senha inválida": "danger",
+  "senha invalida": "danger",
 
   "a começar": "info",
   "a comecar": "info",

@@ -49,7 +49,13 @@ function chunk<T>(items: T[], size: number): T[][] {
 }
 
 type Request = { saleTables: boolean; salePriceTableIds: number[]; stockStoreIds: string[]; purchaseStoreIds: string[] };
-type StoreRow = { id: string; code: string | null; millennium_store_id: number | null; cost_table_id: number | null };
+type StoreRow = {
+  id: string;
+  code: string | null;
+  millennium_store_id: number | null;
+  cost_table_id: number | null;
+  credential_id?: string | null;
+};
 type Part = "saleTables" | "salePrices" | "stock" | "purchase";
 
 async function replaceRows(
@@ -268,7 +274,7 @@ serve(async (req) => {
   if (requestedStoreIds.length > 0) {
     const { data, error } = await admin
       .from("store")
-      .select("id, code, millennium_store_id, cost_table_id")
+      .select("id, code, millennium_store_id, cost_table_id, credential_id")
       .eq("tenant_id", tenantId)
       .eq("active", true)
       .in("id", requestedStoreIds);
@@ -300,11 +306,14 @@ serve(async (req) => {
     return json({ ok: false, error: "no_cost_table" });
   }
 
-  const { data: cred } = await admin
+  const credentialIds = [...new Set(allStores.map((s) => s.credential_id).filter((id): id is string => Boolean(id)))];
+  let credQuery = admin
     .from("erp_credential")
     .select("id, username, password_ciphertext, status, sync_paused, millennium_session")
-    .eq("tenant_id", tenantId)
-    .maybeSingle();
+    .eq("tenant_id", tenantId);
+  if (credentialIds.length === 1) credQuery = credQuery.eq("id", credentialIds[0]);
+  else credQuery = credQuery.eq("status", "VALID").eq("sync_paused", false);
+  const { data: cred } = await credQuery.limit(1).maybeSingle();
   if (!cred) return json({ ok: false, error: "credential_missing" });
   if (cred.status === "INVALID" || cred.status === "NOT_CONFIGURED") return json({ ok: false, error: "credential_invalid" });
   if (cred.sync_paused) return json({ ok: false, error: "integration_paused" });
@@ -330,12 +339,92 @@ serve(async (req) => {
   if (body.salePriceTableIds.length > 0) {
     parts.push({ part: "salePrices", run: (s) => refreshSalePrices(admin, s, body.salePriceTableIds, fallbackCostTable!) });
   }
-  if (stores.length > 0) parts.push({ part: "stock", run: (s) => refreshStock(admin, s, tenantId, stores) });
   const purchaseFailedStores: string[] = [];
-  if (purchaseStores.length > 0) {
+  const splitByCredential = credentialIds.length > 1;
+  if (!splitByCredential && stores.length > 0) parts.push({ part: "stock", run: (s) => refreshStock(admin, s, tenantId, stores) });
+  if (!splitByCredential && purchaseStores.length > 0) {
     parts.push({ part: "purchase", run: (s) => refreshPurchase(admin, s, tenantId, purchaseStores, purchaseFailedStores) });
   }
-  if (parts.length === 0) return json({ ok: true, stores: 0 });
+  if (parts.length === 0 && !splitByCredential) return json({ ok: true, stores: 0 });
+
+  const result: Record<string, number> = {};
+  const failed: Part[] = [];
+
+  if (splitByCredential) {
+    const { data: credRows } = await admin
+      .from("erp_credential")
+      .select("id, username, password_ciphertext, status, sync_paused, millennium_session")
+      .eq("tenant_id", tenantId)
+      .in("id", credentialIds);
+    const byId = new Map((credRows ?? []).map((row) => [row.id as string, row]));
+    const loginFor = async (row: NonNullable<typeof cred>): Promise<string | { error: string }> => {
+      let password: string;
+      try {
+        password = await decryptPassword(row.password_ciphertext as string, erpSecret);
+      } catch {
+        return { error: "credential_invalid" };
+      }
+      const r = await loginMillennium(row.username as string, password);
+      if (!r.ok) return { error: r.reason === "password" ? "credential_invalid" : r.reason === "busy" ? "erp_busy" : "erp_login_failed" };
+      await admin
+        .from("erp_credential")
+        .update({ millennium_session: r.session, millennium_session_at: new Date().toISOString(), millennium_session_by: "app" })
+        .eq("id", row.id);
+      return r.session;
+    };
+    for (const credentialId of credentialIds) {
+      const row = byId.get(credentialId);
+      if (!row || row.status !== "VALID" || row.sync_paused) {
+        failed.push("stock");
+        continue;
+      }
+      let token = (row.millennium_session as string | null)?.trim() || "";
+      if (!token) {
+        const opened = await loginFor(row as NonNullable<typeof cred>);
+        if (typeof opened !== "string") {
+          failed.push("stock");
+          continue;
+        }
+        token = opened;
+      }
+      const group = stores.filter((s) => s.credential_id === credentialId);
+      const purchaseGroup = purchaseStores.filter((s) => s.credential_id === credentialId);
+      const runGroup = async (tokenValue: string) => {
+        if (group.length > 0) result.stock = (result.stock ?? 0) + (await refreshStock(admin, tokenValue, tenantId, group));
+        if (purchaseGroup.length > 0) {
+          result.purchase = (result.purchase ?? 0) + (await refreshPurchase(admin, tokenValue, tenantId, purchaseGroup, purchaseFailedStores));
+        }
+      };
+      try {
+        await runGroup(token);
+      } catch (e) {
+        if (e instanceof MillenniumHttpError && e.status === 401) {
+          const opened = await loginFor(row as NonNullable<typeof cred>);
+          if (typeof opened !== "string") {
+            failed.push("stock");
+            continue;
+          }
+          try {
+            await runGroup(opened);
+          } catch (e2) {
+            console.error("erp-stock-sync", e2 instanceof Error ? e2.message : e2);
+            failed.push("stock");
+          }
+        } else {
+          console.error("erp-stock-sync", e instanceof Error ? e.message : e);
+          failed.push("stock");
+        }
+      }
+    }
+  }
+
+  if (parts.length === 0) {
+    if (failed.length > 0 && result.stock == null && result.purchase == null) {
+      return json({ ok: false, error: "erp_request_failed", failed, purchaseFailedStores });
+    }
+    if (purchaseFailedStores.length > 0 && !failed.includes("purchase")) failed.push("purchase");
+    return json({ ok: true, ...result, failed, purchaseFailedStores });
+  }
 
   let session = (cred.millennium_session as string | null)?.trim() || null;
   let reused = session != null;
@@ -345,8 +434,6 @@ serve(async (req) => {
     session = s;
   }
 
-  const result: Record<string, number> = {};
-  const failed: Part[] = [];
   for (const { part, run } of parts) {
     try {
       result[part] = await run(session);

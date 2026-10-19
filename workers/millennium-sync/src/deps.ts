@@ -376,8 +376,8 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
       };
     },
 
-    async listStores(tenantId) {
-      const { data, error } = await sb
+    async listStores(tenantId, credentialId) {
+      let query = sb
         .from("store")
         .select(
           "id, millennium_store_id, code, name, trade_name, tax_id, timezone, opened_at, has_wpink, millennium_gerador_id, last_closed_day",
@@ -385,6 +385,8 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
         .eq("tenant_id", tenantId)
         .eq("active", true)
         .order("millennium_store_id");
+      if (credentialId) query = query.eq("credential_id", credentialId);
+      const { data, error } = await query;
       if (error) throw error;
       const stoneRes = await sb
         .from("store_stone")
@@ -1507,6 +1509,7 @@ export async function enqueueDueCloseJobs(sb: SupabaseClient, now = new Date()):
       .from("store")
       .select("timezone")
       .eq("tenant_id", tenantId)
+      .eq("credential_id", credentialId)
       .eq("active", true)
       .order("created_at", { ascending: true })
       .limit(1)
@@ -1550,6 +1553,7 @@ export async function enqueueDueCloseJobs(sb: SupabaseClient, now = new Date()):
       .from("store")
       .select("id, last_closed_day")
       .eq("tenant_id", tenantId)
+      .eq("credential_id", credentialId)
       .eq("active", true);
     if (storeErr) throw storeErr;
     const pendingStores = (storeRows ?? [])
@@ -1619,6 +1623,7 @@ export async function enqueueDueCashCloseCatchUp(sb: SupabaseClient, now = new D
       .from("store")
       .select("timezone")
       .eq("tenant_id", tenantId)
+      .eq("credential_id", credentialId)
       .eq("active", true)
       .order("created_at", { ascending: true })
       .limit(1)
@@ -1638,7 +1643,12 @@ export async function enqueueDueCashCloseCatchUp(sb: SupabaseClient, now = new D
       .maybeSingle();
     if (busy) continue;
 
-    const { data: storeRows, error: storeErr } = await sb.from("store").select("id").eq("tenant_id", tenantId).eq("active", true);
+    const { data: storeRows, error: storeErr } = await sb
+      .from("store")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("credential_id", credentialId)
+      .eq("active", true);
     if (storeErr) throw storeErr;
     let chosen: { day: string; storeIds: string[] } | null = null;
     for (const store of storeRows ?? []) {
@@ -1752,6 +1762,7 @@ export async function enqueueDueAutoRefreshJobs(sb: SupabaseClient, now = new Da
       .from("store")
       .select("id, timezone, hours, last_sync_at")
       .eq("tenant_id", tenantId)
+      .eq("credential_id", credentialId)
       .eq("active", true);
     if (storeErr) throw storeErr;
     if (!storeRows?.length) continue;
@@ -1840,6 +1851,7 @@ export async function enqueueDueDeepHistoryJobs(sb: SupabaseClient, now = new Da
       .from("store")
       .select("id, timezone, opened_at")
       .eq("tenant_id", tenantId)
+      .eq("credential_id", credentialId)
       .eq("active", true);
     if (storeErr) throw storeErr;
     if (!storeRows?.length) continue;

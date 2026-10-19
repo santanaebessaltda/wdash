@@ -1569,7 +1569,7 @@ export type SyncJobDeps = {
   loadCredential: (credentialId: string) => Promise<SyncCredential>;
   /** Erros/avisos do job  ->  `sync_log` (Configuracoes > Logs). Best-effort. */
   insertSyncLogs?: (rows: SyncLogRow[]) => Promise<void>;
-  listStores: (tenantId: string) => Promise<SyncStore[]>;
+  listStores: (tenantId: string, credentialId?: string) => Promise<SyncStore[]>;
   /** Faturamento de hoje (marca ALL) antes da rodada, para o push. */
   readTodayRevenue?: (tenantId: string, stores: Array<{ id: string; timezone: string }>) => Promise<Map<string, number>>;
   /** Push do que vendeu desde a leitura anterior. Só na rodada automática. */
@@ -2494,7 +2494,7 @@ async function syncOnboardingRegistry(job: SyncJob, deps: SyncJobDeps): Promise<
       return 0;
     }
     session = ensured.session;
-    stores = await deps.listStores(job.tenantId);
+    stores = await deps.listStores(job.tenantId, job.credentialId);
   } catch (e) {
     warn("cadastro", e);
     return 0;
@@ -2589,7 +2589,7 @@ async function runRegistryJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyncR
       return finish(`login no Millennium falhou (${ensured.reason})`);
     }
     session = ensured.session;
-    stores = await deps.listStores(job.tenantId);
+    stores = await deps.listStores(job.tenantId, job.credentialId);
   } catch (e) {
     return finish(e instanceof Error ? e.message : String(e));
   }
@@ -2614,7 +2614,7 @@ async function runRegistryJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyncR
       await step("lojas", async () => {
         const erp = await fetchErpStores(session);
         const r = await updateStoresFromErp(job.tenantId, erp);
-        stores = await deps.listStores(job.tenantId);
+        stores = await deps.listStores(job.tenantId, job.credentialId);
         console.log(`  Lojas · ${r.updated} atualizada(s)${r.missing > 0 ? ` · ${r.missing} do ERP fora da WDash` : ""}`);
       });
     }
@@ -2695,7 +2695,7 @@ async function runDailyForceJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyn
         credentialId: job.credentialId,
         day: prev,
         fillUntil: until,
-        ...(!isSeed && job.payload.storeIds?.length ? { storeIds: job.payload.storeIds } : {}),
+        ...(job.payload.storeIds?.length ? { storeIds: job.payload.storeIds } : {}),
       });
       if (queued) detail(`  Carga do histórico: enfileirado ${prev}`);
     } catch (e) {
@@ -2726,7 +2726,7 @@ async function runDailyForceJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyn
     return { ok: false as const, reason, error };
   };
 
-  let stores = await deps.listStores(job.tenantId);
+  let stores = await deps.listStores(job.tenantId, job.credentialId);
   if (job.payload.storeIds && job.payload.storeIds.length > 0) {
     const want = new Set(job.payload.storeIds);
     stores = stores.filter((s) => want.has(s.id));
@@ -2937,7 +2937,7 @@ async function priorityJobQueued(deps: SyncJobDeps, credentialId: string): Promi
 async function setRecoveryBase(job: SyncJob, deps: SyncJobDeps): Promise<void> {
   try {
     const now = deps.now();
-    const stores = await deps.listStores(job.tenantId);
+    const stores = await deps.listStores(job.tenantId, job.credentialId);
     await markStoresClosed(
       deps,
       stores
@@ -3018,7 +3018,7 @@ async function runRefreshJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyncRe
     }
   }
 
-  let stores = await deps.listStores(job.tenantId);
+  let stores = await deps.listStores(job.tenantId, job.credentialId);
   if (job.payload.storeIds && job.payload.storeIds.length > 0) {
     const want = new Set(job.payload.storeIds);
     stores = stores.filter((s) => want.has(s.id));
@@ -3191,7 +3191,7 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
   try {
     // HISTORY sem janelas: nao gasta sessao. RANGE sem buracos ainda precisa CMV.
     if (job.kind === "HISTORY") {
-      let previewStores = await deps.listStores(job.tenantId);
+      let previewStores = await deps.listStores(job.tenantId, job.credentialId);
       if (job.payload.storeIds && job.payload.storeIds.length > 0) {
         const want = new Set(job.payload.storeIds);
         previewStores = previewStores.filter((s) => want.has(s.id));
@@ -3280,7 +3280,7 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
 
     session = ensured.session;
     activeMillenniumSession = session;
-    let storeList = await deps.listStores(job.tenantId);
+    let storeList = await deps.listStores(job.tenantId, job.credentialId);
     if (job.payload.storeIds && job.payload.storeIds.length > 0) {
       const want = new Set(job.payload.storeIds);
       storeList = storeList.filter((s) => want.has(s.id));

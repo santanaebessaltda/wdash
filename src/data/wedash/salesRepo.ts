@@ -789,22 +789,28 @@ export async function fetchSyncWatermark(
   // Prefer light watermark; fall back to any successful sync (e.g. onboarding BACKFILL).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (client.from("erp_credential") as any)
-    .select("last_light_sync_at, last_success_at")
-    .eq("tenant_id", tenantId)
-    .maybeSingle();
+    .select("last_light_sync_at, last_success_at, status, sync_paused")
+    .eq("tenant_id", tenantId);
 
   if (error) {
     console.warn("fetchSyncWatermark:", error.message ?? error);
     throw error;
   }
-  const row = data as {
+  const rows = (Array.isArray(data) ? data : data ? [data] : []) as {
     last_light_sync_at?: string | null;
     last_success_at?: string | null;
-  } | null;
-  const raw = row?.last_light_sync_at ?? row?.last_success_at ?? null;
-  if (!raw) return null;
-  const d = new Date(raw);
-  return Number.isNaN(d.getTime()) ? null : d;
+    status?: string | null;
+    sync_paused?: boolean | null;
+  }[];
+  const active = rows.filter((row) => row.status !== "INVALID" && row.status !== "NOT_CONFIGURED" && !row.sync_paused);
+  const pool = active.length > 0 ? active : rows;
+  const stamps = pool
+    .map((row) => row.last_light_sync_at ?? row.last_success_at ?? null)
+    .filter((value): value is string => Boolean(value))
+    .map((value) => new Date(value).getTime())
+    .filter((value) => !Number.isNaN(value));
+  if (stamps.length === 0) return null;
+  return new Date(Math.min(...stamps));
 }
 
 /**

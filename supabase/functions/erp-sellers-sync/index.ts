@@ -138,17 +138,18 @@ serve(async (req) => {
 
   const { data: store } = await admin
     .from("store")
-    .select("id, millennium_store_id")
+    .select("id, millennium_store_id, credential_id")
     .eq("id", storeId)
     .eq("tenant_id", tenantId)
     .maybeSingle();
   if (!store) return json({ error: "invalid_store" }, 400);
 
-  const { data: cred } = await admin
+  let credQuery = admin
     .from("erp_credential")
     .select("id, username, password_ciphertext, status, sync_paused, millennium_session")
-    .eq("tenant_id", tenantId)
-    .maybeSingle();
+    .eq("tenant_id", tenantId);
+  if (store.credential_id) credQuery = credQuery.eq("id", store.credential_id as string);
+  const { data: cred } = await credQuery.limit(1).maybeSingle();
   if (!cred) return json({ ok: false, error: "credential_missing" });
   if (cred.status === "INVALID" || cred.status === "NOT_CONFIGURED") {
     return json({ ok: false, error: "credential_invalid" });

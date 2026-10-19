@@ -139,12 +139,15 @@ export async function logoutErp(session: string | undefined): Promise<void> {
 }
 
 /** Libera sessao WDash no Millennium + (opcional) pausa o sync do worker. */
-export async function releaseErpSession(opts?: { pauseSync?: boolean }): Promise<void> {
+export async function releaseErpSession(opts?: { pauseSync?: boolean; credentialId?: string }): Promise<void> {
   const sb = getSupabase();
   if (!sb) return;
   try {
     await sb.functions.invoke("millennium-onboarding", {
-      body: { action: opts?.pauseSync ? "pause" : "release" },
+      body: {
+        action: opts?.pauseSync ? "pause" : "release",
+        ...(opts?.credentialId ? { credentialId: opts.credentialId } : {}),
+      },
     });
   } catch (e) {
     console.warn("millennium-onboarding release:", e);
@@ -173,7 +176,100 @@ export type ErpIntegrationStatus = {
   autoRefreshEnabled: boolean;
 };
 
-/** Le estado da integracao (sem senha) para Configuracoes > Integracao ERP. */
+export type ErpAccount = {
+  id: string;
+  username: string;
+  status: string;
+  syncPaused: boolean;
+  dedicated: boolean;
+  storeCount: number;
+  storeIds: string[];
+};
+
+export type ErpConnectionState = "connected" | "disconnected" | "password" | "partial" | "unknown";
+
+/** Contas que cobrem as filiais do seletor. Lista vazia = todas. */
+export function erpConnectionOf(accounts: ErpAccount[], storeIds: string[]): ErpConnectionState {
+  const relevant =
+    storeIds.length === 0 ? accounts : accounts.filter((account) => account.storeIds.some((id) => storeIds.includes(id)));
+  if (relevant.length === 0) return accounts.length === 0 ? "disconnected" : "connected";
+  const healthy = (account: ErpAccount) => account.status === "VALID" && !account.syncPaused;
+  const up = relevant.filter(healthy).length;
+  if (up === relevant.length) return "connected";
+  if (up > 0) return "partial";
+  if (relevant.some((account) => account.status === "INVALID")) return "password";
+  return "disconnected";
+}
+
+type CredentialListRow = {
+  id: string;
+  username: string;
+  status: string;
+  sync_paused?: boolean | null;
+  dedicated?: boolean | null;
+  last_success_at?: string | null;
+  last_error?: string | null;
+  last_error_at?: string | null;
+  last_light_sync_at?: string | null;
+  auto_refresh_enabled?: boolean | null;
+};
+
+/** Contas Millennium da empresa, com a quantidade de filiais de cada uma. */
+export async function fetchErpAccounts(tenantId: string): Promise<ErpAccount[] | null> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  const [credRes, storeRes] = await Promise.all([
+    sb
+      .from("erp_credential")
+      .select("id, username, status, sync_paused, dedicated")
+      .eq("tenant_id", tenantId)
+      .order("created_at", { ascending: true }),
+    sb.from("store").select("id, credential_id").eq("tenant_id", tenantId).eq("active", true),
+  ]);
+  if (credRes.error) {
+    console.warn("fetchErpAccounts:", credRes.error.message);
+    return null;
+  }
+  const byCredential = new Map<string, string[]>();
+  for (const row of (storeRes.data ?? []) as { id?: string; credential_id?: string | null }[]) {
+    if (!row.credential_id || !row.id) continue;
+    const list = byCredential.get(row.credential_id) ?? [];
+    list.push(row.id);
+    byCredential.set(row.credential_id, list);
+  }
+  return ((credRes.data ?? []) as CredentialListRow[]).map((row) => {
+    const storeIds = byCredential.get(row.id) ?? [];
+    return {
+      id: row.id,
+      username: row.username,
+      status: row.status,
+      syncPaused: Boolean(row.sync_paused),
+      dedicated: Boolean(row.dedicated),
+      storeCount: storeIds.length,
+      storeIds,
+    };
+  });
+}
+
+function foldErpStatus(rows: CredentialListRow[]): ErpIntegrationStatus | null {
+  if (rows.length === 0) return null;
+  const healthy = rows.filter((row) => row.status === "VALID" && !row.sync_paused);
+  const invalid = rows.find((row) => row.status === "INVALID");
+  const focus = healthy[0] ?? invalid ?? rows[0]!;
+  return {
+    username: focus.username,
+    status: healthy.length > 0 ? "VALID" : invalid ? "INVALID" : focus.status,
+    syncPaused: healthy.length === 0 && rows.every((row) => row.sync_paused || row.status !== "VALID"),
+    dedicated: Boolean(focus.dedicated),
+    lastSuccessAt: focus.last_success_at ?? null,
+    lastError: focus.last_error ?? null,
+    lastErrorAt: focus.last_error_at ?? null,
+    lastLightSyncAt: focus.last_light_sync_at ?? null,
+    autoRefreshEnabled: focus.auto_refresh_enabled ?? true,
+  };
+}
+
+/** Le estado da integracao (sem senha). Com várias contas, vale a que ainda sincroniza. */
 export async function fetchErpIntegrationStatus(
   tenantId: string,
 ): Promise<ErpIntegrationStatus | null> {
@@ -182,37 +278,15 @@ export async function fetchErpIntegrationStatus(
   const { data, error } = await sb
     .from("erp_credential")
     .select(
-      "username, status, sync_paused, dedicated, last_success_at, last_error, last_error_at, last_light_sync_at, auto_refresh_enabled",
+      "id, username, status, sync_paused, dedicated, last_success_at, last_error, last_error_at, last_light_sync_at, auto_refresh_enabled",
     )
     .eq("tenant_id", tenantId)
-    .maybeSingle();
+    .order("created_at", { ascending: true });
   if (error) {
     console.warn("fetchErpIntegrationStatus:", error.message);
     return null;
   }
-  if (!data) return null;
-  const row = data as {
-    username: string;
-    status: string;
-    sync_paused?: boolean | null;
-    dedicated?: boolean | null;
-    last_success_at?: string | null;
-    last_error?: string | null;
-    last_error_at?: string | null;
-    last_light_sync_at?: string | null;
-    auto_refresh_enabled?: boolean | null;
-  };
-  return {
-    username: row.username,
-    status: row.status,
-    syncPaused: Boolean(row.sync_paused),
-    dedicated: Boolean(row.dedicated),
-    lastSuccessAt: row.last_success_at ?? null,
-    lastError: row.last_error ?? null,
-    lastErrorAt: row.last_error_at ?? null,
-    lastLightSyncAt: row.last_light_sync_at ?? null,
-    autoRefreshEnabled: row.auto_refresh_enabled ?? true,
-  };
+  return foldErpStatus((data ?? []) as CredentialListRow[]);
 }
 
 /**
@@ -376,6 +450,62 @@ export async function applyErpCredentialChange(change: PreparedErpChange): Promi
     }
   }
   return { ok: true, wiped: plan.kind === "full", storeIds: persisted.storeIds };
+}
+
+/**
+ * Conecta mais um usuário Millennium. Filial que já está em outra conta permanece lá.
+ * Filial nova entra nesta conta e vai para a carga inicial.
+ */
+export async function connectErpAccount(input: {
+  tenantId: string;
+  membershipId: string;
+  username: string;
+  password: string;
+  dedicated: boolean;
+}): Promise<
+  | { ok: true; added: number; skipped: { storeId: number; name: string }[]; storeIds: string[] }
+  | {
+      ok: false;
+      reason: ErpLoginFailReason | "no_stores" | "no_new_stores" | "persist";
+      reports?: ErpReportCheck[];
+      skipped?: { storeId: number; name: string }[];
+    }
+> {
+  const username = input.username.trim().toUpperCase();
+  const login = await testErpLogin(username, input.password);
+  if (!login.ok) return { ok: false, reason: login.reason, reports: login.reports };
+  if (login.stores.length === 0) {
+    await logoutErp(login.session);
+    return { ok: false, reason: "no_stores" };
+  }
+  const persisted = await persistErpCredentialAndStores({
+    tenantId: input.tenantId,
+    membershipId: input.membershipId,
+    username,
+    password: input.password,
+    dedicated: input.dedicated,
+    stores: login.stores,
+    millenniumSession: login.session,
+    mode: "add",
+  });
+  if (!persisted.ok) {
+    return {
+      ok: false,
+      reason: persisted.error === "no_new_stores" ? "no_new_stores" : "persist",
+      skipped: persisted.skipped,
+    };
+  }
+  if (persisted.addedStoreIds.length > 0) {
+    const sb = getSupabase();
+    try {
+      await sb?.functions.invoke("erp-sync-enqueue", {
+        body: { action: "seed", storeIds: persisted.addedStoreIds },
+      });
+    } catch (e) {
+      console.warn("erp-sync-enqueue seed:", e);
+    }
+  }
+  return { ok: true, added: persisted.addedStoreIds.length, skipped: persisted.skipped, storeIds: persisted.storeIds };
 }
 
 /** Marca presenca WDash (heartbeat). Worker so synca com presenca recente. */
