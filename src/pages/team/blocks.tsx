@@ -414,7 +414,6 @@ export function GoalProgressBar({
   individual?: boolean;
 }) {
   const showsProjection = !soBarra && goalShowsProjection(goal.start, goal.end, todayIso);
-  const fecha = goal.projectedPct >= 100;
   const scaleMax = Math.max(...tiers.map((d) => d.minAttainmentPct), 100);
   const fillPct = Math.min(100, (goal.pct / scaleMax) * 100);
   const colorBarra = progressColor(goal.pct);
@@ -442,11 +441,11 @@ export function GoalProgressBar({
           {showsProjection && (
             <Tooltip label="Projeção de atingimento ao final da meta. Aparece depois de metade do período.">
               <span className="inline-flex cursor-help">
-                <Badge variant={fecha ? "success" : "warning"}>{projectionLabel}</Badge>
+                <Badge variant="accent" className="uppercase">{projectionLabel}</Badge>
               </span>
             </Tooltip>
           )}
-          <Badge variant="neutral" className="gap-1">
+          <Badge variant="neutral" className="gap-1 uppercase">
             <ClockIcon />
             {goal.daysRemaining <= 0
               ? "Encerrada"
@@ -650,11 +649,11 @@ export function GoalCard({
       <CardTitle>{card.name}</CardTitle>
 
       <div className="mt-2.5 flex flex-wrap gap-1.5">
-        <Badge variant="neutral" className="gap-1">
+        <Badge variant="neutral" className="gap-1 uppercase">
           {card.kind === "individual" ? <IndividualTypeIcon /> : <GroupTypeIcon />}
           {kindLabel}
         </Badge>
-        <Badge variant="neutral" className="gap-1">
+        <Badge variant="neutral" className="gap-1 uppercase">
           <StoreIcon />
           {card.storeNameValue}
         </Badge>
@@ -665,16 +664,16 @@ export function GoalCard({
           </Badge>
         ))}
         {card.qtyGroups > 0 ? (
-          <Badge variant="neutral" className="gap-1">
+          <Badge variant="neutral" className="gap-1 uppercase">
             <GroupsIcon />
             {card.qtyGroups} {card.qtyGroups === 1 ? "grupo" : "grupos"}
           </Badge>
         ) : null}
-        <Badge variant="neutral" className="gap-1">
+        <Badge variant="neutral" className="gap-1 uppercase">
           <SellersIcon />
           {card.qtySellers} na equipe
         </Badge>
-        <Badge variant="neutral" className="gap-1">
+        <Badge variant="neutral" className="gap-1 uppercase">
           <LevelsIcon />
           {card.qtyLevels} {card.qtyLevels === 1 ? "nível" : "níveis"}
         </Badge>

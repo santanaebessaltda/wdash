@@ -289,7 +289,7 @@ function GoalHero({
         <div className="min-w-[220px] flex-1">
           <div className="mb-1.5 flex flex-wrap items-center gap-2.5">
             <h1 className="text-xl font-extrabold text-t0 sm:text-[22px]">{goal.name}</h1>
-            <Badge variant={statusBadgeVariant(GOAL_STATUS_LABEL[status])}>{GOAL_STATUS_LABEL[status]}</Badge>
+            <Badge variant={statusBadgeVariant(GOAL_STATUS_LABEL[status])} className="uppercase">{GOAL_STATUS_LABEL[status]}</Badge>
           </div>
           <p className="flex flex-wrap items-center gap-x-1.5 text-[13.5px] leading-relaxed text-t1">
             {fullDate(goal.startsOn)} a {fullDate(goal.endsOn)}

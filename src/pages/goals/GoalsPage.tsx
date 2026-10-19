@@ -357,12 +357,12 @@ function GoalCard({
       <div className="flex-1" />
       <div className="mt-4 flex items-center justify-between gap-3">
         <div className="flex min-w-0 flex-wrap gap-1.5">
-          <Badge variant={statusBadgeVariant(GOAL_STATUS_LABEL[status])}>{GOAL_STATUS_LABEL[status]}</Badge>
-          <Badge variant="neutral">{g.tierMode === "INDIVIDUAL" ? "Individual" : g.tierMode === "GENERAL" ? "Geral" : "Grupo"}</Badge>
-          <Badge variant="neutral">
+          <Badge variant={statusBadgeVariant(GOAL_STATUS_LABEL[status])} className="uppercase">{GOAL_STATUS_LABEL[status]}</Badge>
+          <Badge variant="neutral" className="uppercase">{g.tierMode === "INDIVIDUAL" ? "Individual" : g.tierMode === "GENERAL" ? "Geral" : "Grupo"}</Badge>
+          <Badge variant="neutral" className="uppercase">
             {g.tiers.length} {g.tiers.length === 1 ? "nível" : "níveis"}
           </Badge>
-          <Badge variant="neutral">{team.length} na equipe</Badge>
+          <Badge variant="neutral" className="uppercase">{team.length} na equipe</Badge>
         </div>
         {team.length > 0 && (
           <div className="shrink-0">
