@@ -347,13 +347,11 @@ export function TeamPage() {
     };
   }, [tableLines]);
 
-  // No ranking padrão o pódio já mostra o 1º, 2º e 3º. A lista segue do 4º.
-  // Busca ou outra ordenação traz todo mundo, para achar quem está no pódio.
+  // O pódio já mostra o 1º, 2º e 3º. A lista e a busca ficam só com o restante.
   const podiumKeys = useMemo(() => new Set(view.people.slice(0, 3).map((p) => p.key)), [view.people]);
-  const rankingOrder = sortKey === "revenue" && sortDir === "desc" && !search.trim();
   const listLines = useMemo(
-    () => (rankingOrder ? tableLines.filter((p) => !podiumKeys.has(p.key)) : tableLines),
-    [rankingOrder, tableLines, podiumKeys],
+    () => tableLines.filter((p) => !podiumKeys.has(p.key)),
+    [tableLines, podiumKeys],
   );
 
   const pageSize = TABLE_PAGE_SIZE;
