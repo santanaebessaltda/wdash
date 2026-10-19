@@ -1,7 +1,6 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { paths } from "@/router/paths";
-import { HeaderFilter } from "@/pages/dashboard/HeaderFilter";
 import { Button, Card, CardHeader, CardTitle, DateRangePicker, PageHeader, Pagination, StatCard, Tabs, ThSort, type SortDir } from "@/components/ui";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { DonutChart } from "@/components/charts";
@@ -193,12 +192,11 @@ export function TeamPage() {
   const [aggs, setAggs] = useState<TeamAggInput>({ dayAggs: [] });
   const [coverageFrom, setCoverageFrom] = useState<Date | null>(null);
   const filterKey = scopeFilterKey(scope);
-  const { pending, showSkeleton, settle } = useFilterSkeleton(filterKey);
+  const { showSkeleton, settle } = useFilterSkeleton(filterKey);
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("revenue");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(1);
-  const [shiftPicked, setShiftPicked] = useState<string | null>(null);
   const [goalsData, setGoalsData] = useState<GoalsData>(GOALS_EMPTY);
   const [challengesData, setChallengesData] = useState<ChallengesData>(CHALLENGES_EMPTY);
   const printing = usePrintMode();
@@ -248,9 +246,9 @@ export function TeamPage() {
   }, [reload]);
 
   const view = useMemo(
-    () => buildTeamDashboardView(scope, aggs, { shift: shiftPicked }),
+    () => buildTeamDashboardView(scope, aggs),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [scope, aggs, storesTick, shiftPicked],
+    [scope, aggs, storesTick],
   );
 
   const todayIso = calendarTodayIso();
@@ -362,7 +360,7 @@ export function TeamPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, sortKey, sortDir, scope, shiftPicked]);
+  }, [search, sortKey, sortDir, scope]);
 
   useEffect(() => {
     if (!hasRankingList) setSearch("");
@@ -377,8 +375,8 @@ export function TeamPage() {
     }
   }
 
-  const exportValue = useExportPdf("Equipe", view.shiftFilter);
-  const { open: openPerson, modal: personModal } = useTeamMemberDetail({ scope, data: aggs, shift: view.shiftFilter, goalLevels });
+  const exportValue = useExportPdf("Equipe");
+  const { open: openPerson, modal: personModal } = useTeamMemberDetail({ scope, data: aggs, goalLevels });
   const teclaAbre = (p: TeamMemberRow) => (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
@@ -401,7 +399,7 @@ export function TeamPage() {
 
   return (
     <div className="flex flex-col p-4 sm:p-6 print:p-0">
-      <ReportHeader filters={view.availableShifts.length > 0 ? [{ label: "Grupo", amount: view.shiftFilter ?? "Todos os grupos" }] : []} />
+      <ReportHeader />
       <PageHeader
         crumbs={[{ label: "Dashboard", to: "/dashboard/visao-geral" }, { label: "Equipe" }]}
         title="Equipe"
@@ -416,14 +414,6 @@ export function TeamPage() {
                 activePresetId={periodActivePresetId(scope.period)}
                 minDate={pickerMinDate(coverageFrom, monthFill)}
               />
-              {!pending && view.availableShifts.length > 0 && (
-                <HeaderFilter
-                  label="Grupo"
-                  value={view.shiftFilter ?? ""}
-                  onChange={(v) => setShiftPicked(v || null)}
-                  options={[{ value: "", label: "Todos os grupos" }, ...view.availableShifts.map((t) => ({ value: t, label: t }))]}
-                />
-              )}
               <Button variant="primary" onClick={exportValue}>
                 Exportar
               </Button>
@@ -542,21 +532,13 @@ export function TeamPage() {
                 <EmptyBlock />
               ) : (
                 (() => {
-                  const { team, unidentified, branchUser, management, total, shift } = view.composition;
-                  const fora = [
+                  const { team, unidentified, branchUser, management, total } = view.composition;
+                  const fatias = [
+                    { name: "Equipe de vendas", amount: team, color: "var(--acc)" },
                     { name: "Sem vendedor identificado", amount: unidentified, color: COLOR_NEUTRA },
                     { name: "Usuário da filial", amount: branchUser, color: "var(--info)" },
                     { name: "Gerência", amount: management, color: "var(--warn)" },
-                  ];
-                  const fatias = (
-                    shift != null && view.shiftFilter
-                      ? [
-                          { name: view.shiftFilter, amount: shift, color: "var(--acc)" },
-                          { name: "Demais da equipe", amount: Math.max(0, team - shift), color: "color-mix(in srgb, var(--acc) 45%, var(--info))" },
-                          ...fora,
-                        ]
-                      : [{ name: "Equipe de vendas", amount: team, color: "var(--acc)" }, ...fora]
-                  ).filter((f) => f.amount > 0);
+                  ].filter((f) => f.amount > 0);
                   return (
                     <div className="flex flex-1 flex-col justify-center px-4 pb-4">
                       <div className="mx-auto my-2">
