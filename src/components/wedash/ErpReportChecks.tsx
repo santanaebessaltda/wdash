@@ -6,7 +6,7 @@ export function ErpReportChecks({ reports, username }: { reports: ErpReportCheck
   return (
     <Alert
       variant="danger"
-      title="Faltam acessos no Millennium"
+      title="Permissões necessárias no Millennium"
       footer={
         <ul className="mt-2.5 space-y-1.5">
           {reports.map((r) => (

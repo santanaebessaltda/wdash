@@ -8,9 +8,9 @@ import { noAutofill, secretStyle } from "@/lib/noAutofill";
 const toastError: Record<Exclude<ErpLoginResult, { ok: true }>["reason"], string> = {
   password: "Usuário ou senha incorretos. Confira os dados e tente novamente.",
   busy: "Este usuário do Millennium está conectado em outro local. Encerre a outra sessão e tente novamente.",
-  stores: "Conseguimos acessar o Millennium, mas não foi possível identificar as filiais deste usuário. Tente novamente.",
+  stores: "O acesso ao Millennium foi confirmado, mas não foi possível identificar as filiais deste usuário. Tente novamente.",
   other: "Não foi possível conectar ao Millennium. Tente novamente em alguns minutos.",
-  reports: "Este usuário não tem acesso a todos os relatórios necessários para a WDash.",
+  reports: "Este usuário não tem acesso a todos os relatórios necessários no Millennium.",
 };
 
 const btnPrimario =

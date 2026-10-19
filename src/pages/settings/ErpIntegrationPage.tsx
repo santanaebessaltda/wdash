@@ -49,12 +49,12 @@ function filialLabel(count: number): string {
 const ERROR_CREDENCIAL: Record<string, string> = {
   password: "Usuário ou senha incorretos. Confira os dados e tente novamente.",
   busy: "Este usuário do Millennium está conectado em outro local. Encerre a outra sessão e tente novamente.",
-  stores: "Conseguimos acessar o Millennium, mas não foi possível identificar as filiais deste usuário. Tente novamente.",
+  stores: "O acesso ao Millennium foi confirmado, mas não foi possível identificar as filiais deste usuário. Tente novamente.",
   no_stores: "Este usuário não possui filiais vinculadas no Millennium. Verifique os vínculos no Millennium e tente novamente.",
-  no_new_stores: "Este usuário só enxerga filiais que já estão em outra conta Millennium. Nada foi alterado.",
+  no_new_stores: "Todas as filiais deste usuário já estão vinculadas a outro acesso do Millennium. Nada foi alterado.",
   other: "Não foi possível conectar ao Millennium. Tente novamente em alguns minutos.",
   persist: "A conexão foi testada, mas não foi possível salvá-la. Tente novamente.",
-  reports: "Este usuário não tem acesso a todos os relatórios necessários para a WDash.",
+  reports: "Este usuário não tem acesso a todos os relatórios necessários no Millennium.",
 };
 
 /**
@@ -84,7 +84,7 @@ export function ErpIntegrationPage() {
   const reload = useCallback(async () => {
     const rows = await fetchErpAccounts(session.tenantId);
     if (rows) setAccounts(rows);
-    else show("Não foi possível carregar as contas do Millennium. Tente novamente.", "danger");
+    else show("Não foi possível carregar os acessos do Millennium. Tente novamente.", "danger");
     setLoading(false);
   }, [session.tenantId, show]);
 
@@ -136,7 +136,7 @@ export function ErpIntegrationPage() {
     const ok = await requestTodaySync(account.storeIds);
     setRetryingId(null);
     if (!ok) {
-      show("Não foi possível tentar de novo. Tente novamente.", "danger");
+      show("Não foi possível iniciar a sincronização. Tente novamente.", "danger");
       return;
     }
     await refreshSync();
@@ -153,12 +153,12 @@ export function ErpIntegrationPage() {
   return (
     <div>
       {showSkeleton ? (
-        <ConnectionSkeleton label="Carregando contas do Millennium…" />
+        <ConnectionSkeleton label="Carregando acessos do Millennium…" />
       ) : accounts.length === 0 ? (
         <Card className="flex min-h-[280px] flex-col">
           <EmptyBlock
             icon="🗄️"
-            title="Nenhum acesso conectado"
+            title="Nenhum acesso do Millennium conectado"
             description="Conecte um acesso do Millennium para sincronizar vendas, produtos e cadastros."
             action={
               <Button size="sm" onClick={() => setConnectOpen(true)} disabled={!canEdit}>
@@ -171,7 +171,7 @@ export function ErpIntegrationPage() {
         <>
           <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
             {canRefresh ? (
-              <Tooltip label="Busca no Millennium as atualizações de produtos, equipe e demais cadastros." side="bottom">
+              <Tooltip label="Busca no Millennium as atualizações de produtos, equipe e outros cadastros." side="bottom">
                 <Button variant="outline" size="sm" onClick={() => void refreshRecords()} disabled={atualizando}>
                   {atualizando ? "Atualizando…" : "Atualizar cadastros"}
                 </Button>
@@ -183,7 +183,7 @@ export function ErpIntegrationPage() {
           </div>
           <ConnectionCard
             title="Millennium"
-            hint="Cada acesso pode atender uma ou mais filiais. Filiais já vinculadas a outra conta permanecem nela."
+            hint="Cada acesso pode atender uma ou mais filiais. Filiais já vinculadas a outro acesso não são transferidas."
             rows={accounts.map((account) => ({
               key: account.id,
               name: account.username,
@@ -220,13 +220,13 @@ export function ErpIntegrationPage() {
             show("Millennium conectado.", "success");
           } else if (skipped.length > 0) {
             show(
-              `Millennium conectado. ${skipped.length === 1 ? "1 filial já estava" : `${skipped.length} filiais já estavam`} em outra conta e não ${skipped.length === 1 ? "foi movida" : "foram movidas"}.`,
+              `Millennium conectado. ${skipped.length === 1 ? "1 filial já estava vinculada a outro acesso e não foi transferida" : `${skipped.length} filiais já estavam vinculadas a outro acesso e não foram transferidas`}.`,
               "success",
             );
           } else if (!result.queued) {
-            show("Millennium conectado, mas a carga não entrou na fila. Use Tentar novamente nesta tela.", "warning");
+            show("Millennium conectado, mas a sincronização das vendas não foi iniciada. Tente novamente nesta tela.", "warning");
           } else {
-            show("Millennium conectado. A carga dessas filiais entrou na fila.", "success");
+            show("Millennium conectado. A sincronização das vendas está na fila.", "success");
           }
           setConnectOpen(false);
         }}
@@ -237,7 +237,7 @@ export function ErpIntegrationPage() {
         onClose={() => {
           if (!disconnecting) setPending(null);
         }}
-        title="Desconectar Millennium"
+        title="Desconectar acesso do Millennium"
         footer={
           <>
             <Button variant="outline" onClick={() => setPending(null)} disabled={disconnecting}>
@@ -250,8 +250,8 @@ export function ErpIntegrationPage() {
         }
       >
         <p className="text-[13.5px] leading-relaxed text-t1">
-          O acesso <strong className="font-semibold text-t0">{pending?.username}</strong> para de sincronizar com o
-          Millennium. As vendas já gravadas permanecem. Os outros acessos não são afetados.
+          O acesso <strong className="font-semibold text-t0">{pending?.username}</strong> deixará de sincronizar com o
+          Millennium. As vendas já salvas serão mantidas e os outros acessos não serão afetados.
         </p>
       </Modal>
     </div>
@@ -291,7 +291,7 @@ function AccountLoad({
       {seed === "running" || seed === "queued" || seed === "waiting" ? (
         <Alert
           variant="accent"
-          title={seed === "running" ? "Buscando as vendas de hoje" : "Sincronização na fila"}
+          title={seed === "running" ? "Buscando vendas de hoje" : "Sincronização na fila"}
           icon={
             <span className="mt-0.5 shrink-0">
               <Spinner size={18} />
@@ -299,15 +299,15 @@ function AccountLoad({
           }
         >
           {seed === "running"
-            ? "As vendas aparecem automaticamente assim que a sincronização terminar."
+            ? "As vendas aparecem automaticamente quando a sincronização terminar."
             : seed === "waiting"
-              ? "Há uma carga em andamento. Estas filiais entram assim que ela liberar o sincronizador."
+              ? "Há outra sincronização em andamento. Estas filiais começam assim que ela terminar."
               : "A busca das vendas de hoje começa em instantes."}
         </Alert>
       ) : null}
       {seed === "stuck" ? (
         <Alert variant="warning" title="A sincronização está demorando mais que o normal">
-          Ainda não conseguimos iniciar a busca das vendas de hoje. Se continuar assim, fale com o suporte.
+          A busca das vendas de hoje ainda não começou. Se o problema continuar, fale com o suporte.
         </Alert>
       ) : null}
       {seed === "failed" ? (
@@ -322,20 +322,20 @@ function AccountLoad({
         >
           {sync.busy
             ? "Este usuário do Millennium está conectado em outro local. Encerre a outra sessão e tente novamente."
-            : "Não foi possível obter as vendas no Millennium. Tente novamente em instantes."}
+            : "Tente novamente em instantes."}
         </Alert>
       ) : null}
       {pendingStart && seed == null && !fill && account.stores.length > 0 ? (
         <Alert
           variant="warning"
-          title="A carga destas filiais ainda não começou"
+          title="A sincronização ainda não começou"
           action={
             <Button size="sm" variant="outline" disabled={retrying} onClick={onRetry}>
               {retrying ? "Tentando…" : "Tentar novamente"}
             </Button>
           }
         >
-          O acesso está conectado, mas a busca das vendas de hoje não entrou na fila.
+          O acesso está conectado, mas a busca das vendas de hoje não foi iniciada.
         </Alert>
       ) : null}
       {fill ? (
@@ -353,7 +353,7 @@ function AccountLoad({
             </>
           }
         >
-          Os dias anteriores entram automaticamente. Você pode continuar usando o painel.
+          As vendas dos dias anteriores serão adicionadas automaticamente. Você pode continuar usando a WDash.
         </Alert>
       ) : null}
       {seed === "running" && account.stores.length > 0 ? (
@@ -466,8 +466,8 @@ function ConnectModal({
     >
       <div className="flex flex-col gap-3.5">
         <p className="text-[13.5px] leading-relaxed text-t1">
-          Informe o usuário e a senha do Millennium. Antes de conectar, a WDash verifica o acesso às filiais e aos dados
-          necessários para a sincronização. Filiais já vinculadas a outra conta permanecem nela.
+          Informe o usuário e a senha do Millennium. A WDash verificará o acesso às filiais e aos dados necessários para a
+          sincronização. Filiais já vinculadas a outro acesso não serão transferidas.
         </p>
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
           <FormField label="Usuário do Millennium" required>
@@ -520,7 +520,7 @@ function ConnectModal({
               Este acesso será usado somente pela WDash
               <span className="mt-0.5 block text-xs text-t2">
                 O Millennium permite apenas uma sessão por usuário. Recomendamos um acesso exclusivo para evitar
-                interrupções e permitir a reconexão automática.
+                interrupções na sincronização.
               </span>
             </span>
           }
