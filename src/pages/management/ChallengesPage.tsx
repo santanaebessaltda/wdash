@@ -18,10 +18,12 @@ import {
   CHALLENGE_METRIC_LABEL,
   CHALLENGE_MODE_LABEL,
   CHALLENGE_STATUS_LABEL,
+  type ChallengeStatus,
   type ChallengeView,
 } from "@/data/wedash/challengeView";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { storesForSession, type Store } from "@/data/wedash/stores";
+import { cn } from "@/lib/cn";
 import { fullDate, isoToDate, endOfMonth, dateToIso } from "@/lib/format";
 import { statusBadgeVariant } from "@/lib/status";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
@@ -129,6 +131,18 @@ export function ChallengesPage() {
   }, [data, storeRows, today]);
 
   const dateRange = useMemo(() => dateRangeFromManagementPeriod(scope.period), [scope.period]);
+  const statusSections = useMemo(() => {
+    const titles: Record<ChallengeStatus, string> = {
+      active: "Em andamento",
+      upcoming: "A começar",
+      ended: "Encerrados",
+    };
+    const present = (["active", "upcoming", "ended"] as const).filter((status) =>
+      cards.some((card) => card.view.status === status),
+    );
+    return { titles, present, split: present.length > 1 };
+  }, [cards]);
+
   function onDateChange(r: DateRange, goal?: DateRangeChangeMeta) {
     setScope(applyPeriodDateChange(scope, r, goal));
   }
@@ -190,18 +204,31 @@ export function ChallengesPage() {
             />
           </Card>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {cards.map(({ challenge, view, store }) => (
-              <ChallengeCard
-                key={challenge.id}
-                challenge={challenge}
-                view={view}
-                store={store}
-                showsStore={storeRows.length > 1}
-                onDetail={() => navigate(paths.management.challengeDetail(challenge.id))}
-                onCopy={() => setDuplicate(challenge)}
-                onDelete={() => setConfirm(challenge)}
-              />
+          <div className="flex flex-col gap-6">
+            {statusSections.present.map((status) => (
+              <div key={status}>
+                {statusSections.split && (
+                  <p className="mb-3 text-[12px] font-bold uppercase tracking-wide text-t2">
+                    {statusSections.titles[status]}
+                  </p>
+                )}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {cards
+                    .filter((card) => card.view.status === status)
+                    .map(({ challenge, view, store }) => (
+                      <ChallengeCard
+                        key={challenge.id}
+                        challenge={challenge}
+                        view={view}
+                        store={store}
+                        showsStore={storeRows.length > 1}
+                        onDetail={() => navigate(paths.management.challengeDetail(challenge.id))}
+                        onCopy={() => setDuplicate(challenge)}
+                        onDelete={() => setConfirm(challenge)}
+                      />
+                    ))}
+                </div>
+              </div>
             ))}
           </div>
         )}
@@ -267,6 +294,8 @@ function ChallengeCard({
   const period = `${fullDate(c.startsOn)} a ${fullDate(c.endsOn)}`;
   const destaque = challengeHeadline(c, view);
   const prize = mainPrizeLabel(c);
+  const ended = view.status === "ended";
+  const statusLabel = CHALLENGE_STATUS_LABEL[view.status];
 
   const action = (fn: () => void) => (e: MouseEvent) => {
     e.stopPropagation();
@@ -286,10 +315,18 @@ function ChallengeCard({
           onDetail();
         }
       }}
-      className="flex cursor-pointer flex-col rounded-2xl border border-line bg-bg-2 p-5 shadow-[var(--shadow-vela)] transition-colors hover:border-line-2 focus-visible:border-acc focus-visible:outline-none"
+      className={cn(
+        "flex cursor-pointer flex-col rounded-2xl border border-line p-5 shadow-[var(--shadow-vela)] transition-colors hover:border-line-2 focus-visible:border-acc focus-visible:outline-none",
+        ended ? "bg-bg-inset" : "bg-bg-2",
+      )}
     >
       <div className="mb-3.5 flex items-center gap-3.5">
-        <div className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-[14px] bg-acc-soft text-acc">
+        <div
+          className={cn(
+            "flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-[14px]",
+            ended ? "bg-bg-3 text-t2" : "bg-acc-soft text-acc",
+          )}
+        >
           <FlameIcon size={22} />
         </div>
         <div className="min-w-0 flex-1">
@@ -334,13 +371,19 @@ function ChallengeCard({
           </span>
         )}
       </div>
-      <p className="mt-2 text-[11.5px] text-t2">{view.prazo}</p>
+      {!ended && <p className="mt-2 text-[11.5px] text-t2">{view.prazo}</p>}
 
       <div className="flex-1" />
       <div className="mt-4 flex flex-wrap gap-1.5">
-        <Badge variant={statusBadgeVariant(CHALLENGE_STATUS_LABEL[view.status])}>{CHALLENGE_STATUS_LABEL[view.status]}</Badge>
-        <Badge variant="neutral">{CHALLENGE_METRIC_LABEL[c.metric]}</Badge>
-        <Badge variant="neutral">{CHALLENGE_MODE_LABEL[c.mode]}</Badge>
+        <Badge variant={statusBadgeVariant(statusLabel)} className="uppercase">
+          {statusLabel}
+        </Badge>
+        <Badge variant="neutral" className="uppercase">
+          {CHALLENGE_METRIC_LABEL[c.metric]}
+        </Badge>
+        <Badge variant="neutral" className="uppercase">
+          {CHALLENGE_MODE_LABEL[c.mode]}
+        </Badge>
       </div>
     </div>
   );
