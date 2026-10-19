@@ -10,7 +10,7 @@ export interface TabNavItem {
 /** Route-driven tab strip used by tabbed module layouts (Account, Settings, Marketing, Reports, Components). */
 export function TabNav({ items }: { items: TabNavItem[] }) {
   return (
-    <div className="flex gap-1 overflow-x-auto border-b border-line pb-0">
+    <div className="flex gap-1 overflow-x-auto border-b border-line pb-0 print:hidden">
       {items.map((item) => (
         <NavLink
           key={item.to}

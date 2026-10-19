@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { Alert, Badge, Button, Card, CardTitle, DataTable, DateRangePicker, PageHeader, Skeleton, StatCard, Tooltip, CALENDAR_QUICK_RANGES, type DataTableColumn, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Alert, Badge, Button, Card, CardTitle, Checkbox, DataTable, DateRangePicker, Dropdown, Modal, PageHeader, Skeleton, StatCard, Tooltip, CALENDAR_QUICK_RANGES, type DataTableColumn, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
+import { WedashBrand } from "@/components/wedash/WedashBrand";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { periodLabels } from "@/data/wedash/dashboard";
 import { monthsTouched } from "@/data/wedash/cashCloseMonth";
@@ -12,12 +12,13 @@ import { loadBranchWallet, loadSellerWallet } from "@/data/wedash/walletLoad";
 import { effectiveWeekHours } from "@/data/wedash/storeHours";
 import { cn } from "@/lib/cn";
 import { brlCent, dateToIso, endOfMonth, fullDate, isoToDate } from "@/lib/format";
+import { exportPdf, usePrintMode } from "@/lib/printMode";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
-import { useScope } from "@/pages/dashboard/useScope";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { CheckCircleIcon, FlameIcon, TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
-import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
+import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
+import type { Store } from "@/data/wedash/stores";
 import { HeaderFilters } from "@/pages/stock/shared";
 
 const money = (cents: number) => brlCent(cents / 100);
@@ -77,6 +78,7 @@ function PeriodControl({
   floor,
   presetId,
   onChange,
+  extra,
 }: {
   from: string;
   to: string;
@@ -84,6 +86,7 @@ function PeriodControl({
   floor: string;
   presetId: DatePresetId | null;
   onChange: (from: string, to: string, presetId: DatePresetId | null) => void;
+  extra?: ReactNode;
 }) {
   function apply(start: Date, end: Date, goal?: DateRangeChangeMeta) {
     onChange(dateToIso(start), dateToIso(end), goal?.presetId ?? null);
@@ -99,12 +102,12 @@ function PeriodControl({
         activePresetId={presetId}
         onChange={([start, end], goal) => apply(start, end, goal)}
       />
+      {extra}
     </HeaderFilters>
   );
 }
 
-function Totals({ wallet }: { wallet: WalletMonth }) {
-  const rows = wallet.people;
+function Totals({ rows }: { rows: WalletPersonMonth[] }) {
   const sum = (pick: (row: WalletPersonMonth) => number) => rows.reduce((total, row) => total + pick(row), 0);
   const balance = sum((row) => row.balanceCents);
   const open = rows.some((row) => row.openPrize || row.lines.some((line) => line.open));
@@ -173,56 +176,56 @@ function Statement({
   );
 }
 
-function PersonSheet({ person, onClose }: { person: WalletPersonMonth; onClose: () => void }) {
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  return createPortal(
-    <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-label={person.name}>
-      <div className="absolute inset-0 bg-black/60 animate-vela-fade" onClick={onClose} />
-      <div className="absolute inset-x-0 bottom-0 flex max-h-[88vh] flex-col overflow-hidden rounded-t-[20px] border border-line bg-bg-2 shadow-[var(--shadow-vela)] animate-vela-pop lg:inset-y-0 lg:left-auto lg:right-0 lg:max-h-none lg:w-[420px] lg:rounded-none">
-        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-line px-5 py-4">
-          <div className="min-w-0">
-            <h3 className="truncate text-[16px] font-bold text-t0">{person.name}</h3>
-            <p className="mt-1 text-[12.5px] text-t2">
-              Saldo: <span className={`font-bold ${balanceClass(person.balanceCents)}`}>{money(person.balanceCents)}</span>
-            </p>
-          </div>
-          <button type="button" onClick={onClose} aria-label="Fechar" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-t1 hover:bg-bg-3 hover:text-t0">
-            ✕
-          </button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <Statement person={person} />
-        </div>
-      </div>
-    </div>,
-    document.body,
+function PersonDialog({ person, storeName, onClose }: { person: WalletPersonMonth; storeName?: string; onClose: () => void }) {
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      size="lg"
+      title={
+        <span className="min-w-0">
+          <span className="block truncate">{person.name}</span>
+          {storeName ? <span className="mt-0.5 block text-[12.5px] font-semibold text-t2">{storeName}</span> : null}
+        </span>
+      }
+    >
+      <p className="mb-4 text-[12.5px] text-t2">
+        Saldo: <span className={`font-bold ${balanceClass(person.balanceCents)}`}>{money(person.balanceCents)}</span>
+      </p>
+      <Statement person={person} />
+    </Modal>
   );
 }
 
-function UnassignedShortage({ wallet }: { wallet: WalletMonth }) {
+type PersonRow = WalletPersonMonth & { storeId: string; storeName: string };
+
+type ShortageBlock = { storeId: string; storeName: string; cents: number; days: { day: string; cents: number }[] };
+
+function rowKey(row: PersonRow): string {
+  return `${row.storeId}:${row.personId}`;
+}
+
+function UnassignedShortage({ blocks, showStore }: { blocks: ShortageBlock[]; showStore: boolean }) {
+  const printing = usePrintMode();
   const [open, setOpen] = useState(false);
-  if (wallet.unassignedShortageCents <= 0) return null;
+  const total = blocks.reduce((sum, block) => sum + block.cents, 0);
+  const days = blocks.flatMap((block) => block.days.map((day) => ({ ...day, storeId: block.storeId, storeName: block.storeName })));
+  if (total <= 0) return null;
+  const shown = printing || open;
   return (
     <div className="rounded-[var(--radius-vela-lg)] border border-line bg-bg-2 px-4 py-3">
-      <button type="button" className="flex w-full items-start justify-between gap-3 text-left" onClick={() => setOpen((current) => !current)} aria-expanded={open}>
+      <button type="button" className="flex w-full items-start justify-between gap-3 text-left" onClick={() => setOpen((current) => !current)} aria-expanded={shown}>
         <span>
-          <span className="text-[13.5px] font-bold text-warn">Quebra sem destino · {money(wallet.unassignedShortageCents)}</span>
+          <span className="text-[13.5px] font-bold text-warn">Quebra sem destino · {money(total)}</span>
           <span className="mt-0.5 block text-[12.5px] text-t2">Há valores de quebra que ainda não estão vinculados a uma pessoa, grupo ou equipe.</span>
         </span>
-        <span className="shrink-0 text-[12px] font-bold text-t2">{open ? "Ocultar" : "Ver dias"}</span>
+        <span className="shrink-0 text-[12px] font-bold text-t2 print:hidden">{shown ? "Ocultar" : "Ver dias"}</span>
       </button>
-      {open ? (
+      {shown ? (
         <ul className="mt-3 border-t border-line">
-          {wallet.unassignedShortageDays.map((day) => (
-            <li key={day.day} className="flex items-center justify-between gap-4 border-b border-line py-2.5 last:border-b-0">
-              <span className="text-[13.5px] text-t0">{fullDate(day.day)}</span>
+          {days.map((day) => (
+            <li key={`${day.storeId}-${day.day}`} className="flex items-center justify-between gap-4 border-b border-line py-2.5 last:border-b-0">
+              <span className="text-[13.5px] text-t0">{showStore ? `${day.storeName} · ${fullDate(day.day)}` : fullDate(day.day)}</span>
               <span className="font-mono text-[13.5px] font-bold text-t0">{money(day.cents)}</span>
             </li>
           ))}
@@ -232,12 +235,15 @@ function UnassignedShortage({ wallet }: { wallet: WalletMonth }) {
   );
 }
 
-function WalletBody({ wallet }: { wallet: WalletMonth }) {
+function WalletBody({ rows, shortages, showStore }: { rows: PersonRow[]; shortages: ShortageBlock[]; showStore: boolean }) {
   const [picked, setPicked] = useState<string | null>(null);
-  const person = wallet.people.find((row) => row.personId === picked) ?? null;
+  const person = rows.find((row) => rowKey(row) === picked) ?? null;
   const close = useCallback(() => setPicked(null), []);
-  const columns = useMemo<DataTableColumn<WalletPersonMonth>[]>(
-    () => [
+  const columns = useMemo<DataTableColumn<PersonRow>[]>(() => {
+    const filial: DataTableColumn<PersonRow>[] = showStore
+      ? [{ key: "store", header: "Filial", sortable: true, sortValue: (row) => row.storeName, render: (row) => row.storeName }]
+      : [];
+    return [
       {
         key: "name",
         header: "Pessoa",
@@ -245,6 +251,7 @@ function WalletBody({ wallet }: { wallet: WalletMonth }) {
         sortValue: (row) => row.name,
         render: (row) => <span className="font-semibold text-t0">{row.name}</span>,
       },
+      ...filial,
       { key: "earnings", header: "Ganhos", align: "right", sortable: true, sortValue: (row) => earningsOf(row), render: (row) => money(earningsOf(row)) },
       { key: "withdrawal", header: "Retiradas", align: "right", sortable: true, sortValue: (row) => row.withdrawalCents, render: (row) => minusMoney(row.withdrawalCents) },
       { key: "shortage", header: "Quebra", align: "right", sortable: true, sortValue: (row) => row.shortageCents, render: (row) => minusMoney(row.shortageCents) },
@@ -256,30 +263,29 @@ function WalletBody({ wallet }: { wallet: WalletMonth }) {
         sortValue: (row) => row.balanceCents,
         render: (row) => <span className={`font-bold ${balanceClass(row.balanceCents)}`}>{money(row.balanceCents)}</span>,
       },
-    ],
-    [],
-  );
+    ];
+  }, [showStore]);
 
   return (
     <div className="flex flex-col gap-4">
-      <Totals wallet={wallet} />
+      <Totals rows={rows} />
       <Card className="min-w-0">
         <CardTitle>Pessoas</CardTitle>
         <div className="mt-3">
           <DataTable
             columns={columns}
-            data={wallet.people}
-            rowKey={(row) => row.personId}
+            data={rows}
+            rowKey={rowKey}
             defaultSortKey="name"
             defaultSortDir="asc"
             paginate="pessoas"
-            onRowClick={(row) => setPicked(row.personId)}
-            empty={<EmptyBlock icon="👛" title="Nada neste mês" description="Não há premiação, desafio, retirada ou quebra neste mês." />}
+            onRowClick={(row) => setPicked(rowKey(row))}
+            empty={<EmptyBlock icon="👛" title="Nada neste período" description="Não há premiação, desafio, retirada ou quebra neste período." />}
           />
         </div>
       </Card>
-      <UnassignedShortage wallet={wallet} />
-      {person ? <PersonSheet person={person} onClose={close} /> : null}
+      <UnassignedShortage blocks={shortages} showStore={showStore} />
+      {person ? <PersonDialog person={person} storeName={showStore ? person.storeName : undefined} onClose={close} /> : null}
     </div>
   );
 }
@@ -567,47 +573,230 @@ export function SellerWalletPage() {
   );
 }
 
-/** Financeiro da gestão: uma filial, uma linha por pessoa. */
+type LoadedBranch = { store: Store; wallet: WalletMonth };
+
+function storeLabel(store: Store): string {
+  return store.tradeName || store.name;
+}
+
+function peopleOf(branches: LoadedBranch[]): PersonRow[] {
+  return branches.flatMap((branch) =>
+    branch.wallet.people.map((person) => ({ ...person, storeId: branch.store.id, storeName: storeLabel(branch.store) })),
+  );
+}
+
+function shortagesOf(branches: LoadedBranch[]): ShortageBlock[] {
+  return branches
+    .filter((branch) => branch.wallet.unassignedShortageCents > 0)
+    .map((branch) => ({
+      storeId: branch.store.id,
+      storeName: storeLabel(branch.store),
+      cents: branch.wallet.unassignedShortageCents,
+      days: branch.wallet.unassignedShortageDays,
+    }));
+}
+
+function dataBr(iso: string): string {
+  return isoToDate(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function periodFile(from: string, to: string, presetId: DatePresetId | null): string {
+  const datas = from === to ? dataBr(from) : `${dataBr(from)} a ${dataBr(to)}`;
+  const preset = presetId ? periodLabels[presetId] : null;
+  return preset ? `${preset} · ${datas}` : datas;
+}
+
+function csvMoney(cents: number): string {
+  return (cents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function csvCell(value: string): string {
+  return /[;"\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+function fileStore(stores: Store[], all: boolean): string {
+  if (stores.length === 1) return [stores[0]!.branchCode.trim(), storeLabel(stores[0]!)].filter(Boolean).join(" ");
+  if (all) return "Todas as filiais";
+  return stores.length <= 3 ? stores.map(storeLabel).join(", ") : `${stores.length} filiais`;
+}
+
+function downloadCsv(rows: PersonRow[], showStore: boolean, fileName: string) {
+  const header = [...(showStore ? ["Filial"] : []), "Pessoa", "Ganhos", "Retiradas", "Quebra", "Saldo"];
+  const body = rows.map((row) =>
+    [...(showStore ? [row.storeName] : []), row.name, csvMoney(earningsOf(row)), csvMoney(row.withdrawalCents), csvMoney(row.shortageCents), csvMoney(row.balanceCents)]
+      .map(csvCell)
+      .join(";"),
+  );
+  const total = [
+    ...(showStore ? [""] : []),
+    "Total",
+    csvMoney(rows.reduce((sum, row) => sum + earningsOf(row), 0)),
+    csvMoney(rows.reduce((sum, row) => sum + row.withdrawalCents, 0)),
+    csvMoney(rows.reduce((sum, row) => sum + row.shortageCents, 0)),
+    csvMoney(rows.reduce((sum, row) => sum + row.balanceCents, 0)),
+  ]
+    .map(csvCell)
+    .join(";");
+  const blob = new Blob([`\uFEFF${[header.join(";"), ...body, total].join("\r\n")}`], { type: "text/csv;charset=utf-8" });
+  const safeName = fileName.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = safeName.endsWith(".csv") ? safeName : `${safeName}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function WalletPrintHeader({ stores, all, period }: { stores: Store[]; all: boolean; period: string }) {
+  const now = new Date();
+  const geradoEm = `${now.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}`;
+  const one = stores.length === 1 ? stores[0] : null;
+  return (
+    <div className="mb-5 hidden border-b border-line pb-4 print:block">
+      <div className="flex items-start justify-between gap-6">
+        <WedashBrand size={28} />
+        <p className="text-right text-[11px] leading-5 text-t2">Gerado em {geradoEm}</p>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-x-8 gap-y-1 text-[12.5px]">
+        <p>
+          <span className="text-t2">{one ? "Filial: " : "Filiais: "}</span>
+          <span className={one ? "font-bold uppercase text-t0" : "font-bold text-t0"}>{one ? storeLabel(one) : all ? "Todas as filiais" : fileStore(stores, false)}</span>
+          {one?.branchCode.trim() ? <span className="text-t2"> · Cód. {one.branchCode.trim()}</span> : null}
+          {one?.cnpj.trim() ? <span className="text-t2"> · {one.cnpj.trim()}</span> : null}
+        </p>
+        <p>
+          <span className="text-t2">Período: </span>
+          <span className="font-bold text-t0">{period}</span>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function ExportMenu({
+  stores,
+  disabled,
+  onCsv,
+  onPdf,
+}: {
+  stores: Store[];
+  disabled: boolean;
+  onCsv: (ids: string[]) => void;
+  onPdf: (ids: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [ids, setIds] = useState<string[]>([]);
+  const many = stores.length > 1;
+  function openStores() {
+    setIds(stores.map((store) => store.id));
+    setOpen(true);
+  }
+
+  function toggle(id: string) {
+    setIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
+  }
+
+  if (!many) {
+    const only = stores.map((store) => store.id);
+    return (
+      <Dropdown
+        align="right"
+        portal
+        trigger={
+          <Button type="button" variant="primary" disabled={disabled || stores.length === 0}>
+            Exportar
+          </Button>
+        }
+        items={[
+          { label: "CSV", onClick: () => onCsv(only) },
+          { label: "PDF", onClick: () => onPdf(only) },
+        ]}
+      />
+    );
+  }
+
+  const allOn = ids.length === stores.length;
+  return (
+    <>
+      <Button type="button" variant="primary" disabled={disabled} onClick={openStores}>
+        Exportar
+      </Button>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        size="sm"
+        title="Exportar"
+        footer={
+          <>
+            <Button type="button" variant="outline" disabled={ids.length === 0} onClick={() => { onCsv(ids); setOpen(false); }}>
+              CSV
+            </Button>
+            <Button type="button" variant="primary" disabled={ids.length === 0} onClick={() => { onPdf(ids); setOpen(false); }}>
+              PDF
+            </Button>
+          </>
+        }
+      >
+        <p className="mb-3 text-[13px] text-t1">Escolha as filiais. O arquivo usa o período desta tela.</p>
+        <div className="flex flex-col gap-2.5">
+          <Checkbox label="Todas" checked={allOn} onChange={() => setIds(allOn ? [] : stores.map((store) => store.id))} />
+          {stores.map((store) => (
+            <Checkbox key={store.id} label={storeLabel(store)} checked={ids.includes(store.id)} onChange={() => toggle(store.id)} />
+          ))}
+        </div>
+      </Modal>
+    </>
+  );
+}
+
+/** Financeiro da gestão: as filiais do seletor, uma linha por pessoa em cada filial. */
 export function BranchWalletPage() {
   const { session, storeRows, loading: storesLoading } = useScopedStores();
-  const { scope } = useScope();
-  const escolher = pickOneStore(scope.storeIds, session.stores.length);
-  const store = escolher ? null : storeRows[0] ?? null;
   const { today, from, to, presetId, floor, change } = useWalletPeriod();
-  const [wallet, setWallet] = useState<WalletMonth | null>(null);
+  const [branches, setBranches] = useState<LoadedBranch[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [printIds, setPrintIds] = useState<string[] | null>(null);
+  const [pdfQueued, setPdfQueued] = useState(false);
+  const printing = usePrintMode();
   const showSkeleton = useMinSkeleton(storesLoading || loading);
   const request = useRef(0);
   const loadedKey = useRef("");
-  const storeId = store?.id ?? "";
+  const pdfOnce = useRef(false);
+  const storeKey = storeRows.map((store) => store.id).join(",");
 
   const load = useCallback(() => {
-    if (!store) return;
+    if (storeRows.length === 0) return;
     const id = ++request.current;
-    const key = `${store.id}|${from}|${to}`;
-    if (loadedKey.current !== key) setWallet(null);
+    const key = `${storeRows.map((store) => store.id).join(",")}|${from}|${to}`;
+    if (loadedKey.current !== key) setBranches(null);
     setFailed(false);
     setLoading(true);
     const months = monthsTouched(from, to);
-    const week = effectiveWeekHours(store.hours);
     void Promise.all(
-      months.map((month) =>
-        loadBranchWallet({
-          tenantId: session.tenantId,
-          storeId: store.id,
-          storeName: store.tradeName || store.name,
-          month,
-          today,
-          timeZone: store.timezone,
-          week,
-        }),
-      ),
+      storeRows.map(async (store) => {
+        const parts = await Promise.all(
+          months.map((month) =>
+            loadBranchWallet({
+              tenantId: session.tenantId,
+              storeId: store.id,
+              storeName: storeLabel(store),
+              month,
+              today,
+              timeZone: store.timezone,
+              week: effectiveWeekHours(store.hours),
+            }),
+          ),
+        );
+        return { store, wallet: walletInRange(parts, from, to) };
+      }),
     )
-      .then((parts) => {
+      .then((loaded) => {
         if (id !== request.current) return;
         loadedKey.current = key;
-        setWallet(walletInRange(parts, from, to));
+        setBranches(loaded);
         setFailed(false);
       })
       .catch(() => {
@@ -617,12 +806,12 @@ export function BranchWalletPage() {
       .finally(() => {
         if (id === request.current) setLoading(false);
       });
-  }, [from, to, session.tenantId, store, today]);
+  }, [from, to, session.tenantId, storeRows, today]);
 
   useEffect(() => {
-    if (!storeId) return;
+    if (!storeKey) return;
     load();
-  }, [load, storeId]);
+  }, [load, storeKey]);
 
   useEffect(() => {
     const onSynced = () => load();
@@ -630,13 +819,59 @@ export function BranchWalletPage() {
     return () => window.removeEventListener(SALES_SYNCED_EVENT, onSynced);
   }, [load]);
 
+  useEffect(() => {
+    if (!printing) setPrintIds(null);
+  }, [printing]);
+
+  const period = periodFile(from, to, presetId);
+  const activeIds = printIds ?? storeRows.map((store) => store.id);
+  const visible = (branches ?? []).filter((branch) => activeIds.includes(branch.store.id));
+  const rows = peopleOf(visible);
+  const showStore = new Set(visible.map((branch) => branch.store.id)).size > 1;
+  const printStores = storeRows.filter((store) => activeIds.includes(store.id));
+  const exportingAll = printStores.length > 1 && printStores.length === session.stores.length;
+
+  useEffect(() => {
+    if (!pdfQueued || !printIds || pdfOnce.current) return;
+    pdfOnce.current = true;
+    setPdfQueued(false);
+    const picked = storeRows.filter((store) => printIds.includes(store.id));
+    const all = picked.length > 1 && picked.length === storeRows.length && storeRows.length === session.stores.length;
+    exportPdf(["Carteira", fileStore(picked, all), period]);
+  }, [pdfQueued, printIds, storeRows, session.stores.length, period]);
+
+  function exportCsv(ids: string[]) {
+    const picked = (branches ?? []).filter((branch) => ids.includes(branch.store.id));
+    const pickedRows = peopleOf(picked);
+    const stores = storeRows.filter((store) => ids.includes(store.id));
+    const all = stores.length > 1 && stores.length === session.stores.length;
+    downloadCsv(pickedRows, stores.length > 1, `WDash - Carteira - ${fileStore(stores, all)} - ${period}.csv`);
+  }
+
+  function exportPdfOf(ids: string[]) {
+    pdfOnce.current = false;
+    setPrintIds(ids);
+    setPdfQueued(true);
+  }
+
   return (
     <div>
+      {printIds ? <WalletPrintHeader stores={printStores} all={exportingAll} period={period} /> : null}
       <SectionHeader
         section="Financeiro"
         title="Carteira"
-        subtitle="A carteira de cada pessoa desta filial. A retirada e a quebra são lançadas no Fechamento."
-        actions={<PeriodControl from={from} to={to} today={today} floor={floor} presetId={presetId} onChange={change} />}
+        subtitle="A carteira de cada pessoa. A retirada e a quebra são lançadas no Fechamento."
+        actions={
+          <PeriodControl
+            from={from}
+            to={to}
+            today={today}
+            floor={floor}
+            presetId={presetId}
+            onChange={change}
+            extra={<ExportMenu stores={storeRows} disabled={!branches || loading} onCsv={exportCsv} onPdf={exportPdfOf} />}
+          />
+        }
       />
       <div className="mt-6 pb-6">
         {failed ? (
@@ -647,18 +882,14 @@ export function BranchWalletPage() {
             </Button>
           </div>
         ) : null}
-        {escolher ? (
-          <div className="max-w-[720px]">
-            <SelectStoreCard />
-          </div>
-        ) : showSkeleton && !wallet ? (
+        {showSkeleton && !branches ? (
           <Skeleton className="h-[520px] w-full rounded-[18px]" />
-        ) : !store ? (
+        ) : storeRows.length === 0 ? (
           <Card>
             <EmptyBlock icon="👛" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
           </Card>
-        ) : wallet ? (
-          <WalletBody wallet={wallet} />
+        ) : branches ? (
+          <WalletBody rows={rows} shortages={shortagesOf(visible)} showStore={showStore} />
         ) : null}
       </div>
     </div>
