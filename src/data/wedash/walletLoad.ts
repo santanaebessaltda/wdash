@@ -18,6 +18,7 @@ import { buildChallengeView } from "./challengeView";
 import { dayShortageCents, netCloseDiff } from "./employeeWithdrawal";
 import { goalWeightFrom } from "./engine/goalProjection";
 import type { StoreWeekHours } from "./engine/goalWeights";
+import { isWalletOpportunity, type WalletOpportunity } from "./engine/sellerOpportunity";
 import { buildWalletMonth, splitEqualCents, type WalletCashDay, type WalletChallengeInput, type WalletGoalInput, type WalletMonth, type WalletPersonInput } from "./engine/wallet";
 import { buildGoalCardView, goalManagerPrize, goalStatus } from "./goalView";
 import { fetchGoalTeam, fetchGoals } from "./goalsRepo";
@@ -349,13 +350,18 @@ function isWalletMonth(value: unknown): value is WalletMonth {
   return typeof row.month === "string" && Array.isArray(row.people) && typeof row.unassignedShortageCents === "number";
 }
 
-/** Carteira da pessoa logada como vendedora. A Edge devolve só a linha dela. */
-export async function loadSellerWallet(month: string): Promise<{ wallet: WalletMonth; historyFrom: string } | null> {
+function readOpportunities(value: unknown): WalletOpportunity[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isWalletOpportunity);
+}
+
+/** Carteira da pessoa logada como vendedora. A Edge devolve só a linha dela e as oportunidades do período. */
+export async function loadSellerWallet(month: string): Promise<{ wallet: WalletMonth; historyFrom: string; opportunities: WalletOpportunity[] } | null> {
   const sb = getSupabase();
   if (!sb) return null;
   const { data, error } = await sb.functions.invoke("wallet", { body: { month: monthKey(month) } });
   if (error) return null;
-  const res = data as { ok?: boolean; wallet?: unknown; historyFrom?: string } | null;
+  const res = data as { ok?: boolean; wallet?: unknown; historyFrom?: string; opportunities?: unknown } | null;
   if (!res?.ok || !isWalletMonth(res.wallet)) return null;
-  return { wallet: res.wallet, historyFrom: res.historyFrom ?? `${monthKey(month)}-01` };
+  return { wallet: res.wallet, historyFrom: res.historyFrom ?? `${monthKey(month)}-01`, opportunities: readOpportunities(res.opportunities) };
 }

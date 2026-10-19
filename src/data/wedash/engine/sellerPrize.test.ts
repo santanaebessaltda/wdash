@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { GoalRecord, GoalTeamMember, SalesSellerDayAgg } from "./goalTypes.ts";
 import { sellerGoalLevels, type SellerGoalLevel } from "./goalView.ts";
-import { nextLevelGain, projectedPrize } from "./sellerPrize.ts";
+import { goalCeiling, nextLevelGain, projectedPrize } from "./sellerPrize.ts";
 
 const goal: GoalRecord = {
   id: "g1",
@@ -90,5 +90,52 @@ describe("projectedPrize", () => {
   it("modo Grupo: projeta o vendido do grupo e dá a parte da pessoa", () => {
     const g = levelOf(group, [ANA, BIA], [sale(1, 4_000), sale(2, 3_000)]);
     expect(projectedPrize(group, g, { today: "2026-09-16", weights: UNIFORM, soldUntilYesterday: 7_000, groupSize: 2 })).toBeCloseTo(290);
+  });
+});
+
+const ladder = goal.tiers.map((tier) => ({
+  name: tier.name,
+  minAttainmentPct: tier.minAttainmentPct,
+  commissionPct: tier.commissionPct,
+  bonus: tier.bonus,
+}));
+
+describe("goalCeiling", () => {
+  const open = {
+    open: true,
+    achieved: 10_500,
+    goalAmount: 10_000,
+    prizeNow: 105,
+    bonusNow: 50,
+    currentPct: 1,
+    groupSize: 1,
+    tiers: ladder,
+  };
+
+  it("usa só o percentual do último nível e soma os bônus que ainda faltam", () => {
+    const ceiling = goalCeiling(open);
+    expect(ceiling.upside).toBeCloseTo(595);
+    expect(ceiling.next).toMatchObject({ name: "Super", number: 2, gap: 1_500, prizeGain: 135, bonusGain: 100 });
+  });
+
+  it("sem vendas, o teto é a premiação do último nível mais todos os bônus", () => {
+    const ceiling = goalCeiling({ ...open, achieved: 0, prizeNow: 0, bonusNow: 0, currentPct: 0 });
+    expect(ceiling.upside).toBeCloseTo(750);
+    expect(ceiling.next).toMatchObject({ name: "Meta", number: 1, gap: 10_000, prizeGain: 100, bonusGain: 50 });
+  });
+
+  it("no último nível não há mais nada a conquistar", () => {
+    expect(goalCeiling({ ...open, achieved: 16_000, prizeNow: 480, bonusNow: 300, currentPct: 3 })).toEqual({ upside: 0, next: null });
+  });
+
+  it("meta encerrada não entra no potencial", () => {
+    expect(goalCeiling({ ...open, open: false })).toEqual({ upside: 0, next: null });
+  });
+
+  it("modo Grupo: a parte dela no percentual final, e o bônus na fração que ela já recebe", () => {
+    const ceiling = goalCeiling({ ...open, prizeNow: 52.5, bonusNow: 25, groupSize: 2 });
+    expect(ceiling.upside).toBeCloseTo(297.5);
+    expect(ceiling.next?.prizeGain).toBeCloseTo(67.5);
+    expect(ceiling.next?.bonusGain).toBeCloseTo(50);
   });
 });

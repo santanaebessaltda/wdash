@@ -9,8 +9,16 @@ import { collaboratorName, endOfMonth, shiftName, startOfMonth } from "../_share
 import { goalWeightFrom } from "../_shared/engine/goalProjection.ts";
 import { excludeNonSalesPeople, goalFromRow, sellerDayFromRow, teamMemberFromRow } from "../_shared/engine/goalRows.ts";
 import type { DayHours, Dow, StoreWeekHours } from "../_shared/engine/goalWeights.ts";
-import { challengeStanding, type SellerChallengeMetric, type SellerChallengeScope, type SellerProductDay } from "../_shared/engine/sellerChallenge.ts";
+import { challengeFloorLabel, challengeStanding, type SellerChallengeMetric, type SellerChallengeScope, type SellerProductDay } from "../_shared/engine/sellerChallenge.ts";
 import { sellerHistoryFrom } from "../_shared/engine/sellerHome.ts";
+import {
+  challengePrizeLabel,
+  challengeUpsideReais,
+  challengeWalletOpportunity,
+  goalWalletOpportunity,
+  type WalletOpportunity,
+} from "../_shared/engine/sellerOpportunity.ts";
+import { groupSize } from "../_shared/engine/sellerRanking.ts";
 import { buildWalletMonth, type WalletCashDay, type WalletChallengeInput, type WalletGoalInput, type WalletPersonInput } from "../_shared/engine/wallet.ts";
 import { buildGoalCardView, goalStatus } from "../_shared/engine/goalView.ts";
 import {
@@ -355,6 +363,7 @@ serve(async (req) => {
       storeWeek.set(id, weekHours(store?.hours));
     }
 
+    const opportunities: WalletOpportunity[] = [];
     const goalSlices: WalletGoalInput[] = goals.map((goal) => {
       const card = buildGoalCardView({
         goal,
@@ -366,13 +375,35 @@ serve(async (req) => {
         today,
         week: storeWeek.get(goal.storeId),
       });
+      const open = goalStatus(goal, today) === "active";
       const rows = [];
       for (const seller of card.sellers) {
         const personId = byEmployee.get(seller.employeeId) ?? byName.get(nameKey(seller.name));
         if (!personId) continue;
         rows.push({ personId, prizeCents: reaisToCents(seller.accruedPrize), bonusCents: reaisToCents(seller.bonusReached) });
+        if (personId !== myId || seller.noGoal) continue;
+        const achieved = seller.individualGoalAmount > 0 ? (seller.attainmentPct / 100) * seller.individualGoalAmount : 0;
+        opportunities.push(goalWalletOpportunity({
+          name: goal.name,
+          endsOn: goal.endsOn,
+          open,
+          levelNumber: seller.currentLevel,
+          levelName: seller.currentTierName,
+          prizeReais: seller.accruedPrize,
+          bonusReais: seller.bonusReached,
+          achieved,
+          goalAmount: seller.individualGoalAmount,
+          currentPct: seller.commissionPct,
+          groupSize: groupSize(card, seller),
+          tiers: goal.tiers.map((tier) => ({
+            name: tier.name,
+            minAttainmentPct: tier.minAttainmentPct,
+            commissionPct: tier.commissionPct,
+            bonus: tier.bonus,
+          })),
+        }));
       }
-      return { name: goal.name, endsOn: goal.endsOn, open: goalStatus(goal, today) === "active", people: rows };
+      return { name: goal.name, endsOn: goal.endsOn, open, people: rows };
     });
 
     const challengeSlices: WalletChallengeInput[] = [];
@@ -408,11 +439,27 @@ serve(async (req) => {
           products: sellerProducts,
           productTypes,
         });
+        const hers = standing.won ? (challenge.mode === "MINIMUM" ? prizes[0] : prizes[(standing.position ?? 1) - 1]) : null;
         if (status === "active") peopleRows.push({ personId: myId, moneyCents: 0, itemLabel: null });
-        else if (standing.won) {
-          const prize = challenge.mode === "MINIMUM" ? prizes[0] : prizes[(standing.position ?? 1) - 1];
-          if (prize?.kind === "ITEM") peopleRows.push({ personId: myId, moneyCents: 0, itemLabel: prize.label });
-          else if (prize?.kind === "MONEY") peopleRows.push({ personId: myId, moneyCents: reaisToCents(prize.amount), itemLabel: null });
+        else if (hers?.kind === "ITEM") peopleRows.push({ personId: myId, moneyCents: 0, itemLabel: hers.label });
+        else if (hers?.kind === "MONEY") peopleRows.push({ personId: myId, moneyCents: reaisToCents(hers.amount), itemLabel: null });
+        if (standing.result != null) {
+          const open = status === "active";
+          const shown = open || !hers ? prizes[0] ?? null : hers;
+          opportunities.push(challengeWalletOpportunity({
+            name: challenge.name,
+            endsOn: challenge.endsOn,
+            open,
+            won: standing.won,
+            metric: challenge.metric,
+            resultLabel: standing.result,
+            metricLabel: standing.metricLabel,
+            targetLabel: challenge.target != null && challenge.target > 0 ? challengeFloorLabel(challenge.metric, challenge.target) : null,
+            gapLabel: standing.gap,
+            position: standing.position,
+            prizeLabel: challengePrizeLabel(shown),
+            upsideReais: challengeUpsideReais(open, prizes),
+          }));
         }
       }
       challengeSlices.push({ name: challenge.name, endsOn: challenge.endsOn, open: status === "active", people: peopleRows });
@@ -433,7 +480,7 @@ serve(async (req) => {
     });
     const mineName = people.find((person) => person.id === myId)?.name || String(mine[0].name ?? "");
     wallet.people = wallet.people.map((person) => (person.personId === myId ? { ...person, name: mineName } : person));
-    return json({ ok: true, historyFrom, wallet });
+    return json({ ok: true, historyFrom, wallet, opportunities });
   } catch (error) {
     console.warn("wallet", error instanceof Error ? error.message : error);
     return fail("load_failed", 500);

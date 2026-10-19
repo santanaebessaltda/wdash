@@ -85,6 +85,11 @@ function metricFloorLabel(metric: SellerChallengeMetric, value: number): string 
   return `${num(value, integer ? 0 : 1)} ${value === 1 ? "item" : "itens"}`;
 }
 
+/** Piso do desafio no mesmo formato do resultado ("10 itens", "R$ 100,00"). */
+export function challengeFloorLabel(metric: SellerChallengeMetric, value: number): string {
+  return metricFloorLabel(metric, value);
+}
+
 /**
  * Regras do desafio em linguagem da vendedora (card Início).
  * Ordem: como ganha → o que conta → piso / vendas mínimas → prêmios.

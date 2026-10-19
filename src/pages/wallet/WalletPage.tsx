@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Alert, Button, Card, CardTitle, DataTable, DateRangePicker, PageHeader, Skeleton, StatCard, CALENDAR_QUICK_RANGES, type DataTableColumn, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
+import { Alert, Badge, Button, Card, CardTitle, DataTable, DateRangePicker, PageHeader, Skeleton, StatCard, CALENDAR_QUICK_RANGES, type DataTableColumn, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { periodLabels } from "@/data/wedash/dashboard";
 import { monthsTouched } from "@/data/wedash/cashCloseMonth";
 import { startOfMonth } from "@/data/wedash/engine/format";
 import { sellerHistoryFloor } from "@/data/wedash/engine/sellerHome";
+import { opportunitiesInRange, type WalletChallengeOpportunity, type WalletGoalOpportunity, type WalletOpportunity } from "@/data/wedash/engine/sellerOpportunity";
 import { walletInRange, type WalletLine, type WalletMonth, type WalletPersonMonth } from "@/data/wedash/engine/wallet";
 import { loadBranchWallet, loadSellerWallet } from "@/data/wedash/walletLoad";
 import { effectiveWeekHours } from "@/data/wedash/storeHours";
@@ -100,13 +101,13 @@ function PeriodControl({
   );
 }
 
-function Totals({ wallet, mine }: { wallet: WalletMonth; mine: boolean }) {
+function Totals({ wallet }: { wallet: WalletMonth }) {
   const rows = wallet.people;
   const sum = (pick: (row: WalletPersonMonth) => number) => rows.reduce((total, row) => total + pick(row), 0);
   const balance = sum((row) => row.balanceCents);
   const open = rows.some((row) => row.openPrize || row.lines.some((line) => line.open));
   const cards = [
-    { label: mine ? "Saldo" : "Saldo a pagar", value: money(balance), sub: open ? "Até agora" : undefined, valueClassName: balanceClass(balance) },
+    { label: "Saldo a pagar", value: money(balance), sub: open ? "Até agora" : undefined, valueClassName: balanceClass(balance) },
     { label: "Ganhos", value: money(sum(earningsOf)) },
     { label: "Descontos", value: money(sum(discountsOf)) },
   ];
@@ -138,11 +139,19 @@ function LineList({ lines }: { lines: WalletLine[] }) {
   );
 }
 
-function Statement({ person }: { person: WalletPersonMonth }) {
+function Statement({
+  person,
+  emptyTitle = "Nada neste mês",
+  emptyDescription = "Não há premiação, desafio, retirada ou quebra neste mês.",
+}: {
+  person: WalletPersonMonth;
+  emptyTitle?: string;
+  emptyDescription?: string;
+}) {
   const gains = person.lines.filter(isGain);
   const discounts = person.lines.filter((line) => !isGain(line));
   if (person.lines.length === 0) {
-    return <EmptyBlock icon="👛" title="Nada neste mês" description="Não há premiação, desafio, retirada ou quebra neste mês." />;
+    return <EmptyBlock icon="👛" title={emptyTitle} description={emptyDescription} />;
   }
   return (
     <div className="flex flex-col gap-5">
@@ -221,9 +230,9 @@ function UnassignedShortage({ wallet }: { wallet: WalletMonth }) {
   );
 }
 
-function WalletBody({ wallet, mine }: { wallet: WalletMonth; mine: boolean }) {
+function WalletBody({ wallet }: { wallet: WalletMonth }) {
   const [picked, setPicked] = useState<string | null>(null);
-  const person = mine ? wallet.people[0] : wallet.people.find((row) => row.personId === picked) ?? null;
+  const person = wallet.people.find((row) => row.personId === picked) ?? null;
   const close = useCallback(() => setPicked(null), []);
   const columns = useMemo<DataTableColumn<WalletPersonMonth>[]>(
     () => [
@@ -251,34 +260,24 @@ function WalletBody({ wallet, mine }: { wallet: WalletMonth; mine: boolean }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <Totals wallet={wallet} mine={mine} />
-      {mine && person ? (
-        <Card>
-          <CardTitle>Movimento do mês</CardTitle>
-          <div className="mt-2">
-            <Statement person={person} />
-          </div>
-        </Card>
-      ) : null}
-      {!mine ? (
-        <Card className="min-w-0">
-          <CardTitle>Pessoas</CardTitle>
-          <div className="mt-3">
-            <DataTable
-              columns={columns}
-              data={wallet.people}
-              rowKey={(row) => row.personId}
-              defaultSortKey="name"
-              defaultSortDir="asc"
-              paginate="pessoas"
-              onRowClick={(row) => setPicked(row.personId)}
-              empty={<EmptyBlock icon="👛" title="Nada neste mês" description="Não há premiação, desafio, retirada ou quebra neste mês." />}
-            />
-          </div>
-        </Card>
-      ) : null}
-      {!mine ? <UnassignedShortage wallet={wallet} /> : null}
-      {!mine && person ? <PersonSheet person={person} onClose={close} /> : null}
+      <Totals wallet={wallet} />
+      <Card className="min-w-0">
+        <CardTitle>Pessoas</CardTitle>
+        <div className="mt-3">
+          <DataTable
+            columns={columns}
+            data={wallet.people}
+            rowKey={(row) => row.personId}
+            defaultSortKey="name"
+            defaultSortDir="asc"
+            paginate="pessoas"
+            onRowClick={(row) => setPicked(row.personId)}
+            empty={<EmptyBlock icon="👛" title="Nada neste mês" description="Não há premiação, desafio, retirada ou quebra neste mês." />}
+          />
+        </div>
+      </Card>
+      <UnassignedShortage wallet={wallet} />
+      {person ? <PersonSheet person={person} onClose={close} /> : null}
     </div>
   );
 }
@@ -297,10 +296,169 @@ function useWalletPeriod() {
   return { today, from, to, presetId, floor, setFloor, change };
 }
 
-/** Início do vendedor: só a carteira dela. */
+function balanceLines(person: WalletPersonMonth): WalletPersonMonth {
+  return {
+    ...person,
+    lines: person.lines.filter((line) => {
+      if (line.open && line.kind === "challenge") return false;
+      if (line.cents === 0 && (line.kind === "prize" || line.kind === "bonus" || line.kind === "management" || line.kind === "managementBonus")) return false;
+      if (line.cents === 0 && line.kind === "challenge" && !line.note) return false;
+      return true;
+    }),
+  };
+}
+
+function sellerSummary(guaranteed: number, upside: number): string | null {
+  if (guaranteed <= 0 && upside <= 0) return null;
+  if (upside <= 0) return `Você já garantiu ${money(guaranteed)} neste período.`;
+  if (guaranteed <= 0) return `Você ainda pode conquistar ${money(upside)} neste período.`;
+  return `Você já garantiu ${money(guaranteed)} e ainda pode conquistar mais ${money(upside)} neste período.`;
+}
+
+function MoneyLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 py-0.5">
+      <span className="text-[13px] text-t1">{label}</span>
+      <span className="font-mono text-[13.5px] font-bold text-t0">{value}</span>
+    </div>
+  );
+}
+
+function GoalOpportunityCard({ item }: { item: WalletGoalOpportunity }) {
+  const badge = item.state === "guaranteed" ? { label: "Alcançado", variant: "success" as const } : item.state === "missed" ? { label: "Não alcançado", variant: "danger" as const } : { label: "Em andamento", variant: "warning" as const };
+  const showMoney = item.state === "guaranteed" || item.prizeCents > 0 || item.bonusCents > 0;
+  return (
+    <div className="rounded-xl border border-line px-4 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Meta</p>
+          <p className="text-[15px] font-bold text-t0">{item.name}</p>
+          {item.levelLabel ? <p className="mt-0.5 text-[13px] font-semibold text-t1">{item.levelLabel}</p> : null}
+        </div>
+        <Badge variant={badge.variant}>{badge.label}</Badge>
+      </div>
+      {showMoney ? (
+        <div className="mt-3">
+          <MoneyLine label="Premiação" value={money(item.prizeCents)} />
+          <MoneyLine label="Bônus" value={money(item.bonusCents)} />
+        </div>
+      ) : null}
+      {item.state === "missed" && (item.missedPrizeCents > 0 || item.missedBonusCents > 0) ? (
+        <div className="mt-3">
+          {item.missedLevelLabel ? <p className="text-[13px] font-semibold text-t1">{item.missedLevelLabel}</p> : null}
+          {item.missedPrizeCents > 0 ? <MoneyLine label="Premiação" value={money(item.missedPrizeCents)} /> : null}
+          {item.missedBonusCents > 0 ? <MoneyLine label="Bônus" value={money(item.missedBonusCents)} /> : null}
+        </div>
+      ) : null}
+      {item.next ? (
+        <div className="mt-3 border-t border-line pt-3">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Próximo nível</p>
+          <p className="mt-1 text-[14px] font-semibold text-t0">{item.next.label}</p>
+          {item.next.gapCents > 0 ? <p className="mt-1 text-[13px] text-t1">Faltam {money(item.next.gapCents)}</p> : null}
+          {item.next.prizeGainCents > 0 || item.next.bonusGainCents > 0 ? (
+            <div className="mt-2">
+              <p className="text-[12.5px] text-t2">Ao alcançar:</p>
+              {item.next.prizeGainCents > 0 ? <p className="text-[13.5px] font-semibold text-t0">+ {money(item.next.prizeGainCents)} de premiação</p> : null}
+              {item.next.bonusGainCents > 0 ? <p className="text-[13.5px] font-semibold text-t0">+ {money(item.next.bonusGainCents)} de bônus</p> : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ChallengeOpportunityCard({ item }: { item: WalletChallengeOpportunity }) {
+  return (
+    <div className="rounded-xl border border-line px-4 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-t2">Desafio</p>
+          <p className="text-[15px] font-bold text-t0">{item.name}</p>
+        </div>
+        <Badge variant={item.state === "open" ? "warning" : "neutral"}>{item.state === "open" ? "Em andamento" : "Encerrado"}</Badge>
+      </div>
+      <div className="mt-3 flex flex-col gap-1">
+        {item.placeLabel ? <p className="text-[13.5px] font-semibold text-t0">{item.placeLabel}</p> : null}
+        {item.state === "missed" ? <p className="text-[13.5px] font-semibold text-bad">Não alcançado</p> : null}
+        {item.resultLabel ? (
+          <p className="text-[13px] text-t1">
+            {item.resultCaption}: {item.resultLabel}
+          </p>
+        ) : null}
+        {item.targetLabel ? <p className="text-[13px] text-t1">Meta: {item.targetLabel}</p> : null}
+        {item.gapLabel ? <p className="text-[13px] font-semibold text-t0">{item.gapLabel}</p> : null}
+        {item.prizeLabel ? (
+          <p className="text-[13.5px] text-t0">
+            {item.state === "guaranteed" ? "Prêmio conquistado" : "Prêmio"}: <span className="font-mono font-bold">{item.prizeLabel}</span>
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function SellerWallet({ wallet, opportunities }: { wallet: WalletMonth; opportunities: WalletOpportunity[] }) {
+  const person = wallet.people[0];
+  if (!person) return <EmptyBlock icon="👛" title="Nada neste período" description="Não há carteira para este acesso." />;
+  const guaranteed = earningsOf(person);
+  const upside = opportunities.reduce((total, item) => total + item.upsideCents, 0);
+  const potential = guaranteed + upside;
+  const sentence = sellerSummary(guaranteed, upside);
+  const span = potential > 0 ? Math.max(0, Math.min(100, (guaranteed / potential) * 100)) : 0;
+  const movement = balanceLines(person);
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCard label="Saldo atual" value={money(person.balanceCents)} sub={person.openPrize ? "Até agora" : undefined} valueClassName={balanceClass(person.balanceCents)} />
+        <StatCard label="Ganhos garantidos" value={money(guaranteed)} />
+        <StatCard label="Potencial do período" value={money(potential)} sub={upside > 0 ? "Se alcançar todas as premiações disponíveis" : undefined} />
+      </div>
+      {sentence ? <p className="text-[14px] font-semibold text-t0">{sentence}</p> : null}
+      {upside > 0 ? (
+        <div>
+          <div className="flex items-baseline justify-between gap-3 text-[12.5px] text-t2">
+            <span>{money(guaranteed)} garantidos</span>
+            <span>{money(potential)} possíveis</span>
+          </div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-bg-inset" role="img" aria-label={`${money(guaranteed)} garantidos de ${money(potential)} possíveis`}>
+            <div className="h-full rounded-full bg-ok" style={{ width: `${span}%` }} />
+          </div>
+        </div>
+      ) : null}
+      <Card>
+        <CardTitle>Suas oportunidades</CardTitle>
+        <div className="mt-3">
+          {opportunities.length === 0 ? (
+            <EmptyBlock icon="🎯" title="Nada neste período" description="Não há meta nem desafio terminando neste período." />
+          ) : (
+            <div className="flex flex-col gap-3">
+              {opportunities.map((item, index) =>
+                item.kind === "goal" ? (
+                  <GoalOpportunityCard key={`${item.kind}-${item.endsOn}-${item.name}-${index}`} item={item} />
+                ) : (
+                  <ChallengeOpportunityCard key={`${item.kind}-${item.endsOn}-${item.name}-${index}`} item={item} />
+                ),
+              )}
+            </div>
+          )}
+        </div>
+      </Card>
+      <Card>
+        <CardTitle>Movimento do período</CardTitle>
+        <div className="mt-2">
+          <Statement person={movement} emptyTitle="Nada neste período" emptyDescription="Não há premiação, bônus, desafio pago, retirada ou quebra neste período." />
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+/** Carteira da vendedora: o que já está garantido e o que ainda dá para conquistar. */
 export function SellerWalletPage() {
   const { today, from, to, presetId, floor, setFloor, change } = useWalletPeriod();
   const [wallet, setWallet] = useState<WalletMonth | null>(null);
+  const [opportunities, setOpportunities] = useState<WalletOpportunity[]>([]);
   const [failed, setFailed] = useState(false);
   const [loading, setLoading] = useState(true);
   const showSkeleton = useMinSkeleton(loading && !wallet);
@@ -316,13 +474,22 @@ export function SellerWalletPage() {
       if (history && history > sellerHistoryFloor(calendarTodayIso())) setFloor(startOfMonth(history));
       if (loaded.some((item) => item == null)) {
         setWallet(null);
+        setOpportunities([]);
         setFailed(true);
         setLoading(false);
         return;
       }
-      const parts = loaded.flatMap((item, index) => (item && item.wallet.month === months[index]?.slice(0, 7) ? [item.wallet] : []));
+      const parts: WalletMonth[] = [];
+      const lists: WalletOpportunity[][] = [];
+      loaded.forEach((item, index) => {
+        const month = months[index]?.slice(0, 7);
+        if (!item || item.wallet.month !== month) return;
+        parts.push(item.wallet);
+        lists.push(item.opportunities);
+      });
       const personId = parts[0]?.people[0]?.personId ?? null;
       setWallet(walletInRange(parts, rangeFrom, rangeTo, personId));
+      setOpportunities(opportunitiesInRange(lists, rangeFrom, rangeTo));
       setFailed(false);
       setLoading(false);
     });
@@ -342,7 +509,7 @@ export function SellerWalletPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Carteira"
-        subtitle="Premiação, bônus, desafios, retiradas e quebra de caixa do período."
+        subtitle="O que já está garantido e o que ainda dá para conquistar no período."
         actions={<PeriodControl from={from} to={to} today={today} floor={floor} presetId={presetId} onChange={change} />}
       />
       {showSkeleton ? (
@@ -355,7 +522,7 @@ export function SellerWalletPage() {
           </Button>
         </div>
       ) : (
-        <WalletBody wallet={wallet} mine />
+        <SellerWallet wallet={wallet} opportunities={opportunities} />
       )}
     </div>
   );
@@ -452,7 +619,7 @@ export function BranchWalletPage() {
             <EmptyBlock icon="👛" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
           </Card>
         ) : wallet ? (
-          <WalletBody wallet={wallet} mine={false} />
+          <WalletBody wallet={wallet} />
         ) : null}
       </div>
     </div>
