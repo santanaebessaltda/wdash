@@ -72,27 +72,24 @@ export function NumbersCard({
     },
   ];
   return (
-    <div>
-      <h2 className="mb-4 text-[15px] font-bold text-t0">Seus números</h2>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {cards.map((kpi, i) => {
-          const Icon = KPI_ICONS[i] ?? IconRevenue;
-          const c = KPI_COLORS[i % KPI_COLORS.length]!;
-          return (
-            <StatCard
-              key={kpi.label}
-              label={kpi.label}
-              value={kpi.value}
-              icon={<Icon />}
-              iconColor={c.iconColor}
-              iconBg={c.iconBg}
-              delta={kpi.delta}
-              deltaTooltip={kpi.delta ? sellerDeltaTip(kpi.delta) : undefined}
-              tooltip={kpi.tooltip}
-            />
-          );
-        })}
-      </div>
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {cards.map((kpi, i) => {
+        const Icon = KPI_ICONS[i] ?? IconRevenue;
+        const c = KPI_COLORS[i % KPI_COLORS.length]!;
+        return (
+          <StatCard
+            key={kpi.label}
+            label={kpi.label}
+            value={kpi.value}
+            icon={<Icon />}
+            iconColor={c.iconColor}
+            iconBg={c.iconBg}
+            delta={kpi.delta}
+            deltaTooltip={kpi.delta ? sellerDeltaTip(kpi.delta) : undefined}
+            tooltip={kpi.tooltip}
+          />
+        );
+      })}
     </div>
   );
 }
