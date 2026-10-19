@@ -895,7 +895,10 @@ export async function setBranchUser(storeId: string, sellerId: string | null): P
     .from("store")
     .update({ branch_user_chosen: true, branch_user_seller_id: sellerId })
     .eq("id", storeId);
-  return error ? { ok: false, error: error.message } : { ok: true };
+  if (error) return { ok: false, error: error.message };
+  const existing = allStores().find((s) => s.id === storeId);
+  if (existing) registerExtraStore({ ...existing, branchUserChosen: true, branchUserSellerId: sellerId });
+  return { ok: true };
 }
 
 export async function setSellerShift(sellerId: string, shiftId: string | null): Promise<WriteResult> {

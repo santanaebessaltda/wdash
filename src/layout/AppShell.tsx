@@ -101,10 +101,10 @@ export function AppShell() {
         <div className="contents print:hidden">
           <Topbar onOpenMobileNav={() => setMobileNavOpen(true)} collapsed={collapsed} onToggleCollapse={() => setCollapsed((c) => !c)} />
         </div>
-        <main ref={mainRef} className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-3.5 pt-5 sm:px-6 sm:pt-6 print:overflow-visible print:p-0">
+        <main ref={mainRef} className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-4 pt-5 sm:px-8 sm:pt-6 print:overflow-visible print:p-0">
           <ProfilePhotosProvider>
             <Suspense fallback={<PageLoader />}>
-              <div key={location.pathname} className="pad-base vela-page-enter print:pb-0" style={padBottom("0px")}>
+              <div key={location.pathname} className="pad-base vela-page-enter print:pb-0" style={padBottom("32px")}>
                 <Outlet />
               </div>
             </Suspense>

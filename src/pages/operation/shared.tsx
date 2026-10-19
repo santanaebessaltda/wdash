@@ -39,6 +39,12 @@ export function useScopedStores() {
     };
   }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    const onStores = () => setTick((n) => n + 1);
+    window.addEventListener("wedash:stores", onStores);
+    return () => window.removeEventListener("wedash:stores", onStores);
+  }, []);
+
   const storeRows = useMemo(() => {
     const all = storesForSession(session.stores);
     return scope.storeIds.length === 0 ? all : all.filter((s) => scope.storeIds.includes(s.id));
