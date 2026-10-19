@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Alert, Badge, Button, Card, CardTitle, Checkbox, DataTable, DateRangePicker, Dropdown, Modal, PageHeader, Segmented, Skeleton, StatCard, Tooltip, CALENDAR_QUICK_RANGES, type DataTableColumn, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
+import { Alert, Badge, Button, Card, CardTitle, Checkbox, DateRangePicker, Dropdown, Modal, PageHeader, Pagination, Segmented, Skeleton, StatCard, ThSort, Tooltip, CALENDAR_QUICK_RANGES, type DatePresetId, type DateRangeChangeMeta, type SortDir } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { WedashBrand } from "@/components/wedash/WedashBrand";
 import { calendarTodayIso } from "@/data/wedash/clock";
@@ -12,9 +12,10 @@ import { walletInRange, type WalletLine, type WalletMonth, type WalletPersonMont
 import { loadBranchWallet, loadSellerWallet } from "@/data/wedash/walletLoad";
 import { effectiveWeekHours } from "@/data/wedash/storeHours";
 import { cn } from "@/lib/cn";
-import { brlCent, dateToIso, endOfMonth, fullDate, isoToDate } from "@/lib/format";
+import { brlCent, dateToIso, endOfMonth, fullDate, isoToDate, num } from "@/lib/format";
 import { exportPdf, usePrintMode } from "@/lib/printMode";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
+import { usePagedRows } from "@/lib/usePagedRows";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { CheckCircleIcon, FlameIcon, TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
@@ -261,60 +262,157 @@ function UnassignedShortage({ blocks, showStore }: { blocks: ShortageBlock[]; sh
   );
 }
 
+type PeopleSort = "name" | "earnings" | "withdrawal" | "shortage" | "balance";
+
+const peopleSearchClass =
+  "h-8 rounded-[var(--radius-vela-sm)] border border-line bg-bg-3 px-3 text-xs font-semibold text-t0 transition-colors hover:border-acc focus:border-acc focus:outline-none";
+
+function peopleValue(row: PersonRow, key: PeopleSort): number {
+  if (key === "earnings") return earningsOf(row);
+  if (key === "withdrawal") return row.withdrawalCents;
+  if (key === "shortage") return row.shortageCents;
+  return row.balanceCents;
+}
+
+function PeopleList({ rows, showStore, onOpen }: { rows: PersonRow[]; showStore: boolean; onOpen: (key: string) => void }) {
+  const [search, setSearch] = useState("");
+  const [sortKey, setSortKey] = useState<PeopleSort>("name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const sorted = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase("pt-BR");
+    const list = query ? rows.filter((row) => row.name.toLocaleLowerCase("pt-BR").includes(query)) : rows;
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...list].sort((a, b) => {
+      const cmp =
+        sortKey === "name"
+          ? a.name.localeCompare(b.name, "pt-BR") || a.storeName.localeCompare(b.storeName, "pt-BR")
+          : peopleValue(a, sortKey) - peopleValue(b, sortKey);
+      return cmp * dir || a.name.localeCompare(b.name, "pt-BR");
+    });
+  }, [rows, search, sortKey, sortDir]);
+  const { page, setPage, totalPages, pageRows } = usePagedRows(sorted, `${search}|${sortKey}|${sortDir}`);
+  const total = useMemo(
+    () => ({
+      earnings: sorted.reduce((sum, row) => sum + earningsOf(row), 0),
+      withdrawal: sorted.reduce((sum, row) => sum + row.withdrawalCents, 0),
+      shortage: sorted.reduce((sum, row) => sum + row.shortageCents, 0),
+      balance: sorted.reduce((sum, row) => sum + row.balanceCents, 0),
+    }),
+    [sorted],
+  );
+
+  function toggleSort(key: PeopleSort) {
+    if (sortKey === key) {
+      setSortDir((dir) => (dir === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortKey(key);
+    setSortDir(key === "name" ? "asc" : "desc");
+  }
+
+  if (rows.length === 0) {
+    return <EmptyBlock icon="👛" title="Nada neste período" description="Não há premiação, desafio, retirada ou quebra neste período." />;
+  }
+
+  return (
+    <div className="flex flex-col">
+      <div className="mb-4 flex flex-wrap items-center gap-2 sm:justify-end print:hidden">
+        <input
+          type="search"
+          placeholder="Buscar por nome…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className={cn(peopleSearchClass, "sm:w-56")}
+        />
+      </div>
+      {sorted.length === 0 ? (
+        <EmptyBlock
+          icon="🔍"
+          title="Nenhuma pessoa encontrada"
+          description="Tente buscar por outro nome."
+          action={
+            <Button variant="outline" size="sm" onClick={() => setSearch("")}>
+              Limpar busca
+            </Button>
+          }
+        />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[720px] border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
+                <ThSort label="Nome" active={sortKey === "name"} dir={sortDir} onClick={() => toggleSort("name")} align="left" className="px-1 pb-3" />
+                <ThSort label="Ganhos" active={sortKey === "earnings"} dir={sortDir} onClick={() => toggleSort("earnings")} className="px-1 pb-3" />
+                <ThSort label="Retiradas" active={sortKey === "withdrawal"} dir={sortDir} onClick={() => toggleSort("withdrawal")} className="px-1 pb-3" />
+                <ThSort label="Quebra" active={sortKey === "shortage"} dir={sortDir} onClick={() => toggleSort("shortage")} className="px-1 pb-3" />
+                <ThSort label="Saldo" active={sortKey === "balance"} dir={sortDir} onClick={() => toggleSort("balance")} className="px-1 pb-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {pageRows.map((row) => (
+                <tr
+                  key={rowKey(row)}
+                  tabIndex={0}
+                  onClick={() => onOpen(rowKey(row))}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter" && event.key !== " ") return;
+                    event.preventDefault();
+                    onOpen(rowKey(row));
+                  }}
+                  className="cursor-pointer border-b border-line transition-colors hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none"
+                >
+                  <td className="px-1 py-3">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <PersonAvatar name={row.name} storeId={row.storeId} size="sm" />
+                      <div className="min-w-0">
+                        <p className="truncate text-[13px] font-bold text-t0">{row.name}</p>
+                        {showStore ? <p className="truncate text-[11px] text-t2">{row.storeName}</p> : null}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{money(earningsOf(row))}</td>
+                  <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{minusMoney(row.withdrawalCents)}</td>
+                  <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{minusMoney(row.shortageCents)}</td>
+                  <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", balanceClass(row.balanceCents))}>{money(row.balanceCents)}</td>
+                </tr>
+              ))}
+              <tr className="bg-bg-inset">
+                <td className="px-1 py-3 text-[13px] font-extrabold text-t0">
+                  Total do filtro
+                  <span className="mt-0.5 block text-[11px] font-semibold text-t2">
+                    {num(sorted.length)} {sorted.length === 1 ? "pessoa" : "pessoas"}
+                  </span>
+                </td>
+                <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{money(total.earnings)}</td>
+                <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{minusMoney(total.withdrawal)}</td>
+                <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{minusMoney(total.shortage)}</td>
+                <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", balanceClass(total.balance))}>{money(total.balance)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+      {sorted.length > 0 ? (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
+          <span className="text-[12.5px] text-t2">
+            Mostrando {pageRows.length} de {num(sorted.length)} pessoas
+          </span>
+          {totalPages > 1 ? <Pagination page={page} totalPages={totalPages} onChange={setPage} /> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function WalletBody({ rows, shortages, showStore }: { rows: PersonRow[]; shortages: ShortageBlock[]; showStore: boolean }) {
   const [picked, setPicked] = useState<string | null>(null);
   const person = rows.find((row) => rowKey(row) === picked) ?? null;
   const close = useCallback(() => setPicked(null), []);
-  const columns = useMemo<DataTableColumn<PersonRow>[]>(() => {
-    const filial: DataTableColumn<PersonRow>[] = showStore
-      ? [{ key: "store", header: "Filial", sortable: true, sortValue: (row) => row.storeName, render: (row) => row.storeName }]
-      : [];
-    return [
-      {
-        key: "name",
-        header: "Pessoa",
-        sortable: true,
-        sortValue: (row) => row.name,
-        render: (row) => (
-          <span className="flex min-w-0 items-center gap-2.5">
-            <PersonAvatar name={row.name} storeId={row.storeId} size="sm" />
-            <span className="truncate font-semibold text-t0">{row.name}</span>
-          </span>
-        ),
-      },
-      ...filial,
-      { key: "earnings", header: "Ganhos", align: "right", sortable: true, sortValue: (row) => earningsOf(row), render: (row) => money(earningsOf(row)) },
-      { key: "withdrawal", header: "Retiradas", align: "right", sortable: true, sortValue: (row) => row.withdrawalCents, render: (row) => minusMoney(row.withdrawalCents) },
-      { key: "shortage", header: "Quebra", align: "right", sortable: true, sortValue: (row) => row.shortageCents, render: (row) => minusMoney(row.shortageCents) },
-      {
-        key: "balance",
-        header: "Saldo",
-        align: "right",
-        sortable: true,
-        sortValue: (row) => row.balanceCents,
-        render: (row) => <span className={`font-bold ${balanceClass(row.balanceCents)}`}>{money(row.balanceCents)}</span>,
-      },
-    ];
-  }, [showStore]);
 
   return (
     <div className="flex flex-col gap-4">
       <Totals rows={rows} />
-      <Card className="min-w-0">
-        <CardTitle>Pessoas</CardTitle>
-        <div className="mt-3">
-          <DataTable
-            columns={columns}
-            data={rows}
-            rowKey={rowKey}
-            defaultSortKey="name"
-            defaultSortDir="asc"
-            paginate="pessoas"
-            onRowClick={(row) => setPicked(rowKey(row))}
-            empty={<EmptyBlock icon="👛" title="Nada neste período" description="Não há premiação, desafio, retirada ou quebra neste período." />}
-          />
-        </div>
-      </Card>
+      <PeopleList rows={rows} showStore={showStore} onOpen={setPicked} />
       <UnassignedShortage blocks={shortages} showStore={showStore} />
       {person ? <PersonDialog person={person} storeId={person.storeId} storeName={showStore ? person.storeName : undefined} onClose={close} /> : null}
     </div>
