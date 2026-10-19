@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildWalletMonth, splitEqualCents, type WalletCashDay, type WalletChallengeInput, type WalletGoalInput, type WalletPersonInput } from "./wallet";
+import { buildWalletMonth, splitEqualCents, walletInRange, type WalletCashDay, type WalletChallengeInput, type WalletGoalInput, type WalletPersonInput } from "./wallet";
 
 const people: WalletPersonInput[] = [
   { id: "ana", name: "ANA" },
@@ -148,6 +148,19 @@ describe("buildWalletMonth", () => {
   it("splits cents equally and leaves the remainder on the first shares", () => {
     expect(splitEqualCents(1_000, 3)).toEqual([334, 333, 333]);
     expect(splitEqualCents(0, 2)).toEqual([0, 0]);
+  });
+
+  it("keeps only the lines inside the selected period", () => {
+    const view = month({
+      goals: [goal()],
+      days: [{ day: "2026-10-03", withdrawals: [{ personId: "ana", cents: 400 }], shortage: [], unassignedShortageCents: 0 }],
+    });
+    const clipped = walletInRange([view], "2026-10-01", "2026-10-15");
+    const ana = clipped.people.find((row) => row.personId === "ana");
+    expect(ana?.lines.map((line) => line.kind)).toEqual(["withdrawal"]);
+    expect(ana?.balanceCents).toBe(-400);
+    const full = walletInRange([view], "2026-10-01", "2026-10-31");
+    expect(full.people.find((row) => row.personId === "ana")?.balanceCents).toBe(15_000 - 400);
   });
 
   it("keeps the seller row when the month is empty", () => {

@@ -1,18 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Alert, Button, Card, CardTitle, DataTable, PageHeader, Skeleton, StatCard, type DataTableColumn } from "@/components/ui";
+import { Alert, Button, Card, CardTitle, DataTable, DateRangePicker, PageHeader, Skeleton, StatCard, CALENDAR_QUICK_RANGES, type DataTableColumn, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
 import { calendarTodayIso } from "@/data/wedash/clock";
-import { addMonths, startOfMonth } from "@/data/wedash/engine/format";
+import { periodLabels } from "@/data/wedash/dashboard";
+import { monthsTouched } from "@/data/wedash/cashCloseMonth";
+import { startOfMonth } from "@/data/wedash/engine/format";
 import { sellerHistoryFloor } from "@/data/wedash/engine/sellerHome";
-import type { WalletLine, WalletMonth, WalletPersonMonth } from "@/data/wedash/engine/wallet";
+import { walletInRange, type WalletLine, type WalletMonth, type WalletPersonMonth } from "@/data/wedash/engine/wallet";
 import { loadBranchWallet, loadSellerWallet } from "@/data/wedash/walletLoad";
 import { effectiveWeekHours } from "@/data/wedash/storeHours";
-import { brlCent, fullDate } from "@/lib/format";
+import { brlCent, dateToIso, endOfMonth, fullDate, isoToDate } from "@/lib/format";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useScope } from "@/pages/dashboard/useScope";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
-import { MonthStep, MonthYearPicker, monthNavBtn } from "@/pages/cash-close/MonthYearPicker";
 import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
 import { HeaderFilters } from "@/pages/stock/shared";
 
@@ -66,29 +67,35 @@ function lineNote(line: WalletLine): string | null {
   return null;
 }
 
-function MonthControls({
-  month,
+function PeriodControl({
+  from,
+  to,
   today,
   floor,
+  presetId,
   onChange,
 }: {
-  month: string;
+  from: string;
+  to: string;
   today: string;
   floor: string;
-  onChange: (next: string) => void;
+  presetId: DatePresetId | null;
+  onChange: (from: string, to: string, presetId: DatePresetId | null) => void;
 }) {
-  const current = startOfMonth(today);
+  function apply(start: Date, end: Date, goal?: DateRangeChangeMeta) {
+    onChange(dateToIso(start), dateToIso(end), goal?.presetId ?? null);
+  }
   return (
     <HeaderFilters>
-      <div className="flex items-center gap-2">
-        <button type="button" className={monthNavBtn} aria-label="Mês anterior" disabled={month <= floor} onClick={() => onChange(addMonths(month, -1))}>
-          <MonthStep dir="anterior" />
-        </button>
-        <MonthYearPicker iso={month} today={today} minIso={floor} onChange={onChange} />
-        <button type="button" className={monthNavBtn} aria-label="Próximo mês" disabled={month >= current} onClick={() => onChange(addMonths(month, 1))}>
-          <MonthStep dir="proximo" />
-        </button>
-      </div>
+      <DateRangePicker
+        value={[isoToDate(from), isoToDate(to)]}
+        minDate={isoToDate(floor)}
+        maxDate={isoToDate(endOfMonth(today))}
+        quickRanges={CALENDAR_QUICK_RANGES}
+        displayLabel={presetId ? periodLabels[presetId] : null}
+        activePresetId={presetId}
+        onChange={([start, end], goal) => apply(start, end, goal)}
+      />
     </HeaderFilters>
   );
 }
@@ -276,58 +283,74 @@ function WalletBody({ wallet, mine }: { wallet: WalletMonth; mine: boolean }) {
   );
 }
 
-function useWalletMonth() {
+function useWalletPeriod() {
   const today = calendarTodayIso();
-  const [month, setMonth] = useState(() => startOfMonth(today));
+  const [from, setFrom] = useState(() => startOfMonth(today));
+  const [to, setTo] = useState(() => endOfMonth(today));
+  const [presetId, setPresetId] = useState<DatePresetId | null>("thisMonth");
   const [floor, setFloor] = useState(() => sellerHistoryFloor(today));
-  return { today, month, setMonth, floor, setFloor };
+  const change = useCallback((nextFrom: string, nextTo: string, nextPreset: DatePresetId | null) => {
+    setFrom(nextFrom);
+    setTo(nextTo);
+    setPresetId(nextPreset);
+  }, []);
+  return { today, from, to, presetId, floor, setFloor, change };
 }
 
 /** Início do vendedor: só a carteira dela. */
 export function SellerWalletPage() {
-  const { today, month, setMonth, floor, setFloor } = useWalletMonth();
+  const { today, from, to, presetId, floor, setFloor, change } = useWalletPeriod();
   const [wallet, setWallet] = useState<WalletMonth | null>(null);
   const [failed, setFailed] = useState(false);
   const [loading, setLoading] = useState(true);
   const showSkeleton = useMinSkeleton(loading && !wallet);
   const request = useRef(0);
 
-  const load = useCallback((target: string) => {
+  const load = useCallback((rangeFrom: string, rangeTo: string) => {
     const id = ++request.current;
     setFailed(false);
-    void loadSellerWallet(target).then((data) => {
+    const months = monthsTouched(rangeFrom, rangeTo);
+    void Promise.all(months.map((month) => loadSellerWallet(month))).then((loaded) => {
       if (id !== request.current) return;
-      if (data?.historyFrom && data.historyFrom > sellerHistoryFloor(calendarTodayIso())) setFloor(startOfMonth(data.historyFrom));
-      if (data && data.wallet.month !== target.slice(0, 7)) setMonth(`${data.wallet.month}-01`);
-      setWallet(data?.wallet ?? null);
-      setFailed(data == null);
+      const history = loaded.find((item) => item?.historyFrom)?.historyFrom;
+      if (history && history > sellerHistoryFloor(calendarTodayIso())) setFloor(startOfMonth(history));
+      if (loaded.some((item) => item == null)) {
+        setWallet(null);
+        setFailed(true);
+        setLoading(false);
+        return;
+      }
+      const parts = loaded.flatMap((item, index) => (item && item.wallet.month === months[index]?.slice(0, 7) ? [item.wallet] : []));
+      const personId = parts[0]?.people[0]?.personId ?? null;
+      setWallet(walletInRange(parts, rangeFrom, rangeTo, personId));
+      setFailed(false);
       setLoading(false);
     });
-  }, [setFloor, setMonth]);
+  }, [setFloor]);
 
   useEffect(() => {
-    load(month);
-  }, [load, month]);
+    load(from, to);
+  }, [load, from, to]);
 
   useEffect(() => {
-    const onSynced = () => load(month);
+    const onSynced = () => load(from, to);
     window.addEventListener(SALES_SYNCED_EVENT, onSynced);
     return () => window.removeEventListener(SALES_SYNCED_EVENT, onSynced);
-  }, [load, month]);
+  }, [load, from, to]);
 
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Carteira"
-        subtitle="Premiação, bônus, desafios, retiradas e quebra de caixa deste mês."
-        actions={<MonthControls month={month} today={today} floor={floor} onChange={setMonth} />}
+        subtitle="Premiação, bônus, desafios, retiradas e quebra de caixa do período."
+        actions={<PeriodControl from={from} to={to} today={today} floor={floor} presetId={presetId} onChange={change} />}
       />
       {showSkeleton ? (
         <Skeleton className="h-[420px] w-full rounded-[18px]" />
       ) : failed || !wallet ? (
         <div className="flex flex-col items-center gap-3 py-10 text-center">
           <p className="text-[15px] font-bold text-t0">Não foi possível carregar a carteira</p>
-          <Button type="button" onClick={() => load(month)}>
+          <Button type="button" onClick={() => load(from, to)}>
             Tentar novamente
           </Button>
         </div>
@@ -344,7 +367,7 @@ export function BranchWalletPage() {
   const { scope } = useScope();
   const escolher = pickOneStore(scope.storeIds, session.stores.length);
   const store = escolher ? null : storeRows[0] ?? null;
-  const { today, month, setMonth, floor } = useWalletMonth();
+  const { today, from, to, presetId, floor, change } = useWalletPeriod();
   const [wallet, setWallet] = useState<WalletMonth | null>(null);
   const [failed, setFailed] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -356,23 +379,29 @@ export function BranchWalletPage() {
   const load = useCallback(() => {
     if (!store) return;
     const id = ++request.current;
-    const key = `${store.id}|${month}`;
+    const key = `${store.id}|${from}|${to}`;
     if (loadedKey.current !== key) setWallet(null);
     setFailed(false);
     setLoading(true);
-    void loadBranchWallet({
-      tenantId: session.tenantId,
-      storeId: store.id,
-      storeName: store.tradeName || store.name,
-      month,
-      today,
-      timeZone: store.timezone,
-      week: effectiveWeekHours(store.hours),
-    })
-      .then((data) => {
+    const months = monthsTouched(from, to);
+    const week = effectiveWeekHours(store.hours);
+    void Promise.all(
+      months.map((month) =>
+        loadBranchWallet({
+          tenantId: session.tenantId,
+          storeId: store.id,
+          storeName: store.tradeName || store.name,
+          month,
+          today,
+          timeZone: store.timezone,
+          week,
+        }),
+      ),
+    )
+      .then((parts) => {
         if (id !== request.current) return;
         loadedKey.current = key;
-        setWallet(data);
+        setWallet(walletInRange(parts, from, to));
         setFailed(false);
       })
       .catch(() => {
@@ -382,7 +411,7 @@ export function BranchWalletPage() {
       .finally(() => {
         if (id === request.current) setLoading(false);
       });
-  }, [month, session.tenantId, store, today]);
+  }, [from, to, session.tenantId, store, today]);
 
   useEffect(() => {
     if (!storeId) return;
@@ -401,7 +430,7 @@ export function BranchWalletPage() {
         section="Financeiro"
         title="Carteira"
         subtitle="A carteira de cada pessoa desta filial. A retirada e a quebra são lançadas no Fechamento."
-        actions={<MonthControls month={month} today={today} floor={floor} onChange={setMonth} />}
+        actions={<PeriodControl from={from} to={to} today={today} floor={floor} presetId={presetId} onChange={change} />}
       />
       <div className="mt-6 pb-6">
         {failed ? (
