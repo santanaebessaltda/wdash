@@ -2,6 +2,7 @@ import { Navigate, type RouteObject } from "react-router-dom";
 import { paths } from "@/router/paths";
 import { RequireRole } from "@/session/RequireSession";
 import { SellerHomePage } from "@/pages/seller/SellerHomePage";
+import { SellerWalletPage } from "@/pages/wallet/WalletPage";
 
 /** URLs antigas que nao tem mais tela. */
 export const retiredRoutes: RouteObject[] = [
@@ -31,6 +32,7 @@ export const retiredRoutes: RouteObject[] = [
     element: <RequireRole roles={["SELLER"]} />,
     children: [
       { path: paths.seller.home, element: <SellerHomePage /> },
+      { path: paths.seller.wallet, element: <SellerWalletPage /> },
       { path: paths.seller.myGoal, element: <Navigate to={paths.seller.home} replace /> },
       { path: paths.legacy.seller.myGoal, element: <Navigate to={paths.seller.home} replace /> },
       { path: paths.seller.tasks, element: <Navigate to={paths.seller.home} replace /> },

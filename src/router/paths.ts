@@ -70,6 +70,8 @@ export const paths = {
     challengeCopyStore: (id: string) => `/performance/challenges/new?copy=${encodeURIComponent(id)}&for=store`,
     /** Calendário do fechamento de caixa. A adquirente fica em Configurações. */
     cashClose: "/finance/cash-close",
+    /** Premiação, bônus, desafios, retiradas e quebra do mês. */
+    wallet: "/finance/wallet",
     cashDrop: "/finance/cash-drop",
     /** Calendário do informe de vendas no shopping. */
     salesReport: "/finance/sales-report",
@@ -103,6 +105,7 @@ export const paths = {
   analytics: "/analytics",
   seller: {
     home: "/home",
+    wallet: "/wallet",
     myGoal: "/my-goal",
     tasks: "/tasks",
     ranking: "/ranking",

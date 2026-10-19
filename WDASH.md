@@ -84,12 +84,14 @@ Gestor, nesta ordem:
 - **Estoque**
 - **Equipe** — pessoas da filial vindas do Millennium (vendedor, operador de caixa e gerência)
 - **Performance** — Metas · Desafios
-- **Financeiro** — Fechamento · Sangrias · Informe de vendas
+- **Financeiro** — Fechamento · Carteira · Sangrias · Informe de vendas
 - **Pedido de compra**
 - **Integrações** — Adquirentes · Administradora
 - **Configurações**
 
-Gerente vê o mesmo, sem a análise financeira do Dashboard, sem Integrações e sem Configurações. Vendedor continua só no Início. As abas do cabeçalho repetem os itens do grupo; item direto não tem aba.
+Gerente vê o mesmo, sem a análise financeira do Dashboard, sem Integrações e sem Configurações. Vendedor vê Início e Carteira. As abas do cabeçalho repetem os itens do grupo; item direto não tem aba.
+
+**Carteira** (2026-10-19): mês civil, com as setas. Saldo = premiação + bônus + prêmio em dinheiro dos desafios − retiradas − quebra de caixa. Premiação e bônus entram no mês em que a meta termina; meta aberta mostra o que já está garantido, com "até agora". Desafio entra no mês em que termina; enquanto está aberto aparece "em andamento" e fica fora do saldo. Prêmio que não é dinheiro aparece na linha e fica fora do saldo. Retirada é o valor já gravado no Fechamento, por pessoa e por dia. Quebra é o que sobra depois da retirada: se o dia aponta uma pessoa, o valor é dela; se aponta um grupo ou a equipe, divide igual (a mesma conta do Fechamento). Dia com quebra e sem destino não entra em ninguém; na filial aparece como "quebra sem destino". O vendedor vê só a própria carteira (`/wallet`). Gestor e gerente abrem a mesma tela em Financeiro (`/finance/wallet`), uma filial por vez, uma linha por pessoa. Não lança nada: retirada e quebra continuam no Fechamento.
 
 **Menu do avatar:** Meu perfil · Notificações · ERP (ícone Database, só Gestor) · Usuários (só Gestor) · Logs (só Gestor) · Sair. **Sair encerra só este aparelho** (2026-10-19): computador e celular são sessões separadas; o outro continua logado. ERP é a conexão com o Millennium. Integrações do menu lateral é adquirente e administradora da filial.
 
@@ -98,7 +100,8 @@ URLs (inglês; o endereço antigo redireciona):
 - Estoque — `/stock`
 - Equipe — `/team`
 - Performance — `/performance/goals` · `/performance/challenges`
-- Financeiro — `/finance/cash-close` · `/finance/cash-drop` · `/finance/sales-report`
+- Financeiro — `/finance/cash-close` · `/finance/wallet` · `/finance/cash-drop` · `/finance/sales-report`
+- Vendedor — `/home` · `/wallet`
 - Pedido de compra — `/purchase-order`
 - Integrações — `/settings/acquirers` · `/settings/shopping`
 - Configurações — `/settings/branch` (`/settings/products-and-taxes` redireciona para cá)

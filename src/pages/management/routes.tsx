@@ -8,6 +8,7 @@ const ChallengesPage = lazyPage(() => import("./ChallengesPage"), "ChallengesPag
 const ChallengeDetailPage = lazyPage(() => import("../challenges/ChallengeDetailPage"), "default");
 const ChallengeEditorPage = lazyPage(() => import("../challenges/ChallengeEditorPage"), "default");
 const CashClosePage = lazyPage(() => import("../cash-close/CashClosePage"), "CashClosePage");
+const WalletPage = lazyPage(() => import("../wallet/WalletPage"), "default");
 const CashDropPage = lazyPage(() => import("./CashDropPage"), "CashDropPage");
 const SalesReportPage = lazyPage(() => import("./SalesReportPage"), "SalesReportPage");
 const StaffPage = lazyPage(() => import("./StaffPage"), "StaffPage");
@@ -32,6 +33,7 @@ export const managementRoutes: RouteObject[] = [
       { path: paths.management.purchaseOrder, element: <PurchaseOrderPage /> },
       { path: paths.legacy.management.purchaseOrder, element: <RedirectTo to={paths.management.purchaseOrder} /> },
       { path: paths.management.cashClose, element: <CashClosePage /> },
+      { path: paths.management.wallet, element: <WalletPage /> },
       { path: paths.legacy.management.cashClose, element: <RedirectTo to={paths.management.cashClose} /> },
       { path: paths.management.cashDrop, element: <CashDropPage /> },
       { path: paths.legacy.management.cashDrop, element: <RedirectTo to={paths.management.cashDrop} /> },

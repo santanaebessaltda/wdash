@@ -52,10 +52,11 @@ const performance: NavGroup = {
 /** Fechamento, sangrias e informe. A análise de margem continua em Dashboard > Financeiro. */
 const finance: NavGroup = {
   label: "Financeiro",
-  description: "Acompanhe o fechamento, as sangrias e o informe de vendas.",
+  description: "Acompanhe o fechamento, a carteira, as sangrias e o informe de vendas.",
   icon: ICON.finance,
   items: [
     { label: "Fechamento", to: paths.management.cashClose },
+    { label: "Carteira", to: paths.management.wallet },
     { label: "Sangrias", to: paths.management.cashDrop },
     { label: "Informe de vendas", to: paths.management.salesReport },
   ],
@@ -161,6 +162,7 @@ export function isOwner(role: Role): boolean {
 
 const sellerNav: NavEntry[] = [
   { label: "Início", icon: ICON.dashboard, to: paths.seller.home },
+  { label: "Carteira", icon: ICON.finance, to: paths.seller.wallet },
 ];
 
 export function navForRole(role: Role): NavEntry[] {

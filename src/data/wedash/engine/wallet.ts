@@ -1,0 +1,217 @@
+/** Carteira do mês: premiação, bônus, desafio, retirada e quebra. Valores em centavos. */
+
+export type WalletLineKind = "prize" | "bonus" | "challenge" | "withdrawal" | "shortage";
+
+export type WalletLine = {
+  kind: WalletLineKind;
+  /** Nome da meta ou do desafio. Vazio na retirada e na quebra. */
+  title: string;
+  day: string | null;
+  cents: number;
+  /** Meta ainda aberta ("até agora") ou desafio que ainda não fechou. */
+  open: boolean;
+  /** Prêmio que não entra no saldo, ou "Em andamento". */
+  note: string | null;
+};
+
+export type WalletPersonMonth = {
+  personId: string;
+  name: string;
+  prizeCents: number;
+  bonusCents: number;
+  challengeCents: number;
+  withdrawalCents: number;
+  shortageCents: number;
+  balanceCents: number;
+  /** Alguma premiação ou bônus deste mês ainda pode mudar. */
+  openPrize: boolean;
+  lines: WalletLine[];
+};
+
+export type WalletMonth = {
+  /** YYYY-MM */
+  month: string;
+  people: WalletPersonMonth[];
+  /** Quebra do mês sem pessoa, grupo ou equipe. Só na visão da filial. */
+  unassignedShortageCents: number;
+};
+
+export type WalletPersonInput = { id: string; name: string };
+
+export type WalletGoalInput = {
+  name: string;
+  endsOn: string;
+  open: boolean;
+  people: { personId: string; prizeCents: number; bonusCents: number }[];
+};
+
+export type WalletChallengeInput = {
+  name: string;
+  endsOn: string;
+  open: boolean;
+  people: { personId: string; moneyCents: number; itemLabel: string | null }[];
+};
+
+export type WalletCashDay = {
+  day: string;
+  withdrawals: { personId: string; cents: number }[];
+  shortage: { personId: string; cents: number }[];
+  unassignedShortageCents: number;
+};
+
+function monthOf(iso: string): string {
+  return iso.slice(0, 7);
+}
+
+function cents(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.round(value));
+}
+
+type Bucket = {
+  personId: string;
+  name: string;
+  prizeCents: number;
+  bonusCents: number;
+  challengeCents: number;
+  withdrawalCents: number;
+  shortageCents: number;
+  openPrize: boolean;
+  lines: WalletLine[];
+};
+
+/**
+ * Monta o mês. Meta e desafio entram no mês em que terminam.
+ * Meta aberta conta o que já está garantido. Desafio aberto aparece e fica fora do saldo.
+ * Prêmio que não é dinheiro fica na linha e fora do saldo.
+ */
+export function buildWalletMonth(input: {
+  month: string;
+  people: WalletPersonInput[];
+  goals: WalletGoalInput[];
+  challenges: WalletChallengeInput[];
+  days: WalletCashDay[];
+  /** Uma pessoa só. A quebra sem destino sai do resultado. */
+  onlyPersonId?: string | null;
+}): WalletMonth {
+  const month = input.month.slice(0, 7);
+  const names = new Map(input.people.map((person) => [person.id, person.name]));
+  const buckets = new Map<string, Bucket>();
+
+  const bucket = (personId: string): Bucket | null => {
+    if (!personId) return null;
+    if (input.onlyPersonId && personId !== input.onlyPersonId) return null;
+    let row = buckets.get(personId);
+    if (!row) {
+      row = {
+        personId,
+        name: names.get(personId) ?? "Funcionário fora do cadastro",
+        prizeCents: 0,
+        bonusCents: 0,
+        challengeCents: 0,
+        withdrawalCents: 0,
+        shortageCents: 0,
+        openPrize: false,
+        lines: [],
+      };
+      buckets.set(personId, row);
+    }
+    return row;
+  };
+
+  for (const goal of input.goals) {
+    if (monthOf(goal.endsOn) !== month) continue;
+    for (const person of goal.people) {
+      const row = bucket(person.personId);
+      if (!row) continue;
+      const prize = cents(person.prizeCents);
+      const bonus = cents(person.bonusCents);
+      if (prize > 0 || goal.open) {
+        row.prizeCents += prize;
+        row.openPrize = row.openPrize || goal.open;
+        row.lines.push({ kind: "prize", title: goal.name, day: null, cents: prize, open: goal.open, note: null });
+      }
+      if (bonus > 0) {
+        row.bonusCents += bonus;
+        row.openPrize = row.openPrize || goal.open;
+        row.lines.push({ kind: "bonus", title: goal.name, day: null, cents: bonus, open: goal.open, note: null });
+      }
+    }
+  }
+
+  for (const challenge of input.challenges) {
+    if (monthOf(challenge.endsOn) !== month) continue;
+    for (const person of challenge.people) {
+      const row = bucket(person.personId);
+      if (!row) continue;
+      if (challenge.open) {
+        row.lines.push({ kind: "challenge", title: challenge.name, day: null, cents: 0, open: true, note: "Em andamento" });
+        continue;
+      }
+      const item = person.itemLabel?.trim() ?? "";
+      if (item) {
+        row.lines.push({ kind: "challenge", title: challenge.name, day: null, cents: 0, open: false, note: item });
+        continue;
+      }
+      const money = cents(person.moneyCents);
+      if (money <= 0) continue;
+      row.challengeCents += money;
+      row.lines.push({ kind: "challenge", title: challenge.name, day: null, cents: money, open: false, note: null });
+    }
+  }
+
+  let unassigned = 0;
+  for (const day of input.days) {
+    if (monthOf(day.day) !== month) continue;
+    for (const line of day.withdrawals) {
+      const amount = cents(line.cents);
+      if (amount <= 0) continue;
+      const row = bucket(line.personId);
+      if (!row) continue;
+      row.withdrawalCents += amount;
+      row.lines.push({ kind: "withdrawal", title: "", day: day.day, cents: amount, open: false, note: null });
+    }
+    for (const line of day.shortage) {
+      const amount = cents(line.cents);
+      if (amount <= 0) continue;
+      const row = bucket(line.personId);
+      if (!row) continue;
+      row.shortageCents += amount;
+      row.lines.push({ kind: "shortage", title: "", day: day.day, cents: amount, open: false, note: null });
+    }
+    if (!input.onlyPersonId) unassigned += cents(day.unassignedShortageCents);
+  }
+
+  const people = [...buckets.values()]
+    .map((row) => ({
+      personId: row.personId,
+      name: row.name,
+      prizeCents: row.prizeCents,
+      bonusCents: row.bonusCents,
+      challengeCents: row.challengeCents,
+      withdrawalCents: row.withdrawalCents,
+      shortageCents: row.shortageCents,
+      balanceCents: row.prizeCents + row.bonusCents + row.challengeCents - row.withdrawalCents - row.shortageCents,
+      openPrize: row.openPrize,
+      lines: row.lines,
+    }))
+    .filter((row) => row.lines.length > 0 || row.personId === input.onlyPersonId)
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR") || a.personId.localeCompare(b.personId));
+
+  if (input.onlyPersonId && !people.some((row) => row.personId === input.onlyPersonId)) {
+    people.push({
+      personId: input.onlyPersonId,
+      name: names.get(input.onlyPersonId) ?? "Funcionário fora do cadastro",
+      prizeCents: 0,
+      bonusCents: 0,
+      challengeCents: 0,
+      withdrawalCents: 0,
+      shortageCents: 0,
+      balanceCents: 0,
+      openPrize: false,
+      lines: [],
+    });
+  }
+
+  return { month, people, unassignedShortageCents: unassigned };
+}
