@@ -564,23 +564,23 @@ export function GlobalGoalBand({
           <span className="mx-1.5 text-[14px] font-semibold text-t2">/</span>
           <span className="font-mono text-[14px] font-bold text-t2 sm:text-[15px]">{brl(goal.total)}</span>
         </p>
-        {!individual && (
-          <p className={`font-mono text-[26px] font-extrabold leading-none sm:text-[28px] ${colorPct}`}>{num(goal.pct, 1)}%</p>
-        )}
+        <p className={`font-mono text-[26px] font-extrabold leading-none sm:text-[28px] ${colorPct}`}>{num(goal.pct, 1)}%</p>
       </div>
       {outsideRankingNote(goal) ? <p className="mt-1 text-[12px] text-t2">{outsideRankingNote(goal)}</p> : null}
       </>
       )}
 
       {individual ? (
-        <div className={cn(!soBarra && "mt-4")}>
-          <div className="relative h-3 w-full overflow-hidden rounded-full" style={{ background: "var(--bg-3)" }}>
+        <div className={cn("flex items-center gap-3", !soBarra && "mt-4")}>
+          <div className="relative h-3 min-w-0 flex-1 overflow-hidden rounded-full" style={{ background: "var(--bg-3)" }}>
             <div
               className="h-full rounded-full transition-[width] duration-500"
               style={{ width: `${Math.min(100, Math.max(0, goal.pct))}%`, background: colorBarra }}
             />
           </div>
-          <p className="mt-2 text-[12px] text-t2">O nível é de cada pessoa. A barra mostra o faturamento da filial.</p>
+          {soBarra && (
+            <p className={`shrink-0 font-mono text-[13px] font-extrabold leading-none ${colorPct}`}>{num(goal.pct, 1)}%</p>
+          )}
         </div>
       ) : (() => {
         const LABEL_MIN_PX = 140;
