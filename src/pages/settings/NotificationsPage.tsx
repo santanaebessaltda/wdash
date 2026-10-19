@@ -1,14 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Card, Segmented } from "@/components/ui";
 import { getSupabase } from "@/lib/supabase";
 import { CheckIcon } from "@/pages/utility/icons";
 import { useActiveSession } from "@/session/SessionProvider";
 
-type PrefKey = "sales" | "cashClose" | "storeGoal" | "stock";
+type StaffKey = "sales" | "cashClose" | "storeGoal" | "stock";
+type SellerKey = "goal" | "challenge" | "wallet" | "near";
+type StaffPrefs = Record<StaffKey, boolean>;
+type SellerPrefs = Record<SellerKey, boolean>;
 
-type Prefs = Record<PrefKey, boolean>;
-
-const DEFAULTS: Prefs = { sales: true, cashClose: true, storeGoal: true, stock: true };
+const STAFF_DEFAULTS: StaffPrefs = { sales: true, cashClose: true, storeGoal: true, stock: true };
+const SELLER_DEFAULTS: SellerPrefs = { goal: true, challenge: true, wallet: true, near: true };
 
 type SalesEvery = 30 | 60;
 
@@ -17,11 +19,18 @@ function salesDesc(every: SalesEvery): string {
   return `${cadence}, se alguma filial vendeu, o resumo mostra o que entrou no período e quanto cada filial já vendeu hoje. As filiais aparecem da que mais vendeu no dia para a que menos vendeu. Chega com o app aberto ou fechado.`;
 }
 
-const ROWS: Array<{ key: PrefKey; name: string; desc?: string }> = [
+const STAFF_ROWS: Array<{ key: StaffKey; name: string; desc?: string }> = [
   { key: "sales", name: "Vendas do período" },
   { key: "cashClose", name: "Fechamento", desc: "Receba um resumo do fechamento do dia, com faltas ou sobras em dinheiro e dias ainda sem total real." },
   { key: "storeGoal", name: "Meta da filial", desc: "Receba um aviso quando a filial atingir um novo nível da meta. Cada nível é avisado uma única vez." },
   { key: "stock", name: "Estoque abaixo do mínimo", desc: "Receba um aviso quando um produto ficar abaixo do mínimo definido para a filial." },
+];
+
+const SELLER_ROWS: Array<{ key: SellerKey; name: string; desc: string }> = [
+  { key: "goal", name: "Nível da sua meta", desc: "Receba um aviso quando você alcançar um novo nível. Cada nível é avisado uma única vez. Vender mais continua aumentando a premiação, sem um aviso a cada venda." },
+  { key: "challenge", name: "Desafio", desc: "Receba um aviso quando você garantir o prêmio e quando o desafio encerrar, tenha ganho ou não." },
+  { key: "wallet", name: "Carteira", desc: "Receba um aviso quando uma retirada ou uma quebra de caixa entrar na sua carteira." },
+  { key: "near", name: "Perto do próximo nível", desc: "Receba um aviso quando faltar pouco para o próximo nível. No máximo uma vez por meta." },
 ];
 
 function Dot({ on }: { on: boolean }) {
@@ -32,10 +41,42 @@ function Dot({ on }: { on: boolean }) {
   );
 }
 
-/** Conta > Notificações. Só o que o push já envia, e cada linha liga ou desliga. */
-export function NotificationsPage() {
+function NoticeList({ children, error }: { children: ReactNode; error: string | null }) {
+  return (
+    <Card className="max-w-[720px]">
+      <h3 className="mb-1 text-[15px] font-bold text-t0">Avisos no celular</h3>
+      <p className="mb-4.5 text-[12.5px] text-t2">Ative ou desative os avisos que deseja receber.</p>
+      <div className="grid grid-cols-[1fr_auto] gap-3 border-b border-line pb-3 text-[10.5px] font-bold uppercase tracking-wide text-t2">
+        <span>Avisar sobre</span>
+        <span className="w-[50px] text-center">Push</span>
+      </div>
+      {children}
+      {error && <p className="mt-3 text-[12.5px] text-t2">{error}</p>}
+    </Card>
+  );
+}
+
+function NoticeRow({ name, desc, on, extra, onToggle }: { name: string; desc?: string; on: boolean; extra?: ReactNode; onToggle: () => void }) {
+  return (
+    <div className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-line py-3.5 last:border-b-0">
+      <div>
+        <p className="text-[13.5px] font-bold text-t0">{name}</p>
+        {desc ? <p className="mt-0.5 text-[11.5px] text-t2">{desc}</p> : null}
+        {extra}
+      </div>
+      <span className="flex w-[50px] justify-center">
+        <button type="button" aria-pressed={on} aria-label={name} onClick={onToggle}>
+          <Dot on={on} />
+        </button>
+      </span>
+    </div>
+  );
+}
+
+/** Conta > Notificações do gestor e do gerente. Cada linha liga ou desliga o push. */
+function StaffNotices() {
   const session = useActiveSession();
-  const [prefs, setPrefs] = useState<Prefs>(DEFAULTS);
+  const [prefs, setPrefs] = useState<StaffPrefs>(STAFF_DEFAULTS);
   const [salesEvery, setSalesEvery] = useState<SalesEvery>(30);
   const [userId, setUserId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +115,7 @@ export function NotificationsPage() {
     };
   }, [session.tenantId]);
 
-  async function persist(next: Prefs, every: SalesEvery) {
+  async function persist(next: StaffPrefs, every: SalesEvery) {
     const sb = getSupabase();
     if (!sb || !userId) return;
     const prev = { prefs, every: salesEvery };
@@ -100,7 +141,7 @@ export function NotificationsPage() {
     }
   }
 
-  function toggle(key: PrefKey) {
+  function toggle(key: StaffKey) {
     void persist({ ...prefs, [key]: !prefs[key] }, salesEvery);
   }
 
@@ -110,19 +151,16 @@ export function NotificationsPage() {
   }
 
   return (
-    <Card className="max-w-[720px]">
-      <h3 className="mb-1 text-[15px] font-bold text-t0">Avisos no celular</h3>
-      <p className="mb-4.5 text-[12.5px] text-t2">Ative ou desative os avisos que deseja receber.</p>
-      <div className="grid grid-cols-[1fr_auto] gap-3 border-b border-line pb-3 text-[10.5px] font-bold uppercase tracking-wide text-t2">
-        <span>Avisar sobre</span>
-        <span className="w-[50px] text-center">Push</span>
-      </div>
-      {ROWS.map((row) => (
-        <div key={row.key} className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-line py-3.5 last:border-b-0">
-          <div>
-            <p className="text-[13.5px] font-bold text-t0">{row.name}</p>
-            <p className="mt-0.5 text-[11.5px] text-t2">{row.key === "sales" ? salesDesc(salesEvery) : row.desc}</p>
-            {row.key === "sales" && (
+    <NoticeList error={error}>
+      {STAFF_ROWS.map((row) => (
+        <NoticeRow
+          key={row.key}
+          name={row.name}
+          desc={row.key === "sales" ? salesDesc(salesEvery) : row.desc}
+          on={prefs[row.key]}
+          onToggle={() => toggle(row.key)}
+          extra={
+            row.key === "sales" ? (
               <Segmented
                 className="mt-2"
                 options={[
@@ -134,16 +172,89 @@ export function NotificationsPage() {
                   if (value === "30" || value === "60") changeEvery(value === "60" ? 60 : 30);
                 }}
               />
-            )}
-          </div>
-          <span className="flex w-[50px] justify-center">
-            <button type="button" aria-pressed={prefs[row.key]} aria-label={row.name} onClick={() => void toggle(row.key)}>
-              <Dot on={prefs[row.key]} />
-            </button>
-          </span>
-        </div>
+            ) : null
+          }
+        />
       ))}
-      {error && <p className="mt-3 text-[12.5px] text-t2">{error}</p>}
-    </Card>
+    </NoticeList>
   );
+}
+
+/** Mesma tela, com as linhas da vendedora. As quatro desligadas = nenhum aviso. */
+function SellerNotices() {
+  const session = useActiveSession();
+  const [prefs, setPrefs] = useState<SellerPrefs>(SELLER_DEFAULTS);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const sb = getSupabase();
+    if (!sb) return;
+    let live = true;
+    void (async () => {
+      const { data: auth } = await sb.auth.getUser();
+      const uid = auth.user?.id;
+      if (!uid || !live) return;
+      setUserId(uid);
+      const { data, error } = await sb
+        .from("notification_pref")
+        .select("seller_goal, seller_challenge, seller_wallet, seller_near")
+        .eq("auth_user_id", uid)
+        .eq("tenant_id", session.tenantId)
+        .maybeSingle();
+      if (!live) return;
+      if (error) {
+        setError("Não foi possível carregar as notificações. Tente novamente.");
+        return;
+      }
+      if (!data) return;
+      setPrefs({
+        goal: data.seller_goal !== false,
+        challenge: data.seller_challenge !== false,
+        wallet: data.seller_wallet !== false,
+        near: data.seller_near !== false,
+      });
+    })();
+    return () => {
+      live = false;
+    };
+  }, [session.tenantId]);
+
+  async function persist(next: SellerPrefs) {
+    const sb = getSupabase();
+    if (!sb || !userId) return;
+    const prev = prefs;
+    setPrefs(next);
+    setError(null);
+    const { error } = await sb.from("notification_pref").upsert(
+      {
+        auth_user_id: userId,
+        tenant_id: session.tenantId,
+        seller_goal: next.goal,
+        seller_challenge: next.challenge,
+        seller_wallet: next.wallet,
+        seller_near: next.near,
+      },
+      { onConflict: "auth_user_id,tenant_id" },
+    );
+    if (error) {
+      setPrefs(prev);
+      setError("Não foi possível salvar as alterações. Tente novamente.");
+    }
+  }
+
+  return (
+    <NoticeList error={error}>
+      {SELLER_ROWS.map((row) => (
+        <NoticeRow key={row.key} name={row.name} desc={row.desc} on={prefs[row.key]} onToggle={() => void persist({ ...prefs, [row.key]: !prefs[row.key] })} />
+      ))}
+    </NoticeList>
+  );
+}
+
+/** Conta > Notificações. Gestor e gerente veem os avisos da loja. A vendedora vê os dela. */
+export function NotificationsPage() {
+  const session = useActiveSession();
+  if (session.role === "SELLER") return <SellerNotices />;
+  return <StaffNotices />;
 }

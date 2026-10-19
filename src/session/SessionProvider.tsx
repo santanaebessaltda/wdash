@@ -133,12 +133,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!session || session.role === "SELLER") return;
+    if (!session) return;
     void requestPermissionAfterLogin(session.tenantId, session.membershipId);
   }, [session]);
 
   useEffect(() => {
-    if (!session || session.role === "SELLER") return;
+    if (!session) return;
     return watchSalesPush(session.tenantId);
   }, [session]);
 

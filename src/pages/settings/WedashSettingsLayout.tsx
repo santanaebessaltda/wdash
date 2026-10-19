@@ -4,7 +4,7 @@ import { paths } from "@/router/paths";
 import { useActiveSession } from "@/session/SessionProvider";
 import { isOwner } from "@/layout/nav-wedash";
 
-/** Mesma ordem do menu do avatar. Notificações fica para gestor e gerente. */
+/** Mesma ordem do menu do avatar. Notificações fica para gestor, gerente e vendedor. */
 const TABS = [
   { label: "Meu perfil", to: paths.profile },
   { label: "Notificações", to: paths.settings.notifications },
@@ -48,13 +48,13 @@ const META: Record<string, { title: string; subtitle: string }> = {
 /**
  * Shell de Conta (menu do avatar)  -  mesmo padrao Vela (TabNav).
  * Gestor: Meu perfil, Notificações, ERP, Usuários e Logs.
- * Gerente: Meu perfil e Notificações. Lojas (só por URL) fica sem abas.
+ * Gerente e vendedor: Meu perfil e Notificações. Lojas (só por URL) fica sem abas.
  */
 export function WedashSettingsLayout() {
   const { pathname } = useLocation();
   const session = useActiveSession();
   const goal = META[pathname] ?? META[paths.settings.stores]!;
-  const items = isOwner(session.role) ? TABS : session.role === "MANAGER" ? MANAGER_TABS : [];
+  const items = isOwner(session.role) ? TABS : session.role === "MANAGER" || session.role === "SELLER" ? MANAGER_TABS : [];
   const tabs = items.some((t) => t.to === pathname) ? items : [];
 
   return (

@@ -67,7 +67,6 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
   });
 
   useEffect(() => {
-    if (session.role === "SELLER") return;
     void refreshSalesPush(session.tenantId);
   }, [session.role, session.tenantId]);
 
@@ -111,11 +110,9 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
     location.pathname.startsWith(paths.settings.root) ||
     location.pathname === paths.profile);
 
-  // Menu do avatar: Meu perfil, Notificações (gestor e gerente), e no Gestor ERP, Usuários e Logs.
+  // Menu do avatar: Meu perfil, Notificações, e no Gestor ERP, Usuários e Logs.
   const conta: DropdownItem[] = [
-    ...(session.role === "SELLER"
-      ? []
-      : [{ label: "Notificações", icon: <MenuIcon d={ICON_NOTICES} />, onClick: () => navigate(paths.settings.notifications) }]),
+    { label: "Notificações", icon: <MenuIcon d={ICON_NOTICES} />, onClick: () => navigate(paths.settings.notifications) },
     ...(isOwner(session.role)
       ? [
           { label: "ERP", icon: <MenuIcon d={ICON_ERP} />, onClick: () => navigate(paths.settings.erp) },

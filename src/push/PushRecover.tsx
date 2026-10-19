@@ -28,14 +28,13 @@ export function PushRecover() {
   const [tentando, setTentando] = useState(false);
 
   useEffect(() => {
-    if (session.role === "SELLER") return;
     try {
       if (sessionStorage.getItem(DISPENSADO) === "1") return;
     } catch {
       /* private mode */
     }
     if (blocked()) setOpen(true);
-  }, [session.role]);
+  }, []);
 
   function dispensar() {
     setOpen(false);
@@ -57,8 +56,6 @@ export function PushRecover() {
     }
     setStill(true);
   }
-
-  if (session.role === "SELLER") return null;
 
   return (
     <Modal
