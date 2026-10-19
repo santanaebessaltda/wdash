@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { Card, CardTitle, Segmented, Tabs } from "@/components/ui";
+import { Card, CardTitle, Tabs } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { brlCent, num } from "@/data/wedash/engine/format";
 import type { MonthRankingEntry, SellerHomeStore } from "@/data/wedash/engine/sellerHome";
@@ -9,8 +8,6 @@ import { RankingBlock } from "@/pages/live/blocks";
 import type { RankingRow } from "@/data/wedash/live";
 import { SellerChallengeList } from "./ChallengeCard";
 import { PrizeCard } from "./PrizeCard";
-
-type RankingScope = "group" | "store";
 
 function RankingList({ ranking }: { ranking: MonthRankingEntry[] }) {
   const podium: RankingRow[] = ranking.slice(0, 3).map((r) => ({
@@ -56,8 +53,7 @@ function RankingList({ ranking }: { ranking: MonthRankingEntry[] }) {
 /** O mesmo card da Equipe: Ranking (podio do mes), Desafios e Meta. Na meta Geral o ranking some: a parte e igual para todos. */
 export function PerformanceCard({ store, today, through, closed }: { store: SellerHomeStore; today: string; through: string; closed: boolean }) {
   const geral = store.goals.some((g) => g.mode === "geral");
-  const [scope, setScope] = useState<RankingScope>("group");
-  const ranking = scope === "store" ? (store.storeRanking ?? []) : (store.monthRanking ?? []);
+  const ranking = store.storeRanking ?? [];
   const challenges = store.challenges ?? [];
   return (
     <Card className="min-w-0 overflow-hidden" padding="lg">
@@ -74,28 +70,11 @@ export function PerformanceCard({ store, today, through, closed }: { store: Sell
             icon: <TrophyIcon size={14} />,
             content: (
               <div>
-                <div className="mb-3 flex flex-col items-start gap-1.5">
-                  <Segmented
-                    options={[
-                      { value: "group", label: "Grupo" },
-                      { value: "store", label: "Loja" },
-                    ]}
-                    value={scope}
-                    onChange={(v) => v && setScope(v)}
-                  />
-                  <p className="text-[12px] font-semibold text-t2">
-                    {scope === "store" ? "Loja inteira" : store.groupName ? `Grupo ${store.groupName}` : "Sem grupo"}
-                  </p>
-                </div>
                 {ranking.length === 0 ? (
                   <EmptyBlock
                     icon="🏆"
-                    title={scope === "store" ? "Ninguém no ranking ainda" : "Ninguém neste grupo ainda"}
-                    description={
-                      scope === "store"
-                        ? "O ranking aparece quando houver pessoas nesta loja."
-                        : "O ranking aparece quando houver pessoas neste grupo."
-                    }
+                    title="Ninguém no ranking ainda"
+                    description="O ranking aparece quando houver pessoas nesta loja."
                   />
                 ) : (
                   <RankingList ranking={ranking} />
