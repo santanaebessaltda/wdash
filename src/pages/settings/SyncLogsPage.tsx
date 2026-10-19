@@ -16,6 +16,7 @@ import { useActiveSession } from "@/session/SessionProvider";
 import { hydrateSessionStores, storesForSession } from "@/data/wedash/stores";
 import {
   SYNC_JOB_KIND_LABEL,
+  clearSyncLogs,
   fetchSyncLogs,
   syncLogExplanation,
   syncLogSourceLabel,
@@ -120,6 +121,8 @@ export function SyncLogsPage() {
   const showSkeleton = useMinSkeleton(loading);
   const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<SyncLogEntry | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const { show } = useToast();
 
   const load = useCallback(async () => {
@@ -140,6 +143,18 @@ export function SyncLogsPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function clearLogs() {
+    if (clearing) return;
+    setClearing(true);
+    const r = await clearSyncLogs(session.tenantId);
+    setClearing(false);
+    if (!r.ok) return show(r.error, "danger");
+    setConfirmClear(false);
+    setDetail(null);
+    setLogs([]);
+    show("Logs limpos.", "success");
+  }
 
   const storeNameValue = useCallback(
     (e: SyncLogEntry) => {
@@ -193,7 +208,15 @@ export function SyncLogsPage() {
 
   return (
     <div>
-      <div className="mb-4 flex flex-col sm:flex-row sm:justify-end print:hidden">
+      <div className="mb-4 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-end print:hidden">
+        <Button
+          variant="outline"
+          className="h-[38px]"
+          disabled={showSkeleton || logs.length === 0 || clearing}
+          onClick={() => setConfirmClear(true)}
+        >
+          Limpar logs
+        </Button>
         <Input
           placeholder="Buscar nos logs…"
           value={search}
@@ -232,6 +255,27 @@ export function SyncLogsPage() {
           <Timeline events={events} />
         )}
       </Card>
+
+      <Modal
+        open={confirmClear}
+        onClose={() => !clearing && setConfirmClear(false)}
+        size="sm"
+        title="Limpar logs?"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setConfirmClear(false)} disabled={clearing}>
+              Voltar
+            </Button>
+            <Button variant="danger" onClick={() => void clearLogs()} disabled={clearing}>
+              {clearing ? "Limpando…" : "Limpar logs"}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm leading-relaxed text-t1">
+          Isso apaga os erros e avisos da sincronização desta conta, inclusive os que a busca não está mostrando. Vendas e cadastro não mudam.
+        </p>
+      </Modal>
 
       <Modal
         open={detail != null}

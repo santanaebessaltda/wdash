@@ -257,3 +257,15 @@ export async function fetchSyncLogs(q: SyncLogQuery): Promise<SyncLogEntry[]> {
     };
   });
 }
+
+/** Apaga erros e avisos da conta. Não mexe em vendas nem cadastro. */
+export async function clearSyncLogs(tenantId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, error: "Não foi possível limpar os logs. Tente novamente." };
+  const { error } = await sb.from("sync_log").delete().eq("tenant_id", tenantId);
+  if (error) {
+    console.warn("clearSyncLogs:", error.message);
+    return { ok: false, error: "Não foi possível limpar os logs. Tente novamente." };
+  }
+  return { ok: true };
+}
