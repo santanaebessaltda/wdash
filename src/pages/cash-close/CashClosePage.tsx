@@ -532,6 +532,8 @@ export function CashClosePage() {
       if (day < today && !withoutReal && hasBody) {
         current.closedStores += 1;
         current.closedRealCents += gap.realCents;
+        if (diffCents > 0) current.surplusStores += 1;
+        else if (diffCents < 0) current.shortageStores += 1;
         if (diffCents !== 0) current.diffStores += 1;
       }
       byDay.set(day, current);
@@ -548,7 +550,13 @@ export function CashClosePage() {
 
   function dayFace(day: string): CalendarFace {
     const info = analysis?.byDay.get(day);
-    const counts = { diffStores: info?.diffStores ?? 0, pendingStores: info?.pendingStores ?? 0, closedStores: info?.closedStores ?? 0 };
+    const counts = {
+      diffStores: info?.diffStores ?? 0,
+      surplusStores: info?.surplusStores ?? 0,
+      shortageStores: info?.shortageStores ?? 0,
+      pendingStores: info?.pendingStores ?? 0,
+      closedStores: info?.closedStores ?? 0,
+    };
     if (day === today) return { kind: "today", totalCents: soldToday?.cents ?? 0, diffCents: 0, withdrawalCents: 0, awaiting: soldToday == null, ...counts };
     if (!info || (info.systemCents === 0 && info.realCents === 0 && !info.pending)) return { kind: "zero", totalCents: 0, diffCents: 0, withdrawalCents: 0, ...counts };
     if (!info.hasMillennium && !info.hasLines && !info.pending) return { kind: "empty", totalCents: 0, diffCents: 0, withdrawalCents: 0, ...counts };
@@ -647,6 +655,8 @@ type DayBucket = {
   hasLines: boolean;
   pending: boolean;
   diffStores: number;
+  surplusStores: number;
+  shortageStores: number;
   pendingStores: number;
   closedStores: number;
   closedRealCents: number;
@@ -662,6 +672,8 @@ function emptyDayBucket(): DayBucket {
     hasLines: false,
     pending: false,
     diffStores: 0,
+    surplusStores: 0,
+    shortageStores: 0,
     pendingStores: 0,
     closedStores: 0,
     closedRealCents: 0,
@@ -675,6 +687,8 @@ type CalendarFace = {
   withdrawalCents: number;
   awaiting?: boolean;
   diffStores: number;
+  surplusStores: number;
+  shortageStores: number;
   pendingStores: number;
   closedStores: number;
 };
@@ -779,7 +793,8 @@ function dayHint(face: CalendarFace, many: boolean): string | undefined {
     const partes: string[] = [];
     if (face.closedStores > 0 && face.pendingStores > 0) partes.push(filialAttention(face.closedStores, "fechada", "fechadas"));
     if (face.pendingStores > 0) partes.push(filialAttention(face.pendingStores, "pendente", "pendentes"));
-    if (face.diffStores > 0) partes.push(filialAttention(face.diffStores, "com diferença", "com diferença"));
+    if (face.surplusStores > 0) partes.push(filialAttention(face.surplusStores, "com sobra", "com sobra"));
+    if (face.shortageStores > 0) partes.push(filialAttention(face.shortageStores, "com quebra", "com quebra"));
     if (face.withdrawalCents > 0) partes.push(`Retirada ${brlCent(face.withdrawalCents / 100)}`);
     return partes.length > 0 ? partes.join(" · ") : undefined;
   }
@@ -831,8 +846,11 @@ function Month({
                     )}
                     {face.pendingStores > 0 && <DayChip color="bg-warn">{filialAttention(face.pendingStores, "pendente", "pendentes")}</DayChip>}
                     {face.kind === "today" && <DayChip color="bg-acc">Em aberto</DayChip>}
-                    {face.kind === "total" && face.diffStores > 0 && (
-                      <DayChip color="bg-bad">{filialAttention(face.diffStores, "com diferença", "com diferença")}</DayChip>
+                    {face.kind === "total" && face.surplusStores > 0 && (
+                      <DayChip color="bg-ok">{filialAttention(face.surplusStores, "com diferença", "com diferença")}</DayChip>
+                    )}
+                    {face.kind === "total" && face.shortageStores > 0 && (
+                      <DayChip color="bg-bad">{filialAttention(face.shortageStores, "com diferença", "com diferença")}</DayChip>
                     )}
                     {face.kind === "total" && face.withdrawalCents > 0 && (
                       <DayChip color="bg-info">{`Retirada ${brlCent(face.withdrawalCents / 100)}`}</DayChip>
