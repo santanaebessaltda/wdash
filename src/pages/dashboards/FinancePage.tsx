@@ -499,7 +499,7 @@ export default function FinancePage() {
             {view.franchiseFixedCosts.map((line) => {
               const estilo = costRowStyle(line);
               return (
-                <div key={line.label} className="flex items-center justify-between border-b border-line py-3">
+                <div key={line.label} className="flex items-center justify-between border-b border-line py-3 last:border-b-0">
                   <span
                     className={cn(
                       estilo.bold ? "text-sm font-extrabold text-t0" : "text-[13px] font-semibold",
@@ -517,11 +517,6 @@ export default function FinancePage() {
                 </div>
               );
             })}
-            <FilterTotal
-              tip="Soma os custos da operação no período. Lucro bruto e resultado ficam de fora dessa soma."
-              count={countNoun(costLines(view.franchiseFixedCosts).length, "custo", "custos")}
-              value={`−${brlCent(costLines(view.franchiseFixedCosts).reduce((s, l) => s + l.amount, 0))}`}
-            />
           </div>
           )}
         </Card>
@@ -537,7 +532,7 @@ export default function FinancePage() {
               const sum = view.paymentMethods.reduce((s, f) => s + f.amount, 0);
               const total = sum || 1;
               return (
-                <div className="flex flex-1 flex-col justify-center px-4">
+                <div className="flex flex-1 flex-col justify-center px-4 pb-4">
                   <div className="mx-auto my-2">
                     <DonutChart
                       segments={view.paymentMethods.map((f) => ({
@@ -562,11 +557,6 @@ export default function FinancePage() {
                       );
                     })}
                   </div>
-                  <FilterTotal
-                    tip="Soma todas as formas de pagamento do período."
-                    count={countNoun(view.paymentMethods.length, "forma", "formas")}
-                    value={brlCent(sum)}
-                  />
                 </div>
               );
             })()
@@ -585,7 +575,7 @@ export default function FinancePage() {
                 const sum = view.revenueByBrand.reduce((s, m) => s + m.amount, 0);
                 const total = sum || 1;
                 return (
-                  <div className="flex flex-1 flex-col justify-center px-4">
+                  <div className="flex flex-1 flex-col justify-center px-4 pb-4">
                     <div className="mx-auto my-2">
                       <DonutChart
                         segments={view.revenueByBrand.map((m) => ({
@@ -610,11 +600,6 @@ export default function FinancePage() {
                         );
                       })}
                     </div>
-                    <FilterTotal
-                      tip="Soma o faturamento das marcas no período."
-                      count={countNoun(view.revenueByBrand.length, "marca", "marcas")}
-                      value={brlCent(sum)}
-                    />
                   </div>
                 );
               })()
@@ -703,27 +688,8 @@ export default function FinancePage() {
   );
 }
 
-function costLines(rows: FixedCostRow[]) {
-  return rows.filter((l) => !l.isTotal && !l.isResult && l.label !== "Lucro bruto");
-}
-
 function countNoun(n: number, one: string, many: string) {
   return `${num(n)} ${n === 1 ? one : many}`;
-}
-
-function FilterTotal({ tip, count, value }: { tip: string; count: string; value: string }) {
-  return (
-    <div className="-mx-4 mt-1 flex items-center justify-between gap-3 bg-bg-inset px-4 py-3">
-      <div className="min-w-0 text-[13px] font-extrabold text-t0">
-        <span className="inline-flex items-center gap-1">
-          Total do filtro
-          <TipHelp label={tip} />
-        </span>
-        <span className="mt-0.5 block text-[11px] font-semibold text-t2">{count}</span>
-      </div>
-      <span className="shrink-0 font-mono text-[13px] font-extrabold tabular-nums text-t0">{value}</span>
-    </div>
-  );
 }
 
 function Mono({ v, total = false, tone = "text-t0" }: { v: string; total?: boolean; tone?: string }) {

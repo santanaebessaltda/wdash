@@ -117,7 +117,7 @@ function ChartCardSkeleton({
 }
 
 /** Rosca + legenda (Formas de pagamento, Curva ABC). */
-function DonutCardSkeleton({ rows = 4, size = 160, withSub = false, lg = false, total = false }: { rows?: number; size?: number; withSub?: boolean; lg?: boolean; total?: boolean }) {
+function DonutCardSkeleton({ rows = 4, size = 160, withSub = false, lg = false }: { rows?: number; size?: number; withSub?: boolean; lg?: boolean }) {
   return (
     <Card className="flex flex-col" padding={lg ? "lg" : "md"}>
       <Title className="mb-4 w-36" />
@@ -139,15 +139,6 @@ function DonutCardSkeleton({ rows = 4, size = 160, withSub = false, lg = false, 
             </div>
           ))}
         </div>
-        {total && (
-          <div className="mt-3 flex items-center gap-3 bg-bg-inset px-1 py-3">
-            <div className="min-w-0 flex-1">
-              <Skeleton className="h-3.5 w-28" />
-              <Skeleton className="mt-1.5 h-2.5 w-16" />
-            </div>
-            <Skeleton className="h-3.5 w-20" />
-          </div>
-        )}
       </div>
     </Card>
   );
@@ -270,20 +261,13 @@ function CostListSkeleton() {
   return (
     <Card className="flex flex-col">
       <Title className="mb-4 w-40" />
-      <div className="px-4 pb-4">
+      <div className="px-4">
         {Array.from({ length: 6 }, (_, i) => (
-          <div key={i} className="flex items-center justify-between border-b border-line py-3">
+          <div key={i} className="flex items-center justify-between border-b border-line py-3 last:border-b-0">
             <Skeleton className={cn("h-3.5", i === 5 ? "w-36" : "w-28", i > 0 && i < 5 && "ml-4")} />
             <Skeleton className={cn(i === 5 ? "h-4 w-28" : "h-3.5 w-24")} />
           </div>
         ))}
-        <div className="mt-1 flex items-center justify-between bg-bg-inset px-1 py-3">
-          <div>
-            <Skeleton className="h-3.5 w-28" />
-            <Skeleton className="mt-1.5 h-2.5 w-16" />
-          </div>
-          <Skeleton className="h-4 w-24" />
-        </div>
       </div>
     </Card>
   );
@@ -375,7 +359,7 @@ export function FinanceSkeleton() {
       </div>
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <CostListSkeleton />
-        <DonutCardSkeleton total />
+        <DonutCardSkeleton />
       </div>
       <WideTableSkeleton cols={6} sub />
     </Busy>
