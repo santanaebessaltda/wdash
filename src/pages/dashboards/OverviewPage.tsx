@@ -46,6 +46,7 @@ import { InitialSyncNotice } from "@/pages/dashboard/InitialSyncNotice";
 import { StoreHoursNotice } from "@/pages/dashboard/StoreHoursNotice";
 import { ErpStatusNotice } from "@/pages/dashboard/ErpStatusNotice";
 import { FirstStepsCard, useFirstSteps } from "@/pages/dashboard/FirstSteps";
+import { ExportDialog } from "@/components/wedash/ExportDialog";
 import { ReportHeader, useExportPdf } from "@/pages/dashboard/ReportHeader";
 import { usePrintMode } from "@/lib/printMode";
 import { cn } from "@/lib/cn";
@@ -488,9 +489,7 @@ export default function OverviewPage() {
                 activePresetId={periodActivePresetId(scope.period)}
                 minDate={pickerMinDate(coverageFrom, monthFill)}
               />
-              <Button variant="primary" onClick={exportValue}>
-                Exportar
-              </Button>
+              <ExportDialog formats={["pdf"]} onExport={() => exportValue()} />
             </div>
           </div>
         }

@@ -32,6 +32,7 @@ import { DeepHistoryNotice } from "@/pages/dashboard/DeepHistoryNotice";
 import { InitialSyncNotice } from "@/pages/dashboard/InitialSyncNotice";
 import { StoreHoursNotice } from "@/pages/dashboard/StoreHoursNotice";
 import { ErpStatusNotice } from "@/pages/dashboard/ErpStatusNotice";
+import { ExportDialog } from "@/components/wedash/ExportDialog";
 import { ReportHeader, useExportPdf } from "@/pages/dashboard/ReportHeader";
 import { usePrintMode } from "@/lib/printMode";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
@@ -314,9 +315,7 @@ export default function ProductsPage() {
                 activePresetId={periodActivePresetId(scope.period)}
                 minDate={pickerMinDate(coverageFrom, monthFill)}
               />
-              <Button variant="primary" onClick={exportValue}>
-                Exportar
-              </Button>
+              <ExportDialog formats={["pdf"]} onExport={() => exportValue()} />
             </div>
           </div>
         }
