@@ -526,7 +526,7 @@ export function PurchaseOrderPage() {
             </div>
           ) : (
             <div className="min-w-0 overflow-x-auto">
-              <table className="w-full min-w-[1160px] border-collapse text-sm">
+              <table className="w-full min-w-[1340px] border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
                     <th className="px-1 pb-3 text-left font-bold">#</th>
@@ -542,6 +542,8 @@ export function PurchaseOrderPage() {
                         className="px-1 pb-3"
                       />
                     ))}
+                    <ThSort label="Múltiplo" active={sortKey === "multipla"} dir={sortDir} onClick={() => toggleSort("multipla")} className="px-1 pb-3" />
+                    <ThSort label="Bloqueado" active={sortKey === "bloqueado"} dir={sortDir} onClick={() => toggleSort("bloqueado")} align="center" className="px-1 pb-3" />
                     <ThSort label="Novo" active={sortKey === "novo"} dir={sortDir} onClick={() => toggleSort("novo")} align="center" className="px-1 pb-3" />
                     <ThSort label="A pedir" active={sortKey === "aPedir"} dir={sortDir} onClick={() => toggleSort("aPedir")} className="px-1 pb-3" />
                   </tr>
@@ -578,9 +580,7 @@ export function PurchaseOrderPage() {
                                     sub={
                                       <div className="min-w-0">
                                         <p className="truncate text-[11px] uppercase text-t2">{[group.code, category].filter(Boolean).join(" · ")}</p>
-                                        <p className="mt-0.5 text-[11px] font-semibold text-t1">
-                                          {filialSummary(group.branches)} · Múltiplo {group.multipla} · Bloqueado {group.blocked ? "Sim" : "Não"}
-                                        </p>
+                                        <p className="mt-0.5 text-[11px] font-semibold text-t1">{filialSummary(group.branches)}</p>
                                         {group.variasVariantes && !group.blocked && <p className="mt-0.5 text-[11px] font-semibold text-warn">Este produto tem mais de uma cor ou tamanho. Faça o pedido diretamente no Millennium.</p>}
                                       </div>
                                     }
@@ -595,6 +595,12 @@ export function PurchaseOrderPage() {
                                   <Qty v={line[key]} />
                                 </td>
                               ))}
+                              <td className="px-1 py-3 text-right">
+                                <span className="font-mono text-[13px] font-bold text-t0">{group.multipla}</span>
+                              </td>
+                              <td className="px-1 py-3 text-center">
+                                <YesNo yes={group.blocked} />
+                              </td>
                               <td className="px-1 py-3 text-center">
                                 <YesNo yes={line.isNew} />
                               </td>
@@ -626,6 +632,12 @@ export function PurchaseOrderPage() {
                                       <Qty v={branch[c.key]} />
                                     </td>
                                   ))}
+                                  <td className="px-1 py-2.5 text-right">
+                                    <span className="font-mono text-[13px] font-bold text-t0">{branch.multipla}</span>
+                                  </td>
+                                  <td className="px-1 py-2.5 text-center">
+                                    <YesNo yes={branch.blocked} />
+                                  </td>
                                   <td className="px-1 py-2.5 text-center">
                                     <YesNo yes={branch.isNew} />
                                   </td>
@@ -661,6 +673,8 @@ export function PurchaseOrderPage() {
                     <td className="px-1 py-3 text-right">
                       <Qty v={totais.vendidos30} total />
                     </td>
+                    <td />
+                    <td />
                     <td />
                     <td className="px-1 py-3 text-right">
                       <Qty v={totais.aRequest} total />
