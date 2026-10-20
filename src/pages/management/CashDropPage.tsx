@@ -715,7 +715,7 @@ function DropShell({
 }) {
   if (embedded) {
     return (
-      <section className="border-t border-line pt-4 first:border-t-0 first:pt-0">
+      <section className="border-t border-line pb-6 pt-5 first:border-t-0 first:pt-0 last:pb-0">
         {storeName ? <p className="mb-3 text-[15px] font-bold text-t0">{storeName}</p> : null}
         {children}
         {footer ? <div className="mt-4 flex flex-wrap justify-end gap-2">{footer}</div> : null}
