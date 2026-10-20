@@ -36,6 +36,8 @@ export interface DataTableProps<T> {
    * "Mostrando X de Y {paginate}" + paginacao quando ha mais de uma pagina. Ex.: `paginate="produtos"`.
    */
   paginate?: string;
+  /** Mesmo respiro da lista de pessoas do ranking (Dashboard > Equipe). */
+  compact?: boolean;
 }
 
 const hideBelowClasses: Record<NonNullable<DataTableColumn<unknown>["hideBelow"]>, string> = {
@@ -72,6 +74,7 @@ export function DataTable<T>({
   defaultSortKey,
   defaultSortDir = "desc",
   paginate,
+  compact = false,
 }: DataTableProps<T>) {
   const sortableCols = columns.filter((c) => c.sortable && c.sortValue);
   const [sortKey, setSortKey] = useState<string | undefined>(() =>
@@ -112,12 +115,17 @@ export function DataTable<T>({
     return <div className="rounded-[var(--radius-vela-lg)] border border-line bg-bg-2 p-10 text-center text-sm text-t1">{emptyMessage}</div>;
   }
 
+  const headClass = compact
+    ? "px-1 pb-3 text-[11px] font-bold uppercase tracking-wide"
+    : "px-4 py-3 text-[10.5px] font-bold uppercase tracking-wide";
+  const cellClass = compact ? "px-1 py-3 align-middle" : "px-4 py-3.5 align-middle";
+
   return (
-    <div className={cn("overflow-hidden rounded-[var(--radius-vela-lg)] border border-line bg-bg-2", className)}>
-      <div className="overflow-x-auto">
-      <table className="w-full min-w-[640px] border-collapse text-sm">
+    <div className={cn(compact ? "overflow-x-auto" : "overflow-hidden rounded-[var(--radius-vela-lg)] border border-line bg-bg-2", className)}>
+      <div className={compact ? undefined : "overflow-x-auto"}>
+      <table className={cn("w-full border-collapse text-sm", compact ? "min-w-[720px]" : "min-w-[640px]")}>
         <thead>
-          <tr className="border-b border-line">
+          <tr className="border-b border-line text-t2">
             {columns.map((col) =>
               col.sortable && col.sortValue ? (
                 <ThSort
@@ -127,20 +135,13 @@ export function DataTable<T>({
                   dir={sortDir}
                   onClick={() => toggleSort(col.key)}
                   align={col.align ?? "left"}
-                  className={cn(
-                    "px-4 py-3 text-[10.5px] font-bold uppercase tracking-wide",
-                    col.hideBelow && hideBelowClasses[col.hideBelow],
-                  )}
+                  className={cn(headClass, col.hideBelow && hideBelowClasses[col.hideBelow])}
                 />
               ) : (
                 <th
                   key={col.key}
                   style={{ width: col.width }}
-                  className={cn(
-                    "px-4 py-3 text-[10.5px] font-bold uppercase tracking-wide text-t2",
-                    alignClasses[col.align ?? "left"],
-                    col.hideBelow && hideBelowClasses[col.hideBelow],
-                  )}
+                  className={cn(headClass, "text-t2", alignClasses[col.align ?? "left"], col.hideBelow && hideBelowClasses[col.hideBelow])}
                 >
                   {col.header}
                 </th>
@@ -153,12 +154,16 @@ export function DataTable<T>({
             <tr
               key={rowKey(row)}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
-              className={cn("border-b border-line last:border-b-0 transition-colors", onRowClick && "cursor-pointer hover:bg-bg-3")}
+              className={cn(
+                "border-b border-line transition-colors last:border-b-0",
+                (compact || onRowClick) && "hover:bg-bg-3",
+                onRowClick && "cursor-pointer",
+              )}
             >
               {columns.map((col) => (
                 <td
                   key={col.key}
-                  className={cn("px-4 py-3.5 text-t0 align-middle", alignClasses[col.align ?? "left"], col.hideBelow && hideBelowClasses[col.hideBelow])}
+                  className={cn(cellClass, "text-t0", alignClasses[col.align ?? "left"], col.hideBelow && hideBelowClasses[col.hideBelow])}
                 >
                   {col.render(row)}
                 </td>
@@ -169,7 +174,7 @@ export function DataTable<T>({
       </table>
       </div>
       {showPager && (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3.5">
+        <div className={cn("flex flex-wrap items-center justify-between gap-3", compact ? "mt-4" : "border-t border-line px-4 py-3.5")}>
           <span className="text-[12.5px] text-t2">
             Mostrando {paged.pageRows.length} de {paged.total} {paginate}
           </span>

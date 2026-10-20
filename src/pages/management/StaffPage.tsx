@@ -324,9 +324,18 @@ function StaffList({
         sortable: true,
         sortValue: (v) => (salesPerson(v) ? groupLabel(v.seller.id in shiftOf ? shiftOf[v.seller.id] : v.seller.shiftId, shifts.get(v.store.id) ?? []) : null),
         render: (v) => {
-          if (!salesPerson(v)) return <span className="text-t2">—</span>;
+          if (!salesPerson(v)) return <span className="text-[12.5px] font-semibold text-t2">—</span>;
           const current = v.seller.id in shiftOf ? shiftOf[v.seller.id] : v.seller.shiftId;
-          return <span className="text-[13px] text-t1">{groupLabel(current, shifts.get(v.store.id) ?? [])}</span>;
+          const shift = (shifts.get(v.store.id) ?? []).find((item) => item.id === current);
+          if (!shift) return <p className="text-[12.5px] font-semibold text-t2">Sem grupo</p>;
+          return (
+            <>
+              <p className="text-[12.5px] font-semibold text-t1">{shiftName(shift.name)}</p>
+              <p className="text-[11px] text-t2">
+                {shift.start} – {shift.end}
+              </p>
+            </>
+          );
         },
       },
       {
@@ -421,15 +430,17 @@ function StaffList({
           }
         />
       ) : (
-        <DataTable
-          className="rounded-none! border-x-0! border-b-0! bg-transparent!"
-          columns={tab === "ativos" ? columns : [...identity, columns[columns.length - 1]!]}
-          data={shown}
-          rowKey={(v) => v.seller.id}
-          paginate="pessoas"
-          defaultSortKey={showStore ? "store" : undefined}
-          defaultSortDir="asc"
-        />
+        <div className="px-5 pb-5">
+          <DataTable
+            compact
+            columns={tab === "ativos" ? columns : [...identity, columns[columns.length - 1]!]}
+            data={shown}
+            rowKey={(v) => v.seller.id}
+            paginate="pessoas"
+            defaultSortKey={showStore ? "store" : undefined}
+            defaultSortDir="asc"
+          />
+        </div>
       )}
       <Modal
         open={removing != null}
@@ -657,9 +668,9 @@ function personColumns(showStore: boolean): DataTableColumn<StaffPerson>[] {
       sortable: true,
       sortValue: (v) => v.seller.name,
       render: (v) => (
-        <div className="flex min-w-0 items-center gap-3">
-          <PersonAvatar name={v.seller.name} employeeId={v.seller.code} storeId={v.store.id} />
-          <span className="truncate text-[13.5px] font-bold text-t0">{v.seller.name}</span>
+        <div className="flex min-w-0 items-center gap-2.5">
+          <PersonAvatar name={v.seller.name} employeeId={v.seller.code} storeId={v.store.id} size="sm" />
+          <p className="min-w-0 truncate text-[13px] font-bold text-t0">{v.seller.name}</p>
         </div>
       ),
     },
@@ -670,7 +681,7 @@ function personColumns(showStore: boolean): DataTableColumn<StaffPerson>[] {
       header: "Filial",
       sortable: true,
       sortValue: (v) => storeLabel(v.store),
-      render: (v) => <span className="text-t1">{storeLabel(v.store)}</span>,
+      render: (v) => <span className="text-[13px] text-t1">{storeLabel(v.store)}</span>,
     });
   }
   columns.push(
@@ -679,14 +690,14 @@ function personColumns(showStore: boolean): DataTableColumn<StaffPerson>[] {
       header: "Cargo",
       sortable: true,
       sortValue: (v) => teamRoleLabel(v.seller, v.store),
-      render: (v) => <span className="text-t1">{teamRoleLabel(v.seller, v.store)}</span>,
+      render: (v) => <span className="text-[13px] text-t1">{teamRoleLabel(v.seller, v.store)}</span>,
     },
     {
       key: "code",
       header: "Código no Millennium",
       sortable: true,
       sortValue: (v) => v.seller.code?.trim() || null,
-      render: (v) => <span className="tabular-nums text-t1">{v.seller.code || "—"}</span>,
+      render: (v) => <span className="font-mono text-[13px] font-bold text-t0">{v.seller.code || "—"}</span>,
     },
     {
       key: "status",
