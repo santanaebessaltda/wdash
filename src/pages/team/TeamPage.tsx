@@ -46,7 +46,7 @@ import { InitialSyncNotice } from "@/pages/dashboard/InitialSyncNotice";
 import { StoreHoursNotice } from "@/pages/dashboard/StoreHoursNotice";
 import { ErpStatusNotice } from "@/pages/dashboard/ErpStatusNotice";
 import { ExportDialog } from "@/components/wedash/ExportDialog";
-import { ReportHeader, useDashboardExport } from "@/pages/dashboard/ReportHeader";
+import { ReportHeader, useExportPdf } from "@/pages/dashboard/ReportHeader";
 import { usePrintMode } from "@/lib/printMode";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { TeamSkeleton } from "@/components/wedash/LoadingSkeletons";
@@ -193,7 +193,7 @@ export function TeamPage() {
   const tab = searchParams.get("tab");
   const performanceTab = tab === "challenges" || tab === "goals" ? tab : "ranking";
   const { scope, setScope } = useScope();
-  const { viewScope, printIds, stores: exportStores, exportPdfFor } = useDashboardExport("Equipe");
+  const exportPdf = useExportPdf("Equipe");
   const [aggs, setAggs] = useState<TeamAggInput>({ dayAggs: [] });
   const [coverageFrom, setCoverageFrom] = useState<Date | null>(null);
   const filterKey = scopeFilterKey(scope);
@@ -251,9 +251,9 @@ export function TeamPage() {
   }, [reload]);
 
   const view = useMemo(
-    () => buildTeamDashboardView(viewScope, aggs),
+    () => buildTeamDashboardView(scope, aggs),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [viewScope, aggs, storesTick],
+    [scope, aggs, storesTick],
   );
 
   const todayIso = calendarTodayIso();
@@ -296,7 +296,7 @@ export function TeamPage() {
           a.challenge.name.localeCompare(b.challenge.name, "pt-BR"),
       );
   }, [challengesData, session.stores, todayIso]);
-  const showChallengeStore = (viewScope.storeIds.length === 0 ? storesForSession(session.stores).length : viewScope.storeIds.length) > 1;
+  const showChallengeStore = (scope.storeIds.length === 0 ? storesForSession(session.stores).length : scope.storeIds.length) > 1;
 
   const goalLevels = useMemo(
     () =>
@@ -406,7 +406,7 @@ export function TeamPage() {
 
   return (
     <div className="flex flex-col p-4 sm:p-6 print:p-0">
-      <ReportHeader pickedIds={printIds} />
+      <ReportHeader />
       <PageHeader
         crumbs={[{ label: "Dashboard", to: "/dashboard/visao-geral" }, { label: "Equipe" }]}
         title="Equipe"
@@ -421,7 +421,7 @@ export function TeamPage() {
                 activePresetId={periodActivePresetId(scope.period)}
                 minDate={pickerMinDate(coverageFrom, monthFill)}
               />
-              <ExportDialog formats={["pdf"]} stores={exportStores} onExport={(_format, storeIds) => exportPdfFor(storeIds)} />
+              <ExportDialog formats={["pdf"]} onExport={() => exportPdf()} />
             </div>
           </div>
         }

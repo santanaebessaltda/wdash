@@ -37,7 +37,7 @@ import { InitialSyncNotice } from "@/pages/dashboard/InitialSyncNotice";
 import { StoreHoursNotice } from "@/pages/dashboard/StoreHoursNotice";
 import { ErpStatusNotice } from "@/pages/dashboard/ErpStatusNotice";
 import { ExportDialog } from "@/components/wedash/ExportDialog";
-import { ReportHeader, useDashboardExport } from "@/pages/dashboard/ReportHeader";
+import { ReportHeader, useExportPdf } from "@/pages/dashboard/ReportHeader";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { FinanceSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
@@ -186,7 +186,7 @@ export default function FinancePage() {
   const session = useActiveSession();
   const navigate = useNavigate();
   const { scope, setScope } = useScope();
-  const { viewScope, printIds, stores: exportStores, exportPdfFor } = useDashboardExport("Financeiro");
+  const exportPdf = useExportPdf("Financeiro");
   const [aggs, setAggs] = useState<FinanceAggInput>({ dayAggs: [] });
   const [coverageFrom, setCoverageFrom] = useState<Date | null>(null);
   const filterKey = scopeFilterKey(scope);
@@ -249,9 +249,9 @@ export default function FinancePage() {
   }, [reload]);
 
   const view = useMemo(
-    () => buildFinanceView({ ...viewScope, division: null }, aggs),
+    () => buildFinanceView({ ...scope, division: null }, aggs),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [viewScope, aggs, storesTick],
+    [scope, aggs, storesTick],
   );
 
   // Resolve o DateRange a partir do escopo  -  sempre mostra algo selecionado.
@@ -265,7 +265,7 @@ export default function FinancePage() {
 
   return (
     <div className="flex flex-col p-4 sm:p-6 print:p-0">
-      <ReportHeader pickedIds={printIds} />
+      <ReportHeader />
       <PageHeader
         crumbs={[{ label: "Dashboard", to: "/dashboard/visao-geral" }, { label: "Financeiro" }]}
         title="Financeiro"
@@ -280,7 +280,7 @@ export default function FinancePage() {
                 activePresetId={periodActivePresetId(scope.period)}
                 minDate={pickerMinDate(coverageFrom, monthFill)}
               />
-              <ExportDialog formats={["pdf"]} stores={exportStores} onExport={(_format, storeIds) => exportPdfFor(storeIds)} />
+              <ExportDialog formats={["pdf"]} onExport={() => exportPdf()} />
             </div>
           </div>
         }
@@ -299,7 +299,7 @@ export default function FinancePage() {
       {!pending && (
         <ProductsWithoutCostNotice
           products={view.productsWithoutCost}
-          storeIds={viewScope.storeIds}
+          storeIds={scope.storeIds}
           from={currentPeriod.start}
           to={currentPeriod.end}
         />

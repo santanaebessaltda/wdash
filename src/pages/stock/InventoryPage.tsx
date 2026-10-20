@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { flushSync } from "react-dom";
+import { useEffect, useMemo, useState } from "react";
 import { Alert, Badge, Button, Card, CardTitle, ThSort, type SortDir } from "@/components/ui";
 import { statusBadgeVariant } from "@/lib/status";
 import { StockProductsSkeleton } from "@/components/wedash/LoadingSkeletons";
@@ -8,14 +7,13 @@ import { Tooltip } from "@/components/ui/Tooltip";
 import { productBrand, stockCostAmount, stockStatus, type StockProductRow, type StockStatus } from "@/data/wedash/stockProducts";
 import { cn } from "@/lib/cn";
 import { num } from "@/lib/format";
-import { exportPdf, reportFileTitle, usePrintMode } from "@/lib/printMode";
+import { usePrintMode } from "@/lib/printMode";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { TABLE_PAGE_SIZE } from "@/lib/usePagedRows";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { ErpStatusNotice } from "@/pages/dashboard/ErpStatusNotice";
 import { ExportDialog } from "@/components/wedash/ExportDialog";
-import { ReportHeader, pickedStoreFile, reportFileParts, useExportPdf, useReportFileTitle } from "@/pages/dashboard/ReportHeader";
-import { storeListSubtitle } from "@/data/wedash/stores";
+import { ReportHeader, useExportPdf, useReportFileTitle } from "@/pages/dashboard/ReportHeader";
 import { SectionHeader } from "@/pages/operation/shared";
 import { HeaderFilter, HeaderSearch } from "@/pages/dashboard/HeaderFilter";
 import { STOCK_STATUS_LABEL, downloadInventoryXlsx, stockTransferNote } from "./inventoryExport";
@@ -38,8 +36,7 @@ type SortKey = "name" | "estoque" | "receber" | "totalGeral" | "custo" | "valor"
 const STATUS_WEIGHT: Record<StockStatus, number> = { negative: 2, awaiting: 1, ok: 0 };
 
 export function InventoryPage() {
-  const [printIds, setPrintIds] = useState<string[] | null>(null);
-  const { storeRows, storeKey, view, loading, syncing, atualizadoText } = useStockData(printIds);
+  const { storeRows, storeKey, view, loading, syncing, atualizadoText } = useStockData();
   const [search, setSearch] = useState("");
   const [statusPicked, setStatus] = useState<StatusFilter>("todos");
   const [brand, setBrand] = useState<BrandFilter>("");
@@ -51,10 +48,7 @@ export function InventoryPage() {
   const showSkeleton = useMinSkeleton(loading);
   const exportScreenPdf = useExportPdf("Estoque", null, { period: false });
   const fileTitle = useReportFileTitle("Estoque", null, { period: false });
-  const shownCount = printIds && printIds.length > 0 && printIds.length < storeRows.length ? printIds.length : storeRows.length;
-  const multipleStores = shownCount > 1;
-  const exportStores =
-    storeRows.length > 1 ? storeRows.map((store) => ({ id: store.id, name: store.tradeName, detail: storeListSubtitle(store) })) : undefined;
+  const multipleStores = storeRows.length > 1;
   const showBrand = storeRows.some((s) => s.hasWpink);
   const activeBrand: BrandFilter = showBrand ? brand : "";
 
@@ -138,38 +132,10 @@ export function InventoryPage() {
   );
 
   const statusLabel = statusOptions.find((o) => o.value === status)?.label ?? "Todos os status";
-  const exportSnap = useRef({ lines, locations });
-  exportSnap.current = { lines, locations };
 
-  function exportInventory(format: "pdf" | "xlsx" | "csv", storeIds?: string[]) {
-    const ids = storeIds && storeIds.length > 0 && storeIds.length < storeRows.length ? storeIds : null;
-    if (format === "xlsx") {
-      if (!ids) {
-        downloadInventoryXlsx(lines, locations, fileTitle());
-        return;
-      }
-      flushSync(() => setPrintIds(ids));
-      const snap = exportSnap.current;
-      downloadInventoryXlsx(
-        snap.lines,
-        snap.locations,
-        reportFileTitle(reportFileParts("Estoque", pickedStoreFile(storeRows, ids), "", null, false)),
-      );
-      flushSync(() => setPrintIds(null));
-      return;
-    }
-    if (format !== "pdf") return;
-    if (!ids) {
-      exportScreenPdf();
-      return;
-    }
-    flushSync(() => setPrintIds(ids));
-    exportPdf(reportFileParts("Estoque", pickedStoreFile(storeRows, ids), "", null, false));
-    const done = () => {
-      window.removeEventListener("afterprint", done);
-      setPrintIds(null);
-    };
-    window.addEventListener("afterprint", done);
+  function exportInventory(format: "pdf" | "xlsx" | "csv") {
+    if (format === "xlsx") downloadInventoryXlsx(lines, locations, fileTitle());
+    else if (format === "pdf") exportScreenPdf();
   }
 
   return (
@@ -182,7 +148,6 @@ export function InventoryPage() {
           ...(activeBrand ? [{ label: "Marca", amount: activeBrand }] : []),
           ...(category ? [{ label: "Categoria", amount: category }] : []),
         ]}
-        pickedIds={printIds}
       />
       <SectionHeader
         section="Estoque"
@@ -212,7 +177,7 @@ export function InventoryPage() {
                 options={[{ value: "", label: "Todas as categorias" }, ...categories.map((c) => ({ value: c, label: c }))]}
               />
             )}
-            <ExportDialog formats={["pdf", "xlsx"]} stores={exportStores} disabled={!view} onExport={exportInventory} />
+            <ExportDialog formats={["pdf", "xlsx"]} disabled={!view} onExport={exportInventory} />
           </HeaderFilters>
         }
         notices={
