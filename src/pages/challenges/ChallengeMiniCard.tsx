@@ -5,7 +5,7 @@ import { CHALLENGE_STATUS_LABEL, metricValueLabel, type ChallengeView } from "@/
 import { cn } from "@/lib/cn";
 import { num, shortDate } from "@/lib/format";
 import { statusBadgeVariant } from "@/lib/status";
-import { challengeHeadline, floorChallengeHeadline, HeadlineText, mainPrizeLabel } from "@/pages/challenges/shared";
+import { challengeCriterion, challengeHeadline, floorChallengeHeadline, HeadlineText, mainPrizeLabel } from "@/pages/challenges/shared";
 import { FlameIcon, TrophyIcon } from "@/pages/dashboards/icons";
 
 /** Desafio na aba Desafios da Equipe: so leitura, clique abre o detalhe. */
@@ -32,12 +32,81 @@ export function ChallengeMiniCard({
   /** Texto corrido, para o placar da loja. */
   floor?: boolean;
 }) {
-  const destaque = floor ? floorChallengeHeadline(c, view) : challengeHeadline(c, view);
   const prize = mainPrizeLabel(c);
   const ended = view.status === "ended";
   const statusLabel = CHALLENGE_STATUS_LABEL[view.status];
   const disputa = c.mode === "CONTEST";
   const leader = Math.max(0, ...view.participants.map((person) => person.result ?? 0));
+  if (floor) {
+    const lead = floorLead(c, view);
+    const detail = floorDetail(c, view.status === "upcoming");
+    return (
+      <div
+        className={cn(
+          "flex w-full flex-col rounded-2xl border border-line px-4 py-3.5 text-left shadow-[var(--shadow-vela)]",
+          ended ? "bg-bg-inset" : "bg-bg-2",
+        )}
+      >
+        <span className="flex items-start justify-between gap-2">
+          <span className="min-w-0 truncate text-[15px] font-bold text-t0">{c.name}</span>
+          <Badge variant={statusBadgeVariant(statusLabel)} className="shrink-0 uppercase">
+            {statusLabel}
+          </Badge>
+        </span>
+        <span className="mt-0.5 block truncate text-[12px] text-t2">
+          {shortDate(c.startsOn)} a {shortDate(c.endsOn)}
+          {!ended ? ` · ${view.prazo}` : ""}
+        </span>
+        {storeNameValue ? <span className="mt-0.5 block truncate text-[12px] text-t2">{storeNameValue}</span> : null}
+        <div className="mt-3">
+          <p className="text-[13px] font-semibold text-t0">{lead}</p>
+          {detail ? <p className="mt-0.5 text-[12px] text-t2">{detail}</p> : null}
+        </div>
+        {showPeople && (
+          <ul className="mt-3 space-y-3 border-t border-line pt-3">
+            {view.participants.length === 0 ? (
+              <li className="text-[12.5px] text-t2">Nenhuma pessoa no desafio.</li>
+            ) : (
+              view.participants.map((person) => {
+                const pct = challengeProgress(person.result, c.target, leader);
+                return (
+                  <li key={person.key} className={cn("min-w-0", hotKey === person.key && "rounded-lg bg-acc-soft px-1.5 py-1")}>
+                    <span className="flex items-start gap-2">
+                      {disputa && (
+                        <span className="w-6 shrink-0 pt-0.5 text-[12px] font-extrabold text-t2">
+                          {person.position == null ? "—" : `${person.position}º`}
+                        </span>
+                      )}
+                      <PersonAvatar name={person.name} employeeId={person.key} storeId={c.storeId} size="sm" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[13px] font-semibold text-t0">{person.name}</span>
+                        <span className="mt-0.5 block font-mono text-[12px] font-bold text-t1">
+                          {person.result == null ? "—" : metricValueLabel(c.metric, person.result)}
+                        </span>
+                        <span className="mt-1 flex items-center gap-2">
+                          <span className="min-w-0 flex-1">
+                            <ProgressBar value={pct} height={6} color={person.winner ? "var(--ok)" : undefined} />
+                          </span>
+                          {person.winner ? (
+                            <Badge variant="success" className="shrink-0">
+                              {person.position != null ? `${person.position}º lugar` : "Atingiu"}
+                            </Badge>
+                          ) : (
+                            <span className="w-9 shrink-0 text-right font-mono text-[11px] font-bold text-t2">{num(pct, 0)}%</span>
+                          )}
+                        </span>
+                      </span>
+                    </span>
+                  </li>
+                );
+              })
+            )}
+          </ul>
+        )}
+      </div>
+    );
+  }
+  const destaque = challengeHeadline(c, view);
   const TextTag = showPeople ? "div" : "span";
   const className = cn(
     "flex w-full items-start gap-3.5 border border-line text-left",
@@ -129,6 +198,30 @@ export function ChallengeMiniCard({
       {body}
     </button>
   );
+}
+
+function floorLead(c: ChallengeRecord, view: ChallengeView): string {
+  if (view.status === "upcoming") return challengeCriterion(c);
+  if (c.mode === "MINIMUM") {
+    const n = view.reachedCount;
+    const ended = view.status === "ended";
+    if (n === 0) return ended ? "Ninguém atingiu o mínimo" : "Ninguém atingiu o mínimo ainda";
+    if (n === 1) return "1 pessoa atingiu o mínimo";
+    return `${n} pessoas atingiram o mínimo`;
+  }
+  return floorChallengeHeadline(c, view).value;
+}
+
+function floorDetail(c: ChallengeRecord, upcoming: boolean): string | null {
+  const prize = mainPrizeLabel(c);
+  if (upcoming) return prize;
+  if (c.mode === "MINIMUM") {
+    const minimum = c.target != null ? `Mínimo ${metricValueLabel(c.metric, c.target)}` : null;
+    const prizePart = prize ? `Prêmio ${prize}` : null;
+    return [minimum, prizePart].filter(Boolean).join(" · ") || null;
+  }
+  const minimum = c.target != null ? `Mínimo ${metricValueLabel(c.metric, c.target)}` : null;
+  return [minimum, prize].filter(Boolean).join(" · ") || null;
 }
 
 /** Barra até a meta. Na disputa sem meta, a barra vai até quem está na frente. */

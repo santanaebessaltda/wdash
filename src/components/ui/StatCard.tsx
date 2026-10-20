@@ -24,10 +24,12 @@ export interface StatCardProps {
   deltaTooltip?: string;
   /** Cor do valor. Sem isso, o número fica na cor padrão do texto. */
   valueClassName?: string;
+  /** Linha de apoio mais clara. Só o placar da loja. */
+  quietSub?: boolean;
   className?: string;
 }
 
-export function StatCard({ label, value, icon, iconColor = "var(--acc)", iconBg = "var(--acc-soft)", delta, sparkline, sub, sub2, tooltip, deltaTooltip, valueClassName, className }: StatCardProps) {
+export function StatCard({ label, value, icon, iconColor = "var(--acc)", iconBg = "var(--acc-soft)", delta, sparkline, sub, sub2, tooltip, deltaTooltip, valueClassName, quietSub = false, className }: StatCardProps) {
   return (
     <Card className={cn("min-w-0", className)}>
       {icon || delta ? (
@@ -67,7 +69,7 @@ export function StatCard({ label, value, icon, iconColor = "var(--acc)", iconBg 
         )}
       </div>
       <AnimatedNumber value={value} className={cn("mt-1 block truncate text-2xl font-extrabold", valueClassName ?? "text-t0")} />
-      {sub && <p className="mt-0.5 truncate text-[11px] text-t2">{sub}</p>}
+      {sub && <p className={cn("mt-0.5 truncate", quietSub ? "text-[10.5px] text-t3" : "text-[11px] text-t2")}>{sub}</p>}
       {sub2 && <p className="mt-0.5 truncate text-[11px] text-t2">{sub2}</p>}
       {sparkline && <div className="mt-3 h-9">{sparkline}</div>}
     </Card>

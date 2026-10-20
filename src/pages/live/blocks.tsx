@@ -42,10 +42,16 @@ export function RankingBlock({
   ranking,
   formatAmount = brlK,
   onSelect,
+  spotlight = false,
+  literalName = false,
 }: {
   ranking: RankingRow[];
   formatAmount?: (v: number) => string;
   onSelect?: (row: RankingRow) => void;
+  /** Faturamento maior; vendas ficam em apoio. Só o placar da loja. */
+  spotlight?: boolean;
+  /** O nome já vem curto. Sem isto, o pódio mostra só o primeiro nome. */
+  literalName?: boolean;
 }) {
   if (ranking.length === 0) {
     return (
@@ -112,7 +118,13 @@ export function RankingBlock({
               : {})}
             className={cn(
               "flex flex-col items-center text-center",
-              isOuro ? "w-[34%] max-w-[168px]" : "w-[30%] max-w-[148px]",
+              spotlight
+                ? isOuro
+                  ? "w-[34%] max-w-[200px]"
+                  : "w-[30%] max-w-[168px]"
+                : isOuro
+                  ? "w-[34%] max-w-[168px]"
+                  : "w-[30%] max-w-[148px]",
               onSelect && "cursor-pointer rounded-2xl transition-opacity hover:opacity-85 focus-visible:outline-2 focus-visible:outline-acc",
             )}
           >
@@ -128,11 +140,19 @@ export function RankingBlock({
               <MedalhaBadge pos={pos} />
             </div>
 
-            <p className="truncate text-[13px] font-bold text-t0 sm:text-[14px]">{l.name.split(" ")[0]}</p>
-            <p className="mt-0.5 text-[11px] font-semibold text-t2">
+            <p className="max-w-full truncate text-[13px] font-bold text-t0 sm:text-[14px]">
+              {literalName ? l.name : l.name.split(" ")[0]}
+            </p>
+            <p className={cn("mt-0.5 text-[11px]", spotlight ? "font-medium text-t3" : "font-semibold text-t2")}>
               {num(l.sales)} {l.sales === 1 ? "venda" : "vendas"}
             </p>
-            <p className="mt-0.5 font-mono text-[13px] font-extrabold sm:text-[14px]" style={{ color: medal.color }}>
+            <p
+              className={cn(
+                "mt-0.5 font-mono font-extrabold",
+                spotlight ? "text-[17px] text-t0 sm:text-[18px]" : "text-[13px] sm:text-[14px]",
+              )}
+              style={spotlight ? undefined : { color: medal.color }}
+            >
               {formatAmount(l.revenue)}
             </p>
             {l.note ? (

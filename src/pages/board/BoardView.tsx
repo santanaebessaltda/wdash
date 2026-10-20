@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Badge, Button, Card, CardTitle, EmptyState, ProgressBar, StatCard, progressTextClass } from "@/components/ui";
+import { Button, Card, CardTitle, EmptyState, ProgressBar, StatCard, progressTextClass } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { RankingBlock } from "@/pages/live/blocks";
 import type { RankingRow } from "@/data/wedash/live";
@@ -309,7 +309,8 @@ export function BoardView({
     return {
       position: index + 1,
       employeeId: person.key,
-      name: person.name,
+      name: firstName(person.name, names),
+      avatarName: person.name,
       storeId: person.storeIds[0] ?? storeId,
       sales: person.sales,
       revenue: person.revenue,
@@ -354,9 +355,10 @@ export function BoardView({
       </header>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Faturamento" value={brlCent(monthRevenue)} sub={`Hoje ${brlCent(todayTotals.revenue)}`} icon={<IconRevenue />} iconColor="var(--acc)" iconBg="var(--acc-soft)" />
-        <StatCard label="Vendas" value={num(month.sales)} sub={`Hoje ${num(todayTotals.sales)}`} icon={<IconSales />} iconColor="var(--ok)" iconBg="var(--ok-soft)" />
+        <StatCard quietSub label="Faturamento" value={brlCent(monthRevenue)} sub={`Hoje ${brlCent(todayTotals.revenue)}`} icon={<IconRevenue />} iconColor="var(--acc)" iconBg="var(--acc-soft)" />
+        <StatCard quietSub label="Vendas" value={num(month.sales)} sub={`Hoje ${num(todayTotals.sales)}`} icon={<IconSales />} iconColor="var(--ok)" iconBg="var(--ok-soft)" />
         <StatCard
+          quietSub
           label="Meta"
           value={activeGoal ? brlCent(activeGoal.target) : "—"}
           sub={activeGoal ? (goalCard?.name ?? "Meta do mês") : "Não configurada"}
@@ -365,6 +367,7 @@ export function BoardView({
           iconBg="rgba(59,130,246,0.12)"
         />
         <StatCard
+          quietSub
           label="Progresso da meta"
           value={summary ? `${num(summary.pct, 1)}%` : "—"}
           sub={
@@ -383,33 +386,26 @@ export function BoardView({
       </div>
 
       {goalCard && activeGoal && summary ? (
-        <div className="flex flex-col rounded-2xl border border-line bg-bg-2 p-5 shadow-[var(--shadow-vela)]">
-          <div className="mb-3.5 flex items-center gap-3.5">
-            <div className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-[14px] bg-acc-soft text-acc">
-              <TargetIcon size={22} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[15px] font-bold text-t0">{goalCard.name}</p>
-              <p className="mt-0.5 truncate text-[12.5px] text-t2">
-                {shortDate(activeGoal.startsOn)} a {shortDate(activeGoal.endsOn)}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="font-mono text-[13px] font-extrabold text-ok">{brlCent(summary.achieved)}</span>
-            <span className="text-right text-[11.5px] text-t2">
+        <div className="flex flex-col rounded-2xl border border-line bg-bg-2 px-4 py-3 shadow-[var(--shadow-vela)]">
+          <p className="truncate text-[15px] font-bold text-t0">{goalCard.name}</p>
+          <p className="mt-0.5 truncate text-[12.5px] text-t2">
+            {shortDate(activeGoal.startsOn)} a {shortDate(activeGoal.endsOn)}
+          </p>
+          <div className="mt-2 flex items-baseline justify-between gap-3">
+            <span className="font-mono text-[18px] font-extrabold text-t0">{brlCent(summary.achieved)}</span>
+            <span className="text-right text-[12px] text-t2">
               <span className={`font-mono font-bold ${progressTextClass(summary.pct)}`}>{num(summary.pct, 1)}%</span> de {brlCent(activeGoal.target)}
             </span>
           </div>
-          <div className="mt-2">
+          <div className="mt-1.5">
             <ProgressBar value={summary.pct} height={5} />
           </div>
-          <p className="mt-2 text-[11.5px] text-t2">
+          <p className="mt-1.5 text-[11.5px] text-t2">
             {summary.projectedPct != null
               ? `Projeção ${num(summary.projectedPct, 0)}% · ${prazoRemaining(summary.daysRemaining).toLowerCase()}`
               : prazoRemaining(summary.daysRemaining)}
           </p>
-          <p className="mt-3 text-[10.5px] font-semibold uppercase tracking-wide text-t3">
+          <p className="mt-1 text-[10.5px] font-semibold uppercase tracking-wide text-t3">
             {GOAL_STATUS_LABEL[summary.status]}
             <span className="mx-1.5">·</span>
             {activeGoal.tierMode === "INDIVIDUAL" ? "Individual" : activeGoal.tierMode === "GENERAL" ? "Geral" : "Grupo"}
@@ -423,7 +419,7 @@ export function BoardView({
         </Card>
       )}
 
-      <div className={cn("grid min-w-0 gap-4", challenges.length > 0 && "xl:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.8fr)] xl:items-start")}>
+      <div className={cn("grid min-w-0 gap-4", challenges.length > 0 && "xl:grid-cols-[minmax(0,65fr)_minmax(280px,35fr)] xl:items-start")}>
         <Card padding="lg" className="min-w-0">
           <div className="mb-1 flex items-center gap-2">
             <TrophyIcon size={16} className="text-acc" />
@@ -433,47 +429,53 @@ export function BoardView({
             <p className="py-10 text-center text-sm text-t2">Carregando o ranking…</p>
           ) : (
             <>
-              <RankingBlock ranking={podium} formatAmount={brlCent} />
-              {(view?.people.length ?? 0) > 0 && (
-                <div className="mt-3 overflow-x-auto">
-                  <table className="w-full min-w-[520px] border-collapse text-[12px]">
-                    <thead>
-                      <tr className="border-b border-line text-left text-[10.5px] font-bold uppercase tracking-wide text-t3">
-                        <th className="pb-1.5 pr-2">#</th>
-                        <th className="pb-1.5 pr-2">Pessoa</th>
-                        <th className="pb-1.5 pr-2 text-right">Vendas</th>
-                        <th className="pb-1.5 pr-2 text-right">P.A.</th>
-                        <th className="pb-1.5 pr-2 text-right">Meta</th>
-                        <th className="pb-1.5 text-right">Faturamento</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {view!.people.map((person, index) => {
-                        const level = personLevel(person);
-                        const individual = activeGoal?.tierMode === "INDIVIDUAL";
-                        return (
-                          <tr key={person.key} className={cn("border-b border-line last:border-b-0", momentKey(current) === person.key && "bg-acc-soft")}>
-                            <td className="py-1.5 pr-2 font-bold text-t3">{index + 1}º</td>
-                            <td className="py-1.5 pr-2">
-                              <span className="flex min-w-0 items-center gap-2">
-                                <PersonAvatar name={person.name} employeeId={person.key} storeId={person.storeIds[0] ?? storeId} size="sm" />
-                                <span className="min-w-0">
-                                  <span className="block truncate text-[12.5px] font-bold text-t0">{person.name}</span>
-                                  {level?.levelLabel ? <Badge variant="accent">{level.levelLabel}</Badge> : level ? <span className="text-[11px] text-t3">Sem nível</span> : null}
+              <RankingBlock ranking={podium} formatAmount={brlCent} spotlight literalName />
+              {(view?.people.length ?? 0) > 3 && (
+                <div className="mt-5">
+                  <p className="mb-2 text-[12px] font-bold uppercase tracking-wide text-t2">Demais posições</p>
+                  <div className="min-w-0 overflow-x-auto">
+                    <table className="w-full min-w-[520px] border-collapse text-[12px]">
+                      <thead>
+                        <tr className="border-b border-line text-left text-[10.5px] font-bold uppercase tracking-wide text-t3">
+                          <th className="pb-1.5 pr-2">#</th>
+                          <th className="pb-1.5 pr-2">Pessoa</th>
+                          <th className="pb-1.5 pr-2 text-right">Vendas</th>
+                          <th className="pb-1.5 pr-2 text-right">P.A.</th>
+                          <th className="pb-1.5 pr-2 text-right">Meta</th>
+                          <th className="pb-1.5 text-right">Faturamento</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {view!.people.slice(3).map((person, index) => {
+                          const level = personLevel(person);
+                          const individual = activeGoal?.tierMode === "INDIVIDUAL";
+                          const pct = level ? (individual ? `${num(level.pct, 1)}%` : `${num(level.storePct, 1)}% da meta`) : null;
+                          return (
+                            <tr key={person.key} className={cn("border-b border-line last:border-b-0", momentKey(current) === person.key && "bg-acc-soft")}>
+                              <td className="py-1.5 pr-2 font-bold text-t3">{index + 4}º</td>
+                              <td className="py-1.5 pr-2">
+                                <span className="flex min-w-0 items-center gap-2">
+                                  <PersonAvatar name={person.name} employeeId={person.key} storeId={person.storeIds[0] ?? storeId} size="sm" />
+                                  <span className="min-w-0 truncate text-[12.5px] font-bold text-t0">{person.name}</span>
                                 </span>
-                              </span>
-                            </td>
-                            <td className="py-1.5 pr-2 text-right font-mono font-bold text-t0">{num(person.sales)}</td>
-                            <td className="py-1.5 pr-2 text-right font-mono font-bold text-t0">{person.pa == null ? "—" : num(person.pa, 2)}</td>
-                            <td className="py-1.5 pr-2 text-right font-mono font-bold text-t0">
-                              {level ? (individual ? `${num(level.pct, 1)}%` : `${num(level.storePct, 1)}% da meta`) : "—"}
-                            </td>
-                            <td className="py-1.5 text-right font-mono font-bold text-t0">{brlCent(person.revenue)}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                              </td>
+                              <td className="py-1.5 pr-2 text-right font-mono font-bold text-t0">{num(person.sales)}</td>
+                              <td className="py-1.5 pr-2 text-right font-mono font-bold text-t0">{person.pa == null ? "—" : num(person.pa, 2)}</td>
+                              <td className="py-1.5 pr-2 text-right">
+                                <span className="block font-mono font-bold text-t0">{pct ?? "—"}</span>
+                                {level?.levelLabel ? (
+                                  <span className="mt-0.5 block text-[11px] font-semibold text-t2">{level.levelLabel}</span>
+                                ) : level ? (
+                                  <span className="mt-0.5 block text-[11px] text-t3">Sem nível</span>
+                                ) : null}
+                              </td>
+                              <td className="py-1.5 text-right font-mono font-bold text-t0">{brlCent(person.revenue)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </>
