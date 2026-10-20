@@ -426,6 +426,9 @@ export function buildCashCloseView(input: {
     if (input.card.otherCents !== 0) touch("other").stoneCents = input.card.otherCents;
   }
   if (input.pixCents != null) touch("pix").stoneCents = input.pixCents;
+  // Outros sem captura da adquirente vale R$ 0,00 e entra na soma. Não segura o dia.
+  const other = acc.get("other");
+  if (other && other.stoneCents == null) other.stoneCents = 0;
   const lines = ORDER.filter((key) => acc.has(key)).map((key) => acc.get(key)!);
   return { lines, pixPending: input.pixRequested && input.pixCents == null };
 }

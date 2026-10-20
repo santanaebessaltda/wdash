@@ -67,6 +67,51 @@ describe("buildCashCloseView", () => {
     });
     expect(view.lines.find((l) => l.key === "credit")?.stoneCents).toBe(1000);
     expect(view.lines.find((l) => l.key === "pix")?.stoneCents).toBe(480);
+    expect(view.lines.find((l) => l.key === "other")).toBeUndefined();
+  });
+
+  it("com o arquivo do cartão, Outros do Millennium sem captura fica zerado e entra na soma", () => {
+    const view = buildCashCloseView({
+      millennium: [
+        { paymentMethod: "DINHEIRO", openingCents: 0, cashDropCents: null, closingCents: 328280, typedCents: 204490 },
+        { paymentMethod: "CARTÃO DE DÉBITO", openingCents: 0, cashDropCents: null, closingCents: 570770, typedCents: 0 },
+        { paymentMethod: "CARTÃO DE CRÉDITO", openingCents: 0, cashDropCents: null, closingCents: 837140, typedCents: 0 },
+        { paymentMethod: "PIX", openingCents: 0, cashDropCents: null, closingCents: 341770, typedCents: 0 },
+        { paymentMethod: "VOUCHER", openingCents: 0, cashDropCents: null, closingCents: 30470, typedCents: 0 },
+      ],
+      card: { creditCents: 825800, debitCents: 620770, otherCents: 0 },
+      pixCents: 400320,
+      pixRequested: false,
+    });
+    expect(view.lines.find((l) => l.key === "other")).toMatchObject({ systemCents: 30470, stoneCents: 0 });
+    expect(dayWithoutReal(view.lines)).toBe(false);
+    const gap = closeDayGap(view.lines);
+    expect(gap.realCents).toBe(204490 + 620770 + 825800 + 400320);
+    expect(gap.systemCents).toBe(328280 + 570770 + 837140 + 341770 + 30470);
+    expect(gap.diffCents).toBe(gap.realCents - gap.systemCents);
+  });
+
+  it("Outros sem captura fica R$ 0,00 e o total soma as outras formas", () => {
+    const view = buildCashCloseView({
+      millennium: [
+        { paymentMethod: "DINHEIRO", openingCents: 0, cashDropCents: null, closingCents: 121530, typedCents: 110410 },
+        { paymentMethod: "CARTÃO DE DÉBITO", openingCents: 0, cashDropCents: null, closingCents: 259840, typedCents: 0 },
+        { paymentMethod: "CARTÃO DE CRÉDITO", openingCents: 0, cashDropCents: null, closingCents: 290570, typedCents: 0 },
+        { paymentMethod: "PIX", openingCents: 0, cashDropCents: null, closingCents: 169670, typedCents: 0 },
+        { paymentMethod: "VOUCHER", openingCents: 0, cashDropCents: null, closingCents: 11190, typedCents: 0 },
+      ],
+      card: { creditCents: 290570, debitCents: 259840, otherCents: 0 },
+      pixCents: 174960,
+      pixRequested: false,
+    });
+    expect(view.lines.find((l) => l.key === "other")).toMatchObject({ systemCents: 11190, stoneCents: 0 });
+    expect(dayWithoutReal(view.lines)).toBe(false);
+    expect(closeDayGap(view.lines)).toEqual({
+      systemCents: 852800,
+      comparedSystemCents: 852800,
+      realCents: 110410 + 259840 + 290570 + 174960,
+      diffCents: 110410 + 259840 + 290570 + 174960 - 852800,
+    });
   });
 
   it("marca falta no calendário e, sem diferença, o dia fechado", () => {
