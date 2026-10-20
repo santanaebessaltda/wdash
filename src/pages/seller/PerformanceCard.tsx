@@ -19,32 +19,28 @@ function RankingList({ ranking }: { ranking: MonthRankingEntry[] }) {
     revenue: r.revenue,
   }));
   const rest = ranking.slice(3);
-  const me = ranking.find((r) => r.me);
-  const onPodium = ranking.slice(0, 3).some((r) => r.me);
   return (
     <div>
       <RankingBlock ranking={podium} formatAmount={brlCent} />
       {rest.length > 0 && (
         <ul className="mt-3 flex flex-col divide-y divide-line">
           {rest.map((r) => (
-            <li key={`${r.position}-${r.employeeId}`} className="flex items-center gap-3 py-2">
-              <span className="w-7 text-right font-mono text-[13px] font-bold text-t2">{r.position}º</span>
+            <li
+              key={`${r.position}-${r.employeeId}`}
+              className={`flex items-center gap-3 py-2 ${r.me ? "-mx-2 rounded-xl bg-acc-soft px-2" : ""}`}
+            >
+              <span className={`w-7 text-right font-mono text-[13px] font-bold ${r.me ? "text-acc" : "text-t2"}`}>{r.position}º</span>
               <PersonAvatar name={r.name} employeeId={r.employeeId} size="sm" />
               <span className={`min-w-0 flex-1 truncate text-[13.5px] ${r.me ? "font-extrabold text-acc" : "font-semibold text-t0"}`}>
                 {r.me ? "VOCÊ" : r.name}
               </span>
-              <span className="text-[12px] text-t2">
+              <span className={`text-[12px] ${r.me ? "font-semibold text-acc" : "text-t2"}`}>
                 {num(r.sales)} {r.sales === 1 ? "venda" : "vendas"}
               </span>
-              <span className="w-24 text-right font-mono text-[13px] font-bold text-t0">{brlCent(r.revenue)}</span>
+              <span className={`w-24 text-right font-mono text-[13px] font-bold ${r.me ? "text-acc" : "text-t0"}`}>{brlCent(r.revenue)}</span>
             </li>
           ))}
         </ul>
-      )}
-      {me && !onPodium && (
-        <p className="mt-3 rounded-xl border border-acc bg-acc-soft px-3 py-2 text-[13px] font-extrabold text-acc">
-          {me.position}º · VOCÊ · {brlCent(me.revenue)}
-        </p>
       )}
     </div>
   );
