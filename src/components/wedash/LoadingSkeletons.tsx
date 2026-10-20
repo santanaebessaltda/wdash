@@ -539,7 +539,7 @@ export function BoardSkeleton({ header = false, className }: { header?: boolean;
             ))}
           </div>
         </Card>
-        <Card padding="lg" glass="var(--acc-soft)" className="min-w-0">
+        <Card padding="lg" glass="var(--warn-soft)" className="min-w-0">
           <div className="flex items-start gap-3.5">
             <Skeleton className="h-12 w-12 shrink-0 rounded-2xl" />
             <div className="min-w-0 flex-1">

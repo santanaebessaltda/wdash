@@ -41,9 +41,9 @@ export function ChallengeMiniCard({
     const lead = floorLead(c, view);
     const detail = floorDetail(c, view.status === "upcoming");
     return (
-      <Card padding="lg" glass="var(--acc-soft)" className="flex w-full flex-col text-left">
+      <Card padding="lg" glass="var(--warn-soft)" className="flex w-full flex-col text-left">
         <span className="flex items-start gap-3.5">
-          <CardHero>
+          <CardHero tone="warn">
             <FlameIcon size={22} />
           </CardHero>
           <span className="min-w-0 flex-1">
