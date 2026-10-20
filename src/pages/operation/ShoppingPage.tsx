@@ -175,7 +175,7 @@ export function ShoppingSettingsPage() {
               name: connectedName,
               store: many && store ? branchName(store) : undefined,
               detail: mallDetail(account),
-              status: account.administrator === "argo" ? undefined : "Configurada",
+              status: account.administrator === "argo" ? undefined : "Conectada",
               mark: provider ? (
                 <img src={provider.logo} alt="" className="h-full w-full object-contain p-1.5" />
               ) : (

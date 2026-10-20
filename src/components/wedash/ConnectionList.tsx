@@ -6,7 +6,7 @@ export type ConnectionRow = {
   key: string;
   name: string;
   detail: string;
-  /** Conectada na adquirente; Configurada na administradora. */
+  /** Conectada na adquirente e na administradora. Argo fica sem badge. */
   status?: string;
   /** Nome da filial, quando a lista junta mais de uma. */
   store?: string;
