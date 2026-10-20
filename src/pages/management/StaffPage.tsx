@@ -21,7 +21,7 @@ import { shiftName } from "@/lib/format";
 import { matchesCodeOrName } from "@/lib/personSearch";
 import { InviteSellerModal } from "@/pages/management/InviteSellerModal";
 import { GroupFormModal, ManageGroupsModal, groupProblem, nextGroupWindow } from "@/pages/management/SellerGroups";
-import { CostCardTitle, SAVE_ERROR_MSG, StoreCardsPage, useScopedStores } from "@/pages/operation/shared";
+import { CostCardTitle, SAVE_ERROR_MSG, SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
 import {
   copySellerInviteLink,
@@ -85,9 +85,11 @@ export function StaffPage() {
     run: refreshTeam,
   });
 
+  const storeKey = storeRows.map((store) => store.id).join(",");
+
   return (
     <>
-      <StoreCardsPage
+      <SectionHeader
         section="Equipe"
         title="Equipe"
         subtitle={
@@ -102,21 +104,18 @@ export function StaffPage() {
             </Button>
           ) : undefined
         }
-        loading={loading}
-        skeleton={(n) => <StoreCardsSkeleton count={n} title team wide />}
-        storeRows={storeRows}
-        wide
-      >
-        {(store) => (
-          <StaffCard
-            tenantId={session.tenantId}
-            store={store}
-            reloadKey={reloadKey}
-            groupsTick={groupsTick}
-            showStore={storeRows.length > 1}
-          />
+      />
+      <div className="mt-6">
+        {loading ? (
+          <StoreCardsSkeleton count={1} title team wide />
+        ) : storeRows.length === 0 ? (
+          <Card>
+            <EmptyState framed={false} icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
+          </Card>
+        ) : (
+          <StaffList key={storeKey} tenantId={session.tenantId} stores={storeRows} reloadKey={reloadKey} groupsTick={groupsTick} />
         )}
-      </StoreCardsPage>
+      </div>
       {singleStore && (
         <ManageGroupsModal
           open={manageOpen}
@@ -131,44 +130,56 @@ export function StaffPage() {
   );
 }
 
-function StaffCard({
+type StaffPerson = { seller: StoreSeller; store: Store };
+
+function storeLabel(store: Store): string {
+  return store.tradeName || store.name;
+}
+
+function StaffList({
   tenantId,
-  store,
+  stores,
   reloadKey,
   groupsTick,
-  showStore,
 }: {
   tenantId: string;
-  store: Store;
+  stores: Store[];
   reloadKey: number;
   groupsTick: number;
-  showStore: boolean;
 }) {
+  const showStore = stores.length > 1;
   const { show } = useToast();
-  const [team, setTeam] = useState<StoreSeller[]>([]);
+  const [team, setTeam] = useState<StaffPerson[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [tick, setTick] = useState(0);
-  const [shifts, setShifts] = useState<StoreShift[]>([]);
+  const [shifts, setShifts] = useState<Map<string, StoreShift[]>>(() => new Map());
+  const storesRef = useRef(stores);
+  storesRef.current = stores;
+  const storeKey = stores.map((store) => store.id).join(",");
   const [shiftOf, setShiftOf] = useState<Record<string, string | null>>({});
   const [tab, setTab] = useState<"ativos" | "desligados">("ativos");
   const [search, setSearch] = useState("");
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const [access, setAccess] = useState<Map<string, AccessState> | null>(null);
-  const [inviting, setInviting] = useState<StoreSeller | null>(null);
-  const [editing, setEditing] = useState<StoreSeller | null>(null);
+  const [inviting, setInviting] = useState<StaffPerson | null>(null);
+  const [editing, setEditing] = useState<StaffPerson | null>(null);
   const [pendingShift, setPendingShift] = useState<{ sellerId: string; shiftId: string } | null>(null);
-  const [removing, setRemoving] = useState<StoreSeller | null>(null);
+  const [removing, setRemoving] = useState<StaffPerson | null>(null);
   const [removingBusy, setRemovingBusy] = useState(false);
-  const [creating, setCreating] = useState<{ sellerId: string; start: string; end: string } | null>(null);
+  const [creating, setCreating] = useState<{ sellerId: string; storeId: string; start: string; end: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    void fetchStoreSellers(tenantId, [store.id])
-      .then((m) => {
-        if (!cancelled) {
-          setTeam(m.get(store.id) ?? []);
-          setShiftOf({});
+    const list = storesRef.current;
+    void fetchStoreSellers(tenantId, list.map((store) => store.id))
+      .then((map) => {
+        if (cancelled) return;
+        const people: StaffPerson[] = [];
+        for (const store of list) {
+          for (const seller of map.get(store.id) ?? []) people.push({ seller, store });
         }
+        setTeam(people);
+        setShiftOf({});
       })
       .finally(() => {
         if (!cancelled) setLoaded(true);
@@ -176,38 +187,46 @@ function StaffCard({
     return () => {
       cancelled = true;
     };
-  }, [tenantId, store.id, tick, reloadKey, groupsTick]);
+  }, [tenantId, storeKey, tick, reloadKey, groupsTick]);
 
   useEffect(() => {
     let cancelled = false;
     setAccess(null);
-    void fetchSellerAccess(store.id).then((rows: SellerAccessRow[] | null) => {
+    const list = storesRef.current;
+    void Promise.all(list.map((store) => fetchSellerAccess(store.id))).then((results: (SellerAccessRow[] | null)[]) => {
       if (cancelled) return;
-      setAccess(new Map((rows ?? []).map((r) => [r.storeSellerId, r.state])));
+      const next = new Map<string, AccessState>();
+      for (const rows of results) {
+        for (const row of rows ?? []) next.set(row.storeSellerId, row.state);
+      }
+      setAccess(next);
     });
     return () => {
       cancelled = true;
     };
-  }, [store.id, tick, reloadKey]);
+  }, [storeKey, tick, reloadKey]);
 
   useEffect(() => {
     let cancelled = false;
-    void fetchStoreShifts(tenantId, store.id).then((list) => {
-      if (!cancelled) setShifts(list);
+    const list = storesRef.current;
+    void Promise.all(list.map(async (store) => [store.id, await fetchStoreShifts(tenantId, store.id)] as const)).then((pairs) => {
+      if (!cancelled) setShifts(new Map(pairs));
     });
     return () => {
       cancelled = true;
     };
-  }, [tenantId, store.id, groupsTick]);
+  }, [tenantId, storeKey, groupsTick]);
 
-  const salesPerson = (seller: StoreSeller) => isBranchSalesPerson(seller, store);
-  const ativos = useMemo(() => team.filter((seller) => isBranchTeamMember(seller, store)), [team, store]);
-  const desligados = useMemo(() => team.filter((s) => !s.active), [team]);
+  const salesPerson = (person: StaffPerson) => isBranchSalesPerson(person.seller, person.store);
+  const ativos = useMemo(() => team.filter((person) => isBranchTeamMember(person.seller, person.store)), [team]);
+  const desligados = useMemo(() => team.filter((person) => !person.seller.active), [team]);
   const rows = tab === "ativos" ? ativos : desligados;
-  const shown = useMemo(
-    () => rows.filter((person) => matchesCodeOrName(person.name, person.code, search)),
-    [rows, search],
-  );
+  const shown = useMemo(() => {
+    const list = rows.filter((person) => matchesCodeOrName(person.seller.name, person.seller.code, search));
+    return [...list].sort(
+      (a, b) => a.seller.name.localeCompare(b.seller.name, "pt-BR") || storeLabel(a.store).localeCompare(storeLabel(b.store), "pt-BR"),
+    );
+  }, [rows, search]);
 
   async function changeShift(sellerId: string, shiftId: string | null): Promise<boolean> {
     const before = shiftOf[sellerId];
@@ -232,21 +251,25 @@ function StaffCard({
 
   async function createGroup(draft: { name: string; start: string; end: string }) {
     if (!creating) return false;
-    const problem = groupProblem(draft.name, draft.start, draft.end, shifts);
+    const storeId = creating.storeId;
+    const sellerId = creating.sellerId;
+    const storeShifts = shifts.get(storeId) ?? [];
+    const problem = groupProblem(draft.name, draft.start, draft.end, storeShifts);
     if (problem) {
       show(problem, "danger");
       return false;
     }
-    const saved = await saveStoreShift({ tenantId, storeId: store.id, shift: draft });
+    const saved = await saveStoreShift({ tenantId, storeId, shift: draft });
     if (!saved.ok) {
       show(SAVE_ERROR_MSG, "danger");
       return false;
     }
-    setShifts(await fetchStoreShifts(tenantId, store.id));
-    const assigned = await changeShift(creating.sellerId, saved.id);
+    const fresh = await fetchStoreShifts(tenantId, storeId);
+    setShifts((current) => new Map(current).set(storeId, fresh));
+    const assigned = await changeShift(sellerId, saved.id);
     if (!assigned) return false;
-    setPendingShift({ sellerId: creating.sellerId, shiftId: saved.id });
-    setTeam((list) => list.map((person) => (person.id === creating.sellerId ? { ...person, shiftId: saved.id } : person)));
+    setPendingShift({ sellerId, shiftId: saved.id });
+    setTeam((list) => list.map((person) => (person.seller.id === sellerId ? { ...person, seller: { ...person.seller, shiftId: saved.id } } : person)));
     show("Grupo criado.", "success");
     return true;
   }
@@ -274,34 +297,36 @@ function StaffCard({
     if (draft.sales && draft.shiftId !== (currentShift ?? null)) {
       const shifted = await changeShift(seller.id, draft.shiftId);
       if (!shifted) return false;
-      setTeam((list) => list.map((person) => (person.id === seller.id ? { ...person, shiftId: draft.shiftId } : person)));
+      setTeam((list) => list.map((person) => (person.seller.id === seller.id ? { ...person, seller: { ...person.seller, shiftId: draft.shiftId } } : person)));
     }
     show("Cadastro salvo.", "success");
     return true;
   }
 
-  const columns = useMemo<DataTableColumn<StoreSeller>[]>(
+  const identity = useMemo(() => personColumns(showStore), [showStore]);
+
+  const columns = useMemo<DataTableColumn<StaffPerson>[]>(
     () => [
-      ...sellerColumns(store),
+      ...identity,
       {
         key: "access",
         header: "Acesso",
         sortable: true,
-        sortValue: (v) => (access == null || !salesPerson(v) ? null : accessLabel(access.get(v.id) ?? "NONE")),
+        sortValue: (v) => (access == null || !salesPerson(v) ? null : accessLabel(access.get(v.seller.id) ?? "NONE")),
         render: (v) => {
           if (!salesPerson(v)) return <span className="text-t2">—</span>;
-          return <AccessBadge state={access == null ? "loading" : (access.get(v.id) ?? "NONE")} />;
+          return <AccessBadge state={access == null ? "loading" : (access.get(v.seller.id) ?? "NONE")} />;
         },
       },
       {
         key: "shift",
         header: "Grupo",
         sortable: true,
-        sortValue: (v) => (salesPerson(v) ? groupLabel(v.id in shiftOf ? shiftOf[v.id] : v.shiftId, shifts) : null),
+        sortValue: (v) => (salesPerson(v) ? groupLabel(v.seller.id in shiftOf ? shiftOf[v.seller.id] : v.seller.shiftId, shifts.get(v.store.id) ?? []) : null),
         render: (v) => {
           if (!salesPerson(v)) return <span className="text-t2">—</span>;
-          const current = v.id in shiftOf ? shiftOf[v.id] : v.shiftId;
-          return <span className="text-[13px] text-t1">{groupLabel(current, shifts)}</span>;
+          const current = v.seller.id in shiftOf ? shiftOf[v.seller.id] : v.seller.shiftId;
+          return <span className="text-[13px] text-t1">{groupLabel(current, shifts.get(v.store.id) ?? [])}</span>;
         },
       },
       {
@@ -309,17 +334,18 @@ function StaffCard({
         header: "",
         align: "right",
         render: (v) => {
+          const current = v.seller.id in shiftOf ? shiftOf[v.seller.id] : v.seller.shiftId;
           const items = rowActions({
             sales: salesPerson(v),
-            state: salesPerson(v) ? (access == null ? null : (access.get(v.id) ?? "NONE")) : null,
-            grouped: hasSalesGroup(v.id in shiftOf ? shiftOf[v.id] : v.shiftId),
-            onEdit: () => setEditing({ ...v, shiftId: (v.id in shiftOf ? shiftOf[v.id] : v.shiftId) ?? null }),
+            state: salesPerson(v) ? (access == null ? null : (access.get(v.seller.id) ?? "NONE")) : null,
+            grouped: hasSalesGroup(current),
+            onEdit: () => setEditing({ seller: { ...v.seller, shiftId: current ?? null }, store: v.store }),
             onInvite: () => setInviting(v),
-            onCopy: () => void copyLink(v.id),
-            onResend: () => void runAccess(v.id, resendSellerInvite, "Convite reenviado."),
-            onRevoke: () => void runAccess(v.id, revokeSellerInvite, "Convite cancelado."),
-            onSuspend: () => void runAccess(v.id, suspendSeller, "Acesso suspenso."),
-            onReactivate: () => void runAccess(v.id, reactivateSeller, "Acesso reativado."),
+            onCopy: () => void copyLink(v.seller.id),
+            onResend: () => void runAccess(v.seller.id, resendSellerInvite, "Convite reenviado."),
+            onRevoke: () => void runAccess(v.seller.id, revokeSellerInvite, "Convite cancelado."),
+            onSuspend: () => void runAccess(v.seller.id, suspendSeller, "Acesso suspenso."),
+            onReactivate: () => void runAccess(v.seller.id, reactivateSeller, "Acesso reativado."),
             onRemove: () => setRemoving(v),
           });
           if (items.length === 0) return null;
@@ -328,7 +354,7 @@ function StaffCard({
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [shifts, shiftOf, savingIds, access, store],
+    [identity, shifts, shiftOf, savingIds, access],
   );
 
   const withoutTeam = loaded && team.length === 0;
@@ -336,7 +362,7 @@ function StaffCard({
   return (
     <Card padding="none">
       <div className="px-5 pt-5">
-        <CostCardTitle title={showStore ? store.tradeName || store.name : "Equipe da filial"} />
+        <CostCardTitle title={showStore ? "Equipe" : "Equipe da filial"} />
       </div>
       {!loaded ? (
         <div className="px-5 pb-4">
@@ -371,9 +397,13 @@ function StaffCard({
           title={withoutTeam ? "Nenhuma pessoa sincronizada" : tab === "ativos" ? "Nenhuma pessoa ativa" : "Nenhuma pessoa desligada"}
           description={
             withoutTeam
-              ? "Use Atualizar equipe no topo para buscar a equipe desta filial no Millennium."
+              ? showStore
+                ? "Use Atualizar equipe no topo para buscar a equipe das filiais no Millennium."
+                : "Use Atualizar equipe no topo para buscar a equipe desta filial no Millennium."
               : tab === "ativos"
-                ? "Não há vendedores, operadores de caixa ou usuários da filial ativos nesta filial no momento."
+                ? showStore
+                  ? "Não há vendedores, operadores de caixa ou usuários da filial ativos nas filiais no momento."
+                  : "Não há vendedores, operadores de caixa ou usuários da filial ativos nesta filial no momento."
                 : "Pessoas desligadas no Millennium aparecem aqui."
           }
         />
@@ -393,10 +423,12 @@ function StaffCard({
       ) : (
         <DataTable
           className="rounded-none! border-x-0! border-b-0! bg-transparent!"
-          columns={tab === "ativos" ? columns : [...sellerColumns(store), columns[columns.length - 1]!]}
+          columns={tab === "ativos" ? columns : [...identity, columns[columns.length - 1]!]}
           data={shown}
-          rowKey={(v) => v.id}
+          rowKey={(v) => v.seller.id}
           paginate="pessoas"
+          defaultSortKey={showStore ? "store" : undefined}
+          defaultSortDir="asc"
         />
       )}
       <Modal
@@ -415,7 +447,7 @@ function StaffCard({
               onClick={() => {
                 if (!removing) return;
                 setRemovingBusy(true);
-                void removeSellerAccess(removing.id).then((r) => {
+                void removeSellerAccess(removing.seller.id).then((r) => {
                   setRemovingBusy(false);
                   if (!r.ok) return show(r.message, "danger");
                   setRemoving(null);
@@ -431,17 +463,20 @@ function StaffCard({
       >
         {removing && (
           <p className="text-[13.5px] leading-relaxed text-t1">
-            <span className="font-bold text-t0">{removing.name}</span> não poderá mais acessar esta filial na WDash. Você poderá convidar essa pessoa novamente depois.
+            <span className="font-bold text-t0">{removing.seller.name}</span> não poderá mais acessar {showStore ? storeLabel(removing.store) : "esta filial"} na WDash. Você poderá convidar essa pessoa novamente depois.
           </p>
         )}
       </Modal>
       <SellerEditor
-        seller={editing}
-        store={store}
-        shifts={shifts}
+        seller={editing?.seller ?? null}
+        store={editing?.store ?? stores[0]!}
+        shifts={editing ? (shifts.get(editing.store.id) ?? []) : []}
         pendingShift={pendingShift}
         onClose={() => setEditing(null)}
-        onCreateGroup={() => editing && setCreating({ sellerId: editing.id, ...nextGroupWindow(shifts) })}
+        onCreateGroup={() => {
+          if (!editing) return;
+          setCreating({ sellerId: editing.seller.id, storeId: editing.store.id, ...nextGroupWindow(shifts.get(editing.store.id) ?? []) });
+        }}
         onSave={(seller, draft) => saveProfile(seller, draft)}
       />
       <GroupFormModal
@@ -454,7 +489,7 @@ function StaffCard({
         onSubmit={createGroup}
       />
       <InviteSellerModal
-        seller={inviting ? { id: inviting.id, name: inviting.name, email: inviting.email } : null}
+        seller={inviting ? { id: inviting.seller.id, name: inviting.seller.name, email: inviting.seller.email } : null}
         onClose={() => setInviting(null)}
         onDone={() => {
           setInviting(null);
@@ -614,45 +649,57 @@ function groupLabel(shiftId: string | null | undefined, shifts: StoreShift[]): s
   return shift ? shiftName(shift.name) : "Sem grupo";
 }
 
-function sellerColumns(store: Store): DataTableColumn<StoreSeller>[] {
-  return [
-  {
-    key: "seller",
-    header: "Nome",
-    sortable: true,
-    sortValue: (v) => v.name,
-    render: (v) => (
-      <div className="flex min-w-0 items-center gap-3">
-        <PersonAvatar name={v.name} employeeId={v.code} />
-        <span className="truncate text-[13.5px] font-bold text-t0">{v.name}</span>
-      </div>
-    ),
-  },
-  {
-    key: "role",
-    header: "Cargo",
-    sortable: true,
-    sortValue: (v) => teamRoleLabel(v, store),
-    render: (v) => <span className="text-t1">{teamRoleLabel(v, store)}</span>,
-  },
-  {
-    key: "code",
-    header: "Código no Millennium",
-    sortable: true,
-    sortValue: (v) => v.code?.trim() || null,
-    render: (v) => <span className="tabular-nums text-t1">{v.code || "—"}</span>,
-  },
-  {
-    key: "status",
-    header: "Status",
-    sortable: true,
-    sortValue: (v) => (v.active ? "Ativo" : "Desligado"),
-    render: (v) => {
-      const label = v.active ? "Ativo" : "Desligado";
-      return <Badge variant={statusBadgeVariant(label)}>{label}</Badge>;
+function personColumns(showStore: boolean): DataTableColumn<StaffPerson>[] {
+  const columns: DataTableColumn<StaffPerson>[] = [
+    {
+      key: "seller",
+      header: "Nome",
+      sortable: true,
+      sortValue: (v) => v.seller.name,
+      render: (v) => (
+        <div className="flex min-w-0 items-center gap-3">
+          <PersonAvatar name={v.seller.name} employeeId={v.seller.code} storeId={v.store.id} />
+          <span className="truncate text-[13.5px] font-bold text-t0">{v.seller.name}</span>
+        </div>
+      ),
     },
-  },
   ];
+  if (showStore) {
+    columns.push({
+      key: "store",
+      header: "Filial",
+      sortable: true,
+      sortValue: (v) => storeLabel(v.store),
+      render: (v) => <span className="text-t1">{storeLabel(v.store)}</span>,
+    });
+  }
+  columns.push(
+    {
+      key: "role",
+      header: "Cargo",
+      sortable: true,
+      sortValue: (v) => teamRoleLabel(v.seller, v.store),
+      render: (v) => <span className="text-t1">{teamRoleLabel(v.seller, v.store)}</span>,
+    },
+    {
+      key: "code",
+      header: "Código no Millennium",
+      sortable: true,
+      sortValue: (v) => v.seller.code?.trim() || null,
+      render: (v) => <span className="tabular-nums text-t1">{v.seller.code || "—"}</span>,
+    },
+    {
+      key: "status",
+      header: "Status",
+      sortable: true,
+      sortValue: (v) => (v.seller.active ? "Ativo" : "Desligado"),
+      render: (v) => {
+        const label = v.seller.active ? "Ativo" : "Desligado";
+        return <Badge variant={statusBadgeVariant(label)}>{label}</Badge>;
+      },
+    },
+  );
+  return columns;
 }
 
 export default StaffPage;
