@@ -501,25 +501,6 @@ function WalletGlyph() {
   );
 }
 
-function sellerSummary(guaranteed: number, upside: number, goals: WalletGoalOpportunity[]): string | null {
-  const belowLast = goals.some((goal) => goal.floor && !goal.atLast);
-  const atLast = goals.some((goal) => goal.atLast);
-  const potential = guaranteed + upside;
-  if (belowLast && upside > 0) {
-    return `Você já garantiu ${money(guaranteed)} e, se alcançar o último nível, passa a receber a partir de ${money(potential)}. Vender mais aumenta a premiação.`;
-  }
-  if (atLast && upside > 0 && guaranteed > 0) {
-    return `Você já garantiu ${money(guaranteed)} e ainda pode conquistar ${money(upside)} neste período. No último nível, vender mais aumenta a premiação.`;
-  }
-  if (atLast && guaranteed > 0) {
-    return `Você já garantiu ${money(guaranteed)}. No último nível, vender mais aumenta a premiação.`;
-  }
-  if (upside > 0 && guaranteed > 0) return `Você já garantiu ${money(guaranteed)} e ainda pode conquistar ${money(upside)} neste período.`;
-  if (upside > 0) return `Você ainda pode conquistar ${money(upside)} neste período.`;
-  if (guaranteed > 0) return `Você já garantiu ${money(guaranteed)} neste período.`;
-  return null;
-}
-
 function Tile({ label, value, sub, tip, mono = true, valueClass = "text-t0" }: { label: string; value: string; sub?: string; tip?: string; mono?: boolean; valueClass?: string }) {
   return (
     <div className="min-w-0 rounded-xl border border-line bg-bg-inset p-3">
@@ -628,7 +609,6 @@ function SellerWallet({ wallet, opportunities }: { wallet: WalletMonth; opportun
   const potential = guaranteed + upside;
   const belowLast = goals.some((goal) => goal.floor && !goal.atLast);
   const atLast = goals.some((goal) => goal.atLast);
-  const sentence = sellerSummary(guaranteed, upside, goals);
   const potentialSub = belowLast ? "A partir do último nível" : atLast ? "Vender mais aumenta a premiação" : upside > 0 ? "Se conquistar o que ainda está em disputa" : undefined;
   const potentialTip = belowLast || atLast ? "O último nível paga um percentual sobre o que você vender. O valor é o mínimo ao chegar nele. Vender mais aumenta a premiação." : undefined;
   const movement = balanceLines(person);
@@ -642,7 +622,6 @@ function SellerWallet({ wallet, opportunities }: { wallet: WalletMonth; opportun
         <StatCard label="Ganhos garantidos" value={money(guaranteed)} icon={<CheckCircleIcon size={20} />} iconColor={ganhos.iconColor} iconBg={ganhos.iconBg} />
         <StatCard label="Potencial do período" value={money(potential)} icon={<TargetIcon size={20} />} iconColor={potencial.iconColor} iconBg={potencial.iconBg} sub={potentialSub} tooltip={potentialTip} />
       </div>
-      {sentence ? <p className="text-[13px] leading-snug text-t1">{sentence}</p> : null}
       <Card>
         <CardTitle>Suas oportunidades</CardTitle>
         <div className="mt-3">
