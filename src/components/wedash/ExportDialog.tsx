@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { Button, Modal } from "@/components/ui";
+import { Button, Checkbox, Modal, Radio } from "@/components/ui";
 
 export type ExportFormat = "csv" | "pdf" | "xlsx";
 
@@ -114,57 +114,51 @@ export function ExportDialog({
       >
         {askStores && stores ? (
           <>
-            <p className="mb-3 text-[13px] font-bold text-t0">Selecione as filiais</p>
-            <label className="flex items-center gap-2 border-b border-line pb-3 text-[13.5px] font-bold text-t0">
-              <input
-                ref={allRef}
-                type="checkbox"
-                checked={allOn}
-                onChange={toggleAll}
-                disabled={exporting}
-                style={{ accentColor: "var(--acc)" }}
-                className="h-4 w-4 shrink-0 rounded"
-              />
-              Todas as filiais
-            </label>
-            <div className="mt-3 flex max-h-52 flex-col gap-3 overflow-y-auto">
+            <p className="mb-1.5 text-[12.5px] font-bold text-t0">Selecione as filiais</p>
+            <Checkbox
+              ref={allRef}
+              className="w-full border-b border-line pb-3 font-bold"
+              checked={allOn}
+              onChange={toggleAll}
+              disabled={exporting}
+              label="Todas as filiais"
+            />
+            <div className="mt-3 flex max-h-52 flex-col gap-2.5 overflow-y-auto">
               {stores.map((store) => (
-                <label key={store.id} className="flex items-start gap-2 text-[13px] text-t0">
-                  <input
-                    type="checkbox"
-                    checked={selected.includes(store.id)}
-                    onChange={() => toggleStore(store.id)}
-                    disabled={exporting}
-                    style={{ accentColor: "var(--acc)" }}
-                    className="mt-0.5 h-4 w-4 shrink-0 rounded"
-                  />
-                  <span className="min-w-0">
-                    <span className="block leading-tight">{store.name}</span>
-                    {store.detail ? <span className="mt-0.5 block text-[11px] leading-tight text-t2">{store.detail}</span> : null}
-                  </span>
-                </label>
+                <Checkbox
+                  key={store.id}
+                  className="items-start"
+                  checked={selected.includes(store.id)}
+                  onChange={() => toggleStore(store.id)}
+                  disabled={exporting}
+                  label={
+                    <span className="min-w-0 leading-none">
+                      <span className="block truncate text-[12px] font-bold uppercase leading-tight">{store.name}</span>
+                      {store.detail ? <span className="mt-0.5 block truncate text-[10px] font-normal leading-tight text-t2">{store.detail}</span> : null}
+                    </span>
+                  }
+                />
               ))}
             </div>
-            <p className="mb-3 mt-5 text-[13px] font-bold text-t0">Formato</p>
-            <div className="flex flex-col gap-3">
+            <p className="mb-1.5 mt-5 text-[12.5px] font-bold text-t0">Formato</p>
+            <div className="flex flex-col gap-2.5">
               {options.map((item) => (
-                <label key={item} className="flex items-start gap-2">
-                  <input
-                    type="radio"
-                    name="export-format"
-                    checked={format === item}
-                    onChange={() => setFormat(item)}
-                    disabled={exporting}
-                    style={{ accentColor: "var(--acc)" }}
-                    className="mt-0.5 h-4 w-4 shrink-0"
-                  />
-                  <span className="min-w-0">
-                    <span className="block text-[13.5px] font-bold leading-tight text-t0">{FORMAT_COPY[item].title}</span>
-                    <span className="mt-0.5 block text-[12.5px] leading-snug text-t2">
-                      {item === "pdf" ? PDF_WITH_STORES : FORMAT_COPY[item].detail}
+                <Radio
+                  key={item}
+                  name="export-format"
+                  className="items-start"
+                  checked={format === item}
+                  onChange={() => setFormat(item)}
+                  disabled={exporting}
+                  label={
+                    <span className="min-w-0">
+                      <span className="block font-bold leading-tight">{FORMAT_COPY[item].title}</span>
+                      <span className="mt-0.5 block text-[12.5px] font-normal leading-snug text-t2">
+                        {item === "pdf" ? PDF_WITH_STORES : FORMAT_COPY[item].detail}
+                      </span>
                     </span>
-                  </span>
-                </label>
+                  }
+                />
               ))}
             </div>
           </>

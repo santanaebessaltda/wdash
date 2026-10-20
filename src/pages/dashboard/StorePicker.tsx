@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import type { Store } from "@/data/wedash/stores";
+import { storeListSubtitle, type Store } from "@/data/wedash/stores";
 import type { Scope } from "@/data/wedash/dashboard";
 import { cn } from "@/lib/cn";
 
@@ -28,12 +28,6 @@ export function StorePicker({ scope, onChange, minhas }: { scope: Scope; onChang
     setOpen(false);
   }
 
-  function storeSubtitle(f: Store): string {
-    const cnpj = f.cnpj?.trim();
-    if (cnpj) return cnpj;
-    return f.branchCode ? `Filial ${f.branchCode}` : "—";
-  }
-
   return (
     <div ref={ref} className="relative min-w-0">
       <button
@@ -46,7 +40,7 @@ export function StorePicker({ scope, onChange, minhas }: { scope: Scope; onChang
             {currentBranch ? currentBranch.tradeName : "Todas as filiais"}
           </p>
           <p className={cn("truncate text-[10px] leading-tight text-t2", !currentBranch && "uppercase")}>
-            {currentBranch ? storeSubtitle(currentBranch) : "Rede consolidada"}
+            {currentBranch ? storeListSubtitle(currentBranch) : "Rede consolidada"}
           </p>
         </div>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={cn("shrink-0 transition-transform", open && "rotate-180")}>
@@ -91,7 +85,7 @@ export function StorePicker({ scope, onChange, minhas }: { scope: Scope; onChang
               >
                 <div className="min-w-0 flex-1 leading-none">
                   <p className={cn("truncate text-[12px] font-bold uppercase leading-tight", active ? "text-acc" : "text-t0")}>{f.tradeName}</p>
-                  <p className="truncate text-[10px] leading-tight text-t2">{storeSubtitle(f)}</p>
+                  <p className="truncate text-[10px] leading-tight text-t2">{storeListSubtitle(f)}</p>
                 </div>
                 {active && (
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">

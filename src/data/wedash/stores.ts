@@ -320,6 +320,13 @@ export function sessionStoreIds(input: {
 }
 
 /** Lojas da sessao: so ids que o membership enxerga (UUIDs reais pos-ERP). */
+/** Segunda linha do seletor de filial: CNPJ, ou o código da filial no Millennium. */
+export function storeListSubtitle(store: Pick<Store, "cnpj" | "branchCode">): string {
+  const cnpj = store.cnpj?.trim();
+  if (cnpj) return cnpj;
+  return store.branchCode ? `Filial ${store.branchCode}` : "—";
+}
+
 export function storesForSession(sessionStoreIds: string[]): Store[] {
   if (sessionStoreIds.length === 0) return [];
   const catalog = allStores();

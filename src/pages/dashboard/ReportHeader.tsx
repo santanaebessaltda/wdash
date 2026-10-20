@@ -3,8 +3,8 @@ import { flushSync } from "react-dom";
 import { WedashBrand } from "@/components/wedash/WedashBrand";
 import { resolvePeriod } from "@/data/wedash/dashboard";
 import { calendarTodayIso } from "@/data/wedash/clock";
-import { storesForSession } from "@/data/wedash/stores";
-import { exportStoreLabel, isoToDate } from "@/lib/format";
+import { storeListSubtitle, storesForSession } from "@/data/wedash/stores";
+import { isoToDate } from "@/lib/format";
 import { exportPdf, reportFileTitle } from "@/lib/printMode";
 import { useActiveSession } from "@/session/SessionProvider";
 import { LastUpdated } from "./LastUpdated";
@@ -94,9 +94,7 @@ export function useDashboardExport(screen: string) {
   const viewScope = scopeForExport(scope, printIds, rows.length);
   const stores =
     scope.storeIds.length === 0 && rows.length > 1
-      ? [...rows]
-          .map((store) => ({ id: store.id, ...exportStoreLabel(store.tradeName, store.name) }))
-          .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+      ? rows.map((store) => ({ id: store.id, name: store.tradeName, detail: storeListSubtitle(store) }))
       : undefined;
 
   function exportPdfFor(storeIds?: string[]) {

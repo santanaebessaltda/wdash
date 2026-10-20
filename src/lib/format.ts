@@ -70,30 +70,6 @@ export function labelCase(s: string | null | undefined): string {
     .join(" ");
 }
 
-function looksTechnicalStoreName(value: string): boolean {
-  const name = value.trim();
-  if (!name) return false;
-  if (name.includes(".")) return true;
-  return /^loja/i.test(name) && !name.includes(" ");
-}
-
-function humanizeStoreCode(value: string): string {
-  const stripped = value.trim().replace(/^(LOJAWEPINK|LOJAWPINK|LOJA)\./i, "");
-  const spaced = stripped.replace(/[._]+/g, " ").replace(/campogrande/gi, "Campo Grande").replace(/\s+/g, " ").trim();
-  return labelCase(spaced);
-}
-
-/** Nome da filial no Exportar. Fantasia legível na frente; código técnico só quando for outro texto. */
-export function exportStoreLabel(tradeName: string, legalName?: string | null): { name: string; detail: string | null } {
-  const fantasy = tradeName.trim();
-  const legal = (legalName ?? "").trim();
-  const source = fantasy || legal;
-  const name = looksTechnicalStoreName(source) ? humanizeStoreCode(source) : labelCase(source);
-  const technical = [legal, fantasy].find((item) => looksTechnicalStoreName(item)) ?? null;
-  const detail = technical && technical.localeCompare(name, "pt-BR", { sensitivity: "accent" }) !== 0 ? technical : null;
-  return { name: name || "Filial", detail };
-}
-
 /** 48%  |  48,3% */
 export function pct(v: number, casas = 0): string {
   return `${num(v, casas)}%`;

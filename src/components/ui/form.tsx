@@ -21,14 +21,15 @@ export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSel
 ));
 Select.displayName = "Select";
 
-export function Checkbox({ label, className, ...props }: InputHTMLAttributes<HTMLInputElement> & { label?: ReactNode }) {
-  return (
+export const Checkbox = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & { label?: ReactNode }>(
+  ({ label, className, ...props }, ref) => (
     <label className={cn("inline-flex items-center gap-2 text-[13px] text-t0", className)}>
-      <input type="checkbox" style={{ accentColor: "var(--acc)" }} className="h-4 w-4 shrink-0 rounded" {...props} />
+      <input ref={ref} type="checkbox" style={{ accentColor: "var(--acc)" }} className="h-4 w-4 shrink-0 rounded" {...props} />
       {label}
     </label>
-  );
-}
+  ),
+);
+Checkbox.displayName = "Checkbox";
 
 export function Radio({ label, className, ...props }: InputHTMLAttributes<HTMLInputElement> & { label?: ReactNode }) {
   return (
