@@ -186,7 +186,7 @@ export function BoardPage() {
             storeId ? (
               <>
                 <ShareBoardButton storeId={storeId} />
-                <Button type="button" variant="outline" icon={<MonitorUpIcon />} onClick={enterTv}>
+                <Button type="button" icon={<MonitorUpIcon />} onClick={enterTv}>
                   Exibir na TV
                 </Button>
               </>

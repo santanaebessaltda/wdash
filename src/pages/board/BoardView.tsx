@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Card, CardTitle, EmptyState, ProgressBar, StatCard, progressTextClass } from "@/components/ui";
+import { Badge, Button, Card, CardTitle, EmptyState, ProgressBar, StatCard, progressTextClass } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { RankingBlock } from "@/pages/live/blocks";
 import type { RankingRow } from "@/data/wedash/live";
@@ -16,6 +16,7 @@ import type { StoreWeekHours } from "@/data/wedash/storeHours";
 import { formatSyncWatermarkLabel } from "@/data/wedash/syncUi";
 import { brlCent, num, shortDate } from "@/lib/format";
 import { cn } from "@/lib/cn";
+import { statusBadgeVariant } from "@/lib/status";
 import type { SalesDayAgg, SalesSellerDayAgg } from "@/data/wedash/salesTypes";
 import overtakeUrl from "@/assets/sound/overtaking.wav";
 import firstPlaceUrl from "@/assets/sound/first-place.wav";
@@ -327,13 +328,10 @@ export function BoardView({
   return (
     <div className={cn("flex flex-col gap-4", controls === "page" ? "" : "min-h-full p-4 sm:p-6")}>
       <style>{`@keyframes board-pop{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:none}}`}</style>
+      {controls !== "page" && (
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          {controls === "page" ? (
-            <h2 className="text-lg font-extrabold tracking-tight text-t0 sm:text-xl">{storeName ?? "Filial"}</h2>
-          ) : (
-            <h1 className="text-[22px] font-extrabold tracking-tight text-t0 sm:text-[26px]">{storeName ?? "Filial"}</h1>
-          )}
+          <h1 className="text-[22px] font-extrabold tracking-tight text-t0 sm:text-[26px]">{storeName ?? "Filial"}</h1>
           <p className="mt-0.5 text-[13px] text-t2">
             {monthLabel(today)}
             <span className="mx-1.5">·</span>
@@ -353,6 +351,7 @@ export function BoardView({
           </div>
         )}
       </header>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard quietSub label="Faturamento" value={brlCent(monthRevenue)} sub={`Hoje ${brlCent(todayTotals.revenue)}`} icon={<IconRevenue />} iconColor="var(--acc)" iconBg="var(--acc-soft)" />
@@ -387,10 +386,21 @@ export function BoardView({
 
       {goalCard && activeGoal && summary ? (
         <div className="flex flex-col rounded-2xl border border-line bg-bg-2 px-4 py-3 shadow-[var(--shadow-vela)]">
-          <p className="truncate text-[15px] font-bold text-t0">{goalCard.name}</p>
-          <p className="mt-0.5 truncate text-[12.5px] text-t2">
-            {shortDate(activeGoal.startsOn)} a {shortDate(activeGoal.endsOn)}
-          </p>
+          <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
+            <div className="min-w-0">
+              <p className="truncate text-[20px] font-extrabold tracking-tight text-t0">{goalCard.name}</p>
+              <p className="mt-0.5 truncate text-[12.5px] text-t2">
+                {shortDate(activeGoal.startsOn)} a {shortDate(activeGoal.endsOn)}
+              </p>
+            </div>
+            <Badge variant={statusBadgeVariant(GOAL_STATUS_LABEL[summary.status])} className="shrink-0 uppercase">
+              {GOAL_STATUS_LABEL[summary.status]}
+              <span className="mx-1.5">·</span>
+              {activeGoal.tierMode === "INDIVIDUAL" ? "Individual" : activeGoal.tierMode === "GENERAL" ? "Geral" : "Grupo"}
+              <span className="mx-1.5">·</span>
+              {activeGoal.tiers.length} {activeGoal.tiers.length === 1 ? "nível" : "níveis"}
+            </Badge>
+          </div>
           <div className="mt-2 flex items-baseline justify-between gap-3">
             <span className="font-mono text-[18px] font-extrabold text-t0">{brlCent(summary.achieved)}</span>
             <span className="text-right text-[12px] text-t2">
@@ -404,13 +414,6 @@ export function BoardView({
             {summary.projectedPct != null
               ? `Projeção ${num(summary.projectedPct, 0)}% · ${prazoRemaining(summary.daysRemaining).toLowerCase()}`
               : prazoRemaining(summary.daysRemaining)}
-          </p>
-          <p className="mt-1 text-[10.5px] font-semibold uppercase tracking-wide text-t3">
-            {GOAL_STATUS_LABEL[summary.status]}
-            <span className="mx-1.5">·</span>
-            {activeGoal.tierMode === "INDIVIDUAL" ? "Individual" : activeGoal.tierMode === "GENERAL" ? "Geral" : "Grupo"}
-            <span className="mx-1.5">·</span>
-            {activeGoal.tiers.length} {activeGoal.tiers.length === 1 ? "nível" : "níveis"}
           </p>
         </div>
       ) : (
