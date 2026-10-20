@@ -435,11 +435,10 @@ export function PurchaseOrderPage() {
                 </button>
               ))}
             </div>
-            <HeaderFilter label="Status dos produtos" lead="Status" value={filter} onChange={setFilter} options={filterOptions} />
+            <HeaderFilter label="Status dos produtos" value={filter} onChange={setFilter} options={filterOptions} />
             <span className="inline-flex items-center gap-1.5">
               <HeaderFilter
                 label="Multiplicador do pedido"
-                lead="Multiplicador"
                 value={String(po.factor)}
                 onChange={(v) => po.setFactor(Number(v))}
                 options={PURCHASE_FACTORS.map((f) => ({ value: String(f), label: `${f}x` }))}

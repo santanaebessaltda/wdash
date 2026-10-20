@@ -11,15 +11,12 @@ export function HeaderFilter<V extends string>({
   options,
   onChange,
   label,
-  lead,
 }: {
   value: V;
   options: Array<{ value: V; label: string }>;
   onChange: (v: V) => void;
   /** Nome do filtro (acessibilidade). */
   label: string;
-  /** Texto fixo antes do valor, no gatilho. */
-  lead?: string;
 }) {
   const current = options.find((o) => o.value === value)?.label ?? options[0]?.label ?? "";
   // Abaixo do `sm` os filtros ficam alinhados a esquerda (um abaixo do outro): o menu abre para a direita.
@@ -30,7 +27,6 @@ export function HeaderFilter<V extends string>({
       menuClassName="max-h-[320px] max-w-[calc(100vw-2rem)] overflow-y-auto"
       trigger={
         <button type="button" aria-label={`${label}: ${current}`} className={TRIGGER_CLASS}>
-          {lead && <span className="shrink-0 text-[13.5px] font-medium text-t2">{lead}</span>}
           <span className="min-w-0 max-w-[220px] truncate text-[13.5px] font-semibold text-t0">{current}</span>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-t2">
             <path d="m6 9 6 6 6-6" />
