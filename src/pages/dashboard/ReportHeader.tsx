@@ -4,7 +4,7 @@ import { WedashBrand } from "@/components/wedash/WedashBrand";
 import { resolvePeriod } from "@/data/wedash/dashboard";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { storesForSession } from "@/data/wedash/stores";
-import { isoToDate } from "@/lib/format";
+import { exportStoreLabel, isoToDate } from "@/lib/format";
 import { exportPdf, reportFileTitle } from "@/lib/printMode";
 import { useActiveSession } from "@/session/SessionProvider";
 import { LastUpdated } from "./LastUpdated";
@@ -95,8 +95,8 @@ export function useDashboardExport(screen: string) {
   const stores =
     scope.storeIds.length === 0 && rows.length > 1
       ? [...rows]
-          .sort((a, b) => a.tradeName.localeCompare(b.tradeName, "pt-BR"))
-          .map((store) => ({ id: store.id, name: store.tradeName }))
+          .map((store) => ({ id: store.id, ...exportStoreLabel(store.tradeName, store.name) }))
+          .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
       : undefined;
 
   function exportPdfFor(storeIds?: string[]) {

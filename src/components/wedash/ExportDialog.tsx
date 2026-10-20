@@ -4,7 +4,7 @@ import { Button, Modal } from "@/components/ui";
 
 export type ExportFormat = "csv" | "pdf" | "xlsx";
 
-export type ExportStore = { id: string; name: string };
+export type ExportStore = { id: string; name: string; detail?: string | null };
 
 const FORMAT_COPY: Record<ExportFormat, { title: string; detail: string }> = {
   csv: {
@@ -21,6 +21,8 @@ const FORMAT_COPY: Record<ExportFormat, { title: string; detail: string }> = {
   },
 };
 
+const PDF_WITH_STORES = "Gera um relatório em PDF com as filiais selecionadas.";
+
 /** Botão Exportar. O modal lista só os formatos passados — no Dashboard, só PDF. */
 export function ExportDialog({
   formats,
@@ -31,29 +33,32 @@ export function ExportDialog({
   formats: ExportFormat[];
   onExport: (format: ExportFormat, storeIds?: string[]) => void;
   disabled?: boolean;
-  /** Com Todas as filiais, a pessoa marca quais entram no arquivo antes do formato. */
+  /** Com Todas as filiais, a pessoa marca quais entram no arquivo no mesmo modal do formato. */
   stores?: ExportStore[];
 }) {
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<"stores" | "format">("format");
   const [selected, setSelected] = useState<string[]>([]);
+  const [format, setFormat] = useState<ExportFormat | null>(null);
+  const [exporting, setExporting] = useState(false);
   const allRef = useRef<HTMLInputElement>(null);
-  const options = formats.filter((format) => format in FORMAT_COPY);
+  const options = formats.filter((item) => item in FORMAT_COPY);
   const askStores = (stores?.length ?? 0) > 1;
   const allOn = askStores && stores!.every((store) => selected.includes(store.id));
   const some = askStores && selected.length > 0 && !allOn;
 
   useEffect(() => {
     if (allRef.current) allRef.current.indeterminate = some;
-  }, [some, open, step]);
+  }, [some, open]);
 
   function openModal() {
     setSelected(stores?.map((store) => store.id) ?? []);
-    setStep(askStores ? "stores" : "format");
+    setFormat(options[0] ?? null);
+    setExporting(false);
     setOpen(true);
   }
 
   function close() {
+    if (exporting) return;
     setOpen(false);
   }
 
@@ -65,86 +70,121 @@ export function ExportDialog({
     setSelected((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
   }
 
-  function choose(format: ExportFormat) {
-    const ids = askStores ? selected : undefined;
+  function choose(next: ExportFormat) {
     flushSync(() => setOpen(false));
-    onExport(format, ids);
+    onExport(next);
   }
 
-  const chosenLabel = !askStores
-    ? ""
-    : allOn
-      ? "Todas as filiais."
-      : selected.length === 1
-        ? (stores!.find((store) => store.id === selected[0])?.name ?? "1 filial.")
-        : `${selected.length} filiais selecionadas.`;
+  function confirm() {
+    if (!format || (askStores && selected.length === 0)) return;
+    setExporting(true);
+    const ids = askStores ? selected : undefined;
+    const chosen = format;
+    requestAnimationFrame(() => {
+      flushSync(() => {
+        setOpen(false);
+        setExporting(false);
+      });
+      onExport(chosen, ids);
+    });
+  }
 
   return (
     <>
       <Button type="button" variant="primary" disabled={disabled || options.length === 0} onClick={openModal}>
         Exportar
       </Button>
-      <Modal open={open} onClose={close} title="Exportar" size="sm">
-        {step === "stores" && stores ? (
+      <Modal
+        open={open}
+        onClose={close}
+        title="Exportar"
+        size="sm"
+        footer={
+          askStores ? (
+            <>
+              <Button variant="outline" size="sm" onClick={close} disabled={exporting}>
+                Cancelar
+              </Button>
+              <Button size="sm" onClick={confirm} disabled={exporting || selected.length === 0 || format == null}>
+                {exporting ? "Exportando…" : "Exportar"}
+              </Button>
+            </>
+          ) : undefined
+        }
+      >
+        {askStores && stores ? (
           <>
-            <p className="mb-4 text-[13px] leading-relaxed text-t1">Quais filiais entram no arquivo?</p>
+            <p className="mb-3 text-[13px] font-bold text-t0">Selecione as filiais</p>
             <label className="flex items-center gap-2 border-b border-line pb-3 text-[13.5px] font-bold text-t0">
               <input
                 ref={allRef}
                 type="checkbox"
                 checked={allOn}
                 onChange={toggleAll}
+                disabled={exporting}
                 style={{ accentColor: "var(--acc)" }}
                 className="h-4 w-4 shrink-0 rounded"
               />
-              Marcar todas
+              Todas as filiais
             </label>
-            <div className="mt-3 flex max-h-64 flex-col gap-2.5 overflow-y-auto">
+            <div className="mt-3 flex max-h-52 flex-col gap-3 overflow-y-auto">
               {stores.map((store) => (
-                <label key={store.id} className="flex items-center gap-2 text-[13px] text-t0">
+                <label key={store.id} className="flex items-start gap-2 text-[13px] text-t0">
                   <input
                     type="checkbox"
                     checked={selected.includes(store.id)}
                     onChange={() => toggleStore(store.id)}
+                    disabled={exporting}
                     style={{ accentColor: "var(--acc)" }}
-                    className="h-4 w-4 shrink-0 rounded"
+                    className="mt-0.5 h-4 w-4 shrink-0 rounded"
                   />
-                  <span className="uppercase">{store.name}</span>
+                  <span className="min-w-0">
+                    <span className="block leading-tight">{store.name}</span>
+                    {store.detail ? <span className="mt-0.5 block text-[11px] leading-tight text-t2">{store.detail}</span> : null}
+                  </span>
                 </label>
               ))}
             </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={close}>
-                Cancelar
-              </Button>
-              <Button size="sm" disabled={selected.length === 0} onClick={() => setStep("format")}>
-                Continuar
-              </Button>
+            <p className="mb-3 mt-5 text-[13px] font-bold text-t0">Formato</p>
+            <div className="flex flex-col gap-3">
+              {options.map((item) => (
+                <label key={item} className="flex items-start gap-2">
+                  <input
+                    type="radio"
+                    name="export-format"
+                    checked={format === item}
+                    onChange={() => setFormat(item)}
+                    disabled={exporting}
+                    style={{ accentColor: "var(--acc)" }}
+                    className="mt-0.5 h-4 w-4 shrink-0"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-[13.5px] font-bold leading-tight text-t0">{FORMAT_COPY[item].title}</span>
+                    <span className="mt-0.5 block text-[12.5px] leading-snug text-t2">
+                      {item === "pdf" ? PDF_WITH_STORES : FORMAT_COPY[item].detail}
+                    </span>
+                  </span>
+                </label>
+              ))}
             </div>
           </>
         ) : (
           <>
-            <p className="mb-1 text-[13px] leading-relaxed text-t1">Escolha o formato do arquivo.</p>
-            {askStores ? <p className="mb-4 text-[12.5px] text-t2">{chosenLabel}</p> : <div className="mb-4" />}
+            <p className="mb-4 text-[13px] leading-relaxed text-t1">Escolha o formato do arquivo.</p>
             <div className="flex flex-col gap-2.5">
-              {options.map((format) => (
+              {options.map((item) => (
                 <button
-                  key={format}
+                  key={item}
                   type="button"
-                  onClick={() => choose(format)}
+                  onClick={() => choose(item)}
                   className="rounded-[var(--radius-vela-lg)] border border-line px-4 py-3 text-left transition-colors hover:border-acc hover:bg-acc-soft/40"
                 >
-                  <p className="text-[13.5px] font-bold text-t0">{FORMAT_COPY[format].title}</p>
-                  <p className="mt-0.5 text-[12.5px] leading-snug text-t2">{FORMAT_COPY[format].detail}</p>
+                  <p className="text-[13.5px] font-bold text-t0">{FORMAT_COPY[item].title}</p>
+                  <p className="mt-0.5 text-[12.5px] leading-snug text-t2">{FORMAT_COPY[item].detail}</p>
                 </button>
               ))}
             </div>
-            <div className="mt-4 flex justify-end gap-2">
-              {askStores ? (
-                <Button variant="outline" size="sm" onClick={() => setStep("stores")}>
-                  Voltar
-                </Button>
-              ) : null}
+            <div className="mt-4 flex justify-end">
               <Button variant="outline" size="sm" onClick={close}>
                 Cancelar
               </Button>
