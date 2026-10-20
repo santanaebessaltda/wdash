@@ -59,9 +59,13 @@ export function PublicBoardPage() {
     <div className="min-h-screen bg-bg-0 text-t0">
       <ProfilePhotosProvider photos={pack.photos}>
         <BoardView
-          storeId={pack.store.id}
-          storeName={pack.store.tradeName}
-          week={effectiveWeekHours(parseWeekHours(pack.store.hours))}
+          stores={[
+            {
+              id: pack.store.id,
+              tradeName: pack.store.tradeName,
+              hours: effectiveWeekHours(parseWeekHours(pack.store.hours)),
+            },
+          ]}
           team={pack.team}
           goalsData={{
             goals: pack.goals,
@@ -73,7 +77,7 @@ export function PublicBoardPage() {
           challengesData={{ challenges: pack.challenges, aggs: pack.challengeAggs }}
           watermark={Number.isNaN(watermark?.getTime() ?? 0) ? null : watermark}
           loading={false}
-          packStore={pack.store.id}
+          packKey={pack.store.id}
           controls="public"
         />
       </ProfilePhotosProvider>

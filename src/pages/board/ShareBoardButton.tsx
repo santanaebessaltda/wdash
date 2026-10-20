@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, FormField, Input, Modal } from "@/components/ui";
+import { Button, FormField, Input, Modal, Select } from "@/components/ui";
 import { boardShareUrl, ensureBoardShare } from "@/data/wedash/boardShare";
 
 /** Lucide Share2. */
@@ -15,15 +15,17 @@ function ShareIcon() {
   );
 }
 
-/** Link público da filial que está no placar. */
-export function ShareBoardButton({ storeId }: { storeId: string }) {
+/** Link público de uma filial. Com várias no seletor, a modal pede qual. */
+export function ShareBoardButton({ stores }: { stores: { id: string; tradeName: string }[] }) {
   const [open, setOpen] = useState(false);
+  const [picked, setPicked] = useState(stores[0]?.id ?? "");
   const [url, setUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const copiedTimer = useRef<number | null>(null);
+  const loadGen = useRef(0);
 
   useEffect(() => {
     return () => {
@@ -31,14 +33,15 @@ export function ShareBoardButton({ storeId }: { storeId: string }) {
     };
   }, []);
 
-  async function show() {
+  async function load(storeId: string) {
+    const mine = ++loadGen.current;
     setUrl(null);
     setFailed(false);
     setCopied(false);
     setCopyFailed(false);
     setBusy(true);
-    setOpen(true);
     const token = await ensureBoardShare(storeId);
+    if (mine !== loadGen.current) return;
     if (!token) {
       setFailed(true);
       setBusy(false);
@@ -46,6 +49,19 @@ export function ShareBoardButton({ storeId }: { storeId: string }) {
     }
     setUrl(boardShareUrl(token));
     setBusy(false);
+  }
+
+  function show() {
+    const storeId = stores[0]?.id;
+    if (!storeId) return;
+    setPicked(storeId);
+    setOpen(true);
+    void load(storeId);
+  }
+
+  function choose(storeId: string) {
+    setPicked(storeId);
+    void load(storeId);
   }
 
   async function copy() {
@@ -76,6 +92,17 @@ export function ShareBoardButton({ storeId }: { storeId: string }) {
       <Modal open={open} onClose={() => setOpen(false)} title="Compartilhar placar">
         <div className="flex flex-col gap-4">
           <p className="text-sm text-t2">Qualquer pessoa com este link pode ver o placar desta filial sem fazer login.</p>
+          {stores.length > 1 ? (
+            <FormField label="Filial">
+              <Select value={picked} onChange={(event) => choose(event.target.value)} aria-label="Filial do link">
+                {stores.map((store) => (
+                  <option key={store.id} value={store.id}>
+                    {store.tradeName}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+          ) : null}
           <FormField label="Link do placar" error={error}>
             <div className="relative">
               <Input

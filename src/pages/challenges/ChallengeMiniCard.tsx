@@ -1,4 +1,4 @@
-import { Badge, ProgressBar } from "@/components/ui";
+import { Badge, Card, ProgressBar } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import type { ChallengeRecord } from "@/data/wedash/challengesRepo";
 import { CHALLENGE_STATUS_LABEL, metricValueLabel, type ChallengeParticipant, type ChallengeView } from "@/data/wedash/challengeView";
@@ -41,12 +41,7 @@ export function ChallengeMiniCard({
     const lead = floorLead(c, view);
     const detail = floorDetail(c, view.status === "upcoming");
     return (
-      <div
-        className={cn(
-          "flex w-full flex-col rounded-[var(--radius-vela-lg)] border border-line p-6 text-left shadow-[var(--shadow-vela)]",
-          ended ? "bg-bg-inset" : "bg-bg-2",
-        )}
-      >
+      <Card padding="lg" className="flex w-full flex-col text-left">
         <span className="block min-w-0 truncate text-[15px] font-bold text-t0">{c.name}</span>
         <span className="mt-0.5 block truncate text-[12px] text-t2">
           {shortDate(c.startsOn)} a {shortDate(c.endsOn)}
@@ -90,7 +85,7 @@ export function ChallengeMiniCard({
             )}
           </ul>
         )}
-      </div>
+      </Card>
     );
   }
   const destaque = challengeHeadline(c, view);

@@ -13,7 +13,7 @@ import { defaultWeekHours, effectiveWeekHours } from "@/data/wedash/storeHours";
 import { storesForSession } from "@/data/wedash/stores";
 import { useActiveSession } from "@/session/SessionProvider";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
-import { BoardView, type BoardChallengesData, type BoardGoalsData } from "./BoardView";
+import { BoardView, boardScopeKey, type BoardChallengesData, type BoardGoalsData, type BoardStore } from "./BoardView";
 import { ShareBoardButton } from "./ShareBoardButton";
 
 const REFRESH_MS = 30 * 60 * 1000;
@@ -40,7 +40,25 @@ export function BoardPage() {
   const [params, setParams] = useSearchParams();
   const tv = params.get("tv") === "1";
   const { scope } = useScope();
-  const storeId = scope.storeIds.length === 1 ? scope.storeIds[0]! : null;
+  const sessionStores = useMemo(() => storesForSession(session.stores), [session.stores]);
+  const picked = useMemo(() => {
+    const allowed = new Map(sessionStores.map((store) => [store.id, store]));
+    const ids = scope.storeIds.length > 0 ? scope.storeIds : sessionStores.map((store) => store.id);
+    return ids.flatMap((id) => {
+      const store = allowed.get(id);
+      return store ? [store] : [];
+    });
+  }, [scope.storeIds, sessionStores]);
+  const scopeKey = boardScopeKey(picked.map((store) => store.id));
+  const boardStores = useMemo<BoardStore[]>(
+    () =>
+      picked.map((store) => ({
+        id: store.id,
+        tradeName: store.tradeName,
+        hours: effectiveWeekHours(store.hours ?? defaultWeekHours()),
+      })),
+    [picked],
+  );
   const [team, setTeam] = useState<TeamAggInput>({ dayAggs: [] });
   const [goalsData, setGoalsData] = useState<BoardGoalsData>(GOALS_EMPTY);
   const [challengesData, setChallengesData] = useState<BoardChallengesData>(CHALLENGES_EMPTY);
@@ -51,9 +69,9 @@ export function BoardPage() {
   const watermarkMs = useRef<number | null>(null);
 
   const boardScope = useMemo<Scope | null>(() => {
-    if (!storeId) return null;
-    return { storeIds: [storeId], period: { kind: "thisMonth" }, division: null };
-  }, [storeId]);
+    if (picked.length === 0) return null;
+    return { storeIds: picked.map((store) => store.id), period: { kind: "thisMonth" }, division: null };
+  }, [picked]);
 
   const exitTv = useCallback(() => {
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
@@ -71,8 +89,8 @@ export function BoardPage() {
   }
 
   useEffect(() => {
-    if (tv && !storeId) exitTv();
-  }, [exitTv, storeId, tv]);
+    if (tv && picked.length === 0) exitTv();
+  }, [exitTv, picked.length, tv]);
 
   useEffect(() => {
     if (!tv) return;
@@ -89,16 +107,17 @@ export function BoardPage() {
   }, [exitTv, tv]);
 
   const reload = useCallback(async () => {
-    if (!boardScope || !storeId) return;
+    if (!boardScope) return;
     const gen = ++reloadGen.current;
+    const ids = boardScope.storeIds;
     const today = calendarTodayIso();
     const period = resolvePeriod(boardScope.period, today);
     try {
       const [nextTeam, stamp, goals, challengeRows] = await Promise.all([
         fetchTeamAggInput(session.tenantId, boardScope),
         fetchSyncWatermark(session.tenantId).catch(() => null),
-        fetchGoals({ tenantId: session.tenantId, storeIds: [storeId], from: period.start, to: period.end }),
-        fetchChallenges({ tenantId: session.tenantId, storeIds: [storeId], from: period.start, to: period.end }),
+        fetchGoals({ tenantId: session.tenantId, storeIds: ids, from: period.start, to: period.end }),
+        fetchChallenges({ tenantId: session.tenantId, storeIds: ids, from: period.start, to: period.end }),
       ]);
       let goalPack = GOALS_EMPTY;
       if (goals.length > 0) {
@@ -108,11 +127,11 @@ export function BoardPage() {
         const historyFrom = goalWeightFrom(from);
         const [dayAggs, sellerAggs, namedAggs, teamRows] = await Promise.all([
           historyFrom <= to
-            ? fetchSalesDayAggs({ tenantId: session.tenantId, storeIds: [storeId], from: historyFrom, to, brand: "ALL" })
+            ? fetchSalesDayAggs({ tenantId: session.tenantId, storeIds: ids, from: historyFrom, to, brand: "ALL" })
             : Promise.resolve([]),
-          from <= to ? fetchSalesSellerDayAggs({ tenantId: session.tenantId, storeIds: [storeId], from, to }) : Promise.resolve([]),
-          from <= to ? fetchNamedSellerDayAggs({ tenantId: session.tenantId, storeIds: [storeId], from, to }) : Promise.resolve([]),
-          fetchGoalTeam(session.tenantId, [storeId]),
+          from <= to ? fetchSalesSellerDayAggs({ tenantId: session.tenantId, storeIds: ids, from, to }) : Promise.resolve([]),
+          from <= to ? fetchNamedSellerDayAggs({ tenantId: session.tenantId, storeIds: ids, from, to }) : Promise.resolve([]),
+          fetchGoalTeam(session.tenantId, ids),
         ]);
         goalPack = { goals, dayAggs, sellerAggs, namedAggs, team: teamRows };
       }
@@ -126,24 +145,28 @@ export function BoardPage() {
       setChallengesData(challengePack);
       setWatermark(stamp);
       watermarkMs.current = stamp?.getTime() ?? null;
-      setPackStore(storeId);
+      setPackStore(boardScopeKey(ids));
       setLoading(false);
     } catch (error) {
       if (gen !== reloadGen.current) return;
       console.error("Board reload:", error);
       setLoading(false);
     }
-  }, [boardScope, session.tenantId, storeId]);
+  }, [boardScope, session.tenantId]);
 
   useEffect(() => {
-    if (packStore === storeId) return;
+    if (picked.length === 0) {
+      setLoading(false);
+      return;
+    }
+    if (packStore === scopeKey) return;
     setLoading(true);
     if (packStore != null) {
       setTeam({ dayAggs: [] });
       setGoalsData(GOALS_EMPTY);
       setChallengesData(CHALLENGES_EMPTY);
     }
-  }, [packStore, storeId]);
+  }, [packStore, picked.length, scopeKey]);
 
   useEffect(() => {
     void reload();
@@ -160,7 +183,7 @@ export function BoardPage() {
   }, [reload]);
 
   useEffect(() => {
-    if (!storeId) return;
+    if (picked.length === 0) return;
     const tick = window.setInterval(() => {
       void fetchSyncWatermark(session.tenantId)
         .then((stamp) => {
@@ -170,22 +193,18 @@ export function BoardPage() {
         .catch(() => undefined);
     }, WATERMARK_MS);
     return () => window.clearInterval(tick);
-  }, [reload, session.tenantId, storeId]);
-
-  const stores = storesForSession(session.stores);
-  const store = stores.find((item) => item.id === storeId);
-  const noStores = session.stores.length === 0;
+  }, [picked.length, reload, session.tenantId]);
 
   return (
     <>
       {!tv && (
         <PageHeader
           title="Placar"
-          subtitle="Acompanhe o desempenho da filial, o ranking, as metas e os desafios em tempo real."
+          subtitle="Acompanhe o desempenho das filiais, o ranking, as metas e os desafios em tempo real."
           actions={
-            storeId ? (
+            picked.length > 0 ? (
               <>
-                <ShareBoardButton storeId={storeId} />
+                <ShareBoardButton stores={boardStores.map((store) => ({ id: store.id, tradeName: store.tradeName }))} />
                 <Button type="button" icon={<MonitorUpIcon />} onClick={enterTv}>
                   Exibir na TV
                 </Button>
@@ -194,30 +213,24 @@ export function BoardPage() {
           }
         />
       )}
-      {!storeId ? (
+      {picked.length === 0 ? (
         <Card>
           <EmptyState
             framed={false}
             icon="🏬"
-            title={noStores ? "Nenhuma filial disponível" : "Selecione uma filial"}
-            description={
-              noStores
-                ? "Não há filiais disponíveis para este acesso."
-                : "Escolha uma filial no seletor do topo para visualizar o placar."
-            }
+            title="Nenhuma filial disponível"
+            description="Não há filiais disponíveis para este acesso."
           />
         </Card>
       ) : (
         <BoardView
-          storeId={storeId}
-          storeName={store?.tradeName ?? null}
-          week={effectiveWeekHours(store?.hours ?? defaultWeekHours())}
+          stores={boardStores}
           team={team}
           goalsData={goalsData}
           challengesData={challengesData}
           watermark={watermark}
           loading={loading}
-          packStore={packStore}
+          packKey={packStore}
           controls={tv ? "tv" : "page"}
           onExitTv={exitTv}
         />

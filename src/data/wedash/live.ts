@@ -11,4 +11,6 @@ export interface RankingRow {
   revenue: number;
   /** Nível da meta desta pessoa, no pódio. */
   note?: string;
+  /** Filial, quando o placar junta mais de uma. */
+  place?: string;
 }

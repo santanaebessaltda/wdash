@@ -13,7 +13,7 @@ import { buildTeamDashboardView, type Scope, type TeamAggInput, type TeamMemberR
 import { ChallengeMiniCard } from "@/pages/challenges/ChallengeMiniCard";
 import { TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
 import { calendarTodayIso } from "@/data/wedash/clock";
-import type { StoreWeekHours } from "@/data/wedash/storeHours";
+import { defaultWeekHours, effectiveWeekHours, type StoreWeekHours } from "@/data/wedash/storeHours";
 import { formatSyncWatermarkLabel } from "@/data/wedash/syncUi";
 import { brlCent, num, shortDate } from "@/lib/format";
 import { cn } from "@/lib/cn";
@@ -45,6 +45,16 @@ export type BoardGoalsData = {
 };
 
 export type BoardChallengesData = { challenges: ChallengeRecord[]; aggs: ChallengeAggInput };
+
+export type BoardStore = { id: string; tradeName: string; hours: StoreWeekHours };
+
+/** Uma filial guarda a chave antiga. Várias filiais usam os ids ordenados. */
+export function boardScopeKey(storeIds: readonly string[]): string {
+  const unique = [...new Set(storeIds)].sort();
+  if (unique.length === 0) return "";
+  if (unique.length === 1) return unique[0]!;
+  return unique.join(",");
+}
 
 type PersonLevel = {
   levelNumber: number | null;
@@ -120,12 +130,12 @@ function levelLabel(levelNumber: number | null, name: string | null): string | n
   return `N${levelNumber} · ${name}`;
 }
 
-function storeTotals(days: SalesDayAgg[], storeId: string, from: string, to: string, onlyDay?: string) {
+function storeTotals(days: SalesDayAgg[], storeIds: readonly string[], from: string, to: string) {
+  const ids = new Set(storeIds);
   let revenue = 0;
   let sales = 0;
   for (const row of days) {
-    if (row.storeId !== storeId || row.brand !== "ALL" || row.day < from || row.day > to) continue;
-    if (onlyDay && row.day !== onlyDay) continue;
+    if (!ids.has(row.storeId) || row.brand !== "ALL" || row.day < from || row.day > to) continue;
     revenue += row.revenueCents / 100;
     sales += row.salesCount;
   }
@@ -145,28 +155,70 @@ const IconSales = () => (
   </svg>
 );
 
+type GoalBoard = {
+  goal: GoalRecord;
+  card: ReturnType<typeof buildGoalCardView>;
+  summary: ReturnType<typeof buildGoalSummary>;
+  storeName: string;
+};
+
+function BoardGoalCard({ board, showStore }: { board: GoalBoard; showStore: boolean }) {
+  const { goal, card, summary, storeName } = board;
+  const mode = goal.tierMode === "INDIVIDUAL" ? "Individual" : goal.tierMode === "GENERAL" ? "Geral" : "Grupo";
+  return (
+    <Card padding="none" className="px-6 py-4">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="truncate text-[18px] font-extrabold tracking-tight text-t0">{card.name}</p>
+          <p className="mt-0.5 truncate text-[12.5px] text-t2">
+            {shortDate(goal.startsOn)} a {shortDate(goal.endsOn)}
+          </p>
+          {showStore ? <p className="truncate text-[12.5px] text-t2">{storeName}</p> : null}
+          <p className="mt-1.5 font-mono text-[20px] font-extrabold leading-none tabular-nums text-t0">{brlCent(summary.achieved)}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <Badge variant={statusBadgeVariant(GOAL_STATUS_LABEL[summary.status])}>{GOAL_STATUS_LABEL[summary.status]}</Badge>
+            <span className="text-[12px] text-t2">
+              {mode}
+              <span className="mx-1.5">·</span>
+              {goal.tiers.length} {goal.tiers.length === 1 ? "nível" : "níveis"}
+            </span>
+          </div>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className={`font-mono text-[22px] font-extrabold leading-none tabular-nums ${progressTextClass(summary.pct)}`}>{num(summary.pct, 1)}%</p>
+          <p className="mt-1 text-[12px] text-t2">de {brlCent(goal.target)}</p>
+        </div>
+      </div>
+      <div className="mt-3">
+        <ProgressBar value={summary.pct} height={5} />
+      </div>
+      <p className="mt-1.5 text-[11.5px] text-t2">
+        {summary.projectedPct != null
+          ? `Projeção ${num(summary.projectedPct, 0)}% · ${prazoRemaining(summary.daysRemaining).toLowerCase()}`
+          : prazoRemaining(summary.daysRemaining)}
+      </p>
+    </Card>
+  );
+}
+
 export function BoardView({
-  storeId,
-  storeName,
-  week,
+  stores,
   team,
   goalsData,
   challengesData,
   watermark,
   loading,
-  packStore,
+  packKey,
   controls = "page",
   onExitTv,
 }: {
-  storeId: string | null;
-  storeName: string | null;
-  week: StoreWeekHours;
+  stores: BoardStore[];
   team: TeamAggInput;
   goalsData: BoardGoalsData;
   challengesData: BoardChallengesData;
   watermark: Date | null;
   loading: boolean;
-  packStore: string | null;
+  packKey: string | null;
   /** page: dentro da WDash. tv: apresentação. public: link sem login. */
   controls?: "page" | "tv" | "public";
   onExitTv?: () => void;
@@ -179,32 +231,42 @@ export function BoardView({
   const seenSnap = useRef<string | null>(null);
 
   const today = calendarTodayIso();
+  const scopeKey = boardScopeKey(stores.map((store) => store.id));
+  const manyStores = stores.length > 1;
+  const storeName = new Map(stores.map((store) => [store.id, store.tradeName]));
+  const headline = manyStores ? `${stores.length} filiais` : (stores[0]?.tradeName ?? "Filial");
   const boardScope = useMemo<Scope | null>(() => {
-    if (!storeId) return null;
-    return { storeIds: [storeId], period: { kind: "thisMonth" }, division: null };
-  }, [storeId]);
+    if (!scopeKey) return null;
+    return { storeIds: scopeKey.split(","), period: { kind: "thisMonth" }, division: null };
+  }, [scopeKey]);
   const view = useMemo(() => (boardScope ? buildTeamDashboardView(boardScope, team) : null), [boardScope, team]);
 
-  const goalCard = useMemo(() => {
-    if (!storeId) return null;
-    const active = goalsData.goals
+  const goalBoards = useMemo<GoalBoard[]>(() => {
+    return goalsData.goals
       .filter((goal) => goalStatus(goal, today) === "active")
-      .sort((a, b) => b.startsOn.localeCompare(a.startsOn));
-    const goal = active[0];
-    if (!goal) return null;
-    return buildGoalCardView({
-      goal,
-      storeNameValue: storeName ?? "Filial",
-      dayAggs: goalsData.dayAggs,
-      sellerDayAggs: goalsData.sellerAggs,
-      namedSellerDayAggs: goalsData.namedAggs,
-      team: goalsData.team,
-      today,
-      week,
-    });
-  }, [goalsData, storeId, storeName, today, week]);
+      .sort((a, b) => b.startsOn.localeCompare(a.startsOn))
+      .map((goal) => {
+        const store = stores.find((item) => item.id === goal.storeId);
+        const name = store?.tradeName ?? "Filial";
+        const week = store?.hours ?? effectiveWeekHours(defaultWeekHours());
+        return {
+          goal,
+          storeName: name,
+          card: buildGoalCardView({
+            goal,
+            storeNameValue: name,
+            dayAggs: goalsData.dayAggs,
+            sellerDayAggs: goalsData.sellerAggs,
+            namedSellerDayAggs: goalsData.namedAggs,
+            team: goalsData.team,
+            today,
+            week,
+          }),
+          summary: buildGoalSummary(goal, goalsData.dayAggs, today, week),
+        };
+      });
+  }, [goalsData, stores, today]);
 
-  const activeGoal = goalCard ? goalsData.goals.find((goal) => goal.id === goalCard.id) ?? null : null;
   const challenges = useMemo(() => {
     return challengesData.challenges
       .map((challenge) => ({ challenge, view: buildChallengeView({ challenge, aggs: challengesData.aggs, today }) }))
@@ -213,31 +275,51 @@ export function BoardView({
   }, [challengesData, today]);
 
   const levels = useMemo(() => {
+    const byStore = new Map<string, PersonLevel>();
     const byKey = new Map<string, PersonLevel>();
     const byName = new Map<string, PersonLevel>();
-    for (const seller of goalCard?.sellers ?? []) {
-      if (seller.noGoal) continue;
-      const row: PersonLevel = {
-        name: seller.name,
-        levelNumber: seller.currentLevel,
-        levelLabel: levelLabel(seller.currentLevel, seller.currentTierName),
-        pct: seller.attainmentPct,
-        storePct: seller.storeGoalPct,
-      };
-      byKey.set(seller.employeeId, row);
-      byName.set(seller.name.trim().toLocaleLowerCase("pt-BR"), row);
+    for (const board of goalBoards) {
+      for (const seller of board.card.sellers) {
+        if (seller.noGoal) continue;
+        const slot = `${board.goal.storeId}:${seller.employeeId}`;
+        if (byStore.has(slot)) continue;
+        const row: PersonLevel = {
+          name: seller.name,
+          levelNumber: seller.currentLevel,
+          levelLabel: levelLabel(seller.currentLevel, seller.currentTierName),
+          pct: seller.attainmentPct,
+          storePct: seller.storeGoalPct,
+        };
+        byStore.set(slot, row);
+        if (!byKey.has(seller.employeeId)) byKey.set(seller.employeeId, row);
+        const name = seller.name.trim().toLocaleLowerCase("pt-BR");
+        if (!byName.has(name)) byName.set(name, row);
+      }
     }
-    return { byKey, byName };
-  }, [goalCard]);
+    return { byStore, byKey, byName };
+  }, [goalBoards]);
 
   function personLevel(person: TeamMemberRow): PersonLevel | null {
+    const home = person.storeIds[0];
+    if (home) {
+      const hit = levels.byStore.get(`${home}:${person.key}`);
+      if (hit) return hit;
+    }
+    if (manyStores) return null;
     return levels.byKey.get(person.key) ?? levels.byName.get(person.name.trim().toLocaleLowerCase("pt-BR")) ?? null;
   }
 
+  function goalFor(person: TeamMemberRow): GoalBoard | null {
+    const home = person.storeIds[0];
+    const match = goalBoards.find((board) => board.goal.storeId === home);
+    if (match) return match;
+    if (!manyStores && goalBoards.length === 1) return goalBoards[0]!;
+    return null;
+  }
+
   const snapshot = useMemo<BoardSnapshot | null>(() => {
-    if (!view || !storeId) return null;
-    const summary = activeGoal ? buildGoalSummary(activeGoal, goalsData.dayAggs, today, week) : null;
-    const storeLevel = activeGoal && activeGoal.tierMode !== "INDIVIDUAL" ? summary : null;
+    if (!view || stores.length === 0) return null;
+    const storeBoard = goalBoards.length === 1 && goalBoards[0]!.goal.tierMode !== "INDIVIDUAL" ? goalBoards[0]! : null;
     return {
       ranks: view.people.map((person, index) => ({ key: person.key, name: person.name, position: index + 1 })),
       levels: [...levels.byKey.entries()].map(([key, level]) => ({
@@ -246,28 +328,28 @@ export function BoardView({
         levelNumber: level.levelNumber,
         levelLabel: level.levelLabel,
       })),
-      storeLevelNumber: storeLevel?.levelNumber ?? null,
-      storeLevelLabel: levelLabel(storeLevel?.levelNumber ?? null, storeLevel?.currentLevel ?? null),
+      storeLevelNumber: storeBoard?.summary.levelNumber ?? null,
+      storeLevelLabel: levelLabel(storeBoard?.summary.levelNumber ?? null, storeBoard?.summary.currentLevel ?? null),
       winners: challenges.flatMap(({ challenge, view: challengeView }) =>
         challengeView.participants
           .filter((person) => person.winner)
           .map((person) => ({ challengeId: challenge.id, challengeName: challenge.name, key: person.key, name: person.name })),
       ),
     };
-  }, [activeGoal, challenges, goalsData.dayAggs, levels, storeId, today, view, week]);
+  }, [challenges, goalBoards, levels, stores.length, view]);
 
   useEffect(() => {
-    if (!snapshot || !storeId || packStore !== storeId) return;
+    if (!snapshot || !scopeKey || packKey !== scopeKey) return;
     const serial = JSON.stringify(snapshot);
     if (seenSnap.current === serial) return;
     seenSnap.current = serial;
-    const previous = readSnapshot(storeId);
-    writeSnapshot(storeId, snapshot);
+    const previous = readSnapshot(scopeKey);
+    writeSnapshot(scopeKey, snapshot);
     const moments = boardMoments(previous, snapshot).slice(0, MOMENT_CAP);
     if (moments.length === 0) return;
     queue.current.push(...moments);
     setCurrent((showing) => showing ?? queue.current.shift() ?? null);
-  }, [packStore, snapshot, storeId]);
+  }, [packKey, scopeKey, snapshot]);
 
   useEffect(() => {
     if (!current) return;
@@ -307,25 +389,31 @@ export function BoardView({
     }
   }
 
-  if (!storeId) return null;
+  if (stores.length === 0) return null;
 
   const names = view?.people.map((person) => person.name) ?? [];
+  const homeStore = (person: TeamMemberRow) => person.storeIds[0] ?? stores[0]?.id ?? "";
   const podium: RankingRow[] = (view?.people.slice(0, 3) ?? []).map((person, index) => {
     const level = personLevel(person);
+    const home = homeStore(person);
     return {
       position: index + 1,
       employeeId: person.key,
       name: firstName(person.name, names),
       avatarName: person.name,
-      storeId: person.storeIds[0] ?? storeId,
+      storeId: home,
       sales: person.sales,
       revenue: person.revenue,
       note: level ? (level.levelLabel ?? "Sem nível") : undefined,
+      place: manyStores ? storeName.get(home) : undefined,
     };
   });
-  const summary = activeGoal ? buildGoalSummary(activeGoal, goalsData.dayAggs, today, week) : null;
-  const month = view ? storeTotals(team.dayAggs, storeId, view.period.start, view.period.end) : { revenue: 0, sales: 0 };
-  const todayTotals = storeTotals(team.dayAggs, storeId, today, today);
+  const oneGoal = goalBoards.length === 1 ? goalBoards[0]! : null;
+  const goalTarget = goalBoards.reduce((sum, board) => sum + board.goal.target, 0);
+  const goalAchieved = goalBoards.reduce((sum, board) => sum + board.summary.achieved, 0);
+  const goalPct = goalTarget > 0 ? (goalAchieved / goalTarget) * 100 : 0;
+  const month = view ? storeTotals(team.dayAggs, scopeKey.split(","), view.period.start, view.period.end) : { revenue: 0, sales: 0 };
+  const todayTotals = storeTotals(team.dayAggs, scopeKey.split(","), today, today);
   const monthRevenue = view?.composition.total ?? month.revenue;
 
   const showSound = controls === "tv" || controls === "public";
@@ -336,7 +424,7 @@ export function BoardView({
       {controls !== "page" && (
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-[22px] font-extrabold tracking-tight text-t0 sm:text-[26px]">{storeName ?? "Filial"}</h1>
+          <h1 className="text-[22px] font-extrabold tracking-tight text-t0 sm:text-[26px]">{headline}</h1>
           <p className="mt-0.5 text-[13px] text-t2">
             {monthLabel(today)}
             <span className="mx-1.5">·</span>
@@ -364,8 +452,8 @@ export function BoardView({
         <StatCard
           dense
           label="Meta"
-          value={activeGoal ? brlCent(activeGoal.target) : "—"}
-          sub={activeGoal ? (goalCard?.name ?? "Meta do mês") : "Não configurada"}
+          value={goalBoards.length > 0 ? brlCent(goalTarget) : "—"}
+          sub={goalBoards.length === 0 ? "Não configurada" : oneGoal ? oneGoal.card.name : `${goalBoards.length} metas ativas`}
           icon={<TargetIcon size={16} />}
           iconColor="var(--info)"
           iconBg="rgba(59,130,246,0.12)"
@@ -373,15 +461,17 @@ export function BoardView({
         <StatCard
           dense
           label="Progresso da meta"
-          value={summary ? `${num(summary.pct, 1)}%` : "—"}
+          value={goalBoards.length > 0 ? `${num(oneGoal ? oneGoal.summary.pct : goalPct, 1)}%` : "—"}
           sub={
-            !summary
+            goalBoards.length === 0
               ? "Meta não configurada"
-              : activeGoal?.tierMode === "INDIVIDUAL"
-                ? "Meta individual"
-                : summary.currentLevel
-                  ? `N${summary.levelNumber} · ${summary.currentLevel}`
-                  : "Sem nível"
+              : !oneGoal
+                ? `${goalBoards.length} metas ativas`
+                : oneGoal.goal.tierMode === "INDIVIDUAL"
+                  ? "Meta individual"
+                  : oneGoal.summary.currentLevel
+                    ? `N${oneGoal.summary.levelNumber} · ${oneGoal.summary.currentLevel}`
+                    : "Sem nível"
           }
           icon={<TrophyIcon size={16} />}
           iconColor="var(--warn)"
@@ -389,37 +479,11 @@ export function BoardView({
         />
       </div>
 
-      {goalCard && activeGoal && summary ? (
-        <div className="flex flex-col rounded-[var(--radius-vela-lg)] border border-line bg-bg-2 px-6 py-4 shadow-[var(--shadow-vela)]">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <p className="truncate text-[18px] font-extrabold tracking-tight text-t0">{goalCard.name}</p>
-              <p className="mt-0.5 truncate text-[12.5px] text-t2">
-                {shortDate(activeGoal.startsOn)} a {shortDate(activeGoal.endsOn)}
-              </p>
-              <p className="mt-1.5 font-mono text-[20px] font-extrabold leading-none tabular-nums text-t0">{brlCent(summary.achieved)}</p>
-              <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
-                <Badge variant={statusBadgeVariant(GOAL_STATUS_LABEL[summary.status])}>{GOAL_STATUS_LABEL[summary.status]}</Badge>
-                <span className="text-[12px] text-t2">
-                  {activeGoal.tierMode === "INDIVIDUAL" ? "Individual" : activeGoal.tierMode === "GENERAL" ? "Geral" : "Grupo"}
-                  <span className="mx-1.5">·</span>
-                  {activeGoal.tiers.length} {activeGoal.tiers.length === 1 ? "nível" : "níveis"}
-                </span>
-              </div>
-            </div>
-            <div className="shrink-0 text-right">
-              <p className={`font-mono text-[22px] font-extrabold leading-none tabular-nums ${progressTextClass(summary.pct)}`}>{num(summary.pct, 1)}%</p>
-              <p className="mt-1 text-[12px] text-t2">de {brlCent(activeGoal.target)}</p>
-            </div>
-          </div>
-          <div className="mt-3">
-            <ProgressBar value={summary.pct} height={5} />
-          </div>
-          <p className="mt-1.5 text-[11.5px] text-t2">
-            {summary.projectedPct != null
-              ? `Projeção ${num(summary.projectedPct, 0)}% · ${prazoRemaining(summary.daysRemaining).toLowerCase()}`
-              : prazoRemaining(summary.daysRemaining)}
-          </p>
+      {goalBoards.length > 0 ? (
+        <div className="flex flex-col gap-3">
+          {goalBoards.map((board) => (
+            <BoardGoalCard key={board.goal.id} board={board} showStore={manyStores} />
+          ))}
         </div>
       ) : (
         <Card>
@@ -452,15 +516,22 @@ export function BoardView({
                       <tbody>
                         {view!.people.slice(3).map((person, index) => {
                           const level = personLevel(person);
-                          const individual = activeGoal?.tierMode === "INDIVIDUAL";
+                          const board = goalFor(person);
+                          const home = homeStore(person);
+                          const individual = board?.goal.tierMode === "INDIVIDUAL";
                           const pct = level ? (individual ? `${num(level.pct, 1)}%` : `${num(level.storePct, 1)}% da meta`) : null;
                           return (
                             <tr key={person.key} className={cn("border-b border-line last:border-b-0", momentKey(current) === person.key && "bg-acc-soft")}>
                               <td className="py-1.5 pr-2 font-bold text-t3">{index + 4}º</td>
                               <td className="py-1.5 pr-2">
                                 <span className="flex min-w-0 items-center gap-2">
-                                  <PersonAvatar name={person.name} employeeId={person.key} storeId={person.storeIds[0] ?? storeId} size="sm" />
-                                  <span className="min-w-0 truncate text-[12.5px] font-bold text-t0">{person.name}</span>
+                                  <PersonAvatar name={person.name} employeeId={person.key} storeId={home} size="sm" />
+                                  <span className="min-w-0">
+                                    <span className="block truncate text-[12.5px] font-bold text-t0">{person.name}</span>
+                                    {manyStores && storeName.get(home) ? (
+                                      <span className="block truncate text-[11px] text-t2">{storeName.get(home)}</span>
+                                    ) : null}
+                                  </span>
                                 </span>
                               </td>
                               <td className="py-1.5 pr-2 text-right font-mono text-[12.5px] font-bold tabular-nums text-t0">{num(person.sales)}</td>
@@ -491,6 +562,7 @@ export function BoardView({
                 key={challenge.id}
                 challenge={challenge}
                 view={challengeView}
+                storeNameValue={manyStores ? storeName.get(challenge.storeId) : undefined}
                 prominent
                 showPeople
                 floor

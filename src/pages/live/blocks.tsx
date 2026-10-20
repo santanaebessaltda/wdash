@@ -150,6 +150,7 @@ export function RankingBlock({
             <p className="max-w-full truncate text-[13px] font-bold text-t0 sm:text-[14px]">
               {literalName ? l.name : l.name.split(" ")[0]}
             </p>
+            {l.place ? <p className="max-w-full truncate text-[11px] text-t2">{l.place}</p> : null}
             {spotlight ? (
               <p className="mt-0.5 font-mono text-[17px] font-extrabold leading-none text-t0 tabular-nums sm:text-[18px]">
                 {formatAmount(l.revenue)}
