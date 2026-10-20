@@ -19,23 +19,25 @@ const PODIO_HEIGHT: Record<1 | 2 | 3, string> = {
 /** Ordem visual do podio: 2 | 1 | 3 */
 const PODIO_ORDEM = [1, 0, 2] as const;
 
-const MEDALHA_EMOJI: Record<1 | 2 | 3, string> = { 1: "🥇", 2: "🥈", 3: "🥉" };
+const MEDALHA_EMOJI: Record<2 | 3, string> = { 2: "🥈", 3: "🥉" };
 
 function MedalhaBadge({ pos, apagada = false }: { pos: 1 | 2 | 3; apagada?: boolean }) {
+  const crown = pos === 1;
   return (
     <span
       className={cn(
-        "absolute -right-2 -top-2 text-[26px] leading-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.35)]",
+        "absolute leading-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.35)]",
+        crown ? "left-1/2 top-0 -translate-x-1/2 -translate-y-[68%] text-[30px]" : "-right-2 -top-2 text-[26px]",
         apagada && "opacity-40 grayscale",
       )}
       aria-hidden
     >
-      {MEDALHA_EMOJI[pos]}
+      {crown ? "👑" : MEDALHA_EMOJI[pos]}
     </span>
   );
 }
 
-/** Podio top 3  -  aba Ranking (ouro / prata / bronze; degrau na cor primaria). */
+/** Podio top 3  -  aba Ranking (1º com coroa, 2º e 3º com medalha; degrau na cor primaria). */
 export function RankingBlock({
   ranking,
   formatAmount = brlK,
@@ -57,7 +59,7 @@ export function RankingBlock({
   const top3 = ranking.slice(0, 3);
 
   return (
-    <div className="flex items-end justify-center gap-2.5 pt-3 sm:gap-6">
+    <div className="flex items-end justify-center gap-2.5 pt-7 sm:gap-6">
       {PODIO_ORDEM.map((i) => {
         const pos = (i + 1) as 1 | 2 | 3;
         const medal = MEDALHA[pos];
