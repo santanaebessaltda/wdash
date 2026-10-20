@@ -4,6 +4,8 @@ import { cn } from "@/lib/cn";
 export interface CardProps extends HTMLAttributes<HTMLDivElement> {
   children: ReactNode;
   padding?: "none" | "sm" | "md" | "lg";
+  /** Fundo em degradê com halo no canto, como o card de insight. A string é a cor do halo. */
+  glass?: string;
 }
 
 const paddingClasses = {
@@ -13,16 +15,24 @@ const paddingClasses = {
   lg: "p-6",
 };
 
-export function Card({ className, children, padding = "md", ...props }: CardProps) {
+export function Card({ className, children, padding = "md", glass, ...props }: CardProps) {
   return (
     <div
       className={cn(
         "rounded-[var(--radius-vela-lg)] border border-line bg-bg-2 shadow-[var(--shadow-vela)] print:break-inside-avoid",
+        glass != null && "relative overflow-hidden bg-gradient-to-br from-bg-3 to-bg-2",
         paddingClasses[padding],
         className,
       )}
       {...props}
     >
+      {glass != null ? (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-5 -top-5 h-20 w-20 rounded-full"
+          style={{ background: `radial-gradient(circle, ${glass}, transparent 70%)` }}
+        />
+      ) : null}
       {children}
     </div>
   );

@@ -166,7 +166,7 @@ function BoardGoalCard({ board, showStore }: { board: GoalBoard; showStore: bool
   const { goal, card, summary, storeName } = board;
   const mode = goal.tierMode === "INDIVIDUAL" ? "Individual" : goal.tierMode === "GENERAL" ? "Geral" : "Grupo";
   return (
-    <Card padding="none" className="px-6 py-4">
+    <Card padding="none" glass="var(--info-soft)" className="px-6 py-4">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="truncate text-[18px] font-extrabold tracking-tight text-t0">{card.name}</p>
@@ -447,10 +447,11 @@ export function BoardView({
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard dense label="Faturamento" value={brlCent(monthRevenue)} sub={`Hoje ${brlCent(todayTotals.revenue)}`} icon={<IconRevenue />} iconColor="var(--acc)" iconBg="var(--acc-soft)" />
-        <StatCard dense label="Vendas" value={num(month.sales)} sub={`Hoje ${num(todayTotals.sales)}`} icon={<IconSales />} iconColor="var(--ok)" iconBg="var(--ok-soft)" />
+        <StatCard dense glass label="Faturamento" value={brlCent(monthRevenue)} sub={`Hoje ${brlCent(todayTotals.revenue)}`} icon={<IconRevenue />} iconColor="var(--acc)" iconBg="var(--acc-soft)" />
+        <StatCard dense glass label="Vendas" value={num(month.sales)} sub={`Hoje ${num(todayTotals.sales)}`} icon={<IconSales />} iconColor="var(--ok)" iconBg="var(--ok-soft)" />
         <StatCard
           dense
+          glass
           label="Meta"
           value={goalBoards.length > 0 ? brlCent(goalTarget) : "—"}
           sub={goalBoards.length === 0 ? "Não configurada" : oneGoal ? oneGoal.card.name : `${goalBoards.length} metas ativas`}
@@ -460,6 +461,7 @@ export function BoardView({
         />
         <StatCard
           dense
+          glass
           label="Progresso da meta"
           value={goalBoards.length > 0 ? `${num(oneGoal ? oneGoal.summary.pct : goalPct, 1)}%` : "—"}
           sub={
@@ -486,13 +488,13 @@ export function BoardView({
           ))}
         </div>
       ) : (
-        <Card>
+        <Card glass="var(--info-soft)">
           <EmptyState framed={false} icon="🎯" title="Meta não configurada" description="Cadastre uma meta para acompanhar o desempenho da equipe no período." />
         </Card>
       )}
 
       <div className={cn("grid min-w-0 gap-4", challenges.length > 0 && "xl:grid-cols-[minmax(0,65fr)_minmax(280px,35fr)] xl:items-start")}>
-        <Card padding="lg" className="min-w-0">
+        <Card padding="lg" glass="var(--acc-soft)" className="min-w-0">
           <div className="mb-1 flex items-center gap-2">
             <TrophyIcon size={16} className="text-acc" />
             <CardTitle>Ranking</CardTitle>

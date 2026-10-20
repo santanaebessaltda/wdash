@@ -474,8 +474,8 @@ export function BoardSkeleton({ header = false, className }: { header?: boolean;
         </div>
       )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 4 }, (_, i) => (
-          <Card key={i} padding="sm" className="min-w-0">
+        {["var(--acc-soft)", "var(--ok-soft)", "var(--info-soft)", "var(--warn-soft)"].map((glow) => (
+          <Card key={glow} padding="sm" glass={glow} className="min-w-0">
             <Skeleton className="h-8 w-8 rounded-[10px]" />
             <Skeleton className="mt-2 h-3 w-24" />
             <Skeleton className="mt-1.5 h-6 w-28" />
@@ -483,7 +483,7 @@ export function BoardSkeleton({ header = false, className }: { header?: boolean;
           </Card>
         ))}
       </div>
-      <div className="min-w-0 overflow-hidden rounded-[var(--radius-vela-lg)] border border-line bg-bg-2 px-6 py-4 shadow-[var(--shadow-vela)]">
+      <Card padding="none" glass="var(--info-soft)" className="min-w-0 px-6 py-4">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <Skeleton className="h-5 w-52" />
@@ -501,9 +501,9 @@ export function BoardSkeleton({ header = false, className }: { header?: boolean;
         </div>
         <Skeleton className="mt-1.5 h-[5px] w-full rounded-full" />
         <Skeleton className="mt-1.5 h-3 w-48" />
-      </div>
+      </Card>
       <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,65fr)_minmax(280px,35fr)] xl:items-start">
-        <Card padding="lg" className="min-w-0 overflow-hidden">
+        <Card padding="lg" glass="var(--acc-soft)" className="min-w-0">
           <Skeleton className="mb-4 h-4 w-24" />
           <div className="flex items-end justify-center gap-2.5 pt-5 sm:gap-6">
             {BOARD_PODIUM.map((step, i) => (

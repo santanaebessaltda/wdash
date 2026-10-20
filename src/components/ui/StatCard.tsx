@@ -28,12 +28,14 @@ export interface StatCardProps {
   quietSub?: boolean;
   /** Ícone e espaços menores. O valor continua o destaque. Só o placar da loja. */
   dense?: boolean;
+  /** Fundo em degradê com halo na cor do ícone, como o card de insight. Só o placar da loja. */
+  glass?: boolean;
   className?: string;
 }
 
-export function StatCard({ label, value, icon, iconColor = "var(--acc)", iconBg = "var(--acc-soft)", delta, sparkline, sub, sub2, tooltip, deltaTooltip, valueClassName, quietSub = false, dense = false, className }: StatCardProps) {
+export function StatCard({ label, value, icon, iconColor = "var(--acc)", iconBg = "var(--acc-soft)", delta, sparkline, sub, sub2, tooltip, deltaTooltip, valueClassName, quietSub = false, dense = false, glass = false, className }: StatCardProps) {
   return (
-    <Card padding={dense ? "sm" : "md"} className={cn("min-w-0", className)}>
+    <Card padding={dense ? "sm" : "md"} glass={glass ? iconBg : undefined} className={cn("min-w-0", className)}>
       {icon || delta ? (
       <div className={cn("flex items-center gap-2", icon ? "justify-between" : "justify-end")}>
         {icon ? (
