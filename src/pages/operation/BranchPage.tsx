@@ -246,7 +246,7 @@ function SettingsCard({
             const name = storeName(store);
             return (
               <section key={store.id} className={cn("flex flex-col gap-4", many && "border-t border-line pb-6 pt-5 first:border-t-0 first:pt-0")}>
-                {many ? <p className="text-[11.5px] font-bold tracking-wide text-t2 break-words">{name}</p> : null}
+                {many ? <p className="text-[13px] font-bold text-t0 break-words">{name}</p> : null}
                 <SettingsDraftProvider register={drafts.register} errorPrefix={many ? name : undefined}>
                   {children(store)}
                 </SettingsDraftProvider>
