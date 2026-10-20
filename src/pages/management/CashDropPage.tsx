@@ -746,8 +746,53 @@ function StoresDayModal({
   onSaved: (storeId: string, lines: CashDropLineRow[], shortage: CashDropShortageRow | null) => void;
   onUndo: (depositId: string) => Promise<void>;
 }) {
+  const { show } = useToast();
+  const savers = useRef(new Map<string, () => Promise<boolean>>());
+  const [salvando, setSalvando] = useState(false);
+  const canSave = blocks.some((block) => block.rows.length > 0);
+  const bindSave = useCallback((storeId: string, save: (() => Promise<boolean>) | null) => {
+    if (save) savers.current.set(storeId, save);
+    else savers.current.delete(storeId);
+  }, []);
+
+  async function saveAll() {
+    setSalvando(true);
+    try {
+      for (const block of blocks) {
+        if (block.rows.length === 0) continue;
+        const save = savers.current.get(block.storeId);
+        if (!save) continue;
+        const ok = await save();
+        if (!ok) return;
+      }
+      show("Sangrias atualizadas.", "success");
+      onClose();
+    } finally {
+      setSalvando(false);
+    }
+  }
+
   return (
-    <Modal open onClose={onClose} size="lg" title={dayTitle(day)} footer={<Button variant="outline" onClick={onClose}>Voltar</Button>}>
+    <Modal
+      open
+      onClose={() => {
+        if (!salvando) onClose();
+      }}
+      size="lg"
+      title={dayTitle(day)}
+      footer={
+        <>
+          <Button variant="outline" onClick={onClose} disabled={salvando}>
+            {canSave ? "Cancelar" : "Voltar"}
+          </Button>
+          {canSave ? (
+            <Button onClick={() => void saveAll()} disabled={salvando}>
+              {salvando ? "Salvando…" : "Salvar"}
+            </Button>
+          ) : null}
+        </>
+      }
+    >
       {blocks.length === 0 ? (
         <p className="text-[13.5px] text-t2">Nenhuma sangria neste dia.</p>
       ) : (
@@ -755,6 +800,8 @@ function StoresDayModal({
           <DayModal
             key={block.storeId}
             embedded
+            busy={salvando}
+            onBindSave={bindSave}
             storeName={block.storeName}
             day={day}
             today={today}
@@ -786,6 +833,8 @@ function DayModal({
   onUndo,
   embedded = false,
   storeName,
+  busy = false,
+  onBindSave,
 }: {
   day: string;
   today: string;
@@ -799,6 +848,8 @@ function DayModal({
   onUndo: (depositId: string) => Promise<void>;
   embedded?: boolean;
   storeName?: string;
+  busy?: boolean;
+  onBindSave?: (storeId: string, save: (() => Promise<boolean>) | null) => void;
 }) {
   const { show } = useToast();
   const [lines, setLines] = useState(rows);
@@ -808,6 +859,7 @@ function DayModal({
   const [confirmUndo, setConfirmUndo] = useState(false);
   const [daysReceipt, setDaysReceipt] = useState(1);
   const [desfazendo, setDesfazendo] = useState(false);
+  const persist = useRef<(quiet: boolean) => Promise<boolean>>(async () => false);
   const consulta = rows.length === 0;
   const travado = Boolean(deposit);
   const preview = dayAmounts(
@@ -821,20 +873,24 @@ function DayModal({
     preview.gapCents > 0 ? { label: "Falta", value: money(preview.gapCents), tone: "text-bad" } : null,
   ].filter((item): item is { label: string; value: string; tone: string } => item != null);
 
-  async function save() {
+  function fail(message: string) {
+    show(storeName ? `${storeName}: ${message}` : message, "danger");
+  }
+
+  async function save(quiet = false) {
     const cents = fieldToCents(gap);
     if (cents == null) {
-      show("O valor da falta não é válido.", "danger");
-      return;
+      fail("O valor da falta não é válido.");
+      return false;
     }
     const base = lines.reduce((sum, line) => (line.kind === "purchase" ? sum : sum + line.amountCents), 0);
     if (cents > base) {
-      show("A falta não pode passar do valor que iria para o boleto.", "danger");
-      return;
+      fail("A falta não pode passar do valor que iria para o boleto.");
+      return false;
     }
     if (!travado && lines.some((line) => line.kind === "purchase" && !line.note.trim())) {
-      show("Informe a descrição das sangrias fora do boleto.", "danger");
-      return;
+      fail("Informe a descrição das sangrias fora do boleto.");
+      return false;
     }
     setSalvando(true);
     try {
@@ -847,14 +903,26 @@ function DayModal({
       const changedGap = (shortage?.amountCents ?? 0) !== cents || (shortage?.note ?? "") !== text;
       if (changedGap) await saveCashDropShortage(tenantId, storeId, day, cents, text);
       onSaved(lines, cents === 0 ? null : { day, amountCents: cents, note: text });
-      show("Sangrias atualizadas.", "success");
-      if (!embedded) onClose();
+      if (!quiet) {
+        show("Sangrias atualizadas.", "success");
+        if (!embedded) onClose();
+      }
+      return true;
     } catch {
-      show("Não foi possível salvar a sangria. Tente novamente.", "danger");
+      fail("Não foi possível salvar a sangria. Tente novamente.");
+      return false;
     } finally {
       setSalvando(false);
     }
   }
+
+  persist.current = save;
+
+  useEffect(() => {
+    if (!onBindSave) return;
+    onBindSave(storeId, () => persist.current(true));
+    return () => onBindSave(storeId, null);
+  }, [onBindSave, storeId]);
 
   async function openUndo() {
     if (!deposit) return;
@@ -885,25 +953,25 @@ function DayModal({
       {selo ? <Badge variant={statusBadgeVariant(selo)}>{selo}</Badge> : null}
     </>
   );
-  const footer = consulta ? (
-    embedded ? null : (
-      <Button variant="outline" onClick={onClose}>
-        Voltar
-      </Button>
-    )
+  const travadoUi = salvando || desfazendo || busy;
+  const desfazer = deposit ? (
+    <Button variant="outline" onClick={() => void openUndo()} disabled={travadoUi}>
+      Desfazer recebimento
+    </Button>
+  ) : null;
+  const footer = embedded ? (
+    desfazer
+  ) : consulta ? (
+    <Button variant="outline" onClick={onClose}>
+      Voltar
+    </Button>
   ) : (
     <>
-      {deposit ? (
-        <Button variant="outline" onClick={() => void openUndo()} disabled={salvando || desfazendo}>
-          Desfazer recebimento
-        </Button>
-      ) : null}
-      {embedded ? null : (
-        <Button variant="outline" onClick={onClose} disabled={salvando || desfazendo}>
-          Cancelar
-        </Button>
-      )}
-      <Button onClick={() => void save()} disabled={salvando || desfazendo}>
+      {desfazer}
+      <Button variant="outline" onClick={onClose} disabled={travadoUi}>
+        Cancelar
+      </Button>
+      <Button onClick={() => void save()} disabled={travadoUi}>
         {salvando ? "Salvando…" : "Salvar"}
       </Button>
     </>

@@ -1079,11 +1079,11 @@ function DayModal({
       {!pronto ? (
         <Skeleton className="h-40 w-full" />
       ) : !closed ? (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col">
           {storeRows.map((store) => {
             const cents = soldByStore && store.id in soldByStore ? soldByStore[store.id] : null;
             return (
-              <div key={store.id}>
+              <div key={store.id} className={storeRows.length > 1 ? "border-t border-line pb-6 pt-5 first:border-t-0 first:pt-0 last:pb-0" : undefined}>
                 {storeRows.length > 1 ? <p className="mb-2 text-[13px] font-bold text-t0">{store.tradeName}</p> : null}
                 <DayMetrics items={[{ label: "Vendido hoje", value: cents == null ? "—" : brlCent(cents / 100) }]} />
                 <p className="text-[13px] leading-relaxed text-t2">Este dia ainda está em aberto. A diferença será calculada após o fechamento.</p>
@@ -1094,7 +1094,7 @@ function DayModal({
       ) : withDados.length === 0 ? (
         <p className="text-[13.5px] leading-relaxed text-t1">Ainda não há fechamento neste dia.</p>
       ) : (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col">
           {withDados.map((store) => {
             const snap = snaps[store.id];
             if (!snap) return null;
@@ -1115,7 +1115,7 @@ function DayModal({
               (withdrawalDrafts[store.id]?.rows ?? []).map((row) => row.sellerId),
             );
             return (
-              <section key={store.id}>
+              <section key={store.id} className={withDados.length > 1 ? "border-t border-line pb-6 pt-5 first:border-t-0 first:pt-0 last:pb-0" : undefined}>
                 {storeRows.length > 1 && <p className="mb-3 text-[13px] font-bold text-t0">{store.tradeName}</p>}
                 {!dayWithoutReal(lines) ? (
                   <DayTotals systemCents={conta.comparedSystemCents} realCents={conta.realCents} diffCents={conta.diffCents} />
