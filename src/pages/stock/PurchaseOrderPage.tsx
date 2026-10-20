@@ -585,9 +585,9 @@ export function PurchaseOrderPage() {
                             </tr>
                             {open &&
                               group.branches.map((branch, branchIdx) => (
-                                <tr key={`${branch.storeId}:${branch.code}`} className={cn("bg-bg-inset", branchIdx === group.branches.length - 1 ? "border-b-2 border-line-2" : "border-b border-line")}>
+                                <tr key={`${branch.storeId}:${branch.code}`} className={cn(branch.onOrder ? "bg-warn-soft" : "bg-bg-inset", branchIdx === group.branches.length - 1 ? "border-b-2 border-line-2" : "border-b border-line")}>
                                   <td className={cn(branch.onOrder && "shadow-[inset_3px_0_0_var(--warn)]")} />
-                                  <td className="border-l-2 border-line-2 px-1 py-2.5 pl-16">
+                                  <td className={cn("border-l-2 px-1 py-2.5 pl-16", branch.onOrder ? "border-l-warn" : "border-l-line-2")}>
                                     <p className="break-words text-[12.5px] font-semibold leading-5 text-t1">{branch.storeName}</p>
                                   </td>
                                   <td className="px-1 py-2 text-right">
