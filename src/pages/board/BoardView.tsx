@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, Card, CardTitle, EmptyState, ProgressBar, StatCard, progressTextClass } from "@/components/ui";
+import { BoardSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { RankingBlock } from "@/pages/live/blocks";
 import type { RankingRow } from "@/data/wedash/live";
@@ -289,6 +290,10 @@ export function BoardView({
     };
   }, [current, muted, unlocked]);
 
+  if (loading) {
+    return <BoardSkeleton header={controls !== "page"} className={controls === "page" ? undefined : "min-h-full p-4 sm:p-6"} />;
+  }
+
   function unlock(nextMuted = muted) {
     const clip = new Audio(overtakeUrl);
     clip.volume = 0;
@@ -428,11 +433,7 @@ export function BoardView({
             <TrophyIcon size={16} className="text-acc" />
             <CardTitle>Ranking</CardTitle>
           </div>
-          {loading ? (
-            <p className="py-10 text-center text-sm text-t2">Carregando o ranking…</p>
-          ) : (
-            <>
-              <RankingBlock ranking={podium} formatAmount={brlCent} spotlight literalName />
+          <RankingBlock ranking={podium} formatAmount={brlCent} spotlight literalName />
               {(view?.people.length ?? 0) > 3 && (
                 <div className="mt-5">
                   <p className="mb-2 text-[12px] font-bold uppercase tracking-wide text-t2">Demais posições</p>
@@ -481,8 +482,6 @@ export function BoardView({
                   </div>
                 </div>
               )}
-            </>
-          )}
         </Card>
 
         {challenges.length > 0 && (

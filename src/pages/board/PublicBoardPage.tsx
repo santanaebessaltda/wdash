@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import { BoardSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { ProfilePhotosProvider } from "@/components/wedash/PersonAvatar";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { readBoardShare, type PublicBoardPack } from "@/data/wedash/boardShare";
@@ -37,10 +38,18 @@ export function PublicBoardPage() {
     };
   }, [token]);
 
-  if (status !== "ready" || !pack) {
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-bg-0">
+        <BoardSkeleton header className="min-h-full p-4 sm:p-6" />
+      </div>
+    );
+  }
+
+  if (status === "missing" || !pack) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-bg-0 p-6 text-center">
-        <p className="text-sm text-t2">{status === "missing" ? "Este placar não está disponível." : "Carregando o placar…"}</p>
+        <p className="text-sm text-t2">Este placar não está disponível.</p>
       </div>
     );
   }
