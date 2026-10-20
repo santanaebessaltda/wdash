@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge, Button, Card, DateRangePicker, Modal, ProgressBar, progressTextClass, useToast } from "@/components/ui";
 import { PersonAvatarGroup } from "@/components/wedash/PersonAvatar";
-import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
 import { Tooltip } from "@/components/ui/Tooltip";
 import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePicker";
 import { DuplicateChoiceModal } from "@/components/wedash/DuplicateChoiceModal";
@@ -303,7 +302,7 @@ function GoalCard({
         <div className="min-w-0 flex-1">
           <p className="truncate text-[15px] font-bold text-t0">{g.name}</p>
           <p className="mt-0.5 text-[12.5px] text-t2">{period}</p>
-          {showsStore && store ? <StoreDivisionTitle className="mt-1.5">{store.tradeName}</StoreDivisionTitle> : null}
+          {showsStore && store ? <p className="mt-0.5 text-[12.5px] text-t2">{store.tradeName}</p> : null}
         </div>
         <div className="flex shrink-0 items-center gap-1.5 self-start">
           <Tooltip label="Duplicar meta">

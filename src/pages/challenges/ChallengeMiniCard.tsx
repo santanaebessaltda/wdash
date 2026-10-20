@@ -1,6 +1,5 @@
 import { Badge, ProgressBar } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
-import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
 import type { ChallengeRecord } from "@/data/wedash/challengesRepo";
 import { CHALLENGE_STATUS_LABEL, metricValueLabel, type ChallengeView } from "@/data/wedash/challengeView";
 import { cn } from "@/lib/cn";
@@ -68,7 +67,7 @@ export function ChallengeMiniCard({
           {shortDate(c.startsOn)} a {shortDate(c.endsOn)}
           {!ended ? ` · ${view.prazo}` : ""}
         </span>
-        {storeNameValue ? <StoreDivisionTitle className="mt-1.5">{storeNameValue}</StoreDivisionTitle> : null}
+        {storeNameValue ? <span className="mt-0.5 block truncate text-[12px] text-t2">{storeNameValue}</span> : null}
         <span className="mt-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <span className="min-w-0 truncate text-[13px] text-t1">
             <HeadlineText headline={destaque} />
