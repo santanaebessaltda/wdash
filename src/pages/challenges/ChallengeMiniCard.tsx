@@ -41,7 +41,7 @@ export function ChallengeMiniCard({
     const lead = floorLead(c, view);
     const detail = floorDetail(c, view.status === "upcoming");
     return (
-      <Card padding="lg" className="flex w-full flex-col text-left">
+      <Card padding="lg" glass="var(--acc-soft)" className="flex w-full flex-col text-left">
         <span className="block min-w-0 truncate text-[15px] font-bold text-t0">{c.name}</span>
         <span className="mt-0.5 block truncate text-[12px] text-t2">
           {shortDate(c.startsOn)} a {shortDate(c.endsOn)}

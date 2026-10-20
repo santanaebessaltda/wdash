@@ -531,7 +531,7 @@ export function BoardSkeleton({ header = false, className }: { header?: boolean;
             ))}
           </div>
         </Card>
-        <div className="min-w-0 overflow-hidden rounded-[var(--radius-vela-lg)] border border-line bg-bg-2 p-6 shadow-[var(--shadow-vela)]">
+        <Card padding="lg" glass="var(--acc-soft)" className="min-w-0">
           <div className="flex items-start justify-between gap-2">
             <Skeleton className="h-4 w-40" />
             <Skeleton className="h-6 w-24 shrink-0 rounded-full" />
@@ -551,7 +551,7 @@ export function BoardSkeleton({ header = false, className }: { header?: boolean;
               </div>
             ))}
           </div>
-        </div>
+        </Card>
       </div>
     </Busy>
   );
