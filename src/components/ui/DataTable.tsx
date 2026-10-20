@@ -121,8 +121,8 @@ export function DataTable<T>({
   const cellClass = compact ? "px-1 py-3 align-middle" : "px-4 py-3.5 align-middle";
 
   return (
-    <div className={cn(compact ? "overflow-x-auto" : "overflow-hidden rounded-[var(--radius-vela-lg)] border border-line bg-bg-2", className)}>
-      <div className={compact ? undefined : "overflow-x-auto"}>
+    <div className={cn(compact ? "min-w-0 overflow-x-auto" : "min-w-0 overflow-hidden rounded-[var(--radius-vela-lg)] border border-line bg-bg-2", className)}>
+      <div className={compact ? undefined : "min-w-0 overflow-x-auto"}>
       <table className={cn("w-full border-collapse text-sm", compact ? "min-w-[720px]" : "min-w-[640px]")}>
         <thead>
           <tr className="border-b border-line text-t2">

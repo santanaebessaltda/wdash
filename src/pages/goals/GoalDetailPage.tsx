@@ -552,7 +552,7 @@ function GoalPayoutCard({
   ];
 
   return (
-    <Card className="mb-5 min-w-0 print:break-inside-avoid">
+    <Card className="mb-5 min-w-0 overflow-hidden print:break-inside-avoid print:overflow-visible">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -588,7 +588,7 @@ function GoalPayoutCard({
       {lines.length === 0 ? (
         <EmptyBlock icon="👤" title="Nenhuma pessoa na meta" description="Nenhuma pessoa da equipe participa desta meta." />
       ) : (
-        <div className="overflow-x-auto">
+        <div className="min-w-0 overflow-x-auto">
           <table className="w-full border-collapse text-[12.5px]" style={{ minWidth: 680 }}>
             <thead>
               <tr className="border-b border-line text-[11px] font-bold uppercase tracking-wide text-t2">

@@ -369,7 +369,7 @@ function StaffList({
   const withoutTeam = loaded && team.length === 0;
 
   return (
-    <Card padding="none">
+    <Card className="min-w-0 overflow-hidden" padding="none">
       <div className="px-5 pt-5">
         <CostCardTitle title={showStore ? "Equipe" : "Equipe da filial"} />
       </div>

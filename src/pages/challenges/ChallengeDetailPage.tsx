@@ -284,7 +284,7 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
   const n = view.participants.length;
 
   return (
-    <Card className="mb-5 min-w-0 print:hidden">
+    <Card className="mb-5 min-w-0 overflow-hidden print:hidden">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <CardTitle>Participantes</CardTitle>
@@ -328,7 +328,7 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
       {n === 0 ? (
         <EmptyBlock icon="👤" title="Nenhuma pessoa no desafio" description="Não há vendedores ativos nem vendas atribuídas à equipe no período." />
       ) : (
-        <div className="overflow-x-auto">
+        <div className="min-w-0 overflow-x-auto">
           <table className="w-full border-collapse text-[12.5px]" style={{ minWidth: 620 }}>
             <thead>
               <tr className="border-b border-line text-[11px] font-bold uppercase tracking-wide text-t2">
@@ -434,7 +434,7 @@ function ChallengePayoutCard({ challenge: c, view, onExport }: { challenge: Chal
   const especie = countEspecie(payout.especie);
 
   return (
-    <Card className="mb-5 min-w-0 print:break-inside-avoid">
+    <Card className="mb-5 min-w-0 overflow-hidden print:break-inside-avoid print:overflow-visible">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -477,7 +477,7 @@ function ChallengePayoutCard({ challenge: c, view, onExport }: { challenge: Chal
             )}
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="min-w-0 overflow-x-auto">
             <table className="w-full border-collapse text-[12.5px]" style={{ minWidth: 480 }}>
               <thead>
                 <tr className="border-b border-line text-[11px] font-bold uppercase tracking-wide text-t2">

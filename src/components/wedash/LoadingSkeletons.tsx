@@ -617,12 +617,12 @@ export function GoalCardsSkeleton({ count = 3 }: { count?: number }) {
 export function GoalDetailSkeleton() {
   return (
     <Busy>
-      <Card padding="lg" className="mb-5">
+      <Card padding="lg" className="mb-5 min-w-0 overflow-hidden">
         <div className="flex items-start gap-4">
           <Skeleton className="h-14 w-14 shrink-0 rounded-2xl" />
-          <div className="flex-1">
-            <Skeleton className="h-6 w-56" />
-            <Skeleton className="mt-2.5 h-3.5 w-64" />
+          <div className="min-w-0 flex-1">
+            <Skeleton className="h-6 w-full max-w-56" />
+            <Skeleton className="mt-2.5 h-3.5 w-full max-w-64" />
           </div>
         </div>
         <div className="mt-5 grid grid-cols-2 gap-3.5 border-t border-line pt-4 sm:grid-cols-3 lg:grid-cols-6">
@@ -635,35 +635,35 @@ export function GoalDetailSkeleton() {
         </div>
       </Card>
       <div className="flex flex-col gap-4">
-        <Card>
+        <Card className="min-w-0 overflow-hidden">
           <Title className="w-40" />
           <Skeleton className="mt-4 h-3 w-full rounded-full" />
-          <div className="mt-2 flex justify-between">
+          <div className="mt-2 flex min-w-0 justify-between gap-3">
             {Array.from({ length: 4 }, (_, i) => (
-              <Skeleton key={i} className="h-3 w-20" />
+              <Skeleton key={i} className="h-3 w-full max-w-20" />
             ))}
           </div>
           <div className="mt-4 flex flex-col gap-3">
             {Array.from({ length: 4 }, (_, i) => (
-              <div key={i} className="flex items-center gap-3 rounded-xl border border-line px-3.5 py-3">
+              <div key={i} className="flex min-w-0 items-center gap-3 rounded-xl border border-line px-3.5 py-3">
                 <Skeleton className="h-[26px] w-[26px] shrink-0 rounded-full" />
-                <div className="flex-1">
+                <div className="min-w-0 flex-1">
                   <Skeleton className="h-3.5 w-28" />
-                  <Skeleton className="mt-1.5 h-3 w-56" />
+                  <Skeleton className="mt-1.5 h-3 w-full max-w-56" />
                 </div>
                 <Skeleton className="h-4 w-12" />
               </div>
             ))}
           </div>
         </Card>
-        <Card>
+        <Card className="min-w-0 overflow-hidden">
           <Title className="w-32" />
           <div className="mt-4 flex flex-col gap-3">
             {Array.from({ length: 5 }, (_, i) => (
-              <div key={i} className="flex items-center gap-3">
+              <div key={i} className="flex min-w-0 items-center gap-3">
                 <Skeleton className="h-8 w-8 shrink-0 rounded-full" />
-                <Skeleton className="h-3.5 w-40" />
-                <Skeleton className="ml-auto h-3.5 w-24" />
+                <Skeleton className="h-3.5 min-w-0 flex-1" />
+                <Skeleton className="h-3.5 w-16 shrink-0 sm:w-24" />
                 <Skeleton className="hidden h-3.5 w-16 md:block" />
                 <Skeleton className="hidden h-6 w-24 rounded-full md:block" />
               </div>
@@ -712,12 +712,12 @@ export function ChallengeCardsSkeleton({ count = 3 }: { count?: number }) {
 export function ChallengeDetailSkeleton() {
   return (
     <Busy>
-      <Card padding="lg" className="mb-5">
+      <Card padding="lg" className="mb-5 min-w-0 overflow-hidden">
         <div className="flex items-start gap-4">
           <Skeleton className="h-14 w-14 shrink-0 rounded-2xl" />
-          <div className="flex-1">
-            <Skeleton className="h-6 w-56" />
-            <Skeleton className="mt-2.5 h-3.5 w-64" />
+          <div className="min-w-0 flex-1">
+            <Skeleton className="h-6 w-full max-w-56" />
+            <Skeleton className="mt-2.5 h-3.5 w-full max-w-64" />
           </div>
         </div>
         <div className="mt-5 grid grid-cols-2 gap-3.5 border-t border-line pt-4 sm:grid-cols-3 lg:grid-cols-5">
@@ -729,15 +729,15 @@ export function ChallengeDetailSkeleton() {
           ))}
         </div>
       </Card>
-      <Card>
+      <Card className="min-w-0 overflow-hidden">
         <Title className="w-32" />
         <div className="mt-4 flex flex-col gap-3">
           {Array.from({ length: 5 }, (_, i) => (
-            <div key={i} className="flex items-center gap-3">
+            <div key={i} className="flex min-w-0 items-center gap-3">
               <Skeleton className="h-4 w-5 shrink-0" />
               <Skeleton className="h-8 w-8 shrink-0 rounded-full" />
-              <Skeleton className="h-3.5 w-40" />
-              <Skeleton className="ml-auto h-3.5 w-20" />
+              <Skeleton className="h-3.5 min-w-0 flex-1" />
+              <Skeleton className="h-3.5 w-16 shrink-0 sm:w-20" />
               <Skeleton className="hidden h-3.5 w-14 md:block" />
               <Skeleton className="hidden h-6 w-28 rounded-full md:block" />
             </div>
@@ -931,7 +931,7 @@ export function StoreCardsSkeleton({
     <Busy className={cn("flex flex-col gap-5", !wide && "max-w-[720px]")}>
       {Array.from({ length: count }, (_, c) =>
         team ? (
-          <Card key={c} padding="none">
+          <Card key={c} className="min-w-0 overflow-hidden" padding="none">
             <div className="px-5 pt-5 pb-4">
               <Skeleton className="mb-4 h-4 w-44" />
               <SegmentedSkeleton widths={["w-24", "w-32"]} />

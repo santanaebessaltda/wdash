@@ -324,7 +324,7 @@ function PeopleList({
   const cellClass = "px-1 py-3 align-middle";
 
   return (
-    <Card className="print-flow min-w-0" padding="none">
+    <Card className="print-flow min-w-0 overflow-hidden print:overflow-visible" padding="none">
       <div className="px-5 pt-5">
         <CostCardTitle title="Pessoas" />
       </div>
@@ -353,8 +353,8 @@ function PeopleList({
           }
         />
       ) : (
-        <div className="px-5 pb-5">
-          <div className="overflow-x-auto">
+        <div className="min-w-0 px-5 pb-5">
+          <div className="min-w-0 overflow-x-auto">
             <table className="w-full min-w-[720px] border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
@@ -857,15 +857,15 @@ function WalletSkeleton() {
           </Card>
         ))}
       </div>
-      <Card padding="none">
+      <Card className="min-w-0 overflow-hidden" padding="none">
         <div className="px-5 pt-5">
           <Skeleton className="mb-4 h-4 w-24" />
         </div>
         <div className="flex justify-end px-5 pb-4">
           <Skeleton className="h-8 w-full rounded-[var(--radius-vela-sm)] sm:w-56" />
         </div>
-        <div className="px-5 pb-5">
-          <table className="w-full border-collapse">
+        <div className="min-w-0 overflow-x-auto px-5 pb-5">
+          <table className="w-full min-w-[720px] border-collapse">
             <thead>
               <tr className="border-b border-line">
                 <th className="px-1 pb-3 text-left">
