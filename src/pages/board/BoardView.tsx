@@ -25,8 +25,6 @@ import goalLevelUrl from "@/assets/sound/reached-the-goal.wav";
 import challengeUrl from "@/assets/sound/target-met.wav";
 
 type RankSortKey = "place" | "name" | "sales" | "pa" | "meta" | "revenue";
-
-const BANNER_MS = 3200;
 const MOMENT_CAP = 4;
 const MUTE_KEY = "wedash.board.muted";
 
@@ -394,27 +392,27 @@ export function BoardView({
     if (!current) return;
     const fromPreview = previewSound.current;
     previewSound.current = false;
-    let clip: HTMLAudioElement | null = null;
-    let timer = 0;
-    const finish = () => {
-      window.clearTimeout(timer);
-      if (fromPreview) audio.current?.pause();
-      else clip?.pause();
-      setCurrent(queue.current.shift() ?? null);
-    };
-    timer = window.setTimeout(finish, BANNER_MS);
-    if (!fromPreview && unlocked && !muted) {
-      audio.current?.pause();
-      clip = new Audio(SOUND[current.kind]);
-      clip.volume = 0.85;
-      audio.current = clip;
-      void clip.play().catch(() => undefined);
-    }
+    if (fromPreview || !unlocked || muted) return;
+    audio.current?.pause();
+    const clip = new Audio(SOUND[current.kind]);
+    clip.volume = 0.85;
+    audio.current = clip;
+    void clip.play().catch(() => undefined);
     return () => {
-      window.clearTimeout(timer);
-      if (!fromPreview) clip?.pause();
+      clip.pause();
     };
   }, [current, muted, unlocked]);
+
+  useEffect(() => {
+    if (!current) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      audio.current?.pause();
+      setCurrent(queue.current.shift() ?? null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [current]);
 
   if (loading) {
     return <BoardSkeleton header={controls !== "page"} className={controls === "page" ? undefined : "min-h-full p-4 sm:p-6"} />;
@@ -451,6 +449,11 @@ export function BoardView({
     void clip.play().catch(() => undefined);
     queue.current = [];
     setCurrent(moment);
+  }
+
+  function closeCelebration() {
+    audio.current?.pause();
+    setCurrent(queue.current.shift() ?? null);
   }
 
   function unlock(nextMuted = muted) {
@@ -694,8 +697,14 @@ export function BoardView({
       </div>
 
       {current && (
-        <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center p-6">
-          <div className="flex flex-col items-center" style={{ animation: "board-pop 0.35s ease" }}>
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/80 p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-label={momentText(current, names)}
+          onClick={closeCelebration}
+        >
+          <div className="flex flex-col items-center" style={{ animation: "board-pop 0.35s ease" }} onClick={(event) => event.stopPropagation()}>
             {celebration ? (
               <div className="relative mb-5">
                 {celebrationMedal ? (
@@ -729,6 +738,9 @@ export function BoardView({
             >
               {momentText(current, names)}
             </p>
+            <Button type="button" variant="outline" className="mt-5" onClick={closeCelebration}>
+              Fechar
+            </Button>
           </div>
         </div>
       )}
