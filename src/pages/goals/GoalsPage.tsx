@@ -295,16 +295,18 @@ function GoalCard({
       }}
       className="flex cursor-pointer flex-col rounded-2xl border border-line bg-bg-2 p-5 shadow-[var(--shadow-vela)] transition-colors hover:border-line-2 focus-visible:border-acc focus-visible:outline-none"
     >
-      <div className="mb-3.5 flex items-center gap-3.5">
+      <div className="mb-3.5 flex items-start gap-3.5">
         <div className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-[14px] bg-acc-soft text-acc">
           <TargetIcon size={22} />
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-[15px] font-bold text-t0">{g.name}</p>
-          <p className="mt-0.5 truncate text-[12.5px] text-t2">
-            {period}
-            {showsStore && store ? ` · ${store.tradeName}` : ""}
-          </p>
+          <p className="mt-0.5 text-[12.5px] text-t2">{period}</p>
+          {showsStore && store ? (
+            <Badge variant="neutral" title={store.tradeName} className="mt-1.5 min-w-0 max-w-full overflow-hidden">
+              <span className="truncate">{store.tradeName}</span>
+            </Badge>
+          ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-1.5 self-start">
           <Tooltip label="Duplicar meta">

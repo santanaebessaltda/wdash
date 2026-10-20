@@ -66,8 +66,12 @@ export function ChallengeMiniCard({
         <span className="mt-0.5 block truncate text-[12px] text-t2">
           {shortDate(c.startsOn)} a {shortDate(c.endsOn)}
           {!ended ? ` · ${view.prazo}` : ""}
-          {storeNameValue ? ` · ${storeNameValue}` : ""}
         </span>
+        {storeNameValue ? (
+          <Badge variant="neutral" title={storeNameValue} className="mt-1.5 min-w-0 max-w-full overflow-hidden">
+            <span className="truncate">{storeNameValue}</span>
+          </Badge>
+        ) : null}
         <span className="mt-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <span className="min-w-0 truncate text-[13px] text-t1">
             <HeadlineText headline={destaque} />
