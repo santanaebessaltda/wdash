@@ -52,7 +52,6 @@ import {
 import { fetchSalesDayAggs, fetchSyncWatermark } from "@/data/wedash/salesRepo";
 import { fetchStoreSellers, isBranchUser, storesForSession, type Store, type StoreSeller } from "@/data/wedash/stores";
 import { fetchWithdrawalStaff } from "@/data/wedash/withdrawalStaff";
-import { isOwner } from "@/layout/nav-wedash";
 import { cn } from "@/lib/cn";
 import { brlCent, longDate, isoToDate, endOfMonth, startOfMonth, dateToIso, addDays, labelUpper } from "@/lib/format";
 import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
@@ -598,7 +597,7 @@ export function CashClosePage() {
         snaps={days}
         reviews={reviews}
         pronto={dayPronto}
-        owner={isOwner(session.role)}
+        owner={session.role === "OWNER" || session.role === "MANAGER" || session.role === "ADMIN_GLOBAL"}
         closed={dayOpen != null && dayOpen < today}
         tenantId={session.tenantId}
         soldByStore={soldToday?.byStore ?? null}
