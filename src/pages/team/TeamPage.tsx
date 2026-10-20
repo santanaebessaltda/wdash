@@ -16,6 +16,7 @@ import {
 import { fetchNamedSellerDayAggs, fetchSalesCoverage, fetchSalesDayAggs, fetchSalesSellerDayAggs } from "@/data/wedash/salesRepo";
 import { fetchGoals, fetchGoalTeam, type GoalRecord, type GoalTeamMember } from "@/data/wedash/goalsRepo";
 import { buildGoalCardView, goalStatus, sellerGoalLevels } from "@/data/wedash/goalView";
+import { rankingWithGeneralShare } from "@/data/wedash/engine/generalRanking";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import type { SalesDayAgg, SalesSellerDayAgg } from "@/data/wedash/salesTypes";
 import { storesForSession } from "@/data/wedash/stores";
@@ -250,11 +251,18 @@ export function TeamPage() {
     return () => window.removeEventListener(SALES_SYNCED_EVENT, onSynced);
   }, [reload]);
 
-  const view = useMemo(
-    () => buildTeamDashboardView(scope, aggs),
+  const view = useMemo(() => {
+    const base = buildTeamDashboardView(scope, aggs);
+    const stores = storesForSession(session.stores);
+    return rankingWithGeneralShare(base, {
+      goals: goalsData.goals,
+      team: goalsData.team,
+      dayAggs: aggs.dayAggs,
+      today: calendarTodayIso(),
+      storeNames: new Map(stores.map((store) => [store.id, store.tradeName])),
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [scope, aggs, storesTick],
-  );
+  }, [scope, aggs, storesTick, goalsData, session.stores]);
 
   const todayIso = calendarTodayIso();
   const goalCards = useMemo(() => {
@@ -576,7 +584,7 @@ export function TeamPage() {
           <Card className="mt-4 min-w-0 overflow-hidden" padding="lg">
             <div className="mb-4 flex items-center gap-1.5">
               <CardTitle>Desempenho da equipe</CardTitle>
-              <TipHelp label={"Acompanhe ranking, desafios e metas da equipe no período.\n\nVendas sem vendedor identificado, do usuário da filial ou realizadas pela gerência não entram no ranking. A meta pode ratear só a venda sem vendedor."} />
+              <TipHelp label={"Acompanhe ranking, desafios e metas da equipe no período.\n\nVendas sem vendedor identificado, do usuário da filial ou realizadas pela gerência não entram no ranking. A meta pode ratear só a venda sem vendedor. Na meta Geral, o ranking mostra a parte igual do total da filial, inclusive essa venda."} />
             </div>
             {printing ? (
               !hasTeamSales ? <EmptyBlock /> : abaRanking()
