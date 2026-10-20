@@ -10,6 +10,13 @@ export const STOCK_STATUS_LABEL: Record<StockStatus, string> = {
   ok: "Regular",
 };
 
+/** Caixa normal, só a primeira letra maiúscula: "PONTO DE VENDA" → "Ponto de venda". */
+export function headerCase(value: string): string {
+  const text = value.trim().replace(/\s+/g, " ").toLocaleLowerCase("pt-BR");
+  if (!text) return "";
+  return text.charAt(0).toLocaleUpperCase("pt-BR") + text.slice(1);
+}
+
 /** Instrucao de transferencia, a mesma que o papel escreve sob o status. */
 export function stockTransferNote(r: StockProductRow, multipleStores: boolean): string {
   return r.storeRows
@@ -31,24 +38,19 @@ function moneyCell(v: number | null): XlsxCell {
 }
 
 /** Planilha da lista filtrada: todas as linhas, nao so a pagina. Um local so nao ganha coluna Total. */
-export function inventoryXlsxRows(
-  lines: Array<{ r: StockProductRow; status: StockStatus }>,
-  locations: string[],
-  multipleStores: boolean,
-): XlsxCell[][] {
+export function inventoryXlsxRows(lines: Array<{ r: StockProductRow; status: StockStatus }>, locations: string[]): XlsxCell[][] {
   const showsTotal = locations.length !== 1;
   const header: XlsxCell[] = [
     "Código",
     "Produto",
     "Categoria",
-    ...locations,
+    ...locations.map(headerCase),
     ...(showsTotal ? ["Total"] : []),
     "A receber",
     "Total geral",
     "Preço de custo",
     "Valor",
     "Status",
-    "Transferência",
   ];
   const body = lines.map(({ r, status }) => {
     const cost = stockCostAmount(r);
@@ -64,7 +66,6 @@ export function inventoryXlsxRows(
       unit,
       moneyCell(cost.amount),
       STOCK_STATUS_LABEL[status],
-      status === "awaiting" ? stockTransferNote(r, multipleStores) : "",
     ];
   });
   if (lines.length === 0) return [header];
@@ -83,7 +84,6 @@ export function inventoryXlsxRows(
     "",
     amount,
     "",
-    "",
   ];
   return [header, ...body, total];
 }
@@ -91,11 +91,10 @@ export function inventoryXlsxRows(
 export function downloadInventoryXlsx(
   lines: Array<{ r: StockProductRow; status: StockStatus }>,
   locations: string[],
-  multipleStores: boolean,
   fileName: string,
 ) {
-  const rows = inventoryXlsxRows(lines, locations, multipleStores);
-  const textColumns = [0, 1, 2, rows[0].length - 2, rows[0].length - 1];
+  const rows = inventoryXlsxRows(lines, locations);
+  const textColumns = [0, 1, 2, rows[0].length - 1];
   const bytes = buildXlsx(rows, { textColumns, sheetName: "Estoque" });
   const blob = new Blob([bytes as BlobPart], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const url = URL.createObjectURL(blob);

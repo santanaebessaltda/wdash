@@ -8,6 +8,7 @@ export function ThSort({
   dir,
   onClick,
   align = "right",
+  uppercase = true,
   className,
 }: {
   label: string;
@@ -15,13 +16,16 @@ export function ThSort({
   dir: SortDir;
   onClick: () => void;
   align?: "left" | "right" | "center";
+  /** Caixa alta. O Estoque deixa desligado: primeira letra maiúscula. */
+  uppercase?: boolean;
   /** Substitui o padding padrao (`px-3 py-2.5`) quando informado. */
   className?: string;
 }) {
   return (
     <th
       className={cn(
-        "align-bottom text-[11px] font-bold uppercase tracking-wide",
+        "align-bottom text-[11px] font-bold tracking-wide",
+        uppercase && "uppercase",
         align === "left" && "text-left",
         align === "right" && "text-right",
         align === "center" && "text-center",
@@ -32,7 +36,8 @@ export function ThSort({
         type="button"
         onClick={onClick}
         className={cn(
-          "inline-flex items-center gap-1 whitespace-nowrap align-bottom uppercase tracking-wide hover:text-t0",
+          "inline-flex items-center gap-1 whitespace-nowrap align-bottom tracking-wide hover:text-t0",
+          uppercase && "uppercase",
           active ? "text-t0" : "text-t2",
           align === "right" && "flex-row-reverse",
           align === "center" && "w-full justify-center",

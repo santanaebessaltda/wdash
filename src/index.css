@@ -555,6 +555,11 @@ input[type="range"]::-moz-range-thumb {
   tr {
     break-inside: avoid;
   }
+  /* Lista longa (estoque): o Card pede para não quebrar e o Chrome empurra a tabela inteira para a página seguinte. */
+  .print-flow {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
   /* Tabelas: no papel não há rolagem lateral — a tabela cabe na largura do card
      (sem largura mínima), com fonte e espaçamento menores e texto quebrando linha. */
   .overflow-x-auto,

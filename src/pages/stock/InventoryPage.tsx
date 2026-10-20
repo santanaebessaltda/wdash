@@ -16,7 +16,7 @@ import { ExportDialog } from "@/components/wedash/ExportDialog";
 import { ReportHeader, useExportPdf, useReportFileTitle } from "@/pages/dashboard/ReportHeader";
 import { SectionHeader } from "@/pages/operation/shared";
 import { HeaderFilter, HeaderSearch } from "@/pages/dashboard/HeaderFilter";
-import { STOCK_STATUS_LABEL, downloadInventoryXlsx, stockTransferNote } from "./inventoryExport";
+import { STOCK_STATUS_LABEL, downloadInventoryXlsx, headerCase, stockTransferNote } from "./inventoryExport";
 import {
   TableFooter,
   TipHelp,
@@ -177,7 +177,7 @@ export function InventoryPage() {
               disabled={!view}
               onExport={(format) => {
                 if (format === "pdf") exportPdf();
-                else downloadInventoryXlsx(lines, locations, multipleStores, fileTitle());
+                else downloadInventoryXlsx(lines, locations, fileTitle());
               }}
             />
           </HeaderFilters>
@@ -200,7 +200,7 @@ export function InventoryPage() {
       {showSkeleton || !view ? (
         <StockProductsSkeleton />
       ) : (
-        <Card className="flex flex-col">
+        <Card className="print-flow flex flex-col">
           <CardTitle className="mb-4">Produtos</CardTitle>
           {lines.length === 0 ? (
             <div className="flex flex-1">
@@ -240,13 +240,14 @@ export function InventoryPage() {
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-sm">
                 <thead>
-                  <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
+                  <tr className="border-b border-line text-[11px] tracking-wide text-t2">
                     <th className="w-11 whitespace-nowrap px-1 pb-3 text-center font-bold">#</th>
-                    <ThSort label="Produto" active={sortKey === "name"} dir={sortDir} onClick={() => toggleSort("name")} align="left" className="w-full px-1 pb-3" />
+                    <ThSort label="Produto" uppercase={false} active={sortKey === "name"} dir={sortDir} onClick={() => toggleSort("name")} align="left" className="w-full px-1 pb-3" />
                     {locations.map((name) => (
                       <ThSort
                         key={name}
-                        label={name}
+                        label={headerCase(name)}
+                        uppercase={false}
                         active={sortKey === `local:${name}`}
                         dir={sortDir}
                         onClick={() => toggleSort(`local:${name}`)}
@@ -254,13 +255,13 @@ export function InventoryPage() {
                       />
                     ))}
                     {showsTotal && (
-                      <ThSort label="Total" active={sortKey === "estoque"} dir={sortDir} onClick={() => toggleSort("estoque")} className="w-0 whitespace-nowrap px-4 pb-3" />
+                      <ThSort label="Total" uppercase={false} active={sortKey === "estoque"} dir={sortDir} onClick={() => toggleSort("estoque")} className="w-0 whitespace-nowrap px-4 pb-3" />
                     )}
-                    <ThSort label="A receber" active={sortKey === "receber"} dir={sortDir} onClick={() => toggleSort("receber")} className="w-0 whitespace-nowrap px-4 pb-3" />
-                    <ThSort label="Total geral" active={sortKey === "totalGeral"} dir={sortDir} onClick={() => toggleSort("totalGeral")} className="w-0 whitespace-nowrap px-4 pb-3" />
-                    <ThSort label="Preço de custo" active={sortKey === "custo"} dir={sortDir} onClick={() => toggleSort("custo")} className="w-0 whitespace-nowrap px-4 pb-3" />
-                    <ThSort label="Valor" active={sortKey === "valor"} dir={sortDir} onClick={() => toggleSort("valor")} className="w-0 whitespace-nowrap pb-3 pl-4 pr-8" />
-                    <ThSort label="Status" active={sortKey === "status"} dir={sortDir} onClick={() => toggleSort("status")} align="left" className="w-0 whitespace-nowrap pb-3 pl-8 pr-1" />
+                    <ThSort label="A receber" uppercase={false} active={sortKey === "receber"} dir={sortDir} onClick={() => toggleSort("receber")} className="w-0 whitespace-nowrap px-4 pb-3" />
+                    <ThSort label="Total geral" uppercase={false} active={sortKey === "totalGeral"} dir={sortDir} onClick={() => toggleSort("totalGeral")} className="w-0 whitespace-nowrap px-4 pb-3" />
+                    <ThSort label="Preço de custo" uppercase={false} active={sortKey === "custo"} dir={sortDir} onClick={() => toggleSort("custo")} className="w-0 whitespace-nowrap px-4 pb-3" />
+                    <ThSort label="Valor" uppercase={false} active={sortKey === "valor"} dir={sortDir} onClick={() => toggleSort("valor")} className="w-0 whitespace-nowrap pb-3 pl-4 pr-8" />
+                    <ThSort label="Status" uppercase={false} active={sortKey === "status"} dir={sortDir} onClick={() => toggleSort("status")} align="left" className="w-0 whitespace-nowrap pb-3 pl-8 pr-1" />
                   </tr>
                 </thead>
                 <tbody>

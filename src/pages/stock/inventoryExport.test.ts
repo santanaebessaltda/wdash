@@ -64,10 +64,9 @@ describe("inventoryXlsxRows", () => {
         },
       ],
       ["ESTOQUE"],
-      false,
     );
-    expect(rows[0]).toEqual(["Código", "Produto", "Categoria", "ESTOQUE", "A receber", "Total geral", "Preço de custo", "Valor", "Status", "Transferência"]);
-    expect(rows[1]).toEqual(["001", "Óleo", "Corpo", 2, 4, 6, 19.9, 39.8, "Regular", ""]);
+    expect(rows[0]).toEqual(["Código", "Produto", "Categoria", "Estoque", "A receber", "Total geral", "Preço de custo", "Valor", "Status"]);
+    expect(rows[1]).toEqual(["001", "Óleo", "Corpo", 2, 4, 6, 19.9, 39.8, "Regular"]);
     expect(rows[2][1]).toBe("Total do filtro");
     expect(rows[2][3]).toBe(2);
     expect(rows[2][7]).toBe(39.8);
@@ -90,9 +89,20 @@ describe("inventoryXlsxRows", () => {
         },
       ],
       ["ESTOQUE", "PONTO DE VENDA"],
-      true,
     );
-    expect(rows[0]).toContain("Total");
+    expect(rows[0]).toEqual([
+      "Código",
+      "Produto",
+      "Categoria",
+      "Estoque",
+      "Ponto de venda",
+      "Total",
+      "A receber",
+      "Total geral",
+      "Preço de custo",
+      "Valor",
+      "Status",
+    ]);
     expect(rows[1][3]).toBe(2);
     expect(rows[1][4]).toBe(3);
     expect(rows[1][5]).toBe(5);
@@ -100,7 +110,7 @@ describe("inventoryXlsxRows", () => {
     expect(rows[1][8]).toBe("Varia");
     expect(rows[1][9]).toBe(56);
     expect(rows[1][10]).toBe("Aguardando transferência");
-    expect(rows[1][11]).toBe("LOJA A: transferir 1 de ESTOQUE para PONTO DE VENDA.");
+    expect(rows[0]).not.toContain("Transferência");
   });
 
   it("a planilha gerada relê o cabeçalho e o produto", async () => {
@@ -116,7 +126,6 @@ describe("inventoryXlsxRows", () => {
         },
       ],
       ["ESTOQUE"],
-      false,
     );
     const read = await readXlsx(buildXlsx(rows, { textColumns: [0, 1, 2], sheetName: "Estoque" }));
     expect(read[0][0]).toBe("Código");
