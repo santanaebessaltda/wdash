@@ -712,7 +712,7 @@ export function TeamPage() {
             <WithoutResult hasDados={hasTeamSales} onClear={() => setSearch("")} />
           ) : null
         ) : (
-          <div className="overflow-x-auto">
+          <div className="min-w-0 overflow-x-auto">
             <table className="w-full min-w-[900px] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">

@@ -218,12 +218,12 @@ function TopTableSkeleton({
   className?: string;
 }) {
   return (
-    <Card className={cn("flex flex-col", className)}>
+    <Card className={cn("flex min-w-0 flex-col overflow-hidden", className)}>
       <div className="mb-4 flex items-center justify-between gap-3">
         <Title className={titleW} />
         {search ? <Skeleton className="h-8 w-40 rounded-[var(--radius-vela-sm)] sm:w-56" /> : <Pill className="w-12" />}
       </div>
-      <div className="overflow-x-auto">
+      <div className="min-w-0 overflow-x-auto">
         <div className={variation ? "min-w-[620px]" : "min-w-[520px]"}>
           <div className="flex items-center gap-3 border-b border-line px-1 pb-3">
             <Skeleton className="h-2.5 w-3" />
@@ -292,7 +292,7 @@ function CostListSkeleton() {
 /** Tabela larga em card `padding="none"` (Evolucao mensal, Desempenho por produto). */
 function WideTableSkeleton({ cols, rows = 6, sub = false, actions = false }: { cols: number; rows?: number; sub?: boolean; actions?: boolean }) {
   return (
-    <Card className="mt-4" padding="none">
+    <Card className="mt-4 min-w-0 overflow-hidden" padding="none">
       <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <Title className="w-44" />
@@ -305,7 +305,7 @@ function WideTableSkeleton({ cols, rows = 6, sub = false, actions = false }: { c
           </div>
         )}
       </div>
-      <div className="overflow-x-auto p-4">
+      <div className="min-w-0 overflow-x-auto p-4">
         <div style={{ minWidth: cols * 110 }}>
           <div className="grid gap-4 border-b border-line px-4 py-3" style={{ gridTemplateColumns: `1.6fr repeat(${cols - 1}, 1fr)` }}>
             {Array.from({ length: cols }, (_, c) => (
@@ -477,7 +477,7 @@ type TableCell = "person" | "text" | "short" | "pill" | "select" | "menu";
 /** Mesmo desenho do `DataTable` (cabecalho uppercase + linhas px-4 py-3.5). */
 function DataTableSkeleton({ cells, rows = 4, bare = false }: { cells: TableCell[]; rows?: number; bare?: boolean }) {
   return (
-    <div className={cn("overflow-x-auto", !bare && "rounded-[var(--radius-vela-lg)] border border-line bg-bg-2", bare && "border-t border-line")}>
+    <div className={cn("min-w-0 max-w-full overflow-x-auto", !bare && "rounded-[var(--radius-vela-lg)] border border-line bg-bg-2", bare && "border-t border-line")}>
       <table className="w-full min-w-[640px] border-collapse">
         <thead>
           <tr className="border-b border-line">

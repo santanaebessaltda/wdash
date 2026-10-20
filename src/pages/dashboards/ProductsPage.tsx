@@ -433,7 +433,7 @@ export default function ProductsPage() {
       </div>
 
       <div className="mt-4 grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
-        <Card className="flex flex-col">
+        <Card className="flex min-w-0 flex-col overflow-hidden">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-1.5">
               <CardTitle className="truncate">Desempenho por linha de produto</CardTitle>
@@ -467,7 +467,7 @@ export default function ProductsPage() {
               />
             )
           ) : (
-          <div className="overflow-x-auto">
+          <div className="min-w-0 overflow-x-auto">
             <table className="w-full min-w-[820px] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
@@ -567,7 +567,7 @@ export default function ProductsPage() {
           )}
         </Card>
 
-        <Card className="flex flex-col">
+        <Card className="flex min-w-0 flex-col overflow-hidden">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-1.5">
             <CardTitle className="truncate">Desempenho por produto</CardTitle>
@@ -602,7 +602,7 @@ export default function ProductsPage() {
             />
           )
         ) : (
-          <div className="overflow-x-auto">
+          <div className="min-w-0 overflow-x-auto">
             <table className="w-full min-w-[820px] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">

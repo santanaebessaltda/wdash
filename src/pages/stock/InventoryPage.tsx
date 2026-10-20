@@ -198,7 +198,7 @@ export function InventoryPage() {
       {showSkeleton || !view ? (
         <StockProductsSkeleton />
       ) : (
-        <Card className="print-flow flex flex-col">
+        <Card className="print-flow flex min-w-0 flex-col overflow-hidden print:overflow-visible">
           <CardTitle className="mb-4">Produtos</CardTitle>
           {lines.length === 0 ? (
             <div className="flex flex-1">
@@ -235,7 +235,7 @@ export function InventoryPage() {
               )}
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="min-w-0 overflow-x-auto">
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-line text-[11px] tracking-wide text-t2">

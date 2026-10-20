@@ -625,7 +625,7 @@ export default function FinancePage() {
 
       {/* Evolucao mensal: mesma lista do Estoque (tabela + Total do filtro), no celular tambem. */}
       {view.showMonthlyEvolution && (
-      <Card className="mt-4 flex flex-col">
+      <Card className="mt-4 flex min-w-0 flex-col overflow-hidden">
         <div className="mb-4">
           <CardTitle>Evolução mensal</CardTitle>
           {view.monthlyEvolution.length > 0 && (
@@ -637,7 +637,7 @@ export default function FinancePage() {
           <EmptyBlock />
         ) : (
         <>
-        <div className="overflow-x-auto">
+        <div className="min-w-0 overflow-x-auto">
           <table className="w-full min-w-[760px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-line text-[11px] tracking-wide text-t2">

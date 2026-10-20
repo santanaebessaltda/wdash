@@ -487,7 +487,7 @@ export function PurchaseOrderPage() {
           <EmptyBlock icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
         </Card>
       ) : (
-        <Card className="flex flex-col">
+        <Card className="flex min-w-0 flex-col overflow-hidden">
           <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
             <span className="inline-flex items-center gap-1.5">
               <CardTitle>Produtos</CardTitle>
@@ -525,7 +525,7 @@ export function PurchaseOrderPage() {
               )}
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="min-w-0 overflow-x-auto">
               <table className="w-full min-w-[1160px] border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">

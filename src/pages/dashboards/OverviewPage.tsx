@@ -932,7 +932,7 @@ export default function OverviewPage() {
 
       {/* Par: Top Vendedoras + Top Produtos */}
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card className="flex flex-col">
+        <Card className="flex min-w-0 flex-col overflow-hidden">
           <CardHeader>
             <div className="flex w-full items-center justify-between gap-1.5">
               <CardTitle>Destaques da equipe</CardTitle>
@@ -942,7 +942,7 @@ export default function OverviewPage() {
           {topSellersOrdenados.length === 0 ? (
             <EmptyBlock />
           ) : (
-          <div className="overflow-x-auto">
+          <div className="min-w-0 overflow-x-auto">
             <table className="w-full min-w-[640px] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
@@ -1061,7 +1061,7 @@ export default function OverviewPage() {
           </div>
           )}
         </Card>
-        <Card className="flex flex-col">
+        <Card className="flex min-w-0 flex-col overflow-hidden">
           <CardHeader>
             <div className="flex w-full items-center justify-between gap-1.5">
               <CardTitle>Top produtos</CardTitle>
@@ -1071,7 +1071,7 @@ export default function OverviewPage() {
           {topProductsOrdenados.length === 0 ? (
             <EmptyBlock />
           ) : (
-          <div className="overflow-x-auto">
+          <div className="min-w-0 overflow-x-auto">
             <table className="w-full min-w-[620px] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
