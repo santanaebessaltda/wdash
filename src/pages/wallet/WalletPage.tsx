@@ -58,16 +58,29 @@ function minusMoney(cents: number): string {
   return `− ${money(cents)}`;
 }
 
-function isGain(line: WalletLine): boolean {
-  return line.kind === "prize" || line.kind === "bonus" || line.kind === "management" || line.kind === "managementBonus" || line.kind === "challenge";
+const LINE_ORDER: Record<WalletLine["kind"], number> = {
+  prize: 0,
+  bonus: 1,
+  management: 2,
+  managementBonus: 3,
+  challenge: 4,
+  withdrawal: 5,
+  shortage: 6,
+};
+
+function compareLines(a: WalletLine, b: WalletLine): number {
+  return (a.day ?? "").localeCompare(b.day ?? "") || LINE_ORDER[a.kind] - LINE_ORDER[b.kind] || lineTitle(a).localeCompare(lineTitle(b), "pt-BR");
 }
 
-function lineAmount(line: WalletLine): string {
-  if (line.cents === 0 && line.note && line.note !== "Em andamento") return line.note;
-  if (line.open && line.kind === "challenge") return "—";
-  const text = money(line.cents);
-  if ((line.kind === "withdrawal" || line.kind === "shortage") && line.cents > 0) return `−${text}`;
-  return text;
+/** O que entra leva +, o que sai leva −. Linha que não mexe no saldo fica sem sinal. */
+function tapeAmount(line: WalletLine): { text: string; className: string } {
+  if (line.cents === 0 && line.note && line.note !== "Em andamento") return { text: line.note, className: "text-t2" };
+  if (line.open && line.kind === "challenge") return { text: "—", className: "text-t2" };
+  if (line.kind === "withdrawal" || line.kind === "shortage") {
+    if (line.cents <= 0) return { text: "—", className: "text-t2" };
+    return { text: `− ${money(line.cents)}`, className: "text-bad" };
+  }
+  return { text: `+ ${money(line.cents)}`, className: "text-ok" };
 }
 
 function lineNote(line: WalletLine): string | null {
@@ -130,37 +143,6 @@ function Totals({ rows }: { rows: WalletPersonMonth[] }) {
   );
 }
 
-function LineList({ lines }: { lines: WalletLine[] }) {
-  return (
-    <ul>
-      {lines.map((line, index) => {
-        const note = lineNote(line);
-        return (
-          <li key={`${line.kind}-${line.title}-${line.day ?? ""}-${index}`} className="flex items-start justify-between gap-4 border-b border-line py-3 last:border-b-0">
-            <div className="min-w-0">
-              <p className="text-[14px] font-semibold text-t0">{lineTitle(line)}</p>
-              {note ? <p className="mt-0.5 text-[12.5px] text-t2">{note}</p> : null}
-            </div>
-            <p className="shrink-0 text-right font-mono text-[13.5px] font-bold text-t0">{lineAmount(line)}</p>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-function MovementSection({ title, total, lines, empty }: { title: string; total: string; lines: WalletLine[]; empty: string }) {
-  return (
-    <section>
-      <div className="flex items-baseline justify-between gap-3 border-b border-line pb-2">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-t2">{title}</p>
-        <p className="font-mono text-[13.5px] font-bold text-t0">{total}</p>
-      </div>
-      {lines.length > 0 ? <LineList lines={lines} /> : <p className="py-3 text-[13px] text-t2">{empty}</p>}
-    </section>
-  );
-}
-
 function Statement({
   person,
   emptyTitle = "Nada neste mês",
@@ -173,34 +155,32 @@ function Statement({
   if (person.lines.length === 0) {
     return <EmptyBlock icon="👛" title={emptyTitle} description={emptyDescription} />;
   }
-  const gains = person.lines.filter(isGain);
-  const discounts = person.lines.filter((line) => !isGain(line));
-  const discountCents = discountsOf(person);
+  const lines = [...person.lines].sort(compareLines);
+  const untilNow = person.openPrize || lines.some((line) => line.open && line.kind !== "challenge");
   return (
-    <div className="flex flex-col gap-5">
-      <MovementSection title="Ganhos" total={money(earningsOf(person))} lines={gains} empty="Nenhum ganho neste período." />
-      <MovementSection title="Descontos" total={discountCents > 0 ? minusMoney(discountCents) : money(0)} lines={discounts} empty="Nenhum desconto neste período." />
-    </div>
-  );
-}
-
-function PersonFigures({ person }: { person: WalletPersonMonth }) {
-  const open = person.openPrize || person.lines.some((line) => line.open);
-  const discountCents = discountsOf(person);
-  const cards = [
-    { label: "Saldo", value: money(person.balanceCents), tone: balanceClass(person.balanceCents), sub: open ? "Até agora" : null },
-    { label: "Ganhos", value: money(earningsOf(person)), tone: "text-t0", sub: null },
-    { label: "Descontos", value: discountCents > 0 ? minusMoney(discountCents) : money(0), tone: "text-t0", sub: null },
-  ];
-  return (
-    <div className="mb-5 grid grid-cols-1 gap-2 sm:grid-cols-3">
-      {cards.map((card) => (
-        <div key={card.label} className="min-w-0 rounded-[14px] border border-line bg-bg-1 px-3 py-3">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-t2">{card.label}</p>
-          <p className={cn("mt-1 truncate font-mono text-lg font-extrabold", card.tone)}>{card.value}</p>
-          {card.sub ? <p className="mt-0.5 text-[12px] text-t2">{card.sub}</p> : null}
-        </div>
-      ))}
+    <div>
+      <ul>
+        {lines.map((line, index) => {
+          const note = lineNote(line);
+          const amount = tapeAmount(line);
+          return (
+            <li key={`${line.kind}-${line.title}-${line.day ?? ""}-${index}`} className="flex items-start justify-between gap-4 border-b border-line py-3">
+              <div className="min-w-0">
+                <p className="text-[14px] font-semibold text-t0">{lineTitle(line)}</p>
+                {note ? <p className="mt-0.5 text-[12.5px] text-t2">{note}</p> : null}
+              </div>
+              <p className={cn("shrink-0 text-right font-mono text-[13.5px] font-bold", amount.className)}>{amount.text}</p>
+            </li>
+          );
+        })}
+      </ul>
+      <div className="flex items-baseline justify-between gap-4 bg-bg-inset px-1 py-3">
+        <span className="text-[13.5px] font-extrabold text-t0">
+          Saldo
+          {untilNow ? <span className="mt-0.5 block text-[11px] font-semibold text-t2">Até agora</span> : null}
+        </span>
+        <span className={cn("font-mono text-[15px] font-extrabold", balanceClass(person.balanceCents))}>{money(person.balanceCents)}</span>
+      </div>
     </div>
   );
 }
@@ -233,7 +213,6 @@ function PersonDialog({
         </span>
       }
     >
-      <PersonFigures person={person} />
       <Statement person={person} emptyTitle="Nada neste período" emptyDescription="Não há premiação, desafio, retirada ou quebra neste período." />
     </Modal>
   );

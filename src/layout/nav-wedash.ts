@@ -51,15 +51,15 @@ const performance: NavGroup = {
   ],
 };
 
-/** Fechamento, sangrias e informe. A análise de margem continua em Dashboard > Financeiro. */
+/** Fechamento, sangrias, carteira e informe. A análise de margem continua em Dashboard > Financeiro. */
 const finance: NavGroup = {
   label: "Financeiro",
-  description: "Acompanhe o fechamento, a carteira, as sangrias e o informe de vendas.",
+  description: "Acompanhe o fechamento, as sangrias, a carteira e o informe de vendas.",
   icon: ICON.finance,
   items: [
     { label: "Fechamento", to: paths.management.cashClose },
-    { label: "Carteira", to: paths.management.wallet },
     { label: "Sangrias", to: paths.management.cashDrop },
+    { label: "Carteira", to: paths.management.wallet },
     { label: "Informe de vendas", to: paths.management.salesReport },
   ],
 };
