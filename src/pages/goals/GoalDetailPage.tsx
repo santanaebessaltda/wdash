@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Badge, Breadcrumbs, Button, Card, CardTitle, progressTextClass } from "@/components/ui";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { DuplicateChoiceModal } from "@/components/wedash/DuplicateChoiceModal";
+import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
 import { GoalDetailSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { goalWeightFrom } from "@/data/wedash/engine/goalProjection";
@@ -297,11 +298,7 @@ function GoalHero({
             <Badge variant="neutral" className="uppercase">
               {fullDate(goal.startsOn)} a {fullDate(goal.endsOn)}
             </Badge>
-            {storeNameValue ? (
-              <Badge variant="accent" className="max-w-full min-w-0 uppercase">
-                <span className="truncate">{storeNameValue}</span>
-              </Badge>
-            ) : null}
+            {storeNameValue ? <StoreDivisionTitle className="max-w-full min-w-0 self-center">{storeNameValue}</StoreDivisionTitle> : null}
             <Badge variant="neutral" className="uppercase">{MODO_LABEL[goal.tierMode]}</Badge>
             <TipHelp label={AJUDA_MODO[goal.tierMode]} />
           </div>

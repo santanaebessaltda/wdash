@@ -4,6 +4,7 @@ import { Badge, Button, Card, DateRangePicker, Modal, useToast } from "@/compone
 import { Tooltip } from "@/components/ui/Tooltip";
 import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePicker";
 import { DuplicateChoiceModal } from "@/components/wedash/DuplicateChoiceModal";
+import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
 import { ChallengeCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import {
   deleteChallenge,
@@ -323,11 +324,7 @@ function ChallengeCard({
         <div className="min-w-0 flex-1">
           <p className="truncate text-[15px] font-bold text-t0">{c.name}</p>
           <p className="mt-0.5 text-[12.5px] text-t2">{period}</p>
-          {showsStore && store ? (
-            <Badge variant="accent" title={store.tradeName} className="mt-1.5 min-w-0 max-w-full overflow-hidden">
-              <span className="truncate">{store.tradeName}</span>
-            </Badge>
-          ) : null}
+          {showsStore && store ? <StoreDivisionTitle className="mt-1.5">{store.tradeName}</StoreDivisionTitle> : null}
         </div>
         <div className="flex shrink-0 items-center gap-1.5 self-start">
           <Tooltip label="Duplicar desafio">

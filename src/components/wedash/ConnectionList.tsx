@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Badge, Button, Card, CardTitle, Skeleton } from "@/components/ui";
 import { statusBadgeVariant } from "@/lib/status";
+import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
 
 export type ConnectionRow = {
   key: string;
@@ -37,11 +38,7 @@ export function ConnectionCard({ title, hint, rows, action }: { title: string; h
                   <p className="text-[13.5px] font-bold text-t0">{row.name}</p>
                   {row.status ? <Badge variant={statusBadgeVariant(row.status)}>{row.status}</Badge> : null}
                 </div>
-                {row.store ? (
-                  <Badge variant="accent" title={row.store} className="mt-1.5 min-w-0 max-w-full overflow-hidden">
-                    <span className="truncate">{row.store}</span>
-                  </Badge>
-                ) : null}
+                {row.store ? <StoreDivisionTitle className="mt-1.5">{row.store}</StoreDivisionTitle> : null}
                 <p className="mt-0.5 truncate text-xs text-t2">{row.detail}</p>
               </div>
               <Button variant="outline" size="sm" onClick={row.onDisconnect}>

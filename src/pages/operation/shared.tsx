@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Badge, Button, Card, CardHeader, CardTitle, EmptyState, FormField, Input, PageHeader, Select, TabNav, Tooltip } from "@/components/ui";
+import { Button, Card, CardHeader, CardTitle, EmptyState, FormField, Input, PageHeader, Select, TabNav, Tooltip } from "@/components/ui";
+import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
 import { financeTabs, integrationTabs, performanceTabs, settingsTabs } from "@/layout/nav-wedash";
 import { useShoppingMenu } from "@/layout/useShoppingMenu";
 import { paths } from "@/router/paths";
@@ -210,7 +211,7 @@ export function TipHelp({ label }: { label: string }) {
   );
 }
 
-/** Título da seção, com a regra de cálculo no ?. Com várias filiais, o nome fica no badge na cor primária. */
+/** Título da seção, com a regra de cálculo no ?. Com várias filiais, o nome fica no mesmo texto das outras telas. */
 export function BlockTitle({ title, tip, store }: { title: string; tip?: string; store?: string }) {
   return (
     <div className="mb-4">
@@ -218,11 +219,7 @@ export function BlockTitle({ title, tip, store }: { title: string; tip?: string;
         <CardTitle>{title}</CardTitle>
         {tip ? <TipHelp label={tip} /> : null}
       </div>
-      {store ? (
-        <Badge variant="accent" title={store} className="mt-1.5 min-w-0 max-w-full overflow-hidden">
-          <span className="truncate">{store}</span>
-        </Badge>
-      ) : null}
+      {store ? <StoreDivisionTitle className="mt-1.5">{store}</StoreDivisionTitle> : null}
     </div>
   );
 }

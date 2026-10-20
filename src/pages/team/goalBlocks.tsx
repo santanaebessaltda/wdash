@@ -6,6 +6,7 @@
 import type { ReactNode } from "react";
 import { Badge, Card, CardTitle, DataTable, EmptyState, ProgressBar, progressColor, progressTextClass, StatCard, type DataTableColumn } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
+import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { brl, brlCent, brlK, eachDay, num } from "@/lib/format";
 import type { BlockState as BlockStateKind } from "@/data/wedash/dashboard";
@@ -685,16 +686,6 @@ function GroupTypeIcon() {
   );
 }
 
-function StoreIcon() {
-  return (
-    <IconBadge>
-      <path d="M4 7V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2" />
-      <path d="M3 7h18l-1.5 5.5A3 3 0 0 1 16.6 13a3 3 0 0 1-2.9-2 3 3 0 0 1-5.4 0 3 3 0 0 1-2.9 2 3 3 0 0 1-2.9-1.5L3 7Z" />
-      <path d="M4 12v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8" />
-    </IconBadge>
-  );
-}
-
 function BrandIcon() {
   return (
     <IconBadge>
@@ -753,10 +744,7 @@ export function GoalSummaryCard({
           {card.kind === "individual" ? <IndividualTypeIcon /> : <GroupTypeIcon />}
           {kindLabel}
         </Badge>
-        <Badge variant="accent" className="gap-1 uppercase">
-          <StoreIcon />
-          {card.storeNameValue}
-        </Badge>
+        <StoreDivisionTitle className="self-center">{card.storeNameValue}</StoreDivisionTitle>
         {card.brands.map((m) => (
           <Badge key={m} variant="neutral" className="gap-1">
             <BrandIcon />
