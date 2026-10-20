@@ -98,6 +98,12 @@ const IconTicket = () => (
 
 const KPI_ICONS = [IconRevenue, IconCmv, IconSales, IconTicket];
 
+/** Loja principal (+N). So com mais de uma filial no filtro, igual ao ranking da Equipe. */
+function storesLabel(storeRows: string[]): string | null {
+  if (storeRows.length === 0) return null;
+  return storeRows.length > 1 ? `${storeRows[0]} · +${storeRows.length - 1}` : storeRows[0]!;
+}
+
 /** Cores fixas para as lojas no donut e barras do Ranking de Lojas. */
 const STORE_COLORS = ["var(--acc)", "var(--info)", "var(--ok)", "var(--warn)", "var(--bad)"];
 /** Fatia neutra "Demais lojas" (1 loja no StorePicker)  -  nao compete com a cor da loja. */
@@ -461,6 +467,7 @@ export default function OverviewPage() {
   const deepHistoryFill = useDeepHistoryFill();
   const printing = usePrintMode();
   const exportValue = useExportPdf("Visão geral");
+  const showSellerStore = (scope.storeIds.length === 0 ? storesForSession(session.stores).length : scope.storeIds.length) > 1;
   const firstSteps = useFirstSteps(scope.storeIds);
   const { open: openDetail, modal: detailModal } = useProductDetail({ scope, tenantId: session.tenantId });
   const goalLevels = useMemo(
@@ -951,6 +958,7 @@ export default function OverviewPage() {
                 {topSellersOrdenados.map((v, idx) => {
                   const key = v.key;
                   const open = key ? () => openPerson(key, v.name) : undefined;
+                  const store = showSellerStore ? storesLabel(v.storeRows) : null;
                   return (
                     <tr
                       key={key ?? v.name}
@@ -971,7 +979,17 @@ export default function OverviewPage() {
                       <td className="px-1 py-3">
                         <div className="flex min-w-0 items-center gap-2.5">
                           <Avatar name={v.name} src={v.avatarUrl} size="sm" />
-                          <p className="min-w-0 truncate text-[13px] font-bold text-t0">{v.name}</p>
+                          <div className="min-w-0">
+                            <p className="truncate text-[13px] font-bold text-t0">{v.name}</p>
+                            {store &&
+                              (v.storeRows.length > 1 ? (
+                                <Tooltip label={v.storeRows.slice(1).join(" · ")}>
+                                  <p className="truncate text-[11px] text-t2">{store}</p>
+                                </Tooltip>
+                              ) : (
+                                <p className="truncate text-[11px] text-t2">{store}</p>
+                              ))}
+                          </div>
                         </div>
                       </td>
                       <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(v.amount)}</td>
