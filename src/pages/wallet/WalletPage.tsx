@@ -20,7 +20,7 @@ import { usePagedRows } from "@/lib/usePagedRows";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { CheckCircleIcon, FlameIcon, TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
-import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
+import { CostCardTitle, SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { fetchStoreSellers, type Store } from "@/data/wedash/stores";
 import { matchesCodeOrName } from "@/lib/personSearch";
 import { buildXlsx, type XlsxCell } from "@/lib/xlsx";
@@ -322,39 +322,36 @@ function PeopleList({
   return (
     <Card className="print-flow min-w-0" padding="none">
       <div className="px-5 pt-5">
-        <CardTitle className="mb-4">Pessoas</CardTitle>
+        <CostCardTitle title="Pessoas" />
       </div>
-      {rows.length === 0 ? (
-        <div className="px-5 pb-5">
-          <EmptyBlock icon="👛" title="Nada neste período" description="Não há premiação, desafio, retirada ou quebra neste período." />
+      {rows.length > 0 ? (
+        <div className="flex flex-wrap items-center justify-end gap-3 px-5 pb-4 print:hidden">
+          <input
+            type="search"
+            placeholder="Buscar por código ou nome…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className={cn(peopleSearchClass, "w-full sm:w-56")}
+          />
         </div>
+      ) : null}
+      {rows.length === 0 ? (
+        <EmptyBlock icon="👛" title="Nada neste período" description="Não há premiação, desafio, retirada ou quebra neste período." />
+      ) : sorted.length === 0 ? (
+        <EmptyBlock
+          icon="🔍"
+          title="Nenhuma pessoa encontrada"
+          description="Tente outro código ou nome."
+          action={
+            <Button variant="outline" size="sm" onClick={() => setSearch("")}>
+              Limpar busca
+            </Button>
+          }
+        />
       ) : (
-        <div className="flex flex-col">
-          <div className="flex flex-wrap items-center justify-end gap-3 px-5 pb-4 print:hidden">
-            <input
-              type="search"
-              placeholder="Buscar por código ou nome…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className={cn(peopleSearchClass, "w-full sm:w-56")}
-            />
-          </div>
-          {sorted.length === 0 ? (
-            <div className="px-5 pb-5">
-              <EmptyBlock
-                icon="🔍"
-                title="Nenhuma pessoa encontrada"
-                description="Tente outro código ou nome."
-                action={
-                  <Button variant="outline" size="sm" onClick={() => setSearch("")}>
-                    Limpar busca
-                  </Button>
-                }
-              />
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] border-collapse text-sm">
+        <div className="overflow-hidden border-t border-line bg-transparent">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-line">
                     <ThSort label="Nome" active={sortKey === "name"} dir={sortDir} onClick={() => toggleSort("name")} align="left" className={headClass} />
@@ -407,17 +404,16 @@ function PeopleList({
                 </tbody>
               </table>
             </div>
-          )}
-          {sorted.length > 0 ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3.5 print:hidden">
-              <span className="text-[12.5px] text-t2">
-                Mostrando {pageRows.length} de {num(sorted.length)} pessoas
-              </span>
-              {totalPages > 1 ? <Pagination page={page} totalPages={totalPages} onChange={setPage} /> : null}
-            </div>
-          ) : null}
-        </div>
+          </div>
       )}
+      {sorted.length > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3.5 print:hidden">
+          <span className="text-[12.5px] text-t2">
+            Mostrando {pageRows.length} de {num(sorted.length)} pessoas
+          </span>
+          {totalPages > 1 ? <Pagination page={page} totalPages={totalPages} onChange={setPage} /> : null}
+        </div>
+      ) : null}
     </Card>
   );
 }
@@ -839,6 +835,60 @@ function WalletPrintHeader({ stores, all, period }: { stores: Store[]; all: bool
   );
 }
 
+/** Três números e a lista, no mesmo lugar em que aparecem carregados. */
+function WalletSkeleton() {
+  return (
+    <div className="flex flex-col gap-4" aria-busy="true" aria-label="Carregando">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {Array.from({ length: 3 }, (_, index) => (
+          <Card key={index}>
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="mt-1 h-8 w-36" />
+          </Card>
+        ))}
+      </div>
+      <Card padding="none">
+        <div className="px-5 pt-5">
+          <Skeleton className="mb-4 h-4 w-24" />
+        </div>
+        <div className="flex justify-end px-5 pb-4">
+          <Skeleton className="h-8 w-full rounded-[var(--radius-vela-sm)] sm:w-56" />
+        </div>
+        <div className="overflow-hidden border-t border-line">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b border-line">
+                {Array.from({ length: 5 }, (_, index) => (
+                  <th key={index} className="px-4 py-3 text-left">
+                    <Skeleton className="h-2.5 w-14" />
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: 4 }, (_, row) => (
+                <tr key={row} className="border-b border-line last:border-b-0">
+                  <td className="px-4 py-3.5">
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+                      <Skeleton className="h-3.5 w-32" />
+                    </div>
+                  </td>
+                  {Array.from({ length: 4 }, (_, cell) => (
+                    <td key={cell} className="px-4 py-3.5 text-right">
+                      <Skeleton className="ml-auto h-3 w-16" />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 /** Financeiro da gestão: as filiais do seletor, uma linha por pessoa em cada filial. */
 export function BranchWalletPage() {
   const { session, storeRows, loading: storesLoading } = useScopedStores();
@@ -1003,7 +1053,7 @@ export function BranchWalletPage() {
           </div>
         ) : null}
         {showSkeleton && !branches ? (
-          <Skeleton className="h-[520px] w-full rounded-[18px]" />
+          <WalletSkeleton />
         ) : storeRows.length === 0 ? (
           <Card>
             <EmptyBlock icon="👛" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
