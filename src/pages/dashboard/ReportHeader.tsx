@@ -4,7 +4,7 @@ import { resolvePeriod } from "@/data/wedash/dashboard";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { storesForSession } from "@/data/wedash/stores";
 import { isoToDate } from "@/lib/format";
-import { exportPdf } from "@/lib/printMode";
+import { exportPdf, reportFileTitle } from "@/lib/printMode";
 import { useActiveSession } from "@/session/SessionProvider";
 import { LastUpdated } from "./LastUpdated";
 import { periodDisplayLabel } from "./periodPicker";
@@ -34,18 +34,30 @@ function useReportScope() {
   };
 }
 
+function reportParts(screen: string, storeFile: string, periodFile: string, extra: string | null | undefined, period: boolean): string[] {
+  return [
+    screen,
+    storeFile,
+    extra ?? "",
+    // Tela sem periodo (retrato, ex.: estoque) leva a data em que foi gerado.
+    period ? periodFile : new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }),
+  ];
+}
+
+/** Nome do arquivo do relatorio, o mesmo da impressao, sem extensao. */
+export function useReportFileTitle(screen: string, extra?: string | null, { period = true }: { period?: boolean } = {}) {
+  const { storeFile, periodFile } = useReportScope();
+  return useCallback(
+    () => reportFileTitle(reportParts(screen, storeFile, periodFile, extra, period)),
+    [screen, storeFile, extra, period, periodFile],
+  );
+}
+
 /** Exportar da tela: abre a impressao com o layout do relatorio (salvar como PDF). */
 export function useExportPdf(screen: string, extra?: string | null, { period = true }: { period?: boolean } = {}) {
   const { storeFile, periodFile } = useReportScope();
   return useCallback(
-    () =>
-      exportPdf([
-        screen,
-        storeFile,
-        extra ?? "",
-        // Tela sem periodo (retrato, ex.: estoque) leva a data em que foi gerado.
-        period ? periodFile : new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }),
-      ]),
+    () => exportPdf(reportParts(screen, storeFile, periodFile, extra, period)),
     [screen, storeFile, extra, period, periodFile],
   );
 }

@@ -12,11 +12,12 @@ import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { TABLE_PAGE_SIZE } from "@/lib/usePagedRows";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { ErpStatusNotice } from "@/pages/dashboard/ErpStatusNotice";
-import { ReportHeader, useExportPdf } from "@/pages/dashboard/ReportHeader";
+import { ExportDialog } from "@/components/wedash/ExportDialog";
+import { ReportHeader, useExportPdf, useReportFileTitle } from "@/pages/dashboard/ReportHeader";
 import { SectionHeader } from "@/pages/operation/shared";
 import { HeaderFilter, HeaderSearch } from "@/pages/dashboard/HeaderFilter";
+import { STOCK_STATUS_LABEL, downloadInventoryXlsx, stockTransferNote } from "./inventoryExport";
 import {
-  ExportButton,
   TableFooter,
   TipHelp,
   HeaderFilters,
@@ -30,24 +31,6 @@ import { useStockData } from "./useStockData";
 type StatusFilter = "todos" | StockStatus;
 type BrandFilter = "" | "WEPINK" | "WPINK";
 type SortKey = "name" | "estoque" | "receber" | "totalGeral" | "custo" | "valor" | "status" | `local:${string}`;
-
-const STATUS_BADGE: Record<StockStatus, { label: string }> = {
-  negative: { label: "Negativo" },
-  awaiting: { label: "Aguardando transferência" },
-  ok: { label: "Regular" },
-};
-
-/** "Transferir 71 de ESTOQUE para PONTO DE VENDA.", uma linha por transferencia ("LOJA X: transferir ..." quando ha varias lojas). */
-function transferTip(r: StockProductRow, multipleStores: boolean): string {
-  return r.storeRows
-    .flatMap((l) =>
-      l.transferencias.map((t) => {
-        const action = `transferir ${qty(t.qty)} de ${t.from} para ${t.to}.`;
-        return multipleStores ? `${l.store.tradeName}: ${action}` : action.charAt(0).toUpperCase() + action.slice(1);
-      }),
-    )
-    .join("\n");
-}
 
 /** Ordenar por Status: do maior para o menor = o mais grave primeiro. */
 const STATUS_WEIGHT: Record<StockStatus, number> = { negative: 2, awaiting: 1, ok: 0 };
@@ -63,7 +46,8 @@ export function InventoryPage() {
   const [page, setPage] = useState(1);
   const printing = usePrintMode();
   const showSkeleton = useMinSkeleton(loading);
-  const exportValue = useExportPdf("Estoque", null, { period: false });
+  const exportPdf = useExportPdf("Estoque", null, { period: false });
+  const fileTitle = useReportFileTitle("Estoque", null, { period: false });
   const multipleStores = storeRows.length > 1;
   const showBrand = storeRows.some((s) => s.hasWpink);
   const activeBrand: BrandFilter = showBrand ? brand : "";
@@ -73,8 +57,8 @@ export function InventoryPage() {
   const nNegative = count("negative");
   const statusOptions: Array<{ value: StatusFilter; label: string }> = [
     { value: "todos", label: "Todos os status" },
-    ...(Object.keys(STATUS_BADGE) as StockStatus[])
-      .map((s) => ({ value: s, label: `${STATUS_BADGE[s].label} (${count(s)})`, n: count(s) }))
+    ...(Object.keys(STOCK_STATUS_LABEL) as StockStatus[])
+      .map((s) => ({ value: s, label: `${STOCK_STATUS_LABEL[s]} (${count(s)})`, n: count(s) }))
       .filter((o) => o.n > 0)
       .map(({ value, label }) => ({ value, label })),
   ];
@@ -188,7 +172,14 @@ export function InventoryPage() {
                 options={[{ value: "", label: "Todas as categorias" }, ...categories.map((c) => ({ value: c, label: c }))]}
               />
             )}
-            <ExportButton onClick={exportValue} />
+            <ExportDialog
+              formats={["pdf", "xlsx"]}
+              disabled={!view}
+              onExport={(format) => {
+                if (format === "pdf") exportPdf();
+                else downloadInventoryXlsx(lines, locations, multipleStores, fileTitle());
+              }}
+            />
           </HeaderFilters>
         }
         notices={
@@ -381,9 +372,9 @@ function UnitCost({ r }: { r: StockProductRow }) {
 }
 
 function StatusCell({ r, status, multipleStores }: { r: StockProductRow; status: StockStatus; multipleStores: boolean }) {
-  const badge = <Badge variant={statusBadgeVariant(STATUS_BADGE[status].label)}>{STATUS_BADGE[status].label}</Badge>;
+  const badge = <Badge variant={statusBadgeVariant(STOCK_STATUS_LABEL[status])}>{STOCK_STATUS_LABEL[status]}</Badge>;
   if (status !== "awaiting") return badge;
-  const tip = transferTip(r, multipleStores);
+  const tip = stockTransferNote(r, multipleStores);
   return (
     <>
       <Tooltip label={tip}>

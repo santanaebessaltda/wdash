@@ -2,7 +2,7 @@ import { useState } from "react";
 import { flushSync } from "react-dom";
 import { Button, Modal } from "@/components/ui";
 
-export type ExportFormat = "csv" | "pdf";
+export type ExportFormat = "csv" | "pdf" | "xlsx";
 
 const FORMAT_COPY: Record<ExportFormat, { title: string; detail: string }> = {
   csv: {
@@ -12,6 +12,10 @@ const FORMAT_COPY: Record<ExportFormat, { title: string; detail: string }> = {
   pdf: {
     title: "PDF",
     detail: "Abre a impressão para salvar o relatório desta tela.",
+  },
+  xlsx: {
+    title: "XLSX",
+    detail: "Baixa a planilha do Excel com os dados desta tela.",
   },
 };
 

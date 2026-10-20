@@ -68,8 +68,13 @@ function safeFileTitle(parts: string[]): string {
     .trim();
 }
 
+/** Mesmo nome sugerido na impressao: "WDash - {Tela} - {Loja} - {Período}". */
+export function reportFileTitle(parts: string[]): string {
+  return safeFileTitle(["WDash", ...parts]);
+}
+
 /** Abre a janela de impressao com o layout do relatorio (o usuario salva como PDF). */
 export function exportPdf(parts: string[]) {
-  enter(safeFileTitle(["WDash", ...parts]));
+  enter(reportFileTitle(parts));
   requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
 }

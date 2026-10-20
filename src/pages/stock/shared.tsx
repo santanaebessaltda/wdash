@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Button, Pagination } from "@/components/ui";
+import { Pagination } from "@/components/ui";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { STOCK_SALES_LOCATION, type StockProductRow } from "@/data/wedash/stockProducts";
 import { brlCent, num } from "@/lib/format";
@@ -28,14 +28,6 @@ export function stockLocations(rows: StockProductRow[]): string[] {
   for (const r of rows) for (const l of r.storeRows) for (const x of l.locations) names.add(x.name);
   const order = (n: string) => (n === "ESTOQUE" ? 0 : n === STOCK_SALES_LOCATION ? 2 : 1);
   return [...names].sort((a, b) => order(a) - order(b) || a.localeCompare(b, "pt-BR"));
-}
-
-export function ExportButton({ onClick }: { onClick: () => void }) {
-  return (
-    <Button variant="primary" size="md" onClick={onClick}>
-      Exportar
-    </Button>
-  );
 }
 
 /** "Mostrando X de Y produtos" + paginacao, abaixo da tabela (padrao Data Tables). */
