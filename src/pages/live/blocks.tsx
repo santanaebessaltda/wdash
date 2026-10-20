@@ -82,9 +82,12 @@ export function RankingBlock({
           return (
             <div
               key={`vazio-${pos}`}
-              className={cn("flex flex-col items-center text-center", isOuro ? "w-[34%] max-w-[168px]" : "w-[30%] max-w-[148px]")}
+              className={cn(
+                "group flex flex-col items-center text-center transition-transform duration-200 hover:-translate-y-1.5",
+                isOuro ? "w-[34%] max-w-[168px]" : "w-[30%] max-w-[148px]",
+              )}
             >
-              <div className={cn("relative", spotlight ? "mb-1.5" : "mb-2.5")}>
+              <div className={cn("relative transition-transform duration-200 group-hover:scale-[1.04]", spotlight ? "mb-1.5" : "mb-2.5")}>
                 <span
                   className={cn(
                     "inline-flex items-center justify-center rounded-full border-2 border-dashed border-line text-t3",
@@ -99,7 +102,11 @@ export function RankingBlock({
               <p className="mt-0.5 text-[11px] font-semibold text-t3">Nenhuma venda</p>
               <p className="mt-0.5 font-mono text-[13px] font-extrabold text-t3 sm:text-[14px]">—</p>
               <div
-                className={cn("flex w-full items-end justify-center rounded-t-2xl", spotlight ? "mt-2" : "mt-3", spotlight ? PODIO_HEIGHT_COMPACT[pos] : PODIO_HEIGHT[pos])}
+                className={cn(
+                  "flex w-full items-end justify-center rounded-t-2xl transition duration-200 group-hover:brightness-125",
+                  spotlight ? "mt-2" : "mt-3",
+                  spotlight ? PODIO_HEIGHT_COMPACT[pos] : PODIO_HEIGHT[pos],
+                )}
                 style={{ background: "color-mix(in srgb, var(--acc) 16%, transparent)" }}
               >
                 <span className="pb-3 text-[24px] font-extrabold leading-none text-t3 sm:text-[28px]">{pos}º</span>
@@ -124,7 +131,7 @@ export function RankingBlock({
                 }
               : {})}
             className={cn(
-              "flex flex-col items-center text-center",
+              "group flex flex-col items-center text-center transition-transform duration-200 hover:-translate-y-1.5",
               spotlight
                 ? isOuro
                   ? "w-[34%] max-w-[200px]"
@@ -132,10 +139,10 @@ export function RankingBlock({
                 : isOuro
                   ? "w-[34%] max-w-[168px]"
                   : "w-[30%] max-w-[148px]",
-              onSelect && "cursor-pointer rounded-2xl transition-opacity hover:opacity-85 focus-visible:outline-2 focus-visible:outline-acc",
+              onSelect && "cursor-pointer rounded-2xl focus-visible:outline-2 focus-visible:outline-acc",
             )}
           >
-            <div className={cn("relative", spotlight ? "mb-1.5" : "mb-2.5")}>
+            <div className={cn("relative transition-transform duration-200 group-hover:scale-[1.04]", spotlight ? "mb-1.5" : "mb-2.5")}>
               <span
                 className="relative inline-flex rounded-full"
                 style={{
@@ -172,7 +179,7 @@ export function RankingBlock({
 
             <div
               className={cn(
-                "flex w-full items-end justify-center rounded-t-2xl",
+                "flex w-full items-end justify-center rounded-t-2xl transition duration-200 group-hover:brightness-125",
                 spotlight ? "mt-2" : "mt-3",
                 spotlight ? PODIO_HEIGHT_COMPACT[pos] : PODIO_HEIGHT[pos],
               )}

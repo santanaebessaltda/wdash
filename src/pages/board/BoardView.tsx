@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Badge, Button, Card, CardHero, CardTitle, EmptyState, ProgressBar, StatCard, progressTextClass } from "@/components/ui";
+import { Badge, Button, Card, CardHero, CardTitle, EmptyState, ProgressBar, StatCard, ThSort, progressTextClass, type SortDir } from "@/components/ui";
 import { BoardSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { RankingBlock } from "@/pages/live/blocks";
@@ -23,6 +23,8 @@ import overtakeUrl from "@/assets/sound/overtaking.wav";
 import firstPlaceUrl from "@/assets/sound/first-place.wav";
 import goalLevelUrl from "@/assets/sound/reached-the-goal.wav";
 import challengeUrl from "@/assets/sound/target-met.wav";
+
+type RankSortKey = "place" | "name" | "sales" | "pa" | "meta" | "revenue";
 
 const BANNER_MS = 3200;
 const MOMENT_CAP = 4;
@@ -235,7 +237,9 @@ export function BoardView({
   const [current, setCurrent] = useState<BoardMoment | null>(null);
   const queue = useRef<BoardMoment[]>([]);
   const audio = useRef<HTMLAudioElement | null>(null);
+  const previewSound = useRef(false);
   const seenSnap = useRef<string | null>(null);
+  const [rankSort, setRankSort] = useState<{ key: RankSortKey; dir: SortDir }>({ key: "place", dir: "asc" });
 
   const today = calendarTodayIso();
   const scopeKey = boardScopeKey(stores.map((store) => store.id));
@@ -360,27 +364,65 @@ export function BoardView({
 
   useEffect(() => {
     if (!current) return;
+    const fromPreview = previewSound.current;
+    previewSound.current = false;
+    let clip: HTMLAudioElement | null = null;
     let timer = 0;
     const finish = () => {
       window.clearTimeout(timer);
-      audio.current?.pause();
+      if (fromPreview) audio.current?.pause();
+      else clip?.pause();
       setCurrent(queue.current.shift() ?? null);
     };
     timer = window.setTimeout(finish, BANNER_MS);
-    if (unlocked && !muted) {
-      const clip = new Audio(SOUND[current.kind]);
+    if (!fromPreview && unlocked && !muted) {
+      audio.current?.pause();
+      clip = new Audio(SOUND[current.kind]);
       clip.volume = 0.85;
       audio.current = clip;
       void clip.play().catch(() => undefined);
     }
     return () => {
       window.clearTimeout(timer);
-      audio.current?.pause();
+      if (!fromPreview) clip?.pause();
     };
   }, [current, muted, unlocked]);
 
   if (loading) {
     return <BoardSkeleton header={controls !== "page"} className={controls === "page" ? undefined : "min-h-full p-4 sm:p-6"} />;
+  }
+
+  function toggleRankSort(key: RankSortKey) {
+    setRankSort((currentSort) => {
+      if (currentSort.key === key) return { key, dir: currentSort.dir === "asc" ? "desc" : "asc" };
+      return { key, dir: key === "name" || key === "place" ? "asc" : "desc" };
+    });
+  }
+
+  function preview(kind: BoardMoment["kind"]) {
+    const people = view?.people ?? [];
+    const leader = people[0];
+    const chaser = people[1] ?? leader;
+    const levelName = (leader ? personLevel(leader)?.levelLabel : null) ?? "N2 · Prata";
+    const challengeName = challenges[0]?.challenge.name ?? "Desafio do mês";
+    const moment: BoardMoment =
+      kind === "first"
+        ? { kind, key: leader?.key ?? "preview", name: leader?.name ?? "Maria" }
+        : kind === "overtake"
+          ? { kind, key: chaser?.key ?? "preview", name: chaser?.name ?? "João", passed: leader?.name ?? "Maria", position: 2 }
+          : kind === "level"
+            ? { kind, key: leader?.key ?? "preview", name: leader?.name ?? "Maria", level: levelName }
+            : kind === "store-level"
+              ? { kind, level: levelName }
+              : { kind, key: leader?.key ?? "preview", name: leader?.name ?? "Maria", challenge: challengeName };
+    previewSound.current = true;
+    audio.current?.pause();
+    const clip = new Audio(SOUND[kind]);
+    clip.volume = 0.85;
+    audio.current = clip;
+    void clip.play().catch(() => undefined);
+    queue.current = [];
+    setCurrent(moment);
   }
 
   function unlock(nextMuted = muted) {
@@ -453,6 +495,17 @@ export function BoardView({
       </header>
       )}
 
+      {controls === "page" && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[12px] font-bold text-t2">Simular</span>
+          <Button type="button" size="sm" variant="outline" onClick={() => preview("first")}>Liderança</Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => preview("overtake")}>Ultrapassagem</Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => preview("level")}>Nível</Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => preview("store-level")}>Nível da loja</Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => preview("challenge")}>Desafio</Button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard dense glass label="Faturamento" value={brlCent(monthRevenue)} sub={`Hoje ${brlCent(todayTotals.revenue)}`} icon={<IconRevenue />} iconColor="var(--acc)" iconBg="var(--acc-soft)" />
         <StatCard dense glass label="Vendas" value={num(month.sales)} sub={`Hoje ${num(todayTotals.sales)}`} icon={<IconSales />} iconColor="var(--ok)" iconBg="var(--ok-soft)" />
@@ -515,17 +568,43 @@ export function BoardView({
                   <div className="min-w-0 overflow-x-auto">
                     <table className="w-full min-w-[520px] border-collapse text-[12px]">
                       <thead>
-                        <tr className="border-b border-line text-left text-[10.5px] font-bold uppercase tracking-wide text-t3">
-                          <th className="pb-1.5 pr-2">#</th>
-                          <th className="pb-1.5 pr-2">Pessoa</th>
-                          <th className="pb-1.5 pr-2 text-right">Vendas</th>
-                          <th className="pb-1.5 pr-2 text-right">P.A.</th>
-                          <th className="pb-1.5 pr-2 text-right">Meta</th>
-                          <th className="pb-1.5 text-right">Faturamento</th>
+                        <tr className="border-b border-line">
+                          <ThSort label="#" active={rankSort.key === "place"} dir={rankSort.dir} align="left" className="pb-1.5 pr-2" onClick={() => toggleRankSort("place")} />
+                          <ThSort label="Pessoa" active={rankSort.key === "name"} dir={rankSort.dir} align="left" className="pb-1.5 pr-2" onClick={() => toggleRankSort("name")} />
+                          <ThSort label="Vendas" active={rankSort.key === "sales"} dir={rankSort.dir} align="right" className="pb-1.5 pr-2" onClick={() => toggleRankSort("sales")} />
+                          <ThSort label="P.A." active={rankSort.key === "pa"} dir={rankSort.dir} align="right" className="pb-1.5 pr-2" onClick={() => toggleRankSort("pa")} />
+                          <ThSort label="Meta" active={rankSort.key === "meta"} dir={rankSort.dir} align="right" className="pb-1.5 pr-2" onClick={() => toggleRankSort("meta")} />
+                          <ThSort label="Faturamento" active={rankSort.key === "revenue"} dir={rankSort.dir} align="right" className="pb-1.5" onClick={() => toggleRankSort("revenue")} />
                         </tr>
                       </thead>
                       <tbody>
-                        {view!.people.slice(3).map((person, index) => {
+                        {view!.people
+                          .map((person, index) => ({ person, place: index + 1 }))
+                          .slice(3)
+                          .sort((a, b) => {
+                            const metaOf = (person: TeamMemberRow) => {
+                              const level = personLevel(person);
+                              if (!level) return null;
+                              return goalFor(person)?.goal.tierMode === "INDIVIDUAL" ? level.pct : level.storePct;
+                            };
+                            const value = (row: { person: TeamMemberRow; place: number }): number | string | null => {
+                              if (rankSort.key === "place") return row.place;
+                              if (rankSort.key === "name") return row.person.name;
+                              if (rankSort.key === "sales") return row.person.sales;
+                              if (rankSort.key === "pa") return row.person.pa;
+                              if (rankSort.key === "revenue") return row.person.revenue;
+                              return metaOf(row.person);
+                            };
+                            const left = value(a);
+                            const right = value(b);
+                            if (left == null && right == null) return a.place - b.place;
+                            if (left == null) return 1;
+                            if (right == null) return -1;
+                            const compared = typeof left === "string" ? left.localeCompare(right as string, "pt-BR") : left - (right as number);
+                            if (compared === 0) return a.place - b.place;
+                            return rankSort.dir === "asc" ? compared : -compared;
+                          })
+                          .map(({ person, place }) => {
                           const level = personLevel(person);
                           const board = goalFor(person);
                           const home = homeStore(person);
@@ -533,7 +612,7 @@ export function BoardView({
                           const pct = level ? (individual ? `${num(level.pct, 1)}%` : `${num(level.storePct, 1)}% da meta`) : null;
                           return (
                             <tr key={person.key} className={cn("border-b border-line last:border-b-0", momentKey(current) === person.key && "bg-acc-soft")}>
-                              <td className="py-1.5 pr-2 font-bold text-t3">{index + 4}º</td>
+                              <td className="py-1.5 pr-2 font-bold text-t3">{place}º</td>
                               <td className="py-1.5 pr-2">
                                 <span className="flex min-w-0 items-center gap-2">
                                   <PersonAvatar name={person.name} employeeId={person.key} storeId={home} size="sm" />
