@@ -40,6 +40,13 @@ const team: NavSingle = {
   to: paths.management.team,
 };
 
+/** Placar da filial. Página direta, sem submenu. */
+const board: NavSingle = {
+  label: "Placar",
+  icon: ICON.live,
+  to: paths.board,
+};
+
 /** Metas e desafios. */
 const performance: NavGroup = {
   label: "Performance",
@@ -130,6 +137,7 @@ const navOwner: NavEntry[] = [
   },
   stock,
   team,
+  board,
   performance,
   finance,
   purchaseOrder,
@@ -150,6 +158,7 @@ const navManager: NavEntry[] = [
   },
   stock,
   team,
+  board,
   performance,
   finance,
   purchaseOrder,

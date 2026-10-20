@@ -65,6 +65,7 @@ export function PublicBoardPage() {
           watermark={Number.isNaN(watermark?.getTime() ?? 0) ? null : watermark}
           loading={false}
           packStore={pack.store.id}
+          controls="public"
         />
       </ProfilePhotosProvider>
     </div>

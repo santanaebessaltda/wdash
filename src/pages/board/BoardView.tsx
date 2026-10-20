@@ -153,8 +153,8 @@ export function BoardView({
   watermark,
   loading,
   packStore,
-  picker,
-  onLeave,
+  controls = "page",
+  onExitTv,
 }: {
   storeId: string | null;
   storeName: string | null;
@@ -165,8 +165,9 @@ export function BoardView({
   watermark: Date | null;
   loading: boolean;
   packStore: string | null;
-  picker?: { stores: { id: string; tradeName: string }[]; onPick: (id: string) => void };
-  onLeave?: () => void;
+  /** page: dentro da WDash. tv: apresentação. public: link sem login. */
+  controls?: "page" | "tv" | "public";
+  onExitTv?: () => void;
 }) {
   const [unlocked, setUnlocked] = useState(false);
   const [muted, setMuted] = useState(readMuted);
@@ -300,21 +301,7 @@ export function BoardView({
     }
   }
 
-  if (!storeId) {
-    return (
-      <div className="flex min-h-full flex-col gap-4 p-6">
-        <h1 className="text-[22px] font-extrabold text-t0">Placar</h1>
-        <p className="text-sm text-t2">Escolha a filial que fica aberta neste notebook.</p>
-        <div className="grid max-w-xl gap-2">
-          {(picker?.stores ?? []).map((item) => (
-            <Button key={item.id} variant="outline" onClick={() => picker?.onPick(item.id)}>
-              {item.tradeName}
-            </Button>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  if (!storeId) return null;
 
   const names = view?.people.map((person) => person.name) ?? [];
   const podium: RankingRow[] = (view?.people.slice(0, 3) ?? []).map((person, index) => {
@@ -334,38 +321,36 @@ export function BoardView({
   const todayTotals = storeTotals(team.dayAggs, storeId, today, today);
   const monthRevenue = view?.composition.total ?? month.revenue;
 
+  const showSound = controls === "tv" || controls === "public";
+
   return (
-    <div className="flex min-h-full flex-col gap-4 p-4 sm:p-6">
+    <div className={cn("flex flex-col gap-4", controls === "page" ? "" : "min-h-full p-4 sm:p-6")}>
       <style>{`@keyframes board-pop{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:none}}`}</style>
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-[22px] font-extrabold tracking-tight text-t0 sm:text-[26px]">{storeName ?? "Filial"}</h1>
+          {controls === "page" ? (
+            <h2 className="text-lg font-extrabold tracking-tight text-t0 sm:text-xl">{storeName ?? "Filial"}</h2>
+          ) : (
+            <h1 className="text-[22px] font-extrabold tracking-tight text-t0 sm:text-[26px]">{storeName ?? "Filial"}</h1>
+          )}
           <p className="mt-0.5 text-[13px] text-t2">
             {monthLabel(today)}
             <span className="mx-1.5">·</span>
             {formatSyncWatermarkLabel(watermark, { loading })}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => (unlocked ? unlock(!muted) : unlock(false))}>
-            {!unlocked ? "Ativar som" : muted ? "Som desligado" : "Som ligado"}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              if (document.fullscreenElement) void document.exitFullscreen();
-              else void document.documentElement.requestFullscreen().catch(() => undefined);
-            }}
-          >
-            Tela cheia
-          </Button>
-          {onLeave && (
-            <Button variant="ghost" size="sm" onClick={onLeave}>
-              Sair
+        {showSound && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => (unlocked ? unlock(!muted) : unlock(false))}>
+              {!unlocked ? "Ativar som" : muted ? "Som desligado" : "Som ligado"}
             </Button>
-          )}
-        </div>
+            {controls === "tv" && (
+              <Button type="button" variant="outline" size="sm" onClick={onExitTv}>
+                Sair da tela cheia
+              </Button>
+            )}
+          </div>
+        )}
       </header>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

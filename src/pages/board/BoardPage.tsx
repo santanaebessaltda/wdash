@@ -1,20 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
+import { Button, Card, EmptyState, PageHeader } from "@/components/ui";
 import { fetchGoals, fetchGoalTeam } from "@/data/wedash/goalsRepo";
 import { emptyChallengeAggInput, fetchChallengeInput, fetchChallenges } from "@/data/wedash/challengesRepo";
 import { fetchNamedSellerDayAggs, fetchSalesDayAggs, fetchSalesSellerDayAggs, fetchSyncWatermark } from "@/data/wedash/salesRepo";
 import { resolvePeriod, type Scope, type TeamAggInput } from "@/data/wedash/dashboard";
 import { fetchTeamAggInput } from "@/pages/dashboard/TeamMemberDetail";
 import { useScope } from "@/pages/dashboard/useScope";
-import { searchForRoute } from "@/pages/dashboard/periodQuery";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { goalWeightFrom } from "@/data/wedash/engine/goalProjection";
 import { defaultWeekHours, effectiveWeekHours } from "@/data/wedash/storeHours";
 import { storesForSession } from "@/data/wedash/stores";
 import { useActiveSession } from "@/session/SessionProvider";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
-import { paths } from "@/router/paths";
 import { BoardView, type BoardChallengesData, type BoardGoalsData } from "./BoardView";
+import { ShareBoardButton } from "./ShareBoardButton";
 
 const REFRESH_MS = 30 * 60 * 1000;
 const WATERMARK_MS = 60 * 1000;
@@ -22,10 +22,24 @@ const WATERMARK_MS = 60 * 1000;
 const GOALS_EMPTY: BoardGoalsData = { goals: [], dayAggs: [], sellerAggs: [], namedAggs: [], team: [] };
 const CHALLENGES_EMPTY: BoardChallengesData = { challenges: [], aggs: emptyChallengeAggInput() };
 
+/** Lucide MonitorUp. */
+function MonitorUpIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="m9 10 3-3 3 3" />
+      <path d="M12 13V7" />
+      <rect width="20" height="14" x="2" y="3" rx="2" />
+      <path d="M12 17v4" />
+      <path d="M8 21h8" />
+    </svg>
+  );
+}
+
 export function BoardPage() {
   const session = useActiveSession();
-  const navigate = useNavigate();
-  const { scope, setScope } = useScope();
+  const [params, setParams] = useSearchParams();
+  const tv = params.get("tv") === "1";
+  const { scope } = useScope();
   const storeId = scope.storeIds.length === 1 ? scope.storeIds[0]! : null;
   const [team, setTeam] = useState<TeamAggInput>({ dayAggs: [] });
   const [goalsData, setGoalsData] = useState<BoardGoalsData>(GOALS_EMPTY);
@@ -40,6 +54,39 @@ export function BoardPage() {
     if (!storeId) return null;
     return { storeIds: [storeId], period: { kind: "thisMonth" }, division: null };
   }, [storeId]);
+
+  const exitTv = useCallback(() => {
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+    const next = new URLSearchParams(params);
+    if (!next.has("tv")) return;
+    next.delete("tv");
+    setParams(next, { replace: true });
+  }, [params, setParams]);
+
+  function enterTv() {
+    const next = new URLSearchParams(params);
+    next.set("tv", "1");
+    setParams(next);
+    void document.documentElement.requestFullscreen().catch(() => undefined);
+  }
+
+  useEffect(() => {
+    if (tv && !storeId) exitTv();
+  }, [exitTv, storeId, tv]);
+
+  useEffect(() => {
+    if (!tv) return;
+    let sawFullscreen = Boolean(document.fullscreenElement);
+    const onChange = () => {
+      if (document.fullscreenElement) {
+        sawFullscreen = true;
+        return;
+      }
+      if (sawFullscreen) exitTv();
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, [exitTv, tv]);
 
   const reload = useCallback(async () => {
     if (!boardScope || !storeId) return;
@@ -89,6 +136,16 @@ export function BoardPage() {
   }, [boardScope, session.tenantId, storeId]);
 
   useEffect(() => {
+    if (packStore === storeId) return;
+    setLoading(true);
+    if (packStore != null) {
+      setTeam({ dayAggs: [] });
+      setGoalsData(GOALS_EMPTY);
+      setChallengesData(CHALLENGES_EMPTY);
+    }
+  }, [packStore, storeId]);
+
+  useEffect(() => {
     void reload();
   }, [reload]);
 
@@ -117,22 +174,54 @@ export function BoardPage() {
 
   const stores = storesForSession(session.stores);
   const store = stores.find((item) => item.id === storeId);
+  const noStores = session.stores.length === 0;
+
   return (
-    <BoardView
-      storeId={storeId}
-      storeName={store?.tradeName ?? null}
-      week={effectiveWeekHours(store?.hours ?? defaultWeekHours())}
-      team={team}
-      goalsData={goalsData}
-      challengesData={challengesData}
-      watermark={watermark}
-      loading={loading}
-      packStore={packStore}
-      picker={{
-        stores: stores.map((item) => ({ id: item.id, tradeName: item.tradeName })),
-        onPick: (id) => setScope({ storeIds: [id], period: scope.period, division: null }),
-      }}
-      onLeave={storeId ? () => navigate(`${paths.team}${searchForRoute(paths.team, `?store=${storeId}`)}`) : undefined}
-    />
+    <>
+      {!tv && (
+        <PageHeader
+          title="Placar"
+          subtitle="Acompanhe o desempenho da filial, ranking, metas e desafios em tempo real."
+          actions={
+            storeId ? (
+              <>
+                <ShareBoardButton storeId={storeId} />
+                <Button type="button" variant="outline" icon={<MonitorUpIcon />} onClick={enterTv}>
+                  Exibir na TV
+                </Button>
+              </>
+            ) : undefined
+          }
+        />
+      )}
+      {!storeId ? (
+        <Card>
+          <EmptyState
+            framed={false}
+            icon="🏬"
+            title={noStores ? "Nenhuma filial disponível" : "Selecione uma filial"}
+            description={
+              noStores
+                ? "Não há filiais disponíveis para este acesso."
+                : "Escolha uma filial no seletor do topo para visualizar o placar."
+            }
+          />
+        </Card>
+      ) : (
+        <BoardView
+          storeId={storeId}
+          storeName={store?.tradeName ?? null}
+          week={effectiveWeekHours(store?.hours ?? defaultWeekHours())}
+          team={team}
+          goalsData={goalsData}
+          challengesData={challengesData}
+          watermark={watermark}
+          loading={loading}
+          packStore={packStore}
+          controls={tv ? "tv" : "page"}
+          onExitTv={exitTv}
+        />
+      )}
+    </>
   );
 }

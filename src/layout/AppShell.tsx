@@ -23,7 +23,7 @@ export function AppShell() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const location = useLocation();
-  const board = location.pathname === paths.board;
+  const presentation = location.pathname === paths.board && new URLSearchParams(location.search).get("tv") === "1";
   const mainRef = useRef<HTMLElement>(null);
 
   // html/body com height 100% + overflow-x hidden fazem o <body> rolar (nao a janela nem o <main>):
@@ -34,10 +34,11 @@ export function AppShell() {
       if (el) el.scrollTop = 0;
     }
     window.scrollTo(0, 0);
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
+      if (presentation) return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setPaletteOpen((o) => !o);
@@ -45,7 +46,11 @@ export function AppShell() {
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [presentation]);
+
+  useEffect(() => {
+    if (presentation) setPaletteOpen(false);
+  }, [presentation]);
 
   useEffect(() => installPrintMode(), []);
 
@@ -95,7 +100,7 @@ export function AppShell() {
 
   return (
     <div className="tela-cheia flex w-full overflow-x-hidden bg-bg-0 text-t0 print:block print:overflow-visible print:bg-white">
-      {!board && (
+      {!presentation && (
         <div className="contents print:hidden">
           <Sidebar collapsed={collapsed} />
           <MobileDrawer open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
@@ -103,7 +108,7 @@ export function AppShell() {
       )}
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col print:block">
-        {!board && (
+        {!presentation && (
           <div className="contents print:hidden">
             <Topbar onOpenMobileNav={() => setMobileNavOpen(true)} collapsed={collapsed} onToggleCollapse={() => setCollapsed((c) => !c)} />
           </div>
@@ -112,15 +117,15 @@ export function AppShell() {
           ref={mainRef}
           className={cn(
             "flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto print:overflow-visible print:p-0",
-            board ? "p-0" : "px-4 pt-5 sm:px-8 sm:pt-6",
+            presentation ? "p-0" : "px-4 pt-5 sm:px-8 sm:pt-6",
           )}
         >
           <ProfilePhotosProvider>
             <Suspense fallback={<PageLoader />}>
               <div
                 key={location.pathname}
-                className={cn("print:pb-0", board ? "flex min-h-full flex-1 flex-col" : "pad-base vela-page-enter")}
-                style={board ? undefined : padBottom("32px")}
+                className={cn("print:pb-0", presentation ? "flex min-h-full flex-1 flex-col" : "pad-base vela-page-enter")}
+                style={presentation ? undefined : padBottom("32px")}
               >
                 <Outlet />
               </div>
@@ -129,7 +134,7 @@ export function AppShell() {
         </main>
       </div>
 
-      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      {!presentation && <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />}
       <PushRecover />
     </div>
   );
