@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Badge, Button, Card, CardHero, CardTitle, EmptyState, ProgressBar, StatCard, ThSort, progressTextClass, type SortDir } from "@/components/ui";
 import { BoardSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
@@ -706,21 +707,22 @@ export function BoardView({
         )}
       </div>
 
-      {current && (
-        <div
-          className="fixed inset-0 z-40 flex items-center justify-center bg-black/80 p-6"
-          role="dialog"
-          aria-modal="true"
-          aria-label={momentText(current, names)}
-          onClick={closeCelebration}
-        >
-          <div className="flex flex-col items-center" style={{ animation: "board-pop 0.35s ease" }} onClick={(event) => event.stopPropagation()}>
+      {current
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 p-6"
+              role="dialog"
+              aria-modal="true"
+              aria-label={momentText(current, names)}
+              onClick={closeCelebration}
+            >
+          <div className="flex flex-col items-center overflow-visible" style={{ animation: "board-pop 0.35s ease" }} onClick={(event) => event.stopPropagation()}>
             {celebration ? (
-              <div className="relative mb-5">
+              <div className="relative mb-5 overflow-visible">
                 {celebrationMedal ? (
                   <span
                     className={cn(
-                      "absolute leading-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.35)]",
+                      "absolute z-10 leading-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.35)]",
                       celebration.place === 1
                         ? "left-1/2 top-0 -translate-x-1/2 -translate-y-[78%] text-[46px]"
                         : "-right-2 -top-2 text-[36px]",
@@ -752,8 +754,10 @@ export function BoardView({
               Fechar
             </Button>
           </div>
-        </div>
-      )}
+        </div>,
+          document.body,
+        )
+        : null}
     </div>
   );
 }
