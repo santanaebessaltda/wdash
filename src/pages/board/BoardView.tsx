@@ -127,6 +127,34 @@ function momentKey(moment: BoardMoment | null): string | null {
   return moment.key;
 }
 
+const MOMENT_MEDAL = {
+  1: { color: "#f7b84e", mark: "👑" },
+  2: { color: "#c7cdd6", mark: "🥈" },
+  3: { color: "#d99a5c", mark: "🥉" },
+} as const;
+
+function momentFace(
+  moment: BoardMoment,
+  people: TeamMemberRow[],
+): { name: string; employeeId: string; storeId: string; place: 1 | 2 | 3 | null } | null {
+  if (moment.kind === "store-level") return null;
+  const found = people.find((person) => person.key === moment.key);
+  const index = found ? people.indexOf(found) : -1;
+  const fromRank = index === 0 ? 1 : index === 1 ? 2 : index === 2 ? 3 : null;
+  const place =
+    moment.kind === "first"
+      ? 1
+      : moment.kind === "overtake" && (moment.position === 1 || moment.position === 2 || moment.position === 3)
+        ? moment.position
+        : fromRank;
+  return {
+    name: found?.name ?? moment.name,
+    employeeId: found?.key ?? moment.key,
+    storeId: found?.storeIds[0] ?? "",
+    place,
+  };
+}
+
 function levelLabel(levelNumber: number | null, name: string | null): string | null {
   if (levelNumber == null || !name) return null;
   return `N${levelNumber} · ${name}`;
@@ -466,6 +494,8 @@ export function BoardView({
   const monthRevenue = view?.composition.total ?? month.revenue;
 
   const showSound = controls === "tv" || controls === "public";
+  const celebration = current ? momentFace(current, view?.people ?? []) : null;
+  const celebrationMedal = celebration?.place ? MOMENT_MEDAL[celebration.place] : null;
 
   return (
     <div className={cn("flex flex-col gap-4", controls === "page" ? "" : "min-h-full p-4 sm:p-6")}>
@@ -665,13 +695,41 @@ export function BoardView({
 
       {current && (
         <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center p-6">
-          <p
-            aria-live="polite"
-            className="max-w-xl rounded-[var(--radius-vela-lg)] border border-acc bg-bg-2 px-8 py-6 text-center text-[22px] font-extrabold tracking-tight text-t0 shadow-[var(--shadow-vela)] sm:text-[28px]"
-            style={{ animation: "board-pop 0.35s ease" }}
-          >
-            {momentText(current, names)}
-          </p>
+          <div className="flex flex-col items-center" style={{ animation: "board-pop 0.35s ease" }}>
+            {celebration ? (
+              <div className="relative mb-5">
+                {celebrationMedal ? (
+                  <span
+                    className={cn(
+                      "absolute leading-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.35)]",
+                      celebration.place === 1
+                        ? "left-1/2 top-0 -translate-x-1/2 -translate-y-[78%] text-[46px]"
+                        : "-right-2 -top-2 text-[36px]",
+                    )}
+                    aria-hidden
+                  >
+                    {celebrationMedal.mark}
+                  </span>
+                ) : null}
+                <span
+                  className="inline-flex rounded-full"
+                  style={{
+                    boxShadow: celebrationMedal
+                      ? `0 0 0 4px ${celebrationMedal.color}${celebration.place === 1 ? ", 0 0 36px rgba(247,184,78,0.45)" : ""}`
+                      : "0 0 0 4px var(--acc)",
+                  }}
+                >
+                  <PersonAvatar size="3xl" name={celebration.name} employeeId={celebration.employeeId} storeId={celebration.storeId} />
+                </span>
+              </div>
+            ) : null}
+            <p
+              aria-live="polite"
+              className="max-w-xl rounded-[var(--radius-vela-lg)] border border-acc bg-bg-2 px-8 py-6 text-center text-[22px] font-extrabold tracking-tight text-t0 shadow-[var(--shadow-vela)] sm:text-[28px]"
+            >
+              {momentText(current, names)}
+            </p>
+          </div>
         </div>
       )}
     </div>
