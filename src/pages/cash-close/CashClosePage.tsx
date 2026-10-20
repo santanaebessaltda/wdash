@@ -139,6 +139,7 @@ function CloseTable({
   closed,
   draft,
   onAcquirer,
+  onTyped,
   pixOnline,
 }: {
   lines: CashCloseLine[];
@@ -147,6 +148,7 @@ function CloseTable({
   closed: boolean;
   draft?: CloseDraft;
   onAcquirer?: (key: CashCloseBucket, value: string) => void;
+  onTyped?: (key: CashCloseBucket, value: string) => void;
   pixOnline: boolean;
 }) {
   if (lines.length === 0) return null;
@@ -183,12 +185,29 @@ function CloseTable({
               const online = row.manualPixCents ?? 0;
               const pixLocked = row.key === "pix" && (pixOnline || online > 0);
               const acqTxt = draft?.acquirer[row.key] ?? (row.stoneCents == null ? "" : centsToField(row.stoneCents));
+              const cashEditable = row.key === "cash" && Boolean(owner && draft && onTyped);
               return (
                 <tr key={row.key} className="border-b border-line">
                   <td className="px-3 py-3 text-t0">{labelUpper(row.label)}</td>
                   <td className="px-3 py-3 text-right font-mono text-[13px] font-bold text-t0">{money(row.systemCents)}</td>
                   <td className="px-3 py-2.5 text-right">
-                    {row.key === "cash" || pixLocked || !(owner && draft && onAcquirer) ? (
+                    {cashEditable ? (
+                      <div className="flex flex-col items-end">
+                        <input
+                          value={draft?.typed.cash ?? ""}
+                          onChange={(e) => onTyped?.("cash", e.target.value)}
+                          inputMode="decimal"
+                          placeholder="—"
+                          aria-label={`Total real para ${row.label}`}
+                          className={field}
+                        />
+                        {(row.withdrawalCents ?? 0) > 0 && (
+                          <span className="mt-0.5 max-w-[220px] text-right text-[11px] leading-tight text-t2">
+                            Digitado {money(fieldToCents(draft?.typed.cash ?? "") ?? row.typedCents)} · Retirada {money(row.withdrawalCents ?? 0)}
+                          </span>
+                        )}
+                      </div>
+                    ) : row.key === "cash" || pixLocked || !(owner && draft && onAcquirer) ? (
                       <div className="flex flex-col items-end">
                         <span className="font-mono text-[13px] font-bold text-t0">{real == null ? "—" : money(real)}</span>
                         {online > 0 && (
@@ -1140,6 +1159,12 @@ function DayModal({
                     setDrafts((current) => ({
                       ...current,
                       [store.id]: { ...(current[store.id] ?? draft!), acquirer: { ...(current[store.id]?.acquirer ?? {}), [key]: value } },
+                    }))
+                  }
+                  onTyped={(key, value) =>
+                    setDrafts((current) => ({
+                      ...current,
+                      [store.id]: { ...(current[store.id] ?? draft!), typed: { ...(current[store.id]?.typed ?? draft?.typed ?? {}), [key]: value } },
                     }))
                   }
                 />
