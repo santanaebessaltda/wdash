@@ -39,15 +39,23 @@ const RENT_TIP =
 
 const MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
-const SETTINGS_PAGES = {
-  branch: { title: "Filial", subtitle: "Defina o tipo desta filial." },
-  hours: { title: "Funcionamento", subtitle: "Defina o fuso e o horário de funcionamento desta filial." },
-  royalties: { title: "Royalties e marketing", subtitle: "Configure os percentuais de royalties e taxa de marketing." },
-  rent: { title: "Aluguel", subtitle: "Configure a regra de aluguel desta filial." },
-  products: { title: "Custo dos produtos", subtitle: "Escolha a tabela de custo dos produtos desta filial." },
-} as const;
+type SettingsSection = "branch" | "hours" | "royalties" | "rent" | "products";
 
-type SettingsSection = keyof typeof SETTINGS_PAGES;
+function settingsCopy(section: SettingsSection, many: boolean): { title: string; subtitle: string } {
+  const each = many ? "de cada filial" : "desta filial";
+  if (section === "hours") return { title: "Funcionamento", subtitle: `Defina o fuso e o horário de funcionamento ${each}.` };
+  if (section === "royalties") {
+    return {
+      title: "Royalties e marketing",
+      subtitle: many
+        ? "Configure os percentuais de royalties e taxa de marketing de cada filial."
+        : "Configure os percentuais de royalties e taxa de marketing.",
+    };
+  }
+  if (section === "rent") return { title: "Aluguel", subtitle: `Configure a regra de aluguel ${each}.` };
+  if (section === "products") return { title: "Custo dos produtos", subtitle: `Escolha a tabela de custo dos produtos ${each}.` };
+  return { title: "Filial", subtitle: `Defina o tipo ${each}.` };
+}
 
 function settingsSection(pathname: string): SettingsSection {
   if (pathname.startsWith(paths.operation.hours)) return "hours";
@@ -84,8 +92,9 @@ function franchiseSections(store: Store): CostFieldSection[] {
 export function BranchPage() {
   const { pathname } = useLocation();
   const section = settingsSection(pathname);
-  const page = SETTINGS_PAGES[section];
   const { storeRows, loading, refresh } = useScopedStores();
+  const many = storeRows.length > 1;
+  const page = settingsCopy(section, many);
   const [tables, setTables] = useState<CostTable[]>([]);
   const [tablesLoading, setTablesLoading] = useState(true);
   const [tablesError, setTablesError] = useState(false);
@@ -112,12 +121,12 @@ export function BranchPage() {
       loading={loading}
       skeleton={(n) => <StoreCardsSkeleton count={n} title schedule={section === "hours"} fields={section === "rent" ? 3 : 1} />}
       storeRows={storeRows}
-      oneStore
     >
       {(store) => (
         <BranchSection
           section={section}
           store={store}
+          storeLabel={many ? store.tradeName || store.name : undefined}
           tables={tables}
           tablesLoading={tablesLoading}
           tablesError={tablesError}
@@ -131,6 +140,7 @@ export function BranchPage() {
 function BranchSection({
   section,
   store,
+  storeLabel,
   tables,
   tablesLoading,
   tablesError,
@@ -138,6 +148,7 @@ function BranchSection({
 }: {
   section: SettingsSection;
   store: Store;
+  storeLabel?: string;
   tables: CostTable[];
   tablesLoading: boolean;
   tablesError: boolean;
@@ -171,7 +182,7 @@ function BranchSection({
     show("Alterações salvas.", "success");
   }
 
-  if (section === "hours") return <StoreHoursCard store={store} canEdit onSaved={onSaved} pointType={store.pointType} />;
+  if (section === "hours") return <StoreHoursCard store={store} canEdit onSaved={onSaved} pointType={store.pointType} storeLabel={storeLabel} />;
   if (section === "royalties") {
     return (
       <CostFieldsCard
@@ -180,22 +191,23 @@ function BranchSection({
         tip={FRANCHISE_TIP}
         fields={franchiseFields(store)}
         sections={franchiseSections(store)}
+        storeLabel={storeLabel}
         onSaved={onSaved}
       />
     );
   }
-  if (section === "rent") return <Card><RentCard store={store} onSaved={onSaved} /></Card>;
+  if (section === "rent") return <Card><RentCard store={store} storeLabel={storeLabel} onSaved={onSaved} /></Card>;
   if (section === "products") {
     return (
       <Card>
-        <CostTableCard store={store} tables={tables} tablesLoading={tablesLoading} tablesError={tablesError} onSaved={onSaved} />
+        <CostTableCard store={store} storeLabel={storeLabel} tables={tables} tablesLoading={tablesLoading} tablesError={tablesError} onSaved={onSaved} />
       </Card>
     );
   }
 
   return (
     <Card>
-      <BlockTitle title="Filial" />
+      <BlockTitle title="Filial" store={storeLabel} />
       <form
         className="flex flex-col gap-4"
         onSubmit={(e) => {
@@ -216,12 +228,14 @@ function BranchSection({
 
 function CostTableCard({
   store,
+  storeLabel,
   tables,
   tablesLoading,
   tablesError,
   onSaved,
 }: {
   store: Store;
+  storeLabel?: string;
   tables: CostTable[];
   tablesLoading: boolean;
   tablesError: boolean;
@@ -255,7 +269,7 @@ function CostTableCard({
 
   return (
     <>
-      <BlockTitle title="Custo dos produtos" tip={COST_TABLE_TIP} />
+      <BlockTitle title="Custo dos produtos" tip={COST_TABLE_TIP} store={storeLabel} />
       <form
         className="flex flex-col gap-4"
         onSubmit={(e) => {
@@ -323,7 +337,7 @@ function seasonsFromDraft(rows: SeasonDraft[]): RentSeason[] | null {
   return out;
 }
 
-function RentCard({ store, onSaved }: { store: Store; onSaved: () => void }) {
+function RentCard({ store, storeLabel, onSaved }: { store: Store; storeLabel?: string; onSaved: () => void }) {
   const { show } = useToast();
   const form = useCostFields(store, RENT_FIELDS);
   const savedSeasons = store.costs?.rentSeasons ?? [];
@@ -357,7 +371,7 @@ function RentCard({ store, onSaved }: { store: Store; onSaved: () => void }) {
 
   return (
     <>
-      <BlockTitle title="Aluguel" tip={street ? undefined : RENT_TIP} />
+      <BlockTitle title="Aluguel" tip={street ? undefined : RENT_TIP} store={storeLabel} />
       <form
         className="flex flex-col gap-4"
         onSubmit={(e) => {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Button, Card, CardHeader, CardTitle, EmptyState, FormField, Input, PageHeader, Select, TabNav, Tooltip } from "@/components/ui";
+import { Badge, Button, Card, CardHeader, CardTitle, EmptyState, FormField, Input, PageHeader, Select, TabNav, Tooltip } from "@/components/ui";
 import { financeTabs, integrationTabs, performanceTabs, settingsTabs } from "@/layout/nav-wedash";
 import { useShoppingMenu } from "@/layout/useShoppingMenu";
 import { paths } from "@/router/paths";
@@ -210,12 +210,19 @@ export function TipHelp({ label }: { label: string }) {
   );
 }
 
-/** Título da seção, com a regra de cálculo no ?. */
-export function BlockTitle({ title, tip }: { title: string; tip?: string }) {
+/** Título da seção, com a regra de cálculo no ?. Com várias filiais, o nome fica no badge. */
+export function BlockTitle({ title, tip, store }: { title: string; tip?: string; store?: string }) {
   return (
-    <div className="mb-4 flex items-center gap-1.5">
-      <CardTitle>{title}</CardTitle>
-      {tip ? <TipHelp label={tip} /> : null}
+    <div className="mb-4">
+      <div className="flex items-center gap-1.5">
+        <CardTitle>{title}</CardTitle>
+        {tip ? <TipHelp label={tip} /> : null}
+      </div>
+      {store ? (
+        <Badge variant="neutral" title={store} className="mt-1.5 min-w-0 max-w-full overflow-hidden">
+          <span className="truncate">{store}</span>
+        </Badge>
+      ) : null}
     </div>
   );
 }

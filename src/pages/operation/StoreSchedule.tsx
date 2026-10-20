@@ -211,6 +211,7 @@ export function StoreHoursCard({
   onSaved,
   pointType,
   presetStamp,
+  storeLabel,
   plain = false,
 }: {
   store: Store;
@@ -218,12 +219,14 @@ export function StoreHoursCard({
   onSaved: () => void;
   pointType?: PointType;
   presetStamp?: number;
+  /** Nome da filial, só quando o seletor tem mais de uma. */
+  storeLabel?: string;
   /** Sem o card: a página de Configurações agrupa as seções num card só. */
   plain?: boolean;
 }) {
   const body = (
     <>
-      <BlockTitle title="Funcionamento" tip={HOURS_TIP} />
+      <BlockTitle title="Funcionamento" tip={HOURS_TIP} store={storeLabel} />
       {!weekHoursConfigured(store.hours) && (
         <Alert variant="warning" className="mb-4" title="Horário não configurado">
           As vendas serão atualizadas apenas pelo botão Atualizar enquanto não houver horário definido.

@@ -76,6 +76,7 @@ export function CostFieldsCard({
   intro,
   sections,
   footer,
+  storeLabel,
   plain = false,
   onSaved,
 }: {
@@ -86,6 +87,8 @@ export function CostFieldsCard({
   intro?: ReactNode;
   sections?: CostFieldSection[];
   footer?: ReactNode;
+  /** Nome da filial, só quando o seletor tem mais de uma. */
+  storeLabel?: string;
   /** Sem o card: a página de Configurações agrupa as seções num card só. */
   plain?: boolean;
   onSaved: () => void;
@@ -123,7 +126,7 @@ export function CostFieldsCard({
 
   const body = (
     <>
-      <BlockTitle title={title} tip={tip} />
+      <BlockTitle title={title} tip={tip} store={storeLabel} />
       <form
         className="flex flex-col gap-4"
         onSubmit={(e) => {
