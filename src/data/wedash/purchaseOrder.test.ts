@@ -314,6 +314,7 @@ describe("purchaseOrderFileName (PC-10 AC 4)", () => {
   });
   it("completa com zero à esquerda", () => {
     expect(purchaseOrderFileName(new Date(2026, 0, 5, 9, 4, 1))).toBe("05012026090401.xlsx");
+    expect(purchaseOrderFileName(new Date(2026, 9, 3, 7, 38, 38), "00386")).toBe("03102026073838-00386.xlsx");
   });
 });
 

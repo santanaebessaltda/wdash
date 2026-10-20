@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/ui";
 import { addDays } from "@/data/wedash/autoRefresh";
 import { calendarTodayIso } from "@/data/wedash/clock";
-import { buildPurchaseOrderView, parseMinInput, type PurchaseStockRow } from "@/data/wedash/purchaseOrder";
+import { buildPurchaseOrderView, parseMinInput, type PurchaseMinUpdate, type PurchaseOrderView, type PurchaseStockRow } from "@/data/wedash/purchaseOrder";
 import { PURCHASE_SYNC_ERROR, fetchPurchaseMins, fetchPurchaseStock, fetchSold30, fetchSoldEver, savePurchaseMin, syncPurchaseStockNow } from "@/data/wedash/purchaseRepo";
 import type { StockCatalogItem } from "@/data/wedash/stockProducts";
 import { fetchCostPrices, fetchStockCatalog } from "@/data/wedash/stockRepo";
@@ -16,6 +16,8 @@ const PURCHASE_MAX_AGE_MS = 30 * 60 * 1000;
 export const SOLD_WINDOWS = [30, 60, 90] as const;
 export type SoldWindow = (typeof SOLD_WINDOWS)[number];
 
+export type PurchaseStoreScope = { id: string; costTableId: number | null };
+
 type Loaded = {
   storeId: string;
   rows: PurchaseStockRow[];
@@ -28,6 +30,16 @@ type Loaded = {
   costs: Map<string, number>;
 };
 
+export type PurchaseOrderPart = {
+  storeId: string;
+  view: PurchaseOrderView;
+  catalog: Map<string, StockCatalogItem>;
+  mins: Map<string, number>;
+  syncedAt: string | null;
+  /** Códigos que a filial tem no saldo. A cópia de mínimos só leva o que está aqui. */
+  stockCodes: ReadonlySet<string>;
+};
+
 function clockLabel(iso: string): string {
   const d = new Date(iso);
   const h = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
@@ -37,14 +49,23 @@ function clockLabel(iso: string): string {
 
 const isStale = (syncedAt: string | null, now: number) => !syncedAt || now - Date.parse(syncedAt) > PURCHASE_MAX_AGE_MS;
 
+function oldestIso(stamps: Array<string | null>): string | null {
+  let oldest: string | null = null;
+  for (const iso of stamps) {
+    if (!iso) continue;
+    if (!oldest || Date.parse(iso) < Date.parse(oldest)) oldest = iso;
+  }
+  return oldest;
+}
+
 /**
- * Pedido de compra de uma loja: saldo guardado + minimos + vendidos em 30 dias (D-30 a D-1) + codigos ja vendidos (Novo).
- * Ao abrir (e ao trocar de loja), busca o saldo no Millennium se a ultima busca tem mais de 30 min;
- * o Atualizar do topo forca a busca.
+ * Pedido de compra das filiais do seletor: saldo guardado + mínimos + vendidos (D-N a D-1) + códigos já vendidos (Novo).
+ * Ao abrir (e ao trocar o seletor), busca o saldo no Millennium das filiais cuja última busca tem mais de 30 min;
+ * o Atualizar do topo força a busca de todas.
  */
-export function usePurchaseOrder(tenantId: string, storeId: string | null, costTableId: number | null) {
+export function usePurchaseOrder(tenantId: string, stores: PurchaseStoreScope[]) {
   const { show } = useToast();
-  const [data, setData] = useState<Loaded | null>(null);
+  const [data, setData] = useState<Loaded[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -53,25 +74,35 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null, costT
   const [now, setNow] = useState(() => Date.now());
   const soldDaysRef = useRef(soldDays);
   soldDaysRef.current = soldDays;
-  const storeRef = useRef(storeId);
-  storeRef.current = storeId;
-  /** Loja com busca em andamento (trocar de loja no meio libera a busca da nova). */
-  const syncRef = useRef<string | null>(null);
+  const storesRef = useRef(stores);
+  storesRef.current = stores;
+  const dataRef = useRef(data);
+  dataRef.current = data;
+  /** Trocar o seletor no meio libera a busca da seleção nova. */
+  const generation = useRef(0);
+  const scopeKey = stores.map((s) => `${s.id}:${s.costTableId ?? ""}`).join("|");
 
-  const load = useCallback(
-    async (id: string, tableId: number | null): Promise<Loaded> => {
+  const loadAll = useCallback(
+    async (scope: PurchaseStoreScope[]): Promise<Loaded[]> => {
       const today = calendarTodayIso();
       const days = soldDaysRef.current;
-      const [stock, mins, sold30, soldEver, catalog, priceTables] = await Promise.all([
-        fetchPurchaseStock(tenantId, id),
-        fetchPurchaseMins(tenantId, id),
-        fetchSold30(tenantId, id, addDays(today, -days), addDays(today, -1)),
-        fetchSoldEver(tenantId, id, today),
-        fetchStockCatalog(),
-        tableId == null ? Promise.resolve(new Map<number, Map<string, number>>()) : fetchCostPrices([tableId]),
-      ]);
-      return {
-        storeId: id,
+      const tableIds = [...new Set(scope.map((s) => s.costTableId).filter((id): id is number => id != null))];
+      const catalogP = fetchStockCatalog();
+      const pricesP = tableIds.length ? fetchCostPrices(tableIds) : Promise.resolve(new Map<number, Map<string, number>>());
+      const perStore = await Promise.all(
+        scope.map(async (s) => {
+          const [stock, mins, sold30, soldEver] = await Promise.all([
+            fetchPurchaseStock(tenantId, s.id),
+            fetchPurchaseMins(tenantId, s.id),
+            fetchSold30(tenantId, s.id, addDays(today, -days), addDays(today, -1)),
+            fetchSoldEver(tenantId, s.id, today),
+          ]);
+          return { s, stock, mins, sold30, soldEver };
+        }),
+      );
+      const [catalog, priceTables] = await Promise.all([catalogP, pricesP]);
+      return perStore.map(({ s, stock, mins, sold30, soldEver }) => ({
+        storeId: s.id,
         rows: stock.rows,
         syncedAt: stock.syncedAt,
         mins,
@@ -79,88 +110,99 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null, costT
         soldWindow: days,
         soldEver,
         catalog,
-        costs: tableId == null ? new Map() : (priceTables.get(tableId) ?? new Map()),
-      };
+        costs: s.costTableId == null ? new Map() : (priceTables.get(s.costTableId) ?? new Map()),
+      }));
     },
     [tenantId],
   );
 
-  /** Busca no Millennium e rele o saldo. `false` = nao buscou (integracao desligada / outra busca rodando). */
+  /** Busca no Millennium e relê o saldo. `false` = não buscou (integração desligada). */
   const sync = useCallback(
-    async (id: string): Promise<boolean> => {
-      if (syncRef.current === id) return false;
-      syncRef.current = id;
+    async (ids: string[], gen: number): Promise<boolean> => {
+      if (ids.length === 0) return false;
       try {
-        // Integracao desligada / senha invalida: o aviso fixo da tela ja explica  -  sem busca e sem alerta.
         const conexao = await fetchErpConnection(tenantId);
         if (conexao === "disconnected" || conexao === "password") return false;
+        if (generation.current !== gen) return false;
         setSyncing(true);
-        const r = await syncPurchaseStockNow([id]);
-        if (storeRef.current !== id) return true;
-        if (!r.ok || r.failedStores.includes(id)) {
-          setSyncError(r.ok ? PURCHASE_SYNC_ERROR : r.message);
+        const r = await syncPurchaseStockNow(ids);
+        if (generation.current !== gen) return true;
+        if (!r.ok) {
+          setSyncError(r.message);
           return true;
         }
-        setSyncError(null);
-        const stock = await fetchPurchaseStock(tenantId, id);
-        if (storeRef.current !== id) return true;
-        setData((d) => (d && d.storeId === id ? { ...d, rows: stock.rows, syncedAt: stock.syncedAt } : d));
-        setNow(Date.now());
+        const okIds = ids.filter((id) => !r.failedStores.includes(id));
+        setSyncError(r.failedStores.length ? PURCHASE_SYNC_ERROR : null);
+        if (okIds.length > 0) {
+          const stocks = await Promise.all(okIds.map((id) => fetchPurchaseStock(tenantId, id)));
+          if (generation.current !== gen) return true;
+          setData((prev) =>
+            prev.map((part) => {
+              const i = okIds.indexOf(part.storeId);
+              if (i < 0) return part;
+              return { ...part, rows: stocks[i].rows, syncedAt: stocks[i].syncedAt };
+            }),
+          );
+          setNow(Date.now());
+        }
         return true;
       } finally {
-        if (syncRef.current === id) {
-          syncRef.current = null;
-          setSyncing(false);
-        }
+        if (generation.current === gen) setSyncing(false);
       }
     },
     [tenantId],
   );
 
   useEffect(() => {
-    if (!storeId) {
+    const gen = ++generation.current;
+    const scope = storesRef.current;
+    if (scope.length === 0) {
+      setData([]);
       setLoading(false);
       setSyncError(null);
-      setData(null);
       return;
     }
     let cancelled = false;
     setLoading(true);
     setSyncError(null);
-    (async () => {
+    void (async () => {
       try {
-        const d = await load(storeId, costTableId);
-        if (cancelled) return;
-        setData(d);
+        const loaded = await loadAll(scope);
+        if (cancelled || generation.current !== gen) return;
+        setData(loaded);
         setNow(Date.now());
-        if (!isStale(d.syncedAt, Date.now())) {
-          setLoading(false);
-          return;
-        }
-        // 1 busca da loja (nada guardado): skeleton ate terminar; senao mostra o guardado e busca por tras.
-        if (d.syncedAt) setLoading(false);
-        await sync(storeId);
-        if (!cancelled) setLoading(false);
+        const staleIds = loaded.filter((d) => isStale(d.syncedAt, Date.now())).map((d) => d.storeId);
+        if (!loaded.some((d) => !d.syncedAt)) setLoading(false);
+        if (staleIds.length > 0) await sync(staleIds, gen);
+        if (!cancelled && generation.current === gen) setLoading(false);
       } catch (e) {
         console.warn("usePurchaseOrder:", e);
-        if (!cancelled) setLoading(false);
+        if (!cancelled && generation.current === gen) setLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [storeId, costTableId, load, sync]);
+  }, [scopeKey, loadAll, sync]);
 
+  const windowKey = data.map((p) => `${p.storeId}:${p.soldWindow}`).join("|");
   useEffect(() => {
-    const id = storeId;
-    if (!id || !data || data.storeId !== id || data.soldWindow === soldDays) return;
+    const pending = dataRef.current.filter((p) => p.soldWindow !== soldDays);
+    if (pending.length === 0) return;
+    const gen = generation.current;
     let cancelled = false;
-    (async () => {
+    void (async () => {
       try {
         const today = calendarTodayIso();
-        const sold = await fetchSold30(tenantId, id, addDays(today, -soldDays), addDays(today, -1));
-        if (cancelled || storeRef.current !== id) return;
-        setData((d) => (d && d.storeId === id ? { ...d, sold30: sold, soldWindow: soldDays } : d));
+        const sold = await Promise.all(pending.map((p) => fetchSold30(tenantId, p.storeId, addDays(today, -soldDays), addDays(today, -1))));
+        if (cancelled || generation.current !== gen) return;
+        setData((prev) =>
+          prev.map((part) => {
+            const i = pending.findIndex((p) => p.storeId === part.storeId);
+            if (i < 0 || part.soldWindow === soldDays) return part;
+            return { ...part, sold30: sold[i], soldWindow: soldDays };
+          }),
+        );
       } catch (e) {
         console.warn("usePurchaseOrder sold window:", e);
       }
@@ -168,15 +210,43 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null, costT
     return () => {
       cancelled = true;
     };
-  }, [soldDays, storeId, tenantId, data]);
+  }, [soldDays, windowKey, tenantId]);
+
+  const parts: PurchaseOrderPart[] = useMemo(
+    () =>
+      data.map((part) => ({
+        storeId: part.storeId,
+        view: buildPurchaseOrderView({
+          stock: part.rows,
+          mins: part.mins,
+          sold30: part.sold30,
+          soldEver: part.soldEver,
+          factor,
+          todayIso: calendarTodayIso(),
+          costs: part.costs,
+        }),
+        catalog: part.catalog,
+        mins: part.mins,
+        syncedAt: part.syncedAt,
+        stockCodes: new Set(part.rows.map((row) => row.code)),
+      })),
+    [data, factor],
+  );
+
+  const stamps = data.map((p) => p.syncedAt);
+  const statusIso = data.length === 0 ? undefined : stamps.every((iso) => !iso) ? null : oldestIso(stamps);
 
   useScreenRefresh({
     label: "Atualizar o saldo do pedido",
-    tip: "Busca no Millennium o saldo usado no pedido de compra desta filial.",
-    status: refreshMomentTitle(data && data.storeId === storeId ? data.syncedAt : undefined),
+    tip:
+      stores.length > 1
+        ? "Busca no Millennium o saldo usado no pedido de compra das filiais desta tela."
+        : "Busca no Millennium o saldo usado no pedido de compra desta filial.",
+    status: refreshMomentTitle(statusIso),
     busyLabel: "Buscando saldo do pedido…",
     run: async () => {
-      if (storeRef.current) await sync(storeRef.current);
+      const ids = storesRef.current.map((s) => s.id);
+      if (ids.length > 0) await sync(ids, generation.current);
     },
   });
 
@@ -185,71 +255,75 @@ export function usePurchaseOrder(tenantId: string, storeId: string | null, costT
     return () => window.clearInterval(t);
   }, []);
 
-  const current = data && data.storeId === storeId ? data : null;
-
-  const view = useMemo(
-    () =>
-      current
-        ? buildPurchaseOrderView({
-            stock: current.rows,
-            mins: current.mins,
-            sold30: current.sold30,
-            soldEver: current.soldEver,
-            factor,
-            todayIso: calendarTodayIso(),
-            costs: current.costs,
-          })
-        : null,
-    [current, factor],
-  );
-
-  /** Grava o minimo digitado. `false` = valor recusado ou gravacao falhou (o campo volta ao ultimo gravado). */
+  /** Grava o mínimo digitado na filial da linha. `false` = valor recusado ou gravação falhou (o campo volta ao último gravado). */
   const saveMin = useCallback(
-    async (code: string, raw: string): Promise<boolean> => {
-      const id = storeRef.current;
-      if (!id || !current) return false;
+    async (storeId: string, code: string, raw: string): Promise<boolean> => {
+      const part = dataRef.current.find((p) => p.storeId === storeId);
+      if (!part) return false;
       const parsed = parseMinInput(raw);
       if (!parsed.ok) {
         show("Use um número inteiro entre 0 e 99.999.", "danger");
         return false;
       }
-      const before = current.mins.has(code) ? current.mins.get(code)! : null;
+      const before = part.mins.has(code) ? part.mins.get(code)! : null;
       if (before === parsed.value) return true;
       const apply = (value: number | null) =>
-        setData((d) => {
-          if (!d || d.storeId !== id) return d;
-          const mins = new Map(d.mins);
-          if (value == null) mins.delete(code);
-          else mins.set(code, value);
-          return { ...d, mins };
-        });
+        setData((prev) =>
+          prev.map((row) => {
+            if (row.storeId !== storeId) return row;
+            const mins = new Map(row.mins);
+            if (value == null) mins.delete(code);
+            else mins.set(code, value);
+            return { ...row, mins };
+          }),
+        );
       apply(parsed.value);
-      const ok = await savePurchaseMin(tenantId, id, code, parsed.value);
+      const ok = await savePurchaseMin(tenantId, storeId, code, parsed.value);
       if (!ok) {
         apply(before);
         show(SAVE_ERROR_MSG, "danger");
       }
       return ok;
     },
-    [current, show, tenantId],
+    [show, tenantId],
   );
 
-  const syncedAt = current?.syncedAt ?? null;
+  const applyMins = useCallback((storeId: string, updates: PurchaseMinUpdate[]) => {
+    setData((prev) =>
+      prev.map((part) => {
+        if (part.storeId !== storeId) return part;
+        const mins = new Map(part.mins);
+        for (const update of updates) mins.set(update.code, update.value);
+        return { ...part, mins };
+      }),
+    );
+  }, []);
+
+  const staleParts = data.filter((p) => isStale(p.syncedAt, now));
+  const staleAt = oldestIso(staleParts.map((p) => p.syncedAt));
+  const many = stores.length > 1;
+  const staleText = staleParts.length === 0
+    ? null
+    : !staleAt
+      ? many
+        ? "O saldo de alguma filial ainda não foi atualizado. O pedido pode usar quantidades desatualizadas."
+        : null
+      : many
+        ? `O saldo de alguma filial foi atualizado ${clockLabel(staleAt)}. O pedido pode usar quantidades desatualizadas.`
+        : `O saldo foi atualizado ${clockLabel(staleAt)}. O pedido pode usar quantidades desatualizadas.`;
 
   return {
-    view,
-    catalog: current?.catalog ?? null,
-    mins: current?.mins ?? null,
-    loading: storeId != null && (loading || current == null),
+    parts,
+    loading: stores.length > 0 && (loading || data.length !== stores.length),
     syncing,
     syncError,
-    syncedAt,
-    stale: !syncing && syncedAt != null && isStale(syncedAt, now),
-    staleText: syncedAt ? `O saldo foi atualizado ${clockLabel(syncedAt)}. O pedido pode usar quantidades desatualizadas.` : null,
+    stale: !syncing && staleParts.length > 0 && staleText != null,
+    staleText,
     factor,
     setFactor,
     soldDays,
     setSoldDays,
     saveMin,
+    applyMins,
   };
 }

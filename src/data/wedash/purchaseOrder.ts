@@ -217,9 +217,11 @@ export function purchaseOrderTotalCents(rows: PurchaseOrderRow[]): number | null
   return any ? total : null;
 }
 
-export function purchaseOrderFileName(d: Date): string {
+export function purchaseOrderFileName(d: Date, branchCode?: string): string {
   const p = (n: number) => String(n).padStart(2, "0");
-  return `${p(d.getDate())}${p(d.getMonth() + 1)}${d.getFullYear()}${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.xlsx`;
+  const stamp = `${p(d.getDate())}${p(d.getMonth() + 1)}${d.getFullYear()}${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+  const code = branchCode?.trim().replace(/[^\w.-]+/g, "");
+  return code ? `${stamp}-${code}.xlsx` : `${stamp}.xlsx`;
 }
 
 const fold = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
