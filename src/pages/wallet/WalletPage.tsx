@@ -85,8 +85,12 @@ function tapeAmount(line: WalletLine): { text: string; className: string } {
 
 function lineNote(line: WalletLine): string | null {
   if (line.kind === "challenge" && line.note === "Em andamento") return "Em andamento";
-  if (line.open) return "Até agora";
   return null;
+}
+
+/** Meta ou desafio ainda aberto: o saldo de agora pode crescer. */
+function balanceStillOpen(person: Pick<WalletPersonMonth, "openPrize" | "lines">): boolean {
+  return person.openPrize || person.lines.some((line) => line.open);
 }
 
 function PeriodControl({
@@ -128,7 +132,7 @@ function PeriodControl({
 function Totals({ rows }: { rows: WalletPersonMonth[] }) {
   const sum = (pick: (row: WalletPersonMonth) => number) => rows.reduce((total, row) => total + pick(row), 0);
   const balance = sum((row) => row.balanceCents);
-  const open = rows.some((row) => row.openPrize || row.lines.some((line) => line.open));
+  const open = rows.some(balanceStillOpen);
   const cards = [
     { label: "Saldo a pagar", value: money(balance), sub: open ? "Até agora" : undefined, valueClassName: balanceClass(balance) },
     { label: "Ganhos", value: money(sum(earningsOf)) },
@@ -156,7 +160,7 @@ function Statement({
     return <EmptyBlock icon="👛" title={emptyTitle} description={emptyDescription} />;
   }
   const lines = [...person.lines].sort(compareLines);
-  const untilNow = person.openPrize || lines.some((line) => line.open && line.kind !== "challenge");
+  const untilNow = balanceStillOpen(person);
   return (
     <div>
       <ul>
@@ -627,7 +631,7 @@ function SellerWallet({ wallet, opportunities }: { wallet: WalletMonth; opportun
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard label="Saldo atual" value={money(person.balanceCents)} icon={<WalletGlyph />} iconColor={saldo.iconColor} iconBg={saldo.iconBg} sub={person.openPrize ? "Até agora" : undefined} valueClassName={balanceClass(person.balanceCents)} />
+        <StatCard label="Saldo atual" value={money(person.balanceCents)} icon={<WalletGlyph />} iconColor={saldo.iconColor} iconBg={saldo.iconBg} sub={balanceStillOpen(person) ? "Até agora" : undefined} valueClassName={balanceClass(person.balanceCents)} />
         <StatCard label="Ganhos garantidos" value={money(guaranteed)} icon={<CheckCircleIcon size={20} />} iconColor={ganhos.iconColor} iconBg={ganhos.iconBg} />
         <StatCard label="Potencial do período" value={money(potential)} icon={<TargetIcon size={20} />} iconColor={potencial.iconColor} iconBg={potencial.iconBg} sub={potentialSub} tooltip={potentialTip} />
       </div>
