@@ -33,7 +33,7 @@ import { InitialSyncNotice } from "@/pages/dashboard/InitialSyncNotice";
 import { StoreHoursNotice } from "@/pages/dashboard/StoreHoursNotice";
 import { ErpStatusNotice } from "@/pages/dashboard/ErpStatusNotice";
 import { ExportDialog } from "@/components/wedash/ExportDialog";
-import { ReportHeader, useExportPdf } from "@/pages/dashboard/ReportHeader";
+import { ReportHeader, useDashboardExport } from "@/pages/dashboard/ReportHeader";
 import { usePrintMode } from "@/lib/printMode";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { ProductsWithoutCostNotice } from "@/pages/dashboard/ProductsWithoutCostNotice";
@@ -116,6 +116,7 @@ function Variation({ v }: { v: number | null }) {
 export default function ProductsPage() {
   const session = useActiveSession();
   const { scope, setScope } = useScope();
+  const { viewScope, printIds, stores: exportStores, exportPdfFor } = useDashboardExport("Produtos");
   const [aggs, setAggs] = useState<ProductsAggInput>({ dayAggs: [] });
   const [coverageFrom, setCoverageFrom] = useState<Date | null>(null);
   const filterKey = scopeFilterKey(scope);
@@ -129,7 +130,6 @@ export default function ProductsPage() {
   const [page, setPage] = useState(1);
   const [linePage, setLinePage] = useState(1);
   const printing = usePrintMode();
-  const exportValue = useExportPdf("Produtos");
   // Catalogo de lojas (custos) hidratado depois do 1 render  ->  recalcula.
   const [storesTick, setStoresTick] = useState(0);
   useEffect(() => {
@@ -170,9 +170,9 @@ export default function ProductsPage() {
   }, [reload]);
 
   const view = useMemo(
-    () => buildProductsView(scope, aggs),
+    () => buildProductsView(viewScope, aggs),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [scope, aggs, storesTick],
+    [viewScope, aggs, storesTick],
   );
 
   const dateRange = useMemo(() => dateRangeFromPeriod(scope.period), [scope.period]);
@@ -300,7 +300,7 @@ export default function ProductsPage() {
 
   return (
     <div className="flex flex-col p-4 sm:p-6 print:p-0">
-      <ReportHeader />
+      <ReportHeader pickedIds={printIds} />
       <PageHeader
         crumbs={[{ label: "Dashboard", to: "/dashboard/visao-geral" }, { label: "Produtos" }]}
         title="Produtos"
@@ -315,7 +315,7 @@ export default function ProductsPage() {
                 activePresetId={periodActivePresetId(scope.period)}
                 minDate={pickerMinDate(coverageFrom, monthFill)}
               />
-              <ExportDialog formats={["pdf"]} onExport={() => exportValue()} />
+              <ExportDialog formats={["pdf"]} stores={exportStores} onExport={(_format, storeIds) => exportPdfFor(storeIds)} />
             </div>
           </div>
         }
@@ -334,7 +334,7 @@ export default function ProductsPage() {
       {!pending && (
         <ProductsWithoutCostNotice
           products={view.productsWithoutCost}
-          storeIds={scope.storeIds}
+          storeIds={viewScope.storeIds}
           from={currentPeriod.start}
           to={currentPeriod.end}
         />

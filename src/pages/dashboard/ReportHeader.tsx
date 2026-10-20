@@ -1,4 +1,5 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
+import { flushSync } from "react-dom";
 import { WedashBrand } from "@/components/wedash/WedashBrand";
 import { resolvePeriod } from "@/data/wedash/dashboard";
 import { calendarTodayIso } from "@/data/wedash/clock";
@@ -15,20 +16,35 @@ function dataBr(iso: string): string {
 }
 
 /** Loja e periodo do relatorio, no formato do cabecalho do PDF e do nome do arquivo. */
-function useReportScope() {
+function useReportScope(pickedIds: string[] | null = null) {
   const session = useActiveSession();
   const { scope } = useScope();
   const storeRows = storesForSession(session.stores);
-  const store = scope.storeIds[0] ? storeRows.find((s) => s.id === scope.storeIds[0]) : storeRows.length === 1 ? storeRows[0] : undefined;
+  const picked =
+    pickedIds && pickedIds.length > 0 && pickedIds.length < storeRows.length
+      ? storeRows.filter((store) => pickedIds.includes(store.id)).sort((a, b) => a.tradeName.localeCompare(b.tradeName, "pt-BR"))
+      : [];
+  const store = picked.length === 1
+    ? picked[0]
+    : scope.storeIds[0]
+      ? storeRows.find((s) => s.id === scope.storeIds[0])
+      : storeRows.length === 1
+        ? storeRows[0]
+        : undefined;
+  const several = picked.length > 1;
   const period = resolvePeriod(scope.period, calendarTodayIso());
   const datas = period.start === period.end ? dataBr(period.start) : `${dataBr(period.start)} a ${dataBr(period.end)}`;
   const preset = periodDisplayLabel(scope.period);
   return {
-    storeNameValue: store ? store.tradeName : "Todas as filiais",
-    storeFile: store ? [store.branchCode.trim(), store.tradeName].filter(Boolean).join(" ") : "Todas as filiais",
-    all: !store,
-    storeCnpj: store?.cnpj?.trim() || null,
-    storeCode: store?.branchCode.trim() || null,
+    storeNameValue: several ? picked.map((item) => item.tradeName).join(" · ") : store ? store.tradeName : "Todas as filiais",
+    storeFile: several
+      ? picked.map((item) => item.tradeName).join(", ")
+      : store
+        ? [store.branchCode.trim(), store.tradeName].filter(Boolean).join(" ")
+        : "Todas as filiais",
+    all: several || !store,
+    storeCnpj: several ? null : store?.cnpj?.trim() || null,
+    storeCode: several ? null : store?.branchCode.trim() || null,
     periodText: preset ? `${preset} · ${datas}` : datas,
     periodFile: preset ?? datas,
   };
@@ -62,19 +78,66 @@ export function useExportPdf(screen: string, extra?: string | null, { period = t
   );
 }
 
+/** Escopo da tela durante o PDF. A rede inteira continua com a lista vazia do seletor. */
+export function scopeForExport<T extends { storeIds: string[] }>(scope: T, storeIds: string[] | null, storeCount: number): T {
+  if (!storeIds || storeIds.length === 0 || storeIds.length >= storeCount) return scope;
+  return { ...scope, storeIds };
+}
+
+/** Exportar do Dashboard. Com Todas as filiais, o PDF pode ficar só com as filiais marcadas. */
+export function useDashboardExport(screen: string) {
+  const session = useActiveSession();
+  const { scope } = useScope();
+  const { periodFile } = useReportScope();
+  const rows = storesForSession(session.stores);
+  const [printIds, setPrintIds] = useState<string[] | null>(null);
+  const viewScope = scopeForExport(scope, printIds, rows.length);
+  const stores =
+    scope.storeIds.length === 0 && rows.length > 1
+      ? [...rows]
+          .sort((a, b) => a.tradeName.localeCompare(b.tradeName, "pt-BR"))
+          .map((store) => ({ id: store.id, name: store.tradeName }))
+      : undefined;
+
+  function exportPdfFor(storeIds?: string[]) {
+    const ids = storeIds && storeIds.length > 0 && storeIds.length < rows.length ? storeIds : null;
+    flushSync(() => setPrintIds(ids));
+    const picked = ids
+      ? rows.filter((store) => ids.includes(store.id)).sort((a, b) => a.tradeName.localeCompare(b.tradeName, "pt-BR"))
+      : [];
+    const storeFile =
+      picked.length === 1
+        ? [picked[0]!.branchCode.trim(), picked[0]!.tradeName].filter(Boolean).join(" ")
+        : picked.length > 1
+          ? picked.map((store) => store.tradeName).join(", ")
+          : "Todas as filiais";
+    exportPdf(reportParts(screen, storeFile, periodFile, null, true));
+    const done = () => {
+      window.removeEventListener("afterprint", done);
+      setPrintIds(null);
+    };
+    window.addEventListener("afterprint", done);
+  }
+
+  return { viewScope, printIds, stores, exportPdfFor };
+}
+
 /** Cabecalho que so aparece no PDF: marca, loja, periodo, filtros da tela e horario dos dados. */
 export function ReportHeader({
   filters = [],
   period = true,
   atualizado,
+  pickedIds = null,
 }: {
   filters?: Array<{ label: string; amount: string }>;
   /** Telas de retrato (ex.: estoque) nao tem periodo. */
   period?: boolean;
   /** Substitui a linha "Vendas de hoje atualizadas...". */
   atualizado?: string;
+  /** Filiais do PDF quando o seletor está em Todas e a pessoa marcou só algumas. */
+  pickedIds?: string[] | null;
 }) {
-  const { storeNameValue, storeCnpj, storeCode, all, periodText } = useReportScope();
+  const { storeNameValue, storeCnpj, storeCode, all, periodText } = useReportScope(pickedIds);
   const now = new Date();
   const geradoEm = `${now.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })} às ${now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}`;
   return (

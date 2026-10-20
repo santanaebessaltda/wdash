@@ -47,7 +47,7 @@ import { StoreHoursNotice } from "@/pages/dashboard/StoreHoursNotice";
 import { ErpStatusNotice } from "@/pages/dashboard/ErpStatusNotice";
 import { FirstStepsCard, useFirstSteps } from "@/pages/dashboard/FirstSteps";
 import { ExportDialog } from "@/components/wedash/ExportDialog";
-import { ReportHeader, useExportPdf } from "@/pages/dashboard/ReportHeader";
+import { ReportHeader, useDashboardExport } from "@/pages/dashboard/ReportHeader";
 import { usePrintMode } from "@/lib/printMode";
 import { cn } from "@/lib/cn";
 import { useProductDetail } from "@/pages/dashboard/ProductDetail";
@@ -150,6 +150,7 @@ export default function OverviewPage() {
   const session = useActiveSession();
   const navigate = useNavigate();
   const { scope, setScope } = useScope();
+  const { viewScope, printIds, stores: exportStores, exportPdfFor } = useDashboardExport("Visão geral");
   const [dayAggs, setDayAggs] = useState<SalesDayAgg[]>([]);
   const [hourAggs, setHourAggs] = useState<SalesHourAgg[]>([]);
   const [categoryDayAggs, setCategoryDayAggs] = useState<SalesCategoryDayAgg[]>([]);
@@ -373,7 +374,7 @@ export default function OverviewPage() {
 
   const view = useMemo(
     () =>
-      buildOverviewView(scope, {
+      buildOverviewView(viewScope, {
         dayAggs,
         hourAggs,
         categoryDayAggs,
@@ -395,7 +396,7 @@ export default function OverviewPage() {
         goalTeam,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [scope, dayAggs, hourAggs, categoryDayAggs, categoryCatalog, paymentDayAggs, sellerDayAggs, sellerShifts, sellerAvatars, productDayAggs, productCostDayAggs, goalHistoryDayAggs, goalHistoryHourAggs, prevDayAggs, prevHourAggs, goals, goalDayAggs, goalSellerDayAggs, goalNamedSellerDayAggs, goalTeam, storesTick],
+    [viewScope, dayAggs, hourAggs, categoryDayAggs, categoryCatalog, paymentDayAggs, sellerDayAggs, sellerShifts, sellerAvatars, productDayAggs, productCostDayAggs, goalHistoryDayAggs, goalHistoryHourAggs, prevDayAggs, prevHourAggs, goals, goalDayAggs, goalSellerDayAggs, goalNamedSellerDayAggs, goalTeam, storesTick],
   );
 
   // A metrica escolhe quais entram (sempre os maiores); a direcao so reordena esses.
@@ -466,8 +467,7 @@ export default function OverviewPage() {
   const monthFill = useMonthFill();
   const deepHistoryFill = useDeepHistoryFill();
   const printing = usePrintMode();
-  const exportValue = useExportPdf("Visão geral");
-  const showSellerStore = (scope.storeIds.length === 0 ? storesForSession(session.stores).length : scope.storeIds.length) > 1;
+  const showSellerStore = (viewScope.storeIds.length === 0 ? storesForSession(session.stores).length : viewScope.storeIds.length) > 1;
   const firstSteps = useFirstSteps(scope.storeIds);
   const { open: openDetail, modal: detailModal } = useProductDetail({ scope, tenantId: session.tenantId });
   const goalLevels = useMemo(
@@ -481,7 +481,7 @@ export default function OverviewPage() {
 
   return (
     <div className="flex flex-col p-4 sm:p-6 print:p-0">
-      <ReportHeader />
+      <ReportHeader pickedIds={printIds} />
       <PageHeader
         crumbs={[{ label: "Dashboard", to: "/dashboard/visao-geral" }, { label: "Visão geral" }]}
         title={printing ? "Visão geral" : welcomeTitle(session.name)}
@@ -496,7 +496,7 @@ export default function OverviewPage() {
                 activePresetId={periodActivePresetId(scope.period)}
                 minDate={pickerMinDate(coverageFrom, monthFill)}
               />
-              <ExportDialog formats={["pdf"]} onExport={() => exportValue()} />
+              <ExportDialog formats={["pdf"]} stores={exportStores} onExport={(_format, storeIds) => exportPdfFor(storeIds)} />
             </div>
           </div>
         }
@@ -777,7 +777,7 @@ export default function OverviewPage() {
         <Card className="flex flex-col">
           <CardHeader className="items-center">
             <CardTitle>Ranking de filiais</CardTitle>
-            {scope.storeIds.length === 1 && view.storesRanking.length > 0 && (view.rankingNetworkTotal ?? 0) > 0 && (
+            {viewScope.storeIds.length === 1 && view.storesRanking.length > 0 && (view.rankingNetworkTotal ?? 0) > 0 && (
               <Badge variant="accent">
                 Rede: {brlCent(view.rankingNetworkTotal ?? 0)}
               </Badge>
@@ -789,7 +789,7 @@ export default function OverviewPage() {
             (() => {
               const totalNetwork =
                 (view.rankingNetworkTotal ?? view.storesRanking.reduce((s, l) => s + l.amount, 0)) || 1;
-              const singleStore = scope.storeIds.length === 1;
+              const singleStore = viewScope.storeIds.length === 1;
               const storeAmount = view.storesRanking[0]?.amount ?? 0;
               const amountRest = singleStore ? Math.max(0, totalNetwork - storeAmount) : 0;
               // 1 loja: fatia da loja x "Demais lojas" (resto da rede)  -  mostra o peso real na rede.
