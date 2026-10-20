@@ -205,7 +205,19 @@ function PersonFigures({ person }: { person: WalletPersonMonth }) {
   );
 }
 
-function PersonDialog({ person, storeId, storeName, onClose }: { person: WalletPersonMonth; storeId: string; storeName?: string; onClose: () => void }) {
+function PersonDialog({
+  person,
+  storeId,
+  storeName,
+  employeeId,
+  onClose,
+}: {
+  person: WalletPersonMonth;
+  storeId: string;
+  storeName?: string;
+  employeeId?: string;
+  onClose: () => void;
+}) {
   return (
     <Modal
       open
@@ -213,7 +225,7 @@ function PersonDialog({ person, storeId, storeName, onClose }: { person: WalletP
       size="lg"
       title={
         <span className="flex min-w-0 items-center gap-3">
-          <PersonAvatar name={person.name} storeId={storeId} size="md" />
+          <PersonAvatar name={person.name} employeeId={employeeId} storeId={storeId} size="md" />
           <span className="min-w-0">
             <span className="block truncate">{person.name}</span>
             {storeName ? <span className="mt-0.5 block truncate text-[12.5px] font-semibold text-t2">{storeName}</span> : null}
@@ -325,100 +337,107 @@ function PeopleList({
     setSortDir(key === "name" || key === "store" ? "asc" : "desc");
   }
 
+  const headClass = "px-4 py-3 text-[10.5px] font-bold uppercase tracking-wide";
+  const cellClass = "px-4 py-3.5 align-middle";
+
   return (
-    <Card className="print-flow flex min-w-0 flex-col" padding="lg">
-      <CardTitle className="mb-4">Pessoas</CardTitle>
-      {rows.length === 0 ? (
-        <EmptyBlock icon="👛" title="Nada neste período" description="Não há premiação, desafio, retirada ou quebra neste período." />
-      ) : (
-    <div className="flex flex-col">
-      <div className="mb-4 flex flex-wrap items-center gap-2 sm:justify-end print:hidden">
-        <input
-          type="search"
-          placeholder="Buscar por código ou nome…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className={cn(peopleSearchClass, "sm:w-56")}
-        />
+    <Card className="print-flow min-w-0" padding="none">
+      <div className="px-5 pt-5">
+        <CardTitle className="mb-4">Pessoas</CardTitle>
       </div>
-      {sorted.length === 0 ? (
-        <EmptyBlock
-          icon="🔍"
-          title="Nenhuma pessoa encontrada"
-          description="Tente outro código ou nome."
-          action={
-            <Button variant="outline" size="sm" onClick={() => setSearch("")}>
-              Limpar busca
-            </Button>
-          }
-        />
+      {rows.length === 0 ? (
+        <div className="px-5 pb-5">
+          <EmptyBlock icon="👛" title="Nada neste período" description="Não há premiação, desafio, retirada ou quebra neste período." />
+        </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
-                <ThSort label="Nome" active={sortKey === "name"} dir={sortDir} onClick={() => toggleSort("name")} align="left" className="px-1 pb-3" />
-                {showStore ? <ThSort label="Filial" active={sortKey === "store"} dir={sortDir} onClick={() => toggleSort("store")} align="left" className="px-1 pb-3" /> : null}
-                <ThSort label="Ganhos" active={sortKey === "earnings"} dir={sortDir} onClick={() => toggleSort("earnings")} className="px-1 pb-3" />
-                <ThSort label="Retiradas" active={sortKey === "withdrawal"} dir={sortDir} onClick={() => toggleSort("withdrawal")} className="px-1 pb-3" />
-                <ThSort label="Quebra" active={sortKey === "shortage"} dir={sortDir} onClick={() => toggleSort("shortage")} className="px-1 pb-3" />
-                <ThSort label="Saldo" active={sortKey === "balance"} dir={sortDir} onClick={() => toggleSort("balance")} className="px-1 pb-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {pageRows.map((row) => (
-                <tr
-                  key={rowKey(row)}
-                  tabIndex={0}
-                  onClick={() => onOpen(rowKey(row))}
-                  onKeyDown={(event) => {
-                    if (event.key !== "Enter" && event.key !== " ") return;
-                    event.preventDefault();
-                    onOpen(rowKey(row));
-                  }}
-                  className="cursor-pointer border-b border-line transition-colors hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none"
-                >
-                  <td className="px-1 py-3">
-                    <div className="flex min-w-0 items-center gap-2.5">
-                      <PersonAvatar name={row.name} storeId={row.storeId} size="sm" />
-                      <div className="min-w-0">
-                        <p className="truncate text-[13px] font-bold text-t0">{row.name}</p>
-                      </div>
-                    </div>
-                  </td>
-                  {showStore ? <td className="px-1 py-3 text-[13px] text-t1">{row.storeName}</td> : null}
-                  <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{money(earningsOf(row))}</td>
-                  <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{minusMoney(row.withdrawalCents)}</td>
-                  <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{minusMoney(row.shortageCents)}</td>
-                  <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", balanceClass(row.balanceCents))}>{money(row.balanceCents)}</td>
-                </tr>
-              ))}
-              <tr className="bg-bg-inset">
-                <td className="px-1 py-3 text-[13px] font-extrabold text-t0">
-                  Total do filtro
-                  <span className="mt-0.5 block text-[11px] font-semibold text-t2">
-                    {num(sorted.length)} {sorted.length === 1 ? "pessoa" : "pessoas"}
-                  </span>
-                </td>
-                {showStore ? <td /> : null}
-                <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{money(total.earnings)}</td>
-                <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{minusMoney(total.withdrawal)}</td>
-                <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{minusMoney(total.shortage)}</td>
-                <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", balanceClass(total.balance))}>{money(total.balance)}</td>
-              </tr>
-            </tbody>
-          </table>
+        <div className="flex flex-col">
+          <div className="flex flex-wrap items-center justify-end gap-3 px-5 pb-4 print:hidden">
+            <input
+              type="search"
+              placeholder="Buscar por código ou nome…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className={cn(peopleSearchClass, "w-full sm:w-56")}
+            />
+          </div>
+          {sorted.length === 0 ? (
+            <div className="px-5 pb-5">
+              <EmptyBlock
+                icon="🔍"
+                title="Nenhuma pessoa encontrada"
+                description="Tente outro código ou nome."
+                action={
+                  <Button variant="outline" size="sm" onClick={() => setSearch("")}>
+                    Limpar busca
+                  </Button>
+                }
+              />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-line">
+                    <ThSort label="Nome" active={sortKey === "name"} dir={sortDir} onClick={() => toggleSort("name")} align="left" className={headClass} />
+                    {showStore ? <ThSort label="Filial" active={sortKey === "store"} dir={sortDir} onClick={() => toggleSort("store")} align="left" className={headClass} /> : null}
+                    <ThSort label="Ganhos" active={sortKey === "earnings"} dir={sortDir} onClick={() => toggleSort("earnings")} className={headClass} />
+                    <ThSort label="Retiradas" active={sortKey === "withdrawal"} dir={sortDir} onClick={() => toggleSort("withdrawal")} className={headClass} />
+                    <ThSort label="Quebra" active={sortKey === "shortage"} dir={sortDir} onClick={() => toggleSort("shortage")} className={headClass} />
+                    <ThSort label="Saldo" active={sortKey === "balance"} dir={sortDir} onClick={() => toggleSort("balance")} className={headClass} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageRows.map((row) => (
+                    <tr
+                      key={rowKey(row)}
+                      tabIndex={0}
+                      onClick={() => onOpen(rowKey(row))}
+                      onKeyDown={(event) => {
+                        if (event.key !== "Enter" && event.key !== " ") return;
+                        event.preventDefault();
+                        onOpen(rowKey(row));
+                      }}
+                      className="cursor-pointer border-b border-line transition-colors hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none"
+                    >
+                      <td className={cellClass}>
+                        <div className="flex min-w-0 items-center gap-3">
+                          <PersonAvatar name={row.name} employeeId={codes.get(rowKey(row))} storeId={row.storeId} />
+                          <span className="truncate text-[13.5px] font-bold text-t0">{row.name}</span>
+                        </div>
+                      </td>
+                      {showStore ? <td className={cn(cellClass, "text-t1")}>{row.storeName}</td> : null}
+                      <td className={cn(cellClass, "text-right font-mono text-[13px] font-bold text-t0")}>{money(earningsOf(row))}</td>
+                      <td className={cn(cellClass, "text-right font-mono text-[13px] font-bold text-t0")}>{minusMoney(row.withdrawalCents)}</td>
+                      <td className={cn(cellClass, "text-right font-mono text-[13px] font-bold text-t0")}>{minusMoney(row.shortageCents)}</td>
+                      <td className={cn(cellClass, "text-right font-mono text-[13px] font-bold", balanceClass(row.balanceCents))}>{money(row.balanceCents)}</td>
+                    </tr>
+                  ))}
+                  <tr className="bg-bg-inset">
+                    <td className={cn(cellClass, "text-[13.5px] font-extrabold text-t0")}>
+                      Total do filtro
+                      <span className="mt-0.5 block text-[11px] font-semibold text-t2">
+                        {num(sorted.length)} {sorted.length === 1 ? "pessoa" : "pessoas"}
+                      </span>
+                    </td>
+                    {showStore ? <td /> : null}
+                    <td className={cn(cellClass, "text-right font-mono text-[13px] font-extrabold text-t0")}>{money(total.earnings)}</td>
+                    <td className={cn(cellClass, "text-right font-mono text-[13px] font-extrabold text-t0")}>{minusMoney(total.withdrawal)}</td>
+                    <td className={cn(cellClass, "text-right font-mono text-[13px] font-extrabold text-t0")}>{minusMoney(total.shortage)}</td>
+                    <td className={cn(cellClass, "text-right font-mono text-[13px] font-extrabold", balanceClass(total.balance))}>{money(total.balance)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+          {sorted.length > 0 ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3.5 print:hidden">
+              <span className="text-[12.5px] text-t2">
+                Mostrando {pageRows.length} de {num(sorted.length)} pessoas
+              </span>
+              {totalPages > 1 ? <Pagination page={page} totalPages={totalPages} onChange={setPage} /> : null}
+            </div>
+          ) : null}
         </div>
-      )}
-      {sorted.length > 0 ? (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
-          <span className="text-[12.5px] text-t2">
-            Mostrando {pageRows.length} de {num(sorted.length)} pessoas
-          </span>
-          {totalPages > 1 ? <Pagination page={page} totalPages={totalPages} onChange={setPage} /> : null}
-        </div>
-      ) : null}
-    </div>
       )}
     </Card>
   );
@@ -444,7 +463,15 @@ function WalletBody({
       <Totals rows={rows} />
       <PeopleList rows={rows} showStore={showStore} codes={codes} onOpen={setPicked} />
       <UnassignedShortage blocks={shortages} showStore={showStore} />
-      {person ? <PersonDialog person={person} storeId={person.storeId} storeName={showStore ? person.storeName : undefined} onClose={close} /> : null}
+      {person ? (
+        <PersonDialog
+          person={person}
+          storeId={person.storeId}
+          storeName={showStore ? person.storeName : undefined}
+          employeeId={codes.get(rowKey(person))}
+          onClose={close}
+        />
+      ) : null}
     </div>
   );
 }
