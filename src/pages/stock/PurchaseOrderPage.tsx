@@ -102,6 +102,20 @@ function groupProducts(lines: OrderLine[], sortKey: SortKey, sortDir: SortDir): 
   return groups;
 }
 
+function productLine(branches: OrderLine[]) {
+  const minimums = branches.map((branch) => branch.minimum);
+  const requests = branches.map((branch) => branch.aRequest);
+  return {
+    minimum: minimums.every((value) => value === minimums[0]) ? minimums[0] : null,
+    saldo: branches.reduce((sum, branch) => sum + branch.saldo, 0),
+    pedidosAbertos: branches.reduce((sum, branch) => sum + branch.pedidosAbertos, 0),
+    total: branches.reduce((sum, branch) => sum + branch.total, 0),
+    vendidos30: branches.reduce((sum, branch) => sum + branch.vendidos30, 0),
+    isNew: branches.some((branch) => branch.isNew),
+    aRequest: requests.some((value) => value != null) ? requests.reduce<number>((sum, value) => sum + (value ?? 0), 0) : null,
+  };
+}
+
 function filialSummary(branches: OrderLine[]): string {
   const total = branches.length;
   const ordering = branches.filter((branch) => branch.onOrder).length;
@@ -541,6 +555,7 @@ export function PurchaseOrderPage() {
                         const open = isOpen(group);
                         const idx = (pageSafe - 1) * PAGE_SIZE + i;
                         const onOrder = group.branches.some((branch) => branch.onOrder);
+                        const line = productLine(group.branches);
                         const category = po.parts.find((p) => p.storeId === group.branches[0]?.storeId)?.catalog.get(group.code)?.category;
                         return (
                           <Fragment key={group.code}>
@@ -576,12 +591,20 @@ export function PurchaseOrderPage() {
                                   />
                                 </div>
                               </td>
-                              <td />
-                              {NUM_COLS.filter((c) => c.key !== "multipla").map((c) => (
-                                <td key={c.key} />
+                              <td className="px-1 py-3 text-right">
+                                <span className="inline-block w-20 pr-2 text-right font-mono text-[13px] font-bold text-t2">{line.minimum == null ? "—" : line.minimum}</span>
+                              </td>
+                              {(["saldo", "pedidosAbertos", "total", "vendidos30"] as const).map((key) => (
+                                <td key={key} className="px-1 py-3 text-right">
+                                  <Qty v={line[key]} />
+                                </td>
                               ))}
-                              <td />
-                              <td />
+                              <td className="px-1 py-3 text-center">
+                                <YesNo yes={line.isNew} />
+                              </td>
+                              <td className="px-1 py-3 text-right">
+                                {line.aRequest == null ? <span className="font-mono text-[13px] font-bold text-t2">—</span> : <Qty v={line.aRequest} strong={line.aRequest > 0} />}
+                              </td>
                             </tr>
                             {open &&
                               group.branches.map((branch, branchIdx) => (
