@@ -16,7 +16,7 @@ export function ThSort({
   dir: SortDir;
   onClick: () => void;
   align?: "left" | "right" | "center";
-  /** Caixa alta. O Estoque deixa desligado: primeira letra maiúscula. */
+  /** Caixa alta, o padrão das tabelas. */
   uppercase?: boolean;
   /** Substitui o padding padrao (`px-3 py-2.5`) quando informado. */
   className?: string;

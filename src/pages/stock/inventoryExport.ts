@@ -10,11 +10,9 @@ export const STOCK_STATUS_LABEL: Record<StockStatus, string> = {
   ok: "Regular",
 };
 
-/** Caixa normal, só a primeira letra maiúscula: "PONTO DE VENDA" → "Ponto de venda". */
-export function headerCase(value: string): string {
-  const text = value.trim().replace(/\s+/g, " ").toLocaleLowerCase("pt-BR");
-  if (!text) return "";
-  return text.charAt(0).toLocaleUpperCase("pt-BR") + text.slice(1);
+/** Cabeçalho da planilha na mesma caixa alta da tabela. */
+function headerCaps(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLocaleUpperCase("pt-BR");
 }
 
 /** Instrucao de transferencia, a mesma que o papel escreve sob o status. */
@@ -44,14 +42,14 @@ export function inventoryXlsxRows(lines: Array<{ r: StockProductRow; status: Sto
     "Código",
     "Produto",
     "Categoria",
-    ...locations.map(headerCase),
+    ...locations,
     ...(showsTotal ? ["Total"] : []),
     "A receber",
     "Total geral",
     "Preço de custo",
     "Valor",
     "Status",
-  ];
+  ].map((cell) => (typeof cell === "string" ? headerCaps(cell) : cell));
   const body = lines.map(({ r, status }) => {
     const cost = stockCostAmount(r);
     const unit: XlsxCell = cost.amount != null && cost.unit == null ? "Varia" : moneyCell(cost.unit);

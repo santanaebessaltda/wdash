@@ -65,7 +65,7 @@ describe("inventoryXlsxRows", () => {
       ],
       ["ESTOQUE"],
     );
-    expect(rows[0]).toEqual(["Código", "Produto", "Categoria", "Estoque", "A receber", "Total geral", "Preço de custo", "Valor", "Status"]);
+    expect(rows[0]).toEqual(["CÓDIGO", "PRODUTO", "CATEGORIA", "ESTOQUE", "A RECEBER", "TOTAL GERAL", "PREÇO DE CUSTO", "VALOR", "STATUS"]);
     expect(rows[1]).toEqual(["001", "Óleo", "Corpo", 2, 4, 6, 19.9, 39.8, "Regular"]);
     expect(rows[2][1]).toBe("Total do filtro");
     expect(rows[2][3]).toBe(2);
@@ -91,17 +91,17 @@ describe("inventoryXlsxRows", () => {
       ["ESTOQUE", "PONTO DE VENDA"],
     );
     expect(rows[0]).toEqual([
-      "Código",
-      "Produto",
-      "Categoria",
-      "Estoque",
-      "Ponto de venda",
-      "Total",
-      "A receber",
-      "Total geral",
-      "Preço de custo",
-      "Valor",
-      "Status",
+      "CÓDIGO",
+      "PRODUTO",
+      "CATEGORIA",
+      "ESTOQUE",
+      "PONTO DE VENDA",
+      "TOTAL",
+      "A RECEBER",
+      "TOTAL GERAL",
+      "PREÇO DE CUSTO",
+      "VALOR",
+      "STATUS",
     ]);
     expect(rows[1][3]).toBe(2);
     expect(rows[1][4]).toBe(3);
@@ -128,7 +128,7 @@ describe("inventoryXlsxRows", () => {
       ["ESTOQUE"],
     );
     const read = await readXlsx(buildXlsx(rows, { textColumns: [0, 1, 2], sheetName: "Estoque" }));
-    expect(read[0][0]).toBe("Código");
+    expect(read[0][0]).toBe("CÓDIGO");
     expect(read[1][0]).toBe("003");
     expect(read[1][1]).toBe("A & B");
     expect(read[1][3]).toBe("-1");
