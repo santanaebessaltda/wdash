@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Badge, Button, Card, CardTitle, EmptyState, ProgressBar, StatCard, progressTextClass } from "@/components/ui";
+import { Badge, Button, Card, CardHero, CardTitle, EmptyState, ProgressBar, StatCard, progressTextClass } from "@/components/ui";
 import { BoardSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { RankingBlock } from "@/pages/live/blocks";
@@ -167,6 +167,11 @@ function BoardGoalCard({ board, showStore }: { board: GoalBoard; showStore: bool
   const mode = goal.tierMode === "INDIVIDUAL" ? "Individual" : goal.tierMode === "GENERAL" ? "Geral" : "Grupo";
   return (
     <Card padding="none" glass="var(--info-soft)" className="px-6 py-4">
+      <div className="flex items-start gap-3.5">
+        <CardHero tone="info">
+          <TargetIcon size={22} />
+        </CardHero>
+        <div className="min-w-0 flex-1">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="truncate text-[18px] font-extrabold tracking-tight text-t0">{card.name}</p>
@@ -197,6 +202,8 @@ function BoardGoalCard({ board, showStore }: { board: GoalBoard; showStore: bool
           ? `Projeção ${num(summary.projectedPct, 0)}% · ${prazoRemaining(summary.daysRemaining).toLowerCase()}`
           : prazoRemaining(summary.daysRemaining)}
       </p>
+        </div>
+      </div>
     </Card>
   );
 }
@@ -495,8 +502,10 @@ export function BoardView({
 
       <div className={cn("grid min-w-0 gap-4", challenges.length > 0 && "xl:grid-cols-[minmax(0,65fr)_minmax(280px,35fr)] xl:items-start")}>
         <Card padding="lg" glass="var(--acc-soft)" className="min-w-0">
-          <div className="mb-1 flex items-center gap-2">
-            <TrophyIcon size={16} className="text-acc" />
+          <div className="mb-4 flex items-center gap-3">
+            <CardHero>
+              <TrophyIcon size={22} />
+            </CardHero>
             <CardTitle>Ranking</CardTitle>
           </div>
           <RankingBlock ranking={podium} formatAmount={brlCent} spotlight literalName />

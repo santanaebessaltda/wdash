@@ -38,6 +38,20 @@ export function Card({ className, children, padding = "md", glass, ...props }: C
   );
 }
 
+/** Ícone do hero, o mesmo bloco do detalhe de meta e de desafio. */
+export function CardHero({ children, tone = "acc" }: { children: ReactNode; tone?: "acc" | "info" }) {
+  return (
+    <span
+      className={cn(
+        "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl",
+        tone === "info" ? "bg-info-soft text-info" : "bg-acc-soft text-acc",
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
 export function CardHeader({ className, children, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div className={cn("mb-4 flex items-start justify-between gap-3", className)} {...props}>

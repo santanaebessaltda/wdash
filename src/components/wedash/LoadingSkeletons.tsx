@@ -484,6 +484,9 @@ export function BoardSkeleton({ header = false, className }: { header?: boolean;
         ))}
       </div>
       <Card padding="none" glass="var(--info-soft)" className="min-w-0 px-6 py-4">
+        <div className="flex items-start gap-3.5">
+          <Skeleton className="h-12 w-12 shrink-0 rounded-2xl" />
+          <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <Skeleton className="h-5 w-52" />
@@ -501,10 +504,15 @@ export function BoardSkeleton({ header = false, className }: { header?: boolean;
         </div>
         <Skeleton className="mt-1.5 h-[5px] w-full rounded-full" />
         <Skeleton className="mt-1.5 h-3 w-48" />
+          </div>
+        </div>
       </Card>
       <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,65fr)_minmax(280px,35fr)] xl:items-start">
         <Card padding="lg" glass="var(--acc-soft)" className="min-w-0">
-          <Skeleton className="mb-4 h-4 w-24" />
+          <div className="mb-4 flex items-center gap-3">
+            <Skeleton className="h-12 w-12 shrink-0 rounded-2xl" />
+            <Skeleton className="h-4 w-24" />
+          </div>
           <div className="flex items-end justify-center gap-2.5 pt-5 sm:gap-6">
             {BOARD_PODIUM.map((step, i) => (
               <div key={i} className={cn("flex flex-col items-center", step.width)}>
@@ -532,6 +540,9 @@ export function BoardSkeleton({ header = false, className }: { header?: boolean;
           </div>
         </Card>
         <Card padding="lg" glass="var(--acc-soft)" className="min-w-0">
+          <div className="flex items-start gap-3.5">
+            <Skeleton className="h-12 w-12 shrink-0 rounded-2xl" />
+            <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <Skeleton className="h-4 w-40" />
             <Skeleton className="h-6 w-24 shrink-0 rounded-full" />
@@ -550,6 +561,8 @@ export function BoardSkeleton({ header = false, className }: { header?: boolean;
                 </div>
               </div>
             ))}
+          </div>
+            </div>
           </div>
         </Card>
       </div>

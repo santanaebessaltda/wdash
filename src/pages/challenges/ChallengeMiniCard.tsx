@@ -1,4 +1,4 @@
-import { Badge, Card, ProgressBar } from "@/components/ui";
+import { Badge, Card, CardHero, ProgressBar } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import type { ChallengeRecord } from "@/data/wedash/challengesRepo";
 import { CHALLENGE_STATUS_LABEL, metricValueLabel, type ChallengeParticipant, type ChallengeView } from "@/data/wedash/challengeView";
@@ -42,14 +42,21 @@ export function ChallengeMiniCard({
     const detail = floorDetail(c, view.status === "upcoming");
     return (
       <Card padding="lg" glass="var(--acc-soft)" className="flex w-full flex-col text-left">
-        <span className="block min-w-0 truncate text-[15px] font-bold text-t0">{c.name}</span>
-        <span className="mt-0.5 block truncate text-[12px] text-t2">
-          {shortDate(c.startsOn)} a {shortDate(c.endsOn)}
-          {!ended ? ` · ${view.prazo}` : ""}
-        </span>
-        {storeNameValue ? <span className="mt-0.5 block truncate text-[12px] text-t2">{storeNameValue}</span> : null}
-        <span className="mt-1.5 block">
-          <Badge variant={statusBadgeVariant(statusLabel)}>{statusLabel}</Badge>
+        <span className="flex items-start gap-3.5">
+          <CardHero>
+            <FlameIcon size={22} />
+          </CardHero>
+          <span className="min-w-0 flex-1">
+            <span className="block min-w-0 truncate text-[15px] font-bold text-t0">{c.name}</span>
+            <span className="mt-0.5 block truncate text-[12px] text-t2">
+              {shortDate(c.startsOn)} a {shortDate(c.endsOn)}
+              {!ended ? ` · ${view.prazo}` : ""}
+            </span>
+            {storeNameValue ? <span className="mt-0.5 block truncate text-[12px] text-t2">{storeNameValue}</span> : null}
+            <span className="mt-1.5 block">
+              <Badge variant={statusBadgeVariant(statusLabel)}>{statusLabel}</Badge>
+            </span>
+          </span>
         </span>
         <div className="mt-4 border-t border-line pt-3">
           <p className="text-[13px] font-semibold text-t0">{lead}</p>
