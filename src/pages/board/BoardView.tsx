@@ -133,12 +133,12 @@ function storeTotals(days: SalesDayAgg[], storeId: string, from: string, to: str
 }
 
 const IconRevenue = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
   </svg>
 );
 const IconSales = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
     <line x1="3" y1="6" x2="21" y2="6" />
     <path d="M16 10a4 4 0 0 1-8 0" />
@@ -359,19 +359,19 @@ export function BoardView({
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard quietSub label="Faturamento" value={brlCent(monthRevenue)} sub={`Hoje ${brlCent(todayTotals.revenue)}`} icon={<IconRevenue />} iconColor="var(--acc)" iconBg="var(--acc-soft)" />
-        <StatCard quietSub label="Vendas" value={num(month.sales)} sub={`Hoje ${num(todayTotals.sales)}`} icon={<IconSales />} iconColor="var(--ok)" iconBg="var(--ok-soft)" />
+        <StatCard dense label="Faturamento" value={brlCent(monthRevenue)} sub={`Hoje ${brlCent(todayTotals.revenue)}`} icon={<IconRevenue />} iconColor="var(--acc)" iconBg="var(--acc-soft)" />
+        <StatCard dense label="Vendas" value={num(month.sales)} sub={`Hoje ${num(todayTotals.sales)}`} icon={<IconSales />} iconColor="var(--ok)" iconBg="var(--ok-soft)" />
         <StatCard
-          quietSub
+          dense
           label="Meta"
           value={activeGoal ? brlCent(activeGoal.target) : "—"}
           sub={activeGoal ? (goalCard?.name ?? "Meta do mês") : "Não configurada"}
-          icon={<TargetIcon size={20} />}
+          icon={<TargetIcon size={16} />}
           iconColor="var(--info)"
           iconBg="rgba(59,130,246,0.12)"
         />
         <StatCard
-          quietSub
+          dense
           label="Progresso da meta"
           value={summary ? `${num(summary.pct, 1)}%` : "—"}
           sub={
@@ -383,40 +383,36 @@ export function BoardView({
                   ? `N${summary.levelNumber} · ${summary.currentLevel}`
                   : "Sem nível"
           }
-          icon={<TrophyIcon size={20} />}
+          icon={<TrophyIcon size={16} />}
           iconColor="var(--warn)"
           iconBg="rgba(245,158,11,0.12)"
         />
       </div>
 
       {goalCard && activeGoal && summary ? (
-        <div className="flex flex-col rounded-2xl border border-line bg-bg-2 px-4 py-3 shadow-[var(--shadow-vela)]">
-          <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
+        <div className="flex flex-col rounded-[var(--radius-vela-lg)] border border-line bg-bg-2 px-6 py-4 shadow-[var(--shadow-vela)]">
+          <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="truncate text-[20px] font-extrabold tracking-tight text-t0">{goalCard.name}</p>
+              <p className="truncate text-[18px] font-extrabold tracking-tight text-t0">{goalCard.name}</p>
               <p className="mt-0.5 truncate text-[12.5px] text-t2">
                 {shortDate(activeGoal.startsOn)} a {shortDate(activeGoal.endsOn)}
               </p>
+              <p className="mt-1.5 font-mono text-[20px] font-extrabold leading-none tabular-nums text-t0">{brlCent(summary.achieved)}</p>
+              <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+                <Badge variant={statusBadgeVariant(GOAL_STATUS_LABEL[summary.status])}>{GOAL_STATUS_LABEL[summary.status]}</Badge>
+                <span className="text-[12px] text-t2">
+                  {activeGoal.tierMode === "INDIVIDUAL" ? "Individual" : activeGoal.tierMode === "GENERAL" ? "Geral" : "Grupo"}
+                  <span className="mx-1.5">·</span>
+                  {activeGoal.tiers.length} {activeGoal.tiers.length === 1 ? "nível" : "níveis"}
+                </span>
+              </div>
             </div>
-            <div className="flex shrink-0 flex-wrap gap-1.5">
-              <Badge variant={statusBadgeVariant(GOAL_STATUS_LABEL[summary.status])} className="uppercase">
-                {GOAL_STATUS_LABEL[summary.status]}
-              </Badge>
-              <Badge variant="neutral" className="uppercase">
-                {activeGoal.tierMode === "INDIVIDUAL" ? "Individual" : activeGoal.tierMode === "GENERAL" ? "Geral" : "Grupo"}
-              </Badge>
-              <Badge variant="neutral" className="uppercase">
-                {activeGoal.tiers.length} {activeGoal.tiers.length === 1 ? "nível" : "níveis"}
-              </Badge>
+            <div className="shrink-0 text-right">
+              <p className={`font-mono text-[22px] font-extrabold leading-none tabular-nums ${progressTextClass(summary.pct)}`}>{num(summary.pct, 1)}%</p>
+              <p className="mt-1 text-[12px] text-t2">de {brlCent(activeGoal.target)}</p>
             </div>
           </div>
-          <div className="mt-2 flex items-baseline justify-between gap-3">
-            <span className="font-mono text-[18px] font-extrabold text-t0">{brlCent(summary.achieved)}</span>
-            <span className="text-right text-[12px] text-t2">
-              <span className={`font-mono font-bold ${progressTextClass(summary.pct)}`}>{num(summary.pct, 1)}%</span> de {brlCent(activeGoal.target)}
-            </span>
-          </div>
-          <div className="mt-1.5">
+          <div className="mt-3">
             <ProgressBar value={summary.pct} height={5} />
           </div>
           <p className="mt-1.5 text-[11.5px] text-t2">
@@ -467,17 +463,17 @@ export function BoardView({
                                   <span className="min-w-0 truncate text-[12.5px] font-bold text-t0">{person.name}</span>
                                 </span>
                               </td>
-                              <td className="py-1.5 pr-2 text-right font-mono font-bold text-t0">{num(person.sales)}</td>
-                              <td className="py-1.5 pr-2 text-right font-mono font-bold text-t0">{person.pa == null ? "—" : num(person.pa, 2)}</td>
+                              <td className="py-1.5 pr-2 text-right font-mono text-[12.5px] font-bold tabular-nums text-t0">{num(person.sales)}</td>
+                              <td className="py-1.5 pr-2 text-right font-mono text-[12.5px] font-bold tabular-nums text-t0">{person.pa == null ? "—" : num(person.pa, 2)}</td>
                               <td className="py-1.5 pr-2 text-right">
-                                <span className="block font-mono font-bold text-t0">{pct ?? "—"}</span>
+                                <span className="block font-mono text-[13px] font-extrabold tabular-nums text-t0">{pct ?? "—"}</span>
                                 {level?.levelLabel ? (
-                                  <span className="mt-0.5 block text-[11px] font-semibold text-t2">{level.levelLabel}</span>
+                                  <span className="mt-0.5 block text-[10px] font-medium text-t3">{level.levelLabel}</span>
                                 ) : level ? (
-                                  <span className="mt-0.5 block text-[11px] text-t3">Sem nível</span>
+                                  <span className="mt-0.5 block text-[10px] text-t3">Sem nível</span>
                                 ) : null}
                               </td>
-                              <td className="py-1.5 text-right font-mono font-bold text-t0">{brlCent(person.revenue)}</td>
+                              <td className="py-1.5 text-right font-mono text-[12.5px] font-bold tabular-nums text-t0">{brlCent(person.revenue)}</td>
                             </tr>
                           );
                         })}

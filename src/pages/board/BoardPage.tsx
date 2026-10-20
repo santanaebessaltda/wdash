@@ -181,7 +181,7 @@ export function BoardPage() {
       {!tv && (
         <PageHeader
           title="Placar"
-          subtitle="Acompanhe o desempenho da filial, ranking, metas e desafios em tempo real."
+          subtitle="Acompanhe o desempenho da filial, o ranking, as metas e os desafios em tempo real."
           actions={
             storeId ? (
               <>

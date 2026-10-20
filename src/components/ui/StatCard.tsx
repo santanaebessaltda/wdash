@@ -26,17 +26,19 @@ export interface StatCardProps {
   valueClassName?: string;
   /** Linha de apoio mais clara. Só o placar da loja. */
   quietSub?: boolean;
+  /** Ícone e espaços menores. O valor continua o destaque. Só o placar da loja. */
+  dense?: boolean;
   className?: string;
 }
 
-export function StatCard({ label, value, icon, iconColor = "var(--acc)", iconBg = "var(--acc-soft)", delta, sparkline, sub, sub2, tooltip, deltaTooltip, valueClassName, quietSub = false, className }: StatCardProps) {
+export function StatCard({ label, value, icon, iconColor = "var(--acc)", iconBg = "var(--acc-soft)", delta, sparkline, sub, sub2, tooltip, deltaTooltip, valueClassName, quietSub = false, dense = false, className }: StatCardProps) {
   return (
-    <Card className={cn("min-w-0", className)}>
+    <Card padding={dense ? "sm" : "md"} className={cn("min-w-0", className)}>
       {icon || delta ? (
       <div className={cn("flex items-center gap-2", icon ? "justify-between" : "justify-end")}>
         {icon ? (
           <div
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[13px]"
+            className={cn("flex shrink-0 items-center justify-center", dense ? "h-8 w-8 rounded-[10px]" : "h-11 w-11 rounded-[13px]")}
             style={{ background: iconBg, color: iconColor }}
           >
             {icon}
@@ -58,7 +60,7 @@ export function StatCard({ label, value, icon, iconColor = "var(--acc)", iconBg 
         })()}
       </div>
       ) : null}
-      <div className={cn("flex items-center gap-1.5", icon || delta ? "mt-4" : "")}>
+      <div className={cn("flex items-center gap-1.5", icon || delta ? (dense ? "mt-2" : "mt-4") : "")}>
         <p className="truncate text-xs font-bold uppercase tracking-wide text-t1">{label}</p>
         {tooltip && (
           <Tooltip label={tooltip} side="bottom">
@@ -68,8 +70,8 @@ export function StatCard({ label, value, icon, iconColor = "var(--acc)", iconBg 
           </Tooltip>
         )}
       </div>
-      <AnimatedNumber value={value} className={cn("mt-1 block truncate text-2xl font-extrabold", valueClassName ?? "text-t0")} />
-      {sub && <p className={cn("mt-0.5 truncate", quietSub ? "text-[10.5px] text-t3" : "text-[11px] text-t2")}>{sub}</p>}
+      <AnimatedNumber value={value} className={cn("block truncate font-extrabold", dense ? "mt-0.5 text-xl leading-none" : "mt-1 text-2xl", valueClassName ?? "text-t0")} />
+      {sub && <p className={cn("truncate", dense ? "mt-1 text-[10px] leading-tight text-t3" : quietSub ? "mt-0.5 text-[10.5px] text-t3" : "mt-0.5 text-[11px] text-t2")}>{sub}</p>}
       {sub2 && <p className="mt-0.5 truncate text-[11px] text-t2">{sub2}</p>}
       {sparkline && <div className="mt-3 h-9">{sparkline}</div>}
     </Card>

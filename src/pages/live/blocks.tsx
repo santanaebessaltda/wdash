@@ -16,6 +16,13 @@ const PODIO_HEIGHT: Record<1 | 2 | 3, string> = {
   3: "h-28 sm:h-32",
 };
 
+/** Cerca de 18% mais baixo, para o placar da loja. */
+const PODIO_HEIGHT_COMPACT: Record<1 | 2 | 3, string> = {
+  1: "h-36 sm:h-40",
+  2: "h-28 sm:h-32",
+  3: "h-24 sm:h-[6.5rem]",
+};
+
 /** Ordem visual do podio: 2 | 1 | 3 */
 const PODIO_ORDEM = [1, 0, 2] as const;
 
@@ -65,7 +72,7 @@ export function RankingBlock({
   const top3 = ranking.slice(0, 3);
 
   return (
-    <div className="flex items-end justify-center gap-2.5 pt-7 sm:gap-6">
+    <div className={cn("flex items-end justify-center gap-2.5 sm:gap-6", spotlight ? "pt-5" : "pt-7")}>
       {PODIO_ORDEM.map((i) => {
         const pos = (i + 1) as 1 | 2 | 3;
         const medal = MEDALHA[pos];
@@ -77,7 +84,7 @@ export function RankingBlock({
               key={`vazio-${pos}`}
               className={cn("flex flex-col items-center text-center", isOuro ? "w-[34%] max-w-[168px]" : "w-[30%] max-w-[148px]")}
             >
-              <div className="relative mb-2.5">
+              <div className={cn("relative", spotlight ? "mb-1.5" : "mb-2.5")}>
                 <span
                   className={cn(
                     "inline-flex items-center justify-center rounded-full border-2 border-dashed border-line text-t3",
@@ -92,7 +99,7 @@ export function RankingBlock({
               <p className="mt-0.5 text-[11px] font-semibold text-t3">Nenhuma venda</p>
               <p className="mt-0.5 font-mono text-[13px] font-extrabold text-t3 sm:text-[14px]">—</p>
               <div
-                className={cn("mt-3 flex w-full items-end justify-center rounded-t-2xl", PODIO_HEIGHT[pos])}
+                className={cn("flex w-full items-end justify-center rounded-t-2xl", spotlight ? "mt-2" : "mt-3", spotlight ? PODIO_HEIGHT_COMPACT[pos] : PODIO_HEIGHT[pos])}
                 style={{ background: "color-mix(in srgb, var(--acc) 16%, transparent)" }}
               >
                 <span className="pb-3 text-[24px] font-extrabold leading-none text-t3 sm:text-[28px]">{pos}º</span>
@@ -128,7 +135,7 @@ export function RankingBlock({
               onSelect && "cursor-pointer rounded-2xl transition-opacity hover:opacity-85 focus-visible:outline-2 focus-visible:outline-acc",
             )}
           >
-            <div className="relative mb-2.5">
+            <div className={cn("relative", spotlight ? "mb-1.5" : "mb-2.5")}>
               <span
                 className="relative inline-flex rounded-full"
                 style={{
@@ -143,28 +150,30 @@ export function RankingBlock({
             <p className="max-w-full truncate text-[13px] font-bold text-t0 sm:text-[14px]">
               {literalName ? l.name : l.name.split(" ")[0]}
             </p>
+            {spotlight ? (
+              <p className="mt-0.5 font-mono text-[17px] font-extrabold leading-none text-t0 tabular-nums sm:text-[18px]">
+                {formatAmount(l.revenue)}
+              </p>
+            ) : null}
             <p className={cn("mt-0.5 text-[11px]", spotlight ? "font-medium text-t3" : "font-semibold text-t2")}>
               {num(l.sales)} {l.sales === 1 ? "venda" : "vendas"}
             </p>
-            <p
-              className={cn(
-                "mt-0.5 font-mono font-extrabold",
-                spotlight ? "text-[17px] text-t0 sm:text-[18px]" : "text-[13px] sm:text-[14px]",
-              )}
-              style={spotlight ? undefined : { color: medal.color }}
-            >
-              {formatAmount(l.revenue)}
-            </p>
+            {spotlight ? null : (
+              <p className="mt-0.5 font-mono text-[13px] font-extrabold tabular-nums sm:text-[14px]" style={{ color: medal.color }}>
+                {formatAmount(l.revenue)}
+              </p>
+            )}
             {l.note ? (
-              <span className="mt-1.5 max-w-full">
+              <span className={cn("max-w-full", spotlight ? "mt-1" : "mt-1.5")}>
                 <Badge variant="accent">{l.note}</Badge>
               </span>
             ) : null}
 
             <div
               className={cn(
-                "mt-3 flex w-full items-end justify-center rounded-t-2xl",
-                PODIO_HEIGHT[pos],
+                "flex w-full items-end justify-center rounded-t-2xl",
+                spotlight ? "mt-2" : "mt-3",
+                spotlight ? PODIO_HEIGHT_COMPACT[pos] : PODIO_HEIGHT[pos],
               )}
               style={{
                 background: "color-mix(in srgb, var(--acc) 48%, transparent)",

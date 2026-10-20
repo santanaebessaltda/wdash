@@ -458,9 +458,9 @@ export function SellerHomeSkeleton({ stores = 1 }: { stores?: number }) {
 }
 
 const BOARD_PODIUM = [
-  { circle: "h-16 w-16", bar: "h-36 sm:h-40", width: "w-[30%] max-w-[148px]" },
-  { circle: "h-20 w-20", bar: "h-44 sm:h-48", width: "w-[34%] max-w-[200px]" },
-  { circle: "h-16 w-16", bar: "h-28 sm:h-32", width: "w-[30%] max-w-[168px]" },
+  { circle: "h-16 w-16", bar: "h-28 sm:h-32", width: "w-[30%] max-w-[148px]" },
+  { circle: "h-20 w-20", bar: "h-36 sm:h-40", width: "w-[34%] max-w-[200px]" },
+  { circle: "h-16 w-16", bar: "h-24 sm:h-[6.5rem]", width: "w-[30%] max-w-[168px]" },
 ];
 
 /** Placar: KPIs, meta ativa, ranking (pódio + demais) e um desafio. */
@@ -475,29 +475,29 @@ export function BoardSkeleton({ header = false, className }: { header?: boolean;
       )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }, (_, i) => (
-          <Card key={i} className="min-w-0">
-            <Skeleton className="h-11 w-11 rounded-[13px]" />
-            <Skeleton className="mt-4 h-3 w-24" />
-            <Skeleton className="mt-2 h-7 w-32" />
-            <Skeleton className="mt-1.5 h-2.5 w-20" />
+          <Card key={i} padding="sm" className="min-w-0">
+            <Skeleton className="h-8 w-8 rounded-[10px]" />
+            <Skeleton className="mt-2 h-3 w-24" />
+            <Skeleton className="mt-1.5 h-6 w-28" />
+            <Skeleton className="mt-1 h-2.5 w-16" />
           </Card>
         ))}
       </div>
-      <div className="min-w-0 overflow-hidden rounded-2xl border border-line bg-bg-2 px-4 py-3 shadow-[var(--shadow-vela)]">
-        <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
+      <div className="min-w-0 overflow-hidden rounded-[var(--radius-vela-lg)] border border-line bg-bg-2 px-6 py-4 shadow-[var(--shadow-vela)]">
+        <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <Skeleton className="h-6 w-52" />
+            <Skeleton className="h-5 w-52" />
             <Skeleton className="mt-2 h-3 w-32" />
+            <Skeleton className="mt-2 h-6 w-36" />
+            <div className="mt-2 flex items-center gap-2">
+              <Skeleton className="h-6 w-28 rounded-full" />
+              <Skeleton className="h-3 w-32" />
+            </div>
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            <Skeleton className="h-6 w-28 rounded-full" />
-            <Skeleton className="h-6 w-20 rounded-full" />
-            <Skeleton className="h-6 w-16 rounded-full" />
+          <div className="shrink-0 text-right">
+            <Skeleton className="ml-auto h-6 w-16" />
+            <Skeleton className="mt-2 h-3 w-24" />
           </div>
-        </div>
-        <div className="mt-2 flex items-baseline justify-between gap-3">
-          <Skeleton className="h-6 w-36" />
-          <Skeleton className="h-3.5 w-28" />
         </div>
         <Skeleton className="mt-1.5 h-[5px] w-full rounded-full" />
         <Skeleton className="mt-1.5 h-3 w-48" />
@@ -505,7 +505,7 @@ export function BoardSkeleton({ header = false, className }: { header?: boolean;
       <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,65fr)_minmax(280px,35fr)] xl:items-start">
         <Card padding="lg" className="min-w-0 overflow-hidden">
           <Skeleton className="mb-4 h-4 w-24" />
-          <div className="flex items-end justify-center gap-2.5 pt-7 sm:gap-6">
+          <div className="flex items-end justify-center gap-2.5 pt-5 sm:gap-6">
             {BOARD_PODIUM.map((step, i) => (
               <div key={i} className={cn("flex flex-col items-center", step.width)}>
                 <Skeleton className={cn("rounded-full", step.circle)} />
@@ -531,7 +531,7 @@ export function BoardSkeleton({ header = false, className }: { header?: boolean;
             ))}
           </div>
         </Card>
-        <div className="min-w-0 overflow-hidden rounded-2xl border border-line bg-bg-2 px-4 py-3.5 shadow-[var(--shadow-vela)]">
+        <div className="min-w-0 overflow-hidden rounded-[var(--radius-vela-lg)] border border-line bg-bg-2 p-6 shadow-[var(--shadow-vela)]">
           <div className="flex items-start justify-between gap-2">
             <Skeleton className="h-4 w-40" />
             <Skeleton className="h-6 w-24 shrink-0 rounded-full" />
