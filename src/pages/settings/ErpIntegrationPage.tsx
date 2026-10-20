@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
-  Badge,
   Button,
   Card,
   Tooltip,
@@ -15,6 +14,7 @@ import {
   useToast,
 } from "@/components/ui";
 import { ConnectionCard, ConnectionSkeleton } from "@/components/wedash/ConnectionList";
+import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
 import { ErpReportChecks } from "@/components/wedash/ErpReportChecks";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import {
@@ -365,14 +365,14 @@ function AccountLoad({
             const done = trackingToday && readyStores.has(store.id);
             const running = trackingToday && !done && seed === "running";
             return (
-              <Badge
+              <StoreDivisionTitle
                 key={store.id}
-                variant={done ? "success" : "neutral"}
+                className="inline-flex items-center gap-1.5"
                 title={done ? "Concluído" : running ? "Buscando vendas de hoje" : trackingToday ? "Na fila" : undefined}
               >
                 {store.name}
                 {running ? <Spinner size={12} /> : null}
-              </Badge>
+              </StoreDivisionTitle>
             );
           })}
         </div>
