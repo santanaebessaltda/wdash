@@ -221,16 +221,15 @@ export function PurchaseOrderPage() {
     setExportPick(null);
   }, [scopeKey]);
 
-  const listCount = manyStores ? groups.length : lines.length;
+  const listCount = groups.length;
   const totalPages = Math.max(1, Math.ceil(listCount / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
-  const pageRows = lines.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
   const pageGroups = groups.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
   const isOpen = (group: ProductGroup) => opened[group.code] ?? group.branches.some((branch) => branch.onOrder);
   const toggleGroup = (code: string, open: boolean) => setOpened((current) => ({ ...current, [code]: !open }));
   const minIndex = new Map<string, number>();
-  if (manyStores) {
+  {
     let next = 0;
     for (const group of pageGroups) {
       if (!isOpen(group)) continue;
@@ -534,7 +533,7 @@ export function PurchaseOrderPage() {
                     <th className="px-1 pb-3 text-left font-bold">#</th>
                     <ThSort label="Produto" active={sortKey === "name"} dir={sortDir} onClick={() => toggleSort("name")} align="left" className="px-1 pb-3" />
                     <ThSort label="Mínimo" active={sortKey === "minimo"} dir={sortDir} onClick={() => toggleSort("minimo")} className="px-1 pb-3" />
-                    {NUM_COLS.filter((c) => !(manyStores && c.key === "multipla")).map((c) => (
+                    {NUM_COLS.filter((c) => c.key !== "multipla").map((c) => (
                       <ThSort
                         key={c.key}
                         label={c.key === "vendidos30" ? `Vendidos em ${po.soldDays} dias` : c.label}
@@ -545,13 +544,11 @@ export function PurchaseOrderPage() {
                       />
                     ))}
                     <ThSort label="Novo" active={sortKey === "novo"} dir={sortDir} onClick={() => toggleSort("novo")} align="center" className="px-1 pb-3" />
-                    {!manyStores && <ThSort label="Bloqueado" active={sortKey === "bloqueado"} dir={sortDir} onClick={() => toggleSort("bloqueado")} align="center" className="px-1 pb-3" />}
                     <ThSort label="A pedir" active={sortKey === "aPedir"} dir={sortDir} onClick={() => toggleSort("aPedir")} className="px-1 pb-3" />
                   </tr>
                 </thead>
                 <tbody>
-                  {manyStores
-                    ? pageGroups.map((group, i) => {
+                  {pageGroups.map((group, i) => {
                         const open = isOpen(group);
                         const idx = (pageSafe - 1) * PAGE_SIZE + i;
                         const onOrder = group.branches.some((branch) => branch.onOrder);
@@ -640,49 +637,6 @@ export function PurchaseOrderPage() {
                               ))}
                           </Fragment>
                         );
-                      })
-                    : pageRows.map((r, i) => {
-                        const idx = (pageSafe - 1) * PAGE_SIZE + i;
-                        const category = po.parts.find((p) => p.storeId === r.storeId)?.catalog.get(r.code)?.category;
-                        return (
-                          <tr key={`${r.storeId}:${r.code}`} className={cn("border-b border-line", r.onOrder && "bg-warn-soft")}>
-                            <td className={cn("px-1 py-3 text-center text-[13px] font-extrabold text-t2", r.onOrder && "shadow-[inset_3px_0_0_var(--warn)]")}>{idx + 1}</td>
-                            <td className="px-1 py-3">
-                              <ProductNameCell
-                                name={r.name}
-                                idx={idx}
-                                upper
-                                sub={
-                                  <div className="min-w-0">
-                                    <p className="truncate text-[11px] uppercase text-t2">{[r.code, category].filter(Boolean).join(" · ")}</p>
-                                    {r.variasVariantes && !r.blocked && <p className="mt-0.5 text-[11px] font-semibold text-warn">Este produto tem mais de uma cor ou tamanho. Faça o pedido diretamente no Millennium.</p>}
-                                  </div>
-                                }
-                              />
-                            </td>
-                            <td className="px-1 py-2 text-right">
-                              {!r.canRequest ? (
-                                <span className="inline-block w-20 pr-2 text-right font-mono text-[13px] font-bold text-t2">{r.minimum == null ? "—" : r.minimum}</span>
-                              ) : (
-                                <MinInput value={r.minimum} idx={i} label={`Mínimo de ${r.name}`} onSave={(raw) => po.saveMin(r.storeId, r.code, raw)} />
-                              )}
-                            </td>
-                            {NUM_COLS.map((c) => (
-                              <td key={c.key} className="px-1 py-3 text-right">
-                                <Qty v={r[c.key]} />
-                              </td>
-                            ))}
-                            <td className="px-1 py-3 text-center">
-                              <YesNo yes={r.isNew} />
-                            </td>
-                            <td className="px-1 py-3 text-center">
-                              <YesNo yes={r.blocked} />
-                            </td>
-                            <td className="px-1 py-3 text-right">
-                              {r.aRequest == null ? <span className="font-mono text-[13px] font-bold text-t2">—</span> : <Qty v={r.aRequest} strong={r.aRequest > 0} />}
-                            </td>
-                          </tr>
-                        );
                       })}
                   <tr className="bg-bg-inset">
                     <td />
@@ -708,9 +662,7 @@ export function PurchaseOrderPage() {
                     <td className="px-1 py-3 text-right">
                       <Qty v={totais.vendidos30} total />
                     </td>
-                    {!manyStores && <td />}
                     <td />
-                    {!manyStores && <td />}
                     <td className="px-1 py-3 text-right">
                       <Qty v={totais.aRequest} total />
                     </td>
@@ -719,7 +671,7 @@ export function PurchaseOrderPage() {
               </table>
             </div>
           )}
-          {lines.length > 0 && <TableFooter shown={manyStores ? pageGroups.length : pageRows.length} total={listCount} page={pageSafe} totalPages={totalPages} onPage={setPage} />}
+          {lines.length > 0 && <TableFooter shown={pageGroups.length} total={listCount} page={pageSafe} totalPages={totalPages} onPage={setPage} />}
         </Card>
       )}
       </div>
