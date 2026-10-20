@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Card, useToast } from "@/components/ui";
 import { EMPTY_STORE_COSTS, updateStoreCosts, type Store, type StoreCosts } from "@/data/wedash/stores";
-import { BlockTitle, FormActions, NumberField, SAVE_ERROR_MSG, numText, parseNum } from "./shared";
+import { BlockTitle, FormActions, NumberField, SAVE_ERROR_MSG, numText, parseNum, useRegisterSettingsDraft, useSettingsDraftScope } from "./shared";
 
 /** Campo de custo da loja: le e grava um pedaco de `store.custos`. */
 export type CostField = {
@@ -95,19 +95,35 @@ export function CostFieldsCard({
 }) {
   const { show } = useToast();
   const form = useCostFields(store, fields);
+  const scope = useSettingsDraftScope();
   const [saving, setSaving] = useState(false);
 
-  async function save() {
+  async function persist(): Promise<boolean> {
     const costs = form.merged();
-    if (!costs) return show(INVALID_COSTS_MSG, "danger");
+    const say = (message: string) => show(scope?.errorPrefix ? `${scope.errorPrefix}: ${message}` : message, "danger");
+    if (!costs) {
+      say(INVALID_COSTS_MSG);
+      return false;
+    }
     setSaving(true);
-    const r = await updateStoreCosts(store.id, costs);
+    const r = await updateStoreCosts(store.id, costs).catch(() => ({ ok: false as const }));
     setSaving(false);
-    if (!r.ok) return show(SAVE_ERROR_MSG, "danger");
+    if (!r.ok) {
+      say(SAVE_ERROR_MSG);
+      return false;
+    }
     form.markSaved(costs);
+    return true;
+  }
+
+  async function save() {
+    const ok = await persist();
+    if (!ok) return;
     onSaved();
     show("Alterações salvas.", "success");
   }
+
+  useRegisterSettingsDraft(store.id, { dirty: form.dirty, reset: form.reset, save: persist });
 
   const grid = (list: CostField[]) => (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -124,6 +140,28 @@ export function CostFieldsCard({
     </div>
   );
 
+  const fieldsBody = (
+    <>
+      {intro && <p className="text-[12.5px] text-t2">{intro}</p>}
+      {sections ? (
+        sections.map((s) => (
+          <div key={s.title} className="flex flex-col gap-3">
+            <div>
+              <p className="text-[14px] font-bold text-t0">{s.title}</p>
+              {s.hint && <p className="mt-0.5 text-[12.5px] text-t2">{s.hint}</p>}
+            </div>
+            {grid(fields.filter((f) => s.keys.includes(f.key)))}
+          </div>
+        ))
+      ) : (
+        grid(fields)
+      )}
+      {footer}
+    </>
+  );
+
+  if (scope) return <div className="flex flex-col gap-4">{fieldsBody}</div>;
+
   const body = (
     <>
       <BlockTitle title={title} tip={tip} store={storeLabel} />
@@ -134,21 +172,7 @@ export function CostFieldsCard({
           void save();
         }}
       >
-        {intro && <p className="text-[12.5px] text-t2">{intro}</p>}
-        {sections ? (
-          sections.map((s) => (
-            <div key={s.title} className="flex flex-col gap-3">
-              <div>
-                <p className="text-[14px] font-bold text-t0">{s.title}</p>
-                {s.hint && <p className="mt-0.5 text-[12.5px] text-t2">{s.hint}</p>}
-              </div>
-              {grid(fields.filter((f) => s.keys.includes(f.key)))}
-            </div>
-          ))
-        ) : (
-          grid(fields)
-        )}
-        {footer}
+        {fieldsBody}
         <FormActions dirty={form.dirty} saving={saving} onReset={form.reset} />
       </form>
     </>

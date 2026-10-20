@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Badge, Button, Card, CardHeader, CardTitle, EmptyState, FormField, Input, PageHeader, Select, TabNav, Tooltip } from "@/components/ui";
 import { financeTabs, integrationTabs, performanceTabs, settingsTabs } from "@/layout/nav-wedash";
 import { useShoppingMenu } from "@/layout/useShoppingMenu";
@@ -237,6 +237,118 @@ export function CostCardTitle({ title, className }: { title: string; className?:
 }
 
 export const SAVE_ERROR_MSG = "Não foi possível salvar as alterações. Tente novamente.";
+
+export type SettingsDraft = {
+  dirty: boolean;
+  reset: () => void;
+  /** false = esta filial falhou e o aviso já foi mostrado. true = gravou ou não havia mudança. */
+  save: () => Promise<boolean>;
+};
+
+type RegisterSettingsDraft = (id: string, draft: SettingsDraft | null) => void;
+
+type SettingsDraftScope = {
+  register: RegisterSettingsDraft;
+  errorPrefix?: string;
+};
+
+const SettingsDraftContext = createContext<SettingsDraftScope | null>(null);
+
+export function SettingsDraftProvider({
+  register,
+  errorPrefix,
+  children,
+}: {
+  register: RegisterSettingsDraft;
+  errorPrefix?: string;
+  children: ReactNode;
+}) {
+  const value = useMemo(() => ({ register, errorPrefix }), [register, errorPrefix]);
+  return <SettingsDraftContext.Provider value={value}>{children}</SettingsDraftContext.Provider>;
+}
+
+export function useSettingsDraftScope(): SettingsDraftScope | null {
+  return useContext(SettingsDraftContext);
+}
+
+function dirtyTotal(map: Map<string, boolean>): number {
+  let total = 0;
+  for (const value of map.values()) if (value) total += 1;
+  return total;
+}
+
+/** Vários blocos, um Resetar e um Salvar. Cada bloco avisa o próprio erro. */
+export function useSettingsDrafts() {
+  const drafts = useRef(new Map<string, { reset: () => void; save: () => Promise<boolean> }>());
+  const dirtyRef = useRef(new Map<string, boolean>());
+  const savingRef = useRef(false);
+  const [dirtyCount, setDirtyCount] = useState(0);
+  const [saving, setSaving] = useState(false);
+
+  const publish = useCallback(() => {
+    const total = dirtyTotal(dirtyRef.current);
+    setDirtyCount((prev) => (prev === total ? prev : total));
+  }, []);
+
+  const register = useCallback(
+    (id: string, draft: SettingsDraft | null) => {
+      if (!draft) {
+        drafts.current.delete(id);
+        dirtyRef.current.delete(id);
+        publish();
+        return;
+      }
+      drafts.current.set(id, { reset: draft.reset, save: draft.save });
+      dirtyRef.current.set(id, draft.dirty);
+      publish();
+    },
+    [publish],
+  );
+
+  const resetAll = useCallback(() => {
+    if (savingRef.current) return;
+    for (const draft of drafts.current.values()) draft.reset();
+  }, []);
+
+  const saveAll = useCallback(async (ids: string[]) => {
+    if (savingRef.current) return { ok: false, wrote: false };
+    savingRef.current = true;
+    setSaving(true);
+    let wrote = false;
+    try {
+      for (const id of ids) {
+        if (!dirtyRef.current.get(id)) continue;
+        const draft = drafts.current.get(id);
+        if (!draft) continue;
+        const ok = await draft.save().catch(() => false);
+        if (!ok) return { ok: false, wrote };
+        wrote = true;
+      }
+      return { ok: true, wrote };
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  }, []);
+
+  return { register, resetAll, saveAll, dirty: dirtyCount > 0, saving };
+}
+
+/** O bloco publica dirty, reset e save enquanto estiver na tela. */
+export function useRegisterSettingsDraft(id: string, draft: SettingsDraft) {
+  const scope = useSettingsDraftScope();
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  useEffect(() => {
+    if (!scope) return;
+    scope.register(id, {
+      dirty: draftRef.current.dirty,
+      reset: () => draftRef.current.reset(),
+      save: () => draftRef.current.save(),
+    });
+    return () => scope.register(id, null);
+  }, [id, scope, draft.dirty]);
+}
 
 export function FormActions({ dirty, saving, onReset }: { dirty: boolean; saving: boolean; onReset: () => void }) {
   return (

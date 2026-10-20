@@ -1,14 +1,29 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
-import { Button, Card, FormField, Input, Segmented, Select, useToast } from "@/components/ui";
+import { Alert, Badge, Button, Card, EmptyState, FormField, Input, Segmented, Select, useToast } from "@/components/ui";
 import { paths } from "@/router/paths";
 import { type RentSeason } from "@/data/wedash/rentSeason";
+import { weekHoursConfigured } from "@/data/wedash/storeHours";
 import { StoreCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { fetchCostTables, updateStoreCostTable, updateStoreCosts, updateStorePointType, type CostTable, type PointType, type Store } from "@/data/wedash/stores";
 import { syncProductsNow } from "@/data/wedash/productCatalog";
+import { cn } from "@/lib/cn";
+import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { CostFieldsCard, INVALID_COSTS_MSG, pctField, useCostFields, type CostField, type CostFieldSection } from "./costFields";
-import { StoreHoursCard } from "./StoreSchedule";
-import { BlockTitle, FormActions, NumberField, SAVE_ERROR_MSG, StoreCardsPage, parseNum, useScopedStores } from "./shared";
+import { HOURS_TIP, StoreScheduleForm } from "./StoreSchedule";
+import {
+  BlockTitle,
+  FormActions,
+  NumberField,
+  SAVE_ERROR_MSG,
+  SectionHeader,
+  SettingsDraftProvider,
+  parseNum,
+  useRegisterSettingsDraft,
+  useScopedStores,
+  useSettingsDraftScope,
+  useSettingsDrafts,
+} from "./shared";
 
 const RENT_MIN: CostField = {
   key: "rentMin",
@@ -88,16 +103,24 @@ function franchiseSections(store: Store): CostFieldSection[] {
   ];
 }
 
-/** Uma tela de Configurações por aba do menu. */
+function storeName(store: Store): string {
+  return store.tradeName || store.name;
+}
+
+/** Uma tela de Configurações por aba do menu. As filiais ficam no mesmo card. */
 export function BranchPage() {
   const { pathname } = useLocation();
   const section = settingsSection(pathname);
   const { storeRows, loading, refresh } = useScopedStores();
   const many = storeRows.length > 1;
   const page = settingsCopy(section, many);
+  const drafts = useSettingsDrafts();
+  const { show } = useToast();
+  const showSkeleton = useMinSkeleton(loading);
   const [tables, setTables] = useState<CostTable[]>([]);
   const [tablesLoading, setTablesLoading] = useState(true);
   const [tablesError, setTablesError] = useState(false);
+  const noTables = !tablesLoading && !tablesError && tables.length === 0;
 
   useEffect(() => {
     if (section !== "products") return;
@@ -113,194 +136,241 @@ export function BranchPage() {
     };
   }, [section]);
 
+  async function saveAll() {
+    const result = await drafts.saveAll(storeRows.map((store) => store.id));
+    if (result.wrote) refresh();
+    if (result.ok && result.wrote) show("Alterações salvas.", "success");
+  }
+
+  const tip =
+    section === "hours"
+      ? HOURS_TIP
+      : section === "royalties"
+        ? FRANCHISE_TIP
+        : section === "products"
+          ? COST_TABLE_TIP
+          : section === "rent" && storeRows.some((store) => store.pointType !== "STREET")
+            ? RENT_TIP
+            : undefined;
+
   return (
-    <StoreCardsPage
-      section="Configurações"
-      title={page.title}
-      subtitle={page.subtitle}
-      loading={loading}
-      skeleton={(n) => <StoreCardsSkeleton count={n} title schedule={section === "hours"} fields={section === "rent" ? 3 : 1} />}
-      storeRows={storeRows}
-    >
-      {(store) => (
-        <BranchSection
-          section={section}
-          store={store}
-          storeLabel={many ? store.tradeName || store.name : undefined}
-          tables={tables}
-          tablesLoading={tablesLoading}
-          tablesError={tablesError}
-          onSaved={refresh}
-        />
-      )}
-    </StoreCardsPage>
+    <div>
+      <SectionHeader section="Configurações" title={page.title} subtitle={page.subtitle} />
+      <div className="mt-6 max-w-[720px]">
+        {showSkeleton ? (
+          <StoreCardsSkeleton
+            count={1}
+            title
+            intro={section === "branch"}
+            schedule={section === "hours"}
+            sections={section === "royalties" ? 1 : 0}
+            fields={section === "rent" ? 3 : section === "products" || section === "branch" ? 1 : 0}
+          />
+        ) : storeRows.length === 0 ? (
+          <Card>
+            <EmptyState framed={false} icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
+          </Card>
+        ) : (
+          <SettingsCard
+            title={page.title}
+            tip={tip}
+            intro={section === "branch" ? "O tipo da filial define o horário padrão e as opções de aluguel." : undefined}
+            notice={
+              section === "products" && tablesError ? (
+                <p className="mb-4 text-[12.5px] font-semibold text-bad">Não foi possível buscar as tabelas de custo. Tente novamente.</p>
+              ) : section === "products" && noTables ? (
+                <p className="mb-4 text-[12.5px] text-t2">Nenhuma tabela de custo disponível.</p>
+              ) : null
+            }
+            storeRows={storeRows}
+            drafts={drafts}
+            onSave={saveAll}
+          >
+            {(store) => {
+              if (section === "hours") return <HoursBlock store={store} />;
+              if (section === "royalties") {
+                return (
+                  <CostFieldsCard
+                    store={store}
+                    title="Royalties e marketing"
+                    fields={franchiseFields(store)}
+                    sections={franchiseSections(store)}
+                    onSaved={() => {}}
+                  />
+                );
+              }
+              if (section === "rent") return <RentBlock store={store} />;
+              if (section === "products") return <CostTableBlock store={store} tables={tables} tablesLoading={tablesLoading} />;
+              return <PointBlock store={store} />;
+            }}
+          </SettingsCard>
+        )}
+      </div>
+    </div>
   );
 }
 
-function BranchSection({
-  section,
-  store,
-  storeLabel,
-  tables,
-  tablesLoading,
-  tablesError,
-  onSaved,
+function SettingsCard({
+  title,
+  tip,
+  intro,
+  notice,
+  storeRows,
+  drafts,
+  onSave,
+  children,
 }: {
-  section: SettingsSection;
-  store: Store;
-  storeLabel?: string;
-  tables: CostTable[];
-  tablesLoading: boolean;
-  tablesError: boolean;
-  onSaved: () => void;
+  title: string;
+  tip?: string;
+  intro?: string;
+  notice?: ReactNode;
+  storeRows: Store[];
+  drafts: ReturnType<typeof useSettingsDrafts>;
+  onSave: () => void;
+  children: (store: Store) => ReactNode;
 }) {
-  const { show } = useToast();
-  const [point, setPoint] = useState<PointType>(store.pointType);
-  const [savingPoint, setSavingPoint] = useState(false);
-  const pointDirty = point !== store.pointType;
-
-  function escolher(next: PointType) {
-    if (next === point || savingPoint) return;
-    setPoint(next);
-  }
-
-  function resetarTipo() {
-    if (!pointDirty || savingPoint) return;
-    setPoint(store.pointType);
-  }
-
-  async function salvarTipo() {
-    if (!pointDirty || savingPoint) return;
-    setSavingPoint(true);
-    const result = await updateStorePointType(store.id, point);
-    setSavingPoint(false);
-    if (!result.ok) {
-      show(SAVE_ERROR_MSG, "danger");
-      return;
-    }
-    onSaved();
-    show("Alterações salvas.", "success");
-  }
-
-  if (section === "hours") return <StoreHoursCard store={store} canEdit onSaved={onSaved} pointType={store.pointType} storeLabel={storeLabel} />;
-  if (section === "royalties") {
-    return (
-      <CostFieldsCard
-        store={store}
-        title="Royalties e marketing"
-        tip={FRANCHISE_TIP}
-        fields={franchiseFields(store)}
-        sections={franchiseSections(store)}
-        storeLabel={storeLabel}
-        onSaved={onSaved}
-      />
-    );
-  }
-  if (section === "rent") return <Card><RentCard store={store} storeLabel={storeLabel} onSaved={onSaved} /></Card>;
-  if (section === "products") {
-    return (
-      <Card>
-        <CostTableCard store={store} storeLabel={storeLabel} tables={tables} tablesLoading={tablesLoading} tablesError={tablesError} onSaved={onSaved} />
-      </Card>
-    );
-  }
-
+  const many = storeRows.length > 1;
   return (
     <Card>
-      <BlockTitle title="Filial" store={storeLabel} />
       <form
-        className="flex flex-col gap-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void salvarTipo();
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSave();
         }}
       >
-        <p className="text-[12.5px] text-t2">O tipo da filial define o horário padrão e as opções de aluguel.</p>
+        <BlockTitle title={title} tip={tip} />
+        {intro ? <p className="mb-4 text-[12.5px] text-t2">{intro}</p> : null}
+        {notice}
         <div>
-          <p className="mb-1.5 text-[12.5px] font-bold text-t0">Tipo de filial</p>
-          <Segmented options={POINT_OPTIONS} value={point} onChange={(v) => v && escolher(v)} />
+          {storeRows.map((store) => {
+            const name = storeName(store);
+            return (
+              <section key={store.id} className={cn("flex flex-col gap-4", many && "border-t border-line pb-6 pt-5 first:border-t-0 first:pt-0")}>
+                {many ? (
+                  <Badge variant="neutral" title={name} className="max-w-full self-start overflow-hidden">
+                    <span className="truncate">{name}</span>
+                  </Badge>
+                ) : null}
+                <SettingsDraftProvider register={drafts.register} errorPrefix={many ? name : undefined}>
+                  {children(store)}
+                </SettingsDraftProvider>
+              </section>
+            );
+          })}
         </div>
-        <FormActions dirty={pointDirty} saving={savingPoint} onReset={resetarTipo} />
+        <div className={many ? undefined : "mt-4"}>
+          <FormActions dirty={drafts.dirty} saving={drafts.saving} onReset={drafts.resetAll} />
+        </div>
       </form>
     </Card>
   );
 }
 
-function CostTableCard({
-  store,
-  storeLabel,
-  tables,
-  tablesLoading,
-  tablesError,
-  onSaved,
-}: {
-  store: Store;
-  storeLabel?: string;
-  tables: CostTable[];
-  tablesLoading: boolean;
-  tablesError: boolean;
-  onSaved: () => void;
-}) {
-  const { show } = useToast();
-  const [savedTable, setSavedTable] = useState<number | null>(store.costTableId ?? null);
-  const [table, setTable] = useState<number | null>(savedTable);
-  const [saving, setSaving] = useState(false);
-  const tableDirty = table !== savedTable;
-
-  /** Tabela nova busca os precos no Millennium antes; falhou = nada e gravado. */
-  async function save() {
-    setSaving(true);
-    if (table != null) {
-      const prices = await syncProductsNow({ scope: "table", tableId: table });
-      if (!prices.ok) {
-        setSaving(false);
-        return show(COST_TABLE_SYNC_ERROR, "danger");
-      }
-    }
-    const r = await updateStoreCostTable(store.id, table);
-    setSaving(false);
-    if (!r.ok) return show(SAVE_ERROR_MSG, "danger");
-    setSavedTable(table);
-    onSaved();
-    show("Alterações salvas.", "success");
-  }
-
-  const noTables = !tablesLoading && !tablesError && tables.length === 0 && table == null;
-
+function HoursBlock({ store }: { store: Store }) {
   return (
     <>
-      <BlockTitle title="Custo dos produtos" tip={COST_TABLE_TIP} store={storeLabel} />
-      <form
-        className="flex flex-col gap-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void save();
-        }}
-      >
-        <FormField label="Tabela de custo" hint="Usada quando uma venda chega sem custo do produto.">
-          <Select
-            value={tablesLoading || table == null ? "" : String(table)}
-            disabled={tablesLoading || noTables}
-            onChange={(e) => setTable(e.target.value ? Number(e.target.value) : null)}
-          >
-            <option value="">{tablesLoading ? "Buscando tabelas no Millennium…" : "Nenhuma tabela"}</option>
-            {!tablesLoading && table != null && !tables.some((t) => t.id === table) && (
-              <option value={String(table)}>Tabela {table} · indisponível</option>
-            )}
-            {tables.map((t) => (
-              <option key={t.id} value={String(t.id)}>
-                {`Tabela ${t.code || t.id}`}
-              </option>
-            ))}
-          </Select>
-        </FormField>
-        {noTables && <p className="text-[12.5px] text-t2">Nenhuma tabela de custo disponível.</p>}
-        {tablesError && (
-          <p className="text-[12.5px] font-semibold text-bad">Não foi possível buscar as tabelas de custo. Tente novamente.</p>
-        )}
-        <FormActions dirty={tableDirty} saving={saving} onReset={() => setTable(savedTable)} />
-      </form>
+      {!weekHoursConfigured(store.hours) && (
+        <Alert variant="warning" title="Horário não configurado">
+          As vendas serão atualizadas apenas pelo botão Atualizar enquanto não houver horário definido.
+        </Alert>
+      )}
+      <StoreScheduleForm store={store} canEdit onSaved={() => {}} />
     </>
+  );
+}
+
+function PointBlock({ store }: { store: Store }) {
+  const { show } = useToast();
+  const scope = useSettingsDraftScope();
+  const [baseline, setBaseline] = useState(store.pointType);
+  const [point, setPoint] = useState<PointType>(store.pointType);
+  const dirty = point !== baseline;
+
+  function reset() {
+    setPoint(baseline);
+  }
+
+  async function persist(): Promise<boolean> {
+    if (!dirty) return true;
+    const result = await updateStorePointType(store.id, point).catch(() => ({ ok: false as const }));
+    if (!result.ok) {
+      show(scope?.errorPrefix ? `${scope.errorPrefix}: ${SAVE_ERROR_MSG}` : SAVE_ERROR_MSG, "danger");
+      return false;
+    }
+    setBaseline(point);
+    return true;
+  }
+
+  useRegisterSettingsDraft(store.id, { dirty, reset, save: persist });
+
+  return (
+    <div>
+      <p className="mb-1.5 text-[12.5px] font-bold text-t0">Tipo de filial</p>
+      <Segmented options={POINT_OPTIONS} value={point} onChange={(value) => value && setPoint(value)} />
+    </div>
+  );
+}
+
+function CostTableBlock({
+  store,
+  tables,
+  tablesLoading,
+}: {
+  store: Store;
+  tables: CostTable[];
+  tablesLoading: boolean;
+}) {
+  const { show } = useToast();
+  const scope = useSettingsDraftScope();
+  const [savedTable, setSavedTable] = useState<number | null>(store.costTableId ?? null);
+  const [table, setTable] = useState<number | null>(savedTable);
+  const dirty = table !== savedTable;
+  const noTables = !tablesLoading && tables.length === 0 && table == null;
+
+  function reset() {
+    setTable(savedTable);
+  }
+
+  /** Tabela nova busca os preços no Millennium antes; falhou = esta filial não grava. */
+  async function persist(): Promise<boolean> {
+    if (!dirty) return true;
+    const say = (message: string) => show(scope?.errorPrefix ? `${scope.errorPrefix}: ${message}` : message, "danger");
+    if (table != null) {
+      const prices = await syncProductsNow({ scope: "table", tableId: table }).catch(() => ({ ok: false as const }));
+      if (!prices.ok) {
+        say(COST_TABLE_SYNC_ERROR);
+        return false;
+      }
+    }
+    const result = await updateStoreCostTable(store.id, table).catch(() => ({ ok: false as const }));
+    if (!result.ok) {
+      say(SAVE_ERROR_MSG);
+      return false;
+    }
+    setSavedTable(table);
+    return true;
+  }
+
+  useRegisterSettingsDraft(store.id, { dirty, reset, save: persist });
+
+  return (
+    <FormField label="Tabela de custo" hint="Usada quando uma venda chega sem custo do produto.">
+      <Select
+        value={tablesLoading || table == null ? "" : String(table)}
+        disabled={tablesLoading || noTables}
+        onChange={(event) => setTable(event.target.value ? Number(event.target.value) : null)}
+      >
+        <option value="">{tablesLoading ? "Buscando tabelas no Millennium…" : "Nenhuma tabela"}</option>
+        {!tablesLoading && table != null && !tables.some((item) => item.id === table) && (
+          <option value={String(table)}>Tabela {table} · indisponível</option>
+        )}
+        {tables.map((item) => (
+          <option key={item.id} value={String(item.id)}>
+            {`Tabela ${item.code || item.id}`}
+          </option>
+        ))}
+      </Select>
+    </FormField>
   );
 }
 
@@ -337,48 +407,52 @@ function seasonsFromDraft(rows: SeasonDraft[]): RentSeason[] | null {
   return out;
 }
 
-function RentCard({ store, storeLabel, onSaved }: { store: Store; storeLabel?: string; onSaved: () => void }) {
+function RentBlock({ store }: { store: Store }) {
   const { show } = useToast();
+  const scope = useSettingsDraftScope();
   const form = useCostFields(store, RENT_FIELDS);
-  const savedSeasons = store.costs?.rentSeasons ?? [];
-  const [seasons, setSeasons] = useState<SeasonDraft[]>(() => seasonDrafts(savedSeasons));
-  const [saving, setSaving] = useState(false);
+  const [seasonBaseline, setSeasonBaseline] = useState<RentSeason[]>(store.costs?.rentSeasons ?? []);
+  const [seasons, setSeasons] = useState<SeasonDraft[]>(() => seasonDrafts(store.costs?.rentSeasons ?? []));
   const street = store.pointType === "STREET";
   const fields = street ? [RENT_MIN] : RENT_FIELDS;
   const pctSaved = parseNum(form.saved[RENT_PCT.key] ?? "");
   const removePct = street && pctSaved != null && pctSaved > 0;
-  const seasonsDirty = JSON.stringify(seasonsFromDraft(seasons)) !== JSON.stringify(savedSeasons);
+  const seasonsDirty = !street && JSON.stringify(seasonsFromDraft(seasons)) !== JSON.stringify(seasonBaseline);
+  const dirty = form.dirty || seasonsDirty;
 
   function reset() {
     form.reset();
-    setSeasons(seasonDrafts(savedSeasons));
+    setSeasons(seasonDrafts(seasonBaseline));
   }
 
-  async function save() {
+  async function persist(): Promise<boolean> {
+    if (!dirty) return true;
+    const say = (message: string) => show(scope?.errorPrefix ? `${scope.errorPrefix}: ${message}` : message, "danger");
     const merged = form.merged();
-    if (!merged) return show(INVALID_COSTS_MSG, "danger");
-    const nextSeasons = street ? savedSeasons : seasonsFromDraft(seasons);
-    if (!nextSeasons) return show("Confira a sazonalidade. Informe o mês e um fator maior que zero, sem repetir o mesmo mês.", "danger");
+    if (!merged) {
+      say(INVALID_COSTS_MSG);
+      return false;
+    }
+    const nextSeasons = street ? seasonBaseline : seasonsFromDraft(seasons);
+    if (!nextSeasons) {
+      say("Confira a sazonalidade. Informe o mês e um fator maior que zero, sem repetir o mesmo mês.");
+      return false;
+    }
     const costs = { ...(street ? RENT_PCT.set(merged, null) : merged), rentSeasons: nextSeasons };
-    setSaving(true);
-    const r = await updateStoreCosts(store.id, costs);
-    setSaving(false);
-    if (!r.ok) return show(SAVE_ERROR_MSG, "danger");
+    const result = await updateStoreCosts(store.id, costs).catch(() => ({ ok: false as const }));
+    if (!result.ok) {
+      say(SAVE_ERROR_MSG);
+      return false;
+    }
     form.markSaved(costs);
-    onSaved();
-    show("Alterações salvas.", "success");
+    setSeasonBaseline(nextSeasons);
+    return true;
   }
+
+  useRegisterSettingsDraft(store.id, { dirty, reset, save: persist });
 
   return (
-    <>
-      <BlockTitle title="Aluguel" tip={street ? undefined : RENT_TIP} store={storeLabel} />
-      <form
-        className="flex flex-col gap-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void save();
-        }}
-      >
+    <div className="flex flex-col gap-4">
         {removePct && (
           <p className="text-[12px] font-semibold text-warn">O aluguel percentual será removido ao salvar as alterações.</p>
         )}
@@ -467,9 +541,7 @@ function RentCard({ store, storeLabel, onSaved }: { store: Store; storeLabel?: s
             </div>
           </>
         )}
-        <FormActions dirty={form.dirty || seasonsDirty} saving={saving} onReset={reset} />
-      </form>
-    </>
+    </div>
   );
 }
 

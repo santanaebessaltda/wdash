@@ -12,7 +12,7 @@ import {
   type StoreWeekHours,
 } from "@/data/wedash/storeHours";
 import { cn } from "@/lib/cn";
-import { BlockTitle, FormActions, SAVE_ERROR_MSG, TimeSelect } from "./shared";
+import { BlockTitle, FormActions, SAVE_ERROR_MSG, TimeSelect, useRegisterSettingsDraft, useSettingsDraftScope } from "./shared";
 
 const DOWS: Dow[] = [0, 1, 2, 3, 4, 5, 6];
 
@@ -38,6 +38,7 @@ export function StoreScheduleForm({
   presetStamp?: number;
 }) {
   const { show } = useToast();
+  const scope = useSettingsDraftScope();
   const [saved, setSaved] = useState(() => ({
     timezone: canonicalStoreTimezone(store.timezone),
     hours: parseWeekHours(store.hours),
@@ -55,26 +56,35 @@ export function StoreScheduleForm({
   const dirty = timezone !== saved.timezone || JSON.stringify(hours) !== JSON.stringify(saved.hours);
   const preset = presetWeekHours(type);
 
-  async function save() {
+  async function persist(): Promise<boolean> {
+    const say = (message: string) => show(scope?.errorPrefix ? `${scope.errorPrefix}: ${message}` : message, "danger");
     const invalid = DOWS.find((d) => {
       const day = hours[d];
       return day != null && day.open >= day.close;
     });
     if (invalid != null) {
-      show("O horário de abertura deve ser anterior ao horário de fechamento.", "danger");
-      return;
+      say("O horário de abertura deve ser anterior ao horário de fechamento.");
+      return false;
     }
     setSaving(true);
     const r = await updateStoreSchedule({ storeId: store.id, timezone, hours }).catch(() => ({ ok: false as const }));
     setSaving(false);
     if (!r.ok) {
-      show(SAVE_ERROR_MSG, "danger");
-      return;
+      say(SAVE_ERROR_MSG);
+      return false;
     }
     setSaved({ timezone, hours });
+    return true;
+  }
+
+  async function save() {
+    const ok = await persist();
+    if (!ok) return;
     onSaved();
     show("Alterações salvas.", "success");
   }
+
+  useRegisterSettingsDraft(store.id, { dirty, reset, save: persist });
 
   function reset() {
     setTimezone(saved.timezone);
@@ -113,14 +123,8 @@ export function StoreScheduleForm({
 
   const copySource = DOWS.find((d) => hours[d] != null);
 
-  return (
-    <form
-      className="flex flex-col gap-4"
-      onSubmit={(e) => {
-        e.preventDefault();
-        void save();
-      }}
-    >
+  const fields = (
+    <div className="flex flex-col gap-4">
       <FormField
         label="Fuso horário"
         hint={(() => {
@@ -197,12 +201,24 @@ export function StoreScheduleForm({
           </button>
         )}
       </FormField>
-      {canEdit && <FormActions dirty={dirty} saving={saving} onReset={reset} />}
+      {canEdit && !scope && <FormActions dirty={dirty} saving={saving} onReset={reset} />}
+    </div>
+  );
+
+  if (scope) return fields;
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        void save();
+      }}
+    >
+      {fields}
     </form>
   );
 }
 
-const HOURS_TIP = "O horário é usado nas atualizações automáticas, nos gráficos por hora e na distribuição da meta do dia.";
+export const HOURS_TIP = "O horário é usado nas atualizações automáticas, nos gráficos por hora e na distribuição da meta do dia.";
 
 /** Fuso + horário. A Configurações e o detalhe da filial usam o mesmo bloco. */
 export function StoreHoursCard({
