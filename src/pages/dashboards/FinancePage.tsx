@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { paths } from "@/router/paths";
-import { Card, CardHeader, CardTitle, StatCard, DateRangePicker, PageHeader, Button, DataTable, Badge, type DataTableColumn } from "@/components/ui";
+import { Card, CardHeader, CardTitle, StatCard, DateRangePicker, PageHeader, Button, Badge, Pagination, ThSort, type SortDir } from "@/components/ui";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { AreaLineChart, DonutChart } from "@/components/charts";
 import { scopeFilterKey, useScope } from "@/pages/dashboard/useScope";
@@ -12,7 +12,6 @@ import {
   resolvePeriod,
   type FinanceAggInput,
   type FinanceKpi,
-  type MonthlyEvolutionRow,
   type FixedCostRow,
 } from "@/data/wedash/dashboard";
 import {
@@ -41,7 +40,8 @@ import { ReportHeader, useExportPdf } from "@/pages/dashboard/ReportHeader";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { FinanceSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
-import { brlCent, isoToDate, labelUpper, deltaTip } from "@/lib/format";
+import { brlCent, isoToDate, labelUpper, deltaTip, num } from "@/lib/format";
+import { usePagedRows } from "@/lib/usePagedRows";
 import { cn } from "@/lib/cn";
 import { QuickStat } from "@/pages/dashboards/QuickStat";
 import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePicker";
@@ -110,58 +110,7 @@ const KPI_COLORS = [
   { iconColor: "var(--info)", iconBg: "rgba(59,130,246,0.12)" },
 ];
 
-const monthlyEvolutionColumns: DataTableColumn<MonthlyEvolutionRow>[] = [
-  {
-    key: "month",
-    header: "Mês",
-    sortable: true,
-    sortValue: (r) => r.label,
-    render: (r) => <span className="font-bold text-t0">{r.label}</span>,
-  },
-  {
-    key: "revenue",
-    header: "Faturamento",
-    align: "right",
-    sortable: true,
-    sortValue: (r) => r.revenue,
-    render: (r) => <span className="font-semibold tabular-nums">{brlCent(r.revenue)}</span>,
-  },
-  {
-    key: "cmv",
-    header: "CMV",
-    align: "right",
-    hideBelow: "sm",
-    sortable: true,
-    sortValue: (r) => r.cost,
-    render: (r) => <span className="tabular-nums text-t1">{brlCent(r.cost)}</span>,
-  },
-  {
-    key: "profit",
-    header: "Lucro bruto",
-    align: "right",
-    sortable: true,
-    sortValue: (r) => r.profit,
-    render: (r) => <span className="font-extrabold tabular-nums text-ok">{brlCent(r.profit)}</span>,
-  },
-  {
-    key: "margin",
-    header: "Margem",
-    align: "right",
-    hideBelow: "md",
-    sortable: true,
-    sortValue: (r) => r.marginPct,
-    render: (r) => <span className="tabular-nums text-t1">{r.marginPct.toFixed(1)}%</span>,
-  },
-  {
-    key: "ticket",
-    header: "Ticket médio",
-    align: "right",
-    hideBelow: "md",
-    sortable: true,
-    sortValue: (r) => r.averageTicket,
-    render: (r) => <span className="tabular-nums text-t1">{brlCent(r.averageTicket)}</span>,
-  },
-];
+type EvoSort = "month" | "revenue" | "cost" | "profit" | "margin" | "ticket";
 
 /** Hierarquia visual no padrao Income statement (ProfitLoss). */
 function costRowStyle(line: FixedCostRow): { bold: boolean; indent: boolean; color?: string; text: string } {
@@ -193,6 +142,8 @@ export default function FinancePage() {
   const { pending, showSkeleton, settle } = useFilterSkeleton(filterKey);
   // Catalogo de lojas (horario/custos) hidratado depois do 1 render  ->  recalcula.
   const [storesTick, setStoresTick] = useState(0);
+  const [evoSort, setEvoSort] = useState<EvoSort>("month");
+  const [evoDir, setEvoDir] = useState<SortDir>("asc");
   useEffect(() => {
     const onStores = () => setStoresTick((n) => n + 1);
     window.addEventListener("wedash:stores", onStores);
@@ -253,6 +204,52 @@ export default function FinancePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [scope, aggs, storesTick],
   );
+
+  const evoRows = useMemo(() => {
+    const rows = view.monthlyEvolution.map((r, order) => ({ ...r, order }));
+    const dir = evoDir === "asc" ? 1 : -1;
+    const value = (r: (typeof rows)[number]) => {
+      if (evoSort === "month") return r.order;
+      if (evoSort === "revenue") return r.revenue;
+      if (evoSort === "cost") return r.cost;
+      if (evoSort === "profit") return r.profit;
+      if (evoSort === "margin") return r.marginPct;
+      return r.averageTicket;
+    };
+    return [...rows].sort((a, b) => (value(a) - value(b)) * dir || a.order - b.order);
+  }, [view.monthlyEvolution, evoSort, evoDir]);
+
+  const evoTotal = useMemo(() => {
+    let revenue = 0;
+    let cost = 0;
+    let profit = 0;
+    let sales = 0;
+    for (const r of view.monthlyEvolution) {
+      revenue += r.revenue;
+      cost += r.cost;
+      profit += r.profit;
+      sales += r.salesCount;
+    }
+    return {
+      count: view.monthlyEvolution.length,
+      revenue,
+      cost,
+      profit,
+      marginPct: revenue > 0 ? (profit / revenue) * 100 : 0,
+      averageTicket: sales > 0 ? revenue / sales : 0,
+    };
+  }, [view.monthlyEvolution]);
+
+  const evoPage = usePagedRows(evoRows, `${filterKey}|${evoSort}|${evoDir}`);
+
+  function toggleEvoSort(key: EvoSort) {
+    if (evoSort === key) {
+      setEvoDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setEvoSort(key);
+      setEvoDir(key === "month" ? "asc" : "desc");
+    }
+  }
 
   // Resolve o DateRange a partir do escopo  -  sempre mostra algo selecionado.
   const dateRange = useMemo(() => dateRangeFromPeriod(scope.period), [scope.period]);
@@ -498,11 +495,11 @@ export default function FinancePage() {
           ) : view.franchiseFixedCosts.every((l) => l.amount === 0) ? (
             <EmptyBlock />
           ) : (
-          <div className="px-4 pb-4">
+          <div className="px-4">
             {view.franchiseFixedCosts.map((line) => {
               const estilo = costRowStyle(line);
               return (
-                <div key={line.label} className="flex items-center justify-between border-b border-line py-3 last:border-b-0">
+                <div key={line.label} className="flex items-center justify-between border-b border-line py-3">
                   <span
                     className={cn(
                       estilo.bold ? "text-sm font-extrabold text-t0" : "text-[13px] font-semibold",
@@ -520,6 +517,11 @@ export default function FinancePage() {
                 </div>
               );
             })}
+            <FilterTotal
+              tip="Soma os custos da operação no período. Lucro bruto e resultado ficam de fora dessa soma."
+              count={countNoun(costLines(view.franchiseFixedCosts).length, "custo", "custos")}
+              value={`−${brlCent(costLines(view.franchiseFixedCosts).reduce((s, l) => s + l.amount, 0))}`}
+            />
           </div>
           )}
         </Card>
@@ -532,9 +534,10 @@ export default function FinancePage() {
             <EmptyBlock />
           ) : (
             (() => {
-              const total = view.paymentMethods.reduce((s, f) => s + f.amount, 0) || 1;
+              const sum = view.paymentMethods.reduce((s, f) => s + f.amount, 0);
+              const total = sum || 1;
               return (
-                <div className="flex flex-1 flex-col justify-center px-4 pb-4">
+                <div className="flex flex-1 flex-col justify-center px-4">
                   <div className="mx-auto my-2">
                     <DonutChart
                       segments={view.paymentMethods.map((f) => ({
@@ -543,7 +546,7 @@ export default function FinancePage() {
                         color: f.color,
                       }))}
                       centerLabel="Total"
-                      centerValue={brlCent(total)}
+                      centerValue={brlCent(sum)}
                     />
                   </div>
                   <div className="mt-2 flex flex-col gap-2">
@@ -559,6 +562,11 @@ export default function FinancePage() {
                       );
                     })}
                   </div>
+                  <FilterTotal
+                    tip="Soma todas as formas de pagamento do período."
+                    count={countNoun(view.paymentMethods.length, "forma", "formas")}
+                    value={brlCent(sum)}
+                  />
                 </div>
               );
             })()
@@ -574,9 +582,10 @@ export default function FinancePage() {
               <EmptyBlock />
             ) : (
               (() => {
-                const total = view.revenueByBrand.reduce((s, m) => s + m.amount, 0) || 1;
+                const sum = view.revenueByBrand.reduce((s, m) => s + m.amount, 0);
+                const total = sum || 1;
                 return (
-                  <div className="flex flex-1 flex-col justify-center px-4 pb-4">
+                  <div className="flex flex-1 flex-col justify-center px-4">
                     <div className="mx-auto my-2">
                       <DonutChart
                         segments={view.revenueByBrand.map((m) => ({
@@ -585,7 +594,7 @@ export default function FinancePage() {
                           color: m.color,
                         }))}
                         centerLabel="Total"
-                        centerValue={brlCent(total)}
+                        centerValue={brlCent(sum)}
                       />
                     </div>
                     <div className="mt-2 flex flex-col gap-2">
@@ -601,6 +610,11 @@ export default function FinancePage() {
                         );
                       })}
                     </div>
+                    <FilterTotal
+                      tip="Soma o faturamento das marcas no período."
+                      count={countNoun(view.revenueByBrand.length, "marca", "marcas")}
+                      value={brlCent(sum)}
+                    />
                   </div>
                 );
               })()
@@ -609,58 +623,75 @@ export default function FinancePage() {
         )}
       </div>
 
-      {/* Evolucao Mensal  -  so com periodo por mes (>31 dias); DataTable (desktop) + cards (mobile) */}
+      {/* Evolucao mensal: mesma lista do Estoque (tabela + Total do filtro), no celular tambem. */}
       {view.showMonthlyEvolution && (
-      <Card className="mt-4" padding="none">
-        <div className="flex items-center gap-1.5 px-5 py-4">
-          <div>
-            <CardTitle>Evolução mensal</CardTitle>
-            {view.monthlyEvolution.length > 0 && (
-              <p className="mt-0.5 text-[11px] font-semibold text-t2">{view.monthlyEvolutionLabel}</p>
-            )}
-          </div>
+      <Card className="mt-4 flex flex-col">
+        <div className="mb-4">
+          <CardTitle>Evolução mensal</CardTitle>
+          {view.monthlyEvolution.length > 0 && (
+            <p className="mt-0.5 text-[11px] font-semibold text-t2">{view.monthlyEvolutionLabel}</p>
+          )}
         </div>
 
         {view.monthlyEvolution.length === 0 ? (
           <EmptyBlock />
         ) : (
         <>
-        {/* Desktop / tablet  -  DataTable Vela */}
-        <div className="hidden p-4 md:block">
-          <DataTable columns={monthlyEvolutionColumns} data={view.monthlyEvolution} rowKey={(r) => r.label} paginate="meses" />
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-line text-[11px] tracking-wide text-t2">
+                <th className="w-11 whitespace-nowrap px-1 pb-3 text-center font-bold">#</th>
+                <ThSort label="Mês" active={evoSort === "month"} dir={evoDir} onClick={() => toggleEvoSort("month")} align="left" className="px-1 pb-3" />
+                <ThSort label="Faturamento" active={evoSort === "revenue"} dir={evoDir} onClick={() => toggleEvoSort("revenue")} className="px-1 pb-3" />
+                <ThSort label="CMV" active={evoSort === "cost"} dir={evoDir} onClick={() => toggleEvoSort("cost")} className="px-1 pb-3" />
+                <ThSort label="Lucro bruto" active={evoSort === "profit"} dir={evoDir} onClick={() => toggleEvoSort("profit")} className="px-1 pb-3" />
+                <ThSort label="Margem" active={evoSort === "margin"} dir={evoDir} onClick={() => toggleEvoSort("margin")} className="px-1 pb-3" />
+                <ThSort label="Ticket médio" active={evoSort === "ticket"} dir={evoDir} onClick={() => toggleEvoSort("ticket")} className="px-1 pb-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {evoPage.pageRows.map((line, i) => {
+                const idx = (evoPage.page - 1) * evoPage.pageSize + i;
+                return (
+                  <tr key={line.label} className="border-b border-line">
+                    <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
+                    <td className="px-1 py-3 text-[13px] font-bold text-t0">{line.label}</td>
+                    <td className="px-1 py-3 text-right"><Mono v={brlCent(line.revenue)} /></td>
+                    <td className="px-1 py-3 text-right"><Mono v={brlCent(line.cost)} /></td>
+                    <td className="px-1 py-3 text-right"><Mono v={brlCent(line.profit)} tone={line.profit < 0 ? "text-bad" : "text-ok"} /></td>
+                    <td className="px-1 py-3 text-right"><Mono v={`${line.marginPct.toFixed(1)}%`} /></td>
+                    <td className="px-1 py-3 text-right"><Mono v={brlCent(line.averageTicket)} /></td>
+                  </tr>
+                );
+              })}
+              <tr className="bg-bg-inset">
+                <td />
+                <td className="px-1 py-3 text-[13px] font-extrabold text-t0">
+                  <span className="inline-flex items-center gap-1">
+                    Total do filtro
+                    <TipHelp label="Soma todos os meses da evolução, inclusive os que não aparecem nesta página." />
+                  </span>
+                  <span className="mt-0.5 block text-[11px] font-semibold text-t2">
+                    {countNoun(evoTotal.count, "mês", "meses")}
+                  </span>
+                </td>
+                <td className="px-1 py-3 text-right"><Mono v={brlCent(evoTotal.revenue)} total /></td>
+                <td className="px-1 py-3 text-right"><Mono v={brlCent(evoTotal.cost)} total /></td>
+                <td className="px-1 py-3 text-right">
+                  <Mono v={brlCent(evoTotal.profit)} total tone={evoTotal.profit < 0 ? "text-bad" : "text-ok"} />
+                </td>
+                <td className="px-1 py-3 text-right"><Mono v={`${evoTotal.marginPct.toFixed(1)}%`} total /></td>
+                <td className="px-1 py-3 text-right"><Mono v={brlCent(evoTotal.averageTicket)} total /></td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-
-        {/* Mobile  -  stack em cards (padrao Responsive Tables) */}
-        <div className="flex flex-col gap-2.5 p-3.5 md:hidden">
-          {view.monthlyEvolution.map((line) => (
-              <div key={line.label} className="rounded-xl border border-line bg-bg-inset p-3.5">
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <p className="text-[13.5px] font-bold text-t0">{line.label}</p>
-                  <div className="text-right">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-t2">Lucro bruto</p>
-                    <span className="text-[13px] font-extrabold tabular-nums text-ok">{brlCent(line.profit)}</span>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-x-3 gap-y-2 border-t border-line pt-2.5 text-[11.5px]">
-                  <div className="flex justify-between gap-2">
-                    <span className="text-t2">Faturamento</span>
-                    <span className="font-semibold tabular-nums text-t0">{brlCent(line.revenue)}</span>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <span className="text-t2">CMV</span>
-                    <span className="font-semibold tabular-nums text-t0">{brlCent(line.cost)}</span>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <span className="text-t2">Margem</span>
-                    <span className="font-semibold tabular-nums text-t0">{line.marginPct.toFixed(1)}%</span>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <span className="text-t2">Ticket médio</span>
-                    <span className="font-semibold tabular-nums text-t0">{brlCent(line.averageTicket)}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
+          <span className="text-[12.5px] text-t2">
+            Mostrando {evoPage.pageRows.length} de {countNoun(evoTotal.count, "mês", "meses")}
+          </span>
+          {evoPage.totalPages > 1 && <Pagination page={evoPage.page} totalPages={evoPage.totalPages} onChange={evoPage.setPage} />}
         </div>
         </>
         )}
@@ -670,6 +701,33 @@ export default function FinancePage() {
       )}
     </div>
   );
+}
+
+function costLines(rows: FixedCostRow[]) {
+  return rows.filter((l) => !l.isTotal && !l.isResult && l.label !== "Lucro bruto");
+}
+
+function countNoun(n: number, one: string, many: string) {
+  return `${num(n)} ${n === 1 ? one : many}`;
+}
+
+function FilterTotal({ tip, count, value }: { tip: string; count: string; value: string }) {
+  return (
+    <div className="-mx-4 mt-1 flex items-center justify-between gap-3 bg-bg-inset px-4 py-3">
+      <div className="min-w-0 text-[13px] font-extrabold text-t0">
+        <span className="inline-flex items-center gap-1">
+          Total do filtro
+          <TipHelp label={tip} />
+        </span>
+        <span className="mt-0.5 block text-[11px] font-semibold text-t2">{count}</span>
+      </div>
+      <span className="shrink-0 font-mono text-[13px] font-extrabold tabular-nums text-t0">{value}</span>
+    </div>
+  );
+}
+
+function Mono({ v, total = false, tone = "text-t0" }: { v: string; total?: boolean; tone?: string }) {
+  return <span className={cn("whitespace-nowrap font-mono text-[13px] tabular-nums", total ? "font-extrabold" : "font-bold", tone)}>{v}</span>;
 }
 
 /** StatCard wrapper com tooltip ? e sparkline de tendencia. */

@@ -1493,6 +1493,8 @@ export interface MonthlyEvolutionRow {
   profit: number;
   marginPct: number;
   averageTicket: number;
+  /** Vendas do mês. O ticket do total é faturamento / vendas, não a média dos tickets. */
+  salesCount: number;
 }
 
 export interface RevenueByBrand {
@@ -1944,6 +1946,7 @@ export function buildFinanceView(scope: Scope, aggs?: FinanceAggInput | null): F
       profit: profit,
       marginPct: divSeguro(profit, agg.revenue) * 100,
       averageTicket: divSeguro(agg.revenue, agg.salesCount),
+      salesCount: agg.salesCount,
     };
   });
 
@@ -2462,6 +2465,7 @@ export function buildFinanceViewFromAggs(scope: Scope, input: FinanceAggInput): 
         profit: profit,
         marginPct: divSeguro(profit, l.rev) * 100,
         averageTicket: divSeguro(l.rev, l.sales),
+        salesCount: l.sales,
       };
     })
     .filter((r) => r.revenue > 0);
