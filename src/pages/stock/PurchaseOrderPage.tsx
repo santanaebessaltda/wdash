@@ -606,7 +606,7 @@ export function PurchaseOrderPage() {
                               group.branches.map((branch) => (
                                 <tr key={`${branch.storeId}:${branch.code}`} className={cn("border-b border-line", branch.onOrder ? "bg-warn-soft" : "bg-bg-inset")}>
                                   <td />
-                                  <td className={cn("px-1 py-2.5 pl-16", !branch.onOrder && "border-l-2 border-l-line-2")}>
+                                  <td className={cn("border-l-2 px-1 py-2.5 pl-16", branch.onOrder ? "border-l-warn" : "border-l-line-2")}>
                                     <p className="break-words text-[12.5px] font-semibold leading-5 text-t1">{branch.storeName}</p>
                                   </td>
                                   <td className="px-1 py-2 text-right">
