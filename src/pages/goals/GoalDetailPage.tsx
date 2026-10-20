@@ -3,7 +3,6 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Badge, Breadcrumbs, Button, Card, CardTitle, progressTextClass } from "@/components/ui";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { DuplicateChoiceModal } from "@/components/wedash/DuplicateChoiceModal";
-import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
 import { GoalDetailSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { goalWeightFrom } from "@/data/wedash/engine/goalProjection";
@@ -294,11 +293,9 @@ function GoalHero({
             <h1 className="text-xl font-extrabold text-t0 sm:text-[22px]">{goal.name}</h1>
             <Badge variant={statusBadgeVariant(GOAL_STATUS_LABEL[status])} className="uppercase">{GOAL_STATUS_LABEL[status]}</Badge>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Badge variant="neutral" className="uppercase">
-              {fullDate(goal.startsOn)} a {fullDate(goal.endsOn)}
-            </Badge>
-            {storeNameValue ? <StoreDivisionTitle className="max-w-full min-w-0 self-center">{storeNameValue}</StoreDivisionTitle> : null}
+          <p className="text-[12.5px] text-t2">{fullDate(goal.startsOn)} a {fullDate(goal.endsOn)}</p>
+          {storeNameValue ? <p className="mt-0.5 text-[12.5px] text-t2">{storeNameValue}</p> : null}
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <Badge variant="neutral" className="uppercase">{MODO_LABEL[goal.tierMode]}</Badge>
             <TipHelp label={AJUDA_MODO[goal.tierMode]} />
           </div>
