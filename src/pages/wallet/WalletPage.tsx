@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Alert, Badge, Button, Card, CardTitle, Checkbox, DateRangePicker, Dropdown, Modal, PageHeader, Pagination, Segmented, Skeleton, StatCard, ThSort, Tooltip, CALENDAR_QUICK_RANGES, type DatePresetId, type DateRangeChangeMeta, type SortDir } from "@/components/ui";
+import { Alert, Badge, Button, Card, CardTitle, DateRangePicker, Modal, PageHeader, Pagination, Skeleton, StatCard, ThSort, Tooltip, CALENDAR_QUICK_RANGES, type DatePresetId, type DateRangeChangeMeta, type SortDir } from "@/components/ui";
+import { ExportDialog } from "@/components/wedash/ExportDialog";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { WedashBrand } from "@/components/wedash/WedashBrand";
 import { calendarTodayIso } from "@/data/wedash/clock";
@@ -22,6 +23,7 @@ import { CheckCircleIcon, FlameIcon, TargetIcon, TrophyIcon } from "@/pages/dash
 import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { fetchStoreSellers, type Store } from "@/data/wedash/stores";
 import { matchesCodeOrName } from "@/lib/personSearch";
+import { buildXlsx, type XlsxCell } from "@/lib/xlsx";
 import { HeaderFilters } from "@/pages/stock/shared";
 
 const money = (cents: number) => brlCent(cents / 100);
@@ -263,7 +265,7 @@ function UnassignedShortage({ blocks, showStore }: { blocks: ShortageBlock[]; sh
   );
 }
 
-type PeopleSort = "name" | "earnings" | "withdrawal" | "shortage" | "balance";
+type PeopleSort = "name" | "store" | "earnings" | "withdrawal" | "shortage" | "balance";
 
 const peopleSearchClass =
   "h-8 rounded-[var(--radius-vela-sm)] border border-line bg-bg-3 px-3 text-xs font-semibold text-t0 transition-colors hover:border-acc focus:border-acc focus:outline-none";
@@ -297,7 +299,9 @@ function PeopleList({
       const cmp =
         sortKey === "name"
           ? a.name.localeCompare(b.name, "pt-BR") || a.storeName.localeCompare(b.storeName, "pt-BR")
-          : peopleValue(a, sortKey) - peopleValue(b, sortKey);
+          : sortKey === "store"
+            ? a.storeName.localeCompare(b.storeName, "pt-BR") || a.name.localeCompare(b.name, "pt-BR")
+            : peopleValue(a, sortKey) - peopleValue(b, sortKey);
       return cmp * dir || a.name.localeCompare(b.name, "pt-BR");
     });
   }, [rows, codes, search, sortKey, sortDir]);
@@ -318,14 +322,15 @@ function PeopleList({
       return;
     }
     setSortKey(key);
-    setSortDir(key === "name" ? "asc" : "desc");
-  }
-
-  if (rows.length === 0) {
-    return <EmptyBlock icon="👛" title="Nada neste período" description="Não há premiação, desafio, retirada ou quebra neste período." />;
+    setSortDir(key === "name" || key === "store" ? "asc" : "desc");
   }
 
   return (
+    <Card className="print-flow flex min-w-0 flex-col" padding="lg">
+      <CardTitle className="mb-4">Pessoas</CardTitle>
+      {rows.length === 0 ? (
+        <EmptyBlock icon="👛" title="Nada neste período" description="Não há premiação, desafio, retirada ou quebra neste período." />
+      ) : (
     <div className="flex flex-col">
       <div className="mb-4 flex flex-wrap items-center gap-2 sm:justify-end print:hidden">
         <input
@@ -353,6 +358,7 @@ function PeopleList({
             <thead>
               <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
                 <ThSort label="Nome" active={sortKey === "name"} dir={sortDir} onClick={() => toggleSort("name")} align="left" className="px-1 pb-3" />
+                {showStore ? <ThSort label="Filial" active={sortKey === "store"} dir={sortDir} onClick={() => toggleSort("store")} align="left" className="px-1 pb-3" /> : null}
                 <ThSort label="Ganhos" active={sortKey === "earnings"} dir={sortDir} onClick={() => toggleSort("earnings")} className="px-1 pb-3" />
                 <ThSort label="Retiradas" active={sortKey === "withdrawal"} dir={sortDir} onClick={() => toggleSort("withdrawal")} className="px-1 pb-3" />
                 <ThSort label="Quebra" active={sortKey === "shortage"} dir={sortDir} onClick={() => toggleSort("shortage")} className="px-1 pb-3" />
@@ -377,10 +383,10 @@ function PeopleList({
                       <PersonAvatar name={row.name} storeId={row.storeId} size="sm" />
                       <div className="min-w-0">
                         <p className="truncate text-[13px] font-bold text-t0">{row.name}</p>
-                        {showStore ? <p className="truncate text-[11px] text-t2">{row.storeName}</p> : null}
                       </div>
                     </div>
                   </td>
+                  {showStore ? <td className="px-1 py-3 text-[13px] text-t1">{row.storeName}</td> : null}
                   <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{money(earningsOf(row))}</td>
                   <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{minusMoney(row.withdrawalCents)}</td>
                   <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{minusMoney(row.shortageCents)}</td>
@@ -394,6 +400,7 @@ function PeopleList({
                     {num(sorted.length)} {sorted.length === 1 ? "pessoa" : "pessoas"}
                   </span>
                 </td>
+                {showStore ? <td /> : null}
                 <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{money(total.earnings)}</td>
                 <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{minusMoney(total.withdrawal)}</td>
                 <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{minusMoney(total.shortage)}</td>
@@ -412,6 +419,8 @@ function PeopleList({
         </div>
       ) : null}
     </div>
+      )}
+    </Card>
   );
 }
 
@@ -756,43 +765,42 @@ function periodFile(from: string, to: string, presetId: DatePresetId | null): st
   return preset ? `${preset} · ${datas}` : datas;
 }
 
-function csvMoney(cents: number): string {
-  return (cents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function csvCell(value: string): string {
-  return /[;"\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
-}
-
 function fileStore(stores: Store[], all: boolean): string {
   if (stores.length === 1) return [stores[0]!.branchCode.trim(), storeLabel(stores[0]!)].filter(Boolean).join(" ");
   if (all) return "Todas as filiais";
   return stores.length <= 3 ? stores.map(storeLabel).join(", ") : `${stores.length} filiais`;
 }
 
-function downloadCsv(rows: PersonRow[], showStore: boolean, fileName: string) {
-  const header = [...(showStore ? ["Filial"] : []), "Pessoa", "Ganhos", "Retiradas", "Quebra", "Saldo"];
-  const body = rows.map((row) =>
-    [...(showStore ? [row.storeName] : []), row.name, csvMoney(earningsOf(row)), csvMoney(row.withdrawalCents), csvMoney(row.shortageCents), csvMoney(row.balanceCents)]
-      .map(csvCell)
-      .join(";"),
-  );
-  const total = [
+function reais(cents: number): number {
+  return Math.round(cents) / 100;
+}
+
+function downloadXlsx(rows: PersonRow[], showStore: boolean, fileName: string) {
+  const header: XlsxCell[] = ["Nome", ...(showStore ? ["Filial"] : []), "Ganhos", "Retiradas", "Quebra", "Saldo"];
+  const body = rows.map((row) => [
+    row.name,
+    ...(showStore ? [row.storeName] : []),
+    reais(earningsOf(row)),
+    reais(row.withdrawalCents),
+    reais(row.shortageCents),
+    reais(row.balanceCents),
+  ]);
+  const total: XlsxCell[] = [
+    "Total do filtro",
     ...(showStore ? [""] : []),
-    "Total",
-    csvMoney(rows.reduce((sum, row) => sum + earningsOf(row), 0)),
-    csvMoney(rows.reduce((sum, row) => sum + row.withdrawalCents, 0)),
-    csvMoney(rows.reduce((sum, row) => sum + row.shortageCents, 0)),
-    csvMoney(rows.reduce((sum, row) => sum + row.balanceCents, 0)),
-  ]
-    .map(csvCell)
-    .join(";");
-  const blob = new Blob([`\uFEFF${[header.join(";"), ...body, total].join("\r\n")}`], { type: "text/csv;charset=utf-8" });
+    reais(rows.reduce((sum, row) => sum + earningsOf(row), 0)),
+    reais(rows.reduce((sum, row) => sum + row.withdrawalCents, 0)),
+    reais(rows.reduce((sum, row) => sum + row.shortageCents, 0)),
+    reais(rows.reduce((sum, row) => sum + row.balanceCents, 0)),
+  ];
+  const sheet = rows.length === 0 ? [header] : [header, ...body, total];
+  const bytes = buildXlsx(sheet, { textColumns: showStore ? [0, 1] : [0], sheetName: "Carteira" });
+  const blob = new Blob([bytes as BlobPart], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const safeName = fileName.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim();
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = safeName.endsWith(".csv") ? safeName : `${safeName}.csv`;
+  link.download = safeName.endsWith(".xlsx") ? safeName : `${safeName}.xlsx`;
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -822,99 +830,6 @@ function WalletPrintHeader({ stores, all, period }: { stores: Store[]; all: bool
         </p>
       </div>
     </div>
-  );
-}
-
-function ExportMenu({
-  stores,
-  disabled,
-  onCsv,
-  onPdf,
-}: {
-  stores: Store[];
-  disabled: boolean;
-  onCsv: (ids: string[]) => void;
-  onPdf: (ids: string[]) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [scope, setScope] = useState<"all" | "pick">("all");
-  const [ids, setIds] = useState<string[]>([]);
-  const many = stores.length > 1;
-  function openStores() {
-    setScope("all");
-    setIds([]);
-    setOpen(true);
-  }
-
-  function toggle(id: string) {
-    setIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
-  }
-
-  if (!many) {
-    const only = stores.map((store) => store.id);
-    return (
-      <Dropdown
-        align="right"
-        portal
-        trigger={
-          <Button type="button" variant="primary" disabled={disabled || stores.length === 0}>
-            Exportar
-          </Button>
-        }
-        items={[
-          { label: "CSV", onClick: () => onCsv(only) },
-          { label: "PDF", onClick: () => onPdf(only) },
-        ]}
-      />
-    );
-  }
-
-  const chosen = scope === "all" ? stores.map((store) => store.id) : ids;
-  const pickedLabel = chosen.length === 1 ? "1 filial" : `${chosen.length} filiais`;
-  return (
-    <>
-      <Button type="button" variant="primary" disabled={disabled} onClick={openStores}>
-        Exportar
-      </Button>
-      <Modal
-        open={open}
-        onClose={() => setOpen(false)}
-        size="sm"
-        title="Exportar"
-        footer={
-          <>
-            <Button type="button" variant="outline" disabled={chosen.length === 0} onClick={() => { onCsv(chosen); setOpen(false); }}>
-              CSV
-            </Button>
-            <Button type="button" variant="primary" disabled={chosen.length === 0} onClick={() => { onPdf(chosen); setOpen(false); }}>
-              PDF
-            </Button>
-          </>
-        }
-      >
-        <p className="mb-3 text-[13px] text-t1">Todas as filiais, ou só as que você marcar. O arquivo usa o período desta tela.</p>
-        <Segmented
-          options={[
-            { value: "all", label: "Todas" },
-            { value: "pick", label: "Escolher filiais" },
-          ]}
-          value={scope}
-          onChange={(next) => {
-            if (next) setScope(next);
-          }}
-        />
-        {scope === "pick" ? (
-          <div className="mt-3 flex max-h-64 flex-col gap-2.5 overflow-y-auto">
-            {stores.map((store) => (
-              <Checkbox key={store.id} label={storeLabel(store)} checked={ids.includes(store.id)} onChange={() => toggle(store.id)} />
-            ))}
-          </div>
-        ) : (
-          <p className="mt-3 text-[13px] text-t2">O arquivo inclui todas as filiais desta tela.</p>
-        )}
-        <p className="mt-3 text-[12.5px] font-semibold text-t2">{chosen.length === 0 ? "Marque ao menos uma filial." : pickedLabel}</p>
-      </Modal>
-    </>
   );
 }
 
@@ -1031,17 +946,16 @@ export function BranchWalletPage() {
     exportPdf(["Carteira", fileStore(picked, all), period]);
   }, [pdfQueued, printIds, storeRows, session.stores.length, period]);
 
-  function exportCsv(ids: string[]) {
-    const picked = (branches ?? []).filter((branch) => ids.includes(branch.store.id));
-    const pickedRows = peopleOf(picked);
-    const stores = storeRows.filter((store) => ids.includes(store.id));
-    const all = stores.length > 1 && stores.length === session.stores.length;
-    downloadCsv(pickedRows, stores.length > 1, `WDash - Carteira - ${fileStore(stores, all)} - ${period}.csv`);
+  function exportXlsx() {
+    const picked = branches ?? [];
+    const many = picked.length > 1;
+    const all = many && picked.length === session.stores.length;
+    downloadXlsx(peopleOf(picked), many, `WDash - Carteira - ${fileStore(picked.map((branch) => branch.store), all)} - ${period}.xlsx`);
   }
 
-  function exportPdfOf(ids: string[]) {
+  function exportPdfOf() {
     pdfOnce.current = false;
-    setPrintIds(ids);
+    setPrintIds(storeRows.map((store) => store.id));
     setPdfQueued(true);
   }
 
@@ -1060,7 +974,16 @@ export function BranchWalletPage() {
             floor={floor}
             presetId={presetId}
             onChange={change}
-            extra={<ExportMenu stores={storeRows} disabled={!branches || loading} onCsv={exportCsv} onPdf={exportPdfOf} />}
+            extra={
+              <ExportDialog
+                formats={["pdf", "xlsx"]}
+                disabled={!branches || loading || storeRows.length === 0}
+                onExport={(format) => {
+                  if (format === "pdf") exportPdfOf();
+                  else exportXlsx();
+                }}
+              />
+            }
           />
         }
       />
