@@ -439,8 +439,8 @@ export function PurchaseOrderPage() {
                 <thead>
                   <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
                     <th className="px-1 pb-3 text-left font-bold">#</th>
-                    {manyStores && <ThSort label="Filial" active={sortKey === "store"} dir={sortDir} onClick={() => toggleSort("store")} align="left" className="px-1 pb-3" />}
                     <ThSort label="Produto" active={sortKey === "name"} dir={sortDir} onClick={() => toggleSort("name")} align="left" className="px-1 pb-3" />
+                    {manyStores && <ThSort label="Filial" active={sortKey === "store"} dir={sortDir} onClick={() => toggleSort("store")} align="left" className="px-1 pb-3" />}
                     <ThSort label="Mínimo" active={sortKey === "minimo"} dir={sortDir} onClick={() => toggleSort("minimo")} className="px-1 pb-3" />
                     {NUM_COLS.map((c) => (
                       <ThSort
@@ -464,7 +464,6 @@ export function PurchaseOrderPage() {
                     return (
                       <tr key={`${r.storeId}:${r.code}`} className={cn("border-b border-line", r.onOrder && "bg-warn-soft")}>
                         <td className={cn("px-1 py-3 text-center text-[13px] font-extrabold text-t2", r.onOrder && "shadow-[inset_3px_0_0_var(--warn)]")}>{idx + 1}</td>
-                        {manyStores && <td className="px-1 py-3 text-[13px] font-semibold text-t0">{r.storeName}</td>}
                         <td className="px-1 py-3">
                           <ProductNameCell
                             name={r.name}
@@ -478,6 +477,7 @@ export function PurchaseOrderPage() {
                             }
                           />
                         </td>
+                        {manyStores && <td className="px-1 py-3 text-[13px] font-semibold text-t0">{r.storeName}</td>}
                         <td className="px-1 py-2 text-right">
                           {!r.canRequest ? (
                             <span className="inline-block w-20 pr-2 text-right font-mono text-[13px] font-bold text-t2">{r.minimum == null ? "—" : r.minimum}</span>
@@ -504,7 +504,6 @@ export function PurchaseOrderPage() {
                   })}
                   <tr className="bg-bg-inset">
                     <td />
-                    {manyStores && <td />}
                     <td className="px-1 py-3 text-[13px] font-extrabold text-t0">
                       <span className="inline-flex items-center gap-1">
                         Total do filtro
@@ -514,6 +513,7 @@ export function PurchaseOrderPage() {
                         {num(lines.length)} produto{lines.length === 1 ? "" : "s"}
                       </span>
                     </td>
+                    {manyStores && <td />}
                     <td />
                     <td className="px-1 py-3 text-right">
                       <Qty v={totais.saldo} total />
