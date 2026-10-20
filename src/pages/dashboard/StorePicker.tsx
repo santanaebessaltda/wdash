@@ -1,8 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { Checkbox } from "@/components/ui";
 import { storeListSubtitle, type Store } from "@/data/wedash/stores";
 import type { Scope } from "@/data/wedash/dashboard";
 import { cn } from "@/lib/cn";
+
+function CheckIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" aria-hidden>
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
 
 /**
  * Seletor de loja no Topbar. Fantasia + CNPJ, sem ícone.
@@ -11,12 +18,9 @@ import { cn } from "@/lib/cn";
 export function StorePicker({ scope, onChange, minhas }: { scope: Scope; onChange: (e: Scope) => void; minhas: Store[] }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const allRef = useRef<HTMLInputElement>(null);
   const many = minhas.length > 1;
   const isAll = many && (scope.storeIds.length === 0 || scope.storeIds.length >= minhas.length);
-  const picked = isAll ? minhas : minhas.filter((store) => scope.storeIds.includes(store.id));
-  const allOn = many && picked.length === minhas.length;
-  const some = many && picked.length > 0 && !allOn;
+  const picked = isAll ? [] : minhas.filter((store) => scope.storeIds.includes(store.id));
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -26,17 +30,21 @@ export function StorePicker({ scope, onChange, minhas }: { scope: Scope; onChang
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  useEffect(() => {
-    if (allRef.current) allRef.current.indeterminate = some;
-  }, [some, open]);
-
   function apply(ids: string[]) {
     onChange({ ...scope, storeIds: ids.length === 0 || ids.length >= minhas.length ? [] : ids });
   }
 
-  function toggleStore(id: string) {
-    const current = isAll ? minhas.map((store) => store.id) : picked.map((store) => store.id);
-    const next = current.includes(id) ? current.filter((item) => item !== id) : [...current, id];
+  function chooseStore(id: string) {
+    if (isAll) {
+      apply([id]);
+      return;
+    }
+    const ids = picked.map((store) => store.id);
+    if (!ids.includes(id)) {
+      apply([...ids, id]);
+      return;
+    }
+    const next = ids.filter((item) => item !== id);
     if (next.length === 0) return;
     apply(next);
   }
@@ -63,34 +71,39 @@ export function StorePicker({ scope, onChange, minhas }: { scope: Scope; onChang
 
       {open && many && (
         <div className="absolute left-0 top-full z-50 mt-1.5 max-h-80 w-full min-w-[260px] overflow-y-auto rounded-[12px] border border-line bg-bg-2 p-1.5 shadow-[var(--shadow-vela)]">
-          <Checkbox
-            ref={allRef}
-            checked={allOn}
-            onChange={() => apply([])}
-            className="w-full rounded-[9px] px-2.5 py-1.5 hover:bg-bg-3"
-            label={
-              <span className="min-w-0 leading-none">
-                <span className="block truncate text-[12px] font-bold uppercase leading-tight">Todas as filiais</span>
-                <span className="mt-0.5 block truncate text-[10px] font-normal uppercase leading-tight text-t2">Rede consolidada</span>
-              </span>
-            }
-          />
+          <button
+            type="button"
+            onClick={() => apply([])}
+            className={cn(
+              "flex w-full items-center gap-2 rounded-[9px] px-2.5 py-1 text-left transition-colors",
+              isAll ? "bg-acc-soft" : "hover:bg-bg-3",
+            )}
+          >
+            {isAll ? <CheckIcon /> : <span className="w-3.5 shrink-0" />}
+            <span className="min-w-0 flex-1 leading-none">
+              <span className={cn("block truncate text-[12px] font-bold uppercase leading-tight", isAll ? "text-acc" : "text-t0")}>Todas as filiais</span>
+              <span className="mt-0.5 block truncate text-[10px] uppercase leading-tight text-t2">Rede consolidada</span>
+            </span>
+          </button>
           <div className="my-1 h-px bg-line" />
           {minhas.map((store) => {
             const on = picked.some((item) => item.id === store.id);
             return (
-              <Checkbox
+              <button
                 key={store.id}
-                checked={on}
-                onChange={() => toggleStore(store.id)}
-                className="w-full items-start rounded-[9px] px-2.5 py-1.5 hover:bg-bg-3"
-                label={
-                  <span className="min-w-0 leading-none">
-                    <span className="block truncate text-[12px] font-bold uppercase leading-tight">{store.tradeName}</span>
-                    <span className="mt-0.5 block truncate text-[10px] font-normal leading-tight text-t2">{storeListSubtitle(store)}</span>
-                  </span>
-                }
-              />
+                type="button"
+                onClick={() => chooseStore(store.id)}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-[9px] px-2.5 py-1 text-left transition-colors",
+                  on ? "bg-acc-soft" : "hover:bg-bg-3",
+                )}
+              >
+                {on ? <CheckIcon /> : <span className="w-3.5 shrink-0" />}
+                <span className="min-w-0 flex-1 leading-none">
+                  <span className={cn("block truncate text-[12px] font-bold uppercase leading-tight", on ? "text-acc" : "text-t0")}>{store.tradeName}</span>
+                  <span className="mt-0.5 block truncate text-[10px] leading-tight text-t2">{storeListSubtitle(store)}</span>
+                </span>
+              </button>
             );
           })}
         </div>

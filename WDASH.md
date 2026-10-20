@@ -316,7 +316,7 @@ Pergunta: "Quais são meus 80/20? Estou perdendo venda por ruptura? O que descon
  - `storeIds`: `[]` = rede; `[id]` = uma loja; `[id, id]` = essas filiais (2026-10-20). A lista completa também vira rede.
  - `period.kind`: `today | yesterday | last7Days | thisMonth | lastMonth | custom` (e os outros presets `thisWeek`, `thisQuarter`, `thisHalf`, `thisYear`). Na URL: `period`, `from`, `to`
  - `division`: `WEPINK | WPINK | null` (URL: `brand`)
-- **`StorePicker`** (`src/pages/dashboard/StorePicker.tsx`) — no Topbar: fantasia + CNPJ, sem ícone (2026-10-10). "Todas as filiais" e "Rede consolidada" em caixa alta (2026-10-10). **2026-10-20:** checkbox. Todas marcadas = rede. Uma ou várias = só essas; o botão mostra o nome ou "N filiais". Quem tem uma loja só não marca. Telas que editam uma filial (Administradora, Filial, Placar) pedem uma escolha quando há mais de uma marcada.
+- **`StorePicker`** (`src/pages/dashboard/StorePicker.tsx`) — no Topbar: fantasia + CNPJ, sem ícone (2026-10-10). "Todas as filiais" e "Rede consolidada" em caixa alta (2026-10-10). **2026-10-20:** a linha marcada fica na cor primária, com o check na frente. Todas marcadas = rede. Clicar uma filial, com todas marcadas, deixa só ela; clicar outra soma. O botão mostra o nome ou "N filiais". Quem tem uma loja só não marca. Telas que editam uma filial (Administradora, Filial, Placar) pedem uma escolha quando há mais de uma marcada.
 - **`Topbar`** — nas telas do produto (exceto equipe de vendas) → `StorePicker`. O campo **Buscar na WDash** saiu do header (2026-10-04), para gestor, gerente e vendedor. Ctrl+K ainda abre a paleta.
 - **`nav-wedash.ts`** — navegação por role (`OWNER` / `MANAGER` / `SELLER` / `ADMIN_GLOBAL`).
 
