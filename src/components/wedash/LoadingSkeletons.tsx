@@ -489,7 +489,11 @@ export function BoardSkeleton({ header = false, className }: { header?: boolean;
             <Skeleton className="h-6 w-52" />
             <Skeleton className="mt-2 h-3 w-32" />
           </div>
-          <Skeleton className="h-6 w-56 max-w-full rounded-full" />
+          <div className="flex flex-wrap gap-1.5">
+            <Skeleton className="h-6 w-28 rounded-full" />
+            <Skeleton className="h-6 w-20 rounded-full" />
+            <Skeleton className="h-6 w-16 rounded-full" />
+          </div>
         </div>
         <div className="mt-2 flex items-baseline justify-between gap-3">
           <Skeleton className="h-6 w-36" />

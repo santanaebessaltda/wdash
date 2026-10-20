@@ -398,13 +398,17 @@ export function BoardView({
                 {shortDate(activeGoal.startsOn)} a {shortDate(activeGoal.endsOn)}
               </p>
             </div>
-            <Badge variant={statusBadgeVariant(GOAL_STATUS_LABEL[summary.status])} className="shrink-0 uppercase">
-              {GOAL_STATUS_LABEL[summary.status]}
-              <span className="mx-1.5">·</span>
-              {activeGoal.tierMode === "INDIVIDUAL" ? "Individual" : activeGoal.tierMode === "GENERAL" ? "Geral" : "Grupo"}
-              <span className="mx-1.5">·</span>
-              {activeGoal.tiers.length} {activeGoal.tiers.length === 1 ? "nível" : "níveis"}
-            </Badge>
+            <div className="flex shrink-0 flex-wrap gap-1.5">
+              <Badge variant={statusBadgeVariant(GOAL_STATUS_LABEL[summary.status])} className="uppercase">
+                {GOAL_STATUS_LABEL[summary.status]}
+              </Badge>
+              <Badge variant="neutral" className="uppercase">
+                {activeGoal.tierMode === "INDIVIDUAL" ? "Individual" : activeGoal.tierMode === "GENERAL" ? "Geral" : "Grupo"}
+              </Badge>
+              <Badge variant="neutral" className="uppercase">
+                {activeGoal.tiers.length} {activeGoal.tiers.length === 1 ? "nível" : "níveis"}
+              </Badge>
+            </div>
           </div>
           <div className="mt-2 flex items-baseline justify-between gap-3">
             <span className="font-mono text-[18px] font-extrabold text-t0">{brlCent(summary.achieved)}</span>
