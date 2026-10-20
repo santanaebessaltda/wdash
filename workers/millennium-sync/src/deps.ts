@@ -2037,6 +2037,7 @@ export async function claimNextJob(sb: SupabaseClient): Promise<SyncJob | null> 
       deep?: unknown;
       cashOnly?: unknown;
       part?: unknown;
+      rewrite?: unknown;
       sangriaFrom?: unknown;
       sangriaTo?: unknown;
     };
@@ -2061,6 +2062,7 @@ export async function claimNextJob(sb: SupabaseClient): Promise<SyncJob | null> 
         ...(payload.deep === true ? { deep: true } : {}),
         ...(payload.cashOnly === true ? { cashOnly: true } : {}),
         ...(payload.part === "sangria" || payload.part === "close" || payload.part === "both" ? { part: payload.part } : {}),
+        ...(payload.rewrite === true ? { rewrite: true } : {}),
         ...(typeof payload.sangriaFrom === "string" ? { sangriaFrom: payload.sangriaFrom } : {}),
         ...(typeof payload.sangriaTo === "string" ? { sangriaTo: payload.sangriaTo } : {}),
       },
