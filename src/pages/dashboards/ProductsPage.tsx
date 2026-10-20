@@ -526,10 +526,7 @@ export default function ProductsPage() {
                 <tr className="bg-bg-inset">
                   <td />
                   <td className="px-1 py-3 text-[13px] font-extrabold text-t0">
-                    <span className="inline-flex items-center gap-1">
-                      Total do filtro
-                      <TipHelp label="Soma todas as linhas encontradas no filtro, inclusive as que não aparecem nesta página." />
-                    </span>
+                    Total do filtro
                     <span className="mt-0.5 block text-[11px] font-semibold text-t2">
                       {num(lineRows.length)} linha{lineRows.length === 1 ? "" : "s"}
                     </span>
@@ -656,10 +653,7 @@ export default function ProductsPage() {
                 <tr className="bg-bg-inset">
                   <td />
                   <td className="px-1 py-3 text-[13px] font-extrabold text-t0">
-                    <span className="inline-flex items-center gap-1">
-                      Total do filtro
-                      <TipHelp label="Soma todos os produtos encontrados no filtro, inclusive os que não aparecem nesta página." />
-                    </span>
+                    Total do filtro
                     <span className="mt-0.5 block text-[11px] font-semibold text-t2">
                       {num(tableLines.length)} produto{tableLines.length === 1 ? "" : "s"}
                     </span>

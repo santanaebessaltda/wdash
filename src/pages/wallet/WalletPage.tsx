@@ -20,7 +20,7 @@ import { usePagedRows } from "@/lib/usePagedRows";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { CheckCircleIcon, FlameIcon, TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
-import { CostCardTitle, SectionHeader, TipHelp, useScopedStores } from "@/pages/operation/shared";
+import { CostCardTitle, SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { fetchStoreSellers, type Store } from "@/data/wedash/stores";
 import { matchesCodeOrName } from "@/lib/personSearch";
 import { buildXlsx, type XlsxCell } from "@/lib/xlsx";
@@ -397,10 +397,7 @@ function PeopleList({
                   <tr className="bg-bg-inset">
                     <td />
                     <td className={cn(cellClass, "text-[13px] font-extrabold text-t0")}>
-                      <span className="inline-flex items-center gap-1">
-                        Total do filtro
-                        <TipHelp label="Soma todas as pessoas encontradas no filtro, inclusive as que não aparecem nesta página." />
-                      </span>
+                      Total do filtro
                       <span className="mt-0.5 block text-[11px] font-semibold text-t2">
                         {num(sorted.length)} {sorted.length === 1 ? "pessoa" : "pessoas"}
                       </span>

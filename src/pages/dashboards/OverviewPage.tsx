@@ -46,7 +46,6 @@ import { InitialSyncNotice } from "@/pages/dashboard/InitialSyncNotice";
 import { StoreHoursNotice } from "@/pages/dashboard/StoreHoursNotice";
 import { ErpStatusNotice } from "@/pages/dashboard/ErpStatusNotice";
 import { FirstStepsCard, useFirstSteps } from "@/pages/dashboard/FirstSteps";
-import { TipHelp } from "@/pages/operation/shared";
 import { ExportDialog } from "@/components/wedash/ExportDialog";
 import { ReportHeader, useExportPdf } from "@/pages/dashboard/ReportHeader";
 import { usePrintMode } from "@/lib/printMode";
@@ -1041,10 +1040,7 @@ export default function OverviewPage() {
                 <tr className="bg-bg-inset">
                   <td />
                   <td className="px-1 py-3 text-[13px] font-extrabold text-t0">
-                    <span className="inline-flex items-center gap-1">
-                      Total do filtro
-                      <TipHelp label="Soma todas as pessoas encontradas no filtro, inclusive as que não aparecem neste destaque." />
-                    </span>
+                    Total do filtro
                     <span className="mt-0.5 block text-[11px] font-semibold text-t2">
                       {num(teamTotal.count)} {teamTotal.count === 1 ? "pessoa" : "pessoas"}
                     </span>
@@ -1157,10 +1153,7 @@ export default function OverviewPage() {
                 <tr className="bg-bg-inset">
                   <td />
                   <td className="px-1 py-3 text-[13px] font-extrabold text-t0">
-                    <span className="inline-flex items-center gap-1">
-                      Total do filtro
-                      <TipHelp label="Soma todos os produtos encontrados no filtro, inclusive os que não aparecem neste destaque." />
-                    </span>
+                    Total do filtro
                     <span className="mt-0.5 block text-[11px] font-semibold text-t2">
                       {num(productTotal.count)} produto{productTotal.count === 1 ? "" : "s"}
                     </span>

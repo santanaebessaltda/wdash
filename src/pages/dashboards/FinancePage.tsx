@@ -653,10 +653,7 @@ export default function FinancePage() {
               <tr className="bg-bg-inset">
                 <td />
                 <td className="px-1 py-3 text-[13px] font-extrabold text-t0">
-                  <span className="inline-flex items-center gap-1">
-                    Total do filtro
-                    <TipHelp label="Soma todos os meses da evolução, inclusive os que não aparecem nesta página." />
-                  </span>
+                  Total do filtro
                   <span className="mt-0.5 block text-[11px] font-semibold text-t2">
                     {countNoun(evoTotal.count, "mês", "meses")}
                   </span>

@@ -787,10 +787,7 @@ export function TeamPage() {
                 <tr className="bg-bg-inset">
                   <td />
                   <td className="px-1 py-3 text-[13px] font-extrabold text-t0" colSpan={2}>
-                    <span className="inline-flex items-center gap-1">
-                      Total do filtro
-                      <TipHelp label="Soma todas as pessoas encontradas no filtro, inclusive quem está no pódio e quem não aparece nesta página." />
-                    </span>
+                    Total do filtro
                     <span className="mt-0.5 block text-[11px] font-semibold text-t2">
                       {num(tableLines.length)} {tableLines.length === 1 ? "pessoa" : "pessoas"}
                     </span>

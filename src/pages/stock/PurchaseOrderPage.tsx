@@ -652,10 +652,7 @@ export function PurchaseOrderPage() {
                   <tr className="bg-bg-inset">
                     <td />
                     <td className="px-1 py-3 text-[13px] font-extrabold text-t0">
-                      <span className="inline-flex items-center gap-1">
-                        Total do filtro
-                        <TipHelp label="Soma todos os produtos encontrados no filtro, inclusive os que não aparecem nesta página." />
-                      </span>
+                      Total do filtro
                       <span className="mt-0.5 block text-[11px] font-semibold text-t2">
                         {num(listCount)} produto{listCount === 1 ? "" : "s"}
                       </span>
