@@ -520,7 +520,7 @@ export function PurchaseOrderPage() {
                     <th className="px-1 pb-3 text-left font-bold">#</th>
                     <ThSort label="Produto" active={sortKey === "name"} dir={sortDir} onClick={() => toggleSort("name")} align="left" className="px-1 pb-3" />
                     <ThSort label="Mínimo" active={sortKey === "minimo"} dir={sortDir} onClick={() => toggleSort("minimo")} className="px-1 pb-3" />
-                    {NUM_COLS.map((c) => (
+                    {NUM_COLS.filter((c) => !(manyStores && c.key === "multipla")).map((c) => (
                       <ThSort
                         key={c.key}
                         label={c.key === "vendidos30" ? `Vendidos em ${po.soldDays} dias` : c.label}
@@ -531,7 +531,7 @@ export function PurchaseOrderPage() {
                       />
                     ))}
                     <ThSort label="Novo" active={sortKey === "novo"} dir={sortDir} onClick={() => toggleSort("novo")} align="center" className="px-1 pb-3" />
-                    <ThSort label="Bloqueado" active={sortKey === "bloqueado"} dir={sortDir} onClick={() => toggleSort("bloqueado")} align="center" className="px-1 pb-3" />
+                    {!manyStores && <ThSort label="Bloqueado" active={sortKey === "bloqueado"} dir={sortDir} onClick={() => toggleSort("bloqueado")} align="center" className="px-1 pb-3" />}
                     <ThSort label="A pedir" active={sortKey === "aPedir"} dir={sortDir} onClick={() => toggleSort("aPedir")} className="px-1 pb-3" />
                   </tr>
                 </thead>
@@ -545,7 +545,7 @@ export function PurchaseOrderPage() {
                         return (
                           <Fragment key={group.code}>
                             <tr
-                              className={cn("cursor-pointer border-b border-line", onOrder && "bg-warn-soft")}
+                              className={cn("cursor-pointer bg-bg-3", open ? "border-b border-line" : "border-b-2 border-line-2")}
                               onClick={() => toggleGroup(group.code, open)}
                               onKeyDown={(event) => {
                                 if (event.key !== "Enter" && event.key !== " ") return;
@@ -567,7 +567,9 @@ export function PurchaseOrderPage() {
                                     sub={
                                       <div className="min-w-0">
                                         <p className="truncate text-[11px] uppercase text-t2">{[group.code, category].filter(Boolean).join(" · ")}</p>
-                                        <p className="mt-0.5 text-[11px] font-semibold text-t2">{filialSummary(group.branches)}</p>
+                                        <p className="mt-0.5 text-[11px] font-semibold text-t1">
+                                          {filialSummary(group.branches)} · Múltiplo {group.multipla} · Bloqueado {group.blocked ? "Sim" : "Não"}
+                                        </p>
                                         {group.variasVariantes && !group.blocked && <p className="mt-0.5 text-[11px] font-semibold text-warn">Este produto tem mais de uma cor ou tamanho. Faça o pedido diretamente no Millennium.</p>}
                                       </div>
                                     }
@@ -575,23 +577,18 @@ export function PurchaseOrderPage() {
                                 </div>
                               </td>
                               <td />
-                              {NUM_COLS.map((c) => (
-                                <td key={c.key} className="px-1 py-3 text-right">
-                                  {c.key === "multipla" ? <Qty v={group.multipla} /> : null}
-                                </td>
+                              {NUM_COLS.filter((c) => c.key !== "multipla").map((c) => (
+                                <td key={c.key} />
                               ))}
                               <td />
-                              <td className="px-1 py-3 text-center">
-                                <YesNo yes={group.blocked} />
-                              </td>
                               <td />
                             </tr>
                             {open &&
-                              group.branches.map((branch) => (
-                                <tr key={`${branch.storeId}:${branch.code}`} className={cn("border-b border-line", branch.onOrder && "bg-warn-soft")}>
+                              group.branches.map((branch, branchIdx) => (
+                                <tr key={`${branch.storeId}:${branch.code}`} className={cn("bg-bg-inset", branchIdx === group.branches.length - 1 ? "border-b-2 border-line-2" : "border-b border-line")}>
                                   <td className={cn(branch.onOrder && "shadow-[inset_3px_0_0_var(--warn)]")} />
-                                  <td className="px-1 py-3 pl-11">
-                                    <p className="break-words text-[13px] font-bold text-t2">{branch.storeName}</p>
+                                  <td className="border-l-2 border-line-2 px-1 py-2.5 pl-16">
+                                    <p className="break-words text-[12.5px] font-semibold leading-5 text-t1">{branch.storeName}</p>
                                   </td>
                                   <td className="px-1 py-2 text-right">
                                     {!branch.canRequest ? (
@@ -605,16 +602,15 @@ export function PurchaseOrderPage() {
                                       />
                                     )}
                                   </td>
-                                  {NUM_COLS.map((c) => (
-                                    <td key={c.key} className="px-1 py-3 text-right">
-                                      {c.key === "multipla" ? null : <Qty v={branch[c.key]} />}
+                                  {NUM_COLS.filter((c) => c.key !== "multipla").map((c) => (
+                                    <td key={c.key} className="px-1 py-2.5 text-right">
+                                      <Qty v={branch[c.key]} />
                                     </td>
                                   ))}
-                                  <td className="px-1 py-3 text-center">
+                                  <td className="px-1 py-2.5 text-center">
                                     <YesNo yes={branch.isNew} />
                                   </td>
-                                  <td />
-                                  <td className="px-1 py-3 text-right">
+                                  <td className="px-1 py-2.5 text-right">
                                     {branch.aRequest == null ? <span className="font-mono text-[13px] font-bold text-t2">—</span> : <Qty v={branch.aRequest} strong={branch.aRequest > 0} />}
                                   </td>
                                 </tr>
@@ -689,9 +685,9 @@ export function PurchaseOrderPage() {
                     <td className="px-1 py-3 text-right">
                       <Qty v={totais.vendidos30} total />
                     </td>
+                    {!manyStores && <td />}
                     <td />
-                    <td />
-                    <td />
+                    {!manyStores && <td />}
                     <td className="px-1 py-3 text-right">
                       <Qty v={totais.aRequest} total />
                     </td>
