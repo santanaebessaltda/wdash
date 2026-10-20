@@ -19,8 +19,7 @@ import { isOwner } from "@/layout/nav-wedash";
 import { noAutofill, secretStyle } from "@/lib/noAutofill";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
-import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "@/pages/operation/shared";
-import { useScope } from "@/pages/dashboard/useScope";
+import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
 
 type AcquirerKind = "stone" | "cielo";
 
@@ -35,9 +34,8 @@ type ActiveAcquirer = {
 export function AcquirersPage() {
   const { show } = useToast();
   const { session, storeRows, loading: storesLoading } = useScopedStores();
-  const { scope } = useScope();
-  const escolher = pickOneStore(scope.storeIds, session.stores.length);
   const showSkeleton = useMinSkeleton(storesLoading);
+  const many = storeRows.length > 1;
   const [links, setLinks] = useState<StoneLink[]>([]);
   const [cieloLinks, setCieloLinks] = useState<CieloLink[]>([]);
   const [cieloAccount, setCieloAccount] = useState<CieloAccount | null>(null);
@@ -78,22 +76,34 @@ export function AcquirersPage() {
     void reload();
   }, [storesLoading, reload]);
 
+  const scopeIds = new Set(storeRows.map((store) => store.id));
+  const branchName = (storeId: string) => {
+    const store = storeRows.find((item) => item.id === storeId);
+    return store?.tradeName || store?.name || "";
+  };
   const rows: ActiveAcquirer[] = [
-    ...links.map((link) => ({
-      kind: "stone" as const,
-      storeId: link.storeId,
-      name: "Stone",
-      detail: `Stone Code ${link.stoneCode}`,
-    })),
-    ...cieloLinks.map((link) => ({
-      kind: "cielo" as const,
-      storeId: link.storeId,
-      name: "Cielo",
-      detail: `Estabelecimento ${link.establishmentCode}`,
-    })),
-  ];
-  const hint =
-    rows.length === 1
+    ...links
+      .filter((link) => scopeIds.has(link.storeId))
+      .map((link) => ({
+        kind: "stone" as const,
+        storeId: link.storeId,
+        name: "Stone",
+        detail: `Stone Code ${link.stoneCode}`,
+      })),
+    ...cieloLinks
+      .filter((link) => scopeIds.has(link.storeId))
+      .map((link) => ({
+        kind: "cielo" as const,
+        storeId: link.storeId,
+        name: "Cielo",
+        detail: `Estabelecimento ${link.establishmentCode}`,
+      })),
+  ].sort((a, b) => branchName(a.storeId).localeCompare(branchName(b.storeId), "pt-BR") || a.name.localeCompare(b.name, "pt-BR"));
+  const taken = new Set(rows.map((row) => row.storeId));
+  const freeStores = storeRows.filter((store) => !taken.has(store.id));
+  const hint = many
+    ? "Cada filial usa uma adquirente. Desconecte para trocar."
+    : rows.length === 1
       ? `Esta filial já está conectada à ${rows[0]!.name}. Desconecte para trocar.`
       : "Desconecte a adquirente atual para conectar outra.";
 
@@ -116,13 +126,9 @@ export function AcquirersPage() {
       <SectionHeader
         section="Integrações"
         title="Adquirentes"
-        subtitle="Conecte a adquirente desta filial para buscar fechamentos de cartão e Pix."
+        subtitle={many ? "Conecte a adquirente de cada filial para buscar fechamentos de cartão e Pix." : "Conecte a adquirente desta filial para buscar fechamentos de cartão e Pix."}
       />
-      {escolher ? (
-        <div className="mt-6">
-          <SelectStoreCard />
-        </div>
-      ) : showSkeleton || (loading && rows.length === 0 && storeRows.length > 0) ? (
+      {showSkeleton || (loading && rows.length === 0 && storeRows.length > 0) ? (
         <ConnectionSkeleton label="Carregando adquirentes…" />
       ) : storeRows.length === 0 ? (
         <Card className="mt-6">
@@ -133,7 +139,7 @@ export function AcquirersPage() {
           <EmptyBlock
             icon="💳"
             title="Nenhuma adquirente conectada"
-            description="Conecte uma adquirente para buscar os fechamentos de cartão e Pix desta filial."
+            description={many ? "Conecte uma adquirente para buscar os fechamentos de cartão e Pix das filiais selecionadas." : "Conecte uma adquirente para buscar os fechamentos de cartão e Pix desta filial."}
             action={
               <Button size="sm" onClick={() => setPicker(true)} disabled={!canEdit || storeRows.length === 0}>
                 Conectar adquirente
@@ -145,9 +151,17 @@ export function AcquirersPage() {
         <ConnectionCard
           title="Adquirente"
           hint={hint}
+          action={
+            freeStores.length > 0 ? (
+              <Button size="sm" onClick={() => setPicker(true)} disabled={!canEdit}>
+                Conectar adquirente
+              </Button>
+            ) : undefined
+          }
           rows={rows.map((row) => ({
             key: `${row.kind}-${row.storeId}`,
             name: row.name,
+            store: many ? branchName(row.storeId) : undefined,
             detail: row.detail,
             status: "Conectada",
             mark: row.kind === "stone" ? <StoneMark /> : <CieloMark />,
@@ -157,6 +171,7 @@ export function AcquirersPage() {
       )}
       <AcquirerPicker
         open={picker}
+        many={freeStores.length > 1}
         onClose={() => setPicker(false)}
         onPick={(kind) => {
           setPicker(false);
@@ -165,7 +180,7 @@ export function AcquirersPage() {
       />
       <StoneModal
         open={connectKind === "stone"}
-        storeRows={storeRows}
+        storeRows={freeStores}
         links={links}
         cieloStoreIds={cieloLinks.map((link) => link.storeId)}
         onClose={() => setConnectKind(null)}
@@ -183,7 +198,7 @@ export function AcquirersPage() {
       />
       <CieloModal
         open={connectKind === "cielo"}
-        storeRows={storeRows}
+        storeRows={freeStores}
         links={cieloLinks}
         account={cieloAccount}
         stoneStoreIds={links.map((link) => link.storeId)}
@@ -219,7 +234,7 @@ export function AcquirersPage() {
         }
       >
         <p className="text-[13.5px] leading-relaxed text-t1">
-          A WDash deixará de buscar os fechamentos de cartão e Pix desta filial. Os fechamentos já salvos serão mantidos.
+          A WDash deixará de buscar os fechamentos de cartão e Pix {many && pending ? `de ${branchName(pending.storeId)}` : "desta filial"}. Os fechamentos já salvos serão mantidos.
         </p>
       </Modal>
     </div>
@@ -234,7 +249,7 @@ function CieloMark() {
   return <span className="text-[13px] font-bold tracking-tight text-t0">Cielo</span>;
 }
 
-function AcquirerPicker({ open, onClose, onPick }: { open: boolean; onClose: () => void; onPick: (kind: AcquirerKind) => void }) {
+function AcquirerPicker({ open, many, onClose, onPick }: { open: boolean; many: boolean; onClose: () => void; onPick: (kind: AcquirerKind) => void }) {
   return (
     <Modal
       open={open}
@@ -246,7 +261,7 @@ function AcquirerPicker({ open, onClose, onPick }: { open: boolean; onClose: () 
         </Button>
       }
     >
-      <p className="mb-3 text-[13.5px] leading-relaxed text-t1">Escolha a adquirente desta filial.</p>
+      <p className="mb-3 text-[13.5px] leading-relaxed text-t1">{many ? "Escolha a adquirente. Depois, escolha a filial." : "Escolha a adquirente desta filial."}</p>
       <div className="flex flex-col gap-2.5">
         <PickerRow name="Stone" detail="Cartão e Pix" mark={<StoneMark />} onClick={() => onPick("stone")} />
         <PickerRow name="Cielo" detail="Cartão e Pix" mark={<CieloMark />} onClick={() => onPick("cielo")} />
@@ -379,7 +394,7 @@ function StoneModal({
               </option>
               {storeRows.map((l) => (
                 <option key={l.id} value={l.id}>
-                  {l.tradeName}
+                  {l.tradeName || l.name}
                 </option>
               ))}
             </Select>
@@ -629,7 +644,7 @@ function CieloModal({
               </option>
               {storeRows.map((l) => (
                 <option key={l.id} value={l.id}>
-                  {l.tradeName}
+                  {l.tradeName || l.name}
                 </option>
               ))}
             </Select>

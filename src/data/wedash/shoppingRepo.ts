@@ -8,6 +8,24 @@ export type ShoppingLaunchResult = { ok: true; message?: string } | { ok: false;
 const FAIL = "Não foi possível informar as vendas ao shopping. Os valores já informados foram mantidos.";
 const SAVE_FAIL = "Não foi possível salvar o acesso do shopping. Tente novamente.";
 
+/** Acessos das filiais. A senha não vem nesta leitura. */
+export async function fetchShoppingAccounts(tenantId: string, storeIds: string[]): Promise<ShoppingAccount[]> {
+  if (storeIds.length === 0) return [];
+  const { getSupabase } = await import("@/lib/supabase");
+  const sb = getSupabase();
+  if (!sb) return [];
+  const { data, error } = await sb
+    .from("store_shopping")
+    .select("store_id, administrator, base_url, username, last_run_at, last_error, unit")
+    .eq("tenant_id", tenantId)
+    .in("store_id", storeIds);
+  if (error) throw new Error(error.message);
+  return (data ?? []).flatMap((row) => {
+    const account = shoppingAccountView(row);
+    return account ? [account] : [];
+  });
+}
+
 /** Acesso da filial. A senha não vem nesta leitura. */
 export async function fetchShoppingAccount(tenantId: string, storeId: string): Promise<ShoppingAccount | null> {
   const { getSupabase } = await import("@/lib/supabase");

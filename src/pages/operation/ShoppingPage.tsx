@@ -1,23 +1,22 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MutableRefObject } from "react";
-import { Button, Card, Checkbox, FormField, Input, Modal, useToast } from "@/components/ui";
+import { Button, Card, Checkbox, FormField, Input, Modal, Select, useToast } from "@/components/ui";
 import { ConnectionCard, ConnectionSkeleton, PickerRow } from "@/components/wedash/ConnectionList";
 import {
   INTRANET_MALL_ORIGIN,
   intranetMallBaseUrl,
   intranetMallSlug,
   shoppingAdministratorName,
-  type ShoppingAdministrator as MallAdministrator,
 } from "@/data/wedash/shoppingReport";
-import { clearShoppingAccount, fetchShoppingAccount, saveShoppingAccount, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
+import { clearShoppingAccount, fetchShoppingAccounts, saveShoppingAccount, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
+import type { Store } from "@/data/wedash/stores";
 import { cn } from "@/lib/cn";
 import { noAutofill, secretStyle } from "@/lib/noAutofill";
 import { isOwner } from "@/layout/nav-wedash";
 import { SHOPPING_MENU_EVENT } from "@/layout/useShoppingMenu";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
-import { useScope } from "@/pages/dashboard/useScope";
 import { GroupComModal, type ShoppingFormBar } from "@/pages/operation/GroupComModal";
-import { SectionHeader, SelectStoreCard, pickOneStore, useScopedStores } from "./shared";
+import { SectionHeader, useScopedStores } from "./shared";
 
 const IDLE_BAR: ShoppingFormBar = { busy: false, canSave: false, label: "Conectar" };
 
@@ -27,11 +26,6 @@ const PROVIDERS: { id: MallStep; name: string; logo: string }[] = [
   { id: "allos", name: "Intranet Mall", logo: "/intranet.png" },
   { id: "groupcom", name: "Group COM", logo: "/group-com.png" },
 ];
-
-function accessPhrase(administrator: MallAdministrator): string {
-  const name = shoppingAdministratorName(administrator);
-  return administrator === "groupcom" ? `do ${name}` : `da ${name}`;
-}
 
 function mallDetail(account: ShoppingAccount): string {
   if (account.administrator === "groupcom") {
@@ -43,63 +37,88 @@ function mallDetail(account: ShoppingAccount): string {
   return slug ? `Informe de vendas · ${slug}` : "Informe de vendas";
 }
 
-/** Integrações > Administradora. Um card por administradora; a filial usa uma só. */
+function branchName(store: Store): string {
+  return store.tradeName || store.name;
+}
+
+/** Integrações > Administradora. Uma administradora por filial de shopping. */
 export function ShoppingSettingsPage() {
   const { show } = useToast();
   const { session, storeRows, loading: storesLoading } = useScopedStores();
-  const { scope } = useScope();
-  const escolher = pickOneStore(scope.storeIds, session.stores.length);
   const showSkeleton = useMinSkeleton(storesLoading);
-  const store = storeRows.length === 1 ? storeRows[0] : null;
-  const [account, setAccount] = useState<ShoppingAccount | null>(null);
-  const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const shoppingStores = storeRows.filter((store) => store.pointType === "SHOPPING");
+  const shoppingKey = shoppingStores.map((store) => store.id).join("|");
+  const many = shoppingStores.length > 1;
+  const [accounts, setAccounts] = useState<ShoppingAccount[]>([]);
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [picker, setPicker] = useState(false);
   const [open, setOpen] = useState<MallStep | null>(null);
-  const [confirm, setConfirm] = useState(false);
+  const [pending, setPending] = useState<ShoppingAccount | null>(null);
   const [removing, setRemoving] = useState(false);
   const canEdit = isOwner(session.role);
-  const accountReady = store != null && loadedFor === store.id;
+  const ready = !storesLoading && loadedKey === shoppingKey;
 
   useEffect(() => {
-    if (!store || store.pointType !== "SHOPPING") return;
+    if (storesLoading) return;
+    if (shoppingStores.length === 0) {
+      setAccounts([]);
+      setLoadedKey(shoppingKey);
+      return;
+    }
     let cancel = false;
-    void fetchShoppingAccount(session.tenantId, store.id)
-      .then((access) => {
+    void fetchShoppingAccounts(session.tenantId, shoppingStores.map((store) => store.id))
+      .then((list) => {
         if (cancel) return;
-        setAccount(access);
-        setLoadedFor(store.id);
+        setAccounts(list);
+        setLoadedKey(shoppingKey);
       })
       .catch(() => {
         if (cancel) return;
-        setAccount(null);
-        setLoadedFor(store.id);
-        show("Não foi possível carregar a administradora desta filial. Tente novamente.", "danger");
+        setAccounts([]);
+        setLoadedKey(shoppingKey);
+        show("Não foi possível carregar a administradora destas filiais. Tente novamente.", "danger");
       });
     return () => {
       cancel = true;
     };
-    // show do toast muda de identidade; a carga segue a filial.
+    // show do toast muda de identidade; a carga segue as filiais.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session.tenantId, store?.id, store?.pointType]);
+  }, [storesLoading, session.tenantId, shoppingKey]);
 
-  const street = store?.pointType === "STREET";
-  const provider = account ? PROVIDERS.find((item) => item.id === account.administrator) : null;
-  const connectedName = account ? shoppingAdministratorName(account.administrator) : "";
+  const streetOnly = storeRows.length > 0 && shoppingStores.length === 0;
+  const scopeIds = new Set(shoppingStores.map((store) => store.id));
+  const rows = accounts
+    .filter((account) => scopeIds.has(account.storeId))
+    .sort((a, b) => {
+      const left = shoppingStores.find((store) => store.id === a.storeId);
+      const right = shoppingStores.find((store) => store.id === b.storeId);
+      return (left ? branchName(left) : "").localeCompare(right ? branchName(right) : "", "pt-BR");
+    });
+  const taken = new Set(rows.map((account) => account.storeId));
+  const freeStores = shoppingStores.filter((store) => !taken.has(store.id));
+  const pendingStore = pending ? shoppingStores.find((store) => store.id === pending.storeId) : null;
+  const pendingName = pending ? shoppingAdministratorName(pending.administrator) : "";
+
+  function remember(next: ShoppingAccount | null, storeId: string) {
+    setAccounts((list) => {
+      const rest = list.filter((account) => account.storeId !== storeId);
+      return next ? [...rest, next] : rest;
+    });
+  }
 
   async function disconnect() {
-    if (!store) return;
+    if (!pending) return;
     setRemoving(true);
-    const result = await clearShoppingAccount(store.id);
+    const result = await clearShoppingAccount(pending.storeId);
     setRemoving(false);
     if (!result.ok) {
       show(result.message, "danger");
       return;
     }
-    setAccount(null);
-    setLoadedFor(store.id);
+    remember(null, pending.storeId);
     window.dispatchEvent(new Event(SHOPPING_MENU_EVENT));
     show("Administradora desconectada.", "success");
-    setConfirm(false);
+    setPending(null);
   }
 
   return (
@@ -107,21 +126,15 @@ export function ShoppingSettingsPage() {
       <SectionHeader
         section="Integrações"
         title="Administradora"
-        subtitle="Conecte a administradora desta filial para informar as vendas ao shopping."
+        subtitle={many ? "Conecte a administradora de cada filial para informar as vendas ao shopping." : "Conecte a administradora desta filial para informar as vendas ao shopping."}
       />
-      {escolher || showSkeleton ? (
-        escolher ? (
-          <div className="mt-6">
-            <SelectStoreCard />
-          </div>
-        ) : (
-          <ConnectionSkeleton label="Carregando administradora…" />
-        )
-      ) : !store ? (
+      {showSkeleton || !ready ? (
+        <ConnectionSkeleton label="Carregando administradora…" />
+      ) : storeRows.length === 0 ? (
         <Card className="mt-6">
           <EmptyBlock icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
         </Card>
-      ) : street ? (
+      ) : streetOnly ? (
         <Card className="mt-6">
           <EmptyBlock
             icon="🏬"
@@ -129,14 +142,12 @@ export function ShoppingSettingsPage() {
             description="Esta configuração está disponível apenas para filiais do tipo Quiosque em shopping."
           />
         </Card>
-      ) : !accountReady ? (
-        <ConnectionSkeleton label="Carregando administradora…" />
-      ) : !account ? (
+      ) : rows.length === 0 ? (
         <Card className="mt-6 flex min-h-[280px] flex-col">
           <EmptyBlock
             icon="🏬"
             title="Nenhuma administradora conectada"
-            description="Conecte a administradora responsável pelo informe de vendas desta filial."
+            description={many ? "Conecte a administradora responsável pelo informe de vendas das filiais selecionadas." : "Conecte a administradora responsável pelo informe de vendas desta filial."}
             action={
               <Button size="sm" onClick={() => setPicker(true)} disabled={!canEdit}>
                 Conectar administradora
@@ -147,11 +158,22 @@ export function ShoppingSettingsPage() {
       ) : (
         <ConnectionCard
           title="Administradora"
-          hint={`Esta filial já está conectada à ${connectedName}. Desconecte para trocar.`}
-          rows={[
-            {
-              key: account.administrator,
+          hint={many ? "Cada filial usa uma administradora. Desconecte para trocar." : `Esta filial já está conectada à ${shoppingAdministratorName(rows[0]!.administrator)}. Desconecte para trocar.`}
+          action={
+            freeStores.length > 0 ? (
+              <Button size="sm" onClick={() => setPicker(true)} disabled={!canEdit}>
+                Conectar administradora
+              </Button>
+            ) : undefined
+          }
+          rows={rows.map((account) => {
+            const store = shoppingStores.find((item) => item.id === account.storeId);
+            const provider = PROVIDERS.find((item) => item.id === account.administrator);
+            const connectedName = shoppingAdministratorName(account.administrator);
+            return {
+              key: account.storeId,
               name: connectedName,
+              store: many && store ? branchName(store) : undefined,
               detail: mallDetail(account),
               status: account.administrator === "argo" ? undefined : "Configurada",
               mark: provider ? (
@@ -159,9 +181,9 @@ export function ShoppingSettingsPage() {
               ) : (
                 <span className="text-[11px] font-bold text-t0">{connectedName}</span>
               ),
-              onDisconnect: () => setConfirm(true),
-            },
-          ]}
+              onDisconnect: () => setPending(account),
+            };
+          })}
         />
       )}
       <Modal
@@ -174,7 +196,7 @@ export function ShoppingSettingsPage() {
           </Button>
         }
       >
-        <p className="mb-3 text-[13.5px] leading-relaxed text-t1">Escolha a administradora desta filial.</p>
+        <p className="mb-3 text-[13.5px] leading-relaxed text-t1">{freeStores.length > 1 ? "Escolha a administradora. Depois, escolha a filial." : "Escolha a administradora desta filial."}</p>
         <div className="flex flex-col gap-2.5">
           {PROVIDERS.map((item) => (
             <PickerRow
@@ -191,15 +213,15 @@ export function ShoppingSettingsPage() {
         </div>
       </Modal>
       <Modal
-        open={confirm}
+        open={pending != null}
         onClose={() => {
-          if (!removing) setConfirm(false);
+          if (!removing) setPending(null);
         }}
-        title={account ? `Desconectar ${connectedName}?` : "Desconectar?"}
+        title={pending ? `Desconectar ${pendingName}?` : "Desconectar?"}
         size="sm"
         footer={
           <>
-            <Button variant="outline" onClick={() => setConfirm(false)} disabled={removing}>
+            <Button variant="outline" onClick={() => setPending(null)} disabled={removing}>
               Cancelar
             </Button>
             <Button variant="danger" onClick={() => void disconnect()} disabled={removing}>
@@ -209,20 +231,16 @@ export function ShoppingSettingsPage() {
         }
       >
         <p className="text-[13.5px] leading-relaxed text-t1">
-          A WDash deixará de informar as vendas desta filial ao shopping. Os valores já informados serão mantidos.
+          A WDash deixará de informar as vendas {many && pendingStore ? `de ${branchName(pendingStore)}` : "desta filial"} ao shopping. Os valores já informados serão mantidos.
         </p>
       </Modal>
-      {store && open ? (
+      {open ? (
         <AdministratorModal
           open
           step={open}
-          storeId={store.id}
-          account={account}
+          stores={freeStores}
           onClose={() => setOpen(null)}
-          onAccount={(next) => {
-            setAccount(next);
-            setLoadedFor(store.id);
-          }}
+          onAccount={remember}
         />
       ) : null}
     </div>
@@ -232,30 +250,33 @@ export function ShoppingSettingsPage() {
 function AdministratorModal({
   open,
   step,
-  storeId,
-  account,
+  stores,
   onClose,
   onAccount,
 }: {
   open: boolean;
   step: MallStep;
-  storeId: string;
-  account: ShoppingAccount | null;
+  stores: Store[];
   onClose: () => void;
-  onAccount: (account: ShoppingAccount | null) => void;
+  onAccount: (account: ShoppingAccount | null, storeId: string) => void;
 }) {
   const { show } = useToast();
   const saveRef = useRef<() => void>(() => {});
   const [bar, setBar] = useState<ShoppingFormBar>(IDLE_BAR);
-  const [removing, setRemoving] = useState(false);
+  const [storeId, setStoreId] = useState("");
+  const storeKey = stores.map((store) => store.id).join("|");
   const onBar = useCallback((next: ShoppingFormBar) => {
     setBar((current) => (current.busy === next.busy && current.canSave === next.canSave && current.label === next.label ? current : next));
   }, []);
 
-  const [removeOpen, setRemoveOpen] = useState(false);
-  const locked = bar.busy || removing;
-  const formAccount = account && account.administrator === step ? account : null;
-  const replaced = account && account.administrator !== step ? accessPhrase(account.administrator) : null;
+  useEffect(() => {
+    if (!open) return;
+    const ids = storeKey.split("|").filter(Boolean);
+    if (ids.length <= 1) setStoreId(ids[0] ?? "");
+    else setStoreId((current) => (ids.includes(current) ? current : ""));
+  }, [open, storeKey]);
+
+  const locked = bar.busy;
 
   function close() {
     if (locked) return;
@@ -263,81 +284,52 @@ function AdministratorModal({
   }
 
   function saved(next: ShoppingAccount) {
-    onAccount(next);
+    onAccount(next, next.storeId);
     window.dispatchEvent(new Event(SHOPPING_MENU_EVENT));
-    const editing = account?.administrator === next.administrator;
     const created = next.administrator === "groupcom" ? "Acesso do Group COM configurado." : "Acesso da Intranet Mall configurado.";
-    show(editing ? "Alterações salvas." : created, "success");
-    onClose();
-  }
-
-  async function remover() {
-    setRemoving(true);
-    const result = await clearShoppingAccount(storeId);
-    setRemoving(false);
-    if (!result.ok) {
-      show(result.message, "danger");
-      return;
-    }
-    onAccount(null);
-    window.dispatchEvent(new Event(SHOPPING_MENU_EVENT));
-    show("Acesso da administradora removido.", "success");
-    setRemoveOpen(false);
+    show(created, "success");
     onClose();
   }
 
   return (
-    <>
-      <Modal
-        open={open}
-        onClose={close}
-        title={shoppingAdministratorName(step)}
-        footer={
-          <>
-            {formAccount ? (
-              <Button variant="outline" className="mr-auto" onClick={() => setRemoveOpen(true)} disabled={locked}>
-                Remover
-              </Button>
-            ) : null}
-            <Button variant="outline" onClick={close} disabled={locked}>
-              Cancelar
-            </Button>
-            <Button onClick={() => saveRef.current()} disabled={!bar.canSave}>
-              {bar.label}
-            </Button>
-          </>
-        }
-      >
-        {open && step === "allos" ? (
-          <IntranetMallForm account={formAccount} replacedName={replaced} storeId={storeId} onSaved={saved} onBar={onBar} saveRef={saveRef} />
+    <Modal
+      open={open}
+      onClose={close}
+      title={shoppingAdministratorName(step)}
+      footer={
+        <>
+          <Button variant="outline" onClick={close} disabled={locked}>
+            Cancelar
+          </Button>
+          <Button onClick={() => saveRef.current()} disabled={!bar.canSave}>
+            {bar.label}
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-3.5">
+        {stores.length > 1 ? (
+          <FormField label="Filial" required>
+            <Select value={storeId} onChange={(e) => setStoreId(e.target.value)} disabled={locked} {...noAutofill}>
+              <option value="" disabled>
+                Selecione a filial
+              </option>
+              {stores.map((store) => (
+                <option key={store.id} value={store.id}>
+                  {branchName(store)}
+                </option>
+              ))}
+            </Select>
+          </FormField>
         ) : null}
-        {open && step === "groupcom" ? (
-          <GroupComModal account={formAccount} replacedName={replaced} storeId={storeId} onSaved={saved} onBar={onBar} saveRef={saveRef} />
+        {open && storeId && step === "allos" ? (
+          <IntranetMallForm key={storeId} account={null} replacedName={null} storeId={storeId} onSaved={saved} onBar={onBar} saveRef={saveRef} />
         ) : null}
-      </Modal>
-      <Modal
-        open={removeOpen}
-        onClose={() => {
-          if (!removing) setRemoveOpen(false);
-        }}
-        title="Remover administradora?"
-        size="sm"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setRemoveOpen(false)} disabled={removing}>
-              Cancelar
-            </Button>
-            <Button variant="danger" onClick={() => void remover()} disabled={removing}>
-              {removing ? "Removendo…" : "Remover"}
-            </Button>
-          </>
-        }
-      >
-        <p className="text-[13.5px] leading-relaxed text-t1">
-          O acesso {account ? accessPhrase(account.administrator) : "salvo"} será removido. A WDash deixará de informar vendas ao shopping.
-        </p>
-      </Modal>
-    </>
+        {open && storeId && step === "groupcom" ? (
+          <GroupComModal key={storeId} account={null} replacedName={null} storeId={storeId} onSaved={saved} onBar={onBar} saveRef={saveRef} />
+        ) : null}
+      </div>
+    </Modal>
   );
 }
 
