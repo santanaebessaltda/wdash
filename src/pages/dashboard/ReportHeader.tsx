@@ -50,7 +50,16 @@ function useReportScope(pickedIds: string[] | null = null) {
   };
 }
 
-function reportParts(screen: string, storeFile: string, periodFile: string, extra: string | null | undefined, period: boolean): string[] {
+/** Nome do arquivo quando o PDF ou a planilha fica só com parte das filiais. */
+export function pickedStoreFile(rows: Array<{ id: string; tradeName: string; branchCode: string }>, ids: string[]): string {
+  const picked = rows
+    .filter((store) => ids.includes(store.id))
+    .sort((a, b) => a.tradeName.localeCompare(b.tradeName, "pt-BR"));
+  if (picked.length === 1) return [picked[0]!.branchCode.trim(), picked[0]!.tradeName].filter(Boolean).join(" ");
+  return picked.map((store) => store.tradeName).join(", ");
+}
+
+export function reportFileParts(screen: string, storeFile: string, periodFile: string, extra: string | null | undefined, period: boolean): string[] {
   return [
     screen,
     storeFile,
@@ -64,7 +73,7 @@ function reportParts(screen: string, storeFile: string, periodFile: string, extr
 export function useReportFileTitle(screen: string, extra?: string | null, { period = true }: { period?: boolean } = {}) {
   const { storeFile, periodFile } = useReportScope();
   return useCallback(
-    () => reportFileTitle(reportParts(screen, storeFile, periodFile, extra, period)),
+    () => reportFileTitle(reportFileParts(screen, storeFile, periodFile, extra, period)),
     [screen, storeFile, extra, period, periodFile],
   );
 }
@@ -73,7 +82,7 @@ export function useReportFileTitle(screen: string, extra?: string | null, { peri
 export function useExportPdf(screen: string, extra?: string | null, { period = true }: { period?: boolean } = {}) {
   const { storeFile, periodFile } = useReportScope();
   return useCallback(
-    () => exportPdf(reportParts(screen, storeFile, periodFile, extra, period)),
+    () => exportPdf(reportFileParts(screen, storeFile, periodFile, extra, period)),
     [screen, storeFile, extra, period, periodFile],
   );
 }
@@ -109,7 +118,7 @@ export function useDashboardExport(screen: string) {
         : picked.length > 1
           ? picked.map((store) => store.tradeName).join(", ")
           : "Todas as filiais";
-    exportPdf(reportParts(screen, storeFile, periodFile, null, true));
+    exportPdf(reportFileParts(screen, storeFile, periodFile, null, true));
     const done = () => {
       window.removeEventListener("afterprint", done);
       setPrintIds(null);

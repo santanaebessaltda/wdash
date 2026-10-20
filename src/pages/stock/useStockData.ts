@@ -39,7 +39,7 @@ async function loadAll(tenantId: string, storeRows: Store[]): Promise<StockLoade
 }
 
 /** Estoque das lojas do escopo. Ao abrir, busca no Millennium o estoque com mais de 30 min. */
-export function useStockData() {
+export function useStockData(focusIds: string[] | null = null) {
   const { show } = useToast();
   const { session, storeRows, loading: storesLoading } = useScopedStores();
   const storeKey = storeRows.map((s) => s.id).join(",");
@@ -124,11 +124,17 @@ export function useStockData() {
     },
   });
 
+  const viewStores = useMemo(() => {
+    if (!focusIds || focusIds.length === 0 || focusIds.length >= storeRows.length) return storeRows;
+    const picked = new Set(focusIds);
+    return storeRows.filter((store) => picked.has(store.id));
+  }, [storeRows, focusIds]);
+
   const view = useMemo(
     () =>
       data
         ? buildStockProductsView({
-            stores: storeRows,
+            stores: viewStores,
             catalog: data.catalog,
             stock: data.stock,
             costPrices: data.costPrices,
@@ -139,7 +145,7 @@ export function useStockData() {
             charged: [],
           })
         : null,
-    [data, storeRows],
+    [data, viewStores],
   );
 
   const atualizadoText = syncing

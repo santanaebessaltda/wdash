@@ -21,7 +21,10 @@ const FORMAT_COPY: Record<ExportFormat, { title: string; detail: string }> = {
   },
 };
 
-const PDF_WITH_STORES = "Gera um relatório em PDF com as filiais selecionadas.";
+const FORMAT_WITH_STORES: Partial<Record<ExportFormat, string>> = {
+  pdf: "Gera um relatório em PDF com as filiais selecionadas.",
+  xlsx: "Baixa a planilha do Excel com as filiais selecionadas.",
+};
 
 /** Botão Exportar. O modal lista só os formatos passados — no Dashboard, só PDF. */
 export function ExportDialog({
@@ -154,7 +157,7 @@ export function ExportDialog({
                     <span className="min-w-0">
                       <span className="block font-bold leading-tight">{FORMAT_COPY[item].title}</span>
                       <span className="mt-0.5 block text-[12.5px] font-normal leading-snug text-t2">
-                        {item === "pdf" ? PDF_WITH_STORES : FORMAT_COPY[item].detail}
+                        {FORMAT_WITH_STORES[item] ?? FORMAT_COPY[item].detail}
                       </span>
                     </span>
                   }
