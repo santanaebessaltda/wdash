@@ -832,7 +832,7 @@ function Month({
                     {face.pendingStores > 0 && <DayChip color="bg-warn">{filialAttention(face.pendingStores, "pendente", "pendentes")}</DayChip>}
                     {face.kind === "today" && <DayChip color="bg-acc">Em aberto</DayChip>}
                     {face.kind === "total" && face.diffStores > 0 && (
-                      <DayChip color="bg-warn">{filialAttention(face.diffStores, "com diferença", "com diferença")}</DayChip>
+                      <DayChip color="bg-bad">{filialAttention(face.diffStores, "com diferença", "com diferença")}</DayChip>
                     )}
                     {face.kind === "total" && face.withdrawalCents > 0 && (
                       <DayChip color="bg-info">{`Retirada ${brlCent(face.withdrawalCents / 100)}`}</DayChip>
