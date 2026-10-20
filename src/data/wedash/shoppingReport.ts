@@ -77,6 +77,50 @@ export function monthReport(days: ClosedDay[], today: string): MonthReport {
   };
 }
 
+/** Dia do calendário com várias filiais. Chave ausente em `informedByKey` não foi informada; zero gravado conta. */
+export function groupedDay(
+  storeIds: readonly string[],
+  day: string,
+  soldByKey: Readonly<Record<string, number>>,
+  informedByKey: Readonly<Record<string, number>>,
+): { soldCents: number; missingStores: number; gapStores: number } {
+  let soldCents = 0;
+  let missingStores = 0;
+  let gapStores = 0;
+  for (const storeId of storeIds) {
+    const key = `${storeId}|${day}`;
+    const sold = soldByKey[key] ?? 0;
+    soldCents += sold;
+    if (!Object.prototype.hasOwnProperty.call(informedByKey, key)) {
+      missingStores += 1;
+      continue;
+    }
+    if (informedByKey[key] !== sold) gapStores += 1;
+  }
+  return { soldCents, missingStores, gapStores };
+}
+
+/** KPIs do período com várias filiais. Dia sem informe entra como zero, igual ao mês de uma filial. */
+export function groupedPeriod(
+  storeIds: readonly string[],
+  from: string,
+  to: string,
+  today: string,
+  soldByKey: Readonly<Record<string, number>>,
+  informedByKey: Readonly<Record<string, number>>,
+): { soldCents: number; informedCents: number; differenceCents: number } {
+  let soldCents = 0;
+  let informedCents = 0;
+  for (let day = from; day <= to && day < today; day = nextIso(day)) {
+    for (const storeId of storeIds) {
+      const key = `${storeId}|${day}`;
+      soldCents += soldByKey[key] ?? 0;
+      if (Object.prototype.hasOwnProperty.call(informedByKey, key)) informedCents += informedByKey[key] ?? 0;
+    }
+  }
+  return { soldCents, informedCents, differenceCents: informedCents - soldCents };
+}
+
 export type PeriodReport = {
   from: string;
   to: string;

@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Alert, Badge, Button, Card, DataTable, DateRangePicker, Modal, Skeleton, useToast, CALENDAR_QUICK_RANGES, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
+import { Alert, Badge, Button, Card, DateRangePicker, Modal, Skeleton, useToast, CALENDAR_QUICK_RANGES, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
 import { DayFace, DayMetrics, MonthCalendar, blankDayClass } from "@/components/wedash/MonthCalendar";
 import { DayChip, PlainKpi } from "@/pages/cash-close/CashClosePage";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { periodLabels } from "@/data/wedash/dashboard";
 import { fetchSalesCoverage, fetchSalesDayAggs } from "@/data/wedash/salesRepo";
 import { fetchInformedCents, fetchLaunchedDays, fetchShoppingAccount, requestShoppingLaunch, requestShoppingRead, type ShoppingAccount } from "@/data/wedash/shoppingRepo";
-import { ALREADY_LAUNCHED, canResendDay, forceLaunchAllowed, informedGap, monthReport, reportDays, shoppingSendsSales, sumSoldByDay } from "@/data/wedash/shoppingReport";
+import { ALREADY_LAUNCHED, canResendDay, forceLaunchAllowed, groupedDay, groupedPeriod, informedGap, monthReport, reportDays, shoppingSendsSales, sumSoldByDay } from "@/data/wedash/shoppingReport";
 import { brlCent, longDate, isoToDate, endOfMonth, startOfMonth, eachDay, dateToIso, addDays } from "@/lib/format";
 import { statusBadgeVariant } from "@/lib/status";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
@@ -59,30 +59,24 @@ function dayStatus(soldCents: number, informedCents: number | null): { text: str
   return { text, color: "bg-bad" };
 }
 
-type KioskLine = {
-  id: string;
-  name: string;
-  soldCents: number;
-  informedCents: number;
-  differenceCents: number;
-};
+type GroupStore = { id: string; name: string };
 
-function kioskPeriod(
-  storeId: string,
-  aggs: Array<{ storeId: string; day: string; revenueCents: number; brand?: string | null }>,
-  informed: Record<string, number>,
-  from: string,
-  to: string,
-  today: string,
-): Pick<KioskLine, "soldCents" | "informedCents" | "differenceCents"> {
-  const sold = sumSoldByDay(aggs.filter((row) => row.storeId === storeId));
-  let soldCents = 0;
-  let informedCents = 0;
-  for (let day = from; day <= to && day < today; day = addDays(day, 1)) {
-    soldCents += sold[day] ?? 0;
-    informedCents += informed[`${storeId}|${day}`] ?? 0;
+function soldByStoreDay(aggs: Array<{ storeId: string; day: string; revenueCents: number; brand?: string | null }>): Record<string, number> {
+  const byStore = new Map<string, typeof aggs>();
+  for (const row of aggs) {
+    const list = byStore.get(row.storeId) ?? [];
+    list.push(row);
+    byStore.set(row.storeId, list);
   }
-  return { soldCents, informedCents, differenceCents: informedCents - soldCents };
+  const out: Record<string, number> = {};
+  for (const [storeId, rows] of byStore) {
+    for (const [day, cents] of Object.entries(sumSoldByDay(rows))) out[`${storeId}|${day}`] = cents;
+  }
+  return out;
+}
+
+function filialCount(count: number, one: string, many: string): string {
+  return count === 1 ? `1 filial ${one}` : `${count} filiais ${many}`;
 }
 
 function rangeCells(from: string, to: string): Array<string | null> {
@@ -90,31 +84,6 @@ function rangeCells(from: string, to: string): Array<string | null> {
   for (let day = from; day <= to; day = addDays(day, 1)) cells.push(day);
   while (cells.length % 7 !== 0) cells.push(null);
   return cells;
-}
-
-function KioskTable({ rows }: { rows: KioskLine[] }) {
-  return (
-    <DataTable
-      columns={[
-        { key: "name", header: "Filial", render: (row) => row.name, sortable: true, sortValue: (row) => row.name },
-        { key: "sold", header: "Vendido", align: "right", render: (row) => money(row.soldCents), sortable: true, sortValue: (row) => row.soldCents },
-        { key: "informed", header: "Informado", align: "right", render: (row) => money(row.informedCents), sortable: true, sortValue: (row) => row.informedCents },
-        {
-          key: "difference",
-          header: "Diferença",
-          align: "right",
-          render: (row) => <span style={{ color: differenceColor(row.differenceCents) }}>{differenceAmount(row.differenceCents)}</span>,
-          sortable: true,
-          sortValue: (row) => row.differenceCents,
-        },
-      ]}
-      data={rows}
-      rowKey={(row) => row.id}
-      emptyMessage="Nenhum quiosque com informe de vendas neste acesso."
-      defaultSortKey="name"
-      paginate="filiais"
-    />
-  );
 }
 
 /** Financeiro > Informe de vendas. Calendário do que foi informado no shopping. */
@@ -139,8 +108,10 @@ export function SalesReportPage() {
   const [lancando, setLancando] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [dayOpen, setDayOpen] = useState<string | null>(null);
-  const [kioskRows, setKioskRows] = useState<KioskLine[]>([]);
-  const [kioskLoaded, setKioskLoaded] = useState("");
+  const [groupStores, setGroupStores] = useState<GroupStore[]>([]);
+  const [groupSold, setGroupSold] = useState<Record<string, number>>({});
+  const [groupInformed, setGroupInformed] = useState<Record<string, number>>({});
+  const [groupLoaded, setGroupLoaded] = useState("");
 
   const store = storeRows[0];
   const storeRef = useRef(store);
@@ -214,8 +185,10 @@ export function SalesReportPage() {
       const sending = accounts.filter((row) => shoppingSendsSales(row.account?.administrator));
       const ids = sending.map((row) => row.item.id);
       if (ids.length === 0) {
-        setKioskRows([]);
-        setKioskLoaded(band);
+        setGroupStores([]);
+        setGroupSold({});
+        setGroupInformed({});
+        setGroupLoaded(band);
         return;
       }
       const [aggs, informed] = await Promise.all([
@@ -223,19 +196,17 @@ export function SalesReportPage() {
         fetchInformedCents(session.tenantId, ids, from, to),
       ]);
       if (cancel) return;
-      setKioskRows(
-        sending
-          .map(({ item }) => ({ id: item.id, name: item.tradeName, ...kioskPeriod(item.id, aggs, informed, from, to, today) }))
-          .sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
-      );
-      setKioskLoaded(band);
+      setGroupStores(sending.map(({ item }) => ({ id: item.id, name: item.tradeName })).sort((a, b) => a.name.localeCompare(b.name, "pt-BR")));
+      setGroupSold(soldByStoreDay(aggs));
+      setGroupInformed(informed);
+      setGroupLoaded(band);
     })().catch(() => {
       if (!cancel) setError(true);
     });
     return () => {
       cancel = true;
     };
-  }, [storesLoading, manyStores, storeRows, session.tenantId, from, to, today, band]);
+  }, [storesLoading, manyStores, storeRows, session.tenantId, from, to, band]);
 
   const pronto = loaded === band;
 
@@ -356,14 +327,28 @@ export function SalesReportPage() {
       <div className="mt-6 pb-8">
         {error ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar o informe de vendas. Tente novamente." /> : null}
         {!manyStores && shoppingSendsSales(account?.administrator) && account?.lastError ? <Alert className="mb-4" variant="danger" title={account.lastError} /> : null}
-        {showStores || (storeRows.length > 0 && (manyStores ? kioskLoaded !== band : store != null && !pronto)) ? (
+        {showStores || (storeRows.length > 0 && (manyStores ? groupLoaded !== band : store != null && !pronto)) ? (
           <Skeleton className="h-[520px] w-full rounded-[18px]" />
         ) : storeRows.length === 0 ? (
           <Card>
             <EmptyBlock icon="🧾" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
           </Card>
         ) : manyStores ? (
-          <KioskTable rows={kioskRows} />
+          groupStores.length === 0 ? (
+            <Card>
+              <EmptyBlock icon="🧾" title="Nenhum quiosque com informe de vendas" description="Neste acesso não há quiosque com Intranet Mall ou Group COM conectados." />
+            </Card>
+          ) : (
+            <GroupCalendar
+              today={today}
+              cells={cells}
+              stores={groupStores}
+              sold={groupSold}
+              informed={groupInformed}
+              summary={groupedPeriod(groupStores.map((item) => item.id), from, to, today, groupSold, groupInformed)}
+              onOpen={setDayOpen}
+            />
+          )
         ) : !kiosk ? (
           <Card>
             <EmptyBlock icon="🧾" title="Informe de vendas indisponível" description="Esta tela está disponível apenas para filiais do tipo Quiosque em shopping." />
@@ -423,13 +408,17 @@ export function SalesReportPage() {
           </>
         )}
       </div>
-      <InformedDayModal
-        day={dayOpen}
-        today={today}
-        sold={dayOpen == null ? null : dayOpen === today ? (sold[today] != null && sold[today] > 0 ? sold[today] : null) : (byDay.get(dayOpen)?.soldCents ?? 0)}
-        informed={dayOpen && dayOpen < today ? (byDay.get(dayOpen)?.launchedCents ?? null) : null}
-        onClose={() => setDayOpen(null)}
-      />
+      {manyStores ? (
+        <GroupDayModal day={dayOpen} today={today} stores={groupStores} sold={groupSold} informed={groupInformed} onClose={() => setDayOpen(null)} />
+      ) : (
+        <InformedDayModal
+          day={dayOpen}
+          today={today}
+          sold={dayOpen == null ? null : dayOpen === today ? (sold[today] != null && sold[today] > 0 ? sold[today] : null) : (byDay.get(dayOpen)?.soldCents ?? 0)}
+          informed={dayOpen && dayOpen < today ? (byDay.get(dayOpen)?.launchedCents ?? null) : null}
+          onClose={() => setDayOpen(null)}
+        />
+      )}
       <Modal
         open={confirm}
         onClose={() => { if (!lancando) setConfirm(false); }}
@@ -452,6 +441,143 @@ export function SalesReportPage() {
         </div>
       </Modal>
     </div>
+  );
+}
+
+function GroupCalendar({
+  today,
+  cells,
+  stores,
+  sold,
+  informed,
+  summary,
+  onOpen,
+}: {
+  today: string;
+  cells: Array<string | null>;
+  stores: GroupStore[];
+  sold: Record<string, number>;
+  informed: Record<string, number>;
+  summary: { soldCents: number; informedCents: number; differenceCents: number };
+  onOpen: (day: string) => void;
+}) {
+  const ids = stores.map((store) => store.id);
+  return (
+    <>
+      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <PlainKpi label="Vendido" value={money(summary.soldCents)} color="var(--t0)" />
+        <PlainKpi label="Informado" value={money(summary.informedCents)} color="var(--t0)" />
+        <PlainKpi
+          label="Diferença"
+          value={differenceAmount(summary.differenceCents)}
+          color={differenceColor(summary.differenceCents)}
+          tooltip="Informado − vendido, somando as filiais. Dia sem informe entra como zero."
+        />
+      </div>
+      <MonthCalendar>
+        {cells.map((day, i) => {
+          if (!day) return <div key={`vazio-${i}`} className={blankDayClass(i)} />;
+          const past = day < today;
+          const todayDay = day === today;
+          const face = past || todayDay ? groupedDay(ids, day, sold, informed) : null;
+          const amount = face && face.soldCents > 0 ? money(face.soldCents) : null;
+          return (
+            <DayFace
+              key={day}
+              index={i}
+              iso={day}
+              today={today}
+              openable={todayDay || past}
+              openLabel={`Abrir ${dayTitle(day)}`}
+              onOpen={() => onOpen(day)}
+              amount={amount}
+              badges={
+                face ? (
+                  <>
+                    {past && face.missingStores > 0 ? <DayChip color="bg-warn">{filialCount(face.missingStores, "não informada", "não informadas")}</DayChip> : null}
+                    {past && face.gapStores > 0 ? <DayChip color="bg-bad">{filialCount(face.gapStores, "com diferença", "com diferença")}</DayChip> : null}
+                    {todayDay ? <DayChip color="bg-acc">Em aberto</DayChip> : null}
+                  </>
+                ) : null
+              }
+            />
+          );
+        })}
+      </MonthCalendar>
+    </>
+  );
+}
+
+function GroupDayModal({
+  day,
+  today,
+  stores,
+  sold,
+  informed,
+  onClose,
+}: {
+  day: string | null;
+  today: string;
+  stores: GroupStore[];
+  sold: Record<string, number>;
+  informed: Record<string, number>;
+  onClose: () => void;
+}) {
+  const todayDay = day === today;
+  const blocks = day
+    ? stores.map((store) => {
+        const key = `${store.id}|${day}`;
+        const soldCents = todayDay ? (sold[key] != null && sold[key] > 0 ? sold[key] : null) : (sold[key] ?? 0);
+        const informedCents = !todayDay && Object.prototype.hasOwnProperty.call(informed, key) ? informed[key]! : null;
+        return { ...store, soldCents, informedCents };
+      })
+    : [];
+  const missing = blocks.some((block) => block.informedCents == null);
+  const gap = blocks.some((block) => block.informedCents != null && block.soldCents != null && block.informedCents !== block.soldCents);
+  const status = todayDay ? "Em aberto" : missing ? "Não informado" : "Informado";
+  const variant = !todayDay && !missing && gap ? "danger" : statusBadgeVariant(status);
+  return (
+    <Modal
+      open={day != null}
+      onClose={onClose}
+      size="lg"
+      title={
+        day ? (
+          <>
+            <span>{dayTitle(day)}</span>
+            <Badge variant={variant}>{status}</Badge>
+          </>
+        ) : (
+          ""
+        )
+      }
+      footer={<Button variant="outline" onClick={onClose}>Voltar</Button>}
+    >
+      {day ? (
+        <div className="flex flex-col gap-6">
+          {blocks.map((block) => {
+            const difference = block.soldCents != null && block.informedCents != null ? block.informedCents - block.soldCents : null;
+            const faltando = !todayDay && block.informedCents == null;
+            const diferente = !todayDay && block.informedCents != null && block.soldCents != null && block.informedCents !== block.soldCents;
+            return (
+              <section key={block.id}>
+                <p className="mb-3 text-[13px] font-bold text-t0">{block.name}</p>
+                <DayMetrics
+                  items={[
+                    { label: "Vendido", value: block.soldCents == null ? "—" : money(block.soldCents) },
+                    { label: "Informado", value: todayDay ? "—" : block.informedCents == null ? "Não informado" : money(block.informedCents) },
+                    { label: "Diferença", value: difference == null ? "—" : differenceAmount(difference), color: difference == null ? undefined : differenceColor(difference) },
+                  ]}
+                />
+                {todayDay ? <p className="text-[13px] leading-relaxed text-t2">Este dia ainda está em aberto. O valor será informado depois do fechamento.</p> : null}
+                {faltando ? <p className="text-[13px] leading-relaxed text-t2">Este dia ainda não foi informado ao shopping.</p> : null}
+                {diferente ? <p className="text-[13px] leading-relaxed text-t2">O valor informado é diferente do vendido.</p> : null}
+              </section>
+            );
+          })}
+        </div>
+      ) : null}
+    </Modal>
   );
 }
 

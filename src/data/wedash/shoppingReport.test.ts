@@ -13,6 +13,8 @@ import {
   informedGap,
   intranetMallBaseUrl,
   intranetMallSlug,
+  groupedDay,
+  groupedPeriod,
   monthReport,
   periodReports,
   unlaunchedDays,
@@ -374,5 +376,34 @@ describe("fillAllosWeek", () => {
     expect(replaced.days.map((day) => day.cents)).toEqual([10000, 9000]);
     expect(replaced.body).toContain("venda0=100,00");
     expect(replaced.body).toContain("venda1=90,00");
+  });
+});
+
+describe("grouped calendar", () => {
+  const sold = { "a|2026-10-11": 10000, "b|2026-10-11": 5000, "a|2026-10-12": 2000 };
+  const informed = { "a|2026-10-11": 10000, "b|2026-10-11": 4000, "c|2026-10-12": 0 };
+
+  it("counts stores that did not inform and stores with a different amount", () => {
+    expect(groupedDay(["a", "b", "c"], "2026-10-11", sold, informed)).toEqual({
+      soldCents: 15000,
+      missingStores: 1,
+      gapStores: 1,
+    });
+  });
+
+  it("treats a stored zero as informed", () => {
+    expect(groupedDay(["c"], "2026-10-12", sold, informed)).toEqual({
+      soldCents: 0,
+      missingStores: 0,
+      gapStores: 0,
+    });
+  });
+
+  it("sums the period and counts a missing day as zero informed", () => {
+    expect(groupedPeriod(["a", "b"], "2026-10-11", "2026-10-12", "2026-10-13", sold, informed)).toEqual({
+      soldCents: 17000,
+      informedCents: 14000,
+      differenceCents: -3000,
+    });
   });
 });
