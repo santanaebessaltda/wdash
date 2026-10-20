@@ -5,6 +5,7 @@ import { paths } from "@/router/paths";
 import { type RentSeason } from "@/data/wedash/rentSeason";
 import { weekHoursConfigured } from "@/data/wedash/storeHours";
 import { StoreCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
+import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
 import { fetchCostTables, updateStoreCostTable, updateStoreCosts, updateStorePointType, type CostTable, type PointType, type Store } from "@/data/wedash/stores";
 import { syncProductsNow } from "@/data/wedash/productCatalog";
 import { cn } from "@/lib/cn";
@@ -246,7 +247,7 @@ function SettingsCard({
             const name = storeName(store);
             return (
               <section key={store.id} className={cn("flex flex-col gap-4", many && "border-t border-line pb-6 pt-5 first:border-t-0 first:pt-0")}>
-                {many ? <p className="text-[13px] font-bold text-t0 break-words">{name}</p> : null}
+                {many ? <StoreDivisionTitle>{name}</StoreDivisionTitle> : null}
                 <SettingsDraftProvider register={drafts.register} errorPrefix={many ? name : undefined}>
                   {children(store)}
                 </SettingsDraftProvider>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Alert, Button, Card, DateRangePicker, Dropdown, Modal, Segmented, Skeleton, useToast, CALENDAR_QUICK_RANGES, Badge, type DatePresetId, type DateRangeChangeMeta, type DropdownItem } from "@/components/ui";
 import { DayFace, MonthCalendar, blankDayClass } from "@/components/wedash/MonthCalendar";
+import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { periodLabels } from "@/data/wedash/dashboard";
 import { fetchLatestCashCloseError, fetchNavMonthFloor, fetchOpenCashCloseJob, requestCashDropMonth } from "@/data/wedash/cashCloseRepo";
@@ -716,7 +717,7 @@ function DropShell({
   if (embedded) {
     return (
       <section className="border-t border-line pb-6 pt-5 first:border-t-0 first:pt-0 last:pb-0">
-        {storeName ? <p className="mb-3 text-[15px] font-bold text-t0">{storeName}</p> : null}
+        {storeName ? <StoreDivisionTitle className="mb-3">{storeName}</StoreDivisionTitle> : null}
         {children}
         {footer ? <div className="mt-4 flex flex-wrap justify-end gap-2">{footer}</div> : null}
       </section>

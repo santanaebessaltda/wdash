@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Alert, Badge, Button, Card, DateRangePicker, Modal, Skeleton, useToast, CALENDAR_QUICK_RANGES, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
 import { DayFace, DayMetrics, MonthCalendar, blankDayClass } from "@/components/wedash/MonthCalendar";
+import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
 import { DayChip, PlainKpi } from "@/pages/cash-close/CashClosePage";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { periodLabels } from "@/data/wedash/dashboard";
@@ -563,7 +564,7 @@ function GroupDayModal({
             const diferente = !todayDay && block.informedCents != null && block.soldCents != null && block.informedCents !== block.soldCents;
             return (
               <section key={block.id}>
-                <p className="mb-3 text-[13px] font-bold text-t0">{block.name}</p>
+                <StoreDivisionTitle className="mb-3">{block.name}</StoreDivisionTitle>
                 <DayMetrics
                   items={[
                     { label: "Vendido", value: block.soldCents == null ? "—" : money(block.soldCents) },

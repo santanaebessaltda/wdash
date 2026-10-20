@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import { Alert, Badge, Button, Card, CardTitle, Checkbox, Dropdown, FormField, Modal, Select, ThSort, useToast, type DropdownItem, type SortDir } from "@/components/ui";
 import { StockProductsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { ProductNameCell } from "@/components/wedash/ProductNameCell";
+import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
 import {
   PURCHASE_FACTORS,
   PURCHASE_FILE_HEADER,
@@ -611,7 +612,7 @@ export function PurchaseOrderPage() {
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pb-5 pt-3">
               {summaryGroups.map((group) => (
                 <div key={group.storeId}>
-                  {summaryGroups.length > 1 && <p className="mb-2 text-[12px] font-extrabold uppercase tracking-wide text-t2">{group.branchCode} · {group.storeName}</p>}
+                  {summaryGroups.length > 1 && <StoreDivisionTitle className="mb-2">{group.branchCode} · {group.storeName}</StoreDivisionTitle>}
                   <ul className="overflow-hidden rounded-[var(--radius-vela-lg)] border border-line">
                     {group.rows.map((r) => (
                       <li key={`${group.storeId}:${r.code}`} className="flex items-center gap-3 border-b border-line px-3 py-2.5 last:border-b-0">

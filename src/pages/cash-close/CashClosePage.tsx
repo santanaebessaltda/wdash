@@ -2,6 +2,7 @@
 import { Alert, Badge, Button, Card, DateRangePicker, Modal, Skeleton, Tooltip, useToast, CALENDAR_QUICK_RANGES, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
 import { statusBadgeVariant } from "@/lib/status";
 import { DayFace, DayMetrics, MonthCalendar, blankDayClass } from "@/components/wedash/MonthCalendar";
+import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
 import { EmployeeWithdrawal } from "@/pages/cash-close/EmployeeWithdrawal";
 import { OnlinePix } from "@/pages/cash-close/OnlinePix";
 import { monthCloseSpanFor, monthsTouched } from "@/data/wedash/cashCloseMonth";
@@ -1084,7 +1085,7 @@ function DayModal({
             const cents = soldByStore && store.id in soldByStore ? soldByStore[store.id] : null;
             return (
               <div key={store.id} className={storeRows.length > 1 ? "border-t border-line pb-6 pt-5 first:border-t-0 first:pt-0 last:pb-0" : undefined}>
-                {storeRows.length > 1 ? <p className="mb-2 text-[13px] font-bold text-t0">{store.tradeName}</p> : null}
+                {storeRows.length > 1 ? <StoreDivisionTitle className="mb-2">{store.tradeName}</StoreDivisionTitle> : null}
                 <DayMetrics items={[{ label: "Vendido hoje", value: cents == null ? "—" : brlCent(cents / 100) }]} />
                 <p className="text-[13px] leading-relaxed text-t2">Este dia ainda está em aberto. A diferença será calculada após o fechamento.</p>
               </div>
@@ -1116,7 +1117,7 @@ function DayModal({
             );
             return (
               <section key={store.id} className={withDados.length > 1 ? "border-t border-line pb-6 pt-5 first:border-t-0 first:pt-0 last:pb-0" : undefined}>
-                {storeRows.length > 1 && <p className="mb-3 text-[13px] font-bold text-t0">{store.tradeName}</p>}
+                {storeRows.length > 1 && <StoreDivisionTitle className="mb-3">{store.tradeName}</StoreDivisionTitle>}
                 {!dayWithoutReal(lines) ? (
                   <DayTotals systemCents={conta.comparedSystemCents} realCents={conta.realCents} diffCents={conta.diffCents} />
                 ) : (
