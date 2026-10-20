@@ -20,7 +20,7 @@ import { usePagedRows } from "@/lib/usePagedRows";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { CheckCircleIcon, FlameIcon, TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
-import { CostCardTitle, SectionHeader, useScopedStores } from "@/pages/operation/shared";
+import { CostCardTitle, SectionHeader, TipHelp, useScopedStores } from "@/pages/operation/shared";
 import { fetchStoreSellers, type Store } from "@/data/wedash/stores";
 import { matchesCodeOrName } from "@/lib/personSearch";
 import { buildXlsx, type XlsxCell } from "@/lib/xlsx";
@@ -300,7 +300,7 @@ function PeopleList({
       return cmp * dir || a.name.localeCompare(b.name, "pt-BR");
     });
   }, [rows, codes, search, sortKey, sortDir]);
-  const { page, setPage, totalPages, pageRows } = usePagedRows(sorted, `${search}|${sortKey}|${sortDir}`);
+  const { page, setPage, totalPages, pageRows, pageSize } = usePagedRows(sorted, `${search}|${sortKey}|${sortDir}`);
   const total = useMemo(
     () => ({
       earnings: sorted.reduce((sum, row) => sum + earningsOf(row), 0),
@@ -320,8 +320,8 @@ function PeopleList({
     setSortDir(key === "name" || key === "store" ? "asc" : "desc");
   }
 
-  const headClass = "px-4 py-3 text-[10.5px] font-bold uppercase tracking-wide";
-  const cellClass = "px-4 py-3.5 align-middle";
+  const headClass = "px-1 pb-3 text-[11px] font-bold uppercase tracking-wide";
+  const cellClass = "px-1 py-3 align-middle";
 
   return (
     <Card className="print-flow min-w-0" padding="none">
@@ -353,11 +353,12 @@ function PeopleList({
           }
         />
       ) : (
-        <div className="overflow-hidden border-t border-line bg-transparent">
+        <div className="px-5 pb-5">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] border-collapse text-sm">
                 <thead>
-                  <tr className="border-b border-line">
+                  <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
+                    <th className="px-1 pb-3 text-left font-bold">#</th>
                     <ThSort label="Nome" active={sortKey === "name"} dir={sortDir} onClick={() => toggleSort("name")} align="left" className={headClass} />
                     {showStore ? <ThSort label="Filial" active={sortKey === "store"} dir={sortDir} onClick={() => toggleSort("store")} align="left" className={headClass} /> : null}
                     <ThSort label="Ganhos" active={sortKey === "earnings"} dir={sortDir} onClick={() => toggleSort("earnings")} className={headClass} />
@@ -367,7 +368,7 @@ function PeopleList({
                   </tr>
                 </thead>
                 <tbody>
-                  {pageRows.map((row) => (
+                  {pageRows.map((row, index) => (
                     <tr
                       key={rowKey(row)}
                       tabIndex={0}
@@ -379,13 +380,14 @@ function PeopleList({
                       }}
                       className="cursor-pointer border-b border-line transition-colors hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none"
                     >
+                      <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{(page - 1) * pageSize + index + 1}</td>
                       <td className={cellClass}>
-                        <div className="flex min-w-0 items-center gap-3">
-                          <PersonAvatar name={row.name} employeeId={codes.get(rowKey(row))} storeId={row.storeId} />
-                          <span className="truncate text-[13.5px] font-bold text-t0">{row.name}</span>
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <PersonAvatar name={row.name} employeeId={codes.get(rowKey(row))} storeId={row.storeId} size="sm" />
+                          <span className="truncate text-[13px] font-bold text-t0">{row.name}</span>
                         </div>
                       </td>
-                      {showStore ? <td className={cn(cellClass, "text-t1")}>{row.storeName}</td> : null}
+                      {showStore ? <td className={cn(cellClass, "text-[13px] text-t1")}>{row.storeName}</td> : null}
                       <td className={cn(cellClass, "text-right font-mono text-[13px] font-bold text-t0")}>{money(earningsOf(row))}</td>
                       <td className={cn(cellClass, "text-right font-mono text-[13px] font-bold text-t0")}>{minusMoney(row.withdrawalCents)}</td>
                       <td className={cn(cellClass, "text-right font-mono text-[13px] font-bold text-t0")}>{minusMoney(row.shortageCents)}</td>
@@ -393,8 +395,12 @@ function PeopleList({
                     </tr>
                   ))}
                   <tr className="bg-bg-inset">
-                    <td className={cn(cellClass, "text-[13.5px] font-extrabold text-t0")}>
-                      Total do filtro
+                    <td />
+                    <td className={cn(cellClass, "text-[13px] font-extrabold text-t0")}>
+                      <span className="inline-flex items-center gap-1">
+                        Total do filtro
+                        <TipHelp label="Soma todas as pessoas encontradas no filtro, inclusive as que não aparecem nesta página." />
+                      </span>
                       <span className="mt-0.5 block text-[11px] font-semibold text-t2">
                         {num(sorted.length)} {sorted.length === 1 ? "pessoa" : "pessoas"}
                       </span>
@@ -408,16 +414,16 @@ function PeopleList({
                 </tbody>
               </table>
             </div>
-          </div>
-      )}
-      {sorted.length > 0 ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3.5 print:hidden">
-          <span className="text-[12.5px] text-t2">
-            Mostrando {pageRows.length} de {num(sorted.length)} pessoas
-          </span>
-          {totalPages > 1 ? <Pagination page={page} totalPages={totalPages} onChange={setPage} /> : null}
+          {sorted.length > 0 ? (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
+              <span className="text-[12.5px] text-t2">
+                Mostrando {pageRows.length} de {num(sorted.length)} pessoas
+              </span>
+              {totalPages > 1 ? <Pagination page={page} totalPages={totalPages} onChange={setPage} /> : null}
+            </div>
+          ) : null}
         </div>
-      ) : null}
+      )}
     </Card>
   );
 }
@@ -858,12 +864,15 @@ function WalletSkeleton() {
         <div className="flex justify-end px-5 pb-4">
           <Skeleton className="h-8 w-full rounded-[var(--radius-vela-sm)] sm:w-56" />
         </div>
-        <div className="overflow-hidden border-t border-line">
+        <div className="px-5 pb-5">
           <table className="w-full border-collapse">
             <thead>
               <tr className="border-b border-line">
+                <th className="px-1 pb-3 text-left">
+                  <Skeleton className="h-2.5 w-3" />
+                </th>
                 {Array.from({ length: 5 }, (_, index) => (
-                  <th key={index} className="px-4 py-3 text-left">
+                  <th key={index} className="px-1 pb-3 text-left">
                     <Skeleton className="h-2.5 w-14" />
                   </th>
                 ))}
@@ -871,20 +880,35 @@ function WalletSkeleton() {
             </thead>
             <tbody>
               {Array.from({ length: 4 }, (_, row) => (
-                <tr key={row} className="border-b border-line last:border-b-0">
-                  <td className="px-4 py-3.5">
-                    <div className="flex items-center gap-3">
-                      <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+                <tr key={row} className="border-b border-line">
+                  <td className="px-1 py-3">
+                    <Skeleton className="mx-auto h-3 w-3" />
+                  </td>
+                  <td className="px-1 py-3">
+                    <div className="flex items-center gap-2.5">
+                      <Skeleton className="h-8 w-8 shrink-0 rounded-full" />
                       <Skeleton className="h-3.5 w-32" />
                     </div>
                   </td>
                   {Array.from({ length: 4 }, (_, cell) => (
-                    <td key={cell} className="px-4 py-3.5 text-right">
+                    <td key={cell} className="px-1 py-3 text-right">
                       <Skeleton className="ml-auto h-3 w-16" />
                     </td>
                   ))}
                 </tr>
               ))}
+              <tr className="bg-bg-inset">
+                <td />
+                <td className="px-1 py-3">
+                  <Skeleton className="h-3.5 w-28" />
+                  <Skeleton className="mt-1.5 h-2.5 w-16" />
+                </td>
+                {Array.from({ length: 4 }, (_, cell) => (
+                  <td key={cell} className="px-1 py-3 text-right">
+                    <Skeleton className="ml-auto h-3.5 w-16" />
+                  </td>
+                ))}
+              </tr>
             </tbody>
           </table>
         </div>
