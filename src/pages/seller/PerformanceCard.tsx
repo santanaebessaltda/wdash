@@ -23,21 +23,25 @@ function RankingList({ ranking }: { ranking: MonthRankingEntry[] }) {
     <div>
       <RankingBlock ranking={podium} formatAmount={brlCent} />
       {rest.length > 0 && (
-        <ul className="mt-3 flex flex-col divide-y divide-line">
+        <ul className="mt-3 flex flex-col">
           {rest.map((r) => (
             <li
               key={`${r.position}-${r.employeeId}`}
-              className={`flex items-center gap-3 py-2 ${r.me ? "-mx-2 rounded-xl bg-acc-soft px-2" : ""}`}
+              className={
+                r.me
+                  ? "my-1 flex items-center gap-3 rounded-xl border border-acc bg-acc-soft px-3 py-2 text-acc"
+                  : "flex items-center gap-3 border-b border-line py-2 last:border-b-0"
+              }
             >
-              <span className={`w-7 text-right font-mono text-[13px] font-bold ${r.me ? "text-acc" : "text-t2"}`}>{r.position}º</span>
+              <span className={`w-7 text-right font-mono text-[13px] font-bold ${r.me ? "" : "text-t2"}`}>{r.position}º</span>
               <PersonAvatar name={r.name} employeeId={r.employeeId} size="sm" />
-              <span className={`min-w-0 flex-1 truncate text-[13.5px] ${r.me ? "font-extrabold text-acc" : "font-semibold text-t0"}`}>
+              <span className={`min-w-0 flex-1 truncate text-[13.5px] ${r.me ? "font-extrabold" : "font-semibold text-t0"}`}>
                 {r.me ? "VOCÊ" : r.name}
               </span>
-              <span className={`text-[12px] ${r.me ? "font-semibold text-acc" : "text-t2"}`}>
+              <span className={`text-[12px] ${r.me ? "font-semibold" : "text-t2"}`}>
                 {num(r.sales)} {r.sales === 1 ? "venda" : "vendas"}
               </span>
-              <span className={`w-24 text-right font-mono text-[13px] font-bold ${r.me ? "text-acc" : "text-t0"}`}>{brlCent(r.revenue)}</span>
+              <span className={`w-24 text-right font-mono text-[13px] font-bold ${r.me ? "" : "text-t0"}`}>{brlCent(r.revenue)}</span>
             </li>
           ))}
         </ul>
