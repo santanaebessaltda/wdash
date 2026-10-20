@@ -46,6 +46,7 @@ import { InitialSyncNotice } from "@/pages/dashboard/InitialSyncNotice";
 import { StoreHoursNotice } from "@/pages/dashboard/StoreHoursNotice";
 import { ErpStatusNotice } from "@/pages/dashboard/ErpStatusNotice";
 import { FirstStepsCard, useFirstSteps } from "@/pages/dashboard/FirstSteps";
+import { TipHelp } from "@/pages/operation/shared";
 import { ExportDialog } from "@/components/wedash/ExportDialog";
 import { ReportHeader, useExportPdf } from "@/pages/dashboard/ReportHeader";
 import { usePrintMode } from "@/lib/printMode";
@@ -451,6 +452,36 @@ export default function OverviewPage() {
     }
     return teamDir === "asc" ? top.reverse() : top;
   }, [view.topSellers, teamSort, teamDir]);
+
+  const teamTotal = useMemo(() => {
+    const people = view.topSellers;
+    const revenue = people.reduce((sum, person) => sum + person.amount, 0);
+    const sales = people.reduce((sum, person) => sum + (person.sales ?? 0), 0);
+    const complete = people.every((person) => person.pa != null || (person.sales ?? 0) === 0);
+    const items = complete ? people.reduce((sum, person) => sum + (person.pa ?? 0) * (person.sales ?? 0), 0) : 0;
+    return {
+      count: people.length,
+      revenue,
+      sales,
+      averageTicket: sales > 0 ? revenue / sales : 0,
+      pa: complete && sales > 0 ? items / sales : null,
+    };
+  }, [view.topSellers]);
+
+  const productTotal = useMemo(() => {
+    const products = view.topProducts;
+    const items = products.reduce((sum, product) => sum + (product.items ?? 0), 0);
+    const revenue = products.reduce((sum, product) => sum + product.amount, 0);
+    const complete = products.length > 0 && products.every((product) => product.profit != null);
+    const revenuePrev = products.reduce((sum, product) => sum + (product.revenuePrev ?? 0), 0);
+    return {
+      count: products.length,
+      items,
+      revenue,
+      profit: complete ? products.reduce((sum, product) => sum + (product.profit ?? 0), 0) : null,
+      variation: revenue > 0 && revenuePrev > 0 ? Math.round(((revenue - revenuePrev) / revenuePrev) * 100) : null,
+    };
+  }, [view.topProducts]);
 
   function toggleTeamSort(key: TeamSort) {
     if (teamSort === key) {
@@ -1007,6 +1038,24 @@ export default function OverviewPage() {
                     </tr>
                   );
                 })}
+                <tr className="bg-bg-inset">
+                  <td />
+                  <td className="px-1 py-3 text-[13px] font-extrabold text-t0">
+                    <span className="inline-flex items-center gap-1">
+                      Total do filtro
+                      <TipHelp label="Soma todas as pessoas encontradas no filtro, inclusive as que não aparecem neste destaque." />
+                    </span>
+                    <span className="mt-0.5 block text-[11px] font-semibold text-t2">
+                      {num(teamTotal.count)} {teamTotal.count === 1 ? "pessoa" : "pessoas"}
+                    </span>
+                  </td>
+                  <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{brlCent(teamTotal.revenue)}</td>
+                  <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{num(teamTotal.sales)}</td>
+                  <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{brlCent(teamTotal.averageTicket)}</td>
+                  <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", teamTotal.pa == null ? "text-t2" : "text-t0")}>
+                    {teamTotal.pa == null ? "—" : num(teamTotal.pa, 2)}
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -1105,6 +1154,34 @@ export default function OverviewPage() {
                     </tr>
                   );
                 })}
+                <tr className="bg-bg-inset">
+                  <td />
+                  <td className="px-1 py-3 text-[13px] font-extrabold text-t0">
+                    <span className="inline-flex items-center gap-1">
+                      Total do filtro
+                      <TipHelp label="Soma todos os produtos encontrados no filtro, inclusive os que não aparecem neste destaque." />
+                    </span>
+                    <span className="mt-0.5 block text-[11px] font-semibold text-t2">
+                      {num(productTotal.count)} produto{productTotal.count === 1 ? "" : "s"}
+                    </span>
+                  </td>
+                  <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{num(productTotal.items)}</td>
+                  <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{brlCent(productTotal.revenue)}</td>
+                  <td
+                    className={cn(
+                      "px-1 py-3 text-right font-mono text-[13px] font-extrabold",
+                      productTotal.profit == null ? "text-t2" : productTotal.profit < 0 ? "text-bad" : "text-ok",
+                    )}
+                  >
+                    {productTotal.profit == null ? "—" : brlCent(productTotal.profit)}
+                  </td>
+                  <td
+                    className="px-1 py-3 text-right text-xs font-extrabold"
+                    style={{ color: productTotal.variation != null ? (productTotal.variation >= 0 ? "var(--ok)" : "var(--bad)") : undefined }}
+                  >
+                    {productTotal.variation != null ? `${productTotal.variation >= 0 ? "+" : ""}${productTotal.variation}%` : "—"}
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>

@@ -226,7 +226,7 @@ function TopTableSkeleton({
             {variation && <Skeleton className="h-2.5 w-14" />}
           </div>
           {Array.from({ length: rows }, (_, i) => (
-            <div key={i} className="flex items-center gap-3 border-b border-line px-1 py-3 last:border-b-0">
+            <div key={i} className="flex items-center gap-3 border-b border-line px-1 py-3">
               <Skeleton className="h-3 w-3" />
               <Skeleton className={cn("h-9 w-9 shrink-0", round ? "rounded-full" : "rounded-[11px]")} />
               <div className="min-w-0 flex-1">
@@ -239,6 +239,17 @@ function TopTableSkeleton({
               {variation && <Skeleton className="h-3.5 w-10" />}
             </div>
           ))}
+          <div className="flex items-center gap-3 bg-bg-inset px-1 py-3">
+            <span className="w-3" />
+            <div className="min-w-0 flex-1">
+              <Skeleton className="h-3.5 w-28" />
+              <Skeleton className="mt-1.5 h-2.5 w-16" />
+            </div>
+            <Skeleton className="h-3.5 w-14" />
+            <Skeleton className="h-3.5 w-20" />
+            <Skeleton className="h-3.5 w-10" />
+            {variation && <Skeleton className="h-3.5 w-10" />}
+          </div>
         </div>
       </div>
     </Card>

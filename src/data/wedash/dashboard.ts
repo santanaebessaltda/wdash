@@ -3918,7 +3918,7 @@ export interface OverviewView {
   /** Ranking completo (maior faturamento primeiro)  -  a tela escolhe a metrica e corta o Top N.
    *  `chave` = mesma do `ProductItemRow` (abre o detalhe do produto). */
   /** `lucro`: null = algum dia com venda sem custo gravado; ausente = fixture. */
-  topProducts: (TopItem & { rowKey?: string; sub?: string; items?: number; category?: string; trend?: number; profit?: number | null })[];
+  topProducts: (TopItem & { rowKey?: string; sub?: string; items?: number; category?: string; trend?: number; profit?: number | null; revenuePrev?: number })[];
   storesRanking: (TopItem & { id?: string; goalPct?: number; pctNetwork?: number; trend?: number })[];
   /** Faturamento da rede no periodo (badge do Ranking  -  independente do StorePicker). */
   rankingNetworkTotal?: number;
@@ -4826,6 +4826,7 @@ export function buildOverviewViewFromAggs(scope: Scope, input: OverviewAggInput)
         amount: p.revenue,
         sub: `${p.items} itens`,
         items: p.items,
+        revenuePrev: prev,
         trend: trendPct,
         profit: p.withoutCost ? null : p.revenue - p.cmv,
       };
@@ -5197,7 +5198,7 @@ export function buildOverviewView(scope: Scope, aggs?: OverviewAggInput | null):
       prodMapPrev.set(p.productCode, (prodMapPrev.get(p.productCode) ?? 0) + p.revenue);
     }
   }
-  const topProducts: (TopItem & { sub?: string; items?: number; category?: string; trend?: number })[] = [...prodMap.entries()]
+  const topProducts: (TopItem & { sub?: string; items?: number; category?: string; trend?: number; revenuePrev?: number })[] = [...prodMap.entries()]
     .map(([code, p]) => {
       const revenuePrev = prodMapPrev.get(code) ?? 0;
       const trendPct = revenuePrev > 0 ? ((p.revenue - revenuePrev) / revenuePrev) * 100 : null;
@@ -5207,6 +5208,7 @@ export function buildOverviewView(scope: Scope, aggs?: OverviewAggInput | null):
         sub: `${p.items} itens`,
         items: p.items,
         category: labelUpper(p.categoryName),
+        revenuePrev,
         trend: trendPct != null ? Math.round(trendPct) : undefined,
       };
     })
