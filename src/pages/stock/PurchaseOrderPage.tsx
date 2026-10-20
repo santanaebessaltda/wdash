@@ -557,7 +557,7 @@ export function PurchaseOrderPage() {
                         return (
                           <Fragment key={group.code}>
                             <tr
-                              className={cn("cursor-pointer bg-bg-3", open ? "border-b border-line" : "border-b-2 border-line-2")}
+                              className="cursor-pointer border-b border-line bg-bg-3"
                               onClick={() => toggleGroup(group.code, open)}
                               onKeyDown={(event) => {
                                 if (event.key !== "Enter" && event.key !== " ") return;
@@ -604,8 +604,8 @@ export function PurchaseOrderPage() {
                               </td>
                             </tr>
                             {open &&
-                              group.branches.map((branch, branchIdx) => (
-                                <tr key={`${branch.storeId}:${branch.code}`} className={cn(branch.onOrder ? "bg-warn-soft" : "bg-bg-inset", branchIdx === group.branches.length - 1 ? "border-b-2 border-line-2" : "border-b border-line")}>
+                              group.branches.map((branch) => (
+                                <tr key={`${branch.storeId}:${branch.code}`} className={cn("border-b border-line", branch.onOrder ? "bg-warn-soft" : "bg-bg-inset")}>
                                   <td className={cn(branch.onOrder && "shadow-[inset_3px_0_0_var(--warn)]")} />
                                   <td className={cn("border-l-2 px-1 py-2.5 pl-16", branch.onOrder ? "border-l-warn" : "border-l-line-2")}>
                                     <p className="break-words text-[12.5px] font-semibold leading-5 text-t1">{branch.storeName}</p>
