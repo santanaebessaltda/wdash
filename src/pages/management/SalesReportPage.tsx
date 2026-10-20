@@ -481,6 +481,8 @@ function GroupCalendar({
           const todayDay = day === today;
           const face = past || todayDay ? groupedDay(ids, day, sold, informed) : null;
           const amount = face && face.soldCents > 0 ? money(face.soldCents) : null;
+          const informedStatus = past && face?.informedCents != null ? dayStatus(face.informedSoldCents, face.informedCents) : null;
+          const missingLabel = face && face.missingStores === ids.length ? "Não informado" : face ? filialCount(face.missingStores, "não informada", "não informadas") : "";
           return (
             <DayFace
               key={day}
@@ -494,8 +496,8 @@ function GroupCalendar({
               badges={
                 face ? (
                   <>
-                    {past && face.missingStores > 0 ? <DayChip color="bg-warn">{filialCount(face.missingStores, "não informada", "não informadas")}</DayChip> : null}
-                    {past && face.gapStores > 0 ? <DayChip color="bg-bad">{filialCount(face.gapStores, "com diferença", "com diferença")}</DayChip> : null}
+                    {informedStatus ? <DayChip color={informedStatus.color}>{informedStatus.text}</DayChip> : null}
+                    {past && face.missingStores > 0 ? <DayChip color="bg-warn">{missingLabel}</DayChip> : null}
                     {todayDay ? <DayChip color="bg-acc">Em aberto</DayChip> : null}
                   </>
                 ) : null

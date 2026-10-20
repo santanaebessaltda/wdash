@@ -83,8 +83,11 @@ export function groupedDay(
   day: string,
   soldByKey: Readonly<Record<string, number>>,
   informedByKey: Readonly<Record<string, number>>,
-): { soldCents: number; missingStores: number; gapStores: number } {
+): { soldCents: number; informedCents: number | null; informedSoldCents: number; missingStores: number; gapStores: number } {
   let soldCents = 0;
+  let informedCents = 0;
+  let informedSoldCents = 0;
+  let informedStores = 0;
   let missingStores = 0;
   let gapStores = 0;
   for (const storeId of storeIds) {
@@ -95,9 +98,18 @@ export function groupedDay(
       missingStores += 1;
       continue;
     }
+    informedStores += 1;
+    informedCents += informedByKey[key] ?? 0;
+    informedSoldCents += sold;
     if (informedByKey[key] !== sold) gapStores += 1;
   }
-  return { soldCents, missingStores, gapStores };
+  return {
+    soldCents,
+    informedCents: informedStores === 0 ? null : informedCents,
+    informedSoldCents,
+    missingStores,
+    gapStores,
+  };
 }
 
 /** KPIs do período com várias filiais. Dia sem informe entra como zero, igual ao mês de uma filial. */

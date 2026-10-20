@@ -386,6 +386,8 @@ describe("grouped calendar", () => {
   it("counts stores that did not inform and stores with a different amount", () => {
     expect(groupedDay(["a", "b", "c"], "2026-10-11", sold, informed)).toEqual({
       soldCents: 15000,
+      informedCents: 14000,
+      informedSoldCents: 15000,
       missingStores: 1,
       gapStores: 1,
     });
@@ -394,6 +396,8 @@ describe("grouped calendar", () => {
   it("treats a stored zero as informed", () => {
     expect(groupedDay(["c"], "2026-10-12", sold, informed)).toEqual({
       soldCents: 0,
+      informedCents: 0,
+      informedSoldCents: 0,
       missingStores: 0,
       gapStores: 0,
     });
