@@ -527,8 +527,10 @@ export function CashClosePage() {
       current.hasMillennium = current.hasMillennium || mark.snap.millennium.length > 0;
       current.hasLines = current.hasLines || lines.length > 0;
       current.pending = current.pending || withoutReal;
+      const hasBody = lines.some((line) => line.systemCents !== 0 || line.typedCents !== 0 || line.stoneCents != null || (line.manualPixCents ?? 0) !== 0 || (line.withdrawalCents ?? 0) !== 0);
       if (day < today && withoutReal) current.pendingStores += 1;
-      if (day < today && !withoutReal) {
+      if (day < today && !withoutReal && hasBody) {
+        current.closedStores += 1;
         current.closedRealCents += gap.realCents;
         if (diffCents !== 0) current.diffStores += 1;
       }
@@ -546,7 +548,7 @@ export function CashClosePage() {
 
   function dayFace(day: string): CalendarFace {
     const info = analysis?.byDay.get(day);
-    const counts = { diffStores: info?.diffStores ?? 0, pendingStores: info?.pendingStores ?? 0 };
+    const counts = { diffStores: info?.diffStores ?? 0, pendingStores: info?.pendingStores ?? 0, closedStores: info?.closedStores ?? 0 };
     if (day === today) return { kind: "today", totalCents: soldToday?.cents ?? 0, diffCents: 0, withdrawalCents: 0, awaiting: soldToday == null, ...counts };
     if (!info || (info.systemCents === 0 && info.realCents === 0 && !info.pending)) return { kind: "zero", totalCents: 0, diffCents: 0, withdrawalCents: 0, ...counts };
     if (!info.hasMillennium && !info.hasLines && !info.pending) return { kind: "empty", totalCents: 0, diffCents: 0, withdrawalCents: 0, ...counts };
@@ -646,6 +648,7 @@ type DayBucket = {
   pending: boolean;
   diffStores: number;
   pendingStores: number;
+  closedStores: number;
   closedRealCents: number;
 };
 
@@ -660,6 +663,7 @@ function emptyDayBucket(): DayBucket {
     pending: false,
     diffStores: 0,
     pendingStores: 0,
+    closedStores: 0,
     closedRealCents: 0,
   };
 }
@@ -672,6 +676,7 @@ type CalendarFace = {
   awaiting?: boolean;
   diffStores: number;
   pendingStores: number;
+  closedStores: number;
 };
 
 function filialAttention(count: number, singular: string, plural: string): string {
@@ -772,6 +777,7 @@ function differenceChip(cents: number): { color: string; text: string } {
 function dayHint(face: CalendarFace, many: boolean): string | undefined {
   if (many) {
     const partes: string[] = [];
+    if (face.closedStores > 0 && face.pendingStores > 0) partes.push(filialAttention(face.closedStores, "fechada", "fechadas"));
     if (face.pendingStores > 0) partes.push(filialAttention(face.pendingStores, "pendente", "pendentes"));
     if (face.diffStores > 0) partes.push(filialAttention(face.diffStores, "com diferença", "com diferença"));
     if (face.withdrawalCents > 0) partes.push(`Retirada ${brlCent(face.withdrawalCents / 100)}`);
@@ -820,6 +826,9 @@ function Month({
               face?.kind === "today" || face?.kind === "pending" || face?.kind === "total" ? (
                 many ? (
                   <>
+                    {face.closedStores > 0 && face.pendingStores > 0 && (
+                      <DayChip color="bg-ok">{filialAttention(face.closedStores, "fechada", "fechadas")}</DayChip>
+                    )}
                     {face.pendingStores > 0 && <DayChip color="bg-warn">{filialAttention(face.pendingStores, "pendente", "pendentes")}</DayChip>}
                     {face.kind === "today" && <DayChip color="bg-acc">Em aberto</DayChip>}
                     {face.kind === "total" && face.diffStores > 0 && (
@@ -919,10 +928,13 @@ function DayModal({
     for (const store of storeRows) {
       const snap = snaps[store.id];
       if (!snap) continue;
-      const review = reviews.find((r) => r.storeId === store.id && r.day === day);
+      const review = reviews.find((r) => r.storeId === store.id && r.day === day) ?? null;
       const typed: CloseDraft["typed"] = {};
       const acquirer: CloseDraft["acquirer"] = {};
-      for (const line of buildCashCloseView(snap).lines) {
+      for (const line of applyCloseReview(buildCashCloseView(snap).lines, review, {
+        cardPending: snap.cardPending,
+        pixRequested: snap.pixRequested,
+      })) {
         const saved = review?.typedCents[line.key] ?? (line.key === "cash" ? review?.cashTypedCents : null);
         typed[line.key] = centsToField(saved ?? line.typedCents);
         const manual = review?.acquirerCents[line.key];
@@ -939,7 +951,12 @@ function DayModal({
   const withDados = day
     ? storeRows.filter((store) => {
         const snap = snaps[store.id];
-        return snap && buildCashCloseView(snap).lines.some((line) => line.systemCents !== 0 || line.typedCents !== 0 || line.stoneCents != null);
+        if (!snap) return false;
+        const review = reviews.find((r) => r.storeId === store.id && r.day.slice(0, 10) === day) ?? null;
+        return applyCloseReview(buildCashCloseView(snap).lines, review, {
+          cardPending: snap.cardPending,
+          pixRequested: snap.pixRequested,
+        }).some((line) => line.systemCents !== 0 || line.typedCents !== 0 || line.stoneCents != null || (line.manualPixCents ?? 0) !== 0 || (line.withdrawalCents ?? 0) !== 0);
       })
     : [];
 
@@ -1118,14 +1135,16 @@ function DayModal({
           {withDados.map((store) => {
             const snap = snaps[store.id];
             if (!snap) return null;
+            const review = reviews.find((item) => item.storeId === store.id && item.day.slice(0, 10) === day) ?? null;
             const view = buildCashCloseView(snap);
-            const cash = view.lines.find((l) => l.key === "cash");
+            const base = applyCloseReview(view.lines, review, { cardPending: snap.cardPending, pixRequested: snap.pixRequested });
+            const cash = base.find((l) => l.key === "cash");
             const draft = drafts[store.id];
             const retirada = (withdrawalDrafts[store.id]?.enabled ? withdrawalDrafts[store.id]?.rows ?? [] : []).reduce((sum, row) => {
               const cents = fieldToCents(row.amount);
               return cents != null && cents > 0 ? sum + cents : sum;
             }, 0);
-            const lines = withCashWithdrawal(linesWithDraft(view.lines, draft), retirada);
+            const lines = withCashWithdrawal(linesWithDraft(base, draft), retirada);
             const conta = closeDayGap(lines);
             const people = withdrawalChoices(
               sellersByStore,

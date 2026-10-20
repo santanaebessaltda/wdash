@@ -331,6 +331,19 @@ describe("resumo do fechamento", () => {
     });
   });
 
+  it("mostra a forma preenchida mesmo sem linha no Millennium", () => {
+    const lines = applyCloseReview([], {
+      cashTypedCents: null,
+      waive: false,
+      acquirerCents: { credit: 140000 },
+      typedCents: { credit: 140000 },
+    });
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ key: "credit", systemCents: 0, typedCents: 140000, stoneCents: 140000 });
+    expect(dayWithoutReal(lines)).toBe(false);
+    expect(closeDayGap(lines)).toMatchObject({ realCents: 140000, diffCents: 140000 });
+  });
+
   it("soma o PIX online à adquirente e mantém os dois valores", () => {
     const lines = applyCloseReview(
       buildCashCloseView({

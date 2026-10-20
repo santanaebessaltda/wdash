@@ -147,14 +147,35 @@ export function withCashWithdrawal(lines: CashCloseLine[], cents: number): CashC
   return lines.map((line) => (line.key === "cash" ? { ...line, withdrawalCents: cents } : line));
 }
 
-/** Aplica o ajuste na linha já somada. O total real gravado pelo gestor substitui o arquivo. O PIX online soma com ele. A retirada soma no dinheiro. */
+function blankLine(key: CashCloseBucket): CashCloseLine {
+  return {
+    key,
+    label: LABEL[key],
+    systemCents: 0,
+    typedCents: 0,
+    stoneCents: null,
+    openingCents: null,
+    cashDropCents: null,
+  };
+}
+
+/** Aplica o ajuste na linha já somada. O total real gravado pelo gestor substitui o arquivo. O PIX online soma com ele. A retirada soma no dinheiro. Uma forma salva sem linha no Millennium entra do mesmo jeito. */
 export function applyCloseReview(
   lines: CashCloseLine[],
   review: CashReview | null,
   _flags: { cardPending?: boolean; pixRequested?: boolean } = {},
 ): CashCloseLine[] {
   if (!review) return lines;
-  const mapped = lines.map((line) => {
+  const present = new Set(lines.map((line) => line.key));
+  const saved: CashCloseLine[] = [];
+  for (const key of ORDER) {
+    if (present.has(key)) continue;
+    const typed = typedOverride(review, key);
+    const manual = review.acquirerCents?.[key];
+    if (typed == null && manual == null) continue;
+    saved.push(blankLine(key));
+  }
+  const mapped = [...lines, ...saved].map((line) => {
     const next = { ...line };
     const typed = typedOverride(review, line.key);
     if (typed != null) next.typedCents = typed;
@@ -166,7 +187,8 @@ export function applyCloseReview(
   const pix = mapped.find((line) => line.key === "pix");
   const withPix = withOnlinePix(mapped, online, pix ? null : (review.acquirerCents?.pix ?? null));
   const withdrawn = (review.withdrawals ?? []).reduce((sum, row) => sum + row.cents, 0);
-  return withCashWithdrawal(withPix, withdrawn);
+  const withCash = withCashWithdrawal(withPix, withdrawn);
+  return ORDER.filter((key) => withCash.some((line) => line.key === key)).map((key) => withCash.find((line) => line.key === key)!);
 }
 
 /** Barras do calendário: falta, sobra, arquivo a caminho, ou o dia fechado sem diferença. */
