@@ -64,7 +64,7 @@ serve(async (req) => {
   const { data: userData, error: userError } = await userClient.auth.getUser();
   if (userError || !userData.user) return json({ error: "unauthorized" }, 401);
 
-  let body: { action?: string; from?: string; to?: string; storeIds?: unknown; part?: unknown };
+  let body: { action?: string; from?: string; to?: string; storeIds?: unknown; part?: unknown; rewrite?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -74,10 +74,11 @@ serve(async (req) => {
   const kind = mapAction(String(body.action ?? "").trim().toLowerCase());
   if (!kind) return json({ error: "invalid_action" }, 400);
 
-  const payload: { from?: string; to?: string; storeIds?: string[]; cashOnly?: boolean; part?: "sangria" | "close" } = {};
+  const payload: { from?: string; to?: string; storeIds?: string[]; cashOnly?: boolean; part?: "sangria" | "close"; rewrite?: boolean } = {};
   if (kind === "CLOSE") {
     payload.cashOnly = true;
     if (body.part === "sangria" || body.part === "close") payload.part = body.part;
+    if (body.rewrite === true && payload.part === "close") payload.rewrite = true;
   }
   if (kind === "FORCE" || kind === "FORCE_LIGHT") {
     // So hoje  -  client pode mandar from=to=hoje (audit); worker usa fuso da loja.
@@ -286,6 +287,7 @@ serve(async (req) => {
 
   // Avoid duplicate SEED/RANGE/REGISTRY while one is already queued/running.
   // CLOSE do botão só deduplica outro fechamento manual (cashOnly), não o da madrugada.
+  // A releitura do mês só acompanha outro pedido que também relê e cobre as mesmas datas.
   if (kind === "CLOSE") {
     const { data: open } = await admin
       .from("sync_job")
@@ -295,12 +297,17 @@ serve(async (req) => {
       .in("status", ["QUEUED", "RUNNING"])
       .limit(20);
     const hit = (open ?? []).find((row) => {
-      const stored = row.payload as { cashOnly?: unknown; part?: unknown } | null;
+      const stored = row.payload as { cashOnly?: unknown; part?: unknown; rewrite?: unknown; from?: unknown; to?: unknown } | null;
       if (stored?.cashOnly !== true) return false;
       const existing = stored.part;
       const wanted = payload.part;
-      if (existing == null || existing === "both" || wanted == null) return true;
-      return existing === wanted;
+      const samePart = existing == null || existing === "both" || wanted == null || existing === wanted;
+      if (!samePart) return false;
+      if (payload.rewrite !== true) return true;
+      if (stored.rewrite !== true) return false;
+      const from = typeof stored.from === "string" ? stored.from : "";
+      const to = typeof stored.to === "string" ? stored.to : "";
+      return from <= (payload.from ?? "") && to >= (payload.to ?? "");
     });
     if (hit) return json({ ok: true, job: { id: hit.id }, deduped: true });
   }

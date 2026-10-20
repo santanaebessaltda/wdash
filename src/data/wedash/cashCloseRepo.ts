@@ -411,14 +411,14 @@ export async function requestCashDropMonth(
   return enqueueCashClose(span.from, span.to, storeIds, "Não foi possível buscar as sangrias deste mês. Tente novamente.", "sangria");
 }
 
-/** Pede o fechamento dos dias do mês visível que ainda não têm, até ontem. */
+/** Relê o fechamento de cada dia do mês visível, do dia 1 até ontem, mesmo o já gravado. */
 export async function requestMonthClose(
   storeIds: string[],
   monthDay = calendarTodayIso(),
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const span = monthCloseSpanFor(monthDay, calendarTodayIso());
   if (!span) return { ok: false, message: "Os fechamentos deste mês estarão disponíveis a partir de amanhã." };
-  return enqueueCashClose(span.from, span.to, storeIds, "Não foi possível buscar os fechamentos deste mês. Tente novamente.", "close");
+  return enqueueCashClose(span.from, span.to, storeIds, "Não foi possível buscar os fechamentos deste mês. Tente novamente.", "close", true);
 }
 
 async function enqueueCashClose(
@@ -427,12 +427,13 @@ async function enqueueCashClose(
   storeIds: string[],
   fail: string,
   part: CashCloseJobPart,
+  rewrite = false,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const { getSupabase } = await import("@/lib/supabase");
   const sb = getSupabase();
   if (!sb) return { ok: true };
   const { error } = await sb.functions.invoke("erp-sync-enqueue", {
-    body: { action: "cash_close", from, to, storeIds, part },
+    body: { action: "cash_close", from, to, storeIds, part, ...(rewrite ? { rewrite: true } : {}) },
   });
   if (error) return { ok: false, message: fail };
   return { ok: true };

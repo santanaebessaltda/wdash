@@ -106,3 +106,13 @@ export function missingCloseDays(from: string, to: string, today: string, filled
   }
   return out;
 }
+
+/** Cada dia do intervalo até ontem, inclusive o que já está gravado. Hoje fica de fora. */
+export function closeSpanDays(from: string, to: string, today: string): string[] {
+  const yesterday = addDays(today, -1);
+  const end = to < yesterday ? to : yesterday;
+  if (from > end) return [];
+  const out: string[] = [];
+  for (let day = from; day <= end; day = addDays(day, 1)) out.push(day);
+  return out;
+}

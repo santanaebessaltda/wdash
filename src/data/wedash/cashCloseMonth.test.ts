@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cashCloseJobMatches, clampCloseRange, closeHistoryFloor, missingCloseDays, monthCloseSpan, monthCloseSpanFor, monthsTouched, navMonthFloor, cashDropMonthSpan } from "./cashCloseMonth";
+import { cashCloseJobMatches, clampCloseRange, closeHistoryFloor, closeSpanDays, missingCloseDays, monthCloseSpan, monthCloseSpanFor, monthsTouched, navMonthFloor, cashDropMonthSpan } from "./cashCloseMonth";
 
 describe("monthsTouched", () => {
   it("um mês devolve só esse mês", () => {
@@ -94,5 +94,35 @@ describe("missingCloseDays", () => {
       "2026-10-06",
       "2026-10-07",
     ]);
+  });
+});
+
+describe("closeSpanDays", () => {
+  it("inclui o dia já gravado e para em ontem", () => {
+    expect(closeSpanDays("2026-10-01", "2026-10-31", "2026-10-20")).toEqual([
+      "2026-10-01",
+      "2026-10-02",
+      "2026-10-03",
+      "2026-10-04",
+      "2026-10-05",
+      "2026-10-06",
+      "2026-10-07",
+      "2026-10-08",
+      "2026-10-09",
+      "2026-10-10",
+      "2026-10-11",
+      "2026-10-12",
+      "2026-10-13",
+      "2026-10-14",
+      "2026-10-15",
+      "2026-10-16",
+      "2026-10-17",
+      "2026-10-18",
+      "2026-10-19",
+    ]);
+  });
+
+  it("no dia 1 ainda não há dia para reler", () => {
+    expect(closeSpanDays("2026-10-01", "2026-10-31", "2026-10-01")).toEqual([]);
   });
 });

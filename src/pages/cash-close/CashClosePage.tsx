@@ -396,7 +396,7 @@ export function CashClosePage() {
 
   useScreenRefresh({
     label: "Atualizar vendas e fechamento",
-    tip: "Busca as vendas de hoje e os fechamentos do período.",
+    tip: "Busca as vendas de hoje e relê o fechamento de cada dia do mês.",
     status: refreshMomentTitle(watermark ? watermark.toISOString() : watermark),
     busyLabel: "Atualizando…",
     sales: true,

@@ -36,7 +36,7 @@ import {
   type CashAccount,
   type CashCloseReportLine,
 } from "./millenniumCashClose.ts";
-import { clampCloseRange, missingCloseDays } from "../../../src/data/wedash/cashCloseMonth.ts";
+import { clampCloseRange, closeSpanDays, missingCloseDays } from "../../../src/data/wedash/cashCloseMonth.ts";
 import type { ParsedCashDrop } from "./millenniumCashDrop.ts";
 import type { StoneCapture } from "./stoneConciliation.ts";
 import {
@@ -168,6 +168,8 @@ export async function syncStoreCashClose(
     accountsOk: boolean;
     /** No fechamento sob pedido, a falha volta para o job em vez de só ir para o log. */
     strict?: boolean;
+    /** Relê cada dia do intervalo, mesmo o já gravado. A madrugada deixa isso desligado. */
+    rewrite?: boolean;
   },
 ): Promise<void> {
   const span = await rangeInsideCloseFloor(deps, {
@@ -190,7 +192,7 @@ export async function syncStoreCashClose(
   }
   const today = ymdInTz(new Date(), args.store.timezone);
   let filled = new Set<string>();
-  if (deps.listFilledCloseDays) {
+  if (!args.rewrite && deps.listFilledCloseDays) {
     try {
       filled = new Set(await deps.listFilledCloseDays({
         tenantId: args.tenantId,
@@ -202,7 +204,7 @@ export async function syncStoreCashClose(
       console.warn(`  AVISO [${args.store.code}] dias de fechamento: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
-  const days = missingCloseDays(span.from, span.to, today, filled);
+  const days = args.rewrite ? closeSpanDays(span.from, span.to, today) : missingCloseDays(span.from, span.to, today, filled);
   if (days.length === 0) return;
   try {
     const rows: CashCloseDay[] = [];
@@ -1496,6 +1498,8 @@ export type SyncJobPayload = {
   cashOnly?: boolean;
   /** Tela de sangria ou de fechamento. Sem parte, o passeio faz as duas. */
   part?: "sangria" | "close" | "both";
+  /** Atualizar do Fechamento: relê o mês visível, mesmo o dia já gravado. */
+  rewrite?: boolean;
   /** Intervalo da lista de sangrias quando o fechamento do job é só um dia. */
   sangriaFrom?: string;
   sangriaTo?: string;

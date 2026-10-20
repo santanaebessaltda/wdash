@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { clampCloseRange, missingCloseDays } from "../../../src/data/wedash/cashCloseMonth.ts";
+import { clampCloseRange, closeSpanDays, missingCloseDays } from "../../../src/data/wedash/cashCloseMonth.ts";
 import { closeSaleDays } from "../../../src/data/wedash/cashCloseView.ts";
 import { stoneFileReady } from "../../../src/data/wedash/stoneClock.ts";
 import { decryptPassword } from "./decrypt.ts";
@@ -99,8 +99,9 @@ function pixDue(pix: PixState | null, now: Date): boolean {
 /**
  * Pedido da tela, sem rebuscar as vendas.
  * Sangria: o mês inteiro, do dia 1 até hoje.
- * Fechamento: só o dia que ainda não está gravado, até ontem. A Stone segue esse pedido.
- * Sem parte, a madrugada faz os dois. O CSV do PIX chega depois, pelo webhook.
+ * Fechamento do Atualizar (`rewrite`): cada dia do mês, até ontem, mesmo o já gravado.
+ * Sem `rewrite`, só o dia que ainda não está gravado, até ontem, mais a janela recente.
+ * A Stone segue os dias do intervalo. Sem parte, o passeio faz os dois. O CSV do PIX chega depois, pelo webhook.
  */
 export async function runCashCloseFillJob(
   job: SyncJob,
@@ -143,6 +144,7 @@ export async function runCashCloseFillJob(
     }
     session = ensured.session;
     stores = await deps.listStores(job.tenantId, job.credentialId);
+    if (job.payload.rewrite) console.log(`  relê os dias já gravados`);
   } catch (e) {
     return finish(e instanceof Error ? e.message : String(e));
   }
@@ -194,7 +196,10 @@ export async function runCashCloseFillJob(
       console.log(`  ${store.code}: sangrias ${sangriaFrom}→${sangriaTo}`);
       continue;
     }
-    const days = missingCloseDays(rangeFrom, to, today, await filledDays(sb, job.tenantId, store.id, rangeFrom, to));
+    const rewrite = job.payload.rewrite === true;
+    const days = rewrite
+      ? closeSpanDays(rangeFrom, to, today)
+      : missingCloseDays(rangeFrom, to, today, await filledDays(sb, job.tenantId, store.id, rangeFrom, to));
     for (const day of days) {
       try {
         await syncStoreCashClose(deps, {
@@ -206,6 +211,7 @@ export async function runCashCloseFillJob(
           accounts,
           accountsOk,
           strict: true,
+          rewrite,
         });
       } catch {
         problems.push(`Não foi possível buscar o fechamento do Millennium em ${day}.`);
