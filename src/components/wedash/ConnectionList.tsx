@@ -38,7 +38,7 @@ export function ConnectionCard({ title, hint, rows, action }: { title: string; h
                   {row.status ? <Badge variant={statusBadgeVariant(row.status)}>{row.status}</Badge> : null}
                 </div>
                 {row.store ? (
-                  <Badge variant="neutral" title={row.store} className="mt-1.5 min-w-0 max-w-full overflow-hidden">
+                  <Badge variant="accent" title={row.store} className="mt-1.5 min-w-0 max-w-full overflow-hidden">
                     <span className="truncate">{row.store}</span>
                   </Badge>
                 ) : null}

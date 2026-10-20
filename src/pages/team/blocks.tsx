@@ -655,7 +655,7 @@ export function GoalCard({
           {card.kind === "individual" ? <IndividualTypeIcon /> : <GroupTypeIcon />}
           {kindLabel}
         </Badge>
-        <Badge variant="neutral" className="gap-1 uppercase">
+        <Badge variant="accent" className="gap-1 uppercase">
           <StoreIcon />
           {card.storeNameValue}
         </Badge>

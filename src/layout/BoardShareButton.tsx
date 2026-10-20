@@ -97,7 +97,7 @@ export function BoardShareButton() {
               {links.map((row) => (
                 <div key={row.id} className="flex flex-col gap-2 border-t border-line py-4 first:border-t-0 first:pt-0 last:pb-0">
                   {many ? (
-                    <Badge variant="neutral" title={row.name} className="max-w-full self-start overflow-hidden">
+                    <Badge variant="accent" title={row.name} className="max-w-full self-start overflow-hidden">
                       <span className="truncate">{row.name}</span>
                     </Badge>
                   ) : null}

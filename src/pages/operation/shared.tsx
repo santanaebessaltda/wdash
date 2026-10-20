@@ -210,7 +210,7 @@ export function TipHelp({ label }: { label: string }) {
   );
 }
 
-/** Título da seção, com a regra de cálculo no ?. Com várias filiais, o nome fica no badge. */
+/** Título da seção, com a regra de cálculo no ?. Com várias filiais, o nome fica no badge na cor primária. */
 export function BlockTitle({ title, tip, store }: { title: string; tip?: string; store?: string }) {
   return (
     <div className="mb-4">
@@ -219,7 +219,7 @@ export function BlockTitle({ title, tip, store }: { title: string; tip?: string;
         {tip ? <TipHelp label={tip} /> : null}
       </div>
       {store ? (
-        <Badge variant="neutral" title={store} className="mt-1.5 min-w-0 max-w-full overflow-hidden">
+        <Badge variant="accent" title={store} className="mt-1.5 min-w-0 max-w-full overflow-hidden">
           <span className="truncate">{store}</span>
         </Badge>
       ) : null}

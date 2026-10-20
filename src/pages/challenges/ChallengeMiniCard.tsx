@@ -68,7 +68,7 @@ export function ChallengeMiniCard({
           {!ended ? ` · ${view.prazo}` : ""}
         </span>
         {storeNameValue ? (
-          <Badge variant="neutral" title={storeNameValue} className="mt-1.5 min-w-0 max-w-full overflow-hidden">
+          <Badge variant="accent" title={storeNameValue} className="mt-1.5 min-w-0 max-w-full overflow-hidden">
             <span className="truncate">{storeNameValue}</span>
           </Badge>
         ) : null}

@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
-import { Alert, Badge, Button, Card, EmptyState, FormField, Input, Segmented, Select, useToast } from "@/components/ui";
+import { Alert, Button, Card, EmptyState, FormField, Input, Segmented, Select, useToast } from "@/components/ui";
 import { paths } from "@/router/paths";
 import { type RentSeason } from "@/data/wedash/rentSeason";
 import { weekHoursConfigured } from "@/data/wedash/storeHours";
@@ -246,11 +246,7 @@ function SettingsCard({
             const name = storeName(store);
             return (
               <section key={store.id} className={cn("flex flex-col gap-4", many && "border-t border-line pb-6 pt-5 first:border-t-0 first:pt-0")}>
-                {many ? (
-                  <Badge variant="neutral" title={name} className="max-w-full self-start overflow-hidden">
-                    <span className="truncate">{name}</span>
-                  </Badge>
-                ) : null}
+                {many ? <p className="text-[11.5px] font-bold tracking-wide text-t2 break-words">{name}</p> : null}
                 <SettingsDraftProvider register={drafts.register} errorPrefix={many ? name : undefined}>
                   {children(store)}
                 </SettingsDraftProvider>

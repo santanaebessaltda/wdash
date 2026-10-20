@@ -298,7 +298,7 @@ function GoalHero({
               {fullDate(goal.startsOn)} a {fullDate(goal.endsOn)}
             </Badge>
             {storeNameValue ? (
-              <Badge variant="neutral" className="max-w-full min-w-0 uppercase">
+              <Badge variant="accent" className="max-w-full min-w-0 uppercase">
                 <span className="truncate">{storeNameValue}</span>
               </Badge>
             ) : null}
