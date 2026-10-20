@@ -158,7 +158,7 @@ export function challengeWalletOpportunity(input: {
   prizeLabel: string;
   upsideReais: number;
 }): WalletChallengeOpportunity {
-  const state: WalletOpportunityState = input.open ? "open" : input.won ? "guaranteed" : "missed";
+  const state: WalletOpportunityState = input.won ? "guaranteed" : input.open ? "open" : "missed";
   return {
     kind: "challenge",
     name: input.name,

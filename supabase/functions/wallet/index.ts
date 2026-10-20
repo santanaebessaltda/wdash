@@ -445,7 +445,7 @@ serve(async (req) => {
         else if (hers?.kind === "MONEY") peopleRows.push({ personId: myId, moneyCents: reaisToCents(hers.amount), itemLabel: null });
         if (standing.result != null) {
           const open = status === "active";
-          const shown = open || !hers ? prizes[0] ?? null : hers;
+          const shown = hers ?? prizes[0] ?? null;
           opportunities.push(challengeWalletOpportunity({
             name: challenge.name,
             endsOn: challenge.endsOn,

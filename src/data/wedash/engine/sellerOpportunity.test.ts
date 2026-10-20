@@ -100,12 +100,32 @@ describe("challenge upside", () => {
     expect(missed.upsideCents).toBe(0);
   });
 
-  it("em andamento fica em disputa, mesmo que o valor tenha sido passado", () => {
+  it("aberto e já com prêmio fica alcançado, e o valor segue no potencial", () => {
     const card = challengeWalletOpportunity({
       name: "Boca de Milhões",
       endsOn: "2026-10-31",
       open: true,
       won: true,
+      metric: "QUANTITY",
+      resultLabel: "10 itens",
+      metricLabel: "Itens vendidos",
+      targetLabel: "10 itens",
+      gapLabel: null,
+      position: null,
+      prizeLabel: "R$ 100,00",
+      upsideReais: 100,
+    });
+    expect(card.state).toBe("guaranteed");
+    expect(card.upsideCents).toBe(10_000);
+    expect(card.resultCaption).toBe("Você vendeu");
+  });
+
+  it("aberto e ainda sem o prêmio fica em andamento", () => {
+    const card = challengeWalletOpportunity({
+      name: "Boca de Milhões",
+      endsOn: "2026-10-31",
+      open: true,
+      won: false,
       metric: "QUANTITY",
       resultLabel: "8 itens",
       metricLabel: "Itens vendidos",
@@ -117,7 +137,6 @@ describe("challenge upside", () => {
     });
     expect(card.state).toBe("open");
     expect(card.upsideCents).toBe(10_000);
-    expect(card.resultCaption).toBe("Você vendeu");
     expect(card.gapLabel).toBe("Faltam 2 itens");
   });
 });

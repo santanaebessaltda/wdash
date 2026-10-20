@@ -585,21 +585,22 @@ function GoalOpportunityCard({ item }: { item: WalletGoalOpportunity }) {
 }
 
 function ChallengeOpportunityCard({ item }: { item: WalletChallengeOpportunity }) {
-  const ended = item.state !== "open";
+  const ended = item.state === "missed";
+  const badge = item.state === "guaranteed" ? { label: "Alcançado", variant: "success" as const } : item.state === "missed" ? { label: "Não alcançado", variant: "danger" as const } : { label: "Em andamento", variant: "warning" as const };
+  const won = item.state === "guaranteed";
   return (
     <div className={cn("flex items-start gap-3.5 rounded-xl border border-line p-4", ended ? "bg-bg-inset" : "bg-bg-2")}>
-      <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", ended ? "bg-bg-3 text-t2" : "bg-acc-soft text-acc")}>
+      <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", ended ? "bg-bg-3 text-t2" : won ? "bg-ok-soft text-ok" : "bg-acc-soft text-acc")}>
         <FlameIcon size={18} />
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
           <p className="min-w-0 truncate text-[14px] font-bold text-t0">{item.name}</p>
-          <Badge variant={item.state === "open" ? "warning" : "neutral"} className="shrink-0 uppercase">
-            {item.state === "open" ? "Em andamento" : "Encerrado"}
+          <Badge variant={badge.variant} className="shrink-0 uppercase">
+            {badge.label}
           </Badge>
         </div>
         {item.placeLabel ? <p className="mt-2 text-[13px] font-semibold text-t0">{item.placeLabel}</p> : null}
-        {item.state === "missed" ? <p className="mt-2 text-[13px] font-semibold text-bad">Não alcançado</p> : null}
         {item.resultLabel ? (
           <p className="mt-2 text-[13px] text-t1">
             {item.resultCaption}: {item.resultLabel}
@@ -608,9 +609,9 @@ function ChallengeOpportunityCard({ item }: { item: WalletChallengeOpportunity }
         {item.targetLabel ? <p className="mt-1 text-[13px] text-t1">Meta: {item.targetLabel}</p> : null}
         {item.gapLabel ? <p className="mt-2 text-[12.5px] font-semibold text-t1">{item.gapLabel}</p> : null}
         {item.prizeLabel ? (
-          <p className="mt-2 flex items-center gap-1 text-[12px] text-t2">
+          <p className={cn("mt-2 flex items-center gap-1 text-[12px]", won ? "font-semibold text-ok" : "text-t2")}>
             <TrophyIcon size={13} />
-            {item.state === "guaranteed" ? "Prêmio conquistado" : "Prêmio"}: <span className="font-mono font-bold text-t0">{item.prizeLabel}</span>
+            {won ? "Prêmio conquistado" : "Prêmio"}: <span className={cn("font-mono font-bold", won ? "text-ok" : "text-t0")}>{item.prizeLabel}</span>
           </p>
         ) : null}
       </div>
