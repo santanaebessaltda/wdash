@@ -24,13 +24,13 @@ export interface FirstStepsInput {
 }
 
 /**
- * "Todas as lojas" avalia a rede. Uma loja no StorePicker mostra so o que falta nela
+ * "Todas as lojas" avalia a rede. As filiais marcadas no StorePicker mostram só o que falta nelas.
  * (o card so some de vez quando todas as lojas da sessao estao prontas).
  */
 export function storesForFirstStepsView<T extends { id: string }>(stores: T[], storeIds: string[]): T[] {
-  if (storeIds.length !== 1) return stores;
-  const one = stores.filter((s) => s.id === storeIds[0]);
-  return one.length === 1 ? one : stores;
+  if (storeIds.length === 0) return stores;
+  const picked = stores.filter((store) => storeIds.includes(store.id));
+  return picked.length > 0 ? picked : stores;
 }
 
 function missingStoreLabel(missing: number, total: number): string | undefined {

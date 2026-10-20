@@ -26,7 +26,7 @@ export function BoardPage() {
   const session = useActiveSession();
   const navigate = useNavigate();
   const { scope, setScope } = useScope();
-  const storeId = scope.storeIds[0] ?? null;
+  const storeId = scope.storeIds.length === 1 ? scope.storeIds[0]! : null;
   const [team, setTeam] = useState<TeamAggInput>({ dayAggs: [] });
   const [goalsData, setGoalsData] = useState<BoardGoalsData>(GOALS_EMPTY);
   const [challengesData, setChallengesData] = useState<BoardChallengesData>(CHALLENGES_EMPTY);

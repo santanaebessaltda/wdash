@@ -19,20 +19,27 @@ function useReportScope() {
   const session = useActiveSession();
   const { scope } = useScope();
   const storeRows = storesForSession(session.stores);
-  const store = scope.storeIds[0]
-    ? storeRows.find((s) => s.id === scope.storeIds[0])
-    : storeRows.length === 1
-      ? storeRows[0]
-      : undefined;
+  const picked =
+    scope.storeIds.length > 0
+      ? storeRows.filter((store) => scope.storeIds.includes(store.id)).sort((a, b) => a.tradeName.localeCompare(b.tradeName, "pt-BR"))
+      : storeRows.length === 1
+        ? [storeRows[0]!]
+        : [];
+  const store = picked.length === 1 ? picked[0] : undefined;
+  const several = picked.length > 1;
   const period = resolvePeriod(scope.period, calendarTodayIso());
   const datas = period.start === period.end ? dataBr(period.start) : `${dataBr(period.start)} a ${dataBr(period.end)}`;
   const preset = periodDisplayLabel(scope.period);
   return {
-    storeNameValue: store ? store.tradeName : "Todas as filiais",
-    storeFile: store ? [store.branchCode.trim(), store.tradeName].filter(Boolean).join(" ") : "Todas as filiais",
-    all: !store,
-    storeCnpj: store?.cnpj?.trim() || null,
-    storeCode: store?.branchCode.trim() || null,
+    storeNameValue: several ? picked.map((item) => item.tradeName).join(" · ") : store ? store.tradeName : "Todas as filiais",
+    storeFile: several
+      ? picked.map((item) => item.tradeName).join(", ")
+      : store
+        ? [store.branchCode.trim(), store.tradeName].filter(Boolean).join(" ")
+        : "Todas as filiais",
+    all: several || !store,
+    storeCnpj: several ? null : store?.cnpj?.trim() || null,
+    storeCode: several ? null : store?.branchCode.trim() || null,
     periodText: preset ? `${preset} · ${datas}` : datas,
     periodFile: preset ?? datas,
   };

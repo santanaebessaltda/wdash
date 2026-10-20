@@ -124,9 +124,9 @@ export function SectionHeader({
   );
 }
 
-/** "Todas" com mais de uma loja na sessão. Quem tem uma loja só segue vendo o conteúdo. */
+/** Tela que edita uma filial por vez. Todas ou várias marcadas pedem uma escolha. Quem tem uma loja só segue. */
 export function pickOneStore(storeIds: string[], sessionStoreCount: number): boolean {
-  return storeIds.length === 0 && sessionStoreCount > 1;
+  return sessionStoreCount > 1 && storeIds.length !== 1;
 }
 
 /** Card vazio das telas que só fazem sentido com uma filial no seletor. */

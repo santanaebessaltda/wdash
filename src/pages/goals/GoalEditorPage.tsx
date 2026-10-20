@@ -281,9 +281,9 @@ export default function GoalEditorPage() {
     [session.stores],
   );
   const [storeId, setStoreId] = useState(
-    () => (copyForStore ? "" : scope.storeIds[0] ?? (storeRows.length === 1 ? storeRows[0]!.id : "")),
+    () => (copyForStore ? "" : scope.storeIds.length === 1 ? scope.storeIds[0]! : storeRows.length === 1 ? storeRows[0]!.id : ""),
   );
-  const storeFilter = scope.storeIds[0];
+  const storeFilter = scope.storeIds.length === 1 ? scope.storeIds[0] : undefined;
   useReturnWhenStoreChanges(id ? storeId || undefined : undefined, origin);
   useEffect(() => {
     if (!id && !copyForStore && storeFilter) setStoreId(storeFilter);

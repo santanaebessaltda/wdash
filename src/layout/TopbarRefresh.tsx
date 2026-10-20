@@ -182,7 +182,9 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
   const salesTip =
     storeIds.length === 1
       ? "Busca no Millennium as vendas de hoje da filial selecionada."
-      : "Busca no Millennium as vendas de hoje de todas as filiais.";
+      : storeIds.length > 1
+        ? "Busca no Millennium as vendas de hoje das filiais selecionadas."
+        : "Busca no Millennium as vendas de hoje de todas as filiais.";
   const tip = screen?.tip ?? salesTip;
   const busyLabel = screen?.busyLabel ?? "Buscando as vendas de hoje…";
   const disconnectTitle =
@@ -199,7 +201,9 @@ export function TopbarRefresh({ storeIds }: { storeIds: string[] }) {
         ? screen.label
         : storeIds.length === 1
           ? "Atualizar as vendas de hoje da filial selecionada"
-          : "Atualizar as vendas de hoje de todas as filiais";
+          : storeIds.length > 1
+            ? "Atualizar as vendas de hoje das filiais selecionadas"
+            : "Atualizar as vendas de hoje de todas as filiais";
 
   const blocked = busy || (!own && forceCooldownSec != null);
   const icon = (

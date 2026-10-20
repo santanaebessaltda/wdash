@@ -31,13 +31,27 @@ function readSavedBranch(): string | null {
   }
 }
 
-function saveBranch(id: string) {
+function saveBranch(ids: string) {
   try {
-    sessionStorage.setItem(STORE_STORAGE_KEY, id);
+    sessionStorage.setItem(STORE_STORAGE_KEY, ids);
     sessionStorage.removeItem(STORE_STORAGE_KEY_LEGACY);
   } catch {
     /* private mode / quota  -  URL ainda works on the same screen */
   }
+}
+
+function parseStoreIds(raw: string | null): string[] {
+  if (!raw) return [];
+  return raw.split(",").map((id) => id.trim()).filter(Boolean);
+}
+
+/** Mantém a ordem das lojas da sessão. Lista vazia ou completa = todas. */
+function scopeStoreIds(raw: string[], sessionStoreIds: string[]): string[] {
+  const allowed = new Set(sessionStoreIds);
+  const picked = sessionStoreIds.filter((id) => raw.includes(id) && allowed.has(id));
+  if (sessionStoreIds.length === 1) return [sessionStoreIds[0]!];
+  if (picked.length === 0 || picked.length >= sessionStoreIds.length) return [];
+  return picked;
 }
 
 const DEFAULT_PERIOD: PeriodType = "today";
@@ -90,10 +104,8 @@ function periodFromUrl(params: URLSearchParams): SavedPeriod | null {
  * **Periodo** vale em todas as telas via sessionStorage; `periodo`/`de`/`ate` so entram
  * na URL das telas que mostram o campo. Periodo padrao = Hoje.
  *
- * Single-select de loja: `filial` na URL e um id (ex.: "filial=f1").
- * Ausente / vazio = "Todas as lojas" (consolida a rede), salvo se houver
- * preferencia salva (ai reidrata a loja escolhida).
- * Se a URL ainda tiver lista antiga ("f1,f2"), usa so o primeiro id.
+ * Loja: ausente = todas. Um id = uma filial. Vários ids separados por vírgula = essas filiais.
+ * Quem tem uma loja só fica nela. A lista completa também vira todas.
  */
 export function useScope() {
   const session = useActiveSession();
@@ -112,22 +124,12 @@ export function useScope() {
   const scope = useMemo<Scope>(() => {
     const hasBranchParameter = params.has("store") || params.has("filial");
     const branchRaw = firstParam(params, ["store", "filial"]);
-    let idsRaw = branchRaw ? branchRaw.split(",").map((s) => s.trim()).filter(Boolean) : [];
+    let idsRaw = parseStoreIds(branchRaw);
 
-    // Sem `?filial=` na URL (navegacao pelo menu): recupera a ultima loja.
-    if (!hasBranchParameter) {
-      const saved = readSavedBranch();
-      if (saved) idsRaw = [saved];
-    }
+    // Sem `?store=` na URL (navegacao pelo menu): recupera a ultima escolha.
+    if (!hasBranchParameter) idsRaw = parseStoreIds(readSavedBranch());
 
-    // So aceita ids que a sessao realmente pode ver; single-select  ->  no max. 1.
-    const validos = idsRaw.filter((id) => session.stores.includes(id));
-    const storeIds =
-      validos.length === 0
-        ? session.stores.length === 1
-          ? [session.stores[0]]
-          : []
-        : [validos[0]];
+    const storeIds = scopeStoreIds(idsRaw, session.stores);
 
     // Sem `?periodo=` (navegacao pelo menu): ultimo periodo da sessao; senao Hoje.
     const per = periodFromUrl(params) ?? readSavedPeriod() ?? { kind: DEFAULT_PERIOD };
@@ -148,7 +150,7 @@ export function useScope() {
 
   // Mantem storage alinhado com a URL (bookmark / share / abas do Dashboard).
   useEffect(() => {
-    if (params.has("store") || params.has("filial")) saveBranch(firstParam(params, ["store", "filial"])?.split(",")[0]?.trim() || "");
+    if (params.has("store") || params.has("filial")) saveBranch(firstParam(params, ["store", "filial"]) ?? "");
     const per = periodFromUrl(params);
     if (per) savePeriod(per);
   }, [params]);
@@ -191,12 +193,15 @@ export function useScope() {
       dirty = true;
     }
 
-    if (!p.has("store")) {
-      const id = scope.storeIds[0];
-      if (id) {
-        p.set("store", id);
-        dirty = true;
-      }
+    if (scope.storeIds.length === 0 && p.has("store") && session.stores.length !== 1) {
+      p.delete("store");
+      dirty = true;
+    } else if (!p.has("store") && scope.storeIds.length > 0) {
+      p.set("store", scope.storeIds.join(","));
+      dirty = true;
+    } else if (p.has("store") && scope.storeIds.length > 1 && p.get("store") !== scope.storeIds.join(",")) {
+      p.set("store", scope.storeIds.join(","));
+      dirty = true;
     }
 
     if (!showBrandPicker && p.has("brand")) {
@@ -211,11 +216,11 @@ export function useScope() {
 
   function setScope(e: Scope) {
     const p = new URLSearchParams();
-    // Array vazio = "Todas as lojas"  ->  nao grava id (URL limpa) + storage "".
-    // Single-select: grava no max. o primeiro id.
-    if (e.storeIds.length > 0) {
-      p.set("store", e.storeIds[0]);
-      saveBranch(e.storeIds[0]);
+    const storeIds = scopeStoreIds(e.storeIds, session.stores);
+    if (storeIds.length > 0) {
+      const value = storeIds.join(",");
+      p.set("store", value);
+      saveBranch(value);
     } else {
       saveBranch("");
     }
@@ -243,9 +248,9 @@ export function useScope() {
 export function useReturnWhenStoreChanges(storeId: string | undefined, to: string) {
   const navigate = useNavigate();
   const { scope } = useScope();
-  const store = scope.storeIds[0];
+  const ids = scope.storeIds;
   useEffect(() => {
-    if (!storeId || !store || storeId === store) return;
+    if (!storeId || ids.length === 0 || ids.includes(storeId)) return;
     navigate(to, { replace: true });
-  }, [storeId, store, to, navigate]);
+  }, [storeId, ids, to, navigate]);
 }

@@ -112,7 +112,7 @@ export default function ChallengeEditorPage() {
 
   const { scope } = useScope();
   const storeRows = useMemo(() => storesForSession(session.stores), [session.stores]);
-  const storeFilter = scope.storeIds[0];
+  const storeFilter = scope.storeIds.length === 1 ? scope.storeIds[0] : undefined;
   const [form, setForm] = useState<ChallengeForm>(() =>
     emptyChallengeForm(copyForStore ? "" : storeFilter ?? (storeRows.length === 1 ? storeRows[0]!.id : "")),
   );
