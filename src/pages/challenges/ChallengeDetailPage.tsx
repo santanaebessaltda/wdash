@@ -4,6 +4,7 @@ import { Alert, Badge, Breadcrumbs, Button, Card, CardTitle } from "@/components
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { DuplicateChoiceModal } from "@/components/wedash/DuplicateChoiceModal";
+import { ExportDialog } from "@/components/wedash/ExportDialog";
 import { ChallengeDetailSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { WedashBrand } from "@/components/wedash/WedashBrand";
 import { usesMinSales } from "@/data/wedash/challengeForm";
@@ -451,9 +452,7 @@ function ChallengePayoutCard({ challenge: c, view, onExport }: { challenge: Chal
           </div>
           <p className="mt-0.5 text-[12px] text-t2">Veja quem ganhou e o prêmio de cada pessoa.</p>
         </div>
-        <Button variant="secondary" size="sm" className="print:hidden" onClick={onExport}>
-          Exportar
-        </Button>
+        <ExportDialog formats={["pdf"]} onExport={() => onExport()} />
       </div>
 
       {lines.length === 0 ? (

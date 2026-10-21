@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Badge, Breadcrumbs, Button, Card, CardTitle, progressTextClass } from "@/components/ui";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { DuplicateChoiceModal } from "@/components/wedash/DuplicateChoiceModal";
+import { ExportDialog } from "@/components/wedash/ExportDialog";
 import { GoalDetailSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { goalWeightFrom } from "@/data/wedash/engine/goalProjection";
@@ -568,9 +569,7 @@ function GoalPayoutCard({
             {lineManagement ? "Veja a premiação final de cada pessoa e da gerência." : "Veja a premiação final de cada pessoa."}
           </p>
         </div>
-        <Button variant="secondary" size="sm" className="print:hidden" onClick={onExport}>
-          Exportar
-        </Button>
+        <ExportDialog formats={["pdf"]} onExport={() => onExport()} />
       </div>
 
       <div className="mb-4 grid grid-cols-2 gap-3.5 sm:grid-cols-3">
