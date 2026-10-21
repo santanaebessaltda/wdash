@@ -64,8 +64,15 @@ export function DeadlineBadge({ label }: { label: string }) {
 /** Meta com o rateio de vendas sem vendedor identificado ligado. */
 export function UnidentifiedSalesBadge() {
   return (
-    <Badge variant="neutral" className="uppercase">
-      Vendas sem vendedor
+    <Badge variant="neutral" className="gap-1 uppercase">
+      <MiniIcon>
+        <circle cx="6" cy="12" r="2.2" />
+        <circle cx="18" cy="6.5" r="2.2" />
+        <circle cx="18" cy="17.5" r="2.2" />
+        <path d="M8.2 11.2 15.6 7.4" />
+        <path d="M8.2 12.8 15.6 16.6" />
+      </MiniIcon>
+      Distribuição automática
     </Badge>
   );
 }
