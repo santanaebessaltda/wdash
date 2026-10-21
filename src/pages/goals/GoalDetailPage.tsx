@@ -50,12 +50,6 @@ const TipHelp = ({ label }: { label: string }) => (
   </Tooltip>
 );
 
-const MODO_LABEL: Record<GoalRecord["tierMode"], string> = {
-  INDIVIDUAL: "Premiação individual",
-  GROUP: "Premiação por grupo",
-  GENERAL: "Premiação geral",
-};
-
 /** Performance > Metas > detalhe — resumo, niveis com o progresso e equipe; meta encerrada = fechamento da premiacao. */
 export default function GoalDetailPage() {
   const { id = "" } = useParams();
@@ -290,7 +284,6 @@ function GoalHero({
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <PeriodBadge from={goal.startsOn} to={goal.endsOn} />
             {storeNameValue ? <BranchBadge name={storeNameValue} /> : null}
-            <Badge variant="neutral" className="uppercase">{MODO_LABEL[goal.tierMode]}</Badge>
             {goalSpreadsUnidentified(goal) ? <UnidentifiedSalesBadge /> : null}
           </div>
         </div>

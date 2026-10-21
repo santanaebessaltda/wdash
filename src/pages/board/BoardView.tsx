@@ -194,7 +194,6 @@ type GoalBoard = {
 
 function BoardGoalCard({ board, showStore }: { board: GoalBoard; showStore: boolean }) {
   const { goal, card, summary, storeName } = board;
-  const mode = goal.tierMode === "INDIVIDUAL" ? "Individual" : goal.tierMode === "GENERAL" ? "Geral" : "Grupo";
   return (
     <Card padding="none" glass="var(--info-soft)" className="px-6 py-4">
       <div className="flex items-start gap-3.5">
@@ -215,8 +214,6 @@ function BoardGoalCard({ board, showStore }: { board: GoalBoard; showStore: bool
           </div>
           <p className="mt-1.5 font-mono text-[20px] font-extrabold leading-none tabular-nums text-t0">{brlCent(summary.achieved)}</p>
           <p className="mt-2 text-[12px] text-t2">
-            {mode}
-            <span className="mx-1.5">·</span>
             {goal.tiers.length} {goal.tiers.length === 1 ? "nível" : "níveis"}
           </p>
         </div>

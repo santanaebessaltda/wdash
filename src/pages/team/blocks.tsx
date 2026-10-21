@@ -549,34 +549,6 @@ export function GoalProgressBar({
  * Card de uma meta ativa: nome + badges + projecao + escada (lista continua).
  * Usado no Ao vivo e na Equipe (embedded dentro de Metas da equipe).
  */
-function IconBadge({ children }: { children: ReactNode }) {
-  return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      {children}
-    </svg>
-  );
-}
-
-function IndividualTypeIcon() {
-  return (
-    <IconBadge>
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </IconBadge>
-  );
-}
-
-function GroupTypeIcon() {
-  return (
-    <IconBadge>
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-    </IconBadge>
-  );
-}
-
 export function GoalCard({
   card,
   activeGoal,
@@ -589,7 +561,6 @@ export function GoalCard({
   /** Clique no resumo abre o detalhe. A escada não navega. */
   onOpen?: () => void;
 }) {
-  const kindLabel = card.kind === "individual" ? "Individual" : card.kind === "geral" ? "Geral" : "Grupo";
   const statusLabel = GOAL_STATUS_LABEL[goalStatus({ startsOn: card.band.start, endsOn: card.band.end }, todayIso ?? calendarTodayIso())];
   const counts = [
     card.qtyGroups > 0 ? `${card.qtyGroups} ${card.qtyGroups === 1 ? "grupo" : "grupos"}` : null,
@@ -608,10 +579,6 @@ export function GoalCard({
       <div className="mt-2.5 flex flex-wrap gap-1.5">
         <PeriodBadge from={card.band.start} to={card.band.end} />
         <BranchBadge name={card.storeNameValue} />
-        <Badge variant="neutral" className="gap-1 uppercase">
-          {card.kind === "individual" ? <IndividualTypeIcon /> : <GroupTypeIcon />}
-          {kindLabel}
-        </Badge>
         {card.spreadsUnidentified ? <UnidentifiedSalesBadge /> : null}
         {card.brands.map((brand) => (
           <Badge key={brand} variant="neutral" className="uppercase">

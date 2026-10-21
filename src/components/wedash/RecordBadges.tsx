@@ -66,13 +66,13 @@ export function UnidentifiedSalesBadge() {
   return (
     <Badge variant="neutral" className="gap-1 uppercase">
       <MiniIcon>
-        <circle cx="6" cy="12" r="2.2" />
-        <circle cx="18" cy="6.5" r="2.2" />
-        <circle cx="18" cy="17.5" r="2.2" />
-        <path d="M8.2 11.2 15.6 7.4" />
-        <path d="M8.2 12.8 15.6 16.6" />
+        <circle cx="12" cy="18" r="3" />
+        <circle cx="6" cy="6" r="3" />
+        <circle cx="18" cy="6" r="3" />
+        <path d="M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9" />
+        <path d="M12 12v3" />
       </MiniIcon>
-      Distribuição automática
+      Rateio automático
     </Badge>
   );
 }

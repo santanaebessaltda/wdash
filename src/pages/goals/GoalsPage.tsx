@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { Badge, Button, Card, DateRangePicker, Modal, ProgressBar, progressTextClass, useToast } from "@/components/ui";
+import { Button, Card, DateRangePicker, Modal, ProgressBar, progressTextClass, useToast } from "@/components/ui";
 import { PersonAvatarGroup } from "@/components/wedash/PersonAvatar";
 import { BranchBadge, PeriodBadge, RecordStatusBadge, UnidentifiedSalesBadge } from "@/components/wedash/RecordBadges";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -306,9 +306,6 @@ function GoalCard({
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <PeriodBadge from={g.startsOn} to={g.endsOn} />
             {showsStore && store ? <BranchBadge name={store.tradeName} /> : null}
-            <Badge variant="neutral" className="uppercase">
-              {g.tierMode === "INDIVIDUAL" ? "Individual" : g.tierMode === "GENERAL" ? "Geral" : "Grupo"}
-            </Badge>
             {goalSpreadsUnidentified(g) ? <UnidentifiedSalesBadge /> : null}
           </div>
         </div>
