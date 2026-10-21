@@ -177,7 +177,7 @@ export default function GoalDetailPage() {
         </Card>
       ) : (
         <>
-          <GoalHero goal={goal} card={card} status={status} storeNameValue={store?.tradeName} management={management} />
+          <GoalHero goal={goal} card={card} status={status} storeNameValue={store?.tradeName} management={management} today={today} />
 
           {status === "ended" ? (
             <>
@@ -188,11 +188,11 @@ export default function GoalDetailPage() {
                 today={today}
                 onExport={() => exportPdf(["Fechamento da meta", store?.tradeName ?? "", goal.name, `${fullDate(goal.startsOn)} a ${fullDate(goal.endsOn)}`])}
               />
-              <GoalTiersCard goal={goal} card={card} status={status} management={management} today={today} />
+              <GoalTiersCard goal={goal} card={card} status={status} management={management} />
             </>
           ) : (
             <div className="flex flex-col gap-5">
-              <GoalTiersCard goal={goal} card={card} status={status} management={management} today={today} />
+              <GoalTiersCard goal={goal} card={card} status={status} management={management} />
               <SellersCard
                 status={card.sellers.length > 0 ? "available" : "noData"}
                 list={card.sellers}
@@ -223,12 +223,14 @@ function GoalHero({
   status,
   storeNameValue,
   management,
+  today,
 }: {
   goal: GoalRecord;
   card: GoalCardView;
   status: GoalStatus;
   storeNameValue?: string;
   management: GoalManagerPrize | null;
+  today: string;
 }) {
   const { achieved, pct, projectedPct, projectionAmount } = card.band;
   const prizeAmount =
@@ -303,39 +305,32 @@ function GoalHero({
           </div>
         ))}
       </div>
+      <div className="mt-4">
+        <GlobalGoalBand goal={card.band} tiers={card.tiers} todayIso={today} embedded soBarra />
+      </div>
     </Card>
   );
 }
 
-/** Barra de progresso com os niveis + grupos + lista de niveis (formato Milestones) + nivel atual da gerencia. */
+/** Grupos, cards de cada nível e a faixa da gerência. A barra fica no resumo. */
 function GoalTiersCard({
   goal,
   card,
   status,
   management,
-  today,
 }: {
   goal: GoalRecord;
   card: GoalCardView;
   status: GoalStatus;
   management: GoalManagerPrize | null;
-  today: string;
 }) {
   return (
     <Card className={status === "ended" ? "print:hidden" : undefined}>
       <div className="mb-4 flex items-center gap-1.5">
         <CardTitle>Níveis e premiação</CardTitle>
       </div>
-      <GlobalGoalBand
-        goal={card.band}
-        tiers={card.tiers}
-        todayIso={today}
-        embedded
-        soBarra
-        individual={goal.tierMode === "INDIVIDUAL"}
-      />
       {goal.groups.length > 0 && (
-        <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[12px]">
+        <div className="flex flex-wrap items-center gap-1.5 text-[12px]">
           <span className="mr-1 text-t2">Grupos:</span>
           {goal.groups.map((g) => (
             <span key={g.shiftId} className="rounded-lg bg-bg-inset px-2.5 py-1 text-t1">

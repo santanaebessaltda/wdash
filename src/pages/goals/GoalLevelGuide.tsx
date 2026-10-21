@@ -1,28 +1,26 @@
 import { useState } from "react";
-import { Button, Modal, Segmented } from "@/components/ui";
+import { Card, Segmented } from "@/components/ui";
 import type { GoalRecord, SellerRow } from "@/data/wedash/engine/goalTypes";
 import { brlCent, num, shiftName } from "@/lib/format";
 import { cn } from "@/lib/cn";
-import { useBoardTheme } from "@/pages/board/boardTheme";
 import { Icon, icons } from "@/pages/users/Icons";
 
-/** Níveis no desenho da vendedora. No placar abre pelo botão; no detalhe fica no card. */
+/** Níveis no desenho da vendedora. No placar fica num accordion; no detalhe fica no card. */
 export function GoalLevelGuide({
   goal,
   sellers,
-  toggle = false,
+  accordion = false,
   showReached = false,
 }: {
   goal: GoalRecord;
   sellers: SellerRow[];
-  /** No placar, o botão abre os níveis numa janela. */
-  toggle?: boolean;
+  /** No placar, um card abaixo da meta esconde e mostra os níveis. */
+  accordion?: boolean;
   /** No detalhe, cada card mostra quantas pessoas do turno já chegaram. */
   showReached?: boolean;
 }) {
   const guide = buildGoalLevelGuide(goal, sellers);
   const [open, setOpen] = useState(false);
-  const [boardTheme] = useBoardTheme();
   const [groupKey, setGroupKey] = useState(guide?.groups[0]?.key ?? "");
   if (!guide) return null;
   const selected = guide.groups.find((group) => group.key === groupKey) ?? guide.groups[0]!;
@@ -65,18 +63,18 @@ export function GoalLevelGuide({
                 ) : null}
               </div>
               <div className="shrink-0 text-right">
-                {toggle && selected.people > 0 ? (
-                  <p className={cn("font-mono text-[13px] font-extrabold tabular-nums", everyone ? "text-ok" : "text-t1")}>
-                    {row.reached}/{selected.people}
-                  </p>
-                ) : (
-                  <p className={cn("font-mono text-[13px] font-extrabold", everyone ? "text-ok" : "text-t1")}>{num(row.commissionPct, 1)}%</p>
-                )}
-                <p className="text-[10.5px] text-t2">{toggle ? "do turno" : "de premiação"}</p>
-                {toggle ? (
-                  <p className={cn("mt-1 font-mono text-[13px] font-extrabold", everyone ? "text-ok" : "text-t1")}>{num(row.commissionPct, 1)}%</p>
+                {accordion && selected.people > 0 ? (
+                  <>
+                    <p className={cn("font-mono text-[13px] font-extrabold tabular-nums", everyone ? "text-ok" : "text-t1")}>
+                      {row.reached}/{selected.people}
+                    </p>
+                    <p className="text-[10.5px] text-t2">do turno</p>
+                  </>
                 ) : null}
-                {toggle ? <p className="text-[10.5px] text-t2">de premiação</p> : null}
+                <p className={cn("font-mono text-[13px] font-extrabold", accordion && "mt-1", everyone ? "text-ok" : "text-t1")}>
+                  {num(row.commissionPct, 1)}%
+                </p>
+                <p className="text-[10.5px] text-t2">de premiação</p>
               </div>
             </div>
           );
@@ -84,16 +82,33 @@ export function GoalLevelGuide({
       </div>
     </>
   );
-  if (toggle) {
+  if (accordion) {
     return (
-      <div className="mt-3">
-        <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>
-          Ver níveis de premiação
-        </Button>
-        <Modal open={open} onClose={() => setOpen(false)} title="Níveis de premiação" size="lg" boardTheme={boardTheme}>
-          {levels}
-        </Modal>
-      </div>
+      <Card padding="none">
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen((current) => !current)}
+          className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
+        >
+          <span className="text-[15px] font-bold text-t0">Níveis de premiação</span>
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={cn("shrink-0 text-t2 transition-transform", open && "rotate-180")}
+            aria-hidden
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+        {open ? <div className="border-t border-line px-5 pb-4 pt-3">{levels}</div> : null}
+      </Card>
     );
   }
   return <div className="mt-4 border-t border-line pt-3">{levels}</div>;

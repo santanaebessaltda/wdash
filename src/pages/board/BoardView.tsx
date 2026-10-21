@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Badge, Button, Card, CardHero, CardTitle, EmptyState, ProgressBar, StatCard, ThSort, progressTextClass, type SortDir } from "@/components/ui";
+import { Badge, Button, Card, CardHero, CardTitle, EmptyState, StatCard, ThSort, progressTextClass, type SortDir } from "@/components/ui";
 import { BoardSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { BranchBadge, DeadlineBadge, PeriodBadge, RecordStatusBadge, UnidentifiedSalesBadge } from "@/components/wedash/RecordBadges";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
@@ -16,6 +16,7 @@ import { teamViewWithGoalShare } from "@/data/wedash/engine/generalRanking";
 import { ChallengeMiniCard } from "@/pages/challenges/ChallengeMiniCard";
 import { TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
 import { GoalLevelGuide } from "@/pages/goals/GoalLevelGuide";
+import { GlobalGoalBand } from "@/pages/team/goalBlocks";
 import { BoardThemeSwitch } from "./boardTheme";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { defaultWeekHours, effectiveWeekHours, type StoreWeekHours } from "@/data/wedash/storeHours";
@@ -257,7 +258,7 @@ function BoardGoalCard({ board, showStore }: { board: GoalBoard; showStore: bool
         </div>
       </div>
       <div className="mt-3">
-        <ProgressBar value={summary.pct} height={5} />
+        <GlobalGoalBand goal={card.band} tiers={card.tiers} embedded soBarra />
       </div>
       <div className="mt-2 flex flex-wrap items-center justify-end gap-1.5">
         {summary.projectedPct != null ? (
@@ -265,7 +266,6 @@ function BoardGoalCard({ board, showStore }: { board: GoalBoard; showStore: bool
         ) : null}
         <DeadlineBadge label={prazoRemaining(summary.daysRemaining)} />
       </div>
-      <GoalLevelGuide goal={goal} sellers={card.sellers} toggle />
         </div>
       </div>
     </Card>
@@ -589,7 +589,10 @@ export function BoardView({
       {goalBoards.length > 0 ? (
         <div className="flex flex-col gap-3">
           {goalBoards.map((board) => (
-            <BoardGoalCard key={board.goal.id} board={board} showStore={manyStores} />
+            <div key={board.goal.id} className="flex flex-col gap-3">
+              <BoardGoalCard board={board} showStore={manyStores} />
+              <GoalLevelGuide goal={board.goal} sellers={board.card.sellers} accordion />
+            </div>
           ))}
         </div>
       ) : (
