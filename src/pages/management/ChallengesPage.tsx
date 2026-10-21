@@ -15,8 +15,6 @@ import {
 } from "@/data/wedash/challengesRepo";
 import {
   buildChallengeView,
-  CHALLENGE_METRIC_LABEL,
-  CHALLENGE_MODE_LABEL,
   CHALLENGE_STATUS_LABEL,
   type ChallengeStatus,
   type ChallengeView,
@@ -331,22 +329,18 @@ function ChallengeCard({
             <PeriodBadge from={c.startsOn} to={c.endsOn} />
             {showsStore && store ? <BranchBadge name={store.tradeName} /> : null}
             {prize ? <PrizeBadge label={prize} /> : null}
-            {minimum ? (
-              <Badge variant="neutral" className="uppercase">
-                {minimum}
-              </Badge>
-            ) : null}
-            {!ended || reached ? (
-              <span className="flex w-full flex-wrap items-center gap-1.5 sm:ml-auto sm:w-auto">
-                {reached ? (
-                  <Badge variant="accent" className="uppercase">
-                    {reached}
-                  </Badge>
-                ) : null}
-                {!ended ? <DeadlineBadge label={view.prazo} /> : null}
-              </span>
-            ) : null}
           </div>
+          {minimum ? <p className="mt-1.5 text-[12px] font-semibold text-t1">{minimum}</p> : null}
+          {!ended || reached ? (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {reached ? (
+                <Badge variant="accent" className="uppercase">
+                  {reached}
+                </Badge>
+              ) : null}
+              {!ended ? <DeadlineBadge label={view.prazo} /> : null}
+            </div>
+          ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-1.5 self-start">
           <Tooltip label="Duplicar desafio">
@@ -377,16 +371,6 @@ function ChallengeCard({
           <HeadlineText headline={destaque} />
         </p>
       ) : null}
-
-      <div className="flex-1" />
-      <div className="mt-4 flex flex-wrap gap-1.5">
-        <Badge variant="neutral" className="uppercase">
-          {CHALLENGE_METRIC_LABEL[c.metric]}
-        </Badge>
-        <Badge variant="neutral" className="uppercase">
-          {CHALLENGE_MODE_LABEL[c.mode]}
-        </Badge>
-      </div>
     </div>
   );
 }

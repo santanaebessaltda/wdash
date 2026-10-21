@@ -177,22 +177,18 @@ function ChallengeIdentity({
         <PeriodBadge from={startsOn} to={endsOn} />
         {storeNameValue ? <BranchBadge name={storeNameValue} /> : null}
         {prize ? <PrizeBadge label={prize} /> : null}
-        {minimum ? (
-          <Badge variant="neutral" className="uppercase">
-            {minimum}
-          </Badge>
-        ) : null}
-        {prazo || reached ? (
-          <span className="flex w-full flex-wrap items-center gap-1.5 sm:ml-auto sm:w-auto">
-            {reached ? (
-              <Badge variant="accent" className="uppercase">
-                {reached}
-              </Badge>
-            ) : null}
-            {prazo ? <DeadlineBadge label={prazo} /> : null}
-          </span>
-        ) : null}
       </span>
+      {minimum ? <span className="mt-1.5 block text-[12px] font-semibold text-t1">{minimum}</span> : null}
+      {prazo || reached ? (
+        <span className="mt-2 flex flex-wrap items-center gap-1.5">
+          {reached ? (
+            <Badge variant="accent" className="uppercase">
+              {reached}
+            </Badge>
+          ) : null}
+          {prazo ? <DeadlineBadge label={prazo} /> : null}
+        </span>
+      ) : null}
     </>
   );
 }

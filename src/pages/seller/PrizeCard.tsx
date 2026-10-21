@@ -169,18 +169,8 @@ function PrizeBody({ goal, me, storeName, today, through, closed }: { goal: Sell
             {MODE[me.modo]}
           </Badge>
           {goal.spreadsUnidentified ? <UnidentifiedSalesBadge /> : null}
-          {me.group ? (
-            <Badge variant="neutral" className="uppercase">
-              {me.group}
-            </Badge>
-          ) : null}
-          <Badge variant="neutral" className="gap-1 uppercase">
-            <IconBadge>
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-            </IconBadge>
-            {me.marcos.length} {me.marcos.length === 1 ? "nível" : "níveis"}
-          </Badge>
         </div>
+        {me.group ? <p className="mt-1.5 text-[12px] text-t2">Grupo {me.group}</p> : null}
       </div>
 
       <GoalProgressBar goal={band} tiers={tiers} todayIso={today} embedded hideTitle individual={false} />

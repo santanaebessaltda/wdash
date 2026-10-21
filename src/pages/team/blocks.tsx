@@ -577,45 +577,6 @@ function GroupTypeIcon() {
   );
 }
 
-function BrandIcon() {
-  return (
-    <IconBadge>
-      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
-      <line x1="7" y1="7" x2="7.01" y2="7" />
-    </IconBadge>
-  );
-}
-
-function GroupsIcon() {
-  return (
-    <IconBadge>
-      <rect x="3" y="3" width="7" height="7" rx="1" />
-      <rect x="14" y="3" width="7" height="7" rx="1" />
-      <rect x="3" y="14" width="7" height="7" rx="1" />
-      <rect x="14" y="14" width="7" height="7" rx="1" />
-    </IconBadge>
-  );
-}
-
-function SellersIcon() {
-  return (
-    <IconBadge>
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-    </IconBadge>
-  );
-}
-
-function LevelsIcon() {
-  return (
-    <IconBadge>
-      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-    </IconBadge>
-  );
-}
-
 export function GoalCard({
   card,
   activeGoal,
@@ -630,6 +591,13 @@ export function GoalCard({
 }) {
   const kindLabel = card.kind === "individual" ? "Individual" : card.kind === "geral" ? "Geral" : "Grupo";
   const statusLabel = GOAL_STATUS_LABEL[goalStatus({ startsOn: card.band.start, endsOn: card.band.end }, todayIso ?? calendarTodayIso())];
+  const counts = [
+    card.qtyGroups > 0 ? `${card.qtyGroups} ${card.qtyGroups === 1 ? "grupo" : "grupos"}` : null,
+    `${card.qtySellers} na equipe`,
+    `${card.qtyLevels} ${card.qtyLevels === 1 ? "nível" : "níveis"}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const summary = (
     <>
       <div className="flex items-start justify-between gap-2">
@@ -645,27 +613,13 @@ export function GoalCard({
           {kindLabel}
         </Badge>
         {card.spreadsUnidentified ? <UnidentifiedSalesBadge /> : null}
-        {card.brands.map((m) => (
-          <Badge key={m} variant="neutral" className="gap-1">
-            <BrandIcon />
-            {m}
+        {card.brands.map((brand) => (
+          <Badge key={brand} variant="neutral" className="uppercase">
+            {brand}
           </Badge>
         ))}
-        {card.qtyGroups > 0 ? (
-          <Badge variant="neutral" className="gap-1 uppercase">
-            <GroupsIcon />
-            {card.qtyGroups} {card.qtyGroups === 1 ? "grupo" : "grupos"}
-          </Badge>
-        ) : null}
-        <Badge variant="neutral" className="gap-1 uppercase">
-          <SellersIcon />
-          {card.qtySellers} na equipe
-        </Badge>
-        <Badge variant="neutral" className="gap-1 uppercase">
-          <LevelsIcon />
-          {card.qtyLevels} {card.qtyLevels === 1 ? "nível" : "níveis"}
-        </Badge>
       </div>
+      <p className="mt-1.5 text-[12px] text-t2">{counts}</p>
 
       <div className="mt-4">
         <GoalProgressBar

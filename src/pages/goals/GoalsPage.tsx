@@ -306,6 +306,10 @@ function GoalCard({
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <PeriodBadge from={g.startsOn} to={g.endsOn} />
             {showsStore && store ? <BranchBadge name={store.tradeName} /> : null}
+            <Badge variant="neutral" className="uppercase">
+              {g.tierMode === "INDIVIDUAL" ? "Individual" : g.tierMode === "GENERAL" ? "Geral" : "Grupo"}
+            </Badge>
+            {goalSpreadsUnidentified(g) ? <UnidentifiedSalesBadge /> : null}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5 self-start">
@@ -355,14 +359,11 @@ function GoalCard({
 
       <div className="flex-1" />
       <div className="mt-4 flex items-center justify-between gap-3">
-        <div className="flex min-w-0 flex-wrap gap-1.5">
-          <Badge variant="neutral" className="uppercase">{g.tierMode === "INDIVIDUAL" ? "Individual" : g.tierMode === "GENERAL" ? "Geral" : "Grupo"}</Badge>
-          {goalSpreadsUnidentified(g) ? <UnidentifiedSalesBadge /> : null}
-          <Badge variant="neutral" className="uppercase">
-            {g.tiers.length} {g.tiers.length === 1 ? "nível" : "níveis"}
-          </Badge>
-          <Badge variant="neutral" className="uppercase">{team.length} na equipe</Badge>
-        </div>
+        <p className="min-w-0 text-[12px] text-t2">
+          {g.tiers.length} {g.tiers.length === 1 ? "nível" : "níveis"}
+          <span className="mx-1.5">·</span>
+          {team.length} na equipe
+        </p>
         {team.length > 0 && (
           <div className="shrink-0">
             <PersonAvatarGroup people={team} max={3} />

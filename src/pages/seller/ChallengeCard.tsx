@@ -68,13 +68,13 @@ function SellerChallengeCard({
           <PeriodBadge from={c.startsOn} to={c.endsOn} />
           <BranchBadge name={storeName} />
           {c.prize ? <PrizeBadge label={c.prize} /> : null}
-          {c.mode === "MINIMUM" && c.won && status !== "upcoming" && !c.unavailable ? (
-            <Badge variant="accent" className="uppercase">Atingiu</Badge>
-          ) : null}
         </div>
-        {prazo ? (
-          <div className="mt-2 flex w-full flex-wrap items-center justify-between gap-1.5 sm:justify-end">
-            <DeadlineBadge label={prazo} />
+        {(prazo || (c.mode === "MINIMUM" && c.won && status !== "upcoming" && !c.unavailable)) ? (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {c.mode === "MINIMUM" && c.won && status !== "upcoming" && !c.unavailable ? (
+              <Badge variant="accent" className="uppercase">Atingiu</Badge>
+            ) : null}
+            {prazo ? <DeadlineBadge label={prazo} /> : null}
           </div>
         ) : null}
         <p className="mt-2 min-w-0 text-[13px] text-t1">
