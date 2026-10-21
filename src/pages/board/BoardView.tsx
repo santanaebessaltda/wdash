@@ -15,6 +15,7 @@ import { type Scope, type TeamAggInput, type TeamMemberRow } from "@/data/wedash
 import { teamViewWithGoalShare } from "@/data/wedash/engine/generalRanking";
 import { ChallengeMiniCard } from "@/pages/challenges/ChallengeMiniCard";
 import { TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
+import { BoardThemeSwitch } from "./boardTheme";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { defaultWeekHours, effectiveWeekHours, type StoreWeekHours } from "@/data/wedash/storeHours";
 import { formatSyncWatermarkLabel } from "@/data/wedash/syncUi";
@@ -489,6 +490,7 @@ export function BoardView({
         </div>
         {showSound && (
           <div className="flex flex-wrap items-center gap-2">
+            <BoardThemeSwitch />
             <Button type="button" variant="outline" size="sm" onClick={() => (unlocked ? unlock(!muted) : unlock(false))}>
               {!unlocked ? "Ativar som" : muted ? "Som desligado" : "Som ligado"}
             </Button>

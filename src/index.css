@@ -75,6 +75,123 @@
   --shadow: 0 14px 34px -18px rgba(20, 24, 40, 0.22);
 }
 
+/* Placar: a escolha da tela vale só nela, mesmo com a conta no outro tema. */
+[data-board-theme="dark"] {
+  color-scheme: dark;
+  --bg-0: #090a0f;
+  --bg-1: #0c0e15;
+  --bg-2: #12141d;
+  --bg-3: #1a1d28;
+  --bg-inset: #0c0e15;
+  --line: rgba(255, 255, 255, 0.07);
+  --line-2: rgba(255, 255, 255, 0.13);
+  --t0: #f3f4f9;
+  --t1: #9aa1b2;
+  --t2: #5f6678;
+  --acc: #7c5cff;
+  --acc-2: #9d86ff;
+  --acc-soft: rgba(124, 92, 255, 0.15);
+  --ok: #33d493;
+  --warn: #f7b84e;
+  --bad: #f76d7d;
+  --info: #56a8ff;
+  --chip-gray: #6a707c;
+  --ok-soft: rgba(51, 212, 147, 0.14);
+  --bad-soft: rgba(247, 109, 125, 0.14);
+  --warn-soft: rgba(247, 184, 78, 0.16);
+  --info-soft: rgba(86, 168, 255, 0.14);
+  --wepink: #ff5fae;
+  --wepink-soft: rgba(255, 95, 174, 0.15);
+  --wpink: #a979ff;
+  --wpink-soft: rgba(169, 121, 255, 0.16);
+  --shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.7);
+  --color-bg-0: var(--bg-0);
+  --color-bg-1: var(--bg-1);
+  --color-bg-2: var(--bg-2);
+  --color-bg-3: var(--bg-3);
+  --color-bg-inset: var(--bg-inset);
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+  --color-t0: var(--t0);
+  --color-t1: var(--t1);
+  --color-t2: var(--t2);
+  --color-acc: var(--acc);
+  --color-acc-2: var(--acc-2);
+  --color-acc-soft: var(--acc-soft);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
+  --color-info: var(--info);
+  --color-chip-gray: var(--chip-gray);
+  --color-ok-soft: var(--ok-soft);
+  --color-bad-soft: var(--bad-soft);
+  --color-warn-soft: var(--warn-soft);
+  --color-info-soft: var(--info-soft);
+  --color-wepink: var(--wepink);
+  --color-wepink-soft: var(--wepink-soft);
+  --color-wpink: var(--wpink);
+  --color-wpink-soft: var(--wpink-soft);
+  --shadow-vela: var(--shadow);
+}
+
+[data-board-theme="light"] {
+  color-scheme: light;
+  --bg-0: #eef0f5;
+  --bg-1: #ffffff;
+  --bg-2: #ffffff;
+  --bg-3: #f3f4f9;
+  --bg-inset: #f5f6fb;
+  --line: rgba(17, 20, 32, 0.08);
+  --line-2: rgba(17, 20, 32, 0.14);
+  --t0: #171a23;
+  --t1: #5a6173;
+  --t2: #9097a8;
+  --acc: #6a4cff;
+  --acc-2: #8b6dff;
+  --acc-soft: rgba(106, 76, 255, 0.11);
+  --ok: #16b67e;
+  --warn: #df9626;
+  --bad: #e8556a;
+  --info: #3b8ef0;
+  --chip-gray: #6a707c;
+  --ok-soft: rgba(22, 182, 126, 0.12);
+  --bad-soft: rgba(232, 85, 106, 0.12);
+  --warn-soft: rgba(223, 150, 38, 0.14);
+  --info-soft: rgba(59, 142, 240, 0.12);
+  --wepink: #e0247f;
+  --wepink-soft: rgba(224, 36, 127, 0.11);
+  --wpink: #7c3aed;
+  --wpink-soft: rgba(124, 58, 237, 0.11);
+  --shadow: 0 14px 34px -18px rgba(20, 24, 40, 0.22);
+  --color-bg-0: var(--bg-0);
+  --color-bg-1: var(--bg-1);
+  --color-bg-2: var(--bg-2);
+  --color-bg-3: var(--bg-3);
+  --color-bg-inset: var(--bg-inset);
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+  --color-t0: var(--t0);
+  --color-t1: var(--t1);
+  --color-t2: var(--t2);
+  --color-acc: var(--acc);
+  --color-acc-2: var(--acc-2);
+  --color-acc-soft: var(--acc-soft);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
+  --color-info: var(--info);
+  --color-chip-gray: var(--chip-gray);
+  --color-ok-soft: var(--ok-soft);
+  --color-bad-soft: var(--bad-soft);
+  --color-warn-soft: var(--warn-soft);
+  --color-info-soft: var(--info-soft);
+  --color-wepink: var(--wepink);
+  --color-wepink-soft: var(--wepink-soft);
+  --color-wpink: var(--wpink);
+  --color-wpink-soft: var(--wpink-soft);
+  --shadow-vela: var(--shadow);
+}
+
 /* Map raw tokens into Tailwind's theme so utilities like bg-bg-2, text-t0,
    border-line, text-acc, bg-ok-soft, etc. are generated and stay in sync
    with the runtime dark/light CSS variables above. */
@@ -513,7 +630,7 @@ input[type="range"]::-moz-range-thumb {
 
 /* Tema claro: o texto solto fica claro sobre o degradê; dentro dos cards volta ao tema. */
 @media screen {
-  :root[data-theme="light"] .access-hero-scope {
+  :root[data-theme="light"] .access-hero-scope:not([data-board-theme="dark"]) {
     --t0: #f3f4f9;
     --t1: rgba(255, 255, 255, 0.72);
     --t2: rgba(255, 255, 255, 0.55);
@@ -527,7 +644,7 @@ input[type="range"]::-moz-range-thumb {
     --color-line-2: rgba(255, 255, 255, 0.28);
     --color-bg-3: rgba(255, 255, 255, 0.08);
   }
-  :root[data-theme="light"] .access-hero-scope :is(.bg-bg-2, .bg-bg-1, .bg-bg-inset) {
+  :root[data-theme="light"] .access-hero-scope:not([data-board-theme="dark"]) :is(.bg-bg-2, .bg-bg-1, .bg-bg-inset) {
     --t0: #171a23;
     --t1: #5a6173;
     --t2: #9097a8;

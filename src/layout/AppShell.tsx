@@ -15,6 +15,7 @@ import { ProfilePhotosProvider } from "@/components/wedash/PersonAvatar";
 import { PushRecover } from "@/push/PushRecover";
 import { isNotificationOpen, reloadSalesAfterOpen } from "@/push/resumeSales";
 import { AccessHeroBackdrop } from "@/pages/access/AccessHeroBackdrop";
+import { useBoardTheme } from "@/pages/board/boardTheme";
 
 /** O banco so grava 1x a cada 5 min; aqui so evita chamadas a toa. */
 const LAST_SEEN_INTERVAL_MS = 5 * 60_000;
@@ -26,6 +27,8 @@ export function AppShell() {
   const location = useLocation();
   const onBoard = location.pathname === paths.board;
   const presentation = onBoard && new URLSearchParams(location.search).get("tv") === "1";
+  const [boardTheme] = useBoardTheme();
+  const darkBoard = onBoard && boardTheme === "dark";
   const mainRef = useRef<HTMLElement | null>(null);
   const setScroller = useCallback((node: HTMLElement | null) => {
     mainRef.current = node;
@@ -120,12 +123,14 @@ export function AppShell() {
         )}
         <main
           ref={onBoard ? undefined : setScroller}
+          data-board-theme={onBoard ? boardTheme : undefined}
           className={cn(
             "relative flex min-h-0 flex-1 flex-col print:overflow-visible print:p-0",
-            onBoard ? "access-hero-scope overflow-hidden" : "overflow-x-hidden overflow-y-auto px-4 pt-5 sm:px-8 sm:pt-6",
+            onBoard ? "overflow-hidden bg-bg-0" : "overflow-x-hidden overflow-y-auto px-4 pt-5 sm:px-8 sm:pt-6",
+            darkBoard && "access-hero-scope",
           )}
         >
-          {onBoard && <AccessHeroBackdrop />}
+          {darkBoard && <AccessHeroBackdrop />}
           <div
             ref={onBoard ? setScroller : undefined}
             className={cn(
