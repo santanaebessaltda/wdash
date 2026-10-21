@@ -9,11 +9,11 @@ const FORMAT_COPY: Record<ExportFormat, { title: string; detail: string }> = {
   },
   pdf: {
     title: "PDF",
-    detail: "Abre a impressão para salvar o relatório desta tela.",
+    detail: "Para visualizar, imprimir ou compartilhar.",
   },
   xlsx: {
     title: "XLSX",
-    detail: "Baixa a planilha do Excel com os dados desta tela.",
+    detail: "Para analisar e editar os dados em planilha.",
   },
 };
 
