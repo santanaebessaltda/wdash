@@ -114,7 +114,12 @@ export function ChallengeMiniCard({
           ) : null}
         </span>
       </span>
-      {showPeople ? <ChallengeSummary challenge={c} view={view} /> : null}
+      {showPeople ? (
+        <>
+          <ChallengeSummary challenge={c} view={view} avatars={false} />
+          <ChallengePeople challenge={c} view={view} disputa={disputa} leader={leader} hotKey={hotKey} className="mt-4 border-t border-line pt-3" />
+        </>
+      ) : null}
     </>
   );
   if (!onOpen) return <div className={className}>{body}</div>;
@@ -181,7 +186,7 @@ function ChallengeIdentity({
 }
 
 /** Mesmo miolo do card de meta: a média da equipe, a barra até o mínimo e os avatares. */
-export function ChallengeSummary({ challenge: c, view }: { challenge: ChallengeRecord; view: ChallengeView }) {
+export function ChallengeSummary({ challenge: c, view, avatars = true }: { challenge: ChallengeRecord; view: ChallengeView; avatars?: boolean }) {
   const upcoming = view.status === "upcoming";
   const ended = view.status === "ended";
   const people = view.participants;
@@ -244,7 +249,7 @@ export function ChallengeSummary({ challenge: c, view }: { challenge: ChallengeR
       <div className="flex-1" />
       <div className="mt-4 flex items-center justify-between gap-3">
         <p className="min-w-0 text-[12px] text-t2">{note}</p>
-        {count > 0 ? (
+        {avatars && count > 0 ? (
           <div className="shrink-0">
             <PersonAvatarGroup people={avatarPeople(c, view)} max={3} />
           </div>
