@@ -693,7 +693,6 @@ export function TeamPage() {
                     view={challengeView}
                     storeNameValue={showChallengeStore ? storeNameValue : undefined}
                     showPeople
-                    showCount
                     onOpen={() =>
                       navigate(paths.management.challengeDetail(challenge.id), {
                         state: { from: teamChallengesReturn(location.search) },

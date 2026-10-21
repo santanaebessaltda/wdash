@@ -51,7 +51,7 @@ function SellerChallengeCard({
       : c.mode === "CONTEST" && c.position != null
         ? <ProgressStanding ok={c.won}>{`${c.position}º lugar`}</ProgressStanding>
         : c.mode === "MINIMUM" && (c.won || ended)
-          ? <ProgressStanding ok={c.won}>{c.won ? "Atingiu" : "Não atingiu"}</ProgressStanding>
+          ? <ProgressStanding ok={c.won}>{c.won ? "Ganhou" : "Não ganhou"}</ProgressStanding>
           : null;
   return (
     <div className={cn("flex items-start gap-3.5 rounded-xl border border-line p-4", ended ? "bg-bg-inset" : "bg-bg-2")}>

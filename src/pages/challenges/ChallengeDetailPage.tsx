@@ -40,6 +40,7 @@ import {
   challengeCriterion,
   challengeHeadline,
   challengeMinimumLabel,
+  challengeWonLabel,
   mainPrizeLabel,
 } from "@/pages/challenges/shared";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
@@ -252,7 +253,7 @@ function ChallengeHero({ challenge: c, view, storeNameValue }: { challenge: Chal
     },
     {
       label: destaque.label ?? "Resultado",
-      value: reachedPeople ? `${view.reachedCount}/${people} já atingiu` : destaque.value,
+      value: reachedPeople ? challengeWonLabel(view.reachedCount, people) : destaque.value,
       cls: reachedPeople && view.reachedCount === people ? "text-ok" : undefined,
     },
     { label: "Prazo", value: view.prazo },
@@ -293,7 +294,7 @@ function ChallengeHero({ challenge: c, view, storeNameValue }: { challenge: Chal
       </div>
       <div className="mt-4">
         <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-t2">Progresso do desafio</p>
-        <ChallengeProgress challenge={c} view={view} height={12} showDeadline={false} showCount />
+        <ChallengeProgress challenge={c} view={view} height={12} showDeadline={false} hideCount />
       </div>
     </Card>
   );
@@ -342,9 +343,9 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
             <span className="font-bold">{prizeLabel(view.management.prize)}</span>
           </p>
           {view.management.atingiu ? (
-            <ProgressStanding ok>Atingiu</ProgressStanding>
+            <ProgressStanding ok>Ganhou</ProgressStanding>
           ) : view.status === "ended" ? (
-            <ProgressStanding ok={false}>Não atingiu</ProgressStanding>
+            <ProgressStanding ok={false}>Não ganhou</ProgressStanding>
           ) : null}
         </div>
       )}
@@ -382,9 +383,9 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
                   {usesSales && <td className="py-2.5 pr-3 text-right font-mono font-bold text-t1">{aComecar ? "—" : num(p.sales)}</td>}
                   <td className="py-2.5 pr-3">
                     {p.winner ? (
-                      <ProgressStanding ok>{p.position != null ? `${p.position}º lugar` : "Atingiu"}</ProgressStanding>
+                      <ProgressStanding ok>{p.position != null ? `${p.position}º lugar` : "Ganhou"}</ProgressStanding>
                     ) : !disputa && view.status === "ended" ? (
-                      <ProgressStanding ok={false}>Não atingiu</ProgressStanding>
+                      <ProgressStanding ok={false}>Não ganhou</ProgressStanding>
                     ) : (
                       <span className="text-t2">{p.gap ?? "—"}</span>
                     )}
@@ -454,7 +455,7 @@ function ChallengePayoutCard({ challenge: c, view, onExport }: { challenge: Chal
       employeeId: w.key,
     })),
     ...(payout.management
-      ? [{ key: "gerencia", name: "GERÊNCIA", sub: "Resultado da equipe", rank: "Atingiu", prize: payout.management, employeeId: null as string | null }]
+      ? [{ key: "gerencia", name: "GERÊNCIA", sub: "Resultado da equipe", rank: "Ganhou", prize: payout.management, employeeId: null as string | null }]
       : []),
   ];
   const especie = countEspecie(payout.especie);
@@ -481,7 +482,7 @@ function ChallengePayoutCard({ challenge: c, view, onExport }: { challenge: Chal
       </div>
 
       {lines.length === 0 ? (
-        <EmptyBlock icon="🏁" title="Nenhum vencedor neste desafio" description="Ninguém atingiu o resultado necessário para receber o prêmio." />
+        <EmptyBlock icon="🏁" title="Nenhum vencedor neste desafio" description="Ninguém ganhou o prêmio." />
       ) : (
         <>
           <div className="mb-4 grid grid-cols-2 gap-3.5 sm:grid-cols-3">

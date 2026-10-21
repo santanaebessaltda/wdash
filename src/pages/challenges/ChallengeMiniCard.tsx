@@ -1,12 +1,12 @@
-import { Card, CardHero, ProgressBar, ProgressStanding, progressTextClass } from "@/components/ui";
+import { Badge, Card, CardHero, ProgressBar, ProgressStanding, progressTextClass } from "@/components/ui";
 import { BranchBadge, DeadlineBadge, PeriodBadge, PrizeBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { PersonAvatar, PersonAvatarGroup } from "@/components/wedash/PersonAvatar";
 import type { ChallengeRecord } from "@/data/wedash/challengesRepo";
 import { CHALLENGE_STATUS_LABEL, metricValueLabel, prizeLabel, type ChallengeParticipant, type ChallengeView } from "@/data/wedash/challengeView";
 import { cn } from "@/lib/cn";
 import { num } from "@/lib/format";
-import { challengeCriterion, challengeHeadline, challengeMinimumLabel, floorChallengeHeadline, floorPrizeLine, HeadlineText, mainPrizeLabel } from "@/pages/challenges/shared";
-import { FlameIcon } from "@/pages/dashboards/icons";
+import { challengeCriterion, challengeHeadline, challengeMinimumLabel, challengeWonLabel, floorChallengeHeadline, floorPrizeLine, HeadlineText, mainPrizeLabel } from "@/pages/challenges/shared";
+import { FlameIcon, TrophyIcon } from "@/pages/dashboards/icons";
 
 /** Desafio na aba Desafios da Equipe: so leitura, clique abre o detalhe. */
 export function ChallengeMiniCard({
@@ -18,7 +18,6 @@ export function ChallengeMiniCard({
   showPeople = false,
   hotKey = null,
   floor = false,
-  showCount = false,
 }: {
   challenge: ChallengeRecord;
   view: ChallengeView;
@@ -32,15 +31,15 @@ export function ChallengeMiniCard({
   hotKey?: string | null;
   /** Texto corrido, para o placar da loja. */
   floor?: boolean;
-  /** No mínimo, “2/6 já atingiu”, como no detalhe. */
-  showCount?: boolean;
 }) {
   const prize = mainPrizeLabel(c);
   const ended = view.status === "ended";
   const statusLabel = CHALLENGE_STATUS_LABEL[view.status];
   const disputa = c.mode === "CONTEST";
   const minimum = challengeMinimumLabel(c);
-  const reached = c.mode === "MINIMUM" && view.status !== "upcoming" ? challengeHeadline(c, view).value : null;
+  const people = view.participants.length;
+  const reached =
+    c.mode === "MINIMUM" && view.status !== "upcoming" && people > 0 ? challengeWonLabel(view.reachedCount, people) : null;
   const leader = Math.max(0, ...view.participants.map((person) => person.result ?? 0));
   if (floor) {
     const lead = disputa ? floorLead(c, view) : null;
@@ -61,8 +60,9 @@ export function ChallengeMiniCard({
               prize={null}
               prizeLine={floorPrizeLine(c)}
               minimum={minimum}
+              minimumBadge
               reached={reached}
-              reachedOk={view.reachedCount > 0}
+              reachedOk={people > 0 && view.reachedCount === people}
               prazo={ended ? null : view.prazo}
             />
           </span>
@@ -108,7 +108,7 @@ export function ChallengeMiniCard({
             prize={prize}
             minimum={showPeople ? null : minimum}
             reached={showPeople ? null : reached}
-            reachedOk={view.reachedCount > 0}
+            reachedOk={people > 0 && view.reachedCount === people}
             prazo={showPeople || ended ? null : view.prazo}
           />
           {disputa && !showPeople ? (
@@ -120,7 +120,7 @@ export function ChallengeMiniCard({
       </span>
       {showPeople ? (
         <>
-          <ChallengeSummary challenge={c} view={view} avatars={false} showCount={showCount} />
+          <ChallengeSummary challenge={c} view={view} avatars={false} />
           <ChallengePeople challenge={c} view={view} disputa={disputa} leader={leader} hotKey={hotKey} className="mt-4 border-t border-line pt-3" />
         </>
       ) : null}
@@ -156,6 +156,7 @@ function ChallengeIdentity({
   prize,
   prizeLine = null,
   minimum,
+  minimumBadge = false,
   reached,
   reachedOk = false,
   prazo,
@@ -170,6 +171,8 @@ function ChallengeIdentity({
   /** Linha de destaque do placar. Quando existe, o badge do prêmio sai. */
   prizeLine?: string | null;
   minimum: string | null;
+  /** No placar, a regra entra na fileira de badges, em caixa alta. */
+  minimumBadge?: boolean;
   reached: string | null;
   reachedOk?: boolean;
   prazo: string | null;
@@ -180,14 +183,26 @@ function ChallengeIdentity({
         <span className={nameClass}>{name}</span>
         <RecordStatusBadge label={statusLabel} />
       </span>
-      {prizeLine ? <span className="mt-1 block text-[14px] font-bold leading-snug text-t0">{prizeLine}</span> : null}
+      {prizeLine ? (
+        <span className="mt-2 flex items-center gap-2">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-warn-soft text-warn">
+            <TrophyIcon size={16} />
+          </span>
+          <span className="text-[16px] font-extrabold leading-snug text-t0">{prizeLine}</span>
+        </span>
+      ) : null}
       <span className="mt-2 flex flex-wrap items-center gap-1.5">
         <PeriodBadge from={startsOn} to={endsOn} />
         {storeNameValue ? <BranchBadge name={storeNameValue} /> : null}
+        {minimum && minimumBadge ? (
+          <Badge variant="neutral" className="uppercase">
+            {minimum}
+          </Badge>
+        ) : null}
         {prize && !prizeLine ? <PrizeBadge label={prize} /> : null}
         {prazo ? <DeadlineBadge label={prazo} /> : null}
       </span>
-      {minimum ? <span className="mt-1.5 block text-[12px] font-semibold text-t1">{minimum}</span> : null}
+      {minimum && !minimumBadge ? <span className="mt-1.5 block text-[12px] font-semibold text-t1">{minimum}</span> : null}
       {reached ? <span className={`mt-2 block text-[12.5px] font-semibold ${reachedOk ? "text-ok" : "text-t1"}`}>{reached}</span> : null}
     </>
   );
@@ -199,15 +214,15 @@ export function ChallengeProgress({
   view,
   height = 5,
   showDeadline = true,
-  showCount = false,
+  hideCount = false,
 }: {
   challenge: ChallengeRecord;
   view: ChallengeView;
   height?: number;
   /** No detalhe o prazo já está nos números do resumo. */
   showDeadline?: boolean;
-  /** “2/6 já atingiu”, como no detalhe da meta. */
-  showCount?: boolean;
+  /** No detalhe o Resultado já mostra quantos ganharam. */
+  hideCount?: boolean;
 }) {
   const upcoming = view.status === "upcoming";
   const ended = view.status === "ended";
@@ -228,16 +243,7 @@ export function ChallengeProgress({
   const headcount = `${count} ${count === 1 ? "pessoa" : "pessoas"}`;
   const left = upcoming ? (c.mode === "MINIMUM" ? challengeMinimumLabel(c) : challengeCriterion(c)) ?? "—" : shown != null ? metricValueLabel(c.metric, shown) : "Sem resultado";
   const everyone = count > 0 && won === count;
-  const reached =
-    c.mode !== "MINIMUM" || upcoming
-      ? null
-      : showCount && count > 0
-        ? `${won}/${count} já atingiu`
-        : won === 0
-          ? "Ninguém atingiu"
-          : won === 1
-            ? "1 pessoa atingiu"
-            : `${won} pessoas atingiram`;
+  const reached = hideCount || c.mode !== "MINIMUM" || upcoming || count === 0 ? null : challengeWonLabel(won, count);
   const prazo = showDeadline && !upcoming && !ended ? view.prazo : null;
 
   return (
@@ -264,7 +270,7 @@ export function ChallengeProgress({
       </div>
       {reached || prazo ? (
         <p className="mt-2 text-[11.5px]">
-          {reached ? <span className={`font-semibold ${showCount ? (everyone ? "text-ok" : "text-t1") : won > 0 ? "text-acc" : "text-t1"}`}>{reached}</span> : null}
+          {reached ? <span className={`font-semibold ${everyone ? "text-ok" : "text-t1"}`}>{reached}</span> : null}
           {reached && prazo ? <span className="text-t2"> · </span> : null}
           {prazo ? <span className="text-t2">{prazo}</span> : null}
         </p>
@@ -278,13 +284,10 @@ export function ChallengeSummary({
   challenge: c,
   view,
   avatars = true,
-  showCount = false,
 }: {
   challenge: ChallengeRecord;
   view: ChallengeView;
   avatars?: boolean;
-  /** No mínimo, “2/6 já atingiu”, como no detalhe. */
-  showCount?: boolean;
 }) {
   const upcoming = view.status === "upcoming";
   const people = view.participants;
@@ -296,7 +299,7 @@ export function ChallengeSummary({
   return (
     <>
       <div className="mt-3.5">
-        <ChallengeProgress challenge={c} view={view} showCount={showCount} />
+        <ChallengeProgress challenge={c} view={view} />
       </div>
       <div className="flex-1" />
       <div className="mt-4 flex items-center justify-between gap-3">
@@ -390,8 +393,8 @@ function ChallengePersonStatus({
   const won = announcePrize && person.winner && person.prize && (!disputa || ended) ? `Ganhou ${prizeLabel(person.prize)}` : null;
   if (won) return <span className="max-w-[11rem] text-right text-[12px] font-semibold leading-tight text-ok">{won}</span>;
   if (disputa && person.position != null) return <ProgressStanding ok={person.winner}>{`${person.position}º lugar`}</ProgressStanding>;
-  if (person.winner) return <ProgressStanding ok>Atingiu</ProgressStanding>;
-  if (!disputa && ended) return <ProgressStanding ok={false}>Não atingiu</ProgressStanding>;
+  if (person.winner) return <ProgressStanding ok>Ganhou</ProgressStanding>;
+  if (!disputa && ended) return <ProgressStanding ok={false}>Não ganhou</ProgressStanding>;
   return <span className={`shrink-0 font-mono text-[12px] font-bold tabular-nums ${progressTextClass(pct)}`}>{num(pct, 0)}%</span>;
 }
 

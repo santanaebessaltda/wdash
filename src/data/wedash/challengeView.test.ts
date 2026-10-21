@@ -560,7 +560,7 @@ describe("fechamento, card e duplicar", () => {
     const c = challenge({ mode: "MINIMUM", target: 3, prizes: [{ kind: "ITEM", label: "Pizza" }] });
     const v = build(c, input({ sellerProducts: [item(1001, "BS1", 5), item(1002, "BS1", 4)] }), "2026-10-15");
     const pay = challengePayout(v);
-    expect(pay.vencedores.map((w) => w.rank)).toEqual(["Atingiu", "Atingiu"]);
+    expect(pay.vencedores.map((w) => w.rank)).toEqual(["Ganhou", "Ganhou"]);
     expect(pay.totalBrl).toBe(0);
     expect(pay.especie).toEqual(["Pizza", "Pizza"]);
   });

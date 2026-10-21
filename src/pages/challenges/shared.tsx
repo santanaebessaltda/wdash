@@ -49,9 +49,9 @@ export function challengeHeadline(c: ChallengeRecord, view: ChallengeView): Chal
   const ended = view.status === "ended";
   if (c.mode === "MINIMUM") {
     const n = view.reachedCount;
-    if (n === 0) return { label: null, value: ended ? "Ninguém atingiu" : "Ninguém atingiu ainda" };
-    if (n === 1) return { label: null, value: "1 pessoa atingiu" };
-    return { label: null, value: `${n} pessoas atingiram` };
+    const people = view.participants.length;
+    if (people > 0) return { label: null, value: challengeWonLabel(n, people) };
+    return { label: null, value: ended ? "Ninguém ganhou" : "Ninguém ganhou ainda" };
   }
   const { leader } = challengeCardSummary(view);
   const primeiros = view.participants.filter((p) => p.position === 1);
@@ -68,13 +68,7 @@ export function challengeHeadline(c: ChallengeRecord, view: ChallengeView): Chal
 export function floorChallengeHeadline(c: ChallengeRecord, view: ChallengeView): ChallengeHeadline {
   if (view.status === "upcoming") return challengeHeadline(c, view);
   const ended = view.status === "ended";
-  if (c.mode === "MINIMUM") {
-    const n = view.reachedCount;
-    const target = c.target != null ? ` de ${metricValueLabel(c.metric, c.target)}` : "";
-    if (n === 0) return { label: null, value: ended ? "Ninguém atingiu o mínimo" : "Ninguém atingiu o mínimo ainda" };
-    if (n === 1) return { label: null, value: `1 pessoa já atingiu o mínimo${target}` };
-    return { label: null, value: `${n} pessoas já atingiram o mínimo${target}` };
-  }
+  if (c.mode === "MINIMUM") return challengeHeadline(c, view);
   const { leader } = challengeCardSummary(view);
   const primeiros = view.participants.filter((person) => person.position === 1);
   if (!leader || primeiros.length === 0 || (ended && !primeiros[0].winner)) {
@@ -103,6 +97,11 @@ export function challengeBackPath(state: unknown): string {
   if (typeof from === "string" && from.startsWith("/") && !from.startsWith("//")) return from;
   if (from === "team") return `${paths.team}?tab=challenges`;
   return paths.management.challenges;
+}
+
+/** "2/6 ganhou". No desafio a pessoa ganha o prêmio. A meta continua com "atingiu". */
+export function challengeWonLabel(won: number, people: number): string {
+  return `${won}/${people} ganhou`;
 }
 
 /** Premio principal: 1 lugar (Disputa) ou o premio por pessoa (Minimo). */

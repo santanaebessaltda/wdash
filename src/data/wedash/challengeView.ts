@@ -511,7 +511,7 @@ export interface ChallengeWinner {
   key: string;
   name: string;
   group: string | null;
-  /** "1 lugar"  |  "Atingiu" */
+  /** "1º lugar" | "Ganhou" */
   rank: string;
   prize: ChallengePrize;
 }
@@ -532,7 +532,7 @@ export function challengePayout(view: ChallengeView): ChallengePayout {
       key: p.key,
       name: p.name,
       group: p.group,
-      rank: p.position != null ? `${p.position}º lugar` : "Atingiu",
+      rank: p.position != null ? `${p.position}º lugar` : "Ganhou",
       prize: p.prize!,
     }));
   const management = view.management?.atingiu ? view.management.prize : null;
