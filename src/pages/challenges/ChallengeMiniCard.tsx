@@ -241,7 +241,7 @@ export function ChallengeSummary({ challenge: c, view, avatars = true }: { chall
       </div>
       {reached || prazo ? (
         <p className="mt-2 text-[11.5px]">
-          {reached ? <span className={`font-semibold ${won > 0 ? "text-ok" : "text-t1"}`}>{reached}</span> : null}
+          {reached ? <span className={`font-semibold ${won > 0 ? "text-acc" : "text-t1"}`}>{reached}</span> : null}
           {reached && prazo ? <span className="text-t2"> · </span> : null}
           {prazo ? <span className="text-t2">{prazo}</span> : null}
         </p>
