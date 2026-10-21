@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ProgressBar, ProgressStanding } from "@/components/ui";
+import { ProgressBar, ProgressStanding, progressTextClass } from "@/components/ui";
 import { BranchBadge, DeadlineBadge, PeriodBadge, PrizeBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { prazoRemaining } from "@/data/wedash/engine/goalView";
 import type { SellerChallenge } from "@/data/wedash/engine/sellerHome";
@@ -76,7 +76,7 @@ function SellerChallengeCard({
         </div>
         <div className="mt-2 flex items-baseline justify-between gap-3">
           <p className="min-w-0 text-[13px] text-t1">
-            <HeadlineText headline={sellerHeadline(c, status)} valueClass={c.progressPct != null && c.progressPct >= 100 ? "text-ok" : "text-t0"} />
+            <HeadlineText headline={sellerHeadline(c, status)} valueClass={c.progressPct == null ? "text-t0" : progressTextClass(c.progressPct)} />
           </p>
           {standing}
         </div>

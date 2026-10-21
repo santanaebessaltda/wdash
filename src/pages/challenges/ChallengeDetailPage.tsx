@@ -317,7 +317,7 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
           <p className="font-bold text-t0">Gerência</p>
           <p className="flex items-center gap-1.5 text-t1">
             <span className="text-t2">{MANAGEMENT_RESULT[c.metric]}: </span>
-            <span className={`font-mono font-bold ${view.management.atingiu ? "text-ok" : "text-t0"}`}>{view.management.result != null ? metricValueLabel(c.metric, view.management.result) : "—"}</span>
+            <span className={`font-mono font-bold ${view.management.result == null ? "text-t0" : view.management.atingiu ? "text-ok" : "text-acc"}`}>{view.management.result != null ? metricValueLabel(c.metric, view.management.result) : "—"}</span>
             {view.management.periodPrevious && (
               <TipHelp
                 label={`Compara a equipe durante o desafio com o período de ${shortDate(view.management.periodPrevious.from)} a ${shortDate(view.management.periodPrevious.to)}: 50% faturamento médio por pessoa, 25% ticket médio e 25% P.A. 100 representa o mesmo desempenho do período anterior. Com o desafio em andamento, os dois lados consideram até ontem.${view.management.result == null ? " Fica indisponível no primeiro dia do desafio, sem vendas em um dos períodos ou quando faltam dados de itens." : ""}`}
@@ -367,7 +367,7 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
                       sub={[p.group, p.eligibleDays < p.periodDays ? `${p.eligibleDays} de ${p.periodDays} dias` : null].filter(Boolean).join(" · ") || null}
                     />
                   </td>
-                  <td className={`py-2.5 pr-3 text-right font-mono font-bold ${p.winner ? "text-ok" : "text-t0"}`}>
+                  <td className={`py-2.5 pr-3 text-right font-mono font-bold ${aComecar || p.result == null ? "text-t0" : p.winner ? "text-ok" : "text-acc"}`}>
                     {aComecar ? "—" : p.result != null ? metricValueLabel(c.metric, p.result) : <WithoutItems index={isIndexMetric(c.metric)} />}
                   </td>
                   {usesSales && <td className="py-2.5 pr-3 text-right font-mono font-bold text-t1">{aComecar ? "—" : num(p.sales)}</td>}

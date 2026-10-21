@@ -238,7 +238,7 @@ function GoalHero({
     {
       label: "Realizado",
       value: brlCent(achieved),
-      cls: pct >= 100 ? "text-ok" : "text-t0",
+      cls: progressTextClass(pct),
       sub: status === "upcoming" ? undefined : `${num(pct, 1)}% da meta`,
       subCls: progressTextClass(pct),
     },
