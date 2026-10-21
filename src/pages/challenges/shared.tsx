@@ -86,14 +86,14 @@ export function floorChallengeHeadline(c: ChallengeRecord, view: ChallengeView):
 }
 
 /** "Lider: ANA  |  12 itens" ou a frase inteira quando nao ha rotulo. */
-export function HeadlineText({ headline }: { headline: ChallengeHeadline }) {
+export function HeadlineText({ headline, valueClass = "text-t0" }: { headline: ChallengeHeadline; valueClass?: string }) {
   return headline.label ? (
     <>
       <span className="text-t2">{headline.label}: </span>
-      <span className="font-bold text-t0">{headline.value}</span>
+      <span className={`font-bold ${valueClass}`}>{headline.value}</span>
     </>
   ) : (
-    <span className="font-bold text-t0">{headline.value}</span>
+    <span className={`font-bold ${valueClass}`}>{headline.value}</span>
   );
 }
 

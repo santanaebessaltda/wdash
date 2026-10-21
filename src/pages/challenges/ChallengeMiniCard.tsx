@@ -201,7 +201,6 @@ export function ChallengeSummary({ challenge: c, view }: { challenge: ChallengeR
   const rule = c.mode === "MINIMUM" ? challengeMinimumLabel(c) : challengeCriterion(c);
   const headcount = `${count} ${count === 1 ? "pessoa" : "pessoas"}`;
   const left = upcoming ? (rule ?? "—") : shown != null ? metricValueLabel(c.metric, shown) : "Sem resultado";
-  const ahead = !upcoming && shown != null && shown > 0;
   const reached =
     c.mode !== "MINIMUM" || upcoming
       ? null
@@ -216,7 +215,7 @@ export function ChallengeSummary({ challenge: c, view }: { challenge: ChallengeR
   return (
     <>
       <div className="mt-3.5 flex items-baseline justify-between gap-2">
-        <span className={cn("min-w-0 truncate font-mono text-[13px] font-extrabold", ahead ? "text-ok" : "text-t0")}>{left}</span>
+        <span className={cn("min-w-0 truncate font-mono text-[13px] font-extrabold", pct >= 100 ? "text-ok" : "text-t0")}>{left}</span>
         <span className="shrink-0 text-right text-[11.5px] text-t2">
           {upcoming ? (
             view.prazo
