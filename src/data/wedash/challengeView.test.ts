@@ -223,6 +223,8 @@ describe("buildChallengeView — participantes e resultado", () => {
       periodPrevious: { from: "2026-09-28", to: "2026-10-04" },
       atingiu: true,
     });
+    expect(build(c(100), aggs).teamAverage).toBe(100);
+    expect(build(challenge({ metric: "INDEX", scope: "ALL", products: [] }), aggs).teamAverage).toBeNull();
     expect(build(c(101), aggs).management).toMatchObject({ result: 100, atingiu: false });
     expect(build(c(100), aggs, "2026-10-05").management).toMatchObject({ result: null, atingiu: false });
     const withoutPrevious = input({ sellerDays: [sellerDay(1, 10, 20, 100_000)] });
@@ -466,7 +468,11 @@ describe("buildChallengeView — gerência, incompleto e status", () => {
     expect(build(c(3), aggs).management).toEqual({ result: 3, target: 3, periodPrevious: null, atingiu: true, prize: { kind: "ITEM", label: "Spa" } });
     const v = build(c(4), aggs);
     expect(v.management).toMatchObject({ result: 3, target: 4, atingiu: false });
+    expect(v.teamAverage).toBe(3);
     expect(v.reachedCount).toBe(2);
+    const semGerencia = build(challenge(), aggs);
+    expect(semGerencia.management).toBeNull();
+    expect(semGerencia.teamAverage).toBe(3);
   });
 
   it("gerência em Valor = Σ R$ ÷ participantes", () => {

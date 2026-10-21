@@ -144,6 +144,13 @@ export interface ChallengeView {
   participants: ChallengeParticipant[];
   /** Minimo: quantas pessoas atingiram. */
   reachedCount: number;
+  /**
+   * Média da equipe, a mesma conta da gerência.
+   * Itens e faturamento: soma ÷ pessoas (quem zerou entra).
+   * P.A.: itens ÷ vendas. Ticket: faturamento ÷ vendas.
+   * Índice: índice da equipe contra o período anterior, só quando há meta da gerência.
+   */
+  teamAverage: number | null;
   management: ChallengeManagerResult | null;
   /** Dias com venda da loja e sem itens por pessoa (produtos/categorias escolhidos). */
   daysIncomplete: string[];
@@ -412,6 +419,22 @@ export function buildChallengeView(args: {
     return x.name.localeCompare(y.name, "pt-BR");
   });
 
+  const teamAverageOf = (): number | null => {
+    if (status === "upcoming" || c.metric === "INDEX") return null;
+    const all = [...accs.values()];
+    const sales = all.reduce((s, a) => s + a.sales, 0);
+    if (usesScope(c.metric)) {
+      const byPerson = all.map(resultOf);
+      if (byPerson.some((v) => v == null)) return null;
+      return all.length > 0 ? round2(byPerson.reduce<number>((s, v) => s + (v ?? 0), 0) / all.length) : 0;
+    }
+    if (c.metric === "PA") {
+      if (all.some((a) => a.withoutItems)) return null;
+      return sales > 0 ? round2(all.reduce((s, a) => s + a.itemsSales, 0) / sales) : 0;
+    }
+    return sales > 0 ? round2(all.reduce((s, a) => s + a.revenueCents, 0) / 100 / sales) : 0;
+  };
+
   let management: ChallengeManagerResult | null = null;
   const managerGoal = c.managerTarget;
   if (c.managerPrize && managerGoal != null && c.metric === "INDEX") {
@@ -445,27 +468,7 @@ export function buildChallengeView(args: {
       prize: c.managerPrize,
     };
   } else if (c.managerPrize && managerGoal != null) {
-    let result: number | null = null;
-    if (status !== "upcoming") {
-      const all = [...accs.values()];
-      const sales = all.reduce((s, a) => s + a.sales, 0);
-      if (usesScope(c.metric)) {
-        const byPerson = all.map(resultOf);
-        result = byPerson.some((v) => v == null)
-          ? null
-          : all.length > 0
-            ? round2(byPerson.reduce<number>((s, v) => s + (v ?? 0), 0) / all.length)
-            : 0;
-      } else if (c.metric === "PA") {
-        result = all.some((a) => a.withoutItems)
-          ? null
-          : sales > 0
-            ? round2(all.reduce((s, a) => s + a.itemsSales, 0) / sales)
-            : 0;
-      } else {
-        result = sales > 0 ? round2(all.reduce((s, a) => s + a.revenueCents, 0) / 100 / sales) : 0;
-      }
-    }
+    const result = teamAverageOf();
     management = {
       result,
       target: managerGoal,
@@ -497,6 +500,7 @@ export function buildChallengeView(args: {
     emClosing: status === "ended" && today <= addDays(c.endsOn, 1),
     participants,
     reachedCount: c.mode === "MINIMUM" ? participants.filter((p) => p.winner).length : 0,
+    teamAverage: c.metric === "INDEX" ? (management?.result ?? null) : teamAverageOf(),
     management,
     daysIncomplete,
   };

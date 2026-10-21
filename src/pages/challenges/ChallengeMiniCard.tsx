@@ -184,7 +184,7 @@ function ChallengeIdentity({
   );
 }
 
-/** Mesmo miolo do card de meta: número, barra, prazo e avatares. */
+/** Mesmo miolo do card de meta: a média da equipe, a barra até o mínimo e os avatares. */
 export function ChallengeSummary({ challenge: c, view }: { challenge: ChallengeRecord; view: ChallengeView }) {
   const upcoming = view.status === "upcoming";
   const ended = view.status === "ended";
@@ -193,27 +193,19 @@ export function ChallengeSummary({ challenge: c, view }: { challenge: ChallengeR
   const won = people.filter((person) => person.winner).length;
   const best = Math.max(0, ...people.map((person) => person.result ?? 0));
   const leader = people.find((person) => person.position === 1);
-  const target = c.target != null && c.target > 0 ? c.target : null;
-  const total = people.reduce((sum, person) => sum + Math.max(0, person.result ?? 0), 0);
-  const pct = upcoming
-    ? 0
-    : target != null
-      ? Math.min(100, (best / target) * 100)
-      : total > 0
-        ? (best / total) * 100
-        : 0;
+  const index = c.metric === "INDEX";
+  const personGoal = c.target != null && c.target > 0 ? c.target : null;
+  const managerGoal = view.management != null && view.management.target > 0 ? view.management.target : null;
+  // No índice a média de quem vendeu é sempre 100. Com gerência, a barra usa o índice da equipe.
+  const hasAverage = view.teamAverage != null;
+  const shown = hasAverage ? view.teamAverage : !upcoming && index && best > 0 ? (leader?.result ?? best) : null;
+  const goal = hasAverage ? (index ? managerGoal : (personGoal ?? managerGoal)) : personGoal;
+  const goalIsManager = hasAverage && goal != null && (index || personGoal == null);
+  const pct = upcoming || shown == null ? 0 : goal != null ? (shown / goal) * 100 : best > 0 ? (shown / best) * 100 : 0;
   const rule = c.mode === "MINIMUM" ? challengeMinimumLabel(c) : challengeCriterion(c);
   const headcount = `${count} ${count === 1 ? "pessoa" : "pessoas"}`;
-  const left = upcoming
-    ? (rule ?? "—")
-    : c.mode === "CONTEST"
-      ? best > 0
-        ? metricValueLabel(c.metric, leader?.result ?? best)
-        : "Sem líder"
-      : best > 0
-        ? metricValueLabel(c.metric, best)
-        : "Sem resultado";
-  const ahead = c.mode === "MINIMUM" ? won > 0 : best > 0;
+  const left = upcoming ? (rule ?? "—") : shown != null ? metricValueLabel(c.metric, shown) : "Sem resultado";
+  const ahead = !upcoming && shown != null && shown > 0;
   const reached =
     c.mode !== "MINIMUM" || upcoming
       ? null
@@ -228,17 +220,17 @@ export function ChallengeSummary({ challenge: c, view }: { challenge: ChallengeR
   return (
     <>
       <div className="mt-3.5 flex items-baseline justify-between gap-2">
-        <span className={cn("min-w-0 truncate font-mono text-[13px] font-extrabold", !upcoming && ahead ? "text-ok" : "text-t0")}>{left}</span>
+        <span className={cn("min-w-0 truncate font-mono text-[13px] font-extrabold", ahead ? "text-ok" : "text-t0")}>{left}</span>
         <span className="shrink-0 text-right text-[11.5px] text-t2">
           {upcoming ? (
             view.prazo
-          ) : c.mode === "CONTEST" ? (
-            leader?.name ?? "Ainda não há líder"
-          ) : target != null ? (
+          ) : shown != null && goal != null ? (
             <>
               <span className={`font-mono font-bold ${progressTextClass(pct)}`}>{num(pct, 1)}%</span>
-              {` de ${metricValueLabel(c.metric, target)}`}
+              {goalIsManager ? " da meta da gerência" : ` de ${metricValueLabel(c.metric, goal)}`}
             </>
+          ) : c.mode === "CONTEST" ? (
+            leader?.name ?? "Ainda não há líder"
           ) : (
             headcount
           )}
