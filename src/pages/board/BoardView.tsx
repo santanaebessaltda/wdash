@@ -7,7 +7,7 @@ import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { RankingBlock } from "@/pages/live/blocks";
 import type { RankingRow } from "@/data/wedash/live";
 import { boardMoments, type BoardMoment, type BoardSnapshot } from "@/data/wedash/boardEvents";
-import { buildGoalCardView, buildGoalSummary, GOAL_STATUS_LABEL, goalSpreadsUnidentified, goalStatus, prazoRemaining } from "@/data/wedash/goalView";
+import { buildGoalCardView, buildGoalSummary, GOAL_STATUS_LABEL, goalSpreadsUnidentified, goalStatus, outsideRankingNote, prazoRemaining } from "@/data/wedash/goalView";
 import type { GoalRecord, GoalTeamMember } from "@/data/wedash/goalsRepo";
 import { buildChallengeView } from "@/data/wedash/challengeView";
 import type { ChallengeAggInput, ChallengeRecord } from "@/data/wedash/challengesRepo";
@@ -229,6 +229,7 @@ type GoalBoard = {
 
 function BoardGoalCard({ board, showStore }: { board: GoalBoard; showStore: boolean }) {
   const { goal, card, summary, storeName } = board;
+  const outsideNote = outsideRankingNote(card.band);
   return (
     <Card padding="none" glass="var(--info-soft)" className="px-6 py-4">
       <div className="flex items-start gap-3.5">
@@ -248,6 +249,7 @@ function BoardGoalCard({ board, showStore }: { board: GoalBoard; showStore: bool
             {goalSpreadsUnidentified(goal) ? <UnidentifiedSalesBadge /> : null}
           </div>
           <p className="mt-1.5 font-mono text-[20px] font-extrabold leading-none tabular-nums text-t0">{brlCent(summary.achieved)}</p>
+          {outsideNote ? <p className="mt-1 text-[11px] leading-snug text-t2">{outsideNote}</p> : null}
           <p className="mt-2 text-[12px] text-t2">
             {goal.tiers.length} {goal.tiers.length === 1 ? "nível" : "níveis"}
           </p>
@@ -258,7 +260,7 @@ function BoardGoalCard({ board, showStore }: { board: GoalBoard; showStore: bool
         </div>
       </div>
       <div className="mt-3">
-        <GlobalGoalBand goal={card.band} tiers={card.tiers} embedded soBarra />
+        <GlobalGoalBand goal={card.band} tiers={card.tiers} embedded soBarra hideOutsideNote />
       </div>
       <div className="mt-2 flex flex-wrap items-center justify-end gap-1.5">
         {summary.projectedPct != null ? (

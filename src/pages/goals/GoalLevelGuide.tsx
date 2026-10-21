@@ -26,8 +26,7 @@ export function GoalLevelGuide({
   const selected = guide.groups.find((group) => group.key === groupKey) ?? guide.groups[0]!;
   const levels = (
     <>
-      {accordion ? <p className="text-[12.5px] leading-snug text-t1">{guide.intro}</p> : null}
-      {guide.note ? <p className={cn("text-[12px] leading-snug text-t2", accordion && "mt-1")}>{guide.note}</p> : null}
+      {guide.note ? <p className="text-[12px] leading-snug text-t2">{guide.note}</p> : null}
       {guide.groups.length > 1 ? (
         <Segmented
           className="mt-3"
@@ -102,7 +101,7 @@ export function GoalLevelGuide({
             <path d="m6 9 6 6 6-6" />
           </svg>
         </button>
-        {open ? <div className="border-t border-line px-5 pb-4 pt-3">{levels}</div> : null}
+        {open ? <div className="px-5 pb-4 pt-3">{levels}</div> : null}
       </Card>
     );
   }
