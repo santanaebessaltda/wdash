@@ -306,6 +306,7 @@ function GoalHero({
         ))}
       </div>
       <div className="mt-4">
+        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-t2">Progresso da meta</p>
         <GlobalGoalBand goal={card.band} tiers={card.tiers} todayIso={today} embedded soBarra />
       </div>
     </Card>
