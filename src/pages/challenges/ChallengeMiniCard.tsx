@@ -1,12 +1,12 @@
 import { Badge, Card, CardHero, ProgressBar } from "@/components/ui";
+import { BranchBadge, PeriodBadge, PrizeBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import type { ChallengeRecord } from "@/data/wedash/challengesRepo";
 import { CHALLENGE_STATUS_LABEL, metricValueLabel, type ChallengeParticipant, type ChallengeView } from "@/data/wedash/challengeView";
 import { cn } from "@/lib/cn";
-import { num, shortDate } from "@/lib/format";
-import { statusBadgeVariant } from "@/lib/status";
+import { num } from "@/lib/format";
 import { challengeCriterion, challengeHeadline, floorChallengeHeadline, HeadlineText, mainPrizeLabel } from "@/pages/challenges/shared";
-import { FlameIcon, TrophyIcon } from "@/pages/dashboards/icons";
+import { FlameIcon } from "@/pages/dashboards/icons";
 
 /** Desafio na aba Desafios da Equipe: so leitura, clique abre o detalhe. */
 export function ChallengeMiniCard({
@@ -47,15 +47,16 @@ export function ChallengeMiniCard({
             <FlameIcon size={22} />
           </CardHero>
           <span className="min-w-0 flex-1">
-            <span className="block min-w-0 truncate text-[15px] font-bold text-t0">{c.name}</span>
-            <span className="mt-0.5 block truncate text-[12px] text-t2">
-              {shortDate(c.startsOn)} a {shortDate(c.endsOn)}
-              {!ended ? ` · ${view.prazo}` : ""}
-            </span>
-            {storeNameValue ? <span className="mt-0.5 block truncate text-[12px] text-t2">{storeNameValue}</span> : null}
-            <span className="mt-1.5 block">
-              <Badge variant={statusBadgeVariant(statusLabel)}>{statusLabel}</Badge>
-            </span>
+            <ChallengeIdentity
+              name={c.name}
+              nameClass="block min-w-0 truncate text-[15px] font-bold text-t0"
+              statusLabel={statusLabel}
+              startsOn={c.startsOn}
+              endsOn={c.endsOn}
+              storeNameValue={storeNameValue}
+              prize={prize}
+              prazo={ended ? null : view.prazo}
+            />
           </span>
         </span>
         <div className="mt-4 border-t border-line pt-3">
@@ -88,27 +89,18 @@ export function ChallengeMiniCard({
           <FlameIcon size={prominent ? 22 : 18} />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="flex items-start justify-between gap-2">
-            <span className={cn("min-w-0 truncate font-bold text-t0", prominent ? "text-[15px]" : "text-[14px]")}>{c.name}</span>
-            <Badge variant={statusBadgeVariant(statusLabel)} className="shrink-0 uppercase">
-              {statusLabel}
-            </Badge>
-          </span>
-          <span className="mt-0.5 block truncate text-[12px] text-t2">
-            {shortDate(c.startsOn)} a {shortDate(c.endsOn)}
-            {!ended ? ` · ${view.prazo}` : ""}
-          </span>
-          {storeNameValue ? <span className="mt-0.5 block truncate text-[12px] text-t2">{storeNameValue}</span> : null}
-          <span className="mt-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-            <span className="min-w-0 truncate text-[13px] text-t1">
-              <HeadlineText headline={destaque} />
-            </span>
-            {prize && (
-              <span className="flex shrink-0 items-center gap-1 text-[12px] font-semibold text-t1">
-                <TrophyIcon size={13} className="text-warn" />
-                {prize}
-              </span>
-            )}
+          <ChallengeIdentity
+            name={c.name}
+            nameClass={cn("min-w-0 truncate font-bold text-t0", prominent ? "text-[15px]" : "text-[14px]")}
+            statusLabel={statusLabel}
+            startsOn={c.startsOn}
+            endsOn={c.endsOn}
+            storeNameValue={storeNameValue}
+            prize={prize}
+            prazo={ended ? null : view.prazo}
+          />
+          <span className="mt-2 block min-w-0 truncate text-[13px] text-t1">
+            <HeadlineText headline={destaque} />
           </span>
         </span>
       </span>
@@ -141,6 +133,41 @@ export function ChallengeMiniCard({
     >
       {body}
     </div>
+  );
+}
+
+function ChallengeIdentity({
+  name,
+  nameClass,
+  statusLabel,
+  startsOn,
+  endsOn,
+  storeNameValue,
+  prize,
+  prazo,
+}: {
+  name: string;
+  nameClass: string;
+  statusLabel: string;
+  startsOn: string;
+  endsOn: string;
+  storeNameValue?: string;
+  prize: string | null;
+  prazo: string | null;
+}) {
+  return (
+    <>
+      <span className="flex items-start justify-between gap-2">
+        <span className={nameClass}>{name}</span>
+        <RecordStatusBadge label={statusLabel} />
+      </span>
+      <span className="mt-2 flex flex-wrap items-center gap-1.5">
+        <PeriodBadge from={startsOn} to={endsOn} />
+        {prazo ? <span className="text-[12px] text-t2">{prazo}</span> : null}
+        {storeNameValue ? <BranchBadge name={storeNameValue} /> : null}
+        {prize ? <PrizeBadge label={prize} /> : null}
+      </span>
+    </>
   );
 }
 

@@ -92,7 +92,7 @@ export function PerformanceCard({ store, today, through, closed }: { store: Sell
               challenges.length === 0 ? (
                 <EmptyBlock icon="🔥" title="Desafio não configurado" description="Quando houver um desafio neste período, ele aparecerá aqui." />
               ) : (
-                <SellerChallengeList challenges={challenges} today={today} through={through} closed={closed} />
+                <SellerChallengeList challenges={challenges} storeName={store.storeName} today={today} through={through} closed={closed} />
               ),
           },
         ]}

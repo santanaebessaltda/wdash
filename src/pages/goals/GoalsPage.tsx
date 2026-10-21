@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge, Button, Card, DateRangePicker, Modal, ProgressBar, progressTextClass, useToast } from "@/components/ui";
 import { PersonAvatarGroup } from "@/components/wedash/PersonAvatar";
+import { BranchBadge, PeriodBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { Tooltip } from "@/components/ui/Tooltip";
 import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePicker";
 import { DuplicateChoiceModal } from "@/components/wedash/DuplicateChoiceModal";
@@ -30,7 +31,6 @@ import { TargetIcon } from "@/pages/dashboards/icons";
 import { IconCopy, IconTrash } from "@/pages/ecommerce/icons";
 import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
-import { statusBadgeVariant } from "@/lib/status";
 import { paths } from "@/router/paths";
 
 const STATUS_ORDER: Record<GoalStatus, number> = { active: 0, upcoming: 1, ended: 2 };
@@ -262,7 +262,6 @@ function GoalCard({
   onDelete: () => void;
 }) {
   const { goal: g, status, achieved, pct, projectedPct, daysRemaining, currentLevel, levelNumber } = summary;
-  const period = `${fullDate(g.startsOn)} a ${fullDate(g.endsOn)}`;
   const prazo = prazoRemaining(daysRemaining);
   const footer =
     status === "active"
@@ -300,9 +299,14 @@ function GoalCard({
           <TargetIcon size={22} />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-bold text-t0">{g.name}</p>
-          <p className="mt-0.5 text-[12.5px] text-t2">{period}</p>
-          {showsStore && store ? <p className="mt-0.5 text-[12.5px] text-t2">{store.tradeName}</p> : null}
+          <div className="flex items-start justify-between gap-2">
+            <p className="min-w-0 truncate text-[15px] font-bold text-t0">{g.name}</p>
+            <RecordStatusBadge label={GOAL_STATUS_LABEL[status]} />
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <PeriodBadge from={g.startsOn} to={g.endsOn} />
+            {showsStore && store ? <BranchBadge name={store.tradeName} /> : null}
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5 self-start">
           <Tooltip label="Duplicar meta">
@@ -352,7 +356,6 @@ function GoalCard({
       <div className="flex-1" />
       <div className="mt-4 flex items-center justify-between gap-3">
         <div className="flex min-w-0 flex-wrap gap-1.5">
-          <Badge variant={statusBadgeVariant(GOAL_STATUS_LABEL[status])} className="uppercase">{GOAL_STATUS_LABEL[status]}</Badge>
           <Badge variant="neutral" className="uppercase">{g.tierMode === "INDIVIDUAL" ? "Individual" : g.tierMode === "GENERAL" ? "Geral" : "Grupo"}</Badge>
           <Badge variant="neutral" className="uppercase">
             {g.tiers.length} {g.tiers.length === 1 ? "nível" : "níveis"}

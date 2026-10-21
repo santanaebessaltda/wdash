@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Badge, Button, Card, CardHero, CardTitle, EmptyState, ProgressBar, StatCard, ThSort, progressTextClass, type SortDir } from "@/components/ui";
+import { Button, Card, CardHero, CardTitle, EmptyState, ProgressBar, StatCard, ThSort, progressTextClass, type SortDir } from "@/components/ui";
 import { BoardSkeleton } from "@/components/wedash/LoadingSkeletons";
+import { BranchBadge, PeriodBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { RankingBlock } from "@/pages/live/blocks";
 import type { RankingRow } from "@/data/wedash/live";
@@ -17,9 +18,8 @@ import { TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { defaultWeekHours, effectiveWeekHours, type StoreWeekHours } from "@/data/wedash/storeHours";
 import { formatSyncWatermarkLabel } from "@/data/wedash/syncUi";
-import { brlCent, num, shortDate } from "@/lib/format";
+import { brlCent, num } from "@/lib/format";
 import { cn } from "@/lib/cn";
-import { statusBadgeVariant } from "@/lib/status";
 import type { SalesDayAgg, SalesSellerDayAgg } from "@/data/wedash/salesTypes";
 import overtakeUrl from "@/assets/sound/overtaking.wav";
 import firstPlaceUrl from "@/assets/sound/first-place.wav";
@@ -204,20 +204,20 @@ function BoardGoalCard({ board, showStore }: { board: GoalBoard; showStore: bool
         <div className="min-w-0 flex-1">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="truncate text-[18px] font-extrabold tracking-tight text-t0">{card.name}</p>
-          <p className="mt-0.5 truncate text-[12.5px] text-t2">
-            {shortDate(goal.startsOn)} a {shortDate(goal.endsOn)}
-          </p>
-          {showStore ? <p className="truncate text-[12.5px] text-t2">{storeName}</p> : null}
-          <p className="mt-1.5 font-mono text-[20px] font-extrabold leading-none tabular-nums text-t0">{brlCent(summary.achieved)}</p>
-          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
-            <Badge variant={statusBadgeVariant(GOAL_STATUS_LABEL[summary.status])}>{GOAL_STATUS_LABEL[summary.status]}</Badge>
-            <span className="text-[12px] text-t2">
-              {mode}
-              <span className="mx-1.5">·</span>
-              {goal.tiers.length} {goal.tiers.length === 1 ? "nível" : "níveis"}
-            </span>
+          <div className="flex items-start justify-between gap-2">
+            <p className="min-w-0 truncate text-[18px] font-extrabold tracking-tight text-t0">{card.name}</p>
+            <RecordStatusBadge label={GOAL_STATUS_LABEL[summary.status]} />
           </div>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <PeriodBadge from={goal.startsOn} to={goal.endsOn} />
+            {showStore ? <BranchBadge name={storeName} /> : null}
+          </div>
+          <p className="mt-1.5 font-mono text-[20px] font-extrabold leading-none tabular-nums text-t0">{brlCent(summary.achieved)}</p>
+          <p className="mt-2 text-[12px] text-t2">
+            {mode}
+            <span className="mx-1.5">·</span>
+            {goal.tiers.length} {goal.tiers.length === 1 ? "nível" : "níveis"}
+          </p>
         </div>
         <div className="shrink-0 text-right">
           <p className={`font-mono text-[22px] font-extrabold leading-none tabular-nums ${progressTextClass(summary.pct)}`}>{num(summary.pct, 1)}%</p>

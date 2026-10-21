@@ -23,9 +23,9 @@ import {
 } from "@/data/wedash/challengeView";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { storesForSession, type Store } from "@/data/wedash/stores";
+import { BranchBadge, PeriodBadge, PrizeBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { cn } from "@/lib/cn";
 import { fullDate, isoToDate, endOfMonth, dateToIso } from "@/lib/format";
-import { statusBadgeVariant } from "@/lib/status";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import {
   CHALLENGE_STATUS_ORDER,
@@ -43,7 +43,7 @@ import {
 } from "@/pages/dashboard/periodPicker";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useScope } from "@/pages/dashboard/useScope";
-import { FlameIcon, TrophyIcon } from "@/pages/dashboards/icons";
+import { FlameIcon } from "@/pages/dashboards/icons";
 import { IconCopy, IconTrash } from "@/pages/ecommerce/icons";
 import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
@@ -282,7 +282,6 @@ function ChallengeCard({
   onCopy: () => void;
   onDelete: () => void;
 }) {
-  const period = `${fullDate(c.startsOn)} a ${fullDate(c.endsOn)}`;
   const destaque = challengeHeadline(c, view);
   const prize = mainPrizeLabel(c);
   const ended = view.status === "ended";
@@ -321,9 +320,16 @@ function ChallengeCard({
           <FlameIcon size={22} />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-bold text-t0">{c.name}</p>
-          <p className="mt-0.5 text-[12.5px] text-t2">{period}</p>
-          {showsStore && store ? <p className="mt-0.5 text-[12.5px] text-t2">{store.tradeName}</p> : null}
+          <div className="flex items-start justify-between gap-2">
+            <p className="min-w-0 truncate text-[15px] font-bold text-t0">{c.name}</p>
+            <RecordStatusBadge label={statusLabel} />
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <PeriodBadge from={c.startsOn} to={c.endsOn} />
+            {!ended ? <span className="text-[12px] text-t2">{view.prazo}</span> : null}
+            {showsStore && store ? <BranchBadge name={store.tradeName} /> : null}
+            {prize ? <PrizeBadge label={prize} /> : null}
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5 self-start">
           <Tooltip label="Duplicar desafio">
@@ -349,24 +355,12 @@ function ChallengeCard({
         </div>
       </div>
 
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="min-w-0 truncate text-[13px] text-t1">
-          <HeadlineText headline={destaque} />
-        </p>
-        {prize && (
-          <span className="flex shrink-0 items-center gap-1 text-[12px] font-semibold text-t1">
-            <TrophyIcon size={13} className="text-warn" />
-            {prize}
-          </span>
-        )}
-      </div>
-      {!ended && <p className="mt-2 text-[11.5px] text-t2">{view.prazo}</p>}
+      <p className="min-w-0 truncate text-[13px] text-t1">
+        <HeadlineText headline={destaque} />
+      </p>
 
       <div className="flex-1" />
       <div className="mt-4 flex flex-wrap gap-1.5">
-        <Badge variant={statusBadgeVariant(statusLabel)} className="uppercase">
-          {statusLabel}
-        </Badge>
         <Badge variant="neutral" className="uppercase">
           {CHALLENGE_METRIC_LABEL[c.metric]}
         </Badge>

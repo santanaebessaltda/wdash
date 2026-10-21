@@ -23,6 +23,7 @@ import type { SalesDayAgg, SalesSellerDayAgg } from "@/data/wedash/salesTypes";
 import { storesForSession } from "@/data/wedash/stores";
 import type { GoalCardView } from "@/data/wedash/teamViews";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
+import { BranchBadge, PeriodBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { WedashBrand } from "@/components/wedash/WedashBrand";
 import { brlCent, fullDate, shortDate, isoToDate, num, dateToIso, shiftName } from "@/lib/format";
 import { statusBadgeVariant } from "@/lib/status";
@@ -292,11 +293,11 @@ function GoalHero({
         <div className="min-w-[220px] flex-1">
           <div className="mb-1.5 flex flex-wrap items-center gap-2.5">
             <h1 className="text-xl font-extrabold text-t0 sm:text-[22px]">{goal.name}</h1>
-            <Badge variant={statusBadgeVariant(GOAL_STATUS_LABEL[status])} className="uppercase">{GOAL_STATUS_LABEL[status]}</Badge>
+            <RecordStatusBadge label={GOAL_STATUS_LABEL[status]} />
           </div>
-          <p className="text-[12.5px] text-t2">{fullDate(goal.startsOn)} a {fullDate(goal.endsOn)}</p>
-          {storeNameValue ? <p className="mt-0.5 text-[12.5px] text-t2">{storeNameValue}</p> : null}
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <PeriodBadge from={goal.startsOn} to={goal.endsOn} />
+            {storeNameValue ? <BranchBadge name={storeNameValue} /> : null}
             <Badge variant="neutral" className="uppercase">{MODO_LABEL[goal.tierMode]}</Badge>
             <TipHelp label={AJUDA_MODO[goal.tierMode]} />
           </div>

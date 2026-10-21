@@ -11,9 +11,10 @@ import { brl, brlCent, eachDay, num } from "@/lib/format";
 import type { BlockState as BlockStateKind } from "@/data/wedash/dashboard";
 import { BlockState } from "@/pages/dashboard/BlockState";
 import type { GoalCardView, NetworkGlobalGoal, SellerRow } from "@/data/wedash/teamViews";
-import { outsideRankingNote } from "@/data/wedash/goalView";
+import { GOAL_STATUS_LABEL, goalStatus, outsideRankingNote } from "@/data/wedash/goalView";
+import { BranchBadge, PeriodBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { defaultTiers } from "@/data/wedash/goals";
-import { TODAY_ISO } from "@/data/wedash/clock";
+import { calendarTodayIso, TODAY_ISO } from "@/data/wedash/clock";
 import { cn } from "@/lib/cn";
 
 const TipHelp = ({ label }: { label: string }) => (
@@ -623,16 +624,6 @@ function LevelsIcon() {
   );
 }
 
-function StoreIcon() {
-  return (
-    <IconBadge>
-      <path d="M3 21h18" />
-      <path d="M5 21V7l7-4 7 4v14" />
-      <path d="M9 21v-6h6v6" />
-    </IconBadge>
-  );
-}
-
 export function GoalCard({
   card,
   activeGoal,
@@ -646,18 +637,20 @@ export function GoalCard({
   onOpen?: () => void;
 }) {
   const kindLabel = card.kind === "individual" ? "Individual" : card.kind === "geral" ? "Geral" : "Grupo";
+  const statusLabel = GOAL_STATUS_LABEL[goalStatus({ startsOn: card.band.start, endsOn: card.band.end }, todayIso ?? calendarTodayIso())];
   const summary = (
     <>
-      <CardTitle>{card.name}</CardTitle>
+      <div className="flex items-start justify-between gap-2">
+        <CardTitle>{card.name}</CardTitle>
+        <RecordStatusBadge label={statusLabel} />
+      </div>
 
       <div className="mt-2.5 flex flex-wrap gap-1.5">
+        <PeriodBadge from={card.band.start} to={card.band.end} />
+        <BranchBadge name={card.storeNameValue} />
         <Badge variant="neutral" className="gap-1 uppercase">
           {card.kind === "individual" ? <IndividualTypeIcon /> : <GroupTypeIcon />}
           {kindLabel}
-        </Badge>
-        <Badge variant="neutral" className="gap-1 uppercase">
-          <StoreIcon />
-          {card.storeNameValue}
         </Badge>
         {card.brands.map((m) => (
           <Badge key={m} variant="neutral" className="gap-1">

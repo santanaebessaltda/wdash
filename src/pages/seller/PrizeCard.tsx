@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 import { Badge, Card, CardTitle } from "@/components/ui";
+import { BranchBadge, PeriodBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { Tooltip } from "@/components/ui/Tooltip";
 import type { SellerHomeGoal, SellerHomeStore } from "@/data/wedash/engine/sellerHome";
+import { GOAL_STATUS_LABEL, goalStatus } from "@/data/wedash/goalView";
 import type { NetworkGlobalGoal } from "@/data/wedash/teamViews";
 import { brlCent, num, shortDate } from "@/lib/format";
 import { cn } from "@/lib/cn";
@@ -98,11 +100,18 @@ export function PrizeCard({
         <Card key={goal.id} className="min-w-0 overflow-hidden" padding="lg">
           {!goal.me ? (
             <>
-              <CardTitle>{goal.name}</CardTitle>
+              <div className="flex items-start justify-between gap-2">
+                <CardTitle>{goal.name}</CardTitle>
+                <RecordStatusBadge label={GOAL_STATUS_LABEL[goalStatus(goal, closed ? through : today)]} />
+              </div>
+              <div className="mt-2.5 flex flex-wrap gap-1.5">
+                <PeriodBadge from={goal.startsOn} to={goal.endsOn} />
+                <BranchBadge name={store.storeName} />
+              </div>
               <p className="py-6 text-center text-[13.5px] text-t1">Você ainda não participa de um grupo desta meta. Fale com a gerência.</p>
             </>
           ) : (
-            <PrizeBody goal={goal} me={goal.me} today={today} through={through} closed={closed} />
+            <PrizeBody goal={goal} me={goal.me} storeName={store.storeName} today={today} through={through} closed={closed} />
           )}
         </Card>
       ))}
@@ -110,7 +119,7 @@ export function PrizeCard({
   );
 }
 
-function PrizeBody({ goal, me, today, through, closed }: { goal: SellerHomeGoal; me: Me; today: string; through: string; closed: boolean }) {
+function PrizeBody({ goal, me, storeName, today, through, closed }: { goal: SellerHomeGoal; me: Me; storeName: string; today: string; through: string; closed: boolean }) {
   const mode = MODE[me.modo];
   const level = me.levelNumber != null && me.level ? `N${me.levelNumber} · ${me.level}` : null;
   const current = me.levelNumber != null ? me.marcos[me.levelNumber - 1] : undefined;
@@ -144,8 +153,13 @@ function PrizeBody({ goal, me, today, through, closed }: { goal: SellerHomeGoal;
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <CardTitle>{goal.name}</CardTitle>
+        <div className="flex items-start justify-between gap-2">
+          <CardTitle>{goal.name}</CardTitle>
+          <RecordStatusBadge label={GOAL_STATUS_LABEL[goalStatus(goal, closed ? through : today)]} />
+        </div>
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+          <PeriodBadge from={goal.startsOn} to={goal.endsOn} />
+          <BranchBadge name={storeName} />
           <Badge variant="neutral" className="gap-1 uppercase">
             <IconBadge>
               {me.modo === "individual" ? (

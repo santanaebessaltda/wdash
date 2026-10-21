@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { Badge, ProgressBar } from "@/components/ui";
+import { ProgressBar } from "@/components/ui";
+import { BranchBadge, PeriodBadge, PrizeBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { prazoRemaining } from "@/data/wedash/engine/goalView";
 import type { SellerChallenge } from "@/data/wedash/engine/sellerHome";
 import { cn } from "@/lib/cn";
-import { isoToDate, shortDate } from "@/lib/format";
-import { statusBadgeVariant } from "@/lib/status";
+import { isoToDate } from "@/lib/format";
 import { HeadlineText, type ChallengeHeadline } from "@/pages/challenges/shared";
-import { FlameIcon, TrophyIcon } from "@/pages/dashboards/icons";
+import { FlameIcon } from "@/pages/dashboards/icons";
 
 const STATUS_LABEL = { active: "Em andamento", upcoming: "A começar", ended: "Encerrado" } as const;
 const SECTION = { active: "Em andamento", upcoming: "A começar", ended: "Encerrados" } as const;
@@ -34,11 +34,13 @@ function sellerHeadline(c: SellerChallenge, status: SellerChallenge["status"]): 
 
 function SellerChallengeCard({
   challenge: c,
+  storeName,
   today,
   through,
   closed,
 }: {
   challenge: SellerChallenge;
+  storeName: string;
   today: string;
   through: string;
   closed: boolean;
@@ -61,14 +63,14 @@ function SellerChallengeCard({
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
           <p className="min-w-0 truncate text-[14px] font-bold text-t0">{c.name}</p>
-          <Badge variant={statusBadgeVariant(STATUS_LABEL[status])} className="shrink-0 uppercase">
-            {STATUS_LABEL[status]}
-          </Badge>
+          <RecordStatusBadge label={STATUS_LABEL[status]} />
         </div>
-        <p className="mt-0.5 truncate text-[12px] text-t2">
-          {shortDate(c.startsOn)} a {shortDate(c.endsOn)}
-          {prazo ? ` · ${prazo}` : ""}
-        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <PeriodBadge from={c.startsOn} to={c.endsOn} />
+          {prazo ? <span className="text-[12px] text-t2">{prazo}</span> : null}
+          <BranchBadge name={storeName} />
+          {c.prize ? <PrizeBadge label={c.prize} /> : null}
+        </div>
         <p className="mt-2 min-w-0 text-[13px] text-t1">
           <HeadlineText headline={sellerHeadline(c, status)} />
         </p>
@@ -83,12 +85,6 @@ function SellerChallengeCard({
           <p className="mt-2 text-[12.5px] text-t2">Faltam dados de itens em parte do período.</p>
         ) : (
           c.gap && <p className="mt-2 text-[12.5px] font-semibold text-t1">{c.gap}</p>
-        )}
-        {c.prize && (
-          <p className="mt-2 flex items-center gap-1 text-[12px] text-t2">
-            <TrophyIcon size={13} />
-            {c.prize}
-          </p>
         )}
         {c.rules.length > 0 && (
           <div className="mt-2">
@@ -119,11 +115,13 @@ function SellerChallengeCard({
 /** Desafios da pessoa, no desenho do card da Equipe, agrupados pelo estado. */
 export function SellerChallengeList({
   challenges,
+  storeName,
   today,
   through,
   closed,
 }: {
   challenges: SellerChallenge[];
+  storeName: string;
   today: string;
   through: string;
   closed: boolean;
@@ -141,7 +139,7 @@ export function SellerChallengeList({
             {challenges
               .filter((c) => shownStatus(c, closed, through) === status)
               .map((c) => (
-                <SellerChallengeCard key={c.id} challenge={c} today={today} through={through} closed={closed} />
+                <SellerChallengeCard key={c.id} challenge={c} storeName={storeName} today={today} through={through} closed={closed} />
               ))}
           </div>
         </div>

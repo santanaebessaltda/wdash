@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Alert, Badge, Breadcrumbs, Button, Card, CardTitle } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
+import { BranchBadge, PeriodBadge, PrizeBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { DuplicateChoiceModal } from "@/components/wedash/DuplicateChoiceModal";
 import { ExportDialog } from "@/components/wedash/ExportDialog";
@@ -38,6 +39,7 @@ import {
   challengeBackPath,
   challengeCriterion,
   challengeHeadline,
+  mainPrizeLabel,
 } from "@/pages/challenges/shared";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
@@ -229,6 +231,7 @@ function itemsText(c: ChallengeRecord): string | null {
 
 function ChallengeHero({ challenge: c, view, storeNameValue }: { challenge: ChallengeRecord; view: ChallengeView; storeNameValue?: string }) {
   const destaque = challengeHeadline(c, view);
+  const prize = mainPrizeLabel(c);
   const items = itemsText(c);
   const usesSales = usesMinSales(c.metric);
   const stats: { label: string; value: string; sub?: string; help?: string }[] = [
@@ -256,13 +259,15 @@ function ChallengeHero({ challenge: c, view, storeNameValue }: { challenge: Chal
         <div className="min-w-[220px] flex-1">
           <div className="mb-1.5 flex flex-wrap items-center gap-2.5">
             <h1 className="text-xl font-extrabold text-t0 sm:text-[22px]">{c.name}</h1>
-            <Badge variant={statusBadgeVariant(CHALLENGE_STATUS_LABEL[view.status])}>{CHALLENGE_STATUS_LABEL[view.status]}</Badge>
+            <RecordStatusBadge label={CHALLENGE_STATUS_LABEL[view.status]} />
           </div>
-          <p className="flex flex-wrap items-center gap-x-1.5 text-[13.5px] leading-relaxed text-t1">
-            {fullDate(c.startsOn)} a {fullDate(c.endsOn)}
-            {storeNameValue ? ` · ${storeNameValue}` : ""} · {CHALLENGE_MODE_LABEL[c.mode]}
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <PeriodBadge from={c.startsOn} to={c.endsOn} />
+            {storeNameValue ? <BranchBadge name={storeNameValue} /> : null}
+            {prize ? <PrizeBadge label={prize} /> : null}
+            <Badge variant="neutral" className="uppercase">{CHALLENGE_MODE_LABEL[c.mode]}</Badge>
             <TipHelp label={CHALLENGE_MODE_HELP[c.mode]} />
-          </p>
+          </div>
         </div>
       </div>
       <div className="mt-5 grid grid-cols-2 gap-3.5 border-t border-line pt-4 sm:grid-cols-3 lg:grid-cols-5">
