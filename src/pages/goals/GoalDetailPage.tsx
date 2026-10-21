@@ -313,7 +313,19 @@ function GoalHero({
   );
 }
 
-/** Grupos, cards de cada nível e a faixa da gerência. A barra fica no resumo. */
+/** Grupos, cards de cada nível e a faixa da gerência. A barra fica no resumo. O ? do título explica o card inteiro. */
+function tiersHelp(goal: GoalRecord): string {
+  const lines = ["Cada nível mostra o valor do mês, a média por dia, a premiação, o bônus e quantas pessoas do turno já atingiram."];
+  if (goal.groups.length > 1) lines.push("O pill troca o turno. Grupos mostra a parte da meta de cada um.");
+  else if (goal.groups.length === 1) lines.push("Grupos mostra a parte da meta deste turno.");
+  if (goal.tiers.some((tier) => tier.managerPct != null)) {
+    lines.push(
+      "A gerência sobe de nível pelo faturamento total da filial, incluindo vendas sem vendedor identificado ou feitas pela própria gerência. A premiação incide sobre a venda da filial e os bônus se acumulam.",
+    );
+  }
+  return lines.join("\n\n");
+}
+
 function GoalTiersCard({
   goal,
   card,
@@ -329,6 +341,7 @@ function GoalTiersCard({
     <Card className={status === "ended" ? "print:hidden" : undefined}>
       <div className="mb-4 flex items-center gap-1.5">
         <CardTitle>Níveis e premiação</CardTitle>
+        <TipHelp label={tiersHelp(goal)} />
       </div>
       {goal.groups.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 text-[12px]">
@@ -348,10 +361,7 @@ function GoalTiersCard({
       )}
       {management && status === "active" && (
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-acc-soft px-3.5 py-3 text-[12.5px]">
-          <span className="flex items-center gap-1.5 font-bold text-t0">
-            Gerência
-            <TipHelp label="A gerência sobe de nível pelo faturamento total da filial, incluindo vendas sem vendedor identificado ou realizadas pela própria gerência. A premiação é calculada sobre o faturamento da filial, e os bônus dos níveis alcançados são acumulados." />
-          </span>
+          <span className="font-bold text-t0">Gerência</span>
           <span className={`font-semibold ${management.level ? "text-acc" : "text-t2"}`}>
             {management.level ? `N${management.levelNumber} · ${management.level}` : "Abaixo do 1º nível"}
           </span>
