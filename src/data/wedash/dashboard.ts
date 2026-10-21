@@ -9,7 +9,7 @@
  * periodos no mesmo eixo (padrao Finance / Revenue vs expenses).
  */
 import { rentSeasonFactor } from "./rentSeason";
-import { categories, stores, productStores, tasks, groups, storeOperatingCostsConfigured, type Division, type Store } from "./stores";
+import { categories, stores, productStores, tasks, groups, storeOperatingCostsConfigured, unknownProductStore, type Division, type Store } from "./stores";
 import { goalOfStore } from "./goals";
 import { productsOfCategory } from "./products";
 import { buildProductLineIndex } from "./productLines";
@@ -454,10 +454,11 @@ export interface StoreView {
 
 function storesInScope(scope: Scope): Store[] {
   // Array vazio = "Todas as lojas"  ->  consolida a rede (ERP hidratado, sem misturar mock).
+  // Id explícito fora do catálogo (link público) continua no escopo: o ranking lê os agregados dele.
   const catalog = productStores();
-  return scope.storeIds.length === 0
-    ? catalog
-    : catalog.filter((f) => scope.storeIds.includes(f.id));
+  if (scope.storeIds.length === 0) return catalog;
+  const byId = new Map(catalog.map((store) => [store.id, store]));
+  return scope.storeIds.map((id) => byId.get(id) ?? unknownProductStore(id));
 }
 
 /** `horaMax` recorta so o ultimo dia (`fim`)  -  dia equivalente ao "hoje" em andamento. */

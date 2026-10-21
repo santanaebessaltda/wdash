@@ -291,6 +291,25 @@ export function productStores(): Store[] {
   return extras.length > 0 ? extras : stores;
 }
 
+/** Filial citada no escopo e ausente do catálogo local (link público do placar). */
+export function unknownProductStore(id: string): Store {
+  return withHours({
+    id,
+    millenniumBranch: 0,
+    branchCode: "",
+    name: "Filial",
+    tradeName: "Filial",
+    cnpj: "",
+    city: "",
+    uf: "",
+    kind: "F",
+    pointType: "STREET",
+    hasWpink: false,
+    timezone: "America/Campo_Grande",
+    openedAt: "2020-01-01",
+  });
+}
+
 /** Loja desativada nao entra na operacao. Ausente = em operacao (fixtures e dados antigos). */
 export function isOperationalStore(s: { active?: boolean }): boolean {
   return s.active !== false;

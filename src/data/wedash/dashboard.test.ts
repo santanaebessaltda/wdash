@@ -1974,6 +1974,19 @@ describe("buildTeamDashboardView com agregados reais", () => {
     expect(v.composition).toMatchObject({ team: 40, unidentified: 30, branchUser: 20, management: 10, excluded: 60, total: 100 });
   });
 
+  it("filial fora do catálogo local entra no ranking", () => {
+    const storeId = "11111111-1111-1111-1111-111111111111";
+    const v = buildTeamDashboardView(
+      { storeIds: [storeId], period: { kind: "custom", start: "2026-08-10", end: "2026-08-11" }, division: null },
+      {
+        dayAggs: [{ ...day("2026-08-10", 400), storeId }],
+        sellerDayAggs: [vend("2026-08-10", "Ana", 400, 4, 8, { sellerEmployeeId: 10, storeId })],
+      },
+    );
+    expect(v.people.map((person) => person.name)).toEqual(["Ana"]);
+    expect(v.composition.total).toBe(400);
+  });
+
   it("sem venda no período: sem badge e sem pessoas", () => {
     const v = buildTeamDashboardView(esc, { dayAggs: [], sellerDayAggs: [vend("2026-08-08", "Ana", 150, 2, 3)] });
     expect(v.people).toEqual([]);
