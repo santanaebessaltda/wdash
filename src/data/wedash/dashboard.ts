@@ -1662,6 +1662,21 @@ function daysInMonth(monthYm: string): number {
   return new Date(y, m, 0).getDate();
 }
 
+/** Este mês, mês passado e os calendários longos cobram o mínimo cheio. Dia, semana e personalizado rateiam. */
+function chargesFullMonthRent(period: ResolvedPeriod): boolean {
+  return period.granularity === "month"
+    || period.kind === "thisQuarter"
+    || period.kind === "thisHalf"
+    || period.kind === "thisYear";
+}
+
+/** Mínimo do mês no recorte: cheio no mês; nos demais, mínimo × dias do filtro ÷ dias do mês. */
+function rentFloor(full: number, days: number, yearMonth: string, period: ResolvedPeriod): number {
+  if (days <= 0 || full <= 0) return 0;
+  if (chargesFullMonthRent(period)) return full;
+  return (full * days) / daysInMonth(yearMonth);
+}
+
 function monthAggregate(fs: Store[], month: string, division: Division | null): Aggregate & { cmv: number; byMethod: Record<string, number> } {
   const start = `${month}-01`;
   const end = endOfMonth(start);
@@ -2080,7 +2095,7 @@ function storeCostRates(f: Store) {
   };
 }
 
-/** Financeiro a partir dos agregados do sync (sem fixture). Custos % seguem o faturamento; o aluguel minimo entra inteiro no mes. */
+/** Financeiro a partir dos agregados do sync (sem fixture). Custos % seguem o faturamento. O aluguel mínimo entra inteiro no mês; no dia, na semana e no período personalizado entra a parte dos dias. */
 export function buildFinanceViewFromAggs(scope: Scope, input: FinanceAggInput): FinanceView {
   const today = calendarTodayIso();
   const period = resolvePeriod(scope.period, today);
@@ -2150,7 +2165,7 @@ export function buildFinanceViewFromAggs(scope: Scope, input: FinanceAggInput): 
     return storeCostRates(f).rentMin * rentSeasonFactor(f.costs?.rentSeasons, yearMonth);
   }
 
-  /** Soma os dias de uma loja. O minimo entra uma vez por mes, inteiro, mesmo com o mes incompleto. */
+  /** Soma os dias de uma loja. No mês o mínimo entra inteiro; no dia e nos recortes curtos, só a parte dos dias. */
   function lineFor(f: Store, days: string[]): FinLine {
     const byMonth = new Map<string, string[]>();
     for (const iso of days) {
@@ -2161,13 +2176,13 @@ export function buildFinanceViewFromAggs(scope: Scope, input: FinanceAggInput): 
     for (const [month, daysMonth] of byMonth) {
       let store = FIN_LINE_ZERO;
       for (const iso of daysMonth) store = finAdd(store, storeDay(f, iso));
-      const full = fullRentMin(f, month);
-      acc = finAdd(acc, { ...store, rentMinBase: full, rentMin: Math.max(0, full - store.rentPct) });
+      const floor = rentFloor(fullRentMin(f, month), daysMonth.length, month, period);
+      acc = finAdd(acc, { ...store, rentMinBase: floor, rentMin: Math.max(0, floor - store.rentPct) });
     }
     return acc;
   }
 
-  /** Soma loja x mes: o aluguel do mes e o maior entre o minimo inteiro e o % do recorte, nao dia a dia. */
+  /** Soma loja x mês: o aluguel é o maior entre o mínimo do recorte e o % , não dia a dia. */
   function sumDays(days: string[]): FinLine {
     return fs.reduce((acc, f) => finAdd(acc, lineFor(f, days)), FIN_LINE_ZERO);
   }
@@ -2227,9 +2242,10 @@ export function buildFinanceViewFromAggs(scope: Scope, input: FinanceAggInput): 
       const frac = day.rev > 0 ? rev / day.rev : 0;
       const escalado = finScale(day, frac);
       const month = prev.end.slice(0, 7);
-      const earlierMonth = lineFor(f, daysPrev.slice(0, -1).filter((d) => d.startsWith(month)));
-      const full = fullRentMin(f, month);
-      const complement = Math.max(0, full - (earlierMonth.rentPct + escalado.rentPct));
+      const earlierDays = daysPrev.slice(0, -1).filter((d) => d.startsWith(month));
+      const earlierMonth = lineFor(f, earlierDays);
+      const floor = rentFloor(fullRentMin(f, month), earlierDays.length + 1, month, period);
+      const complement = Math.max(0, floor - (earlierMonth.rentPct + escalado.rentPct));
       partial = finAdd(partial, {
         ...escalado,
         rev,
@@ -2237,7 +2253,7 @@ export function buildFinanceViewFromAggs(scope: Scope, input: FinanceAggInput): 
         items,
         fixed: day.fixed,
         others: day.others,
-        rentMinBase: earlierMonth.rentMinBase > 0 ? 0 : full,
+        rentMinBase: Math.max(0, floor - earlierMonth.rentMinBase),
         rentMin: 0,
       });
       partial = { ...partial, rentMin: partial.rentMin - earlierMonth.rentMin + complement };
