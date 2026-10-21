@@ -263,4 +263,28 @@ describe("buildSellerHome", () => {
       { storeId: "s1", day: "2026-09-15", revenue: 1_200, sales: 2, items: 3 },
     ]);
   });
+
+  it("meta individual com rateio: os números e o ranking somam a parte da venda sem vendedor", () => {
+    const day: SalesDayAgg = {
+      tenantId: "t",
+      storeId: "s1",
+      day: "2026-09-10",
+      brand: "ALL",
+      revenueCents: 1_000_000,
+      salesCount: 10,
+      itemCount: 20,
+    };
+    const out = buildSellerHome(
+      input({
+        goals: [{ ...goal, groups: [], spreadUnidentified: true }],
+        dayAggs: [day],
+        namedSellerDayAggs: sales,
+      }),
+    );
+    expect(out.myDays).toEqual([
+      { storeId: "s1", day: "2026-09-10", revenue: 2_800, sales: 3, items: 5 },
+      { storeId: "s1", day: "2026-09-15", revenue: 1_200, sales: 2, items: 3 },
+    ]);
+    expect(out.stores[0]!.storeRanking.find((r) => r.me)).toMatchObject({ name: "ANA", revenue: 4_000, sales: 5 });
+  });
 });

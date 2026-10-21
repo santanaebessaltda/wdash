@@ -1,4 +1,4 @@
-/** Pacote da tela Inicio do vendedor. No modo Geral, os números da pessoa são a parte igual da filial e o ranking fica vazio. Nos outros modos, o ranking é a venda de cada pessoa. */
+/** Pacote da tela Inicio do vendedor. No modo Geral, os números da pessoa são a parte igual da filial e o ranking fica vazio. Com rateio na meta Individual ou Grupo, os números e o ranking somam a parte da venda sem vendedor. Nos outros modos, o ranking é a venda de cada pessoa. */
 import { addMonths, addDays, brlCent, collaboratorName, eachDay, startOfMonth } from "./format.ts";
 import type { GoalCardView, GoalRecord, GoalTeamMember, SalesDayAgg, SalesSellerDayAgg, SellerRow } from "./goalTypes.ts";
 import { buildGoalCardView, goalSpreadsUnidentified, goalStatus, sellerGoalLevels, type SellerGoalLevel } from "./goalView.ts";
@@ -11,6 +11,7 @@ import {
   type SellerChallengeScope,
   type SellerProductDay,
 } from "./sellerChallenge.ts";
+import { unidentifiedShares } from "./goalShare.ts";
 import { nextLevelGain, projectedPrize } from "./sellerPrize.ts";
 
 /** Semanas de historico da loja antes da meta para o peso por dia da semana (as mesmas da curva da meta). */
@@ -74,7 +75,7 @@ export interface SellerHomeStore {
   goal: SellerHomeGoal | null;
   /** Podio do mes no grupo da pessoa (dia 1 ate hoje), por faturamento, com ou sem meta. Na meta Geral, a parte igual da filial. */
   monthRanking: MonthRankingEntry[];
-  /** Podio do mes da equipe de vendas da loja (dia 1 ate hoje), pela venda real de cada pessoa. */
+  /** Pódio da equipe de vendas da loja no intervalo. Com rateio, soma a parte da venda sem vendedor. */
   storeRanking: MonthRankingEntry[];
   /** Nome do grupo da pessoa; null quando ela esta sem grupo. */
   groupName: string | null;
@@ -288,6 +289,16 @@ function salesRanking(
     row.revenue += r.revenueCents / 100;
     row.sales += r.salesCount;
   }
+  const shares = rateioByPerson(input, s.storeId, from, range.to);
+  for (const [key, share] of shares) {
+    const row = totals.get(key);
+    if (!row) continue;
+    for (const [day, bit] of share.byDay) {
+      if (day < from || day > range.to) continue;
+      row.revenue += bit.revenue;
+      row.sales += bit.sales;
+    }
+  }
   const ordered = [...totals.values()].sort((a, b) => b.revenue - a.revenue || b.sales - a.sales || a.name.localeCompare(b.name, "pt-BR"));
   const entries: MonthRankingEntry[] = [];
   ordered.forEach((r, i) => {
@@ -408,7 +419,23 @@ function buildStore(input: SellerHomeInput, s: SellerHomeInput["stores"][number]
   };
 }
 
-/** Linhas do proprio vendedor. Na meta Geral, cada dia dentro da meta e a parte igual da filial. */
+/** Parte da venda sem vendedor para cada pessoa da loja, nos dias de meta Individual ou Grupo com rateio. */
+function rateioByPerson(input: SellerHomeInput, storeId: string, from: string, to: string) {
+  if (!input.namedSellerDayAggs) return new Map<string, { byDay: Map<string, { revenue: number; sales: number; items: number; missing: boolean }> }>();
+  return unidentifiedShares({
+    goals: input.goals,
+    team: input.team,
+    dayAggs: input.dayAggs,
+    namedSellerDayAggs: input.namedSellerDayAggs,
+    sellerDayAggs: input.sellerDayAggs,
+    storeIds: [storeId],
+    from,
+    to,
+    today: input.today,
+  });
+}
+
+/** Linhas do proprio vendedor. Na meta Geral, cada dia dentro da meta e a parte igual da filial. Com rateio, soma a parte da venda sem vendedor. */
 function sellerDays(input: SellerHomeInput): SellerDay[] {
   const days = new Map<string, SellerDay>();
   for (const s of input.stores) {
@@ -437,6 +464,23 @@ function sellerDays(input: SellerHomeInput): SellerDay[] {
       d.revenue += r.revenueCents / 100;
       d.sales += r.salesCount;
       d.items = d.items == null || (!r.itemCount && r.salesCount > 0) ? null : d.items + (r.itemCount ?? 0);
+      days.set(key, d);
+    }
+    let from = input.today;
+    let to = input.today;
+    for (const a of input.dayAggs) {
+      if (a.storeId !== s.storeId || a.brand !== "ALL") continue;
+      if (a.day < from) from = a.day;
+      if (a.day > to) to = a.day;
+    }
+    const mine = rateioByPerson(input, s.storeId, from, to).get(`e:${s.employeeId}`);
+    if (!mine) continue;
+    for (const [day, bit] of mine.byDay) {
+      const key = `${s.storeId}|${day}`;
+      const d = days.get(key) ?? { storeId: s.storeId, day, revenue: 0, sales: 0, items: 0 };
+      d.revenue += bit.revenue;
+      d.sales += bit.sales;
+      d.items = d.items == null || bit.missing ? null : (d.items ?? 0) + bit.items;
       days.set(key, d);
     }
   }
