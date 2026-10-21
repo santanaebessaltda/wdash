@@ -265,7 +265,6 @@ export function BoardView({
   const [current, setCurrent] = useState<BoardMoment | null>(null);
   const queue = useRef<BoardMoment[]>([]);
   const audio = useRef<HTMLAudioElement | null>(null);
-  const previewSound = useRef(false);
   const seenSnap = useRef<string | null>(null);
   const [rankSort, setRankSort] = useState<{ key: RankSortKey; dir: SortDir }>({ key: "place", dir: "asc" });
 
@@ -394,10 +393,7 @@ export function BoardView({
   }, [packKey, scopeKey, snapshot]);
 
   useEffect(() => {
-    if (!current) return;
-    const fromPreview = previewSound.current;
-    previewSound.current = false;
-    if (fromPreview || !unlocked || muted) return;
+    if (!current || !unlocked || muted) return;
     audio.current?.pause();
     const clip = new Audio(SOUND[current.kind]);
     clip.volume = 0.85;
@@ -428,32 +424,6 @@ export function BoardView({
       if (currentSort.key === key) return { key, dir: currentSort.dir === "asc" ? "desc" : "asc" };
       return { key, dir: key === "name" || key === "place" ? "asc" : "desc" };
     });
-  }
-
-  function preview(kind: BoardMoment["kind"]) {
-    const people = view?.people ?? [];
-    const leader = people[0];
-    const chaser = people[1] ?? leader;
-    const levelName = (leader ? personLevel(leader)?.levelLabel : null) ?? "N2 · Prata";
-    const challengeName = challenges[0]?.challenge.name ?? "Desafio do mês";
-    const moment: BoardMoment =
-      kind === "first"
-        ? { kind, key: leader?.key ?? "preview", name: leader?.name ?? "Maria" }
-        : kind === "overtake"
-          ? { kind, key: chaser?.key ?? "preview", name: chaser?.name ?? "João", passed: leader?.name ?? "Maria", position: 2 }
-          : kind === "level"
-            ? { kind, key: leader?.key ?? "preview", name: leader?.name ?? "Maria", level: levelName }
-            : kind === "store-level"
-              ? { kind, level: levelName }
-              : { kind, key: leader?.key ?? "preview", name: leader?.name ?? "Maria", challenge: challengeName };
-    previewSound.current = true;
-    audio.current?.pause();
-    const clip = new Audio(SOUND[kind]);
-    clip.volume = 0.85;
-    audio.current = clip;
-    void clip.play().catch(() => undefined);
-    queue.current = [];
-    setCurrent(moment);
   }
 
   function closeCelebration() {
@@ -531,17 +501,6 @@ export function BoardView({
           </div>
         )}
       </header>
-      )}
-
-      {controls === "page" && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[12px] font-bold text-t2">Simular</span>
-          <Button type="button" size="sm" variant="outline" onClick={() => preview("first")}>Liderança</Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => preview("overtake")}>Ultrapassagem</Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => preview("level")}>Nível</Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => preview("store-level")}>Nível da loja</Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => preview("challenge")}>Desafio</Button>
-        </div>
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
