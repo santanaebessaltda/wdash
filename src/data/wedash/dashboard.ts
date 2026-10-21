@@ -3751,11 +3751,34 @@ export function buildTeamMemberDetail(
   scope: Scope,
   input: TeamAggInput,
   key: string,
-  opts: { shift?: string | null } = {},
+  opts: {
+    shift?: string | null;
+    /** Parte do rateio da venda sem vendedor, por dia. */
+    extraByDay?: Map<string, { revenue: number; sales: number; items: number; missing?: boolean }>;
+    /** Dia de meta Geral: fica fora do detalhe, como no ranking. */
+    omitDay?: (storeId: string, day: string) => boolean;
+    fallbackName?: string;
+  } = {},
 ): TeamMemberDetail | null {
   const view = buildTeamDashboardView(scope, input, opts);
-  const row = view.people.find((p) => p.key === key);
-  if (!row) return null;
+  const found = view.people.find((p) => p.key === key);
+  const extraByDay = opts.extraByDay ?? new Map();
+  if (!found && extraByDay.size === 0) return null;
+  const row: TeamMemberRow = found ?? {
+    key,
+    name: opts.fallbackName ?? key,
+    storeIds: [],
+    storeRows: [],
+    revenue: 0,
+    sales: 0,
+    items: 0,
+    averageTicket: 0,
+    pa: null,
+    participationPct: 0,
+    variationPct: null,
+    revenueCmp: 0,
+    revenuePrev: 0,
+  };
 
   const period = view.period;
   const fs = storesInScope(view.scope);
@@ -3770,7 +3793,7 @@ export function buildTeamMemberDetail(
   const inPrevCmp = (d: string) => d >= prev.start && d <= prevEndCmp;
 
   const lines = (input.sellerDayAggs ?? []).filter(
-    (r) => storeName.has(r.storeId) && (r.sellerEmployeeId != null ? `e:${r.sellerEmployeeId}` : `n:${r.sellerKey}`) === key,
+    (r) => storeName.has(r.storeId) && (r.sellerEmployeeId != null ? `e:${r.sellerEmployeeId}` : `n:${r.sellerKey}`) === key && !opts.omitDay?.(r.storeId, r.day),
   );
 
   type Total = { revenue: number; sales: number; items: number; withoutItems: boolean };
@@ -3783,11 +3806,28 @@ export function buildTeamMemberDetail(
       t.items += r.itemCount ?? 0;
       if (r.salesCount > 0 && !(r.itemCount && r.itemCount > 0)) t.withoutItems = true;
     }
+    for (const [day, bit] of extraByDay) {
+      if (!no(day)) continue;
+      t.revenue += bit.revenue;
+      t.sales += bit.sales;
+      t.items += bit.items;
+      if (bit.missing || (bit.sales > 0 && bit.items <= 0)) t.withoutItems = true;
+    }
     return t;
+  };
+  const currentT = sum(inCurrent);
+  if (!found && currentT.revenue <= 0 && currentT.sales <= 0) return null;
+  const shown: TeamMemberRow = {
+    ...row,
+    revenue: currentT.revenue,
+    sales: currentT.sales,
+    items: currentT.items,
+    averageTicket: currentT.sales > 0 ? currentT.revenue / currentT.sales : 0,
+    pa: currentT.withoutItems || currentT.sales === 0 ? null : currentT.items / currentT.sales,
   };
   const cmp = sum(inCurrentCmp);
   const prevT = sum(inPrevCmp);
-  const comparavel = row.revenue > 0 && cmp.sales > 0 && prevT.sales > 0;
+  const comparavel = shown.revenue > 0 && cmp.sales > 0 && prevT.sales > 0;
   const paComparavel = comparavel && !cmp.withoutItems && !prevT.withoutItems;
   const comparison: TeamMemberDetail["comparison"] = comparavel
     ? {
@@ -3812,6 +3852,14 @@ export function buildTeamMemberDetail(
       acc.sales += r.salesCount;
       byDay.set(k, acc);
     }
+    for (const [day, bit] of extraByDay) {
+      if (!inCurrent(day)) continue;
+      const k = seriesGranularity === "month" ? day.slice(0, 7) : day;
+      const acc = byDay.get(k) ?? { revenue: 0, sales: 0 };
+      acc.revenue += bit.revenue;
+      acc.sales += bit.sales;
+      byDay.set(k, acc);
+    }
     const eixo = seriesGranularity === "month" ? [...new Set(days.map((d) => d.slice(0, 7)))] : days;
     const variosAnos = period.start.slice(0, 4) !== period.end.slice(0, 4);
     series = eixo.map((k) => ({
@@ -3822,7 +3870,7 @@ export function buildTeamMemberDetail(
     }));
   }
 
-  return { ...row, series, seriesGranularity, comparison };
+  return { ...shown, series, seriesGranularity, comparison };
 }
 
 /* ================================================================

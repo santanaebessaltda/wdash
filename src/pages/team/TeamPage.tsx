@@ -15,7 +15,7 @@ import {
 import { fetchNamedSellerDayAggs, fetchSalesCoverage, fetchSalesDayAggs, fetchSalesSellerDayAggs } from "@/data/wedash/salesRepo";
 import { fetchGoals, fetchGoalTeam, type GoalRecord, type GoalTeamMember } from "@/data/wedash/goalsRepo";
 import { buildGoalCardView, goalStatus, sellerGoalLevels } from "@/data/wedash/goalView";
-import { rankingOutsideGeneralGoal } from "@/data/wedash/engine/generalRanking";
+import { teamViewWithGoalShare } from "@/data/wedash/engine/generalRanking";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import type { SalesDayAgg, SalesSellerDayAgg } from "@/data/wedash/salesTypes";
 import { storesForSession } from "@/data/wedash/stores";
@@ -250,10 +250,17 @@ export function TeamPage() {
     return () => window.removeEventListener(SALES_SYNCED_EVENT, onSynced);
   }, [reload]);
 
-  const view = useMemo(
-    () => rankingOutsideGeneralGoal(scope, aggs, goalsData.goals, calendarTodayIso()),
-    [scope, aggs, goalsData.goals],
-  );
+  const view = useMemo(() => {
+    const stores = storesForSession(session.stores);
+    return teamViewWithGoalShare(
+      scope,
+      aggs,
+      goalsData.goals,
+      goalsData.team,
+      calendarTodayIso(),
+      new Map(stores.map((store) => [store.id, store.tradeName])),
+    );
+  }, [scope, aggs, goalsData.goals, goalsData.team, session.stores]);
 
   const todayIso = calendarTodayIso();
   const goalCards = useMemo(() => {
@@ -382,7 +389,16 @@ export function TeamPage() {
     }
   }
 
-  const { open: openPerson, modal: personModal } = useTeamMemberDetail({ scope, data: aggs, goalLevels });
+  const { open: openPerson, modal: personModal } = useTeamMemberDetail({
+    scope,
+    data: aggs,
+    goalLevels,
+    goalShare: {
+      goals: goalsData.goals,
+      team: goalsData.team,
+      storeNames: new Map(storesForSession(session.stores).map((store) => [store.id, store.tradeName])),
+    },
+  });
   const teclaAbre = (p: TeamMemberRow) => (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
@@ -467,7 +483,7 @@ export function TeamPage() {
               <CardHeader>
                 <CardTitle>Faturamento por grupo</CardTitle>
               </CardHeader>
-              {!hasTeamSales ? (
+              {view.shifts.length === 0 ? (
                 <EmptyBlock />
               ) : !view.shiftsConfigured ? (
                 <EmptyBlock
@@ -575,7 +591,7 @@ export function TeamPage() {
           <Card className="mt-4 min-w-0 overflow-hidden" padding="lg">
             <div className="mb-4 flex items-center gap-1.5">
               <CardTitle>Desempenho da equipe</CardTitle>
-              <TipHelp label={"Acompanhe ranking, desafios e metas da equipe no período.\n\nVendas sem vendedor identificado, do usuário da filial ou realizadas pela gerência não entram no ranking. A meta pode ratear só a venda sem vendedor. Na meta Geral, o ranking fica sem posições."} />
+              <TipHelp label={"Acompanhe ranking, desafios e metas da equipe no período.\n\nNa meta Individual ou Grupo, com o rateio ligado, a venda sem vendedor entra no faturamento e no ranking, dividida entre quem estava na loja. O faturamento por grupo não recebe essa parte. Na meta Geral, os números são o total da filial e o ranking fica sem posições."} />
             </div>
             {printing ? (
               !hasTeamSales ? <EmptyBlock /> : abaRanking()

@@ -14,6 +14,9 @@ import { excludeNonSalesPeople, fetchNamedSellerDayAggs, fetchSalesDayAggs, fetc
 import { unionOriginKeys } from "@/data/wedash/engine/salesOrigin";
 import { getSupabase } from "@/lib/supabase";
 import { calendarTodayIso } from "@/data/wedash/clock";
+import { dayInGeneralGoal } from "@/data/wedash/engine/goalView";
+import { personShareDays, teamViewWithGoalShare } from "@/data/wedash/engine/generalRanking";
+import type { GoalRecord, GoalTeamMember } from "@/data/wedash/engine/goalTypes";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { DetailSkeleton, MetricDetail, pctFmt } from "@/pages/dashboard/ProductDetail";
@@ -24,13 +27,12 @@ import { GoalLevelSummary } from "@/components/wedash/GoalLevelsBar";
 
 /** Tudo o que a tela Equipe le  -  tambem usado pelo detalhe aberto da Visao geral. */
 export async function fetchTeamAggInput(tenantId: string, scope: Scope): Promise<TeamAggInput> {
-  const period = resolvePeriod(scope.period, calendarTodayIso());
   const range = productsFetchRange(scope);
   const storeIds = scope.storeIds;
   const client = getSupabase();
   const sellerQuery = { tenantId, storeIds, from: range.from, to: range.to };
   const [dayAggs, namedSellerDayAggs, origins, sellerShifts] = await Promise.all([
-    fetchSalesDayAggs({ tenantId, storeIds, from: period.start, to: period.end, brand: null }),
+    fetchSalesDayAggs({ tenantId, storeIds, from: range.from, to: range.to, brand: null }),
     fetchNamedSellerDayAggs(sellerQuery),
     client ? fetchSalesOrigins(client, tenantId) : Promise.resolve(null),
     fetchSellerShifts(tenantId),
@@ -53,12 +55,15 @@ export function useTeamMemberDetail({
   tenantId,
   shift,
   goalLevels,
+  goalShare,
 }: {
   scope: Scope;
   data?: TeamAggInput;
   tenantId?: string;
   shift?: string | null;
   goalLevels?: Map<string, SellerGoalLevel>;
+  /** Equipe: o detalhe usa o mesmo rateio do ranking. A Visão geral não passa. */
+  goalShare?: { goals: GoalRecord[]; team: GoalTeamMember[]; storeNames?: Map<string, string> };
 }): { open: (key: string, name: string) => void; modal: ReactNode } {
   const [picked, setPicked] = useState<Selection | null>(null);
   const open = useCallback((key: string, name: string) => setPicked({ key, name }), []);
@@ -77,11 +82,36 @@ export function useTeamMemberDetail({
   const lazy = useLazyTeamData(scope, tenantId, !data && picked != null);
   const source = data ?? lazy;
 
-  const detail = useMemo(
-    () => (picked && source ? buildTeamMemberDetail(scope, source, picked.key, { shift }) : null),
+  const detail = useMemo(() => {
+    if (!picked || !source) return null;
+    const today = calendarTodayIso();
+    const extraByDay = goalShare ? personShareDays(scope, source, goalShare.goals, goalShare.team, today, picked.key) : undefined;
+    const built = buildTeamMemberDetail(scope, source, picked.key, {
+      shift,
+      extraByDay,
+      fallbackName: picked.name,
+      omitDay: goalShare ? (storeId, day) => dayInGeneralGoal(goalShare.goals, storeId, day, today) : undefined,
+    });
+    if (!built || !goalShare) return built;
+    const row = teamViewWithGoalShare(scope, source, goalShare.goals, goalShare.team, today, goalShare.storeNames).people.find((person) => person.key === picked.key);
+    if (!row) return built;
+    return {
+      ...built,
+      revenue: row.revenue,
+      sales: row.sales,
+      items: row.items,
+      averageTicket: row.averageTicket,
+      pa: row.pa,
+      participationPct: row.participationPct,
+      variationPct: row.variationPct,
+      revenueCmp: row.revenueCmp,
+      revenuePrev: row.revenuePrev,
+      storeIds: row.storeIds,
+      storeRows: row.storeRows,
+      name: row.name,
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [picked, source, scope, shift, storesTick],
-  );
+  }, [picked, source, scope, shift, storesTick, goalShare]);
 
   const modal = (
     <TeamMemberDetailModal
