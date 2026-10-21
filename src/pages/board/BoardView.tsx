@@ -27,7 +27,7 @@ import firstPlaceUrl from "@/assets/sound/first-place.wav";
 import goalLevelUrl from "@/assets/sound/reached-the-goal.wav";
 import challengeUrl from "@/assets/sound/target-met.wav";
 
-type RankSortKey = "place" | "name" | "sales" | "pa" | "meta" | "revenue";
+type RankSortKey = "place" | "name" | "sales" | "pa" | "meta" | "gap" | "revenue";
 const MOMENT_CAP = 4;
 const MUTE_KEY = "wedash.board.muted";
 
@@ -65,6 +65,11 @@ type PersonLevel = {
   name: string;
   pct: number;
   storePct: number;
+  /** Quanto falta para o próximo nível. null = não há próximo, ou a pessoa não tem meta. */
+  gap: number | null;
+  nextName: string | null;
+  /** Já está no último nível. */
+  top: boolean;
 };
 
 function snapshotKey(storeId: string): string {
@@ -161,6 +166,13 @@ function levelLabel(levelNumber: number | null, name: string | null): string | n
   return `N${levelNumber} · ${name}`;
 }
 
+function gapLine(level: PersonLevel | null): string | undefined {
+  if (!level) return undefined;
+  if (level.top) return "Último nível";
+  if (level.gap == null) return undefined;
+  return `Faltam ${brlCent(level.gap)}`;
+}
+
 function storeTotals(days: SalesDayAgg[], storeIds: readonly string[], from: string, to: string) {
   const ids = new Set(storeIds);
   let revenue = 0;
@@ -178,6 +190,26 @@ const IconRevenue = () => (
     <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
   </svg>
 );
+function SoundOnIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+      <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+      <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+    </svg>
+  );
+}
+
+function SoundOffIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+      <line x1="22" y1="9" x2="16" y2="15" />
+      <line x1="16" y1="9" x2="22" y2="15" />
+    </svg>
+  );
+}
+
 const IconSales = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
@@ -330,6 +362,9 @@ export function BoardView({
           levelLabel: levelLabel(seller.currentLevel, seller.currentTierName),
           pct: seller.attainmentPct,
           storePct: seller.storeGoalPct,
+          gap: seller.nextTier ? seller.nextTier.gapAmount : null,
+          nextName: seller.nextTier?.name ?? null,
+          top: seller.currentLevel != null && seller.nextTier == null,
         };
         byStore.set(slot, row);
         if (!byKey.has(seller.employeeId)) byKey.set(seller.employeeId, row);
@@ -460,6 +495,7 @@ export function BoardView({
       sales: person.sales,
       revenue: person.revenue,
       note: level ? (level.levelLabel ?? "Sem nível") : undefined,
+      gap: gapLine(level),
       place: manyStores ? storeName.get(home) : undefined,
     };
   });
@@ -491,9 +527,18 @@ export function BoardView({
         {showSound && (
           <div className="flex flex-wrap items-center gap-2">
             <BoardThemeSwitch />
-            <Button type="button" variant="outline" size="sm" onClick={() => (unlocked ? unlock(!muted) : unlock(false))}>
-              {!unlocked ? "Ativar som" : muted ? "Som desligado" : "Som ligado"}
-            </Button>
+            <button
+              type="button"
+              className={cn(
+                "inline-flex h-8 w-8 items-center justify-center rounded-[9px] border transition-colors",
+                unlocked && !muted ? "border-acc bg-acc-soft text-acc" : "border-line text-t1 hover:border-acc",
+              )}
+              aria-label={!unlocked || muted ? "Ativar som" : "Desligar som"}
+              title={!unlocked || muted ? "Ativar som" : "Desligar som"}
+              onClick={() => (unlocked ? unlock(!muted) : unlock(false))}
+            >
+              {!unlocked || muted ? <SoundOffIcon /> : <SoundOnIcon />}
+            </button>
             {controls === "tv" && (
               <Button type="button" variant="outline" size="sm" onClick={onExitTv}>
                 Sair da tela cheia
@@ -568,7 +613,7 @@ export function BoardView({
                 <div className="mt-5">
                   <p className="mb-2 text-[12px] font-bold uppercase tracking-wide text-t2">Demais posições</p>
                   <div className="min-w-0 overflow-x-auto">
-                    <table className="w-full min-w-[520px] border-collapse text-[12px]">
+                    <table className="w-full min-w-[640px] border-collapse text-[12px]">
                       <thead>
                         <tr className="border-b border-line">
                           <ThSort label="#" active={rankSort.key === "place"} dir={rankSort.dir} align="left" className="pb-1.5 pr-2" onClick={() => toggleRankSort("place")} />
@@ -576,6 +621,7 @@ export function BoardView({
                           <ThSort label="Vendas" active={rankSort.key === "sales"} dir={rankSort.dir} align="right" className="pb-1.5 pr-2" onClick={() => toggleRankSort("sales")} />
                           <ThSort label="P.A." active={rankSort.key === "pa"} dir={rankSort.dir} align="right" className="pb-1.5 pr-2" onClick={() => toggleRankSort("pa")} />
                           <ThSort label="Meta" active={rankSort.key === "meta"} dir={rankSort.dir} align="right" className="pb-1.5 pr-2" onClick={() => toggleRankSort("meta")} />
+                          <ThSort label="Falta" active={rankSort.key === "gap"} dir={rankSort.dir} align="right" className="pb-1.5 pr-2" onClick={() => toggleRankSort("gap")} />
                           <ThSort label="Faturamento" active={rankSort.key === "revenue"} dir={rankSort.dir} align="right" className="pb-1.5" onClick={() => toggleRankSort("revenue")} />
                         </tr>
                       </thead>
@@ -595,6 +641,7 @@ export function BoardView({
                               if (rankSort.key === "sales") return row.person.sales;
                               if (rankSort.key === "pa") return row.person.pa;
                               if (rankSort.key === "revenue") return row.person.revenue;
+                              if (rankSort.key === "gap") return personLevel(row.person)?.gap ?? null;
                               return metaOf(row.person);
                             };
                             const left = value(a);
@@ -635,6 +682,18 @@ export function BoardView({
                                     <Badge variant="neutral" className="uppercase">{level.levelLabel ?? "Sem nível"}</Badge>
                                   </span>
                                 ) : null}
+                              </td>
+                              <td className="py-1.5 pr-2 text-right">
+                                {level?.top ? (
+                                  <span className="text-[12.5px] font-bold text-ok">Último nível</span>
+                                ) : level?.gap == null ? (
+                                  <span className="text-t2">—</span>
+                                ) : (
+                                  <>
+                                    <span className="block font-mono text-[12.5px] font-bold tabular-nums text-t0">{brlCent(level.gap)}</span>
+                                    {level.nextName ? <span className="block text-[11px] text-t2">para {level.nextName}</span> : null}
+                                  </>
+                                )}
                               </td>
                               <td className="py-1.5 text-right font-mono text-[12.5px] font-bold tabular-nums text-t0">{brlCent(person.revenue)}</td>
                             </tr>

@@ -176,6 +176,7 @@ export function RankingBlock({
                 <Badge variant="accent">{l.note}</Badge>
               </span>
             ) : null}
+            {l.gap ? <p className="mt-1 max-w-full truncate text-[11px] font-semibold text-t1">{l.gap}</p> : null}
 
             <div
               className={cn(
