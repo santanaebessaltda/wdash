@@ -12,7 +12,7 @@ import type { BlockState as BlockStateKind } from "@/data/wedash/dashboard";
 import { BlockState } from "@/pages/dashboard/BlockState";
 import type { GoalCardView, NetworkGlobalGoal, SellerRow } from "@/data/wedash/teamViews";
 import { GOAL_STATUS_LABEL, goalStatus, outsideRankingNote } from "@/data/wedash/goalView";
-import { BranchBadge, PeriodBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
+import { BranchBadge, DeadlineBadge, PeriodBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { defaultTiers } from "@/data/wedash/goals";
 import { calendarTodayIso, TODAY_ISO } from "@/data/wedash/clock";
 import { cn } from "@/lib/cn";
@@ -27,15 +27,6 @@ const TipHelp = ({ label }: { label: string }) => (
     </span>
   </Tooltip>
 );
-
-function ClockIcon() {
-  return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v5l3 2" />
-    </svg>
-  );
-}
 
 function shortStoreName(tradeName: string): string {
   return tradeName.replace(/^Shopping\s+/i, "");
@@ -448,14 +439,15 @@ export function GoalProgressBar({
               </span>
             </Tooltip>
           )}
-          <Badge variant="neutral" className="gap-1 uppercase">
-            <ClockIcon />
-            {goal.daysRemaining <= 0
-              ? "Encerrada"
-              : goal.daysRemaining === 1
-                ? "Último dia"
-                : `${goal.daysRemaining} dias restantes`}
-          </Badge>
+          <DeadlineBadge
+            label={
+              goal.daysRemaining <= 0
+                ? "Encerrada"
+                : goal.daysRemaining === 1
+                  ? "Último dia"
+                  : `${goal.daysRemaining} dias restantes`
+            }
+          />
         </div>
       </div>
 

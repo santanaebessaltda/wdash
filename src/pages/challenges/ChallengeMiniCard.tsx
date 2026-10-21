@@ -1,5 +1,5 @@
 import { Badge, Card, CardHero, ProgressBar } from "@/components/ui";
-import { BranchBadge, PeriodBadge, PrizeBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
+import { BranchBadge, DeadlineBadge, PeriodBadge, PrizeBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import type { ChallengeRecord } from "@/data/wedash/challengesRepo";
 import { CHALLENGE_STATUS_LABEL, metricValueLabel, type ChallengeParticipant, type ChallengeView } from "@/data/wedash/challengeView";
@@ -163,10 +163,14 @@ function ChallengeIdentity({
       </span>
       <span className="mt-2 flex flex-wrap items-center gap-1.5">
         <PeriodBadge from={startsOn} to={endsOn} />
-        {prazo ? <span className="text-[12px] text-t2">{prazo}</span> : null}
         {storeNameValue ? <BranchBadge name={storeNameValue} /> : null}
         {prize ? <PrizeBadge label={prize} /> : null}
       </span>
+      {prazo ? (
+        <span className="mt-2 flex w-full flex-wrap items-center justify-between gap-1.5 sm:justify-end">
+          <DeadlineBadge label={prazo} />
+        </span>
+      ) : null}
     </>
   );
 }

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ProgressBar } from "@/components/ui";
-import { BranchBadge, PeriodBadge, PrizeBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
+import { BranchBadge, DeadlineBadge, PeriodBadge, PrizeBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { prazoRemaining } from "@/data/wedash/engine/goalView";
 import type { SellerChallenge } from "@/data/wedash/engine/sellerHome";
 import { cn } from "@/lib/cn";
@@ -67,10 +67,14 @@ function SellerChallengeCard({
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           <PeriodBadge from={c.startsOn} to={c.endsOn} />
-          {prazo ? <span className="text-[12px] text-t2">{prazo}</span> : null}
           <BranchBadge name={storeName} />
           {c.prize ? <PrizeBadge label={c.prize} /> : null}
         </div>
+        {prazo ? (
+          <div className="mt-2 flex w-full flex-wrap items-center justify-between gap-1.5 sm:justify-end">
+            <DeadlineBadge label={prazo} />
+          </div>
+        ) : null}
         <p className="mt-2 min-w-0 text-[13px] text-t1">
           <HeadlineText headline={sellerHeadline(c, status)} />
         </p>

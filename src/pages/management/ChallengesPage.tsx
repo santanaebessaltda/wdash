@@ -23,7 +23,7 @@ import {
 } from "@/data/wedash/challengeView";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { storesForSession, type Store } from "@/data/wedash/stores";
-import { BranchBadge, PeriodBadge, PrizeBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
+import { BranchBadge, DeadlineBadge, PeriodBadge, PrizeBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { cn } from "@/lib/cn";
 import { fullDate, isoToDate, endOfMonth, dateToIso } from "@/lib/format";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
@@ -326,10 +326,14 @@ function ChallengeCard({
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <PeriodBadge from={c.startsOn} to={c.endsOn} />
-            {!ended ? <span className="text-[12px] text-t2">{view.prazo}</span> : null}
             {showsStore && store ? <BranchBadge name={store.tradeName} /> : null}
             {prize ? <PrizeBadge label={prize} /> : null}
           </div>
+          {!ended ? (
+            <div className="mt-2 flex w-full flex-wrap items-center justify-between gap-1.5 sm:justify-end">
+              <DeadlineBadge label={view.prazo} />
+            </div>
+          ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-1.5 self-start">
           <Tooltip label="Duplicar desafio">

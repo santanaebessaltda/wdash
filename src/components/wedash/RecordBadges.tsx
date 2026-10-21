@@ -48,6 +48,19 @@ export function BranchBadge({ name }: { name: string }) {
   );
 }
 
+/** "3 dias restantes", "Último dia" ou "Começa em …", no mesmo selo da meta. */
+export function DeadlineBadge({ label }: { label: string }) {
+  return (
+    <Badge variant="neutral" className="gap-1 uppercase">
+      <MiniIcon>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
+      </MiniIcon>
+      {label}
+    </Badge>
+  );
+}
+
 export function PrizeBadge({ label }: { label: string }) {
   return (
     <Badge variant="neutral" className="gap-1 uppercase">
