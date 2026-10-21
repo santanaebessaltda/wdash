@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rankingOutsideGeneralGoal, teamViewWithGoalShare } from "./generalRanking";
+import { rankingOutsideGeneralGoal, TEAM_UNATTRIBUTED_SALE, teamViewWithGoalShare } from "./generalRanking";
 import type { GoalRecord, GoalTeamMember, SalesDayAgg, SalesSellerDayAgg } from "./goalTypes";
 
 const period = { kind: "custom" as const, start: "2026-10-01", end: "2026-10-31" };
@@ -107,8 +107,10 @@ describe("teamViewWithGoalShare", () => {
     ]);
     expect(out.people.reduce((sum, person) => sum + person.revenue, 0)).toBe(300);
     expect(out.kpis[0]?.amount).toBe("R$\u00a0300,00");
+    expect(out.kpis[0]?.sub).toBe("2 pessoas · média de R$\u00a0150,00");
     expect(out.kpis[1]?.amount).toBe("3");
-    expect(out.shifts.reduce((sum, shift) => sum + shift.revenue, 0)).toBe(100);
+    expect(out.shifts.filter((shift) => shift.name !== TEAM_UNATTRIBUTED_SALE).reduce((sum, shift) => sum + shift.revenue, 0)).toBe(100);
+    expect(out.shifts.find((shift) => shift.name === TEAM_UNATTRIBUTED_SALE)?.revenue).toBe(200);
   });
 
   it("sem o rateio, a venda sem vendedor fica fora do ranking e dos KPIs", () => {
@@ -125,10 +127,22 @@ describe("teamViewWithGoalShare", () => {
     expect(out.kpis[0]?.amount).toBe("R$\u00a0100,00");
   });
 
-  it("na meta Geral o ranking fica vazio e o KPI é o total da filial", () => {
-    const out = teamViewWithGoalShare(scope, { dayAggs: [storeDay(8_000, 1, 1)], sellerDayAggs: [] }, [general], [], "2026-10-20");
-    expect(out.people).toEqual([]);
+  it("na meta Geral o ranking divide o total da filial e a média conta a equipe", () => {
+    const out = teamViewWithGoalShare(
+      scope,
+      { dayAggs: [storeDay(8_000, 2, 2)], sellerDayAggs: [] },
+      [general],
+      [member(1, "Ana"), member(2, "Bia")],
+      "2026-10-20",
+    );
+    expect(out.people.map((person) => [person.name, person.revenue, person.sales])).toEqual([
+      ["ANA", 40, 1],
+      ["BIA", 40, 1],
+    ]);
     expect(out.kpis[0]?.amount).toBe("R$\u00a080,00");
+    expect(out.kpis[0]?.sub).toBe("2 pessoas · média de R$\u00a040,00");
+    expect(out.kpis[1]?.amount).toBe("2");
+    expect(out.kpis[2]?.amount).toBe("R$\u00a040,00");
   });
 
   it("a venda do usuário da filial não entra no rateio", () => {

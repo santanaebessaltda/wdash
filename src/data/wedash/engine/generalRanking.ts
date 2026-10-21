@@ -44,7 +44,10 @@ export function rankingOutsideGeneralGoal(
 }
 
 const TEAM_REVENUE_TIP =
-  "Faturamento das vendas da equipe. Quando a meta rateia a venda sem vendedor, essa parte entra aqui e no ranking. Na meta Geral, é o total da filial e o ranking fica sem posições.";
+  "Faturamento da equipe. Na meta Individual ou Grupo com rateio, a venda sem vendedor entra neste valor, na média e no ranking. Na meta Geral, é o total da filial dividido entre quem estava na loja.";
+
+/** Fatia do gráfico de grupos: venda que não saiu no nome de ninguém. */
+export const TEAM_UNATTRIBUTED_SALE = "Sem vendedor";
 
 type Money = { revenue: number; sales: number; items: number; missing: boolean };
 type ShareDay = { revenue: number; sales: number; items: number; missing: boolean };
@@ -213,6 +216,54 @@ export function unidentifiedShares(input: {
   return out;
 }
 
+/** Na meta Geral, o total do dia da filial dividido entre a equipe de vendas presente. */
+export function generalShares(input: {
+  goals: GoalRecord[];
+  team: GoalTeamMember[];
+  dayAggs: SalesDayAgg[];
+  sellerDayAggs?: SalesSellerDayAgg[];
+  storeIds: string[];
+  from: string;
+  to: string;
+  today: string;
+}): Map<string, PersonShare> {
+  const out = new Map<string, PersonShare>();
+  const sellerDays = input.sellerDayAggs ?? [];
+  if (!input.goals.some((goal) => goal.tierMode === "GENERAL")) return out;
+  const days = new Set<string>();
+  for (const row of input.dayAggs) {
+    if (!inStore(input.storeIds, row.storeId) || row.brand !== "ALL") continue;
+    if (row.day < input.from || row.day > input.to) continue;
+    if (!dayInGeneralGoal(input.goals, row.storeId, row.day, input.today)) continue;
+    days.add(`${row.storeId}|${row.day}`);
+  }
+  for (const stamp of days) {
+    const [storeId, day] = stamp.split("|") as [string, string];
+    const goal = input.goals
+      .filter((item) => item.storeId === storeId && item.tierMode === "GENERAL" && item.startsOn <= day && day <= item.endsOn && goalStatus(item, input.today) !== "upcoming")
+      .sort((a, b) => b.startsOn.localeCompare(a.startsOn))[0];
+    if (!goal) continue;
+    const pot = unidentifiedGap(input.dayAggs, [], storeId, day);
+    if (pot.revenue <= 0 && pot.sales <= 0) continue;
+    const present = recipientsOn(input.team, sellerDays, goal, day);
+    if (present.length === 0) continue;
+    const revenue = splitEven(pot.revenue, present.length);
+    const sales = splitEven(pot.sales, present.length);
+    const items = splitEven(pot.items, present.length);
+    present.forEach((member, index) => {
+      const row = out.get(member.key) ?? { name: member.name, storeId, shiftName: member.shiftName, byDay: new Map() };
+      const bit = row.byDay.get(day) ?? { revenue: 0, sales: 0, items: 0, missing: false };
+      bit.revenue += (revenue[index] ?? 0) / 100;
+      bit.sales += sales[index] ?? 0;
+      bit.items += items[index] ?? 0;
+      if (pot.missing && (sales[index] ?? 0) > 0) bit.missing = true;
+      row.byDay.set(day, bit);
+      out.set(member.key, row);
+    });
+  }
+  return out;
+}
+
 function addMoney(total: Money, day: string, from: string, to: string, bit: { revenue: number; sales: number; items: number; missing?: boolean }): void {
   if (day < from || day > to) return;
   total.revenue += bit.revenue;
@@ -304,10 +355,16 @@ function teamKpis(current: Money, cmp: Money, prev: Money, people: number, vs: s
   ];
 }
 
+function withUnattributedSale(view: TeamDashboardView): TeamDashboardView {
+  const revenue = view.composition.unidentified;
+  if (!(revenue > 0) || view.shifts.some((shift) => shift.name === TEAM_UNATTRIBUTED_SALE)) return view;
+  return { ...view, shifts: [...view.shifts, { name: TEAM_UNATTRIBUTED_SALE, revenue, people: 0 }] };
+}
+
 /**
- * KPIs e ranking recebem a parte igual da venda sem vendedor quando a meta Individual ou Grupo pede o rateio.
- * O faturamento por grupo permanece só com a venda lançada no nome.
- * Na meta Geral, o ranking continua vazio e os KPIs ficam com o total da filial.
+ * KPIs, ranking e pódio recebem a parte igual.
+ * Individual ou Grupo com rateio: a venda sem vendedor. Geral: o total da filial.
+ * O faturamento por grupo continua com a venda no nome e ganha a fatia sem vendedor.
  */
 export function teamViewWithGoalShare(
   scope: Scope,
@@ -318,14 +375,14 @@ export function teamViewWithGoalShare(
   storeNames: Map<string, string> = new Map(),
 ): TeamDashboardView {
   const ranked = rankingOutsideGeneralGoal(scope, input, goals, today);
-  if (goals.length === 0) return ranked;
+  if (goals.length === 0) return withUnattributedSale(ranked);
   const period = ranked.period;
   const prev = previousPeriod(period, calendarCurrentHour());
   const cuts = prev.hourMax != null;
   const endCmp = cuts ? addDays(period.end, -1) : period.end;
   const prevEndCmp = cuts ? addDays(prev.end, -1) : prev.end;
   const from = prev.start < period.start ? prev.start : period.start;
-  const shares = unidentifiedShares({
+  const shareInput = {
     goals,
     team,
     dayAggs: input.dayAggs,
@@ -335,7 +392,9 @@ export function teamViewWithGoalShare(
     from,
     to: period.end,
     today,
-  });
+  };
+  const shares = unidentifiedShares(shareInput);
+  const collective = generalShares(shareInput);
   const storeIds = scope.storeIds;
   const current = plus(
     plus(namedTeamMoney(input.sellerDayAggs, storeIds, goals, today, period.start, period.end), generalStoreMoney(input.dayAggs, storeIds, goals, today, period.start, period.end)),
@@ -350,13 +409,13 @@ export function teamViewWithGoalShare(
     shareMoney(shares, prev.start, prevEndCmp),
   );
   const baseCurrent = namedTeamMoney(input.sellerDayAggs, storeIds, goals, today, period.start, period.end);
-  const unchanged = shares.size === 0 && current.revenue === baseCurrent.revenue && current.sales === baseCurrent.sales;
-  if (unchanged) return ranked;
+  const unchanged = shares.size === 0 && collective.size === 0 && current.revenue === baseCurrent.revenue && current.sales === baseCurrent.sales;
+  if (unchanged) return withUnattributedSale(ranked);
 
   const people = ranked.people.map((person) => ({ ...person, storeIds: [...person.storeIds], storeRows: [...person.storeRows] }));
   const byKey = new Map(people.map((person) => [person.key, person]));
   const missing = new Set(people.filter((person) => person.pa == null && person.sales > 0).map((person) => person.key));
-  for (const [key, share] of shares) {
+  for (const [key, share] of [...shares, ...collective]) {
     let person = byKey.get(key);
     if (!person) {
       person = {
@@ -402,11 +461,11 @@ export function teamViewWithGoalShare(
     person.variationPct = person.revenueCmp > 0 && person.revenuePrev > 0 ? ((person.revenueCmp - person.revenuePrev) / person.revenuePrev) * 100 : null;
   }
   visible.sort((a, b) => b.revenue - a.revenue || a.name.localeCompare(b.name, "pt-BR"));
-  return {
+  return withUnattributedSale({
     ...ranked,
     people: visible,
     kpis: teamKpis(current, cmp, previous, visible.length, ranked.vsVariation),
-  };
+  });
 }
 
 /** Parte de um vendedor, por dia, para o detalhe bater com a linha do ranking. */
@@ -421,17 +480,22 @@ export function personShareDays(
   const period = rankingOutsideGeneralGoal(scope, input, goals, today).period;
   const prev = previousPeriod(period, calendarCurrentHour());
   const from = prev.start < period.start ? prev.start : period.start;
-  return (
-    unidentifiedShares({
-      goals,
-      team,
-      dayAggs: input.dayAggs,
-      namedSellerDayAggs: input.namedSellerDayAggs,
-      sellerDayAggs: input.sellerDayAggs,
-      storeIds: scope.storeIds,
-      from,
-      to: period.end,
-      today,
-    }).get(key)?.byDay ?? new Map()
-  );
+  const shareInput = {
+    goals,
+    team,
+    dayAggs: input.dayAggs,
+    namedSellerDayAggs: input.namedSellerDayAggs,
+    sellerDayAggs: input.sellerDayAggs,
+    storeIds: scope.storeIds,
+    from,
+    to: period.end,
+    today,
+  };
+  const byDay = new Map<string, ShareDay>();
+  for (const source of [unidentifiedShares(shareInput), generalShares(shareInput)]) {
+    const row = source.get(key);
+    if (!row) continue;
+    for (const [day, bit] of row.byDay) byDay.set(day, bit);
+  }
+  return byDay;
 }

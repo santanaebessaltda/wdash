@@ -15,7 +15,7 @@ import {
 import { fetchNamedSellerDayAggs, fetchSalesCoverage, fetchSalesDayAggs, fetchSalesSellerDayAggs } from "@/data/wedash/salesRepo";
 import { fetchGoals, fetchGoalTeam, type GoalRecord, type GoalTeamMember } from "@/data/wedash/goalsRepo";
 import { buildGoalCardView, goalStatus, sellerGoalLevels } from "@/data/wedash/goalView";
-import { teamViewWithGoalShare } from "@/data/wedash/engine/generalRanking";
+import { TEAM_UNATTRIBUTED_SALE, teamViewWithGoalShare } from "@/data/wedash/engine/generalRanking";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import type { SalesDayAgg, SalesSellerDayAgg } from "@/data/wedash/salesTypes";
 import { storesForSession } from "@/data/wedash/stores";
@@ -485,7 +485,7 @@ export function TeamPage() {
               </CardHeader>
               {view.shifts.length === 0 ? (
                 <EmptyBlock />
-              ) : !view.shiftsConfigured ? (
+              ) : !view.shiftsConfigured && !view.shifts.some((shift) => shift.name === TEAM_UNATTRIBUTED_SALE) ? (
                 <EmptyBlock
                   icon="👥"
                   title="Grupos não configurados"
@@ -502,7 +502,7 @@ export function TeamPage() {
                 (() => {
                   const total = view.shifts.reduce((s, t) => s + t.revenue, 0) || 1;
                   let colorIdx = 0;
-                  const colors = view.shifts.map((t) => (t.name === TEAM_WITHOUT_SHIFT ? COLOR_NEUTRA : COLORS_SHIFT[colorIdx++ % COLORS_SHIFT.length]!));
+                  const colors = view.shifts.map((t) => (t.name === TEAM_WITHOUT_SHIFT || t.name === TEAM_UNATTRIBUTED_SALE ? COLOR_NEUTRA : COLORS_SHIFT[colorIdx++ % COLORS_SHIFT.length]!));
                   return (
                     <div className="flex flex-1 flex-col justify-center px-4 pb-4">
                       <div className="mx-auto my-2">
@@ -526,8 +526,9 @@ export function TeamPage() {
                                   <span className="min-w-[32px] shrink-0 text-right text-[11.5px] font-semibold text-t2">{pct}%</span>
                                 </div>
                                 <p className="mt-0.5 text-[11.5px] text-t2">
-                                  {pt.schedule ? `${pt.schedule} · ` : ""}
-                                  {t.people} {t.people === 1 ? "pessoa" : "pessoas"}
+                                  {t.name === TEAM_UNATTRIBUTED_SALE
+                                    ? "Venda sem vendedor identificado"
+                                    : `${pt.schedule ? `${pt.schedule} · ` : ""}${t.people} ${t.people === 1 ? "pessoa" : "pessoas"}`}
                                 </p>
                               </div>
                             </div>
@@ -591,7 +592,7 @@ export function TeamPage() {
           <Card className="mt-4 min-w-0 overflow-hidden" padding="lg">
             <div className="mb-4 flex items-center gap-1.5">
               <CardTitle>Desempenho da equipe</CardTitle>
-              <TipHelp label={"Acompanhe ranking, desafios e metas da equipe no período.\n\nNa meta Individual ou Grupo, com o rateio ligado, a venda sem vendedor entra no faturamento e no ranking, dividida entre quem estava na loja. O faturamento por grupo não recebe essa parte. Na meta Geral, os números são o total da filial e o ranking fica sem posições."} />
+              <TipHelp label={"Acompanhe ranking, desafios e metas da equipe no período.\n\nNa meta Individual ou Grupo, com o rateio ligado, a venda sem vendedor entra no faturamento, na média e no ranking. Na meta Geral, o total da filial é dividido entre quem estava na loja e essas pessoas entram no ranking. O faturamento por grupo mostra essa venda à parte, sem distribuir no grupo."} />
             </div>
             {printing ? (
               !hasTeamSales ? <EmptyBlock /> : abaRanking()
