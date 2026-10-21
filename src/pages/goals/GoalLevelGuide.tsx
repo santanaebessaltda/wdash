@@ -26,8 +26,8 @@ export function GoalLevelGuide({
   const selected = guide.groups.find((group) => group.key === groupKey) ?? guide.groups[0]!;
   const levels = (
     <>
-      <p className="text-[12.5px] leading-snug text-t1">{guide.intro}</p>
-      {guide.note ? <p className="mt-1 text-[12px] leading-snug text-t2">{guide.note}</p> : null}
+      {accordion ? <p className="text-[12.5px] leading-snug text-t1">{guide.intro}</p> : null}
+      {guide.note ? <p className={cn("text-[12px] leading-snug text-t2", accordion && "mt-1")}>{guide.note}</p> : null}
       {guide.groups.length > 1 ? (
         <Segmented
           className="mt-3"
@@ -106,7 +106,7 @@ export function GoalLevelGuide({
       </Card>
     );
   }
-  return <div className="mt-4 border-t border-line pt-3">{levels}</div>;
+  return <div className="mt-4">{levels}</div>;
 }
 
 function moneyLine(kind: GuideGroup["kind"], month: number, day: number): string {

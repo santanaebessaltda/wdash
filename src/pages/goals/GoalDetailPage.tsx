@@ -15,6 +15,7 @@ import {
   goalManagerPrize,
   goalSpreadsUnidentified,
   goalStatus,
+  outsideRankingNote,
   prazoRemaining,
   type GoalManagerPrize,
   type GoalStatus,
@@ -236,7 +237,7 @@ function GoalHero({
   const prizeAmount =
     card.sellers.reduce((s, v) => s + v.accruedPrize + v.bonusReached, 0) + (management ? management.prizeAmount + management.bonus : 0);
   const missing = Math.max(0, goal.target - achieved);
-  const stats: { label: string; value: string; cls: string; sub?: string; subCls?: string; help?: string }[] = [
+  const stats: { label: string; value: string; cls: string; sub?: string; subCls?: string; help?: string; note?: string }[] = [
     { label: "Meta da filial", value: brlCent(goal.target), cls: "text-acc" },
     {
       label: "Realizado",
@@ -244,6 +245,7 @@ function GoalHero({
       cls: progressTextClass(pct),
       sub: status === "upcoming" ? undefined : `${num(pct, 1)}% da meta`,
       subCls: progressTextClass(pct),
+      note: outsideRankingNote(card.band) ?? undefined,
     },
     {
       label: status === "ended" && missing > 0 ? "Faltou" : "Faltam",
@@ -293,7 +295,7 @@ function GoalHero({
           </div>
         </div>
       </div>
-      <div className={`mt-5 grid grid-cols-2 gap-3.5 border-t border-line pt-4 sm:grid-cols-3 ${stats.length === 6 ? "lg:grid-cols-6" : "lg:grid-cols-5"}`}>
+      <div className={`mt-5 grid grid-cols-2 gap-3.5 sm:grid-cols-3 ${stats.length === 6 ? "lg:grid-cols-6" : "lg:grid-cols-5"}`}>
         {stats.map((s) => (
           <div key={s.label} className="min-w-0">
             <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-t2">
@@ -302,12 +304,13 @@ function GoalHero({
             </p>
             <p className={`mt-1 truncate font-mono text-[16px] font-extrabold ${s.cls}`}>{s.value}</p>
             {s.sub && <p className={`mt-0.5 truncate text-[11px] font-semibold ${s.subCls ?? "text-t2"}`}>{s.sub}</p>}
+            {s.note ? <p className="mt-1 text-[11px] leading-snug text-t2">{s.note}</p> : null}
           </div>
         ))}
       </div>
       <div className="mt-4">
         <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-t2">Progresso da meta</p>
-        <GlobalGoalBand goal={card.band} tiers={card.tiers} todayIso={today} embedded soBarra />
+        <GlobalGoalBand goal={card.band} tiers={card.tiers} todayIso={today} embedded soBarra hideOutsideNote />
       </div>
     </Card>
   );

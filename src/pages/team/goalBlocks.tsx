@@ -501,11 +501,14 @@ export function GlobalGoalBand({
   todayIso,
   soBarra = false,
   individual = false,
+  hideOutsideNote = false,
 }: {
   goal: NetworkGlobalGoal;
   embedded?: boolean;
   /** Só a barra com os níveis (os números ficam no resumo, como no detalhe da meta). */
   soBarra?: boolean;
+  /** No detalhe da meta a frase fica sob o Realizado. */
+  hideOutsideNote?: boolean;
   /** Quando o título da meta já está no CardMeta. */
   hideTitle?: boolean;
   /** Degraus desta meta (default = escada padrão). */
@@ -649,7 +652,7 @@ export function GlobalGoalBand({
           </div>
         );
       })()}
-      {soBarra && outsideRankingNote(goal) ? <p className="mt-1 text-[12px] text-t2">{outsideRankingNote(goal)}</p> : null}
+      {soBarra && !hideOutsideNote && outsideRankingNote(goal) ? <p className="mt-1 text-[12px] text-t2">{outsideRankingNote(goal)}</p> : null}
     </>
   );
 
