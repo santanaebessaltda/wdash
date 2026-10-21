@@ -26,7 +26,7 @@ export function ChallengeMiniCard({
   onOpen?: () => void;
   /** Mesmo ícone e tamanho do card de desafio da Gestão. */
   prominent?: boolean;
-  /** Lista o resultado de cada pessoa, como no detalhe do desafio. */
+  /** Lista cada pessoa com o resultado e a barra, no mesmo desenho do placar. */
   showPeople?: boolean;
   hotKey?: string | null;
   /** Texto corrido, para o placar da loja. */
@@ -63,34 +63,7 @@ export function ChallengeMiniCard({
           {detail ? <p className="mt-0.5 text-[12px] text-t2">{detail}</p> : null}
         </div>
         {showPeople && (
-          <ul className="mt-4 space-y-3.5">
-            {view.participants.length === 0 ? (
-              <li className="text-[12.5px] text-t2">Nenhuma pessoa no desafio.</li>
-            ) : (
-              view.participants.map((person) => {
-                const pct = challengeProgress(person.result, c.target, leader);
-                return (
-                  <li key={person.key} className={cn("min-w-0", hotKey === person.key && "rounded-lg bg-acc-soft px-1.5 py-1")}>
-                    <span className="flex items-start gap-2">
-                      <PersonAvatar name={person.name} employeeId={person.key} storeId={c.storeId} size="sm" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[13px] font-semibold text-t0">{person.name}</span>
-                        <span className="mt-0.5 flex items-baseline justify-between gap-2">
-                          <span className="font-mono text-[12px] font-bold tabular-nums text-t1">
-                            {person.result == null ? "—" : metricValueLabel(c.metric, person.result)}
-                          </span>
-                          <ChallengePersonStatus person={person} disputa={disputa} pct={pct} />
-                        </span>
-                        <span className="mt-1.5 block">
-                          <ProgressBar value={pct} height={5} color={person.winner ? "var(--ok)" : person.result == null ? "var(--line)" : "var(--acc)"} />
-                        </span>
-                      </span>
-                    </span>
-                  </li>
-                );
-              })
-            )}
-          </ul>
+          <ChallengePeople challenge={c} view={view} disputa={disputa} leader={leader} hotKey={hotKey} className="mt-4" />
         )}
       </Card>
     );
@@ -138,54 +111,82 @@ export function ChallengeMiniCard({
           )}
         </span>
         {showPeople && (
-          <ul className="mt-3 space-y-2.5 border-t border-line pt-3">
-            {view.participants.length === 0 ? (
-              <li className="py-2 text-[12.5px] text-t2">Nenhuma pessoa no desafio.</li>
-            ) : (
-              view.participants.map((person) => {
-                const pct = challengeProgress(person.result, c.target, leader);
-                return (
-                  <li key={person.key} className={cn("flex items-center gap-2", hotKey === person.key && "rounded-lg bg-acc-soft px-1")}>
-                    {disputa && (
-                      <span className="w-6 shrink-0 text-[12px] font-extrabold text-t2">
-                        {person.position == null ? "—" : `${person.position}º`}
-                      </span>
-                    )}
-                    <PersonAvatar name={person.name} employeeId={person.key} storeId={c.storeId} size="sm" />
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-baseline justify-between gap-2">
-                        <span className="min-w-0 truncate text-[13px] font-semibold text-t0">{person.name}</span>
-                        <span className="shrink-0 font-mono text-[12px] font-bold text-t0">
-                          {person.result == null ? "—" : metricValueLabel(c.metric, person.result)}
-                        </span>
-                      </span>
-                      <span className="mt-1 flex items-center gap-2">
-                        <span className="min-w-0 flex-1">
-                          <ProgressBar value={pct} height={5} color={person.winner ? "var(--ok)" : undefined} />
-                        </span>
-                        {person.winner ? (
-                          <Badge variant="success" className="shrink-0">
-                            {person.position != null ? `${person.position}º lugar` : "Atingiu"}
-                          </Badge>
-                        ) : (
-                          <span className="w-9 shrink-0 text-right font-mono text-[11px] font-bold text-t2">{num(pct, 0)}%</span>
-                        )}
-                      </span>
-                    </span>
-                  </li>
-                );
-              })
-            )}
-          </ul>
+          <ChallengePeople
+            challenge={c}
+            view={view}
+            disputa={disputa}
+            leader={leader}
+            hotKey={hotKey}
+            className="mt-3 border-t border-line pt-3"
+          />
         )}
       </TextTag>
     </>
   );
   if (!onOpen) return <div className={className}>{body}</div>;
   return (
-    <button type="button" onClick={onOpen} aria-label={`Ver detalhe do desafio ${c.name}`} className={className}>
+    <div
+      role="link"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen();
+        }
+      }}
+      aria-label={`Ver detalhe do desafio ${c.name}`}
+      className={className}
+    >
       {body}
-    </button>
+    </div>
+  );
+}
+
+function ChallengePeople({
+  challenge: c,
+  view,
+  disputa,
+  leader,
+  hotKey,
+  className,
+}: {
+  challenge: ChallengeRecord;
+  view: ChallengeView;
+  disputa: boolean;
+  leader: number;
+  hotKey: string | null;
+  className?: string;
+}) {
+  return (
+    <ul className={cn(className, "space-y-3.5")}>
+      {view.participants.length === 0 ? (
+        <li className="text-[12.5px] text-t2">Nenhuma pessoa no desafio.</li>
+      ) : (
+        view.participants.map((person) => {
+          const pct = challengeProgress(person.result, c.target, leader);
+          return (
+            <li key={person.key} className={cn("min-w-0", hotKey === person.key && "rounded-lg bg-acc-soft px-1.5 py-1")}>
+              <span className="flex items-start gap-2">
+                <PersonAvatar name={person.name} employeeId={person.key} storeId={c.storeId} size="sm" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px] font-semibold text-t0">{person.name}</span>
+                  <span className="mt-0.5 flex items-baseline justify-between gap-2">
+                    <span className="font-mono text-[12px] font-bold tabular-nums text-t1">
+                      {person.result == null ? "—" : metricValueLabel(c.metric, person.result)}
+                    </span>
+                    <ChallengePersonStatus person={person} disputa={disputa} pct={pct} />
+                  </span>
+                  <span className="mt-1.5 block">
+                    <ProgressBar value={pct} height={5} color={person.winner ? "var(--ok)" : person.result == null ? "var(--line)" : "var(--acc)"} />
+                  </span>
+                </span>
+              </span>
+            </li>
+          );
+        })
+      )}
+    </ul>
   );
 }
 
