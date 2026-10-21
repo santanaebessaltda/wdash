@@ -718,7 +718,7 @@ export function TeamPage() {
               placeholder="Buscar por código ou nome…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className={cn(filterInputClass, "sm:w-56")}
+              className={cn(filterInputClass, "w-full sm:w-56")}
             />
           </div>
         )}
