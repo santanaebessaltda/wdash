@@ -1,26 +1,25 @@
 import { useState } from "react";
-import { Card, Segmented } from "@/components/ui";
+import { Segmented } from "@/components/ui";
 import type { GoalRecord, SellerRow } from "@/data/wedash/engine/goalTypes";
 import { brlCent, num, shiftName } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { Icon, icons } from "@/pages/users/Icons";
 
-/** Níveis no desenho da vendedora. No placar fica num accordion; no detalhe fica no card. */
+/** Níveis no desenho da vendedora. No detalhe fica no card. No placar abre numa janela. */
 export function GoalLevelGuide({
   goal,
   sellers,
-  accordion = false,
   showReached = false,
+  flush = false,
 }: {
   goal: GoalRecord;
   sellers: SellerRow[];
-  /** No placar, um card abaixo da meta esconde e mostra os níveis. */
-  accordion?: boolean;
-  /** No detalhe e no placar, cada card mostra “3/3 já atingiu” abaixo das regras. */
+  /** No detalhe, a linha da gerência entra em cada nível. */
   showReached?: boolean;
+  /** Sem a margem de cima, para caber numa janela. */
+  flush?: boolean;
 }) {
   const guide = buildGoalLevelGuide(goal, sellers);
-  const [open, setOpen] = useState(false);
   const [groupKey, setGroupKey] = useState(guide?.groups[0]?.key ?? "");
   if (!guide) return null;
   const selected = guide.groups.find((group) => group.key === groupKey) ?? guide.groups[0]!;
@@ -35,7 +34,7 @@ export function GoalLevelGuide({
           onChange={(value) => value && setGroupKey(value)}
         />
       ) : null}
-      <div className="mt-3 flex flex-col gap-2.5">
+      <div className={cn("flex flex-col gap-2.5", (guide.note || guide.groups.length > 1) && "mt-3")}>
         {selected.rows.map((row) => {
           const everyone = selected.people > 0 && row.reached === selected.people;
           return (
@@ -57,7 +56,7 @@ export function GoalLevelGuide({
                 <p className="mt-0.5 text-[12px] font-semibold text-t1">{moneyLine(selected.kind, row.month, row.day)}</p>
                 <p className="mt-0.5 text-[11.5px] text-t2">{ruleLine(row)}</p>
                 {showReached && row.manager ? <p className="mt-0.5 text-[11.5px] text-t2">{row.manager}</p> : null}
-                {(showReached || accordion) && selected.people > 0 ? (
+                {selected.people > 0 ? (
                   <p className={cn("mt-0.5 text-[11.5px] font-semibold", everyone ? "text-ok" : "text-t1")}>
                     <span className="font-mono tabular-nums">
                       {row.reached}/{selected.people}
@@ -76,36 +75,7 @@ export function GoalLevelGuide({
       </div>
     </>
   );
-  if (accordion) {
-    return (
-      <Card padding="none">
-        <button
-          type="button"
-          aria-expanded={open}
-          onClick={() => setOpen((current) => !current)}
-          className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
-        >
-          <span className="text-[15px] font-bold text-t0">Níveis de premiação</span>
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={cn("shrink-0 text-t2 transition-transform", open && "rotate-180")}
-            aria-hidden
-          >
-            <path d="m6 9 6 6 6-6" />
-          </svg>
-        </button>
-        {open ? <div className="px-5 pb-4 pt-3">{levels}</div> : null}
-      </Card>
-    );
-  }
-  return <div className="mt-4">{levels}</div>;
+  return <div className={flush ? undefined : "mt-4"}>{levels}</div>;
 }
 
 function moneyLine(kind: GuideGroup["kind"], month: number, day: number): string {

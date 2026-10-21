@@ -12,6 +12,8 @@ export interface ModalProps {
   size?: "sm" | "md" | "lg" | "xl";
   /** Substitui o padding e a rolagem padrão do corpo. */
   bodyClassName?: string;
+  /** O portal sai da tela. No placar, repete o tema claro ou escuro da tela. */
+  boardTheme?: "light" | "dark";
 }
 
 const sizeClasses = {
@@ -21,11 +23,12 @@ const sizeClasses = {
   xl: "max-w-4xl",
 };
 
-export function Modal({ open, onClose, title, children, footer, size = "md", bodyClassName }: ModalProps) {
+export function Modal({ open, onClose, title, children, footer, size = "md", bodyClassName, boardTheme }: ModalProps) {
   if (!open) return null;
 
   return createPortal(
     <div
+      data-board-theme={boardTheme}
       className="pad-topo pad-base fixed inset-0 z-[100] flex items-center justify-center px-4"
       style={padTopAndBottom("1rem", "1rem")}
       role="dialog"

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Badge, Button, Card, CardHero, CardTitle, EmptyState, StatCard, ThSort, progressTextClass, type SortDir } from "@/components/ui";
+import { Badge, Button, Card, CardHero, CardTitle, EmptyState, Modal, StatCard, ThSort, progressTextClass, type SortDir } from "@/components/ui";
 import { BoardSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { BranchBadge, DeadlineBadge, PeriodBadge, RecordStatusBadge, UnidentifiedSalesBadge } from "@/components/wedash/RecordBadges";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
@@ -17,7 +17,7 @@ import { ChallengeMiniCard } from "@/pages/challenges/ChallengeMiniCard";
 import { TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
 import { GoalLevelGuide } from "@/pages/goals/GoalLevelGuide";
 import { GlobalGoalBand } from "@/pages/team/goalBlocks";
-import { BoardThemeSwitch } from "./boardTheme";
+import { BoardThemeSwitch, useBoardTheme } from "./boardTheme";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { defaultWeekHours, effectiveWeekHours, type StoreWeekHours } from "@/data/wedash/storeHours";
 import { formatSyncWatermarkLabel } from "@/data/wedash/syncUi";
@@ -230,6 +230,8 @@ type GoalBoard = {
 function BoardGoalCard({ board, showStore }: { board: GoalBoard; showStore: boolean }) {
   const { goal, card, summary, storeName } = board;
   const outsideNote = outsideRankingNote(card.band);
+  const [levelsOpen, setLevelsOpen] = useState(false);
+  const [boardTheme] = useBoardTheme();
   return (
     <Card padding="none" glass="var(--info-soft)" className="px-6 py-4">
       <div className="flex items-start gap-3.5">
@@ -262,14 +264,24 @@ function BoardGoalCard({ board, showStore }: { board: GoalBoard; showStore: bool
       <div className="mt-3">
         <GlobalGoalBand goal={card.band} tiers={card.tiers} embedded soBarra hideOutsideNote />
       </div>
-      <div className="mt-2 flex flex-wrap items-center justify-end gap-1.5">
-        {summary.projectedPct != null ? (
-          <Badge variant="accent" className="uppercase">Projeção: {num(summary.projectedPct, 0)}%</Badge>
+      <div className={cn("mt-3 flex flex-wrap items-center gap-2", goal.tiers.length > 0 ? "justify-between" : "justify-end")}>
+        {goal.tiers.length > 0 ? (
+          <Button type="button" variant="outline" size="sm" aria-haspopup="dialog" onClick={() => setLevelsOpen(true)}>
+            Níveis de premiação
+          </Button>
         ) : null}
-        <DeadlineBadge label={prazoRemaining(summary.daysRemaining)} />
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
+          {summary.projectedPct != null ? (
+            <Badge variant="accent" className="uppercase">Projeção: {num(summary.projectedPct, 0)}%</Badge>
+          ) : null}
+          <DeadlineBadge label={prazoRemaining(summary.daysRemaining)} />
+        </div>
       </div>
         </div>
       </div>
+      <Modal open={levelsOpen} onClose={() => setLevelsOpen(false)} title="Níveis de premiação" size="lg" boardTheme={boardTheme}>
+        <GoalLevelGuide goal={goal} sellers={card.sellers} flush />
+      </Modal>
     </Card>
   );
 }
@@ -591,10 +603,7 @@ export function BoardView({
       {goalBoards.length > 0 ? (
         <div className="flex flex-col gap-3">
           {goalBoards.map((board) => (
-            <div key={board.goal.id} className="flex flex-col gap-3">
-              <BoardGoalCard board={board} showStore={manyStores} />
-              <GoalLevelGuide goal={board.goal} sellers={board.card.sellers} accordion />
-            </div>
+            <BoardGoalCard key={board.goal.id} board={board} showStore={manyStores} />
           ))}
         </div>
       ) : (
