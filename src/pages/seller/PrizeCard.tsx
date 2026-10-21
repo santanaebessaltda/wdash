@@ -26,6 +26,7 @@ function Tile({
   label,
   value,
   sub,
+  detail,
   tip,
   mono = true,
   valueClass = "text-t0",
@@ -33,6 +34,7 @@ function Tile({
   label: string;
   value: string;
   sub?: string;
+  detail?: string;
   tip?: string;
   mono?: boolean;
   valueClass?: string;
@@ -45,6 +47,7 @@ function Tile({
       </p>
       <p className={cn("mt-1 text-[15px] font-extrabold leading-tight", mono && "font-mono tabular-nums", value === "—" ? "text-t2" : valueClass)}>{value}</p>
       {sub && <p className="mt-0.5 text-[12px] font-semibold leading-snug text-t1">{sub}</p>}
+      {detail && <p className="mt-0.5 text-[12px] font-semibold leading-snug text-t1">{detail}</p>}
     </div>
   );
 }
@@ -115,15 +118,28 @@ function PrizeBody({ goal, me, storeName, today, through, closed }: { goal: Sell
     number: i + 1,
     bonusSoFar: me.marcos.slice(0, i + 1).reduce((sum, m) => sum + m.bonus, 0),
   }));
-  const nextGain =
-    me.next == null
-      ? undefined
-      : [
-          goal.nextLevelGain != null && goal.nextLevelGain > 0 ? `${num(me.next.commissionPct, 1)}% de premiação` : "de premiação",
-          me.next.bonus > 0 ? `+${brlCent(me.next.bonus)} de bônus` : "",
-        ]
-          .filter(Boolean)
-          .join(" · ");
+  const nextMarco = me.next ? me.marcos[me.next.number - 1] : undefined;
+  const nextDaily =
+    me.next && me.daysRemaining > 0
+      ? me.next.gap / me.daysRemaining
+      : nextMarco && me.periodDays > 0
+        ? (me.goalAmount * nextMarco.pct) / 100 / me.periodDays
+        : null;
+  const nextSub = me.next
+    ? [`Faltam ${brlCent(me.next.gap)}`, nextDaily != null && nextDaily > 0 ? `${brlCent(nextDaily)} por dia` : ""]
+        .filter(Boolean)
+        .join(" · ")
+    : undefined;
+  const nextDetail = me.next
+    ? [
+        goal.nextLevelGain != null && goal.nextLevelGain > 0
+          ? `Ao atingir: +${brlCent(goal.nextLevelGain)} de premiação`
+          : `Ao atingir: ${num(me.next.commissionPct, 1)}% de premiação`,
+        me.next.bonus > 0 ? `+${brlCent(me.next.bonus)} de bônus` : "",
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : undefined;
 
   return (
     <div className="flex flex-col gap-4">
@@ -142,7 +158,7 @@ function PrizeBody({ goal, me, storeName, today, through, closed }: { goal: Sell
 
       <GoalProgressBar goal={band} tiers={tiers} todayIso={today} embedded hideTitle individual={false} />
 
-      <div className={cn("grid grid-cols-2 gap-2.5", me.next ? "lg:grid-cols-4" : "lg:grid-cols-3")}>
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
         <Tile
           label="Premiação atual"
           value={brlCent(total)}
@@ -151,26 +167,18 @@ function PrizeBody({ goal, me, storeName, today, through, closed }: { goal: Sell
           tip={me.bonus > 0 ? `Inclui ${brlCent(me.bonus)} de bônus dos níveis alcançados.` : undefined}
         />
         {me.next ? (
-          <Tile label="Próximo nível" value={`N${me.next.number} · ${me.next.name}`} mono={false} sub={`Faltam ${brlCent(me.next.gap)}`} />
+          <Tile label="Próximo nível" value={`N${me.next.number} · ${me.next.name}`} mono={false} sub={nextSub} detail={nextDetail} />
         ) : (
           <Tile label="Próximo nível" value="Último nível" mono={false} valueClass="text-ok" sub="Você chegou ao último nível." />
         )}
-        {me.next && (
-          <Tile
-            label="Premiação no próximo nível"
-            value={goal.nextLevelGain != null && goal.nextLevelGain > 0 ? `+${brlCent(goal.nextLevelGain)}` : `${num(me.next.commissionPct, 1)}%`}
-            valueClass={goal.nextLevelGain != null && goal.nextLevelGain > 0 ? "text-ok" : "text-t0"}
-            sub={nextGain}
-            tip="Quanto a premiação aumenta ao chegar neste nível, sobre as vendas de agora."
-          />
-        )}
-        <Tile
-          label="Premiação projetada"
-          value={goal.projectedPrize != null ? brlCent(goal.projectedPrize) : "—"}
-          sub={goal.projectedPrize != null ? `Se mantiver o ritmo até ${shortDate(goal.endsOn)}` : "Disponível após metade do período"}
-          tip="Estimativa da sua premiação no fim da meta, se o ritmo de vendas se mantiver. Aparece depois de metade do período."
-        />
       </div>
+      {me.daysRemaining > 0 ? (
+        <p className="text-[12px] leading-snug text-t2">
+          Premiação projetada:{" "}
+          <span className="font-semibold text-t1">{goal.projectedPrize != null ? brlCent(goal.projectedPrize) : "—"}</span>
+          {goal.projectedPrize != null ? ` · se mantiver o ritmo até ${shortDate(goal.endsOn)}` : " · disponível após metade do período"}
+        </p>
+      ) : null}
 
       {levels.length > 0 && (
         <div>
@@ -179,15 +187,7 @@ function PrizeBody({ goal, me, storeName, today, through, closed }: { goal: Sell
             <p className="mb-3 text-[12px] text-t2">
               Sua parte, {me.eligibleDays} de {me.periodDays} dias. Os valores abaixo já saem dessa parte.
             </p>
-          ) : (
-            <p className="mb-3 text-[12px] text-t2">
-              {me.modo === "geral"
-                ? "Cada linha é o que a loja precisa vender. Por dia é o valor do mês dividido pelos dias da meta."
-                : me.modo === "grupo"
-                  ? "Cada linha é o que o grupo precisa vender. Por dia é o valor do mês dividido pelos dias da meta."
-                  : "Cada linha é o que você precisa vender. Por dia é o valor do mês dividido pelos dias da meta."}
-            </p>
-          )}
+          ) : null}
           <div className="flex flex-col gap-2.5">
             {levels.map(({ marco, number, bonusSoFar }) => {
               const reached = me.levelNumber != null && me.levelNumber >= number;
@@ -245,14 +245,6 @@ function PrizeBody({ goal, me, storeName, today, through, closed }: { goal: Sell
         </div>
       )}
 
-      {me.modo === "grupo" && me.group && (
-        <p className="text-[12px] text-t2">
-          O grupo <span className="font-semibold text-t1">{me.group}</span> sobe de nível pela soma das vendas.
-        </p>
-      )}
-      {me.modo === "geral" && (
-        <p className="text-[12px] text-t2">A equipe sobe de nível pelo total da loja e divide a premiação igualmente.</p>
-      )}
     </div>
   );
 }

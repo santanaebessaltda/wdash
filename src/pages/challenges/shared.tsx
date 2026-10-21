@@ -11,9 +11,8 @@ import {
 export const CHALLENGE_STATUS_ORDER: Record<ChallengeStatus, number> = { active: 0, upcoming: 1, ended: 2 };
 
 export const CHALLENGE_MODE_HELP: Record<ChallengeRecord["mode"], string> = {
-  CONTEST:
-    "Ganha quem tiver o melhor resultado. Em caso de empate, as pessoas empatadas recebem o prêmio da posição e a posição seguinte é pulada.",
-  MINIMUM: "Todas as pessoas que atingirem o mínimo ganham o prêmio.",
+  CONTEST: "Os melhores resultados ganham os prêmios por posição. No empate, dividem o prêmio daquela posição.",
+  MINIMUM: "Todos que chegarem ao mínimo ganham o prêmio.",
 };
 
 const HIGHER: Record<ChallengeMetric, string> = {

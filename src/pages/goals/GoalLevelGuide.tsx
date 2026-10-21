@@ -11,6 +11,7 @@ export function GoalLevelGuide({
   sellers,
   showReached = false,
   flush = false,
+  hideNote = false,
 }: {
   goal: GoalRecord;
   sellers: SellerRow[];
@@ -18,6 +19,8 @@ export function GoalLevelGuide({
   showReached?: boolean;
   /** Sem a margem de cima, para caber numa janela. */
   flush?: boolean;
+  /** No detalhe, a proporcionalidade fica na ajuda do título. */
+  hideNote?: boolean;
 }) {
   const guide = buildGoalLevelGuide(goal, sellers);
   const [groupKey, setGroupKey] = useState(guide?.groups[0]?.key ?? "");
@@ -25,7 +28,7 @@ export function GoalLevelGuide({
   const selected = guide.groups.find((group) => group.key === groupKey) ?? guide.groups[0]!;
   const levels = (
     <>
-      {guide.note ? <p className="text-[12px] leading-snug text-t2">{guide.note}</p> : null}
+      {guide.note && !hideNote ? <p className="text-[12px] leading-snug text-t2">{guide.note}</p> : null}
       {guide.groups.length > 1 ? (
         <Segmented
           className="mt-3"
@@ -34,7 +37,7 @@ export function GoalLevelGuide({
           onChange={(value) => value && setGroupKey(value)}
         />
       ) : null}
-      <div className={cn("flex flex-col gap-2.5", (guide.note || guide.groups.length > 1) && "mt-3")}>
+      <div className={cn("flex flex-col gap-2.5", ((guide.note && !hideNote) || guide.groups.length > 1) && "mt-3")}>
         {selected.rows.map((row) => {
           const everyone = selected.people > 0 && row.reached === selected.people;
           return (

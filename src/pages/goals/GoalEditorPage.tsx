@@ -618,7 +618,7 @@ export default function GoalEditorPage() {
           active={groupsOn}
           onToggle={setGroupsOn}
           emptyIcon="👥"
-          emptyText="Distribua a meta da filial entre os grupos, como Manhã 60% e Tarde 40%."
+          emptyText="Defina quanto da meta pertence a cada grupo."
         >
           <GroupsEditor
             storeId={storeId}
@@ -670,7 +670,7 @@ export default function GoalEditorPage() {
           title="Simulação"
           active
           emptyIcon="🧮"
-          emptyText="Informe a meta da filial para visualizar a simulação."
+          emptyText="Informe a meta da filial para ver a simulação."
         >
           <Simulation
             storeId={storeId}

@@ -153,7 +153,7 @@ export default function GoalsPage() {
       <SectionHeader
         section="Performance"
         title="Metas"
-        subtitle="Gerencie metas, distribuição da equipe e níveis de premiação."
+        subtitle="Gerencie metas, distribuição e premiação da equipe."
         actions={
           <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
             <DateRangePicker
@@ -270,9 +270,11 @@ function GoalCard({
         : prazo
       : status === "upcoming"
         ? `Começa em ${fullDate(g.startsOn)}`
-        : currentLevel
+          : currentLevel
           ? `Nível final: N${levelNumber} · ${currentLevel}`
-          : "Nenhum nível atingido";
+          : pct < 100
+            ? ""
+            : "Nenhum nível atingido";
 
   const action = (fn: () => void) => (e: MouseEvent) => {
     e.stopPropagation();
@@ -355,7 +357,7 @@ function GoalCard({
       <div className="mt-2">
         <ProgressBar value={status === "upcoming" ? 0 : pct} height={5} />
       </div>
-      <p className="mt-2 text-[11.5px] text-t2">{footer}</p>
+      {footer ? <p className="mt-2 text-[11.5px] text-t2">{footer}</p> : null}
 
       <div className="flex-1" />
       <div className="mt-4 flex items-center justify-between gap-3">

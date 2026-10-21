@@ -243,8 +243,6 @@ function GoalHero({
       label: "Realizado",
       value: brlCent(achieved),
       cls: progressTextClass(pct),
-      sub: status === "upcoming" ? undefined : `${num(pct, 1)}% da meta`,
-      subCls: progressTextClass(pct),
       note: outsideRankingNote(card.band) ?? undefined,
     },
     {
@@ -309,7 +307,12 @@ function GoalHero({
         ))}
       </div>
       <div className="mt-4">
-        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-t2">Progresso da meta</p>
+        <div className="mb-2 flex items-baseline justify-between gap-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-t2">Progresso da meta</p>
+          {status !== "upcoming" ? (
+            <p className={`font-mono text-[13px] font-extrabold ${progressTextClass(pct)}`}>{num(pct, 1)}%</p>
+          ) : null}
+        </div>
         <GlobalGoalBand goal={card.band} tiers={card.tiers} todayIso={today} embedded soBarra hideOutsideNote />
       </div>
     </Card>
@@ -317,8 +320,11 @@ function GoalHero({
 }
 
 /** Grupos, cards de cada nível e a faixa da gerência. A barra fica no resumo. O ? do título explica o card inteiro. */
-function tiersHelp(goal: GoalRecord): string {
+function tiersHelp(goal: GoalRecord, sellers: GoalCardView["sellers"]): string {
   const lines = ["Cada nível mostra o valor do mês, a média por dia, a premiação, o bônus e quantas pessoas do turno já atingiram."];
+  if (sellers.some((seller) => seller.proportionalGoal)) {
+    lines.push("A meta individual considera os dias em que a pessoa participou do período.");
+  }
   if (goal.groups.length > 1) lines.push("O pill troca o turno. Grupos mostra a parte da meta de cada um.");
   else if (goal.groups.length === 1) lines.push("Grupos mostra a parte da meta deste turno.");
   if (goal.tiers.some((tier) => tier.managerPct != null)) {
@@ -344,7 +350,7 @@ function GoalTiersCard({
     <Card className={status === "ended" ? "print:hidden" : undefined}>
       <div className="mb-4 flex items-center gap-1.5">
         <CardTitle>Níveis e premiação</CardTitle>
-        <TipHelp label={tiersHelp(goal)} />
+        <TipHelp label={tiersHelp(goal, card.sellers)} />
       </div>
       {goal.groups.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 text-[12px]">
@@ -360,7 +366,7 @@ function GoalTiersCard({
       {goal.tiers.length === 0 ? (
         <p className="mt-4 text-[12.5px] text-t2">Esta meta não tem níveis de premiação.</p>
       ) : (
-        <GoalLevelGuide goal={goal} sellers={card.sellers} showReached />
+        <GoalLevelGuide goal={goal} sellers={card.sellers} showReached hideNote />
       )}
       {management && status === "active" && (
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-acc-soft px-3.5 py-3 text-[12.5px]">
