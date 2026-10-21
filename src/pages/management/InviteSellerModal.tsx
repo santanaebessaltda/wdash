@@ -6,8 +6,17 @@ import { normalizeEmail, validEmail } from "@/data/wedash/engine/sellerAccess";
 /**
  * Convite de acesso do vendedor. O e-mail vem preenchido da ficha da WDash.
  * Depois de enviar, oferece o mesmo link do e-mail para copiar.
+ * Cada vendedor monta o formulário de novo: o "enviado" de um não fica no próximo.
  */
-export function InviteSellerModal({
+export function InviteSellerModal(props: {
+  seller: { id: string; name: string; email: string | null } | null;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  return <InviteSellerForm key={props.seller?.id ?? "closed"} {...props} />;
+}
+
+function InviteSellerForm({
   seller,
   onClose,
   onDone,
