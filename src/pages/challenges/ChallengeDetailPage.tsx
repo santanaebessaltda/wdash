@@ -320,7 +320,7 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
             <span className="text-t2">Prêmio: </span>
             <span className="font-bold">{prizeLabel(view.management.prize)}</span>
           </p>
-          <Badge variant={view.management.atingiu ? "success" : "neutral"}>
+          <Badge variant={view.management.atingiu ? "accent" : "neutral"}>
             {view.management.atingiu ? "Atingiu" : view.status === "ended" ? "Não atingiu" : "Ainda não atingiu"}
           </Badge>
         </div>
@@ -359,7 +359,7 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
                   {usesSales && <td className="py-2.5 pr-3 text-right font-mono font-bold text-t1">{aComecar ? "—" : num(p.sales)}</td>}
                   <td className="py-2.5 pr-3">
                     {p.winner ? (
-                      <Badge variant="success">{p.position != null ? `${p.position}º lugar` : "Atingiu"}</Badge>
+                      <Badge variant={p.position != null ? "success" : "accent"}>{p.position != null ? `${p.position}º lugar` : "Atingiu"}</Badge>
                     ) : (
                       <span className="text-t2">{p.gap ?? "—"}</span>
                     )}

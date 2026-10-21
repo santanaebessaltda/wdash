@@ -164,7 +164,7 @@ export function BarChart({
  * Inspirado em referencia01.png  -  cada periodo mostra 2 barras adjacentes:
  *   - Esquerda: realizado (preenchido, cor do tema)
  *   - Direita: meta (contorno tracejado, fundo transparente)
- * Valores acima de cada barra. Verde quando realizado >= meta.
+ * Valores acima de cada barra. A barra fica na cor recebida, inclusive quando o realizado passa da meta.
  * Sem dots, sem tooltips, sem sobreposicao. Leitura imediata.
  */
 export function StackedBarWithGoal({ data, height = 200, color = "var(--acc)", formatValue = (v: number) => String(v) }: {
@@ -178,7 +178,6 @@ export function StackedBarWithGoal({ data, height = 200, color = "var(--acc)", f
   return (
     <div className="flex items-stretch gap-1.5 sm:gap-2.5" style={{ height }}>
       {data.map((d, i) => {
-        const achieved = d.goal > 0 && d.value >= d.goal;
         const realPct = (d.value / maxVal) * 100;
         const goalPct = d.goal > 0 ? (d.goal / maxVal) * 100 : 0;
         return (
@@ -197,7 +196,7 @@ export function StackedBarWithGoal({ data, height = 200, color = "var(--acc)", f
                 className="flex-1 rounded-t-[4px] sm:rounded-t-[6px]"
                 style={{
                   height: `${Math.max(realPct, d.value > 0 ? 2 : 0)}%`,
-                  background: achieved ? "var(--ok)" : color,
+                  background: color,
                   transformOrigin: "bottom",
                   animation: `velaGrowY .55s cubic-bezier(.22,.61,.36,1) ${i * 0.05}s both`,
                 }}
@@ -208,7 +207,7 @@ export function StackedBarWithGoal({ data, height = 200, color = "var(--acc)", f
                   className="flex-1 rounded-t-[4px] border-2 border-dashed sm:rounded-t-[6px]"
                   style={{
                     height: `${Math.max(goalPct, 2)}%`,
-                    borderColor: achieved ? "var(--ok)" : "var(--t2)",
+                    borderColor: "var(--t2)",
                     background: "transparent",
                     transformOrigin: "bottom",
                     animation: `velaGrowY .55s cubic-bezier(.22,.61,.36,1) ${i * 0.05 + 0.1}s both`,

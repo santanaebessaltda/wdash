@@ -179,7 +179,7 @@ function ChallengePeople({
                     <ChallengePersonStatus person={person} disputa={disputa} pct={pct} />
                   </span>
                   <span className="mt-1.5 block">
-                    <ProgressBar value={pct} height={5} color={person.winner ? "var(--ok)" : person.result == null ? "var(--line)" : "var(--acc)"} />
+                    <ProgressBar value={pct} height={5} color={person.result == null ? "var(--line)" : "var(--acc)"} />
                   </span>
                 </span>
               </span>
@@ -224,7 +224,7 @@ function ChallengePersonStatus({ person, disputa, pct }: { person: ChallengePart
       </Badge>
     );
   }
-  if (person.winner) return <Badge variant="success" className="shrink-0">Atingiu</Badge>;
+  if (person.winner) return <Badge variant="accent" className="shrink-0">Atingiu</Badge>;
   return <span className="shrink-0 font-mono text-[12px] font-bold tabular-nums text-acc">{num(pct, 0)}%</span>;
 }
 

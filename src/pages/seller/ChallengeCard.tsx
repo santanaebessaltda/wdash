@@ -74,7 +74,7 @@ function SellerChallengeCard({
         </p>
         {status !== "upcoming" && c.progressPct != null && (
           <div className="mt-2.5">
-            <ProgressBar value={c.progressPct} color={c.won ? "var(--ok)" : "var(--acc)"} height={6} />
+            <ProgressBar value={c.progressPct} height={6} />
           </div>
         )}
         {status === "upcoming" ? (
