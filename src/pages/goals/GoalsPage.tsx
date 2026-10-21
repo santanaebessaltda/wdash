@@ -234,7 +234,7 @@ export default function GoalsPage() {
         }
       >
         {confirm && (
-          <p className="text-[13px] leading-relaxed text-t1">
+          <p className="text-[13.5px] leading-relaxed text-t1">
             A meta <span className="font-bold text-t0">{confirm.name}</span>, de {fullDate(confirm.startsOn)} a {fullDate(confirm.endsOn)}, será
             excluída. Essa ação não pode ser desfeita.
           </p>

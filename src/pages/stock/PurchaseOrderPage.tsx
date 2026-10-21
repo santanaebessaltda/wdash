@@ -703,7 +703,7 @@ export function PurchaseOrderPage() {
       >
         {exportPick && (
           <div className="flex flex-col gap-3">
-            <p className="text-[13px] leading-relaxed text-t1">Cada filial marcada gera uma planilha. O arquivo não junta quantidades de filiais diferentes.</p>
+            <p className="text-[13.5px] leading-relaxed text-t1">Cada filial marcada gera uma planilha. O arquivo não junta quantidades de filiais diferentes.</p>
             <Checkbox
               label="Todas as filiais"
               checked={exportPick.length === storeRows.length}
@@ -741,7 +741,7 @@ export function PurchaseOrderPage() {
         {summaryGroups && (
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="shrink-0 space-y-3 px-5 pt-5">
-              <p className="text-[13px] leading-relaxed text-t1">
+              <p className="text-[13.5px] leading-relaxed text-t1">
                 {summaryGroups.length === 1 ? `${summaryGroups[0].branchCode} · ${summaryGroups[0].storeName}. ` : `${summaryGroups.length} planilhas. `}
                 Multiplicador {po.factor}x. {summaryProductLabel(summaryGroups)}
               </p>
@@ -797,7 +797,7 @@ export function PurchaseOrderPage() {
       >
         {manyStores ? (
           <div className="flex flex-col gap-3">
-            <p className="text-[13px] leading-relaxed text-t1">Escolha a filial de origem e as filiais que recebem os mínimos dela.</p>
+            <p className="text-[13.5px] leading-relaxed text-t1">Escolha a filial de origem e as filiais que recebem os mínimos dela.</p>
             <FormField label="Copiar de">
               <Select
                 value={copyOriginId}
@@ -839,7 +839,7 @@ export function PurchaseOrderPage() {
           store &&
           (all || destination) && (
             <div className="flex flex-col gap-3">
-              <p className="text-[13px] leading-relaxed text-t1">Copie os mínimos de {store.tradeName} para outra filial ou para todas.</p>
+              <p className="text-[13.5px] leading-relaxed text-t1">Copie os mínimos de {store.tradeName} para outra filial ou para todas.</p>
               <FormField label="Copiar para">
                 <Select value={all ? "" : (destination?.id ?? "")} onChange={(e) => setDestinationId(e.target.value)} disabled={copiando}>
                   {otherStores.length > 1 && <option value="">Todas as outras filiais</option>}

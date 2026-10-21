@@ -367,7 +367,7 @@ export function SystemUsersPage() {
           </>
         }
       >
-        <p className="text-sm leading-relaxed text-t1">
+        <p className="text-[13.5px] leading-relaxed text-t1">
           {confirming?.action === "revoke"
             ? `O link enviado para ${confirming.user.email} deixará de funcionar.`
             : `${confirming ? displayName(confirming.user) : ""} não poderá mais entrar na WDash. O acesso poderá ser reativado depois.`}

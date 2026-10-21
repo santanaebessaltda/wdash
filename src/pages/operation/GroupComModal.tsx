@@ -106,7 +106,7 @@ export function GroupComModal({
           Informe os dados de acesso do Group COM e escolha a unidade desta filial. A WDash protege esses dados e os usa somente para informar as vendas ao shopping.
         </p>
         {replacedName ? (
-          <p className="text-[13px] leading-relaxed text-t1">Ao conectar, o acesso {replacedName} será substituído pelo do Group COM.</p>
+          <p className="text-[13.5px] leading-relaxed text-t1">Ao conectar, o acesso {replacedName} será substituído pelo do Group COM.</p>
         ) : null}
         <FormField
           label="Identificador do portal"

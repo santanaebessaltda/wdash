@@ -68,14 +68,14 @@ export function ConnectionSkeleton({ label }: { label: string }) {
   );
 }
 
-export function PickerRow({ name, detail, mark, onClick }: { name: string; detail: string; mark: ReactNode; onClick: () => void }) {
+export function PickerRow({ name, detail, mark, onClick }: { name: string; detail: string; mark?: ReactNode; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className="flex items-center gap-3 rounded-[13px] border border-line bg-bg-inset px-4 py-3.5 text-left transition-colors hover:bg-bg-3"
     >
-      <Mark>{mark}</Mark>
+      {mark ? <Mark>{mark}</Mark> : null}
       <span className="min-w-0">
         <span className="block text-[13.5px] font-bold text-t0">{name}</span>
         <span className="mt-0.5 block text-xs text-t2">{detail}</span>

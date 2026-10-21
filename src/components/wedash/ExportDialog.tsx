@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { flushSync } from "react-dom";
 import { Button, Modal } from "@/components/ui";
+import { PickerRow } from "@/components/wedash/ConnectionList";
 
 export type ExportFormat = "csv" | "pdf" | "xlsx";
 
@@ -42,25 +43,21 @@ export function ExportDialog({
       <Button type="button" variant="primary" disabled={disabled || options.length === 0} onClick={() => setOpen(true)}>
         Exportar
       </Button>
-      <Modal open={open} onClose={() => setOpen(false)} title="Exportar" size="sm">
-        <p className="mb-4 text-[13px] leading-relaxed text-t1">Escolha o formato do arquivo.</p>
-        <div className="flex flex-col gap-2.5">
-          {options.map((item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => choose(item)}
-              className="rounded-[var(--radius-vela-lg)] border border-line px-4 py-3 text-left transition-colors hover:border-acc hover:bg-acc-soft/40"
-            >
-              <p className="text-[13.5px] font-bold text-t0">{FORMAT_COPY[item].title}</p>
-              <p className="mt-0.5 text-[12.5px] leading-snug text-t2">{FORMAT_COPY[item].detail}</p>
-            </button>
-          ))}
-        </div>
-        <div className="mt-4 flex justify-end">
-          <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Exportar"
+        footer={
+          <Button type="button" variant="outline" onClick={() => setOpen(false)}>
             Cancelar
           </Button>
+        }
+      >
+        <p className="mb-3 text-[13.5px] leading-relaxed text-t1">Escolha o formato do arquivo.</p>
+        <div className="flex flex-col gap-2.5">
+          {options.map((item) => (
+            <PickerRow key={item} name={FORMAT_COPY[item].title} detail={FORMAT_COPY[item].detail} onClick={() => choose(item)} />
+          ))}
         </div>
       </Modal>
     </>

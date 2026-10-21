@@ -43,6 +43,7 @@ export function Modal({ open, onClose, title, children, footer, size = "md", bod
           <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-5 py-4">
             <h3 className="flex min-w-0 flex-wrap items-center gap-2 text-[15px] font-bold text-t0">{title}</h3>
             <button
+              type="button"
               onClick={onClose}
               aria-label="Fechar"
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-t1 hover:bg-bg-3 hover:text-t0"
@@ -52,7 +53,16 @@ export function Modal({ open, onClose, title, children, footer, size = "md", bod
           </div>
         )}
         <div className={cn("min-h-0 flex-1", bodyClassName ?? "overflow-y-auto p-5")}>{children}</div>
-        {footer && <div className="flex shrink-0 items-center justify-end gap-2 border-t border-line px-5 py-4">{footer}</div>}
+        {footer ? (
+          <div
+            className={cn(
+              "flex shrink-0 flex-wrap items-center justify-end gap-2.5 border-t border-line px-5 py-4",
+              "[&_button]:!h-10 [&_button]:!min-w-[7.5rem] [&_button]:!rounded-[var(--radius-vela-md)] [&_button]:!px-4 [&_button]:!text-[13px]",
+            )}
+          >
+            {footer}
+          </div>
+        ) : null}
       </div>
     </div>,
     document.body,

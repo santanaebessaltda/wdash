@@ -84,7 +84,7 @@ export function GroupFormModal({
       }}
       footer={
         <>
-          <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>
+          <Button type="button" variant="outline" onClick={onClose} disabled={busy}>
             Cancelar
           </Button>
           <Button type="submit" form={formId} disabled={busy}>
@@ -324,7 +324,7 @@ export function ManageGroupsModal({
           </>
         }
       >
-        <p className="text-[13px] leading-relaxed text-t1">
+        <p className="text-[13.5px] leading-relaxed text-t1">
           {removingCount === 1 ? "1 vendedor ficará sem grupo definido." : `${removingCount} vendedores ficarão sem grupo definido.`}
         </p>
       </Modal>

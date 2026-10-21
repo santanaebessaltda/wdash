@@ -414,7 +414,7 @@ function IntranetMallForm({
         Informe os dados de acesso da Intranet Mall desta filial. A WDash protege esses dados e os usa somente para informar as vendas ao shopping.
       </p>
       {replacedName ? (
-        <p className="text-[13px] leading-relaxed text-t1">Ao conectar, o acesso {replacedName} será substituído pelo da Intranet Mall.</p>
+        <p className="text-[13.5px] leading-relaxed text-t1">Ao conectar, o acesso {replacedName} será substituído pelo da Intranet Mall.</p>
       ) : null}
       <FormField
         label="Identificador da filial"

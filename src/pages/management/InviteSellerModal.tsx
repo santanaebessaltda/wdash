@@ -69,7 +69,7 @@ export function InviteSellerModal({
       footer={
         sent ? (
           <>
-            <Button type="button" variant="secondary" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={onClose}>
               Fechar
             </Button>
             <Button type="button" onClick={() => void copyLink()}>
@@ -78,7 +78,7 @@ export function InviteSellerModal({
           </>
         ) : (
           <>
-            <Button type="button" variant="secondary" onClick={onClose} disabled={sending}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={sending}>
               Cancelar
             </Button>
             <Button type="button" onClick={() => void send()} disabled={sending || !validEmail(normalized)}>

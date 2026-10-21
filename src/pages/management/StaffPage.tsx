@@ -448,7 +448,7 @@ function StaffList({
         title="Excluir acesso?"
         footer={
           <>
-            <Button type="button" variant="secondary" onClick={() => setRemoving(null)} disabled={removingBusy}>
+            <Button type="button" variant="outline" onClick={() => setRemoving(null)} disabled={removingBusy}>
               Cancelar
             </Button>
             <Button
@@ -618,7 +618,7 @@ function SellerEditor({
       title={seller ? `Editar ${seller.name}` : ""}
       footer={
         <>
-          <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>
+          <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
             Cancelar
           </Button>
           <Button type="button" onClick={() => void save()} disabled={saving}>

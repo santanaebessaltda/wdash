@@ -272,7 +272,7 @@ export function SyncLogsPage() {
           </>
         }
       >
-        <p className="text-sm leading-relaxed text-t1">
+        <p className="text-[13.5px] leading-relaxed text-t1">
           Isso apaga os erros e avisos da sincronização desta conta, inclusive os que a busca não está mostrando. Vendas e cadastro não mudam.
         </p>
       </Modal>
