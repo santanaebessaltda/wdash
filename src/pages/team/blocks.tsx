@@ -6,7 +6,6 @@
 import type { ReactNode } from "react";
 import { Badge, Card, CardTitle, DataTable, EmptyState, ProgressBar, progressColor, progressTextClass, type DataTableColumn } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
-import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { brl, brlCent, eachDay, num } from "@/lib/format";
 import type { BlockState as BlockStateKind } from "@/data/wedash/dashboard";
@@ -624,6 +623,16 @@ function LevelsIcon() {
   );
 }
 
+function StoreIcon() {
+  return (
+    <IconBadge>
+      <path d="M3 21h18" />
+      <path d="M5 21V7l7-4 7 4v14" />
+      <path d="M9 21v-6h6v6" />
+    </IconBadge>
+  );
+}
+
 export function GoalCard({
   card,
   activeGoal,
@@ -646,7 +655,10 @@ export function GoalCard({
           {card.kind === "individual" ? <IndividualTypeIcon /> : <GroupTypeIcon />}
           {kindLabel}
         </Badge>
-        <StoreDivisionTitle className="self-center">{card.storeNameValue}</StoreDivisionTitle>
+        <Badge variant="neutral" className="gap-1 uppercase">
+          <StoreIcon />
+          {card.storeNameValue}
+        </Badge>
         {card.brands.map((m) => (
           <Badge key={m} variant="neutral" className="gap-1">
             <BrandIcon />
