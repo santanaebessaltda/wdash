@@ -759,6 +759,41 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
     expect(v.topSellers[1]?.name).toBe("Carla");
   });
 
+  it("meta Geral fica fora dos destaques; as outras filiais continuam", () => {
+    const period = { kind: "custom" as const, start: "2026-10-01", end: "2026-10-20" };
+    const goal = {
+      id: "g",
+      storeId: "f1",
+      name: "Outubro",
+      startsOn: "2026-10-01",
+      endsOn: "2026-10-31",
+      target: 1000,
+      tierMode: "GENERAL" as const,
+      tiers: [],
+      groups: [],
+    };
+    const seller = (storeId: string, name: string, cents: number) => ({
+      tenantId: "t1",
+      storeId,
+      day: "2026-10-10",
+      sellerKey: name,
+      sellerName: name,
+      brand: "ALL" as const,
+      revenueCents: cents,
+      salesCount: 1,
+    });
+    const onlyGeneral = buildOverviewView(
+      { storeIds: ["f1"], period, division: null },
+      { dayAggs: [], sellerDayAggs: [seller("f1", "Ana", 100_00)], goals: [goal] },
+    );
+    expect(onlyGeneral.topSellers).toEqual([]);
+    const network = buildOverviewView(
+      { storeIds: [], period, division: null },
+      { dayAggs: [], sellerDayAggs: [seller("f1", "Ana", 100_00), seller("f2", "Bia", 80_00)], goals: [goal] },
+    );
+    expect(network.topSellers.map((person) => person.name)).toEqual(["Bia"]);
+  });
+
   it("topVendedoras devolve o ranking completo, do maior faturamento para o menor", () => {
     const sellerDayAggs = Array.from({ length: 12 }, (_, i) => ({
       tenantId: "t1",

@@ -50,7 +50,7 @@ function RankingList({ ranking }: { ranking: MonthRankingEntry[] }) {
   );
 }
 
-/** O mesmo card da Equipe: Ranking (podio do mes), Desafios e Meta. Na meta Geral o ranking some: a parte e igual para todos. */
+/** O mesmo card da Equipe: Ranking, Desafios e Meta. Na meta Geral o ranking fica no vazio: a parte é igual e não há ordem. */
 export function PerformanceCard({ store, today, through, closed }: { store: SellerHomeStore; today: string; through: string; closed: boolean }) {
   const geral = store.goals.some((g) => g.mode === "geral");
   const ranking = store.storeRanking ?? [];
@@ -60,30 +60,24 @@ export function PerformanceCard({ store, today, through, closed }: { store: Sell
       <CardTitle className="mb-4">{store.storeName}</CardTitle>
       <Tabs
         variant="accent"
-        defaultKey={geral ? "metas" : "ranking"}
+        defaultKey="ranking"
         items={[
-          ...(!geral
-            ? [
-                {
+          {
             key: "ranking",
             label: "Ranking",
             icon: <TrophyIcon size={14} />,
-            content: (
-              <div>
-                {ranking.length === 0 ? (
-                  <EmptyBlock
-                    icon="🏆"
-                    title="Ninguém no ranking ainda"
-                    description="O ranking aparece quando houver pessoas nesta loja."
-                  />
-                ) : (
-                  <RankingList ranking={ranking} />
-                )}
-              </div>
+            content: geral ? (
+              <EmptyBlock />
+            ) : ranking.length === 0 ? (
+              <EmptyBlock
+                icon="🏆"
+                title="Ninguém no ranking ainda"
+                description="O ranking aparece quando houver pessoas nesta loja."
+              />
+            ) : (
+              <RankingList ranking={ranking} />
             ),
           },
-              ]
-            : []),
           {
             key: "metas",
             label: "Metas",

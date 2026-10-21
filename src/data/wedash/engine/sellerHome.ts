@@ -1,4 +1,4 @@
-/** Pacote da tela Inicio do vendedor. No modo Geral, numeros e podio sao a parte igual da filial. Nos outros modos, o podio e a venda de cada pessoa. */
+/** Pacote da tela Inicio do vendedor. No modo Geral, os números da pessoa são a parte igual da filial e o ranking fica vazio. Nos outros modos, o ranking é a venda de cada pessoa. */
 import { addMonths, addDays, brlCent, collaboratorName, eachDay, startOfMonth } from "./format.ts";
 import type { GoalCardView, GoalRecord, GoalTeamMember, SalesDayAgg, SalesSellerDayAgg, SellerRow } from "./goalTypes.ts";
 import { buildGoalCardView, goalStatus, sellerGoalLevels, type SellerGoalLevel } from "./goalView.ts";

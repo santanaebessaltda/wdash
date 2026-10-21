@@ -20,6 +20,18 @@ export function goalStatus(g: Pick<GoalRecord, "startsOn" | "endsOn">, today: st
   return "active";
 }
 
+/** Dia coberto por uma meta Geral que já começou. A meta a começar não entra. */
+export function dayInGeneralGoal(goals: Pick<GoalRecord, "storeId" | "tierMode" | "startsOn" | "endsOn">[], storeId: string, day: string, today: string): boolean {
+  return goals.some(
+    (goal) =>
+      goal.storeId === storeId &&
+      goal.tierMode === "GENERAL" &&
+      goalStatus(goal, today) !== "upcoming" &&
+      goal.startsOn <= day &&
+      day <= goal.endsOn,
+  );
+}
+
 export const GOAL_STATUS_LABEL: Record<GoalStatus, string> = {
   active: "Em andamento",
   upcoming: "A começar",

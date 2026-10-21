@@ -17,7 +17,7 @@ import { NOW, UPDATED_AT, TODAY_ISO, CURRENT_HOUR, SYNC_INTERVAL_MIN, LAST_SYNC,
 import { defaultWeekHours, effectiveWeekHours, hourAxisRange, unionOpenWindow, type Dow } from "./storeHours";
 import { hourShares, periodDailyGoal, weekdayWeights } from "./goalCurve";
 import { goalStoreClosing } from "./engine/goalProjection";
-import { sellerGoalLevels } from "./goalView";
+import { dayInGeneralGoal, sellerGoalLevels } from "./goalView";
 import { sellerOrigin } from "./engine/salesOrigin";
 import { dayAggregate, salesDay, salesDays, storeOpen, dayWeight, sumAggregates, type Aggregate } from "./sales";
 import { brl, brlCent, fullDate, shortDate, dayAxisLabel, dayPointDetail, isoToDate, delta as fmtDelta, hourSpan, endOfMonth, shortHour, startOfMonth, eachDay, labelUpper, monthYear, shortMonth, pct, addDays } from "@/lib/format";
@@ -4729,6 +4729,7 @@ export function buildOverviewViewFromAggs(scope: Scope, input: OverviewAggInput)
   const vendMap = new Map<string, VendAcc>();
   for (const row of input.sellerDayAggs ?? []) {
     if (scope.storeIds.length > 0 && !scopedStoreIds.has(row.storeId)) continue;
+    if (row.day >= period.start && row.day <= period.end && dayInGeneralGoal(goals, row.storeId, row.day, todayIso)) continue;
     const key = row.sellerEmployeeId != null ? `e:${row.sellerEmployeeId}` : `n:${row.sellerKey}`;
     const acc = vendMap.get(key) ?? {
       name: row.sellerName,

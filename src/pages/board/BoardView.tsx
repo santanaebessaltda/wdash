@@ -10,8 +10,8 @@ import { buildGoalCardView, buildGoalSummary, GOAL_STATUS_LABEL, goalStatus, pra
 import type { GoalRecord, GoalTeamMember } from "@/data/wedash/goalsRepo";
 import { buildChallengeView } from "@/data/wedash/challengeView";
 import type { ChallengeAggInput, ChallengeRecord } from "@/data/wedash/challengesRepo";
-import { buildTeamDashboardView, type Scope, type TeamAggInput, type TeamMemberRow } from "@/data/wedash/dashboard";
-import { rankingWithGeneralShare } from "@/data/wedash/engine/generalRanking";
+import { type Scope, type TeamAggInput, type TeamMemberRow } from "@/data/wedash/dashboard";
+import { rankingOutsideGeneralGoal } from "@/data/wedash/engine/generalRanking";
 import { ChallengeMiniCard } from "@/pages/challenges/ChallengeMiniCard";
 import { TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
 import { calendarTodayIso } from "@/data/wedash/clock";
@@ -280,14 +280,8 @@ export function BoardView({
   }, [scopeKey]);
   const view = useMemo(() => {
     if (!boardScope) return null;
-    return rankingWithGeneralShare(buildTeamDashboardView(boardScope, team), {
-      goals: goalsData.goals,
-      team: goalsData.team,
-      dayAggs: team.dayAggs,
-      today,
-      storeNames: new Map(stores.map((store) => [store.id, store.tradeName])),
-    });
-  }, [boardScope, goalsData, stores, team, today]);
+    return rankingOutsideGeneralGoal(boardScope, team, goalsData.goals, today);
+  }, [boardScope, goalsData.goals, team, today]);
 
   const goalBoards = useMemo<GoalBoard[]>(() => {
     return goalsData.goals
@@ -605,6 +599,10 @@ export function BoardView({
             </CardHero>
             <CardTitle>Ranking</CardTitle>
           </div>
+          {(view?.people.length ?? 0) === 0 ? (
+            <EmptyState framed={false} icon="📊" title="Sem dados no período" description="Nenhuma venda registrada no período selecionado." />
+          ) : (
+            <>
           <RankingBlock ranking={podium} formatAmount={brlCent} spotlight literalName />
               {(view?.people.length ?? 0) > 3 && (
                 <div className="mt-5">
@@ -687,6 +685,8 @@ export function BoardView({
                   </div>
                 </div>
               )}
+            </>
+          )}
         </Card>
 
         {challenges.length > 0 && (
