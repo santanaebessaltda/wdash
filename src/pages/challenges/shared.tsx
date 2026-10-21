@@ -111,3 +111,15 @@ export function mainPrizeLabel(c: ChallengeRecord): string | null {
   if (!p) return null;
   return c.mode === "MINIMUM" ? `${prizeLabel(p)} por pessoa` : `1º lugar: ${prizeLabel(p)}`;
 }
+
+const PRIZE_PLACE = ["1º", "2º", "3º"];
+
+/** Linha de destaque do placar. No minimo, o premio por pessoa; na disputa, cada lugar. */
+export function floorPrizeLine(c: ChallengeRecord): string | null {
+  if (c.prizes.length === 0) return null;
+  if (c.mode === "MINIMUM") {
+    const prize = c.prizes[0];
+    return prize ? `Prêmio: ${prizeLabel(prize)} por pessoa` : null;
+  }
+  return c.prizes.map((prize, index) => `${PRIZE_PLACE[index] ?? `${index + 1}º`} ${prizeLabel(prize)}`).join(" · ");
+}
