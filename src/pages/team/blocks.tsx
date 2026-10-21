@@ -598,7 +598,6 @@ export function GoalCard({
           hideTitle
           tiers={card.tiers}
           todayIso={todayIso}
-          individual={card.kind === "individual"}
         />
       </div>
     </>
