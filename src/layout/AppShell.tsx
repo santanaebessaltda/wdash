@@ -118,6 +118,7 @@ export function AppShell() {
           className={cn(
             "flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto print:overflow-visible print:p-0",
             presentation ? "p-0" : "px-4 pt-5 sm:px-8 sm:pt-6",
+            location.pathname === paths.board && "board-backdrop",
           )}
         >
           <ProfilePhotosProvider>

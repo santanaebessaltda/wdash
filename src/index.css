@@ -511,18 +511,66 @@ input[type="range"]::-moz-range-thumb {
   }
 }
 
+/* Mesmo fundo do painel de "Crie seu acesso": degradê azul/roxo com brilho. */
+.board-backdrop {
+  background-color: #14103a;
+  background-image:
+    radial-gradient(70% 60% at 25% 80%, rgba(86, 168, 255, 0.35), transparent 60%),
+    linear-gradient(150deg, #0f2d54, #1b1650 55%, #14103a);
+}
+
+/* Tema claro: o texto solto fica claro sobre o degradê; dentro dos cards volta ao tema. */
+@media screen {
+  :root[data-theme="light"] .board-backdrop {
+    --t0: #f3f4f9;
+    --t1: rgba(255, 255, 255, 0.72);
+    --t2: rgba(255, 255, 255, 0.55);
+    --line: rgba(255, 255, 255, 0.18);
+    --line-2: rgba(255, 255, 255, 0.28);
+    --bg-3: rgba(255, 255, 255, 0.08);
+    --color-t0: #f3f4f9;
+    --color-t1: rgba(255, 255, 255, 0.72);
+    --color-t2: rgba(255, 255, 255, 0.55);
+    --color-line: rgba(255, 255, 255, 0.18);
+    --color-line-2: rgba(255, 255, 255, 0.28);
+    --color-bg-3: rgba(255, 255, 255, 0.08);
+  }
+  :root[data-theme="light"] .board-backdrop :is(.bg-bg-2, .bg-bg-1) {
+    --t0: #171a23;
+    --t1: #5a6173;
+    --t2: #9097a8;
+    --line: rgba(17, 20, 32, 0.08);
+    --line-2: rgba(17, 20, 32, 0.14);
+    --bg-1: #ffffff;
+    --bg-3: #f3f4f9;
+    --bg-inset: #f5f6fb;
+    --color-t0: #171a23;
+    --color-t1: #5a6173;
+    --color-t2: #9097a8;
+    --color-line: rgba(17, 20, 32, 0.08);
+    --color-line-2: rgba(17, 20, 32, 0.14);
+    --color-bg-1: #ffffff;
+    --color-bg-3: #f3f4f9;
+    --color-bg-inset: #f5f6fb;
+  }
+}
+
 /* Exportar PDF (layout de impressão): A4 deitado tem ~1047px úteis, então as
    grades de desktop (lg) valem no papel. Tema claro vem de printMode.ts. */
 @page {
   size: A4 landscape;
   margin: 10mm;
 }
+
 @media print {
   html,
   body,
   #root {
     height: auto !important;
     overflow: visible !important;
+    background: #fff !important;
+  }
+  .board-backdrop {
     background: #fff !important;
   }
   body {

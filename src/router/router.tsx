@@ -122,7 +122,7 @@ const routeTree: RouteObject[] = [
   {
     path: paths.boardShare(":token"),
     element: (
-      <Suspense fallback={<div className="min-h-screen bg-bg-0" />}>
+      <Suspense fallback={<div className="board-backdrop tela-cheia" />}>
         <PublicBoardPage />
       </Suspense>
     ),

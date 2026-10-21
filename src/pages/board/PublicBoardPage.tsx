@@ -40,7 +40,7 @@ export function PublicBoardPage() {
 
   if (status === "loading") {
     return (
-      <div className="min-h-screen bg-bg-0">
+      <div className="board-backdrop tela-cheia overflow-y-auto">
         <BoardSkeleton header className="min-h-full p-4 sm:p-6" />
       </div>
     );
@@ -48,7 +48,7 @@ export function PublicBoardPage() {
 
   if (status === "missing" || !pack) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-bg-0 p-6 text-center">
+      <div className="board-backdrop tela-cheia flex items-center justify-center overflow-y-auto p-6 text-center">
         <p className="text-sm text-t2">Este placar não está disponível.</p>
       </div>
     );
@@ -56,7 +56,7 @@ export function PublicBoardPage() {
 
   const watermark = pack.watermark ? new Date(pack.watermark) : null;
   return (
-    <div className="min-h-screen bg-bg-0 text-t0">
+    <div className="board-backdrop tela-cheia overflow-y-auto text-t0">
       <ProfilePhotosProvider photos={pack.photos}>
         <BoardView
           stores={[
