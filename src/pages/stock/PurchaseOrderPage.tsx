@@ -552,7 +552,7 @@ export function PurchaseOrderPage() {
                         return (
                           <Fragment key={group.code}>
                             <tr
-                              className={cn("border-b border-line", manyStores && "cursor-pointer", short && "bg-warn-soft")}
+                              className={cn("border-b border-line transition-colors", manyStores && "cursor-pointer", short && "hover:bg-warn-soft")}
                               onClick={manyStores ? () => toggleGroup(group.code, open) : undefined}
                             >
                               <td className={cn("px-1 py-3 text-center text-[13px] font-extrabold text-t2", short && "shadow-[inset_3px_0_0_var(--warn)]")}>{idx + 1}</td>
@@ -618,7 +618,7 @@ export function PurchaseOrderPage() {
                               group.branches.map((branch) => (
                                 <tr
                                   key={`${branch.storeId}:${branch.code}`}
-                                  className={cn("group border-b border-line transition-colors", branch.onOrder ? "bg-warn-soft" : "bg-bg-inset hover:bg-acc-soft")}
+                                  className={cn("group border-b border-line bg-bg-inset transition-colors", branch.onOrder ? "hover:bg-warn-soft" : "hover:bg-acc-soft")}
                                 >
                                   <td />
                                   <td className={cn("border-l-2 px-1 py-2.5 pl-16 transition-colors", branch.onOrder ? "border-l-warn" : "border-l-line-2 group-hover:border-l-acc")}>
