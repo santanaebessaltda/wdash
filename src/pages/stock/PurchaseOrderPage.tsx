@@ -116,17 +116,9 @@ function productLine(branches: OrderLine[]) {
   };
 }
 
-function filialSummary(branches: OrderLine[]): string {
-  const total = branches.length;
-  const ordering = branches.filter((branch) => branch.onOrder).length;
-  const filiais = total === 1 ? "1 filial" : `${num(total)} filiais`;
-  if (ordering === 0) return filiais;
-  return `${filiais} · ${ordering === 1 ? "1 no pedido" : `${num(ordering)} no pedido`}`;
-}
-
 function Chevron({ open }: { open: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" className={cn("h-3.5 w-3.5 shrink-0 text-t2 transition-transform", open && "rotate-90")} fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
+    <svg viewBox="0 0 24 24" className={cn("h-3.5 w-3.5 shrink-0 transition-transform", open && "rotate-90")} fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
       <path d="m9 6 6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
@@ -226,14 +218,14 @@ export function PurchaseOrderPage() {
   const pageSafe = Math.min(page, totalPages);
   const pageGroups = groups.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
-  const isOpen = (group: ProductGroup) => opened[group.code] ?? group.branches.some((branch) => branch.onOrder);
+  const isOpen = (group: ProductGroup) => manyStores && Boolean(opened[group.code]);
   const toggleGroup = (code: string, open: boolean) => setOpened((current) => ({ ...current, [code]: !open }));
   const minIndex = new Map<string, number>();
   {
     let next = 0;
     for (const group of pageGroups) {
-      if (!isOpen(group)) continue;
-      for (const branch of group.branches) minIndex.set(`${branch.storeId}:${branch.code}`, next++);
+      const editable = manyStores ? (isOpen(group) ? group.branches : []) : group.branches.slice(0, 1);
+      for (const branch of editable) minIndex.set(`${branch.storeId}:${branch.code}`, next++);
     }
   }
 
@@ -552,43 +544,56 @@ export function PurchaseOrderPage() {
                   {pageGroups.map((group, i) => {
                         const open = isOpen(group);
                         const idx = (pageSafe - 1) * PAGE_SIZE + i;
-                        const onOrder = group.branches.some((branch) => branch.onOrder);
                         const line = productLine(group.branches);
                         const category = po.parts.find((p) => p.storeId === group.branches[0]?.storeId)?.catalog.get(group.code)?.category;
+                        const alone = !manyStores ? group.branches[0] : null;
+                        const productSub = [group.code, category].filter(Boolean).join(" · ");
                         return (
                           <Fragment key={group.code}>
                             <tr
-                              className="cursor-pointer border-b border-line bg-bg-3"
-                              onClick={() => toggleGroup(group.code, open)}
-                              onKeyDown={(event) => {
-                                if (event.key !== "Enter" && event.key !== " ") return;
-                                event.preventDefault();
-                                toggleGroup(group.code, open);
-                              }}
-                              role="button"
-                              tabIndex={0}
-                              aria-expanded={open}
+                              className={cn("border-b border-line", manyStores && "cursor-pointer")}
+                              onClick={manyStores ? () => toggleGroup(group.code, open) : undefined}
                             >
-                              <td className={cn("px-1 py-3 text-center text-[13px] font-extrabold text-t2", onOrder && "shadow-[inset_3px_0_0_var(--warn)]")}>{idx + 1}</td>
+                              <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
                               <td className="px-1 py-3">
-                                <div className="flex min-w-0 items-center gap-2">
-                                  <Chevron open={open} />
+                                <div className={cn("flex min-w-0 items-center", manyStores && "gap-2")}>
+                                  {manyStores && (
+                                    <button
+                                      type="button"
+                                      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-t2 outline-none hover:bg-bg-inset focus-visible:ring-2 focus-visible:ring-acc"
+                                      aria-expanded={open}
+                                      aria-label={open ? `Fechar filiais de ${group.name}` : `Abrir filiais de ${group.name}`}
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        toggleGroup(group.code, open);
+                                      }}
+                                    >
+                                      <Chevron open={open} />
+                                    </button>
+                                  )}
                                   <ProductNameCell
                                     name={group.name}
                                     idx={idx}
                                     upper
                                     sub={
-                                      <div className="min-w-0">
-                                        <p className="truncate text-[11px] uppercase text-t2">{[group.code, category].filter(Boolean).join(" · ")}</p>
-                                        <p className="mt-0.5 text-[11px] font-semibold text-t1">{filialSummary(group.branches)}</p>
-                                        {group.variasVariantes && !group.blocked && <p className="mt-0.5 text-[11px] font-semibold text-warn">Este produto tem mais de uma cor ou tamanho. Faça o pedido diretamente no Millennium.</p>}
-                                      </div>
+                                      group.variasVariantes && !group.blocked ? (
+                                        <div className="min-w-0">
+                                          <p className="truncate text-[11px] uppercase text-t2">{productSub}</p>
+                                          <p className="mt-0.5 text-[11px] font-semibold text-warn">Este produto tem mais de uma cor ou tamanho. Faça o pedido diretamente no Millennium.</p>
+                                        </div>
+                                      ) : (
+                                        productSub
+                                      )
                                     }
                                   />
                                 </div>
                               </td>
                               <td className="px-1 py-3 text-right">
-                                <span className="inline-block w-20 pr-2 text-right font-mono text-[13px] font-bold text-t2">{line.minimum == null ? "—" : line.minimum}</span>
+                                {alone ? (
+                                  <BranchMinimum branch={alone} idx={minIndex.get(`${alone.storeId}:${alone.code}`) ?? 0} onSave={(raw) => po.saveMin(alone.storeId, alone.code, raw)} />
+                                ) : (
+                                  <span className="inline-block w-20 pr-2 text-right font-mono text-[13px] font-bold text-t2">{line.minimum == null ? "—" : line.minimum}</span>
+                                )}
                               </td>
                               {(["saldo", "pedidosAbertos", "total", "vendidos30"] as const).map((key) => (
                                 <td key={key} className="px-1 py-3 text-right">
@@ -610,22 +615,17 @@ export function PurchaseOrderPage() {
                             </tr>
                             {open &&
                               group.branches.map((branch) => (
-                                <tr key={`${branch.storeId}:${branch.code}`} className={cn("border-b border-line", branch.onOrder ? "bg-warn-soft" : "bg-bg-inset")}>
+                                <tr key={`${branch.storeId}:${branch.code}`} className="group border-b border-line bg-bg-inset transition-colors hover:bg-acc-soft">
                                   <td />
-                                  <td className={cn("border-l-2 px-1 py-2.5 pl-16", branch.onOrder ? "border-l-warn" : "border-l-line-2")}>
+                                  <td className="border-l-2 border-l-line-2 px-1 py-2.5 pl-16 transition-colors group-hover:border-l-acc">
                                     <p className="break-words text-[12.5px] font-semibold leading-5 text-t1">{branch.storeName}</p>
                                   </td>
                                   <td className="px-1 py-2 text-right">
-                                    {!branch.canRequest ? (
-                                      <span className="inline-block w-20 pr-2 text-right font-mono text-[13px] font-bold text-t2">{branch.minimum == null ? "—" : branch.minimum}</span>
-                                    ) : (
-                                      <MinInput
-                                        value={branch.minimum}
-                                        idx={minIndex.get(`${branch.storeId}:${branch.code}`) ?? 0}
-                                        label={`Mínimo de ${branch.name} em ${branch.storeName}`}
-                                        onSave={(raw) => po.saveMin(branch.storeId, branch.code, raw)}
-                                      />
-                                    )}
+                                    <BranchMinimum
+                                      branch={branch}
+                                      idx={minIndex.get(`${branch.storeId}:${branch.code}`) ?? 0}
+                                      onSave={(raw) => po.saveMin(branch.storeId, branch.code, raw)}
+                                    />
                                   </td>
                                   {NUM_COLS.filter((c) => c.key !== "multipla").map((c) => (
                                     <td key={c.key} className="px-1 py-2.5 text-right">
@@ -962,6 +962,13 @@ function Qty({ v, total = false, strong = false }: { v: number; total?: boolean;
 }
 
 const fmtMin = (v: number | null) => (v == null ? "" : String(v));
+
+function BranchMinimum({ branch, idx, onSave }: { branch: OrderLine; idx: number; onSave: (raw: string) => Promise<boolean> }) {
+  if (!branch.canRequest) {
+    return <span className="inline-block w-20 pr-2 text-right font-mono text-[13px] font-bold text-t2">{branch.minimum == null ? "—" : branch.minimum}</span>;
+  }
+  return <MinInput value={branch.minimum} idx={idx} label={`Mínimo de ${branch.name} em ${branch.storeName}`} onSave={onSave} />;
+}
 
 /** Minimo editavel: grava ao sair do campo; Enter desce para o minimo da linha de baixo; Esc desfaz. */
 function MinInput({ value, idx, label, onSave }: { value: number | null; idx: number; label: string; onSave: (raw: string) => Promise<boolean> }) {
