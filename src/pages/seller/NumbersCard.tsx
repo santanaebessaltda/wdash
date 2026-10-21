@@ -47,26 +47,46 @@ const KPI_COLORS = [
   { iconColor: "var(--info)", iconBg: "rgba(59,130,246,0.12)" },
 ];
 
-/** Faturamento, vendas, ticket e P.A. do vendedor no intervalo do seletor. */
+/** Faturamento, vendas, ticket e P.A. do vendedor no intervalo do seletor. Em Este mês, cada card mostra o dia de hoje embaixo. */
 export function NumbersCard({
   days,
   period,
   today,
+  showToday = false,
 }: {
   days: SellerDay[];
   period: { from: string; to: string };
   today: string;
+  showToday?: boolean;
 }) {
   const singleToday = period.from === today && period.to === today;
   const n = sellerNumbers(days, period, today, singleToday ? "today" : "month");
+  const todayNumbers = showToday && !singleToday ? sellerNumbers(days, { from: today, to: today }, today, "today") : null;
   const pa = n.pa.value == null ? "—" : num(n.pa.value, 2);
-  const cards: { label: string; value: string; delta?: (typeof n.revenue)["delta"]; tooltip?: string }[] = [
-    { label: "Faturamento", value: brlCent(n.revenue.value ?? 0), delta: n.revenue.delta },
-    { label: "Vendas", value: num(n.sales.value ?? 0, 0), delta: n.sales.delta },
-    { label: "Ticket médio", value: brlCent(n.ticket.value ?? 0), delta: n.ticket.delta },
+  const todayPa = todayNumbers == null || todayNumbers.pa.value == null ? "—" : num(todayNumbers.pa.value, 2);
+  const cards: { label: string; value: string; sub?: string; delta?: (typeof n.revenue)["delta"]; tooltip?: string }[] = [
+    {
+      label: "Faturamento",
+      value: brlCent(n.revenue.value ?? 0),
+      sub: todayNumbers ? `Hoje ${brlCent(todayNumbers.revenue.value ?? 0)}` : undefined,
+      delta: n.revenue.delta,
+    },
+    {
+      label: "Vendas",
+      value: num(n.sales.value ?? 0, 0),
+      sub: todayNumbers ? `Hoje ${num(todayNumbers.sales.value ?? 0, 0)}` : undefined,
+      delta: n.sales.delta,
+    },
+    {
+      label: "Ticket médio",
+      value: brlCent(n.ticket.value ?? 0),
+      sub: todayNumbers ? `Hoje ${brlCent(todayNumbers.ticket.value ?? 0)}` : undefined,
+      delta: n.ticket.delta,
+    },
     {
       label: "P.A.",
       value: pa,
+      sub: todayNumbers ? `Hoje ${todayPa}` : undefined,
       delta: n.pa.delta,
       tooltip: n.pa.value == null ? "Não há dados suficientes para calcular o P.A. neste período." : undefined,
     },
@@ -84,6 +104,7 @@ export function NumbersCard({
             icon={<Icon />}
             iconColor={c.iconColor}
             iconBg={c.iconBg}
+            sub={kpi.sub}
             delta={kpi.delta}
             deltaTooltip={kpi.delta ? sellerDeltaTip(kpi.delta) : undefined}
             tooltip={kpi.tooltip}

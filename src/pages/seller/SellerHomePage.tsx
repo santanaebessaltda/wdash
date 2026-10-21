@@ -106,7 +106,7 @@ export function SellerHomePage() {
         </div>
       ) : (
         <>
-          <NumbersCard days={home.myDays} period={home.numbersPeriod} today={home.today} />
+          <NumbersCard days={home.myDays} period={home.numbersPeriod} today={home.today} showToday={period.kind === "thisMonth"} />
           {home.stores.map((s) => (
             <PerformanceCard key={s.storeId} store={s} today={home.today} through={home.numbersPeriod.to} closed={closed} />
           ))}
