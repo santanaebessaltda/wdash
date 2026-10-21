@@ -12,6 +12,8 @@ export interface ModalProps {
   size?: "sm" | "md" | "lg" | "xl";
   /** Substitui o padding e a rolagem padrão do corpo. */
   bodyClassName?: string;
+  /** Tema do placar, para a janela aberta fora do card herdar claro ou escuro. */
+  boardTheme?: "light" | "dark";
 }
 
 const sizeClasses = {
@@ -21,12 +23,13 @@ const sizeClasses = {
   xl: "max-w-4xl",
 };
 
-export function Modal({ open, onClose, title, children, footer, size = "md", bodyClassName }: ModalProps) {
+export function Modal({ open, onClose, title, children, footer, size = "md", bodyClassName, boardTheme }: ModalProps) {
   if (!open) return null;
 
   return createPortal(
     <div
-      className="pad-topo pad-base fixed inset-0 z-[100] flex items-center justify-center px-4"
+      data-board-theme={boardTheme}
+      className="pad-topo pad-base fixed inset-0 z-[100] flex items-center justify-center px-4 text-t0"
       style={padTopAndBottom("1rem", "1rem")}
       role="dialog"
       aria-modal="true"

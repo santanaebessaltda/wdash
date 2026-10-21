@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { Button, Segmented } from "@/components/ui";
+import { Button, Modal, Segmented } from "@/components/ui";
 import type { GoalRecord, SellerRow } from "@/data/wedash/engine/goalTypes";
 import { brlCent, num, shiftName } from "@/lib/format";
+import { cn } from "@/lib/cn";
+import { useBoardTheme } from "@/pages/board/boardTheme";
 import { Icon, icons } from "@/pages/users/Icons";
 
 /** Níveis no desenho da vendedora. No placar abre pelo botão; no detalhe fica no card. */
@@ -13,73 +15,88 @@ export function GoalLevelGuide({
 }: {
   goal: GoalRecord;
   sellers: SellerRow[];
-  /** No placar, os níveis ficam atrás do botão. */
+  /** No placar, o botão abre os níveis numa janela. */
   toggle?: boolean;
   /** No detalhe, cada card mostra quantas pessoas do turno já chegaram. */
   showReached?: boolean;
 }) {
   const guide = buildGoalLevelGuide(goal, sellers);
-  const [open, setOpen] = useState(!toggle);
+  const [open, setOpen] = useState(false);
+  const [boardTheme] = useBoardTheme();
   const [groupKey, setGroupKey] = useState(guide?.groups[0]?.key ?? "");
   if (!guide) return null;
   const selected = guide.groups.find((group) => group.key === groupKey) ?? guide.groups[0]!;
-  return (
-    <div className={toggle ? "mt-3" : "mt-4 border-t border-line pt-3"}>
-      {toggle ? (
-        <Button type="button" variant="outline" size="sm" aria-expanded={open} onClick={() => setOpen((current) => !current)}>
-          {open ? "Fechar níveis" : "Níveis de premiação"}
-        </Button>
+  const levels = (
+    <>
+      <p className="text-[12.5px] leading-snug text-t1">{guide.intro}</p>
+      {guide.note ? <p className="mt-1 text-[12px] leading-snug text-t2">{guide.note}</p> : null}
+      {guide.groups.length > 1 ? (
+        <Segmented
+          className="mt-3"
+          options={guide.groups.map((group) => ({ value: group.key, label: group.title }))}
+          value={selected.key}
+          onChange={(value) => value && setGroupKey(value)}
+        />
       ) : null}
-      {open ? (
-        <div className={toggle ? "mt-3" : undefined}>
-          <p className="text-[12.5px] leading-snug text-t1">{guide.intro}</p>
-          {guide.note ? <p className="mt-1 text-[12px] leading-snug text-t2">{guide.note}</p> : null}
-          {guide.groups.length > 1 ? (
-            <Segmented
-              className="mt-3"
-              options={guide.groups.map((group) => ({ value: group.key, label: group.title }))}
-              value={selected.key}
-              onChange={(value) => value && setGroupKey(value)}
-            />
-          ) : null}
-          <div className="mt-3 flex flex-col gap-2.5">
-            {selected.rows.map((row) => {
-              const everyone = selected.people > 0 && row.reached === selected.people;
-              return (
-                <div key={row.number} className="flex items-center gap-3 rounded-xl border border-line bg-bg-inset px-3.5 py-3">
-                  <span
-                    className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-bold"
-                    style={{
-                      background: everyone ? "var(--ok)" : "var(--bg-3)",
-                      borderColor: everyone ? "var(--ok)" : "var(--line-2)",
-                      color: everyone ? "#fff" : "var(--t2)",
-                    }}
-                  >
-                    {everyone ? <Icon d={icons.check} size={12} /> : row.number}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[13.5px] font-bold text-t0">
-                      N{row.number} · {row.name}
-                    </p>
-                    <p className="mt-0.5 text-[12px] font-semibold text-t1">{moneyLine(selected.kind, row.month, row.day)}</p>
-                    <p className="mt-0.5 text-[11.5px] text-t2">{ruleLine(row)}</p>
-                    {showReached && row.manager ? <p className="mt-0.5 text-[11.5px] text-t2">{row.manager}</p> : null}
-                    {showReached && selected.people > 0 ? (
-                      <p className="mt-0.5 text-[11.5px] font-semibold text-t1">{reachedLine(row.reached)}</p>
-                    ) : null}
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className={`font-mono text-[13px] font-extrabold ${everyone ? "text-ok" : "text-t1"}`}>{num(row.commissionPct, 1)}%</p>
-                    <p className="text-[10.5px] text-t2">de premiação</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
-    </div>
+      <div className="mt-3 flex flex-col gap-2.5">
+        {selected.rows.map((row) => {
+          const everyone = selected.people > 0 && row.reached === selected.people;
+          return (
+            <div key={row.number} className="flex items-center gap-3 rounded-xl border border-line bg-bg-inset px-3.5 py-3">
+              <span
+                className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-bold"
+                style={{
+                  background: everyone ? "var(--ok)" : "var(--bg-3)",
+                  borderColor: everyone ? "var(--ok)" : "var(--line-2)",
+                  color: everyone ? "#fff" : "var(--t2)",
+                }}
+              >
+                {everyone ? <Icon d={icons.check} size={12} /> : row.number}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[13.5px] font-bold text-t0">
+                  N{row.number} · {row.name}
+                </p>
+                <p className="mt-0.5 text-[12px] font-semibold text-t1">{moneyLine(selected.kind, row.month, row.day)}</p>
+                <p className="mt-0.5 text-[11.5px] text-t2">{ruleLine(row)}</p>
+                {showReached && row.manager ? <p className="mt-0.5 text-[11.5px] text-t2">{row.manager}</p> : null}
+                {showReached && selected.people > 0 ? (
+                  <p className="mt-0.5 text-[11.5px] font-semibold text-t1">{reachedLine(row.reached)}</p>
+                ) : null}
+              </div>
+              <div className="shrink-0 text-right">
+                {toggle && selected.people > 0 ? (
+                  <p className={cn("font-mono text-[13px] font-extrabold tabular-nums", everyone ? "text-ok" : "text-t1")}>
+                    {row.reached}/{selected.people}
+                  </p>
+                ) : (
+                  <p className={cn("font-mono text-[13px] font-extrabold", everyone ? "text-ok" : "text-t1")}>{num(row.commissionPct, 1)}%</p>
+                )}
+                <p className="text-[10.5px] text-t2">{toggle ? "do turno" : "de premiação"}</p>
+                {toggle ? (
+                  <p className={cn("mt-1 font-mono text-[13px] font-extrabold", everyone ? "text-ok" : "text-t1")}>{num(row.commissionPct, 1)}%</p>
+                ) : null}
+                {toggle ? <p className="text-[10.5px] text-t2">de premiação</p> : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
   );
+  if (toggle) {
+    return (
+      <div className="mt-3">
+        <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>
+          Ver níveis de premiação
+        </Button>
+        <Modal open={open} onClose={() => setOpen(false)} title="Níveis de premiação" size="lg" boardTheme={boardTheme}>
+          {levels}
+        </Modal>
+      </div>
+    );
+  }
+  return <div className="mt-4 border-t border-line pt-3">{levels}</div>;
 }
 
 function moneyLine(kind: GuideGroup["kind"], month: number, day: number): string {
