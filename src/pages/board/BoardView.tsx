@@ -15,6 +15,7 @@ import { type Scope, type TeamAggInput, type TeamMemberRow } from "@/data/wedash
 import { teamViewWithGoalShare } from "@/data/wedash/engine/generalRanking";
 import { ChallengeMiniCard } from "@/pages/challenges/ChallengeMiniCard";
 import { TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
+import { GoalLevelGuide } from "@/pages/goals/GoalLevelGuide";
 import { BoardThemeSwitch } from "./boardTheme";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { defaultWeekHours, effectiveWeekHours, type StoreWeekHours } from "@/data/wedash/storeHours";
@@ -264,6 +265,7 @@ function BoardGoalCard({ board, showStore }: { board: GoalBoard; showStore: bool
         ) : null}
         <DeadlineBadge label={prazoRemaining(summary.daysRemaining)} />
       </div>
+      <GoalLevelGuide goal={goal} sellers={card.sellers} />
         </div>
       </div>
     </Card>

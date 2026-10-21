@@ -31,6 +31,7 @@ import { statusBadgeVariant } from "@/lib/status";
 import { exportPdf } from "@/lib/printMode";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
+import { GoalLevelGuide } from "@/pages/goals/GoalLevelGuide";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useReturnWhenStoreChanges } from "@/pages/dashboard/useScope";
 import { TargetIcon } from "@/pages/dashboards/icons";
@@ -347,6 +348,7 @@ function GoalTiersCard({
           ))}
         </div>
       )}
+      <GoalLevelGuide goal={goal} sellers={card.sellers} />
       <div className="my-4 border-t border-line" />
       {goal.tiers.length === 0 ? (
         <p className="text-[12.5px] text-t2">Esta meta não tem níveis de premiação.</p>

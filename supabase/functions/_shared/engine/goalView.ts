@@ -180,6 +180,12 @@ export interface SellerGoalLevel {
   group: string | null;
   /** Meta da pessoa (individual) ou do grupo (modo Grupo). */
   goalAmount: number;
+  /** Dias do período da meta. */
+  periodDays: number;
+  /** Dias em que a pessoa conta na meta. */
+  eligibleDays: number;
+  /** A parte dela é menor porque não ficou o período inteiro. */
+  proportional: boolean;
   /** O que conta para a meta: vendas da pessoa (individual) ou do grupo (modo Grupo), do inicio da meta ate hoje. */
   achieved: number;
   next: { name: string; number: number; gap: number; commissionPct: number; bonus: number } | null;
@@ -234,6 +240,9 @@ export function sellerGoalLevels(input: {
           modo: goal.tierMode === "INDIVIDUAL" ? "individual" : goal.tierMode === "GENERAL" ? "geral" : "grupo",
           group: goal.tierMode === "GENERAL" || goal.groups.length === 0 ? null : r.group,
           goalAmount: r.individualGoalAmount,
+          periodDays: r.periodDays,
+          eligibleDays: r.eligibleDays,
+          proportional: r.proportionalGoal,
           achieved: (r.attainmentPct * r.individualGoalAmount) / 100,
           next: r.nextTier
             ? {

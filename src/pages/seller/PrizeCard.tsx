@@ -174,11 +174,33 @@ function PrizeBody({ goal, me, storeName, today, through, closed }: { goal: Sell
 
       {levels.length > 0 && (
         <div>
-          <CardTitle className="mb-3">Níveis e premiação</CardTitle>
+          <CardTitle className="mb-1">Níveis e premiação</CardTitle>
+          {me.modo === "individual" && me.proportional ? (
+            <p className="mb-3 text-[12px] text-t2">
+              Sua parte, {me.eligibleDays} de {me.periodDays} dias. Os valores abaixo já saem dessa parte.
+            </p>
+          ) : (
+            <p className="mb-3 text-[12px] text-t2">
+              {me.modo === "geral"
+                ? "Cada linha é o que a loja precisa vender. Por dia é o valor do mês dividido pelos dias da meta."
+                : me.modo === "grupo"
+                  ? "Cada linha é o que o grupo precisa vender. Por dia é o valor do mês dividido pelos dias da meta."
+                  : "Cada linha é o que você precisa vender. Por dia é o valor do mês dividido pelos dias da meta."}
+            </p>
+          )}
           <div className="flex flex-col gap-2.5">
             {levels.map(({ marco, number, bonusSoFar }) => {
               const reached = me.levelNumber != null && me.levelNumber >= number;
               const currentLevel = me.levelNumber === number;
+              const days = me.periodDays > 0 ? me.periodDays : 1;
+              const month = (me.goalAmount * marco.pct) / 100;
+              const perDay = month / days;
+              const money =
+                me.modo === "geral"
+                  ? `${brlCent(month)} a loja no mês · ${brlCent(perDay)} por dia`
+                  : me.modo === "grupo"
+                    ? `${brlCent(month)} o grupo no mês · ${brlCent(perDay)} por dia`
+                    : `${brlCent(month)} no mês · ${brlCent(perDay)} por dia`;
               const parts = [`A partir de ${num(marco.pct, 0)}% da meta`];
               if (marco.bonus > 0) {
                 parts.push(`bônus de ${brlCent(marco.bonus)}`);
@@ -209,6 +231,7 @@ function PrizeBody({ goal, me, storeName, today, through, closed }: { goal: Sell
                         </Badge>
                       )}
                     </p>
+                    {me.goalAmount > 0 ? <p className="mt-0.5 text-[12px] font-semibold text-t1">{money}</p> : null}
                     <p className="mt-0.5 text-[11.5px] text-t2">{parts.join(" · ")}</p>
                   </div>
                   <div className="shrink-0 text-right">
