@@ -190,8 +190,19 @@ function ChallengeIdentity({
   );
 }
 
-/** Mesmo miolo do card de meta: a média da equipe, a barra até o mínimo e os avatares. */
-export function ChallengeSummary({ challenge: c, view, avatars = true }: { challenge: ChallengeRecord; view: ChallengeView; avatars?: boolean }) {
+/** Média da equipe, percentual e a barra até o mínimo. A mesma conta do card e do detalhe. */
+export function ChallengeProgress({
+  challenge: c,
+  view,
+  height = 5,
+  showDeadline = true,
+}: {
+  challenge: ChallengeRecord;
+  view: ChallengeView;
+  height?: number;
+  /** No detalhe o prazo já está nos números do resumo. */
+  showDeadline?: boolean;
+}) {
   const upcoming = view.status === "upcoming";
   const ended = view.status === "ended";
   const people = view.participants;
@@ -208,9 +219,8 @@ export function ChallengeSummary({ challenge: c, view, avatars = true }: { chall
   const goal = hasAverage ? (index ? managerGoal : (personGoal ?? managerGoal)) : personGoal;
   const goalIsManager = hasAverage && goal != null && (index || personGoal == null);
   const pct = upcoming || shown == null ? 0 : goal != null ? (shown / goal) * 100 : best > 0 ? (shown / best) * 100 : 0;
-  const rule = c.mode === "MINIMUM" ? challengeMinimumLabel(c) : challengeCriterion(c);
   const headcount = `${count} ${count === 1 ? "pessoa" : "pessoas"}`;
-  const left = upcoming ? (rule ?? "—") : shown != null ? metricValueLabel(c.metric, shown) : "Sem resultado";
+  const left = upcoming ? (c.mode === "MINIMUM" ? challengeMinimumLabel(c) : challengeCriterion(c)) ?? "—" : shown != null ? metricValueLabel(c.metric, shown) : "Sem resultado";
   const reached =
     c.mode !== "MINIMUM" || upcoming
       ? null
@@ -219,12 +229,11 @@ export function ChallengeSummary({ challenge: c, view, avatars = true }: { chall
         : won === 1
           ? "1 pessoa atingiu"
           : `${won} pessoas atingiram`;
-  const prazo = !upcoming && !ended ? view.prazo : null;
-  const note = upcoming ? headcount : [rule, headcount].filter(Boolean).join(" · ");
+  const prazo = showDeadline && !upcoming && !ended ? view.prazo : null;
 
   return (
     <>
-      <div className="mt-3.5 flex items-baseline justify-between gap-2">
+      <div className="flex items-baseline justify-between gap-2">
         <span className={cn("min-w-0 truncate font-mono text-[13px] font-extrabold", shown != null && !upcoming ? progressTextClass(pct) : "text-t0")}>{left}</span>
         <span className="shrink-0 text-right text-[11.5px] text-t2">
           {upcoming ? (
@@ -242,7 +251,7 @@ export function ChallengeSummary({ challenge: c, view, avatars = true }: { chall
         </span>
       </div>
       <div className="mt-2">
-        <ProgressBar value={pct} height={5} />
+        <ProgressBar value={pct} height={height} />
       </div>
       {reached || prazo ? (
         <p className="mt-2 text-[11.5px]">
@@ -251,6 +260,24 @@ export function ChallengeSummary({ challenge: c, view, avatars = true }: { chall
           {prazo ? <span className="text-t2">{prazo}</span> : null}
         </p>
       ) : null}
+    </>
+  );
+}
+
+/** Mesmo miolo do card de meta: a média da equipe, a barra até o mínimo e os avatares. */
+export function ChallengeSummary({ challenge: c, view, avatars = true }: { challenge: ChallengeRecord; view: ChallengeView; avatars?: boolean }) {
+  const upcoming = view.status === "upcoming";
+  const people = view.participants;
+  const count = people.length;
+  const rule = c.mode === "MINIMUM" ? challengeMinimumLabel(c) : challengeCriterion(c);
+  const headcount = `${count} ${count === 1 ? "pessoa" : "pessoas"}`;
+  const note = upcoming ? headcount : [rule, headcount].filter(Boolean).join(" · ");
+
+  return (
+    <>
+      <div className="mt-3.5">
+        <ChallengeProgress challenge={c} view={view} />
+      </div>
       <div className="flex-1" />
       <div className="mt-4 flex items-center justify-between gap-3">
         <p className="min-w-0 text-[12px] text-t2">{note}</p>

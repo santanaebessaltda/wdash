@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Alert, Badge, Breadcrumbs, Button, Card, CardTitle, ProgressStanding } from "@/components/ui";
+import { ChallengeProgress } from "@/pages/challenges/ChallengeMiniCard";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { BranchBadge, PeriodBadge, PrizeBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -285,6 +286,10 @@ function ChallengeHero({ challenge: c, view, storeNameValue }: { challenge: Chal
             {s.sub && <p className="mt-0.5 text-[11.5px] leading-snug text-t2">{s.sub}</p>}
           </div>
         ))}
+      </div>
+      <div className="mt-4">
+        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-t2">Progresso do desafio</p>
+        <ChallengeProgress challenge={c} view={view} height={12} showDeadline={false} />
       </div>
     </Card>
   );

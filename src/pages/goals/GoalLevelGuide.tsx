@@ -16,7 +16,7 @@ export function GoalLevelGuide({
   sellers: SellerRow[];
   /** No placar, um card abaixo da meta esconde e mostra os níveis. */
   accordion?: boolean;
-  /** No detalhe, cada card mostra quantas pessoas do turno já chegaram. */
+  /** No detalhe e no placar, cada card mostra “3/3 já atingiu” abaixo das regras. */
   showReached?: boolean;
 }) {
   const guide = buildGoalLevelGuide(goal, sellers);
@@ -58,7 +58,7 @@ export function GoalLevelGuide({
                 <p className="mt-0.5 text-[12px] font-semibold text-t1">{moneyLine(selected.kind, row.month, row.day)}</p>
                 <p className="mt-0.5 text-[11.5px] text-t2">{ruleLine(row)}</p>
                 {showReached && row.manager ? <p className="mt-0.5 text-[11.5px] text-t2">{row.manager}</p> : null}
-                {showReached && selected.people > 0 ? (
+                {(showReached || accordion) && selected.people > 0 ? (
                   <p className={cn("mt-0.5 text-[11.5px] font-semibold", everyone ? "text-ok" : "text-t1")}>
                     <span className="font-mono tabular-nums">
                       {row.reached}/{selected.people}
@@ -68,17 +68,7 @@ export function GoalLevelGuide({
                 ) : null}
               </div>
               <div className="shrink-0 text-right">
-                {accordion && selected.people > 0 ? (
-                  <>
-                    <p className={cn("font-mono text-[13px] font-extrabold tabular-nums", everyone ? "text-ok" : "text-t1")}>
-                      {row.reached}/{selected.people}
-                    </p>
-                    <p className="text-[10.5px] text-t2">já atingiu</p>
-                  </>
-                ) : null}
-                <p className={cn("font-mono text-[13px] font-extrabold", accordion && "mt-1", everyone ? "text-ok" : "text-t1")}>
-                  {num(row.commissionPct, 1)}%
-                </p>
+                <p className={cn("font-mono text-[13px] font-extrabold", everyone ? "text-ok" : "text-t1")}>{num(row.commissionPct, 1)}%</p>
                 <p className="text-[10.5px] text-t2">de premiação</p>
               </div>
             </div>
