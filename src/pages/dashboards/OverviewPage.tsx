@@ -241,7 +241,7 @@ export default function OverviewPage() {
         fetchSalesCategoryDayAggs({
           tenantId: session.tenantId,
           storeIds: scope.storeIds,
-          from: period.start,
+          from: prev.start < period.start ? prev.start : period.start,
           to: period.end,
           brand: null,
         }),
@@ -714,35 +714,46 @@ export default function OverviewPage() {
       {/* Linha: Categoria vs Meta + Dia da Semana vs Meta (Dia some em periodo de 1 dia) */}
       <div className={`mt-4 grid grid-cols-1 gap-4 ${view.dayVsMeta.length > 0 ? "lg:grid-cols-2" : ""}`}>
         <Card padding="lg" className="flex flex-col">
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-1.5">
-                <CardTitle>Faturamento por categoria</CardTitle>
-                <Tooltip label="Veja como o faturamento está distribuído entre as categorias de produtos.">
-                  <span className="inline-flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full bg-bg-inset text-[10px] font-semibold text-t2 hover:text-t1 transition-colors">
-                    ?
-                  </span>
-                </Tooltip>
-              </div>
-            </div>
-            <BadgeVsPrevious delta={view.revenueDelta} metric="Faturamento total" />
-          </div>
-          {view.categoryVsGoal.filter((c) => c.achieved > 0).length === 0 ? (
-            <EmptyBlock />
-          ) : (
-            <BarChart
-              data={view.categoryVsGoal
-                .filter((c) => c.achieved > 0)
-                .map((c) => ({
-                  label: c.category,
-                  value: c.achieved,
-                }))}
-              height={220}
-              color="var(--acc)"
-              formatValue={brlCent}
-              onSelect={(d) => openDetail({ kind: "category", name: d.label })}
-            />
-          )}
+          {(() => {
+            const bars = view.categoryVsGoal.filter((c) => c.achieved > 0);
+            const totalCategories = bars.reduce((s, c) => s + c.achieved, 0);
+            return (
+              <>
+                <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <CardTitle>Faturamento por categoria</CardTitle>
+                      <Tooltip label="Veja como o faturamento está distribuído entre as categorias de produtos.">
+                        <span className="inline-flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full bg-bg-inset text-[10px] font-semibold text-t2 hover:text-t1 transition-colors">
+                          ?
+                        </span>
+                      </Tooltip>
+                    </div>
+                    {bars.length > 0 && (
+                      <p className="mt-1.5 font-mono text-2xl font-extrabold text-t0">{brlCent(totalCategories)}</p>
+                    )}
+                  </div>
+                  {bars.length > 0 && (
+                    <BadgeVsPrevious delta={view.deltaCategories} metric="Faturamento das categorias" />
+                  )}
+                </div>
+                {bars.length === 0 ? (
+                  <EmptyBlock />
+                ) : (
+                  <BarChart
+                    data={bars.map((c) => ({
+                      label: c.category,
+                      value: c.achieved,
+                    }))}
+                    height={220}
+                    color="var(--acc)"
+                    formatValue={brlCent}
+                    onSelect={(d) => openDetail({ kind: "category", name: d.label })}
+                  />
+                )}
+              </>
+            );
+          })()}
         </Card>
         {view.dayVsMeta.length > 0 && (
           <Card padding="lg" className="flex flex-col">

@@ -604,7 +604,7 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
   });
 
   it("fills categoriaVsMeta from categoryDayAggs (reais) and keeps catalog zeros", () => {
-    const v = buildOverviewView(scope("f1"), {
+    const v = buildOverviewView(scope("f1", { kind: "custom", start: "2026-09-10", end: "2026-09-10" }), {
       dayAggs: [
         {
           tenantId: "t1",
@@ -1356,6 +1356,33 @@ describe("buildOverviewView — comparativo com o período anterior", () => {
       expect(byLabel(l)?.amount).toBe("—");
       expect(byLabel(l)?.delta).toBeUndefined();
     }
+  });
+
+  it("faturamento por categoria soma o período e compara com o anterior", () => {
+    const cat = (d: string, id: number, name: string, rev: number) => ({
+      tenantId: "t1",
+      storeId: "f1",
+      day: d,
+      categoryId: id,
+      categoryName: name,
+      brand: "WEPINK" as const,
+      revenueCents: rev * 100,
+      itemCount: 1,
+    });
+    const v = buildOverviewView(esc, {
+      dayAggs: [day("2026-08-10", 200, 80, 4), day("2026-08-11", 100, 40, 2)],
+      categoryDayAggs: [
+        cat("2026-08-10", 1, "Perfumaria", 200),
+        cat("2026-08-11", 2, "Body", 100),
+        cat("2026-08-08", 1, "Perfumaria", 150),
+      ],
+    });
+    expect(v.categoryVsGoal.filter((c) => c.achieved > 0).map((c) => [c.category, c.achieved])).toEqual([
+      ["PERFUMARIA", 200],
+      ["BODY", 100],
+    ]);
+    expect(v.categoryVsGoal.reduce((s, c) => s + c.achieved, 0)).toBe(300);
+    expect(v.deltaCategories).toMatchObject({ value: "100%", positive: true, vs: "os 2 dias anteriores" });
   });
 
   it("sem vendas no período anterior não mostra badge", () => {

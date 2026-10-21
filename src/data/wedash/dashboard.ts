@@ -3926,6 +3926,8 @@ export interface OverviewView {
   goalDescription?: string | null;
   /** Delta do faturamento vs periodo anterior (badge dos cards de grafico). */
   revenueDelta?: { value: string; positive: boolean; vs?: string };
+  /** Soma das categorias vs periodo anterior (card Faturamento por categoria). */
+  deltaCategories?: { value: string; positive: boolean; vs?: string; previous?: string };
   seriesAxis: SeriesAxis;
   seriesLabel: string;
   categoryVsGoal: CategoryVsGoal[];
@@ -4620,6 +4622,15 @@ export function buildOverviewViewFromAggs(scope: Scope, input: OverviewAggInput)
 
   // Faturamento por categoria  -  mix do periodo + catalogo historico (zeros).
   // Meta por categoria fica p/ CRUD de Metas; nao inventar Goal aqui.
+  // O fetch inclui o periodo anterior: so o periodo atual vira barra; os dois lados
+  // alimentam o badge, com o mesmo recorte da tela Produtos (hoje compara ate ontem).
+  const prevCat = previousPeriod(period, calendarCurrentHour());
+  const cutsCatToday = prevCat.hourMax != null;
+  const endCatCmp = cutsCatToday ? addDays(period.end, -1) : period.end;
+  const prevEndCatCmp = cutsCatToday ? addDays(prevCat.end, -1) : prevCat.end;
+  const vsCat = cutsCatToday ? `${prevCat.label}, até o mesmo dia` : prevCat.label;
+  let catCmp = 0;
+  let catPrev = 0;
   const catAcc = new Map<string, { achieved: number }>();
   for (const ref of input.categoryCatalog ?? []) {
     if (brand && ref.brand !== brand && ref.brand !== "ALL") continue;
@@ -4629,12 +4640,18 @@ export function buildOverviewViewFromAggs(scope: Scope, input: OverviewAggInput)
   for (const row of input.categoryDayAggs ?? []) {
     if (brand && row.brand !== brand && row.brand !== "ALL") continue;
     if (brand && row.brand === "ALL") continue;
-    const name = row.categoryName || `Tipo ${row.categoryId}`;
-    const key = labelUpper(name);
-    const cur = catAcc.get(key) ?? { achieved: 0 };
-    cur.achieved += row.revenueCents / 100;
-    catAcc.set(key, cur);
+    const v = row.revenueCents / 100;
+    if (row.day >= period.start && row.day <= period.end) {
+      const name = row.categoryName || `Tipo ${row.categoryId}`;
+      const key = labelUpper(name);
+      const cur = catAcc.get(key) ?? { achieved: 0 };
+      cur.achieved += v;
+      catAcc.set(key, cur);
+    }
+    if (row.day >= period.start && row.day <= endCatCmp) catCmp += v;
+    if (row.day >= prevCat.start && row.day <= prevEndCatCmp) catPrev += v;
   }
+  const deltaCategories = catCmp > 0 && catPrev > 0 ? kpiDelta(catCmp, catPrev, vsCat) : undefined;
   const categoryVsGoal: CategoryVsGoal[] = [...catAcc.entries()]
     .map(([category, c]) => ({
       category,
@@ -4873,6 +4890,7 @@ export function buildOverviewViewFromAggs(scope: Scope, input: OverviewAggInput)
     rankingNetworkTotal,
     otherStoresRanking,
     revenueDelta,
+    deltaCategories,
     fromAggregates: true,
   };
 }
