@@ -527,7 +527,7 @@ export function TeamPage() {
                                 </div>
                                 <p className="mt-0.5 text-[11.5px] text-t2">
                                   {t.name === TEAM_UNATTRIBUTED_SALE
-                                    ? "Venda sem vendedor identificado"
+                                    ? "Vendas sem vendedor identificado"
                                     : `${pt.schedule ? `${pt.schedule} · ` : ""}${t.people} ${t.people === 1 ? "pessoa" : "pessoas"}`}
                                 </p>
                               </div>

@@ -47,7 +47,7 @@ const TEAM_REVENUE_TIP =
   "Faturamento da equipe. Na meta Individual ou Grupo com rateio, a venda sem vendedor entra neste valor, na média e no ranking. Na meta Geral, é o total da filial dividido entre quem estava na loja.";
 
 /** Fatia do gráfico de grupos: venda que não saiu no nome de ninguém. */
-export const TEAM_UNATTRIBUTED_SALE = "Sem vendedor";
+export const TEAM_UNATTRIBUTED_SALE = "SEM GRUPO IDENTIFICADO";
 
 type Money = { revenue: number; sales: number; items: number; missing: boolean };
 type ShareDay = { revenue: number; sales: number; items: number; missing: boolean };
