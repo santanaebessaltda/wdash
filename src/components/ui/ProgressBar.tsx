@@ -1,16 +1,25 @@
-/** Cor da barra do Dash. O valor não troca a cor. */
-export function progressColor(_value: number): string {
-  return "var(--acc)";
+function progressComplete(value: number): boolean {
+  return value >= 100;
 }
 
-/** Texto do percentual que acompanha a barra. Também não muda com o valor. */
-export function progressTextClass(_value: number): string {
-  return "text-acc";
+/** Cor da barra. Abaixo de 100% fica na cor do sistema; em 100% fica verde. */
+export function progressColor(value: number): string {
+  return progressComplete(value) ? "var(--ok)" : "var(--acc)";
+}
+
+/** Texto do percentual que acompanha a barra. Verde só em 100%. */
+export function progressTextClass(value: number): string {
+  return progressComplete(value) ? "text-ok" : "text-acc";
+}
+
+/** "Atingiu" em verde, ou o lugar / "Não atingiu" na cor do texto. Não é badge. */
+export function ProgressStanding({ ok, children }: { ok: boolean; children: string }) {
+  return <span className={`shrink-0 text-[12px] font-semibold ${ok ? "text-ok" : "text-t1"}`}>{children}</span>;
 }
 
 export interface ProgressBarProps {
   value: number; // 0-100
-  /** Se omitido, usa a cor primária. */
+  /** Se omitido, usa a cor do progresso: primária abaixo de 100%, verde em 100%. */
   color?: string;
   trackColor?: string;
   height?: number;
@@ -48,7 +57,7 @@ export function RadialProgress({
   value: number;
   size?: number;
   stroke?: number;
-  /** Se omitido, usa a cor primária. */
+  /** Se omitido, usa a cor do progresso: primária abaixo de 100%, verde em 100%. */
   color?: string;
   trackColor?: string;
   /** Subtitulo abaixo do % (ex.: "da meta"). */
@@ -78,7 +87,9 @@ export function RadialProgress({
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className={large ? "text-[26px] font-extrabold tracking-tight text-t0" : "text-xs font-bold text-t0"}>
+        <span
+          className={`${large ? "text-[26px] font-extrabold tracking-tight" : "text-xs font-bold"} ${progressComplete(value) ? "text-ok" : "text-t0"}`}
+        >
           {Math.round(value)}%
         </span>
         {label && <span className="text-[11px] text-t2">{label}</span>}

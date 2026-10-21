@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, DateRangePicker, Modal, ProgressBar, progressTextClass, useToast } from "@/components/ui";
+import { Button, Card, DateRangePicker, Modal, ProgressBar, ProgressStanding, progressTextClass, useToast } from "@/components/ui";
 import { PersonAvatarGroup } from "@/components/wedash/PersonAvatar";
 import { BranchBadge, PeriodBadge, RecordStatusBadge, UnidentifiedSalesBadge } from "@/components/wedash/RecordBadges";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -343,9 +343,12 @@ function GoalCard({
           {status === "upcoming" ? (
             "Meta da filial"
           ) : (
-            <>
-              <span className={`font-mono font-bold ${progressTextClass(pct)}`}>{num(pct, 1)}%</span> de {brlCent(g.target)}
-            </>
+            <span className="inline-flex flex-col items-end gap-0.5">
+              <span>
+                <span className={`font-mono font-bold ${progressTextClass(pct)}`}>{num(pct, 1)}%</span> de {brlCent(g.target)}
+              </span>
+              {status === "ended" && pct < 100 ? <ProgressStanding ok={false}>Não atingiu</ProgressStanding> : null}
+            </span>
           )}
         </span>
       </div>

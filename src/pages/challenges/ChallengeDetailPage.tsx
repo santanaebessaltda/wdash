@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { Alert, Badge, Breadcrumbs, Button, Card, CardTitle } from "@/components/ui";
+import { Alert, Badge, Breadcrumbs, Button, Card, CardTitle, ProgressStanding } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { BranchBadge, PeriodBadge, PrizeBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -333,7 +333,9 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
             <span className="font-bold">{prizeLabel(view.management.prize)}</span>
           </p>
           {view.management.atingiu ? (
-            <Badge variant="accent" className="uppercase">Atingiu</Badge>
+            <ProgressStanding ok>Atingiu</ProgressStanding>
+          ) : view.status === "ended" ? (
+            <ProgressStanding ok={false}>Não atingiu</ProgressStanding>
           ) : null}
         </div>
       )}
@@ -371,7 +373,9 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
                   {usesSales && <td className="py-2.5 pr-3 text-right font-mono font-bold text-t1">{aComecar ? "—" : num(p.sales)}</td>}
                   <td className="py-2.5 pr-3">
                     {p.winner ? (
-                      <Badge variant={p.position != null ? "success" : "accent"} className={p.position == null ? "uppercase" : undefined}>{p.position != null ? `${p.position}º lugar` : "Atingiu"}</Badge>
+                      <ProgressStanding ok>{p.position != null ? `${p.position}º lugar` : "Atingiu"}</ProgressStanding>
+                    ) : !disputa && view.status === "ended" ? (
+                      <ProgressStanding ok={false}>Não atingiu</ProgressStanding>
                     ) : (
                       <span className="text-t2">{p.gap ?? "—"}</span>
                     )}
@@ -503,7 +507,7 @@ function ChallengePayoutCard({ challenge: c, view, onExport }: { challenge: Chal
                     <td className="py-2.5 pr-3">
                       <PersonName name={r.name} employeeId={r.employeeId} storeId={r.key === "gerencia" ? null : c.storeId} sub={r.sub} />
                     </td>
-                    <td className="py-2.5 pr-3 font-semibold text-acc">{r.rank}</td>
+                    <td className="py-2.5 pr-3 font-semibold text-ok">{r.rank}</td>
                     <td
                       className={`py-2.5 text-right font-extrabold ${r.prize.kind === "MONEY" ? "font-mono text-ok" : "text-t0"}`}
                     >

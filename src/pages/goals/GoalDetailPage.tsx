@@ -245,7 +245,9 @@ function GoalHero({
     {
       label: status === "ended" && missing > 0 ? "Faltou" : "Faltam",
       value: missing <= 0 ? "Meta atingida" : brlCent(missing),
-      cls: missing > 0 ? "text-warn" : "text-ok",
+      cls: missing > 0 ? "text-t0" : "text-ok",
+      sub: status === "ended" && missing > 0 ? "Não atingiu" : undefined,
+      subCls: "text-t1",
     },
     ...(status === "active"
       ? [

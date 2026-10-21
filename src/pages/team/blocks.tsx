@@ -4,7 +4,7 @@
  * Badge, Avatar, EmptyState e o padrao BlockState compartilhado.
  */
 import type { ReactNode } from "react";
-import { Badge, Card, CardTitle, DataTable, EmptyState, ProgressBar, progressColor, progressTextClass, type DataTableColumn } from "@/components/ui";
+import { Badge, Card, CardTitle, DataTable, EmptyState, ProgressBar, ProgressStanding, progressColor, progressTextClass, type DataTableColumn } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { brl, brlCent, eachDay, num } from "@/lib/format";
@@ -457,7 +457,10 @@ export function GoalProgressBar({
           <span className="mx-1.5 text-[14px] font-semibold text-t2">/</span>
           <span className="font-mono text-[14px] font-bold text-t2 sm:text-[15px]">{brlCent(goal.total)}</span>
         </p>
-        <p className={`font-mono text-[26px] font-extrabold leading-none sm:text-[28px] ${colorPct}`}>{num(goal.pct, 1)}%</p>
+        <div className="flex flex-col items-start gap-1 sm:items-end">
+          <p className={`font-mono text-[26px] font-extrabold leading-none sm:text-[28px] ${colorPct}`}>{num(goal.pct, 1)}%</p>
+          {goal.daysRemaining <= 0 && goal.pct < 100 ? <ProgressStanding ok={false}>Não atingiu</ProgressStanding> : null}
+        </div>
       </div>
       {outsideRankingNote(goal) ? <p className="mt-1 text-[12px] text-t2">{outsideRankingNote(goal)}</p> : null}
       </>

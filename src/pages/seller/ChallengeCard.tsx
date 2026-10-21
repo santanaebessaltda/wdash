@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Badge, ProgressBar } from "@/components/ui";
+import { ProgressBar, ProgressStanding } from "@/components/ui";
 import { BranchBadge, DeadlineBadge, PeriodBadge, PrizeBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { prazoRemaining } from "@/data/wedash/engine/goalView";
 import type { SellerChallenge } from "@/data/wedash/engine/sellerHome";
@@ -23,10 +23,6 @@ function shownStatus(c: SellerChallenge, closed: boolean, through: string): Sell
 function sellerHeadline(c: SellerChallenge, status: SellerChallenge["status"]): ChallengeHeadline {
   if (status === "upcoming") return { label: "Critério", value: c.metricLabel };
   if (c.unavailable) return { label: null, value: "Resultado indisponível" };
-  if (c.position != null) {
-    const result = c.result ? ` · ${c.result}` : "";
-    return { label: null, value: `${c.position}º lugar${result}` };
-  }
   if (c.result) return { label: c.metricLabel, value: c.result };
   return { label: null, value: "Sem resultado ainda" };
 }
@@ -49,6 +45,14 @@ function SellerChallengeCard({
   const ended = status === "ended";
   const clock = closed ? through : today;
   const prazo = status === "active" ? prazoRemaining(daysLeft(clock, c.endsOn)) : null;
+  const standing =
+    status === "upcoming" || c.unavailable
+      ? null
+      : c.mode === "CONTEST" && c.position != null
+        ? <ProgressStanding ok={c.won}>{`${c.position}º lugar`}</ProgressStanding>
+        : c.mode === "MINIMUM" && (c.won || ended)
+          ? <ProgressStanding ok={c.won}>{c.won ? "Atingiu" : "Não atingiu"}</ProgressStanding>
+          : null;
   return (
     <div className={cn("flex items-start gap-3.5 rounded-xl border border-line p-4", ended ? "bg-bg-inset" : "bg-bg-2")}>
       <span
@@ -68,18 +72,14 @@ function SellerChallengeCard({
           <PeriodBadge from={c.startsOn} to={c.endsOn} />
           <BranchBadge name={storeName} />
           {c.prize ? <PrizeBadge label={c.prize} /> : null}
+          {prazo ? <DeadlineBadge label={prazo} /> : null}
         </div>
-        {(prazo || (c.mode === "MINIMUM" && c.won && status !== "upcoming" && !c.unavailable)) ? (
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            {c.mode === "MINIMUM" && c.won && status !== "upcoming" && !c.unavailable ? (
-              <Badge variant="accent" className="uppercase">Atingiu</Badge>
-            ) : null}
-            {prazo ? <DeadlineBadge label={prazo} /> : null}
-          </div>
-        ) : null}
-        <p className="mt-2 min-w-0 text-[13px] text-t1">
-          <HeadlineText headline={sellerHeadline(c, status)} />
-        </p>
+        <div className="mt-2 flex items-baseline justify-between gap-3">
+          <p className="min-w-0 text-[13px] text-t1">
+            <HeadlineText headline={sellerHeadline(c, status)} />
+          </p>
+          {standing}
+        </div>
         {status !== "upcoming" && c.progressPct != null && (
           <div className="mt-2.5">
             <ProgressBar value={c.progressPct} height={6} />

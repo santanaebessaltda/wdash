@@ -1,4 +1,4 @@
-import { Badge, Card, CardHero, ProgressBar, progressTextClass } from "@/components/ui";
+import { Card, CardHero, ProgressBar, ProgressStanding, progressTextClass } from "@/components/ui";
 import { BranchBadge, DeadlineBadge, PeriodBadge, PrizeBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { PersonAvatar, PersonAvatarGroup } from "@/components/wedash/PersonAvatar";
 import type { ChallengeRecord } from "@/data/wedash/challengesRepo";
@@ -58,6 +58,7 @@ export function ChallengeMiniCard({
               prize={prize}
               minimum={minimum}
               reached={reached}
+              reachedOk={view.reachedCount > 0}
               prazo={ended ? null : view.prazo}
             />
           </span>
@@ -103,6 +104,7 @@ export function ChallengeMiniCard({
             prize={prize}
             minimum={showPeople ? null : minimum}
             reached={showPeople ? null : reached}
+            reachedOk={view.reachedCount > 0}
             prazo={showPeople || ended ? null : view.prazo}
           />
           {disputa && !showPeople ? (
@@ -145,6 +147,7 @@ function ChallengeIdentity({
   prize,
   minimum,
   reached,
+  reachedOk = false,
   prazo,
 }: {
   name: string;
@@ -156,6 +159,7 @@ function ChallengeIdentity({
   prize: string | null;
   minimum: string | null;
   reached: string | null;
+  reachedOk?: boolean;
   prazo: string | null;
 }) {
   return (
@@ -168,18 +172,10 @@ function ChallengeIdentity({
         <PeriodBadge from={startsOn} to={endsOn} />
         {storeNameValue ? <BranchBadge name={storeNameValue} /> : null}
         {prize ? <PrizeBadge label={prize} /> : null}
+        {prazo ? <DeadlineBadge label={prazo} /> : null}
       </span>
       {minimum ? <span className="mt-1.5 block text-[12px] font-semibold text-t1">{minimum}</span> : null}
-      {prazo || reached ? (
-        <span className="mt-2 flex flex-wrap items-center gap-1.5">
-          {reached ? (
-            <Badge variant="accent" className="uppercase">
-              {reached}
-            </Badge>
-          ) : null}
-          {prazo ? <DeadlineBadge label={prazo} /> : null}
-        </span>
-      ) : null}
+      {reached ? <span className={`mt-2 block text-[12.5px] font-semibold ${reachedOk ? "text-ok" : "text-t1"}`}>{reached}</span> : null}
     </>
   );
 }
@@ -214,7 +210,7 @@ export function ChallengeSummary({ challenge: c, view }: { challenge: ChallengeR
         : won === 1
           ? "1 pessoa atingiu"
           : `${won} pessoas atingiram`;
-  const caption = [reached, !upcoming && !ended ? view.prazo : null].filter(Boolean).join(" · ");
+  const prazo = !upcoming && !ended ? view.prazo : null;
   const note = upcoming ? headcount : [rule, headcount].filter(Boolean).join(" · ");
 
   return (
@@ -239,7 +235,13 @@ export function ChallengeSummary({ challenge: c, view }: { challenge: ChallengeR
       <div className="mt-2">
         <ProgressBar value={pct} height={5} />
       </div>
-      {caption ? <p className="mt-2 text-[11.5px] text-t2">{caption}</p> : null}
+      {reached || prazo ? (
+        <p className="mt-2 text-[11.5px]">
+          {reached ? <span className={`font-semibold ${won > 0 ? "text-ok" : "text-t1"}`}>{reached}</span> : null}
+          {reached && prazo ? <span className="text-t2"> · </span> : null}
+          {prazo ? <span className="text-t2">{prazo}</span> : null}
+        </p>
+      ) : null}
       <div className="flex-1" />
       <div className="mt-4 flex items-center justify-between gap-3">
         <p className="min-w-0 text-[12px] text-t2">{note}</p>
@@ -292,10 +294,10 @@ function ChallengePeople({
                     <span className="font-mono text-[12px] font-bold tabular-nums text-t1">
                       {person.result == null ? "—" : metricValueLabel(c.metric, person.result)}
                     </span>
-                    <ChallengePersonStatus person={person} disputa={disputa} pct={pct} />
+                    <ChallengePersonStatus person={person} disputa={disputa} ended={view.status === "ended"} pct={pct} />
                   </span>
                   <span className="mt-1.5 block">
-                    <ProgressBar value={pct} height={5} color={person.result == null ? "var(--line)" : "var(--acc)"} />
+                    <ProgressBar value={pct} height={5} color={person.result == null ? "var(--line)" : undefined} />
                   </span>
                 </span>
               </span>
@@ -312,17 +314,22 @@ function floorLead(c: ChallengeRecord, view: ChallengeView): string {
   return floorChallengeHeadline(c, view).value;
 }
 
-function ChallengePersonStatus({ person, disputa, pct }: { person: ChallengeParticipant; disputa: boolean; pct: number }) {
+function ChallengePersonStatus({
+  person,
+  disputa,
+  ended,
+  pct,
+}: {
+  person: ChallengeParticipant;
+  disputa: boolean;
+  ended: boolean;
+  pct: number;
+}) {
   if (person.result == null) return <span className="shrink-0 text-[11px] font-semibold text-t3">Sem resultado</span>;
-  if (disputa && person.position != null) {
-    return (
-      <Badge variant={person.winner ? "success" : "accent"} className="shrink-0">
-        {person.position}º lugar
-      </Badge>
-    );
-  }
-  if (person.winner) return <Badge variant="accent" className="shrink-0 uppercase">Atingiu</Badge>;
-  return <span className="shrink-0 font-mono text-[12px] font-bold tabular-nums text-acc">{num(pct, 0)}%</span>;
+  if (disputa && person.position != null) return <ProgressStanding ok={person.winner}>{`${person.position}º lugar`}</ProgressStanding>;
+  if (person.winner) return <ProgressStanding ok>Atingiu</ProgressStanding>;
+  if (!disputa && ended) return <ProgressStanding ok={false}>Não atingiu</ProgressStanding>;
+  return <span className={`shrink-0 font-mono text-[12px] font-bold tabular-nums ${progressTextClass(pct)}`}>{num(pct, 0)}%</span>;
 }
 
 /** Barra até a meta. Na disputa sem meta, a barra vai até quem está na frente. */
