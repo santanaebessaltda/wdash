@@ -18,6 +18,7 @@ export function ChallengeMiniCard({
   showPeople = false,
   hotKey = null,
   floor = false,
+  showCount = false,
 }: {
   challenge: ChallengeRecord;
   view: ChallengeView;
@@ -31,6 +32,8 @@ export function ChallengeMiniCard({
   hotKey?: string | null;
   /** Texto corrido, para o placar da loja. */
   floor?: boolean;
+  /** No mínimo, “2/6 já atingiu”, como no detalhe. */
+  showCount?: boolean;
 }) {
   const prize = mainPrizeLabel(c);
   const ended = view.status === "ended";
@@ -117,7 +120,7 @@ export function ChallengeMiniCard({
       </span>
       {showPeople ? (
         <>
-          <ChallengeSummary challenge={c} view={view} avatars={false} />
+          <ChallengeSummary challenge={c} view={view} avatars={false} showCount={showCount} />
           <ChallengePeople challenge={c} view={view} disputa={disputa} leader={leader} hotKey={hotKey} className="mt-4 border-t border-line pt-3" />
         </>
       ) : null}
@@ -203,7 +206,7 @@ export function ChallengeProgress({
   height?: number;
   /** No detalhe o prazo já está nos números do resumo. */
   showDeadline?: boolean;
-  /** No detalhe, “2/6 já atingiu”, como na meta. */
+  /** “2/6 já atingiu”, como no detalhe da meta. */
   showCount?: boolean;
 }) {
   const upcoming = view.status === "upcoming";
@@ -271,7 +274,18 @@ export function ChallengeProgress({
 }
 
 /** Mesmo miolo do card de meta: a média da equipe, a barra até o mínimo e os avatares. */
-export function ChallengeSummary({ challenge: c, view, avatars = true }: { challenge: ChallengeRecord; view: ChallengeView; avatars?: boolean }) {
+export function ChallengeSummary({
+  challenge: c,
+  view,
+  avatars = true,
+  showCount = false,
+}: {
+  challenge: ChallengeRecord;
+  view: ChallengeView;
+  avatars?: boolean;
+  /** No mínimo, “2/6 já atingiu”, como no detalhe. */
+  showCount?: boolean;
+}) {
   const upcoming = view.status === "upcoming";
   const people = view.participants;
   const count = people.length;
@@ -282,7 +296,7 @@ export function ChallengeSummary({ challenge: c, view, avatars = true }: { chall
   return (
     <>
       <div className="mt-3.5">
-        <ChallengeProgress challenge={c} view={view} />
+        <ChallengeProgress challenge={c} view={view} showCount={showCount} />
       </div>
       <div className="flex-1" />
       <div className="mt-4 flex items-center justify-between gap-3">
