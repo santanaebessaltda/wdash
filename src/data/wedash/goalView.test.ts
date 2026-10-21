@@ -136,6 +136,34 @@ describe("goalView", () => {
     expect(card.band.outsideTeam).toBe(2000);
   });
 
+  it("nível em 0%: o percentual incide desde a primeira venda e o bônus entra mesmo sem venda", () => {
+    const flat: GoalRecord = {
+      ...goal,
+      tiers: [{ name: "Fixa", minAttainmentPct: 0, commissionPct: 2, bonus: 50 }],
+    };
+    const team: GoalTeamMember[] = [
+      { storeId: "s1", employeeId: 1, name: "ANA", nameKeys: ["ANA"], salesPerson: true, shiftId: null, shiftName: null },
+      { storeId: "s1", employeeId: 2, name: "BIA", nameKeys: ["BIA"], salesPerson: true, shiftId: null, shiftName: null },
+    ];
+    const card = buildGoalCardView({
+      goal: flat,
+      storeNameValue: "LOJA",
+      dayAggs: [day("s1", "2026-09-05", 1000)],
+      sellerDayAggs: [seller("2026-09-05", "ANA", 1000, 1)],
+      team,
+      today: "2026-09-30",
+    });
+    const by = new Map(card.sellers.map((l) => [l.name, l]));
+    const ana = by.get("ANA")!;
+    expect(ana.currentTierName).toBe("Fixa");
+    expect(ana.accruedPrize).toBeCloseTo(20);
+    const bia = by.get("BIA")!;
+    expect(bia.revenueAmount).toBe(0);
+    expect(bia.currentTierName).toBe("Fixa");
+    expect(bia.accruedPrize).toBe(0);
+    expect(bia.bonusReached).toBe(50);
+  });
+
   const teamGroups: GoalTeamMember[] = [
     { storeId: "s1", employeeId: 1, name: "ANA", nameKeys: ["ANA"], salesPerson: true, shiftId: "m", shiftName: "MANHA" },
     { storeId: "s1", employeeId: 2, name: "BIA", nameKeys: ["BIA"], salesPerson: true, shiftId: "m", shiftName: "MANHA" },

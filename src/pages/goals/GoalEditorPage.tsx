@@ -11,7 +11,6 @@ import {
   DatePicker,
   FormField,
   Input,
-  Segmented,
   Select,
   Skeleton,
   Switch,
@@ -60,18 +59,6 @@ type TierRow = {
   mgrCommission: string;
   mgrBonus: string;
 };
-/** Individual = cada pessoa sobre a propria meta; Grupo = o grupo sobre a soma; Geral = a loja sobre o total vendido, premiacao dividida. */
-type PrizeMode = "INDIVIDUAL" | "GROUP" | "GENERAL";
-
-const PRIZE_MODE_HELP: Record<PrizeMode, string> = {
-  INDIVIDUAL:
-    "Cada pessoa sobe de nível pela própria meta e recebe a premiação sobre as próprias vendas. O bônus também é individual.",
-  GROUP:
-    "O grupo sobe de nível pela soma das vendas. A premiação é dividida igualmente entre as pessoas do grupo, e o bônus vale para cada pessoa.",
-  GENERAL:
-    "A filial sobe de nível pelo total vendido, inclusive a venda do caixa e a venda sem vendedor. Faturamento e nº de vendas de cada pessoa são a parte igual desse total. Ticket médio e P.A. são os da filial. A premiação é dividida igualmente e o bônus vale para cada pessoa.",
-};
-
 type TierErrors = { goal?: string; commission?: string; mgrCommission?: string };
 type FormErrors = {
   name?: string;
@@ -95,7 +82,6 @@ function validateGoal(f: {
   target: number | null;
   groupsOn: boolean;
   groups: GroupRow[] | null;
-  tiersOn: boolean;
   tiers: TierRow[];
   managerOn: boolean;
 }): FormErrors {
@@ -119,22 +105,20 @@ function validateGoal(f: {
     }
   }
 
-  if (f.tiersOn) {
-    const tiers: Record<number, TierErrors> = {};
-    let previous: number | null = null;
-    for (const t of f.tiers) {
-      const te: TierErrors = {};
-      const goal = positive(t.goal);
-      if (goal == null) te.goal = REQUIRED;
-      else if (previous != null && goal <= previous)
-        te.goal = `A meta deste nível precisa ser maior que a do nível anterior (${numText(previous)}%).`;
-      if (positive(t.commission) == null) te.commission = REQUIRED;
-      if (f.managerOn && positive(t.mgrCommission) == null) te.mgrCommission = REQUIRED;
-      if (te.goal || te.commission || te.mgrCommission) tiers[t.key] = te;
-      if (goal != null) previous = goal;
-    }
-    if (Object.keys(tiers).length > 0) e.tiers = tiers;
+  const tiers: Record<number, TierErrors> = {};
+  let previous: number | null = null;
+  for (const t of f.tiers) {
+    const te: TierErrors = {};
+    const goal = nonNegative(t.goal);
+    if (goal == null) te.goal = REQUIRED;
+    else if (previous != null && goal <= previous)
+      te.goal = `A meta deste nível precisa ser maior que a do nível anterior (${numText(previous)}%).`;
+    if (positive(t.commission) == null) te.commission = REQUIRED;
+    if (f.managerOn && positive(t.mgrCommission) == null) te.mgrCommission = REQUIRED;
+    if (te.goal || te.commission || te.mgrCommission) tiers[t.key] = te;
+    if (goal != null) previous = goal;
   }
+  if (Object.keys(tiers).length > 0) e.tiers = tiers;
   return e;
 }
 
@@ -142,6 +126,12 @@ function validateGoal(f: {
 function positive(txt: string): number | null {
   const v = parseNum(txt);
   return v != null && !Number.isNaN(v) && v > 0 ? v : null;
+}
+
+/** Percentual da meta do nivel, inclusive 0 (premiacao desde a primeira venda). */
+function nonNegative(txt: string): number | null {
+  const v = parseNum(txt);
+  return v != null && !Number.isNaN(v) && v >= 0 ? v : null;
 }
 
 /** "Atingir", premiacao (% sobre o total vendido) e bonus de cada nivel sobre uma base (meta global ou meta do grupo). */
@@ -157,8 +147,8 @@ function tierResults(
 }[] {
   let accumulated = 0;
   return tiers.map((t) => {
-    const m = positive(t.goal);
-    const atingir = m != null && base ? (base * m) / 100 : null;
+    const m = nonNegative(t.goal);
+    const atingir = m != null && base != null ? (base * m) / 100 : null;
     const c = positive(t.commission);
     const commission = c != null && atingir != null ? (atingir * c) / 100 : null;
     const bonus = positive(t.bonus);
@@ -293,11 +283,9 @@ export default function GoalEditorPage() {
   const [endsOn, setEndsOn] = useState<Date | null>(null);
   const [target, setTarget] = useState("");
   const [groupsOn, setGroupsOn] = useState(false);
-  const [tiersOn, setTiersOn] = useState(false);
   const [groups, setGroups] = useState<GroupRow[] | null>(null);
-  const [tiers, setTiers] = useState<TierRow[]>(DEFAULT_TIERS);
+  const [tiers, setTiers] = useState<TierRow[]>(() => (id || copyId ? [] : DEFAULT_TIERS()));
   const [managerOn, setManagerOn] = useState(false);
-  const [prizeMode, setPrizeMode] = useState<PrizeMode>("INDIVIDUAL");
   const [spreadUnidentified, setSpreadUnidentified] = useState(false);
   /** % gravado de cada grupo (edicao); aplicado quando os grupos da loja carregam. */
   const savedGroups = useRef<GoalGroup[]>([]);
@@ -312,6 +300,8 @@ export default function GoalEditorPage() {
   const [copiedFrom, setCopiedFrom] = useState<{ name: string; target: number; forStore?: boolean } | null>(null);
   const [sourceStoreId, setSourceStoreId] = useState<string | null>(null);
   const sourceId = id ?? copyId;
+  /** Edição e cópia só liberam o card de níveis e o salvar depois que a meta de origem chega. */
+  const [sourceReady, setSourceReady] = useState(!sourceId);
   const targetStores = useMemo(
     () => (copyForStore && sourceStoreId ? storeRows.filter((l) => l.id !== sourceStoreId) : storeRows),
     [copyForStore, sourceStoreId, storeRows],
@@ -328,7 +318,11 @@ export default function GoalEditorPage() {
         ? "Para escolher outra filial, selecione Todas as filiais no topo."
         : undefined;
   useEffect(() => {
-    if (!sourceId) return;
+    if (!sourceId) {
+      setSourceReady(true);
+      return;
+    }
+    setSourceReady(false);
     let cancelled = false;
     void fetchGoal(session.tenantId, sourceId).then((g) => {
       if (cancelled || !g) return;
@@ -361,10 +355,8 @@ export default function GoalEditorPage() {
         setEndsOn(isoToDate(g.endsOn));
         setTarget(numText(g.target, "R$"));
       }
-      setPrizeMode(g.tierMode);
       setSpreadUnidentified(g.spreadUnidentified === true);
       if (g.tiers.length > 0) {
-        setTiersOn(true);
         setTiers(
           g.tiers.map((t, i) => ({
             ...newTier(i, numText(t.minAttainmentPct), numText(t.commissionPct)),
@@ -375,12 +367,16 @@ export default function GoalEditorPage() {
           })),
         );
         setManagerOn(g.tiers.some((t) => t.managerPct != null));
+      } else {
+        setTiers([newTier(0)]);
+        setManagerOn(false);
       }
       savedGroups.current = g.groups;
-      if (g.groups.length > 0 && g.tierMode !== "GENERAL") {
+      if (g.groups.length > 0) {
         setGroupsOn(true);
         setGroups((gs) => gs && applySavedGroups(gs));
       }
+      setSourceReady(true);
     });
     return () => {
       cancelled = true;
@@ -434,7 +430,6 @@ export default function GoalEditorPage() {
     target: targetValue,
     groupsOn,
     groups,
-    tiersOn,
     tiers,
     managerOn,
   };
@@ -443,6 +438,7 @@ export default function GoalEditorPage() {
   const dateError = (e?: string) => e ?? (overlap ? overlapMsg : undefined);
 
   const submit = async () => {
+    if (!sourceReady) return;
     setTried(true);
     if (Object.keys(validateGoal(fields)).length > 0) {
       toast.show("Revise os campos destacados.", "danger");
@@ -455,21 +451,19 @@ export default function GoalEditorPage() {
       startsOn: dateToIso(startsOn!),
       endsOn: dateToIso(endsOn!),
       target: targetValue!,
-      tierMode: prizeMode,
+      tierMode: "INDIVIDUAL",
       spreadUnidentified,
-      tiers: tiersOn
-        ? tiers.map((t, i) => ({
-            name: t.name.trim() || `Nível ${i + 1}`,
-            minAttainmentPct: positive(t.goal)!,
-            commissionPct: positive(t.commission)!,
-            bonus: positive(t.bonus) ?? 0,
-            ...(managerOn
-              ? { managerPct: positive(t.mgrCommission)!, managerBonus: positive(t.mgrBonus) ?? 0 }
-              : {}),
-          }))
-        : [],
+      tiers: tiers.map((t, i) => ({
+        name: t.name.trim() || `Nível ${i + 1}`,
+        minAttainmentPct: nonNegative(t.goal)!,
+        commissionPct: positive(t.commission)!,
+        bonus: positive(t.bonus) ?? 0,
+        ...(managerOn
+          ? { managerPct: positive(t.mgrCommission)!, managerBonus: positive(t.mgrBonus) ?? 0 }
+          : {}),
+      })),
       groups:
-        prizeMode !== "GENERAL" && groupsOn && groups
+        groupsOn && groups
           ? groups.map((g) => ({
               shiftId: g.key,
               name: g.name,
@@ -604,40 +598,21 @@ export default function GoalEditorPage() {
               <GlobalSplit
                 target={targetValue}
                 teamSize={teamSize}
-                byPerson={prizeMode === "INDIVIDUAL" && !(groupsOn && groups && groups.length > 0)}
+                byPerson={!(groupsOn && groups && groups.length > 0)}
               />
             </FormField>
-            <FormField label="Modo de premiação" required>
-              <Segmented<PrizeMode>
-                options={[
-                  { value: "INDIVIDUAL", label: "Individual" },
-                  { value: "GROUP", label: "Grupo" },
-                  { value: "GENERAL", label: "Geral" },
-                ]}
-                value={prizeMode}
-                onChange={(v) => {
-                  if (!v) return;
-                  setPrizeMode(v);
-                  if (v === "GENERAL") setGroupsOn(false);
-                }}
-              />
-              <p className="mt-1.5 text-[11.5px] text-t2">{PRIZE_MODE_HELP[prizeMode]}</p>
-            </FormField>
-            {prizeMode !== "GENERAL" && (
-              <div className="flex items-start justify-between gap-3 rounded-[var(--radius-vela-md)] bg-bg-inset px-3 py-2.5">
-                <div className="min-w-0">
-                  <p className="text-[12.5px] font-bold text-t0">Vendas sem vendedor identificado</p>
-                  <p className="mt-0.5 text-[11.5px] text-t2">
-                    Ratear igualmente entre os vendedores que estavam naquele dia. O usuário da filial e a gerência ficam de fora.
-                  </p>
-                </div>
-                <Switch checked={spreadUnidentified} onChange={setSpreadUnidentified} />
+            <div className="flex items-start justify-between gap-3 rounded-[var(--radius-vela-md)] bg-bg-inset px-3 py-2.5">
+              <div className="min-w-0">
+                <p className="text-[12.5px] font-bold text-t0">Vendas sem vendedor identificado</p>
+                <p className="mt-0.5 text-[11.5px] text-t2">
+                  Ratear igualmente entre os vendedores que estavam naquele dia. O usuário da filial e a gerência ficam de fora.
+                </p>
               </div>
-            )}
+              <Switch checked={spreadUnidentified} onChange={setSpreadUnidentified} />
+            </div>
           </div>
         </Card>
 
-        {prizeMode !== "GENERAL" && (
         <SideCard
           title="Distribuição por grupos"
           active={groupsOn}
@@ -651,39 +626,45 @@ export default function GoalEditorPage() {
             setGroups={setGroups}
             team={team}
             target={targetValue}
-            mode={prizeMode}
             onCreate={() => navigate(paths.management.team)}
             error={errors.groups}
           />
         </SideCard>
-        )}
         <SideCard
           title="Níveis de premiação"
-          active={tiersOn}
-          onToggle={setTiersOn}
+          active
           emptyIcon="📈"
           emptyText="Crie níveis de atingimento com premiações crescentes, como 100%, 120% e 150% da meta."
           action={
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={<Icon d={icons.plus} size={14} />}
-              onClick={() => setTiers((ts) => [...ts, newTier(ts.length)])}
-            >
-              Nível
-            </Button>
+            sourceReady ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<Icon d={icons.plus} size={14} />}
+                onClick={() => setTiers((ts) => [...ts, newTier(ts.length)])}
+              >
+                Nível
+              </Button>
+            ) : undefined
           }
         >
-          <TiersEditor
-            tiers={tiers}
-            setTiers={setTiers}
-            target={targetValue}
-            errors={errors.tiers}
-            mode={prizeMode}
-            hasGroups={prizeMode !== "GENERAL" && Boolean(groupsOn && groups && groups.length > 0)}
-            managerOn={managerOn}
-            setManagerOn={setManagerOn}
-          />
+          {sourceReady ? (
+            <TiersEditor
+              tiers={tiers}
+              setTiers={setTiers}
+              target={targetValue}
+              errors={errors.tiers}
+              hasGroups={Boolean(groupsOn && groups && groups.length > 0)}
+              managerOn={managerOn}
+              setManagerOn={setManagerOn}
+            />
+          ) : (
+            <div className="flex flex-col gap-3">
+              {[0, 1].map((i) => (
+                <Skeleton key={i} className="h-24 w-full" />
+              ))}
+            </div>
+          )}
         </SideCard>
         <SideCard
           title="Simulação"
@@ -696,10 +677,8 @@ export default function GoalEditorPage() {
             groups={groups}
             team={team}
             tiers={tiers}
-            tiersOn={tiersOn}
             target={targetValue}
-            mode={prizeMode}
-            teamToda={prizeMode === "GENERAL" || !groupsOn}
+            teamToda={!groupsOn}
             managerOn={managerOn}
           />
         </SideCard>
@@ -709,7 +688,7 @@ export default function GoalEditorPage() {
         <Button variant="outline" onClick={back}>
           Cancelar
         </Button>
-        <Button onClick={() => void submit()} disabled={saving}>
+        <Button onClick={() => void submit()} disabled={saving || !sourceReady}>
           {saving ? "Salvando…" : id ? "Salvar alterações" : "Criar meta"}
         </Button>
       </div>
@@ -717,10 +696,7 @@ export default function GoalEditorPage() {
   );
 }
 
-/**
- * Meta global  team from sales active ofValue store. So no modo Individual without groups from distribuicao  - 
- * withValue groups a meta from each one vem do % do group; no modo Group a meta nao e dividida by person.
- */
+/** Abaixo da meta da filial: quanto cabe a cada pessoa quando não há distribuição por grupos. */
 function GlobalSplit({
   target,
   teamSize,
@@ -818,7 +794,6 @@ function GroupsEditor({
   setGroups,
   team,
   target,
-  mode,
   onCreate,
   error,
 }: {
@@ -827,7 +802,6 @@ function GroupsEditor({
   setGroups: (fn: (g: GroupRow[] | null) => GroupRow[] | null) => void;
   team: GoalTeamMember[] | null;
   target: number | null;
-  mode: PrizeMode;
   onCreate: () => void;
   error?: string;
 }) {
@@ -921,7 +895,7 @@ function GroupsEditor({
         )
       )}
 
-      <GroupsSimulation groups={groups} team={team} target={target} mode={mode} />
+      <GroupsSimulation groups={groups} team={team} target={target} />
     </div>
   );
 }
@@ -931,12 +905,10 @@ function GroupsSimulation({
   groups,
   team,
   target,
-  mode,
 }: {
   groups: GroupRow[];
   team: GoalTeamMember[] | null;
   target: number | null;
-  mode: PrizeMode;
 }) {
   const ids = new Set(groups.map((g) => g.key));
   const people = [...(team ?? [])].sort((a, b) =>
@@ -973,9 +945,7 @@ function GroupsSimulation({
             const pct = groupPct(g);
             const members = people.filter((p) => p.shiftId === g.key);
             const each =
-              mode === "INDIVIDUAL" && goal != null && members.length > 0
-                ? brlCent(goal / members.length)
-                : null;
+              goal != null && members.length > 0 ? brlCent(goal / members.length) : null;
             return (
               <div key={g.key} className="py-2.5 first:pt-0 last:pb-0">
                 <div className="mb-1 flex items-baseline justify-between gap-2">
@@ -1093,7 +1063,6 @@ function TiersEditor({
   setTiers,
   target,
   errors,
-  mode,
   hasGroups,
   managerOn,
   setManagerOn,
@@ -1102,7 +1071,6 @@ function TiersEditor({
   setTiers: (fn: (t: TierRow[]) => TierRow[]) => void;
   target: number | null;
   errors?: Record<number, TierErrors>;
-  mode: PrizeMode;
   hasGroups: boolean;
   managerOn: boolean;
   setManagerOn: (v: boolean) => void;
@@ -1116,7 +1084,8 @@ function TiersEditor({
         <p>
           <span className="font-semibold text-t1">Meta:</span> percentual
           necessário para alcançar o nível. Ex.: 120% = vender 20% acima da
-          meta.
+          meta. 0% vale desde a primeira venda: um nível só, com o percentual,
+          é a premiação fixa.
         </p>
         <p>
           <span className="font-semibold text-t1">Premiação:</span> percentual
@@ -1252,39 +1221,15 @@ function TiersEditor({
 
       {target != null && (
         <Alert variant="warning">
-          {mode === "GENERAL" ? (
-            <>
-              Os percentuais são aplicados à{" "}
-              <span className="font-semibold">meta da loja</span>. A equipe
-              sobe de nível pelo total vendido da loja. Faturamento e nº de
-              vendas de cada pessoa são a parte igual desse total. A premiação
-              é dividida igualmente e o bônus vale para cada uma.
-            </>
-          ) : mode === "INDIVIDUAL" ? (
-            <>
-              Os percentuais dos níveis são aplicados à{" "}
-              <span className="font-semibold">meta individual</span> de cada
-              pessoa. A premiação é calculada sobre as próprias vendas, sem
-              teto.{" "}
-              {hasGroups
-                ? "Meta individual = meta do grupo ÷ pessoas do grupo."
-                : "Meta individual = meta da filial ÷ pessoas da equipe."}
-            </>
-          ) : hasGroups ? (
-            <>
-              Os percentuais são aplicados à{" "}
-              <span className="font-semibold">meta de cada grupo</span>. O
-              grupo sobe de nível pela soma das vendas, a premiação é dividida
-              igualmente entre as pessoas e o bônus vale para cada uma.
-            </>
-          ) : (
-            <>
-              Os percentuais são aplicados à{" "}
-              <span className="font-semibold">meta da loja</span>. A equipe
-              sobe de nível pela soma das vendas, a premiação é dividida
-              igualmente entre as pessoas e o bônus vale para cada uma.
-            </>
-          )}
+          <>
+            Os percentuais dos níveis são aplicados à{" "}
+            <span className="font-semibold">meta individual</span> de cada
+            pessoa. A premiação é calculada sobre as próprias vendas, sem
+            teto.{" "}
+            {hasGroups
+              ? "Meta individual = meta do grupo ÷ pessoas do grupo."
+              : "Meta individual = meta da filial ÷ pessoas da equipe."}
+          </>
           {managerOn && (
             <>
               {" "}A <span className="font-semibold">gerência</span> sobe pelos
@@ -1304,9 +1249,7 @@ function Simulation({
   groups: groupsAll,
   team,
   tiers,
-  tiersOn,
   target,
-  mode,
   teamToda,
   managerOn,
 }: {
@@ -1315,15 +1258,11 @@ function Simulation({
   groups: GroupRow[] | null;
   team: GoalTeamMember[] | null;
   tiers: TierRow[];
-  /** Niveis desligados: a simulacao mostra so a meta, sem premiação. */
-  tiersOn: boolean;
   target: number | null;
-  mode: PrizeMode;
-  /** Sem distribuicao por grupos: a equipe toda e um bloco so. Individual divide a meta da loja; Grupo e Geral usam a meta da loja. */
+  /** Sem distribuicao por grupos: a equipe toda e um bloco so, e a meta da filial se divide pelas pessoas. */
   teamToda: boolean;
   managerOn: boolean;
 }) {
-  const individual = mode === "INDIVIDUAL";
   const groups = teamToda
     ? target != null
       ? [
@@ -1333,12 +1272,7 @@ function Simulation({
             pct: null,
             groupGoal: target,
             people: team?.length ?? 0,
-            base:
-              individual && (team?.length ?? 0) > 0
-                ? target / team!.length
-                : individual
-                  ? null
-                  : target,
+            base: (team?.length ?? 0) > 0 ? target / team!.length : null,
           },
         ]
       : []
@@ -1346,14 +1280,7 @@ function Simulation({
     .map((g) => {
       const groupGoal = groupTarget(g, target);
       const people = team?.filter((m) => m.shiftId === g.key).length ?? 0;
-      const base =
-        groupGoal == null
-          ? null
-          : individual
-            ? people > 0
-              ? groupGoal / people
-              : null
-            : groupGoal;
+      const base = groupGoal == null ? null : people > 0 ? groupGoal / people : null;
       return {
         key: g.key,
         name: g.name,
@@ -1364,7 +1291,7 @@ function Simulation({
       };
     })
     .filter((g) => g.groupGoal != null);
-  const hasLevel = tiersOn && tiers.some((t) => positive(t.goal) != null);
+  const hasLevel = tiers.some((t) => nonNegative(t.goal) != null);
 
   if (!storeId) {
     return (
@@ -1419,18 +1346,10 @@ function Simulation({
     <div className="flex flex-col gap-3">
       <p className="text-[11.5px] text-t2">
         {hasLevel
-          ? individual
-            ? "Premiação de cada pessoa calculada sobre a própria meta individual."
-            : teamToda
-              ? "Premiação da equipe calculada sobre a meta da filial e dividida igualmente entre as pessoas."
-              : "Premiação do grupo calculada sobre a meta do grupo e dividida igualmente entre as pessoas."
-          : individual
-            ? teamToda
-              ? "Meta individual de cada pessoa, com a meta da filial dividida pela equipe."
-              : "Meta individual de cada pessoa, com a meta do grupo dividida pelas pessoas do grupo."
-            : teamToda
-              ? "Meta da filial para a equipe toda."
-              : "Meta de cada grupo conforme a distribuição."}
+          ? "Premiação de cada pessoa calculada sobre a própria meta individual."
+          : teamToda
+            ? "Meta individual de cada pessoa, com a meta da filial dividida pela equipe."
+            : "Meta individual de cada pessoa, com a meta do grupo dividida pelas pessoas do grupo."}
       </p>
       {groups.map((g) => {
         const resultados = g.base != null ? tierResults(tiers, g.base) : [];
@@ -1444,7 +1363,7 @@ function Simulation({
               {g.pct != null && ` · ${numText(Math.round(g.pct * 10) / 10)}%`}
             </p>
             <p className="mb-2.5 mt-0.5 text-[11.5px] text-t2">
-              {mode === "GENERAL" ? "Meta da filial" : individual ? "Meta individual" : "Meta do grupo"}:{" "}
+              Meta individual:{" "}
               <span className="font-mono text-t1">
                 {g.base != null ? brlCent(g.base) : "—"}
               </span>
@@ -1462,7 +1381,7 @@ function Simulation({
                 {tiers.map((t, i) => {
                   const r = resultados[i]!;
                   if (r.atingir == null) return null;
-                  const pct = positive(t.goal);
+                  const pct = nonNegative(t.goal);
                   const taxa = positive(t.commission);
                   return (
                     <div
@@ -1494,10 +1413,10 @@ function Simulation({
                               </span>
                             </>
                           ),
-                          taxa != null && r.commission != null && (individual || g.people > 0) && (
+                          taxa != null && r.commission != null && r.commission > 0 && (
                             <>
                               <span className="font-mono font-semibold text-ok">
-                                {brlCent(individual ? r.commission : r.commission / g.people)}
+                                {brlCent(r.commission)}
                               </span>{" "}
                               por pessoa
                             </>
@@ -1515,7 +1434,7 @@ function Simulation({
                   <div key={`${p.storeId}:${p.employeeId}`} className="flex items-center gap-2.5 py-1">
                     <PersonAvatar name={p.name} employeeId={p.employeeId} storeId={p.storeId} size="sm" />
                     <p className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-t0">{p.name}</p>
-                    {individual && g.base != null && (
+                    {g.base != null && (
                       <span className="shrink-0 font-mono text-[12px] text-t1">{brlCent(g.base)}</span>
                     )}
                   </div>
@@ -1525,7 +1444,7 @@ function Simulation({
           </div>
         );
       })}
-      {tiersOn && !hasLevel && (
+      {!hasLevel && (
         <p className="text-[11.5px] text-t2">
           Informe a meta de pelo menos um nível para simular a premiação.
         </p>
@@ -1550,7 +1469,7 @@ function ManagerSimulation({ tiers, target }: { tiers: TierRow[]; target: number
           const r = resultados[i]!;
           const mgr = managerResult(tiers, i, r.atingir);
           if (r.atingir == null) return null;
-          const pct = positive(t.goal);
+          const pct = nonNegative(t.goal);
           const taxa = positive(t.mgrCommission);
           return (
             <div key={t.key} className="rounded-lg bg-bg-2 px-2.5 py-1.5 text-[12px]">
@@ -1569,7 +1488,7 @@ function ManagerSimulation({ tiers, target }: { tiers: TierRow[]; target: number
                       premiação de <span className="font-semibold text-ok">{numText(taxa)}%</span> da venda da loja
                     </>
                   ),
-                  taxa != null && mgr.commission != null && (
+                  taxa != null && mgr.commission != null && mgr.commission > 0 && (
                     <span className="font-mono font-semibold text-ok">{brlCent(mgr.commission)}</span>
                   ),
                   ...bonusItems(mgr.bonus, mgr.bonusTotal, false, true),
