@@ -416,9 +416,9 @@ function Chevron({ open }: { open: boolean }) {
 function StoreLine({ detail, product, locations, showsTotal }: { detail: StockStoreDetail; product: StockProductRow; locations: string[]; showsTotal: boolean }) {
   const oneStore: StockProductRow = { ...product, storeRows: [detail], stock: detail.stock, aReceive: detail.aReceive, totalGeral: storeTotal(detail) };
   return (
-    <tr className="border-b border-line bg-bg-inset">
+    <tr className="group border-b border-line bg-bg-inset transition-colors hover:bg-acc-soft">
       <td />
-      <td className="border-l-2 border-l-line-2 px-1 py-2.5 pl-16">
+      <td className="border-l-2 border-l-line-2 px-1 py-2.5 pl-16 transition-colors group-hover:border-l-acc">
         <p className="break-words text-[12.5px] font-semibold leading-5 text-t1">{branchName(detail)}</p>
       </td>
       {locations.map((name) => (
