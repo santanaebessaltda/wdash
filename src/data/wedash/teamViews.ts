@@ -949,6 +949,7 @@ function buildGoalCards(
         qtyGroups: groupCount,
         qtySellers: list.length,
         qtyLevels: m.tiers.length,
+        spreadsUnidentified: false,
         tiers: m.tiers,
         band,
         sellers: list,

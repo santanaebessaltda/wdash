@@ -157,6 +157,8 @@ export interface GoalCardView {
   qtyGroups: number;
   qtySellers: number;
   qtyLevels: number;
+  /** Individual ou Grupo com o rateio de vendas sem vendedor identificado. O modo Geral ignora a chave. */
+  spreadsUnidentified: boolean;
   tiers: Tier[];
   band: NetworkGlobalGoal;
   sellers: SellerRow[];

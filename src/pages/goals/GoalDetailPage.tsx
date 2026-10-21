@@ -5,6 +5,7 @@ import { Tooltip } from "@/components/ui/Tooltip";
 import { DuplicateChoiceModal } from "@/components/wedash/DuplicateChoiceModal";
 import { ExportDialog } from "@/components/wedash/ExportDialog";
 import { GoalDetailSkeleton } from "@/components/wedash/LoadingSkeletons";
+import { BranchBadge, PeriodBadge, RecordStatusBadge, UnidentifiedSalesBadge } from "@/components/wedash/RecordBadges";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { goalWeightFrom } from "@/data/wedash/engine/goalProjection";
 import { effectiveWeekHours } from "@/data/wedash/storeHours";
@@ -12,6 +13,7 @@ import {
   buildGoalCardView,
   GOAL_STATUS_LABEL,
   goalManagerPrize,
+  goalSpreadsUnidentified,
   goalStatus,
   prazoRemaining,
   type GoalManagerPrize,
@@ -23,7 +25,6 @@ import type { SalesDayAgg, SalesSellerDayAgg } from "@/data/wedash/salesTypes";
 import { storesForSession } from "@/data/wedash/stores";
 import type { GoalCardView } from "@/data/wedash/teamViews";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
-import { BranchBadge, PeriodBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { WedashBrand } from "@/components/wedash/WedashBrand";
 import { brlCent, fullDate, shortDate, isoToDate, num, dateToIso, shiftName } from "@/lib/format";
 import { statusBadgeVariant } from "@/lib/status";
@@ -48,15 +49,6 @@ const TipHelp = ({ label }: { label: string }) => (
     </span>
   </Tooltip>
 );
-
-const AJUDA_MODO: Record<GoalRecord["tierMode"], string> = {
-  INDIVIDUAL:
-    "Cada pessoa sobe de nível pela própria meta e recebe a premiação do nível sobre as próprias vendas. Os bônus dos níveis alcançados são acumulados.",
-  GROUP:
-    "O grupo sobe de nível pela soma das vendas. A premiação é dividida igualmente entre as pessoas do grupo, e o bônus de cada nível vale para cada pessoa. Os bônus dos níveis alcançados são acumulados.",
-  GENERAL:
-    "A filial sobe de nível pelo total vendido, inclusive a venda do caixa e a venda sem vendedor. Faturamento e nº de vendas de cada pessoa são a parte igual desse total. Ticket médio e P.A. são os da filial. A premiação é dividida igualmente e o bônus vale para cada pessoa.",
-};
 
 const MODO_LABEL: Record<GoalRecord["tierMode"], string> = {
   INDIVIDUAL: "Premiação individual",
@@ -299,7 +291,7 @@ function GoalHero({
             <PeriodBadge from={goal.startsOn} to={goal.endsOn} />
             {storeNameValue ? <BranchBadge name={storeNameValue} /> : null}
             <Badge variant="neutral" className="uppercase">{MODO_LABEL[goal.tierMode]}</Badge>
-            <TipHelp label={AJUDA_MODO[goal.tierMode]} />
+            {goalSpreadsUnidentified(goal) ? <UnidentifiedSalesBadge /> : null}
           </div>
         </div>
       </div>

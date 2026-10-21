@@ -2,12 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Badge, Button, Card, CardHero, CardTitle, EmptyState, ProgressBar, StatCard, ThSort, progressTextClass, type SortDir } from "@/components/ui";
 import { BoardSkeleton } from "@/components/wedash/LoadingSkeletons";
-import { BranchBadge, DeadlineBadge, PeriodBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
+import { BranchBadge, DeadlineBadge, PeriodBadge, RecordStatusBadge, UnidentifiedSalesBadge } from "@/components/wedash/RecordBadges";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { RankingBlock } from "@/pages/live/blocks";
 import type { RankingRow } from "@/data/wedash/live";
 import { boardMoments, type BoardMoment, type BoardSnapshot } from "@/data/wedash/boardEvents";
-import { buildGoalCardView, buildGoalSummary, GOAL_STATUS_LABEL, goalStatus, prazoRemaining } from "@/data/wedash/goalView";
+import { buildGoalCardView, buildGoalSummary, GOAL_STATUS_LABEL, goalSpreadsUnidentified, goalStatus, prazoRemaining } from "@/data/wedash/goalView";
 import type { GoalRecord, GoalTeamMember } from "@/data/wedash/goalsRepo";
 import { buildChallengeView } from "@/data/wedash/challengeView";
 import type { ChallengeAggInput, ChallengeRecord } from "@/data/wedash/challengesRepo";
@@ -211,6 +211,7 @@ function BoardGoalCard({ board, showStore }: { board: GoalBoard; showStore: bool
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <PeriodBadge from={goal.startsOn} to={goal.endsOn} />
             {showStore ? <BranchBadge name={storeName} /> : null}
+            {goalSpreadsUnidentified(goal) ? <UnidentifiedSalesBadge /> : null}
           </div>
           <p className="mt-1.5 font-mono text-[20px] font-extrabold leading-none tabular-nums text-t0">{brlCent(summary.achieved)}</p>
           <p className="mt-2 text-[12px] text-t2">

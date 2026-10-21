@@ -1,7 +1,7 @@
 /** Pacote da tela Inicio do vendedor. No modo Geral, os números da pessoa são a parte igual da filial e o ranking fica vazio. Nos outros modos, o ranking é a venda de cada pessoa. */
 import { addMonths, addDays, brlCent, collaboratorName, eachDay, startOfMonth } from "./format.ts";
 import type { GoalCardView, GoalRecord, GoalTeamMember, SalesDayAgg, SalesSellerDayAgg, SellerRow } from "./goalTypes.ts";
-import { buildGoalCardView, goalStatus, sellerGoalLevels, type SellerGoalLevel } from "./goalView.ts";
+import { buildGoalCardView, goalSpreadsUnidentified, goalStatus, sellerGoalLevels, type SellerGoalLevel } from "./goalView.ts";
 import { weekdayWeights, type StoreWeekHours } from "./goalWeights.ts";
 import { buildSellerRanking, groupSize, type SellerRankingEntry } from "./sellerRanking.ts";
 import {
@@ -51,6 +51,8 @@ export interface SellerHomeGoal {
   startsOn: string;
   endsOn: string;
   mode: "individual" | "grupo" | "geral";
+  /** Individual ou Grupo com o rateio de vendas sem vendedor identificado. */
+  spreadsUnidentified: boolean;
   /** null = fora dos grupos da meta. */
   me: SellerGoalLevel | null;
   nextLevelGain: number | null;
@@ -101,6 +103,7 @@ export interface SellerChallenge {
   startsOn: string;
   endsOn: string;
   status: "active" | "upcoming" | "ended";
+  mode: "CONTEST" | "MINIMUM";
   prize: string | null;
   /** Regras em linguagem da vendedora (como ganha, o que conta, piso, premios). */
   rules: string[];
@@ -314,6 +317,7 @@ function storeChallenges(input: SellerHomeInput, s: SellerHomeInput["stores"][nu
         startsOn: c.startsOn,
         endsOn: c.endsOn,
         status: goalStatus(c, input.today),
+        mode: c.mode,
         prize: prizeLabel(c.prize, c.mode),
         rules: sellerChallengeRules(c),
         ...standing,
@@ -371,6 +375,7 @@ function buildHomeGoal(input: SellerHomeInput, s: SellerHomeInput["stores"][numb
     startsOn: goal.startsOn,
     endsOn: goal.endsOn,
     mode: goal.tierMode === "INDIVIDUAL" ? "individual" : goal.tierMode === "GENERAL" ? "geral" : "grupo",
+    spreadsUnidentified: goalSpreadsUnidentified(goal),
     me,
     nextLevelGain: me ? nextLevelGain(me, size) : null,
     projectedPrize: projected,

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ProgressBar } from "@/components/ui";
+import { Badge, ProgressBar } from "@/components/ui";
 import { BranchBadge, DeadlineBadge, PeriodBadge, PrizeBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { prazoRemaining } from "@/data/wedash/engine/goalView";
 import type { SellerChallenge } from "@/data/wedash/engine/sellerHome";
@@ -23,7 +23,6 @@ function shownStatus(c: SellerChallenge, closed: boolean, through: string): Sell
 function sellerHeadline(c: SellerChallenge, status: SellerChallenge["status"]): ChallengeHeadline {
   if (status === "upcoming") return { label: "Critério", value: c.metricLabel };
   if (c.unavailable) return { label: null, value: "Resultado indisponível" };
-  if (c.won && c.position == null) return { label: null, value: "Você atingiu o mínimo" };
   if (c.position != null) {
     const result = c.result ? ` · ${c.result}` : "";
     return { label: null, value: `${c.position}º lugar${result}` };
@@ -69,6 +68,11 @@ function SellerChallengeCard({
           <PeriodBadge from={c.startsOn} to={c.endsOn} />
           <BranchBadge name={storeName} />
           {c.prize ? <PrizeBadge label={c.prize} /> : null}
+          {c.mode === "MINIMUM" && status !== "upcoming" && !c.unavailable ? (
+            <Badge variant={c.won ? "success" : "danger"} className="uppercase">
+              {c.won ? "Você atingiu o mínimo" : "Você não atingiu o mínimo"}
+            </Badge>
+          ) : null}
         </div>
         {prazo ? (
           <div className="mt-2 flex w-full flex-wrap items-center justify-between gap-1.5 sm:justify-end">

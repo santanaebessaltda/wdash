@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Badge, Card, CardTitle } from "@/components/ui";
-import { BranchBadge, PeriodBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
+import { BranchBadge, PeriodBadge, RecordStatusBadge, UnidentifiedSalesBadge } from "@/components/wedash/RecordBadges";
 import { Tooltip } from "@/components/ui/Tooltip";
 import type { SellerHomeGoal, SellerHomeStore } from "@/data/wedash/engine/sellerHome";
 import { GOAL_STATUS_LABEL, goalStatus } from "@/data/wedash/goalView";
@@ -14,18 +14,9 @@ import { Icon, icons } from "@/pages/users/Icons";
 type Me = NonNullable<SellerHomeGoal["me"]>;
 
 const MODE = {
-  individual: {
-    badge: "Individual",
-    help: "Cada pessoa sobe de nível pela própria meta e recebe a premiação do nível sobre as próprias vendas. Os bônus dos níveis alcançados são acumulados.",
-  },
-  grupo: {
-    badge: "Grupo",
-    help: "O grupo sobe de nível pela soma das vendas. A premiação é dividida igualmente entre as pessoas do grupo, e o bônus de cada nível vale para cada pessoa. Os bônus dos níveis alcançados são acumulados.",
-  },
-  geral: {
-    badge: "Geral",
-    help: "A filial sobe de nível pelo total vendido, inclusive a venda do caixa e a venda sem vendedor. A premiação é dividida igualmente e o bônus vale para cada pessoa.",
-  },
+  individual: "Individual",
+  grupo: "Grupo",
+  geral: "Geral",
 } as const;
 
 function TipHelp({ label }: { label: string }) {
@@ -120,7 +111,6 @@ export function PrizeCard({
 }
 
 function PrizeBody({ goal, me, storeName, today, through, closed }: { goal: SellerHomeGoal; me: Me; storeName: string; today: string; through: string; closed: boolean }) {
-  const mode = MODE[me.modo];
   const level = me.levelNumber != null && me.level ? `N${me.levelNumber} · ${me.level}` : null;
   const current = me.levelNumber != null ? me.marcos[me.levelNumber - 1] : undefined;
   const total = me.prizeAmount + me.bonus;
@@ -176,9 +166,9 @@ function PrizeBody({ goal, me, storeName, today, through, closed }: { goal: Sell
                 </>
               )}
             </IconBadge>
-            {mode.badge}
+            {MODE[me.modo]}
           </Badge>
-          <TipHelp label={mode.help} />
+          {goal.spreadsUnidentified ? <UnidentifiedSalesBadge /> : null}
           {me.group ? (
             <Badge variant="neutral" className="uppercase">
               {me.group}

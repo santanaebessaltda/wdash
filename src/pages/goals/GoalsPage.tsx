@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge, Button, Card, DateRangePicker, Modal, ProgressBar, progressTextClass, useToast } from "@/components/ui";
 import { PersonAvatarGroup } from "@/components/wedash/PersonAvatar";
-import { BranchBadge, PeriodBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
+import { BranchBadge, PeriodBadge, RecordStatusBadge, UnidentifiedSalesBadge } from "@/components/wedash/RecordBadges";
 import { Tooltip } from "@/components/ui/Tooltip";
 import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePicker";
 import { DuplicateChoiceModal } from "@/components/wedash/DuplicateChoiceModal";
@@ -10,7 +10,7 @@ import { GoalCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { goalWeightFrom } from "@/data/wedash/engine/goalProjection";
 import { effectiveWeekHours } from "@/data/wedash/storeHours";
-import { buildGoalSummary, GOAL_STATUS_LABEL, prazoRemaining, type GoalStatus, type GoalSummary } from "@/data/wedash/goalView";
+import { buildGoalSummary, GOAL_STATUS_LABEL, goalSpreadsUnidentified, prazoRemaining, type GoalStatus, type GoalSummary } from "@/data/wedash/goalView";
 import { deleteGoal, fetchGoalTeam, fetchGoals, type GoalRecord, type GoalTeamMember } from "@/data/wedash/goalsRepo";
 import { fetchSalesDayAggs } from "@/data/wedash/salesRepo";
 import type { SalesDayAgg } from "@/data/wedash/salesTypes";
@@ -357,6 +357,7 @@ function GoalCard({
       <div className="mt-4 flex items-center justify-between gap-3">
         <div className="flex min-w-0 flex-wrap gap-1.5">
           <Badge variant="neutral" className="uppercase">{g.tierMode === "INDIVIDUAL" ? "Individual" : g.tierMode === "GENERAL" ? "Geral" : "Grupo"}</Badge>
+          {goalSpreadsUnidentified(g) ? <UnidentifiedSalesBadge /> : null}
           <Badge variant="neutral" className="uppercase">
             {g.tiers.length} {g.tiers.length === 1 ? "nível" : "níveis"}
           </Badge>

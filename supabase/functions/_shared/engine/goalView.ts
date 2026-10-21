@@ -20,6 +20,18 @@ export function goalStatus(g: Pick<GoalRecord, "startsOn" | "endsOn">, today: st
   return "active";
 }
 
+/** Dia coberto por uma meta Geral que já começou. A meta a começar não entra. */
+export function dayInGeneralGoal(goals: Pick<GoalRecord, "storeId" | "tierMode" | "startsOn" | "endsOn">[], storeId: string, day: string, today: string): boolean {
+  return goals.some(
+    (goal) =>
+      goal.storeId === storeId &&
+      goal.tierMode === "GENERAL" &&
+      goalStatus(goal, today) !== "upcoming" &&
+      goal.startsOn <= day &&
+      day <= goal.endsOn,
+  );
+}
+
 export const GOAL_STATUS_LABEL: Record<GoalStatus, string> = {
   active: "Em andamento",
   upcoming: "A começar",
@@ -364,6 +376,11 @@ export function outsideRankingNote(goal: NetworkGlobalGoal): string | null {
   return chunks.length > 0 ? chunks.join(" ") : null;
 }
 
+/** Individual ou Grupo com a chave de rateio. O modo Geral já divide o total da filial e ignora a chave. */
+export function goalSpreadsUnidentified(goal: Pick<GoalRecord, "spreadUnidentified" | "tierMode">): boolean {
+  return goal.spreadUnidentified === true && goal.tierMode !== "GENERAL";
+}
+
 export function buildGoalCardView(input: {
   goal: GoalRecord;
   storeNameValue: string;
@@ -686,6 +703,7 @@ export function buildGoalCardView(input: {
     qtyGroups: groups.length,
     qtySellers: n,
     qtyLevels: g.tiers.length,
+    spreadsUnidentified: goalSpreadsUnidentified(g),
     tiers: g.tiers,
     band,
     sellers,

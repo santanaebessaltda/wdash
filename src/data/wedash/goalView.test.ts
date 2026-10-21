@@ -411,6 +411,7 @@ describe("goalView", () => {
     expect(card.band.outsideBranchUser).toBeCloseTo(20);
     expect(card.band.outsideManagement).toBeCloseTo(10);
     expect(card.band.outsideUnidentified).toBeCloseTo(0);
+    expect(card.spreadsUnidentified).toBe(true);
     expect(card.band.unidentifiedSpread).toBeCloseTo(30);
     expect(card.band.outsideTeam).toBeCloseTo(30);
 
@@ -418,6 +419,7 @@ describe("goalView", () => {
     const keptBy = new Map(kept.sellers.map((l) => [l.name, l]));
     expect(keptBy.get("ANA")!.revenueAmount).toBeCloseTo(40);
     expect(keptBy.get("BIA")!.revenueAmount).toBeCloseTo(0);
+    expect(kept.spreadsUnidentified).toBe(false);
     expect(kept.band.outsideUnidentified).toBeCloseTo(30);
     expect(kept.band.outsideTeam).toBeCloseTo(60);
   });

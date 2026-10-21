@@ -12,7 +12,7 @@ import type { BlockState as BlockStateKind } from "@/data/wedash/dashboard";
 import { BlockState } from "@/pages/dashboard/BlockState";
 import type { GoalCardView, NetworkGlobalGoal, SellerRow } from "@/data/wedash/teamViews";
 import { GOAL_STATUS_LABEL, goalStatus, outsideRankingNote } from "@/data/wedash/goalView";
-import { BranchBadge, DeadlineBadge, PeriodBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
+import { BranchBadge, DeadlineBadge, PeriodBadge, RecordStatusBadge, UnidentifiedSalesBadge } from "@/components/wedash/RecordBadges";
 import { defaultTiers } from "@/data/wedash/goals";
 import { calendarTodayIso, TODAY_ISO } from "@/data/wedash/clock";
 import { cn } from "@/lib/cn";
@@ -644,6 +644,7 @@ export function GoalCard({
           {card.kind === "individual" ? <IndividualTypeIcon /> : <GroupTypeIcon />}
           {kindLabel}
         </Badge>
+        {card.spreadsUnidentified ? <UnidentifiedSalesBadge /> : null}
         {card.brands.map((m) => (
           <Badge key={m} variant="neutral" className="gap-1">
             <BrandIcon />

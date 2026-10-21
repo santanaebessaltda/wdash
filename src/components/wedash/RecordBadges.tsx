@@ -61,6 +61,15 @@ export function DeadlineBadge({ label }: { label: string }) {
   );
 }
 
+/** Meta com o rateio de vendas sem vendedor identificado ligado. */
+export function UnidentifiedSalesBadge() {
+  return (
+    <Badge variant="neutral" className="uppercase">
+      Vendas sem vendedor
+    </Badge>
+  );
+}
+
 export function PrizeBadge({ label }: { label: string }) {
   return (
     <Badge variant="neutral" className="gap-1 uppercase">
