@@ -434,21 +434,19 @@ export default function ProductsPage() {
 
       <div className="mt-4 grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
         <Card className="flex min-w-0 flex-col overflow-hidden">
-          <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="mb-4 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
             <div className="flex min-w-0 items-center gap-1.5">
-              <CardTitle className="truncate">Desempenho por linha de produto</CardTitle>
+              <CardTitle className="min-w-0 sm:truncate">Desempenho por linha de produto</CardTitle>
               <TipHelp label={"Agrupa produtos da mesma linha, mesmo quando existem em diferentes tipos, como colônia, body splash, body cream ou roll-on.\n\nExemplo: Obsessed, Obsessed Deluxe e Obsessed Intense pertencem à linha OBSESSED.\n\nQuando aparecer “—”, faltam dados de custo para calcular o CMV, o lucro bruto ou a margem."} />
             </div>
             {view.lines.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2 print:hidden">
-                <input
-                  type="search"
-                  placeholder="Buscar por linha…"
-                  value={lineSearch}
-                  onChange={(e) => setLineSearch(e.target.value)}
-                  className={cn(filterInputClass, "w-40 shrink-0 sm:w-44")}
-                />
-              </div>
+              <input
+                type="search"
+                placeholder="Buscar por linha…"
+                value={lineSearch}
+                onChange={(e) => setLineSearch(e.target.value)}
+                className={cn(filterInputClass, "w-full print:hidden sm:w-44 sm:shrink-0")}
+              />
             )}
           </div>
           {lineRows.length === 0 ? (
@@ -565,21 +563,19 @@ export default function ProductsPage() {
         </Card>
 
         <Card className="flex min-w-0 flex-col overflow-hidden">
-        <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="mb-4 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
           <div className="flex min-w-0 items-center gap-1.5">
-            <CardTitle className="truncate">Desempenho por produto</CardTitle>
+            <CardTitle className="min-w-0 sm:truncate">Desempenho por produto</CardTitle>
             <TipHelp label={tipCmvProduct} />
           </div>
           {view.products.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 print:hidden">
             <input
               type="search"
               placeholder="Buscar por produto ou código…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className={cn(filterInputClass, "w-40 shrink-0 sm:w-44")}
+              className={cn(filterInputClass, "w-full print:hidden sm:w-44 sm:shrink-0")}
             />
-          </div>
           )}
         </div>
 

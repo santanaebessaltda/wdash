@@ -210,9 +210,9 @@ function TopTableSkeleton({
 }) {
   return (
     <Card className={cn("flex min-w-0 flex-col overflow-hidden", className)}>
-      <div className="mb-4 flex items-center justify-between gap-3">
+      <div className={cn("mb-4 flex", search ? "flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3" : "items-center justify-between gap-3")}>
         <Title className={titleW} />
-        {search ? <Skeleton className="h-8 w-40 rounded-[var(--radius-vela-sm)] sm:w-56" /> : <Pill className="w-12" />}
+        {search ? <Skeleton className="h-8 w-full rounded-[var(--radius-vela-sm)] sm:w-44" /> : <Pill className="w-12" />}
       </div>
       <div className="min-w-0 overflow-x-auto">
         <div className={variation ? "min-w-[620px]" : "min-w-[520px]"}>
