@@ -39,6 +39,7 @@ import {
   challengeBackPath,
   challengeCriterion,
   challengeHeadline,
+  challengeMinimumLabel,
   mainPrizeLabel,
 } from "@/pages/challenges/shared";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
@@ -232,6 +233,7 @@ function itemsText(c: ChallengeRecord): string | null {
 function ChallengeHero({ challenge: c, view, storeNameValue }: { challenge: ChallengeRecord; view: ChallengeView; storeNameValue?: string }) {
   const destaque = challengeHeadline(c, view);
   const prize = mainPrizeLabel(c);
+  const minimum = challengeMinimumLabel(c);
   const items = itemsText(c);
   const usesSales = usesMinSales(c.metric);
   const stats: { label: string; value: string; sub?: string; help?: string }[] = [
@@ -265,6 +267,11 @@ function ChallengeHero({ challenge: c, view, storeNameValue }: { challenge: Chal
             <PeriodBadge from={c.startsOn} to={c.endsOn} />
             {storeNameValue ? <BranchBadge name={storeNameValue} /> : null}
             {prize ? <PrizeBadge label={prize} /> : null}
+            {minimum ? (
+              <Badge variant="neutral" className="uppercase">
+                {minimum}
+              </Badge>
+            ) : null}
             <Badge variant="neutral" className="uppercase">{CHALLENGE_MODE_LABEL[c.mode]}</Badge>
             <TipHelp label={CHALLENGE_MODE_HELP[c.mode]} />
           </div>

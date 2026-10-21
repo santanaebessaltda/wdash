@@ -5,7 +5,7 @@ import type { ChallengeRecord } from "@/data/wedash/challengesRepo";
 import { CHALLENGE_STATUS_LABEL, metricValueLabel, type ChallengeParticipant, type ChallengeView } from "@/data/wedash/challengeView";
 import { cn } from "@/lib/cn";
 import { num } from "@/lib/format";
-import { challengeCriterion, challengeHeadline, floorChallengeHeadline, HeadlineText, mainPrizeLabel } from "@/pages/challenges/shared";
+import { challengeCriterion, challengeHeadline, challengeMinimumLabel, floorChallengeHeadline, HeadlineText, mainPrizeLabel } from "@/pages/challenges/shared";
 import { FlameIcon } from "@/pages/dashboards/icons";
 
 /** Desafio na aba Desafios da Equipe: so leitura, clique abre o detalhe. */
@@ -36,10 +36,11 @@ export function ChallengeMiniCard({
   const ended = view.status === "ended";
   const statusLabel = CHALLENGE_STATUS_LABEL[view.status];
   const disputa = c.mode === "CONTEST";
+  const minimum = challengeMinimumLabel(c);
+  const reached = c.mode === "MINIMUM" && view.status !== "upcoming" ? challengeHeadline(c, view).value : null;
   const leader = Math.max(0, ...view.participants.map((person) => person.result ?? 0));
   if (floor) {
-    const lead = floorLead(c, view);
-    const detail = floorDetail(c, view.status === "upcoming");
+    const lead = disputa ? floorLead(c, view) : null;
     return (
       <Card padding="lg" glass="var(--warn-soft)" className="flex w-full flex-col text-left">
         <span className="flex items-start gap-3.5">
@@ -55,14 +56,17 @@ export function ChallengeMiniCard({
               endsOn={c.endsOn}
               storeNameValue={storeNameValue}
               prize={prize}
+              minimum={minimum}
+              reached={reached}
               prazo={ended ? null : view.prazo}
             />
           </span>
         </span>
-        <div className="mt-4 border-t border-line pt-3">
-          <p className="text-[13px] font-semibold text-t0">{lead}</p>
-          {detail ? <p className="mt-0.5 text-[12px] text-t2">{detail}</p> : null}
-        </div>
+        {lead ? (
+          <div className="mt-4 border-t border-line pt-3">
+            <p className="text-[13px] font-semibold text-t0">{lead}</p>
+          </div>
+        ) : null}
         {showPeople && (
           <ChallengePeople challenge={c} view={view} disputa={disputa} leader={leader} hotKey={hotKey} className="mt-4" />
         )}
@@ -97,11 +101,15 @@ export function ChallengeMiniCard({
             endsOn={c.endsOn}
             storeNameValue={storeNameValue}
             prize={prize}
+            minimum={minimum}
+            reached={reached}
             prazo={ended ? null : view.prazo}
           />
-          <span className="mt-2 block min-w-0 truncate text-[13px] text-t1">
-            <HeadlineText headline={destaque} />
-          </span>
+          {disputa ? (
+            <span className="mt-2 block min-w-0 truncate text-[13px] text-t1">
+              <HeadlineText headline={destaque} />
+            </span>
+          ) : null}
         </span>
       </span>
       {showPeople && (
@@ -144,6 +152,8 @@ function ChallengeIdentity({
   endsOn,
   storeNameValue,
   prize,
+  minimum,
+  reached,
   prazo,
 }: {
   name: string;
@@ -153,6 +163,8 @@ function ChallengeIdentity({
   endsOn: string;
   storeNameValue?: string;
   prize: string | null;
+  minimum: string | null;
+  reached: string | null;
   prazo: string | null;
 }) {
   return (
@@ -165,10 +177,20 @@ function ChallengeIdentity({
         <PeriodBadge from={startsOn} to={endsOn} />
         {storeNameValue ? <BranchBadge name={storeNameValue} /> : null}
         {prize ? <PrizeBadge label={prize} /> : null}
+        {minimum ? (
+          <Badge variant="neutral" className="uppercase">
+            {minimum}
+          </Badge>
+        ) : null}
       </span>
-      {prazo ? (
-        <span className="mt-2 flex w-full flex-wrap items-center justify-between gap-1.5 sm:justify-end">
-          <DeadlineBadge label={prazo} />
+      {prazo || reached ? (
+        <span className="mt-2 flex w-full flex-wrap items-center justify-end gap-1.5">
+          {reached ? (
+            <Badge variant="accent" className="uppercase">
+              {reached}
+            </Badge>
+          ) : null}
+          {prazo ? <DeadlineBadge label={prazo} /> : null}
         </span>
       ) : null}
     </>
@@ -224,26 +246,7 @@ function ChallengePeople({
 
 function floorLead(c: ChallengeRecord, view: ChallengeView): string {
   if (view.status === "upcoming") return challengeCriterion(c);
-  if (c.mode === "MINIMUM") {
-    const n = view.reachedCount;
-    const ended = view.status === "ended";
-    if (n === 0) return ended ? "Ninguém atingiu o mínimo" : "Ninguém atingiu o mínimo ainda";
-    if (n === 1) return "1 pessoa atingiu o mínimo";
-    return `${n} pessoas atingiram o mínimo`;
-  }
   return floorChallengeHeadline(c, view).value;
-}
-
-function floorDetail(c: ChallengeRecord, upcoming: boolean): string | null {
-  const prize = mainPrizeLabel(c);
-  if (upcoming) return prize;
-  if (c.mode === "MINIMUM") {
-    const minimum = c.target != null ? `Mínimo ${metricValueLabel(c.metric, c.target)}` : null;
-    const prizePart = prize ? `Prêmio ${prize}` : null;
-    return [minimum, prizePart].filter(Boolean).join(" · ") || null;
-  }
-  const minimum = c.target != null ? `Mínimo ${metricValueLabel(c.metric, c.target)}` : null;
-  return [minimum, prize].filter(Boolean).join(" · ") || null;
 }
 
 function ChallengePersonStatus({ person, disputa, pct }: { person: ChallengeParticipant; disputa: boolean; pct: number }) {

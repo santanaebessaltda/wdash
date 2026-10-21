@@ -30,6 +30,7 @@ import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import {
   CHALLENGE_STATUS_ORDER,
   challengeHeadline,
+  challengeMinimumLabel,
   HeadlineText,
   mainPrizeLabel,
 } from "@/pages/challenges/shared";
@@ -284,6 +285,8 @@ function ChallengeCard({
 }) {
   const destaque = challengeHeadline(c, view);
   const prize = mainPrizeLabel(c);
+  const minimum = challengeMinimumLabel(c);
+  const reached = c.mode === "MINIMUM" && view.status !== "upcoming" ? destaque.value : null;
   const ended = view.status === "ended";
   const statusLabel = CHALLENGE_STATUS_LABEL[view.status];
 
@@ -328,10 +331,20 @@ function ChallengeCard({
             <PeriodBadge from={c.startsOn} to={c.endsOn} />
             {showsStore && store ? <BranchBadge name={store.tradeName} /> : null}
             {prize ? <PrizeBadge label={prize} /> : null}
+            {minimum ? (
+              <Badge variant="neutral" className="uppercase">
+                {minimum}
+              </Badge>
+            ) : null}
           </div>
-          {!ended ? (
-            <div className="mt-2 flex w-full flex-wrap items-center justify-between gap-1.5 sm:justify-end">
-              <DeadlineBadge label={view.prazo} />
+          {!ended || reached ? (
+            <div className="mt-2 flex w-full flex-wrap items-center justify-end gap-1.5">
+              {reached ? (
+                <Badge variant="accent" className="uppercase">
+                  {reached}
+                </Badge>
+              ) : null}
+              {!ended ? <DeadlineBadge label={view.prazo} /> : null}
             </div>
           ) : null}
         </div>
@@ -359,9 +372,11 @@ function ChallengeCard({
         </div>
       </div>
 
-      <p className="min-w-0 truncate text-[13px] text-t1">
-        <HeadlineText headline={destaque} />
-      </p>
+      {c.mode === "CONTEST" ? (
+        <p className="min-w-0 truncate text-[13px] text-t1">
+          <HeadlineText headline={destaque} />
+        </p>
+      ) : null}
 
       <div className="flex-1" />
       <div className="mt-4 flex flex-wrap gap-1.5">

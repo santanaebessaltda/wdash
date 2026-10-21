@@ -31,6 +31,12 @@ export function challengeCriterion(c: ChallengeRecord): string {
   return c.target != null ? `${quem} · mínimo de ${metricValueLabel(c.metric, c.target)}` : quem;
 }
 
+/** Piso do desafio, para o badge ao lado do período e do prêmio. */
+export function challengeMinimumLabel(c: ChallengeRecord): string | null {
+  if (c.target == null) return null;
+  return `Mínimo de ${metricValueLabel(c.metric, c.target)}`;
+}
+
 /** Destaque do card: `label` null = a frase ja e completa ("Ainda nao ha lider"). */
 export interface ChallengeHeadline {
   label: string | null;
@@ -43,10 +49,9 @@ export function challengeHeadline(c: ChallengeRecord, view: ChallengeView): Chal
   const ended = view.status === "ended";
   if (c.mode === "MINIMUM") {
     const n = view.reachedCount;
-    const target = c.target != null ? ` · mínimo de ${metricValueLabel(c.metric, c.target)}` : "";
     if (n === 0) return { label: null, value: ended ? "Ninguém atingiu" : "Ninguém atingiu ainda" };
-    if (n === 1) return { label: null, value: `1 pessoa atingiu${target}` };
-    return { label: "Atingiram", value: `${n} pessoas${target}` };
+    if (n === 1) return { label: null, value: "1 pessoa atingiu" };
+    return { label: null, value: `${n} pessoas atingiram` };
   }
   const { leader } = challengeCardSummary(view);
   const primeiros = view.participants.filter((p) => p.position === 1);
