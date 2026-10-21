@@ -325,20 +325,9 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
             <span className="text-t2">Prêmio: </span>
             <span className="font-bold">{prizeLabel(view.management.prize)}</span>
           </p>
-          <Badge
-            variant={c.mode === "MINIMUM" ? (view.management.atingiu ? "success" : "danger") : view.management.atingiu ? "accent" : "neutral"}
-            className="uppercase"
-          >
-            {c.mode === "MINIMUM"
-              ? view.management.atingiu
-                ? "Atingiu o mínimo"
-                : "Não atingiu"
-              : view.management.atingiu
-                ? "Atingiu"
-                : view.status === "ended"
-                  ? "Não atingiu"
-                  : "Ainda não atingiu"}
-          </Badge>
+          {view.management.atingiu ? (
+            <Badge variant="accent" className="uppercase">Atingiu</Badge>
+          ) : null}
         </div>
       )}
 
@@ -374,19 +363,8 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
                   </td>
                   {usesSales && <td className="py-2.5 pr-3 text-right font-mono font-bold text-t1">{aComecar ? "—" : num(p.sales)}</td>}
                   <td className="py-2.5 pr-3">
-                    {!disputa ? (
-                      p.result == null ? (
-                        <span className="text-t2">{p.gap ?? "—"}</span>
-                      ) : (
-                        <span className="inline-flex flex-col items-start gap-1">
-                          <Badge variant={p.winner ? "success" : "danger"} className="uppercase">
-                            {p.winner ? "Atingiu o mínimo" : "Não atingiu"}
-                          </Badge>
-                          {!p.winner && p.gap ? <span className="text-t2">{p.gap}</span> : null}
-                        </span>
-                      )
-                    ) : p.winner ? (
-                      <Badge variant={p.position != null ? "success" : "accent"}>{p.position != null ? `${p.position}º lugar` : "Atingiu"}</Badge>
+                    {p.winner ? (
+                      <Badge variant={p.position != null ? "success" : "accent"} className={p.position == null ? "uppercase" : undefined}>{p.position != null ? `${p.position}º lugar` : "Atingiu"}</Badge>
                     ) : (
                       <span className="text-t2">{p.gap ?? "—"}</span>
                     )}

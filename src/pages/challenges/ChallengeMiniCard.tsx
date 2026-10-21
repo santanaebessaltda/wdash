@@ -255,14 +255,7 @@ function ChallengePersonStatus({ person, disputa, pct }: { person: ChallengePart
       </Badge>
     );
   }
-  if (!disputa) {
-    return (
-      <Badge variant={person.winner ? "success" : "danger"} className="shrink-0 uppercase">
-        {person.winner ? "Atingiu o mínimo" : "Não atingiu"}
-      </Badge>
-    );
-  }
-  if (person.winner) return <Badge variant="accent" className="shrink-0">Atingiu</Badge>;
+  if (person.winner) return <Badge variant="accent" className="shrink-0 uppercase">Atingiu</Badge>;
   return <span className="shrink-0 font-mono text-[12px] font-bold tabular-nums text-acc">{num(pct, 0)}%</span>;
 }
 

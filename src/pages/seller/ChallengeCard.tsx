@@ -68,10 +68,8 @@ function SellerChallengeCard({
           <PeriodBadge from={c.startsOn} to={c.endsOn} />
           <BranchBadge name={storeName} />
           {c.prize ? <PrizeBadge label={c.prize} /> : null}
-          {c.mode === "MINIMUM" && status !== "upcoming" && !c.unavailable ? (
-            <Badge variant={c.won ? "success" : "danger"} className="uppercase">
-              {c.won ? "Você atingiu o mínimo" : "Você não atingiu o mínimo"}
-            </Badge>
+          {c.mode === "MINIMUM" && c.won && status !== "upcoming" && !c.unavailable ? (
+            <Badge variant="accent" className="uppercase">Atingiu</Badge>
           ) : null}
         </div>
         {prazo ? (
