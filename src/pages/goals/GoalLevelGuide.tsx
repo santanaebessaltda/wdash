@@ -59,7 +59,12 @@ export function GoalLevelGuide({
                 <p className="mt-0.5 text-[11.5px] text-t2">{ruleLine(row)}</p>
                 {showReached && row.manager ? <p className="mt-0.5 text-[11.5px] text-t2">{row.manager}</p> : null}
                 {showReached && selected.people > 0 ? (
-                  <p className="mt-0.5 text-[11.5px] font-semibold text-t1">{reachedLine(row.reached)}</p>
+                  <p className={cn("mt-0.5 text-[11.5px] font-semibold", everyone ? "text-ok" : "text-t1")}>
+                    <span className="font-mono tabular-nums">
+                      {row.reached}/{selected.people}
+                    </span>{" "}
+                    já atingiu
+                  </p>
                 ) : null}
               </div>
               <div className="shrink-0 text-right">
@@ -68,7 +73,7 @@ export function GoalLevelGuide({
                     <p className={cn("font-mono text-[13px] font-extrabold tabular-nums", everyone ? "text-ok" : "text-t1")}>
                       {row.reached}/{selected.people}
                     </p>
-                    <p className="text-[10.5px] text-t2">do turno</p>
+                    <p className="text-[10.5px] text-t2">já atingiu</p>
                   </>
                 ) : null}
                 <p className={cn("font-mono text-[13px] font-extrabold", accordion && "mt-1", everyone ? "text-ok" : "text-t1")}>
@@ -126,12 +131,6 @@ function ruleLine(row: GuideRow): string {
     if (row.bonusSoFar > row.bonus) parts.push(`bônus acumulado de ${brlCent(row.bonusSoFar)}`);
   }
   return parts.join(" · ");
-}
-
-function reachedLine(count: number): string {
-  if (count === 0) return "Ninguém chegou";
-  if (count === 1) return "1 pessoa já chegou";
-  return `${count} pessoas já chegaram`;
 }
 
 type GuideKind = "person" | "group" | "store";
