@@ -421,7 +421,7 @@ function GoalTiersCard({
           <span className="text-t1 sm:ml-auto">
             {management.next ? (
               <>
-                Falta <span className="font-mono font-bold text-warn">{brlCent(management.next.gap)}</span> para N{management.next.number} ·{" "}
+                Falta <span className="font-mono font-bold text-acc">{brlCent(management.next.gap)}</span> para N{management.next.number} ·{" "}
                 {management.next.name}
               </>
             ) : (

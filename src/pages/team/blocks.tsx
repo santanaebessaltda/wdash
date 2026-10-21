@@ -66,9 +66,9 @@ function IndividualPctCell({ l }: { l: LineRank }) {
   const scale = Math.max(...l.ladderMarks.map((m) => m.pct), 100);
   return (
     <div className="w-[88px]">
-      <p className="font-mono text-[12.5px] font-bold text-t0">{num(l.attainmentPct, 0)}%</p>
+      <p className={`font-mono text-[12.5px] font-bold ${progressTextClass(l.attainmentPct)}`}>{num(l.attainmentPct, 0)}%</p>
       <div className="mt-1">
-        <ProgressBar value={Math.min(100, (l.attainmentPct / scale) * 100)} height={5} />
+        <ProgressBar value={Math.min(100, (l.attainmentPct / scale) * 100)} color={progressColor(l.attainmentPct)} height={5} />
       </div>
     </div>
   );
@@ -238,7 +238,7 @@ export function SellersBlock({
             sortable: true,
             sortValue: (l: LineRank) => (l.noGoal ? null : l.storeGoalPct),
             render: (l: LineRank) =>
-              l.noGoal ? <span className="text-t2">—</span> : <span className="font-mono text-[12.5px] font-bold text-t0">{num(l.storeGoalPct, 1)}%</span>,
+              l.noGoal ? <span className="text-t2">—</span> : <span className={`font-mono text-[12.5px] font-bold ${progressTextClass(l.storeGoalPct)}`}>{num(l.storeGoalPct, 1)}%</span>,
           },
           {
             key: "nivel",
