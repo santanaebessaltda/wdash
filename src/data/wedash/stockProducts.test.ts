@@ -91,6 +91,7 @@ describe("buildStockProductsView", () => {
     expect(stockCostAmount(view.rows.find((r) => r.code === "P2")!)).toEqual({ amount: null, unit: null });
     expect(p1.aReceive).toBeNull();
     expect(p1.totalGeral).toBeNull();
+    expect(p1.storeRows.every((l) => l.aReceive == null)).toBe(true);
   });
 
   it("soma o que está a receber com o saldo e inclui produto que só tem pedido", () => {
@@ -112,10 +113,18 @@ describe("buildStockProductsView", () => {
     const p1 = view.rows.find((r) => r.code === "P1")!;
     expect(p1.aReceive).toBe(5);
     expect(p1.totalGeral).toBe(10);
+    expect(p1.storeRows.map((l) => [l.store.id, l.aReceive])).toEqual([
+      ["a", 2],
+      ["b", 3],
+    ]);
     const p3 = view.rows.find((r) => r.code === "P3")!;
     expect(p3.stock).toBe(0);
     expect(p3.aReceive).toBe(12);
     expect(p3.totalGeral).toBe(12);
+    expect(p3.storeRows.map((l) => [l.store.id, l.aReceive])).toEqual([
+      ["a", 12],
+      ["b", 0],
+    ]);
   });
 
   it("local negativo com outro local positivo = transferência; total = soma dos locais", () => {

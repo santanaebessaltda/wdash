@@ -137,6 +137,8 @@ export type StockStoreDetail = {
   praticado: { price: number; items: number; profit: number | null; marginPct: number | null } | null;
   /** Pecas vendidas nos ultimos 30 dias na loja. */
   vendidos30d: number;
+  /** Pecas pedidas e ainda nao recebidas nesta loja. Null = saldo futuro desta loja ainda nao buscado. */
+  aReceive: number | null;
 };
 
 export type StockProductRow = {
@@ -192,9 +194,15 @@ export function costCentsFor(costPrices: StockInput["costPrices"], store: Store,
  */
 export type StockStatus = "negative" | "awaiting" | "ok";
 
+/** Status de uma filial: negativo se o total dela e abaixo de zero; aguardando se ha transferencia pendente. */
+export function storeStockStatus(detail: Pick<StockStoreDetail, "stock" | "transferencias">): StockStatus {
+  if (detail.stock < 0) return "negative";
+  return detail.transferencias.length > 0 ? "awaiting" : "ok";
+}
+
 export function stockStatus(r: StockProductRow): StockStatus {
-  if (r.storeRows.some((l) => l.stock < 0)) return "negative";
-  return r.storeRows.some((l) => l.transferencias.length > 0) ? "awaiting" : "ok";
+  if (r.storeRows.some((l) => storeStockStatus(l) === "negative")) return "negative";
+  return r.storeRows.some((l) => storeStockStatus(l) === "awaiting") ? "awaiting" : "ok";
 }
 
 export type StockCostAmount = {
@@ -277,7 +285,8 @@ export function buildStockProductsView(input: StockInput): StockProductsView {
         const p = composePrice(store, code, Math.round(ch.revenueCents / ch.items), costCents);
         praticado = { price: ch.revenueCents / ch.items / 100, items: ch.items, profit: p.profit, marginPct: p.marginPct };
       }
-      return { store, stock, locations, transferencias: stockTransfers(locations), composition, praticado, vendidos30d: ch?.items ?? 0 };
+      const aReceive = incomingKnown.has(store.id) ? (incoming.get(`${store.id}|${code}`) ?? 0) : null;
+      return { store, stock, locations, transferencias: stockTransfers(locations), composition, praticado, vendidos30d: ch?.items ?? 0, aReceive };
     });
 
     const neg = storeRows.filter((l) => l.stock < 0);

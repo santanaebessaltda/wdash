@@ -20,6 +20,7 @@ function detail(
     composition: { cost } as PriceComposition,
     praticado: null,
     vendidos30d: 0,
+    aReceive: null,
   };
 }
 

@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Alert, Badge, Button, Card, CardTitle, ThSort, type SortDir } from "@/components/ui";
 import { statusBadgeVariant } from "@/lib/status";
 import { StockProductsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { ProductNameCell } from "@/components/wedash/ProductNameCell";
 import { Tooltip } from "@/components/ui/Tooltip";
-import { productBrand, stockCostAmount, stockStatus, type StockProductRow, type StockStatus } from "@/data/wedash/stockProducts";
+import { productBrand, stockCostAmount, stockStatus, storeStockStatus, type StockProductRow, type StockStatus, type StockStoreDetail } from "@/data/wedash/stockProducts";
 import { cn } from "@/lib/cn";
 import { num } from "@/lib/format";
 import { usePrintMode } from "@/lib/printMode";
@@ -43,6 +43,7 @@ export function InventoryPage() {
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [page, setPage] = useState(1);
+  const [opened, setOpened] = useState<Record<string, boolean>>({});
   const printing = usePrintMode();
   const showSkeleton = useMinSkeleton(loading);
   const exportScreenPdf = useExportPdf("Estoque", null, { period: false });
@@ -105,10 +106,13 @@ export function InventoryPage() {
   }, [withStatus, search, status, activeBrand, category, sortKey, sortDir]);
 
   useEffect(() => setPage(1), [search, status, activeBrand, category, sortKey, sortDir, storeKey]);
+  useEffect(() => setOpened({}), [storeKey]);
 
   const totalPages = Math.max(1, Math.ceil(lines.length / TABLE_PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
   const pageRows = printing ? lines : lines.slice((pageSafe - 1) * TABLE_PAGE_SIZE, pageSafe * TABLE_PAGE_SIZE);
+
+  const toggleGroup = (code: string) => setOpened((current) => ({ ...current, [code]: !current[code] }));
 
   const toggleSort = (k: SortKey) => {
     if (k === sortKey) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -263,38 +267,76 @@ export function InventoryPage() {
                 <tbody>
                   {pageRows.map(({ r, status: s }, i) => {
                     const idx = (printing ? 0 : (pageSafe - 1) * TABLE_PAGE_SIZE) + i;
+                    const open = multipleStores && Boolean(opened[r.code]);
+                    const branches = multipleStores ? [...r.storeRows].sort((a, b) => branchName(a).localeCompare(branchName(b), "pt-BR")) : [];
                     return (
-                      <tr key={r.code} className="border-b border-line">
-                        <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
-                        <td className="px-1 py-3">
-                          <ProductNameCell name={r.name} idx={idx} sub={[r.code, r.category].filter(Boolean).join(" · ")} />
-                        </td>
-                        {locations.map((name) => (
-                          <td key={name} className="whitespace-nowrap px-4 py-3 text-right">
-                            <Qty v={localQty(r, name)} />
+                      <Fragment key={r.code}>
+                        <tr
+                          className={cn("border-b border-line", multipleStores && "cursor-pointer bg-bg-3")}
+                          onClick={multipleStores ? () => toggleGroup(r.code) : undefined}
+                        >
+                          <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
+                          <td className="px-1 py-3">
+                            {multipleStores ? (
+                              <div className="flex min-w-0 items-center gap-2">
+                                <button
+                                  type="button"
+                                  className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-t2 outline-none hover:bg-bg-inset focus-visible:ring-2 focus-visible:ring-acc"
+                                  aria-expanded={open}
+                                  aria-label={open ? `Fechar filiais de ${r.name}` : `Abrir filiais de ${r.name}`}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    toggleGroup(r.code);
+                                  }}
+                                >
+                                  <Chevron open={open} />
+                                </button>
+                                <ProductNameCell
+                                  name={r.name}
+                                  idx={idx}
+                                  sub={
+                                    <div className="min-w-0">
+                                      <p className="truncate text-[11px] text-t2">{[r.code, r.category].filter(Boolean).join(" · ")}</p>
+                                      <p className="mt-0.5 text-[11px] font-semibold text-t1">{filialLabel(branches.length)}</p>
+                                    </div>
+                                  }
+                                />
+                              </div>
+                            ) : (
+                              <ProductNameCell name={r.name} idx={idx} sub={[r.code, r.category].filter(Boolean).join(" · ")} />
+                            )}
                           </td>
-                        ))}
-                        {showsTotal && (
+                          {locations.map((name) => (
+                            <td key={name} className="whitespace-nowrap px-4 py-3 text-right">
+                              <Qty v={localQty(r, name)} />
+                            </td>
+                          ))}
+                          {showsTotal && (
+                            <td className="whitespace-nowrap px-4 py-3 text-right">
+                              <Qty v={r.stock} />
+                            </td>
+                          )}
                           <td className="whitespace-nowrap px-4 py-3 text-right">
-                            <Qty v={r.stock} />
+                            <Qty v={r.aReceive} />
                           </td>
-                        )}
-                        <td className="whitespace-nowrap px-4 py-3 text-right">
-                          <Qty v={r.aReceive} />
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right">
-                          <Qty v={r.totalGeral} />
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right">
-                          <UnitCost r={r} />
-                        </td>
-                        <td className="whitespace-nowrap py-3 pl-4 pr-8 text-right">
-                          <Money v={stockCostAmount(r).amount} />
-                        </td>
-                        <td className="whitespace-nowrap py-3 pl-8 pr-1">
-                          <StatusCell r={r} status={s} multipleStores={multipleStores} />
-                        </td>
-                      </tr>
+                          <td className="whitespace-nowrap px-4 py-3 text-right">
+                            <Qty v={r.totalGeral} />
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-right">
+                            <UnitCost r={r} />
+                          </td>
+                          <td className="whitespace-nowrap py-3 pl-4 pr-8 text-right">
+                            <Money v={stockCostAmount(r).amount} />
+                          </td>
+                          <td className="whitespace-nowrap py-3 pl-8 pr-1" onClick={(event) => event.stopPropagation()}>
+                            <StatusCell r={r} status={s} multipleStores={multipleStores} />
+                          </td>
+                        </tr>
+                        {open &&
+                          branches.map((detail) => (
+                            <StoreLine key={detail.store.id} detail={detail} product={r} locations={locations} showsTotal={showsTotal} />
+                          ))}
+                      </Fragment>
                     );
                   })}
                   <tr className="bg-bg-inset">
@@ -339,6 +381,74 @@ export function InventoryPage() {
 }
 
 export default InventoryPage;
+
+function branchName(detail: StockStoreDetail): string {
+  return detail.store.tradeName || detail.store.name;
+}
+
+function filialLabel(count: number): string {
+  return count === 1 ? "1 filial" : `${num(count)} filiais`;
+}
+
+function storeLocalQty(detail: StockStoreDetail, name: string): number {
+  return detail.locations.find((x) => x.name === name)?.qty ?? 0;
+}
+
+function storeAmount(detail: StockStoreDetail): number | null {
+  const unit = detail.composition.cost;
+  if (unit == null) return null;
+  return detail.stock * unit;
+}
+
+function storeTotal(detail: StockStoreDetail): number | null {
+  return detail.aReceive == null ? null : detail.stock + detail.aReceive;
+}
+
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" className={cn("h-3.5 w-3.5 shrink-0 transition-transform", open && "rotate-90")} fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
+      <path d="m9 6 6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Linha da filial, abaixo do produto. Mesmas colunas, sem marca de quantidade. */
+function StoreLine({ detail, product, locations, showsTotal }: { detail: StockStoreDetail; product: StockProductRow; locations: string[]; showsTotal: boolean }) {
+  const oneStore: StockProductRow = { ...product, storeRows: [detail], stock: detail.stock, aReceive: detail.aReceive, totalGeral: storeTotal(detail) };
+  return (
+    <tr className="border-b border-line bg-bg-inset">
+      <td />
+      <td className="border-l-2 border-l-line-2 px-1 py-2.5 pl-16">
+        <p className="break-words text-[12.5px] font-semibold leading-5 text-t1">{branchName(detail)}</p>
+      </td>
+      {locations.map((name) => (
+        <td key={name} className="whitespace-nowrap px-4 py-2.5 text-right">
+          <Qty v={storeLocalQty(detail, name)} />
+        </td>
+      ))}
+      {showsTotal && (
+        <td className="whitespace-nowrap px-4 py-2.5 text-right">
+          <Qty v={detail.stock} />
+        </td>
+      )}
+      <td className="whitespace-nowrap px-4 py-2.5 text-right">
+        <Qty v={detail.aReceive} />
+      </td>
+      <td className="whitespace-nowrap px-4 py-2.5 text-right">
+        <Qty v={storeTotal(detail)} />
+      </td>
+      <td className="whitespace-nowrap px-4 py-2.5 text-right">
+        <Money v={detail.composition.cost} />
+      </td>
+      <td className="whitespace-nowrap py-2.5 pl-4 pr-8 text-right">
+        <Money v={storeAmount(detail)} />
+      </td>
+      <td className="whitespace-nowrap py-2.5 pl-8 pr-1">
+        <StatusCell r={oneStore} status={storeStockStatus(detail)} multipleStores={false} />
+      </td>
+    </tr>
+  );
+}
 
 /** Saldo em mono negrito (como os numeros do Desempenho por produto): negativo em vermelho, zero em cinza. */
 function Qty({ v, total = false }: { v: number | null; total?: boolean }) {
