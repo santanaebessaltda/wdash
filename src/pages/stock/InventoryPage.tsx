@@ -272,13 +272,13 @@ export function InventoryPage() {
                     return (
                       <Fragment key={r.code}>
                         <tr
-                          className={cn("border-b border-line", multipleStores && "cursor-pointer bg-bg-3")}
+                          className={cn("border-b border-line", multipleStores && "cursor-pointer")}
                           onClick={multipleStores ? () => toggleGroup(r.code) : undefined}
                         >
                           <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
                           <td className="px-1 py-3">
-                            {multipleStores ? (
-                              <div className="flex min-w-0 items-center gap-2">
+                            <div className={cn("flex min-w-0 items-center", multipleStores && "gap-2")}>
+                              {multipleStores && (
                                 <button
                                   type="button"
                                   className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-t2 outline-none hover:bg-bg-inset focus-visible:ring-2 focus-visible:ring-acc"
@@ -291,20 +291,9 @@ export function InventoryPage() {
                                 >
                                   <Chevron open={open} />
                                 </button>
-                                <ProductNameCell
-                                  name={r.name}
-                                  idx={idx}
-                                  sub={
-                                    <div className="min-w-0">
-                                      <p className="truncate text-[11px] text-t2">{[r.code, r.category].filter(Boolean).join(" · ")}</p>
-                                      <p className="mt-0.5 text-[11px] font-semibold text-t1">{filialLabel(branches.length)}</p>
-                                    </div>
-                                  }
-                                />
-                              </div>
-                            ) : (
+                              )}
                               <ProductNameCell name={r.name} idx={idx} sub={[r.code, r.category].filter(Boolean).join(" · ")} />
-                            )}
+                            </div>
                           </td>
                           {locations.map((name) => (
                             <td key={name} className="whitespace-nowrap px-4 py-3 text-right">
@@ -384,10 +373,6 @@ export default InventoryPage;
 
 function branchName(detail: StockStoreDetail): string {
   return detail.store.tradeName || detail.store.name;
-}
-
-function filialLabel(count: number): string {
-  return count === 1 ? "1 filial" : `${num(count)} filiais`;
 }
 
 function storeLocalQty(detail: StockStoreDetail, name: string): number {
