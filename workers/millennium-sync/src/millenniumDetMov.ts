@@ -6,7 +6,7 @@ import { millenniumBaseUrl } from "./millenniumAuth.ts";
 
 export type DetMovLine = {
   productId: number;
-  /** PRECO_TOTAL em centavos. */
+  /** Preço da linha em centavos. PRECO_TOTAL quando o ERP manda; senão PRECO × quantidade. */
   revenueCents: number;
   /** QUANTIDADE (unidades). */
   qty: number;
@@ -48,10 +48,24 @@ function asStr(v: unknown): string {
   return String(v).trim();
 }
 
-function reaisToCents(v: unknown): number {
-  const n = asNum(v);
-  if (n == null) return 0;
-  return Math.round(n * 100);
+function reaisToCents(v: number): number {
+  return Math.round(v * 100);
+}
+
+/**
+ * Preço da linha. Na 00386 o ConsultaDetMov devolve PRECO_TOTAL e PRECO_APLICADO
+ * nulos e o valor da venda em PRECO (unitário). PRECO × QUANTIDADE fecha a Lista.
+ * Nas outras filiais PRECO_TOTAL já vem preenchido e é o total da linha.
+ */
+export function detMovLineRevenueCents(row: Record<string, unknown>): number {
+  const total = asNum(pick(row, "PRECO_TOTAL", "preco_total"));
+  if (total != null) return reaisToCents(total);
+  const qty = asNum(pick(row, "QUANTIDADE", "quantidade")) ?? 0;
+  const applied = asNum(pick(row, "PRECO_APLICADO", "preco_aplicado"));
+  if (applied != null) return reaisToCents(applied * qty);
+  const unit = asNum(pick(row, "PRECO", "preco"));
+  if (unit != null) return reaisToCents(unit * qty);
+  return 0;
 }
 
 function extractList(payload: unknown): unknown[] {
@@ -74,7 +88,7 @@ export function parseConsultaDetMovPayload(payload: unknown): DetMovLine[] {
     if (productId == null) continue;
     out.push({
       productId,
-      revenueCents: reaisToCents(pick(o, "PRECO_TOTAL", "preco_total")),
+      revenueCents: detMovLineRevenueCents(o),
       qty: asNum(pick(o, "QUANTIDADE", "quantidade")) ?? 0,
       descProduto: asStr(pick(o, "DESC_PRODUTO", "desc_produto")),
     });

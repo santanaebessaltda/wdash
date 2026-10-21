@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseConsultaDetMovPayload } from "./millenniumDetMov";
+import { detMovLineRevenueCents, parseConsultaDetMovPayload } from "./millenniumDetMov";
 
 describe("parseConsultaDetMovPayload", () => {
   it("maps PRODUTO / PRECO_TOTAL / QUANTIDADE", () => {
@@ -31,6 +31,35 @@ describe("parseConsultaDetMovPayload", () => {
         descProduto: "WP024-POWER PINK",
       },
     ]);
+  });
+
+  it("uses PRECO × QUANTIDADE when PRECO_TOTAL is null", () => {
+    expect(
+      detMovLineRevenueCents({
+        PRECO: 109.9,
+        PRECO_APLICADO: null,
+        PRECO_TOTAL: null,
+        QUANTIDADE: 1,
+      }),
+    ).toBe(10990);
+    expect(
+      detMovLineRevenueCents({
+        PRECO: 20,
+        PRECO_TOTAL: null,
+        QUANTIDADE: 3,
+      }),
+    ).toBe(6000);
+  });
+
+  it("keeps PRECO_TOTAL when the ERP sends the line total", () => {
+    expect(
+      detMovLineRevenueCents({
+        PRECO: 10,
+        PRECO_APLICADO: 27.95,
+        PRECO_TOTAL: 55.9,
+        QUANTIDADE: 2,
+      }),
+    ).toBe(5590);
   });
 
   it("skips rows without PRODUTO", () => {
