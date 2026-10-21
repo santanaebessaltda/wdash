@@ -170,7 +170,7 @@ function gapLine(level: PersonLevel | null): string | undefined {
   if (!level) return undefined;
   if (level.top) return "Último nível";
   if (level.gap == null) return undefined;
-  return `Faltam ${brlCent(level.gap)}`;
+  return level.nextName ? `Faltam ${brlCent(level.gap)} para ${level.nextName}` : `Faltam ${brlCent(level.gap)}`;
 }
 
 function storeTotals(days: SalesDayAgg[], storeIds: readonly string[], from: string, to: string) {
