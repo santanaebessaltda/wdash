@@ -12,6 +12,7 @@ export function InviteSellerModal(props: {
   seller: { id: string; name: string; email: string | null } | null;
   onClose: () => void;
   onDone: () => void;
+  onInvited: (sellerId: string, email: string) => void;
 }) {
   return <InviteSellerForm key={props.seller?.id ?? "closed"} {...props} />;
 }
@@ -20,10 +21,12 @@ function InviteSellerForm({
   seller,
   onClose,
   onDone,
+  onInvited,
 }: {
   seller: { id: string; name: string; email: string | null } | null;
   onClose: () => void;
   onDone: () => void;
+  onInvited: (sellerId: string, email: string) => void;
 }) {
   const { show } = useToast();
   const [email, setEmail] = useState(seller?.email ?? "");
@@ -51,6 +54,7 @@ function InviteSellerForm({
       onDone();
       return;
     }
+    onInvited(seller.id, normalized);
     setSent(true);
     show("Convite enviado.", "success");
   }

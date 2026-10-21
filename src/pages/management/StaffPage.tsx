@@ -274,6 +274,17 @@ function StaffList({
     return true;
   }
 
+  function noteInvited(sellerId: string, email: string) {
+    setAccess((current) => {
+      const next = new Map(current ?? []);
+      next.set(sellerId, "PENDING");
+      return next;
+    });
+    setTeam((list) =>
+      list.map((person) => (person.seller.id === sellerId ? { ...person, seller: { ...person.seller, email } } : person)),
+    );
+  }
+
   async function runAccess(sellerId: string, fn: (id: string) => Promise<{ ok: boolean; message?: string }>, okMsg: string) {
     const r = await fn(sellerId);
     if (!r.ok) return show(r.message ?? "Não foi possível alterar o acesso. Tente novamente.", "danger");
@@ -502,6 +513,7 @@ function StaffList({
       <InviteSellerModal
         seller={inviting ? { id: inviting.seller.id, name: inviting.seller.name, email: inviting.seller.email } : null}
         onClose={() => setInviting(null)}
+        onInvited={noteInvited}
         onDone={() => {
           setInviting(null);
           setTick((n) => n + 1);
