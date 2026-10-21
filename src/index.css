@@ -511,17 +511,9 @@ input[type="range"]::-moz-range-thumb {
   }
 }
 
-/* Mesmo fundo do painel de "Crie seu acesso": degradê azul/roxo com brilho. */
-.board-backdrop {
-  background-color: #14103a;
-  background-image:
-    radial-gradient(70% 60% at 25% 80%, rgba(86, 168, 255, 0.35), transparent 60%),
-    linear-gradient(150deg, #0f2d54, #1b1650 55%, #14103a);
-}
-
 /* Tema claro: o texto solto fica claro sobre o degradê; dentro dos cards volta ao tema. */
 @media screen {
-  :root[data-theme="light"] .board-backdrop {
+  :root[data-theme="light"] .access-hero-scope {
     --t0: #f3f4f9;
     --t1: rgba(255, 255, 255, 0.72);
     --t2: rgba(255, 255, 255, 0.55);
@@ -535,7 +527,7 @@ input[type="range"]::-moz-range-thumb {
     --color-line-2: rgba(255, 255, 255, 0.28);
     --color-bg-3: rgba(255, 255, 255, 0.08);
   }
-  :root[data-theme="light"] .board-backdrop :is(.bg-bg-2, .bg-bg-1) {
+  :root[data-theme="light"] .access-hero-scope :is(.bg-bg-2, .bg-bg-1, .bg-bg-inset) {
     --t0: #171a23;
     --t1: #5a6173;
     --t2: #9097a8;
@@ -570,7 +562,7 @@ input[type="range"]::-moz-range-thumb {
     overflow: visible !important;
     background: #fff !important;
   }
-  .board-backdrop {
+  .access-hero-scope {
     background: #fff !important;
   }
   body {

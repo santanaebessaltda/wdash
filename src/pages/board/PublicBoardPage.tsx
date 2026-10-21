@@ -5,6 +5,7 @@ import { ProfilePhotosProvider } from "@/components/wedash/PersonAvatar";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { readBoardShare, type PublicBoardPack } from "@/data/wedash/boardShare";
 import { effectiveWeekHours, parseWeekHours } from "@/data/wedash/storeHours";
+import { AccessHeroBackdrop } from "@/pages/access/AccessHeroBackdrop";
 import { BoardView } from "./BoardView";
 
 const POLL_MS = 60 * 1000;
@@ -40,23 +41,29 @@ export function PublicBoardPage() {
 
   if (status === "loading") {
     return (
-      <div className="board-backdrop tela-cheia overflow-y-auto">
-        <BoardSkeleton header className="min-h-full p-4 sm:p-6" />
+      <div className="access-hero-scope tela-cheia relative overflow-hidden">
+        <AccessHeroBackdrop />
+        <div className="relative z-10 h-full overflow-y-auto">
+          <BoardSkeleton header className="min-h-full p-4 sm:p-6" />
+        </div>
       </div>
     );
   }
 
   if (status === "missing" || !pack) {
     return (
-      <div className="board-backdrop tela-cheia flex items-center justify-center overflow-y-auto p-6 text-center">
-        <p className="text-sm text-t2">Este placar não está disponível.</p>
+      <div className="access-hero-scope tela-cheia relative flex items-center justify-center overflow-hidden p-6 text-center">
+        <AccessHeroBackdrop />
+        <p className="relative z-10 text-sm text-t2">Este placar não está disponível.</p>
       </div>
     );
   }
 
   const watermark = pack.watermark ? new Date(pack.watermark) : null;
   return (
-    <div className="board-backdrop tela-cheia overflow-y-auto text-t0">
+    <div className="access-hero-scope tela-cheia relative overflow-hidden text-t0">
+      <AccessHeroBackdrop />
+      <div className="relative z-10 h-full overflow-y-auto">
       <ProfilePhotosProvider photos={pack.photos}>
         <BoardView
           stores={[
@@ -81,6 +88,7 @@ export function PublicBoardPage() {
           controls="public"
         />
       </ProfilePhotosProvider>
+      </div>
     </div>
   );
 }

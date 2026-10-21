@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { WizardSteps, useToast } from "@/components/ui";
 import { BrandMark } from "@/pages/auth/authKit";
 import { PhotoField, PasswordField, NameFields, PasswordStrength, accessButton, personNameIsValid, type PersonName } from "@/pages/access/AccessKit";
+import { AccessHeroBackdrop } from "@/pages/access/AccessHeroBackdrop";
 import { ONBOARDING_STEPS } from "@/pages/onboarding/steps";
 import { PRODUCT_NAME } from "@/data/wedash/tenant";
 import { PASSWORD_RULE_TEXT, passwordIsValid } from "@/lib/password";
@@ -110,14 +111,8 @@ export function CreateAccess() {
         </div>
       </div>
 
-      <div
-        className="relative hidden flex-col justify-center overflow-hidden p-12 lg:flex"
-        style={{ background: "linear-gradient(150deg,#0f2d54,#1b1650 55%,#14103a)" }}
-      >
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{ background: "radial-gradient(70% 60% at 25% 80%,rgba(86,168,255,.35),transparent 60%)" }}
-        />
+      <div className="relative hidden flex-col justify-center overflow-hidden p-12 lg:flex">
+        <AccessHeroBackdrop />
         <div className="relative">
           <h2 className="mb-6 text-[26px] font-extrabold leading-[1.3] tracking-tight text-white">
             Seu acesso à WDash

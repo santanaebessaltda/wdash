@@ -8,6 +8,7 @@ import { RequireSession } from "@/session/RequireSession";
 import { useSession } from "@/session/SessionProvider";
 import { destinationAfterAuth } from "@/session/authApi";
 import { lazyPage } from "@/lib/lazyPage";
+import { AccessHeroBackdrop } from "@/pages/access/AccessHeroBackdrop";
 
 /* Produto */
 import { accessRoutes } from "@/pages/access/routes";
@@ -122,7 +123,7 @@ const routeTree: RouteObject[] = [
   {
     path: paths.boardShare(":token"),
     element: (
-      <Suspense fallback={<div className="board-backdrop tela-cheia" />}>
+      <Suspense fallback={<div className="access-hero-scope tela-cheia relative"><AccessHeroBackdrop /></div>}>
         <PublicBoardPage />
       </Suspense>
     ),

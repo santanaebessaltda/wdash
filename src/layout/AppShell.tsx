@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { padBottom } from "@/lib/safeArea";
 import { Outlet, useLocation } from "react-router-dom";
 import { paths } from "@/router/paths";
@@ -14,6 +14,7 @@ import { storedThemePreference, useTheme } from "@/theme/ThemeProvider";
 import { ProfilePhotosProvider } from "@/components/wedash/PersonAvatar";
 import { PushRecover } from "@/push/PushRecover";
 import { isNotificationOpen, reloadSalesAfterOpen } from "@/push/resumeSales";
+import { AccessHeroBackdrop } from "@/pages/access/AccessHeroBackdrop";
 
 /** O banco so grava 1x a cada 5 min; aqui so evita chamadas a toa. */
 const LAST_SEEN_INTERVAL_MS = 5 * 60_000;
@@ -23,8 +24,12 @@ export function AppShell() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const location = useLocation();
-  const presentation = location.pathname === paths.board && new URLSearchParams(location.search).get("tv") === "1";
-  const mainRef = useRef<HTMLElement>(null);
+  const onBoard = location.pathname === paths.board;
+  const presentation = onBoard && new URLSearchParams(location.search).get("tv") === "1";
+  const mainRef = useRef<HTMLElement | null>(null);
+  const setScroller = useCallback((node: HTMLElement | null) => {
+    mainRef.current = node;
+  }, []);
 
   // html/body com height 100% + overflow-x hidden fazem o <body> rolar (nao a janela nem o <main>):
   // zera todos para a tela nova abrir no topo.
@@ -114,13 +119,20 @@ export function AppShell() {
           </div>
         )}
         <main
-          ref={mainRef}
+          ref={onBoard ? undefined : setScroller}
           className={cn(
-            "flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto print:overflow-visible print:p-0",
-            presentation ? "p-0" : "px-4 pt-5 sm:px-8 sm:pt-6",
-            location.pathname === paths.board && "board-backdrop",
+            "relative flex min-h-0 flex-1 flex-col print:overflow-visible print:p-0",
+            onBoard ? "access-hero-scope overflow-hidden" : "overflow-x-hidden overflow-y-auto px-4 pt-5 sm:px-8 sm:pt-6",
           )}
         >
+          {onBoard && <AccessHeroBackdrop />}
+          <div
+            ref={onBoard ? setScroller : undefined}
+            className={cn(
+              onBoard && "relative z-10 min-h-0 flex-1 overflow-x-hidden overflow-y-auto print:overflow-visible print:p-0",
+              onBoard && (presentation ? "p-0" : "px-4 pt-5 sm:px-8 sm:pt-6"),
+            )}
+          >
           <ProfilePhotosProvider>
             <Suspense fallback={<PageLoader />}>
               <div
@@ -132,6 +144,7 @@ export function AppShell() {
               </div>
             </Suspense>
           </ProfilePhotosProvider>
+          </div>
         </main>
       </div>
 
