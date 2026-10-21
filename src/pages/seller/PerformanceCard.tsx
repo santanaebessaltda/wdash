@@ -54,6 +54,7 @@ function RankingList({ ranking }: { ranking: MonthRankingEntry[] }) {
 export function PerformanceCard({ store, today, through, closed }: { store: SellerHomeStore; today: string; through: string; closed: boolean }) {
   const geral = store.goals.some((g) => g.mode === "geral");
   const ranking = store.storeRanking ?? [];
+  const hasSales = ranking.some((r) => r.revenue > 0 || r.sales > 0);
   const challenges = store.challenges ?? [];
   return (
     <Card className="min-w-0 overflow-hidden" padding="lg">
@@ -74,6 +75,8 @@ export function PerformanceCard({ store, today, through, closed }: { store: Sell
                 title="Ninguém no ranking ainda"
                 description="O ranking aparece quando houver pessoas nesta loja."
               />
+            ) : !hasSales ? (
+              <EmptyBlock />
             ) : (
               <RankingList ranking={ranking} />
             ),
