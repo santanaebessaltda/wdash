@@ -45,15 +45,22 @@ function sum(days: SellerDay[], from: string, to: string): Totais {
   return { revenue, sales, items: withoutItems ? null : items };
 }
 
-function number(current: number, previous: number | null, vs: string | undefined, unit: "brl" | "sales" | "pa"): SellerNumber {
-  return { value: current, delta: previous == null ? undefined : kpiDelta(current, previous, vs, unit) };
+function number(
+  shown: number,
+  compare: number | null,
+  previous: number | null,
+  vs: string | undefined,
+  unit: "brl" | "sales" | "pa",
+): SellerNumber {
+  return { value: shown, delta: compare == null || previous == null ? undefined : kpiDelta(compare, previous, vs, unit) };
 }
 
 /**
  * Faturamento, vendas, ticket e P.A. do vendedor.
- * Mes compara com o mesmo recorte do periodo anterior, os dois lados ate ontem
- * (mesma regra da Dashboard > Equipe, via `previousPeriod`); Hoje nao compara.
- * P.A. fica indisponivel quando algum dia com venda nao tem itens.
+ * O número é o período inteiro, o mesmo corte do ranking. A comparação, quando o
+ * período termina hoje, perde o último dia nos dois lados (não há venda por pessoa
+ * e hora) — a mesma regra da Dashboard > Equipe.
+ * P.A. fica indisponível quando algum dia com venda não tem itens.
  */
 export function sellerNumbers(days: SellerDay[], period: { from: string; to: string }, today: string, mode: NumbersMode): SellerNumbers {
   if (mode === "today") {
@@ -69,25 +76,29 @@ export function sellerNumbers(days: SellerDay[], period: { from: string; to: str
   const resolvido = resolvePeriod({ kind: "custom", start: period.from, end: period.to }, today);
   const compara = resolvido.endsToday;
   const band = previousPeriod(resolvido);
-  // Periodo que termina hoje: os dois lados perdem o ultimo dia (nao existe venda por pessoa e hora).
-  const endCurrent = compara ? addDays(period.to, -1) : period.to;
+  const endCompare = compara ? addDays(period.to, -1) : period.to;
   const endPrevious = compara ? addDays(band.end, -1) : band.end;
-  const current = sum(days, period.from, endCurrent);
-  if (current.sales === 0 && current.revenue === 0) return { ...ZERO, pa: { value: current.items == null ? null : 0 } };
+  const shown = sum(days, period.from, period.to);
+  if (shown.sales === 0 && shown.revenue === 0) return { ...ZERO, pa: { value: shown.items == null ? null : 0 } };
 
+  const compare = compara ? sum(days, period.from, endCompare) : shown;
   const previous = sum(days, band.start, endPrevious);
   const hasPrevious = previous.sales > 0 || previous.revenue > 0;
   const vs = band.label;
+  const compareRevenue = hasPrevious ? compare.revenue : null;
+  const compareSales = hasPrevious ? compare.sales : null;
 
-  const ticketCurrent = current.sales > 0 ? current.revenue / current.sales : 0;
-  const ticketPrevious = previous && previous.sales > 0 ? previous.revenue / previous.sales : null;
-  const paCurrent = current.items == null ? null : current.sales > 0 ? current.items / current.sales : 0;
-  const paPrevious = previous == null || previous.items == null ? null : previous.sales > 0 ? previous.items / previous.sales : null;
+  const ticketShown = shown.sales > 0 ? shown.revenue / shown.sales : 0;
+  const ticketCompare = compare.sales > 0 ? compare.revenue / compare.sales : null;
+  const ticketPrevious = previous.sales > 0 ? previous.revenue / previous.sales : null;
+  const paShown = shown.items == null ? null : shown.sales > 0 ? shown.items / shown.sales : 0;
+  const paCompare = compare.items == null ? null : compare.sales > 0 ? compare.items / compare.sales : null;
+  const paPrevious = previous.items == null ? null : previous.sales > 0 ? previous.items / previous.sales : null;
 
   return {
-    revenue: number(current.revenue, hasPrevious && previous ? previous.revenue : null, vs, "brl"),
-    sales: number(current.sales, hasPrevious && previous ? previous.sales : null, vs, "sales"),
-    ticket: number(ticketCurrent, hasPrevious && ticketPrevious != null ? ticketPrevious : null, vs, "brl"),
-    pa: { value: paCurrent, delta: paCurrent != null && paPrevious != null ? kpiDelta(paCurrent, paPrevious, vs, "pa") : undefined },
+    revenue: number(shown.revenue, compareRevenue, hasPrevious ? previous.revenue : null, vs, "brl"),
+    sales: number(shown.sales, compareSales, hasPrevious ? previous.sales : null, vs, "sales"),
+    ticket: number(ticketShown, hasPrevious ? ticketCompare : null, hasPrevious ? ticketPrevious : null, vs, "brl"),
+    pa: { value: paShown, delta: paCompare != null && paPrevious != null ? kpiDelta(paCompare, paPrevious, vs, "pa") : undefined },
   };
 }

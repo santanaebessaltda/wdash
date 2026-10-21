@@ -287,4 +287,16 @@ describe("buildSellerHome", () => {
     ]);
     expect(out.stores[0]!.storeRanking.find((r) => r.me)).toMatchObject({ name: "ANA", revenue: 4_000, sales: 5 });
   });
+
+  it("venda só pelo nome entra na linha da pessoa, a mesma soma dos números", () => {
+    const out = buildSellerHome(input({ sellerDayAggs: [...sales, sale(null, "ANA", "2026-09-12", 500)] }));
+    const me = out.stores[0]!.storeRanking.find((r) => r.me);
+    const mine = out.myDays.filter((d) => d.day >= "2026-09-01" && d.day <= "2026-09-15");
+    expect(me).toMatchObject({
+      revenue: mine.reduce((sum, d) => sum + d.revenue, 0),
+      sales: mine.reduce((sum, d) => sum + d.sales, 0),
+    });
+    expect(me?.revenue).toBe(4_100);
+    expect(me?.sales).toBe(6);
+  });
 });

@@ -27,10 +27,11 @@ describe("sellerNumbers", () => {
       day(TODAY, 900, 9, 18),
     ];
     const n = sellerNumbers(days, { from: "2026-10-01", to: TODAY }, TODAY, "month");
-    // Hoje fica de fora dos dois lados: 01 - 03/10 x os 4 dias anteriores ate 29/09.
-    expect(n.revenue.value).toBe(900);
-    expect(n.revenue.delta?.previous).toBeTruthy();
-    expect(n.sales.value).toBe(9);
+    // O número inclui hoje (400+500+900). A comparação perde o dia: 01–03/10 contra os 4 dias anteriores até 29/09.
+    expect(n.revenue.value).toBe(1_800);
+    expect(n.revenue.delta?.value).toBe("125%");
+    expect(n.sales.value).toBe(18);
+    expect(n.sales.delta?.value).toBe("125%");
   });
 
   it("P.A. fica indisponível quando um dia com venda não tem itens (AC 4)", () => {

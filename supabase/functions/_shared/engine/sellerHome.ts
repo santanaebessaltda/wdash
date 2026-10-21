@@ -272,19 +272,21 @@ function salesRanking(
   const inScope = (m: GoalTeamMember) =>
     m.storeId === s.storeId && m.salesPerson && (scope === "store" || group == null || m.shiftId === group.shiftId);
   const byEmployee = new Map<number, GoalTeamMember>();
+  const byName = new Map<string, GoalTeamMember>();
   const totals = new Map<string, { employeeId: number; name: string; revenue: number; sales: number; me: boolean }>();
   for (const m of input.team) {
     if (!inScope(m) || m.employeeId == null) continue;
     byEmployee.set(m.employeeId, m);
+    for (const k of m.nameKeys) if (!byName.has(k)) byName.set(k, m);
     const name = collaboratorName(m.name);
     if (!name) continue;
     totals.set(`e:${m.employeeId}`, { employeeId: m.employeeId, name, revenue: 0, sales: 0, me: m.employeeId === s.employeeId });
   }
   for (const r of input.sellerDayAggs) {
-    if (r.storeId !== s.storeId || r.day < from || r.day > range.to || r.sellerEmployeeId == null) continue;
-    const member = byEmployee.get(r.sellerEmployeeId);
-    if (!member) continue;
-    const row = totals.get(`e:${r.sellerEmployeeId}`);
+    if (r.storeId !== s.storeId || r.day < from || r.day > range.to) continue;
+    const member = r.sellerEmployeeId != null ? byEmployee.get(r.sellerEmployeeId) : byName.get(r.sellerKey);
+    if (!member || member.employeeId == null || !inScope(member)) continue;
+    const row = totals.get(`e:${member.employeeId}`);
     if (!row) continue;
     row.revenue += r.revenueCents / 100;
     row.sales += r.salesCount;
