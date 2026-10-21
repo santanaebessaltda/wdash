@@ -233,7 +233,7 @@ export function SellersBlock({
           },
           {
             key: "pctGeral",
-            header: "% da meta da filial",
+            header: "Participação na meta da filial",
             hideBelow: "lg",
             sortable: true,
             sortValue: (l: LineRank) => (l.noGoal ? null : l.storeGoalPct),
@@ -391,6 +391,8 @@ export function GoalProgressBar({
   todayIso,
   soBarra = false,
   individual = false,
+  quietLabels = false,
+  hideMissed = false,
 }: {
   goal: NetworkGlobalGoal;
   embedded?: boolean;
@@ -404,6 +406,10 @@ export function GoalProgressBar({
   todayIso?: string;
   /** Individual: o nivel e de cada pessoa. A barra mostra so o faturamento da filial. */
   individual?: boolean;
+  /** No card da Equipe, o nome do nível fica mais leve que o percentual. */
+  quietLabels?: boolean;
+  /** Na vendedora, o desfecho fica no bloco do nível, não ao lado do percentual. */
+  hideMissed?: boolean;
 }) {
   const showsProjection =
     !soBarra &&
@@ -459,7 +465,7 @@ export function GoalProgressBar({
         </p>
         <div className="flex flex-col items-start gap-1 sm:items-end">
           <p className={`font-mono text-[26px] font-extrabold leading-none sm:text-[28px] ${colorPct}`}>{num(goal.pct, 1)}%</p>
-          {goal.daysRemaining <= 0 && goal.pct < 100 ? <ProgressStanding ok={false}>Não atingiu</ProgressStanding> : null}
+          {!hideMissed && goal.daysRemaining <= 0 && goal.pct < 100 ? <ProgressStanding ok={false}>Não atingiu</ProgressStanding> : null}
         </div>
       </div>
       {outsideRankingNote(goal) ? <p className="mt-1 text-[12px] text-t2">{outsideRankingNote(goal)}</p> : null}
@@ -521,17 +527,18 @@ export function GoalProgressBar({
                     <p
                       key={d.name}
                       className={cn(
-                        "absolute top-0 whitespace-nowrap text-[10px] font-bold leading-tight",
+                        "absolute top-0 whitespace-nowrap leading-tight",
+                        quietLabels ? "text-[10px] font-medium" : "text-[10px] font-bold",
                         isLast && "right-0 text-right",
                         anchorDireitaNoTick && "-translate-x-full text-right",
                         !isLast && !anchorDireitaNoTick && "-translate-x-1/2 text-center",
-                        atingido ? "text-acc" : "text-t2",
+                        quietLabels ? (atingido ? "text-t2" : "text-t3") : atingido ? "text-acc" : "text-t2",
                       )}
                       style={isLast ? undefined : { left: `${left}%` }}
                       title={`N${i + 1} · ${d.name} · ${num(d.commissionPct, 1)}%`}
                     >
                       N{i + 1} · {shortLabel}
-                      <span className="font-semibold opacity-75"> ({num(d.commissionPct, 1)}%)</span>
+                      <span className={quietLabels ? "font-normal" : "font-semibold opacity-75"}> ({num(d.commissionPct, 1)}%)</span>
                     </p>
                   );
                 })}
@@ -598,6 +605,7 @@ export function GoalCard({
           hideTitle
           tiers={card.tiers}
           todayIso={todayIso}
+          quietLabels
         />
       </div>
     </>

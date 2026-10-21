@@ -257,7 +257,7 @@ function BoardGoalCard({ board, showStore }: { board: GoalBoard; showStore: bool
           </p>
         </div>
         <div className="shrink-0 text-right">
-          <p className={`font-mono text-[22px] font-extrabold leading-none tabular-nums ${progressTextClass(summary.pct)}`}>{num(summary.pct, 1)}%</p>
+          <p className={`font-mono text-[16px] font-bold leading-none tabular-nums ${progressTextClass(summary.pct)}`}>{num(summary.pct, 1)}%</p>
           <p className="mt-1 text-[12px] text-t2">de {brlCent(goal.target)}</p>
         </div>
       </div>
@@ -603,7 +603,7 @@ export function BoardView({
       {goalBoards.length > 0 ? (
         <div className="flex flex-col gap-3">
           {goalBoards.map((board) => (
-            <BoardGoalCard key={board.goal.id} board={board} showStore={manyStores} />
+            <BoardGoalCard key={board.goal.id} board={board} showStore={manyStores && controls !== "tv"} />
           ))}
         </div>
       ) : (

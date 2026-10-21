@@ -2,7 +2,7 @@ import { Badge, Card, CardHero, ProgressBar, ProgressStanding, progressTextClass
 import { BranchBadge, DeadlineBadge, PeriodBadge, PrizeBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { PersonAvatar, PersonAvatarGroup } from "@/components/wedash/PersonAvatar";
 import type { ChallengeRecord } from "@/data/wedash/challengesRepo";
-import { CHALLENGE_STATUS_LABEL, metricValueLabel, prizeLabel, type ChallengeParticipant, type ChallengeView } from "@/data/wedash/challengeView";
+import { CHALLENGE_STATUS_LABEL, metricValueLabel, type ChallengeParticipant, type ChallengeView } from "@/data/wedash/challengeView";
 import { cn } from "@/lib/cn";
 import { num } from "@/lib/format";
 import { challengeCriterion, challengeHeadline, challengeMinimumLabel, challengeWonLabel, floorChallengeHeadline, floorPrizeLine, HeadlineText, mainPrizeLabel } from "@/pages/challenges/shared";
@@ -335,7 +335,7 @@ function ChallengePeople({
   disputa: boolean;
   leader: number;
   hotKey: string | null;
-  /** No placar, quem já levou mostra "Ganhou" com o prêmio. */
+  /** No placar, quem já levou mostra "Ganhou". O valor fica no cabeçalho. */
   announcePrize?: boolean;
   className?: string;
 }) {
@@ -390,7 +390,7 @@ function ChallengePersonStatus({
   announcePrize: boolean;
 }) {
   if (person.result == null) return <span className="shrink-0 text-[11px] font-semibold text-t3">Sem resultado</span>;
-  const won = announcePrize && person.winner && person.prize && (!disputa || ended) ? `Ganhou ${prizeLabel(person.prize)}` : null;
+  const won = announcePrize && person.winner && (!disputa || ended) ? "Ganhou" : null;
   if (won) return <span className="max-w-[11rem] text-right text-[12px] font-semibold leading-tight text-ok">{won}</span>;
   if (disputa && person.position != null) return <ProgressStanding ok={person.winner}>{`${person.position}º lugar`}</ProgressStanding>;
   if (person.winner) return <ProgressStanding ok>Ganhou</ProgressStanding>;

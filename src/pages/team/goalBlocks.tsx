@@ -343,7 +343,7 @@ export function SellersBlock({
           },
           {
             key: "pctGeral",
-            header: "% da meta da filial",
+            header: "Participação na meta da filial",
             hideBelow: "lg",
             sortable: true,
             sortValue: (l: LineRank) => (l.noGoal ? null : l.storeGoalPct),

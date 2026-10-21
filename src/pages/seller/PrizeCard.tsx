@@ -140,6 +140,8 @@ function PrizeBody({ goal, me, storeName, today, through, closed }: { goal: Sell
         .filter(Boolean)
         .join(" · ")
     : undefined;
+  const ended = goalStatus(goal, closed ? through : today) === "ended";
+  const missedNext = ended && me.next ? `Faltaram ${brlCent(me.next.gap)} para N${me.next.number} · ${me.next.name}` : undefined;
 
   return (
     <div className="flex flex-col gap-4">
@@ -156,17 +158,35 @@ function PrizeBody({ goal, me, storeName, today, through, closed }: { goal: Sell
         {me.group ? <p className="mt-1.5 text-[12px] text-t2">Grupo {me.group}</p> : null}
       </div>
 
-      <GoalProgressBar goal={band} tiers={tiers} todayIso={today} embedded hideTitle individual={false} />
+      <GoalProgressBar goal={band} tiers={tiers} todayIso={today} embedded hideTitle individual={false} hideMissed />
 
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
         <Tile
           label="Premiação atual"
           value={brlCent(total)}
           valueClass={total > 0 ? "text-ok" : "text-t0"}
-          sub={level ? `${level}${current ? ` · ${num(current.commissionPct, 1)}%` : ""}` : "Ainda abaixo do 1º nível"}
+          sub={
+            !level
+              ? ended
+                ? undefined
+                : "Ainda abaixo do 1º nível"
+              : ended
+                ? current
+                  ? `${num(current.commissionPct, 1)}%`
+                  : undefined
+                : `${level}${current ? ` · ${num(current.commissionPct, 1)}%` : ""}`
+          }
           tip={me.bonus > 0 ? `Inclui ${brlCent(me.bonus)} de bônus dos níveis alcançados.` : undefined}
         />
-        {me.next ? (
+        {ended ? (
+          <Tile
+            label="Nível final"
+            value={level ?? "Não atingiu"}
+            mono={false}
+            valueClass={!level ? "text-t1" : me.next ? "text-t0" : "text-ok"}
+            sub={level && !me.next ? "Você chegou ao último nível." : missedNext}
+          />
+        ) : me.next ? (
           <Tile label="Próximo nível" value={`N${me.next.number} · ${me.next.name}`} mono={false} sub={nextSub} detail={nextDetail} />
         ) : (
           <Tile label="Próximo nível" value="Último nível" mono={false} valueClass="text-ok" sub="Você chegou ao último nível." />
