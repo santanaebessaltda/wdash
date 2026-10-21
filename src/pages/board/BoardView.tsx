@@ -526,7 +526,7 @@ export function BoardView({
         </div>
         {showSound && (
           <div className="flex flex-wrap items-center gap-2">
-            <BoardThemeSwitch />
+            {controls === "public" ? <BoardThemeSwitch /> : null}
             <button
               type="button"
               className={cn(

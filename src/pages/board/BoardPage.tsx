@@ -15,8 +15,6 @@ import { useActiveSession } from "@/session/SessionProvider";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { BoardView, boardScopeKey, type BoardChallengesData, type BoardGoalsData, type BoardStore } from "./BoardView";
 import { ShareBoardButton } from "./ShareBoardButton";
-import { BoardThemeSwitch } from "./boardTheme";
-
 const REFRESH_MS = 30 * 60 * 1000;
 const WATERMARK_MS = 60 * 1000;
 
@@ -203,17 +201,14 @@ export function BoardPage() {
           title="Placar"
           subtitle="Acompanhe o desempenho das filiais, o ranking, as metas e os desafios em tempo real."
           actions={
-            <>
-              <BoardThemeSwitch />
-              {picked.length > 0 ? (
-                <>
-                  <ShareBoardButton stores={boardStores.map((store) => ({ id: store.id, tradeName: store.tradeName }))} />
-                  <Button type="button" icon={<MonitorUpIcon />} onClick={enterTv}>
-                    Exibir na TV
-                  </Button>
-                </>
-              ) : null}
-            </>
+            picked.length > 0 ? (
+              <>
+                <ShareBoardButton stores={boardStores.map((store) => ({ id: store.id, tradeName: store.tradeName }))} />
+                <Button type="button" icon={<MonitorUpIcon />} onClick={enterTv}>
+                  Exibir na TV
+                </Button>
+              </>
+            ) : null
           }
         />
       )}
