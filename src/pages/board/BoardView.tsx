@@ -265,7 +265,7 @@ function BoardGoalCard({ board, showStore }: { board: GoalBoard; showStore: bool
         ) : null}
         <DeadlineBadge label={prazoRemaining(summary.daysRemaining)} />
       </div>
-      <GoalLevelGuide goal={goal} sellers={card.sellers} />
+      <GoalLevelGuide goal={goal} sellers={card.sellers} toggle />
         </div>
       </div>
     </Card>

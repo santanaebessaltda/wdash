@@ -1,70 +1,110 @@
+import { useState } from "react";
+import { Button, Segmented } from "@/components/ui";
 import type { GoalRecord, SellerRow } from "@/data/wedash/engine/goalTypes";
 import { brlCent, num, shiftName } from "@/lib/format";
+import { Icon, icons } from "@/pages/users/Icons";
 
-/** Quanto cada nível vale, no formato da planilha: valor do mês, média por dia, premiação e bônus. */
-export function GoalLevelGuide({ goal, sellers }: { goal: GoalRecord; sellers: SellerRow[] }) {
+/** Níveis no desenho da vendedora. No placar abre pelo botão; no detalhe fica no card. */
+export function GoalLevelGuide({
+  goal,
+  sellers,
+  toggle = false,
+  showReached = false,
+}: {
+  goal: GoalRecord;
+  sellers: SellerRow[];
+  /** No placar, os níveis ficam atrás do botão. */
+  toggle?: boolean;
+  /** No detalhe, cada card mostra quantas pessoas do turno já chegaram. */
+  showReached?: boolean;
+}) {
   const guide = buildGoalLevelGuide(goal, sellers);
+  const [open, setOpen] = useState(!toggle);
+  const [groupKey, setGroupKey] = useState(guide?.groups[0]?.key ?? "");
   if (!guide) return null;
+  const selected = guide.groups.find((group) => group.key === groupKey) ?? guide.groups[0]!;
   return (
-    <div className="mt-4 border-t border-line pt-3">
-      <p className="text-[12.5px] leading-snug text-t1">{guide.intro}</p>
-      {guide.note ? <p className="mt-1 text-[12px] leading-snug text-t2">{guide.note}</p> : null}
-      <div className="mt-3 flex flex-col gap-3">
-        {guide.groups.map((group) => (
-          <div key={group.key}>
-            <p className="mb-1.5 text-[12px] font-bold text-t0">
-              {group.title}
-              {group.people > 0 ? (
-                <span className="font-semibold text-t2">
-                  {" "}
-                  · {group.people} {group.people === 1 ? "pessoa" : "pessoas"}
-                </span>
-              ) : null}
-            </p>
-            <div className="min-w-0 overflow-x-auto">
-              <table className="w-full min-w-[520px] border-collapse text-[12px]">
-                <thead>
-                  <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-t2">
-                    <th className="py-1.5 pr-2 font-semibold">Nível</th>
-                    <th className="py-1.5 pr-2 text-right font-semibold">No mês</th>
-                    <th className="py-1.5 pr-2 text-right font-semibold">Por dia</th>
-                    <th className="py-1.5 pr-2 text-right font-semibold">Premiação</th>
-                    <th className="py-1.5 text-right font-semibold">Bônus</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {group.rows.map((row) => (
-                    <tr key={`${group.key}-${row.number}`} className="border-b border-line last:border-b-0">
-                      <td className="py-1.5 pr-2 font-semibold text-t0">
-                        N{row.number} · {row.name}
-                        <span className="mt-0.5 block text-[11px] font-medium text-t2">a partir de {num(row.pct, 0)}%</span>
-                      </td>
-                      <td className="py-1.5 pr-2 text-right font-mono font-bold tabular-nums text-t0">{brlCent(row.month)}</td>
-                      <td className="py-1.5 pr-2 text-right font-mono tabular-nums text-t1">{brlCent(row.day)}</td>
-                      <td className="py-1.5 pr-2 text-right font-mono font-bold tabular-nums text-t0">{num(row.commissionPct, 1)}%</td>
-                      <td className="py-1.5 text-right text-t1">
-                        {row.bonus > 0 ? (
-                          <>
-                            <span className="font-mono font-bold text-t0">{brlCent(row.bonus)}</span>
-                            {row.bonusSoFar > row.bonus ? <span className="block text-[11px] text-t2">acumula {brlCent(row.bonusSoFar)}</span> : null}
-                          </>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+    <div className={toggle ? "mt-3" : "mt-4 border-t border-line pt-3"}>
+      {toggle ? (
+        <Button type="button" variant="outline" size="sm" aria-expanded={open} onClick={() => setOpen((current) => !current)}>
+          {open ? "Fechar níveis" : "Níveis de premiação"}
+        </Button>
+      ) : null}
+      {open ? (
+        <div className={toggle ? "mt-3" : undefined}>
+          <p className="text-[12.5px] leading-snug text-t1">{guide.intro}</p>
+          {guide.note ? <p className="mt-1 text-[12px] leading-snug text-t2">{guide.note}</p> : null}
+          {guide.groups.length > 1 ? (
+            <Segmented
+              className="mt-3"
+              options={guide.groups.map((group) => ({ value: group.key, label: group.title }))}
+              value={selected.key}
+              onChange={(value) => value && setGroupKey(value)}
+            />
+          ) : null}
+          <div className="mt-3 flex flex-col gap-2.5">
+            {selected.rows.map((row) => {
+              const everyone = selected.people > 0 && row.reached === selected.people;
+              return (
+                <div key={row.number} className="flex items-center gap-3 rounded-xl border border-line bg-bg-inset px-3.5 py-3">
+                  <span
+                    className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-bold"
+                    style={{
+                      background: everyone ? "var(--ok)" : "var(--bg-3)",
+                      borderColor: everyone ? "var(--ok)" : "var(--line-2)",
+                      color: everyone ? "#fff" : "var(--t2)",
+                    }}
+                  >
+                    {everyone ? <Icon d={icons.check} size={12} /> : row.number}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13.5px] font-bold text-t0">
+                      N{row.number} · {row.name}
+                    </p>
+                    <p className="mt-0.5 text-[12px] font-semibold text-t1">{moneyLine(selected.kind, row.month, row.day)}</p>
+                    <p className="mt-0.5 text-[11.5px] text-t2">{ruleLine(row)}</p>
+                    {showReached && row.manager ? <p className="mt-0.5 text-[11.5px] text-t2">{row.manager}</p> : null}
+                    {showReached && selected.people > 0 ? (
+                      <p className="mt-0.5 text-[11.5px] font-semibold text-t1">{reachedLine(row.reached)}</p>
+                    ) : null}
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className={`font-mono text-[13px] font-extrabold ${everyone ? "text-ok" : "text-t1"}`}>{num(row.commissionPct, 1)}%</p>
+                    <p className="text-[10.5px] text-t2">de premiação</p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        ))}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }
 
-type GuideGroup = { key: string; title: string; people: number; fullAmount: number; days: number };
+function moneyLine(kind: GuideGroup["kind"], month: number, day: number): string {
+  const value = `${brlCent(month)} ${kind === "store" ? "a loja no mês" : kind === "group" ? "o grupo no mês" : "no mês"} · ${brlCent(day)} por dia`;
+  return value;
+}
+
+function ruleLine(row: GuideRow): string {
+  const parts = [`A partir de ${num(row.pct, 0)}% da meta`];
+  if (row.bonus > 0) {
+    parts.push(`bônus de ${brlCent(row.bonus)}`);
+    if (row.bonusSoFar > row.bonus) parts.push(`bônus acumulado de ${brlCent(row.bonusSoFar)}`);
+  }
+  return parts.join(" · ");
+}
+
+function reachedLine(count: number): string {
+  if (count === 0) return "Ninguém chegou";
+  if (count === 1) return "1 pessoa já chegou";
+  return `${count} pessoas já chegaram`;
+}
+
+type GuideKind = "person" | "group" | "store";
+
+type GuideGroup = { key: string; title: string; people: number; fullAmount: number; days: number; kind: GuideKind; members: SellerRow[] };
 
 type GuideRow = {
   number: number;
@@ -75,6 +115,8 @@ type GuideRow = {
   commissionPct: number;
   bonus: number;
   bonusSoFar: number;
+  reached: number;
+  manager: string | null;
 };
 
 function buildGoalLevelGuide(goal: GoalRecord, sellers: SellerRow[]): { intro: string; note: string | null; groups: Array<GuideGroup & { rows: GuideRow[] }> } | null {
@@ -94,19 +136,21 @@ function buildGoalLevelGuide(goal: GoalRecord, sellers: SellerRow[]): { intro: s
   let blocks: GuideGroup[];
 
   if (goal.tierMode === "GENERAL") {
-    intro = "A loja sobe de nível junta. Cada linha é o que a filial precisa vender no mês. Por dia é esse valor dividido pelos dias da meta.";
-    blocks = [{ key: "store", title: "Filial", people: people.length, fullAmount: goal.target, days }];
+    intro = "A loja sobe de nível junta. Cada card é o que a filial precisa vender no mês. Por dia é esse valor dividido pelos dias da meta.";
+    blocks = [{ key: "store", title: "Filial", people: people.length, fullAmount: goal.target, days, kind: "store", members: people }];
   } else if (goal.tierMode === "GROUP") {
-    intro = "O turno sobe junto. Cada linha é o que o grupo precisa vender no mês. Por dia é esse valor dividido pelos dias da meta.";
+    intro = "O turno sobe junto. Cada card é o que o grupo precisa vender no mês. Por dia é esse valor dividido pelos dias da meta.";
     blocks = [...grouped.entries()].map(([name, rows]) => ({
       key: name,
       title: shiftName(name),
       people: rows.length,
       fullAmount: rows[0]?.individualGoalAmount ?? 0,
       days: rows[0]?.periodDays || days,
+      kind: "group",
+      members: rows,
     }));
   } else {
-    intro = "Cada linha é o que uma pessoa do turno precisa vender no mês, na parte cheia. Por dia é esse valor dividido pelos dias da meta.";
+    intro = "Cada card é o que uma pessoa do turno precisa vender no mês, na parte cheia. Por dia é esse valor dividido pelos dias da meta.";
     if (people.some((seller) => seller.proportionalGoal)) {
       note = "Quem não ficou o mês inteiro leva uma parte menor, pelos dias em que esteve presente. Na tela dela, os valores já saem dessa parte.";
     }
@@ -114,37 +158,63 @@ function buildGoalLevelGuide(goal: GoalRecord, sellers: SellerRow[]): { intro: s
       const shares = rows.map(fullPersonShare).filter((amount) => amount > 0);
       return {
         key: name,
-        title: `${shiftName(name)} · cada pessoa`,
+        title: shiftName(name),
         people: rows.length,
         fullAmount: shares.length > 0 ? Math.max(...shares) : 0,
         days: rows[0]?.periodDays || days,
+        kind: "person",
+        members: rows,
       };
     });
   }
 
   if (blocks.length === 0) return null;
+  const order = goal.groups.map((group) => shiftName(group.name));
   const groups = blocks
     .filter((group) => group.fullAmount > 0)
-    .sort((a, b) => a.title.localeCompare(b.title, "pt-BR"))
-    .map((group) => ({ ...group, rows: rowsOf(goal, group.fullAmount, group.days) }));
+    .sort((a, b) => {
+      const left = order.indexOf(a.title);
+      const right = order.indexOf(b.title);
+      if (left === -1 && right === -1) return a.title.localeCompare(b.title, "pt-BR");
+      if (left === -1) return 1;
+      if (right === -1) return -1;
+      return left - right;
+    })
+    .map((group) => ({ ...group, rows: rowsOf(goal, group) }));
   if (groups.length === 0) return null;
   return { intro, note, groups };
 }
 
-function rowsOf(goal: GoalRecord, fullAmount: number, days: number): GuideRow[] {
+function rowsOf(goal: GoalRecord, group: GuideGroup): GuideRow[] {
   let bonusSoFar = 0;
+  let managerBonusSoFar = 0;
   return goal.tiers.map((tier, index) => {
     bonusSoFar += tier.bonus;
-    const month = (fullAmount * tier.minAttainmentPct) / 100;
+    const managerBonus = tier.managerBonus ?? 0;
+    managerBonusSoFar += tier.managerPct != null ? managerBonus : 0;
+    const month = (group.fullAmount * tier.minAttainmentPct) / 100;
+    const number = index + 1;
+    const manager =
+      tier.managerPct != null
+        ? [
+            `Gerência: ${num(tier.managerPct, 1)}% da venda da filial`,
+            managerBonus > 0 ? `bônus de ${brlCent(managerBonus)}` : "",
+            managerBonusSoFar > managerBonus ? `total de ${brlCent(managerBonusSoFar)}` : "",
+          ]
+            .filter(Boolean)
+            .join(" · ")
+        : null;
     return {
-      number: index + 1,
+      number,
       name: tier.name,
       pct: tier.minAttainmentPct,
       month,
-      day: days > 0 ? month / days : month,
+      day: group.days > 0 ? month / group.days : month,
       commissionPct: tier.commissionPct,
       bonus: tier.bonus,
       bonusSoFar,
+      reached: group.members.filter((seller) => (seller.currentLevel ?? 0) >= number).length,
+      manager,
     };
   });
 }

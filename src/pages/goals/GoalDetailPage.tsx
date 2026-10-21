@@ -321,9 +321,6 @@ function GoalTiersCard({
   management: GoalManagerPrize | null;
   today: string;
 }) {
-  const participants = card.sellers.filter((v) => !v.noGoal);
-  let bonusAcum = 0;
-  let bonusGerAcum = 0;
   return (
     <Card className={status === "ended" ? "print:hidden" : undefined}>
       <div className="mb-4 flex items-center gap-1.5">
@@ -348,65 +345,10 @@ function GoalTiersCard({
           ))}
         </div>
       )}
-      <GoalLevelGuide goal={goal} sellers={card.sellers} />
-      <div className="my-4 border-t border-line" />
       {goal.tiers.length === 0 ? (
-        <p className="text-[12.5px] text-t2">Esta meta não tem níveis de premiação.</p>
+        <p className="mt-4 text-[12.5px] text-t2">Esta meta não tem níveis de premiação.</p>
       ) : (
-        <div className="flex flex-col gap-3">
-          {goal.tiers.map((t, i) => {
-            bonusAcum += t.bonus;
-            const alcancaram = participants.filter((v) => (v.currentLevel ?? 0) >= i + 1).length;
-            const feito = participants.length > 0 && alcancaram === participants.length;
-            const partes = [`A partir de ${num(t.minAttainmentPct, 0)}% da meta`];
-            if (t.bonus > 0) {
-              partes.push(`bônus de ${brlCent(t.bonus)}`);
-              if (bonusAcum > t.bonus) partes.push(`bônus acumulado de ${brlCent(bonusAcum)}`);
-            }
-            let lineManagement: string | null = null;
-            if (t.managerPct != null) {
-              const bonusGer = t.managerBonus ?? 0;
-              bonusGerAcum += bonusGer;
-              const ger = [`Gerência: ${num(t.managerPct, 1)}% da venda da filial`];
-              if (bonusGer > 0) ger.push(`bônus de ${brlCent(bonusGer)}`);
-              if (bonusGerAcum > bonusGer) ger.push(`total de ${brlCent(bonusGerAcum)}`);
-              lineManagement = ger.join(" · ");
-            }
-            return (
-              <div
-                key={`${t.name}-${i}`}
-                className="flex items-center gap-3 rounded-xl border bg-bg-inset px-3.5 py-3"
-                style={{ borderColor: feito ? "var(--ok-soft)" : "var(--line)" }}
-              >
-                <span
-                  className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full border-2 text-white"
-                  style={{ background: feito ? "var(--ok)" : "var(--bg-3)", borderColor: feito ? "var(--ok)" : "var(--line-2)" }}
-                >
-                  {feito && <Icon d={icons.check} size={12} />}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[13.5px] font-bold text-t0">
-                    N{i + 1} · {t.name}
-                  </p>
-                  <p className="mt-0.5 text-[11.5px] text-t2">{partes.join(" · ")}</p>
-                  {lineManagement && <p className="mt-0.5 text-[11.5px] text-t2">{lineManagement}</p>}
-                </div>
-                {participants.length > 0 && (
-                  <div className="shrink-0 text-right">
-                    <p className={`font-mono text-[13px] font-extrabold ${feito ? "text-ok" : alcancaram > 0 ? "text-t1" : "text-t2"}`}>
-                      {alcancaram} de {participants.length}
-                    </p>
-                    <p className="text-[10.5px] text-t2">{participants.length === 1 ? "pessoa" : "pessoas"}</p>
-                  </div>
-                )}
-                <div className="shrink-0 text-right">
-                  <p className={`font-mono text-[13px] font-extrabold ${feito ? "text-ok" : "text-t1"}`}>{num(t.commissionPct, 1)}%</p>
-                  <p className="text-[10.5px] text-t2">de premiação</p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <GoalLevelGuide goal={goal} sellers={card.sellers} showReached />
       )}
       {management && status === "active" && (
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-acc-soft px-3.5 py-3 text-[12.5px]">
