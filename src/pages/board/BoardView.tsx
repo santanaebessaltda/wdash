@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Button, Card, CardHero, CardTitle, EmptyState, ProgressBar, StatCard, ThSort, progressTextClass, type SortDir } from "@/components/ui";
+import { Badge, Button, Card, CardHero, CardTitle, EmptyState, ProgressBar, StatCard, ThSort, progressTextClass, type SortDir } from "@/components/ui";
 import { BoardSkeleton } from "@/components/wedash/LoadingSkeletons";
-import { BranchBadge, PeriodBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
+import { BranchBadge, DeadlineBadge, PeriodBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { RankingBlock } from "@/pages/live/blocks";
 import type { RankingRow } from "@/data/wedash/live";
@@ -227,11 +227,12 @@ function BoardGoalCard({ board, showStore }: { board: GoalBoard; showStore: bool
       <div className="mt-3">
         <ProgressBar value={summary.pct} height={5} />
       </div>
-      <p className="mt-1.5 text-[11.5px] text-t2">
-        {summary.projectedPct != null
-          ? `Projeção ${num(summary.projectedPct, 0)}% · ${prazoRemaining(summary.daysRemaining).toLowerCase()}`
-          : prazoRemaining(summary.daysRemaining)}
-      </p>
+      <div className="mt-2 flex flex-wrap items-center justify-end gap-1.5">
+        {summary.projectedPct != null ? (
+          <Badge variant="accent" className="uppercase">Projeção: {num(summary.projectedPct, 0)}%</Badge>
+        ) : null}
+        <DeadlineBadge label={prazoRemaining(summary.daysRemaining)} />
+      </div>
         </div>
       </div>
     </Card>
@@ -629,10 +630,10 @@ export function BoardView({
                               <td className="py-1.5 pr-2 text-right font-mono text-[12.5px] font-bold tabular-nums text-t0">{person.pa == null ? "—" : num(person.pa, 2)}</td>
                               <td className="py-1.5 pr-2 text-right">
                                 <span className="block font-mono text-[13px] font-extrabold tabular-nums text-t0">{pct ?? "—"}</span>
-                                {level?.levelLabel ? (
-                                  <span className="mt-0.5 block text-[10px] font-medium text-t3">{level.levelLabel}</span>
-                                ) : level ? (
-                                  <span className="mt-0.5 block text-[10px] text-t3">Sem nível</span>
+                                {level ? (
+                                  <span className="mt-1 flex justify-end">
+                                    <Badge variant="neutral" className="uppercase">{level.levelLabel ?? "Sem nível"}</Badge>
+                                  </span>
                                 ) : null}
                               </td>
                               <td className="py-1.5 text-right font-mono text-[12.5px] font-bold tabular-nums text-t0">{brlCent(person.revenue)}</td>
