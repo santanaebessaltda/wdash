@@ -336,17 +336,17 @@ function ChallengeCard({
                 {minimum}
               </Badge>
             ) : null}
+            {!ended || reached ? (
+              <span className="flex w-full flex-wrap items-center gap-1.5 sm:ml-auto sm:w-auto">
+                {reached ? (
+                  <Badge variant="accent" className="uppercase">
+                    {reached}
+                  </Badge>
+                ) : null}
+                {!ended ? <DeadlineBadge label={view.prazo} /> : null}
+              </span>
+            ) : null}
           </div>
-          {!ended || reached ? (
-            <div className="mt-2 flex w-full flex-wrap items-center justify-end gap-1.5">
-              {reached ? (
-                <Badge variant="accent" className="uppercase">
-                  {reached}
-                </Badge>
-              ) : null}
-              {!ended ? <DeadlineBadge label={view.prazo} /> : null}
-            </div>
-          ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-1.5 self-start">
           <Tooltip label="Duplicar desafio">

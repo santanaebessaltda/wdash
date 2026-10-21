@@ -182,17 +182,17 @@ function ChallengeIdentity({
             {minimum}
           </Badge>
         ) : null}
+        {prazo || reached ? (
+          <span className="flex w-full flex-wrap items-center gap-1.5 sm:ml-auto sm:w-auto">
+            {reached ? (
+              <Badge variant="accent" className="uppercase">
+                {reached}
+              </Badge>
+            ) : null}
+            {prazo ? <DeadlineBadge label={prazo} /> : null}
+          </span>
+        ) : null}
       </span>
-      {prazo || reached ? (
-        <span className="mt-2 flex w-full flex-wrap items-center justify-end gap-1.5">
-          {reached ? (
-            <Badge variant="accent" className="uppercase">
-              {reached}
-            </Badge>
-          ) : null}
-          {prazo ? <DeadlineBadge label={prazo} /> : null}
-        </span>
-      ) : null}
     </>
   );
 }
