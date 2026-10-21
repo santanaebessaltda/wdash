@@ -548,13 +548,14 @@ export function PurchaseOrderPage() {
                         const category = po.parts.find((p) => p.storeId === group.branches[0]?.storeId)?.catalog.get(group.code)?.category;
                         const alone = !manyStores ? group.branches[0] : null;
                         const productSub = [group.code, category].filter(Boolean).join(" · ");
+                        const short = group.branches.some((branch) => branch.onOrder);
                         return (
                           <Fragment key={group.code}>
                             <tr
-                              className={cn("border-b border-line", manyStores && "cursor-pointer")}
+                              className={cn("border-b border-line", manyStores && "cursor-pointer", short && "bg-warn-soft")}
                               onClick={manyStores ? () => toggleGroup(group.code, open) : undefined}
                             >
-                              <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
+                              <td className={cn("px-1 py-3 text-center text-[13px] font-extrabold text-t2", short && "shadow-[inset_3px_0_0_var(--warn)]")}>{idx + 1}</td>
                               <td className="px-1 py-3">
                                 <div className={cn("flex min-w-0 items-center", manyStores && "gap-2")}>
                                   {manyStores && (
@@ -615,9 +616,12 @@ export function PurchaseOrderPage() {
                             </tr>
                             {open &&
                               group.branches.map((branch) => (
-                                <tr key={`${branch.storeId}:${branch.code}`} className="group border-b border-line bg-bg-inset transition-colors hover:bg-acc-soft">
+                                <tr
+                                  key={`${branch.storeId}:${branch.code}`}
+                                  className={cn("group border-b border-line transition-colors", branch.onOrder ? "bg-warn-soft" : "bg-bg-inset hover:bg-acc-soft")}
+                                >
                                   <td />
-                                  <td className="border-l-2 border-l-line-2 px-1 py-2.5 pl-16 transition-colors group-hover:border-l-acc">
+                                  <td className={cn("border-l-2 px-1 py-2.5 pl-16 transition-colors", branch.onOrder ? "border-l-warn" : "border-l-line-2 group-hover:border-l-acc")}>
                                     <p className="break-words text-[12.5px] font-semibold leading-5 text-t1">{branch.storeName}</p>
                                   </td>
                                   <td className="px-1 py-2 text-right">
