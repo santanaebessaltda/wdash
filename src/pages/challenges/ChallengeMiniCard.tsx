@@ -196,12 +196,15 @@ export function ChallengeProgress({
   view,
   height = 5,
   showDeadline = true,
+  showCount = false,
 }: {
   challenge: ChallengeRecord;
   view: ChallengeView;
   height?: number;
   /** No detalhe o prazo já está nos números do resumo. */
   showDeadline?: boolean;
+  /** No detalhe, “2/6 já atingiu”, como na meta. */
+  showCount?: boolean;
 }) {
   const upcoming = view.status === "upcoming";
   const ended = view.status === "ended";
@@ -221,14 +224,17 @@ export function ChallengeProgress({
   const pct = upcoming || shown == null ? 0 : goal != null ? (shown / goal) * 100 : best > 0 ? (shown / best) * 100 : 0;
   const headcount = `${count} ${count === 1 ? "pessoa" : "pessoas"}`;
   const left = upcoming ? (c.mode === "MINIMUM" ? challengeMinimumLabel(c) : challengeCriterion(c)) ?? "—" : shown != null ? metricValueLabel(c.metric, shown) : "Sem resultado";
+  const everyone = count > 0 && won === count;
   const reached =
     c.mode !== "MINIMUM" || upcoming
       ? null
-      : won === 0
-        ? "Ninguém atingiu"
-        : won === 1
-          ? "1 pessoa atingiu"
-          : `${won} pessoas atingiram`;
+      : showCount && count > 0
+        ? `${won}/${count} já atingiu`
+        : won === 0
+          ? "Ninguém atingiu"
+          : won === 1
+            ? "1 pessoa atingiu"
+            : `${won} pessoas atingiram`;
   const prazo = showDeadline && !upcoming && !ended ? view.prazo : null;
 
   return (
@@ -255,7 +261,7 @@ export function ChallengeProgress({
       </div>
       {reached || prazo ? (
         <p className="mt-2 text-[11.5px]">
-          {reached ? <span className={`font-semibold ${won > 0 ? "text-acc" : "text-t1"}`}>{reached}</span> : null}
+          {reached ? <span className={`font-semibold ${showCount ? (everyone ? "text-ok" : "text-t1") : won > 0 ? "text-acc" : "text-t1"}`}>{reached}</span> : null}
           {reached && prazo ? <span className="text-t2"> · </span> : null}
           {prazo ? <span className="text-t2">{prazo}</span> : null}
         </p>

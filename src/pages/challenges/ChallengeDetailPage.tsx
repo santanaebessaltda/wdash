@@ -36,7 +36,6 @@ import { statusBadgeVariant } from "@/lib/status";
 import { exportPdf } from "@/lib/printMode";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import {
-  CHALLENGE_MODE_HELP,
   challengeBackPath,
   challengeCriterion,
   challengeHeadline,
@@ -237,7 +236,9 @@ function ChallengeHero({ challenge: c, view, storeNameValue }: { challenge: Chal
   const minimum = challengeMinimumLabel(c);
   const items = itemsText(c);
   const usesSales = usesMinSales(c.metric);
-  const stats: { label: string; value: string; sub?: string; help?: string }[] = [
+  const people = view.participants.length;
+  const reachedPeople = c.mode === "MINIMUM" && view.status !== "upcoming" && people > 0;
+  const stats: { label: string; value: string; sub?: string; cls?: string }[] = [
     { label: "Tipo", value: CHALLENGE_METRIC_LABEL[c.metric], sub: items ?? undefined },
     {
       label: "Critério",
@@ -249,7 +250,11 @@ function ChallengeHero({ challenge: c, view, storeNameValue }: { challenge: Chal
       value: prizesText(c),
       sub: c.managerPrize ? `Gerência: ${prizeLabel(c.managerPrize)}${managerGoalText(c)}` : undefined,
     },
-    { label: destaque.label ?? "Resultado", value: destaque.value },
+    {
+      label: destaque.label ?? "Resultado",
+      value: reachedPeople ? `${view.reachedCount}/${people} já atingiu` : destaque.value,
+      cls: reachedPeople && view.reachedCount === people ? "text-ok" : undefined,
+    },
     { label: "Prazo", value: view.prazo },
   ];
 
@@ -274,7 +279,6 @@ function ChallengeHero({ challenge: c, view, storeNameValue }: { challenge: Chal
               </Badge>
             ) : null}
             <Badge variant="neutral" className="uppercase">{CHALLENGE_MODE_LABEL[c.mode]}</Badge>
-            <TipHelp label={CHALLENGE_MODE_HELP[c.mode]} />
           </div>
         </div>
       </div>
@@ -282,14 +286,14 @@ function ChallengeHero({ challenge: c, view, storeNameValue }: { challenge: Chal
         {stats.map((s) => (
           <div key={s.label} className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-t2">{s.label}</p>
-            <p className="mt-1 text-[14px] font-extrabold leading-snug text-t0">{s.value}</p>
+            <p className={`mt-1 text-[14px] font-extrabold leading-snug ${s.cls ?? "text-t0"}`}>{s.value}</p>
             {s.sub && <p className="mt-0.5 text-[11.5px] leading-snug text-t2">{s.sub}</p>}
           </div>
         ))}
       </div>
       <div className="mt-4">
         <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-t2">Progresso do desafio</p>
-        <ChallengeProgress challenge={c} view={view} height={12} showDeadline={false} />
+        <ChallengeProgress challenge={c} view={view} height={12} showDeadline={false} showCount />
       </div>
     </Card>
   );
