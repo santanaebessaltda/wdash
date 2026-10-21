@@ -1,6 +1,6 @@
-import { Badge, Card, CardHero, ProgressBar } from "@/components/ui";
+import { Badge, Card, CardHero, ProgressBar, progressTextClass } from "@/components/ui";
 import { BranchBadge, DeadlineBadge, PeriodBadge, PrizeBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
-import { PersonAvatar } from "@/components/wedash/PersonAvatar";
+import { PersonAvatar, PersonAvatarGroup } from "@/components/wedash/PersonAvatar";
 import type { ChallengeRecord } from "@/data/wedash/challengesRepo";
 import { CHALLENGE_STATUS_LABEL, metricValueLabel, type ChallengeParticipant, type ChallengeView } from "@/data/wedash/challengeView";
 import { cn } from "@/lib/cn";
@@ -101,27 +101,18 @@ export function ChallengeMiniCard({
             endsOn={c.endsOn}
             storeNameValue={storeNameValue}
             prize={prize}
-            minimum={minimum}
-            reached={reached}
-            prazo={ended ? null : view.prazo}
+            minimum={showPeople ? null : minimum}
+            reached={showPeople ? null : reached}
+            prazo={showPeople || ended ? null : view.prazo}
           />
-          {disputa ? (
+          {disputa && !showPeople ? (
             <span className="mt-2 block min-w-0 truncate text-[13px] text-t1">
               <HeadlineText headline={destaque} />
             </span>
           ) : null}
         </span>
       </span>
-      {showPeople && (
-        <ChallengePeople
-          challenge={c}
-          view={view}
-          disputa={disputa}
-          leader={leader}
-          hotKey={hotKey}
-          className="mt-3 border-t border-line pt-3"
-        />
-      )}
+      {showPeople ? <ChallengeSummary challenge={c} view={view} /> : null}
     </>
   );
   if (!onOpen) return <div className={className}>{body}</div>;
@@ -191,6 +182,90 @@ function ChallengeIdentity({
       ) : null}
     </>
   );
+}
+
+/** Mesmo miolo do card de meta: número, barra, prazo e avatares. */
+export function ChallengeSummary({ challenge: c, view }: { challenge: ChallengeRecord; view: ChallengeView }) {
+  const upcoming = view.status === "upcoming";
+  const ended = view.status === "ended";
+  const people = view.participants;
+  const count = people.length;
+  const won = people.filter((person) => person.winner).length;
+  const best = Math.max(0, ...people.map((person) => person.result ?? 0));
+  const leader = people.find((person) => person.position === 1);
+  const target = c.target != null && c.target > 0 ? c.target : null;
+  const total = people.reduce((sum, person) => sum + Math.max(0, person.result ?? 0), 0);
+  const pct = upcoming
+    ? 0
+    : target != null
+      ? Math.min(100, (best / target) * 100)
+      : total > 0
+        ? (best / total) * 100
+        : 0;
+  const rule = c.mode === "MINIMUM" ? challengeMinimumLabel(c) : challengeCriterion(c);
+  const headcount = `${count} ${count === 1 ? "pessoa" : "pessoas"}`;
+  const left = upcoming
+    ? (rule ?? "—")
+    : c.mode === "CONTEST"
+      ? best > 0
+        ? metricValueLabel(c.metric, leader?.result ?? best)
+        : "Sem líder"
+      : best > 0
+        ? metricValueLabel(c.metric, best)
+        : "Sem resultado";
+  const ahead = c.mode === "MINIMUM" ? won > 0 : best > 0;
+  const reached =
+    c.mode !== "MINIMUM" || upcoming
+      ? null
+      : won === 0
+        ? "Ninguém atingiu"
+        : won === 1
+          ? "1 pessoa atingiu"
+          : `${won} pessoas atingiram`;
+  const caption = [reached, !upcoming && !ended ? view.prazo : null].filter(Boolean).join(" · ");
+  const note = upcoming ? headcount : [rule, headcount].filter(Boolean).join(" · ");
+
+  return (
+    <>
+      <div className="mt-3.5 flex items-baseline justify-between gap-2">
+        <span className={cn("min-w-0 truncate font-mono text-[13px] font-extrabold", !upcoming && ahead ? "text-ok" : "text-t0")}>{left}</span>
+        <span className="shrink-0 text-right text-[11.5px] text-t2">
+          {upcoming ? (
+            view.prazo
+          ) : c.mode === "CONTEST" ? (
+            leader?.name ?? "Ainda não há líder"
+          ) : target != null ? (
+            <>
+              <span className={`font-mono font-bold ${progressTextClass(pct)}`}>{num(pct, 1)}%</span>
+              {` de ${metricValueLabel(c.metric, target)}`}
+            </>
+          ) : (
+            headcount
+          )}
+        </span>
+      </div>
+      <div className="mt-2">
+        <ProgressBar value={pct} height={5} />
+      </div>
+      {caption ? <p className="mt-2 text-[11.5px] text-t2">{caption}</p> : null}
+      <div className="flex-1" />
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <p className="min-w-0 text-[12px] text-t2">{note}</p>
+        {count > 0 ? (
+          <div className="shrink-0">
+            <PersonAvatarGroup people={avatarPeople(c, view)} max={3} />
+          </div>
+        ) : null}
+      </div>
+    </>
+  );
+}
+
+function avatarPeople(c: ChallengeRecord, view: ChallengeView) {
+  return view.participants.map((person) => {
+    const code = person.key.startsWith("e:") ? Number(person.key.slice(2)) : NaN;
+    return { name: person.name, storeId: c.storeId, employeeId: Number.isFinite(code) ? code : undefined };
+  });
 }
 
 function ChallengePeople({

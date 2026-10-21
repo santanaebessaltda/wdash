@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { Badge, Button, Card, DateRangePicker, Modal, useToast } from "@/components/ui";
+import { Button, Card, DateRangePicker, Modal, useToast } from "@/components/ui";
 import { Tooltip } from "@/components/ui/Tooltip";
 import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePicker";
 import { DuplicateChoiceModal } from "@/components/wedash/DuplicateChoiceModal";
@@ -21,17 +21,12 @@ import {
 } from "@/data/wedash/challengeView";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { storesForSession, type Store } from "@/data/wedash/stores";
-import { BranchBadge, DeadlineBadge, PeriodBadge, PrizeBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
+import { BranchBadge, PeriodBadge, PrizeBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { cn } from "@/lib/cn";
 import { fullDate, isoToDate, endOfMonth, dateToIso } from "@/lib/format";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
-import {
-  CHALLENGE_STATUS_ORDER,
-  challengeHeadline,
-  challengeMinimumLabel,
-  HeadlineText,
-  mainPrizeLabel,
-} from "@/pages/challenges/shared";
+import { ChallengeSummary } from "@/pages/challenges/ChallengeMiniCard";
+import { CHALLENGE_STATUS_ORDER, mainPrizeLabel } from "@/pages/challenges/shared";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import {
   applyPeriodDateChange,
@@ -281,10 +276,7 @@ function ChallengeCard({
   onCopy: () => void;
   onDelete: () => void;
 }) {
-  const destaque = challengeHeadline(c, view);
   const prize = mainPrizeLabel(c);
-  const minimum = challengeMinimumLabel(c);
-  const reached = c.mode === "MINIMUM" && view.status !== "upcoming" ? destaque.value : null;
   const ended = view.status === "ended";
   const statusLabel = CHALLENGE_STATUS_LABEL[view.status];
 
@@ -308,7 +300,7 @@ function ChallengeCard({
       }}
       className={cn(
         "flex cursor-pointer flex-col rounded-2xl border border-line p-5 shadow-[var(--shadow-vela)] transition-colors hover:border-line-2 focus-visible:border-acc focus-visible:outline-none",
-        ended ? "bg-bg-inset" : "bg-bg-2",
+        "bg-bg-2",
       )}
     >
       <div className="mb-3.5 flex items-start gap-3.5">
@@ -330,17 +322,6 @@ function ChallengeCard({
             {showsStore && store ? <BranchBadge name={store.tradeName} /> : null}
             {prize ? <PrizeBadge label={prize} /> : null}
           </div>
-          {minimum ? <p className="mt-1.5 text-[12px] font-semibold text-t1">{minimum}</p> : null}
-          {!ended || reached ? (
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              {reached ? (
-                <Badge variant="accent" className="uppercase">
-                  {reached}
-                </Badge>
-              ) : null}
-              {!ended ? <DeadlineBadge label={view.prazo} /> : null}
-            </div>
-          ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-1.5 self-start">
           <Tooltip label="Duplicar desafio">
@@ -366,11 +347,7 @@ function ChallengeCard({
         </div>
       </div>
 
-      {c.mode === "CONTEST" ? (
-        <p className="min-w-0 truncate text-[13px] text-t1">
-          <HeadlineText headline={destaque} />
-        </p>
-      ) : null}
+      <ChallengeSummary challenge={c} view={view} />
     </div>
   );
 }
