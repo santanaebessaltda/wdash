@@ -1,6 +1,7 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Badge, Button, Card, DateRangePicker, Modal, Skeleton, Tooltip, useToast, CALENDAR_QUICK_RANGES, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
 import { statusBadgeVariant } from "@/lib/status";
+import { FinanceMonthSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { DayFace, DayMetrics, MonthCalendar, blankDayClass } from "@/components/wedash/MonthCalendar";
 import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
 import { EmployeeWithdrawal } from "@/pages/cash-close/EmployeeWithdrawal";
@@ -605,20 +606,18 @@ export function CashClosePage() {
       <div className="mt-6 pb-6">
         {error ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar o fechamento. Tente novamente." /> : null}
         {showStores ? (
-          <Skeleton className="h-[520px] w-full rounded-[18px]" />
+          <FinanceMonthSkeleton cells={cells} today={today} />
         ) : storeRows.length === 0 ? (
           <Card>
             <EmptyBlock icon="📒" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
           </Card>
-        ) : (
+        ) : analysis ? (
           <>
-            {analysis ? (
-              <MonthSummary summary={analysis.summary} many={manyStores} diffDays={analysis.diffDays} closedRealCents={analysis.closedRealCents} />
-            ) : (
-              <Skeleton className="mb-4 h-[88px] w-full rounded-[18px]" />
-            )}
+            <MonthSummary summary={analysis.summary} many={manyStores} diffDays={analysis.diffDays} closedRealCents={analysis.closedRealCents} />
             <Month today={today} cells={cells} dayFace={dayFace} onOpen={openDay} many={manyStores} />
           </>
+        ) : (
+          <FinanceMonthSkeleton cells={cells} today={today} />
         )}
       </div>
       <DayModal
@@ -751,6 +750,91 @@ function MonthSummary({
     <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
       {cards.map((card) => (
         <PlainKpi key={card.label} label={card.label} value={card.value} color={card.color} tooltip={"tooltip" in card ? card.tooltip : undefined} />
+      ))}
+    </div>
+  );
+}
+
+function MetricSkeleton({ cols }: { cols: string }) {
+  return (
+    <div className={cn("mb-4 grid grid-cols-1 gap-2", cols)}>
+      {Array.from({ length: cols.includes("grid-cols-3") ? 3 : 1 }, (_, index) => (
+        <div key={index} className="min-w-0 rounded-[14px] border border-line bg-bg-1 px-3 py-3">
+          <Skeleton className="h-2.5 w-16" />
+          <Skeleton className="mt-1 h-7 w-24" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CloseTableSkeleton() {
+  return (
+    <div className="overflow-x-auto rounded-[var(--radius-vela-lg)] border border-line bg-bg-2">
+      <table className="w-full border-collapse text-sm">
+        <thead>
+          <tr className="border-b border-line">
+            <th className="px-3 py-3 text-left">
+              <Skeleton className="h-2.5 w-12" />
+            </th>
+            {Array.from({ length: 3 }, (_, index) => (
+              <th key={index} className="px-3 py-3 text-right">
+                <Skeleton className="ml-auto h-2.5 w-16" />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: 4 }, (_, row) => (
+            <tr key={row} className="border-b border-line last:border-b-0">
+              <td className="px-3 py-3">
+                <Skeleton className="h-3.5 w-20" />
+              </td>
+              {Array.from({ length: 3 }, (_, cell) => (
+                <td key={cell} className="px-3 py-3 text-right">
+                  <Skeleton className="ml-auto h-3.5 w-16" />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="bg-bg-1">
+            <td className="px-3 py-3">
+              <Skeleton className="h-3 w-12" />
+            </td>
+            {Array.from({ length: 3 }, (_, cell) => (
+              <td key={cell} className="px-3 py-3 text-right">
+                <Skeleton className="ml-auto h-3.5 w-16" />
+              </td>
+            ))}
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
+/** Dia em aberto: um número. Dia fechado: três números e a tabela de formas. */
+function DayLoadingSkeleton({ closed, stores }: { closed: boolean; stores: number }) {
+  const blocks = Math.max(1, stores);
+  return (
+    <div className="flex flex-col" aria-busy="true" aria-label="Carregando">
+      {Array.from({ length: blocks }, (_, index) => (
+        <section key={index} className={blocks > 1 ? "border-t border-line pb-6 pt-5 first:border-t-0 first:pt-0 last:pb-0" : undefined}>
+          {blocks > 1 ? <Skeleton className="mb-2 h-3.5 w-40" /> : null}
+          {closed ? (
+            <>
+              <MetricSkeleton cols="sm:grid-cols-3" />
+              <CloseTableSkeleton />
+            </>
+          ) : (
+            <>
+              <MetricSkeleton cols="" />
+              <Skeleton className="h-3.5 w-full max-w-md" />
+            </>
+          )}
+        </section>
       ))}
     </div>
   );
@@ -1132,7 +1216,7 @@ function DayModal({
       }
     >
       {!pronto ? (
-        <Skeleton className="h-40 w-full" />
+        <DayLoadingSkeleton closed={closed} stores={closed ? 1 : storeRows.length} />
       ) : !closed ? (
         <div className="flex flex-col">
           {storeRows.map((store) => {

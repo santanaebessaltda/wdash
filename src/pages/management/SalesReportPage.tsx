@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Alert, Badge, Button, Card, DateRangePicker, Modal, Skeleton, useToast, CALENDAR_QUICK_RANGES, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
+import { Alert, Badge, Button, Card, DateRangePicker, Modal, useToast, CALENDAR_QUICK_RANGES, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
+import { FinanceMonthSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { DayFace, DayMetrics, MonthCalendar, blankDayClass } from "@/components/wedash/MonthCalendar";
 import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
 import { DayChip, PlainKpi } from "@/pages/cash-close/CashClosePage";
@@ -329,7 +330,7 @@ export function SalesReportPage() {
         {error ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar o informe de vendas. Tente novamente." /> : null}
         {!manyStores && shoppingSendsSales(account?.administrator) && account?.lastError ? <Alert className="mb-4" variant="danger" title={account.lastError} /> : null}
         {showStores || (storeRows.length > 0 && (manyStores ? groupLoaded !== band : store != null && !pronto)) ? (
-          <Skeleton className="h-[520px] w-full rounded-[18px]" />
+          <FinanceMonthSkeleton cells={cells} today={today} marked={storeRows.length === 1} />
         ) : storeRows.length === 0 ? (
           <Card>
             <EmptyBlock icon="🧾" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />

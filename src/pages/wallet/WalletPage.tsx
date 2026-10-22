@@ -706,7 +706,7 @@ export function SellerWalletPage() {
         actions={<PeriodControl from={from} to={to} today={today} floor={floor} presetId={presetId} onChange={change} />}
       />
       {showSkeleton ? (
-        <Skeleton className="h-[420px] w-full rounded-[18px]" />
+        <SellerWalletSkeleton />
       ) : failed || !wallet ? (
         <div className="flex flex-col items-center gap-3 py-10 text-center">
           <p className="text-[15px] font-bold text-t0">Não foi possível carregar a carteira</p>
@@ -822,72 +822,155 @@ function WalletPrintHeader({ stores, all, period }: { stores: Store[]; all: bool
   );
 }
 
-/** Três números e a lista, no mesmo lugar em que aparecem carregados. */
-function WalletSkeleton() {
+/** Três números do `StatCard` (sem ícone) e a lista de pessoas. */
+function WalletSkeleton({ showStore = false }: { showStore?: boolean }) {
   return (
     <div className="flex flex-col gap-4" aria-busy="true" aria-label="Carregando">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {Array.from({ length: 3 }, (_, index) => (
-          <Card key={index}>
-            <Skeleton className="h-3 w-24" />
+          <Card key={index} className="min-w-0">
+            <Skeleton className="h-3 w-28" />
             <Skeleton className="mt-1 h-8 w-36" />
           </Card>
         ))}
       </div>
       <Card className="min-w-0 overflow-hidden" padding="none">
         <div className="px-5 pt-5">
-          <Skeleton className="mb-4 h-4 w-24" />
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <Skeleton className="h-4 w-20" />
+          </div>
         </div>
-        <div className="flex justify-end px-5 pb-4">
+        <div className="flex flex-wrap items-center justify-end gap-3 px-5 pb-4">
           <Skeleton className="h-8 w-full rounded-[var(--radius-vela-sm)] sm:w-56" />
         </div>
-        <div className="min-w-0 overflow-x-auto px-5 pb-5">
-          <table className="w-full min-w-[720px] border-collapse">
-            <thead>
-              <tr className="border-b border-line">
-                <th className="px-1 pb-3 text-left">
-                  <Skeleton className="h-2.5 w-3" />
-                </th>
-                {Array.from({ length: 5 }, (_, index) => (
-                  <th key={index} className="px-1 pb-3 text-left">
-                    <Skeleton className="h-2.5 w-14" />
+        <div className="min-w-0 px-5 pb-5">
+          <div className="min-w-0 overflow-x-auto">
+            <table className="w-full min-w-[720px] border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-line">
+                  <th className="px-1 pb-3 text-left">
+                    <Skeleton className="h-2.5 w-3" />
                   </th>
+                  <th className="px-1 pb-3 text-left">
+                    <Skeleton className="h-2.5 w-12" />
+                  </th>
+                  {showStore ? (
+                    <th className="px-1 pb-3 text-left">
+                      <Skeleton className="h-2.5 w-12" />
+                    </th>
+                  ) : null}
+                  {Array.from({ length: 4 }, (_, index) => (
+                    <th key={index} className="px-1 pb-3 text-right">
+                      <Skeleton className="ml-auto h-2.5 w-14" />
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({ length: 8 }, (_, row) => (
+                  <tr key={row} className="border-b border-line">
+                    <td className="px-1 py-3 text-center">
+                      <Skeleton className="mx-auto h-3.5 w-3" />
+                    </td>
+                    <td className="px-1 py-3 align-middle">
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <Skeleton className="h-8 w-8 shrink-0 rounded-full" />
+                        <Skeleton className="h-3.5 w-32" />
+                      </div>
+                    </td>
+                    {showStore ? (
+                      <td className="px-1 py-3 align-middle">
+                        <Skeleton className="h-3.5 w-24" />
+                      </td>
+                    ) : null}
+                    {Array.from({ length: 4 }, (_, cell) => (
+                      <td key={cell} className="px-1 py-3 text-right align-middle">
+                        <Skeleton className="ml-auto h-3.5 w-16" />
+                      </td>
+                    ))}
+                  </tr>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {Array.from({ length: 4 }, (_, row) => (
-                <tr key={row} className="border-b border-line">
-                  <td className="px-1 py-3">
-                    <Skeleton className="mx-auto h-3 w-3" />
+                <tr className="bg-bg-inset">
+                  <td />
+                  <td className="px-1 py-3 align-middle">
+                    <Skeleton className="h-3.5 w-28" />
+                    <Skeleton className="mt-1.5 h-2.5 w-16" />
                   </td>
-                  <td className="px-1 py-3">
-                    <div className="flex items-center gap-2.5">
-                      <Skeleton className="h-8 w-8 shrink-0 rounded-full" />
-                      <Skeleton className="h-3.5 w-32" />
-                    </div>
-                  </td>
+                  {showStore ? <td /> : null}
                   {Array.from({ length: 4 }, (_, cell) => (
-                    <td key={cell} className="px-1 py-3 text-right">
-                      <Skeleton className="ml-auto h-3 w-16" />
+                    <td key={cell} className="px-1 py-3 text-right align-middle">
+                      <Skeleton className="ml-auto h-3.5 w-16" />
                     </td>
                   ))}
                 </tr>
-              ))}
-              <tr className="bg-bg-inset">
-                <td />
-                <td className="px-1 py-3">
-                  <Skeleton className="h-3.5 w-28" />
-                  <Skeleton className="mt-1.5 h-2.5 w-16" />
-                </td>
-                {Array.from({ length: 4 }, (_, cell) => (
-                  <td key={cell} className="px-1 py-3 text-right">
-                    <Skeleton className="ml-auto h-3.5 w-16" />
-                  </td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <Skeleton className="h-3.5 w-44" />
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+/** Saldo, oportunidades e movimento, no mesmo lugar da carteira da vendedora. */
+function SellerWalletSkeleton() {
+  return (
+    <div className="flex flex-col gap-4" aria-busy="true" aria-label="Carregando">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {Array.from({ length: 3 }, (_, index) => (
+          <Card key={index} className="min-w-0">
+            <Skeleton className="h-11 w-11 rounded-[13px]" />
+            <Skeleton className="mt-4 h-3 w-28" />
+            <Skeleton className="mt-1 h-8 w-36" />
+          </Card>
+        ))}
+      </div>
+      <Card>
+        <Skeleton className="h-4 w-40" />
+        <div className="mt-3 flex flex-col gap-3">
+          {Array.from({ length: 2 }, (_, index) => (
+            <div key={index} className="flex items-start gap-3.5 rounded-xl border border-line p-4">
+              <Skeleton className="h-10 w-10 shrink-0 rounded-xl" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-2">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-6 w-20 shrink-0 rounded-full" />
+                </div>
+                <Skeleton className="mt-2 h-3 w-24" />
+                <div className="mt-3 grid grid-cols-2 gap-2.5">
+                  {Array.from({ length: 2 }, (_, tile) => (
+                    <div key={tile} className="min-w-0 rounded-xl border border-line bg-bg-inset p-3">
+                      <Skeleton className="h-3 w-16" />
+                      <Skeleton className="mt-1 h-4 w-20" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+      <Card>
+        <Skeleton className="h-4 w-44" />
+        <div className="mt-2">
+          <ul>
+            {Array.from({ length: 4 }, (_, index) => (
+              <li key={index} className="flex items-start justify-between gap-4 border-b border-line py-3">
+                <div className="min-w-0">
+                  <Skeleton className="h-4 w-36" />
+                  <Skeleton className="mt-1.5 h-3 w-24" />
+                </div>
+                <Skeleton className="h-4 w-16 shrink-0" />
+              </li>
+            ))}
+          </ul>
+          <div className="flex items-baseline justify-between gap-4 bg-bg-inset px-1 py-3">
+            <Skeleton className="h-4 w-16" />
+            <Skeleton className="h-5 w-20" />
+          </div>
         </div>
       </Card>
     </div>
@@ -1058,7 +1141,7 @@ export function BranchWalletPage() {
           </div>
         ) : null}
         {showSkeleton && !branches ? (
-          <WalletSkeleton />
+          <WalletSkeleton showStore={storeRows.length > 1} />
         ) : storeRows.length === 0 ? (
           <Card>
             <EmptyBlock icon="👛" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />

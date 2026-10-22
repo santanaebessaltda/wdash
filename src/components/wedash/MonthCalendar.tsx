@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Skeleton } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { isoToDate } from "@/lib/format";
 
@@ -37,6 +38,44 @@ export function MonthCalendar({ children }: { children: ReactNode }) {
 
 export function blankDayClass(index: number): string {
   return cn(cell, (index + 1) % 7 === 0 && "border-r-0", "bg-bg-1/30");
+}
+
+/** Mesma grade do mês: dia, valor e chip no lugar em que aparecem carregados. Dias futuros ficam só com o número. */
+export function MonthCalendarSkeleton({
+  cells,
+  today,
+  marked = false,
+}: {
+  cells: Array<string | null>;
+  today?: string;
+  marked?: boolean;
+}) {
+  return (
+    <MonthCalendar>
+      {cells.map((day, index) => {
+        const future = day != null && today != null && day > today;
+        const showMark = marked && day != null && !future;
+        return (
+          <div key={day ?? `vazio-${index}`} className={cn(cell, (index + 1) % 7 === 0 && "border-r-0", day == null && "bg-bg-1/30")}>
+            {day ? (
+              <div className="flex w-full min-w-0 flex-col">
+                <span className="flex w-full items-start justify-between gap-1">
+                  <Skeleton className="h-6 w-6 shrink-0 rounded-full" />
+                  {showMark ? <Skeleton className="mt-0.5 h-4 w-4 shrink-0 rounded-[3px]" /> : null}
+                </span>
+                {future ? null : (
+                  <div className="mt-1.5 w-full min-w-0">
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="mt-1 h-[22px] w-full rounded-md" />
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+    </MonthCalendar>
+  );
 }
 
 /** Número, valor e badges no mesmo lugar. A caixa fica no canto e não abre o dia. */

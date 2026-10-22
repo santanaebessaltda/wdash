@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Alert, Button, Card, DateRangePicker, Dropdown, Modal, Segmented, Skeleton, useToast, CALENDAR_QUICK_RANGES, Badge, type DatePresetId, type DateRangeChangeMeta, type DropdownItem } from "@/components/ui";
+import { Alert, Button, Card, DateRangePicker, Dropdown, Modal, Segmented, useToast, CALENDAR_QUICK_RANGES, Badge, type DatePresetId, type DateRangeChangeMeta, type DropdownItem } from "@/components/ui";
+import { FinanceMonthSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { DayFace, MonthCalendar, blankDayClass } from "@/components/wedash/MonthCalendar";
 import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
 import { calendarTodayIso } from "@/data/wedash/clock";
@@ -456,7 +457,7 @@ export function CashDropPage() {
       <div className="mt-6 pb-8">
         {error ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar as sangrias. Tente novamente." /> : null}
         {showStores || (storeRows.length > 0 && !pronto) ? (
-          <Skeleton className="h-[520px] w-full rounded-[18px]" />
+          <FinanceMonthSkeleton cells={cells} today={today} kpis={4} columns="sm:grid-cols-2 lg:grid-cols-4" hint marked={storeRows.length === 1} />
         ) : storeRows.length === 0 || !store ? (
           <Card>
             <EmptyBlock icon="💵" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />

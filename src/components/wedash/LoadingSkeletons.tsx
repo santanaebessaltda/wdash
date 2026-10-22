@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Card, Skeleton } from "@/components/ui";
+import { MonthCalendarSkeleton } from "@/components/wedash/MonthCalendar";
 import { cn } from "@/lib/cn";
 
 /*
@@ -990,6 +991,64 @@ export function ShiftRowsSkeleton({ rows = 2 }: { rows?: number }) {
       <Skeleton className="h-3.5 w-28" />
       <FormActionsSkeleton />
     </div>
+  );
+}
+
+/** Rótulo + valor do `PlainKpi` (Fechamento, Sangrias, Informe de vendas). */
+function PlainKpiSkeleton({ hint = false }: { hint?: boolean }) {
+  return (
+    <Card className="min-w-0">
+      <div className="flex items-center gap-1.5">
+        <Skeleton className="h-3 w-24" />
+        {hint ? <Skeleton className="h-4 w-4 shrink-0 rounded-full" /> : null}
+      </div>
+      <Skeleton className="mt-1.5 h-7 w-32" />
+    </Card>
+  );
+}
+
+/** Faixa de KPIs. No celular empilha; a partir de `sm` segue `columns`. */
+export function FinanceKpiSkeleton({
+  count = 3,
+  columns = "sm:grid-cols-3",
+  hint = false,
+  className,
+}: {
+  count?: number;
+  columns?: string;
+  hint?: boolean;
+  className?: string;
+}) {
+  return (
+    <div className={cn("grid grid-cols-1 gap-4", columns, className)}>
+      {Array.from({ length: count }, (_, index) => (
+        <PlainKpiSkeleton key={index} hint={hint} />
+      ))}
+    </div>
+  );
+}
+
+/** KPIs + calendário do mês, na mesma grade da tela carregada. */
+export function FinanceMonthSkeleton({
+  cells,
+  today,
+  kpis = 3,
+  columns = "sm:grid-cols-3",
+  hint = false,
+  marked = false,
+}: {
+  cells: Array<string | null>;
+  today?: string;
+  kpis?: number;
+  columns?: string;
+  hint?: boolean;
+  marked?: boolean;
+}) {
+  return (
+    <Busy>
+      <FinanceKpiSkeleton count={kpis} columns={columns} hint={hint} className="mb-4" />
+      <MonthCalendarSkeleton cells={cells} today={today} marked={marked} />
+    </Busy>
   );
 }
 
