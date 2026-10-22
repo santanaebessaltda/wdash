@@ -91,6 +91,7 @@ export function PublicBoardPage() {
               id: pack.store.id,
               tradeName: pack.store.tradeName,
               hours: effectiveWeekHours(parseWeekHours(pack.store.hours)),
+              timeZone: pack.store.timezone,
             },
           ]}
           team={pack.team}

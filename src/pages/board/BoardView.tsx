@@ -21,7 +21,7 @@ import { BoardThemeSwitch, useBoardTheme } from "./boardTheme";
 import { BoardCelebration, type CelebrationFace } from "./celebration";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { defaultWeekHours, effectiveWeekHours, type StoreWeekHours } from "@/data/wedash/storeHours";
-import { formatSyncWatermarkLabel } from "@/data/wedash/syncUi";
+import { formatBoardRefreshStatus } from "@/data/wedash/syncUi";
 import { brlCent, num, shortDate } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import type { SalesDayAgg, SalesSellerDayAgg } from "@/data/wedash/salesTypes";
@@ -52,7 +52,7 @@ export type BoardGoalsData = {
 
 export type BoardChallengesData = { challenges: ChallengeRecord[]; aggs: ChallengeAggInput };
 
-export type BoardStore = { id: string; tradeName: string; hours: StoreWeekHours };
+export type BoardStore = { id: string; tradeName: string; hours: StoreWeekHours; timeZone?: string | null };
 
 /** Uma filial guarda a chave antiga. Várias filiais usam os ids ordenados. */
 export function boardScopeKey(storeIds: readonly string[]): string {
@@ -343,6 +343,12 @@ export function BoardView({
   const [challengeSlot, setChallengeSlot] = useState(0);
   const [challengeOn, setChallengeOn] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const tick = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(tick);
+  }, []);
 
   const today = calendarTodayIso();
   const scopeKey = boardScopeKey(stores.map((store) => store.id));
@@ -641,10 +647,10 @@ export function BoardView({
       <header className="board-in flex shrink-0 items-center justify-between gap-3">
         <div className="min-w-0">
           <h1 className="truncate text-[20px] font-extrabold leading-tight tracking-tight text-t0 sm:text-[22px]">{headline}</h1>
-          <p className="truncate text-[13px] font-medium text-t1">
+          <p className="text-[13px] font-medium leading-snug text-t1">
             {monthLabel(today)}
             <span className="mx-1.5">·</span>
-            {formatSyncWatermarkLabel(watermark)}
+            {formatBoardRefreshStatus({ watermark, now, loading, stores })}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">

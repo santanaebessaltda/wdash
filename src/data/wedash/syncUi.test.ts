@@ -6,6 +6,7 @@ import {
   forcePendingStorageKey,
   forceRefreshRetryAfterSec,
   formatForceCooldownLabel,
+  formatBoardRefreshStatus,
   formatSyncWatermarkLabel,
   lastForceAtFromRetryAfter,
   clearPendingForce,
@@ -14,6 +15,12 @@ import {
   writePendingForce,
 } from "./syncUi";
 import { fetchSalesDayAggs, type SalesQueryClient } from "./salesRepo";
+import type { StoreWeekHours } from "./storeHours";
+
+function openWeek(): StoreWeekHours {
+  const day = { open: "09:00", close: "22:00" };
+  return { 0: day, 1: day, 2: day, 3: day, 4: day, 5: day, 6: day };
+}
 
 describe("syncUi watermark label (SYNC-10)", () => {
   it("shows pending when never synced", () => {
@@ -33,6 +40,39 @@ describe("syncUi watermark label (SYNC-10)", () => {
     expect(formatSyncWatermarkLabel(wm, { now, timeZone: "America/Sao_Paulo" })).toBe(
       "Atualizado em 18/09 às 18:40",
     );
+  });
+});
+
+describe("placar refresh line", () => {
+  const zone = "America/Sao_Paulo";
+  const stores = [{ hours: openWeek(), timeZone: zone }];
+
+  it("shows the next round 30 minutes after the last one, while the store is open", () => {
+    const now = new Date("2026-10-22T17:40:00.000Z");
+    const watermark = new Date("2026-10-22T17:35:00.000Z");
+    expect(formatBoardRefreshStatus({ watermark, now, stores })).toBe("atualizado às 14:35 · próxima às 15:05");
+  });
+
+  it("says the round is in progress once that time has passed", () => {
+    const now = new Date("2026-10-22T18:06:00.000Z");
+    const watermark = new Date("2026-10-22T17:35:00.000Z");
+    expect(formatBoardRefreshStatus({ watermark, now, stores })).toBe("atualizado às 14:35 · atualizando…");
+  });
+
+  it("does not promise a next time before the store opens", () => {
+    const now = new Date("2026-10-22T08:00:00.000Z");
+    const watermark = new Date("2026-10-21T23:40:00.000Z");
+    expect(formatBoardRefreshStatus({ watermark, now, stores })).toBe("atualizado em 21/10 às 20:40");
+  });
+
+  it("says the last round of the day is still running", () => {
+    const now = new Date("2026-10-22T02:00:00.000Z");
+    const watermark = new Date("2026-10-21T23:40:00.000Z");
+    expect(formatBoardRefreshStatus({ watermark, now, stores })).toBe("atualizado às 20:40 · atualizando…");
+  });
+
+  it("keeps the first-sync copy when nothing has been saved", () => {
+    expect(formatBoardRefreshStatus({ watermark: null, stores })).toBe("Aguardando primeira sincronização");
   });
 });
 

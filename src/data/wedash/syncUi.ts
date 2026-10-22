@@ -1,5 +1,8 @@
 /** Pure helpers for Overview sync watermark / force UI (testable without React). */
 
+import { AUTO_REFRESH_MIN, finalRoundAt, nextAutoRefreshAt, storePhase } from "./autoRefresh.ts";
+import type { StoreWeekHours } from "./storeHours.ts";
+
 /**
  * Cooldown do botao Atualizar.
  * **0 = off** (decisao 2026-09-23  -  sem espera entre cliques).
@@ -43,6 +46,71 @@ export function formatSyncWatermarkLabel(
     return opts.loading ? "Sincronizando dados…" : "Aguardando primeira sincronização";
   }
   return formatUpdatedAtLabel(watermark, opts);
+}
+
+function clockInZone(at: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone,
+  }).format(at);
+}
+
+function dayInZone(at: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone,
+  }).format(at);
+}
+
+/** "atualizado às 14:35" no mesmo dia, ou "atualizado em 21/10 às 18:40". */
+function boardUpdatedPhrase(at: Date, now: Date, timeZone: string): string {
+  const clock = clockInZone(at, timeZone);
+  const day = dayInZone(at, timeZone);
+  if (day === dayInZone(now, timeZone)) return `atualizado às ${clock}`;
+  return `atualizado em ${day.slice(0, 5)} às ${clock}`;
+}
+
+/**
+ * Linha do placar: última gravação e o horário da próxima rodada automática.
+ * Passou esse horário (ou a última do dia ainda não gravou) = "atualizando…".
+ * Loja fechada, ainda não abriu, ou sem horário = só a última, sem prometer a próxima.
+ */
+export function formatBoardRefreshStatus(args: {
+  watermark: Date | null;
+  now?: Date;
+  loading?: boolean;
+  stores: Array<{ hours: StoreWeekHours; timeZone?: string | null }>;
+}): string {
+  const watermark = args.watermark;
+  if (watermark == null) {
+    return args.loading ? "Sincronizando dados…" : "Aguardando primeira sincronização";
+  }
+  const now = args.now ?? new Date();
+  const zones = args.stores.map((store) => ({
+    hours: store.hours,
+    timezone: store.timeZone || "America/Sao_Paulo",
+  }));
+  const timeZone = zones[0]?.timezone ?? "America/Sao_Paulo";
+  const updated = boardUpdatedPhrase(watermark, now, timeZone);
+  const catchingUp = zones.some((store) => {
+    if (storePhase(store.hours, now, store.timezone) !== "finalDue") return false;
+    const final = finalRoundAt(store.hours, now, store.timezone);
+    return final != null && watermark < final;
+  });
+  if (catchingUp) return `${updated} · atualizando…`;
+  const next = nextAutoRefreshAt({
+    stores: zones,
+    now,
+    intervalMin: AUTO_REFRESH_MIN,
+    lastAutoAt: watermark,
+  });
+  if (!next) return updated;
+  if (next.getTime() <= now.getTime()) return `${updated} · atualizando…`;
+  return `${updated} · próxima às ${clockInZone(next, timeZone)}`;
 }
 
 export function canForceSyncRefresh(role: string): boolean {
