@@ -81,11 +81,15 @@ export function Login() {
       {/* Hero  -  layout LoginSplit */}
       <div
         className="relative hidden flex-col justify-between overflow-hidden p-12 lg:flex"
-        style={{ background: "linear-gradient(150deg,#14103a,#1b1650 45%,#0f2d54)" }}
+        style={{ background: "linear-gradient(165deg,#1b1640,#0c0e15 70%)" }}
       >
         <div
-          className="pointer-events-none absolute inset-0"
-          style={{ background: "radial-gradient(70% 60% at 75% 15%,rgba(124,92,255,.4),transparent 60%)" }}
+          className="pointer-events-none absolute -right-16 -top-20 h-[340px] w-[340px] rounded-full"
+          style={{ background: "radial-gradient(circle,rgba(124,92,255,.35),transparent 70%)" }}
+        />
+        <div
+          className="pointer-events-none absolute -bottom-24 -left-10 h-[300px] w-[300px] rounded-full"
+          style={{ background: "radial-gradient(circle,rgba(86,168,255,.22),transparent 70%)" }}
         />
         <div className="relative flex items-center gap-3">
           <BrandMark size={38} light />

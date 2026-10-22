@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
 
@@ -9,6 +9,21 @@ export function Tooltip({ label, children, side = "top" }: { label: string; chil
   const triggerRef = useRef<HTMLSpanElement>(null);
   const tipRef = useRef<HTMLSpanElement>(null);
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
+  // O toque deixa o ponteiro "dentro" do botão e o aviso não recebe mouseleave. Segura até o ponteiro sair.
+  const held = useRef(false);
+  const release = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (release.current != null) window.clearTimeout(release.current);
+    },
+    [],
+  );
+
+  function dismiss() {
+    held.current = true;
+    setShow(false);
+  }
 
   useLayoutEffect(() => {
     if (!show || !triggerRef.current || !tipRef.current) {
@@ -51,10 +66,29 @@ export function Tooltip({ label, children, side = "top" }: { label: string; chil
     <span
       ref={triggerRef}
       className="relative inline-flex"
-      onMouseEnter={() => setShow(true)}
-      onMouseLeave={() => setShow(false)}
-      onFocus={() => setShow(true)}
-      onBlur={() => setShow(false)}
+      onMouseEnter={() => {
+        if (held.current || !window.matchMedia("(hover: hover)").matches) return;
+        setShow(true);
+      }}
+      onMouseLeave={() => {
+        if (release.current != null) window.clearTimeout(release.current);
+        release.current = null;
+        held.current = false;
+        setShow(false);
+      }}
+      onFocus={() => {
+        if (!held.current) setShow(true);
+      }}
+      onBlur={() => {
+        setShow(false);
+        if (release.current != null) window.clearTimeout(release.current);
+        release.current = window.setTimeout(() => {
+          release.current = null;
+          held.current = false;
+        }, 500);
+      }}
+      onPointerDown={dismiss}
+      onClick={dismiss}
     >
       {children}
       {show &&
@@ -64,7 +98,7 @@ export function Tooltip({ label, children, side = "top" }: { label: string; chil
             role="tooltip"
             style={coords ? { top: coords.top, left: coords.left } : { top: 0, left: 0, visibility: "hidden" }}
             className={cn(
-              "pointer-events-none fixed z-[200] w-max max-w-[min(17.5rem,calc(100vw-1rem))] whitespace-pre-line break-words text-left rounded-md bg-bg-3 border border-line px-2.5 py-1.5 text-[11px] font-semibold leading-snug text-t0 shadow-[var(--shadow-vela)] animate-vela-fade",
+              "pointer-events-none fixed z-[96] w-max max-w-[min(17.5rem,calc(100vw-1rem))] whitespace-pre-line break-words text-left rounded-md bg-bg-3 border border-line px-2.5 py-1.5 text-[11px] font-semibold leading-snug text-t0 shadow-[var(--shadow-vela)] animate-vela-fade",
             )}
           >
             {label}
