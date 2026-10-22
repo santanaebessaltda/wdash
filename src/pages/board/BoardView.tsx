@@ -17,7 +17,6 @@ import { ChallengeMiniCard } from "@/pages/challenges/ChallengeMiniCard";
 import { TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
 import { GoalLevelGuide } from "@/pages/goals/GoalLevelGuide";
 import { GlobalGoalBand } from "@/pages/team/goalBlocks";
-import { BrandMark } from "@/pages/auth/authKit";
 import { BoardThemeSwitch, useBoardTheme } from "./boardTheme";
 import { BoardCelebration, type CelebrationFace } from "./celebration";
 import { calendarTodayIso } from "@/data/wedash/clock";
@@ -640,16 +639,13 @@ export function BoardView({
     <div className="flex h-full min-h-0 flex-col gap-1.5 overflow-x-hidden overflow-y-auto p-3 sm:p-4 xl:overflow-y-hidden">
       <style>{`@keyframes board-pop{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:none}}@keyframes board-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}@keyframes board-breathe{0%,100%{box-shadow:0 0 0 3px #f7b84e,0 0 14px rgba(247,184,78,.28)}50%{box-shadow:0 0 0 3px #f7b84e,0 0 26px rgba(247,184,78,.5)}}@keyframes board-pin{0%,100%{filter:none}50%{filter:brightness(1.55)}}.board-in{animation:board-in .7s ease both}.board-breathe{animation:board-breathe 4.8s ease-in-out infinite}.board-pin{animation:board-pin .7s ease-in-out 2}@media (prefers-reduced-motion:reduce){.board-in,.board-breathe,.board-pin{animation:none}}`}</style>
       <header className="board-in flex shrink-0 items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <BrandMark size={48} />
-          <div className="min-w-0">
-            <h1 className="truncate text-[20px] font-extrabold leading-tight tracking-tight text-t0 sm:text-[22px]">{headline}</h1>
-            <p className="truncate text-[13px] font-medium text-t1">
-              {monthLabel(today)}
-              <span className="mx-1.5">·</span>
-              {formatSyncWatermarkLabel(watermark)}
-            </p>
-          </div>
+        <div className="min-w-0">
+          <h1 className="truncate text-[20px] font-extrabold leading-tight tracking-tight text-t0 sm:text-[22px]">{headline}</h1>
+          <p className="truncate text-[13px] font-medium text-t1">
+            {monthLabel(today)}
+            <span className="mx-1.5">·</span>
+            {formatSyncWatermarkLabel(watermark)}
+          </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           <BoardThemeSwitch />

@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { Card } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
-import { BrandMark } from "@/pages/auth/authKit";
 import { TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
 import { cn } from "@/lib/cn";
 import type { BoardMoment } from "@/data/wedash/boardEvents";
@@ -197,11 +196,6 @@ function LevelEvent({
         >
           <TargetIcon size={face ? 22 : 52} />
         </span>
-        {store ? (
-          <span className="absolute -top-5 left-1/2 z-20 -translate-x-1/2">
-            <BrandMark size={34} />
-          </span>
-        ) : null}
       </div>
     </SceneFrame>
   );
