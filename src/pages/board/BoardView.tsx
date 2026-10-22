@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Badge, Button, Card, CardHero, CardTitle, EmptyState, Modal, StatCard, ThSort, progressTextClass, type SortDir } from "@/components/ui";
+import { Badge, Button, Card, CardHero, CardTitle, EmptyState, Modal, StatCard, ThSort, Tooltip, progressTextClass, type SortDir } from "@/components/ui";
 import { BoardSkeleton } from "@/components/wedash/LoadingSkeletons";
-import { BranchBadge, DeadlineBadge, PeriodBadge, RecordStatusBadge, UnidentifiedSalesBadge } from "@/components/wedash/RecordBadges";
+import { RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { RankingBlock } from "@/pages/live/blocks";
 import type { RankingRow } from "@/data/wedash/live";
@@ -21,7 +21,7 @@ import { BoardThemeSwitch, useBoardTheme } from "./boardTheme";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { defaultWeekHours, effectiveWeekHours, type StoreWeekHours } from "@/data/wedash/storeHours";
 import { formatSyncWatermarkLabel } from "@/data/wedash/syncUi";
-import { brlCent, num } from "@/lib/format";
+import { brlCent, num, shortDate } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import type { SalesDayAgg, SalesSellerDayAgg } from "@/data/wedash/salesTypes";
 import overtakeUrl from "@/assets/sound/overtaking.wav";
@@ -227,60 +227,102 @@ type GoalBoard = {
   storeName: string;
 };
 
+function OutsideNoteTip({ note }: { note: string }) {
+  return (
+    <Tooltip label={note} side="bottom">
+      <button
+        type="button"
+        aria-label="Vendas fora do ranking"
+        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-t2 transition-colors hover:bg-bg-3 hover:text-t1"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <circle cx="12" cy="12" r="9" />
+          <line x1="12" y1="11" x2="12" y2="16" />
+          <line x1="12" y1="8" x2="12.01" y2="8" />
+        </svg>
+      </button>
+    </Tooltip>
+  );
+}
+
 function BoardGoalCard({ board, showStore }: { board: GoalBoard; showStore: boolean }) {
   const { goal, card, summary, storeName } = board;
   const outsideNote = outsideRankingNote(card.band);
   const [levelsOpen, setLevelsOpen] = useState(false);
   const [boardTheme] = useBoardTheme();
+  const supportParts = [`${shortDate(goal.startsOn)} a ${shortDate(goal.endsOn)}`];
+  if (showStore) supportParts.push(storeName);
+  if (goalSpreadsUnidentified(goal)) supportParts.push("Rateio automático");
+  const support = supportParts.join(" · ");
+  const currentTier = summary.levelNumber != null ? goal.tiers[summary.levelNumber - 1] : undefined;
+  const currentLevel = currentTier
+    ? `N${summary.levelNumber} · ${currentTier.name.replace(/^Goal\s+/i, "")} (${num(currentTier.commissionPct, 1)}%)`
+    : null;
+
   return (
-    <Card padding="none" glass="var(--info-soft)" className="px-6 py-4">
-      <div className="flex items-start gap-3.5">
+    <Card padding="none" glass="var(--info-soft)" className="px-4 py-4 sm:px-6">
+      <div className="flex items-start gap-3">
         <CardHero tone="info">
           <TargetIcon size={22} />
         </CardHero>
         <div className="min-w-0 flex-1">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <p className="min-w-0 truncate text-[18px] font-extrabold tracking-tight text-t0">{card.name}</p>
-            <RecordStatusBadge label={GOAL_STATUS_LABEL[summary.status]} />
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between md:gap-8">
+            <div className="min-w-0">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[17px] font-extrabold leading-tight tracking-tight text-t0 md:truncate md:text-[18px]">{card.name}</p>
+                  {showStore ? <p className="mt-0.5 truncate text-[12px] text-t2 md:hidden">{storeName}</p> : null}
+                </div>
+                <span className="md:hidden">
+                  <RecordStatusBadge label={GOAL_STATUS_LABEL[summary.status]} />
+                </span>
+              </div>
+              <p className="mt-1 hidden text-[12.5px] leading-snug text-t2 md:block">{support}</p>
+              <p className={`mt-3 font-mono text-[34px] font-extrabold leading-none tabular-nums md:hidden ${progressTextClass(summary.pct)}`}>
+                {num(summary.pct, 1)}%
+              </p>
+              <div className="mt-2 flex items-center gap-1.5 md:mt-3">
+                <p className="font-mono text-[24px] font-extrabold leading-none tabular-nums text-t0 md:text-[28px]">{brlCent(summary.achieved)}</p>
+                {outsideNote ? <OutsideNoteTip note={outsideNote} /> : null}
+              </div>
+              <p className="mt-1.5 text-[13px] text-t2 md:hidden">de {brlCent(goal.target)}</p>
+            </div>
+            <div className="hidden shrink-0 text-right md:block">
+              <p className={`font-mono text-[40px] font-extrabold leading-none tabular-nums ${progressTextClass(summary.pct)}`}>{num(summary.pct, 1)}%</p>
+              <p className="mt-1.5 text-[13px] text-t2">de {brlCent(goal.target)}</p>
+              <div className="mt-2 flex justify-end">
+                <RecordStatusBadge label={GOAL_STATUS_LABEL[summary.status]} />
+              </div>
+            </div>
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <PeriodBadge from={goal.startsOn} to={goal.endsOn} />
-            {showStore ? <BranchBadge name={storeName} /> : null}
-            {goalSpreadsUnidentified(goal) ? <UnidentifiedSalesBadge /> : null}
+
+          <div className="mt-4">
+            <GlobalGoalBand goal={card.band} tiers={card.tiers} embedded soBarra hideOutsideNote highlightCurrent />
           </div>
-          <p className="mt-1.5 font-mono text-[20px] font-extrabold leading-none tabular-nums text-t0">{brlCent(summary.achieved)}</p>
-          {outsideNote ? <p className="mt-1 text-[11px] leading-snug text-t2">{outsideNote}</p> : null}
-          <p className="mt-2 text-[12px] text-t2">
-            {goal.tiers.length} {goal.tiers.length === 1 ? "nível" : "níveis"}
-          </p>
-        </div>
-        <div className="shrink-0 text-right">
-          <p className={`font-mono text-[16px] font-bold leading-none tabular-nums ${progressTextClass(summary.pct)}`}>{num(summary.pct, 1)}%</p>
-          <p className="mt-1 text-[12px] text-t2">de {brlCent(goal.target)}</p>
-        </div>
-      </div>
-      <div className="mt-3">
-        <GlobalGoalBand goal={card.band} tiers={card.tiers} embedded soBarra hideOutsideNote />
-      </div>
-      <div className={cn("mt-3 flex flex-wrap items-center gap-2", goal.tiers.length > 0 ? "justify-between" : "justify-end")}>
-        {goal.tiers.length > 0 ? (
-          <Button type="button" variant="outline" size="sm" aria-haspopup="dialog" onClick={() => setLevelsOpen(true)}>
-            Níveis de premiação
-          </Button>
-        ) : null}
-        <div className="flex flex-wrap items-center justify-end gap-1.5">
-          {summary.projectedPct != null ? (
-            <Badge variant="accent" className="uppercase">Projeção: {num(summary.projectedPct, 0)}%</Badge>
-          ) : null}
-          <DeadlineBadge label={prazoRemaining(summary.daysRemaining)} />
-        </div>
-      </div>
+
+          <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <p className="min-w-0 text-[13px] leading-snug text-t2">
+              {currentLevel ? <span className="font-bold text-acc">{currentLevel}</span> : null}
+              {currentLevel ? <span className="mx-2 text-t3">·</span> : null}
+              {summary.projectedPct != null ? (
+                <>
+                  <span className="font-semibold text-t1">Projeção: {num(summary.projectedPct, 0)}%</span>
+                  <span className="mx-2 text-t3">·</span>
+                </>
+              ) : null}
+              <span>{prazoRemaining(summary.daysRemaining)}</span>
+            </p>
+            {goal.tiers.length > 0 ? (
+              <Button type="button" variant="outline" size="sm" className="w-full shrink-0 md:w-auto" aria-haspopup="dialog" onClick={() => setLevelsOpen(true)}>
+                Níveis de premiação
+              </Button>
+            ) : null}
+          </div>
         </div>
       </div>
       <Modal open={levelsOpen} onClose={() => setLevelsOpen(false)} title="Níveis de premiação" size="lg" boardTheme={boardTheme}>
         <GoalLevelGuide goal={goal} sellers={card.sellers} flush />
+        {outsideNote ? <p className="mt-3 text-[12.5px] leading-snug text-t2">{outsideNote}</p> : null}
       </Modal>
     </Card>
   );

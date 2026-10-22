@@ -502,6 +502,7 @@ export function GlobalGoalBand({
   soBarra = false,
   individual = false,
   hideOutsideNote = false,
+  highlightCurrent = false,
 }: {
   goal: NetworkGlobalGoal;
   embedded?: boolean;
@@ -509,6 +510,8 @@ export function GlobalGoalBand({
   soBarra?: boolean;
   /** No detalhe da meta a frase fica sob o Realizado. */
   hideOutsideNote?: boolean;
+  /** No placar, só o nível já alcançado fica em destaque. Os outros continuam como marcação. */
+  highlightCurrent?: boolean;
   /** Quando o título da meta já está no CardMeta. */
   hideTitle?: boolean;
   /** Degraus desta meta (default = escada padrão). */
@@ -593,6 +596,13 @@ export function GlobalGoalBand({
       ) : (() => {
         const LABEL_MIN_PX = 140;
         const GAP_PX = 10;
+        let currentIndex = -1;
+        if (highlightCurrent) {
+          for (let i = 0; i < tiers.length; i++) {
+            if (goal.pct >= tiers[i].minAttainmentPct) currentIndex = i;
+            else break;
+          }
+        }
         let lowerFrac = 1;
         for (let i = 1; i < tiers.length; i++) {
           const frac = (tiers[i].minAttainmentPct - tiers[i - 1].minAttainmentPct) / scaleMax;
@@ -606,20 +616,25 @@ export function GlobalGoalBand({
             <div className="w-full" style={{ minWidth: trackMinW }}>
               <div className="relative h-3 w-full overflow-hidden rounded-full" style={{ background: "var(--bg-3)" }}>
                 <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${fillPct}%`, background: colorBarra }} />
-                {tiers.map((d) => {
+                {tiers.map((d, i) => {
                   const left = (d.minAttainmentPct / scaleMax) * 100;
                   const atingido = goal.pct >= d.minAttainmentPct;
+                  const current = highlightCurrent && i === currentIndex;
                   return (
                     <span
                       key={`tick-${d.name}`}
-                      className="absolute top-0 bottom-0 w-0.5 -translate-x-1/2"
-                      style={{ left: `${left}%`, background: atingido ? "var(--t0)" : "var(--t2)", opacity: atingido ? 0.55 : 0.35 }}
+                      className={cn("absolute top-0 bottom-0 -translate-x-1/2", current ? "w-[3px]" : "w-0.5")}
+                      style={{
+                        left: `${left}%`,
+                        background: current ? "var(--acc)" : atingido ? "var(--t0)" : "var(--t2)",
+                        opacity: current ? 1 : atingido ? 0.55 : 0.35,
+                      }}
                     />
                   );
                 })}
               </div>
 
-              <div className="relative mt-2 h-7 w-full">
+              <div className={cn("relative mt-2 w-full", highlightCurrent ? "h-8" : "h-7")}>
                 {tiers.map((d, i) => {
                   const left = (d.minAttainmentPct / scaleMax) * 100;
                   const atingido = goal.pct >= d.minAttainmentPct;
@@ -629,15 +644,17 @@ export function GlobalGoalBand({
                   // Intervalo apertado: texto termina no tick (não centra), liberando o vão até o N4.
                   const anchorDireitaNoTick = !isLast && gapPts <= 15;
                   const shortLabel = d.name.replace(/^Goal\s+/i, "");
+                  const current = highlightCurrent && i === currentIndex;
                   return (
                     <p
                       key={d.name}
                       className={cn(
-                        "absolute top-0 whitespace-nowrap text-[10px] font-bold leading-tight",
+                        "absolute top-0 whitespace-nowrap leading-tight",
                         isLast && "right-0 text-right",
                         anchorDireitaNoTick && "-translate-x-full text-right",
                         !isLast && !anchorDireitaNoTick && "-translate-x-1/2 text-center",
-                        atingido ? "text-acc" : "text-t2",
+                        current ? "text-[12px] font-extrabold text-acc" : highlightCurrent ? "text-[10px] font-semibold text-t2" : "text-[10px] font-bold",
+                        !highlightCurrent && (atingido ? "text-acc" : "text-t2"),
                       )}
                       style={isLast ? undefined : { left: `${left}%` }}
                       title={`N${i + 1} · ${d.name} · ${num(d.commissionPct, 1)}%`}
