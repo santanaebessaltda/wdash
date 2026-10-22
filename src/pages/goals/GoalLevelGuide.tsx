@@ -39,7 +39,7 @@ export function GoalLevelGuide({
   const managementRows = management ? rowsForManagement(goal, days, management.levelNumber) : null;
   const options = [
     ...(guide?.groups.map((group) => ({ value: group.key, label: group.title })) ?? []),
-    ...(managementRows ? [{ value: MANAGEMENT_KEY, label: "Gerência" }] : []),
+    ...(managementRows ? [{ value: MANAGEMENT_KEY, label: "GERÊNCIA" }] : []),
   ];
   const selectedKey = options.some((option) => option.value === groupKey) ? groupKey : (options[0]?.value ?? MANAGEMENT_KEY);
   const selected = guide?.groups.find((group) => group.key === selectedKey) ?? null;
@@ -66,7 +66,13 @@ export function GoalLevelGuide({
         {rows.map((row) => {
           const everyone = row.marked || (people > 0 && row.reached === people);
           return (
-            <div key={row.number} className="flex items-center gap-3 rounded-xl border border-line bg-bg-inset px-3.5 py-3">
+            <div
+              key={row.number}
+              className={cn(
+                "flex items-center gap-3 rounded-xl border bg-bg-inset px-3.5 py-3",
+                everyone ? "border-ok" : "border-line",
+              )}
+            >
               <span
                 className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-bold"
                 style={{
