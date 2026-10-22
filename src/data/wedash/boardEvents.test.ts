@@ -77,6 +77,21 @@ describe("boardMoments", () => {
     expect(boardMoments(prev, next)).toEqual([{ kind: "store-level", level: "N2 · Super" }]);
   });
 
+  it("prioriza liderança, ultrapassagem, nível, loja e desafio", () => {
+    const prev = empty();
+    prev.ranks = [rank("a", "Ana", 1), rank("b", "Bia", 2), rank("c", "Caio", 3)];
+    prev.levels = [{ key: "b", name: "Bia", levelNumber: 1, levelLabel: "N1 · Meta" }];
+    prev.storeLevelNumber = 1;
+    prev.storeLevelLabel = "N1 · Meta";
+    const next = empty();
+    next.ranks = [rank("b", "Bia", 1), rank("c", "Caio", 2), rank("a", "Ana", 3)];
+    next.levels = [{ key: "b", name: "Bia", levelNumber: 2, levelLabel: "N2 · Super" }];
+    next.storeLevelNumber = 2;
+    next.storeLevelLabel = "N2 · Super";
+    next.winners = [{ challengeId: "c", challengeName: "Pizza", key: "b", name: "Bia" }];
+    expect(boardMoments(prev, next).map((moment) => moment.kind)).toEqual(["first", "overtake", "level", "store-level", "challenge"]);
+  });
+
   it("desafio já batido não toca de novo", () => {
     const prev = empty();
     prev.winners = [{ challengeId: "c", challengeName: "Pizza", key: "a", name: "Ana" }];

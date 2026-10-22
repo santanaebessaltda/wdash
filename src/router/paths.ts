@@ -38,7 +38,7 @@ export const paths = {
   products: "/dashboard/products",
   groups: "/dashboard/groups",
   team: "/dashboard/team",
-  /** Placar da filial, tela cheia, para o notebook da loja. */
+  /** Endereço antigo do placar interno. Abre a Visão geral. O placar é o link público. */
   board: "/board",
   /** Link público do placar. O token não é o id da filial. */
   boardShare: (token: string) => `/board/s/${token}`,

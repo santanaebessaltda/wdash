@@ -34,13 +34,33 @@ export interface StatCardProps {
 }
 
 export function StatCard({ label, value, icon, iconColor = "var(--acc)", iconBg = "var(--acc-soft)", delta, sparkline, sub, sub2, tooltip, deltaTooltip, valueClassName, quietSub = false, dense = false, glass = false, className }: StatCardProps) {
+  const labelNode = (
+    <div className={cn("flex min-w-0 items-center gap-1.5", !dense && (icon || delta) && "mt-4", dense && "min-w-0 flex-1")}>
+      <p className="truncate text-xs font-bold uppercase tracking-wide text-t1">{label}</p>
+      {tooltip && (
+        <Tooltip label={tooltip} side="bottom">
+          <span className="inline-flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full bg-bg-inset text-[10px] font-semibold text-t2 hover:text-t1 transition-colors">
+            ?
+          </span>
+        </Tooltip>
+      )}
+    </div>
+  );
   return (
-    <Card padding={dense ? "sm" : "md"} glass={glass ? iconBg : undefined} className={cn("min-w-0", className)}>
-      {icon || delta ? (
+    <Card padding={dense ? "sm" : "md"} glass={glass ? iconBg : undefined} className={cn("min-w-0", dense && "!p-2.5", className)}>
+      {dense && icon ? (
+        <div className="flex items-center gap-2">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px]" style={{ background: iconBg, color: iconColor }}>
+            {icon}
+          </div>
+          {labelNode}
+        </div>
+      ) : null}
+      {!dense && (icon || delta) ? (
       <div className={cn("flex items-center gap-2", icon ? "justify-between" : "justify-end")}>
         {icon ? (
           <div
-            className={cn("flex shrink-0 items-center justify-center", dense ? "h-8 w-8 rounded-[10px]" : "h-11 w-11 rounded-[13px]")}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[13px]"
             style={{ background: iconBg, color: iconColor }}
           >
             {icon}
@@ -62,18 +82,9 @@ export function StatCard({ label, value, icon, iconColor = "var(--acc)", iconBg 
         })()}
       </div>
       ) : null}
-      <div className={cn("flex items-center gap-1.5", icon || delta ? (dense ? "mt-2" : "mt-4") : "")}>
-        <p className="truncate text-xs font-bold uppercase tracking-wide text-t1">{label}</p>
-        {tooltip && (
-          <Tooltip label={tooltip} side="bottom">
-            <span className="inline-flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full bg-bg-inset text-[10px] font-semibold text-t2 hover:text-t1 transition-colors">
-              ?
-            </span>
-          </Tooltip>
-        )}
-      </div>
-      <AnimatedNumber value={value} className={cn("block truncate font-extrabold", dense ? "mt-0.5 text-xl leading-none" : "mt-1 text-2xl", valueClassName ?? "text-t0")} />
-      {sub && <p className={cn("truncate", dense ? "mt-1 text-[10px] leading-tight text-t3" : quietSub ? "mt-0.5 text-[10.5px] text-t3" : "mt-0.5 text-[11px] text-t2")}>{sub}</p>}
+      {!dense || !icon ? labelNode : null}
+      <AnimatedNumber once={dense} duration={dense ? 700 : 1100} value={value} className={cn("block truncate font-extrabold", dense ? "mt-1 text-xl leading-none" : "mt-1 text-2xl", valueClassName ?? "text-t0")} />
+      {sub && <p className={cn("truncate", dense ? "mt-1 text-[11px] leading-tight text-t2" : quietSub ? "mt-0.5 text-[10.5px] text-t3" : "mt-0.5 text-[11px] text-t2")}>{sub}</p>}
       {sub2 && <p className="mt-0.5 truncate text-[11px] text-t2">{sub2}</p>}
       {sparkline && <div className="mt-3 h-9">{sparkline}</div>}
     </Card>

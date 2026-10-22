@@ -2,10 +2,10 @@ import { Badge, Card, CardHero, ProgressBar, ProgressStanding, progressTextClass
 import { BranchBadge, DeadlineBadge, PeriodBadge, PrizeBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { PersonAvatar, PersonAvatarGroup } from "@/components/wedash/PersonAvatar";
 import type { ChallengeRecord } from "@/data/wedash/challengesRepo";
-import { CHALLENGE_STATUS_LABEL, metricValueLabel, type ChallengeParticipant, type ChallengeView } from "@/data/wedash/challengeView";
+import { CHALLENGE_STATUS_LABEL, metricValueLabel, prizeLabel, type ChallengeParticipant, type ChallengeView } from "@/data/wedash/challengeView";
 import { cn } from "@/lib/cn";
 import { num } from "@/lib/format";
-import { challengeCriterion, challengeHeadline, challengeMinimumLabel, challengeWonLabel, floorChallengeHeadline, floorPrizeLine, HeadlineText, mainPrizeLabel } from "@/pages/challenges/shared";
+import { challengeCriterion, challengeHeadline, challengeMinimumLabel, challengeWonLabel, HeadlineText, mainPrizeLabel } from "@/pages/challenges/shared";
 import { FlameIcon, TrophyIcon } from "@/pages/dashboards/icons";
 
 /** Desafio na aba Desafios da Equipe: so leitura, clique abre o detalhe. */
@@ -18,6 +18,7 @@ export function ChallengeMiniCard({
   showPeople = false,
   hotKey = null,
   floor = false,
+  counter = null,
 }: {
   challenge: ChallengeRecord;
   view: ChallengeView;
@@ -31,6 +32,8 @@ export function ChallengeMiniCard({
   hotKey?: string | null;
   /** Texto corrido, para o placar da loja. */
   floor?: boolean;
+  /** "1 / 3" quando o placar reveza os desafios. */
+  counter?: string | null;
 }) {
   const prize = mainPrizeLabel(c);
   const ended = view.status === "ended";
@@ -42,39 +45,71 @@ export function ChallengeMiniCard({
     c.mode === "MINIMUM" && view.status !== "upcoming" && people > 0 ? challengeWonLabel(view.reachedCount, people) : null;
   const leader = Math.max(0, ...view.participants.map((person) => person.result ?? 0));
   if (floor) {
-    const lead = disputa ? floorLead(c, view) : null;
+    const title = /^desafio\b/i.test(c.name) ? c.name : `Desafio ${c.name}`;
+    const prize = boardPrizeLine(c);
+    const wonLine = c.mode === "MINIMUM" && view.status !== "upcoming" && people > 0 ? boardWonCount(view.reachedCount, people) : null;
+    const boardBadge = "!px-2.5 !py-1 !text-[12px]";
     return (
-      <Card padding="lg" glass="var(--warn-soft)" className="flex w-full flex-col text-left">
-        <span className="flex items-start gap-3.5">
-          <CardHero tone="warn">
-            <FlameIcon size={22} />
+      <Card padding="sm" glass="var(--warn-soft)" className="flex h-full min-h-0 w-full flex-col overflow-hidden text-left !px-2.5 !py-2.5">
+        <div className="flex items-start gap-2">
+          <CardHero tone="warn" compact>
+            <FlameIcon size={18} />
           </CardHero>
-          <span className="min-w-0 flex-1">
-            <ChallengeIdentity
-              name={c.name}
-              nameClass="block min-w-0 truncate text-[15px] font-bold text-t0"
-              statusLabel={statusLabel}
-              startsOn={c.startsOn}
-              endsOn={c.endsOn}
-              storeNameValue={storeNameValue}
-              prize={null}
-              prizeLine={floorPrizeLine(c)}
-              minimum={minimum}
-              minimumBadge
-              reached={reached}
-              reachedOk={people > 0 && view.reachedCount === people}
-              prazo={ended ? null : view.prazo}
-            />
-          </span>
-        </span>
-        {lead ? (
-          <div className="mt-4 border-t border-line pt-3">
-            <p className="text-[13px] font-semibold text-t0">{lead}</p>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-2">
+              <p className="min-w-0 truncate text-[16px] font-extrabold leading-tight text-t0">{title}</p>
+              <span className="flex shrink-0 items-center gap-1.5">
+                {counter ? <span className="text-[12px] font-bold tabular-nums text-t2">{counter}</span> : null}
+                <RecordStatusBadge label={statusLabel} className={boardBadge} />
+              </span>
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              <PeriodBadge from={c.startsOn} to={c.endsOn} className={boardBadge} />
+              {!ended && view.prazo ? <DeadlineBadge label={view.prazo} className={boardBadge} /> : null}
+              {storeNameValue ? <BranchBadge name={storeNameValue} /> : null}
+            </div>
+            {prize || minimum ? (
+              <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[13px] leading-snug">
+                {prize ? (
+                  <span className="inline-flex min-w-0 items-center gap-1.5 font-semibold text-t1">
+                    <span className="shrink-0 text-warn">
+                      <TrophyIcon size={14} />
+                    </span>
+                    <span className="truncate">{prize}</span>
+                  </span>
+                ) : null}
+                {minimum ? <span className="font-medium text-t2">{minimum}</span> : null}
+              </p>
+            ) : null}
+            {wonLine ? <p className="mt-1 text-[13px] font-semibold text-t1">{wonLine}</p> : null}
           </div>
+        </div>
+        {showPeople ? (
+          <ul className="mt-2.5 min-h-0 flex-1 space-y-2.5 overflow-y-auto">
+            {view.participants.length === 0 ? (
+              <li className="text-[13px] text-t2">Nenhuma pessoa no desafio.</li>
+            ) : (
+              view.participants.map((person) => {
+                const pct = challengeProgress(person.result, c.target, leader);
+                const wonLook = !disputa && person.winner;
+                return (
+                  <li key={person.key} className={cn("min-w-0", hotKey === person.key && "rounded-lg bg-acc-soft px-1 py-1")}>
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="min-w-0 truncate text-[13px] font-extrabold uppercase tracking-wide text-t0">{person.name}</span>
+                      <span className="shrink-0 text-[13px] font-bold text-t1">{person.result == null ? "—" : metricValueLabel(c.metric, person.result)}</span>
+                    </div>
+                    <div className="mt-1 flex items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        <ProgressBar enter value={wonLook ? 100 : pct} height={10} color={wonLook ? "var(--ok)" : "var(--acc)"} />
+                      </div>
+                      <BoardPersonMark person={person} disputa={disputa} ended={ended} pct={pct} />
+                    </div>
+                  </li>
+                );
+              })
+            )}
+          </ul>
         ) : null}
-        {showPeople && (
-          <ChallengePeople challenge={c} view={view} disputa={disputa} leader={leader} hotKey={hotKey} announcePrize className="mt-4" />
-        )}
       </Card>
     );
   }
@@ -371,9 +406,30 @@ function ChallengePeople({
   );
 }
 
-function floorLead(c: ChallengeRecord, view: ChallengeView): string {
-  if (view.status === "upcoming") return challengeCriterion(c);
-  return floorChallengeHeadline(c, view).value;
+function boardPrizeLine(c: ChallengeRecord): string | null {
+  if (c.prizes.length === 0) return null;
+  if (c.mode === "MINIMUM") {
+    const prize = c.prizes[0];
+    return prize ? `${prizeLabel(prize)} por pessoa` : null;
+  }
+  const place = ["1º", "2º", "3º"];
+  return c.prizes.map((prize, index) => `${place[index] ?? `${index + 1}º`} ${prizeLabel(prize)}`).join(" · ");
+}
+
+function boardWonCount(won: number, people: number): string {
+  return `${won} de ${people} ${won === 1 ? "ganhou" : "ganharam"}`;
+}
+
+function BoardPersonMark({ person, disputa, ended, pct }: { person: ChallengeParticipant; disputa: boolean; ended: boolean; pct: number }) {
+  if (person.result == null) return <span className="shrink-0 text-[12px] font-semibold text-t3">—</span>;
+  if (disputa) {
+    if (ended && !person.winner) return <span className="shrink-0 text-[13px] font-semibold text-t1">Não ganhou</span>;
+    if (person.position != null) return <ProgressStanding ok={Boolean(ended && person.winner)}>{`${person.position}º lugar`}</ProgressStanding>;
+    return ended ? <span className="shrink-0 text-[13px] font-semibold text-t1">Não ganhou</span> : <span className="shrink-0 text-[12px] text-t3">—</span>;
+  }
+  if (person.winner) return <span className="shrink-0 text-[14px] font-extrabold text-ok">Ganhou</span>;
+  if (ended) return <span className="shrink-0 text-[13px] font-semibold text-t1">Não ganhou</span>;
+  return <span className={`shrink-0 font-mono text-[13px] font-bold tabular-nums ${progressTextClass(pct)}`}>{num(pct, 0)}%</span>;
 }
 
 function ChallengePersonStatus({

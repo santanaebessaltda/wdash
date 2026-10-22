@@ -3,7 +3,7 @@
  * Reusa os componentes do tema: StatCard, DataTable, Card, ProgressBar,
  * Badge, Avatar, EmptyState e o padrão BlockState compartilhado.
  */
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Badge, Card, CardTitle, DataTable, EmptyState, ProgressBar, ProgressStanding, progressColor, progressTextClass, StatCard, type DataTableColumn } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
@@ -503,6 +503,8 @@ export function GlobalGoalBand({
   individual = false,
   hideOutsideNote = false,
   highlightCurrent = false,
+  enter = false,
+  pulseCurrent = false,
 }: {
   goal: NetworkGlobalGoal;
   embedded?: boolean;
@@ -512,6 +514,10 @@ export function GlobalGoalBand({
   hideOutsideNote?: boolean;
   /** No placar, só o nível já alcançado fica em destaque. Os outros continuam como marcação. */
   highlightCurrent?: boolean;
+  /** A barra do placar enche ao abrir. */
+  enter?: boolean;
+  /** O pino do nível atual pulsa durante a celebração. */
+  pulseCurrent?: boolean;
   /** Quando o título da meta já está no CardMeta. */
   hideTitle?: boolean;
   /** Degraus desta meta (default = escada padrão). */
@@ -521,12 +527,22 @@ export function GlobalGoalBand({
   /** Individual: o nível é de cada pessoa. A barra mostra só o faturamento da filial. */
   individual?: boolean;
 }) {
+  const [drawnPct, setDrawnPct] = useState(enter ? 0 : goal.pct);
+  useEffect(() => {
+    if (!enter) {
+      setDrawnPct(goal.pct);
+      return;
+    }
+    const frame = requestAnimationFrame(() => setDrawnPct(goal.pct));
+    return () => cancelAnimationFrame(frame);
+  }, [enter, goal.pct]);
+  const barPct = enter ? drawnPct : goal.pct;
   const showsProjection =
     !soBarra &&
     (goal.projectionAmount === null ? false : typeof goal.projectionAmount === "number" ? true : goalUnlockedProjection(goal.start, goal.end, todayIso));
   const scaleMax = Math.max(...tiers.map((d) => d.minAttainmentPct), 100);
-  const fillPct = Math.min(100, (goal.pct / scaleMax) * 100);
-  const colorBarra = progressColor(goal.pct);
+  const fillPct = Math.min(100, (barPct / scaleMax) * 100);
+  const colorBarra = progressColor(barPct);
   const colorPct = progressTextClass(goal.pct);
   const projectionLabel = `Projeção: ${num(goal.projectedPct, 0)}%`;
 
@@ -586,7 +602,7 @@ export function GlobalGoalBand({
           <div className="relative h-3 min-w-0 flex-1 overflow-hidden rounded-full" style={{ background: "var(--bg-3)" }}>
             <div
               className="h-full rounded-full transition-[width] duration-500"
-              style={{ width: `${Math.min(100, Math.max(0, goal.pct))}%`, background: colorBarra }}
+              style={{ width: `${Math.min(100, Math.max(0, barPct))}%`, background: colorBarra }}
             />
           </div>
           {soBarra && (
@@ -623,11 +639,12 @@ export function GlobalGoalBand({
                   return (
                     <span
                       key={`tick-${d.name}`}
-                      className={cn("absolute top-0 bottom-0 -translate-x-1/2", current ? "w-[3px]" : "w-0.5")}
+                      className={cn("absolute top-0 bottom-0 z-10 -translate-x-1/2", current ? "w-[3px]" : "w-0.5", current && pulseCurrent && "board-pin")}
                       style={{
                         left: `${left}%`,
-                        background: current ? "var(--acc)" : atingido ? "var(--t0)" : "var(--t2)",
-                        opacity: current ? 1 : atingido ? 0.55 : 0.35,
+                        background: atingido ? "#fff" : "var(--t2)",
+                        opacity: atingido ? 1 : 0.45,
+                        boxShadow: atingido ? "0 0 0 1px rgba(0,0,0,0.35)" : undefined,
                       }}
                     />
                   );
@@ -654,6 +671,7 @@ export function GlobalGoalBand({
                         anchorDireitaNoTick && "-translate-x-full text-right",
                         !isLast && !anchorDireitaNoTick && "-translate-x-1/2 text-center",
                         current ? "text-[12px] font-extrabold text-acc" : highlightCurrent ? "text-[10px] font-semibold text-t2" : "text-[10px] font-bold",
+                        current && pulseCurrent && "board-pin",
                         !highlightCurrent && (atingido ? "text-acc" : "text-t2"),
                       )}
                       style={isLast ? undefined : { left: `${left}%` }}

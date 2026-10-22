@@ -10,6 +10,13 @@ const MEDALHA = {
   3: { color: "#d99a5c", glow: "none" },
 } as const;
 
+/** Faturamento do pódio no placar. Ouro vivo, prata clara e bronze quente, legíveis no fundo escuro. */
+const PODIO_VALOR = {
+  1: "#ffd166",
+  2: "#e4eaf2",
+  3: "#f0b56b",
+} as const;
+
 const PODIO_HEIGHT: Record<1 | 2 | 3, string> = {
   1: "h-44 sm:h-48",
   2: "h-36 sm:h-40",
@@ -22,6 +29,29 @@ const PODIO_HEIGHT_COMPACT: Record<1 | 2 | 3, string> = {
   2: "h-28 sm:h-32",
   3: "h-24 sm:h-[6.5rem]",
 };
+
+/** Degrau do placar externo: alto o bastante para o 1º, o 2º e o 3º, sem estourar a tela. */
+const PODIO_HEIGHT_FLAT: Record<1 | 2 | 3, string> = {
+  1: "h-[4.75rem]",
+  2: "h-14",
+  3: "h-12",
+};
+
+const PODIO_SLOT: Record<1 | 2 | 3, { left: string; width: string }> = {
+  1: { left: "33%", width: "34%" },
+  2: { left: "0%", width: "33%" },
+  3: { left: "67%", width: "33%" },
+};
+
+function WinsMark({ count }: { count?: number }) {
+  if (!count || count <= 0) return null;
+  return (
+    <span className="absolute -bottom-1 left-1/2 z-20 inline-flex -translate-x-1/2 items-center gap-0.5 rounded-full border border-line bg-bg-2 px-1.5 py-px text-[10px] font-bold leading-none text-t0">
+      <span aria-hidden>🏆</span>
+      {count}
+    </span>
+  );
+}
 
 /** Ordem visual do podio: 2 | 1 | 3 */
 const PODIO_ORDEM = [1, 0, 2] as const;
@@ -51,6 +81,8 @@ export function RankingBlock({
   onSelect,
   spotlight = false,
   literalName = false,
+  motion = false,
+  flashId = null,
 }: {
   ranking: RankingRow[];
   formatAmount?: (v: number) => string;
@@ -59,6 +91,10 @@ export function RankingBlock({
   spotlight?: boolean;
   /** O nome já vem curto. Sem isto, o pódio mostra só o primeiro nome. */
   literalName?: boolean;
+  /** O avatar se desloca quando a posição muda. Só o placar externo. */
+  motion?: boolean;
+  /** A pessoa pisca depois da comemoração. Só o placar externo. */
+  flashId?: string | null;
 }) {
   if (ranking.length === 0) {
     return (
@@ -72,7 +108,7 @@ export function RankingBlock({
   const top3 = ranking.slice(0, 3);
 
   return (
-    <div className={cn("flex items-end justify-center gap-2.5 sm:gap-6", spotlight ? "pt-5" : "pt-7")}>
+    <div className={cn(motion ? "relative mx-auto h-[19.25rem] w-full max-w-3xl" : "flex items-end justify-center gap-2.5 sm:gap-6", !motion && (spotlight ? "pt-5" : "pt-7"))}>
       {PODIO_ORDEM.map((i) => {
         const pos = (i + 1) as 1 | 2 | 3;
         const medal = MEDALHA[pos];
@@ -83,9 +119,11 @@ export function RankingBlock({
             <div
               key={`vazio-${pos}`}
               className={cn(
-                "group flex flex-col items-center text-center transition-transform duration-200 hover:-translate-y-1.5",
-                isOuro ? "w-[34%] max-w-[168px]" : "w-[30%] max-w-[148px]",
+                "flex flex-col items-center text-center",
+                motion ? "absolute bottom-0" : "group transition-transform duration-200 hover:-translate-y-1.5",
+                !motion && (isOuro ? "w-[34%] max-w-[168px]" : "w-[30%] max-w-[148px]"),
               )}
+              style={motion ? { left: PODIO_SLOT[pos].left, width: PODIO_SLOT[pos].width } : undefined}
             >
               <div className={cn("relative transition-transform duration-200 group-hover:scale-[1.04]", spotlight ? "mb-1.5" : "mb-2.5")}>
                 <span
@@ -103,13 +141,14 @@ export function RankingBlock({
               <p className="mt-0.5 font-mono text-[13px] font-extrabold text-t3 sm:text-[14px]">—</p>
               <div
                 className={cn(
-                  "flex w-full items-end justify-center rounded-t-2xl transition duration-200 group-hover:brightness-125",
+                  "flex w-full justify-center rounded-t-2xl transition duration-200 group-hover:brightness-125",
+                  motion ? "items-center" : "items-end",
                   spotlight ? "mt-2" : "mt-3",
-                  spotlight ? PODIO_HEIGHT_COMPACT[pos] : PODIO_HEIGHT[pos],
+                  motion ? PODIO_HEIGHT_FLAT[pos] : spotlight ? PODIO_HEIGHT_COMPACT[pos] : PODIO_HEIGHT[pos],
                 )}
                 style={{ background: "color-mix(in srgb, var(--acc) 16%, transparent)" }}
               >
-                <span className="pb-3 text-[24px] font-extrabold leading-none text-t3 sm:text-[28px]">{pos}º</span>
+                <span className={cn("font-extrabold leading-none text-t3", motion ? (isOuro ? "text-[28px] sm:text-[32px]" : "text-[22px] sm:text-[24px]") : "pb-3 text-[24px] sm:text-[28px]")}>{pos}º</span>
               </div>
             </div>
           );
@@ -117,6 +156,7 @@ export function RankingBlock({
         return (
           <div
             key={l.employeeId}
+            style={motion ? { left: PODIO_SLOT[pos].left, width: PODIO_SLOT[pos].width, transform: isOuro ? "scale(1.06)" : "scale(1)" } : undefined}
             {...(onSelect
               ? {
                   role: "button",
@@ -131,20 +171,23 @@ export function RankingBlock({
                 }
               : {})}
             className={cn(
-              "group flex flex-col items-center text-center transition-transform duration-200 hover:-translate-y-1.5",
-              spotlight
-                ? isOuro
-                  ? "w-[34%] max-w-[200px]"
-                  : "w-[30%] max-w-[168px]"
-                : isOuro
-                  ? "w-[34%] max-w-[168px]"
-                  : "w-[30%] max-w-[148px]",
+              "flex flex-col items-center text-center",
+              motion ? "absolute bottom-0 z-10 origin-bottom transition-[left,width,transform] duration-700 ease-out" : "group transition-transform duration-200 hover:-translate-y-1.5",
+              flashId === l.employeeId && "board-row-flash",
+              !motion &&
+                (spotlight
+                  ? isOuro
+                    ? "w-[34%] max-w-[200px]"
+                    : "w-[30%] max-w-[168px]"
+                  : isOuro
+                    ? "w-[34%] max-w-[168px]"
+                    : "w-[30%] max-w-[148px]"),
               onSelect && "cursor-pointer rounded-2xl focus-visible:outline-2 focus-visible:outline-acc",
             )}
           >
             <div className={cn("relative transition-transform duration-200 group-hover:scale-[1.04]", spotlight ? "mb-1.5" : "mb-2.5")}>
               <span
-                className="relative inline-flex rounded-full"
+                className={cn("relative inline-flex rounded-full", motion && isOuro && "board-breathe")}
                 style={{
                   boxShadow: `0 0 0 3px ${medal.color}${isOuro ? `, ${medal.glow}` : ""}`,
                 }}
@@ -152,14 +195,18 @@ export function RankingBlock({
                 <PersonAvatar size={isOuro ? "2xl" : "xl"} name={l.avatarName ?? l.name} employeeId={l.employeeId} storeId={l.storeId} />
               </span>
               <MedalhaBadge pos={pos} />
+              <WinsMark count={l.wins} />
             </div>
 
-            <p className="max-w-full truncate text-[13px] font-bold text-t0 sm:text-[14px]">
+            <p className={cn("max-w-full truncate font-bold text-t0", motion && isOuro ? "text-[15px] sm:text-[16px]" : "text-[13px] sm:text-[14px]")}>
               {literalName ? l.name : l.name.split(" ")[0]}
             </p>
             {l.place ? <p className="max-w-full truncate text-[11px] text-t2">{l.place}</p> : null}
             {spotlight ? (
-              <p className="mt-0.5 font-mono text-[17px] font-extrabold leading-none text-t0 tabular-nums sm:text-[18px]">
+              <p
+                className={cn("mt-0.5 font-mono font-extrabold leading-none tabular-nums", motion && isOuro ? "text-[20px] sm:text-[22px]" : "text-[17px] sm:text-[18px]")}
+                style={{ color: PODIO_VALOR[pos] }}
+              >
                 {formatAmount(l.revenue)}
               </p>
             ) : null}
@@ -180,9 +227,9 @@ export function RankingBlock({
 
             <div
               className={cn(
-                "flex w-full items-end justify-center rounded-t-2xl transition duration-200 group-hover:brightness-125",
-                spotlight ? "mt-2" : "mt-3",
-                spotlight ? PODIO_HEIGHT_COMPACT[pos] : PODIO_HEIGHT[pos],
+                "flex w-full justify-center rounded-t-2xl transition duration-200 group-hover:brightness-125",
+                motion ? "mt-1.5 items-center" : spotlight ? "mt-2 items-end" : "mt-3 items-end",
+                motion ? PODIO_HEIGHT_FLAT[pos] : spotlight ? PODIO_HEIGHT_COMPACT[pos] : PODIO_HEIGHT[pos],
               )}
               style={{
                 background: "color-mix(in srgb, var(--acc) 48%, transparent)",
@@ -190,7 +237,7 @@ export function RankingBlock({
               }}
             >
               <span
-                className="pb-3 text-[24px] font-extrabold leading-none sm:text-[28px]"
+                className={cn("font-extrabold leading-none", motion ? (isOuro ? "text-[28px] sm:text-[32px]" : "text-[22px] sm:text-[24px]") : "pb-3 text-[24px] sm:text-[28px]")}
                 style={{ color: medal.color }}
               >
                 {pos}º

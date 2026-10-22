@@ -11,9 +11,6 @@ const ICON = {
   ranking: "M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4a2 2 0 0 0 0 4h3M17 6h3a2 2 0 0 1 0 4h-3",
   /** Lucide ChartNoAxesColumnIncreasing — Performance. */
   chart: "M5 21v-6M12 21V9M19 21V3",
-  /** Lucide Trophy — Placar. */
-  trophy:
-    "M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0V2Z",
   /** Ondas de transmissao  -  "ao vivo" / tempo real (nao raio). */
   live: "M4.9 19.1C1 15.2 1 8.8 4.9 4.9M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5M19.1 4.9C23 8.8 23 15.1 19.1 19M9.5 12a2.5 2.5 0 1 0 5 0 2.5 2.5 0 1 0-5 0",
   /** ClipboardList — pedido de compra. */
@@ -43,13 +40,6 @@ const team: NavSingle = {
   label: "Equipe",
   icon: ICON.team,
   to: paths.management.team,
-};
-
-/** Placar da filial. Página direta, sem submenu. */
-const board: NavSingle = {
-  label: "Placar",
-  icon: ICON.trophy,
-  to: paths.board,
 };
 
 /** Metas e desafios. */
@@ -142,7 +132,6 @@ const navOwner: NavEntry[] = [
   },
   stock,
   team,
-  board,
   performance,
   finance,
   purchaseOrder,
@@ -163,7 +152,6 @@ const navManager: NavEntry[] = [
   },
   stock,
   team,
-  board,
   performance,
   finance,
   purchaseOrder,

@@ -54,20 +54,24 @@ const prefersReduced =
 export function AnimatedNumber({
   value,
   duration = 1100,
+  once = false,
   className,
 }: {
   value: string | number;
   duration?: number;
+  /** Conta só na primeira vez. Nas seguintes, o número troca direto. */
+  once?: boolean;
   className?: string;
 }) {
   const parsed = parse(value);
+  const played = useRef(false);
   const [display, setDisplay] = useState(() =>
     parsed && !prefersReduced ? format(parsed, 0) : String(value),
   );
   const frame = useRef<number>(0);
 
   useEffect(() => {
-    if (!parsed || prefersReduced) {
+    if (!parsed || prefersReduced || (once && played.current)) {
       setDisplay(String(value));
       return;
     }
@@ -78,11 +82,12 @@ export function AnimatedNumber({
       const eased = 1 - Math.pow(1 - t, 3);
       setDisplay(format(parsed, parsed.target * eased));
       if (t < 1) frame.current = requestAnimationFrame(tick);
+      else played.current = true;
     };
     frame.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value, duration]);
+  }, [value, duration, once]);
 
   return <span className={className}>{display}</span>;
 }

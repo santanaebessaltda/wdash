@@ -14,6 +14,7 @@ import {
 import { StorePicker } from "@/pages/dashboard/StorePicker";
 import { useScope } from "@/pages/dashboard/useScope";
 import { TopbarRefresh } from "./TopbarRefresh";
+import { ShareBoardButton } from "@/pages/board/ShareBoardButton";
 import { refreshSalesPush } from "@/push/salesPush";
 
 const ICON_PERFIL = "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8";
@@ -42,7 +43,6 @@ function showsRefresh(pathname: string): boolean {
   if (covers(pathname, paths.dashboard)) return true;
   if (pathname === paths.stock.inventory || pathname === paths.management.purchaseOrder) return true;
   if (pathname === paths.management.cashClose || pathname === paths.management.cashDrop || pathname === paths.management.salesReport || pathname === paths.management.team) return true;
-  if (pathname === paths.board) return true;
   if (pathname === paths.goals || isRecord(pathname, paths.goals)) return true;
   return pathname === paths.management.challenges || isRecord(pathname, paths.management.challenges);
 }
@@ -102,7 +102,6 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
     location.pathname === paths.stock.inventory ||
     location.pathname.startsWith("/stock/") ||
     covers(location.pathname, paths.management.team) ||
-    location.pathname === paths.board ||
     covers(location.pathname, paths.management.purchaseOrder) ||
     covers(location.pathname, paths.management.cashClose) ||
     covers(location.pathname, paths.management.wallet) ||
@@ -149,6 +148,14 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
       )}
 
       <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2.5">
+        {showsRefresh(location.pathname) && session.role !== "SELLER" && (
+          <ShareBoardButton
+            stores={(scope.storeIds.length === 0 ? listStores : listStores.filter((store) => scope.storeIds.includes(store.id))).map((store) => ({
+              id: store.id,
+              tradeName: store.tradeName,
+            }))}
+          />
+        )}
         {showsRefresh(location.pathname) && <TopbarRefresh storeIds={scope.storeIds} />}
 
         <Dropdown

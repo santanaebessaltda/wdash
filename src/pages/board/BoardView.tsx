@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Badge, Button, Card, CardHero, CardTitle, EmptyState, Modal, StatCard, ThSort, Tooltip, progressTextClass, type SortDir } from "@/components/ui";
+import { Button, Card, CardHero, CardTitle, EmptyState, Modal, StatCard, ThSort, progressTextClass, type SortDir } from "@/components/ui";
 import { BoardSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { RankingBlock } from "@/pages/live/blocks";
 import type { RankingRow } from "@/data/wedash/live";
 import { boardMoments, type BoardMoment, type BoardSnapshot } from "@/data/wedash/boardEvents";
-import { buildGoalCardView, buildGoalSummary, GOAL_STATUS_LABEL, goalSpreadsUnidentified, goalStatus, outsideRankingNote, prazoRemaining } from "@/data/wedash/goalView";
+import { buildGoalCardView, buildGoalSummary, GOAL_STATUS_LABEL, goalSpreadsUnidentified, goalStatus, prazoRemaining } from "@/data/wedash/goalView";
 import type { GoalRecord, GoalTeamMember } from "@/data/wedash/goalsRepo";
 import { buildChallengeView } from "@/data/wedash/challengeView";
 import type { ChallengeAggInput, ChallengeRecord } from "@/data/wedash/challengesRepo";
@@ -17,7 +17,9 @@ import { ChallengeMiniCard } from "@/pages/challenges/ChallengeMiniCard";
 import { TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
 import { GoalLevelGuide } from "@/pages/goals/GoalLevelGuide";
 import { GlobalGoalBand } from "@/pages/team/goalBlocks";
+import { BrandMark } from "@/pages/auth/authKit";
 import { BoardThemeSwitch, useBoardTheme } from "./boardTheme";
+import { BoardCelebration, type CelebrationFace } from "./celebration";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { defaultWeekHours, effectiveWeekHours, type StoreWeekHours } from "@/data/wedash/storeHours";
 import { formatSyncWatermarkLabel } from "@/data/wedash/syncUi";
@@ -29,7 +31,7 @@ import firstPlaceUrl from "@/assets/sound/first-place.wav";
 import goalLevelUrl from "@/assets/sound/reached-the-goal.wav";
 import challengeUrl from "@/assets/sound/target-met.wav";
 
-type RankSortKey = "place" | "name" | "sales" | "pa" | "meta" | "gap" | "revenue";
+type RankSortKey = "place" | "name" | "sales" | "meta" | "gap" | "revenue";
 const MOMENT_CAP = 4;
 const MUTE_KEY = "wedash.board.muted";
 
@@ -117,9 +119,13 @@ function momentText(moment: BoardMoment, names: string[]): string {
   if (moment.kind === "overtake") {
     return `${firstName(moment.name, names)} passou ${firstName(moment.passed, names)} e agora está em ${moment.position}º!`;
   }
-  if (moment.kind === "level") return `${firstName(moment.name, names)} chegou ao ${moment.level}!`;
-  if (moment.kind === "store-level") return `A loja chegou ao ${moment.level}!`;
-  return `${firstName(moment.name, names)} concluiu o desafio ${moment.challenge}!`;
+  if (moment.kind === "level") return `${firstName(moment.name, names)} atingiu ${moment.level}!`;
+  if (moment.kind === "store-level") return `A loja atingiu ${moment.level}!`;
+  return `${firstName(moment.name, names)} ganhou o desafio ${moment.challenge}!`;
+}
+
+function winHoldId(key: string, challenge: string): string {
+  return `${key}\n${challenge}`;
 }
 
 function monthLabel(today: string): string {
@@ -135,11 +141,10 @@ function momentKey(moment: BoardMoment | null): string | null {
   return moment.key;
 }
 
-const MOMENT_MEDAL = {
-  1: { color: "#f7b84e", mark: "👑" },
-  2: { color: "#c7cdd6", mark: "🥈" },
-  3: { color: "#d99a5c", mark: "🥉" },
-} as const;
+const MOMENT_ENTER_MS = 360;
+const MOMENT_HOLD_MS = 2240;
+const MOMENT_EXIT_MS = 300;
+const MOMENT_PEAK_MS = 320;
 
 function momentFace(
   moment: BoardMoment,
@@ -227,104 +232,84 @@ type GoalBoard = {
   storeName: string;
 };
 
-function OutsideNoteTip({ note }: { note: string }) {
-  return (
-    <Tooltip label={note} side="bottom">
-      <button
-        type="button"
-        aria-label="Vendas fora do ranking"
-        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-t2 transition-colors hover:bg-bg-3 hover:text-t1"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <circle cx="12" cy="12" r="9" />
-          <line x1="12" y1="11" x2="12" y2="16" />
-          <line x1="12" y1="8" x2="12.01" y2="8" />
-        </svg>
-      </button>
-    </Tooltip>
-  );
-}
-
-function BoardGoalCard({ board, showStore }: { board: GoalBoard; showStore: boolean }) {
-  const { goal, card, summary, storeName } = board;
-  const outsideNote = outsideRankingNote(card.band);
+function BoardGoalCard({ board, pulse }: { board: GoalBoard; pulse: boolean }) {
+  const { goal, card, summary } = board;
   const [levelsOpen, setLevelsOpen] = useState(false);
   const [boardTheme] = useBoardTheme();
-  const supportParts = [`${shortDate(goal.startsOn)} a ${shortDate(goal.endsOn)}`];
-  if (showStore) supportParts.push(storeName);
-  if (goalSpreadsUnidentified(goal)) supportParts.push("Rateio automático");
-  const support = supportParts.join(" · ");
+  const support = [`${shortDate(goal.startsOn)} a ${shortDate(goal.endsOn)}`];
+  if (goalSpreadsUnidentified(goal)) support.push("Rateio automático");
   const currentTier = summary.levelNumber != null ? goal.tiers[summary.levelNumber - 1] : undefined;
   const currentLevel = currentTier
     ? `N${summary.levelNumber} · ${currentTier.name.replace(/^Goal\s+/i, "")} (${num(currentTier.commissionPct, 1)}%)`
     : null;
+  const hasLevels = goal.tiers.length > 0;
 
   return (
-    <Card padding="none" glass="var(--info-soft)" className="px-4 py-4 sm:px-6">
-      <div className="flex items-start gap-3">
-        <CardHero tone="info">
-          <TargetIcon size={22} />
+    <Card padding="none" glass="var(--info-soft)" className="shrink-0 px-3 py-2 sm:px-4">
+      <div className="flex items-center gap-2.5">
+        <CardHero tone="info" compact>
+          <TargetIcon size={18} />
         </CardHero>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-col md:flex-row md:items-start md:justify-between md:gap-8">
-            <div className="min-w-0">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[17px] font-extrabold leading-tight tracking-tight text-t0 md:truncate md:text-[18px]">{card.name}</p>
-                  {showStore ? <p className="mt-0.5 truncate text-[12px] text-t2 md:hidden">{storeName}</p> : null}
-                </div>
-                <span className="md:hidden">
-                  <RecordStatusBadge label={GOAL_STATUS_LABEL[summary.status]} />
-                </span>
-              </div>
-              <p className="mt-1 hidden text-[12.5px] leading-snug text-t2 md:block">{support}</p>
-              <p className={`mt-3 font-mono text-[34px] font-extrabold leading-none tabular-nums md:hidden ${progressTextClass(summary.pct)}`}>
-                {num(summary.pct, 1)}%
-              </p>
-              <div className="mt-2 flex items-center gap-1.5 md:mt-3">
-                <p className="font-mono text-[24px] font-extrabold leading-none tabular-nums text-t0 md:text-[28px]">{brlCent(summary.achieved)}</p>
-                {outsideNote ? <OutsideNoteTip note={outsideNote} /> : null}
-              </div>
-              <p className="mt-1.5 text-[13px] text-t2 md:hidden">de {brlCent(goal.target)}</p>
-            </div>
-            <div className="hidden shrink-0 text-right md:block">
-              <p className={`font-mono text-[40px] font-extrabold leading-none tabular-nums ${progressTextClass(summary.pct)}`}>{num(summary.pct, 1)}%</p>
-              <p className="mt-1.5 text-[13px] text-t2">de {brlCent(goal.target)}</p>
-              <div className="mt-2 flex justify-end">
-                <RecordStatusBadge label={GOAL_STATUS_LABEL[summary.status]} />
-              </div>
-            </div>
+          <div className="flex items-center justify-between gap-2">
+            <p className="min-w-0 truncate text-[15px] font-extrabold leading-tight text-t0">{card.name}</p>
+            <RecordStatusBadge label={GOAL_STATUS_LABEL[summary.status]} />
           </div>
-
-          <div className="mt-4">
-            <GlobalGoalBand goal={card.band} tiers={card.tiers} embedded soBarra hideOutsideNote highlightCurrent />
-          </div>
-
-          <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <p className="min-w-0 text-[13px] leading-snug text-t2">
-              {currentLevel ? <span className="font-bold text-acc">{currentLevel}</span> : null}
-              {currentLevel ? <span className="mx-2 text-t3">·</span> : null}
-              {summary.projectedPct != null ? (
-                <>
-                  <span className="font-semibold text-t1">Projeção: {num(summary.projectedPct, 0)}%</span>
-                  <span className="mx-2 text-t3">·</span>
-                </>
-              ) : null}
-              <span>{prazoRemaining(summary.daysRemaining)}</span>
-            </p>
-            {goal.tiers.length > 0 ? (
-              <Button type="button" variant="outline" size="sm" className="w-full shrink-0 md:w-auto" aria-haspopup="dialog" onClick={() => setLevelsOpen(true)}>
-                Níveis de premiação
-              </Button>
-            ) : null}
-          </div>
+          <p className="mt-0.5 truncate text-[12px] text-t2">{support.join(" · ")}</p>
         </div>
       </div>
-      <Modal open={levelsOpen} onClose={() => setLevelsOpen(false)} title="Níveis de premiação" size="lg" boardTheme={boardTheme}>
-        <GoalLevelGuide goal={goal} sellers={card.sellers} flush />
-        {outsideNote ? <p className="mt-3 text-[12.5px] leading-snug text-t2">{outsideNote}</p> : null}
-      </Modal>
+      <div className="mt-1.5 flex items-end justify-between gap-3">
+        <p className="font-mono text-[22px] font-extrabold leading-none tabular-nums text-t0 sm:text-[26px]">{brlCent(summary.achieved)}</p>
+        <div className="text-right">
+          <p className={`font-mono text-[22px] font-extrabold leading-none tabular-nums sm:text-[26px] ${progressTextClass(summary.pct)}`}>{num(summary.pct, 1)}%</p>
+          <p className="mt-0.5 text-[12px] text-t2">de {brlCent(goal.target)}</p>
+        </div>
+      </div>
+      <div className="mt-1.5">
+        <GlobalGoalBand goal={card.band} tiers={card.tiers} embedded soBarra hideOutsideNote highlightCurrent enter pulseCurrent={pulse} />
+      </div>
+      <div className="mt-1 flex items-center justify-between gap-2">
+        <p className="min-w-0 truncate text-[12px] leading-snug text-t2">
+          {currentLevel ? <span className="font-bold text-acc">{currentLevel}</span> : null}
+          {currentLevel && summary.projectedPct != null ? <span className="mx-1.5 text-t3">·</span> : null}
+          {summary.projectedPct != null ? <span className="font-semibold text-t1">Projeção {num(summary.projectedPct, 0)}%</span> : null}
+          {(currentLevel || summary.projectedPct != null) ? <span className="mx-1.5 text-t3">·</span> : null}
+          <span>{prazoRemaining(summary.daysRemaining)}</span>
+        </p>
+        {hasLevels ? (
+          <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => setLevelsOpen(true)}>
+            Níveis de premiação
+          </Button>
+        ) : null}
+      </div>
+      {hasLevels ? (
+        <Modal open={levelsOpen} onClose={() => setLevelsOpen(false)} title="Níveis de premiação" size="lg" boardTheme={boardTheme}>
+          <GoalLevelGuide goal={goal} sellers={card.sellers} flush hideNote />
+        </Modal>
+      ) : null}
     </Card>
+  );
+}
+
+function FullscreenIcon({ exit }: { exit: boolean }) {
+  return exit ? (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3" />
+    </svg>
+  ) : (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />
+    </svg>
+  );
+}
+
+function WinBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span className="absolute -bottom-1 left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-0.5 rounded-full border border-line bg-bg-2 px-1 py-px text-[9px] font-bold leading-none text-t0">
+      <span aria-hidden>🏆</span>
+      {count}
+    </span>
   );
 }
 
@@ -336,8 +321,6 @@ export function BoardView({
   watermark,
   loading,
   packKey,
-  controls = "page",
-  onExitTv,
 }: {
   stores: BoardStore[];
   team: TeamAggInput;
@@ -346,19 +329,21 @@ export function BoardView({
   watermark: Date | null;
   loading: boolean;
   packKey: string | null;
-  /** page: dentro da WDash. tv: apresentação. public: link sem login. */
-  controls?: "page" | "tv" | "public";
-  onExitTv?: () => void;
 }) {
   const [unlocked, setUnlocked] = useState(false);
   const [muted, setMuted] = useState(readMuted);
   const [current, setCurrent] = useState<BoardMoment | null>(null);
-  const [bannerKey, setBannerKey] = useState(0);
+  const [leaving, setLeaving] = useState(false);
+  const [lingerKey, setLingerKey] = useState<string | null>(null);
   const queue = useRef<BoardMoment[]>([]);
   const audio = useRef<HTMLAudioElement | null>(null);
-  const previewSound = useRef(false);
+  const lingerTimer = useRef(0);
   const seenSnap = useRef<string | null>(null);
   const [rankSort, setRankSort] = useState<{ key: RankSortKey; dir: SortDir }>({ key: "place", dir: "asc" });
+  const [heldWins, setHeldWins] = useState<Set<string>>(() => new Set());
+  const [challengeSlot, setChallengeSlot] = useState(0);
+  const [challengeOn, setChallengeOn] = useState(true);
+  const [fullscreen, setFullscreen] = useState(false);
 
   const today = calendarTodayIso();
   const scopeKey = boardScopeKey(stores.map((store) => store.id));
@@ -483,38 +468,96 @@ export function BoardView({
     writeSnapshot(scopeKey, snapshot);
     const moments = boardMoments(previous, snapshot).slice(0, MOMENT_CAP);
     if (moments.length === 0) return;
+    const holds = moments.flatMap((moment) => (moment.kind === "challenge" ? [winHoldId(moment.key, moment.challenge)] : []));
+    if (holds.length > 0) setHeldWins((prev) => new Set([...prev, ...holds]));
     queue.current.push(...moments);
     setCurrent((showing) => showing ?? queue.current.shift() ?? null);
   }, [packKey, scopeKey, snapshot]);
 
   useEffect(() => {
-    if (!current) return;
-    const fromPreview = previewSound.current;
-    previewSound.current = false;
-    if (fromPreview || !unlocked || muted) return;
+    if (!current || !unlocked || muted) return;
+    const kind = current.kind;
     audio.current?.pause();
-    const clip = new Audio(SOUND[current.kind]);
-    clip.volume = 0.85;
-    audio.current = clip;
-    void clip.play().catch(() => undefined);
-    return () => {
-      clip.pause();
-    };
+    const timer = window.setTimeout(() => {
+      const clip = new Audio(SOUND[kind]);
+      clip.volume = 0.85;
+      audio.current = clip;
+      void clip.play().catch(() => undefined);
+    }, MOMENT_PEAK_MS);
+    return () => window.clearTimeout(timer);
   }, [current, muted, unlocked]);
 
   useEffect(() => {
     if (!current) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
+    const showing = current;
+    setLeaving(false);
+    const exitTimer = window.setTimeout(() => {
+      setLeaving(true);
+      const key = momentKey(showing);
+      if (!key) return;
+      setLingerKey(key);
+      window.clearTimeout(lingerTimer.current);
+      lingerTimer.current = window.setTimeout(() => setLingerKey((value) => (value === key ? null : value)), 900);
+    }, MOMENT_ENTER_MS + MOMENT_HOLD_MS);
+    const doneTimer = window.setTimeout(() => {
+      if (showing.kind === "challenge") {
+        const id = winHoldId(showing.key, showing.challenge);
+        setHeldWins((prev) => {
+          if (!prev.has(id)) return prev;
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }
       audio.current?.pause();
+      setLeaving(false);
       setCurrent(queue.current.shift() ?? null);
+    }, MOMENT_ENTER_MS + MOMENT_HOLD_MS + MOMENT_EXIT_MS);
+    return () => {
+      window.clearTimeout(exitTimer);
+      window.clearTimeout(doneTimer);
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
   }, [current]);
 
+  useEffect(() => {
+    if (challenges.length < 2) return;
+    let fade: number | null = null;
+    const timer = window.setInterval(() => {
+      setChallengeOn(false);
+      fade = window.setTimeout(() => {
+        setChallengeSlot((slot) => (slot + 1) % challenges.length);
+        setChallengeOn(true);
+      }, 280);
+    }, 10000);
+    return () => {
+      window.clearInterval(timer);
+      if (fade != null) window.clearTimeout(fade);
+    };
+  }, [challenges.length]);
+
+  useEffect(() => {
+    const sync = () => setFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", sync);
+    return () => document.removeEventListener("fullscreenchange", sync);
+  }, []);
+
+  const winCount = useMemo(() => {
+    const map = new Map<string, number>();
+    const count = (people: { key: string; winner: boolean }[]) => {
+      for (const person of people) {
+        if (person.winner) map.set(person.key, (map.get(person.key) ?? 0) + 1);
+      }
+    };
+    count(challenges.flatMap((card) => card.view.participants));
+    for (const challenge of challengesData.challenges) {
+      if (challenges.some((card) => card.challenge.id === challenge.id)) continue;
+      count(buildChallengeView({ challenge, aggs: challengesData.aggs, today }).participants);
+    }
+    return map;
+  }, [challenges, challengesData, today]);
+
   if (loading) {
-    return <BoardSkeleton header={controls !== "page"} className={controls === "page" ? undefined : "min-h-full p-4 sm:p-6"} />;
+    return <BoardSkeleton header className="h-full overflow-hidden p-3 sm:p-4" />;
   }
 
   function toggleRankSort(key: RankSortKey) {
@@ -524,36 +567,13 @@ export function BoardView({
     });
   }
 
-  function preview(kind: BoardMoment["kind"]) {
-    const people = view?.people ?? [];
-    const leader = people[0];
-    const chaser = people[1] ?? leader;
-    const levelName = (leader ? personLevel(leader)?.levelLabel : null) ?? "N2 · Prata";
-    const challengeName = challenges[0]?.challenge.name ?? "Desafio do mês";
-    const moment: BoardMoment =
-      kind === "first"
-        ? { kind, key: leader?.key ?? "preview", name: leader?.name ?? "Maria" }
-        : kind === "overtake"
-          ? { kind, key: chaser?.key ?? "preview", name: chaser?.name ?? "João", passed: leader?.name ?? "Maria", position: 2 }
-          : kind === "level"
-            ? { kind, key: leader?.key ?? "preview", name: leader?.name ?? "Maria", level: levelName }
-            : kind === "store-level"
-              ? { kind, level: levelName }
-              : { kind, key: leader?.key ?? "preview", name: leader?.name ?? "Maria", challenge: challengeName };
-    previewSound.current = true;
-    audio.current?.pause();
-    const clip = new Audio(SOUND[kind]);
-    clip.volume = 0.85;
-    audio.current = clip;
-    void clip.play().catch(() => undefined);
-    queue.current = [];
-    setBannerKey((key) => key + 1);
-    setCurrent(moment);
-  }
-
-  function closeCelebration() {
-    audio.current?.pause();
-    setCurrent(queue.current.shift() ?? null);
+  function visibleWins(key: string): number {
+    const total = winCount.get(key) ?? 0;
+    let held = 0;
+    for (const id of heldWins) {
+      if (id.startsWith(`${key}\n`)) held += 1;
+    }
+    return Math.max(0, total - held);
   }
 
   function unlock(nextMuted = muted) {
@@ -587,78 +607,87 @@ export function BoardView({
       note: level ? (level.levelLabel ?? "Sem nível") : undefined,
       gap: gapLine(level),
       place: manyStores ? storeName.get(home) : undefined,
+      wins: visibleWins(person.key),
     };
   });
-  const oneGoal = goalBoards.length === 1 ? goalBoards[0]! : null;
-  const goalTarget = goalBoards.reduce((sum, board) => sum + board.goal.target, 0);
-  const goalAchieved = goalBoards.reduce((sum, board) => sum + board.summary.achieved, 0);
-  const goalPct = goalTarget > 0 ? (goalAchieved / goalTarget) * 100 : 0;
+  const activeGoal = goalBoards[0] ?? null;
   const month = view ? storeTotals(team.dayAggs, scopeKey.split(","), view.period.start, view.period.end) : { revenue: 0, sales: 0 };
   const todayTotals = storeTotals(team.dayAggs, scopeKey.split(","), today, today);
   const monthRevenue = view?.composition.total ?? month.revenue;
+  const celebration: CelebrationFace | null = current ? momentFace(current, view?.people ?? []) : null;
+  const passedPerson =
+    current?.kind === "overtake" ? (view?.people.find((person) => person.name === current.passed) ?? null) : null;
+  const passedFace: CelebrationFace | null =
+    current?.kind === "overtake"
+      ? {
+          name: passedPerson?.name ?? current.passed,
+          employeeId: passedPerson?.key ?? "passed",
+          storeId: passedPerson?.storeIds[0] ?? "",
+        }
+      : null;
+  const soundLabel = !unlocked ? "Ativar som" : muted ? "Som desligado" : "Som ligado";
+  const challengeCard = challenges.length > 0 ? challenges[challengeSlot % challenges.length] : null;
+  const pulseGoal = current?.kind === "level" || current?.kind === "store-level";
+  const canFull = typeof document !== "undefined" && document.fullscreenEnabled;
 
-  const showSound = controls === "tv" || controls === "public";
-  const celebration = current ? momentFace(current, view?.people ?? []) : null;
-  const celebrationMedal = celebration?.place ? MOMENT_MEDAL[celebration.place] : null;
+  function toggleFull() {
+    if (!document.fullscreenEnabled) return;
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+    else void document.documentElement.requestFullscreen().catch(() => undefined);
+  }
 
   return (
-    <div className={cn("flex flex-col gap-4", controls === "page" ? "" : "min-h-full p-4 sm:p-6")}>
-      <style>{`@keyframes board-pop{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:none}}`}</style>
-      {controls !== "page" && (
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-[22px] font-extrabold tracking-tight text-t0 sm:text-[26px]">{headline}</h1>
-          <p className="mt-0.5 text-[13px] text-t2">
-            {monthLabel(today)}
-            <span className="mx-1.5">·</span>
-            {formatSyncWatermarkLabel(watermark, { loading })}
-          </p>
+    <div className="flex h-full min-h-0 flex-col gap-1.5 overflow-x-hidden overflow-y-auto p-3 sm:p-4 xl:overflow-y-hidden">
+      <style>{`@keyframes board-pop{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:none}}@keyframes board-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}@keyframes board-breathe{0%,100%{box-shadow:0 0 0 3px #f7b84e,0 0 14px rgba(247,184,78,.28)}50%{box-shadow:0 0 0 3px #f7b84e,0 0 26px rgba(247,184,78,.5)}}@keyframes board-pin{0%,100%{filter:none}50%{filter:brightness(1.55)}}.board-in{animation:board-in .7s ease both}.board-breathe{animation:board-breathe 4.8s ease-in-out infinite}.board-pin{animation:board-pin .7s ease-in-out 2}@media (prefers-reduced-motion:reduce){.board-in,.board-breathe,.board-pin{animation:none}}`}</style>
+      <header className="board-in flex shrink-0 items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <BrandMark size={48} />
+          <div className="min-w-0">
+            <h1 className="truncate text-[20px] font-extrabold leading-tight tracking-tight text-t0 sm:text-[22px]">{headline}</h1>
+            <p className="truncate text-[13px] font-medium text-t1">
+              {monthLabel(today)}
+              <span className="mx-1.5">·</span>
+              {formatSyncWatermarkLabel(watermark)}
+            </p>
+          </div>
         </div>
-        {showSound && (
-          <div className="flex flex-wrap items-center gap-2">
-            {controls === "public" ? <BoardThemeSwitch /> : null}
+        <div className="flex shrink-0 items-center gap-1.5">
+          <BoardThemeSwitch />
+          <button
+            type="button"
+            className={cn(
+              "inline-flex h-8 w-8 items-center justify-center rounded-[9px] border transition-colors",
+              unlocked && !muted ? "border-acc bg-acc-soft text-acc" : "border-line text-t1 hover:border-acc",
+            )}
+            aria-label={soundLabel}
+            title={soundLabel}
+            onClick={() => (unlocked ? unlock(!muted) : unlock(false))}
+          >
+            {!unlocked || muted ? <SoundOffIcon /> : <SoundOnIcon />}
+          </button>
+          {canFull ? (
             <button
               type="button"
-              className={cn(
-                "inline-flex h-8 w-8 items-center justify-center rounded-[9px] border transition-colors",
-                unlocked && !muted ? "border-acc bg-acc-soft text-acc" : "border-line text-t1 hover:border-acc",
-              )}
-              aria-label={!unlocked || muted ? "Ativar som" : "Desligar som"}
-              title={!unlocked || muted ? "Ativar som" : "Desligar som"}
-              onClick={() => (unlocked ? unlock(!muted) : unlock(false))}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-[9px] border border-line text-t1 transition-colors hover:border-acc"
+              aria-label={fullscreen ? "Sair da tela cheia" : "Tela cheia"}
+              title={fullscreen ? "Sair da tela cheia" : "Tela cheia"}
+              onClick={toggleFull}
             >
-              {!unlocked || muted ? <SoundOffIcon /> : <SoundOnIcon />}
+              <FullscreenIcon exit={fullscreen} />
             </button>
-            {controls === "tv" && (
-              <Button type="button" variant="outline" size="sm" onClick={onExitTv}>
-                Sair da tela cheia
-              </Button>
-            )}
-          </div>
-        )}
-      </header>
-      )}
-
-      {controls === "page" && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[12px] font-bold text-t2">Simular</span>
-          <Button type="button" size="sm" variant="outline" onClick={() => preview("first")}>Liderança</Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => preview("overtake")}>Ultrapassagem</Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => preview("level")}>Nível</Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => preview("store-level")}>Nível da loja</Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => preview("challenge")}>Desafio</Button>
+          ) : null}
         </div>
-      )}
+      </header>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="board-in grid shrink-0 grid-cols-2 gap-1.5 xl:grid-cols-4" style={{ animationDelay: "70ms" }}>
         <StatCard dense glass label="Faturamento" value={brlCent(monthRevenue)} sub={`Hoje ${brlCent(todayTotals.revenue)}`} icon={<IconRevenue />} iconColor="var(--acc)" iconBg="var(--acc-soft)" />
         <StatCard dense glass label="Vendas" value={num(month.sales)} sub={`Hoje ${num(todayTotals.sales)}`} icon={<IconSales />} iconColor="var(--ok)" iconBg="var(--ok-soft)" />
         <StatCard
           dense
           glass
           label="Meta"
-          value={goalBoards.length > 0 ? brlCent(goalTarget) : "—"}
-          sub={goalBoards.length === 0 ? "Não configurada" : oneGoal ? oneGoal.card.name : `${goalBoards.length} metas ativas`}
+          value={activeGoal ? brlCent(activeGoal.goal.target) : "—"}
+          sub={activeGoal ? activeGoal.card.name : "Não configurada"}
           icon={<TargetIcon size={16} />}
           iconColor="var(--info)"
           iconBg="rgba(59,130,246,0.12)"
@@ -667,17 +696,15 @@ export function BoardView({
           dense
           glass
           label="Progresso da meta"
-          value={goalBoards.length > 0 ? `${num(oneGoal ? oneGoal.summary.pct : goalPct, 1)}%` : "—"}
+          value={activeGoal ? `${num(activeGoal.summary.pct, 1)}%` : "—"}
           sub={
-            goalBoards.length === 0
-              ? "Meta não configurada"
-              : !oneGoal
-                ? `${goalBoards.length} metas ativas`
-                : oneGoal.goal.tierMode === "INDIVIDUAL"
-                  ? "Meta individual"
-                  : oneGoal.summary.currentLevel
-                    ? `N${oneGoal.summary.levelNumber} · ${oneGoal.summary.currentLevel}`
-                    : "Sem nível"
+            activeGoal
+              ? activeGoal.goal.tierMode === "INDIVIDUAL"
+                ? "Meta individual"
+                : activeGoal.summary.currentLevel
+                  ? `N${activeGoal.summary.levelNumber} · ${activeGoal.summary.currentLevel}`
+                  : "Sem nível"
+              : "Meta não configurada"
           }
           icon={<TrophyIcon size={16} />}
           iconColor="var(--warn)"
@@ -685,23 +712,29 @@ export function BoardView({
         />
       </div>
 
-      {goalBoards.length > 0 ? (
-        <div className="flex flex-col gap-3">
-          {goalBoards.map((board) => (
-            <BoardGoalCard key={board.goal.id} board={board} showStore={manyStores && controls !== "tv"} />
-          ))}
+      {activeGoal ? (
+        <div className="board-in shrink-0" style={{ animationDelay: "140ms" }}>
+          <BoardGoalCard board={activeGoal} pulse={pulseGoal} />
         </div>
       ) : (
-        <Card glass="var(--info-soft)">
+        <Card glass="var(--info-soft)" className="board-in shrink-0 !p-3" style={{ animationDelay: "140ms" }}>
           <EmptyState framed={false} icon="🎯" title="Meta não configurada" description="Cadastre uma meta para acompanhar o desempenho da equipe no período." />
         </Card>
       )}
 
-      <div className={cn("grid min-w-0 gap-4", challenges.length > 0 && "xl:grid-cols-[minmax(0,65fr)_minmax(280px,35fr)] xl:items-start")}>
-        <Card padding="lg" glass="var(--acc-soft)" className="min-w-0">
-          <div className="mb-4 flex items-center gap-3">
-            <CardHero>
-              <TrophyIcon size={22} />
+      <div
+        className={cn(
+          "board-in grid min-h-0 flex-1 gap-1.5",
+          challengeCard
+            ? "grid-rows-[minmax(0,1.15fr)_minmax(0,0.85fr)] xl:grid-cols-[minmax(0,65fr)_minmax(220px,35fr)] xl:grid-rows-[minmax(0,1fr)]"
+            : "grid-rows-[minmax(0,1fr)]",
+        )}
+        style={{ animationDelay: "200ms" }}
+      >
+        <Card padding="sm" glass="var(--acc-soft)" className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden !px-3 !py-2">
+          <div className="mb-0.5 flex shrink-0 items-center gap-2">
+            <CardHero compact>
+              <TrophyIcon size={18} />
             </CardHero>
             <CardTitle>Ranking</CardTitle>
           </div>
@@ -709,174 +742,124 @@ export function BoardView({
             <EmptyState framed={false} icon="📊" title="Sem dados no período" description="Nenhuma venda registrada no período selecionado." />
           ) : (
             <>
-          <RankingBlock ranking={podium} formatAmount={brlCent} spotlight literalName />
+              <div className="shrink-0">
+                <RankingBlock ranking={podium} formatAmount={brlCent} spotlight literalName motion flashId={lingerKey} />
+              </div>
               {(view?.people.length ?? 0) > 3 && (
-                <div className="mt-5">
-                  <p className="mb-2 text-[12px] font-bold uppercase tracking-wide text-t2">Demais posições</p>
-                  <div className="min-w-0 overflow-x-auto">
-                    <table className="w-full min-w-[640px] border-collapse text-[12px]">
-                      <thead>
-                        <tr className="border-b border-line">
-                          <ThSort label="#" active={rankSort.key === "place"} dir={rankSort.dir} align="left" className="pb-1.5 pr-2" onClick={() => toggleRankSort("place")} />
-                          <ThSort label="Pessoa" active={rankSort.key === "name"} dir={rankSort.dir} align="left" className="pb-1.5 pr-2" onClick={() => toggleRankSort("name")} />
-                          <ThSort label="Vendas" active={rankSort.key === "sales"} dir={rankSort.dir} align="right" className="pb-1.5 pr-2" onClick={() => toggleRankSort("sales")} />
-                          <ThSort label="P.A." active={rankSort.key === "pa"} dir={rankSort.dir} align="right" className="pb-1.5 pr-2" onClick={() => toggleRankSort("pa")} />
-                          <ThSort label="Meta" active={rankSort.key === "meta"} dir={rankSort.dir} align="right" className="pb-1.5 pr-2" onClick={() => toggleRankSort("meta")} />
-                          <ThSort label="Falta" active={rankSort.key === "gap"} dir={rankSort.dir} align="right" className="pb-1.5 pr-2" onClick={() => toggleRankSort("gap")} />
-                          <ThSort label="Faturamento" active={rankSort.key === "revenue"} dir={rankSort.dir} align="right" className="pb-1.5" onClick={() => toggleRankSort("revenue")} />
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {view!.people
-                          .map((person, index) => ({ person, place: index + 1 }))
-                          .slice(3)
-                          .sort((a, b) => {
-                            const metaOf = (person: TeamMemberRow) => {
-                              const level = personLevel(person);
-                              if (!level) return null;
-                              return goalFor(person)?.goal.tierMode === "INDIVIDUAL" ? level.pct : level.storePct;
-                            };
-                            const value = (row: { person: TeamMemberRow; place: number }): number | string | null => {
-                              if (rankSort.key === "place") return row.place;
-                              if (rankSort.key === "name") return row.person.name;
-                              if (rankSort.key === "sales") return row.person.sales;
-                              if (rankSort.key === "pa") return row.person.pa;
-                              if (rankSort.key === "revenue") return row.person.revenue;
-                              if (rankSort.key === "gap") return personLevel(row.person)?.gap ?? null;
-                              return metaOf(row.person);
-                            };
-                            const left = value(a);
-                            const right = value(b);
-                            if (left == null && right == null) return a.place - b.place;
-                            if (left == null) return 1;
-                            if (right == null) return -1;
-                            const compared = typeof left === "string" ? left.localeCompare(right as string, "pt-BR") : left - (right as number);
-                            if (compared === 0) return a.place - b.place;
-                            return rankSort.dir === "asc" ? compared : -compared;
-                          })
-                          .map(({ person, place }) => {
+                <div className="mt-1 min-h-0 flex-1 overflow-y-auto">
+                  <p className="mb-0.5 text-[11px] font-bold uppercase tracking-wide text-t2">Demais posições</p>
+                  <table className="w-full border-collapse text-[12px]">
+                    <thead>
+                      <tr className="border-b border-line">
+                        <ThSort label="#" active={rankSort.key === "place"} dir={rankSort.dir} align="left" className="pb-1.5 pr-2" onClick={() => toggleRankSort("place")} />
+                        <ThSort label="Pessoa" active={rankSort.key === "name"} dir={rankSort.dir} align="left" className="pb-1.5 pr-2" onClick={() => toggleRankSort("name")} />
+                        <ThSort label="Vendas" active={rankSort.key === "sales"} dir={rankSort.dir} align="right" className="pb-1.5 pr-2" onClick={() => toggleRankSort("sales")} />
+                        <ThSort label="Meta" active={rankSort.key === "meta"} dir={rankSort.dir} align="right" className="pb-1.5 pr-2" onClick={() => toggleRankSort("meta")} />
+                        <ThSort label="Falta" active={rankSort.key === "gap"} dir={rankSort.dir} align="right" className="pb-1.5 pr-2" onClick={() => toggleRankSort("gap")} />
+                        <ThSort label="Faturamento" active={rankSort.key === "revenue"} dir={rankSort.dir} align="right" className="pb-1.5" onClick={() => toggleRankSort("revenue")} />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {view!.people
+                        .map((person, index) => ({ person, place: index + 1 }))
+                        .slice(3)
+                        .sort((a, b) => {
+                          const metaOf = (person: TeamMemberRow) => {
+                            const level = personLevel(person);
+                            if (!level) return null;
+                            return goalFor(person)?.goal.tierMode === "INDIVIDUAL" ? level.pct : level.storePct;
+                          };
+                          const value = (row: { person: TeamMemberRow; place: number }): number | string | null => {
+                            if (rankSort.key === "place") return row.place;
+                            if (rankSort.key === "name") return row.person.name;
+                            if (rankSort.key === "sales") return row.person.sales;
+                            if (rankSort.key === "revenue") return row.person.revenue;
+                            if (rankSort.key === "gap") return personLevel(row.person)?.gap ?? null;
+                            return metaOf(row.person);
+                          };
+                          const left = value(a);
+                          const right = value(b);
+                          if (left == null && right == null) return a.place - b.place;
+                          if (left == null) return 1;
+                          if (right == null) return -1;
+                          const compared = typeof left === "string" ? left.localeCompare(right as string, "pt-BR") : left - (right as number);
+                          if (compared === 0) return a.place - b.place;
+                          return rankSort.dir === "asc" ? compared : -compared;
+                        })
+                        .map(({ person, place }) => {
                           const level = personLevel(person);
                           const board = goalFor(person);
                           const home = homeStore(person);
                           const individual = board?.goal.tierMode === "INDIVIDUAL";
-                          const pct = level ? (individual ? `${num(level.pct, 1)}%` : `${num(level.storePct, 1)}% da meta`) : null;
+                          const pct = level ? `${num(individual ? level.pct : level.storePct, 1)}%` : null;
+                          const wins = visibleWins(person.key);
                           return (
-                            <tr key={person.key} className={cn("border-b border-line last:border-b-0", momentKey(current) === person.key && "bg-acc-soft")}>
-                              <td className="py-1.5 pr-2 font-bold text-t3">{place}º</td>
-                              <td className="py-1.5 pr-2">
+                            <tr key={person.key} className={cn("border-b border-line last:border-b-0", lingerKey === person.key && "board-row-flash")}>
+                              <td className="py-1 pr-2 font-bold text-t3">{place}º</td>
+                              <td className="py-1 pr-2">
                                 <span className="flex min-w-0 items-center gap-2">
-                                  <PersonAvatar name={person.name} employeeId={person.key} storeId={home} size="sm" />
-                                  <span className="min-w-0">
-                                    <span className="block truncate text-[12.5px] font-bold text-t0">{person.name}</span>
-                                    {manyStores && storeName.get(home) ? (
-                                      <span className="block truncate text-[11px] text-t2">{storeName.get(home)}</span>
-                                    ) : null}
+                                  <span className="relative inline-flex">
+                                    <PersonAvatar name={person.name} employeeId={person.key} storeId={home} size="sm" />
+                                    <WinBadge count={wins} />
                                   </span>
+                                  <span className="min-w-0 truncate text-[12.5px] font-bold text-t0">{person.name}</span>
                                 </span>
                               </td>
-                              <td className="py-1.5 pr-2 text-right font-mono text-[12.5px] font-bold tabular-nums text-t0">{num(person.sales)}</td>
-                              <td className="py-1.5 pr-2 text-right font-mono text-[12.5px] font-bold tabular-nums text-t0">{person.pa == null ? "—" : num(person.pa, 2)}</td>
-                              <td className="py-1.5 pr-2 text-right">
-                                <span className="block font-mono text-[13px] font-extrabold tabular-nums text-t0">{pct ?? "—"}</span>
-                                {level ? (
-                                  <span className="mt-1 flex justify-end">
-                                    <Badge variant="neutral" className="uppercase">{level.levelLabel ?? "Sem nível"}</Badge>
-                                  </span>
-                                ) : null}
+                              <td className="py-1 pr-2 text-right font-mono text-[12.5px] font-bold tabular-nums text-t0">{num(person.sales)}</td>
+                              <td className="py-1 pr-2 text-right">
+                                <span className="block font-mono text-[12.5px] font-extrabold tabular-nums text-t0">{pct ?? "—"}</span>
+                                {level ? <span className="block text-[11px] text-t2">{level.levelLabel ?? "Sem nível"}</span> : null}
                               </td>
-                              <td className="py-1.5 pr-2 text-right">
+                              <td className="py-1 pr-2 text-right">
                                 {level?.top ? (
-                                  <span className="text-[12.5px] font-bold text-ok">Último nível</span>
+                                  <span className="text-[12px] font-bold text-ok">Último nível</span>
                                 ) : level?.gap == null ? (
                                   <span className="text-t2">—</span>
                                 ) : (
                                   <>
-                                    <span className="block font-mono text-[12.5px] font-bold tabular-nums text-t0">{brlCent(level.gap)}</span>
+                                    <span className="block font-mono text-[12px] font-bold tabular-nums text-t0">{brlCent(level.gap)}</span>
                                     {level.nextName ? <span className="block text-[11px] text-t2">para {level.nextName}</span> : null}
                                   </>
                                 )}
                               </td>
-                              <td className="py-1.5 text-right font-mono text-[12.5px] font-bold tabular-nums text-t0">{brlCent(person.revenue)}</td>
+                              <td className="py-1 text-right font-mono text-[12.5px] font-bold tabular-nums text-t0">{brlCent(person.revenue)}</td>
                             </tr>
                           );
                         })}
-                      </tbody>
-                    </table>
-                  </div>
+                    </tbody>
+                  </table>
                 </div>
               )}
             </>
           )}
         </Card>
 
-        {challenges.length > 0 && (
-          <div className="flex min-w-0 flex-col gap-3">
-            {challenges.map(({ challenge, view: challengeView }) => (
-              <ChallengeMiniCard
-                key={challenge.id}
-                challenge={challenge}
-                view={challengeView}
-                storeNameValue={manyStores ? storeName.get(challenge.storeId) : undefined}
-                prominent
-                showPeople
-                floor
-                hotKey={current?.kind === "challenge" ? current.key : null}
-              />
-            ))}
+        {challengeCard ? (
+          <div className={cn("h-full min-h-0 transition-opacity duration-300", challengeOn ? "opacity-100" : "opacity-0")}>
+            <ChallengeMiniCard
+              challenge={challengeCard.challenge}
+              view={challengeCard.view}
+              prominent
+              showPeople
+              floor
+              counter={challenges.length > 1 ? `${(challengeSlot % challenges.length) + 1} / ${challenges.length}` : null}
+              hotKey={current?.kind === "challenge" ? current.key : null}
+            />
           </div>
-        )}
+        ) : null}
       </div>
 
       {current
         ? createPortal(
-            <div
-              className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 p-6"
-              role="dialog"
-              aria-modal="true"
-              aria-label={momentText(current, names)}
-              onClick={closeCelebration}
-            >
-          <div key={bannerKey} className="flex flex-col items-center overflow-visible" style={{ animation: "board-pop 0.35s ease" }} onClick={(event) => event.stopPropagation()}>
-            {celebration ? (
-              <div className="relative mb-5 overflow-visible">
-                {celebrationMedal ? (
-                  <span
-                    className={cn(
-                      "absolute z-10 leading-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.35)]",
-                      celebration.place === 1
-                        ? "left-1/2 top-0 -translate-x-1/2 -translate-y-[78%] text-[46px]"
-                        : "-right-2 -top-2 text-[36px]",
-                    )}
-                    aria-hidden
-                  >
-                    {celebrationMedal.mark}
-                  </span>
-                ) : null}
-                <span
-                  className="inline-flex rounded-full"
-                  style={{
-                    boxShadow: celebrationMedal
-                      ? `0 0 0 4px ${celebrationMedal.color}${celebration.place === 1 ? ", 0 0 36px rgba(247,184,78,0.45)" : ""}`
-                      : "0 0 0 4px var(--acc)",
-                  }}
-                >
-                  <PersonAvatar size="3xl" name={celebration.name} employeeId={celebration.employeeId} storeId={celebration.storeId} />
-                </span>
-              </div>
-            ) : null}
-            <p
-              aria-live="polite"
-              className="max-w-xl rounded-[var(--radius-vela-lg)] border border-acc bg-bg-2 px-8 py-6 text-center text-[22px] font-extrabold tracking-tight text-t0 shadow-[var(--shadow-vela)] sm:text-[28px]"
-            >
-              {momentText(current, names)}
-            </p>
-            <Button type="button" variant="outline" className="mt-5" onClick={closeCelebration}>
-              Fechar
-            </Button>
-          </div>
-        </div>,
-          document.body,
-        )
+            <BoardCelebration
+              moment={current}
+              leaving={leaving}
+              face={celebration}
+              passed={passedFace}
+              caption={momentText(current, names)}
+            />,
+            document.body,
+          )
         : null}
     </div>
   );

@@ -67,7 +67,7 @@ export function FormField({
   optional,
   children,
 }: {
-  label: string;
+  label?: string;
   hint?: string;
   error?: string;
   required?: boolean;
@@ -77,11 +77,13 @@ export function FormField({
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-[12.5px] font-bold text-t0">
-        {label}
-        {required && <span className="text-bad"> *</span>}
-        {optional && !required && <span className="font-normal text-t2"> (opcional)</span>}
-      </label>
+      {label ? (
+        <label className="mb-1.5 block text-[12.5px] font-bold text-t0">
+          {label}
+          {required && <span className="text-bad"> *</span>}
+          {optional && !required && <span className="font-normal text-t2"> (opcional)</span>}
+        </label>
+      ) : null}
       {children}
       {hint && !error && <p className="mt-1.5 text-[11.5px] text-t2">{hint}</p>}
       {error && <p className="mt-1.5 text-[11.5px] font-medium text-bad">{error}</p>}

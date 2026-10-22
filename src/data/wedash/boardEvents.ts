@@ -54,6 +54,14 @@ function passedName(person: BoardRank, prev: Map<string, BoardRank>, next: Board
   return victims[0]?.name ?? null;
 }
 
+const MOMENT_RANK: Record<BoardMoment["kind"], number> = {
+  first: 0,
+  overtake: 1,
+  level: 2,
+  "store-level": 3,
+  challenge: 4,
+};
+
 export function boardMoments(prev: BoardSnapshot | null, next: BoardSnapshot): BoardMoment[] {
   if (!prev) return [];
   const moments: BoardMoment[] = [];
@@ -101,5 +109,6 @@ export function boardMoments(prev: BoardSnapshot | null, next: BoardSnapshot): B
   }
   overtakes.sort((a, b) => (a.kind === "overtake" && b.kind === "overtake" ? a.position - b.position : 0));
   moments.push(...overtakes);
+  moments.sort((a, b) => MOMENT_RANK[a.kind] - MOMENT_RANK[b.kind]);
   return moments;
 }

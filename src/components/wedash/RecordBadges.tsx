@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui";
+import { cn } from "@/lib/cn";
 import { shortDate } from "@/lib/format";
 import { statusBadgeVariant } from "@/lib/status";
 import { TrophyIcon } from "@/pages/dashboards/icons";
@@ -13,17 +14,17 @@ function MiniIcon({ children }: { children: ReactNode }) {
 }
 
 /** Selo de status do card e do detalhe: Em andamento, A começar, Encerrada ou Encerrado. */
-export function RecordStatusBadge({ label }: { label: string }) {
+export function RecordStatusBadge({ label, className }: { label: string; className?: string }) {
   return (
-    <Badge variant={statusBadgeVariant(label)} className="shrink-0 uppercase">
+    <Badge variant={statusBadgeVariant(label)} className={cn("shrink-0 uppercase", className)}>
       {label}
     </Badge>
   );
 }
 
-export function PeriodBadge({ from, to }: { from: string; to: string }) {
+export function PeriodBadge({ from, to, className }: { from: string; to: string; className?: string }) {
   return (
-    <Badge variant="neutral" className="gap-1 uppercase">
+    <Badge variant="neutral" className={cn("gap-1 uppercase", className)}>
       <MiniIcon>
         <rect x="3" y="4" width="18" height="18" rx="2" />
         <line x1="16" y1="2" x2="16" y2="6" />
@@ -49,9 +50,9 @@ export function BranchBadge({ name }: { name: string }) {
 }
 
 /** "3 dias restantes", "Último dia" ou "Começa em …", no mesmo selo da meta. */
-export function DeadlineBadge({ label }: { label: string }) {
+export function DeadlineBadge({ label, className }: { label: string; className?: string }) {
   return (
-    <Badge variant="neutral" className="gap-1 uppercase">
+    <Badge variant="neutral" className={cn("gap-1 uppercase", className)}>
       <MiniIcon>
         <circle cx="12" cy="12" r="9" />
         <path d="M12 7v5l3 2" />
@@ -77,9 +78,9 @@ export function UnidentifiedSalesBadge() {
   );
 }
 
-export function PrizeBadge({ label }: { label: string }) {
+export function PrizeBadge({ label, className }: { label: string; className?: string }) {
   return (
-    <Badge variant="neutral" className="gap-1 uppercase">
+    <Badge variant="neutral" className={cn("gap-1 uppercase", className)}>
       <TrophyIcon size={11} />
       {label}
     </Badge>

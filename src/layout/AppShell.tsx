@@ -1,8 +1,6 @@
 import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { padBottom } from "@/lib/safeArea";
 import { Outlet, useLocation } from "react-router-dom";
-import { paths } from "@/router/paths";
-import { cn } from "@/lib/cn";
 import { Sidebar } from "./Sidebar";
 import { MobileDrawer } from "./MobileDrawer";
 import { Topbar } from "./Topbar";
@@ -14,9 +12,6 @@ import { storedThemePreference, useTheme } from "@/theme/ThemeProvider";
 import { ProfilePhotosProvider } from "@/components/wedash/PersonAvatar";
 import { PushRecover } from "@/push/PushRecover";
 import { isNotificationOpen, reloadSalesAfterOpen } from "@/push/resumeSales";
-import { AccessHeroBackdrop } from "@/pages/access/AccessHeroBackdrop";
-import { useBoardTheme } from "@/pages/board/boardTheme";
-
 /** O banco so grava 1x a cada 5 min; aqui so evita chamadas a toa. */
 const LAST_SEEN_INTERVAL_MS = 5 * 60_000;
 
@@ -25,10 +20,6 @@ export function AppShell() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const location = useLocation();
-  const onBoard = location.pathname === paths.board;
-  const presentation = onBoard && new URLSearchParams(location.search).get("tv") === "1";
-  const [boardTheme] = useBoardTheme();
-  const darkBoard = onBoard && boardTheme === "dark";
   const mainRef = useRef<HTMLElement | null>(null);
   const setScroller = useCallback((node: HTMLElement | null) => {
     mainRef.current = node;
@@ -46,7 +37,6 @@ export function AppShell() {
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (presentation) return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setPaletteOpen((o) => !o);
@@ -54,11 +44,7 @@ export function AppShell() {
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [presentation]);
-
-  useEffect(() => {
-    if (presentation) setPaletteOpen(false);
-  }, [presentation]);
+  }, []);
 
   useEffect(() => installPrintMode(), []);
 
@@ -108,52 +94,30 @@ export function AppShell() {
 
   return (
     <div className="tela-cheia flex w-full overflow-x-hidden bg-bg-0 text-t0 print:block print:overflow-visible print:bg-white">
-      {!presentation && (
-        <div className="contents print:hidden">
-          <Sidebar collapsed={collapsed} />
-          <MobileDrawer open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
-        </div>
-      )}
+      <div className="contents print:hidden">
+        <Sidebar collapsed={collapsed} />
+        <MobileDrawer open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
+      </div>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col print:block">
-        {!presentation && (
-          <div className="contents print:hidden">
-            <Topbar onOpenMobileNav={() => setMobileNavOpen(true)} collapsed={collapsed} onToggleCollapse={() => setCollapsed((c) => !c)} />
-          </div>
-        )}
+        <div className="contents print:hidden">
+          <Topbar onOpenMobileNav={() => setMobileNavOpen(true)} collapsed={collapsed} onToggleCollapse={() => setCollapsed((c) => !c)} />
+        </div>
         <main
-          ref={onBoard ? undefined : setScroller}
-          data-board-theme={onBoard ? boardTheme : undefined}
-          className={cn(
-            "relative flex min-h-0 flex-1 flex-col print:overflow-visible print:p-0",
-            onBoard ? "overflow-hidden bg-bg-0" : "overflow-x-hidden overflow-y-auto px-4 pt-5 sm:px-8 sm:pt-6",
-            darkBoard && "access-hero-scope",
-          )}
+          ref={setScroller}
+          className="relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-4 pt-5 sm:px-8 sm:pt-6 print:overflow-visible print:p-0"
         >
-          {darkBoard && <AccessHeroBackdrop />}
-          <div
-            ref={onBoard ? setScroller : undefined}
-            className={cn(
-              onBoard && "relative z-10 min-h-0 flex-1 overflow-x-hidden overflow-y-auto print:overflow-visible print:p-0",
-              onBoard && (presentation ? "p-0" : "px-4 pt-5 sm:px-8 sm:pt-6"),
-            )}
-          >
           <ProfilePhotosProvider>
             <Suspense fallback={<PageLoader />}>
-              <div
-                key={location.pathname}
-                className={cn("print:pb-0", presentation ? "flex min-h-full flex-1 flex-col" : "pad-base vela-page-enter")}
-                style={presentation ? undefined : padBottom("32px")}
-              >
+              <div key={location.pathname} className="pad-base vela-page-enter print:pb-0" style={padBottom("32px")}>
                 <Outlet />
               </div>
             </Suspense>
           </ProfilePhotosProvider>
-          </div>
         </main>
       </div>
 
-      {!presentation && <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />}
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <PushRecover />
     </div>
   );

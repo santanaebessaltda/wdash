@@ -13,6 +13,8 @@ export interface RankingRow {
   note?: string;
   /** Quanto falta para o próximo nível, no pódio do placar. */
   gap?: string;
+  /** Desafios do período já ganhos. No avatar do placar. */
+  wins?: number;
   /** Filial, quando o placar junta mais de uma. */
   place?: string;
 }

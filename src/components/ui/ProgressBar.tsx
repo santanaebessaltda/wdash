@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 function progressComplete(value: number): boolean {
   return value >= 100;
 }
@@ -24,10 +26,22 @@ export interface ProgressBarProps {
   trackColor?: string;
   height?: number;
   label?: string;
+  /** Na primeira pintura a barra sai do zero. */
+  enter?: boolean;
 }
 
-export function ProgressBar({ value, color, trackColor = "var(--bg-3)", height = 8, label }: ProgressBarProps) {
-  const fill = color ?? progressColor(value);
+export function ProgressBar({ value, color, trackColor = "var(--bg-3)", height = 8, label, enter = false }: ProgressBarProps) {
+  const [drawn, setDrawn] = useState(enter ? 0 : value);
+  useEffect(() => {
+    if (!enter) {
+      setDrawn(value);
+      return;
+    }
+    const frame = requestAnimationFrame(() => setDrawn(value));
+    return () => cancelAnimationFrame(frame);
+  }, [enter, value]);
+  const shown = enter ? drawn : value;
+  const fill = color ?? progressColor(shown);
   return (
     <div>
       {label && (
@@ -39,7 +53,7 @@ export function ProgressBar({ value, color, trackColor = "var(--bg-3)", height =
       <div className="w-full overflow-hidden rounded-full" style={{ height, background: trackColor }}>
         <div
           className="h-full rounded-full transition-[width,background] duration-500"
-          style={{ width: `${Math.min(100, Math.max(0, value))}%`, background: fill }}
+          style={{ width: `${Math.min(100, Math.max(0, shown))}%`, background: fill }}
         />
       </div>
     </div>

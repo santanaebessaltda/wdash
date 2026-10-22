@@ -5,7 +5,6 @@ import { ProfilePhotosProvider } from "@/components/wedash/PersonAvatar";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { readBoardShare, type PublicBoardPack } from "@/data/wedash/boardShare";
 import { effectiveWeekHours, parseWeekHours } from "@/data/wedash/storeHours";
-import { AccessHeroBackdrop } from "@/pages/access/AccessHeroBackdrop";
 import { cn } from "@/lib/cn";
 import { BoardView } from "./BoardView";
 import { useBoardTheme, type BoardTheme } from "./boardTheme";
@@ -16,7 +15,18 @@ function BoardFrame({ theme, children }: { theme: BoardTheme; children: ReactNod
   const dark = theme === "dark";
   return (
     <div data-board-theme={theme} className={cn("tela-cheia relative overflow-hidden text-t0", dark ? "access-hero-scope" : "bg-bg-0")}>
-      {dark ? <AccessHeroBackdrop /> : null}
+      {dark ? (
+        <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: "linear-gradient(165deg,#1b1640,#0c0e15 70%)" }}>
+          <div
+            className="absolute -right-16 -top-20 h-[340px] w-[340px] rounded-full"
+            style={{ background: "radial-gradient(circle,rgba(124,92,255,.35),transparent 70%)" }}
+          />
+          <div
+            className="absolute -bottom-24 -left-10 h-[300px] w-[300px] rounded-full"
+            style={{ background: "radial-gradient(circle,rgba(86,168,255,.22),transparent 70%)" }}
+          />
+        </div>
+      ) : null}
       {children}
     </div>
   );
@@ -55,8 +65,8 @@ export function PublicBoardPage() {
   if (status === "loading") {
     return (
       <BoardFrame theme={boardTheme}>
-        <div className="relative z-10 h-full overflow-y-auto">
-          <BoardSkeleton header className="min-h-full p-4 sm:p-6" />
+        <div className="relative z-10 h-full overflow-hidden">
+          <BoardSkeleton header className="h-full overflow-hidden p-3 sm:p-4" />
         </div>
       </BoardFrame>
     );
@@ -73,7 +83,7 @@ export function PublicBoardPage() {
   const watermark = pack.watermark ? new Date(pack.watermark) : null;
   return (
     <BoardFrame theme={boardTheme}>
-      <div className="relative z-10 h-full overflow-y-auto">
+      <div className="relative z-10 h-full min-h-0 overflow-hidden">
       <ProfilePhotosProvider photos={pack.photos}>
         <BoardView
           stores={[
@@ -95,7 +105,6 @@ export function PublicBoardPage() {
           watermark={Number.isNaN(watermark?.getTime() ?? 0) ? null : watermark}
           loading={false}
           packKey={pack.store.id}
-          controls="public"
         />
       </ProfilePhotosProvider>
       </div>
