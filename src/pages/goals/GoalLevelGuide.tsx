@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { Segmented } from "@/components/ui";
+import type { GoalManagerPrize } from "@/data/wedash/engine/goalView";
 import type { GoalRecord, SellerRow } from "@/data/wedash/engine/goalTypes";
 import { brlCent, num, shiftName } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { Icon, icons } from "@/pages/users/Icons";
+
+const MANAGEMENT_KEY = "gerencia";
 
 /** Níveis no desenho da vendedora. No detalhe fica no card. No placar abre numa janela. */
 export function GoalLevelGuide({
@@ -12,34 +15,56 @@ export function GoalLevelGuide({
   showReached = false,
   flush = false,
   hideNote = false,
+  management = null,
+  managementClosed = false,
 }: {
   goal: GoalRecord;
   sellers: SellerRow[];
-  /** No detalhe, a linha da gerência entra em cada nível. */
+  /** No detalhe, a contagem de quem já atingiu entra em cada nível. */
   showReached?: boolean;
   /** Sem a margem de cima, para caber numa janela. */
   flush?: boolean;
   /** No detalhe, a proporcionalidade fica na ajuda do título. */
   hideNote?: boolean;
+  /** No detalhe da meta, a gerência vira um pill no mesmo formato dos turnos. O placar não recebe. */
+  management?: GoalManagerPrize | null;
+  /** Meta encerrada: a premiação vira total e some o que falta para o próximo nível. */
+  managementClosed?: boolean;
 }) {
   const guide = buildGoalLevelGuide(goal, sellers);
-  const [groupKey, setGroupKey] = useState(guide?.groups[0]?.key ?? "");
-  if (!guide) return null;
-  const selected = guide.groups.find((group) => group.key === groupKey) ?? guide.groups[0]!;
+  const [groupKey, setGroupKey] = useState(guide?.groups[0]?.key ?? MANAGEMENT_KEY);
+  if (!guide && !management) return null;
+
+  const days = guide?.groups[0]?.days ?? daysBetween(goal.startsOn, goal.endsOn);
+  const managementRows = management ? rowsForManagement(goal, days, management.levelNumber) : null;
+  const options = [
+    ...(guide?.groups.map((group) => ({ value: group.key, label: group.title })) ?? []),
+    ...(managementRows ? [{ value: MANAGEMENT_KEY, label: "Gerência" }] : []),
+  ];
+  const selectedKey = options.some((option) => option.value === groupKey) ? groupKey : (options[0]?.value ?? MANAGEMENT_KEY);
+  const selected = guide?.groups.find((group) => group.key === selectedKey) ?? null;
+  const showingManagement = selectedKey === MANAGEMENT_KEY && managementRows != null && management != null;
+  const rows = showingManagement ? managementRows : (selected?.rows ?? []);
+  const kind: GuideKind = showingManagement ? "store" : (selected?.kind ?? "person");
+  const people = showingManagement ? 0 : (selected?.people ?? 0);
+  const hasNote = Boolean(guide?.note && !hideNote);
+  const hasPills = options.length > 1;
+
   const levels = (
     <>
-      {guide.note && !hideNote ? <p className="text-[12px] leading-snug text-t2">{guide.note}</p> : null}
-      {guide.groups.length > 1 ? (
+      {hasNote ? <p className="text-[12px] leading-snug text-t2">{guide?.note}</p> : null}
+      {hasPills ? (
         <Segmented
-          className="mt-3"
-          options={guide.groups.map((group) => ({ value: group.key, label: group.title }))}
-          value={selected.key}
+          className={hasNote ? "mt-3" : undefined}
+          options={options}
+          value={selectedKey}
           onChange={(value) => value && setGroupKey(value)}
         />
       ) : null}
-      <div className={cn("flex flex-col gap-2.5", ((guide.note && !hideNote) || guide.groups.length > 1) && "mt-3")}>
-        {selected.rows.map((row) => {
-          const everyone = selected.people > 0 && row.reached === selected.people;
+      {showingManagement ? <ManagementSummary management={management} closed={managementClosed} className={hasNote || hasPills ? "mt-3" : undefined} /> : null}
+      <div className={cn("flex flex-col gap-2.5", (hasNote || hasPills || showingManagement) && "mt-3")}>
+        {rows.map((row) => {
+          const everyone = row.marked || (people > 0 && row.reached === people);
           return (
             <div key={row.number} className="flex items-center gap-3 rounded-xl border border-line bg-bg-inset px-3.5 py-3">
               <span
@@ -56,13 +81,15 @@ export function GoalLevelGuide({
                 <p className="text-[13.5px] font-bold text-t0">
                   N{row.number} · {row.name}
                 </p>
-                <p className="mt-0.5 text-[12px] font-semibold text-t1">{moneyLine(selected.kind, row.month, row.day)}</p>
+                <p className="mt-0.5 text-[12px] font-semibold text-t1">{moneyLine(kind, row.month, row.day)}</p>
                 <p className="mt-0.5 text-[11.5px] text-t2">{ruleLine(row)}</p>
-                {showReached && row.manager ? <p className="mt-0.5 text-[11.5px] text-t2">{row.manager}</p> : null}
-                {selected.people > 0 ? (
+                {showReached && !management && row.manager ? <p className="mt-0.5 text-[11.5px] text-t2">{row.manager}</p> : null}
+                {row.statusLine ? (
+                  <p className={cn("mt-0.5 text-[11.5px] font-semibold", row.statusLine.tone === "current" ? "text-acc" : "text-ok")}>{row.statusLine.text}</p>
+                ) : people > 0 ? (
                   <p className={cn("mt-0.5 text-[11.5px] font-semibold", everyone ? "text-ok" : "text-t1")}>
                     <span className="font-mono tabular-nums">
-                      {row.reached}/{selected.people}
+                      {row.reached}/{people}
                     </span>{" "}
                     já atingiu
                   </p>
@@ -79,6 +106,32 @@ export function GoalLevelGuide({
     </>
   );
   return <div className={flush ? undefined : "mt-4"}>{levels}</div>;
+}
+
+/** Nível já atingido e a premiação acumulada. Fica só na vista Gerência. */
+function ManagementSummary({ management, closed, className }: { management: GoalManagerPrize; closed: boolean; className?: string }) {
+  const prize = management.prizeAmount + management.bonus;
+  return (
+    <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-acc-soft px-3.5 py-3 text-[12.5px]", className)}>
+      <span className={`font-semibold ${management.level ? "text-acc" : "text-t2"}`}>
+        {management.level ? `N${management.levelNumber} · ${management.level}` : "Abaixo do 1º nível"}
+      </span>
+      <span className="text-t1">
+        {closed ? "Premiação total" : "Premiação até agora"}: <span className="font-mono font-bold text-t0">{brlCent(prize)}</span>
+      </span>
+      {!closed ? (
+        <span className="text-t1 sm:ml-auto">
+          {management.next ? (
+            <>
+              Falta <span className="font-mono font-bold text-acc">{brlCent(management.next.gap)}</span> para N{management.next.number} · {management.next.name}
+            </>
+          ) : (
+            <span className="font-semibold text-ok">Último nível</span>
+          )}
+        </span>
+      ) : null}
+    </div>
+  );
 }
 
 function moneyLine(kind: GuideGroup["kind"], month: number, day: number): string {
@@ -110,6 +163,10 @@ type GuideRow = {
   bonusSoFar: number;
   reached: number;
   manager: string | null;
+  /** Check verde sem depender da contagem de pessoas. Usado na gerência. */
+  marked?: boolean;
+  /** Substitui "N/M já atingiu". */
+  statusLine?: { text: string; tone: "current" | "done" } | null;
 };
 
 function buildGoalLevelGuide(goal: GoalRecord, sellers: SellerRow[]): { intro: string; note: string | null; groups: Array<GuideGroup & { rows: GuideRow[] }> } | null {
@@ -176,6 +233,32 @@ function buildGoalLevelGuide(goal: GoalRecord, sellers: SellerRow[]): { intro: s
     .map((group) => ({ ...group, rows: rowsOf(goal, group) }));
   if (groups.length === 0) return null;
   return { intro, note, groups };
+}
+
+/** Mesmos cards do turno, sobre a meta da loja e a premiação da gerência. */
+function rowsForManagement(goal: GoalRecord, days: number, levelNumber: number | null): GuideRow[] {
+  let bonusSoFar = 0;
+  return goal.tiers.map((tier, index) => {
+    const bonus = tier.managerPct != null ? (tier.managerBonus ?? 0) : 0;
+    bonusSoFar += bonus;
+    const month = (goal.target * tier.minAttainmentPct) / 100;
+    const number = index + 1;
+    const reached = levelNumber != null && number <= levelNumber;
+    return {
+      number,
+      name: tier.name,
+      pct: tier.minAttainmentPct,
+      month,
+      day: days > 0 ? month / days : month,
+      commissionPct: tier.managerPct ?? 0,
+      bonus,
+      bonusSoFar,
+      reached: reached ? 1 : 0,
+      manager: null,
+      marked: reached,
+      statusLine: levelNumber === number ? { text: "Nível atual", tone: "current" } : reached ? { text: "Já atingiu", tone: "done" } : null,
+    };
+  });
 }
 
 function rowsOf(goal: GoalRecord, group: GuideGroup): GuideRow[] {

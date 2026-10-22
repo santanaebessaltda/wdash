@@ -319,17 +319,21 @@ function GoalHero({
   );
 }
 
-/** Grupos, cards de cada nível e a faixa da gerência. A barra fica no resumo. O ? do título explica o card inteiro. */
+/** Grupos, cards de cada nível e o pill da gerência. A barra fica no resumo. O ? do título explica o card inteiro. */
 function tiersHelp(goal: GoalRecord, sellers: GoalCardView["sellers"]): string {
   const lines = ["Cada nível mostra o valor do mês, a média por dia, a premiação, o bônus e quantas pessoas do turno já atingiram."];
   if (sellers.some((seller) => seller.proportionalGoal)) {
     lines.push("A meta individual considera os dias em que a pessoa participou do período.");
   }
-  if (goal.groups.length > 1) lines.push("O pill troca o turno. Grupos mostra a parte da meta de cada um.");
-  else if (goal.groups.length === 1) lines.push("Grupos mostra a parte da meta deste turno.");
-  if (goal.tiers.some((tier) => tier.managerPct != null)) {
+  const hasManagement = goal.tiers.some((tier) => tier.managerPct != null);
+  if (goal.groups.length > 1) {
+    lines.push(hasManagement ? "O pill troca o turno e a gerência. Grupos mostra a parte da meta de cada um." : "O pill troca o turno. Grupos mostra a parte da meta de cada um.");
+  } else if (goal.groups.length === 1) {
+    lines.push(hasManagement ? "O pill troca o turno e a gerência. Grupos mostra a parte da meta deste turno." : "Grupos mostra a parte da meta deste turno.");
+  }
+  if (hasManagement) {
     lines.push(
-      "A gerência sobe de nível pelo faturamento total da filial, incluindo vendas sem vendedor identificado ou feitas pela própria gerência. A premiação incide sobre a venda da filial e os bônus se acumulam.",
+      "Gerência abre os mesmos cards, sobre a meta da loja: valor do mês, média por dia, premiação, bônus, o nível já atingido e a premiação até agora. Ela sobe pelo faturamento total da filial, incluindo vendas sem vendedor identificado ou feitas pela própria gerência. A premiação incide sobre a venda da filial e os bônus se acumulam.",
     );
   }
   return lines.join("\n\n");
@@ -366,28 +370,7 @@ function GoalTiersCard({
       {goal.tiers.length === 0 ? (
         <p className="mt-4 text-[12.5px] text-t2">Esta meta não tem níveis de premiação.</p>
       ) : (
-        <GoalLevelGuide goal={goal} sellers={card.sellers} showReached hideNote />
-      )}
-      {management && status === "active" && (
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-acc-soft px-3.5 py-3 text-[12.5px]">
-          <span className="font-bold text-t0">Gerência</span>
-          <span className={`font-semibold ${management.level ? "text-acc" : "text-t2"}`}>
-            {management.level ? `N${management.levelNumber} · ${management.level}` : "Abaixo do 1º nível"}
-          </span>
-          <span className="text-t1">
-            Premiação até agora: <span className="font-mono font-bold text-t0">{brlCent(management.prizeAmount + management.bonus)}</span>
-          </span>
-          <span className="text-t1 sm:ml-auto">
-            {management.next ? (
-              <>
-                Falta <span className="font-mono font-bold text-acc">{brlCent(management.next.gap)}</span> para N{management.next.number} ·{" "}
-                {management.next.name}
-              </>
-            ) : (
-              <span className="font-semibold text-ok">Último nível</span>
-            )}
-          </span>
-        </div>
+        <GoalLevelGuide goal={goal} sellers={card.sellers} showReached hideNote management={management} managementClosed={status === "ended"} />
       )}
     </Card>
   );
