@@ -84,7 +84,7 @@ export function StatCard({ label, value, icon, iconColor = "var(--acc)", iconBg 
       ) : null}
       {!dense || !icon ? labelNode : null}
       <AnimatedNumber once={dense} duration={dense ? 700 : 1100} value={value} className={cn("block truncate font-extrabold", dense ? "mt-1 text-xl leading-none" : "mt-1 text-2xl", valueClassName ?? "text-t0")} />
-      {sub && <p className={cn("truncate", dense ? "mt-1 text-[11px] leading-tight text-t2" : quietSub ? "mt-0.5 text-[10.5px] text-t3" : "mt-0.5 text-[11px] text-t2")}>{sub}</p>}
+      {sub && <p className={cn("truncate", dense ? "mt-1 text-[11px] leading-tight text-t0" : quietSub ? "mt-0.5 text-[10.5px] text-t3" : "mt-0.5 text-[11px] text-t2")}>{sub}</p>}
       {sub2 && <p className="mt-0.5 truncate text-[11px] text-t2">{sub2}</p>}
       {sparkline && <div className="mt-3 h-9">{sparkline}</div>}
     </Card>
