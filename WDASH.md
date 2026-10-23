@@ -31,7 +31,7 @@ Remediação do security audit (standard):
 - **Worker:** sessão Millennium só em memória (+ coluna `millennium_session`); claim de `sync_job` = UPDATE atômico QUEUED→RUNNING; Actions/CLI pinados por SHA/versão; `verify_jwt=true` em todas as Edges no `config.toml`.
 - **Senha do ERP no onboarding:** só na memória do separador (F5 pede de novo). Não vai para `sessionStorage`.
 - **CORS das Edges:** só `APP_ORIGIN` e localhost (`CORS_ORIGINS`).
-- **Headers do site:** `public/_headers` (nosniff, frame, HSTS, CSP).
+- **Headers do site:** `public/_headers` (nosniff, frame, HSTS, CSP). O vídeo da Ajuda é servido pelo Supabase, então `media-src` inclui `blob:` e `https://*.supabase.co`. Sem isso o navegador bloqueia o play.
 - **Tabelas de venda:** `erp-stock-sync` só grava catálogo global para Gestor. Gerente continua no estoque e no saldo das lojas dele.
 - **HTTP do Millennium:** o host `:6017` não completa TLS. O esquema fica `http` até o ERP oferecer HTTPS. Cooldown do Atualizar continua desligado (decisão de produto: o gestor clica de novo quando quiser).
 - **Escrita por loja:** meta, desafio, turno, horário/fuso da loja e flags da vendedora passam por `staff_can_write_store` (migration `20261008120000_manager_store_writes`). Gerente sem vínculo escreve em todas; com vínculo, só nas lojas ligadas.

@@ -199,6 +199,7 @@ export function HelpVideoPage() {
                 key={videoUrl}
                 ref={player}
                 className="aspect-video w-full bg-black"
+                src={videoUrl}
                 poster={posterUrl ?? undefined}
                 controls={started}
                 playsInline
@@ -208,9 +209,7 @@ export function HelpVideoPage() {
                   void onPlay();
                 }}
                 onError={() => setPlaybackError(true)}
-              >
-                <source src={videoUrl} type={video.mimeType} />
-              </video>
+              />
               {started ? null : (
                 <button
                   type="button"
