@@ -62,6 +62,15 @@ export type WalletChallengeInput = {
   people: { personId: string; moneyCents: number; itemLabel: string | null; management?: boolean }[];
 };
 
+export type WalletManager = { id: string; name: string; storeIds: string[] };
+
+/** Gerentes da filial. Lista vazia de filiais = gerente de todas. */
+export function managersForStore(managers: WalletManager[], storeId: string): WalletManager[] {
+  return managers
+    .filter((manager) => manager.storeIds.length === 0 || manager.storeIds.includes(storeId))
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR") || a.id.localeCompare(b.id));
+}
+
 /** Divide centavos em partes iguais. O resto fica nas primeiras partes. */
 export function splitEqualCents(total: number, count: number): number[] {
   const amount = Math.max(0, Math.round(total));
@@ -185,6 +194,11 @@ export function buildWalletMonth(input: {
         continue;
       }
       if (person.management) {
+        const item = person.itemLabel?.trim() ?? "";
+        if (item) {
+          row.lines.push({ kind: "management", title: challenge.name, day: challenge.endsOn, cents: 0, open: false, note: item });
+          continue;
+        }
         const share = cents(person.moneyCents);
         if (share <= 0) continue;
         row.managementCents += share;

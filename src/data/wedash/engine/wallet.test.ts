@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildWalletMonth, splitEqualCents, walletInRange, type WalletCashDay, type WalletChallengeInput, type WalletGoalInput, type WalletPersonInput } from "./wallet";
+import { buildWalletMonth, managersForStore, splitEqualCents, walletInRange, type WalletCashDay, type WalletChallengeInput, type WalletGoalInput, type WalletPersonInput } from "./wallet";
 
 const people: WalletPersonInput[] = [
   { id: "ana", name: "ANA" },
@@ -143,6 +143,35 @@ describe("buildWalletMonth", () => {
     expect(ana.balanceCents).toBe(7_000);
     expect(ana.prizeCents).toBe(0);
     expect(ana.lines.map((line) => line.kind)).toEqual(["management", "managementBonus"]);
+  });
+
+  it("keeps a challenge item for the manager outside the balance", () => {
+    const view = month({
+      challenges: [
+        {
+          name: "Outubro",
+          endsOn: "2026-10-31",
+          open: false,
+          people: [{ personId: "ana", moneyCents: 0, itemLabel: "Kit", management: true }],
+        },
+      ],
+    });
+    const ana = view.people[0];
+    expect(ana.managementCents).toBe(0);
+    expect(ana.balanceCents).toBe(0);
+    expect(ana.lines).toEqual([
+      { kind: "management", title: "Outubro", day: "2026-10-31", cents: 0, open: false, note: "Kit" },
+    ]);
+  });
+
+  it("gives the branch prize to the managers of that branch", () => {
+    const managers = [
+      { id: "joyce", name: "Joyce", storeIds: ["tres"] },
+      { id: "laura", name: "Laura", storeIds: [] },
+      { id: "luiz", name: "Luiz", storeIds: ["outra"] },
+    ];
+    expect(managersForStore(managers, "tres").map((manager) => manager.id)).toEqual(["joyce", "laura"]);
+    expect(managersForStore(managers, "campo").map((manager) => manager.id)).toEqual(["laura"]);
   });
 
   it("splits cents equally and leaves the remainder on the first shares", () => {

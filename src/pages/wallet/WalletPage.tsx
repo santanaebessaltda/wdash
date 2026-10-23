@@ -477,7 +477,7 @@ function balanceLines(person: WalletPersonMonth): WalletPersonMonth {
     ...person,
     lines: person.lines.filter((line) => {
       if (line.open && line.kind === "challenge") return false;
-      if (line.cents === 0 && (line.kind === "prize" || line.kind === "bonus" || line.kind === "management" || line.kind === "managementBonus")) return false;
+      if (line.cents === 0 && !line.note && (line.kind === "prize" || line.kind === "bonus" || line.kind === "management" || line.kind === "managementBonus")) return false;
       if (line.cents === 0 && line.kind === "challenge" && !line.note) return false;
       return true;
     }),

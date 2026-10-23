@@ -19,7 +19,7 @@ import { dayShortageCents, netCloseDiff } from "./employeeWithdrawal";
 import { goalWeightFrom } from "./engine/goalProjection";
 import type { StoreWeekHours } from "./engine/goalWeights";
 import { isWalletOpportunity, type WalletOpportunity } from "./engine/sellerOpportunity";
-import { buildWalletMonth, splitEqualCents, type WalletCashDay, type WalletChallengeInput, type WalletGoalInput, type WalletMonth, type WalletPersonInput } from "./engine/wallet";
+import { buildWalletMonth, managersForStore, splitEqualCents, type WalletCashDay, type WalletChallengeInput, type WalletGoalInput, type WalletManager, type WalletMonth, type WalletPersonInput } from "./engine/wallet";
 import { buildGoalCardView, goalManagerPrize, goalStatus } from "./goalView";
 import { fetchGoalTeam, fetchGoals } from "./goalsRepo";
 import { fetchNamedSellerDayAggs, fetchSalesDayAggs, fetchSalesSellerDayAggs } from "./salesRepo";
@@ -50,15 +50,13 @@ function nameKey(name: string): string {
     .toLocaleUpperCase("pt-BR");
 }
 
-type RosterManager = { id: string; name: string; employeeId: number };
-
 type Roster = {
   people: WalletPersonInput[];
   byId: Map<string, string>;
   byEmployee: Map<string, string>;
   byName: Map<string, string>;
-  /** Ativas com cargo Gerência. O usuário da filial sai depois, quando a equipe chega. */
-  managers: RosterManager[];
+  /** Gerentes ativas da WDash. Filiais vazias = todas. */
+  managers: WalletManager[];
 };
 
 function rememberName(index: Map<string, string>, name: string, personId: string) {
@@ -66,20 +64,40 @@ function rememberName(index: Map<string, string>, name: string, personId: string
   if (key && !index.has(key)) index.set(key, personId);
 }
 
+async function fetchWalletManagers(tenantId: string): Promise<WalletManager[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (sb as any).rpc("wallet_managers", { p_tenant_id: tenantId });
+  if (error) {
+    console.warn("fetchWalletManagers:", error.message);
+    return [];
+  }
+  const managers: WalletManager[] = [];
+  for (const row of (data ?? []) as { id?: string | null; name?: string | null; store_ids?: unknown }[]) {
+    const id = row.id?.trim() ?? "";
+    const name = collaboratorName(row.name);
+    if (!id || !name) continue;
+    const storeIds = Array.isArray(row.store_ids)
+      ? row.store_ids.filter((storeId): storeId is string => typeof storeId === "string" && storeId.length > 0)
+      : [];
+    managers.push({ id, name, storeIds });
+  }
+  return managers;
+}
+
 async function loadRoster(tenantId: string, storeId: string): Promise<Roster> {
   const sb = getSupabase();
   const people: WalletPersonInput[] = [];
-  const managers: RosterManager[] = [];
   const byId = new Map<string, string>();
   const byEmployee = new Map<string, string>();
   const byName = new Map<string, string>();
-  const add = (id: string, name: string, employeeId: number | null, nameKeys: string[], manager = false) => {
+  const add = (id: string, name: string, employeeId: number | null, nameKeys: string[]) => {
     if (!id || byId.has(id)) return;
     const label = collaboratorName(name) || "Funcionário fora do cadastro";
     byId.set(id, id);
     people.push({ id, name: label });
     if (employeeId != null) byEmployee.set(`e:${employeeId}`, id);
-    if (manager && employeeId != null) managers.push({ id, name: label, employeeId });
     rememberName(byName, label, id);
     for (const key of nameKeys) rememberName(byName, key, id);
   };
@@ -87,7 +105,7 @@ async function loadRoster(tenantId: string, storeId: string): Promise<Roster> {
   if (sb) {
     const { data, error } = await sb
       .from("store_seller")
-      .select("id, millennium_employee_id, name, name_keys, active, erp_role")
+      .select("id, millennium_employee_id, name, name_keys")
       .eq("tenant_id", tenantId)
       .eq("store_id", storeId)
       .limit(2000);
@@ -98,22 +116,15 @@ async function loadRoster(tenantId: string, storeId: string): Promise<Roster> {
         String(row.name ?? ""),
         row.millennium_employee_id == null ? null : Number(row.millennium_employee_id),
         Array.isArray(row.name_keys) ? row.name_keys.filter((key): key is string => typeof key === "string") : [],
-        row.active === true && row.erp_role === "GERENCIA" && row.millennium_employee_id != null,
       );
     }
   }
 
+  const managers = await fetchWalletManagers(tenantId);
+  for (const manager of managers) add(manager.id, manager.name, null, []);
   const staff = await fetchWithdrawalStaff(tenantId);
   for (const person of staff) add(person.id, person.name, null, []);
   return { people, byId, byEmployee, byName, managers };
-}
-
-/** Gerência da filial, sem o usuário da loja. A parte de cada uma já chega pronta para a carteira. */
-function branchManagers(roster: Roster, team: { storeId: string; employeeId: number; branchUser?: boolean }[], storeId: string): RosterManager[] {
-  const branch = new Set(team.filter((member) => member.storeId === storeId && member.branchUser).map((member) => member.employeeId));
-  return roster.managers
-    .filter((person) => !branch.has(person.employeeId))
-    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR") || a.id.localeCompare(b.id));
 }
 
 function personFromKey(roster: Roster, key: string, name: string): string | null {
@@ -171,7 +182,7 @@ export async function loadBranchWallet(input: {
     fetchChallengeInput({ tenantId: input.tenantId, challenges: endingChallenges, today: input.today }),
   ]);
 
-  const managers = branchManagers(roster, team, input.storeId);
+  const managers = managersForStore(roster.managers, input.storeId);
   const goalSlices: WalletGoalInput[] = endingGoals.map((goal) => {
     const card = buildGoalCardView({
       goal,
@@ -228,12 +239,16 @@ export async function loadBranchWallet(input: {
       people.push({ personId, moneyCents: reaisToCents(participant.prize.amount), itemLabel: null });
     }
     const managerPrize = status === "active" ? null : view.management?.atingiu ? view.management.prize : null;
-    if (managerPrize?.kind === "MONEY" && managers.length > 0) {
-      const shares = splitEqualCents(reaisToCents(managerPrize.amount), managers.length);
-      managers.forEach((manager, index) => {
-        const share = shares[index] ?? 0;
-        if (share > 0) people.push({ personId: manager.id, moneyCents: share, itemLabel: null, management: true });
-      });
+    if (managerPrize && managers.length > 0) {
+      if (managerPrize.kind === "ITEM") {
+        for (const manager of managers) people.push({ personId: manager.id, moneyCents: 0, itemLabel: managerPrize.label, management: true });
+      } else {
+        const shares = splitEqualCents(reaisToCents(managerPrize.amount), managers.length);
+        managers.forEach((manager, index) => {
+          const share = shares[index] ?? 0;
+          if (share > 0) people.push({ personId: manager.id, moneyCents: share, itemLabel: null, management: true });
+        });
+      }
     }
     challengeSlices.push({ name: challenge.name, endsOn: challenge.endsOn, open: status === "active", people });
   }
