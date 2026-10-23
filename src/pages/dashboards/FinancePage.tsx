@@ -27,6 +27,7 @@ import { ProductsWithoutCostNotice } from "@/pages/dashboard/ProductsWithoutCost
 import type { SalesHourAgg } from "@/data/wedash/salesTypes";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { isOwner } from "@/layout/nav-wedash";
+import { queryStoreIds } from "@/data/wedash/stores";
 import { useActiveSession } from "@/session/SessionProvider";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useMonthFill } from "@/pages/dashboard/useMonthFill";
@@ -163,7 +164,7 @@ export default function FinancePage() {
     const period = resolvePeriod(scope.period, calendarTodayIso());
     const range = financeFetchRange(scope);
     const costRange = productsFetchRange(scope);
-    const storeIds = scope.storeIds;
+    const storeIds = queryStoreIds(session.role, scope.storeIds, session.stores);
     try {
       const [dayAggs, hourAggs, prevHourAggs, paymentDayAggs, productCostDayAggs, cov, informedCents] = await Promise.all([
         fetchSalesDayAggs({ tenantId: session.tenantId, storeIds, from: range.from, to: range.to, brand: null }),
@@ -192,7 +193,7 @@ export default function FinancePage() {
       console.error("Finance reload:", e);
       settle(key);
     }
-  }, [scope, session.tenantId, filterKey, settle]);
+  }, [scope, session.role, session.stores, session.tenantId, filterKey, settle]);
 
   useEffect(() => {
     void reload();

@@ -338,6 +338,19 @@ export function sessionStoreIds(input: {
   return operational.filter((s) => allowed.has(s.id)).map((s) => s.id);
 }
 
+/** Consulta sem loja não pode virar a rede inteira para o gerente. */
+const NO_STORE_ID = "00000000-0000-0000-0000-000000000000";
+
+/**
+ * Ids que a consulta pode pedir.
+ * Gestor com lista vazia lê a rede. Gerente usa o seletor ou, em Todas, só as filiais do vínculo.
+ */
+export function queryStoreIds(role: string, picked: string[], sessionStores: string[]): string[] {
+  if (role === "OWNER" || role === "ADMIN_GLOBAL") return picked;
+  if (picked.length > 0) return picked;
+  return sessionStores.length > 0 ? sessionStores : [NO_STORE_ID];
+}
+
 /** Lojas da sessao: so ids que o membership enxerga (UUIDs reais pos-ERP). */
 /** Segunda linha do seletor de filial: CNPJ, ou o código da filial no Millennium. */
 export function storeListSubtitle(store: Pick<Store, "cnpj" | "branchCode">): string {

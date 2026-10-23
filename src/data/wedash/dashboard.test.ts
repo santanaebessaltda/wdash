@@ -958,6 +958,25 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
     expect(v.otherStoresRanking).toBe(1);
   });
 
+  it("ranking fechado fica nas filiais do vínculo, mesmo com uma no seletor", () => {
+    const day = (storeId: string, revenueCents: number) => ({
+      tenantId: "t1",
+      storeId,
+      day: "2026-09-10",
+      brand: "ALL" as const,
+      revenueCents,
+      salesCount: 1,
+      itemCount: 1,
+    });
+    const v = buildOverviewView(scope("f1"), {
+      dayAggs: [day("f1", 300_00), day("f2", 100_00), day("fora", 50_00)],
+      rankingStoreIds: ["f1", "f2"],
+    });
+    expect(v.storesRanking.map((row) => row.amount)).toEqual([300, 100]);
+    expect(v.rankingNetworkTotal).toBe(400);
+    expect(v.otherStoresRanking).toBeUndefined();
+  });
+
   it("rankingLojas rede omits stores with zero revenue (no ghost cards)", () => {
     const v = buildOverviewView(scope("todas"), {
       dayAggs: [

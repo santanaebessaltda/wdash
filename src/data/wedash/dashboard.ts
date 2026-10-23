@@ -4013,6 +4013,11 @@ export type OverviewAggInput = {
   sellerShifts?: import("./salesTypes").SellerShiftRef[];
   /** Foto de perfil de quem tem conta WDash (codigo, gerador ou nome). */
   sellerAvatars?: import("./salesTypes").SellerAvatarRef[];
+  /**
+   * Filiais do ranking. Quando vem preenchido, o card só usa essas lojas,
+   * mesmo com a rede inteira nos agregados e com uma loja no seletor.
+   */
+  rankingStoreIds?: string[];
   /** Top produtos ({E7A5C5C7})  -  brand=ALL. Pode incluir dias do periodo anterior p/ variacao. */
   productDayAggs?: import("./salesTypes").SalesProductDayAgg[];
   /** CMV por produto do periodo (RELATORIOMARGEM)  -  lucro bruto do Top produtos. */
@@ -4709,9 +4714,14 @@ export function buildOverviewViewFromAggs(scope: Scope, input: OverviewAggInput)
     }))
     .sort((a, b) => b.achieved - a.achieved || a.category.localeCompare(b.category, "pt-BR"));
 
-  // Ranking de lojas  -  totais da rede; lista pode filtrar 1 loja, mas %/badge = rede.
+  // Ranking de lojas. Sem lista fechada: totais da rede; 1 loja no seletor vira fatia da rede.
+  // Com lista fechada (gerente): só essas filiais, nomeadas, mesmo com uma no seletor.
+  const rankingOnly = input.rankingStoreIds ?? [];
+  const rankingClosed = rankingOnly.length > 0;
+  const rankingAllowed = rankingClosed ? new Set(rankingOnly) : null;
   const byStore = new Map<string, number>();
   for (const d of daysNetwork) {
+    if (rankingAllowed && !rankingAllowed.has(d.storeId)) continue;
     byStore.set(d.storeId, (byStore.get(d.storeId) ?? 0) + d.revenueCents / 100);
   }
   const rankingNetworkTotal = [...byStore.values()].reduce((s, v) => s + v, 0);
@@ -4732,12 +4742,13 @@ export function buildOverviewViewFromAggs(scope: Scope, input: OverviewAggInput)
     })
     .filter((row) => {
       if (row.amount <= 0) return false;
+      if (rankingClosed) return rankingAllowed?.has(row.id ?? "") ?? false;
       if (scope.storeIds.length === 1) return row.id === scope.storeIds[0];
       return true;
     })
     .sort((a, b) => b.amount - a.amount);
   const otherStoresRanking =
-    scope.storeIds.length === 1
+    !rankingClosed && scope.storeIds.length === 1
       ? [...byStore.entries()].filter(([id, v]) => v > 0 && id !== scope.storeIds[0]).length
       : undefined;
 

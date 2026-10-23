@@ -13,6 +13,7 @@ import {
   type ProductsKpi,
 } from "@/data/wedash/dashboard";
 import { fetchSalesCoverage } from "@/data/wedash/salesRepo";
+import { queryStoreIds } from "@/data/wedash/stores";
 import { ProductNameCell } from "@/components/wedash/ProductNameCell";
 import {
   BadgeVsPrevious,
@@ -145,8 +146,8 @@ export default function ProductsPage() {
     const key = filterKey;
     try {
       const [next, cov] = await Promise.all([
-        fetchProductsAggInput(session.tenantId, scope),
-        fetchSalesCoverage(session.tenantId, scope.storeIds),
+        fetchProductsAggInput(session.tenantId, scope, queryStoreIds(session.role, scope.storeIds, session.stores)),
+        fetchSalesCoverage(session.tenantId, queryStoreIds(session.role, scope.storeIds, session.stores)),
       ]);
       if (gen !== reloadGen.current) return;
       setAggs(next);
@@ -157,7 +158,7 @@ export default function ProductsPage() {
       console.error("Products reload:", e);
       settle(key);
     }
-  }, [scope, session.tenantId, filterKey, settle]);
+  }, [scope, session.role, session.stores, session.tenantId, filterKey, settle]);
 
   useEffect(() => {
     void reload();

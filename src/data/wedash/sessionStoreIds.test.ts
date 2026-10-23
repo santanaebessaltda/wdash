@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sessionStoreIds } from "./stores";
+import { queryStoreIds, sessionStoreIds } from "./stores";
 
 const storeRows = [
   { id: "a", active: true },
@@ -23,6 +23,20 @@ describe("sessionStoreIds", () => {
 
   it("vendedor sem vínculo não ganha a rede", () => {
     expect(sessionStoreIds({ linkedIds: [], tenantStores: storeRows, role: "SELLER" })).toEqual([]);
+  });
+
+  it("gerente sem loja no seletor consulta só o vínculo", () => {
+    expect(queryStoreIds("MANAGER", [], ["a", "c"])).toEqual(["a", "c"]);
+    expect(queryStoreIds("MANAGER", ["a"], ["a", "c"])).toEqual(["a"]);
+  });
+
+  it("gerente sem vínculo não abre a rede", () => {
+    expect(queryStoreIds("MANAGER", [], [])).toEqual(["00000000-0000-0000-0000-000000000000"]);
+  });
+
+  it("gestor com seletor vazio continua na rede", () => {
+    expect(queryStoreIds("OWNER", [], ["a"])).toEqual([]);
+    expect(queryStoreIds("ADMIN_GLOBAL", ["c"], ["a", "c"])).toEqual(["c"]);
   });
 
   it("todas desativadas deixam o seletor vazio", () => {

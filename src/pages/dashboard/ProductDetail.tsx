@@ -65,11 +65,10 @@ export const moneyOrDash = (v: number | null) => (v == null ? "—" : brlCent(v)
 /* ---------- Dados ---------- */
 
 /** Tudo o que a tela Produtos le  -  tambem usado pelo detalhe aberto de outras telas. */
-export async function fetchProductsAggInput(tenantId: string, scope: Scope): Promise<ProductsAggInput> {
+export async function fetchProductsAggInput(tenantId: string, scope: Scope, storeIds = scope.storeIds): Promise<ProductsAggInput> {
   const period = resolvePeriod(scope.period, calendarTodayIso());
   const range = financeFetchRange(scope);
   const prodRange = productsFetchRange(scope);
-  const storeIds = scope.storeIds;
   const [dayAggs, hourAggs, prevHourAggs, categoryDayAggs, productDayAggs, productCostDayAggs, catalogDescriptions, catalogTypes] =
     await Promise.all([
       fetchSalesDayAggs({ tenantId, storeIds, from: range.from, to: range.to, brand: null }),

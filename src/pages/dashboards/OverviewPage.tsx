@@ -5,6 +5,8 @@ import { ProductNameCell } from "@/components/wedash/ProductNameCell";
 import { Avatar, Badge, Card, CardHeader, CardTitle, RadialProgress, StatCard, DateRangePicker, PageHeader, Button, ThSort, type SortDir } from "@/components/ui";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { AreaLineChart, BarChart, DonutChart } from "@/components/charts";
+import { isOwner } from "@/layout/nav-wedash";
+import { queryStoreIds } from "@/data/wedash/stores";
 import { scopeFilterKey, useScope } from "@/pages/dashboard/useScope";
 import { buildOverviewView, resolvePeriod, previousPeriod, OVERVIEW_PRODUCTS_TOP, OVERVIEW_TEAM_TOP, type OverviewKpi } from "@/data/wedash/dashboard";
 import {
@@ -196,6 +198,9 @@ export default function OverviewPage() {
     const singleDay = period.start === period.end;
     const goalDays = goalHistoryDayRange(period.start);
     const today = calendarTodayIso();
+    const owner = isOwner(session.role);
+    const asked = queryStoreIds(session.role, scope.storeIds, session.stores);
+    const rankingIds = owner ? [] : queryStoreIds(session.role, [], session.stores);
     const goalStoreIds =
       scope.storeIds.length > 0 ? scope.storeIds : storesForSession(session.stores).map((s) => s.id);
     const goalsP = fetchGoals({ tenantId: session.tenantId, storeIds: goalStoreIds, from: period.start, to: period.end });
@@ -224,8 +229,8 @@ export default function OverviewPage() {
       const [days, hours, cats, catalog, payments, sellers, products, productCosts, wm, cov, goalHistDays, goalHistHours, prevDays, prevHours, shifts, avatars, goalsLoaded, goalAggs] = await Promise.all([
         fetchSalesDayAggs({
           tenantId: session.tenantId,
-          // Sempre a rede: Ranking precisa do total/participacao mesmo com 1 loja no StorePicker.
-          storeIds: [],
+          // Gestor: a rede, para a fatia "Demais filiais". Gerente: só as filiais do vínculo.
+          storeIds: rankingIds,
           from: period.start,
           to: period.end,
           brand: null,
@@ -233,52 +238,52 @@ export default function OverviewPage() {
         singleDay
           ? fetchSalesHourAggs({
               tenantId: session.tenantId,
-              storeIds: scope.storeIds,
+              storeIds: asked,
               day: period.start,
               brand: null,
             })
           : Promise.resolve([] as SalesHourAgg[]),
         fetchSalesCategoryDayAggs({
           tenantId: session.tenantId,
-          storeIds: scope.storeIds,
+          storeIds: asked,
           from: prev.start < period.start ? prev.start : period.start,
           to: period.end,
           brand: null,
         }),
         fetchSalesCategoryCatalog({
           tenantId: session.tenantId,
-          storeIds: scope.storeIds,
+          storeIds: asked,
           brand: null,
         }),
         fetchSalesPaymentDayAggs({
           tenantId: session.tenantId,
-          storeIds: scope.storeIds,
+          storeIds: asked,
           from: period.start,
           to: period.end,
         }),
         fetchSalesSellerDayAggs({
           tenantId: session.tenantId,
-          storeIds: scope.storeIds,
+          storeIds: asked,
           from: period.start,
           to: period.end,
         }),
         fetchSalesProductDayAggs({
           tenantId: session.tenantId,
-          storeIds: scope.storeIds,
+          storeIds: asked,
           from: prev.start < period.start ? prev.start : period.start,
           to: period.end,
         }),
         fetchSalesProductCostDayAggs({
           tenantId: session.tenantId,
-          storeIds: scope.storeIds,
+          storeIds: asked,
           from: period.start,
           to: period.end,
         }),
         fetchSyncWatermark(session.tenantId).catch(() => null),
-        fetchSalesCoverage(session.tenantId, scope.storeIds),
+        fetchSalesCoverage(session.tenantId, asked),
         fetchSalesDayAggs({
           tenantId: session.tenantId,
-          storeIds: scope.storeIds,
+          storeIds: asked,
           from: goalDays.from,
           to: goalDays.to,
           brand: "ALL",
@@ -286,14 +291,14 @@ export default function OverviewPage() {
         singleDay
           ? fetchSalesHourAggs({
               tenantId: session.tenantId,
-              storeIds: scope.storeIds,
+              storeIds: asked,
               day: goalHistorySameWeekdays(period.start),
               brand: "ALL",
             })
           : Promise.resolve([] as SalesHourAgg[]),
         fetchSalesDayAggs({
           tenantId: session.tenantId,
-          storeIds: scope.storeIds,
+          storeIds: asked,
           from: prev.start,
           to: prev.end,
           brand: null,
@@ -301,7 +306,7 @@ export default function OverviewPage() {
         period.endsToday
           ? fetchSalesHourAggs({
               tenantId: session.tenantId,
-              storeIds: scope.storeIds,
+              storeIds: asked,
               day: prev.end,
               brand: null,
             })
@@ -339,7 +344,7 @@ export default function OverviewPage() {
       console.error("Overview reloadAggs:", e);
       settle(key);
     }
-  }, [scope, session.tenantId, session.stores, filterKey, settle]);
+  }, [scope, session.role, session.stores, session.tenantId, filterKey, settle]);
 
   useEffect(() => {
     const onSynced = () => void reloadAggs();
@@ -365,12 +370,12 @@ export default function OverviewPage() {
   // Enquanto o historico ainda cresce (HISTORY), repolha cobertura do picker.
   useEffect(() => {
     const id = window.setInterval(() => {
-      void fetchSalesCoverage(session.tenantId, scope.storeIds).then((cov) => {
+      void fetchSalesCoverage(session.tenantId, queryStoreIds(session.role, scope.storeIds, session.stores)).then((cov) => {
         setCoverageFrom(cov.from ? isoToDate(cov.from) : null);
       });
     }, 30_000);
     return () => window.clearInterval(id);
-  }, [session.tenantId, scope.storeIds]);
+  }, [session.role, session.stores, session.tenantId, scope.storeIds]);
 
   const view = useMemo(
     () =>
@@ -394,9 +399,10 @@ export default function OverviewPage() {
         goalSellerDayAggs,
         goalNamedSellerDayAggs,
         goalTeam,
+        rankingStoreIds: isOwner(session.role) ? undefined : queryStoreIds(session.role, [], session.stores),
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [scope, dayAggs, hourAggs, categoryDayAggs, categoryCatalog, paymentDayAggs, sellerDayAggs, sellerShifts, sellerAvatars, productDayAggs, productCostDayAggs, goalHistoryDayAggs, goalHistoryHourAggs, prevDayAggs, prevHourAggs, goals, goalDayAggs, goalSellerDayAggs, goalNamedSellerDayAggs, goalTeam, storesTick],
+    [scope, session.role, session.stores, dayAggs, hourAggs, categoryDayAggs, categoryCatalog, paymentDayAggs, sellerDayAggs, sellerShifts, sellerAvatars, productDayAggs, productCostDayAggs, goalHistoryDayAggs, goalHistoryHourAggs, prevDayAggs, prevHourAggs, goals, goalDayAggs, goalSellerDayAggs, goalNamedSellerDayAggs, goalTeam, storesTick],
   );
 
   // A metrica escolhe quais entram (sempre os maiores); a direcao so reordena esses.
@@ -813,12 +819,17 @@ export default function OverviewPage() {
         )}
       </div>
 
-      {/* Linha: Ranking de Lojas + Formas de Pagamento */}
+      {/* Linha: Ranking de Lojas + Formas de Pagamento.
+          O gestor compara com a rede. O gerente vê o ranking só das filiais dele. */}
+      {(() => {
+        const compareNetwork = isOwner(session.role) && scope.storeIds.length === 1 && (view.otherStoresRanking ?? 0) > 0;
+        const shareLabel = isOwner(session.role) ? "da rede" : "do total";
+        return (
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card className="flex flex-col">
           <CardHeader className="items-center">
             <CardTitle>Ranking de filiais</CardTitle>
-            {scope.storeIds.length === 1 && view.storesRanking.length > 0 && (view.rankingNetworkTotal ?? 0) > 0 && (
+            {compareNetwork && (
               <Badge variant="accent">
                 Rede: {brlCent(view.rankingNetworkTotal ?? 0)}
               </Badge>
@@ -830,12 +841,11 @@ export default function OverviewPage() {
             (() => {
               const totalNetwork =
                 (view.rankingNetworkTotal ?? view.storesRanking.reduce((s, l) => s + l.amount, 0)) || 1;
-              const singleStore = scope.storeIds.length === 1;
               const storeAmount = view.storesRanking[0]?.amount ?? 0;
-              const amountRest = singleStore ? Math.max(0, totalNetwork - storeAmount) : 0;
-              // 1 loja: fatia da loja x "Demais lojas" (resto da rede)  -  mostra o peso real na rede.
+              const amountRest = compareNetwork ? Math.max(0, totalNetwork - storeAmount) : 0;
+              // Gestor com 1 loja: fatia da loja x "Demais filiais" (resto da rede).
               const rest: (typeof view.storesRanking)[number] | null =
-                singleStore && amountRest > 0
+                compareNetwork && amountRest > 0
                   ? {
                       name: `Demais filiais${view.otherStoresRanking ? ` (${view.otherStoresRanking})` : ""}`,
                       amount: amountRest,
@@ -856,9 +866,9 @@ export default function OverviewPage() {
                       segments={donutSegments}
                       size={148}
                       thickness={20}
-                      centerLabel={singleStore ? "da rede" : "Total"}
+                      centerLabel={compareNetwork ? "da rede" : "Total"}
                       centerValue={
-                        singleStore
+                        compareNetwork
                           ? `${Math.round((storeAmount / totalNetwork) * 100)}%`
                           : brlCent(totalNetwork)
                       }
@@ -886,7 +896,7 @@ export default function OverviewPage() {
                             <div className="h-full rounded-full" style={{ width: `${pctBar}%`, background: color }} />
                           </div>
                           <span className="text-[11px] font-semibold text-t2">
-                            {pctBar}% da rede
+                            {pctBar}% {shareLabel}
                           </span>
                         </div>
                       );
@@ -939,6 +949,8 @@ export default function OverviewPage() {
           )}
         </Card>
       </div>
+        );
+      })()}
 
       {/* Par: Top Vendedoras + Top Produtos */}
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">

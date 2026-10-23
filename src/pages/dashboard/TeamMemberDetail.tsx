@@ -26,9 +26,8 @@ import { GOAL_STATUS_LABEL, type SellerGoalLevel } from "@/data/wedash/goalView"
 import { GoalLevelSummary } from "@/components/wedash/GoalLevelsBar";
 
 /** Tudo o que a tela Equipe le  -  tambem usado pelo detalhe aberto da Visao geral. */
-export async function fetchTeamAggInput(tenantId: string, scope: Scope): Promise<TeamAggInput> {
+export async function fetchTeamAggInput(tenantId: string, scope: Scope, storeIds = scope.storeIds): Promise<TeamAggInput> {
   const range = productsFetchRange(scope);
-  const storeIds = scope.storeIds;
   const client = getSupabase();
   const sellerQuery = { tenantId, storeIds, from: range.from, to: range.to };
   const [dayAggs, namedSellerDayAggs, origins, sellerShifts] = await Promise.all([

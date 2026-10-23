@@ -18,7 +18,7 @@ import { buildGoalCardView, goalStatus, sellerGoalLevels } from "@/data/wedash/g
 import { TEAM_UNATTRIBUTED_SALE, teamViewWithGoalShare } from "@/data/wedash/engine/generalRanking";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import type { SalesDayAgg, SalesSellerDayAgg } from "@/data/wedash/salesTypes";
-import { storesForSession } from "@/data/wedash/stores";
+import { queryStoreIds, storesForSession } from "@/data/wedash/stores";
 import { teamChallengesReturn, teamGoalsReturn } from "@/pages/goals/backPath";
 import { GoalCard } from "./blocks";
 import {
@@ -219,8 +219,8 @@ export function TeamPage() {
     const key = filterKey;
     try {
       const [next, cov, goals, challenges] = await Promise.all([
-        fetchTeamAggInput(session.tenantId, scope),
-        fetchSalesCoverage(session.tenantId, scope.storeIds),
+        fetchTeamAggInput(session.tenantId, scope, queryStoreIds(session.role, scope.storeIds, session.stores)),
+        fetchSalesCoverage(session.tenantId, queryStoreIds(session.role, scope.storeIds, session.stores)),
         fetchGoalsData(session.tenantId, scope, session.stores),
         fetchPeriodChallenges(session.tenantId, scope, session.stores).catch((e: unknown) => {
           console.error("Team challenges:", e);
@@ -238,7 +238,7 @@ export function TeamPage() {
       console.error("Team reload:", e);
       settle(key);
     }
-  }, [scope, session.tenantId, session.stores, filterKey, settle]);
+  }, [scope, session.role, session.stores, session.tenantId, filterKey, settle]);
 
   useEffect(() => {
     void reload();
