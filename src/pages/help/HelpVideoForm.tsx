@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, Checkbox, FormField, Input, Modal, Switch, Textarea, useToast } from "@/components/ui";
+import { cn } from "@/lib/cn";
 import {
   HELP_AUDIENCE_LABEL,
   HELP_AUDIENCE_ORDER,
@@ -16,6 +17,7 @@ import {
   type HelpVideo,
 } from "@/data/wedash/helpVideo";
 import { useActiveSession } from "@/session/SessionProvider";
+import { HELP_ICON, HelpIcon } from "./icons";
 import { readHelpVideoFile } from "./videoFile";
 
 export function HelpVideoForm({
@@ -37,8 +39,10 @@ export function HelpVideoForm({
   const [audiences, setAudiences] = useState<HelpAudience[]>([]);
   const [visible, setVisible] = useState(true);
   const [file, setFile] = useState<File | null>(null);
+  const [dragOver, setDragOver] = useState(false);
   const [errors, setErrors] = useState<ReturnType<typeof helpDraftErrors>>({});
   const [saving, setSaving] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -47,9 +51,20 @@ export function HelpVideoForm({
     setAudiences(video?.audiences ?? []);
     setVisible(video?.visible ?? true);
     setFile(null);
+    setDragOver(false);
     setErrors({});
     setSaving(false);
   }, [open, video]);
+
+  function chooseFile(next: File | null) {
+    setFile(next);
+    setErrors((current) => ({ ...current, file: next ? (helpVideoFileError(next) ?? undefined) : undefined }));
+  }
+
+  function openFilePicker() {
+    if (saving) return;
+    fileInput.current?.click();
+  }
 
   function toggleAudience(audience: HelpAudience) {
     setAudiences((current) => {
@@ -162,28 +177,94 @@ export function HelpVideoForm({
           <Switch checked={visible} onChange={setVisible} label={visible ? "Visível" : "Oculto"} />
         </FormField>
         {editing ? null : (
-          <FormField label="Vídeo" required error={errors.file} hint={`MP4, WEBM ou MOV, até ${HELP_VIDEO_MAX_MB} MB.`}>
-            <div className="flex flex-wrap items-center gap-3">
-              <Button type="button" variant="outline" disabled={saving} onClick={() => document.getElementById("help-video-file")?.click()}>
+          <FormField label="Vídeo" required error={errors.file}>
+            <div
+              onDragOver={(event) => {
+                event.preventDefault();
+                if (!saving) setDragOver(true);
+              }}
+              onDragLeave={(event) => {
+                if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+                setDragOver(false);
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                setDragOver(false);
+                if (saving) return;
+                chooseFile(event.dataTransfer.files?.[0] ?? null);
+              }}
+              onClick={openFilePicker}
+              className={cn(
+                "cursor-pointer rounded-2xl border-2 border-dashed px-6 py-8 text-center transition-colors",
+                dragOver ? "border-acc bg-acc-soft" : "border-line",
+                saving && "pointer-events-none opacity-60",
+              )}
+            >
+              <span className="mx-auto mb-4 flex h-[60px] w-[60px] items-center justify-center rounded-2xl bg-acc-soft text-acc">
+                <HelpIcon d={HELP_ICON.upload} size={28} />
+              </span>
+              <h3 className="text-[17px] font-bold text-t0">Arraste o vídeo aqui ou clique para enviar</h3>
+              <p className="mt-2 mb-4 text-[13.5px] text-t2">MP4, WEBM ou MOV, até {HELP_VIDEO_MAX_MB} MB</p>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={saving}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  openFilePicker();
+                }}
+              >
                 Escolher vídeo
               </Button>
               <input
-                id="help-video-file"
+                ref={fileInput}
                 type="file"
                 accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov,.m4v"
                 className="hidden"
+                onClick={(event) => event.stopPropagation()}
                 onChange={(event) => {
-                  const next = event.target.files?.[0] ?? null;
+                  chooseFile(event.target.files?.[0] ?? null);
                   event.target.value = "";
-                  setFile(next);
-                  setErrors((current) => ({ ...current, file: next ? (helpVideoFileError(next) ?? undefined) : undefined }));
                 }}
               />
-              {file ? <span className="min-w-0 truncate text-[13px] text-t1">{file.name}</span> : null}
             </div>
+            {file ? (
+              <div className="mt-3 flex items-center gap-3.5 rounded-xl border border-line bg-bg-inset p-3.5">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-acc-soft text-acc">
+                  <HelpIcon d={HELP_ICON.file} size={18} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-[13.5px] font-bold text-t0">{file.name}</span>
+                    <span className="shrink-0 text-xs text-t2">{formatHelpFileSize(file.size)}</span>
+                  </div>
+                  {saving ? <p className="mt-1 text-[11.5px] font-semibold text-t2">Enviando…</p> : null}
+                </div>
+                <button
+                  type="button"
+                  aria-label="Remover vídeo"
+                  disabled={saving}
+                  onClick={() => chooseFile(null)}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-line text-t2 hover:border-bad hover:text-bad disabled:pointer-events-none disabled:opacity-50"
+                >
+                  <HelpIcon d={HELP_ICON.close} size={12} />
+                </button>
+              </div>
+            ) : null}
           </FormField>
         )}
       </div>
     </Modal>
   );
+}
+
+function formatHelpFileSize(bytes: number): string {
+  const mb = bytes / (1024 * 1024);
+  if (mb >= 1) {
+    const digits = mb >= 10 ? 0 : 1;
+    return `${mb.toLocaleString("pt-BR", { minimumFractionDigits: digits, maximumFractionDigits: digits })} MB`;
+  }
+  const kb = bytes / 1024;
+  if (kb >= 1) return `${kb.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} KB`;
+  return `${bytes} B`;
 }
