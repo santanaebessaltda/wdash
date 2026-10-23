@@ -125,7 +125,7 @@ export function HelpVideoPage() {
   return (
     <div className="pb-8">
       <div className="mb-5 flex flex-wrap items-center gap-3">
-        <Button variant="secondary" size="sm" icon={<HelpIcon d={HELP_ICON.back} size={14} />} onClick={() => navigate(paths.help)}>
+        <Button variant="secondary" size="sm" className="sm:hidden" icon={<HelpIcon d={HELP_ICON.back} size={14} />} aria-label="Voltar" onClick={() => navigate(paths.help)}>
           Voltar
         </Button>
         <Breadcrumbs items={[{ label: "Ajuda", to: paths.help }, { label: video?.title ?? "Vídeo" }]} />
@@ -145,7 +145,9 @@ export function HelpVideoPage() {
               {manage ? (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {video.audiences.map((audience) => (
-                    <Badge key={audience}>{HELP_AUDIENCE_LABEL[audience]}</Badge>
+                    <span key={audience} className="inline-flex items-center rounded-full bg-bg-3 px-2 py-0.5 text-[10.5px] font-medium text-t2">
+                      {HELP_AUDIENCE_LABEL[audience]}
+                    </span>
                   ))}
                   {video.visible ? null : <Badge variant="warning">Oculto</Badge>}
                 </div>
@@ -232,7 +234,7 @@ export function HelpVideoPage() {
           </>
         }
       >
-        <p className="text-[13px] text-t1">O vídeo sai da biblioteca e deixa de aparecer para quem tinha acesso.</p>
+        <p className="text-[13px] text-t1">O vídeo será excluído da biblioteca e deixará de aparecer para todos os públicos.</p>
       </Modal>
     </div>
   );

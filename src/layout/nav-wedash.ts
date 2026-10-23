@@ -71,8 +71,8 @@ const finance: NavGroup = {
 /** Card no pé do menu, fora da lista. Gestor, gerente e equipe. */
 export const helpMenu = {
   label: "Ajuda",
-  description: "Vídeos de como usar a WDash",
-  action: "Assistir",
+  description: "Aprenda a usar a WDash",
+  action: "Ver vídeos",
   icon: ICON.help,
   to: paths.help,
 };

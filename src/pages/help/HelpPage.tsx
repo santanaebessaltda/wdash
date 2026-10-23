@@ -121,10 +121,10 @@ export function HelpPage() {
     <div className="pb-8">
       <PageHeader
         title="Ajuda"
-        subtitle={manage ? "Envie vídeos explicativos e veja quem já assistiu." : "Vídeos explicativos da empresa."}
+        subtitle={manage ? "Envie e organize vídeos explicativos da WDash." : "Aprenda a usar a WDash com vídeos rápidos."}
         actions={
           <>
-            {videos.length > 0 ? <HeaderSearch value={query} onChange={setQuery} placeholder="Buscar por título" width={220} /> : null}
+            {videos.length > 0 ? <HeaderSearch value={query} onChange={setQuery} placeholder="Buscar vídeos" width={220} /> : null}
             {manage ? (
               <Button icon={<HelpIcon d={HELP_ICON.upload} />} onClick={openCreate}>
                 Enviar vídeo
@@ -168,10 +168,10 @@ export function HelpPage() {
               description={
                 videos.length === 0
                   ? manage
-                    ? "Envie um vídeo para a equipe, os gerentes ou os gestores."
-                    : "Quando houver um vídeo para você, ele aparece aqui."
+                    ? "Envie o primeiro vídeo e escolha quem poderá assistir."
+                    : "Os vídeos disponíveis para você aparecerão aqui."
                   : filter === "hidden" && !query.trim()
-                    ? "Os vídeos que você ocultar continuam aqui."
+                    ? "Os vídeos ocultos aparecem aqui."
                     : "Tente outro título ou descrição."
               }
               action={
@@ -210,7 +210,9 @@ export function HelpPage() {
                         {manage ? (
                           <div className="mt-1.5 flex flex-wrap gap-1">
                             {video.audiences.map((audience) => (
-                              <Badge key={audience}>{HELP_AUDIENCE_LABEL[audience]}</Badge>
+                              <span key={audience} className="inline-flex items-center rounded-full bg-bg-3 px-2 py-0.5 text-[10.5px] font-medium text-t2">
+                                {HELP_AUDIENCE_LABEL[audience]}
+                              </span>
                             ))}
                             {video.visible ? null : <Badge variant="warning">Oculto</Badge>}
                           </div>
@@ -275,7 +277,7 @@ export function HelpPage() {
           </>
         }
       >
-        <p className="text-[13px] text-t1">O vídeo sai da biblioteca e deixa de aparecer para quem tinha acesso.</p>
+        <p className="text-[13px] text-t1">O vídeo será excluído da biblioteca e deixará de aparecer para todos os públicos.</p>
       </Modal>
     </div>
   );

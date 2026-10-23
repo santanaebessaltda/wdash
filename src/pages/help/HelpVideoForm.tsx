@@ -149,35 +149,46 @@ export function HelpVideoForm({
         </>
       }
     >
-      <div className="flex flex-col gap-4">
-        <FormField label="Título" required error={errors.title}>
-          <Input value={title} maxLength={HELP_TITLE_MAX} onChange={(event) => setTitle(event.target.value)} placeholder="Ex.: Como ler a meta do mês" />
-        </FormField>
-        <FormField label="Descrição" optional error={errors.description}>
-          <Textarea
-            value={description}
-            maxLength={HELP_DESCRIPTION_MAX}
-            onChange={(event) => setDescription(event.target.value)}
-            placeholder="O que a pessoa vai aprender neste vídeo."
-          />
-        </FormField>
-        <FormField label="Quem pode ver" required error={errors.audiences} hint="Pode marcar mais de um.">
-          <div className="flex flex-wrap gap-4">
-            {HELP_AUDIENCE_ORDER.map((audience) => (
-              <Checkbox
-                key={audience}
-                checked={audiences.includes(audience)}
-                label={HELP_AUDIENCE_LABEL[audience]}
-                onChange={() => toggleAudience(audience)}
-              />
-            ))}
-          </div>
-        </FormField>
-        <FormField label="Visível" hint="Oculto continua na biblioteca e some para quem assiste.">
-          <Switch checked={visible} onChange={setVisible} label={visible ? "Visível" : "Oculto"} />
-        </FormField>
+      <div className="flex flex-col gap-6">
+        <section className="flex flex-col gap-4">
+          <HelpFormHeading>Informações</HelpFormHeading>
+          <FormField label="Título" required error={errors.title}>
+            <Input value={title} maxLength={HELP_TITLE_MAX} onChange={(event) => setTitle(event.target.value)} placeholder="Ex.: Como ler a meta do mês" />
+          </FormField>
+          <FormField label="Descrição" optional error={errors.description}>
+            <Textarea
+              value={description}
+              maxLength={HELP_DESCRIPTION_MAX}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="O que a pessoa vai aprender neste vídeo."
+            />
+          </FormField>
+        </section>
+        <section className="flex flex-col gap-3">
+          <HelpFormHeading required>Público</HelpFormHeading>
+          <FormField error={errors.audiences} hint="Pode marcar mais de um.">
+            <div className="flex flex-wrap gap-4">
+              {HELP_AUDIENCE_ORDER.map((audience) => (
+                <Checkbox
+                  key={audience}
+                  checked={audiences.includes(audience)}
+                  label={HELP_AUDIENCE_LABEL[audience]}
+                  onChange={() => toggleAudience(audience)}
+                />
+              ))}
+            </div>
+          </FormField>
+        </section>
+        <section className="flex flex-col gap-3">
+          <HelpFormHeading>Visibilidade</HelpFormHeading>
+          <FormField hint="Vídeos ocultos continuam na biblioteca, mas não aparecem para o público.">
+            <Switch checked={visible} onChange={setVisible} label={visible ? "Visível" : "Oculto"} />
+          </FormField>
+        </section>
         {editing ? null : (
-          <FormField label="Vídeo" required error={errors.file}>
+          <section className="flex flex-col gap-3">
+            <HelpFormHeading required>Vídeo</HelpFormHeading>
+            <FormField error={errors.file}>
             <div
               onDragOver={(event) => {
                 event.preventDefault();
@@ -203,7 +214,7 @@ export function HelpVideoForm({
               <span className="mx-auto mb-4 flex h-[60px] w-[60px] items-center justify-center rounded-2xl bg-acc-soft text-acc">
                 <HelpIcon d={HELP_ICON.upload} size={28} />
               </span>
-              <h3 className="text-[17px] font-bold text-t0">Arraste o vídeo aqui ou clique para enviar</h3>
+              <h3 className="text-[17px] font-bold text-t0">Arraste o vídeo aqui ou escolha um arquivo</h3>
               <p className="mt-2 mb-4 text-[13.5px] text-t2">MP4, WEBM ou MOV, até {HELP_VIDEO_MAX_MB} MB</p>
               <Button
                 type="button"
@@ -251,10 +262,20 @@ export function HelpVideoForm({
                 </button>
               </div>
             ) : null}
-          </FormField>
+            </FormField>
+          </section>
         )}
       </div>
     </Modal>
+  );
+}
+
+function HelpFormHeading({ children, required }: { children: string; required?: boolean }) {
+  return (
+    <p className="text-[11px] font-bold uppercase tracking-wider text-t2">
+      {children}
+      {required ? <span className="text-bad"> *</span> : null}
+    </p>
   );
 }
 
