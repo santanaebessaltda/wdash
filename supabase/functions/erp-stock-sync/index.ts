@@ -264,7 +264,7 @@ serve(async (req) => {
     .maybeSingle();
   if (!membership) return json({ error: "forbidden" }, 403);
   const owner = membership.role === "OWNER" || membership.role === "ADMIN_GLOBAL";
-  if ((body.saleTables || body.salePriceTableIds.length > 0) && !owner) {
+  if ((body.saleTables || body.salePriceTableIds.length > 0 || body.purchaseStoreIds.length > 0) && !owner) {
     return json({ error: "forbidden" }, 403);
   }
   const tenantId = membership.tenant_id as string;

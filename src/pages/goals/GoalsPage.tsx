@@ -29,6 +29,7 @@ import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useScope } from "@/pages/dashboard/useScope";
 import { TargetIcon } from "@/pages/dashboards/icons";
 import { IconCopy, IconTrash } from "@/pages/ecommerce/icons";
+import { isOwner } from "@/layout/nav-wedash";
 import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
 import { paths } from "@/router/paths";
@@ -48,6 +49,7 @@ export default function GoalsPage() {
   const navigate = useNavigate();
   const { show } = useToast();
   const { session, storeRows, loading: storesLoading } = useScopedStores();
+  const manage = isOwner(session.role);
   const { scope, setScope } = useScope();
   const today = calendarTodayIso();
   const janela = useMemo(() => managementScheduleWindow(scope.period, today), [scope.period, today]);
@@ -163,9 +165,11 @@ export default function GoalsPage() {
               activePresetId={periodActivePresetId(scope.period)}
               maxDate={maxPickerDate(today)}
             />
+            {manage ? (
             <Button icon={<Icon d={icons.plus} size={14} />} onClick={() => navigate(paths.goalNew)}>
               Nova meta
             </Button>
+            ) : null}
           </div>
         }
       />
@@ -178,11 +182,13 @@ export default function GoalsPage() {
             <EmptyBlock
               icon="🎯"
               title="Nenhuma meta no período"
-              description="Cadastre uma meta para acompanhar o atingimento e a premiação da equipe."
+              description={manage ? "Cadastre uma meta para acompanhar o atingimento e a premiação da equipe." : "Quando houver uma meta neste período, ela aparece aqui."}
               action={
+                manage ? (
                 <Button size="sm" onClick={() => navigate(paths.goalNew)}>
                   Criar meta
                 </Button>
+                ) : undefined
               }
             />
           </Card>
@@ -196,6 +202,7 @@ export default function GoalsPage() {
                 showsStore={storeRows.length > 1}
                 team={team}
                 onDetail={() => navigate(paths.goalDetail(summary.goal.id))}
+                manage={manage}
                 onCopy={() => setDuplicate(summary.goal)}
                 onDelete={() => setConfirm(summary.goal)}
               />
@@ -250,6 +257,7 @@ function GoalCard({
   showsStore,
   team,
   onDetail,
+  manage,
   onCopy,
   onDelete,
 }: {
@@ -258,6 +266,7 @@ function GoalCard({
   showsStore: boolean;
   team: { name: string; employeeId: number; storeId: string }[];
   onDetail: () => void;
+  manage: boolean;
   onCopy: () => void;
   onDelete: () => void;
 }) {
@@ -311,6 +320,7 @@ function GoalCard({
             {goalSpreadsUnidentified(g) ? <UnidentifiedSalesBadge /> : null}
           </div>
         </div>
+        {manage ? (
         <div className="flex shrink-0 items-center gap-1.5 self-start">
           <Tooltip label="Duplicar meta">
             <button
@@ -333,6 +343,7 @@ function GoalCard({
             </button>
           </Tooltip>
         </div>
+        ) : null}
       </div>
 
       <div className="flex items-baseline justify-between gap-2">

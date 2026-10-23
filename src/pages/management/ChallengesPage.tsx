@@ -39,6 +39,7 @@ import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useScope } from "@/pages/dashboard/useScope";
 import { FlameIcon } from "@/pages/dashboards/icons";
 import { IconCopy, IconTrash } from "@/pages/ecommerce/icons";
+import { isOwner } from "@/layout/nav-wedash";
 import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
 import { paths } from "@/router/paths";
@@ -56,6 +57,7 @@ export function ChallengesPage() {
   const navigate = useNavigate();
   const { show } = useToast();
   const { session, storeRows, loading: storesLoading } = useScopedStores();
+  const manage = isOwner(session.role);
   const { scope, setScope } = useScope();
   const today = calendarTodayIso();
   const janela = useMemo(() => managementScheduleWindow(scope.period, today), [scope.period, today]);
@@ -165,9 +167,11 @@ export function ChallengesPage() {
               activePresetId={periodActivePresetId(scope.period)}
               maxDate={maxPickerDate(today)}
             />
+            {manage ? (
             <Button icon={<Icon d={icons.plus} size={14} />} onClick={() => navigate(paths.management.challengeNew)}>
               Novo desafio
             </Button>
+            ) : null}
           </div>
         }
       />
@@ -180,11 +184,13 @@ export function ChallengesPage() {
             <EmptyBlock
               icon="🔥"
               title="Nenhum desafio no período"
-              description="Crie um desafio para engajar a equipe e acompanhar resultados em um período curto."
+              description={manage ? "Crie um desafio para engajar a equipe e acompanhar resultados em um período curto." : "Quando houver um desafio neste período, ele aparece aqui."}
               action={
+                manage ? (
                 <Button size="sm" onClick={() => navigate(paths.management.challengeNew)}>
                   Criar desafio
                 </Button>
+                ) : undefined
               }
             />
           </Card>
@@ -208,6 +214,7 @@ export function ChallengesPage() {
                         store={store}
                         showsStore={storeRows.length > 1}
                         onDetail={() => navigate(paths.management.challengeDetail(challenge.id))}
+                        manage={manage}
                         onCopy={() => setDuplicate(challenge)}
                         onDelete={() => setConfirm(challenge)}
                       />
@@ -265,6 +272,7 @@ function ChallengeCard({
   store,
   showsStore,
   onDetail,
+  manage,
   onCopy,
   onDelete,
 }: {
@@ -273,6 +281,7 @@ function ChallengeCard({
   store: Store | undefined;
   showsStore: boolean;
   onDetail: () => void;
+  manage: boolean;
   onCopy: () => void;
   onDelete: () => void;
 }) {
@@ -323,6 +332,7 @@ function ChallengeCard({
             {prize ? <PrizeBadge label={prize} /> : null}
           </div>
         </div>
+        {manage ? (
         <div className="flex shrink-0 items-center gap-1.5 self-start">
           <Tooltip label="Duplicar desafio">
             <button
@@ -345,6 +355,7 @@ function ChallengeCard({
             </button>
           </Tooltip>
         </div>
+        ) : null}
       </div>
 
       <ChallengeSummary challenge={c} view={view} />

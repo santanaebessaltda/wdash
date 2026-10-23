@@ -69,10 +69,10 @@ describe("help library", () => {
     video({ id: "v2", title: "Royalties", description: "Percentual da marca", visible: false, audiences: ["OWNER"] }),
   ];
 
-  it("lets gestor and gerente manage the library", () => {
+  it("lets only the gestor manage the library", () => {
     expect(canManageHelp("OWNER")).toBe(true);
-    expect(canManageHelp("MANAGER")).toBe(true);
     expect(canManageHelp("ADMIN_GLOBAL")).toBe(true);
+    expect(canManageHelp("MANAGER")).toBe(false);
     expect(canManageHelp("SELLER")).toBe(false);
   });
 

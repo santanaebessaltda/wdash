@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Alert, Badge, Breadcrumbs, Button, Modal, useToast } from "@/components/ui";
 import {
   HELP_AUDIENCE_LABEL,
+  audienceOf,
   canManageHelp,
   deleteHelpVideo,
   readHelpVideo,
@@ -48,7 +49,11 @@ export function HelpVideoPage() {
         setStatus("error");
         return;
       }
-      if (!result.video) {
+      const allowed =
+        result.video &&
+        (canManageHelp(session.role) ||
+          (result.video.visible && result.video.audiences.includes(audienceOf(session.role))));
+      if (!result.video || !allowed) {
         setVideo(null);
         setStatus("missing");
         return;
@@ -61,7 +66,7 @@ export function HelpVideoPage() {
     return () => {
       cancel = true;
     };
-  }, [id, session.tenantId]);
+  }, [id, session.role, session.tenantId]);
 
   const videoId = video?.id ?? "";
   const knownPoster = video?.posterPath ?? null;

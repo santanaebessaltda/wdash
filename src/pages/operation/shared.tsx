@@ -1,11 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button, Card, CardHeader, CardTitle, EmptyState, FormField, Input, PageHeader, Select, TabNav, Tooltip } from "@/components/ui";
 import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
-import { financeTabs, integrationTabs, performanceTabs, settingsTabs } from "@/layout/nav-wedash";
-import { useShoppingMenu } from "@/layout/useShoppingMenu";
-import { paths } from "@/router/paths";
-import { halfHourOptions } from "@/data/wedash/storeHours";
+import { applyShoppingMenu, financeTabs, integrationTabs, navForRole, performanceTabs, settingsTabs } from "@/layout/nav-wedash";
+import { isNavGroup } from "@/layout/nav-config";
 import { useActiveSession } from "@/session/SessionProvider";
+import { useShoppingMenu } from "@/layout/useShoppingMenu";
+import { halfHourOptions } from "@/data/wedash/storeHours";
 import { storesKey } from "@/session/session";
 import { useScope } from "@/pages/dashboard/useScope";
 import { hydrateSessionStores, storesForSession, type Store } from "@/data/wedash/stores";
@@ -103,14 +103,14 @@ export function SectionHeader({
   notices?: ReactNode;
 }) {
   const menu = useShoppingMenu();
+  const session = useActiveSession();
   useEffect(() => {
     for (const load of SECTION_PAGES[section]) void load().catch(() => {});
   }, [section]);
-  const tabs = SECTION_TABS[section].filter((tab) => {
-    if (tab.to === paths.operation.shopping) return menu.settings;
-    if (tab.to === paths.management.salesReport) return menu.report;
-    return true;
-  });
+  const allowed = new Set(
+    applyShoppingMenu(navForRole(session.role), menu).flatMap((entry) => (isNavGroup(entry) ? entry.items.map((item) => item.to) : [entry.to])),
+  );
+  const tabs = SECTION_TABS[section].filter((tab) => allowed.has(tab.to));
   return (
     <>
       <PageHeader

@@ -3,7 +3,6 @@ import type { RouteObject } from "react-router-dom";
 import { Navigate } from "react-router-dom";
 import { paths } from "@/router/paths";
 import { RequireRole } from "@/session/RequireSession";
-import { OWNER_ROLES } from "@/layout/nav-wedash";
 const AnalyticsDashboardPage = lazyPage(() => import("./AnalyticsDashboardPage"), "AnalyticsDashboardPage");
 const SalesDashboardPage = lazyPage(() => import("./SalesDashboardPage"), "SalesDashboardPage");
 const ProjectDashboardPage = lazyPage(() => import("./ProjectDashboardPage"), "ProjectDashboardPage");
@@ -26,7 +25,7 @@ export const dashboardsRoutes: RouteObject[] = [
   { path: paths.dashboards.projects, element: <ProjectDashboardPage /> },
   { path: paths.dashboards.saas, element: <SaasDashboardPage /> },
   { path: paths.dashboards.bi, element: <BiDashboardPage /> },
-  { element: <RequireRole roles={OWNER_ROLES} />, children: [{ path: paths.financial, element: <FinancePage /> }] },
+  { element: <RequireRole roles={["OWNER", "MANAGER", "ADMIN_GLOBAL"]} />, children: [{ path: paths.financial, element: <FinancePage /> }] },
   { path: paths.products, element: <ProductsPage /> },
   { path: paths.groups, element: <Navigate to={paths.overview} replace /> },
   { path: paths.overview, element: <OverviewPage /> },

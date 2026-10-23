@@ -40,6 +40,7 @@ import { SellersCard, GlobalGoalBand } from "@/pages/team/goalBlocks";
 import { Icon, icons } from "@/pages/users/Icons";
 import { goalBackPath } from "@/pages/goals/backPath";
 import { paths } from "@/router/paths";
+import { isOwner } from "@/layout/nav-wedash";
 import { useActiveSession } from "@/session/SessionProvider";
 
 type Loaded = { goal: GoalRecord | null; dayAggs: SalesDayAgg[]; sellerAggs: SalesSellerDayAgg[]; namedAggs: SalesSellerDayAgg[]; team: GoalTeamMember[] };
@@ -58,6 +59,7 @@ export default function GoalDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const session = useActiveSession();
+  const manage = isOwner(session.role);
   const today = calendarTodayIso();
   const [data, setData] = useState<Loaded | null>(null);
   const [reload, setReload] = useState(0);
@@ -136,7 +138,7 @@ export default function GoalDetailPage() {
               : [{ label: "Performance" }, { label: "Metas", to: paths.goals }, { label: goal?.name ?? "Detalhe" }]
           }
         />
-        {goal && !showSkeleton && (
+        {manage && goal && !showSkeleton && (
           <div className="ml-auto flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setDuplicateOpen(true)}>
               Duplicar meta

@@ -1,7 +1,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
 import { Alert, Button, Card, EmptyState, FormField, Input, Segmented, Select, useToast } from "@/components/ui";
+import { isOwner } from "@/layout/nav-wedash";
 import { paths } from "@/router/paths";
+import { useActiveSession } from "@/session/SessionProvider";
 import { type RentSeason } from "@/data/wedash/rentSeason";
 import { weekHoursConfigured } from "@/data/wedash/storeHours";
 import { StoreCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
@@ -111,10 +113,15 @@ function storeName(store: Store): string {
 /** Uma tela de Configurações por aba do menu. As filiais ficam no mesmo card. */
 export function BranchPage() {
   const { pathname } = useLocation();
+  const session = useActiveSession();
+  const canEdit = isOwner(session.role);
   const section = settingsSection(pathname);
   const { storeRows, loading, refresh } = useScopedStores();
   const many = storeRows.length > 1;
   const page = settingsCopy(section, many);
+  if (!canEdit && section === "hours") {
+    page.subtitle = many ? "Veja o fuso e o horário de funcionamento de cada filial." : "Veja o fuso e o horário de funcionamento desta filial.";
+  }
   const drafts = useSettingsDrafts();
   const { show } = useToast();
   const showSkeleton = useMinSkeleton(loading);
@@ -173,6 +180,7 @@ export function BranchPage() {
           </Card>
         ) : (
           <SettingsCard
+            canEdit={canEdit}
             title={page.title}
             tip={tip}
             intro={section === "branch" ? "O tipo da filial define o horário padrão e as opções de aluguel." : undefined}
@@ -188,7 +196,7 @@ export function BranchPage() {
             onSave={saveAll}
           >
             {(store) => {
-              if (section === "hours") return <HoursBlock store={store} />;
+              if (section === "hours") return <HoursBlock store={store} canEdit={canEdit} />;
               if (section === "royalties") {
                 return (
                   <CostFieldsCard
@@ -212,6 +220,7 @@ export function BranchPage() {
 }
 
 function SettingsCard({
+  canEdit,
   title,
   tip,
   intro,
@@ -221,6 +230,7 @@ function SettingsCard({
   onSave,
   children,
 }: {
+  canEdit: boolean;
   title: string;
   tip?: string;
   intro?: string;
@@ -255,15 +265,17 @@ function SettingsCard({
             );
           })}
         </div>
+        {canEdit ? (
         <div className={many ? undefined : "mt-4"}>
           <FormActions dirty={drafts.dirty} saving={drafts.saving} onReset={drafts.resetAll} />
         </div>
+        ) : null}
       </form>
     </Card>
   );
 }
 
-function HoursBlock({ store }: { store: Store }) {
+function HoursBlock({ store, canEdit }: { store: Store; canEdit: boolean }) {
   return (
     <>
       {!weekHoursConfigured(store.hours) && (
@@ -271,7 +283,7 @@ function HoursBlock({ store }: { store: Store }) {
           As vendas serão atualizadas apenas pelo botão Atualizar enquanto não houver horário definido.
         </Alert>
       )}
-      <StoreScheduleForm store={store} canEdit onSaved={() => {}} />
+      <StoreScheduleForm store={store} canEdit={canEdit} onSaved={() => {}} />
     </>
   );
 }

@@ -282,6 +282,7 @@ serve(async (req) => {
   if (action.startsWith("seller_")) {
     const who = await sellerCaller(admin, userData.user.id, tenantId);
     if (!who) return json({ error: "forbidden" }, 403);
+    if (who.role === "MANAGER" && action !== "seller_list") return json({ error: "forbidden" }, 403);
     const storeSellerId = typeof body.storeSellerId === "string" ? body.storeSellerId : "";
     const storeId = typeof body.storeId === "string" ? body.storeId : "";
     const invite = (email: string) => inviteSellerAccount(admin, tenantId, email);

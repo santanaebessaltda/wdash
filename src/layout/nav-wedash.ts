@@ -150,13 +150,22 @@ const navOwner: NavEntry[] = [
   settings,
 ];
 
-/** Gerente: sem a análise financeira do Dashboard, sem Integrações e sem Configurações. */
+/** Funcionamento, só consulta. O restante de Configurações fica com o Gestor. */
+const settingsHours: NavGroup = {
+  label: "Configurações",
+  description: "Veja o horário de funcionamento da filial.",
+  icon: ICON.gear,
+  items: [{ label: "Funcionamento", to: paths.operation.hours }],
+};
+
+/** Gerente: operação da filial. Sem pedido de compra, sem Integrações e sem custos. */
 const navManager: NavEntry[] = [
   {
     label: "Dashboard",
     icon: ICON.dashboard,
     items: [
       { label: "Visão geral", to: paths.overview },
+      { label: "Financeiro", to: paths.financial },
       { label: "Produtos", to: paths.products },
       { label: "Equipe", to: paths.team },
     ],
@@ -165,10 +174,10 @@ const navManager: NavEntry[] = [
   team,
   performance,
   finance,
-  purchaseOrder,
+  settingsHours,
 ];
 
-/** Telas só do Gestor (análise financeira, Integrações, Configurações, ERP, Usuários, Logs). */
+/** Telas só do Gestor (custos, Integrações, Configurações, ERP, Usuários, Logs, pedido de compra). */
 export const OWNER_ROLES: Role[] = ["OWNER", "ADMIN_GLOBAL"];
 
 export function isOwner(role: Role): boolean {

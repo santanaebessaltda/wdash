@@ -26,6 +26,7 @@ import { fetchInformedCents } from "@/data/wedash/shoppingRepo";
 import { ProductsWithoutCostNotice } from "@/pages/dashboard/ProductsWithoutCostNotice";
 import type { SalesHourAgg } from "@/data/wedash/salesTypes";
 import { calendarTodayIso } from "@/data/wedash/clock";
+import { isOwner } from "@/layout/nav-wedash";
 import { useActiveSession } from "@/session/SessionProvider";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { useMonthFill } from "@/pages/dashboard/useMonthFill";
@@ -102,6 +103,9 @@ function PriorPeriodBadge({ delta }: { delta?: { value: string; positive: boolea
 
 const KPI_ICONS = [IconRevenue, IconCmv, IconProfit, IconMargin];
 
+/** Lucro, margem e CMV ficam só com o Gestor. */
+const STRATEGIC_KPI = new Set(["CMV", "Lucro bruto", "Margem", "CMV WPINK", "Lucro bruto WPINK", "Margem WPINK"]);
+
 /** Mesma paleta da Visao Geral: Faturamento, CMV, Lucro, Margem. */
 const KPI_COLORS = [
   { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" },
@@ -133,6 +137,7 @@ function costRowStyle(line: FixedCostRow): { bold: boolean; indent: boolean; col
 
 export default function FinancePage() {
   const session = useActiveSession();
+  const costs = isOwner(session.role);
   const navigate = useNavigate();
   const { scope, setScope } = useScope();
   const exportPdf = useExportPdf("Financeiro");
@@ -253,6 +258,8 @@ export default function FinancePage() {
 
   // Resolve o DateRange a partir do escopo  -  sempre mostra algo selecionado.
   const dateRange = useMemo(() => dateRangeFromPeriod(scope.period), [scope.period]);
+  const kpis = costs ? view.kpis : view.kpis.filter((kpi) => !STRATEGIC_KPI.has(kpi.label));
+  const kpisWpink = costs ? view.kpisWpink : view.kpisWpink.filter((kpi) => !STRATEGIC_KPI.has(kpi.label));
   const currentPeriod = resolvePeriod(scope.period, calendarTodayIso());
   const monthFill = useMonthFill();
   const deepHistoryFill = useDeepHistoryFill();
@@ -266,7 +273,7 @@ export default function FinancePage() {
       <PageHeader
         crumbs={[{ label: "Dashboard", to: "/dashboard/visao-geral" }, { label: "Financeiro" }]}
         title="Financeiro"
-        subtitle="Acompanhe faturamento, custos, margens e resultado da operação."
+        subtitle={costs ? "Acompanhe faturamento, custos, margens e resultado da operação." : "Acompanhe o faturamento e as vendas da operação."}
         actions={
           <div className="flex flex-col items-start gap-2 sm:items-end">
             <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
@@ -293,7 +300,7 @@ export default function FinancePage() {
         end={currentPeriod.end}
       />
       <StoreHoursNotice />
-      {!pending && (
+      {costs && !pending && (
         <ProductsWithoutCostNotice
           products={view.productsWithoutCost}
           storeIds={scope.storeIds}
@@ -307,17 +314,17 @@ export default function FinancePage() {
       ) : (
       <>
 
-      {/* KPI row  -  4 cards */}
+      {/* KPI row  -  4 cards. Gerente fica sem CMV, lucro e margem. */}
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {view.kpis.map((kpi, i) => (
+        {kpis.map((kpi, i) => (
           <KpiCard key={kpi.label} kpi={kpi} Icon={KPI_ICONS[i]} colorIdx={i} />
         ))}
       </div>
 
       {/* Quick stats WPINK  -  so quando a loja (ou rede) tem a marca */}
-      {view.kpisWpink.length > 0 && (
+      {kpisWpink.length > 0 && (
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {view.kpisWpink.map((kpi, i) => {
+          {kpisWpink.map((kpi, i) => {
             const Icon = KPI_ICONS[i] ?? IconRevenue;
             return (
               <QuickStat
@@ -335,7 +342,8 @@ export default function FinancePage() {
         </div>
       )}
 
-      {/* Par: CMV/Lucro + Resultado operacional */}
+      {/* Par: CMV/Lucro + Resultado operacional. Só o Gestor. */}
+      {costs && (
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         {(() => {
           const series = view.costProfitSeries;
@@ -465,15 +473,18 @@ export default function FinancePage() {
           );
         })()}
       </div>
+      )}
 
       {/* Custos antes de Formas (leitura natural apos Resultado / margem op.).
-          Com WPINK no escopo: 3 colunas (Custos | Formas | Marcas); senao 2. */}
+          Com WPINK no escopo: 3 colunas (Custos | Formas | Marcas); senao 2.
+          Gerente não vê o card de custos. */}
       <div
         className={cn(
           "mt-4 grid grid-cols-1 gap-4",
-          view.revenueByBrand ? "lg:grid-cols-3" : "lg:grid-cols-2",
+          costs && view.revenueByBrand ? "lg:grid-cols-3" : costs || view.revenueByBrand ? "lg:grid-cols-2" : undefined,
         )}
       >
+        {costs && (
         <Card className="flex flex-col">
           <CardHeader>
             <div className="flex items-center gap-1.5">
@@ -520,6 +531,7 @@ export default function FinancePage() {
           </div>
           )}
         </Card>
+        )}
 
         <Card className="flex flex-col">
           <CardHeader>
@@ -623,15 +635,15 @@ export default function FinancePage() {
         ) : (
         <>
         <div className="min-w-0 overflow-x-auto">
-          <table className="w-full min-w-[760px] border-collapse text-sm">
+          <table className={cn("w-full border-collapse text-sm", costs ? "min-w-[760px]" : "min-w-[480px]")}>
             <thead>
               <tr className="border-b border-line text-[11px] tracking-wide text-t2">
                 <th className="w-11 whitespace-nowrap px-1 pb-3 text-center font-bold">#</th>
                 <ThSort label="Mês" active={evoSort === "month"} dir={evoDir} onClick={() => toggleEvoSort("month")} align="left" className="px-1 pb-3" />
                 <ThSort label="Faturamento" active={evoSort === "revenue"} dir={evoDir} onClick={() => toggleEvoSort("revenue")} className="px-1 pb-3" />
-                <ThSort label="CMV" active={evoSort === "cost"} dir={evoDir} onClick={() => toggleEvoSort("cost")} className="px-1 pb-3" />
-                <ThSort label="Lucro bruto" active={evoSort === "profit"} dir={evoDir} onClick={() => toggleEvoSort("profit")} className="px-1 pb-3" />
-                <ThSort label="Margem" active={evoSort === "margin"} dir={evoDir} onClick={() => toggleEvoSort("margin")} className="px-1 pb-3" />
+                {costs && <ThSort label="CMV" active={evoSort === "cost"} dir={evoDir} onClick={() => toggleEvoSort("cost")} className="px-1 pb-3" />}
+                {costs && <ThSort label="Lucro bruto" active={evoSort === "profit"} dir={evoDir} onClick={() => toggleEvoSort("profit")} className="px-1 pb-3" />}
+                {costs && <ThSort label="Margem" active={evoSort === "margin"} dir={evoDir} onClick={() => toggleEvoSort("margin")} className="px-1 pb-3" />}
                 <ThSort label="Ticket médio" active={evoSort === "ticket"} dir={evoDir} onClick={() => toggleEvoSort("ticket")} className="px-1 pb-3" />
               </tr>
             </thead>
@@ -643,9 +655,9 @@ export default function FinancePage() {
                     <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
                     <td className="px-1 py-3 text-[13px] font-bold text-t0">{line.label}</td>
                     <td className="px-1 py-3 text-right"><Mono v={brlCent(line.revenue)} /></td>
-                    <td className="px-1 py-3 text-right"><Mono v={brlCent(line.cost)} /></td>
-                    <td className="px-1 py-3 text-right"><Mono v={brlCent(line.profit)} tone={line.profit < 0 ? "text-bad" : "text-ok"} /></td>
-                    <td className="px-1 py-3 text-right"><Mono v={`${line.marginPct.toFixed(1)}%`} /></td>
+                    {costs && <td className="px-1 py-3 text-right"><Mono v={brlCent(line.cost)} /></td>}
+                    {costs && <td className="px-1 py-3 text-right"><Mono v={brlCent(line.profit)} tone={line.profit < 0 ? "text-bad" : "text-ok"} /></td>}
+                    {costs && <td className="px-1 py-3 text-right"><Mono v={`${line.marginPct.toFixed(1)}%`} /></td>}
                     <td className="px-1 py-3 text-right"><Mono v={brlCent(line.averageTicket)} /></td>
                   </tr>
                 );
@@ -659,11 +671,13 @@ export default function FinancePage() {
                   </span>
                 </td>
                 <td className="px-1 py-3 text-right"><Mono v={brlCent(evoTotal.revenue)} total /></td>
-                <td className="px-1 py-3 text-right"><Mono v={brlCent(evoTotal.cost)} total /></td>
+                {costs && <td className="px-1 py-3 text-right"><Mono v={brlCent(evoTotal.cost)} total /></td>}
+                {costs && (
                 <td className="px-1 py-3 text-right">
                   <Mono v={brlCent(evoTotal.profit)} total tone={evoTotal.profit < 0 ? "text-bad" : "text-ok"} />
                 </td>
-                <td className="px-1 py-3 text-right"><Mono v={`${evoTotal.marginPct.toFixed(1)}%`} total /></td>
+                )}
+                {costs && <td className="px-1 py-3 text-right"><Mono v={`${evoTotal.marginPct.toFixed(1)}%`} total /></td>}
                 <td className="px-1 py-3 text-right"><Mono v={brlCent(evoTotal.averageTicket)} total /></td>
               </tr>
             </tbody>

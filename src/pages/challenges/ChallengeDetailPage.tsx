@@ -49,6 +49,7 @@ import { useReturnWhenStoreChanges } from "@/pages/dashboard/useScope";
 import { FlameIcon } from "@/pages/dashboards/icons";
 import { Icon, icons } from "@/pages/users/Icons";
 import { paths } from "@/router/paths";
+import { isOwner } from "@/layout/nav-wedash";
 import { useActiveSession } from "@/session/SessionProvider";
 
 type Loaded = { challenge: ChallengeRecord | null; aggs: ChallengeAggInput | null };
@@ -84,6 +85,7 @@ export default function ChallengeDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const session = useActiveSession();
+  const manage = isOwner(session.role);
   const today = calendarTodayIso();
   const [data, setData] = useState<Loaded | null>(null);
   const [reload, setReload] = useState(0);
@@ -139,7 +141,7 @@ export default function ChallengeDetailPage() {
               : [{ label: "Performance" }, { label: "Desafios", to: paths.management.challenges }, { label: challenge?.name ?? "Detalhe" }]
           }
         />
-        {challenge && !showSkeleton && (
+        {manage && challenge && !showSkeleton && (
           <div className="ml-auto flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setDuplicateOpen(true)}>
               Duplicar desafio

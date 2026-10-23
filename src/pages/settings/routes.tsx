@@ -30,10 +30,10 @@ export const settingsRoutes: RouteObject[] = [
     children: [
       { path: paths.profile, element: <MyProfilePage /> },
       { path: paths.settings.notifications, element: <NotificationsPage /> },
-      { path: paths.settings.stores, element: <StoresSettingsPage /> },
       {
         element: <RequireRole roles={OWNER_ROLES} />,
         children: [
+          { path: paths.settings.stores, element: <StoresSettingsPage /> },
           { path: paths.settings.users, element: <SystemUsersPage /> },
           { path: paths.settings.erp, element: <ErpIntegrationPage /> },
           { path: paths.settings.logs, element: <SyncLogsPage /> },
@@ -41,12 +41,18 @@ export const settingsRoutes: RouteObject[] = [
       },
     ],
   },
-  { path: paths.settings.storeDetail(":id"), element: <StoreDetailPage /> },
+  {
+    element: <RequireRole roles={OWNER_ROLES} />,
+    children: [{ path: paths.settings.storeDetail(":id"), element: <StoreDetailPage /> }],
+  },
+  {
+    element: <RequireRole roles={["OWNER", "MANAGER", "ADMIN_GLOBAL"]} />,
+    children: [{ path: paths.operation.hours, element: <BranchPage /> }],
+  },
   {
     element: <RequireRole roles={OWNER_ROLES} />,
     children: [
       { path: paths.operation.branch, element: <BranchPage /> },
-      { path: paths.operation.hours, element: <BranchPage /> },
       { path: paths.operation.royalties, element: <BranchPage /> },
       { path: paths.operation.rentPage, element: <BranchPage /> },
       { path: paths.operation.productsTaxes, element: <BranchPage /> },

@@ -115,7 +115,7 @@ export const paths = {
     ranking: "/ranking",
   },
   profile: "/profile",
-  /** Biblioteca de vídeos. Gestor e gerente enviam; a equipe assiste o que for dela. */
+  /** Biblioteca de vídeos. O gestor envia; gerente e equipe assistem o que for deles. */
   help: "/help",
   helpVideo: (id: string) => `/help/${id}`,
 

@@ -21,6 +21,7 @@ import { shiftName } from "@/lib/format";
 import { matchesCodeOrName } from "@/lib/personSearch";
 import { InviteSellerModal } from "@/pages/management/InviteSellerModal";
 import { GroupFormModal, ManageGroupsModal, groupProblem, nextGroupWindow } from "@/pages/management/SellerGroups";
+import { isOwner } from "@/layout/nav-wedash";
 import { CostCardTitle, SAVE_ERROR_MSG, SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
 import {
@@ -86,6 +87,7 @@ export function StaffPage() {
   });
 
   const storeKey = storeRows.map((store) => store.id).join(",");
+  const manage = isOwner(session.role);
 
   return (
     <>
@@ -93,12 +95,16 @@ export function StaffPage() {
         section="Equipe"
         title="Equipe"
         subtitle={
-          storeRows.length > 1
-            ? "Acompanhe a equipe das filiais e gerencie cadastros, grupos e acessos."
-            : "Acompanhe a equipe da filial e gerencie cadastros, grupos e acessos."
+          manage
+            ? storeRows.length > 1
+              ? "Acompanhe a equipe das filiais e gerencie cadastros, grupos e acessos."
+              : "Acompanhe a equipe da filial e gerencie cadastros, grupos e acessos."
+            : storeRows.length > 1
+              ? "Consulte a equipe das filiais."
+              : "Consulte a equipe da filial."
         }
         actions={
-          singleStore ? (
+          manage && singleStore ? (
             <Button type="button" onClick={() => setManageOpen(true)}>
               Gerenciar grupos
             </Button>
@@ -113,10 +119,10 @@ export function StaffPage() {
             <EmptyState framed={false} icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
           </Card>
         ) : (
-          <StaffList key={storeKey} tenantId={session.tenantId} stores={storeRows} reloadKey={reloadKey} groupsTick={groupsTick} />
+          <StaffList key={storeKey} tenantId={session.tenantId} stores={storeRows} reloadKey={reloadKey} groupsTick={groupsTick} manage={manage} />
         )}
       </div>
-      {singleStore && (
+      {manage && singleStore && (
         <ManageGroupsModal
           open={manageOpen}
           tenantId={session.tenantId}
@@ -141,11 +147,13 @@ function StaffList({
   stores,
   reloadKey,
   groupsTick,
+  manage,
 }: {
   tenantId: string;
   stores: Store[];
   reloadKey: number;
   groupsTick: number;
+  manage: boolean;
 }) {
   const showStore = stores.length > 1;
   const { show } = useToast();
@@ -349,11 +357,13 @@ function StaffList({
           );
         },
       },
+      ...(manage
+        ? [
       {
         key: "actions",
         header: "",
-        align: "right",
-        render: (v) => {
+        align: "right" as const,
+        render: (v: StaffPerson) => {
           const current = v.seller.id in shiftOf ? shiftOf[v.seller.id] : v.seller.shiftId;
           const items = rowActions({
             sales: salesPerson(v),
@@ -372,9 +382,11 @@ function StaffList({
           return <RowMenu items={items} />;
         },
       },
+          ]
+        : []),
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [identity, shifts, shiftOf, savingIds, access],
+    [identity, shifts, shiftOf, savingIds, access, manage],
   );
 
   const withoutTeam = loaded && team.length === 0;

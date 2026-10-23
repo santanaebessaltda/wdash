@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Alert, Badge, Button, Dropdown, EmptyState, Modal, PageHeader, Segmented, Skeleton, useToast } from "@/components/ui";
 import { HeaderSearch } from "@/pages/dashboard/HeaderFilter";
 import {
+  audienceOf,
   canManageHelp,
   deleteHelpVideo,
   filterHelpVideos,
@@ -59,7 +60,10 @@ export function HelpPage() {
     };
   }, [session.tenantId]);
 
-  const filtered = filterHelpVideos(videos, { query, filter });
+  const library = manage
+    ? videos
+    : videos.filter((video) => video.visible && video.audiences.includes(audienceOf(session.role)));
+  const filtered = filterHelpVideos(library, { query, filter });
   const openCreate = () => {
     setEditing(null);
     setFormOpen(true);
@@ -164,9 +168,9 @@ export function HelpPage() {
           {filtered.length === 0 ? (
             <EmptyState
               icon="🎬"
-              title={videos.length === 0 ? (manage ? "Nenhum vídeo na biblioteca" : "Nenhum vídeo disponível") : filter === "hidden" && !query.trim() ? "Nenhum vídeo oculto" : "Nenhum vídeo encontrado"}
+              title={library.length === 0 ? (manage ? "Nenhum vídeo na biblioteca" : "Nenhum vídeo disponível") : filter === "hidden" && !query.trim() ? "Nenhum vídeo oculto" : "Nenhum vídeo encontrado"}
               description={
-                videos.length === 0
+                library.length === 0
                   ? manage
                     ? "Envie o primeiro vídeo e escolha quem poderá assistir."
                     : "Os vídeos disponíveis para você aparecerão aqui."
@@ -175,7 +179,7 @@ export function HelpPage() {
                     : "Tente outro título ou descrição."
               }
               action={
-                videos.length === 0 && manage ? (
+                library.length === 0 && manage ? (
                   <Button icon={<HelpIcon d={HELP_ICON.upload} />} onClick={openCreate}>
                     Enviar vídeo
                   </Button>

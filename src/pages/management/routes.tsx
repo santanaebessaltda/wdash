@@ -2,6 +2,7 @@ import { Navigate, useLocation, useParams, type RouteObject } from "react-router
 import { lazyPage } from "@/lib/lazyPage";
 import { paths } from "@/router/paths";
 import { RedirectTo } from "@/router/RedirectTo";
+import { OWNER_ROLES } from "@/layout/nav-wedash";
 import { RequireRole } from "@/session/RequireSession";
 
 const ChallengesPage = lazyPage(() => import("./ChallengesPage"), "ChallengesPage");
@@ -30,8 +31,6 @@ export const managementRoutes: RouteObject[] = [
       { path: paths.legacy.management.team, element: <RedirectTo to={paths.management.team} /> },
       { path: paths.legacy.management.shifts, element: <RedirectTo to={paths.management.team} /> },
       { path: paths.legacy.management.staff, element: <RedirectTo to={paths.management.team} /> },
-      { path: paths.management.purchaseOrder, element: <PurchaseOrderPage /> },
-      { path: paths.legacy.management.purchaseOrder, element: <RedirectTo to={paths.management.purchaseOrder} /> },
       { path: paths.management.cashClose, element: <CashClosePage /> },
       { path: paths.management.wallet, element: <WalletPage /> },
       { path: paths.legacy.management.cashClose, element: <RedirectTo to={paths.management.cashClose} /> },
@@ -41,13 +40,20 @@ export const managementRoutes: RouteObject[] = [
       { path: paths.management.salesReport, element: <SalesReportPage /> },
       { path: paths.legacy.management.salesReport, element: <RedirectTo to={paths.management.salesReport} /> },
       { path: paths.management.challenges, element: <ChallengesPage /> },
-      { path: paths.management.challengeNew, element: <ChallengeEditorPage /> },
-      { path: `${paths.management.challenges}/:id/edit`, element: <ChallengeEditorPage /> },
       { path: `${paths.management.challenges}/:id`, element: <ChallengeDetailPage /> },
       { path: paths.legacy.management.challenges, element: <RedirectTo to={paths.management.challenges} /> },
       { path: `${paths.legacy.management.challenges}/new`, element: <RedirectTo to={paths.management.challengeNew} /> },
       { path: `${paths.legacy.management.challenges}/:id/edit`, element: <LegacyChallengeRedirect edit /> },
       { path: `${paths.legacy.management.challenges}/:id`, element: <LegacyChallengeRedirect /> },
+    ],
+  },
+  {
+    element: <RequireRole roles={OWNER_ROLES} />,
+    children: [
+      { path: paths.management.purchaseOrder, element: <PurchaseOrderPage /> },
+      { path: paths.legacy.management.purchaseOrder, element: <RedirectTo to={paths.management.purchaseOrder} /> },
+      { path: paths.management.challengeNew, element: <ChallengeEditorPage /> },
+      { path: `${paths.management.challenges}/:id/edit`, element: <ChallengeEditorPage /> },
     ],
   },
 ];

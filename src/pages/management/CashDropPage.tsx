@@ -4,6 +4,7 @@ import { FinanceMonthSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { DayFace, MonthCalendar, blankDayClass } from "@/components/wedash/MonthCalendar";
 import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
 import { calendarTodayIso } from "@/data/wedash/clock";
+import { isOwner } from "@/layout/nav-wedash";
 import { periodLabels } from "@/data/wedash/dashboard";
 import { fetchLatestCashCloseError, fetchNavMonthFloor, fetchOpenCashCloseJob, requestCashDropMonth } from "@/data/wedash/cashCloseRepo";
 import { fetchSyncWatermark } from "@/data/wedash/salesRepo";
@@ -116,6 +117,7 @@ function dayTitle(iso: string): string {
 export function CashDropPage() {
   const { show } = useToast();
   const { session, storeRows, loading: storesLoading } = useScopedStores();
+  const gestor = isOwner(session.role);
   const manyStores = storeRows.length > 1;
   const showStores = useMinSkeleton(storesLoading);
   const today = calendarTodayIso();
@@ -450,7 +452,7 @@ export function CashDropPage() {
               activePresetId={presetId}
               onChange={([start, end], goal) => applyInterval(start, end, goal)}
             />
-            {!manyStores && store ? <MarkAs days={marcados.length} label={markLabel} amount={amountToReceive} recebidoOk={daysReceivables.length > 0} excludedOk={linesBoletoAbertas.length > 0} cobrarOk={linesExcludedAbertas.length > 0} tudoRecebido={marcados.length > 0 && marcados.every((day) => taken.has(day))} canUndo={markedDeposits.length > 0} onRecebido={() => setAction("recebido")} onCobrar={() => setAction("aCobrar")} onExcluded={() => { setReasonBatch(""); setAction("fora"); }} onGap={openShortage} onUndo={() => void openUndo()} /> : null}
+            {!manyStores && store ? <MarkAs days={marcados.length} label={markLabel} amount={amountToReceive} recebidoOk={daysReceivables.length > 0} excludedOk={linesBoletoAbertas.length > 0} cobrarOk={linesExcludedAbertas.length > 0} tudoRecebido={marcados.length > 0 && marcados.every((day) => taken.has(day))} canUndo={gestor && markedDeposits.length > 0} gapOk={gestor || marcados.every((day) => !taken.has(day))} onRecebido={() => setAction("recebido")} onCobrar={() => setAction("aCobrar")} onExcluded={() => { setReasonBatch(""); setAction("fora"); }} onGap={openShortage} onUndo={() => void openUndo()} /> : null}
           </HeaderFilters>
         }
       />
@@ -499,6 +501,7 @@ export function CashDropPage() {
           rows={byDay.get(day) ?? []}
           shortage={shortages.find((s) => s.day === day)}
           deposit={deposits.find((d) => d.day === day)}
+          gestor={gestor}
           tenantId={session.tenantId}
           storeId={store.id}
           onClose={() => setDay(null)}
@@ -528,6 +531,7 @@ export function CashDropPage() {
       ) : null}
       {day && manyStores ? (
         <StoresDayModal
+          gestor={gestor}
           day={day}
           today={today}
           blocks={storeRows.flatMap((item) => {
@@ -732,6 +736,7 @@ function DropShell({
 }
 
 function StoresDayModal({
+  gestor,
   day,
   today,
   blocks,
@@ -740,6 +745,7 @@ function StoresDayModal({
   onSaved,
   onUndo,
 }: {
+  gestor: boolean;
   day: string;
   today: string;
   blocks: Array<{ storeId: string; storeName: string; rows: DropLine[]; shortage?: DropShortage; deposit?: DropDeposit }>;
@@ -751,7 +757,7 @@ function StoresDayModal({
   const { show } = useToast();
   const savers = useRef(new Map<string, () => Promise<boolean>>());
   const [salvando, setSalvando] = useState(false);
-  const canSave = blocks.some((block) => block.rows.length > 0);
+  const canSave = blocks.some((block) => block.rows.length > 0 && (gestor || !block.deposit));
   const bindSave = useCallback((storeId: string, save: (() => Promise<boolean>) | null) => {
     if (save) savers.current.set(storeId, save);
     else savers.current.delete(storeId);
@@ -801,6 +807,7 @@ function StoresDayModal({
         blocks.map((block) => (
           <DayModal
             key={block.storeId}
+            gestor={gestor}
             embedded
             busy={salvando}
             onBindSave={bindSave}
@@ -823,6 +830,7 @@ function StoresDayModal({
 }
 
 function DayModal({
+  gestor,
   day,
   today,
   rows,
@@ -838,6 +846,7 @@ function DayModal({
   busy = false,
   onBindSave,
 }: {
+  gestor: boolean;
   day: string;
   today: string;
   rows: CashDropLineRow[];
@@ -864,6 +873,7 @@ function DayModal({
   const persist = useRef<(quiet: boolean) => Promise<boolean>>(async () => false);
   const consulta = rows.length === 0;
   const travado = Boolean(deposit);
+  const concluido = travado && !gestor;
   const preview = dayAmounts(
     lines.map((line) => ({ amountCents: line.amountCents, kind: line.kind, note: line.note })),
     fieldToCents(gap) ?? shortage?.amountCents ?? 0,
@@ -880,6 +890,7 @@ function DayModal({
   }
 
   async function save(quiet = false) {
+    if (concluido) return false;
     const cents = fieldToCents(gap);
     if (cents == null) {
       fail("O valor da falta não é válido.");
@@ -922,9 +933,13 @@ function DayModal({
 
   useEffect(() => {
     if (!onBindSave) return;
+    if (concluido) {
+      onBindSave(storeId, null);
+      return;
+    }
     onBindSave(storeId, () => persist.current(true));
     return () => onBindSave(storeId, null);
-  }, [onBindSave, storeId]);
+  }, [onBindSave, storeId, concluido]);
 
   async function openUndo() {
     if (!deposit) return;
@@ -956,14 +971,14 @@ function DayModal({
     </>
   );
   const travadoUi = salvando || desfazendo || busy;
-  const desfazer = deposit ? (
+  const desfazer = gestor && deposit ? (
     <Button variant="outline" onClick={() => void openUndo()} disabled={travadoUi}>
       Desfazer recebimento
     </Button>
   ) : null;
   const footer = embedded ? (
     desfazer
-  ) : consulta ? (
+  ) : consulta || concluido ? (
     <Button variant="outline" onClick={onClose}>
       Voltar
     </Button>
@@ -1039,13 +1054,14 @@ function DayModal({
           <div className="mt-4 rounded-[14px] border border-line p-3">
             <p className="text-[12.5px] font-bold text-t0">Falta em dinheiro</p>
             {travado ? <p className="mt-1 text-[12px] text-t2">Este dia já foi recebido. A falta reduz o valor recebido.</p> : null}
-            <NumberInput className="mt-2" compact unit="R$" value={gap} aria-label="Valor da falta" onChange={setGap} />
+            <NumberInput className="mt-2" compact unit="R$" value={gap} aria-label="Valor da falta" onChange={setGap} disabled={concluido} />
             <p className="mt-3 text-[12.5px] font-bold text-t0">Motivo da falta</p>
             <input
               className="mt-2 w-full rounded-[10px] border border-line bg-bg-1 px-2.5 py-2 text-[13px] text-t0"
               value={reason}
               placeholder="Ex.: diferença no caixa"
               aria-label="Motivo da falta"
+              disabled={concluido}
               onChange={(e) => setReason(e.target.value)}
             />
           </div>
@@ -1088,6 +1104,7 @@ function MarkAs({
   cobrarOk,
   tudoRecebido,
   canUndo,
+  gapOk,
   onRecebido,
   onCobrar,
   onExcluded,
@@ -1102,6 +1119,7 @@ function MarkAs({
   cobrarOk: boolean;
   tudoRecebido: boolean;
   canUndo: boolean;
+  gapOk: boolean;
   onRecebido: () => void;
   onCobrar: () => void;
   onExcluded: () => void;
@@ -1152,8 +1170,8 @@ function MarkAs({
     },
     {
       label: "Registrar falta",
-      description: days === 1 ? "Informe o valor que deveria estar no caixa e não foi encontrado." : "Selecione apenas um dia para registrar a falta.",
-      disabled: days !== 1,
+      description: days !== 1 ? "Selecione apenas um dia para registrar a falta." : gapOk ? "Informe o valor que deveria estar no caixa e não foi encontrado." : "Este dia já foi recebido.",
+      disabled: days !== 1 || !gapOk,
       onClick: onGap,
     },
   ];

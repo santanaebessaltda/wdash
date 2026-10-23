@@ -34,6 +34,7 @@ import {
   type CashCloseSnapshot,
 } from "@/data/wedash/cashCloseRepo";
 import { calendarTodayIso } from "@/data/wedash/clock";
+import { isOwner } from "@/layout/nav-wedash";
 import { periodLabels } from "@/data/wedash/dashboard";
 import {
   dayShortageCents,
@@ -626,7 +627,7 @@ export function CashClosePage() {
         snaps={days}
         reviews={reviews}
         pronto={dayPronto}
-        owner={session.role === "OWNER" || session.role === "MANAGER" || session.role === "ADMIN_GLOBAL"}
+        gestor={isOwner(session.role)}
         closed={dayOpen != null && dayOpen < today}
         tenantId={session.tenantId}
         soldByStore={soldToday?.byStore ?? null}
@@ -993,7 +994,7 @@ function DayModal({
   snaps,
   reviews,
   pronto,
-  owner,
+  gestor,
   closed,
   tenantId,
   soldByStore,
@@ -1008,7 +1009,7 @@ function DayModal({
   snaps: Record<string, CashCloseSnapshot>;
   reviews: CashCloseReview[];
   pronto: boolean;
-  owner: boolean;
+  gestor: boolean;
   closed: boolean;
   tenantId: string;
   soldByStore: Record<string, number> | null;
@@ -1020,6 +1021,11 @@ function DayModal({
 }) {
   const { show } = useToast();
   const [drafts, setDrafts] = useState<Record<string, CloseDraft>>({});
+  function canEditStore(storeId: string) {
+    if (!day) return false;
+    if (gestor) return true;
+    return !reviews.some((item) => item.storeId === storeId && item.day.slice(0, 10) === day);
+  }
   const [withdrawalDrafts, setWithdrawalDrafts] = useState<Record<string, WithdrawalDraft>>({});
   const [busy, setBusy] = useState(false);
 
@@ -1081,6 +1087,7 @@ function DayModal({
     if (!day) return;
     setBusy(true);
     for (const store of withDados) {
+      if (!canEditStore(store.id)) continue;
       const snap = snaps[store.id];
       const draft = drafts[store.id];
       if (!snap || !draft) continue;
@@ -1205,9 +1212,9 @@ function DayModal({
       footer={
         <>
           <Button variant="outline" onClick={onClose} disabled={busy}>
-            {owner ? "Cancelar" : "Voltar"}
+            {withDados.some((store) => canEditStore(store.id)) ? "Cancelar" : "Voltar"}
           </Button>
-          {owner && closed && withDados.length > 0 && (
+          {closed && withDados.some((store) => canEditStore(store.id)) && (
             <Button onClick={() => void save()} disabled={busy || !pronto}>
               {busy ? "Salvando…" : "Salvar"}
             </Button>
@@ -1272,7 +1279,7 @@ function DayModal({
                 <CloseTable
                   lines={lines}
                   pixPending={view.pixPending}
-                  owner={owner}
+                  owner={canEditStore(store.id)}
                   closed={closed}
                   draft={draft}
                   pixOnline={(draft?.onlinePix.length ?? 0) > 0}
@@ -1291,7 +1298,7 @@ function DayModal({
                 />
                 {draft && (
                   <OnlinePix
-                    owner={owner}
+                    owner={canEditStore(store.id)}
                     rows={draft.onlinePix}
                     acquirerText={draft.acquirer.pix ?? ""}
                     acquirerCents={lines.find((line) => line.key === "pix")?.stoneCents ?? null}
@@ -1315,7 +1322,7 @@ function DayModal({
                   />
                 )}
                 <EmployeeWithdrawal
-                  owner={owner}
+                  owner={canEditStore(store.id)}
                   typedCents={lines.find((line) => line.key === "cash")?.typedCents ?? 0}
                   people={people.people}
                   names={people.names}

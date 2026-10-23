@@ -64,7 +64,7 @@ export type HelpDraftErrors = {
 };
 
 export function canManageHelp(role: Role): boolean {
-  return role === "OWNER" || role === "MANAGER" || role === "ADMIN_GLOBAL";
+  return role === "OWNER" || role === "ADMIN_GLOBAL";
 }
 
 export function audienceOf(role: Role): HelpAudience {
