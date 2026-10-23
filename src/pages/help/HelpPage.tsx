@@ -121,7 +121,7 @@ export function HelpPage() {
     <div className="pb-8">
       <PageHeader
         title="Tutoriais"
-        subtitle={manage ? "Envie e organize vídeos explicativos da WDash." : "Aprenda a usar a WDash com vídeos rápidos."}
+        subtitle={manage ? "Envie e organize vídeos de orientação para a operação." : "Vídeos para apoiar a operação do dia a dia."}
         actions={
           <>
             {videos.length > 0 ? <HeaderSearch value={query} onChange={setQuery} placeholder="Buscar vídeos" width={220} /> : null}
