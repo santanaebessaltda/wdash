@@ -183,6 +183,7 @@ export async function loadBranchWallet(input: {
   ]);
 
   const managers = managersForStore(roster.managers, input.storeId);
+  const managerIds = new Set(roster.managers.map((manager) => manager.id));
   const goalSlices: WalletGoalInput[] = endingGoals.map((goal) => {
     const card = buildGoalCardView({
       goal,
@@ -197,7 +198,7 @@ export async function loadBranchWallet(input: {
     const people = new Map<string, WalletGoalInput["people"][number]>();
     for (const seller of card.sellers) {
       const personId = personFromKey(roster, seller.employeeId, seller.name);
-      if (!personId) continue;
+      if (!personId || managerIds.has(personId)) continue;
       people.set(personId, {
         personId,
         prizeCents: reaisToCents(seller.accruedPrize),
@@ -228,7 +229,7 @@ export async function loadBranchWallet(input: {
     const people = [];
     for (const participant of view.participants) {
       const personId = personFromKey(roster, participant.key, participant.name);
-      if (!personId) continue;
+      if (!personId || managerIds.has(personId)) continue;
       if (status === "active") {
         people.push({ personId, moneyCents: 0, itemLabel: null });
         continue;

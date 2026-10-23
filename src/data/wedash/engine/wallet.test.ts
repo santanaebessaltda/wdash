@@ -145,6 +145,24 @@ describe("buildWalletMonth", () => {
     expect(ana.lines.map((line) => line.kind)).toEqual(["management", "managementBonus"]);
   });
 
+  it("leaves the seller prize off an open goal when the person is on the management share", () => {
+    const view = month({
+      goals: [
+        goal({
+          open: true,
+          name: "Meta Outubro 2026",
+          people: [{ personId: "ana", prizeCents: 4_000, bonusCents: 500, managementPrizeCents: 6_000, managementBonusCents: 0 }],
+        }),
+      ],
+    });
+    const ana = view.people[0];
+    expect(ana.prizeCents).toBe(0);
+    expect(ana.bonusCents).toBe(0);
+    expect(ana.managementCents).toBe(6_000);
+    expect(ana.balanceCents).toBe(6_000);
+    expect(ana.lines.map((line) => line.kind)).toEqual(["management"]);
+  });
+
   it("keeps a challenge item for the manager outside the balance", () => {
     const view = month({
       challenges: [

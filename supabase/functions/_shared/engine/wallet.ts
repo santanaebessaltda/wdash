@@ -148,12 +148,14 @@ export function buildWalletMonth(input: {
       if (!row) continue;
       const prize = cents(person.prizeCents);
       const bonus = cents(person.bonusCents);
-      if (prize > 0 || goal.open) {
+      // A parte da gerência não leva a premiação nem o bônus de vendedora.
+      const managementShare = person.managementPrizeCents != null || person.managementBonusCents != null;
+      if (!managementShare && (prize > 0 || goal.open)) {
         row.prizeCents += prize;
         row.openPrize = row.openPrize || goal.open;
         row.lines.push({ kind: "prize", title: goal.name, day: goal.endsOn, cents: prize, open: goal.open, note: null });
       }
-      if (bonus > 0) {
+      if (!managementShare && bonus > 0) {
         row.bonusCents += bonus;
         row.openPrize = row.openPrize || goal.open;
         row.lines.push({ kind: "bonus", title: goal.name, day: goal.endsOn, cents: bonus, open: goal.open, note: null });
