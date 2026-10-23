@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   Badge,
   Button,
@@ -415,6 +415,7 @@ function UserModal({
   const [picked, setPicked] = useState<Set<string>>(new Set(user?.storeIds ?? []));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const sending = useRef(false);
 
   const storeIds = allStores ? [] : [...picked];
   const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) && (allStores || picked.size > 0);
@@ -438,25 +439,35 @@ function UserModal({
     });
   }
 
+  async function inviteLanded(address: string): Promise<boolean> {
+    const listed = await fetchSystemUsers();
+    if (!listed.ok) return false;
+    const wanted = address.trim().toLowerCase();
+    return listed.data.members.some((member) => member.email.toLowerCase() === wanted && member.status === "PENDING");
+  }
+
   async function submit(e?: FormEvent) {
     e?.preventDefault();
-    if (!valid || saving) return;
+    if (!valid || sending.current) return;
+    sending.current = true;
     setSaving(true);
     setError(null);
+    const address = email.trim().toLowerCase();
     const r = user
       ? await updateSystemUser(user.membershipId, role, storeIds)
-      : await inviteSystemUser({ email: email.trim(), role, storeIds });
-    setSaving(false);
+      : await inviteSystemUser({ email: address, role, storeIds });
+    if (!r.ok && !user && (!r.code || r.code === "invite_failed") && (await inviteLanded(address))) {
+      await onDone(`Convite enviado para ${address}.`, true);
+      return;
+    }
     if (!r.ok) {
+      sending.current = false;
+      setSaving(false);
       setError(errorMessage(r, user));
       return;
     }
     await onDone(
-      !user
-        ? `Convite enviado para ${email.trim().toLowerCase()}.`
-        : isInvite
-          ? "Convite atualizado."
-          : "Acesso atualizado.",
+      !user ? `Convite enviado para ${address}.` : isInvite ? "Convite atualizado." : "Acesso atualizado.",
       !user,
     );
   }
@@ -470,10 +481,10 @@ function UserModal({
       }
       footer={
         <>
-          <Button variant="outline" onClick={onClose} disabled={saving}>
+          <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
             Cancelar
           </Button>
-          <Button onClick={() => void submit()} disabled={!valid || saving}>
+          <Button type="button" onClick={() => void submit()} disabled={!valid || saving}>
             {user ? (saving ? "Salvando…" : "Salvar alterações") : saving ? "Enviando…" : "Enviar convite"}
           </Button>
         </>

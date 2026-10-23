@@ -73,6 +73,34 @@ function messageFor(code: string | undefined): string {
   return (code && MESSAGES[code]) || GENERIC_ERROR;
 }
 
+function asPayload<T>(value: unknown): ({ ok?: boolean; error?: string } & T) | null {
+  if (typeof value === "string") {
+    try {
+      return asPayload<T>(JSON.parse(value));
+    } catch {
+      return null;
+    }
+  }
+  if (!value || typeof value !== "object") return null;
+  return value as { ok?: boolean; error?: string } & T;
+}
+
+/** Corpo da Edge, mesmo quando o SDK coloca a resposta em `error` por causa do status. */
+async function payloadOf<T>(error: unknown): Promise<({ ok?: boolean; error?: string } & T) | null> {
+  const ctx = (error as { context?: unknown } | null)?.context;
+  if (typeof ctx === "string") return asPayload<T>(ctx);
+  if (ctx && typeof ctx === "object" && ("ok" in ctx || "error" in ctx) && typeof (ctx as { json?: unknown }).json !== "function") {
+    return asPayload<T>(ctx);
+  }
+  const response = ctx as { json?: () => Promise<unknown> } | null;
+  if (!response || typeof response.json !== "function") return null;
+  try {
+    return asPayload<T>(await response.json());
+  } catch {
+    return null;
+  }
+}
+
 async function invoke<T>(
   body: Record<string, unknown>,
 ): Promise<{ ok: true; data: T } | { ok: false; message: string; code?: string }> {
@@ -82,16 +110,11 @@ async function invoke<T>(
     body: { ...body, origin: window.location.origin },
   });
   if (error) {
-    let code: string | undefined;
-    try {
-      const ctx = (error as { context?: Response }).context;
-      code = ctx ? ((await ctx.json()) as { error?: string }).error : undefined;
-    } catch {
-      /* ignore */
-    }
-    return { ok: false, message: messageFor(code), code };
+    const body = await payloadOf<T>(error);
+    if (body?.ok) return { ok: true, data: body };
+    return { ok: false, message: messageFor(body?.error), code: body?.error };
   }
-  const res = data as { ok?: boolean; error?: string } & T;
+  const res = asPayload<T>(data);
   if (!res?.ok) return { ok: false, message: messageFor(res?.error), code: res?.error };
   return { ok: true, data: res };
 }

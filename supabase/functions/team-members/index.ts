@@ -328,6 +328,7 @@ serve(async (req) => {
   }
 
   if (action === "invite") {
+    try {
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
     const role = body.role as Role;
     if (!emailOk(email)) return fail("invalid_email");
@@ -397,6 +398,9 @@ serve(async (req) => {
       return fail("invite_failed");
     }
     return json({ ok: true, membershipId: membership.id });
+    } catch {
+      return fail("invite_failed");
+    }
   }
 
   /* Acoes sobre um membro existente do tenant. */
