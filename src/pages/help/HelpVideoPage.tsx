@@ -1,25 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Alert, Avatar, Badge, Breadcrumbs, Button, Card, CardHeader, CardTitle, Modal, useToast } from "@/components/ui";
+import { Alert, Badge, Breadcrumbs, Button, Modal, useToast } from "@/components/ui";
 import {
   HELP_AUDIENCE_LABEL,
   canManageHelp,
   deleteHelpVideo,
-  formatWatchedLabel,
-  helpPersonRoleLabel,
-  helpWatchCount,
-  helpWatchCountLabel,
-  helpWatchLines,
-  listHelpViews,
-  markHelpVideoWatched,
   readHelpVideo,
   saveHelpPoster,
   setHelpVideoVisible,
-  type HelpPerson,
   type HelpVideo,
-  type HelpView,
 } from "@/data/wedash/helpVideo";
-import { titleName } from "@/lib/format";
 import { paths } from "@/router/paths";
 import { useActiveSession } from "@/session/SessionProvider";
 import { HelpVideoForm } from "./HelpVideoForm";
@@ -35,27 +25,23 @@ export function HelpVideoPage() {
   const [video, setVideo] = useState<HelpVideo | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [posterUrl, setPosterUrl] = useState<string | null>(null);
-  const [people, setPeople] = useState<HelpPerson[] | null>(null);
-  const [views, setViews] = useState<HelpView[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "missing" | "error">("loading");
   const [error, setError] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [busy, setBusy] = useState(false);
-  const played = useRef(false);
   const player = useRef<HTMLVideoElement>(null);
   const [started, setStarted] = useState(false);
   const [playbackError, setPlaybackError] = useState(false);
 
   useEffect(() => {
-    played.current = false;
     setStarted(false);
     setPlaybackError(false);
     let cancel = false;
     void (async () => {
       setStatus("loading");
-      const result = await readHelpVideo(session.tenantId, id, manage);
+      const result = await readHelpVideo(session.tenantId, id);
       if (cancel) return;
       if (!result.ok) {
         setError(result.error);
@@ -70,14 +56,12 @@ export function HelpVideoPage() {
       setVideo(result.video);
       setVideoUrl(result.videoUrl);
       setPosterUrl(result.posterUrl);
-      setPeople(result.people);
-      setViews(result.views);
       setStatus("ready");
     })();
     return () => {
       cancel = true;
     };
-  }, [id, manage, session.tenantId]);
+  }, [id, session.tenantId]);
 
   const videoId = video?.id ?? "";
   const knownPoster = video?.posterPath ?? null;
@@ -111,14 +95,6 @@ export function HelpVideoPage() {
     };
   }, [knownDuration, knownPoster, manage, posterUrl, session.tenantId, videoId, videoUrl]);
 
-  async function onPlay() {
-    if (played.current || !video) return;
-    played.current = true;
-    await markHelpVideoWatched(video.id);
-    if (!manage) return;
-    setViews(await listHelpViews(video.id));
-  }
-
   async function toggleVisible() {
     if (!video || busy) return;
     setBusy(true);
@@ -145,9 +121,6 @@ export function HelpVideoPage() {
     toast.show("Vídeo excluído.", "success");
     navigate(paths.help);
   }
-
-  const lines = video && people ? helpWatchLines(people, views, video) : null;
-  const count = lines ? helpWatchCount(lines) : null;
 
   return (
     <div className="pb-8">
@@ -204,10 +177,7 @@ export function HelpVideoPage() {
                 controls={started}
                 playsInline
                 preload="auto"
-                onPlay={() => {
-                  setStarted(true);
-                  void onPlay();
-                }}
+                onPlay={() => setStarted(true)}
                 onError={() => setPlaybackError(true)}
               />
               {started ? null : (
@@ -233,37 +203,6 @@ export function HelpVideoPage() {
           )}
 
           {video.description ? <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-t1">{video.description}</p> : null}
-
-          {manage && !lines ? <p className="text-[13px] text-t2">Não foi possível carregar quem viu.</p> : null}
-
-          {manage && lines && count ? (
-            <Card>
-              <CardHeader className="mb-2">
-                <CardTitle>Quem viu</CardTitle>
-                <p className="text-[13px] font-medium text-t1">{helpWatchCountLabel(count)}</p>
-              </CardHeader>
-              {lines.length === 0 ? (
-                <p className="text-[13px] text-t1">Nenhuma pessoa ativa nesse público.</p>
-              ) : (
-                <ul>
-                  {lines.map((line) => (
-                    <li key={line.identityId} className="flex items-center gap-3 border-b border-line py-2.5 last:border-0">
-                      <Avatar name={titleName(line.name)} size="sm" />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[13.5px] font-semibold text-t0">{titleName(line.name)}</p>
-                        <div className="mt-1 flex flex-wrap items-center gap-2">
-                          <Badge>{helpPersonRoleLabel(line.role)}</Badge>
-                          <p className={line.watchedAt ? "text-[12.5px] font-medium text-ok" : "text-[12.5px] text-t2"}>
-                            {line.watchedAt ? `Viu ${formatWatchedLabel(new Date(line.watchedAt), new Date())}` : "Ainda não viu"}
-                          </p>
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
-          ) : null}
         </div>
       )}
 

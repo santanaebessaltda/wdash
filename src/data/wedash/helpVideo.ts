@@ -1,4 +1,4 @@
-/** Ajuda: biblioteca de vídeos, público e quem viu. */
+/** Ajuda: biblioteca de vídeos e público. A tela não mostra quem viu. */
 
 import type { Role } from "./team";
 import { getSupabase } from "@/lib/supabase";
@@ -71,12 +71,6 @@ export function audienceOf(role: Role): HelpAudience {
   if (role === "MANAGER") return "MANAGER";
   if (role === "SELLER") return "SELLER";
   return "OWNER";
-}
-
-export function helpPersonRoleLabel(role: Role): string {
-  if (role === "MANAGER") return "Gerente";
-  if (role === "SELLER") return "Equipe";
-  return "Gestor";
 }
 
 export function helpVideoContentType(file: { name: string; type: string }): string | null {
@@ -279,8 +273,8 @@ async function signedUrls(paths: string[]): Promise<Record<string, string>> {
   return out;
 }
 
-export async function listHelpLibrary(tenantId: string, manage: boolean): Promise<
-  | { ok: true; videos: HelpVideo[]; posters: Record<string, string>; clips: Record<string, string>; people: HelpPerson[] | null; views: HelpView[] }
+export async function listHelpLibrary(tenantId: string): Promise<
+  | { ok: true; videos: HelpVideo[]; posters: Record<string, string>; clips: Record<string, string> }
   | { ok: false; error: string }
 > {
   const sb = getSupabase();
@@ -299,51 +293,28 @@ export async function listHelpLibrary(tenantId: string, manage: boolean): Promis
     if (video.posterPath && urls[video.posterPath]) posters[video.posterPath] = urls[video.posterPath];
     else if (urls[video.storagePath]) clips[video.id] = urls[video.storagePath];
   }
-  if (!manage) return { ok: true, videos, posters, clips, people: null, views: [] };
-
-  const [peopleResult, viewsResult] = await Promise.all([
-    sb.rpc("help_audience", { p_tenant_id: tenantId }),
-    videos.length === 0
-      ? Promise.resolve({ data: [], error: null })
-      : sb.from("help_video_view").select("video_id, identity_id, watched_at").in(
-          "video_id",
-          videos.map((video) => video.id),
-        ),
-  ]);
-  const people = peopleResult.error ? null : asPeople(peopleResult.data);
-  const views = viewsResult.error ? [] : asViews(viewsResult.data);
-  return { ok: true, videos, posters, clips, people, views };
+  return { ok: true, videos, posters, clips };
 }
 
 export async function readHelpVideo(
   tenantId: string,
   videoId: string,
-  manage: boolean,
 ): Promise<
-  | { ok: true; video: HelpVideo | null; videoUrl: string | null; posterUrl: string | null; people: HelpPerson[] | null; views: HelpView[] }
+  | { ok: true; video: HelpVideo | null; videoUrl: string | null; posterUrl: string | null }
   | { ok: false; error: string }
 > {
   const sb = getSupabase();
   if (!sb) return { ok: false, error: HELP_OFFLINE };
   const { data, error } = await sb.from("help_video").select(VIDEO_COLUMNS).eq("tenant_id", tenantId).eq("id", videoId).maybeSingle();
   if (error) return { ok: false, error: failed(error, HELP_LOAD_ERROR) };
-  if (!data) return { ok: true, video: null, videoUrl: null, posterUrl: null, people: null, views: [] };
+  if (!data) return { ok: true, video: null, videoUrl: null, posterUrl: null };
   const video = asVideo(data as VideoRow);
   const urls = await signedUrls([video.storagePath, ...(video.posterPath ? [video.posterPath] : [])]);
-  if (!manage) {
-    return { ok: true, video, videoUrl: urls[video.storagePath] ?? null, posterUrl: video.posterPath ? (urls[video.posterPath] ?? null) : null, people: null, views: [] };
-  }
-  const [peopleResult, viewsResult] = await Promise.all([
-    sb.rpc("help_audience", { p_tenant_id: tenantId }),
-    sb.from("help_video_view").select("video_id, identity_id, watched_at").eq("video_id", video.id),
-  ]);
   return {
     ok: true,
     video,
     videoUrl: urls[video.storagePath] ?? null,
     posterUrl: video.posterPath ? (urls[video.posterPath] ?? null) : null,
-    people: peopleResult.error ? null : asPeople(peopleResult.data),
-    views: viewsResult.error ? [] : asViews(viewsResult.data),
   };
 }
 
@@ -480,42 +451,3 @@ export async function deleteHelpVideo(video: Pick<HelpVideo, "id" | "storagePath
   return { ok: true };
 }
 
-export async function markHelpVideoWatched(videoId: string): Promise<void> {
-  const sb = getSupabase();
-  if (!sb) return;
-  const { error } = await sb.rpc("mark_help_video_watched", { p_video_id: videoId });
-  if (error) console.warn("help video watch:", error.message);
-}
-
-export async function listHelpViews(videoId: string): Promise<HelpView[]> {
-  const sb = getSupabase();
-  if (!sb) return [];
-  const { data, error } = await sb.from("help_video_view").select("video_id, identity_id, watched_at").eq("video_id", videoId);
-  if (error || !data) return [];
-  return asViews(data);
-}
-
-function asPeople(raw: unknown): HelpPerson[] {
-  if (!Array.isArray(raw)) return [];
-  const people: HelpPerson[] = [];
-  for (const row of raw) {
-    if (!row || typeof row !== "object") continue;
-    const item = row as { identity_id?: unknown; name?: unknown; role?: unknown };
-    if (typeof item.identity_id !== "string" || typeof item.name !== "string") continue;
-    if (item.role !== "OWNER" && item.role !== "MANAGER" && item.role !== "SELLER" && item.role !== "ADMIN_GLOBAL") continue;
-    people.push({ identityId: item.identity_id, name: item.name, role: item.role });
-  }
-  return people;
-}
-
-function asViews(raw: unknown): HelpView[] {
-  if (!Array.isArray(raw)) return [];
-  const views: HelpView[] = [];
-  for (const row of raw) {
-    if (!row || typeof row !== "object") continue;
-    const item = row as { video_id?: unknown; identity_id?: unknown; watched_at?: unknown };
-    if (typeof item.video_id !== "string" || typeof item.identity_id !== "string" || typeof item.watched_at !== "string") continue;
-    views.push({ videoId: item.video_id, identityId: item.identity_id, watchedAt: item.watched_at });
-  }
-  return views;
-}

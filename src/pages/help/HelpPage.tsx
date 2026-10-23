@@ -7,17 +7,12 @@ import {
   deleteHelpVideo,
   filterHelpVideos,
   formatHelpDuration,
-  helpWatchCount,
-  helpWatchCountLabel,
-  helpWatchLines,
   listHelpLibrary,
   saveHelpPoster,
   setHelpVideoVisible,
   HELP_AUDIENCE_LABEL,
   type HelpLibraryFilter,
-  type HelpPerson,
   type HelpVideo,
-  type HelpView,
 } from "@/data/wedash/helpVideo";
 import { paths } from "@/router/paths";
 import { useActiveSession } from "@/session/SessionProvider";
@@ -35,8 +30,6 @@ export function HelpPage() {
   const [videos, setVideos] = useState<HelpVideo[]>([]);
   const [posters, setPosters] = useState<Record<string, string>>({});
   const [clips, setClips] = useState<Record<string, string>>({});
-  const [people, setPeople] = useState<HelpPerson[] | null>(null);
-  const [views, setViews] = useState<HelpView[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
@@ -49,7 +42,7 @@ export function HelpPage() {
   useEffect(() => {
     let cancel = false;
     void (async () => {
-      const result = await listHelpLibrary(session.tenantId, manage);
+      const result = await listHelpLibrary(session.tenantId);
       if (cancel) return;
       if (!result.ok) {
         setError(result.error);
@@ -59,14 +52,12 @@ export function HelpPage() {
       setVideos(result.videos);
       setPosters(result.posters);
       setClips(result.clips);
-      setPeople(result.people);
-      setViews(result.views);
       setStatus("ready");
     })();
     return () => {
       cancel = true;
     };
-  }, [manage, session.tenantId]);
+  }, [session.tenantId]);
 
   const filtered = filterHelpVideos(videos, { query, filter });
   const openCreate = () => {
@@ -195,7 +186,6 @@ export function HelpPage() {
             <div className="grid gap-x-4 gap-y-7" style={helpGrid}>
               {filtered.map((video) => {
                 const duration = formatHelpDuration(video.durationSec);
-                const watched = manage && people ? helpWatchCountLabel(helpWatchCount(helpWatchLines(people, views, video))) : null;
                 const posterUrl = video.posterPath ? (posters[video.posterPath] ?? null) : null;
                 return (
                   <article key={video.id} className="min-w-0">
@@ -225,7 +215,6 @@ export function HelpPage() {
                             {video.visible ? null : <Badge variant="warning">Oculto</Badge>}
                           </div>
                         ) : null}
-                        {watched ? <p className="mt-1 text-[12px] text-t2">{watched}</p> : null}
                       </Link>
                       {manage ? (
                         <Dropdown
