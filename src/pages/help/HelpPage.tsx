@@ -120,7 +120,7 @@ export function HelpPage() {
   return (
     <div className="pb-8">
       <PageHeader
-        title="Ajuda"
+        title="Tutoriais"
         subtitle={manage ? "Envie e organize vídeos explicativos da WDash." : "Aprenda a usar a WDash com vídeos rápidos."}
         actions={
           <>

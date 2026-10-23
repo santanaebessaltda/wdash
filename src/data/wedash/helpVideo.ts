@@ -1,4 +1,4 @@
-/** Ajuda: biblioteca de vídeos e público. A tela não mostra quem viu. */
+/** Tutoriais: biblioteca de vídeos e público. A tela não mostra quem viu. */
 
 import type { Role } from "./team";
 import { getSupabase } from "@/lib/supabase";
