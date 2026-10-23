@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildWalletMonth, managersForStore, splitEqualCents, walletInRange, type WalletCashDay, type WalletChallengeInput, type WalletGoalInput, type WalletPersonInput } from "./wallet";
+import { buildWalletMonth, groupWalletPeople, managersForStore, splitEqualCents, walletInRange, type WalletCashDay, type WalletChallengeInput, type WalletGoalInput, type WalletPersonInput, type WalletPersonMonth } from "./wallet";
 
 const people: WalletPersonInput[] = [
   { id: "ana", name: "ANA" },
@@ -207,5 +207,69 @@ describe("buildWalletMonth", () => {
     expect(view.people).toEqual([
       expect.objectContaining({ personId: "ana", balanceCents: 0, lines: [] }),
     ]);
+  });
+});
+
+function placed(person: WalletPersonMonth, storeId: string, storeName: string) {
+  return { ...person, storeId, storeName };
+}
+
+function walletPerson(over: Partial<WalletPersonMonth> & Pick<WalletPersonMonth, "personId" | "name">): WalletPersonMonth {
+  return {
+    prizeCents: 0,
+    bonusCents: 0,
+    managementCents: 0,
+    challengeCents: 0,
+    withdrawalCents: 0,
+    shortageCents: 0,
+    balanceCents: 0,
+    openPrize: false,
+    lines: [],
+    ...over,
+  };
+}
+
+describe("groupWalletPeople", () => {
+  it("sums one manager across branches and keeps each branch", () => {
+    const santana = walletPerson({
+      personId: "joyce",
+      name: "JOYCE",
+      prizeCents: 1_000,
+      withdrawalCents: 100,
+      balanceCents: 900,
+      lines: [{ kind: "prize", title: "Meta", day: "2026-10-31", cents: 1_000, open: false, note: null }],
+    });
+    const centro = walletPerson({
+      personId: "joyce",
+      name: "JOYCE",
+      managementCents: 2_500,
+      balanceCents: 2_500,
+      openPrize: true,
+      lines: [{ kind: "management", title: "Meta", day: "2026-10-31", cents: 2_500, open: true, note: null }],
+    });
+    const ana = walletPerson({
+      personId: "ana",
+      name: "ANA",
+      prizeCents: 500,
+      balanceCents: 500,
+      lines: [{ kind: "prize", title: "Meta", day: "2026-10-31", cents: 500, open: false, note: null }],
+    });
+    const rows = groupWalletPeople([
+      placed(santana, "santana", "Santana"),
+      placed(ana, "santana", "Santana"),
+      placed(centro, "centro", "Centro"),
+    ]);
+    expect(rows.map((row) => row.personId)).toEqual(["joyce", "ana"]);
+    const joyce = rows[0];
+    expect(joyce?.storeName).toBe("2 filiais");
+    expect(joyce?.prizeCents).toBe(1_000);
+    expect(joyce?.managementCents).toBe(2_500);
+    expect(joyce?.withdrawalCents).toBe(100);
+    expect(joyce?.balanceCents).toBe(3_400);
+    expect(joyce?.openPrize).toBe(true);
+    expect(joyce?.branches.map((branch) => branch.storeName)).toEqual(["Centro", "Santana"]);
+    expect(joyce?.branches.map((branch) => branch.person.balanceCents)).toEqual([2_500, 900]);
+    expect(rows[1]?.storeName).toBe("Santana");
+    expect(rows[1]?.branches).toHaveLength(1);
   });
 });

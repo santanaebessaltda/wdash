@@ -9,7 +9,7 @@ import { monthsTouched } from "@/data/wedash/cashCloseMonth";
 import { startOfMonth } from "@/data/wedash/engine/format";
 import { sellerHistoryFloor } from "@/data/wedash/engine/sellerHome";
 import { opportunitiesInRange, type WalletChallengeOpportunity, type WalletGoalOpportunity, type WalletOpportunity } from "@/data/wedash/engine/sellerOpportunity";
-import { walletInRange, type WalletLine, type WalletMonth, type WalletPersonMonth } from "@/data/wedash/engine/wallet";
+import { groupWalletPeople, walletInRange, type WalletGroupedPerson, type WalletLine, type WalletMonth, type WalletPersonMonth } from "@/data/wedash/engine/wallet";
 import { loadBranchWallet, loadSellerWallet } from "@/data/wedash/walletLoad";
 import { effectiveWeekHours } from "@/data/wedash/storeHours";
 import { cn } from "@/lib/cn";
@@ -151,10 +151,12 @@ function Statement({
   person,
   emptyTitle = "Nada neste mês",
   emptyDescription = "Não há premiação, desafio, retirada ou quebra neste mês.",
+  balanceLabel = "Saldo",
 }: {
   person: WalletPersonMonth;
   emptyTitle?: string;
   emptyDescription?: string;
+  balanceLabel?: string;
 }) {
   if (person.lines.length === 0) {
     return <EmptyBlock icon="👛" title={emptyTitle} description={emptyDescription} />;
@@ -180,6 +182,32 @@ function Statement({
       </ul>
       <div className="flex items-baseline justify-between gap-4 bg-bg-inset px-1 py-3">
         <span className="text-[13.5px] font-extrabold text-t0">
+          {balanceLabel}
+          {untilNow ? <span className="mt-0.5 block text-[11px] font-semibold text-t2">Até agora</span> : null}
+        </span>
+        <span className={cn("font-mono text-[15px] font-extrabold", balanceClass(person.balanceCents))}>{money(person.balanceCents)}</span>
+      </div>
+    </div>
+  );
+}
+
+function BranchBreakdown({ person }: { person: WalletGroupedPerson }) {
+  const untilNow = balanceStillOpen(person);
+  return (
+    <div className="flex flex-col gap-6">
+      {person.branches.map((branch) => (
+        <section key={branch.storeId}>
+          <h3 className="text-[13.5px] font-extrabold text-t0">{branch.storeName}</h3>
+          <Statement
+            person={branch.person}
+            balanceLabel="Saldo da filial"
+            emptyTitle="Nada nesta filial"
+            emptyDescription="Não há premiação, desafio, retirada ou quebra nesta filial."
+          />
+        </section>
+      ))}
+      <div className="flex items-baseline justify-between gap-4 border-t border-line px-1 pt-3">
+        <span className="text-[13.5px] font-extrabold text-t0">
           Saldo
           {untilNow ? <span className="mt-0.5 block text-[11px] font-semibold text-t2">Até agora</span> : null}
         </span>
@@ -196,12 +224,13 @@ function PersonDialog({
   employeeId,
   onClose,
 }: {
-  person: WalletPersonMonth;
+  person: WalletGroupedPerson;
   storeId: string;
   storeName?: string;
   employeeId?: string;
   onClose: () => void;
 }) {
+  const many = person.branches.length > 1;
   return (
     <Modal
       open
@@ -209,7 +238,7 @@ function PersonDialog({
       size="lg"
       title={
         <span className="flex min-w-0 items-center gap-3">
-          <PersonAvatar name={person.name} employeeId={employeeId} storeId={storeId} size="md" />
+          <PersonAvatar name={person.name} membershipId={person.personId} employeeId={employeeId} storeId={storeId} size="md" />
           <span className="min-w-0">
             <span className="block truncate">{person.name}</span>
             {storeName ? <span className="mt-0.5 block truncate text-[12.5px] font-semibold text-t2">{storeName}</span> : null}
@@ -217,17 +246,33 @@ function PersonDialog({
         </span>
       }
     >
-      <Statement person={person} emptyTitle="Nada neste período" emptyDescription="Não há premiação, desafio, retirada ou quebra neste período." />
+      {many ? (
+        <BranchBreakdown person={person} />
+      ) : (
+        <Statement person={person} emptyTitle="Nada neste período" emptyDescription="Não há premiação, desafio, retirada ou quebra neste período." />
+      )}
     </Modal>
   );
 }
 
-type PersonRow = WalletPersonMonth & { storeId: string; storeName: string };
+type PersonRow = WalletGroupedPerson;
 
 type ShortageBlock = { storeId: string; storeName: string; cents: number; days: { day: string; cents: number }[] };
 
 function rowKey(row: PersonRow): string {
-  return `${row.storeId}:${row.personId}`;
+  return row.personId;
+}
+
+function codeFor(row: PersonRow, codes: Map<string, string>): string | undefined {
+  for (const branch of row.branches) {
+    const code = codes.get(`${branch.storeId}:${row.personId}`);
+    if (code) return code;
+  }
+  return undefined;
+}
+
+function filialNames(row: PersonRow): string {
+  return row.branches.map((branch) => branch.storeName).join(", ");
 }
 
 function UnassignedShortage({ blocks, showStore }: { blocks: ShortageBlock[]; showStore: boolean }) {
@@ -288,7 +333,7 @@ function PeopleList({
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const sorted = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("pt-BR");
-    const list = query ? rows.filter((row) => matchesCodeOrName(row.name, codes.get(rowKey(row)), query)) : rows;
+    const list = query ? rows.filter((row) => matchesCodeOrName(row.name, codeFor(row, codes), query)) : rows;
     const dir = sortDir === "asc" ? 1 : -1;
     return [...list].sort((a, b) => {
       const cmp =
@@ -383,11 +428,15 @@ function PeopleList({
                       <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{(page - 1) * pageSize + index + 1}</td>
                       <td className={cellClass}>
                         <div className="flex min-w-0 items-center gap-2.5">
-                          <PersonAvatar name={row.name} employeeId={codes.get(rowKey(row))} storeId={row.storeId} size="sm" />
+                          <PersonAvatar name={row.name} membershipId={row.personId} employeeId={codeFor(row, codes)} storeId={row.storeId} size="sm" />
                           <span className="truncate text-[13px] font-bold text-t0">{row.name}</span>
                         </div>
                       </td>
-                      {showStore ? <td className={cn(cellClass, "text-[13px] text-t1")}>{row.storeName}</td> : null}
+                      {showStore ? (
+                        <td className={cn(cellClass, "max-w-[180px] truncate text-[13px] text-t1")} title={row.branches.length > 1 ? filialNames(row) : undefined}>
+                          {row.storeName}
+                        </td>
+                      ) : null}
                       <td className={cn(cellClass, "text-right font-mono text-[13px] font-bold text-t0")}>{money(earningsOf(row))}</td>
                       <td className={cn(cellClass, "text-right font-mono text-[13px] font-bold text-t0")}>{minusMoney(row.withdrawalCents)}</td>
                       <td className={cn(cellClass, "text-right font-mono text-[13px] font-bold text-t0")}>{minusMoney(row.shortageCents)}</td>
@@ -450,7 +499,7 @@ function WalletBody({
           person={person}
           storeId={person.storeId}
           storeName={showStore ? person.storeName : undefined}
-          employeeId={codes.get(rowKey(person))}
+          employeeId={codeFor(person, codes)}
           onClose={close}
         />
       ) : null}
@@ -728,8 +777,10 @@ function storeLabel(store: Store): string {
 }
 
 function peopleOf(branches: LoadedBranch[]): PersonRow[] {
-  return branches.flatMap((branch) =>
-    branch.wallet.people.map((person) => ({ ...person, storeId: branch.store.id, storeName: storeLabel(branch.store) })),
+  return groupWalletPeople(
+    branches.flatMap((branch) =>
+      branch.wallet.people.map((person) => ({ ...person, storeId: branch.store.id, storeName: storeLabel(branch.store) })),
+    ),
   );
 }
 
@@ -768,7 +819,7 @@ function downloadXlsx(rows: PersonRow[], showStore: boolean, fileName: string) {
   const header: XlsxCell[] = ["Nome", ...(showStore ? ["Filial"] : []), "Ganhos", "Retiradas", "Quebra", "Saldo"];
   const body = rows.map((row) => [
     row.name,
-    ...(showStore ? [row.storeName] : []),
+    ...(showStore ? [row.branches.length > 1 ? filialNames(row) : row.storeName] : []),
     reais(earningsOf(row)),
     reais(row.withdrawalCents),
     reais(row.shortageCents),
@@ -977,7 +1028,7 @@ function SellerWalletSkeleton() {
   );
 }
 
-/** Financeiro da gestão: as filiais do seletor, uma linha por pessoa em cada filial. */
+/** Financeiro da gestão: as filiais do seletor. A mesma gerente entra numa linha só. */
 export function BranchWalletPage() {
   const { session, storeRows, loading: storesLoading } = useScopedStores();
   const { today, from, to, presetId, floor, change } = useWalletPeriod();

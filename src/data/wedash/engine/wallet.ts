@@ -375,3 +375,61 @@ export function walletInRange(parts: WalletMonth[], from: string, to: string, ke
     unassignedShortageDays,
   };
 }
+
+export type WalletPersonBranch = {
+  storeId: string;
+  storeName: string;
+  person: WalletPersonMonth;
+};
+
+/** Pessoa na lista do gestor. Várias filiais quando o mesmo usuário entra em mais de uma. */
+export type WalletGroupedPerson = WalletPersonMonth & {
+  storeId: string;
+  storeName: string;
+  branches: WalletPersonBranch[];
+};
+
+/** Junta a mesma pessoa quando ela entra em mais de uma filial. Quem aparece numa só fica como está. */
+export function groupWalletPeople(rows: (WalletPersonMonth & { storeId: string; storeName: string })[]): WalletGroupedPerson[] {
+  const order: string[] = [];
+  const groups = new Map<string, (WalletPersonMonth & { storeId: string; storeName: string })[]>();
+  for (const row of rows) {
+    const current = groups.get(row.personId);
+    if (current) current.push(row);
+    else {
+      order.push(row.personId);
+      groups.set(row.personId, [row]);
+    }
+  }
+  return order.map((personId) => {
+    const sorted = [...(groups.get(personId) ?? [])].sort(
+      (a, b) => a.storeName.localeCompare(b.storeName, "pt-BR") || a.storeId.localeCompare(b.storeId),
+    );
+    const branches: WalletPersonBranch[] = sorted.map((part) => ({
+      storeId: part.storeId,
+      storeName: part.storeName,
+      person: part,
+    }));
+    const first = sorted[0];
+    if (!first || sorted.length === 1) {
+      return { ...first!, branches };
+    }
+    const sum = (pick: (row: WalletPersonMonth) => number) => sorted.reduce((total, row) => total + pick(row), 0);
+    return {
+      personId,
+      name: first.name,
+      prizeCents: sum((row) => row.prizeCents),
+      bonusCents: sum((row) => row.bonusCents),
+      managementCents: sum((row) => row.managementCents),
+      challengeCents: sum((row) => row.challengeCents),
+      withdrawalCents: sum((row) => row.withdrawalCents),
+      shortageCents: sum((row) => row.shortageCents),
+      balanceCents: sum((row) => row.balanceCents),
+      openPrize: sorted.some((row) => row.openPrize),
+      lines: sorted.flatMap((row) => [...row.lines]),
+      storeId: first.storeId,
+      storeName: `${sorted.length} filiais`,
+      branches,
+    };
+  });
+}
