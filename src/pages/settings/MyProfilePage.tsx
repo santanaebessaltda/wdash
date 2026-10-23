@@ -94,8 +94,28 @@ function PersonalDataCard({ saved, onSaved }: { saved: PersonName; onSaved: (n: 
   const { show } = useToast();
   const [name, setName] = useState<PersonName>(saved);
   const [saving, setSaving] = useState(false);
+  const seller = session.role === "SELLER";
+  const sellerName = titleName(`${saved.name} ${saved.lastName}`.trim()) || session.name;
 
   useEffect(() => setName(saved), [saved]);
+
+  if (seller) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Dados pessoais</CardTitle>
+        </CardHeader>
+        <div className="flex flex-col gap-4">
+          <FormField label="Nome" hint="O nome vem do Millennium e não pode ser alterado aqui.">
+            <Input value={sellerName} readOnly disabled />
+          </FormField>
+          <FormField label="E-mail" hint="O e-mail é usado para entrar na WDash e não pode ser alterado aqui.">
+            <Input value={session.email} readOnly disabled />
+          </FormField>
+        </div>
+      </Card>
+    );
+  }
 
   const dirty = name.name.trim() !== saved.name || name.lastName.trim() !== saved.lastName;
 
@@ -273,12 +293,17 @@ function ThemeCard() {
 /** Conta > Meu perfil  -  layout Account > Profile do Vela (resumo a esquerda, formularios a direita). */
 export function MyProfilePage() {
   const session = useActiveSession();
+  const { update } = useSession();
   const [saved, setSaved] = useState<PersonName>(() => splitPersonName(session.name));
 
   useEffect(() => {
     let live = true;
     void fetchMyNames(session.name).then((n) => {
-      if (live) setSaved({ name: n.firstName, lastName: n.lastName });
+      if (!live) return;
+      setSaved({ name: n.firstName, lastName: n.lastName });
+      if (session.role !== "SELLER") return;
+      const full = titleName(`${n.firstName} ${n.lastName}`.trim());
+      if (full && full !== session.name) update({ name: full });
     });
     return () => {
       live = false;

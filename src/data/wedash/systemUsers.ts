@@ -243,12 +243,17 @@ export async function fetchInviteInfo(): Promise<{ ok: true; info: InviteInfo } 
   };
 }
 
-/** Ativa o convite gravando o nome e o sobrenome informados no "Crie seu acesso". */
-export async function acceptInvite(personal: { firstName: string; lastName: string }): Promise<boolean> {
+/** Ativa o convite. Gestor e gerente gravam o nome informado. Vendedor fica com o nome do Millennium. */
+export async function acceptInvite(personal?: { firstName: string; lastName: string }): Promise<boolean> {
   const sb = getSupabase();
   if (!sb) return false;
   const { data, error } = await sb.functions.invoke("team-members", {
-    body: { action: "accept", firstName: titleName(personal.firstName), lastName: titleName(personal.lastName) },
+    body: {
+      action: "accept",
+      ...(personal
+        ? { firstName: titleName(personal.firstName), lastName: titleName(personal.lastName) }
+        : {}),
+    },
   });
   return !error && Boolean((data as { ok?: boolean } | null)?.ok);
 }

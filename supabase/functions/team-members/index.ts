@@ -216,13 +216,36 @@ serve(async (req) => {
     }
     const firstName = titleName(typeof body.firstName === "string" ? body.firstName : "");
     const lastName = titleName(typeof body.lastName === "string" ? body.lastName : "");
-    if (firstName.length < 2 || lastName.length < 2) return fail("invalid_personal_data");
+    const seller = pending.role === "SELLER";
+    if (!seller && (firstName.length < 2 || lastName.length < 2)) return fail("invalid_personal_data");
     const now = new Date().toISOString();
     const { error: mErr } = await admin
       .from("membership")
       .update({ status: "ACTIVE", accepted_at: now })
       .eq("id", pending.id);
     if (mErr) return fail("accept_failed");
+    if (seller) {
+      const { data: linked } = await admin
+        .from("store_seller")
+        .select("name")
+        .eq("membership_id", pending.id)
+        .order("synced_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const erpName = typeof linked?.name === "string" ? linked.name.trim() : "";
+      const first = erpName.split(/\s+/)[0] ?? "";
+      const rest = erpName.slice(first.length).trim();
+      const { error: iErr } = await admin
+        .from("identity")
+        .update({
+          status: "ACTIVE",
+          temporary_password: false,
+          ...(erpName ? { name: erpName, first_name: first, last_name: rest || null } : {}),
+        })
+        .eq("id", me.identity.id);
+      if (iErr) return fail("accept_failed");
+      return json({ ok: true });
+    }
     const { error: iErr } = await admin
       .from("identity")
       .update({

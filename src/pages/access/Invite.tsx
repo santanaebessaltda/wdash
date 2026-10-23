@@ -181,8 +181,9 @@ export function Invite() {
   }
 
   const { info } = state;
+  const asksName = info.role !== "SELLER";
   const errorConfirma = confirma.length > 0 && confirma !== password ? "As senhas não coincidem." : null;
-  const can = personNameIsValid(name) && passwordIsValid(password) && confirma === password && !loading;
+  const can = (!asksName || personNameIsValid(name)) && passwordIsValid(password) && confirma === password && !loading;
 
   async function create(e: FormEvent) {
     e.preventDefault();
@@ -197,7 +198,7 @@ export function Invite() {
       setLoading(false);
       return;
     }
-    const accepted = await acceptInvite({ firstName: name.name, lastName: name.lastName });
+    const accepted = await acceptInvite(asksName ? { firstName: name.name, lastName: name.lastName } : undefined);
     const session = accepted ? await sessionFromPersistedAuth() : null;
     if (!session) {
       setError("Não foi possível ativar seu acesso. Tente novamente.");
@@ -225,14 +226,14 @@ export function Invite() {
           </>
         ) : info.role === "SELLER" ? (
           <>
-            Informe seu nome e crie uma senha para acessar a WDash como vendedor
+            Crie uma senha para acessar a WDash como vendedor
             {info.storeName ? (
               <>
                 {" "}
                 da loja <span className="font-bold text-t0">{info.storeName}</span>
               </>
             ) : null}
-            .
+            . Seu nome é o que está no Millennium.
           </>
         ) : (
           <>
@@ -248,7 +249,7 @@ export function Invite() {
         )}
       </p>
       <form onSubmit={create} className="flex flex-col gap-4" noValidate>
-        <NameFields amount={name} onChange={(p) => setName((n) => ({ ...n, ...p }))} autoFocus />
+        {asksName && <NameFields amount={name} onChange={(p) => setName((n) => ({ ...n, ...p }))} autoFocus />}
         {/* Escondido: gerenciador de senhas associa a senha nova a este login. */}
         <input type="email" name="username" autoComplete="username" value={info.email} readOnly tabIndex={-1} aria-hidden className="sr-only" />
         <PasswordField
@@ -257,6 +258,7 @@ export function Invite() {
           onChange={setPassword}
           placeholder={PASSWORD_RULE_TEXT}
           autoComplete="new-password"
+          autoFocus={!asksName}
         />
         <PasswordField
           label="Confirme a nova senha"

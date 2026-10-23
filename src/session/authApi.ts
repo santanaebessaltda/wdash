@@ -447,7 +447,7 @@ export async function fetchMyNames(fallbackName: string): Promise<{ firstName: s
 
 export type SaveProfileInput = { firstName: string; lastName: string; photo: File | null; removePhoto: boolean };
 
-/** Meu perfil: grava nome, sobrenome e foto (trocada ou removida) na identity. */
+/** Meu perfil: grava nome e sobrenome de gestor e gerente, e a foto. O vendedor só troca a foto; o nome fica o do Millennium. */
 export async function saveMyProfile(
   input: SaveProfileInput,
 ): Promise<{ ok: true; name: string; avatarUrl: string | null | undefined } | { ok: false; error: string }> {
@@ -466,6 +466,17 @@ export async function saveMyProfile(
   const uid = userData.user?.id;
   if (!uid) return { ok: false, error: MESSAGE_SESSAO_EXPIRADA };
 
+  const { data: ident } = await sb.from("identity").select("id, name").eq("auth_user_id", uid).maybeSingle();
+  if (!ident) return { ok: false, error: MESSAGE_SESSAO_EXPIRADA };
+  const { data: memb } = await sb
+    .from("membership")
+    .select("role")
+    .eq("identity_id", ident.id)
+    .eq("status", "ACTIVE")
+    .limit(1)
+    .maybeSingle();
+  const keepsErpName = memb?.role === "SELLER";
+
   let avatarUrl: string | null | undefined;
   if (input.photo) {
     const up = await uploadAvatar(input.photo);
@@ -475,15 +486,18 @@ export async function saveMyProfile(
     avatarUrl = null;
   }
 
-  const { error } = await sb
-    .from("identity")
-    .update({ first_name: firstName, last_name: lastName, name, ...(avatarUrl !== undefined ? { avatar_url: avatarUrl } : {}) })
-    .eq("auth_user_id", uid);
-  if (error) {
-    console.warn("saveMyProfile:", error.message);
-    return { ok: false, error: "Não foi possível salvar as alterações. Tente novamente." };
+  const patch: { first_name?: string; last_name?: string; name?: string; avatar_url?: string | null } = keepsErpName
+    ? {}
+    : { first_name: firstName, last_name: lastName, name };
+  if (avatarUrl !== undefined) patch.avatar_url = avatarUrl;
+  if (Object.keys(patch).length > 0) {
+    const { error } = await sb.from("identity").update(patch).eq("auth_user_id", uid);
+    if (error) {
+      console.warn("saveMyProfile:", error.message);
+      return { ok: false, error: "Não foi possível salvar as alterações. Tente novamente." };
+    }
   }
-  return { ok: true, name, avatarUrl };
+  return { ok: true, name: keepsErpName ? titleName(ident.name) : name, avatarUrl };
 }
 
 /** Meu perfil: confere a senha atual (novo login) e troca a senha sem encerrar a sessao. */
