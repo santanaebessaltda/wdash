@@ -55,7 +55,7 @@ type Roster = {
   byId: Map<string, string>;
   byEmployee: Map<string, string>;
   byName: Map<string, string>;
-  /** Gerentes ativas da WDash. Filiais vazias = todas. */
+  /** Gerentes ativas da WDash. Sem filial marcada, entra onde ninguém foi marcado. */
   managers: WalletManager[];
 };
 
@@ -215,7 +215,9 @@ export async function loadBranchWallet(input: {
         people.set(manager.id, row);
       });
     }
-    return { name: goal.name, endsOn: goal.endsOn, open: goalStatus(goal, input.today) === "active", people: [...people.values()] };
+    const endsOn = goal.endsOn.slice(0, 10);
+    const open = goalStatus(goal, input.today) === "active";
+    return { name: goal.name, endsOn: open && input.today < endsOn ? input.today : endsOn, open, people: [...people.values()] };
   });
 
   const challengeSlices: WalletChallengeInput[] = [];
@@ -250,7 +252,7 @@ export async function loadBranchWallet(input: {
         });
       }
     }
-    challengeSlices.push({ name: challenge.name, endsOn: challenge.endsOn, open: status === "active", people });
+    challengeSlices.push({ name: challenge.name, endsOn: challenge.endsOn.slice(0, 10), open: status === "active", people });
   }
 
   const storeShifts = shifts

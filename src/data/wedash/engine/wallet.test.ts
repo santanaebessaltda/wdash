@@ -170,8 +170,9 @@ describe("buildWalletMonth", () => {
       { id: "laura", name: "Laura", storeIds: [] },
       { id: "luiz", name: "Luiz", storeIds: ["outra"] },
     ];
-    expect(managersForStore(managers, "tres").map((manager) => manager.id)).toEqual(["joyce", "laura"]);
+    expect(managersForStore(managers, "tres").map((manager) => manager.id)).toEqual(["joyce"]);
     expect(managersForStore(managers, "campo").map((manager) => manager.id)).toEqual(["laura"]);
+    expect(managersForStore(managers, "outra").map((manager) => manager.id)).toEqual(["luiz"]);
   });
 
   it("splits cents equally and leaves the remainder on the first shares", () => {
@@ -190,6 +191,15 @@ describe("buildWalletMonth", () => {
     expect(ana?.balanceCents).toBe(-400);
     const full = walletInRange([view], "2026-10-01", "2026-10-31");
     expect(full.people.find((row) => row.personId === "ana")?.balanceCents).toBe(15_000 - 400);
+  });
+
+  it("keeps an open goal inside the month when the period stops before it ends", () => {
+    const view = month({ goals: [goal({ open: true })] });
+    const clipped = walletInRange([view], "2026-10-01", "2026-10-23");
+    const ana = clipped.people.find((row) => row.personId === "ana");
+    expect(ana?.prizeCents).toBe(10_000);
+    expect(ana?.lines.map((line) => line.kind)).toEqual(["prize", "bonus"]);
+    expect(walletInRange([view], "2026-09-01", "2026-09-30").people).toEqual([]);
   });
 
   it("keeps the seller row when the month is empty", () => {

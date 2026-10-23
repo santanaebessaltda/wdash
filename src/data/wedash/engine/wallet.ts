@@ -64,11 +64,11 @@ export type WalletChallengeInput = {
 
 export type WalletManager = { id: string; name: string; storeIds: string[] };
 
-/** Gerentes da filial. Lista vazia de filiais = gerente de todas. */
+/** Gerentes da filial. Quem tem filiais marcadas fica só nelas. Quem não tem marca entra nas filiais que ninguém reivindicou. */
 export function managersForStore(managers: WalletManager[], storeId: string): WalletManager[] {
-  return managers
-    .filter((manager) => manager.storeIds.length === 0 || manager.storeIds.includes(storeId))
-    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR") || a.id.localeCompare(b.id));
+  const named = managers.filter((manager) => manager.storeIds.includes(storeId));
+  const picked = named.length > 0 ? named : managers.filter((manager) => manager.storeIds.length === 0);
+  return picked.sort((a, b) => a.name.localeCompare(b.name, "pt-BR") || a.id.localeCompare(b.id));
 }
 
 /** Divide centavos em partes iguais. O resto fica nas primeiras partes. */
@@ -311,6 +311,15 @@ function recount(person: WalletPersonMonth, lines: WalletLine[]): WalletPersonMo
   };
 }
 
+/** Junta os meses do intervalo e fica só com o que cai entre `from` e `to`. Meta ainda aberta entra no mês em que termina, mesmo quando o período para antes do último dia. */
+function lineInRange(line: WalletLine, start: string, end: string): boolean {
+  if (line.day == null) return false;
+  if (line.day >= start && line.day <= end) return true;
+  if (!line.open || line.day < start) return false;
+  const month = line.day.slice(0, 7);
+  return start.slice(0, 7) <= month && end.slice(0, 7) >= month;
+}
+
 /** Junta os meses do intervalo e fica só com o que cai entre `from` e `to`. */
 export function walletInRange(parts: WalletMonth[], from: string, to: string, keepPersonId?: string | null): WalletMonth {
   const start = from <= to ? from : to;
@@ -327,7 +336,7 @@ export function walletInRange(parts: WalletMonth[], from: string, to: string, ke
     }
   }
   const people = [...byId.values()]
-    .map((person) => recount(person, person.lines.filter((line) => line.day != null && line.day >= start && line.day <= end)))
+    .map((person) => recount(person, person.lines.filter((line) => lineInRange(line, start, end))))
     .filter((person) => person.lines.length > 0 || person.personId === keepPersonId)
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR") || a.personId.localeCompare(b.personId));
   if (keepPersonId && !people.some((person) => person.personId === keepPersonId)) {
