@@ -8,6 +8,7 @@ import {
   hasHelpDraftError,
   helpDraftErrors,
   helpObjectPaths,
+  helpVideoExtension,
   helpVideoFileError,
   helpWatchCount,
   helpWatchCountLabel,
@@ -27,6 +28,7 @@ function video(partial: Partial<HelpVideo> = {}): HelpVideo {
     storagePath: "t/v1/video",
     posterPath: null,
     durationSec: 195,
+    mimeType: "video/mp4",
     createdAt: "2026-10-23T12:00:00.000Z",
     ...partial,
   };
@@ -89,9 +91,11 @@ describe("help library", () => {
 
   it("keeps the file under the tenant and the video id", () => {
     expect(helpObjectPaths("tenant", "video")).toEqual({
-      video: "tenant/video/video",
+      video: "tenant/video/video.mp4",
       poster: "tenant/video/poster.jpg",
     });
+    expect(helpVideoExtension("video/webm")).toBe("webm");
+    expect(helpObjectPaths("tenant", "video", "video/quicktime").video).toBe("tenant/video/video.mov");
   });
 });
 

@@ -27,7 +27,7 @@ const SESSION_EXPIRED = "Sua sessão expirou. Entre novamente.";
 
 const HELP_BUCKET = "help-videos";
 const HELP_URL_SECONDS = 4 * 60 * 60;
-const VIDEO_COLUMNS = "id, title, description, audiences, visible, storage_path, poster_path, duration_sec, created_at";
+const VIDEO_COLUMNS = "id, title, description, audiences, visible, storage_path, poster_path, duration_sec, mime_type, created_at";
 
 export type HelpVideo = {
   id: string;
@@ -38,6 +38,7 @@ export type HelpVideo = {
   storagePath: string;
   posterPath: string | null;
   durationSec: number | null;
+  mimeType: string;
   createdAt: string;
 };
 
@@ -150,9 +151,22 @@ export function formatWatchedLabel(at: Date, now: Date, timeZone = "America/Sao_
   return `em ${day.format(at).slice(0, 5)} às ${clock}`;
 }
 
-export function helpObjectPaths(tenantId: string, videoId: string): { video: string; poster: string } {
+export function helpVideoExtension(contentType: string): "mp4" | "webm" | "mov" {
+  if (contentType === "video/webm") return "webm";
+  if (contentType === "video/quicktime") return "mov";
+  return "mp4";
+}
+
+/** O storage grava o tipo do Blob. Sem isso o arquivo sobe genérico e o navegador não dá play. */
+export function helpVideoUploadBody(file: Blob, contentType: string): Blob {
+  if (file.type === contentType) return file;
+  const name = file instanceof File && file.name ? file.name : `video.${helpVideoExtension(contentType)}`;
+  return new File([file], name, { type: contentType });
+}
+
+export function helpObjectPaths(tenantId: string, videoId: string, contentType = "video/mp4"): { video: string; poster: string } {
   return {
-    video: `${tenantId}/${videoId}/video`,
+    video: `${tenantId}/${videoId}/video.${helpVideoExtension(contentType)}`,
     poster: `${tenantId}/${videoId}/poster.jpg`,
   };
 }
@@ -220,6 +234,7 @@ type VideoRow = {
   storage_path: string;
   poster_path: string | null;
   duration_sec: number | null;
+  mime_type: string;
   created_at: string;
 };
 
@@ -239,6 +254,7 @@ function asVideo(raw: VideoRow): HelpVideo {
     storagePath: raw.storage_path,
     posterPath: raw.poster_path,
     durationSec: raw.duration_sec,
+    mimeType: raw.mime_type,
     createdAt: raw.created_at,
   };
 }
@@ -256,14 +272,15 @@ async function signedUrls(paths: string[]): Promise<Record<string, string>> {
   const { data, error } = await sb.storage.from(HELP_BUCKET).createSignedUrls(unique, HELP_URL_SECONDS);
   if (error || !data) return {};
   const out: Record<string, string> = {};
-  for (const row of data) {
-    if (row.path && row.signedUrl) out[row.path] = row.signedUrl;
-  }
+  unique.forEach((path, index) => {
+    const url = data[index]?.signedUrl;
+    if (url) out[path] = url;
+  });
   return out;
 }
 
 export async function listHelpLibrary(tenantId: string, manage: boolean): Promise<
-  | { ok: true; videos: HelpVideo[]; posters: Record<string, string>; people: HelpPerson[] | null; views: HelpView[] }
+  | { ok: true; videos: HelpVideo[]; posters: Record<string, string>; clips: Record<string, string>; people: HelpPerson[] | null; views: HelpView[] }
   | { ok: false; error: string }
 > {
   const sb = getSupabase();
@@ -275,8 +292,14 @@ export async function listHelpLibrary(tenantId: string, manage: boolean): Promis
     .order("created_at", { ascending: false });
   if (error) return { ok: false, error: failed(error, HELP_LOAD_ERROR) };
   const videos = ((data ?? []) as VideoRow[]).map(asVideo);
-  const posters = await signedUrls(videos.flatMap((video) => (video.posterPath ? [video.posterPath] : [])));
-  if (!manage) return { ok: true, videos, posters, people: null, views: [] };
+  const urls = await signedUrls(videos.flatMap((video) => [video.storagePath, ...(video.posterPath ? [video.posterPath] : [])]));
+  const posters: Record<string, string> = {};
+  const clips: Record<string, string> = {};
+  for (const video of videos) {
+    if (video.posterPath && urls[video.posterPath]) posters[video.posterPath] = urls[video.posterPath];
+    else if (urls[video.storagePath]) clips[video.id] = urls[video.storagePath];
+  }
+  if (!manage) return { ok: true, videos, posters, clips, people: null, views: [] };
 
   const [peopleResult, viewsResult] = await Promise.all([
     sb.rpc("help_audience", { p_tenant_id: tenantId }),
@@ -289,7 +312,7 @@ export async function listHelpLibrary(tenantId: string, manage: boolean): Promis
   ]);
   const people = peopleResult.error ? null : asPeople(peopleResult.data);
   const views = viewsResult.error ? [] : asViews(viewsResult.data);
-  return { ok: true, videos, posters, people, views };
+  return { ok: true, videos, posters, clips, people, views };
 }
 
 export async function readHelpVideo(
@@ -338,15 +361,18 @@ export async function createHelpVideo(args: {
   const sb = getSupabase();
   if (!sb) return { ok: false, error: HELP_OFFLINE };
   const id = crypto.randomUUID();
-  const paths = helpObjectPaths(args.tenantId, id);
-  const uploaded = await sb.storage.from(HELP_BUCKET).upload(paths.video, args.file, { contentType: args.contentType, upsert: false });
+  const paths = helpObjectPaths(args.tenantId, id, args.contentType);
+  const uploaded = await sb.storage.from(HELP_BUCKET).upload(paths.video, helpVideoUploadBody(args.file, args.contentType), {
+    contentType: args.contentType,
+    upsert: false,
+  });
   if (uploaded.error) {
     console.warn("help video upload:", uploaded.error.message);
     return { ok: false, error: failed(uploaded.error, HELP_SEND_ERROR) };
   }
   let posterPath: string | null = null;
   if (args.poster) {
-    const poster = await sb.storage.from(HELP_BUCKET).upload(paths.poster, args.poster, { contentType: "image/jpeg", upsert: false });
+    const poster = await sb.storage.from(HELP_BUCKET).upload(paths.poster, jpegBody(args.poster), { contentType: "image/jpeg", upsert: false });
     if (!poster.error) posterPath = paths.poster;
     else console.warn("help poster upload:", poster.error.message);
   }
@@ -374,6 +400,35 @@ export async function createHelpVideo(args: {
   const video = asVideo(data as VideoRow);
   const urls = posterPath ? await signedUrls([posterPath]) : {};
   return { ok: true, video, posterUrl: posterPath ? (urls[posterPath] ?? null) : null };
+}
+
+export async function saveHelpPoster(args: {
+  tenantId: string;
+  videoId: string;
+  poster: Blob;
+  durationSec: number | null;
+}): Promise<{ ok: true; posterPath: string; posterUrl: string | null; durationSec: number | null } | { ok: false; error: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, error: HELP_OFFLINE };
+  const posterPath = helpObjectPaths(args.tenantId, args.videoId).poster;
+  const uploaded = await sb.storage.from(HELP_BUCKET).upload(posterPath, jpegBody(args.poster), { contentType: "image/jpeg", upsert: false });
+  if (uploaded.error && !storedAlready(uploaded.error.message)) return { ok: false, error: failed(uploaded.error, HELP_SAVE_ERROR) };
+  const patch: { poster_path: string; duration_sec?: number } = { poster_path: posterPath };
+  if (args.durationSec != null) patch.duration_sec = args.durationSec;
+  const { error } = await sb.from("help_video").update(patch).eq("tenant_id", args.tenantId).eq("id", args.videoId);
+  if (error) return { ok: false, error: failed(error, HELP_SAVE_ERROR) };
+  const urls = await signedUrls([posterPath]);
+  return { ok: true, posterPath, posterUrl: urls[posterPath] ?? null, durationSec: args.durationSec };
+}
+
+function storedAlready(message: string | undefined): boolean {
+  const text = (message ?? "").toLowerCase();
+  return text.includes("exists") || text.includes("duplicate");
+}
+
+function jpegBody(file: Blob): Blob {
+  if (file.type === "image/jpeg") return file;
+  return new File([file], "poster.jpg", { type: "image/jpeg" });
 }
 
 export async function updateHelpVideo(args: {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Alert, Badge, Button, Card, Dropdown, EmptyState, Modal, PageHeader, Segmented, Skeleton, useToast } from "@/components/ui";
+import { Alert, Badge, Button, Dropdown, EmptyState, Modal, PageHeader, Segmented, Skeleton, useToast } from "@/components/ui";
 import { HeaderSearch } from "@/pages/dashboard/HeaderFilter";
 import {
   canManageHelp,
@@ -11,6 +11,7 @@ import {
   helpWatchCountLabel,
   helpWatchLines,
   listHelpLibrary,
+  saveHelpPoster,
   setHelpVideoVisible,
   HELP_AUDIENCE_LABEL,
   type HelpLibraryFilter,
@@ -20,8 +21,12 @@ import {
 } from "@/data/wedash/helpVideo";
 import { paths } from "@/router/paths";
 import { useActiveSession } from "@/session/SessionProvider";
+import { HelpThumb } from "./HelpThumb";
 import { HelpVideoForm } from "./HelpVideoForm";
-import { HELP_ICON, HelpIcon } from "./icons";
+import { HELP_ICON, HelpIcon, HelpPlayMark } from "./icons";
+
+const posterSaves = new Set<string>();
+const helpGrid = { gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 220px), 280px))" };
 
 export function HelpPage() {
   const session = useActiveSession();
@@ -29,6 +34,7 @@ export function HelpPage() {
   const manage = canManageHelp(session.role);
   const [videos, setVideos] = useState<HelpVideo[]>([]);
   const [posters, setPosters] = useState<Record<string, string>>({});
+  const [clips, setClips] = useState<Record<string, string>>({});
   const [people, setPeople] = useState<HelpPerson[] | null>(null);
   const [views, setViews] = useState<HelpView[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -52,6 +58,7 @@ export function HelpPage() {
       }
       setVideos(result.videos);
       setPosters(result.posters);
+      setClips(result.clips);
       setPeople(result.people);
       setViews(result.views);
       setStatus("ready");
@@ -66,6 +73,33 @@ export function HelpPage() {
     setEditing(null);
     setFormOpen(true);
   };
+
+  function keepPoster(video: HelpVideo, poster: Blob, durationSec: number | null) {
+    if (video.posterPath || posterSaves.has(video.id)) return;
+    posterSaves.add(video.id);
+    void saveHelpPoster({
+      tenantId: session.tenantId,
+      videoId: video.id,
+      poster,
+      durationSec: video.durationSec ?? durationSec,
+    }).then((result) => {
+      if (!result.ok) {
+        posterSaves.delete(video.id);
+        return;
+      }
+      setVideos((current) =>
+        current.map((item) =>
+          item.id === video.id ? { ...item, posterPath: result.posterPath, durationSec: item.durationSec ?? result.durationSec } : item,
+        ),
+      );
+      if (result.posterUrl) setPosters((current) => ({ ...current, [result.posterPath]: result.posterUrl! }));
+      setClips((current) => {
+        const next = { ...current };
+        delete next[video.id];
+        return next;
+      });
+    });
+  }
 
   async function toggleVisible(video: HelpVideo) {
     const next = !video.visible;
@@ -112,9 +146,13 @@ export function HelpPage() {
       {status === "error" ? (
         <Alert variant="danger" title={error} />
       ) : status === "loading" ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {Array.from({ length: 6 }, (_, index) => (
-            <Skeleton key={index} className="h-64 rounded-[var(--radius-vela-lg)]" />
+        <div className="grid gap-x-4 gap-y-7" style={helpGrid}>
+          {Array.from({ length: 8 }, (_, index) => (
+            <div key={index}>
+              <Skeleton className="aspect-video rounded-xl" />
+              <Skeleton className="mt-2 h-4 w-4/5" />
+              <Skeleton className="mt-1.5 h-3 w-1/2" />
+            </div>
           ))}
         </div>
       ) : (
@@ -154,35 +192,40 @@ export function HelpPage() {
               }
             />
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-x-4 gap-y-7" style={helpGrid}>
               {filtered.map((video) => {
                 const duration = formatHelpDuration(video.durationSec);
                 const watched = manage && people ? helpWatchCountLabel(helpWatchCount(helpWatchLines(people, views, video))) : null;
+                const posterUrl = video.posterPath ? (posters[video.posterPath] ?? null) : null;
                 return (
-                  <Card key={video.id} padding="none" className="overflow-hidden">
-                    <Link to={paths.helpVideo(video.id)} className="relative block aspect-video bg-bg-3">
-                      {video.posterPath && posters[video.posterPath] ? (
-                        <img src={posters[video.posterPath]} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <span className="flex h-full items-center justify-center text-2xl text-t2">▶</span>
-                      )}
+                  <article key={video.id} className="min-w-0">
+                    <Link to={paths.helpVideo(video.id)} aria-label={`Assistir ${video.title}`} className="group relative block aspect-video overflow-hidden rounded-xl bg-black">
+                      <HelpThumb
+                        posterUrl={posterUrl}
+                        clipUrl={clips[video.id] ?? null}
+                        onCapture={manage && !video.posterPath ? (poster, durationSec) => keepPoster(video, poster, durationSec) : undefined}
+                      />
+                      <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/25">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black/70 text-white">
+                          <HelpPlayMark />
+                        </span>
+                      </span>
                       {duration ? (
-                        <span className="absolute bottom-2 right-2 rounded bg-black/75 px-1.5 py-0.5 text-[11px] font-bold text-white">{duration}</span>
+                        <span className="pointer-events-none absolute bottom-1.5 right-1.5 rounded bg-black/80 px-1.5 py-0.5 text-[11px] font-semibold text-white">{duration}</span>
                       ) : null}
                     </Link>
-                    <div className="flex items-start gap-2 p-3.5">
+                    <div className="flex items-start gap-1 pt-2">
                       <Link to={paths.helpVideo(video.id)} className="min-w-0 flex-1">
-                        <h2 className="line-clamp-2 text-[15px] font-bold leading-snug text-t0">{video.title}</h2>
-                        {video.description ? <p className="mt-1 line-clamp-2 text-[13px] text-t1">{video.description}</p> : null}
+                        <h2 className="line-clamp-2 text-[14px] font-semibold leading-5 text-t0">{video.title}</h2>
                         {manage ? (
-                          <div className="mt-2 flex flex-wrap gap-1.5">
+                          <div className="mt-1.5 flex flex-wrap gap-1">
                             {video.audiences.map((audience) => (
                               <Badge key={audience}>{HELP_AUDIENCE_LABEL[audience]}</Badge>
                             ))}
                             {video.visible ? null : <Badge variant="warning">Oculto</Badge>}
                           </div>
                         ) : null}
-                        {watched ? <p className="mt-2 text-[12px] font-medium text-t2">{watched}</p> : null}
+                        {watched ? <p className="mt-1 text-[12px] text-t2">{watched}</p> : null}
                       </Link>
                       {manage ? (
                         <Dropdown
@@ -202,7 +245,7 @@ export function HelpPage() {
                         />
                       ) : null}
                     </div>
-                  </Card>
+                  </article>
                 );
               })}
             </div>
