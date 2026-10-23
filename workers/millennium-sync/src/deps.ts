@@ -1320,7 +1320,7 @@ export function buildDeps(sb: SupabaseClient, erpSecret: string): SyncJobDeps {
         seller_key: r.sellerKey,
         seller_name: r.sellerName,
         seller_employee_id: r.sellerEmployeeId ?? null,
-        seller_gerador_id: r.sellerGeradorId ?? null,
+        seller_gerador_id: r.sellerGeneratorId ?? null,
         brand: r.brand,
         revenue_cents: r.revenueCents,
         sales_count: r.salesCount,

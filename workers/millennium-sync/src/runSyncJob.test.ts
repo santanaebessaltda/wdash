@@ -759,7 +759,9 @@ describe("runSyncJob", () => {
       "s1:2026-09-02",
       "s2:2026-09-02",
       "s1:2026-09-03",
+      "s1:2026-09-01",
       "s2:2026-09-03",
+      "s2:2026-09-01",
     ]);
     // Dia sem venda grava R$ 0 (tela de sincronizacao conta o dia).
     const zeroDays = (deps.upsertDayAggs as ReturnType<typeof vi.fn>).mock.calls
@@ -905,9 +907,11 @@ describe("runSyncJob", () => {
     expect(hours.filter((h) => h.brand === "WPINK").reduce((s, h) => s + h.revenueCents, 0)).toBe(6_000);
     expect(hours.filter((h) => h.brand === "WEPINK").reduce((s, h) => s + h.revenueCents, 0)).toBe(14_000);
     const sellers = replaceSellerDayAggs.mock.calls.flatMap((c) => c[0].rows);
-    expect(sellers).toEqual([
-      expect.objectContaining({ sellerName: "Gabriela Silva", sellerGeradorId: 66161, revenueCents: 10_000 }),
-    ]);
+    expect(sellers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ sellerName: "Gabriela Silva", sellerGeradorId: 66161, revenueCents: 10_000 }),
+      ]),
+    );
     const products = replaceProductDayAggs.mock.calls.flatMap((c) => c[0].rows);
     expect(products.map((p: { productCode: string }) => p.productCode).sort()).toEqual(["BSPPAR", "WP002"]);
     // Cupom B (sem vendedora) entra no top produtos pelo detalhe, sem chamada extra.
@@ -962,10 +966,12 @@ describe("runSyncJob", () => {
         expect.objectContaining({ tenantId: "t1", storeId: "s1", from: "2026-09-19", to: "2026-09-19" }),
       );
       const rows = replaceSellerProductDayAggs.mock.calls.flatMap((c) => c[0].rows);
-      expect(rows).toEqual([
-        expect.objectContaining({ day: "2026-09-19", sellerGeradorId: 66161, productCode: "BSPPAR", itemCount: 2, revenueCents: 4_000 }),
-        expect.objectContaining({ day: "2026-09-19", sellerGeradorId: 66161, productCode: "WP002", itemCount: 1, revenueCents: 6_000 }),
-      ]);
+      expect(rows).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ day: "2026-09-19", sellerGeradorId: 66161, productCode: "BSPPAR", itemCount: 2, revenueCents: 4_000 }),
+          expect.objectContaining({ day: "2026-09-19", sellerGeradorId: 66161, productCode: "WP002", itemCount: 1, revenueCents: 6_000 }),
+        ]),
+      );
     });
 
     it("falha ao gravar os itens por pessoa não derruba o job (top produtos segue gravado)", async () => {
@@ -1117,7 +1123,8 @@ describe("runSyncJob", () => {
     );
     expect(result.ok).toBe(true);
     expect(windows.length).toBeGreaterThan(0);
-    expect(windows.every((w) => w.from === "2026-09-19" && w.to === "2026-09-19")).toBe(true);
+    expect(windows.filter((w) => w.from === w.to).every((w) => w.from === "2026-09-19")).toBe(true);
+    expect(windows).toContainEqual({ from: "2026-09-01", to: "2026-09-19" });
     expect(deps.updateCredential).toHaveBeenCalledWith(
       expect.objectContaining({ lastLightSyncAt: expect.any(Date) }),
     );
@@ -1141,7 +1148,9 @@ describe("runSyncJob", () => {
       { from: "2026-09-22", to: "2026-09-22" },
       { from: "2026-09-22", to: "2026-09-22" },
       { from: "2026-09-23", to: "2026-09-23" },
+      { from: "2026-09-01", to: "2026-09-23" },
       { from: "2026-09-23", to: "2026-09-23" },
+      { from: "2026-09-01", to: "2026-09-23" },
     ]);
     expect(deps.markJobRunning).toHaveBeenCalledTimes(1);
     expect(deps.markJobFinished).toHaveBeenCalledTimes(1);
@@ -1184,7 +1193,8 @@ describe("runSyncJob", () => {
     );
     expect(result.ok).toBe(true);
     expect(windows.length).toBeGreaterThan(0);
-    expect(windows.every((w) => w.from === "2026-09-19" && w.to === "2026-09-19")).toBe(true);
+    expect(windows.filter((w) => w.from === w.to).every((w) => w.from === "2026-09-19")).toBe(true);
+    expect(windows).toContainEqual({ from: "2026-09-01", to: "2026-09-19" });
   });
 
   it("FORCE_LIGHT without payload stays today-only (compat)", async () => {
@@ -1257,7 +1267,7 @@ describe("Atualizar (manual e automático)", () => {
     });
     const result = await runSyncJob(baseJob({ kind: "FORCE" }), deps);
     expect(result.ok).toBe(true);
-    expect(listaDays(fetchSalesLista)).toEqual(["2026-09-17", "2026-09-18", "2026-09-19"]);
+    expect(listaDays(fetchSalesLista)).toEqual(["2026-09-17", "2026-09-18", "2026-09-19", "2026-09-01"]);
     expect(markStoresClosed.mock.calls.map((c) => c[0])).toEqual([
       [{ storeId: "s1", day: "2026-09-17" }],
       [{ storeId: "s1", day: "2026-09-18" }],
@@ -1314,17 +1324,19 @@ describe("Atualizar (manual e automático)", () => {
       expect((await run()).ok).toBe(true);
       const coupon1 = fetchCouponReport.mock.calls.length;
       const margem1 = fetchRelatorioMargem.mock.calls.length;
-      expect(coupon1).toBe(1);
+      // Hoje + releitura dos vendedores do mês.
+      expect(coupon1).toBe(2);
       expect(margem1).toBeGreaterThan(0);
 
       expect((await run()).ok).toBe(true);
-      expect(fetchSalesLista).toHaveBeenCalledTimes(2);
-      expect(fetchCouponReport).toHaveBeenCalledTimes(coupon1);
+      // Segunda rodada: Lista de hoje + Lista do mês. Cupom de hoje pulado; cupom do mês relido. Margem parada.
+      expect(fetchSalesLista).toHaveBeenCalledTimes(4);
+      expect(fetchCouponReport).toHaveBeenCalledTimes(coupon1 + 1);
       expect(fetchRelatorioMargem).toHaveBeenCalledTimes(margem1);
 
       lista = [...lista, sale("2", 50_00)];
       expect((await run()).ok).toBe(true);
-      expect(fetchCouponReport).toHaveBeenCalledTimes(coupon1 + 1);
+      expect(fetchCouponReport).toHaveBeenCalledTimes(coupon1 + 1 + 2);
       expect(fetchRelatorioMargem.mock.calls.length).toBeGreaterThan(margem1);
     } finally {
       vi.useRealTimers();

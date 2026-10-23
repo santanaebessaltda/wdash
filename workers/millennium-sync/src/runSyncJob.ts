@@ -65,6 +65,7 @@ import type {
   SalesSellerDayAgg,
   SalesSellerProductDayAgg,
 } from "../../../src/data/wedash/salesTypes.ts";
+import { openMonthThrough, shouldRefreshOpenMonthSellers } from "./sellerMonthRefresh.ts";
 import { onboardingHistoryUntil, SYNC_OFF_NOTE, syncOnboardingOff } from "./syncConfig.ts";
 import { formatElapsed, nowMs, StepTimings } from "./syncTiming.ts";
 import {
@@ -371,7 +372,7 @@ export function withCouponSeller(row: SaleRow, sellers: Map<string, CouponSeller
   const tipo = (x.tipoOperacao ?? "S").trim() || "S";
   const seller = sellers.get(couponKey({ millenniumOpCode: x.millenniumOpCode, nf: x.nf, tipoOperacao: tipo }));
   if (!seller) return row;
-  return { ...row, sellerGeradorId: seller.geradorId, sellerName: seller.name || row.sellerName };
+  return { ...row, sellerGeneratorId: seller.geradorId, sellerName: seller.name || row.sellerName };
 }
 
 /** Ranking da equipe da janela Lista (replace no range). */
@@ -387,7 +388,7 @@ async function persistSellerDayAggs(
     now: args.now,
     dayFrom: args.from,
     dayTo: args.to,
-  });
+  }).map((row) => ({ ...row, sellerGeradorId: row.sellerGeneratorId }));
   const sellers = args.linkSellers ? await args.linkSellers(byName) : byName;
   await deps.replaceSellerDayAggs({
     tenantId: args.tenantId,
@@ -1500,6 +1501,8 @@ export type SyncJobPayload = {
   part?: "sangria" | "close" | "both";
   /** Atualizar do Fechamento: relê o mês visível, mesmo o dia já gravado. */
   rewrite?: boolean;
+  /** Regrava o faturamento de cada pessoa com a Lista e o cupom do mês corrente. */
+  refreshMonthSellers?: boolean;
   /** Intervalo da lista de sangrias quando o fechamento do job é só um dia. */
   sangriaFrom?: string;
   sangriaTo?: string;
@@ -2816,7 +2819,15 @@ async function runDailyForceJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyn
           kind: "FORCE",
           logKind: job.kind,
           logTitle: days.length > 1 ? `${runLabel} · dia ${dayIndex + 1}/${days.length}` : runLabel,
-          payload: { from: day, to: day, storeIds },
+          payload: {
+            from: day,
+            to: day,
+            storeIds,
+            // Uma vez por fechamento da madrugada, no último dia. Não na carga do histórico.
+            ...( !isSeed && !fillUntil && !job.payload.cashOnly && !job.payload.deep && day === days[days.length - 1]
+              ? { refreshMonthSellers: true }
+              : {}),
+          },
           ...(closedMonth ? { compactLog: true } : {}),
         },
         dayDeps,
@@ -3093,6 +3104,7 @@ async function runRefreshJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSyncRe
       ...(job.payload.to ? { to: job.payload.to } : {}),
       ...(job.payload.storeIds?.length ? { storeIds: job.payload.storeIds } : {}),
       ...(fullStoreIds.length ? { fullStoreIds } : {}),
+      ...(!auto ? { refreshMonthSellers: true } : {}),
     }),
     innerDeps,
   );
@@ -3380,6 +3392,89 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
         syncLog("WARN", "gerador", `Lookup filial → gerador falhou (marca, categorias e top produtos pulados): ${msg}`);
       }
     }
+
+    /**
+     * Relê Lista + cupom do dia 1 até hoje e regrava o faturamento de cada pessoa.
+     * Vendedor corrigido no ERP (venda que estava no usuário da filial) passa a contar para a pessoa.
+     * Lista vazia não apaga o que já está gravado. Cupom vazio cai no nome da Lista.
+     */
+    const refreshOpenMonthSellers = async (store: SyncStore, today: string): Promise<boolean> => {
+      if (!shouldRefreshOpenMonthSellers(job)) return false;
+      const span = openMonthThrough(today);
+      const geradorId = geradorMap.get(store.code) ?? null;
+      try {
+        const eventoIds = await deps.resolveEventoIds(session!, job.tenantId, store.code);
+        const rows = await deps.fetchSalesLista({
+          session: session!,
+          storeId: store.id,
+          millenniumStoreId: store.millenniumStoreId,
+          from: span.from,
+          to: span.to,
+          eventoIds,
+        });
+        if (rows.length === 0) {
+          console.warn(`  AVISO [${store.code}] ${span.from}→${span.to} sem vendas na Lista — vendedores não regravados`);
+          return false;
+        }
+        let couponLines: CouponReportLine[] | null = null;
+        if (geradorId != null) {
+          try {
+            couponLines = await deps.fetchCouponReport({
+              session: session!,
+              geradorId,
+              from: span.from,
+              to: span.to,
+            });
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            if (isSessionDeadError(msg)) throw e;
+            console.warn(`  AVISO [${store.code}] cupom do mês (vendedores): ${msg}`);
+            syncLog("WARN", "cupom", `Relatório de cupom do mês não atualizou os vendedores: ${msg}`, { store });
+            couponLines = null;
+          }
+        }
+        const sellersByCoupon =
+          couponLines && couponLines.length > 0 ? couponSellers(groupCouponLines(couponLines)) : null;
+        await persistSellerDayAggs(deps, {
+          tenantId: job.tenantId,
+          storeId: store.id,
+          timeZone: store.timezone,
+          from: span.from,
+          to: span.to,
+          rows,
+          now: deps.now(),
+          linkSellers: linkSellersFor(store),
+          sellersByCoupon,
+        });
+        if (couponLines && couponLines.length > 0) {
+          const byCoupon = groupCouponLines(couponLines);
+          const dayByCoupon = new Map<string, string>();
+          for (const header of uniqueBrandSplitHeaders(rows)) {
+            dayByCoupon.set(couponKey(header), ymdInTz(header.occurredAt, store.timezone));
+          }
+          await saveSellerProductDayAggs(deps, {
+            tenantId: job.tenantId,
+            store,
+            from: span.from,
+            to: span.to,
+            rows: sellerProductDayAggsFromCouponLines(byCoupon, {
+              tenantId: job.tenantId,
+              storeId: store.id,
+              dayOf: (key) => dayByCoupon.get(key) ?? null,
+            }),
+          });
+        }
+        detail(`  [${store.code}] vendedores do mês ${span.from}→${span.to} regravados`);
+        return true;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (isSessionDeadError(msg)) throw e;
+        console.warn(`  AVISO [${store.code}] vendedores do mês: ${msg}`);
+        syncLog("WARN", "vendedoras", `Vendedores do mês não regravaram: ${msg}`, { store });
+        return false;
+      }
+    };
+
     let productMap: ProductBrandMap = new Map();
     let geradorIdsWithWpink = new Set<number>();
     const geradorIds = [
@@ -3988,6 +4083,7 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
           salesChanged = true;
         }
         if (fingerprint && mayReuse && fingerprint === prevFingerprint) {
+          const monthSellers = await refreshOpenMonthSellers(store, todayStore);
           const ms = nowMs() - tStore;
           const revenueCents = listaForBrand.reduce((a, r) => a + r.revenueCents, 0);
           totalSales += storeSales;
@@ -3997,6 +4093,7 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
               facts: [
                 `${storeSales} ${storeSales === 1 ? "venda" : "vendas"} · ${brlCents(revenueCents)}`,
                 "sem venda nova — relatórios de cupom e margem pulados",
+                ...(monthSellers ? ["vendedores do mês regravados"] : []),
               ],
               ms,
               timings,
@@ -4075,6 +4172,7 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
           if (fingerprint && syncLogIssueCount(store.id) === issuesBefore) memo.set(store.id, fingerprint);
           else memo.forget(store.id);
         }
+        const monthSellers = await refreshOpenMonthSellers(store, todayStore);
         const storeMs = nowMs() - tStore;
         const revenueCents = listaForBrand.reduce((a, r) => a + r.revenueCents, 0);
         const facts = [
@@ -4082,6 +4180,7 @@ export async function runSyncJob(job: SyncJob, deps: SyncJobDeps): Promise<RunSy
           ...(wpinkCents > 0 ? [`WPINK ${brlCents(wpinkCents)}`] : []),
           ...(storeDays > 1 ? [`${storeDays} dias`] : []),
           couponsByKey ? `${couponsByKey.size} cupons no relatório` : "relatório de cupom indisponível",
+          ...(monthSellers ? ["vendedores do mês regravados"] : []),
           ...(detMovCoupons > 0 ? [`${detMovCoupons} no detalhe (sem vendedora)`] : []),
         ];
         totalSales += storeSales;
