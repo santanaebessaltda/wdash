@@ -64,9 +64,10 @@ function fmtAgo(iso: string | null): string {
   return new Date(iso).toLocaleDateString("pt-BR");
 }
 
-function storesLabel(ids: string[], stores: SystemUserStore[]): { text: string; title?: string } {
-  if (ids.length === 0) return { text: "Todas as filiais" };
-  const names = ids.map((id) => stores.find((s) => s.id === id)?.name ?? "Filial removida");
+function storesLabel(user: SystemUser, stores: SystemUserStore[]): { text: string; title?: string } {
+  // O onboarding grava as filiais da época no Gestor principal. O acesso é a rede inteira, inclusive filiais novas.
+  if (user.isOwner || user.storeIds.length === 0) return { text: "Todas as filiais" };
+  const names = user.storeIds.map((id) => stores.find((s) => s.id === id)?.name ?? "Filial removida");
   if (names.length <= 2) return { text: names.join(", ") };
   return { text: `${names.length} filiais`, title: names.join(" · ") };
 }
@@ -190,7 +191,7 @@ export function SystemUsersPage() {
     header: "Filiais",
     hideBelow: "md",
     render: (u) => {
-      const l = storesLabel(u.storeIds, stores);
+      const l = storesLabel(u, stores);
       return (
         <span className="text-[13px] text-t1" title={l.title}>
           {l.text}
