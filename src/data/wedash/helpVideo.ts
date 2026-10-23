@@ -1,0 +1,466 @@
+/** Ajuda: biblioteca de vídeos, público e quem viu. */
+
+import type { Role } from "./team";
+import { getSupabase } from "@/lib/supabase";
+
+export type HelpAudience = "SELLER" | "MANAGER" | "OWNER";
+
+export const HELP_AUDIENCE_ORDER: HelpAudience[] = ["SELLER", "MANAGER", "OWNER"];
+
+export const HELP_AUDIENCE_LABEL: Record<HelpAudience, string> = {
+  SELLER: "Equipe",
+  MANAGER: "Gerentes",
+  OWNER: "Gestor",
+};
+
+export const HELP_VIDEO_MAX_BYTES = 200 * 1024 * 1024;
+export const HELP_VIDEO_MAX_MB = 200;
+export const HELP_TITLE_MAX = 120;
+export const HELP_DESCRIPTION_MAX = 2000;
+
+export const HELP_OFFLINE = "Não foi possível conectar à WDash. Verifique sua conexão e tente novamente.";
+export const HELP_LOAD_ERROR = "Não foi possível carregar os vídeos. Tente novamente.";
+export const HELP_SEND_ERROR = "Não foi possível enviar o vídeo. Tente novamente.";
+export const HELP_SAVE_ERROR = "Não foi possível salvar as alterações. Tente novamente.";
+export const HELP_DELETE_ERROR = "Não foi possível excluir o vídeo. Tente novamente.";
+const SESSION_EXPIRED = "Sua sessão expirou. Entre novamente.";
+
+const HELP_BUCKET = "help-videos";
+const HELP_URL_SECONDS = 4 * 60 * 60;
+const VIDEO_COLUMNS = "id, title, description, audiences, visible, storage_path, poster_path, duration_sec, created_at";
+
+export type HelpVideo = {
+  id: string;
+  title: string;
+  description: string;
+  audiences: HelpAudience[];
+  visible: boolean;
+  storagePath: string;
+  posterPath: string | null;
+  durationSec: number | null;
+  createdAt: string;
+};
+
+export type HelpPerson = {
+  identityId: string;
+  name: string;
+  role: Role;
+};
+
+export type HelpView = {
+  videoId: string;
+  identityId: string;
+  watchedAt: string;
+};
+
+export type HelpLibraryFilter = "all" | "visible" | "hidden";
+
+export type HelpDraftErrors = {
+  title?: string;
+  description?: string;
+  audiences?: string;
+  file?: string;
+};
+
+export function canManageHelp(role: Role): boolean {
+  return role === "OWNER" || role === "MANAGER" || role === "ADMIN_GLOBAL";
+}
+
+export function audienceOf(role: Role): HelpAudience {
+  if (role === "MANAGER") return "MANAGER";
+  if (role === "SELLER") return "SELLER";
+  return "OWNER";
+}
+
+export function helpPersonRoleLabel(role: Role): string {
+  if (role === "MANAGER") return "Gerente";
+  if (role === "SELLER") return "Equipe";
+  return "Gestor";
+}
+
+export function helpVideoContentType(file: { name: string; type: string }): string | null {
+  const name = file.name.toLowerCase();
+  const type = file.type.toLowerCase();
+  if (type === "video/mp4" || name.endsWith(".mp4") || name.endsWith(".m4v")) return "video/mp4";
+  if (type === "video/webm" || name.endsWith(".webm")) return "video/webm";
+  if (type === "video/quicktime" || type === "video/mov" || name.endsWith(".mov")) return "video/quicktime";
+  return null;
+}
+
+export function helpVideoFileError(file: { name: string; type: string; size: number }): string | null {
+  if (!helpVideoContentType(file)) return "Use um vídeo MP4, WEBM ou MOV.";
+  if (file.size <= 0) return "Esse arquivo está vazio.";
+  if (file.size > HELP_VIDEO_MAX_BYTES) return `O vídeo passa de ${HELP_VIDEO_MAX_MB} MB.`;
+  return null;
+}
+
+export function helpDraftErrors(draft: {
+  title: string;
+  description: string;
+  audiences: HelpAudience[];
+  file: { name: string; type: string; size: number } | null;
+  fileRequired: boolean;
+}): HelpDraftErrors {
+  const errors: HelpDraftErrors = {};
+  const title = draft.title.trim();
+  if (!title) errors.title = "Informe o título.";
+  else if (title.length > HELP_TITLE_MAX) errors.title = `O título passa de ${HELP_TITLE_MAX} caracteres.`;
+  if (draft.description.trim().length > HELP_DESCRIPTION_MAX) {
+    errors.description = "A descrição passa de 2.000 caracteres.";
+  }
+  if (draft.audiences.length === 0) errors.audiences = "Escolha quem pode ver o vídeo.";
+  if (draft.fileRequired && !draft.file) errors.file = "Escolha o vídeo.";
+  else if (draft.file) {
+    const fileError = helpVideoFileError(draft.file);
+    if (fileError) errors.file = fileError;
+  }
+  return errors;
+}
+
+export function hasHelpDraftError(errors: HelpDraftErrors): boolean {
+  return Boolean(errors.title || errors.description || errors.audiences || errors.file);
+}
+
+/** "3:15", "13:30" ou "1:02:03". */
+export function formatHelpDuration(seconds: number | null): string | null {
+  if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return null;
+  const total = Math.round(seconds);
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const rest = total % 60;
+  const pad = (value: number) => String(value).padStart(2, "0");
+  if (hours > 0) return `${hours}:${pad(minutes)}:${pad(rest)}`;
+  return `${minutes}:${pad(rest)}`;
+}
+
+export function formatWatchedLabel(at: Date, now: Date, timeZone = "America/Sao_Paulo"): string {
+  const clock = new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone,
+  }).format(at);
+  const day = new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone,
+  });
+  if (day.format(at) === day.format(now)) return `hoje às ${clock}`;
+  return `em ${day.format(at).slice(0, 5)} às ${clock}`;
+}
+
+export function helpObjectPaths(tenantId: string, videoId: string): { video: string; poster: string } {
+  return {
+    video: `${tenantId}/${videoId}/video`,
+    poster: `${tenantId}/${videoId}/poster.jpg`,
+  };
+}
+
+export function filterHelpVideos(
+  videos: HelpVideo[],
+  args: { query: string; filter: HelpLibraryFilter },
+): HelpVideo[] {
+  const query = args.query.trim().toLocaleLowerCase("pt-BR");
+  return videos.filter((video) => {
+    if (args.filter === "visible" && !video.visible) return false;
+    if (args.filter === "hidden" && video.visible) return false;
+    if (!query) return true;
+    const title = video.title.toLocaleLowerCase("pt-BR");
+    const description = video.description.toLocaleLowerCase("pt-BR");
+    return title.includes(query) || description.includes(query);
+  });
+}
+
+export type HelpWatchLine = {
+  identityId: string;
+  name: string;
+  role: Role;
+  watchedAt: string | null;
+};
+
+export function helpWatchLines(people: HelpPerson[], views: HelpView[], video: Pick<HelpVideo, "id" | "audiences">): HelpWatchLine[] {
+  const seen = new Map(
+    views.filter((view) => view.videoId === video.id).map((view) => [view.identityId, view.watchedAt]),
+  );
+  const allowed = new Set(video.audiences);
+  return people
+    .filter((person) => allowed.has(audienceOf(person.role)))
+    .map((person) => ({
+      identityId: person.identityId,
+      name: person.name,
+      role: person.role,
+      watchedAt: seen.get(person.identityId) ?? null,
+    }))
+    .sort((a, b) => {
+      if (a.watchedAt == null && b.watchedAt != null) return -1;
+      if (a.watchedAt != null && b.watchedAt == null) return 1;
+      if (a.watchedAt && b.watchedAt && a.watchedAt !== b.watchedAt) return b.watchedAt.localeCompare(a.watchedAt);
+      return a.name.localeCompare(b.name, "pt-BR");
+    });
+}
+
+export function helpWatchCount(lines: HelpWatchLine[]): { watched: number; total: number } {
+  return { watched: lines.filter((line) => line.watchedAt != null).length, total: lines.length };
+}
+
+export function helpWatchCountLabel(count: { watched: number; total: number }): string {
+  if (count.total === 0) return "Sem pessoas nesse público";
+  if (count.watched === 0) return "Ninguém viu";
+  if (count.watched === count.total) return count.total === 1 ? "1 pessoa viu" : "Todos viram";
+  return `${count.watched} de ${count.total} viram`;
+}
+
+type VideoRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  audiences: unknown;
+  visible: boolean;
+  storage_path: string;
+  poster_path: string | null;
+  duration_sec: number | null;
+  created_at: string;
+};
+
+function asAudiences(value: unknown): HelpAudience[] {
+  if (!Array.isArray(value)) return [];
+  const found = new Set(value.filter((item): item is HelpAudience => item === "SELLER" || item === "MANAGER" || item === "OWNER"));
+  return HELP_AUDIENCE_ORDER.filter((audience) => found.has(audience));
+}
+
+function asVideo(raw: VideoRow): HelpVideo {
+  return {
+    id: raw.id,
+    title: raw.title,
+    description: raw.description ?? "",
+    audiences: asAudiences(raw.audiences),
+    visible: raw.visible,
+    storagePath: raw.storage_path,
+    posterPath: raw.poster_path,
+    durationSec: raw.duration_sec,
+    createdAt: raw.created_at,
+  };
+}
+
+function failed(error: { message?: string; code?: string } | null, fallback: string): string {
+  const message = `${error?.message ?? ""} ${error?.code ?? ""}`.toLowerCase();
+  if (message.includes("jwt") || message.includes("session") || message.includes("pgrst301")) return SESSION_EXPIRED;
+  return fallback;
+}
+
+async function signedUrls(paths: string[]): Promise<Record<string, string>> {
+  const sb = getSupabase();
+  const unique = [...new Set(paths.filter(Boolean))];
+  if (!sb || unique.length === 0) return {};
+  const { data, error } = await sb.storage.from(HELP_BUCKET).createSignedUrls(unique, HELP_URL_SECONDS);
+  if (error || !data) return {};
+  const out: Record<string, string> = {};
+  for (const row of data) {
+    if (row.path && row.signedUrl) out[row.path] = row.signedUrl;
+  }
+  return out;
+}
+
+export async function listHelpLibrary(tenantId: string, manage: boolean): Promise<
+  | { ok: true; videos: HelpVideo[]; posters: Record<string, string>; people: HelpPerson[] | null; views: HelpView[] }
+  | { ok: false; error: string }
+> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, error: HELP_OFFLINE };
+  const { data, error } = await sb
+    .from("help_video")
+    .select(VIDEO_COLUMNS)
+    .eq("tenant_id", tenantId)
+    .order("created_at", { ascending: false });
+  if (error) return { ok: false, error: failed(error, HELP_LOAD_ERROR) };
+  const videos = ((data ?? []) as VideoRow[]).map(asVideo);
+  const posters = await signedUrls(videos.flatMap((video) => (video.posterPath ? [video.posterPath] : [])));
+  if (!manage) return { ok: true, videos, posters, people: null, views: [] };
+
+  const [peopleResult, viewsResult] = await Promise.all([
+    sb.rpc("help_audience", { p_tenant_id: tenantId }),
+    videos.length === 0
+      ? Promise.resolve({ data: [], error: null })
+      : sb.from("help_video_view").select("video_id, identity_id, watched_at").in(
+          "video_id",
+          videos.map((video) => video.id),
+        ),
+  ]);
+  const people = peopleResult.error ? null : asPeople(peopleResult.data);
+  const views = viewsResult.error ? [] : asViews(viewsResult.data);
+  return { ok: true, videos, posters, people, views };
+}
+
+export async function readHelpVideo(
+  tenantId: string,
+  videoId: string,
+  manage: boolean,
+): Promise<
+  | { ok: true; video: HelpVideo | null; videoUrl: string | null; posterUrl: string | null; people: HelpPerson[] | null; views: HelpView[] }
+  | { ok: false; error: string }
+> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, error: HELP_OFFLINE };
+  const { data, error } = await sb.from("help_video").select(VIDEO_COLUMNS).eq("tenant_id", tenantId).eq("id", videoId).maybeSingle();
+  if (error) return { ok: false, error: failed(error, HELP_LOAD_ERROR) };
+  if (!data) return { ok: true, video: null, videoUrl: null, posterUrl: null, people: null, views: [] };
+  const video = asVideo(data as VideoRow);
+  const urls = await signedUrls([video.storagePath, ...(video.posterPath ? [video.posterPath] : [])]);
+  if (!manage) {
+    return { ok: true, video, videoUrl: urls[video.storagePath] ?? null, posterUrl: video.posterPath ? (urls[video.posterPath] ?? null) : null, people: null, views: [] };
+  }
+  const [peopleResult, viewsResult] = await Promise.all([
+    sb.rpc("help_audience", { p_tenant_id: tenantId }),
+    sb.from("help_video_view").select("video_id, identity_id, watched_at").eq("video_id", video.id),
+  ]);
+  return {
+    ok: true,
+    video,
+    videoUrl: urls[video.storagePath] ?? null,
+    posterUrl: video.posterPath ? (urls[video.posterPath] ?? null) : null,
+    people: peopleResult.error ? null : asPeople(peopleResult.data),
+    views: viewsResult.error ? [] : asViews(viewsResult.data),
+  };
+}
+
+export async function createHelpVideo(args: {
+  tenantId: string;
+  title: string;
+  description: string;
+  audiences: HelpAudience[];
+  visible: boolean;
+  file: Blob;
+  contentType: string;
+  durationSec: number | null;
+  poster: Blob | null;
+}): Promise<{ ok: true; video: HelpVideo; posterUrl: string | null } | { ok: false; error: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, error: HELP_OFFLINE };
+  const id = crypto.randomUUID();
+  const paths = helpObjectPaths(args.tenantId, id);
+  const uploaded = await sb.storage.from(HELP_BUCKET).upload(paths.video, args.file, { contentType: args.contentType, upsert: false });
+  if (uploaded.error) {
+    console.warn("help video upload:", uploaded.error.message);
+    return { ok: false, error: failed(uploaded.error, HELP_SEND_ERROR) };
+  }
+  let posterPath: string | null = null;
+  if (args.poster) {
+    const poster = await sb.storage.from(HELP_BUCKET).upload(paths.poster, args.poster, { contentType: "image/jpeg", upsert: false });
+    if (!poster.error) posterPath = paths.poster;
+    else console.warn("help poster upload:", poster.error.message);
+  }
+  const { data, error } = await sb
+    .from("help_video")
+    .insert({
+      id,
+      tenant_id: args.tenantId,
+      title: args.title.trim(),
+      description: args.description.trim(),
+      audiences: args.audiences,
+      visible: args.visible,
+      storage_path: paths.video,
+      poster_path: posterPath,
+      duration_sec: args.durationSec,
+      mime_type: args.contentType,
+    })
+    .select(VIDEO_COLUMNS)
+    .single();
+  if (error || !data) {
+    console.warn("help video insert:", error?.message);
+    await sb.storage.from(HELP_BUCKET).remove([paths.video, ...(posterPath ? [posterPath] : [])]);
+    return { ok: false, error: failed(error, HELP_SEND_ERROR) };
+  }
+  const video = asVideo(data as VideoRow);
+  const urls = posterPath ? await signedUrls([posterPath]) : {};
+  return { ok: true, video, posterUrl: posterPath ? (urls[posterPath] ?? null) : null };
+}
+
+export async function updateHelpVideo(args: {
+  tenantId: string;
+  videoId: string;
+  title: string;
+  description: string;
+  audiences: HelpAudience[];
+  visible: boolean;
+}): Promise<{ ok: true; video: HelpVideo } | { ok: false; error: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, error: HELP_OFFLINE };
+  const { data, error } = await sb
+    .from("help_video")
+    .update({
+      title: args.title.trim(),
+      description: args.description.trim(),
+      audiences: args.audiences,
+      visible: args.visible,
+    })
+    .eq("tenant_id", args.tenantId)
+    .eq("id", args.videoId)
+    .select(VIDEO_COLUMNS)
+    .single();
+  if (error || !data) return { ok: false, error: failed(error, HELP_SAVE_ERROR) };
+  return { ok: true, video: asVideo(data as VideoRow) };
+}
+
+export async function setHelpVideoVisible(
+  tenantId: string,
+  videoId: string,
+  visible: boolean,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, error: HELP_OFFLINE };
+  const { error } = await sb.from("help_video").update({ visible }).eq("tenant_id", tenantId).eq("id", videoId);
+  if (error) return { ok: false, error: failed(error, HELP_SAVE_ERROR) };
+  return { ok: true };
+}
+
+export async function deleteHelpVideo(video: Pick<HelpVideo, "id" | "storagePath" | "posterPath">, tenantId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, error: HELP_OFFLINE };
+  const { error } = await sb.from("help_video").delete().eq("tenant_id", tenantId).eq("id", video.id);
+  if (error) return { ok: false, error: failed(error, HELP_DELETE_ERROR) };
+  const paths = [video.storagePath, ...(video.posterPath ? [video.posterPath] : [])];
+  const removed = await sb.storage.from(HELP_BUCKET).remove(paths);
+  if (removed.error) console.warn("help video remove:", removed.error.message);
+  return { ok: true };
+}
+
+export async function markHelpVideoWatched(videoId: string): Promise<void> {
+  const sb = getSupabase();
+  if (!sb) return;
+  const { error } = await sb.rpc("mark_help_video_watched", { p_video_id: videoId });
+  if (error) console.warn("help video watch:", error.message);
+}
+
+export async function listHelpViews(videoId: string): Promise<HelpView[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  const { data, error } = await sb.from("help_video_view").select("video_id, identity_id, watched_at").eq("video_id", videoId);
+  if (error || !data) return [];
+  return asViews(data);
+}
+
+function asPeople(raw: unknown): HelpPerson[] {
+  if (!Array.isArray(raw)) return [];
+  const people: HelpPerson[] = [];
+  for (const row of raw) {
+    if (!row || typeof row !== "object") continue;
+    const item = row as { identity_id?: unknown; name?: unknown; role?: unknown };
+    if (typeof item.identity_id !== "string" || typeof item.name !== "string") continue;
+    if (item.role !== "OWNER" && item.role !== "MANAGER" && item.role !== "SELLER" && item.role !== "ADMIN_GLOBAL") continue;
+    people.push({ identityId: item.identity_id, name: item.name, role: item.role });
+  }
+  return people;
+}
+
+function asViews(raw: unknown): HelpView[] {
+  if (!Array.isArray(raw)) return [];
+  const views: HelpView[] = [];
+  for (const row of raw) {
+    if (!row || typeof row !== "object") continue;
+    const item = row as { video_id?: unknown; identity_id?: unknown; watched_at?: unknown };
+    if (typeof item.video_id !== "string" || typeof item.identity_id !== "string" || typeof item.watched_at !== "string") continue;
+    views.push({ videoId: item.video_id, identityId: item.identity_id, watchedAt: item.watched_at });
+  }
+  return views;
+}

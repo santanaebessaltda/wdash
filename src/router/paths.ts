@@ -115,6 +115,9 @@ export const paths = {
     ranking: "/ranking",
   },
   profile: "/profile",
+  /** Biblioteca de vídeos. Gestor e gerente enviam; a equipe assiste o que for dela. */
+  help: "/help",
+  helpVideo: (id: string) => `/help/${id}`,
 
   /** URLs antigas em PT  -  so para redirects. */
   legacy: {
@@ -165,6 +168,7 @@ export const paths = {
       tv: "/ao-vivo/tv",
     },
     analytics: "/analise",
+    help: "/ajuda",
     settings: {
       root: "/configuracoes",
       challenges: "/configuracoes/desafios",
