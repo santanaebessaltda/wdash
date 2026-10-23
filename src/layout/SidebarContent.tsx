@@ -3,7 +3,7 @@ import { padBottom, padTop } from "@/lib/safeArea";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/cn";
 import { isNavGroup, type NavEntry } from "./nav-config";
-import { applyShoppingMenu, navForRole } from "./nav-wedash";
+import { applyShoppingMenu, helpMenu, navForRole } from "./nav-wedash";
 import { useShoppingMenu } from "./useShoppingMenu";
 import { WedashBrand } from "@/components/wedash/WedashBrand";
 import { searchForRoute } from "@/pages/dashboard/periodQuery";
@@ -36,6 +36,36 @@ function GroupIcon({ d }: { d: string }) {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
       <path d={d} />
     </svg>
+  );
+}
+
+function HelpMenuCard({ collapsed, to, active, onNavigate }: { collapsed: boolean; to: string; active: boolean; onNavigate?: () => void }) {
+  if (collapsed) {
+    return (
+      <div className="px-3.5 pb-3.5">
+        <NavLink to={to} onClick={onNavigate} title={helpMenu.label} aria-label={helpMenu.label} className={cn(linkBase, "justify-center", active && linkActive)}>
+          <GroupIcon d={helpMenu.icon} />
+        </NavLink>
+      </div>
+    );
+  }
+  return (
+    <div className="px-3.5 pb-3.5">
+      <NavLink
+        to={to}
+        onClick={onNavigate}
+        aria-label={`${helpMenu.label}. ${helpMenu.description}`}
+        className={cn("block rounded-2xl p-3.5 text-white", active && "ring-1 ring-white/25")}
+        style={{ background: "linear-gradient(180deg, #322a52 0%, #221c38 100%)" }}
+      >
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10">
+          <GroupIcon d={helpMenu.icon} />
+        </span>
+        <p className="mt-3 text-[14px] font-bold leading-tight">{helpMenu.label}</p>
+        <p className="mt-1 text-[12.5px] leading-snug text-white/70">{helpMenu.description}</p>
+        <span className="mt-3 flex h-9 w-full items-center justify-center rounded-[10px] bg-acc text-[13px] font-bold">{helpMenu.action}</span>
+      </NavLink>
+    </div>
   );
 }
 
@@ -115,6 +145,7 @@ export function SidebarContent({ collapsed = false, onNavigate }: { collapsed?: 
           );
         })}
       </nav>
+      <HelpMenuCard collapsed={collapsed} to={withSearch(helpMenu.to, search)} active={leafMatches(helpMenu.to, location.pathname)} onNavigate={onNavigate} />
     </div>
   );
 }

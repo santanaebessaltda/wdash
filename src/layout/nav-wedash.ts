@@ -68,9 +68,11 @@ const finance: NavGroup = {
   ],
 };
 
-/** Vídeos da empresa. Gestor e gerente enviam; todo mundo assiste o que for do seu papel. */
-const help: NavSingle = {
+/** Card no pé do menu, fora da lista. Gestor, gerente e equipe. */
+export const helpMenu = {
   label: "Ajuda",
+  description: "Vídeos de como usar a WDash",
+  action: "Assistir",
   icon: ICON.help,
   to: paths.help,
 };
@@ -146,7 +148,6 @@ const navOwner: NavEntry[] = [
   purchaseOrder,
   integrations,
   settings,
-  help,
 ];
 
 /** Gerente: sem a análise financeira do Dashboard, sem Integrações e sem Configurações. */
@@ -165,7 +166,6 @@ const navManager: NavEntry[] = [
   performance,
   finance,
   purchaseOrder,
-  help,
 ];
 
 /** Telas só do Gestor (análise financeira, Integrações, Configurações, ERP, Usuários, Logs). */
@@ -178,7 +178,6 @@ export function isOwner(role: Role): boolean {
 const sellerNav: NavEntry[] = [
   { label: "Início", icon: ICON.dashboard, to: paths.seller.home },
   { label: "Carteira", icon: ICON.wallet, to: paths.seller.wallet },
-  help,
 ];
 
 export function navForRole(role: Role): NavEntry[] {
