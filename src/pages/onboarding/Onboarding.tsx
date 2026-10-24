@@ -118,11 +118,11 @@ export function Onboarding() {
 
       <div
         className="relative hidden flex-col justify-center overflow-hidden p-12 lg:flex"
-        style={{ background: "linear-gradient(150deg,#0f2d54,#1b1650 55%,#14103a)" }}
+        style={{ background: "linear-gradient(150deg,#4a1234,#1a0a16 55%,#0c0e15)" }}
       >
         <div
           className="pointer-events-none absolute inset-0"
-          style={{ background: "radial-gradient(70% 60% at 25% 80%,rgba(86,168,255,.35),transparent 60%)" }}
+          style={{ background: "radial-gradient(70% 60% at 25% 80%,rgba(255,0,128,.42),transparent 60%), radial-gradient(50% 45% at 82% 12%,rgba(255,140,190,.28),transparent 62%)" }}
         />
         <div className="relative">
           <h2 className="mb-6 text-[26px] font-extrabold leading-[1.3] tracking-tight text-white">

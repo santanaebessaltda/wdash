@@ -360,7 +360,7 @@ export function PhotoField({
           onClick={escolher}
           aria-label={photo ? "Trocar foto de perfil" : "Adicionar foto de perfil"}
           className="flex h-[88px] w-[88px] items-center justify-center overflow-hidden rounded-[24px] text-[32px] font-extrabold text-white"
-          style={{ background: "linear-gradient(135deg,#7c5cff,#56a8ff)" }}
+          style={{ background: "linear-gradient(135deg,#ff5cad,#ff0080)" }}
         >
           {preview ? (
             <img src={preview} alt="" className="h-full w-full object-cover" />

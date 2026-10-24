@@ -16,14 +16,14 @@ function BoardFrame({ theme, children }: { theme: BoardTheme; children: ReactNod
   return (
     <div data-board-theme={theme} className={cn("tela-cheia relative overflow-hidden text-t0", dark ? "access-hero-scope" : "bg-bg-0")}>
       {dark ? (
-        <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: "linear-gradient(165deg,#1b1640,#0c0e15 70%)" }}>
+        <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: "linear-gradient(165deg,#3a1028,#0c0e15 70%)" }}>
           <div
             className="absolute -right-16 -top-20 h-[340px] w-[340px] rounded-full"
-            style={{ background: "radial-gradient(circle,rgba(124,92,255,.35),transparent 70%)" }}
+            style={{ background: "radial-gradient(circle,rgba(255,0,128,.42),transparent 70%)" }}
           />
           <div
             className="absolute -bottom-24 -left-10 h-[300px] w-[300px] rounded-full"
-            style={{ background: "radial-gradient(circle,rgba(86,168,255,.22),transparent 70%)" }}
+            style={{ background: "radial-gradient(circle,rgba(255,140,190,.28),transparent 70%)" }}
           />
         </div>
       ) : null}

@@ -56,7 +56,7 @@ function HelpMenuCard({ collapsed, to, active, onNavigate }: { collapsed: boolea
         onClick={onNavigate}
         aria-label={`${helpMenu.label}. ${helpMenu.description}`}
         className={cn("block rounded-2xl p-3.5 text-white", active && "ring-1 ring-white/25")}
-        style={{ background: "linear-gradient(180deg, #322a52 0%, #221c38 100%)" }}
+        style={{ background: "linear-gradient(180deg, #6b1a48 0%, #2c1020 100%)" }}
       >
         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10">
           <GroupIcon d={helpMenu.icon} />

@@ -2,12 +2,12 @@ import { useState } from "react";
 import { cn } from "@/lib/cn";
 
 const GRADIENTS = [
-  "linear-gradient(135deg,#7c5cff,#56a8ff)",
+  "linear-gradient(135deg,#ff5cad,#ff0080)",
   "linear-gradient(135deg,#33d493,#56a8ff)",
   "linear-gradient(135deg,#f7b84e,#f76d7d)",
-  "linear-gradient(135deg,#9d86ff,#7c5cff)",
+  "linear-gradient(135deg,#ffb3d6,#ff0080)",
   "linear-gradient(135deg,#56a8ff,#33d493)",
-  "linear-gradient(135deg,#f76d7d,#9d86ff)",
+  "linear-gradient(135deg,#f76d7d,#ff5cad)",
 ];
 
 function hashString(s: string) {

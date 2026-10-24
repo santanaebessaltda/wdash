@@ -2,7 +2,7 @@ export function Heatmap({
   rows,
   cols,
   data,
-  color = "124,92,255",
+  color = "255,0,128",
   formatValue = (v: number) => String(v),
   rowMinWidth = 72,
 }: {

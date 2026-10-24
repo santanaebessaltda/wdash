@@ -15,9 +15,9 @@ export function BrandMark({ size = 34, light: _light = false }: { size?: number;
       <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <linearGradient id={gradId} x1="4" y1="4" x2="36" y2="36" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stopColor="#B01CFF" />
-            <stop offset="0.5" stopColor="#7A3FFF" />
-            <stop offset="1" stopColor="#2C9CFF" />
+            <stop offset="0" stopColor="#ff8ec4" />
+            <stop offset="0.5" stopColor="#ff0080" />
+            <stop offset="1" stopColor="#c40062" />
           </linearGradient>
         </defs>
         <rect width="40" height="40" rx="10" fill={`url(#${gradId})`} />
@@ -98,7 +98,7 @@ export function AuthGlow() {
       className="pointer-events-none absolute inset-0"
       style={{
         background:
-          "radial-gradient(50% 50% at 50% 40%,rgba(124,92,255,.14),transparent 70%)",
+          "radial-gradient(50% 50% at 50% 40%,rgba(255,0,128,.16),transparent 70%)",
       }}
     />
   );

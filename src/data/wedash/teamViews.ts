@@ -553,7 +553,7 @@ const COLOR_ICON_CHALLENGE: Record<string, string> = {
 const COLOR_ICON_KIND: Record<Challenge["kind"], string> = {
   product: "var(--acc)",
   quantity: "var(--warn)",
-  revenue: "#9d86ff",
+  revenue: "var(--acc-2)",
   pa: "var(--info)",
   ticket: "var(--ok)",
 };
