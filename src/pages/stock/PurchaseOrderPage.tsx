@@ -134,6 +134,26 @@ const TONE_BORDER: Record<Exclude<PurchaseOrderTone, null>, string> = {
   warn: "border-l-warn",
 };
 
+const TONE_LEGEND: Array<{ tone: Exclude<PurchaseOrderTone, null>; label: string; hint: string }> = [
+  { tone: "bad", label: "Sem estoque", hint: "total zero ou negativo" },
+  { tone: "warn", label: "Abaixo do alvo", hint: "ainda há saldo" },
+];
+
+/** A barra da linha: vermelho = total zero ou negativo; amarelo = ainda há saldo, abaixo do alvo. */
+function ToneLegend() {
+  return (
+    <ul className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+      {TONE_LEGEND.map((item) => (
+        <li key={item.tone} className="inline-flex items-center gap-1.5 text-[12px] text-t1">
+          <span className={cn("h-3.5 w-1 rounded-full", item.tone === "bad" ? "bg-bad" : "bg-warn")} aria-hidden />
+          <span className="font-semibold">{item.label}</span>
+          <span className="text-t2">{item.hint}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function Chevron({ open }: { open: boolean }) {
   return (
     <svg viewBox="0 0 24 24" className={cn("h-3.5 w-3.5 shrink-0 transition-transform", open && "rotate-90")} fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
@@ -498,16 +518,19 @@ export function PurchaseOrderPage() {
         </Card>
       ) : (
         <Card className="flex min-w-0 flex-col overflow-hidden">
-          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-            <span className="inline-flex items-center gap-1.5">
-              <CardTitle>Produtos</CardTitle>
-              <TipHelp label="Novo: produto cadastrado no Millennium há menos de 30 dias ou que a filial ainda não vendeu. A segunda regra só é usada quando há histórico suficiente desde a inauguração ou dos últimos 12 meses. Produtos bloqueados para compra não aparecem." />
-            </span>
-            {anyRows && (
-              <span className="text-[12.5px] font-semibold text-t1">
-                {num(summary.products)} produto{summary.products === 1 ? "" : "s"} · {num(summary.items)} ite{summary.items === 1 ? "m" : "ns"} no pedido
+          <div className="mb-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <span className="inline-flex items-center gap-1.5">
+                <CardTitle>Produtos</CardTitle>
+                <TipHelp label="Novo: produto cadastrado no Millennium há menos de 30 dias ou que a filial ainda não vendeu. A segunda regra só é usada quando há histórico suficiente desde a inauguração ou dos últimos 12 meses. Produtos bloqueados para compra não aparecem." />
               </span>
-            )}
+              {anyRows && (
+                <span className="text-[12.5px] font-semibold text-t1">
+                  {num(summary.products)} produto{summary.products === 1 ? "" : "s"} · {num(summary.items)} ite{summary.items === 1 ? "m" : "ns"} no pedido
+                </span>
+              )}
+            </div>
+            {anyRows && <ToneLegend />}
           </div>
           {lines.length === 0 ? (
             <div className="flex flex-1">
