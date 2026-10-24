@@ -1,42 +1,17 @@
 import type { ReactNode, InputHTMLAttributes } from "react";
-import { useId } from "react";
 
-/** Marca WDash  -  quadrado com gradiente + "W" na fonte do tema. */
+/** Marca WDash — o arquivo public/logo.png. */
 export function BrandMark({ size = 34, light: _light = false }: { size?: number; light?: boolean }) {
-  const uid = useId().replace(/:/g, "");
-  const gradId = `wedashGradient-${uid}`;
-
   return (
-    <span
-      className="flex shrink-0 items-center justify-center overflow-hidden rounded-[10px]"
+    <img
+      src="/logo.png"
+      alt=""
+      width={size}
+      height={size}
+      draggable={false}
+      className="block shrink-0 select-none"
       style={{ width: size, height: size }}
-      aria-hidden
-    >
-      <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <linearGradient id={gradId} x1="4" y1="4" x2="36" y2="36" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stopColor="#ff8ec4" />
-            <stop offset="0.5" stopColor="#ff0080" />
-            <stop offset="1" stopColor="#c40062" />
-          </linearGradient>
-        </defs>
-        <rect width="40" height="40" rx="10" fill={`url(#${gradId})`} />
-        <text
-          x="20"
-          y="27"
-          textAnchor="middle"
-          fill="#FFFFFF"
-          style={{
-            fontFamily: "var(--font-sans)",
-            fontSize: 22,
-            fontWeight: 800,
-            letterSpacing: "-0.04em",
-          }}
-        >
-          W
-        </text>
-      </svg>
-    </span>
+    />
   );
 }
 

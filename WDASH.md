@@ -11,7 +11,7 @@ As regras de cada feature ficam **neste arquivo**. A pasta `.specs` saiu: as spe
 Arquivo, pasta, função, tipo, variável, constante, serviço, chave de objeto e rota canônica são em inglês. Comentário pode ser em português. A frase que a pessoa lê na tela continua em português. Não traduzir WEPINK, WPINK nem coluna, tabela ou valor já gravado no banco. Endereço antigo em português só redireciona para a rota em inglês.
 
 ### Nome WDash (DECIDIDO — 2026-10-04)
-- O nome visível do produto é **WDash** (W e D maiúsculos): sidebar, login, onboarding, telas de acesso, aba do navegador, app instalado, PDF e e-mails. `PRODUCT_NAME` em `src/data/wedash/tenant.ts`. O símbolo é a letra **W**.
+- O nome visível do produto é **WDash** (W e D maiúsculos): sidebar, login, onboarding, telas de acesso, aba do navegador, app instalado, PDF e e-mails. `PRODUCT_NAME` em `src/data/wedash/tenant.ts`. O símbolo é `public/logo.png` (W rosa). Favicon, ícones do PWA (`public/icons/*-v4.png`) e a marca nas telas (`BrandMark`) usam esse arquivo. A URL do ícone leva `v4` de propósito: o Chrome trata o endereço antigo como imutável e, sem a troca, quem já salvou o app não recebe o ícone novo. No iPhone, o ícone da Tela de Início só muda se a pessoa remover o app e adicionar de novo.
 - Código, pastas, rotas e banco continuam `wedash` (`WedashBrand`, `src/data/wedash/`). Endereço previsto: `wdash.app`.
 
 ### Publicação (DECIDIDO — 2026-10-07)
