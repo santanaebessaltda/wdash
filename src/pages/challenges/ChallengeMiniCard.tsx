@@ -334,11 +334,26 @@ export function ChallengeSummary({
   const headcount = `${count} ${count === 1 ? "pessoa" : "pessoas"}`;
   const note = upcoming ? headcount : [rule, headcount].filter(Boolean).join(" · ");
 
+  const management = view.management;
+  const managerWon =
+    management == null || view.status === "upcoming"
+      ? null
+      : management.atingiu
+        ? "Gerência ganhou"
+        : view.status === "ended"
+          ? "Gerência não ganhou"
+          : null;
+
   return (
     <>
       <div className="mt-3.5">
         <ChallengeProgress challenge={c} view={view} />
       </div>
+      {managerWon ? (
+        <p className="mt-2">
+          <ProgressStanding ok={management?.atingiu === true}>{managerWon}</ProgressStanding>
+        </p>
+      ) : null}
       <div className="flex-1" />
       <div className="mt-4 flex items-center justify-between gap-3">
         <p className="min-w-0 text-[12px] text-t2">{note}</p>

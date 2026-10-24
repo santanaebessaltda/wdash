@@ -15,6 +15,7 @@ import { GOAL_STATUS_LABEL, goalStatus, outsideRankingNote } from "@/data/wedash
 import { BranchBadge, DeadlineBadge, PeriodBadge, RecordStatusBadge, UnidentifiedSalesBadge } from "@/components/wedash/RecordBadges";
 import { defaultTiers } from "@/data/wedash/goals";
 import { calendarTodayIso, TODAY_ISO } from "@/data/wedash/clock";
+import { TargetIcon } from "@/pages/dashboards/icons";
 import { cn } from "@/lib/cn";
 
 const TipHelp = ({ label }: { label: string }) => (
@@ -571,7 +572,9 @@ export function GoalCard({
   /** Clique no resumo abre o detalhe. A escada não navega. */
   onOpen?: () => void;
 }) {
-  const statusLabel = GOAL_STATUS_LABEL[goalStatus({ startsOn: card.band.start, endsOn: card.band.end }, todayIso ?? calendarTodayIso())];
+  const status = goalStatus({ startsOn: card.band.start, endsOn: card.band.end }, todayIso ?? calendarTodayIso());
+  const statusLabel = GOAL_STATUS_LABEL[status];
+  const ended = status === "ended";
   const counts = [
     card.qtyGroups > 0 ? `${card.qtyGroups} ${card.qtyGroups === 1 ? "grupo" : "grupos"}` : null,
     `${card.qtySellers} na equipe`,
@@ -581,22 +584,34 @@ export function GoalCard({
     .join(" · ");
   const summary = (
     <>
-      <div className="flex items-start justify-between gap-2">
-        <CardTitle>{card.name}</CardTitle>
-        <RecordStatusBadge label={statusLabel} />
-      </div>
+      <div className="flex items-start gap-3.5">
+        <span
+          className={cn(
+            "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+            ended ? "bg-bg-3 text-t2" : "bg-acc-soft text-acc",
+          )}
+        >
+          <TargetIcon size={18} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <CardTitle>{card.name}</CardTitle>
+            <RecordStatusBadge label={statusLabel} />
+          </div>
 
-      <div className="mt-2.5 flex flex-wrap gap-1.5">
-        <PeriodBadge from={card.band.start} to={card.band.end} />
-        <BranchBadge name={card.storeNameValue} />
-        {card.spreadsUnidentified ? <UnidentifiedSalesBadge /> : null}
-        {card.brands.map((brand) => (
-          <Badge key={brand} variant="neutral" className="uppercase">
-            {brand}
-          </Badge>
-        ))}
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <PeriodBadge from={card.band.start} to={card.band.end} />
+            <BranchBadge name={card.storeNameValue} />
+            {card.spreadsUnidentified ? <UnidentifiedSalesBadge /> : null}
+            {card.brands.map((brand) => (
+              <Badge key={brand} variant="neutral" className="uppercase">
+                {brand}
+              </Badge>
+            ))}
+          </div>
+          <p className="mt-1.5 text-[12px] text-t2">{counts}</p>
+        </div>
       </div>
-      <p className="mt-1.5 text-[12px] text-t2">{counts}</p>
 
       <div className="mt-4">
         <GoalProgressBar
