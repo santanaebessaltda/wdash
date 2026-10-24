@@ -258,20 +258,20 @@ function BoardGoalCard({ board, pulse }: { board: GoalBoard; pulse: boolean }) {
         </div>
       </div>
       <div className="mt-1.5 flex items-end justify-between gap-3">
-        <p className="font-mono text-[22px] font-extrabold leading-none tabular-nums text-t0 sm:text-[26px]">{brlCent(summary.achieved)}</p>
+        <p className="font-mono text-[22px] font-extrabold leading-none tabular-nums text-t0 sm:text-[26px]" data-secret="">{brlCent(summary.achieved)}</p>
         <div className="text-right">
-          <p className={`font-mono text-[22px] font-extrabold leading-none tabular-nums sm:text-[26px] ${progressTextClass(summary.pct)}`}>{num(summary.pct, 1)}%</p>
-          <p className="mt-0.5 text-[12px] text-t2">de {brlCent(goal.target)}</p>
+          <p className={`font-mono text-[22px] font-extrabold leading-none tabular-nums sm:text-[26px] ${progressTextClass(summary.pct)}`} data-secret="">{num(summary.pct, 1)}%</p>
+          <p className="mt-0.5 text-[12px] text-t2">de <span data-secret="">{brlCent(goal.target)}</span></p>
         </div>
       </div>
       <div className="mt-1.5">
-        <GlobalGoalBand goal={card.band} tiers={card.tiers} embedded soBarra hideOutsideNote highlightCurrent enter pulseCurrent={pulse} />
+          <GlobalGoalBand goal={card.band} tiers={card.tiers} embedded soBarra hideOutsideNote highlightCurrent enter pulseCurrent={pulse} secret />
       </div>
       <div className="mt-1 flex items-center justify-between gap-2">
         <p className="min-w-0 truncate text-[12px] leading-snug text-t2">
-          {currentLevel ? <span className="font-bold text-acc">{currentLevel}</span> : null}
+          {currentLevel ? <span className="font-bold text-acc" data-secret="">{currentLevel}</span> : null}
           {currentLevel && summary.projectedPct != null ? <span className="mx-1.5 text-t3">·</span> : null}
-          {summary.projectedPct != null ? <span className="font-semibold text-t1">Projeção {num(summary.projectedPct, 0)}%</span> : null}
+          {summary.projectedPct != null ? <span className="font-semibold text-t1" data-secret="">Projeção {num(summary.projectedPct, 0)}%</span> : null}
           {(currentLevel || summary.projectedPct != null) ? <span className="mx-1.5 text-t3">·</span> : null}
           <span>{prazoRemaining(summary.daysRemaining)}</span>
         </p>
@@ -307,8 +307,28 @@ function WinBadge({ count }: { count: number }) {
   return (
     <span className="absolute -bottom-1 left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-0.5 rounded-full border border-line bg-bg-2 px-1 py-px text-[9px] font-bold leading-none text-t0">
       <span aria-hidden>🏆</span>
-      {count}
+      <span data-secret="">{count}</span>
     </span>
+  );
+}
+
+function EyeOpenIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function EyeShutIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+      <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+      <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
   );
 }
 
@@ -343,6 +363,7 @@ export function BoardView({
   const [challengeSlot, setChallengeSlot] = useState(0);
   const [challengeOn, setChallengeOn] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
+  const [peek, setPeek] = useState(false);
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -642,8 +663,8 @@ export function BoardView({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-1.5 overflow-x-hidden overflow-y-auto p-3 sm:p-4 xl:overflow-y-hidden">
-      <style>{`@keyframes board-pop{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:none}}@keyframes board-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}@keyframes board-breathe{0%,100%{box-shadow:0 0 0 3px #f7b84e,0 0 14px rgba(247,184,78,.28)}50%{box-shadow:0 0 0 3px #f7b84e,0 0 26px rgba(247,184,78,.5)}}@keyframes board-pin{0%,100%{filter:none}50%{filter:brightness(1.55)}}.board-in{animation:board-in .7s ease both}.board-breathe{animation:board-breathe 4.8s ease-in-out infinite}.board-pin{animation:board-pin .7s ease-in-out 2}@media (prefers-reduced-motion:reduce){.board-in,.board-breathe,.board-pin{animation:none}}`}</style>
+    <div className={cn("flex h-full min-h-0 flex-col gap-4 overflow-x-hidden overflow-y-auto p-3 sm:p-4 xl:overflow-y-hidden", !peek && "board-secret")}>
+      <style>{`@keyframes board-pop{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:none}}@keyframes board-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}@keyframes board-breathe{0%,100%{box-shadow:0 0 0 3px #f7b84e,0 0 14px rgba(247,184,78,.28)}50%{box-shadow:0 0 0 3px #f7b84e,0 0 26px rgba(247,184,78,.5)}}@keyframes board-pin{0%,100%{filter:none}50%{filter:brightness(1.55)}}.board-in{animation:board-in .7s ease both}.board-breathe{animation:board-breathe 4.8s ease-in-out infinite}.board-pin{animation:board-pin .7s ease-in-out 2}.board-secret [data-secret]{filter:blur(8px);user-select:none;-webkit-user-select:none}@media (prefers-reduced-motion:reduce){.board-in,.board-breathe,.board-pin{animation:none}}`}</style>
       <header className="board-in flex shrink-0 items-center justify-between gap-3">
         <div className="min-w-0">
           <h1 className="truncate text-[20px] font-extrabold leading-tight tracking-tight text-t0 sm:text-[22px]">{headline}</h1>
@@ -654,6 +675,36 @@ export function BoardView({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
+          <button
+            type="button"
+            className={cn(
+              "inline-flex h-8 w-8 touch-none items-center justify-center rounded-[9px] border transition-colors select-none",
+              peek ? "border-acc bg-acc-soft text-acc" : "border-line text-t1 hover:border-acc",
+            )}
+            aria-pressed={peek}
+            aria-label="Segure para mostrar os valores"
+            title="Segure para mostrar os valores"
+            onPointerDown={(event) => {
+              if (event.pointerType === "mouse" && event.button !== 0) return;
+              event.currentTarget.setPointerCapture(event.pointerId);
+              setPeek(true);
+            }}
+            onPointerUp={() => setPeek(false)}
+            onPointerCancel={() => setPeek(false)}
+            onLostPointerCapture={() => setPeek(false)}
+            onContextMenu={(event) => event.preventDefault()}
+            onKeyDown={(event) => {
+              if (event.key !== " " && event.key !== "Enter") return;
+              event.preventDefault();
+              setPeek(true);
+            }}
+            onKeyUp={(event) => {
+              if (event.key === " " || event.key === "Enter") setPeek(false);
+            }}
+            onBlur={() => setPeek(false)}
+          >
+            {peek ? <EyeOpenIcon /> : <EyeShutIcon />}
+          </button>
           <BoardThemeSwitch />
           <button
             type="button"
@@ -681,12 +732,13 @@ export function BoardView({
         </div>
       </header>
 
-      <div className="board-in grid shrink-0 grid-cols-2 gap-1.5 xl:grid-cols-4" style={{ animationDelay: "70ms" }}>
-        <StatCard dense glass label="Faturamento" value={brlCent(monthRevenue)} sub={`Hoje ${brlCent(todayTotals.revenue)}`} icon={<IconRevenue />} iconColor="var(--acc)" iconBg="var(--acc-soft)" />
-        <StatCard dense glass label="Vendas" value={num(month.sales)} sub={`Hoje ${num(todayTotals.sales)}`} icon={<IconSales />} iconColor="var(--ok)" iconBg="var(--ok-soft)" />
+      <div className="board-in grid shrink-0 grid-cols-2 gap-4 xl:grid-cols-4" style={{ animationDelay: "70ms" }}>
+        <StatCard dense glass secret label="Faturamento" value={brlCent(monthRevenue)} sub={<>Hoje <span data-secret="">{brlCent(todayTotals.revenue)}</span></>} icon={<IconRevenue />} iconColor="var(--acc)" iconBg="var(--acc-soft)" />
+        <StatCard dense glass secret label="Vendas" value={num(month.sales)} sub={<>Hoje <span data-secret="">{num(todayTotals.sales)}</span></>} icon={<IconSales />} iconColor="var(--ok)" iconBg="var(--ok-soft)" />
         <StatCard
           dense
           glass
+          secret
           label="Meta"
           value={activeGoal ? brlCent(activeGoal.goal.target) : "—"}
           sub={activeGoal ? activeGoal.card.name : "Não configurada"}
@@ -697,6 +749,7 @@ export function BoardView({
         <StatCard
           dense
           glass
+          secret
           label="Progresso da meta"
           value={activeGoal ? `${num(activeGoal.summary.pct, 1)}%` : "—"}
           sub={
@@ -726,7 +779,7 @@ export function BoardView({
 
       <div
         className={cn(
-          "board-in grid min-h-0 flex-1 gap-1.5",
+          "board-in grid min-h-0 flex-1 gap-4",
           challengeCard
             ? "grid-rows-[minmax(0,1.15fr)_minmax(0,0.85fr)] xl:grid-cols-[minmax(0,65fr)_minmax(220px,35fr)] xl:grid-rows-[minmax(0,1fr)]"
             : "grid-rows-[minmax(0,1fr)]",
@@ -745,7 +798,7 @@ export function BoardView({
           ) : (
             <>
               <div className="shrink-0">
-                <RankingBlock ranking={podium} formatAmount={brlCent} spotlight literalName motion flashId={lingerKey} />
+                <RankingBlock ranking={podium} formatAmount={brlCent} spotlight literalName motion flashId={lingerKey} secret />
               </div>
               {(view?.people.length ?? 0) > 3 && (
                 <div className="mt-1 min-h-0 flex-1 overflow-y-auto">
@@ -807,9 +860,9 @@ export function BoardView({
                                   <span className="min-w-0 truncate text-[12.5px] font-bold text-t0">{person.name}</span>
                                 </span>
                               </td>
-                              <td className="py-1 pr-2 text-right font-mono text-[12.5px] font-bold tabular-nums text-t0">{num(person.sales)}</td>
+                              <td className="py-1 pr-2 text-right font-mono text-[12.5px] font-bold tabular-nums text-t0" data-secret="">{num(person.sales)}</td>
                               <td className="py-1 pr-2 text-right">
-                                <span className="block font-mono text-[12.5px] font-extrabold tabular-nums text-t0">{pct ?? "—"}</span>
+                                <span className="block font-mono text-[12.5px] font-extrabold tabular-nums text-t0" data-secret="">{pct ?? "—"}</span>
                                 {level ? <span className="block text-[11px] text-t2">{level.levelLabel ?? "Sem nível"}</span> : null}
                               </td>
                               <td className="py-1 pr-2 text-right">
@@ -819,12 +872,12 @@ export function BoardView({
                                   <span className="text-t2">—</span>
                                 ) : (
                                   <>
-                                    <span className="block font-mono text-[12px] font-bold tabular-nums text-t0">{brlCent(level.gap)}</span>
+                                    <span className="block font-mono text-[12px] font-bold tabular-nums text-t0" data-secret="">{brlCent(level.gap)}</span>
                                     {level.nextName ? <span className="block text-[11px] text-t2">para {level.nextName}</span> : null}
                                   </>
                                 )}
                               </td>
-                              <td className="py-1 text-right font-mono text-[12.5px] font-bold tabular-nums text-t0">{brlCent(person.revenue)}</td>
+                              <td className="py-1 text-right font-mono text-[12.5px] font-bold tabular-nums text-t0" data-secret="">{brlCent(person.revenue)}</td>
                             </tr>
                           );
                         })}
@@ -844,6 +897,7 @@ export function BoardView({
               prominent
               showPeople
               floor
+              secret
               counter={challenges.length > 1 ? `${(challengeSlot % challenges.length) + 1} / ${challenges.length}` : null}
               hotKey={current?.kind === "challenge" ? current.key : null}
             />

@@ -43,12 +43,12 @@ const PODIO_SLOT: Record<1 | 2 | 3, { left: string; width: string }> = {
   3: { left: "67%", width: "33%" },
 };
 
-function WinsMark({ count }: { count?: number }) {
+function WinsMark({ count, secret = false }: { count?: number; secret?: boolean }) {
   if (!count || count <= 0) return null;
   return (
     <span className="absolute -bottom-1 left-1/2 z-20 inline-flex -translate-x-1/2 items-center gap-0.5 rounded-full border border-line bg-bg-2 px-1.5 py-px text-[10px] font-bold leading-none text-t0">
       <span aria-hidden>🏆</span>
-      {count}
+      <span {...(secret ? { "data-secret": "" } : {})}>{count}</span>
     </span>
   );
 }
@@ -83,6 +83,7 @@ export function RankingBlock({
   literalName = false,
   motion = false,
   flashId = null,
+  secret = false,
 }: {
   ranking: RankingRow[];
   formatAmount?: (v: number) => string;
@@ -95,6 +96,8 @@ export function RankingBlock({
   motion?: boolean;
   /** A pessoa pisca depois da comemoração. Só o placar externo. */
   flashId?: string | null;
+  /** Borra faturamento, vendas e o que falta. Só o placar externo. */
+  secret?: boolean;
 }) {
   if (ranking.length === 0) {
     return (
@@ -195,7 +198,7 @@ export function RankingBlock({
                 <PersonAvatar size={isOuro ? "2xl" : "xl"} name={l.avatarName ?? l.name} employeeId={l.employeeId} storeId={l.storeId} />
               </span>
               <MedalhaBadge pos={pos} />
-              <WinsMark count={l.wins} />
+              <WinsMark count={l.wins} secret={secret} />
             </div>
 
             <p className={cn("max-w-full truncate font-bold text-t0", motion && isOuro ? "text-[15px] sm:text-[16px]" : "text-[13px] sm:text-[14px]")}>
@@ -206,15 +209,16 @@ export function RankingBlock({
               <p
                 className={cn("mt-0.5 font-mono font-extrabold leading-none tabular-nums", motion && isOuro ? "text-[20px] sm:text-[22px]" : "text-[17px] sm:text-[18px]")}
                 style={{ color: PODIO_VALOR[pos] }}
+                {...(secret ? { "data-secret": "" } : {})}
               >
                 {formatAmount(l.revenue)}
               </p>
             ) : null}
-            <p className={cn("mt-0.5 text-[11px]", spotlight ? "font-medium text-t3" : "font-semibold text-t2")}>
+            <p className={cn("mt-0.5 text-[11px]", spotlight ? "font-medium text-t3" : "font-semibold text-t2")} {...(secret ? { "data-secret": "" } : {})}>
               {num(l.sales)} {l.sales === 1 ? "venda" : "vendas"}
             </p>
             {spotlight ? null : (
-              <p className="mt-0.5 font-mono text-[13px] font-extrabold tabular-nums sm:text-[14px]" style={{ color: medal.color }}>
+              <p className="mt-0.5 font-mono text-[13px] font-extrabold tabular-nums sm:text-[14px]" style={{ color: medal.color }} {...(secret ? { "data-secret": "" } : {})}>
                 {formatAmount(l.revenue)}
               </p>
             )}
@@ -223,7 +227,7 @@ export function RankingBlock({
                 <Badge variant="accent">{l.note}</Badge>
               </span>
             ) : null}
-            {l.gap ? <p className="mt-1 max-w-full text-[11px] font-semibold leading-tight text-t1">{l.gap}</p> : null}
+            {l.gap ? <p className="mt-1 max-w-full text-[11px] font-semibold leading-tight text-t1" {...(secret ? { "data-secret": "" } : {})}>{l.gap}</p> : null}
 
             <div
               className={cn(

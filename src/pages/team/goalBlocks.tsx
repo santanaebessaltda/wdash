@@ -505,6 +505,7 @@ export function GlobalGoalBand({
   highlightCurrent = false,
   enter = false,
   pulseCurrent = false,
+  secret = false,
 }: {
   goal: NetworkGlobalGoal;
   embedded?: boolean;
@@ -518,6 +519,8 @@ export function GlobalGoalBand({
   enter?: boolean;
   /** O pino do nível atual pulsa durante a celebração. */
   pulseCurrent?: boolean;
+  /** Borra o percentual de premiação de cada nível. Só o placar. */
+  secret?: boolean;
   /** Quando o título da meta já está no CardMeta. */
   hideTitle?: boolean;
   /** Degraus desta meta (default = escada padrão). */
@@ -678,7 +681,7 @@ export function GlobalGoalBand({
                       title={`N${i + 1} · ${d.name} · ${num(d.commissionPct, 1)}%`}
                     >
                       N{i + 1} · {shortLabel}
-                      <span className="font-semibold opacity-75"> ({num(d.commissionPct, 1)}%)</span>
+                      <span className="font-semibold opacity-75" {...(secret ? { "data-secret": "" } : {})}> ({num(d.commissionPct, 1)}%)</span>
                     </p>
                   );
                 })}

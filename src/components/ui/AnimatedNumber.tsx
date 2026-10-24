@@ -56,12 +56,15 @@ export function AnimatedNumber({
   duration = 1100,
   once = false,
   className,
+  secret = false,
 }: {
   value: string | number;
   duration?: number;
   /** Conta só na primeira vez. Nas seguintes, o número troca direto. */
   once?: boolean;
   className?: string;
+  /** O placar borra este número até segurarem o olho. */
+  secret?: boolean;
 }) {
   const parsed = parse(value);
   const played = useRef(false);
@@ -89,7 +92,11 @@ export function AnimatedNumber({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, duration, once]);
 
-  return <span className={className}>{display}</span>;
+  return (
+    <span className={className} {...(secret ? { "data-secret": "" } : {})}>
+      {display}
+    </span>
+  );
 }
 
 function format(p: Parsed, n: number): string {

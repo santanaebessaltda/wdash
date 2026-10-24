@@ -19,6 +19,7 @@ export function ChallengeMiniCard({
   hotKey = null,
   floor = false,
   counter = null,
+  secret = false,
 }: {
   challenge: ChallengeRecord;
   view: ChallengeView;
@@ -34,6 +35,8 @@ export function ChallengeMiniCard({
   floor?: boolean;
   /** "1 / 3" quando o placar reveza os desafios. */
   counter?: string | null;
+  /** Borra prêmio, resultado e percentual. Só o placar. */
+  secret?: boolean;
 }) {
   const prize = mainPrizeLabel(c);
   const ended = view.status === "ended";
@@ -75,13 +78,13 @@ export function ChallengeMiniCard({
                     <span className="shrink-0 text-warn">
                       <TrophyIcon size={14} />
                     </span>
-                    <span className="truncate">{prize}</span>
+                    <span className="truncate" {...(secret ? { "data-secret": "" } : {})}>{prize}</span>
                   </span>
                 ) : null}
-                {minimum ? <span className="font-medium text-t2">{minimum}</span> : null}
+                {minimum ? <span className="font-medium text-t2" {...(secret ? { "data-secret": "" } : {})}>{minimum}</span> : null}
               </p>
             ) : null}
-            {wonLine ? <p className="mt-1 text-[13px] font-semibold text-t1">{wonLine}</p> : null}
+            {wonLine ? <p className="mt-1 text-[13px] font-semibold text-t1" {...(secret ? { "data-secret": "" } : {})}>{wonLine}</p> : null}
           </div>
         </div>
         {showPeople ? (
@@ -96,13 +99,13 @@ export function ChallengeMiniCard({
                   <li key={person.key} className={cn("min-w-0", hotKey === person.key && "rounded-lg bg-acc-soft px-1 py-1")}>
                     <div className="flex items-baseline justify-between gap-3">
                       <span className="min-w-0 truncate text-[13px] font-extrabold uppercase tracking-wide text-t0">{person.name}</span>
-                      <span className="shrink-0 text-[13px] font-bold text-t1">{person.result == null ? "—" : metricValueLabel(c.metric, person.result)}</span>
+                      <span className="shrink-0 text-[13px] font-bold text-t1" {...(secret ? { "data-secret": "" } : {})}>{person.result == null ? "—" : metricValueLabel(c.metric, person.result)}</span>
                     </div>
                     <div className="mt-1 flex items-center gap-2">
                       <div className="min-w-0 flex-1">
                         <ProgressBar enter value={wonLook ? 100 : pct} height={10} color={wonLook ? "var(--ok)" : "var(--acc)"} />
                       </div>
-                      <BoardPersonMark person={person} disputa={disputa} ended={ended} pct={pct} />
+                      <BoardPersonMark person={person} disputa={disputa} ended={ended} pct={pct} secret={secret} />
                     </div>
                   </li>
                 );
@@ -420,7 +423,7 @@ function boardWonCount(won: number, people: number): string {
   return `${won} de ${people} ${won === 1 ? "ganhou" : "ganharam"}`;
 }
 
-function BoardPersonMark({ person, disputa, ended, pct }: { person: ChallengeParticipant; disputa: boolean; ended: boolean; pct: number }) {
+function BoardPersonMark({ person, disputa, ended, pct, secret = false }: { person: ChallengeParticipant; disputa: boolean; ended: boolean; pct: number; secret?: boolean }) {
   if (person.result == null) return <span className="shrink-0 text-[12px] font-semibold text-t3">—</span>;
   if (disputa) {
     if (ended && !person.winner) return <span className="shrink-0 text-[13px] font-semibold text-t1">Não ganhou</span>;
@@ -429,7 +432,7 @@ function BoardPersonMark({ person, disputa, ended, pct }: { person: ChallengePar
   }
   if (person.winner) return <span className="shrink-0 text-[14px] font-extrabold text-ok">Ganhou</span>;
   if (ended) return <span className="shrink-0 text-[13px] font-semibold text-t1">Não ganhou</span>;
-  return <span className={`shrink-0 font-mono text-[13px] font-bold tabular-nums ${progressTextClass(pct)}`}>{num(pct, 0)}%</span>;
+  return <span className={`shrink-0 font-mono text-[13px] font-bold tabular-nums ${progressTextClass(pct)}`} {...(secret ? { "data-secret": "" } : {})}>{num(pct, 0)}%</span>;
 }
 
 function ChallengePersonStatus({

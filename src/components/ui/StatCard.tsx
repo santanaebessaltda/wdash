@@ -15,7 +15,9 @@ export interface StatCardProps {
   delta?: { value: string; positive: boolean; vs?: string; diff?: string; previous?: string };
   sparkline?: ReactNode;
   /** Texto secundario abaixo do valor (ex.: "1.665 vendas  |  2.495 itens"). */
-  sub?: string;
+  sub?: ReactNode;
+  /** Borra o número principal no placar. */
+  secret?: boolean;
   /** Segunda linha (ex.: contribuicao WPINK na Overview). */
   sub2?: string;
   /** Tooltip exibido ao passar o mouse no  ao lado do label. */
@@ -33,7 +35,7 @@ export interface StatCardProps {
   className?: string;
 }
 
-export function StatCard({ label, value, icon, iconColor = "var(--acc)", iconBg = "var(--acc-soft)", delta, sparkline, sub, sub2, tooltip, deltaTooltip, valueClassName, quietSub = false, dense = false, glass = false, className }: StatCardProps) {
+export function StatCard({ label, value, icon, iconColor = "var(--acc)", iconBg = "var(--acc-soft)", delta, sparkline, sub, sub2, tooltip, deltaTooltip, valueClassName, quietSub = false, dense = false, glass = false, secret = false, className }: StatCardProps) {
   const labelNode = (
     <div className={cn("flex min-w-0 items-center gap-1.5", !dense && (icon || delta) && "mt-4", dense && "min-w-0 flex-1")}>
       <p className="truncate text-xs font-bold uppercase tracking-wide text-t1">{label}</p>
@@ -83,7 +85,7 @@ export function StatCard({ label, value, icon, iconColor = "var(--acc)", iconBg 
       </div>
       ) : null}
       {!dense || !icon ? labelNode : null}
-      <AnimatedNumber once={dense} duration={dense ? 700 : 1100} value={value} className={cn("block truncate font-extrabold", dense ? "mt-1 text-xl leading-none" : "mt-1 text-2xl", valueClassName ?? "text-t0")} />
+      <AnimatedNumber once={dense} duration={dense ? 700 : 1100} value={value} secret={secret} className={cn("block truncate font-extrabold", dense ? "mt-1 text-xl leading-none" : "mt-1 text-2xl", valueClassName ?? "text-t0")} />
       {sub && <p className={cn("truncate", dense ? "mt-1 text-[11px] leading-tight text-t0" : quietSub ? "mt-0.5 text-[10.5px] text-t3" : "mt-0.5 text-[11px] text-t2")}>{sub}</p>}
       {sub2 && <p className="mt-0.5 truncate text-[11px] text-t2">{sub2}</p>}
       {sparkline && <div className="mt-3 h-9">{sparkline}</div>}
