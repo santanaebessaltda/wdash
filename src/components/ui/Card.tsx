@@ -39,17 +39,18 @@ export function Card({ className, children, padding = "md", glass, ...props }: C
 }
 
 /** Ícone do hero, o mesmo bloco do detalhe de meta e de desafio. */
-export function CardHero({ children, tone = "acc", compact = false }: { children: ReactNode; tone?: "acc" | "info" | "warn" | "muted"; compact?: boolean }) {
+export function CardHero({ children, tone = "acc", compact = false, color, background }: { children: ReactNode; tone?: "acc" | "info" | "warn" | "muted"; compact?: boolean; color?: string; background?: string }) {
   return (
     <span
       className={cn(
         "flex shrink-0 items-center justify-center",
         compact ? "h-9 w-9 rounded-xl" : "h-12 w-12 rounded-2xl",
-        tone === "info" && "bg-info-soft text-info",
-        tone === "warn" && "bg-warn-soft text-warn",
-        tone === "acc" && "bg-acc-soft text-acc",
-        tone === "muted" && "bg-bg-3 text-t1",
+        !color && tone === "info" && "bg-info-soft text-info",
+        !color && tone === "warn" && "bg-warn-soft text-warn",
+        !color && tone === "acc" && "bg-acc-soft text-acc",
+        !color && tone === "muted" && "bg-bg-3 text-t1",
       )}
+      style={color ? { color, background } : undefined}
     >
       {children}
     </span>

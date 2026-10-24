@@ -115,12 +115,13 @@ export function RankingBlock({
             <div
               key={`vazio-${pos}`}
               className={cn(
-                "flex flex-col items-center text-center",
-                motion ? "absolute bottom-0" : "group transition-transform duration-200 hover:-translate-y-1.5",
+                "group flex flex-col items-center text-center",
+                motion ? "absolute bottom-0" : "transition-transform duration-200 hover:-translate-y-1.5",
                 !motion && (isOuro ? "w-[34%] max-w-[168px]" : "w-[30%] max-w-[148px]"),
               )}
               style={motion ? { left: PODIO_SLOT[pos].left, width: PODIO_SLOT[pos].width } : undefined}
             >
+              <div className={cn(motion ? "flex w-full flex-col items-center transition-transform duration-200 group-hover:-translate-y-1.5" : "contents")}>
               <div className={cn("relative transition-transform duration-200 group-hover:scale-[1.04]", spotlight ? "mb-1.5" : "mb-2.5")}>
                 <span
                   className={cn(
@@ -145,6 +146,7 @@ export function RankingBlock({
               >
                 <span className={cn("font-extrabold leading-none text-t3", motion ? (isOuro ? "text-[28px] sm:text-[32px]" : "text-[22px] sm:text-[24px]") : "pb-3 text-[24px] sm:text-[28px]")}>{pos}º</span>
               </div>
+              </div>
             </div>
           );
         }
@@ -166,8 +168,8 @@ export function RankingBlock({
                 }
               : {})}
             className={cn(
-              "flex flex-col items-center text-center",
-              motion ? "absolute bottom-0 z-10 origin-bottom transition-[left,width,transform] duration-700 ease-out" : "group transition-transform duration-200 hover:-translate-y-1.5",
+              "group flex flex-col items-center text-center",
+              motion ? "absolute bottom-0 z-10 origin-bottom transition-[left,width,transform] duration-700 ease-out" : "transition-transform duration-200 hover:-translate-y-1.5",
               flashId === l.employeeId && "board-row-flash",
               !motion &&
                 (spotlight
@@ -180,6 +182,7 @@ export function RankingBlock({
               onSelect && "cursor-pointer rounded-2xl focus-visible:outline-2 focus-visible:outline-acc",
             )}
           >
+            <div className={cn(motion ? "flex w-full flex-col items-center transition-transform duration-200 group-hover:-translate-y-1.5" : "contents")}>
             <div className={cn("relative transition-transform duration-200 group-hover:scale-[1.04]", spotlight ? "mb-1.5" : "mb-2.5")}>
               <span
                 className={cn("relative inline-flex rounded-full", motion && isOuro && "board-breathe")}
@@ -237,6 +240,7 @@ export function RankingBlock({
               >
                 {pos}º
               </span>
+            </div>
             </div>
           </div>
         );

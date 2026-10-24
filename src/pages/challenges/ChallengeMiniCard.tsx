@@ -58,9 +58,9 @@ export function ChallengeMiniCard({
     const wonLine = c.mode === "MINIMUM" && view.status !== "upcoming" && people > 0 ? boardWonCount(view.reachedCount, people) : null;
     const boardBadge = "!px-2.5 !py-1 !text-[12px]";
     return (
-      <Card padding="sm" glass={view.status === "active" ? "var(--acc-soft)" : "color-mix(in srgb, var(--t1) 28%, transparent)"} className="flex h-full min-h-0 w-full flex-col overflow-hidden text-left !px-2.5 !py-2.5">
+      <Card padding="sm" glass={view.status === "active" ? "var(--wpink-soft)" : "color-mix(in srgb, var(--t1) 28%, transparent)"} className="flex h-full min-h-0 w-full flex-col overflow-hidden text-left !px-2.5 !py-2.5">
         <div className="flex items-start gap-2">
-          <CardHero compact tone={view.status === "active" ? "acc" : "muted"}>
+          <CardHero compact tone={view.status === "active" ? "acc" : "muted"} color={view.status === "active" ? "var(--wpink)" : undefined} background={view.status === "active" ? "var(--wpink-soft)" : undefined}>
             <FlameIcon size={18} />
           </CardHero>
           <div className="min-w-0 flex-1">
@@ -101,22 +101,26 @@ export function ChallengeMiniCard({
                 const pct = challengeProgress(person.result, c.target, leader);
                 const wonLook = !disputa && person.winner;
                 const late = settlesAtEnd(c.metric);
-                const above = c.target != null && c.target > 0 && person.result != null && person.result >= c.target;
-                const resultClass = person.result == null ? "text-t2" : person.result < 0 ? "text-bad" : late && c.metric === "TICKET" ? "text-ok" : late ? "text-t0" : "text-acc";
+                const floorTarget = c.target != null && c.target > 0 ? c.target : null;
+                const above = floorTarget != null && person.result != null && person.result >= floorTarget;
+                const resultClass = person.result == null ? "text-t2" : late && floorTarget != null ? (above ? "text-acc" : "text-t1") : person.result < 0 ? "text-bad" : late ? "text-t0" : "text-acc";
+                const showTrack = !late || disputa || person.winner || (ended && person.result != null);
                 return (
                   <li key={person.key} className={cn("min-w-0", hotKey === person.key && "rounded-lg bg-acc-soft px-1 py-1")}>
                     <div className="flex items-baseline justify-between gap-3">
                       <span className="min-w-0 truncate text-[13px] font-extrabold uppercase tracking-wide text-t0">{person.name}</span>
                       <span className={`shrink-0 text-[13px] font-bold ${resultClass}`} {...(secret && (c.metric === "VALUE" || c.metric === "TICKET") ? { "data-secret": "" } : {})}>{person.result == null ? "—" : metricValueLabel(c.metric, person.result)}</span>
                     </div>
-                    <div className={cn("mt-1 flex items-center gap-2", late && "justify-end")}>
-                      {late ? null : (
-                        <div className="min-w-0 flex-1">
-                          <ProgressBar enter value={wonLook ? 100 : pct} height={10} />
-                        </div>
-                      )}
-                      <BoardPersonMark person={person} disputa={disputa} ended={ended} pct={pct} late={late} above={above} />
-                    </div>
+                    {showTrack ? (
+                      <div className={cn("mt-1 flex items-center gap-2", late && "justify-end")}>
+                        {late ? null : (
+                          <div className="min-w-0 flex-1">
+                            <ProgressBar enter value={wonLook ? 100 : pct} height={10} />
+                          </div>
+                        )}
+                        <BoardPersonMark person={person} disputa={disputa} ended={ended} pct={pct} late={late} />
+                      </div>
+                    ) : null}
                   </li>
                 );
               })
@@ -491,14 +495,12 @@ function BoardPersonMark({
   ended,
   pct,
   late = false,
-  above = false,
 }: {
   person: ChallengeParticipant;
   disputa: boolean;
   ended: boolean;
   pct: number;
   late?: boolean;
-  above?: boolean;
 }) {
   if (person.result == null) return <span className="shrink-0 text-[12px] font-semibold text-t3">—</span>;
   if (disputa) {
@@ -508,7 +510,8 @@ function BoardPersonMark({
   }
   if (person.winner) return <span className="shrink-0 text-[14px] font-extrabold text-acc">Ganhou</span>;
   if (ended) return <span className="shrink-0 text-[13px] font-semibold text-t1">Não ganhou</span>;
-  return <span className={`shrink-0 font-mono text-[13px] font-bold tabular-nums ${late ? (above ? "text-acc" : "text-t2") : progressTextClass(pct)}`}>{num(pct, 0)}%</span>;
+  if (late) return null;
+  return <span className={`shrink-0 font-mono text-[13px] font-bold tabular-nums ${progressTextClass(pct)}`}>{num(pct, 0)}%</span>;
 }
 
 function ChallengePersonStatus({

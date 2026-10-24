@@ -245,9 +245,9 @@ function BoardGoalCard({ board, pulse }: { board: GoalBoard; pulse: boolean }) {
   const hasLevels = goal.tiers.length > 0;
 
   return (
-    <Card padding="none" glass="var(--acc-soft)" className="shrink-0 px-3 py-2 sm:px-4">
+    <Card padding="none" glass="var(--bad-soft)" className="shrink-0 px-3 py-2 sm:px-4">
       <div className="flex items-center gap-2.5">
-        <CardHero compact>
+        <CardHero compact color="var(--bad)" background="var(--bad-soft)">
           <TargetIcon size={18} />
         </CardHero>
         <div className="min-w-0 flex-1">
@@ -775,7 +775,6 @@ export function BoardView({
           glass
           label="Progresso da meta"
           value={activeGoal ? `${num(activeGoal.summary.pct, 1)}%` : "—"}
-          valueClassName={activeGoal ? "text-acc" : undefined}
           sub={
             activeGoal
               ? activeGoal.goal.tierMode === "INDIVIDUAL"
@@ -796,7 +795,7 @@ export function BoardView({
           <BoardGoalCard board={activeGoal} pulse={pulseGoal} />
         </div>
       ) : (
-        <Card glass="var(--acc-soft)" className="board-in shrink-0 !p-3" style={{ animationDelay: "140ms" }}>
+        <Card glass="var(--bad-soft)" className="board-in shrink-0 !p-3" style={{ animationDelay: "140ms" }}>
           <EmptyState framed={false} icon="🎯" title="Meta não configurada" description="Cadastre uma meta para acompanhar o desempenho da equipe no período." />
         </Card>
       )}
@@ -884,7 +883,7 @@ export function BoardView({
                                   <span className="min-w-0 truncate text-[12.5px] font-bold text-t0">{person.name}</span>
                                 </span>
                               </td>
-                              <td className="py-1 pr-2 text-right font-mono text-[12.5px] font-bold tabular-nums text-palette-purple">{num(person.sales)}</td>
+                              <td className="py-1 pr-2 text-right font-mono text-[12.5px] font-bold tabular-nums text-acc">{num(person.sales)}</td>
                               <td className="py-1 pr-2 text-right">
                                 <span className={`block font-mono text-[12.5px] font-extrabold tabular-nums ${pct ? "text-acc" : "text-t0"}`}>{pct ?? "—"}</span>
                                 {level ? <span className="block text-[11px] text-t2">{level.levelLabel ?? "Sem nível"}</span> : null}
