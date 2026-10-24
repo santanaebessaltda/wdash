@@ -68,11 +68,9 @@ const finance: NavGroup = {
   ],
 };
 
-/** Card no pé do menu, fora da lista. Gestor, gerente e equipe. */
-export const helpMenu = {
+/** Biblioteca de vídeos. Página direta, sem submenu. */
+const tutorials: NavSingle = {
   label: "Tutoriais",
-  description: "Vídeos para o dia a dia",
-  action: "Ver vídeos",
   icon: ICON.help,
   to: paths.help,
 };
@@ -146,6 +144,7 @@ const navOwner: NavEntry[] = [
   performance,
   finance,
   purchaseOrder,
+  tutorials,
   integrations,
   settings,
 ];
@@ -175,6 +174,7 @@ const navManager: NavEntry[] = [
   performance,
   finance,
   settingsHours,
+  tutorials,
 ];
 
 /** Telas só do Gestor (custos, Integrações, Configurações, ERP, Usuários, Logs, pedido de compra). */
@@ -187,6 +187,7 @@ export function isOwner(role: Role): boolean {
 const sellerNav: NavEntry[] = [
   { label: "Início", icon: ICON.dashboard, to: paths.seller.home },
   { label: "Carteira", icon: ICON.wallet, to: paths.seller.wallet },
+  tutorials,
 ];
 
 export function navForRole(role: Role): NavEntry[] {

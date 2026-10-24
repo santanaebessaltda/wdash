@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Alert, Badge, Breadcrumbs, Button, Modal, useToast } from "@/components/ui";
+import { Alert, Badge, Breadcrumbs, Button, Modal, Skeleton, useToast } from "@/components/ui";
+import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import {
   HELP_AUDIENCE_LABEL,
   audienceOf,
@@ -35,6 +36,7 @@ export function HelpVideoPage() {
   const player = useRef<HTMLVideoElement>(null);
   const [started, setStarted] = useState(false);
   const [playbackError, setPlaybackError] = useState(false);
+  const showSkeleton = useMinSkeleton(status === "loading");
 
   useEffect(() => {
     setStarted(false);
@@ -136,8 +138,15 @@ export function HelpVideoPage() {
         <Breadcrumbs items={[{ label: "Tutoriais", to: paths.help }, { label: video?.title ?? "Vídeo" }]} />
       </div>
 
-      {status === "loading" ? (
-        <p className="text-[13px] text-t2">Carregando vídeo…</p>
+      {showSkeleton ? (
+        <div className="mx-auto flex max-w-4xl flex-col gap-4" aria-busy="true" aria-label="Carregando">
+          <Skeleton className="h-7 w-2/3 max-w-sm sm:h-8" />
+          <Skeleton className="aspect-video w-full rounded-xl" />
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-4/5" />
+          </div>
+        </div>
       ) : status === "error" ? (
         <Alert variant="danger" title={error} />
       ) : status === "missing" || !video ? (

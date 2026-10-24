@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Alert, Badge, Button, Dropdown, EmptyState, Modal, PageHeader, Segmented, Skeleton, useToast } from "@/components/ui";
+import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { HeaderSearch } from "@/pages/dashboard/HeaderFilter";
 import {
   audienceOf,
@@ -22,7 +23,8 @@ import { HelpVideoForm } from "./HelpVideoForm";
 import { HELP_ICON, HelpIcon, HelpPlayMark } from "./icons";
 
 const posterSaves = new Set<string>();
-const helpGrid = { gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 220px), 280px))" };
+/** No celular, uma coluna na largura da tela. A partir de `sm`, miniaturas de 220 a 280px. */
+const helpGrid = "grid min-w-0 grid-cols-1 gap-x-4 gap-y-7 sm:grid-cols-[repeat(auto-fill,minmax(220px,280px))]";
 
 export function HelpPage() {
   const session = useActiveSession();
@@ -39,6 +41,7 @@ export function HelpPage() {
   const [editing, setEditing] = useState<HelpVideo | null>(null);
   const [pendingDelete, setPendingDelete] = useState<HelpVideo | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const showSkeleton = useMinSkeleton(status === "loading");
 
   useEffect(() => {
     let cancel = false;
@@ -128,8 +131,13 @@ export function HelpPage() {
         subtitle={manage ? "Envie e organize vídeos de orientação para a operação." : "Vídeos para apoiar a operação do dia a dia."}
         actions={
           <>
-            {videos.length > 0 ? <HeaderSearch value={query} onChange={setQuery} placeholder="Buscar vídeos" width={220} /> : null}
-            {manage ? (
+            {showSkeleton ? (
+              <Skeleton className="h-10 w-[220px] max-w-full rounded-[var(--radius-vela-sm)]" />
+            ) : videos.length > 0 ? (
+              <HeaderSearch value={query} onChange={setQuery} placeholder="Buscar vídeos" width={220} />
+            ) : null}
+            {manage && showSkeleton ? <Skeleton className="h-10 w-[148px] max-w-full rounded-[var(--radius-vela-md)]" /> : null}
+            {manage && !showSkeleton ? (
               <Button icon={<HelpIcon d={HELP_ICON.upload} />} onClick={openCreate}>
                 Enviar vídeo
               </Button>
@@ -138,18 +146,10 @@ export function HelpPage() {
         }
       />
 
-      {status === "error" ? (
+      {status === "error" && !showSkeleton ? (
         <Alert variant="danger" title={error} />
-      ) : status === "loading" ? (
-        <div className="grid gap-x-4 gap-y-7" style={helpGrid}>
-          {Array.from({ length: 8 }, (_, index) => (
-            <div key={index}>
-              <Skeleton className="aspect-video rounded-xl" />
-              <Skeleton className="mt-2 h-4 w-4/5" />
-              <Skeleton className="mt-1.5 h-3 w-1/2" />
-            </div>
-          ))}
-        </div>
+      ) : showSkeleton ? (
+        <HelpLibrarySkeleton />
       ) : (
         <>
           {manage && videos.length > 0 ? (
@@ -187,7 +187,7 @@ export function HelpPage() {
               }
             />
           ) : (
-            <div className="grid gap-x-4 gap-y-7" style={helpGrid}>
+            <div className={helpGrid}>
               {filtered.map((video) => {
                 const duration = formatHelpDuration(video.durationSec);
                 const posterUrl = video.posterPath ? (posters[video.posterPath] ?? null) : null;
@@ -283,6 +283,22 @@ export function HelpPage() {
       >
         <p className="text-[13px] text-t1">O vídeo será excluído da biblioteca e deixará de aparecer para todos os públicos.</p>
       </Modal>
+    </div>
+  );
+}
+
+function HelpLibrarySkeleton() {
+  return (
+    <div className={helpGrid} aria-busy="true" aria-label="Carregando">
+      {Array.from({ length: 8 }, (_, index) => (
+        <div key={index} className={index >= 3 ? "hidden min-w-0 sm:block" : "min-w-0"}>
+          <Skeleton className="aspect-video w-full rounded-xl" />
+          <div className="pt-2">
+            <Skeleton className="h-5 w-4/5" />
+            <Skeleton className="mt-1 h-5 w-3/5" />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
