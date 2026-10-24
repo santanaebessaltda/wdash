@@ -95,7 +95,7 @@ export function SidebarContent({ collapsed = false, onNavigate }: { collapsed?: 
           const groupActive = entry.items.some((item) => leafMatches(item.to, location.pathname));
           return (
             <div key={entry.label}>
-              <button onClick={() => toggleGroup(entry.label)} className={cn(linkBase, "w-full justify-between", collapsed && "justify-center", groupActive && linkActive)} title={collapsed ? entry.label : entry.description}>
+              <button onClick={() => toggleGroup(entry.label)} className={cn(linkBase, "w-full justify-between", collapsed && "justify-center", collapsed && groupActive && linkActive)} title={collapsed ? entry.label : entry.description}>
                 <span className="flex min-w-0 items-center gap-3 text-left">
                   <GroupIcon d={entry.icon} />
                   {!collapsed && entry.label}
@@ -111,15 +111,11 @@ export function SidebarContent({ collapsed = false, onNavigate }: { collapsed?: 
                       onClick={onNavigate}
                       className={({ isActive }) => cn("flex items-center gap-2.5 rounded-[9px] px-2.5 py-2 text-[12.5px] font-medium text-t1 hover:bg-bg-3 hover:text-t0", isActive && linkActive)}
                     >
-                      {({ isActive }) => (
-                        <>
-                          <span
-                            className={cn("h-[5px] w-[5px] shrink-0 rounded-full", isActive ? "bg-acc" : !item.dot && "bg-t2")}
-                            style={!isActive && item.dot ? { background: item.dot } : undefined}
-                          />
-                          <span className="flex-1 truncate">{item.label}</span>
-                        </>
-                      )}
+                      <span
+                        className={cn("h-[5px] w-[5px] shrink-0 rounded-full", !item.dot && "bg-t2")}
+                        style={item.dot ? { background: item.dot } : undefined}
+                      />
+                      <span className="flex-1 truncate">{item.label}</span>
                     </NavLink>
                   ))}
                 </div>

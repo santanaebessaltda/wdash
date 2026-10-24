@@ -200,7 +200,7 @@ Sem esses 4 elementos, o número é "dado jogado na tela" — não serve para de
 - `MapPins` — mapa com pinos (bom para visão multi-loja geográfica)
 
 ### Layout (`src/layout/`)
-- `Sidebar` + `SidebarContent` — menu lateral colapsável (76px / 258px). O grupo e o submenu da rota atual ficam com fundo rosa; o ponto do submenu selecionado também fica rosa.
+- `Sidebar` + `SidebarContent` — menu lateral colapsável (76px / 258px). Item sem submenu fica com fundo rosa. Grupo com submenu fica sem fundo: só o item ativo do submenu é preenchido, e o ponto dele permanece cinza (`bg-t2`), no padrão Vela. Com o menu recolhido o ícone do grupo ativo continua rosa, porque o submenu não aparece.
 - `MobileDrawer` — sidebar mobile
 
 ### Específicos de produto (`src/components/wedash/`)
