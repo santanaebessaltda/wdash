@@ -122,9 +122,10 @@ export function SidebarContent({ collapsed = false, onNavigate }: { collapsed?: 
             );
           }
           const open = openGroup === entry.label;
+          const groupActive = entry.items.some((item) => leafMatches(item.to, location.pathname));
           return (
             <div key={entry.label}>
-              <button onClick={() => toggleGroup(entry.label)} className={cn(linkBase, "w-full justify-between", collapsed && "justify-center")} title={collapsed ? entry.label : entry.description}>
+              <button onClick={() => toggleGroup(entry.label)} className={cn(linkBase, "w-full justify-between", collapsed && "justify-center", groupActive && linkActive)} title={collapsed ? entry.label : entry.description}>
                 <span className="flex min-w-0 items-center gap-3 text-left">
                   <GroupIcon d={entry.icon} />
                   {!collapsed && entry.label}
@@ -134,9 +135,16 @@ export function SidebarContent({ collapsed = false, onNavigate }: { collapsed?: 
               {!collapsed && open && (
                 <div className="ml-[21px] mt-1 flex flex-col gap-0.5 border-l border-line pl-4">
                   {entry.items.map((item) => (
-                    <NavLink key={item.to} to={withSearch(item.to, search)} end onClick={onNavigate} className={({ isActive }) => cn("flex items-center gap-2.5 rounded-[9px] px-2.5 py-2 text-[12.5px] font-medium text-t1 hover:bg-bg-3 hover:text-t0", isActive && linkActive)}>
-                      <span className={cn("h-[5px] w-[5px] shrink-0 rounded-full", !item.dot && "bg-t2")} style={item.dot ? { background: item.dot } : undefined} />
-                      <span className="flex-1 truncate">{item.label}</span>
+                    <NavLink key={item.to} to={withSearch(item.to, search)} onClick={onNavigate} className="flex items-center gap-2.5 rounded-[9px] px-2.5 py-2 text-[12.5px] font-medium text-t1 hover:bg-bg-3 hover:text-t0">
+                      {({ isActive }) => (
+                        <>
+                          <span
+                            className={cn("h-[5px] w-[5px] shrink-0 rounded-full", isActive ? "bg-acc" : !item.dot && "bg-t2")}
+                            style={!isActive && item.dot ? { background: item.dot } : undefined}
+                          />
+                          <span className={cn("flex-1 truncate", isActive && "text-t0")}>{item.label}</span>
+                        </>
+                      )}
                     </NavLink>
                   ))}
                 </div>
