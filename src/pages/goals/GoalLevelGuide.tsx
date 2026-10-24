@@ -70,14 +70,14 @@ export function GoalLevelGuide({
               key={row.number}
               className={cn(
                 "flex items-center gap-3 rounded-xl border bg-bg-inset px-3.5 py-3",
-                everyone ? "border-ok" : "border-line",
+                everyone ? "border-acc" : "border-line",
               )}
             >
               <span
                 className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-bold"
                 style={{
-                  background: everyone ? "var(--ok)" : "var(--bg-3)",
-                  borderColor: everyone ? "var(--ok)" : "var(--line-2)",
+                  background: everyone ? "var(--acc)" : "var(--bg-3)",
+                  borderColor: everyone ? "var(--acc)" : "var(--line-2)",
                   color: everyone ? "#fff" : "var(--t2)",
                 }}
               >
@@ -91,9 +91,9 @@ export function GoalLevelGuide({
                 <p className="mt-0.5 text-[11.5px] text-t2">{ruleLine(row)}</p>
                 {showReached && !management && row.manager ? <p className="mt-0.5 text-[11.5px] text-t2">{row.manager}</p> : null}
                 {row.statusLine ? (
-                  <p className={cn("mt-0.5 text-[11.5px] font-semibold", row.statusLine.tone === "current" ? "text-acc" : "text-ok")}>{row.statusLine.text}</p>
+                  <p className="mt-0.5 text-[11.5px] font-semibold text-acc">{row.statusLine.text}</p>
                 ) : people > 0 ? (
-                  <p className={cn("mt-0.5 text-[11.5px] font-semibold", everyone ? "text-ok" : "text-t1")}>
+                  <p className="mt-0.5 text-[11.5px] font-semibold text-acc">
                     <span className="font-mono tabular-nums">
                       {row.reached}/{people}
                     </span>{" "}
@@ -102,7 +102,7 @@ export function GoalLevelGuide({
                 ) : null}
               </div>
               <div className="shrink-0 text-right">
-                <p className={cn("font-mono text-[13px] font-extrabold", everyone ? "text-ok" : "text-t1")}>{num(row.commissionPct, 1)}%</p>
+                <p className="font-mono text-[13px] font-extrabold text-acc">{num(row.commissionPct, 1)}%</p>
                 <p className="text-[10.5px] text-t2">de premiação</p>
               </div>
             </div>
@@ -132,7 +132,7 @@ function ManagementSummary({ management, closed, className }: { management: Goal
               Falta <span className="font-mono font-bold text-acc">{brlCent(management.next.gap)}</span> para N{management.next.number} · {management.next.name}
             </>
           ) : (
-            <span className="font-semibold text-ok">Último nível</span>
+            <span className="font-semibold text-acc">Último nível</span>
           )}
         </span>
       ) : null}

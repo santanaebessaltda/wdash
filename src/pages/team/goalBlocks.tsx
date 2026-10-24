@@ -158,7 +158,7 @@ function SellerCell({ l }: { l: LineRank }) {
 function RevenueCell({ l }: { l: LineRank }) {
   return (
     <div>
-      <p className="font-mono text-[12.5px] font-bold text-t0">{l.revenue}</p>
+      <p className="font-mono text-[12.5px] font-bold text-acc">{l.revenue}</p>
       <p className="text-[11px] text-t2">
         {num(l.salesCount, 0)} {l.salesCount === 1 ? "venda" : "vendas"}
       </p>
@@ -191,7 +191,7 @@ function LevelCell({ l }: { l: LineRank }) {
 function NextCell({ l }: { l: LineRank }) {
   if (l.noGoal) return <span className="text-t2">—</span>;
   if (!l.nextTier) {
-    return <p className="text-[12.5px] font-bold text-ok">Último nível</p>;
+    return <p className="text-[12.5px] font-bold text-acc">Último nível</p>;
   }
   return (
     <div>
@@ -207,7 +207,7 @@ function PrizeCell({ l }: { l: LineRank }) {
   if (amount <= 0 && l.commissionPct <= 0) return <span className="text-t2">—</span>;
   return (
     <div className="text-right">
-      <p className="font-mono text-[12.5px] font-bold text-ok">{brlCent(amount)}</p>
+      <p className="font-mono text-[12.5px] font-bold text-acc">{brlCent(amount)}</p>
       {l.commissionPct > 0 ? (
         <p className="text-[11px] text-t2">
           {num(l.commissionPct, 1)}%
@@ -339,7 +339,6 @@ export function SellersBlock({
           {
             key: "pctGeral",
             header: "Part. na meta da filial",
-            width: "108px",
             hideBelow: "lg",
             sortable: true,
             sortValue: (l: LineRank) => (l.noGoal ? null : l.storeGoalPct),
@@ -584,7 +583,7 @@ export function GlobalGoalBand({
 
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <p className="text-[18px] font-extrabold tracking-tight text-t0 sm:text-[20px]">
-          <span className={`font-mono ${goal.achieved < 0 ? "text-bad" : "text-ok"}`}>{brlCent(goal.achieved)}</span>
+          <span className={`font-mono ${goal.achieved < 0 ? "text-bad" : "text-acc"}`}>{brlCent(goal.achieved)}</span>
           <span className="mx-1.5 text-[14px] font-semibold text-t2">/</span>
           <span className="font-mono text-[14px] font-bold text-t2 sm:text-[15px]">{brlCent(goal.total)}</span>
         </p>
