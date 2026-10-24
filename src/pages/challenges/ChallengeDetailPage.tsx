@@ -70,6 +70,14 @@ const MANAGEMENT_RESULT: Record<ChallengeRecord["metric"], string> = {
   INDEX: "Índice da equipe",
 };
 
+const STORE_RESULT: Record<ChallengeRecord["metric"], string> = {
+  QUANTITY: "Itens da filial",
+  VALUE: "Faturamento da filial",
+  PA: "P.A. da filial",
+  TICKET: "Ticket médio da filial",
+  INDEX: "Índice da filial",
+};
+
 const ORDINAL = ["1º", "2º", "3º"];
 
 /** "  |  meta de 2,00"  |  Indice: "  |  indice da equipe de 105,0". */
@@ -225,6 +233,7 @@ function daysText(days: string[]): string {
 }
 
 function prizesText(c: ChallengeRecord): string {
+  if (c.mode === "COLLECTIVE") return c.prizes[0] ? `${prizeLabel(c.prizes[0])} para a equipe` : "—";
   if (c.mode === "MINIMUM") return c.prizes[0] ? `${prizeLabel(c.prizes[0])} por pessoa` : "—";
   return c.prizes.map((p, i) => `${ORDINAL[i]}: ${prizeLabel(p)}`).join(" · ") || "—";
 }
@@ -319,24 +328,28 @@ function RoleResultBar({
   metric,
   status,
   result,
+  resultLabel,
+  storeIndex = false,
 }: {
   title: string;
   goalLabel: string;
   metric: ChallengeRecord["metric"];
   status: ChallengeView["status"];
   result: NonNullable<ChallengeView["management"]>;
+  resultLabel?: string;
+  storeIndex?: boolean;
 }) {
   return (
     <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-1.5 rounded-xl bg-bg-inset px-3.5 py-3 text-[12.5px]">
       <p className="font-bold text-t0">{title}</p>
       <p className="flex items-center gap-1.5 text-t1">
-        <span className="text-t2">{MANAGEMENT_RESULT[metric]}: </span>
+        <span className="text-t2">{resultLabel ?? MANAGEMENT_RESULT[metric]}: </span>
         <span className={`font-mono font-bold ${result.result == null ? "text-t0" : "text-acc"}`}>
           {result.result != null ? metricValueLabel(metric, result.result) : "—"}
         </span>
         {result.periodPrevious && (
           <TipHelp
-            label={`Compara a equipe durante o desafio com o período de ${shortDate(result.periodPrevious.from)} a ${shortDate(result.periodPrevious.to)}: 50% faturamento médio por pessoa, 25% ticket médio e 25% P.A. 100 representa o mesmo desempenho do período anterior. Com o desafio em andamento, os dois lados consideram até ontem.${result.result == null ? " Fica indisponível no primeiro dia do desafio, sem vendas em um dos períodos ou quando faltam dados de itens." : ""}`}
+            label={`Compara ${storeIndex ? "a filial" : "a equipe"} durante o desafio com o período de ${shortDate(result.periodPrevious.from)} a ${shortDate(result.periodPrevious.to)}: 50% ${storeIndex ? "faturamento" : "faturamento médio por pessoa"}, 25% ticket médio e 25% P.A. 100 representa o mesmo desempenho do período anterior. Com o desafio em andamento, os dois lados consideram até ontem.${result.result == null ? " Fica indisponível no primeiro dia do desafio, sem vendas em um dos períodos ou quando faltam dados de itens." : ""}`}
           />
         )}
       </p>
@@ -371,7 +384,9 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
           <p className="mt-0.5 text-[12px] text-t2">
             {aComecar
               ? "Os resultados aparecerão quando o desafio começar."
-              : "Acompanhe o resultado de cada pessoa participante. Vendas sem vendedor identificado ou realizadas pela gerência não entram no ranking."}
+              : c.mode === "COLLECTIVE"
+                ? "O resultado é o total da filial. A venda sem vendedor identificado entra na conta."
+                : "Acompanhe o resultado de cada pessoa participante. Vendas sem vendedor identificado ou realizadas pela gerência não entram no ranking."}
           </p>
         </div>
         <span className="text-[12px] font-semibold text-t2">
@@ -379,6 +394,17 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
         </span>
       </div>
 
+      {c.mode === "COLLECTIVE" && view.collective && !aComecar && (
+        <RoleResultBar
+          title="Equipe"
+          goalLabel="Mínimo da filial"
+          resultLabel={STORE_RESULT[c.metric]}
+          storeIndex={c.metric === "INDEX"}
+          metric={c.metric}
+          status={view.status}
+          result={view.collective}
+        />
+      )}
       {view.management && !aComecar && (
         <RoleResultBar
           title="Gerência"
@@ -398,7 +424,15 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
         />
       )}
 
-      {n === 0 ? (
+      {c.mode === "COLLECTIVE" ? (
+        <p className="text-[12.5px] text-t1">
+          {view.collective?.prize.kind === "ITEM"
+            ? "O prêmio é da equipe e não se multiplica por pessoa."
+            : view.collective && view.collective.recipients.length > 0
+              ? `O prêmio em R$ divide igual entre ${view.collective.recipients.map((person) => person.name).join(", ")}.`
+              : "O prêmio em R$ divide igual entre os vendedores. Nesta filial não há vendedor ativo no período."}
+        </p>
+      ) : n === 0 ? (
         <EmptyBlock icon="👤" title="Nenhuma pessoa no desafio" description="Não há vendedores ativos nem vendas atribuídas à equipe no período." />
       ) : (
         <div className="min-w-0 overflow-x-auto">
@@ -508,6 +542,21 @@ function ChallengePayoutCard({ challenge: c, view, onExport }: { challenge: Chal
     ...(payout.cashier
       ? [{ key: "caixa", name: "OPERADOR DE CAIXA", sub: "Cargo da filial", rank: "Ganhou", prize: payout.cashier, employeeId: null as string | null }]
       : []),
+    ...(payout.collective
+      ? [{
+          key: "equipe",
+          name: "EQUIPE",
+          sub:
+            payout.collective.kind === "ITEM"
+              ? "Prêmio da equipe"
+              : view.collective && view.collective.recipients.length > 0
+                ? `Dividido entre ${view.collective.recipients.length} ${view.collective.recipients.length === 1 ? "vendedor" : "vendedores"}`
+                : "Nenhum vendedor na equipe",
+          rank: "Ganhou",
+          prize: payout.collective,
+          employeeId: null as string | null,
+        }]
+      : []),
   ];
   const especie = countEspecie(payout.especie);
 
@@ -563,9 +612,9 @@ function ChallengePayoutCard({ challenge: c, view, onExport }: { challenge: Chal
               </thead>
               <tbody>
                 {lines.map((r) => (
-                  <tr key={r.key} className={`border-b border-line ${r.key === "gerencia" ? "bg-bg-inset" : ""}`}>
+                  <tr key={r.key} className={`border-b border-line ${r.key === "gerencia" || r.key === "equipe" || r.key === "caixa" ? "bg-bg-inset" : ""}`}>
                     <td className="py-2.5 pr-3">
-                      <PersonName name={r.name} employeeId={r.employeeId} storeId={r.key === "gerencia" ? null : c.storeId} sub={r.sub} />
+                      <PersonName name={r.name} employeeId={r.employeeId} storeId={r.key === "gerencia" || r.key === "equipe" || r.key === "caixa" ? null : c.storeId} sub={r.sub} />
                     </td>
                     <td className="py-2.5 pr-3 font-semibold text-acc">{r.rank}</td>
                     <td

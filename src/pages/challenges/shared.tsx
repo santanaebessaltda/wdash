@@ -13,6 +13,7 @@ export const CHALLENGE_STATUS_ORDER: Record<ChallengeStatus, number> = { active:
 export const CHALLENGE_MODE_HELP: Record<ChallengeRecord["mode"], string> = {
   CONTEST: "Os melhores resultados ganham os prêmios por posição. No empate, dividem o prêmio daquela posição.",
   MINIMUM: "Todos que chegarem ao mínimo ganham o prêmio.",
+  COLLECTIVE: "A filial inteira concorre junta. A venda sem vendedor identificado entra na conta. O prêmio em R$ divide igual entre os vendedores.",
 };
 
 const HIGHER: Record<ChallengeMetric, string> = {
@@ -25,7 +26,7 @@ const HIGHER: Record<ChallengeMetric, string> = {
 
 /** "Maior faturamento" / "Minimo de 15 itens"  -  o criterio do desafio em uma linha. */
 export function challengeCriterion(c: ChallengeRecord): string {
-  if (c.mode === "MINIMUM") return c.target != null ? `Mínimo de ${metricValueLabel(c.metric, c.target)}` : "Mínimo não definido";
+  if (c.mode === "MINIMUM" || c.mode === "COLLECTIVE") return c.target != null ? `Mínimo de ${metricValueLabel(c.metric, c.target)}` : "Mínimo não definido";
   const quem = HIGHER[c.metric];
   return c.target != null ? `${quem} · mínimo de ${metricValueLabel(c.metric, c.target)}` : quem;
 }
@@ -46,6 +47,10 @@ export interface ChallengeHeadline {
 export function challengeHeadline(c: ChallengeRecord, view: ChallengeView): ChallengeHeadline {
   if (view.status === "upcoming") return { label: "Critério", value: challengeCriterion(c) };
   const ended = view.status === "ended";
+  if (c.mode === "COLLECTIVE") {
+    if (view.collective?.result == null) return { label: null, value: ended ? "Sem resultado" : "Sem resultado ainda" };
+    return { label: "Resultado da filial", value: metricValueLabel(c.metric, view.collective.result) };
+  }
   if (c.mode === "MINIMUM") {
     const n = view.reachedCount;
     const people = view.participants.length;
@@ -67,7 +72,7 @@ export function challengeHeadline(c: ChallengeRecord, view: ChallengeView): Chal
 export function floorChallengeHeadline(c: ChallengeRecord, view: ChallengeView): ChallengeHeadline {
   if (view.status === "upcoming") return challengeHeadline(c, view);
   const ended = view.status === "ended";
-  if (c.mode === "MINIMUM") return challengeHeadline(c, view);
+  if (c.mode === "MINIMUM" || c.mode === "COLLECTIVE") return challengeHeadline(c, view);
   const { leader } = challengeCardSummary(view);
   const primeiros = view.participants.filter((person) => person.position === 1);
   if (!leader || primeiros.length === 0 || (ended && !primeiros[0].winner)) {
@@ -107,6 +112,7 @@ export function challengeWonLabel(won: number, people: number): string {
 export function mainPrizeLabel(c: ChallengeRecord): string | null {
   const p = c.prizes[0];
   if (!p) return null;
+  if (c.mode === "COLLECTIVE") return `${prizeLabel(p)} para a equipe`;
   return c.mode === "MINIMUM" ? `${prizeLabel(p)} por pessoa` : `1º lugar: ${prizeLabel(p)}`;
 }
 
@@ -118,6 +124,10 @@ export function floorPrizeLine(c: ChallengeRecord): string | null {
   if (c.mode === "MINIMUM") {
     const prize = c.prizes[0];
     return prize ? `Prêmio: ${prizeLabel(prize)} por pessoa` : null;
+  }
+  if (c.mode === "COLLECTIVE") {
+    const prize = c.prizes[0];
+    return prize ? `Prêmio: ${prizeLabel(prize)} para a equipe` : null;
   }
   return c.prizes.map((prize, index) => `${PRIZE_PLACE[index] ?? `${index + 1}º`} ${prizeLabel(prize)}`).join(" · ");
 }

@@ -281,6 +281,7 @@ export function ChallengeProgress({
   const best = Math.max(0, ...people.map((person) => person.result ?? 0));
   const leader = people.find((person) => person.position === 1);
   const index = c.metric === "INDEX";
+  const collective = c.mode === "COLLECTIVE";
   const personGoal = c.target != null && c.target > 0 ? c.target : null;
   const managerGoal = view.management != null && view.management.target > 0 ? view.management.target : null;
   const cashierGoal = view.cashier != null && view.cashier.target > 0 ? view.cashier.target : null;
@@ -288,8 +289,8 @@ export function ChallengeProgress({
   // No índice a média de quem vendeu é sempre 100. Com gerência ou operador de caixa, a barra usa o índice da equipe.
   const hasAverage = view.teamAverage != null;
   const shown = hasAverage ? view.teamAverage : !upcoming && index && best > 0 ? (leader?.result ?? best) : null;
-  const goal = hasAverage ? (index ? roleGoal : (personGoal ?? roleGoal)) : personGoal;
-  const goalIsRole = hasAverage && goal != null && (index || personGoal == null);
+  const goal = hasAverage ? (index && !collective ? roleGoal : (personGoal ?? roleGoal)) : personGoal;
+  const goalIsRole = !collective && hasAverage && goal != null && (index || personGoal == null);
   const roleGoalLabel = managerGoal != null ? "da meta da gerência" : "da meta do operador de caixa";
   const pct = upcoming || shown == null ? 0 : goal != null ? (shown / goal) * 100 : best > 0 ? (shown / best) * 100 : 0;
   const headcount = `${count} ${count === 1 ? "pessoa" : "pessoas"}`;
@@ -363,11 +364,21 @@ export function ChallengeSummary({
   const upcoming = view.status === "upcoming";
   const people = view.participants;
   const count = people.length;
-  const rule = c.mode === "MINIMUM" ? challengeMinimumLabel(c) : challengeCriterion(c);
+  const rule = c.mode === "MINIMUM" || c.mode === "COLLECTIVE" ? challengeMinimumLabel(c) : challengeCriterion(c);
   const headcount = `${count} ${count === 1 ? "pessoa" : "pessoas"}`;
   const note = upcoming ? headcount : [rule, headcount].filter(Boolean).join(" · ");
 
   const standings = [
+    c.mode === "COLLECTIVE"
+      ? roleStanding(
+          view.collective
+            ? { result: view.collective.result, target: view.collective.target, periodPrevious: view.collective.periodPrevious, atingiu: view.collective.atingiu, prize: view.collective.prize }
+            : null,
+          view.status,
+          "Equipe ganhou",
+          "Equipe não ganhou",
+        )
+      : null,
     roleStanding(view.management, view.status, "Gerência ganhou", "Gerência não ganhou"),
     roleStanding(view.cashier, view.status, "Operador de caixa ganhou", "Operador de caixa não ganhou"),
   ].filter((item): item is { ok: boolean; label: string } => item != null);

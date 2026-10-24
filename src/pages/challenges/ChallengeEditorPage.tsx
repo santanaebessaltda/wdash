@@ -271,6 +271,7 @@ export default function ChallengeEditorPage() {
   const index = isIndexMetric(form.metric);
   const modo = form.mode;
   const podio = modo === "CONTEST" ? form.prizes.slice(0, MAX_PODIUM) : form.prizes.slice(0, 1);
+  const coletivo = modo === "COLLECTIVE";
 
   return (
     <div>
@@ -392,6 +393,7 @@ export default function ChallengeEditorPage() {
               options={[
                 { value: "CONTEST", label: CHALLENGE_MODE_LABEL.CONTEST },
                 { value: "MINIMUM", label: CHALLENGE_MODE_LABEL.MINIMUM },
+                { value: "COLLECTIVE", label: CHALLENGE_MODE_LABEL.COLLECTIVE },
               ]}
               value={modo}
               onChange={(v) => v && set({ mode: v })}
@@ -401,13 +403,17 @@ export default function ChallengeEditorPage() {
           <div className="flex flex-col gap-4">
             <FormField
               label={MIN_LABEL[form.metric]}
-              required={modo === "MINIMUM"}
+              required={modo === "MINIMUM" || coletivo}
               optional={modo === "CONTEST"}
               error={errors.target}
               hint={
-                modo === "MINIMUM"
-                  ? "Quem atingir esse valor no período ganha o prêmio."
-                  : `Quem ficar abaixo deste ${index ? "índice" : "valor"} não recebe prêmio, mesmo que esteja entre as primeiras posições.`
+                coletivo
+                  ? index
+                    ? "A filial ganha quando o índice contra o período anterior chegar nesse valor. A venda sem vendedor identificado entra na conta."
+                    : "A filial ganha quando o total do período chegar nesse valor. A venda sem vendedor identificado entra na conta."
+                  : modo === "MINIMUM"
+                    ? "Quem atingir esse valor no período ganha o prêmio."
+                    : `Quem ficar abaixo deste ${index ? "índice" : "valor"} não recebe prêmio, mesmo que esteja entre as primeiras posições.`
               }
             >
               <TargetInput metric={form.metric} value={form.target} onChange={(target) => set({ target })} invalid={Boolean(errors.target)} />
@@ -417,7 +423,11 @@ export default function ChallengeEditorPage() {
                 label="Vendas mínimas para participar"
                 optional
                 error={errors.minSales}
-                hint="Opcional. Em branco ou 0 = sem piso. Se preencher (≥ 1), só concorre quem tiver pelo menos esse número de vendas."
+                hint={
+                  coletivo
+                    ? "Opcional. Em branco ou 0 = sem piso. Se preencher (≥ 1), a filial só ganha com pelo menos esse número de vendas."
+                    : "Opcional. Em branco ou 0 = sem piso. Se preencher (≥ 1), só concorre quem tiver pelo menos esse número de vendas."
+                }
               >
                 <Input
                   inputMode="numeric"
@@ -434,7 +444,7 @@ export default function ChallengeEditorPage() {
           {podio.map((p, i) => (
             <FormField
               key={i}
-              label={modo === "MINIMUM" ? "Prêmio por pessoa" : PODIUM_LABEL[i]}
+              label={coletivo ? "Prêmio da equipe" : modo === "MINIMUM" ? "Prêmio por pessoa" : PODIUM_LABEL[i]}
               required
               error={errors.prizes?.[i]}
             >
@@ -480,9 +490,13 @@ export default function ChallengeEditorPage() {
               />
             </div>
             <p className="mt-1.5 text-[11.5px] text-t2">
-              {index
-                ? "A gerência recebe o prêmio quando o índice da equipe, comparado com o período anterior de mesma duração, atingir o mínimo definido abaixo."
-                : "A gerência recebe o prêmio quando a equipe atinge a meta definida abaixo."}
+              {coletivo
+                ? index
+                  ? "A gerência recebe o prêmio quando o índice da filial, comparado com o período anterior de mesma duração, atingir o mínimo definido abaixo."
+                  : "A gerência recebe o prêmio quando o total da filial atingir a meta definida abaixo. A venda sem vendedor identificado entra na conta."
+                : index
+                  ? "A gerência recebe o prêmio quando o índice da equipe, comparado com o período anterior de mesma duração, atingir o mínimo definido abaixo."
+                  : "A gerência recebe o prêmio quando a equipe atinge a meta definida abaixo."}
             </p>
             {form.managerOn && (
               <div className="mt-3 flex flex-col gap-4">
@@ -524,9 +538,13 @@ export default function ChallengeEditorPage() {
               />
             </div>
             <p className="mt-1.5 text-[11.5px] text-t2">
-              {index
-                ? "Quem tem o cargo Operador de caixa nesta filial recebe o prêmio quando o índice da equipe, comparado com o período anterior de mesma duração, atingir o mínimo definido abaixo."
-                : "Quem tem o cargo Operador de caixa nesta filial recebe o prêmio quando a equipe atinge a meta definida abaixo."}
+              {coletivo
+                ? index
+                  ? "Quem tem o cargo Operador de caixa nesta filial recebe o prêmio quando o índice da filial, comparado com o período anterior de mesma duração, atingir o mínimo definido abaixo."
+                  : "Quem tem o cargo Operador de caixa nesta filial recebe o prêmio quando o total da filial atingir a meta definida abaixo. A venda sem vendedor identificado entra na conta."
+                : index
+                  ? "Quem tem o cargo Operador de caixa nesta filial recebe o prêmio quando o índice da equipe, comparado com o período anterior de mesma duração, atingir o mínimo definido abaixo."
+                  : "Quem tem o cargo Operador de caixa nesta filial recebe o prêmio quando a equipe atinge a meta definida abaixo."}
             </p>
             {form.cashierOn && (
               <div className="mt-3 flex flex-col gap-4">

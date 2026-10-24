@@ -136,6 +136,25 @@ describe("validateChallengeForm", () => {
     expect([e.cashierPrize, e.cashierTarget]).toEqual(["Campo obrigatório.", "Campo obrigatório."]);
     expect(validateChallengeForm(valid({ cashierOn: false, cashierPrize: empty, cashierTarget: "" }))).toEqual({});
   });
+
+  it("equipe junta exige o mínimo e grava um prêmio só", () => {
+    expect(validateChallengeForm(valid({ mode: "COLLECTIVE", target: "" })).target).toBe("Campo obrigatório.");
+    const input = challengeFormToInput(
+      valid({
+        mode: "COLLECTIVE",
+        scope: "ALL",
+        products: [],
+        target: "10",
+        prizes: [
+          { kind: "MONEY", amount: "50,00", label: "" },
+          { kind: "MONEY", amount: "30,00", label: "" },
+        ],
+      }),
+    );
+    expect(input.mode).toBe("COLLECTIVE");
+    expect(input.target).toBe(10);
+    expect(input.prizes).toEqual([{ kind: "MONEY", amount: 50 }]);
+  });
 });
 
 describe("challengeFormToInput / challengeToForm", () => {

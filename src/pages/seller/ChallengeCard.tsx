@@ -50,6 +50,8 @@ function SellerChallengeCard({
       ? null
       : c.mode === "CONTEST" && c.position != null
         ? <ProgressStanding ok={c.won}>{`${c.position}º lugar`}</ProgressStanding>
+        : c.mode === "COLLECTIVE" && (c.won || ended)
+          ? <ProgressStanding ok={c.won}>{c.won ? "Equipe ganhou" : "Equipe não ganhou"}</ProgressStanding>
         : c.mode === "MINIMUM" && (c.won || ended)
           ? <ProgressStanding ok={c.won}>{c.won ? "Ganhou" : "Não ganhou"}</ProgressStanding>
           : null;

@@ -5,14 +5,14 @@
 import { eachDay, addDays } from "@/lib/format";
 import type { GoalTeamMember } from "./goalsRepo";
 import type { NonSalesPeople } from "./salesRepo";
-import type { SalesSellerDayAgg, SalesSellerProductDayAgg } from "./salesTypes";
+import type { SalesDayAgg, SalesProductDayAgg, SalesSellerDayAgg, SalesSellerProductDayAgg } from "./salesTypes";
 
 /** Tipo do desafio: Itens vendidos  |  Faturamento  |  P.A.  |  Ticket medio  |  Indice de desempenho. */
 export type ChallengeMetric = "QUANTITY" | "VALUE" | "PA" | "TICKET" | "INDEX";
 /** O que conta em Quantidade/Valor: produtos escolhidos  |  categorias escolhidas  |  tudo o que a pessoa vender. */
 export type ChallengeScope = "PRODUCTS" | "CATEGORIES" | "ALL";
-/** CONTEST = Quem fizer mais (podio)  |  MINIMUM = Quem chegar ao minimo (todos que chegarem). */
-export type ChallengeMode = "CONTEST" | "MINIMUM";
+/** CONTEST = Quem fizer mais (podio)  |  MINIMUM = Quem chegar ao minimo  |  COLLECTIVE = a filial junta. */
+export type ChallengeMode = "CONTEST" | "MINIMUM" | "COLLECTIVE";
 
 /** Premio: valor em R$ (> 0) ou descricao livre (1 - 60 caracteres). */
 export type ChallengePrize = { kind: "MONEY"; amount: number } | { kind: "ITEM"; label: string };
@@ -61,7 +61,7 @@ export const PRIZE_LABEL_MAX = 60;
 
 const METRICS: readonly ChallengeMetric[] = ["QUANTITY", "VALUE", "PA", "TICKET", "INDEX"];
 const SCOPES: readonly ChallengeScope[] = ["PRODUCTS", "CATEGORIES", "ALL"];
-const MODES: readonly ChallengeMode[] = ["CONTEST", "MINIMUM"];
+const MODES: readonly ChallengeMode[] = ["CONTEST", "MINIMUM", "COLLECTIVE"];
 
 export const usesScope = (m: ChallengeMetric) => m === "QUANTITY" || m === "VALUE";
 /** Indice de desempenho: gerencia ganha pelo indice da equipe x o mesmo n de dias antes do desafio. */
@@ -388,13 +388,17 @@ export interface ChallengeAggInput {
   sellerDays: SalesSellerDayAgg[];
   /** `storeId|day` com venda da loja (sales_day_agg ALL)  -  base do alerta de resultado incompleto. */
   storeSaleDays: Set<string>;
+  /** Total da filial (sales_day_agg ALL). O desafio coletivo conta daqui, com a venda sem vendedor. */
+  storeDays: SalesDayAgg[];
+  /** Itens da filial por produto (sales_product_day_agg). Desafio coletivo de produtos ou categorias. */
+  storeProducts: SalesProductDayAgg[];
   team: GoalTeamMember[];
   /** COD_PRODUTO  ->  tipo (categoria). */
   typeByCode: Map<string, number>;
 }
 
 export function emptyChallengeAggInput(): ChallengeAggInput {
-  return { sellerProducts: [], sellerDays: [], storeSaleDays: new Set(), team: [], typeByCode: new Map() };
+  return { sellerProducts: [], sellerDays: [], storeSaleDays: new Set(), storeDays: [], storeProducts: [], team: [], typeByCode: new Map() };
 }
 
 /** Tira as linhas de gerencia / conta de freelancer (ativos com cargo = VENDEDOR), por gerador e por nome. */
@@ -434,17 +438,21 @@ export async function fetchChallengeInput(q: {
   if (q.challenges.length === 0) return out;
   const sb = await client();
   if (!sb) return out;
-  const { fetchAllPages, fetchNonSalesPeople, fetchSalesDayAggs, fetchSalesSellerDayAggs } = await import("./salesRepo");
+  const { fetchAllPages, fetchNonSalesPeople, fetchSalesDayAggs, fetchSalesProductDayAggs, fetchSalesSellerDayAggs } = await import("./salesRepo");
   const { fetchGoalTeam } = await import("./goalsRepo");
   const storeIds = [...new Set(q.challenges.map((c) => c.storeId))];
   // Indice com premio da gerencia compara a equipe com o mesmo n de dias antes do desafio.
   const start = (c: ChallengeRecord) =>
-    isIndexMetric(c.metric) && c.managerPrize ? managerIndexWindows(c, q.today).previous.from : c.startsOn;
+    isIndexMetric(c.metric) && (c.mode === "COLLECTIVE" || c.managerPrize != null || c.cashierPrize != null)
+      ? managerIndexWindows(c, q.today).previous.from
+      : c.startsOn;
   const from = q.challenges.reduce((m, c) => (start(c) < m ? start(c) : m), start(q.challenges[0]));
   const maxEnd = q.challenges.reduce((m, c) => (c.endsOn > m ? c.endsOn : m), q.challenges[0].endsOn);
   const to = maxEnd < q.today ? maxEnd : q.today;
   const needsItems = q.challenges.some((c) => usesScope(c.metric) && c.scope !== "ALL");
   const needsTypes = q.challenges.some((c) => usesScope(c.metric) && c.scope === "CATEGORIES");
+  const needsStoreDays = needsItems || q.challenges.some((c) => c.mode === "COLLECTIVE");
+  const needsStoreProducts = q.challenges.some((c) => c.mode === "COLLECTIVE" && usesScope(c.metric) && c.scope !== "ALL");
 
   out.team = await fetchGoalTeam(q.tenantId, storeIds);
   if (from > to) return out;
@@ -487,14 +495,17 @@ export async function fetchChallengeInput(q: {
       })()
     : Promise.resolve([] as SalesSellerProductDayAgg[]);
 
-  const [products, sellerDays, storeDays, catalog] = await Promise.all([
+  const [products, sellerDays, storeDays, storeProducts, catalog] = await Promise.all([
     sellerProducts,
     fetchSalesSellerDayAggs(range),
-    needsItems ? fetchSalesDayAggs({ ...range, brand: "ALL" }) : Promise.resolve([]),
+    needsStoreDays ? fetchSalesDayAggs({ ...range, brand: "ALL" }) : Promise.resolve([]),
+    needsStoreProducts ? fetchSalesProductDayAggs(range) : Promise.resolve([]),
     needsTypes ? fetchChallengeCatalog() : Promise.resolve(null),
   ]);
   out.sellerProducts = products;
   out.sellerDays = sellerDays;
+  out.storeDays = storeDays;
+  out.storeProducts = storeProducts;
   for (const d of storeDays) if (d.revenueCents > 0) out.storeSaleDays.add(`${d.storeId}|${d.day}`);
   if (catalog) out.typeByCode = catalog.typeByCode;
   return out;

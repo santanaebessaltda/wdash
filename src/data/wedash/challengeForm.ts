@@ -137,7 +137,8 @@ function prizeValue(p: PrizeForm): ChallengePrize {
   return p.kind === "MONEY" ? { kind: "MONEY", amount: round2(parseNumber(p.amount) ?? 0) } : { kind: "ITEM", label: p.label.trim() };
 }
 
-const activePrizes = (f: ChallengeForm) => (f.mode === "MINIMUM" ? f.prizes.slice(0, 1) : f.prizes.slice(0, MAX_PODIUM));
+const onePrize = (mode: ChallengeMode) => mode === "MINIMUM" || mode === "COLLECTIVE";
+const activePrizes = (f: ChallengeForm) => (onePrize(f.mode) ? f.prizes.slice(0, 1) : f.prizes.slice(0, MAX_PODIUM));
 
 /** Erros do formulario; objeto vazio = pode salvar. */
 export function validateChallengeForm(f: ChallengeForm): ChallengeFormErrors {
@@ -161,7 +162,7 @@ export function validateChallengeForm(f: ChallengeForm): ChallengeFormErrors {
     }
   }
 
-  const target = targetError(f.metric, f.target, f.mode === "MINIMUM");
+  const target = targetError(f.metric, f.target, f.mode === "MINIMUM" || f.mode === "COLLECTIVE");
   if (target) e.target = target;
 
   const prizes: Record<number, string> = {};

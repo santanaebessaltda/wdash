@@ -261,6 +261,19 @@ export async function loadBranchWallet(input: {
         });
       }
     }
+    const teamPrize = status === "active" || view.collective?.prize.kind !== "MONEY" ? null : view.collective?.atingiu ? view.collective.prize : null;
+    if (teamPrize && teamPrize.kind === "MONEY" && view.collective) {
+      const ids: string[] = [];
+      for (const person of view.collective.recipients) {
+        const personId = personFromKey(roster, person.key, person.name);
+        if (personId && !ids.includes(personId)) ids.push(personId);
+      }
+      const shares = splitEqualCents(reaisToCents(teamPrize.amount), ids.length);
+      ids.forEach((personId, index) => {
+        const share = shares[index] ?? 0;
+        if (share > 0) people.push({ personId, moneyCents: share, itemLabel: null });
+      });
+    }
     const cashierPrize = status === "active" ? null : view.cashier?.atingiu ? view.cashier.prize : null;
     const cashiers = roster.cashiers;
     if (cashierPrize && cashiers.length > 0) {

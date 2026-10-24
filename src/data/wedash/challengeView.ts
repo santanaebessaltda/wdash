@@ -104,6 +104,7 @@ export const CHALLENGE_SCOPE_LABEL: Record<ChallengeScope, string> = {
 export const CHALLENGE_MODE_LABEL: Record<ChallengeMode, string> = {
   CONTEST: "Quem fizer mais",
   MINIMUM: "Quem atingir o mínimo",
+  COLLECTIVE: "A equipe junta",
 };
 
 export interface ChallengeParticipant {
@@ -123,6 +124,17 @@ export interface ChallengeParticipant {
   /** Dias do desafio em que a pessoa participa. */
   eligibleDays: number;
   periodDays: number;
+}
+
+export interface ChallengeCollectiveResult {
+  /** Total da filial. Índice: a filial contra o período anterior. */
+  result: number | null;
+  target: number;
+  periodPrevious: { from: string; to: string } | null;
+  atingiu: boolean;
+  prize: ChallengePrize;
+  /** Vendedores que dividem o prêmio em R$. */
+  recipients: { key: string; name: string; group: string | null }[];
 }
 
 export interface ChallengeManagerResult {
@@ -154,6 +166,8 @@ export interface ChallengeView {
   management: ChallengeManagerResult | null;
   /** Mesma conta da gerência, com meta e prêmio próprios. */
   cashier: ChallengeManagerResult | null;
+  /** A filial contra um mínimo. Null nos outros modos. */
+  collective: ChallengeCollectiveResult | null;
   /** Dias com venda da loja e sem itens por pessoa (produtos/categorias escolhidos). */
   daysIncomplete: string[];
 }
@@ -445,11 +459,70 @@ export function buildChallengeView(args: {
     return sales > 0 ? round2(all.reduce((s, a) => s + a.revenueCents, 0) / 100 / sales) : 0;
   };
 
+  const collectiveMode = c.mode === "COLLECTIVE";
+  const storeSold = new Set(aggs.storeSaleDays);
+  for (const day of aggs.storeDays) {
+    if (day.storeId === c.storeId && day.brand === "ALL" && (day.revenueCents > 0 || day.salesCount > 0)) {
+      storeSold.add(`${day.storeId}|${day.day}`);
+    }
+  }
+
+  const storeSlice = (from: string, to: string) => {
+    let revenueCents = 0;
+    let sales = 0;
+    let items = 0;
+    let withoutItems = false;
+    const productDays = new Set<string>();
+    const byProduct = usesScope(c.metric) && c.scope !== "ALL";
+    if (byProduct) {
+      const codes = new Set(c.products.map((p) => p.code));
+      const kinds = new Set(c.categories.map((t) => t.typeId));
+      for (const row of aggs.storeProducts) {
+        if (row.storeId !== c.storeId || row.day < from || row.day > to) continue;
+        productDays.add(row.day);
+        const chosen = c.scope === "PRODUCTS" ? codes.has(row.productCode) : kinds.has(aggs.typeByCode.get(row.productCode) ?? Number.NaN);
+        if (!chosen) continue;
+        items += row.itemCount;
+        revenueCents += row.revenueCents;
+      }
+    }
+    for (const day of aggs.storeDays) {
+      if (day.storeId !== c.storeId || day.brand !== "ALL" || day.day < from || day.day > to) continue;
+      if (!byProduct) {
+        revenueCents += day.revenueCents;
+        items += day.itemCount;
+      }
+      sales += day.salesCount;
+      if (day.salesCount > 0 && day.itemCount <= 0) withoutItems = true;
+    }
+    let incomplete = false;
+    if (byProduct && status !== "upcoming") {
+      for (const day of eachDay(from, to)) {
+        if (storeSold.has(`${c.storeId}|${day}`) && !productDays.has(day)) incomplete = true;
+      }
+    }
+    return { revenueCents, sales, items, withoutItems, incomplete };
+  };
+
+  const storeNumber = (from: string, to: string): { result: number | null; sales: number } => {
+    if (status === "upcoming") return { result: null, sales: 0 };
+    const slice = storeSlice(from, to);
+    if (slice.incomplete) return { result: null, sales: slice.sales };
+    const chosen = usesScope(c.metric) && c.scope !== "ALL";
+    if (c.metric === "QUANTITY") return { result: !chosen && slice.withoutItems ? null : slice.items, sales: slice.sales };
+    if (c.metric === "VALUE") return { result: round2(slice.revenueCents / 100), sales: slice.sales };
+    if (slice.sales <= 0) return { result: 0, sales: 0 };
+    if (c.metric === "PA") return { result: slice.withoutItems ? null : round2(slice.items / slice.sales), sales: slice.sales };
+    return { result: round2(slice.revenueCents / 100 / slice.sales), sales: slice.sales };
+  };
+
   let indexBundle: { result: number | null; periodPrevious: { from: string; to: string } | null } | null = null;
-  const wantsIndex =
+  const wantsPeopleIndex =
+    !collectiveMode &&
     c.metric === "INDEX" &&
     ((c.managerPrize != null && c.managerTarget != null) || (c.cashierPrize != null && c.cashierTarget != null));
-  if (wantsIndex) {
+  const wantsStoreIndex = collectiveMode && c.metric === "INDEX";
+  if (wantsPeopleIndex) {
     const janelas = managerIndexWindows(c, today);
     const peopleIn = (j: DayRange) => {
       const m = new Map<string, IndexPersonTotals>();
@@ -472,7 +545,21 @@ export function buildChallengeView(args: {
         ? null
         : teamIndex(peopleIn(janelas.current), peopleIn(janelas.comparado));
     indexBundle = { result: index == null ? null : round2(index), periodPrevious: janelas.previous };
+  } else if (wantsStoreIndex) {
+    const janelas = managerIndexWindows(c, today);
+    const asPeople = (from: string, to: string): IndexPersonTotals[] => {
+      const slice = storeSlice(from, to);
+      if (slice.sales <= 0) return [];
+      return [{ revenue: slice.revenueCents, sales: slice.sales, items: slice.items, withoutItems: slice.withoutItems || slice.incomplete }];
+    };
+    const index =
+      status === "upcoming" || !janelas.current || !janelas.comparado
+        ? null
+        : teamIndex(asPeople(janelas.current.from, janelas.current.to), asPeople(janelas.comparado.from, janelas.comparado.to));
+    indexBundle = { result: index == null ? null : round2(index), periodPrevious: janelas.previous };
   }
+
+  const storeNow = collectiveMode && c.metric !== "INDEX" ? storeNumber(c.startsOn, until) : null;
 
   const roleResult = (prize: ChallengePrize | null, goal: number | null): ChallengeManagerResult | null => {
     if (!prize || goal == null) return null;
@@ -486,7 +573,7 @@ export function buildChallengeView(args: {
         prize,
       };
     }
-    const result = teamAverageOf();
+    const result = collectiveMode ? (storeNow?.result ?? null) : teamAverageOf();
     return {
       result,
       target: goal,
@@ -500,11 +587,62 @@ export function buildChallengeView(args: {
   const cashier = roleResult(c.cashierPrize, c.cashierTarget);
 
   const daysIncomplete: string[] = [];
-  if (byProduct && status !== "upcoming") {
+  if (byProduct && status !== "upcoming" && !collectiveMode) {
     const withItems = new Set(aggs.sellerProducts.filter(inPeriod).map((r) => r.day));
     for (const day of eachDay(c.startsOn, until)) {
-      if (aggs.storeSaleDays.has(`${c.storeId}|${day}`) && !withItems.has(day)) daysIncomplete.push(day);
+      if (storeSold.has(`${c.storeId}|${day}`) && !withItems.has(day)) daysIncomplete.push(day);
     }
+  }
+  if (byProduct && status !== "upcoming" && collectiveMode) {
+    const withItems = new Set(aggs.storeProducts.filter(inPeriod).map((r) => r.day));
+    for (const day of eachDay(c.startsOn, until)) {
+      if (storeSold.has(`${c.storeId}|${day}`) && !withItems.has(day)) daysIncomplete.push(day);
+    }
+  }
+
+  const recipients = team
+    .filter((member) => member.salesPerson && (presenceOf.get(member.employeeId)?.size ?? 0) > 0)
+    .map((member) => ({
+      key: `e:${member.employeeId}`,
+      name: collaboratorName(member.name),
+      group: member.shiftName ?? null,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR") || a.key.localeCompare(b.key));
+
+  let collective: ChallengeCollectiveResult | null = null;
+  let shown = participants;
+  if (collectiveMode && c.target != null && c.prizes[0]) {
+    const measured = c.metric === "INDEX" ? { result: indexBundle?.result ?? null, sales: storeSlice(c.startsOn, until).sales } : storeNow;
+    const result = measured?.result ?? null;
+    const sales = measured?.sales ?? 0;
+    const openUntilEndTeam = settlesAtEnd(c.metric) && status === "active";
+    collective = {
+      result,
+      target: c.target,
+      periodPrevious: c.metric === "INDEX" ? (indexBundle?.periodPrevious ?? null) : null,
+      atingiu:
+        status !== "upcoming" &&
+        !openUntilEndTeam &&
+        result != null &&
+        result > 0 &&
+        sales >= minSales &&
+        result >= c.target - 1e-9,
+      prize: c.prizes[0],
+      recipients,
+    };
+    shown = recipients.map((person) => ({
+      key: person.key,
+      name: person.name,
+      group: person.group,
+      result: null,
+      sales: 0,
+      position: null,
+      winner: false,
+      prize: null,
+      gap: null,
+      eligibleDays: 0,
+      periodDays,
+    }));
   }
 
   const prazo =
@@ -519,11 +657,12 @@ export function buildChallengeView(args: {
     status,
     prazo,
     emClosing: status === "ended" && today <= addDays(c.endsOn, 1),
-    participants,
+    participants: shown,
     reachedCount: c.mode === "MINIMUM" ? participants.filter((p) => p.winner).length : 0,
-    teamAverage: c.metric === "INDEX" ? (management?.result ?? cashier?.result ?? null) : teamAverageOf(),
+    teamAverage: collective ? collective.result : c.metric === "INDEX" ? (management?.result ?? cashier?.result ?? null) : teamAverageOf(),
     management,
     cashier,
+    collective,
     daysIncomplete,
   };
 }
@@ -542,6 +681,8 @@ export interface ChallengePayout {
   vencedores: ChallengeWinner[];
   management: ChallengePrize | null;
   cashier: ChallengePrize | null;
+  /** Prêmio da equipe, uma vez. O valor em R$ é dividido na carteira. */
+  collective: ChallengePrize | null;
   /** Premios em R$ (pessoas + gerencia + operador de caixa), cada um uma vez. */
   totalBrl: number;
   /** Outros premios (texto livre), um por vencedor, mais gerencia e operador de caixa. */
@@ -560,11 +701,13 @@ export function challengePayout(view: ChallengeView): ChallengePayout {
     }));
   const management = view.management?.atingiu ? view.management.prize : null;
   const cashier = view.cashier?.atingiu ? view.cashier.prize : null;
-  const prizes = [...vencedores.map((w) => w.prize), ...(management ? [management] : []), ...(cashier ? [cashier] : [])];
+  const collective = view.collective?.atingiu ? view.collective.prize : null;
+  const prizes = [...vencedores.map((w) => w.prize), ...(management ? [management] : []), ...(cashier ? [cashier] : []), ...(collective ? [collective] : [])];
   return {
     vencedores,
     management,
     cashier,
+    collective,
     totalBrl: prizes.reduce((s, p) => s + (p.kind === "MONEY" ? p.amount : 0), 0),
     especie: prizes.flatMap((p) => (p.kind === "ITEM" ? [p.label] : [])),
   };

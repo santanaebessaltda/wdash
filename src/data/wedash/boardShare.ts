@@ -6,7 +6,7 @@ import { goalFromRow, sellerDayFromRow, teamMemberFromRow, type GoalRow, type Go
 import { unionOriginKeys } from "@/data/wedash/engine/salesOrigin";
 import type { GoalRecord, GoalTeamMember } from "@/data/wedash/goalsRepo";
 import { excludeNonSalesPeople, salesOriginsFrom, type OriginSeller, type OriginStore } from "@/data/wedash/salesRepo";
-import type { SalesDayAgg, SalesSellerDayAgg, SalesSellerProductDayAgg, SellerShiftRef } from "@/data/wedash/salesTypes";
+import type { SalesDayAgg, SalesProductDayAgg, SalesSellerDayAgg, SalesSellerProductDayAgg, SellerShiftRef } from "@/data/wedash/salesTypes";
 import { shiftName } from "@/lib/format";
 import { getSupabase } from "@/lib/supabase";
 import { paths } from "@/router/paths";
@@ -62,6 +62,7 @@ type Raw = {
   goals: GoalRow[];
   challenges: ChallengeRow[];
   sellerProducts: SalesSellerProductDayAgg[];
+  storeProducts?: SalesProductDayAgg[];
   catalog: { code: string; typeId: number | null }[];
   photos: ProfilePhotoRef[];
 };
@@ -127,6 +128,8 @@ export function mapBoardShare(raw: Raw): PublicBoardPack {
   aggs.team = goalTeam;
   aggs.sellerDays = teamSellers;
   aggs.sellerProducts = products;
+  aggs.storeDays = days.filter((day) => day.brand === "ALL");
+  aggs.storeProducts = raw.storeProducts ?? [];
   for (const day of days) if (day.brand === "ALL" && day.revenueCents > 0) aggs.storeSaleDays.add(`${day.storeId}|${day.day}`);
   for (const item of raw.catalog ?? []) {
     if (item.typeId != null) aggs.typeByCode.set(item.code, Number(item.typeId));

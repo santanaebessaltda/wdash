@@ -11,7 +11,7 @@ import {
 } from "./challengeView";
 import { emptyChallengeAggInput, managerIndexWindows, type ChallengeAggInput, type ChallengeRecord } from "./challengesRepo";
 import type { GoalTeamMember } from "./goalsRepo";
-import type { SalesSellerDayAgg, SalesSellerProductDayAgg } from "./salesTypes";
+import type { SalesDayAgg, SalesProductDayAgg, SalesSellerDayAgg, SalesSellerProductDayAgg } from "./salesTypes";
 
 const challenge = (over: Partial<ChallengeRecord> = {}): ChallengeRecord => ({
   id: "c1",
@@ -83,6 +83,29 @@ const sellerDay = (
   salesCount,
   itemCount,
   ...over,
+});
+
+const storeDay = (day: string, revenueCents: number, salesCount: number, itemCount: number): SalesDayAgg => ({
+  tenantId: "t1",
+  storeId: "s1",
+  day,
+  brand: "ALL",
+  revenueCents,
+  salesCount,
+  itemCount,
+  cmvCents: 0,
+});
+
+const storeProduct = (productCode: string, itemCount: number, revenueCents: number): SalesProductDayAgg => ({
+  tenantId: "t1",
+  storeId: "s1",
+  day: "2026-10-06",
+  productId: 1,
+  productCode,
+  productName: productCode,
+  brand: "ALL",
+  revenueCents,
+  itemCount,
 });
 
 const team = [member(1, "ANA"), member(2, "BIA"), member(3, "CAROL")];
@@ -567,6 +590,52 @@ describe("buildChallengeView — gerência, incompleto e status", () => {
     expect(v.cashier).toMatchObject({ result: 100, target: 100, atingiu: true, prize: { kind: "ITEM", label: "Vale" } });
     expect(challengePayout(v).management).toBeNull();
     expect(challengePayout(v).cashier).toEqual({ kind: "ITEM", label: "Vale" });
+  });
+
+  it("equipe junta usa o total da filial, com a venda sem vendedor, e divide o prêmio entre vendedores", () => {
+    const v = build(
+      challenge({
+        mode: "COLLECTIVE",
+        metric: "VALUE",
+        scope: "ALL",
+        products: [],
+        target: 100,
+        prizes: [{ kind: "MONEY", amount: 90 }],
+      }),
+      input({
+        team: [...team, member(9, "CAIXA", { salesPerson: false })],
+        sellerDays: [sellerDay(1, 1, 1, 1_000)],
+        storeDays: [storeDay("2026-10-06", 20_000, 4, 8)],
+      }),
+    );
+    expect(v.collective).toMatchObject({ result: 200, target: 100, atingiu: true });
+    expect(v.collective?.recipients.map((person) => person.name)).toEqual(["ANA", "BIA", "CAROL"]);
+    expect(v.participants.every((person) => !person.winner)).toBe(true);
+    expect(v.management).toBeNull();
+    const pay = challengePayout(v);
+    expect(pay.collective).toEqual({ kind: "MONEY", amount: 90 });
+    expect(pay.totalBrl).toBe(90);
+    expect(pay.vencedores).toEqual([]);
+  });
+
+  it("equipe junta de produtos escolhidos ignora a venda atribuída e soma o total da filial", () => {
+    const v = build(
+      challenge({
+        mode: "COLLECTIVE",
+        metric: "QUANTITY",
+        products: [{ code: "BS1", name: "A" }],
+        target: 3,
+        prizes: [{ kind: "ITEM", label: "Pizza" }],
+      }),
+      input({
+        sellerProducts: [item(1001, "BS1", 99)],
+        storeProducts: [storeProduct("BS1", 4, 8_000), storeProduct("OUTRO", 9, 1_000)],
+      }),
+      "2026-10-15",
+    );
+    expect(v.collective).toMatchObject({ result: 4, atingiu: true, prize: { kind: "ITEM", label: "Pizza" } });
+    expect(challengePayout(v).especie).toEqual(["Pizza"]);
+    expect(challengePayout(v).totalBrl).toBe(0);
   });
 
   it("gerência em P.A. = Σ itens ÷ Σ vendas da equipe; Atingiu só no fim", () => {
