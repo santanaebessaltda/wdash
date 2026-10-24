@@ -5,28 +5,14 @@ import { ProfilePhotosProvider } from "@/components/wedash/PersonAvatar";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { readBoardShare, type PublicBoardPack } from "@/data/wedash/boardShare";
 import { effectiveWeekHours, parseWeekHours } from "@/data/wedash/storeHours";
-import { cn } from "@/lib/cn";
 import { BoardView } from "./BoardView";
 import { useBoardTheme, type BoardTheme } from "./boardTheme";
 
 const POLL_MS = 60 * 1000;
 
 function BoardFrame({ theme, children }: { theme: BoardTheme; children: ReactNode }) {
-  const dark = theme === "dark";
   return (
-    <div data-board-theme={theme} className={cn("tela-cheia relative overflow-hidden text-t0", dark ? "access-hero-scope" : "bg-bg-0")}>
-      {dark ? (
-        <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: "linear-gradient(165deg,#3a1028,#0c0e15 70%)" }}>
-          <div
-            className="absolute -right-16 -top-20 h-[340px] w-[340px] rounded-full"
-            style={{ background: "radial-gradient(circle,rgba(255,0,128,.42),transparent 70%)" }}
-          />
-          <div
-            className="absolute -bottom-24 -left-10 h-[300px] w-[300px] rounded-full"
-            style={{ background: "radial-gradient(circle,rgba(255,140,190,.28),transparent 70%)" }}
-          />
-        </div>
-      ) : null}
+    <div data-board-theme={theme} className="tela-cheia relative overflow-hidden bg-bg-0 text-t0">
       {children}
     </div>
   );
