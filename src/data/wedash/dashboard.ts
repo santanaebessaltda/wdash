@@ -25,7 +25,7 @@ import type { TintKey } from "@/pages/dashboards/icons";
 import { buildStoreInsight } from "./insight";
 
 /** Destaques da equipe na Visão geral. */
-export const OVERVIEW_TEAM_TOP = 3;
+export const OVERVIEW_TEAM_TOP = 5;
 
 /** Top produtos na Visão geral. */
 export const OVERVIEW_PRODUCTS_TOP = 5;

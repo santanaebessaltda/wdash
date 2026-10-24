@@ -106,8 +106,14 @@ function storesLabel(storeRows: string[]): string | null {
   return storeRows.length > 1 ? `${storeRows[0]} · +${storeRows.length - 1}` : storeRows[0]!;
 }
 
-/** Demais filiais no ranking: cinza neutro do Vela, sem competir com a filial em foco. */
-const OTHER_STORES_COLOR = "var(--palette-neutral)";
+/** Demais fatias do ranking. A de maior faturamento fica de fora e usa a cor primária. */
+const BRANCH_COLORS = [
+  "var(--palette-purple)",
+  "var(--palette-blue)",
+  "var(--palette-green)",
+  "var(--palette-amber)",
+  "var(--palette-red)",
+] as const;
 
 /** Ícones dos quatro cards do topo, na ordem dos KPIs. */
 const KPI_TONES = [
@@ -779,8 +785,8 @@ export default function OverviewPage() {
                       value: c.achieved,
                     }))}
                     height={220}
-                    color="var(--palette-purple)"
-                    hoverColor="var(--palette-purple-2)"
+                    color="var(--palette-pink)"
+                    hoverColor="var(--palette-pink-2)"
                     formatValue={brlCent}
                     onSelect={(d) => openDetail({ kind: "category", name: d.label })}
                   />
@@ -879,19 +885,22 @@ export default function OverviewPage() {
                       amount: amountRest,
                     }
                   : null;
-              // Rosa na filial do seletor. Sem uma filial escolhida, o rosa fica na primeira do ranking.
-              const branchColor = (id: string | undefined, isRest: boolean, index: number) => {
-                if (isRest) return OTHER_STORES_COLOR;
-                if (scope.storeIds.length === 0) return index === 0 ? "var(--palette-pink)" : OTHER_STORES_COLOR;
-                return id != null && scope.storeIds.includes(id) ? "var(--palette-pink)" : OTHER_STORES_COLOR;
-              };
+              const topRevenue = view.storesRanking.reduce((max, store) => Math.max(max, store.amount), 0);
+              let paletteIndex = 0;
+              const rankingColors = view.storesRanking.map((store) => {
+                if (topRevenue > 0 && store.amount === topRevenue) return "var(--palette-pink)";
+                const color = BRANCH_COLORS[paletteIndex % BRANCH_COLORS.length];
+                paletteIndex += 1;
+                return color;
+              });
+              const restColor = BRANCH_COLORS[paletteIndex % BRANCH_COLORS.length];
               const donutSegments = [
                 ...view.storesRanking.map((l, i) => ({
                   label: l.name,
                   value: l.amount,
-                  color: branchColor(l.id, false, i),
+                  color: rankingColors[i],
                 })),
-                ...(rest ? [{ label: rest.name, value: rest.amount, color: OTHER_STORES_COLOR }] : []),
+                ...(rest ? [{ label: rest.name, value: rest.amount, color: restColor }] : []),
               ];
               return (
                 <>
@@ -914,7 +923,7 @@ export default function OverviewPage() {
                         store.pctNetwork ?? (totalNetwork > 0 ? (store.amount / totalNetwork) * 100 : 0),
                       );
                       const pctBar = Math.min(100, Math.max(0, pctNetwork));
-                      const color = branchColor("id" in store ? store.id : undefined, store === rest, idx);
+                      const color = store === rest ? restColor : rankingColors[idx];
                       return (
                         <div key={"id" in store && store.id ? String(store.id) : `${store.name}-${idx}`} className="min-w-0 rounded-xl bg-bg-inset p-3">
                           <div className="mb-1.5 flex min-w-0 items-baseline gap-2">
@@ -992,7 +1001,7 @@ export default function OverviewPage() {
           <CardHeader>
             <div className="flex w-full items-center justify-between gap-1.5">
               <CardTitle>Destaques da equipe</CardTitle>
-              <Badge className="!bg-palette-purple-soft !text-palette-purple">Top {OVERVIEW_TEAM_TOP}</Badge>
+              <Badge variant="accent">Top {OVERVIEW_TEAM_TOP}</Badge>
             </div>
           </CardHeader>
           {topSellersOrdenados.length === 0 ? (

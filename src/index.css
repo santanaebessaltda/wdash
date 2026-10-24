@@ -42,6 +42,7 @@
   --wpink-soft: rgba(169, 121, 255, 0.16);
   /* Paleta do Vela (dark). O rosa continua o acento do WDash; o roxo é o acento original do tema. */
   --palette-pink: var(--acc);
+  --palette-pink-2: var(--acc-2);
   --palette-pink-soft: var(--acc-soft);
   --palette-purple: #7c5cff;
   --palette-purple-2: #9d86ff;
@@ -245,6 +246,7 @@
   --color-wpink: var(--wpink);
   --color-wpink-soft: var(--wpink-soft);
   --color-palette-pink: var(--palette-pink);
+  --color-palette-pink-2: var(--palette-pink-2);
   --color-palette-pink-soft: var(--palette-pink-soft);
   --color-palette-purple: var(--palette-purple);
   --color-palette-purple-2: var(--palette-purple-2);
