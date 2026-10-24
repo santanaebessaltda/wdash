@@ -4,19 +4,21 @@
    aponta para pacotes que não existem mais. O cache serve só para abrir
    offline e para os arquivos com hash no nome. Nunca cacheia resposta de erro
    (404 de chunk antigo depois de deploy). */
-const VERSAO = "v14";
+const VERSAO = "v15";
 const CACHE = `wedash-${VERSAO}`;
 // Escopo do SW (= base do app). Em dominio proprio fica "/".
 const BASE = self.registration.scope;
 const INDEX = new URL("index.html", BASE).href;
-// Nomes com v5: o Chrome trata a URL do ícone como imutável. Sem trocar o
-// endereço, quem já salvou o app continua com o ícone antigo.
+// O Chrome trata a URL do ícone como imutável. Sem trocar o endereço,
+// quem já salvou o app continua com o ícone antigo.
 const OFFLINE = [
   "index.html",
   "manifest.webmanifest",
-  "logo.png",
-  "icons/icon-192-v5.png",
-  "icons/icon-512-v5.png",
+  "wdash-logo.svg",
+  "wdash-logo.png",
+  "icons/icon-192-v6.png",
+  "icons/icon-maskable-192-v6.png",
+  "icons/icon-maskable-512-v6.png",
 ].map((arquivo) => new URL(arquivo, BASE).href);
 
 self.addEventListener("install", (event) => {
@@ -43,7 +45,7 @@ self.addEventListener("push", (event) => {
   }
   const opcoes = {
     body: data.body,
-    icon: new URL("icons/icon-192-v5.png", BASE).href,
+    icon: new URL("icons/icon-192-v6.png", BASE).href,
     // A mesma tag troca o resumo anterior e volta a avisar. Sem isso o iPhone
     // às vezes engole o seguinte depois que o app foi aberto pelo primeiro.
     tag: data.tag || "wdash-" + Date.now(),

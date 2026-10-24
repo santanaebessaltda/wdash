@@ -1,10 +1,10 @@
 import type { ReactNode, InputHTMLAttributes } from "react";
 
-/** Marca WDash — o arquivo public/logo.png. */
+/** Marca nas telas. O quadrado tem o mesmo tamanho do Vela (34px). O arquivo é o SVG. */
 export function BrandMark({ size = 34, light: _light = false }: { size?: number; light?: boolean }) {
   return (
     <img
-      src="/logo.png"
+      src="/wdash-logo.svg"
       alt=""
       width={size}
       height={size}

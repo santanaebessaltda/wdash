@@ -23,7 +23,7 @@ export const accessButton =
 export const accessLink = "text-[13px] font-bold text-acc";
 export const accessFooter = "text-[13px] text-t2";
 
-/** Marca das telas de acesso: sempre public/logo.png. */
+/** Marca das telas de acesso: o SVG, no mesmo quadrado do Vela. */
 export function AccessBrand({ size = 56 }: { size?: number }) {
   return (
     <div className="mb-6 flex flex-col items-center gap-3">
