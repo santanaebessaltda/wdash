@@ -276,6 +276,20 @@
   --animate-vela-shimmer: velaShimmer 1.6s ease-in-out infinite;
 }
 
+/* Degrau do pódio. Mistura com vinho escuro para o hover continuar rosa, sem puxar o azul do fundo. */
+.podium-step {
+  background: color-mix(in srgb, var(--acc) 62%, #160814);
+}
+.group:hover .podium-step {
+  background: color-mix(in srgb, var(--acc-2) 78%, #160814);
+}
+.podium-step-empty {
+  background: color-mix(in srgb, var(--acc) 22%, #160814);
+}
+.group:hover .podium-step-empty {
+  background: color-mix(in srgb, var(--acc) 40%, #160814);
+}
+
 @layer base {
   * {
     box-sizing: border-box;

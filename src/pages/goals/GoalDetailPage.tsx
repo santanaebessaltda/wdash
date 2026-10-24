@@ -244,7 +244,7 @@ function GoalHero({
     {
       label: "Realizado",
       value: brlCent(achieved),
-      cls: progressTextClass(pct),
+      cls: achieved < 0 ? "text-bad" : "text-ok",
       note: outsideRankingNote(card.band) ?? undefined,
     },
     {

@@ -614,7 +614,7 @@ function ChallengeOpportunityCard({ item }: { item: WalletChallengeOpportunity }
   const won = item.state === "guaranteed";
   return (
     <div className={cn("flex items-start gap-3.5 rounded-xl border border-line p-4", ended ? "bg-bg-inset" : "bg-bg-2")}>
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-acc-soft text-acc">
+      <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", item.state === "open" ? "bg-acc-soft text-acc" : "bg-bg-3 text-t1")}>
         <FlameIcon size={18} />
       </span>
       <div className="min-w-0 flex-1">

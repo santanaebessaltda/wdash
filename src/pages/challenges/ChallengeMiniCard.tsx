@@ -53,9 +53,9 @@ export function ChallengeMiniCard({
     const wonLine = c.mode === "MINIMUM" && view.status !== "upcoming" && people > 0 ? boardWonCount(view.reachedCount, people) : null;
     const boardBadge = "!px-2.5 !py-1 !text-[12px]";
     return (
-      <Card padding="sm" glass="var(--acc-soft)" className="flex h-full min-h-0 w-full flex-col overflow-hidden text-left !px-2.5 !py-2.5">
+      <Card padding="sm" glass={view.status === "active" ? "var(--acc-soft)" : "color-mix(in srgb, var(--t1) 28%, transparent)"} className="flex h-full min-h-0 w-full flex-col overflow-hidden text-left !px-2.5 !py-2.5">
         <div className="flex items-start gap-2">
-          <CardHero compact>
+          <CardHero compact tone={view.status === "active" ? "acc" : "muted"}>
             <FlameIcon size={18} />
           </CardHero>
           <div className="min-w-0 flex-1">
@@ -103,7 +103,7 @@ export function ChallengeMiniCard({
                     </div>
                     <div className="mt-1 flex items-center gap-2">
                       <div className="min-w-0 flex-1">
-                        <ProgressBar enter value={wonLook ? 100 : pct} height={10} color={wonLook ? "var(--ok)" : "var(--acc)"} />
+                        <ProgressBar enter value={wonLook ? 100 : pct} height={10} />
                       </div>
                       <BoardPersonMark person={person} disputa={disputa} ended={ended} pct={pct} />
                     </div>
@@ -130,7 +130,7 @@ export function ChallengeMiniCard({
           className={cn(
             "flex shrink-0 items-center justify-center",
             prominent ? "h-[50px] w-[50px] rounded-[14px]" : "h-10 w-10 rounded-xl",
-            "bg-acc-soft text-acc",
+            view.status === "active" ? "bg-acc-soft text-acc" : "bg-bg-3 text-t1",
           )}
         >
           <FlameIcon size={prominent ? 22 : 18} />
@@ -288,7 +288,7 @@ export function ChallengeProgress({
   return (
     <>
       <div className="flex items-baseline justify-between gap-2">
-        <span className={cn("min-w-0 truncate font-mono text-[13px] font-extrabold", shown != null && !upcoming ? progressTextClass(pct) : "text-t0")}>{left}</span>
+        <span className={cn("min-w-0 truncate font-mono text-[13px] font-extrabold", shown != null && !upcoming ? (c.metric === "VALUE" || c.metric === "TICKET" ? (shown < 0 ? "text-bad" : "text-ok") : progressTextClass(pct)) : "text-t0")}>{left}</span>
         <span className="shrink-0 text-right text-[11.5px] text-t2">
           {upcoming ? (
             view.prazo

@@ -182,7 +182,7 @@ function IndividualPctCell({ l }: { l: LineRank }) {
 function LevelCell({ l }: { l: LineRank }) {
   if (l.noGoal || !l.currentTierName || l.currentLevel == null) return <span className="text-t2">—</span>;
   return (
-    <Badge variant="neutral">
+    <Badge variant="neutral" className="whitespace-nowrap">
       N{l.currentLevel} · {l.currentTierName}
     </Badge>
   );
@@ -338,7 +338,8 @@ export function SellersBlock({
           },
           {
             key: "pctGeral",
-            header: "Participação na meta da filial",
+            header: "Part. na meta da filial",
+            width: "108px",
             hideBelow: "lg",
             sortable: true,
             sortValue: (l: LineRank) => (l.noGoal ? null : l.storeGoalPct),
@@ -348,6 +349,7 @@ export function SellersBlock({
           {
             key: "nivel",
             header: "Nível",
+            width: "168px",
             hideBelow: "md",
             sortable: true,
             sortValue: (l: LineRank) => l.currentLevel ?? 0,
@@ -582,7 +584,7 @@ export function GlobalGoalBand({
 
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <p className="text-[18px] font-extrabold tracking-tight text-t0 sm:text-[20px]">
-          <span className={`font-mono ${progressTextClass(goal.pct)}`}>{brlCent(goal.achieved)}</span>
+          <span className={`font-mono ${goal.achieved < 0 ? "text-bad" : "text-ok"}`}>{brlCent(goal.achieved)}</span>
           <span className="mx-1.5 text-[14px] font-semibold text-t2">/</span>
           <span className="font-mono text-[14px] font-bold text-t2 sm:text-[15px]">{brlCent(goal.total)}</span>
         </p>
@@ -862,8 +864,8 @@ export function ChallengesBlock({
         <span
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px]"
           style={{
-            color: d.colorIcon,
-            backgroundColor: `color-mix(in srgb, ${d.colorIcon} 18%, transparent)`,
+            color: d.statusLabel === "Ativo" ? "var(--acc)" : "var(--t1)",
+            backgroundColor: d.statusLabel === "Ativo" ? "var(--acc-soft)" : "var(--bg-3)",
           }}
           aria-hidden
         >

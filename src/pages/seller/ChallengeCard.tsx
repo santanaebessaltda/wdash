@@ -57,7 +57,8 @@ function SellerChallengeCard({
     <div className={cn("flex items-start gap-3.5 rounded-xl border border-line p-4", ended ? "bg-bg-inset" : "bg-bg-2")}>
       <span
         className={cn(
-          "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-acc-soft text-acc",
+          "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+          status === "active" ? "bg-acc-soft text-acc" : "bg-bg-3 text-t1",
         )}
       >
         <FlameIcon size={18} />
@@ -75,7 +76,7 @@ function SellerChallengeCard({
         </div>
         <div className="mt-2 flex items-baseline justify-between gap-3">
           <p className="min-w-0 text-[13px] text-t1">
-            <HeadlineText headline={sellerHeadline(c, status)} valueClass={c.progressPct == null ? "text-t0" : progressTextClass(c.progressPct)} />
+            <HeadlineText headline={sellerHeadline(c, status)} valueClass={c.progressPct == null ? "text-t0" : c.result?.includes("R$") ? "text-ok" : progressTextClass(c.progressPct)} />
           </p>
           {standing}
         </div>

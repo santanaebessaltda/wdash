@@ -1,17 +1,15 @@
 import { useEffect, useState } from "react";
 
-function progressComplete(value: number): boolean {
-  return value >= 100;
-}
-
-/** Cor da barra. Abaixo de 100% fica na cor do sistema; em 100% fica verde. */
+/** Cor da barra. Fica na cor primária, também em 100%. Verde e vermelho ficam no dinheiro. */
 export function progressColor(value: number): string {
-  return progressComplete(value) ? "var(--ok)" : "var(--acc)";
+  void value;
+  return "var(--acc)";
 }
 
-/** Texto do percentual que acompanha a barra. Verde só em 100%. */
+/** Texto do percentual que acompanha a barra. A cor primária vale também em 100%. */
 export function progressTextClass(value: number): string {
-  return progressComplete(value) ? "text-ok" : "text-acc";
+  void value;
+  return "text-acc";
 }
 
 /** "Atingiu" em verde, ou o lugar / "Não atingiu" na cor do texto. Não é badge. */
@@ -21,7 +19,7 @@ export function ProgressStanding({ ok, children }: { ok: boolean; children: stri
 
 export interface ProgressBarProps {
   value: number; // 0-100
-  /** Se omitido, usa a cor do progresso: primária abaixo de 100%, verde em 100%. */
+  /** Se omitido, a barra fica na cor primária. */
   color?: string;
   trackColor?: string;
   height?: number;
@@ -72,12 +70,12 @@ export function RadialProgress({
   value: number;
   size?: number;
   stroke?: number;
-  /** Se omitido, usa a cor do progresso: primária abaixo de 100%, verde em 100%. */
+  /** Se omitido, o anel fica na cor primária. */
   color?: string;
   trackColor?: string;
   /** Subtitulo abaixo do % (ex.: "da meta"). */
   label?: string;
-  /** Cor do percentual. Sem isso, fica branco e verde ao completar. */
+  /** Cor do percentual. Sem isso, fica branco. */
   valueClassName?: string;
 }) {
   const r = (size - stroke) / 2;
@@ -105,7 +103,7 @@ export function RadialProgress({
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span
-          className={`${large ? "text-[26px] font-extrabold tracking-tight" : "text-xs font-bold"} ${valueClassName ?? (progressComplete(value) ? "text-ok" : "text-t0")}`}
+          className={`${large ? "text-[26px] font-extrabold tracking-tight" : "text-xs font-bold"} ${valueClassName ?? "text-t0"}`}
         >
           {Math.round(value)}%
         </span>

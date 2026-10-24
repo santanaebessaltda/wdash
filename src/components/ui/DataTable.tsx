@@ -135,6 +135,7 @@ export function DataTable<T>({
                   dir={sortDir}
                   onClick={() => toggleSort(col.key)}
                   align={col.align ?? "left"}
+                  width={col.width}
                   className={cn(headClass, col.hideBelow && hideBelowClasses[col.hideBelow])}
                 />
               ) : (
@@ -163,6 +164,7 @@ export function DataTable<T>({
               {columns.map((col) => (
                 <td
                   key={col.key}
+                  style={col.width ? { width: col.width, maxWidth: col.width } : undefined}
                   className={cn(cellClass, "text-t0", alignClasses[col.align ?? "left"], col.hideBelow && hideBelowClasses[col.hideBelow])}
                 >
                   {col.render(row)}

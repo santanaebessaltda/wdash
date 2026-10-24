@@ -314,7 +314,8 @@ function ChallengeCard({
       <div className="mb-3.5 flex items-start gap-3.5">
         <div
           className={cn(
-            "flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-[14px] bg-acc-soft text-acc",
+            "flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-[14px]",
+            view.status === "active" ? "bg-acc-soft text-acc" : "bg-bg-3 text-t1",
           )}
         >
           <FlameIcon size={22} />

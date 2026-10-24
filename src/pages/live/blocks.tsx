@@ -144,12 +144,11 @@ export function RankingBlock({
               <p className="mt-0.5 font-mono text-[13px] font-extrabold text-t3 sm:text-[14px]">—</p>
               <div
                 className={cn(
-                  "flex w-full justify-center rounded-t-2xl transition duration-200 group-hover:brightness-125",
+                  "podium-step-empty flex w-full justify-center rounded-t-2xl transition-colors duration-200",
                   motion ? "items-center" : "items-end",
                   spotlight ? "mt-2" : "mt-3",
                   motion ? PODIO_HEIGHT_FLAT[pos] : spotlight ? PODIO_HEIGHT_COMPACT[pos] : PODIO_HEIGHT[pos],
                 )}
-                style={{ background: "color-mix(in srgb, var(--acc) 16%, transparent)" }}
               >
                 <span className={cn("font-extrabold leading-none text-t3", motion ? (isOuro ? "text-[28px] sm:text-[32px]" : "text-[22px] sm:text-[24px]") : "pb-3 text-[24px] sm:text-[28px]")}>{pos}º</span>
               </div>
@@ -231,12 +230,11 @@ export function RankingBlock({
 
             <div
               className={cn(
-                "flex w-full justify-center rounded-t-2xl transition duration-200 group-hover:brightness-125",
+                "podium-step flex w-full justify-center rounded-t-2xl transition-colors duration-200",
                 motion ? "mt-1.5 items-center" : spotlight ? "mt-2 items-end" : "mt-3 items-end",
                 motion ? PODIO_HEIGHT_FLAT[pos] : spotlight ? PODIO_HEIGHT_COMPACT[pos] : PODIO_HEIGHT[pos],
               )}
               style={{
-                background: "color-mix(in srgb, var(--acc) 48%, transparent)",
                 boxShadow: isOuro ? "0 8px 28px color-mix(in srgb, var(--acc) 35%, transparent)" : undefined,
               }}
             >

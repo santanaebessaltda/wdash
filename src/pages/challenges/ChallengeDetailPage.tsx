@@ -6,6 +6,7 @@ import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { BranchBadge, PeriodBadge, PrizeBadge, RecordStatusBadge } from "@/components/wedash/RecordBadges";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { DuplicateChoiceModal } from "@/components/wedash/DuplicateChoiceModal";
+import { cn } from "@/lib/cn";
 import { ExportDialog } from "@/components/wedash/ExportDialog";
 import { ChallengeDetailSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { WedashBrand } from "@/components/wedash/WedashBrand";
@@ -264,7 +265,7 @@ function ChallengeHero({ challenge: c, view, storeNameValue }: { challenge: Chal
   return (
     <Card padding="lg" className="mb-5">
       <div className="flex flex-wrap items-start gap-4">
-        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-acc-soft text-acc">
+        <span className={cn("flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl", view.status === "active" ? "bg-acc-soft text-acc" : "bg-bg-3 text-t1")}>
           <FlameIcon size={26} />
         </span>
         <div className="min-w-[220px] flex-1">

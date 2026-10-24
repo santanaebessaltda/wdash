@@ -10,6 +10,7 @@ export function ThSort({
   align = "right",
   uppercase = true,
   className,
+  width,
 }: {
   label: string;
   active: boolean;
@@ -20,9 +21,12 @@ export function ThSort({
   uppercase?: boolean;
   /** Substitui o padding padrao (`px-3 py-2.5`) quando informado. */
   className?: string;
+  /** Largura da coluna. Com ela, o rótulo pode quebrar. */
+  width?: string;
 }) {
   return (
     <th
+      style={width ? { width, maxWidth: width } : undefined}
       className={cn(
         "align-bottom text-[11px] font-bold tracking-wide",
         uppercase && "uppercase",
@@ -36,7 +40,8 @@ export function ThSort({
         type="button"
         onClick={onClick}
         className={cn(
-          "inline-flex items-center gap-1 whitespace-nowrap align-bottom tracking-wide hover:text-t0",
+          "inline-flex items-center gap-1 align-bottom tracking-wide hover:text-t0",
+          width ? "w-full whitespace-normal" : "whitespace-nowrap",
           uppercase && "uppercase",
           active ? "text-t0" : "text-t2",
           align === "right" && "flex-row-reverse",
