@@ -40,6 +40,22 @@
   --wepink-soft: rgba(255, 0, 128, 0.16);
   --wpink: #a979ff;
   --wpink-soft: rgba(169, 121, 255, 0.16);
+  /* Paleta do Vela (dark). O rosa continua o acento do WDash; o roxo é o acento original do tema. */
+  --palette-pink: var(--acc);
+  --palette-pink-soft: var(--acc-soft);
+  --palette-purple: #7c5cff;
+  --palette-purple-2: #9d86ff;
+  --palette-purple-soft: #7c5cff26;
+  --palette-blue: var(--info);
+  --palette-blue-soft: var(--info-soft);
+  --palette-green: var(--ok);
+  --palette-green-soft: var(--ok-soft);
+  --palette-amber: var(--warn);
+  --palette-amber-soft: var(--warn-soft);
+  --palette-red: var(--bad);
+  --palette-red-soft: var(--bad-soft);
+  --palette-neutral: var(--t1);
+  --palette-track: var(--bg-inset);
   --shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.7);
 }
 
@@ -72,6 +88,9 @@
   --wepink-soft: rgba(255, 0, 128, 0.12);
   --wpink: #7c3aed;
   --wpink-soft: rgba(124, 58, 237, 0.11);
+  --palette-purple: #6a4cff;
+  --palette-purple-2: #8b6dff;
+  --palette-purple-soft: #6a4cff1c;
   --shadow: 0 14px 34px -18px rgba(20, 24, 40, 0.22);
 }
 
@@ -225,6 +244,20 @@
   --color-wepink-soft: var(--wepink-soft);
   --color-wpink: var(--wpink);
   --color-wpink-soft: var(--wpink-soft);
+  --color-palette-pink: var(--palette-pink);
+  --color-palette-pink-soft: var(--palette-pink-soft);
+  --color-palette-purple: var(--palette-purple);
+  --color-palette-purple-2: var(--palette-purple-2);
+  --color-palette-purple-soft: var(--palette-purple-soft);
+  --color-palette-blue: var(--palette-blue);
+  --color-palette-blue-soft: var(--palette-blue-soft);
+  --color-palette-green: var(--palette-green);
+  --color-palette-green-soft: var(--palette-green-soft);
+  --color-palette-amber: var(--palette-amber);
+  --color-palette-amber-soft: var(--palette-amber-soft);
+  --color-palette-red: var(--palette-red);
+  --color-palette-red-soft: var(--palette-red-soft);
+  --color-palette-neutral: var(--palette-neutral);
 
   --shadow-vela: var(--shadow);
 

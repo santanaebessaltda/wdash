@@ -10,6 +10,12 @@ export interface AreaLineChartProps {
   tooltipLabels?: (string | undefined)[];
   color?: string;
   compareColor?: string;
+  /** Nome da série principal no tooltip. */
+  name?: string;
+  /** Nome da segunda série no tooltip. */
+  compareName?: string;
+  /** Opacidade do topo do degradê sob a curva. */
+  areaOpacity?: number;
   height?: number;
   showArea?: boolean;
   /** Mostra o valor formatado direto em cada ponto da linha. */
@@ -62,6 +68,9 @@ export function AreaLineChart({
   tooltipLabels,
   color = "var(--acc)",
   compareColor = "var(--t2)",
+  name,
+  compareName,
+  areaOpacity = 0.35,
   height = 240,
   showArea = true,
   showValues = false,
@@ -125,7 +134,7 @@ export function AreaLineChart({
           >
             <defs>
               <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={color} stopOpacity="0.35" />
+                <stop offset="0%" stopColor={color} stopOpacity={areaOpacity} />
                 <stop offset="100%" stopColor={color} stopOpacity="0" />
               </linearGradient>
             </defs>
@@ -219,13 +228,15 @@ export function AreaLineChart({
                 {activeValue != null && (
                   <span className="flex items-center gap-1.5 font-bold text-t0">
                     <span className="inline-block h-2 w-2 rounded-[2px]" style={{ background: color }} />
+                    {name ? <span className="font-semibold text-t1">{name}</span> : null}
                     {formatValue(activeValue)}
                   </span>
                 )}
                 {compareData && compareData.length === data.length && activeCompareValue != null && (
                   <span className="mt-0.5 flex items-center gap-1.5 font-semibold text-t1">
                     <span className="inline-block h-2 w-2 rounded-[2px]" style={{ background: compareColor }} />
-                    {formatValue(activeCompareValue)}
+                    {compareName ? <span>{compareName}</span> : null}
+                    <span className={compareName ? "font-bold text-t0" : undefined}>{formatValue(activeCompareValue)}</span>
                   </span>
                 )}
               </div>

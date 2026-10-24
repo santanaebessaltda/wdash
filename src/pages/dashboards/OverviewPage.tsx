@@ -106,13 +106,34 @@ function storesLabel(storeRows: string[]): string | null {
   return storeRows.length > 1 ? `${storeRows[0]} · +${storeRows.length - 1}` : storeRows[0]!;
 }
 
-/** Cores fixas para as lojas no donut e barras do Ranking de Lojas. */
-const STORE_COLORS = ["var(--acc)", "var(--info)", "var(--ok)", "var(--warn)", "var(--bad)"];
-/** Fatia neutra "Demais lojas" (1 loja no StorePicker)  -  nao compete com a cor da loja. */
-const OTHER_STORES_COLOR = "color-mix(in srgb, var(--t2) 40%, transparent)";
+/** Demais filiais no ranking: cinza neutro do Vela, sem competir com a filial em foco. */
+const OTHER_STORES_COLOR = "var(--palette-neutral)";
 
-/** Hero dos KPIs: rosa primário do dashboard. */
-const KPI_HERO = { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" };
+/** Ícones dos quatro cards do topo, na ordem dos KPIs. */
+const KPI_TONES = [
+  { iconColor: "var(--palette-pink)", iconBg: "var(--palette-pink-soft)" },
+  { iconColor: "var(--palette-amber)", iconBg: "var(--palette-amber-soft)" },
+  { iconColor: "var(--palette-purple)", iconBg: "var(--palette-purple-soft)" },
+  { iconColor: "var(--palette-blue)", iconBg: "var(--palette-blue-soft)" },
+] as const;
+
+/** Avatares dos produtos: tons auxiliares do Vela, sem o rosa do faturamento. */
+const PRODUCT_AVATAR_TONES = [
+  "var(--palette-purple)",
+  "var(--palette-blue)",
+  "var(--palette-green)",
+  "var(--palette-amber)",
+] as const;
+
+/** Cor da forma no donut, na legenda e no detalhamento. */
+function paymentColor(method: string): string {
+  const key = method.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+  if (key.includes("credito")) return "var(--palette-purple)";
+  if (key.includes("pix")) return "var(--palette-green)";
+  if (key.includes("debito")) return "var(--palette-blue)";
+  if (key.includes("dinheiro") || key === "cash") return "var(--palette-amber)";
+  return "var(--palette-neutral)";
+}
 
 /**
  * Badge de delta  -  so % no chip; base do comparativo no tooltip (igual StatCard).
@@ -556,7 +577,7 @@ export default function OverviewPage() {
       {/* KPI row  -  4 cards */}
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {view.kpis.map((kpi, i) => (
-          <KpiCard key={kpi.label} kpi={kpi} Icon={KPI_ICONS[i]} />
+          <KpiCard key={kpi.label} kpi={kpi} Icon={KPI_ICONS[i]} tone={KPI_TONES[i] ?? KPI_TONES[0]} />
         ))}
       </div>
 
@@ -598,7 +619,15 @@ export default function OverviewPage() {
                 {view.goalDescription && <p className="mt-0.5 text-[11px] font-semibold text-t2">{view.goalDescription}</p>}
               </div>
               <div className="relative mx-auto mb-4 h-[150px] w-[150px]">
-                <RadialProgress value={pct} size={150} stroke={15} trackColor="var(--bg-inset)" label="da meta" />
+                <RadialProgress
+                  value={pct}
+                  size={150}
+                  stroke={15}
+                  color="var(--palette-pink)"
+                  trackColor="var(--palette-track)"
+                  valueClassName="text-t0"
+                  label="da meta"
+                />
               </div>
               <div className="flex flex-col gap-2.5">
                 <div className="flex justify-between">
@@ -607,13 +636,13 @@ export default function OverviewPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[12.5px] text-t2">Meta</span>
-                  <span className={`text-[13px] font-bold ${goal && pct < 100 ? "text-warn" : goal ? "text-ok" : "text-t2"}`}>
+                  <span className={`text-[13px] font-bold ${goal ? "text-palette-amber" : "text-t2"}`}>
                     {goal ? brlCent(target) : "—"}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[12.5px] text-t2">Faltam</span>
-                  <span className={`text-[13px] font-bold ${goal && missingAmount > 0 ? "text-warn" : goal ? "text-ok" : "text-t2"}`}>
+                  <span className={`text-[13px] font-bold ${goal ? "text-palette-amber" : "text-t2"}`}>
                     {!goal ? "—" : missingAmount <= 0 ? "Meta atingida" : brlCent(missingAmount)}
                   </span>
                 </div>
@@ -647,7 +676,7 @@ export default function OverviewPage() {
               <div className="mt-2.5 flex flex-wrap gap-5">
                 <div>
                   <span className="flex items-center gap-1.5 text-xs font-semibold text-t1">
-                    <span className="h-2.5 w-2.5 rounded-[3px] bg-[var(--ok)]" />Realizado
+                    <span className="h-2.5 w-2.5 rounded-[3px] bg-palette-pink" />Realizado
                   </span>
                   <p className="mt-0.5 font-mono text-base font-extrabold text-t0">
                     {brlCent(view.evolution[view.evolution.length - 1]?.achieved ?? 0)}
@@ -655,7 +684,7 @@ export default function OverviewPage() {
                 </div>
                 <div>
                   <span className="flex items-center gap-1.5 text-xs font-semibold text-t1">
-                    <span className="h-2.5 w-2.5 rounded-[3px] bg-[var(--warn)]" />Meta
+                    <span className="h-2.5 w-2.5 rounded-[3px] bg-palette-amber" />Meta
                   </span>
                   <p className="mt-0.5 font-mono text-base font-extrabold text-t0">
                     {brlCent(view.evolution[view.evolution.length - 1]?.goal ?? 0)}
@@ -702,8 +731,11 @@ export default function OverviewPage() {
                 compareData={series.map((e) => e.goal)}
                 labels={series.map((e) => e.label)}
                 tooltipLabels={series.map((e) => e.band)}
-                color="var(--ok)"
-                compareColor="var(--warn)"
+                color="var(--palette-pink)"
+                compareColor="var(--palette-amber)"
+                name="Realizado"
+                compareName="Meta"
+                areaOpacity={0.18}
                 formatValue={brlCent}
                 showAxisLabels
               />
@@ -747,7 +779,8 @@ export default function OverviewPage() {
                       value: c.achieved,
                     }))}
                     height={220}
-                    color="var(--acc)"
+                    color="var(--palette-purple)"
+                    hoverColor="var(--palette-purple-2)"
                     formatValue={brlCent}
                     onSelect={(d) => openDetail({ kind: "category", name: d.label })}
                   />
@@ -772,7 +805,7 @@ export default function OverviewPage() {
                 <div className="mt-2.5 flex flex-wrap gap-5">
                   <div>
                     <span className="flex items-center gap-1.5 text-xs font-semibold text-t1">
-                      <span className="h-2.5 w-2.5 rounded-[3px] bg-[var(--info)]" />Realizado
+                      <span className="h-2.5 w-2.5 rounded-[3px] bg-palette-blue" />Realizado
                     </span>
                     <p className="mt-0.5 font-mono text-base font-extrabold text-t0">
                       {brlCent(view.dayVsMeta.reduce((s, d) => s + d.achieved, 0))}
@@ -781,7 +814,7 @@ export default function OverviewPage() {
                   <div>
                     <span className="flex items-center gap-1.5 text-xs font-semibold text-t1">
                       <span
-                        className="inline-block w-3 border-t-2 border-dashed border-[var(--warn)]"
+                        className="inline-block w-3 border-t-2 border-dashed border-palette-amber"
                         aria-hidden
                       />
                       Meta
@@ -805,8 +838,8 @@ export default function OverviewPage() {
                 goal: d.goal > 0 ? d.goal : undefined,
               }))}
               height={220}
-              color="var(--info)"
-              goalColor="var(--warn)"
+              color="var(--palette-blue)"
+              goalColor="var(--palette-amber)"
               formatValue={brlCent}
             />
             )}
@@ -825,7 +858,7 @@ export default function OverviewPage() {
           <CardHeader className="items-center">
             <CardTitle>Ranking de filiais</CardTitle>
             {compareNetwork && (
-              <Badge variant="accent">
+              <Badge variant="neutral">
                 Rede: {brlCent(view.rankingNetworkTotal ?? 0)}
               </Badge>
             )}
@@ -846,11 +879,17 @@ export default function OverviewPage() {
                       amount: amountRest,
                     }
                   : null;
+              // Rosa na filial do seletor. Sem uma filial escolhida, o rosa fica na primeira do ranking.
+              const branchColor = (id: string | undefined, isRest: boolean, index: number) => {
+                if (isRest) return OTHER_STORES_COLOR;
+                if (scope.storeIds.length === 0) return index === 0 ? "var(--palette-pink)" : OTHER_STORES_COLOR;
+                return id != null && scope.storeIds.includes(id) ? "var(--palette-pink)" : OTHER_STORES_COLOR;
+              };
               const donutSegments = [
                 ...view.storesRanking.map((l, i) => ({
                   label: l.name,
                   value: l.amount,
-                  color: STORE_COLORS[i % STORE_COLORS.length],
+                  color: branchColor(l.id, false, i),
                 })),
                 ...(rest ? [{ label: rest.name, value: rest.amount, color: OTHER_STORES_COLOR }] : []),
               ];
@@ -875,7 +914,7 @@ export default function OverviewPage() {
                         store.pctNetwork ?? (totalNetwork > 0 ? (store.amount / totalNetwork) * 100 : 0),
                       );
                       const pctBar = Math.min(100, Math.max(0, pctNetwork));
-                      const color = store === rest ? OTHER_STORES_COLOR : STORE_COLORS[idx % STORE_COLORS.length];
+                      const color = branchColor("id" in store ? store.id : undefined, store === rest, idx);
                       return (
                         <div key={"id" in store && store.id ? String(store.id) : `${store.name}-${idx}`} className="min-w-0 rounded-xl bg-bg-inset p-3">
                           <div className="mb-1.5 flex min-w-0 items-baseline gap-2">
@@ -919,7 +958,7 @@ export default function OverviewPage() {
                       segments={view.paymentMethods.map((f) => ({
                         label: labelUpper(f.method),
                         value: f.amount,
-                        color: f.color,
+                        color: paymentColor(f.method),
                       }))}
                       centerLabel="Total"
                       centerValue={brlCent(total)}
@@ -930,7 +969,7 @@ export default function OverviewPage() {
                       const pct = Math.round((f.amount / total) * 100);
                       return (
                         <div key={f.method} className="flex items-center gap-2.5">
-                          <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: f.color }} />
+                          <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: paymentColor(f.method) }} />
                           <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-t1">{labelUpper(f.method)}</span>
                           <span className="shrink-0 font-mono text-[12.5px] font-bold text-t0">{brlCent(f.amount)}</span>
                           <span className="min-w-[32px] shrink-0 text-right text-[11.5px] font-semibold text-t2">{pct}%</span>
@@ -953,7 +992,7 @@ export default function OverviewPage() {
           <CardHeader>
             <div className="flex w-full items-center justify-between gap-1.5">
               <CardTitle>Destaques da equipe</CardTitle>
-              <Badge variant="accent">Top {OVERVIEW_TEAM_TOP}</Badge>
+              <Badge className="!bg-palette-purple-soft !text-palette-purple">Top {OVERVIEW_TEAM_TOP}</Badge>
             </div>
           </CardHeader>
           {topSellersOrdenados.length === 0 ? (
@@ -1150,19 +1189,19 @@ export default function OverviewPage() {
                     >
                       <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
                       <td className="px-1 py-3">
-                        <ProductNameCell name={p.name} idx={idx} sub={p.category} upper />
+                        <ProductNameCell name={p.name} idx={idx} sub={p.category} upper tones={PRODUCT_AVATAR_TONES} />
                       </td>
                       <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{p.items != null ? p.items.toLocaleString("pt-BR") : (p.sub?.replace(" itens", "") ?? "—")}</td>
                       <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.amount)}</td>
                       <td
                         className={cn(
                           "px-1 py-3 text-right font-mono text-[13px] font-bold",
-                          p.profit == null ? "text-t2" : p.profit < 0 ? "text-bad" : "text-ok",
+                          p.profit == null ? "text-t2" : p.profit < 0 ? "text-palette-red" : "text-palette-green",
                         )}
                       >
                         {p.profit == null ? "—" : brlCent(p.profit)}
                       </td>
-                      <td className="px-1 py-3 text-right text-xs font-bold" style={{ color: p.trend != null ? (p.trend >= 0 ? "var(--ok)" : "var(--bad)") : undefined }}>
+                      <td className="px-1 py-3 text-right text-xs font-bold" style={{ color: p.trend != null ? (p.trend >= 0 ? "var(--palette-green)" : "var(--palette-red)") : undefined }}>
                         {p.trend != null ? `${p.trend >= 0 ? "+" : ""}${p.trend}%` : "—"}
                       </td>
                     </tr>
@@ -1181,14 +1220,14 @@ export default function OverviewPage() {
                   <td
                     className={cn(
                       "px-1 py-3 text-right font-mono text-[13px] font-extrabold",
-                      productTotal.profit == null ? "text-t2" : productTotal.profit < 0 ? "text-bad" : "text-ok",
+                      productTotal.profit == null ? "text-t2" : productTotal.profit < 0 ? "text-palette-red" : "text-palette-green",
                     )}
                   >
                     {productTotal.profit == null ? "—" : brlCent(productTotal.profit)}
                   </td>
                   <td
                     className="px-1 py-3 text-right text-xs font-extrabold"
-                    style={{ color: productTotal.variation != null ? (productTotal.variation >= 0 ? "var(--ok)" : "var(--bad)") : undefined }}
+                    style={{ color: productTotal.variation != null ? (productTotal.variation >= 0 ? "var(--palette-green)" : "var(--palette-red)") : undefined }}
                   >
                     {productTotal.variation != null ? `${productTotal.variation >= 0 ? "+" : ""}${productTotal.variation}%` : "—"}
                   </td>
@@ -1208,17 +1247,26 @@ export default function OverviewPage() {
   );
 }
 
-function KpiCard({ kpi, Icon }: { kpi: OverviewKpi; Icon: () => React.JSX.Element }) {
+function KpiCard({
+  kpi,
+  Icon,
+  tone,
+}: {
+  kpi: OverviewKpi;
+  Icon: () => React.JSX.Element;
+  tone: { iconColor: string; iconBg: string };
+}) {
   return (
     <StatCard
       label={kpi.label}
       value={kpi.amount}
       icon={<Icon />}
-      iconColor={KPI_HERO.iconColor}
-      iconBg={KPI_HERO.iconBg}
+      iconColor={tone.iconColor}
+      iconBg={tone.iconBg}
       delta={kpi.delta}
       sub={kpi.sub}
       tooltip={kpi.tooltip}
+      valueClassName="text-t0"
     />
   );
 }

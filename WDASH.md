@@ -47,6 +47,7 @@ Remediação do security audit (standard):
 - Seguir **estritamente** o tema **Vela** (paleta, componentes, tokens).
 - **Não reinventar componentes** — reutilizar os primitives do Vela antes de criar novos.
 - Paleta rosa/magenta das referências é apenas inspiração de layout; a execução usa Vela.
+- **Visão geral** (2026-10-24): dark do Vela com o rosa do WDash (`#ff0080`). As séries dessa tela usam `--palette-*`: roxo `#7c5cff` (hover `#9d86ff`), azul `#56a8ff`, verde `#33d493`, âmbar `#f7b84e`, vermelho `#f76d7d` e as superfícies do tema. No tema claro o roxo segue o acento claro do Vela (`#6a4cff`). As outras páginas não mudam de cor.
 
 ## Referências visuais
 - Concorrente / BI atual: `docs/referencias/referencia01.png` … `referencia16.jpeg`

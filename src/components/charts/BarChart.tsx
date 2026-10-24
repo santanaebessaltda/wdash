@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 export interface BarDatum {
   label: string;
   value: number;
@@ -31,6 +33,7 @@ export function BarChart({
   data,
   height = 220,
   color = "var(--acc)",
+  hoverColor,
   goalColor = "var(--warn)",
   formatValue = (v: number) => String(v),
   showValues = true,
@@ -39,6 +42,8 @@ export function BarChart({
   data: BarDatum[];
   height?: number;
   color?: string;
+  /** Tom da barra ao passar o mouse. Sem isso, a coluna só perde um pouco de opacidade. */
+  hoverColor?: string;
   /** Cor da linha de meta (quando `goal` presente). */
   goalColor?: string;
   formatValue?: (v: number) => string;
@@ -47,6 +52,7 @@ export function BarChart({
   /** Torna cada coluna clicavel. */
   onSelect?: (datum: BarDatum, index: number) => void;
 }) {
+  const [hot, setHot] = useState<number | null>(null);
   const Col = onSelect ? "button" : "div";
   const hasGoals = data.some((d) => (d.goal ?? 0) > 0);
   const max = Math.max(...data.map((d) => Math.max(d.value, d.goal ?? 0)), 1);
@@ -84,9 +90,16 @@ export function BarChart({
               onClick={onSelect ? () => onSelect(d, i) : undefined}
               className={
                 "relative z-[1] box-border flex min-w-0 flex-col items-center gap-2 overflow-hidden border-0 bg-transparent p-0" +
-                (onSelect ? " cursor-pointer rounded-[8px] transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-acc" : "")
+                (onSelect
+                  ? " cursor-pointer rounded-[8px] focus-visible:outline-2 focus-visible:outline-acc" +
+                    (hoverColor ? "" : " transition-opacity hover:opacity-80")
+                  : "")
               }
               style={{ flex: `1 0 ${colW}px`, minWidth: colW }}
+              onMouseEnter={hoverColor ? () => setHot(i) : undefined}
+              onMouseLeave={hoverColor ? () => setHot((current) => (current === i ? null : current)) : undefined}
+              onFocus={hoverColor ? () => setHot(i) : undefined}
+              onBlur={hoverColor ? () => setHot((current) => (current === i ? null : current)) : undefined}
             >
               {showValues && (
                 <span className="max-w-full truncate whitespace-nowrap text-center text-[10.5px] font-bold tabular-nums text-t1" title={d.value === 0 ? undefined : formatValue(d.value)}>
@@ -98,7 +111,7 @@ export function BarChart({
                   className="w-full rounded-t-[8px] transition-all"
                   style={{
                     height: `${(d.value / max) * 100}%`,
-                    background: d.color ?? color,
+                    background: hot === i && hoverColor ? hoverColor : (d.color ?? color),
                     minHeight: d.value > 0 ? 4 : 0,
                     transformOrigin: "bottom",
                     animation: `velaGrowY .55s cubic-bezier(.22,.61,.36,1) ${i * 0.05}s both`,

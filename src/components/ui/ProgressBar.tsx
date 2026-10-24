@@ -67,6 +67,7 @@ export function RadialProgress({
   color,
   trackColor = "var(--bg-3)",
   label,
+  valueClassName,
 }: {
   value: number;
   size?: number;
@@ -76,6 +77,8 @@ export function RadialProgress({
   trackColor?: string;
   /** Subtitulo abaixo do % (ex.: "da meta"). */
   label?: string;
+  /** Cor do percentual. Sem isso, fica branco e verde ao completar. */
+  valueClassName?: string;
 }) {
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
@@ -102,7 +105,7 @@ export function RadialProgress({
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span
-          className={`${large ? "text-[26px] font-extrabold tracking-tight" : "text-xs font-bold"} ${progressComplete(value) ? "text-ok" : "text-t0"}`}
+          className={`${large ? "text-[26px] font-extrabold tracking-tight" : "text-xs font-bold"} ${valueClassName ?? (progressComplete(value) ? "text-ok" : "text-t0")}`}
         >
           {Math.round(value)}%
         </span>
