@@ -33,7 +33,6 @@ import {
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { storesForSession } from "@/data/wedash/stores";
 import { brlCent, fullDate, shortDate, isoToDate, num, dateToIso } from "@/lib/format";
-import { statusBadgeVariant } from "@/lib/status";
 import { exportPdf } from "@/lib/printMode";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import {
@@ -467,24 +466,23 @@ function ChallengePayoutCard({ challenge: c, view, onExport }: { challenge: Chal
     <Card className="mb-5 min-w-0 overflow-hidden print:break-inside-avoid print:overflow-visible">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <CardTitle>Fechamento do desafio</CardTitle>
-            {view.emClosing && (
-              <Tooltip
-                label={`O último dia do desafio será fechado na madrugada de ${shortDate(dateToIso(endMais1))}. Vendas incluídas ou canceladas até lá ainda podem alterar o resultado.`}
-              >
-                <span className="inline-flex cursor-help">
-                  <Badge variant={statusBadgeVariant("Fechamento em andamento")}>Fechamento em andamento</Badge>
-                </span>
-              </Tooltip>
-            )}
-          </div>
-          <p className="mt-0.5 text-[12px] text-t2">Veja quem ganhou e o prêmio de cada pessoa.</p>
+          <CardTitle>Fechamento do desafio</CardTitle>
+          <p className="mt-0.5 text-[12px] text-t2">
+            {view.emClosing
+              ? "O resultado oficial aparece depois do fechamento do último dia."
+              : "Veja quem ganhou e o prêmio de cada pessoa."}
+          </p>
         </div>
-        <ExportDialog formats={["pdf"]} onExport={() => onExport()} />
+        {!view.emClosing && <ExportDialog formats={["pdf"]} onExport={() => onExport()} />}
       </div>
 
-      {lines.length === 0 ? (
+      {view.emClosing ? (
+        <EmptyBlock
+          icon="⏳"
+          title="Fechamento em andamento"
+          description={`O último dia do desafio será fechado na madrugada de ${shortDate(dateToIso(endMais1))}. Vendas incluídas ou canceladas até lá ainda podem alterar o resultado.`}
+        />
+      ) : lines.length === 0 ? (
         <EmptyBlock icon="🏁" title="Nenhum vencedor neste desafio" description="Ninguém ganhou o prêmio." />
       ) : (
         <>
