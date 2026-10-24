@@ -12,9 +12,12 @@ import {
   purchaseLineCents,
   purchaseOrderFileName,
   purchaseOrderFileRows,
+  purchaseOrderGroupTone,
+  purchaseOrderTone,
   purchaseOrderTotalCents,
   type PurchaseFilter,
   type PurchaseOrderRow,
+  type PurchaseOrderTone,
 } from "@/data/wedash/purchaseOrder";
 import { PURCHASE_SYNC_BUSY, PURCHASE_SYNC_ERROR, PURCHASE_SYNC_OFFLINE, PURCHASE_SYNC_TITLE, fetchPurchaseStock, savePurchaseMins } from "@/data/wedash/purchaseRepo";
 import { storesForSession } from "@/data/wedash/stores";
@@ -115,6 +118,21 @@ function productLine(branches: OrderLine[]) {
     aRequest: requests.some((value) => value != null) ? requests.reduce<number>((sum, value) => sum + (value ?? 0), 0) : null,
   };
 }
+
+const TONE_HOVER: Record<Exclude<PurchaseOrderTone, null>, string> = {
+  bad: "hover:bg-bad-soft",
+  warn: "hover:bg-warn-soft",
+};
+
+const TONE_BAR: Record<Exclude<PurchaseOrderTone, null>, string> = {
+  bad: "shadow-[inset_3px_0_0_var(--bad)]",
+  warn: "shadow-[inset_3px_0_0_var(--warn)]",
+};
+
+const TONE_BORDER: Record<Exclude<PurchaseOrderTone, null>, string> = {
+  bad: "border-l-bad",
+  warn: "border-l-warn",
+};
 
 function Chevron({ open }: { open: boolean }) {
   return (
@@ -548,14 +566,14 @@ export function PurchaseOrderPage() {
                         const category = po.parts.find((p) => p.storeId === group.branches[0]?.storeId)?.catalog.get(group.code)?.category;
                         const alone = !manyStores ? group.branches[0] : null;
                         const productSub = [group.code, category].filter(Boolean).join(" · ");
-                        const short = group.branches.some((branch) => branch.onOrder);
+                        const tone = purchaseOrderGroupTone(group.branches);
                         return (
                           <Fragment key={group.code}>
                             <tr
-                              className={cn("border-b border-line transition-colors", manyStores && "cursor-pointer", short && "hover:bg-warn-soft")}
+                              className={cn("border-b border-line transition-colors", manyStores && "cursor-pointer", tone && TONE_HOVER[tone])}
                               onClick={manyStores ? () => toggleGroup(group.code, open) : undefined}
                             >
-                              <td className={cn("px-1 py-3 text-center text-[13px] font-extrabold text-t2", short && "shadow-[inset_3px_0_0_var(--warn)]")}>{idx + 1}</td>
+                              <td className={cn("px-1 py-3 text-center text-[13px] font-extrabold text-t2", tone && TONE_BAR[tone])}>{idx + 1}</td>
                               <td className="px-1 py-3">
                                 <div className={cn("flex min-w-0 items-center", manyStores && "gap-2")}>
                                   {manyStores && (
@@ -615,41 +633,44 @@ export function PurchaseOrderPage() {
                               </td>
                             </tr>
                             {open &&
-                              group.branches.map((branch) => (
-                                <tr
-                                  key={`${branch.storeId}:${branch.code}`}
-                                  className={cn("group border-b border-line bg-bg-inset transition-colors", branch.onOrder ? "hover:bg-warn-soft" : "hover:bg-acc-soft")}
-                                >
-                                  <td />
-                                  <td className={cn("border-l-2 px-1 py-2.5 pl-16 transition-colors", branch.onOrder ? "border-l-warn" : "border-l-line-2 group-hover:border-l-acc")}>
-                                    <p className="break-words text-[12.5px] font-semibold leading-5 text-t1">{branch.storeName}</p>
-                                  </td>
-                                  <td className="px-1 py-2 text-right">
-                                    <BranchMinimum
-                                      branch={branch}
-                                      idx={minIndex.get(`${branch.storeId}:${branch.code}`) ?? 0}
-                                      onSave={(raw) => po.saveMin(branch.storeId, branch.code, raw)}
-                                    />
-                                  </td>
-                                  {NUM_COLS.filter((c) => c.key !== "multipla").map((c) => (
-                                    <td key={c.key} className="px-1 py-2.5 text-right">
-                                      <Qty v={branch[c.key]} />
+                              group.branches.map((branch) => {
+                                const branchTone = purchaseOrderTone(branch);
+                                return (
+                                  <tr
+                                    key={`${branch.storeId}:${branch.code}`}
+                                    className={cn("group border-b border-line bg-bg-inset transition-colors", branchTone ? TONE_HOVER[branchTone] : "hover:bg-acc-soft")}
+                                  >
+                                    <td />
+                                    <td className={cn("border-l-2 px-1 py-2.5 pl-16 transition-colors", branchTone ? TONE_BORDER[branchTone] : "border-l-line-2 group-hover:border-l-acc")}>
+                                      <p className="break-words text-[12.5px] font-semibold leading-5 text-t1">{branch.storeName}</p>
                                     </td>
-                                  ))}
-                                  <td className="px-1 py-2.5 text-right">
-                                    <span className="font-mono text-[13px] font-bold text-t0">{branch.multipla}</span>
-                                  </td>
-                                  <td className="px-1 py-2.5 text-center">
-                                    <YesNo yes={branch.blocked} />
-                                  </td>
-                                  <td className="px-1 py-2.5 text-center">
-                                    <YesNo yes={branch.isNew} />
-                                  </td>
-                                  <td className="px-1 py-2.5 text-right">
-                                    {branch.aRequest == null ? <span className="font-mono text-[13px] font-bold text-t2">—</span> : <Qty v={branch.aRequest} strong={branch.aRequest > 0} />}
-                                  </td>
-                                </tr>
-                              ))}
+                                    <td className="px-1 py-2 text-right">
+                                      <BranchMinimum
+                                        branch={branch}
+                                        idx={minIndex.get(`${branch.storeId}:${branch.code}`) ?? 0}
+                                        onSave={(raw) => po.saveMin(branch.storeId, branch.code, raw)}
+                                      />
+                                    </td>
+                                    {NUM_COLS.filter((c) => c.key !== "multipla").map((c) => (
+                                      <td key={c.key} className="px-1 py-2.5 text-right">
+                                        <Qty v={branch[c.key]} />
+                                      </td>
+                                    ))}
+                                    <td className="px-1 py-2.5 text-right">
+                                      <span className="font-mono text-[13px] font-bold text-t0">{branch.multipla}</span>
+                                    </td>
+                                    <td className="px-1 py-2.5 text-center">
+                                      <YesNo yes={branch.blocked} />
+                                    </td>
+                                    <td className="px-1 py-2.5 text-center">
+                                      <YesNo yes={branch.isNew} />
+                                    </td>
+                                    <td className="px-1 py-2.5 text-right">
+                                      {branch.aRequest == null ? <span className="font-mono text-[13px] font-bold text-t2">—</span> : <Qty v={branch.aRequest} strong={branch.aRequest > 0} />}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
                           </Fragment>
                         );
                       })}

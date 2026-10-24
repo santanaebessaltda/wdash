@@ -92,6 +92,26 @@ export function soldHistoryCovers(firstDay: string | null, openedAt: string | nu
   return openedAt != null && dayNumber(firstDay) <= dayNumber(openedAt);
 }
 
+/** Barra da linha: ruptura (no pedido e total ≤ 0), reposição (no pedido com saldo) ou sem marca. */
+export type PurchaseOrderTone = "bad" | "warn" | null;
+
+/** Sem mínimo, coberto, bloqueado ou com várias variantes não marca. Zerado sem mínimo fica sem cor. */
+export function purchaseOrderTone(row: Pick<PurchaseOrderRow, "onOrder" | "total">): PurchaseOrderTone {
+  if (!row.onOrder) return null;
+  return row.total <= 0 ? "bad" : "warn";
+}
+
+/** A linha do produto usa a cor mais grave entre as filiais: vermelho antes do amarelo. */
+export function purchaseOrderGroupTone(rows: Array<Pick<PurchaseOrderRow, "onOrder" | "total">>): PurchaseOrderTone {
+  let tone: PurchaseOrderTone = null;
+  for (const row of rows) {
+    const next = purchaseOrderTone(row);
+    if (next === "bad") return "bad";
+    if (next === "warn") tone = "warn";
+  }
+  return tone;
+}
+
 export function purchaseQuantity(total: number, min: number | null, multiple: number, factor: number): number {
   if (!min || min <= 0 || multiple <= 0) return 0;
   const target = min * factor;

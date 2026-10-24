@@ -6,6 +6,8 @@ import {
   filterPurchaseRows,
   purchaseOrderFileName,
   purchaseOrderFileRows,
+  purchaseOrderGroupTone,
+  purchaseOrderTone,
   purchaseLineCents,
   purchaseOrderTotalCents,
   purchaseMinsToCopy,
@@ -171,6 +173,24 @@ describe("buildPurchaseOrderView", () => {
     const r = view([stock({ total: 80 })], { "BSPPAR-ATH-001": 72 }).rows[0];
     expect(r.aRequest).toBe(0);
     expect(r.onOrder).toBe(false);
+  });
+
+  it("marca a linha: ruptura vermelha, reposição amarela, coberto e sem mínimo sem cor", () => {
+    const below = view([stock({ total: 2 })], { "BSPPAR-ATH-001": 72 }).rows[0];
+    const rupture = view([stock({ total: 0 })], { "BSPPAR-ATH-001": 24 }).rows[0];
+    const negative = view([stock({ total: -3 })], { "BSPPAR-ATH-001": 24 }).rows[0];
+    const covered = view([stock({ total: 80 })], { "BSPPAR-ATH-001": 72 }).rows[0];
+    const withoutMin = view([stock({ total: 0 })]).rows[0];
+    const blocked = view([stock({ total: 0, blocked: true })], { "BSPPAR-ATH-001": 24 }).rows[0];
+    expect(purchaseOrderTone(below)).toBe("warn");
+    expect(purchaseOrderTone(rupture)).toBe("bad");
+    expect(purchaseOrderTone(negative)).toBe("bad");
+    expect(purchaseOrderTone(covered)).toBeNull();
+    expect(purchaseOrderTone(withoutMin)).toBeNull();
+    expect(purchaseOrderTone(blocked)).toBeNull();
+    expect(purchaseOrderGroupTone([covered, below])).toBe("warn");
+    expect(purchaseOrderGroupTone([below, rupture])).toBe("bad");
+    expect(purchaseOrderGroupTone([covered, withoutMin])).toBeNull();
   });
 
   it("selo Novo pela data de cadastro (PC-02)", () => {
