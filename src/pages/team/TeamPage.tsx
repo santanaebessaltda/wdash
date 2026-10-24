@@ -495,20 +495,21 @@ export function TeamPage() {
                 />
               ) : (
                 (() => {
-                  const total = view.shifts.reduce((s, t) => s + t.revenue, 0) || 1;
+                  const shifts = view.shifts.filter((t) => Math.round(t.revenue * 100) >= 1);
+                  const total = shifts.reduce((s, t) => s + t.revenue, 0) || 1;
                   let colorIdx = 0;
-                  const colors = view.shifts.map((t) => (t.name === TEAM_WITHOUT_SHIFT || t.name === TEAM_UNATTRIBUTED_SALE ? COLOR_NEUTRA : COLORS_SHIFT[colorIdx++ % COLORS_SHIFT.length]!));
+                  const colors = shifts.map((t) => (t.name === TEAM_WITHOUT_SHIFT || t.name === TEAM_UNATTRIBUTED_SALE ? COLOR_NEUTRA : COLORS_SHIFT[colorIdx++ % COLORS_SHIFT.length]!));
                   return (
                     <div className="flex flex-1 flex-col justify-center px-4 pb-4">
                       <div className="mx-auto my-2">
                         <DonutChart
-                          segments={view.shifts.map((t, i) => ({ label: partesShift(t.name === TEAM_WITHOUT_SHIFT ? undefined : t.name).name, value: t.revenue, color: colors[i]! }))}
+                          segments={shifts.map((t, i) => ({ label: partesShift(t.name === TEAM_WITHOUT_SHIFT ? undefined : t.name).name, value: t.revenue, color: colors[i]! }))}
                           centerLabel="Total"
                           centerValue={brlCent(total)}
                         />
                       </div>
                       <div className="mt-2 flex flex-col gap-2.5">
-                        {view.shifts.map((t, i) => {
+                        {shifts.map((t, i) => {
                           const pct = Math.round((t.revenue / total) * 100);
                           const pt = partesShift(t.name === TEAM_WITHOUT_SHIFT ? undefined : t.name);
                           return (
@@ -554,7 +555,7 @@ export function TeamPage() {
                     { name: "Sem vendedor identificado", amount: unidentified, color: COLOR_NEUTRA },
                     { name: "Usuário da filial", amount: branchUser, color: "var(--info)" },
                     { name: "Gerência", amount: management, color: "var(--warn)" },
-                  ].filter((f) => f.amount > 0);
+                  ].filter((f) => Math.round(f.amount * 100) >= 1);
                   return (
                     <div className="flex flex-1 flex-col justify-center px-4 pb-4">
                       <div className="mx-auto my-2">

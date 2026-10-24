@@ -3669,7 +3669,8 @@ export function buildTeamDashboardView(
     }
   }
   const attributed = teamTotal + branchUser + management;
-  const unidentified = Math.max(0, storeCount - attributed);
+  // Soma em reais perde fração de centavo. Abaixo de 1 centavo não é venda sem vendedor.
+  const unidentified = Math.max(0, Math.round((storeCount - attributed) * 100) / 100);
   const excluded = unidentified + branchUser + management;
 
   // Comparativos: so com venda no periodo atual (nunca 100%) e dado nos dois lados.

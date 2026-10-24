@@ -147,7 +147,7 @@ function teamKpis(current: Money, cmp: Money, prev: Money, people: number, vs: s
 
 function withUnattributedSale(view: TeamDashboardView): TeamDashboardView {
   const revenue = view.composition.unidentified;
-  if (!(revenue > 0) || view.shifts.some((shift) => shift.name === TEAM_UNATTRIBUTED_SALE)) return view;
+  if (Math.round(revenue * 100) < 1 || view.shifts.some((shift) => shift.name === TEAM_UNATTRIBUTED_SALE)) return view;
   return { ...view, shifts: [...view.shifts, { name: TEAM_UNATTRIBUTED_SALE, revenue, people: 0 }] };
 }
 

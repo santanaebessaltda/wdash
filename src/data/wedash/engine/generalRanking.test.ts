@@ -113,6 +113,22 @@ describe("teamViewWithGoalShare", () => {
     expect(out.shifts.find((shift) => shift.name === TEAM_UNATTRIBUTED_SALE)?.revenue).toBe(200);
   });
 
+  it("não mostra sem grupo identificado quando a venda inteira tem vendedor", () => {
+    const cents: number[] = [];
+    for (let index = 0; index < 200; index += 1) cents.push(index % 2 ? 1 : 3);
+    const total = cents.reduce((sum, value) => sum + value, 0);
+    const sellers = cents.map((value, index) => seller(`P${index}`, index + 1, value));
+    const out = teamViewWithGoalShare(
+      scope,
+      { dayAggs: [storeDay(total, sellers.length, sellers.length)], sellerDayAggs: sellers, namedSellerDayAggs: sellers },
+      [],
+      [],
+      "2026-10-20",
+    );
+    expect(out.composition.unidentified).toBe(0);
+    expect(out.shifts.some((shift) => shift.name === TEAM_UNATTRIBUTED_SALE)).toBe(false);
+  });
+
   it("sem o rateio, a venda sem vendedor fica fora do ranking e dos KPIs", () => {
     const ana = seller("Ana", 1, 10_000);
     const out = teamViewWithGoalShare(
