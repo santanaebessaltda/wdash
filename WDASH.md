@@ -199,7 +199,7 @@ Sem esses 4 elementos, o número é "dado jogado na tela" — não serve para de
 - `MapPins` — mapa com pinos (bom para visão multi-loja geográfica)
 
 ### Layout (`src/layout/`)
-- `Sidebar` + `SidebarContent` — menu lateral colapsável (76px / 258px). O grupo da rota atual fica rosa; no submenu, só o ponto do item selecionado fica rosa.
+- `Sidebar` + `SidebarContent` — menu lateral colapsável (76px / 258px). O grupo e o submenu da rota atual ficam com fundo rosa; o ponto do submenu selecionado também fica rosa.
 - `MobileDrawer` — sidebar mobile
 
 ### Específicos de produto (`src/components/wedash/`)
