@@ -16,6 +16,7 @@ const row = (over: Partial<ChallengeRow> = {}): ChallengeRow => ({
   min_sales: null,
   prizes: [{ kind: "MONEY", cents: 10_000 }, { kind: "ITEM", label: "Combo KFC" }],
   manager_prize: null,
+  cashier_prize: null,
   ...over,
 });
 
@@ -40,6 +41,8 @@ describe("challengeFromRow", () => {
       ],
       managerPrize: null,
       managerTarget: null,
+      cashierPrize: null,
+      cashierTarget: null,
     });
   });
 
@@ -111,6 +114,14 @@ describe("challengeFromRow", () => {
     expect(challengeFromRow(row({ target: "10", manager_prize: { kind: "ITEM", label: "Spa", target: 0 } })).managerTarget).toBe(10);
     expect(challengeFromRow(row({ target: "10", manager_prize: null })).managerTarget).toBeNull();
   });
+
+  it("prêmio do operador de caixa segue o mesmo formato da gerência", () => {
+    expect(challengeFromRow(row({ cashier_prize: { kind: "MONEY", cents: 4_000, target: 12 } }))).toMatchObject({
+      cashierPrize: { kind: "MONEY", amount: 40 },
+      cashierTarget: 12,
+    });
+    expect(challengeFromRow(row({ metric: "INDEX", cashier_prize: { kind: "MONEY", cents: 4_000 } })).cashierPrize).toBeNull();
+  });
 });
 
 describe("challengeToRow", () => {
@@ -129,6 +140,8 @@ describe("challengeToRow", () => {
     prizes: [{ kind: "MONEY", amount: 50.1 }],
     managerPrize: { kind: "ITEM", label: " Combo KFC " },
     managerTarget: 110.004,
+    cashierPrize: null,
+    cashierTarget: null,
   };
 
   it("grava reais como centavos, nome e descrição sem espaços nas pontas, alvo com 2 casas", () => {
@@ -146,6 +159,7 @@ describe("challengeToRow", () => {
       min_sales: 10,
       prizes: [{ kind: "MONEY", cents: 5010 }],
       manager_prize: { kind: "ITEM", label: "Combo KFC", target: 110 },
+      cashier_prize: null,
     });
   });
 

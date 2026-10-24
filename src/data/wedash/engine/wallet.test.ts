@@ -163,6 +163,27 @@ describe("buildWalletMonth", () => {
     expect(ana.lines.map((line) => line.kind)).toEqual(["management"]);
   });
 
+  it("pays the cashier share as challenge money", () => {
+    const view = month({
+      challenges: [
+        {
+          name: "Outubro",
+          endsOn: "2026-10-31",
+          open: false,
+          people: [
+            { personId: "ana", moneyCents: 2_500, itemLabel: null, cashier: true },
+            { personId: "bia", moneyCents: 2_500, itemLabel: null, cashier: true },
+          ],
+        },
+      ],
+    });
+    const ana = view.people.find((row) => row.personId === "ana");
+    expect(ana?.challengeCents).toBe(2_500);
+    expect(ana?.managementCents).toBe(0);
+    expect(ana?.balanceCents).toBe(2_500);
+    expect(ana?.lines[0]).toMatchObject({ kind: "cashier", cents: 2_500, note: null });
+  });
+
   it("keeps a challenge item for the manager outside the balance", () => {
     const view = month({
       challenges: [

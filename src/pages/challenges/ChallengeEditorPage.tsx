@@ -509,6 +509,50 @@ export default function ChallengeEditorPage() {
               </div>
             )}
           </div>
+
+          <Divider />
+          <div>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[12.5px] font-bold text-t0">Prêmio do operador de caixa</p>
+              <Switch
+                checked={form.cashierOn}
+                onChange={(v) =>
+                  set(
+                    v && !form.cashierTarget.trim() && !index ? { cashierOn: v, cashierTarget: form.target } : { cashierOn: v },
+                  )
+                }
+              />
+            </div>
+            <p className="mt-1.5 text-[11.5px] text-t2">
+              {index
+                ? "Quem tem o cargo Operador de caixa nesta filial recebe o prêmio quando o índice da equipe, comparado com o período anterior de mesma duração, atingir o mínimo definido abaixo."
+                : "Quem tem o cargo Operador de caixa nesta filial recebe o prêmio quando a equipe atinge a meta definida abaixo."}
+            </p>
+            {form.cashierOn && (
+              <div className="mt-3 flex flex-col gap-4">
+                <FormField
+                  label={index ? "Índice mínimo do operador de caixa" : "Meta do operador de caixa"}
+                  required
+                  error={errors.cashierTarget}
+                  hint={MANAGER_TARGET_HELP[form.metric]}
+                >
+                  <TargetInput
+                    metric={form.metric}
+                    value={form.cashierTarget}
+                    onChange={(cashierTarget) => set({ cashierTarget })}
+                    invalid={Boolean(errors.cashierTarget)}
+                  />
+                </FormField>
+                <FormField label="Prêmio do operador de caixa" required error={errors.cashierPrize}>
+                  <PrizeField
+                    prize={form.cashierPrize}
+                    onChange={(cashierPrize) => set({ cashierPrize })}
+                    invalid={Boolean(errors.cashierPrize)}
+                  />
+                </FormField>
+              </div>
+            )}
+          </div>
         </div>
       </Card>
       </div>

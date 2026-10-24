@@ -79,6 +79,12 @@ function managerGoalText(c: ChallengeRecord): string {
   return isIndexMetric(c.metric) ? ` · índice da equipe de ${amount}` : ` · meta de ${amount}`;
 }
 
+function cashierGoalText(c: ChallengeRecord): string {
+  if (c.cashierTarget == null) return "";
+  const amount = metricValueLabel(c.metric, c.cashierTarget);
+  return isIndexMetric(c.metric) ? ` · índice da equipe de ${amount}` : ` · meta de ${amount}`;
+}
+
 /** Performance > Desafios > detalhe — resumo e participantes; encerrado = fechamento com quem ganhou o que. */
 export default function ChallengeDetailPage() {
   const { id = "" } = useParams();
@@ -251,7 +257,12 @@ function ChallengeHero({ challenge: c, view, storeNameValue }: { challenge: Chal
     {
       label: "Prêmios",
       value: prizesText(c),
-      sub: c.managerPrize ? `Gerência: ${prizeLabel(c.managerPrize)}${managerGoalText(c)}` : undefined,
+      sub: [
+        c.managerPrize ? `Gerência: ${prizeLabel(c.managerPrize)}${managerGoalText(c)}` : "",
+        c.cashierPrize ? `Operador de caixa: ${prizeLabel(c.cashierPrize)}${cashierGoalText(c)}` : "",
+      ]
+        .filter(Boolean)
+        .join(" · ") || undefined,
     },
     {
       label: destaque.label ?? "Resultado",
@@ -302,6 +313,50 @@ function ChallengeHero({ challenge: c, view, storeNameValue }: { challenge: Chal
   );
 }
 
+function RoleResultBar({
+  title,
+  goalLabel,
+  metric,
+  status,
+  result,
+}: {
+  title: string;
+  goalLabel: string;
+  metric: ChallengeRecord["metric"];
+  status: ChallengeView["status"];
+  result: NonNullable<ChallengeView["management"]>;
+}) {
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-1.5 rounded-xl bg-bg-inset px-3.5 py-3 text-[12.5px]">
+      <p className="font-bold text-t0">{title}</p>
+      <p className="flex items-center gap-1.5 text-t1">
+        <span className="text-t2">{MANAGEMENT_RESULT[metric]}: </span>
+        <span className={`font-mono font-bold ${result.result == null ? "text-t0" : "text-acc"}`}>
+          {result.result != null ? metricValueLabel(metric, result.result) : "—"}
+        </span>
+        {result.periodPrevious && (
+          <TipHelp
+            label={`Compara a equipe durante o desafio com o período de ${shortDate(result.periodPrevious.from)} a ${shortDate(result.periodPrevious.to)}: 50% faturamento médio por pessoa, 25% ticket médio e 25% P.A. 100 representa o mesmo desempenho do período anterior. Com o desafio em andamento, os dois lados consideram até ontem.${result.result == null ? " Fica indisponível no primeiro dia do desafio, sem vendas em um dos períodos ou quando faltam dados de itens." : ""}`}
+          />
+        )}
+      </p>
+      <p className="text-t1">
+        <span className="text-t2">{goalLabel}: </span>
+        <span className="font-mono font-bold">{metricValueLabel(metric, result.target)}</span>
+      </p>
+      <p className="text-t1">
+        <span className="text-t2">Prêmio: </span>
+        <span className="font-bold text-ok">{prizeLabel(result.prize)}</span>
+      </p>
+      {result.atingiu ? (
+        <ProgressStanding ok tone="acc">Ganhou</ProgressStanding>
+      ) : status === "ended" ? (
+        <ProgressStanding ok={false}>Não ganhou</ProgressStanding>
+      ) : null}
+    </div>
+  );
+}
+
 function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; view: ChallengeView }) {
   const disputa = c.mode === "CONTEST";
   const aComecar = view.status === "upcoming";
@@ -325,31 +380,22 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
       </div>
 
       {view.management && !aComecar && (
-        <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-1.5 rounded-xl bg-bg-inset px-3.5 py-3 text-[12.5px]">
-          <p className="font-bold text-t0">Gerência</p>
-          <p className="flex items-center gap-1.5 text-t1">
-            <span className="text-t2">{MANAGEMENT_RESULT[c.metric]}: </span>
-            <span className={`font-mono font-bold ${view.management.result == null ? "text-t0" : "text-acc"}`}>{view.management.result != null ? metricValueLabel(c.metric, view.management.result) : "—"}</span>
-            {view.management.periodPrevious && (
-              <TipHelp
-                label={`Compara a equipe durante o desafio com o período de ${shortDate(view.management.periodPrevious.from)} a ${shortDate(view.management.periodPrevious.to)}: 50% faturamento médio por pessoa, 25% ticket médio e 25% P.A. 100 representa o mesmo desempenho do período anterior. Com o desafio em andamento, os dois lados consideram até ontem.${view.management.result == null ? " Fica indisponível no primeiro dia do desafio, sem vendas em um dos períodos ou quando faltam dados de itens." : ""}`}
-              />
-            )}
-          </p>
-          <p className="text-t1">
-            <span className="text-t2">Meta da gerência: </span>
-            <span className="font-mono font-bold">{metricValueLabel(c.metric, view.management.target)}</span>
-          </p>
-          <p className="text-t1">
-            <span className="text-t2">Prêmio: </span>
-            <span className="font-bold text-ok">{prizeLabel(view.management.prize)}</span>
-          </p>
-          {view.management.atingiu ? (
-            <ProgressStanding ok tone="acc">Ganhou</ProgressStanding>
-          ) : view.status === "ended" ? (
-            <ProgressStanding ok={false}>Não ganhou</ProgressStanding>
-          ) : null}
-        </div>
+        <RoleResultBar
+          title="Gerência"
+          goalLabel="Meta da gerência"
+          metric={c.metric}
+          status={view.status}
+          result={view.management}
+        />
+      )}
+      {view.cashier && !aComecar && (
+        <RoleResultBar
+          title="Operador de caixa"
+          goalLabel="Meta do operador de caixa"
+          metric={c.metric}
+          status={view.status}
+          result={view.cashier}
+        />
       )}
 
       {n === 0 ? (
@@ -458,6 +504,9 @@ function ChallengePayoutCard({ challenge: c, view, onExport }: { challenge: Chal
     })),
     ...(payout.management
       ? [{ key: "gerencia", name: "GERÊNCIA", sub: "Resultado da equipe", rank: "Ganhou", prize: payout.management, employeeId: null as string | null }]
+      : []),
+    ...(payout.cashier
+      ? [{ key: "caixa", name: "OPERADOR DE CAIXA", sub: "Cargo da filial", rank: "Ganhou", prize: payout.cashier, employeeId: null as string | null }]
       : []),
   ];
   const especie = countEspecie(payout.especie);

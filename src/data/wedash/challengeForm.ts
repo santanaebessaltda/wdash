@@ -43,6 +43,10 @@ export interface ChallengeForm {
   managerPrize: PrizeForm;
   /** Media da equipe que a gerencia precisa alcancar, na unidade da metrica (Indice: indice da equipe x periodo anterior). */
   managerTarget: string;
+  cashierOn: boolean;
+  cashierPrize: PrizeForm;
+  /** Mesma conta da gerencia. Quem recebe tem o cargo Operador de caixa na filial. */
+  cashierTarget: string;
 }
 
 export interface ChallengeFormErrors {
@@ -58,6 +62,8 @@ export interface ChallengeFormErrors {
   prizes?: Record<number, string>;
   managerPrize?: string;
   managerTarget?: string;
+  cashierPrize?: string;
+  cashierTarget?: string;
 }
 
 const REQUIRED = "Campo obrigatório.";
@@ -81,6 +87,9 @@ export function emptyChallengeForm(storeId: string): ChallengeForm {
     managerOn: false,
     managerPrize: emptyPrize(),
     managerTarget: "",
+    cashierOn: false,
+    cashierPrize: emptyPrize(),
+    cashierTarget: "",
   };
 }
 
@@ -168,6 +177,12 @@ export function validateChallengeForm(f: ChallengeForm): ChallengeFormErrors {
     const mt = targetError(f.metric, f.managerTarget, true);
     if (mt) e.managerTarget = mt;
   }
+  if (f.cashierOn) {
+    const ce = prizeError(f.cashierPrize);
+    if (ce) e.cashierPrize = ce;
+    const ct = targetError(f.metric, f.cashierTarget, true);
+    if (ct) e.cashierTarget = ct;
+  }
   return e;
 }
 
@@ -194,6 +209,8 @@ export function challengeFormToInput(f: ChallengeForm): ChallengeInput {
     prizes: activePrizes(f).map(prizeValue),
     managerPrize: f.managerOn ? prizeValue(f.managerPrize) : null,
     managerTarget: f.managerOn ? targetValue(f.metric, f.managerTarget) : null,
+    cashierPrize: f.cashierOn ? prizeValue(f.cashierPrize) : null,
+    cashierTarget: f.cashierOn ? targetValue(f.metric, f.cashierTarget) : null,
   };
 }
 
@@ -227,5 +244,8 @@ export function challengeToForm(c: ChallengeRecord | ChallengeInput): ChallengeF
     managerOn: c.managerPrize != null,
     managerPrize: c.managerPrize ? prizeToForm(c.managerPrize) : emptyPrize(),
     managerTarget: c.managerPrize ? targetToText(c.metric, c.managerTarget) : "",
+    cashierOn: c.cashierPrize != null,
+    cashierPrize: c.cashierPrize ? prizeToForm(c.cashierPrize) : emptyPrize(),
+    cashierTarget: c.cashierPrize ? targetToText(c.metric, c.cashierTarget) : "",
   };
 }

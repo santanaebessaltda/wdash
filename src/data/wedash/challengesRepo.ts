@@ -50,6 +50,9 @@ export interface ChallengeRecord {
   managerPrize: ChallengePrize | null;
   /** Meta da gerencia = media da equipe, na unidade da metrica (Indice: indice da equipe x periodo anterior). So com `managerPrize`. */
   managerTarget: number | null;
+  /** Quem recebe tem cargo OPERADOR DE CAIXA ativo na filial. A conta e a mesma da gerencia. */
+  cashierPrize: ChallengePrize | null;
+  cashierTarget: number | null;
 }
 
 export type ChallengeInput = Omit<ChallengeRecord, "id">;
@@ -136,6 +139,7 @@ export type ChallengeRow = {
   min_sales: number | null;
   prizes: unknown;
   manager_prize: unknown;
+  cashier_prize: unknown;
 };
 
 /** Meta guardada junto do premio da gerencia; desafio antigo sem ela usa o alvo/piso. */
@@ -150,6 +154,8 @@ export function challengeFromRow(r: ChallengeRow): ChallengeRecord {
   // Indice: o piso das vendedoras nao serve de meta da gerencia (outra escala)  ->  sem meta, sem premio.
   const managerTargetRaw = parseManagerTarget(r.manager_prize, index ? null : numOrNull(r.target));
   const managerPrize = index && managerTargetRaw == null ? null : parsePrize(r.manager_prize);
+  const cashierTargetRaw = parseManagerTarget(r.cashier_prize, index ? null : numOrNull(r.target));
+  const cashierPrize = index && cashierTargetRaw == null ? null : parsePrize(r.cashier_prize);
   return {
     id: r.id,
     storeId: r.store_id,
@@ -165,6 +171,8 @@ export function challengeFromRow(r: ChallengeRow): ChallengeRecord {
     prizes: parsePrizes(r.prizes),
     managerPrize,
     managerTarget: managerPrize ? managerTargetRaw : null,
+    cashierPrize,
+    cashierTarget: cashierPrize ? cashierTargetRaw : null,
   };
 }
 
@@ -192,11 +200,14 @@ export function challengeToRow(c: ChallengeInput): Omit<ChallengeRow, "id"> {
     manager_prize: c.managerPrize
       ? { ...prizeToJson(c.managerPrize), target: c.managerTarget == null ? null : Math.round(c.managerTarget * 100) / 100 }
       : null,
+    cashier_prize: c.cashierPrize
+      ? { ...prizeToJson(c.cashierPrize), target: c.cashierTarget == null ? null : Math.round(c.cashierTarget * 100) / 100 }
+      : null,
   };
 }
 
 const COLS =
-  "id, store_id, name, starts_on, ends_on, metric, scope, mode, products, categories, target, min_sales, prizes, manager_prize";
+  "id, store_id, name, starts_on, ends_on, metric, scope, mode, products, categories, target, min_sales, prizes, manager_prize, cashier_prize";
 
 async function client() {
   const { getSupabase } = await import("@/lib/supabase");

@@ -129,6 +129,13 @@ describe("validateChallengeForm", () => {
     );
     expect(validateChallengeForm(valid({ managerOn: false, managerPrize: empty, managerTarget: "" }))).toEqual({});
   });
+
+  it("operador de caixa ligado exige prêmio e meta própria", () => {
+    const empty = { kind: "MONEY" as const, amount: "", label: "" };
+    const e = validateChallengeForm(valid({ cashierOn: true, cashierPrize: empty, cashierTarget: "" }));
+    expect([e.cashierPrize, e.cashierTarget]).toEqual(["Campo obrigatório.", "Campo obrigatório."]);
+    expect(validateChallengeForm(valid({ cashierOn: false, cashierPrize: empty, cashierTarget: "" }))).toEqual({});
+  });
 });
 
 describe("challengeFormToInput / challengeToForm", () => {
@@ -166,6 +173,8 @@ describe("challengeFormToInput / challengeToForm", () => {
       ],
       managerPrize: { kind: "ITEM", label: "Spa" },
       managerTarget: 8,
+      cashierPrize: null,
+      cashierTarget: null,
     });
   });
 
@@ -244,6 +253,8 @@ describe("challengeFormToInput / challengeToForm", () => {
       prizes: [{ kind: "MONEY", amount: 50 }],
       managerPrize: { kind: "ITEM", label: "Spa" },
       managerTarget: 2.1,
+      cashierPrize: null,
+      cashierTarget: null,
     };
     const form = challengeToForm(rec);
     expect(form.target).toBe("1,9");

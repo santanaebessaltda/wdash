@@ -1,6 +1,6 @@
 /** Carteira do mês: premiação, bônus, desafio, retirada e quebra. Valores em centavos. */
 
-export type WalletLineKind = "prize" | "bonus" | "management" | "managementBonus" | "challenge" | "withdrawal" | "shortage";
+export type WalletLineKind = "prize" | "bonus" | "management" | "managementBonus" | "cashier" | "challenge" | "withdrawal" | "shortage";
 
 export type WalletLine = {
   kind: WalletLineKind;
@@ -59,7 +59,7 @@ export type WalletChallengeInput = {
   name: string;
   endsOn: string;
   open: boolean;
-  people: { personId: string; moneyCents: number; itemLabel: string | null; management?: boolean }[];
+  people: { personId: string; moneyCents: number; itemLabel: string | null; management?: boolean; cashier?: boolean }[];
 };
 
 export type WalletManager = { id: string; name: string; storeIds: string[] };
@@ -190,9 +190,21 @@ export function buildWalletMonth(input: {
       const row = bucket(person.personId);
       if (!row) continue;
       if (challenge.open) {
-        if (!person.management) {
+        if (!person.management && !person.cashier) {
           row.lines.push({ kind: "challenge", title: challenge.name, day: challenge.endsOn, cents: 0, open: true, note: "Em andamento" });
         }
+        continue;
+      }
+      if (person.cashier) {
+        const item = person.itemLabel?.trim() ?? "";
+        if (item) {
+          row.lines.push({ kind: "cashier", title: challenge.name, day: challenge.endsOn, cents: 0, open: false, note: item });
+          continue;
+        }
+        const share = cents(person.moneyCents);
+        if (share <= 0) continue;
+        row.challengeCents += share;
+        row.lines.push({ kind: "cashier", title: challenge.name, day: challenge.endsOn, cents: share, open: false, note: null });
         continue;
       }
       if (person.management) {
@@ -294,7 +306,7 @@ function recount(person: WalletPersonMonth, lines: WalletLine[]): WalletPersonMo
     if (line.kind === "prize") prizeCents += line.cents;
     else if (line.kind === "bonus") bonusCents += line.cents;
     else if (line.kind === "management" || line.kind === "managementBonus") managementCents += line.cents;
-    else if (line.kind === "challenge") challengeCents += line.cents;
+    else if (line.kind === "cashier" || line.kind === "challenge") challengeCents += line.cents;
     else if (line.kind === "withdrawal") withdrawalCents += line.cents;
     else shortageCents += line.cents;
     if (line.open && line.kind !== "challenge") openPrize = true;

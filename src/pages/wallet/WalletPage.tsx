@@ -40,6 +40,7 @@ function lineTitle(line: WalletLine): string {
   if (line.kind === "bonus") return `Bônus · ${line.title}`;
   if (line.kind === "management") return `Premiação da gerência · ${line.title}`;
   if (line.kind === "managementBonus") return `Bônus da gerência · ${line.title}`;
+  if (line.kind === "cashier") return `Prêmio do operador de caixa · ${line.title}`;
   if (line.kind === "challenge") return `Desafio · ${line.title}`;
   if (line.kind === "withdrawal") return `Retirada · ${line.day ? fullDate(line.day) : ""}`;
   return `Quebra de caixa · ${line.day ? fullDate(line.day) : ""}`;
@@ -63,9 +64,10 @@ const LINE_ORDER: Record<WalletLine["kind"], number> = {
   bonus: 1,
   management: 2,
   managementBonus: 3,
-  challenge: 4,
-  withdrawal: 5,
-  shortage: 6,
+  cashier: 4,
+  challenge: 5,
+  withdrawal: 6,
+  shortage: 7,
 };
 
 function compareLines(a: WalletLine, b: WalletLine): number {
@@ -526,7 +528,7 @@ function balanceLines(person: WalletPersonMonth): WalletPersonMonth {
     ...person,
     lines: person.lines.filter((line) => {
       if (line.open && line.kind === "challenge") return false;
-      if (line.cents === 0 && !line.note && (line.kind === "prize" || line.kind === "bonus" || line.kind === "management" || line.kind === "managementBonus")) return false;
+      if (line.cents === 0 && !line.note && (line.kind === "prize" || line.kind === "bonus" || line.kind === "management" || line.kind === "managementBonus" || line.kind === "cashier")) return false;
       if (line.cents === 0 && line.kind === "challenge" && !line.note) return false;
       return true;
     }),

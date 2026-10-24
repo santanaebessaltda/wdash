@@ -2,7 +2,7 @@ import { parseRentSeasons, type RentSeason } from "./rentSeason";
 import { defaultWeekHours, effectiveWeekHours, openHourFloor, closeHourCeil, parseWeekHours, type StoreWeekHours } from "./storeHours";
 import { collaboratorName, shiftName } from "@/lib/format";
 import { isBranchUser, millenniumCodeKey, resolveBranchSellerId } from "./engine/branchUser";
-import { SELLER_ROLE } from "./engine/goalRows";
+import { CASHIER_ROLE, SELLER_ROLE } from "./engine/goalRows";
 
 export { isBranchUser, millenniumCodeKey, resolveBranchSellerId };
 
@@ -786,7 +786,7 @@ export function isBranchSalesPerson(
 }
 
 /** Cargos que a tela Equipe lista. O ranking continua só com `isActiveSalesPerson`. */
-const BRANCH_TEAM_ROLES = new Set<string>([SELLER_ROLE, "GERENCIA", "OPERADOR DE CAIXA"]);
+const BRANCH_TEAM_ROLES = new Set<string>([SELLER_ROLE, "GERENCIA", CASHIER_ROLE]);
 
 /** Ativo na lista da filial: vendedor, operador de caixa, gerência, ou o usuário da filial. Cargo null conta como vendedor. */
 export function isBranchTeamMember(
@@ -803,7 +803,7 @@ export function branchRoleLabel(role: string | null): string {
   if (role == null || role === SELLER_ROLE) return "Vendedor";
   if (role === "") return "Sem cargo";
   if (role === "GERENCIA") return "Gerente";
-  if (role === "OPERADOR DE CAIXA") return "Operador de caixa";
+  if (role === CASHIER_ROLE) return "Operador de caixa";
   if (role === "INDEFINIDO") return "Sem cargo";
   return role;
 }

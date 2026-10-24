@@ -3,6 +3,7 @@ import { collaboratorName, shiftName } from "./format.ts";
 import type { GoalGroup, GoalRecord, GoalTeamMember, SalesBrand, SalesSellerDayAgg, Tier } from "./goalTypes.ts";
 
 export const SELLER_ROLE = "VENDEDOR";
+export const CASHIER_ROLE = "OPERADOR DE CAIXA";
 
 type TierJson = {
   name?: string;

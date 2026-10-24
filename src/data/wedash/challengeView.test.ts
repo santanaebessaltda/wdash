@@ -29,6 +29,8 @@ const challenge = (over: Partial<ChallengeRecord> = {}): ChallengeRecord => ({
   prizes: [{ kind: "MONEY", amount: 100 }],
   managerPrize: null,
   managerTarget: null,
+  cashierPrize: null,
+  cashierTarget: null,
   ...over,
 });
 
@@ -548,6 +550,23 @@ describe("buildChallengeView — gerência, incompleto e status", () => {
       input({ sellerProducts: [item(1001, "BS1", 4), item(1002, "BS1", 2)] }),
     );
     expect(v.management).toMatchObject({ result: 100, target: 100, atingiu: true });
+  });
+
+  it("operador de caixa usa a média da equipe e a meta própria", () => {
+    const v = build(
+      challenge({
+        metric: "VALUE",
+        managerPrize: { kind: "MONEY", amount: 80 },
+        managerTarget: 200,
+        cashierPrize: { kind: "ITEM", label: "Vale" },
+        cashierTarget: 100,
+      }),
+      input({ sellerProducts: [item(1001, "BS1", 4), item(1002, "BS1", 2)] }),
+    );
+    expect(v.management).toMatchObject({ result: 100, atingiu: false });
+    expect(v.cashier).toMatchObject({ result: 100, target: 100, atingiu: true, prize: { kind: "ITEM", label: "Vale" } });
+    expect(challengePayout(v).management).toBeNull();
+    expect(challengePayout(v).cashier).toEqual({ kind: "ITEM", label: "Vale" });
   });
 
   it("gerência em P.A. = Σ itens ÷ Σ vendas da equipe; Atingiu só no fim", () => {

@@ -148,10 +148,12 @@ export interface ChallengeView {
    * Média da equipe, a mesma conta da gerência.
    * Itens e faturamento: soma ÷ pessoas (quem zerou entra).
    * P.A.: itens ÷ vendas. Ticket: faturamento ÷ vendas.
-   * Índice: índice da equipe contra o período anterior, só quando há meta da gerência.
+   * Índice: índice da equipe contra o período anterior, quando há meta da gerência ou do operador de caixa.
    */
   teamAverage: number | null;
   management: ChallengeManagerResult | null;
+  /** Mesma conta da gerência, com meta e prêmio próprios. */
+  cashier: ChallengeManagerResult | null;
   /** Dias com venda da loja e sem itens por pessoa (produtos/categorias escolhidos). */
   daysIncomplete: string[];
 }
@@ -443,9 +445,11 @@ export function buildChallengeView(args: {
     return sales > 0 ? round2(all.reduce((s, a) => s + a.revenueCents, 0) / 100 / sales) : 0;
   };
 
-  let management: ChallengeManagerResult | null = null;
-  const managerGoal = c.managerTarget;
-  if (c.managerPrize && managerGoal != null && c.metric === "INDEX") {
+  let indexBundle: { result: number | null; periodPrevious: { from: string; to: string } | null } | null = null;
+  const wantsIndex =
+    c.metric === "INDEX" &&
+    ((c.managerPrize != null && c.managerTarget != null) || (c.cashierPrize != null && c.cashierTarget != null));
+  if (wantsIndex) {
     const janelas = managerIndexWindows(c, today);
     const peopleIn = (j: DayRange) => {
       const m = new Map<string, IndexPersonTotals>();
@@ -467,24 +471,33 @@ export function buildChallengeView(args: {
       status === "upcoming" || !janelas.current || !janelas.comparado
         ? null
         : teamIndex(peopleIn(janelas.current), peopleIn(janelas.comparado));
-    const result = index == null ? null : round2(index);
-    management = {
-      result,
-      target: managerGoal,
-      periodPrevious: janelas.previous,
-      atingiu: status === "ended" && result != null && result >= managerGoal - 1e-9,
-      prize: c.managerPrize,
-    };
-  } else if (c.managerPrize && managerGoal != null) {
-    const result = teamAverageOf();
-    management = {
-      result,
-      target: managerGoal,
-      periodPrevious: null,
-      atingiu: (!settlesAtEnd(c.metric) || status === "ended") && result != null && result > 0 && result >= managerGoal - 1e-9,
-      prize: c.managerPrize,
-    };
+    indexBundle = { result: index == null ? null : round2(index), periodPrevious: janelas.previous };
   }
+
+  const roleResult = (prize: ChallengePrize | null, goal: number | null): ChallengeManagerResult | null => {
+    if (!prize || goal == null) return null;
+    if (c.metric === "INDEX") {
+      const result = indexBundle?.result ?? null;
+      return {
+        result,
+        target: goal,
+        periodPrevious: indexBundle?.periodPrevious ?? null,
+        atingiu: status === "ended" && result != null && result >= goal - 1e-9,
+        prize,
+      };
+    }
+    const result = teamAverageOf();
+    return {
+      result,
+      target: goal,
+      periodPrevious: null,
+      atingiu: (!settlesAtEnd(c.metric) || status === "ended") && result != null && result > 0 && result >= goal - 1e-9,
+      prize,
+    };
+  };
+
+  const management = roleResult(c.managerPrize, c.managerTarget);
+  const cashier = roleResult(c.cashierPrize, c.cashierTarget);
 
   const daysIncomplete: string[] = [];
   if (byProduct && status !== "upcoming") {
@@ -508,8 +521,9 @@ export function buildChallengeView(args: {
     emClosing: status === "ended" && today <= addDays(c.endsOn, 1),
     participants,
     reachedCount: c.mode === "MINIMUM" ? participants.filter((p) => p.winner).length : 0,
-    teamAverage: c.metric === "INDEX" ? (management?.result ?? null) : teamAverageOf(),
+    teamAverage: c.metric === "INDEX" ? (management?.result ?? cashier?.result ?? null) : teamAverageOf(),
     management,
+    cashier,
     daysIncomplete,
   };
 }
@@ -527,9 +541,10 @@ export interface ChallengeWinner {
 export interface ChallengePayout {
   vencedores: ChallengeWinner[];
   management: ChallengePrize | null;
-  /**  premios em R$ (pessoas + gerencia). */
+  cashier: ChallengePrize | null;
+  /** Premios em R$ (pessoas + gerencia + operador de caixa), cada um uma vez. */
   totalBrl: number;
-  /** Outros premios (texto livre), um por vencedor (+ gerencia). */
+  /** Outros premios (texto livre), um por vencedor, mais gerencia e operador de caixa. */
   especie: string[];
 }
 
@@ -544,10 +559,12 @@ export function challengePayout(view: ChallengeView): ChallengePayout {
       prize: p.prize!,
     }));
   const management = view.management?.atingiu ? view.management.prize : null;
-  const prizes = [...vencedores.map((w) => w.prize), ...(management ? [management] : [])];
+  const cashier = view.cashier?.atingiu ? view.cashier.prize : null;
+  const prizes = [...vencedores.map((w) => w.prize), ...(management ? [management] : []), ...(cashier ? [cashier] : [])];
   return {
     vencedores,
     management,
+    cashier,
     totalBrl: prizes.reduce((s, p) => s + (p.kind === "MONEY" ? p.amount : 0), 0),
     especie: prizes.flatMap((p) => (p.kind === "ITEM" ? [p.label] : [])),
   };
@@ -579,6 +596,7 @@ export function copyChallenge(c: ChallengeRecord): ChallengeInput {
     categories: c.categories.map((t) => ({ ...t })),
     prizes: c.prizes.map((p) => ({ ...p })),
     managerPrize: c.managerPrize ? { ...c.managerPrize } : null,
+    cashierPrize: c.cashierPrize ? { ...c.cashierPrize } : null,
   };
 }
 
@@ -591,5 +609,6 @@ export function copyChallengeToStore(c: ChallengeRecord): ChallengeInput {
     categories: c.categories.map((t) => ({ ...t })),
     prizes: c.prizes.map((p) => ({ ...p })),
     managerPrize: c.managerPrize ? { ...c.managerPrize } : null,
+    cashierPrize: c.cashierPrize ? { ...c.cashierPrize } : null,
   };
 }

@@ -273,11 +273,14 @@ export function ChallengeProgress({
   const index = c.metric === "INDEX";
   const personGoal = c.target != null && c.target > 0 ? c.target : null;
   const managerGoal = view.management != null && view.management.target > 0 ? view.management.target : null;
-  // No índice a média de quem vendeu é sempre 100. Com gerência, a barra usa o índice da equipe.
+  const cashierGoal = view.cashier != null && view.cashier.target > 0 ? view.cashier.target : null;
+  const roleGoal = managerGoal ?? cashierGoal;
+  // No índice a média de quem vendeu é sempre 100. Com gerência ou operador de caixa, a barra usa o índice da equipe.
   const hasAverage = view.teamAverage != null;
   const shown = hasAverage ? view.teamAverage : !upcoming && index && best > 0 ? (leader?.result ?? best) : null;
-  const goal = hasAverage ? (index ? managerGoal : (personGoal ?? managerGoal)) : personGoal;
-  const goalIsManager = hasAverage && goal != null && (index || personGoal == null);
+  const goal = hasAverage ? (index ? roleGoal : (personGoal ?? roleGoal)) : personGoal;
+  const goalIsRole = hasAverage && goal != null && (index || personGoal == null);
+  const roleGoalLabel = managerGoal != null ? "da meta da gerência" : "da meta do operador de caixa";
   const pct = upcoming || shown == null ? 0 : goal != null ? (shown / goal) * 100 : best > 0 ? (shown / best) * 100 : 0;
   const headcount = `${count} ${count === 1 ? "pessoa" : "pessoas"}`;
   const left = upcoming ? (c.mode === "MINIMUM" ? challengeMinimumLabel(c) : challengeCriterion(c)) ?? "—" : shown != null ? metricValueLabel(c.metric, shown) : "Sem resultado";
@@ -295,7 +298,7 @@ export function ChallengeProgress({
           ) : shown != null && goal != null ? (
             <>
               <span className={`font-mono font-bold ${progressTextClass(pct)}`}>{num(pct, 1)}%</span>
-              {goalIsManager ? " da meta da gerência" : ` de ${metricValueLabel(c.metric, goal)}`}
+              {goalIsRole ? ` ${roleGoalLabel}` : ` de ${metricValueLabel(c.metric, goal)}`}
             </>
           ) : c.mode === "CONTEST" ? (
             leader?.name ?? "Ainda não há líder"
@@ -318,6 +321,18 @@ export function ChallengeProgress({
   );
 }
 
+function roleStanding(
+  result: ChallengeView["management"],
+  status: ChallengeView["status"],
+  won: string,
+  missed: string,
+): { ok: boolean; label: string } | null {
+  if (result == null || status === "upcoming") return null;
+  if (result.atingiu) return { ok: true, label: won };
+  if (status === "ended") return { ok: false, label: missed };
+  return null;
+}
+
 /** Mesmo miolo do card de meta: a média da equipe, a barra até o mínimo e os avatares. */
 export function ChallengeSummary({
   challenge: c,
@@ -338,24 +353,23 @@ export function ChallengeSummary({
   const headcount = `${count} ${count === 1 ? "pessoa" : "pessoas"}`;
   const note = upcoming ? headcount : [rule, headcount].filter(Boolean).join(" · ");
 
-  const management = view.management;
-  const managerWon =
-    management == null || view.status === "upcoming"
-      ? null
-      : management.atingiu
-        ? "Gerência ganhou"
-        : view.status === "ended"
-          ? "Gerência não ganhou"
-          : null;
+  const standings = [
+    roleStanding(view.management, view.status, "Gerência ganhou", "Gerência não ganhou"),
+    roleStanding(view.cashier, view.status, "Operador de caixa ganhou", "Operador de caixa não ganhou"),
+  ].filter((item): item is { ok: boolean; label: string } => item != null);
 
   return (
     <>
       <div className="mt-3.5">
         <ChallengeProgress challenge={c} view={view} />
       </div>
-      {managerWon ? (
-        <p className="mt-2">
-          <ProgressStanding ok={management?.atingiu === true}>{managerWon}</ProgressStanding>
+      {standings.length > 0 ? (
+        <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          {standings.map((item) => (
+            <ProgressStanding key={item.label} ok={item.ok}>
+              {item.label}
+            </ProgressStanding>
+          ))}
         </p>
       ) : null}
       {pinNote ? <div className="flex-1" /> : null}

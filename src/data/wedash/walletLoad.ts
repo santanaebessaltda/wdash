@@ -19,6 +19,7 @@ import { dayShortageCents, netCloseDiff } from "./employeeWithdrawal";
 import { goalWeightFrom } from "./engine/goalProjection";
 import type { StoreWeekHours } from "./engine/goalWeights";
 import { isWalletOpportunity, type WalletOpportunity } from "./engine/sellerOpportunity";
+import { CASHIER_ROLE } from "./engine/goalRows";
 import { buildWalletMonth, managersForStore, splitEqualCents, type WalletCashDay, type WalletChallengeInput, type WalletGoalInput, type WalletManager, type WalletMonth, type WalletPersonInput } from "./engine/wallet";
 import { buildGoalCardView, goalManagerPrize, goalStatus } from "./goalView";
 import { fetchGoalTeam, fetchGoals } from "./goalsRepo";
@@ -57,6 +58,8 @@ type Roster = {
   byName: Map<string, string>;
   /** Gerentes ativas da WDash. Sem filial marcada, entra onde ninguém foi marcado. */
   managers: WalletManager[];
+  /** Cargo OPERADOR DE CAIXA ativo nesta filial. */
+  cashiers: { id: string; name: string }[];
 };
 
 function rememberName(index: Map<string, string>, name: string, personId: string) {
@@ -89,6 +92,7 @@ async function fetchWalletManagers(tenantId: string): Promise<WalletManager[]> {
 async function loadRoster(tenantId: string, storeId: string): Promise<Roster> {
   const sb = getSupabase();
   const people: WalletPersonInput[] = [];
+  const cashiers: { id: string; name: string }[] = [];
   const byId = new Map<string, string>();
   const byEmployee = new Map<string, string>();
   const byName = new Map<string, string>();
@@ -105,18 +109,21 @@ async function loadRoster(tenantId: string, storeId: string): Promise<Roster> {
   if (sb) {
     const { data, error } = await sb
       .from("store_seller")
-      .select("id, millennium_employee_id, name, name_keys")
+      .select("id, millennium_employee_id, name, name_keys, active, erp_role")
       .eq("tenant_id", tenantId)
       .eq("store_id", storeId)
       .limit(2000);
     if (error) throw new Error(error.message);
     for (const row of data ?? []) {
+      const id = String(row.id);
+      const name = collaboratorName(String(row.name ?? "")) || "Funcionário fora do cadastro";
       add(
-        String(row.id),
+        id,
         String(row.name ?? ""),
         row.millennium_employee_id == null ? null : Number(row.millennium_employee_id),
         Array.isArray(row.name_keys) ? row.name_keys.filter((key): key is string => typeof key === "string") : [],
       );
+      if (row.active === true && row.erp_role === CASHIER_ROLE && id) cashiers.push({ id, name });
     }
   }
 
@@ -124,7 +131,8 @@ async function loadRoster(tenantId: string, storeId: string): Promise<Roster> {
   for (const manager of managers) add(manager.id, manager.name, null, []);
   const staff = await fetchWithdrawalStaff(tenantId);
   for (const person of staff) add(person.id, person.name, null, []);
-  return { people, byId, byEmployee, byName, managers };
+  cashiers.sort((a, b) => a.name.localeCompare(b.name, "pt-BR") || a.id.localeCompare(b.id));
+  return { people, byId, byEmployee, byName, managers, cashiers };
 }
 
 function personFromKey(roster: Roster, key: string, name: string): string | null {
@@ -250,6 +258,19 @@ export async function loadBranchWallet(input: {
         managers.forEach((manager, index) => {
           const share = shares[index] ?? 0;
           if (share > 0) people.push({ personId: manager.id, moneyCents: share, itemLabel: null, management: true });
+        });
+      }
+    }
+    const cashierPrize = status === "active" ? null : view.cashier?.atingiu ? view.cashier.prize : null;
+    const cashiers = roster.cashiers;
+    if (cashierPrize && cashiers.length > 0) {
+      if (cashierPrize.kind === "ITEM") {
+        for (const cashier of cashiers) people.push({ personId: cashier.id, moneyCents: 0, itemLabel: cashierPrize.label, cashier: true });
+      } else {
+        const shares = splitEqualCents(reaisToCents(cashierPrize.amount), cashiers.length);
+        cashiers.forEach((cashier, index) => {
+          const share = shares[index] ?? 0;
+          if (share > 0) people.push({ personId: cashier.id, moneyCents: share, itemLabel: null, cashier: true });
         });
       }
     }
