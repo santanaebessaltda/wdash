@@ -10,13 +10,6 @@ const MEDALHA = {
   3: { color: "#d99a5c", glow: "none" },
 } as const;
 
-/** Faturamento do pódio no placar. Ouro vivo, prata clara e bronze quente, legíveis no fundo escuro. */
-const PODIO_VALOR = {
-  1: "#ffd166",
-  2: "#e4eaf2",
-  3: "#f0b56b",
-} as const;
-
 const PODIO_HEIGHT: Record<1 | 2 | 3, string> = {
   1: "h-44 sm:h-48",
   2: "h-36 sm:h-40",
@@ -207,7 +200,7 @@ export function RankingBlock({
             {spotlight ? (
               <p
                 className={cn("mt-0.5 font-mono font-extrabold leading-none tabular-nums", motion && isOuro ? "text-[20px] sm:text-[22px]" : "text-[17px] sm:text-[18px]")}
-                style={{ color: PODIO_VALOR[pos] }}
+                style={{ color: medal.color }}
                 {...(secret ? { "data-secret": "" } : {})}
               >
                 {formatAmount(l.revenue)}

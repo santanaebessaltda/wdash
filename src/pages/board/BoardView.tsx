@@ -14,7 +14,7 @@ import type { ChallengeAggInput, ChallengeRecord } from "@/data/wedash/challenge
 import { type Scope, type TeamAggInput, type TeamMemberRow } from "@/data/wedash/dashboard";
 import { teamViewWithGoalShare } from "@/data/wedash/engine/generalRanking";
 import { ChallengeMiniCard } from "@/pages/challenges/ChallengeMiniCard";
-import { kpiTone } from "@/pages/dashboard/palette";
+import { PALETTE, kpiTone } from "@/pages/dashboard/palette";
 import { TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
 import { GoalLevelGuide } from "@/pages/goals/GoalLevelGuide";
 import { GlobalGoalBand } from "@/pages/team/goalBlocks";
@@ -767,6 +767,8 @@ export function BoardView({
           value={activeGoal ? brlCent(activeGoal.goal.target) : "—"}
           sub={activeGoal ? activeGoal.card.name : "Não configurada"}
           icon={<TargetIcon size={16} />}
+          iconColor={PALETTE.blue}
+          iconBg={PALETTE.blueSoft}
         />
         <StatCard
           dense
@@ -784,6 +786,8 @@ export function BoardView({
               : "Meta não configurada"
           }
           icon={<TrophyIcon size={16} />}
+          iconColor={PALETTE.green}
+          iconBg={PALETTE.greenSoft}
         />
       </div>
 
@@ -806,9 +810,9 @@ export function BoardView({
         )}
         style={{ animationDelay: "200ms" }}
       >
-        <Card padding="sm" glass="var(--acc-soft)" className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden !px-3 !py-2">
+        <Card padding="sm" glass={PALETTE.amberSoft} className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden !px-3 !py-2">
           <div className="mb-0.5 flex shrink-0 items-center gap-2">
-            <CardHero compact>
+            <CardHero compact tone="warn">
               <TrophyIcon size={18} />
             </CardHero>
             <CardTitle>Ranking</CardTitle>

@@ -4,7 +4,7 @@ import { BranchBadge, DeadlineBadge, PeriodBadge, PrizeBadge, RecordStatusBadge 
 import { prazoRemaining } from "@/data/wedash/engine/goalView";
 import type { SellerChallenge } from "@/data/wedash/engine/sellerHome";
 import { cn } from "@/lib/cn";
-import { isoToDate } from "@/lib/format";
+import { isoToDate, num } from "@/lib/format";
 import { HeadlineText, type ChallengeHeadline } from "@/pages/challenges/shared";
 import { FlameIcon } from "@/pages/dashboards/icons";
 
@@ -80,11 +80,13 @@ function SellerChallengeCard({
           </p>
           {standing}
         </div>
-        {status !== "upcoming" && c.progressPct != null && (
+        {status !== "upcoming" && c.progressPct != null && (c.metricLabel === "P.A." || c.metricLabel === "Ticket médio" || c.metricLabel === "Índice de desempenho") ? (
+          <p className={`mt-2 font-mono text-[13px] font-extrabold tabular-nums ${c.progressPct >= 100 ? "text-acc" : "text-t2"}`}>{num(c.progressPct, 1)}%</p>
+        ) : status !== "upcoming" && c.progressPct != null ? (
           <div className="mt-2.5">
             <ProgressBar value={c.progressPct} height={6} />
           </div>
-        )}
+        ) : null}
         {status === "upcoming" ? (
           <p className="mt-2 text-[12.5px] text-t2">O resultado aparece quando o desafio começar.</p>
         ) : c.unavailable ? (
