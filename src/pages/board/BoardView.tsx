@@ -349,8 +349,10 @@ export function BoardView({
   loading: boolean;
   packKey: string | null;
 }) {
+  const [boardTheme] = useBoardTheme();
   const [unlocked, setUnlocked] = useState(false);
   const [muted, setMuted] = useState(readMuted);
+  const [askSound, setAskSound] = useState(false);
   const [current, setCurrent] = useState<BoardMoment | null>(null);
   const [leaving, setLeaving] = useState(false);
   const [lingerKey, setLingerKey] = useState<string | null>(null);
@@ -501,6 +503,26 @@ export function BoardView({
   }, [packKey, scopeKey, snapshot]);
 
   useEffect(() => {
+    if (readMuted()) return;
+    let cancel = false;
+    const clip = new Audio(overtakeUrl);
+    clip.volume = 0;
+    void clip
+      .play()
+      .then(() => {
+        clip.pause();
+        if (!cancel) setUnlocked(true);
+      })
+      .catch(() => {
+        if (!cancel) setAskSound(true);
+      });
+    return () => {
+      cancel = true;
+      clip.pause();
+    };
+  }, []);
+
+  useEffect(() => {
     if (!current || !unlocked || muted) return;
     const kind = current.kind;
     audio.current?.pause();
@@ -608,6 +630,7 @@ export function BoardView({
     void clip.play().then(() => clip.pause()).catch(() => undefined);
     setUnlocked(true);
     setMuted(nextMuted);
+    setAskSound(false);
     try {
       localStorage.setItem(MUTE_KEY, nextMuted ? "1" : "0");
     } catch {
@@ -900,6 +923,19 @@ export function BoardView({
         ) : null}
       </div>
 
+      {askSound && !unlocked && !muted
+        ? createPortal(
+            <div data-board-theme={boardTheme} className="fixed inset-0 z-[130] flex items-center justify-center px-4" role="dialog" aria-modal="true" aria-labelledby="board-sound-title">
+              <div className="absolute inset-0 bg-black/60" />
+              <div className="relative w-full max-w-sm rounded-[var(--radius-vela-lg)] border border-line bg-bg-2 p-5 shadow-[var(--shadow-vela)]">
+                <h3 id="board-sound-title" className="text-[15px] font-bold text-t0">Permitir o som</h3>
+                <p className="mt-2 text-[13px] leading-snug text-t1">O placar avisa quando alguém sobe no ranking. Permita o som neste aparelho.</p>
+                <Button type="button" className="mt-4 w-full" onClick={() => unlock(false)}>Permitir som</Button>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
       {current
         ? createPortal(
             <BoardCelebration
