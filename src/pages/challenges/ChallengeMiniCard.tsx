@@ -158,8 +158,9 @@ export function ChallengeMiniCard({
       </span>
       {showPeople ? (
         <>
-          <ChallengeSummary challenge={c} view={view} avatars={false} />
+          <ChallengeSummary challenge={c} view={view} avatars={false} pinNote={false} />
           <ChallengePeople challenge={c} view={view} disputa={disputa} leader={leader} hotKey={hotKey} className="mt-4 border-t border-line pt-3" />
+          <div className="flex-1" />
         </>
       ) : null}
     </>
@@ -322,10 +323,13 @@ export function ChallengeSummary({
   challenge: c,
   view,
   avatars = true,
+  pinNote = true,
 }: {
   challenge: ChallengeRecord;
   view: ChallengeView;
   avatars?: boolean;
+  /** Empurra o mínimo para o fim do card. Com a lista de pessoas, o espaço fica abaixo dela. */
+  pinNote?: boolean;
 }) {
   const upcoming = view.status === "upcoming";
   const people = view.participants;
@@ -354,7 +358,7 @@ export function ChallengeSummary({
           <ProgressStanding ok={management?.atingiu === true}>{managerWon}</ProgressStanding>
         </p>
       ) : null}
-      <div className="flex-1" />
+      {pinNote ? <div className="flex-1" /> : null}
       <div className="mt-4 flex items-center justify-between gap-3">
         <p className="min-w-0 text-[12px] text-t2">{note}</p>
         {avatars && count > 0 ? (
