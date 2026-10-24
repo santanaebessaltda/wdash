@@ -4160,21 +4160,21 @@ function buildFinanceWpinkKpis(p: {
       amount: cmv != null ? brlCent(cmv) : "—",
       sub: cmv != null && current.revenue > 0 ? `${Math.round((cmv / current.revenue) * 100)}% do faturamento WPINK` : undefined,
       tooltip: cmv != null ? TIP_CMV_WPINK : TIP_CMV_WPINK_INDISPONIVEL,
-      tint: "warn",
+      tint: "acc",
       delta: cmvComp ? kpiDelta(cmvA, cmvB, c.vsLabel) : undefined,
     },
     {
       label: "Lucro bruto WPINK",
       amount: cmv != null ? brlCent(profit) : "—",
       tooltip: TIP_PROFIT_GROSS_WPINK,
-      tint: "ok",
+      tint: "acc",
       delta: cmvComp ? kpiDelta(profitA, profitB, c.vsLabel) : undefined,
     },
     {
       label: "Margem WPINK",
       amount: cmv != null ? pct(margin) : "—",
       tooltip: TIP_MARGIN_WPINK,
-      tint: "info",
+      tint: "acc",
       delta: cmvComp ? kpiDeltaPp(marginA, marginB, c.vsLabel) : undefined,
     },
   ];
@@ -4358,13 +4358,13 @@ export function buildOverviewViewFromAggs(scope: Scope, input: OverviewAggInput)
               ? `${Math.round((wpinkCmv / wpinkRevenue) * 100)}% do faturamento`
               : undefined,
           tooltip: tipCmvWpink,
-          tint: "warn",
+          tint: "acc",
         },
         {
           label: "Nº de vendas WPINK",
           amount: wpink.salesIncomplete ? "—" : num(wpinkSales),
           sub: wpink.salesIncomplete ? undefined : `${num(wpinkItems)} itens`,
-          tint: "ok",
+          tint: "acc",
         },
         {
           label: "Ticket médio WPINK",
@@ -4373,7 +4373,7 @@ export function buildOverviewViewFromAggs(scope: Scope, input: OverviewAggInput)
             wpinkSales > 0
               ? `P.A. ${num(divSeguro(wpinkItems, wpinkSales), 2)}`
               : undefined,
-          tint: "info",
+          tint: "acc",
         },
       ]
     : [];
@@ -5004,13 +5004,13 @@ export function buildOverviewView(scope: Scope, aggs?: OverviewAggInput | null):
               ? `${Math.round((wpinkCmvFix / wpinkAgg.revenue) * 100)}% do faturamento`
               : undefined,
           tooltip: tipCmvWpink,
-          tint: "warn",
+          tint: "acc",
         },
         {
           label: "Nº de vendas WPINK",
           amount: num(wpinkAgg.salesCount),
           sub: `${num(wpinkAgg.items)} itens`,
-          tint: "ok",
+          tint: "acc",
         },
         {
           label: "Ticket médio WPINK",
@@ -5019,7 +5019,7 @@ export function buildOverviewView(scope: Scope, aggs?: OverviewAggInput | null):
             wpinkAgg.salesCount > 0
               ? `P.A. ${num(divSeguro(wpinkAgg.items, wpinkAgg.salesCount), 2)}`
               : undefined,
-          tint: "info",
+          tint: "acc",
         },
       ]
     : [];

@@ -129,12 +129,8 @@ const IconItems = () => (
 );
 const KPI_ICONS = [IconRevenue, IconSales, IconTicket, IconItems];
 
-const KPI_COLORS = [
-  { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" },
-  { iconColor: "var(--ok)", iconBg: "var(--ok-soft)" },
-  { iconColor: "var(--info)", iconBg: "rgba(59,130,246,0.12)" },
-  { iconColor: "var(--warn)", iconBg: "rgba(245,158,11,0.12)" },
-];
+/** Hero dos KPIs: rosa primário do dashboard. */
+const KPI_HERO = { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" };
 
 const COLORS_SHIFT = ["var(--acc)", "var(--info)", "var(--ok)", "var(--warn)", "var(--bad)"];
 /** Fatia neutra (sem turno / fora da equipe)  -  nao compete com as demais. */
@@ -459,7 +455,6 @@ export function TeamPage() {
         <>
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {view.kpis.map((kpi, i) => {
-              const c = KPI_COLORS[i % KPI_COLORS.length]!;
               const Icon = KPI_ICONS[i] ?? IconRevenue;
               return (
                 <StatCard
@@ -467,8 +462,8 @@ export function TeamPage() {
                   label={kpi.label}
                   value={kpi.amount}
                   icon={<Icon />}
-                  iconColor={c.iconColor}
-                  iconBg={c.iconBg}
+                  iconColor={KPI_HERO.iconColor}
+                  iconBg={KPI_HERO.iconBg}
                   delta={kpi.delta}
                   sub={kpi.sub}
                   tooltip={kpi.tooltip}

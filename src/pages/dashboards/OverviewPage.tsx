@@ -111,13 +111,8 @@ const STORE_COLORS = ["var(--acc)", "var(--info)", "var(--ok)", "var(--warn)", "
 /** Fatia neutra "Demais lojas" (1 loja no StorePicker)  -  nao compete com a cor da loja. */
 const OTHER_STORES_COLOR = "color-mix(in srgb, var(--t2) 40%, transparent)";
 
-/** Cores distintas para cada KPI card (hero). */
-const KPI_COLORS = [
-  { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" },
-  { iconColor: "var(--warn)", iconBg: "rgba(245,158,11,0.12)" },
-  { iconColor: "var(--ok)", iconBg: "var(--ok-soft)" },
-  { iconColor: "var(--info)", iconBg: "rgba(59,130,246,0.12)" },
-];
+/** Hero dos KPIs: rosa primário do dashboard. */
+const KPI_HERO = { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" };
 
 /**
  * Badge de delta  -  so % no chip; base do comparativo no tooltip (igual StatCard).
@@ -561,7 +556,7 @@ export default function OverviewPage() {
       {/* KPI row  -  4 cards */}
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {view.kpis.map((kpi, i) => (
-          <KpiCard key={kpi.label} kpi={kpi} Icon={KPI_ICONS[i]} colorIdx={i} />
+          <KpiCard key={kpi.label} kpi={kpi} Icon={KPI_ICONS[i]} />
         ))}
       </div>
 
@@ -1213,15 +1208,14 @@ export default function OverviewPage() {
   );
 }
 
-function KpiCard({ kpi, Icon, colorIdx = 0 }: { kpi: OverviewKpi; Icon: () => React.JSX.Element; colorIdx?: number }) {
-  const c = KPI_COLORS[colorIdx % KPI_COLORS.length];
+function KpiCard({ kpi, Icon }: { kpi: OverviewKpi; Icon: () => React.JSX.Element }) {
   return (
     <StatCard
       label={kpi.label}
       value={kpi.amount}
       icon={<Icon />}
-      iconColor={c.iconColor}
-      iconBg={c.iconBg}
+      iconColor={KPI_HERO.iconColor}
+      iconBg={KPI_HERO.iconBg}
       delta={kpi.delta}
       sub={kpi.sub}
       tooltip={kpi.tooltip}

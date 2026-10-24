@@ -107,13 +107,8 @@ const KPI_ICONS = [IconRevenue, IconCmv, IconProfit, IconMargin];
 /** Lucro, margem e CMV ficam só com o Gestor. */
 const STRATEGIC_KPI = new Set(["CMV", "Lucro bruto", "Margem", "CMV WPINK", "Lucro bruto WPINK", "Margem WPINK"]);
 
-/** Mesma paleta da Visao Geral: Faturamento, CMV, Lucro, Margem. */
-const KPI_COLORS = [
-  { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" },
-  { iconColor: "var(--warn)", iconBg: "rgba(245,158,11,0.12)" },
-  { iconColor: "var(--ok)", iconBg: "var(--ok-soft)" },
-  { iconColor: "var(--info)", iconBg: "rgba(59,130,246,0.12)" },
-];
+/** Hero dos KPIs: rosa primário do dashboard. */
+const KPI_HERO = { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" };
 
 type EvoSort = "month" | "revenue" | "cost" | "profit" | "margin" | "ticket";
 
@@ -318,7 +313,7 @@ export default function FinancePage() {
       {/* KPI row  -  4 cards. Gerente fica sem CMV, lucro e margem. */}
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {kpis.map((kpi, i) => (
-          <KpiCard key={kpi.label} kpi={kpi} Icon={KPI_ICONS[i]} colorIdx={i} />
+          <KpiCard key={kpi.label} kpi={kpi} Icon={KPI_ICONS[i]} />
         ))}
       </div>
 
@@ -709,15 +704,14 @@ function Mono({ v, total = false, tone = "text-t0" }: { v: string; total?: boole
 }
 
 /** StatCard wrapper com tooltip ? e sparkline de tendencia. */
-function KpiCard({ kpi, Icon, colorIdx = 0 }: { kpi: FinanceKpi; Icon: () => React.JSX.Element; colorIdx?: number }) {
-  const c = KPI_COLORS[colorIdx % KPI_COLORS.length];
+function KpiCard({ kpi, Icon }: { kpi: FinanceKpi; Icon: () => React.JSX.Element }) {
   return (
     <StatCard
       label={kpi.label}
       value={kpi.value}
       icon={<Icon />}
-      iconColor={c.iconColor}
-      iconBg={c.iconBg}
+      iconColor={KPI_HERO.iconColor}
+      iconBg={KPI_HERO.iconBg}
       delta={kpi.delta}
       sub={kpi.sub}
       tooltip={kpi.tooltip}

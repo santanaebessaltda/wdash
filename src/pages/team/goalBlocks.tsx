@@ -69,12 +69,8 @@ const IconPA = () => (
 );
 
 /** Mesmo padrão visual das demais telas (VG/Fin/Prod): ícone + valor + delta + sub + tooltip — sem sparkline. */
-const KPI_COLORS = [
-  { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" },
-  { iconColor: "var(--ok)", iconBg: "var(--ok-soft)" },
-  { iconColor: "var(--info)", iconBg: "rgba(59,130,246,0.12)" },
-  { iconColor: "var(--warn)", iconBg: "rgba(245,158,11,0.12)" },
-];
+/** Hero dos KPIs: rosa primário do dashboard. */
+const KPI_HERO = { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" };
 
 export function TeamKpisBlock({
   revenue,
@@ -121,8 +117,7 @@ export function TeamKpisBlock({
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {kpis.map((kpi, i) => {
-        const c = KPI_COLORS[i];
+      {kpis.map((kpi) => {
         const Icon = kpi.Icon;
         return (
           <StatCard
@@ -130,8 +125,8 @@ export function TeamKpisBlock({
             label={kpi.label}
             value={kpi.amount}
             icon={<Icon />}
-            iconColor={c.iconColor}
-            iconBg={c.iconBg}
+            iconColor={KPI_HERO.iconColor}
+            iconBg={KPI_HERO.iconBg}
             delta={kpi.delta}
             sub={kpi.sub}
             tooltip={"tooltip" in kpi ? kpi.tooltip : undefined}

@@ -533,11 +533,8 @@ function balanceLines(person: WalletPersonMonth): WalletPersonMonth {
   };
 }
 
-const KPI_COLORS = [
-  { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" },
-  { iconColor: "var(--ok)", iconBg: "var(--ok-soft)" },
-  { iconColor: "var(--info)", iconBg: "rgba(59,130,246,0.12)" },
-];
+/** Hero dos KPIs: rosa primário do dashboard. */
+const KPI_HERO = { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" };
 
 function WalletGlyph() {
   return (
@@ -617,7 +614,7 @@ function ChallengeOpportunityCard({ item }: { item: WalletChallengeOpportunity }
   const won = item.state === "guaranteed";
   return (
     <div className={cn("flex items-start gap-3.5 rounded-xl border border-line p-4", ended ? "bg-bg-inset" : "bg-bg-2")}>
-      <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", ended ? "bg-bg-3 text-t2" : won ? "bg-ok-soft text-ok" : "bg-acc-soft text-acc")}>
+      <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", ended ? "bg-bg-3 text-t2" : "bg-acc-soft text-acc")}>
         <FlameIcon size={18} />
       </span>
       <div className="min-w-0 flex-1">
@@ -658,15 +655,12 @@ function SellerWallet({ wallet, opportunities }: { wallet: WalletMonth; opportun
   const potentialSub = belowLast ? "A partir do último nível" : atLast ? "Vender mais aumenta a premiação" : upside > 0 ? "Se conquistar o que ainda está em disputa" : undefined;
   const potentialTip = belowLast || atLast ? "O último nível paga um percentual sobre o que você vender. O valor é o mínimo ao chegar nele. Vender mais aumenta a premiação." : undefined;
   const movement = balanceLines(person);
-  const saldo = KPI_COLORS[0]!;
-  const ganhos = KPI_COLORS[1]!;
-  const potencial = KPI_COLORS[2]!;
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard label="Saldo atual" value={money(person.balanceCents)} icon={<WalletGlyph />} iconColor={saldo.iconColor} iconBg={saldo.iconBg} sub={balanceStillOpen(person) ? "Até agora" : undefined} valueClassName={balanceClass(person.balanceCents)} />
-        <StatCard label="Ganhos garantidos" value={money(guaranteed)} icon={<CheckCircleIcon size={20} />} iconColor={ganhos.iconColor} iconBg={ganhos.iconBg} />
-        <StatCard label="Potencial do período" value={money(potential)} icon={<TargetIcon size={20} />} iconColor={potencial.iconColor} iconBg={potencial.iconBg} sub={potentialSub} tooltip={potentialTip} />
+        <StatCard label="Saldo atual" value={money(person.balanceCents)} icon={<WalletGlyph />} iconColor={KPI_HERO.iconColor} iconBg={KPI_HERO.iconBg} sub={balanceStillOpen(person) ? "Até agora" : undefined} valueClassName={balanceClass(person.balanceCents)} />
+        <StatCard label="Ganhos garantidos" value={money(guaranteed)} icon={<CheckCircleIcon size={20} />} iconColor={KPI_HERO.iconColor} iconBg={KPI_HERO.iconBg} />
+        <StatCard label="Potencial do período" value={money(potential)} icon={<TargetIcon size={20} />} iconColor={KPI_HERO.iconColor} iconBg={KPI_HERO.iconBg} sub={potentialSub} tooltip={potentialTip} />
       </div>
       <Card>
         <CardTitle>Suas oportunidades</CardTitle>

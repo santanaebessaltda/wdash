@@ -40,12 +40,8 @@ function sellerDeltaTip(delta: { vs?: string; previous?: string }): string {
 }
 
 /** Mesma paleta da Visao geral e do Financeiro. */
-const KPI_COLORS = [
-  { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" },
-  { iconColor: "var(--warn)", iconBg: "rgba(245,158,11,0.12)" },
-  { iconColor: "var(--ok)", iconBg: "var(--ok-soft)" },
-  { iconColor: "var(--info)", iconBg: "rgba(59,130,246,0.12)" },
-];
+/** Hero dos KPIs: rosa primário do dashboard. */
+const KPI_HERO = { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" };
 
 /** Faturamento, vendas, ticket e P.A. do vendedor no intervalo do seletor. Em Este mês, cada card mostra o dia de hoje embaixo. */
 export function NumbersCard({
@@ -95,15 +91,14 @@ export function NumbersCard({
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {cards.map((kpi, i) => {
         const Icon = KPI_ICONS[i] ?? IconRevenue;
-        const c = KPI_COLORS[i % KPI_COLORS.length]!;
         return (
           <StatCard
             key={kpi.label}
             label={kpi.label}
             value={kpi.value}
             icon={<Icon />}
-            iconColor={c.iconColor}
-            iconBg={c.iconBg}
+            iconColor={KPI_HERO.iconColor}
+            iconBg={KPI_HERO.iconBg}
             sub={kpi.sub}
             delta={kpi.delta}
             deltaTooltip={kpi.delta ? sellerDeltaTip(kpi.delta) : undefined}

@@ -79,12 +79,8 @@ const IconItems = () => (
 const KPI_ICONS = [IconRevenue, IconProfit, IconMargin, IconItems];
 
 /** Heroes por metrica: Fat/Lucro/Margem iguais ao Financeiro; Itens = warn. */
-const KPI_COLORS = [
-  { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" },
-  { iconColor: "var(--ok)", iconBg: "var(--ok-soft)" },
-  { iconColor: "var(--info)", iconBg: "rgba(59,130,246,0.12)" },
-  { iconColor: "var(--warn)", iconBg: "rgba(245,158,11,0.12)" },
-];
+/** Hero dos KPIs: rosa primário do dashboard. */
+const KPI_HERO = { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" };
 
 type SortKey = "name" | "revenue" | "items" | "cmv" | "profit" | "marginPct" | "variationPct";
 
@@ -348,7 +344,7 @@ export default function ProductsPage() {
 
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {view.kpis.map((kpi, i) => (
-          <KpiCard key={kpi.label} kpi={kpi} Icon={KPI_ICONS[i] ?? IconRevenue} colorIdx={i} />
+          <KpiCard key={kpi.label} kpi={kpi} Icon={KPI_ICONS[i] ?? IconRevenue} />
         ))}
       </div>
 
@@ -697,15 +693,14 @@ export default function ProductsPage() {
   );
 }
 
-function KpiCard({ kpi, Icon, colorIdx = 0 }: { kpi: ProductsKpi; Icon: () => React.JSX.Element; colorIdx?: number }) {
-  const c = KPI_COLORS[colorIdx % KPI_COLORS.length];
+function KpiCard({ kpi, Icon }: { kpi: ProductsKpi; Icon: () => React.JSX.Element }) {
   return (
     <StatCard
       label={kpi.label}
       value={kpi.value}
       icon={<Icon />}
-      iconColor={c.iconColor}
-      iconBg={c.iconBg}
+      iconColor={KPI_HERO.iconColor}
+      iconBg={KPI_HERO.iconBg}
       delta={kpi.delta}
       sub={kpi.sub}
       tooltip={kpi.tooltip}

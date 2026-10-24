@@ -223,7 +223,7 @@ function ChallengeIdentity({
       </span>
       {prizeLine ? (
         <span className="mt-2 flex items-center gap-2">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-warn-soft text-warn">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-acc-soft text-acc">
             <TrophyIcon size={16} />
           </span>
           <span className="text-[16px] font-extrabold leading-snug text-t0">{prizeLine}</span>
