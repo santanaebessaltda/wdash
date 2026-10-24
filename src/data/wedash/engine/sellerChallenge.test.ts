@@ -109,6 +109,27 @@ describe("challengeStanding", () => {
     expect(end.gap).toBeNull();
   });
 
+  it("ticket e índice acima do mínimo em andamento ainda não ganharam", () => {
+    const days = [day(1, 10, 20, 200_000), day(2, 10, 10, 50_000)];
+    const ticket = challengeStanding(
+      { ...base, mode: "MINIMUM", metric: "TICKET", target: 100, minSales: 1 },
+      { today: "2026-09-15", employeeId: 1, team, sellerDays: days },
+    );
+    expect(ticket.won).toBe(false);
+    expect(ticket.gap).toBe("O ticket médio só vale no fim do desafio");
+    const index = challengeStanding(
+      { ...base, mode: "MINIMUM", metric: "INDEX", target: 100, minSales: 1 },
+      { today: "2026-09-15", employeeId: 1, team, sellerDays: days },
+    );
+    expect(index.won).toBe(false);
+    expect(index.gap).toBe("O índice só vale no fim do desafio");
+    const closed = challengeStanding(
+      { ...base, mode: "MINIMUM", metric: "TICKET", target: 100, minSales: 1, endsOn: "2026-09-10" },
+      { today: "2026-09-15", employeeId: 1, team, sellerDays: days },
+    );
+    expect(closed.won).toBe(true);
+  });
+
   it("asks for the remaining sales before the person can take part", () => {
     const standing = challengeStanding(
       { ...base, metric: "TICKET", minSales: 10, target: 100 },

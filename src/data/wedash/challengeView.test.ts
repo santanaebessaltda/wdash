@@ -179,7 +179,17 @@ describe("buildChallengeView — participantes e resultado", () => {
     expect(p.BIA.result).toBe(94.72);
     expect((p.ANA.result ?? 0) + (p.BIA.result ?? 0)).toBeCloseTo(200);
     expect(p.CAROL.result).toBe(0);
-    expect(p.ANA.winner).toBe(true);
+    expect(p.ANA.winner).toBe(false);
+    expect(p.ANA.gap).toBe("O índice só vale no fim do desafio");
+    const end = byName(
+      build(
+        challenge({ metric: "INDEX", scope: "ALL", products: [], minSales: 1, target: 100 }),
+        input({ sellerDays: [sellerDay(1, 10, 20, 100_000), sellerDay(2, 20, 30, 120_000)] }),
+        "2026-10-12",
+      ),
+    );
+    expect(end.ANA.winner).toBe(true);
+    expect(end.ANA.gap).toBeNull();
     expect(metricValueLabel("INDEX", 111.9)).toBe("111,9");
   });
 
@@ -221,12 +231,49 @@ describe("buildChallengeView — participantes e resultado", () => {
       result: 100,
       target: 100,
       periodPrevious: { from: "2026-09-28", to: "2026-10-04" },
-      atingiu: true,
+      atingiu: false,
     });
     expect(build(c(100), aggs).teamAverage).toBe(100);
     expect(build(challenge({ metric: "INDEX", scope: "ALL", products: [] }), aggs).teamAverage).toBeNull();
     expect(build(c(101), aggs).management).toMatchObject({ result: 100, atingiu: false });
     expect(build(c(100), aggs, "2026-10-05").management).toMatchObject({ result: null, atingiu: false });
+    const closed = build(
+      challenge({
+        metric: "INDEX",
+        scope: "ALL",
+        products: [],
+        startsOn: "2026-10-05",
+        endsOn: "2026-10-06",
+        managerPrize: { kind: "MONEY", amount: 80 },
+        managerTarget: 150,
+      }),
+      input({
+        sellerDays: [
+          sellerDay(1, 10, 20, 200_000, { day: "2026-10-05" }),
+          sellerDay(1, 10, 20, 100_000, { day: "2026-10-03" }),
+        ],
+      }),
+      "2026-10-06",
+    );
+    expect(closed.management).toMatchObject({ result: 175, atingiu: false });
+    expect(build(
+      challenge({
+        metric: "INDEX",
+        scope: "ALL",
+        products: [],
+        startsOn: "2026-10-05",
+        endsOn: "2026-10-06",
+        managerPrize: { kind: "MONEY", amount: 80 },
+        managerTarget: 150,
+      }),
+      input({
+        sellerDays: [
+          sellerDay(1, 10, 20, 200_000, { day: "2026-10-05" }),
+          sellerDay(1, 10, 20, 100_000, { day: "2026-10-03" }),
+        ],
+      }),
+      "2026-10-07",
+    ).management).toMatchObject({ result: 175, atingiu: true });
     const withoutPrevious = input({ sellerDays: [sellerDay(1, 10, 20, 100_000)] });
     expect(build(c(100), withoutPrevious).management?.result).toBeNull();
   });
@@ -399,7 +446,17 @@ describe("buildChallengeView — Disputa e Mínimo", () => {
     expect(p.ANA.winner).toBe(false);
     expect(p.ANA.gap).toBe("Faltam 8 vendas para participar");
     expect(p.BIA.position).toBe(1);
-    expect(p.BIA.winner).toBe(true);
+    expect(p.BIA.winner).toBe(false);
+    expect(p.BIA.gap).toBe("O ticket médio só vale no fim do desafio");
+    const end = byName(
+      build(
+        challenge({ metric: "TICKET", products: [], minSales: 10 }),
+        input({ sellerDays: [sellerDay(1, 2, 2, 100_000), sellerDay(2, 12, 15, 120_000)] }),
+        "2026-10-12",
+      ),
+    );
+    expect(end.BIA.winner).toBe(true);
+    expect(end.BIA.gap).toBeNull();
   });
 
   it("Mínimo de P.A.: em andamento não marca Atingiu; no fim, 1,90 com 10 vendas atinge e 2,0 com 8 vendas não", () => {
@@ -446,6 +503,16 @@ describe("buildChallengeView — Disputa e Mínimo", () => {
       ),
     );
     expect(ticket.ANA.gap).toBe(`Faltam R$\u00a012,50 de ticket médio para o mínimo`);
+
+    const above = byName(
+      build(
+        challenge({ metric: "TICKET", mode: "MINIMUM", products: [], target: 80, minSales: 1 }),
+        input({ sellerDays: [sellerDay(1, 4, 4, 40_000)] }),
+      ),
+    );
+    expect(above.ANA.result).toBe(100);
+    expect(above.ANA.winner).toBe(false);
+    expect(above.ANA.gap).toBe("O ticket médio só vale no fim do desafio");
   });
 
   it("encerrado não mostra o que falta", () => {

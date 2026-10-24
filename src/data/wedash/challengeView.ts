@@ -157,7 +157,15 @@ export interface ChallengeView {
 }
 
 const usesMinSales = (m: ChallengeMetric) => m === "PA" || m === "TICKET" || m === "INDEX";
+/** P.A., ticket e índice mudam até o último dia: o prêmio só existe com o período fechado. */
+const settlesAtEnd = (m: ChallengeMetric) => m === "PA" || m === "TICKET" || m === "INDEX";
 const round2 = (v: number) => Math.round(v * 100) / 100;
+
+function pendingAtEnd(metric: ChallengeMetric): string {
+  if (metric === "TICKET") return "O ticket médio só vale no fim do desafio";
+  if (metric === "INDEX") return "O índice só vale no fim do desafio";
+  return "O P.A. só vale no fim do desafio";
+}
 
 function daysBetween(start: string, end: string): number {
   return Math.round((isoToDate(end).getTime() - isoToDate(start).getTime()) / 86_400_000) + 1;
@@ -355,14 +363,14 @@ export function buildChallengeView(args: {
     .filter((x) => concorre(x) && positionOf.has(x.a.key))
     .map((x) => ({ amount: x.result!, position: positionOf.get(x.a.key)! }));
 
-  // P.A. oscila ate o ultimo dia: ninguem "atinge" enquanto o desafio esta aberto.
-  const paEmProgress = c.metric === "PA" && status === "active";
+  // P.A., ticket e índice oscilam até o último dia: ninguém ganha enquanto o desafio está aberto.
+  const openUntilEnd = settlesAtEnd(c.metric) && status === "active";
 
   const participants: ChallengeParticipant[] = base.map(({ a, result }) => {
     const position = positionOf.get(a.key) ?? null;
     let winner = false;
     let prize: ChallengePrize | null = null;
-    if (status !== "upcoming" && !paEmProgress) {
+    if (status !== "upcoming" && !openUntilEnd) {
       if (c.mode === "CONTEST") {
         winner = position != null && position <= c.prizes.length && alcancaTarget(a, result);
         prize = winner ? (c.prizes[position! - 1] ?? null) : null;
@@ -375,8 +383,8 @@ export function buildChallengeView(args: {
     let gap: string | null = null;
     if (status === "active" && result != null) {
       if (a.sales < minSales) gap = gapSales(minSales - a.sales);
-      else if (paEmProgress && alcancaTarget(a, result) && (c.mode === "MINIMUM" || (position != null && position <= c.prizes.length))) {
-        gap = "O P.A. só vale no fim do desafio";
+      else if (openUntilEnd && alcancaTarget(a, result) && (c.mode === "MINIMUM" || (position != null && position <= c.prizes.length))) {
+        gap = pendingAtEnd(c.metric);
       } else if (c.mode === "MINIMUM") {
         const floor = floorOf(a);
         if (!winner && floor != null) gap = `${gapLabel(c.metric, floor - result)} para o mínimo`;
@@ -464,7 +472,7 @@ export function buildChallengeView(args: {
       result,
       target: managerGoal,
       periodPrevious: janelas.previous,
-      atingiu: result != null && result >= managerGoal - 1e-9,
+      atingiu: status === "ended" && result != null && result >= managerGoal - 1e-9,
       prize: c.managerPrize,
     };
   } else if (c.managerPrize && managerGoal != null) {
@@ -473,7 +481,7 @@ export function buildChallengeView(args: {
       result,
       target: managerGoal,
       periodPrevious: null,
-      atingiu: (c.metric !== "PA" || status === "ended") && result != null && result > 0 && result >= managerGoal - 1e-9,
+      atingiu: (!settlesAtEnd(c.metric) || status === "ended") && result != null && result > 0 && result >= managerGoal - 1e-9,
       prize: c.managerPrize,
     };
   }

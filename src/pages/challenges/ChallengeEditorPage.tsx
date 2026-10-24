@@ -59,10 +59,10 @@ import { useActiveSession } from "@/session/SessionProvider";
 const METRIC_HELP: Record<ChallengeMetric, string> = {
   QUANTITY: "Itens vendidos por cada pessoa no período.",
   VALUE: "Faturamento de cada pessoa no período.",
-  PA: "Média de itens por venda de cada pessoa no período.",
-  TICKET: "Valor médio das vendas de cada pessoa no período.",
+  PA: "Média de itens por venda de cada pessoa no período. Quem ganha só é definido no fim.",
+  TICKET: "Valor médio das vendas de cada pessoa no período. Quem ganha só é definido no fim.",
   INDEX:
-    "Combina faturamento (50%), ticket médio (25%) e P.A. (25%), comparando o resultado de cada pessoa com a média da equipe. Índice 100 representa a média; 120 representa 20% acima.",
+    "Combina faturamento (50%), ticket médio (25%) e P.A. (25%), comparando o resultado de cada pessoa com a média da equipe. Índice 100 representa a média; 120 representa 20% acima. Quem ganha só é definido no fim.",
 };
 
 const SCOPE_HELP: Record<Exclude<ChallengeScope, "ALL">, string> = {
