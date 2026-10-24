@@ -14,6 +14,7 @@ import type { ChallengeAggInput, ChallengeRecord } from "@/data/wedash/challenge
 import { type Scope, type TeamAggInput, type TeamMemberRow } from "@/data/wedash/dashboard";
 import { teamViewWithGoalShare } from "@/data/wedash/engine/generalRanking";
 import { ChallengeMiniCard } from "@/pages/challenges/ChallengeMiniCard";
+import { kpiTone } from "@/pages/dashboard/palette";
 import { TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
 import { GoalLevelGuide } from "@/pages/goals/GoalLevelGuide";
 import { GlobalGoalBand } from "@/pages/team/goalBlocks";
@@ -258,7 +259,7 @@ function BoardGoalCard({ board, pulse }: { board: GoalBoard; pulse: boolean }) {
         </div>
       </div>
       <div className="mt-1.5 flex items-end justify-between gap-3">
-        <p className="font-mono text-[22px] font-extrabold leading-none tabular-nums text-t0 sm:text-[26px]" data-secret="">{brlCent(summary.achieved)}</p>
+        <p className={`font-mono text-[22px] font-extrabold leading-none tabular-nums sm:text-[26px] ${summary.achieved < 0 ? "text-bad" : "text-acc"}`} data-secret="">{brlCent(summary.achieved)}</p>
         <div className="text-right">
           <p className={`font-mono text-[22px] font-extrabold leading-none tabular-nums sm:text-[26px] ${progressTextClass(summary.pct)}`}>{num(summary.pct, 1)}%</p>
           <p className="mt-0.5 text-[12px] text-t2">de <span data-secret="">{brlCent(goal.target)}</span></p>
@@ -756,8 +757,8 @@ export function BoardView({
       </header>
 
       <div className="board-in grid shrink-0 grid-cols-2 gap-4 xl:grid-cols-4" style={{ animationDelay: "70ms" }}>
-        <StatCard dense glass secret label="Faturamento" value={brlCent(monthRevenue)} sub={<>Hoje <span data-secret="">{brlCent(todayTotals.revenue)}</span></>} icon={<IconRevenue />} />
-        <StatCard dense glass label="Vendas" value={num(month.sales)} sub={<>Hoje {num(todayTotals.sales)}</>} icon={<IconSales />} />
+        <StatCard dense glass secret label="Faturamento" value={brlCent(monthRevenue)} sub={<>Hoje <span data-secret="">{brlCent(todayTotals.revenue)}</span></>} icon={<IconRevenue />} iconColor={kpiTone("Faturamento").iconColor} iconBg={kpiTone("Faturamento").iconBg} />
+        <StatCard dense glass label="Vendas" value={num(month.sales)} sub={<>Hoje {num(todayTotals.sales)}</>} icon={<IconSales />} iconColor={kpiTone("Vendas").iconColor} iconBg={kpiTone("Vendas").iconBg} />
         <StatCard
           dense
           glass
@@ -772,6 +773,7 @@ export function BoardView({
           glass
           label="Progresso da meta"
           value={activeGoal ? `${num(activeGoal.summary.pct, 1)}%` : "—"}
+          valueClassName={activeGoal ? "text-acc" : undefined}
           sub={
             activeGoal
               ? activeGoal.goal.tierMode === "INDIVIDUAL"
@@ -878,14 +880,14 @@ export function BoardView({
                                   <span className="min-w-0 truncate text-[12.5px] font-bold text-t0">{person.name}</span>
                                 </span>
                               </td>
-                              <td className="py-1 pr-2 text-right font-mono text-[12.5px] font-bold tabular-nums text-t0">{num(person.sales)}</td>
+                              <td className="py-1 pr-2 text-right font-mono text-[12.5px] font-bold tabular-nums text-palette-purple">{num(person.sales)}</td>
                               <td className="py-1 pr-2 text-right">
-                                <span className="block font-mono text-[12.5px] font-extrabold tabular-nums text-t0">{pct ?? "—"}</span>
+                                <span className={`block font-mono text-[12.5px] font-extrabold tabular-nums ${pct ? "text-acc" : "text-t0"}`}>{pct ?? "—"}</span>
                                 {level ? <span className="block text-[11px] text-t2">{level.levelLabel ?? "Sem nível"}</span> : null}
                               </td>
                               <td className="py-1 pr-2 text-right">
                                 {level?.top ? (
-                                  <span className="text-[12px] font-bold text-ok">Último nível</span>
+                                  <span className="text-[12px] font-bold text-acc">Último nível</span>
                                 ) : level?.gap == null ? (
                                   <span className="text-t2">—</span>
                                 ) : (
@@ -895,7 +897,7 @@ export function BoardView({
                                   </>
                                 )}
                               </td>
-                              <td className="py-1 text-right font-mono text-[12.5px] font-bold tabular-nums text-t0" data-secret="">{brlCent(person.revenue)}</td>
+                              <td className={`py-1 text-right font-mono text-[12.5px] font-bold tabular-nums ${person.revenue < 0 ? "text-bad" : "text-acc"}`} data-secret="">{brlCent(person.revenue)}</td>
                             </tr>
                           );
                         })}

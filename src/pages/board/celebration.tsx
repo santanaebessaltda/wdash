@@ -177,11 +177,11 @@ function LevelEvent({
   caption: string;
   leaving: boolean;
 }) {
-  const glow = store ? "var(--info)" : "var(--acc)";
+  const glow = "var(--acc)";
   return (
     <SceneFrame leaving={leaving} glow={glow} caption={caption}>
       <div className={cn("relative mx-auto flex items-center justify-center", store ? "h-28 w-28" : "h-24 w-24")}>
-        <Glow color={store ? "color-mix(in srgb, var(--info) 50%, transparent)" : "color-mix(in srgb, var(--acc) 50%, transparent)"} wide={store} />
+        <Glow color="color-mix(in srgb, var(--acc) 50%, transparent)" wide={store} />
         <span
           aria-hidden
           className="board-ring pointer-events-none absolute inset-0 rounded-full border-2"
@@ -191,7 +191,7 @@ function LevelEvent({
         <span
           className={cn(
             "z-10 flex items-center justify-center rounded-full",
-            face ? "absolute -bottom-1 -right-1 h-11 w-11 bg-acc-soft text-acc" : "relative h-28 w-28 bg-info-soft text-info",
+            face ? "absolute -bottom-1 -right-1 h-11 w-11 bg-acc-soft text-acc" : "relative h-28 w-28 bg-acc-soft text-acc",
           )}
         >
           <TargetIcon size={face ? 22 : 52} />
@@ -203,12 +203,12 @@ function LevelEvent({
 
 function ChallengeWinEvent({ face, caption, leaving }: { face: CelebrationFace; caption: string; leaving: boolean }) {
   return (
-    <SceneFrame leaving={leaving} glow="var(--warn)" caption={caption}>
+    <SceneFrame leaving={leaving} glow="var(--acc)" caption={caption}>
       <div className="relative mx-auto flex h-24 w-24 items-center justify-center">
-        <Glow color="color-mix(in srgb, var(--warn) 55%, transparent)" />
-        <Sparks color="var(--warn)" />
+        <Glow color="color-mix(in srgb, var(--acc) 55%, transparent)" />
+        <Sparks color="var(--acc)" />
         <HeroAvatar face={face} />
-        <span className="board-trophy absolute -right-4 -top-3 z-10 flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-warn-soft text-warn">
+        <span className="board-trophy absolute -right-4 -top-3 z-10 flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-acc-soft text-acc">
           <TrophyIcon size={26} />
           <span aria-hidden className="board-shine pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-white/50" />
         </span>

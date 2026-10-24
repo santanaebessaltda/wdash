@@ -78,13 +78,13 @@ export function ChallengeMiniCard({
                     <span className="shrink-0 text-acc">
                       <TrophyIcon size={14} />
                     </span>
-                    <span className="truncate">{prize}</span>
+                    <span className="truncate text-ok">{prize}</span>
                   </span>
                 ) : null}
                 {minimum ? <span className="font-medium text-t2">{minimum}</span> : null}
               </p>
             ) : null}
-            {wonLine ? <p className="mt-1 text-[13px] font-semibold text-t1">{wonLine}</p> : null}
+            {wonLine ? <p className={`mt-1 text-[13px] font-semibold ${people > 0 && view.reachedCount === people ? "text-acc" : "text-t1"}`}>{wonLine}</p> : null}
           </div>
         </div>
         {showPeople ? (
@@ -99,7 +99,7 @@ export function ChallengeMiniCard({
                   <li key={person.key} className={cn("min-w-0", hotKey === person.key && "rounded-lg bg-acc-soft px-1 py-1")}>
                     <div className="flex items-baseline justify-between gap-3">
                       <span className="min-w-0 truncate text-[13px] font-extrabold uppercase tracking-wide text-t0">{person.name}</span>
-                      <span className="shrink-0 text-[13px] font-bold text-t1" {...(secret && (c.metric === "VALUE" || c.metric === "TICKET") ? { "data-secret": "" } : {})}>{person.result == null ? "—" : metricValueLabel(c.metric, person.result)}</span>
+                      <span className={`shrink-0 text-[13px] font-bold ${person.result == null ? "text-t2" : person.result < 0 ? "text-bad" : "text-acc"}`} {...(secret && (c.metric === "VALUE" || c.metric === "TICKET") ? { "data-secret": "" } : {})}>{person.result == null ? "—" : metricValueLabel(c.metric, person.result)}</span>
                     </div>
                     <div className="mt-1 flex items-center gap-2">
                       <div className="min-w-0 flex-1">
@@ -446,10 +446,10 @@ function BoardPersonMark({ person, disputa, ended, pct }: { person: ChallengePar
   if (person.result == null) return <span className="shrink-0 text-[12px] font-semibold text-t3">—</span>;
   if (disputa) {
     if (ended && !person.winner) return <span className="shrink-0 text-[13px] font-semibold text-t1">Não ganhou</span>;
-    if (person.position != null) return <ProgressStanding ok={Boolean(ended && person.winner)}>{`${person.position}º lugar`}</ProgressStanding>;
+    if (person.position != null) return <ProgressStanding ok={Boolean(ended && person.winner)} tone="acc">{`${person.position}º lugar`}</ProgressStanding>;
     return ended ? <span className="shrink-0 text-[13px] font-semibold text-t1">Não ganhou</span> : <span className="shrink-0 text-[12px] text-t3">—</span>;
   }
-  if (person.winner) return <span className="shrink-0 text-[14px] font-extrabold text-ok">Ganhou</span>;
+  if (person.winner) return <span className="shrink-0 text-[14px] font-extrabold text-acc">Ganhou</span>;
   if (ended) return <span className="shrink-0 text-[13px] font-semibold text-t1">Não ganhou</span>;
   return <span className={`shrink-0 font-mono text-[13px] font-bold tabular-nums ${progressTextClass(pct)}`}>{num(pct, 0)}%</span>;
 }
