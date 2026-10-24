@@ -78,13 +78,13 @@ export function ChallengeMiniCard({
                     <span className="shrink-0 text-warn">
                       <TrophyIcon size={14} />
                     </span>
-                    <span className="truncate" {...(secret ? { "data-secret": "" } : {})}>{prize}</span>
+                    <span className="truncate">{prize}</span>
                   </span>
                 ) : null}
-                {minimum ? <span className="font-medium text-t2" {...(secret ? { "data-secret": "" } : {})}>{minimum}</span> : null}
+                {minimum ? <span className="font-medium text-t2">{minimum}</span> : null}
               </p>
             ) : null}
-            {wonLine ? <p className="mt-1 text-[13px] font-semibold text-t1" {...(secret ? { "data-secret": "" } : {})}>{wonLine}</p> : null}
+            {wonLine ? <p className="mt-1 text-[13px] font-semibold text-t1">{wonLine}</p> : null}
           </div>
         </div>
         {showPeople ? (
