@@ -286,7 +286,6 @@ function ChallengeCard({
   onDelete: () => void;
 }) {
   const prize = mainPrizeLabel(c);
-  const ended = view.status === "ended";
   const statusLabel = CHALLENGE_STATUS_LABEL[view.status];
 
   const action = (fn: () => void) => (e: MouseEvent) => {
@@ -315,8 +314,7 @@ function ChallengeCard({
       <div className="mb-3.5 flex items-start gap-3.5">
         <div
           className={cn(
-            "flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-[14px]",
-            ended ? "bg-bg-3 text-t2" : "bg-acc-soft text-acc",
+            "flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-[14px] bg-acc-soft text-acc",
           )}
         >
           <FlameIcon size={22} />

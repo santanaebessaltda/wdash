@@ -75,7 +75,7 @@ export function ChallengeMiniCard({
               <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[13px] leading-snug">
                 {prize ? (
                   <span className="inline-flex min-w-0 items-center gap-1.5 font-semibold text-t1">
-                    <span className="shrink-0 text-warn">
+                    <span className="shrink-0 text-acc">
                       <TrophyIcon size={14} />
                     </span>
                     <span className="truncate">{prize}</span>
@@ -130,7 +130,7 @@ export function ChallengeMiniCard({
           className={cn(
             "flex shrink-0 items-center justify-center",
             prominent ? "h-[50px] w-[50px] rounded-[14px]" : "h-10 w-10 rounded-xl",
-            ended ? "bg-bg-3 text-t2" : "bg-acc-soft text-acc",
+            "bg-acc-soft text-acc",
           )}
         >
           <FlameIcon size={prominent ? 22 : 18} />

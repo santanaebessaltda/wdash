@@ -57,8 +57,7 @@ function SellerChallengeCard({
     <div className={cn("flex items-start gap-3.5 rounded-xl border border-line p-4", ended ? "bg-bg-inset" : "bg-bg-2")}>
       <span
         className={cn(
-          "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
-          ended ? "bg-bg-3 text-t2" : "bg-acc-soft text-acc",
+          "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-acc-soft text-acc",
         )}
       >
         <FlameIcon size={18} />
