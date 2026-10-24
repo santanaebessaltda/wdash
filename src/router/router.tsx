@@ -8,7 +8,7 @@ import { RequireSession } from "@/session/RequireSession";
 import { useSession } from "@/session/SessionProvider";
 import { destinationAfterAuth } from "@/session/authApi";
 import { lazyPage } from "@/lib/lazyPage";
-import { AccessHeroBackdrop } from "@/pages/access/AccessHeroBackdrop";
+import { readBoardTheme } from "@/pages/board/boardTheme";
 
 /* Produto */
 import { accessRoutes } from "@/pages/access/routes";
@@ -48,6 +48,11 @@ import { authRoutes } from "@/pages/auth/routes";
 
 const CreateAccess = lazyPage(() => import("@/pages/access/CreateAccess"), "CreateAccess");
 const PublicBoardPage = lazyPage(() => import("@/pages/board/PublicBoardPage"), "PublicBoardPage");
+
+/** Enquanto o placar baixa, o fundo já é o cinza neutro do dashboard. */
+function BoardLoadingFrame() {
+  return <div data-board-theme={readBoardTheme()} className="tela-cheia bg-bg-0" />;
+}
 
 /** Raiz: sem sessao  ->  login; com sessao  ->  senha temp  ->  onboarding  ->  app. */
 function Raiz() {
@@ -124,7 +129,7 @@ const routeTree: RouteObject[] = [
   {
     path: paths.boardShare(":token"),
     element: (
-      <Suspense fallback={<div className="access-hero-scope tela-cheia relative"><AccessHeroBackdrop /></div>}>
+      <Suspense fallback={<BoardLoadingFrame />}>
         <PublicBoardPage />
       </Suspense>
     ),
