@@ -244,9 +244,9 @@ function BoardGoalCard({ board, pulse }: { board: GoalBoard; pulse: boolean }) {
   const hasLevels = goal.tiers.length > 0;
 
   return (
-    <Card padding="none" glass="var(--info-soft)" className="shrink-0 px-3 py-2 sm:px-4">
+    <Card padding="none" glass="var(--acc-soft)" className="shrink-0 px-3 py-2 sm:px-4">
       <div className="flex items-center gap-2.5">
-        <CardHero tone="info" compact>
+        <CardHero compact>
           <TargetIcon size={18} />
         </CardHero>
         <div className="min-w-0 flex-1">
@@ -733,8 +733,8 @@ export function BoardView({
       </header>
 
       <div className="board-in grid shrink-0 grid-cols-2 gap-4 xl:grid-cols-4" style={{ animationDelay: "70ms" }}>
-        <StatCard dense glass secret label="Faturamento" value={brlCent(monthRevenue)} sub={<>Hoje <span data-secret="">{brlCent(todayTotals.revenue)}</span></>} icon={<IconRevenue />} iconColor="var(--acc)" iconBg="var(--acc-soft)" />
-        <StatCard dense glass secret label="Vendas" value={num(month.sales)} sub={<>Hoje <span data-secret="">{num(todayTotals.sales)}</span></>} icon={<IconSales />} iconColor="var(--ok)" iconBg="var(--ok-soft)" />
+        <StatCard dense glass secret label="Faturamento" value={brlCent(monthRevenue)} sub={<>Hoje <span data-secret="">{brlCent(todayTotals.revenue)}</span></>} icon={<IconRevenue />} />
+        <StatCard dense glass secret label="Vendas" value={num(month.sales)} sub={<>Hoje <span data-secret="">{num(todayTotals.sales)}</span></>} icon={<IconSales />} />
         <StatCard
           dense
           glass
@@ -743,8 +743,6 @@ export function BoardView({
           value={activeGoal ? brlCent(activeGoal.goal.target) : "—"}
           sub={activeGoal ? activeGoal.card.name : "Não configurada"}
           icon={<TargetIcon size={16} />}
-          iconColor="var(--info)"
-          iconBg="rgba(59,130,246,0.12)"
         />
         <StatCard
           dense
@@ -762,8 +760,6 @@ export function BoardView({
               : "Meta não configurada"
           }
           icon={<TrophyIcon size={16} />}
-          iconColor="var(--warn)"
-          iconBg="rgba(245,158,11,0.12)"
         />
       </div>
 
@@ -772,7 +768,7 @@ export function BoardView({
           <BoardGoalCard board={activeGoal} pulse={pulseGoal} />
         </div>
       ) : (
-        <Card glass="var(--info-soft)" className="board-in shrink-0 !p-3" style={{ animationDelay: "140ms" }}>
+        <Card glass="var(--acc-soft)" className="board-in shrink-0 !p-3" style={{ animationDelay: "140ms" }}>
           <EmptyState framed={false} icon="🎯" title="Meta não configurada" description="Cadastre uma meta para acompanhar o desempenho da equipe no período." />
         </Card>
       )}

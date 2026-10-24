@@ -459,8 +459,8 @@ export function BoardSkeleton({ header = false, className }: { header?: boolean;
         </div>
       )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {["var(--acc-soft)", "var(--ok-soft)", "var(--info-soft)", "var(--warn-soft)"].map((glow) => (
-          <Card key={glow} padding="sm" glass={glow} className="min-w-0">
+        {Array.from({ length: 4 }, (_, index) => (
+          <Card key={index} padding="sm" glass="var(--acc-soft)" className="min-w-0">
             <Skeleton className="h-8 w-8 rounded-[10px]" />
             <Skeleton className="mt-2 h-3 w-24" />
             <Skeleton className="mt-1.5 h-6 w-28" />
@@ -468,7 +468,7 @@ export function BoardSkeleton({ header = false, className }: { header?: boolean;
           </Card>
         ))}
       </div>
-      <Card padding="none" glass="var(--info-soft)" className="min-w-0 px-6 py-4">
+      <Card padding="none" glass="var(--acc-soft)" className="min-w-0 px-6 py-4">
         <div className="flex items-start gap-3.5">
           <Skeleton className="h-12 w-12 shrink-0 rounded-2xl" />
           <div className="min-w-0 flex-1">
@@ -524,7 +524,7 @@ export function BoardSkeleton({ header = false, className }: { header?: boolean;
             ))}
           </div>
         </Card>
-        <Card padding="lg" glass="var(--warn-soft)" className="min-w-0">
+        <Card padding="lg" glass="var(--acc-soft)" className="min-w-0">
           <div className="flex items-start gap-3.5">
             <Skeleton className="h-12 w-12 shrink-0 rounded-2xl" />
             <div className="min-w-0 flex-1">

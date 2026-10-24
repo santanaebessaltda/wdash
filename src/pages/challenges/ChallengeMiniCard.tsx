@@ -53,9 +53,9 @@ export function ChallengeMiniCard({
     const wonLine = c.mode === "MINIMUM" && view.status !== "upcoming" && people > 0 ? boardWonCount(view.reachedCount, people) : null;
     const boardBadge = "!px-2.5 !py-1 !text-[12px]";
     return (
-      <Card padding="sm" glass="var(--warn-soft)" className="flex h-full min-h-0 w-full flex-col overflow-hidden text-left !px-2.5 !py-2.5">
+      <Card padding="sm" glass="var(--acc-soft)" className="flex h-full min-h-0 w-full flex-col overflow-hidden text-left !px-2.5 !py-2.5">
         <div className="flex items-start gap-2">
-          <CardHero tone="warn" compact>
+          <CardHero compact>
             <FlameIcon size={18} />
           </CardHero>
           <div className="min-w-0 flex-1">
