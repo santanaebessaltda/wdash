@@ -364,7 +364,7 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
                 <th className="pb-3 pr-3 text-left">Nome</th>
                 <th className="pb-3 pr-3 text-right">Resultado</th>
                 {usesSales && <th className="pb-3 pr-3 text-right">Vendas</th>}
-                <th className="pb-3 pr-3 text-left">Situação</th>
+                <th className="pb-3 pr-3 text-left">Status</th>
                 <th className="pb-3 text-right">Prêmio</th>
               </tr>
             </thead>
