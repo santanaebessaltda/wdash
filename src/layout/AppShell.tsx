@@ -25,8 +25,14 @@ export function AppShell() {
     mainRef.current = node;
   }, []);
 
-  // html/body com height 100% + overflow-x hidden fazem o <body> rolar (nao a janela nem o <main>):
-  // zera todos para a tela nova abrir no topo.
+  // Com o shell aberto o documento não rola: só o <main>. A classe sai ao desmontar
+  // para login e onboarding continuarem rolando a página.
+  useLayoutEffect(() => {
+    document.documentElement.classList.add("app-shell");
+    return () => document.documentElement.classList.remove("app-shell");
+  }, []);
+
+  // Troca de tela abre no topo do miolo. O documento entra no reset para o caso de a rolagem ter vazado para ele.
   useLayoutEffect(() => {
     setMobileNavOpen(false);
     for (const el of [mainRef.current, document.body, document.documentElement]) {
@@ -93,7 +99,7 @@ export function AppShell() {
   }, []);
 
   return (
-    <div className="tela-cheia flex w-full overflow-x-hidden bg-bg-0 text-t0 print:block print:overflow-visible print:bg-white">
+    <div className="tela-cheia flex w-full overflow-hidden bg-bg-0 text-t0 print:block print:overflow-visible print:bg-white">
       <div className="contents print:hidden">
         <Sidebar collapsed={collapsed} />
         <MobileDrawer open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
@@ -105,7 +111,7 @@ export function AppShell() {
         </div>
         <main
           ref={setScroller}
-          className="relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-4 pt-5 sm:px-8 sm:pt-6 print:overflow-visible print:p-0"
+          className="relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain px-4 pt-5 sm:px-8 sm:pt-6 print:overflow-visible print:p-0"
         >
           <ProfilePhotosProvider>
             <Suspense fallback={<PageLoader />}>
