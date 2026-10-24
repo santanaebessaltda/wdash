@@ -148,7 +148,8 @@ export function Topbar({ onOpenMobileNav, collapsed, onToggleCollapse }: { onOpe
       )}
 
       <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2.5">
-        {showsRefresh(location.pathname) && session.role !== "SELLER" && (
+        {/* Placar em todas as telas do gestor e do gerente. Atualizar só onde a tela depende do Millennium. */}
+        {session.role !== "SELLER" && (
           <ShareBoardButton
             stores={(scope.storeIds.length === 0 ? listStores : listStores.filter((store) => scope.storeIds.includes(store.id))).map((store) => ({
               id: store.id,
