@@ -68,10 +68,7 @@ export function GoalLevelGuide({
           return (
             <div
               key={row.number}
-              className={cn(
-                "flex items-center gap-3 rounded-xl border bg-bg-inset px-3.5 py-3",
-                everyone ? "border-acc" : "border-line",
-              )}
+              className="flex items-center gap-3 rounded-xl border border-line bg-bg-inset px-3.5 py-3"
             >
               <span
                 className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-bold"
