@@ -23,6 +23,19 @@ export const accessButton =
 export const accessLink = "text-[13px] font-bold text-acc";
 export const accessFooter = "text-[13px] text-t2";
 
+/** Marca das telas de acesso: sempre public/logo.png. */
+export function AccessBrand({ size = 56 }: { size?: number }) {
+  return (
+    <div className="mb-6 flex flex-col items-center gap-3">
+      <BrandMark size={size} />
+      <p className="text-[17px] font-extrabold tracking-tight text-t0">
+        {PRODUCT_NAME}
+        <span className="text-acc">.</span>
+      </p>
+    </div>
+  );
+}
+
 /** Moldura das telas de acesso, no mesmo formato de ForgotPassword/ResetPassword do template. */
 export function AccessShell({ children, footer, width = 420, brand = true }: { children: ReactNode; footer?: ReactNode; width?: number; brand?: boolean }) {
   return (
@@ -33,15 +46,7 @@ export function AccessShell({ children, footer, width = 420, brand = true }: { c
       <AuthGlow />
       <div className="relative flex min-h-full w-full items-center justify-center px-4">
         <div className="w-full py-8" style={{ maxWidth: width }}>
-        {brand && (
-          <div className="mb-6 flex flex-col items-center gap-3">
-            <BrandMark size={56} />
-            <p className="text-[17px] font-extrabold tracking-tight text-t0">
-              {PRODUCT_NAME}
-              <span className="text-acc">.</span>
-            </p>
-          </div>
-        )}
+        {brand && <AccessBrand />}
         <div className="rounded-[22px] border border-line bg-bg-2 p-7 sm:p-9" style={{ boxShadow: "0 20px 60px -20px rgba(0,0,0,.6)" }}>
           {children}
         </div>

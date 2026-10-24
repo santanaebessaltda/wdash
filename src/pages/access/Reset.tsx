@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { paths } from "@/router/paths";
 import { AuthGlow } from "@/pages/auth/authKit";
 import {
+  AccessBrand,
   PasswordField,
   PasswordStrength,
   accessButton,
@@ -243,6 +244,7 @@ export function Reset() {
       <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-bg-0 p-10">
         <AuthGlow />
         <div className="relative w-full max-w-[420px]">
+          <AccessBrand />
           <div className="rounded-[22px] border border-line bg-bg-2 p-9 text-center" style={{ boxShadow: "0 20px 60px -20px rgba(0,0,0,.6)" }}>
             <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-[18px] bg-warn-soft">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--warn)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -267,7 +269,10 @@ export function Reset() {
     return (
       <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-bg-0 p-10">
         <AuthGlow />
-        <Spinner size={28} />
+        <div className="relative flex flex-col items-center">
+          <AccessBrand />
+          <Spinner size={28} />
+        </div>
       </div>
     );
   }
@@ -278,6 +283,7 @@ export function Reset() {
       <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-bg-0 p-10">
         <AuthGlow />
         <div className="relative w-full max-w-[420px]">
+          <AccessBrand />
           <div className="rounded-[22px] border border-line bg-bg-2 p-9 text-center" style={{ boxShadow: "0 20px 60px -20px rgba(0,0,0,.6)" }}>
             <h2 className={accessTitle}>Informe seu e-mail</h2>
             <p className={accessSubtitle}>Comece pela recuperação de senha para receber um código de verificação.</p>
@@ -296,6 +302,7 @@ export function Reset() {
     <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-bg-0 p-10">
       <AuthGlow />
       <div className="relative w-full max-w-[420px]">
+        <AccessBrand />
         <div className="rounded-[22px] border border-line bg-bg-2 p-9 text-center" style={{ boxShadow: "0 20px 60px -20px rgba(0,0,0,.6)" }}>
           <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-[18px] bg-ok-soft">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

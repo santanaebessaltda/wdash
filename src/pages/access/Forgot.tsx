@@ -5,6 +5,7 @@ import { paths } from "@/router/paths";
 import { AuthGlow } from "@/pages/auth/authKit";
 import { requestPasswordReset } from "@/session/authApi";
 import {
+  AccessBrand,
   EmailField,
   accessButton,
   accessLink,
@@ -54,6 +55,7 @@ export function Forgot() {
     <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-bg-0 p-10">
       <AuthGlow />
       <div className="relative w-full max-w-[420px]">
+        <AccessBrand />
         <div className="rounded-[22px] border border-line bg-bg-2 p-9 text-center" style={{ boxShadow: "0 20px 60px -20px rgba(0,0,0,.6)" }}>
           <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-[18px] bg-acc-soft">{mailIcon}</div>
           <h2 className={accessTitle}>Redefina sua senha</h2>

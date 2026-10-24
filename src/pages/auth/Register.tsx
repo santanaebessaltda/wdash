@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { paths } from "@/router/paths";
+import { BrandMark } from "./authKit";
 
 const authFeatures = [
   { emoji: "📊", title: "Live dashboards", desc: "Real-time metrics, always fresh" },
@@ -16,12 +17,7 @@ export function Register() {
       <div className="flex flex-col items-center justify-center px-6 py-12 sm:px-14">
         <div className="w-full max-w-[400px]">
           <div className="mb-9 flex items-center gap-2.5">
-            <span
-              className="flex h-9 w-9 items-center justify-center rounded-[10px]"
-              style={{ background: "var(--acc)" }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" /></svg>
-            </span>
+            <BrandMark size={36} />
             <span className="text-xl font-extrabold text-t0">Vela</span>
           </div>
           <h1 className="mb-2 text-[30px] font-extrabold tracking-tight text-t0">Create your account</h1>

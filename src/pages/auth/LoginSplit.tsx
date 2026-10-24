@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { paths } from "@/router/paths";
+import { BrandMark } from "./authKit";
 
 /** Alternate split-screen login (gradient hero left, compact form right). */
 export function LoginSplit() {
@@ -15,12 +16,7 @@ export function LoginSplit() {
           style={{ background: "radial-gradient(70% 60% at 75% 15%,rgba(124,92,255,.4),transparent 60%)" }}
         />
         <div className="relative flex items-center gap-3">
-          <span
-            className="flex h-[38px] w-[38px] items-center justify-center rounded-[11px] text-[17px] font-extrabold text-white"
-            style={{ background: "linear-gradient(135deg,#7c5cff,#56a8ff)" }}
-          >
-            V
-          </span>
+          <BrandMark size={38} />
           <span className="text-[17px] font-extrabold text-white">Vela</span>
         </div>
         <div className="relative">
