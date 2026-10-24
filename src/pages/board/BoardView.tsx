@@ -260,18 +260,18 @@ function BoardGoalCard({ board, pulse }: { board: GoalBoard; pulse: boolean }) {
       <div className="mt-1.5 flex items-end justify-between gap-3">
         <p className="font-mono text-[22px] font-extrabold leading-none tabular-nums text-t0 sm:text-[26px]" data-secret="">{brlCent(summary.achieved)}</p>
         <div className="text-right">
-          <p className={`font-mono text-[22px] font-extrabold leading-none tabular-nums sm:text-[26px] ${progressTextClass(summary.pct)}`} data-secret="">{num(summary.pct, 1)}%</p>
+          <p className={`font-mono text-[22px] font-extrabold leading-none tabular-nums sm:text-[26px] ${progressTextClass(summary.pct)}`}>{num(summary.pct, 1)}%</p>
           <p className="mt-0.5 text-[12px] text-t2">de <span data-secret="">{brlCent(goal.target)}</span></p>
         </div>
       </div>
       <div className="mt-1.5">
-          <GlobalGoalBand goal={card.band} tiers={card.tiers} embedded soBarra hideOutsideNote highlightCurrent enter pulseCurrent={pulse} secret />
+          <GlobalGoalBand goal={card.band} tiers={card.tiers} embedded soBarra hideOutsideNote highlightCurrent enter pulseCurrent={pulse} />
       </div>
       <div className="mt-1 flex items-center justify-between gap-2">
         <p className="min-w-0 truncate text-[12px] leading-snug text-t2">
-          {currentLevel ? <span className="font-bold text-acc" data-secret="">{currentLevel}</span> : null}
+          {currentLevel ? <span className="font-bold text-acc">{currentLevel}</span> : null}
           {currentLevel && summary.projectedPct != null ? <span className="mx-1.5 text-t3">·</span> : null}
-          {summary.projectedPct != null ? <span className="font-semibold text-t1" data-secret="">Projeção {num(summary.projectedPct, 0)}%</span> : null}
+          {summary.projectedPct != null ? <span className="font-semibold text-t1">Projeção {num(summary.projectedPct, 0)}%</span> : null}
           {(currentLevel || summary.projectedPct != null) ? <span className="mx-1.5 text-t3">·</span> : null}
           <span>{prazoRemaining(summary.daysRemaining)}</span>
         </p>
@@ -307,7 +307,7 @@ function WinBadge({ count }: { count: number }) {
   return (
     <span className="absolute -bottom-1 left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-0.5 rounded-full border border-line bg-bg-2 px-1 py-px text-[9px] font-bold leading-none text-t0">
       <span aria-hidden>🏆</span>
-      <span data-secret="">{count}</span>
+      <span>{count}</span>
     </span>
   );
 }
@@ -734,7 +734,7 @@ export function BoardView({
 
       <div className="board-in grid shrink-0 grid-cols-2 gap-4 xl:grid-cols-4" style={{ animationDelay: "70ms" }}>
         <StatCard dense glass secret label="Faturamento" value={brlCent(monthRevenue)} sub={<>Hoje <span data-secret="">{brlCent(todayTotals.revenue)}</span></>} icon={<IconRevenue />} />
-        <StatCard dense glass secret label="Vendas" value={num(month.sales)} sub={<>Hoje <span data-secret="">{num(todayTotals.sales)}</span></>} icon={<IconSales />} />
+        <StatCard dense glass label="Vendas" value={num(month.sales)} sub={<>Hoje {num(todayTotals.sales)}</>} icon={<IconSales />} />
         <StatCard
           dense
           glass
@@ -747,7 +747,6 @@ export function BoardView({
         <StatCard
           dense
           glass
-          secret
           label="Progresso da meta"
           value={activeGoal ? `${num(activeGoal.summary.pct, 1)}%` : "—"}
           sub={
@@ -856,9 +855,9 @@ export function BoardView({
                                   <span className="min-w-0 truncate text-[12.5px] font-bold text-t0">{person.name}</span>
                                 </span>
                               </td>
-                              <td className="py-1 pr-2 text-right font-mono text-[12.5px] font-bold tabular-nums text-t0" data-secret="">{num(person.sales)}</td>
+                              <td className="py-1 pr-2 text-right font-mono text-[12.5px] font-bold tabular-nums text-t0">{num(person.sales)}</td>
                               <td className="py-1 pr-2 text-right">
-                                <span className="block font-mono text-[12.5px] font-extrabold tabular-nums text-t0" data-secret="">{pct ?? "—"}</span>
+                                <span className="block font-mono text-[12.5px] font-extrabold tabular-nums text-t0">{pct ?? "—"}</span>
                                 {level ? <span className="block text-[11px] text-t2">{level.levelLabel ?? "Sem nível"}</span> : null}
                               </td>
                               <td className="py-1 pr-2 text-right">

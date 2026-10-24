@@ -96,7 +96,7 @@ export function RankingBlock({
   motion?: boolean;
   /** A pessoa pisca depois da comemoração. Só o placar externo. */
   flashId?: string | null;
-  /** Borra faturamento, vendas e o que falta. Só o placar externo. */
+  /** Borra o faturamento e o valor em R$ que falta. Só o placar externo. */
   secret?: boolean;
 }) {
   if (ranking.length === 0) {
@@ -198,7 +198,7 @@ export function RankingBlock({
                 <PersonAvatar size={isOuro ? "2xl" : "xl"} name={l.avatarName ?? l.name} employeeId={l.employeeId} storeId={l.storeId} />
               </span>
               <MedalhaBadge pos={pos} />
-              <WinsMark count={l.wins} secret={secret} />
+              <WinsMark count={l.wins} />
             </div>
 
             <p className={cn("max-w-full truncate font-bold text-t0", motion && isOuro ? "text-[15px] sm:text-[16px]" : "text-[13px] sm:text-[14px]")}>
@@ -214,7 +214,7 @@ export function RankingBlock({
                 {formatAmount(l.revenue)}
               </p>
             ) : null}
-            <p className={cn("mt-0.5 text-[11px]", spotlight ? "font-medium text-t3" : "font-semibold text-t2")} {...(secret ? { "data-secret": "" } : {})}>
+            <p className={cn("mt-0.5 text-[11px]", spotlight ? "font-medium text-t3" : "font-semibold text-t2")}>
               {num(l.sales)} {l.sales === 1 ? "venda" : "vendas"}
             </p>
             {spotlight ? null : (
