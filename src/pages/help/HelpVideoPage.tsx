@@ -135,7 +135,7 @@ export function HelpVideoPage() {
         <Button variant="secondary" size="sm" className="sm:hidden" icon={<HelpIcon d={HELP_ICON.back} size={14} />} aria-label="Voltar" onClick={() => navigate(paths.help)}>
           Voltar
         </Button>
-        <Breadcrumbs items={[{ label: "Tutoriais", to: paths.help }, { label: video?.title ?? "Vídeo" }]} />
+        <Breadcrumbs items={[{ label: "Guia prático", to: paths.help }, { label: video?.title ?? "Vídeo" }]} />
       </div>
 
       {showSkeleton ? (

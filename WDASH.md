@@ -31,7 +31,7 @@ Remediação do security audit (standard):
 - **Worker:** sessão Millennium só em memória (+ coluna `millennium_session`); claim de `sync_job` = UPDATE atômico QUEUED→RUNNING; Actions/CLI pinados por SHA/versão; `verify_jwt=true` em todas as Edges no `config.toml`.
 - **Senha do ERP no onboarding:** só na memória do separador (F5 pede de novo). Não vai para `sessionStorage`.
 - **CORS das Edges:** só `APP_ORIGIN` e localhost (`CORS_ORIGINS`).
-- **Headers do site:** `public/_headers` (nosniff, frame, HSTS, CSP). O vídeo de Tutoriais é servido pelo Supabase, então `media-src` inclui `blob:` e `https://*.supabase.co`. Sem isso o navegador bloqueia o play.
+- **Headers do site:** `public/_headers` (nosniff, frame, HSTS, CSP). O vídeo do Guia prático é servido pelo Supabase, então `media-src` inclui `blob:` e `https://*.supabase.co`. Sem isso o navegador bloqueia o play.
 - **Tabelas de venda:** `erp-stock-sync` só grava catálogo global para Gestor. Gerente continua no estoque e no saldo das lojas dele.
 - **HTTP do Millennium:** o host `:6017` não completa TLS. O esquema fica `http` até o ERP oferecer HTTPS. Cooldown do Atualizar continua desligado (decisão de produto: o gestor clica de novo quando quiser).
 - **Escrita por loja:** meta, desafio, turno, horário/fuso da loja e flags da vendedora passam por `staff_can_write_store` (migration `20261008120000_manager_store_writes`). Gerente sem vínculo escreve em todas; com vínculo, só nas lojas ligadas.
@@ -78,7 +78,7 @@ Princípios do Dashboard:
 
 ### 2. FORA DO DASHBOARD — operacional / ações
 
-**Menu lateral (2026-10-16, decisão do dono).** Separado por intenção. Ícones: Integrações = Plug, Configurações = engrenagem.
+**Menu lateral (2026-10-16, decisão do dono).** Separado por intenção. Ícones: Integrações = Plug, Configurações = engrenagem, Guia prático = livro aberto.
 
 Gestor, nesta ordem:
 - **Dashboard** — Visão geral · Financeiro (análise) · Produtos · Equipe
@@ -87,11 +87,11 @@ Gestor, nesta ordem:
 - **Performance** — Metas · Desafios
 - **Financeiro** — Fechamento · Sangrias · Carteira · Informe de vendas
 - **Pedido de compra**
-- **Tutoriais**
+- **Guia prático**
 - **Integrações** — Adquirentes · Administradora
 - **Configurações**
 
-Gerente acompanha a operação da filial: Dashboard (Visão geral, Financeiro sem lucro, margem e custos, Produtos e Equipe), Estoque, Equipe em consulta, Performance em consulta, Financeiro (Fechamento, Sangrias, Carteira e Informe de vendas), Configurações só com Funcionamento em consulta e Tutoriais no fim do menu. Pedido de compra e Integrações não aparecem. O gerente assiste e não envia. Vendedor vê Início, Carteira e Tutoriais. As abas do cabeçalho repetem os itens do grupo; item direto não tem aba.
+Gerente acompanha a operação da filial: Dashboard (Visão geral, Financeiro sem lucro, margem e custos, Produtos e Equipe), Estoque, Equipe em consulta, Performance em consulta, Financeiro (Fechamento, Sangrias, Carteira e Informe de vendas), Configurações só com Funcionamento em consulta e Guia prático no fim do menu. Pedido de compra e Integrações não aparecem. O gerente assiste e não envia. Vendedor vê Início, Carteira e Guia prático. As abas do cabeçalho repetem os itens do grupo; item direto não tem aba.
 
 **Gerente** (2026-10-23): o papel continua o mesmo. O gestor não muda. O gerente fica nas filiais do vínculo (`membership_store` vazio = todas). No Dashboard > Financeiro ele vê faturamento, vendas, formas de pagamento, marca e ticket; CMV, lucro, margem, resultado e custos da operação ficam de fora. O ranking de filiais da Visão geral, e as consultas com Todas, usam só as filiais do vínculo: com mais de uma, o ranking é entre elas; a fatia da rede e o total das outras filiais ficam com o gestor. Estoque segue consulta: a tela não tem exclusão nem ajuste. Equipe é consulta: sem grupo, convite, suspensão ou exclusão de acesso. Metas e desafios são consulta: sem criar, editar, duplicar ou excluir. Fechamento: pode gravar o dia que ainda não tem ajuste; não altera nem apaga um fechamento já salvo. Sangrias: pode classificar e registrar; não desfaz recebimento nem muda um dia já recebido. Carteira e Informe de vendas continuam consulta, com exportação. Pedido de compra, Integrações, Filial, Royalties, Aluguel e Custo dos produtos não abrem nem pela URL. Funcionamento abre só para ver. A biblioteca de vídeos não filtra por filial. As mesmas regras valem no banco (RLS) e nas Edges de convite da equipe e de pedido de compra.
 
@@ -107,14 +107,14 @@ URLs (inglês; o endereço antigo redireciona):
 - Performance — `/performance/goals` · `/performance/challenges`
 - Financeiro — `/finance/cash-close` · `/finance/cash-drop` · `/finance/wallet` · `/finance/sales-report`
 - Vendedor — `/home` · `/wallet` · `/help`
-- Tutoriais — `/help` (`/ajuda` redireciona)
+- Guia prático — `/help` (`/ajuda` redireciona)
 - Pedido de compra — `/purchase-order`
 - Integrações — `/settings/acquirers` · `/settings/shopping`
 - Configurações — `/settings/branch` (`/settings/products-and-taxes` redireciona para cá)
 
 `/management/*`, `/goals`, `/metas`, `/stock/purchase-order` e `/cash-close` abrem o endereço novo.
 
-**Tutoriais** (2026-10-23): biblioteca de vídeos da operação. Cabe WDash, ERP e procedimentos da loja. O nome na tela é Tutoriais. Quem assiste vê "Vídeos para apoiar a operação do dia a dia." Quem administra vê "Envie e organize vídeos de orientação para a operação." No menu do gestor, Tutoriais fica logo abaixo de Pedido de compra. No menu do gerente, fica no fim. No menu do vendedor, fica depois de Carteira. A mesma tela (`/help`) serve os três: o vendedor assiste o que está visível e marcado para Equipe. O endereço antigo `/ajuda` redireciona. O gestor envia, edita, oculta e exclui qualquer vídeo da empresa. O gerente assiste, pesquisa e reproduz, sem cadastro, edição ou exclusão. Cada vídeo tem título, descrição, público (Equipe, Gerentes e Gestor, um ou mais) e visível ou oculto. Oculto fica na biblioteca de quem administra e some para quem só assiste. A equipe vê só o que está visível e marcado para Equipe. A tela não mostra quem viu e o play não grava visualização. O card da biblioteca fica no tamanho de uma miniatura e mostra um quadro do vídeo; clicar abre o player. O arquivo é MP4, WEBM ou MOV, até 200 MB. Sem nota, pergunta, vídeo por filial e contador público. O seletor de filial não entra nessa tela.
+**Guia prático** (2026-10-23, nome em 2026-10-24): biblioteca de vídeos da operação. Cabe WDash, ERP e procedimentos da loja. O nome na tela é Guia prático e o ícone do menu é um livro aberto. Quem assiste vê "Vídeos para apoiar a operação do dia a dia." Quem administra vê "Envie e organize vídeos de orientação para a operação." No menu do gestor, Guia prático fica logo abaixo de Pedido de compra. No menu do gerente, fica no fim. No menu do vendedor, fica depois de Carteira. A mesma tela (`/help`) serve os três: o vendedor assiste o que está visível e marcado para Equipe. O endereço antigo `/ajuda` redireciona. O gestor envia, edita, oculta e exclui qualquer vídeo da empresa. O gerente assiste, pesquisa e reproduz, sem cadastro, edição ou exclusão. Cada vídeo tem título, descrição, público (Equipe, Gerentes e Gestor, um ou mais) e visível ou oculto. Oculto fica na biblioteca de quem administra e some para quem só assiste. A equipe vê só o que está visível e marcado para Equipe. A tela não mostra quem viu e o play não grava visualização. O card da biblioteca fica no tamanho de uma miniatura e mostra um quadro do vídeo; clicar abre o player. O arquivo é MP4, WEBM ou MOV, até 200 MB. Sem nota, pergunta, vídeo por filial e contador público. O seletor de filial não entra nessa tela.
 
 - **Metas** — CRUD de metas de faturamento/comissão por loja/período/equipe. Reaproveitar layout do BI (ver referências metas01-03).
 - **Desafios** — gamificação (ver `dashboard-desafios01.png`: desafio, progresso, engajadas, prêmio).

@@ -127,7 +127,7 @@ export function HelpPage() {
   return (
     <div className="pb-8">
       <PageHeader
-        title="Tutoriais"
+        title="Guia prático"
         subtitle={manage ? "Envie e organize vídeos de orientação para a operação." : "Vídeos para apoiar a operação do dia a dia."}
         actions={
           <>
@@ -167,7 +167,7 @@ export function HelpPage() {
 
           {filtered.length === 0 ? (
             <EmptyState
-              icon="🎬"
+              icon="📖"
               title={library.length === 0 ? (manage ? "Nenhum vídeo na biblioteca" : "Nenhum vídeo disponível") : filter === "hidden" && !query.trim() ? "Nenhum vídeo oculto" : "Nenhum vídeo encontrado"}
               description={
                 library.length === 0
