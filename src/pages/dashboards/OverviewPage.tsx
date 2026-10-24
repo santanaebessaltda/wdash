@@ -55,6 +55,7 @@ import { cn } from "@/lib/cn";
 import { useProductDetail } from "@/pages/dashboard/ProductDetail";
 import { useTeamMemberDetail } from "@/pages/dashboard/TeamMemberDetail";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
+import { PRODUCT_AVATAR_TONES, colorsByAmount, kpiTone, nextSeriesColor, paymentColor } from "@/pages/dashboard/palette";
 import { OverviewSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
 import { calendarTodayIso } from "@/data/wedash/clock";
@@ -104,41 +105,6 @@ const KPI_ICONS = [IconRevenue, IconCmv, IconSales, IconTicket];
 function storesLabel(storeRows: string[]): string | null {
   if (storeRows.length === 0) return null;
   return storeRows.length > 1 ? `${storeRows[0]} · +${storeRows.length - 1}` : storeRows[0]!;
-}
-
-/** Demais fatias do ranking. A de maior faturamento fica de fora e usa a cor primária. */
-const BRANCH_COLORS = [
-  "var(--palette-purple)",
-  "var(--palette-blue)",
-  "var(--palette-green)",
-  "var(--palette-amber)",
-  "var(--palette-red)",
-] as const;
-
-/** Ícones dos quatro cards do topo, na ordem dos KPIs. */
-const KPI_TONES = [
-  { iconColor: "var(--palette-pink)", iconBg: "var(--palette-pink-soft)" },
-  { iconColor: "var(--palette-amber)", iconBg: "var(--palette-amber-soft)" },
-  { iconColor: "var(--palette-purple)", iconBg: "var(--palette-purple-soft)" },
-  { iconColor: "var(--palette-blue)", iconBg: "var(--palette-blue-soft)" },
-] as const;
-
-/** Avatares dos produtos: tons auxiliares do Vela, sem o rosa do faturamento. */
-const PRODUCT_AVATAR_TONES = [
-  "var(--palette-purple)",
-  "var(--palette-blue)",
-  "var(--palette-green)",
-  "var(--palette-amber)",
-] as const;
-
-/** Cor da forma no donut, na legenda e no detalhamento. */
-function paymentColor(method: string): string {
-  const key = method.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
-  if (key.includes("credito")) return "var(--palette-purple)";
-  if (key.includes("pix")) return "var(--palette-green)";
-  if (key.includes("debito")) return "var(--palette-blue)";
-  if (key.includes("dinheiro") || key === "cash") return "var(--palette-amber)";
-  return "var(--palette-neutral)";
 }
 
 /**
@@ -583,7 +549,7 @@ export default function OverviewPage() {
       {/* KPI row  -  4 cards */}
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {view.kpis.map((kpi, i) => (
-          <KpiCard key={kpi.label} kpi={kpi} Icon={KPI_ICONS[i]} tone={KPI_TONES[i] ?? KPI_TONES[0]} />
+          <KpiCard key={kpi.label} kpi={kpi} Icon={KPI_ICONS[i]} />
         ))}
       </div>
 
@@ -885,15 +851,8 @@ export default function OverviewPage() {
                       amount: amountRest,
                     }
                   : null;
-              const topRevenue = view.storesRanking.reduce((max, store) => Math.max(max, store.amount), 0);
-              let paletteIndex = 0;
-              const rankingColors = view.storesRanking.map((store) => {
-                if (topRevenue > 0 && store.amount === topRevenue) return "var(--palette-pink)";
-                const color = BRANCH_COLORS[paletteIndex % BRANCH_COLORS.length];
-                paletteIndex += 1;
-                return color;
-              });
-              const restColor = BRANCH_COLORS[paletteIndex % BRANCH_COLORS.length];
+              const rankingColors = colorsByAmount(view.storesRanking.map((store) => ({ amount: store.amount })));
+              const restColor = nextSeriesColor(rankingColors);
               const donutSegments = [
                 ...view.storesRanking.map((l, i) => ({
                   label: l.name,
@@ -1256,15 +1215,8 @@ export default function OverviewPage() {
   );
 }
 
-function KpiCard({
-  kpi,
-  Icon,
-  tone,
-}: {
-  kpi: OverviewKpi;
-  Icon: () => React.JSX.Element;
-  tone: { iconColor: string; iconBg: string };
-}) {
+function KpiCard({ kpi, Icon }: { kpi: OverviewKpi; Icon: () => React.JSX.Element }) {
+  const tone = kpiTone(kpi.label);
   return (
     <StatCard
       label={kpi.label}

@@ -43,6 +43,7 @@ import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
 import { brlCent, isoToDate, num, comparedWithTip } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePicker";
+import { PALETTE, PRODUCT_AVATAR_TONES, kpiTone, profitText, variationColor } from "@/pages/dashboard/palette";
 import {
   applyPeriodDateChange,
   dateRangeFromPeriod,
@@ -78,10 +79,6 @@ const IconItems = () => (
 );
 const KPI_ICONS = [IconRevenue, IconProfit, IconMargin, IconItems];
 
-/** Heroes por metrica: Fat/Lucro/Margem iguais ao Financeiro; Itens = warn. */
-/** Hero dos KPIs: rosa primário do dashboard. */
-const KPI_HERO = { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" };
-
 type SortKey = "name" | "revenue" | "items" | "cmv" | "profit" | "marginPct" | "variationPct";
 
 function lineCmv(line: ProductLineRow): number | null {
@@ -89,21 +86,19 @@ function lineCmv(line: ProductLineRow): number | null {
 }
 
 const COLORS_ABC: Record<AbcClass, string> = {
-  A: "var(--bad)",
-  B: "var(--warn)",
-  C: "var(--ok)",
+  A: PALETTE.pink,
+  B: PALETTE.purple,
+  C: PALETTE.blue,
 };
 
 const filterInputClass =
   "h-8 rounded-[var(--radius-vela-sm)] border border-line bg-bg-3 px-3 text-xs font-semibold text-t0 transition-colors hover:border-acc focus:border-acc focus:outline-none";
 
-const colorProfit = (v: number | null) => (v == null ? "text-t2" : v < 0 ? "text-bad" : "text-ok");
-
 function Variation({ v }: { v: number | null }) {
   if (v == null) return <span className="text-t2">—</span>;
   const r = Math.round(v);
   return (
-    <span className="font-bold" style={{ color: r >= 0 ? "var(--ok)" : "var(--bad)" }}>
+    <span className="font-bold" style={{ color: variationColor(r) }}>
       {r >= 0 ? "+" : ""}
       {r}%
     </span>
@@ -365,6 +360,8 @@ export default function ProductsPage() {
             <BarChart
               data={view.categories.map((c) => ({ label: c.name, value: c.revenue }))}
               height={220}
+              color={PALETTE.pink}
+              hoverColor={PALETTE.pinkHover}
               formatValue={brlCent}
               onSelect={(_, i) => {
                 const c = view.categories[i];
@@ -498,14 +495,15 @@ export default function ProductsPage() {
                       <ProductNameCell
                         name={l.name}
                         idx={idx}
+                        tones={PRODUCT_AVATAR_TONES}
                         sub={`${l.products} produto${l.products === 1 ? "" : "s"} · ${l.kinds.length} tipo${l.kinds.length === 1 ? "" : "s"}`}
                       />
                     </td>
                     <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(l.items)}</td>
                     <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(l.revenue)}</td>
                     <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", cmv == null ? "text-t2" : "text-t0")}>{moneyOrDash(cmv)}</td>
-                    <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", colorProfit(l.profit))}>{moneyOrDash(l.profit)}</td>
-                    <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", l.marginPct == null ? "text-t2" : "text-ok")}>
+                    <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", profitText(l.profit))}>{moneyOrDash(l.profit)}</td>
+                    <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", l.marginPct == null ? "text-t2" : "text-palette-blue")}>
                       {pctFmt(l.marginPct)}
                     </td>
                     <td className="px-1 py-3 text-right font-mono text-[13px]">
@@ -531,10 +529,10 @@ export default function ProductsPage() {
                   <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", lineTotal.cmv == null ? "text-t2" : "text-t0")}>
                     {moneyOrDash(lineTotal.cmv)}
                   </td>
-                  <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", colorProfit(lineTotal.profit))}>
+                  <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", profitText(lineTotal.profit))}>
                     {moneyOrDash(lineTotal.profit)}
                   </td>
-                  <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", lineTotal.marginPct == null ? "text-t2" : "text-ok")}>
+                  <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", lineTotal.marginPct == null ? "text-t2" : "text-palette-blue")}>
                     {pctFmt(lineTotal.marginPct)}
                   </td>
                   <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold">
@@ -624,13 +622,13 @@ export default function ProductsPage() {
                     >
                       <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
                       <td className="px-1 py-3">
-                        <ProductNameCell name={p.name} idx={idx} sub={p.code} />
+                        <ProductNameCell name={p.name} idx={idx} sub={p.code} tones={PRODUCT_AVATAR_TONES} />
                       </td>
                       <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(p.items)}</td>
                       <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.revenue)}</td>
                       <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", p.cmv == null ? "text-t2" : "text-t0")}>{moneyOrDash(p.cmv)}</td>
-                      <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", colorProfit(p.profit))}>{moneyOrDash(p.profit)}</td>
-                      <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", p.marginPct == null ? "text-t2" : "text-ok")}>
+                      <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", profitText(p.profit))}>{moneyOrDash(p.profit)}</td>
+                      <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", p.marginPct == null ? "text-t2" : "text-palette-blue")}>
                         {pctFmt(p.marginPct)}
                       </td>
                       <td className="px-1 py-3 text-right font-mono text-[13px]">
@@ -656,10 +654,10 @@ export default function ProductsPage() {
                   <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", tableTotal.cmv == null ? "text-t2" : "text-t0")}>
                     {moneyOrDash(tableTotal.cmv)}
                   </td>
-                  <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", colorProfit(tableTotal.profit))}>
+                  <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", profitText(tableTotal.profit))}>
                     {moneyOrDash(tableTotal.profit)}
                   </td>
-                  <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", tableTotal.marginPct == null ? "text-t2" : "text-ok")}>
+                  <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", tableTotal.marginPct == null ? "text-t2" : "text-palette-blue")}>
                     {pctFmt(tableTotal.marginPct)}
                   </td>
                   <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold">
@@ -694,13 +692,14 @@ export default function ProductsPage() {
 }
 
 function KpiCard({ kpi, Icon }: { kpi: ProductsKpi; Icon: () => React.JSX.Element }) {
+  const tone = kpiTone(kpi.label);
   return (
     <StatCard
       label={kpi.label}
       value={kpi.value}
       icon={<Icon />}
-      iconColor={KPI_HERO.iconColor}
-      iconBg={KPI_HERO.iconBg}
+      iconColor={tone.iconColor}
+      iconBg={tone.iconBg}
       delta={kpi.delta}
       sub={kpi.sub}
       tooltip={kpi.tooltip}

@@ -46,6 +46,8 @@ import { brlCent, isoToDate, labelUpper, deltaTip, num } from "@/lib/format";
 import { usePagedRows } from "@/lib/usePagedRows";
 import { cn } from "@/lib/cn";
 import { QuickStat } from "@/pages/dashboards/QuickStat";
+import { PALETTE, kpiTone, paymentColor, profitText } from "@/pages/dashboard/palette";
+import type { TintKey } from "@/pages/dashboards/icons";
 import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePicker";
 import {
   applyPeriodDateChange,
@@ -107,8 +109,13 @@ const KPI_ICONS = [IconRevenue, IconCmv, IconProfit, IconMargin];
 /** Lucro, margem e CMV ficam só com o Gestor. */
 const STRATEGIC_KPI = new Set(["CMV", "Lucro bruto", "Margem", "CMV WPINK", "Lucro bruto WPINK", "Margem WPINK"]);
 
-/** Hero dos KPIs: rosa primário do dashboard. */
-const KPI_HERO = { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" };
+function wpinkTint(label: string): TintKey {
+  const color = kpiTone(label).iconColor;
+  if (color === PALETTE.amber) return "warn";
+  if (color === PALETTE.green) return "ok";
+  if (color === PALETTE.blue) return "info";
+  return "acc";
+}
 
 type EvoSort = "month" | "revenue" | "cost" | "profit" | "margin" | "ticket";
 
@@ -118,7 +125,7 @@ function costRowStyle(line: FixedCostRow): { bold: boolean; indent: boolean; col
     return {
       bold: true,
       indent: false,
-      color: line.amount < 0 ? "var(--bad)" : "var(--acc)",
+      color: line.amount < 0 ? PALETTE.red : PALETTE.pink,
       text: brlCent(line.amount),
     };
   }
@@ -126,7 +133,7 @@ function costRowStyle(line: FixedCostRow): { bold: boolean; indent: boolean; col
     return { bold: true, indent: false, text: `−${brlCent(line.amount)}` };
   }
   if (line.label === "Lucro bruto") {
-    return { bold: true, indent: false, color: "var(--ok)", text: brlCent(line.amount) };
+    return { bold: true, indent: false, color: PALETTE.green, text: brlCent(line.amount) };
   }
   return { bold: false, indent: true, text: `−${brlCent(line.amount)}` };
 }
@@ -328,7 +335,7 @@ export default function FinancePage() {
                 label={kpi.label}
                 value={kpi.amount}
                 icon={<Icon />}
-                tint={kpi.tint}
+                tint={wpinkTint(kpi.label)}
                 tooltip={kpi.tooltip}
                 sub={kpi.sub}
                 badge={<PriorPeriodBadge delta={kpi.delta} />}
@@ -367,13 +374,13 @@ export default function FinancePage() {
                   <div className="mt-2.5 flex flex-wrap gap-5">
                     <div>
                       <span className="flex items-center gap-1.5 text-xs font-semibold text-t1">
-                        <span className="h-2.5 w-2.5 rounded-[3px] bg-[var(--ok)]" />Lucro bruto
+                        <span className="h-2.5 w-2.5 rounded-[3px] bg-palette-green" />Lucro bruto
                       </span>
                       <p className="mt-0.5 font-mono text-base font-extrabold text-t0">{brlCent(totalProfit)}</p>
                     </div>
                     <div>
                       <span className="flex items-center gap-1.5 text-xs font-semibold text-t1">
-                        <span className="h-2.5 w-2.5 rounded-[3px] bg-[var(--bad)]" />CMV
+                        <span className="h-2.5 w-2.5 rounded-[3px] bg-palette-amber" />CMV
                       </span>
                       <p className="mt-0.5 font-mono text-base font-extrabold text-t0">{brlCent(totalCmv)}</p>
                     </div>
@@ -394,8 +401,11 @@ export default function FinancePage() {
                   compareData={series.map((m) => (m.future ? null : m.cost))}
                   labels={series.map((m) => m.label)}
                   tooltipLabels={series.map((m) => m.rangeLabel)}
-                  color="var(--ok)"
-                  compareColor="var(--bad)"
+                  color={PALETTE.green}
+                  compareColor={PALETTE.amber}
+                  name="Lucro bruto"
+                  compareName="CMV"
+                  areaOpacity={0.18}
                   formatValue={brlCent}
                   showAxisLabels
                 />
@@ -432,13 +442,13 @@ export default function FinancePage() {
                   <div className="mt-2.5 flex flex-wrap gap-5">
                     <div>
                       <span className="flex items-center gap-1.5 text-xs font-semibold text-t1">
-                        <span className="h-2.5 w-2.5 rounded-[3px] bg-[var(--ok)]" />Lucro bruto
+                        <span className="h-2.5 w-2.5 rounded-[3px] bg-palette-green" />Lucro bruto
                       </span>
                       <p className="mt-0.5 font-mono text-base font-extrabold text-t0">{brlCent(totalProfit)}</p>
                     </div>
                     <div>
                       <span className="flex items-center gap-1.5 text-xs font-semibold text-t1">
-                        <span className="h-2.5 w-2.5 rounded-[3px] bg-[var(--acc)]" />Resultado operacional
+                        <span className="h-2.5 w-2.5 rounded-[3px] bg-palette-pink" />Resultado operacional
                       </span>
                       <p className="mt-0.5 font-mono text-base font-extrabold text-t0">{brlCent(totalRes)}</p>
                     </div>
@@ -459,8 +469,11 @@ export default function FinancePage() {
                   compareData={series.map((m) => (m.future ? null : m.result))}
                   labels={series.map((m) => m.label)}
                   tooltipLabels={series.map((m) => m.rangeLabel)}
-                  color="var(--ok)"
-                  compareColor="var(--acc)"
+                  color={PALETTE.green}
+                  compareColor={PALETTE.pink}
+                  name="Lucro bruto"
+                  compareName="Resultado operacional"
+                  areaOpacity={0.18}
                   formatValue={brlCent}
                   showAxisLabels
                 />
@@ -546,7 +559,7 @@ export default function FinancePage() {
                       segments={view.paymentMethods.map((f) => ({
                         label: labelUpper(f.method),
                         value: f.amount,
-                        color: f.color,
+                        color: paymentColor(f.method),
                       }))}
                       centerLabel="Total"
                       centerValue={brlCent(sum)}
@@ -557,7 +570,7 @@ export default function FinancePage() {
                       const pct = Math.round((f.amount / total) * 100);
                       return (
                         <div key={f.method} className="flex items-center gap-2.5">
-                          <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: f.color }} />
+                          <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: paymentColor(f.method) }} />
                           <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-t1">{labelUpper(f.method)}</span>
                           <span className="shrink-0 font-mono text-[12.5px] font-bold text-t0">{brlCent(f.amount)}</span>
                           <span className="min-w-[32px] shrink-0 text-right text-[11.5px] font-semibold text-t2">{pct}%</span>
@@ -652,7 +665,7 @@ export default function FinancePage() {
                     <td className="px-1 py-3 text-[13px] font-bold text-t0">{line.label}</td>
                     <td className="px-1 py-3 text-right"><Mono v={brlCent(line.revenue)} /></td>
                     {costs && <td className="px-1 py-3 text-right"><Mono v={brlCent(line.cost)} /></td>}
-                    {costs && <td className="px-1 py-3 text-right"><Mono v={brlCent(line.profit)} tone={line.profit < 0 ? "text-bad" : "text-ok"} /></td>}
+                    {costs && <td className="px-1 py-3 text-right"><Mono v={brlCent(line.profit)} tone={profitText(line.profit)} /></td>}
                     {costs && <td className="px-1 py-3 text-right"><Mono v={`${line.marginPct.toFixed(1)}%`} /></td>}
                     <td className="px-1 py-3 text-right"><Mono v={brlCent(line.averageTicket)} /></td>
                   </tr>
@@ -670,7 +683,7 @@ export default function FinancePage() {
                 {costs && <td className="px-1 py-3 text-right"><Mono v={brlCent(evoTotal.cost)} total /></td>}
                 {costs && (
                 <td className="px-1 py-3 text-right">
-                  <Mono v={brlCent(evoTotal.profit)} total tone={evoTotal.profit < 0 ? "text-bad" : "text-ok"} />
+                  <Mono v={brlCent(evoTotal.profit)} total tone={profitText(evoTotal.profit)} />
                 </td>
                 )}
                 {costs && <td className="px-1 py-3 text-right"><Mono v={`${evoTotal.marginPct.toFixed(1)}%`} total /></td>}
@@ -705,13 +718,14 @@ function Mono({ v, total = false, tone = "text-t0" }: { v: string; total?: boole
 
 /** StatCard wrapper com tooltip ? e sparkline de tendencia. */
 function KpiCard({ kpi, Icon }: { kpi: FinanceKpi; Icon: () => React.JSX.Element }) {
+  const tone = kpiTone(kpi.label);
   return (
     <StatCard
       label={kpi.label}
       value={kpi.value}
       icon={<Icon />}
-      iconColor={KPI_HERO.iconColor}
-      iconBg={KPI_HERO.iconBg}
+      iconColor={tone.iconColor}
+      iconBg={tone.iconBg}
       delta={kpi.delta}
       sub={kpi.sub}
       tooltip={kpi.tooltip}

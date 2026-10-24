@@ -53,6 +53,7 @@ import { TeamSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
 import { FlameIcon, TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
 import { RankingBlock } from "@/pages/live/blocks";
+import { PALETTE, colorsByAmount, kpiTone, variationColor } from "@/pages/dashboard/palette";
 import type { RankingRow } from "@/data/wedash/live";
 import { TABLE_PAGE_SIZE } from "@/lib/usePagedRows";
 import { brlCent, isoToDate, labelUpper, num, comparedWithTip } from "@/lib/format";
@@ -129,12 +130,6 @@ const IconItems = () => (
 );
 const KPI_ICONS = [IconRevenue, IconSales, IconTicket, IconItems];
 
-/** Hero dos KPIs: rosa primário do dashboard. */
-const KPI_HERO = { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" };
-
-const COLORS_SHIFT = ["var(--acc)", "var(--info)", "var(--ok)", "var(--warn)", "var(--bad)"];
-/** Fatia neutra (sem turno / fora da equipe)  -  nao compete com as demais. */
-const COLOR_NEUTRA = "color-mix(in srgb, var(--t2) 40%, transparent)";
 const CAN_CONFIGURE_STORE = new Set(["OWNER", "MANAGER", "ADMIN_GLOBAL"]);
 
 type SortKey = "name" | "revenue" | "sales" | "averageTicket" | "pa" | "participationPct" | "variationPct";
@@ -157,7 +152,7 @@ function Variation({ v }: { v: number | null }) {
   if (v == null) return <span className="text-t2">—</span>;
   const r = Math.round(v);
   return (
-    <span className="font-bold" style={{ color: r >= 0 ? "var(--ok)" : "var(--bad)" }}>
+    <span className="font-bold" style={{ color: variationColor(r) }}>
       {r >= 0 ? "+" : ""}
       {r}%
     </span>
@@ -462,8 +457,8 @@ export function TeamPage() {
                   label={kpi.label}
                   value={kpi.amount}
                   icon={<Icon />}
-                  iconColor={KPI_HERO.iconColor}
-                  iconBg={KPI_HERO.iconBg}
+                  iconColor={kpiTone(kpi.label).iconColor}
+                  iconBg={kpiTone(kpi.label).iconBg}
                   delta={kpi.delta}
                   sub={kpi.sub}
                   tooltip={kpi.tooltip}
@@ -497,8 +492,12 @@ export function TeamPage() {
                 (() => {
                   const shifts = view.shifts.filter((t) => Math.round(t.revenue * 100) >= 1);
                   const total = shifts.reduce((s, t) => s + t.revenue, 0) || 1;
-                  let colorIdx = 0;
-                  const colors = shifts.map((t) => (t.name === TEAM_WITHOUT_SHIFT || t.name === TEAM_UNATTRIBUTED_SALE ? COLOR_NEUTRA : COLORS_SHIFT[colorIdx++ % COLORS_SHIFT.length]!));
+                  const colors = colorsByAmount(
+                    shifts.map((t) => ({
+                      amount: t.revenue,
+                      neutral: t.name === TEAM_WITHOUT_SHIFT || t.name === TEAM_UNATTRIBUTED_SALE,
+                    })),
+                  );
                   return (
                     <div className="flex flex-1 flex-col justify-center px-4 pb-4">
                       <div className="mx-auto my-2">
@@ -551,10 +550,10 @@ export function TeamPage() {
                 (() => {
                   const { team, unidentified, branchUser, management, total } = view.composition;
                   const fatias = [
-                    { name: "Equipe de vendas", amount: team, color: "var(--acc)" },
-                    { name: "Sem vendedor identificado", amount: unidentified, color: COLOR_NEUTRA },
-                    { name: "Usuário da filial", amount: branchUser, color: "var(--info)" },
-                    { name: "Gerência", amount: management, color: "var(--warn)" },
+                    { name: "Equipe de vendas", amount: team, color: PALETTE.pink },
+                    { name: "Sem vendedor identificado", amount: unidentified, color: PALETTE.neutral },
+                    { name: "Usuário da filial", amount: branchUser, color: PALETTE.blue },
+                    { name: "Gerência", amount: management, color: PALETTE.amber },
                   ].filter((f) => Math.round(f.amount * 100) >= 1);
                   return (
                     <div className="flex flex-1 flex-col justify-center px-4 pb-4">

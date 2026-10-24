@@ -3,6 +3,7 @@ import { Badge, Modal, ProgressBar, Skeleton, ThSort, type SortDir } from "@/com
 import { Tooltip } from "@/components/ui/Tooltip";
 import { AreaLineChart } from "@/components/charts";
 import { ProductNameCell } from "@/components/wedash/ProductNameCell";
+import { PRODUCT_AVATAR_TONES, PALETTE, profitText } from "@/pages/dashboard/palette";
 import {
   buildAbcClassDetail,
   buildCategoryDetail,
@@ -236,7 +237,7 @@ const amountOfSort = (r: { items: number; revenue: number; profit: number | null
 
 function ProfitCell({ v }: { v: number | null }) {
   return (
-    <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", v == null ? "text-t2" : v < 0 ? "text-bad" : "text-ok")}>
+    <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", profitText(v))}>
       {v == null ? "—" : brlCent(v)}
     </td>
   );
@@ -325,12 +326,12 @@ function ProductsOfGroup({ products, onProduct }: { products: ProductDetailItem[
             >
               <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
               <td className="px-1 py-3">
-                <ProductNameCell name={p.name} idx={idx} sub={p.code} />
+                <ProductNameCell name={p.name} idx={idx} sub={p.code} tones={PRODUCT_AVATAR_TONES} />
               </td>
               <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(p.items)}</td>
               <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.revenue)}</td>
               <ProfitCell v={p.profit} />
-              <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", p.marginPct == null ? "text-t2" : "text-ok")}>
+              <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", p.marginPct == null ? "text-t2" : "text-palette-blue")}>
                 {pctFmt(p.marginPct)}
               </td>
             </tr>
@@ -405,12 +406,12 @@ function CategoriesOfClass({
             >
               <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
               <td className="px-1 py-3">
-                <ProductNameCell name={c.name} idx={idx} />
+                <ProductNameCell name={c.name} idx={idx} tones={PRODUCT_AVATAR_TONES} />
               </td>
               <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(c.items)}</td>
               <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(c.revenue)}</td>
               <ProfitCell v={c.profit} />
-              <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", c.marginPct == null ? "text-t2" : "text-ok")}>
+              <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", c.marginPct == null ? "text-t2" : "text-palette-blue")}>
                 {pctFmt(c.marginPct)}
               </td>
               <td className="px-1 py-3 text-right">
@@ -530,6 +531,9 @@ function ProductDetailModal({
                 tooltipLabels={detail.series.map((d) => d.detail ?? d.label)}
                 formatValue={brlCent}
                 height={200}
+                color={PALETTE.pink}
+                name="Faturamento"
+                areaOpacity={0.18}
                 showAxisLabels
               />
             </section>

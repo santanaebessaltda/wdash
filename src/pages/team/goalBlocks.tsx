@@ -9,6 +9,7 @@ import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { brl, brlCent, brlK, eachDay, num } from "@/lib/format";
+import { kpiTone } from "@/pages/dashboard/palette";
 import type { BlockState as BlockStateKind } from "@/data/wedash/dashboard";
 import { BlockState } from "@/pages/dashboard/BlockState";
 import type { ChallengeView, TeamView, GoalCardView, NetworkGlobalGoal, SellerRow } from "@/data/wedash/teamViews";
@@ -69,8 +70,6 @@ const IconPA = () => (
 );
 
 /** Mesmo padrão visual das demais telas (VG/Fin/Prod): ícone + valor + delta + sub + tooltip — sem sparkline. */
-/** Hero dos KPIs: rosa primário do dashboard. */
-const KPI_HERO = { iconColor: "var(--acc)", iconBg: "var(--acc-soft)" };
 
 export function TeamKpisBlock({
   revenue,
@@ -119,14 +118,15 @@ export function TeamKpisBlock({
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {kpis.map((kpi) => {
         const Icon = kpi.Icon;
+        const tone = kpiTone(kpi.label);
         return (
           <StatCard
             key={kpi.label}
             label={kpi.label}
             value={kpi.amount}
             icon={<Icon />}
-            iconColor={KPI_HERO.iconColor}
-            iconBg={KPI_HERO.iconBg}
+            iconColor={tone.iconColor}
+            iconBg={tone.iconBg}
             delta={kpi.delta}
             sub={kpi.sub}
             tooltip={"tooltip" in kpi ? kpi.tooltip : undefined}
