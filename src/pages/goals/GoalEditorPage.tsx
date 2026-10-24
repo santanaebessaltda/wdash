@@ -1167,7 +1167,7 @@ function TiersEditor({
                   positive(t.commission) != null && (
                     <>
                       premiação de{" "}
-                      <span className="font-semibold text-ok">
+                      <span className="font-semibold text-acc">
                         {numText(positive(t.commission)!)}%
                       </span>
                     </>
@@ -1206,7 +1206,7 @@ function TiersEditor({
                       positive(t.mgrCommission) != null && (
                         <>
                           premiação de{" "}
-                          <span className="font-semibold text-ok">{numText(positive(t.mgrCommission)!)}%</span>
+                          <span className="font-semibold text-acc">{numText(positive(t.mgrCommission)!)}%</span>
                         </>
                       ),
                       ...bonusItems(mgr.bonus, mgr.bonusTotal),
@@ -1408,14 +1408,14 @@ function Simulation({
                           taxa != null && (
                             <>
                               premiação de{" "}
-                              <span className="font-semibold text-ok">
+                              <span className="font-semibold text-acc">
                                 {numText(taxa)}% das vendas
                               </span>
                             </>
                           ),
                           taxa != null && r.commission != null && r.commission > 0 && (
                             <>
-                              <span className="font-mono font-semibold text-ok">
+                              <span className="font-mono font-semibold text-acc">
                                 {brlCent(r.commission)}
                               </span>{" "}
                               por pessoa
@@ -1485,11 +1485,11 @@ function ManagerSimulation({ tiers, target }: { tiers: TierRow[]; target: number
                   </>,
                   taxa != null && (
                     <>
-                      premiação de <span className="font-semibold text-ok">{numText(taxa)}%</span> da venda da loja
+                      premiação de <span className="font-semibold text-acc">{numText(taxa)}%</span> da venda da loja
                     </>
                   ),
                   taxa != null && mgr.commission != null && mgr.commission > 0 && (
-                    <span className="font-mono font-semibold text-ok">{brlCent(mgr.commission)}</span>
+                    <span className="font-mono font-semibold text-acc">{brlCent(mgr.commission)}</span>
                   ),
                   ...bonusItems(mgr.bonus, mgr.bonusTotal, false, true),
                 ]}
