@@ -6,12 +6,11 @@ import { PlainKpi } from "@/pages/cash-close/CashClosePage";
 import { MonthStep, monthNavBtn } from "@/pages/cash-close/MonthYearPicker";
 import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
-import { isOwner } from "@/layout/nav-wedash";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { addDays, addMonths, endOfMonth, isoToDate, startOfMonth } from "@/data/wedash/engine/format";
 import { fetchGoals } from "@/data/wedash/goalsRepo";
 import { monthCoveredByGoal, scheduleStartMonth, type GoalSpan } from "@/data/wedash/goalMonths";
-import { branchRoleLabel, fetchStoreSellers, fetchStoreShifts, isBranchTeamMember, storesForSession, type StoreSeller, type StoreShift } from "@/data/wedash/stores";
+import { branchRoleLabel, fetchStoreSellers, fetchStoreShifts, isBranchTeamMember, type StoreSeller, type StoreShift } from "@/data/wedash/stores";
 import { defaultDayNeeds, generateMonth, nextSundayShift, shiftThatWorked, weekday, type DayStatus, type Sex } from "@/data/wedash/scheduleGenerate";
 import { holidayLabel, holidaysForStore, loadHolidaySeed, loadNationalHolidays, storePlace, type Holiday } from "@/data/wedash/scheduleHolidays";
 import { deleteSchedule, fetchCompDue, fetchSchedule, fetchScheduleDays, saveManualDay, saveSchedule, type StoredDay, type StoredSchedule } from "@/data/wedash/scheduleRepo";
@@ -158,12 +157,6 @@ export function SchedulePage() {
     };
   }, [store?.id, monthStart, session.tenantId, reloadKey]);
 
-  const otherStores = isOwner(session.role)
-    ? storesForSession(session.stores)
-        .filter((row) => row.id !== store?.id)
-        .map((row) => ({ id: row.id, name: row.tradeName || row.name }))
-    : [];
-
   const initialWizard = (): ScheduleWizardValue => ({
     scenario: "before_6x1",
     pattern: schedule?.pattern ?? "6x1",
@@ -179,7 +172,6 @@ export function SchedulePage() {
     dayNeeds: schedule && schedule.dayNeeds.length === 7 ? schedule.dayNeeds : defaultDayNeeds(),
     groupNeeds: [],
     holidayRules: schedule?.holidayRules ?? [],
-    copyStoreIds: [],
     replaceManual: false,
   });
 
@@ -270,16 +262,7 @@ export function SchedulePage() {
         groupId: people.find((person) => person.id === id)?.shiftId ?? null,
       }));
       const result = await generateFor(store.id, value, selected);
-      let kept = result.keptManualDays;
-      if (value.copyStoreIds.length > 0) {
-        const teams = await fetchStoreSellers(session.tenantId, value.copyStoreIds);
-        for (const storeId of value.copyStoreIds) {
-          const team = (teams.get(storeId) ?? []).filter((person) => isBranchTeamMember(person));
-          const copiedPeople = team.map((person) => ({ id: person.id, fixedOffDow: null, sex: "woman" as const, groupId: person.shiftId }));
-          const copied = await generateFor(storeId, value, copiedPeople);
-          kept += copied.keptManualDays;
-        }
-      }
+      const kept = result.keptManualDays;
       setNotice(kept > 0 ? `Escala gerada. ${kept} ${kept === 1 ? "dia ajustado na mão foi mantido" : "dias ajustados na mão foram mantidos"}.` : "Escala gerada.");
       setWizard(false);
       setReloadKey((value) => value + 1);
@@ -407,7 +390,6 @@ export function SchedulePage() {
             code: person.code,
             storeId: store.id,
           }))}
-          otherStores={otherStores}
           hasSchedule={schedule != null}
           nationalHolidays={holidays}
           initial={initialWizard()}

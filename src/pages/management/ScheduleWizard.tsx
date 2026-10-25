@@ -55,12 +55,55 @@ export type ScheduleWizardValue = {
   dayNeeds: DayNeed[];
   groupNeeds: GroupNeed[];
   holidayRules: HolidayRule[];
-  copyStoreIds: string[];
   replaceManual: boolean;
 };
 
 function defaultRule(date: string, name: string): HolidayRule {
   return { date, name, open: true, workers: 1, pay: "extra_off", window: "7_days" };
+}
+
+function CountField({
+  value,
+  disabled,
+  label,
+  onChange,
+}: {
+  value: number;
+  disabled?: boolean;
+  label: string;
+  onChange: (next: number) => void;
+}) {
+  const next = (raw: number) => onChange(Math.min(99, Math.max(0, Math.floor(raw) || 0)));
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-vela-md)] border border-line bg-bg-inset text-t0 disabled:cursor-not-allowed disabled:opacity-40"
+        disabled={disabled || value <= 0}
+        aria-label={`Diminuir ${label}`}
+        onClick={() => next(value - 1)}
+      >
+        <Icon d={icons.minus} size={14} />
+      </button>
+      <Input
+        inputMode="numeric"
+        disabled={disabled}
+        value={value}
+        aria-label={label}
+        onChange={(event) => next(Number(event.target.value.replace(/\D/g, "")))}
+        className="h-9! w-12 px-1 text-center"
+      />
+      <button
+        type="button"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-vela-md)] border border-line bg-bg-inset text-t0 disabled:cursor-not-allowed disabled:opacity-40"
+        disabled={disabled || value >= 99}
+        aria-label={`Aumentar ${label}`}
+        onClick={() => next(value + 1)}
+      >
+        <Icon d={icons.plus} size={14} />
+      </button>
+    </div>
+  );
 }
 
 function periodDays(from: string, to: string): number {
@@ -74,7 +117,6 @@ export function ScheduleWizard({
   open,
   onClose,
   people,
-  otherStores,
   hasSchedule,
   nationalHolidays,
   initial,
@@ -84,7 +126,6 @@ export function ScheduleWizard({
   open: boolean;
   onClose: () => void;
   people: WizardPerson[];
-  otherStores: { id: string; name: string }[];
   hasSchedule: boolean;
   nationalHolidays: { date: string; name: string }[];
   initial: ScheduleWizardValue;
@@ -104,6 +145,7 @@ export function ScheduleWizard({
   }));
   const [extraDate, setExtraDate] = useState("");
   const [extraName, setExtraName] = useState("");
+  const [addingHoliday, setAddingHoliday] = useState(false);
   const days = periodDays(value.periodStart, value.periodEnd);
   const periodOk = value.periodEnd >= value.periodStart && days > 0 && days <= 93;
   const types = TYPES.filter((item) => patternFits(value.scenario, item.id));
@@ -140,6 +182,7 @@ export function ScheduleWizard({
     setValue((current) => ({ ...current, holidayRules: [...current.holidayRules.filter((rule) => rule.date !== extraDate), defaultRule(extraDate, name)].sort((a, b) => a.date.localeCompare(b.date)) }));
     setExtraDate("");
     setExtraName("");
+    setAddingHoliday(false);
   }
 
   function patchRule(date: string, patch: Partial<HolidayRule>) {
@@ -150,10 +193,9 @@ export function ScheduleWizard({
   }
 
   function setDayMin(dow: number, min: number) {
-    const next = Math.min(99, Math.max(0, Math.floor(min) || 0));
     setValue((current) => ({
       ...current,
-      dayNeeds: current.dayNeeds.map((day) => (day.dow === dow ? { ...day, min: next } : day)),
+      dayNeeds: current.dayNeeds.map((day) => (day.dow === dow ? { ...day, min } : day)),
     }));
   }
 
@@ -334,34 +376,7 @@ export function ScheduleWizard({
                 </label>
                 <div className="flex shrink-0 items-center gap-2 text-[12px] text-t2">
                   <span>Pelo menos{day.open ? <span className="text-bad"> *</span> : null}</span>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-vela-md)] border border-line bg-bg-inset text-t0 disabled:cursor-not-allowed disabled:opacity-40"
-                      disabled={!day.open || day.min <= 0}
-                      aria-label={`Diminuir pessoas de ${weekdayLabel(day.dow)}`}
-                      onClick={() => setDayMin(day.dow, day.min - 1)}
-                    >
-                      <Icon d={icons.minus} size={14} />
-                    </button>
-                    <Input
-                      inputMode="numeric"
-                      disabled={!day.open}
-                      value={day.min}
-                      aria-label={`Mínimo de ${weekdayLabel(day.dow)}`}
-                      onChange={(event) => setDayMin(day.dow, Number(event.target.value.replace(/\D/g, "")))}
-                      className="h-9! w-12 px-1 text-center"
-                    />
-                    <button
-                      type="button"
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-vela-md)] border border-line bg-bg-inset text-t0 disabled:cursor-not-allowed disabled:opacity-40"
-                      disabled={!day.open || day.min >= 99}
-                      aria-label={`Aumentar pessoas de ${weekdayLabel(day.dow)}`}
-                      onClick={() => setDayMin(day.dow, day.min + 1)}
-                    >
-                      <Icon d={icons.plus} size={14} />
-                    </button>
-                  </div>
+                  <CountField value={day.min} disabled={!day.open} label={`pessoas de ${weekdayLabel(day.dow)}`} onChange={(min) => setDayMin(day.dow, min)} />
                 </div>
               </li>
             ))}
@@ -380,16 +395,17 @@ export function ScheduleWizard({
                     <span className="block truncate text-[13.5px] font-semibold text-t0">{rule.name}</span>
                     <span className="text-[12px] text-t2">{rule.date.split("-").reverse().join("/")}</span>
                   </span>
-                  <button
+                  <Button
                     type="button"
-                    className="shrink-0 text-[12px] text-t2"
+                    variant="ghost"
+                    size="sm"
                     onClick={() => {
                       setDismissed((current) => [...current, rule.date]);
                       setValue((current) => ({ ...current, holidayRules: current.holidayRules.filter((item) => item !== rule) }));
                     }}
                   >
                     Remover
-                  </button>
+                  </Button>
                 </div>
                 <label className="mt-2 flex items-center gap-2 text-[13px] text-t0">
                   <input type="checkbox" className="shrink-0" checked={rule.open} onChange={(event) => patchRule(rule.date, { open: event.target.checked })} />
@@ -398,7 +414,7 @@ export function ScheduleWizard({
                 {rule.open ? (
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     <FormField label="Pessoas trabalhando" required>
-                      <Input inputMode="numeric" value={rule.workers} aria-label={`Pessoas trabalhando em ${rule.name}`} onChange={(event) => patchRule(rule.date, { workers: Math.max(0, Number(event.target.value) || 0) })} />
+                      <CountField value={rule.workers} label={`pessoas trabalhando em ${rule.name}`} onChange={(workers) => patchRule(rule.date, { workers })} />
                     </FormField>
                     <FormField label="Quem trabalha recebe" required>
                       <Select value={rule.pay} aria-label={`Pagamento de ${rule.name}`} onChange={(event) => patchRule(rule.date, { pay: event.target.value as HolidayRule["pay"] })}>
@@ -422,47 +438,52 @@ export function ScheduleWizard({
               </li>
             ))}
           </ul>
-          <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
-            <FormField label="Data do feriado" required>
-              <DatePicker
-                value={extraDate ? isoToDate(extraDate) : null}
-                onChange={(day) => setExtraDate(dateToIso(day))}
-                minDate={value.periodStart ? isoToDate(value.periodStart) : null}
-                maxDate={value.periodEnd ? isoToDate(value.periodEnd) : null}
-                aria-label="Data do feriado municipal"
-              />
-            </FormField>
-            <FormField label="Nome do feriado" required>
-              <Input placeholder="Feriado municipal" value={extraName} onChange={(event) => setExtraName(event.target.value)} aria-label="Nome do feriado municipal" />
-            </FormField>
-            <Button type="button" variant="outline" onClick={addMunicipal}>Adicionar</Button>
-          </div>
-          {otherStores.length > 0 ? (
-            <div className="mt-5">
-              <p className="text-[13px] font-semibold text-t0">Copiar para outras filiais</p>
-              <p className="mt-1 mb-2 text-[12px] text-t2">A mesma regra. Cada filial usa a própria equipe, e quem não tiver sexo entra como mulher.</p>
-              <ul className="space-y-2">
-                {otherStores.map((store) => (
-                  <li key={store.id}>
-                    <label className="flex min-w-0 items-center gap-3 rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3 py-2 text-[13.5px]">
-                      <input
-                        type="checkbox"
-                        className="shrink-0"
-                        checked={value.copyStoreIds.includes(store.id)}
-                        onChange={() =>
-                          setValue((current) => ({
-                            ...current,
-                            copyStoreIds: current.copyStoreIds.includes(store.id) ? current.copyStoreIds.filter((id) => id !== store.id) : [...current.copyStoreIds, store.id],
-                          }))
-                        }
-                      />
-                      <span className="min-w-0 truncate">{store.name}</span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
+          {addingHoliday ? (
+            <section className="mt-4 rounded-[var(--radius-vela-lg)] border border-line bg-bg-2 p-3">
+              <p className="text-[12.5px] font-bold text-t0">Feriado municipal</p>
+              <p className="mt-1 text-[12.5px] leading-relaxed text-t2">Feriado desta cidade que a lista não trouxe.</p>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+                <div className="min-w-0 flex-1">
+                  <FormField label="Data do feriado" required>
+                    <DatePicker
+                      value={extraDate ? isoToDate(extraDate) : null}
+                      onChange={(day) => setExtraDate(dateToIso(day))}
+                      minDate={value.periodStart ? isoToDate(value.periodStart) : null}
+                      maxDate={value.periodEnd ? isoToDate(value.periodEnd) : null}
+                      aria-label="Data do feriado municipal"
+                    />
+                  </FormField>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <FormField label="Nome do feriado" required>
+                    <Input placeholder="Feriado municipal" value={extraName} onChange={(event) => setExtraName(event.target.value)} aria-label="Nome do feriado municipal" />
+                  </FormField>
+                </div>
+                <Button type="button" variant="outline" size="sm" disabled={!extraDate || !extraName.trim()} onClick={addMunicipal}>
+                  Adicionar feriado
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setExtraDate("");
+                    setExtraName("");
+                    setAddingHoliday(false);
+                  }}
+                >
+                  Remover
+                </Button>
+              </div>
+            </section>
+          ) : (
+            <div className="mt-4">
+              <Button type="button" variant="outline" size="sm" onClick={() => setAddingHoliday(true)}>
+                Adicionar feriado
+              </Button>
+              <p className="mt-1.5 text-[12.5px] leading-relaxed text-t2">Feriado desta cidade que a lista não trouxe.</p>
             </div>
-          ) : null}
+          )}
           <p className="mt-4 text-[13px] text-t2">
             {selectedPeople.length} pessoas · {selectedType?.title} · {value.holidayRules.filter((rule) => rule.open).length} feriados com trabalho.
           </p>
