@@ -170,6 +170,27 @@ describe("geração da escala", () => {
     expect(working("2026-03-01", "tarde")).toBe(0);
     expect(working("2026-03-08", "tarde")).toBe(2);
     expect(working("2026-03-08", "manha")).toBe(0);
+    const split = generateMonth({
+      year: 2026,
+      month: 3,
+      from: "2026-03-01",
+      to: "2026-03-02",
+      pattern: "12x36",
+      offMode: "rotating",
+      sundayMin: 0,
+      people: team,
+      holidayDates: [],
+      dayNeeds: Array.from({ length: 7 }, (_, dow) => ({ dow, open: true, min: 0 })),
+      groupNeeds: [
+        { groupId: "manha", dow: 1, min: 2 },
+        { groupId: "tarde", dow: 1, min: 1 },
+      ],
+      sundayShifts: ["manha", "tarde"],
+      sundayShiftStart: 0,
+    }).days;
+    const onMonday = (groupId: string) => split.filter((row) => row.date === "2026-03-02" && team.find((person) => person.id === row.personId)?.groupId === groupId && (row.status === "work" || row.status === "holiday_work")).length;
+    expect(onMonday("manha")).toBe(2);
+    expect(onMonday("tarde")).toBe(1);
     expect(nextSundayShift("manha", ["manha", "tarde"])).toBe(1);
     expect(nextSundayShift(null, ["manha", "tarde"])).toBe(0);
   });

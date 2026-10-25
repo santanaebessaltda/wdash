@@ -21,7 +21,8 @@ export type SchedulePerson = {
 };
 
 export type DayNeed = { dow: number; open: boolean; min: number };
-export type GroupNeed = { groupId: string; min: number };
+/** Mínimo de um turno. Sem `dow`, vale para todos os dias. */
+export type GroupNeed = { groupId: string; min: number; dow?: number };
 
 export type HolidayRule = {
   date: string;
@@ -135,9 +136,13 @@ function dayMin(needs: DayNeed[] | undefined, dow: number): { open: boolean; min
   return { open: row.open, min: row.open ? row.min : 0 };
 }
 
-function groupMin(needs: GroupNeed[] | undefined, groupId: string | null | undefined): number {
+function groupMin(needs: GroupNeed[] | undefined, groupId: string | null | undefined, dow?: number): number {
   if (!groupId || !needs) return 0;
-  return needs.find((item) => item.groupId === groupId)?.min ?? 0;
+  if (dow != null) {
+    const exact = needs.find((item) => item.groupId === groupId && item.dow === dow);
+    if (exact) return exact.min;
+  }
+  return needs.find((item) => item.groupId === groupId && item.dow == null)?.min ?? 0;
 }
 
 function staysCovered(grid: DayStatus[][], people: SchedulePerson[], needs: DayNeed[] | undefined, groups: GroupNeed[] | undefined, day: number, dow: number, leaving: number): boolean {
@@ -191,8 +196,8 @@ function ensureSundayCoverage(grid: DayStatus[][], dates: string[], sundays: num
 }
 
 function shiftFloor(needs: DayNeed[] | undefined, groups: GroupNeed[] | undefined, dow: number, groupId: string | null | undefined): number {
-  const explicit = groupMin(groups, groupId);
-  if (explicit > 0) return explicit;
+  const hasShift = Boolean(groupId && groups?.some((item) => item.groupId === groupId && (item.dow == null || item.dow === dow)));
+  if (hasShift) return groupMin(groups, groupId, dow);
   if (needs && groupId) return dayMin(needs, dow).min;
   return 0;
 }

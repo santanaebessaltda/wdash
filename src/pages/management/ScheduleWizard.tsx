@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { Badge, Button, DatePicker, FormField, Input, Modal, Select, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
+import { Link } from "react-router-dom";
+import { Alert, Badge, Button, DatePicker, FormField, Input, Modal, Select, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { Icon, icons } from "@/pages/users/Icons";
 import { cn } from "@/lib/cn";
 import { dateToIso, isoToDate } from "@/lib/format";
 import { defaultDayNeeds, patternFits, weekdayLabel, type CompWindow, type DayNeed, type GroupNeed, type HolidayRule, type OffMode, type SchedulePattern, type ScheduleScenario, type Sex, type SundayRule } from "@/data/wedash/scheduleGenerate";
+import { paths } from "@/router/paths";
 
 const STEPS = [
   { num: 1, label: "Escala" },
@@ -151,6 +153,34 @@ export function ScheduleWizard({
   const types = TYPES.filter((item) => patternFits(value.scenario, item.id));
   const selectedType = TYPES.find((item) => item.id === value.pattern);
   const selectedPeople = people.filter((person) => value.selectedIds.includes(person.id));
+  const shifts = [...new Map(selectedPeople.filter((person) => person.groupId).map((person) => [person.groupId as string, person.groupName || "Turno"])).entries()]
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  const unassigned = selectedPeople.filter((person) => !person.groupId);
+
+  function shownMin(groupId: string, dow: number, source: typeof value): number {
+    const exact = source.groupNeeds.find((row) => row.groupId === groupId && row.dow === dow);
+    if (exact) return exact.min;
+    const legacy = source.groupNeeds.find((row) => row.groupId === groupId && row.dow == null);
+    if (legacy) return legacy.min;
+    return source.dayNeeds.find((row) => row.dow === dow)?.min ?? 1;
+  }
+
+  function withShiftNeeds(source: typeof value): typeof value {
+    if (unassigned.length > 0 || shifts.length === 0) return source;
+    const groupNeeds: GroupNeed[] = [];
+    for (const day of source.dayNeeds) {
+      for (const shift of shifts) groupNeeds.push({ groupId: shift.id, dow: day.dow, min: shownMin(shift.id, day.dow, source) });
+    }
+    return { ...source, dayNeeds: source.dayNeeds.map((day) => ({ ...day, min: 0 })), groupNeeds };
+  }
+
+  function setShiftMin(groupId: string, dow: number, min: number) {
+    setValue((current) => {
+      const next = withShiftNeeds(current);
+      return { ...next, groupNeeds: next.groupNeeds.map((row) => (row.groupId === groupId && row.dow === dow ? { ...row, min } : row)) };
+    });
+  }
 
   function rulesFor(start: string, end: string, current: HolidayRule[], skipped: string[]): HolidayRule[] {
     const kept = current.filter((rule) => rule.date >= start && rule.date <= end);
@@ -192,13 +222,6 @@ export function ScheduleWizard({
     }));
   }
 
-  function setDayMin(dow: number, min: number) {
-    setValue((current) => ({
-      ...current,
-      dayNeeds: current.dayNeeds.map((day) => (day.dow === dow ? { ...day, min } : day)),
-    }));
-  }
-
   return (
     <Modal
       open={open}
@@ -210,11 +233,11 @@ export function ScheduleWizard({
         <WizardNav
           hidePrevious={step === 1}
           previousDisabled={saving}
-          nextDisabled={saving || (step === 1 && !periodOk) || (step === 2 && value.selectedIds.length === 0)}
+          nextDisabled={saving || (step === 1 && !periodOk) || (step === 2 && value.selectedIds.length === 0) || (step === 3 && unassigned.length > 0)}
           nextLabel={step === 4 ? (saving ? "Criando…" : "Nova escala") : "Continuar"}
           hideNextIcon={step === 4}
           onPrevious={() => setStep((current) => current - 1)}
-          onNext={() => (step === 4 ? onSubmit(value) : setStep((current) => current + 1))}
+          onNext={() => (step === 4 ? onSubmit(withShiftNeeds(value)) : setStep((current) => current + 1))}
         />
       }
     >
@@ -348,39 +371,61 @@ export function ScheduleWizard({
       {step === 3 ? (
         <>
           <WizardCardHeader title="Em quais dias a empresa abre?" subtitle="Desmarque o dia em que todos ficam de folga." />
-          <p className="text-[13px] font-semibold text-t0">Nos dias abertos, de quantas pessoas você precisa?</p>
-          <p className="mt-1 mb-3 text-[12px] text-t2">
-            {(() => {
-              const shifts = new Set(selectedPeople.map((person) => person.groupId).filter(Boolean)).size;
-              return shifts > 1
-                ? `O número é por turno. Com ${shifts} turnos, 2 significa 2 em cada um. Os domingos revezam entre os turnos e continuam a partir do domingo anterior.`
-                : "O menor número trabalhando em cada dia.";
-            })()}
-          </p>
-          <ul className="space-y-2">
-            {value.dayNeeds.map((day) => (
-              <li key={day.dow} className="flex min-w-0 items-center justify-between gap-3 border-b border-line py-2">
-                <label className="flex min-w-0 items-center gap-2 text-[13.5px] text-t0">
-                  <input
-                    type="checkbox"
-                    className="shrink-0"
-                    checked={day.open}
-                    onChange={(event) =>
-                      setValue((current) => ({
-                        ...current,
-                        dayNeeds: current.dayNeeds.map((item) => (item.dow === day.dow ? { ...item, open: event.target.checked } : item)),
-                      }))
-                    }
-                  />
-                  <span className="truncate">{weekdayLabel(day.dow)}</span>
-                </label>
-                <div className="flex shrink-0 items-center gap-2 text-[12px] text-t2">
-                  <span>Pelo menos{day.open ? <span className="text-bad"> *</span> : null}</span>
-                  <CountField value={day.min} disabled={!day.open} label={`pessoas de ${weekdayLabel(day.dow)}`} onChange={(min) => setDayMin(day.dow, min)} />
-                </div>
-              </li>
-            ))}
-          </ul>
+          {unassigned.length > 0 ? (
+            <Alert
+              variant="warning"
+              title="Falta o grupo de alguém"
+              action={
+                <Link to={paths.management.team} className="shrink-0 text-[12.5px] font-bold text-acc">
+                  Abrir Equipe
+                </Link>
+              }
+            >
+              {unassigned.length === 1 ? `${unassigned[0].name} não tem grupo.` : `${unassigned.map((person) => person.name).join(", ")} não têm grupo.`} Escolha o grupo de cada pessoa em Equipe e volte para montar a escala.
+            </Alert>
+          ) : (
+            <>
+              <p className="text-[13px] font-semibold text-t0">Quantas pessoas de cada turno?</p>
+              <p className="mt-1 mb-3 text-[12px] text-t2">
+                {shifts.length > 1
+                  ? "O número é só daquele turno, no dia marcado. Os domingos revezam entre os turnos e continuam a partir do domingo anterior."
+                  : "O número é o mínimo desse turno em cada dia aberto."}
+              </p>
+              <ul className="space-y-2">
+                {value.dayNeeds.map((day) => (
+                  <li key={day.dow} className="border-b border-line py-2">
+                    <label className="flex min-w-0 items-center gap-2 text-[13.5px] text-t0">
+                      <input
+                        type="checkbox"
+                        className="shrink-0"
+                        checked={day.open}
+                        onChange={(event) =>
+                          setValue((current) => ({
+                            ...current,
+                            dayNeeds: current.dayNeeds.map((item) => (item.dow === day.dow ? { ...item, open: event.target.checked } : item)),
+                          }))
+                        }
+                      />
+                      <span className="truncate font-semibold">{weekdayLabel(day.dow)}</span>
+                    </label>
+                    {day.open
+                      ? shifts.map((shift) => (
+                          <div key={shift.id} className="mt-2 flex min-w-0 items-center justify-between gap-3 pl-6">
+                            <span className="min-w-0 truncate text-[13px] text-t0">{shift.name}</span>
+                            <div className="flex shrink-0 items-center gap-2 text-[12px] text-t2">
+                              <span>
+                                Pelo menos<span className="text-bad"> *</span>
+                              </span>
+                              <CountField value={shownMin(shift.id, day.dow, value)} label={`pessoas de ${shift.name} em ${weekdayLabel(day.dow)}`} onChange={(min) => setShiftMin(shift.id, day.dow, min)} />
+                            </div>
+                          </div>
+                        ))
+                      : null}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </>
       ) : null}
       {step === 4 ? (
