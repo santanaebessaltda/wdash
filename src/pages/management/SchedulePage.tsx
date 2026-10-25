@@ -404,6 +404,8 @@ export function SchedulePage() {
             role: branchRoleLabel(person.role),
             groupId: person.shiftId,
             groupName: shifts.find((shift) => shift.id === person.shiftId)?.name ?? "",
+            code: person.code,
+            storeId: store.id,
           }))}
           otherStores={otherStores}
           hasSchedule={schedule != null}

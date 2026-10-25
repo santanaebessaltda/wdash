@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Badge, Button, DatePicker, FormField, Input, Modal, Select, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
+import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { cn } from "@/lib/cn";
 import { dateToIso, isoToDate } from "@/lib/format";
 import { defaultDayNeeds, patternFits, weekdayLabel, type CompWindow, type DayNeed, type GroupNeed, type HolidayRule, type OffMode, type SchedulePattern, type ScheduleScenario, type Sex, type SundayRule } from "@/data/wedash/scheduleGenerate";
@@ -27,7 +28,16 @@ const SUNDAY_OPTIONS: { id: SundayRule; label: string }[] = [
   { id: "none", label: "Nenhum obrigatório" },
 ];
 
-export type WizardPerson = { id: string; name: string; role: string; groupId: string | null; groupName: string };
+export type WizardPerson = {
+  id: string;
+  name: string;
+  role: string;
+  groupId: string | null;
+  groupName: string;
+  /** Código no Millennium, para achar a foto da conta. */
+  code: string | null;
+  storeId: string;
+};
 
 export type ScheduleWizardValue = {
   scenario: ScheduleScenario;
@@ -167,7 +177,9 @@ export function ScheduleWizard({
     >
       <WizardSteps steps={STEPS} current={step} />
       {step === 1 ? (
-        <div className="flex flex-col gap-4">
+        <>
+          <WizardCardHeader title={<>Qual escala montar?<span className="text-bad"> *</span></>} subtitle="O cenário, o tipo e o período. A escala começa no primeiro dia." />
+          <div className="flex flex-col gap-4">
           <FormField label="Cenário" required>
             <div className="grid gap-2 sm:grid-cols-2">
               <button type="button" onClick={() => setScenario("before_6x1")} className={cn("rounded-[var(--radius-vela-md)] border px-3 py-3 text-left", value.scenario === "before_6x1" ? "border-acc bg-acc-soft" : "border-line bg-bg-inset")}>
@@ -210,7 +222,8 @@ export function ScheduleWizard({
             </FormField>
           </div>
           {periodOk ? <p className="text-[12px] text-t2">A escala começa em {value.periodStart.split("-").reverse().join("/")} e segue até {value.periodEnd.split("-").reverse().join("/")}. O ciclo conta a partir do primeiro dia.</p> : null}
-        </div>
+          </div>
+        </>
       ) : null}
       {step === 2 ? (
         <>
@@ -232,6 +245,7 @@ export function ScheduleWizard({
                       }))
                     }
                   />
+                  <PersonAvatar name={person.name} employeeId={person.code} storeId={person.storeId} size="sm" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13.5px] font-semibold text-t0">{person.name}</span>
                     <span className="block truncate text-[12px] text-t2">{person.groupName || person.role}</span>
