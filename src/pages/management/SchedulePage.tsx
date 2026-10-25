@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Badge, Button, Card, EmptyState, Modal, useToast } from "@/components/ui";
-import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
-import { PersonAvatarGroup } from "@/components/wedash/PersonAvatar";
+import { Alert, Badge, Button, Card, EmptyState, FormField, Modal, Select, useToast } from "@/components/ui";
 import { MonthCalendar } from "@/components/wedash/MonthCalendar";
+import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
+import { PersonAvatar, PersonAvatarGroup } from "@/components/wedash/PersonAvatar";
 import { DayChip, PlainKpi } from "@/pages/cash-close/CashClosePage";
 import { MonthStep, monthNavBtn } from "@/pages/cash-close/MonthYearPicker";
 import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
@@ -34,11 +34,11 @@ const STATUS_BADGE: Record<DayStatus, "success" | "warning" | "info" | "neutral"
 };
 
 const SCHEDULE_LEGEND: LegendItem[] = [
-  { key: "work", color: "bg-ok", label: "Trabalha", hint: "dia de trabalho" },
+  { key: "work", color: "bg-ok", label: "Trabalha", hint: "quem está na loja" },
   { key: "off", color: "bg-chip-gray", label: "Folga", hint: "descanso da escala" },
-  { key: "holiday", color: "bg-warn", label: "Feriado trabalhado", hint: "quem abre no feriado" },
+  { key: "holiday", color: "bg-warn", label: "Feriado trabalhado", hint: "abre no feriado" },
   { key: "double", color: "bg-acc", label: "Pagamento em dobro", hint: "feriado com o dobro" },
-  { key: "comp", color: "bg-info", label: "Folga compensatória", hint: "folga de quem trabalhou no feriado" },
+  { key: "comp", color: "bg-info", label: "Folga compensatória", hint: "folga de quem trabalhou o feriado" },
 ];
 
 function monthLabel(iso: string): string {
@@ -384,7 +384,7 @@ export function SchedulePage() {
               <PlainKpi label="Feriados" value={String(holidayCount)} color="var(--t0)" />
               <PlainKpi label="Dias manuais" value={String(new Set(days.filter((row) => row.origin === "manual").map((row) => row.day)).size)} color="var(--t0)" />
             </div>
-            {schedule ? <ColorLegend className="mb-3" mark="dot" items={SCHEDULE_LEGEND} /> : null}
+            {schedule ? <ColorLegend className="mb-3" items={SCHEDULE_LEGEND} /> : null}
             <MonthCalendar>
               {cells.map((day, index) => {
                 const rows = day ? (dayRows.get(day) ?? []) : [];
@@ -438,6 +438,7 @@ export function SchedulePage() {
           holiday={holidayLabel(holidays, dayOpen)}
           doublePay={Boolean(schedule?.holidayRules.some((rule) => rule.date === dayOpen && rule.pay === "double"))}
           rows={dayRows.get(dayOpen) ?? []}
+          storeId={store.id}
           names={byPerson}
           onClose={() => setDayOpen(null)}
           onSave={async (next) => {
@@ -529,6 +530,7 @@ function DayEditor({
   holiday,
   doublePay,
   rows,
+  storeId,
   names,
   onClose,
   onSave,
@@ -538,17 +540,28 @@ function DayEditor({
   holiday: string | null;
   doublePay: boolean;
   rows: StoredDay[];
+  storeId: string;
   names: Map<string, StoreSeller>;
   onClose: () => void;
   onSave: (rows: StoredDay[]) => Promise<void>;
   onReset: () => Promise<void>;
 }) {
   const [draft, setDraft] = useState(rows);
+  const [pick, setPick] = useState("");
   const [busy, setBusy] = useState(false);
+  const ordered = [...draft].sort((a, b) => (names.get(a.sellerId)?.name ?? "").localeCompare(names.get(b.sellerId)?.name ?? "", "pt-BR"));
+  const missing = [...names.values()].filter((person) => !draft.some((row) => row.sellerId === person.id)).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+
+  function addPerson() {
+    if (!pick || draft.some((row) => row.sellerId === pick)) return;
+    setDraft((current) => [...current, { sellerId: pick, day, status: "work", origin: "manual" }]);
+    setPick("");
+  }
+
   return (
     <Modal
       open
-      onClose={onClose}
+      onClose={busy ? () => {} : onClose}
       title={`Dia ${Number(day.slice(8))}`}
       footer={
         <div className="flex flex-wrap justify-between gap-2">
@@ -563,7 +576,7 @@ function DayEditor({
             Voltar ao padrão
           </Button>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose}>Cancelar</Button>
+            <Button variant="outline" onClick={onClose} disabled={busy}>Cancelar</Button>
             <Button
               disabled={busy}
               onClick={() => {
@@ -578,30 +591,62 @@ function DayEditor({
       }
     >
       {holiday ? <p className="mb-3 text-[13px] font-semibold text-warn">{holiday}</p> : null}
+      <p className="mb-3 text-[12.5px] text-t2">Inclua, tire ou mude a situação de cada pessoa. Voltar ao padrão restaura o dia gerado.</p>
+      {ordered.length === 0 ? <p className="text-[13px] text-t2">Ninguém neste dia.</p> : null}
       <ul className="space-y-2">
-        {draft.map((row) => (
-          <li key={row.sellerId} className="flex items-center justify-between gap-3">
-            <span className="truncate text-[13.5px] font-semibold text-t0">{names.get(row.sellerId)?.name ?? "Pessoa"}</span>
-            <button
-              type="button"
-              className="shrink-0"
-              onClick={() =>
-                setDraft((current) =>
-                  current.map((item) => {
-                    if (item.sellerId !== row.sellerId) return item;
-                    const next = CYCLE[(CYCLE.indexOf(item.status) + 1) % CYCLE.length];
-                    return { ...item, status: next, origin: "manual" };
-                  }),
-                )
-              }
-            >
-              <Badge variant={row.status === "holiday_work" && doublePay ? "accent" : STATUS_BADGE[row.status]}>
-                {STATUS_LABEL[row.status]}{row.status === "holiday_work" && doublePay ? " 2×" : ""}
-              </Badge>
-            </button>
-          </li>
-        ))}
+        {ordered.map((row) => {
+          const person = names.get(row.sellerId);
+          const name = person?.name ?? "Pessoa";
+          return (
+            <li key={row.sellerId} className="flex min-w-0 items-center justify-between gap-3">
+              <span className="flex min-w-0 items-center gap-2">
+                <PersonAvatar name={name} employeeId={person?.code} storeId={storeId} size="sm" />
+                <span className="truncate text-[13.5px] font-semibold text-t0">{name}</span>
+              </span>
+              <span className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  className="shrink-0"
+                  aria-label={`Mudar a situação de ${name}`}
+                  onClick={() =>
+                    setDraft((current) =>
+                      current.map((item) => {
+                        if (item.sellerId !== row.sellerId) return item;
+                        const next = CYCLE[(CYCLE.indexOf(item.status) + 1) % CYCLE.length];
+                        return { ...item, status: next, origin: "manual" };
+                      }),
+                    )
+                  }
+                >
+                  <Badge variant={row.status === "holiday_work" && doublePay ? "accent" : STATUS_BADGE[row.status]}>
+                    {STATUS_LABEL[row.status]}{row.status === "holiday_work" && doublePay ? " 2×" : ""}
+                  </Badge>
+                </button>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setDraft((current) => current.filter((item) => item.sellerId !== row.sellerId))}>
+                  Remover
+                </Button>
+              </span>
+            </li>
+          );
+        })}
       </ul>
+      {missing.length > 0 ? (
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-end">
+          <div className="min-w-0 flex-1">
+            <FormField label="Adicionar pessoa">
+              <Select value={pick} onChange={(event) => setPick(event.target.value)} aria-label="Pessoa para incluir no dia">
+                <option value="">Escolha</option>
+                {missing.map((person) => (
+                  <option key={person.id} value={person.id}>{person.name}</option>
+                ))}
+              </Select>
+            </FormField>
+          </div>
+          <Button type="button" variant="outline" size="sm" disabled={!pick} onClick={addPerson}>
+            Adicionar
+          </Button>
+        </div>
+      ) : null}
     </Modal>
   );
 }
