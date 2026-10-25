@@ -207,7 +207,7 @@ export function EmailField({
 } & Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type">) {
   const ref = useReleaseAutofillSelection();
   return (
-    <FormField label={label} error={error ?? undefined}>
+    <FormField label={label} required error={error ?? undefined}>
       <Input
         {...props}
         ref={ref}
@@ -241,7 +241,7 @@ export function CpfField({
   error?: string | null;
 } & Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange">) {
   return (
-    <FormField label={label} error={error ?? undefined}>
+    <FormField label={label} required error={error ?? undefined}>
       <Input
         {...props}
         value={value}
@@ -273,7 +273,7 @@ export function PasswordField({
 } & Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type">) {
   const [show, setShow] = useState(false);
   return (
-    <FormField label={label} error={error ?? undefined}>
+    <FormField label={label} required error={error ?? undefined}>
       <div className="relative">
         <Input
           {...props}
@@ -308,7 +308,7 @@ export function NameFields({
 }) {
   return (
     <div className="grid grid-cols-2 gap-3">
-      <FormField label="Nome">
+      <FormField label="Nome" required>
         <Input
           value={amount.name}
           onChange={(e) => onChange({ name: e.target.value })}
@@ -318,7 +318,7 @@ export function NameFields({
           maxLength={40}
         />
       </FormField>
-      <FormField label="Sobrenome">
+      <FormField label="Sobrenome" required>
         <Input
           value={amount.lastName}
           onChange={(e) => onChange({ lastName: e.target.value })}

@@ -68,23 +68,29 @@ export function OnlinePix({
         )}
         {owner
           ? rows.map((row) => (
-              <div key={row.id} className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <input
-                  value={row.note}
-                  onChange={(event) => onRows(rows.map((item) => (item.id === row.id ? { ...item, note: event.target.value } : item)))}
-                  placeholder="Descrição (opcional)"
-                  aria-label="Descrição do PIX online"
-                  maxLength={80}
-                  className={field}
-                />
-                <input
-                  value={row.amount}
-                  onChange={(event) => onRows(rows.map((item) => (item.id === row.id ? { ...item, amount: event.target.value } : item)))}
-                  inputMode="decimal"
-                  placeholder="0,00"
-                  aria-label="Valor do PIX online"
-                  className={`${field} text-right font-mono font-bold sm:w-32`}
-                />
+              <div key={row.id} className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                <label className="min-w-0 flex-1 text-[12.5px] font-bold text-t0">
+                  Descrição<span className="font-normal text-t2"> (opcional)</span>
+                  <input
+                    value={row.note}
+                    onChange={(event) => onRows(rows.map((item) => (item.id === row.id ? { ...item, note: event.target.value } : item)))}
+                    placeholder="Descrição"
+                    aria-label="Descrição do PIX online"
+                    maxLength={80}
+                    className={`${field} mt-1`}
+                  />
+                </label>
+                <label className="text-[12.5px] font-bold text-t0 sm:w-32">
+                  Valor<span className="text-bad"> *</span>
+                  <input
+                    value={row.amount}
+                    onChange={(event) => onRows(rows.map((item) => (item.id === row.id ? { ...item, amount: event.target.value } : item)))}
+                    inputMode="decimal"
+                    placeholder="0,00"
+                    aria-label="Valor do PIX online"
+                    className={`${field} mt-1 text-right font-mono font-bold`}
+                  />
+                </label>
                 <Button type="button" variant="ghost" size="sm" onClick={() => onRows(rows.filter((item) => item.id !== row.id))}>
                   Remover
                 </Button>

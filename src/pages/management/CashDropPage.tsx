@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Alert, Button, Card, DateRangePicker, Dropdown, Modal, Segmented, useToast, CALENDAR_QUICK_RANGES, Badge, type DatePresetId, type DateRangeChangeMeta, type DropdownItem } from "@/components/ui";
+import { Alert, Button, Card, DateRangePicker, Dropdown, FormField, Input, Modal, Segmented, useToast, CALENDAR_QUICK_RANGES, Badge, type DatePresetId, type DateRangeChangeMeta, type DropdownItem } from "@/components/ui";
 import { FinanceMonthSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { DayFace, MonthCalendar, blankDayClass } from "@/components/wedash/MonthCalendar";
 import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
@@ -1030,15 +1030,17 @@ function DayModal({
                 <li key={line.id} className="rounded-[14px] border border-line px-3 py-3">
                   <p className="font-mono text-[15px] font-bold text-t0">{money(line.amountCents)}</p>
                   {line.document ? <p className="mt-0.5 text-[12px] text-t2">{line.document}</p> : null}
-                  <p className="mt-2 text-[12.5px] font-bold text-t0">Descrição</p>
-                  <input
-                    className="mt-1.5 w-full rounded-[10px] border border-line bg-bg-1 px-2.5 py-2 text-[13px] text-t0 disabled:opacity-60"
-                    value={line.note}
-                    aria-label="Descrição"
-                    placeholder="Descrição"
-                    disabled={travado}
-                    onChange={(e) => setLines((current) => current.map((row) => (row.id === line.id ? { ...row, note: e.target.value } : row)))}
-                  />
+                  <div className="mt-2">
+                    <FormField label="Descrição" required={excluded}>
+                      <Input
+                        value={line.note}
+                        aria-label="Descrição"
+                        placeholder="Descrição"
+                        disabled={travado}
+                        onChange={(e) => setLines((current) => current.map((row) => (row.id === line.id ? { ...row, note: e.target.value } : row)))}
+                      />
+                    </FormField>
+                  </div>
                   <div className="mt-2">
                     {travado ? (
                       <>
@@ -1058,7 +1060,6 @@ function DayModal({
                         }}
                       />
                     )}
-                    {excluded && !travado ? <p className="mt-1 text-[12px] text-t2">A descrição é obrigatória.</p> : null}
                   </div>
                 </li>
               );
@@ -1068,15 +1069,17 @@ function DayModal({
             <p className="text-[12.5px] font-bold text-t0">Falta em dinheiro</p>
             {travado ? <p className="mt-1 text-[12px] text-t2">Este dia já foi recebido. A falta reduz o valor recebido.</p> : null}
             <NumberInput className="mt-2" compact unit="R$" value={gap} aria-label="Valor da falta" onChange={setGap} disabled={concluido} />
-            <p className="mt-3 text-[12.5px] font-bold text-t0">Motivo da falta</p>
-            <input
-              className="mt-2 w-full rounded-[10px] border border-line bg-bg-1 px-2.5 py-2 text-[13px] text-t0"
-              value={reason}
-              placeholder="Ex.: diferença no caixa"
-              aria-label="Motivo da falta"
-              disabled={concluido}
-              onChange={(e) => setReason(e.target.value)}
-            />
+            <div className="mt-3">
+              <FormField label="Motivo da falta" optional>
+                <Input
+                  value={reason}
+                  placeholder="Ex.: diferença no caixa"
+                  aria-label="Motivo da falta"
+                  disabled={concluido}
+                  onChange={(e) => setReason(e.target.value)}
+                />
+              </FormField>
+            </div>
           </div>
         </>
       )}
@@ -1297,14 +1300,16 @@ function ActionModal({
               ? "As sangrias a receber dos dias selecionados ficarão fora do boleto. Os dias já recebidos não mudam."
               : "Todas as sangrias dos dias selecionados ficarão fora do boleto."}
           </p>
-          <p className="mt-3 text-[12.5px] font-bold text-t0">Motivo</p>
-          <input
-            className="mt-2 w-full rounded-[10px] border border-line bg-bg-1 px-2.5 py-2 text-[13px] text-t0"
-            value={reason}
-            placeholder="Ex.: pagamento de fornecedor"
-            aria-label="Motivo"
-            onChange={(e) => onReason(e.target.value)}
-          />
+          <div className="mt-3">
+            <FormField label="Motivo" required>
+              <Input
+                value={reason}
+                placeholder="Ex.: pagamento de fornecedor"
+                aria-label="Motivo"
+                onChange={(e) => onReason(e.target.value)}
+              />
+            </FormField>
+          </div>
           <p className="mt-1 text-[12px] text-t2">A descrição que a sangria já tem permanece.</p>
         </div>
       ) : null}
@@ -1312,16 +1317,21 @@ function ActionModal({
         <div>
           <p className="text-[13.5px] text-t1">Informe o valor que deveria estar no caixa e não foi encontrado.</p>
           {dayRecebido ? <p className="mt-2 text-[13.5px] text-t1">Este dia já foi recebido. A falta reduz o valor recebido.</p> : null}
-          <p className="mt-3 text-[12.5px] font-bold text-t0">Valor da falta</p>
-          <NumberInput className="mt-2" compact unit="R$" value={gap} aria-label="Valor da falta" onChange={onGap} />
-          <p className="mt-3 text-[12.5px] font-bold text-t0">Motivo da falta</p>
-          <input
-            className="mt-2 w-full rounded-[10px] border border-line bg-bg-1 px-2.5 py-2 text-[13px] text-t0"
-            value={reasonGap}
-            placeholder="Ex.: diferença no caixa"
-            aria-label="Motivo da falta"
-            onChange={(e) => onReasonGap(e.target.value)}
-          />
+          <div className="mt-3">
+            <FormField label="Valor da falta" required>
+              <NumberInput compact unit="R$" value={gap} aria-label="Valor da falta" onChange={onGap} />
+            </FormField>
+          </div>
+          <div className="mt-3">
+            <FormField label="Motivo da falta" optional>
+              <Input
+                value={reasonGap}
+                placeholder="Ex.: diferença no caixa"
+                aria-label="Motivo da falta"
+                onChange={(e) => onReasonGap(e.target.value)}
+              />
+            </FormField>
+          </div>
         </div>
       ) : null}
     </Modal>

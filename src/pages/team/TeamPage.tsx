@@ -143,7 +143,7 @@ const TipHelp = ({ label }: { label: string }) => (
 );
 
 const filterInputClass =
-  "h-8 rounded-[var(--radius-vela-sm)] border border-line bg-bg-3 px-3 text-xs font-semibold text-t0 transition-colors hover:border-acc focus:border-acc focus:outline-none";
+  "h-8 rounded-[var(--radius-vela-sm)] border border-line bg-bg-inset px-3 text-xs font-semibold text-t0 transition-colors hover:border-acc focus:border-acc focus:outline-none";
 
 const pctFmt = (v: number | null, casas = 1) => (v == null ? "—" : `${num(v, casas)}%`);
 const paFmt = (v: number | null) => (v == null ? "—" : num(v, 2));

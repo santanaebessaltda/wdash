@@ -26,7 +26,7 @@ export function BrandPicker({
       trigger={
         <button
           type="button"
-          className="flex h-8 items-center gap-2 rounded-[var(--radius-vela-sm)] border border-line bg-bg-3 px-3 text-xs font-semibold text-t0 transition-colors hover:border-acc"
+          className="flex h-8 items-center gap-2 rounded-[var(--radius-vela-sm)] border border-line bg-bg-inset px-3 text-xs font-semibold text-t0 transition-colors hover:border-acc"
         >
           <span className="max-w-[9.5rem] truncate">{label}</span>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-t2">

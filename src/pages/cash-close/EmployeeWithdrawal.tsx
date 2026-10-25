@@ -53,7 +53,7 @@ function PersonSelect({
   };
 
   return (
-    <div ref={boxRef} className="relative min-w-0 w-full sm:flex-1">
+    <div ref={boxRef} className="relative mt-1 min-w-0 w-full">
       <button
         type="button"
         aria-label="Funcionário da retirada"
@@ -176,30 +176,36 @@ export function EmployeeWithdrawal({
               const selectedId = canonicalId(row.sellerId);
               const options = people.filter((person) => person.id === selectedId || !taken.has(person.id));
               return (
-                <div key={row.id} className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <PersonSelect
-                    value={selectedId}
-                    options={options}
-                    onChange={(sellerId) =>
-                      onChange({
-                        ...draft,
-                        rows: draft.rows.map((item) => (item.id === row.id ? { ...item, sellerId } : item)),
-                      })
-                    }
-                  />
-                  <input
-                    value={row.amount}
-                    onChange={(event) =>
-                      onChange({
-                        ...draft,
-                        rows: draft.rows.map((item) => (item.id === row.id ? { ...item, amount: event.target.value } : item)),
-                      })
-                    }
-                    inputMode="decimal"
-                    placeholder="0,00"
-                    aria-label="Valor da retirada"
-                    className={`${field} text-right font-mono font-bold sm:w-32`}
-                  />
+                <div key={row.id} className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                  <label className="min-w-0 flex-1 text-[12.5px] font-bold text-t0">
+                    Funcionário<span className="text-bad"> *</span>
+                    <PersonSelect
+                      value={selectedId}
+                      options={options}
+                      onChange={(sellerId) =>
+                        onChange({
+                          ...draft,
+                          rows: draft.rows.map((item) => (item.id === row.id ? { ...item, sellerId } : item)),
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="text-[12.5px] font-bold text-t0 sm:w-32">
+                    Valor<span className="text-bad"> *</span>
+                    <input
+                      value={row.amount}
+                      onChange={(event) =>
+                        onChange({
+                          ...draft,
+                          rows: draft.rows.map((item) => (item.id === row.id ? { ...item, amount: event.target.value } : item)),
+                        })
+                      }
+                      inputMode="decimal"
+                      placeholder="0,00"
+                      aria-label="Valor da retirada"
+                      className={`${field} mt-1 text-right font-mono font-bold`}
+                    />
+                  </label>
                   <Button
                     type="button"
                     variant="ghost"

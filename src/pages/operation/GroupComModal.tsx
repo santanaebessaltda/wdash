@@ -170,7 +170,7 @@ export function GroupComModal({
         </FormField>
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-[13px] font-semibold text-t0">Unidade</p>
+            <p className="text-[13px] font-semibold text-t0">Unidade<span className="text-bad"> *</span></p>
             <Button size="sm" variant="outline" onClick={() => void buscar()} disabled={!canBuscar}>
               {task === "list" ? "Buscando…" : "Buscar unidades"}
             </Button>
@@ -186,7 +186,7 @@ export function GroupComModal({
                   type="button"
                   onClick={() => setSelected(unit)}
                   disabled={busy}
-                  className={cn("rounded-[var(--radius-vela-md)] border px-3 py-2 text-left", active ? "border-acc bg-acc-soft" : "border-line hover:bg-bg-3")}
+                  className={cn("rounded-[var(--radius-vela-md)] border px-3 py-2 text-left", active ? "border-acc bg-acc-soft" : "border-line bg-bg-inset")}
                 >
                   <span className="block text-[13px] font-bold text-t0">{unit.mall}</span>
                   <span className="block text-[12px] text-t2">{[unit.floor, unit.code].filter(Boolean).join(" · ")}</span>

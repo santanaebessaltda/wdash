@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Badge, Button, DatePicker, FormField, Modal, WizardCardHeader, WizardNav } from "@/components/ui";
+import { Badge, Button, DatePicker, FormField, Input, Modal, Select, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { dateToIso, isoToDate } from "@/lib/format";
 import { defaultDayNeeds, patternFits, weekdayLabel, type CompWindow, type DayNeed, type GroupNeed, type HolidayRule, type OffMode, type SchedulePattern, type ScheduleScenario, type Sex, type SundayRule } from "@/data/wedash/scheduleGenerate";
@@ -26,8 +26,6 @@ const SUNDAY_OPTIONS: { id: SundayRule; label: string }[] = [
   { id: "all", label: "Todos os domingos" },
   { id: "none", label: "Nenhum obrigatório" },
 ];
-
-const fieldClass = "w-full min-w-0 rounded-[10px] border border-line bg-bg-2 px-2 py-2 text-[13px] text-t0";
 
 export type WizardPerson = { id: string; name: string; role: string; groupId: string | null; groupName: string };
 
@@ -59,38 +57,6 @@ function periodDays(from: string, to: string): number {
   const end = Date.parse(`${to}T00:00:00Z`);
   if (Number.isNaN(start) || Number.isNaN(end)) return 0;
   return Math.round((end - start) / 86_400_000) + 1;
-}
-
-function ScheduleSteps({ current }: { current: number }) {
-  return (
-    <ol className="mb-5 grid grid-cols-4 gap-1">
-      {STEPS.map((step) => {
-        const done = step.num < current;
-        const active = step.num === current;
-        return (
-          <li key={step.num} className="flex min-w-0 flex-col items-center gap-1 text-center">
-            <span
-              className={cn(
-                "flex h-8 w-8 items-center justify-center rounded-full border-2 text-[12px] font-extrabold",
-                done && "border-acc bg-acc text-white",
-                active && "border-acc bg-acc-soft text-acc",
-                !done && !active && "border-line bg-bg-inset text-t2",
-              )}
-            >
-              {done ? (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 6 9 17l-5-5" />
-                </svg>
-              ) : (
-                step.num
-              )}
-            </span>
-            <span className={cn("w-full truncate text-[11px] font-semibold", active ? "text-t0" : "text-t2")}>{step.label}</span>
-          </li>
-        );
-      })}
-    </ol>
-  );
 }
 
 export function ScheduleWizard({
@@ -199,31 +165,29 @@ export function ScheduleWizard({
         />
       }
     >
-      <ScheduleSteps current={step} />
+      <WizardSteps steps={STEPS} current={step} />
       {step === 1 ? (
-        <>
-          <WizardCardHeader title="Qual escala você quer montar?" subtitle="Primeiro o cenário, o tipo e o período." />
-          <p className="mb-2 text-[13px] font-semibold text-t0">Cenário</p>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <button type="button" onClick={() => setScenario("before_6x1")} className={`rounded-[12px] border px-3 py-3 text-left ${value.scenario === "before_6x1" ? "border-acc bg-acc-soft" : "border-line"}`}>
-              <span className="block text-[14px] font-bold text-t0">Antes do fim da 6×1</span>
-              <span className="mt-1 block text-[12px] text-t2">6×1, 5×2, 4×3 e 12×36.</span>
-            </button>
-            <button type="button" onClick={() => setScenario("after_6x1")} className={`rounded-[12px] border px-3 py-3 text-left ${value.scenario === "after_6x1" ? "border-acc bg-acc-soft" : "border-line"}`}>
-              <span className="block text-[14px] font-bold text-t0">Após o fim da 6×1</span>
-              <span className="mt-1 block text-[12px] text-t2">Duas ou mais folgas por semana.</span>
-            </button>
-          </div>
-          <label className="mt-4 block min-w-0 text-[13px] font-semibold text-t0">
-            Tipo de escala
-            <select className={`mt-1 ${fieldClass}`} value={value.pattern} onChange={(event) => setValue((current) => ({ ...current, pattern: event.target.value as SchedulePattern }))}>
+        <div className="flex flex-col gap-4">
+          <FormField label="Cenário" required>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <button type="button" onClick={() => setScenario("before_6x1")} className={cn("rounded-[var(--radius-vela-md)] border px-3 py-3 text-left", value.scenario === "before_6x1" ? "border-acc bg-acc-soft" : "border-line bg-bg-inset")}>
+                <span className="block text-[14px] font-bold text-t0">Antes do fim da 6×1</span>
+                <span className="mt-1 block text-[12px] text-t2">6×1, 5×2, 4×3 e 12×36.</span>
+              </button>
+              <button type="button" onClick={() => setScenario("after_6x1")} className={cn("rounded-[var(--radius-vela-md)] border px-3 py-3 text-left", value.scenario === "after_6x1" ? "border-acc bg-acc-soft" : "border-line bg-bg-inset")}>
+                <span className="block text-[14px] font-bold text-t0">Após o fim da 6×1</span>
+                <span className="mt-1 block text-[12px] text-t2">Duas ou mais folgas por semana.</span>
+              </button>
+            </div>
+          </FormField>
+          <FormField label="Tipo de escala" required hint={`${selectedType?.detail}. Os dias fechados e as folgas de domingo também entram na conta.`}>
+            <Select value={value.pattern} onChange={(event) => setValue((current) => ({ ...current, pattern: event.target.value as SchedulePattern }))}>
               {types.map((item) => (
                 <option key={item.id} value={item.id}>{item.title} · {item.detail}</option>
               ))}
-            </select>
-          </label>
-          <p className="mt-2 text-[12px] text-t2">{selectedType?.detail}. Os dias fechados e as folgas de domingo também entram na conta.</p>
-          <div className="mt-4 grid grid-cols-2 gap-3">
+            </Select>
+          </FormField>
+          <div className="grid grid-cols-2 gap-3">
             <FormField label="Data de início" required error={value.periodStart ? undefined : "Informe a data de início."}>
               <DatePicker
                 value={value.periodStart ? isoToDate(value.periodStart) : null}
@@ -245,16 +209,16 @@ export function ScheduleWizard({
               />
             </FormField>
           </div>
-          {periodOk ? <p className="mt-2 text-[12px] text-t2">A escala começa em {value.periodStart.split("-").reverse().join("/")} e segue até {value.periodEnd.split("-").reverse().join("/")}. O ciclo conta a partir do primeiro dia.</p> : null}
-        </>
+          {periodOk ? <p className="text-[12px] text-t2">A escala começa em {value.periodStart.split("-").reverse().join("/")} e segue até {value.periodEnd.split("-").reverse().join("/")}. O ciclo conta a partir do primeiro dia.</p> : null}
+        </div>
       ) : null}
       {step === 2 ? (
         <>
-          <WizardCardHeader title="Quem vai trabalhar?" subtitle="A equipe desta filial. O sexo organiza a folga de domingo." />
+          <WizardCardHeader title={<>Quem vai trabalhar?<span className="text-bad"> *</span></>} subtitle="A equipe desta filial. O sexo organiza a folga de domingo." />
           <ul className="space-y-2">
             {people.length === 0 ? <li className="text-[13px] text-t2">Nenhuma pessoa ativa nesta filial.</li> : null}
             {people.map((person) => (
-              <li key={person.id} className="min-w-0 rounded-[12px] border border-line px-3 py-2">
+              <li key={person.id} className="min-w-0 rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3 py-2">
                 <div className="flex min-w-0 items-center gap-3">
                   <input
                     type="checkbox"
@@ -272,16 +236,20 @@ export function ScheduleWizard({
                     <span className="block truncate text-[13.5px] font-semibold text-t0">{person.name}</span>
                     <span className="block truncate text-[12px] text-t2">{person.groupName || person.role}</span>
                   </span>
-                  <select className="shrink-0 rounded-[10px] border border-line bg-bg-2 px-2 py-1.5 text-[13px]" value={value.sex[person.id] ?? "woman"} onChange={(event) => setValue((current) => ({ ...current, sex: { ...current.sex, [person.id]: event.target.value as Sex } }))}>
-                    <option value="woman">Mulher</option>
-                    <option value="man">Homem</option>
-                  </select>
+                  <label className="shrink-0 text-[12px] font-bold text-t0">
+                    Sexo<span className="text-bad"> *</span>
+                    <Select className="mt-1 h-9! w-[7.5rem]! px-2!" aria-label={`Sexo de ${person.name}`} value={value.sex[person.id] ?? "woman"} onChange={(event) => setValue((current) => ({ ...current, sex: { ...current.sex, [person.id]: event.target.value as Sex } }))}>
+                      <option value="woman">Mulher</option>
+                      <option value="man">Homem</option>
+                    </Select>
+                  </label>
                 </div>
                 {value.selectedIds.includes(person.id) ? (
                   <label className="mt-2 flex min-w-0 items-center justify-between gap-3 text-[12px] text-t2">
                     Dia de folga
-                    <select
-                      className="shrink-0 rounded-[10px] border border-line bg-bg-2 px-2 py-1.5 text-[13px] text-t0"
+                    <Select
+                      className="h-9! w-[9.5rem]! shrink-0 px-2!"
+                      aria-label={`Dia de folga de ${person.name}`}
                       value={value.fixedOff[person.id] ?? ""}
                       onChange={(event) =>
                         setValue((current) => ({
@@ -294,7 +262,7 @@ export function ScheduleWizard({
                       {WEEKDAYS.map((label, index) => (
                         <option key={label} value={index + 1}>{label}</option>
                       ))}
-                    </select>
+                    </Select>
                   </label>
                 ) : null}
               </li>
@@ -302,22 +270,20 @@ export function ScheduleWizard({
           </ul>
           <p className="mt-3 text-[12px] text-t2">No automático, a folga muda ao longo do período. Quem precisa do mesmo dia toda semana escolhe o dia.</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <label className="min-w-0 text-[13px] font-semibold text-t0">
-              Mulheres folgam
-              <select className={`mt-1 ${fieldClass}`} value={value.womenSunday} onChange={(event) => setValue((current) => ({ ...current, womenSunday: event.target.value as SundayRule }))}>
+            <FormField label="Mulheres folgam" required>
+              <Select value={value.womenSunday} onChange={(event) => setValue((current) => ({ ...current, womenSunday: event.target.value as SundayRule }))}>
                 {SUNDAY_OPTIONS.filter((option) => option.id !== "every_3").map((option) => (
                   <option key={option.id} value={option.id}>{option.label}</option>
                 ))}
-              </select>
-            </label>
-            <label className="min-w-0 text-[13px] font-semibold text-t0">
-              Homens folgam
-              <select className={`mt-1 ${fieldClass}`} value={value.menSunday} onChange={(event) => setValue((current) => ({ ...current, menSunday: event.target.value as SundayRule }))}>
+              </Select>
+            </FormField>
+            <FormField label="Homens folgam" required>
+              <Select value={value.menSunday} onChange={(event) => setValue((current) => ({ ...current, menSunday: event.target.value as SundayRule }))}>
                 {SUNDAY_OPTIONS.filter((option) => option.id !== "none").map((option) => (
                   <option key={option.id} value={option.id}>{option.label}</option>
                 ))}
-              </select>
-            </label>
+              </Select>
+            </FormField>
           </div>
           <p className="mt-2 text-[12px] text-t2">Se a empresa fechar no domingo, todo mundo folga.</p>
         </>
@@ -325,7 +291,7 @@ export function ScheduleWizard({
       {step === 3 ? (
         <>
           <WizardCardHeader title="Em quais dias a empresa abre?" subtitle="Desmarque o dia em que todos ficam de folga." />
-          <label className="mb-4 flex items-center gap-2 rounded-[12px] border border-line bg-bg-1 px-3 py-3 text-[13.5px] text-t0">
+          <label className="mb-4 flex items-center gap-2 rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3 py-3 text-[13.5px] text-t0">
             <input type="checkbox" className="shrink-0" checked={sunday ? !sunday.open : false} onChange={(event) => setSundayClosed(event.target.checked)} />
             A empresa fecha aos domingos
           </label>
@@ -356,18 +322,19 @@ export function ScheduleWizard({
                   <span className="truncate">{weekdayLabel(day.dow)}</span>
                 </label>
                 <label className="flex shrink-0 items-center gap-2 text-[12px] text-t2">
-                  Pelo menos
-                  <input
+                  Pelo menos{day.open ? <span className="text-bad"> *</span> : null}
+                  <Input
                     inputMode="numeric"
                     disabled={!day.open}
                     value={day.min}
+                    aria-label={`Mínimo de ${weekdayLabel(day.dow)}`}
                     onChange={(event) =>
                       setValue((current) => ({
                         ...current,
                         dayNeeds: current.dayNeeds.map((item) => (item.dow === day.dow ? { ...item, min: Math.max(0, Number(event.target.value) || 0) } : item)),
                       }))
                     }
-                    className="w-14 rounded-[10px] border border-line bg-bg-2 px-2 py-1.5 text-center text-[13px] text-t0"
+                    className="h-9! w-14 px-2 text-center"
                   />
                 </label>
               </li>
@@ -381,7 +348,7 @@ export function ScheduleWizard({
           <ul className="space-y-3">
             {value.holidayRules.length === 0 ? <li className="text-[13px] text-t2">Nenhum feriado neste período.</li> : null}
             {value.holidayRules.map((rule) => (
-              <li key={`${rule.date}-${rule.name}`} className="min-w-0 rounded-[12px] border border-line px-3 py-3">
+              <li key={`${rule.date}-${rule.name}`} className="min-w-0 rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3 py-3">
                 <div className="flex min-w-0 items-start justify-between gap-3">
                   <span className="min-w-0">
                     <span className="block truncate text-[13.5px] font-semibold text-t0">{rule.name}</span>
@@ -403,36 +370,45 @@ export function ScheduleWizard({
                   A empresa abre neste feriado
                 </label>
                 {rule.open ? (
-                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                    <label className="min-w-0 text-[12px] text-t2">
-                      Pessoas trabalhando
-                      <input inputMode="numeric" value={rule.workers} onChange={(event) => patchRule(rule.date, { workers: Math.max(0, Number(event.target.value) || 0) })} className={`mt-1 ${fieldClass}`} />
-                    </label>
-                    <label className="min-w-0 text-[12px] text-t2">
-                      Quem trabalha recebe
-                      <select className={`mt-1 ${fieldClass}`} value={rule.pay} onChange={(event) => patchRule(rule.date, { pay: event.target.value as HolidayRule["pay"] })}>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <FormField label="Pessoas trabalhando" required>
+                      <Input inputMode="numeric" value={rule.workers} aria-label={`Pessoas trabalhando em ${rule.name}`} onChange={(event) => patchRule(rule.date, { workers: Math.max(0, Number(event.target.value) || 0) })} />
+                    </FormField>
+                    <FormField label="Quem trabalha recebe" required>
+                      <Select value={rule.pay} aria-label={`Pagamento de ${rule.name}`} onChange={(event) => patchRule(rule.date, { pay: event.target.value as HolidayRule["pay"] })}>
                         <option value="extra_off">Uma folga adicional</option>
                         <option value="double">Pagamento em dobro</option>
-                      </select>
-                    </label>
+                      </Select>
+                    </FormField>
                     {rule.pay === "extra_off" ? (
-                      <label className="min-w-0 text-[12px] text-t2 sm:col-span-2">
-                        Quando a folga acontece
-                        <select className={`mt-1 ${fieldClass}`} value={rule.window} onChange={(event) => patchRule(rule.date, { window: event.target.value as CompWindow })}>
-                          <option value="7_days">Nos 7 dias seguintes</option>
-                          <option value="month_end">Até o último dia do mês</option>
-                          <option value="next_month">No mês seguinte</option>
-                        </select>
-                      </label>
+                      <div className="sm:col-span-2">
+                        <FormField label="Quando a folga acontece" required>
+                          <Select value={rule.window} aria-label={`Janela da folga de ${rule.name}`} onChange={(event) => patchRule(rule.date, { window: event.target.value as CompWindow })}>
+                            <option value="7_days">Nos 7 dias seguintes</option>
+                            <option value="month_end">Até o último dia do mês</option>
+                            <option value="next_month">No mês seguinte</option>
+                          </Select>
+                        </FormField>
+                      </div>
                     ) : null}
                   </div>
                 ) : null}
               </li>
             ))}
           </ul>
-          <div className="mt-3 grid gap-2 sm:grid-cols-[9.5rem_minmax(0,1fr)_auto] sm:items-center">
-            <input type="date" value={extraDate} min={value.periodStart} max={value.periodEnd} onChange={(event) => setExtraDate(event.target.value)} className={fieldClass} />
-            <input placeholder="Feriado municipal" value={extraName} onChange={(event) => setExtraName(event.target.value)} className={fieldClass} />
+          <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
+            <FormField label="Data do feriado" required>
+              <DatePicker
+                value={extraDate ? isoToDate(extraDate) : null}
+                onChange={(day) => setExtraDate(dateToIso(day))}
+                minDate={value.periodStart ? isoToDate(value.periodStart) : null}
+                maxDate={value.periodEnd ? isoToDate(value.periodEnd) : null}
+                aria-label="Data do feriado municipal"
+              />
+            </FormField>
+            <FormField label="Nome do feriado" required>
+              <Input placeholder="Feriado municipal" value={extraName} onChange={(event) => setExtraName(event.target.value)} aria-label="Nome do feriado municipal" />
+            </FormField>
             <Button type="button" variant="outline" onClick={addMunicipal}>Adicionar</Button>
           </div>
           {otherStores.length > 0 ? (
@@ -442,7 +418,7 @@ export function ScheduleWizard({
               <ul className="space-y-2">
                 {otherStores.map((store) => (
                   <li key={store.id}>
-                    <label className="flex min-w-0 items-center gap-3 rounded-[12px] border border-line px-3 py-2 text-[13.5px]">
+                    <label className="flex min-w-0 items-center gap-3 rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3 py-2 text-[13.5px]">
                       <input
                         type="checkbox"
                         className="shrink-0"
@@ -465,7 +441,7 @@ export function ScheduleWizard({
             {selectedPeople.length} pessoas · {selectedType?.title} · {value.holidayRules.filter((rule) => rule.open).length} feriados com trabalho.
           </p>
           {hasSchedule ? (
-            <label className="mt-3 flex items-start gap-3 rounded-[12px] border border-line px-3 py-3 text-[13px] text-t0">
+            <label className="mt-3 flex items-start gap-3 rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3 py-3 text-[13px] text-t0">
               <input type="checkbox" className="mt-0.5 shrink-0" checked={value.replaceManual} onChange={(event) => setValue((current) => ({ ...current, replaceManual: event.target.checked }))} />
               <span>Substituir também os dias ajustados na mão dentro deste período. Fora dele, a escala permanece.</span>
             </label>

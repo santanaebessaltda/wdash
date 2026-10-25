@@ -215,7 +215,7 @@ export function MonthYearPicker({
         aria-label={`Mês e ano: ${monthYearLabel(iso)}`}
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "flex h-10 min-w-0 items-center gap-2.5 rounded-[var(--radius-vela-sm)] border bg-bg-3 px-3.5 text-left transition-colors",
+          "flex h-10 min-w-0 items-center gap-2.5 rounded-[var(--radius-vela-sm)] border bg-bg-inset px-3.5 text-left transition-colors",
           open ? "border-acc" : "border-line hover:border-acc",
         )}
       >

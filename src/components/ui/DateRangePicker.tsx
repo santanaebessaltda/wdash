@@ -424,7 +424,7 @@ export function DateRangePicker({
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "flex min-w-0 items-center rounded-[var(--radius-vela-sm)] border bg-bg-3 text-left transition-colors",
+          "flex min-w-0 items-center rounded-[var(--radius-vela-sm)] border bg-bg-inset text-left transition-colors",
           size === "sm" ? "h-8 gap-2 px-3" : "h-10 gap-2.5 px-3.5",
           open ? "border-acc" : "border-line hover:border-acc",
         )}

@@ -92,7 +92,7 @@ const COLORS_ABC: Record<AbcClass, string> = {
 };
 
 const filterInputClass =
-  "h-8 rounded-[var(--radius-vela-sm)] border border-line bg-bg-3 px-3 text-xs font-semibold text-t0 transition-colors hover:border-acc focus:border-acc focus:outline-none";
+  "h-8 rounded-[var(--radius-vela-sm)] border border-line bg-bg-inset px-3 text-xs font-semibold text-t0 transition-colors hover:border-acc focus:border-acc focus:outline-none";
 
 function Variation({ v }: { v: number | null }) {
   if (v == null) return <span className="text-t2">—</span>;

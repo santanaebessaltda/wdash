@@ -101,14 +101,14 @@ export function GroupFormModal({
           void submit();
         }}
       >
-        <FormField label="Nome do grupo">
+        <FormField label="Nome do grupo" required>
           <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="Ex.: Manhã" aria-label="Nome do grupo" />
         </FormField>
         <div className="flex gap-3">
-          <FormField label="Início">
+          <FormField label="Início" required>
             <TimeSelect value={start} onChange={setStart} aria-label="Início" />
           </FormField>
-          <FormField label="Fim">
+          <FormField label="Fim" required>
             <TimeSelect value={end} onChange={setEnd} aria-label="Fim" />
           </FormField>
         </div>

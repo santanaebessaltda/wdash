@@ -3,7 +3,7 @@ import { useMediaQuery } from "@/lib/useMediaQuery";
 
 /** Mesmo desenho do gatilho do DateRangePicker (md)  -  filtros do cabecalho das telas. */
 const TRIGGER_CLASS =
-  "flex h-10 min-w-0 items-center gap-2.5 rounded-[var(--radius-vela-sm)] border border-line bg-bg-3 px-3.5 text-left transition-colors hover:border-acc";
+  "flex h-10 min-w-0 items-center gap-2.5 rounded-[var(--radius-vela-sm)] border border-line bg-bg-inset px-3.5 text-left transition-colors hover:border-acc";
 
 /** Filtro de opcao unica no cabecalho: gatilho igual ao do periodo + menu com a opcao ativa marcada. */
 export function HeaderFilter<V extends string>({
@@ -58,7 +58,7 @@ export function HeaderSearch({
       placeholder={placeholder}
       aria-label="Buscar"
       style={{ width }}
-      className="h-10 min-w-0 rounded-[var(--radius-vela-sm)] border border-line bg-bg-3 px-3.5 text-[13.5px] font-semibold text-t0 outline-none transition-colors placeholder:font-medium placeholder:text-t2 hover:border-acc focus:border-acc"
+      className="h-10 min-w-0 rounded-[var(--radius-vela-sm)] border border-line bg-bg-inset px-3.5 text-[13.5px] font-semibold text-t0 outline-none transition-colors placeholder:font-medium placeholder:text-t2 hover:border-acc focus:border-acc"
     />
   );
 }

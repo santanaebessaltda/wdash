@@ -310,7 +310,7 @@ function UnassignedShortage({ blocks, showStore }: { blocks: ShortageBlock[]; sh
 type PeopleSort = "name" | "store" | "earnings" | "withdrawal" | "shortage" | "balance";
 
 const peopleSearchClass =
-  "h-8 rounded-[var(--radius-vela-sm)] border border-line bg-bg-3 px-3 text-xs font-semibold text-t0 transition-colors hover:border-acc focus:border-acc focus:outline-none";
+  "h-8 rounded-[var(--radius-vela-sm)] border border-line bg-bg-inset px-3 text-xs font-semibold text-t0 transition-colors hover:border-acc focus:border-acc focus:outline-none";
 
 function peopleValue(row: PersonRow, key: PeopleSort): number {
   if (key === "earnings") return earningsOf(row);

@@ -12,8 +12,8 @@ export function WizardSteps({ steps, current }: { steps: WizardStep[]; current: 
         const done = s.num < current;
         const active = s.num === current;
         return (
-          <div key={s.num} className="flex items-center">
-            <div className="flex min-w-[80px] flex-col items-center gap-2">
+          <div key={s.num} className="flex min-w-0 items-center">
+            <div className="flex min-w-0 flex-col items-center gap-2 sm:min-w-[80px]">
               <div
                 className={cn(
                   "flex h-10 w-10 items-center justify-center rounded-full border-2 text-[13px] font-extrabold",
@@ -30,10 +30,10 @@ export function WizardSteps({ steps, current }: { steps: WizardStep[]; current: 
                   s.num
                 )}
               </div>
-              <span className={cn("whitespace-nowrap text-[11.5px] font-semibold", active ? "text-t0" : "text-t2")}>{s.label}</span>
+              <span className={cn("max-w-[4.5rem] truncate text-center text-[11.5px] font-semibold sm:max-w-none sm:whitespace-nowrap", active ? "text-t0" : "text-t2")}>{s.label}</span>
             </div>
             {i < steps.length - 1 && (
-              <div className={cn("mb-5 h-0.5 w-10 sm:w-16", s.num < current ? "bg-acc" : "bg-line")} />
+              <div className={cn("mb-5 h-0.5 w-4 shrink-0 sm:w-16", s.num < current ? "bg-acc" : "bg-line")} />
             )}
           </div>
         );
@@ -43,7 +43,7 @@ export function WizardSteps({ steps, current }: { steps: WizardStep[]; current: 
 }
 
 /** Titulo/subtitulo  -  mesmo markup do Multi-Step Wizard. */
-export function WizardCardHeader({ title, subtitle }: { title: string; subtitle: string }) {
+export function WizardCardHeader({ title, subtitle }: { title: ReactNode; subtitle: string }) {
   return (
     <>
       <h3 className="text-lg font-bold text-t0">{title}</h3>

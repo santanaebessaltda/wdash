@@ -501,7 +501,7 @@ function RentBlock({ store }: { store: Store }) {
               ) : (
                 seasons.map((row) => (
                   <div key={row.key} className="grid grid-cols-1 gap-3 rounded-[13px] border border-line p-3 sm:grid-cols-[160px_1fr_120px_auto] sm:items-end">
-                    <FormField label="Repetição">
+                    <FormField label="Repetição" required>
                       <Select
                         value={row.kind}
                         onChange={(event) =>
@@ -513,7 +513,7 @@ function RentBlock({ store }: { store: Store }) {
                       </Select>
                     </FormField>
                     {row.kind === "year" ? (
-                      <FormField label="Mês">
+                      <FormField label="Mês" required>
                         <Select
                           value={row.month}
                           onChange={(event) => setSeasons((rows) => rows.map((item) => (item.key === row.key ? { ...item, month: event.target.value } : item)))}
@@ -526,7 +526,7 @@ function RentBlock({ store }: { store: Store }) {
                         </Select>
                       </FormField>
                     ) : (
-                      <FormField label="Mês">
+                      <FormField label="Mês" required>
                         <Input
                           type="month"
                           value={row.yearMonth}
@@ -534,7 +534,7 @@ function RentBlock({ store }: { store: Store }) {
                         />
                       </FormField>
                     )}
-                    <FormField label="Fator" hint="2 dobra o mínimo.">
+                    <FormField label="Fator" required hint="2 dobra o mínimo.">
                       <Input
                         value={row.factor}
                         inputMode="decimal"
