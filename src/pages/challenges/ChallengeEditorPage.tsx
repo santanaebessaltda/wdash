@@ -1032,7 +1032,7 @@ function LinePicker({
         <div className="flex flex-wrap gap-1.5">
           {[...options, ...missing.map((line) => ({ key: line.key, name: line.name, kinds: line.kinds }))].map((line) => (
             <button key={line.key} type="button" aria-pressed={chosen.has(line.key)} onClick={() => toggleLine(line)} className={chipClass(chosen.has(line.key))}>
-              {line.name}
+              {line.name.toLocaleUpperCase("pt-BR")}
             </button>
           ))}
         </div>
