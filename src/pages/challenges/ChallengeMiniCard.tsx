@@ -301,6 +301,20 @@ export function ChallengeProgress({
   const late = settlesAtEnd(c.metric);
   const hasFloor = goal != null && goal > 0;
   const left = upcoming ? (c.mode === "MINIMUM" ? challengeMinimumLabel(c) : challengeCriterion(c)) ?? "—" : shown != null ? metricValueLabel(c.metric, shown) : "Sem resultado";
+  const leftClass =
+    shown == null || upcoming
+      ? "text-t0"
+      : late && hasFloor
+        ? pct >= 100
+          ? "text-acc"
+          : "text-t1"
+        : shown < 0
+          ? "text-bad"
+          : late
+            ? "text-t0"
+            : c.metric === "VALUE" || c.metric === "TICKET"
+              ? "text-ok"
+              : progressTextClass(pct);
   const everyone = count > 0 && won === count;
   const reached = hideCount || c.mode !== "MINIMUM" || upcoming || count === 0 ? null : challengeWonLabel(won, count);
   const prazo = showDeadline && !upcoming && !ended ? view.prazo : null;
@@ -308,15 +322,19 @@ export function ChallengeProgress({
   return (
     <>
       <div className="flex items-baseline justify-between gap-2">
-        <span className={cn("min-w-0 truncate font-mono text-[13px] font-extrabold", shown != null && !upcoming ? (late ? (c.metric === "TICKET" ? (shown < 0 ? "text-bad" : "text-ok") : "text-t0") : c.metric === "VALUE" || c.metric === "TICKET" ? (shown < 0 ? "text-bad" : "text-ok") : progressTextClass(pct)) : "text-t0")}>{left}</span>
+        <span className={cn("min-w-0 truncate font-mono text-[13px] font-extrabold", leftClass)}>{left}</span>
         <span className="shrink-0 text-right text-[11.5px] text-t2">
           {upcoming ? (
             view.prazo
           ) : shown != null && goal != null ? (
+            late ? (
+              goalIsRole ? roleGoalLabel : `de ${metricValueLabel(c.metric, goal)}`
+            ) : (
             <>
-              <span className={`font-mono font-bold ${late ? (hasFloor && pct >= 100 ? "text-acc" : "text-t2") : progressTextClass(pct)}`}>{num(pct, 1)}%</span>
+              <span className={`font-mono font-bold ${progressTextClass(pct)}`}>{num(pct, 1)}%</span>
               {goalIsRole ? ` ${roleGoalLabel}` : ` de ${metricValueLabel(c.metric, goal)}`}
             </>
+            )
           ) : c.mode === "CONTEST" ? (
             leader?.name ?? "Ainda não há líder"
           ) : (
@@ -447,7 +465,9 @@ function ChallengePeople({
         view.participants.map((person) => {
           const pct = challengeProgress(person.result, c.target, leader);
           const late = settlesAtEnd(c.metric);
-          const above = c.target != null && c.target > 0 && person.result != null && person.result >= c.target;
+          const floorTarget = c.target != null && c.target > 0 ? c.target : null;
+          const above = floorTarget != null && person.result != null && person.result >= floorTarget;
+          const resultClass = person.result == null ? "text-t2" : late && floorTarget != null ? (above ? "text-acc" : "text-t1") : person.result < 0 ? "text-bad" : late ? "text-t0" : "text-t1";
           return (
             <li key={person.key} className={cn("min-w-0", hotKey === person.key && "rounded-lg bg-acc-soft px-1.5 py-1")}>
               <span className="flex items-start gap-2">
@@ -455,10 +475,10 @@ function ChallengePeople({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[13px] font-semibold text-t0">{person.name}</span>
                   <span className="mt-0.5 flex items-baseline justify-between gap-2">
-                    <span className="font-mono text-[12px] font-bold tabular-nums text-t1">
+                    <span className={`font-mono text-[12px] font-bold tabular-nums ${resultClass}`}>
                       {person.result == null ? "—" : metricValueLabel(c.metric, person.result)}
                     </span>
-                    <ChallengePersonStatus person={person} disputa={disputa} ended={view.status === "ended"} pct={pct} announcePrize={announcePrize} late={late} above={above} />
+                    <ChallengePersonStatus person={person} disputa={disputa} ended={view.status === "ended"} pct={pct} announcePrize={announcePrize} late={late} />
                   </span>
                   {late ? null : (
                     <span className="mt-1.5 block">
@@ -521,7 +541,6 @@ function ChallengePersonStatus({
   pct,
   announcePrize,
   late = false,
-  above = false,
 }: {
   person: ChallengeParticipant;
   disputa: boolean;
@@ -529,7 +548,6 @@ function ChallengePersonStatus({
   pct: number;
   announcePrize: boolean;
   late?: boolean;
-  above?: boolean;
 }) {
   if (person.result == null) return <span className="shrink-0 text-[11px] font-semibold text-t3">Sem resultado</span>;
   const won = announcePrize && person.winner && (!disputa || ended) ? "Ganhou" : null;
@@ -537,7 +555,8 @@ function ChallengePersonStatus({
   if (disputa && person.position != null) return <ProgressStanding ok={person.winner}>{`${person.position}º lugar`}</ProgressStanding>;
   if (person.winner) return <ProgressStanding ok>Ganhou</ProgressStanding>;
   if (!disputa && ended) return <ProgressStanding ok={false}>Não ganhou</ProgressStanding>;
-  return <span className={`shrink-0 font-mono text-[12px] font-bold tabular-nums ${late ? (above ? "text-acc" : "text-t2") : progressTextClass(pct)}`}>{num(pct, 0)}%</span>;
+  if (late) return null;
+  return <span className={`shrink-0 font-mono text-[12px] font-bold tabular-nums ${progressTextClass(pct)}`}>{num(pct, 0)}%</span>;
 }
 
 /** Barra até a meta. Na disputa sem meta, a barra vai até quem está na frente. */

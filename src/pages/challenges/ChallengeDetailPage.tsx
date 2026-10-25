@@ -339,12 +339,15 @@ function RoleResultBar({
   resultLabel?: string;
   storeIndex?: boolean;
 }) {
+  const late = metric === "PA" || metric === "TICKET" || metric === "INDEX";
+  const above = result.result != null && result.target > 0 && result.result >= result.target;
+  const resultClass = result.result == null ? "text-t0" : late ? (above ? "text-acc" : "text-t1") : "text-acc";
   return (
     <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-1.5 rounded-xl bg-bg-inset px-3.5 py-3 text-[12.5px]">
       <p className="font-bold text-t0">{title}</p>
       <p className="flex items-center gap-1.5 text-t1">
         <span className="text-t2">{resultLabel ?? MANAGEMENT_RESULT[metric]}: </span>
-        <span className={`font-mono font-bold ${result.result == null ? "text-t0" : "text-acc"}`}>
+        <span className={`font-mono font-bold ${resultClass}`}>
           {result.result != null ? metricValueLabel(metric, result.result) : "—"}
         </span>
         {result.periodPrevious && (
@@ -374,6 +377,8 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
   const disputa = c.mode === "CONTEST";
   const aComecar = view.status === "upcoming";
   const usesSales = usesMinSales(c.metric);
+  const late = c.metric === "PA" || c.metric === "TICKET" || c.metric === "INDEX";
+  const floor = c.target != null && c.target > 0 ? c.target : null;
   const n = view.participants.length;
 
   return (
@@ -459,7 +464,7 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
                       sub={[p.group, p.eligibleDays < p.periodDays ? `${p.eligibleDays} de ${p.periodDays} dias` : null].filter(Boolean).join(" · ") || null}
                     />
                   </td>
-                  <td className={`py-2.5 pr-3 text-right font-mono font-bold ${aComecar || p.result == null ? "text-t0" : "text-acc"}`}>
+                  <td className={`py-2.5 pr-3 text-right font-mono font-bold ${aComecar || p.result == null ? "text-t0" : late && floor != null ? (p.result >= floor ? "text-acc" : "text-t1") : "text-acc"}`}>
                     {aComecar ? "—" : p.result != null ? metricValueLabel(c.metric, p.result) : <WithoutItems index={isIndexMetric(c.metric)} />}
                   </td>
                   {usesSales && <td className="py-2.5 pr-3 text-right font-mono font-bold text-t1">{aComecar ? "—" : num(p.sales)}</td>}

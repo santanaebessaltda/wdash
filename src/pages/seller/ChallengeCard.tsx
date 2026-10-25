@@ -4,7 +4,7 @@ import { BranchBadge, DeadlineBadge, PeriodBadge, PrizeBadge, RecordStatusBadge 
 import { prazoRemaining } from "@/data/wedash/engine/goalView";
 import type { SellerChallenge } from "@/data/wedash/engine/sellerHome";
 import { cn } from "@/lib/cn";
-import { isoToDate, num } from "@/lib/format";
+import { isoToDate } from "@/lib/format";
 import { HeadlineText, type ChallengeHeadline } from "@/pages/challenges/shared";
 import { FlameIcon } from "@/pages/dashboards/icons";
 
@@ -45,6 +45,18 @@ function SellerChallengeCard({
   const ended = status === "ended";
   const clock = closed ? through : today;
   const prazo = status === "active" ? prazoRemaining(daysLeft(clock, c.endsOn)) : null;
+  const late = c.metricLabel === "P.A." || c.metricLabel === "Ticket médio" || c.metricLabel === "Índice de desempenho";
+  const valueClass = late
+    ? c.progressPct == null
+      ? "text-t0"
+      : c.progressPct >= 100
+        ? "text-acc"
+        : "text-t1"
+    : c.progressPct == null
+      ? "text-t0"
+      : c.result?.includes("R$")
+        ? "text-ok"
+        : progressTextClass(c.progressPct);
   const standing =
     status === "upcoming" || c.unavailable
       ? null
@@ -78,13 +90,11 @@ function SellerChallengeCard({
         </div>
         <div className="mt-2 flex items-baseline justify-between gap-3">
           <p className="min-w-0 text-[13px] text-t1">
-            <HeadlineText headline={sellerHeadline(c, status)} valueClass={c.progressPct == null ? "text-t0" : c.result?.includes("R$") ? "text-ok" : progressTextClass(c.progressPct)} />
+            <HeadlineText headline={sellerHeadline(c, status)} valueClass={valueClass} />
           </p>
           {standing}
         </div>
-        {status !== "upcoming" && c.progressPct != null && (c.metricLabel === "P.A." || c.metricLabel === "Ticket médio" || c.metricLabel === "Índice de desempenho") ? (
-          <p className={`mt-2 font-mono text-[13px] font-extrabold tabular-nums ${c.progressPct >= 100 ? "text-acc" : "text-t2"}`}>{num(c.progressPct, 1)}%</p>
-        ) : status !== "upcoming" && c.progressPct != null ? (
+        {!late && status !== "upcoming" && c.progressPct != null ? (
           <div className="mt-2.5">
             <ProgressBar value={c.progressPct} height={6} />
           </div>

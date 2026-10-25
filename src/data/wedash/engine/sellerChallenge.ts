@@ -440,6 +440,12 @@ export function challengeStanding(
       }
     }
   }
+  // P.A., ticket e índice não têm barra. O percentual mede só o mínimo, para a cor do número.
+  if (settlesAtEnd(metric)) {
+    if (minSales > 0 && mine.sales < minSales) progressPct = bar(mine.sales, minSales);
+    else if (personalTarget != null && personalTarget > 0) progressPct = bar(result, personalTarget);
+    else progressPct = null;
+  }
 
   return {
     metricLabel: SELLER_CHALLENGE_METRIC_LABEL[metric],
