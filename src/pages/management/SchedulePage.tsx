@@ -2,9 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Alert, Badge, Button, Card, EmptyState, FormField, Modal, Select, useToast } from "@/components/ui";
 import { MonthCalendar } from "@/components/wedash/MonthCalendar";
 import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
-import { PersonAvatar } from "@/components/wedash/PersonAvatar";
-import { PlainKpi } from "@/pages/cash-close/CashClosePage";
-import { cn } from "@/lib/cn";
+import { PersonAvatar, PersonAvatarGroup } from "@/components/wedash/PersonAvatar";
+import { DayChip, PlainKpi } from "@/pages/cash-close/CashClosePage";
 import { MonthStep, monthNavBtn } from "@/pages/cash-close/MonthYearPicker";
 import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
@@ -81,50 +80,29 @@ function DayFaces({
   doublePay: boolean;
 }) {
   if (rows.length === 0) return null;
+  const faces = [...rows]
+    .sort((a, b) => CHIP_ORDER.indexOf(a.status) - CHIP_ORDER.indexOf(b.status) || (byPerson.get(a.sellerId)?.name ?? "").localeCompare(byPerson.get(b.sellerId)?.name ?? "", "pt-BR"))
+    .map((row) => {
+      const person = byPerson.get(row.sellerId);
+      return { name: person?.name ?? "Pessoa", employeeId: person?.code, storeId };
+    });
+  const counts = new Map<DayStatus, number>();
+  for (const row of rows) counts.set(row.status, (counts.get(row.status) ?? 0) + 1);
   return (
     <>
+      <div className="mt-1.5 flex items-center justify-between gap-1">
+        <PersonAvatarGroup people={faces} max={3} />
+        <span className="shrink-0 text-[12px] font-bold text-t0" title={`${rows.length} ${rows.length === 1 ? "pessoa" : "pessoas"}`}>
+          {rows.length}
+        </span>
+      </div>
       {CHIP_ORDER.map((status) => {
-        const people = rows
-          .filter((row) => row.status === status)
-          .sort((a, b) => (byPerson.get(a.sellerId)?.name ?? "").localeCompare(byPerson.get(b.sellerId)?.name ?? "", "pt-BR"));
-        if (people.length === 0) return null;
+        const count = counts.get(status) ?? 0;
+        if (count === 0) return null;
         const holiday = status === "holiday_work" && doublePay;
         const label = holiday ? "Feriado 2×" : STATUS_LABEL[status];
         const color = holiday ? "bg-acc" : status === "work" ? "bg-ok" : status === "holiday_work" ? "bg-warn" : status === "comp_off" ? "bg-info" : "bg-chip-gray";
-        const shown = people.slice(0, 3);
-        const rest = people.length - shown.length;
-        const names = people.map((row) => byPerson.get(row.sellerId)?.name ?? "Pessoa").join(", ");
-        return (
-          <div
-            key={status}
-            title={`${label}: ${names}`}
-            className={cn("mt-1 flex w-full min-w-0 items-center gap-1 rounded-md px-1 py-1 text-white", color)}
-          >
-            <span className="flex shrink-0 items-center">
-              {shown.map((row, index) => {
-                const person = byPerson.get(row.sellerId);
-                const name = person?.name ?? "Pessoa";
-                return (
-                  <PersonAvatar
-                    key={row.sellerId}
-                    name={name}
-                    employeeId={person?.code}
-                    storeId={storeId}
-                    size="xs"
-                    ring
-                    className={index > 0 ? "-ml-1.5" : ""}
-                  />
-                );
-              })}
-              {rest > 0 ? (
-                <span className="-ml-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-white/25 text-[10px] font-bold text-white ring-2 ring-bg-2">
-                  +{rest}
-                </span>
-              ) : null}
-            </span>
-            <span className="min-w-0 truncate text-[10px] font-semibold sm:text-[11px]">{`${label} ${people.length}`}</span>
-          </div>
-        );
+        return <DayChip key={status} color={color}>{`${label} ${count}`}</DayChip>;
       })}
     </>
   );
