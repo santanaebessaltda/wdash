@@ -299,7 +299,7 @@ export function SchedulePage() {
               </button>
             </div>
             <Button disabled={!store || people.length === 0 || loading} onClick={() => setWizard(true)}>
-              Gerar escala
+              Nova escala
             </Button>
             <Button variant="outline" disabled={!store || !schedule} onClick={() => setConfirmDelete(true)}>
               Apagar escala

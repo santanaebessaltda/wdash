@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Badge, Button, Modal, WizardCardHeader, WizardNav } from "@/components/ui";
+import { Badge, Button, DatePicker, FormField, Modal, WizardCardHeader, WizardNav } from "@/components/ui";
 import { cn } from "@/lib/cn";
+import { dateToIso, isoToDate } from "@/lib/format";
 import { defaultDayNeeds, patternFits, weekdayLabel, type CompWindow, type DayNeed, type GroupNeed, type HolidayRule, type OffMode, type SchedulePattern, type ScheduleScenario, type Sex, type SundayRule } from "@/data/wedash/scheduleGenerate";
 
 const STEPS = [
@@ -143,6 +144,7 @@ export function ScheduleWizard({
   function setPeriod(patch: { periodStart?: string; periodEnd?: string }) {
     setValue((current) => {
       const next = { ...current, ...patch };
+      if (!next.periodStart || !next.periodEnd || next.periodEnd < next.periodStart) return next;
       return { ...next, holidayRules: rulesFor(next.periodStart, next.periodEnd, current.holidayRules, dismissed) };
     });
   }
@@ -182,7 +184,7 @@ export function ScheduleWizard({
     <Modal
       open={open}
       onClose={saving ? () => {} : onClose}
-      title="Gerar escala"
+      title="Nova escala"
       size="lg"
       bodyClassName="overflow-x-hidden overflow-y-auto p-5"
       footer={
@@ -190,7 +192,7 @@ export function ScheduleWizard({
           hidePrevious={step === 1}
           previousDisabled={saving}
           nextDisabled={saving || (step === 1 && !periodOk) || (step === 2 && value.selectedIds.length === 0)}
-          nextLabel={step === 4 ? (saving ? "Gerando…" : "Gerar escala") : "Continuar"}
+          nextLabel={step === 4 ? (saving ? "Criando…" : "Nova escala") : "Continuar"}
           hideNextIcon={step === 4}
           onPrevious={() => setStep((current) => current - 1)}
           onNext={() => (step === 4 ? onSubmit(value) : setStep((current) => current + 1))}
@@ -221,19 +223,29 @@ export function ScheduleWizard({
             </select>
           </label>
           <p className="mt-2 text-[12px] text-t2">{selectedType?.detail}. Os dias fechados e as folgas de domingo também entram na conta.</p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <label className="min-w-0 text-[13px] font-semibold text-t0">
-              Data de início
-              <input type="date" value={value.periodStart} max={value.periodEnd} onChange={(event) => setPeriod({ periodStart: event.target.value })} className={`mt-1 ${fieldClass}`} />
-            </label>
-            <label className="min-w-0 text-[13px] font-semibold text-t0">
-              Data de fim
-              <input type="date" value={value.periodEnd} min={value.periodStart} onChange={(event) => setPeriod({ periodEnd: event.target.value })} className={`mt-1 ${fieldClass}`} />
-            </label>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <FormField label="Data de início" required error={value.periodStart ? undefined : "Informe a data de início."}>
+              <DatePicker
+                value={value.periodStart ? isoToDate(value.periodStart) : null}
+                onChange={(day) => {
+                  const next = dateToIso(day);
+                  setPeriod(value.periodEnd && value.periodEnd < next ? { periodStart: next, periodEnd: "" } : { periodStart: next });
+                }}
+                invalid={!value.periodStart}
+                aria-label="Data de início"
+              />
+            </FormField>
+            <FormField label="Data de fim" required error={periodOk ? undefined : "A data de fim precisa ser depois da data de início, em até 93 dias."}>
+              <DatePicker
+                value={value.periodEnd ? isoToDate(value.periodEnd) : null}
+                onChange={(day) => setPeriod({ periodEnd: dateToIso(day) })}
+                minDate={value.periodStart ? isoToDate(value.periodStart) : null}
+                invalid={!periodOk}
+                aria-label="Data de fim"
+              />
+            </FormField>
           </div>
-          <p className="mt-2 text-[12px] text-t2">
-            {periodOk ? `A escala começa em ${value.periodStart.split("-").reverse().join("/")} e segue até ${value.periodEnd.split("-").reverse().join("/")}. O ciclo conta a partir do primeiro dia.` : "Escolha um fim igual ou depois do início, em até 93 dias."}
-          </p>
+          {periodOk ? <p className="mt-2 text-[12px] text-t2">A escala começa em {value.periodStart.split("-").reverse().join("/")} e segue até {value.periodEnd.split("-").reverse().join("/")}. O ciclo conta a partir do primeiro dia.</p> : null}
         </>
       ) : null}
       {step === 2 ? (
