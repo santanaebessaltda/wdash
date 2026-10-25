@@ -1,6 +1,7 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Badge, Button, Card, DateRangePicker, Modal, Skeleton, Tooltip, useToast, CALENDAR_QUICK_RANGES, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
 import { statusBadgeVariant } from "@/lib/status";
+import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
 import { FinanceMonthSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { DayFace, DayMetrics, MonthCalendar, blankDayClass } from "@/components/wedash/MonthCalendar";
 import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
@@ -628,6 +629,7 @@ export function CashClosePage() {
         ) : analysis ? (
           <>
             <MonthSummary summary={analysis.summary} many={manyStores} diffDays={analysis.diffDays} closedRealCents={analysis.closedRealCents} />
+            <ColorLegend className="mb-3" items={manyStores ? CLOSE_LEGEND_MANY : CLOSE_LEGEND_ONE} />
             <Month today={today} cells={cells} dayFace={dayFace} onOpen={openDay} many={manyStores} />
           </>
         ) : (
@@ -879,6 +881,23 @@ export function DayChip({ color, children }: { color: string; children: string }
     </div>
   );
 }
+
+const CLOSE_LEGEND_ONE: LegendItem[] = [
+  { key: "surplus", color: "bg-ok", label: "Sobra", hint: "total real acima do Millennium" },
+  { key: "shortage", color: "bg-bad", label: "Quebra", hint: "total real abaixo do Millennium" },
+  { key: "even", color: "bg-chip-gray", label: "Sem diferença", hint: "os dois totais iguais" },
+  { key: "pending", color: "bg-warn", label: "Pendente", hint: "ainda sem total real" },
+  { key: "today", color: "bg-acc", label: "Em aberto", hint: "o dia de hoje" },
+  { key: "withdrawal", color: "bg-info", label: "Retirada", hint: "valor retirado no dia" },
+];
+
+const CLOSE_LEGEND_MANY: LegendItem[] = [
+  { key: "closed", color: "bg-ok", label: "Fechada ou sobra", hint: "filial fechada, ou total real acima" },
+  { key: "shortage", color: "bg-bad", label: "Quebra", hint: "total real abaixo do Millennium" },
+  { key: "pending", color: "bg-warn", label: "Pendente", hint: "ainda sem total real" },
+  { key: "today", color: "bg-acc", label: "Em aberto", hint: "o dia de hoje" },
+  { key: "withdrawal", color: "bg-info", label: "Retirada", hint: "valor retirado no dia" },
+];
 
 function differenceChip(cents: number): { color: string; text: string } {
   if (cents > 0) return { color: "bg-ok", text: `Sobra ${brlCent(cents / 100)}` };

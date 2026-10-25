@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Alert, Badge, Button, Card, CardTitle, Checkbox, Dropdown, FormField, Modal, Select, ThSort, useToast, type DropdownItem, type SortDir } from "@/components/ui";
+import { ColorLegend } from "@/components/wedash/ColorLegend";
 import { StockProductsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { ProductNameCell } from "@/components/wedash/ProductNameCell";
 import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
@@ -134,23 +135,17 @@ const TONE_BORDER: Record<Exclude<PurchaseOrderTone, null>, string> = {
   warn: "border-l-warn",
 };
 
-const TONE_LEGEND: Array<{ tone: Exclude<PurchaseOrderTone, null>; label: string; hint: string }> = [
-  { tone: "bad", label: "Sem estoque", hint: "total zero ou negativo" },
-  { tone: "warn", label: "Abaixo do alvo", hint: "ainda há saldo" },
-];
-
 /** A barra da linha: vermelho = total zero ou negativo; amarelo = ainda há saldo, abaixo do alvo. */
 function ToneLegend() {
   return (
-    <ul className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-      {TONE_LEGEND.map((item) => (
-        <li key={item.tone} className="inline-flex items-center gap-1.5 text-[12px] text-t1">
-          <span className={cn("h-3.5 w-1 rounded-full", item.tone === "bad" ? "bg-bad" : "bg-warn")} aria-hidden />
-          <span className="font-semibold">{item.label}</span>
-          <span className="text-t2">{item.hint}</span>
-        </li>
-      ))}
-    </ul>
+    <ColorLegend
+      className="mt-2.5"
+      mark="bar"
+      items={[
+        { key: "bad", color: "bg-bad", label: "Sem estoque", hint: "total zero ou negativo" },
+        { key: "warn", color: "bg-warn", label: "Abaixo do alvo", hint: "ainda há saldo" },
+      ]}
+    />
   );
 }
 

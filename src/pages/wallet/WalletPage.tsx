@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Alert, Badge, Button, Card, CardTitle, DateRangePicker, Modal, PageHeader, Pagination, Skeleton, StatCard, ThSort, Tooltip, CALENDAR_QUICK_RANGES, type DatePresetId, type DateRangeChangeMeta, type SortDir } from "@/components/ui";
+import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
 import { ExportDialog } from "@/components/wedash/ExportDialog";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { WedashBrand } from "@/components/wedash/WedashBrand";
@@ -20,13 +21,24 @@ import { usePagedRows } from "@/lib/usePagedRows";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { CheckCircleIcon, FlameIcon, TargetIcon, TrophyIcon } from "@/pages/dashboards/icons";
-import { CostCardTitle, SectionHeader, useScopedStores } from "@/pages/operation/shared";
+import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { fetchStoreSellers, type Store } from "@/data/wedash/stores";
 import { matchesCodeOrName } from "@/lib/personSearch";
 import { buildXlsx, type XlsxCell } from "@/lib/xlsx";
 import { HeaderFilters } from "@/pages/stock/shared";
 
 const money = (cents: number) => brlCent(cents / 100);
+
+const MONEY_LEGEND: LegendItem[] = [
+  { key: "in", color: "bg-ok", label: "Entra", hint: "premiação, bônus, desafio ou saldo a receber" },
+  { key: "out", color: "bg-bad", label: "Sai", hint: "retirada, quebra ou saldo que passou da premiação" },
+];
+
+const OPPORTUNITY_LEGEND: LegendItem[] = [
+  { key: "done", color: "bg-ok", label: "Alcançado", hint: "já entrou na carteira" },
+  { key: "open", color: "bg-warn", label: "Em andamento", hint: "ainda dá para conquistar" },
+  { key: "missed", color: "bg-bad", label: "Não alcançado", hint: "não entrou na carteira" },
+];
 
 /** Positivo ainda tem valor a receber. Negativo já passou da premiação. Zero fica na cor do texto. */
 function balanceClass(cents: number): string {
@@ -167,6 +179,7 @@ function Statement({
   const untilNow = balanceStillOpen(person);
   return (
     <div>
+      <ColorLegend className="mb-1" mark="dot" items={MONEY_LEGEND} />
       <ul>
         {lines.map((line, index) => {
           const note = lineNote(line);
@@ -372,8 +385,9 @@ function PeopleList({
 
   return (
     <Card className="print-flow min-w-0 overflow-hidden print:overflow-visible" padding="none">
-      <div className="px-5 pt-5">
-        <CostCardTitle title="Pessoas" />
+      <div className="mb-4 px-5 pt-5">
+        <CardTitle>Pessoas</CardTitle>
+        {rows.length > 0 ? <ColorLegend className="mt-2.5" mark="dot" items={MONEY_LEGEND} /> : null}
       </div>
       {rows.length > 0 ? (
         <div className="flex flex-wrap items-center justify-end gap-3 px-5 pb-4 print:hidden">
@@ -666,6 +680,7 @@ function SellerWallet({ wallet, opportunities }: { wallet: WalletMonth; opportun
       </div>
       <Card>
         <CardTitle>Suas oportunidades</CardTitle>
+        {opportunities.length > 0 ? <ColorLegend className="mt-2.5" mark="dot" items={OPPORTUNITY_LEGEND} /> : null}
         <div className="mt-3">
           {opportunities.length === 0 ? (
             <EmptyBlock icon="🎯" title="Nada neste período" description="Não há meta nem desafio terminando neste período." />

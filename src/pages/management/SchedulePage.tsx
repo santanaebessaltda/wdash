@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Badge, Button, Card, EmptyState, Modal, useToast } from "@/components/ui";
+import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
 import { MonthCalendar } from "@/components/wedash/MonthCalendar";
 import { PlainKpi } from "@/pages/cash-close/CashClosePage";
 import { MonthStep, monthNavBtn } from "@/pages/cash-close/MonthYearPicker";
@@ -24,6 +25,12 @@ const STATUS_LABEL: Record<DayStatus, string> = {
   comp_off: "Folga compensatória",
 };
 const CYCLE: DayStatus[] = ["work", "off", "holiday_work", "comp_off"];
+
+const SCHEDULE_LEGEND: LegendItem[] = [
+  { key: "work", color: "bg-ok", label: "Trabalha", hint: "dia de trabalho" },
+  { key: "holiday", color: "bg-warn", label: "Feriado trabalhado", hint: "2× quando o pagamento é em dobro" },
+  { key: "off", color: "bg-t2", label: "Folga", hint: "folga ou folga compensatória" },
+];
 
 function monthLabel(iso: string): string {
   const date = isoToDate(startOfMonth(iso));
@@ -344,6 +351,7 @@ export function SchedulePage() {
               <PlainKpi label="Feriados" value={String(holidayCount)} color="var(--warn)" />
               <PlainKpi label="Dias manuais" value={String(new Set(days.filter((row) => row.origin === "manual").map((row) => row.day)).size)} color="var(--t0)" />
             </div>
+            {schedule ? <ColorLegend className="mb-3" mark="dot" items={SCHEDULE_LEGEND} /> : null}
             <MonthCalendar>
               {cells.map((day, index) => {
                 const rows = day ? (dayRows.get(day) ?? []) : [];

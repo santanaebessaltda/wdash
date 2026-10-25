@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Alert, Button, Card, DateRangePicker, Dropdown, FormField, Input, Modal, Segmented, useToast, CALENDAR_QUICK_RANGES, Badge, type DatePresetId, type DateRangeChangeMeta, type DropdownItem } from "@/components/ui";
+import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
 import { FinanceMonthSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { DayFace, MonthCalendar, blankDayClass } from "@/components/wedash/MonthCalendar";
 import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
@@ -480,6 +481,7 @@ export function CashDropPage() {
         ) : (
           <>
             <MonthSummary aCobrar={open} recebido={depositado} excluded={monthCards.excluded} gap={monthCards.gap} />
+            <ColorLegend className="mb-3" items={DROP_LEGEND} />
             <MonthCalendar>
               {cells.map((day, i) => {
                 const across = day && manyStores && day <= today ? dayAcrossStores(day, today, storeRows, lines, deposits, shortages) : null;
@@ -604,6 +606,14 @@ export function CashDropPage() {
     </div>
   );
 }
+
+const DROP_LEGEND: LegendItem[] = [
+  { key: "today", color: "bg-acc", label: "Em aberto", hint: "o dia de hoje" },
+  { key: "due", color: "bg-warn", label: "A receber", hint: "ainda entra no boleto" },
+  { key: "paid", color: "bg-ok", label: "Recebido", hint: "já entrou no boleto" },
+  { key: "out", color: "bg-info", label: "Fora", hint: "não entra no boleto" },
+  { key: "gap", color: "bg-bad", label: "Falta", hint: "valor que não foi encontrado" },
+];
 
 function dayChips(total: CashDropAmounts, recebido: boolean, open: boolean): Array<{ color: string; text: string }> {
   if (total.totalCents <= 0 && total.gapCents <= 0) return [];
