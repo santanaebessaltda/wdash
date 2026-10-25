@@ -4,6 +4,7 @@ import { MonthCalendar } from "@/components/wedash/MonthCalendar";
 import { PlainKpi } from "@/pages/cash-close/CashClosePage";
 import { MonthStep, monthNavBtn } from "@/pages/cash-close/MonthYearPicker";
 import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
+import { Icon, icons } from "@/pages/users/Icons";
 import { isOwner } from "@/layout/nav-wedash";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { addDays, addMonths, endOfMonth, isoToDate, startOfMonth } from "@/data/wedash/engine/format";
@@ -319,7 +320,7 @@ export function SchedulePage() {
                 <MonthStep dir="proximo" />
               </button>
             </div>
-            <Button disabled={!store || people.length === 0 || loading} onClick={() => setWizard(true)}>
+            <Button icon={<Icon d={icons.plus} size={14} />} disabled={!store || people.length === 0 || loading} onClick={() => setWizard(true)}>
               Nova escala
             </Button>
             <Button variant="outline" disabled={!store || !schedule} onClick={() => setConfirmDelete(true)}>

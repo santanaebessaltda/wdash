@@ -125,7 +125,7 @@ export function DatePicker({
           <div
             ref={panelRef}
             style={{ top: panelPos.top, left: panelPos.left, width: PANEL_WIDTH, maxHeight: panelPos.maxHeight }}
-            className="fixed z-[80] overflow-y-auto rounded-[var(--radius-vela-lg)] border border-line bg-bg-2 p-6 shadow-[var(--shadow-vela)]"
+            className="fixed z-[105] overflow-y-auto rounded-[var(--radius-vela-lg)] border border-line bg-bg-2 p-6 shadow-[var(--shadow-vela)]"
           >
             <div className="mb-3.5 flex items-center justify-between">
               <button
