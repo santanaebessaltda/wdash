@@ -27,6 +27,8 @@ import {
   type ChallengeFormErrors,
   type PrizeForm,
 } from "@/data/wedash/challengeForm";
+import { metricValueLabel } from "@/data/wedash/challengeView";
+import { challengeChangeNotice, enqueuePlanNotice, publishNotice } from "@/data/wedash/planNotice";
 import {
   fetchChallenge,
   fetchChallengeCatalog,
@@ -35,6 +37,7 @@ import {
   saveChallenge,
   usesScope,
   type ChallengeCatalog,
+  type ChallengeRecord,
   type ChallengeMetric,
   type ChallengeMode,
   type ChallengeScope,
@@ -128,6 +131,7 @@ export default function ChallengeEditorPage() {
   const [copiedFrom, setCopiedFrom] = useState<string | null>(null);
   const [copiedForStore, setCopiedForStore] = useState(false);
   const [sourceStoreId, setSourceStoreId] = useState<string | null>(null);
+  const savedChallenge = useRef<ChallengeRecord | null>(null);
   const targetStores = useMemo(
     () => (copyForStore && sourceStoreId ? storeRows.filter((l) => l.id !== sourceStoreId) : storeRows),
     [copyForStore, sourceStoreId, storeRows],
@@ -165,7 +169,10 @@ export default function ChallengeEditorPage() {
           setCopiedFrom(c.name);
           setCopiedForStore(false);
         }
-      } else setForm(challengeToForm(c));
+      } else {
+        savedChallenge.current = c;
+        setForm(challengeToForm(c));
+      }
       setLoadingSource(false);
     });
     return () => {
@@ -190,20 +197,42 @@ export default function ChallengeEditorPage() {
   const [tried, setTried] = useState(false);
   const [saving, setSaving] = useState(false);
   const errors: ChallengeFormErrors = tried ? validateChallengeForm(form) : {};
-  const submit = async () => {
+  const submit = async (publish: boolean) => {
     setTried(true);
     if (Object.keys(validateChallengeForm(form)).length > 0) {
       toast.show("Revise os campos destacados.", "danger");
       return;
     }
+    const wasPublished = Boolean(id && savedChallenge.current?.published !== false);
+    const input = challengeFormToInput(form);
     setSaving(true);
-    const res = await saveChallenge(session.tenantId, id ?? null, challengeFormToInput(form));
+    const res = await saveChallenge(session.tenantId, id ?? null, { ...input, ...(wasPublished ? {} : { published: publish }) });
     setSaving(false);
     if (!res.ok) {
       toast.show(SAVE_ERROR_MSG, "danger");
       return;
     }
-    toast.show(id ? "Alterações salvas." : "Desafio criado.", "success");
+    const storeName = storeRows.find((store) => store.id === input.storeId)?.tradeName ?? "Filial";
+    if (!wasPublished && publish) {
+      await enqueuePlanNotice(
+        session.tenantId,
+        input.storeId,
+        publishNotice([{ kind: "challenge", name: input.name, storeName, startsOn: input.startsOn, endsOn: input.endsOn }]),
+      );
+    } else if (wasPublished && savedChallenge.current) {
+      const label = (value: number | null) => (value == null ? null : metricValueLabel(input.metric, value));
+      await enqueuePlanNotice(
+        session.tenantId,
+        input.storeId,
+        challengeChangeNotice({
+          storeName,
+          name: input.name,
+          targetFrom: label(savedChallenge.current.target),
+          targetTo: label(input.target),
+        }),
+      );
+    }
+    toast.show(wasPublished ? "Alterações salvas." : publish ? "Desafio publicado." : "Rascunho salvo.", "success");
     navigate(paths.management.challengeDetail(res.id), { state: location.state });
   };
 
@@ -579,9 +608,20 @@ export default function ChallengeEditorPage() {
         <Button variant="outline" onClick={back}>
           Cancelar
         </Button>
-        <Button onClick={() => void submit()} disabled={saving}>
-          {saving ? "Salvando…" : id ? "Salvar alterações" : "Criar desafio"}
-        </Button>
+        {!loadingSource && id && savedChallenge.current?.published !== false ? (
+          <Button onClick={() => void submit(true)} disabled={saving}>
+            {saving ? "Salvando…" : "Salvar alterações"}
+          </Button>
+        ) : (
+          <>
+            <Button variant="outline" onClick={() => void submit(false)} disabled={saving || loadingSource}>
+              {saving ? "Salvando…" : "Salvar rascunho"}
+            </Button>
+            <Button onClick={() => void submit(true)} disabled={saving || loadingSource}>
+              {saving ? "Salvando…" : "Publicar"}
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );

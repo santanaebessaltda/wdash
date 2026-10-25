@@ -70,13 +70,16 @@ export async function notifyStoreGoals(
   const minDay = days.reduce((a, b) => (a < b ? a : b));
   const maxDay = days.reduce((a, b) => (a > b ? a : b));
 
-  const { data: goals, error: goalErr } = await sb
-    .from("goal")
-    .select("id, store_id, name, starts_on, ends_on, target_cents, tiers")
-    .eq("tenant_id", args.tenantId)
-    .in("store_id", args.stores.map((store) => store.id))
-    .lte("starts_on", maxDay)
-    .gte("ends_on", minDay);
+  const goalQuery = () =>
+    sb
+      .from("goal")
+      .select("id, store_id, name, starts_on, ends_on, target_cents, tiers")
+      .eq("tenant_id", args.tenantId)
+      .in("store_id", args.stores.map((store) => store.id))
+      .lte("starts_on", maxDay)
+      .gte("ends_on", minDay);
+  let { data: goals, error: goalErr } = await goalQuery().not("published_at", "is", null);
+  if (goalErr?.code === "42703") ({ data: goals, error: goalErr } = await goalQuery());
   if (goalErr) throw goalErr;
   const active = (goals ?? []).filter((goal) => {
     const today = todayOf.get(goal.store_id as string);

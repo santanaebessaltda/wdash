@@ -36,6 +36,8 @@ export interface GoalRecord {
   groups: GoalGroup[];
   /** Individual e Grupo: rateia a venda sem vendedor identificado. Ausente = não rateia. O modo Geral ignora. */
   spreadUnidentified?: boolean;
+  /** false = rascunho. Ausente = publicada (meta antiga). */
+  published?: boolean;
 }
 
 export interface GoalGroup {

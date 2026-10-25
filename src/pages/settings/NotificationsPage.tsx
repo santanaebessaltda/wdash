@@ -4,13 +4,13 @@ import { getSupabase } from "@/lib/supabase";
 import { CheckIcon } from "@/pages/utility/icons";
 import { useActiveSession } from "@/session/SessionProvider";
 
-type StaffKey = "sales" | "cashClose" | "storeGoal" | "stock";
-type SellerKey = "goal" | "challenge" | "wallet" | "near";
+type StaffKey = "sales" | "cashClose" | "storeGoal" | "stock" | "plan";
+type SellerKey = "goal" | "challenge" | "wallet" | "near" | "plan";
 type StaffPrefs = Record<StaffKey, boolean>;
 type SellerPrefs = Record<SellerKey, boolean>;
 
-const STAFF_DEFAULTS: StaffPrefs = { sales: true, cashClose: true, storeGoal: true, stock: true };
-const SELLER_DEFAULTS: SellerPrefs = { goal: true, challenge: true, wallet: true, near: true };
+const STAFF_DEFAULTS: StaffPrefs = { sales: true, cashClose: true, storeGoal: true, stock: true, plan: true };
+const SELLER_DEFAULTS: SellerPrefs = { goal: true, challenge: true, wallet: true, near: true, plan: true };
 
 type SalesEvery = 30 | 60;
 
@@ -24,6 +24,7 @@ const STAFF_ROWS: Array<{ key: StaffKey; name: string; desc?: string }> = [
   { key: "cashClose", name: "Fechamento", desc: "Receba um resumo do fechamento do dia, com faltas ou sobras em dinheiro e dias ainda sem total real." },
   { key: "storeGoal", name: "Meta da filial", desc: "Receba um aviso quando a filial atingir um novo nível da meta. Cada nível é avisado uma única vez." },
   { key: "stock", name: "Estoque abaixo do mínimo", desc: "Receba um aviso quando um produto ficar abaixo do mínimo definido para a filial." },
+  { key: "plan", name: "Meta e desafio", desc: "Receba um aviso quando uma meta ou um desafio for publicado, ou quando o valor ou o percentual dos níveis mudar. Quem salvou não recebe o próprio aviso." },
 ];
 
 const SELLER_ROWS: Array<{ key: SellerKey; name: string; desc: string }> = [
@@ -31,6 +32,7 @@ const SELLER_ROWS: Array<{ key: SellerKey; name: string; desc: string }> = [
   { key: "challenge", name: "Desafio", desc: "Receba um aviso quando você garantir o prêmio e quando o desafio encerrar, tenha ganho ou não." },
   { key: "wallet", name: "Carteira", desc: "Receba um aviso quando uma retirada ou uma quebra de caixa entrar na sua carteira." },
   { key: "near", name: "Perto do próximo nível", desc: "Receba um aviso quando faltar pouco para o próximo nível. No máximo uma vez por meta." },
+  { key: "plan", name: "Meta e desafio", desc: "Receba um aviso quando uma meta ou um desafio seu for publicado, ou quando o valor ou o percentual dos níveis mudar." },
 ];
 
 function Dot({ on }: { on: boolean }) {
@@ -92,7 +94,7 @@ function StaffNotices() {
       setUserId(uid);
       const { data, error } = await sb
         .from("notification_pref")
-        .select("sales, cash_close, store_goal, stock, sales_every_min")
+        .select("sales, cash_close, store_goal, stock, sales_every_min, plan")
         .eq("auth_user_id", uid)
         .eq("tenant_id", session.tenantId)
         .maybeSingle();
@@ -107,6 +109,7 @@ function StaffNotices() {
         cashClose: Boolean(data.cash_close),
         storeGoal: Boolean(data.store_goal),
         stock: data.stock !== false,
+        plan: data.plan !== false,
       });
       setSalesEvery(data.sales_every_min === 60 ? 60 : 30);
     })();
@@ -130,6 +133,7 @@ function StaffNotices() {
         cash_close: next.cashClose,
         store_goal: next.storeGoal,
         stock: next.stock,
+        plan: next.plan,
         sales_every_min: every,
       },
       { onConflict: "auth_user_id,tenant_id" },
@@ -198,7 +202,7 @@ function SellerNotices() {
       setUserId(uid);
       const { data, error } = await sb
         .from("notification_pref")
-        .select("seller_goal, seller_challenge, seller_wallet, seller_near")
+        .select("seller_goal, seller_challenge, seller_wallet, seller_near, seller_plan")
         .eq("auth_user_id", uid)
         .eq("tenant_id", session.tenantId)
         .maybeSingle();
@@ -213,6 +217,7 @@ function SellerNotices() {
         challenge: data.seller_challenge !== false,
         wallet: data.seller_wallet !== false,
         near: data.seller_near !== false,
+        plan: data.seller_plan !== false,
       });
     })();
     return () => {
@@ -234,6 +239,7 @@ function SellerNotices() {
         seller_challenge: next.challenge,
         seller_wallet: next.wallet,
         seller_near: next.near,
+        seller_plan: next.plan,
       },
       { onConflict: "auth_user_id,tenant_id" },
     );

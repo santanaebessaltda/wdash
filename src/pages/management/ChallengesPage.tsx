@@ -13,6 +13,7 @@ import {
   type ChallengeAggInput,
   type ChallengeRecord,
 } from "@/data/wedash/challengesRepo";
+import { enqueuePlanNotice, isDraft, publishDraftsInWindow, publishNotice } from "@/data/wedash/planNotice";
 import {
   buildChallengeView,
   CHALLENGE_STATUS_LABEL,
@@ -70,6 +71,7 @@ export function ChallengesPage() {
   const [confirm, setConfirm] = useState<ChallengeRecord | null>(null);
   const [excluindo, setExcluindo] = useState(false);
   const [duplicate, setDuplicate] = useState<ChallengeRecord | null>(null);
+  const [publishing, setPublishing] = useState(false);
   const hasOtherStores = storesForSession(session.stores).length > 1;
 
   useEffect(() => {
@@ -87,7 +89,7 @@ export function ChallengesPage() {
     (async () => {
       // Venda nova (SALES_SYNCED_EVENT) recarrega sem skeleton; so filtro novo mostra o skeleton.
       if (loadedKey.current !== filterKey) setLoading(true);
-      const challenges = await fetchChallenges({ tenantId: session.tenantId, storeIds, from: janela.from, to: janela.to });
+      const challenges = await fetchChallenges({ tenantId: session.tenantId, storeIds, from: janela.from, to: janela.to, includeDrafts: true });
       const aggs =
         challenges.length > 0
           ? await fetchChallengeInput({ tenantId: session.tenantId, challenges, today })
@@ -122,6 +124,49 @@ export function ChallengesPage() {
   }, [data, storeRows, today]);
 
   const dateRange = useMemo(() => dateRangeFromManagementPeriod(scope.period), [scope.period]);
+
+  async function publishWindow() {
+    setPublishing(true);
+    const res = await publishDraftsInWindow({
+      tenantId: session.tenantId,
+      storeIds,
+      from: janela.from,
+      to: janela.to,
+      storeName: (storeId) => storeRows.find((store) => store.id === storeId)?.tradeName ?? "Filial",
+    });
+    setPublishing(false);
+    if (!res.ok) {
+      show("Não foi possível publicar. Tente novamente.", "danger");
+      return;
+    }
+    show(res.count === 0 ? "Nenhum rascunho neste período." : "Rascunhos publicados.", "success");
+    setReload((n) => n + 1);
+  }
+
+  async function publishOne(challenge: ChallengeRecord) {
+    const storeName = storeRows.find((store) => store.id === challenge.storeId)?.tradeName ?? "Filial";
+    const { getSupabase } = await import("@/lib/supabase");
+    const sb = getSupabase();
+    if (!sb) return;
+    const now = new Date().toISOString();
+    const { data, error } = await sb.from("challenge").update({ published_at: now, updated_at: now }).eq("id", challenge.id).is("published_at", null).select("id");
+    if (error) {
+      show("Não foi possível publicar. Tente novamente.", "danger");
+      return;
+    }
+    if (!data?.length) {
+      setReload((n) => n + 1);
+      return;
+    }
+    await enqueuePlanNotice(
+      session.tenantId,
+      challenge.storeId,
+      publishNotice([{ kind: "challenge", name: challenge.name, storeName, startsOn: challenge.startsOn, endsOn: challenge.endsOn }]),
+    );
+    show("Desafio publicado.", "success");
+    setReload((n) => n + 1);
+  }
+
   const statusSections = useMemo(() => {
     const titles: Record<ChallengeStatus, string> = {
       active: "Em andamento",
@@ -168,9 +213,16 @@ export function ChallengesPage() {
               maxDate={maxPickerDate(today)}
             />
             {manage ? (
+            <>
+            {cards.some((card) => isDraft(card.challenge.published)) ? (
+              <Button variant="outline" onClick={() => void publishWindow()} disabled={publishing}>
+                {publishing ? "Publicando…" : "Publicar rascunhos"}
+              </Button>
+            ) : null}
             <Button icon={<Icon d={icons.plus} size={14} />} onClick={() => navigate(paths.management.challengeNew)}>
               Novo desafio
             </Button>
+            </>
             ) : null}
           </div>
         }
@@ -217,6 +269,7 @@ export function ChallengesPage() {
                         manage={manage}
                         onCopy={() => setDuplicate(challenge)}
                         onDelete={() => setConfirm(challenge)}
+                        onPublish={() => void publishOne(challenge)}
                       />
                     ))}
                 </div>
@@ -275,6 +328,7 @@ function ChallengeCard({
   manage,
   onCopy,
   onDelete,
+  onPublish,
 }: {
   challenge: ChallengeRecord;
   view: ChallengeView;
@@ -284,9 +338,10 @@ function ChallengeCard({
   manage: boolean;
   onCopy: () => void;
   onDelete: () => void;
+  onPublish: () => void;
 }) {
   const prize = mainPrizeLabel(c);
-  const statusLabel = CHALLENGE_STATUS_LABEL[view.status];
+  const statusLabel = isDraft(c.published) ? "Rascunho" : CHALLENGE_STATUS_LABEL[view.status];
 
   const action = (fn: () => void) => (e: MouseEvent) => {
     e.stopPropagation();
@@ -315,7 +370,7 @@ function ChallengeCard({
         <div
           className={cn(
             "flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-[14px]",
-            view.status === "active" ? "bg-acc-soft text-acc" : "bg-bg-3 text-t1",
+            !isDraft(c.published) && view.status === "active" ? "bg-acc-soft text-acc" : "bg-bg-3 text-t1",
           )}
         >
           <FlameIcon size={22} />
@@ -333,6 +388,18 @@ function ChallengeCard({
         </div>
         {manage ? (
         <div className="flex shrink-0 items-center gap-1.5 self-start">
+          {isDraft(c.published) ? (
+            <Tooltip label="Publicar desafio">
+              <button
+                type="button"
+                onClick={action(onPublish)}
+                aria-label="Publicar desafio"
+                className="inline-flex h-7 items-center rounded-lg px-2 text-[12px] font-bold text-acc hover:bg-acc-soft"
+              >
+                Publicar
+              </button>
+            </Tooltip>
+          ) : null}
           <Tooltip label="Duplicar desafio">
             <button
               type="button"

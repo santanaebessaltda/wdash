@@ -20,11 +20,13 @@ function fixtureRecords(): GoalRecord[] {
       tierMode: g.kind === "individual" ? "INDIVIDUAL" : "GROUP",
       tiers: g.tiers,
       groups: [],
+      published: true,
     }));
 }
 
-const COLS = "id, store_id, name, starts_on, ends_on, target_cents, tier_mode, tiers, groups, spread_unidentified";
-const COLS_WITHOUT_SPREAD = "id, store_id, name, starts_on, ends_on, target_cents, tier_mode, tiers, groups";
+const COLS = "id, store_id, name, starts_on, ends_on, target_cents, tier_mode, tiers, groups, spread_unidentified, published_at";
+const COLS_WITHOUT_SPREAD = "id, store_id, name, starts_on, ends_on, target_cents, tier_mode, tiers, groups, published_at";
+const COLS_LEGACY = "id, store_id, name, starts_on, ends_on, target_cents, tier_mode, tiers, groups, spread_unidentified";
 
 export type GoalInput = Omit<GoalRecord, "id">;
 
@@ -56,17 +58,27 @@ export async function saveGoal(
     })),
     groups: g.groups.map((x) => ({ shiftId: x.shiftId, name: x.name, pct: x.pct })),
   };
+  const publishedAt =
+    !id
+      ? g.published === false
+        ? null
+        : new Date().toISOString()
+      : g.published === true
+        ? new Date().toISOString()
+        : g.published === false
+          ? null
+          : undefined;
   const res = id
     ? await sb
         .from("goal")
-        .update({ ...row, updated_at: new Date().toISOString() })
+        .update({ ...row, updated_at: new Date().toISOString(), ...(publishedAt !== undefined ? { published_at: publishedAt } : {}) })
         .eq("tenant_id", tenantId)
         .eq("id", id)
         .select("id")
         .single()
     : await sb
         .from("goal")
-        .insert({ ...row, tenant_id: tenantId })
+        .insert({ ...row, tenant_id: tenantId, published_at: publishedAt ?? null })
         .select("id")
         .single();
   if (res.error) {
@@ -77,17 +89,17 @@ export async function saveGoal(
 }
 
 /** Metas das lojas com periodo que cruza [from, to]; mais recentes primeiro. */
-export async function fetchGoals(q: { tenantId: string; storeIds: string[]; from: string; to: string }): Promise<GoalRecord[]> {
+export async function fetchGoals(q: { tenantId: string; storeIds: string[]; from: string; to: string; includeDrafts?: boolean }): Promise<GoalRecord[]> {
   if (q.storeIds.length === 0) return [];
   const { getSupabase } = await import("@/lib/supabase");
   const sb = getSupabase();
   if (!sb) {
     return fixtureRecords()
-      .filter((g) => q.storeIds.includes(g.storeId) && g.startsOn <= q.to && g.endsOn >= q.from)
+      .filter((g) => q.storeIds.includes(g.storeId) && g.startsOn <= q.to && g.endsOn >= q.from && (q.includeDrafts || g.published !== false))
       .sort((a, b) => b.startsOn.localeCompare(a.startsOn));
   }
-  const run = (cols: string) =>
-    sb
+  const run = (cols: string, drafts: boolean) => {
+    let query = sb
       .from("goal")
       .select(cols)
       .eq("tenant_id", q.tenantId)
@@ -95,8 +107,12 @@ export async function fetchGoals(q: { tenantId: string; storeIds: string[]; from
       .lte("starts_on", q.to)
       .gte("ends_on", q.from)
       .order("starts_on", { ascending: false });
-  let { data, error } = await run(COLS);
-  if (error?.code === "42703") ({ data, error } = await run(COLS_WITHOUT_SPREAD));
+    if (!drafts) query = query.not("published_at", "is", null);
+    return query;
+  };
+  let { data, error } = await run(COLS, q.includeDrafts === true);
+  if (error?.code === "42703") ({ data, error } = await run(COLS_WITHOUT_SPREAD, q.includeDrafts === true));
+  if (error?.code === "42703") ({ data, error } = await run(COLS_LEGACY, true));
   if (error) {
     console.warn("fetchGoals:", error.message);
     return [];
@@ -110,6 +126,7 @@ export async function fetchGoal(tenantId: string, id: string): Promise<GoalRecor
   if (!sb) return fixtureRecords().find((g) => g.id === id) ?? null;
   let { data, error } = await sb.from("goal").select(COLS).eq("tenant_id", tenantId).eq("id", id).maybeSingle();
   if (error?.code === "42703") ({ data, error } = await sb.from("goal").select(COLS_WITHOUT_SPREAD).eq("tenant_id", tenantId).eq("id", id).maybeSingle());
+  if (error?.code === "42703") ({ data, error } = await sb.from("goal").select(COLS_LEGACY).eq("tenant_id", tenantId).eq("id", id).maybeSingle());
   if (error) {
     console.warn("fetchGoal:", error.message);
     return null;

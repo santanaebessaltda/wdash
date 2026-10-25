@@ -223,12 +223,14 @@ serve(async (req) => {
       allPages(
         admin.from("goal").select("id, store_id, name, starts_on, ends_on, target_cents, tier_mode, tiers, groups, spread_unidentified")
           .eq("tenant_id", membership.tenant_id).in("store_id", storeIds).lte("starts_on", rangeTo).gte("ends_on", rangeFrom)
+          .not("published_at", "is", null)
           .order("starts_on", { ascending: false }),
       ),
       allPages(
         admin.from("challenge").select("id, store_id, name, starts_on, ends_on, metric, scope, mode, products, categories, target, min_sales, prizes")
           .eq("tenant_id", membership.tenant_id).in("store_id", storeIds)
           .lte("starts_on", rangeTo).gte("ends_on", rangeFrom)
+          .not("published_at", "is", null)
           .order("starts_on", { ascending: false }),
       ),
     ]);

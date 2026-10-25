@@ -12,6 +12,7 @@ import { goalWeightFrom } from "@/data/wedash/engine/goalProjection";
 import { effectiveWeekHours } from "@/data/wedash/storeHours";
 import { buildGoalSummary, GOAL_STATUS_LABEL, goalSpreadsUnidentified, prazoRemaining, type GoalStatus, type GoalSummary } from "@/data/wedash/goalView";
 import { deleteGoal, fetchGoalTeam, fetchGoals, type GoalRecord, type GoalTeamMember } from "@/data/wedash/goalsRepo";
+import { isDraft, publishDraftsInWindow, publishNotice, enqueuePlanNotice } from "@/data/wedash/planNotice";
 import { fetchSalesDayAggs } from "@/data/wedash/salesRepo";
 import type { SalesDayAgg } from "@/data/wedash/salesTypes";
 import { storesForSession, type Store } from "@/data/wedash/stores";
@@ -62,6 +63,7 @@ export default function GoalsPage() {
   const [confirm, setConfirm] = useState<GoalRecord | null>(null);
   const [excluindo, setExcluindo] = useState(false);
   const [duplicate, setDuplicate] = useState<GoalRecord | null>(null);
+  const [publishing, setPublishing] = useState(false);
   const hasOtherStores = storesForSession(session.stores).length > 1;
 
   useEffect(() => {
@@ -79,7 +81,7 @@ export default function GoalsPage() {
     (async () => {
       // Venda nova (SALES_SYNCED_EVENT) recarrega sem skeleton; so filtro novo mostra o skeleton.
       if (loadedKey.current !== filterKey) setLoading(true);
-      const goals = await fetchGoals({ tenantId: session.tenantId, storeIds, from: janela.from, to: janela.to });
+      const goals = await fetchGoals({ tenantId: session.tenantId, storeIds, from: janela.from, to: janela.to, includeDrafts: true });
       let dayAggs: SalesDayAgg[] = [];
       let team: GoalTeamMember[] = [];
       if (goals.length > 0) {
@@ -125,6 +127,7 @@ export default function GoalsPage() {
       })
       .sort(
         (a, b) =>
+          (isDraft(a.summary.goal.published) ? 0 : 1) - (isDraft(b.summary.goal.published) ? 0 : 1) ||
           STATUS_ORDER[a.summary.status] - STATUS_ORDER[b.summary.status] ||
           b.summary.goal.startsOn.localeCompare(a.summary.goal.startsOn) ||
           (a.store?.tradeName ?? "").localeCompare(b.store?.tradeName ?? "", "pt-BR"),
@@ -134,6 +137,48 @@ export default function GoalsPage() {
   const dateRange = useMemo(() => dateRangeFromManagementPeriod(scope.period), [scope.period]);
   function onDateChange(r: DateRange, goal?: DateRangeChangeMeta) {
     setScope(applyPeriodDateChange(scope, r, goal));
+  }
+
+  async function publishWindow() {
+    setPublishing(true);
+    const res = await publishDraftsInWindow({
+      tenantId: session.tenantId,
+      storeIds,
+      from: janela.from,
+      to: janela.to,
+      storeName: (storeId) => storeRows.find((store) => store.id === storeId)?.tradeName ?? "Filial",
+    });
+    setPublishing(false);
+    if (!res.ok) {
+      show("Não foi possível publicar. Tente novamente.", "danger");
+      return;
+    }
+    show(res.count === 0 ? "Nenhum rascunho neste período." : "Rascunhos publicados.", "success");
+    setReload((n) => n + 1);
+  }
+
+  async function publishOne(goal: GoalRecord) {
+    const storeName = storeRows.find((store) => store.id === goal.storeId)?.tradeName ?? "Filial";
+    const { getSupabase } = await import("@/lib/supabase");
+    const sb = getSupabase();
+    if (!sb) return;
+    const now = new Date().toISOString();
+    const { data, error } = await sb.from("goal").update({ published_at: now, updated_at: now }).eq("id", goal.id).is("published_at", null).select("id");
+    if (error) {
+      show("Não foi possível publicar. Tente novamente.", "danger");
+      return;
+    }
+    if (!data?.length) {
+      setReload((n) => n + 1);
+      return;
+    }
+    await enqueuePlanNotice(
+      session.tenantId,
+      goal.storeId,
+      publishNotice([{ kind: "goal", name: goal.name, storeName, startsOn: goal.startsOn, endsOn: goal.endsOn, targetLabel: brlCent(goal.target) }]),
+    );
+    show("Meta publicada.", "success");
+    setReload((n) => n + 1);
   }
 
   async function exclude() {
@@ -166,9 +211,16 @@ export default function GoalsPage() {
               maxDate={maxPickerDate(today)}
             />
             {manage ? (
+            <>
+            {cards.some((card) => isDraft(card.summary.goal.published)) ? (
+              <Button variant="outline" onClick={() => void publishWindow()} disabled={publishing}>
+                {publishing ? "Publicando…" : "Publicar rascunhos"}
+              </Button>
+            ) : null}
             <Button icon={<Icon d={icons.plus} size={14} />} onClick={() => navigate(paths.goalNew)}>
               Nova meta
             </Button>
+            </>
             ) : null}
           </div>
         }
@@ -205,6 +257,7 @@ export default function GoalsPage() {
                 manage={manage}
                 onCopy={() => setDuplicate(summary.goal)}
                 onDelete={() => setConfirm(summary.goal)}
+                onPublish={() => void publishOne(summary.goal)}
               />
             ))}
           </div>
@@ -260,6 +313,7 @@ function GoalCard({
   manage,
   onCopy,
   onDelete,
+  onPublish,
 }: {
   summary: GoalSummary;
   store: Store | undefined;
@@ -269,6 +323,7 @@ function GoalCard({
   manage: boolean;
   onCopy: () => void;
   onDelete: () => void;
+  onPublish: () => void;
 }) {
   const { goal: g, status, achieved, pct, projectedPct, daysRemaining, currentLevel, levelNumber } = summary;
   const prazo = prazoRemaining(daysRemaining);
@@ -312,7 +367,7 @@ function GoalCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <p className="min-w-0 truncate text-[15px] font-bold text-t0">{g.name}</p>
-            <RecordStatusBadge label={GOAL_STATUS_LABEL[status]} />
+            <RecordStatusBadge label={isDraft(g.published) ? "Rascunho" : GOAL_STATUS_LABEL[status]} />
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <PeriodBadge from={g.startsOn} to={g.endsOn} />
@@ -322,6 +377,18 @@ function GoalCard({
         </div>
         {manage ? (
         <div className="flex shrink-0 items-center gap-1.5 self-start">
+          {isDraft(g.published) ? (
+            <Tooltip label="Publicar meta">
+              <button
+                type="button"
+                onClick={action(onPublish)}
+                aria-label="Publicar meta"
+                className="inline-flex h-7 items-center rounded-lg px-2 text-[12px] font-bold text-acc hover:bg-acc-soft"
+              >
+                Publicar
+              </button>
+            </Tooltip>
+          ) : null}
           <Tooltip label="Duplicar meta">
             <button
               type="button"

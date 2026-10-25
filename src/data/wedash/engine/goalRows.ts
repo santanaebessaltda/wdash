@@ -48,6 +48,7 @@ export type GoalRow = {
   tiers: unknown;
   groups: unknown;
   spread_unidentified?: boolean | null;
+  published_at?: string | null;
 };
 
 export function goalFromRow(r: GoalRow): GoalRecord {
@@ -62,6 +63,7 @@ export function goalFromRow(r: GoalRow): GoalRecord {
     tiers: parseTiers(r.tiers),
     groups: parseGroups(r.groups),
     spreadUnidentified: r.spread_unidentified === true,
+    published: !("published_at" in r) || r.published_at != null,
   };
 }
 

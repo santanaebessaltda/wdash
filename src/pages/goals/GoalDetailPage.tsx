@@ -286,7 +286,7 @@ function GoalHero({
         <div className="min-w-[220px] flex-1">
           <div className="mb-1.5 flex flex-wrap items-center gap-2.5">
             <h1 className="text-xl font-extrabold text-t0 sm:text-[22px]">{goal.name}</h1>
-            <RecordStatusBadge label={GOAL_STATUS_LABEL[status]} />
+            <RecordStatusBadge label={goal.published === false ? "Rascunho" : GOAL_STATUS_LABEL[status]} />
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <PeriodBadge from={goal.startsOn} to={goal.endsOn} />

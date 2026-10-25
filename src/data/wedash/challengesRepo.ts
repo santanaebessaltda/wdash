@@ -35,6 +35,8 @@ export interface ChallengeRecord {
   /** ISO YYYY-MM-DD (inclusive). */
   startsOn: string;
   endsOn: string;
+  /** false = rascunho. Ausente = publicado. */
+  published?: boolean;
   metric: ChallengeMetric;
   /** Quantidade/Valor; P.A. e ticket = ALL. */
   scope: ChallengeScope;
@@ -140,6 +142,7 @@ export type ChallengeRow = {
   prizes: unknown;
   manager_prize: unknown;
   cashier_prize: unknown;
+  published_at?: string | null;
 };
 
 /** Meta guardada junto do premio da gerencia; desafio antigo sem ela usa o alvo/piso. */
@@ -173,6 +176,7 @@ export function challengeFromRow(r: ChallengeRow): ChallengeRecord {
     managerTarget: managerPrize ? managerTargetRaw : null,
     cashierPrize,
     cashierTarget: cashierPrize ? cashierTargetRaw : null,
+    published: !("published_at" in r) || r.published_at != null,
   };
 }
 
@@ -207,6 +211,8 @@ export function challengeToRow(c: ChallengeInput): Omit<ChallengeRow, "id"> {
 }
 
 const COLS =
+  "id, store_id, name, starts_on, ends_on, metric, scope, mode, products, categories, target, min_sales, prizes, manager_prize, cashier_prize, published_at";
+const COLS_LEGACY =
   "id, store_id, name, starts_on, ends_on, metric, scope, mode, products, categories, target, min_sales, prizes, manager_prize, cashier_prize";
 
 async function client() {
@@ -220,30 +226,38 @@ export async function fetchChallenges(q: {
   storeIds: string[];
   from: string;
   to: string;
+  includeDrafts?: boolean;
 }): Promise<ChallengeRecord[]> {
   if (q.storeIds.length === 0) return [];
   const sb = await client();
   if (!sb) return [];
-  const { data, error } = await sb
-    .from("challenge")
-    .select(COLS)
-    .eq("tenant_id", q.tenantId)
-    .in("store_id", q.storeIds)
-    .lte("starts_on", q.to)
-    .gte("ends_on", q.from)
-    .order("starts_on", { ascending: false })
-    .order("id");
+  const run = (cols: string, drafts: boolean) => {
+    let query = sb
+      .from("challenge")
+      .select(cols)
+      .eq("tenant_id", q.tenantId)
+      .in("store_id", q.storeIds)
+      .lte("starts_on", q.to)
+      .gte("ends_on", q.from)
+      .order("starts_on", { ascending: false })
+      .order("id");
+    if (!drafts) query = query.not("published_at", "is", null);
+    return query;
+  };
+  let { data, error } = await run(COLS, q.includeDrafts === true);
+  if (error?.code === "42703") ({ data, error } = await run(COLS_LEGACY, true));
   if (error) {
     console.warn("fetchChallenges:", error.message);
     return [];
   }
-  return ((data ?? []) as ChallengeRow[]).map(challengeFromRow);
+  return ((data ?? []) as unknown as ChallengeRow[]).map(challengeFromRow);
 }
 
 export async function fetchChallenge(tenantId: string, id: string): Promise<ChallengeRecord | null> {
   const sb = await client();
   if (!sb) return null;
-  const { data, error } = await sb.from("challenge").select(COLS).eq("tenant_id", tenantId).eq("id", id).maybeSingle();
+  let { data, error } = await sb.from("challenge").select(COLS).eq("tenant_id", tenantId).eq("id", id).maybeSingle();
+  if (error?.code === "42703") ({ data, error } = await sb.from("challenge").select(COLS_LEGACY).eq("tenant_id", tenantId).eq("id", id).maybeSingle());
   if (error) {
     console.warn("fetchChallenge:", error.message);
     return null;
@@ -260,17 +274,26 @@ export async function saveChallenge(
   const sb = await client();
   if (!sb) return { ok: true, id: id ?? "demo" };
   const row = challengeToRow(c);
+  const publishedAt = !id
+    ? c.published === false
+      ? null
+      : new Date().toISOString()
+    : c.published === true
+      ? new Date().toISOString()
+      : c.published === false
+        ? null
+        : undefined;
   const res = id
     ? await sb
         .from("challenge")
-        .update({ ...row, updated_at: new Date().toISOString() })
+        .update({ ...row, updated_at: new Date().toISOString(), ...(publishedAt !== undefined ? { published_at: publishedAt } : {}) })
         .eq("tenant_id", tenantId)
         .eq("id", id)
         .select("id")
         .single()
     : await sb
         .from("challenge")
-        .insert({ ...row, tenant_id: tenantId })
+        .insert({ ...row, tenant_id: tenantId, published_at: publishedAt ?? null })
         .select("id")
         .single();
   if (res.error) {

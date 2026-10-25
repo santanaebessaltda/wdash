@@ -52,6 +52,7 @@ const PRODUCT_STATUS: Record<string, StatusVariant> = {
   "sem acesso": "neutral",
   encerrada: "neutral",
   encerrado: "neutral",
+  rascunho: "neutral",
   "não configurado": "neutral",
   "nao configurado": "neutral",
   desconectado: "neutral",

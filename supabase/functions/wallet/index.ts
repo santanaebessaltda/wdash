@@ -248,7 +248,8 @@ serve(async (req) => {
           .eq("tenant_id", membership.tenant_id)
           .in("store_id", storeIds)
           .lte("starts_on", monthEnd)
-          .gte("ends_on", monthStart),
+          .gte("ends_on", monthStart)
+          .not("published_at", "is", null),
       ),
       allPages(
         admin
@@ -257,7 +258,8 @@ serve(async (req) => {
           .eq("tenant_id", membership.tenant_id)
           .in("store_id", storeIds)
           .lte("starts_on", monthEnd)
-          .gte("ends_on", monthStart),
+          .gte("ends_on", monthStart)
+          .not("published_at", "is", null),
       ),
     ]);
     const goals = goalRows.map(goalFromRow).filter((goal) => goal.endsOn.slice(0, 7) === month);

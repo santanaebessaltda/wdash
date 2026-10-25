@@ -24,6 +24,7 @@ import { assertSyncConfig, autoRefreshEnabled, deepHistorySpan, describeSpan, on
 import { isWorkerPaused } from "./workerPause.ts";
 import { acquireWorkerLock, releaseWorkerLock } from "./workerLock.ts";
 import { runDueShoppingLaunches, runShoppingStore } from "./allosJob.ts";
+import { drainPlanOutbox } from "./planPush.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -231,6 +232,9 @@ async function main() {
       wasPaused = paused;
 
       if (!paused) {
+        await drainPlanOutbox(sb).catch((e: unknown) => {
+          console.warn(`Avisos de meta: ${e instanceof Error ? e.message : String(e)}`);
+        });
         const stale = await recoverStaleRunningJobs(sb);
         if (stale > 0) console.log(`Recuperados ${stale} job(s) travados`);
         await purgeLogsIfDue();

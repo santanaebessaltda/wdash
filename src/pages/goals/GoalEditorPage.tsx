@@ -21,9 +21,11 @@ import {
   fetchGoalTeam,
   saveGoal,
   type GoalGroup,
+  type GoalRecord,
   type GoalTeamMember,
 } from "@/data/wedash/goalsRepo";
 import { copyGoalName, nextGoalPeriod } from "@/data/wedash/goalView";
+import { enqueuePlanNotice, goalChangeNotice, levelCuts, publishNotice } from "@/data/wedash/planNotice";
 import { fetchStoreShifts, storesForSession } from "@/data/wedash/stores";
 import { brlCent, isoToDate, dateToIso } from "@/lib/format";
 import { cn } from "@/lib/cn";
@@ -302,6 +304,7 @@ export default function GoalEditorPage() {
   const sourceId = id ?? copyId;
   /** Edição e cópia só liberam o card de níveis e o salvar depois que a meta de origem chega. */
   const [sourceReady, setSourceReady] = useState(!sourceId);
+  const savedGoal = useRef<GoalRecord | null>(null);
   const targetStores = useMemo(
     () => (copyForStore && sourceStoreId ? storeRows.filter((l) => l.id !== sourceStoreId) : storeRows),
     [copyForStore, sourceStoreId, storeRows],
@@ -349,6 +352,7 @@ export default function GoalEditorPage() {
           setCopiedFrom({ name: g.name, target: g.target });
         }
       } else {
+        savedGoal.current = g;
         setStoreId(g.storeId);
         setName(g.name);
         setStartsOn(isoToDate(g.startsOn));
@@ -437,13 +441,23 @@ export default function GoalEditorPage() {
   const overlapMsg = "Já existe uma meta desta filial nesse período.";
   const dateError = (e?: string) => e ?? (overlap ? overlapMsg : undefined);
 
-  const submit = async () => {
+  const submit = async (publish: boolean) => {
     if (!sourceReady) return;
     setTried(true);
     if (Object.keys(validateGoal(fields)).length > 0) {
       toast.show("Revise os campos destacados.", "danger");
       return;
     }
+    const wasPublished = Boolean(id && savedGoal.current?.published !== false);
+    const nextTiers = tiers.map((t, i) => ({
+      name: t.name.trim() || `Nível ${i + 1}`,
+      minAttainmentPct: nonNegative(t.goal)!,
+      commissionPct: positive(t.commission)!,
+      bonus: positive(t.bonus) ?? 0,
+      ...(managerOn
+        ? { managerPct: positive(t.mgrCommission)!, managerBonus: positive(t.mgrBonus) ?? 0 }
+        : {}),
+    }));
     setSaving(true);
     const res = await saveGoal(session.tenantId, id ?? null, {
       storeId,
@@ -453,15 +467,7 @@ export default function GoalEditorPage() {
       target: targetValue!,
       tierMode: "INDIVIDUAL",
       spreadUnidentified,
-      tiers: tiers.map((t, i) => ({
-        name: t.name.trim() || `Nível ${i + 1}`,
-        minAttainmentPct: nonNegative(t.goal)!,
-        commissionPct: positive(t.commission)!,
-        bonus: positive(t.bonus) ?? 0,
-        ...(managerOn
-          ? { managerPct: positive(t.mgrCommission)!, managerBonus: positive(t.mgrBonus) ?? 0 }
-          : {}),
-      })),
+      tiers: nextTiers,
       groups:
         groupsOn && groups
           ? groups.map((g) => ({
@@ -470,6 +476,7 @@ export default function GoalEditorPage() {
               pct: groupPct(g) ?? 0,
             }))
           : [],
+      ...(wasPublished ? {} : { published: publish }),
     });
     setSaving(false);
     if (!res.ok) {
@@ -479,7 +486,38 @@ export default function GoalEditorPage() {
       } else toast.show(SAVE_ERROR_MSG, "danger");
       return;
     }
-    toast.show(id ? "Alterações salvas." : "Meta criada.", "success");
+    const storeName = storeRows.find((store) => store.id === storeId)?.tradeName ?? "Filial";
+    if (!wasPublished && publish) {
+      await enqueuePlanNotice(
+        session.tenantId,
+        storeId,
+        publishNotice([
+          {
+            kind: "goal",
+            name: name.trim(),
+            storeName,
+            startsOn: dateToIso(startsOn!),
+            endsOn: dateToIso(endsOn!),
+            targetLabel: brlCent(targetValue!),
+          },
+        ]),
+      );
+    } else if (wasPublished && savedGoal.current) {
+      const levels = levelCuts(savedGoal.current.tiers, nextTiers);
+      await enqueuePlanNotice(
+        session.tenantId,
+        storeId,
+        goalChangeNotice({
+          storeName,
+          name: name.trim(),
+          targetFrom: savedGoal.current.target,
+          targetTo: targetValue!,
+          levels: levels.cuts,
+          levelsReshaped: levels.reshaped,
+        }),
+      );
+    }
+    toast.show(wasPublished ? "Alterações salvas." : publish ? "Meta publicada." : "Rascunho salvo.", "success");
     navigate(paths.goalDetail(res.id), { state: location.state });
   };
 
@@ -688,9 +726,20 @@ export default function GoalEditorPage() {
         <Button variant="outline" onClick={back}>
           Cancelar
         </Button>
-        <Button onClick={() => void submit()} disabled={saving || !sourceReady}>
-          {saving ? "Salvando…" : id ? "Salvar alterações" : "Criar meta"}
-        </Button>
+        {sourceReady && id && savedGoal.current?.published !== false ? (
+          <Button onClick={() => void submit(true)} disabled={saving || !sourceReady}>
+            {saving ? "Salvando…" : "Salvar alterações"}
+          </Button>
+        ) : (
+          <>
+            <Button variant="outline" onClick={() => void submit(false)} disabled={saving || !sourceReady}>
+              {saving ? "Salvando…" : "Salvar rascunho"}
+            </Button>
+            <Button onClick={() => void submit(true)} disabled={saving || !sourceReady}>
+              {saving ? "Salvando…" : "Publicar"}
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );
