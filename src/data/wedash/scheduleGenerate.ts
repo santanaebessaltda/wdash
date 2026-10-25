@@ -1,8 +1,9 @@
 /** Geração da escala do mês. O dia é a unidade: 12×36 alterna dia sim e dia não. */
 
-import { addMonths, endOfMonth } from "./engine/format";
+import { addDays, addMonths, endOfMonth } from "./engine/format";
 
-export type SchedulePattern = "6x1" | "5x2" | "12x36";
+export type SchedulePattern = "6x1" | "5x2" | "4x3" | "12x36";
+export type ScheduleScenario = "before_6x1" | "after_6x1";
 export type OffMode = "rotating" | "fixed";
 export type DayStatus = "work" | "off" | "holiday_work" | "comp_off";
 export type Sex = "woman" | "man";
@@ -44,8 +45,14 @@ export type GeneratedMonth = { days: GeneratedDay[]; compDue: CompDue[] };
 const CYCLE: Record<SchedulePattern, { work: number; off: number }> = {
   "6x1": { work: 6, off: 1 },
   "5x2": { work: 5, off: 2 },
+  "4x3": { work: 4, off: 3 },
   "12x36": { work: 1, off: 1 },
 };
+
+export function patternFits(scenario: ScheduleScenario, pattern: SchedulePattern): boolean {
+  if (scenario === "after_6x1") return pattern !== "6x1";
+  return true;
+}
 
 const WEEK = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 
@@ -223,15 +230,20 @@ export function generateMonth(input: {
   groupNeeds?: GroupNeed[];
   holidayRules?: HolidayRule[];
   incomingComp?: CompDue[];
+  /** O ciclo começa nesta data. Sem ela, a escala usa o mês inteiro. */
+  from?: string;
+  to?: string;
 }): GeneratedMonth {
-  const count = daysInMonth(input.year, input.month);
-  const dates = Array.from({ length: count }, (_, index) => isoDate(input.year, input.month, index + 1));
+  const dates = input.from && input.to && input.from <= input.to
+    ? Array.from({ length: 93 }, (_, index) => addDays(input.from!, index)).filter((iso) => iso <= input.to!)
+    : Array.from({ length: daysInMonth(input.year, input.month) }, (_, index) => isoDate(input.year, input.month, index + 1));
+  const count = dates.length;
   const grid: DayStatus[][] = input.people.map((person, personIndex) =>
     dates.map((iso, day) => {
       const dow = weekday(iso);
       if (input.dayNeeds && !dayMin(input.dayNeeds, dow).open) return "off";
-      if (input.offMode === "fixed" && person.fixedOffDow != null && dow === person.fixedOffDow) return "off";
-      if (input.offMode === "rotating" && baseOff(input.pattern, personIndex, day)) return "off";
+      if (person.fixedOffDow != null) return dow === person.fixedOffDow ? "off" : "work";
+      if (baseOff(input.pattern, personIndex, day)) return "off";
       return "work";
     }),
   );

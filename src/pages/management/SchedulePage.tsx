@@ -10,7 +10,7 @@ import { addDays, addMonths, endOfMonth, isoToDate, startOfMonth } from "@/data/
 import { fetchGoals } from "@/data/wedash/goalsRepo";
 import { monthCoveredByGoal, scheduleStartMonth, type GoalSpan } from "@/data/wedash/goalMonths";
 import { branchRoleLabel, fetchStoreSellers, fetchStoreShifts, isBranchTeamMember, storesForSession, type StoreSeller, type StoreShift } from "@/data/wedash/stores";
-import { defaultDayNeeds, generateMonth, weekday, type DayStatus, type GroupNeed, type Sex } from "@/data/wedash/scheduleGenerate";
+import { defaultDayNeeds, generateMonth, weekday, type DayStatus, type Sex } from "@/data/wedash/scheduleGenerate";
 import { holidayLabel, holidaysForStore, loadHolidaySeed, loadNationalHolidays, storePlace, type Holiday } from "@/data/wedash/scheduleHolidays";
 import { deleteSchedule, fetchCompDue, fetchSchedule, saveManualDay, saveSchedule, type StoredDay, type StoredSchedule } from "@/data/wedash/scheduleRepo";
 import { ScheduleWizard, type ScheduleWizardValue } from "./ScheduleWizard";
@@ -37,6 +37,17 @@ function cellsOf(from: string, to: string): Array<string | null> {
 }
 
 type SelectedPerson = { id: string; fixedOffDow: number | null; sex: Sex; groupId: string | null };
+
+function monthsBetween(from: string, to: string): string[] {
+  const months: string[] = [];
+  let cursor = startOfMonth(from);
+  const last = startOfMonth(to);
+  while (cursor <= last && months.length < 4) {
+    months.push(cursor);
+    cursor = addMonths(cursor, 1);
+  }
+  return months;
+}
 
 export function SchedulePage() {
   const { show } = useToast();
@@ -146,94 +157,97 @@ export function SchedulePage() {
     : [];
 
   const initialWizard = (): ScheduleWizardValue => ({
+    scenario: "before_6x1",
     pattern: schedule?.pattern ?? "6x1",
     offMode: schedule?.offMode ?? "rotating",
     sundayMin: schedule?.sundayMin ?? 1,
     womenSunday: schedule?.womenSunday ?? "every_2",
     menSunday: schedule?.menSunday ?? "every_3",
+    periodStart: schedule?.periodStart ?? monthStart,
+    periodEnd: schedule?.periodEnd ?? monthEnd,
     selectedIds: schedule ? schedule.people.map((person) => person.sellerId) : people.map((person) => person.id),
     sex: Object.fromEntries(people.map((person) => [person.id, schedule?.people.find((row) => row.sellerId === person.id)?.sex ?? "woman"])),
-    fixedOff: Object.fromEntries(schedule?.people.map((person) => [person.sellerId, person.fixedOffDow ?? 1]) ?? []),
+    fixedOff: Object.fromEntries(schedule?.people.filter((person) => person.fixedOffDow != null).map((person) => [person.sellerId, person.fixedOffDow ?? 1]) ?? []),
     dayNeeds: schedule && schedule.dayNeeds.length === 7 ? schedule.dayNeeds : defaultDayNeeds(),
-    groupNeeds: schedule?.groupNeeds ?? [],
+    groupNeeds: [],
     holidayRules: schedule?.holidayRules ?? [],
     copyStoreIds: [],
     replaceManual: false,
   });
 
-  function coverageFor(selected: SelectedPerson[], value: ScheduleWizardValue): GroupNeed[] {
-    const ids = [...new Set(selected.map((person) => person.groupId).filter((id): id is string => Boolean(id)))];
-    return ids.map((groupId) => ({ groupId, min: value.groupNeeds.find((row) => row.groupId === groupId)?.min ?? 2 }));
-  }
-
-  async function generateFor(storeId: string, value: ScheduleWizardValue, selected: SelectedPerson[], groupNeeds: GroupNeed[]) {
-    const [year, monthNumber] = monthStart.split("-").map(Number);
-    const incoming = await fetchCompDue(storeId, monthStart);
+  async function generateFor(storeId: string, value: ScheduleWizardValue, selected: SelectedPerson[]) {
+    const [year, monthNumber] = value.periodStart.split("-").map(Number);
+    const incoming = await fetchCompDue(storeId, value.periodStart);
+    const offMode = selected.length > 0 && selected.every((person) => person.fixedOffDow != null) ? "fixed" : "rotating";
     const generated = generateMonth({
       year,
       month: monthNumber,
+      from: value.periodStart,
+      to: value.periodEnd,
       pattern: value.pattern,
-      offMode: value.offMode,
+      offMode,
       sundayMin: value.sundayMin,
       womenSunday: value.womenSunday,
       menSunday: value.menSunday,
       people: selected.map((person) => ({
         id: person.id,
-        fixedOffDow: value.offMode === "fixed" ? person.fixedOffDow : null,
+        fixedOffDow: person.fixedOffDow,
         sex: person.sex,
         groupId: person.groupId,
       })),
       holidayDates: [],
       dayNeeds: value.dayNeeds,
-      groupNeeds,
+      groupNeeds: [],
       holidayRules: value.holidayRules,
       incomingComp: incoming,
     });
     const known = new Set(holidays.filter((row) => row.kind !== "municipal").map((row) => row.date));
-    return saveSchedule({
-      tenantId: session.tenantId,
-      storeId,
-      monthStart,
-      pattern: value.pattern,
-      offMode: value.offMode,
-      sundayMin: value.sundayMin,
-      extraHolidays: value.holidayRules.filter((rule) => !known.has(rule.date)).map((rule) => ({ day: Number(rule.date.slice(8, 10)), name: rule.name })),
-      womenSunday: value.womenSunday,
-      menSunday: value.menSunday,
-      dayNeeds: value.dayNeeds,
-      groupNeeds,
-      holidayRules: value.holidayRules,
-      compDue: generated.compDue,
-      people: selected.map((person) => ({ sellerId: person.id, fixedOffDow: value.offMode === "fixed" ? person.fixedOffDow : null, sex: person.sex })),
-      days: generated.days.map((row) => ({ sellerId: row.personId, day: row.date, status: row.status })),
-      keepManual: !value.replaceManual,
-    });
+    const months = monthsBetween(value.periodStart, value.periodEnd);
+    let keptManualDays = 0;
+    for (const start of months) {
+      const saved = await saveSchedule({
+        tenantId: session.tenantId,
+        storeId,
+        monthStart: start,
+        pattern: value.pattern,
+        offMode,
+        sundayMin: value.sundayMin,
+        extraHolidays: value.holidayRules.filter((rule) => !known.has(rule.date) && rule.date >= start && rule.date <= endOfMonth(start)).map((rule) => ({ day: Number(rule.date.slice(8, 10)), name: rule.name })),
+        womenSunday: value.womenSunday,
+        menSunday: value.menSunday,
+        dayNeeds: value.dayNeeds,
+        groupNeeds: [],
+        holidayRules: value.holidayRules,
+        compDue: start === months[months.length - 1] ? generated.compDue : [],
+        people: selected.map((person) => ({ sellerId: person.id, fixedOffDow: person.fixedOffDow, sex: person.sex })),
+        days: generated.days.filter((row) => row.date >= start && row.date <= endOfMonth(start)).map((row) => ({ sellerId: row.personId, day: row.date, status: row.status })),
+        keepManual: !value.replaceManual,
+        rangeStart: value.periodStart,
+        rangeEnd: value.periodEnd,
+      });
+      keptManualDays += saved.keptManualDays;
+    }
+    return { keptManualDays };
   }
 
   async function onGenerate(value: ScheduleWizardValue) {
     if (!store) return;
     setSaving(true);
     try {
-      const selected = value.selectedIds.map((id, index) => ({
+      const selected = value.selectedIds.map((id) => ({
         id,
-        fixedOffDow: value.fixedOff[id] ?? ((index % 6) + 1),
+        fixedOffDow: value.fixedOff[id] > 0 ? value.fixedOff[id] : null,
         sex: value.sex[id] ?? "woman",
         groupId: people.find((person) => person.id === id)?.shiftId ?? null,
       }));
-      const result = await generateFor(store.id, value, selected, coverageFor(selected, value));
+      const result = await generateFor(store.id, value, selected);
       let kept = result.keptManualDays;
       if (value.copyStoreIds.length > 0) {
         const teams = await fetchStoreSellers(session.tenantId, value.copyStoreIds);
         for (const storeId of value.copyStoreIds) {
           const team = (teams.get(storeId) ?? []).filter((person) => isBranchTeamMember(person));
-          const copiedPeople = team.map((person, index) => ({ id: person.id, fixedOffDow: (index % 6) + 1, sex: "woman" as const, groupId: person.shiftId }));
-          const groupFloor = value.groupNeeds.length > 0 ? Math.max(...value.groupNeeds.map((row) => row.min)) : 2;
-          const copied = await generateFor(
-            storeId,
-            value,
-            copiedPeople,
-            coverageFor(copiedPeople, { ...value, groupNeeds: [] }).map((row) => ({ ...row, min: groupFloor })),
-          );
+          const copiedPeople = team.map((person) => ({ id: person.id, fixedOffDow: null, sex: "woman" as const, groupId: person.shiftId }));
+          const copied = await generateFor(storeId, value, copiedPeople);
           kept += copied.keptManualDays;
         }
       }
@@ -366,9 +380,7 @@ export function SchedulePage() {
           }))}
           otherStores={otherStores}
           hasSchedule={schedule != null}
-          monthLabel={monthLabel(monthStart)}
-          monthStart={monthStart}
-          nationalHolidays={holidays.filter((row) => row.date >= monthStart && row.date <= monthEnd)}
+          nationalHolidays={holidays}
           initial={initialWizard()}
           saving={saving}
           onSubmit={(value) => void onGenerate(value)}
@@ -391,11 +403,15 @@ export function SchedulePage() {
           }}
           onReset={async () => {
             if (!schedule) return;
-            const [year, monthNumber] = monthStart.split("-").map(Number);
-            const incoming = await fetchCompDue(store.id, monthStart);
+            const from = schedule.periodStart ?? monthStart;
+            const to = schedule.periodEnd ?? monthEnd;
+            const [year, monthNumber] = from.split("-").map(Number);
+            const incoming = await fetchCompDue(store.id, from);
             const generated = generateMonth({
               year,
               month: monthNumber,
+              from,
+              to,
               pattern: schedule.pattern,
               offMode: schedule.offMode,
               sundayMin: schedule.sundayMin,
@@ -409,7 +425,7 @@ export function SchedulePage() {
               })),
               holidayDates: [],
               dayNeeds: schedule.dayNeeds,
-              groupNeeds: schedule.groupNeeds,
+              groupNeeds: [],
               holidayRules: schedule.holidayRules,
               incomingComp: incoming,
             }).days.filter((row) => row.date === dayOpen);

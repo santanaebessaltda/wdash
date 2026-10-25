@@ -15,6 +15,8 @@ export type StoredSchedule = {
   holidayRules: HolidayRule[];
   compDue: CompDue[];
   extraHolidays: ExtraHoliday[];
+  periodStart: string | null;
+  periodEnd: string | null;
   people: { sellerId: string; fixedOffDow: number | null; sex: Sex }[];
 };
 
@@ -37,6 +39,8 @@ type ScheduleRecord = {
   group_needs?: GroupNeed[] | null;
   holiday_rules?: HolidayRule[] | null;
   comp_due?: CompDue[] | null;
+  period_start?: string | null;
+  period_end?: string | null;
   store_schedule_person: { seller_id: string; fixed_off_dow: number | null; sex?: Sex | null }[] | null;
 };
 
@@ -57,6 +61,8 @@ function asSchedule(row: ScheduleRecord): StoredSchedule {
     holidayRules: asList(row.holiday_rules),
     compDue: asList(row.comp_due),
     extraHolidays: asList(row.extra_holidays),
+    periodStart: row.period_start ? String(row.period_start).slice(0, 10) : null,
+    periodEnd: row.period_end ? String(row.period_end).slice(0, 10) : null,
     people: (row.store_schedule_person ?? []).map((person) => ({
       sellerId: person.seller_id,
       fixedOffDow: person.fixed_off_dow,
@@ -78,7 +84,7 @@ export async function fetchSchedule(storeId: string, monthStart: string): Promis
   const [scheduleResult, dayResult] = await Promise.all([
     sb
       .from("store_schedule")
-      .select("id, pattern, off_mode, sunday_min, extra_holidays, women_sunday, men_sunday, day_needs, group_needs, holiday_rules, comp_due, store_schedule_person(seller_id, fixed_off_dow, sex)")
+      .select("id, pattern, off_mode, sunday_min, extra_holidays, women_sunday, men_sunday, day_needs, group_needs, holiday_rules, comp_due, period_start, period_end, store_schedule_person(seller_id, fixed_off_dow, sex)")
       .eq("store_id", storeId)
       .eq("month_start", startOfMonth(monthStart))
       .maybeSingle(),
@@ -119,17 +125,21 @@ export async function saveSchedule(input: {
   people: { sellerId: string; fixedOffDow: number | null; sex: Sex }[];
   days: { sellerId: string; day: string; status: DayStatus }[];
   keepManual: boolean;
+  rangeStart: string;
+  rangeEnd: string;
 }): Promise<{ keptManualDays: number }> {
   const sb = await client();
   const monthStart = startOfMonth(input.monthStart);
   const monthEnd = endOfMonth(monthStart);
+  const from = input.rangeStart > monthStart ? input.rangeStart : monthStart;
+  const to = input.rangeEnd < monthEnd ? input.rangeEnd : monthEnd;
   const existing = input.keepManual
     ? await sb
         .from("store_schedule_day")
         .select("day, seller_id")
         .eq("store_id", input.storeId)
-        .gte("day", monthStart)
-        .lte("day", monthEnd)
+        .gte("day", from)
+        .lte("day", to)
         .eq("origin", "manual")
     : { data: [], error: null };
   if (existing.error) throw new Error(existing.error.message);
@@ -152,6 +162,8 @@ export async function saveSchedule(input: {
         group_needs: input.groupNeeds,
         holiday_rules: input.holidayRules,
         comp_due: input.compDue,
+        period_start: input.rangeStart,
+        period_end: input.rangeEnd,
         generated_at: new Date().toISOString(),
       },
       { onConflict: "store_id,month_start" },
@@ -178,13 +190,13 @@ export async function saveSchedule(input: {
   }
 
   const dropGenerated = input.keepManual
-    ? sb.from("store_schedule_day").delete().eq("store_id", input.storeId).gte("day", monthStart).lte("day", monthEnd).eq("origin", "generated")
-    : sb.from("store_schedule_day").delete().eq("store_id", input.storeId).gte("day", monthStart).lte("day", monthEnd);
+    ? sb.from("store_schedule_day").delete().eq("store_id", input.storeId).gte("day", from).lte("day", to).eq("origin", "generated")
+    : sb.from("store_schedule_day").delete().eq("store_id", input.storeId).gte("day", from).lte("day", to);
   const dropped = await dropGenerated;
   if (dropped.error) throw new Error(dropped.error.message);
 
   const fresh = input.days
-    .filter((day) => !manual.has(`${day.day}|${day.sellerId}`))
+    .filter((day) => day.day >= monthStart && day.day <= monthEnd && !manual.has(`${day.day}|${day.sellerId}`))
     .map((day) => ({
       tenant_id: input.tenantId,
       store_id: input.storeId,

@@ -126,4 +126,21 @@ describe("geração da escala", () => {
     });
     expect(generated.compDue).toEqual([{ personId: "a", holiday: "2026-10-12", until: "2026-11-30" }]);
   });
+
+  it("começa o ciclo no primeiro dia do período", () => {
+    const rows = generateMonth({
+      year: 2026,
+      month: 3,
+      pattern: "6x1",
+      offMode: "rotating",
+      sundayMin: 0,
+      people: [{ id: "a" }],
+      holidayDates: [],
+      from: "2026-03-04",
+      to: "2026-03-10",
+    }).days.filter((row) => row.personId === "a");
+    expect(rows.map((row) => row.date)).toEqual(["2026-03-04", "2026-03-05", "2026-03-06", "2026-03-07", "2026-03-08", "2026-03-09", "2026-03-10"]);
+    expect(rows[0]?.status).toBe("work");
+    expect(rows[6]?.status).toBe("off");
+  });
 });
