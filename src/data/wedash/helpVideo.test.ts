@@ -8,6 +8,7 @@ import {
   hasHelpDraftError,
   helpDraftErrors,
   helpObjectPaths,
+  helpVideoContentType,
   helpVideoExtension,
   helpVideoFileError,
   helpWatchCount,
@@ -38,17 +39,21 @@ describe("help video draft", () => {
   it("asks for a title, an audience and a file", () => {
     const errors = helpDraftErrors({ title: "  ", description: "", audiences: [], file: null, fileRequired: true });
     expect(errors.title).toBe("Informe o título.");
-    expect(errors.audiences).toBe("Escolha quem pode ver o vídeo.");
-    expect(errors.file).toBe("Escolha o vídeo.");
+    expect(errors.audiences).toBe("Escolha quem pode ver.");
+    expect(errors.file).toBe("Escolha o arquivo.");
     expect(hasHelpDraftError(errors)).toBe(true);
   });
 
-  it("accepts mp4, webm and mov up to 200 MB", () => {
+  it("accepts mp4, webm, mov and pdf up to 200 MB", () => {
     expect(helpVideoFileError({ name: "aula.mp4", type: "", size: 10 })).toBeNull();
     expect(helpVideoFileError({ name: "aula.mov", type: "video/quicktime", size: 10 })).toBeNull();
     expect(helpVideoFileError({ name: "aula.webm", type: "video/webm", size: 10 })).toBeNull();
-    expect(helpVideoFileError({ name: "aula.pdf", type: "application/pdf", size: 10 })).toBe("Use um vídeo MP4, WEBM ou MOV.");
+    expect(helpVideoFileError({ name: "manual.pdf", type: "application/pdf", size: 10 })).toBeNull();
+    expect(helpVideoFileError({ name: "manual.pdf", type: "", size: 10 })).toBeNull();
+    expect(helpVideoContentType({ name: "manual.PDF", type: "application/x-pdf" })).toBe("application/pdf");
+    expect(helpVideoFileError({ name: "aula.txt", type: "text/plain", size: 10 })).toBe("Use MP4, WEBM, MOV ou PDF.");
     expect(helpVideoFileError({ name: "aula.mp4", type: "video/mp4", size: 201 * 1024 * 1024 })).toBe("O vídeo passa de 200 MB.");
+    expect(helpVideoFileError({ name: "manual.pdf", type: "application/pdf", size: 201 * 1024 * 1024 })).toBe("O PDF passa de 200 MB.");
   });
 
   it("accepts a complete draft", () => {
@@ -96,6 +101,7 @@ describe("help library", () => {
     });
     expect(helpVideoExtension("video/webm")).toBe("webm");
     expect(helpObjectPaths("tenant", "video", "video/quicktime").video).toBe("tenant/video/video.mov");
+    expect(helpObjectPaths("tenant", "video", "application/pdf").video).toBe("tenant/video/file.pdf");
   });
 });
 

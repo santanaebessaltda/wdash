@@ -7,6 +7,7 @@ import {
   audienceOf,
   canManageHelp,
   deleteHelpVideo,
+  isHelpPdf,
   readHelpVideo,
   saveHelpPoster,
   setHelpVideoVisible,
@@ -73,9 +74,10 @@ export function HelpVideoPage() {
   const videoId = video?.id ?? "";
   const knownPoster = video?.posterPath ?? null;
   const knownDuration = video?.durationSec ?? null;
+  const pdf = video != null && isHelpPdf(video);
 
   useEffect(() => {
-    if (posterUrl || !videoUrl || !videoId) return;
+    if (pdf || posterUrl || !videoUrl || !videoId) return;
     let cancel = false;
     void captureHelpVideo(videoUrl, true).then((result) => {
       if (cancel || !result.poster) return;
@@ -100,7 +102,7 @@ export function HelpVideoPage() {
     return () => {
       cancel = true;
     };
-  }, [knownDuration, knownPoster, manage, posterUrl, session.tenantId, videoId, videoUrl]);
+  }, [knownDuration, knownPoster, manage, pdf, posterUrl, session.tenantId, videoId, videoUrl]);
 
   async function toggleVisible() {
     if (!video || busy) return;
@@ -113,7 +115,8 @@ export function HelpVideoPage() {
       return;
     }
     setVideo({ ...video, visible: next });
-    toast.show(next ? "Vídeo visível." : "Vídeo oculto.", "success");
+    const kind = isHelpPdf(video) ? "PDF" : "Vídeo";
+    toast.show(next ? `${kind} visível.` : `${kind} oculto.`, "success");
   }
 
   async function confirmDelete() {
@@ -125,7 +128,7 @@ export function HelpVideoPage() {
       toast.show(result.error, "danger");
       return;
     }
-    toast.show("Vídeo excluído.", "success");
+    toast.show(isHelpPdf(video) ? "PDF excluído." : "Vídeo excluído.", "success");
     navigate(paths.help);
   }
 
@@ -135,7 +138,7 @@ export function HelpVideoPage() {
         <Button variant="secondary" size="sm" className="sm:hidden" icon={<HelpIcon d={HELP_ICON.back} size={14} />} aria-label="Voltar" onClick={() => navigate(paths.help)}>
           Voltar
         </Button>
-        <Breadcrumbs items={[{ label: "Guia prático", to: paths.help }, { label: video?.title ?? "Vídeo" }]} />
+        <Breadcrumbs items={[{ label: "Guia prático", to: paths.help }, { label: video?.title ?? "Material" }]} />
       </div>
 
       {showSkeleton ? (
@@ -150,7 +153,7 @@ export function HelpVideoPage() {
       ) : status === "error" ? (
         <Alert variant="danger" title={error} />
       ) : status === "missing" || !video ? (
-        <p className="text-[13px] text-t1">Este vídeo não está disponível.</p>
+        <p className="text-[13px] text-t1">Este material não está disponível.</p>
       ) : (
         <div className="mx-auto flex max-w-4xl flex-col gap-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -182,7 +185,11 @@ export function HelpVideoPage() {
             ) : null}
           </div>
 
-          {videoUrl && !playbackError ? (
+          {pdf && videoUrl ? (
+            <HelpPdfFrame url={videoUrl} title={video.title} />
+          ) : pdf ? (
+            <Alert variant="danger" title="Não foi possível abrir o PDF. Tente novamente." />
+          ) : videoUrl && !playbackError ? (
             <div className="relative overflow-hidden rounded-xl bg-black">
               <video
                 key={videoUrl}
@@ -236,7 +243,7 @@ export function HelpVideoPage() {
         onClose={() => {
           if (!deleting) setPendingDelete(false);
         }}
-        title="Excluir vídeo?"
+        title={video && isHelpPdf(video) ? "Excluir PDF?" : "Excluir vídeo?"}
         footer={
           <>
             <Button type="button" variant="outline" disabled={deleting} onClick={() => setPendingDelete(false)}>
@@ -248,8 +255,62 @@ export function HelpVideoPage() {
           </>
         }
       >
-        <p className="text-[13px] text-t1">O vídeo será excluído da biblioteca e deixará de aparecer para todos os públicos.</p>
+        <p className="text-[13px] text-t1">
+          {video && isHelpPdf(video)
+            ? "O PDF será excluído da biblioteca e deixará de aparecer para todos os públicos."
+            : "O vídeo será excluído da biblioteca e deixará de aparecer para todos os públicos."}
+        </p>
       </Modal>
+    </div>
+  );
+}
+
+function HelpPdfFrame({ url, title }: { url: string; title: string }) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancel = false;
+    let created = "";
+    setBlobUrl(null);
+    setFailed(false);
+    void fetch(url)
+      .then((response) => {
+        if (!response.ok) throw new Error("pdf");
+        return response.blob();
+      })
+      .then((blob) => {
+        if (cancel) return;
+        const file = blob.type === "application/pdf" ? blob : new Blob([blob], { type: "application/pdf" });
+        created = URL.createObjectURL(file);
+        setBlobUrl(created);
+      })
+      .catch(() => {
+        if (!cancel) setFailed(true);
+      });
+    return () => {
+      cancel = true;
+      if (created) URL.revokeObjectURL(created);
+    };
+  }, [url]);
+
+  const openUrl = blobUrl ?? url;
+  return (
+    <div className="flex flex-col gap-2">
+      {failed ? (
+        <Alert variant="danger" title="Não foi possível abrir o PDF nesta tela." />
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-line bg-white">
+          {blobUrl ? (
+            <iframe title={title} src={blobUrl} className="h-[80vh] w-full bg-white" />
+          ) : (
+            <Skeleton className="h-[80vh] w-full rounded-none" />
+          )}
+        </div>
+      )}
+      <a href={openUrl} target="_blank" rel="noopener noreferrer" className="self-start text-[13px] font-semibold text-acc hover:underline">
+        Abrir PDF em nova aba
+      </a>
     </div>
   );
 }

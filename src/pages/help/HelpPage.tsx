@@ -9,6 +9,7 @@ import {
   deleteHelpVideo,
   filterHelpVideos,
   formatHelpDuration,
+  isHelpPdf,
   listHelpLibrary,
   saveHelpPoster,
   setHelpVideoVisible,
@@ -107,7 +108,8 @@ export function HelpPage() {
       return;
     }
     setVideos((current) => current.map((item) => (item.id === video.id ? { ...item, visible: next } : item)));
-    toast.show(next ? "Vídeo visível." : "Vídeo oculto.", "success");
+    const kind = isHelpPdf(video) ? "PDF" : "Vídeo";
+    toast.show(next ? `${kind} visível.` : `${kind} oculto.`, "success");
   }
 
   async function confirmDelete() {
@@ -121,25 +123,25 @@ export function HelpPage() {
     }
     setVideos((current) => current.filter((item) => item.id !== pendingDelete.id));
     setPendingDelete(null);
-    toast.show("Vídeo excluído.", "success");
+    toast.show(isHelpPdf(pendingDelete) ? "PDF excluído." : "Vídeo excluído.", "success");
   }
 
   return (
     <div className="pb-8">
       <PageHeader
         title="Guia prático"
-        subtitle={manage ? "Envie e organize vídeos de orientação para a operação." : "Vídeos para apoiar a operação do dia a dia."}
+        subtitle={manage ? "Envie e organize vídeos e PDFs de orientação para a operação." : "Vídeos e PDFs para apoiar a operação do dia a dia."}
         actions={
           <>
             {showSkeleton ? (
               <Skeleton className="h-10 w-[220px] max-w-full rounded-[var(--radius-vela-sm)]" />
             ) : videos.length > 0 ? (
-              <HeaderSearch value={query} onChange={setQuery} placeholder="Buscar vídeos" width={220} />
+              <HeaderSearch value={query} onChange={setQuery} placeholder="Buscar" width={220} />
             ) : null}
             {manage && showSkeleton ? <Skeleton className="h-10 w-[148px] max-w-full rounded-[var(--radius-vela-md)]" /> : null}
             {manage && !showSkeleton ? (
               <Button icon={<HelpIcon d={HELP_ICON.upload} />} onClick={openCreate}>
-                Enviar vídeo
+                Enviar arquivo
               </Button>
             ) : null}
           </>
@@ -168,20 +170,20 @@ export function HelpPage() {
           {filtered.length === 0 ? (
             <EmptyState
               icon="📖"
-              title={library.length === 0 ? (manage ? "Nenhum vídeo na biblioteca" : "Nenhum vídeo disponível") : filter === "hidden" && !query.trim() ? "Nenhum vídeo oculto" : "Nenhum vídeo encontrado"}
+              title={library.length === 0 ? (manage ? "Nenhum material na biblioteca" : "Nenhum material disponível") : filter === "hidden" && !query.trim() ? "Nenhum material oculto" : "Nenhum material encontrado"}
               description={
                 library.length === 0
                   ? manage
-                    ? "Envie o primeiro vídeo e escolha quem poderá assistir."
-                    : "Os vídeos disponíveis para você aparecerão aqui."
+                    ? "Envie o primeiro vídeo ou PDF e escolha quem poderá ver."
+                    : "Os materiais disponíveis para você aparecerão aqui."
                   : filter === "hidden" && !query.trim()
-                    ? "Os vídeos ocultos aparecem aqui."
+                    ? "Os materiais ocultos aparecem aqui."
                     : "Tente outro título ou descrição."
               }
               action={
                 library.length === 0 && manage ? (
                   <Button icon={<HelpIcon d={HELP_ICON.upload} />} onClick={openCreate}>
-                    Enviar vídeo
+                    Enviar arquivo
                   </Button>
                 ) : undefined
               }
@@ -189,23 +191,40 @@ export function HelpPage() {
           ) : (
             <div className={helpGrid}>
               {filtered.map((video) => {
-                const duration = formatHelpDuration(video.durationSec);
+                const pdf = isHelpPdf(video);
+                const duration = pdf ? null : formatHelpDuration(video.durationSec);
                 const posterUrl = video.posterPath ? (posters[video.posterPath] ?? null) : null;
                 return (
                   <article key={video.id} className="min-w-0">
-                    <Link to={paths.helpVideo(video.id)} aria-label={`Assistir ${video.title}`} className="group relative block aspect-video overflow-hidden rounded-xl bg-black">
-                      <HelpThumb
-                        posterUrl={posterUrl}
-                        clipUrl={clips[video.id] ?? null}
-                        onCapture={manage && !video.posterPath ? (poster, durationSec) => keepPoster(video, poster, durationSec) : undefined}
-                      />
-                      <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/25">
-                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black/70 text-white">
-                          <HelpPlayMark />
+                    <Link
+                      to={paths.helpVideo(video.id)}
+                      aria-label={pdf ? `Abrir ${video.title}` : `Assistir ${video.title}`}
+                      className={pdf ? "group relative block aspect-video overflow-hidden rounded-xl border border-line bg-bg-2" : "group relative block aspect-video overflow-hidden rounded-xl bg-black"}
+                    >
+                      {pdf ? (
+                        <span className="flex h-full w-full items-center justify-center text-acc">
+                          <HelpIcon d={HELP_ICON.file} size={36} />
                         </span>
-                      </span>
-                      {duration ? (
-                        <span className="pointer-events-none absolute bottom-1.5 right-1.5 rounded bg-black/80 px-1.5 py-0.5 text-[11px] font-semibold text-white">{duration}</span>
+                      ) : (
+                        <HelpThumb
+                          posterUrl={posterUrl}
+                          clipUrl={clips[video.id] ?? null}
+                          onCapture={manage && !video.posterPath ? (poster, durationSec) => keepPoster(video, poster, durationSec) : undefined}
+                        />
+                      )}
+                      {pdf ? (
+                        <span className="pointer-events-none absolute inset-0 bg-black/0 transition group-hover:bg-black/10" />
+                      ) : (
+                        <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/25">
+                          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black/70 text-white">
+                            <HelpPlayMark />
+                          </span>
+                        </span>
+                      )}
+                      {pdf || duration ? (
+                        <span className="pointer-events-none absolute bottom-1.5 right-1.5 rounded bg-black/80 px-1.5 py-0.5 text-[11px] font-semibold text-white">
+                          {pdf ? "PDF" : duration}
+                        </span>
                       ) : null}
                     </Link>
                     <div className="flex items-start gap-1 pt-2">
@@ -269,7 +288,7 @@ export function HelpPage() {
         onClose={() => {
           if (!deleting) setPendingDelete(null);
         }}
-        title="Excluir vídeo?"
+        title={pendingDelete && isHelpPdf(pendingDelete) ? "Excluir PDF?" : "Excluir vídeo?"}
         footer={
           <>
             <Button type="button" variant="outline" disabled={deleting} onClick={() => setPendingDelete(null)}>
@@ -281,7 +300,11 @@ export function HelpPage() {
           </>
         }
       >
-        <p className="text-[13px] text-t1">O vídeo será excluído da biblioteca e deixará de aparecer para todos os públicos.</p>
+        <p className="text-[13px] text-t1">
+          {pendingDelete && isHelpPdf(pendingDelete)
+            ? "O PDF será excluído da biblioteca e deixará de aparecer para todos os públicos."
+            : "O vídeo será excluído da biblioteca e deixará de aparecer para todos os públicos."}
+        </p>
       </Modal>
     </div>
   );

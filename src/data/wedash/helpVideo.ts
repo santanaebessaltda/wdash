@@ -1,4 +1,4 @@
-/** Guia prático: biblioteca de vídeos e público. A tela não mostra quem viu. */
+/** Guia prático: biblioteca de vídeos e PDFs. A tela não mostra quem viu. */
 
 import type { Role } from "./team";
 import { getSupabase } from "@/lib/supabase";
@@ -19,10 +19,10 @@ export const HELP_TITLE_MAX = 120;
 export const HELP_DESCRIPTION_MAX = 2000;
 
 export const HELP_OFFLINE = "Não foi possível conectar à WDash. Verifique sua conexão e tente novamente.";
-export const HELP_LOAD_ERROR = "Não foi possível carregar os vídeos. Tente novamente.";
-export const HELP_SEND_ERROR = "Não foi possível enviar o vídeo. Tente novamente.";
+export const HELP_LOAD_ERROR = "Não foi possível carregar os materiais. Tente novamente.";
+export const HELP_SEND_ERROR = "Não foi possível enviar o arquivo. Tente novamente.";
 export const HELP_SAVE_ERROR = "Não foi possível salvar as alterações. Tente novamente.";
-export const HELP_DELETE_ERROR = "Não foi possível excluir o vídeo. Tente novamente.";
+export const HELP_DELETE_ERROR = "Não foi possível excluir o arquivo. Tente novamente.";
 const SESSION_EXPIRED = "Sua sessão expirou. Entre novamente.";
 
 const HELP_BUCKET = "help-videos";
@@ -73,9 +73,14 @@ export function audienceOf(role: Role): HelpAudience {
   return "OWNER";
 }
 
+export function isHelpPdf(item: { mimeType: string }): boolean {
+  return item.mimeType === "application/pdf";
+}
+
 export function helpVideoContentType(file: { name: string; type: string }): string | null {
   const name = file.name.toLowerCase();
   const type = file.type.toLowerCase();
+  if (type === "application/pdf" || type === "application/x-pdf" || name.endsWith(".pdf")) return "application/pdf";
   if (type === "video/mp4" || name.endsWith(".mp4") || name.endsWith(".m4v")) return "video/mp4";
   if (type === "video/webm" || name.endsWith(".webm")) return "video/webm";
   if (type === "video/quicktime" || type === "video/mov" || name.endsWith(".mov")) return "video/quicktime";
@@ -83,9 +88,12 @@ export function helpVideoContentType(file: { name: string; type: string }): stri
 }
 
 export function helpVideoFileError(file: { name: string; type: string; size: number }): string | null {
-  if (!helpVideoContentType(file)) return "Use um vídeo MP4, WEBM ou MOV.";
+  const contentType = helpVideoContentType(file);
+  if (!contentType) return "Use MP4, WEBM, MOV ou PDF.";
   if (file.size <= 0) return "Esse arquivo está vazio.";
-  if (file.size > HELP_VIDEO_MAX_BYTES) return `O vídeo passa de ${HELP_VIDEO_MAX_MB} MB.`;
+  if (file.size > HELP_VIDEO_MAX_BYTES) {
+    return contentType === "application/pdf" ? `O PDF passa de ${HELP_VIDEO_MAX_MB} MB.` : `O vídeo passa de ${HELP_VIDEO_MAX_MB} MB.`;
+  }
   return null;
 }
 
@@ -103,8 +111,8 @@ export function helpDraftErrors(draft: {
   if (draft.description.trim().length > HELP_DESCRIPTION_MAX) {
     errors.description = "A descrição passa de 2.000 caracteres.";
   }
-  if (draft.audiences.length === 0) errors.audiences = "Escolha quem pode ver o vídeo.";
-  if (draft.fileRequired && !draft.file) errors.file = "Escolha o vídeo.";
+  if (draft.audiences.length === 0) errors.audiences = "Escolha quem pode ver.";
+  if (draft.fileRequired && !draft.file) errors.file = "Escolha o arquivo.";
   else if (draft.file) {
     const fileError = helpVideoFileError(draft.file);
     if (fileError) errors.file = fileError;
@@ -145,7 +153,8 @@ export function formatWatchedLabel(at: Date, now: Date, timeZone = "America/Sao_
   return `em ${day.format(at).slice(0, 5)} às ${clock}`;
 }
 
-export function helpVideoExtension(contentType: string): "mp4" | "webm" | "mov" {
+export function helpVideoExtension(contentType: string): "mp4" | "webm" | "mov" | "pdf" {
+  if (contentType === "application/pdf") return "pdf";
   if (contentType === "video/webm") return "webm";
   if (contentType === "video/quicktime") return "mov";
   return "mp4";
@@ -159,8 +168,10 @@ export function helpVideoUploadBody(file: Blob, contentType: string): Blob {
 }
 
 export function helpObjectPaths(tenantId: string, videoId: string, contentType = "video/mp4"): { video: string; poster: string } {
+  const extension = helpVideoExtension(contentType);
+  const fileName = extension === "pdf" ? "file.pdf" : `video.${extension}`;
   return {
-    video: `${tenantId}/${videoId}/video.${helpVideoExtension(contentType)}`,
+    video: `${tenantId}/${videoId}/${fileName}`,
     poster: `${tenantId}/${videoId}/poster.jpg`,
   };
 }
@@ -286,10 +297,13 @@ export async function listHelpLibrary(tenantId: string): Promise<
     .order("created_at", { ascending: false });
   if (error) return { ok: false, error: failed(error, HELP_LOAD_ERROR) };
   const videos = ((data ?? []) as VideoRow[]).map(asVideo);
-  const urls = await signedUrls(videos.flatMap((video) => [video.storagePath, ...(video.posterPath ? [video.posterPath] : [])]));
+  const urls = await signedUrls(
+    videos.flatMap((video) => (isHelpPdf(video) ? [] : [video.storagePath, ...(video.posterPath ? [video.posterPath] : [])])),
+  );
   const posters: Record<string, string> = {};
   const clips: Record<string, string> = {};
   for (const video of videos) {
+    if (isHelpPdf(video)) continue;
     if (video.posterPath && urls[video.posterPath]) posters[video.posterPath] = urls[video.posterPath];
     else if (urls[video.storagePath]) clips[video.id] = urls[video.storagePath];
   }

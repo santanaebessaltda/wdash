@@ -108,7 +108,8 @@ export function HelpVideoForm({
       setSaving(false);
       return;
     }
-    const meta = await readHelpVideoFile(file);
+    const pdf = contentType === "application/pdf";
+    const meta = pdf ? { durationSec: null, poster: null } : await readHelpVideoFile(file);
     const result = await createHelpVideo({
       tenantId: session.tenantId,
       title,
@@ -125,7 +126,7 @@ export function HelpVideoForm({
       toast.show(result.error, "danger");
       return;
     }
-    toast.show("Vídeo enviado.", "success");
+    toast.show(pdf ? "PDF enviado." : "Vídeo enviado.", "success");
     onSaved(result.video, result.posterUrl);
     onClose();
   }
@@ -136,7 +137,7 @@ export function HelpVideoForm({
       onClose={() => {
         if (!saving) onClose();
       }}
-      title={editing ? "Editar vídeo" : "Enviar vídeo"}
+      title={editing ? "Editar" : "Enviar arquivo"}
       size="lg"
       footer={
         <>
@@ -144,7 +145,7 @@ export function HelpVideoForm({
             Cancelar
           </Button>
           <Button type="button" disabled={saving} onClick={() => void submit()}>
-            {saving ? (editing ? "Salvando…" : "Enviando…") : editing ? "Salvar alterações" : "Enviar vídeo"}
+            {saving ? (editing ? "Salvando…" : "Enviando…") : editing ? "Salvar alterações" : "Enviar arquivo"}
           </Button>
         </>
       }
@@ -160,7 +161,7 @@ export function HelpVideoForm({
               value={description}
               maxLength={HELP_DESCRIPTION_MAX}
               onChange={(event) => setDescription(event.target.value)}
-              placeholder="O que a pessoa vai aprender neste vídeo."
+              placeholder="Para que serve este material."
             />
           </FormField>
         </section>
@@ -181,13 +182,13 @@ export function HelpVideoForm({
         </section>
         <section className="flex flex-col gap-3">
           <HelpFormHeading>Visibilidade</HelpFormHeading>
-          <FormField hint="Vídeos ocultos continuam na biblioteca, mas não aparecem para o público.">
+          <FormField hint="Oculto continua na biblioteca, mas não aparece para o público.">
             <Switch checked={visible} onChange={setVisible} label={visible ? "Visível" : "Oculto"} />
           </FormField>
         </section>
         {editing ? null : (
           <section className="flex flex-col gap-3">
-            <HelpFormHeading required>Vídeo</HelpFormHeading>
+            <HelpFormHeading required>Arquivo</HelpFormHeading>
             <FormField error={errors.file}>
             <div
               onDragOver={(event) => {
@@ -214,8 +215,8 @@ export function HelpVideoForm({
               <span className="mx-auto mb-4 flex h-[60px] w-[60px] items-center justify-center rounded-2xl bg-acc-soft text-acc">
                 <HelpIcon d={HELP_ICON.upload} size={28} />
               </span>
-              <h3 className="text-[17px] font-bold text-t0">Arraste o vídeo aqui ou escolha um arquivo</h3>
-              <p className="mt-2 mb-4 text-[13.5px] text-t2">MP4, WEBM ou MOV, até {HELP_VIDEO_MAX_MB} MB</p>
+              <h3 className="text-[17px] font-bold text-t0">Arraste o arquivo aqui ou escolha um</h3>
+              <p className="mt-2 mb-4 text-[13.5px] text-t2">MP4, WEBM, MOV ou PDF, até {HELP_VIDEO_MAX_MB} MB</p>
               <Button
                 type="button"
                 variant="secondary"
@@ -225,12 +226,12 @@ export function HelpVideoForm({
                   openFilePicker();
                 }}
               >
-                Escolher vídeo
+                Escolher arquivo
               </Button>
               <input
                 ref={fileInput}
                 type="file"
-                accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov,.m4v"
+                accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov,.m4v,application/pdf,.pdf"
                 className="hidden"
                 onClick={(event) => event.stopPropagation()}
                 onChange={(event) => {
@@ -253,7 +254,7 @@ export function HelpVideoForm({
                 </div>
                 <button
                   type="button"
-                  aria-label="Remover vídeo"
+                  aria-label="Remover arquivo"
                   disabled={saving}
                   onClick={() => chooseFile(null)}
                   className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-line text-t2 hover:border-bad hover:text-bad disabled:pointer-events-none disabled:opacity-50"
