@@ -6,7 +6,9 @@ import { MonthStep, monthNavBtn } from "@/pages/cash-close/MonthYearPicker";
 import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { isOwner } from "@/layout/nav-wedash";
 import { calendarTodayIso } from "@/data/wedash/clock";
-import { addDays, endOfMonth, isoToDate, startOfMonth } from "@/data/wedash/engine/format";
+import { addDays, addMonths, endOfMonth, isoToDate, startOfMonth } from "@/data/wedash/engine/format";
+import { fetchGoals } from "@/data/wedash/goalsRepo";
+import { monthCoveredByGoal, scheduleStartMonth, type GoalSpan } from "@/data/wedash/goalMonths";
 import { branchRoleLabel, fetchStoreSellers, isBranchTeamMember, storesForSession, type StoreSeller } from "@/data/wedash/stores";
 import { generateMonth, weekday, type DayStatus } from "@/data/wedash/scheduleGenerate";
 import { holidayLabel, holidaysForStore, loadHolidaySeed, storePlace, type Holiday } from "@/data/wedash/scheduleHolidays";
@@ -25,12 +27,6 @@ const CYCLE: DayStatus[] = ["work", "off", "holiday_work", "comp_off"];
 function monthLabel(iso: string): string {
   const date = isoToDate(startOfMonth(iso));
   return `${MONTHS[date.getMonth()]} de ${date.getFullYear()}`;
-}
-
-function moveMonth(iso: string, delta: number): string {
-  const date = isoToDate(startOfMonth(iso));
-  const next = new Date(date.getFullYear(), date.getMonth() + delta, 1);
-  return startOfMonth(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-01`);
 }
 
 function cellsOf(from: string, to: string): Array<string | null> {
@@ -67,6 +63,8 @@ export function SchedulePage() {
   const [dayOpen, setDayOpen] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [goalSpans, setGoalSpans] = useState<GoalSpan[] | null>(null);
+  const storeIds = storeRows.map((row) => row.id).join(",");
 
   const monthStart = startOfMonth(month);
   const monthEnd = endOfMonth(monthStart);
@@ -81,6 +79,32 @@ export function SchedulePage() {
     }
     return map;
   }, [days]);
+
+  useEffect(() => {
+    const ids = storeIds ? storeIds.split(",") : [];
+    if (ids.length === 0) {
+      setGoalSpans([]);
+      return;
+    }
+    let stop = false;
+    setGoalSpans(null);
+    void fetchGoals({
+      tenantId: session.tenantId,
+      storeIds: ids,
+      from: addMonths(today, -24),
+      to: endOfMonth(addMonths(today, 14)),
+      includeDrafts: true,
+    }).then((rows) => {
+      if (stop) return;
+      const spans = rows.map((row) => ({ startsOn: row.startsOn, endsOn: row.endsOn }));
+      setGoalSpans(spans);
+      const open = scheduleStartMonth(today, spans);
+      setMonth((current) => (current < open ? open : current));
+    });
+    return () => {
+      stop = true;
+    };
+  }, [storeIds, session.tenantId, today]);
 
   useEffect(() => {
     if (!store) return;
@@ -217,11 +241,17 @@ export function SchedulePage() {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1">
-              <button type="button" className={monthNavBtn} aria-label="Mês anterior" onClick={() => setMonth((current) => moveMonth(current, -1))}>
+              <button
+                type="button"
+                className={monthNavBtn}
+                aria-label="Mês anterior"
+                disabled={goalSpans == null || !monthCoveredByGoal(addMonths(monthStart, -1), goalSpans)}
+                onClick={() => setMonth((current) => addMonths(current, -1))}
+              >
                 <MonthStep dir="anterior" />
               </button>
               <span className="min-w-[140px] text-center text-[13.5px] font-semibold text-t0">{monthLabel(monthStart)}</span>
-              <button type="button" className={monthNavBtn} aria-label="Próximo mês" onClick={() => setMonth((current) => moveMonth(current, 1))}>
+              <button type="button" className={monthNavBtn} aria-label="Próximo mês" onClick={() => setMonth((current) => addMonths(current, 1))}>
                 <MonthStep dir="proximo" />
               </button>
             </div>

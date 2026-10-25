@@ -7,6 +7,9 @@ import { calendarTodayIso } from "@/data/wedash/clock";
 import { isOwner } from "@/layout/nav-wedash";
 import { periodLabels } from "@/data/wedash/dashboard";
 import { fetchLatestCashCloseError, fetchNavMonthFloor, fetchOpenCashCloseJob, requestCashDropMonth } from "@/data/wedash/cashCloseRepo";
+import { addMonths } from "@/data/wedash/engine/format";
+import { goalMonthFloor, laterMonth } from "@/data/wedash/goalMonths";
+import { fetchGoals } from "@/data/wedash/goalsRepo";
 import { fetchSyncWatermark } from "@/data/wedash/salesRepo";
 import {
   createCashDropDeposit,
@@ -166,9 +169,19 @@ export function CashDropPage() {
     if (storesLoading || !storeKey) return;
     let stop = false;
     const ids = storeKey.split(",");
-    void Promise.all(ids.map((id) => fetchNavMonthFloor("sangria_line", session.tenantId, id, today))).then((months) => {
+    void Promise.all([
+      Promise.all(ids.map((id) => fetchNavMonthFloor("sangria_line", session.tenantId, id, today))),
+      fetchGoals({
+        tenantId: session.tenantId,
+        storeIds: ids,
+        from: addMonths(today, -36),
+        to: endOfMonth(today),
+        includeDrafts: true,
+      }),
+    ]).then(([months, goals]) => {
       if (stop || months.length === 0) return;
-      const month = months.reduce((earliest, item) => (item < earliest ? item : earliest));
+      const dataFloor = months.reduce((earliest, item) => (item < earliest ? item : earliest));
+      const month = laterMonth(dataFloor, goalMonthFloor(today, goals));
       setFloor(month);
       setRangeFrom((current) => {
         if (current >= month) return current;
