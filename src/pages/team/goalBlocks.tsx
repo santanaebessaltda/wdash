@@ -13,7 +13,7 @@ import { kpiTone } from "@/pages/dashboard/palette";
 import type { BlockState as BlockStateKind } from "@/data/wedash/dashboard";
 import { BlockState } from "@/pages/dashboard/BlockState";
 import type { ChallengeView, TeamView, GoalCardView, NetworkGlobalGoal, SellerRow } from "@/data/wedash/teamViews";
-import { goalBarScale, outsideRankingNote } from "@/data/wedash/goalView";
+import { goalBarScale, goalLevelPct, outsideRankingNote } from "@/data/wedash/goalView";
 import { defaultTiers } from "@/data/wedash/goals";
 import { TODAY_ISO } from "@/data/wedash/clock";
 import { cn } from "@/lib/cn";
@@ -168,12 +168,12 @@ function RevenueCell({ l }: { l: LineRank }) {
 
 function IndividualPctCell({ l }: { l: LineRank }) {
   if (l.noGoal) return <span className="text-t2">—</span>;
-  const scale = goalBarScale(l.ladderMarks.map((m) => m.pct));
+  const shown = goalLevelPct(l.attainmentPct, l.ladderMarks.map((m) => m.pct));
   return (
     <div className="w-[88px]">
-      <p className={`font-mono text-[12.5px] font-bold ${progressTextClass(l.attainmentPct)}`}>{num(l.attainmentPct, 0)}%</p>
+      <p className={`font-mono text-[12.5px] font-bold ${progressTextClass(shown)}`}>{num(shown, 0)}%</p>
       <div className="mt-1">
-        <ProgressBar value={Math.min(100, (l.attainmentPct / scale) * 100)} color={progressColor(l.attainmentPct)} height={5} />
+        <ProgressBar value={Math.min(100, shown)} color={progressColor(shown)} height={5} />
       </div>
     </div>
   );

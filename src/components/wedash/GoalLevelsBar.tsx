@@ -1,4 +1,5 @@
 import { progressColor, progressTextClass } from "@/components/ui/ProgressBar";
+import { goalLevelPct } from "@/data/wedash/goalView";
 import { cn } from "@/lib/cn";
 import { num } from "@/lib/format";
 
@@ -135,10 +136,11 @@ export function GoalLevelSummary({
   rolagem?: boolean;
 }) {
   const barra = <GoalLevelsBar pct={pct} marcos={marcos} complete={complete} />;
+  const shown = goalLevelPct(pct, marcos.map((m) => m.pct));
   return (
     <div className="min-w-0">
       <p className="mb-1 text-[11.5px] text-t2">
-        <span className={cn("font-mono font-bold", progressTextClass(pct))}>{num(pct, 0)}%</span> da meta
+        <span className={cn("font-mono font-bold", progressTextClass(shown))}>{num(shown, 0)}%</span> da meta
         {level && (
           <>
             {" · "}

@@ -11,7 +11,7 @@ import { brl, brlCent, eachDay, num } from "@/lib/format";
 import type { BlockState as BlockStateKind } from "@/data/wedash/dashboard";
 import { BlockState } from "@/pages/dashboard/BlockState";
 import type { GoalCardView, NetworkGlobalGoal, SellerRow } from "@/data/wedash/teamViews";
-import { GOAL_STATUS_LABEL, goalBarScale, goalStatus, outsideRankingNote } from "@/data/wedash/goalView";
+import { GOAL_STATUS_LABEL, goalBarScale, goalLevelPct, goalStatus, outsideRankingNote } from "@/data/wedash/goalView";
 import { BranchBadge, DeadlineBadge, PeriodBadge, RecordStatusBadge, UnidentifiedSalesBadge } from "@/components/wedash/RecordBadges";
 import { defaultTiers } from "@/data/wedash/goals";
 import { calendarTodayIso, TODAY_ISO } from "@/data/wedash/clock";
@@ -64,12 +64,12 @@ function RevenueCell({ l }: { l: LineRank }) {
 
 function IndividualPctCell({ l }: { l: LineRank }) {
   if (l.noGoal) return <span className="text-t2">—</span>;
-  const scale = goalBarScale(l.ladderMarks.map((m) => m.pct));
+  const shown = goalLevelPct(l.attainmentPct, l.ladderMarks.map((m) => m.pct));
   return (
     <div className="w-[88px]">
-      <p className={`font-mono text-[12.5px] font-bold ${progressTextClass(l.attainmentPct)}`}>{num(l.attainmentPct, 0)}%</p>
+      <p className={`font-mono text-[12.5px] font-bold ${progressTextClass(shown)}`}>{num(shown, 0)}%</p>
       <div className="mt-1">
-        <ProgressBar value={Math.min(100, (l.attainmentPct / scale) * 100)} color={progressColor(l.attainmentPct)} height={5} />
+        <ProgressBar value={Math.min(100, shown)} color={progressColor(shown)} height={5} />
       </div>
     </div>
   );
@@ -395,6 +395,7 @@ export function GoalProgressBar({
   individual = false,
   quietLabels = false,
   hideMissed = false,
+  labelPct,
 }: {
   goal: NetworkGlobalGoal;
   embedded?: boolean;
@@ -412,6 +413,8 @@ export function GoalProgressBar({
   quietLabels?: boolean;
   /** Na vendedora, o desfecho fica no bloco do nível, não ao lado do percentual. */
   hideMissed?: boolean;
+  /** Número ao lado da barra. Sem ele, usa o percentual da meta. */
+  labelPct?: number;
 }) {
   const showsProjection =
     !soBarra &&
@@ -419,7 +422,8 @@ export function GoalProgressBar({
   const scaleMax = goalBarScale(tiers.map((d) => d.minAttainmentPct));
   const fillPct = Math.min(100, (goal.pct / scaleMax) * 100);
   const colorBarra = progressColor(goal.pct);
-  const colorPct = progressTextClass(goal.pct);
+  const shownPct = labelPct ?? goal.pct;
+  const colorPct = progressTextClass(shownPct);
   const projectionLabel = `Projeção: ${num(goal.projectedPct, 0)}%`;
 
   const body = (
@@ -466,7 +470,7 @@ export function GoalProgressBar({
           <span className="font-mono text-[14px] font-bold text-t2 sm:text-[15px]">{brlCent(goal.total)}</span>
         </p>
         <div className="flex flex-col items-start gap-1 sm:items-end">
-          <p className={`font-mono text-[26px] font-extrabold leading-none sm:text-[28px] ${colorPct}`}>{num(goal.pct, 1)}%</p>
+          <p className={`font-mono text-[26px] font-extrabold leading-none sm:text-[28px] ${colorPct}`}>{num(shownPct, 1)}%</p>
           {!hideMissed && goal.daysRemaining <= 0 && goal.pct < 100 ? <ProgressStanding ok={false}>Não atingiu</ProgressStanding> : null}
         </div>
       </div>
@@ -483,7 +487,7 @@ export function GoalProgressBar({
             />
           </div>
           {soBarra && (
-            <p className={`shrink-0 font-mono text-[13px] font-extrabold leading-none ${colorPct}`}>{num(goal.pct, 1)}%</p>
+            <p className={`shrink-0 font-mono text-[13px] font-extrabold leading-none ${colorPct}`}>{num(shownPct, 1)}%</p>
           )}
         </div>
       ) : (() => {

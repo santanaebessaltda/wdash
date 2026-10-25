@@ -7,7 +7,7 @@ import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { RankingBlock } from "@/pages/live/blocks";
 import type { RankingRow } from "@/data/wedash/live";
 import { boardMoments, type BoardMoment, type BoardSnapshot } from "@/data/wedash/boardEvents";
-import { buildGoalCardView, buildGoalSummary, GOAL_STATUS_LABEL, goalSpreadsUnidentified, goalStatus, prazoRemaining } from "@/data/wedash/goalView";
+import { buildGoalCardView, buildGoalSummary, GOAL_STATUS_LABEL, goalLevelPct, goalSpreadsUnidentified, goalStatus, prazoRemaining } from "@/data/wedash/goalView";
 import type { GoalRecord, GoalTeamMember } from "@/data/wedash/goalsRepo";
 import { buildChallengeView } from "@/data/wedash/challengeView";
 import type { ChallengeAggInput, ChallengeRecord } from "@/data/wedash/challengesRepo";
@@ -434,7 +434,7 @@ export function BoardView({
           name: seller.name,
           levelNumber: seller.currentLevel,
           levelLabel: levelLabel(seller.currentLevel, seller.currentTierName),
-          pct: seller.attainmentPct,
+          pct: goalLevelPct(seller.attainmentPct, board.goal.tiers.map((t) => t.minAttainmentPct)),
           storePct: seller.storeGoalPct,
           gap: seller.nextTier ? seller.nextTier.gapAmount : null,
           nextName: seller.nextTier?.name ?? null,

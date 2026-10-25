@@ -2,7 +2,7 @@ import { Badge, Card, CardTitle } from "@/components/ui";
 import { BranchBadge, PeriodBadge, RecordStatusBadge, UnidentifiedSalesBadge } from "@/components/wedash/RecordBadges";
 import { Tooltip } from "@/components/ui/Tooltip";
 import type { SellerHomeGoal, SellerHomeStore } from "@/data/wedash/engine/sellerHome";
-import { GOAL_STATUS_LABEL, goalStatus } from "@/data/wedash/goalView";
+import { GOAL_STATUS_LABEL, goalLevelPct, goalStatus } from "@/data/wedash/goalView";
 import type { NetworkGlobalGoal } from "@/data/wedash/teamViews";
 import { brlCent, num, shortDate } from "@/lib/format";
 import { cn } from "@/lib/cn";
@@ -158,7 +158,7 @@ function PrizeBody({ goal, me, storeName, today, through, closed }: { goal: Sell
         {me.group ? <p className="mt-1.5 text-[12px] text-t2">Grupo {me.group}</p> : null}
       </div>
 
-      <GoalProgressBar goal={band} tiers={tiers} todayIso={today} embedded hideTitle individual={false} hideMissed />
+      <GoalProgressBar goal={band} tiers={tiers} todayIso={today} embedded hideTitle individual={false} hideMissed labelPct={goalLevelPct(me.attainmentPct, me.marcos.map((m) => m.pct))} />
 
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
         <Tile
