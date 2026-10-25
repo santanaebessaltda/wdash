@@ -1,20 +1,18 @@
 import { useState } from "react";
-import { Badge, Button, Modal, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
-import { defaultDayNeeds, weekdayLabel, type CompWindow, type DayNeed, type GroupNeed, type HolidayPay, type HolidayRule, type OffMode, type SchedulePattern, type Sex, type SundayRule } from "@/data/wedash/scheduleGenerate";
+import { Badge, Button, Modal, WizardCardHeader, WizardNav } from "@/components/ui";
+import { cn } from "@/lib/cn";
+import { defaultDayNeeds, weekdayLabel, type CompWindow, type DayNeed, type GroupNeed, type HolidayRule, type OffMode, type SchedulePattern, type Sex, type SundayRule } from "@/data/wedash/scheduleGenerate";
 
 const STEPS = [
   { num: 1, label: "Equipe" },
-  { num: 2, label: "Modelo" },
-  { num: 3, label: "Cobertura" },
-  { num: 4, label: "Feriados" },
-  { num: 5, label: "Filiais" },
-  { num: 6, label: "Revisão" },
+  { num: 2, label: "Regras" },
+  { num: 3, label: "Feriados" },
 ];
 
 const PATTERNS: { id: SchedulePattern; title: string; text: string }[] = [
-  { id: "6x1", title: "6×1", text: "6 dias de trabalho e 1 de folga" },
-  { id: "5x2", title: "5×2", text: "5 dias de trabalho e 2 de folga" },
-  { id: "12x36", title: "12×36", text: "Um dia trabalha, o outro folga" },
+  { id: "6x1", title: "6×1", text: "6 dias de trabalho e 1 de folga." },
+  { id: "5x2", title: "5×2", text: "5 dias de trabalho e 2 de folga." },
+  { id: "12x36", title: "12×36", text: "Um dia trabalha, o outro folga." },
 ];
 
 const WEEKDAYS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
@@ -25,6 +23,8 @@ const SUNDAY_OPTIONS: { id: SundayRule; label: string }[] = [
   { id: "all", label: "Todos os domingos" },
   { id: "none", label: "Nenhum obrigatório" },
 ];
+
+const fieldClass = "w-full min-w-0 rounded-[10px] border border-line bg-bg-2 px-2 py-2 text-[13px] text-t0";
 
 export type WizardPerson = { id: string; name: string; role: string; groupId: string | null; groupName: string };
 
@@ -46,6 +46,38 @@ export type ScheduleWizardValue = {
 
 function defaultRule(date: string, name: string): HolidayRule {
   return { date, name, open: true, workers: 1, pay: "extra_off", window: "7_days" };
+}
+
+function ScheduleSteps({ current }: { current: number }) {
+  return (
+    <ol className="mb-5 grid grid-cols-3 gap-2">
+      {STEPS.map((step) => {
+        const done = step.num < current;
+        const active = step.num === current;
+        return (
+          <li key={step.num} className="flex min-w-0 flex-col items-center gap-1 text-center">
+            <span
+              className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-full border-2 text-[12px] font-extrabold",
+                done && "border-acc bg-acc text-white",
+                active && "border-acc bg-acc-soft text-acc",
+                !done && !active && "border-line bg-bg-inset text-t2",
+              )}
+            >
+              {done ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              ) : (
+                step.num
+              )}
+            </span>
+            <span className={cn("w-full truncate text-[11px] font-semibold", active ? "text-t0" : "text-t2")}>{step.label}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
 }
 
 export function ScheduleWizard({
@@ -81,14 +113,10 @@ export function ScheduleWizard({
   }));
   const [extraDate, setExtraDate] = useState("");
   const [extraName, setExtraName] = useState("");
-  const order = otherStores.length > 0 ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 6];
-  const steps = order.map((source, index) => ({ num: index + 1, label: STEPS.find((item) => item.num === source)!.label }));
-  const last = order[order.length - 1] === step;
-
-  function go(delta: number) {
-    const target = order[order.indexOf(step) + delta];
-    if (target) setStep(target);
-  }
+  const canLeaveTeam = value.selectedIds.length > 0;
+  const selectedPeople = people.filter((person) => value.selectedIds.includes(person.id));
+  const groups = [...new Map(selectedPeople.filter((person) => person.groupId).map((person) => [person.groupId, person.groupName])).entries()];
+  const pattern = PATTERNS.find((item) => item.id === value.pattern);
 
   function addMunicipal() {
     const name = extraName.trim();
@@ -97,10 +125,6 @@ export function ScheduleWizard({
     setExtraDate("");
     setExtraName("");
   }
-
-  const canLeaveTeam = value.selectedIds.length > 0;
-  const selectedPeople = people.filter((person) => value.selectedIds.includes(person.id));
-  const groups = [...new Map(selectedPeople.filter((person) => person.groupId).map((person) => [person.groupId, person.groupName])).entries()];
 
   function patchRule(date: string, patch: Partial<HolidayRule>) {
     setValue((current) => ({
@@ -115,28 +139,30 @@ export function ScheduleWizard({
       onClose={saving ? () => {} : onClose}
       title="Gerar escala"
       size="lg"
+      bodyClassName="overflow-x-hidden overflow-y-auto p-5"
       footer={
         <WizardNav
           hidePrevious={step === 1}
           previousDisabled={saving}
           nextDisabled={saving || (step === 1 && !canLeaveTeam)}
-          nextLabel={last ? (saving ? "Gerando…" : "Gerar escala") : "Continuar"}
-          hideNextIcon={last}
-          onPrevious={() => go(-1)}
-          onNext={() => (last ? onSubmit(value) : go(1))}
+          nextLabel={step === 3 ? (saving ? "Gerando…" : "Gerar escala") : "Continuar"}
+          hideNextIcon={step === 3}
+          onPrevious={() => setStep((current) => current - 1)}
+          onNext={() => (step === 3 ? onSubmit(value) : setStep((current) => current + 1))}
         />
       }
     >
-      <WizardSteps steps={steps} current={order.indexOf(step) + 1} />
+      <ScheduleSteps current={step} />
       {step === 1 ? (
         <>
-          <WizardCardHeader title="Quem entra na escala" subtitle="A equipe ativa desta filial. O sexo vale só para a folga de domingo desta escala." />
-          <ul className="max-h-64 space-y-2 overflow-y-auto">
+          <WizardCardHeader title="Quem entra na escala" subtitle="A equipe ativa desta filial. O sexo vale só para a folga de domingo." />
+          <ul className="space-y-2">
             {people.length === 0 ? <li className="text-[13px] text-t2">Nenhuma pessoa ativa nesta filial.</li> : null}
             {people.map((person) => (
-              <li key={person.id} className="flex items-center gap-3 rounded-[12px] border border-line px-3 py-2">
+              <li key={person.id} className="flex min-w-0 items-center gap-3 rounded-[12px] border border-line px-3 py-2">
                 <input
                   type="checkbox"
+                  className="shrink-0"
                   checked={value.selectedIds.includes(person.id)}
                   onChange={() =>
                     setValue((current) => ({
@@ -150,10 +176,10 @@ export function ScheduleWizard({
                 />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[13.5px] font-semibold text-t0">{person.name}</span>
-                  <span className="text-[12px] text-t2">{person.groupName || person.role}</span>
+                  <span className="block truncate text-[12px] text-t2">{person.groupName || person.role}</span>
                 </span>
                 <select
-                  className="rounded-[10px] border border-line bg-bg-2 px-2 py-1.5 text-[13px]"
+                  className="shrink-0 rounded-[10px] border border-line bg-bg-2 px-2 py-1.5 text-[13px]"
                   value={value.sex[person.id] ?? "woman"}
                   onChange={(event) => setValue((current) => ({ ...current, sex: { ...current.sex, [person.id]: event.target.value as Sex } }))}
                 >
@@ -167,50 +193,49 @@ export function ScheduleWizard({
       ) : null}
       {step === 2 ? (
         <>
-          <WizardCardHeader title="Modelo" subtitle={`A regra vale para ${monthLabel}.`} />
-          <div className="grid gap-2 sm:grid-cols-3">
-            {PATTERNS.map((pattern) => (
+          <WizardCardHeader title="Regras" subtitle={`Vale para ${monthLabel}. ${pattern?.text ?? ""}`} />
+          <div className="grid grid-cols-3 gap-2">
+            {PATTERNS.map((item) => (
               <button
-                key={pattern.id}
+                key={item.id}
                 type="button"
-                onClick={() => setValue((current) => ({ ...current, pattern: pattern.id }))}
-                className={`rounded-[12px] border px-3 py-3 text-left ${value.pattern === pattern.id ? "border-acc bg-acc-soft" : "border-line"}`}
+                onClick={() => setValue((current) => ({ ...current, pattern: item.id }))}
+                className={`rounded-[12px] border px-2 py-2 text-[14px] font-bold ${value.pattern === item.id ? "border-acc bg-acc-soft text-acc" : "border-line text-t0"}`}
               >
-                <span className="block text-[15px] font-bold text-t0">{pattern.title}</span>
-                <span className="mt-1 block text-[12px] text-t2">{pattern.text}</span>
+                {item.title}
               </button>
             ))}
           </div>
-          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          <div className="mt-3 grid grid-cols-2 gap-2">
             {(
               [
-                ["rotating", "Rotativas", "A folga muda de dia na semana."],
-                ["fixed", "Fixas na semana", "Cada pessoa folga sempre no mesmo dia, de segunda a sábado."],
+                ["rotating", "Rotativas"],
+                ["fixed", "Fixas"],
               ] as const
-            ).map(([id, title, text]) => (
+            ).map(([id, title]) => (
               <button
                 key={id}
                 type="button"
                 onClick={() => setValue((current) => ({ ...current, offMode: id }))}
-                className={`rounded-[12px] border px-3 py-3 text-left ${value.offMode === id ? "border-acc bg-acc-soft" : "border-line"}`}
+                className={`rounded-[12px] border px-2 py-2 text-[13px] font-semibold ${value.offMode === id ? "border-acc bg-acc-soft text-acc" : "border-line text-t0"}`}
               >
-                <span className="block text-[14px] font-bold text-t0">{title}</span>
-                <span className="mt-1 block text-[12px] text-t2">{text}</span>
+                {title}
               </button>
             ))}
           </div>
+          <p className="mt-2 text-[12px] text-t2">{value.offMode === "fixed" ? "Cada pessoa folga sempre no mesmo dia, de segunda a sábado." : "A folga muda de dia na semana."}</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <label className="text-[13px] font-semibold text-t0">
+            <label className="min-w-0 text-[13px] font-semibold text-t0">
               Mulheres folgam
-              <select className="mt-1 w-full rounded-[10px] border border-line bg-bg-2 px-2 py-2 text-[13px]" value={value.womenSunday} onChange={(event) => setValue((current) => ({ ...current, womenSunday: event.target.value as SundayRule }))}>
+              <select className={`mt-1 ${fieldClass}`} value={value.womenSunday} onChange={(event) => setValue((current) => ({ ...current, womenSunday: event.target.value as SundayRule }))}>
                 {SUNDAY_OPTIONS.filter((option) => option.id !== "every_3").map((option) => (
                   <option key={option.id} value={option.id}>{option.label}</option>
                 ))}
               </select>
             </label>
-            <label className="text-[13px] font-semibold text-t0">
+            <label className="min-w-0 text-[13px] font-semibold text-t0">
               Homens folgam
-              <select className="mt-1 w-full rounded-[10px] border border-line bg-bg-2 px-2 py-2 text-[13px]" value={value.menSunday} onChange={(event) => setValue((current) => ({ ...current, menSunday: event.target.value as SundayRule }))}>
+              <select className={`mt-1 ${fieldClass}`} value={value.menSunday} onChange={(event) => setValue((current) => ({ ...current, menSunday: event.target.value as SundayRule }))}>
                 {SUNDAY_OPTIONS.filter((option) => option.id !== "none").map((option) => (
                   <option key={option.id} value={option.id}>{option.label}</option>
                 ))}
@@ -218,12 +243,12 @@ export function ScheduleWizard({
             </label>
           </div>
           {value.offMode === "fixed" ? (
-            <ul className="mt-4 max-h-48 space-y-2 overflow-y-auto">
+            <ul className="mt-4 space-y-2">
               {selectedPeople.map((person) => (
-                <li key={person.id} className="flex items-center justify-between gap-3">
-                  <span className="truncate text-[13px] text-t0">{person.name}</span>
+                <li key={person.id} className="flex min-w-0 items-center justify-between gap-3">
+                  <span className="min-w-0 truncate text-[13px] text-t0">{person.name}</span>
                   <select
-                    className="rounded-[10px] border border-line bg-bg-2 px-2 py-1.5 text-[13px]"
+                    className="shrink-0 rounded-[10px] border border-line bg-bg-2 px-2 py-1.5 text-[13px]"
                     value={value.fixedOff[person.id] ?? 1}
                     onChange={(event) => setValue((current) => ({ ...current, fixedOff: { ...current.fixedOff, [person.id]: Number(event.target.value) } }))}
                   >
@@ -235,17 +260,15 @@ export function ScheduleWizard({
               ))}
             </ul>
           ) : null}
-        </>
-      ) : null}
-      {step === 3 ? (
-        <>
-          <WizardCardHeader title="Quem precisa estar" subtitle="Desmarque o dia em que a loja fecha. O número é o mínimo trabalhando." />
+          <p className="mt-5 text-[13px] font-semibold text-t0">Quem precisa estar</p>
+          <p className="mt-1 mb-3 text-[12px] text-t2">Desmarque o dia em que a loja fecha. O número é o mínimo trabalhando.</p>
           <ul className="space-y-2">
             {value.dayNeeds.map((day) => (
-              <li key={day.dow} className="flex items-center justify-between gap-3">
-                <label className="flex items-center gap-2 text-[13.5px] text-t0">
+              <li key={day.dow} className="flex min-w-0 items-center justify-between gap-3">
+                <label className="flex min-w-0 items-center gap-2 text-[13.5px] text-t0">
                   <input
                     type="checkbox"
+                    className="shrink-0"
                     checked={day.open}
                     onChange={(event) =>
                       setValue((current) => ({
@@ -254,9 +277,9 @@ export function ScheduleWizard({
                       }))
                     }
                   />
-                  {weekdayLabel(day.dow)}
+                  <span className="truncate">{weekdayLabel(day.dow)}</span>
                 </label>
-                <label className="flex items-center gap-2 text-[12px] text-t2">
+                <label className="flex shrink-0 items-center gap-2 text-[12px] text-t2">
                   Pelo menos
                   <input
                     inputMode="numeric"
@@ -281,9 +304,9 @@ export function ScheduleWizard({
                 {groups.map(([id, name]) => {
                   const min = value.groupNeeds.find((item) => item.groupId === id)?.min ?? 2;
                   return (
-                    <li key={id} className="flex items-center justify-between gap-3">
-                      <span className="truncate text-[13.5px] text-t0">{name}</span>
-                      <label className="flex items-center gap-2 text-[12px] text-t2">
+                    <li key={id} className="flex min-w-0 items-center justify-between gap-3">
+                      <span className="min-w-0 truncate text-[13.5px] text-t0">{name}</span>
+                      <label className="flex shrink-0 items-center gap-2 text-[12px] text-t2">
                         Pelo menos
                         <input
                           inputMode="numeric"
@@ -308,99 +331,98 @@ export function ScheduleWizard({
           ) : null}
         </>
       ) : null}
-      {step === 4 ? (
+      {step === 3 ? (
         <>
-          <WizardCardHeader title="Feriados do mês" subtitle="A lista começa com os feriados do mês. O nacional vem da Brasil API. Inclua o municipal, ou remova o que não vale nesta loja." />
-          <ul className="max-h-80 space-y-3 overflow-y-auto">
+          <WizardCardHeader title="Feriados do mês" subtitle="O nacional já vem na lista. Inclua o municipal ou remova o que não vale nesta loja." />
+          <ul className="space-y-3">
             {value.holidayRules.length === 0 ? <li className="text-[13px] text-t2">Nenhum feriado neste mês.</li> : null}
             {value.holidayRules.map((rule) => (
-              <li key={`${rule.date}-${rule.name}`} className="rounded-[12px] border border-line px-3 py-3">
-                <div className="flex items-start justify-between gap-3">
-                  <span>
-                    <span className="block text-[13.5px] font-semibold text-t0">{rule.name}</span>
+              <li key={`${rule.date}-${rule.name}`} className="min-w-0 rounded-[12px] border border-line px-3 py-3">
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <span className="min-w-0">
+                    <span className="block truncate text-[13.5px] font-semibold text-t0">{rule.name}</span>
                     <span className="text-[12px] text-t2">{rule.date.split("-").reverse().join("/")}</span>
                   </span>
-                  <button type="button" className="text-[12px] text-t2" onClick={() => setValue((current) => ({ ...current, holidayRules: current.holidayRules.filter((item) => item !== rule) }))}>
+                  <button type="button" className="shrink-0 text-[12px] text-t2" onClick={() => setValue((current) => ({ ...current, holidayRules: current.holidayRules.filter((item) => item !== rule) }))}>
                     Remover
                   </button>
                 </div>
                 <label className="mt-2 flex items-center gap-2 text-[13px] text-t0">
-                  <input type="checkbox" checked={rule.open} onChange={(event) => patchRule(rule.date, { open: event.target.checked })} />
+                  <input type="checkbox" className="shrink-0" checked={rule.open} onChange={(event) => patchRule(rule.date, { open: event.target.checked })} />
                   A empresa abre neste feriado
                 </label>
                 {rule.open ? (
-                  <div className="mt-2 space-y-2">
-                    <label className="flex items-center gap-2 text-[12px] text-t2">
-                      Quantas pessoas vão trabalhar?
-                      <input inputMode="numeric" value={rule.workers} onChange={(event) => patchRule(rule.date, { workers: Math.max(0, Number(event.target.value) || 0) })} className="w-14 rounded-[10px] border border-line bg-bg-2 px-2 py-1.5 text-center text-[13px] text-t0" />
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    <label className="min-w-0 text-[12px] text-t2">
+                      Pessoas trabalhando
+                      <input inputMode="numeric" value={rule.workers} onChange={(event) => patchRule(rule.date, { workers: Math.max(0, Number(event.target.value) || 0) })} className={`mt-1 ${fieldClass}`} />
                     </label>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {(
-                        [
-                          ["extra_off", "Uma folga adicional"],
-                          ["double", "Pagamento em dobro"],
-                        ] as const
-                      ).map(([id, label]) => (
-                        <button key={id} type="button" onClick={() => patchRule(rule.date, { pay: id as HolidayPay })} className={`rounded-[12px] border px-3 py-2 text-left text-[13px] ${rule.pay === id ? "border-acc bg-acc-soft" : "border-line"}`}>
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                    {rule.pay === "extra_off" ? (
-                      <select className="w-full rounded-[10px] border border-line bg-bg-2 px-2 py-2 text-[13px]" value={rule.window} onChange={(event) => patchRule(rule.date, { window: event.target.value as CompWindow })}>
-                        <option value="7_days">Nos 7 dias seguintes</option>
-                        <option value="month_end">Até o último dia do mês</option>
-                        <option value="next_month">No mês seguinte</option>
+                    <label className="min-w-0 text-[12px] text-t2">
+                      Quem trabalha recebe
+                      <select className={`mt-1 ${fieldClass}`} value={rule.pay} onChange={(event) => patchRule(rule.date, { pay: event.target.value as HolidayRule["pay"] })}>
+                        <option value="extra_off">Uma folga adicional</option>
+                        <option value="double">Pagamento em dobro</option>
                       </select>
+                    </label>
+                    {rule.pay === "extra_off" ? (
+                      <label className="min-w-0 text-[12px] text-t2 sm:col-span-2">
+                        Quando a folga acontece
+                        <select className={`mt-1 ${fieldClass}`} value={rule.window} onChange={(event) => patchRule(rule.date, { window: event.target.value as CompWindow })}>
+                          <option value="7_days">Nos 7 dias seguintes</option>
+                          <option value="month_end">Até o último dia do mês</option>
+                          <option value="next_month">No mês seguinte</option>
+                        </select>
+                      </label>
                     ) : null}
                   </div>
                 ) : null}
               </li>
             ))}
           </ul>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <input type="date" value={extraDate} min={`${monthStart.slice(0, 7)}-01`} max={`${monthStart.slice(0, 7)}-31`} onChange={(event) => setExtraDate(event.target.value)} className="rounded-[10px] border border-line bg-bg-2 px-2 py-2 text-[13px]" />
-            <input placeholder="Nome do feriado municipal" value={extraName} onChange={(event) => setExtraName(event.target.value)} className="min-w-0 flex-1 rounded-[10px] border border-line bg-bg-2 px-2 py-2 text-[13px]" />
+          <div className="mt-3 grid gap-2 sm:grid-cols-[9.5rem_minmax(0,1fr)_auto] sm:items-center">
+            <input type="date" value={extraDate} min={`${monthStart.slice(0, 7)}-01`} max={`${monthStart.slice(0, 7)}-31`} onChange={(event) => setExtraDate(event.target.value)} className={fieldClass} />
+            <input placeholder="Feriado municipal" value={extraName} onChange={(event) => setExtraName(event.target.value)} className={fieldClass} />
             <Button type="button" variant="outline" onClick={addMunicipal}>Adicionar</Button>
           </div>
-        </>
-      ) : null}
-      {step === 5 ? (
-        <>
-          <WizardCardHeader title="Outras filiais" subtitle="A mesma cobertura e os mesmos feriados. Cada filial usa a própria equipe. Quem não tiver sexo marcado entra como mulher." />
-          <ul className="max-h-64 space-y-2 overflow-y-auto">
-            {otherStores.map((store) => (
-              <li key={store.id}>
-                <label className="flex items-center gap-3 rounded-[12px] border border-line px-3 py-2 text-[13.5px]">
-                  <input
-                    type="checkbox"
-                    checked={value.copyStoreIds.includes(store.id)}
-                    onChange={() =>
-                      setValue((current) => ({
-                        ...current,
-                        copyStoreIds: current.copyStoreIds.includes(store.id) ? current.copyStoreIds.filter((id) => id !== store.id) : [...current.copyStoreIds, store.id],
-                      }))
-                    }
-                  />
-                  {store.name}
-                </label>
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : null}
-      {step === 6 ? (
-        <>
-          <WizardCardHeader title="Revisão" subtitle={`${selectedPeople.length} pessoas · ${PATTERNS.find((pattern) => pattern.id === value.pattern)?.title} · ${monthLabel}`} />
-          <p className="mb-3 text-[13px] text-t2">{value.holidayRules.filter((rule) => rule.open).length} feriados com trabalho. A folga que não couber neste mês fica para o mês seguinte.</p>
-          {value.copyStoreIds.length > 0 ? <p className="mb-3 text-[13px] text-t2">Também em {value.copyStoreIds.length} {value.copyStoreIds.length === 1 ? "filial" : "filiais"}.</p> : null}
+          {otherStores.length > 0 ? (
+            <div className="mt-5">
+              <p className="text-[13px] font-semibold text-t0">Copiar para outras filiais</p>
+              <p className="mt-1 mb-2 text-[12px] text-t2">A mesma regra. Cada filial usa a própria equipe, e quem não tiver sexo entra como mulher.</p>
+              <ul className="space-y-2">
+                {otherStores.map((store) => (
+                  <li key={store.id}>
+                    <label className="flex min-w-0 items-center gap-3 rounded-[12px] border border-line px-3 py-2 text-[13.5px]">
+                      <input
+                        type="checkbox"
+                        className="shrink-0"
+                        checked={value.copyStoreIds.includes(store.id)}
+                        onChange={() =>
+                          setValue((current) => ({
+                            ...current,
+                            copyStoreIds: current.copyStoreIds.includes(store.id) ? current.copyStoreIds.filter((id) => id !== store.id) : [...current.copyStoreIds, store.id],
+                          }))
+                        }
+                      />
+                      <span className="min-w-0 truncate">{store.name}</span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          <p className="mt-4 text-[13px] text-t2">
+            {selectedPeople.length} pessoas · {pattern?.title} · {value.holidayRules.filter((rule) => rule.open).length} feriados com trabalho.
+            {value.copyStoreIds.length > 0 ? ` Também em ${value.copyStoreIds.length} ${value.copyStoreIds.length === 1 ? "filial" : "filiais"}.` : ""}
+          </p>
           {hasSchedule ? (
-            <label className="flex items-start gap-3 rounded-[12px] border border-line px-3 py-3 text-[13px] text-t0">
-              <input type="checkbox" className="mt-0.5" checked={value.replaceManual} onChange={(event) => setValue((current) => ({ ...current, replaceManual: event.target.checked }))} />
+            <label className="mt-3 flex items-start gap-3 rounded-[12px] border border-line px-3 py-3 text-[13px] text-t0">
+              <input type="checkbox" className="mt-0.5 shrink-0" checked={value.replaceManual} onChange={(event) => setValue((current) => ({ ...current, replaceManual: event.target.checked }))} />
               <span>Substituir também os dias ajustados na mão. Sem esta marca, esses dias permanecem.</span>
             </label>
           ) : (
-            <Badge variant="info">Primeira escala deste mês</Badge>
+            <div className="mt-3">
+              <Badge variant="info">Primeira escala deste mês</Badge>
+            </div>
           )}
         </>
       ) : null}
