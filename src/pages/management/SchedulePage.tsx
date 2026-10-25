@@ -3,7 +3,7 @@ import { Alert, Badge, Button, Card, EmptyState, FormField, Modal, Select, useTo
 import { MonthCalendar } from "@/components/wedash/MonthCalendar";
 import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
 import { PersonAvatar, PersonAvatarGroup } from "@/components/wedash/PersonAvatar";
-import { DayChip, PlainKpi } from "@/pages/cash-close/CashClosePage";
+import { PlainKpi } from "@/pages/cash-close/CashClosePage";
 import { MonthStep, monthNavBtn } from "@/pages/cash-close/MonthYearPicker";
 import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
@@ -34,16 +34,22 @@ const STATUS_BADGE: Record<DayStatus, "success" | "warning" | "info" | "neutral"
 };
 
 const SCHEDULE_LEGEND: LegendItem[] = [
-  { key: "work", color: "bg-ok", label: "Trabalha", hint: "quem está na loja" },
-  { key: "off", color: "bg-chip-gray", label: "Folga", hint: "descanso da escala" },
-  { key: "holiday", color: "bg-warn", label: "Feriado trabalhado", hint: "abre no feriado" },
-  { key: "double", color: "bg-acc", label: "Pagamento em dobro", hint: "feriado com o dobro" },
-  { key: "comp", color: "bg-info", label: "Folga compensatória", hint: "folga de quem trabalhou o feriado" },
+  { key: "work", color: "bg-ok", label: "Trabalha", hint: "Na loja" },
+  { key: "off", color: "bg-chip-gray", label: "Folga", hint: "Descanso" },
+  { key: "holiday", color: "bg-warn", label: "Feriado trabalhado", hint: "Trabalha no feriado" },
+  { key: "double", color: "bg-acc", label: "Pagamento em dobro", hint: "Trabalha com pagamento em dobro" },
+  { key: "comp", color: "bg-info", label: "Folga compensatória", hint: "Folga pelo feriado trabalhado" },
 ];
 
 function monthLabel(iso: string): string {
   const date = isoToDate(startOfMonth(iso));
   return `${MONTHS[date.getMonth()]} de ${date.getFullYear()}`;
+}
+
+function dayTitle(iso: string, holiday: string | null): string {
+  const date = isoToDate(iso);
+  const label = `${date.getDate()} de ${MONTHS[date.getMonth()].toLowerCase()}`;
+  return holiday ? `${label} · ${holiday}` : label;
 }
 
 function cellsOf(from: string, to: string): Array<string | null> {
@@ -96,14 +102,20 @@ function DayFaces({
           {rows.length}
         </span>
       </div>
+      <div className="mt-1 flex flex-wrap gap-1">
       {CHIP_ORDER.map((status) => {
         const count = counts.get(status) ?? 0;
         if (count === 0) return null;
         const holiday = status === "holiday_work" && doublePay;
         const label = holiday ? "Feriado 2×" : STATUS_LABEL[status];
         const color = holiday ? "bg-acc" : status === "work" ? "bg-ok" : status === "holiday_work" ? "bg-warn" : status === "comp_off" ? "bg-info" : "bg-chip-gray";
-        return <DayChip key={status} color={color}>{`${label} ${count}`}</DayChip>;
+        return (
+          <span key={status} className={`inline-flex max-w-full truncate rounded-md px-1.5 py-0.5 text-[10px] font-semibold text-white ${color}`}>
+            {`${label} ${count}`}
+          </span>
+        );
       })}
+      </div>
     </>
   );
 }
@@ -343,7 +355,7 @@ export function SchedulePage() {
       <SectionHeader
         section="Gestão"
         title="Escala"
-        subtitle="Veja quem trabalha, quem folga e o feriado de cada dia."
+        subtitle="Acompanhe e ajuste a escala da filial."
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1">
@@ -361,8 +373,8 @@ export function SchedulePage() {
                 <MonthStep dir="proximo" />
               </button>
             </div>
-            <Button icon={<Icon d={icons.plus} size={14} />} disabled={!store || people.length === 0 || loading} onClick={() => setWizard(true)}>
-              Nova escala
+            <Button icon={schedule ? undefined : <Icon d={icons.plus} size={14} />} disabled={!store || people.length === 0 || loading} onClick={() => setWizard(true)}>
+              {schedule ? "Editar escala" : "Criar escala"}
             </Button>
             <Button variant="outline" disabled={!store || !schedule} onClick={() => setConfirmDelete(true)}>
               Apagar escala
@@ -382,7 +394,7 @@ export function SchedulePage() {
               <PlainKpi label="Pessoas" value={String(schedule?.people.length ?? people.length)} color="var(--t0)" />
               <PlainKpi label="Modelo" value={patternLabel} color="var(--t0)" />
               <PlainKpi label="Feriados" value={String(holidayCount)} color="var(--t0)" />
-              <PlainKpi label="Dias manuais" value={String(new Set(days.filter((row) => row.origin === "manual").map((row) => row.day)).size)} color="var(--t0)" />
+              <PlainKpi label="Dias ajustados" value={String(new Set(days.filter((row) => row.origin === "manual").map((row) => row.day)).size)} color="var(--t0)" />
             </div>
             {schedule ? <ColorLegend className="mb-3" items={SCHEDULE_LEGEND} /> : null}
             <MonthCalendar>
@@ -562,12 +574,13 @@ function DayEditor({
     <Modal
       open
       onClose={busy ? () => {} : onClose}
-      title={`Dia ${Number(day.slice(8))}`}
+      title={dayTitle(day, holiday)}
       footer={
         <div className="flex flex-wrap justify-between gap-2">
           <Button
             variant="outline"
             disabled={busy}
+            title="Restaura o dia que a escala gerou."
             onClick={() => {
               setBusy(true);
               void onReset().finally(() => setBusy(false));
@@ -590,8 +603,7 @@ function DayEditor({
         </div>
       }
     >
-      {holiday ? <p className="mb-3 text-[13px] font-semibold text-warn">{holiday}</p> : null}
-      <p className="mb-3 text-[12.5px] text-t2">Inclua, tire ou mude a situação de cada pessoa. Voltar ao padrão restaura o dia gerado.</p>
+      <p className="mb-3 text-[12.5px] text-t2">Ajuste quem trabalha ou folga neste dia.</p>
       {ordered.length === 0 ? <p className="text-[13px] text-t2">Ninguém neste dia.</p> : null}
       <ul className="space-y-2">
         {ordered.map((row) => {
@@ -623,7 +635,7 @@ function DayEditor({
                   </Badge>
                 </button>
                 <Button type="button" variant="ghost" size="sm" onClick={() => setDraft((current) => current.filter((item) => item.sellerId !== row.sellerId))}>
-                  Remover
+                  Remover do dia
                 </Button>
               </span>
             </li>

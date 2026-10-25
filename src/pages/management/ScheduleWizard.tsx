@@ -151,7 +151,6 @@ export function ScheduleWizard({
   const days = periodDays(value.periodStart, value.periodEnd);
   const periodOk = value.periodEnd >= value.periodStart && days > 0 && days <= 93;
   const types = TYPES.filter((item) => patternFits(value.scenario, item.id));
-  const selectedType = TYPES.find((item) => item.id === value.pattern);
   const selectedPeople = people.filter((person) => value.selectedIds.includes(person.id));
   const shifts = [...new Map(selectedPeople.filter((person) => person.groupId).map((person) => [person.groupId as string, person.groupName || "Turno"])).entries()]
     .map(([id, name]) => ({ id, name }))
@@ -226,7 +225,7 @@ export function ScheduleWizard({
     <Modal
       open={open}
       onClose={saving ? () => {} : onClose}
-      title="Nova escala"
+      title={hasSchedule ? "Editar escala" : "Criar escala"}
       size="lg"
       bodyClassName="overflow-x-hidden overflow-y-auto p-5"
       footer={
@@ -234,7 +233,7 @@ export function ScheduleWizard({
           hidePrevious={step === 1}
           previousDisabled={saving}
           nextDisabled={saving || (step === 1 && !periodOk) || (step === 2 && value.selectedIds.length === 0) || (step === 3 && unassigned.length > 0)}
-          nextLabel={step === 4 ? (saving ? "Criando…" : "Nova escala") : "Continuar"}
+          nextLabel={step === 4 ? (saving ? (hasSchedule ? "Salvando…" : "Criando…") : hasSchedule ? "Salvar" : "Criar escala") : "Continuar"}
           hideNextIcon={step === 4}
           onPrevious={() => setStep((current) => current - 1)}
           onNext={() => (step === 4 ? onSubmit(withShiftNeeds(value)) : setStep((current) => current + 1))}
@@ -244,13 +243,13 @@ export function ScheduleWizard({
       <WizardSteps steps={STEPS} current={step} />
       {step === 1 ? (
         <>
-          <WizardCardHeader title={<>Qual escala montar?<span className="text-bad"> *</span></>} subtitle="O cenário, o tipo e o período. A escala começa no primeiro dia." />
+          <WizardCardHeader title={<>Modelo da escala<span className="text-bad"> *</span></>} subtitle="Escolha o modelo e o período da escala." />
           <div className="flex flex-col gap-4">
           <FormField label="Cenário" required>
             <div className="grid gap-2 sm:grid-cols-2">
               <button type="button" onClick={() => setScenario("before_6x1")} className={cn("rounded-[var(--radius-vela-md)] border px-3 py-3 text-left", value.scenario === "before_6x1" ? "border-acc bg-acc-soft" : "border-line bg-bg-inset")}>
                 <span className="block text-[14px] font-bold text-t0">Antes do fim da 6×1</span>
-                <span className="mt-1 block text-[12px] text-t2">6×1, 5×2, 4×3 e 12×36.</span>
+                <span className="mt-1 block text-[12px] text-t2">Inclui 6×1, 5×2, 4×3 e 12×36.</span>
               </button>
               <button type="button" onClick={() => setScenario("after_6x1")} className={cn("rounded-[var(--radius-vela-md)] border px-3 py-3 text-left", value.scenario === "after_6x1" ? "border-acc bg-acc-soft" : "border-line bg-bg-inset")}>
                 <span className="block text-[14px] font-bold text-t0">Após o fim da 6×1</span>
@@ -258,7 +257,7 @@ export function ScheduleWizard({
               </button>
             </div>
           </FormField>
-          <FormField label="Tipo de escala" required hint={`${selectedType?.detail}. Os dias fechados e as folgas de domingo também entram na conta.`}>
+          <FormField label="Tipo de escala" required hint="Os dias fechados e as folgas de domingo também entram na conta.">
             <Select value={value.pattern} onChange={(event) => setValue((current) => ({ ...current, pattern: event.target.value as SchedulePattern }))}>
               {types.map((item) => (
                 <option key={item.id} value={item.id}>{item.title} · {item.detail}</option>
@@ -293,7 +292,7 @@ export function ScheduleWizard({
       ) : null}
       {step === 2 ? (
         <>
-          <WizardCardHeader title={<>Quem vai trabalhar?<span className="text-bad"> *</span></>} subtitle="A equipe desta filial. O sexo organiza a folga de domingo." />
+          <WizardCardHeader title={<>Equipe da escala<span className="text-bad"> *</span></>} subtitle="Selecione as pessoas e defina as regras de folga." />
           <ul className="space-y-2">
             {people.length === 0 ? <li className="text-[13px] text-t2">Nenhuma pessoa ativa nesta filial.</li> : null}
             {people.map((person) => (
@@ -316,7 +315,7 @@ export function ScheduleWizard({
                     <span className="block truncate text-[13.5px] font-semibold text-t0">{person.name}</span>
                     <span className="block truncate text-[12px] text-t2">{person.groupName || person.role}</span>
                   </span>
-                  <label className="shrink-0 text-[12px] font-bold text-t0">
+                  <label className="shrink-0 text-[12px] font-bold text-t0" title="Usado apenas para aplicar a regra de folga aos domingos.">
                     Sexo<span className="text-bad"> *</span>
                     <Select className="mt-1 h-9! w-[7.5rem]! px-2!" aria-label={`Sexo de ${person.name}`} value={value.sex[person.id] ?? "woman"} onChange={(event) => setValue((current) => ({ ...current, sex: { ...current.sex, [person.id]: event.target.value as Sex } }))}>
                       <option value="woman">Mulher</option>
@@ -370,25 +369,25 @@ export function ScheduleWizard({
       ) : null}
       {step === 3 ? (
         <>
-          <WizardCardHeader title="Em quais dias a empresa abre?" subtitle="Desmarque o dia em que todos ficam de folga." />
+          <WizardCardHeader title="Dias de funcionamento" subtitle="Desmarque os dias em que a filial fica fechada." />
           {unassigned.length > 0 ? (
             <Alert
               variant="warning"
-              title="Falta o grupo de alguém"
+              title="Há pessoas sem grupo"
               action={
                 <Link to={paths.management.team} className="shrink-0 text-[12.5px] font-bold text-acc">
                   Abrir Equipe
                 </Link>
               }
             >
-              {unassigned.length === 1 ? `${unassigned[0].name} não tem grupo.` : `${unassigned.map((person) => person.name).join(", ")} não têm grupo.`} Escolha o grupo de cada pessoa em Equipe e volte para montar a escala.
+              {unassigned.length === 1 ? `${unassigned[0].name} não tem grupo.` : `${unassigned.map((person) => person.name).join(", ")} não têm grupo.`} Defina o grupo dessas pessoas em Equipe antes de continuar.
             </Alert>
           ) : (
             <>
               <p className="text-[13px] font-semibold text-t0">Quantas pessoas de cada turno?</p>
               <p className="mt-1 mb-3 text-[12px] text-t2">
                 {shifts.length > 1
-                  ? "O número é só daquele turno, no dia marcado. Os domingos revezam entre os turnos e continuam a partir do domingo anterior."
+                  ? "O mínimo é só daquele turno. Os domingos revezam entre os turnos, a partir do domingo anterior."
                   : "O número é o mínimo desse turno em cada dia aberto."}
               </p>
               <ul className="space-y-2">
@@ -430,7 +429,7 @@ export function ScheduleWizard({
       ) : null}
       {step === 4 ? (
         <>
-          <WizardCardHeader title="Vai abrir nos feriados?" subtitle="O nacional já vem na lista. Inclua o municipal ou remova o que não vale nesta loja." />
+          <WizardCardHeader title="Feriados" subtitle="Defina quais feriados a filial abre e como serão compensados." />
           <ul className="space-y-3">
             {value.holidayRules.length === 0 ? <li className="text-[13px] text-t2">Nenhum feriado neste período.</li> : null}
             {value.holidayRules.map((rule) => (
@@ -461,15 +460,15 @@ export function ScheduleWizard({
                     <FormField label="Pessoas trabalhando" required>
                       <CountField value={rule.workers} label={`pessoas trabalhando em ${rule.name}`} onChange={(workers) => patchRule(rule.date, { workers })} />
                     </FormField>
-                    <FormField label="Quem trabalha recebe" required>
-                      <Select value={rule.pay} aria-label={`Pagamento de ${rule.name}`} onChange={(event) => patchRule(rule.date, { pay: event.target.value as HolidayRule["pay"] })}>
-                        <option value="extra_off">Uma folga adicional</option>
+                    <FormField label="Compensação" required>
+                      <Select value={rule.pay} aria-label={`Compensação de ${rule.name}`} onChange={(event) => patchRule(rule.date, { pay: event.target.value as HolidayRule["pay"] })}>
+                        <option value="extra_off">Folga compensatória</option>
                         <option value="double">Pagamento em dobro</option>
                       </Select>
                     </FormField>
                     {rule.pay === "extra_off" ? (
                       <div className="sm:col-span-2">
-                        <FormField label="Quando a folga acontece" required>
+                        <FormField label="Prazo da folga compensatória" required>
                           <Select value={rule.window} aria-label={`Janela da folga de ${rule.name}`} onChange={(event) => patchRule(rule.date, { window: event.target.value as CompWindow })}>
                             <option value="7_days">Nos 7 dias seguintes</option>
                             <option value="month_end">Até o último dia do mês</option>
@@ -486,7 +485,7 @@ export function ScheduleWizard({
           {addingHoliday ? (
             <section className="mt-4 rounded-[var(--radius-vela-lg)] border border-line bg-bg-2 p-3">
               <p className="text-[12.5px] font-bold text-t0">Feriado municipal</p>
-              <p className="mt-1 text-[12.5px] leading-relaxed text-t2">Feriado desta cidade que a lista não trouxe.</p>
+              <p className="mt-1 text-[12.5px] leading-relaxed text-t2">Adicione um feriado municipal que não apareceu na lista.</p>
               <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
                 <div className="min-w-0 flex-1">
                   <FormField label="Data do feriado" required>
@@ -526,7 +525,7 @@ export function ScheduleWizard({
               <Button type="button" variant="outline" size="sm" onClick={() => setAddingHoliday(true)}>
                 Adicionar feriado
               </Button>
-              <p className="mt-1.5 text-[12.5px] leading-relaxed text-t2">Feriado desta cidade que a lista não trouxe.</p>
+              <p className="mt-1.5 text-[12.5px] leading-relaxed text-t2">Adicione um feriado municipal que não apareceu na lista.</p>
             </div>
           )}
           {hasSchedule ? (
