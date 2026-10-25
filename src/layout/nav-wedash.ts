@@ -13,9 +13,6 @@ const ICON = {
   chart: "M5 21v-6M12 21V9M19 21V3",
   /** Ondas de transmissao  -  "ao vivo" / tempo real (nao raio). */
   live: "M4.9 19.1C1 15.2 1 8.8 4.9 4.9M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5M19.1 4.9C23 8.8 23 15.1 19.1 19M9.5 12a2.5 2.5 0 1 0 5 0 2.5 2.5 0 1 0-5 0",
-  /** ClipboardList — pedido de compra. */
-  order:
-    "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M9 2h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zM12 11h4M12 16h4M8 11h.01M8 16h.01",
   /** Cifrão — fechamento, sangrias e informe. */
   finance: "M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6",
   /** Lucide Wallet — carteira da vendedora. */
@@ -45,12 +42,22 @@ const team: NavSingle = {
   to: paths.management.team,
 };
 
-/** Escala da equipe. */
+const scheduleItem = { label: "Escala", to: paths.management.schedule };
+const purchaseOrderItem = { label: "Pedido de compra", to: paths.management.purchaseOrder };
+
+/** Escala da equipe. O gestor também vê o pedido de compra neste grupo. */
 const schedule: NavGroup = {
   label: "Gestão",
   description: "Monte a escala da equipe.",
   icon: ICON.calendar,
-  items: [{ label: "Escala", to: paths.management.schedule }],
+  items: [scheduleItem],
+};
+
+const scheduleOwner: NavGroup = {
+  label: "Gestão",
+  description: "Monte a escala da equipe e o pedido de compra.",
+  icon: ICON.calendar,
+  items: [scheduleItem, purchaseOrderItem],
 };
 
 /** Metas e desafios. */
@@ -82,13 +89,6 @@ const tutorials: NavSingle = {
   label: "Guia prático",
   icon: ICON.help,
   to: paths.help,
-};
-
-/** Saldo do pedido. Página direta, sem submenu. */
-const purchaseOrder: NavSingle = {
-  label: "Pedido de compra",
-  icon: ICON.order,
-  to: paths.management.purchaseOrder,
 };
 
 /** Adquirente e administradora da filial (só Gestor). */
@@ -133,7 +133,7 @@ export function applyShoppingMenu(entries: NavEntry[], menu: { settings: boolean
 
 /** Abas das telas de cada grupo = os mesmos itens do menu. */
 export const performanceTabs = performance.items.map(({ label, to }) => ({ label, to }));
-export const scheduleTabs = schedule.items.map(({ label, to }) => ({ label, to }));
+export const scheduleTabs = scheduleOwner.items.map(({ label, to }) => ({ label, to }));
 export const financeTabs = finance.items.map(({ label, to }) => ({ label, to }));
 export const integrationTabs = integrations.items.map(({ label, to }) => ({ label, to }));
 export const settingsTabs = settings.items.map(({ label, to }) => ({ label, to }));
@@ -151,10 +151,9 @@ const navOwner: NavEntry[] = [
   },
   stock,
   team,
-  schedule,
+  scheduleOwner,
   performance,
   finance,
-  purchaseOrder,
   tutorials,
   integrations,
   settings,

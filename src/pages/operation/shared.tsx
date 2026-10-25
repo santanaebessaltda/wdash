@@ -60,7 +60,6 @@ export type SectionName =
   | "Performance"
   | "Financeiro"
   | "Gestão"
-  | "Pedido de compra"
   | "Integrações"
   | "Configurações";
 
@@ -70,7 +69,6 @@ const SECTION_TABS: Record<SectionName, Array<{ label: string; to: string; end?:
   Gestão: scheduleTabs,
   Performance: performanceTabs,
   Financeiro: financeTabs,
-  "Pedido de compra": [],
   Integrações: integrationTabs,
   Configurações: settingsTabs,
 };
@@ -79,14 +77,13 @@ const SECTION_TABS: Record<SectionName, Array<{ label: string; to: string; end?:
 const SECTION_PAGES: Record<SectionName, Array<() => Promise<unknown>>> = {
   Estoque: [() => import("@/pages/stock/InventoryPage")],
   Equipe: [() => import("@/pages/management/StaffPage")],
-  Gestão: [() => import("@/pages/management/SchedulePage")],
+  Gestão: [() => import("@/pages/management/SchedulePage"), () => import("@/pages/stock/PurchaseOrderPage")],
   Performance: [() => import("@/pages/goals/GoalsPage"), () => import("@/pages/management/ChallengesPage")],
   Financeiro: [
     () => import("@/pages/cash-close/CashClosePage"),
     () => import("@/pages/management/CashDropPage"),
     () => import("@/pages/management/SalesReportPage"),
   ],
-  "Pedido de compra": [() => import("@/pages/stock/PurchaseOrderPage")],
   Integrações: [() => import("@/pages/cash-close/AcquirersPage"), () => import("@/pages/operation/ShoppingPage")],
   Configurações: [() => import("@/pages/operation/BranchPage")],
 };
