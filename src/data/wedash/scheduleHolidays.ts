@@ -81,6 +81,26 @@ export function nationalHolidays(year: number): Holiday[] {
   return rows;
 }
 
+const nationalCache = new Map<number, Promise<Holiday[]>>();
+
+/** Feriados nacionais da Brasil API. Se a API falhar, usa a conta local. A Páscoa não entra. */
+export function loadNationalHolidays(year: number): Promise<Holiday[]> {
+  const cached = nationalCache.get(year);
+  if (cached) return cached;
+  const promise = fetch(`https://brasilapi.com.br/api/feriados/v1/${year}`)
+    .then(async (response) => {
+      if (!response.ok) return nationalHolidays(year);
+      const rows = (await response.json()) as { date?: string; name?: string; type?: string }[];
+      const national = rows
+        .filter((row) => row.type === "national" && row.date && row.name && !/^p[aá]scoa$/i.test(row.name.trim()))
+        .map((row) => ({ date: String(row.date).slice(0, 10), name: String(row.name), kind: "national" as const }));
+      return national.length > 0 ? national : nationalHolidays(year);
+    })
+    .catch(() => nationalHolidays(year));
+  nationalCache.set(year, promise);
+  return promise;
+}
+
 export function foldPlace(value: string): string {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }

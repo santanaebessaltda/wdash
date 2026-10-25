@@ -9,10 +9,10 @@ import { calendarTodayIso } from "@/data/wedash/clock";
 import { addDays, addMonths, endOfMonth, isoToDate, startOfMonth } from "@/data/wedash/engine/format";
 import { fetchGoals } from "@/data/wedash/goalsRepo";
 import { monthCoveredByGoal, scheduleStartMonth, type GoalSpan } from "@/data/wedash/goalMonths";
-import { branchRoleLabel, fetchStoreSellers, isBranchTeamMember, storesForSession, type StoreSeller } from "@/data/wedash/stores";
-import { generateMonth, weekday, type DayStatus } from "@/data/wedash/scheduleGenerate";
-import { holidayLabel, holidaysForStore, loadHolidaySeed, storePlace, type Holiday } from "@/data/wedash/scheduleHolidays";
-import { deleteSchedule, fetchSchedule, saveManualDay, saveSchedule, type ExtraHoliday, type StoredDay, type StoredSchedule } from "@/data/wedash/scheduleRepo";
+import { branchRoleLabel, fetchStoreSellers, fetchStoreShifts, isBranchTeamMember, storesForSession, type StoreSeller, type StoreShift } from "@/data/wedash/stores";
+import { defaultDayNeeds, generateMonth, weekday, type DayStatus, type GroupNeed, type Sex } from "@/data/wedash/scheduleGenerate";
+import { holidayLabel, holidaysForStore, loadHolidaySeed, loadNationalHolidays, storePlace, type Holiday } from "@/data/wedash/scheduleHolidays";
+import { deleteSchedule, fetchCompDue, fetchSchedule, saveManualDay, saveSchedule, type StoredDay, type StoredSchedule } from "@/data/wedash/scheduleRepo";
 import { ScheduleWizard, type ScheduleWizardValue } from "./ScheduleWizard";
 
 const MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -36,14 +36,7 @@ function cellsOf(from: string, to: string): Array<string | null> {
   return cells;
 }
 
-function extraDates(monthStart: string, extras: ExtraHoliday[]): { date: string; name: string }[] {
-  const [year, month] = monthStart.split("-").map(Number);
-  const last = isoToDate(endOfMonth(monthStart)).getDate();
-  return extras.filter((row) => row.day >= 1 && row.day <= last).map((row) => ({
-    date: `${year}-${String(month).padStart(2, "0")}-${String(row.day).padStart(2, "0")}`,
-    name: row.name,
-  }));
-}
+type SelectedPerson = { id: string; fixedOffDow: number | null; sex: Sex; groupId: string | null };
 
 export function SchedulePage() {
   const { show } = useToast();
@@ -52,6 +45,7 @@ export function SchedulePage() {
   const today = calendarTodayIso();
   const [month, setMonth] = useState(() => startOfMonth(today));
   const [people, setPeople] = useState<StoreSeller[]>([]);
+  const [shifts, setShifts] = useState<StoreShift[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [schedule, setSchedule] = useState<StoredSchedule | null>(null);
   const [days, setDays] = useState<StoredDay[]>([]);
@@ -113,17 +107,25 @@ export function SchedulePage() {
     setError(false);
     void (async () => {
       try {
-        const [team, seed, stored] = await Promise.all([
+        const year = Number(monthStart.slice(0, 4));
+        const [team, seed, stored, national, storeShifts] = await Promise.all([
           fetchStoreSellers(session.tenantId, [store.id]),
           loadHolidaySeed(),
           fetchSchedule(store.id, monthStart),
+          loadNationalHolidays(year),
+          fetchStoreShifts(session.tenantId, store.id),
         ]);
         if (stop) return;
         const active = (team.get(store.id) ?? []).filter((person) => isBranchTeamMember(person));
         setPeople(active);
-        const extras = extraDates(monthStart, stored.schedule?.extraHolidays ?? []);
+        setShifts(storeShifts);
         const place = storePlace(store);
-        setHolidays(holidaysForStore(seed, Number(monthStart.slice(0, 4)), place.uf, place.city, extras));
+        const base = holidaysForStore(seed, year, place.uf, place.city, []).filter((row) => row.kind !== "national");
+        const known = new Set(base.map((row) => `${row.date}|${row.name}`));
+        const extras = (stored.schedule?.holidayRules ?? [])
+          .filter((rule) => !known.has(`${rule.date}|${rule.name}`))
+          .map((rule) => ({ date: rule.date, name: rule.name }));
+        setHolidays([...national, ...holidaysForStore(seed, year, place.uf, place.city, extras).filter((row) => row.kind !== "national")]);
         setSchedule(stored.schedule);
         setDays(stored.days);
       } catch {
@@ -147,27 +149,47 @@ export function SchedulePage() {
     pattern: schedule?.pattern ?? "6x1",
     offMode: schedule?.offMode ?? "rotating",
     sundayMin: schedule?.sundayMin ?? 1,
+    womenSunday: schedule?.womenSunday ?? "every_2",
+    menSunday: schedule?.menSunday ?? "every_3",
     selectedIds: schedule ? schedule.people.map((person) => person.sellerId) : people.map((person) => person.id),
+    sex: Object.fromEntries(people.map((person) => [person.id, schedule?.people.find((row) => row.sellerId === person.id)?.sex ?? "woman"])),
     fixedOff: Object.fromEntries(schedule?.people.map((person) => [person.sellerId, person.fixedOffDow ?? 1]) ?? []),
-    extraHolidays: schedule?.extraHolidays ?? [],
+    dayNeeds: schedule && schedule.dayNeeds.length === 7 ? schedule.dayNeeds : defaultDayNeeds(),
+    groupNeeds: schedule?.groupNeeds ?? [],
+    holidayRules: schedule?.holidayRules ?? [],
     copyStoreIds: [],
     replaceManual: false,
   });
 
-  async function generateFor(storeId: string, city: string, uf: string, value: ScheduleWizardValue, selected: { id: string; fixedOffDow: number | null }[]) {
-    const seed = await loadHolidaySeed();
-    const extras = extraDates(monthStart, value.extraHolidays);
-    const holidayRows = holidaysForStore(seed, Number(monthStart.slice(0, 4)), uf, city, extras);
+  function coverageFor(selected: SelectedPerson[], value: ScheduleWizardValue): GroupNeed[] {
+    const ids = [...new Set(selected.map((person) => person.groupId).filter((id): id is string => Boolean(id)))];
+    return ids.map((groupId) => ({ groupId, min: value.groupNeeds.find((row) => row.groupId === groupId)?.min ?? 2 }));
+  }
+
+  async function generateFor(storeId: string, value: ScheduleWizardValue, selected: SelectedPerson[], groupNeeds: GroupNeed[]) {
     const [year, monthNumber] = monthStart.split("-").map(Number);
+    const incoming = await fetchCompDue(storeId, monthStart);
     const generated = generateMonth({
       year,
       month: monthNumber,
       pattern: value.pattern,
       offMode: value.offMode,
       sundayMin: value.sundayMin,
-      people: selected.map((person) => ({ id: person.id, fixedOffDow: value.offMode === "fixed" ? person.fixedOffDow : null })),
-      holidayDates: holidayRows.map((row) => row.date),
+      womenSunday: value.womenSunday,
+      menSunday: value.menSunday,
+      people: selected.map((person) => ({
+        id: person.id,
+        fixedOffDow: value.offMode === "fixed" ? person.fixedOffDow : null,
+        sex: person.sex,
+        groupId: person.groupId,
+      })),
+      holidayDates: [],
+      dayNeeds: value.dayNeeds,
+      groupNeeds,
+      holidayRules: value.holidayRules,
+      incomingComp: incoming,
     });
+    const known = new Set(holidays.filter((row) => row.kind !== "municipal").map((row) => row.date));
     return saveSchedule({
       tenantId: session.tenantId,
       storeId,
@@ -175,9 +197,15 @@ export function SchedulePage() {
       pattern: value.pattern,
       offMode: value.offMode,
       sundayMin: value.sundayMin,
-      extraHolidays: value.extraHolidays,
-      people: selected.map((person) => ({ sellerId: person.id, fixedOffDow: value.offMode === "fixed" ? person.fixedOffDow : null })),
-      days: generated.map((row) => ({ sellerId: row.personId, day: row.date, status: row.status })),
+      extraHolidays: value.holidayRules.filter((rule) => !known.has(rule.date)).map((rule) => ({ day: Number(rule.date.slice(8, 10)), name: rule.name })),
+      womenSunday: value.womenSunday,
+      menSunday: value.menSunday,
+      dayNeeds: value.dayNeeds,
+      groupNeeds,
+      holidayRules: value.holidayRules,
+      compDue: generated.compDue,
+      people: selected.map((person) => ({ sellerId: person.id, fixedOffDow: value.offMode === "fixed" ? person.fixedOffDow : null, sex: person.sex })),
+      days: generated.days.map((row) => ({ sellerId: row.personId, day: row.date, status: row.status })),
       keepManual: !value.replaceManual,
     });
   }
@@ -186,24 +214,25 @@ export function SchedulePage() {
     if (!store) return;
     setSaving(true);
     try {
-      const selected = value.selectedIds.map((id, index) => ({ id, fixedOffDow: value.fixedOff[id] ?? ((index % 6) + 1) }));
-      const place = storePlace(store);
-      const result = await generateFor(store.id, place.city, place.uf, value, selected);
+      const selected = value.selectedIds.map((id, index) => ({
+        id,
+        fixedOffDow: value.fixedOff[id] ?? ((index % 6) + 1),
+        sex: value.sex[id] ?? "woman",
+        groupId: people.find((person) => person.id === id)?.shiftId ?? null,
+      }));
+      const result = await generateFor(store.id, value, selected, coverageFor(selected, value));
       let kept = result.keptManualDays;
       if (value.copyStoreIds.length > 0) {
         const teams = await fetchStoreSellers(session.tenantId, value.copyStoreIds);
-        const catalog = storesForSession(session.stores);
         for (const storeId of value.copyStoreIds) {
-          const target = catalog.find((row) => row.id === storeId);
-          if (!target) continue;
-          const place = storePlace(target);
           const team = (teams.get(storeId) ?? []).filter((person) => isBranchTeamMember(person));
+          const copiedPeople = team.map((person, index) => ({ id: person.id, fixedOffDow: (index % 6) + 1, sex: "woman" as const, groupId: person.shiftId }));
+          const groupFloor = value.groupNeeds.length > 0 ? Math.max(...value.groupNeeds.map((row) => row.min)) : 2;
           const copied = await generateFor(
             storeId,
-            place.city,
-            place.uf,
             value,
-            team.map((person, index) => ({ id: person.id, fixedOffDow: (index % 6) + 1 })),
+            copiedPeople,
+            coverageFor(copiedPeople, { ...value, groupNeeds: [] }).map((row) => ({ ...row, min: groupFloor })),
           );
           kept += copied.keptManualDays;
         }
@@ -255,7 +284,7 @@ export function SchedulePage() {
                 <MonthStep dir="proximo" />
               </button>
             </div>
-            <Button disabled={!store || people.length === 0} onClick={() => setWizard(true)}>
+            <Button disabled={!store || people.length === 0 || loading} onClick={() => setWizard(true)}>
               Gerar escala
             </Button>
             <Button variant="outline" disabled={!store || !schedule} onClick={() => setConfirmDelete(true)}>
@@ -297,16 +326,19 @@ export function SchedulePage() {
                         </div>
                         {label ? <p className="mt-1 line-clamp-2 text-[10px] font-semibold leading-tight text-warn">{label}</p> : null}
                         <div className="mt-1 flex flex-col gap-0.5">
-                          {rows.slice(0, 4).map((row) => (
-                            <Badge
-                              key={row.sellerId}
-                              title={row.origin === "manual" ? "Ajustado na mão" : undefined}
-                              variant={row.status === "off" || row.status === "comp_off" ? "neutral" : row.status === "holiday_work" ? "warning" : "success"}
-                              className="max-w-full truncate"
-                            >
-                              {byPerson.get(row.sellerId)?.name ?? "Pessoa"}
-                            </Badge>
-                          ))}
+                          {rows.slice(0, 4).map((row) => {
+                            const double = row.status === "holiday_work" && schedule?.holidayRules.some((rule) => rule.date === day && rule.pay === "double");
+                            return (
+                              <Badge
+                                key={row.sellerId}
+                                title={double ? "Pagamento em dobro" : row.origin === "manual" ? "Ajustado na mão" : undefined}
+                                variant={row.status === "off" || row.status === "comp_off" ? "neutral" : row.status === "holiday_work" ? "warning" : "success"}
+                                className="max-w-full truncate"
+                              >
+                                {byPerson.get(row.sellerId)?.name ?? "Pessoa"}{double ? " 2×" : ""}
+                              </Badge>
+                            );
+                          })}
                           {rows.length > 4 ? <span className="text-[10px] text-t2">+{rows.length - 4}</span> : null}
                         </div>
                       </div>
@@ -325,10 +357,18 @@ export function SchedulePage() {
         <ScheduleWizard
           open
           onClose={() => setWizard(false)}
-          people={people.map((person) => ({ id: person.id, name: person.name, role: branchRoleLabel(person.role) }))}
+          people={people.map((person) => ({
+            id: person.id,
+            name: person.name,
+            role: branchRoleLabel(person.role),
+            groupId: person.shiftId,
+            groupName: shifts.find((shift) => shift.id === person.shiftId)?.name ?? "",
+          }))}
           otherStores={otherStores}
           hasSchedule={schedule != null}
           monthLabel={monthLabel(monthStart)}
+          monthStart={monthStart}
+          nationalHolidays={holidays.filter((row) => row.date >= monthStart && row.date <= monthEnd)}
           initial={initialWizard()}
           saving={saving}
           onSubmit={(value) => void onGenerate(value)}
@@ -352,15 +392,27 @@ export function SchedulePage() {
           onReset={async () => {
             if (!schedule) return;
             const [year, monthNumber] = monthStart.split("-").map(Number);
+            const incoming = await fetchCompDue(store.id, monthStart);
             const generated = generateMonth({
               year,
               month: monthNumber,
               pattern: schedule.pattern,
               offMode: schedule.offMode,
               sundayMin: schedule.sundayMin,
-              people: schedule.people.map((person) => ({ id: person.sellerId, fixedOffDow: person.fixedOffDow })),
-              holidayDates: holidays.map((row) => row.date),
-            }).filter((row) => row.date === dayOpen);
+              womenSunday: schedule.womenSunday,
+              menSunday: schedule.menSunday,
+              people: schedule.people.map((person) => ({
+                id: person.sellerId,
+                fixedOffDow: person.fixedOffDow,
+                sex: person.sex,
+                groupId: people.find((row) => row.id === person.sellerId)?.shiftId ?? null,
+              })),
+              holidayDates: [],
+              dayNeeds: schedule.dayNeeds,
+              groupNeeds: schedule.groupNeeds,
+              holidayRules: schedule.holidayRules,
+              incomingComp: incoming,
+            }).days.filter((row) => row.date === dayOpen);
             try {
               await saveDay(generated.map((row) => ({ sellerId: row.personId, day: row.date, status: row.status, origin: "generated" as const })));
               setDayOpen(null);

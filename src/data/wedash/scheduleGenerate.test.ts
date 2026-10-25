@@ -32,7 +32,7 @@ describe("geração da escala", () => {
       sundayMin: 0,
       people,
       holidayDates: [],
-    });
+    }).days;
     const byDate = new Map<string, string[]>();
     for (const row of rows) {
       const list = byDate.get(row.date) ?? [];
@@ -53,7 +53,7 @@ describe("geração da escala", () => {
       sundayMin: 0,
       people: [{ id: "a" }],
       holidayDates: ["2026-04-21"],
-    });
+    }).days;
     const tiradentes = rows.find((row) => row.date === "2026-04-21");
     expect(tiradentes?.status === "holiday_work" || tiradentes?.status === "off").toBe(true);
     expect(weekday("2026-04-21")).toBe(2);
@@ -68,9 +68,62 @@ describe("geração da escala", () => {
       sundayMin: 0,
       people: [{ id: "a", fixedOffDow: 2 }],
       holidayDates: [],
-    });
+    }).days;
     const tuesdays = rows.filter((row) => weekday(row.date) === 2);
     expect(tuesdays.every((row) => row.status === "off" || row.status === "holiday_work")).toBe(true);
     expect(tuesdays.some((row) => row.status === "off")).toBe(true);
+  });
+
+  it("dá mais domingo de folga para mulher do que para homem", () => {
+    const rows = generateMonth({
+      year: 2026,
+      month: 3,
+      pattern: "6x1",
+      offMode: "rotating",
+      sundayMin: 0,
+      womenSunday: "every_2",
+      menSunday: "every_3",
+      people: [
+        { id: "mulher", sex: "woman" },
+        { id: "homem", sex: "man" },
+      ],
+      holidayDates: [],
+    }).days;
+    const sundayOffs = (id: string) => rows.filter((row) => row.personId === id && weekday(row.date) === 0 && (row.status === "off" || row.status === "comp_off")).length;
+    expect(sundayOffs("mulher")).toBeGreaterThanOrEqual(2);
+    expect(sundayOffs("homem")).toBeGreaterThanOrEqual(1);
+  });
+
+  it("marca a folga do feriado nos sete dias seguintes", () => {
+    const generated = generateMonth({
+      year: 2026,
+      month: 10,
+      pattern: "6x1",
+      offMode: "rotating",
+      sundayMin: 0,
+      people: [{ id: "a" }, { id: "b" }],
+      holidayDates: [],
+      dayNeeds: Array.from({ length: 7 }, (_, dow) => ({ dow, open: true, min: 1 })),
+      holidayRules: [{ date: "2026-10-12", name: "Aparecida", open: true, workers: 1, pay: "extra_off", window: "7_days" }],
+    });
+    const worked = generated.days.find((row) => row.date === "2026-10-12" && row.status === "holiday_work");
+    expect(worked).toBeTruthy();
+    const comp = generated.days.filter((row) => row.personId === worked?.personId && row.status === "comp_off" && row.date > "2026-10-12" && row.date <= "2026-10-19");
+    expect(comp.length).toBe(1);
+    expect(generated.compDue).toEqual([]);
+  });
+
+  it("deixa a folga do feriado para o mês seguinte", () => {
+    const generated = generateMonth({
+      year: 2026,
+      month: 10,
+      pattern: "6x1",
+      offMode: "rotating",
+      sundayMin: 0,
+      people: [{ id: "a" }],
+      holidayDates: [],
+      holidayRules: [{ date: "2026-10-12", name: "Aparecida", open: true, workers: 1, pay: "extra_off", window: "next_month" }],
+    });
+    expect(generated.compDue).toEqual([{ personId: "a", holiday: "2026-10-12", until: "2026-11-30" }]);
   });
 });

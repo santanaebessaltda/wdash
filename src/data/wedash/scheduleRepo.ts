@@ -1,5 +1,5 @@
-import type { DayStatus, OffMode, SchedulePattern } from "./scheduleGenerate";
-import { endOfMonth, startOfMonth } from "./engine/format";
+import type { DayStatus, OffMode, SchedulePattern, Sex, SundayRule, DayNeed, GroupNeed, HolidayRule, CompDue } from "./scheduleGenerate";
+import { addMonths, endOfMonth, startOfMonth } from "./engine/format";
 
 export type ExtraHoliday = { day: number; name: string };
 
@@ -8,8 +8,14 @@ export type StoredSchedule = {
   pattern: SchedulePattern;
   offMode: OffMode;
   sundayMin: number;
+  womenSunday: SundayRule;
+  menSunday: SundayRule;
+  dayNeeds: DayNeed[];
+  groupNeeds: GroupNeed[];
+  holidayRules: HolidayRule[];
+  compDue: CompDue[];
   extraHolidays: ExtraHoliday[];
-  people: { sellerId: string; fixedOffDow: number | null }[];
+  people: { sellerId: string; fixedOffDow: number | null; sex: Sex }[];
 };
 
 export type StoredDay = {
@@ -25,8 +31,18 @@ type ScheduleRecord = {
   off_mode: OffMode;
   sunday_min: number;
   extra_holidays: ExtraHoliday[] | null;
-  store_schedule_person: { seller_id: string; fixed_off_dow: number | null }[] | null;
+  women_sunday?: SundayRule | null;
+  men_sunday?: SundayRule | null;
+  day_needs?: DayNeed[] | null;
+  group_needs?: GroupNeed[] | null;
+  holiday_rules?: HolidayRule[] | null;
+  comp_due?: CompDue[] | null;
+  store_schedule_person: { seller_id: string; fixed_off_dow: number | null; sex?: Sex | null }[] | null;
 };
+
+function asList<T>(value: T[] | null | undefined): T[] {
+  return Array.isArray(value) ? value : [];
+}
 
 function asSchedule(row: ScheduleRecord): StoredSchedule {
   return {
@@ -34,10 +50,17 @@ function asSchedule(row: ScheduleRecord): StoredSchedule {
     pattern: row.pattern,
     offMode: row.off_mode,
     sundayMin: row.sunday_min,
-    extraHolidays: Array.isArray(row.extra_holidays) ? row.extra_holidays : [],
+    womenSunday: row.women_sunday ?? "every_2",
+    menSunday: row.men_sunday ?? "every_3",
+    dayNeeds: asList(row.day_needs),
+    groupNeeds: asList(row.group_needs),
+    holidayRules: asList(row.holiday_rules),
+    compDue: asList(row.comp_due),
+    extraHolidays: asList(row.extra_holidays),
     people: (row.store_schedule_person ?? []).map((person) => ({
       sellerId: person.seller_id,
       fixedOffDow: person.fixed_off_dow,
+      sex: person.sex === "man" ? "man" : "woman",
     })),
   };
 }
@@ -55,7 +78,7 @@ export async function fetchSchedule(storeId: string, monthStart: string): Promis
   const [scheduleResult, dayResult] = await Promise.all([
     sb
       .from("store_schedule")
-      .select("id, pattern, off_mode, sunday_min, extra_holidays, store_schedule_person(seller_id, fixed_off_dow)")
+      .select("id, pattern, off_mode, sunday_min, extra_holidays, women_sunday, men_sunday, day_needs, group_needs, holiday_rules, comp_due, store_schedule_person(seller_id, fixed_off_dow, sex)")
       .eq("store_id", storeId)
       .eq("month_start", startOfMonth(monthStart))
       .maybeSingle(),
@@ -87,7 +110,13 @@ export async function saveSchedule(input: {
   offMode: OffMode;
   sundayMin: number;
   extraHolidays: ExtraHoliday[];
-  people: { sellerId: string; fixedOffDow: number | null }[];
+  womenSunday: SundayRule;
+  menSunday: SundayRule;
+  dayNeeds: DayNeed[];
+  groupNeeds: GroupNeed[];
+  holidayRules: HolidayRule[];
+  compDue: CompDue[];
+  people: { sellerId: string; fixedOffDow: number | null; sex: Sex }[];
   days: { sellerId: string; day: string; status: DayStatus }[];
   keepManual: boolean;
 }): Promise<{ keptManualDays: number }> {
@@ -117,6 +146,12 @@ export async function saveSchedule(input: {
         off_mode: input.offMode,
         sunday_min: input.sundayMin,
         extra_holidays: input.extraHolidays,
+        women_sunday: input.womenSunday,
+        men_sunday: input.menSunday,
+        day_needs: input.dayNeeds,
+        group_needs: input.groupNeeds,
+        holiday_rules: input.holidayRules,
+        comp_due: input.compDue,
         generated_at: new Date().toISOString(),
       },
       { onConflict: "store_id,month_start" },
@@ -136,6 +171,7 @@ export async function saveSchedule(input: {
         schedule_id: scheduleId,
         seller_id: person.sellerId,
         fixed_off_dow: person.fixedOffDow,
+        sex: person.sex,
       })),
     );
     if (people.error) throw new Error(people.error.message);
@@ -162,6 +198,14 @@ export async function saveSchedule(input: {
     if (chunk.error) throw new Error(chunk.error.message);
   }
   return { keptManualDays: new Set([...manual].map((key) => key.split("|")[0])).size };
+}
+
+export async function fetchCompDue(storeId: string, monthStart: string): Promise<CompDue[]> {
+  const sb = await client();
+  const previous = addMonths(startOfMonth(monthStart), -1);
+  const result = await sb.from("store_schedule").select("comp_due").eq("store_id", storeId).eq("month_start", previous).maybeSingle();
+  if (result.error || !result.data || !Array.isArray(result.data.comp_due)) return [];
+  return result.data.comp_due as CompDue[];
 }
 
 export async function saveManualDay(input: {
