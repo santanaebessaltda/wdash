@@ -356,10 +356,7 @@ export function SchedulePage() {
                     ) : null}
                     {day ? (
                       <div className="pointer-events-none relative z-10">
-                        <div className="flex items-start justify-between gap-1">
-                          <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-bold ${day === today ? "bg-acc text-white" : "text-t0"}`}>{Number(day.slice(8))}</span>
-                          {weekday(day) === 0 ? <span className="text-[10px] font-semibold text-t2">Dom</span> : null}
-                        </div>
+                        <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-bold ${day === today ? "bg-acc text-white" : "text-t0"}`}>{Number(day.slice(8))}</span>
                         {label ? <p className="mt-1 line-clamp-2 text-[10px] font-semibold leading-tight text-warn">{label}</p> : null}
                         <div className="mt-1 flex flex-col gap-0.5">
                           {rows.slice(0, 4).map((row) => {
