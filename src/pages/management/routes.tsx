@@ -13,6 +13,7 @@ const WalletPage = lazyPage(() => import("../wallet/WalletPage"), "default");
 const CashDropPage = lazyPage(() => import("./CashDropPage"), "CashDropPage");
 const SalesReportPage = lazyPage(() => import("./SalesReportPage"), "SalesReportPage");
 const StaffPage = lazyPage(() => import("./StaffPage"), "StaffPage");
+const SchedulePage = lazyPage(() => import("./SchedulePage"), "SchedulePage");
 const PurchaseOrderPage = lazyPage(() => import("../stock/PurchaseOrderPage"), "PurchaseOrderPage");
 
 function LegacyChallengeRedirect({ edit = false }: { edit?: boolean }) {
@@ -28,6 +29,7 @@ export const managementRoutes: RouteObject[] = [
     element: <RequireRole roles={["OWNER", "MANAGER", "ADMIN_GLOBAL"]} />,
     children: [
       { path: paths.management.team, element: <StaffPage /> },
+      { path: paths.management.schedule, element: <SchedulePage /> },
       { path: paths.legacy.management.team, element: <RedirectTo to={paths.management.team} /> },
       { path: paths.legacy.management.shifts, element: <RedirectTo to={paths.management.team} /> },
       { path: paths.legacy.management.staff, element: <RedirectTo to={paths.management.team} /> },

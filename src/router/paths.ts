@@ -79,6 +79,8 @@ export const paths = {
     cashDrop: "/finance/cash-drop",
     /** Calendário do informe de vendas no shopping. */
     salesReport: "/finance/sales-report",
+    /** Escala da equipe. */
+    schedule: "/schedule",
   },
   /** Configurações da filial em `/settings`. Custos, loja e equipe são URLs antigas. */
   operation: {

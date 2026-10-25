@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button, Card, CardHeader, CardTitle, EmptyState, FormField, Input, PageHeader, Select, TabNav, Tooltip } from "@/components/ui";
 import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
-import { applyShoppingMenu, financeTabs, integrationTabs, navForRole, performanceTabs, settingsTabs } from "@/layout/nav-wedash";
+import { applyShoppingMenu, financeTabs, integrationTabs, navForRole, performanceTabs, scheduleTabs, settingsTabs } from "@/layout/nav-wedash";
 import { isNavGroup } from "@/layout/nav-config";
 import { useActiveSession } from "@/session/SessionProvider";
 import { useShoppingMenu } from "@/layout/useShoppingMenu";
@@ -59,6 +59,7 @@ export type SectionName =
   | "Equipe"
   | "Performance"
   | "Financeiro"
+  | "Gestão"
   | "Pedido de compra"
   | "Integrações"
   | "Configurações";
@@ -66,6 +67,7 @@ export type SectionName =
 const SECTION_TABS: Record<SectionName, Array<{ label: string; to: string; end?: boolean }>> = {
   Estoque: [],
   Equipe: [],
+  Gestão: scheduleTabs,
   Performance: performanceTabs,
   Financeiro: financeTabs,
   "Pedido de compra": [],
@@ -77,6 +79,7 @@ const SECTION_TABS: Record<SectionName, Array<{ label: string; to: string; end?:
 const SECTION_PAGES: Record<SectionName, Array<() => Promise<unknown>>> = {
   Estoque: [() => import("@/pages/stock/InventoryPage")],
   Equipe: [() => import("@/pages/management/StaffPage")],
+  Gestão: [() => import("@/pages/management/SchedulePage")],
   Performance: [() => import("@/pages/goals/GoalsPage"), () => import("@/pages/management/ChallengesPage")],
   Financeiro: [
     () => import("@/pages/cash-close/CashClosePage"),

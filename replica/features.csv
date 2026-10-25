@@ -1,0 +1,43 @@
+feature,area,priority,original,clone,notes
+Abrir o Montador a partir da home da Caixa,entrada,skip,yes,skip,as outras ferramentas da Caixa não entram
+Cadastrar funcionário na hora (nome cargo sexo),equipe,skip,yes,skip,a Equipe do WDash já vem do Millennium; não há campo de sexo
+Lista de funcionários com remoção e contador,equipe,skip,yes,skip,substituído por quem está ativo na filial
+Escolher quem da equipe entra na escala,equipe,must,no,yes,passo 1 do wizard; pessoa afastada fica de fora
+Modelo 6x1,modelo,must,yes,yes,6 dias de trabalho e 1 de folga
+Modelo 5x2,modelo,must,yes,yes,5 dias de trabalho e 2 de folga
+Modelo 12x36 como dia sim e dia não,modelo,must,yes,yes,a célula é o dia; o original não marca hora de entrada nem de saída
+Modelo 6x2,modelo,should,yes,no,
+Modelo 5x1,modelo,should,yes,no,
+Escala espanhola (48h e 40h alternadas),modelo,could,yes,no,no original também vira quantidade de folgas no mês
+Folgas rotativas de segunda a sábado,folgas,must,yes,yes,domingo continua no mínimo configurado
+Folga fixa no mesmo dia da semana por pessoa,folgas,must,yes,yes,seg a sáb; domingo não é o dia fixo
+Mês e ano da escala,periodo,must,yes,yes,calendário do mês no padrão de Fechamento e Sangrias
+Mínimo de domingos separado para homens e mulheres,folgas,could,yes,no,a Equipe não tem sexo; v1 usa um mínimo único para todos
+Mínimo de domingos único para a equipe,folgas,should,no,yes,0 a 4 ou todos os domingos do mês
+Feriados nacionais do mês,feriados,must,yes,yes,"importar joaopbini/feriados-brasil (MIT) uma vez por ano; Carnaval e os móveis nacionais são calculados; estadual e municipal de 2026 vêm do arquivo"
+Feriado municipal no mês,feriados,must,yes,yes,"mesmo repositório, pelo IBGE da cidade e UF da filial; o card mostra o nome; linha genérica Feriado Municipal entra assim mesmo; o wizard cobre o que faltar"
+Gerar escala abre o wizard na própria tela,geracao,must,yes,yes,botão em Gestão → Escala; modal com WizardSteps; escreve o mês das filiais escolhidas
+Estado do dia: trabalho folga feriado trabalhado folga compensatória,grade,must,yes,yes,ciclo do clique no original
+Grade em tabela pessoa por dia,grade,could,yes,no,no WDash o mês é calendário com badges
+Calendário do mês com badge de quem trabalha e de quem folga,calendario,must,no,yes,padrão visual de Fechamento e Sangrias
+KPIs do mês (pessoas dias modelo domingos),resumo,must,yes,yes,cards no topo como Sangrias
+Cobertura de cada domingo,resumo,should,yes,no,quantos trabalham naquele domingo
+Resumo por pessoa com status ok atenção irregular,resumo,should,yes,no,mais de 6 dias seguidos ou domingo abaixo do mínimo
+Alertas de consecutivo e de domingo,resumo,should,yes,no,
+Análise de conformidade da CLT com texto pronto,legal,could,yes,no,não copiar o parecer; oito checagens no original; fora da v1
+Editar o dia de uma filial,edicao,must,yes,yes,modal do dia em Gestão, com uma filial no seletor
+Dia ajustado na mão sobrevive a gerar de novo,edicao,must,no,yes,padrão da revisão; a opção explícita substitui tudo; voltar ao padrão desfaz um dia
+Aviso do que gerar de novo fez e quantos dias manuais ficaram,edicao,must,no,yes,visível em Gestão → Escala
+Apagar a escala do mês da filial,edicao,must,no,yes,confirmação própria; tira também o dia manual; o feriado continua no card; não mexe em outro mês nem em outra filial
+Wizard de geração,configuracao,must,yes,yes,modal na tela de Escala; passos equipe modelo regras filiais revisão
+Salvar a configuração e abrir de novo,configuracao,must,yes,yes,no original a lista fica neste navegador; no WDash fica no banco
+Excluir uma configuração,configuracao,should,yes,no,
+Copiar a configuração para outras filiais,configuracao,must,no,yes,cada filial recebe a regra e recalcula o próprio mês; o dia manual do destino permanece; salvar a origem depois não mexe nas outras
+Menu Gestão com submenu Escala,navegacao,must,no,yes,calendário e Gerar escala; Equipe continua o cadastro; Fechamento e Sangrias continuam em Financeiro; Configurações não ganha Escala
+Várias filiais no seletor mostram o mês e não editam o dia,navegacao,should,no,yes,igual Sangrias: ação do dia só com uma filial
+Rascunho automático neste navegador,persistencia,skip,yes,skip,não é o arquivo oficial
+Baixar e reabrir arquivo JSON,persistencia,skip,yes,skip,
+Imprimir a escala,exportacao,could,yes,no,
+Exportar Excel,exportacao,could,yes,no,
+Nova escala do zero,configuracao,should,yes,no,no WDash é criar outra configuração
+Marca e texto Método EmpresaBlindada,marca,skip,yes,skip,não levar nome logo nem rodapé
