@@ -260,7 +260,7 @@ function GoalHero({
             label: "Projeção",
             value: projectionAmount != null ? brlCent(projectionAmount) : "—",
             cls: projectionAmount == null ? "text-t2" : "text-t0",
-            sub: projectionAmount != null ? `${num(projectedPct, 0)}% da meta` : "Disponível após metade do período",
+            sub: projectionAmount != null ? `${num(projectedPct, 0)}% ${goal.tiers.length > 0 ? "do último nível" : "da meta"}` : "Disponível após metade do período",
             help: "Estimativa de fechamento pelo ritmo dos dias já fechados e pelo peso de cada dia da semana. A mesma conta do card Atingimento da meta.",
           },
         ]

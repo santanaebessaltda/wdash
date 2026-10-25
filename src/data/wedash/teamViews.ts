@@ -25,7 +25,7 @@ import { TODAY_ISO, CURRENT_HOUR } from "./clock";
 import { dayAggregate, salesDay, storeOpen, sumAggregates, type Aggregate } from "./sales";
 import { storeById, stores, groups, type Store } from "./stores";
 import { brlK, revenueCurve, seriesAxisForPeriod, kpiDelta, previousPeriod, resolvePeriod, seriesAxisLabel, type Scope, type ResolvedPeriod, type BlockState } from "./dashboard";
-import { goalBarScale } from "./engine/goalView";
+import { goalBarScale, goalLevelPct } from "./engine/goalView";
 import { brl, shortDate, isoToDate, endOfMonth, shortHour, eachDay, monthYear, num, dayCountLabel, addDays } from "@/lib/format";
 import type { TintKey } from "@/pages/dashboards/icons";
 import type { GoalCardView, NetworkGlobalGoal, SellerRow } from "./engine/goalTypes";
@@ -444,7 +444,7 @@ function sellersView(storeId: string, period: ResolvedPeriod, activeGoal: boolea
       for (const iso of eachDay(`${competence}-01`, TODAY_ISO)) accumulatedShare += curve.weight(iso);
       if (accumulatedShare > 0) finalProjection = revenue / accumulatedShare;
     }
-    const atingProjPct = personGoal && personGoal.amount > 0 ? (finalProjection / personGoal.amount) * 100 : 0;
+    const atingProjPct = personGoal && personGoal.amount > 0 ? goalLevelPct((finalProjection / personGoal.amount) * 100, tiers.map((d) => d.minAttainmentPct)) : 0;
 
     // Escada no MTD = o que ja garantiu (mesma base do Progresso da Meta).
     // Projecao alimenta so premiacao projetada / atingimentoProjetadoPct.
@@ -860,18 +860,18 @@ function firstName(nameComplete: string): string {
   return nameComplete.split(" ")[0];
 }
 
-function buildGoalBand(achieved: number, total: number, competence: string, storesInScope: Store[]): NetworkGlobalGoal | null {
+function buildGoalBand(achieved: number, total: number, competence: string, storesInScope: Store[], levels: readonly number[] = []): NetworkGlobalGoal | null {
   if (total <= 0) return null;
   const first = `${competence}-01`;
   const last = endOfMonth(first);
   const pct = (achieved / total) * 100;
   const closed = last < TODAY_ISO;
-  let projectedPct = pct;
+  let projectedPct = goalLevelPct(pct, levels);
   if (!closed) {
     const curve = revenueCurve(storesInScope, competence);
     let accumulatedShare = 0;
     for (const iso of eachDay(first, TODAY_ISO)) accumulatedShare += curve.weight(iso);
-    if (accumulatedShare > 0) projectedPct = (achieved / accumulatedShare / total) * 100;
+    if (accumulatedShare > 0) projectedPct = goalLevelPct((achieved / accumulatedShare / total) * 100, levels);
   }
   const remainingOpen = eachDay(TODAY_ISO, last).filter((iso) => storesInScope.some((f) => storeOpen(f, iso)));
   const goalName =
@@ -934,9 +934,9 @@ function buildGoalCards(
       const singleBrand = m.brands.length === 1 ? m.brands[0] : null;
       const achieved = achievedCompetence(storeId, competence, singleBrand);
       const band = singleBrand
-        ? buildGoalBand(achieved, m.storeAmount, competence, [branch])
+        ? buildGoalBand(achieved, m.storeAmount, competence, [branch], m.tiers.map((t) => t.minAttainmentPct))
         : bandWithOutsideTeam(
-            buildGoalBand(achieved, m.storeAmount, competence, [branch]),
+            buildGoalBand(achieved, m.storeAmount, competence, [branch], m.tiers.map((t) => t.minAttainmentPct)),
             list.reduce((s, l) => s + l.revenueAmount, 0),
           );
       if (!band) continue;
@@ -1141,7 +1141,7 @@ function storeView(scope: Scope, period: ResolvedPeriod, goalPeriod: ResolvedPer
   const storeGoalAmount = activeGoal ? (goalOfStore(storeId, competence)?.storeAmount ?? 0) : 0;
   if (activeGoal && storeGoalAmount > 0) {
     networkGoal = bandWithOutsideTeam(
-      buildGoalBand(achievedCompetence(storeId, competence, null), storeGoalAmount, competence, [branch]),
+      buildGoalBand(achievedCompetence(storeId, competence, null), storeGoalAmount, competence, [branch], goalOfStore(storeId, competence)?.tiers.map((t) => t.minAttainmentPct) ?? []),
       sellers.reduce((s, l) => s + l.revenueAmount, 0),
     );
   }
