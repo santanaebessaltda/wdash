@@ -85,6 +85,33 @@ export function defaultDayNeeds(): DayNeed[] {
   return Array.from({ length: 7 }, (_, dow) => ({ dow, open: true, min: 1 }));
 }
 
+export function nextSundayShift(lastShiftId: string | null, orderedShiftIds: string[]): number {
+  if (orderedShiftIds.length === 0) return 0;
+  const index = lastShiftId ? orderedShiftIds.indexOf(lastShiftId) : -1;
+  if (index < 0) return 0;
+  return (index + 1) % orderedShiftIds.length;
+}
+
+/** Turno com mais gente trabalhando naquele domingo. */
+export function shiftThatWorked(rows: { personId: string; status: string }[], shiftOf: (personId: string) => string | null): string | null {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    if (row.status !== "work" && row.status !== "holiday_work") continue;
+    const shift = shiftOf(row.personId);
+    if (!shift) continue;
+    counts.set(shift, (counts.get(shift) ?? 0) + 1);
+  }
+  let winner: string | null = null;
+  let best = 0;
+  for (const [id, count] of counts) {
+    if (count > best) {
+      best = count;
+      winner = id;
+    }
+  }
+  return winner;
+}
+
 function baseOff(pattern: SchedulePattern, personIndex: number, dayIndex: number): boolean {
   if (pattern === "12x36") return (dayIndex + personIndex) % 2 === 1;
   const { work, off } = CYCLE[pattern];
@@ -118,7 +145,7 @@ function staysCovered(grid: DayStatus[][], people: SchedulePerson[], needs: DayN
   next[leaving][day] = "off";
   if (workersOn(next, day) < dayMin(needs, dow).min) return false;
   const groupId = people[leaving].groupId;
-  const min = groupMin(groups, groupId);
+  const min = shiftFloor(needs, groups, dow, groupId);
   if (min <= 0 || !groupId) return true;
   const members = people.map((person, index) => (person.groupId === groupId ? index : -1)).filter((index) => index >= 0);
   return workersOn(next, day, members) >= min;
@@ -141,14 +168,16 @@ function applySundayMinimum(grid: DayStatus[][], dates: string[], people: Schedu
   }
 }
 
-function ensureSundayCoverage(grid: DayStatus[][], dates: string[], sundays: number[], needs: DayNeed[] | undefined) {
+function ensureSundayCoverage(grid: DayStatus[][], dates: string[], sundays: number[], needs: DayNeed[] | undefined, locked?: boolean[][]) {
   if (grid.length === 0) return;
   for (const day of sundays) {
     if (!dayMin(needs, 0).open) continue;
-    if (workersOn(grid, day) > 0 && workersOn(grid, day) >= dayMin(needs, 0).min) continue;
-    let pick = 0;
+    const allowed = grid.map((_, person) => person).filter((person) => !locked?.[person]?.[day]);
+    const pool = allowed.length > 0 ? allowed : grid.map((_, person) => person);
+    if (workersOn(grid, day, pool) > 0 && workersOn(grid, day) >= dayMin(needs, 0).min) continue;
+    let pick = pool[0] ?? 0;
     let best = -1;
-    for (let person = 0; person < grid.length; person++) {
+    for (const person of pool) {
       const offs = sundays.filter((sunday) => isOff(grid[person][sunday])).length;
       if (offs > best) {
         best = offs;
@@ -156,12 +185,19 @@ function ensureSundayCoverage(grid: DayStatus[][], dates: string[], sundays: num
       }
     }
     grid[pick][day] = "work";
-    const swap = grid[pick].findIndex((status, index) => index !== day && weekday(dates[index]) !== 0 && !isOff(status) && dayMin(needs, weekday(dates[index])).open);
+    const swap = grid[pick].findIndex((status, index) => index !== day && weekday(dates[index]) !== 0 && !isOff(status) && dayMin(needs, weekday(dates[index])).open && !locked?.[pick]?.[index]);
     if (swap >= 0) grid[pick][swap] = "off";
   }
 }
 
-function enforceMinimums(grid: DayStatus[][], dates: string[], people: SchedulePerson[], needs: DayNeed[] | undefined, groups: GroupNeed[] | undefined) {
+function shiftFloor(needs: DayNeed[] | undefined, groups: GroupNeed[] | undefined, dow: number, groupId: string | null | undefined): number {
+  const explicit = groupMin(groups, groupId);
+  if (explicit > 0) return explicit;
+  if (needs && groupId) return dayMin(needs, dow).min;
+  return 0;
+}
+
+function enforceMinimums(grid: DayStatus[][], dates: string[], people: SchedulePerson[], needs: DayNeed[] | undefined, groups: GroupNeed[] | undefined, locked?: boolean[][]) {
   for (let day = 0; day < dates.length; day++) {
     const dow = weekday(dates[day]);
     const rule = dayMin(needs, dow);
@@ -170,7 +206,7 @@ function enforceMinimums(grid: DayStatus[][], dates: string[], people: ScheduleP
       continue;
     }
     while (workersOn(grid, day) < rule.min) {
-      const person = grid.findIndex((row) => isOff(row[day]));
+      const person = grid.findIndex((row, index) => isOff(row[day]) && !locked?.[index]?.[day]);
       if (person < 0) break;
       grid[person][day] = "work";
     }
@@ -178,10 +214,11 @@ function enforceMinimums(grid: DayStatus[][], dates: string[], people: ScheduleP
     for (const person of people) {
       if (!person.groupId || seen.has(person.groupId)) continue;
       seen.add(person.groupId);
-      const min = groupMin(groups, person.groupId);
+      const min = shiftFloor(needs, groups, dow, person.groupId);
       const members = people.map((item, index) => (item.groupId === person.groupId ? index : -1)).filter((index) => index >= 0);
+      if (members.some((index) => locked?.[index]?.[day])) continue;
       while (workersOn(grid, day, members) < min) {
-        const pick = members.find((index) => isOff(grid[index][day]));
+        const pick = members.find((index) => isOff(grid[index][day]) && !locked?.[index]?.[day]);
         if (pick == null) break;
         grid[pick][day] = "work";
       }
@@ -233,21 +270,38 @@ export function generateMonth(input: {
   /** O ciclo começa nesta data. Sem ela, a escala usa o mês inteiro. */
   from?: string;
   to?: string;
+  /** Ordem dos turnos. Com dois ou mais, os domingos revezam. */
+  sundayShifts?: string[];
+  /** Índice do turno que trabalha o primeiro domingo do período. */
+  sundayShiftStart?: number;
 }): GeneratedMonth {
   const dates = input.from && input.to && input.from <= input.to
     ? Array.from({ length: 93 }, (_, index) => addDays(input.from!, index)).filter((iso) => iso <= input.to!)
     : Array.from({ length: daysInMonth(input.year, input.month) }, (_, index) => isoDate(input.year, input.month, index + 1));
   const count = dates.length;
+  const openSundays = dates.map((iso, index) => (weekday(iso) === 0 ? index : -1)).filter((index) => index >= 0 && dayMin(input.dayNeeds, 0).open);
+  const shifts = input.sundayShifts ?? [];
+  function sundayOwner(day: number): string | null {
+    if (shifts.length < 2) return null;
+    const pos = openSundays.indexOf(day);
+    if (pos < 0) return null;
+    return shifts[((input.sundayShiftStart ?? 0) + pos) % shifts.length];
+  }
+  const locked = input.people.map((person) => dates.map((_, day) => {
+    const owner = sundayOwner(day);
+    return Boolean(owner && person.groupId && person.groupId !== owner);
+  }));
   const grid: DayStatus[][] = input.people.map((person, personIndex) =>
     dates.map((iso, day) => {
       const dow = weekday(iso);
       if (input.dayNeeds && !dayMin(input.dayNeeds, dow).open) return "off";
+      if (locked[personIndex][day]) return "off";
       if (person.fixedOffDow != null) return dow === person.fixedOffDow ? "off" : "work";
       if (baseOff(input.pattern, personIndex, day)) return "off";
       return "work";
     }),
   );
-  const sundays = dates.map((iso, index) => (weekday(iso) === 0 ? index : -1)).filter((index) => index >= 0 && dayMin(input.dayNeeds, 0).open);
+  const sundays = openSundays;
   const bySex = input.womenSunday != null || input.menSunday != null;
   const ruleFor = (person: number) => {
     if (!bySex) return input.sundayMin >= 5 ? sundays.length : input.sundayMin;
@@ -256,8 +310,8 @@ export function generateMonth(input: {
     return sundayOffTarget(rule, sundays.length);
   };
   if (input.offMode === "rotating" || bySex) applySundayMinimum(grid, dates, input.people, sundays, ruleFor, input.dayNeeds, input.groupNeeds);
-  ensureSundayCoverage(grid, dates, sundays, input.dayNeeds);
-  enforceMinimums(grid, dates, input.people, input.dayNeeds, input.groupNeeds);
+  ensureSundayCoverage(grid, dates, sundays, input.dayNeeds, locked);
+  enforceMinimums(grid, dates, input.people, input.dayNeeds, input.groupNeeds, locked);
   capConsecutive(grid, dates, input.people, input.dayNeeds, input.groupNeeds);
 
   const compDue: CompDue[] = [];

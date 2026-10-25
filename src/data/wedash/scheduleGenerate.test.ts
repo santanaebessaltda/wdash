@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateMonth, weekday } from "./scheduleGenerate";
+import { generateMonth, nextSundayShift, weekday } from "./scheduleGenerate";
 import { easter, nationalHolidays, storePlace } from "./scheduleHolidays";
 
 describe("feriados nacionais", () => {
@@ -142,5 +142,35 @@ describe("geração da escala", () => {
     expect(rows.map((row) => row.date)).toEqual(["2026-03-04", "2026-03-05", "2026-03-06", "2026-03-07", "2026-03-08", "2026-03-09", "2026-03-10"]);
     expect(rows[0]?.status).toBe("work");
     expect(rows[6]?.status).toBe("off");
+  });
+
+  it("pede o mínimo em cada turno e reveza o domingo", () => {
+    const team = [
+      { id: "a1", groupId: "manha" },
+      { id: "a2", groupId: "manha" },
+      { id: "b1", groupId: "tarde" },
+      { id: "b2", groupId: "tarde" },
+    ];
+    const rows = generateMonth({
+      year: 2026,
+      month: 3,
+      pattern: "6x1",
+      offMode: "rotating",
+      sundayMin: 0,
+      people: team,
+      holidayDates: [],
+      dayNeeds: Array.from({ length: 7 }, (_, dow) => ({ dow, open: true, min: 2 })),
+      sundayShifts: ["manha", "tarde"],
+      sundayShiftStart: 0,
+    }).days;
+    const working = (date: string, groupId: string) => rows.filter((row) => row.date === date && team.find((person) => person.id === row.personId)?.groupId === groupId && (row.status === "work" || row.status === "holiday_work")).length;
+    expect(working("2026-03-02", "manha")).toBe(2);
+    expect(working("2026-03-02", "tarde")).toBe(2);
+    expect(working("2026-03-01", "manha")).toBe(2);
+    expect(working("2026-03-01", "tarde")).toBe(0);
+    expect(working("2026-03-08", "tarde")).toBe(2);
+    expect(working("2026-03-08", "manha")).toBe(0);
+    expect(nextSundayShift("manha", ["manha", "tarde"])).toBe(1);
+    expect(nextSundayShift(null, ["manha", "tarde"])).toBe(0);
   });
 });

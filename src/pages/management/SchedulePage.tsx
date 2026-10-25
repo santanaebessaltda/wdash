@@ -10,9 +10,9 @@ import { addDays, addMonths, endOfMonth, isoToDate, startOfMonth } from "@/data/
 import { fetchGoals } from "@/data/wedash/goalsRepo";
 import { monthCoveredByGoal, scheduleStartMonth, type GoalSpan } from "@/data/wedash/goalMonths";
 import { branchRoleLabel, fetchStoreSellers, fetchStoreShifts, isBranchTeamMember, storesForSession, type StoreSeller, type StoreShift } from "@/data/wedash/stores";
-import { defaultDayNeeds, generateMonth, weekday, type DayStatus, type Sex } from "@/data/wedash/scheduleGenerate";
+import { defaultDayNeeds, generateMonth, nextSundayShift, shiftThatWorked, weekday, type DayStatus, type Sex } from "@/data/wedash/scheduleGenerate";
 import { holidayLabel, holidaysForStore, loadHolidaySeed, loadNationalHolidays, storePlace, type Holiday } from "@/data/wedash/scheduleHolidays";
-import { deleteSchedule, fetchCompDue, fetchSchedule, saveManualDay, saveSchedule, type StoredDay, type StoredSchedule } from "@/data/wedash/scheduleRepo";
+import { deleteSchedule, fetchCompDue, fetchSchedule, fetchScheduleDays, saveManualDay, saveSchedule, type StoredDay, type StoredSchedule } from "@/data/wedash/scheduleRepo";
 import { ScheduleWizard, type ScheduleWizardValue } from "./ScheduleWizard";
 
 const MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -175,9 +175,28 @@ export function SchedulePage() {
     replaceManual: false,
   });
 
+  async function sundayPlan(storeId: string, team: { id: string; groupId: string | null }[], from: string) {
+    const storeShifts = await fetchStoreShifts(session.tenantId, storeId);
+    const present = [...new Set(team.map((person) => person.groupId).filter((id): id is string => Boolean(id)))];
+    const ordered = storeShifts.map((shift) => shift.id).filter((id) => present.includes(id));
+    for (const id of present) if (!ordered.includes(id)) ordered.push(id);
+    if (ordered.length < 2) return { sundayShifts: ordered, sundayShiftStart: 0 };
+    const previous = await fetchScheduleDays(storeId, addDays(from, -45), addDays(from, -1));
+    const last = previous.filter((row) => weekday(row.day) === 0).reduce((max, row) => (row.day > max ? row.day : max), "");
+    const shiftOf = new Map(team.map((person) => [person.id, person.groupId]));
+    const lastShift = last
+      ? shiftThatWorked(
+          previous.filter((row) => row.day === last).map((row) => ({ personId: row.sellerId, status: row.status })),
+          (id) => shiftOf.get(id) ?? null,
+        )
+      : null;
+    return { sundayShifts: ordered, sundayShiftStart: nextSundayShift(lastShift, ordered) };
+  }
+
   async function generateFor(storeId: string, value: ScheduleWizardValue, selected: SelectedPerson[]) {
     const [year, monthNumber] = value.periodStart.split("-").map(Number);
     const incoming = await fetchCompDue(storeId, value.periodStart);
+    const rotation = await sundayPlan(storeId, selected, value.periodStart);
     const offMode = selected.length > 0 && selected.every((person) => person.fixedOffDow != null) ? "fixed" : "rotating";
     const generated = generateMonth({
       year,
@@ -200,6 +219,8 @@ export function SchedulePage() {
       groupNeeds: [],
       holidayRules: value.holidayRules,
       incomingComp: incoming,
+      sundayShifts: rotation.sundayShifts,
+      sundayShiftStart: rotation.sundayShiftStart,
     });
     const known = new Set(holidays.filter((row) => row.kind !== "municipal").map((row) => row.date));
     const months = monthsBetween(value.periodStart, value.periodEnd);
@@ -406,7 +427,14 @@ export function SchedulePage() {
             const from = schedule.periodStart ?? monthStart;
             const to = schedule.periodEnd ?? monthEnd;
             const [year, monthNumber] = from.split("-").map(Number);
+            const team = schedule.people.map((person) => ({
+              id: person.sellerId,
+              fixedOffDow: person.fixedOffDow,
+              sex: person.sex,
+              groupId: people.find((row) => row.id === person.sellerId)?.shiftId ?? null,
+            }));
             const incoming = await fetchCompDue(store.id, from);
+            const rotation = await sundayPlan(store.id, team, from);
             const generated = generateMonth({
               year,
               month: monthNumber,
@@ -417,17 +445,14 @@ export function SchedulePage() {
               sundayMin: schedule.sundayMin,
               womenSunday: schedule.womenSunday,
               menSunday: schedule.menSunday,
-              people: schedule.people.map((person) => ({
-                id: person.sellerId,
-                fixedOffDow: person.fixedOffDow,
-                sex: person.sex,
-                groupId: people.find((row) => row.id === person.sellerId)?.shiftId ?? null,
-              })),
+              people: team,
               holidayDates: [],
               dayNeeds: schedule.dayNeeds,
               groupNeeds: [],
               holidayRules: schedule.holidayRules,
               incomingComp: incoming,
+              sundayShifts: rotation.sundayShifts,
+              sundayShiftStart: rotation.sundayShiftStart,
             }).days.filter((row) => row.date === dayOpen);
             try {
               await saveDay(generated.map((row) => ({ sellerId: row.personId, day: row.date, status: row.status, origin: "generated" as const })));

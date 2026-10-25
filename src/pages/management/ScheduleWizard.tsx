@@ -330,7 +330,14 @@ export function ScheduleWizard({
             A empresa fecha aos domingos
           </label>
           <p className="text-[13px] font-semibold text-t0">Nos dias abertos, de quantas pessoas você precisa?</p>
-          <p className="mt-1 mb-3 text-[12px] text-t2">O menor número trabalhando em cada dia. Vale a equipe toda.</p>
+          <p className="mt-1 mb-3 text-[12px] text-t2">
+            {(() => {
+              const shifts = new Set(selectedPeople.map((person) => person.groupId).filter(Boolean)).size;
+              return shifts > 1
+                ? `O número é por turno. Com ${shifts} turnos, 2 significa 2 em cada um. Os domingos revezam entre os turnos e continuam a partir do domingo anterior.`
+                : "O menor número trabalhando em cada dia.";
+            })()}
+          </p>
           <ul className="space-y-2">
             {value.dayNeeds.map((day) => (
               <li key={day.dow} className="flex min-w-0 items-center justify-between gap-3 border-b border-line py-2">

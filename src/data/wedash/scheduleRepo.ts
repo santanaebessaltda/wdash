@@ -220,6 +220,18 @@ export async function fetchCompDue(storeId: string, monthStart: string): Promise
   return result.data.comp_due as CompDue[];
 }
 
+export async function fetchScheduleDays(storeId: string, from: string, to: string): Promise<StoredDay[]> {
+  const sb = await client();
+  const result = await sb.from("store_schedule_day").select("seller_id, day, status, origin").eq("store_id", storeId).gte("day", from).lte("day", to);
+  if (result.error) throw new Error(result.error.message);
+  return (result.data ?? []).map((row) => ({
+    sellerId: String(row.seller_id),
+    day: String(row.day).slice(0, 10),
+    status: row.status as DayStatus,
+    origin: row.origin as StoredDay["origin"],
+  }));
+}
+
 export async function saveManualDay(input: {
   tenantId: string;
   storeId: string;
