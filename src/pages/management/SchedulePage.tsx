@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Badge, Button, Card, EmptyState, Modal, useToast } from "@/components/ui";
 import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
-import { PersonAvatar } from "@/components/wedash/PersonAvatar";
+import { PersonAvatarGroup } from "@/components/wedash/PersonAvatar";
 import { MonthCalendar } from "@/components/wedash/MonthCalendar";
-import { PlainKpi } from "@/pages/cash-close/CashClosePage";
+import { DayChip, PlainKpi } from "@/pages/cash-close/CashClosePage";
 import { MonthStep, monthNavBtn } from "@/pages/cash-close/MonthYearPicker";
 import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
@@ -26,17 +26,19 @@ const STATUS_LABEL: Record<DayStatus, string> = {
 };
 const CYCLE: DayStatus[] = ["work", "off", "holiday_work", "comp_off"];
 
-const STATUS_RING: Record<DayStatus, string> = {
-  work: "ring-ok",
-  holiday_work: "ring-warn",
-  off: "ring-t2",
-  comp_off: "ring-t2",
+const STATUS_BADGE: Record<DayStatus, "success" | "warning" | "info" | "neutral"> = {
+  work: "success",
+  holiday_work: "warning",
+  off: "neutral",
+  comp_off: "info",
 };
 
 const SCHEDULE_LEGEND: LegendItem[] = [
   { key: "work", color: "bg-ok", label: "Trabalha", hint: "dia de trabalho" },
-  { key: "holiday", color: "bg-warn", label: "Feriado trabalhado", hint: "2× quando o pagamento é em dobro" },
-  { key: "off", color: "bg-t2", label: "Folga", hint: "folga ou folga compensatória" },
+  { key: "off", color: "bg-chip-gray", label: "Folga", hint: "descanso da escala" },
+  { key: "holiday", color: "bg-warn", label: "Feriado trabalhado", hint: "quem abre no feriado" },
+  { key: "double", color: "bg-acc", label: "Pagamento em dobro", hint: "feriado com o dobro" },
+  { key: "comp", color: "bg-info", label: "Folga compensatória", hint: "folga de quem trabalhou no feriado" },
 ];
 
 function monthLabel(iso: string): string {
@@ -64,11 +66,7 @@ function monthsBetween(from: string, to: string): string[] {
   return months;
 }
 
-function faceRank(status: DayStatus): number {
-  if (status === "work") return 0;
-  if (status === "holiday_work") return 1;
-  return 2;
-}
+const CHIP_ORDER: DayStatus[] = ["work", "holiday_work", "off", "comp_off"];
 
 function DayFaces({
   rows,
@@ -81,31 +79,32 @@ function DayFaces({
   byPerson: Map<string, StoreSeller>;
   doublePay: boolean;
 }) {
-  const ordered = [...rows].sort((a, b) => faceRank(a.status) - faceRank(b.status) || (byPerson.get(a.sellerId)?.name ?? "").localeCompare(byPerson.get(b.sellerId)?.name ?? "", "pt-BR"));
-  const shown = ordered.slice(0, 3);
-  const rest = ordered.slice(3);
-  if (shown.length === 0) return null;
+  if (rows.length === 0) return null;
+  const faces = [...rows]
+    .sort((a, b) => CHIP_ORDER.indexOf(a.status) - CHIP_ORDER.indexOf(b.status) || (byPerson.get(a.sellerId)?.name ?? "").localeCompare(byPerson.get(b.sellerId)?.name ?? "", "pt-BR"))
+    .map((row) => {
+      const person = byPerson.get(row.sellerId);
+      return { name: person?.name ?? "Pessoa", employeeId: person?.code, storeId };
+    });
+  const counts = new Map<DayStatus, number>();
+  for (const row of rows) counts.set(row.status, (counts.get(row.status) ?? 0) + 1);
   return (
-    <div className="mt-1.5 flex flex-wrap items-center">
-      {shown.map((row, index) => {
-        const person = byPerson.get(row.sellerId);
-        const name = person?.name ?? "Pessoa";
-        const double = doublePay && row.status === "holiday_work";
-        return (
-          <span key={row.sellerId} title={`${name} · ${STATUS_LABEL[row.status]}${double ? " · 2×" : ""}`} className={index > 0 ? "-ml-1.5" : undefined}>
-            <PersonAvatar name={name} employeeId={person?.code} storeId={storeId} size="xs" className={`ring-2 ${STATUS_RING[row.status]}`} />
-          </span>
-        );
-      })}
-      {rest.length > 0 ? (
-        <span
-          title={rest.map((row) => byPerson.get(row.sellerId)?.name ?? "Pessoa").join(", ")}
-          className="-ml-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-bg-3 text-[10px] font-bold text-t1 ring-2 ring-bg-2"
-        >
-          +{rest.length}
+    <>
+      <div className="mt-1.5 flex items-center justify-between gap-1">
+        <PersonAvatarGroup people={faces} max={3} />
+        <span className="shrink-0 text-[12px] font-bold text-t0" title={`${rows.length} ${rows.length === 1 ? "pessoa" : "pessoas"}`}>
+          {rows.length}
         </span>
-      ) : null}
-    </div>
+      </div>
+      {CHIP_ORDER.map((status) => {
+        const count = counts.get(status) ?? 0;
+        if (count === 0) return null;
+        const holiday = status === "holiday_work" && doublePay;
+        const label = holiday ? "Feriado 2×" : STATUS_LABEL[status];
+        const color = holiday ? "bg-acc" : status === "work" ? "bg-ok" : status === "holiday_work" ? "bg-warn" : status === "comp_off" ? "bg-info" : "bg-chip-gray";
+        return <DayChip key={status} color={color}>{`${label} ${count}`}</DayChip>;
+      })}
+    </>
   );
 }
 
@@ -124,7 +123,6 @@ export function SchedulePage() {
   const [error, setError] = useState(false);
   const [wizard, setWizard] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
   const [dayOpen, setDayOpen] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -316,7 +314,7 @@ export function SchedulePage() {
       }));
       const result = await generateFor(store.id, value, selected);
       const kept = result.keptManualDays;
-      setNotice(kept > 0 ? `Escala gerada. ${kept} ${kept === 1 ? "dia ajustado na mão foi mantido" : "dias ajustados na mão foram mantidos"}.` : "Escala gerada.");
+      show(kept > 0 ? `Escala salva. ${kept} ${kept === 1 ? "dia ajustado na mão foi mantido" : "dias ajustados na mão foram mantidos"}.` : "Escala salva.", "success");
       setWizard(false);
       setReloadKey((value) => value + 1);
     } catch (caught) {
@@ -374,7 +372,6 @@ export function SchedulePage() {
       />
       <div className="mt-6 pb-8">
         {error ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar a escala. Tente novamente." /> : null}
-        {notice ? <Alert className="mb-4" variant="success" title={notice} /> : null}
         {!store ? (
           <Card>
             <EmptyState icon="📅" title="Escolha uma filial" description="Com várias filiais no seletor, o dia não abre. Escolha uma para ver, gerar e ajustar a escala." />
@@ -439,6 +436,7 @@ export function SchedulePage() {
         <DayEditor
           day={dayOpen}
           holiday={holidayLabel(holidays, dayOpen)}
+          doublePay={Boolean(schedule?.holidayRules.some((rule) => rule.date === dayOpen && rule.pay === "double"))}
           rows={dayRows.get(dayOpen) ?? []}
           names={byPerson}
           onClose={() => setDayOpen(null)}
@@ -446,6 +444,7 @@ export function SchedulePage() {
             try {
               await saveDay(next);
               setDayOpen(null);
+              show("Dia salvo.", "success");
             } catch (caught) {
               show(caught instanceof Error ? caught.message : "Não foi possível salvar o dia.", "danger");
             }
@@ -485,6 +484,7 @@ export function SchedulePage() {
             try {
               await saveDay(generated.map((row) => ({ sellerId: row.personId, day: row.date, status: row.status, origin: "generated" as const })));
               setDayOpen(null);
+              show("Dia voltou ao padrão.", "success");
             } catch (caught) {
               show(caught instanceof Error ? caught.message : "Não foi possível voltar ao padrão.", "danger");
             }
@@ -504,7 +504,7 @@ export function SchedulePage() {
                 void deleteSchedule(store.id, monthStart)
                   .then(() => {
                     setConfirmDelete(false);
-                    setNotice("Escala apagada. O feriado continua no calendário.");
+                    show("Escala apagada. O feriado continua no calendário.", "success");
                     setReloadKey((value) => value + 1);
                   })
                   .catch((caught) => show(caught instanceof Error ? caught.message : "Não foi possível apagar a escala.", "danger"));
@@ -527,6 +527,7 @@ export function SchedulePage() {
 function DayEditor({
   day,
   holiday,
+  doublePay,
   rows,
   names,
   onClose,
@@ -535,6 +536,7 @@ function DayEditor({
 }: {
   day: string;
   holiday: string | null;
+  doublePay: boolean;
   rows: StoredDay[];
   names: Map<string, StoreSeller>;
   onClose: () => void;
@@ -593,8 +595,8 @@ function DayEditor({
                 )
               }
             >
-              <Badge variant={row.status === "off" || row.status === "comp_off" ? "neutral" : row.status === "holiday_work" ? "warning" : "success"}>
-                {STATUS_LABEL[row.status]}
+              <Badge variant={row.status === "holiday_work" && doublePay ? "accent" : STATUS_BADGE[row.status]}>
+                {STATUS_LABEL[row.status]}{row.status === "holiday_work" && doublePay ? " 2×" : ""}
               </Badge>
             </button>
           </li>
