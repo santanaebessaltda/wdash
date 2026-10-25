@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Badge, Button, Card, EmptyState, Modal, useToast } from "@/components/ui";
 import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
+import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { MonthCalendar } from "@/components/wedash/MonthCalendar";
 import { PlainKpi } from "@/pages/cash-close/CashClosePage";
 import { MonthStep, monthNavBtn } from "@/pages/cash-close/MonthYearPicker";
@@ -24,6 +25,13 @@ const STATUS_LABEL: Record<DayStatus, string> = {
   comp_off: "Folga compensatória",
 };
 const CYCLE: DayStatus[] = ["work", "off", "holiday_work", "comp_off"];
+
+const STATUS_RING: Record<DayStatus, string> = {
+  work: "ring-ok",
+  holiday_work: "ring-warn",
+  off: "ring-t2",
+  comp_off: "ring-t2",
+};
 
 const SCHEDULE_LEGEND: LegendItem[] = [
   { key: "work", color: "bg-ok", label: "Trabalha", hint: "dia de trabalho" },
@@ -54,6 +62,51 @@ function monthsBetween(from: string, to: string): string[] {
     cursor = addMonths(cursor, 1);
   }
   return months;
+}
+
+function faceRank(status: DayStatus): number {
+  if (status === "work") return 0;
+  if (status === "holiday_work") return 1;
+  return 2;
+}
+
+function DayFaces({
+  rows,
+  storeId,
+  byPerson,
+  doublePay,
+}: {
+  rows: StoredDay[];
+  storeId: string;
+  byPerson: Map<string, StoreSeller>;
+  doublePay: boolean;
+}) {
+  const ordered = [...rows].sort((a, b) => faceRank(a.status) - faceRank(b.status) || (byPerson.get(a.sellerId)?.name ?? "").localeCompare(byPerson.get(b.sellerId)?.name ?? "", "pt-BR"));
+  const shown = ordered.slice(0, 3);
+  const rest = ordered.slice(3);
+  if (shown.length === 0) return null;
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center">
+      {shown.map((row, index) => {
+        const person = byPerson.get(row.sellerId);
+        const name = person?.name ?? "Pessoa";
+        const double = doublePay && row.status === "holiday_work";
+        return (
+          <span key={row.sellerId} title={`${name} · ${STATUS_LABEL[row.status]}${double ? " · 2×" : ""}`} className={index > 0 ? "-ml-1.5" : undefined}>
+            <PersonAvatar name={name} employeeId={person?.code} storeId={storeId} size="xs" className={`ring-2 ${STATUS_RING[row.status]}`} />
+          </span>
+        );
+      })}
+      {rest.length > 0 ? (
+        <span
+          title={rest.map((row) => byPerson.get(row.sellerId)?.name ?? "Pessoa").join(", ")}
+          className="-ml-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-bg-3 text-[10px] font-bold text-t1 ring-2 ring-bg-2"
+        >
+          +{rest.length}
+        </span>
+      ) : null}
+    </div>
+  );
 }
 
 export function SchedulePage() {
@@ -330,8 +383,8 @@ export function SchedulePage() {
           <>
             <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <PlainKpi label="Pessoas" value={String(schedule?.people.length ?? people.length)} color="var(--t0)" />
-              <PlainKpi label="Modelo" value={patternLabel} color="var(--acc)" />
-              <PlainKpi label="Feriados" value={String(holidayCount)} color="var(--warn)" />
+              <PlainKpi label="Modelo" value={patternLabel} color="var(--t0)" />
+              <PlainKpi label="Feriados" value={String(holidayCount)} color="var(--t0)" />
               <PlainKpi label="Dias manuais" value={String(new Set(days.filter((row) => row.origin === "manual").map((row) => row.day)).size)} color="var(--t0)" />
             </div>
             {schedule ? <ColorLegend className="mb-3" mark="dot" items={SCHEDULE_LEGEND} /> : null}
@@ -349,22 +402,7 @@ export function SchedulePage() {
                       <div className="pointer-events-none relative z-10">
                         <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-bold ${day === today ? "bg-acc text-white" : "text-t0"}`}>{Number(day.slice(8))}</span>
                         {label ? <p className="mt-1 line-clamp-2 text-[10px] font-semibold leading-tight text-warn">{label}</p> : null}
-                        <div className="mt-1 flex flex-col gap-0.5">
-                          {rows.slice(0, 4).map((row) => {
-                            const double = row.status === "holiday_work" && schedule?.holidayRules.some((rule) => rule.date === day && rule.pay === "double");
-                            return (
-                              <Badge
-                                key={row.sellerId}
-                                title={double ? "Pagamento em dobro" : row.origin === "manual" ? "Ajustado na mão" : undefined}
-                                variant={row.status === "off" || row.status === "comp_off" ? "neutral" : row.status === "holiday_work" ? "warning" : "success"}
-                                className="max-w-full truncate"
-                              >
-                                {byPerson.get(row.sellerId)?.name ?? "Pessoa"}{double ? " 2×" : ""}
-                              </Badge>
-                            );
-                          })}
-                          {rows.length > 4 ? <span className="text-[10px] text-t2">+{rows.length - 4}</span> : null}
-                        </div>
+                        <DayFaces rows={rows} storeId={store.id} byPerson={byPerson} doublePay={Boolean(schedule?.holidayRules.some((rule) => rule.date === day && rule.pay === "double"))} />
                       </div>
                     ) : null}
                   </div>
