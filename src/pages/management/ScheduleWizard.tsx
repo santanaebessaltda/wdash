@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Alert, Badge, Button, DatePicker, FormField, Input, Modal, Select, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
+import { Alert, Button, DatePicker, FormField, Input, Modal, Select, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { Icon, icons } from "@/pages/users/Icons";
 import { cn } from "@/lib/cn";
@@ -529,19 +529,12 @@ export function ScheduleWizard({
               <p className="mt-1.5 text-[12.5px] leading-relaxed text-t2">Feriado desta cidade que a lista não trouxe.</p>
             </div>
           )}
-          <p className="mt-4 text-[13px] text-t2">
-            {selectedPeople.length} pessoas · {selectedType?.title} · {value.holidayRules.filter((rule) => rule.open).length} feriados com trabalho.
-          </p>
           {hasSchedule ? (
-            <label className="mt-3 flex items-start gap-3 rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3 py-3 text-[13px] text-t0">
+            <label className="mt-4 flex items-start gap-3 rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3 py-3 text-[13px] text-t0">
               <input type="checkbox" className="mt-0.5 shrink-0" checked={value.replaceManual} onChange={(event) => setValue((current) => ({ ...current, replaceManual: event.target.checked }))} />
               <span>Substituir também os dias ajustados na mão dentro deste período. Fora dele, a escala permanece.</span>
             </label>
-          ) : (
-            <div className="mt-3">
-              <Badge variant="info">Primeira escala deste mês</Badge>
-            </div>
-          )}
+          ) : null}
         </>
       ) : null}
     </Modal>
