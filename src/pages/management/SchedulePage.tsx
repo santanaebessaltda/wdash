@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Alert, Badge, Button, Card, EmptyState, FormField, Modal, Select, useToast } from "@/components/ui";
 import { MonthCalendar } from "@/components/wedash/MonthCalendar";
 import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
-import { PersonAvatar, PersonAvatarGroup } from "@/components/wedash/PersonAvatar";
-import { PlainKpi } from "@/pages/cash-close/CashClosePage";
+import { PersonAvatar } from "@/components/wedash/PersonAvatar";
+import { DayChip, PlainKpi } from "@/pages/cash-close/CashClosePage";
 import { MonthStep, monthNavBtn } from "@/pages/cash-close/MonthYearPicker";
 import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
@@ -74,48 +74,20 @@ function monthsBetween(from: string, to: string): string[] {
 
 const CHIP_ORDER: DayStatus[] = ["work", "holiday_work", "off", "comp_off"];
 
-function DayFaces({
-  rows,
-  storeId,
-  byPerson,
-  doublePay,
-}: {
-  rows: StoredDay[];
-  storeId: string;
-  byPerson: Map<string, StoreSeller>;
-  doublePay: boolean;
-}) {
+function DayFaces({ rows, doublePay }: { rows: StoredDay[]; doublePay: boolean }) {
   if (rows.length === 0) return null;
-  const faces = [...rows]
-    .sort((a, b) => CHIP_ORDER.indexOf(a.status) - CHIP_ORDER.indexOf(b.status) || (byPerson.get(a.sellerId)?.name ?? "").localeCompare(byPerson.get(b.sellerId)?.name ?? "", "pt-BR"))
-    .map((row) => {
-      const person = byPerson.get(row.sellerId);
-      return { name: person?.name ?? "Pessoa", employeeId: person?.code, storeId };
-    });
   const counts = new Map<DayStatus, number>();
   for (const row of rows) counts.set(row.status, (counts.get(row.status) ?? 0) + 1);
   return (
     <>
-      <div className="mt-1.5 flex items-center justify-between gap-1">
-        <PersonAvatarGroup people={faces} max={3} />
-        <span className="shrink-0 text-[12px] font-bold text-t0" title={`${rows.length} ${rows.length === 1 ? "pessoa" : "pessoas"}`}>
-          {rows.length}
-        </span>
-      </div>
-      <div className="mt-1 flex flex-wrap gap-1">
       {CHIP_ORDER.map((status) => {
         const count = counts.get(status) ?? 0;
         if (count === 0) return null;
         const holiday = status === "holiday_work" && doublePay;
         const label = holiday ? "Feriado 2×" : STATUS_LABEL[status];
         const color = holiday ? "bg-acc" : status === "work" ? "bg-ok" : status === "holiday_work" ? "bg-warn" : status === "comp_off" ? "bg-info" : "bg-chip-gray";
-        return (
-          <span key={status} className={`inline-flex max-w-full truncate rounded-md px-1.5 py-0.5 text-[10px] font-semibold text-white ${color}`}>
-            {`${label} ${count}`}
-          </span>
-        );
+        return <DayChip key={status} color={color}>{`${label} ${count}`}</DayChip>;
       })}
-      </div>
     </>
   );
 }
@@ -411,7 +383,7 @@ export function SchedulePage() {
                       <div className="pointer-events-none relative z-10">
                         <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-bold ${day === today ? "bg-acc text-white" : "text-t0"}`}>{Number(day.slice(8))}</span>
                         {label ? <p className="mt-1 line-clamp-2 text-[10px] font-semibold leading-tight text-warn">{label}</p> : null}
-                        <DayFaces rows={rows} storeId={store.id} byPerson={byPerson} doublePay={Boolean(schedule?.holidayRules.some((rule) => rule.date === day && rule.pay === "double"))} />
+                        <DayFaces rows={rows} doublePay={Boolean(schedule?.holidayRules.some((rule) => rule.date === day && rule.pay === "double"))} />
                       </div>
                     ) : null}
                   </div>
