@@ -132,6 +132,7 @@ export interface SellerChallengeInput {
   scope?: SellerChallengeScope;
   productCodes?: string[];
   categoryIds?: number[];
+  lines?: { key: string; kinds: string[] }[];
   target?: number | null;
   minSales?: number | null;
   prizes?: SellerChallengePrize[];
@@ -177,6 +178,8 @@ export interface SellerHomeInput {
   sellerProducts?: SellerProductDay[];
   /** COD_PRODUTO  ->  tipo, para desafios de categorias. */
   productTypes?: { code: string; typeId: number }[];
+  /** COD_PRODUTO  ->  descricao, para desafios por linha. */
+  productNames?: { code: string; name: string }[];
 }
 
 function storeWeights(input: SellerHomeInput, goal: GoalRecord, week: StoreWeekHours): number[] {
@@ -324,6 +327,7 @@ function storeChallenges(input: SellerHomeInput, s: SellerHomeInput["stores"][nu
         sellerDays: input.sellerDayAggs,
         products: input.sellerProducts,
         productTypes: input.productTypes,
+        productNames: input.productNames,
         storeDays: input.dayAggs,
       });
       return {

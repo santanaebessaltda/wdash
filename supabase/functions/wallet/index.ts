@@ -85,7 +85,7 @@ function metricScope(metric: string, scope: string | null): { metric: SellerChal
   if (metric === "PRODUCTS" || metric === "CATEGORIES") return { metric: "QUANTITY", scope: metric };
   const parsed = METRICS.find((item) => item === metric) ?? "QUANTITY";
   if (parsed !== "QUANTITY" && parsed !== "VALUE") return { metric: parsed, scope: "ALL" };
-  const parsedScope = scope === "PRODUCTS" || scope === "CATEGORIES" || scope === "ALL" ? scope : "ALL";
+  const parsedScope = scope === "PRODUCTS" || scope === "CATEGORIES" || scope === "LINES" || scope === "ALL" ? scope : "ALL";
   return { metric: parsed, scope: parsedScope };
 }
 
@@ -97,6 +97,16 @@ function codesOf(raw: unknown): string[] {
 function typeIdsOf(raw: unknown): number[] {
   if (!Array.isArray(raw)) return [];
   return raw.map((item) => Number((item as { typeId?: unknown })?.typeId)).filter((n) => Number.isInteger(n));
+}
+
+function linesOf(raw: unknown): { key: string; kinds: string[] }[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((item) => {
+    const line = item as { key?: unknown; kinds?: unknown };
+    const key = String(line?.key ?? "").trim();
+    const kinds = Array.isArray(line?.kinds) ? line.kinds.map((kind) => String(kind ?? "").trim()).filter(Boolean) : [];
+    return key && kinds.length > 0 ? [{ key, kinds }] : [];
+  });
 }
 
 function needsProductLines(metric: string, scope: string | null): boolean {
@@ -254,7 +264,7 @@ serve(async (req) => {
       allPages(
         admin
           .from("challenge")
-          .select("id, store_id, name, starts_on, ends_on, metric, scope, mode, products, categories, target, min_sales, prizes")
+          .select("id, store_id, name, starts_on, ends_on, metric, scope, mode, products, categories, lines, target, min_sales, prizes")
           .eq("tenant_id", membership.tenant_id)
           .in("store_id", storeIds)
           .lte("starts_on", monthEnd)
@@ -322,9 +332,12 @@ serve(async (req) => {
     const productChallenges = challenges.filter((row) => needsProductLines(String(row.metric ?? ""), row.scope == null ? null : String(row.scope)));
     let sellerProducts: SellerProductDay[] = [];
     let productTypes: { code: string; typeId: number }[] = [];
+    let productNames: { code: string; name: string }[] = [];
     if (productChallenges.length > 0 && salesFrom <= salesTo) {
       const productFrom = productChallenges.reduce((min, row) => (String(row.starts_on) < min ? String(row.starts_on) : min), String(productChallenges[0].starts_on));
-      const needsTypes = productChallenges.some((row) => metricScope(String(row.metric ?? ""), row.scope == null ? null : String(row.scope)).scope === "CATEGORIES");
+      const scopeOf = (row: { metric?: unknown; scope?: unknown }) => metricScope(String(row.metric ?? ""), row.scope == null ? null : String(row.scope)).scope;
+      const needsTypes = productChallenges.some((row) => scopeOf(row) === "CATEGORIES");
+      const needsNames = productChallenges.some((row) => scopeOf(row) === "LINES");
       const [productRows, typeRows] = await Promise.all([
         allPages(
           admin
@@ -336,7 +349,9 @@ serve(async (req) => {
             .lte("day", salesTo)
             .order("day"),
         ),
-        needsTypes ? allPages(admin.from("product_catalog").select("product_code, type_id").order("product_code")) : Promise.resolve([]),
+        needsTypes || needsNames
+          ? allPages(admin.from("product_catalog").select("product_code, type_id, description").order("product_code"))
+          : Promise.resolve([]),
       ]);
       sellerProducts = productRows.map((row) => ({
         storeId: String(row.store_id),
@@ -349,6 +364,9 @@ serve(async (req) => {
         revenueCents: Number(row.revenue_cents) || 0,
       }));
       productTypes = typeRows.filter((row) => row.type_id != null).map((row) => ({ code: String(row.product_code), typeId: Number(row.type_id) }));
+      productNames = typeRows
+        .map((row) => ({ code: String(row.product_code ?? "").trim(), name: String(row.description ?? "").trim() }))
+        .filter((row) => row.code && row.name);
       sellerProducts = sellerProducts.filter(
         (row) => !nonSales.generatorIds.has(row.sellerGeneratorId) && !nonSales.storeNameKeys.has(`${row.storeId}|${row.sellerKey}`),
       );
@@ -425,6 +443,7 @@ serve(async (req) => {
         scope: parsed.scope,
         productCodes: codesOf(row.products),
         categoryIds: typeIdsOf(row.categories),
+        lines: linesOf(row.lines),
         target: numOrNull(row.target),
         minSales: numOrNull(row.min_sales),
       };
@@ -440,6 +459,7 @@ serve(async (req) => {
           sellerDays: sellerAggs,
           products: sellerProducts,
           productTypes,
+          productNames,
         });
         const hers = standing.won ? (challenge.mode === "MINIMUM" ? prizes[0] : prizes[(standing.position ?? 1) - 1]) : null;
         if (status === "active") peopleRows.push({ personId: myId, moneyCents: 0, itemLabel: null });

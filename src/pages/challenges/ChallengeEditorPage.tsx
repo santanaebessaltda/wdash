@@ -40,8 +40,10 @@ import {
   type ChallengeRecord,
   type ChallengeMetric,
   type ChallengeMode,
+  type ChallengeLine,
   type ChallengeScope,
 } from "@/data/wedash/challengesRepo";
+import { catalogLines } from "@/data/wedash/productLines";
 import {
   CHALLENGE_METRIC_LABEL,
   CHALLENGE_MODE_LABEL,
@@ -71,6 +73,7 @@ const METRIC_HELP: Record<ChallengeMetric, string> = {
 const SCOPE_HELP: Record<Exclude<ChallengeScope, "ALL">, string> = {
   PRODUCTS: "Considera somente os produtos escolhidos, incluindo todas as variações vinculadas ao mesmo código.",
   CATEGORIES: "Considera somente os produtos das categorias escolhidas.",
+  LINES: "Considera a linha escolhida. Um lançamento do mesmo tipo entra sozinho.",
 };
 
 const MIN_LABEL: Record<ChallengeMetric, string> = {
@@ -386,6 +389,7 @@ export default function ChallengeEditorPage() {
                 options={[
                   { value: "PRODUCTS", label: "Produtos" },
                   { value: "CATEGORIES", label: "Categorias" },
+                  { value: "LINES", label: "Linhas" },
                 ]}
                 value={form.scope}
                 onChange={(v) => v && set({ scope: v })}
@@ -408,6 +412,9 @@ export default function ChallengeEditorPage() {
               onChange={(categories) => set({ categories })}
               error={errors.categories}
             />
+          )}
+          {metricUsesScope && form.scope === "LINES" && (
+            <LinePicker catalog={catalog} selected={form.lines} onChange={(lines) => set({ lines })} error={errors.lines} />
           )}
         </div>
       </Card>
@@ -983,6 +990,77 @@ function ProductPicker({
               {verAll ? "Mostrar menos" : `+${selected.length - TAGS_VISIBLE}`}
             </button>
           )}
+        </div>
+      )}
+    </PickerShell>
+  );
+}
+
+const chipClass = (active: boolean) =>
+  cn(
+    "h-8 cursor-pointer rounded-[9px] border px-3 text-xs font-semibold transition-colors",
+    active ? "border-acc bg-acc-soft text-acc" : "border-line text-t1 hover:border-acc",
+  );
+
+/** Linhas do catalogo. Os tipos da linha escolhida comecam ligados. */
+function LinePicker({
+  catalog,
+  selected,
+  onChange,
+  error,
+}: {
+  catalog: ChallengeCatalog | null;
+  selected: ChallengeLine[];
+  onChange: (lines: ChallengeLine[]) => void;
+  error?: string;
+}) {
+  const options = catalogLines(catalog?.products.map((product) => product.name) ?? []);
+  const byKey = new Map(options.map((line) => [line.key, line]));
+  const chosen = new Set(selected.map((line) => line.key));
+  const missing = selected.filter((line) => !byKey.has(line.key));
+  const toggleLine = (line: { key: string; name: string; kinds: string[] }) => {
+    if (chosen.has(line.key)) onChange(selected.filter((item) => item.key !== line.key));
+    else onChange([...selected, { key: line.key, name: line.name, kinds: [...line.kinds] }]);
+  };
+  const toggleKind = (key: string, kind: string) => {
+    onChange(
+      selected.flatMap((line) => {
+        if (line.key !== key) return [line];
+        const kinds = line.kinds.includes(kind) ? line.kinds.filter((item) => item !== kind) : [...line.kinds, kind];
+        return kinds.length > 0 ? [{ ...line, kinds }] : [];
+      }),
+    );
+  };
+  return (
+    <PickerShell label="Linhas" error={error}>
+      {!catalog ? (
+        <p className="text-[12.5px] text-t2">Carregando linhas…</p>
+      ) : options.length === 0 && missing.length === 0 ? (
+        <p className="text-[12.5px] text-t2">Nenhuma linha no catálogo.</p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap gap-1.5">
+            {[...options, ...missing.map((line) => ({ key: line.key, name: line.name, kinds: line.kinds }))].map((line) => (
+              <button key={line.key} type="button" aria-pressed={chosen.has(line.key)} onClick={() => toggleLine(line)} className={chipClass(chosen.has(line.key))}>
+                {line.name}
+              </button>
+            ))}
+          </div>
+          {selected.map((line) => {
+            const kinds = [...new Set([...(byKey.get(line.key)?.kinds ?? []), ...line.kinds])].sort((a, b) => a.localeCompare(b, "pt-BR"));
+            return (
+              <div key={line.key} className="flex flex-col gap-1.5">
+                <p className="text-[11.5px] text-t2">Tipos de {line.name}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {kinds.map((kind) => (
+                    <button key={kind} type="button" aria-pressed={line.kinds.includes(kind)} onClick={() => toggleKind(line.key, kind)} className={chipClass(line.kinds.includes(kind))}>
+                      {kind}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </PickerShell>

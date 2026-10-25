@@ -9,8 +9,8 @@ import type { SalesDayAgg, SalesProductDayAgg, SalesSellerDayAgg, SalesSellerPro
 
 /** Tipo do desafio: Itens vendidos  |  Faturamento  |  P.A.  |  Ticket medio  |  Indice de desempenho. */
 export type ChallengeMetric = "QUANTITY" | "VALUE" | "PA" | "TICKET" | "INDEX";
-/** O que conta em Quantidade/Valor: produtos escolhidos  |  categorias escolhidas  |  tudo o que a pessoa vender. */
-export type ChallengeScope = "PRODUCTS" | "CATEGORIES" | "ALL";
+/** O que conta em Quantidade/Valor: produtos  |  categorias  |  linhas  |  tudo o que a pessoa vender. */
+export type ChallengeScope = "PRODUCTS" | "CATEGORIES" | "LINES" | "ALL";
 /** CONTEST = Quem fizer mais (podio)  |  MINIMUM = Quem chegar ao minimo  |  COLLECTIVE = a filial junta. */
 export type ChallengeMode = "CONTEST" | "MINIMUM" | "COLLECTIVE";
 
@@ -28,6 +28,13 @@ export interface ChallengeCategory {
   name: string;
 }
 
+/** Linha da tela de Produtos. `key` e estavel; `kinds` sao os tipos ligados. */
+export interface ChallengeLine {
+  key: string;
+  name: string;
+  kinds: string[];
+}
+
 export interface ChallengeRecord {
   id: string;
   storeId: string;
@@ -43,6 +50,7 @@ export interface ChallengeRecord {
   mode: ChallengeMode;
   products: ChallengeProduct[];
   categories: ChallengeCategory[];
+  lines: ChallengeLine[];
   /** Minimo (obrigatorio em "Quem chegar ao minimo", opcional em "Quem fizer mais"). Itens = inteiro; P.A. = 2 casas; valor/ticket = R$. */
   target: number | null;
   /** P.A./ticket: vendas minimas para concorrer. */
@@ -62,7 +70,7 @@ export type ChallengeInput = Omit<ChallengeRecord, "id">;
 export const PRIZE_LABEL_MAX = 60;
 
 const METRICS: readonly ChallengeMetric[] = ["QUANTITY", "VALUE", "PA", "TICKET", "INDEX"];
-const SCOPES: readonly ChallengeScope[] = ["PRODUCTS", "CATEGORIES", "ALL"];
+const SCOPES: readonly ChallengeScope[] = ["PRODUCTS", "CATEGORIES", "LINES", "ALL"];
 const MODES: readonly ChallengeMode[] = ["CONTEST", "MINIMUM", "COLLECTIVE"];
 
 export const usesScope = (m: ChallengeMetric) => m === "QUANTITY" || m === "VALUE";
@@ -119,6 +127,17 @@ function parseCategories(raw: unknown): ChallengeCategory[] {
     .filter((c) => Number.isInteger(c.typeId));
 }
 
+function parseLines(raw: unknown): ChallengeLine[] {
+  if (!Array.isArray(raw)) return [];
+  return (raw as { key?: unknown; name?: unknown; kinds?: unknown }[])
+    .map((line) => ({
+      key: String(line?.key ?? "").trim(),
+      name: String(line?.name ?? "").trim(),
+      kinds: Array.isArray(line?.kinds) ? line.kinds.map((kind) => String(kind ?? "").trim()).filter(Boolean) : [],
+    }))
+    .filter((line) => line.key && line.kinds.length > 0);
+}
+
 function numOrNull(v: unknown): number | null {
   if (v == null || v === "") return null;
   const n = Number(v);
@@ -136,6 +155,7 @@ export type ChallengeRow = {
   mode: string;
   products: unknown;
   categories: unknown;
+  lines?: unknown;
   /** numeric chega como texto pelo PostgREST. */
   target: number | string | null;
   min_sales: number | null;
@@ -169,6 +189,7 @@ export function challengeFromRow(r: ChallengeRow): ChallengeRecord {
     mode: MODES.includes(r.mode as ChallengeMode) ? (r.mode as ChallengeMode) : "CONTEST",
     products: parseProducts(r.products),
     categories: parseCategories(r.categories),
+    lines: parseLines(r.lines),
     target: numOrNull(r.target),
     minSales: numOrNull(r.min_sales),
     prizes: parsePrizes(r.prizes),
@@ -198,6 +219,7 @@ export function challengeToRow(c: ChallengeInput): Omit<ChallengeRow, "id"> {
     mode: c.mode,
     products: c.products.map((p) => ({ code: p.code, name: p.name })),
     categories: c.categories.map((x) => ({ typeId: x.typeId, name: x.name })),
+    lines: c.lines.map((line) => ({ key: line.key, name: line.name, kinds: [...line.kinds] })),
     target: c.target == null ? null : Math.round(c.target * 100) / 100,
     min_sales: c.minSales,
     prizes: c.prizes.map(prizeToJson),
@@ -211,6 +233,8 @@ export function challengeToRow(c: ChallengeInput): Omit<ChallengeRow, "id"> {
 }
 
 const COLS =
+  "id, store_id, name, starts_on, ends_on, metric, scope, mode, products, categories, lines, target, min_sales, prizes, manager_prize, cashier_prize, published_at";
+const COLS_NO_LINES =
   "id, store_id, name, starts_on, ends_on, metric, scope, mode, products, categories, target, min_sales, prizes, manager_prize, cashier_prize, published_at";
 const COLS_LEGACY =
   "id, store_id, name, starts_on, ends_on, metric, scope, mode, products, categories, target, min_sales, prizes, manager_prize, cashier_prize";
@@ -245,6 +269,7 @@ export async function fetchChallenges(q: {
     return query;
   };
   let { data, error } = await run(COLS, q.includeDrafts === true);
+  if (error?.code === "42703") ({ data, error } = await run(COLS_NO_LINES, q.includeDrafts === true));
   if (error?.code === "42703") ({ data, error } = await run(COLS_LEGACY, true));
   if (error) {
     console.warn("fetchChallenges:", error.message);
@@ -257,6 +282,7 @@ export async function fetchChallenge(tenantId: string, id: string): Promise<Chal
   const sb = await client();
   if (!sb) return null;
   let { data, error } = await sb.from("challenge").select(COLS).eq("tenant_id", tenantId).eq("id", id).maybeSingle();
+  if (error?.code === "42703") ({ data, error } = await sb.from("challenge").select(COLS_NO_LINES).eq("tenant_id", tenantId).eq("id", id).maybeSingle());
   if (error?.code === "42703") ({ data, error } = await sb.from("challenge").select(COLS_LEGACY).eq("tenant_id", tenantId).eq("id", id).maybeSingle());
   if (error) {
     console.warn("fetchChallenge:", error.message);
@@ -418,10 +444,12 @@ export interface ChallengeAggInput {
   team: GoalTeamMember[];
   /** COD_PRODUTO  ->  tipo (categoria). */
   typeByCode: Map<string, number>;
+  /** COD_PRODUTO  ->  descricao, para desafio por linha. */
+  nameByCode: Map<string, string>;
 }
 
 export function emptyChallengeAggInput(): ChallengeAggInput {
-  return { sellerProducts: [], sellerDays: [], storeSaleDays: new Set(), storeDays: [], storeProducts: [], team: [], typeByCode: new Map() };
+  return { sellerProducts: [], sellerDays: [], storeSaleDays: new Set(), storeDays: [], storeProducts: [], team: [], typeByCode: new Map(), nameByCode: new Map() };
 }
 
 /** Tira as linhas de gerencia / conta de freelancer (ativos com cargo = VENDEDOR), por gerador e por nome. */
@@ -474,6 +502,7 @@ export async function fetchChallengeInput(q: {
   const to = maxEnd < q.today ? maxEnd : q.today;
   const needsItems = q.challenges.some((c) => usesScope(c.metric) && c.scope !== "ALL");
   const needsTypes = q.challenges.some((c) => usesScope(c.metric) && c.scope === "CATEGORIES");
+  const needsNames = q.challenges.some((c) => usesScope(c.metric) && c.scope === "LINES");
   const needsStoreDays = needsItems || q.challenges.some((c) => c.mode === "COLLECTIVE");
   const needsStoreProducts = q.challenges.some((c) => c.mode === "COLLECTIVE" && usesScope(c.metric) && c.scope !== "ALL");
 
@@ -523,7 +552,7 @@ export async function fetchChallengeInput(q: {
     fetchSalesSellerDayAggs(range),
     needsStoreDays ? fetchSalesDayAggs({ ...range, brand: "ALL" }) : Promise.resolve([]),
     needsStoreProducts ? fetchSalesProductDayAggs(range) : Promise.resolve([]),
-    needsTypes ? fetchChallengeCatalog() : Promise.resolve(null),
+    needsTypes || needsNames ? fetchChallengeCatalog() : Promise.resolve(null),
   ]);
   out.sellerProducts = products;
   out.sellerDays = sellerDays;
@@ -531,5 +560,11 @@ export async function fetchChallengeInput(q: {
   out.storeProducts = storeProducts;
   for (const d of storeDays) if (d.revenueCents > 0) out.storeSaleDays.add(`${d.storeId}|${d.day}`);
   if (catalog) out.typeByCode = catalog.typeByCode;
+  if (catalog && needsNames) {
+    for (const product of catalog.products) if (product.name) out.nameByCode.set(product.code, product.name);
+  }
+  for (const row of storeProducts) {
+    if (row.productName && !out.nameByCode.has(row.productCode)) out.nameByCode.set(row.productCode, row.productName);
+  }
   return out;
 }

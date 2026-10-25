@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildProductLineIndex, fragranceOf } from "./productLines";
+import { buildProductLineIndex, fragranceOf, lineIdentity, productInLines } from "./productLines";
 
 const CATALOG = [
   "DESOD COL OBSESSED 100ML - WEPINK",
@@ -68,5 +68,13 @@ describe("buildProductLineIndex", () => {
 
   it("produto fora do catálogo cai na linha do grupo", () => {
     expect(line("BODY SPLASH OBSESSED NOVO 200ML - WEPINK")).toBe("OBSESSED");
+  });
+});
+
+describe("productInLines", () => {
+  it("lançamento da mesma linha e do mesmo tipo entra; outro tipo fica de fora", () => {
+    const lines = [{ key: lineIdentity("ESPUMA DE BANHO SHOWER DREAM 200ML - WEPINK")!.key, kinds: ["Espuma de banho"] }];
+    expect(productInLines("ESPUMA DE BANHO SHOWER DREAM NIGHT 150ML - WEPINK", lines)).toBe(true);
+    expect(productInLines("BODY SPLASH SHOWER DREAM 200ML - WEPINK", lines)).toBe(false);
   });
 });

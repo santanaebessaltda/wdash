@@ -15,6 +15,7 @@ import type { GoalTeamMember } from "./goalsRepo";
 import type { SalesSellerDayAgg } from "./salesTypes";
 import { goalStatus, prazoRemaining, type GoalStatus } from "./goalView";
 import { presenceDays, scaledMinimum } from "./engine/presence";
+import { productInLines } from "./productLines";
 
 export type ChallengeStatus = GoalStatus;
 
@@ -98,8 +99,17 @@ export function teamIndex(current: IndexPersonTotals[], previous: IndexPersonTot
 export const CHALLENGE_SCOPE_LABEL: Record<ChallengeScope, string> = {
   PRODUCTS: "Produtos escolhidos",
   CATEGORIES: "Categorias escolhidas",
+  LINES: "Linhas escolhidas",
   ALL: "Tudo o que vender",
 };
+
+/** Produto entra no desafio de quantidade ou valor. */
+function productCounts(c: ChallengeRecord, aggs: ChallengeAggInput, code: string, fallbackName?: string): boolean {
+  if (c.scope === "PRODUCTS") return c.products.some((product) => product.code === code);
+  if (c.scope === "CATEGORIES") return c.categories.some((category) => category.typeId === aggs.typeByCode.get(code));
+  if (c.scope === "LINES") return productInLines(aggs.nameByCode.get(code) || fallbackName, c.lines);
+  return false;
+}
 
 export const CHALLENGE_MODE_LABEL: Record<ChallengeMode, string> = {
   CONTEST: "Quem fizer mais",
@@ -310,16 +320,12 @@ export function buildChallengeView(args: {
   const byProduct = usesScope(c.metric) && c.scope !== "ALL";
   if (status !== "upcoming") {
     if (byProduct) {
-      const codigos = new Set(c.products.map((p) => p.code));
-      const kinds = new Set(c.categories.map((t) => t.typeId));
-      const conta = (code: string) =>
-        c.scope === "PRODUCTS" ? codigos.has(code) : kinds.has(aggs.typeByCode.get(code) ?? Number.NaN);
       for (const r of aggs.sellerProducts) {
         if (!inPeriod(r)) continue;
         const member = byGenerator.get(r.sellerGeneratorId) ?? byName.get(r.sellerKey);
         if (!onRoster(member, r.day)) continue;
         const a = acc(member, r.sellerKey, r.sellerName);
-        if (conta(r.productCode)) {
+        if (productCounts(c, aggs, r.productCode)) {
           a.items += r.itemCount;
           a.amountCents += r.revenueCents;
         }
@@ -475,12 +481,10 @@ export function buildChallengeView(args: {
     const productDays = new Set<string>();
     const byProduct = usesScope(c.metric) && c.scope !== "ALL";
     if (byProduct) {
-      const codes = new Set(c.products.map((p) => p.code));
-      const kinds = new Set(c.categories.map((t) => t.typeId));
       for (const row of aggs.storeProducts) {
         if (row.storeId !== c.storeId || row.day < from || row.day > to) continue;
         productDays.add(row.day);
-        const chosen = c.scope === "PRODUCTS" ? codes.has(row.productCode) : kinds.has(aggs.typeByCode.get(row.productCode) ?? Number.NaN);
+        const chosen = productCounts(c, aggs, row.productCode, row.productName);
         if (!chosen) continue;
         items += row.itemCount;
         revenueCents += row.revenueCents;
@@ -737,6 +741,7 @@ export function copyChallenge(c: ChallengeRecord): ChallengeInput {
     endsOn: addDays(startsOn, duration - 1),
     products: c.products.map((p) => ({ ...p })),
     categories: c.categories.map((t) => ({ ...t })),
+    lines: c.lines.map((line) => ({ ...line, kinds: [...line.kinds] })),
     prizes: c.prizes.map((p) => ({ ...p })),
     managerPrize: c.managerPrize ? { ...c.managerPrize } : null,
     cashierPrize: c.cashierPrize ? { ...c.cashierPrize } : null,
@@ -750,6 +755,7 @@ export function copyChallengeToStore(c: ChallengeRecord): ChallengeInput {
     ...rest,
     products: c.products.map((p) => ({ ...p })),
     categories: c.categories.map((t) => ({ ...t })),
+    lines: c.lines.map((line) => ({ ...line, kinds: [...line.kinds] })),
     prizes: c.prizes.map((p) => ({ ...p })),
     managerPrize: c.managerPrize ? { ...c.managerPrize } : null,
     cashierPrize: c.cashierPrize ? { ...c.cashierPrize } : null,

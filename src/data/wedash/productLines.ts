@@ -95,9 +95,50 @@ function commonPrefix(names: string[]): string {
 }
 
 export type ProductLineIndex = {
-  /** Linha do produto; null = sem fragrancia. */
-  lineOf(description: string): { line: string; kind: string } | null;
+  /** Linha do produto; null = sem fragrancia. `key` e estavel; `line` e o nome exibido. */
+  lineOf(description: string): { key: string; line: string; kind: string } | null;
 };
+
+/** Chave da linha + tipo, sem depender do catalogo. Um lancamento com o mesmo nome cai na mesma chave. */
+export function lineIdentity(description: string): { key: string; kind: string } | null {
+  const fragrance = fragranceOf(description);
+  if (!fragrance) return null;
+  return { key: groupKey(fragrance.name), kind: fragrance.kind };
+}
+
+export type CatalogLine = { key: string; name: string; kinds: string[] };
+
+/** Linhas do catalogo, no mesmo nome da tela de Produtos. */
+export function catalogLines(descriptions: readonly string[]): CatalogLine[] {
+  const index = buildProductLineIndex(descriptions);
+  const byKey = new Map<string, { name: string; kinds: Set<string> }>();
+  for (const description of descriptions) {
+    const hit = index.lineOf(description);
+    if (!hit) continue;
+    const row = byKey.get(hit.key) ?? { name: hit.line, kinds: new Set<string>() };
+    row.name = hit.line;
+    row.kinds.add(hit.kind);
+    byKey.set(hit.key, row);
+  }
+  return [...byKey.entries()]
+    .map(([key, row]) => ({
+      key,
+      name: row.name,
+      kinds: [...row.kinds].sort((a, b) => a.localeCompare(b, "pt-BR")),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+}
+
+/** O produto entra na linha se a chave bate e o tipo esta ligado. */
+export function productInLines(
+  description: string | null | undefined,
+  lines: readonly { key: string; kinds: readonly string[] }[],
+): boolean {
+  if (!description) return false;
+  const hit = lineIdentity(description);
+  if (!hit) return false;
+  return lines.some((line) => line.key === hit.key && line.kinds.includes(hit.kind));
+}
 
 /** Indice de linhas a partir das descricoes do catalogo (e das vendas, para produto fora do catalogo). */
 export function buildProductLineIndex(descriptions: Iterable<string>): ProductLineIndex {
@@ -114,10 +155,9 @@ export function buildProductLineIndex(descriptions: Iterable<string>): ProductLi
   for (const [k, names] of byKey) lineByKey.set(k, commonPrefix([...names]) || k);
   return {
     lineOf(description) {
-      const f = fragranceOf(description);
-      if (!f) return null;
-      const k = groupKey(f.name);
-      return { line: lineByKey.get(k) ?? k, kind: f.kind };
+      const id = lineIdentity(description);
+      if (!id) return null;
+      return { key: id.key, line: lineByKey.get(id.key) ?? id.key, kind: id.kind };
     },
   };
 }

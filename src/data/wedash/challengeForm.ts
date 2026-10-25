@@ -4,6 +4,7 @@ import {
   usesScope,
   type ChallengeCategory,
   type ChallengeInput,
+  type ChallengeLine,
   type ChallengeMetric,
   type ChallengeMode,
   type ChallengePrize,
@@ -34,6 +35,7 @@ export interface ChallengeForm {
   mode: ChallengeMode;
   products: ChallengeProduct[];
   categories: ChallengeCategory[];
+  lines: ChallengeLine[];
   /** Minimo na unidade do tipo: obrigatorio em "Quem chegar ao minimo", opcional em "Quem fizer mais". */
   target: string;
   minSales: string;
@@ -56,6 +58,7 @@ export interface ChallengeFormErrors {
   storeId?: string;
   products?: string;
   categories?: string;
+  lines?: string;
   target?: string;
   minSales?: string;
   /** Por posicao do premio (0 = 1). */
@@ -81,6 +84,7 @@ export function emptyChallengeForm(storeId: string): ChallengeForm {
     mode: "CONTEST",
     products: [],
     categories: [],
+    lines: [],
     target: "",
     minSales: "",
     prizes: [emptyPrize()],
@@ -154,6 +158,7 @@ export function validateChallengeForm(f: ChallengeForm): ChallengeFormErrors {
   const scope = scopeOf(f);
   if (scope === "PRODUCTS" && f.products.length === 0) e.products = "Escolha pelo menos 1 produto.";
   if (scope === "CATEGORIES" && f.categories.length === 0) e.categories = "Escolha pelo menos 1 categoria.";
+  if (scope === "LINES" && f.lines.length === 0) e.lines = "Escolha pelo menos 1 linha.";
   if (usesMinSales(f.metric) && f.minSales.trim()) {
     const v = parseNumber(f.minSales);
     // 0 / vazio = sem piso. Se preencheu outro valor, so aceita inteiro >= 1.
@@ -200,6 +205,7 @@ export function challengeFormToInput(f: ChallengeForm): ChallengeInput {
     mode: f.mode,
     products: scope === "PRODUCTS" ? f.products : [],
     categories: scope === "CATEGORIES" ? f.categories : [],
+    lines: scope === "LINES" ? f.lines.map((line) => ({ ...line, kinds: [...line.kinds] })) : [],
     target: targetValue(f.metric, f.target),
     minSales: usesMinSales(f.metric)
       ? (() => {
@@ -239,6 +245,7 @@ export function challengeToForm(c: ChallengeRecord | ChallengeInput): ChallengeF
     mode: c.mode,
     products: c.products.map((p) => ({ ...p })),
     categories: c.categories.map((t) => ({ ...t })),
+    lines: c.lines.map((line) => ({ ...line, kinds: [...line.kinds] })),
     target: targetToText(c.metric, c.target),
     minSales: c.minSales != null ? String(c.minSales) : usesMinSales(c.metric) ? "" : DEFAULT_MIN_SALES,
     prizes: c.prizes.length > 0 ? c.prizes.map(prizeToForm) : [emptyPrize()],

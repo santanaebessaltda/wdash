@@ -242,7 +242,12 @@ function prizesText(c: ChallengeRecord): string {
 function itemsText(c: ChallengeRecord): string | null {
   if (!usesScope(c.metric)) return null;
   if (c.scope === "ALL") return CHALLENGE_SCOPE_LABEL.ALL;
-  const names = c.scope === "PRODUCTS" ? c.products.map((p) => p.name) : c.categories.map((t) => t.name);
+  const names =
+    c.scope === "PRODUCTS"
+      ? c.products.map((p) => p.name)
+      : c.scope === "LINES"
+        ? c.lines.map((line) => `${line.name} · ${line.kinds.join(", ")}`)
+        : c.categories.map((t) => t.name);
   if (names.length === 0) return null;
   if (names.length <= 3) return names.join(" · ");
   return `${names.slice(0, 2).join(" · ")} · +${names.length - 2}`;

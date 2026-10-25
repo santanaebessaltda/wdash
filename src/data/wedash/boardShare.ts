@@ -63,7 +63,7 @@ type Raw = {
   challenges: ChallengeRow[];
   sellerProducts: SalesSellerProductDayAgg[];
   storeProducts?: SalesProductDayAgg[];
-  catalog: { code: string; typeId: number | null }[];
+  catalog: { code: string; typeId: number | null; name?: string | null }[];
   photos: ProfilePhotoRef[];
 };
 
@@ -133,6 +133,10 @@ export function mapBoardShare(raw: Raw): PublicBoardPack {
   for (const day of days) if (day.brand === "ALL" && day.revenueCents > 0) aggs.storeSaleDays.add(`${day.storeId}|${day.day}`);
   for (const item of raw.catalog ?? []) {
     if (item.typeId != null) aggs.typeByCode.set(item.code, Number(item.typeId));
+    if (item.name) aggs.nameByCode.set(item.code, item.name);
+  }
+  for (const item of aggs.storeProducts) {
+    if (item.productName && !aggs.nameByCode.has(item.productCode)) aggs.nameByCode.set(item.productCode, item.productName);
   }
   return {
     store: raw.store,

@@ -10,9 +10,10 @@ const row = (over: Partial<ChallengeRow> = {}): ChallengeRow => ({
   metric: "QUANTITY",
   scope: "PRODUCTS",
   mode: "CONTEST",
-  products: [{ code: "BSPPAR-ATH-001", name: "BODY SPLASH PARIS" }],
-  categories: [],
-  target: null,
+      products: [{ code: "BSPPAR-ATH-001", name: "BODY SPLASH PARIS" }],
+      categories: [],
+      lines: [],
+      target: null,
   min_sales: null,
   prizes: [{ kind: "MONEY", cents: 10_000 }, { kind: "ITEM", label: "Combo KFC" }],
   manager_prize: null,
@@ -33,6 +34,7 @@ describe("challengeFromRow", () => {
       mode: "CONTEST",
       products: [{ code: "BSPPAR-ATH-001", name: "BODY SPLASH PARIS" }],
       categories: [],
+      lines: [],
       target: null,
       minSales: null,
       prizes: [
@@ -43,6 +45,7 @@ describe("challengeFromRow", () => {
       managerTarget: null,
       cashierPrize: null,
       cashierTarget: null,
+      published: true,
     });
   });
 
@@ -135,6 +138,7 @@ describe("challengeToRow", () => {
     mode: "MINIMUM",
     products: [],
     categories: [],
+    lines: [],
     target: 92.345,
     minSales: 10,
     prizes: [{ kind: "MONEY", amount: 50.1 }],
@@ -155,6 +159,7 @@ describe("challengeToRow", () => {
       mode: "MINIMUM",
       products: [],
       categories: [],
+      lines: [],
       target: 92.35,
       min_sales: 10,
       prizes: [{ kind: "MONEY", cents: 5010 }],
@@ -166,7 +171,7 @@ describe("challengeToRow", () => {
   it("ida e volta preserva o desafio", () => {
     const limpo = { ...input, name: "Ticket da semana", managerPrize: { kind: "ITEM" as const, label: "Combo KFC" }, target: 92.35, managerTarget: 110 };
     const back = challengeFromRow({ ...challengeToRow(limpo), id: "c9" } as ChallengeRow);
-    expect(back).toEqual({ ...limpo, id: "c9" });
+    expect(back).toEqual({ ...limpo, id: "c9", published: true });
   });
 
   it("métrica de itens grava o alvo inteiro; sem prêmio da gerência grava null", () => {

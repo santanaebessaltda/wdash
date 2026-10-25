@@ -54,6 +54,7 @@ describe("validateChallengeForm", () => {
     expect(validateChallengeForm(valid({ products: [] })).products).toBe("Escolha pelo menos 1 produto.");
     const cat = validateChallengeForm(valid({ scope: "CATEGORIES", products: [], categories: [] }));
     expect(cat.categories).toBe("Escolha pelo menos 1 categoria.");
+    expect(validateChallengeForm(valid({ scope: "LINES", products: [], lines: [] })).lines).toBe("Escolha pelo menos 1 linha.");
     expect(cat.products).toBeUndefined();
     expect(validateChallengeForm(valid({ scope: "ALL", products: [] }))).toEqual({});
     expect(validateChallengeForm(valid({ metric: "VALUE", scope: "PRODUCTS", products: [] })).products).toBe(
@@ -184,6 +185,7 @@ describe("challengeFormToInput / challengeToForm", () => {
       mode: "CONTEST",
       products: [{ code: "BS1", name: "BODY SPLASH 1" }],
       categories: [],
+      lines: [],
       target: 5,
       minSales: null,
       prizes: [
@@ -267,6 +269,7 @@ describe("challengeFormToInput / challengeToForm", () => {
       mode: "MINIMUM",
       products: [],
       categories: [],
+      lines: [],
       target: 1.9,
       minSales: 10,
       prizes: [{ kind: "MONEY", amount: 50 }],

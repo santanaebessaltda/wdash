@@ -24,6 +24,7 @@ const challenge = (over: Partial<ChallengeRecord> = {}): ChallengeRecord => ({
   mode: "CONTEST",
   products: [{ code: "BS1", name: "BODY SPLASH 1" }],
   categories: [],
+  lines: [],
   target: null,
   minSales: null,
   prizes: [{ kind: "MONEY", amount: 100 }],
@@ -148,6 +149,26 @@ describe("buildChallengeView — participantes e resultado", () => {
     );
     expect(byName(v).ANA.result).toBe(3);
     expect(byName(v).BIA.result).toBe(2);
+  });
+
+  it("Linha: soma a espuma da linha, inclusive um código que não estava no cadastro", () => {
+    const v = build(
+      challenge({
+        scope: "LINES",
+        products: [],
+        lines: [{ key: "SHOWER", name: "SHOWER DREAM", kinds: ["Espuma de banho"] }],
+      }),
+      input({
+        sellerProducts: [item(1001, "NOVA", 4), item(1001, "SPLASH", 2), item(1002, "VELHA", 1)],
+        nameByCode: new Map([
+          ["NOVA", "ESPUMA DE BANHO SHOWER DREAM NIGHT 150ML - WEPINK"],
+          ["SPLASH", "BODY SPLASH SHOWER DREAM 200ML - WEPINK"],
+          ["VELHA", "ESPUMA DE BANHO SHOWER DREAM 200ML - WEPINK"],
+        ]),
+      }),
+    );
+    expect(byName(v).ANA.result).toBe(4);
+    expect(byName(v).BIA.result).toBe(1);
   });
 
   it("Valor dos produtos escolhidos = R$ desses produtos, por pessoa", () => {

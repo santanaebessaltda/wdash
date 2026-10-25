@@ -7,9 +7,10 @@ import { brlCent, eachDay, num } from "./format.ts";
 import type { GoalTeamMember, SalesSellerDayAgg } from "./goalTypes.ts";
 import { goalStatus } from "./goalView.ts";
 import { presenceDays, scaledMinimum } from "./presence.ts";
+import { productInLines } from "../productLines.ts";
 
 export type SellerChallengeMetric = "QUANTITY" | "VALUE" | "PA" | "TICKET" | "INDEX";
-export type SellerChallengeScope = "PRODUCTS" | "CATEGORIES" | "ALL";
+export type SellerChallengeScope = "PRODUCTS" | "CATEGORIES" | "LINES" | "ALL";
 
 export const SELLER_CHALLENGE_METRIC_LABEL: Record<SellerChallengeMetric, string> = {
   QUANTITY: "Itens vendidos",
@@ -54,6 +55,7 @@ interface ChallengeShape {
   scope?: SellerChallengeScope;
   productCodes?: string[];
   categoryIds?: number[];
+  lines?: { key: string; kinds: string[] }[];
   target?: number | null;
   minSales?: number | null;
   prizes?: ChallengePrizeShape[];
@@ -121,6 +123,15 @@ export function sellerChallengeRules(challenge: ChallengeShape): string[] {
     } else if (scope === "CATEGORIES") {
       const n = challenge.categoryIds?.length ?? 0;
       rules.push(n > 0 ? `Contam só as ${n} ${n === 1 ? "categoria escolhida" : "categorias escolhidas"} pelo gestor.` : "Contam só as categorias escolhidas pelo gestor.");
+    } else if (scope === "LINES") {
+      const n = challenge.lines?.length ?? 0;
+      rules.push(
+        n === 1
+          ? "Conta a linha escolhida pelo gestor, inclusive lançamento do mesmo tipo."
+          : n > 1
+            ? `Contam as ${n} linhas escolhidas pelo gestor, inclusive lançamento do mesmo tipo.`
+            : "Contam as linhas escolhidas pelo gestor, inclusive lançamento do mesmo tipo.",
+      );
     } else {
       rules.push(challenge.mode === "COLLECTIVE" ? "Conta tudo o que a filial vender." : "Conta tudo o que você vender na loja.");
     }
@@ -215,6 +226,7 @@ export function challengeStanding(
     sellerDays: SalesSellerDayAgg[];
     products?: SellerProductDay[];
     productTypes?: { code: string; typeId: number }[];
+    productNames?: { code: string; name: string }[];
     storeDays?: { storeId: string; day: string; brand: string; revenueCents: number; salesCount: number; itemCount: number }[];
   },
 ): SellerChallengeStanding {
@@ -331,7 +343,13 @@ export function challengeStanding(
     const codigos = new Set(challenge.productCodes ?? []);
     const kinds = new Set(challenge.categoryIds ?? []);
     const typeByCode = new Map((input.productTypes ?? []).map((t) => [t.code, t.typeId]));
-    const conta = (code: string) => (scope === "PRODUCTS" ? codigos.has(code) : kinds.has(typeByCode.get(code) ?? Number.NaN));
+    const nameByCode = new Map((input.productNames ?? []).map((item) => [item.code, item.name]));
+    const conta = (code: string) =>
+      scope === "PRODUCTS"
+        ? codigos.has(code)
+        : scope === "LINES"
+          ? productInLines(nameByCode.get(code), challenge.lines ?? [])
+          : kinds.has(typeByCode.get(code) ?? Number.NaN);
     for (const r of input.products ?? []) {
       if (!inPeriod(r) || !conta(r.productCode)) continue;
       const member = byGenerator.get(r.sellerGeneratorId) ?? byName.get(r.sellerKey);

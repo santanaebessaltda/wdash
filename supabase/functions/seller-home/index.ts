@@ -70,7 +70,7 @@ function challengeMetricScope(metric: string, scope: string | null): { metric: S
   if (metric === "PRODUCTS" || metric === "CATEGORIES") return { metric: "QUANTITY", scope: metric };
   const parsed = CHALLENGE_METRICS.find((m) => m === metric) ?? "QUANTITY";
   if (parsed !== "QUANTITY" && parsed !== "VALUE") return { metric: parsed, scope: "ALL" };
-  const parsedScope = scope === "PRODUCTS" || scope === "CATEGORIES" || scope === "ALL" ? scope : "ALL";
+  const parsedScope = scope === "PRODUCTS" || scope === "CATEGORIES" || scope === "LINES" || scope === "ALL" ? scope : "ALL";
   return { metric: parsed, scope: parsedScope };
 }
 
@@ -82,6 +82,16 @@ function codesOf(raw: unknown): string[] {
 function typeIdsOf(raw: unknown): number[] {
   if (!Array.isArray(raw)) return [];
   return raw.map((c) => Number((c as { typeId?: unknown })?.typeId)).filter((n) => Number.isInteger(n));
+}
+
+function linesOf(raw: unknown): { key: string; kinds: string[] }[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((item) => {
+    const line = item as { key?: unknown; kinds?: unknown };
+    const key = String(line?.key ?? "").trim();
+    const kinds = Array.isArray(line?.kinds) ? line.kinds.map((kind) => String(kind ?? "").trim()).filter(Boolean) : [];
+    return key && kinds.length > 0 ? [{ key, kinds }] : [];
+  });
 }
 
 function needsProductLines(metric: string, scope: string | null): boolean {
@@ -227,7 +237,7 @@ serve(async (req) => {
           .order("starts_on", { ascending: false }),
       ),
       allPages(
-        admin.from("challenge").select("id, store_id, name, starts_on, ends_on, metric, scope, mode, products, categories, target, min_sales, prizes")
+        admin.from("challenge").select("id, store_id, name, starts_on, ends_on, metric, scope, mode, products, categories, lines, target, min_sales, prizes")
           .eq("tenant_id", membership.tenant_id).in("store_id", storeIds)
           .lte("starts_on", rangeTo).gte("ends_on", rangeFrom)
           .not("published_at", "is", null)
@@ -236,9 +246,13 @@ serve(async (req) => {
     ]);
 
     const productChallenges = challengeRows.filter((r) => needsProductLines(String(r.metric ?? ""), r.scope == null ? null : String(r.scope)));
-    const needsTypes = productChallenges.some((r) => challengeMetricScope(String(r.metric ?? ""), r.scope == null ? null : String(r.scope)).scope === "CATEGORIES");
+    const challengeScopeOf = (r: { metric?: unknown; scope?: unknown }) =>
+      challengeMetricScope(String(r.metric ?? ""), r.scope == null ? null : String(r.scope)).scope;
+    const needsTypes = productChallenges.some((r) => challengeScopeOf(r) === "CATEGORIES");
+    const needsNames = productChallenges.some((r) => challengeScopeOf(r) === "LINES");
     let sellerProducts: SellerProductDay[] = [];
     let productTypes: { code: string; typeId: number }[] = [];
+    let productNames: { code: string; name: string }[] = [];
     if (productChallenges.length > 0) {
       const productFrom = productChallenges.reduce((m: string, r) => (String(r.starts_on) < m ? String(r.starts_on) : m), String(productChallenges[0].starts_on));
       const productTo = rangeTo;
@@ -250,8 +264,8 @@ serve(async (req) => {
             .gte("day", productFrom).lte("day", productTo)
             .order("day").order("store_id").order("seller_gerador_id").order("product_code"),
         ),
-        needsTypes
-          ? allPages(admin.from("product_catalog").select("product_code, type_id").order("product_code"))
+        needsTypes || needsNames
+          ? allPages(admin.from("product_catalog").select("product_code, type_id, description").order("product_code"))
           : Promise.resolve([]),
       ]);
       sellerProducts = productRows.map((r) => ({
@@ -267,6 +281,9 @@ serve(async (req) => {
       productTypes = typeRows
         .filter((r) => r.type_id != null)
         .map((r) => ({ code: String(r.product_code), typeId: Number(r.type_id) }));
+      productNames = typeRows
+        .map((r) => ({ code: String(r.product_code ?? "").trim(), name: String(r.description ?? "").trim() }))
+        .filter((r) => r.code && r.name);
     }
 
     const branchStores = await allPages(
@@ -312,6 +329,7 @@ serve(async (req) => {
       team,
       sellerProducts,
       productTypes,
+      productNames,
       challenges: challengeRows.map((r): SellerChallengeInput => {
         const prizes = challengePrizes(r.prizes);
         const metricScope = challengeMetricScope(String(r.metric ?? ""), r.scope == null ? null : String(r.scope));
@@ -328,6 +346,7 @@ serve(async (req) => {
           scope: metricScope.scope,
           productCodes: codesOf(r.products),
           categoryIds: typeIdsOf(r.categories),
+          lines: linesOf(r.lines),
           target: numOrNull(r.target),
           minSales: numOrNull(r.min_sales),
         };
