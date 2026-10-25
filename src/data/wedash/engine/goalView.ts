@@ -14,6 +14,12 @@ import type {
 
 export type GoalStatus = "active" | "upcoming" | "ended";
 
+/** A barra fecha no último nível. Sem nível, ou com o nível em 0%, fecha na meta da filial. */
+export function goalBarScale(levels: readonly number[]): number {
+  const last = levels.reduce((max, level) => Math.max(max, level), 0);
+  return last > 0 ? last : 100;
+}
+
 export function goalStatus(g: Pick<GoalRecord, "startsOn" | "endsOn">, today: string): GoalStatus {
   if (today < g.startsOn) return "upcoming";
   if (today > g.endsOn) return "ended";
@@ -551,7 +557,7 @@ export function buildGoalCardView(input: {
   const general = g.tierMode === "GENERAL";
   const individual = g.tierMode === "INDIVIDUAL";
   const branchSales = status === "upcoming" ? { sales: 0, items: 0 as number | null } : storeSales(g, input.dayAggs);
-  const scale = Math.max(100, ...g.tiers.map((t) => t.minAttainmentPct));
+  const scale = goalBarScale(g.tiers.map((t) => t.minAttainmentPct));
   const marcos = g.tiers.map((t) => ({ name: t.name, pct: t.minAttainmentPct, prizePct: t.commissionPct, bonus: t.bonus }));
   const periodDays = period.length;
   const teamTotal = people.reduce((s, p) => s + p.revenue, 0);

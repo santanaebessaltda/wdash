@@ -11,7 +11,7 @@ import { brl, brlCent, eachDay, num } from "@/lib/format";
 import type { BlockState as BlockStateKind } from "@/data/wedash/dashboard";
 import { BlockState } from "@/pages/dashboard/BlockState";
 import type { GoalCardView, NetworkGlobalGoal, SellerRow } from "@/data/wedash/teamViews";
-import { GOAL_STATUS_LABEL, goalStatus, outsideRankingNote } from "@/data/wedash/goalView";
+import { GOAL_STATUS_LABEL, goalBarScale, goalStatus, outsideRankingNote } from "@/data/wedash/goalView";
 import { BranchBadge, DeadlineBadge, PeriodBadge, RecordStatusBadge, UnidentifiedSalesBadge } from "@/components/wedash/RecordBadges";
 import { defaultTiers } from "@/data/wedash/goals";
 import { calendarTodayIso, TODAY_ISO } from "@/data/wedash/clock";
@@ -64,7 +64,7 @@ function RevenueCell({ l }: { l: LineRank }) {
 
 function IndividualPctCell({ l }: { l: LineRank }) {
   if (l.noGoal) return <span className="text-t2">—</span>;
-  const scale = Math.max(...l.ladderMarks.map((m) => m.pct), 100);
+  const scale = goalBarScale(l.ladderMarks.map((m) => m.pct));
   return (
     <div className="w-[88px]">
       <p className={`font-mono text-[12.5px] font-bold ${progressTextClass(l.attainmentPct)}`}>{num(l.attainmentPct, 0)}%</p>
@@ -416,7 +416,7 @@ export function GoalProgressBar({
   const showsProjection =
     !soBarra &&
     (goal.projectionAmount === null ? false : typeof goal.projectionAmount === "number" ? true : goalShowsProjection(goal.start, goal.end, todayIso));
-  const scaleMax = Math.max(...tiers.map((d) => d.minAttainmentPct), 100);
+  const scaleMax = goalBarScale(tiers.map((d) => d.minAttainmentPct));
   const fillPct = Math.min(100, (goal.pct / scaleMax) * 100);
   const colorBarra = progressColor(goal.pct);
   const colorPct = progressTextClass(goal.pct);
@@ -479,7 +479,7 @@ export function GoalProgressBar({
           <div className="relative h-3 min-w-0 flex-1 overflow-hidden rounded-full" style={{ background: "var(--bg-3)" }}>
             <div
               className="h-full rounded-full transition-[width] duration-500"
-              style={{ width: `${Math.min(100, Math.max(0, goal.pct))}%`, background: colorBarra }}
+              style={{ width: `${Math.max(0, fillPct)}%`, background: colorBarra }}
             />
           </div>
           {soBarra && (

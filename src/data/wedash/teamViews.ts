@@ -25,6 +25,7 @@ import { TODAY_ISO, CURRENT_HOUR } from "./clock";
 import { dayAggregate, salesDay, storeOpen, sumAggregates, type Aggregate } from "./sales";
 import { storeById, stores, groups, type Store } from "./stores";
 import { brlK, revenueCurve, seriesAxisForPeriod, kpiDelta, previousPeriod, resolvePeriod, seriesAxisLabel, type Scope, type ResolvedPeriod, type BlockState } from "./dashboard";
+import { goalBarScale } from "./engine/goalView";
 import { brl, shortDate, isoToDate, endOfMonth, shortHour, eachDay, monthYear, num, dayCountLabel, addDays } from "@/lib/format";
 import type { TintKey } from "@/pages/dashboards/icons";
 import type { GoalCardView, NetworkGlobalGoal, SellerRow } from "./engine/goalTypes";
@@ -505,7 +506,7 @@ function sellersView(storeId: string, period: ResolvedPeriod, activeGoal: boolea
       attainmentPct: personGoal && personGoal.amount > 0 ? (revenue / personGoal.amount) * 100 : 0,
       barPct:
         personGoal && personGoal.amount > 0
-          ? Math.min(100, (revenue / personGoal.amount) * 100 / Math.max(...tiers.map((d) => d.minAttainmentPct), 100) * 100)
+          ? Math.min(100, ((revenue / personGoal.amount) * 100 / goalBarScale(tiers.map((d) => d.minAttainmentPct))) * 100)
           : 0,
       storeGoalPct: storeGoal > 0 ? (revenue / storeGoal) * 100 : 0,
       // Marcos da escada para a barra segmentada do mockup (posicao % de cada

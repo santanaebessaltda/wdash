@@ -13,7 +13,7 @@ import { kpiTone } from "@/pages/dashboard/palette";
 import type { BlockState as BlockStateKind } from "@/data/wedash/dashboard";
 import { BlockState } from "@/pages/dashboard/BlockState";
 import type { ChallengeView, TeamView, GoalCardView, NetworkGlobalGoal, SellerRow } from "@/data/wedash/teamViews";
-import { outsideRankingNote } from "@/data/wedash/goalView";
+import { goalBarScale, outsideRankingNote } from "@/data/wedash/goalView";
 import { defaultTiers } from "@/data/wedash/goals";
 import { TODAY_ISO } from "@/data/wedash/clock";
 import { cn } from "@/lib/cn";
@@ -168,7 +168,7 @@ function RevenueCell({ l }: { l: LineRank }) {
 
 function IndividualPctCell({ l }: { l: LineRank }) {
   if (l.noGoal) return <span className="text-t2">—</span>;
-  const scale = Math.max(...l.ladderMarks.map((m) => m.pct), 100);
+  const scale = goalBarScale(l.ladderMarks.map((m) => m.pct));
   return (
     <div className="w-[88px]">
       <p className={`font-mono text-[12.5px] font-bold ${progressTextClass(l.attainmentPct)}`}>{num(l.attainmentPct, 0)}%</p>
@@ -539,7 +539,7 @@ export function GlobalGoalBand({
   const showsProjection =
     !soBarra &&
     (goal.projectionAmount === null ? false : typeof goal.projectionAmount === "number" ? true : goalUnlockedProjection(goal.start, goal.end, todayIso));
-  const scaleMax = Math.max(...tiers.map((d) => d.minAttainmentPct), 100);
+  const scaleMax = goalBarScale(tiers.map((d) => d.minAttainmentPct));
   const fillPct = Math.min(100, (barPct / scaleMax) * 100);
   const colorBarra = progressColor(barPct);
   const colorPct = progressTextClass(goal.pct);
@@ -601,7 +601,7 @@ export function GlobalGoalBand({
           <div className="relative h-3 min-w-0 flex-1 overflow-hidden rounded-full" style={{ background: "var(--bg-3)" }}>
             <div
               className="h-full rounded-full transition-[width] duration-500"
-              style={{ width: `${Math.min(100, Math.max(0, barPct))}%`, background: colorBarra }}
+              style={{ width: `${Math.max(0, fillPct)}%`, background: colorBarra }}
             />
           </div>
           {soBarra && (
