@@ -156,7 +156,7 @@ describe("buildChallengeView — participantes e resultado", () => {
       challenge({
         scope: "LINES",
         products: [],
-        lines: [{ key: "SHOWER", name: "SHOWER DREAM", kinds: ["Espuma de banho"] }],
+        lines: [{ key: "Espuma de banho", name: "Espuma de banho", kinds: [] }],
       }),
       input({
         sellerProducts: [item(1001, "NOVA", 4), item(1001, "SPLASH", 2), item(1002, "VELHA", 1)],

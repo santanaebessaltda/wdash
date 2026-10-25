@@ -22,6 +22,8 @@ const KIND_PREFIXES: Array<{ prefix: string; kind: string }> = [
   { prefix: "BODY CREAM", kind: "Body cream" },
   { prefix: "BODY SCRUB", kind: "Body scrub" },
   { prefix: "PERFUME CAPILAR", kind: "Perfume capilar" },
+  { prefix: "LIP GLOSS", kind: "Gloss" },
+  { prefix: "GLOSS", kind: "Gloss" },
   { prefix: "ESPUMA DE BANHO", kind: "Espuma de banho" },
   { prefix: "SABONETE EM BARRA", kind: "Sabonete" },
   { prefix: "THE OIL", kind: "The Oil" },
@@ -108,36 +110,36 @@ export function lineIdentity(description: string): { key: string; kind: string }
 
 export type CatalogLine = { key: string; name: string; kinds: string[] };
 
-/** Linhas do catalogo, no mesmo nome da tela de Produtos. */
+/** Tipo no começo do nome (Espuma de banho, Body splash, Desodorante colônia, Gloss). Null = sem prefixo conhecido. */
+export function aggregationOf(description: string): { key: string; name: string } | null {
+  const s = normalize(description);
+  const hit = KIND_PREFIXES.find((k) => s === k.prefix || s.startsWith(`${k.prefix} `));
+  if (!hit) return null;
+  return { key: hit.kind, name: hit.kind };
+}
+
+/** Agregações que existem no catálogo, uma por tipo do nome. */
 export function catalogLines(descriptions: readonly string[]): CatalogLine[] {
-  const index = buildProductLineIndex(descriptions);
-  const byKey = new Map<string, { name: string; kinds: Set<string> }>();
+  const byKey = new Map<string, string>();
   for (const description of descriptions) {
-    const hit = index.lineOf(description);
+    const hit = aggregationOf(description);
     if (!hit) continue;
-    const row = byKey.get(hit.key) ?? { name: hit.line, kinds: new Set<string>() };
-    row.name = hit.line;
-    row.kinds.add(hit.kind);
-    byKey.set(hit.key, row);
+    byKey.set(hit.key, hit.name);
   }
   return [...byKey.entries()]
-    .map(([key, row]) => ({
-      key,
-      name: row.name,
-      kinds: [...row.kinds].sort((a, b) => a.localeCompare(b, "pt-BR")),
-    }))
+    .map(([key, name]) => ({ key, name, kinds: [] as string[] }))
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 }
 
-/** O produto entra na linha se a chave bate e o tipo esta ligado. */
+/** O produto entra se o começo do nome é uma agregação escolhida. Lançamento com o mesmo prefixo entra. */
 export function productInLines(
   description: string | null | undefined,
   lines: readonly { key: string; kinds: readonly string[] }[],
 ): boolean {
   if (!description) return false;
-  const hit = lineIdentity(description);
+  const hit = aggregationOf(description);
   if (!hit) return false;
-  return lines.some((line) => line.key === hit.key && line.kinds.includes(hit.kind));
+  return lines.some((line) => line.key === hit.key);
 }
 
 /** Indice de linhas a partir das descricoes do catalogo (e das vendas, para produto fora do catalogo). */

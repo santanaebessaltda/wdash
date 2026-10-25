@@ -246,7 +246,7 @@ function itemsText(c: ChallengeRecord): string | null {
     c.scope === "PRODUCTS"
       ? c.products.map((p) => p.name)
       : c.scope === "LINES"
-        ? c.lines.map((line) => `${line.name} · ${line.kinds.join(", ")}`)
+        ? c.lines.map((line) => line.name)
         : c.categories.map((t) => t.name);
   if (names.length === 0) return null;
   if (names.length <= 3) return names.join(" · ");

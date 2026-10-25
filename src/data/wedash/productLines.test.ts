@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildProductLineIndex, fragranceOf, lineIdentity, productInLines } from "./productLines";
+import { aggregationOf, buildProductLineIndex, fragranceOf, productInLines } from "./productLines";
 
 const CATALOG = [
   "DESOD COL OBSESSED 100ML - WEPINK",
@@ -72,9 +72,11 @@ describe("buildProductLineIndex", () => {
 });
 
 describe("productInLines", () => {
-  it("lançamento da mesma linha e do mesmo tipo entra; outro tipo fica de fora", () => {
-    const lines = [{ key: lineIdentity("ESPUMA DE BANHO SHOWER DREAM 200ML - WEPINK")!.key, kinds: ["Espuma de banho"] }];
+  it("agrega pelo começo do nome, inclusive lançamento; outro tipo fica de fora", () => {
+    expect(aggregationOf("GLOSS LABIAL ROSE 5ML - WEPINK")?.name).toBe("Gloss");
+    const lines = [{ key: "Espuma de banho", kinds: [] as string[] }];
     expect(productInLines("ESPUMA DE BANHO SHOWER DREAM NIGHT 150ML - WEPINK", lines)).toBe(true);
     expect(productInLines("BODY SPLASH SHOWER DREAM 200ML - WEPINK", lines)).toBe(false);
+    expect(productInLines("DESOD COL SHOWER DREAM 100ML - WEPINK", [{ key: "Desodorante colônia", kinds: [] }])).toBe(true);
   });
 });

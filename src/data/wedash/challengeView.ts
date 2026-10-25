@@ -99,7 +99,7 @@ export function teamIndex(current: IndexPersonTotals[], previous: IndexPersonTot
 export const CHALLENGE_SCOPE_LABEL: Record<ChallengeScope, string> = {
   PRODUCTS: "Produtos escolhidos",
   CATEGORIES: "Categorias escolhidas",
-  LINES: "Linhas escolhidas",
+  LINES: "Agregações escolhidas",
   ALL: "Tudo o que vender",
 };
 

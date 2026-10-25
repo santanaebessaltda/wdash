@@ -158,7 +158,7 @@ export function validateChallengeForm(f: ChallengeForm): ChallengeFormErrors {
   const scope = scopeOf(f);
   if (scope === "PRODUCTS" && f.products.length === 0) e.products = "Escolha pelo menos 1 produto.";
   if (scope === "CATEGORIES" && f.categories.length === 0) e.categories = "Escolha pelo menos 1 categoria.";
-  if (scope === "LINES" && f.lines.length === 0) e.lines = "Escolha pelo menos 1 linha.";
+  if (scope === "LINES" && f.lines.length === 0) e.lines = "Escolha pelo menos 1 agregação.";
   if (usesMinSales(f.metric) && f.minSales.trim()) {
     const v = parseNumber(f.minSales);
     // 0 / vazio = sem piso. Se preencheu outro valor, so aceita inteiro >= 1.

@@ -124,10 +124,10 @@ export function sellerChallengeRules(challenge: ChallengeShape): string[] {
       const n = challenge.lines?.length ?? 0;
       rules.push(
         n === 1
-          ? "Conta a linha escolhida pelo gestor, inclusive lançamento do mesmo tipo."
+          ? "Conta a agregação escolhida, inclusive lançamento com o mesmo nome."
           : n > 1
-            ? `Contam as ${n} linhas escolhidas pelo gestor, inclusive lançamento do mesmo tipo.`
-            : "Contam as linhas escolhidas pelo gestor, inclusive lançamento do mesmo tipo.",
+            ? `Contam as ${n} agregações escolhidas, inclusive lançamento com o mesmo nome.`
+            : "Contam as agregações escolhidas, inclusive lançamento com o mesmo nome.",
       );
     } else {
       rules.push("Conta tudo o que você vender na loja.");

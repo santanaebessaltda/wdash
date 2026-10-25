@@ -54,7 +54,7 @@ describe("validateChallengeForm", () => {
     expect(validateChallengeForm(valid({ products: [] })).products).toBe("Escolha pelo menos 1 produto.");
     const cat = validateChallengeForm(valid({ scope: "CATEGORIES", products: [], categories: [] }));
     expect(cat.categories).toBe("Escolha pelo menos 1 categoria.");
-    expect(validateChallengeForm(valid({ scope: "LINES", products: [], lines: [] })).lines).toBe("Escolha pelo menos 1 linha.");
+    expect(validateChallengeForm(valid({ scope: "LINES", products: [], lines: [] })).lines).toBe("Escolha pelo menos 1 agregação.");
     expect(cat.products).toBeUndefined();
     expect(validateChallengeForm(valid({ scope: "ALL", products: [] }))).toEqual({});
     expect(validateChallengeForm(valid({ metric: "VALUE", scope: "PRODUCTS", products: [] })).products).toBe(
