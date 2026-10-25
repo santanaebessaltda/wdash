@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Badge, Button, DatePicker, FormField, Input, Modal, Select, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
+import { Icon, icons } from "@/pages/users/Icons";
 import { cn } from "@/lib/cn";
 import { dateToIso, isoToDate } from "@/lib/format";
 import { defaultDayNeeds, patternFits, weekdayLabel, type CompWindow, type DayNeed, type GroupNeed, type HolidayRule, type OffMode, type SchedulePattern, type ScheduleScenario, type Sex, type SundayRule } from "@/data/wedash/scheduleGenerate";
@@ -108,7 +109,6 @@ export function ScheduleWizard({
   const types = TYPES.filter((item) => patternFits(value.scenario, item.id));
   const selectedType = TYPES.find((item) => item.id === value.pattern);
   const selectedPeople = people.filter((person) => value.selectedIds.includes(person.id));
-  const sunday = value.dayNeeds.find((day) => day.dow === 0);
 
   function rulesFor(start: string, end: string, current: HolidayRule[], skipped: string[]): HolidayRule[] {
     const kept = current.filter((rule) => rule.date >= start && rule.date <= end);
@@ -149,10 +149,11 @@ export function ScheduleWizard({
     }));
   }
 
-  function setSundayClosed(closed: boolean) {
+  function setDayMin(dow: number, min: number) {
+    const next = Math.min(99, Math.max(0, Math.floor(min) || 0));
     setValue((current) => ({
       ...current,
-      dayNeeds: current.dayNeeds.map((day) => (day.dow === 0 ? { ...day, open: !closed } : day)),
+      dayNeeds: current.dayNeeds.map((day) => (day.dow === dow ? { ...day, min: next } : day)),
     }));
   }
 
@@ -299,16 +300,12 @@ export function ScheduleWizard({
               </Select>
             </FormField>
           </div>
-          <p className="mt-2 text-[12px] text-t2">Se a empresa fechar no domingo, todo mundo folga.</p>
+          <p className="mt-2 text-[12px] text-t2">Com o domingo desmarcado, todo mundo folga.</p>
         </>
       ) : null}
       {step === 3 ? (
         <>
           <WizardCardHeader title="Em quais dias a empresa abre?" subtitle="Desmarque o dia em que todos ficam de folga." />
-          <label className="mb-4 flex items-center gap-2 rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3 py-3 text-[13.5px] text-t0">
-            <input type="checkbox" className="shrink-0" checked={sunday ? !sunday.open : false} onChange={(event) => setSundayClosed(event.target.checked)} />
-            A empresa fecha aos domingos
-          </label>
           <p className="text-[13px] font-semibold text-t0">Nos dias abertos, de quantas pessoas você precisa?</p>
           <p className="mt-1 mb-3 text-[12px] text-t2">
             {(() => {
@@ -335,22 +332,37 @@ export function ScheduleWizard({
                   />
                   <span className="truncate">{weekdayLabel(day.dow)}</span>
                 </label>
-                <label className="flex shrink-0 items-center gap-2 text-[12px] text-t2">
-                  Pelo menos{day.open ? <span className="text-bad"> *</span> : null}
-                  <Input
-                    inputMode="numeric"
-                    disabled={!day.open}
-                    value={day.min}
-                    aria-label={`Mínimo de ${weekdayLabel(day.dow)}`}
-                    onChange={(event) =>
-                      setValue((current) => ({
-                        ...current,
-                        dayNeeds: current.dayNeeds.map((item) => (item.dow === day.dow ? { ...item, min: Math.max(0, Number(event.target.value) || 0) } : item)),
-                      }))
-                    }
-                    className="h-9! w-14 px-2 text-center"
-                  />
-                </label>
+                <div className="flex shrink-0 items-center gap-2 text-[12px] text-t2">
+                  <span>Pelo menos{day.open ? <span className="text-bad"> *</span> : null}</span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-vela-md)] border border-line bg-bg-inset text-t0 disabled:cursor-not-allowed disabled:opacity-40"
+                      disabled={!day.open || day.min <= 0}
+                      aria-label={`Diminuir pessoas de ${weekdayLabel(day.dow)}`}
+                      onClick={() => setDayMin(day.dow, day.min - 1)}
+                    >
+                      <Icon d={icons.minus} size={14} />
+                    </button>
+                    <Input
+                      inputMode="numeric"
+                      disabled={!day.open}
+                      value={day.min}
+                      aria-label={`Mínimo de ${weekdayLabel(day.dow)}`}
+                      onChange={(event) => setDayMin(day.dow, Number(event.target.value.replace(/\D/g, "")))}
+                      className="h-9! w-12 px-1 text-center"
+                    />
+                    <button
+                      type="button"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-vela-md)] border border-line bg-bg-inset text-t0 disabled:cursor-not-allowed disabled:opacity-40"
+                      disabled={!day.open || day.min >= 99}
+                      aria-label={`Aumentar pessoas de ${weekdayLabel(day.dow)}`}
+                      onClick={() => setDayMin(day.dow, day.min + 1)}
+                    >
+                      <Icon d={icons.plus} size={14} />
+                    </button>
+                  </div>
+                </div>
               </li>
             ))}
           </ul>

@@ -22,6 +22,7 @@ export const icons = {
   arrowLeft: "M19 12H5M12 5l-7 7 7 7",
   chevronRight: "m9 18 6-6-6-6",
   plus: "M12 5v14M5 12h14",
+  minus: "M5 12h14",
   check: "M20 6 9 17l-5-5",
   x: "M18 6 6 18M6 6l12 12",
   trash: "M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6",
