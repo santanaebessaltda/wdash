@@ -13,7 +13,11 @@ begin
     where nsp.nspname = 'public'
       and rel.relname = 'challenge'
       and con.contype = 'c'
-      and pg_get_constraintdef(con.oid) ilike '%mode in%'
+      and (
+        con.conname = 'challenge_mode_check'
+        or pg_get_constraintdef(con.oid) ilike '%mode in%'
+        or pg_get_constraintdef(con.oid) ilike '%mode = any%'
+      )
   loop
     execute format('alter table public.challenge drop constraint %I', r.conname);
   end loop;
