@@ -817,12 +817,12 @@ export default function OverviewPage() {
         const compareNetwork = isOwner(session.role) && scope.storeIds.length === 1 && (view.otherStoresRanking ?? 0) > 0;
         const shareLabel = isOwner(session.role) ? "da rede" : "do total";
         return (
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card className="flex flex-col">
-          <CardHeader className="items-center">
+      <div className="mt-4 grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card className="flex min-w-0 flex-col">
+          <CardHeader className="w-full min-w-0 flex-wrap items-center gap-y-2">
             <CardTitle>Ranking de filiais</CardTitle>
             {compareNetwork && (
-              <Badge variant="accent">
+              <Badge variant="accent" className="max-w-full shrink-0">
                 Rede: {brlCent(view.rankingNetworkTotal ?? 0)}
               </Badge>
             )}
