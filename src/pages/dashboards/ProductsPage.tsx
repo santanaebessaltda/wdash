@@ -15,7 +15,6 @@ import {
 import { fetchSalesCoverage } from "@/data/wedash/salesRepo";
 import { queryStoreIds } from "@/data/wedash/stores";
 import { ProductNameCell } from "@/components/wedash/ProductNameCell";
-import { StickyHeadTable } from "@/components/ui/StickyHeadTable";
 import {
   BadgeVsPrevious,
   TipHelp,
@@ -469,24 +468,21 @@ export default function ProductsPage() {
               />
             )
           ) : (
-          <StickyHeadTable
-            tableClassName={SCROLL_TABLE}
-            headClassName="text-[11px] uppercase tracking-wide text-t2"
-            minWidth={820}
-            syncKey={`${linePageRows.length}|${lineSortKey}|${lineSortDir}|${linePageSafe}`}
-            head={
-              <>
-                <th className={cn(RANK_STICKY, STICKY_BG, "px-1 pb-3 text-left font-bold")}>#</th>
-                <ThSort label="Linha" active={lineSortKey === "name"} dir={lineSortDir} onClick={() => toggleLineSort("name")} align="left" className={cn(NAME_STICKY, STICKY_BG, "px-1 pb-3")} />
-                <ThSort label="Itens vendidos" active={lineSortKey === "items"} dir={lineSortDir} onClick={() => toggleLineSort("items")} className="bg-bg-2 px-1 pb-3" />
-                <ThSort label="Faturamento" active={lineSortKey === "revenue"} dir={lineSortDir} onClick={() => toggleLineSort("revenue")} className="bg-bg-2 px-1 pb-3" />
-                <ThSort label="CMV" active={lineSortKey === "cmv"} dir={lineSortDir} onClick={() => toggleLineSort("cmv")} className="bg-bg-2 px-1 pb-3" />
-                <ThSort label="Lucro bruto" active={lineSortKey === "profit"} dir={lineSortDir} onClick={() => toggleLineSort("profit")} className="bg-bg-2 px-1 pb-3" />
-                <ThSort label="Margem" active={lineSortKey === "marginPct"} dir={lineSortDir} onClick={() => toggleLineSort("marginPct")} className="bg-bg-2 px-1 pb-3" />
-                <ThSort label="Variação" active={lineSortKey === "variationPct"} dir={lineSortDir} onClick={() => toggleLineSort("variationPct")} className="bg-bg-2 px-1 pb-3" />
-              </>
-            }
-          >
+          <div className="min-w-0 overflow-x-auto">
+            <table className={SCROLL_TABLE}>
+              <thead>
+                <tr className="text-[11px] uppercase tracking-wide text-t2">
+                  <th className={cn(RANK_STICKY, STICKY_BG, "px-1 pb-3 text-left font-bold")}>#</th>
+                  <ThSort label="Linha" active={lineSortKey === "name"} dir={lineSortDir} onClick={() => toggleLineSort("name")} align="left" className={cn(NAME_STICKY, STICKY_BG, "px-1 pb-3")} />
+                  <ThSort label="Itens vendidos" active={lineSortKey === "items"} dir={lineSortDir} onClick={() => toggleLineSort("items")} className="px-1 pb-3" />
+                  <ThSort label="Faturamento" active={lineSortKey === "revenue"} dir={lineSortDir} onClick={() => toggleLineSort("revenue")} className="px-1 pb-3" />
+                  <ThSort label="CMV" active={lineSortKey === "cmv"} dir={lineSortDir} onClick={() => toggleLineSort("cmv")} className="px-1 pb-3" />
+                  <ThSort label="Lucro bruto" active={lineSortKey === "profit"} dir={lineSortDir} onClick={() => toggleLineSort("profit")} className="px-1 pb-3" />
+                  <ThSort label="Margem" active={lineSortKey === "marginPct"} dir={lineSortDir} onClick={() => toggleLineSort("marginPct")} className="px-1 pb-3" />
+                  <ThSort label="Variação" active={lineSortKey === "variationPct"} dir={lineSortDir} onClick={() => toggleLineSort("variationPct")} className="px-1 pb-3" />
+                </tr>
+              </thead>
+              <tbody>
                 {linePageRows.map((l, i) => {
                   const idx = printing ? i : (linePageSafe - 1) * pageSize + i;
                   const cmv = lineCmv(l);
@@ -560,7 +556,9 @@ export default function ProductsPage() {
                     </Tooltip>
                   </td>
                 </tr>
-          </StickyHeadTable>
+              </tbody>
+            </table>
+          </div>
           )}
           {lineRows.length > 0 && (
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
@@ -605,24 +603,21 @@ export default function ProductsPage() {
             />
           )
         ) : (
-          <StickyHeadTable
-            tableClassName={SCROLL_TABLE}
-            headClassName="text-[11px] uppercase tracking-wide text-t2"
-            minWidth={820}
-            syncKey={`${pageRows.length}|${sortKey}|${sortDir}|${pageSafe}`}
-            head={
-              <>
-                <th className={cn(RANK_STICKY, STICKY_BG, "px-1 pb-3 text-left font-bold")}>#</th>
-                <ThSort label="Produto" active={sortKey === "name"} dir={sortDir} onClick={() => toggleSort("name")} align="left" className={cn(NAME_STICKY, STICKY_BG, "px-1 pb-3")} />
-                <ThSort label="Itens vendidos" active={sortKey === "items"} dir={sortDir} onClick={() => toggleSort("items")} className="bg-bg-2 px-1 pb-3" />
-                <ThSort label="Faturamento" active={sortKey === "revenue"} dir={sortDir} onClick={() => toggleSort("revenue")} className="bg-bg-2 px-1 pb-3" />
-                <ThSort label="CMV" active={sortKey === "cmv"} dir={sortDir} onClick={() => toggleSort("cmv")} className="bg-bg-2 px-1 pb-3" />
-                <ThSort label="Lucro bruto" active={sortKey === "profit"} dir={sortDir} onClick={() => toggleSort("profit")} className="bg-bg-2 px-1 pb-3" />
-                <ThSort label="Margem" active={sortKey === "marginPct"} dir={sortDir} onClick={() => toggleSort("marginPct")} className="bg-bg-2 px-1 pb-3" />
-                <ThSort label="Variação" active={sortKey === "variationPct"} dir={sortDir} onClick={() => toggleSort("variationPct")} className="bg-bg-2 px-1 pb-3" />
-              </>
-            }
-          >
+          <div className="min-w-0 overflow-x-auto">
+            <table className={SCROLL_TABLE}>
+              <thead>
+                <tr className="text-[11px] uppercase tracking-wide text-t2">
+                  <th className={cn(RANK_STICKY, STICKY_BG, "px-1 pb-3 text-left font-bold")}>#</th>
+                  <ThSort label="Produto" active={sortKey === "name"} dir={sortDir} onClick={() => toggleSort("name")} align="left" className={cn(NAME_STICKY, STICKY_BG, "px-1 pb-3")} />
+                  <ThSort label="Itens vendidos" active={sortKey === "items"} dir={sortDir} onClick={() => toggleSort("items")} className="px-1 pb-3" />
+                  <ThSort label="Faturamento" active={sortKey === "revenue"} dir={sortDir} onClick={() => toggleSort("revenue")} className="px-1 pb-3" />
+                  <ThSort label="CMV" active={sortKey === "cmv"} dir={sortDir} onClick={() => toggleSort("cmv")} className="px-1 pb-3" />
+                  <ThSort label="Lucro bruto" active={sortKey === "profit"} dir={sortDir} onClick={() => toggleSort("profit")} className="px-1 pb-3" />
+                  <ThSort label="Margem" active={sortKey === "marginPct"} dir={sortDir} onClick={() => toggleSort("marginPct")} className="px-1 pb-3" />
+                  <ThSort label="Variação" active={sortKey === "variationPct"} dir={sortDir} onClick={() => toggleSort("variationPct")} className="px-1 pb-3" />
+                </tr>
+              </thead>
+              <tbody>
                 {pageRows.map((p, i) => {
                   const idx = printing ? i : (pageSafe - 1) * pageSize + i;
                   return (
@@ -690,7 +685,9 @@ export default function ProductsPage() {
                     </Tooltip>
                   </td>
                 </tr>
-          </StickyHeadTable>
+              </tbody>
+            </table>
+          </div>
         )}
 
         {tableLines.length > 0 && (

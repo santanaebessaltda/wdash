@@ -1,7 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { usePagedRows } from "@/lib/usePagedRows";
-import { StickyHeadTable } from "./StickyHeadTable";
 import { Pagination } from "./Pagination";
 import { ThSort, type SortDir } from "./ThSort";
 
@@ -133,80 +132,71 @@ export function DataTable<T>({
     : "px-4 py-3 text-[10.5px] font-bold uppercase tracking-wide";
   const cellClass = compact ? "px-1 py-3 align-middle" : "px-4 py-3.5 align-middle";
   const pinned = columns.some((col) => col.pin);
-  const tableClass = cn(
-    "w-full text-sm",
-    compact ? "min-w-[720px]" : "min-w-[640px]",
-    pinned
-      ? "border-separate border-spacing-0 [&_tbody_td]:border-b [&_tbody_td]:border-line [&_tbody_tr:last-child_td]:border-b-0 [&_th]:border-b [&_th]:border-line"
-      : "border-collapse",
-  );
-  const headerCells = columns.map((col) =>
-    col.sortable && col.sortValue ? (
-      <ThSort
-        key={col.key}
-        label={col.header}
-        active={sortKeyActive === col.key}
-        dir={sortDir}
-        onClick={() => toggleSort(col.key)}
-        align={col.align ?? "left"}
-        width={col.width}
-        className={cn(headClass, "bg-bg-2", pinClass(col.pin), col.hideBelow && hideBelowClasses[col.hideBelow])}
-      />
-    ) : (
-      <th
-        key={col.key}
-        style={{ width: col.width }}
-        className={cn(headClass, "bg-bg-2 text-t2", pinClass(col.pin), alignClasses[col.align ?? "left"], col.hideBelow && hideBelowClasses[col.hideBelow])}
-      >
-        {col.header}
-      </th>
-    ),
-  );
-  const bodyRows = rows.map((row) => (
-    <tr
-      key={rowKey(row)}
-      onClick={onRowClick ? () => onRowClick(row) : undefined}
-      className={cn(
-        !pinned && "border-b border-line last:border-b-0",
-        "transition-colors",
-        (compact || onRowClick) && "hover:bg-bg-3",
-        onRowClick && "cursor-pointer",
-      )}
-    >
-      {columns.map((col) => (
-        <td
-          key={col.key}
-          style={col.width ? { width: col.width, maxWidth: col.width } : undefined}
-          className={cn(cellClass, "text-t0", pinClass(col.pin), alignClasses[col.align ?? "left"], col.hideBelow && hideBelowClasses[col.hideBelow])}
-        >
-          {col.pin === "label" ? <div className={PIN_CLIP}>{col.render(row)}</div> : col.render(row)}
-        </td>
-      ))}
-    </tr>
-  ));
 
   return (
-    <div className={cn(compact ? "min-w-0" : "min-w-0 overflow-hidden rounded-[var(--radius-vela-lg)] border border-line bg-bg-2", className)}>
-      {pinned ? (
-        <StickyHeadTable
-          tableClassName={tableClass}
-          headClassName="text-t2"
-          minWidth={compact ? 720 : 640}
-          syncKey={`${rows.length}|${sortKeyActive}|${sortDir}|${firstKey}`}
-          head={headerCells}
-        >
-          {bodyRows}
-        </StickyHeadTable>
-      ) : (
-      <div className={compact ? "min-w-0 overflow-x-auto" : "min-w-0 overflow-x-auto"}>
-      <table className={tableClass}>
+    <div className={cn(compact ? "min-w-0 overflow-x-auto" : "min-w-0 overflow-hidden rounded-[var(--radius-vela-lg)] border border-line bg-bg-2", className)}>
+      <div className={compact ? undefined : "min-w-0 overflow-x-auto"}>
+      <table
+        className={cn(
+          "w-full text-sm",
+          compact ? "min-w-[720px]" : "min-w-[640px]",
+          pinned
+            ? "border-separate border-spacing-0 [&_tbody_td]:border-b [&_tbody_td]:border-line [&_tbody_tr:last-child_td]:border-b-0 [&_th]:border-b [&_th]:border-line"
+            : "border-collapse",
+        )}
+      >
         <thead>
-          <tr className="border-b border-line text-t2">{headerCells}</tr>
+          <tr className={cn("text-t2", !pinned && "border-b border-line")}>
+            {columns.map((col) =>
+              col.sortable && col.sortValue ? (
+                <ThSort
+                  key={col.key}
+                  label={col.header}
+                  active={sortKeyActive === col.key}
+                  dir={sortDir}
+                  onClick={() => toggleSort(col.key)}
+                  align={col.align ?? "left"}
+                  width={col.width}
+                  className={cn(headClass, pinClass(col.pin), col.hideBelow && hideBelowClasses[col.hideBelow])}
+                />
+              ) : (
+                <th
+                  key={col.key}
+                  style={{ width: col.width }}
+                  className={cn(headClass, "text-t2", pinClass(col.pin), alignClasses[col.align ?? "left"], col.hideBelow && hideBelowClasses[col.hideBelow])}
+                >
+                  {col.header}
+                </th>
+              ),
+            )}
+          </tr>
         </thead>
-        <tbody>{bodyRows}</tbody>
+        <tbody>
+          {rows.map((row) => (
+            <tr
+              key={rowKey(row)}
+              onClick={onRowClick ? () => onRowClick(row) : undefined}
+              className={cn(
+                !pinned && "border-b border-line last:border-b-0",
+                "transition-colors",
+                (compact || onRowClick) && "hover:bg-bg-3",
+                onRowClick && "cursor-pointer",
+              )}
+            >
+              {columns.map((col) => (
+                <td
+                  key={col.key}
+                  style={col.width ? { width: col.width, maxWidth: col.width } : undefined}
+                  className={cn(cellClass, "text-t0", pinClass(col.pin), alignClasses[col.align ?? "left"], col.hideBelow && hideBelowClasses[col.hideBelow])}
+                >
+                  {col.pin === "label" ? <div className={PIN_CLIP}>{col.render(row)}</div> : col.render(row)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
       </table>
       </div>
-      )}
       {showPager && (
         <div className={cn("flex flex-wrap items-center justify-between gap-3", compact ? "mt-4" : "border-t border-line px-4 py-3.5")}>
           <span className="text-[12.5px] text-t2">

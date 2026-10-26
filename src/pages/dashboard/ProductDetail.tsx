@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Badge, Modal, Pagination, ProgressBar, Skeleton, ThSort, type SortDir } from "@/components/ui";
-import { StickyHeadTable } from "@/components/ui/StickyHeadTable";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { AreaLineChart } from "@/components/charts";
 import { ProductNameCell } from "@/components/wedash/ProductNameCell";
@@ -293,8 +292,6 @@ const NAME_CLIP = "min-w-0 max-w-[9.5rem] sm:max-w-[12.5rem] lg:max-w-[14rem] xl
 const SCROLL_TABLE =
   "w-full min-w-[620px] border-separate border-spacing-0 text-sm [&_tbody_tr:last-child_td]:border-b-0 [&_td]:border-b [&_td]:border-line [&_th]:border-b [&_th]:border-line";
 
-const HEAD = "sticky top-0 z-30 bg-bg-2";
-
 /** Mesmo padrao da tabela Top produtos (#  |  Produto  |  Itens  |  Faturamento  |  Lucro bruto  |  Margem); clique abre o produto. */
 function ProductsOfGroup({
   products,
@@ -332,22 +329,19 @@ function ProductsOfGroup({
   };
   return (
     <div className="mt-2">
-      <StickyHeadTable
-        tableClassName={SCROLL_TABLE}
-        headClassName="text-[11px] uppercase tracking-wide text-t2"
-        minWidth={620}
-        syncKey={`${shown.length}|${sort}|${dir}|${rankBase}`}
-        head={
-          <>
-            <th className={cn(RANK_STICKY, "top-0 z-40 bg-bg-2 px-1 pb-3 text-left font-bold")}>#</th>
-            <ThSort label="Produto" active={sort === "name"} dir={dir} onClick={() => toggle("name")} align="left" className={cn(NAME_STICKY, HEAD, "z-40 px-1 pb-3")} />
-            <ThSort label="Itens vendidos" active={sort === "items"} dir={dir} onClick={() => toggle("items")} className={cn(HEAD, "px-1 pb-3")} />
-            <ThSort label="Faturamento" active={sort === "revenue"} dir={dir} onClick={() => toggle("revenue")} className={cn(HEAD, "px-1 pb-3")} />
-            <ThSort label="Lucro bruto" active={sort === "profit"} dir={dir} onClick={() => toggle("profit")} className={cn(HEAD, "px-1 pb-3")} />
-            <ThSort label="Margem" active={sort === "margin"} dir={dir} onClick={() => toggle("margin")} className={cn(HEAD, "px-1 pb-3")} />
-          </>
-        }
-      >
+      <div className="min-w-0 overflow-x-auto">
+      <table className={SCROLL_TABLE}>
+        <thead>
+          <tr className="text-[11px] uppercase tracking-wide text-t2">
+            <th className={cn(RANK_STICKY, STICKY_BG, "px-1 pb-3 text-left font-bold")}>#</th>
+            <ThSort label="Produto" active={sort === "name"} dir={dir} onClick={() => toggle("name")} align="left" className={cn(NAME_STICKY, STICKY_BG, "px-1 pb-3")} />
+            <ThSort label="Itens vendidos" active={sort === "items"} dir={dir} onClick={() => toggle("items")} className="px-1 pb-3" />
+            <ThSort label="Faturamento" active={sort === "revenue"} dir={dir} onClick={() => toggle("revenue")} className="px-1 pb-3" />
+            <ThSort label="Lucro bruto" active={sort === "profit"} dir={dir} onClick={() => toggle("profit")} className="px-1 pb-3" />
+            <ThSort label="Margem" active={sort === "margin"} dir={dir} onClick={() => toggle("margin")} className="px-1 pb-3" />
+          </tr>
+        </thead>
+        <tbody>
         {shown.map((p, idx) => {
           const rank = rankBase + idx;
           return (
@@ -378,7 +372,9 @@ function ProductsOfGroup({
             </tr>
           );
         })}
-      </StickyHeadTable>
+        </tbody>
+      </table>
+      </div>
       {paginate && paged.totalPages > 1 ? (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <span className="text-[12.5px] text-t2">
