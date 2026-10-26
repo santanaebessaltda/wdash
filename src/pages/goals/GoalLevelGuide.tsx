@@ -31,7 +31,7 @@ export function GoalLevelGuide({
   management?: GoalManagerPrize | null;
   /** Meta encerrada: a premiação vira total e some o que falta para o próximo nível. */
   managementClosed?: boolean;
-  /** No detalhe da meta, o valor da premiação fica verde. O percentual segue na cor primária. */
+  /** No detalhe da meta, o valor da premiação fica verde e o percentual de cada nível fica na cor secundária. */
   greenValues?: boolean;
 }) {
   const guide = buildGoalLevelGuide(goal, sellers);
@@ -102,7 +102,7 @@ export function GoalLevelGuide({
                 ) : null}
               </div>
               <div className="shrink-0 text-right">
-                <p className="font-mono text-[13px] font-extrabold text-acc">{num(row.commissionPct, 1)}%</p>
+                <p className={`font-mono text-[13px] font-extrabold ${greenValues ? "text-t2" : "text-acc"}`}>{num(row.commissionPct, 1)}%</p>
                 <p className="text-[10.5px] text-t2">de premiação</p>
               </div>
             </div>

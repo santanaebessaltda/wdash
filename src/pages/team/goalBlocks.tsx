@@ -210,7 +210,7 @@ function PrizeCell({ l }: { l: LineRank }) {
       <p className="font-mono text-[12.5px] font-bold text-ok">{brlCent(amount)}</p>
       {l.commissionPct > 0 ? (
         <p className="text-[11px] text-t2">
-          <span className="font-semibold text-acc">{num(l.commissionPct, 1)}%</span>
+          <span className="font-semibold text-t2">{num(l.commissionPct, 1)}%</span>
           {l.bonusReached > 0 ? ` · +${brlCent(l.bonusReached)} de bônus` : ""}
         </p>
       ) : null}
