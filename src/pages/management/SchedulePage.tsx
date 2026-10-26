@@ -427,46 +427,6 @@ export function SchedulePage() {
               show(caught instanceof Error ? caught.message : "Não foi possível salvar o dia.", "danger");
             }
           }}
-          onReset={async () => {
-            if (!schedule) return;
-            const from = schedule.periodStart ?? monthStart;
-            const to = schedule.periodEnd ?? monthEnd;
-            const [year, monthNumber] = from.split("-").map(Number);
-            const team = schedule.people.map((person) => ({
-              id: person.sellerId,
-              fixedOffDow: person.fixedOffDow,
-              sex: person.sex,
-              groupId: people.find((row) => row.id === person.sellerId)?.shiftId ?? null,
-            }));
-            const incoming = await fetchCompDue(store.id, from);
-            const rotation = await sundayPlan(store.id, team, from);
-            const generated = generateMonth({
-              year,
-              month: monthNumber,
-              from,
-              to,
-              pattern: schedule.pattern,
-              offMode: schedule.offMode,
-              sundayMin: schedule.sundayMin,
-              womenSunday: schedule.womenSunday,
-              menSunday: schedule.menSunday,
-              people: team,
-              holidayDates: [],
-              dayNeeds: schedule.dayNeeds,
-              groupNeeds: schedule.groupNeeds,
-              holidayRules: schedule.holidayRules,
-              incomingComp: incoming,
-              sundayShifts: rotation.sundayShifts,
-              sundayShiftStart: rotation.sundayShiftStart,
-            }).days.filter((row) => row.date === dayOpen);
-            try {
-              await saveDay(generated.map((row) => ({ sellerId: row.personId, day: row.date, status: row.status, origin: "generated" as const })));
-              setDayOpen(null);
-              show("Dia voltou ao padrão.", "success");
-            } catch (caught) {
-              show(caught instanceof Error ? caught.message : "Não foi possível voltar ao padrão.", "danger");
-            }
-          }}
         />
       ) : null}
       <Modal
@@ -513,7 +473,6 @@ function DayEditor({
   names,
   onClose,
   onSave,
-  onReset,
 }: {
   day: string;
   holiday: string | null;
@@ -525,7 +484,6 @@ function DayEditor({
   names: Map<string, StoreSeller>;
   onClose: () => void;
   onSave: (rows: StoredDay[]) => Promise<void>;
-  onReset: () => Promise<void>;
 }) {
   const [draft, setDraft] = useState(rows);
   const [pick, setPick] = useState("");
@@ -547,30 +505,17 @@ function DayEditor({
       onClose={busy ? () => {} : onClose}
       title={dayTitle(day, holiday)}
       footer={
-        <div className="flex flex-wrap justify-between gap-2">
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose} disabled={busy}>Cancelar</Button>
           <Button
-            variant="outline"
             disabled={busy}
-            title="Restaura o dia que a escala gerou."
             onClick={() => {
               setBusy(true);
-              void onReset().finally(() => setBusy(false));
+              void onSave(draft).finally(() => setBusy(false));
             }}
           >
-            Voltar ao padrão
+            Salvar dia
           </Button>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose} disabled={busy}>Cancelar</Button>
-            <Button
-              disabled={busy}
-              onClick={() => {
-                setBusy(true);
-                void onSave(draft).finally(() => setBusy(false));
-              }}
-            >
-              Salvar dia
-            </Button>
-          </div>
         </div>
       }
     >
