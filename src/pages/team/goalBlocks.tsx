@@ -158,7 +158,7 @@ function SellerCell({ l }: { l: LineRank }) {
 function RevenueCell({ l }: { l: LineRank }) {
   return (
     <div>
-      <p className={`font-mono text-[12.5px] font-bold ${l.revenueAmount < 0 ? "text-bad" : "text-ok"}`}>{l.revenue}</p>
+      <p className={`font-mono text-[12.5px] font-bold ${l.revenueAmount < 0 ? "text-bad" : "text-acc"}`}>{l.revenue}</p>
       <p className="text-[11px] text-t2">
         {num(l.salesCount, 0)} {l.salesCount === 1 ? "venda" : "vendas"}
       </p>
@@ -210,7 +210,7 @@ function PrizeCell({ l }: { l: LineRank }) {
       <p className="font-mono text-[12.5px] font-bold text-ok">{brlCent(amount)}</p>
       {l.commissionPct > 0 ? (
         <p className="text-[11px] text-t2">
-          {num(l.commissionPct, 1)}%
+          <span className="font-semibold text-acc">{num(l.commissionPct, 1)}%</span>
           {l.bonusReached > 0 ? ` · +${brlCent(l.bonusReached)} de bônus` : ""}
         </p>
       ) : null}
@@ -502,7 +502,7 @@ export function GlobalGoalBand({
   enter = false,
   pulseCurrent = false,
   secret = false,
-  greenPrize = false,
+  primaryPrize = false,
 }: {
   goal: NetworkGlobalGoal;
   embedded?: boolean;
@@ -518,8 +518,8 @@ export function GlobalGoalBand({
   pulseCurrent?: boolean;
   /** Borra o percentual de premiação de cada nível. Só o placar. */
   secret?: boolean;
-  /** No detalhe da meta, o percentual de premiação de cada nível fica verde. */
-  greenPrize?: boolean;
+  /** No detalhe da meta, o percentual de premiação de cada nível fica na cor primária. */
+  primaryPrize?: boolean;
   /** Quando o título da meta já está no CardMeta. */
   hideTitle?: boolean;
   /** Degraus desta meta (default = escada padrão). */
@@ -680,7 +680,7 @@ export function GlobalGoalBand({
                       title={`N${i + 1} · ${d.name} · ${num(d.commissionPct, 1)}%`}
                     >
                       N{i + 1} · {shortLabel}
-                      <span className={cn("font-semibold opacity-75", greenPrize && "text-ok")} {...(secret ? { "data-secret": "" } : {})}> ({num(d.commissionPct, 1)}%)</span>
+                      <span className={cn("font-semibold opacity-75", primaryPrize && "text-acc")} {...(secret ? { "data-secret": "" } : {})}> ({num(d.commissionPct, 1)}%)</span>
                     </p>
                   );
                 })}
