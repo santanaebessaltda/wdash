@@ -2,6 +2,7 @@ import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { paths } from "@/router/paths";
 import { ProductNameCell } from "@/components/wedash/ProductNameCell";
+import { StickyHeadTable } from "@/components/ui/StickyHeadTable";
 import { Avatar, Badge, Card, CardHeader, CardTitle, RadialProgress, StatCard, DateRangePicker, PageHeader, Button, ThSort, type SortDir } from "@/components/ui";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { AreaLineChart, BarChart, DonutChart } from "@/components/charts";
@@ -957,50 +958,22 @@ export default function OverviewPage() {
           {topSellersOrdenados.length === 0 ? (
             <EmptyBlock />
           ) : (
-          <div className="min-w-0 overflow-x-auto">
-            <table className="w-full min-w-[640px] border-separate border-spacing-0 text-sm [&_tbody_tr:last-child_td]:border-b-0 [&_td]:border-b [&_td]:border-line [&_th]:border-b [&_th]:border-line">
-              <thead>
-                <tr className="text-[11px] uppercase tracking-wide text-t2">
-                  <th className={cn(RANK_STICKY, STICKY_BG, "px-1 pb-3 text-left font-bold")}>#</th>
-                  <ThSort
-                    label="Nome"
-                    active={teamSort === "name"}
-                    dir={teamDir}
-                    onClick={() => toggleTeamSort("name")}
-                    align="left"
-                    className={cn(NAME_STICKY, STICKY_BG, "px-1 pb-3")}
-                  />
-                  <ThSort
-                    label="Faturamento"
-                    active={teamSort === "revenue"}
-                    dir={teamDir}
-                    onClick={() => toggleTeamSort("revenue")}
-                    className="px-1 pb-3"
-                  />
-                  <ThSort
-                    label="Nº de vendas"
-                    active={teamSort === "sales"}
-                    dir={teamDir}
-                    onClick={() => toggleTeamSort("sales")}
-                    className="px-1 pb-3"
-                  />
-                  <ThSort
-                    label="Ticket médio"
-                    active={teamSort === "averageTicket"}
-                    dir={teamDir}
-                    onClick={() => toggleTeamSort("averageTicket")}
-                    className="px-1 pb-3"
-                  />
-                  <ThSort
-                    label="P.A."
-                    active={teamSort === "pa"}
-                    dir={teamDir}
-                    onClick={() => toggleTeamSort("pa")}
-                    className="px-1 pb-3"
-                  />
-                </tr>
-              </thead>
-              <tbody>
+          <StickyHeadTable
+            tableClassName="w-full min-w-[640px] border-separate border-spacing-0 text-sm [&_tbody_tr:last-child_td]:border-b-0 [&_td]:border-b [&_td]:border-line [&_th]:border-b [&_th]:border-line"
+            headClassName="text-[11px] uppercase tracking-wide text-t2"
+            minWidth={640}
+            syncKey={`${topSellersOrdenados.length}|${teamSort}|${teamDir}`}
+            head={
+              <>
+                <th className={cn(RANK_STICKY, STICKY_BG, "px-1 pb-3 text-left font-bold")}>#</th>
+                <ThSort label="Nome" active={teamSort === "name"} dir={teamDir} onClick={() => toggleTeamSort("name")} align="left" className={cn(NAME_STICKY, STICKY_BG, "px-1 pb-3")} />
+                <ThSort label="Faturamento" active={teamSort === "revenue"} dir={teamDir} onClick={() => toggleTeamSort("revenue")} className="bg-bg-2 px-1 pb-3" />
+                <ThSort label="Nº de vendas" active={teamSort === "sales"} dir={teamDir} onClick={() => toggleTeamSort("sales")} className="bg-bg-2 px-1 pb-3" />
+                <ThSort label="Ticket médio" active={teamSort === "averageTicket"} dir={teamDir} onClick={() => toggleTeamSort("averageTicket")} className="bg-bg-2 px-1 pb-3" />
+                <ThSort label="P.A." active={teamSort === "pa"} dir={teamDir} onClick={() => toggleTeamSort("pa")} className="bg-bg-2 px-1 pb-3" />
+              </>
+            }
+          >
                 {topSellersOrdenados.map((v, idx) => {
                   const key = v.key;
                   const open = key ? () => openPerson(key, v.name) : undefined;
@@ -1069,9 +1042,7 @@ export default function OverviewPage() {
                     {teamTotal.pa == null ? "—" : num(teamTotal.pa, 2)}
                   </td>
                 </tr>
-              </tbody>
-            </table>
-          </div>
+          </StickyHeadTable>
           )}
         </Card>
         <Card className="flex min-w-0 flex-col overflow-hidden">
@@ -1084,50 +1055,22 @@ export default function OverviewPage() {
           {topProductsOrdenados.length === 0 ? (
             <EmptyBlock />
           ) : (
-          <div className="min-w-0 overflow-x-auto">
-            <table className="w-full min-w-[620px] border-separate border-spacing-0 text-sm [&_tbody_tr:last-child_td]:border-b-0 [&_td]:border-b [&_td]:border-line [&_th]:border-b [&_th]:border-line">
-              <thead>
-                <tr className="text-[11px] uppercase tracking-wide text-t2">
-                  <th className={cn(RANK_STICKY, STICKY_BG, "px-1 pb-3 text-left font-bold")}>#</th>
-                  <ThSort
-                    label="Produto"
-                    active={topProdSort === "name"}
-                    dir={topProdDir}
-                    onClick={() => toggleTopProdSort("name")}
-                    align="left"
-                    className={cn(NAME_STICKY, STICKY_BG, "px-1 pb-3")}
-                  />
-                  <ThSort
-                    label="Itens vendidos"
-                    active={topProdSort === "items"}
-                    dir={topProdDir}
-                    onClick={() => toggleTopProdSort("items")}
-                    className="px-1 pb-3"
-                  />
-                  <ThSort
-                    label="Faturamento"
-                    active={topProdSort === "revenue"}
-                    dir={topProdDir}
-                    onClick={() => toggleTopProdSort("revenue")}
-                    className="px-1 pb-3"
-                  />
-                  <ThSort
-                    label="Lucro bruto"
-                    active={topProdSort === "profit"}
-                    dir={topProdDir}
-                    onClick={() => toggleTopProdSort("profit")}
-                    className="px-1 pb-3"
-                  />
-                  <ThSort
-                    label="Variação"
-                    active={topProdSort === "variation"}
-                    dir={topProdDir}
-                    onClick={() => toggleTopProdSort("variation")}
-                    className="px-1 pb-3"
-                  />
-                </tr>
-              </thead>
-              <tbody>
+          <StickyHeadTable
+            tableClassName="w-full min-w-[620px] border-separate border-spacing-0 text-sm [&_tbody_tr:last-child_td]:border-b-0 [&_td]:border-b [&_td]:border-line [&_th]:border-b [&_th]:border-line"
+            headClassName="text-[11px] uppercase tracking-wide text-t2"
+            minWidth={620}
+            syncKey={`${topProductsOrdenados.length}|${topProdSort}|${topProdDir}`}
+            head={
+              <>
+                <th className={cn(RANK_STICKY, STICKY_BG, "px-1 pb-3 text-left font-bold")}>#</th>
+                <ThSort label="Produto" active={topProdSort === "name"} dir={topProdDir} onClick={() => toggleTopProdSort("name")} align="left" className={cn(NAME_STICKY, STICKY_BG, "px-1 pb-3")} />
+                <ThSort label="Itens vendidos" active={topProdSort === "items"} dir={topProdDir} onClick={() => toggleTopProdSort("items")} className="bg-bg-2 px-1 pb-3" />
+                <ThSort label="Faturamento" active={topProdSort === "revenue"} dir={topProdDir} onClick={() => toggleTopProdSort("revenue")} className="bg-bg-2 px-1 pb-3" />
+                <ThSort label="Lucro bruto" active={topProdSort === "profit"} dir={topProdDir} onClick={() => toggleTopProdSort("profit")} className="bg-bg-2 px-1 pb-3" />
+                <ThSort label="Variação" active={topProdSort === "variation"} dir={topProdDir} onClick={() => toggleTopProdSort("variation")} className="bg-bg-2 px-1 pb-3" />
+              </>
+            }
+          >
                 {topProductsOrdenados.map((p, idx) => {
                   const rowKey = p.rowKey;
                   const open = rowKey ? () => openDetail({ kind: "product", rowKey, name: p.name }) : undefined;
@@ -1195,9 +1138,7 @@ export default function OverviewPage() {
                     {productTotal.variation != null ? `${productTotal.variation >= 0 ? "+" : ""}${productTotal.variation}%` : "—"}
                   </td>
                 </tr>
-              </tbody>
-            </table>
-          </div>
+          </StickyHeadTable>
           )}
         </Card>
       </div>

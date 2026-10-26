@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Badge, Modal, ProgressBar, Skeleton, ThSort, type SortDir } from "@/components/ui";
+import { Badge, Modal, Pagination, ProgressBar, Skeleton, ThSort, type SortDir } from "@/components/ui";
+import { StickyHeadTable } from "@/components/ui/StickyHeadTable";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { AreaLineChart } from "@/components/charts";
 import { ProductNameCell } from "@/components/wedash/ProductNameCell";
@@ -37,6 +38,7 @@ import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { brlCent, num, deltaTip, comparedWithTip, profitBrl } from "@/lib/format";
 import { cn } from "@/lib/cn";
+import { usePagedRows } from "@/lib/usePagedRows";
 
 type Delta = { value: string; positive: boolean; vs?: string; diff?: string; previous?: string };
 
@@ -291,8 +293,19 @@ const NAME_CLIP = "min-w-0 max-w-[9.5rem] sm:max-w-[12.5rem] lg:max-w-[14rem] xl
 const SCROLL_TABLE =
   "w-full min-w-[620px] border-separate border-spacing-0 text-sm [&_tbody_tr:last-child_td]:border-b-0 [&_td]:border-b [&_td]:border-line [&_th]:border-b [&_th]:border-line";
 
+const HEAD = "sticky top-0 z-30 bg-bg-2";
+
 /** Mesmo padrao da tabela Top produtos (#  |  Produto  |  Itens  |  Faturamento  |  Lucro bruto  |  Margem); clique abre o produto. */
-function ProductsOfGroup({ products, onProduct }: { products: ProductDetailItem[]; onProduct: (rowKey: string) => void }) {
+function ProductsOfGroup({
+  products,
+  onProduct,
+  paginate = false,
+}: {
+  products: ProductDetailItem[];
+  onProduct: (rowKey: string) => void;
+  /** 10 por página. A lista de produtos da categoria usa isso. */
+  paginate?: boolean;
+}) {
   const [sort, setSort] = useState<TopSort>("revenue");
   const [dir, setDir] = useState<SortDir>("desc");
   const lines = useMemo(() => {
@@ -307,6 +320,9 @@ function ProductsOfGroup({ products, onProduct }: { products: ProductDetailItem[
       return (va - vb) * d || b.revenue - a.revenue;
     });
   }, [products, sort, dir]);
+  const paged = usePagedRows(lines, `${lines.length}|${sort}|${dir}`);
+  const shown = paginate ? paged.pageRows : lines;
+  const rankBase = paginate ? (paged.page - 1) * paged.pageSize : 0;
   const toggle = (k: TopSort) => {
     if (sort === k) setDir((x) => (x === "asc" ? "desc" : "asc"));
     else {
@@ -315,20 +331,26 @@ function ProductsOfGroup({ products, onProduct }: { products: ProductDetailItem[
     }
   };
   return (
-    <div className="mt-2 min-w-0 overflow-x-auto">
-      <table className={SCROLL_TABLE}>
-        <thead>
-          <tr className="text-[11px] uppercase tracking-wide text-t2">
-            <th className={cn(RANK_STICKY, STICKY_BG, "px-1 pb-3 text-left font-bold")}>#</th>
-            <ThSort label="Produto" active={sort === "name"} dir={dir} onClick={() => toggle("name")} align="left" className={cn(NAME_STICKY, STICKY_BG, "px-1 pb-3")} />
-            <ThSort label="Itens vendidos" active={sort === "items"} dir={dir} onClick={() => toggle("items")} className="px-1 pb-3" />
-            <ThSort label="Faturamento" active={sort === "revenue"} dir={dir} onClick={() => toggle("revenue")} className="px-1 pb-3" />
-            <ThSort label="Lucro bruto" active={sort === "profit"} dir={dir} onClick={() => toggle("profit")} className="px-1 pb-3" />
-            <ThSort label="Margem" active={sort === "margin"} dir={dir} onClick={() => toggle("margin")} className="px-1 pb-3" />
-          </tr>
-        </thead>
-        <tbody>
-          {lines.map((p, idx) => (
+    <div className="mt-2">
+      <StickyHeadTable
+        tableClassName={SCROLL_TABLE}
+        headClassName="text-[11px] uppercase tracking-wide text-t2"
+        minWidth={620}
+        syncKey={`${shown.length}|${sort}|${dir}|${rankBase}`}
+        head={
+          <>
+            <th className={cn(RANK_STICKY, "top-0 z-40 bg-bg-2 px-1 pb-3 text-left font-bold")}>#</th>
+            <ThSort label="Produto" active={sort === "name"} dir={dir} onClick={() => toggle("name")} align="left" className={cn(NAME_STICKY, HEAD, "z-40 px-1 pb-3")} />
+            <ThSort label="Itens vendidos" active={sort === "items"} dir={dir} onClick={() => toggle("items")} className={cn(HEAD, "px-1 pb-3")} />
+            <ThSort label="Faturamento" active={sort === "revenue"} dir={dir} onClick={() => toggle("revenue")} className={cn(HEAD, "px-1 pb-3")} />
+            <ThSort label="Lucro bruto" active={sort === "profit"} dir={dir} onClick={() => toggle("profit")} className={cn(HEAD, "px-1 pb-3")} />
+            <ThSort label="Margem" active={sort === "margin"} dir={dir} onClick={() => toggle("margin")} className={cn(HEAD, "px-1 pb-3")} />
+          </>
+        }
+      >
+        {shown.map((p, idx) => {
+          const rank = rankBase + idx;
+          return (
             <tr
               key={p.rowKey}
               tabIndex={0}
@@ -341,10 +363,10 @@ function ProductsOfGroup({ products, onProduct }: { products: ProductDetailItem[
               }}
               className="group cursor-pointer transition-colors hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none"
             >
-              <td className={cn(RANK_STICKY, STICKY_BG, "px-1 py-3 text-center text-[13px] font-extrabold text-t2")}>{idx + 1}</td>
+              <td className={cn(RANK_STICKY, STICKY_BG, "px-1 py-3 text-center text-[13px] font-extrabold text-t2")}>{rank + 1}</td>
               <td className={cn(NAME_STICKY, STICKY_BG, "px-1 py-3")}>
                 <div className={NAME_CLIP}>
-                  <ProductNameCell name={p.name} idx={idx} sub={p.code} tones={PRODUCT_AVATAR_TONES} />
+                  <ProductNameCell name={p.name} idx={rank} sub={p.code} tones={PRODUCT_AVATAR_TONES} />
                 </div>
               </td>
               <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(p.items)}</td>
@@ -354,9 +376,17 @@ function ProductsOfGroup({ products, onProduct }: { products: ProductDetailItem[
                 {pctFmt(p.marginPct)}
               </td>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          );
+        })}
+      </StickyHeadTable>
+      {paginate && paged.totalPages > 1 ? (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <span className="text-[12.5px] text-t2">
+            Mostrando {paged.pageRows.length} de {paged.total} produtos
+          </span>
+          <Pagination page={paged.page} totalPages={paged.totalPages} onChange={paged.setPage} />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -562,7 +592,7 @@ function ProductDetailModal({
             <section>
               <h4 className="text-[13px] font-bold text-t0">Produtos {article}</h4>
               {detail.kinds.length > 0 && <p className="mt-0.5 text-[11.5px] text-t2">{detail.kinds.join(" · ")}</p>}
-              <ProductsOfGroup key={`${kind}-${detail.rowKey}`} products={detail.products} onProduct={onProduct} />
+              <ProductsOfGroup key={`${kind}-${detail.rowKey}`} products={detail.products} onProduct={onProduct} paginate={kind === "category"} />
             </section>
           )}
 
