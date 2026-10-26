@@ -529,6 +529,7 @@ function DayEditor({
 }) {
   const [draft, setDraft] = useState(rows);
   const [pick, setPick] = useState("");
+  const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
   const ordered = [...draft].sort((a, b) => (names.get(a.sellerId)?.name ?? "").localeCompare(names.get(b.sellerId)?.name ?? "", "pt-BR"));
   const missing = [...names.values()].filter((person) => !draft.some((row) => row.sellerId === person.id)).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
@@ -537,6 +538,7 @@ function DayEditor({
     if (!pick || draft.some((row) => row.sellerId === pick)) return;
     setDraft((current) => [...current, { sellerId: pick, day, status: "work", origin: "manual" }]);
     setPick("");
+    setAdding(false);
   }
 
   return (
@@ -604,30 +606,59 @@ function DayEditor({
                   <option value="holiday_work">{doublePay ? "Feriado trabalhado 2×" : "Feriado trabalhado"}</option>
                   <option value="comp_off">Folga compensatória</option>
                 </Select>
-                <Button type="button" variant="ghost" size="sm" onClick={() => setDraft((current) => current.filter((item) => item.sellerId !== row.sellerId))}>
-                  Remover do dia
-                </Button>
+                <button
+                  type="button"
+                  aria-label={`Remover ${name} do dia`}
+                  onClick={() => setDraft((current) => current.filter((item) => item.sellerId !== row.sellerId))}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] border border-line text-bad transition-colors hover:bg-bad-soft"
+                >
+                  <Icon d={icons.trash} size={14} />
+                </button>
               </span>
             </li>
           );
         })}
       </ul>
       {missing.length > 0 ? (
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-end">
-          <div className="min-w-0 flex-1">
-            <FormField label="Adicionar pessoa">
-              <Select value={pick} onChange={(event) => setPick(event.target.value)} aria-label="Pessoa para incluir no dia">
-                <option value="">Escolha</option>
-                {missing.map((person) => (
-                  <option key={person.id} value={person.id}>{person.name}</option>
-                ))}
-              </Select>
-            </FormField>
+        adding ? (
+          <section className="mt-4 rounded-[var(--radius-vela-lg)] border border-line bg-bg-2 p-3">
+            <p className="text-[12.5px] font-bold text-t0">Adicionar pessoa</p>
+            <p className="mt-1 text-[12.5px] leading-relaxed text-t2">Alguém da equipe que ainda não está neste dia.</p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+              <div className="min-w-0 flex-1">
+                <FormField label="Pessoa" required>
+                  <Select value={pick} onChange={(event) => setPick(event.target.value)} aria-label="Pessoa para incluir no dia">
+                    <option value="">Escolha</option>
+                    {missing.map((person) => (
+                      <option key={person.id} value={person.id}>{person.name}</option>
+                    ))}
+                  </Select>
+                </FormField>
+              </div>
+              <Button type="button" variant="outline" size="sm" disabled={!pick} onClick={addPerson}>
+                Adicionar pessoa
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setPick("");
+                  setAdding(false);
+                }}
+              >
+                Remover
+              </Button>
+            </div>
+          </section>
+        ) : (
+          <div className="mt-4">
+            <Button type="button" variant="outline" size="sm" onClick={() => setAdding(true)}>
+              Adicionar pessoa
+            </Button>
+            <p className="mt-1.5 text-[12.5px] leading-relaxed text-t2">Alguém da equipe que ainda não está neste dia.</p>
           </div>
-          <Button type="button" variant="outline" size="sm" disabled={!pick} onClick={addPerson}>
-            Adicionar
-          </Button>
-        </div>
+        )
       ) : null}
     </Modal>
   );
