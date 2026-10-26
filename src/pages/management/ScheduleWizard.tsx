@@ -504,7 +504,7 @@ export function ScheduleWizard({
                     <label htmlFor={`day-open-${day.dow}`} className="block truncate text-[13.5px] font-semibold text-t0">{weekdayLabel(day.dow)}</label>
                     {day.open ? (
                       <div className="mt-2 flex items-center gap-2">
-                        <p className="text-[12.5px] font-semibold text-t0">Pelo menos</p>
+                        <p className="text-[12.5px] font-semibold text-t2">Pelo menos</p>
                         <HeadcountField value={day.min} max={headcount} label={`Pelo menos em ${weekdayLabel(day.dow)}`} onChange={(min) => setDayMin(day.dow, min)} />
                       </div>
                     ) : null}
@@ -547,7 +547,7 @@ export function ScheduleWizard({
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     <FormField label="Pessoas trabalhando" required>
                       <div className="flex items-center gap-2">
-                        <span className="text-[12.5px] font-semibold text-t0">Pelo menos</span>
+                        <span className="text-[12.5px] font-semibold text-t2">Pelo menos</span>
                         <HeadcountField value={rule.workers} max={headcount} label={`Pelo menos em ${rule.name}`} onChange={(workers) => patchRule(rule.date, { workers })} />
                       </div>
                     </FormField>
