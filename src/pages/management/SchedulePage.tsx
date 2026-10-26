@@ -12,9 +12,9 @@ import { addDays, addMonths, endOfMonth, isoToDate, shiftName, startOfMonth } fr
 import { fetchGoals } from "@/data/wedash/goalsRepo";
 import { monthCoveredByGoal, scheduleStartMonth, type GoalSpan } from "@/data/wedash/goalMonths";
 import { branchRoleLabel, fetchStoreSellers, fetchStoreShifts, isBranchTeamMember, type StoreSeller, type StoreShift } from "@/data/wedash/stores";
-import { defaultDayNeeds, generateMonth, nextSundayShift, shiftThatWorked, weekday, type DayStatus, type Sex } from "@/data/wedash/scheduleGenerate";
+import { defaultDayNeeds, generateMonth, type DayStatus, type Sex } from "@/data/wedash/scheduleGenerate";
 import { holidayLabel, holidaysForStore, loadHolidaySeed, loadNationalHolidays, storePlace, type Holiday } from "@/data/wedash/scheduleHolidays";
-import { deleteSchedule, fetchCompDue, fetchSchedule, fetchScheduleDays, saveManualDay, saveSchedule, type StoredDay, type StoredSchedule } from "@/data/wedash/scheduleRepo";
+import { deleteSchedule, fetchCompDue, fetchSchedule, saveManualDay, saveSchedule, type StoredDay, type StoredSchedule } from "@/data/wedash/scheduleRepo";
 import { ScheduleWizard, type ScheduleWizardValue } from "./ScheduleWizard";
 
 const MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -201,28 +201,9 @@ export function SchedulePage() {
     replaceManual: false,
   });
 
-  async function sundayPlan(storeId: string, team: { id: string; groupId: string | null }[], from: string) {
-    const storeShifts = await fetchStoreShifts(session.tenantId, storeId);
-    const present = [...new Set(team.map((person) => person.groupId).filter((id): id is string => Boolean(id)))];
-    const ordered = storeShifts.map((shift) => shift.id).filter((id) => present.includes(id));
-    for (const id of present) if (!ordered.includes(id)) ordered.push(id);
-    if (ordered.length < 2) return { sundayShifts: ordered, sundayShiftStart: 0 };
-    const previous = await fetchScheduleDays(storeId, addDays(from, -45), addDays(from, -1));
-    const last = previous.filter((row) => weekday(row.day) === 0).reduce((max, row) => (row.day > max ? row.day : max), "");
-    const shiftOf = new Map(team.map((person) => [person.id, person.groupId]));
-    const lastShift = last
-      ? shiftThatWorked(
-          previous.filter((row) => row.day === last).map((row) => ({ personId: row.sellerId, status: row.status })),
-          (id) => shiftOf.get(id) ?? null,
-        )
-      : null;
-    return { sundayShifts: ordered, sundayShiftStart: nextSundayShift(lastShift, ordered) };
-  }
-
   async function generateFor(storeId: string, value: ScheduleWizardValue, selected: SelectedPerson[]) {
     const [year, monthNumber] = value.periodStart.split("-").map(Number);
     const incoming = await fetchCompDue(storeId, value.periodStart);
-    const rotation = await sundayPlan(storeId, selected, value.periodStart);
     const offMode = selected.length > 0 && selected.every((person) => person.fixedOffDow != null) ? "fixed" : "rotating";
     const generated = generateMonth({
       year,
@@ -245,8 +226,6 @@ export function SchedulePage() {
       groupNeeds: value.groupNeeds,
       holidayRules: value.holidayRules,
       incomingComp: incoming,
-      sundayShifts: rotation.sundayShifts,
-      sundayShiftStart: rotation.sundayShiftStart,
     });
     const known = new Set(holidays.filter((row) => row.kind !== "municipal").map((row) => row.date));
     const months = monthsBetween(value.periodStart, value.periodEnd);

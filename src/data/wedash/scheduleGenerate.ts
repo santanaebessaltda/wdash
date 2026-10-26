@@ -150,7 +150,7 @@ function staysCovered(grid: DayStatus[][], people: SchedulePerson[], needs: DayN
   next[leaving][day] = "off";
   if (workersOn(next, day) < dayMin(needs, dow).min) return false;
   const groupId = people[leaving].groupId;
-  const min = shiftFloor(needs, groups, dow, groupId);
+  const min = shiftFloor(groups, dow, groupId);
   if (min <= 0 || !groupId) return true;
   const members = people.map((person, index) => (person.groupId === groupId ? index : -1)).filter((index) => index >= 0);
   return workersOn(next, day, members) >= min;
@@ -195,11 +195,10 @@ function ensureSundayCoverage(grid: DayStatus[][], dates: string[], sundays: num
   }
 }
 
-function shiftFloor(needs: DayNeed[] | undefined, groups: GroupNeed[] | undefined, dow: number, groupId: string | null | undefined): number {
-  const hasShift = Boolean(groupId && groups?.some((item) => item.groupId === groupId && (item.dow == null || item.dow === dow)));
-  if (hasShift) return groupMin(groups, groupId, dow);
-  if (needs && groupId) return dayMin(needs, dow).min;
-  return 0;
+/** Piso de um turno só quando a escala pede esse turno. O mínimo do dia é o total da equipe. */
+function shiftFloor(groups: GroupNeed[] | undefined, dow: number, groupId: string | null | undefined): number {
+  if (!groupId || !groups?.some((item) => item.groupId === groupId && (item.dow == null || item.dow === dow))) return 0;
+  return groupMin(groups, groupId, dow);
 }
 
 function enforceMinimums(grid: DayStatus[][], dates: string[], people: SchedulePerson[], needs: DayNeed[] | undefined, groups: GroupNeed[] | undefined, locked?: boolean[][]) {
@@ -219,7 +218,7 @@ function enforceMinimums(grid: DayStatus[][], dates: string[], people: ScheduleP
     for (const person of people) {
       if (!person.groupId || seen.has(person.groupId)) continue;
       seen.add(person.groupId);
-      const min = shiftFloor(needs, groups, dow, person.groupId);
+      const min = shiftFloor(groups, dow, person.groupId);
       const members = people.map((item, index) => (item.groupId === person.groupId ? index : -1)).filter((index) => index >= 0);
       if (members.some((index) => locked?.[index]?.[day])) continue;
       while (workersOn(grid, day, members) < min) {
