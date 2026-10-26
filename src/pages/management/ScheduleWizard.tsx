@@ -406,13 +406,15 @@ export function ScheduleWizard({
           <WizardCardHeader title={<>Equipe da escala<span className="text-bad"> *</span></>} subtitle="Selecione as pessoas e defina as regras de folga." />
           <ul className="space-y-2">
             {people.length === 0 ? <li className="text-[13px] text-t2">Nenhuma pessoa ativa nesta filial.</li> : null}
-            {people.map((person) => (
+            {people.map((person) => {
+              const selected = value.selectedIds.includes(person.id);
+              return (
               <li key={person.id} className="min-w-0 rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3 py-2">
-                <div className="flex min-w-0 items-center gap-3">
+                <div className={cn("flex min-w-0 gap-3", selected ? "items-start" : "items-center")}>
                   <input
                     type="checkbox"
-                    className="shrink-0"
-                    checked={value.selectedIds.includes(person.id)}
+                    className={cn("shrink-0", selected && "mt-2")}
+                    checked={selected}
                     onChange={() =>
                       setValue((current) => ({
                         ...current,
@@ -422,43 +424,44 @@ export function ScheduleWizard({
                     }
                   />
                   <PersonAvatar name={person.name} employeeId={person.code} storeId={person.storeId} size="sm" />
-                  <span className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1">
                     <span className="block truncate text-[13.5px] font-semibold text-t0">{person.name}</span>
                     <span className="block truncate text-[12px] text-t2">{person.groupName || person.role}</span>
-                  </span>
-                </div>
-                {value.selectedIds.includes(person.id) ? (
-                  <div className="mt-2 grid grid-cols-1 gap-3 border-t border-line pt-2.5 sm:grid-cols-2">
-                    <label className="min-w-0 text-[12px] font-bold text-t0">
-                      Dia de folga<span className="text-bad"> *</span>
-                      <Select
-                        className="mt-1 h-9! w-full px-2!"
-                        aria-label={`Dia de folga de ${person.name}`}
-                        value={value.fixedOff[person.id] ?? ""}
-                        onChange={(event) =>
-                          setValue((current) => ({
-                            ...current,
-                            fixedOff: event.target.value ? { ...current.fixedOff, [person.id]: Number(event.target.value) } : Object.fromEntries(Object.entries(current.fixedOff).filter(([id]) => id !== person.id)),
-                          }))
-                        }
-                      >
-                        <option value="">Automático</option>
-                        {WEEKDAYS.map((label, index) => (
-                          <option key={label} value={index + 1}>{label}</option>
-                        ))}
-                      </Select>
-                    </label>
-                    <label className="min-w-0 text-[12px] font-bold text-t0" title="Usado apenas para aplicar a regra de folga aos domingos.">
-                      Sexo<span className="text-bad"> *</span>
-                      <Select className="mt-1 h-9! w-full px-2!" aria-label={`Sexo de ${person.name}`} value={value.sex[person.id] ?? "woman"} onChange={(event) => setValue((current) => ({ ...current, sex: { ...current.sex, [person.id]: event.target.value as Sex } }))}>
-                        <option value="woman">Mulher</option>
-                        <option value="man">Homem</option>
-                      </Select>
-                    </label>
+                    {selected ? (
+                      <div className="mt-2.5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <label className="min-w-0 text-[12px] font-bold text-t0">
+                          Dia de folga<span className="text-bad"> *</span>
+                          <Select
+                            className="mt-1 h-9! w-full px-2!"
+                            aria-label={`Dia de folga de ${person.name}`}
+                            value={value.fixedOff[person.id] ?? ""}
+                            onChange={(event) =>
+                              setValue((current) => ({
+                                ...current,
+                                fixedOff: event.target.value ? { ...current.fixedOff, [person.id]: Number(event.target.value) } : Object.fromEntries(Object.entries(current.fixedOff).filter(([id]) => id !== person.id)),
+                              }))
+                            }
+                          >
+                            <option value="">Automático</option>
+                            {WEEKDAYS.map((label, index) => (
+                              <option key={label} value={index + 1}>{label}</option>
+                            ))}
+                          </Select>
+                        </label>
+                        <label className="min-w-0 text-[12px] font-bold text-t0" title="Usado apenas para aplicar a regra de folga aos domingos.">
+                          Sexo<span className="text-bad"> *</span>
+                          <Select className="mt-1 h-9! w-full px-2!" aria-label={`Sexo de ${person.name}`} value={value.sex[person.id] ?? "woman"} onChange={(event) => setValue((current) => ({ ...current, sex: { ...current.sex, [person.id]: event.target.value as Sex } }))}>
+                            <option value="woman">Mulher</option>
+                            <option value="man">Homem</option>
+                          </Select>
+                        </label>
+                      </div>
+                    ) : null}
                   </div>
-                ) : null}
+                </div>
               </li>
-            ))}
+              );
+            })}
           </ul>
           <p className="mt-3 text-[12px] text-t2">No automático, a folga muda ao longo do período. Quem precisa do mesmo dia toda semana escolhe o dia.</p>
           <div className="mt-4 border-t border-line pt-4">
