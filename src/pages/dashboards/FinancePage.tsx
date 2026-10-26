@@ -42,7 +42,7 @@ import { ReportHeader, useExportPdf } from "@/pages/dashboard/ReportHeader";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { FinanceSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
-import { brlCent, isoToDate, labelUpper, deltaTip, num } from "@/lib/format";
+import { brlCent, isoToDate, labelUpper, deltaTip, num, profitBrl } from "@/lib/format";
 import { usePagedRows } from "@/lib/usePagedRows";
 import { cn } from "@/lib/cn";
 import { QuickStat } from "@/pages/dashboards/QuickStat";
@@ -665,7 +665,7 @@ export default function FinancePage() {
                     <td className="px-1 py-3 text-[13px] font-bold text-t0">{line.label}</td>
                     <td className="px-1 py-3 text-right"><Mono v={brlCent(line.revenue)} /></td>
                     {costs && <td className="px-1 py-3 text-right"><Mono v={brlCent(line.cost)} /></td>}
-                    {costs && <td className="px-1 py-3 text-right"><Mono v={brlCent(line.profit)} tone={profitText(line.profit)} /></td>}
+                    {costs && <td className="px-1 py-3 text-right"><Mono v={profitBrl(line.profit)} tone={profitText(line.profit)} /></td>}
                     {costs && <td className="px-1 py-3 text-right"><Mono v={`${line.marginPct.toFixed(1)}%`} /></td>}
                     <td className="px-1 py-3 text-right"><Mono v={brlCent(line.averageTicket)} /></td>
                   </tr>
@@ -683,7 +683,7 @@ export default function FinancePage() {
                 {costs && <td className="px-1 py-3 text-right"><Mono v={brlCent(evoTotal.cost)} total /></td>}
                 {costs && (
                 <td className="px-1 py-3 text-right">
-                  <Mono v={brlCent(evoTotal.profit)} total tone={profitText(evoTotal.profit)} />
+                  <Mono v={profitBrl(evoTotal.profit)} total tone={profitText(evoTotal.profit)} />
                 </td>
                 )}
                 {costs && <td className="px-1 py-3 text-right"><Mono v={`${evoTotal.marginPct.toFixed(1)}%`} total /></td>}

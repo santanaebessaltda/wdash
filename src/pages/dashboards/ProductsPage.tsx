@@ -40,7 +40,7 @@ import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { ProductsWithoutCostNotice } from "@/pages/dashboard/ProductsWithoutCostNotice";
 import { ProductsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { useFilterSkeleton } from "@/lib/useFilterSkeleton";
-import { brlCent, isoToDate, num, comparedWithTip } from "@/lib/format";
+import { brlCent, isoToDate, num, comparedWithTip, profitBrl } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePicker";
 import { PALETTE, PRODUCT_AVATAR_TONES, kpiTone, profitText, variationColor } from "@/pages/dashboard/palette";
@@ -513,7 +513,7 @@ export default function ProductsPage() {
                     <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(l.items)}</td>
                     <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(l.revenue)}</td>
                     <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", cmv == null ? "text-t2" : "text-t0")}>{moneyOrDash(cmv)}</td>
-                    <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", profitText(l.profit))}>{moneyOrDash(l.profit)}</td>
+                    <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", profitText(l.profit))}>{profitBrl(l.profit)}</td>
                     <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", l.marginPct == null ? "text-t2" : "text-t1")}>
                       {pctFmt(l.marginPct)}
                     </td>
@@ -543,7 +543,7 @@ export default function ProductsPage() {
                     {moneyOrDash(lineTotal.cmv)}
                   </td>
                   <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", profitText(lineTotal.profit))}>
-                    {moneyOrDash(lineTotal.profit)}
+                    {profitBrl(lineTotal.profit)}
                   </td>
                   <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", lineTotal.marginPct == null ? "text-t2" : "text-t1")}>
                     {pctFmt(lineTotal.marginPct)}
@@ -642,7 +642,7 @@ export default function ProductsPage() {
                       <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(p.items)}</td>
                       <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.revenue)}</td>
                       <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", p.cmv == null ? "text-t2" : "text-t0")}>{moneyOrDash(p.cmv)}</td>
-                      <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", profitText(p.profit))}>{moneyOrDash(p.profit)}</td>
+                      <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", profitText(p.profit))}>{profitBrl(p.profit)}</td>
                       <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", p.marginPct == null ? "text-t2" : "text-t1")}>
                         {pctFmt(p.marginPct)}
                       </td>
@@ -672,7 +672,7 @@ export default function ProductsPage() {
                     {moneyOrDash(tableTotal.cmv)}
                   </td>
                   <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", profitText(tableTotal.profit))}>
-                    {moneyOrDash(tableTotal.profit)}
+                    {profitBrl(tableTotal.profit)}
                   </td>
                   <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", tableTotal.marginPct == null ? "text-t2" : "text-t1")}>
                     {pctFmt(tableTotal.marginPct)}

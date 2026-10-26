@@ -34,7 +34,7 @@ import type { SalesHourAgg } from "@/data/wedash/salesTypes";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
-import { brlCent, num, deltaTip, comparedWithTip } from "@/lib/format";
+import { brlCent, num, deltaTip, comparedWithTip, profitBrl } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
 type Delta = { value: string; positive: boolean; vs?: string; diff?: string; previous?: string };
@@ -238,7 +238,7 @@ const amountOfSort = (r: { items: number; revenue: number; profit: number | null
 function ProfitCell({ v }: { v: number | null }) {
   return (
     <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", profitText(v))}>
-      {v == null ? "—" : brlCent(v)}
+      {profitBrl(v)}
     </td>
   );
 }

@@ -36,7 +36,7 @@ import type {
   SellerAvatarRef,
   SellerShiftRef,
 } from "@/data/wedash/salesTypes";
-import { brlCent, isoToDate, labelUpper, num, deltaTip, titleName } from "@/lib/format";
+import { brlCent, isoToDate, labelUpper, num, deltaTip, titleName, profitBrl } from "@/lib/format";
 import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePicker";
 import { useActiveSession } from "@/session/SessionProvider";
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
@@ -1176,7 +1176,7 @@ export default function OverviewPage() {
                           p.profit == null ? "text-t2" : p.profit < 0 ? "text-palette-red" : "text-palette-green",
                         )}
                       >
-                        {p.profit == null ? "—" : brlCent(p.profit)}
+                        {profitBrl(p.profit)}
                       </td>
                       <td className="px-1 py-3 text-right text-xs font-bold" style={{ color: p.trend != null ? (p.trend >= 0 ? "var(--palette-green)" : "var(--palette-red)") : undefined }}>
                         {p.trend != null ? `${p.trend >= 0 ? "+" : ""}${p.trend}%` : "—"}
@@ -1202,7 +1202,7 @@ export default function OverviewPage() {
                       productTotal.profit == null ? "text-t2" : productTotal.profit < 0 ? "text-palette-red" : "text-palette-green",
                     )}
                   >
-                    {productTotal.profit == null ? "—" : brlCent(productTotal.profit)}
+                    {profitBrl(productTotal.profit)}
                   </td>
                   <td
                     className="px-1 py-3 text-right text-xs font-extrabold"

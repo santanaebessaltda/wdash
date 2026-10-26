@@ -1,6 +1,6 @@
 /** Formatacao pt-BR usada em todas as telas do produto. */
 
-import { isoToDate, eachDay, num } from "../data/wedash/engine/format.ts";
+import { isoToDate, eachDay, num, brlCent } from "../data/wedash/engine/format.ts";
 
 export {
   brlCent,
@@ -16,6 +16,12 @@ export {
 } from "../data/wedash/engine/format.ts";
 
 const brlInteger = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+
+/** Lucro bruto na tabela: +R$ quando positivo. Negativo ja vem com o sinal do R$. Sem custo = "—". */
+export function profitBrl(v: number | null | undefined): string {
+  if (v == null) return "—";
+  return v > 0 ? `+${brlCent(v)}` : brlCent(v);
+}
 
 /** R$ 84.210  -  sem centavos, para paineis. */
 export function brl(v: number): string {
