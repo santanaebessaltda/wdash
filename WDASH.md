@@ -436,6 +436,7 @@ Pergunta: "Quais são meus 80/20? Estou perdendo venda por ruptura? O que descon
  - ~~Faixa **quick stats WPINK**~~ **removida da Visão Geral e de Produtos (2026-09-26)**: separação por marca = detalhe → fica **só no Financeiro** (faixa WPINK + card Faturamento por marca). A view ainda calcula `kpisWpink`; as páginas não renderizam.
  - Sub do Faturamento WPINK: `X% do faturamento` (não “do total”).
  - KPIs principais = total puro (sem subtítulo WPINK).
+ - **Ticket médio sem P.A.** (2026-10-26, decisão do dono): o card mostra só o valor e o comparativo. P.A. é outro indicador e saiu do subtítulo do Ticket médio e do Ticket médio WPINK. Nº de vendas continua com "N itens vendidos".
  - Demais cards sem anotação de marca.
  - Outras telas do Dashboard: decidir tela a tela depois.
 

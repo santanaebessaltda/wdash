@@ -4400,10 +4400,6 @@ export function buildOverviewViewFromAggs(scope: Scope, input: OverviewAggInput)
         {
           label: "Ticket médio WPINK",
           amount: wpink.salesIncomplete ? "—" : brlCent(wpinkTicket),
-          sub:
-            wpinkSales > 0
-              ? `P.A. ${num(divSeguro(wpinkItems, wpinkSales), 2)}`
-              : undefined,
           tint: "acc",
         },
       ]
@@ -4545,7 +4541,6 @@ export function buildOverviewViewFromAggs(scope: Scope, input: OverviewAggInput)
     {
       label: "Ticket médio",
       amount: brlCent(ticket),
-      sub: salesCount > 0 ? `P.A. ${num(divSeguro(items, salesCount), 2)}` : undefined,
       delta: hasComp && ticket > 0 ? kpiDelta(ticket, prevTicket, vsLabel) : undefined,
     },
   ];
@@ -5046,10 +5041,6 @@ export function buildOverviewView(scope: Scope, aggs?: OverviewAggInput | null):
         {
           label: "Ticket médio WPINK",
           amount: brlCent(wpinkTicketFix),
-          sub:
-            wpinkAgg.salesCount > 0
-              ? `P.A. ${num(divSeguro(wpinkAgg.items, wpinkAgg.salesCount), 2)}`
-              : undefined,
           tint: "acc",
         },
       ]
@@ -5100,7 +5091,6 @@ export function buildOverviewView(scope: Scope, aggs?: OverviewAggInput | null):
     {
       label: "Ticket médio",
       amount: brlCent(ticketCurrent),
-      sub: `P.A. ${num(divSeguro(current.items, current.salesCount), 2)}`,
       delta: hasComp ? kpiDelta(ticketCurrent, ticketPrevious, vsLabel) : undefined,
     },
   ];

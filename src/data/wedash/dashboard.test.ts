@@ -619,6 +619,7 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
     const revenue = v.kpis.find((k) => k.label === "Faturamento")?.amount ?? "";
     expect(revenue).toMatch(/200|R\$/);
     expect(v.kpis.find((k) => k.label === "Ticket médio")?.amount).toMatch(/50/);
+    expect(v.kpis.find((k) => k.label === "Ticket médio")?.sub).toBeUndefined();
     expect(v.kpis.find((k) => k.label === "CMV")?.amount).toMatch(/80/);
     expect(v.kpis.find((k) => k.label === "CMV")?.sub).toMatch(/%/);
   });
@@ -1065,6 +1066,8 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
     expect(vF2.kpisWpink[0]?.sub).toMatch(/% do faturamento/);
     expect(vF2.kpisWpink[0]?.sub).not.toMatch(/do total/);
     expect(vF2.kpisWpink[2]?.amount).toMatch(/3/);
+    expect(vF2.kpis.find((k) => k.label === "Ticket médio")?.sub).toBeUndefined();
+    expect(vF2.kpisWpink[3]?.sub).toBeUndefined();
   });
 
   it("post-sync read reflects updated aggregates without mocks (SYNC-09)", () => {
