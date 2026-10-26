@@ -518,7 +518,7 @@ export function GlobalGoalBand({
   pulseCurrent?: boolean;
   /** Borra o percentual de premiação de cada nível. Só o placar. */
   secret?: boolean;
-  /** No detalhe da meta, o percentual de premiação de cada nível fica na cor primária. */
+  /** No detalhe da meta, o percentual acompanha a cor do nível. */
   primaryPrize?: boolean;
   /** Quando o título da meta já está no CardMeta. */
   hideTitle?: boolean;
@@ -680,7 +680,7 @@ export function GlobalGoalBand({
                       title={`N${i + 1} · ${d.name} · ${num(d.commissionPct, 1)}%`}
                     >
                       N{i + 1} · {shortLabel}
-                      <span className={cn("font-semibold opacity-75", primaryPrize && "text-acc")} {...(secret ? { "data-secret": "" } : {})}> ({num(d.commissionPct, 1)}%)</span>
+                      <span className={cn("font-semibold", !primaryPrize && "opacity-75")} {...(secret ? { "data-secret": "" } : {})}> ({num(d.commissionPct, 1)}%)</span>
                     </p>
                   );
                 })}
