@@ -341,7 +341,7 @@ function ProductsOfGroup({ products, onProduct }: { products: ProductDetailItem[
               <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(p.items)}</td>
               <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.revenue)}</td>
               <ProfitCell v={p.profit} />
-              <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", p.marginPct == null ? "text-t2" : "text-palette-pink")}>
+              <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", p.marginPct == null ? "text-t2" : "text-t1")}>
                 {pctFmt(p.marginPct)}
               </td>
             </tr>
