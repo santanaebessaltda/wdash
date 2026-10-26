@@ -136,6 +136,40 @@ describe("goalView", () => {
     expect(card.band.outsideTeam).toBe(2000);
   });
 
+  it("gerente ativa entra na lista com a premiação da loja; usuário da filial não entra", () => {
+    const withManagement: GoalRecord = {
+      ...goal,
+      tiers: [
+        { ...goal.tiers[0]!, managerPct: 0.5, managerBonus: 100 },
+        { ...goal.tiers[1]!, managerPct: 1, managerBonus: 200 },
+      ],
+    };
+    const team: GoalTeamMember[] = [
+      { storeId: "s1", employeeId: 1, name: "ANA", nameKeys: ["ANA"], salesPerson: true, shiftId: "m", shiftName: "MANHA" },
+      { storeId: "s1", employeeId: 8, name: "RITA", nameKeys: ["RITA"], salesPerson: false, role: "GERENCIA", active: true, shiftId: null, shiftName: null },
+      { storeId: "s1", employeeId: 9, name: "LOJA", nameKeys: ["LOJA"], salesPerson: false, role: "GERENCIA", active: true, branchUser: true, shiftId: null, shiftName: null },
+    ];
+    const card = buildGoalCardView({
+      goal: withManagement,
+      storeNameValue: "LOJA",
+      dayAggs: [day("s1", "2026-09-05", 6000)],
+      sellerDayAggs: [seller("2026-09-05", "ANA", 3000, 1)],
+      namedSellerDayAggs: [seller("2026-09-05", "RITA", 400, 8)],
+      team,
+      today: "2026-09-30",
+    });
+    const rita = card.sellers.find((person) => person.name === "RITA");
+    expect(rita?.manager).toBe(true);
+    expect(rita?.role).toBe("GERENCIA");
+    expect(rita?.revenueAmount).toBe(400);
+    expect(rita?.accruedPrize).toBeCloseTo(30);
+    expect(rita?.bonusReached).toBe(100);
+    expect(rita?.currentLevel).toBe(1);
+    expect(card.sellers.some((person) => person.name === "LOJA")).toBe(false);
+    expect(card.sellers.at(-1)?.name).toBe("RITA");
+    expect(card.qtySellers).toBe(card.sellers.length);
+  });
+
   it("nível em 0%: o percentual incide desde a primeira venda e o bônus entra mesmo sem venda", () => {
     const flat: GoalRecord = {
       ...goal,

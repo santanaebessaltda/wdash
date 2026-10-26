@@ -21,10 +21,11 @@ import {
   type ProductsView,
   type Scope,
 } from "@/data/wedash/dashboard";
+import { rollupCategoryDays } from "@/data/wedash/categoryRollup";
 import {
   fetchProductCatalogDescriptions,
   fetchProductCatalogTypes,
-  fetchSalesCategoryDayAggs,
+  fetchProductTypeNames,
   fetchSalesDayAggs,
   fetchSalesHourAggs,
   fetchSalesProductCostDayAggs,
@@ -70,7 +71,7 @@ export async function fetchProductsAggInput(tenantId: string, scope: Scope, stor
   const period = resolvePeriod(scope.period, calendarTodayIso());
   const range = financeFetchRange(scope);
   const prodRange = productsFetchRange(scope);
-  const [dayAggs, hourAggs, prevHourAggs, categoryDayAggs, productDayAggs, productCostDayAggs, catalogDescriptions, catalogTypes] =
+  const [dayAggs, hourAggs, prevHourAggs, productDayAggs, productCostDayAggs, catalogDescriptions, catalogTypes, typeNames] =
     await Promise.all([
       fetchSalesDayAggs({ tenantId, storeIds, from: range.from, to: range.to, brand: null }),
       period.start === period.end
@@ -79,12 +80,18 @@ export async function fetchProductsAggInput(tenantId: string, scope: Scope, stor
       range.prevHourDay
         ? fetchSalesHourAggs({ tenantId, storeIds, day: range.prevHourDay, brand: null })
         : Promise.resolve([] as SalesHourAgg[]),
-      fetchSalesCategoryDayAggs({ tenantId, storeIds, from: prodRange.from, to: prodRange.to, brand: null }),
       fetchSalesProductDayAggs({ tenantId, storeIds, from: prodRange.from, to: prodRange.to }),
       fetchSalesProductCostDayAggs({ tenantId, storeIds, from: prodRange.from, to: prodRange.to }),
       fetchProductCatalogDescriptions(),
       fetchProductCatalogTypes(),
+      fetchProductTypeNames(),
     ]);
+  const categoryDayAggs = rollupCategoryDays({
+    products: productDayAggs,
+    costs: productCostDayAggs,
+    typeByProductId: catalogTypes,
+    typeNameById: typeNames,
+  });
   return { dayAggs, hourAggs, prevHourAggs, categoryDayAggs, productDayAggs, productCostDayAggs, catalogDescriptions, catalogTypes };
 }
 
@@ -343,7 +350,7 @@ function ProductsOfGroup({ products, onProduct }: { products: ProductDetailItem[
               <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(p.items)}</td>
               <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.revenue)}</td>
               <ProfitCell v={p.profit} />
-              <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", p.marginPct == null ? "text-t2" : "text-t1")}>
+              <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", p.marginPct == null ? "text-t2" : "text-t0")}>
                 {pctFmt(p.marginPct)}
               </td>
             </tr>
@@ -423,7 +430,7 @@ function CategoriesOfClass({
               <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(c.items)}</td>
               <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(c.revenue)}</td>
               <ProfitCell v={c.profit} />
-              <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", c.marginPct == null ? "text-t2" : "text-palette-blue")}>
+              <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", c.marginPct == null ? "text-t2" : "text-t0")}>
                 {pctFmt(c.marginPct)}
               </td>
               <td className="px-1 py-3 text-right">

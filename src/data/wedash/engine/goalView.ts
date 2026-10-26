@@ -653,6 +653,7 @@ export function buildGoalCardView(input: {
       storeId: g.storeId,
       storeName: storeNameValue,
       group: member?.shiftName ?? "Sem grupo definido",
+      role: member?.role ?? null,
       revenueAmount: revenueToShow,
       revenue: brlCent(revenueToShow),
       salesCount: salesToShow,
@@ -692,6 +693,77 @@ export function buildGoalCardView(input: {
   });
   sellers.sort((a, b) => b.revenueAmount - a.revenueAmount || a.name.localeCompare(b.name, "pt-BR"));
 
+  const managementPrize = goalManagerPrize(g, achieved);
+  const managers = team
+    .filter((m) => m.role === "GERENCIA" && m.active !== false && !m.branchUser)
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  if (managementPrize && managers.length > 0) {
+    const named = input.namedSellerDayAggs ?? [];
+    for (const member of managers) {
+      let revenue = 0;
+      let sales = 0;
+      let items = 0;
+      const days = new Set<string>();
+      for (const r of named) {
+        if (r.storeId !== g.storeId || r.day < g.startsOn || r.day > g.endsOn) continue;
+        const byId = r.sellerEmployeeId != null && r.sellerEmployeeId === member.employeeId;
+        const byName = r.sellerEmployeeId == null && member.nameKeys.includes(r.sellerKey);
+        if (!byId && !byName) continue;
+        revenue += r.revenueCents / 100;
+        sales += r.salesCount;
+        items += r.itemCount ?? 0;
+        if (r.revenueCents > 0) days.add(r.day);
+      }
+      const ticket = sales > 0 ? revenue / sales : 0;
+      const pa = sales > 0 && items > 0 ? items / sales : 0;
+      const next = managementPrize.next;
+      sellers.push({
+        employeeId: `e:${member.employeeId}`,
+        name: member.name,
+        storeId: g.storeId,
+        storeName: storeNameValue,
+        group: member.shiftName ?? "Sem grupo definido",
+        role: "GERENCIA",
+        manager: true,
+        revenueAmount: revenue,
+        revenue: brlCent(revenue),
+        salesCount: sales,
+        ticketAmount: ticket,
+        ticket: brlCent(ticket),
+        paAmount: pa,
+        pa: pa > 0 ? num(pa, 2) : "—",
+        daysWorked: days.size,
+        trend: "flat",
+        individualGoalAmount: g.target,
+        proportionalGoal: false,
+        eligibleDays: periodDays,
+        periodDays,
+        attainmentPct: pct,
+        barPct: Math.min(100, (pct / scale) * 100),
+        storeGoalPct: g.target > 0 ? (revenue / g.target) * 100 : 0,
+        ladderMarks: marcos,
+        currentTierName: managementPrize.level,
+        currentLevel: managementPrize.levelNumber,
+        nextTier: next
+          ? {
+              name: next.name,
+              gapAmount: next.gap,
+              prizePct: next.pct,
+              bonus: next.bonus,
+              minAttainmentPct: g.tiers[next.number - 1]?.minAttainmentPct ?? 0,
+            }
+          : null,
+        accruedPrize: managementPrize.prizeAmount,
+        commissionPct: managementPrize.pct,
+        projectedIndividualPrize: null,
+        projectedAttainmentPct: null,
+        bonusReached: managementPrize.bonus,
+        attention: null,
+        noGoal: g.target <= 0,
+      });
+    }
+  }
+
   const closing = status === "active" ? goalStoreClosing(g, storeDayAggs(g, input.dayAggs), today, input.week) : null;
   const band: NetworkGlobalGoal = {
     competenceText: g.name,
@@ -721,7 +793,7 @@ export function buildGoalCardView(input: {
     storeNameValue,
     brands: [],
     qtyGroups: groups.length,
-    qtySellers: n,
+    qtySellers: sellers.length,
     qtyLevels: g.tiers.length,
     spreadsUnidentified: goalSpreadsUnidentified(g),
     tiers: g.tiers,

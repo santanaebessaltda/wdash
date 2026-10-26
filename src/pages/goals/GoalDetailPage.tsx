@@ -27,7 +27,7 @@ import { storesForSession } from "@/data/wedash/stores";
 import type { GoalCardView } from "@/data/wedash/teamViews";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { WedashBrand } from "@/components/wedash/WedashBrand";
-import { brlCent, fullDate, shortDate, isoToDate, num, dateToIso, shiftName } from "@/lib/format";
+import { brlCent, fullDate, shortDate, isoToDate, num, dateToIso, profitBrl, shiftName } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { statusBadgeVariant } from "@/lib/status";
 import { exportPdf } from "@/lib/printMode";
@@ -238,7 +238,8 @@ function GoalHero({
 }) {
   const { achieved, pct, projectedPct, projectionAmount } = card.band;
   const prizeAmount =
-    card.sellers.reduce((s, v) => s + v.accruedPrize + v.bonusReached, 0) + (management ? management.prizeAmount + management.bonus : 0);
+    card.sellers.reduce((s, v) => s + (v.manager ? 0 : v.accruedPrize + v.bonusReached), 0) +
+    (management ? management.prizeAmount + management.bonus : 0);
   const missing = Math.max(0, goal.target - achieved);
   const stats: { label: string; value: string; cls: string; sub?: string; subCls?: string; help?: string; note?: string }[] = [
     { label: "Meta da filial", value: brlCent(goal.target), cls: "text-t0" },
@@ -268,8 +269,8 @@ function GoalHero({
       : []),
     {
       label: status === "ended" ? "Premiação total" : "Premiação até agora",
-      value: brlCent(prizeAmount),
-      cls: "text-ok",
+      value: profitBrl(prizeAmount),
+      cls: prizeAmount < 0 ? "text-bad" : "text-ok",
       help:
         status === "ended"
           ? "Total de premiação e bônus obtidos pela equipe e, quando aplicável, pela gerência no período da meta."
@@ -336,7 +337,7 @@ function tiersHelp(goal: GoalRecord, sellers: GoalCardView["sellers"]): string {
   }
   if (hasManagement) {
     lines.push(
-      "Gerência abre os mesmos cards, sobre a meta da loja: valor do mês, média por dia, premiação, bônus, o nível já atingido e a premiação até agora. Ela sobe pelo faturamento total da filial, incluindo vendas sem vendedor identificado ou feitas pela própria gerência. A premiação incide sobre a venda da filial e os bônus se acumulam.",
+      "Gerência abre os mesmos cards, sobre a meta da loja: valor do mês, média por dia, premiação, bônus e o nível já atingido. Ela sobe pelo faturamento total da filial, incluindo vendas sem vendedor identificado ou feitas pela própria gerência. A premiação incide sobre a venda da filial e os bônus se acumulam.",
     );
   }
   return lines.join("\n\n");
@@ -373,7 +374,7 @@ function GoalTiersCard({
       {goal.tiers.length === 0 ? (
         <p className="mt-4 text-[12.5px] text-t2">Esta meta não tem níveis de premiação.</p>
       ) : (
-        <GoalLevelGuide goal={goal} sellers={card.sellers} showReached hideNote management={management} managementClosed={status === "ended"} greenValues />
+        <GoalLevelGuide goal={goal} sellers={card.sellers} showReached hideNote management={management} greenValues />
       )}
     </Card>
   );
@@ -448,7 +449,7 @@ function GoalPayoutCard({
   const emClosing = today <= dateToIso(endMais1);
 
   const team: PayoutRow[] = card.sellers
-    .filter((v) => !v.noGoal)
+    .filter((v) => !v.noGoal && !v.manager)
     .map((v) => ({
       key: v.employeeId || v.name,
       name: v.name,

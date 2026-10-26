@@ -12,8 +12,8 @@ import { buildOverviewView, resolvePeriod, previousPeriod, OVERVIEW_PRODUCTS_TOP
 import {
   fetchSalesDayAggs,
   fetchSalesHourAggs,
-  fetchSalesCategoryDayAggs,
-  fetchSalesCategoryCatalog,
+  fetchProductCatalogTypes,
+  fetchProductTypeNames,
   fetchSalesPaymentDayAggs,
   fetchNamedSellerDayAggs,
   fetchSalesSellerDayAggs,
@@ -36,6 +36,7 @@ import type {
   SellerAvatarRef,
   SellerShiftRef,
 } from "@/data/wedash/salesTypes";
+import { categoryCatalogFromTypes, rollupCategoryDays } from "@/data/wedash/categoryRollup";
 import { brlCent, isoToDate, labelUpper, num, deltaTip, titleName, profitBrl } from "@/lib/format";
 import type { DateRange, DateRangeChangeMeta } from "@/components/ui/DateRangePicker";
 import { useActiveSession } from "@/session/SessionProvider";
@@ -220,8 +221,9 @@ export default function OverviewPage() {
       ]);
       return { days, sellers, named, team };
     });
+    const categoryFrom = prev.start < period.start ? prev.start : period.start;
     try {
-      const [days, hours, cats, catalog, payments, sellers, products, productCosts, wm, cov, goalHistDays, goalHistHours, prevDays, prevHours, shifts, avatars, goalsLoaded, goalAggs] = await Promise.all([
+      const [days, hours, payments, sellers, products, productCosts, typeByProductId, typeNameById, wm, cov, goalHistDays, goalHistHours, prevDays, prevHours, shifts, avatars, goalsLoaded, goalAggs] = await Promise.all([
         fetchSalesDayAggs({
           tenantId: session.tenantId,
           // Gestor: a rede, para a fatia "Demais filiais". Gerente: só as filiais do vínculo.
@@ -238,18 +240,6 @@ export default function OverviewPage() {
               brand: null,
             })
           : Promise.resolve([] as SalesHourAgg[]),
-        fetchSalesCategoryDayAggs({
-          tenantId: session.tenantId,
-          storeIds: asked,
-          from: prev.start < period.start ? prev.start : period.start,
-          to: period.end,
-          brand: null,
-        }),
-        fetchSalesCategoryCatalog({
-          tenantId: session.tenantId,
-          storeIds: asked,
-          brand: null,
-        }),
         fetchSalesPaymentDayAggs({
           tenantId: session.tenantId,
           storeIds: asked,
@@ -265,15 +255,17 @@ export default function OverviewPage() {
         fetchSalesProductDayAggs({
           tenantId: session.tenantId,
           storeIds: asked,
-          from: prev.start < period.start ? prev.start : period.start,
+          from: categoryFrom,
           to: period.end,
         }),
         fetchSalesProductCostDayAggs({
           tenantId: session.tenantId,
           storeIds: asked,
-          from: period.start,
+          from: categoryFrom,
           to: period.end,
         }),
+        fetchProductCatalogTypes(),
+        fetchProductTypeNames(),
         fetchSyncWatermark(session.tenantId).catch(() => null),
         fetchSalesCoverage(session.tenantId, asked),
         fetchSalesDayAggs({
@@ -312,6 +304,8 @@ export default function OverviewPage() {
         goalDataP,
       ]);
       if (gen !== reloadGen.current) return;
+      const cats = rollupCategoryDays({ products, costs: productCosts, typeByProductId, typeNameById });
+      const catalog = categoryCatalogFromTypes(typeByProductId, typeNameById);
       setGoals(goalsLoaded);
       setGoalDayAggs(goalAggs.days);
       setGoalSellerDayAggs(goalAggs.sellers);

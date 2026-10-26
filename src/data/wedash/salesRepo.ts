@@ -686,6 +686,7 @@ export function fetchProductCatalogDescriptions(clientOverride?: SalesQueryClien
 }
 
 let catalogTypes: Promise<Record<number, number>> | null = null;
+let productTypeNames: Promise<Record<number, string>> | null = null;
 
 /**
  * id do produto no ERP  ->  tipo (categoria), mesmo join da `sales_category_day_view`.
@@ -712,6 +713,33 @@ export function fetchProductCatalogTypes(clientOverride?: SalesQueryClient): Pro
     catalogTypes = run;
     void run.then((m) => {
       if (Object.keys(m).length === 0) catalogTypes = null;
+    });
+  }
+  return run;
+}
+
+/** PRODUTO_TIPO  ->  nome. Global, 1x por sessao. */
+export function fetchProductTypeNames(clientOverride?: SalesQueryClient): Promise<Record<number, string>> {
+  if (productTypeNames && !clientOverride) return productTypeNames;
+  const client = clientOrNull(clientOverride);
+  if (!client) return Promise.resolve({});
+  const run = (async () => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const q: any = (client.from("product_type") as any).select("type_id, description").order("type_id");
+      const rows = await fetchAllPages<{ type_id: number; description: string | null }>(q, "fetchProductTypeNames");
+      const out: Record<number, string> = {};
+      for (const r of rows) out[Number(r.type_id)] = String(r.description ?? "") || "INDEFINIDO";
+      return out;
+    } catch (e) {
+      console.error("fetchProductTypeNames:", e);
+      return {};
+    }
+  })();
+  if (!clientOverride) {
+    productTypeNames = run;
+    void run.then((m) => {
+      if (Object.keys(m).length === 0) productTypeNames = null;
     });
   }
   return run;

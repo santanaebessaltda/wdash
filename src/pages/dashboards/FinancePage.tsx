@@ -119,23 +119,16 @@ function wpinkTint(label: string): TintKey {
 
 type EvoSort = "month" | "revenue" | "cost" | "profit" | "margin" | "ticket";
 
-/** Hierarquia visual no padrao Income statement (ProfitLoss). */
+/** Cada linha da soma: positivo verde com +, negativo vermelho com −. */
 function costRowStyle(line: FixedCostRow): { bold: boolean; indent: boolean; color?: string; text: string } {
-  if (line.isResult) {
-    return {
-      bold: true,
-      indent: false,
-      color: line.amount < 0 ? PALETTE.red : PALETTE.pink,
-      text: brlCent(line.amount),
-    };
-  }
-  if (line.isTotal) {
-    return { bold: true, indent: false, text: `−${brlCent(line.amount)}` };
-  }
-  if (line.label === "Lucro bruto") {
-    return { bold: true, indent: false, color: PALETTE.green, text: brlCent(line.amount) };
-  }
-  return { bold: false, indent: true, text: `−${brlCent(line.amount)}` };
+  const deduction = !line.isResult && line.label !== "Lucro bruto";
+  const signed = deduction ? -line.amount : line.amount;
+  return {
+    bold: Boolean(line.isResult || line.isTotal || line.label === "Lucro bruto"),
+    indent: deduction && !line.isTotal,
+    color: signed < 0 ? PALETTE.red : signed > 0 ? PALETTE.green : undefined,
+    text: profitBrl(signed),
+  };
 }
 
 export default function FinancePage() {

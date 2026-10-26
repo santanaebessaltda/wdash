@@ -90,6 +90,8 @@ export function teamMemberFromRow(r: GoalTeamRow): GoalTeamMember {
     name: collaboratorName(r.name),
     nameKeys: r.name_keys ?? [],
     salesPerson: r.active && (r.erp_role == null || r.erp_role === SELLER_ROLE),
+    role: r.erp_role,
+    active: r.active,
     admittedOn: r.admitted_on ?? null,
     departedOn: r.departed_on ?? null,
     shiftId: r.shift_id,

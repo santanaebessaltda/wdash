@@ -427,7 +427,7 @@ export function BoardView({
     const byName = new Map<string, PersonLevel>();
     for (const board of goalBoards) {
       for (const seller of board.card.sellers) {
-        if (seller.noGoal) continue;
+        if (seller.noGoal || seller.manager) continue;
         const slot = `${board.goal.storeId}:${seller.employeeId}`;
         if (byStore.has(slot)) continue;
         const row: PersonLevel = {

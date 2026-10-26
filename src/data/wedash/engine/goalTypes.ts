@@ -57,6 +57,10 @@ export interface GoalTeamMember {
   nameKeys: string[];
   /** Ativo com cargo VENDEDOR = na equipe de vendas agora. O usuário da filial fica false. */
   salesPerson: boolean;
+  /** CARGO no Millennium. Ausente nas contas antigas. */
+  role?: string | null;
+  /** Ausente = ativo. A gerente desligada não entra na lista da meta. */
+  active?: boolean;
   /** Venda lançada no usuário da filial: fora do ranking e fora do rateio. */
   branchUser?: boolean;
   /** DATA_ADMISSAO. Ausente ou null = desde o início do período. */
@@ -76,6 +80,10 @@ export interface SellerRow {
   storeName: string;
   /** Nome do grupo (Grupo 1/Grupo 2) ou "Sem grupo". */
   group: string;
+  /** CARGO no Millennium. Null = vendedor na tela. */
+  role?: string | null;
+  /** Linha da gerência: a premiação é a da loja, não entra de novo na soma da equipe. */
+  manager?: boolean;
   revenueAmount: number;
   revenue: string;
   salesCount: number;

@@ -344,15 +344,12 @@ function RoleResultBar({
   resultLabel?: string;
   storeIndex?: boolean;
 }) {
-  const late = metric === "PA" || metric === "TICKET" || metric === "INDEX";
-  const above = result.result != null && result.target > 0 && result.result >= result.target;
-  const resultClass = result.result == null ? "text-t0" : late ? (above ? "text-acc" : "text-t1") : "text-acc";
   return (
     <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-1.5 rounded-xl bg-bg-inset px-3.5 py-3 text-[12.5px]">
       <p className="font-bold text-t0">{title}</p>
       <p className="flex items-center gap-1.5 text-t1">
         <span className="text-t2">{resultLabel ?? MANAGEMENT_RESULT[metric]}: </span>
-        <span className={`font-mono font-bold ${resultClass}`}>
+        <span className="font-mono font-bold text-t0">
           {result.result != null ? metricValueLabel(metric, result.result) : "—"}
         </span>
         {result.periodPrevious && (
@@ -363,11 +360,11 @@ function RoleResultBar({
       </p>
       <p className="text-t1">
         <span className="text-t2">{goalLabel}: </span>
-        <span className="font-mono font-bold">{metricValueLabel(metric, result.target)}</span>
+        <span className="font-mono font-bold text-t0">{metricValueLabel(metric, result.target)}</span>
       </p>
       <p className="text-t1">
         <span className="text-t2">Prêmio: </span>
-        <span className="font-bold text-ok">{prizeLabel(result.prize)}</span>
+        <span className="font-bold text-t0">{prizeLabel(result.prize)}</span>
       </p>
       {result.atingiu ? (
         <ProgressStanding ok tone="acc">Ganhou</ProgressStanding>

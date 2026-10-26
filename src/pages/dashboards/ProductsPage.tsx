@@ -514,7 +514,7 @@ export default function ProductsPage() {
                     <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(l.revenue)}</td>
                     <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", cmv == null ? "text-t2" : "text-t0")}>{moneyOrDash(cmv)}</td>
                     <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", profitText(l.profit))}>{profitBrl(l.profit)}</td>
-                    <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", l.marginPct == null ? "text-t2" : "text-t1")}>
+                    <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", l.marginPct == null ? "text-t2" : "text-t0")}>
                       {pctFmt(l.marginPct)}
                     </td>
                     <td className="px-1 py-3 text-right font-mono text-[13px]">
@@ -545,7 +545,7 @@ export default function ProductsPage() {
                   <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", profitText(lineTotal.profit))}>
                     {profitBrl(lineTotal.profit)}
                   </td>
-                  <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", lineTotal.marginPct == null ? "text-t2" : "text-t1")}>
+                  <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", lineTotal.marginPct == null ? "text-t2" : "text-t0")}>
                     {pctFmt(lineTotal.marginPct)}
                   </td>
                   <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold">
@@ -643,7 +643,7 @@ export default function ProductsPage() {
                       <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.revenue)}</td>
                       <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", p.cmv == null ? "text-t2" : "text-t0")}>{moneyOrDash(p.cmv)}</td>
                       <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", profitText(p.profit))}>{profitBrl(p.profit)}</td>
-                      <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", p.marginPct == null ? "text-t2" : "text-t1")}>
+                      <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-bold", p.marginPct == null ? "text-t2" : "text-t0")}>
                         {pctFmt(p.marginPct)}
                       </td>
                       <td className="px-1 py-3 text-right font-mono text-[13px]">
@@ -674,7 +674,7 @@ export default function ProductsPage() {
                   <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", profitText(tableTotal.profit))}>
                     {profitBrl(tableTotal.profit)}
                   </td>
-                  <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", tableTotal.marginPct == null ? "text-t2" : "text-t1")}>
+                  <td className={cn("px-1 py-3 text-right font-mono text-[13px] font-extrabold", tableTotal.marginPct == null ? "text-t2" : "text-t0")}>
                     {pctFmt(tableTotal.marginPct)}
                   </td>
                   <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold">

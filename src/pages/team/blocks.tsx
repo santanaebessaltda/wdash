@@ -7,12 +7,13 @@ import type { ReactNode } from "react";
 import { Badge, Card, CardTitle, DataTable, EmptyState, ProgressBar, ProgressStanding, progressColor, progressTextClass, type DataTableColumn } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { Tooltip } from "@/components/ui/Tooltip";
-import { brl, brlCent, eachDay, num } from "@/lib/format";
+import { brl, brlCent, eachDay, num, profitBrl } from "@/lib/format";
 import type { BlockState as BlockStateKind } from "@/data/wedash/dashboard";
 import { BlockState } from "@/pages/dashboard/BlockState";
 import type { GoalCardView, NetworkGlobalGoal, SellerRow } from "@/data/wedash/teamViews";
 import { GOAL_STATUS_LABEL, goalBarScale, goalLevelPct, goalStatus, outsideRankingNote } from "@/data/wedash/goalView";
 import { BranchBadge, DeadlineBadge, PeriodBadge, RecordStatusBadge, UnidentifiedSalesBadge } from "@/components/wedash/RecordBadges";
+import { branchRoleLabel } from "@/data/wedash/stores";
 import { defaultTiers } from "@/data/wedash/goals";
 import { calendarTodayIso, TODAY_ISO } from "@/data/wedash/clock";
 import { TargetIcon } from "@/pages/dashboards/icons";
@@ -29,8 +30,9 @@ const TipHelp = ({ label }: { label: string }) => (
   </Tooltip>
 );
 
-function shortStoreName(tradeName: string): string {
-  return tradeName.replace(/^Shopping\s+/i, "");
+function personSubtitle(l: Pick<SellerRow, "group" | "role">): string {
+  const shift = l.group === "Sem grupo definido" || l.group === "Sem grupo" ? "" : l.group;
+  return [shift, branchRoleLabel(l.role ?? null)].filter(Boolean).join(" · ");
 }
 
 /* ------------------------- Tabela de vendedoras ------------------------- */
@@ -43,9 +45,7 @@ function SellerCell({ l }: { l: LineRank }) {
       <PersonAvatar name={l.name} employeeId={l.employeeId} storeId={l.storeId} size="sm" />
       <div className="min-w-0">
         <p className="truncate text-[13px] font-bold text-t0">{l.name}</p>
-        <p className="truncate text-[11px] text-t2">
-          {l.group} · {shortStoreName(l.storeName)}
-        </p>
+        <p className="truncate text-[11px] text-t2">{personSubtitle(l)}</p>
       </div>
     </div>
   );
@@ -54,7 +54,7 @@ function SellerCell({ l }: { l: LineRank }) {
 function RevenueCell({ l }: { l: LineRank }) {
   return (
     <div>
-      <p className="font-mono text-[12.5px] font-bold text-acc">{l.revenue}</p>
+      <p className="font-mono text-[12.5px] font-bold text-t0">{l.revenue}</p>
       <p className="text-[11px] text-t2">
         {num(l.salesCount, 0)} {l.salesCount === 1 ? "venda" : "vendas"}
       </p>
@@ -78,7 +78,7 @@ function IndividualPctCell({ l }: { l: LineRank }) {
 function LevelCell({ l }: { l: LineRank }) {
   if (l.noGoal || !l.currentTierName || l.currentLevel == null) return <span className="text-t2">—</span>;
   return (
-    <Badge variant="neutral" className="whitespace-nowrap">
+    <Badge variant="accent" className="whitespace-nowrap">
       N{l.currentLevel} · {l.currentTierName}
     </Badge>
   );
@@ -101,9 +101,10 @@ function PrizeCell({ l }: { l: LineRank }) {
   if (l.noGoal) return <span className="text-t2">—</span>;
   const amount = l.accruedPrize + l.bonusReached;
   if (amount <= 0 && l.commissionPct <= 0) return <span className="text-t2">—</span>;
+  const prizeClass = amount < 0 ? "text-palette-red" : amount > 0 ? "text-palette-green" : "text-t0";
   return (
     <div className="text-right">
-      <p className="font-mono text-[12.5px] font-bold text-acc">{brlCent(amount)}</p>
+      <p className={cn("font-mono text-[12.5px] font-bold", prizeClass)}>{profitBrl(amount)}</p>
       {l.commissionPct > 0 ? (
         <p className="text-[11px] text-t2">
           {num(l.commissionPct, 1)}%
@@ -122,9 +123,7 @@ function SellerMobileCard({ l, activeGoal, closed = false }: { l: LineRank; acti
         <PersonAvatar name={l.name} employeeId={l.employeeId} storeId={l.storeId} size="md" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-[13.5px] font-bold text-t0">{l.name}</p>
-          <p className="truncate text-[11.5px] text-t2">
-            {l.group} · {shortStoreName(l.storeName)}
-          </p>
+          <p className="truncate text-[11.5px] text-t2">{personSubtitle(l)}</p>
         </div>
       </div>
       {activeGoal ? (
@@ -241,7 +240,7 @@ export function SellersBlock({
             sortable: true,
             sortValue: (l: LineRank) => (l.noGoal ? null : l.storeGoalPct),
             render: (l: LineRank) =>
-              l.noGoal ? <span className="text-t2">—</span> : <span className={`font-mono text-[12.5px] font-bold ${progressTextClass(l.storeGoalPct)}`}>{num(l.storeGoalPct, 1)}%</span>,
+              l.noGoal ? <span className="text-t2">—</span> : <span className="font-mono text-[12.5px] font-bold text-t0">{num(l.storeGoalPct, 1)}%</span>,
           },
           {
             key: "nivel",
@@ -449,7 +448,7 @@ export function GoalProgressBar({
           {showsProjection && (
             <Tooltip label="Projeção de atingimento ao final da meta. Aparece depois de metade do período.">
               <span className="inline-flex cursor-help">
-                <Badge variant="accent" className="uppercase">{projectionLabel}</Badge>
+                <Badge variant="neutral" className="uppercase">{projectionLabel}</Badge>
               </span>
             </Tooltip>
           )}
@@ -540,7 +539,7 @@ export function GoalProgressBar({
                         isLast && "right-0 text-right",
                         anchorDireitaNoTick && "-translate-x-full text-right",
                         !isLast && !anchorDireitaNoTick && "-translate-x-1/2 text-center",
-                        quietLabels ? (atingido ? "text-t2" : "text-t3") : atingido ? "text-acc" : "text-t2",
+                        atingido ? "text-acc" : "text-t1",
                       )}
                       style={isLast ? undefined : { left: `${left}%` }}
                       title={`N${i + 1} · ${d.name} · ${num(d.commissionPct, 1)}%`}

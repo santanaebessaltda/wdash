@@ -16,7 +16,6 @@ export function GoalLevelGuide({
   flush = false,
   hideNote = false,
   management = null,
-  managementClosed = false,
   greenValues = false,
 }: {
   goal: GoalRecord;
@@ -29,8 +28,6 @@ export function GoalLevelGuide({
   hideNote?: boolean;
   /** No detalhe da meta, a gerência vira um pill no mesmo formato dos turnos. O placar não recebe. */
   management?: GoalManagerPrize | null;
-  /** Meta encerrada: a premiação vira total e some o que falta para o próximo nível. */
-  managementClosed?: boolean;
   /** No detalhe da meta, o valor da premiação fica verde e o percentual de cada nível fica na cor secundária. */
   greenValues?: boolean;
 }) {
@@ -64,8 +61,7 @@ export function GoalLevelGuide({
           onChange={(value) => value && setGroupKey(value)}
         />
       ) : null}
-      {showingManagement ? <ManagementSummary management={management} closed={managementClosed} greenValues={greenValues} className={hasNote || hasPills ? "mt-3" : undefined} /> : null}
-      <div className={cn("flex flex-col gap-2.5", (hasNote || hasPills || showingManagement) && "mt-3")}>
+      <div className={cn("flex flex-col gap-2.5", (hasNote || hasPills) && "mt-3")}>
         {rows.map((row) => {
           const everyone = row.marked || (people > 0 && row.reached === people);
           return (
@@ -114,32 +110,6 @@ export function GoalLevelGuide({
   return <div className={flush ? undefined : "mt-4"}>{levels}</div>;
 }
 
-/** Nível já atingido e a premiação acumulada. Fica só na vista Gerência. */
-function ManagementSummary({ management, closed, greenValues = false, className }: { management: GoalManagerPrize; closed: boolean; greenValues?: boolean; className?: string }) {
-  const prize = management.prizeAmount + management.bonus;
-  return (
-    <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-acc-soft px-3.5 py-3 text-[12.5px]", className)}>
-      <span className={`font-semibold ${management.level ? "text-acc" : "text-t2"}`}>
-        {management.level ? `N${management.levelNumber} · ${management.level}` : "Abaixo do 1º nível"}
-      </span>
-      <span className="text-t1">
-        {closed ? "Premiação total" : "Premiação até agora"}: <span className={`font-mono font-bold ${greenValues ? "text-ok" : "text-t0"}`}>{brlCent(prize)}</span>
-      </span>
-      {!closed ? (
-        <span className="text-t1 sm:ml-auto">
-          {management.next ? (
-            <>
-              Falta <span className="font-mono font-bold text-acc">{brlCent(management.next.gap)}</span> para N{management.next.number} · {management.next.name}
-            </>
-          ) : (
-            <span className="font-semibold text-acc">Último nível</span>
-          )}
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
 function moneyLine(kind: GuideGroup["kind"], month: number, day: number): string {
   const value = `${brlCent(month)} ${kind === "store" ? "a loja no mês" : kind === "group" ? "o grupo no mês" : "no mês"} · ${brlCent(day)} por dia`;
   return value;
@@ -177,7 +147,7 @@ type GuideRow = {
 
 function buildGoalLevelGuide(goal: GoalRecord, sellers: SellerRow[]): { intro: string; note: string | null; groups: Array<GuideGroup & { rows: GuideRow[] }> } | null {
   if (goal.tiers.length === 0) return null;
-  const people = sellers.filter((seller) => !seller.noGoal);
+  const people = sellers.filter((seller) => !seller.noGoal && !seller.manager);
   const days = people[0]?.periodDays && people[0].periodDays > 0 ? people[0].periodDays : daysBetween(goal.startsOn, goal.endsOn);
   const grouped = new Map<string, SellerRow[]>();
   for (const seller of people) {
