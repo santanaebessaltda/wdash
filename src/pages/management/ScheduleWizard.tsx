@@ -501,9 +501,9 @@ export function ScheduleWizard({
                   <span className="truncate font-semibold">{weekdayLabel(day.dow)}</span>
                 </label>
                 {day.open ? (
-                  <div className="mt-2 flex items-center justify-between gap-3 pl-6">
-                    <p className="text-[12px] font-bold text-t0">Pessoas</p>
-                    <HeadcountField value={day.min} max={headcount} label={`Pessoas em ${weekdayLabel(day.dow)}`} onChange={(min) => setDayMin(day.dow, min)} />
+                  <div className="mt-2 flex items-center justify-end gap-2 pl-6">
+                    <p className="text-[12.5px] font-semibold text-t0">Pelo menos</p>
+                    <HeadcountField value={day.min} max={headcount} label={`Pelo menos em ${weekdayLabel(day.dow)}`} onChange={(min) => setDayMin(day.dow, min)} />
                   </div>
                 ) : null}
               </li>
@@ -542,7 +542,10 @@ export function ScheduleWizard({
                 {rule.open ? (
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     <FormField label="Pessoas trabalhando" required>
-                      <HeadcountField value={rule.workers} max={headcount} label={`Pessoas trabalhando em ${rule.name}`} onChange={(workers) => patchRule(rule.date, { workers })} />
+                      <div className="flex items-center gap-2">
+                        <span className="text-[12.5px] font-semibold text-t0">Pelo menos</span>
+                        <HeadcountField value={rule.workers} max={headcount} label={`Pelo menos em ${rule.name}`} onChange={(workers) => patchRule(rule.date, { workers })} />
+                      </div>
                     </FormField>
                     <FormField label="Compensação" required>
                       <Select value={rule.pay} aria-label={`Compensação de ${rule.name}`} onChange={(event) => patchRule(rule.date, { pay: event.target.value as HolidayRule["pay"] })}>
