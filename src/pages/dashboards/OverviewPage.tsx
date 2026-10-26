@@ -101,6 +101,13 @@ const IconTicket = () => (
 
 const KPI_ICONS = [IconRevenue, IconCmv, IconSales, IconTicket];
 
+/** # e nome/produto parados no scroll horizontal. A largura do # (w-8) e o left-8 da coluna seguinte. */
+const RANK_STICKY = "sticky left-0 z-20 w-8 min-w-8 max-w-8";
+const NAME_STICKY = "sticky left-8 z-10 min-w-0 border-r border-line";
+const STICKY_BG = "bg-bg-2 transition-colors group-hover:bg-bg-3 group-focus-visible:bg-bg-3";
+/** No card estreito o nome nao ocupa a tela inteira, para sobrar numero ao lado. */
+const NAME_CLIP = "min-w-0 max-w-[9.5rem] sm:max-w-[12.5rem] lg:max-w-[14rem] xl:max-w-none";
+
 /** Loja principal (+N). So com mais de uma filial no filtro, igual ao ranking da Equipe. */
 function storesLabel(storeRows: string[]): string | null {
   if (storeRows.length === 0) return null;
@@ -967,17 +974,17 @@ export default function OverviewPage() {
             <EmptyBlock />
           ) : (
           <div className="min-w-0 overflow-x-auto">
-            <table className="w-full min-w-[640px] border-collapse text-sm">
+            <table className="w-full min-w-[640px] border-separate border-spacing-0 text-sm [&_tbody_tr:last-child_td]:border-b-0 [&_td]:border-b [&_td]:border-line [&_th]:border-b [&_th]:border-line">
               <thead>
-                <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
-                  <th className="px-1 pb-3 text-left font-bold">#</th>
+                <tr className="text-[11px] uppercase tracking-wide text-t2">
+                  <th className={cn(RANK_STICKY, STICKY_BG, "px-1 pb-3 text-left font-bold")}>#</th>
                   <ThSort
                     label="Nome"
                     active={teamSort === "name"}
                     dir={teamDir}
                     onClick={() => toggleTeamSort("name")}
                     align="left"
-                    className="px-1 pb-3"
+                    className={cn(NAME_STICKY, STICKY_BG, "px-1 pb-3")}
                   />
                   <ThSort
                     label="Faturamento"
@@ -1026,13 +1033,12 @@ export default function OverviewPage() {
                         }
                       }}
                       className={cn(
-                        "border-b border-line last:border-b-0",
-                        open && "cursor-pointer transition-colors hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none",
+                        open && "group cursor-pointer transition-colors hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none",
                       )}
                     >
-                      <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
-                      <td className="px-1 py-3">
-                        <div className="flex min-w-0 items-center gap-2.5">
+                      <td className={cn(RANK_STICKY, STICKY_BG, "px-1 py-3 text-center text-[13px] font-extrabold text-t2")}>{idx + 1}</td>
+                      <td className={cn(NAME_STICKY, STICKY_BG, "px-1 py-3")}>
+                        <div className={cn("flex min-w-0 items-center gap-2.5", NAME_CLIP)}>
                           <Avatar name={v.name} src={v.avatarUrl} size="sm" />
                           <div className="min-w-0">
                             <p className="truncate text-[13px] font-bold text-t0">{v.name}</p>
@@ -1063,12 +1069,14 @@ export default function OverviewPage() {
                   );
                 })}
                 <tr className="bg-bg-inset">
-                  <td />
-                  <td className="px-1 py-3 text-[13px] font-extrabold text-t0">
-                    Total do filtro
-                    <span className="mt-0.5 block text-[11px] font-semibold text-t2">
-                      {num(teamTotal.count)} {teamTotal.count === 1 ? "pessoa" : "pessoas"}
-                    </span>
+                  <td className={cn(RANK_STICKY, "bg-bg-inset")} />
+                  <td className={cn(NAME_STICKY, "bg-bg-inset px-1 py-3 text-[13px] font-extrabold text-t0")}>
+                    <div className={NAME_CLIP}>
+                      Total do filtro
+                      <span className="mt-0.5 block text-[11px] font-semibold text-t2">
+                        {num(teamTotal.count)} {teamTotal.count === 1 ? "pessoa" : "pessoas"}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{brlCent(teamTotal.revenue)}</td>
                   <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{num(teamTotal.sales)}</td>
@@ -1093,17 +1101,17 @@ export default function OverviewPage() {
             <EmptyBlock />
           ) : (
           <div className="min-w-0 overflow-x-auto">
-            <table className="w-full min-w-[620px] border-collapse text-sm">
+            <table className="w-full min-w-[620px] border-separate border-spacing-0 text-sm [&_tbody_tr:last-child_td]:border-b-0 [&_td]:border-b [&_td]:border-line [&_th]:border-b [&_th]:border-line">
               <thead>
-                <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
-                  <th className="px-1 pb-3 text-left font-bold">#</th>
+                <tr className="text-[11px] uppercase tracking-wide text-t2">
+                  <th className={cn(RANK_STICKY, STICKY_BG, "px-1 pb-3 text-left font-bold")}>#</th>
                   <ThSort
                     label="Produto"
                     active={topProdSort === "name"}
                     dir={topProdDir}
                     onClick={() => toggleTopProdSort("name")}
                     align="left"
-                    className="px-1 pb-3"
+                    className={cn(NAME_STICKY, STICKY_BG, "px-1 pb-3")}
                   />
                   <ThSort
                     label="Itens vendidos"
@@ -1151,13 +1159,14 @@ export default function OverviewPage() {
                         }
                       }}
                       className={cn(
-                        "border-b border-line last:border-b-0",
-                        open && "cursor-pointer transition-colors hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none",
+                        open && "group cursor-pointer transition-colors hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none",
                       )}
                     >
-                      <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
-                      <td className="px-1 py-3">
-                        <ProductNameCell name={p.name} idx={idx} sub={p.category} upper tones={PRODUCT_AVATAR_TONES} />
+                      <td className={cn(RANK_STICKY, STICKY_BG, "px-1 py-3 text-center text-[13px] font-extrabold text-t2")}>{idx + 1}</td>
+                      <td className={cn(NAME_STICKY, STICKY_BG, "px-1 py-3")}>
+                        <div className={NAME_CLIP}>
+                          <ProductNameCell name={p.name} idx={idx} sub={p.category} upper tones={PRODUCT_AVATAR_TONES} />
+                        </div>
                       </td>
                       <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{p.items != null ? p.items.toLocaleString("pt-BR") : (p.sub?.replace(" itens", "") ?? "—")}</td>
                       <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.amount)}</td>
@@ -1176,12 +1185,14 @@ export default function OverviewPage() {
                   );
                 })}
                 <tr className="bg-bg-inset">
-                  <td />
-                  <td className="px-1 py-3 text-[13px] font-extrabold text-t0">
-                    Total do filtro
-                    <span className="mt-0.5 block text-[11px] font-semibold text-t2">
-                      {num(productTotal.count)} produto{productTotal.count === 1 ? "" : "s"}
-                    </span>
+                  <td className={cn(RANK_STICKY, "bg-bg-inset")} />
+                  <td className={cn(NAME_STICKY, "bg-bg-inset px-1 py-3 text-[13px] font-extrabold text-t0")}>
+                    <div className={NAME_CLIP}>
+                      Total do filtro
+                      <span className="mt-0.5 block text-[11px] font-semibold text-t2">
+                        {num(productTotal.count)} produto{productTotal.count === 1 ? "" : "s"}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{num(productTotal.items)}</td>
                   <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{brlCent(productTotal.revenue)}</td>
