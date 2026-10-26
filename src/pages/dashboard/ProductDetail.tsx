@@ -248,12 +248,14 @@ export function MetricDetail({
   amount,
   delta,
   destaque,
+  amountClass,
   tip,
 }: {
   label: string;
   amount: string;
   delta?: Delta;
   destaque?: boolean;
+  amountClass?: string;
   tip?: string;
 }) {
   return (
@@ -262,7 +264,7 @@ export function MetricDetail({
         {label}
         {tip && <TipHelp label={tip} />}
       </p>
-      <p className={cn("mt-1 font-mono text-[15px] font-extrabold tabular-nums", amount === "—" ? "text-t2" : destaque ? "text-ok" : "text-t0")}>
+      <p className={cn("mt-1 font-mono text-[15px] font-extrabold tabular-nums", amount === "—" ? "text-t2" : amountClass ? amountClass : destaque ? "text-ok" : "text-t0")}>
         {amount}
       </p>
       {delta && (
@@ -519,7 +521,7 @@ function ProductDetailModal({
                 tip={`Participação ${article} no faturamento de todos os produtos do período.`}
               />
               <MetricDetail label="CMV" amount={moneyOrDash(detail.cmv)} />
-              <MetricDetail label="Lucro bruto" amount={moneyOrDash(detail.profit)} destaque />
+              <MetricDetail label="Lucro bruto" amount={profitBrl(detail.profit)} amountClass={profitText(detail.profit)} />
               <MetricDetail label="Margem" amount={pctFmt(detail.marginPct)} delta={cmp?.margin} />
             </div>
             <p className="mt-2.5 text-[11.5px] text-t2">
