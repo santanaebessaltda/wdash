@@ -164,8 +164,8 @@ describe("geração da escala", () => {
       sundayShiftStart: 0,
     }).days;
     const working = (date: string, groupId: string) => rows.filter((row) => row.date === date && team.find((person) => person.id === row.personId)?.groupId === groupId && (row.status === "work" || row.status === "holiday_work")).length;
-    const monday = rows.filter((row) => row.date === "2026-03-02" && (row.status === "work" || row.status === "holiday_work")).length;
-    expect(monday).toBeGreaterThanOrEqual(2);
+    expect(working("2026-03-02", "manha")).toBeGreaterThanOrEqual(2);
+    expect(working("2026-03-02", "tarde")).toBeGreaterThanOrEqual(2);
     expect(working("2026-03-01", "manha")).toBe(2);
     expect(working("2026-03-01", "tarde")).toBe(0);
     expect(working("2026-03-08", "tarde")).toBe(2);
@@ -193,5 +193,36 @@ describe("geração da escala", () => {
     expect(onMonday("tarde")).toBe(1);
     expect(nextSundayShift("manha", ["manha", "tarde"])).toBe(1);
     expect(nextSundayShift(null, ["manha", "tarde"])).toBe(0);
+  });
+
+  it("divide o mínimo do dia entre os grupos e não deixa um turno cheio e o outro vazio", () => {
+    const team = [
+      { id: "a1", groupId: "manha" },
+      { id: "a2", groupId: "manha" },
+      { id: "a3", groupId: "manha" },
+      { id: "b1", groupId: "tarde" },
+      { id: "b2", groupId: "tarde" },
+      { id: "b3", groupId: "tarde" },
+    ];
+    const rows = generateMonth({
+      year: 2026,
+      month: 3,
+      from: "2026-03-02",
+      to: "2026-03-06",
+      pattern: "6x1",
+      offMode: "rotating",
+      sundayMin: 0,
+      people: team,
+      holidayDates: [],
+      dayNeeds: Array.from({ length: 7 }, (_, dow) => ({ dow, open: dow >= 1 && dow <= 5, min: 2 })),
+    }).days;
+    for (const date of ["2026-03-02", "2026-03-03", "2026-03-04", "2026-03-05", "2026-03-06"]) {
+      const count = (groupId: string) => rows.filter((row) => row.date === date && team.find((person) => person.id === row.personId)?.groupId === groupId && (row.status === "work" || row.status === "holiday_work")).length;
+      const morning = count("manha");
+      const afternoon = count("tarde");
+      expect(morning).toBeGreaterThanOrEqual(2);
+      expect(afternoon).toBeGreaterThanOrEqual(2);
+      expect(Math.abs(morning - afternoon)).toBeLessThanOrEqual(1);
+    }
   });
 });

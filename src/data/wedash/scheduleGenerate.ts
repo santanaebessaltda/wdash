@@ -150,7 +150,7 @@ function staysCovered(grid: DayStatus[][], people: SchedulePerson[], needs: DayN
   next[leaving][day] = "off";
   if (workersOn(next, day) < dayMin(needs, dow).min) return false;
   const groupId = people[leaving].groupId;
-  const min = shiftFloor(groups, dow, groupId);
+  const min = shiftFloor(groups, dow, groupId, people, dayMin(needs, dow).min);
   if (min <= 0 || !groupId) return true;
   const members = people.map((person, index) => (person.groupId === groupId ? index : -1)).filter((index) => index >= 0);
   return workersOn(next, day, members) >= min;
@@ -195,10 +195,21 @@ function ensureSundayCoverage(grid: DayStatus[][], dates: string[], sundays: num
   }
 }
 
-/** Piso de um turno só quando a escala pede esse turno. O mínimo do dia é o total da equipe. */
-function shiftFloor(groups: GroupNeed[] | undefined, dow: number, groupId: string | null | undefined): number {
-  if (!groupId || !groups?.some((item) => item.groupId === groupId && (item.dow == null || item.dow === dow))) return 0;
-  return groupMin(groups, groupId, dow);
+function distinctGroups(people: SchedulePerson[]): string[] {
+  const ids: string[] = [];
+  for (const person of people) {
+    if (person.groupId && !ids.includes(person.groupId)) ids.push(person.groupId);
+  }
+  return ids;
+}
+
+/** Com dois ou mais grupos, o mínimo do dia vale em cada um. Um mínimo já gravado no turno substitui esse valor. */
+function shiftFloor(groups: GroupNeed[] | undefined, dow: number, groupId: string | null | undefined, people: SchedulePerson[], dayMinimum: number): number {
+  if (!groupId) return 0;
+  if (groups?.some((item) => item.groupId === groupId && (item.dow == null || item.dow === dow))) return groupMin(groups, groupId, dow);
+  if (distinctGroups(people).length < 2) return 0;
+  const members = people.filter((person) => person.groupId === groupId).length;
+  return Math.min(Math.max(0, dayMinimum), members);
 }
 
 function enforceMinimums(grid: DayStatus[][], dates: string[], people: SchedulePerson[], needs: DayNeed[] | undefined, groups: GroupNeed[] | undefined, locked?: boolean[][]) {
@@ -218,7 +229,7 @@ function enforceMinimums(grid: DayStatus[][], dates: string[], people: ScheduleP
     for (const person of people) {
       if (!person.groupId || seen.has(person.groupId)) continue;
       seen.add(person.groupId);
-      const min = shiftFloor(groups, dow, person.groupId);
+      const min = shiftFloor(groups, dow, person.groupId, people, rule.min);
       const members = people.map((item, index) => (item.groupId === person.groupId ? index : -1)).filter((index) => index >= 0);
       if (members.some((index) => locked?.[index]?.[day])) continue;
       while (workersOn(grid, day, members) < min) {
@@ -226,6 +237,29 @@ function enforceMinimums(grid: DayStatus[][], dates: string[], people: ScheduleP
         if (pick == null) break;
         grid[pick][day] = "work";
       }
+    }
+  }
+}
+
+/** Tira gente do grupo que está mais cheio, sem descer do mínimo de cada grupo. */
+function balanceGroups(grid: DayStatus[][], dates: string[], people: SchedulePerson[], needs: DayNeed[] | undefined, groups: GroupNeed[] | undefined, locked?: boolean[][]) {
+  const ids = distinctGroups(people);
+  if (ids.length < 2 || (groups && groups.length > 0)) return;
+  const membersOf = (groupId: string) => people.map((person, index) => (person.groupId === groupId ? index : -1)).filter((index) => index >= 0);
+  for (let day = 0; day < dates.length; day++) {
+    const dow = weekday(dates[day]);
+    const rule = dayMin(needs, dow);
+    if (!rule.open) continue;
+    if (ids.some((groupId) => membersOf(groupId).some((index) => locked?.[index]?.[day]))) continue;
+    for (let guard = 0; guard < people.length; guard++) {
+      const counts = ids.map((groupId) => ({ groupId, count: workersOn(grid, day, membersOf(groupId)) }));
+      counts.sort((a, b) => a.count - b.count);
+      const light = counts[0];
+      const heavy = counts[counts.length - 1];
+      if (!light || !heavy || heavy.count - light.count < 2) break;
+      const pick = membersOf(heavy.groupId).find((index) => !isOff(grid[index][day]) && !locked?.[index]?.[day] && staysCovered(grid, people, needs, groups, day, dow, index));
+      if (pick == null) break;
+      grid[pick][day] = "off";
     }
   }
 }
@@ -317,6 +351,7 @@ export function generateMonth(input: {
   ensureSundayCoverage(grid, dates, sundays, input.dayNeeds, locked);
   enforceMinimums(grid, dates, input.people, input.dayNeeds, input.groupNeeds, locked);
   capConsecutive(grid, dates, input.people, input.dayNeeds, input.groupNeeds);
+  balanceGroups(grid, dates, input.people, input.dayNeeds, input.groupNeeds, locked);
 
   const compDue: CompDue[] = [];
   const monthEnd = endOfMonth(dates[0] ?? isoDate(input.year, input.month, 1));

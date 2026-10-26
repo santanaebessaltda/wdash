@@ -90,13 +90,14 @@ function HeadcountField({ value, max, label, onChange }: { value: number; max: n
   );
 }
 
-/** Mínimo antigo por turno vira o total do dia. O campo grava só esse total. */
+/** Mínimo antigo por turno vira o número único do dia. O campo grava só esse número. */
 function teamTotal(dayNeeds: DayNeed[], groupNeeds: GroupNeed[], headcount: number): DayNeed[] {
   const days = dayNeeds.length === 7 ? dayNeeds.map((day) => ({ ...day })) : defaultDayNeeds();
   return days.map((day) => {
     const exact = groupNeeds.filter((row) => row.dow === day.dow);
     const legacy = groupNeeds.filter((row) => row.dow == null);
-    const fromGroups = (exact.length > 0 ? exact : legacy).reduce((sum, row) => sum + row.min, 0);
+    const rows = exact.length > 0 ? exact : legacy;
+    const fromGroups = rows.reduce((highest, row) => Math.max(highest, row.min), 0);
     const raw = day.min > 0 ? day.min : fromGroups;
     const min = Math.max(0, raw);
     return { ...day, min: headcount > 0 ? Math.min(headcount, min) : min };
@@ -482,7 +483,7 @@ export function ScheduleWizard({
       ) : null}
       {step === 3 ? (
         <>
-          <WizardCardHeader title="Dias de funcionamento" subtitle="Marque os dias abertos e quantas pessoas trabalham, no total." />
+          <WizardCardHeader title="Dias de funcionamento" subtitle="Informe o menor número de pessoas que precisa estar trabalhando em cada dia. Ex.: se pode funcionar com 2, coloque 2." />
           <ul className="space-y-2">
             {value.dayNeeds.map((day) => (
               <li key={day.dow} className="min-w-0 rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3 py-2.5">
