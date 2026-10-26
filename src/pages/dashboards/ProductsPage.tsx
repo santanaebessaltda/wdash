@@ -51,6 +51,15 @@ import {
   periodDisplayLabel,
 } from "@/pages/dashboard/periodPicker";
 
+/** # e linha/produto parados no scroll horizontal. A largura do # (w-8) e o left-8 da coluna seguinte. */
+const RANK_STICKY = "sticky left-0 z-20 w-8 min-w-8 max-w-8";
+const NAME_STICKY = "sticky left-8 z-10 min-w-0 border-r border-line";
+const STICKY_BG = "bg-bg-2 transition-colors group-hover:bg-bg-3 group-focus-visible:bg-bg-3";
+/** No card estreito o nome nao ocupa a tela inteira, para sobrar numero ao lado. */
+const NAME_CLIP = "min-w-0 max-w-[9.5rem] sm:max-w-[12.5rem] lg:max-w-[14rem] xl:max-w-none";
+const SCROLL_TABLE =
+  "w-full min-w-[820px] border-separate border-spacing-0 text-sm [&_tbody_tr:last-child_td]:border-b-0 [&_td]:border-b [&_td]:border-line [&_th]:border-b [&_th]:border-line";
+
 /** Icones dos KPIs  -  Fat/Lucro/Margem iguais ao Financeiro; Itens proprio da tela. */
 const IconRevenue = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -460,11 +469,11 @@ export default function ProductsPage() {
             )
           ) : (
           <div className="min-w-0 overflow-x-auto">
-            <table className="w-full min-w-[820px] border-collapse text-sm">
+            <table className={SCROLL_TABLE}>
               <thead>
-                <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
-                  <th className="px-1 pb-3 text-left font-bold">#</th>
-                  <ThSort label="Linha" active={lineSortKey === "name"} dir={lineSortDir} onClick={() => toggleLineSort("name")} align="left" className="px-1 pb-3" />
+                <tr className="text-[11px] uppercase tracking-wide text-t2">
+                  <th className={cn(RANK_STICKY, STICKY_BG, "px-1 pb-3 text-left font-bold")}>#</th>
+                  <ThSort label="Linha" active={lineSortKey === "name"} dir={lineSortDir} onClick={() => toggleLineSort("name")} align="left" className={cn(NAME_STICKY, STICKY_BG, "px-1 pb-3")} />
                   <ThSort label="Itens vendidos" active={lineSortKey === "items"} dir={lineSortDir} onClick={() => toggleLineSort("items")} className="px-1 pb-3" />
                   <ThSort label="Faturamento" active={lineSortKey === "revenue"} dir={lineSortDir} onClick={() => toggleLineSort("revenue")} className="px-1 pb-3" />
                   <ThSort label="CMV" active={lineSortKey === "cmv"} dir={lineSortDir} onClick={() => toggleLineSort("cmv")} className="px-1 pb-3" />
@@ -488,16 +497,18 @@ export default function ProductsPage() {
                         open({ kind: "line", name: l.name });
                       }
                     }}
-                    className="cursor-pointer border-b border-line transition-colors hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none"
+                    className="group cursor-pointer transition-colors hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none"
                   >
-                    <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
-                    <td className="px-1 py-3">
-                      <ProductNameCell
-                        name={l.name}
-                        idx={idx}
-                        tones={PRODUCT_AVATAR_TONES}
-                        sub={`${l.products} produto${l.products === 1 ? "" : "s"} · ${l.kinds.length} tipo${l.kinds.length === 1 ? "" : "s"}`}
-                      />
+                    <td className={cn(RANK_STICKY, STICKY_BG, "px-1 py-3 text-center text-[13px] font-extrabold text-t2")}>{idx + 1}</td>
+                    <td className={cn(NAME_STICKY, STICKY_BG, "px-1 py-3")}>
+                      <div className={NAME_CLIP}>
+                        <ProductNameCell
+                          name={l.name}
+                          idx={idx}
+                          tones={PRODUCT_AVATAR_TONES}
+                          sub={`${l.products} produto${l.products === 1 ? "" : "s"} · ${l.kinds.length} tipo${l.kinds.length === 1 ? "" : "s"}`}
+                        />
+                      </div>
                     </td>
                     <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(l.items)}</td>
                     <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(l.revenue)}</td>
@@ -517,12 +528,14 @@ export default function ProductsPage() {
                   );
                 })}
                 <tr className="bg-bg-inset">
-                  <td />
-                  <td className="px-1 py-3 text-[13px] font-extrabold text-t0">
-                    Total do filtro
-                    <span className="mt-0.5 block text-[11px] font-semibold text-t2">
-                      {num(lineRows.length)} linha{lineRows.length === 1 ? "" : "s"}
-                    </span>
+                  <td className={cn(RANK_STICKY, "bg-bg-inset")} />
+                  <td className={cn(NAME_STICKY, "bg-bg-inset px-1 py-3 text-[13px] font-extrabold text-t0")}>
+                    <div className={NAME_CLIP}>
+                      Total do filtro
+                      <span className="mt-0.5 block text-[11px] font-semibold text-t2">
+                        {num(lineRows.length)} linha{lineRows.length === 1 ? "" : "s"}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{num(lineTotal.items)}</td>
                   <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{brlCent(lineTotal.revenue)}</td>
@@ -591,11 +604,11 @@ export default function ProductsPage() {
           )
         ) : (
           <div className="min-w-0 overflow-x-auto">
-            <table className="w-full min-w-[820px] border-collapse text-sm">
+            <table className={SCROLL_TABLE}>
               <thead>
-                <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
-                  <th className="px-1 pb-3 text-left font-bold">#</th>
-                  <ThSort label="Produto" active={sortKey === "name"} dir={sortDir} onClick={() => toggleSort("name")} align="left" className="px-1 pb-3" />
+                <tr className="text-[11px] uppercase tracking-wide text-t2">
+                  <th className={cn(RANK_STICKY, STICKY_BG, "px-1 pb-3 text-left font-bold")}>#</th>
+                  <ThSort label="Produto" active={sortKey === "name"} dir={sortDir} onClick={() => toggleSort("name")} align="left" className={cn(NAME_STICKY, STICKY_BG, "px-1 pb-3")} />
                   <ThSort label="Itens vendidos" active={sortKey === "items"} dir={sortDir} onClick={() => toggleSort("items")} className="px-1 pb-3" />
                   <ThSort label="Faturamento" active={sortKey === "revenue"} dir={sortDir} onClick={() => toggleSort("revenue")} className="px-1 pb-3" />
                   <ThSort label="CMV" active={sortKey === "cmv"} dir={sortDir} onClick={() => toggleSort("cmv")} className="px-1 pb-3" />
@@ -618,11 +631,13 @@ export default function ProductsPage() {
                           open({ kind: "product", rowKey: p.rowKey, name: p.name });
                         }
                       }}
-                      className="cursor-pointer border-b border-line transition-colors hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none"
+                      className="group cursor-pointer transition-colors hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none"
                     >
-                      <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{idx + 1}</td>
-                      <td className="px-1 py-3">
-                        <ProductNameCell name={p.name} idx={idx} sub={p.code} tones={PRODUCT_AVATAR_TONES} />
+                      <td className={cn(RANK_STICKY, STICKY_BG, "px-1 py-3 text-center text-[13px] font-extrabold text-t2")}>{idx + 1}</td>
+                      <td className={cn(NAME_STICKY, STICKY_BG, "px-1 py-3")}>
+                        <div className={NAME_CLIP}>
+                          <ProductNameCell name={p.name} idx={idx} sub={p.code} tones={PRODUCT_AVATAR_TONES} />
+                        </div>
                       </td>
                       <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(p.items)}</td>
                       <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.revenue)}</td>
@@ -642,12 +657,14 @@ export default function ProductsPage() {
                   );
                 })}
                 <tr className="bg-bg-inset">
-                  <td />
-                  <td className="px-1 py-3 text-[13px] font-extrabold text-t0">
-                    Total do filtro
-                    <span className="mt-0.5 block text-[11px] font-semibold text-t2">
-                      {num(tableLines.length)} produto{tableLines.length === 1 ? "" : "s"}
-                    </span>
+                  <td className={cn(RANK_STICKY, "bg-bg-inset")} />
+                  <td className={cn(NAME_STICKY, "bg-bg-inset px-1 py-3 text-[13px] font-extrabold text-t0")}>
+                    <div className={NAME_CLIP}>
+                      Total do filtro
+                      <span className="mt-0.5 block text-[11px] font-semibold text-t2">
+                        {num(tableLines.length)} produto{tableLines.length === 1 ? "" : "s"}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{num(tableTotal.items)}</td>
                   <td className="px-1 py-3 text-right font-mono text-[13px] font-extrabold text-t0">{brlCent(tableTotal.revenue)}</td>
