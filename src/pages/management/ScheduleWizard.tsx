@@ -69,22 +69,23 @@ function HeadcountField({ value, max, label, onChange }: { value: number; max: n
   const cap = Math.max(0, max);
   const current = Math.min(cap, Math.max(0, value));
   const set = (raw: number) => onChange(Math.min(cap, Math.max(0, Math.floor(raw) || 0)));
+  const stepClass = "absolute top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-[5px] bg-acc text-white hover:bg-acc-2 disabled:cursor-not-allowed disabled:opacity-40";
   return (
-    <div className="flex items-center gap-1">
-      <Button type="button" variant="primary" className="h-9 w-9 shrink-0 px-0" disabled={cap === 0 || current <= 0} aria-label={`Diminuir ${label}`} onClick={() => set(current - 1)}>
-        <Icon d={icons.minus} size={14} />
-      </Button>
+    <div className="relative h-9 w-[6.75rem] shrink-0">
       <Input
         inputMode="numeric"
         disabled={cap === 0}
         value={current}
         aria-label={label}
         onChange={(event) => set(Number(event.target.value.replace(/\D/g, "")))}
-        className="h-9! w-12 px-1 text-center"
+        className="h-9! w-full px-6 text-center"
       />
-      <Button type="button" variant="primary" className="h-9 w-9 shrink-0 px-0" disabled={cap === 0 || current >= cap} aria-label={`Aumentar ${label}`} onClick={() => set(current + 1)}>
-        <Icon d={icons.plus} size={14} />
-      </Button>
+      <button type="button" className={cn(stepClass, "left-1")} disabled={cap === 0 || current <= 0} aria-label={`Diminuir ${label}`} onClick={() => set(current - 1)}>
+        <Icon d={icons.minus} size={12} />
+      </button>
+      <button type="button" className={cn(stepClass, "right-1")} disabled={cap === 0 || current >= cap} aria-label={`Aumentar ${label}`} onClick={() => set(current + 1)}>
+        <Icon d={icons.plus} size={12} />
+      </button>
     </div>
   );
 }
