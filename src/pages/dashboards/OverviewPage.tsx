@@ -818,13 +818,15 @@ export default function OverviewPage() {
         return (
       <div className="mt-4 grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
         <Card className="flex min-w-0 flex-col">
-          <CardHeader className="w-full min-w-0 flex-col items-start justify-start gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="min-w-0">Ranking de filiais</CardTitle>
-            {compareNetwork && (
-              <Badge variant="accent" className="inline-block max-w-full whitespace-normal">
-                Rede: {brlCent(view.rankingNetworkTotal ?? 0)}
-              </Badge>
-            )}
+          <CardHeader>
+            <div className="flex w-full min-w-0 items-center justify-between gap-1.5">
+              <CardTitle className="shrink-0">Ranking de filiais</CardTitle>
+              {compareNetwork && (
+                <Badge variant="accent" className="inline-block min-w-0 max-w-full shrink whitespace-normal text-right">
+                  Rede: {brlCent(view.rankingNetworkTotal ?? 0)}
+                </Badge>
+              )}
+            </div>
           </CardHeader>
           {view.storesRanking.length === 0 ? (
             <EmptyBlock />
