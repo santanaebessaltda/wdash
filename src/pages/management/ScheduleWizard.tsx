@@ -386,16 +386,18 @@ export function ScheduleWizard({
               </button>
             </div>
           </FormField>
-          <FormField label="Tipo de escala" required hint="Os dias fechados e as folgas de domingo também entram na conta.">
-            <Select value={value.pattern} onChange={(event) => setValue((current) => ({ ...current, pattern: event.target.value as SchedulePattern }))}>
-              {types.map((item) => (
-                <option key={item.id} value={item.id}>{item.title} · {item.detail}</option>
-              ))}
-            </Select>
-          </FormField>
-          <FormField label="Mês da escala" required>
-            <ScheduleMonthField iso={value.periodStart} onChange={setScaleMonth} />
-          </FormField>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <FormField label="Tipo de escala" required hint="Os dias fechados e as folgas de domingo também entram na conta.">
+              <Select value={value.pattern} onChange={(event) => setValue((current) => ({ ...current, pattern: event.target.value as SchedulePattern }))}>
+                {types.map((item) => (
+                  <option key={item.id} value={item.id}>{item.title} · {item.detail}</option>
+                ))}
+              </Select>
+            </FormField>
+            <FormField label="Mês da escala" required>
+              <ScheduleMonthField iso={value.periodStart} onChange={setScaleMonth} />
+            </FormField>
+          </div>
           </div>
         </>
       ) : null}
