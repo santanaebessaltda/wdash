@@ -924,8 +924,8 @@ function ProductPicker({
                     >
                       <span
                         className={cn(
-                          "grid h-4 w-4 shrink-0 place-items-center rounded-[4px] border transition-colors",
-                          marcado ? "border-acc bg-acc text-white shadow-[0_1px_2px_rgba(0,0,0,0.28)]" : "border-line bg-transparent",
+                          "grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[5px] border transition-colors",
+                          marcado ? "border-acc bg-acc text-white" : "border-line bg-bg-inset",
                         )}
                       >
                         {marcado && <Icon d={icons.check} size={12} />}
