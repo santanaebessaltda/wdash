@@ -6,7 +6,7 @@ import { calendarTodayIso } from "@/data/wedash/clock";
 
 /**
  * Seletor de 1 data  -  campo "Single date" e calendario de src/pages/forms/DatePickersPage.tsx.
- * Um clique no dia escolhe e fecha. Painel em portal, alinhado a esquerda do campo.
+ * Um clique no dia escolhe e fecha. Painel em portal, alinhado à esquerda do campo, e abre para cima quando não cabe abaixo.
  */
 
 const WEEKDAY_INITIALS = ["D", "S", "T", "Q", "Q", "S", "S"];
@@ -85,12 +85,18 @@ export function DatePicker({
       if (!triggerRef.current) return;
       const rect = triggerRef.current.getBoundingClientRect();
       const margin = 12;
+      const gap = 8;
+      const wanted = 380;
       const vw = window.innerWidth;
       const vh = window.innerHeight;
       let left = rect.left;
       if (left + PANEL_WIDTH > vw - margin) left = Math.max(margin, vw - margin - PANEL_WIDTH);
-      const top = Math.min(rect.bottom + 8, vh - margin - 80);
-      setPanelPos({ top, left, maxHeight: Math.max(200, vh - top - margin) });
+      const below = vh - rect.bottom - margin - gap;
+      const above = rect.top - margin - gap;
+      const openAbove = below < wanted && above > below;
+      const maxHeight = Math.min(wanted, Math.max(0, openAbove ? above : below));
+      const top = openAbove ? Math.max(margin, rect.top - gap - maxHeight) : rect.bottom + gap;
+      setPanelPos({ top, left, maxHeight });
     }
     colocar();
     window.addEventListener("resize", colocar);

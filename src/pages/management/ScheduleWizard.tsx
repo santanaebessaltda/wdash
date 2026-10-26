@@ -527,17 +527,17 @@ export function ScheduleWizard({
                     <span className="block truncate text-[13.5px] font-semibold text-t0">{rule.name}</span>
                     <span className="text-[12px] text-t2">{rule.date.split("-").reverse().join("/")}</span>
                   </span>
-                  <Button
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="sm"
+                    aria-label={`Remover ${rule.name}`}
                     onClick={() => {
                       setDismissed((current) => [...current, rule.date]);
                       setValue((current) => ({ ...current, holidayRules: current.holidayRules.filter((item) => item !== rule) }));
                     }}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] border border-line text-bad transition-colors hover:bg-bad-soft"
                   >
-                    Remover
-                  </Button>
+                    <Icon d={icons.trash} size={14} />
+                  </button>
                 </div>
                 <label className="mt-2 flex items-center gap-2 text-[13px] text-t0">
                   <input type="checkbox" className="shrink-0" checked={rule.open} onChange={(event) => patchRule(rule.date, { open: event.target.checked })} />
@@ -597,18 +597,18 @@ export function ScheduleWizard({
                 <Button type="button" variant="outline" size="sm" disabled={!extraDate || !extraName.trim()} onClick={addMunicipal}>
                   Adicionar feriado
                 </Button>
-                <Button
+                <button
                   type="button"
-                  variant="ghost"
-                  size="sm"
+                  aria-label="Remover feriado municipal"
                   onClick={() => {
                     setExtraDate("");
                     setExtraName("");
                     setAddingHoliday(false);
                   }}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] border border-line text-bad transition-colors hover:bg-bad-soft"
                 >
-                  Remover
-                </Button>
+                  <Icon d={icons.trash} size={14} />
+                </button>
               </div>
             </section>
           ) : (
