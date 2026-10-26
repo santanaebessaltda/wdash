@@ -611,7 +611,7 @@ export default function OverviewPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[12.5px] text-t2">Faltam</span>
-                  <span className={`text-[13px] font-bold ${goal ? "text-palette-amber" : "text-t2"}`}>
+                  <span className={`text-[13px] font-bold ${!goal ? "text-t2" : missingAmount <= 0 ? "text-ok" : "text-t0"}`}>
                     {!goal ? "—" : missingAmount <= 0 ? "Meta atingida" : brlCent(missingAmount)}
                   </span>
                 </div>
