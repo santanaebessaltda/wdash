@@ -37,7 +37,7 @@ function dayTitle(iso: string, holiday: string | null): string {
   return holiday ? `${label} · ${holiday}` : label;
 }
 
-const SHORT_WEEK = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const WEEKDAY = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
 
 function monthDates(from: string, to: string): string[] {
   const dates: string[] = [];
@@ -495,7 +495,7 @@ function ScheduleGrid({
                 <th key={iso} className={cn("min-w-[108px] border-b border-line px-1 py-3 text-center align-bottom", !last && "border-r")}>
                   <button type="button" className="flex w-full flex-col items-center" aria-label={`Ajustar ${Number(iso.slice(8))} de ${MONTHS[isoToDate(iso).getMonth()].toLowerCase()}`} onClick={() => onOpenDay(iso)}>
                     <span className={cn("flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-bold", iso === today ? "bg-acc text-white" : "text-t1")}>{Number(iso.slice(8))}</span>
-                    <span className="mt-1 text-[10px] font-bold leading-tight text-t2 sm:text-[11px]">{SHORT_WEEK[dow]}</span>
+                    <span className="mt-1 whitespace-nowrap text-[10px] font-bold leading-tight text-t2 sm:text-[11px]">{WEEKDAY[dow]}</span>
                     {holiday ? <span className="mt-1 line-clamp-2 text-[10px] font-semibold leading-tight text-warn">{holiday}</span> : null}
                   </button>
                 </th>
