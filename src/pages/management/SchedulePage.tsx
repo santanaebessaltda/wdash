@@ -1,29 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Button, Card, EmptyState, FormField, Modal, Select, useToast } from "@/components/ui";
-import { MonthCalendar } from "@/components/wedash/MonthCalendar";
 import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { DayChip, PlainKpi } from "@/pages/cash-close/CashClosePage";
 import { MonthStep, monthNavBtn } from "@/pages/cash-close/MonthYearPicker";
 import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
+import { cn } from "@/lib/cn";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { addDays, addMonths, endOfMonth, isoToDate, shiftName, startOfMonth } from "@/data/wedash/engine/format";
 import { fetchGoals } from "@/data/wedash/goalsRepo";
 import { monthCoveredByGoal, scheduleStartMonth, type GoalSpan } from "@/data/wedash/goalMonths";
 import { branchRoleLabel, fetchStoreSellers, fetchStoreShifts, isBranchTeamMember, type StoreSeller, type StoreShift } from "@/data/wedash/stores";
-import { defaultDayNeeds, generateMonth, type DayStatus, type Sex } from "@/data/wedash/scheduleGenerate";
+import { defaultDayNeeds, generateMonth, weekday, weekdayLabel, type DayStatus, type Sex } from "@/data/wedash/scheduleGenerate";
 import { holidayLabel, holidaysForStore, loadHolidaySeed, loadNationalHolidays, storePlace, type Holiday } from "@/data/wedash/scheduleHolidays";
 import { deleteSchedule, fetchCompDue, fetchSchedule, saveManualDay, saveSchedule, type StoredDay, type StoredSchedule } from "@/data/wedash/scheduleRepo";
 import { ScheduleWizard, type ScheduleWizardValue } from "./ScheduleWizard";
 
 const MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-const STATUS_LABEL: Record<DayStatus, string> = {
-  work: "Trabalha",
-  off: "Folga",
-  holiday_work: "Feriado trabalhado",
-  comp_off: "Folga compensatória",
-};
 const SCHEDULE_LEGEND: LegendItem[] = [
   { key: "work", color: "bg-ok", label: "Trabalha", hint: "Na loja" },
   { key: "off", color: "bg-chip-gray", label: "Folga", hint: "Descanso" },
@@ -43,11 +37,20 @@ function dayTitle(iso: string, holiday: string | null): string {
   return holiday ? `${label} · ${holiday}` : label;
 }
 
-function cellsOf(from: string, to: string): Array<string | null> {
-  const cells: Array<string | null> = Array.from({ length: isoToDate(from).getDay() }, () => null);
-  for (let day = from; day <= to; day = addDays(day, 1)) cells.push(day);
-  while (cells.length % 7 !== 0) cells.push(null);
-  return cells;
+const SHORT_WEEK = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+function monthDates(from: string, to: string): string[] {
+  const dates: string[] = [];
+  for (let day = from; day <= to; day = addDays(day, 1)) dates.push(day);
+  return dates;
+}
+
+function statusFace(status: DayStatus, doublePay: boolean): { fill: string; chip: string; label: string; full: string } {
+  if (status === "holiday_work" && doublePay) return { fill: "bg-acc-soft", chip: "bg-acc", label: "Dobro", full: "Pagamento em dobro" };
+  if (status === "holiday_work") return { fill: "bg-warn-soft", chip: "bg-warn", label: "Feriado", full: "Feriado trabalhado" };
+  if (status === "comp_off") return { fill: "bg-info-soft", chip: "bg-info", label: "Compensa", full: "Folga compensatória" };
+  if (status === "off") return { fill: "bg-bg-3", chip: "bg-chip-gray", label: "Folga", full: "Folga" };
+  return { fill: "bg-ok-soft", chip: "bg-ok", label: "Trabalha", full: "Trabalha" };
 }
 
 type SelectedPerson = { id: string; fixedOffDow: number | null; sex: Sex; groupId: string | null };
@@ -63,25 +66,7 @@ function monthsBetween(from: string, to: string): string[] {
   return months;
 }
 
-const CHIP_ORDER: DayStatus[] = ["work", "holiday_work", "off", "comp_off"];
-
-function DayFaces({ rows, doublePay }: { rows: StoredDay[]; doublePay: boolean }) {
-  if (rows.length === 0) return null;
-  const counts = new Map<DayStatus, number>();
-  for (const row of rows) counts.set(row.status, (counts.get(row.status) ?? 0) + 1);
-  return (
-    <>
-      {CHIP_ORDER.map((status) => {
-        const count = counts.get(status) ?? 0;
-        if (count === 0) return null;
-        const holiday = status === "holiday_work" && doublePay;
-        const label = holiday ? "Feriado 2×" : STATUS_LABEL[status];
-        const color = holiday ? "bg-acc" : status === "work" ? "bg-ok" : status === "holiday_work" ? "bg-warn" : status === "comp_off" ? "bg-info" : "bg-chip-gray";
-        return <DayChip key={status} color={color}>{`${label} ${count}`}</DayChip>;
-      })}
-    </>
-  );
-}
+const STICKY = "sticky left-0 z-20 border-r border-line bg-bg-2";
 
 export function SchedulePage() {
   const { show } = useToast();
@@ -106,7 +91,7 @@ export function SchedulePage() {
 
   const monthStart = startOfMonth(month);
   const monthEnd = endOfMonth(monthStart);
-  const cells = useMemo(() => cellsOf(monthStart, monthEnd), [monthStart, monthEnd]);
+  const dates = useMemo(() => monthDates(monthStart, monthEnd), [monthStart, monthEnd]);
   const byPerson = useMemo(() => new Map(people.map((person) => [person.id, person])), [people]);
   const dayRows = useMemo(() => {
     const map = new Map<string, StoredDay[]>();
@@ -339,27 +324,18 @@ export function SchedulePage() {
               <PlainKpi label="Dias ajustados" value={String(new Set(days.filter((row) => row.origin === "manual").map((row) => row.day)).size)} color="var(--t0)" />
             </div>
             {schedule ? <ColorLegend className="mb-3" items={SCHEDULE_LEGEND} /> : null}
-            <MonthCalendar>
-              {cells.map((day, index) => {
-                const rows = day ? (dayRows.get(day) ?? []) : [];
-                const label = day ? holidayLabel(holidays, day) : null;
-                const edge = (index + 1) % 7 === 0;
-                return (
-                  <div key={day ?? `vazio-${index}`} className={`relative min-h-[110px] border-b border-r border-line p-1.5 text-left ${edge ? "border-r-0" : ""} ${day ? "" : "bg-bg-1/30"}`}>
-                    {day && schedule ? (
-                      <button type="button" className="absolute inset-0 z-0" aria-label={`Ajustar ${day.split("-")[2]}`} onClick={() => setDayOpen(day)} />
-                    ) : null}
-                    {day ? (
-                      <div className="pointer-events-none relative z-10">
-                        <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-bold ${day === today ? "bg-acc text-white" : "text-t0"}`}>{Number(day.slice(8))}</span>
-                        {label ? <p className="mt-1 line-clamp-2 text-[10px] font-semibold leading-tight text-warn">{label}</p> : null}
-                        <DayFaces rows={rows} doublePay={Boolean(schedule?.holidayRules.some((rule) => rule.date === day && rule.pay === "double"))} />
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </MonthCalendar>
+            {schedule ? (
+              <ScheduleGrid
+                dates={dates}
+                today={today}
+                holidays={holidays}
+                schedule={schedule}
+                days={days}
+                people={people}
+                shifts={shifts}
+                onOpenDay={setDayOpen}
+              />
+            ) : null}
             {loading ? <p className="mt-3 text-[12px] text-t2">Carregando a escala…</p> : null}
             {!loading && people.length === 0 ? <p className="mt-3 text-[12px] text-t2">Esta filial não tem equipe ativa.</p> : null}
             {!loading && people.length > 0 && !schedule ? <p className="mt-3 text-[12px] text-t2">Este mês ainda não tem escala. O feriado do dia já aparece.</p> : null}
@@ -437,6 +413,135 @@ export function SchedulePage() {
           {monthEnd < today ? " Este mês já passou." : ""}
         </p>
       </Modal>
+    </div>
+  );
+}
+
+function ScheduleGrid({
+  dates,
+  today,
+  holidays,
+  schedule,
+  days,
+  people,
+  shifts,
+  onOpenDay,
+}: {
+  dates: string[];
+  today: string;
+  holidays: Holiday[];
+  schedule: StoredSchedule;
+  days: StoredDay[];
+  people: StoreSeller[];
+  shifts: StoreShift[];
+  onOpenDay: (day: string) => void;
+}) {
+  const byDay = new Map<string, StoredDay[]>();
+  for (const row of days) {
+    const list = byDay.get(row.day) ?? [];
+    list.push(row);
+    byDay.set(row.day, list);
+  }
+  const byId = new Map(people.map((person) => [person.id, person]));
+  const ids = new Set<string>([...schedule.people.map((person) => person.sellerId), ...days.map((row) => row.sellerId)]);
+  const roster = [...ids]
+    .map((id) => {
+      const person = byId.get(id);
+      const fixed = schedule.people.find((row) => row.sellerId === id)?.fixedOffDow ?? null;
+      const shift = shifts.find((item) => item.id === person?.shiftId);
+      const detail = [person ? branchRoleLabel(person.role) : "", shift ? shiftName(shift.name) : "", fixed != null ? `folga ${weekdayLabel(fixed)}` : ""].filter(Boolean).join(" · ");
+      return { id, name: person?.name ?? "Pessoa", detail, shiftId: person?.shiftId ?? null };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  const groupIds = new Set(roster.map((person) => person.shiftId).filter((id): id is string => Boolean(id)));
+  const perGroup = groupIds.size >= 2;
+
+  function floorOf(iso: string): { min: number; closed: boolean; perGroup: boolean } {
+    const need = schedule.dayNeeds.find((row) => row.dow === weekday(iso));
+    const holiday = schedule.holidayRules.find((row) => row.date === iso);
+    if (holiday && !holiday.open) return { min: 0, closed: true, perGroup: false };
+    if (holiday?.open) return { min: holiday.workers, closed: false, perGroup: false };
+    if (need && !need.open) return { min: 0, closed: true, perGroup: false };
+    return { min: need?.min ?? 0, closed: false, perGroup };
+  }
+
+  function presence(iso: string): { working: number; short: boolean; floor: { min: number; closed: boolean; perGroup: boolean } } {
+    const floor = floorOf(iso);
+    const rows = byDay.get(iso) ?? [];
+    const on = (row: StoredDay | undefined) => row?.status === "work" || row?.status === "holiday_work";
+    const working = rows.filter((row) => on(row)).length;
+    if (floor.closed || !floor.perGroup) return { working, short: !floor.closed && working < floor.min, floor };
+    const counts = new Map<string, number>();
+    for (const person of roster) {
+      if (!person.shiftId) continue;
+      const row = rows.find((item) => item.sellerId === person.id);
+      counts.set(person.shiftId, (counts.get(person.shiftId) ?? 0) + (on(row) ? 1 : 0));
+    }
+    const short = [...counts.values()].some((count) => count < floor.min);
+    return { working, short, floor };
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-[18px] border border-line bg-bg-2 shadow-[var(--shadow-vela)]">
+      <table className="w-max min-w-full border-separate border-spacing-0 text-left">
+        <thead>
+          <tr>
+            <th className={cn(STICKY, "z-30 min-w-[190px] border-b px-3 py-2 text-[12px] font-bold text-t0")}>Funcionário</th>
+            {dates.map((iso) => {
+              const holiday = holidayLabel(holidays, iso);
+              const dow = weekday(iso);
+              return (
+                <th key={iso} className="min-w-[4.75rem] border-b border-line p-1 text-center align-bottom">
+                  <button type="button" className="flex w-full flex-col items-center gap-0.5 rounded-[9px] px-1 py-1 hover:bg-bg-3" aria-label={`Ajustar ${Number(iso.slice(8))} de ${MONTHS[isoToDate(iso).getMonth()].toLowerCase()}`} onClick={() => onOpenDay(iso)}>
+                    <span className={cn("flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-bold", iso === today ? "bg-acc text-white" : dow === 0 ? "text-t1" : "text-t0")}>{Number(iso.slice(8))}</span>
+                    <span className="text-[10px] font-bold text-t2">{SHORT_WEEK[dow]}</span>
+                    {holiday ? <span className="w-full truncate text-[10px] font-semibold text-warn">{holiday}</span> : null}
+                  </button>
+                </th>
+              );
+            })}
+          </tr>
+        </thead>
+        <tbody>
+          {roster.map((person) => (
+            <tr key={person.id}>
+              <th className={cn(STICKY, "min-w-[190px] border-b px-3 py-2 text-left font-normal")}>
+                <span className="block truncate text-[13px] font-semibold text-t0">{person.name}</span>
+                {person.detail ? <span className="block truncate text-[11px] text-t2">{person.detail}</span> : null}
+              </th>
+              {dates.map((iso) => {
+                const row = (byDay.get(iso) ?? []).find((item) => item.sellerId === person.id);
+                const holiday = holidayLabel(holidays, iso);
+                const doublePay = schedule.holidayRules.some((rule) => rule.date === iso && rule.pay === "double");
+                if (!row) return <td key={iso} className="border-b border-line bg-bg-1/40" />;
+                const face = statusFace(row.status, doublePay && row.status === "holiday_work");
+                return (
+                  <td key={iso} className={cn("border-b border-line p-1 align-middle", face.fill)}>
+                    <button type="button" className="flex min-h-[52px] w-full items-center" aria-label={`${person.name}, ${Number(iso.slice(8))}: ${face.full}${holiday ? `, ${holiday}` : ""}`} onClick={() => onOpenDay(iso)}>
+                      <DayChip color={face.chip}>{face.label}</DayChip>
+                    </button>
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr>
+            <th className={cn(STICKY, "px-3 py-2 text-left text-[12px] font-bold text-t0")}>Pessoas presentes</th>
+            {dates.map((iso) => {
+              const { working, short, floor } = presence(iso);
+              const text = floor.closed ? "Fechado" : floor.min > 0 ? `${working} · mín. ${floor.min}${floor.perGroup ? "/grupo" : ""}` : String(working);
+              const title = floor.closed ? "A loja fecha neste dia" : floor.perGroup ? "Mínimo em cada grupo" : "Mínimo do dia";
+              return (
+                <td key={iso} title={title} className={cn("px-1 py-2 text-center text-[11px] font-bold tabular-nums", floor.closed ? "text-t2" : short ? "text-bad" : "text-ok")}>
+                  {text}
+                </td>
+              );
+            })}
+          </tr>
+        </tfoot>
+      </table>
     </div>
   );
 }
