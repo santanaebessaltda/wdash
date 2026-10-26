@@ -240,7 +240,7 @@ function GoalHero({
     card.sellers.reduce((s, v) => s + v.accruedPrize + v.bonusReached, 0) + (management ? management.prizeAmount + management.bonus : 0);
   const missing = Math.max(0, goal.target - achieved);
   const stats: { label: string; value: string; cls: string; sub?: string; subCls?: string; help?: string; note?: string }[] = [
-    { label: "Meta da filial", value: brlCent(goal.target), cls: "text-acc" },
+    { label: "Meta da filial", value: brlCent(goal.target), cls: "text-t0" },
     {
       label: "Realizado",
       value: brlCent(achieved),

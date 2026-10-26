@@ -93,7 +93,7 @@ export function GoalLevelGuide({
                 {row.statusLine ? (
                   <p className="mt-0.5 text-[11.5px] font-semibold text-acc">{row.statusLine.text}</p>
                 ) : people > 0 ? (
-                  <p className="mt-0.5 text-[11.5px] font-semibold text-acc">
+                  <p className={`mt-0.5 text-[11.5px] font-semibold ${everyone ? "text-acc" : "text-t2"}`}>
                     <span className="font-mono tabular-nums">
                       {row.reached}/{people}
                     </span>{" "}
