@@ -687,9 +687,16 @@ function ScheduleBoard({
           const holiday = holidayLabel(holidays, iso);
           const day = Number(iso.slice(8));
           return (
-            <div key={iso} title={holiday ?? dayTitle(iso, null)} className={cn("border-b border-line px-0.5 py-2 text-center", holiday && "text-warn")}>
-              <span className={cn("block text-[12px] font-bold", iso === today ? "text-acc" : holiday ? "text-warn" : "text-t0")}>{day}</span>
-              <span className="block text-[10px] font-bold uppercase text-t2">{SHORT_WEEK[weekday(iso)]}</span>
+            <div key={iso} title={holiday ?? dayTitle(iso, null)} className={cn("border-b border-line px-0.5 py-2 text-center", holiday && iso !== today && "text-warn")}>
+              <span
+                className={cn(
+                  "mx-auto inline-flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-bold",
+                  iso === today ? "bg-acc text-white" : holiday ? "text-warn" : "text-t0",
+                )}
+              >
+                {day}
+              </span>
+              <span className="mt-0.5 block text-[10px] font-bold uppercase text-t2">{SHORT_WEEK[weekday(iso)]}</span>
             </div>
           );
         })}
