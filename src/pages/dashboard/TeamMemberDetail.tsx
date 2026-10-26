@@ -20,7 +20,7 @@ import type { GoalRecord, GoalTeamMember } from "@/data/wedash/engine/goalTypes"
 import { SALES_SYNCED_EVENT } from "@/pages/dashboard/useForceRefresh";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { DetailSkeleton, MetricDetail, pctFmt } from "@/pages/dashboard/ProductDetail";
-import { brlCent, shortDate, num, comparedWithTip } from "@/lib/format";
+import { brlCent, shortDate, num, comparedWithTip, profitBrl } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { GOAL_STATUS_LABEL, type SellerGoalLevel } from "@/data/wedash/goalView";
 import { GoalLevelSummary } from "@/components/wedash/GoalLevelsBar";
@@ -216,7 +216,12 @@ function GoalSection({ goal }: { goal: SellerGoalLevel }) {
           amount={brlCent(goal.achieved)}
           tip="Do início da meta até hoje. Não segue o período escolhido na tela."
         />
-        <MetricDetail label="Premiação até agora" amount={brlCent(total)} destaque={total > 0} tip={prizeTip} />
+        <MetricDetail
+          label="Premiação até agora"
+          amount={profitBrl(total)}
+          amountClass={total < 0 ? "text-bad" : total > 0 ? "text-ok" : undefined}
+          tip={prizeTip}
+        />
       </div>
       <div className="mt-2.5 rounded-xl border border-line bg-bg-inset p-3">
         <GoalLevelSummary pct={goal.attainmentPct} level={goal.level} levelNumber={goal.levelNumber} marcos={goal.marcos} rolagem />
