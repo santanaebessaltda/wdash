@@ -495,7 +495,7 @@ export default function OverviewPage() {
   }
 
   return (
-    <div className="flex flex-col p-4 sm:p-6 print:p-0">
+    <div className="flex w-full min-w-0 max-w-full flex-col p-4 sm:p-6 print:p-0">
       <ReportHeader />
       <PageHeader
         crumbs={[{ label: "Dashboard", to: "/dashboard/visao-geral" }, { label: "Visão geral" }]}
@@ -538,14 +538,14 @@ export default function OverviewPage() {
       <>
 
       {/* KPI row  -  4 cards */}
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-4 grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {view.kpis.map((kpi, i) => (
           <KpiCard key={kpi.label} kpi={kpi} Icon={KPI_ICONS[i]} />
         ))}
       </div>
 
       {/* Linha: Atingimento da Meta + Faturamento vs Meta */}
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.6fr]">
+      <div className="mt-4 grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[1fr_1.6fr]">
         {(() => {
           const goal = view.gauges.find((g) => g.name === "Meta") ?? view.gauges[0];
           const revenueAcum = view.evolution[view.evolution.length - 1]?.achieved ?? 0;
@@ -708,7 +708,7 @@ export default function OverviewPage() {
       </div>
 
       {/* Linha: Categoria vs Meta + Dia da Semana vs Meta (Dia some em periodo de 1 dia) */}
-      <div className={`mt-4 grid grid-cols-1 gap-4 ${view.dayVsMeta.length > 0 ? "lg:grid-cols-2" : ""}`}>
+      <div className={`mt-4 grid min-w-0 grid-cols-1 gap-4 ${view.dayVsMeta.length > 0 ? "lg:grid-cols-2" : ""}`}>
         <Card padding="lg" className="flex flex-col">
           {(() => {
             const bars = view.categoryVsGoal.filter((c) => c.achieved > 0);
@@ -818,10 +818,10 @@ export default function OverviewPage() {
         return (
       <div className="mt-4 grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
         <Card className="flex min-w-0 flex-col">
-          <CardHeader className="w-full min-w-0 flex-wrap items-center gap-y-2">
-            <CardTitle>Ranking de filiais</CardTitle>
+          <CardHeader className="w-full min-w-0 flex-col items-start justify-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="min-w-0">Ranking de filiais</CardTitle>
             {compareNetwork && (
-              <Badge variant="accent" className="max-w-full shrink-0">
+              <Badge variant="accent" className="inline-block max-w-full whitespace-normal">
                 Rede: {brlCent(view.rankingNetworkTotal ?? 0)}
               </Badge>
             )}
@@ -900,7 +900,7 @@ export default function OverviewPage() {
             })()
           )}
         </Card>
-        <Card className="flex flex-col">
+        <Card className="flex min-w-0 flex-col">
           <CardHeader>
             <CardTitle>Formas de pagamento</CardTitle>
           </CardHeader>
@@ -946,7 +946,7 @@ export default function OverviewPage() {
       })()}
 
       {/* Par: Top Vendedoras + Top Produtos */}
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="mt-4 grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
         <Card className="flex min-w-0 flex-col overflow-hidden">
           <CardHeader>
             <div className="flex w-full items-center justify-between gap-1.5">

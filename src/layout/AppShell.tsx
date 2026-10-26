@@ -115,7 +115,7 @@ export function AppShell() {
         >
           <ProfilePhotosProvider>
             <Suspense fallback={<PageLoader />}>
-              <div key={location.pathname} className="pad-base vela-page-enter print:pb-0" style={padBottom("32px")}>
+              <div key={location.pathname} className="pad-base vela-page-enter min-w-0 print:pb-0" style={padBottom("32px")}>
                 <Outlet />
               </div>
             </Suspense>
