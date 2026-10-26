@@ -487,10 +487,11 @@ export function ScheduleWizard({
           <ul className="space-y-2">
             {value.dayNeeds.map((day) => (
               <li key={day.dow} className="min-w-0 rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3 py-2.5">
-                <label className="flex min-w-0 items-center gap-2 text-[13.5px] text-t0">
+                <div className="flex min-w-0 items-start gap-2">
                   <input
+                    id={`day-open-${day.dow}`}
                     type="checkbox"
-                    className="shrink-0"
+                    className="mt-0.5 shrink-0"
                     checked={day.open}
                     onChange={(event) =>
                       setValue((current) => ({
@@ -499,14 +500,16 @@ export function ScheduleWizard({
                       }))
                     }
                   />
-                  <span className="truncate font-semibold">{weekdayLabel(day.dow)}</span>
-                </label>
-                {day.open ? (
-                  <div className="mt-2 flex items-center justify-end gap-2 pl-6">
-                    <p className="text-[12.5px] font-semibold text-t0">Pelo menos</p>
-                    <HeadcountField value={day.min} max={headcount} label={`Pelo menos em ${weekdayLabel(day.dow)}`} onChange={(min) => setDayMin(day.dow, min)} />
+                  <div className="min-w-0 flex-1">
+                    <label htmlFor={`day-open-${day.dow}`} className="block truncate text-[13.5px] font-semibold text-t0">{weekdayLabel(day.dow)}</label>
+                    {day.open ? (
+                      <div className="mt-2 flex items-center gap-2">
+                        <p className="text-[12.5px] font-semibold text-t0">Pelo menos</p>
+                        <HeadcountField value={day.min} max={headcount} label={`Pelo menos em ${weekdayLabel(day.dow)}`} onChange={(min) => setDayMin(day.dow, min)} />
+                      </div>
+                    ) : null}
                   </div>
-                ) : null}
+                </div>
               </li>
             ))}
           </ul>
