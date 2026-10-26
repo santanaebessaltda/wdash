@@ -33,7 +33,7 @@ export function RegisterSplit() {
               </div>
             </label>
             <label className="flex cursor-pointer items-start gap-2.5 text-xs leading-normal text-t1">
-              <input type="checkbox" className="mt-0.5" style={{ accentColor: "var(--acc)" }} />
+              <input type="checkbox" className="mt-0.5" />
               I agree to the <a href="#" className="font-semibold text-acc">Terms of Service</a> and{" "}
               <a href="#" className="font-semibold text-acc">Privacy Policy</a>
             </label>

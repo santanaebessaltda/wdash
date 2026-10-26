@@ -654,10 +654,10 @@ function OffcanvasDemo() {
             <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-t2">Status</p>
             <div className="flex flex-col gap-2.5">
               <label className="flex items-center gap-2.5 text-[13px] text-t1">
-                <input type="checkbox" defaultChecked style={{ accentColor: "var(--acc)" }} /> Active
+                <input type="checkbox" defaultChecked /> Active
               </label>
               <label className="flex items-center gap-2.5 text-[13px] text-t1">
-                <input type="checkbox" style={{ accentColor: "var(--acc)" }} /> Archived
+                <input type="checkbox" /> Archived
               </label>
             </div>
           </div>

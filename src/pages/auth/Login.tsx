@@ -97,7 +97,7 @@ export function Login() {
             className="mb-[18px] h-11 w-full rounded-xl border border-line bg-bg-inset px-3.5 text-[13.5px] text-t0 outline-none focus:border-acc"
           />
           <label className="mb-[22px] flex cursor-pointer items-center gap-2.5">
-            <input type="checkbox" defaultChecked className="h-[18px] w-[18px]" style={{ accentColor: "var(--acc)" }} />
+            <input type="checkbox" defaultChecked />
             <span className="text-[13px] text-t1">Keep me signed in</span>
           </label>
           <button

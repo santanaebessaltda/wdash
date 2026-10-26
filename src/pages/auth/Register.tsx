@@ -30,7 +30,7 @@ export function Register() {
             <Field label={<>Work email <span className="text-bad">*</span></>} placeholder="marcus@company.com" />
             <Field label={<>Password <span className="text-bad">*</span></>} type="password" placeholder="Min. 8 characters" />
             <label className="flex cursor-pointer items-start gap-2.5">
-              <input type="checkbox" className="mt-0.5 h-[15px] w-[15px]" style={{ accentColor: "var(--acc)" }} />
+              <input type="checkbox" className="mt-0.5" />
               <span className="text-[13px] text-t2">
                 I agree to the <a className="text-acc" href="#">Terms</a> and <a className="text-acc" href="#">Privacy Policy</a>
               </span>

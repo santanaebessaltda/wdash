@@ -58,7 +58,7 @@ export function LoginSplit() {
             </label>
             <div className="flex items-center justify-between">
               <label className="flex cursor-pointer items-center gap-2 text-[12.5px] text-t1">
-                <input type="checkbox" defaultChecked style={{ accentColor: "var(--acc)" }} />
+                <input type="checkbox" defaultChecked />
                 Remember me
               </label>
               <Link to={paths.auth.forgotPassword} className="text-[12.5px] font-bold text-acc">

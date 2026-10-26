@@ -135,7 +135,6 @@ export function DayFace({
               aria-label={check.label}
               checked={check.checked}
               className="pointer-events-auto mt-0.5 h-4 w-4 shrink-0"
-              style={{ accentColor: "var(--acc)" }}
               onClick={(e) => e.stopPropagation()}
               onChange={() => check.onToggle()}
             />

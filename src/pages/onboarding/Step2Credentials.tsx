@@ -151,7 +151,6 @@ export function Step2Credentials({
               syncErp({ dedicada: e.target.checked });
             }}
             className="mt-0.5"
-            style={{ accentColor: "var(--acc)" }}
           />
           <span>
             Este usuário será usado somente pela WDash
@@ -171,7 +170,6 @@ export function Step2Credentials({
               syncErp({ aceite: e.target.checked });
             }}
             className="mt-0.5"
-            style={{ accentColor: "var(--acc)" }}
           />
           Autorizo a WDash a usar este acesso para realizar a sincronização.
         </label>

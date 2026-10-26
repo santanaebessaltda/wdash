@@ -243,6 +243,7 @@ Sem esses 4 elementos, o número é "dado jogado na tela" — não serve para de
 - `WaterfallChart` (DRE em cascata, Financeiro) — não existe; hoje resolvido com `StackedBarChart` + `DataTable`. Plus visual, não bloqueante.
 ### ⚠️ Melhoria em componentes existentes (não é novo)
 - `showValues?: boolean` (default `true`) em `BarChart`/`StackedBarChart`/`AreaLineChart` — R$ direto na barra/linha. Evolução dos que já existem.
+- **Checkbox** (2026-10-26): todo `input[type=checkbox]` segue o desenho do Vela. Caixa de 16px, cantos de 4px, preenchida na cor primária (`--acc`) e visto branco. O componente `Checkbox` e os inputs soltos usam o mesmo CSS. A lista de produtos do desafio usa a mesma caixa.
 - ⓘ nos títulos = `CardTitle` + `Tooltip` (Tooltip **já existe**). Só compor.
 ### Padrão de grade dos dashboards Vela (confirmado no código — replicar nas nossas telas)
 - **AnalyticsDashboard**: KPIs `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`; blocos de gráfico `lg:grid-cols-3` com card principal `lg:col-span-2`.
