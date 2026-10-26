@@ -319,28 +319,25 @@ export function ChallengeProgress({
   const reached = hideCount || c.mode !== "MINIMUM" || upcoming || count === 0 ? null : challengeWonLabel(won, count);
   const prazo = showDeadline && !upcoming && !ended ? view.prazo : null;
 
+  const roleBesideNumber = !upcoming && shown != null && goal != null && goalIsRole;
+  const compare = !upcoming && shown != null && goal != null && !goalIsRole ? `de ${metricValueLabel(c.metric, goal)}` : null;
+  const showPct = !upcoming && !late && shown != null && goal != null;
+  const rightText = upcoming ? view.prazo : shown == null || goal == null ? (c.mode === "CONTEST" ? (leader?.name ?? "Ainda não há líder") : headcount) : null;
+
   return (
     <>
       <div className="flex items-baseline justify-between gap-2">
-        <span className={cn("min-w-0 truncate font-mono text-[13px] font-extrabold", leftClass)}>{left}</span>
-        <span className="shrink-0 text-right text-[11.5px] text-t2">
-          {upcoming ? (
-            view.prazo
-          ) : shown != null && goal != null ? (
-            late ? (
-              goalIsRole ? roleGoalLabel : `de ${metricValueLabel(c.metric, goal)}`
-            ) : (
-            <>
-              <span className={`font-mono font-bold ${progressTextClass(pct)}`}>{num(pct, 1)}%</span>
-              {goalIsRole ? ` ${roleGoalLabel}` : ` de ${metricValueLabel(c.metric, goal)}`}
-            </>
-            )
-          ) : c.mode === "CONTEST" ? (
-            leader?.name ?? "Ainda não há líder"
-          ) : (
-            headcount
-          )}
+        <span className="min-w-0">
+          <span className={cn("font-mono text-[13px] font-extrabold", leftClass)}>{left}</span>
+          {roleBesideNumber ? <span className="ml-1.5 text-[11.5px] text-t2">{roleGoalLabel}</span> : null}
         </span>
+        {showPct || compare || rightText ? (
+          <span className="shrink-0 text-right text-[11.5px] text-t2">
+            {showPct ? <span className={`font-mono font-bold ${progressTextClass(pct)}`}>{num(pct, 1)}%</span> : null}
+            {compare ? <span>{showPct ? ` ${compare}` : compare}</span> : null}
+            {rightText}
+          </span>
+        ) : null}
       </div>
       {late ? null : (
         <div className="mt-2">

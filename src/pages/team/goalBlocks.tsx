@@ -144,7 +144,7 @@ type LineRank = SellerRow & { position: number };
 
 function personSubtitle(l: Pick<SellerRow, "group" | "role">): string {
   const shift = l.group === "Sem grupo definido" || l.group === "Sem grupo" ? "" : l.group;
-  return [shift, branchRoleLabel(l.role ?? null)].filter(Boolean).join(" · ");
+  return [shift, branchRoleLabel(l.role ?? null).toLocaleUpperCase("pt-BR")].filter(Boolean).join(" · ");
 }
 
 function SellerCell({ l }: { l: LineRank }) {

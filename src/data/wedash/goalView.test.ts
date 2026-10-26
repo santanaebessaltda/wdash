@@ -136,7 +136,7 @@ describe("goalView", () => {
     expect(card.band.outsideTeam).toBe(2000);
   });
 
-  it("gerente ativa entra na lista com a premiação da loja; usuário da filial não entra", () => {
+  it("gerência fica fora da lista de participantes", () => {
     const withManagement: GoalRecord = {
       ...goal,
       tiers: [
@@ -158,16 +158,8 @@ describe("goalView", () => {
       team,
       today: "2026-09-30",
     });
-    const rita = card.sellers.find((person) => person.name === "RITA");
-    expect(rita?.manager).toBe(true);
-    expect(rita?.role).toBe("GERENCIA");
-    expect(rita?.revenueAmount).toBe(400);
-    expect(rita?.accruedPrize).toBeCloseTo(30);
-    expect(rita?.bonusReached).toBe(100);
-    expect(rita?.currentLevel).toBe(1);
-    expect(card.sellers.some((person) => person.name === "LOJA")).toBe(false);
-    expect(card.sellers.at(-1)?.name).toBe("RITA");
-    expect(card.qtySellers).toBe(card.sellers.length);
+    expect(card.sellers.map((person) => person.name)).toEqual(["ANA"]);
+    expect(card.qtySellers).toBe(1);
   });
 
   it("nível em 0%: o percentual incide desde a primeira venda e o bônus entra mesmo sem venda", () => {
