@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { Alert, Button, DatePicker, FormField, Input, Modal, Select, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { Icon, icons } from "@/pages/users/Icons";
 import { cn } from "@/lib/cn";
 import { dateToIso, isoToDate } from "@/lib/format";
+import { endOfMonth, startOfMonth } from "@/data/wedash/engine/format";
 import { defaultDayNeeds, patternFits, weekdayLabel, type CompWindow, type DayNeed, type GroupNeed, type HolidayRule, type OffMode, type SchedulePattern, type ScheduleScenario, type Sex, type SundayRule } from "@/data/wedash/scheduleGenerate";
 import { paths } from "@/router/paths";
 
@@ -23,6 +25,7 @@ const TYPES: { id: SchedulePattern; title: string; detail: string }[] = [
 ];
 
 const WEEKDAYS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+const MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
 const SUNDAY_OPTIONS: { id: SundayRule; label: string }[] = [
   { id: "every_3", label: "Um a cada três domingos" },
@@ -108,6 +111,121 @@ function CountField({
   );
 }
 
+function scaleMonthLabel(iso: string): string {
+  const date = isoToDate(startOfMonth(iso));
+  return `${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+function ScheduleMonthField({ iso, onChange }: { iso: string; onChange: (firstDay: string) => void }) {
+  const selected = isoToDate(startOfMonth(iso || dateToIso(new Date())));
+  const thisYear = new Date().getFullYear();
+  const [open, setOpen] = useState(false);
+  const [yearView, setYearView] = useState(selected.getFullYear());
+  const [panelPos, setPanelPos] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const minYear = thisYear - 5;
+  const maxYear = thisYear + 3;
+
+  useEffect(() => {
+    if (!open) return;
+    setYearView(isoToDate(startOfMonth(iso)).getFullYear());
+  }, [open, iso]);
+
+  useEffect(() => {
+    function onClick(event: MouseEvent) {
+      const target = event.target as Node;
+      if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  useEffect(() => {
+    if (!open || !triggerRef.current) {
+      setPanelPos(null);
+      return;
+    }
+    function place() {
+      if (!triggerRef.current) return;
+      const rect = triggerRef.current.getBoundingClientRect();
+      const margin = 12;
+      const width = Math.min(window.innerWidth - margin * 2, 300);
+      let left = rect.left;
+      if (left + width > window.innerWidth - margin) left = Math.max(margin, window.innerWidth - margin - width);
+      const top = Math.min(rect.bottom + 8, window.innerHeight - margin - 80);
+      setPanelPos({ top, left, width, maxHeight: Math.max(200, window.innerHeight - top - margin) });
+    }
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open]);
+
+  const yearBtn = (ok: boolean) => cn("flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-line text-t1", ok ? "hover:bg-bg-3" : "cursor-not-allowed opacity-40");
+  const panel =
+    open && panelPos
+      ? createPortal(
+          <div
+            ref={panelRef}
+            style={{ top: panelPos.top, left: panelPos.left, width: panelPos.width, maxHeight: panelPos.maxHeight }}
+            className="fixed z-[105] overflow-y-auto rounded-[14px] border border-line bg-bg-2 p-4 shadow-[var(--shadow-vela)]"
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <button type="button" disabled={yearView <= minYear} aria-label="Ano anterior" className={yearBtn(yearView > minYear)} onClick={() => setYearView((year) => year - 1)}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="m15 18-6-6 6-6" /></svg>
+              </button>
+              <span className="text-sm font-bold text-t0">{yearView}</span>
+              <button type="button" disabled={yearView >= maxYear} aria-label="Próximo ano" className={yearBtn(yearView < maxYear)} onClick={() => setYearView((year) => year + 1)}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="m9 18 6-6-6-6" /></svg>
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-1">
+              {MONTHS.map((name, month) => {
+                const active = selected.getFullYear() === yearView && selected.getMonth() === month;
+                return (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => {
+                      onChange(dateToIso(new Date(yearView, month, 1)));
+                      setOpen(false);
+                    }}
+                    className={cn("h-9 truncate rounded-[9px] px-1 text-[12.5px] font-semibold transition-colors", active ? "bg-acc text-white" : "text-t1 hover:bg-bg-3")}
+                  >
+                    {name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>,
+          document.body,
+        )
+      : null;
+
+  return (
+    <div ref={triggerRef} className="relative flex w-full">
+      <button
+        type="button"
+        aria-label={`Mês da escala: ${scaleMonthLabel(iso)}`}
+        onClick={() => setOpen((current) => !current)}
+        className={cn("flex h-[42px] w-full min-w-0 items-center gap-2.5 rounded-[11px] border bg-bg-inset px-3.5 text-left transition-colors", open ? "border-acc" : "border-line hover:border-acc")}
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={open ? "var(--acc)" : "var(--t2)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" aria-hidden>
+          <rect x="3" y="4" width="18" height="18" rx="2" />
+          <path d="M16 2v4M8 2v4M3 10h18" />
+        </svg>
+        <span className="min-w-0 truncate text-[13.5px] font-semibold text-t0">{scaleMonthLabel(iso)}</span>
+      </button>
+      {panel}
+    </div>
+  );
+}
+
 function periodDays(from: string, to: string): number {
   const start = Date.parse(`${from}T00:00:00Z`);
   const end = Date.parse(`${to}T00:00:00Z`);
@@ -140,11 +258,17 @@ export function ScheduleWizard({
     const kept = new Set(initial.holidayRules.map((rule) => rule.date));
     return nationalHolidays.filter((row) => row.date >= initial.periodStart && row.date <= initial.periodEnd && !kept.has(row.date)).map((row) => row.date);
   });
-  const [value, setValue] = useState(() => ({
-    ...initial,
-    dayNeeds: initial.dayNeeds.length === 7 ? initial.dayNeeds : defaultDayNeeds(),
-    holidayRules: initial.holidayRules.length > 0 ? initial.holidayRules : nationalHolidays.filter((row) => row.date >= initial.periodStart && row.date <= initial.periodEnd).map((row) => defaultRule(row.date, row.name)),
-  }));
+  const [value, setValue] = useState(() => {
+    const periodStart = startOfMonth(initial.periodStart);
+    const periodEnd = endOfMonth(periodStart);
+    return {
+      ...initial,
+      periodStart,
+      periodEnd,
+      dayNeeds: initial.dayNeeds.length === 7 ? initial.dayNeeds : defaultDayNeeds(),
+      holidayRules: initial.holidayRules.length > 0 ? initial.holidayRules.filter((rule) => rule.date >= periodStart && rule.date <= periodEnd) : nationalHolidays.filter((row) => row.date >= periodStart && row.date <= periodEnd).map((row) => defaultRule(row.date, row.name)),
+    };
+  });
   const [extraDate, setExtraDate] = useState("");
   const [extraName, setExtraName] = useState("");
   const [addingHoliday, setAddingHoliday] = useState(false);
@@ -196,6 +320,11 @@ export function ScheduleWizard({
     });
   }
 
+  function setScaleMonth(firstDay: string) {
+    const periodStart = startOfMonth(firstDay);
+    setPeriod({ periodStart, periodEnd: endOfMonth(periodStart) });
+  }
+
   function setScenario(scenario: ScheduleScenario) {
     setValue((current) => ({
       ...current,
@@ -243,7 +372,7 @@ export function ScheduleWizard({
       <WizardSteps steps={STEPS} current={step} />
       {step === 1 ? (
         <>
-          <WizardCardHeader title={<>Modelo da escala<span className="text-bad"> *</span></>} subtitle="Escolha o modelo e o período da escala." />
+          <WizardCardHeader title={<>Modelo da escala<span className="text-bad"> *</span></>} subtitle="Escolha o modelo e o mês da escala." />
           <div className="flex flex-col gap-4">
           <FormField label="Cenário" required>
             <div className="grid gap-2 sm:grid-cols-2">
@@ -264,29 +393,9 @@ export function ScheduleWizard({
               ))}
             </Select>
           </FormField>
-          <div className="grid grid-cols-2 gap-3">
-            <FormField label="Data de início" required error={value.periodStart ? undefined : "Informe a data de início."}>
-              <DatePicker
-                value={value.periodStart ? isoToDate(value.periodStart) : null}
-                onChange={(day) => {
-                  const next = dateToIso(day);
-                  setPeriod(value.periodEnd && value.periodEnd < next ? { periodStart: next, periodEnd: "" } : { periodStart: next });
-                }}
-                invalid={!value.periodStart}
-                aria-label="Data de início"
-              />
-            </FormField>
-            <FormField label="Data de fim" required error={periodOk ? undefined : "A data de fim precisa ser depois da data de início, em até 93 dias."}>
-              <DatePicker
-                value={value.periodEnd ? isoToDate(value.periodEnd) : null}
-                onChange={(day) => setPeriod({ periodEnd: dateToIso(day) })}
-                minDate={value.periodStart ? isoToDate(value.periodStart) : null}
-                invalid={!periodOk}
-                aria-label="Data de fim"
-              />
-            </FormField>
-          </div>
-          {periodOk ? <p className="text-[12px] text-t2">A escala começa em {value.periodStart.split("-").reverse().join("/")} e segue até {value.periodEnd.split("-").reverse().join("/")}. O ciclo conta a partir do primeiro dia.</p> : null}
+          <FormField label="Mês da escala" required>
+            <ScheduleMonthField iso={value.periodStart} onChange={setScaleMonth} />
+          </FormField>
           </div>
         </>
       ) : null}
