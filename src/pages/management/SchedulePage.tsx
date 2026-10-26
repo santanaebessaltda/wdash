@@ -449,7 +449,7 @@ function ScheduleGrid({
       const person = byId.get(id);
       const fixed = schedule.people.find((row) => row.sellerId === id)?.fixedOffDow ?? null;
       const shift = shifts.find((item) => item.id === person?.shiftId);
-      const detail = [person ? branchRoleLabel(person.role) : "", shift ? shiftName(shift.name) : "", fixed != null ? `folga ${weekdayLabel(fixed)}` : ""].filter(Boolean).join(" · ");
+      const detail = [person ? branchRoleLabel(person.role).toLocaleUpperCase("pt-BR") : "", shift ? shiftName(shift.name) : "", fixed != null ? `folga ${weekdayLabel(fixed)}` : ""].filter(Boolean).join(" · ");
       return { id, name: person?.name ?? "Pessoa", detail, shiftId: person?.shiftId ?? null };
     })
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
@@ -506,7 +506,7 @@ function ScheduleGrid({
         <tbody>
           {roster.map((person) => (
             <tr key={person.id}>
-              <th className={cn(STICKY, "min-w-[190px] border-b px-3 py-2 text-left font-normal")}>
+              <th className={cn(STICKY, "min-w-[190px] border-b px-3 py-2 text-left align-top font-normal")}>
                 <span className="block truncate text-[13px] font-semibold text-t0">{person.name}</span>
                 {person.detail ? <span className="block truncate text-[11px] text-t2">{person.detail}</span> : null}
               </th>
@@ -515,14 +515,18 @@ function ScheduleGrid({
                 const holiday = holidayLabel(holidays, iso);
                 const doublePay = schedule.holidayRules.some((rule) => rule.date === iso && rule.pay === "double");
                 const last = index === dates.length - 1;
-                const cell = cn("relative min-h-[84px] border-b border-line p-1.5 align-top sm:p-2", !last && "border-r");
-                if (!row) return <td key={iso} className={cell} />;
-                const chip = statusChip(row.status, doublePay);
+                const chip = row ? statusChip(row.status, doublePay) : null;
                 return (
-                  <td key={iso} className={cell}>
-                    <button type="button" className="absolute inset-0 z-0" aria-label={`${person.name}, ${Number(iso.slice(8))}: ${chip.label}${holiday ? `, ${holiday}` : ""}`} onClick={() => onOpenDay(iso)} />
-                    <div className="pointer-events-none relative z-10">
-                      <DayChip color={chip.color}>{chip.label}</DayChip>
+                  <td key={iso} className={cn("relative border-b border-line align-top", !last && "border-r")}>
+                    <div className="relative flex min-h-[84px] flex-col p-1.5 sm:min-h-[110px] sm:p-2">
+                      {chip ? (
+                        <>
+                          <button type="button" className="absolute inset-0 z-0" aria-label={`${person.name}, ${Number(iso.slice(8))}: ${chip.label}${holiday ? `, ${holiday}` : ""}`} onClick={() => onOpenDay(iso)} />
+                          <div className="pointer-events-none relative z-10">
+                            <DayChip color={chip.color}>{chip.label}</DayChip>
+                          </div>
+                        </>
+                      ) : null}
                     </div>
                   </td>
                 );
