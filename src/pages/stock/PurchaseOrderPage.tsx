@@ -21,6 +21,7 @@ import {
   type PurchaseOrderTone,
 } from "@/data/wedash/purchaseOrder";
 import { PURCHASE_SYNC_BUSY, PURCHASE_SYNC_ERROR, PURCHASE_SYNC_OFFLINE, PURCHASE_SYNC_TITLE, fetchPurchaseStock, savePurchaseMins } from "@/data/wedash/purchaseRepo";
+import { productBrand } from "@/data/wedash/stockProducts";
 import { storesForSession } from "@/data/wedash/stores";
 import { cn } from "@/lib/cn";
 import { num } from "@/lib/format";
@@ -34,6 +35,8 @@ import { HeaderFilters, TableFooter, TipHelp, money, qty } from "./shared";
 import { SOLD_WINDOWS, usePurchaseOrder } from "./usePurchaseOrder";
 
 const PAGE_SIZE = 50;
+
+type BrandFilter = "" | "WEPINK" | "WPINK";
 
 type SortKey = "store" | "name" | "minimo" | "saldo" | "pedidosAbertos" | "total" | "vendidos30" | "multipla" | "novo" | "bloqueado" | "aPedir";
 
@@ -184,9 +187,12 @@ export function PurchaseOrderPage() {
   );
   const [search, setSearch] = useState("");
   const [filterPicked, setFilter] = useState<PurchaseFilter>("todos");
+  const [brand, setBrand] = useState<BrandFilter>("");
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [page, setPage] = useState(1);
+  const showBrand = storeRows.some((s) => s.hasWpink);
+  const activeBrand: BrandFilter = showBrand ? brand : "";
   const [summaryGroups, setSummaryGroups] = useState<OrderGroup[] | null>(null);
   const [summarySkipped, setSummarySkipped] = useState(0);
   const [exportPick, setExportPick] = useState<string[] | null>(null);
@@ -222,7 +228,9 @@ export function PurchaseOrderPage() {
       if (!part) continue;
       for (const row of part.view.rows) tagged.push({ ...row, storeId: rowStore.id, storeName: rowStore.tradeName || rowStore.name });
     }
-    const out = filterPurchaseRows(tagged, { search, filter }) as OrderLine[];
+    const out = (filterPurchaseRows(tagged, { search, filter }) as OrderLine[]).filter(
+      (row) => !activeBrand || productBrand(row.code) === activeBrand,
+    );
     const dir = sortDir === "asc" ? 1 : -1;
     const byName = (a: OrderLine, b: OrderLine) => a.name.localeCompare(b.name, "pt-BR");
     const byStore = (a: OrderLine, b: OrderLine) => a.storeName.localeCompare(b.storeName, "pt-BR") || byName(a, b);
@@ -231,10 +239,10 @@ export function PurchaseOrderPage() {
       if (sortKey === "name") return byName(a, b) * dir || a.storeName.localeCompare(b.storeName, "pt-BR");
       return (sortValue(a, sortKey) - sortValue(b, sortKey)) * dir || byStore(a, b);
     });
-  }, [po.parts, storeRows, search, filter, sortKey, sortDir]);
+  }, [po.parts, storeRows, search, filter, activeBrand, sortKey, sortDir]);
 
-  useEffect(() => setPage(1), [search, filter, sortKey, sortDir, scopeKey]);
-  useEffect(() => setOpened({}), [search, filter, scopeKey]);
+  useEffect(() => setPage(1), [search, filter, activeBrand, sortKey, sortDir, scopeKey]);
+  useEffect(() => setOpened({}), [search, filter, activeBrand, scopeKey]);
   const groups = useMemo(() => groupProducts(lines, sortKey, sortDir), [lines, sortKey, sortDir]);
 
   useEffect(() => {
@@ -287,7 +295,9 @@ export function PurchaseOrderPage() {
     for (const rowStore of storeRows) {
       if (!ids.includes(rowStore.id)) continue;
       const part = po.parts.find((p) => p.storeId === rowStore.id);
-      const rows = (part?.view.rows ?? []).filter((r) => r.onOrder).sort((a, b) => a.position - b.position);
+      const rows = (part?.view.rows ?? [])
+        .filter((r) => r.onOrder && (!activeBrand || productBrand(r.code) === activeBrand))
+        .sort((a, b) => a.position - b.position);
       if (rows.length === 0) {
         skipped += 1;
         continue;
@@ -424,6 +434,7 @@ export function PurchaseOrderPage() {
   const clearSearch = () => {
     setSearch("");
     setFilter("todos");
+    setBrand("");
   };
 
   const summary = po.parts.reduce(
@@ -461,6 +472,18 @@ export function PurchaseOrderPage() {
               ))}
             </div>
             <HeaderFilter label="Status dos produtos" value={filter} onChange={setFilter} options={filterOptions} />
+            {showBrand && (
+              <HeaderFilter
+                label="Marca"
+                value={brand}
+                onChange={setBrand}
+                options={[
+                  { value: "", label: "Todas as marcas" },
+                  { value: "WEPINK", label: "WEPINK" },
+                  { value: "WPINK", label: "WPINK" },
+                ]}
+              />
+            )}
             <span className="inline-flex items-center gap-1.5">
               <HeaderFilter
                 label="Multiplicador do pedido"

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, Card, DateRangePicker, Modal, Select, useToast, CALENDAR_QUICK_RANGES, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
 import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
+import { ScheduleCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { BranchBadge, PeriodBadge } from "@/components/wedash/RecordBadges";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
@@ -8,6 +9,7 @@ import { HeaderFilters } from "@/pages/stock/shared";
 import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
 import { cn } from "@/lib/cn";
+import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { addDays, addMonths, dateToIso, endOfMonth, isoToDate, shiftName, startOfMonth } from "@/data/wedash/engine/format";
 import { periodLabels } from "@/data/wedash/dashboard";
@@ -106,6 +108,7 @@ export function SchedulePage() {
   rangeFromRef.current = rangeFrom;
   const [views, setViews] = useState<BranchSchedule[]>([]);
   const [loading, setLoading] = useState(false);
+  const showSkeleton = useMinSkeleton(loading);
   const [error, setError] = useState(false);
   const [wizardStoreId, setWizardStoreId] = useState<string | null>(null);
   const [wizardMonth, setWizardMonth] = useState<string | null>(null);
@@ -470,57 +473,52 @@ export function SchedulePage() {
           <Card className="flex min-h-[280px] flex-col">
             <EmptyBlock icon="📅" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
           </Card>
-        ) : loading && views.length === 0 ? (
-          <p className="text-[12px] text-t2">Carregando a escala…</p>
+        ) : showSkeleton ? (
+          <ScheduleCardsSkeleton count={many ? 2 : 1} />
+        ) : registered.length === 0 ? (
+          <Card className="flex min-h-[280px] flex-col">
+            <EmptyBlock
+              icon="📅"
+              title="Sem escala cadastrada"
+              description="Nenhuma filial deste filtro tem escala neste período."
+              action={creatable.length > 0 ? <Button size="sm" onClick={openCreate}>Criar escala</Button> : undefined}
+            />
+          </Card>
         ) : (
           <>
-            {registered.length === 0 ? (
-              <Card className="flex min-h-[280px] flex-col">
-                <EmptyBlock
-                  icon="📅"
-                  title="Sem escala cadastrada"
-                  description="Nenhuma filial deste filtro tem escala neste período."
-                  action={creatable.length > 0 ? <Button size="sm" onClick={openCreate}>Criar escala</Button> : undefined}
-                />
-              </Card>
-            ) : (
-              <>
-                <ColorLegend className="mb-4" items={SCHEDULE_LEGEND} />
-                <div className="flex flex-col gap-4">
-                  {scheduleCards.map(({ view, item }) => {
-                      const monthDates = dates.filter((iso) => startOfMonth(iso) === item.monthStart);
-                      return (
-                        <Card key={`${view.store.id}-${item.monthStart}`}>
-                          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <h3 className="text-[15px] font-bold text-t0">{scheduleTitle(item.schedule.pattern, item.monthStart)}</h3>
-                              <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                                <PeriodBadge from={item.monthStart} to={endOfMonth(item.monthStart)} />
-                                <BranchBadge name={view.store.tradeName || view.store.name} />
-                              </div>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2">{registeredActions(view, item.monthStart)}</div>
-                          </div>
-                          <ScheduleBoard
-                            dates={monthDates}
-                            today={today}
-                            section={{
-                              storeId: view.store.id,
-                              holidays: view.holidays,
-                              schedules: [item],
-                              days: view.days.filter((row) => startOfMonth(row.day) === item.monthStart),
-                              people: view.people,
-                              shifts: view.shifts,
-                            }}
-                            onOpenDay={(day, sellerId) => setDayOpen({ storeId: view.store.id, day, sellerId })}
-                          />
-                        </Card>
-                      );
-                    })}
-                </div>
-              </>
-            )}
-            {loading && views.length > 0 ? <p className="mt-3 text-[12px] text-t2">Carregando a escala…</p> : null}
+            <ColorLegend className="mb-4" items={SCHEDULE_LEGEND} />
+            <div className="flex flex-col gap-4">
+              {scheduleCards.map(({ view, item }) => {
+                const monthDates = dates.filter((iso) => startOfMonth(iso) === item.monthStart);
+                return (
+                  <Card key={`${view.store.id}-${item.monthStart}`}>
+                    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="text-[15px] font-bold text-t0">{scheduleTitle(item.schedule.pattern, item.monthStart)}</h3>
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                          <PeriodBadge from={item.monthStart} to={endOfMonth(item.monthStart)} />
+                          <BranchBadge name={view.store.tradeName || view.store.name} />
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">{registeredActions(view, item.monthStart)}</div>
+                    </div>
+                    <ScheduleBoard
+                      dates={monthDates}
+                      today={today}
+                      section={{
+                        storeId: view.store.id,
+                        holidays: view.holidays,
+                        schedules: [item],
+                        days: view.days.filter((row) => startOfMonth(row.day) === item.monthStart),
+                        people: view.people,
+                        shifts: view.shifts,
+                      }}
+                      onOpenDay={(day, sellerId) => setDayOpen({ storeId: view.store.id, day, sellerId })}
+                    />
+                  </Card>
+                );
+              })}
+            </div>
           </>
         )}
       </div>

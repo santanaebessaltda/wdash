@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { Card, Skeleton } from "@/components/ui";
 import { MonthCalendarSkeleton } from "@/components/wedash/MonthCalendar";
 import { cn } from "@/lib/cn";
@@ -769,6 +769,71 @@ export function GoalDetailSkeleton() {
           </div>
         </Card>
       </div>
+    </Busy>
+  );
+}
+
+/** Escala: card com titulo, selos, botoes e grade pessoa × dia. */
+export function ScheduleCardsSkeleton({ count = 1, people = 5, days = 7 }: { count?: number; people?: number; days?: number }) {
+  return (
+    <Busy className="flex flex-col gap-4">
+      <div className="flex flex-wrap gap-3">
+        {Array.from({ length: 4 }, (_, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <Skeleton className="h-3 w-3 rounded-sm" />
+            <Skeleton className="h-3 w-24" />
+          </div>
+        ))}
+      </div>
+      {Array.from({ length: count }, (_, c) => (
+        <Card key={c} className="min-w-0 overflow-hidden">
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <Skeleton className="h-4 w-48" />
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <Pill className="w-24" />
+                <Pill className="w-28" />
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Skeleton className="h-8 w-20 rounded-[var(--radius-vela-sm)]" />
+              <Skeleton className="h-8 w-20 rounded-[var(--radius-vela-sm)]" />
+            </div>
+          </div>
+          <div className="min-w-0 overflow-hidden">
+            <div
+              className="grid gap-px rounded-[var(--radius-vela-sm)] border border-line bg-line"
+              style={{ gridTemplateColumns: `minmax(14rem, 16rem) repeat(${days}, minmax(0, 1fr))` }}
+            >
+              <div className="bg-bg-2 px-3 py-2">
+                <Skeleton className="h-3 w-14" />
+              </div>
+              {Array.from({ length: days }, (_, d) => (
+                <div key={d} className="bg-bg-2 px-1 py-2">
+                  <Skeleton className="mx-auto h-3 w-6" />
+                  <Skeleton className="mx-auto mt-1 h-2.5 w-8" />
+                </div>
+              ))}
+              {Array.from({ length: people }, (_, p) => (
+                <Fragment key={p}>
+                  <div className="flex items-center gap-2.5 bg-bg-2 px-3 py-2.5">
+                    <Skeleton className="h-8 w-8 shrink-0 rounded-full" />
+                    <div className="min-w-0 flex-1">
+                      <Skeleton className="h-3.5 w-28" />
+                      <Skeleton className="mt-1.5 h-2.5 w-40 max-w-full" />
+                    </div>
+                  </div>
+                  {Array.from({ length: days }, (_, d) => (
+                    <div key={d} className="flex items-center justify-center bg-bg-2 py-2.5">
+                      <Skeleton className="h-7 w-7 rounded-md" />
+                    </div>
+                  ))}
+                </Fragment>
+              ))}
+            </div>
+          </div>
+        </Card>
+      ))}
     </Busy>
   );
 }
