@@ -827,7 +827,7 @@ export default function OverviewPage() {
           <CardHeader className="items-center">
             <CardTitle>Ranking de filiais</CardTitle>
             {compareNetwork && (
-              <Badge variant="neutral">
+              <Badge variant="accent">
                 Rede: {brlCent(view.rankingNetworkTotal ?? 0)}
               </Badge>
             )}
