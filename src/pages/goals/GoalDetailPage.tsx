@@ -244,7 +244,7 @@ function GoalHero({
     {
       label: "Realizado",
       value: brlCent(achieved),
-      cls: achieved < 0 ? "text-bad" : "text-acc",
+      cls: achieved < 0 ? "text-bad" : "text-ok",
       note: outsideRankingNote(card.band) ?? undefined,
     },
     {
@@ -268,7 +268,7 @@ function GoalHero({
     {
       label: status === "ended" ? "Premiação total" : "Premiação até agora",
       value: brlCent(prizeAmount),
-      cls: "text-t0",
+      cls: "text-ok",
       help:
         status === "ended"
           ? "Total de premiação e bônus obtidos pela equipe e, quando aplicável, pela gerência no período da meta."
@@ -315,7 +315,7 @@ function GoalHero({
             <p className={`font-mono text-[13px] font-extrabold ${progressTextClass(pct)}`}>{num(pct, 1)}%</p>
           ) : null}
         </div>
-        <GlobalGoalBand goal={card.band} tiers={card.tiers} todayIso={today} embedded soBarra hideOutsideNote />
+        <GlobalGoalBand goal={card.band} tiers={card.tiers} todayIso={today} embedded soBarra hideOutsideNote greenPrize />
       </div>
     </Card>
   );
@@ -372,7 +372,7 @@ function GoalTiersCard({
       {goal.tiers.length === 0 ? (
         <p className="mt-4 text-[12.5px] text-t2">Esta meta não tem níveis de premiação.</p>
       ) : (
-        <GoalLevelGuide goal={goal} sellers={card.sellers} showReached hideNote management={management} managementClosed={status === "ended"} />
+        <GoalLevelGuide goal={goal} sellers={card.sellers} showReached hideNote management={management} managementClosed={status === "ended"} greenValues />
       )}
     </Card>
   );
@@ -478,7 +478,7 @@ function GoalPayoutCard({
   const summary = [
     { label: "Equipe", value: teamTotal },
     ...(lineManagement ? [{ label: "Gerência", value: totalManagement }] : []),
-    { label: "Total ganho", value: teamTotal + totalManagement, destaque: true },
+    { label: "Total ganho", value: teamTotal + totalManagement },
   ];
 
   return (
@@ -508,7 +508,7 @@ function GoalPayoutCard({
         {summary.map((r) => (
           <div key={r.label} className="rounded-xl bg-bg-inset px-3.5 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-t2">{r.label}</p>
-            <p className={`mt-1 font-mono text-[16px] font-extrabold ${r.destaque ? "text-ok" : "text-t0"}`}>{brlCent(r.value)}</p>
+            <p className="mt-1 font-mono text-[16px] font-extrabold text-ok">{brlCent(r.value)}</p>
           </div>
         ))}
       </div>
@@ -541,9 +541,9 @@ function GoalPayoutCard({
                     </div>
                   </td>
                   <td className={`py-2.5 pr-3 font-semibold ${r.level ? "text-acc" : "text-t2"}`}>{r.level ?? "Abaixo do 1º nível"}</td>
-                  <td className="py-2.5 pr-3 text-right font-mono font-bold text-t1">{brlCent(r.revenue)}</td>
+                  <td className={`py-2.5 pr-3 text-right font-mono font-bold ${r.revenue < 0 ? "text-bad" : "text-ok"}`}>{brlCent(r.revenue)}</td>
                   <td className="py-2.5 pr-3 text-right">
-                    <p className="font-mono font-bold text-t0">{r.prizeAmount > 0 ? brlCent(r.prizeAmount) : "—"}</p>
+                    <p className={`font-mono font-bold ${r.prizeAmount > 0 ? "text-ok" : "text-t2"}`}>{r.prizeAmount > 0 ? brlCent(r.prizeAmount) : "—"}</p>
                     {r.pct > 0 && <p className="text-[11px] text-t2">{num(r.pct, 1)}%</p>}
                   </td>
                   <td className="py-2.5 pr-3 text-right font-mono font-bold text-t0">{r.bonus > 0 ? brlCent(r.bonus) : "—"}</td>
@@ -556,7 +556,7 @@ function GoalPayoutCard({
                 <td className="pt-3 pr-3 font-extrabold" colSpan={3}>
                   Total
                 </td>
-                <td className="pt-3 pr-3 text-right font-mono font-extrabold">{brlCent(sum("prizeAmount"))}</td>
+                <td className="pt-3 pr-3 text-right font-mono font-extrabold text-ok">{brlCent(sum("prizeAmount"))}</td>
                 <td className="pt-3 pr-3 text-right font-mono font-extrabold">{brlCent(sum("bonus"))}</td>
                 <td className="pt-3 text-right font-mono font-extrabold text-ok">{brlCent(sum("total"))}</td>
               </tr>

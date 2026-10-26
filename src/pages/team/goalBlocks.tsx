@@ -158,7 +158,7 @@ function SellerCell({ l }: { l: LineRank }) {
 function RevenueCell({ l }: { l: LineRank }) {
   return (
     <div>
-      <p className="font-mono text-[12.5px] font-bold text-acc">{l.revenue}</p>
+      <p className={`font-mono text-[12.5px] font-bold ${l.revenueAmount < 0 ? "text-bad" : "text-ok"}`}>{l.revenue}</p>
       <p className="text-[11px] text-t2">
         {num(l.salesCount, 0)} {l.salesCount === 1 ? "venda" : "vendas"}
       </p>
@@ -207,7 +207,7 @@ function PrizeCell({ l }: { l: LineRank }) {
   if (amount <= 0 && l.commissionPct <= 0) return <span className="text-t2">—</span>;
   return (
     <div className="text-right">
-      <p className="font-mono text-[12.5px] font-bold text-acc">{brlCent(amount)}</p>
+      <p className="font-mono text-[12.5px] font-bold text-ok">{brlCent(amount)}</p>
       {l.commissionPct > 0 ? (
         <p className="text-[11px] text-t2">
           {num(l.commissionPct, 1)}%
@@ -502,6 +502,7 @@ export function GlobalGoalBand({
   enter = false,
   pulseCurrent = false,
   secret = false,
+  greenPrize = false,
 }: {
   goal: NetworkGlobalGoal;
   embedded?: boolean;
@@ -517,6 +518,8 @@ export function GlobalGoalBand({
   pulseCurrent?: boolean;
   /** Borra o percentual de premiação de cada nível. Só o placar. */
   secret?: boolean;
+  /** No detalhe da meta, o percentual de premiação de cada nível fica verde. */
+  greenPrize?: boolean;
   /** Quando o título da meta já está no CardMeta. */
   hideTitle?: boolean;
   /** Degraus desta meta (default = escada padrão). */
@@ -677,7 +680,7 @@ export function GlobalGoalBand({
                       title={`N${i + 1} · ${d.name} · ${num(d.commissionPct, 1)}%`}
                     >
                       N{i + 1} · {shortLabel}
-                      <span className="font-semibold opacity-75" {...(secret ? { "data-secret": "" } : {})}> ({num(d.commissionPct, 1)}%)</span>
+                      <span className={cn("font-semibold opacity-75", greenPrize && "text-ok")} {...(secret ? { "data-secret": "" } : {})}> ({num(d.commissionPct, 1)}%)</span>
                     </p>
                   );
                 })}

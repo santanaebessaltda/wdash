@@ -17,6 +17,7 @@ export function GoalLevelGuide({
   hideNote = false,
   management = null,
   managementClosed = false,
+  greenValues = false,
 }: {
   goal: GoalRecord;
   sellers: SellerRow[];
@@ -30,6 +31,8 @@ export function GoalLevelGuide({
   management?: GoalManagerPrize | null;
   /** Meta encerrada: a premiação vira total e some o que falta para o próximo nível. */
   managementClosed?: boolean;
+  /** No detalhe da meta, realizado e premiação ficam verdes. O placar segue na cor primária. */
+  greenValues?: boolean;
 }) {
   const guide = buildGoalLevelGuide(goal, sellers);
   const [groupKey, setGroupKey] = useState(guide?.groups[0]?.key ?? MANAGEMENT_KEY);
@@ -61,7 +64,7 @@ export function GoalLevelGuide({
           onChange={(value) => value && setGroupKey(value)}
         />
       ) : null}
-      {showingManagement ? <ManagementSummary management={management} closed={managementClosed} className={hasNote || hasPills ? "mt-3" : undefined} /> : null}
+      {showingManagement ? <ManagementSummary management={management} closed={managementClosed} greenValues={greenValues} className={hasNote || hasPills ? "mt-3" : undefined} /> : null}
       <div className={cn("flex flex-col gap-2.5", (hasNote || hasPills || showingManagement) && "mt-3")}>
         {rows.map((row) => {
           const everyone = row.marked || (people > 0 && row.reached === people);
@@ -99,7 +102,7 @@ export function GoalLevelGuide({
                 ) : null}
               </div>
               <div className="shrink-0 text-right">
-                <p className="font-mono text-[13px] font-extrabold text-acc">{num(row.commissionPct, 1)}%</p>
+                <p className={`font-mono text-[13px] font-extrabold ${greenValues ? "text-ok" : "text-acc"}`}>{num(row.commissionPct, 1)}%</p>
                 <p className="text-[10.5px] text-t2">de premiação</p>
               </div>
             </div>
@@ -112,7 +115,7 @@ export function GoalLevelGuide({
 }
 
 /** Nível já atingido e a premiação acumulada. Fica só na vista Gerência. */
-function ManagementSummary({ management, closed, className }: { management: GoalManagerPrize; closed: boolean; className?: string }) {
+function ManagementSummary({ management, closed, greenValues = false, className }: { management: GoalManagerPrize; closed: boolean; greenValues?: boolean; className?: string }) {
   const prize = management.prizeAmount + management.bonus;
   return (
     <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-acc-soft px-3.5 py-3 text-[12.5px]", className)}>
@@ -120,7 +123,7 @@ function ManagementSummary({ management, closed, className }: { management: Goal
         {management.level ? `N${management.levelNumber} · ${management.level}` : "Abaixo do 1º nível"}
       </span>
       <span className="text-t1">
-        {closed ? "Premiação total" : "Premiação até agora"}: <span className="font-mono font-bold text-t0">{brlCent(prize)}</span>
+        {closed ? "Premiação total" : "Premiação até agora"}: <span className={`font-mono font-bold ${greenValues ? "text-ok" : "text-t0"}`}>{brlCent(prize)}</span>
       </span>
       {!closed ? (
         <span className="text-t1 sm:ml-auto">
