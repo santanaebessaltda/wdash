@@ -16,6 +16,8 @@ export interface DataTableColumn<T> {
   sortable?: boolean;
   /** Valor usado na comparacao; obrigatorio quando `sortable`. */
   sortValue?: (row: T) => string | number | null | undefined;
+  /** Parada no scroll horizontal. `rank` encosta na esquerda; `label` encosta na coluna de 48px. */
+  pin?: "rank" | "label";
 }
 
 export interface DataTableProps<T> {
@@ -51,6 +53,16 @@ const alignClasses = {
   right: "text-right",
   center: "text-center",
 };
+
+const PIN_RANK = "sticky left-0 z-20 w-12 min-w-12 max-w-12 bg-bg-2";
+const PIN_LABEL = "sticky left-12 z-10 min-w-0 bg-bg-2";
+const PIN_CLIP = "min-w-0 max-w-[9.5rem] sm:max-w-[12.5rem] lg:max-w-[14rem] xl:max-w-none";
+
+function pinClass(pin: DataTableColumn<unknown>["pin"]): string | undefined {
+  if (pin === "rank") return PIN_RANK;
+  if (pin === "label") return PIN_LABEL;
+  return undefined;
+}
 
 function compareSortValues(a: string | number | null | undefined, b: string | number | null | undefined, dir: SortDir): number {
   const mul = dir === "asc" ? 1 : -1;
@@ -119,13 +131,22 @@ export function DataTable<T>({
     ? "px-1 pb-3 text-[11px] font-bold uppercase tracking-wide"
     : "px-4 py-3 text-[10.5px] font-bold uppercase tracking-wide";
   const cellClass = compact ? "px-1 py-3 align-middle" : "px-4 py-3.5 align-middle";
+  const pinned = columns.some((col) => col.pin);
 
   return (
     <div className={cn(compact ? "min-w-0 overflow-x-auto" : "min-w-0 overflow-hidden rounded-[var(--radius-vela-lg)] border border-line bg-bg-2", className)}>
       <div className={compact ? undefined : "min-w-0 overflow-x-auto"}>
-      <table className={cn("w-full border-collapse text-sm", compact ? "min-w-[720px]" : "min-w-[640px]")}>
+      <table
+        className={cn(
+          "w-full text-sm",
+          compact ? "min-w-[720px]" : "min-w-[640px]",
+          pinned
+            ? "border-separate border-spacing-0 [&_tbody_td]:border-b [&_tbody_td]:border-line [&_tbody_tr:last-child_td]:border-b-0 [&_th]:border-b [&_th]:border-line"
+            : "border-collapse",
+        )}
+      >
         <thead>
-          <tr className="border-b border-line text-t2">
+          <tr className={cn("text-t2", !pinned && "border-b border-line")}>
             {columns.map((col) =>
               col.sortable && col.sortValue ? (
                 <ThSort
@@ -136,13 +157,13 @@ export function DataTable<T>({
                   onClick={() => toggleSort(col.key)}
                   align={col.align ?? "left"}
                   width={col.width}
-                  className={cn(headClass, col.hideBelow && hideBelowClasses[col.hideBelow])}
+                  className={cn(headClass, pinClass(col.pin), col.hideBelow && hideBelowClasses[col.hideBelow])}
                 />
               ) : (
                 <th
                   key={col.key}
                   style={{ width: col.width }}
-                  className={cn(headClass, "text-t2", alignClasses[col.align ?? "left"], col.hideBelow && hideBelowClasses[col.hideBelow])}
+                  className={cn(headClass, "text-t2", pinClass(col.pin), alignClasses[col.align ?? "left"], col.hideBelow && hideBelowClasses[col.hideBelow])}
                 >
                   {col.header}
                 </th>
@@ -156,7 +177,8 @@ export function DataTable<T>({
               key={rowKey(row)}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
               className={cn(
-                "border-b border-line transition-colors last:border-b-0",
+                !pinned && "border-b border-line last:border-b-0",
+                "transition-colors",
                 (compact || onRowClick) && "hover:bg-bg-3",
                 onRowClick && "cursor-pointer",
               )}
@@ -165,9 +187,9 @@ export function DataTable<T>({
                 <td
                   key={col.key}
                   style={col.width ? { width: col.width, maxWidth: col.width } : undefined}
-                  className={cn(cellClass, "text-t0", alignClasses[col.align ?? "left"], col.hideBelow && hideBelowClasses[col.hideBelow])}
+                  className={cn(cellClass, "text-t0", pinClass(col.pin), alignClasses[col.align ?? "left"], col.hideBelow && hideBelowClasses[col.hideBelow])}
                 >
-                  {col.render(row)}
+                  {col.pin === "label" ? <div className={PIN_CLIP}>{col.render(row)}</div> : col.render(row)}
                 </td>
               ))}
             </tr>

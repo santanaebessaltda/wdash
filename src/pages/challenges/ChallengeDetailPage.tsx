@@ -378,6 +378,13 @@ function RoleResultBar({
   );
 }
 
+const RANK_PIN = "sticky left-0 z-20 w-10 min-w-10 max-w-10 bg-bg-2";
+const NAME_AFTER = "sticky left-10 z-10 min-w-0 bg-bg-2";
+const NAME_FIRST = "sticky left-0 z-10 min-w-0";
+const NAME_CLIP = "min-w-0 max-w-[9.5rem] sm:max-w-[12.5rem] lg:max-w-[14rem] xl:max-w-none";
+const PIN_TABLE =
+  "w-full border-separate border-spacing-0 text-[12.5px] [&_tbody_td]:border-b [&_tbody_td]:border-line [&_th]:border-b [&_th]:border-line";
+
 function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; view: ChallengeView }) {
   const disputa = c.mode === "CONTEST";
   const aComecar = view.status === "upcoming";
@@ -446,11 +453,11 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
         <EmptyBlock icon="👤" title="Nenhuma pessoa no desafio" description="Não há vendedores ativos nem vendas atribuídas à equipe no período." />
       ) : (
         <div className="min-w-0 overflow-x-auto">
-          <table className="w-full border-collapse text-[12.5px]" style={{ minWidth: 620 }}>
+          <table className={PIN_TABLE} style={{ minWidth: 620 }}>
             <thead>
-              <tr className="border-b border-line text-[11px] font-bold uppercase tracking-wide text-t2">
-                {disputa && <th className="w-10 pb-3 pr-3 text-left">#</th>}
-                <th className="pb-3 pr-3 text-left">Nome</th>
+              <tr className="text-[11px] font-bold uppercase tracking-wide text-t2">
+                {disputa && <th className={cn(RANK_PIN, "pb-3 pr-3 text-left")}>#</th>}
+                <th className={cn(disputa ? NAME_AFTER : cn(NAME_FIRST, "bg-bg-2"), "pb-3 pr-3 text-left")}>Nome</th>
                 <th className="pb-3 pr-3 text-right">Resultado</th>
                 {usesSales && <th className="pb-3 pr-3 text-right">Vendas</th>}
                 <th className="pb-3 pr-3 text-left">Status</th>
@@ -459,15 +466,17 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
             </thead>
             <tbody>
               {view.participants.map((p) => (
-                <tr key={p.key} className="border-b border-line last:border-b-0">
-                  {disputa && <td className="py-2.5 pr-3 font-mono font-bold text-t2">{p.position ?? "—"}</td>}
-                  <td className="py-2.5 pr-3">
-                    <PersonName
-                      name={p.name}
-                      employeeId={p.key}
-                      storeId={c.storeId}
-                      sub={[p.group, p.eligibleDays < p.periodDays ? `${p.eligibleDays} de ${p.periodDays} dias` : null].filter(Boolean).join(" · ") || null}
-                    />
+                <tr key={p.key}>
+                  {disputa && <td className={cn(RANK_PIN, "py-2.5 pr-3 font-mono font-bold text-t2")}>{p.position ?? "—"}</td>}
+                  <td className={cn(disputa ? NAME_AFTER : cn(NAME_FIRST, "bg-bg-2"), "py-2.5 pr-3")}>
+                    <div className={NAME_CLIP}>
+                      <PersonName
+                        name={p.name}
+                        employeeId={p.key}
+                        storeId={c.storeId}
+                        sub={[p.group, p.eligibleDays < p.periodDays ? `${p.eligibleDays} de ${p.periodDays} dias` : null].filter(Boolean).join(" · ") || null}
+                      />
+                    </div>
                   </td>
                   <td className={`py-2.5 pr-3 text-right font-mono font-bold ${aComecar || p.result == null ? "text-t0" : late && floor != null ? (p.result >= floor ? "text-acc" : "text-t1") : "text-acc"}`}>
                     {aComecar ? "—" : p.result != null ? metricValueLabel(c.metric, p.result) : <WithoutItems index={isIndexMetric(c.metric)} />}
@@ -612,19 +621,23 @@ function ChallengePayoutCard({ challenge: c, view, onExport }: { challenge: Chal
           </div>
 
           <div className="min-w-0 overflow-x-auto">
-            <table className="w-full border-collapse text-[12.5px]" style={{ minWidth: 480 }}>
+            <table className={PIN_TABLE} style={{ minWidth: 480 }}>
               <thead>
-                <tr className="border-b border-line text-[11px] font-bold uppercase tracking-wide text-t2">
-                  <th className="pb-3 pr-3 text-left">Nome</th>
+                <tr className="text-[11px] font-bold uppercase tracking-wide text-t2">
+                  <th className={cn(NAME_FIRST, "bg-bg-2 pb-3 pr-3 text-left")}>Nome</th>
                   <th className="pb-3 pr-3 text-left">Colocação</th>
                   <th className="pb-3 text-right">Prêmio</th>
                 </tr>
               </thead>
               <tbody>
-                {lines.map((r) => (
-                  <tr key={r.key} className={`border-b border-line ${r.key === "gerencia" || r.key === "equipe" || r.key === "caixa" ? "bg-bg-inset" : ""}`}>
-                    <td className="py-2.5 pr-3">
-                      <PersonName name={r.name} employeeId={r.employeeId} storeId={r.key === "gerencia" || r.key === "equipe" || r.key === "caixa" ? null : c.storeId} sub={r.sub} />
+                {lines.map((r) => {
+                  const inset = r.key === "gerencia" || r.key === "equipe" || r.key === "caixa";
+                  return (
+                  <tr key={r.key} className={inset ? "bg-bg-inset" : undefined}>
+                    <td className={cn(NAME_FIRST, inset ? "bg-bg-inset" : "bg-bg-2", "py-2.5 pr-3")}>
+                      <div className={NAME_CLIP}>
+                        <PersonName name={r.name} employeeId={r.employeeId} storeId={inset ? null : c.storeId} sub={r.sub} />
+                      </div>
                     </td>
                     <td className="py-2.5 pr-3 font-semibold text-acc">{r.rank}</td>
                     <td
@@ -633,7 +646,8 @@ function ChallengePayoutCard({ challenge: c, view, onExport }: { challenge: Chal
                       {prizeLabel(r.prize)}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
               <tfoot>
                 <tr className="text-t0">

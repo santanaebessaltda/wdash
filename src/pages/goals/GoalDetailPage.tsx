@@ -28,6 +28,7 @@ import type { GoalCardView } from "@/data/wedash/teamViews";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { WedashBrand } from "@/components/wedash/WedashBrand";
 import { brlCent, fullDate, shortDate, isoToDate, num, dateToIso, shiftName } from "@/lib/format";
+import { cn } from "@/lib/cn";
 import { statusBadgeVariant } from "@/lib/status";
 import { exportPdf } from "@/lib/printMode";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
@@ -424,6 +425,11 @@ type PayoutRow = {
 };
 
 /** Meta encerrada: quanto cada pessoa e a gerencia ganharam (premiacao do nivel + bonus somados). */
+const NAME_PIN = "sticky left-0 z-10 min-w-0";
+const NAME_CLIP = "min-w-0 max-w-[9.5rem] sm:max-w-[12.5rem] lg:max-w-[14rem] xl:max-w-none";
+const PIN_TABLE =
+  "w-full border-separate border-spacing-0 text-[12.5px] [&_tbody_td]:border-b [&_tbody_td]:border-line [&_th]:border-b [&_th]:border-line";
+
 function GoalPayoutCard({
   goal,
   card,
@@ -517,10 +523,10 @@ function GoalPayoutCard({
         <EmptyBlock icon="👤" title="Nenhuma pessoa na meta" description="Nenhuma pessoa da equipe participa desta meta." />
       ) : (
         <div className="min-w-0 overflow-x-auto">
-          <table className="w-full border-collapse text-[12.5px]" style={{ minWidth: 680 }}>
+          <table className={PIN_TABLE} style={{ minWidth: 680 }}>
             <thead>
-              <tr className="border-b border-line text-[11px] font-bold uppercase tracking-wide text-t2">
-                <th className="pb-3 pr-3 text-left">Nome</th>
+              <tr className="text-[11px] font-bold uppercase tracking-wide text-t2">
+                <th className={cn(NAME_PIN, "bg-bg-2 pb-3 pr-3 text-left")}>Nome</th>
                 <th className="pb-3 pr-3 text-left">Nível</th>
                 <th className="pb-3 pr-3 text-right">Faturamento</th>
                 <th className="pb-3 pr-3 text-right">Premiação</th>
@@ -530,9 +536,9 @@ function GoalPayoutCard({
             </thead>
             <tbody>
               {lines.map((r) => (
-                <tr key={r.key} className={`border-b border-line ${r.key === "gerencia" ? "bg-bg-inset" : ""}`}>
-                  <td className="py-2.5 pr-3">
-                    <div className="flex min-w-0 items-center gap-2.5">
+                <tr key={r.key} className={r.key === "gerencia" ? "bg-bg-inset" : undefined}>
+                  <td className={cn(NAME_PIN, r.key === "gerencia" ? "bg-bg-inset" : "bg-bg-2", "py-2.5 pr-3")}>
+                    <div className={cn("flex min-w-0 items-center gap-2.5", NAME_CLIP)}>
                       <PersonAvatar name={r.name} employeeId={r.key === "gerencia" ? null : r.key} storeId={r.storeId} size="sm" />
                       <div className="min-w-0">
                         <p className="truncate font-bold text-t0">{r.name}</p>

@@ -189,6 +189,7 @@ export function SellersBlock({
       key: "pos",
       header: "#",
       width: "48px",
+      pin: "rank",
       sortable: true,
       sortValue: (l) => l.position,
       render: (l) => <span className="text-[12.5px] font-extrabold text-t2">{l.position}º</span>,
@@ -196,6 +197,7 @@ export function SellersBlock({
     {
       key: "vendedora",
       header: "Nome",
+      pin: "label",
       sortable: true,
       sortValue: (l) => l.name,
       render: (l) => <SellerCell l={l} />,
