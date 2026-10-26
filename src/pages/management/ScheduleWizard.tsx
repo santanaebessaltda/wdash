@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Accordion, Button, DatePicker, FormField, Input, Modal, Select, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
+import { Icon, icons } from "@/pages/users/Icons";
 import { cn } from "@/lib/cn";
 import { dateToIso, isoToDate } from "@/lib/format";
 import { endOfMonth, startOfMonth } from "@/data/wedash/engine/format";
@@ -64,33 +65,31 @@ function defaultRule(date: string, name: string): HolidayRule {
   return { date, name, open: true, workers: 1, pay: "extra_off", window: "7_days" };
 }
 
-function HeadcountRange({ value, max, label, onChange }: { value: number; max: number; label: string; onChange: (next: number) => void }) {
+function HeadcountField({ value, max, label, onChange }: { value: number; max: number; label: string; onChange: (next: number) => void }) {
   const cap = Math.max(0, max);
   const current = Math.min(cap, Math.max(0, value));
+  const set = (raw: number) => onChange(Math.min(cap, Math.max(0, Math.floor(raw) || 0)));
   return (
-    <div>
-      <input
-        type="range"
-        min={0}
-        max={cap}
-        step={1}
+    <div className="flex items-center gap-1">
+      <Button type="button" variant="primary" className="h-9 w-9 shrink-0 px-0" disabled={cap === 0 || current <= 0} aria-label={`Diminuir ${label}`} onClick={() => set(current - 1)}>
+        <Icon d={icons.minus} size={14} />
+      </Button>
+      <Input
+        inputMode="numeric"
+        disabled={cap === 0}
         value={current}
         aria-label={label}
-        disabled={cap === 0}
-        onChange={(event) => onChange(Number(event.target.value))}
-        className="w-full cursor-pointer disabled:cursor-not-allowed"
-        style={{ accentColor: "var(--acc)" }}
+        onChange={(event) => set(Number(event.target.value.replace(/\D/g, "")))}
+        className="h-9! w-12 px-1 text-center"
       />
-      <div className="mt-1 flex justify-between text-[11.5px] text-t2">
-        <span>0</span>
-        <span className="font-bold text-acc">{current}</span>
-        <span>{cap}</span>
-      </div>
+      <Button type="button" variant="primary" className="h-9 w-9 shrink-0 px-0" disabled={cap === 0 || current >= cap} aria-label={`Aumentar ${label}`} onClick={() => set(current + 1)}>
+        <Icon d={icons.plus} size={14} />
+      </Button>
     </div>
   );
 }
 
-/** Mínimo antigo por turno vira o total do dia. O range novo grava só esse total. */
+/** Mínimo antigo por turno vira o total do dia. O campo grava só esse total. */
 function teamTotal(dayNeeds: DayNeed[], groupNeeds: GroupNeed[], headcount: number): DayNeed[] {
   const days = dayNeeds.length === 7 ? dayNeeds.map((day) => ({ ...day })) : defaultDayNeeds();
   return days.map((day) => {
@@ -501,9 +500,9 @@ export function ScheduleWizard({
                   <span className="truncate font-semibold">{weekdayLabel(day.dow)}</span>
                 </label>
                 {day.open ? (
-                  <div className="mt-2 pl-6">
-                    <p className="mb-1 text-[12px] font-bold text-t0">Pessoas</p>
-                    <HeadcountRange value={day.min} max={headcount} label={`Pessoas em ${weekdayLabel(day.dow)}`} onChange={(min) => setDayMin(day.dow, min)} />
+                  <div className="mt-2 flex items-center justify-between gap-3 pl-6">
+                    <p className="text-[12px] font-bold text-t0">Pessoas</p>
+                    <HeadcountField value={day.min} max={headcount} label={`Pessoas em ${weekdayLabel(day.dow)}`} onChange={(min) => setDayMin(day.dow, min)} />
                   </div>
                 ) : null}
               </li>
@@ -542,7 +541,7 @@ export function ScheduleWizard({
                 {rule.open ? (
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     <FormField label="Pessoas trabalhando" required>
-                      <HeadcountRange value={rule.workers} max={headcount} label={`Pessoas trabalhando em ${rule.name}`} onChange={(workers) => patchRule(rule.date, { workers })} />
+                      <HeadcountField value={rule.workers} max={headcount} label={`Pessoas trabalhando em ${rule.name}`} onChange={(workers) => patchRule(rule.date, { workers })} />
                     </FormField>
                     <FormField label="Compensação" required>
                       <Select value={rule.pay} aria-label={`Compensação de ${rule.name}`} onChange={(event) => patchRule(rule.date, { pay: event.target.value as HolidayRule["pay"] })}>
