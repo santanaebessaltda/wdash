@@ -28,11 +28,16 @@ import { HeaderFilters } from "@/pages/stock/shared";
 
 const money = (cents: number) => brlCent(cents / 100);
 
-/** Positivo ainda tem valor a receber. Negativo já passou da premiação. Zero fica na cor do texto. */
-function balanceClass(cents: number): string {
-  if (cents > 0) return "text-ok";
-  if (cents < 0) return "text-bad";
-  return "text-t0";
+/** O que entra leva + verde. O que sai leva − vermelho. Saldo zero fica na cor do texto, sem sinal. */
+function signedAmount(cents: number, flow: "in" | "out" | "net", empty: "dash" | "zero" = "dash"): { text: string; className: string } {
+  if (flow === "net") {
+    if (cents > 0) return { text: `+ ${money(cents)}`, className: "text-ok" };
+    if (cents < 0) return { text: `− ${money(Math.abs(cents))}`, className: "text-bad" };
+    return { text: money(0), className: "text-t0" };
+  }
+  if (cents <= 0) return empty === "dash" ? { text: "—", className: "text-t2" } : { text: money(0), className: "text-t0" };
+  if (flow === "out") return { text: `− ${money(cents)}`, className: "text-bad" };
+  return { text: `+ ${money(cents)}`, className: "text-ok" };
 }
 
 function lineTitle(line: WalletLine): string {
@@ -52,11 +57,6 @@ function earningsOf(row: WalletPersonMonth): number {
 
 function discountsOf(row: WalletPersonMonth): number {
   return row.withdrawalCents + row.shortageCents;
-}
-
-function minusMoney(cents: number): string {
-  if (cents <= 0) return "—";
-  return `− ${money(cents)}`;
 }
 
 const LINE_ORDER: Record<WalletLine["kind"], number> = {
@@ -135,10 +135,13 @@ function Totals({ rows }: { rows: WalletPersonMonth[] }) {
   const sum = (pick: (row: WalletPersonMonth) => number) => rows.reduce((total, row) => total + pick(row), 0);
   const balance = sum((row) => row.balanceCents);
   const open = rows.some(balanceStillOpen);
+  const earnings = signedAmount(sum(earningsOf), "in", "zero");
+  const discounts = signedAmount(sum(discountsOf), "out", "zero");
+  const balanceShown = signedAmount(balance, "net");
   const cards = [
-    { label: "Saldo a pagar", value: money(balance), sub: open ? "Até agora" : undefined, valueClassName: balanceClass(balance) },
-    { label: "Ganhos", value: money(sum(earningsOf)) },
-    { label: "Descontos", value: money(sum(discountsOf)) },
+    { label: "Saldo a pagar", value: balanceShown.text, sub: open ? "Até agora" : undefined, valueClassName: balanceShown.className },
+    { label: "Ganhos", value: earnings.text, valueClassName: earnings.className },
+    { label: "Descontos", value: discounts.text, valueClassName: discounts.className },
   ];
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -187,7 +190,7 @@ function Statement({
           {balanceLabel}
           {untilNow ? <span className="mt-0.5 block text-[11px] font-semibold text-t2">Até agora</span> : null}
         </span>
-        <span className={cn("font-mono text-[15px] font-extrabold", balanceClass(person.balanceCents))}>{money(person.balanceCents)}</span>
+        <span className={cn("font-mono text-[15px] font-extrabold", signedAmount(person.balanceCents, "net").className)}>{signedAmount(person.balanceCents, "net").text}</span>
       </div>
     </div>
   );
@@ -213,7 +216,7 @@ function BranchBreakdown({ person }: { person: WalletGroupedPerson }) {
           Saldo
           {untilNow ? <span className="mt-0.5 block text-[11px] font-semibold text-t2">Até agora</span> : null}
         </span>
-        <span className={cn("font-mono text-[15px] font-extrabold", balanceClass(person.balanceCents))}>{money(person.balanceCents)}</span>
+        <span className={cn("font-mono text-[15px] font-extrabold", signedAmount(person.balanceCents, "net").className)}>{signedAmount(person.balanceCents, "net").text}</span>
       </div>
     </div>
   );
@@ -288,7 +291,7 @@ function UnassignedShortage({ blocks, showStore }: { blocks: ShortageBlock[]; sh
     <div className="rounded-[var(--radius-vela-lg)] border border-line bg-bg-2 px-4 py-3">
       <button type="button" className="flex w-full items-start justify-between gap-3 text-left" onClick={() => setOpen((current) => !current)} aria-expanded={shown}>
         <span>
-          <span className="text-[13.5px] font-bold text-warn">Quebra sem destino · {money(total)}</span>
+          <span className="text-[13.5px] font-bold text-t0">Quebra sem destino · <span className="text-bad">− {money(total)}</span></span>
           <span className="mt-0.5 block text-[12.5px] text-t2">Há valores de quebra que ainda não estão vinculados a uma pessoa, grupo ou equipe.</span>
         </span>
         <span className="shrink-0 text-[12px] font-bold text-t2 print:hidden">{shown ? "Ocultar" : "Ver dias"}</span>
@@ -298,7 +301,7 @@ function UnassignedShortage({ blocks, showStore }: { blocks: ShortageBlock[]; sh
           {days.map((day) => (
             <li key={`${day.storeId}-${day.day}`} className="flex items-center justify-between gap-4 border-b border-line py-2.5 last:border-b-0">
               <span className="text-[13.5px] text-t0">{showStore ? `${day.storeName} · ${fullDate(day.day)}` : fullDate(day.day)}</span>
-              <span className="font-mono text-[13.5px] font-bold text-t0">{money(day.cents)}</span>
+              <span className="font-mono text-[13.5px] font-bold text-bad">− {money(day.cents)}</span>
             </li>
           ))}
         </ul>
@@ -439,10 +442,10 @@ function PeopleList({
                           {row.storeName}
                         </td>
                       ) : null}
-                      <td className={cn(cellClass, "text-right font-mono text-[13px] font-bold text-t0")}>{money(earningsOf(row))}</td>
-                      <td className={cn(cellClass, "text-right font-mono text-[13px] font-bold text-t0")}>{minusMoney(row.withdrawalCents)}</td>
-                      <td className={cn(cellClass, "text-right font-mono text-[13px] font-bold text-t0")}>{minusMoney(row.shortageCents)}</td>
-                      <td className={cn(cellClass, "text-right font-mono text-[13px] font-bold", balanceClass(row.balanceCents))}>{money(row.balanceCents)}</td>
+                      <td className={cn(cellClass, "text-right font-mono text-[13px] font-bold", signedAmount(earningsOf(row), "in").className)}>{signedAmount(earningsOf(row), "in").text}</td>
+                      <td className={cn(cellClass, "text-right font-mono text-[13px] font-bold", signedAmount(row.withdrawalCents, "out").className)}>{signedAmount(row.withdrawalCents, "out").text}</td>
+                      <td className={cn(cellClass, "text-right font-mono text-[13px] font-bold", signedAmount(row.shortageCents, "out").className)}>{signedAmount(row.shortageCents, "out").text}</td>
+                      <td className={cn(cellClass, "text-right font-mono text-[13px] font-bold", signedAmount(row.balanceCents, "net").className)}>{signedAmount(row.balanceCents, "net").text}</td>
                     </tr>
                   ))}
                   <tr className="bg-bg-inset">
@@ -454,10 +457,10 @@ function PeopleList({
                       </span>
                     </td>
                     {showStore ? <td /> : null}
-                    <td className={cn(cellClass, "text-right font-mono text-[13px] font-extrabold text-t0")}>{money(total.earnings)}</td>
-                    <td className={cn(cellClass, "text-right font-mono text-[13px] font-extrabold text-t0")}>{minusMoney(total.withdrawal)}</td>
-                    <td className={cn(cellClass, "text-right font-mono text-[13px] font-extrabold text-t0")}>{minusMoney(total.shortage)}</td>
-                    <td className={cn(cellClass, "text-right font-mono text-[13px] font-extrabold", balanceClass(total.balance))}>{money(total.balance)}</td>
+                    <td className={cn(cellClass, "text-right font-mono text-[13px] font-extrabold", signedAmount(total.earnings, "in").className)}>{signedAmount(total.earnings, "in").text}</td>
+                    <td className={cn(cellClass, "text-right font-mono text-[13px] font-extrabold", signedAmount(total.withdrawal, "out").className)}>{signedAmount(total.withdrawal, "out").text}</td>
+                    <td className={cn(cellClass, "text-right font-mono text-[13px] font-extrabold", signedAmount(total.shortage, "out").className)}>{signedAmount(total.shortage, "out").text}</td>
+                    <td className={cn(cellClass, "text-right font-mono text-[13px] font-extrabold", signedAmount(total.balance, "net").className)}>{signedAmount(total.balance, "net").text}</td>
                   </tr>
                 </tbody>
               </table>
@@ -660,8 +663,8 @@ function SellerWallet({ wallet, opportunities }: { wallet: WalletMonth; opportun
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard label="Saldo atual" value={money(person.balanceCents)} icon={<WalletGlyph />} iconColor={KPI_HERO.iconColor} iconBg={KPI_HERO.iconBg} sub={balanceStillOpen(person) ? "Até agora" : undefined} valueClassName={balanceClass(person.balanceCents)} />
-        <StatCard label="Ganhos garantidos" value={money(guaranteed)} icon={<CheckCircleIcon size={20} />} iconColor={KPI_HERO.iconColor} iconBg={KPI_HERO.iconBg} />
+        <StatCard label="Saldo atual" value={signedAmount(person.balanceCents, "net").text} icon={<WalletGlyph />} iconColor={KPI_HERO.iconColor} iconBg={KPI_HERO.iconBg} sub={balanceStillOpen(person) ? "Até agora" : undefined} valueClassName={signedAmount(person.balanceCents, "net").className} />
+        <StatCard label="Ganhos garantidos" value={signedAmount(guaranteed, "in", "zero").text} icon={<CheckCircleIcon size={20} />} iconColor={KPI_HERO.iconColor} iconBg={KPI_HERO.iconBg} valueClassName={signedAmount(guaranteed, "in", "zero").className} />
         <StatCard label="Potencial do período" value={money(potential)} icon={<TargetIcon size={20} />} iconColor={KPI_HERO.iconColor} iconBg={KPI_HERO.iconBg} sub={potentialSub} tooltip={potentialTip} />
       </div>
       <Card>
@@ -1190,7 +1193,7 @@ export function BranchWalletPage() {
         {showSkeleton && !branches ? (
           <WalletSkeleton showStore={storeRows.length > 1} />
         ) : storeRows.length === 0 ? (
-          <Card>
+          <Card className="flex min-h-[280px] flex-col">
             <EmptyBlock icon="👛" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
           </Card>
         ) : branches ? (

@@ -55,8 +55,8 @@ const alignClasses = {
 };
 
 const PIN_RANK = "sticky left-0 z-20 w-12 min-w-12 max-w-12 bg-bg-2";
-const PIN_LABEL = "sticky left-12 z-10 min-w-0 bg-bg-2";
-const PIN_CLIP = "min-w-0 max-w-[9.5rem] sm:max-w-[12.5rem] lg:max-w-[14rem] xl:max-w-none";
+const PIN_LABEL = "sticky left-12 z-10 w-px max-w-[9.5rem] bg-bg-2 sm:max-w-[12.5rem] lg:max-w-[14rem] xl:w-auto xl:max-w-none";
+const PIN_CLIP = "w-[9.5rem] max-w-[9.5rem] overflow-hidden sm:w-[12.5rem] sm:max-w-[12.5rem] lg:w-[14rem] lg:max-w-[14rem] xl:w-auto xl:max-w-none";
 
 function pinClass(pin: DataTableColumn<unknown>["pin"]): string | undefined {
   if (pin === "rank") return PIN_RANK;

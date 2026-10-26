@@ -32,7 +32,7 @@ import {
 } from "@/data/wedash/challengeView";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { storesForSession } from "@/data/wedash/stores";
-import { brlCent, fullDate, shortDate, isoToDate, num, dateToIso } from "@/lib/format";
+import { brlCent, fullDate, shortDate, isoToDate, num, dateToIso, presenceDayLabel } from "@/lib/format";
 import { exportPdf } from "@/lib/printMode";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import {
@@ -376,9 +376,9 @@ function RoleResultBar({
 }
 
 const RANK_PIN = "sticky left-0 z-20 w-10 min-w-10 max-w-10 bg-bg-2";
-const NAME_AFTER = "sticky left-10 z-10 min-w-0 bg-bg-2";
-const NAME_FIRST = "sticky left-0 z-10 min-w-0";
-const NAME_CLIP = "min-w-0 max-w-[9.5rem] sm:max-w-[12.5rem] lg:max-w-[14rem] xl:max-w-none";
+const NAME_AFTER = "sticky left-10 z-10 w-px max-w-[9.5rem] bg-bg-2 sm:max-w-[12.5rem] lg:max-w-[14rem] xl:w-auto xl:max-w-none";
+const NAME_FIRST = "sticky left-0 z-10 w-px max-w-[9.5rem] sm:max-w-[12.5rem] lg:max-w-[14rem] xl:w-auto xl:max-w-none";
+const NAME_CLIP = "w-[9.5rem] max-w-[9.5rem] overflow-hidden sm:w-[12.5rem] sm:max-w-[12.5rem] lg:w-[14rem] lg:max-w-[14rem] xl:w-auto xl:max-w-none";
 const PIN_TABLE =
   "w-full border-separate border-spacing-0 text-[12.5px] [&_tbody_td]:border-b [&_tbody_td]:border-line [&_th]:border-b [&_th]:border-line";
 
@@ -471,7 +471,7 @@ function ParticipantsCard({ challenge: c, view }: { challenge: ChallengeRecord; 
                         name={p.name}
                         employeeId={p.key}
                         storeId={c.storeId}
-                        sub={[p.group, p.eligibleDays < p.periodDays ? `${p.eligibleDays} de ${p.periodDays} dias` : null].filter(Boolean).join(" · ") || null}
+                        sub={[p.group, p.periodDays > 0 ? presenceDayLabel(p.eligibleDays, "desafio") : null].filter(Boolean).join(" · ") || null}
                       />
                     </div>
                   </td>

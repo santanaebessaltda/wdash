@@ -1,4 +1,5 @@
-import { Badge, EmptyState } from "@/components/ui";
+import { Badge } from "@/components/ui";
+import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { brlK, num } from "@/lib/format";
 import { cn } from "@/lib/cn";
@@ -94,7 +95,7 @@ export function RankingBlock({
 }) {
   if (ranking.length === 0) {
     return (
-      <EmptyState
+      <EmptyBlock
         title="Nenhuma venda no mês"
         description="Lance vendas para ver o ranking ao vivo da competência."
       />

@@ -4,7 +4,7 @@ import { Tooltip } from "@/components/ui/Tooltip";
 import type { SellerHomeGoal, SellerHomeStore } from "@/data/wedash/engine/sellerHome";
 import { GOAL_STATUS_LABEL, goalLevelPct, goalStatus } from "@/data/wedash/goalView";
 import type { NetworkGlobalGoal } from "@/data/wedash/teamViews";
-import { brlCent, num, shortDate } from "@/lib/format";
+import { brlCent, num, presenceDayLabel, shortDate } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { GoalProgressBar } from "@/pages/team/blocks";
@@ -203,10 +203,8 @@ function PrizeBody({ goal, me, storeName, today, through, closed }: { goal: Sell
       {levels.length > 0 && (
         <div>
           <CardTitle className="mb-1">Níveis e premiação</CardTitle>
-          {me.modo === "individual" && me.proportional ? (
-            <p className="mb-3 text-[12px] text-t2">
-              Sua parte, {me.eligibleDays} de {me.periodDays} dias. Os valores abaixo já saem dessa parte.
-            </p>
+          {me.periodDays > 0 ? (
+            <p className="mb-3 text-[12px] text-t2">{presenceDayLabel(me.eligibleDays, "meta")}</p>
           ) : null}
           <div className="flex flex-col gap-2.5">
             {levels.map(({ marco, number, bonusSoFar }) => {

@@ -25,6 +25,11 @@ export function goalLevelPct(branchPct: number, levels: readonly number[]): numb
   return (branchPct / goalBarScale(levels)) * 100;
 }
 
+/** Valor em reais do último nível. Sem nível, ou com o nível em 0%, fica a meta cadastrada. */
+export function goalLevelAmount(target: number, levels: readonly number[]): number {
+  return (target * goalBarScale(levels)) / 100;
+}
+
 export function goalStatus(g: Pick<GoalRecord, "startsOn" | "endsOn">, today: string): GoalStatus {
   if (today < g.startsOn) return "upcoming";
   if (today > g.endsOn) return "ended";

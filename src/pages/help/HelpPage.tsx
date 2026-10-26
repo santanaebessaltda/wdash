@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Alert, Badge, Button, Dropdown, EmptyState, Modal, PageHeader, Segmented, Skeleton, useToast } from "@/components/ui";
+import { Alert, Badge, Button, Card, Dropdown, Modal, PageHeader, Segmented, Skeleton, useToast } from "@/components/ui";
+import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { useMinSkeleton } from "@/lib/useMinSkeleton";
 import { HeaderSearch } from "@/pages/dashboard/HeaderFilter";
 import {
@@ -168,26 +169,28 @@ export function HelpPage() {
           ) : null}
 
           {filtered.length === 0 ? (
-            <EmptyState
-              icon="📖"
-              title={library.length === 0 ? (manage ? "Nenhum material na biblioteca" : "Nenhum material disponível") : filter === "hidden" && !query.trim() ? "Nenhum material oculto" : "Nenhum material encontrado"}
-              description={
-                library.length === 0
-                  ? manage
-                    ? "Envie o primeiro vídeo ou PDF e escolha quem poderá ver."
-                    : "Os materiais disponíveis para você aparecerão aqui."
-                  : filter === "hidden" && !query.trim()
-                    ? "Os materiais ocultos aparecem aqui."
-                    : "Tente outro título ou descrição."
-              }
-              action={
-                library.length === 0 && manage ? (
-                  <Button icon={<HelpIcon d={HELP_ICON.upload} />} onClick={openCreate}>
-                    Enviar arquivo
-                  </Button>
-                ) : undefined
-              }
-            />
+            <Card className="flex min-h-[280px] flex-col">
+              <EmptyBlock
+                icon="📖"
+                title={library.length === 0 ? (manage ? "Nenhum material na biblioteca" : "Nenhum material disponível") : filter === "hidden" && !query.trim() ? "Nenhum material oculto" : "Nenhum material encontrado"}
+                description={
+                  library.length === 0
+                    ? manage
+                      ? "Envie o primeiro vídeo ou PDF e escolha quem poderá ver."
+                      : "Os materiais disponíveis para você aparecerão aqui."
+                    : filter === "hidden" && !query.trim()
+                      ? "Os materiais ocultos aparecem aqui."
+                      : "Tente outro título ou descrição."
+                }
+                action={
+                  library.length === 0 && manage ? (
+                    <Button size="sm" icon={<HelpIcon d={HELP_ICON.upload} />} onClick={openCreate}>
+                      Enviar arquivo
+                    </Button>
+                  ) : undefined
+                }
+              />
+            </Card>
           ) : (
             <div className={helpGrid}>
               {filtered.map((video) => {

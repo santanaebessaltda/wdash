@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Button, Card, CardHeader, CardTitle, EmptyState, FormField, Input, PageHeader, Select, TabNav, Tooltip } from "@/components/ui";
+import { Button, Card, CardHeader, CardTitle, FormField, Input, PageHeader, Select, TabNav, Tooltip } from "@/components/ui";
+import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
 import { applyShoppingMenu, financeTabs, integrationTabs, navForRole, performanceTabs, scheduleTabs, settingsTabs } from "@/layout/nav-wedash";
 import { isNavGroup } from "@/layout/nav-config";
@@ -133,9 +134,8 @@ export function pickOneStore(storeIds: string[], sessionStoreCount: number): boo
 /** Card vazio das telas que só fazem sentido com uma filial no seletor. */
 export function SelectStoreCard() {
   return (
-    <Card>
-      <EmptyState
-        framed={false}
+    <Card className="flex min-h-[280px] flex-col">
+      <EmptyBlock
         icon="🏬"
         title="Selecione uma filial"
         description="Estas configurações são definidas por filial. Escolha uma filial no seletor do topo para continuar."
@@ -186,8 +186,8 @@ export function StoreCardsPage({
         ) : showSkeleton ? (
           skeleton(skeletonCount)
         ) : storeRows.length === 0 ? (
-          <Card>
-            <EmptyState framed={false} icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
+          <Card className="flex min-h-[280px] flex-col">
+            <EmptyBlock icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
           </Card>
         ) : (
           <div className={wide ? "flex flex-col gap-5" : "flex max-w-[720px] flex-col gap-5"}>

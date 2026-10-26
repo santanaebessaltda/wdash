@@ -475,7 +475,7 @@ export function CashDropPage() {
         {showStores || (storeRows.length > 0 && !pronto) ? (
           <FinanceMonthSkeleton cells={cells} today={today} kpis={4} columns="sm:grid-cols-2 lg:grid-cols-4" hint marked={storeRows.length === 1} />
         ) : storeRows.length === 0 || !store ? (
-          <Card>
+          <Card className="flex min-h-[280px] flex-col">
             <EmptyBlock icon="💵" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
           </Card>
         ) : (

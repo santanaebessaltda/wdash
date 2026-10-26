@@ -508,7 +508,7 @@ export function PurchaseOrderPage() {
       {showSkeleton ? (
         <StockProductsSkeleton />
       ) : storeRows.length === 0 ? (
-        <Card className="flex flex-col">
+        <Card className="flex min-h-[280px] flex-col">
           <EmptyBlock icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
         </Card>
       ) : (

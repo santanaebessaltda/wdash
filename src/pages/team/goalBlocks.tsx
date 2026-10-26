@@ -1,19 +1,20 @@
 /**
  * Blocos visuais da aba Equipe. A página só monta; nada calcula aqui.
  * Reusa os componentes do tema: StatCard, DataTable, Card, ProgressBar,
- * Badge, Avatar, EmptyState e o padrão BlockState compartilhado.
+ * Badge, Avatar, EmptyBlock e o padrão BlockState compartilhado.
  */
 import { useEffect, useState, type ReactNode } from "react";
-import { Badge, Card, CardTitle, DataTable, EmptyState, ProgressBar, ProgressStanding, progressColor, progressTextClass, StatCard, type DataTableColumn } from "@/components/ui";
+import { Badge, Card, CardTitle, DataTable, ProgressBar, ProgressStanding, progressColor, progressTextClass, StatCard, type DataTableColumn } from "@/components/ui";
+import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { StoreDivisionTitle } from "@/components/wedash/StoreDivisionTitle";
 import { Tooltip } from "@/components/ui/Tooltip";
-import { brl, brlCent, brlK, eachDay, num, profitBrl } from "@/lib/format";
+import { brl, brlCent, brlK, eachDay, num, presenceDayLabel, profitBrl } from "@/lib/format";
 import { kpiTone } from "@/pages/dashboard/palette";
 import type { BlockState as BlockStateKind } from "@/data/wedash/dashboard";
 import { BlockState } from "@/pages/dashboard/BlockState";
 import type { ChallengeView, TeamView, GoalCardView, NetworkGlobalGoal, SellerRow } from "@/data/wedash/teamViews";
-import { goalBarScale, goalLevelPct, outsideRankingNote } from "@/data/wedash/goalView";
+import { goalBarScale, goalLevelAmount, goalLevelPct, outsideRankingNote } from "@/data/wedash/goalView";
 import { branchRoleLabel } from "@/data/wedash/stores";
 import { defaultTiers } from "@/data/wedash/goals";
 import { TODAY_ISO } from "@/data/wedash/clock";
@@ -323,14 +324,14 @@ export function SellersBlock({
             header: goalHeader,
             hideBelow: "md",
             sortable: true,
-            sortValue: (l: LineRank) => (l.noGoal ? null : l.individualGoalAmount),
+            sortValue: (l: LineRank) => (l.noGoal ? null : goalLevelAmount(l.individualGoalAmount, l.ladderMarks.map((m) => m.pct))),
             render: (l: LineRank) =>
               l.noGoal ? (
                 <span className="text-t2">—</span>
               ) : (
                 <span className="inline-flex flex-col items-end">
-                  <span className="font-mono text-[12.5px] font-bold text-t0">{brl(l.individualGoalAmount)}</span>
-                  {l.proportionalGoal ? <span className="text-[11px] text-t2">{l.eligibleDays} de {l.periodDays} dias</span> : null}
+                  <span className="font-mono text-[12.5px] font-bold text-t0">{brl(goalLevelAmount(l.individualGoalAmount, l.ladderMarks.map((m) => m.pct)))}</span>
+                  {l.periodDays > 0 ? <span className="text-[11px] text-t2">{presenceDayLabel(l.eligibleDays, "meta")}</span> : null}
                 </span>
               ),
           },
@@ -346,9 +347,9 @@ export function SellersBlock({
             header: "Part. na meta da filial",
             hideBelow: "lg",
             sortable: true,
-            sortValue: (l: LineRank) => (l.noGoal ? null : l.storeGoalPct),
+            sortValue: (l: LineRank) => (l.noGoal ? null : goalLevelPct(l.storeGoalPct, l.ladderMarks.map((m) => m.pct))),
             render: (l: LineRank) =>
-              l.noGoal ? <span className="text-t2">—</span> : <span className="font-mono text-[12.5px] font-bold text-t0">{num(l.storeGoalPct, 1)}%</span>,
+              l.noGoal ? <span className="text-t2">—</span> : <span className="font-mono text-[12.5px] font-bold text-t0">{num(goalLevelPct(l.storeGoalPct, l.ladderMarks.map((m) => m.pct)), 1)}%</span>,
           },
           {
             key: "nivel",
@@ -453,7 +454,7 @@ export function SellersCard({
       </div>
     ) : (
       <div className={embedded ? "py-2" : "p-5"}>
-        <EmptyState icon="👤" title="Nenhuma pessoa na meta" description="Nenhuma pessoa da equipe participa desta meta." />
+        <EmptyBlock icon="👤" title="Nenhuma pessoa na meta" description="Nenhuma pessoa da equipe participa desta meta." />
       </div>
     );
 
@@ -547,10 +548,13 @@ export function GlobalGoalBand({
   const showsProjection =
     !soBarra &&
     (goal.projectionAmount === null ? false : typeof goal.projectionAmount === "number" ? true : goalUnlockedProjection(goal.start, goal.end, todayIso));
-  const scaleMax = goalBarScale(tiers.map((d) => d.minAttainmentPct));
+  const levels = tiers.map((d) => d.minAttainmentPct);
+  const scaleMax = goalBarScale(levels);
+  const levelPct = goalLevelPct(goal.pct, levels);
+  const levelAmount = goalLevelAmount(goal.total, levels);
   const fillPct = Math.min(100, (barPct / scaleMax) * 100);
-  const colorBarra = progressColor(barPct);
-  const colorPct = progressTextClass(goal.pct);
+  const colorBarra = progressColor(goalLevelPct(barPct, levels));
+  const colorPct = progressTextClass(levelPct);
   const projectionLabel = `Projeção: ${num(goal.projectedPct, 0)}%`;
 
   const body = (
@@ -593,11 +597,11 @@ export function GlobalGoalBand({
         <p className="text-[18px] font-extrabold tracking-tight text-t0 sm:text-[20px]">
           <span className={`font-mono ${goal.achieved < 0 ? "text-bad" : "text-t0"}`}>{brlCent(goal.achieved)}</span>
           <span className="mx-1.5 text-[14px] font-semibold text-t2">/</span>
-          <span className="font-mono text-[14px] font-bold text-t2 sm:text-[15px]">{brlCent(goal.total)}</span>
+          <span className="font-mono text-[14px] font-bold text-t2 sm:text-[15px]">{brlCent(levelAmount)}</span>
         </p>
         <div className="flex flex-col items-start gap-1 sm:items-end">
-          <p className={`font-mono text-[26px] font-extrabold leading-none sm:text-[28px] ${colorPct}`}>{num(goal.pct, 1)}%</p>
-          {goal.daysRemaining <= 0 && goal.pct < 100 ? <ProgressStanding ok={false}>Não atingiu</ProgressStanding> : null}
+          <p className={`font-mono text-[26px] font-extrabold leading-none sm:text-[28px] ${colorPct}`}>{num(levelPct, 1)}%</p>
+          {goal.daysRemaining <= 0 && levelPct < 100 ? <ProgressStanding ok={false}>Não atingiu</ProgressStanding> : null}
         </div>
       </div>
       {outsideRankingNote(goal) ? <p className="mt-1 text-[12px] text-t2">{outsideRankingNote(goal)}</p> : null}
@@ -613,7 +617,7 @@ export function GlobalGoalBand({
             />
           </div>
           {soBarra && (
-            <p className={`shrink-0 font-mono text-[13px] font-extrabold leading-none ${colorPct}`}>{num(goal.pct, 1)}%</p>
+            <p className={`shrink-0 font-mono text-[13px] font-extrabold leading-none ${colorPct}`}>{num(levelPct, 1)}%</p>
           )}
         </div>
       ) : (() => {
@@ -853,13 +857,13 @@ export function ChallengesBlock({
 }) {
   if (challenges.length === 0) {
     const empty = (
-      <EmptyState
+      <EmptyBlock
         icon="🎯"
         title="Nenhum desafio nesta competência."
         description="Não há desafios cadastrados para o período atual."
       />
     );
-    return embedded ? empty : <Card>{empty}</Card>;
+    return embedded ? empty : <Card className="flex min-h-[280px] flex-col">{empty}</Card>;
   }
 
   const cards = challenges.map((d) => {

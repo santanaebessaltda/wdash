@@ -1,48 +1,56 @@
-import { useEffect, useMemo, useState } from "react";
-import { Alert, Button, Card, EmptyState, FormField, Modal, Select, useToast } from "@/components/ui";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Alert, Button, Card, DateRangePicker, Modal, Select, useToast, CALENDAR_QUICK_RANGES, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
 import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
+import { BranchBadge, PeriodBadge } from "@/components/wedash/RecordBadges";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
-import { PlainKpi } from "@/pages/cash-close/CashClosePage";
-import { MonthStep, monthNavBtn } from "@/pages/cash-close/MonthYearPicker";
+import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
+import { HeaderFilters } from "@/pages/stock/shared";
 import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
 import { cn } from "@/lib/cn";
 import { calendarTodayIso } from "@/data/wedash/clock";
-import { addDays, addMonths, endOfMonth, isoToDate, shiftName, startOfMonth } from "@/data/wedash/engine/format";
+import { addDays, addMonths, dateToIso, endOfMonth, isoToDate, shiftName, startOfMonth } from "@/data/wedash/engine/format";
+import { periodLabels } from "@/data/wedash/dashboard";
 import { fetchGoals } from "@/data/wedash/goalsRepo";
-import { monthCoveredByGoal, scheduleStartMonth, type GoalSpan } from "@/data/wedash/goalMonths";
-import { branchRoleLabel, fetchStoreSellers, fetchStoreShifts, isBranchTeamMember, type StoreSeller, type StoreShift } from "@/data/wedash/stores";
-import { defaultDayNeeds, generateMonth, weekday, weekdayLabel, type DayStatus, type Sex } from "@/data/wedash/scheduleGenerate";
+import { goalMonthFloor, scheduleStartMonth, type GoalSpan } from "@/data/wedash/goalMonths";
+import { branchRoleLabel, fetchStoreSellers, fetchStoreShifts, isBranchTeamMember, type Store, type StoreSeller, type StoreShift } from "@/data/wedash/stores";
+import { DOW_LABELS } from "@/data/wedash/storeHours";
+import { applyDayChoices, dayEditOptions, defaultDayNeeds, generateMonth, inferCompLinks, PREVIOUS_MONTH_EDIT, weekday, type CellChoice, type DayNeed, type DayStatus, type HolidayRule, type SchedulePattern, type Sex } from "@/data/wedash/scheduleGenerate";
 import { holidayLabel, holidaysForStore, loadHolidaySeed, loadNationalHolidays, storePlace, type Holiday } from "@/data/wedash/scheduleHolidays";
 import { deleteSchedule, fetchCompDue, fetchSchedule, saveManualDay, saveSchedule, type StoredDay, type StoredSchedule } from "@/data/wedash/scheduleRepo";
-import { ScheduleWizard, type ScheduleWizardValue } from "./ScheduleWizard";
+import { ScheduleWizard, type ScheduleWizardValue, type WizardBranch } from "./ScheduleWizard";
 
 const MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 const SCHEDULE_LEGEND: LegendItem[] = [
-  { key: "work", color: "bg-ok", label: "Trabalha", hint: "Na loja" },
-  { key: "off", color: "bg-chip-gray", label: "Folga", hint: "Descanso" },
-  { key: "holiday", color: "bg-warn", label: "Feriado trabalhado", hint: "Trabalha no feriado" },
-  { key: "double", color: "bg-acc", label: "Pagamento em dobro", hint: "Trabalha com pagamento em dobro" },
-  { key: "comp", color: "bg-info", label: "Folga compensatória", hint: "Folga pelo feriado trabalhado" },
+  { key: "work", color: "bg-ok", label: "T · Trabalha", hint: "Na filial" },
+  { key: "off", color: "bg-chip-gray", label: "F · Folga", hint: "Descanso" },
+  { key: "holiday", color: "bg-warn", label: "FE · Feriado trabalhado", hint: "Trabalha no feriado" },
+  { key: "double", color: "bg-acc", label: "FE 2× · Pagamento em dobro", hint: "Trabalha com pagamento em dobro" },
+  { key: "comp", color: "bg-info", label: "FC · Folga compensatória", hint: "Folga pelo feriado trabalhado" },
 ];
+const PATTERN_LABEL: Record<SchedulePattern, string> = {
+  "6x1": "6×1",
+  "5x2": "5×2",
+  "4x3": "4×3",
+  "12x36": "12×36",
+};
+const SHORT_WEEK = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
 function monthLabel(iso: string): string {
   const date = isoToDate(startOfMonth(iso));
   return `${MONTHS[date.getMonth()]} de ${date.getFullYear()}`;
 }
 
+function scheduleTitle(pattern: SchedulePattern, monthStart: string): string {
+  const date = isoToDate(startOfMonth(monthStart));
+  const month = `${MONTHS[date.getMonth()].toLocaleLowerCase("pt-BR")} de ${date.getFullYear()}`;
+  return `${PATTERN_LABEL[pattern]} · ${month}`;
+}
+
 function dayTitle(iso: string, holiday: string | null): string {
   const date = isoToDate(iso);
   const label = `${date.getDate()} de ${MONTHS[date.getMonth()].toLowerCase()}`;
   return holiday ? `${label} · ${holiday}` : label;
-}
-
-const WEEKDAY = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
-
-function monthDates(from: string, to: string): string[] {
-  const dates: string[] = [];
-  for (let day = from; day <= to; day = addDays(day, 1)) dates.push(day);
-  return dates;
 }
 
 function statusChip(status: DayStatus, doublePay: boolean): { color: string; label: string } {
@@ -53,7 +61,27 @@ function statusChip(status: DayStatus, doublePay: boolean): { color: string; lab
   return { color: "bg-ok", label: "Trabalha" };
 }
 
-type SelectedPerson = { id: string; fixedOffDow: number | null; sex: Sex; groupId: string | null };
+type SelectedPerson = { id: string; name: string; fixedOffDow: number | null; sex: Sex; groupId: string | null };
+
+type BranchSchedule = {
+  store: Store;
+  people: StoreSeller[];
+  shifts: StoreShift[];
+  holidays: Holiday[];
+  months: { monthStart: string; schedule: StoredSchedule }[];
+  days: StoredDay[];
+};
+
+function monthStarts(from: string, to: string): string[] {
+  const months: string[] = [];
+  let cursor = startOfMonth(from);
+  const last = startOfMonth(to);
+  while (cursor <= last && months.length < 12) {
+    months.push(cursor);
+    cursor = addMonths(cursor, 1);
+  }
+  return months;
+}
 
 function monthsBetween(from: string, to: string): string[] {
   const months: string[] = [];
@@ -66,46 +94,40 @@ function monthsBetween(from: string, to: string): string[] {
   return months;
 }
 
-const STICKY = "sticky left-0 z-20 border-r border-line bg-bg-2";
-/** Card do Calendar (src/pages/apps/Calendar.tsx). O cabeçalho tem a mesma altura, sem divisor entre os dias, no formato 1 · Quinta-feira. */
-const CALENDAR_HEADER = "border-b border-line px-2 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-t2";
-const CALENDAR_CELL = "relative min-h-[84px] border-b border-r border-line p-1.5 text-left sm:min-h-[110px] sm:p-2";
-const CALENDAR_CHIP = "truncate rounded-md px-1.5 py-1 text-[10px] font-semibold text-white sm:text-[11px]";
-
 export function SchedulePage() {
   const { show } = useToast();
   const { session, storeRows } = useScopedStores();
-  const store = storeRows.length === 1 ? storeRows[0] : null;
+  const many = storeRows.length > 1;
   const today = calendarTodayIso();
-  const [month, setMonth] = useState(() => startOfMonth(today));
-  const [people, setPeople] = useState<StoreSeller[]>([]);
-  const [shifts, setShifts] = useState<StoreShift[]>([]);
-  const [holidays, setHolidays] = useState<Holiday[]>([]);
-  const [schedule, setSchedule] = useState<StoredSchedule | null>(null);
-  const [days, setDays] = useState<StoredDay[]>([]);
+  const [rangeFrom, setRangeFrom] = useState(() => startOfMonth(today));
+  const [rangeTo, setRangeTo] = useState(() => endOfMonth(today));
+  const [presetId, setPresetId] = useState<DatePresetId | null>("thisMonth");
+  const rangeFromRef = useRef(rangeFrom);
+  rangeFromRef.current = rangeFrom;
+  const [views, setViews] = useState<BranchSchedule[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const [wizard, setWizard] = useState(false);
+  const [wizardStoreId, setWizardStoreId] = useState<string | null>(null);
+  const [wizardMonth, setWizardMonth] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [dayOpen, setDayOpen] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [dayOpen, setDayOpen] = useState<{ storeId: string; day: string; sellerId: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ storeId: string; monthStart: string } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [goalSpans, setGoalSpans] = useState<GoalSpan[] | null>(null);
   const storeIds = storeRows.map((row) => row.id).join(",");
 
-  const monthStart = startOfMonth(month);
-  const monthEnd = endOfMonth(monthStart);
-  const dates = useMemo(() => monthDates(monthStart, monthEnd), [monthStart, monthEnd]);
-  const byPerson = useMemo(() => new Map(people.map((person) => [person.id, person])), [people]);
-  const dayRows = useMemo(() => {
-    const map = new Map<string, StoredDay[]>();
-    for (const row of days) {
-      const list = map.get(row.day) ?? [];
-      list.push(row);
-      map.set(row.day, list);
-    }
-    return map;
-  }, [days]);
+  const periodFloor = goalSpans ? goalMonthFloor(scheduleStartMonth(today, goalSpans), goalSpans) : startOfMonth(today);
+  const periodCeil = endOfMonth(addMonths(today, 14));
+  const dates = useMemo(() => {
+    const list: string[] = [];
+    for (let day = rangeFrom; day <= rangeTo; day = addDays(day, 1)) list.push(day);
+    return list;
+  }, [rangeFrom, rangeTo]);
+  const wizardView = views.find((view) => view.store.id === wizardStoreId) ?? null;
+  const dayView = dayOpen ? views.find((view) => view.store.id === dayOpen.storeId && view.months.length > 0) ?? null : null;
+  const openSchedule = dayOpen && dayView ? scheduleOn(dayView, dayOpen.day) : null;
+  const deleteView = deleteTarget ? views.find((view) => view.store.id === deleteTarget.storeId) ?? null : null;
+  const deleteMonth = deleteView?.months.find((item) => item.monthStart === deleteTarget?.monthStart) ?? null;
 
   useEffect(() => {
     const ids = storeIds ? storeIds.split(",") : [];
@@ -126,7 +148,11 @@ export function SchedulePage() {
       const spans = rows.map((row) => ({ startsOn: row.startsOn, endsOn: row.endsOn }));
       setGoalSpans(spans);
       const open = scheduleStartMonth(today, spans);
-      setMonth((current) => (current < open ? open : current));
+      if (rangeFromRef.current < open) {
+        setRangeFrom(open);
+        setRangeTo(endOfMonth(open));
+        setPresetId(open === startOfMonth(today) ? "thisMonth" : null);
+      }
     });
     return () => {
       stop = true;
@@ -134,33 +160,51 @@ export function SchedulePage() {
   }, [storeIds, session.tenantId, today]);
 
   useEffect(() => {
-    if (!store) return;
+    if (storeRows.length === 0) {
+      setViews([]);
+      return;
+    }
     let stop = false;
     setLoading(true);
     setError(false);
     void (async () => {
       try {
-        const year = Number(monthStart.slice(0, 4));
-        const [team, seed, stored, national, storeShifts] = await Promise.all([
-          fetchStoreSellers(session.tenantId, [store.id]),
-          loadHolidaySeed(),
-          fetchSchedule(store.id, monthStart),
-          loadNationalHolidays(year),
-          fetchStoreShifts(session.tenantId, store.id),
-        ]);
+        const covered = monthStarts(rangeFrom, rangeTo);
+        const years = [...new Set(covered.map((month) => Number(month.slice(0, 4))))];
+        const [seed, ...nationals] = await Promise.all([loadHolidaySeed(), ...years.map((year) => loadNationalHolidays(year))]);
+        const national = nationals.flat();
+        const loaded = await Promise.all(
+          storeRows.map(async (store) => {
+            const teamPromise = fetchStoreSellers(session.tenantId, [store.id]);
+            const shiftPromise = fetchStoreShifts(session.tenantId, store.id);
+            const stored = await Promise.all(covered.map((month) => fetchSchedule(store.id, month)));
+            const [team, storeShifts] = await Promise.all([teamPromise, shiftPromise]);
+            const active = (team.get(store.id) ?? []).filter((person) => isBranchTeamMember(person));
+            const place = storePlace(store);
+            const months = covered.flatMap((month, index) => {
+              const schedule = stored[index]?.schedule;
+              return schedule ? [{ monthStart: month, schedule }] : [];
+            });
+            const base = holidaysForStore(seed, years[0] ?? Number(rangeFrom.slice(0, 4)), place.uf, place.city, []).filter((row) => row.kind !== "national");
+            const known = new Set(base.map((row) => `${row.date}|${row.name}`));
+            const extras = months
+              .flatMap((item) => item.schedule.holidayRules)
+              .filter((rule) => !known.has(`${rule.date}|${rule.name}`))
+              .map((rule) => ({ date: rule.date, name: rule.name }));
+            const seen = new Set<string>();
+            const local = years.flatMap((year) => holidaysForStore(seed, year, place.uf, place.city, extras).filter((row) => row.kind !== "national")).filter((row) => {
+              const key = `${row.date}|${row.name}`;
+              if (seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            });
+            const holidays = [...national, ...local];
+            const days = stored.flatMap((item) => item.days);
+            return { store, people: active, shifts: storeShifts, holidays, months, days };
+          }),
+        );
         if (stop) return;
-        const active = (team.get(store.id) ?? []).filter((person) => isBranchTeamMember(person));
-        setPeople(active);
-        setShifts(storeShifts);
-        const place = storePlace(store);
-        const base = holidaysForStore(seed, year, place.uf, place.city, []).filter((row) => row.kind !== "national");
-        const known = new Set(base.map((row) => `${row.date}|${row.name}`));
-        const extras = (stored.schedule?.holidayRules ?? [])
-          .filter((rule) => !known.has(`${rule.date}|${rule.name}`))
-          .map((rule) => ({ date: rule.date, name: rule.name }));
-        setHolidays([...national, ...holidaysForStore(seed, year, place.uf, place.city, extras).filter((row) => row.kind !== "national")]);
-        setSchedule(stored.schedule);
-        setDays(stored.days);
+        setViews(loaded);
       } catch {
         if (!stop) setError(true);
       } finally {
@@ -170,27 +214,37 @@ export function SchedulePage() {
     return () => {
       stop = true;
     };
-  }, [store?.id, monthStart, session.tenantId, reloadKey]);
+  }, [storeRows, rangeFrom, rangeTo, session.tenantId, reloadKey]);
 
-  const initialWizard = (): ScheduleWizardValue => ({
-    scenario: "before_6x1",
-    pattern: schedule?.pattern ?? "6x1",
-    offMode: schedule?.offMode ?? "rotating",
-    sundayMin: schedule?.sundayMin ?? 1,
-    womenSunday: schedule?.womenSunday ?? "every_2",
-    menSunday: schedule?.menSunday ?? "every_3",
-    periodStart: schedule?.periodStart ?? monthStart,
-    periodEnd: schedule?.periodEnd ?? monthEnd,
-    selectedIds: schedule ? schedule.people.map((person) => person.sellerId) : people.map((person) => person.id),
-    sex: Object.fromEntries(people.map((person) => [person.id, schedule?.people.find((row) => row.sellerId === person.id)?.sex ?? "woman"])),
-    fixedOff: Object.fromEntries(schedule?.people.filter((person) => person.fixedOffDow != null).map((person) => [person.sellerId, person.fixedOffDow ?? 1]) ?? []),
-    dayNeeds: schedule && schedule.dayNeeds.length === 7 ? schedule.dayNeeds : defaultDayNeeds(),
-    groupNeeds: schedule?.groupNeeds ?? [],
-    holidayRules: schedule?.holidayRules ?? [],
-    replaceManual: false,
-  });
+  function scheduleOn(view: BranchSchedule, day: string): StoredSchedule | null {
+    return view.months.find((item) => item.monthStart === startOfMonth(day))?.schedule ?? null;
+  }
 
-  async function generateFor(storeId: string, value: ScheduleWizardValue, selected: SelectedPerson[]) {
+  function initialWizard(view: BranchSchedule, monthStart?: string | null): ScheduleWizardValue {
+    const schedule = (monthStart ? view.months.find((item) => item.monthStart === monthStart)?.schedule : null) ?? scheduleOn(view, rangeFrom) ?? view.months[0]?.schedule ?? null;
+    const people = view.people;
+    const anchor = monthStart ?? startOfMonth(rangeFrom);
+    const monthEnd = endOfMonth(anchor);
+    return {
+      scenario: "before_6x1",
+      pattern: schedule?.pattern ?? "6x1",
+      offMode: schedule?.offMode ?? "rotating",
+      sundayMin: schedule?.sundayMin ?? 1,
+      womenSunday: schedule?.womenSunday ?? "every_2",
+      menSunday: schedule?.menSunday ?? "every_3",
+      periodStart: schedule?.periodStart ?? anchor,
+      periodEnd: schedule?.periodEnd ?? monthEnd,
+      selectedIds: schedule ? schedule.people.map((person) => person.sellerId) : people.map((person) => person.id),
+      sex: Object.fromEntries(people.map((person) => [person.id, schedule?.people.find((row) => row.sellerId === person.id)?.sex ?? "woman"])),
+      fixedOff: Object.fromEntries(schedule?.people.filter((person) => person.fixedOffDow != null).map((person) => [person.sellerId, person.fixedOffDow ?? 1]) ?? []),
+      dayNeeds: schedule && schedule.dayNeeds.length === 7 ? schedule.dayNeeds : defaultDayNeeds(),
+      groupNeeds: schedule?.groupNeeds ?? [],
+      holidayRules: schedule?.holidayRules ?? [],
+      replaceManual: false,
+    };
+  }
+
+  async function generateFor(storeId: string, value: ScheduleWizardValue, selected: SelectedPerson[], storeHolidays: Holiday[]) {
     const [year, monthNumber] = value.periodStart.split("-").map(Number);
     const incoming = await fetchCompDue(storeId, value.periodStart);
     const offMode = selected.length > 0 && selected.every((person) => person.fixedOffDow != null) ? "fixed" : "rotating";
@@ -206,6 +260,7 @@ export function SchedulePage() {
       menSunday: value.menSunday,
       people: selected.map((person) => ({
         id: person.id,
+        name: person.name,
         fixedOffDow: person.fixedOffDow,
         sex: person.sex,
         groupId: person.groupId,
@@ -216,8 +271,9 @@ export function SchedulePage() {
       holidayRules: value.holidayRules,
       incomingComp: incoming,
     });
-    const known = new Set(holidays.filter((row) => row.kind !== "municipal").map((row) => row.date));
+    const known = new Set(storeHolidays.filter((row) => row.kind !== "municipal").map((row) => row.date));
     const months = monthsBetween(value.periodStart, value.periodEnd);
+    if (months.length === 0) throw new Error("Não foi possível gerar a escala.");
     let keptManualDays = 0;
     for (const start of months) {
       const saved = await saveSchedule({
@@ -242,165 +298,272 @@ export function SchedulePage() {
       });
       keptManualDays += saved.keptManualDays;
     }
-    return { keptManualDays };
+    const monthStart = months[0];
+    const schedule: StoredSchedule = {
+      id: "local",
+      pattern: value.pattern,
+      offMode,
+      sundayMin: value.sundayMin,
+      womenSunday: value.womenSunday,
+      menSunday: value.menSunday,
+      dayNeeds: value.dayNeeds,
+      groupNeeds: value.groupNeeds,
+      holidayRules: value.holidayRules,
+      compDue: generated.compDue,
+      extraHolidays: [],
+      periodStart: value.periodStart,
+      periodEnd: value.periodEnd,
+      people: selected.map((person) => ({ sellerId: person.id, fixedOffDow: person.fixedOffDow, sex: person.sex })),
+    };
+    const days: StoredDay[] = generated.days
+      .filter((row) => row.date >= monthStart && row.date <= endOfMonth(monthStart))
+      .map((row) => ({ sellerId: row.personId, day: row.date, status: row.status, origin: "generated" }));
+    return { keptManualDays, monthStart, schedule, days };
   }
 
-  async function onGenerate(value: ScheduleWizardValue) {
-    if (!store) return;
+  async function onGenerate(storeId: string, value: ScheduleWizardValue): Promise<string | void> {
+    const view = views.find((item) => item.store.id === storeId);
+    if (!view) return "Não foi possível gerar a escala.";
     setSaving(true);
     try {
       const selected = value.selectedIds.map((id) => ({
         id,
+        name: view.people.find((person) => person.id === id)?.name ?? "Pessoa",
         fixedOffDow: value.fixedOff[id] > 0 ? value.fixedOff[id] : null,
         sex: value.sex[id] ?? "woman",
-        groupId: people.find((person) => person.id === id)?.shiftId ?? null,
+        groupId: null,
       }));
-      const result = await generateFor(store.id, value, selected);
+      const result = await generateFor(view.store.id, value, selected, view.holidays);
       const kept = result.keptManualDays;
-      show(kept > 0 ? `Escala salva. ${kept} ${kept === 1 ? "dia ajustado na mão foi mantido" : "dias ajustados na mão foram mantidos"}.` : "Escala salva.", "success");
-      setWizard(false);
+      const editing = view.months.length > 0;
+      const end = endOfMonth(result.monthStart);
+      setViews((current) => current.map((item) => {
+        if (item.store.id !== view.store.id) return item;
+        const months = [...item.months.filter((month) => month.monthStart !== result.monthStart), { monthStart: result.monthStart, schedule: result.schedule }];
+        const days = [...item.days.filter((row) => startOfMonth(row.day) !== result.monthStart), ...result.days];
+        return { ...item, months, days };
+      }));
+      if (rangeFrom > result.monthStart || rangeTo < end) {
+        setRangeFrom(result.monthStart);
+        setRangeTo(end);
+        setPresetId(result.monthStart === startOfMonth(today) ? "thisMonth" : null);
+      }
+      show(
+        kept > 0
+          ? `Escala salva. ${kept} ${kept === 1 ? "dia ajustado foi mantido" : "dias ajustados foram mantidos"}.`
+          : editing
+            ? "Alterações salvas."
+            : "Escala criada.",
+        "success",
+      );
+      setWizardStoreId(null);
+      setWizardMonth(null);
       setReloadKey((value) => value + 1);
     } catch (caught) {
-      show(caught instanceof Error ? caught.message : "Não foi possível gerar a escala.", "danger");
+      return caught instanceof Error && caught.message ? caught.message : "Não foi possível gerar a escala.";
     } finally {
       setSaving(false);
     }
   }
 
-  async function saveDay(next: StoredDay[]) {
-    if (!store || !dayOpen) return;
-    await saveManualDay({
-      tenantId: session.tenantId,
-      storeId: store.id,
-      day: dayOpen,
-      rows: next.map((row) => ({ sellerId: row.sellerId, status: row.status, origin: row.origin })),
-    });
-    setDays((current) => [...current.filter((row) => row.day !== dayOpen), ...next]);
+  async function saveDay(next: Array<{ storeId: string; days: { day: string; rows: StoredDay[] }[] }>) {
+    await Promise.all(
+      next.flatMap((item) =>
+        item.days.map((group) =>
+          saveManualDay({
+            tenantId: session.tenantId,
+            storeId: item.storeId,
+            day: group.day,
+            rows: group.rows.map((row) => ({ sellerId: row.sellerId, status: row.status, origin: row.origin })),
+          }),
+        ),
+      ),
+    );
+    setViews((current) =>
+      current.map((view) => {
+        const saved = next.find((item) => item.storeId === view.store.id);
+        if (!saved) return view;
+        const touched = new Set(saved.days.map((group) => group.day));
+        return { ...view, days: [...view.days.filter((row) => !touched.has(row.day)), ...saved.days.flatMap((group) => group.rows)] };
+      }),
+    );
   }
 
-  const patternLabel = schedule ? schedule.pattern.replace("x", "×") : "—";
-  const holidayCount = holidays.filter((row) => row.date >= monthStart && row.date <= monthEnd).length;
+  const registered = views.filter((view) => view.months.length > 0);
+  const creatable = views.filter((view) => view.months.length === 0 && view.people.length > 0);
+  const scheduleCards = registered
+    .flatMap((view) => view.months.map((item) => ({ view, item })))
+    .sort((a, b) => a.item.monthStart.localeCompare(b.item.monthStart) || (a.view.store.tradeName || a.view.store.name).localeCompare(b.view.store.tradeName || b.view.store.name, "pt-BR"));
+
+  function openCreate() {
+    setWizardMonth(null);
+    setWizardStoreId(creatable[0].store.id);
+  }
+
+  function registeredActions(view: BranchSchedule, monthStart: string) {
+    return (
+      <>
+        <Button size="sm" variant="outline" onClick={() => setDeleteTarget({ storeId: view.store.id, monthStart })}>
+          Apagar escala
+        </Button>
+        <Button size="sm" disabled={view.people.length === 0 || loading} onClick={() => { setWizardMonth(monthStart); setWizardStoreId(view.store.id); }}>
+          Editar escala
+        </Button>
+      </>
+    );
+  }
+
+  function toBranch(view: BranchSchedule): WizardBranch {
+    return {
+      id: view.store.id,
+      name: view.store.tradeName || view.store.name,
+      hasSchedule: view.months.length > 0,
+      holidays: view.holidays.map((row) => ({ date: row.date, name: row.name })),
+      closedDays: view.store.daysClosed,
+      people: view.people.map((person) => ({
+        id: person.id,
+        name: person.name,
+        role: branchRoleLabel(person.role),
+        groupId: person.shiftId,
+        groupName: view.shifts.find((shift) => shift.id === person.shiftId)?.name ?? "",
+        code: person.code,
+        storeId: view.store.id,
+      })),
+      initial: initialWizard(view, view.store.id === wizardStoreId ? wizardMonth : null),
+    };
+  }
+
+  const wizardBranches = (wizardView && wizardView.months.length > 0 ? [wizardView] : creatable).map((view) => toBranch(view));
 
   return (
     <div>
       <SectionHeader
         section="Gestão"
         title="Escala"
-        subtitle="Acompanhe e ajuste a escala da filial."
+        subtitle={many ? "Acompanhe a escala das filiais." : "Acompanhe e ajuste a escala da filial."}
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                className={monthNavBtn}
-                aria-label="Mês anterior"
-                disabled={goalSpans == null || !monthCoveredByGoal(addMonths(monthStart, -1), goalSpans)}
-                onClick={() => setMonth((current) => addMonths(current, -1))}
-              >
-                <MonthStep dir="anterior" />
-              </button>
-              <span className="min-w-[140px] text-center text-[13.5px] font-semibold text-t0">{monthLabel(monthStart)}</span>
-              <button type="button" className={monthNavBtn} aria-label="Próximo mês" onClick={() => setMonth((current) => addMonths(current, 1))}>
-                <MonthStep dir="proximo" />
-              </button>
-            </div>
-            <Button icon={schedule ? undefined : <Icon d={icons.plus} size={14} />} disabled={!store || people.length === 0 || loading} onClick={() => setWizard(true)}>
-              {schedule ? "Editar escala" : "Criar escala"}
-            </Button>
-            <Button variant="outline" disabled={!store || !schedule} onClick={() => setConfirmDelete(true)}>
-              Apagar escala
-            </Button>
-          </div>
+          <HeaderFilters>
+            <DateRangePicker
+              value={[isoToDate(rangeFrom), isoToDate(rangeTo)]}
+              minDate={isoToDate(periodFloor)}
+              maxDate={isoToDate(periodCeil)}
+              quickRanges={CALENDAR_QUICK_RANGES}
+              displayLabel={presetId ? periodLabels[presetId] : null}
+              activePresetId={presetId}
+              onChange={([start, end], meta?: DateRangeChangeMeta) => {
+                setRangeFrom(dateToIso(start));
+                setRangeTo(dateToIso(end));
+                setPresetId(meta?.presetId ?? null);
+              }}
+            />
+            {creatable.length > 0 ? (
+              <Button icon={<Icon d={icons.plus} size={16} />} disabled={loading} onClick={openCreate}>
+                Nova escala
+              </Button>
+            ) : null}
+          </HeaderFilters>
         }
       />
-      <div className="mt-6 pb-8">
+      <div className="mt-6 min-w-0 pb-8">
         {error ? <Alert className="mb-4" variant="danger" title="Não foi possível carregar a escala. Tente novamente." /> : null}
-        {!store ? (
-          <Card>
-            <EmptyState icon="📅" title="Escolha uma filial" description="Com várias filiais no seletor, o dia não abre. Escolha uma para ver, gerar e ajustar a escala." />
+        {storeRows.length === 0 ? (
+          <Card className="flex min-h-[280px] flex-col">
+            <EmptyBlock icon="📅" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
           </Card>
+        ) : loading && views.length === 0 ? (
+          <p className="text-[12px] text-t2">Carregando a escala…</p>
         ) : (
           <>
-            <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <PlainKpi label="Pessoas" value={String(schedule?.people.length ?? people.length)} color="var(--t0)" />
-              <PlainKpi label="Modelo" value={patternLabel} color="var(--t0)" />
-              <PlainKpi label="Feriados" value={String(holidayCount)} color="var(--t0)" />
-              <PlainKpi label="Dias ajustados" value={String(new Set(days.filter((row) => row.origin === "manual").map((row) => row.day)).size)} color="var(--t0)" />
-            </div>
-            {schedule ? <ColorLegend className="mb-3" items={SCHEDULE_LEGEND} /> : null}
-            {schedule ? (
-              <ScheduleGrid
-                dates={dates}
-                today={today}
-                holidays={holidays}
-                schedule={schedule}
-                days={days}
-                people={people}
-                shifts={shifts}
-                onOpenDay={setDayOpen}
-              />
-            ) : null}
-            {loading ? <p className="mt-3 text-[12px] text-t2">Carregando a escala…</p> : null}
-            {!loading && people.length === 0 ? <p className="mt-3 text-[12px] text-t2">Esta filial não tem equipe ativa.</p> : null}
-            {!loading && people.length > 0 && !schedule ? <p className="mt-3 text-[12px] text-t2">Este mês ainda não tem escala. O feriado do dia já aparece.</p> : null}
+            {registered.length === 0 ? (
+              <Card className="flex min-h-[280px] flex-col">
+                <EmptyBlock
+                  icon="📅"
+                  title="Sem escala cadastrada"
+                  description="Nenhuma filial deste filtro tem escala neste período."
+                  action={creatable.length > 0 ? <Button size="sm" onClick={openCreate}>Criar escala</Button> : undefined}
+                />
+              </Card>
+            ) : (
+              <>
+                <ColorLegend className="mb-4" items={SCHEDULE_LEGEND} />
+                <div className="flex flex-col gap-4">
+                  {scheduleCards.map(({ view, item }) => {
+                      const monthDates = dates.filter((iso) => startOfMonth(iso) === item.monthStart);
+                      return (
+                        <Card key={`${view.store.id}-${item.monthStart}`}>
+                          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <h3 className="text-[15px] font-bold text-t0">{scheduleTitle(item.schedule.pattern, item.monthStart)}</h3>
+                              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                <PeriodBadge from={item.monthStart} to={endOfMonth(item.monthStart)} />
+                                <BranchBadge name={view.store.tradeName || view.store.name} />
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">{registeredActions(view, item.monthStart)}</div>
+                          </div>
+                          <ScheduleBoard
+                            dates={monthDates}
+                            today={today}
+                            section={{
+                              storeId: view.store.id,
+                              holidays: view.holidays,
+                              schedules: [item],
+                              days: view.days.filter((row) => startOfMonth(row.day) === item.monthStart),
+                              people: view.people,
+                              shifts: view.shifts,
+                            }}
+                            onOpenDay={(day, sellerId) => setDayOpen({ storeId: view.store.id, day, sellerId })}
+                          />
+                        </Card>
+                      );
+                    })}
+                </div>
+              </>
+            )}
+            {loading && views.length > 0 ? <p className="mt-3 text-[12px] text-t2">Carregando a escala…</p> : null}
           </>
         )}
       </div>
-      {store && wizard ? (
+      {wizardStoreId && wizardBranches.length > 0 ? (
         <ScheduleWizard
           open
-          onClose={() => setWizard(false)}
-          people={people.map((person) => ({
-            id: person.id,
-            name: person.name,
-            role: branchRoleLabel(person.role),
-            groupId: person.shiftId,
-            groupName: shifts.find((shift) => shift.id === person.shiftId)?.name ?? "",
-            code: person.code,
-            storeId: store.id,
-          }))}
-          hasSchedule={schedule != null}
-          nationalHolidays={holidays}
-          initial={initialWizard()}
+          onClose={() => { setWizardStoreId(null); setWizardMonth(null); }}
+          stores={wizardBranches}
+          storeId={wizardStoreId}
           saving={saving}
-          onSubmit={(value) => void onGenerate(value)}
+          onSubmit={onGenerate}
         />
       ) : null}
-      {store && dayOpen ? (
+      {dayOpen && dayView && openSchedule ? (
         <DayEditor
-          day={dayOpen}
-          holiday={holidayLabel(holidays, dayOpen)}
-          doublePay={Boolean(schedule?.holidayRules.some((rule) => rule.date === dayOpen && rule.pay === "double"))}
-          rows={dayRows.get(dayOpen) ?? []}
-          storeId={store.id}
-          shopping={store.tradeName || store.name}
-          shifts={shifts}
-          names={byPerson}
+          day={dayOpen.day}
+          sellerId={dayOpen.sellerId}
+          pattern={openSchedule.pattern}
+          rules={openSchedule.holidayRules}
+          dayNeeds={openSchedule.dayNeeds}
+          monthDays={dayView.days.filter((row) => startOfMonth(row.day) === startOfMonth(dayOpen.day))}
+          names={new Map(dayView.people.map((person) => [person.id, person]))}
           onClose={() => setDayOpen(null)}
           onSave={async (next) => {
-            try {
-              await saveDay(next);
-              setDayOpen(null);
-              show("Dia salvo.", "success");
-            } catch (caught) {
-              show(caught instanceof Error ? caught.message : "Não foi possível salvar o dia.", "danger");
-            }
+            await saveDay([{ storeId: dayView.store.id, days: next }]);
+            setDayOpen(null);
+            show("Dia salvo.", "success");
           }}
         />
       ) : null}
       <Modal
-        open={confirmDelete}
-        onClose={() => setConfirmDelete(false)}
+        open={deleteMonth != null}
+        onClose={() => setDeleteTarget(null)}
         title="Apagar escala"
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setConfirmDelete(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancelar</Button>
             <Button
               onClick={() => {
-                if (!store) return;
-                void deleteSchedule(store.id, monthStart)
+                if (!deleteView || !deleteMonth) return;
+                void deleteSchedule(deleteView.store.id, deleteMonth.monthStart)
                   .then(() => {
-                    setConfirmDelete(false);
+                    setDeleteTarget(null);
                     show("Escala apagada. O feriado continua no calendário.", "success");
                     setReloadKey((value) => value + 1);
                   })
@@ -413,124 +576,167 @@ export function SchedulePage() {
         }
       >
         <p className="text-[13.5px] text-t1">
-          Apaga a escala de {monthLabel(monthStart)} desta filial, inclusive os dias ajustados na mão. O feriado do dia continua no calendário.
-          {monthEnd < today ? " Este mês já passou." : ""}
+          Apaga a escala de {deleteMonth ? monthLabel(deleteMonth.monthStart) : ""}
+          {many && deleteView ? ` de ${deleteView.store.tradeName || deleteView.store.name}` : " desta filial"}, inclusive os dias ajustados na mão. O feriado do dia continua no calendário.
+          {deleteMonth && endOfMonth(deleteMonth.monthStart) < today ? " Este período já passou." : ""}
         </p>
       </Modal>
     </div>
   );
 }
 
-function ScheduleGrid({
-  dates,
-  today,
-  holidays,
-  schedule,
-  days,
-  people,
-  shifts,
-  onOpenDay,
-}: {
-  dates: string[];
-  today: string;
+type ScheduleSection = {
+  storeId: string;
   holidays: Holiday[];
-  schedule: StoredSchedule;
+  schedules: { monthStart: string; schedule: StoredSchedule }[];
   days: StoredDay[];
   people: StoreSeller[];
   shifts: StoreShift[];
-  onOpenDay: (day: string) => void;
-}) {
+};
+
+function cellMark(status: DayStatus, doublePay: boolean): { letters: string; note: string | null; className: string } {
+  if (status === "holiday_work" && doublePay) return { letters: "FE", note: "2×", className: "bg-acc-soft text-acc" };
+  if (status === "holiday_work") return { letters: "FE", note: null, className: "bg-warn-soft text-warn" };
+  if (status === "comp_off") return { letters: "FC", note: null, className: "bg-info-soft text-info" };
+  if (status === "off") return { letters: "F", note: null, className: "bg-bg-3 text-t2" };
+  return { letters: "T", note: null, className: "bg-ok-soft text-ok" };
+}
+
+function dayFloor(schedule: StoredSchedule, iso: string): { min: number; closed: boolean; exact: boolean } {
+  const need = schedule.dayNeeds.find((row) => row.dow === weekday(iso));
+  const holiday = schedule.holidayRules.find((row) => row.date === iso);
+  if (holiday && !holiday.open) return { min: 0, closed: true, exact: false };
+  if (holiday?.open) return { min: holiday.workers, closed: false, exact: true };
+  if (need && !need.open) return { min: 0, closed: true, exact: false };
+  return { min: need?.min ?? 0, closed: false, exact: false };
+}
+
+function daysByDate(days: StoredDay[]): Map<string, StoredDay[]> {
   const byDay = new Map<string, StoredDay[]>();
   for (const row of days) {
     const list = byDay.get(row.day) ?? [];
     list.push(row);
     byDay.set(row.day, list);
   }
+  return byDay;
+}
+
+function isWorking(row: StoredDay | undefined): boolean {
+  return row?.status === "work" || row?.status === "holiday_work";
+}
+
+function ScheduleBoard({
+  dates,
+  today,
+  section,
+  onOpenDay,
+}: {
+  dates: string[];
+  today: string;
+  section: ScheduleSection;
+  onOpenDay: (day: string, sellerId: string) => void;
+}) {
+  const { schedules, people, shifts, holidays } = section;
   const byId = new Map(people.map((person) => [person.id, person]));
-  const ids = new Set<string>([...schedule.people.map((person) => person.sellerId), ...days.map((row) => row.sellerId)]);
+  const byDay = daysByDate(section.days);
+  function scheduleFor(iso: string): StoredSchedule | null {
+    return schedules.find((item) => item.monthStart === startOfMonth(iso))?.schedule ?? null;
+  }
+  const ids = new Set<string>([...schedules.flatMap((item) => item.schedule.people.map((person) => person.sellerId)), ...section.days.map((row) => row.sellerId)]);
+  function offDowOf(id: string, fixed: number | null): number | null {
+    if (fixed != null) return fixed;
+    const counts = Array.from({ length: 7 }, () => 0);
+    for (const iso of dates) {
+      const row = (byDay.get(iso) ?? []).find((item) => item.sellerId === id);
+      if (row?.status === "off") counts[weekday(iso)] += 1;
+    }
+    let best = -1;
+    let bestCount = 0;
+    counts.forEach((count, dow) => {
+      if (count > bestCount) {
+        best = dow;
+        bestCount = count;
+      }
+    });
+    return bestCount > 0 ? best : null;
+  }
   const roster = [...ids]
     .map((id) => {
       const person = byId.get(id);
-      const fixed = schedule.people.find((row) => row.sellerId === id)?.fixedOffDow ?? null;
+      const fixed = schedules.flatMap((item) => item.schedule.people).find((row) => row.sellerId === id)?.fixedOffDow ?? null;
       const shift = shifts.find((item) => item.id === person?.shiftId);
-      const detail = [person ? branchRoleLabel(person.role).toLocaleUpperCase("pt-BR") : "", shift ? shiftName(shift.name) : "", fixed != null ? `folga ${weekdayLabel(fixed)}` : ""].filter(Boolean).join(" · ");
-      return { id, name: person?.name ?? "Pessoa", detail, shiftId: person?.shiftId ?? null };
+      const offDow = offDowOf(id, fixed);
+      const detail = [person ? branchRoleLabel(person.role).toLocaleUpperCase("pt-BR") : "", shift ? shiftName(shift.name) : "", offDow != null ? `FOLGA: ${DOW_LABELS[offDow as 0 | 1 | 2 | 3 | 4 | 5 | 6].toLocaleUpperCase("pt-BR")}` : ""].filter(Boolean).join(" · ");
+      return { id, name: person?.name ?? "Pessoa", detail, shiftId: person?.shiftId ?? null, code: person?.code ?? null };
     })
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
-  const groupIds = new Set(roster.map((person) => person.shiftId).filter((id): id is string => Boolean(id)));
-  const perGroup = groupIds.size >= 2;
 
-  function floorOf(iso: string): { min: number; closed: boolean; perGroup: boolean } {
-    const need = schedule.dayNeeds.find((row) => row.dow === weekday(iso));
-    const holiday = schedule.holidayRules.find((row) => row.date === iso);
-    if (holiday && !holiday.open) return { min: 0, closed: true, perGroup: false };
-    if (holiday?.open) return { min: holiday.workers, closed: false, perGroup: false };
-    if (need && !need.open) return { min: 0, closed: true, perGroup: false };
-    return { min: need?.min ?? 0, closed: false, perGroup };
-  }
-
-  function presence(iso: string): { working: number; short: boolean; floor: { min: number; closed: boolean; perGroup: boolean } } {
-    const floor = floorOf(iso);
+  function presence(iso: string): { working: number; closed: boolean; min: number; exact: boolean } {
     const rows = byDay.get(iso) ?? [];
-    const on = (row: StoredDay | undefined) => row?.status === "work" || row?.status === "holiday_work";
-    const working = rows.filter((row) => on(row)).length;
-    if (floor.closed || !floor.perGroup) return { working, short: !floor.closed && working < floor.min, floor };
-    const counts = new Map<string, number>();
-    for (const person of roster) {
-      if (!person.shiftId) continue;
-      const row = rows.find((item) => item.sellerId === person.id);
-      counts.set(person.shiftId, (counts.get(person.shiftId) ?? 0) + (on(row) ? 1 : 0));
-    }
-    const short = [...counts.values()].some((count) => count < floor.min);
-    return { working, short, floor };
+    const working = rows.filter((row) => isWorking(row)).length;
+    const schedule = scheduleFor(iso);
+    if (!schedule) return { working, closed: false, min: 0, exact: false };
+    const floor = dayFloor(schedule, iso);
+    return { working, closed: floor.closed, min: floor.min, exact: floor.exact };
   }
 
-  const columns = `11.5rem repeat(${dates.length}, calc(100cqw / 7))`;
+  const columns = `minmax(14rem, 16rem) repeat(${dates.length}, minmax(0, 1fr))`;
   return (
-    <div className="@container overflow-x-auto rounded-[18px] border border-line bg-bg-2 shadow-[var(--shadow-vela)]">
-      <div className="grid w-max" style={{ gridTemplateColumns: columns }}>
-        <div className={cn(STICKY, CALENDAR_HEADER, "z-30 text-left")}>Funcionário</div>
+    <div className="min-w-0 overflow-hidden rounded-[18px] border border-line bg-bg-2">
+      <div className="grid w-full min-w-0" style={{ gridTemplateColumns: columns }}>
+        <div className="border-b border-r border-line bg-bg-2 px-2 py-2 text-left text-[11px] font-bold uppercase tracking-wide text-t2">Pessoa</div>
         {dates.map((iso) => {
           const holiday = holidayLabel(holidays, iso);
           const day = Number(iso.slice(8));
           return (
-            <div key={iso} title={holiday ?? undefined} className={cn(CALENDAR_HEADER, "min-w-0 truncate", holiday && "text-warn")}>
-              <span className={iso === today ? "text-acc" : undefined}>{day}</span>
-              <span> · {WEEKDAY[weekday(iso)]}</span>
+            <div key={iso} title={holiday ?? dayTitle(iso, null)} className={cn("border-b border-line px-0.5 py-2 text-center", holiday && "text-warn")}>
+              <span className={cn("block text-[12px] font-bold", iso === today ? "text-acc" : holiday ? "text-warn" : "text-t0")}>{day}</span>
+              <span className="block text-[10px] font-bold uppercase text-t2">{SHORT_WEEK[weekday(iso)]}</span>
             </div>
           );
         })}
         {roster.map((person) => (
           <div key={person.id} className="contents">
-            <div className={cn(STICKY, "border-b border-line p-1.5 sm:p-2")}>
-              <span className="block truncate text-[13px] font-semibold text-t0">{person.name}</span>
-              {person.detail ? <span className="mt-0.5 block truncate text-[11px] text-t2">{person.detail}</span> : null}
+            <div className="flex min-w-0 items-center gap-2 border-b border-r border-line bg-bg-2 px-2 py-1.5">
+              <PersonAvatar name={person.name} employeeId={person.code} storeId={section.storeId} size="sm" />
+              <span className="min-w-0">
+                <span className="block text-[12px] font-semibold leading-tight text-t0">{person.name}</span>
+                {person.detail ? <span className="mt-0.5 block text-[11px] leading-snug text-t2">{person.detail}</span> : null}
+              </span>
             </div>
-            {dates.map((iso, index) => {
+            {dates.map((iso) => {
               const row = (byDay.get(iso) ?? []).find((item) => item.sellerId === person.id);
-              const holiday = holidayLabel(holidays, iso);
-              const doublePay = schedule.holidayRules.some((rule) => rule.date === iso && rule.pay === "double");
-              const chip = row ? statusChip(row.status, doublePay) : null;
-              const day = Number(iso.slice(8));
+              const doublePay = scheduleFor(iso)?.holidayRules.some((rule) => rule.date === iso && rule.pay === "double") ?? false;
+              const mark = row ? cellMark(row.status, doublePay) : null;
+              const status = row ? statusChip(row.status, doublePay).label : "sem escala";
+              if (!row || !mark) {
+                return <div key={iso} className="min-h-11 border-b border-line" />;
+              }
               return (
-                <div key={iso} className={cn(CALENDAR_CELL, index === dates.length - 1 && "border-r-0")}>
-                  <button type="button" className="absolute inset-0 z-0" aria-label={`${person.name}, ${day}: ${chip?.label ?? "sem escala"}${holiday ? `, ${holiday}` : ""}`} onClick={() => onOpenDay(iso)} />
-                  <div className="pointer-events-none relative z-10">
-                    {chip ? <div className={cn(CALENDAR_CHIP, chip.color)}>{chip.label}</div> : null}
-                  </div>
-                </div>
+                <button
+                  key={iso}
+                  type="button"
+                  className="flex min-h-11 min-w-0 cursor-pointer items-center justify-center border-b border-line p-0.5"
+                  aria-label={`${person.name}, ${Number(iso.slice(8))}: ${status}`}
+                  onClick={() => onOpenDay(iso, person.id)}
+                >
+                  <span className={cn("flex h-8 w-full max-w-9 flex-col items-center justify-center rounded-[6px] text-[10px] font-bold leading-none", mark.className)}>
+                    {mark.letters}
+                    {mark.note ? <span className="mt-0.5 text-[8px] font-semibold uppercase">{mark.note}</span> : null}
+                  </span>
+                </button>
               );
             })}
           </div>
         ))}
-        <div className={cn(STICKY, "border-line px-2 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-t2")}>Pessoas presentes</div>
-        {dates.map((iso, index) => {
-          const { working, short, floor } = presence(iso);
-          const text = floor.closed ? "Fechado" : floor.min > 0 ? `${working} · mín. ${floor.min}${floor.perGroup ? "/grupo" : ""}` : String(working);
-          const title = floor.closed ? "A loja fecha neste dia" : floor.perGroup ? "Mínimo em cada grupo" : "Mínimo do dia";
+        <div className="border-r border-line bg-bg-2 px-2 py-2 text-left text-[11px] font-bold uppercase leading-tight tracking-wide text-t2">Pessoas presentes</div>
+        {dates.map((iso) => {
+          const face = presence(iso);
+          const title = face.closed ? "A loja fecha neste dia" : face.exact ? "Quantidade exata neste feriado" : "Mínimo do dia";
           return (
-            <div key={iso} title={title} className={cn("border-line px-2 py-3 text-center text-[11px] font-bold tabular-nums", index < dates.length - 1 && "border-r", floor.closed ? "text-t2" : short ? "text-bad" : "text-ok")}>
-              {text}
+            <div key={iso} title={title} className="min-w-0 px-0.5 py-1.5 text-center">
+              <span className={cn("block text-[11px] font-bold tabular-nums", face.closed ? "text-t2" : "text-t1")}>{face.closed ? "—" : face.working}</span>
+              <span className="block text-[9px] leading-tight text-t2">{face.closed ? "Fechado" : face.min > 0 ? `${face.exact ? "Exato" : "Mínimo"} ${face.min}` : ""}</span>
             </div>
           );
         })}
@@ -539,149 +745,136 @@ function ScheduleGrid({
   );
 }
 
+function shortDate(iso: string): string {
+  const [year, month, day] = iso.split("-");
+  return `${day}/${month}/${year}`;
+}
+
+function choiceOf(status: DayStatus): CellChoice {
+  if (status === "off") return "off";
+  if (status === "comp_off") return "comp_off";
+  return "work";
+}
+
 function DayEditor({
   day,
-  holiday,
-  doublePay,
-  rows,
-  storeId,
-  shopping,
-  shifts,
+  sellerId,
+  pattern,
+  rules,
+  dayNeeds,
+  monthDays,
   names,
   onClose,
   onSave,
 }: {
   day: string;
-  holiday: string | null;
-  doublePay: boolean;
-  rows: StoredDay[];
-  storeId: string;
-  shopping: string;
-  shifts: StoreShift[];
+  sellerId: string;
+  pattern: SchedulePattern;
+  rules: HolidayRule[];
+  dayNeeds: DayNeed[];
+  monthDays: StoredDay[];
   names: Map<string, StoreSeller>;
   onClose: () => void;
-  onSave: (rows: StoredDay[]) => Promise<void>;
+  onSave: (next: { day: string; rows: StoredDay[] }[]) => Promise<void>;
 }) {
-  const [draft, setDraft] = useState(rows);
-  const [pick, setPick] = useState("");
-  const [adding, setAdding] = useState(false);
+  const monthEnd = endOfMonth(startOfMonth(day));
+  const links = inferCompLinks(monthDays, rules, monthEnd);
+  const roster = monthDays.filter((row) => row.day === day && row.sellerId === sellerId);
+  const personName = names.get(sellerId)?.name ?? "Pessoa";
+  const [drafts, setDrafts] = useState<Record<string, { value: CellChoice; holiday: string }>>(() =>
+    Object.fromEntries(
+      roster.map((row) => {
+        const options = dayEditOptions({ day, days: monthDays, rules, dayNeeds, pattern, personId: row.sellerId, monthEnd });
+        const linked = links.find((item) => item.personId === row.sellerId && item.day === day);
+        return [row.sellerId, { value: choiceOf(row.status), holiday: linked?.holiday ?? options.holidays[0]?.date ?? "" }];
+      }),
+    ),
+  );
   const [busy, setBusy] = useState(false);
-  const ordered = [...draft].sort((a, b) => (names.get(a.sellerId)?.name ?? "").localeCompare(names.get(b.sellerId)?.name ?? "", "pt-BR"));
-  const missing = [...names.values()].filter((person) => !draft.some((row) => row.sellerId === person.id)).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  function addPerson() {
-    if (!pick || draft.some((row) => row.sellerId === pick)) return;
-    setDraft((current) => [...current, { sellerId: pick, day, status: "work", origin: "manual" }]);
-    setPick("");
-    setAdding(false);
+  function apply() {
+    const edited = applyDayChoices({
+      day,
+      days: monthDays,
+      rules,
+      dayNeeds,
+      pattern,
+      monthEnd,
+      choices: roster.map((row) => ({ personId: row.sellerId, value: drafts[row.sellerId]?.value ?? choiceOf(row.status), holiday: drafts[row.sellerId]?.holiday || null })),
+    });
+    if (edited.error) {
+      setSaveError(edited.error);
+      return;
+    }
+    const touched = new Set<string>();
+    for (const row of edited.days) {
+      const before = monthDays.find((item) => item.sellerId === row.sellerId && item.day === row.day);
+      if (!before || before.status !== row.status || before.origin !== row.origin) touched.add(row.day);
+    }
+    setBusy(true);
+    setSaveError(null);
+    void onSave([...touched].map((iso) => ({ day: iso, rows: edited.days.filter((row) => row.day === iso) })))
+      .catch((caught) => setSaveError(caught instanceof Error && caught.message ? caught.message : "Não foi possível salvar o dia."))
+      .finally(() => setBusy(false));
   }
 
   return (
     <Modal
       open
       onClose={busy ? () => {} : onClose}
-      title={dayTitle(day, holiday)}
+      title={`${personName} · ${shortDate(day)}`}
       footer={
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={onClose} disabled={busy}>Cancelar</Button>
-          <Button
-            disabled={busy}
-            onClick={() => {
-              setBusy(true);
-              void onSave(draft).finally(() => setBusy(false));
-            }}
-          >
-            Salvar dia
-          </Button>
+        <div className="flex w-full min-w-0 flex-col gap-3">
+          {saveError ? <Alert variant="danger" title={saveError} /> : null}
+          <div className="flex justify-end gap-2.5">
+            <Button variant="outline" onClick={onClose} disabled={busy}>Cancelar</Button>
+            <Button disabled={busy} onClick={apply}>Aplicar</Button>
+          </div>
         </div>
       }
     >
-      <p className="mb-3 text-[12.5px] text-t2">Ajuste quem trabalha ou folga neste dia.</p>
-      {ordered.length === 0 ? <p className="text-[13px] text-t2">Ninguém neste dia.</p> : null}
-      <ul className="space-y-2">
-        {ordered.map((row) => {
-          const person = names.get(row.sellerId);
-          const name = person?.name ?? "Pessoa";
-          const shift = shifts.find((item) => item.id === person?.shiftId);
-          const place = [shift ? shiftName(shift.name) : "Sem grupo", shopping].filter(Boolean).join(" · ");
-          return (
-            <li key={row.sellerId} className="flex min-w-0 flex-col gap-2 border-b border-line py-2 sm:flex-row sm:items-center sm:justify-between">
-              <span className="flex min-w-0 items-center gap-2">
-                <PersonAvatar name={name} employeeId={person?.code} storeId={storeId} size="sm" />
-                <span className="min-w-0">
-                  <span className="block truncate text-[13.5px] font-semibold text-t0">{name}</span>
-                  <span className="block truncate text-[12px] text-t2">{place}</span>
-                </span>
-              </span>
-              <span className="flex min-w-0 items-center gap-2 sm:shrink-0">
-                <Select
-                  className="h-9! min-w-0 flex-1 px-2! sm:w-[13.5rem] sm:flex-none"
-                  aria-label={`Situação de ${name}`}
-                  value={row.status}
-                  onChange={(event) => {
-                    const status = event.target.value as DayStatus;
-                    setDraft((current) => current.map((item) => (item.sellerId === row.sellerId ? { ...item, status, origin: "manual" } : item)));
-                  }}
-                >
-                  <option value="work">Trabalha</option>
-                  <option value="off">Folga</option>
-                  <option value="holiday_work">{doublePay ? "Feriado trabalhado 2×" : "Feriado trabalhado"}</option>
-                  <option value="comp_off">Folga compensatória</option>
-                </Select>
-                <button
-                  type="button"
-                  aria-label={`Remover ${name} do dia`}
-                  onClick={() => setDraft((current) => current.filter((item) => item.sellerId !== row.sellerId))}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] border border-line text-bad transition-colors hover:bg-bad-soft"
-                >
-                  <Icon d={icons.trash} size={14} />
-                </button>
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-      {missing.length > 0 ? (
-        adding ? (
-          <section className="mt-4 rounded-[var(--radius-vela-lg)] border border-line bg-bg-2 p-3">
-            <p className="text-[12.5px] font-bold text-t0">Adicionar pessoa</p>
-            <p className="mt-1 text-[12.5px] leading-relaxed text-t2">Alguém da equipe que ainda não está neste dia.</p>
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
-              <div className="min-w-0 flex-1">
-                <FormField label="Pessoa" required>
-                  <Select value={pick} onChange={(event) => setPick(event.target.value)} aria-label="Pessoa para incluir no dia">
-                    <option value="">Escolha</option>
-                    {missing.map((person) => (
-                      <option key={person.id} value={person.id}>{person.name}</option>
-                    ))}
-                  </Select>
-                </FormField>
-              </div>
-              <Button type="button" variant="outline" size="sm" disabled={!pick} onClick={addPerson}>
-                Adicionar pessoa
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setPick("");
-                  setAdding(false);
+      {roster.map((row) => {
+        const options = dayEditOptions({ day, days: monthDays, rules, dayNeeds, pattern, personId: row.sellerId, monthEnd });
+        const draft = drafts[row.sellerId] ?? { value: choiceOf(row.status), holiday: "" };
+        return (
+          <div key={row.sellerId} className="flex flex-col gap-3">
+            <label className="flex flex-col gap-1.5 text-[13px] font-semibold text-t0">
+              O que esta pessoa fará neste dia?
+              <Select
+                aria-label={`O que ${personName} fará neste dia?`}
+                value={draft.value}
+                disabled={options.locked || busy}
+                onChange={(event) => {
+                  const value = event.target.value as CellChoice;
+                  setDrafts((current) => ({ ...current, [row.sellerId]: { ...draft, value } }));
                 }}
               >
-                Remover
-              </Button>
-            </div>
-          </section>
-        ) : (
-          <div className="mt-4">
-            <Button type="button" variant="outline" size="sm" onClick={() => setAdding(true)}>
-              Adicionar pessoa
-            </Button>
-            <p className="mt-1.5 text-[12.5px] leading-relaxed text-t2">Alguém da equipe que ainda não está neste dia.</p>
+                <option value="work">Trabalhar</option>
+                <option value="off">Folgar</option>
+                <option value="comp_off" disabled={!options.fcEnabled}>Folga compensatória</option>
+              </Select>
+            </label>
+            {draft.value === "comp_off" && options.fcEnabled ? (
+              <label className="flex flex-col gap-1.5 text-[13px] font-semibold text-t0">
+                Qual feriado gerou esta folga?
+                <Select
+                  aria-label={`Essa folga de ${personName} é por qual feriado?`}
+                  value={draft.holiday}
+                  disabled={busy}
+                  onChange={(event) => setDrafts((current) => ({ ...current, [row.sellerId]: { ...draft, holiday: event.target.value } }))}
+                >
+                  {options.holidays.map((rule) => (
+                    <option key={rule.date} value={rule.date}>{shortDate(rule.date)} · {rule.name}</option>
+                  ))}
+                </Select>
+              </label>
+            ) : null}
+            {options.locked ? <p className="text-[12.5px] text-t2">{PREVIOUS_MONTH_EDIT}</p> : null}
+            <p className="text-[12.5px] text-t2">Ao alterar uma folga compensatória, a folga anterior vinculada ao feriado também será atualizada.</p>
           </div>
-        )
-      ) : null}
+        );
+      })}
     </Modal>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateMonth, nextSundayShift, weekday } from "./scheduleGenerate";
+import { applyDayChoices, generateMonth, weekday, type EditableDay, type HolidayRule } from "./scheduleGenerate";
 import { easter, nationalHolidays, storePlace } from "./scheduleHolidays";
 
 describe("feriados nacionais", () => {
@@ -127,102 +127,120 @@ describe("geração da escala", () => {
     expect(generated.compDue).toEqual([{ personId: "a", holiday: "2026-10-12", until: "2026-11-30" }]);
   });
 
-  it("começa o ciclo no primeiro dia do período", () => {
+  it("respeita a folga fixa dentro do período pedido", () => {
     const rows = generateMonth({
       year: 2026,
       month: 3,
       pattern: "6x1",
-      offMode: "rotating",
+      offMode: "fixed",
       sundayMin: 0,
-      people: [{ id: "a" }],
+      womenSunday: "none",
+      menSunday: "none",
+      people: [{ id: "a", fixedOffDow: 1 }],
       holidayDates: [],
-      from: "2026-03-04",
-      to: "2026-03-10",
-    }).days.filter((row) => row.personId === "a");
-    expect(rows.map((row) => row.date)).toEqual(["2026-03-04", "2026-03-05", "2026-03-06", "2026-03-07", "2026-03-08", "2026-03-09", "2026-03-10"]);
-    expect(rows[0]?.status).toBe("work");
-    expect(rows[6]?.status).toBe("off");
-  });
-
-  it("pede o mínimo em cada turno e reveza o domingo", () => {
-    const team = [
-      { id: "a1", groupId: "manha" },
-      { id: "a2", groupId: "manha" },
-      { id: "b1", groupId: "tarde" },
-      { id: "b2", groupId: "tarde" },
-    ];
-    const rows = generateMonth({
-      year: 2026,
-      month: 3,
-      pattern: "6x1",
-      offMode: "rotating",
-      sundayMin: 0,
-      people: team,
-      holidayDates: [],
-      dayNeeds: Array.from({ length: 7 }, (_, dow) => ({ dow, open: true, min: 2 })),
-      sundayShifts: ["manha", "tarde"],
-      sundayShiftStart: 0,
-    }).days;
-    const working = (date: string, groupId: string) => rows.filter((row) => row.date === date && team.find((person) => person.id === row.personId)?.groupId === groupId && (row.status === "work" || row.status === "holiday_work")).length;
-    expect(working("2026-03-02", "manha")).toBeGreaterThanOrEqual(2);
-    expect(working("2026-03-02", "tarde")).toBeGreaterThanOrEqual(2);
-    expect(working("2026-03-01", "manha")).toBe(2);
-    expect(working("2026-03-01", "tarde")).toBe(0);
-    expect(working("2026-03-08", "tarde")).toBe(2);
-    expect(working("2026-03-08", "manha")).toBe(0);
-    const split = generateMonth({
-      year: 2026,
-      month: 3,
-      from: "2026-03-01",
-      to: "2026-03-02",
-      pattern: "12x36",
-      offMode: "rotating",
-      sundayMin: 0,
-      people: team,
-      holidayDates: [],
-      dayNeeds: Array.from({ length: 7 }, (_, dow) => ({ dow, open: true, min: 0 })),
-      groupNeeds: [
-        { groupId: "manha", dow: 1, min: 2 },
-        { groupId: "tarde", dow: 1, min: 1 },
-      ],
-      sundayShifts: ["manha", "tarde"],
-      sundayShiftStart: 0,
-    }).days;
-    const onMonday = (groupId: string) => split.filter((row) => row.date === "2026-03-02" && team.find((person) => person.id === row.personId)?.groupId === groupId && (row.status === "work" || row.status === "holiday_work")).length;
-    expect(onMonday("manha")).toBe(2);
-    expect(onMonday("tarde")).toBe(1);
-    expect(nextSundayShift("manha", ["manha", "tarde"])).toBe(1);
-    expect(nextSundayShift(null, ["manha", "tarde"])).toBe(0);
-  });
-
-  it("divide o mínimo do dia entre os grupos e não deixa um turno cheio e o outro vazio", () => {
-    const team = [
-      { id: "a1", groupId: "manha" },
-      { id: "a2", groupId: "manha" },
-      { id: "a3", groupId: "manha" },
-      { id: "b1", groupId: "tarde" },
-      { id: "b2", groupId: "tarde" },
-      { id: "b3", groupId: "tarde" },
-    ];
-    const rows = generateMonth({
-      year: 2026,
-      month: 3,
       from: "2026-03-02",
-      to: "2026-03-06",
+      to: "2026-03-08",
+    }).days.filter((row) => row.personId === "a");
+    expect(rows.map((row) => row.date)).toEqual(["2026-03-02", "2026-03-03", "2026-03-04", "2026-03-05", "2026-03-06", "2026-03-07", "2026-03-08"]);
+    expect(rows.map((row) => row.status)).toEqual(["off", "work", "work", "work", "work", "work", "work"]);
+  });
+
+  it("repete a escala de outubro do gerador", () => {
+    const names = ["emily", "gabriela", "izabelly", "maria", "pamela", "stefani"];
+    const expected: Record<string, string> = {
+      emily: "TTTTFTTTTTFFTTTTTTFTTTTTFFTTTTT",
+      gabriela: "TTTTTFTTTTFHFTTTTTTFTTTTFTFTTTT",
+      izabelly: "TTTTTTFTTTFHTFTTTTTTFTTTFTTFTTT",
+      maria: "TTTFFTTTTTTFTTTTTFFTTTTTTFTTTTT",
+      pamela: "TTTFTFTTTTTHFTTTTFTFTTTTTTFTTTT",
+      stefani: "TTTFTTFTTTTFTFTTTFTTFTTTTTTFTTT",
+    };
+    const rows = generateMonth({
+      year: 2026,
+      month: 10,
       pattern: "6x1",
       offMode: "rotating",
       sundayMin: 0,
-      people: team,
+      womenSunday: "every_2",
+      menSunday: "every_3",
+      people: names.map((id) => ({ id, sex: "woman" as const })),
       holidayDates: [],
-      dayNeeds: Array.from({ length: 7 }, (_, dow) => ({ dow, open: dow >= 1 && dow <= 5, min: 2 })),
+      dayNeeds: [
+        { dow: 0, open: true, min: 3 },
+        { dow: 1, open: true, min: 4 },
+        { dow: 2, open: true, min: 4 },
+        { dow: 3, open: true, min: 4 },
+        { dow: 4, open: true, min: 6 },
+        { dow: 5, open: true, min: 6 },
+        { dow: 6, open: true, min: 6 },
+      ],
+      holidayRules: [{ date: "2026-10-12", name: "Nossa Senhora Aparecida", open: true, workers: 3, pay: "double", window: "7_days" }],
     }).days;
-    for (const date of ["2026-03-02", "2026-03-03", "2026-03-04", "2026-03-05", "2026-03-06"]) {
-      const count = (groupId: string) => rows.filter((row) => row.date === date && team.find((person) => person.id === row.personId)?.groupId === groupId && (row.status === "work" || row.status === "holiday_work")).length;
-      const morning = count("manha");
-      const afternoon = count("tarde");
-      expect(morning).toBeGreaterThanOrEqual(2);
-      expect(afternoon).toBeGreaterThanOrEqual(2);
-      expect(Math.abs(morning - afternoon)).toBeLessThanOrEqual(1);
+    const letter = (status: string) => (status === "holiday_work" ? "H" : status === "off" ? "F" : status === "comp_off" ? "C" : "T");
+    for (const id of names) {
+      const line = rows.filter((row) => row.personId === id).map((row) => letter(row.status)).join("");
+      expect(line, id).toBe(expected[id]);
     }
+  });
+});
+
+describe("edição de um dia", () => {
+  const rules: HolidayRule[] = [{ date: "2026-10-12", name: "Nossa Senhora Aparecida", open: true, workers: 3, pay: "extra_off", window: "7_days" }];
+  const needs = [0, 1, 2, 3, 4, 5, 6].map((dow) => ({ dow, open: dow !== 0, min: 1 }));
+  const days: EditableDay[] = [
+    { sellerId: "ana", day: "2026-10-12", status: "holiday_work", origin: "generated" },
+    { sellerId: "ana", day: "2026-10-15", status: "comp_off", origin: "generated" },
+    { sellerId: "ana", day: "2026-10-16", status: "work", origin: "generated" },
+    { sellerId: "bia", day: "2026-10-12", status: "holiday_work", origin: "generated" },
+    { sellerId: "bia", day: "2026-10-15", status: "work", origin: "generated" },
+    { sellerId: "bia", day: "2026-10-16", status: "work", origin: "generated" },
+  ];
+
+  it("move a folga do feriado e devolve o dia anterior para trabalho", () => {
+    const edited = applyDayChoices({
+      day: "2026-10-16",
+      days,
+      rules,
+      dayNeeds: needs,
+      pattern: "6x1",
+      monthEnd: "2026-10-31",
+      choices: [
+        { personId: "ana", value: "comp_off", holiday: "2026-10-12" },
+        { personId: "bia", value: "off", holiday: null },
+      ],
+    });
+    expect(edited.error).toBeNull();
+    expect(edited.days.find((row) => row.sellerId === "ana" && row.day === "2026-10-15")?.status).toBe("work");
+    expect(edited.days.find((row) => row.sellerId === "ana" && row.day === "2026-10-16")?.status).toBe("comp_off");
+    expect(edited.days.find((row) => row.sellerId === "bia" && row.day === "2026-10-16")?.status).toBe("off");
+    expect(edited.days.find((row) => row.sellerId === "bia" && row.day === "2026-10-15")?.status).toBe("work");
+  });
+
+  it("trabalhar num feriado continua como feriado trabalhado", () => {
+    const edited = applyDayChoices({
+      day: "2026-10-12",
+      days,
+      rules,
+      dayNeeds: needs,
+      pattern: "6x1",
+      monthEnd: "2026-10-31",
+      choices: [{ personId: "ana", value: "work", holiday: null }],
+    });
+    expect(edited.error).toBeNull();
+    expect(edited.days.find((row) => row.sellerId === "ana" && row.day === "2026-10-12")?.status).toBe("holiday_work");
+  });
+
+  it("não coloca folga de feriado em cima de uma folga normal", () => {
+    const edited = applyDayChoices({
+      day: "2026-10-16",
+      days: days.map((row) => (row.sellerId === "ana" && row.day === "2026-10-16" ? { ...row, status: "off" as const } : row)),
+      rules,
+      dayNeeds: needs,
+      pattern: "6x1",
+      monthEnd: "2026-10-31",
+      choices: [{ personId: "ana", value: "comp_off", holiday: "2026-10-12" }],
+    });
+    expect(edited.error).toMatch(/folgas normais/);
+    expect(edited.days.find((row) => row.sellerId === "ana" && row.day === "2026-10-15")?.status).toBe("comp_off");
   });
 });

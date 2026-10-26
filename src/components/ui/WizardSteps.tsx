@@ -64,7 +64,7 @@ const iconNext = (
   </svg>
 );
 
-/** Rodape Previous / Next  -  mesmos botoes do Multi-Step Wizard. */
+/** Rodape Previous / Next. Na modal, `align="end"` junta o par à direita com espaço entre os botões. */
 export function WizardNav({
   onPrevious,
   onNext,
@@ -74,7 +74,9 @@ export function WizardNav({
   nextDisabled,
   hidePrevious,
   nextType = "button",
+  hidePreviousIcon = false,
   hideNextIcon = false,
+  align = "between",
 }: {
   onPrevious?: () => void;
   onNext?: () => void;
@@ -84,14 +86,16 @@ export function WizardNav({
   nextDisabled?: boolean;
   hidePrevious?: boolean;
   nextType?: "button" | "submit";
+  hidePreviousIcon?: boolean;
   hideNextIcon?: boolean;
+  align?: "between" | "end";
 }) {
   return (
-    <div className="flex items-center justify-between pt-2">
+    <div className={cn("flex w-full items-center gap-2.5", align === "end" ? "justify-end" : "justify-between")}>
       {hidePrevious ? (
         <span />
       ) : (
-        <Button variant="outline" onClick={onPrevious} disabled={previousDisabled} icon={iconPrev}>
+        <Button variant="outline" onClick={onPrevious} disabled={previousDisabled} icon={hidePreviousIcon ? undefined : iconPrev}>
           {previousLabel}
         </Button>
       )}

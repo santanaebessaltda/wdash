@@ -7,7 +7,7 @@ import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { RankingBlock } from "@/pages/live/blocks";
 import type { RankingRow } from "@/data/wedash/live";
 import { boardMoments, type BoardMoment, type BoardSnapshot } from "@/data/wedash/boardEvents";
-import { buildGoalCardView, buildGoalSummary, GOAL_STATUS_LABEL, goalLevelPct, goalSpreadsUnidentified, goalStatus, prazoRemaining } from "@/data/wedash/goalView";
+import { buildGoalCardView, buildGoalSummary, GOAL_STATUS_LABEL, goalLevelAmount, goalLevelPct, goalSpreadsUnidentified, goalStatus, prazoRemaining } from "@/data/wedash/goalView";
 import type { GoalRecord, GoalTeamMember } from "@/data/wedash/goalsRepo";
 import { buildChallengeView } from "@/data/wedash/challengeView";
 import type { ChallengeAggInput, ChallengeRecord } from "@/data/wedash/challengesRepo";
@@ -243,6 +243,9 @@ function BoardGoalCard({ board, pulse }: { board: GoalBoard; pulse: boolean }) {
     ? `N${summary.levelNumber} · ${currentTier.name.replace(/^Goal\s+/i, "")} (${num(currentTier.commissionPct, 1)}%)`
     : null;
   const hasLevels = goal.tiers.length > 0;
+  const tierPcts = goal.tiers.map((tier) => tier.minAttainmentPct);
+  const levelPct = goalLevelPct(summary.pct, tierPcts);
+  const storeGoal = goalLevelAmount(goal.target, tierPcts);
 
   return (
     <Card padding="none" glass="var(--bad-soft)" className="shrink-0 px-3 py-2 sm:px-4">
@@ -261,8 +264,8 @@ function BoardGoalCard({ board, pulse }: { board: GoalBoard; pulse: boolean }) {
       <div className="mt-1.5 flex items-end justify-between gap-3">
         <p className={`font-mono text-[22px] font-extrabold leading-none tabular-nums sm:text-[26px] ${summary.achieved < 0 ? "text-bad" : "text-t0"}`} data-secret="">{brlCent(summary.achieved)}</p>
         <div className="text-right">
-          <p className={`font-mono text-[22px] font-extrabold leading-none tabular-nums sm:text-[26px] ${progressTextClass(summary.pct)}`}>{num(summary.pct, 1)}%</p>
-          <p className="mt-0.5 text-[12px] text-t2">de <span data-secret="">{brlCent(goal.target)}</span></p>
+          <p className={`font-mono text-[22px] font-extrabold leading-none tabular-nums sm:text-[26px] ${progressTextClass(levelPct)}`}>{num(levelPct, 1)}%</p>
+          <p className="mt-0.5 text-[12px] text-t2">de <span data-secret="">{brlCent(storeGoal)}</span></p>
         </div>
       </div>
       <div className="mt-1.5">
@@ -435,7 +438,7 @@ export function BoardView({
           levelNumber: seller.currentLevel,
           levelLabel: levelLabel(seller.currentLevel, seller.currentTierName),
           pct: goalLevelPct(seller.attainmentPct, board.goal.tiers.map((t) => t.minAttainmentPct)),
-          storePct: seller.storeGoalPct,
+          storePct: goalLevelPct(seller.storeGoalPct, board.goal.tiers.map((t) => t.minAttainmentPct)),
           gap: seller.nextTier ? seller.nextTier.gapAmount : null,
           nextName: seller.nextTier?.name ?? null,
           top: seller.currentLevel != null && seller.nextTier == null,
@@ -661,6 +664,9 @@ export function BoardView({
     };
   });
   const activeGoal = goalBoards[0] ?? null;
+  const activeLevels = activeGoal?.goal.tiers.map((tier) => tier.minAttainmentPct) ?? [];
+  const activeStoreGoal = activeGoal ? goalLevelAmount(activeGoal.goal.target, activeLevels) : 0;
+  const activeLevelPct = activeGoal ? goalLevelPct(activeGoal.summary.pct, activeLevels) : 0;
   const month = view ? storeTotals(team.dayAggs, scopeKey.split(","), view.period.start, view.period.end) : { revenue: 0, sales: 0 };
   const todayTotals = storeTotals(team.dayAggs, scopeKey.split(","), today, today);
   const monthRevenue = view?.composition.total ?? month.revenue;
@@ -764,7 +770,7 @@ export function BoardView({
           glass
           secret
           label="Meta"
-          value={activeGoal ? brlCent(activeGoal.goal.target) : "—"}
+          value={activeGoal ? brlCent(activeStoreGoal) : "—"}
           sub={activeGoal ? activeGoal.card.name : "Não configurada"}
           icon={<TargetIcon size={16} />}
           iconColor={PALETTE.blue}
@@ -774,7 +780,7 @@ export function BoardView({
           dense
           glass
           label="Progresso da meta"
-          value={activeGoal ? `${num(activeGoal.summary.pct, 1)}%` : "—"}
+          value={activeGoal ? `${num(activeLevelPct, 1)}%` : "—"}
           sub={
             activeGoal
               ? activeGoal.goal.tierMode === "INDIVIDUAL"

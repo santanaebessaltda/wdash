@@ -186,3 +186,8 @@ export function deltaTip(delta: { vs?: string; previous?: string }, metric?: str
 export function dayCountLabel(n: number): string {
   return n === 1 ? "1 dia" : `${n} dias`;
 }
+
+/** Dias que contam para a pessoa: "31 dias de meta", "1 dia de desafio". */
+export function presenceDayLabel(days: number, kind: "meta" | "desafio"): string {
+  return `${dayCountLabel(days)} de ${kind}`;
+}

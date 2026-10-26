@@ -340,12 +340,12 @@ export function SalesReportPage() {
         {showStores || (storeRows.length > 0 && (manyStores ? groupLoaded !== band : store != null && !pronto)) ? (
           <FinanceMonthSkeleton cells={cells} today={today} marked={storeRows.length === 1} />
         ) : storeRows.length === 0 ? (
-          <Card>
+          <Card className="flex min-h-[280px] flex-col">
             <EmptyBlock icon="🧾" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
           </Card>
         ) : manyStores ? (
           groupStores.length === 0 ? (
-            <Card>
+            <Card className="flex min-h-[280px] flex-col">
               <EmptyBlock icon="🧾" title="Nenhum quiosque com informe de vendas" description="Neste acesso não há quiosque com Intranet Mall ou Group COM conectados." />
             </Card>
           ) : (
@@ -360,20 +360,20 @@ export function SalesReportPage() {
             />
           )
         ) : !kiosk ? (
-          <Card>
+          <Card className="flex min-h-[280px] flex-col">
             <EmptyBlock icon="🧾" title="Informe de vendas indisponível" description="Esta tela está disponível apenas para filiais do tipo Quiosque em shopping." />
           </Card>
         ) : account?.administrator === "argo" ? (
-          <Card>
+          <Card className="flex min-h-[280px] flex-col">
             <EmptyBlock icon="🧾" title="Argo ainda não disponível" description="A integração com a Argo ainda não está disponível na WDash." />
           </Card>
         ) : !shoppingSendsSales(account?.administrator) ? (
-          <Card>
+          <Card className="flex min-h-[280px] flex-col">
             <EmptyBlock
               icon="🧾"
               title="Administradora desconectada"
               description={owner ? "Conecte a administradora desta filial para informar as vendas ao shopping." : "O Gestor ainda não conectou a administradora desta filial."}
-              action={owner ? <Button onClick={() => navigate(paths.operation.shopping)}>Conectar administradora</Button> : undefined}
+              action={owner ? <Button size="sm" onClick={() => navigate(paths.operation.shopping)}>Conectar administradora</Button> : undefined}
             />
           </Card>
         ) : (

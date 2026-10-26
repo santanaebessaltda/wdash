@@ -1,17 +1,18 @@
 /**
  * Blocos visuais da aba Equipe. A pagina so monta; nada calcula aqui.
  * Reusa os componentes do tema: DataTable, Card, ProgressBar,
- * Badge, Avatar, EmptyState e o padrao BlockState compartilhado.
+ * Badge, Avatar, EmptyBlock e o padrao BlockState compartilhado.
  */
 import type { ReactNode } from "react";
-import { Badge, Card, CardTitle, DataTable, EmptyState, ProgressBar, ProgressStanding, progressColor, progressTextClass, type DataTableColumn } from "@/components/ui";
+import { Badge, Card, CardTitle, DataTable, ProgressBar, ProgressStanding, progressColor, progressTextClass, type DataTableColumn } from "@/components/ui";
+import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { Tooltip } from "@/components/ui/Tooltip";
-import { brl, brlCent, eachDay, num, profitBrl } from "@/lib/format";
+import { brl, brlCent, eachDay, num, presenceDayLabel, profitBrl } from "@/lib/format";
 import type { BlockState as BlockStateKind } from "@/data/wedash/dashboard";
 import { BlockState } from "@/pages/dashboard/BlockState";
 import type { GoalCardView, NetworkGlobalGoal, SellerRow } from "@/data/wedash/teamViews";
-import { GOAL_STATUS_LABEL, goalBarScale, goalLevelPct, goalStatus, outsideRankingNote } from "@/data/wedash/goalView";
+import { GOAL_STATUS_LABEL, goalBarScale, goalLevelAmount, goalLevelPct, goalStatus, outsideRankingNote } from "@/data/wedash/goalView";
 import { BranchBadge, DeadlineBadge, PeriodBadge, RecordStatusBadge, UnidentifiedSalesBadge } from "@/components/wedash/RecordBadges";
 import { branchRoleLabel } from "@/data/wedash/stores";
 import { defaultTiers } from "@/data/wedash/goals";
@@ -188,7 +189,6 @@ export function SellersBlock({
       key: "pos",
       header: "#",
       width: "48px",
-      pin: "rank",
       sortable: true,
       sortValue: (l) => l.position,
       render: (l) => <span className="text-[12.5px] font-extrabold text-t2">{l.position}º</span>,
@@ -196,7 +196,6 @@ export function SellersBlock({
     {
       key: "vendedora",
       header: "Nome",
-      pin: "label",
       sortable: true,
       sortValue: (l) => l.name,
       render: (l) => <SellerCell l={l} />,
@@ -215,14 +214,14 @@ export function SellersBlock({
             header: goalHeader,
             hideBelow: "md",
             sortable: true,
-            sortValue: (l: LineRank) => (l.noGoal ? null : l.individualGoalAmount),
+            sortValue: (l: LineRank) => (l.noGoal ? null : goalLevelAmount(l.individualGoalAmount, l.ladderMarks.map((m) => m.pct))),
             render: (l: LineRank) =>
               l.noGoal ? (
                 <span className="text-t2">—</span>
               ) : (
                 <span className="inline-flex flex-col items-end">
-                  <span className="font-mono text-[12.5px] font-bold text-t0">{brl(l.individualGoalAmount)}</span>
-                  {l.proportionalGoal ? <span className="text-[11px] text-t2">{l.eligibleDays} de {l.periodDays} dias</span> : null}
+                  <span className="font-mono text-[12.5px] font-bold text-t0">{brl(goalLevelAmount(l.individualGoalAmount, l.ladderMarks.map((m) => m.pct)))}</span>
+                  {l.periodDays > 0 ? <span className="text-[11px] text-t2">{presenceDayLabel(l.eligibleDays, "meta")}</span> : null}
                 </span>
               ),
           },
@@ -238,9 +237,9 @@ export function SellersBlock({
             header: "Part. na meta da filial",
             hideBelow: "lg",
             sortable: true,
-            sortValue: (l: LineRank) => (l.noGoal ? null : l.storeGoalPct),
+            sortValue: (l: LineRank) => (l.noGoal ? null : goalLevelPct(l.storeGoalPct, l.ladderMarks.map((m) => m.pct))),
             render: (l: LineRank) =>
-              l.noGoal ? <span className="text-t2">—</span> : <span className="font-mono text-[12.5px] font-bold text-t0">{num(l.storeGoalPct, 1)}%</span>,
+              l.noGoal ? <span className="text-t2">—</span> : <span className="font-mono text-[12.5px] font-bold text-t0">{num(goalLevelPct(l.storeGoalPct, l.ladderMarks.map((m) => m.pct)), 1)}%</span>,
           },
           {
             key: "nivel",
@@ -345,7 +344,7 @@ export function SellersCard({
       </div>
     ) : (
       <div className={embedded ? "py-2" : "p-5"}>
-        <EmptyState icon="👤" title="Nenhuma pessoa na meta" description="Nenhuma pessoa da equipe participa desta meta." />
+        <EmptyBlock icon="👤" title="Nenhuma pessoa na meta" description="Nenhuma pessoa da equipe participa desta meta." />
       </div>
     );
 
@@ -414,16 +413,18 @@ export function GoalProgressBar({
   quietLabels?: boolean;
   /** Na vendedora, o desfecho fica no bloco do nível, não ao lado do percentual. */
   hideMissed?: boolean;
-  /** Número ao lado da barra. Sem ele, usa o percentual da meta. */
+  /** Número ao lado da barra. Sem ele, usa o percentual do último nível. */
   labelPct?: number;
 }) {
   const showsProjection =
     !soBarra &&
     (goal.projectionAmount === null ? false : typeof goal.projectionAmount === "number" ? true : goalShowsProjection(goal.start, goal.end, todayIso));
-  const scaleMax = goalBarScale(tiers.map((d) => d.minAttainmentPct));
+  const levels = tiers.map((d) => d.minAttainmentPct);
+  const scaleMax = goalBarScale(levels);
+  const levelAmount = goalLevelAmount(goal.total, levels);
   const fillPct = Math.min(100, (goal.pct / scaleMax) * 100);
-  const colorBarra = progressColor(goal.pct);
-  const shownPct = labelPct ?? goal.pct;
+  const colorBarra = progressColor(goalLevelPct(goal.pct, levels));
+  const shownPct = labelPct ?? goalLevelPct(goal.pct, levels);
   const colorPct = progressTextClass(shownPct);
   const projectionLabel = `Projeção: ${num(goal.projectedPct, 0)}%`;
 
@@ -468,11 +469,11 @@ export function GoalProgressBar({
         <p className="text-[18px] font-extrabold tracking-tight text-t0 sm:text-[20px]">
           <span className={`font-mono ${goal.achieved < 0 ? "text-bad" : "text-t0"}`}>{brlCent(goal.achieved)}</span>
           <span className="mx-1.5 text-[14px] font-semibold text-t2">/</span>
-          <span className="font-mono text-[14px] font-bold text-t2 sm:text-[15px]">{brlCent(goal.total)}</span>
+          <span className="font-mono text-[14px] font-bold text-t2 sm:text-[15px]">{brlCent(levelAmount)}</span>
         </p>
         <div className="flex flex-col items-start gap-1 sm:items-end">
           <p className={`font-mono text-[26px] font-extrabold leading-none sm:text-[28px] ${colorPct}`}>{num(shownPct, 1)}%</p>
-          {!hideMissed && goal.daysRemaining <= 0 && goal.pct < 100 ? <ProgressStanding ok={false}>Não atingiu</ProgressStanding> : null}
+          {!hideMissed && goal.daysRemaining <= 0 && shownPct < 100 ? <ProgressStanding ok={false}>Não atingiu</ProgressStanding> : null}
         </div>
       </div>
       {outsideRankingNote(goal) ? <p className="mt-1 text-[12px] text-t2">{outsideRankingNote(goal)}</p> : null}

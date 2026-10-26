@@ -3,6 +3,7 @@ import {
   buildGoalCardView,
   buildGoalSummary,
   copyGoalName,
+  goalLevelAmount,
   goalManagerPrize,
   goalStatus,
   nextGoalPeriod,
@@ -10,6 +11,14 @@ import {
 } from "./goalView";
 import type { GoalRecord, GoalTeamMember } from "./goalsRepo";
 import type { SalesDayAgg, SalesSellerDayAgg } from "./salesTypes";
+
+describe("goalLevelAmount", () => {
+  it("uses the last configured level as the goal amount", () => {
+    expect(goalLevelAmount(600_000, [80, 100, 110])).toBe(660_000);
+    expect(goalLevelAmount(230_000, [])).toBe(230_000);
+    expect(goalLevelAmount(230_000, [0])).toBe(230_000);
+  });
+});
 
 const goal: GoalRecord = {
   id: "g1",

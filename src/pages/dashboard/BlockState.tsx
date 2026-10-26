@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { EmptyState, Skeleton } from "@/components/ui";
+import { Skeleton } from "@/components/ui";
+import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import type { BlockState as BlockStateKind } from "@/data/wedash/dashboard";
 
 const STATE_LABEL: Record<Exclude<BlockStateKind, "available">, string> = {
@@ -21,7 +22,7 @@ export function BlockState({ status, children }: { status: BlockStateKind; child
     );
   }
   return (
-    <EmptyState
+    <EmptyBlock
       icon="📭"
       title={STATE_LABEL[status]}
       description={status === "noData" ? "Não existem vendas para o período selecionado." : "Tente outro período ou consulte a equipe de TI."}

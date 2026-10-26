@@ -22,7 +22,7 @@ import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { DetailSkeleton, MetricDetail, pctFmt } from "@/pages/dashboard/ProductDetail";
 import { brlCent, shortDate, num, comparedWithTip, profitBrl } from "@/lib/format";
 import { cn } from "@/lib/cn";
-import { GOAL_STATUS_LABEL, type SellerGoalLevel } from "@/data/wedash/goalView";
+import { GOAL_STATUS_LABEL, goalLevelAmount, type SellerGoalLevel } from "@/data/wedash/goalView";
 import { GoalLevelSummary } from "@/components/wedash/GoalLevelsBar";
 
 /** Tudo o que a tela Equipe le  -  tambem usado pelo detalhe aberto da Visao geral. */
@@ -210,7 +210,7 @@ function GoalSection({ goal }: { goal: SellerGoalLevel }) {
         </span>
       </div>
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-        <MetricDetail label={geral ? "Meta da filial" : group ? "Meta do grupo" : "Meta individual"} amount={brlCent(goal.goalAmount)} />
+        <MetricDetail label={geral ? "Meta da filial" : group ? "Meta do grupo" : "Meta individual"} amount={brlCent(goalLevelAmount(goal.goalAmount, goal.marcos.map((marco) => marco.pct)))} />
         <MetricDetail
           label={geral ? "Vendas da filial" : group ? "Vendas do grupo" : "Vendas na meta"}
           amount={brlCent(goal.achieved)}
@@ -225,6 +225,7 @@ function GoalSection({ goal }: { goal: SellerGoalLevel }) {
       </div>
       <div className="mt-2.5 rounded-xl border border-line bg-bg-inset p-3">
         <GoalLevelSummary pct={goal.attainmentPct} level={goal.level} levelNumber={goal.levelNumber} marcos={goal.marcos} rolagem />
+        {(goal.next || (group && goal.group) || geral) && (
         <div className="mt-3 border-t border-line pt-3">
           {goal.next ? (
             <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 sm:grid-cols-3">
@@ -239,20 +240,19 @@ function GoalSection({ goal }: { goal: SellerGoalLevel }) {
                 {goal.next.bonus > 0 && <span className="block text-[12px] font-semibold text-t2">+ {brlCent(goal.next.bonus)} de bônus</span>}
               </GoalInfo>
             </div>
-          ) : (
-            <p className="text-[12.5px] font-semibold text-ok">Chegou ao último nível da meta.</p>
-          )}
+          ) : null}
           {group && goal.group && (
-            <p className="mt-2.5 text-[11.5px] text-t2">
+            <p className={cn("text-[11.5px] text-t2", goal.next && "mt-2.5")}>
               Meta por grupo: o grupo <span className="font-semibold text-t1">{goal.group}</span> sobe de nível junto, pela soma das vendas.
             </p>
           )}
           {geral && (
-            <p className="mt-2.5 text-[11.5px] text-t2">
+            <p className={cn("text-[11.5px] text-t2", goal.next && "mt-2.5")}>
               Meta geral: a equipe sobe de nível junta, pelo total vendido da loja. A premiação é dividida igualmente.
             </p>
           )}
         </div>
+        )}
       </div>
     </section>
   );

@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Badge, Button, Card, DateRangePicker, Modal, Skeleton, Tooltip, useToast, CALENDAR_QUICK_RANGES, type DatePresetId, type DateRangeChangeMeta } from "@/components/ui";
 import { statusBadgeVariant } from "@/lib/status";
 import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
@@ -544,12 +544,20 @@ export function CashClosePage() {
       current.hasLines = current.hasLines || lines.length > 0;
       current.pending = current.pending || withoutReal;
       const hasBody = lines.some((line) => line.systemCents !== 0 || line.typedCents !== 0 || line.stoneCents != null || (line.manualPixCents ?? 0) !== 0 || (line.withdrawalCents ?? 0) !== 0);
-      if (day < today && withoutReal) current.pendingStores += 1;
+      if (day < today && withoutReal) {
+        current.pendingStores += 1;
+        current.pendingCents += gap.systemCents;
+      }
       if (day < today && !withoutReal && hasBody) {
         current.closedStores += 1;
         current.closedRealCents += gap.realCents;
-        if (diffCents > 0) current.surplusStores += 1;
-        else if (diffCents < 0) current.shortageStores += 1;
+        if (diffCents > 0) {
+          current.surplusStores += 1;
+          current.surplusCents += diffCents;
+        } else if (diffCents < 0) {
+          current.shortageStores += 1;
+          current.shortageCents += Math.abs(diffCents);
+        }
         if (diffCents !== 0) current.diffStores += 1;
       }
       byDay.set(day, current);
@@ -570,7 +578,10 @@ export function CashClosePage() {
       diffStores: info?.diffStores ?? 0,
       surplusStores: info?.surplusStores ?? 0,
       shortageStores: info?.shortageStores ?? 0,
+      surplusCents: info?.surplusCents ?? 0,
+      shortageCents: info?.shortageCents ?? 0,
       pendingStores: info?.pendingStores ?? 0,
+      pendingCents: info?.pendingCents ?? 0,
       closedStores: info?.closedStores ?? 0,
     };
     if (day === today) return { kind: "today", totalCents: soldToday?.cents ?? 0, diffCents: 0, withdrawalCents: 0, awaiting: soldToday == null, ...counts };
@@ -623,13 +634,13 @@ export function CashClosePage() {
         {showStores ? (
           <FinanceMonthSkeleton cells={cells} today={today} />
         ) : storeRows.length === 0 ? (
-          <Card>
+          <Card className="flex min-h-[280px] flex-col">
             <EmptyBlock icon="📒" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
           </Card>
         ) : analysis ? (
           <>
             <MonthSummary summary={analysis.summary} many={manyStores} diffDays={analysis.diffDays} closedRealCents={analysis.closedRealCents} />
-            <ColorLegend className="mb-3" items={manyStores ? CLOSE_LEGEND_MANY : CLOSE_LEGEND_ONE} />
+            <ColorLegend className="mb-3" items={CLOSE_LEGEND_ONE} />
             <Month today={today} cells={cells} dayFace={dayFace} onOpen={openDay} many={manyStores} />
           </>
         ) : (
@@ -672,7 +683,10 @@ type DayBucket = {
   diffStores: number;
   surplusStores: number;
   shortageStores: number;
+  surplusCents: number;
+  shortageCents: number;
   pendingStores: number;
+  pendingCents: number;
   closedStores: number;
   closedRealCents: number;
 };
@@ -689,7 +703,10 @@ function emptyDayBucket(): DayBucket {
     diffStores: 0,
     surplusStores: 0,
     shortageStores: 0,
+    surplusCents: 0,
+    shortageCents: 0,
     pendingStores: 0,
+    pendingCents: 0,
     closedStores: 0,
     closedRealCents: 0,
   };
@@ -704,7 +721,10 @@ type CalendarFace = {
   diffStores: number;
   surplusStores: number;
   shortageStores: number;
+  surplusCents: number;
+  shortageCents: number;
   pendingStores: number;
+  pendingCents: number;
   closedStores: number;
 };
 
@@ -876,7 +896,7 @@ function DayTotals({ systemCents, realCents, diffCents }: { systemCents: number;
 
 export function DayChip({ color, children }: { color: string; children: string }) {
   return (
-    <div title={children} className={cn("mt-1 w-full self-stretch truncate rounded-md px-1.5 py-1 text-[10px] font-semibold text-white sm:text-[11px]", color)}>
+    <div title={children} className={cn("mt-1 w-full self-stretch whitespace-normal rounded-md px-1.5 py-1 text-[10px] font-semibold leading-tight text-white sm:text-[11px]", color)}>
       {children}
     </div>
   );
@@ -891,13 +911,21 @@ const CLOSE_LEGEND_ONE: LegendItem[] = [
   { key: "withdrawal", color: "bg-info", label: "Retirada", hint: "valor retirado no dia" },
 ];
 
-const CLOSE_LEGEND_MANY: LegendItem[] = [
-  { key: "closed", color: "bg-ok", label: "Fechada ou sobra", hint: "filial fechada, ou total real acima" },
-  { key: "shortage", color: "bg-bad", label: "Quebra", hint: "total real abaixo do Millennium" },
-  { key: "pending", color: "bg-warn", label: "Pendente", hint: "ainda sem total real" },
-  { key: "today", color: "bg-acc", label: "Em aberto", hint: "o dia de hoje" },
-  { key: "withdrawal", color: "bg-info", label: "Retirada", hint: "valor retirado no dia" },
-];
+function groupedClose(count: number, status: string, detail: string): string {
+  return `${filialAttention(count, status, status === "fechada" ? "fechadas" : "pendentes")} · ${detail}`;
+}
+
+function manyBadges(face: CalendarFace): Array<{ color: string; text: string }> {
+  const even = face.closedStores - face.surplusStores - face.shortageStores;
+  const chips: Array<{ color: string; text: string }> = [];
+  if (face.surplusStores > 0) chips.push({ color: "bg-ok", text: groupedClose(face.surplusStores, "fechada", `Sobra ${brlCent(face.surplusCents / 100)}`) });
+  if (even > 0) chips.push({ color: "bg-chip-gray", text: groupedClose(even, "fechada", "Sem diferença") });
+  if (face.shortageStores > 0) chips.push({ color: "bg-bad", text: groupedClose(face.shortageStores, "fechada", `Quebra ${brlCent(face.shortageCents / 100)}`) });
+  if (face.pendingStores > 0) chips.push({ color: "bg-warn", text: groupedClose(face.pendingStores, "pendente", brlCent(face.pendingCents / 100)) });
+  if (face.kind === "today") chips.push({ color: "bg-acc", text: "Em aberto" });
+  if (face.kind === "total" && face.withdrawalCents > 0) chips.push({ color: "bg-info", text: `Retirada ${brlCent(face.withdrawalCents / 100)}` });
+  return chips;
+}
 
 function differenceChip(cents: number): { color: string; text: string } {
   if (cents > 0) return { color: "bg-ok", text: `Sobra ${brlCent(cents / 100)}` };
@@ -907,12 +935,7 @@ function differenceChip(cents: number): { color: string; text: string } {
 
 function dayHint(face: CalendarFace, many: boolean): string | undefined {
   if (many) {
-    const partes: string[] = [];
-    if (face.closedStores > 0 && face.pendingStores > 0) partes.push(filialAttention(face.closedStores, "fechada", "fechadas"));
-    if (face.pendingStores > 0) partes.push(filialAttention(face.pendingStores, "pendente", "pendentes"));
-    if (face.surplusStores > 0) partes.push(filialAttention(face.surplusStores, "com sobra", "com sobra"));
-    if (face.shortageStores > 0) partes.push(filialAttention(face.shortageStores, "com quebra", "com quebra"));
-    if (face.withdrawalCents > 0) partes.push(`Retirada ${brlCent(face.withdrawalCents / 100)}`);
+    const partes = manyBadges(face).map((chip) => chip.text);
     return partes.length > 0 ? partes.join(" · ") : undefined;
   }
   if (face.kind !== "total") return undefined;
@@ -958,20 +981,9 @@ function Month({
               face?.kind === "today" || face?.kind === "pending" || face?.kind === "total" ? (
                 many ? (
                   <>
-                    {face.closedStores > 0 && face.pendingStores > 0 && (
-                      <DayChip color="bg-ok">{filialAttention(face.closedStores, "fechada", "fechadas")}</DayChip>
-                    )}
-                    {face.pendingStores > 0 && <DayChip color="bg-warn">{filialAttention(face.pendingStores, "pendente", "pendentes")}</DayChip>}
-                    {face.kind === "today" && <DayChip color="bg-acc">Em aberto</DayChip>}
-                    {face.kind === "total" && face.surplusStores > 0 && (
-                      <DayChip color="bg-ok">{filialAttention(face.surplusStores, "com diferença", "com diferença")}</DayChip>
-                    )}
-                    {face.kind === "total" && face.shortageStores > 0 && (
-                      <DayChip color="bg-bad">{filialAttention(face.shortageStores, "com diferença", "com diferença")}</DayChip>
-                    )}
-                    {face.kind === "total" && face.withdrawalCents > 0 && (
-                      <DayChip color="bg-info">{`Retirada ${brlCent(face.withdrawalCents / 100)}`}</DayChip>
-                    )}
+                    {manyBadges(face).map((chip) => (
+                      <DayChip key={chip.text} color={chip.color}>{chip.text}</DayChip>
+                    ))}
                   </>
                 ) : (
                   <>

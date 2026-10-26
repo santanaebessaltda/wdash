@@ -16,6 +16,7 @@ import {
   type StoreSeller,
   type StoreShift,
 } from "@/data/wedash/stores";
+import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { refreshMomentTitle, useScreenRefresh } from "@/pages/dashboard/screenRefresh";
 import { shiftName } from "@/lib/format";
 import { matchesCodeOrName } from "@/lib/personSearch";
@@ -115,8 +116,8 @@ export function StaffPage() {
         {loading ? (
           <StoreCardsSkeleton count={1} title team wide />
         ) : storeRows.length === 0 ? (
-          <Card>
-            <EmptyState framed={false} icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
+          <Card className="flex min-h-[280px] flex-col">
+            <EmptyBlock icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
           </Card>
         ) : (
           <StaffList key={storeKey} tenantId={session.tenantId} stores={storeRows} reloadKey={reloadKey} groupsTick={groupsTick} manage={manage} />

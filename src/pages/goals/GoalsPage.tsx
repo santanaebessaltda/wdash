@@ -10,7 +10,7 @@ import { GoalCardsSkeleton } from "@/components/wedash/LoadingSkeletons";
 import { calendarTodayIso } from "@/data/wedash/clock";
 import { goalWeightFrom } from "@/data/wedash/engine/goalProjection";
 import { effectiveWeekHours } from "@/data/wedash/storeHours";
-import { buildGoalSummary, GOAL_STATUS_LABEL, goalSpreadsUnidentified, prazoRemaining, type GoalStatus, type GoalSummary } from "@/data/wedash/goalView";
+import { buildGoalSummary, GOAL_STATUS_LABEL, goalLevelAmount, goalLevelPct, goalSpreadsUnidentified, prazoRemaining, type GoalStatus, type GoalSummary } from "@/data/wedash/goalView";
 import { deleteGoal, fetchGoalTeam, fetchGoals, type GoalRecord, type GoalTeamMember } from "@/data/wedash/goalsRepo";
 import { isDraft, publishDraftsInWindow, publishNotice, enqueuePlanNotice } from "@/data/wedash/planNotice";
 import { fetchSalesDayAggs } from "@/data/wedash/salesRepo";
@@ -326,6 +326,9 @@ function GoalCard({
   onPublish: () => void;
 }) {
   const { goal: g, status, achieved, pct, projectedPct, daysRemaining, currentLevel, levelNumber } = summary;
+  const levels = g.tiers.map((tier) => tier.minAttainmentPct);
+  const storeGoal = goalLevelAmount(g.target, levels);
+  const levelPct = goalLevelPct(pct, levels);
   const prazo = prazoRemaining(daysRemaining);
   const footer =
     status === "active"
@@ -415,7 +418,7 @@ function GoalCard({
 
       <div className="flex items-baseline justify-between gap-2">
         {status === "upcoming" ? (
-          <span className="font-mono text-[13px] font-extrabold text-t0">{brlCent(g.target)}</span>
+          <span className="font-mono text-[13px] font-extrabold text-t0">{brlCent(storeGoal)}</span>
         ) : (
           <span className={`font-mono text-[13px] font-extrabold ${achieved < 0 ? "text-bad" : "text-t0"}`}>{brlCent(achieved)}</span>
         )}
@@ -425,15 +428,15 @@ function GoalCard({
           ) : (
             <span className="inline-flex flex-col items-end gap-0.5">
               <span>
-                <span className={`font-mono font-bold ${progressTextClass(pct)}`}>{num(pct, 1)}%</span> de {brlCent(g.target)}
+                <span className={`font-mono font-bold ${progressTextClass(levelPct)}`}>{num(levelPct, 1)}%</span> de {brlCent(storeGoal)}
               </span>
-              {status === "ended" && pct < 100 ? <ProgressStanding ok={false}>Não atingiu</ProgressStanding> : null}
+              {status === "ended" && levelPct < 100 ? <ProgressStanding ok={false}>Não atingiu</ProgressStanding> : null}
             </span>
           )}
         </span>
       </div>
       <div className="mt-2">
-        <ProgressBar value={status === "upcoming" ? 0 : pct} height={5} />
+        <ProgressBar value={status === "upcoming" ? 0 : levelPct} height={5} />
       </div>
       {footer ? <p className="mt-2 text-[11.5px] text-t2">{footer}</p> : null}
 

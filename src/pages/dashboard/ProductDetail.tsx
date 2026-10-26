@@ -284,13 +284,7 @@ export function MetricDetail({
   );
 }
 
-/** # e produto parados no scroll horizontal. A largura do # (w-8) e o left-8 da coluna seguinte. */
-const RANK_STICKY = "sticky left-0 z-20 w-8 min-w-8 max-w-8";
-const NAME_STICKY = "sticky left-8 z-10 min-w-0";
-const STICKY_BG = "bg-bg-2 transition-colors group-hover:bg-bg-3 group-focus-visible:bg-bg-3";
-const NAME_CLIP = "min-w-0 max-w-[9.5rem] sm:max-w-[12.5rem] lg:max-w-[14rem] xl:max-w-none";
-const SCROLL_TABLE =
-  "w-full min-w-[620px] border-separate border-spacing-0 text-sm [&_tbody_tr:last-child_td]:border-b-0 [&_td]:border-b [&_td]:border-line [&_th]:border-b [&_th]:border-line";
+const SCROLL_TABLE = "w-full min-w-[620px] border-collapse text-sm";
 
 /** Mesmo padrao da tabela Top produtos (#  |  Produto  |  Itens  |  Faturamento  |  Lucro bruto  |  Margem); clique abre o produto. */
 function ProductsOfGroup({
@@ -332,9 +326,9 @@ function ProductsOfGroup({
       <div className="min-w-0 overflow-x-auto">
       <table className={SCROLL_TABLE}>
         <thead>
-          <tr className="text-[11px] uppercase tracking-wide text-t2">
-            <th className={cn(RANK_STICKY, STICKY_BG, "px-1 pb-3 text-left font-bold")}>#</th>
-            <ThSort label="Produto" active={sort === "name"} dir={dir} onClick={() => toggle("name")} align="left" className={cn(NAME_STICKY, STICKY_BG, "px-1 pb-3")} />
+          <tr className="border-b border-line text-[11px] uppercase tracking-wide text-t2">
+            <th className="px-1 pb-3 text-left font-bold">#</th>
+            <ThSort label="Produto" active={sort === "name"} dir={dir} onClick={() => toggle("name")} align="left" className="px-1 pb-3" />
             <ThSort label="Itens vendidos" active={sort === "items"} dir={dir} onClick={() => toggle("items")} className="px-1 pb-3" />
             <ThSort label="Faturamento" active={sort === "revenue"} dir={dir} onClick={() => toggle("revenue")} className="px-1 pb-3" />
             <ThSort label="Lucro bruto" active={sort === "profit"} dir={dir} onClick={() => toggle("profit")} className="px-1 pb-3" />
@@ -355,13 +349,11 @@ function ProductsOfGroup({
                   onProduct(p.rowKey);
                 }
               }}
-              className="group cursor-pointer transition-colors hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none"
+              className="cursor-pointer border-b border-line transition-colors hover:bg-bg-3 focus-visible:bg-bg-3 focus-visible:outline-none"
             >
-              <td className={cn(RANK_STICKY, STICKY_BG, "px-1 py-3 text-center text-[13px] font-extrabold text-t2")}>{rank + 1}</td>
-              <td className={cn(NAME_STICKY, STICKY_BG, "px-1 py-3")}>
-                <div className={NAME_CLIP}>
-                  <ProductNameCell name={p.name} idx={rank} sub={p.code} tones={PRODUCT_AVATAR_TONES} />
-                </div>
+              <td className="px-1 py-3 text-center text-[13px] font-extrabold text-t2">{rank + 1}</td>
+              <td className="px-1 py-3">
+                <ProductNameCell name={p.name} idx={rank} sub={p.code} tones={PRODUCT_AVATAR_TONES} />
               </td>
               <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{num(p.items)}</td>
               <td className="px-1 py-3 text-right font-mono text-[13px] font-bold text-t0">{brlCent(p.revenue)}</td>

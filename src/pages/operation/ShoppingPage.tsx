@@ -131,11 +131,11 @@ export function ShoppingSettingsPage() {
       {showSkeleton || !ready ? (
         <ConnectionSkeleton label="Carregando administradora…" />
       ) : storeRows.length === 0 ? (
-        <Card className="mt-6">
+        <Card className="mt-6 flex min-h-[280px] flex-col">
           <EmptyBlock icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
         </Card>
       ) : streetOnly ? (
-        <Card className="mt-6">
+        <Card className="mt-6 flex min-h-[280px] flex-col">
           <EmptyBlock
             icon="🏬"
             title="Administradora indisponível"

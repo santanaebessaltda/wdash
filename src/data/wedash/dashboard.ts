@@ -4189,7 +4189,7 @@ function buildFinanceWpinkKpis(p: {
     {
       label: "CMV WPINK",
       amount: cmv != null ? brlCent(cmv) : "—",
-      sub: cmv != null && current.revenue > 0 ? `${Math.round((cmv / current.revenue) * 100)}% do faturamento WPINK` : undefined,
+      sub: cmv != null && current.revenue > 0 ? `${Math.round((cmv / current.revenue) * 100)}% do faturamento` : undefined,
       tooltip: cmv != null ? TIP_CMV_WPINK : TIP_CMV_WPINK_INDISPONIVEL,
       tint: "acc",
       delta: cmvComp ? kpiDelta(cmvA, cmvB, c.vsLabel) : undefined,

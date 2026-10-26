@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
-import { Alert, Button, Card, EmptyState, FormField, Input, Segmented, Select, useToast } from "@/components/ui";
+import { Alert, Button, Card, FormField, Input, Segmented, Select, useToast } from "@/components/ui";
+import { EmptyBlock } from "@/pages/dashboard/EmptyBlock";
 import { isOwner } from "@/layout/nav-wedash";
 import { paths } from "@/router/paths";
 import { useActiveSession } from "@/session/SessionProvider";
@@ -175,8 +176,8 @@ export function BranchPage() {
             fields={section === "rent" ? 3 : section === "products" || section === "branch" ? 1 : 0}
           />
         ) : storeRows.length === 0 ? (
-          <Card>
-            <EmptyState framed={false} icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
+          <Card className="flex min-h-[280px] flex-col">
+            <EmptyBlock icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
           </Card>
         ) : (
           <SettingsCard

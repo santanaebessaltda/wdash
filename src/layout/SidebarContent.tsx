@@ -111,11 +111,15 @@ export function SidebarContent({ collapsed = false, onNavigate }: { collapsed?: 
                       onClick={onNavigate}
                       className={({ isActive }) => cn("flex items-center gap-2.5 rounded-[9px] px-2.5 py-2 text-[12.5px] font-medium text-t1 hover:bg-bg-3 hover:text-t0", isActive && linkActive)}
                     >
-                      <span
-                        className={cn("h-[5px] w-[5px] shrink-0 rounded-full", !item.dot && "bg-t2")}
-                        style={item.dot ? { background: item.dot } : undefined}
-                      />
-                      <span className="flex-1 truncate">{item.label}</span>
+                      {({ isActive }) => (
+                        <>
+                          <span
+                            className={cn("h-[5px] w-[5px] shrink-0 rounded-full", !item.dot && (isActive ? "bg-acc" : "bg-t2"))}
+                            style={item.dot ? { background: item.dot } : undefined}
+                          />
+                          <span className="flex-1 truncate">{item.label}</span>
+                        </>
+                      )}
                     </NavLink>
                   ))}
                 </div>

@@ -98,7 +98,7 @@ export function Tooltip({ label, children, side = "top" }: { label: string; chil
             role="tooltip"
             style={coords ? { top: coords.top, left: coords.left } : { top: 0, left: 0, visibility: "hidden" }}
             className={cn(
-              "pointer-events-none fixed z-[96] w-max max-w-[min(17.5rem,calc(100vw-1rem))] whitespace-pre-line break-words text-left rounded-md bg-bg-3 border border-line px-2.5 py-1.5 text-[11px] font-semibold leading-snug text-t0 shadow-[var(--shadow-vela)] animate-vela-fade",
+              "pointer-events-none fixed z-[160] w-max max-w-[min(17.5rem,calc(100vw-1rem))] whitespace-pre-line break-words text-left rounded-md bg-bg-3 border border-line px-2.5 py-1.5 text-[11px] font-semibold leading-snug text-t0 shadow-[var(--shadow-vela)] animate-vela-fade",
             )}
           >
             {label}

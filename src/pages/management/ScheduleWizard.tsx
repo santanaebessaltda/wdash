@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Accordion, Button, DatePicker, FormField, Input, Modal, Select, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
+import { Accordion, Alert, Button, DatePicker, FormField, Input, Modal, Select, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { Icon, icons } from "@/pages/users/Icons";
 import { cn } from "@/lib/cn";
 import { dateToIso, isoToDate } from "@/lib/format";
 import { endOfMonth, startOfMonth } from "@/data/wedash/engine/format";
-import { defaultDayNeeds, patternFits, weekdayLabel, type CompWindow, type DayNeed, type GroupNeed, type HolidayRule, type OffMode, type SchedulePattern, type ScheduleScenario, type Sex, type SundayRule } from "@/data/wedash/scheduleGenerate";
+import { DOW_LABELS, type Dow } from "@/data/wedash/storeHours";
+import { defaultDayNeeds, patternFits, type CompWindow, type DayNeed, type GroupNeed, type HolidayRule, type OffMode, type SchedulePattern, type ScheduleScenario, type Sex, type SundayRule } from "@/data/wedash/scheduleGenerate";
 
 const STEPS = [
   { num: 1, label: "Escala" },
@@ -43,6 +44,17 @@ export type WizardPerson = {
   storeId: string;
 };
 
+export type WizardBranch = {
+  id: string;
+  name: string;
+  people: WizardPerson[];
+  hasSchedule: boolean;
+  holidays: { date: string; name: string }[];
+  /** Dias da semana fechados em Configurações > Funcionamento (0 = domingo). */
+  closedDays: number[];
+  initial: ScheduleWizardValue;
+};
+
 export type ScheduleWizardValue = {
   scenario: ScheduleScenario;
   pattern: SchedulePattern;
@@ -68,24 +80,19 @@ function defaultRule(date: string, name: string): HolidayRule {
 function HeadcountField({ value, max, label, onChange }: { value: number; max: number; label: string; onChange: (next: number) => void }) {
   const cap = Math.max(0, max);
   const current = Math.min(cap, Math.max(0, value));
-  const set = (raw: number) => onChange(Math.min(cap, Math.max(0, Math.floor(raw) || 0)));
-  const stepClass = "absolute top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-[5px] bg-acc text-white hover:bg-acc-2 disabled:cursor-not-allowed disabled:opacity-40";
   return (
-    <div className="relative h-9 w-[6.75rem] shrink-0">
-      <Input
-        inputMode="numeric"
-        disabled={cap === 0}
-        value={current}
+    <div className="w-16 shrink-0">
+      <Select
         aria-label={label}
-        onChange={(event) => set(Number(event.target.value.replace(/\D/g, "")))}
-        className="h-9! w-full px-6 text-center"
-      />
-      <button type="button" className={cn(stepClass, "left-1")} disabled={cap === 0 || current <= 0} aria-label={`Diminuir ${label}`} onClick={() => set(current - 1)}>
-        <Icon d={icons.minus} size={12} />
-      </button>
-      <button type="button" className={cn(stepClass, "right-1")} disabled={cap === 0 || current >= cap} aria-label={`Aumentar ${label}`} onClick={() => set(current + 1)}>
-        <Icon d={icons.plus} size={12} />
-      </button>
+        className="h-9! px-2!"
+        value={current}
+        disabled={cap === 0}
+        onChange={(event) => onChange(Number(event.target.value))}
+      >
+        {Array.from({ length: cap + 1 }, (_, count) => (
+          <option key={count} value={count}>{count}</option>
+        ))}
+      </Select>
     </div>
   );
 }
@@ -102,6 +109,17 @@ function teamTotal(dayNeeds: DayNeed[], groupNeeds: GroupNeed[], headcount: numb
     const min = Math.max(0, raw);
     return { ...day, min: headcount > 0 ? Math.min(headcount, min) : min };
   });
+}
+
+/** Dia fechado em Configurações > Funcionamento não pede quantidade. */
+function withStoreDays(days: DayNeed[], closedDays: number[]): DayNeed[] {
+  const closed = new Set(closedDays);
+  return days.map((day) => ({ ...day, open: !closed.has(day.dow) }));
+}
+
+function holidayDateLabel(iso: string): string {
+  const [year, month, day] = iso.split("-");
+  return `${day}/${month}/${year} · ${DOW_LABELS[isoToDate(iso).getDay() as Dow]}`;
 }
 
 function scaleMonthLabel(iso: string): string {
@@ -226,46 +244,60 @@ function periodDays(from: string, to: string): number {
   return Math.round((end - start) / 86_400_000) + 1;
 }
 
+function branchValue(branch: WizardBranch, keep?: Pick<ScheduleWizardValue, "scenario" | "pattern" | "periodStart" | "periodEnd">): ScheduleWizardValue {
+  const periodStart = startOfMonth(keep?.periodStart ?? branch.initial.periodStart);
+  const periodEnd = endOfMonth(periodStart);
+  const own = branch.initial.holidayRules.filter((rule) => rule.date >= periodStart && rule.date <= periodEnd);
+  const holidayRules = own.length > 0 ? own : branch.holidays.filter((row) => row.date >= periodStart && row.date <= periodEnd).map((row) => defaultRule(row.date, row.name));
+  const headcount = branch.people.filter((person) => branch.initial.selectedIds.includes(person.id)).length;
+  const scenario = keep?.scenario ?? branch.initial.scenario;
+  const pattern = keep && patternFits(scenario, keep.pattern) ? keep.pattern : branch.initial.pattern;
+  return {
+    ...branch.initial,
+    scenario,
+    pattern,
+    periodStart,
+    periodEnd,
+    dayNeeds: withStoreDays(teamTotal(branch.initial.dayNeeds, branch.initial.groupNeeds, headcount), branch.closedDays),
+    groupNeeds: [],
+    holidayRules,
+    replaceManual: false,
+  };
+}
+
+function hiddenHolidays(branch: WizardBranch, value: ScheduleWizardValue): string[] {
+  const kept = new Set(value.holidayRules.map((rule) => rule.date));
+  return branch.holidays.filter((row) => row.date >= value.periodStart && row.date <= value.periodEnd && !kept.has(row.date)).map((row) => row.date);
+}
+
 export function ScheduleWizard({
   open,
   onClose,
-  people,
-  hasSchedule,
-  nationalHolidays,
-  initial,
+  stores,
+  storeId,
   saving,
   onSubmit,
 }: {
   open: boolean;
   onClose: () => void;
-  people: WizardPerson[];
-  hasSchedule: boolean;
-  nationalHolidays: { date: string; name: string }[];
-  initial: ScheduleWizardValue;
+  stores: WizardBranch[];
+  storeId: string;
   saving: boolean;
-  onSubmit: (value: ScheduleWizardValue) => void;
+  onSubmit: (storeId: string, value: ScheduleWizardValue) => Promise<string | void>;
 }) {
+  const opening = (stores.find((item) => item.id === storeId) ?? stores[0]) as WizardBranch;
+  const [branchId, setBranchId] = useState(opening.id);
+  const branch = stores.find((item) => item.id === branchId) ?? opening;
+  const people = branch.people;
+  const hasSchedule = branch.hasSchedule;
+  const nationalHolidays = branch.holidays;
   const [step, setStep] = useState(1);
-  const [dismissed, setDismissed] = useState<string[]>(() => {
-    if (initial.holidayRules.length === 0) return [];
-    const kept = new Set(initial.holidayRules.map((rule) => rule.date));
-    return nationalHolidays.filter((row) => row.date >= initial.periodStart && row.date <= initial.periodEnd && !kept.has(row.date)).map((row) => row.date);
-  });
-  const [value, setValue] = useState(() => {
-    const periodStart = startOfMonth(initial.periodStart);
-    const periodEnd = endOfMonth(periodStart);
-    return {
-      ...initial,
-      periodStart,
-      periodEnd,
-      dayNeeds: teamTotal(initial.dayNeeds, initial.groupNeeds, people.filter((person) => initial.selectedIds.includes(person.id)).length),
-      groupNeeds: [],
-      holidayRules: initial.holidayRules.length > 0 ? initial.holidayRules.filter((rule) => rule.date >= periodStart && rule.date <= periodEnd) : nationalHolidays.filter((row) => row.date >= periodStart && row.date <= periodEnd).map((row) => defaultRule(row.date, row.name)),
-    };
-  });
+  const [value, setValue] = useState(() => branchValue(opening));
+  const [dismissed, setDismissed] = useState<string[]>(() => hiddenHolidays(opening, branchValue(opening)));
   const [extraDate, setExtraDate] = useState("");
   const [extraName, setExtraName] = useState("");
   const [addingHoliday, setAddingHoliday] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const days = periodDays(value.periodStart, value.periodEnd);
   const periodOk = value.periodEnd >= value.periodStart && days > 0 && days <= 93;
   const types = TYPES.filter((item) => patternFits(value.scenario, item.id));
@@ -276,7 +308,7 @@ export function ScheduleWizard({
     return {
       ...source,
       groupNeeds: [],
-      dayNeeds: source.dayNeeds.map((day) => ({ ...day, min: Math.min(headcount, Math.max(0, day.min)) })),
+      dayNeeds: withStoreDays(source.dayNeeds.map((day) => ({ ...day, min: Math.min(headcount, Math.max(0, day.min)) })), branch.closedDays),
       holidayRules: source.holidayRules.map((rule) => ({ ...rule, workers: Math.min(headcount, Math.max(0, rule.workers)) })),
     };
   }
@@ -286,6 +318,15 @@ export function ScheduleWizard({
       ...current,
       groupNeeds: [],
       dayNeeds: current.dayNeeds.map((item) => (item.dow === dow ? { ...item, min: Math.min(headcount, Math.max(0, min)) } : item)),
+    }));
+  }
+
+  function copyMin(from: number) {
+    const source = value.dayNeeds.find((day) => day.dow === from);
+    if (!source?.open) return;
+    setValue((current) => ({
+      ...current,
+      dayNeeds: current.dayNeeds.map((item) => (item.open ? { ...item, min: source.min } : item)),
     }));
   }
 
@@ -327,6 +368,19 @@ export function ScheduleWizard({
     setAddingHoliday(false);
   }
 
+  function chooseStore(id: string) {
+    const next = stores.find((item) => item.id === id);
+    if (!next || id === branchId) return;
+    const seeded = branchValue(next, value);
+    setBranchId(id);
+    setValue(seeded);
+    setDismissed(hiddenHolidays(next, seeded));
+    setExtraDate("");
+    setExtraName("");
+    setAddingHoliday(false);
+    setSaveError(null);
+  }
+
   function patchRule(date: string, patch: Partial<HolidayRule>) {
     setValue((current) => ({
       ...current,
@@ -342,15 +396,32 @@ export function ScheduleWizard({
       size="lg"
       bodyClassName="overflow-x-hidden overflow-y-auto p-5"
       footer={
-        <WizardNav
-          hidePrevious={step === 1}
-          previousDisabled={saving}
-          nextDisabled={saving || (step === 1 && !periodOk) || (step === 2 && value.selectedIds.length === 0)}
-          nextLabel={step === 4 ? (saving ? (hasSchedule ? "Salvando…" : "Criando…") : hasSchedule ? "Salvar" : "Criar escala") : "Continuar"}
-          hideNextIcon={step === 4}
-          onPrevious={() => setStep((current) => current - 1)}
-          onNext={() => (step === 4 ? onSubmit(forSubmit(value)) : setStep((current) => current + 1))}
-        />
+        <div className="flex w-full min-w-0 flex-col gap-3">
+          {saveError ? <Alert variant="danger" title={saveError} /> : null}
+          <WizardNav
+            align="end"
+            hidePrevious={step === 1}
+            previousDisabled={saving}
+            nextDisabled={saving || (step === 1 && !periodOk) || (step === 2 && value.selectedIds.length === 0)}
+            nextLabel={step === 4 ? (saving ? (hasSchedule ? "Salvando…" : "Criando…") : hasSchedule ? "Salvar alterações" : "Criar escala") : "Continuar"}
+            hidePreviousIcon
+            hideNextIcon
+            onPrevious={() => {
+              setSaveError(null);
+              setStep((current) => current - 1);
+            }}
+            onNext={() => {
+              if (step < 4) {
+                setSaveError(null);
+                setStep((current) => current + 1);
+                return;
+              }
+              void onSubmit(branchId, forSubmit(value)).then((message) => {
+                if (message) setSaveError(message);
+              });
+            }}
+          />
+        </div>
       }
     >
       <WizardSteps steps={STEPS} current={step} />
@@ -360,13 +431,13 @@ export function ScheduleWizard({
           <div className="flex flex-col gap-4">
           <FormField label="Cenário" required>
             <div className="grid gap-2 sm:grid-cols-2">
-              <button type="button" onClick={() => setScenario("before_6x1")} className={cn("rounded-[var(--radius-vela-md)] border px-3 py-3 text-left", value.scenario === "before_6x1" ? "border-acc bg-acc-soft" : "border-line bg-bg-inset")}>
-                <span className="block text-[14px] font-bold text-t0">Antes do fim da 6×1</span>
-                <span className="mt-1 block text-[12px] text-t2">Inclui 6×1, 5×2, 4×3 e 12×36.</span>
+              <button type="button" onClick={() => setScenario("before_6x1")} className={cn("rounded-[var(--radius-vela-md)] border px-3 py-2 text-left", value.scenario === "before_6x1" ? "border-acc bg-acc-soft" : "border-line bg-bg-inset")}>
+                <span className="block text-[13px] font-semibold text-t0">Antes do fim da 6×1</span>
+                <span className="mt-0.5 block text-[12px] text-t2">Inclui 6×1, 5×2, 4×3 e 12×36.</span>
               </button>
-              <button type="button" onClick={() => setScenario("after_6x1")} className={cn("rounded-[var(--radius-vela-md)] border px-3 py-3 text-left", value.scenario === "after_6x1" ? "border-acc bg-acc-soft" : "border-line bg-bg-inset")}>
-                <span className="block text-[14px] font-bold text-t0">Após o fim da 6×1</span>
-                <span className="mt-1 block text-[12px] text-t2">Duas ou mais folgas por semana.</span>
+              <button type="button" onClick={() => setScenario("after_6x1")} className={cn("rounded-[var(--radius-vela-md)] border px-3 py-2 text-left", value.scenario === "after_6x1" ? "border-acc bg-acc-soft" : "border-line bg-bg-inset")}>
+                <span className="block text-[13px] font-semibold text-t0">Após o fim da 6×1</span>
+                <span className="mt-0.5 block text-[12px] text-t2">Duas ou mais folgas por semana.</span>
               </button>
             </div>
           </FormField>
@@ -387,67 +458,73 @@ export function ScheduleWizard({
       ) : null}
       {step === 2 ? (
         <>
-          <WizardCardHeader title={<>Equipe da escala<span className="text-bad"> *</span></>} subtitle="Selecione as pessoas e defina as regras de folga." />
-          <ul className="space-y-2">
+          <WizardCardHeader title={<>Equipe da escala<span className="text-bad"> *</span></>} subtitle="Escolha a filial e as pessoas que entram nesta escala." />
+          <p className="-mt-2 mb-1 text-[12px] text-t2">Usado apenas para aplicar a regra de folga aos domingos.</p>
+          <FormField label="Filial" required>
+            <Select value={branchId} disabled={stores.length < 2} aria-label="Filial da escala" onChange={(event) => chooseStore(event.target.value)}>
+              {stores.map((item) => (
+                <option key={item.id} value={item.id}>{item.name}</option>
+              ))}
+            </Select>
+          </FormField>
+          <ul className="mt-4 space-y-1.5">
             {people.length === 0 ? <li className="text-[13px] text-t2">Nenhuma pessoa ativa nesta filial.</li> : null}
             {people.map((person) => {
               const selected = value.selectedIds.includes(person.id);
               return (
-              <li key={person.id} className="min-w-0 rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3 py-2">
-                <div className={cn("flex min-w-0 gap-3", selected ? "items-start" : "items-center")}>
-                  <input
-                    type="checkbox"
-                    className={cn("shrink-0", selected && "mt-2")}
-                    checked={selected}
-                    onChange={() =>
-                      setValue((current) => ({
-                        ...current,
-                        selectedIds: current.selectedIds.includes(person.id) ? current.selectedIds.filter((id) => id !== person.id) : [...current.selectedIds, person.id],
-                        sex: { ...current.sex, [person.id]: current.sex[person.id] ?? "woman" },
-                      }))
-                    }
-                  />
-                  <PersonAvatar name={person.name} employeeId={person.code} storeId={person.storeId} size="sm" />
-                  <div className="min-w-0 flex-1">
-                    <span className="block truncate text-[13.5px] font-semibold text-t0">{person.name}</span>
-                    <span className="block truncate text-[12px] text-t2">{person.groupName || person.role}</span>
-                    {selected ? (
-                      <div className="mt-2.5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <label className="min-w-0 text-[12px] font-bold text-t0">
-                          Dia de folga<span className="text-bad"> *</span>
-                          <Select
-                            className="mt-1 h-9! w-full px-2!"
-                            aria-label={`Dia de folga de ${person.name}`}
-                            value={value.fixedOff[person.id] ?? ""}
-                            onChange={(event) =>
-                              setValue((current) => ({
-                                ...current,
-                                fixedOff: event.target.value ? { ...current.fixedOff, [person.id]: Number(event.target.value) } : Object.fromEntries(Object.entries(current.fixedOff).filter(([id]) => id !== person.id)),
-                              }))
-                            }
-                          >
-                            <option value="">Automático</option>
-                            {WEEKDAYS.map((label, index) => (
-                              <option key={label} value={index + 1}>{label}</option>
-                            ))}
-                          </Select>
-                        </label>
-                        <label className="min-w-0 text-[12px] font-bold text-t0" title="Usado apenas para aplicar a regra de folga aos domingos.">
-                          Sexo<span className="text-bad"> *</span>
-                          <Select className="mt-1 h-9! w-full px-2!" aria-label={`Sexo de ${person.name}`} value={value.sex[person.id] ?? "woman"} onChange={(event) => setValue((current) => ({ ...current, sex: { ...current.sex, [person.id]: event.target.value as Sex } }))}>
-                            <option value="woman">Mulher</option>
-                            <option value="man">Homem</option>
-                          </Select>
-                        </label>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
+              <li key={person.id} className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3 py-1.5">
+                <input
+                  type="checkbox"
+                  className="shrink-0"
+                  checked={selected}
+                  onChange={() =>
+                    setValue((current) => ({
+                      ...current,
+                      selectedIds: current.selectedIds.includes(person.id) ? current.selectedIds.filter((id) => id !== person.id) : [...current.selectedIds, person.id],
+                      sex: { ...current.sex, [person.id]: current.sex[person.id] ?? "woman" },
+                    }))
+                  }
+                />
+                <PersonAvatar name={person.name} employeeId={person.code} storeId={person.storeId} size="sm" />
+                <span className="min-w-[8rem] flex-1">
+                  <span className="block truncate text-[13px] font-semibold text-t0">{person.name}</span>
+                  <span className="block truncate text-[11px] text-t2">{[person.role, person.groupName].filter(Boolean).join(" · ")}</span>
+                </span>
+                {selected ? (
+                  <span className="flex min-w-0 flex-wrap items-end gap-2">
+                    <label className="w-[9.5rem] text-[11px] font-bold text-t0">
+                      Dia de folga<span className="text-bad"> *</span>
+                      <Select
+                        className="mt-1 h-8! px-2!"
+                        aria-label={`Dia de folga de ${person.name}`}
+                        value={value.fixedOff[person.id] ?? ""}
+                        onChange={(event) =>
+                          setValue((current) => ({
+                            ...current,
+                            fixedOff: event.target.value ? { ...current.fixedOff, [person.id]: Number(event.target.value) } : Object.fromEntries(Object.entries(current.fixedOff).filter(([id]) => id !== person.id)),
+                          }))
+                        }
+                      >
+                        <option value="">Automático</option>
+                        {WEEKDAYS.map((label, index) => (
+                          <option key={label} value={index + 1}>{label}</option>
+                        ))}
+                      </Select>
+                    </label>
+                    <label className="w-[7.5rem] text-[11px] font-bold text-t0">
+                      Sexo<span className="text-bad"> *</span>
+                      <Select className="mt-1 h-8! px-2!" aria-label={`Sexo de ${person.name}`} value={value.sex[person.id] ?? "woman"} onChange={(event) => setValue((current) => ({ ...current, sex: { ...current.sex, [person.id]: event.target.value as Sex } }))}>
+                        <option value="woman">Mulher</option>
+                        <option value="man">Homem</option>
+                      </Select>
+                    </label>
+                  </span>
+                ) : null}
               </li>
               );
             })}
           </ul>
-          <p className="mt-3 text-[12px] text-t2">No automático, a folga muda ao longo do período. Quem precisa do mesmo dia toda semana escolhe o dia.</p>
+          <p className="mt-3 text-[12px] text-t2">No automático, a folga é definida pela escala. Para fixar um dia da semana, escolha-o aqui.</p>
           <div className="mt-4">
           <Accordion
             items={[
@@ -472,7 +549,7 @@ export function ScheduleWizard({
                         </Select>
                       </FormField>
                     </div>
-                    <p className="mt-2 text-[12px] text-t2">Com o domingo desmarcado, todo mundo folga.</p>
+                    <p className="mt-2 text-[12px] text-t2">Se o domingo estiver fechado na filial, todas as pessoas folgam nesse dia.</p>
                   </>
                 ),
               },
@@ -483,41 +560,38 @@ export function ScheduleWizard({
       ) : null}
       {step === 3 ? (
         <>
-          <WizardCardHeader title="Dias de funcionamento" subtitle="Informe o menor número de pessoas que precisa estar trabalhando em cada dia. Ex.: se pode funcionar com 2, coloque 2." />
-          <ul className="space-y-2">
-            {value.dayNeeds.map((day) => (
-              <li key={day.dow} className="min-w-0 rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3 py-2.5">
-                <div className="flex min-w-0 items-start gap-2">
-                  <input
-                    id={`day-open-${day.dow}`}
-                    type="checkbox"
-                    className="mt-0.5 shrink-0"
-                    checked={day.open}
-                    onChange={(event) =>
-                      setValue((current) => ({
-                        ...current,
-                        dayNeeds: current.dayNeeds.map((item) => (item.dow === day.dow ? { ...item, open: event.target.checked } : item)),
-                      }))
-                    }
-                  />
-                  <div className="min-w-0 flex-1">
-                    <label htmlFor={`day-open-${day.dow}`} className="block truncate text-[13.5px] font-semibold text-t0">{weekdayLabel(day.dow)}</label>
+          <WizardCardHeader title="Dias de funcionamento" subtitle="Os dias fechados vêm do horário da filial. Nos dias abertos, informe quantas pessoas precisam trabalhar." />
+          <div>
+            {[...value.dayNeeds].sort((a, b) => a.dow - b.dow).map((day) => {
+              const label = DOW_LABELS[day.dow as Dow];
+              const firstOpen = [...value.dayNeeds].sort((a, b) => a.dow - b.dow).find((item) => item.open)?.dow === day.dow;
+              return (
+                <Fragment key={day.dow}>
+                  <div className="flex items-center justify-between gap-3 border-b border-line py-1.5">
+                    <p className="text-[13px] font-semibold text-t0">{label}</p>
                     {day.open ? (
-                      <div className="mt-2 flex items-center gap-2">
-                        <p className="text-[12.5px] font-semibold text-t2">Pelo menos</p>
-                        <HeadcountField value={day.min} max={headcount} label={`Pelo menos em ${weekdayLabel(day.dow)}`} onChange={(min) => setDayMin(day.dow, min)} />
+                      <div className="flex items-center gap-2">
+                        <span className="text-[12px] font-semibold text-t2">Mínimo de pessoas</span>
+                        <HeadcountField value={day.min} max={headcount} label={`Mínimo de pessoas em ${label}`} onChange={(min) => setDayMin(day.dow, min)} />
                       </div>
-                    ) : null}
+                    ) : (
+                      <p className="text-[13px] text-t2">Fechado</p>
+                    )}
                   </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+                  {firstOpen ? (
+                    <button type="button" onClick={() => copyMin(day.dow)} className="mt-1.5 text-left text-[12.5px] font-semibold text-acc hover:underline">
+                      Copiar quantidade
+                    </button>
+                  ) : null}
+                </Fragment>
+              );
+            })}
+          </div>
         </>
       ) : null}
       {step === 4 ? (
         <>
-          <WizardCardHeader title="Feriados" subtitle="Defina quais feriados a filial abre e como serão compensados." />
+          <WizardCardHeader title="Feriados" subtitle="Defina quais feriados a filial abre e quantas pessoas trabalham." />
           <ul className="space-y-3">
             {value.holidayRules.length === 0 ? <li className="text-[13px] text-t2">Nenhum feriado neste período.</li> : null}
             {value.holidayRules.map((rule) => (
@@ -525,7 +599,7 @@ export function ScheduleWizard({
                 <div className="flex min-w-0 items-start justify-between gap-3">
                   <span className="min-w-0">
                     <span className="block truncate text-[13.5px] font-semibold text-t0">{rule.name}</span>
-                    <span className="text-[12px] text-t2">{rule.date.split("-").reverse().join("/")}</span>
+                    <span className="text-[12px] text-t2">{holidayDateLabel(rule.date)}</span>
                   </span>
                   <button
                     type="button"
@@ -541,15 +615,12 @@ export function ScheduleWizard({
                 </div>
                 <label className="mt-2 flex items-center gap-2 text-[13px] text-t0">
                   <input type="checkbox" className="shrink-0" checked={rule.open} onChange={(event) => patchRule(rule.date, { open: event.target.checked })} />
-                  A empresa abre neste feriado
+                  A filial abre neste feriado
                 </label>
                 {rule.open ? (
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     <FormField label="Pessoas trabalhando" required>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[12.5px] font-semibold text-t2">Pelo menos</span>
-                        <HeadcountField value={rule.workers} max={headcount} label={`Pelo menos em ${rule.name}`} onChange={(workers) => patchRule(rule.date, { workers })} />
-                      </div>
+                      <HeadcountField value={rule.workers} max={headcount} label={`Pessoas trabalhando em ${rule.name}`} onChange={(workers) => patchRule(rule.date, { workers })} />
                     </FormField>
                     <FormField label="Compensação" required>
                       <Select value={rule.pay} aria-label={`Compensação de ${rule.name}`} onChange={(event) => patchRule(rule.date, { pay: event.target.value as HolidayRule["pay"] })}>
@@ -576,7 +647,6 @@ export function ScheduleWizard({
           {addingHoliday ? (
             <section className="mt-4 rounded-[var(--radius-vela-lg)] border border-line bg-bg-2 p-3">
               <p className="text-[12.5px] font-bold text-t0">Feriado municipal</p>
-              <p className="mt-1 text-[12.5px] leading-relaxed text-t2">Adicione um feriado municipal que não apareceu na lista.</p>
               <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
                 <div className="min-w-0 flex-1">
                   <FormField label="Data do feriado" required>
@@ -622,7 +692,7 @@ export function ScheduleWizard({
           {hasSchedule ? (
             <label className="mt-4 flex items-start gap-3 rounded-[var(--radius-vela-md)] border border-line bg-bg-inset px-3 py-3 text-[13px] text-t0">
               <input type="checkbox" className="mt-0.5 shrink-0" checked={value.replaceManual} onChange={(event) => setValue((current) => ({ ...current, replaceManual: event.target.checked }))} />
-              <span>Substituir também os dias ajustados na mão dentro deste período. Fora dele, a escala permanece.</span>
+              <span>Substituir também os dias ajustados neste período. Fora dele, a escala permanece.</span>
             </label>
           ) : null}
         </>

@@ -14,6 +14,8 @@ import {
   GOAL_STATUS_LABEL,
   goalManagerPrize,
   goalSpreadsUnidentified,
+  goalLevelAmount,
+  goalLevelPct,
   goalStatus,
   outsideRankingNote,
   prazoRemaining,
@@ -237,12 +239,15 @@ function GoalHero({
   today: string;
 }) {
   const { achieved, pct, projectedPct, projectionAmount } = card.band;
+  const levels = goal.tiers.map((tier) => tier.minAttainmentPct);
+  const storeGoal = goalLevelAmount(goal.target, levels);
+  const levelPct = goalLevelPct(pct, levels);
   const prizeAmount =
     card.sellers.reduce((s, v) => s + (v.manager ? 0 : v.accruedPrize + v.bonusReached), 0) +
     (management ? management.prizeAmount + management.bonus : 0);
-  const missing = Math.max(0, goal.target - achieved);
+  const missing = Math.max(0, storeGoal - achieved);
   const stats: { label: string; value: string; cls: string; sub?: string; subCls?: string; help?: string; note?: string }[] = [
-    { label: "Meta da filial", value: brlCent(goal.target), cls: "text-t0" },
+    { label: "Meta da filial", value: brlCent(storeGoal), cls: "text-t0" },
     {
       label: "Realizado",
       value: brlCent(achieved),
@@ -314,7 +319,7 @@ function GoalHero({
         <div className="mb-2 flex items-baseline justify-between gap-2">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-t2">Progresso da meta</p>
           {status !== "upcoming" ? (
-            <p className={`font-mono text-[13px] font-extrabold ${progressTextClass(pct)}`}>{num(pct, 1)}%</p>
+            <p className={`font-mono text-[13px] font-extrabold ${progressTextClass(levelPct)}`}>{num(levelPct, 1)}%</p>
           ) : null}
         </div>
         <GlobalGoalBand goal={card.band} tiers={card.tiers} todayIso={today} embedded soBarra hideOutsideNote primaryPrize />
@@ -426,8 +431,8 @@ type PayoutRow = {
 };
 
 /** Meta encerrada: quanto cada pessoa e a gerencia ganharam (premiacao do nivel + bonus somados). */
-const NAME_PIN = "sticky left-0 z-10 min-w-0";
-const NAME_CLIP = "min-w-0 max-w-[9.5rem] sm:max-w-[12.5rem] lg:max-w-[14rem] xl:max-w-none";
+const NAME_PIN = "sticky left-0 z-10 w-px max-w-[9.5rem] sm:max-w-[12.5rem] lg:max-w-[14rem] xl:w-auto xl:max-w-none";
+const NAME_CLIP = "w-[9.5rem] max-w-[9.5rem] overflow-hidden sm:w-[12.5rem] sm:max-w-[12.5rem] lg:w-[14rem] lg:max-w-[14rem] xl:w-auto xl:max-w-none";
 const PIN_TABLE =
   "w-full border-separate border-spacing-0 text-[12.5px] [&_tbody_td]:border-b [&_tbody_td]:border-line [&_th]:border-b [&_th]:border-line";
 

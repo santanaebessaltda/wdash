@@ -131,7 +131,7 @@ export function AcquirersPage() {
       {showSkeleton || (loading && rows.length === 0 && storeRows.length > 0) ? (
         <ConnectionSkeleton label="Carregando adquirentes…" />
       ) : storeRows.length === 0 ? (
-        <Card className="mt-6">
+        <Card className="mt-6 flex min-h-[280px] flex-col">
           <EmptyBlock icon="🏬" title="Nenhuma filial disponível" description="Não há filiais disponíveis para este acesso." />
         </Card>
       ) : rows.length === 0 ? (
