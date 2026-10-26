@@ -30,6 +30,36 @@ export const OVERVIEW_TEAM_TOP = 5;
 /** Top produtos na Visão geral. */
 export const OVERVIEW_PRODUCTS_TOP = 5;
 
+/** Linha do Top produtos usada no rodapé (só o que a tabela está mostrando). */
+export type OverviewProductTotalRow = {
+  amount: number;
+  items?: number;
+  profit?: number | null;
+  revenuePrev?: number;
+};
+
+/**
+ * Total do filtro do Top produtos: itens, faturamento e lucro das linhas exibidas.
+ * A variação pondera só as linhas com período anterior. Linha em "—" fica fora dos
+ * dois lados, senão a venda nova entra no faturamento atual e o rodapé fica positivo
+ * com a listagem negativa.
+ */
+export function overviewDisplayedProductTotal(products: OverviewProductTotalRow[]) {
+  const items = products.reduce((sum, product) => sum + (product.items ?? 0), 0);
+  const revenue = products.reduce((sum, product) => sum + product.amount, 0);
+  const complete = products.length > 0 && products.every((product) => product.profit != null);
+  const compared = products.filter((product) => (product.revenuePrev ?? 0) > 0);
+  const revenueCmp = compared.reduce((sum, product) => sum + product.amount, 0);
+  const revenuePrev = compared.reduce((sum, product) => sum + (product.revenuePrev ?? 0), 0);
+  return {
+    count: products.length,
+    items,
+    revenue,
+    profit: complete ? products.reduce((sum, product) => sum + (product.profit ?? 0), 0) : null,
+    variation: revenueCmp > 0 && revenuePrev > 0 ? Math.round(((revenueCmp - revenuePrev) / revenuePrev) * 100) : null,
+  };
+}
+
 export type PeriodType =
   | "today"
   | "yesterday"

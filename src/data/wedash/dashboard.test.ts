@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { buildStoreView, buildOverviewView, buildFinanceView, buildProductsView, buildTeamDashboardView, TEAM_WITHOUT_SHIFT, kpiDelta, monthlyEvolutionMonths, previousPeriod, resolvePeriod, revenueCurve, seriesAxisForPeriod, type ComparisonView, type Period, type Scope, type TrackStatus } from "./dashboard";
+import { buildStoreView, buildOverviewView, buildFinanceView, buildProductsView, buildTeamDashboardView, TEAM_WITHOUT_SHIFT, kpiDelta, monthlyEvolutionMonths, overviewDisplayedProductTotal, previousPeriod, resolvePeriod, revenueCurve, seriesAxisForPeriod, type ComparisonView, type Period, type Scope, type TrackStatus } from "./dashboard";
 import { deltaTip } from "@/lib/format";
 
 describe("tooltip do badge com unidade", () => {
@@ -568,6 +568,26 @@ describe("Overview from sales aggregates (SYNC-06/08)", () => {
     expect(v.topProducts[0]?.name).toBe("CARO 1");
     const byQty = [...v.topProducts].sort((a, b) => (b.items ?? 0) - (a.items ?? 0));
     expect(byQty[0]).toMatchObject({ name: "BARATO", items: 9 });
+  });
+
+  it("total das linhas exibidas: venda sem período anterior não vira variação positiva", () => {
+    const total = overviewDisplayedProductTotal([
+      { amount: 1042.9, items: 11, profit: 522.16, revenuePrev: 0 },
+      { amount: 431.68, items: 4, profit: 236.48, revenuePrev: 863.36 },
+      { amount: 431.68, items: 4, profit: 255.84, revenuePrev: 0 },
+      { amount: 335.2, items: 8, profit: 184.88, revenuePrev: 500.3 },
+      { amount: 275.7, items: 3, profit: 148.94, revenuePrev: 0 },
+    ]);
+    expect(total).toMatchObject({ count: 5, items: 30 });
+    expect(total.revenue).toBeCloseTo(2517.16);
+    expect(total.profit).toBeCloseTo(1348.3);
+    expect(total.variation).toBe(-44);
+  });
+
+  it("total sem nenhuma linha comparável fica sem variação", () => {
+    expect(overviewDisplayedProductTotal([
+      { amount: 100, items: 1, profit: null, revenuePrev: 0 },
+    ])).toMatchObject({ count: 1, items: 1, revenue: 100, profit: null, variation: null });
   });
 
   it("sums revenue and sales_count from day aggs into KPIs", () => {

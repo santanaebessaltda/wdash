@@ -8,7 +8,7 @@ import { AreaLineChart, BarChart, DonutChart } from "@/components/charts";
 import { isOwner } from "@/layout/nav-wedash";
 import { queryStoreIds } from "@/data/wedash/stores";
 import { scopeFilterKey, useScope } from "@/pages/dashboard/useScope";
-import { buildOverviewView, resolvePeriod, previousPeriod, OVERVIEW_PRODUCTS_TOP, OVERVIEW_TEAM_TOP, type OverviewKpi } from "@/data/wedash/dashboard";
+import { buildOverviewView, resolvePeriod, previousPeriod, OVERVIEW_PRODUCTS_TOP, OVERVIEW_TEAM_TOP, overviewDisplayedProductTotal, type OverviewKpi } from "@/data/wedash/dashboard";
 import {
   fetchSalesDayAggs,
   fetchSalesHourAggs,
@@ -468,20 +468,10 @@ export default function OverviewPage() {
     };
   }, [view.topSellers]);
 
-  const productTotal = useMemo(() => {
-    const products = view.topProducts;
-    const items = products.reduce((sum, product) => sum + (product.items ?? 0), 0);
-    const revenue = products.reduce((sum, product) => sum + product.amount, 0);
-    const complete = products.length > 0 && products.every((product) => product.profit != null);
-    const revenuePrev = products.reduce((sum, product) => sum + (product.revenuePrev ?? 0), 0);
-    return {
-      count: products.length,
-      items,
-      revenue,
-      profit: complete ? products.reduce((sum, product) => sum + (product.profit ?? 0), 0) : null,
-      variation: revenue > 0 && revenuePrev > 0 ? Math.round(((revenue - revenuePrev) / revenuePrev) * 100) : null,
-    };
-  }, [view.topProducts]);
+  const productTotal = useMemo(
+    () => overviewDisplayedProductTotal(topProductsOrdenados),
+    [topProductsOrdenados],
+  );
 
   function toggleTeamSort(key: TeamSort) {
     if (teamSort === key) {
