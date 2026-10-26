@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
-import { Alert, Button, DatePicker, FormField, Input, Modal, Select, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
+import { Accordion, Alert, Button, DatePicker, FormField, Input, Modal, Select, WizardCardHeader, WizardNav, WizardSteps } from "@/components/ui";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
 import { Icon, icons } from "@/pages/users/Icons";
 import { cn } from "@/lib/cn";
@@ -464,25 +464,36 @@ export function ScheduleWizard({
             })}
           </ul>
           <p className="mt-3 text-[12px] text-t2">No automático, a folga muda ao longo do período. Quem precisa do mesmo dia toda semana escolhe o dia.</p>
-          <div className="mt-4 border-t border-line pt-4">
-            <p className="mb-3 text-[13px] font-bold text-t2">Folgas aos domingos</p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <FormField label="Mulheres folgam" required>
-                <Select value={value.womenSunday} onChange={(event) => setValue((current) => ({ ...current, womenSunday: event.target.value as SundayRule }))}>
-                  {SUNDAY_OPTIONS.filter((option) => option.id !== "every_3").map((option) => (
-                    <option key={option.id} value={option.id}>{option.label}</option>
-                  ))}
-                </Select>
-              </FormField>
-              <FormField label="Homens folgam" required>
-                <Select value={value.menSunday} onChange={(event) => setValue((current) => ({ ...current, menSunday: event.target.value as SundayRule }))}>
-                  {SUNDAY_OPTIONS.filter((option) => option.id !== "none").map((option) => (
-                    <option key={option.id} value={option.id}>{option.label}</option>
-                  ))}
-                </Select>
-              </FormField>
-            </div>
-            <p className="mt-2 text-[12px] text-t2">Com o domingo desmarcado, todo mundo folga.</p>
+          <div className="mt-4">
+          <Accordion
+            items={[
+              {
+                key: "sunday",
+                title: "Folgas aos domingos",
+                content: (
+                  <>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <FormField label="Mulheres folgam" required>
+                        <Select value={value.womenSunday} onChange={(event) => setValue((current) => ({ ...current, womenSunday: event.target.value as SundayRule }))}>
+                          {SUNDAY_OPTIONS.filter((option) => option.id !== "every_3").map((option) => (
+                            <option key={option.id} value={option.id}>{option.label}</option>
+                          ))}
+                        </Select>
+                      </FormField>
+                      <FormField label="Homens folgam" required>
+                        <Select value={value.menSunday} onChange={(event) => setValue((current) => ({ ...current, menSunday: event.target.value as SundayRule }))}>
+                          {SUNDAY_OPTIONS.filter((option) => option.id !== "none").map((option) => (
+                            <option key={option.id} value={option.id}>{option.label}</option>
+                          ))}
+                        </Select>
+                      </FormField>
+                    </div>
+                    <p className="mt-2 text-[12px] text-t2">Com o domingo desmarcado, todo mundo folga.</p>
+                  </>
+                ),
+              },
+            ]}
+          />
           </div>
         </>
       ) : null}
