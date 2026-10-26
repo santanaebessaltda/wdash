@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Alert, Button, Card, EmptyState, FormField, Modal, Select, useToast } from "@/components/ui";
 import { ColorLegend, type LegendItem } from "@/components/wedash/ColorLegend";
 import { PersonAvatar } from "@/components/wedash/PersonAvatar";
-import { DayChip, PlainKpi } from "@/pages/cash-close/CashClosePage";
+import { PlainKpi } from "@/pages/cash-close/CashClosePage";
 import { MonthStep, monthNavBtn } from "@/pages/cash-close/MonthYearPicker";
 import { SectionHeader, useScopedStores } from "@/pages/operation/shared";
 import { Icon, icons } from "@/pages/users/Icons";
@@ -67,6 +67,10 @@ function monthsBetween(from: string, to: string): string[] {
 }
 
 const STICKY = "sticky left-0 z-20 border-r border-line bg-bg-2";
+/** Cabeçalho e card do Calendar (src/pages/apps/Calendar.tsx). A grade só acrescenta a coluna, a sequência dos dias e o rodapé. */
+const CALENDAR_HEADER = "border-b border-line px-2 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-t2";
+const CALENDAR_CELL = "relative min-h-[84px] border-b border-r border-line p-1.5 text-left sm:min-h-[110px] sm:p-2";
+const CALENDAR_CHIP = "truncate rounded-md px-1.5 py-1 text-[10px] font-semibold text-white sm:text-[11px]";
 
 export function SchedulePage() {
   const { show } = useToast();
@@ -481,75 +485,61 @@ function ScheduleGrid({
     return { working, short, floor };
   }
 
+  const columns = `11.5rem repeat(${dates.length}, calc(100cqw / 7))`;
   return (
-    <div className="overflow-x-auto rounded-[18px] border border-line bg-bg-2 shadow-[var(--shadow-vela)]">
-      <table className="w-max min-w-full border-separate border-spacing-0 text-left">
-        <thead>
-          <tr>
-            <th className={cn(STICKY, "z-30 min-w-[190px] border-b px-3 py-3 text-[11px] font-bold text-t2")}>Funcionário</th>
+    <div className="@container overflow-x-auto rounded-[18px] border border-line bg-bg-2 shadow-[var(--shadow-vela)]">
+      <div className="grid w-max" style={{ gridTemplateColumns: columns }}>
+        <div className={cn(STICKY, CALENDAR_HEADER, "z-30 text-left")}>Funcionário</div>
+        {dates.map((iso) => {
+          const holiday = holidayLabel(holidays, iso);
+          return (
+            <div key={iso} className={CALENDAR_HEADER}>
+              <span className="hidden sm:inline">{WEEKDAY[weekday(iso)]}</span>
+              <span className="sm:hidden">{WEEKDAY[weekday(iso)].slice(0, 1)}</span>
+              {holiday ? <span className="mt-1 block truncate text-[11px] font-bold normal-case tracking-normal text-warn">{holiday}</span> : null}
+            </div>
+          );
+        })}
+        {roster.map((person) => (
+          <div key={person.id} className="contents">
+            <div className={cn(STICKY, "border-b border-line p-1.5 sm:p-2")}>
+              <span className="block truncate text-[13px] font-semibold text-t0">{person.name}</span>
+              {person.detail ? <span className="mt-0.5 block truncate text-[11px] text-t2">{person.detail}</span> : null}
+            </div>
             {dates.map((iso, index) => {
+              const row = (byDay.get(iso) ?? []).find((item) => item.sellerId === person.id);
               const holiday = holidayLabel(holidays, iso);
-              const dow = weekday(iso);
-              const last = index === dates.length - 1;
+              const doublePay = schedule.holidayRules.some((rule) => rule.date === iso && rule.pay === "double");
+              const chip = row ? statusChip(row.status, doublePay) : null;
+              const day = Number(iso.slice(8));
               return (
-                <th key={iso} className={cn("min-w-[108px] border-b border-line px-1 py-3 text-center align-bottom", !last && "border-r")}>
-                  <button type="button" className="flex w-full flex-col items-center" aria-label={`Ajustar ${Number(iso.slice(8))} de ${MONTHS[isoToDate(iso).getMonth()].toLowerCase()}`} onClick={() => onOpenDay(iso)}>
-                    <span className={cn("flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-bold", iso === today ? "bg-acc text-white" : "text-t1")}>{Number(iso.slice(8))}</span>
-                    <span className="mt-1 whitespace-nowrap text-[10px] font-bold leading-tight text-t2 sm:text-[11px]">{WEEKDAY[dow]}</span>
-                    {holiday ? <span className="mt-1 line-clamp-2 text-[10px] font-semibold leading-tight text-warn">{holiday}</span> : null}
-                  </button>
-                </th>
+                <div key={iso} className={cn(CALENDAR_CELL, index === dates.length - 1 && "border-r-0")}>
+                  <button type="button" className="absolute inset-0 z-0" aria-label={`${person.name}, ${day}: ${chip?.label ?? "sem escala"}${holiday ? `, ${holiday}` : ""}`} onClick={() => onOpenDay(iso)} />
+                  <div className="pointer-events-none relative z-10">
+                    <span className={cn("inline-flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-bold", iso === today ? "bg-acc text-white" : "text-t1")}>{day}</span>
+                    {chip ? (
+                      <div className="mt-1.5 flex flex-col gap-1">
+                        <div className={cn(CALENDAR_CHIP, chip.color)}>{chip.label}</div>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
               );
             })}
-          </tr>
-        </thead>
-        <tbody>
-          {roster.map((person) => (
-            <tr key={person.id}>
-              <th className={cn(STICKY, "min-w-[190px] border-b px-3 py-2 text-left align-top font-normal")}>
-                <span className="block truncate text-[13px] font-semibold text-t0">{person.name}</span>
-                {person.detail ? <span className="block truncate text-[11px] text-t2">{person.detail}</span> : null}
-              </th>
-              {dates.map((iso, index) => {
-                const row = (byDay.get(iso) ?? []).find((item) => item.sellerId === person.id);
-                const holiday = holidayLabel(holidays, iso);
-                const doublePay = schedule.holidayRules.some((rule) => rule.date === iso && rule.pay === "double");
-                const last = index === dates.length - 1;
-                const chip = row ? statusChip(row.status, doublePay) : null;
-                return (
-                  <td key={iso} className={cn("relative border-b border-line align-top", !last && "border-r")}>
-                    <div className="relative flex min-h-[84px] flex-col p-1.5 sm:min-h-[110px] sm:p-2">
-                      {chip ? (
-                        <>
-                          <button type="button" className="absolute inset-0 z-0" aria-label={`${person.name}, ${Number(iso.slice(8))}: ${chip.label}${holiday ? `, ${holiday}` : ""}`} onClick={() => onOpenDay(iso)} />
-                          <div className="pointer-events-none relative z-10">
-                            <DayChip color={chip.color}>{chip.label}</DayChip>
-                          </div>
-                        </>
-                      ) : null}
-                    </div>
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-        <tfoot>
-          <tr>
-            <th className={cn(STICKY, "px-3 py-2 text-left text-[12px] font-bold text-t0")}>Pessoas presentes</th>
-            {dates.map((iso, index) => {
-              const { working, short, floor } = presence(iso);
-              const text = floor.closed ? "Fechado" : floor.min > 0 ? `${working} · mín. ${floor.min}${floor.perGroup ? "/grupo" : ""}` : String(working);
-              const title = floor.closed ? "A loja fecha neste dia" : floor.perGroup ? "Mínimo em cada grupo" : "Mínimo do dia";
-              return (
-                <td key={iso} title={title} className={cn("border-line px-1.5 py-2 text-center text-[11px] font-bold tabular-nums", index < dates.length - 1 && "border-r", floor.closed ? "text-t2" : short ? "text-bad" : "text-ok")}>
-                  {text}
-                </td>
-              );
-            })}
-          </tr>
-        </tfoot>
-      </table>
+          </div>
+        ))}
+        <div className={cn(STICKY, "border-line px-2 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-t2")}>Pessoas presentes</div>
+        {dates.map((iso, index) => {
+          const { working, short, floor } = presence(iso);
+          const text = floor.closed ? "Fechado" : floor.min > 0 ? `${working} · mín. ${floor.min}${floor.perGroup ? "/grupo" : ""}` : String(working);
+          const title = floor.closed ? "A loja fecha neste dia" : floor.perGroup ? "Mínimo em cada grupo" : "Mínimo do dia";
+          return (
+            <div key={iso} title={title} className={cn("border-line px-2 py-3 text-center text-[11px] font-bold tabular-nums", index < dates.length - 1 && "border-r", floor.closed ? "text-t2" : short ? "text-bad" : "text-ok")}>
+              {text}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
